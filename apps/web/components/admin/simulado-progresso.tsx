@@ -3,12 +3,33 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Loader2, Search, ArrowUpDown, Users, RefreshCw } from 'lucide-react'
+import { Loader2, Search, ArrowUpDown, Users, RefreshCw, Radio, PauseCircle, CheckCircle2, Circle } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { progressoEstudantesSimulado, type ProgressoEstudante } from '@/app/admin/simulados/actions'
+import { progressoEstudantesSimulado, type ProgressoEstudante, type SituacaoAoVivo } from '@/app/admin/simulados/actions'
 
 type Campo = 'nome' | 'email' | 'respondidas' | 'acertos' | 'erros' | 'emBranco' | 'media'
+type FiltroSit = 'todos' | SituacaoAoVivo
 const POR_PAGINA = 11
+
+// Rótulo/estilo de cada situação ao vivo (badge da tabela + chips do filtro).
+const SIT_META: Record<SituacaoAoVivo, { label: string; icon: any; badge: string; chip: string; dot: string }> = {
+  fazendo:    { label: 'Fazendo agora', icon: Radio,        badge: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400', chip: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300', dot: 'bg-emerald-500' },
+  pausado:    { label: 'Pausado',       icon: PauseCircle,  badge: 'bg-amber-500/10 text-amber-600 dark:text-amber-400',       chip: 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300',       dot: 'bg-amber-500' },
+  finalizou:  { label: 'Finalizou',     icon: CheckCircle2, badge: 'bg-sky-500/10 text-sky-600 dark:text-sky-400',             chip: 'border-sky-500/40 bg-sky-500/10 text-sky-700 dark:text-sky-300',                 dot: 'bg-sky-500' },
+  nao_iniciou:{ label: 'Não iniciou',   icon: Circle,       badge: 'bg-muted text-muted-foreground',                          chip: 'border-border bg-muted text-muted-foreground',                                   dot: 'bg-muted-foreground/40' },
+}
+
+/** Tempo relativo curto ("agora", "há 3 min", "há 2h", "há 5d") para a última atividade. */
+function haQuanto(ms: number | null): string {
+  if (!ms) return ''
+  const d = Date.now() - ms
+  const min = Math.floor(d / 60_000)
+  if (min < 1) return 'agora'
+  if (min < 60) return `há ${min} min`
+  const h = Math.floor(min / 60)
+  if (h < 24) return `há ${h}h`
+  return `há ${Math.floor(h / 24)}d`
+}
 
 export function SimuladoProgresso({ simuladoId }: { simuladoId: string }) {
   const [carregando, setCarregando] = useState(true)
@@ -17,6 +38,7 @@ export function SimuladoProgresso({ simuladoId }: { simuladoId: string }) {
   const [total, setTotal] = useState(0)
 
   const [busca, setBusca] = useState('')
+  const [filtroSit, setFiltroSit] = useState<FiltroSit>('todos')
   const [campo, setCampo] = useState<Campo>('nome')
   const [dir, setDir] = useState<'asc' | 'desc'>('asc')
   const [pagina, setPagina] = useState(1)
@@ -37,9 +59,16 @@ export function SimuladoProgresso({ simuladoId }: { simuladoId: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [simuladoId])
 
+  // Contagem por situação (para os chips do filtro).
+  const contagem = useMemo(() => {
+    const c = { todos: dados.length, fazendo: 0, pausado: 0, finalizou: 0, nao_iniciou: 0 } as Record<FiltroSit, number>
+    for (const e of dados) c[e.situacao]++
+    return c
+  }, [dados])
+
   const filtrados = useMemo(() => {
     const q = busca.toLowerCase().trim()
-    let lista = dados.filter((e) => !q || `${e.nome} ${e.email ?? ''}`.toLowerCase().includes(q))
+    let lista = dados.filter((e) => (!q || `${e.nome} ${e.email ?? ''}`.toLowerCase().includes(q)) && (filtroSit === 'todos' || e.situacao === filtroSit))
     lista = [...lista].sort((a, b) => {
       let c = 0
       if (campo === 'nome') c = a.nome.localeCompare(b.nome, 'pt-BR')
@@ -50,7 +79,7 @@ export function SimuladoProgresso({ simuladoId }: { simuladoId: string }) {
     return lista
   }, [dados, busca, campo, dir])
 
-  useEffect(() => { setPagina(1) }, [busca, campo, dir])
+  useEffect(() => { setPagina(1) }, [busca, campo, dir, filtroSit])
 
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA))
   const paginaAtual = Math.min(pagina, totalPaginas)
@@ -91,27 +120,52 @@ export function SimuladoProgresso({ simuladoId }: { simuladoId: string }) {
         </button>
       </div>
 
+      {/* Filtro por situação ao vivo — clique em "Fazendo agora" p/ ver só quem está mexendo. */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {([
+          { key: 'todos', label: 'Todos' },
+          { key: 'fazendo', label: 'Fazendo agora' },
+          { key: 'pausado', label: 'Pausados' },
+          { key: 'finalizou', label: 'Finalizaram' },
+          { key: 'nao_iniciou', label: 'Não iniciaram' },
+        ] as { key: FiltroSit; label: string }[]).map((c) => {
+          const ativo = filtroSit === c.key
+          const meta = c.key !== 'todos' ? SIT_META[c.key as SituacaoAoVivo] : null
+          return (
+            <button key={c.key} type="button" onClick={() => setFiltroSit(c.key)}
+              className={cn('inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors',
+                ativo ? (meta ? meta.chip : 'border-primary bg-primary/10 text-primary') : 'border-border text-muted-foreground hover:bg-muted')}>
+              {meta && <span className={cn('h-1.5 w-1.5 rounded-full', meta.dot)} />}
+              {c.label}
+              <span className="tabular-nums opacity-70">{contagem[c.key]}</span>
+            </button>
+          )
+        })}
+      </div>
+
       <p className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-        <Users className="h-3.5 w-3.5" /> {filtrados.length} de {dados.length} estudante(s) · {total} questão(ões) no simulado
+        <Users className="h-3.5 w-3.5" /> {filtrados.length} de {dados.length} estudante(s) · {total} questão(ões) no simulado · <span className="font-medium text-emerald-600 dark:text-emerald-400">{contagem.fazendo} fazendo agora</span>
         <span className="ml-1 inline-flex items-center gap-1">· <span className="relative flex h-1.5 w-1.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" /><span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" /></span> ao vivo (15s){atualizadoEm && ` · ${atualizadoEm}`}</span>
       </p>
 
       <div className="overflow-hidden rounded-lg border">
         <Table className="w-full table-fixed">
           <colgroup>
-            <col className="w-[19%]" />
-            <col className="w-[21%]" />
-            <col className="w-[17%]" />
+            <col className="w-[15%]" />
+            <col className="w-[15%]" />
+            <col className="w-[15%]" />
+            <col className="w-[14%]" />
             <col className="w-[10%]" />
             <col className="w-[8%]" />
             <col className="w-[8%]" />
-            <col className="w-[9%]" />
             <col className="w-[8%]" />
+            <col className="w-[7%]" />
           </colgroup>
           <TableHeader>
             <TableRow>
               <Th c="nome">Nome</Th>
               <Th c="email">E-mail</Th>
+              <TableHead>Situação</TableHead>
               <TableHead>Progresso</TableHead>
               <Th c="respondidas" className="text-right">Respondidas</Th>
               <Th c="acertos" className="text-right">Acertos</Th>
@@ -122,13 +176,26 @@ export function SimuladoProgresso({ simuladoId }: { simuladoId: string }) {
           </TableHeader>
           <TableBody>
             {visiveis.length === 0 ? (
-              <TableRow><TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">Nenhum estudante encontrado.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9} className="py-10 text-center text-sm text-muted-foreground">Nenhum estudante encontrado.</TableCell></TableRow>
             ) : visiveis.map((e) => {
               const pct = total ? Math.round((e.respondidas / total) * 100) : 0
+              const sit = SIT_META[e.situacao]
+              const rel = e.situacao === 'fazendo' || e.situacao === 'pausado' ? haQuanto(e.ultimaAtividadeMs) : ''
               return (
-                <TableRow key={e.id}>
+                <TableRow key={e.id} className={cn(e.situacao === 'fazendo' && 'bg-emerald-500/[0.04]')}>
                   <TableCell className="truncate font-medium" title={e.nome}>{e.nome}</TableCell>
                   <TableCell className="truncate text-muted-foreground" title={e.email ?? undefined}>{e.email ?? '—'}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5">
+                      <span className={cn('inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-medium', sit.badge)}>
+                        {e.situacao === 'fazendo'
+                          ? <span className="relative flex h-1.5 w-1.5"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-75" /><span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" /></span>
+                          : <sit.icon className="h-3 w-3" />}
+                        {sit.label}
+                      </span>
+                      {rel && <span className="hidden shrink-0 text-[10px] text-muted-foreground xl:inline" title="Última atividade">{rel}</span>}
+                    </div>
+                  </TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">

@@ -40,7 +40,7 @@ export default async function AoVivoPage({ params }: { params: Promise<{ id: str
             <Card>
               <CardHeader>
                 <CardTitle>Progresso individual</CardTitle>
-                <CardDescription>Por estudante: barra de progresso, respondidas, acertos, erros, em branco e média — com busca e ordenação.</CardDescription>
+                <CardDescription>Por estudante: situação ao vivo (fazendo agora / pausado / finalizou), última atividade, respondidas, acertos, erros, em branco e média — filtre por “Fazendo agora” para o controle em tempo real.</CardDescription>
               </CardHeader>
               <CardContent>
                 <SimuladoProgresso simuladoId={id} />

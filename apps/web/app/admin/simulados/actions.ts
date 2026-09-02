@@ -9,7 +9,7 @@ import { checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { softDelete } from '@/lib/soft-delete'
 import { brtLocalParaIso } from '@/lib/brt'
-import { computarResumoAoVivo, computarOnlinePorSimulado, type ResumoAoVivo } from '@/lib/simulado/ao-vivo'
+import { computarResumoAoVivo, computarOnlinePorSimulado, JANELA_ATIVO_MIN, type ResumoAoVivo } from '@/lib/simulado/ao-vivo'
 import { criarNotificacoesEmMassa } from '@/lib/notificacoes/criar'
 
 // Sentinela p/ escopo de tenant: com tenantId null, o filtro vira um uuid impossível →
@@ -292,6 +292,8 @@ export async function removerPassaportesIndevidos(simuladoId: string): Promise<{
   return { ok: true, removidos: remover.length }
 }
 
+export type SituacaoAoVivo = 'fazendo' | 'pausado' | 'finalizou' | 'nao_iniciou'
+
 export interface ProgressoEstudante {
   id: string
   nome: string
@@ -301,6 +303,8 @@ export interface ProgressoEstudante {
   erros: number
   emBranco: number
   media: number        // aproveitamento 0–100 (acertos / total)
+  situacao: SituacaoAoVivo         // estado ao vivo (fazendo agora / pausado / finalizou / não iniciou)
+  ultimaAtividadeMs: number | null // epoch ms da última atividade (resposta ou início); null se não iniciou
 }
 
 /**
@@ -324,7 +328,7 @@ export async function progressoEstudantesSimulado(simuladoId: string): Promise<{
   const [matriculas, estRows, sessRows] = await Promise.all([
     fetchAll<any>(() => svc.from('simulado_matriculas').select('estudante_id').eq('simulado_id', simuladoId).order('estudante_id')),
     fetchAll<any>(() => svc.from('simulado_estudantes').select('id, nome, email').eq('tenant_id', tid).eq('deletado', false).order('id')),
-    fetchAll<any>(() => svc.from('simulado_sessoes_prova').select('id, estudante_id, iniciado_em').eq('simulado_id', simuladoId).eq('tenant_id', tid).eq('is_teste', false).eq('deletado', false).order('estudante_id')),
+    fetchAll<any>(() => svc.from('simulado_sessoes_prova').select('id, estudante_id, status, iniciado_em, finalizado_em').eq('simulado_id', simuladoId).eq('tenant_id', tid).eq('is_teste', false).eq('deletado', false).order('estudante_id')),
   ])
   const estMap = new Map(estRows.map((e: any) => [e.id, e]))
 
@@ -336,24 +340,36 @@ export async function progressoEstudantesSimulado(simuladoId: string): Promise<{
   }
   const chosenIds = [...sessByEst.values()].map((s: any) => s.id)
   const resp = chosenIds.length
-    ? await fetchAllByIn<any>(chosenIds, (chunk) => svc.from('simulado_respostas_objetivas').select('sessao_id, correta').in('sessao_id', chunk).eq('tenant_id', tid).order('id'))
+    ? await fetchAllByIn<any>(chosenIds, (chunk) => svc.from('simulado_respostas_objetivas').select('sessao_id, correta, respondido_em').in('sessao_id', chunk).eq('tenant_id', tid).order('id'))
     : []
-  const bySess = new Map<string, { resp: number; ok: number }>()
+  const bySess = new Map<string, { resp: number; ok: number; ult: number }>()
   for (const r of resp) {
-    const a = bySess.get(r.sessao_id) ?? { resp: 0, ok: 0 }
+    const a = bySess.get(r.sessao_id) ?? { resp: 0, ok: 0, ult: 0 }
     a.resp++; if (r.correta) a.ok++
+    const t = new Date((r as any).respondido_em ?? 0).getTime()
+    if (t > a.ult) a.ult = t
     bySess.set(r.sessao_id, a)
   }
 
   // Base: matriculados + quem tem sessão (ex.: passaporte que fez sem matrícula).
   const base = new Set<string>([...matriculas.map((m: any) => m.estudante_id).filter(Boolean), ...sessByEst.keys()])
+  const cutoffMs = Date.now() - JANELA_ATIVO_MIN * 60_000
 
   const estudantes: ProgressoEstudante[] = [...base].map((eid) => {
     const e: any = estMap.get(eid) ?? {}
     const sess = sessByEst.get(eid)
-    const agg = sess ? (bySess.get(sess.id) ?? { resp: 0, ok: 0 }) : { resp: 0, ok: 0 }
+    const agg = sess ? (bySess.get(sess.id) ?? { resp: 0, ok: 0, ult: 0 }) : { resp: 0, ok: 0, ult: 0 }
     const respondidas = agg.resp
     const acertos = agg.ok
+    // Situação ao vivo + última atividade (max entre última resposta e início da sessão).
+    let situacao: SituacaoAoVivo = 'nao_iniciou'
+    let ultimaAtividadeMs: number | null = null
+    if (sess) {
+      const iniciadoMs = new Date(sess.iniciado_em ?? 0).getTime() || 0
+      ultimaAtividadeMs = Math.max(agg.ult, iniciadoMs) || null
+      if (sess.status === 'finalizada') situacao = 'finalizou'
+      else situacao = (ultimaAtividadeMs ?? 0) >= cutoffMs ? 'fazendo' : 'pausado'
+    }
     return {
       id: eid,
       nome: e.nome ?? 'Estudante',
@@ -363,6 +379,8 @@ export async function progressoEstudantesSimulado(simuladoId: string): Promise<{
       erros: Math.max(0, respondidas - acertos),
       emBranco: Math.max(0, total - respondidas),
       media: total ? Math.round((acertos / total) * 1000) / 10 : 0,
+      situacao,
+      ultimaAtividadeMs,
     }
   }).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
 

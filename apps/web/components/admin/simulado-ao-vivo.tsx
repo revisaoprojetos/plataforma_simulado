@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Loader2, Radio, CheckCircle2, Circle, Users, RefreshCw } from 'lucide-react'
+import { Loader2, Radio, CheckCircle2, Circle, Users, RefreshCw, PauseCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { resumoAoVivoSimulado } from '@/app/admin/simulados/actions'
 import type { ResumoAoVivo } from '@/lib/simulado/ao-vivo'
@@ -57,6 +57,7 @@ export function AoVivoPainel({ simuladoId }: { simuladoId: string }) {
 
   const cards: { chave: string; label: string; valor: number; icon: any; cor: string; anel: string }[] = resumo ? [
     { chave: 'online', label: 'Fazendo agora', valor: resumo.online, icon: Radio, cor: 'text-emerald-600 dark:text-emerald-400', anel: 'bg-emerald-500/10' },
+    { chave: 'pausado', label: 'Pausados', valor: resumo.pausados, icon: PauseCircle, cor: 'text-amber-600 dark:text-amber-400', anel: 'bg-amber-500/10' },
     { chave: 'fin', label: 'Finalizaram', valor: resumo.finalizados, icon: CheckCircle2, cor: 'text-sky-600 dark:text-sky-400', anel: 'bg-sky-500/10' },
     { chave: 'nao', label: 'Não iniciaram', valor: resumo.naoIniciaram, icon: Circle, cor: 'text-muted-foreground', anel: 'bg-muted' },
   ] : []
@@ -71,7 +72,7 @@ export function AoVivoPainel({ simuladoId }: { simuladoId: string }) {
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <div className="flex flex-col justify-center rounded-2xl border bg-muted/30 p-4">
           <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Users className="h-4 w-4" /> Matriculados</span>
           <span className="mt-1 text-3xl font-extrabold tabular-nums">{total}</span>
@@ -95,11 +96,13 @@ export function AoVivoPainel({ simuladoId }: { simuladoId: string }) {
           <div className="flex h-full">
             <div className="h-full bg-sky-500 transition-all" style={{ width: `${pctFin}%` }} title={`Finalizados: ${resumo.finalizados}`} />
             <div className="h-full bg-emerald-500 transition-all" style={{ width: `${pct(resumo.online)}%` }} title={`Fazendo agora: ${resumo.online}`} />
+            <div className="h-full bg-amber-500 transition-all" style={{ width: `${pct(resumo.pausados)}%` }} title={`Pausados: ${resumo.pausados}`} />
           </div>
         </div>
         <p className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
           <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-sky-500" /> Finalizaram</span>
           <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Fazendo agora</span>
+          <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-amber-500" /> Pausados</span>
           <span className="inline-flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-muted-foreground/40" /> Não iniciaram</span>
         </p>
       </div>
@@ -113,7 +116,7 @@ export function AoVivoPainel({ simuladoId }: { simuladoId: string }) {
           <RefreshCw className={cn('h-3 w-3', carregando && 'animate-spin')} /> Atualizar
         </button>
       </div>
-      <p className="text-[10px] leading-snug text-muted-foreground">“Fazendo agora” = sessões em andamento (ainda não finalizadas). Sem heartbeat, um aluno que fechou o navegador sem enviar aparece aqui até finalizar/estourar o tempo.</p>
+      <p className="text-[10px] leading-snug text-muted-foreground">“Fazendo agora” = atividade (início da prova ou resposta) nos últimos 30 min. Quem iniciou e ficou sem atividade por mais de 30 min sem finalizar aparece como “Pausados” (provavelmente saiu sem enviar). Veja quem é cada um na aba “Progresso dos estudantes”.</p>
     </div>
   )
 }
