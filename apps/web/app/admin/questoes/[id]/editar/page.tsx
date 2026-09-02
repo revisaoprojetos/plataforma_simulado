@@ -23,6 +23,7 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
   const [
     { data: questao },
     { data: bancas },
+    { data: orgaosLista },
     { data: disciplinas },
     { data: assuntosLista },
     { data: alternativas },
@@ -30,14 +31,16 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
     { data: vinculos },
     vincAll,
     detalheRows,
+    cargoRows,
   ] = await Promise.all([
     admin
       .from('simulado_questoes')
-      .select('*, bancas:simulado_bancas(nome), disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome)')
+      .select('*, bancas:simulado_bancas(nome), orgaos:simulado_orgaos(nome), disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome)')
       .eq('id', id)
       .eq('tenant_id', tenantId ?? NADA)
       .maybeSingle(),
     admin.from('simulado_bancas').select('nome').eq('tenant_id', tenantId ?? NADA).order('nome'),
+    admin.from('simulado_orgaos').select('nome').eq('tenant_id', tenantId ?? NADA).order('nome'),
     admin.from('simulado_disciplinas').select('nome').eq('tenant_id', tenantId ?? NADA).order('nome'),
     admin.from('simulado_assuntos').select('nome').eq('tenant_id', tenantId ?? NADA).order('nome'),
     admin
@@ -52,6 +55,8 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
     fetchAll<{ pasta_id: string; questao_id: string }>(() => admin.from('simulado_questao_pasta').select('pasta_id, questao_id').eq('tenant_id', tenantId ?? NADA)),
     // Valores distintos de "assunto específico" (assunto_detalhe) já cadastrados → opções do dropdown.
     fetchAll<{ assunto_detalhe: string | null }>(() => admin.from('simulado_questoes').select('assunto_detalhe').eq('tenant_id', tenantId ?? NADA).not('assunto_detalhe', 'is', null)),
+    // Cargos distintos já cadastrados (coluna texto simulado_questoes.cargo) → opções do dropdown.
+    fetchAll<{ cargo: string | null }>(() => admin.from('simulado_questoes').select('cargo').eq('tenant_id', tenantId ?? NADA).not('cargo', 'is', null)),
   ])
 
   if (!questao) {
@@ -59,6 +64,8 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
   }
 
   const bancasSugestoes = (bancas ?? []).map((b) => b.nome)
+  const orgaosSugestoes = (orgaosLista ?? []).map((o: { nome: string }) => o.nome)
+  const cargosSugestoes = [...new Set(cargoRows.map((r) => (r.cargo ?? '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'))
   const disciplinasSugestoes = (disciplinas ?? []).map((d) => d.nome)
   const assuntosSugestoes = [...new Set((assuntosLista ?? []).map((a: { nome: string }) => a.nome).filter(Boolean))]
   const assuntosDetalheSugestoes = [...new Set(detalheRows.map((r) => (r.assunto_detalhe ?? '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'))
@@ -113,6 +120,8 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
     formato: ((questao.formato as string | null) === 'certo_errado' ? 'certo_errado' : 'multipla') as 'multipla' | 'certo_errado',
     enunciado: questao.enunciado,
     banca: (questao.bancas as { nome?: string } | null)?.nome ?? undefined,
+    orgao: (questao.orgaos as { nome?: string } | null)?.nome ?? undefined,
+    cargo: (questao.cargo as string | null) ?? undefined,
     disciplina: (questao.disciplinas as { nome?: string } | null)?.nome ?? undefined,
     assunto: (questao.assuntos as { nome?: string } | null)?.nome ?? undefined,
     assunto_detalhe: (questao.assunto_detalhe as string | null) ?? undefined,
@@ -140,6 +149,8 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
       initialData={initialData}
       codigo={codigoQuestao(id, (questao as { codigo?: string | null }).codigo)}
       bancasSugestoes={bancasSugestoes}
+      orgaosSugestoes={orgaosSugestoes}
+      cargosSugestoes={cargosSugestoes}
       disciplinasSugestoes={disciplinasSugestoes}
       assuntosSugestoes={assuntosSugestoes}
       assuntosDetalheSugestoes={assuntosDetalheSugestoes}

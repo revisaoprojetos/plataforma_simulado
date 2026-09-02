@@ -26,6 +26,8 @@ interface QuestaoData {
   enunciado: string
   banca?: string
   orgao?: string
+  /** Cargo (texto livre importado — coluna simulado_questoes.cargo). */
+  cargo?: string
   ano?: number
   disciplina?: string
   assunto?: string
@@ -230,6 +232,7 @@ async function buildQuestaoFields(supabase: SupabaseClient, tenantId: string, da
     enunciado: data.enunciado,
     banca_id,
     orgao_id,
+    cargo: data.cargo?.trim() || null,
     ano: data.ano || null,
     disciplina_id,
     assunto_id,
@@ -250,7 +253,7 @@ async function buildQuestaoFields(supabase: SupabaseClient, tenantId: string, da
 
 // Remove colunas que podem não estar migradas (fallback tolerante em insert/update).
 function semColunasNovas<T extends Record<string, any>>(fields: T) {
-  const { imagem_url: _i, pontuacao_total: _p, linhas: _l, categoria_discursiva: _c, assunto_detalhe: _ad, formato: _f, ...resto } = fields
+  const { imagem_url: _i, pontuacao_total: _p, linhas: _l, categoria_discursiva: _c, assunto_detalhe: _ad, formato: _f, cargo: _cg, ...resto } = fields
   return resto
 }
 
@@ -294,7 +297,7 @@ export async function createQuestaoAction(data: QuestaoData) {
     .single()
 
   // Tolerante: se alguma coluna nova (imagem_url/pontuacao_total/linhas/categoria_discursiva) ainda não foi migrada, reinsere sem elas.
-  if (error && /imagem_url|pontuacao_total|linhas|categoria_discursiva|assunto_detalhe|formato|column/i.test(error.message)) {
+  if (error && /imagem_url|pontuacao_total|linhas|categoria_discursiva|assunto_detalhe|formato|cargo|column/i.test(error.message)) {
     ;({ data: questao, error } = await supabase.from('simulado_questoes').insert(semColunasNovas(fields)).select().single())
   }
 
@@ -355,7 +358,7 @@ export async function updateQuestaoAction(id: string, data: QuestaoData) {
     .eq('id', id)
 
   // Tolerante: colunas novas (imagem_url/pontuacao_total/linhas/categoria_discursiva) ainda não migradas → atualiza sem elas.
-  if (error && /imagem_url|pontuacao_total|linhas|categoria_discursiva|assunto_detalhe|formato|column/i.test(error.message)) {
+  if (error && /imagem_url|pontuacao_total|linhas|categoria_discursiva|assunto_detalhe|formato|cargo|column/i.test(error.message)) {
     ;({ error } = await supabase.from('simulado_questoes').update(semColunasNovas(fields)).eq('id', id))
   }
 

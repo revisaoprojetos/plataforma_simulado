@@ -147,6 +147,7 @@ const questaoSchema = z
     enunciado: z.string().min(10, 'Enunciado deve ter ao menos 10 caracteres'),
     banca: z.string().optional(),
     orgao: z.string().optional(),
+    cargo: z.string().optional(),
     ano: z.coerce.number().optional(),
     disciplina: z.string().optional(),
     assunto: z.string().optional(),
@@ -181,6 +182,8 @@ interface QuestaoFormProps {
   /** Código da questão (ex.: Q-4.812) — mostrado na barra do topo (só na edição). */
   codigo?: string
   bancasSugestoes?: string[]
+  orgaosSugestoes?: string[]
+  cargosSugestoes?: string[]
   disciplinasSugestoes?: string[]
   assuntosSugestoes?: string[]
   /** Valores distintos de "assunto específico" (coluna assunto_detalhe) já cadastrados. */
@@ -402,7 +405,7 @@ function StatusBadge({ status }: { status?: string }) {
   return <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', cfg.cls)}>{cfg.label}</span>
 }
 
-export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], disciplinasSugestoes = [], assuntosSugestoes = [], assuntosDetalheSugestoes = [], bancosDaQuestao = [], sidebarExtra, onSubmit }: QuestaoFormProps) {
+export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], orgaosSugestoes = [], cargosSugestoes = [], disciplinasSugestoes = [], assuntosSugestoes = [], assuntosDetalheSugestoes = [], bancosDaQuestao = [], sidebarExtra, onSubmit }: QuestaoFormProps) {
   const ocultarDiscursiva = useOcultarDiscursiva()
   const [isLoading, setIsLoading] = useState(false)
   const [, forcar] = useReducer((x: number) => x + 1, 0) // força re-render (reverte o <select> Tipo ao cancelar)
@@ -472,6 +475,8 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
   const anoAtual = new Date().getFullYear()
   const anos = Array.from({ length: anoAtual + 2 - 1999 }, (_, i) => anoAtual + 1 - i)
   const bancasOpts = [...new Set([watch('banca'), ...bancasSugestoes].filter(Boolean) as string[])]
+  const orgaoOpts = [...new Set([watch('orgao'), ...orgaosSugestoes].filter(Boolean) as string[])]
+  const cargoOpts = [...new Set([watch('cargo'), ...cargosSugestoes].filter(Boolean) as string[])]
   const discOpts = [...new Set([watch('disciplina'), ...disciplinasSugestoes].filter(Boolean) as string[])]
   const assuntoOpts = [...new Set([watch('assunto'), ...assuntosSugestoes].filter(Boolean) as string[])]
   const assuntoDetalheOpts = [...new Set([watch('assunto_detalhe'), ...assuntosDetalheSugestoes].filter(Boolean) as string[])]
@@ -790,6 +795,19 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], discipl
                   <SelectMenu value={String(watch('ano') ?? '')} ariaLabel="Ano" placeholder="—" buscavel
                     onChange={(v) => setValue('ano', v ? Number(v) : undefined, { shouldDirty: true })}
                     options={[{ value: '', label: '—' }, ...anos.map((y) => ({ value: String(y), label: String(y) }))]} />
+                </Campo>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Campo label="Órgão">
+                  <SelectMenu value={watch('orgao') ?? ''} ariaLabel="Órgão" placeholder="—" buscavel
+                    onChange={(v) => setValue('orgao', v, { shouldDirty: true })}
+                    options={[{ value: '', label: '—' }, ...orgaoOpts.map((n) => ({ value: n, label: n }))]} />
+                </Campo>
+                <Campo label="Cargo">
+                  <SelectMenu value={watch('cargo') ?? ''} ariaLabel="Cargo" placeholder="—" buscavel
+                    onChange={(v) => setValue('cargo', v, { shouldDirty: true })}
+                    options={[{ value: '', label: '—' }, ...cargoOpts.map((n) => ({ value: n, label: n }))]} />
                 </Campo>
               </div>
 

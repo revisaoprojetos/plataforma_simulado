@@ -10,14 +10,18 @@ export default async function NovaQuestaoPage() {
   const admin = createAdminClient()
   const NADA = '00000000-0000-0000-0000-000000000000'
 
-  const [{ data: bancas }, { data: disciplinas }, { data: assuntosLista }, detalheRows] = await Promise.all([
+  const [{ data: bancas }, { data: orgaosLista }, { data: disciplinas }, { data: assuntosLista }, detalheRows, cargoRows] = await Promise.all([
     supabase.from('simulado_bancas').select('nome').order('nome'),
+    admin.from('simulado_orgaos').select('nome').eq('tenant_id', tenantId ?? NADA).order('nome'),
     supabase.from('simulado_disciplinas').select('nome').order('nome'),
     admin.from('simulado_assuntos').select('nome').eq('tenant_id', tenantId ?? NADA).order('nome'),
     fetchAll<{ assunto_detalhe: string | null }>(() => admin.from('simulado_questoes').select('assunto_detalhe').eq('tenant_id', tenantId ?? NADA).not('assunto_detalhe', 'is', null)),
+    fetchAll<{ cargo: string | null }>(() => admin.from('simulado_questoes').select('cargo').eq('tenant_id', tenantId ?? NADA).not('cargo', 'is', null)),
   ])
 
   const bancasSugestoes = (bancas ?? []).map((b) => b.nome)
+  const orgaosSugestoes = (orgaosLista ?? []).map((o: { nome: string }) => o.nome)
+  const cargosSugestoes = [...new Set(cargoRows.map((r) => (r.cargo ?? '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'))
   const disciplinasSugestoes = (disciplinas ?? []).map((d) => d.nome)
   const assuntosSugestoes = [...new Set((assuntosLista ?? []).map((a: { nome: string }) => a.nome).filter(Boolean))]
   const assuntosDetalheSugestoes = [...new Set(detalheRows.map((r) => (r.assunto_detalhe ?? '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'pt-BR'))
@@ -25,6 +29,8 @@ export default async function NovaQuestaoPage() {
   return (
     <QuestaoForm
       bancasSugestoes={bancasSugestoes}
+      orgaosSugestoes={orgaosSugestoes}
+      cargosSugestoes={cargosSugestoes}
       disciplinasSugestoes={disciplinasSugestoes}
       assuntosSugestoes={assuntosSugestoes}
       assuntosDetalheSugestoes={assuntosDetalheSugestoes}
