@@ -201,23 +201,23 @@ export function TaxonomiaUnificacao({ tipo, itens, recentes = [] }: { tipo: Tipo
             <p className="flex items-center gap-1.5 text-sm font-semibold"><History className="h-4 w-4 text-primary" /> Unificações recentes <span className="text-xs font-normal text-muted-foreground">({recentes.length})</span></p>
             <p className="text-xs text-muted-foreground">Errou na mesclagem? Desfaça — recria as disciplinas e devolve as questões.</p>
             <div className="overflow-hidden rounded-lg border">
-              <table className="w-full text-sm">
+              <table className="w-full table-fixed text-sm">
                 <thead className="bg-background text-left text-muted-foreground">
                   <tr className="border-b">
-                    <ThRec campo="mantida">Mantida</ThRec>
-                    <ThRec campo="mescladas" className="hidden sm:table-cell">Mescladas</ThRec>
-                    <ThRec campo="questoes" className="text-right"><span className="ml-auto">Questões</span></ThRec>
-                    <ThRec campo="data" className="hidden md:table-cell">Feito em</ThRec>
-                    <th className="w-28 px-3 py-2" />
+                    <ThRec campo="mantida" className="w-[26%]">Mantida</ThRec>
+                    <ThRec campo="mescladas" className="hidden w-[36%] sm:table-cell">Mescladas</ThRec>
+                    <ThRec campo="questoes" className="w-[10%] text-right">Questões</ThRec>
+                    <ThRec campo="data" className="hidden w-[16%] md:table-cell">Feito em</ThRec>
+                    <th className="w-[12%] px-3 py-2" />
                   </tr>
                 </thead>
                 <tbody>
                   {visiveis.map((u) => (
                     <tr key={u.id} className="border-b last:border-0 hover:bg-muted/30">
                       <td className="px-3 py-2"><span className="block truncate font-medium">«{u.mantida}»</span></td>
-                      <td className="hidden px-3 py-2 text-muted-foreground sm:table-cell" title={u.duplicadas.join(', ')}><span className="line-clamp-1">{u.duplicadas.length} · {u.duplicadas.join(', ') || '—'}</span></td>
+                      <td className="hidden px-3 py-2 text-muted-foreground sm:table-cell" title={u.duplicadas.join(', ')}><span className="block truncate">{u.duplicadas.length} · {u.duplicadas.join(', ') || '—'}</span></td>
                       <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{u.questoes.toLocaleString('pt-BR')}</td>
-                      <td className="hidden px-3 py-2 tabular-nums text-muted-foreground md:table-cell">{formatBrt(u.criado_em) ?? '—'}</td>
+                      <td className="hidden whitespace-nowrap px-3 py-2 tabular-nums text-muted-foreground md:table-cell">{formatBrt(u.criado_em) ?? '—'}</td>
                       <td className="px-3 py-2 text-right">
                         <button onClick={() => desfazer(u)} disabled={desfazendo === u.id}
                           className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold text-muted-foreground transition hover:bg-muted disabled:opacity-50">
