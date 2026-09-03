@@ -36,6 +36,7 @@ export function TaxonomiaUnificacao({ tipo, itens, recentes = [] }: { tipo: Tipo
   const [manter, setManter] = useState('')
   const [salvando, setSalvando] = useState(false)
   const [desfazendo, setDesfazendo] = useState('')
+  const [pagRec, setPagRec] = useState(1) // página da tabela "Unificações recentes" (10/pág)
 
   // Clusters de possíveis duplicatas (mesmo nome normalizado, 2+ variações).
   const clusters = useMemo(() => {
@@ -167,26 +168,57 @@ export function TaxonomiaUnificacao({ tipo, itens, recentes = [] }: { tipo: Tipo
         </div>
       )}
 
-      {/* Unificações recentes — desfazer (só disciplina, que tem log/RPC) */}
-      {m.undo && recentes.length > 0 && (
-        <div className="space-y-2 rounded-2xl border bg-card p-4 shadow-sm">
-          <p className="flex items-center gap-1.5 text-sm font-semibold"><History className="h-4 w-4 text-primary" /> Unificações recentes</p>
-          <p className="text-xs text-muted-foreground">Errou na mesclagem? Desfaça — recria as disciplinas e devolve as questões.</p>
-          <div className="divide-y">
-            {recentes.map((u) => (
-              <div key={u.id} className="flex flex-wrap items-center gap-2 py-2 text-sm">
-                <span className="min-w-0 flex-1 truncate">
-                  <span className="font-medium">«{u.mantida}»</span> <span className="text-muted-foreground">← {u.duplicadas.length} disciplina(s) · {u.questoes} questão(ões)</span>
-                </span>
-                <button onClick={() => desfazer(u)} disabled={desfazendo === u.id}
-                  className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold text-muted-foreground transition hover:bg-muted disabled:opacity-50">
-                  {desfazendo === u.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Undo2 className="h-3.5 w-3.5" />} Desfazer
-                </button>
+      {/* Unificações recentes — desfazer (só disciplina, que tem log/RPC): tabela paginada (10/pág) */}
+      {m.undo && recentes.length > 0 && (() => {
+        const POR_PAG = 10
+        const totalPag = Math.max(1, Math.ceil(recentes.length / POR_PAG))
+        const pag = Math.min(pagRec, totalPag)
+        const visiveis = recentes.slice((pag - 1) * POR_PAG, pag * POR_PAG)
+        return (
+          <div className="space-y-2 rounded-2xl border bg-card p-4 shadow-sm">
+            <p className="flex items-center gap-1.5 text-sm font-semibold"><History className="h-4 w-4 text-primary" /> Unificações recentes <span className="text-xs font-normal text-muted-foreground">({recentes.length})</span></p>
+            <p className="text-xs text-muted-foreground">Errou na mesclagem? Desfaça — recria as disciplinas e devolve as questões.</p>
+            <div className="overflow-hidden rounded-lg border">
+              <table className="w-full text-sm">
+                <thead className="bg-background text-left text-muted-foreground">
+                  <tr className="border-b">
+                    <th className="px-3 py-2 font-medium">Mantida</th>
+                    <th className="hidden px-3 py-2 font-medium sm:table-cell">Mescladas</th>
+                    <th className="px-3 py-2 text-right font-medium">Questões</th>
+                    <th className="w-28 px-3 py-2" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {visiveis.map((u) => (
+                    <tr key={u.id} className="border-b last:border-0 hover:bg-muted/30">
+                      <td className="px-3 py-2"><span className="block truncate font-medium">«{u.mantida}»</span></td>
+                      <td className="hidden px-3 py-2 text-muted-foreground sm:table-cell" title={u.duplicadas.join(', ')}><span className="line-clamp-1">{u.duplicadas.length} · {u.duplicadas.join(', ') || '—'}</span></td>
+                      <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{u.questoes.toLocaleString('pt-BR')}</td>
+                      <td className="px-3 py-2 text-right">
+                        <button onClick={() => desfazer(u)} disabled={desfazendo === u.id}
+                          className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold text-muted-foreground transition hover:bg-muted disabled:opacity-50">
+                          {desfazendo === u.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Undo2 className="h-3.5 w-3.5" />} Desfazer
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {totalPag > 1 && (
+              <div className="flex items-center justify-between pt-1 text-sm">
+                <span className="text-muted-foreground">Página {pag} de {totalPag}</span>
+                <div className="flex gap-1.5">
+                  <button onClick={() => setPagRec(1)} disabled={pag <= 1} className="rounded-lg border px-2.5 py-1 hover:bg-muted disabled:opacity-40">Início</button>
+                  <button onClick={() => setPagRec((p) => Math.max(1, p - 1))} disabled={pag <= 1} className="rounded-lg border px-2.5 py-1 hover:bg-muted disabled:opacity-40">Anterior</button>
+                  <button onClick={() => setPagRec((p) => Math.min(totalPag, p + 1))} disabled={pag >= totalPag} className="rounded-lg border px-2.5 py-1 hover:bg-muted disabled:opacity-40">Próxima</button>
+                  <button onClick={() => setPagRec(totalPag)} disabled={pag >= totalPag} className="rounded-lg border px-2.5 py-1 hover:bg-muted disabled:opacity-40">Final</button>
+                </div>
               </div>
-            ))}
+            )}
           </div>
-        </div>
-      )}
+        )
+      })()}
     </div>
   )
 }

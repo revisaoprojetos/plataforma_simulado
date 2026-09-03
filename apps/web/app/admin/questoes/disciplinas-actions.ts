@@ -102,7 +102,7 @@ export async function unificarDisciplinas(canonicaId: string, duplicadaIds: stri
 export async function listarUnificacoesRecentes(): Promise<{ ok: boolean; itens?: UnificacaoRecente[]; error?: string }> {
   const g = await acesso('view'); if (!g) return { ok: false, error: 'Sem permissão.' }
   const svc = createAdminClient()
-  const { data, error } = await svc.from('simulado_disciplina_unificacoes').select('id, canonica_nome, mapa, criado_em').eq('tenant_id', g.tenantId).eq('desfeita', false).order('criado_em', { ascending: false }).limit(10)
+  const { data, error } = await svc.from('simulado_disciplina_unificacoes').select('id, canonica_nome, mapa, criado_em').eq('tenant_id', g.tenantId).eq('desfeita', false).order('criado_em', { ascending: false }).limit(200)
   if (error) return { ok: true, itens: [] } // tabela ausente (migração pendente) → sem histórico
   const itens = (data ?? []).map((r: any) => {
     const mapa = Array.isArray(r.mapa) ? r.mapa : []
