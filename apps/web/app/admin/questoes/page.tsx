@@ -66,6 +66,7 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
   let totalPages = 1
   const nomeAssunto = new Map<string, string>()
   const nomeOrgao = new Map<string, string>()
+  const qtdAlternativas = new Map<string, number>()
   if (tab === 'questoes') {
     const { data: disc } = await supabase
       .from('simulado_disciplinas').select('id, nome')
@@ -75,7 +76,9 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
     // Busca por código OU enunciado. Tolerante: `codigo` e os campos/embeds extras (cargo/assunto
     // específico/assunto/órgão) podem faltar em bases antigas → refaz com um select mínimo.
     const REST = 'enunciado, status, tipo, nivel_dificuldade, ano, disciplinas:simulado_disciplinas(nome), bancas:simulado_bancas(nome)'
-    const EXTRAS = ', formato, cargo, assunto_detalhe, assunto_id, orgao_id'
+    // `formato` NÃO existe nesta base (só bases novas) — não incluir aqui senão o select 400 e derruba
+    // TODOS os extras. O tipo Certo/Errado é derivado da contagem de alternativas mais abaixo.
+    const EXTRAS = ', cargo, assunto_detalhe, assunto_id, orgao_id'
     const montarQuery = (comCodigo: boolean, comExtras: boolean) => {
       const sel: string = (comCodigo ? 'id, codigo, ' : 'id, ') + REST + (comExtras ? EXTRAS : '')
       let query = supabase
@@ -94,7 +97,7 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
       return query
     }
     let res = await montarQuery(true, true)
-    if (res.error && /(formato|cargo|assunto_detalhe|assunto_id|orgao_id)/i.test(res.error.message)) res = await montarQuery(true, false)
+    if (res.error && /(cargo|assunto_detalhe|assunto_id|orgao_id)/i.test(res.error.message)) res = await montarQuery(true, false)
     if (res.error && /codigo/i.test(res.error.message)) res = await montarQuery(false, false)
     questoes = (res.data ?? []) as any[]
     count = res.count
@@ -102,15 +105,19 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
 
     // Nomes de Assunto/Órgão via SERVICE ROLE: a taxonomia (simulado_assuntos/orgaos) tem RLS que barra
     // o embed sob a sessão do admin (por isso vinham vazios). Resolve pelos ids presentes na página.
+    // Também conta as alternativas de cada questão → 2 = Certo/Errado, senão Múltipla (não há coluna `formato`).
     const admin = createAdminClient()
+    const qIds = questoes.map((x) => x.id)
     const assIds = [...new Set(questoes.map((x) => x.assunto_id).filter(Boolean))]
     const orgIds = [...new Set(questoes.map((x) => x.orgao_id).filter(Boolean))]
-    const [assRows, orgRows] = await Promise.all([
+    const [assRows, orgRows, altRows] = await Promise.all([
       assIds.length ? admin.from('simulado_assuntos').select('id, nome').in('id', assIds) : Promise.resolve({ data: [] as any[] }),
       orgIds.length ? admin.from('simulado_orgaos').select('id, nome').in('id', orgIds) : Promise.resolve({ data: [] as any[] }),
+      qIds.length ? admin.from('simulado_alternativas').select('questao_id').in('questao_id', qIds) : Promise.resolve({ data: [] as any[] }),
     ])
     for (const a of (assRows.data ?? []) as any[]) nomeAssunto.set(a.id, a.nome)
     for (const o of (orgRows.data ?? []) as any[]) nomeOrgao.set(o.id, o.nome)
+    for (const r of (altRows.data ?? []) as any[]) qtdAlternativas.set(r.questao_id, (qtdAlternativas.get(r.questao_id) ?? 0) + 1)
   }
 
   // ── Aba UNIFICAÇÃO: itens da taxonomia escolhida + (só disciplina) unificações recentes p/ desfazer ──
@@ -172,7 +179,8 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
         />
         <CardContent className="p-0">
           <QuestoesTabela questoes={(questoes ?? []).map((q: any) => ({
-            id: q.id, codigo: q.codigo ?? null, enunciado: q.enunciado ?? '', status: q.status ?? null, tipo: q.tipo ?? null, formato: q.formato ?? null,
+            id: q.id, codigo: q.codigo ?? null, enunciado: q.enunciado ?? '', status: q.status ?? null, tipo: q.tipo ?? null,
+            formato: qtdAlternativas.get(q.id) === 2 ? 'certo_errado' : 'multipla',
             nivel_dificuldade: q.nivel_dificuldade ?? null, ano: q.ano ?? null, cargo: q.cargo ?? null, assunto_detalhe: q.assunto_detalhe ?? null,
             disciplina: (q.disciplinas as { nome?: string } | null)?.nome ?? null,
             assunto: q.assunto_id ? (nomeAssunto.get(q.assunto_id) ?? null) : null,
