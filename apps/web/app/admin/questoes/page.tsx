@@ -27,7 +27,8 @@ import { listarTaxonomia } from './taxonomia-actions'
 import { ehTipoTaxonomia } from './taxonomia-tipos'
 import { listarUnificacoesRecentes } from './disciplinas-actions'
 
-const ITEMS_PER_PAGE = 20
+const PER_PAGE_OPTIONS = [10, 12, 15, 20]
+const PER_PAGE_DEFAULT = 12
 const NADA = '00000000-0000-0000-0000-000000000000'
 
 interface PageProps {
@@ -40,6 +41,7 @@ interface PageProps {
     status?: string
     tab?: string
     tipoTax?: string
+    pp?: string
   }>
 }
 
@@ -58,6 +60,7 @@ const dificuldadeLabel: Record<string, string> = {
 export default async function QuestoesPage({ searchParams }: PageProps) {
   const params = await searchParams
   const page = Number(params.page ?? 1)
+  const perPage = PER_PAGE_OPTIONS.includes(Number(params.pp)) ? Number(params.pp) : PER_PAGE_DEFAULT
   const q = (params.q ?? '').trim()
   // Se o termo for um código de questão (ex.: "Q-6BA4EF94"), busca pelo id (faixa de UUID).
   const faixaCodigo = q ? faixaUuidDoCodigo(q) : null
@@ -94,7 +97,7 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
         .eq('deletado', false)
         .eq('tenant_id', tenantId ?? NADA)
         .order('created_at', { ascending: false })
-        .range((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE - 1)
+        .range((page - 1) * perPage, page * perPage - 1)
       if (faixaCodigo) query = query.gte('id', faixaCodigo.lo).lte('id', faixaCodigo.hi)
       else if (q) query = comCodigo ? query.or(`enunciado.ilike.%${q}%,codigo.ilike.%${q}%`) : query.ilike('enunciado', `%${q}%`)
       if (status) query = query.eq('status', status)
@@ -107,7 +110,7 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
     if (res.error && /codigo/i.test(res.error.message)) res = await montarQuery(false)
     questoes = (res.data ?? []) as any[]
     count = res.count
-    totalPages = Math.ceil((count ?? 0) / ITEMS_PER_PAGE)
+    totalPages = Math.ceil((count ?? 0) / perPage)
   }
 
   // ── Aba UNIFICAÇÃO: itens da taxonomia escolhida + (só disciplina) unificações recentes p/ desfazer ──
@@ -225,7 +228,7 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
         </CardContent>
       </Card>
 
-      <PaginationControls page={page} totalPages={totalPages} />
+      <PaginationControls page={page} totalPages={totalPages} perPage={perPage} perPageOptions={PER_PAGE_OPTIONS} />
       </>)}
     </div>
   )
