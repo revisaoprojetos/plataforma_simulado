@@ -177,6 +177,9 @@ const questaoSchema = z
 
 export type QuestaoFormData = z.infer<typeof questaoSchema>
 
+/** Campos de taxonomia que aceitam "criar novo" pelo pop-up (o valor é criado ao salvar a questão). */
+type CampoCriavel = 'disciplina' | 'assunto' | 'banca' | 'orgao' | 'cargo' | 'assunto_detalhe'
+
 interface QuestaoFormProps {
   initialData?: Partial<QuestaoFormData>
   /** Código da questão (ex.: Q-4.812) — mostrado na barra do topo (só na edição). */
@@ -229,13 +232,15 @@ type Opt = { value: string; label: string; disabled?: boolean }
  * O texto digitado é só filtro — só vira valor quando uma opção é escolhida; ao fechar sem
  * escolher, mantém o que já estava selecionado.
  */
-function SelectMenu({ value, onChange, options, placeholder, ariaLabel, buscavel }: {
+function SelectMenu({ value, onChange, options, placeholder, ariaLabel, buscavel, onCriar }: {
   value: string
   onChange: (v: string) => void
   options: Opt[]
   placeholder?: string
   ariaLabel?: string
   buscavel?: boolean
+  /** Se definido, mostra "+ Criar…" no topo da lista; recebe o texto já digitado (busca) como inicial. */
+  onCriar?: (inicial?: string) => void
 }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -269,8 +274,9 @@ function SelectMenu({ value, onChange, options, placeholder, ariaLabel, buscavel
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
-              // Enter dentro do form NÃO deve submeter: seleciona a 1ª opção filtrada.
-              if (e.key === 'Enter') { e.preventDefault(); const f = filtradas.find((o) => !o.disabled); if (f) escolher(f.value) }
+              // Enter dentro do form NÃO deve submeter: seleciona a 1ª opção filtrada; se nada casar e
+              // houver "criar", cria com o texto digitado.
+              if (e.key === 'Enter') { e.preventDefault(); const f = filtradas.find((o) => !o.disabled); if (f) escolher(f.value); else if (onCriar) { setOpen(false); onCriar(query.trim()) } }
             }}
             placeholder={atual?.label || placeholder || 'Buscar…'}
             aria-label={ariaLabel}
@@ -290,8 +296,15 @@ function SelectMenu({ value, onChange, options, placeholder, ariaLabel, buscavel
       {montado && (
         <div role="listbox" className={cn('absolute left-0 right-0 top-[calc(100%+4px)] z-40 max-h-60 origin-top overflow-auto rounded-xl border bg-popover p-1 shadow-lg transition duration-150 ease-out',
           aberto ? 'scale-100 opacity-100 translate-y-0' : 'pointer-events-none -translate-y-1 scale-95 opacity-0')}>
+          {onCriar && (
+            <button type="button" onMouseDown={(e) => e.preventDefault()}
+              onClick={() => { const ini = buscavel ? query.trim() : ''; setOpen(false); onCriar(ini) }}
+              className="mb-1 flex w-full items-center gap-2 rounded-lg border-b px-2.5 py-2 text-left text-sm font-medium text-primary transition-colors hover:bg-primary/10">
+              <Plus className="h-4 w-4 shrink-0" /> {buscavel && query.trim() ? `Criar «${query.trim()}»` : 'Criar novo…'}
+            </button>
+          )}
           {filtradas.length === 0 ? (
-            <p className="px-2.5 py-3 text-center text-xs text-muted-foreground">Nada encontrado.</p>
+            onCriar ? null : <p className="px-2.5 py-3 text-center text-xs text-muted-foreground">Nada encontrado.</p>
           ) : filtradas.map((o) => {
             const sel = o.value === value
             return (
@@ -453,6 +466,18 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], orgaosS
   const imgInputRef = useRef<HTMLInputElement>(null)
   const [uploadingImg, setUploadingImg] = useState(false)
   const [dragOver, setDragOver] = useState(false)
+
+  // Pop-up "Criar novo" dos campos de taxonomia: o valor digitado vira o selecionado; a disciplina/
+  // assunto/banca/órgão é criada ao SALVAR (resolveByName/resolveAssunto em buildQuestaoFields), e
+  // cargo/assunto específico (texto livre) gravam direto na coluna.
+  const [criando, setCriando] = useState<{ campo: CampoCriavel; label: string; valor: string } | null>(null)
+  const abrirCriar = (campo: CampoCriavel, label: string, inicial?: string) => setCriando({ campo, label, valor: (inicial ?? '').trim() })
+  function salvarCriar() {
+    if (!criando) return
+    const v = criando.valor.trim()
+    if (v) setValue(criando.campo, v, { shouldDirty: true })
+    setCriando(null)
+  }
 
   const tipoUi: 'multipla' | 'certo_errado' | 'discursiva' =
     tipo === 'discursiva' ? 'discursiva' : formato === 'certo_errado' ? 'certo_errado' : 'multipla'
@@ -788,7 +813,7 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], orgaosS
               <div className="grid grid-cols-2 gap-3">
                 <Campo label="Banca">
                   <SelectMenu value={watch('banca') ?? ''} ariaLabel="Banca" placeholder="—" buscavel
-                    onChange={(v) => setValue('banca', v, { shouldDirty: true })}
+                    onChange={(v) => setValue('banca', v, { shouldDirty: true })} onCriar={(ini) => abrirCriar('banca', 'banca', ini)}
                     options={[{ value: '', label: '—' }, ...bancasOpts.map((n) => ({ value: n, label: n }))]} />
                 </Campo>
                 <Campo label="Ano">
@@ -801,31 +826,31 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], orgaosS
               <div className="grid grid-cols-2 gap-3">
                 <Campo label="Órgão">
                   <SelectMenu value={watch('orgao') ?? ''} ariaLabel="Órgão" placeholder="—" buscavel
-                    onChange={(v) => setValue('orgao', v, { shouldDirty: true })}
+                    onChange={(v) => setValue('orgao', v, { shouldDirty: true })} onCriar={(ini) => abrirCriar('orgao', 'órgão', ini)}
                     options={[{ value: '', label: '—' }, ...orgaoOpts.map((n) => ({ value: n, label: n }))]} />
                 </Campo>
                 <Campo label="Cargo">
                   <SelectMenu value={watch('cargo') ?? ''} ariaLabel="Cargo" placeholder="—" buscavel
-                    onChange={(v) => setValue('cargo', v, { shouldDirty: true })}
+                    onChange={(v) => setValue('cargo', v, { shouldDirty: true })} onCriar={(ini) => abrirCriar('cargo', 'cargo', ini)}
                     options={[{ value: '', label: '—' }, ...cargoOpts.map((n) => ({ value: n, label: n }))]} />
                 </Campo>
               </div>
 
               <Campo label="Disciplina">
                 <SelectMenu value={watch('disciplina') ?? ''} ariaLabel="Disciplina" placeholder="—" buscavel
-                  onChange={(v) => setValue('disciplina', v, { shouldDirty: true })}
+                  onChange={(v) => setValue('disciplina', v, { shouldDirty: true })} onCriar={(ini) => abrirCriar('disciplina', 'disciplina', ini)}
                   options={[{ value: '', label: '—' }, ...discOpts.map((n) => ({ value: n, label: n }))]} />
               </Campo>
 
               <Campo label="Assunto">
                 <SelectMenu value={watch('assunto') ?? ''} ariaLabel="Assunto" placeholder="—" buscavel
-                  onChange={(v) => setValue('assunto', v, { shouldDirty: true })}
+                  onChange={(v) => setValue('assunto', v, { shouldDirty: true })} onCriar={(ini) => abrirCriar('assunto', 'assunto', ini)}
                   options={[{ value: '', label: '—' }, ...assuntoOpts.map((n) => ({ value: n, label: n }))]} />
               </Campo>
 
               <Campo label="Assunto específico">
                 <SelectMenu value={watch('assunto_detalhe') ?? ''} ariaLabel="Assunto específico" placeholder="—" buscavel
-                  onChange={(v) => setValue('assunto_detalhe', v, { shouldDirty: true })}
+                  onChange={(v) => setValue('assunto_detalhe', v, { shouldDirty: true })} onCriar={(ini) => abrirCriar('assunto_detalhe', 'assunto específico', ini)}
                   options={[{ value: '', label: '—' }, ...assuntoDetalheOpts.map((n) => ({ value: n, label: n }))]} />
               </Campo>
 
@@ -866,6 +891,29 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], orgaosS
           {sidebarExtra}
         </aside>
       </div>
+
+      {/* Pop-up "Criar novo" (disciplina/assunto/banca/órgão/cargo/assunto específico) */}
+      {criando && createPortal(
+        <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setCriando(null)} />
+          <div role="dialog" aria-modal="true" className="animate-pop relative w-full max-w-sm rounded-2xl border bg-card p-5 shadow-2xl">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold capitalize">Criar {criando.label}</h3>
+              <button type="button" onClick={() => setCriando(null)} aria-label="Fechar" className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
+            </div>
+            <Input autoFocus value={criando.valor}
+              onChange={(e) => setCriando((c) => c ? { ...c, valor: e.target.value } : c)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); salvarCriar() } }}
+              placeholder={`Nome d${criando.label.startsWith('ó') || criando.label.startsWith('a') ? 'a' : 'o'} ${criando.label}…`} />
+            <p className="mt-2 text-xs text-muted-foreground">Fica selecionad{criando.label.startsWith('a') || criando.label.startsWith('ó') ? 'a' : 'o'} agora e é criad{criando.label.startsWith('a') || criando.label.startsWith('ó') ? 'a' : 'o'} ao salvar a questão.</p>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setCriando(null)}>Cancelar</Button>
+              <Button type="button" size="sm" onClick={salvarCriar} disabled={!criando.valor.trim()}><Check className="mr-1.5 h-4 w-4" /> Usar</Button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
     </form>
   )
 }

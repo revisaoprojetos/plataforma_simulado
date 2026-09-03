@@ -22,8 +22,10 @@ import { codigoQuestao, faixaUuidDoCodigo } from '@/lib/codigo-questao'
 import { NovaQuestaoDialog } from '@/components/admin/nova-questao-dialog'
 import { ExportQuestoesButton } from '@/components/admin/export-questoes-button'
 import { SecaoHeader } from '@/components/admin/secao-header'
-import { DisciplinasUnificacao } from '@/components/admin/disciplinas-unificacao'
-import { listarDisciplinasContagem, listarUnificacoesRecentes } from './disciplinas-actions'
+import { TaxonomiaUnificacao } from '@/components/admin/taxonomia-unificacao'
+import { listarTaxonomia } from './taxonomia-actions'
+import { ehTipoTaxonomia } from './taxonomia-tipos'
+import { listarUnificacoesRecentes } from './disciplinas-actions'
 
 const ITEMS_PER_PAGE = 20
 const NADA = '00000000-0000-0000-0000-000000000000'
@@ -37,6 +39,7 @@ interface PageProps {
     tipo?: string
     status?: string
     tab?: string
+    tipoTax?: string
   }>
 }
 
@@ -63,7 +66,8 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
   const dificuldade = params.dificuldade ?? ''
   const tipo = params.tipo ?? ''
 
-  const tab = params.tab === 'disciplinas' ? 'disciplinas' : 'questoes'
+  const tab = (params.tab === 'unificacao' || params.tab === 'disciplinas') ? 'unificacao' : 'questoes'
+  const tipoTax = ehTipoTaxonomia(params.tipoTax) ? params.tipoTax : 'disciplina'
 
   const supabase = await createServiceClient()
   const tenantId = await getCurrentTenantId()
@@ -106,11 +110,11 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
     totalPages = Math.ceil((count ?? 0) / ITEMS_PER_PAGE)
   }
 
-  // ── Aba UNIFICAÇÃO: disciplinas + contagens + unificações recentes (desfazer) ──
-  const [discUnif, recentesUnif] = tab === 'disciplinas'
+  // ── Aba UNIFICAÇÃO: itens da taxonomia escolhida + (só disciplina) unificações recentes p/ desfazer ──
+  const [itensTax, recentesUnif] = tab === 'unificacao'
     ? await Promise.all([
-        listarDisciplinasContagem().then((r) => r.itens ?? []),
-        listarUnificacoesRecentes().then((r) => r.itens ?? []),
+        listarTaxonomia(tipoTax).then((r) => r.itens ?? []),
+        tipoTax === 'disciplina' ? listarUnificacoesRecentes().then((r) => r.itens ?? []) : Promise.resolve([] as { id: string; mantida: string; duplicadas: string[]; questoes: number; criado_em: string }[]),
       ])
     : [[], []]
 
@@ -122,7 +126,7 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Questões</h1>
           <p className="text-muted-foreground">
-            {tab === 'questoes' ? `${count ?? 0} questões cadastradas` : `${discUnif.length} disciplinas — mescle as duplicadas`}
+            {tab === 'questoes' ? `${count ?? 0} questões cadastradas` : `${itensTax.length} item(ns) — mescle os duplicados`}
           </p>
         </div>
         {tab === 'questoes' && (
@@ -136,11 +140,11 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
       {/* Abas: Questões · Unificação de disciplinas */}
       <div className="flex gap-4 border-b text-sm">
         <Link href="/admin/questoes" className={tabCls(tab === 'questoes')}><BookOpen className="h-4 w-4" /> Questões</Link>
-        <Link href="/admin/questoes?tab=disciplinas" className={tabCls(tab === 'disciplinas')}><Merge className="h-4 w-4" /> Unificação de disciplinas</Link>
+        <Link href="/admin/questoes?tab=unificacao" className={tabCls(tab === 'unificacao')}><Merge className="h-4 w-4" /> Unificação</Link>
       </div>
 
-      {tab === 'disciplinas' ? (
-        <DisciplinasUnificacao disciplinas={discUnif} recentes={recentesUnif} />
+      {tab === 'unificacao' ? (
+        <TaxonomiaUnificacao tipo={tipoTax} itens={itensTax} recentes={recentesUnif} />
       ) : (<>
       <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
         <SecaoHeader
