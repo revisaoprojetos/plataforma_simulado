@@ -73,7 +73,7 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
     // Busca por código OU enunciado. Tolerante: `codigo` e os campos/embeds extras (cargo/assunto
     // específico/assunto/órgão) podem faltar em bases antigas → refaz com um select mínimo.
     const REST = 'enunciado, status, tipo, nivel_dificuldade, ano, disciplinas:simulado_disciplinas(nome), bancas:simulado_bancas(nome)'
-    const EXTRAS = ', cargo, assunto_detalhe, assuntos:simulado_assuntos(nome), orgaos:simulado_orgaos(nome)'
+    const EXTRAS = ', formato, cargo, assunto_detalhe, assuntos:simulado_assuntos(nome), orgaos:simulado_orgaos(nome)'
     const montarQuery = (comCodigo: boolean, comExtras: boolean) => {
       const sel: string = (comCodigo ? 'id, codigo, ' : 'id, ') + REST + (comExtras ? EXTRAS : '')
       let query = supabase
@@ -92,7 +92,7 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
       return query
     }
     let res = await montarQuery(true, true)
-    if (res.error && /(cargo|assunto_detalhe|assuntos|orgaos|orgao)/i.test(res.error.message)) res = await montarQuery(true, false)
+    if (res.error && /(formato|cargo|assunto_detalhe|assuntos|orgaos|orgao)/i.test(res.error.message)) res = await montarQuery(true, false)
     if (res.error && /codigo/i.test(res.error.message)) res = await montarQuery(false, false)
     questoes = (res.data ?? []) as any[]
     count = res.count
@@ -158,7 +158,7 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
         />
         <CardContent className="p-0">
           <QuestoesTabela questoes={(questoes ?? []).map((q: any) => ({
-            id: q.id, codigo: q.codigo ?? null, enunciado: q.enunciado ?? '', status: q.status ?? null, tipo: q.tipo ?? null,
+            id: q.id, codigo: q.codigo ?? null, enunciado: q.enunciado ?? '', status: q.status ?? null, tipo: q.tipo ?? null, formato: q.formato ?? null,
             nivel_dificuldade: q.nivel_dificuldade ?? null, ano: q.ano ?? null, cargo: q.cargo ?? null, assunto_detalhe: q.assunto_detalhe ?? null,
             disciplina: (q.disciplinas as { nome?: string } | null)?.nome ?? null,
             assunto: (q.assuntos as { nome?: string } | null)?.nome ?? null,

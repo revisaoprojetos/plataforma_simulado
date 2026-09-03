@@ -14,7 +14,7 @@ import { codigoQuestao } from '@/lib/codigo-questao'
 import { verificarUsoQuestoes, excluirQuestoes, type UsoQuestao } from '@/app/admin/questoes/actions'
 
 export type LinhaQuestao = {
-  id: string; codigo: string | null; enunciado: string; status: string | null; tipo: string | null
+  id: string; codigo: string | null; enunciado: string; status: string | null; tipo: string | null; formato: string | null
   nivel_dificuldade: string | null; ano: number | null; cargo: string | null; assunto_detalhe: string | null
   disciplina: string | null; assunto: string | null; banca: string | null; orgao: string | null
 }
@@ -25,6 +25,12 @@ const statusCfg: Record<string, { label: string; variant: 'default' | 'secondary
   arquivada: { label: 'Arquivada', variant: 'secondary' },
 }
 const difLabel: Record<string, string> = { facil: 'Fácil', medio: 'Médio', dificil: 'Difícil' }
+/** Tipo exibido: discursiva, ou (objetiva) Certo/Errado vs Múltipla, conforme o formato. */
+function tipoLabel(q: LinhaQuestao): string {
+  if (q.tipo === 'discursiva') return 'Discursiva'
+  if (q.formato === 'certo_errado') return 'Certo/Errado'
+  return 'Múltipla'
+}
 
 /** Quadradinho de seleção (mesmo visual da aba Unificação). */
 function CaixaSel({ on }: { on: boolean }) {
@@ -82,14 +88,15 @@ export function QuestoesTabela({ questoes }: { questoes: LinhaQuestao[] }) {
 
       {/* Tabela com rolagem horizontal */}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1120px] text-sm">
+        <table className="w-full min-w-[1480px] text-sm">
           <thead>
             <tr className="border-b text-left text-muted-foreground">
               <th className="w-10 px-3 py-2"><button type="button" onClick={toggleTodos} aria-label="Selecionar todos"><CaixaSel on={todosMarcados} /></button></th>
-              <th className="px-3 py-2 font-medium">Código</th>
-              <th className="px-3 py-2 font-medium">Enunciado</th>
+              <th className="w-[132px] whitespace-nowrap px-3 py-2 font-medium">Código</th>
+              <th className="w-[34rem] px-3 py-2 font-medium">Enunciado</th>
               <th className="px-3 py-2 font-medium">Disciplina</th>
               <th className="px-3 py-2 font-medium">Assunto</th>
+              <th className="px-3 py-2 font-medium">Assunto específico</th>
               <th className="px-3 py-2 font-medium">Órgão</th>
               <th className="px-3 py-2 font-medium">Cargo</th>
               <th className="px-3 py-2 font-medium">Ano</th>
@@ -102,23 +109,24 @@ export function QuestoesTabela({ questoes }: { questoes: LinhaQuestao[] }) {
           </thead>
           <tbody>
             {questoes.length === 0 ? (
-              <tr><td colSpan={13} className="py-8 text-center text-muted-foreground">Nenhuma questão encontrada.</td></tr>
+              <tr><td colSpan={14} className="py-8 text-center text-muted-foreground">Nenhuma questão encontrada.</td></tr>
             ) : questoes.map((q) => {
               const on = sel.has(q.id)
               const cfg = statusCfg[q.status ?? 'rascunho'] ?? statusCfg.rascunho
               return (
                 <tr key={q.id} className={cn('border-b transition-colors hover:bg-muted/30', on && 'bg-primary/5')}>
                   <td className="px-3 py-2"><button type="button" onClick={() => toggle(q.id)} aria-label="Selecionar questão"><CaixaSel on={on} /></button></td>
-                  <td className="px-3 py-2"><CopiarCodigo codigo={codigoQuestao(q.id, q.codigo)} /></td>
-                  <td className="max-w-[22rem] px-3 py-2"><Link href={`/admin/questoes/${q.id}/editar`} className="line-clamp-2 hover:text-primary hover:underline">{q.enunciado || '—'}</Link></td>
+                  <td className="whitespace-nowrap px-3 py-2"><CopiarCodigo codigo={codigoQuestao(q.id, q.codigo)} /></td>
+                  <td className="px-3 py-2 align-top"><Link href={`/admin/questoes/${q.id}/editar`} className="line-clamp-3 hover:text-primary hover:underline">{q.enunciado || '—'}</Link></td>
                   <td className="whitespace-nowrap px-3 py-2">{q.disciplina ?? '—'}</td>
-                  <td className="whitespace-nowrap px-3 py-2">{q.assunto ?? q.assunto_detalhe ?? '—'}</td>
+                  <td className="whitespace-nowrap px-3 py-2">{q.assunto ?? '—'}</td>
+                  <td className="whitespace-nowrap px-3 py-2">{q.assunto_detalhe ?? '—'}</td>
                   <td className="whitespace-nowrap px-3 py-2">{q.orgao ?? '—'}</td>
                   <td className="whitespace-nowrap px-3 py-2">{q.cargo ?? '—'}</td>
                   <td className="whitespace-nowrap px-3 py-2 tabular-nums">{q.ano ?? '—'}</td>
                   <td className="whitespace-nowrap px-3 py-2">{q.banca ?? '—'}</td>
                   <td className="whitespace-nowrap px-3 py-2">{q.nivel_dificuldade ? (difLabel[q.nivel_dificuldade] ?? q.nivel_dificuldade) : '—'}</td>
-                  <td className="whitespace-nowrap px-3 py-2 capitalize">{q.tipo ?? '—'}</td>
+                  <td className="whitespace-nowrap px-3 py-2">{tipoLabel(q)}</td>
                   <td className="px-3 py-2"><Badge variant={cfg.variant}>{cfg.label}</Badge></td>
                   <td className="px-3 py-2"><Link href={`/admin/questoes/${q.id}/editar`} className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"><Pencil className="h-3.5 w-3.5" /></Link></td>
                 </tr>
