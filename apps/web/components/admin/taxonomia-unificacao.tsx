@@ -105,8 +105,10 @@ export function TaxonomiaUnificacao({ tipo, itens, recentes = [] }: { tipo: Tipo
         <div className="space-y-2">
           <p className="flex items-center gap-1.5 text-sm font-semibold"><Sparkles className="h-4 w-4 text-primary" /> Sugestões automáticas <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">{clusters.length}</span></p>
           <p className="text-xs text-muted-foreground">Grupos com o mesmo nome escrito de formas diferentes. Confira {m.artigo === 'a' ? 'a que' : 'o que'} vai ser mantid{m.artigo} e unifique num clique.</p>
-          <div className="grid gap-2 lg:grid-cols-2">
-            {clusters.map((g, i) => <ClusterCard key={i} grupo={g} meta={m} salvando={salvando} onUnificar={unificar} />)}
+          <div className="max-h-[58vh] overflow-y-auto rounded-2xl border bg-muted/10 p-2">
+            <div className="grid gap-2 lg:grid-cols-2">
+              {clusters.map((g, i) => <ClusterCard key={i} grupo={g} meta={m} salvando={salvando} onUnificar={unificar} />)}
+            </div>
           </div>
         </div>
       )}
