@@ -2,30 +2,22 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import Link from 'next/link'
 import { Suspense } from 'react'
-import { buttonVariants } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { Card, CardContent } from '@/components/ui/card'
-import { Pencil, BookOpen, Merge } from 'lucide-react'
+import { BookOpen, Merge, Tag } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { QuestoesFilters } from '@/components/admin/questoes-filters'
 import { PaginationControls } from '@/components/admin/pagination-controls'
-import { CopiarCodigo } from '@/components/admin/copiar-codigo'
-import { codigoQuestao, faixaUuidDoCodigo } from '@/lib/codigo-questao'
+import { faixaUuidDoCodigo } from '@/lib/codigo-questao'
 import { NovaQuestaoDialog } from '@/components/admin/nova-questao-dialog'
 import { ExportQuestoesButton } from '@/components/admin/export-questoes-button'
 import { SecaoHeader } from '@/components/admin/secao-header'
 import { TaxonomiaUnificacao } from '@/components/admin/taxonomia-unificacao'
+import { QuestoesTabela } from '@/components/admin/questoes-tabela'
 import { listarTaxonomia } from './taxonomia-actions'
 import { ehTipoTaxonomia } from './taxonomia-tipos'
 import { listarUnificacoesRecentes } from './disciplinas-actions'
+import { EtiquetasClient } from '../etiquetas/etiquetas-client'
+import { listarEtiquetas } from '../etiquetas/actions'
 
 const PER_PAGE_OPTIONS = [10, 12, 15, 20]
 const PER_PAGE_DEFAULT = 12
@@ -45,18 +37,6 @@ interface PageProps {
   }>
 }
 
-const statusConfig: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-  publicada: { label: 'Publicada', variant: 'default' },
-  rascunho: { label: 'Rascunho', variant: 'outline' },
-  arquivada: { label: 'Arquivada', variant: 'secondary' },
-}
-
-const dificuldadeLabel: Record<string, string> = {
-  facil: 'Fácil',
-  medio: 'Médio',
-  dificil: 'Difícil',
-}
-
 export default async function QuestoesPage({ searchParams }: PageProps) {
   const params = await searchParams
   const page = Number(params.page ?? 1)
@@ -69,7 +49,11 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
   const dificuldade = params.dificuldade ?? ''
   const tipo = params.tipo ?? ''
 
-  const tab = (params.tab === 'unificacao' || params.tab === 'disciplinas') ? 'unificacao' : 'questoes'
+  const tab = params.tab === 'etiquetas'
+    ? 'etiquetas'
+    : (params.tab === 'unificacao' || params.tab === 'disciplinas')
+      ? 'unificacao'
+      : 'questoes'
   const tipoTax = ehTipoTaxonomia(params.tipoTax) ? params.tipoTax : 'disciplina'
 
   const supabase = await createServiceClient()
@@ -86,11 +70,12 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
       .eq('tenant_id', tenantId ?? NADA).order('nome')
     disciplinas = (disc ?? []) as { id: string; nome: string }[]
 
-    // Busca por código OU enunciado. Tolerante: se `codigo` não existir, refaz sem ela.
-    const montarQuery = (comCodigo: boolean) => {
-      const sel: string = comCodigo
-        ? 'id, codigo, enunciado, status, tipo, nivel_dificuldade, ano, disciplinas:simulado_disciplinas(nome), bancas:simulado_bancas(nome)'
-        : 'id, enunciado, status, tipo, nivel_dificuldade, ano, disciplinas:simulado_disciplinas(nome), bancas:simulado_bancas(nome)'
+    // Busca por código OU enunciado. Tolerante: `codigo` e os campos/embeds extras (cargo/assunto
+    // específico/assunto/órgão) podem faltar em bases antigas → refaz com um select mínimo.
+    const REST = 'enunciado, status, tipo, nivel_dificuldade, ano, disciplinas:simulado_disciplinas(nome), bancas:simulado_bancas(nome)'
+    const EXTRAS = ', cargo, assunto_detalhe, assuntos:simulado_assuntos(nome), orgaos:simulado_orgaos(nome)'
+    const montarQuery = (comCodigo: boolean, comExtras: boolean) => {
+      const sel: string = (comCodigo ? 'id, codigo, ' : 'id, ') + REST + (comExtras ? EXTRAS : '')
       let query = supabase
         .from('simulado_questoes')
         .select(sel, { count: 'exact' })
@@ -106,8 +91,9 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
       if (tipo) query = query.eq('tipo', tipo)
       return query
     }
-    let res = await montarQuery(true)
-    if (res.error && /codigo/i.test(res.error.message)) res = await montarQuery(false)
+    let res = await montarQuery(true, true)
+    if (res.error && /(cargo|assunto_detalhe|assuntos|orgaos|orgao)/i.test(res.error.message)) res = await montarQuery(true, false)
+    if (res.error && /codigo/i.test(res.error.message)) res = await montarQuery(false, false)
     questoes = (res.data ?? []) as any[]
     count = res.count
     totalPages = Math.ceil((count ?? 0) / perPage)
@@ -121,6 +107,9 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
       ])
     : [[], []]
 
+  // ── Aba ETIQUETAS: rótulos das questões (movida da sidebar para cá) ──
+  const etiquetas = tab === 'etiquetas' ? await listarEtiquetas().then((r) => (r.ok ? r.itens ?? [] : [])) : []
+
   const tabCls = (ativo: boolean) => cn('flex items-center gap-1.5 border-b-2 px-1 pb-2 font-medium transition-colors', ativo ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')
 
   return (
@@ -129,7 +118,11 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Questões</h1>
           <p className="text-muted-foreground">
-            {tab === 'questoes' ? `${count ?? 0} questões cadastradas` : `${itensTax.length} item(ns) — mescle os duplicados`}
+            {tab === 'questoes'
+              ? `${count ?? 0} questões cadastradas`
+              : tab === 'etiquetas'
+                ? `${etiquetas.length} etiqueta(s) — rótulos para organizar e sinalizar questões`
+                : `${itensTax.length} item(ns) — mescle os duplicados`}
           </p>
         </div>
         {tab === 'questoes' && (
@@ -140,13 +133,16 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
         )}
       </div>
 
-      {/* Abas: Questões · Unificação de disciplinas */}
+      {/* Abas: Questões · Unificação · Etiquetas */}
       <div className="flex gap-4 border-b text-sm">
         <Link href="/admin/questoes" className={tabCls(tab === 'questoes')}><BookOpen className="h-4 w-4" /> Questões</Link>
         <Link href="/admin/questoes?tab=unificacao" className={tabCls(tab === 'unificacao')}><Merge className="h-4 w-4" /> Unificação</Link>
+        <Link href="/admin/questoes?tab=etiquetas" className={tabCls(tab === 'etiquetas')}><Tag className="h-4 w-4" /> Etiquetas</Link>
       </div>
 
-      {tab === 'unificacao' ? (
+      {tab === 'etiquetas' ? (
+        <EtiquetasClient inicial={etiquetas} />
+      ) : tab === 'unificacao' ? (
         <TaxonomiaUnificacao tipo={tipoTax} itens={itensTax} recentes={recentesUnif} />
       ) : (<>
       <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
@@ -161,70 +157,14 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
           }
         />
         <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[130px]">Código</TableHead>
-                <TableHead>Enunciado</TableHead>
-                <TableHead>Disciplina</TableHead>
-                <TableHead>Banca</TableHead>
-                <TableHead>Dificuldade</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-[60px]" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {!questoes || questoes.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
-                    Nenhuma questão encontrada.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                questoes.map((q) => {
-                  const cfg = statusConfig[q.status ?? 'rascunho'] ?? statusConfig.rascunho
-                  const enunciado = q.enunciado ?? ''
-                  const preview = enunciado.length > 80
-                    ? enunciado.slice(0, 80) + '…'
-                    : enunciado
-                  const disciplina = (q.disciplinas as { nome?: string } | null)?.nome
-                  const banca = (q.bancas as { nome?: string } | null)?.nome
-
-                  return (
-                    <TableRow key={q.id}>
-                      <TableCell>
-                        <CopiarCodigo codigo={codigoQuestao(q.id, (q as any).codigo)} />
-                      </TableCell>
-                      <TableCell className="max-w-xs">
-                        <Link href={`/admin/questoes/${q.id}/editar`} className="text-sm line-clamp-2 hover:text-primary hover:underline">{preview}</Link>
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {disciplina ?? '—'}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {banca ?? '—'}
-                      </TableCell>
-                      <TableCell className="text-sm">
-                        {q.nivel_dificuldade ? dificuldadeLabel[q.nivel_dificuldade] ?? q.nivel_dificuldade : '—'}
-                      </TableCell>
-                      <TableCell className="text-sm capitalize">
-                        {q.tipo ?? '—'}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={cfg.variant}>{cfg.label}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Link href={`/admin/questoes/${q.id}/editar`} className={buttonVariants({ variant: 'ghost', size: 'icon-sm' })}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Link>
-                      </TableCell>
-                    </TableRow>
-                  )
-                })
-              )}
-            </TableBody>
-          </Table>
+          <QuestoesTabela questoes={(questoes ?? []).map((q: any) => ({
+            id: q.id, codigo: q.codigo ?? null, enunciado: q.enunciado ?? '', status: q.status ?? null, tipo: q.tipo ?? null,
+            nivel_dificuldade: q.nivel_dificuldade ?? null, ano: q.ano ?? null, cargo: q.cargo ?? null, assunto_detalhe: q.assunto_detalhe ?? null,
+            disciplina: (q.disciplinas as { nome?: string } | null)?.nome ?? null,
+            assunto: (q.assuntos as { nome?: string } | null)?.nome ?? null,
+            banca: (q.bancas as { nome?: string } | null)?.nome ?? null,
+            orgao: (q.orgaos as { nome?: string } | null)?.nome ?? null,
+          }))} />
         </CardContent>
       </Card>
 

@@ -9,6 +9,8 @@ import { checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { hospedarBase64 } from '@/lib/storage/hospedar-base64'
 import { BUCKET_IMAGENS } from '@/lib/storage/bucket-imagens'
+import { softDelete } from '@/lib/soft-delete'
+import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 interface AlternativaData {
@@ -393,4 +395,68 @@ export async function updateQuestaoAction(id: string, data: QuestaoData) {
   revalidatePath('/admin/banco-questoes')
   // Não redireciona: o usuário permanece na edição e recebe um toast de sucesso no cliente.
   return { ok: true as const }
+}
+
+export interface UsoQuestao { id: string; codigo: string | null; enunciado: string; bancos: string[]; simulados: string[]; respostas: number }
+
+/**
+ * Salvaguarda de exclusão: dentre as questões informadas, retorna SÓ as que estão EM USO — em algum
+ * BANCO (simulado_questao_pasta → nome), em algum SIMULADO (simulado_prova_questoes → título) ou já
+ * RESPONDIDAS por alunos (simulado_respostas_objetivas). O cliente mostra isso antes de excluir.
+ */
+export async function verificarUsoQuestoes(ids: string[]): Promise<{ ok: boolean; itens?: UsoQuestao[]; error?: string }> {
+  if (!(await checkPermission('questoes:view'))) return { ok: false, error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
+  const qids = [...new Set((ids ?? []).filter(Boolean))]
+  if (!qids.length) return { ok: true, itens: [] }
+  const svc = createAdminClient()
+  const tid = tenantId ?? '00000000-0000-0000-0000-000000000000'
+
+  const [vincBanco, vincSim, resp, meta] = await Promise.all([
+    fetchAllByIn<any>(qids, (chunk) => svc.from('simulado_questao_pasta').select('questao_id, pasta_id').eq('tenant_id', tid).in('questao_id', chunk)),
+    fetchAllByIn<any>(qids, (chunk) => svc.from('simulado_prova_questoes').select('questao_id, simulado_id').eq('tenant_id', tid).in('questao_id', chunk)),
+    fetchAllByIn<any>(qids, (chunk) => svc.from('simulado_respostas_objetivas').select('questao_id').eq('tenant_id', tid).in('questao_id', chunk)),
+    fetchAllByIn<any>(qids, (chunk) => svc.from('simulado_questoes').select('id, codigo, enunciado').eq('tenant_id', tid).in('id', chunk)),
+  ])
+
+  const pastaIds = [...new Set(vincBanco.map((v) => v.pasta_id).filter(Boolean))]
+  const simIds = [...new Set(vincSim.map((v) => v.simulado_id).filter(Boolean))]
+  const [pastas, sims] = await Promise.all([
+    pastaIds.length ? fetchAllByIn<any>(pastaIds, (chunk) => svc.from('simulado_pastas').select('id, nome').in('id', chunk)) : Promise.resolve([] as any[]),
+    simIds.length ? fetchAllByIn<any>(simIds, (chunk) => svc.from('simulado_simulados').select('id, titulo').in('id', chunk)) : Promise.resolve([] as any[]),
+  ])
+  const nomeBanco = new Map(pastas.map((p: any) => [p.id, p.nome ?? 'Banco']))
+  const nomeSim = new Map(sims.map((s: any) => [s.id, s.titulo ?? 'Simulado']))
+
+  const bancosPorQ = new Map<string, Set<string>>()
+  for (const v of vincBanco) { if (!v.questao_id) continue; const s = bancosPorQ.get(v.questao_id) ?? new Set<string>(); const n = nomeBanco.get(v.pasta_id); if (n) s.add(n); bancosPorQ.set(v.questao_id, s) }
+  const simsPorQ = new Map<string, Set<string>>()
+  for (const v of vincSim) { if (!v.questao_id) continue; const s = simsPorQ.get(v.questao_id) ?? new Set<string>(); const n = nomeSim.get(v.simulado_id); if (n) s.add(n); simsPorQ.set(v.questao_id, s) }
+  const respPorQ = new Map<string, number>()
+  for (const r of resp) { if (!r.questao_id) continue; respPorQ.set(r.questao_id, (respPorQ.get(r.questao_id) ?? 0) + 1) }
+  const metaMap = new Map(meta.map((m: any) => [m.id, m]))
+
+  const itens: UsoQuestao[] = []
+  for (const id of qids) {
+    const bancos = [...(bancosPorQ.get(id) ?? [])]
+    const simulados = [...(simsPorQ.get(id) ?? [])]
+    const respostas = respPorQ.get(id) ?? 0
+    if (!bancos.length && !simulados.length && !respostas) continue
+    const m: any = metaMap.get(id) ?? {}
+    itens.push({ id, codigo: m.codigo ?? null, enunciado: (m.enunciado ?? '').slice(0, 90), bancos, simulados, respostas })
+  }
+  return { ok: true, itens }
+}
+
+/** Exclui (soft-delete) questões em massa — vão para a lixeira, reversível. */
+export async function excluirQuestoes(ids: string[]): Promise<{ ok: boolean; count?: number; error?: string }> {
+  if (!(await checkPermission('questoes:delete'))) return { ok: false, error: 'Você não tem permissão para excluir questões.' }
+  const qids = [...new Set((ids ?? []).filter(Boolean))]
+  if (!qids.length) return { ok: false, error: 'Selecione ao menos uma questão.' }
+  const { error, count } = await softDelete('simulado_questoes', qids)
+  if (error) return { ok: false, error: error.message }
+  await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_questoes', entidadeId: qids[0], depois: { excluidas: count, ids: qids.slice(0, 50) } })
+  revalidatePath('/admin/questoes')
+  revalidatePath('/admin/banco-questoes')
+  return { ok: true, count }
 }
