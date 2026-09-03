@@ -1,11 +1,12 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Merge, Search, Check, Loader2, Info, Sparkles, X, Undo2, History } from 'lucide-react'
+import { Merge, Search, Check, Loader2, Info, Sparkles, X, Undo2, History, ArrowUpDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { formatBrt } from '@/lib/brt'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { unificarTaxonomia, previewUnificacaoTax } from '@/app/admin/questoes/taxonomia-actions'
 import type { TipoTaxonomia, ItemTax } from '@/app/admin/questoes/taxonomia-tipos'
@@ -37,6 +38,12 @@ export function TaxonomiaUnificacao({ tipo, itens, recentes = [] }: { tipo: Tipo
   const [salvando, setSalvando] = useState(false)
   const [desfazendo, setDesfazendo] = useState('')
   const [pagRec, setPagRec] = useState(1) // página da tabela "Unificações recentes" (10/pág)
+  const [campoRec, setCampoRec] = useState<'mantida' | 'mescladas' | 'questoes' | 'data'>('data')
+  const [dirRec, setDirRec] = useState<'asc' | 'desc'>('desc')
+  function ordenarRec(campo: 'mantida' | 'mescladas' | 'questoes' | 'data') {
+    if (campoRec === campo) setDirRec((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setCampoRec(campo); setDirRec(campo === 'mantida' ? 'asc' : 'desc') }
+  }
 
   // Clusters de possíveis duplicatas (mesmo nome normalizado, 2+ variações).
   const clusters = useMemo(() => {
@@ -171,9 +178,24 @@ export function TaxonomiaUnificacao({ tipo, itens, recentes = [] }: { tipo: Tipo
       {/* Unificações recentes — desfazer (só disciplina, que tem log/RPC): tabela paginada (10/pág) */}
       {m.undo && recentes.length > 0 && (() => {
         const POR_PAG = 10
-        const totalPag = Math.max(1, Math.ceil(recentes.length / POR_PAG))
+        const ordenados = [...recentes].sort((a, b) => {
+          let c = 0
+          if (campoRec === 'mantida') c = a.mantida.localeCompare(b.mantida, 'pt-BR')
+          else if (campoRec === 'mescladas') c = a.duplicadas.length - b.duplicadas.length
+          else if (campoRec === 'questoes') c = a.questoes - b.questoes
+          else c = (a.criado_em ?? '').localeCompare(b.criado_em ?? '') // data: ISO → ordem cronológica
+          return dirRec === 'asc' ? c : -c
+        })
+        const totalPag = Math.max(1, Math.ceil(ordenados.length / POR_PAG))
         const pag = Math.min(pagRec, totalPag)
-        const visiveis = recentes.slice((pag - 1) * POR_PAG, pag * POR_PAG)
+        const visiveis = ordenados.slice((pag - 1) * POR_PAG, pag * POR_PAG)
+        const ThRec = ({ campo, children, className }: { campo: 'mantida' | 'mescladas' | 'questoes' | 'data'; children: ReactNode; className?: string }) => (
+          <th className={cn('px-3 py-2 font-medium', className)}>
+            <button type="button" onClick={() => ordenarRec(campo)} className="inline-flex items-center gap-1 hover:text-foreground">
+              {children}<ArrowUpDown className={cn('h-3 w-3', campoRec === campo ? 'text-primary' : 'text-muted-foreground/50')} />
+            </button>
+          </th>
+        )
         return (
           <div className="space-y-2 rounded-2xl border bg-card p-4 shadow-sm">
             <p className="flex items-center gap-1.5 text-sm font-semibold"><History className="h-4 w-4 text-primary" /> Unificações recentes <span className="text-xs font-normal text-muted-foreground">({recentes.length})</span></p>
@@ -182,9 +204,10 @@ export function TaxonomiaUnificacao({ tipo, itens, recentes = [] }: { tipo: Tipo
               <table className="w-full text-sm">
                 <thead className="bg-background text-left text-muted-foreground">
                   <tr className="border-b">
-                    <th className="px-3 py-2 font-medium">Mantida</th>
-                    <th className="hidden px-3 py-2 font-medium sm:table-cell">Mescladas</th>
-                    <th className="px-3 py-2 text-right font-medium">Questões</th>
+                    <ThRec campo="mantida">Mantida</ThRec>
+                    <ThRec campo="mescladas" className="hidden sm:table-cell">Mescladas</ThRec>
+                    <ThRec campo="questoes" className="text-right"><span className="ml-auto">Questões</span></ThRec>
+                    <ThRec campo="data" className="hidden md:table-cell">Feito em</ThRec>
                     <th className="w-28 px-3 py-2" />
                   </tr>
                 </thead>
@@ -194,6 +217,7 @@ export function TaxonomiaUnificacao({ tipo, itens, recentes = [] }: { tipo: Tipo
                       <td className="px-3 py-2"><span className="block truncate font-medium">«{u.mantida}»</span></td>
                       <td className="hidden px-3 py-2 text-muted-foreground sm:table-cell" title={u.duplicadas.join(', ')}><span className="line-clamp-1">{u.duplicadas.length} · {u.duplicadas.join(', ') || '—'}</span></td>
                       <td className="px-3 py-2 text-right tabular-nums text-muted-foreground">{u.questoes.toLocaleString('pt-BR')}</td>
+                      <td className="hidden px-3 py-2 tabular-nums text-muted-foreground md:table-cell">{formatBrt(u.criado_em) ?? '—'}</td>
                       <td className="px-3 py-2 text-right">
                         <button onClick={() => desfazer(u)} disabled={desfazendo === u.id}
                           className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold text-muted-foreground transition hover:bg-muted disabled:opacity-50">
