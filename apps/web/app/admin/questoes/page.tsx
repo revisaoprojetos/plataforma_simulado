@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/lib/supabase/server'
+import { createServiceClient, createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import Link from 'next/link'
 import { Suspense } from 'react'
@@ -64,6 +64,8 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
   let questoes: any[] = []
   let count: number | null = 0
   let totalPages = 1
+  const nomeAssunto = new Map<string, string>()
+  const nomeOrgao = new Map<string, string>()
   if (tab === 'questoes') {
     const { data: disc } = await supabase
       .from('simulado_disciplinas').select('id, nome')
@@ -73,7 +75,7 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
     // Busca por código OU enunciado. Tolerante: `codigo` e os campos/embeds extras (cargo/assunto
     // específico/assunto/órgão) podem faltar em bases antigas → refaz com um select mínimo.
     const REST = 'enunciado, status, tipo, nivel_dificuldade, ano, disciplinas:simulado_disciplinas(nome), bancas:simulado_bancas(nome)'
-    const EXTRAS = ', formato, cargo, assunto_detalhe, assuntos:simulado_assuntos(nome), orgaos:simulado_orgaos(nome)'
+    const EXTRAS = ', formato, cargo, assunto_detalhe, assunto_id, orgao_id'
     const montarQuery = (comCodigo: boolean, comExtras: boolean) => {
       const sel: string = (comCodigo ? 'id, codigo, ' : 'id, ') + REST + (comExtras ? EXTRAS : '')
       let query = supabase
@@ -92,11 +94,23 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
       return query
     }
     let res = await montarQuery(true, true)
-    if (res.error && /(formato|cargo|assunto_detalhe|assuntos|orgaos|orgao)/i.test(res.error.message)) res = await montarQuery(true, false)
+    if (res.error && /(formato|cargo|assunto_detalhe|assunto_id|orgao_id)/i.test(res.error.message)) res = await montarQuery(true, false)
     if (res.error && /codigo/i.test(res.error.message)) res = await montarQuery(false, false)
     questoes = (res.data ?? []) as any[]
     count = res.count
     totalPages = Math.ceil((count ?? 0) / perPage)
+
+    // Nomes de Assunto/Órgão via SERVICE ROLE: a taxonomia (simulado_assuntos/orgaos) tem RLS que barra
+    // o embed sob a sessão do admin (por isso vinham vazios). Resolve pelos ids presentes na página.
+    const admin = createAdminClient()
+    const assIds = [...new Set(questoes.map((x) => x.assunto_id).filter(Boolean))]
+    const orgIds = [...new Set(questoes.map((x) => x.orgao_id).filter(Boolean))]
+    const [assRows, orgRows] = await Promise.all([
+      assIds.length ? admin.from('simulado_assuntos').select('id, nome').in('id', assIds) : Promise.resolve({ data: [] as any[] }),
+      orgIds.length ? admin.from('simulado_orgaos').select('id, nome').in('id', orgIds) : Promise.resolve({ data: [] as any[] }),
+    ])
+    for (const a of (assRows.data ?? []) as any[]) nomeAssunto.set(a.id, a.nome)
+    for (const o of (orgRows.data ?? []) as any[]) nomeOrgao.set(o.id, o.nome)
   }
 
   // ── Aba UNIFICAÇÃO: itens da taxonomia escolhida + (só disciplina) unificações recentes p/ desfazer ──
@@ -161,9 +175,9 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
             id: q.id, codigo: q.codigo ?? null, enunciado: q.enunciado ?? '', status: q.status ?? null, tipo: q.tipo ?? null, formato: q.formato ?? null,
             nivel_dificuldade: q.nivel_dificuldade ?? null, ano: q.ano ?? null, cargo: q.cargo ?? null, assunto_detalhe: q.assunto_detalhe ?? null,
             disciplina: (q.disciplinas as { nome?: string } | null)?.nome ?? null,
-            assunto: (q.assuntos as { nome?: string } | null)?.nome ?? null,
+            assunto: q.assunto_id ? (nomeAssunto.get(q.assunto_id) ?? null) : null,
             banca: (q.bancas as { nome?: string } | null)?.nome ?? null,
-            orgao: (q.orgaos as { nome?: string } | null)?.nome ?? null,
+            orgao: q.orgao_id ? (nomeOrgao.get(q.orgao_id) ?? null) : null,
           }))} />
         </CardContent>
       </Card>

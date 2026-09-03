@@ -1,11 +1,11 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
-import { Check, Loader2, Trash2, Pencil, X, AlertTriangle } from 'lucide-react'
+import { Check, Loader2, Trash2, Pencil, X, AlertTriangle, ArrowUpDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { Badge } from '@/components/ui/badge'
@@ -32,6 +32,8 @@ function tipoLabel(q: LinhaQuestao): string {
   return 'Múltipla'
 }
 
+type CampoOrd = 'codigo' | 'enunciado' | 'disciplina' | 'assunto' | 'assunto_detalhe' | 'orgao' | 'cargo' | 'ano' | 'banca' | 'dificuldade' | 'tipo' | 'status'
+
 /** Quadradinho de seleção (mesmo visual da aba Unificação). */
 function CaixaSel({ on }: { on: boolean }) {
   return <span className={cn('flex h-4 w-4 items-center justify-center rounded border', on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>{on && <Check className="h-3 w-3" />}</span>
@@ -46,6 +48,47 @@ export function QuestoesTabela({ questoes }: { questoes: LinhaQuestao[] }) {
 
   const idsPagina = useMemo(() => questoes.map((q) => q.id), [questoes])
   const todosMarcados = idsPagina.length > 0 && idsPagina.every((id) => sel.has(id))
+
+  // Ordenação (da página atual). Clique no cabeçalho alterna asc/desc.
+  const [campo, setCampo] = useState<CampoOrd | null>(null)
+  const [dir, setDir] = useState<'asc' | 'desc'>('asc')
+  function ordenar(c: CampoOrd) {
+    if (campo === c) setDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    else { setCampo(c); setDir('asc') }
+  }
+  const linhas = useMemo(() => {
+    if (!campo) return questoes
+    const difIdx: Record<string, number> = { facil: 0, medio: 1, dificil: 2 }
+    const val = (q: LinhaQuestao): string | number => {
+      switch (campo) {
+        case 'codigo': return codigoQuestao(q.id, q.codigo)
+        case 'enunciado': return q.enunciado ?? ''
+        case 'disciplina': return q.disciplina ?? ''
+        case 'assunto': return q.assunto ?? ''
+        case 'assunto_detalhe': return q.assunto_detalhe ?? ''
+        case 'orgao': return q.orgao ?? ''
+        case 'cargo': return q.cargo ?? ''
+        case 'ano': return q.ano ?? -1
+        case 'banca': return q.banca ?? ''
+        case 'dificuldade': return q.nivel_dificuldade ? (difIdx[q.nivel_dificuldade] ?? 9) : 9
+        case 'tipo': return tipoLabel(q)
+        case 'status': return q.status ?? ''
+      }
+    }
+    return [...questoes].sort((a, b) => {
+      const va = val(a), vb = val(b)
+      const c = typeof va === 'number' && typeof vb === 'number' ? va - vb : String(va).localeCompare(String(vb), 'pt-BR')
+      return dir === 'asc' ? c : -c
+    })
+  }, [questoes, campo, dir])
+
+  const ThOrd = ({ campo: c, children, className }: { campo: CampoOrd; children: ReactNode; className?: string }) => (
+    <th className={cn('px-3 py-2 font-medium', className)}>
+      <button type="button" onClick={() => ordenar(c)} className="inline-flex items-center gap-1 hover:text-foreground">
+        {children}<ArrowUpDown className={cn('h-3 w-3', campo === c ? 'text-primary' : 'text-muted-foreground/50')} />
+      </button>
+    </th>
+  )
 
   function toggle(id: string) { setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n }) }
   function toggleTodos() { setSel((p) => (todosMarcados ? new Set([...p].filter((id) => !idsPagina.includes(id))) : new Set([...p, ...idsPagina]))) }
@@ -88,36 +131,36 @@ export function QuestoesTabela({ questoes }: { questoes: LinhaQuestao[] }) {
 
       {/* Tabela com rolagem horizontal */}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[1480px] text-sm">
+        <table className="w-full min-w-[1720px] text-sm">
           <thead>
             <tr className="border-b text-left text-muted-foreground">
               <th className="w-10 px-3 py-2"><button type="button" onClick={toggleTodos} aria-label="Selecionar todos"><CaixaSel on={todosMarcados} /></button></th>
-              <th className="w-[132px] whitespace-nowrap px-3 py-2 font-medium">Código</th>
-              <th className="w-[34rem] px-3 py-2 font-medium">Enunciado</th>
-              <th className="px-3 py-2 font-medium">Disciplina</th>
-              <th className="px-3 py-2 font-medium">Assunto</th>
-              <th className="px-3 py-2 font-medium">Assunto específico</th>
-              <th className="px-3 py-2 font-medium">Órgão</th>
-              <th className="px-3 py-2 font-medium">Cargo</th>
-              <th className="px-3 py-2 font-medium">Ano</th>
-              <th className="px-3 py-2 font-medium">Banca</th>
-              <th className="px-3 py-2 font-medium">Dificuldade</th>
-              <th className="px-3 py-2 font-medium">Tipo</th>
-              <th className="px-3 py-2 font-medium">Status</th>
+              <ThOrd campo="codigo" className="w-[136px] whitespace-nowrap">Código</ThOrd>
+              <ThOrd campo="enunciado" className="w-[48rem]">Enunciado</ThOrd>
+              <ThOrd campo="disciplina">Disciplina</ThOrd>
+              <ThOrd campo="assunto">Assunto</ThOrd>
+              <ThOrd campo="assunto_detalhe">Assunto específico</ThOrd>
+              <ThOrd campo="orgao">Órgão</ThOrd>
+              <ThOrd campo="cargo">Cargo</ThOrd>
+              <ThOrd campo="ano">Ano</ThOrd>
+              <ThOrd campo="banca">Banca</ThOrd>
+              <ThOrd campo="dificuldade">Dificuldade</ThOrd>
+              <ThOrd campo="tipo">Tipo</ThOrd>
+              <ThOrd campo="status">Status</ThOrd>
               <th className="w-12 px-3 py-2" />
             </tr>
           </thead>
           <tbody>
-            {questoes.length === 0 ? (
+            {linhas.length === 0 ? (
               <tr><td colSpan={14} className="py-8 text-center text-muted-foreground">Nenhuma questão encontrada.</td></tr>
-            ) : questoes.map((q) => {
+            ) : linhas.map((q) => {
               const on = sel.has(q.id)
               const cfg = statusCfg[q.status ?? 'rascunho'] ?? statusCfg.rascunho
               return (
                 <tr key={q.id} className={cn('border-b transition-colors hover:bg-muted/30', on && 'bg-primary/5')}>
                   <td className="px-3 py-2"><button type="button" onClick={() => toggle(q.id)} aria-label="Selecionar questão"><CaixaSel on={on} /></button></td>
                   <td className="whitespace-nowrap px-3 py-2"><CopiarCodigo codigo={codigoQuestao(q.id, q.codigo)} /></td>
-                  <td className="px-3 py-2 align-top"><Link href={`/admin/questoes/${q.id}/editar`} className="line-clamp-3 hover:text-primary hover:underline">{q.enunciado || '—'}</Link></td>
+                  <td className="max-w-[48rem] px-3 py-2"><Link href={`/admin/questoes/${q.id}/editar`} title={q.enunciado || undefined} className="block truncate hover:text-primary hover:underline">{q.enunciado || '—'}</Link></td>
                   <td className="whitespace-nowrap px-3 py-2">{q.disciplina ?? '—'}</td>
                   <td className="whitespace-nowrap px-3 py-2">{q.assunto ?? '—'}</td>
                   <td className="whitespace-nowrap px-3 py-2">{q.assunto_detalhe ?? '—'}</td>
