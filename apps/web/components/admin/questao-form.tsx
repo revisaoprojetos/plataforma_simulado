@@ -232,7 +232,7 @@ type Opt = { value: string; label: string; disabled?: boolean }
  * O texto digitado é só filtro — só vira valor quando uma opção é escolhida; ao fechar sem
  * escolher, mantém o que já estava selecionado.
  */
-function SelectMenu({ value, onChange, options, placeholder, ariaLabel, buscavel, onCriar }: {
+function SelectMenu({ value, onChange, options, placeholder, ariaLabel, buscavel, onCriar, expandir }: {
   value: string
   onChange: (v: string) => void
   options: Opt[]
@@ -241,6 +241,9 @@ function SelectMenu({ value, onChange, options, placeholder, ariaLabel, buscavel
   buscavel?: boolean
   /** Se definido, mostra "+ Criar…" no topo da lista; recebe o texto já digitado (busca) como inicial. */
   onCriar?: (inicial?: string) => void
+  /** Em campos estreitos (grid 2 col): abre o menu maior que o gatilho, ancorado por um lado (o oposto
+   * cresce). 'left' = alinhado à esquerda cresce p/ direita; 'right' = alinhado à direita cresce p/ esq. */
+  expandir?: 'left' | 'right'
 }) {
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -294,7 +297,8 @@ function SelectMenu({ value, onChange, options, placeholder, ariaLabel, buscavel
         </button>
       </div>
       {montado && (
-        <div role="listbox" className={cn('absolute left-0 right-0 top-[calc(100%+4px)] z-40 max-h-60 origin-top overflow-auto rounded-xl border bg-popover p-1 shadow-lg transition duration-150 ease-out',
+        <div role="listbox" className={cn('absolute top-[calc(100%+4px)] z-40 max-h-60 origin-top overflow-auto rounded-xl border bg-popover p-1 shadow-lg transition duration-150 ease-out',
+          expandir ? cn('min-w-full w-max max-w-[18rem]', expandir === 'right' ? 'right-0' : 'left-0') : 'left-0 right-0',
           aberto ? 'scale-100 opacity-100 translate-y-0' : 'pointer-events-none -translate-y-1 scale-95 opacity-0')}>
           {onCriar && (
             <button type="button" onMouseDown={(e) => e.preventDefault()}
@@ -812,12 +816,12 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], orgaosS
 
               <div className="grid grid-cols-2 gap-3">
                 <Campo label="Banca">
-                  <SelectMenu value={watch('banca') ?? ''} ariaLabel="Banca" placeholder="—" buscavel
+                  <SelectMenu value={watch('banca') ?? ''} ariaLabel="Banca" placeholder="—" buscavel expandir="left"
                     onChange={(v) => setValue('banca', v, { shouldDirty: true })} onCriar={(ini) => abrirCriar('banca', 'banca', ini)}
                     options={[{ value: '', label: '—' }, ...bancasOpts.map((n) => ({ value: n, label: n }))]} />
                 </Campo>
                 <Campo label="Ano">
-                  <SelectMenu value={String(watch('ano') ?? '')} ariaLabel="Ano" placeholder="—" buscavel
+                  <SelectMenu value={String(watch('ano') ?? '')} ariaLabel="Ano" placeholder="—" buscavel expandir="right"
                     onChange={(v) => setValue('ano', v ? Number(v) : undefined, { shouldDirty: true })}
                     options={[{ value: '', label: '—' }, ...anos.map((y) => ({ value: String(y), label: String(y) }))]} />
                 </Campo>
@@ -825,12 +829,12 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], orgaosS
 
               <div className="grid grid-cols-2 gap-3">
                 <Campo label="Órgão">
-                  <SelectMenu value={watch('orgao') ?? ''} ariaLabel="Órgão" placeholder="—" buscavel
+                  <SelectMenu value={watch('orgao') ?? ''} ariaLabel="Órgão" placeholder="—" buscavel expandir="left"
                     onChange={(v) => setValue('orgao', v, { shouldDirty: true })} onCriar={(ini) => abrirCriar('orgao', 'órgão', ini)}
                     options={[{ value: '', label: '—' }, ...orgaoOpts.map((n) => ({ value: n, label: n }))]} />
                 </Campo>
                 <Campo label="Cargo">
-                  <SelectMenu value={watch('cargo') ?? ''} ariaLabel="Cargo" placeholder="—" buscavel
+                  <SelectMenu value={watch('cargo') ?? ''} ariaLabel="Cargo" placeholder="—" buscavel expandir="right"
                     onChange={(v) => setValue('cargo', v, { shouldDirty: true })} onCriar={(ini) => abrirCriar('cargo', 'cargo', ini)}
                     options={[{ value: '', label: '—' }, ...cargoOpts.map((n) => ({ value: n, label: n }))]} />
                 </Campo>
