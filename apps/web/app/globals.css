@@ -705,22 +705,47 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 .leitura-prosa [data-caixa] > :first-child, .leitura-prosa [data-caixa] > :last-child,
 .leitura-prosa [class*="box-"] > :first-child, .leitura-prosa [class*="box-"] > :last-child { margin-top:0; margin-bottom:0; }
 
-/* Caixas colapsáveis (ENTENDIMENTO DO STJ/STF): recolhidas por padrão, expandem no clique da
-   faixa do topo, com animação. A classe/atributo é ligada por JS no leitor (não muda o HTML
-   salvo, nem a "espinha" das âncoras — o chevron é um ::after, sem nó de texto). */
-.leitura-prosa [data-caixa].caixa-colapsavel { position:relative; max-height:3rem; overflow:hidden; cursor:pointer; padding-right:34px; transition:max-height .35s ease; }
-.leitura-prosa [data-caixa].caixa-colapsavel[data-aberto] { max-height:240rem; cursor:auto; }
-.leitura-prosa [data-caixa].caixa-colapsavel::after {
-  content:""; position:absolute; top:13px; right:13px; width:9px; height:9px;
-  border-right:2px solid currentColor; border-bottom:2px solid currentColor; opacity:.5;
-  transform:rotate(45deg); transition:transform .3s ease; pointer-events:none;
+/* Caixas EXPANSÍVEIS (ENTENDIMENTO DO STJ/STF): recolhidas mostram só o CABEÇALHO; clicar nele
+   abre o corpo com animação (grid-rows 0fr↔1fr, sem cortar texto no meio). O JS envolve o corpo
+   em .caixa-corpo/.caixa-corpo-in e marca o 1º filho como .caixa-cab (não muda o texto → âncoras
+   e "espinha" intactas). */
+.leitura-prosa .caixa-colapsavel > .caixa-cab { position:relative; display:flex; align-items:baseline; gap:.45em; margin:0; padding-right:26px; cursor:pointer; user-select:none; }
+.leitura-prosa .caixa-colapsavel > .caixa-cab:hover { opacity:.85; }
+/* Título ("ENTENDIMENTO DO STJ:") não encolhe; a prévia (começo do corpo) trunca em 1 linha e some ao abrir.
+   A prévia é um ::before com content:attr(data-previa) — SEM nó de texto, então não entra na "espinha"
+   das âncoras dos grifos (mesma razão do chevron ser ::after). order:1 a joga depois do título. */
+.leitura-prosa .caixa-colapsavel > .caixa-cab > :first-child { order:0; flex:none; white-space:nowrap; }
+.leitura-prosa .caixa-colapsavel > .caixa-cab::before {
+  content:attr(data-previa); order:1; flex:1 1 auto; min-width:0;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  font-weight:400; font-style:normal; opacity:.6; font-size:.92em; pointer-events:none;
 }
-.leitura-prosa [data-caixa].caixa-colapsavel[data-aberto]::after { transform:rotate(-135deg); }
-.leitura-prosa [data-caixa].caixa-colapsavel::before {
-  content:""; position:absolute; inset-inline:0; bottom:0; height:1.4rem; pointer-events:none;
-  background:linear-gradient(to bottom, transparent, rgba(0,0,0,.07)); transition:opacity .3s ease;
+.leitura-prosa .caixa-colapsavel[data-aberto] > .caixa-cab::before { content:none; }
+.leitura-prosa .caixa-colapsavel > .caixa-cab::after {
+  content:""; position:absolute; top:50%; right:4px; width:8px; height:8px; margin-top:-6px;
+  border-right:2px solid currentColor; border-bottom:2px solid currentColor; opacity:.55;
+  transform:rotate(45deg); transition:transform .25s ease; pointer-events:none;
 }
-.leitura-prosa [data-caixa].caixa-colapsavel[data-aberto]::before { opacity:0; }
+.leitura-prosa .caixa-colapsavel[data-aberto] > .caixa-cab::after { transform:rotate(-135deg); }
+.leitura-prosa .caixa-colapsavel > .caixa-corpo { display:grid; grid-template-rows:0fr; transition:grid-template-rows .3s ease; }
+.leitura-prosa .caixa-colapsavel[data-aberto] > .caixa-corpo { grid-template-rows:1fr; }
+.leitura-prosa .caixa-colapsavel > .caixa-corpo > .caixa-corpo-in { overflow:hidden; min-height:0; }
+
+/* Destaque ao navegar pelo índice: o dispositivo alvo pisca na cor da marca. */
+@keyframes leitura-flash {
+  0%   { background-color: color-mix(in oklab, var(--primary) 32%, transparent); box-shadow: 0 0 0 4px color-mix(in oklab, var(--primary) 18%, transparent); }
+  100% { background-color: transparent; box-shadow: 0 0 0 4px transparent; }
+}
+.leitura-prosa .leitura-alvo { animation: leitura-flash 1.6s ease-out; border-radius: 4px; }
+/* Ao pular pelo índice, deixa um respiro acima do alvo (não cola no topo do container). */
+.leitura-prosa [data-disp], .leitura-prosa [data-art] { scroll-margin-top: 1.75rem; }
+
+/* Marcação dos dispositivos ALTERADOS na prévia (aba Alterações do editor): caixa em volta,
+   colorida por tipo (amber=alterado, emerald=novo, rose=removido). box-shadow não muda o layout. */
+.leitura-prosa .leitura-alt { border-radius: 6px; scroll-margin-top: 1.75rem; transition: box-shadow .2s ease; }
+.leitura-prosa .leitura-alt-mod { box-shadow: 0 0 0 2px rgba(245,158,11,.75); background: rgba(245,158,11,.09); }
+.leitura-prosa .leitura-alt-add { box-shadow: 0 0 0 2px rgba(16,185,129,.75); background: rgba(16,185,129,.09); }
+.leitura-prosa .leitura-alt-rem { box-shadow: 0 0 0 2px rgba(244,63,94,.65); background: rgba(244,63,94,.07); }
 
 /* "📌 Já cobrado em prova" — chip estrutural */
 .leitura-prosa [data-cobranca] {

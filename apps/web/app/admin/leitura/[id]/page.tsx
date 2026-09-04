@@ -1,9 +1,7 @@
-import Link from 'next/link'
 import { notFound, redirect } from 'next/navigation'
-import { GitCompare } from 'lucide-react'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
-import { buttonVariants } from '@/components/ui/button'
+import { limparCabecalhoHtml } from '@/lib/leitura/limpar-cabecalho'
 import { LeituraEditor } from '@/components/admin/leitura-editor'
 import { listarMaterias, type Documento } from '../actions'
 
@@ -39,21 +37,13 @@ export default async function LeituraEditorPage({ params }: { params: Promise<{ 
   }
   const materias = (await listarMaterias()).itens ?? []
   const temRascunhoPendente = rascunhoVersao > publicadaVersao
-  // Só oferece o antes/depois quando há o que comparar (rascunho pendente ou 2+ versões publicadas).
-  const podeComparar = temRascunhoPendente || publicadaVersao > 1
 
   return (
     <div className="space-y-3">
-      {podeComparar && (
-        <div className="flex justify-end">
-          <Link href={`/admin/leitura/${id}/alteracoes`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-            <GitCompare className="mr-1.5 h-4 w-4" /> Alterações (antes/depois)
-          </Link>
-        </div>
-      )}
+      {/* O antes/depois (Alterações) agora fica no sidebar do editor, como aba ao lado do Índice. */}
       <LeituraEditor
         documento={documento}
-        htmlAtual={(cont as any)?.html ?? ''}
+        htmlAtual={limparCabecalhoHtml((cont as any)?.html ?? '')}
         podeEditar={await checkPermission('leitura:update')}
         podePublicar={await checkPermission('leitura:publicar')}
         materias={materias}

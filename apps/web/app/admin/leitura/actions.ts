@@ -151,19 +151,41 @@ async function carryOver(svc: ReturnType<typeof createAdminClient>, tenantId: st
 }
 
 /** Publica o rascunho como versão IMUTÁVEL e vira o ponteiro (commit num único UPDATE). */
-export async function publicarVersao(documentoId: string, relatorio?: { tipo?: string; descricao?: string }): Promise<{ ok: boolean; versao?: number; error?: string }> {
+export async function publicarVersao(documentoId: string, relatorio?: { tipo?: string; descricao?: string; substituir?: boolean; avisar?: boolean }): Promise<{ ok: boolean; versao?: number; error?: string }> {
   const g = await guard('leitura:publicar'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
-  const { data: doc, error: derr } = await svc.from('simulado_documentos').select('versao, versao_publicada, versao_rascunho').eq('id', documentoId).eq('tenant_id', g.tenantId).maybeSingle()
+  const { data: doc, error: derr } = await svc.from('simulado_documentos').select('versao, versao_publicada, versao_rascunho, publicado').eq('id', documentoId).eq('tenant_id', g.tenantId).maybeSingle()
   if (derr && /versao_publicada|column/i.test(derr.message)) return { ok: false, error: 'Rode a migração de versionamento (20260823000002).' }
   if (!doc) return { ok: false, error: 'Documento não encontrado.' }
   const pub = (doc as any).versao_publicada ?? (doc as any).versao ?? 1
   const rasc = (doc as any).versao_rascunho ?? pub
   if (rasc <= pub) return { ok: false, error: 'Não há rascunho novo para publicar. Edite o conteúdo primeiro.' }
 
-  const { data: cont } = await svc.from('simulado_documento_conteudos').select('html').eq('documento_id', documentoId).eq('versao', rasc).maybeSingle()
+  const { data: cont } = await svc.from('simulado_documento_conteudos').select('html, artigos').eq('documento_id', documentoId).eq('versao', rasc).maybeSingle()
   const html = (cont as any)?.html as string | undefined
   if (!html || !html.replace(/<[^>]+>/g, '').trim()) return { ok: false, error: 'Rascunho vazio — nada a publicar.' }
+
+  // SUBSTITUIR a versão atual: aplica o rascunho SOBRE a versão já publicada, sem criar nova versão
+  // nem relatório de "antes/depois" (correção silenciosa — o aluno não vê que mudou). Só faz sentido
+  // quando já existe versão publicada; senão cai no fluxo normal (primeira publicação).
+  if (relatorio?.substituir && (doc as any).publicado && pub >= 1) {
+    const artigos = (cont as any)?.artigos ?? 0
+    // 1) sobrescreve o conteúdo da versão publicada
+    await svc.from('simulado_documento_conteudos').update({ html, artigos }).eq('documento_id', documentoId).eq('versao', pub)
+    // 2) copia os dispositivos do rascunho para a versão publicada (tolerante à migração A3 ausente)
+    try {
+      const { data: disp } = await svc.from('simulado_lei_dispositivos').select('*').eq('documento_id', documentoId).eq('versao', rasc)
+      await svc.from('simulado_lei_dispositivos').delete().eq('documento_id', documentoId).eq('versao', pub)
+      if (disp?.length) await svc.from('simulado_lei_dispositivos').insert((disp as any[]).map(({ id, ...d }) => ({ ...d, versao: pub })))
+    } catch { /* A3 ausente */ }
+    // 3) descarta a linha de rascunho e volta o ponteiro para a publicada
+    try { await svc.from('simulado_lei_dispositivos').delete().eq('documento_id', documentoId).eq('versao', rasc) } catch { /* A3 ausente */ }
+    await svc.from('simulado_documento_conteudos').delete().eq('documento_id', documentoId).eq('versao', rasc)
+    await svc.from('simulado_documentos').update({ versao_rascunho: pub, versao: pub, versao_publicada: pub, publicado: true, situacao_editorial: 'publicada', atualizado_em: new Date().toISOString() }).eq('id', documentoId).eq('tenant_id', g.tenantId)
+    await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_documentos', entidadeId: documentoId, depois: { substituiu_versao: pub }, atorId: g.atorId, tenantId: g.tenantId })
+    revalidatePath('/admin/leitura'); revalidatePath(`/admin/leitura/${documentoId}`)
+    return { ok: true, versao: pub }
+  }
 
   // 1) carry-over aditivo (mantém linhas antigas → seguro/re-executável)
   try { await carryOver(svc, g.tenantId, documentoId, pub, rasc, html) } catch (e) { console.error('[leitura] carryOver:', (e as Error)?.message) }
@@ -172,10 +194,12 @@ export async function publicarVersao(documentoId: string, relatorio?: { tipo?: s
   // 3) COMMIT — vira o ponteiro num único UPDATE (aluno passa a ver a nova versão)
   const { error } = await svc.from('simulado_documentos').update({ versao_publicada: rasc, versao: rasc, publicado: true, situacao_editorial: 'publicada', atualizado_em: new Date().toISOString() }).eq('id', documentoId).eq('tenant_id', g.tenantId)
   if (error) return { ok: false, error: error.message }
-  // 4) relatório público + auditoria
+  // 4) relatório público (só se "avisar" — a pílula "lei atualizada"/antes-depois do aluno) + auditoria
   const tipo = relatorio?.tipo || (pub === rasc - 1 && pub <= 1 ? 'nova_lei' : 'alteracao')
-  await svc.from('simulado_lei_atualizacoes').insert({ tenant_id: g.tenantId, documento_id: documentoId, versao: rasc, tipo, descricao: relatorio?.descricao || null, criado_por: g.atorId })
-  await registrarAudit({ operacao: 'LIBERAR', entidade: 'simulado_documentos', entidadeId: documentoId, depois: { versao_publicada: rasc, tipo }, atorId: g.atorId, tenantId: g.tenantId })
+  if (relatorio?.avisar !== false) {
+    await svc.from('simulado_lei_atualizacoes').insert({ tenant_id: g.tenantId, documento_id: documentoId, versao: rasc, tipo, descricao: relatorio?.descricao || null, criado_por: g.atorId })
+  }
+  await registrarAudit({ operacao: 'LIBERAR', entidade: 'simulado_documentos', entidadeId: documentoId, depois: { versao_publicada: rasc, tipo, avisou: relatorio?.avisar !== false }, atorId: g.atorId, tenantId: g.tenantId })
   revalidatePath('/admin/leitura'); revalidatePath(`/admin/leitura/${documentoId}`)
   return { ok: true, versao: rasc }
 }

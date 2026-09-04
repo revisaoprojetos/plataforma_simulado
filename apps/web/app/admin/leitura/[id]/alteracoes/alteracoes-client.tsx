@@ -9,7 +9,7 @@ import type { DiffDoc, VersaoInfo } from '@/lib/leitura/diff-tipos'
 
 function rotuloVersao(v: VersaoInfo): string {
   const tag = v.rascunho ? ' · rascunho' : v.atual ? ' · publicada' : ''
-  return `v${v.versao}${tag}`
+  return v.nome ? `${v.nome} (v${v.versao})` : `v${v.versao}${tag}`
 }
 
 export function AlteracoesClient({

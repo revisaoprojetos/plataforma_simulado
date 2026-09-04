@@ -354,6 +354,9 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
     if (!el) return
     if (modo === 'scroll') { el.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
     else { const alvo = Math.floor(el.offsetLeft / (colW + GAP)); irPara(alvo) }
+    // Pisca o dispositivo alvo (remove+reflow p/ reiniciar a animação em cliques repetidos).
+    el.classList.remove('leitura-alvo'); void el.offsetWidth; el.classList.add('leitura-alvo')
+    window.setTimeout(() => el.classList.remove('leitura-alvo'), 1700)
   }
 
   function irMatch(delta: number) {
@@ -506,35 +509,47 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
 
   const proseStyle = useMemo<React.CSSProperties>(() => ({ fontSize: fonte, lineHeight: 1.7, color: cores.fg }), [fonte, cores.fg])
 
-  // #4 — caixas "ENTENDIMENTO DO STJ/STF" viram expansíveis (recolhidas por padrão).
+  // #4 — caixas "ENTENDIMENTO DO STJ/STF" viram ACORDEÃO: recolhidas mostram só o cabeçalho;
+  // clicar no cabeçalho abre o corpo (envolvido em .caixa-corpo/.caixa-corpo-in, grid-rows).
+  // Envolver o corpo não muda ordem/texto dos nós → a "espinha" das âncoras dos grifos fica intacta.
   useEffect(() => {
     const cont = contentRef.current
     if (!cont) return
-    const caixas = Array.from(cont.querySelectorAll<HTMLElement>('[data-caixa="stj"], [data-caixa="stf"]'))
-    const onClick = (e: Event) => {
-      const box = e.currentTarget as HTMLElement
-      if (box.hasAttribute('data-aberto')) {
-        // Aberta: só recolhe clicando na FAIXA do topo (limiar relativo à fonte, imune ao
-        // font-scale) e sem seleção de texto ativa.
-        const cs = getComputedStyle(box)
-        const limiar = (parseFloat(cs.paddingTop) || 10) + (parseFloat(cs.lineHeight) || 20) + 8
-        const top = (e as MouseEvent).clientY - box.getBoundingClientRect().top
-        if (top > limiar) return
-        if ((window.getSelection()?.toString() ?? '').length > 0) return
-        box.removeAttribute('data-aberto')
-      } else {
-        box.setAttribute('data-aberto', '1')
-      }
-      // Nudge imediato + ao FIM da transição (0.35s), senão o overlay mede um estado intermediário.
+    const onCab = (e: Event) => {
+      const box = (e.currentTarget as HTMLElement).closest('.caixa-colapsavel') as HTMLElement | null
+      if (!box) return
+      if (box.hasAttribute('data-aberto')) box.removeAttribute('data-aberto')
+      else box.setAttribute('data-aberto', '1')
+      // Nudge imediato + ao FIM da transição, senão o overlay dos grifos mede um estado intermediário.
       window.dispatchEvent(new Event('resize'))
-      box.addEventListener('transitionend', () => window.dispatchEvent(new Event('resize')), { once: true })
+      box.querySelector('.caixa-corpo')?.addEventListener(
+        'transitionend', () => window.dispatchEvent(new Event('resize')), { once: true },
+      )
     }
+    const ligados: HTMLElement[] = []
+    // Pega data-caixa (novo) E as classes legadas box-stj/box-stf (conteúdo antigo).
+    const caixas = Array.from(cont.querySelectorAll<HTMLElement>('[data-caixa="stj"], [data-caixa="stf"], .box-stj, .box-stf'))
     for (const box of caixas) {
+      if (box.classList.contains('caixa-colapsavel')) continue
+      const filhos = Array.from(box.children)
+      if (filhos.length < 2) continue // sem corpo pra recolher
+      const cab = filhos[0] as HTMLElement
+      cab.classList.add('caixa-cab')
+      const corpo = document.createElement('div'); corpo.className = 'caixa-corpo'
+      const inner = document.createElement('div'); inner.className = 'caixa-corpo-in'
+      for (const f of filhos.slice(1)) inner.appendChild(f)
+      corpo.appendChild(inner); box.appendChild(corpo)
+      // Prévia (começo do corpo) ao lado do título, pra diferenciar as caixas recolhidas.
+      // Vai num data-attr → renderizada via CSS ::before (sem nó de texto → não mexe na espinha das âncoras).
+      const previa = (inner.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 160)
+      if (previa) cab.setAttribute('data-previa', previa)
       box.classList.add('caixa-colapsavel')
-      box.removeAttribute('data-aberto')
-      box.addEventListener('click', onClick)
+      // A caixa de LEGENDA dos grifos abre por padrão (o aluno vê as cores de cara); as demais recolhem.
+      if (/^\s*LEGENDA\b/i.test(cab.textContent || '')) box.setAttribute('data-aberto', '1')
+      else box.removeAttribute('data-aberto')
+      cab.addEventListener('click', onCab); ligados.push(cab)
     }
-    return () => { for (const box of caixas) box.removeEventListener('click', onClick) }
+    return () => { for (const c of ligados) c.removeEventListener('click', onCab) }
   }, [doc.html])
 
   return (

@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAll } from '@/lib/supabase/fetch-all'
 import { remember } from '@/lib/cache/relatorio-cache'
 import { diffDocumentos } from './diff'
+import { limparCabecalhoHtml } from './limpar-cabecalho'
 import type { DiffDoc } from './diff-tipos'
 
 /**
@@ -311,7 +312,7 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
     titulo: (doc as any).titulo,
     descricao: (doc as any).descricao ?? null,
     versao,
-    html: cont.html,
+    html: limparCabecalhoHtml(cont.html),
     artigos: cont.artigos,
     desafio: { ativo: !!(doc as any).desafio_ativo, exigeFim: !!(doc as any).desafio_exige_fim, tempoMin: (doc as any).desafio_tempo_min ?? 0 },
     progresso: {

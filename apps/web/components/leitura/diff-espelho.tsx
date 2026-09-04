@@ -1,15 +1,22 @@
 'use client'
 
 // Espelho de alterações (antes/depois) — usado no admin (professor) e no leitor (aluno).
+import type { ReactNode } from 'react'
 import type { BlocoDiff, DiffDoc, Token } from '@/lib/leitura/diff-tipos'
 
-export function DiffEspelho({ diff }: { diff: DiffDoc }) {
+export function DiffEspelho({ diff, onSelecionar, acaoBloco }: {
+  diff: DiffDoc
+  /** Clicar no cabeçalho do bloco (ex.: rolar até o dispositivo na prévia). */
+  onSelecionar?: (b: BlocoDiff) => void
+  /** Slot opcional à direita do cabeçalho (ex.: botão de descartar a alteração). */
+  acaoBloco?: (b: BlocoDiff) => ReactNode
+}) {
   if (!diff.blocos.length) {
     return <p className="rounded-2xl border border-dashed p-10 text-center text-sm text-muted-foreground">Nenhuma diferença de texto entre estas versões.</p>
   }
   return (
     <div className="space-y-3">
-      {diff.blocos.map((b, i) => <Bloco key={i} b={b} />)}
+      {diff.blocos.map((b, i) => <Bloco key={i} b={b} onSelecionar={onSelecionar} acaoBloco={acaoBloco} />)}
     </div>
   )
 }
@@ -30,23 +37,46 @@ function Tokens({ tokens }: { tokens: Token[] }) {
   )
 }
 
-function Bloco({ b }: { b: BlocoDiff }) {
+function Bloco({ b, onSelecionar, acaoBloco }: { b: BlocoDiff; onSelecionar?: (b: BlocoDiff) => void; acaoBloco?: (b: BlocoDiff) => ReactNode }) {
   const cor = b.estado === 'add' ? 'border-emerald-400/50' : b.estado === 'rem' ? 'border-rose-400/50' : 'border-amber-400/50'
   const rotuloEstado = b.estado === 'add' ? 'Adicionado' : b.estado === 'rem' ? 'Removido' : 'Alterado'
   const corBadge =
     b.estado === 'add' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300'
       : b.estado === 'rem' ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300'
         : 'bg-amber-500/15 text-amber-700 dark:text-amber-300'
+  const acao = acaoBloco?.(b)
 
   return (
     <div className={`overflow-hidden rounded-2xl border bg-card shadow-sm ${cor}`}>
       <div className="flex items-center gap-2 border-b bg-muted/30 px-4 py-2">
-        <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${corBadge}`}>{rotuloEstado}</span>
-        {b.rotulo && <span className="text-sm font-medium">{b.rotulo}</span>}
+        <button
+          type="button"
+          onClick={onSelecionar ? () => onSelecionar(b) : undefined}
+          disabled={!onSelecionar}
+          className={`flex min-w-0 flex-1 items-center gap-2 text-left ${onSelecionar ? 'cursor-pointer hover:opacity-80' : 'cursor-default'}`}
+          title={onSelecionar ? 'Ver na prévia' : undefined}
+        >
+          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${corBadge}`}>{rotuloEstado}</span>
+          {b.rotulo && <span className="truncate text-sm font-medium">{b.rotulo}</span>}
+        </button>
+        {acao}
       </div>
 
       {b.estado === 'mod' ? (
-        <div className="grid gap-px bg-border sm:grid-cols-2">
+        (b.antes.length === 0 && b.depois.length === 0 && (b.htmlAntes || b.htmlDepois)) ? (
+          // Só grifo/formatação mudou (texto igual) → renderiza os dois lados p/ ver os grifos.
+          <div className="grid gap-px bg-border">
+            <div className="bg-card p-4">
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Antes</p>
+              <div className="leitura-prosa text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: b.htmlAntes ?? '' }} />
+            </div>
+            <div className="bg-card p-4">
+              <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Depois</p>
+              <div className="leitura-prosa text-sm leading-relaxed" dangerouslySetInnerHTML={{ __html: b.htmlDepois ?? '' }} />
+            </div>
+          </div>
+        ) : (
+        <div className="grid gap-px bg-border">
           <div className="bg-card p-4">
             <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Antes</p>
             <p className="text-sm leading-relaxed"><Tokens tokens={b.antes} /></p>
@@ -56,6 +86,7 @@ function Bloco({ b }: { b: BlocoDiff }) {
             <p className="text-sm leading-relaxed"><Tokens tokens={b.depois} /></p>
           </div>
         </div>
+        )
       ) : (
         <div className={`leitura-prosa p-4 text-sm ${b.estado === 'rem' ? 'opacity-70' : ''}`} dangerouslySetInnerHTML={{ __html: b.html }} />
       )}

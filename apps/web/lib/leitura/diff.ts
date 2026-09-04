@@ -1,6 +1,6 @@
 import 'server-only'
 import { parse, NodeType } from 'node-html-parser'
-import type { BlocoDiff, DiffDoc, Token } from './diff-tipos'
+import type { AncoraBloco, BlocoDiff, DiffDoc, Token } from './diff-tipos'
 
 // Diff de versões da Leitura (antes/depois).
 //
@@ -27,37 +27,31 @@ function rotuloDe(el: any, texto: string): string | null {
   return tipo || null
 }
 
+// Blocos de conteúdo considerados no diff (folha = não contém outro desses).
+const CONTENT_SEL = 'p,li,h1,h2,h3,h4,h5,h6,div,section,blockquote'
+
 function extrairBlocos(html: string): Bloco[] {
   const root = parse(html || '')
   const out: Bloco[] = []
-  // Blocos com âncora estável (data-disp/data-art) em QUALQUER profundidade — o sanitizador
-  // ancora via querySelectorAll, então um wrapper <div>/<section> de topo (comum no import de
-  // Word) NÃO pode colapsar o documento inteiro num bloco só. Pegamos só os FOLHA (âncora sem
-  // âncora descendente), para um capítulo que envolva artigos não duplicar o texto deles.
-  // Chaves duplicadas (ex.: data-art repetido vindo do input, ou textos idênticos) recebem um
-  // sufixo por ocorrência — senão o LCS casaria blocos errados.
+  // Pegamos os blocos FOLHA de conteúdo (que não contêm outro bloco) — assim um wrapper <div> de
+  // topo (comum no import de Word) ou um capítulo que envolve artigos NÃO duplica o texto dos
+  // filhos. Entram TANTO os dispositivos ancorados (art./§ — casados pela âncora data-disp/data-art,
+  // estável) QUANTO o conteúdo sem âncora (preâmbulo, cabeçalho, caixas STJ/legenda — casado por
+  // TEXTO), então QUALQUER mudança de texto conta no antes/depois. Chaves duplicadas (data-art
+  // repetido, textos idênticos) recebem sufixo por ocorrência — senão o LCS casaria blocos errados.
   const vistos = new Map<string, number>()
   const unica = (k: string) => { const n = (vistos.get(k) ?? 0) + 1; vistos.set(k, n); return n === 1 ? k : `${k}#${n}` }
 
-  const ancorados = Array.from(root.querySelectorAll('[data-disp], [data-art]')) as any[]
-  const folhas = ancorados.filter((el) => !el.querySelector?.('[data-disp], [data-art]'))
-  if (folhas.length) {
-    for (const el of folhas) {
-      const texto = norm(el.text ?? '')
-      if (!texto) continue
-      const disp = el.getAttribute?.('data-disp')
-      const art = el.getAttribute?.('data-art')
-      out.push({ key: unica(disp ? `d:${disp}` : `a:${art}`), rotulo: rotuloDe(el, texto), texto, html: el.outerHTML ?? String(el) })
-    }
-    return out
-  }
-  // Sem âncoras (preâmbulo/cabeçalho): cai nos filhos de topo, casados por texto.
-  for (const node of root.childNodes) {
-    if (node.nodeType !== NodeType.ELEMENT_NODE) continue
-    const el: any = node
+  const cands = Array.from(root.querySelectorAll(CONTENT_SEL)) as any[]
+  const folhas = cands.filter((el) => !el.querySelector?.(CONTENT_SEL))
+  const lista: any[] = folhas.length ? folhas : (root.childNodes as any[]).filter((n) => n.nodeType === NodeType.ELEMENT_NODE)
+  for (const el of lista) {
     const texto = norm(el.text ?? '')
     if (!texto) continue
-    out.push({ key: unica(`t:${texto.toLowerCase()}`), rotulo: rotuloDe(el, texto), texto, html: el.outerHTML ?? String(el) })
+    const disp = el.getAttribute?.('data-disp')
+    const art = el.getAttribute?.('data-art')
+    const key = disp ? `d:${disp}` : art ? `a:${art}` : `t:${texto.toLowerCase()}`
+    out.push({ key: unica(key), rotulo: rotuloDe(el, texto), texto, html: el.outerHTML ?? String(el) })
   }
   return out
 }
@@ -98,6 +92,67 @@ function palavrasDiff(a: string, b: string): { antes: Token[]; depois: Token[] }
   return { antes, depois }
 }
 
+/** Âncora (data-disp/data-art) a partir da chave do bloco (`d:xxx`/`a:xxx`, sem o sufixo `#n` de dedup). */
+function ancoraDaKey(key: string): AncoraBloco | undefined {
+  const base = key.replace(/#\d+$/, '')
+  if (base.startsWith('d:')) return { tipo: 'disp', id: base.slice(2) }
+  if (base.startsWith('a:')) return { tipo: 'art', id: base.slice(2) }
+  return undefined
+}
+
+/** Acha o elemento com data-disp/data-art = id, comparando o atributo (sem selector CSS,
+ *  evita problemas de escape com pontos/aspas nos ids gerados pelo sanitizador). */
+function acharPorAncora(root: any, anchor: AncoraBloco): any {
+  const attr = anchor.tipo === 'disp' ? 'data-disp' : 'data-art'
+  return (root.querySelectorAll(`[${attr}]`) as any[]).find((e) => e.getAttribute(attr) === anchor.id) ?? null
+}
+
+/**
+ * Reverte UM dispositivo do rascunho ao conteúdo da versão anterior (antes). Devolve o novo HTML
+ * do rascunho, ou null se não localizou o alvo:
+ *  - 'mod': troca o bloco do rascunho pelo do antes.
+ *  - 'add': remove o bloco do rascunho (não existia antes).
+ *  - 'rem': re-insere o bloco do antes logo após o dispositivo anterior que ainda existe no rascunho.
+ */
+export function reverterBlocoHtml(htmlRascunho: string, htmlAntes: string, anchor: AncoraBloco, estado: 'mod' | 'add' | 'rem'): string | null {
+  const rootR = parse(htmlRascunho || '')
+  const rootA = parse(htmlAntes || '')
+
+  if (estado === 'add') {
+    const elR = acharPorAncora(rootR, anchor)
+    if (!elR) return null
+    elR.remove()
+    return rootR.toString()
+  }
+
+  if (estado === 'mod') {
+    const elR = acharPorAncora(rootR, anchor)
+    const elA = acharPorAncora(rootA, anchor)
+    if (!elR || !elA) return null
+    elR.insertAdjacentHTML('afterend', elA.outerHTML)
+    elR.remove()
+    return rootR.toString()
+  }
+
+  // 'rem': o bloco existia no antes e sumiu no rascunho → re-inserir na posição aproximada.
+  const elA = acharPorAncora(rootA, anchor)
+  if (!elA) return null
+  const ancorasA = Array.from(rootA.querySelectorAll('[data-disp], [data-art]')) as any[]
+  const idx = ancorasA.findIndex((e) => e === elA)
+  for (let i = idx - 1; i >= 0; i--) {
+    const prev = ancorasA[i]
+    const pdisp = prev.getAttribute('data-disp'); const part = prev.getAttribute('data-art')
+    const prevAnchor: AncoraBloco | null = pdisp ? { tipo: 'disp', id: pdisp } : part ? { tipo: 'art', id: part } : null
+    if (!prevAnchor) continue
+    const prevR = acharPorAncora(rootR, prevAnchor)
+    if (prevR) { prevR.insertAdjacentHTML('afterend', elA.outerHTML); return rootR.toString() }
+  }
+  const primeiraR = acharPorAncora(rootR, anchor) ? null : (rootR.querySelector('[data-disp], [data-art]') as any)
+  if (primeiraR) { primeiraR.insertAdjacentHTML('beforebegin', elA.outerHTML); return rootR.toString() }
+  rootR.insertAdjacentHTML('beforeend', elA.outerHTML)
+  return rootR.toString()
+}
+
 /** Compara duas versões de HTML (já sanitizado) e devolve só o que MUDOU, em ordem. */
 export function diffDocumentos(htmlAntes: string, htmlDepois: string): DiffDoc {
   const A = extrairBlocos(htmlAntes)
@@ -105,20 +160,46 @@ export function diffDocumentos(htmlAntes: string, htmlDepois: string): DiffDoc {
   const ops = lcsOps(A, B, (x, y) => x.key === y.key)
   const blocos: BlocoDiff[] = []
   const resumo = { mod: 0, add: 0, rem: 0, igual: 0 }
-  for (const op of ops) {
+  for (let i = 0; i < ops.length; i++) {
+    const op = ops[i]
     if (op.t === 'eq') {
       const a = op.a!, b = op.b!
-      if (a.texto === b.texto) { resumo.igual++; continue }
+      if (a.texto === b.texto) {
+        // Texto igual: se o HTML também for igual, nada mudou. Se o HTML diferir (grifo/negrito/
+        // caixa/formatação), conta como alteração e mostra os dois lados renderizados.
+        if (norm(a.html) === norm(b.html)) { resumo.igual++; continue }
+        blocos.push({ estado: 'mod', rotulo: b.rotulo ?? a.rotulo, antes: [], depois: [], anchor: ancoraDaKey(b.key), htmlAntes: a.html, htmlDepois: b.html })
+        resumo.mod++
+        continue
+      }
       const { antes, depois } = palavrasDiff(a.texto, b.texto)
-      blocos.push({ estado: 'mod', rotulo: b.rotulo ?? a.rotulo, antes, depois })
+      blocos.push({ estado: 'mod', rotulo: b.rotulo ?? a.rotulo, antes, depois, anchor: ancoraDaKey(b.key) })
       resumo.mod++
     } else if (op.t === 'rem') {
-      blocos.push({ estado: 'rem', rotulo: op.a!.rotulo, html: op.a!.html })
+      // Se o próximo op é um ADD parecido, é uma ALTERAÇÃO do mesmo bloco (ex.: título que ganhou
+      // um ".") — mostra como "Alterado" (palavra a palavra) em vez de remover+adicionar idênticos.
+      const prox = ops[i + 1]
+      if (prox && prox.t === 'add' && similares(op.a!.texto, prox.b!.texto)) {
+        const { antes, depois } = palavrasDiff(op.a!.texto, prox.b!.texto)
+        blocos.push({ estado: 'mod', rotulo: prox.b!.rotulo ?? op.a!.rotulo, antes, depois, anchor: ancoraDaKey(prox.b!.key) })
+        resumo.mod++; i++
+        continue
+      }
+      blocos.push({ estado: 'rem', rotulo: op.a!.rotulo, html: op.a!.html, anchor: ancoraDaKey(op.a!.key) })
       resumo.rem++
     } else {
-      blocos.push({ estado: 'add', rotulo: op.b!.rotulo, html: op.b!.html })
+      blocos.push({ estado: 'add', rotulo: op.b!.rotulo, html: op.b!.html, anchor: ancoraDaKey(op.b!.key) })
       resumo.add++
     }
   }
   return { blocos, resumo }
+}
+
+/** Dois textos são "o mesmo bloco alterado"? (≥50% das palavras em comum via LCS). */
+function similares(a: string, b: string): boolean {
+  const pa = a.split(/\s+/).filter(Boolean), pb = b.split(/\s+/).filter(Boolean)
+  if (!pa.length || !pb.length) return false
+  if (pa.length * pb.length > 40_000) return a.slice(0, 40).toLowerCase() === b.slice(0, 40).toLowerCase()
+  const ig = lcsOps(pa, pb, (x, y) => x.toLowerCase() === y.toLowerCase()).filter((o) => o.t === 'eq').length
+  return (ig * 2) / (pa.length + pb.length) >= 0.5
 }
