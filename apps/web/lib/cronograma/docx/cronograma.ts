@@ -173,6 +173,9 @@ function conteudoDaCelula(metas: MetaDatada[]): Paragraph[] {
   for (const m of metas) {
     out.push(texto(m.titulo, { size: sz(8) }))
     if (m.complemento) out.push(texto(m.complemento, { size: sz(7), color: '#666666' }))
+    // Videoaula (plataforma "Vídeo") — destaque próprio, antes dos links de questões.
+    if (m.video) out.push(link('▶ Vídeo', m.video, sz(7)))
+    if (m.pdf) out.push(link('📄 PDF', m.pdf, sz(7)))
     // Os links entram como hyperlinks clicáveis (spec §7.1).
     for (const u of m.links?.urls ?? []) out.push(link(u.plataforma.nome, u.url, sz(7)))
     if (m.links?.ausente) out.push(texto(m.links.ausente, { size: sz(7), color: '#999999' }))

@@ -12,6 +12,7 @@ import { SecaoMontagem } from './secao-montagem'
 import { SecaoMetas } from './secao-metas'
 import { SecaoLinks } from './secao-links'
 import { SecaoAcessos } from './secao-acessos'
+import { PreviaViva } from './previa-viva'
 
 export default function CriarCronogramaPage() {
   const { draft, patch, reset } = useCriar()
@@ -50,17 +51,19 @@ export default function CriarCronogramaPage() {
   }
 
   return (
-    <div className="space-y-4">
-      {/* Barra de ação fixa — tudo se cria daqui, sem etapas. */}
-      <div className="sticky top-2 z-20 flex flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card/95 p-3 shadow-sm backdrop-blur supports-backdrop-filter:bg-card/80">
+    // lg: ocupa a altura do painel e NÃO rola por fora — cada coluna rola por dentro.
+    // Abaixo de lg cai no fluxo normal (a página rola), que é o esperado no mobile.
+    <div className="flex flex-col gap-3 lg:h-[calc(100vh-7rem)]">
+      {/* Barra de ação. */}
+      <div className="sticky top-2 z-30 flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-2xl border bg-card/95 p-3 shadow-sm backdrop-blur supports-backdrop-filter:bg-card/80 lg:static">
         <div className="min-w-0">
           <h1 className="text-lg font-bold tracking-tight">Novo cronograma</h1>
-          <p className="text-xs text-muted-foreground">Preencha as seções abaixo e crie — tudo em uma página. Nasce como rascunho.</p>
+          <p className="text-xs text-muted-foreground">Edite à esquerda, veja a prévia ao vivo à direita. Nasce como rascunho.</p>
         </div>
         <div className="flex items-center gap-3">
           <label
             className="flex items-center gap-1.5 text-xs text-muted-foreground"
-            title={draft.metas.length ? 'Já fica visível para quem tem acesso' : 'Adicione ao menos uma meta para poder publicar'}
+            title={draft.metas.length ? 'Já fica visível para quem tem acesso' : 'Aplique as metas (seção Conteúdos) para poder publicar'}
           >
             <input
               type="checkbox"
@@ -78,12 +81,25 @@ export default function CriarCronogramaPage() {
         </div>
       </div>
 
-      <SecaoPersonalizar />
-      <SecaoEstrutura />
-      <SecaoMontagem />
-      <SecaoMetas />
-      <SecaoLinks />
-      <SecaoAcessos />
+      {/* 2 colunas, cada uma um CARD único com rolagem interna; as seções ficam separadas por
+          divisória (sem card individual). A linha 1fr faz o grid preencher a altura disponível. */}
+      <div className="grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-cols-2 lg:grid-rows-1">
+        <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border bg-card shadow-sm">
+          <div className="min-h-0 flex-1 divide-y divide-border overflow-y-auto px-4">
+            <SecaoPersonalizar />
+            <SecaoEstrutura />
+            <SecaoMontagem />
+            <SecaoMetas />
+            <SecaoLinks />
+            <SecaoAcessos />
+          </div>
+        </div>
+        <div className="flex min-h-0 flex-col overflow-hidden rounded-2xl border bg-card shadow-sm">
+          <div className="min-h-0 flex-1 overflow-y-auto p-4">
+            <PreviaViva />
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

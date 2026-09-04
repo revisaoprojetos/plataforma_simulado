@@ -9,7 +9,7 @@
  */
 
 import { useMemo, useState } from 'react'
-import { ChevronDown, Eye, EyeOff, ExternalLink } from 'lucide-react'
+import { ChevronDown, Eye, EyeOff, ExternalLink, FileText, ListChecks, PlayCircle } from 'lucide-react'
 import { CaixaCheck } from '@/components/cronograma/caixa-check'
 import { NotaMeta } from '@/components/cronograma/nota-meta'
 import { Badge } from '@/components/ui/badge'
@@ -38,17 +38,20 @@ export function ResumoGrade({
   grade,
   ocultos,
   aoAlternar,
+  ocultarDatas,
 }: {
   grade: Grade | null
   /** Chaves escondidas pelo aluno. Ausente = a tela não oferece esconder. */
   ocultos?: string[]
   aoAlternar?: (chave: string) => void
+  /** Plano "só semanas": esconde a data de conclusão (sem calendário). */
+  ocultarDatas?: boolean
 }) {
   const numeros: [string, string, string | number][] = [
     ['semanas', 'Semanas', grade?.resumo.totalSemanas ?? '—'],
     ['dias', 'Dias por semana', grade?.resumo.diasPorSemana ?? '—'],
     ['atividades', 'Atividades', grade?.resumo.atividades ?? '—'],
-    ['conclusao', 'Conclusão', grade?.resumo.conclusao ? fmtBr(grade.resumo.conclusao) : '—'],
+    ...(ocultarDatas ? [] : [['conclusao', 'Conclusão', grade?.resumo.conclusao ? fmtBr(grade.resumo.conclusao) : '—'] as [string, string, string | number]]),
   ]
   const escondidos = new Set(ocultos ?? [])
   const visiveis = numeros.filter(([chave]) => !escondidos.has(chave))
@@ -125,10 +128,14 @@ export function GradeCronograma({
   aoDefinirColapsadas,
   ocultarContagem,
   aoAlternarContagem,
+  ocultarDatas,
+  resolverHref,
 }: {
   grade: Grade
   paletaSlug: string
   titulo?: string
+  /** Plano "só semanas": esconde as datas (intervalo da semana e data de cada meta). */
+  ocultarDatas?: boolean
   /** metaId → instante em que o aluno marcou. Ausente = a tela não tem marcação. */
   checks?: Record<string, string>
   aoAlternarCheck?: (meta: MetaDatada, marcar: boolean) => void
@@ -142,6 +149,8 @@ export function GradeCronograma({
   aoDefinirColapsadas?: (semanas: number[]) => void
   ocultarContagem?: boolean
   aoAlternarContagem?: () => void
+  /** Quando presente, o chip "N questões" vira link "Resolver" para esta URL (área do aluno). */
+  resolverHref?: (meta: MetaDatada) => string | null | undefined
 }) {
   const comCheck = !!aoAlternarCheck
   const paleta = acharPaleta(paletaSlug)
@@ -266,7 +275,7 @@ export function GradeCronograma({
                 />
               )}
               <span>Semana {s.numero}</span>
-              <span className="font-normal opacity-90">{fmtIntervalo(s.inicio, s.fim)}</span>
+              {!ocultarDatas && <span className="font-normal opacity-90">{fmtIntervalo(s.inicio, s.fim)}</span>}
               {s.kind === 'revisao' && <Badge variant="secondary">Revisão</Badge>}
               {s.kind === 'recesso' && <Badge variant="secondary">Recesso</Badge>}
               {!ocultarContagem && s.kind === 'conteudo' && (
@@ -318,8 +327,8 @@ export function GradeCronograma({
                     />
                   )}
                   <div className="w-24 shrink-0 text-xs">
-                    <p className="font-medium">{fmtBr(m.data)}</p>
-                    <p className="text-muted-foreground">{m.diaNome}</p>
+                    {!ocultarDatas && <p className="font-medium">{fmtBr(m.data)}</p>}
+                    <p className={ocultarDatas ? 'font-medium' : 'text-muted-foreground'}>{m.diaNome}</p>
                   </div>
                   <Badge variant="outline" className="max-w-full shrink-0 justify-self-start truncate">
                     {m.tipoDef.nome}
@@ -336,25 +345,84 @@ export function GradeCronograma({
                       </a>
                     )}
                   </div>
-                  <div className="flex shrink-0 flex-wrap gap-1.5">
-                    {m.qtdQuestoes ? (
-                      <span className="rounded-md border bg-background/70 px-2 py-0.5 text-xs text-muted-foreground" title="Questões desta aula (referência)">
-                        {m.qtdQuestoes} {m.qtdQuestoes === 1 ? 'questão' : 'questões'}
-                      </span>
-                    ) : null}
-                    {m.links?.urls.map((u) => (
-                      <a
-                        key={u.plataforma.id}
-                        href={u.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="rounded-md border bg-background/70 px-2 py-0.5 text-xs text-primary hover:bg-background"
-                      >
-                        {u.plataforma.nome}
-                      </a>
-                    ))}
-                    {m.links?.ausente && <span className="text-xs italic text-muted-foreground">{m.links.ausente}</span>}
-                  </div>
+                  {(() => {
+                    const externos = m.links?.urls ?? []
+                    const temSistema = !!m.qtdQuestoes
+                    const temExterno = externos.length > 0
+                    // Só rotula "do sistema" / "externas" quando há os DOIS — com um só, o rótulo é ruído.
+                    const rotular = temSistema && temExterno
+                    const href = resolverHref?.(m)
+                    return (
+                      <div className="flex shrink-0 flex-col gap-1.5">
+                        {(m.video || m.pdf) && (
+                          <div className="flex flex-wrap gap-1.5">
+                            {m.video && (
+                              <a
+                                href={m.video}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 rounded-md border bg-background/70 px-2 py-0.5 text-xs text-primary hover:bg-background"
+                                title="Assistir à videoaula"
+                              >
+                                <PlayCircle className="h-3 w-3" /> Vídeo
+                              </a>
+                            )}
+                            {m.pdf && (
+                              <a
+                                href={m.pdf}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 rounded-md border bg-background/70 px-2 py-0.5 text-xs text-primary hover:bg-background"
+                                title="Abrir o PDF da matéria"
+                              >
+                                <FileText className="h-3 w-3" /> PDF
+                              </a>
+                            )}
+                          </div>
+                        )}
+
+                        {temSistema && (
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {rotular && <span className="basis-full text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Questões do sistema</span>}
+                            {href ? (
+                              <a
+                                href={href}
+                                className="inline-flex items-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary transition hover:bg-primary/20"
+                                title="Resolver na plataforma"
+                              >
+                                <ListChecks className="h-3 w-3" /> Resolver {m.qtdQuestoes} {m.qtdQuestoes === 1 ? 'questão' : 'questões'}
+                              </a>
+                            ) : (
+                              <span className="rounded-md border bg-background/70 px-2 py-0.5 text-xs text-muted-foreground" title="Questões desta aula (referência)">
+                                {m.qtdQuestoes} {m.qtdQuestoes === 1 ? 'questão' : 'questões'}
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {temExterno && (
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {rotular && <span className="basis-full text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Questões externas</span>}
+                            {externos.map((u) => (
+                              <a
+                                key={u.plataforma.id}
+                                href={u.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="rounded-md border bg-background/70 px-2 py-0.5 text-xs text-primary hover:bg-background"
+                              >
+                                {u.plataforma.nome}
+                              </a>
+                            ))}
+                          </div>
+                        )}
+
+                        {!temSistema && !temExterno && m.links?.ausente && (
+                          <span className="text-xs italic text-muted-foreground">{m.links.ausente}</span>
+                        )}
+                      </div>
+                    )
+                  })()}
                       {emissaoId && aoSalvarNota && (
                     <NotaMeta
                       meta={m}

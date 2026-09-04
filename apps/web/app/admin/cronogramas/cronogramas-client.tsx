@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState, useTransition } from 'react'
-import { CalendarDays, Check, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ListChecks, Loader2, Package, Pencil, Plus, Power, Search, Tags, Trash2, Upload, X, Zap } from 'lucide-react'
+import { CalendarDays, Check, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FolderInput, ListChecks, Loader2, Package, Pencil, Plus, Power, Search, Tags, Trash2, Upload, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
@@ -26,6 +26,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import {
   alternarLiberacao,
   alternarLiberacaoEmLote,
@@ -143,9 +151,10 @@ export function CronogramasClient({
   }
   const [selecao, setSelecao] = useState<Set<string>>(new Set())
   const router = useRouter()
-  const [escolhaAberta, setEscolhaAberta] = useState(false)
   const [aberto, setAberto] = useState(false)
   const [editando, setEditando] = useState<string | null>(null)
+  // Renomear a DIVISÃO (categoria) direto no cabeçalho do grupo.
+  const [editandoCat, setEditandoCat] = useState<string | null>(null)
   const [form, setForm] = useState<EntradaCronograma>(vazio())
   const [busca, setBusca] = useState('')
   const [filtro, setFiltro] = useState<'todos' | 'liberados' | 'rascunhos' | 'sem_pacote' | 'sem_metas'>('todos')
@@ -156,33 +165,6 @@ export function CronogramasClient({
   const [ordem, setOrdem] = useState<'padrao' | 'metas' | 'semanas'>('padrao')
   const [categoria, setCategoria] = useState<string>('todas')
   const [porPagina, setPorPagina] = useState(25)
-
-  // GERADOR RÁPIDO: cria um rascunho (grade de semanas) em segundos, sem abrir o diálogo.
-  const [gerCarga, setGerCarga] = useState(6)
-  const [gerSemanas, setGerSemanas] = useState(39)
-  const [gerDias, setGerDias] = useState<'seg-sab' | 'seg-sex'>('seg-sab')
-  const [gerando, setGerando] = useState(false)
-  const gerDiasQtd = gerDias === 'seg-sab' ? 6 : 5
-  // Estimativa (aprox.): dias de estudo × blocos/dia (≈ carga/1,5h por bloco). Só orienta o tamanho.
-  const metasEstimadas = gerSemanas * gerDiasQtd * Math.max(1, Math.round(gerCarga / 1.5))
-  async function gerarRascunho() {
-    const dias_curso = gerDias === 'seg-sab' ? [1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5]
-    const dias_nome = gerDias === 'seg-sab' ? ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'] : ['Seg', 'Ter', 'Qua', 'Qui', 'Sex']
-    const entrada: EntradaCronograma = {
-      nome: `Rascunho ${gerCarga}h — ${gerSemanas} semanas`,
-      carga_horaria: gerCarga, total_semanas: gerSemanas, dias_curso, dias_nome,
-      semanas_revisao: [], categoria_id: null, subtitulo: null, ordem: 0,
-    }
-    setGerando(true)
-    try {
-      const r = await criarCronograma(entrada)
-      if (!r.ok) { toast.error(r.error ?? 'Não foi possível gerar o rascunho.'); return }
-      toast.success('Rascunho gerado — cadastre as metas para liberar')
-      setItens((xs) => [...xs, { ...(entrada as any), id: (r as any).id, slug: '', status: 'rascunho', metas: 0, pacotes: 0, faixa: faixaSemanal(dias_curso), categoria_nome: null }])
-    } finally {
-      setGerando(false)
-    }
-  }
 
   /**
    * "Invisível": liberado, mas fora de qualquer pacote. É o estado que mais engana — a
@@ -301,12 +283,6 @@ export function CronogramasClient({
       return a[0].localeCompare(b[0], 'pt-BR')
     })
   }, [daPagina])
-
-  function abrirNovo() {
-    setEditando(null)
-    setForm(vazio())
-    setAberto(true)
-  }
 
   function abrirEdicao(c: CronogramaLista) {
     setEditando(c.id)
@@ -476,6 +452,22 @@ export function CronogramasClient({
     })
   }
 
+  /** Move o cronograma para outra DIVISÃO (categoria) — reusa atualizarCronograma com os mesmos dados. */
+  function mover(c: CronogramaLista, categoriaId: string | null) {
+    if ((c.categoria_id ?? null) === (categoriaId ?? null)) return
+    executar(`mov:${c.id}`, async () => {
+      const r = await atualizarCronograma(c.id, {
+        nome: c.nome, carga_horaria: c.carga_horaria, total_semanas: c.total_semanas,
+        dias_curso: c.dias_curso, dias_nome: c.dias_nome, semanas_revisao: c.semanas_revisao,
+        categoria_id: categoriaId, subtitulo: null, ordem: c.ordem,
+      })
+      if (!r.ok) { toast.error(r.error ?? 'Não foi possível mover.'); return }
+      const nome = categorias.find((k) => k.id === categoriaId)?.nome ?? null
+      setItens((xs) => xs.map((x) => (x.id === c.id ? { ...x, categoria_id: categoriaId, categoria_nome: nome } : x)))
+      toast.success(categoriaId ? `Movido para "${nome}"` : 'Movido para Sem categoria')
+    })
+  }
+
   return (
     <>
       <div className="space-y-5">
@@ -498,7 +490,7 @@ export function CronogramasClient({
           {/* Botão "Novo cronograma" com brilho: gradiente + glow (cor dedicada --crono-cor). */}
           <button
             type="button"
-            onClick={() => setEscolhaAberta(true)}
+            onClick={() => router.push('/admin/cronogramas/criar')}
             className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
             style={{ background: GRAD_MARCA, boxShadow: GLOW_BTN }}
           >
@@ -511,102 +503,8 @@ export function CronogramasClient({
       {/* ABAS da seção Cronograma (componente único, idêntico às subpáginas). */}
       <CronogramaTabs catalogoCount={itens.length} />
 
-      {/* LAYOUT 2 COLUNAS: Gerador rápido (vertical, à esquerda) + lista (à direita), como na referência. */}
-      <div className="grid items-start gap-5 lg:grid-cols-[300px_1fr]" style={{ marginTop: '1.25rem' }}>
-        {/* GERADOR RÁPIDO — painel vertical fixo à esquerda. Mesma função de antes, reflow vertical. */}
-        <aside
-          className="space-y-4 rounded-2xl border border-white/10 p-4 text-white lg:sticky lg:top-4"
-          style={{ background: GRAD_MARCA, boxShadow: GLOW_CARD }}
-        >
-          <div className="space-y-1.5">
-            <span className="inline-flex items-center gap-1 rounded-full bg-white/20 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wide">
-              <Zap className="h-3.5 w-3.5" /> Gerador rápido
-            </span>
-            <h2 className="text-lg font-bold leading-tight">Cronograma em segundos</h2>
-            <p className="text-xs text-white/80">Só o básico: carga, duração e dias. Você ajusta depois.</p>
-          </div>
-
-          <div>
-            <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-white/70">Carga diária</div>
-            <div className="space-y-1.5">
-              {[2, 3, 4, 6].map((h) => {
-                const sel = gerCarga === h
-                return (
-                  <button
-                    key={h}
-                    type="button"
-                    onClick={() => setGerCarga(h)}
-                    className={cn('flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-semibold transition', sel ? 'bg-white shadow' : 'bg-white/10 text-white hover:bg-white/20')}
-                    style={sel ? { color: MARCA } : undefined}
-                  >
-                    <span>{h}h / dia</span>
-                    <span className={cn('text-xs font-medium', sel ? 'opacity-70' : 'text-white/70')}>≈ {h * gerDiasQtd}h/sem</span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <div>
-            <div className="mb-1 flex items-center justify-between">
-              <span className="text-[10px] font-semibold uppercase tracking-wide text-white/70">Duração (semanas)</span>
-              <span className="text-sm font-bold tabular-nums">{gerSemanas}</span>
-            </div>
-            <input
-              type="range"
-              min={4}
-              max={60}
-              value={gerSemanas}
-              onChange={(e) => setGerSemanas(Number(e.target.value))}
-              className="w-full accent-white"
-              aria-label="Total de semanas"
-            />
-          </div>
-
-          <div>
-            <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-white/70">Dias</div>
-            <div className="flex gap-1.5">
-              {([['seg-sab', 'Seg–Sáb'], ['seg-sex', 'Seg–Sex']] as const).map(([v, l]) => {
-                const sel = gerDias === v
-                return (
-                  <button
-                    key={v}
-                    type="button"
-                    onClick={() => setGerDias(v)}
-                    className={cn('flex-1 rounded-lg px-3 py-1.5 text-sm font-semibold transition', sel ? 'bg-white shadow' : 'bg-white/10 text-white hover:bg-white/20')}
-                    style={sel ? { color: MARCA } : undefined}
-                  >
-                    {l}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2 rounded-xl bg-white/10 px-3 py-2.5 text-center">
-            <div>
-              <div className="text-base font-extrabold leading-none">{metasEstimadas.toLocaleString('pt-BR')}</div>
-              <div className="mt-0.5 text-[10px] text-white/70">metas ≈</div>
-            </div>
-            <div>
-              <div className="text-base font-extrabold leading-none">{gerSemanas}</div>
-              <div className="mt-0.5 text-[10px] text-white/70">semanas</div>
-            </div>
-            <div>
-              <div className="text-base font-extrabold leading-none">{gerDiasQtd}</div>
-              <div className="mt-0.5 text-[10px] text-white/70">dias/sem</div>
-            </div>
-          </div>
-
-          <Button onClick={gerarRascunho} disabled={gerando} className="w-full bg-white hover:bg-white/90" style={{ color: MARCA }}>
-            {gerando ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Zap className="mr-1 h-4 w-4" />}
-            Gerar cronograma
-          </Button>
-          <p className="text-center text-[11px] text-white/70">Nada é publicado sem a sua revisão.</p>
-        </aside>
-
-        {/* COLUNA DIREITA: filtros + lista + paginação. */}
-        <div className="min-w-0 space-y-4">
+      {/* Lista + filtros (o gerador rápido foi removido; o "Novo cronograma" leva ao assistente). */}
+      <div className="min-w-0 space-y-4" style={{ marginTop: '1.25rem' }}>
       {/* TUDO que filtra mora aqui: busca, categoria, situação e carga. */}
       <div className="space-y-3">
       <div className="flex flex-row flex-wrap items-center gap-2">
@@ -784,7 +682,7 @@ export function CronogramasClient({
             Crie um cronograma e depois importe as metas, ou use a importação para trazer o catálogo inteiro.
           </p>
           <div className="mt-4 flex justify-center gap-2">
-            <Button onClick={() => setEscolhaAberta(true)}>
+            <Button onClick={() => router.push('/admin/cronogramas/criar')}>
               <Plus className="mr-1 h-4 w-4" />
               Criar o primeiro
             </Button>
@@ -829,11 +727,30 @@ export function CronogramasClient({
                 </Button>
               </div>
             )}
-            {porCategoria.map(([cat, lista]) => (
+            {porCategoria.map(([cat, lista]) => {
+              const catRow = categorias.find((k) => k.nome === cat) ?? null
+              return (
               <div key={cat}>
-                {/* Cabeçalho do grupo: NOME da categoria + contagem + divisória (como na referência). */}
-                <div className="mb-2 flex items-center gap-3">
-                  <span className="text-xs font-bold uppercase tracking-wide text-foreground">{cat}</span>
+                {/* Cabeçalho da DIVISÃO: nome (editável no lápis) + contagem + divisória. */}
+                <div className="mb-2 flex items-center gap-2">
+                  {catRow && editandoCat === catRow.id ? (
+                    <Input
+                      defaultValue={cat}
+                      autoFocus
+                      className="h-7 w-56 text-xs font-bold uppercase"
+                      onBlur={(e) => { const n = e.target.value.trim(); if (n && n !== cat) renomearCategoria(catRow, n); setEditandoCat(null) }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); if (e.key === 'Escape') setEditandoCat(null) }}
+                    />
+                  ) : (
+                    <>
+                      <span className="text-xs font-bold uppercase tracking-wide text-foreground">{cat}</span>
+                      {catRow && (
+                        <button type="button" onClick={() => setEditandoCat(catRow.id)} title="Renomear divisão" className="text-muted-foreground transition hover:text-foreground">
+                          <Pencil className="h-3 w-3" />
+                        </button>
+                      )}
+                    </>
+                  )}
                   <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold tabular-nums text-muted-foreground">{lista.length}</span>
                   <span className="h-px flex-1 bg-border" />
                 </div>
@@ -962,6 +879,23 @@ export function CronogramasClient({
                         >
                           <ListChecks className="h-4 w-4" />
                         </Link>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger className={buttonVariants({ variant: 'ghost', size: 'sm' })} title="Mover para outra divisão">
+                            {ocupado(`mov:${c.id}`) ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderInput className="h-4 w-4" />}
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-52">
+                            <DropdownMenuLabel>Mover para a divisão</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={() => mover(c, null)}>
+                              {!c.categoria_id ? <Check className="mr-2 h-4 w-4" /> : <span className="mr-2 h-4 w-4" />} Sem categoria
+                            </DropdownMenuItem>
+                            {categorias.length > 0 && <DropdownMenuSeparator />}
+                            {categorias.map((k) => (
+                              <DropdownMenuItem key={k.id} onClick={() => mover(c, k.id)}>
+                                {c.categoria_id === k.id ? <Check className="mr-2 h-4 w-4" /> : <span className="mr-2 h-4 w-4" />} {k.nome}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                         <Button size="sm" variant="ghost" onClick={() => abrirEdicao(c)} disabled={pendente} title="Editar metadados">
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -974,7 +908,8 @@ export function CronogramasClient({
                 })}
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         )}
 
@@ -1025,51 +960,6 @@ export function CronogramasClient({
         )}
         </div>
       </div>
-      </div>
-
-      {/* Pop-up de escolha: assistente completo (wizard) × criação rápida (o diálogo abaixo). */}
-      <Dialog open={escolhaAberta} onOpenChange={setEscolhaAberta}>
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Novo cronograma</DialogTitle>
-            <DialogDescription>Como você quer criar?</DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-3 sm:grid-cols-2">
-            <button
-              type="button"
-              onClick={() => {
-                setEscolhaAberta(false)
-                router.push('/admin/cronogramas/criar')
-              }}
-              className="group flex flex-col items-start gap-2 rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md"
-            >
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <ListChecks className="h-5 w-5" />
-              </span>
-              <span className="font-semibold">Assistente completo</span>
-              <span className="text-xs text-muted-foreground">
-                Etapas guiadas — personalização, estrutura, metas, links e acessos. Monta o cronograma inteiro e cria como rascunho.
-              </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setEscolhaAberta(false)
-                abrirNovo()
-              }}
-              className="group flex flex-col items-start gap-2 rounded-2xl border p-4 text-left transition hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md"
-            >
-              <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-foreground">
-                <Zap className="h-5 w-5" />
-              </span>
-              <span className="font-semibold">Rápido</span>
-              <span className="text-xs text-muted-foreground">
-                Só a casca — nome, carga, semanas e dias. Cria na hora; as metas você adiciona depois no editor.
-              </span>
-            </button>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Dialog open={aberto} onOpenChange={setAberto}>
         <DialogContent className="sm:max-w-lg">

@@ -89,8 +89,8 @@ export function SecaoLinks() {
   }
 
   return (
-    <Secao numero={5} titulo="Links de aula" descricao="(disciplina, aula) → tema + link por plataforma. Casa por texto exato com a aula da meta. A Montagem já traz os links do banco — aqui é para complementar. Opcional.">
-      <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
+    <Secao numero={5} titulo="Links de aula" descricao="(disciplina, aula) → tema + link por plataforma. Casa por texto exato com a aula da meta. A Montagem já traz os links do banco — aqui é para complementar. Opcional." colapsavel defaultAberto={false}>
+      <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" variant="outline" onClick={puxarDasMetas} disabled={!faltando.length}>
             <Sparkles className="mr-1 h-4 w-4" />

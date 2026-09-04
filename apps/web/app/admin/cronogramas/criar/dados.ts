@@ -49,7 +49,7 @@ export async function dadosMetas(): Promise<{
 
 export async function dadosLinks(): Promise<{
   ok: boolean
-  plataformas?: { id: string; nome: string; slug: string }[]
+  plataformas?: { id: string; nome: string; slug: string; cor: string | null; ordem: number }[]
   error?: string
 }> {
   const g = await guard()
@@ -57,12 +57,12 @@ export async function dadosLinks(): Promise<{
   const svc = createAdminClient()
   const { data } = await svc
     .from('simulado_cronograma_plataformas')
-    .select('id, nome, slug')
+    .select('id, nome, slug, cor, ordem')
     .eq('tenant_id', g.tenantId)
     .eq('ativo', true)
     .order('ordem')
     .order('nome')
-  return { ok: true, plataformas: (data ?? []) as { id: string; nome: string; slug: string }[] }
+  return { ok: true, plataformas: (data ?? []) as { id: string; nome: string; slug: string; cor: string | null; ordem: number }[] }
 }
 
 export async function dadosAcessos(): Promise<{ ok: boolean; pacotes?: { id: string; nome: string }[]; error?: string }> {

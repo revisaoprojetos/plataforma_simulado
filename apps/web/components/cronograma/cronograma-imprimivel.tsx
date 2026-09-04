@@ -36,6 +36,7 @@ export function CronogramaImprimivel({
   marca,
   cargaHoraria,
   checks,
+  ocultarDatas,
 }: {
   grade: Grade
   paletaSlug: string
@@ -47,6 +48,8 @@ export function CronogramaImprimivel({
   marca?: string | null
   cargaHoraria?: number | null
   checks?: Record<string, string>
+  /** Plano "só semanas": some com o intervalo de datas da faixa (as colunas seguem sendo dias). */
+  ocultarDatas?: boolean
 }) {
   const paleta = acharPaleta(paletaSlug)
 
@@ -143,7 +146,8 @@ export function CronogramaImprimivel({
             <tbody>
               <tr>
                 <td className="faixa1" colSpan={8} style={{ background: paleta.primaria }}>
-                  SEMANA {s.numero} - {fmtIntervalo(s.inicio, s.fim)}
+                  SEMANA {s.numero}
+                  {!ocultarDatas && ` - ${fmtIntervalo(s.inicio, s.fim)}`}
                 </td>
               </tr>
               {faixaSec && (

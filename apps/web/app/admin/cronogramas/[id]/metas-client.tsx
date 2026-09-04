@@ -1,11 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useState, useTransition } from 'react'
-import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Clock, ListChecks, Package, Pencil, Plus, Search, Trash2, Users, X } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
+import { useEffect, useMemo, useState, useTransition } from 'react'
+import { AlertTriangle, CalendarDays, ChevronLeft, ChevronRight, Clock, ExternalLink, Link2, ListChecks, Loader2, Package, Pencil, Plus, Search, Send, Trash2, Users, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -41,6 +42,14 @@ import {
   type Diagnostico,
   type EntradaMeta,
 } from './metas-actions'
+import {
+  atualizarBancoConteudo,
+  bancoAulasDaChave,
+  contarPropagacao,
+  propagarConteudoAula,
+  type BancoAulaRef,
+  type PropagacaoAlvo,
+} from '../conteudos/actions'
 
 const novaMeta = (semana: number, tipo: string): EntradaMeta => ({
   semana,
@@ -83,6 +92,7 @@ export function MetasClient({
   // Disciplinas em estado: criar uma nova pelo picker precisa fazê-la aparecer na hora.
   const [disciplinas, setDisciplinas] = useState(disciplinasIniciais)
   const [pendente, iniciar] = useTransition()
+  const searchParams = useSearchParams()
 
   /** Cria (ou reaproveita) uma disciplina e a deixa disponível nos pickers imediatamente. */
   async function criarDisciplinaLocal(nome: string) {
@@ -110,10 +120,16 @@ export function MetasClient({
   }
   const [semanaAtiva, setSemanaAtiva] = useState<number>(1)
   const [aberto, setAberto] = useState(false)
+  // Conteúdo da meta começa como RESUMO read-only (a fonte é o banco); só abre pra editar
+  // "só neste cronograma" sob demanda, ou já aberto ao criar uma meta nova.
+  const [editarConteudo, setEditarConteudo] = useState(false)
   const [editando, setEditando] = useState<string | null>(null)
   const [form, setForm] = useState<EntradaMeta>(novaMeta(1, tipos[0]?.slug ?? 'pdfull'))
   const [pac, setPac] = useState(pacotes)
   const [pacotesAberto, setPacotesAberto] = useState(false)
+  const [propagarMeta, setPropagarMeta] = useState<MetaFonte | null>(null)
+  // Vínculo com o banco da meta em edição: null = ainda carregando; [] = não está no banco.
+  const [vinculo, setVinculo] = useState<BancoAulaRef[] | null>(null)
 
   const revisao = useMemo(() => new Set(c.semanas_revisao), [c.semanas_revisao])
 
@@ -224,12 +240,14 @@ export function MetasClient({
 
   function abrirNova() {
     setEditando(null)
+    setEditarConteudo(true) // meta nova: precisa preencher o conteúdo.
     setForm(novaMeta(semanaAtiva, tipos[0]?.slug ?? 'pdfull'))
     setAberto(true)
   }
 
   function abrirEdicao(m: MetaFonte) {
     setEditando(m.id)
+    setEditarConteudo(false) // edição: começa no resumo read-only.
     setForm({
       semana: m.semana,
       dia: m.dia,
@@ -263,6 +281,33 @@ export function MetasClient({
       }
       setSemanaAtiva(form.semana)
     })
+  }
+
+  // Atalho da Auditoria: ?meta=<id> abre a meta já no diálogo de edição; ?semana=<n> pula pra semana.
+  useEffect(() => {
+    const alvo = searchParams.get('meta')
+    if (alvo) {
+      const m = metas.find((x) => x.id === alvo)
+      if (m) { setSemanaAtiva(m.semana); abrirEdicao(m); return }
+    }
+    const sem = Number(searchParams.get('semana'))
+    if (sem >= 1 && sem <= c.total_semanas) setSemanaAtiva(sem)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Vínculo com o banco: mostra, no editor de meta, se este conteúdo também está no Banco de Conteúdos.
+  useEffect(() => {
+    if (!aberto) { setVinculo(null); return }
+    let vivo = true
+    setVinculo(null)
+    bancoAulasDaChave({ disciplina: form.disciplina, aula: form.aula ?? '', tipo: form.tipo }).then((r) => {
+      if (vivo) setVinculo(r.ok ? (r.aulas ?? []) : [])
+    })
+    return () => { vivo = false }
+  }, [aberto, form.disciplina, form.aula, form.tipo])
+
+  function abrirPropagar(m: MetaFonte) {
+    setPropagarMeta(m)
   }
 
   function remover(m: MetaFonte) {
@@ -569,6 +614,9 @@ export function MetasClient({
               </span>
 
               <div className="flex shrink-0 items-center">
+                <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => abrirPropagar(m)} disabled={pendente} title="Propagar este conteúdo (outros cronogramas / banco)">
+                  <Send className="h-3.5 w-3.5" />
+                </Button>
                 <Button size="sm" variant="ghost" className="h-7 w-7 p-0" onClick={() => abrirEdicao(m)} disabled={pendente} title="Editar">
                   <Pencil className="h-3.5 w-3.5" />
                 </Button>
@@ -686,7 +734,7 @@ export function MetasClient({
           </DialogHeader>
 
           <div className="space-y-5">
-            {/* ── Onde a meta fica na grade */}
+            {/* ── Onde a meta fica na grade (o que é REALMENTE próprio da meta) */}
             <Secao titulo="Posição na grade">
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1.5">
@@ -726,66 +774,108 @@ export function MetasClient({
               </div>
             </Secao>
 
-            {/* ── O que o aluno vê */}
+            {/* ── O conteúdo é do BANCO: por padrão mostramos um resumo + atalhos. Só vira campo
+                   editável sob "editar só aqui" (correção pontual neste cronograma). */}
             <Secao titulo="Conteúdo">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label>Tipo</Label>
-                  <Select value={form.tipo} onValueChange={(v) => setForm((f) => ({ ...f, tipo: (v ?? '') as TipoMeta }))}>
-                    <SelectTrigger>
-                      {/* O gatilho deste Select mostra o VALOR cru; passamos o rótulo. */}
-                      <SelectValue>{rotulo(form.tipo)}</SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      {tipos.map((t) => (
-                        <SelectItem key={t.slug} value={t.slug}>
-                          {t.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              {editarConteudo ? (
+                <div className="space-y-3">
+                  {editando && (
+                    <div className="flex items-center justify-between gap-2 rounded-md bg-amber-500/10 px-2.5 py-1.5">
+                      <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                        Editando o conteúdo <strong>só neste cronograma</strong>. Para mudar em todo lugar, edite no banco.
+                      </p>
+                      <button type="button" onClick={() => setEditarConteudo(false)} className="shrink-0 text-[11px] font-medium text-primary hover:underline">
+                        voltar ao resumo
+                      </button>
+                    </div>
+                  )}
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="space-y-1.5">
+                      <Label>Tipo</Label>
+                      <Select value={form.tipo} onValueChange={(v) => setForm((f) => ({ ...f, tipo: (v ?? '') as TipoMeta }))}>
+                        <SelectTrigger><SelectValue>{rotulo(form.tipo)}</SelectValue></SelectTrigger>
+                        <SelectContent>
+                          {tipos.map((t) => (
+                            <SelectItem key={t.slug} value={t.slug}>{t.nome}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Aula</Label>
+                      <Input value={form.aula ?? ''} onChange={(e) => setForm((f) => ({ ...f, aula: e.target.value }))} placeholder="01" />
+                      <p className="text-xs text-muted-foreground">Texto, não número: “01” e “1” são aulas diferentes.</p>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Disciplina</Label>
+                    <DisciplinaPicker
+                      disciplinas={disciplinas}
+                      nome={form.disciplina}
+                      disciplinaId={form.disciplina_id}
+                      onChange={(v) => setForm((f) => ({ ...f, ...v }))}
+                      onCriar={criarDisciplinaLocal}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Conteúdo</Label>
+                    <Textarea rows={2} value={form.conteudo ?? ''} onChange={(e) => setForm((f) => ({ ...f, conteudo: e.target.value }))} placeholder="O que o aluno estuda nesta meta" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label>Duração</Label>
+                    <Input value={form.duracao ?? ''} onChange={(e) => setForm((f) => ({ ...f, duracao: e.target.value }))} placeholder="3 - 4h" className="sm:w-48" />
+                  </div>
                 </div>
-                <div className="space-y-1.5">
-                  <Label>Aula</Label>
-                  <Input
-                    value={form.aula ?? ''}
-                    onChange={(e) => setForm((f) => ({ ...f, aula: e.target.value }))}
-                    placeholder="01"
-                  />
-                  <p className="text-xs text-muted-foreground">Texto, não número: “01” e “1” são aulas diferentes.</p>
+              ) : (
+                <div className="space-y-3">
+                  {/* Resumo read-only do conteúdo */}
+                  <div className="rounded-lg border bg-muted/20 p-3 text-sm">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                      <Badge variant="secondary">{rotulo(form.tipo)}</Badge>
+                      <span className="font-medium">{form.disciplina || <span className="text-muted-foreground">sem disciplina</span>}</span>
+                      {form.aula && <span className="text-muted-foreground">· aula {form.aula}</span>}
+                      {form.duracao && <span className="ml-auto text-xs tabular-nums text-muted-foreground">{form.duracao}</span>}
+                    </div>
+                    {form.conteudo ? (
+                      <p className="mt-1.5 whitespace-pre-wrap text-muted-foreground">{form.conteudo}</p>
+                    ) : (
+                      <p className="mt-1.5 text-xs italic text-muted-foreground">sem conteúdo</p>
+                    )}
+                  </div>
+
+                  {/* Vínculo com o banco + atalhos */}
+                  {vinculo == null ? (
+                    <p className="flex items-center gap-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" /> verificando o banco…</p>
+                  ) : vinculo.length > 0 ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+                        <Link2 className="h-3.5 w-3.5 shrink-0 text-primary" /> No banco:{' '}
+                        <span className="truncate font-medium text-foreground">{vinculo.map((v) => v.conjunto_nome).join(', ')}</span>
+                      </span>
+                      <div className="ml-auto flex shrink-0 items-center gap-2">
+                        <Link href={`/admin/cronogramas/conteudos/${vinculo[0].conjunto_id}`} target="_blank" className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+                          <ExternalLink className="mr-1 h-4 w-4" /> Editar no banco
+                        </Link>
+                        {editando && (
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => { const m = metas.find((x) => x.id === editando); if (m) { setAberto(false); setPropagarMeta(m) } }}
+                          >
+                            <Send className="mr-1 h-4 w-4" /> Propagar
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Este conteúdo ainda não está no banco de conteúdos.</p>
+                  )}
+
+                  <button type="button" onClick={() => setEditarConteudo(true)} className="text-xs text-primary hover:underline">
+                    editar conteúdo só neste cronograma
+                  </button>
                 </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>Disciplina</Label>
-                <DisciplinaPicker
-                  disciplinas={disciplinas}
-                  nome={form.disciplina}
-                  disciplinaId={form.disciplina_id}
-                  onChange={(v) => setForm((f) => ({ ...f, ...v }))}
-                  onCriar={criarDisciplinaLocal}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>Conteúdo</Label>
-                <Textarea
-                  rows={2}
-                  value={form.conteudo ?? ''}
-                  onChange={(e) => setForm((f) => ({ ...f, conteudo: e.target.value }))}
-                  placeholder="O que o aluno estuda nesta meta"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label>Duração</Label>
-                <Input
-                  value={form.duracao ?? ''}
-                  onChange={(e) => setForm((f) => ({ ...f, duracao: e.target.value }))}
-                  placeholder="3 - 4h"
-                  className="sm:w-48"
-                />
-              </div>
+              )}
             </Secao>
 
             {/* ── Só aparece quando o tipo aponta simulado */}
@@ -855,7 +945,150 @@ export function MetasClient({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <PropagarMetaDialog meta={propagarMeta} aoFechar={() => setPropagarMeta(null)} aoAplicado={recarregarMetas} />
     </>
+  )
+}
+
+// ── Propagar a partir de UMA meta: empurra o conteúdo para outros cronogramas e/ou o banco ──
+function PropagarMetaDialog({
+  meta,
+  aoFechar,
+  aoAplicado,
+}: {
+  meta: MetaFonte | null
+  aoFechar: () => void
+  aoAplicado: () => void
+}) {
+  const [carregando, setCarregando] = useState(false)
+  const [alvos, setAlvos] = useState<PropagacaoAlvo[]>([])
+  const [sel, setSel] = useState<Set<string>>(new Set())
+  const [banco, setBanco] = useState<BancoAulaRef[]>([])
+  const [incluirBanco, setIncluirBanco] = useState(true)
+  const [salvando, setSalvando] = useState(false)
+
+  useEffect(() => {
+    if (!meta) return
+    let vivo = true
+    setCarregando(true)
+    setAlvos([])
+    setSel(new Set())
+    setBanco([])
+    const chave = { disciplina: meta.disciplina, aula: meta.aula ?? '', tipo: meta.tipo }
+    Promise.all([contarPropagacao(chave), bancoAulasDaChave(chave)]).then(([rc, rb]) => {
+      if (!vivo) return
+      setCarregando(false)
+      if (rc.ok) { const xs = rc.alvos ?? []; setAlvos(xs); setSel(new Set(xs.map((a) => a.cronograma_id))) }
+      else toast.error(rc.error ?? 'Não foi possível consultar.')
+      if (rb.ok) { const bs = rb.aulas ?? []; setBanco(bs); setIncluirBanco(bs.length > 0) }
+    })
+    return () => { vivo = false }
+  }, [meta])
+
+  const metasSel = alvos.filter((a) => sel.has(a.cronograma_id)).reduce((n, a) => n + a.metas, 0)
+  const todos = alvos.length > 0 && sel.size === alvos.length
+  const nadaSelecionado = sel.size === 0 && !(incluirBanco && banco.length > 0)
+
+  async function aplicar() {
+    if (!meta || nadaSelecionado) return
+    const chave = { disciplina: meta.disciplina, aula: meta.aula ?? '', tipo: meta.tipo, conteudo: meta.conteudo }
+    setSalvando(true)
+    const msgs: string[] = []
+    if (sel.size) {
+      const r = await propagarConteudoAula({ ...chave, cronogramaIds: [...sel] })
+      if (!r.ok) { setSalvando(false); return toast.error(r.error ?? 'Falha ao propagar.') }
+      msgs.push(`${(r.atualizadas ?? 0).toLocaleString('pt-BR')} meta(s)`)
+    }
+    if (incluirBanco && banco.length) {
+      const r = await atualizarBancoConteudo(chave)
+      if (!r.ok) { setSalvando(false); return toast.error(r.error ?? 'Falha ao atualizar o banco.') }
+      msgs.push(`${r.atualizadas ?? 0} no banco`)
+    }
+    setSalvando(false)
+    toast.success(`Propagado: ${msgs.join(' · ') || 'nada mudou'}`)
+    aoAplicado()
+    aoFechar()
+  }
+
+  return (
+    <Dialog open={!!meta} onOpenChange={(o) => !o && aoFechar()}>
+      <DialogContent className="w-full sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Propagar conteúdo</DialogTitle>
+          <DialogDescription>{meta ? `${meta.disciplina} · aula ${meta.aula || '—'} · ${meta.tipo}` : ''}</DialogDescription>
+        </DialogHeader>
+
+        <div className="rounded-lg border bg-muted/30 p-3">
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Conteúdo a aplicar (o desta meta)</p>
+          <p className="max-h-24 overflow-y-auto whitespace-pre-wrap text-sm">
+            {meta?.conteudo?.trim() || <span className="italic text-muted-foreground">vazio — vai limpar o conteúdo dos selecionados</span>}
+          </p>
+        </div>
+
+        {carregando ? (
+          <p className="flex items-center justify-center gap-2 py-8 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Procurando…</p>
+        ) : (
+          <>
+            {/* Atualizar o molde no banco */}
+            <label className={`flex items-start gap-2 rounded-lg border p-3 text-sm ${banco.length ? 'cursor-pointer hover:bg-muted/40' : 'opacity-60'}`}>
+              <input
+                type="checkbox"
+                disabled={!banco.length}
+                checked={incluirBanco && banco.length > 0}
+                onChange={(e) => setIncluirBanco(e.target.checked)}
+                className="mt-0.5 h-4 w-4 accent-[var(--primary)]"
+              />
+              <span className="min-w-0 flex-1">
+                <span className="font-medium">Atualizar a aula no banco</span>
+                <span className="block text-xs text-muted-foreground">
+                  {banco.length ? `Conjunto: ${banco.map((b) => b.conjunto_nome).join(', ')}` : 'Esta aula ainda não está no banco.'}
+                </span>
+              </span>
+            </label>
+
+            {/* Outros cronogramas */}
+            {alvos.length === 0 ? (
+              <p className="rounded-xl border bg-muted/20 py-6 text-center text-sm text-muted-foreground">Nenhum cronograma usa esta aula.</p>
+            ) : (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">{alvos.length} cronograma(s) · {metasSel.toLocaleString('pt-BR')} meta(s)</p>
+                  <button type="button" className="text-xs text-primary hover:underline" onClick={() => setSel(todos ? new Set() : new Set(alvos.map((a) => a.cronograma_id)))}>
+                    {todos ? 'Desmarcar todos' : 'Marcar todos'}
+                  </button>
+                </div>
+                <div className="max-h-[36vh] space-y-1 overflow-y-auto pr-1">
+                  {alvos.map((a) => (
+                    <label key={a.cronograma_id} className="flex cursor-pointer items-center gap-2 rounded-md border px-3 py-2 text-sm transition hover:bg-muted/40">
+                      <input
+                        type="checkbox"
+                        checked={sel.has(a.cronograma_id)}
+                        onChange={(e) => setSel((s) => { const n = new Set(s); e.target.checked ? n.add(a.cronograma_id) : n.delete(a.cronograma_id); return n })}
+                        className="h-4 w-4 accent-[var(--primary)]"
+                      />
+                      <span className="min-w-0 flex-1 truncate">{a.nome}</span>
+                      {a.status === 'liberado' && (
+                        <Badge variant="outline" className="shrink-0 border-amber-400 text-[10px] text-amber-700 dark:text-amber-300">liberado</Badge>
+                      )}
+                      <Badge variant="secondary" className="shrink-0 text-[10px]">{a.metas} meta(s)</Badge>
+                    </label>
+                  ))}
+                </div>
+                <p className="text-[11px] text-muted-foreground">Cronogramas <strong>liberados</strong> mudam o que o aluno já vê.</p>
+              </div>
+            )}
+          </>
+        )}
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={aoFechar} disabled={salvando}>Cancelar</Button>
+          <Button onClick={aplicar} disabled={salvando || carregando || nadaSelecionado}>
+            {salvando ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Send className="mr-1 h-4 w-4" />} Propagar
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 

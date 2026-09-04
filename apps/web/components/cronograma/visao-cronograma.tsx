@@ -31,11 +31,14 @@ export function VisaoCronograma({
   aoAlternarSemana,
   aoDefinirSemanas,
   aoAlternarContagem,
+  ocultarDatas,
 }: {
   grade: Grade
   paletaSlug: string
   /** Sem emissão salva não há onde gravar — a tela mostra o plano sem as caixas. */
   emissaoId: string | null
+  /** Plano "só semanas": esconde datas e a visão Calendário (que é baseada em datas). */
+  ocultarDatas?: boolean
   checksIniciais?: ChecksDaEmissao
   notasIniciais?: NotasDaEmissao
   /* As preferências vêm de fora: os cartões do resumo são IRMÃOS desta lista na tela, e
@@ -131,7 +134,7 @@ export function VisaoCronograma({
             </p>
           )}
 
-          <div className="flex shrink-0 overflow-hidden rounded-lg border">
+          <div className={`flex shrink-0 overflow-hidden rounded-lg border ${ocultarDatas ? 'hidden' : ''}`}>
             {(
               [
                 ['lista', 'Lista', List],
@@ -153,7 +156,7 @@ export function VisaoCronograma({
         </div>
       </Card>
 
-      {visao === 'lista' ? (
+      {visao === 'lista' || ocultarDatas ? (
         <GradeCronograma
           grade={grade}
           paletaSlug={paletaSlug}
@@ -168,6 +171,8 @@ export function VisaoCronograma({
           aoDefinirColapsadas={aoDefinirSemanas}
           ocultarContagem={prefs.ocultarContagem}
           aoAlternarContagem={aoAlternarContagem}
+          ocultarDatas={ocultarDatas}
+          resolverHref={emissaoId ? (m) => (m.qtdQuestoes ? `/aluno/cronograma/resolver/${m.id}?voltar=${encodeURIComponent(`/aluno/cronograma/${emissaoId}`)}` : null) : undefined}
         />
       ) : (
         <CalendarioCronograma

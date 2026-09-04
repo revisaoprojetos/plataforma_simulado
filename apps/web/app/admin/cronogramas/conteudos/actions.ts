@@ -16,6 +16,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { garantirPlataformaPdf } from '@/lib/cronograma/plataforma-video'
 
 const AREA = 'cronograma_conteudo'
 
@@ -38,6 +39,10 @@ export type ConjuntoLista = {
   ordem: number
   aulas: number
   questoes: number
+  /** Aulas de tipo 'legproc' deste conjunto — alimenta a aba LegProc (o resto é da disciplina). */
+  aulasLegproc: number
+  /** 'disciplina' (padrão) | 'legproc' — reservado; hoje LegProc vem das aulas, não do conjunto. */
+  tipo: string
 }
 export type PastaLista = { id: string; nome: string; pai_id: string | null }
 export type AulaBanco = {
@@ -79,27 +84,43 @@ export async function listarConteudos(
   ).catch(() => [] as any[])
   const pastas: PastaLista[] = (pastasRaw as any[]).filter((p) => (p.pai_id ?? null) === pai).map((p) => ({ id: p.id, nome: p.nome, pai_id: p.pai_id ?? null }))
 
-  // Conjuntos no nível atual.
-  const conjuntosRaw = await fetchAll<any>(() =>
-    svc
-      .from('simulado_cronograma_conjuntos')
-      .select('id, nome, disciplina, disciplina_id, descricao, cor, pasta_id, ordem')
-      .eq('tenant_id', g.tenantId)
-      .eq('deletado', false)
-      .order('ordem')
-      .order('nome') as any,
-  )
+  // Conjuntos no nível atual. Tolerante à coluna `tipo` (migração 20260902000000) ainda não aplicada.
+  const selConj = 'id, nome, disciplina, disciplina_id, descricao, cor, pasta_id, ordem'
+  const buscarConj = (cols: string) =>
+    fetchAll<any>(() =>
+      svc.from('simulado_cronograma_conjuntos').select(cols).eq('tenant_id', g.tenantId).eq('deletado', false).order('ordem').order('nome') as any,
+    )
+  let conjuntosRaw: any[]
+  try {
+    conjuntosRaw = await buscarConj(`${selConj}, tipo`)
+  } catch (e: any) {
+    if (/tipo|column/i.test(e?.message ?? '')) conjuntosRaw = await buscarConj(selConj)
+    else throw e
+  }
   const doNivel = (conjuntosRaw as any[]).filter((c) => (c.pasta_id ?? null) === pai)
 
-  // Contagens de aulas + questões por conjunto (uma varredura leve das aulas).
+  // Contagens por conjunto. "aulas" = DIAS de aula distintos (número da aula normalizado),
+  // não linhas de conteúdo — uma aula pode ter várias linhas (PDF, flash, quest, legproc…).
   const ids = doNivel.map((c) => c.id)
-  const aulasPorConjunto = new Map<string, number>()
+  const aulasPorConjunto = new Map<string, Set<string>>()
+  const legprocPorConjunto = new Map<string, Set<string>>()
   const questoesPorConjunto = new Map<string, number>()
   if (ids.length) {
     const aulas = await fetchAllByIn<any>(ids, (chunk) =>
-      svc.from('simulado_cronograma_conjunto_aulas').select('id, conjunto_id').eq('tenant_id', g.tenantId).in('conjunto_id', chunk).order('id') as any,
+      svc.from('simulado_cronograma_conjunto_aulas').select('id, conjunto_id, tipo, aula').eq('tenant_id', g.tenantId).in('conjunto_id', chunk).order('id') as any,
     )
-    for (const a of aulas) aulasPorConjunto.set(a.conjunto_id, (aulasPorConjunto.get(a.conjunto_id) ?? 0) + 1)
+    for (const a of aulas) {
+      const chave = chaveAulaSrv(a.aula)
+      if (!chave) continue
+      let sd = aulasPorConjunto.get(a.conjunto_id)
+      if (!sd) { sd = new Set(); aulasPorConjunto.set(a.conjunto_id, sd) }
+      sd.add(chave)
+      if (a.tipo === 'legproc') {
+        let sl = legprocPorConjunto.get(a.conjunto_id)
+        if (!sl) { sl = new Set(); legprocPorConjunto.set(a.conjunto_id, sl) }
+        sl.add(chave)
+      }
+    }
     const aulaIds = aulas.map((a) => a.id)
     if (aulaIds.length) {
       const qs = await fetchAllByIn<any>(aulaIds, (chunk) =>
@@ -122,8 +143,10 @@ export async function listarConteudos(
     cor: c.cor ?? null,
     pasta_id: c.pasta_id ?? null,
     ordem: c.ordem ?? 0,
-    aulas: aulasPorConjunto.get(c.id) ?? 0,
+    aulas: aulasPorConjunto.get(c.id)?.size ?? 0,
     questoes: questoesPorConjunto.get(c.id) ?? 0,
+    aulasLegproc: legprocPorConjunto.get(c.id)?.size ?? 0,
+    tipo: c.tipo ?? 'disciplina',
   }))
 
   // Trilha (breadcrumb) subindo por pai_id.
@@ -143,7 +166,7 @@ export async function listarConteudos(
 }
 
 // ── Busca para compor (picker "Adicionar do banco") ─────────────────────────
-export type ConjuntoParaCompor = { id: string; nome: string; disciplina: string; disciplina_id: string | null; aulas: number; questoes: number }
+export type ConjuntoParaCompor = { id: string; nome: string; disciplina: string; disciplina_id: string | null; aulas: number; aulasLegproc: number; questoes: number }
 
 export async function buscarConjuntosParaCompor(
   filtros: { busca?: string; disciplinaId?: string } = {},
@@ -158,24 +181,29 @@ export async function buscarConjuntosParaCompor(
   const conjuntos = await fetchAll<any>(() => q.order('nome') as any)
   const ids = conjuntos.map((c) => c.id)
 
-  const aulasPorConjunto = new Map<string, number>()
-  const questoesPorConjunto = new Map<string, number>()
+  // DIAS de aula distintos (não linhas) — casa com o card do banco e a lista de selecionados.
+  // Só a contagem de aulas/legproc: as QUESTÕES são puxadas depois, só dos conjuntos escolhidos
+  // (a contagem por aula aqui varria conjunto_aula_questoes inteiro e deixava o picker lento).
+  const aulasPorConjunto = new Map<string, Set<string>>()
+  const legprocPorConjunto = new Map<string, Set<string>>()
   if (ids.length) {
-    const aulas = await fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_cronograma_conjunto_aulas').select('id, conjunto_id').eq('tenant_id', g.tenantId).in('conjunto_id', chunk).order('id') as any)
-    for (const a of aulas) aulasPorConjunto.set(a.conjunto_id, (aulasPorConjunto.get(a.conjunto_id) ?? 0) + 1)
-    const aulaIds = aulas.map((a) => a.id)
-    if (aulaIds.length) {
-      const qs = await fetchAllByIn<any>(aulaIds, (chunk) => svc.from('simulado_cronograma_conjunto_aula_questoes').select('aula_id').eq('tenant_id', g.tenantId).in('aula_id', chunk).order('id') as any)
-      const conjuntoDaAula = new Map<string, string>(aulas.map((a) => [a.id, a.conjunto_id]))
-      for (const x of qs) {
-        const cid = conjuntoDaAula.get(x.aula_id)
-        if (cid) questoesPorConjunto.set(cid, (questoesPorConjunto.get(cid) ?? 0) + 1)
+    const aulas = await fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_cronograma_conjunto_aulas').select('conjunto_id, tipo, aula').eq('tenant_id', g.tenantId).in('conjunto_id', chunk) as any)
+    for (const a of aulas) {
+      const ch = chaveAulaSrv(a.aula)
+      if (!ch) continue
+      let dias = aulasPorConjunto.get(a.conjunto_id)
+      if (!dias) aulasPorConjunto.set(a.conjunto_id, (dias = new Set()))
+      dias.add(ch)
+      if (a.tipo === 'legproc') {
+        let leg = legprocPorConjunto.get(a.conjunto_id)
+        if (!leg) legprocPorConjunto.set(a.conjunto_id, (leg = new Set()))
+        leg.add(ch)
       }
     }
   }
 
   const itens: ConjuntoParaCompor[] = conjuntos
-    .map((c) => ({ id: c.id, nome: c.nome, disciplina: c.disciplina, disciplina_id: c.disciplina_id ?? null, aulas: aulasPorConjunto.get(c.id) ?? 0, questoes: questoesPorConjunto.get(c.id) ?? 0 }))
+    .map((c) => ({ id: c.id, nome: c.nome, disciplina: c.disciplina, disciplina_id: c.disciplina_id ?? null, aulas: aulasPorConjunto.get(c.id)?.size ?? 0, aulasLegproc: legprocPorConjunto.get(c.id)?.size ?? 0, questoes: 0 }))
     .filter((c) => c.aulas > 0)
   return { ok: true, itens }
 }
@@ -191,6 +219,10 @@ export type AulaConteudoBanco = {
   tema: string | null
   /** slug da plataforma → url. */
   urls: Record<string, string>
+  /** IDs das questões anexadas a esta aula — viram `meta_questoes` ao montar (chip "N questões"). */
+  questaoIds: string[]
+  /** Videoaula da aula — vira link sob a plataforma "Vídeo" na grade. */
+  videoUrl: string | null
 }
 export type ConteudoBanco = { id: string; disciplina: string; disciplina_id: string | null; nome: string; aulas: AulaConteudoBanco[] }
 
@@ -211,7 +243,7 @@ export async function buscarConteudosParaMontar(conjuntoIds: string[]): Promise<
     svc.from('simulado_cronograma_conjuntos').select('id, nome, disciplina, disciplina_id').eq('tenant_id', g.tenantId).eq('deletado', false).in('id', chunk).order('id') as any,
   )
   const aulas = await fetchAllByIn<any>(conjuntoIds, (chunk) =>
-    svc.from('simulado_cronograma_conjunto_aulas').select('id, conjunto_id, tipo, aula, conteudo, tema, ordem').eq('tenant_id', g.tenantId).in('conjunto_id', chunk).order('ordem').order('id') as any,
+    svc.from('simulado_cronograma_conjunto_aulas').select('id, conjunto_id, tipo, aula, conteudo, tema, video_url, ordem').eq('tenant_id', g.tenantId).in('conjunto_id', chunk).order('ordem').order('id') as any,
   )
   const aulaIds = aulas.map((a) => a.id)
   const urlsPorAula = new Map<string, Record<string, string>>()
@@ -225,6 +257,19 @@ export async function buscarConteudosParaMontar(conjuntoIds: string[]): Promise<
       const m = urlsPorAula.get(u.aula_id) ?? {}
       m[slug] = u.url
       urlsPorAula.set(u.aula_id, m)
+    }
+  }
+
+  // Questões anexadas por aula → seguem a aula até virar meta_questoes ao montar (mesma fonte do editor).
+  const questoesPorAula = new Map<string, string[]>()
+  if (aulaIds.length) {
+    const qs = await fetchAllByIn<any>(aulaIds, (chunk) =>
+      svc.from('simulado_cronograma_conjunto_aula_questoes').select('aula_id, questao_id, ordem').eq('tenant_id', g.tenantId).in('aula_id', chunk).order('ordem') as any,
+    )
+    for (const x of qs) {
+      const l = questoesPorAula.get(x.aula_id) ?? []
+      l.push(x.questao_id)
+      questoesPorAula.set(x.aula_id, l)
     }
   }
 
@@ -247,6 +292,8 @@ export async function buscarConteudosParaMontar(conjuntoIds: string[]): Promise<
       conteudo: a.conteudo ?? null,
       tema: a.tema ?? null,
       urls: urlsPorAula.get(a.id) ?? {},
+      questaoIds: questoesPorAula.get(a.id) ?? [],
+      videoUrl: a.video_url ?? null,
     })),
   }))
   return { ok: true, conteudos }
@@ -259,29 +306,33 @@ export async function criarConjunto(entrada: {
   disciplina_id: string | null
   descricao?: string | null
   pastaId?: string | null
+  tipo?: string
 }): Promise<{ ok: boolean; id?: string; error?: string }> {
   const g = await guard('cronogramas:update')
   if (!g.ok) return { ok: false, error: g.error }
   const nome = entrada.nome.trim()
   if (nome.length < 2) return { ok: false, error: 'Informe um nome (mín. 2 letras).' }
-  if (!entrada.disciplina.trim()) return { ok: false, error: 'Escolha a disciplina do conjunto.' }
+  const tipo = entrada.tipo === 'legproc' ? 'legproc' : 'disciplina'
+  // LegProc não tem disciplina; conjuntos de disciplina exigem uma.
+  if (tipo === 'disciplina' && !entrada.disciplina.trim()) return { ok: false, error: 'Escolha a disciplina do conjunto.' }
   const svc = createAdminClient()
-  const { data, error } = await svc
-    .from('simulado_cronograma_conjuntos')
-    .insert({
-      tenant_id: g.tenantId,
-      nome,
-      disciplina: entrada.disciplina.trim(),
-      disciplina_id: entrada.disciplina_id || null,
-      descricao: entrada.descricao?.trim() || null,
-      pasta_id: entrada.pastaId || null,
-    })
-    .select('id')
-    .single()
-  if (error) return { ok: false, error: error.message }
-  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_cronograma_conjuntos', entidadeId: (data as any).id, depois: { nome, disciplina: entrada.disciplina }, atorId: g.atorId, tenantId: g.tenantId })
+  const base = {
+    tenant_id: g.tenantId,
+    nome,
+    disciplina: entrada.disciplina.trim() || (tipo === 'legproc' ? 'LegProc' : ''),
+    disciplina_id: entrada.disciplina_id || null,
+    descricao: entrada.descricao?.trim() || null,
+    pasta_id: entrada.pastaId || null,
+  }
+  // Tolerante à coluna `tipo` ainda não migrada: tenta com, cai para sem.
+  let ins = await svc.from('simulado_cronograma_conjuntos').insert({ ...base, tipo }).select('id').single()
+  if (ins.error && /tipo|column/i.test(ins.error.message)) {
+    ins = await svc.from('simulado_cronograma_conjuntos').insert(base).select('id').single()
+  }
+  if (ins.error) return { ok: false, error: ins.error.message }
+  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_cronograma_conjuntos', entidadeId: (ins.data as any).id, depois: { nome, disciplina: base.disciplina, tipo }, atorId: g.atorId, tenantId: g.tenantId })
   revalidatePath('/admin/cronogramas/conteudos')
-  return { ok: true, id: (data as any).id }
+  return { ok: true, id: (ins.data as any).id }
 }
 
 export async function atualizarConjunto(
@@ -586,6 +637,26 @@ export async function salvarUrlsAula(aulaId: string, urls: { plataforma_id: stri
   return { ok: true }
 }
 
+/**
+ * PDF da aula: gravado como um link sob a plataforma "PDF" (upsert dirigido — não apaga QC/TEC).
+ * Devolve o `plataformaId` para o cliente atualizar `aula.urls` sem recarregar.
+ */
+export async function salvarPdfAula(aulaId: string, url: string): Promise<{ ok: boolean; plataformaId?: string; error?: string }> {
+  const g = await guard('cronogramas:update')
+  if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const pdfId = await garantirPlataformaPdf(svc, g.tenantId)
+  if (!pdfId) return { ok: false, error: 'Não foi possível preparar a plataforma PDF.' }
+  await svc.from('simulado_cronograma_conjunto_aula_urls').delete().eq('tenant_id', g.tenantId).eq('aula_id', aulaId).eq('plataforma_id', pdfId)
+  const u = url.trim()
+  if (u) {
+    const { error } = await svc.from('simulado_cronograma_conjunto_aula_urls').insert({ tenant_id: g.tenantId, aula_id: aulaId, plataforma_id: pdfId, url: u })
+    if (error) return { ok: false, error: error.message }
+  }
+  revalidatePath('/admin/cronogramas/conteudos')
+  return { ok: true, plataformaId: pdfId }
+}
+
 // ── Questões anexadas ────────────────────────────────────────────────────────
 export async function anexarQuestoes(aulaId: string, questaoIds: string[]): Promise<{ ok: boolean; adicionadas?: number; error?: string }> {
   const g = await guard('cronogramas:update')
@@ -609,4 +680,151 @@ export async function removerQuestao(aulaId: string, questaoId: string): Promise
   if (error) return { ok: false, error: error.message }
   revalidatePath('/admin/cronogramas/conteudos')
   return { ok: true }
+}
+
+// ── Propagação: empurrar o conteúdo do banco para as metas já compostas ───────
+// Snapshot + push: as metas continuam cópias, mas ao editar uma aula no banco dá para
+// atualizar as metas que representam a MESMA aula (mesma chave natural disciplina+aula+tipo,
+// a mesma que os links já usam). Sem coluna nova — casa metas existentes na hora.
+export type PropagacaoAlvo = { cronograma_id: string; nome: string; status: string; metas: number }
+
+/** Metas do tenant que representam a mesma aula (disciplina + tipo + aula normalizada "01"~"1"). */
+async function metasDaAula(
+  svc: ReturnType<typeof createAdminClient>,
+  tenantId: string,
+  disciplina: string,
+  tipo: string,
+  aulaNorm: string,
+  cronogramaIds?: string[],
+): Promise<{ id: string; cronograma_id: string; aula: string | null; conteudo: string | null }[]> {
+  const metas = await fetchAll<any>(() => {
+    let q = svc
+      .from('simulado_cronograma_metas')
+      .select('id, cronograma_id, aula, conteudo')
+      .eq('tenant_id', tenantId)
+      .eq('tipo', tipo)
+      .eq('disciplina', disciplina)
+    if (cronogramaIds?.length) q = q.in('cronograma_id', cronogramaIds)
+    return q as any
+  })
+  return metas.filter((m) => chaveAulaSrv(m.aula) === aulaNorm)
+}
+
+export async function contarPropagacao(
+  entrada: { disciplina: string; aula: string; tipo: string },
+): Promise<{ ok: boolean; alvos?: PropagacaoAlvo[]; total?: number; error?: string }> {
+  const g = await guard('cronogramas:view')
+  if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const aulaNorm = chaveAulaSrv(entrada.aula)
+  if (!aulaNorm || !entrada.disciplina.trim()) return { ok: true, alvos: [], total: 0 }
+  const metas = await metasDaAula(svc, g.tenantId, entrada.disciplina.trim(), entrada.tipo, aulaNorm)
+  const porCron = new Map<string, number>()
+  for (const m of metas) porCron.set(m.cronograma_id, (porCron.get(m.cronograma_id) ?? 0) + 1)
+  const ids = [...porCron.keys()]
+  if (!ids.length) return { ok: true, alvos: [], total: 0 }
+  const crons = await fetchAllByIn<any>(ids, (chunk) =>
+    svc.from('simulado_cronogramas').select('id, nome, status, deletado').eq('tenant_id', g.tenantId).in('id', chunk) as any,
+  )
+  const alvos: PropagacaoAlvo[] = crons
+    .filter((c) => !c.deletado)
+    .map((c) => ({ cronograma_id: c.id, nome: c.nome, status: c.status, metas: porCron.get(c.id) ?? 0 }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+  return { ok: true, alvos, total: metas.length }
+}
+
+export async function propagarConteudoAula(
+  entrada: { disciplina: string; aula: string; tipo: string; conteudo: string | null; cronogramaIds: string[] },
+): Promise<{ ok: boolean; atualizadas?: number; error?: string }> {
+  const g = await guard('cronogramas:update')
+  if (!g.ok) return { ok: false, error: g.error }
+  if (!entrada.cronogramaIds.length) return { ok: true, atualizadas: 0 }
+  const svc = createAdminClient()
+  const aulaNorm = chaveAulaSrv(entrada.aula)
+  if (!aulaNorm || !entrada.disciplina.trim()) return { ok: true, atualizadas: 0 }
+  const metas = await metasDaAula(svc, g.tenantId, entrada.disciplina.trim(), entrada.tipo, aulaNorm, entrada.cronogramaIds)
+  const novo = entrada.conteudo?.trim() || null
+  // Só as que realmente mudam — evita gravar linha à toa (e o audit fica honesto).
+  const ids = metas.filter((m) => (m.conteudo ?? null) !== novo).map((m) => m.id)
+  if (!ids.length) return { ok: true, atualizadas: 0 }
+  for (let i = 0; i < ids.length; i += 200) {
+    const chunk = ids.slice(i, i + 200)
+    const { error } = await svc.from('simulado_cronograma_metas').update({ conteudo: novo }).eq('tenant_id', g.tenantId).in('id', chunk)
+    if (error) return { ok: false, error: error.message }
+  }
+  await registrarAudit({
+    operacao: 'UPDATE',
+    entidade: 'simulado_cronograma_metas',
+    entidadeId: `propagacao:${entrada.disciplina.trim()}|${aulaNorm}|${entrada.tipo}`,
+    depois: { conteudo: novo, metas: ids.length, cronogramas: entrada.cronogramaIds.length },
+    atorId: g.atorId,
+    tenantId: g.tenantId,
+  })
+  revalidatePath('/admin/cronogramas')
+  return { ok: true, atualizadas: ids.length }
+}
+
+// ── Vínculo meta ↔ banco: achar (e atualizar) a aula do BANCO da mesma chave ──
+export type BancoAulaRef = { aula_id: string; conjunto_id: string; conjunto_nome: string; conteudo: string | null }
+
+/** Aulas do banco (conjunto_aulas) da mesma chave natural — o "molde" daquela meta. */
+async function bancoAulasMatch(
+  svc: ReturnType<typeof createAdminClient>,
+  tenantId: string,
+  disciplina: string,
+  tipo: string,
+  aulaNorm: string,
+): Promise<BancoAulaRef[]> {
+  const conjuntos = await fetchAll<any>(() =>
+    svc.from('simulado_cronograma_conjuntos').select('id, nome').eq('tenant_id', tenantId).eq('deletado', false).eq('disciplina', disciplina) as any,
+  )
+  if (!conjuntos.length) return []
+  const nomePorConj = new Map<string, string>(conjuntos.map((c) => [c.id, c.nome]))
+  const aulas = await fetchAllByIn<any>(conjuntos.map((c) => c.id), (chunk) =>
+    svc.from('simulado_cronograma_conjunto_aulas').select('id, conjunto_id, aula, conteudo').eq('tenant_id', tenantId).eq('tipo', tipo).in('conjunto_id', chunk) as any,
+  )
+  return aulas
+    .filter((a) => chaveAulaSrv(a.aula) === aulaNorm)
+    .map((a) => ({ aula_id: a.id, conjunto_id: a.conjunto_id, conjunto_nome: nomePorConj.get(a.conjunto_id) ?? '', conteudo: a.conteudo ?? null }))
+}
+
+export async function bancoAulasDaChave(
+  entrada: { disciplina: string; aula: string; tipo: string },
+): Promise<{ ok: boolean; aulas?: BancoAulaRef[]; error?: string }> {
+  const g = await guard('cronogramas:view')
+  if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const aulaNorm = chaveAulaSrv(entrada.aula)
+  if (!aulaNorm || !entrada.disciplina.trim()) return { ok: true, aulas: [] }
+  return { ok: true, aulas: await bancoAulasMatch(svc, g.tenantId, entrada.disciplina.trim(), entrada.tipo, aulaNorm) }
+}
+
+/** Atualiza o conteúdo da(s) aula(s) do BANCO da mesma chave — mantém o molde em dia. */
+export async function atualizarBancoConteudo(
+  entrada: { disciplina: string; aula: string; tipo: string; conteudo: string | null },
+): Promise<{ ok: boolean; atualizadas?: number; error?: string }> {
+  const g = await guard('cronogramas:update')
+  if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const aulaNorm = chaveAulaSrv(entrada.aula)
+  if (!aulaNorm || !entrada.disciplina.trim()) return { ok: true, atualizadas: 0 }
+  const refs = await bancoAulasMatch(svc, g.tenantId, entrada.disciplina.trim(), entrada.tipo, aulaNorm)
+  const novo = entrada.conteudo?.trim() || null
+  const ids = refs.filter((r) => (r.conteudo ?? null) !== novo).map((r) => r.aula_id)
+  if (!ids.length) return { ok: true, atualizadas: 0 }
+  for (let i = 0; i < ids.length; i += 200) {
+    const chunk = ids.slice(i, i + 200)
+    const { error } = await svc.from('simulado_cronograma_conjunto_aulas').update({ conteudo: novo, atualizado_em: new Date().toISOString() }).eq('tenant_id', g.tenantId).in('id', chunk)
+    if (error) return { ok: false, error: error.message }
+  }
+  await registrarAudit({
+    operacao: 'UPDATE',
+    entidade: 'simulado_cronograma_conjunto_aulas',
+    entidadeId: `propagacao-banco:${entrada.disciplina.trim()}|${aulaNorm}|${entrada.tipo}`,
+    depois: { conteudo: novo, aulas: ids.length },
+    atorId: g.atorId,
+    tenantId: g.tenantId,
+  })
+  revalidatePath('/admin/cronogramas/conteudos')
+  return { ok: true, atualizadas: ids.length }
 }

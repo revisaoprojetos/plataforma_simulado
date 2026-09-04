@@ -47,6 +47,7 @@ export function EmissaoClient({
 
   const paleta = (emissao.formulario?.paleta as string) ?? 'revisao'
   const inicio = emissao.formulario?.inicio as string | undefined
+  const semDatas = !!emissao.formulario?.semDatas
 
   function salvarTitulo() {
     iniciar(async () => {
@@ -91,7 +92,7 @@ export function EmissaoClient({
           )}
           <p className="text-muted-foreground">
             {emissao.cronograma_nome}
-            {inicio && ` · começa em ${fmtBr(inicio)}`}
+            {!semDatas && inicio && ` · começa em ${fmtBr(inicio)}`}
             {` · gerado em ${new Date(emissao.criado_em).toLocaleDateString('pt-BR')} às ${new Date(
               emissao.criado_em,
             ).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`}
@@ -118,7 +119,7 @@ export function EmissaoClient({
         </AlertBox>
       ) : (
         <>
-          <ResumoGrade grade={grade} ocultos={prefs.resumoOculto} aoAlternar={alternarResumo} />
+          <ResumoGrade grade={grade} ocultos={prefs.resumoOculto} aoAlternar={alternarResumo} ocultarDatas={semDatas} />
           <p className="text-sm text-muted-foreground">{grade.resumo.subtitulo}</p>
           <VisaoCronograma
             grade={grade}
@@ -130,6 +131,7 @@ export function EmissaoClient({
             aoAlternarSemana={alternarSemana}
             aoDefinirSemanas={definirSemanas}
             aoAlternarContagem={alternarContagem}
+            ocultarDatas={semDatas}
           />
         </>
       )}

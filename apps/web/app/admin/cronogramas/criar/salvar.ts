@@ -12,6 +12,8 @@
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
+import { SLUG_PDF, SLUG_VIDEO } from '@/lib/cronograma/tipos'
+import { garantirPlataformaVideo, garantirPlataformaPdf } from '@/lib/cronograma/plataforma-video'
 import { criarCronograma, alternarLiberacao } from '../actions'
 import type { CronogramaDraft } from './criar-context'
 
@@ -55,10 +57,25 @@ export async function criarCronogramaCompletoAction(
       duracao: m.duracao?.trim() || null,
       ordem: m.ordem ?? 0,
     }))
-    const { error: eMetas } = await svc.from('simulado_cronograma_metas').insert(linhas)
+    const { data: metasRows, error: eMetas } = await svc.from('simulado_cronograma_metas').insert(linhas).select('id')
     if (eMetas) {
       await svc.from('simulado_cronogramas').delete().eq('id', id).eq('tenant_id', tenantId)
       return { error: `Não foi possível gravar as metas: ${eMetas.message}` }
+    }
+
+    // 2b. Questões anexadas (via Montagem) → meta_questoes. O INSERT devolve os ids na ORDEM de
+    // entrada, então metasRows[i] casa com draft.metas[i]. Só vincula se a contagem bater (defensivo).
+    const ids = (metasRows ?? []) as { id: string }[]
+    const temQuestoes = draft.metas.some((m) => (m.questaoIds?.length ?? 0) > 0)
+    if (temQuestoes && ids.length === draft.metas.length) {
+      const mq: { tenant_id: string; meta_id: string; questao_id: string; ordem: number }[] = []
+      draft.metas.forEach((m, i) => (m.questaoIds ?? []).forEach((qid, k) => mq.push({ tenant_id: tenantId, meta_id: ids[i].id, questao_id: qid, ordem: k })))
+      if (mq.length) {
+        const { error: eMq } = await svc.from('simulado_cronograma_meta_questoes').upsert(mq, { onConflict: 'meta_id,questao_id', ignoreDuplicates: true })
+        if (eMq) avisos.push(`Questões das metas: ${eMq.message}`)
+      }
+    } else if (temQuestoes) {
+      avisos.push('As questões anexadas não puderam ser vinculadas às metas (contagem divergente).')
     }
   }
 
@@ -69,6 +86,15 @@ export async function criarCronogramaCompletoAction(
       .select('id, slug')
       .eq('tenant_id', tenantId)
     const idPorSlug = new Map((plats ?? []).map((p: any) => [p.slug as string, p.id as string]))
+    // Vídeo e PDF vêm da montagem como links sob plataformas próprias — garante que existam.
+    if (!idPorSlug.has(SLUG_VIDEO) && draft.links.some((l) => l.urls[SLUG_VIDEO]?.trim())) {
+      const vid = await garantirPlataformaVideo(svc, tenantId)
+      if (vid) idPorSlug.set(SLUG_VIDEO, vid)
+    }
+    if (!idPorSlug.has(SLUG_PDF) && draft.links.some((l) => l.urls[SLUG_PDF]?.trim())) {
+      const pid = await garantirPlataformaPdf(svc, tenantId)
+      if (pid) idPorSlug.set(SLUG_PDF, pid)
+    }
     for (const l of draft.links) {
       const disc = l.disciplina.trim()
       const aula = l.aula.trim()

@@ -20,6 +20,8 @@
  * duração vem da configuração da linha, não de cada célula.
  */
 
+import { SLUG_PDF, SLUG_VIDEO } from './tipos'
+
 /** R11 — aula é TEXTO; "01" e "1" são a MESMA aula. Chave de casamento normalizada. */
 export function chaveAulaMontador(aula: string): string {
   const t = (aula ?? '').trim()
@@ -35,6 +37,10 @@ export type DadoAula = {
   tema: string | null
   /** slug da plataforma → url. */
   urls: Record<string, string>
+  /** IDs das questões anexadas a esta aula (viram meta_questoes). */
+  questaoIds?: string[]
+  /** Videoaula da aula — vira um link sob a plataforma "Vídeo". */
+  videoUrl?: string | null
 }
 
 /** Uma disciplina selecionada para montar (com sua sequência de aulas e a faixa de semanas). */
@@ -60,6 +66,11 @@ export type LinhaMontagem = {
   continuacao: boolean
   /** Usa os links de questões da aula (Resolução). */
   usaLinks: boolean
+  /**
+   * Só emite meta onde a aula TEM conteúdo deste tipo no banco (LegProc é esparso: "Aula 4 tem
+   * legproc", as outras não). Sem isto, uma linha esparsa criaria linhas vazias em toda semana.
+   */
+  somenteComDado?: boolean
 }
 
 export type ConfigMontagem = {
@@ -82,6 +93,8 @@ export type MetaMontada = {
   conteudo: string | null
   duracao: string | null
   ordem: number
+  /** Questões anexadas à aula (só na meta principal) — viram meta_questoes ao salvar. */
+  questaoIds?: string[]
 }
 
 export type LinkMontado = {
@@ -161,16 +174,34 @@ function distribuirLicoes(config: ConfigMontagem, conteudos: ConteudoMontagem[],
 export function montarPorConteudos(config: ConfigMontagem, conteudos: ConteudoMontagem[]): ResultadoMontagem {
   const CW = semanasDeConteudo(config.totalSemanas, config.semanasRevisao)
   const metas: MetaMontada[] = []
-  const links: LinkMontado[] = []
-  const linkVistos = new Set<string>()
+  // (disciplina, aula) → link acumulado. Um Map (em vez de Set + push) para MESCLAR os links de
+  // questões (QC/TEC) e a videoaula numa mesma entrada quando a lição e a resolução dividem a aula.
+  const linkPorChave = new Map<string, LinkMontado>()
   const colocacao: LicaoColocada[] = []
 
-  if (!CW.length || !conteudos.length) return { metas, links, avisos: [], colocacao }
+  const linkDe = (disc: string, discId: string | null, aula: string, tema: string): LinkMontado => {
+    const chave = `${disc}||${aula}`
+    let l = linkPorChave.get(chave)
+    if (!l) {
+      l = { disciplina: disc, disciplina_id: discId, aula, tema, urls: {} }
+      linkPorChave.set(chave, l)
+    }
+    if (!l.tema && tema) l.tema = tema
+    return l
+  }
+
+  if (!CW.length || !conteudos.length) return { metas, links: [], avisos: [], colocacao }
 
   const { porSemana, avisos } = distribuirLicoes(config, conteudos, CW)
+  // 1 aula por dia (passo=1) é o padrão: todos os dias ganham lição de verdade. Só quando alguma
+  // linha usa "continuação" volta ao passo=2 (a lição ocupa 2 dias: aula + CONTINUAÇÃO).
+  const passo = config.linhas.some((l) => l.continuacao) ? 2 : 1
   const porDisciplina = new Map(conteudos.map((c) => [c.disciplina, c]))
   const dadoDe = (disc: string, aulaKey: string, tipo: string): DadoAula | null =>
     porDisciplina.get(disc)?.dados[aulaKey]?.[tipo] ?? null
+  // A 1ª linha é a LIÇÃO base — é a aula "de verdade". As linhas derivadas (PDFlash, Resolução)
+  // reexibem essa mesma aula em semanas seguintes (offset), então caem no conteúdo dela.
+  const baseTipo = config.linhas[0]?.tipo
 
   // Prévia: lições na ordem em que caíram.
   porSemana.forEach((licoes, i) =>
@@ -183,13 +214,19 @@ export function montarPorConteudos(config: ConfigMontagem, conteudos: ConteudoMo
       if (iFonte < 0) continue // semana 1 (offset 1) não tem fonte → Resolução não aparece
       const semana = CW[i]
       porSemana[iFonte].forEach((ev, j) => {
-        const diaBase = j * 2
-        const dado = dadoDe(ev.disciplina, ev.aulaKey, linha.tipo)
+        const col = j * passo
+        // Dado próprio da linha; se não houver (ex.: PDFlash sem conteúdo de flash), reexibe a
+        // lição base. LegProc (somenteComDado) é sequência à parte e NÃO cai na lição.
+        const proprio = dadoDe(ev.disciplina, ev.aulaKey, linha.tipo)
+        const dado = proprio ?? (linha.somenteComDado ? null : dadoDe(ev.disciplina, ev.aulaKey, baseTipo))
+        // Linha esparsa (LegProc): só entra onde a aula realmente tem esse conteúdo no banco.
+        if (linha.somenteComDado && !dado) return
         const aulaReal = dado?.aulaReal ?? ev.aulaKey
-        // Meta principal. Lição senta no 1º dia; Resolução (sem continuação) no 2º.
+        // Passo 1: todas as linhas caem na coluna da lição (dia = j). Passo 2 (continuação): a lição
+        // fica na 1ª coluna do par e as demais linhas na 2ª.
         metas.push({
           semana,
-          dia: linha.continuacao ? diaBase : diaBase + 1,
+          dia: linha.continuacao ? col : passo === 2 ? col + 1 : col,
           tipo: linha.tipo,
           disciplina: ev.disciplina,
           disciplina_id: ev.disciplina_id,
@@ -197,12 +234,13 @@ export function montarPorConteudos(config: ConfigMontagem, conteudos: ConteudoMo
           conteudo: linha.usaLinks ? null : dado?.conteudo ?? null,
           duracao: linha.duracao,
           ordem: 0,
+          questaoIds: dado?.questaoIds?.length ? [...dado.questaoIds] : undefined,
         })
-        // Continuação (2º dia).
-        if (linha.continuacao && diaBase + 1 < config.diasCount) {
+        // Continuação (2º dia) — só no modo passo=2 (alguma linha com continuação ligada).
+        if (linha.continuacao && col + 1 < config.diasCount) {
           metas.push({
             semana,
-            dia: diaBase + 1,
+            dia: col + 1,
             tipo: linha.tipo,
             disciplina: ev.disciplina,
             disciplina_id: ev.disciplina_id,
@@ -212,17 +250,24 @@ export function montarPorConteudos(config: ConfigMontagem, conteudos: ConteudoMo
             ordem: 1,
           })
         }
-        // Links (Resolução): (disciplina, aula) → tema + urls.
+        // Links de questões (Resolução): (disciplina, aula) → tema + urls QC/TEC.
         if (linha.usaLinks && dado && Object.keys(dado.urls).length) {
-          const chave = `${ev.disciplina}||${aulaReal}`
-          if (!linkVistos.has(chave)) {
-            linkVistos.add(chave)
-            links.push({ disciplina: ev.disciplina, disciplina_id: ev.disciplina_id, aula: aulaReal, tema: dado.tema ?? '', urls: dado.urls })
-          }
+          const l = linkDe(ev.disciplina, ev.disciplina_id, aulaReal, dado.tema ?? '')
+          Object.assign(l.urls, dado.urls)
+        }
+        // Videoaula (Lição): entra como mais um link, sob a plataforma "Vídeo".
+        if (dado?.videoUrl) {
+          const l = linkDe(ev.disciplina, ev.disciplina_id, aulaReal, dado.tema ?? '')
+          l.urls[SLUG_VIDEO] = dado.videoUrl
+        }
+        // PDF da aula: mais um link, sob a plataforma "PDF" (vem das urls do banco, como QC/TEC).
+        if (dado?.urls?.[SLUG_PDF]) {
+          const l = linkDe(ev.disciplina, ev.disciplina_id, aulaReal, dado.tema ?? '')
+          l.urls[SLUG_PDF] = dado.urls[SLUG_PDF]
         }
       })
     }
   }
 
-  return { metas, links, avisos, colocacao }
+  return { metas, links: [...linkPorChave.values()], avisos, colocacao }
 }

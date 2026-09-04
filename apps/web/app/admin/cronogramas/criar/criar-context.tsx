@@ -1,6 +1,7 @@
 'use client'
 
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useRef, useState, type MutableRefObject } from 'react'
+import type { ConjuntoParaCompor, ConteudoBanco } from '../conteudos/actions'
 
 /**
  * Estado compartilhado da criação de cronograma (página-por-página), espelhando o assistente
@@ -24,6 +25,8 @@ export interface MetaDraft {
   conteudo: string | null
   duracao: string | null
   ordem: number
+  /** Questões anexadas (via montagem) — viram simulado_cronograma_meta_questoes ao salvar. */
+  questaoIds?: string[]
 }
 
 /** Um link de aula em construção: (disciplina, aula) → tema + uma URL por plataforma. */
@@ -73,10 +76,47 @@ export function draftVazio(): CronogramaDraft {
   }
 }
 
+/**
+ * Estado da MONTAGEM (linhas da grade + conteúdos escolhidos), levantado do componente para o
+ * contexto no layout "split ao vivo": a coluna de controles edita e a prévia à direita lê o
+ * mesmo estado, montando o modelo ao vivo. Fica FORA do `draft` persistido (guarda `banco` pesado
+ * e é reconstruído a cada sessão); só o que "Gerar e aplicar" comita vira `draft.metas`.
+ */
+export interface MontagemLinha {
+  id: string
+  label: string
+  tipo: string
+  duracao: string | null
+  offset: number
+  continuacao: boolean
+  usaLinks: boolean
+  somenteComDado?: boolean
+}
+export interface MontagemSelecionado {
+  conjuntoId: string
+  disciplina: string
+  disciplina_id: string | null
+  nome: string
+  qtdAulas: number
+  qtdQuestoes: number
+  semInicio: number
+  semFim: number
+  banco: ConteudoBanco
+}
+export interface MontagemState {
+  linhas: MontagemLinha[]
+  selecionados: MontagemSelecionado[]
+  aulasPorSemana: number
+}
+
 interface CriarCtx {
   draft: CronogramaDraft
   patch: (p: Partial<CronogramaDraft>) => void
   reset: () => void
+  montagem: MontagemState
+  setMontagem: (updater: MontagemState | ((m: MontagemState) => MontagemState)) => void
+  /** Cache do "Adicionar do banco" por termo de busca — reabrir o pop-up fica instantâneo. */
+  bancoCache: MutableRefObject<Map<string, ConjuntoParaCompor[]>>
 }
 
 const Ctx = createContext<CriarCtx | null>(null)
@@ -107,6 +147,9 @@ export function CriarProvider({ children }: { children: React.ReactNode }) {
     }
   }, [draft])
 
+  const [montagem, setMontagem] = useState<MontagemState>({ linhas: [], selecionados: [], aulasPorSemana: 3 })
+  const bancoCache = useRef<Map<string, ConjuntoParaCompor[]>>(new Map())
+
   const patch = (p: Partial<CronogramaDraft>) => setDraft((d) => ({ ...d, ...p }))
   const reset = () => {
     try {
@@ -115,7 +158,9 @@ export function CriarProvider({ children }: { children: React.ReactNode }) {
       /* ignora */
     }
     setDraft(draftVazio())
+    setMontagem({ linhas: [], selecionados: [], aulasPorSemana: 3 })
+    bancoCache.current.clear()
   }
 
-  return <Ctx.Provider value={{ draft, patch, reset }}>{children}</Ctx.Provider>
+  return <Ctx.Provider value={{ draft, patch, reset, montagem, setMontagem, bancoCache }}>{children}</Ctx.Provider>
 }

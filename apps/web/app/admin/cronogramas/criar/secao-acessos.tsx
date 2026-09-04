@@ -24,17 +24,17 @@ export function SecaoAcessos() {
   }
 
   return (
-    <Secao numero={6} titulo="Acessos" descricao="Grupos de acesso que recebem o cronograma — é por eles que o aluno recebe. Opcional; dá para vincular depois.">
+    <Secao numero={6} titulo="Acessos" descricao="Grupos de acesso que recebem o cronograma — é por eles que o aluno recebe. Opcional; dá para vincular depois." colapsavel defaultAberto={false}>
       {carregando ? (
-        <p className="flex items-center gap-2 rounded-2xl border bg-card p-4 text-sm text-muted-foreground shadow-sm">
+        <p className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" /> Carregando grupos de acesso…
         </p>
       ) : pacotes.length === 0 ? (
-        <p className="rounded-2xl border bg-card p-4 text-sm text-muted-foreground shadow-sm">
+        <p className="py-2 text-sm text-muted-foreground">
           Nenhum grupo de acesso cadastrado ainda. Você pode vincular o cronograma a um grupo depois de criar.
         </p>
       ) : (
-        <div className="grid gap-2 rounded-2xl border bg-card p-3 shadow-sm sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-2 sm:grid-cols-2">
           {pacotes.map((p) => {
             const on = draft.pacoteIds.includes(p.id)
             return (

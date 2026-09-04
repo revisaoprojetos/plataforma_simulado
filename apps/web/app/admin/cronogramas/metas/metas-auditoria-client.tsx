@@ -12,6 +12,7 @@ import {
   Info,
   Layers,
   Loader2,
+  Pencil,
   Search,
   ShieldCheck,
   Trash2,
@@ -453,7 +454,7 @@ function AbaDuracao({
             <div key={chave} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3">
               <div className="min-w-0 flex-1">
                 <Link
-                  href={`/admin/cronogramas/${d.cronograma_id}`}
+                  href={`/admin/cronogramas/${d.cronograma_id}?semana=${d.semana}`}
                   className="block truncate text-sm font-medium hover:underline"
                 >
                   {d.cronograma_nome}
@@ -697,6 +698,13 @@ function AbaBuscar({
                             {c.aula}
                           </Badge>
                         )}
+                        <Link
+                          href={`/admin/cronogramas/${c.id}?meta=${c.meta_id}`}
+                          className="inline-flex shrink-0 items-center gap-1 rounded-md border px-1.5 py-0.5 font-medium text-primary transition hover:bg-muted"
+                          title="Editar esta meta no cronograma"
+                        >
+                          <Pencil className="h-3 w-3" /> Editar
+                        </Link>
                         <Button
                           size="sm"
                           variant="ghost"

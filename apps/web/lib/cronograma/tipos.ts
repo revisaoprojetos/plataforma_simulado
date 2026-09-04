@@ -84,6 +84,16 @@ export function acharTipo(tipos: MapaTipos, slug: string): TipoMetaDef {
 /** R13 — não é disciplina: é o valor usado quando a linha não pertence a uma matéria. */
 export const PSEUDO_DISCIPLINA = 'Atividade'
 
+/**
+ * Slug da plataforma "Vídeo". A videoaula da aula (banco de conteúdos) é gravada como mais um
+ * link de aula sob esta plataforma; a grade a mostra como um destaque ▶ Vídeo (fora dos chips de
+ * questões QC/TEC), então não depende de coluna nova nem de `mostra_links` do tipo.
+ */
+export const SLUG_VIDEO = 'video'
+
+/** Slug da plataforma "PDF". O PDF da aula é gravado como link sob esta plataforma (igual ao vídeo). */
+export const SLUG_PDF = 'pdf'
+
 /** O cronograma como está no catálogo (antes de datar e reprogramar). */
 export type CronogramaFonte = {
   id: string
@@ -164,6 +174,10 @@ export type MetaDatada = MetaFonte & {
   acessoSimulado?: boolean
   /** Quantas questões do banco de conteúdos foram anexadas a esta meta (referência). */
   qtdQuestoes?: number
+  /** Videoaula da aula (link sob a plataforma "Vídeo"), quando houver. */
+  video?: string | null
+  /** PDF da aula (link sob a plataforma "PDF"), quando houver. */
+  pdf?: string | null
 }
 
 export type BlocoRevisao = { titulo: string; texto: string }

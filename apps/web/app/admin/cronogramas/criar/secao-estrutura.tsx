@@ -28,8 +28,8 @@ export function SecaoEstrutura() {
   }
 
   return (
-    <Secao numero={2} titulo="Estrutura" descricao="A grade fixa: carga por dia, número de semanas e os dias de curso.">
-      <div className="space-y-4 rounded-2xl border bg-card p-4 shadow-sm">
+    <Secao numero={2} titulo="Estrutura" descricao="A grade fixa: carga por dia, número de semanas e os dias de curso." colapsavel defaultAberto>
+      <div className="space-y-4">
         <div className="grid max-w-sm grid-cols-2 gap-3">
           <div className="space-y-1.5">
             <Label>Carga (h/dia)</Label>

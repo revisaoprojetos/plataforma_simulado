@@ -102,6 +102,8 @@ export type CronogramaDoAluno = {
   semanas_revisao: number[]
   categoria_id: string | null
   via: ViaAcesso
+  /** Quando o cronograma foi criado — usado como "disponível desde" no catálogo do aluno. */
+  criado_em: string | null
 }
 
 /**
@@ -155,7 +157,7 @@ export async function cronogramasDoAluno(
   const ids = [...via.keys()]
   if (!ids.length) return []
 
-  const campos = 'id, slug, nome, subtitulo, carga_horaria, total_semanas, dias_curso, dias_nome, semanas_revisao, categoria_id, status'
+  const campos = 'id, slug, nome, subtitulo, carga_horaria, total_semanas, dias_curso, dias_nome, semanas_revisao, categoria_id, status, criado_em'
   const linhas = await fetchAllByIn<any>(
     ids,
     (chunk) => svc.from('simulado_cronogramas').select(campos).in('id', chunk).eq('tenant_id', tid).eq('deletado', false) as any,
@@ -176,6 +178,7 @@ export async function cronogramasDoAluno(
       semanas_revisao: c.semanas_revisao ?? [],
       categoria_id: c.categoria_id ?? null,
       via: via.get(c.id) as ViaAcesso,
+      criado_em: c.criado_em ?? null,
     }))
     .sort((a, b) => a.carga_horaria - b.carga_horaria || a.nome.localeCompare(b.nome, 'pt-BR'))
 }

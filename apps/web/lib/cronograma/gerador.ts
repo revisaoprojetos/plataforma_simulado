@@ -11,7 +11,7 @@
  */
 
 import { addDias, offsetDesdeSegunda, proximaSegunda, type DataISO } from './datas'
-import { linksDaMeta, rotuloConteudo } from './formato-meta'
+import { linksDaMeta, pdfDaMeta, rotuloConteudo, videoDaMeta } from './formato-meta'
 import { subtituloGrade } from './faixa'
 import { montarPredicadoRecesso } from './recesso'
 import {
@@ -145,6 +145,8 @@ function datarMetas(
       titulo,
       complemento,
       links: linksDaMeta(m, tipoDef, links),
+      video: videoDaMeta(m, links),
+      pdf: pdfDaMeta(m, links),
     }
   })
 }

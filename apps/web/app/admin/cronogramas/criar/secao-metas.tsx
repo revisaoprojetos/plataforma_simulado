@@ -159,8 +159,10 @@ export function SecaoMetas() {
       numero={4}
       titulo="Ajuste fino das metas"
       descricao="Opcional. A Montagem por conteúdos acima já preenche tudo — aqui você revisa semana a semana, corrige ou adiciona metas avulsas. “Repetir semana” leva um padrão adiante (a aula avança sozinha)."
+      colapsavel
+      defaultAberto={false}
     >
-      <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
+      <div className="space-y-3">
         {/* Régua de semanas */}
         <div className="flex gap-1 overflow-x-auto rounded-lg border bg-muted/20 p-1.5">
           {Array.from({ length: Math.max(1, draft.totalSemanas) }, (_, i) => i + 1).map((s) => {

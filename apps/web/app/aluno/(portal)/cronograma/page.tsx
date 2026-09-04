@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { CalendarDays, ChevronRight } from 'lucide-react'
+import { CalendarDays, CalendarRange, ChevronRight } from 'lucide-react'
 import { redirect } from 'next/navigation'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { getTenantTheme } from '@/lib/tenant-theme'
@@ -7,6 +7,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { cronogramasDoAluno } from '@/lib/cronograma/acesso'
 import { Card } from '@/components/ui/card'
 import { CronogramaClient } from './cronograma-client'
+import { HistoricoTabela, LiberadosTabela } from './cronograma-paineis'
 import { listarMinhasEmissoes } from './emissoes-actions'
 
 export const dynamic = 'force-dynamic'
@@ -29,25 +30,27 @@ export default async function CronogramaAlunoPage() {
 
   const ativo = !!(cfg as { ativo?: boolean } | null)?.ativo
   const catalogo = ativo ? await cronogramasDoAluno(svc, sessao.tenantId, sessao.estudanteId) : []
-  // Só o total: a pílula do herói mostra a contagem, a lista vive na outra tela.
-  const emissoes = await listarMinhasEmissoes({ porPagina: 1 })
-  const { tenantNome } = await getTenantTheme()
+  // Histórico: carrega um lote (paginação/busca/filtro acontecem no cliente, na tabela).
+  const emissoes = await listarMinhasEmissoes({ porPagina: 100 })
+  const historico = emissoes.dados?.itens ?? []
   const salvos = emissoes.dados?.ativas ?? 0
+  const { tenantNome } = await getTenantTheme()
   // "Revisão / Ensino Jurídico" no meio da frase fica arrastado — a manchete usa só a primeira
   // parte do nome do tenant, que é como a marca é dita ("do Revisão").
   const marca = (tenantNome ?? '').split(/[/|–—-]/)[0].trim()
 
   // Mesma linguagem dos heróis do portal (Ligas, Perfil): marca do tenant no gradiente e
-  // `--brand-accent` no destaque. É o que aproxima esta tela do gerador antigo sem trocar
-  // a identidade da plataforma por outra.
+  // `--brand-accent` no destaque.
   const HERO_BG =
     'linear-gradient(135deg, color-mix(in oklab, var(--brand-primary, var(--primary)) 62%, #17122e) 0%, color-mix(in oklab, var(--brand-primary, var(--primary)) 26%, #14102a) 100%)'
   const ACENTO = 'var(--brand-accent, #f6c343)'
 
   return (
-    <div className="animate-page">
+    <div className="animate-page space-y-6">
+      {/* Bloco roxo: manchete + o card de montar cronograma vivem DENTRO do mesmo fundo,
+          então o roxo vai até a base do card. */}
       <section
-        className="relative overflow-hidden rounded-2xl px-6 pb-28 pt-10 sm:px-10 sm:pt-14"
+        className="relative overflow-hidden rounded-2xl px-4 pb-6 pt-10 sm:px-8 sm:pt-14"
         style={{ background: HERO_BG }}
       >
         <div
@@ -60,8 +63,14 @@ export default async function CronogramaAlunoPage() {
           className="pointer-events-none absolute -bottom-24 right-1/4 h-64 w-64 rounded-full"
           style={{ background: 'color-mix(in oklab, #ffffff 12%, transparent)', filter: 'blur(60px)' }}
         />
+        {/* Ícone-referência de cronograma, à direita da manchete (decorativo). */}
+        <CalendarRange
+          aria-hidden
+          strokeWidth={1.25}
+          className="pointer-events-none absolute right-4 top-8 hidden h-44 w-44 text-white/10 lg:block xl:right-10 xl:h-56 xl:w-56"
+        />
 
-        <div className="relative max-w-2xl">
+        <div className="relative max-w-2xl px-2">
           <div className="mb-3 flex items-center gap-2">
             <span
               className="h-1.5 w-1.5 rounded-full"
@@ -91,24 +100,29 @@ export default async function CronogramaAlunoPage() {
             </Link>
           )}
         </div>
+
+        {/* Card de montar — dentro do roxo, com respiro embaixo (pb do section) */}
+        <div className="relative z-10 mt-8">
+          {!catalogo.length ? (
+            <Card className="px-4 py-12 text-center">
+              <CalendarDays className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
+              <p className="font-medium">Nenhum cronograma disponível para você</p>
+              <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
+                {ativo
+                  ? 'Os cronogramas são liberados pela equipe. Fale com o suporte para saber como ter acesso.'
+                  : 'Esta área ainda está sendo preparada. Volte em breve.'}
+              </p>
+            </Card>
+          ) : (
+            <CronogramaClient catalogo={catalogo} />
+          )}
+        </div>
       </section>
 
-      {/* O cartão sobe sobre o herói, como no gerador antigo. */}
-      <div className="relative z-10 -mt-20 space-y-6 sm:mx-4">
-        {!catalogo.length ? (
-          <Card className="px-4 py-12 text-center">
-            <CalendarDays className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
-            <p className="font-medium">Nenhum cronograma disponível para você</p>
-            <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-              {ativo
-                ? 'Os cronogramas são liberados pela equipe. Fale com o suporte para saber como ter acesso.'
-                : 'Esta área ainda está sendo preparada. Volte em breve.'}
-            </p>
-          </Card>
-        ) : (
-          <CronogramaClient catalogo={catalogo} />
-        )}
-
+      {/* Painéis (tabelas com busca/filtro/paginação): histórico (esq.) + liberados (dir.) */}
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <HistoricoTabela itens={historico} salvos={salvos} />
+        <LiberadosTabela itens={catalogo} />
       </div>
     </div>
   )

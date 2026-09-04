@@ -34,7 +34,9 @@ export type ResultadoGeracao =
 export async function gerarCronograma(
   cronogramaId: string,
   opcoes: OpcoesGeracao,
-  formulario: { nome: string; paleta: string },
+  formulario: { nome: string; paleta: string; semDatas?: boolean },
+  /** false = só monta a grade para PRÉVIA, sem gravar a emissão na conta. */
+  salvar = true,
 ): Promise<ResultadoGeracao> {
   const sessao = await getSessaoAluno()
   if (!sessao) return { ok: false, error: 'Sua sessão expirou. Entre novamente.' }
@@ -97,7 +99,7 @@ export async function gerarCronograma(
    */
   let emissaoId: string | null = null
   let erroAoSalvar: string | undefined
-  {
+  if (salvar) {
     const { data, error } = await svc
       .from('simulado_cronograma_emissoes')
       .insert({

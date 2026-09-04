@@ -19,8 +19,8 @@ export function SecaoPersonalizar() {
   }, [])
 
   return (
-    <Secao numero={1} titulo="Personalizar" descricao="Como o cronograma aparece no catálogo.">
-      <div className="grid gap-3 rounded-2xl border bg-card p-4 shadow-sm sm:grid-cols-2">
+    <Secao numero={1} titulo="Básico" descricao="Como o cronograma aparece no catálogo." colapsavel defaultAberto>
+      <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5 sm:col-span-2">
           <Label>Nome</Label>
           <Input value={draft.nome} onChange={(e) => patch({ nome: e.target.value })} placeholder="9 Matérias Essenciais (4 horas)" autoFocus />

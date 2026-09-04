@@ -98,6 +98,7 @@ export default async function ImprimirCronogramaPage({
         marca={marca}
         cargaHoraria={cargaHoraria}
         checks={checks}
+        ocultarDatas={!!emissao.formulario?.semDatas}
       />
     </>
   )

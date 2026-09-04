@@ -10,8 +10,11 @@ import { ConjuntoEditorClient } from './conjunto-editor-client'
 
 export const dynamic = 'force-dynamic'
 
-export default async function ConjuntoPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ConjuntoPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tipo?: string }> }) {
   const { id } = await params
+  const { tipo } = await searchParams
+  // Aberto pela aba LegProc: o editor já entra filtrado só nas aulas de tipo legproc.
+  const filtroInicial = tipo === 'legproc' ? 'legproc' : undefined
   const acesso = await getCurrentAccess()
   const [r, disciplinas, tipos] = await Promise.all([
     carregarConjunto(id),
@@ -30,7 +33,7 @@ export default async function ConjuntoPage({ params }: { params: Promise<{ id: s
       {!r.ok || !r.dados ? (
         <SemPermissao>{r.error ?? 'Conjunto não encontrado.'}</SemPermissao>
       ) : (
-        <ConjuntoEditorClient dados={r.dados} tipos={tipos} disciplinas={disciplinas} />
+        <ConjuntoEditorClient dados={r.dados} tipos={tipos} disciplinas={disciplinas} filtroInicial={filtroInicial} />
       )}
     </div>
   )

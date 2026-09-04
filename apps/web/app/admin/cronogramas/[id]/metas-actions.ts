@@ -14,6 +14,7 @@ import { somarAula } from '@/lib/cronograma/aula'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { chaveLink } from '@/lib/cronograma/formato-meta'
 import { listarTiposMeta } from '@/lib/cronograma/carregar-tipos'
+import { garantirPlataformaVideo } from '@/lib/cronograma/plataforma-video'
 import type { MetaFonte, TipoMeta, TipoMetaDef } from '@/lib/cronograma/tipos'
 
 export type CronogramaDetalhe = {
@@ -587,7 +588,7 @@ export async function comporDoBanco(cronogramaId: string, opts: ComposicaoBanco)
   const conjMap = new Map(conjuntos.map((x) => [x.id, x]))
 
   const aulas = await fetchAllByIn<any>(opts.conjuntoIds, (chunk) =>
-    svc.from('simulado_cronograma_conjunto_aulas').select('id, conjunto_id, tipo, aula, conteudo, duracao, tema, ordem').eq('tenant_id', g.tenantId).in('conjunto_id', chunk).order('ordem') as any,
+    svc.from('simulado_cronograma_conjunto_aulas').select('id, conjunto_id, tipo, aula, conteudo, duracao, tema, video_url, ordem').eq('tenant_id', g.tenantId).in('conjunto_id', chunk).order('ordem') as any,
   )
   if (!aulas.length) return { ok: false, error: 'Os conjuntos selecionados não têm aulas.' }
   const idxConjunto = new Map(opts.conjuntoIds.map((id, i) => [id, i]))
@@ -682,15 +683,17 @@ export async function comporDoBanco(cronogramaId: string, opts: ComposicaoBanco)
     }
   }
 
-  // Links QC/TEC por (disciplina, aula) distinta (compartilhado por tenant — último vence).
+  // Links QC/TEC + videoaula por (disciplina, aula) distinta (compartilhado por tenant — último vence).
   const linksVistos = new Set<string>()
+  let videoPlatId: string | null | undefined // undefined = ainda não resolvido; null = falhou
   for (const a of usados) {
     const disc = conjMap.get(a.conjunto_id)
     const disciplina = (disc?.disciplina ?? '').trim()
     const aula = a.aula?.trim()
     if (!disciplina || !aula) continue
     const urls = urlsPorAula.get(a.id) ?? []
-    if (!urls.length && !a.tema) continue
+    const videoUrl = a.video_url?.trim() || null
+    if (!urls.length && !a.tema && !videoUrl) continue
     const chave = `${disciplina.toLowerCase()}|${aula.toLowerCase()}`
     if (linksVistos.has(chave)) continue
     linksVistos.add(chave)
@@ -703,10 +706,16 @@ export async function comporDoBanco(cronogramaId: string, opts: ComposicaoBanco)
       avisos.push(`Link ${disciplina}/${aula}: ${eLink?.message ?? 'falhou'}`)
       continue
     }
-    if (urls.length) {
+    // A videoaula entra como mais um aula_link, sob a plataforma "Vídeo" (criada sob demanda).
+    const linhasUrl = urls.map((u) => ({ tenant_id: g.tenantId, link_id: (linkRow as any).id, plataforma_id: u.plataforma_id, url: u.url }))
+    if (videoUrl) {
+      if (videoPlatId === undefined) videoPlatId = await garantirPlataformaVideo(svc, g.tenantId)
+      if (videoPlatId) linhasUrl.push({ tenant_id: g.tenantId, link_id: (linkRow as any).id, plataforma_id: videoPlatId, url: videoUrl })
+    }
+    if (linhasUrl.length) {
       const { error: eUrl } = await svc
         .from('simulado_cronograma_aula_links')
-        .upsert(urls.map((u) => ({ tenant_id: g.tenantId, link_id: (linkRow as any).id, plataforma_id: u.plataforma_id, url: u.url })), { onConflict: 'link_id,plataforma_id' })
+        .upsert(linhasUrl, { onConflict: 'link_id,plataforma_id' })
       if (eUrl) avisos.push(`URLs de ${disciplina}/${aula}: ${eUrl.message}`)
     }
   }

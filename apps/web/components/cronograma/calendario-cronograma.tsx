@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { CalendarOff, Check, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react'
+import { CalendarOff, Check, ChevronLeft, ChevronRight, ExternalLink, FileText, PlayCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -460,6 +460,27 @@ export function CalendarioCronograma({
                             {m.titulo}
                           </p>
                           {m.complemento && <p className="text-sm text-muted-foreground">{m.complemento}</p>}
+
+                          {m.video && (
+                            <a
+                              href={m.video}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-2 inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                            >
+                              <PlayCircle className="h-3.5 w-3.5" /> Videoaula
+                            </a>
+                          )}
+                          {m.pdf && (
+                            <a
+                              href={m.pdf}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="mt-2 inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                            >
+                              <FileText className="h-3.5 w-3.5" /> PDF
+                            </a>
+                          )}
 
                           {m.links && (m.links.urls.length > 0 || m.links.ausente) && (
                             <div className="mt-2 flex flex-wrap items-center gap-1.5">
