@@ -329,9 +329,17 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   }
   // Renderiza UM grupo de cards de pilar. keyBase = prefixo das partes (pilar:i na seção; pilarG:gi:j nos grupos).
   const emitirPilares = (pilares: DiagPilar[], keyBase: string, blockKey: string) => {
+    // Com dados REAIS (aluno/banco), esconde o card de um pilar que NÃO tem questões no simulado
+    // (variável `total_pilar_<chave>` ausente → 0 questões) — evita o card "X%/X de N" quebrado.
+    // No modo MODELO (sem dados), mostra todos com placeholder. Retorna null no map p/ preservar os
+    // índices de cor/formatação (`${keyBase}:${i}`).
+    const comDados = Object.keys(vars).length > 0
+    const semQuestoes = (pl: DiagPilar) => comDados && !!pl.chave && vars[`total_${prefFonte(pl.tipoFonte)}${pl.chave}`] === undefined
+    if (comDados && pilares.every(semQuestoes)) return
     add(blockKey, (
       <div style={{ display: 'flex', gap: 14, alignItems: 'stretch', marginBottom: 4 }}>
         {pilares.map((pl, i) => {
+          if (semQuestoes(pl)) return null
           const banda = bandaAdaptativa(pl, vars)
           const bandas = banda ? [banda] : pl.bandas // com dado do aluno mostra só a faixa; sem dado, todas (modelo)
           const parte = `${keyBase}:${i}`
