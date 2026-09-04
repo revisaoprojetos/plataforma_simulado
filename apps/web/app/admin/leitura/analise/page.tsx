@@ -1,13 +1,13 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowLeft, CheckCircle2, Library } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, BarChart3 } from 'lucide-react'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { relatorioLeitura, detalheDocumento } from './_dados'
 import { formatBrt } from '@/lib/brt'
 
 export const dynamic = 'force-dynamic'
 
-export default async function RelatorioLeituraPage({ searchParams }: { searchParams: Promise<{ doc?: string }> }) {
+export default async function AnaliseLeituraPage({ searchParams }: { searchParams: Promise<{ doc?: string }> }) {
   if (!(await checkPermission('relatorios:view'))) redirect('/admin')
   const access = await getCurrentAccess()
   if (!access.tenantId) redirect('/admin')
@@ -16,10 +16,10 @@ export default async function RelatorioLeituraPage({ searchParams }: { searchPar
   // ── Detalhe de um documento ──
   if (doc) {
     const det = await detalheDocumento(access.tenantId, doc)
-    if (!det) redirect('/admin/relatorios/leitura')
+    if (!det) redirect('/admin/leitura/analise')
     return (
       <div className="space-y-5">
-        <Link href="/admin/relatorios/leitura" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Relatório de Leitura</Link>
+        <Link href="/admin/leitura/analise" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Análise · LegProc Digital</Link>
         <h1 className="text-2xl font-bold tracking-tight">{det.titulo}</h1>
         <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
           <table className="w-full text-sm">
@@ -57,7 +57,7 @@ export default async function RelatorioLeituraPage({ searchParams }: { searchPar
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><Library className="h-6 w-6 text-primary" /> Relatório de Leitura</h1>
+        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><BarChart3 className="h-6 w-6 text-primary" /> Análise · LegProc Digital</h1>
         <p className="text-muted-foreground">Quem começou e concluiu cada documento, com progresso e tempo médios.</p>
       </div>
       <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
@@ -71,7 +71,7 @@ export default async function RelatorioLeituraPage({ searchParams }: { searchPar
             ) : linhas.map((l) => (
               <tr key={l.id} className="border-t transition-colors hover:bg-muted/40">
                 <td className="px-4 py-2.5">
-                  <Link href={`/admin/relatorios/leitura?doc=${l.id}`} className="font-medium hover:text-primary hover:underline">{l.titulo}</Link>
+                  <Link href={`/admin/leitura/analise?doc=${l.id}`} className="font-medium hover:text-primary hover:underline">{l.titulo}</Link>
                   {!l.publicado && <span className="ml-2 rounded-full bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">rascunho</span>}
                 </td>
                 <td className="px-4 py-2.5 tabular-nums">{l.iniciaram}</td>

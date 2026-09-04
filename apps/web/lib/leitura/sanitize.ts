@@ -51,6 +51,33 @@ function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
+// `style` inline: só um SUBCONJUNTO seguro sobrevive (cor/fundo/tamanho/alinhamento e afins),
+// validado contra qualquer coisa executável (url(), expression, javascript:). Habilita a
+// edição de cor/fonte/tamanho no editor e preserva cores vindas do Word.
+const PROPS_STYLE = new Set(['color', 'background-color', 'font-size', 'text-align', 'font-weight', 'font-style', 'text-decoration'])
+function valorStyleSeguro(prop: string, val: string): boolean {
+  const v = val.trim().toLowerCase()
+  if (!v || /url\(|expression|javascript:|@import|[{}<>]/.test(v)) return false
+  if (prop === 'color' || prop === 'background-color') return /^#[0-9a-f]{3,8}$/.test(v) || /^rgba?\([\d.,\s%]+\)$/.test(v) || /^[a-z]{3,20}$/.test(v)
+  if (prop === 'font-size') return /^\d{1,3}(\.\d+)?(px|pt|em|rem|%)$/.test(v)
+  if (prop === 'text-align') return /^(left|center|right|justify)$/.test(v)
+  if (prop === 'font-weight') return /^(normal|bold|[1-9]00)$/.test(v)
+  if (prop === 'font-style') return /^(normal|italic)$/.test(v)
+  if (prop === 'text-decoration') return /^(none|underline|line-through)$/.test(v)
+  return false
+}
+function styleSeguro(raw: string): string | null {
+  const out: string[] = []
+  for (const decl of (raw ?? '').split(';')) {
+    const i = decl.indexOf(':')
+    if (i < 0) continue
+    const prop = decl.slice(0, i).trim().toLowerCase()
+    const val = decl.slice(i + 1).trim()
+    if (PROPS_STYLE.has(prop) && valorStyleSeguro(prop, val)) out.push(prop + ':' + val)
+  }
+  return out.length ? out.join(';') : null
+}
+
 // Atributos sanitizados de um elemento allowlist, como string.
 function attrsSeguros(tag: string, el: any): string {
   const permitidos = ALLOW_ATTR[tag] ?? ALLOW_ATTR['*']
@@ -59,6 +86,7 @@ function attrsSeguros(tag: string, el: any): string {
   for (const [nome, valorRaw] of Object.entries(el.attributes as Record<string, string>)) {
     const n = nome.toLowerCase()
     if (n.startsWith('on')) continue // handlers de evento
+    if (n === 'style') { const s = styleSeguro(valorRaw ?? ''); if (s) out.push('style="' + esc(s) + '"'); continue }
     if (!permitidos.has(n) && !globais.has(n)) continue
     let valor = valorRaw ?? ''
     if (n === 'href') { const h = hrefSeguro(valor); if (!h) continue; valor = h }
@@ -198,7 +226,13 @@ export interface HtmlSanitizado {
 
 // Sanitiza + ancora (data-art) + indexa dispositivos (data-disp) + extrai a espinha.
 export function sanitizarDocumento(htmlBruto: string): HtmlSanitizado {
-  const root = parse(htmlBruto ?? '', { comment: false })
+  // O DOCTYPE / declaração XML não é elemento — o parser o deixa como TEXTO e ele sairia
+  // escapado no fim (aparecia "<!DOCTYPE html>" literal na leitura). Removemos antes do parse.
+  // <html>/<head>/<body> já somem (REMOVE_TAGS / unwrap); aqui é só o cabeçalho do arquivo.
+  const limpo = (htmlBruto ?? '')
+    .replace(/<\?xml[^>]*\?>/gi, '')
+    .replace(/<!DOCTYPE[^>]*>/gi, '')
+  const root = parse(limpo, { comment: false })
   mapearMontagem(root)
   const artigos = ancorarArtigos(root)
   const dispositivos = indexarDispositivos(root)

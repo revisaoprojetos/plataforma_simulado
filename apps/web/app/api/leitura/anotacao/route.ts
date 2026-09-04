@@ -14,9 +14,10 @@ export async function POST(request: NextRequest) {
   try { b = await request.json() } catch { return NextResponse.json({ message: 'Requisição inválida.' }, { status: 400 }) }
   const svc = createAdminClient()
 
-  // Editar (cor/nota) uma anotação existente do próprio aluno.
+  // Editar (cor/nota) ou RESTAURAR (undelete — para o "voltar/avançar") uma anotação do aluno.
   if (b.id) {
     const patch: Record<string, unknown> = { atualizado_em: new Date().toISOString() }
+    if (b.restaurar) patch.deletado = false // undo/redo: traz de volta o MESMO id (preserva base_id/origem)
     if ('cor' in b) patch.cor = b.cor || COR_PADRAO
     if ('nota' in b) patch.nota = b.nota || null
     const { error } = await svc.from('simulado_leitura_anotacoes').update(patch).eq('id', b.id).eq('estudante_id', sessao.estudanteId).eq('tenant_id', sessao.tenantId)

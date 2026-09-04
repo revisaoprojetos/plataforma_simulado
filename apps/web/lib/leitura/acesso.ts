@@ -2,6 +2,8 @@ import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAll } from '@/lib/supabase/fetch-all'
 import { remember } from '@/lib/cache/relatorio-cache'
+import { diffDocumentos } from './diff'
+import type { DiffDoc } from './diff-tipos'
 
 /**
  * Detecção de colunas opcionais (lei A1: materia_id; versionamento A2: versao_publicada) memoizada
@@ -148,9 +150,13 @@ export interface DocumentoCarregado {
   prefs: { tema: string | null; fonte: number | null; modo: string | null; semGrifos: boolean | null } | null
   ultimoDisp: string | null
   favorito: boolean
+  atualizacao: AtualizacaoInfo | null
 }
 
 export interface GrifoLei { id: string; inicio: number; fim: number; exact: string; prefix: string; suffix: string; tipo: string; nota: string | null }
+
+/** Sinaliza que a lei foi atualizada (há versão publicada anterior) — alimenta o "o que mudou". */
+export interface AtualizacaoInfo { versaoAnterior: number; atualizadoEm: string | null; tipo: string | null; descricao: string | null }
 
 /**
  * Clona as anotações BASE (pré-definidas do admin) para o conjunto do aluno, uma vez.
@@ -206,6 +212,18 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
 
   // Aluno lê a versão PUBLICADA vigente (A2); genéricos usam a versão única.
   const versao = (doc as any).versao_publicada ?? (doc as any).versao ?? 1
+
+  // "O que mudou": há uma versão publicada ANTERIOR? (qualquer versão < a vigente é publicada).
+  let atualizacao: AtualizacaoInfo | null = null
+  if (versao > 1) {
+    const ant = await svc.from('simulado_documento_conteudos').select('versao').eq('documento_id', documentoId).lt('versao', versao).order('versao', { ascending: false }).limit(1).maybeSingle()
+    const va = (ant.data as any)?.versao
+    if (va) {
+      let atz: any = null
+      try { const r = await svc.from('simulado_lei_atualizacoes').select('tipo, descricao, criado_em').eq('documento_id', documentoId).eq('versao', versao).maybeSingle(); atz = r.data } catch { /* migração A2 ausente */ }
+      atualizacao = { versaoAnterior: va, atualizadoEm: atz?.criado_em ?? null, tipo: atz?.tipo ?? null, descricao: atz?.descricao ?? null }
+    }
+  }
   // O HTML/artigos de uma (documento, versão) é IMUTÁVEL depois de publicado (nova publicação =
   // nova versão = nova chave). Cacheia → não relê a lei inteira do banco a cada abertura (egress).
   const cont = await remember<{ html: string; artigos: number }>(
@@ -308,5 +326,51 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
     prefs,
     ultimoDisp,
     favorito,
+    atualizacao,
   }
+}
+
+/** Regra de visibilidade do aluno (mesma do catálogo/leitor): sem atribuição = todos. */
+async function alunoPodeVer(svc: ReturnType<typeof createAdminClient>, documentoId: string, estudanteId: string): Promise<boolean> {
+  const [{ data: dg }, { data: de }] = await Promise.all([
+    svc.from('simulado_documento_grupos').select('grupo_id').eq('documento_id', documentoId),
+    svc.from('simulado_documento_estudantes').select('estudante_id').eq('documento_id', documentoId),
+  ])
+  const grupos = (dg ?? []).map((r: any) => r.grupo_id)
+  const estuds = (de ?? []).map((r: any) => r.estudante_id)
+  if (!grupos.length && !estuds.length) return true
+  if (estuds.includes(estudanteId)) return true
+  if (grupos.length) {
+    const { data: gm } = await svc.from('simulado_grupo_membros').select('grupo_id').eq('estudante_id', estudanteId).in('grupo_id', grupos)
+    if ((gm ?? []).length) return true
+  }
+  return false
+}
+
+/** Diff (antes/depois) entre a versão publicada anterior e a vigente, para o aluno. */
+export async function carregarDiffAluno(
+  documentoId: string,
+  estudanteId: string,
+  tenantId: string,
+  de?: number,
+): Promise<{ ok: boolean; diff?: DiffDoc; de?: number; para?: number; error?: string }> {
+  const svc = createAdminClient()
+  let dsel = await svc.from('simulado_documentos').select('versao, versao_publicada, publicado, deletado').eq('id', documentoId).eq('tenant_id', tenantId).maybeSingle()
+  if (dsel.error && /versao_publicada|column/i.test(String(dsel.error.message))) {
+    dsel = await svc.from('simulado_documentos').select('versao, publicado, deletado').eq('id', documentoId).eq('tenant_id', tenantId).maybeSingle() as any
+  }
+  const doc: any = dsel.data
+  if (!doc || doc.deletado || !doc.publicado) return { ok: false, error: 'Sem acesso.' }
+  if (!(await alunoPodeVer(svc, documentoId, estudanteId))) return { ok: false, error: 'Sem acesso.' }
+  const para = doc.versao_publicada ?? doc.versao ?? 1
+  let deV = de
+  if (!deV) {
+    const ant = await svc.from('simulado_documento_conteudos').select('versao').eq('documento_id', documentoId).lt('versao', para).order('versao', { ascending: false }).limit(1).maybeSingle()
+    deV = (ant.data as any)?.versao
+  }
+  const vazio: DiffDoc = { blocos: [], resumo: { mod: 0, add: 0, rem: 0, igual: 0 } }
+  if (!deV || deV >= para) return { ok: true, diff: vazio, de: deV, para }
+  const { data } = await svc.from('simulado_documento_conteudos').select('versao, html').eq('documento_id', documentoId).in('versao', [deV, para])
+  const porV = new Map<number, string>((data ?? []).map((c: any) => [c.versao, (c.html ?? '') as string]))
+  return { ok: true, diff: diffDocumentos(porV.get(deV) ?? '', porV.get(para) ?? ''), de: deV, para }
 }

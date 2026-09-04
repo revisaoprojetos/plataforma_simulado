@@ -705,6 +705,23 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 .leitura-prosa [data-caixa] > :first-child, .leitura-prosa [data-caixa] > :last-child,
 .leitura-prosa [class*="box-"] > :first-child, .leitura-prosa [class*="box-"] > :last-child { margin-top:0; margin-bottom:0; }
 
+/* Caixas colapsáveis (ENTENDIMENTO DO STJ/STF): recolhidas por padrão, expandem no clique da
+   faixa do topo, com animação. A classe/atributo é ligada por JS no leitor (não muda o HTML
+   salvo, nem a "espinha" das âncoras — o chevron é um ::after, sem nó de texto). */
+.leitura-prosa [data-caixa].caixa-colapsavel { position:relative; max-height:3rem; overflow:hidden; cursor:pointer; padding-right:34px; transition:max-height .35s ease; }
+.leitura-prosa [data-caixa].caixa-colapsavel[data-aberto] { max-height:240rem; cursor:auto; }
+.leitura-prosa [data-caixa].caixa-colapsavel::after {
+  content:""; position:absolute; top:13px; right:13px; width:9px; height:9px;
+  border-right:2px solid currentColor; border-bottom:2px solid currentColor; opacity:.5;
+  transform:rotate(45deg); transition:transform .3s ease; pointer-events:none;
+}
+.leitura-prosa [data-caixa].caixa-colapsavel[data-aberto]::after { transform:rotate(-135deg); }
+.leitura-prosa [data-caixa].caixa-colapsavel::before {
+  content:""; position:absolute; inset-inline:0; bottom:0; height:1.4rem; pointer-events:none;
+  background:linear-gradient(to bottom, transparent, rgba(0,0,0,.07)); transition:opacity .3s ease;
+}
+.leitura-prosa [data-caixa].caixa-colapsavel[data-aberto]::before { opacity:0; }
+
 /* "📌 Já cobrado em prova" — chip estrutural */
 .leitura-prosa [data-cobranca] {
   display:inline-block; background:rgba(37,99,235,.08); border-left:3px solid #2563eb;

@@ -40,7 +40,6 @@ import {
   Megaphone,
   LogOut,
   Building2,
-  Tag,
   Library,
   CalendarDays,
   Upload,
@@ -120,10 +119,8 @@ const navGroups: NavGroup[] = [
       { label: 'Aplicação de Simulado', href: '/admin/simulados', icon: ClipboardList, perm: 'simulados:view' },
       { label: 'Correção (discursivas)', href: '/admin/correcao', icon: PenLine, perm: 'questoes:view' },
       { label: 'Questões', href: '/admin/questoes', icon: BookOpen, perm: 'questoes:view' },
-      { label: 'Etiquetas', href: '/admin/etiquetas', icon: Tag, perm: 'questoes:view' },
       { label: 'Banco de Simulado', href: '/admin/banco-questoes', icon: Database, perm: 'questoes:view' },
       { label: 'Modelos de Caderno', href: '/admin/modelos-caderno', icon: LayoutTemplate, perm: 'questoes:view', oculto: !MODELOS_CADERNO_ATIVO },
-      { label: 'LegProc Digital', href: '/admin/leitura', icon: Library, perm: 'leitura:view', oculto: !LEITURA_ATIVA },
     ],
   },
   {
@@ -135,6 +132,14 @@ const navGroups: NavGroup[] = [
       { label: 'Catálogo', href: '/admin/cronogramas', icon: CalendarDays, perm: 'cronogramas:view' },
       { label: 'Relatórios', href: '/admin/cronogramas/relatorios', icon: BarChart3, perm: 'cronogramas:view' },
       { label: 'Importar', href: '/admin/cronogramas/importar', icon: Upload, perm: 'cronogramas:update' },
+    ],
+  },
+  {
+    label: 'LegProc Digital',
+    icon: Library,
+    items: [
+      { label: 'Biblioteca', href: '/admin/leitura', icon: Library, perm: 'leitura:view', oculto: !LEITURA_ATIVA },
+      { label: 'Análise', href: '/admin/leitura/analise', icon: BarChart3, perm: 'relatorios:view', oculto: !LEITURA_ATIVA },
     ],
   },
   {
@@ -164,7 +169,6 @@ const navGroups: NavGroup[] = [
       { label: 'Relatório Estudantes', href: '/admin/relatorios/estudantes', icon: GraduationCap, perm: 'relatorios:view' },
       { label: 'Ranking', href: '/admin/relatorios/ranking', icon: Trophy, perm: 'relatorios:view' },
       { label: 'NPS / Satisfação', href: '/admin/relatorios/nps', icon: Star, perm: 'relatorios:view' },
-      { label: 'Relatório Leitura', href: '/admin/relatorios/leitura', icon: Library, perm: 'relatorios:view', oculto: !LEITURA_ATIVA },
     ],
   },
   {

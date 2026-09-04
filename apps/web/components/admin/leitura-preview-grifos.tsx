@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Pencil, Save, Loader2, Bold, Eraser, X, Check } from 'lucide-react'
@@ -43,6 +43,30 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
   const [dirty, setDirty] = useState(false)
   const [salvando, setSalvando] = useState(false)
   const [maxH, setMaxH] = useState<number>()
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  // Índice (CAPÍTULO→Art→§) do conteúdo, para o professor navegar a prévia (mesma hierarquia do leitor).
+  const secoes = useMemo(() => {
+    type Sec = { dispId: string | null; artId: string | null; nivel: number; label: string }
+    if (typeof window === 'undefined' || !html) return [] as Sec[]
+    const parsed = new DOMParser().parseFromString(html, 'text/html')
+    const NIVEL: Record<string, number> = { livro: 0, parte: 0, titulo: 0, capitulo: 0, secao: 0, subsecao: 0, artigo: 1, paragrafo: 2, inciso: 3, alinea: 4, item: 4 }
+    const disp = Array.from(parsed.querySelectorAll('[data-disp]'))
+    const src = disp.length ? disp : Array.from(parsed.querySelectorAll('[data-art]'))
+    return src.map((el): Sec => {
+      const dispId = el.getAttribute('data-disp')
+      const artId = el.getAttribute('data-art')
+      const tipo = el.getAttribute('data-disp-tipo') || 'artigo'
+      const id = dispId || `art-${artId}`
+      const nivel = disp.length ? (NIVEL[tipo] ?? Math.min(4, (id.match(/\./g) || []).length + 1)) : 0
+      return { dispId, artId, nivel, label: (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60) || id }
+    })
+  }, [html])
+  function pular(s: { dispId: string | null; artId: string | null }) {
+    const cont = scrollRef.current; if (!cont) return
+    const alvo = s.dispId ? cont.querySelector(`[data-disp="${CSS.escape(s.dispId)}"]`) : s.artId ? cont.querySelector(`[data-art="${s.artId}"]`) : null
+    alvo?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+  }
 
   // Adapta a altura do canvas à tela: mede o topo e ocupa até 16px do fim da janela.
   useEffect(() => {
@@ -216,10 +240,30 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
             </p>
           </>
         )}
+
+        {/* Índice CAPÍTULO→Art→§ — navega a prévia (funciona lendo e editando). */}
+        {secoes.length > 0 && (
+          <div className="space-y-1 border-t pt-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Índice</p>
+            <div className="max-h-[42vh] space-y-0.5 overflow-y-auto">
+              {secoes.map((s, i) => (
+                <button
+                  key={i}
+                  onClick={() => pular(s)}
+                  className="block w-full truncate rounded py-0.5 pr-1 text-left text-xs text-muted-foreground transition hover:bg-muted hover:text-foreground"
+                  style={{ paddingLeft: 4 + s.nivel * 10, fontWeight: s.nivel <= 1 ? 600 : 400, opacity: s.nivel >= 2 ? 0.85 : 1 }}
+                  title={s.label}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* DIREITA: prévia grande sobre canvas pontilhado (igual ao construtor) */}
-      <div className={cn('overflow-auto p-5', CANVAS_DOTS)}>
+      <div ref={scrollRef} className={cn('overflow-auto p-5', CANVAS_DOTS)}>
         {editando ? (
           <div className="mx-auto max-w-3xl overflow-hidden rounded-lg border bg-card shadow-sm">
             <div ref={boxRef} contentEditable suppressContentEditableWarning spellCheck={false} onInput={() => setDirty(true)}

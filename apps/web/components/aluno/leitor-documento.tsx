@@ -7,16 +7,23 @@ import { toast } from 'sonner'
 import {
   ArrowLeft, ScrollText, BookOpen, ChevronLeft, ChevronRight, Minus, Plus,
   Sun, Moon, Coffee, CheckCircle2, Loader2, X, PanelLeft, Highlighter, Trash2, StickyNote, Crosshair, Search, ChevronUp, ChevronDown, Star,
+  Undo2, Redo2, RotateCcw,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { DocumentoCarregado, AnotacaoAluno } from '@/lib/leitura/acesso'
 import { construirEspinha, rangeParaAncora, ancoraParaRange, rectsDoRange, type Espinha, type RectRel } from '@/lib/leitura/anotacoes-engine'
 import { QuestaoLeitura } from '@/components/aluno/questao-leitura'
+import { LeituraAtualizacaoAviso } from '@/components/aluno/leitura-atualizacao-aviso'
 import { GRIFOS, corDoGrifo, ehEstrutural } from '@/lib/leitura/grifos'
 
 type Modo = 'scroll' | 'flip'
 type Tema = 'claro' | 'sepia' | 'escuro'
 interface Secao { id: string; art: number; label: string; tipo: string; nivel: number }
+// #3 — histórico de grifos (voltar/avançar). Cada ação é um "batch" (o reset apaga vários de uma vez).
+type AcaoGrifo =
+  | { k: 'add'; a: AnotacaoAluno }
+  | { k: 'del'; a: AnotacaoAluno }
+  | { k: 'upd'; id: string; de: { cor: string; nota: string | null }; para: { cor: string; nota: string | null } }
 
 const TEMAS: Record<Tema, { bg: string; fg: string; muted: string }> = {
   claro: { bg: '#ffffff', fg: '#1f2937', muted: '#6b7280' },
@@ -64,6 +71,9 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
 
   // Anotações (grifos/notas)
   const [anotacoes, setAnotacoes] = useState<AnotacaoAluno[]>(doc.anotacoes ?? [])
+  const [passado, setPassado] = useState<AcaoGrifo[][]>([]) // histórico p/ voltar
+  const [futuro, setFuturo] = useState<AcaoGrifo[][]>([])   // p/ avançar
+  const opLock = useRef(false) // impede reentrância (clique/Enter rápido) nas operações de grifo
   const [rectsPorId, setRectsPorId] = useState<Record<string, RectRel[]>>({})
   const [barraDir, setBarraDir] = useState(false)
   const [sel, setSel] = useState<{ anc: { inicio: number; fim: number; exact: string; prefix: string; suffix: string }; x: number; y: number } | null>(null)
@@ -119,10 +129,12 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
     if (!root) return
     const disp = Array.from(root.querySelectorAll<HTMLElement>('[data-disp]'))
     if (disp.length) {
+      // Hierarquia do índice: CAPÍTULO/TÍTULO/SEÇÃO (0) → Art. (1) → § (2) → inciso (3) → alínea (4).
+      const NIVEL_TIPO: Record<string, number> = { livro: 0, parte: 0, titulo: 0, capitulo: 0, secao: 0, subsecao: 0, artigo: 1, paragrafo: 2, inciso: 3, alinea: 4, item: 4 }
       setSecoes(disp.map((el) => {
         const id = el.getAttribute('data-disp') || ''
         const tipo = el.getAttribute('data-disp-tipo') || 'artigo'
-        const nivel = tipo === 'secao' ? 0 : Math.min(3, (id.match(/\./g) || []).length)
+        const nivel = NIVEL_TIPO[tipo] ?? Math.min(4, (id.match(/\./g) || []).length + 1)
         return { id, art: 0, tipo, nivel, label: (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 70) || id }
       }))
       return
@@ -199,6 +211,25 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
     setGrifosRects(gmap)
   }, [anotacoes, grifos])
   useIsoLayout(() => { recomputarGrifos() }, [recomputarGrifos, modo, colW, fonte, doc.html, slots])
+
+  // Reflow por RESIZE real da janela E pelo colapso/expansão das caixas STJ/STF (que disparam
+  // um 'resize' sintético): sem isto o overlay de grifos desalinha e a paginação (flip) fica
+  // errada, pois o ResizeObserver só observa a largura da viewport (não a altura do conteúdo).
+  useEffect(() => {
+    const onResize = () => {
+      recomputarGrifos()
+      if (modo === 'flip') {
+        const ct = contentRef.current
+        if (ct && colW) {
+          const total = Math.max(1, Math.round(ct.scrollWidth / (colW + GAP)))
+          setTotalPag(total)
+          setPagina((p) => Math.min(p, total - 1))
+        }
+      }
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [recomputarGrifos, modo, colW])
 
   // ── Busca dentro da lei: acha ocorrências na espinha, gera rects p/ realçar + navegar. ──
   useIsoLayout(() => {
@@ -349,26 +380,104 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
     setSel({ anc, x: Math.min(Math.max(60, rc.left + rc.width / 2 - cr.left), cr.width - 60), y: rc.bottom - cr.top + 6 })
   }
 
+  // ── Primitivas (API + estado). IDs são ESTÁVEIS: exclusão é soft-delete e "voltar" é undelete
+  //    do MESMO id (nunca recria) — então os batches do histórico podem ser reusados sem
+  //    reescrever ids, e o vínculo base_id/origem é preservado. ──
+  async function inserirServidor(a: AnotacaoAluno): Promise<AnotacaoAluno | null> {
+    // Única fonte de IDs NOVOS: a ação de grifar do usuário.
+    try {
+      const res = await fetch('/api/leitura/anotacao', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ documento_id: doc.id, versao: doc.versao, inicio_char: a.inicio, fim_char: a.fim, exact: a.exact, prefix: a.prefix, suffix: a.suffix, cor: a.cor, nota: a.nota }) })
+      const j = await res.json()
+      if (!j?.ok) return null
+      const novo: AnotacaoAluno = { ...a, id: j.id, origem: 'propria' }
+      setAnotacoes((p) => [...p, novo])
+      return novo
+    } catch { return null }
+  }
+  async function removerServidor(id: string) {
+    setAnotacoes((p) => p.filter((a) => a.id !== id))
+    try { await fetch(`/api/leitura/anotacao?id=${id}`, { method: 'DELETE' }) } catch { /* ok */ }
+  }
+  async function restaurarServidor(a: AnotacaoAluno) {
+    setAnotacoes((p) => (p.some((x) => x.id === a.id) ? p : [...p, a]))
+    try { await fetch('/api/leitura/anotacao', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: a.id, restaurar: true, cor: a.cor, nota: a.nota }) }) } catch { /* ok */ }
+  }
+  async function atualizarServidor(id: string, cor: string, nota: string | null) {
+    setAnotacoes((p) => p.map((a) => (a.id === id ? { ...a, cor, nota } : a)))
+    try { await fetch('/api/leitura/anotacao', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id, cor, nota }) }) } catch { /* otimista */ }
+  }
+  const registrar = (b: AcaoGrifo[]) => { if (b.length) { setPassado((p) => [...p, b].slice(-60)); setFuturo([]) } }
+
+  // ── Ações do usuário (registram no histórico). opLock evita reentrância (clique/Enter rápido). ──
   async function criarAnotacao(cor: string) {
-    if (!sel) return
+    if (!sel || opLock.current) return
     const a = sel.anc
     setSel(null); window.getSelection()?.removeAllRanges()
-    try {
-      const res = await fetch('/api/leitura/anotacao', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ documento_id: doc.id, versao: doc.versao, inicio_char: a.inicio, fim_char: a.fim, exact: a.exact, prefix: a.prefix, suffix: a.suffix, cor }) })
-      const j = await res.json()
-      if (j?.ok) setAnotacoes((p) => [...p, { id: j.id, inicio: a.inicio, fim: a.fim, exact: a.exact, prefix: a.prefix, suffix: a.suffix, cor, nota: null, origem: 'propria' }])
-      else toast.error('Erro ao grifar.')
-    } catch { toast.error('Erro ao grifar.') }
+    opLock.current = true
+    const novo = await inserirServidor({ id: 'tmp', inicio: a.inicio, fim: a.fim, exact: a.exact, prefix: a.prefix, suffix: a.suffix, cor, nota: null, origem: 'propria' })
+    opLock.current = false
+    if (!novo) { toast.error('Erro ao grifar.'); return }
+    registrar([{ k: 'add', a: novo }])
   }
 
   async function atualizarAnotacao(id: string, patch: Partial<Pick<AnotacaoAluno, 'cor' | 'nota'>>) {
-    setAnotacoes((p) => p.map((a) => (a.id === id ? { ...a, ...patch } : a)))
-    try { await fetch('/api/leitura/anotacao', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id, ...patch }) }) } catch { /* mantém otimista */ }
+    if (opLock.current) return
+    const atual = anotacoes.find((a) => a.id === id); if (!atual) return
+    const de = { cor: atual.cor, nota: atual.nota }
+    const para = { cor: patch.cor ?? atual.cor, nota: 'nota' in patch ? (patch.nota ?? null) : atual.nota }
+    opLock.current = true
+    await atualizarServidor(id, para.cor, para.nota)
+    opLock.current = false
+    registrar([{ k: 'upd', id, de, para }])
   }
 
   async function excluirAnotacao(id: string) {
-    setAnotacoes((p) => p.filter((a) => a.id !== id))
-    try { await fetch(`/api/leitura/anotacao?id=${id}`, { method: 'DELETE' }) } catch { /* ok */ }
+    if (opLock.current) return
+    const a = anotacoes.find((x) => x.id === id); if (!a) return
+    opLock.current = true
+    await removerServidor(id)
+    opLock.current = false
+    registrar([{ k: 'del', a }])
+  }
+
+  async function resetarGrifos() {
+    if (opLock.current) return
+    const meus = anotacoes.filter((a) => a.origem === 'propria')
+    if (!meus.length) { toast.message('Você não tem grifos próprios para resetar.'); return }
+    opLock.current = true
+    for (const a of meus) await removerServidor(a.id)
+    opLock.current = false
+    registrar(meus.map((a) => ({ k: 'del' as const, a })))
+    toast.success(`${meus.length} grifo(s) removido(s)`)
+  }
+
+  // ── Voltar / Avançar. Como os ids são estáveis (soft-delete/undelete), o MESMO batch é só
+  //    movido entre as pilhas — sem reescrever ids. ──
+  async function desfazer() {
+    if (opLock.current) return
+    const b = passado[passado.length - 1]; if (!b) return
+    opLock.current = true
+    for (const ac of [...b].reverse()) {
+      if (ac.k === 'add') await removerServidor(ac.a.id)
+      else if (ac.k === 'del') await restaurarServidor(ac.a)
+      else await atualizarServidor(ac.id, ac.de.cor, ac.de.nota)
+    }
+    opLock.current = false
+    setPassado((p) => p.slice(0, -1))
+    setFuturo((f) => [...f, b])
+  }
+  async function refazer() {
+    if (opLock.current) return
+    const b = futuro[futuro.length - 1]; if (!b) return
+    opLock.current = true
+    for (const ac of b) {
+      if (ac.k === 'add') await restaurarServidor(ac.a)
+      else if (ac.k === 'del') await removerServidor(ac.a.id)
+      else await atualizarServidor(ac.id, ac.para.cor, ac.para.nota)
+    }
+    opLock.current = false
+    setFuturo((f) => f.slice(0, -1))
+    setPassado((p) => [...p, b])
   }
 
   function pularAnotacao(a: AnotacaoAluno) {
@@ -397,8 +506,41 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
 
   const proseStyle = useMemo<React.CSSProperties>(() => ({ fontSize: fonte, lineHeight: 1.7, color: cores.fg }), [fonte, cores.fg])
 
+  // #4 — caixas "ENTENDIMENTO DO STJ/STF" viram expansíveis (recolhidas por padrão).
+  useEffect(() => {
+    const cont = contentRef.current
+    if (!cont) return
+    const caixas = Array.from(cont.querySelectorAll<HTMLElement>('[data-caixa="stj"], [data-caixa="stf"]'))
+    const onClick = (e: Event) => {
+      const box = e.currentTarget as HTMLElement
+      if (box.hasAttribute('data-aberto')) {
+        // Aberta: só recolhe clicando na FAIXA do topo (limiar relativo à fonte, imune ao
+        // font-scale) e sem seleção de texto ativa.
+        const cs = getComputedStyle(box)
+        const limiar = (parseFloat(cs.paddingTop) || 10) + (parseFloat(cs.lineHeight) || 20) + 8
+        const top = (e as MouseEvent).clientY - box.getBoundingClientRect().top
+        if (top > limiar) return
+        if ((window.getSelection()?.toString() ?? '').length > 0) return
+        box.removeAttribute('data-aberto')
+      } else {
+        box.setAttribute('data-aberto', '1')
+      }
+      // Nudge imediato + ao FIM da transição (0.35s), senão o overlay mede um estado intermediário.
+      window.dispatchEvent(new Event('resize'))
+      box.addEventListener('transitionend', () => window.dispatchEvent(new Event('resize')), { once: true })
+    }
+    for (const box of caixas) {
+      box.classList.add('caixa-colapsavel')
+      box.removeAttribute('data-aberto')
+      box.addEventListener('click', onClick)
+    }
+    return () => { for (const box of caixas) box.removeEventListener('click', onClick) }
+  }, [doc.html])
+
   return (
     <div ref={containerRef} className="relative flex h-[calc(100dvh-7rem)] min-h-[420px] overflow-hidden rounded-2xl border shadow-sm" style={{ background: cores.bg }}>
+      {/* Aviso "esta lei foi atualizada" + espelho do que mudou (flutua via portal). */}
+      <LeituraAtualizacaoAviso doc={doc} />
       {/* Barra esquerda: navegação/sumário + ajustes */}
       {menuAberto && (
         <aside className="flex w-64 shrink-0 flex-col border-r" style={{ borderColor: '#0000001a', background: cores.bg }}>
@@ -436,10 +578,20 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
             </div>
             {(grifos.length > 0 || temGrifosBaked) && (
               <label className="flex items-center justify-between text-xs" style={{ color: cores.muted }}>
-                <span className="inline-flex items-center gap-1"><Highlighter className="h-3.5 w-3.5" /> Modo sem grifos</span>
-                <input type="checkbox" checked={semGrifos} onChange={(e) => setSemGrifos(e.target.checked)} className="h-4 w-4 rounded border" />
+                <span className="inline-flex items-center gap-1"><Highlighter className="h-3.5 w-3.5" /> Grifos do Revisão</span>
+                {/* Marcado = MOSTRAR os grifos do Revisão; desmarcado = ler sem grifo. */}
+                <input type="checkbox" checked={!semGrifos} onChange={(e) => setSemGrifos(!e.target.checked)} className="h-4 w-4 rounded border" />
               </label>
             )}
+            {/* #3 — Meus grifos: voltar/avançar (undo/redo) + resetar. */}
+            <div className="flex items-center justify-between gap-1 text-xs" style={{ color: cores.muted }}>
+              <span className="inline-flex items-center gap-1"><StickyNote className="h-3.5 w-3.5" /> Meus grifos</span>
+              <div className="flex items-center gap-1">
+                <button onClick={desfazer} disabled={!passado.length} title="Voltar (desfazer)" className="rounded border p-1 transition disabled:opacity-40" style={{ borderColor: '#0000001a', color: cores.fg }}><Undo2 className="h-3.5 w-3.5" /></button>
+                <button onClick={refazer} disabled={!futuro.length} title="Avançar (refazer)" className="rounded border p-1 transition disabled:opacity-40" style={{ borderColor: '#0000001a', color: cores.fg }}><Redo2 className="h-3.5 w-3.5" /></button>
+                <button onClick={resetarGrifos} title="Resetar meus grifos" className="rounded border p-1 transition hover:text-destructive" style={{ borderColor: '#0000001a', color: cores.fg }}><RotateCcw className="h-3.5 w-3.5" /></button>
+              </div>
+            </div>
           </div>
 
           {/* Sumário */}

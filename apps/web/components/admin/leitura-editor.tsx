@@ -8,6 +8,7 @@ import {
   ArrowLeft, Save, Loader2, Eye, EyeOff, Upload, ClipboardPaste, PenLine, FileText,
   Bold, Italic, Underline, Heading, List, Trophy, Scale, Send, ChevronDown,
   ImagePlus, Trash2, RefreshCw, Users, Settings2,
+  Strikethrough, ListOrdered, AlignLeft, AlignCenter, AlignRight, Palette, Eraser, Undo2, Redo2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { atualizarDocumento, publicarVersao, type Documento, type Materia, type SituacaoEditorial } from '@/app/admin/leitura/actions'
@@ -140,11 +141,47 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
   }
 
   const exec = (cmd: string, val?: string) => { document.execCommand(cmd, false, val); editorRef.current?.focus() }
+  // Aplica um estilo inline (cor/tamanho) à seleção — sobrevive à sanitização (subconjunto seguro).
+  const envolverEstilo = (css: string) => {
+    const sel = window.getSelection()
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) { toast.message('Selecione um trecho primeiro.'); return }
+    const range = sel.getRangeAt(0)
+    const span = document.createElement('span')
+    span.setAttribute('style', css)
+    try {
+      span.appendChild(range.extractContents())
+      range.insertNode(span)
+      sel.removeAllRanges()
+    } catch {
+      // Seleção que cruza fronteiras de bloco: não dá para envolver num span só. Mantém a
+      // seleção e avisa (em vez de sumir em silêncio).
+      toast.error('Selecione um trecho dentro de um mesmo parágrafo para aplicar cor/tamanho.')
+    }
+    editorRef.current?.focus()
+  }
+  // Limpar formatação: removeFormat NÃO tira nossos <span style> (cor/tamanho) — desembrulhamos.
+  const limparFormatacao = () => {
+    document.execCommand('removeFormat', false)
+    const sel = window.getSelection()
+    const cont = editorRef.current
+    if (cont && sel && sel.rangeCount && !sel.isCollapsed) {
+      const range = sel.getRangeAt(0)
+      for (const s of Array.from(cont.querySelectorAll('span[style]')) as HTMLElement[]) {
+        if (!range.intersectsNode(s)) continue
+        const pai = s.parentNode
+        while (s.firstChild) pai?.insertBefore(s.firstChild, s)
+        pai?.removeChild(s)
+      }
+    }
+    cont?.focus()
+  }
 
   // Ao abrir a aba "Editor", carrega o conteúdo salvo (permite editar em vez de recomeçar do zero).
   useEffect(() => {
-    if (modo === 'editor' && editorRef.current && !editorRef.current.innerHTML.trim() && htmlAtual) {
-      editorRef.current.innerHTML = htmlAtual
+    if (modo === 'editor' && editorRef.current) {
+      // styleWithCSS: alinhamento/cor via execCommand saem como `style` (que agora sobrevive à sanitização).
+      try { document.execCommand('styleWithCSS', false, 'true') } catch { /* browser antigo */ }
+      if (!editorRef.current.innerHTML.trim() && htmlAtual) editorRef.current.innerHTML = htmlAtual
     }
   }, [modo, htmlAtual])
 
@@ -305,12 +342,39 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
 
               {modo === 'editor' && (
                 <div className="space-y-2">
-                  <div className="flex flex-wrap gap-1 rounded-lg border bg-muted/40 p-1">
-                    {([['bold', Bold], ['italic', Italic], ['underline', Underline]] as const).map(([cmd, Icon]) => (
-                      <button key={cmd} onClick={() => exec(cmd)} className="rounded-md p-1.5 text-muted-foreground hover:bg-card hover:text-foreground"><Icon className="h-4 w-4" /></button>
+                  <div className="flex flex-wrap items-center gap-1 rounded-lg border bg-muted/40 p-1">
+                    <button onClick={() => exec('undo')} title="Desfazer" className="rounded-md p-1.5 text-muted-foreground hover:bg-card hover:text-foreground"><Undo2 className="h-4 w-4" /></button>
+                    <button onClick={() => exec('redo')} title="Refazer" className="rounded-md p-1.5 text-muted-foreground hover:bg-card hover:text-foreground"><Redo2 className="h-4 w-4" /></button>
+                    <span className="mx-0.5 h-5 w-px bg-border" />
+                    {([['bold', Bold, 'Negrito'], ['italic', Italic, 'Itálico'], ['underline', Underline, 'Sublinhado'], ['strikeThrough', Strikethrough, 'Riscado']] as const).map(([cmd, Icon, t]) => (
+                      <button key={cmd} onClick={() => exec(cmd)} title={t} className="rounded-md p-1.5 text-muted-foreground hover:bg-card hover:text-foreground"><Icon className="h-4 w-4" /></button>
                     ))}
-                    <button onClick={() => exec('formatBlock', 'h2')} className="rounded-md p-1.5 text-muted-foreground hover:bg-card hover:text-foreground" title="Título"><Heading className="h-4 w-4" /></button>
-                    <button onClick={() => exec('insertUnorderedList')} className="rounded-md p-1.5 text-muted-foreground hover:bg-card hover:text-foreground" title="Lista"><List className="h-4 w-4" /></button>
+                    <span className="mx-0.5 h-5 w-px bg-border" />
+                    <button onClick={() => exec('formatBlock', 'h2')} title="Título" className="rounded-md p-1.5 text-muted-foreground hover:bg-card hover:text-foreground"><Heading className="h-4 w-4" /></button>
+                    <button onClick={() => exec('formatBlock', 'h3')} title="Subtítulo" className="rounded-md px-1.5 py-1 text-xs font-semibold text-muted-foreground hover:bg-card hover:text-foreground">H3</button>
+                    <button onClick={() => exec('formatBlock', 'p')} title="Parágrafo" className="rounded-md px-1.5 py-1 text-xs font-medium text-muted-foreground hover:bg-card hover:text-foreground">P</button>
+                    <span className="mx-0.5 h-5 w-px bg-border" />
+                    <button onClick={() => exec('insertUnorderedList')} title="Lista" className="rounded-md p-1.5 text-muted-foreground hover:bg-card hover:text-foreground"><List className="h-4 w-4" /></button>
+                    <button onClick={() => exec('insertOrderedList')} title="Lista numerada" className="rounded-md p-1.5 text-muted-foreground hover:bg-card hover:text-foreground"><ListOrdered className="h-4 w-4" /></button>
+                    <span className="mx-0.5 h-5 w-px bg-border" />
+                    <button onClick={() => exec('justifyLeft')} title="Alinhar à esquerda" className="rounded-md p-1.5 text-muted-foreground hover:bg-card hover:text-foreground"><AlignLeft className="h-4 w-4" /></button>
+                    <button onClick={() => exec('justifyCenter')} title="Centralizar" className="rounded-md p-1.5 text-muted-foreground hover:bg-card hover:text-foreground"><AlignCenter className="h-4 w-4" /></button>
+                    <button onClick={() => exec('justifyRight')} title="Alinhar à direita" className="rounded-md p-1.5 text-muted-foreground hover:bg-card hover:text-foreground"><AlignRight className="h-4 w-4" /></button>
+                    <span className="mx-0.5 h-5 w-px bg-border" />
+                    <label title="Cor do texto" className="relative flex cursor-pointer items-center rounded-md p-1.5 text-muted-foreground hover:bg-card hover:text-foreground">
+                      <Palette className="h-4 w-4" />
+                      <input type="color" onChange={(e) => envolverEstilo('color: ' + e.target.value)} className="absolute inset-0 cursor-pointer opacity-0" aria-label="Cor do texto" />
+                    </label>
+                    <select
+                      onChange={(e) => { if (e.target.value) envolverEstilo('font-size: ' + e.target.value); e.currentTarget.selectedIndex = 0 }}
+                      title="Tamanho da fonte"
+                      className="h-8 rounded-md border bg-card px-1 text-xs text-muted-foreground"
+                    >
+                      <option value="">Tam.</option>
+                      {['14px', '16px', '18px', '20px', '24px', '28px', '32px'].map((s) => <option key={s} value={s}>{s.replace('px', '')}</option>)}
+                    </select>
+                    <span className="mx-0.5 h-5 w-px bg-border" />
+                    <button onClick={limparFormatacao} title="Limpar formatação" className="rounded-md p-1.5 text-muted-foreground hover:bg-card hover:text-foreground"><Eraser className="h-4 w-4" /></button>
                   </div>
                   <div ref={editorRef} contentEditable suppressContentEditableWarning className="min-h-[220px] rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm leading-relaxed outline-none focus:ring-1 focus:ring-ring [&_h2]:mb-1 [&_h2]:mt-2 [&_h2]:text-base [&_h2]:font-bold [&_ul]:ml-5 [&_ul]:list-disc" />
                   <button onClick={() => processarConteudo(editorRef.current?.innerHTML ?? '')} disabled={savingConteudo} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50">
