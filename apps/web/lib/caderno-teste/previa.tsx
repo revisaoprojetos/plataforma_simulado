@@ -329,13 +329,14 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   }
   // Renderiza UM grupo de cards de pilar. keyBase = prefixo das partes (pilar:i na seção; pilarG:gi:j nos grupos).
   const emitirPilares = (pilares: DiagPilar[], keyBase: string, blockKey: string) => {
-    // Com dados REAIS (aluno/banco), esconde o card de um pilar que NÃO tem questões no simulado
-    // (variável `total_pilar_<chave>` ausente → 0 questões) — evita o card "X%/X de N" quebrado.
-    // No modo MODELO (sem dados), mostra todos com placeholder. Retorna null no map p/ preservar os
-    // índices de cor/formatação (`${keyBase}:${i}`).
-    const comDados = Object.keys(vars).length > 0
-    const semQuestoes = (pl: DiagPilar) => comDados && !!pl.chave && vars[`total_${prefFonte(pl.tipoFonte)}${pl.chave}`] === undefined
-    if (comDados && pilares.every(semQuestoes)) return
+    // Esconde o card de um pilar SEM questões (var `total_pilar_<chave>` ausente) — evita o card
+    // "X%/X de N" quebrado. SÓ esconde quando ALGUM outro pilar TEM questões (garante que a análise
+    // do banco rodou neste contexto); se NENHUMA variável de pilar estiver presente (modo modelo ou
+    // contexto sem os totais), NÃO esconde nada — mostra todos com placeholder. Retorna null no map
+    // p/ preservar os índices de cor/formatação (`${keyBase}:${i}`).
+    const temPilar = (pl: DiagPilar) => !!pl.chave && vars[`total_${prefFonte(pl.tipoFonte)}${pl.chave}`] !== undefined
+    const algumComQuestoes = pilares.some(temPilar)
+    const semQuestoes = (pl: DiagPilar) => algumComQuestoes && !!pl.chave && !temPilar(pl)
     add(blockKey, (
       <div style={{ display: 'flex', gap: 14, alignItems: 'stretch', marginBottom: 4 }}>
         {pilares.map((pl, i) => {
