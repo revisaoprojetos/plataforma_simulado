@@ -217,6 +217,15 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
       vars[`total_pilar_${s}`] = String(tot)
       vars[`pct_pilar_${s}`] = tot ? `${Math.round(((porPilar.get(p) ?? 0) / tot) * 100)}%` : '0%'
     }
+    // Pilares JURÍDICOS canônicos SEMPRE presentes (mesmo com 0 questões): assim o card do pilar
+    // aparece com "0% / 0 de 0 questões" em vez do placeholder de modelo "X% / X de N questões".
+    for (const chave of ['lei_seca', 'jurisprudencia', 'doutrina']) {
+      if (vars[`total_pilar_${chave}`] === undefined) {
+        vars[`acerto_pilar_${chave}`] = '0'
+        vars[`total_pilar_${chave}`] = '0'
+        vars[`pct_pilar_${chave}`] = '0%'
+      }
+    }
     return { id: a.id, nome: a.nome ?? a.email ?? 'Aluno', vars, respostas: Object.fromEntries(marcadaPorAluno.get(a.id) ?? []) }
   })
 }
