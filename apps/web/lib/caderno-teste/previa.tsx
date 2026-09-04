@@ -329,13 +329,29 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   }
   // Renderiza UM grupo de cards de pilar. keyBase = prefixo das partes (pilar:i na seção; pilarG:gi:j nos grupos).
   const emitirPilares = (pilares: DiagPilar[], keyBase: string, blockKey: string) => {
+    // Detecta pilar SEM questões no simulado: com dados reais (algum pilar TEM questões), um pilar
+    // cujo total é 0/ausente ganha um AVISO no lugar do %/banda — o card fica visível, mas sinaliza
+    // claramente que aquele pilar não foi cobrado neste simulado (em vez do "0%/abaixo de 50%").
+    const totalDe = (pl: DiagPilar) => (pl.chave ? vars[`total_${prefFonte(pl.tipoFonte)}${pl.chave}`] : undefined)
+    const algumComQuestoes = pilares.some((pl) => { const t = totalDe(pl); return t !== undefined && t !== '0' })
     add(blockKey, (
       <div style={{ display: 'flex', gap: 14, alignItems: 'stretch', marginBottom: 4 }}>
         {pilares.map((pl, i) => {
-          const banda = bandaAdaptativa(pl, vars)
-          const bandas = banda ? [banda] : pl.bandas // com dado do aluno mostra só a faixa; sem dado, todas (modelo)
           const parte = `${keyBase}:${i}`
           const cor = corP(parte, prim) // destaque do card (nome + %)
+          const t = totalDe(pl)
+          const vazio = algumComQuestoes && !!pl.chave && (t === undefined || t === '0')
+          if (vazio) {
+            return (
+              <div key={i} {...atr(parte, pl.nome, cor, { flex: 1, minWidth: 0, background: '#fff2cc', border: `1px solid ${cor}22`, padding: 8 })}>
+                <div style={{ fontSize: fs(parte, 9), fontWeight: 700, color: cor, letterSpacing: 0.5 }}>{V(pl.nome)}</div>
+                <div style={{ fontSize: fs(parte, 22), fontWeight: 800, color: `${cor}88`, lineHeight: 1.1 }}>—</div>
+                <div style={{ fontSize: fs(parte, corpo), color: '#8a8397', fontStyle: 'italic', lineHeight: 1.4, marginTop: 2 }}>Sem questões deste pilar neste simulado.</div>
+              </div>
+            )
+          }
+          const banda = bandaAdaptativa(pl, vars)
+          const bandas = banda ? [banda] : pl.bandas // com dado do aluno mostra só a faixa; sem dado, todas (modelo)
           return (
             <div key={i} {...atr(parte, pl.nome, cor, { flex: 1, minWidth: 0, background: '#fff2cc', border: `1px solid ${cor}22`, padding: 8 })}>
               <div style={{ fontSize: fs(parte, 9), fontWeight: 700, color: cor, letterSpacing: 0.5 }}>{V(pl.nome)}</div>
