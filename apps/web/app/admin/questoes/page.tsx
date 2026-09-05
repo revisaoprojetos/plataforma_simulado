@@ -10,7 +10,6 @@ import { PaginationControls } from '@/components/admin/pagination-controls'
 import { faixaUuidDoCodigo } from '@/lib/codigo-questao'
 import { NovaQuestaoDialog } from '@/components/admin/nova-questao-dialog'
 import { ExportQuestoesButton } from '@/components/admin/export-questoes-button'
-import { SecaoHeader } from '@/components/admin/secao-header'
 import { TaxonomiaUnificacao } from '@/components/admin/taxonomia-unificacao'
 import { QuestoesTabela } from '@/components/admin/questoes-tabela'
 import { listarTaxonomia } from './taxonomia-actions'
@@ -165,18 +164,21 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
         <EtiquetasClient inicial={etiquetas} />
       ) : tab === 'unificacao' ? (
         <TaxonomiaUnificacao tipo={tipoTax} itens={itensTax} recentes={recentesUnif} />
-      ) : (<>
+      ) : (
+      // marginTop inline vence o space-y-5 do pai (senão o gap de cima ficaria 20px e o de baixo 12px).
+      // space-y-3 dá o mesmo respiro (12px) entre linha de filtros ↔ tabela ↔ paginação.
+      <div className="space-y-3" style={{ marginTop: '0.75rem' }}>
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
+        <div className="flex min-w-0 items-baseline gap-2">
+          <h3 className="text-sm font-semibold leading-tight">Questões</h3>
+          <span className="whitespace-nowrap text-xs text-muted-foreground">{(count ?? 0).toLocaleString('pt-BR')} cadastrada(s)</span>
+        </div>
+        <Suspense fallback={<div className="h-10 w-full animate-pulse rounded-lg bg-muted lg:w-[520px]" />}>
+          <QuestoesFilters disciplinas={disciplinas ?? []} />
+        </Suspense>
+      </div>
+
       <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
-        <SecaoHeader
-          icon={BookOpen}
-          titulo="Questões"
-          subtitulo={`${count ?? 0} cadastrada(s)`}
-          acao={
-            <Suspense fallback={<div className="h-10 w-full animate-pulse rounded-lg bg-muted lg:w-[520px]" />}>
-              <QuestoesFilters disciplinas={disciplinas ?? []} />
-            </Suspense>
-          }
-        />
         <CardContent className="p-0">
           <QuestoesTabela questoes={(questoes ?? []).map((q: any) => ({
             id: q.id, codigo: q.codigo ?? null, enunciado: q.enunciado ?? '', status: q.status ?? null, tipo: q.tipo ?? null,
@@ -191,7 +193,8 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
       </Card>
 
       <PaginationControls page={page} totalPages={totalPages} perPage={perPage} perPageOptions={PER_PAGE_OPTIONS} />
-      </>)}
+      </div>
+      )}
     </div>
   )
 }
