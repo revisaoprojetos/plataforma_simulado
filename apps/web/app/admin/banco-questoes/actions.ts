@@ -3,7 +3,7 @@
 import type { CapaMetaIn } from '@/lib/capa-meta'
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
-import { fetchAll } from '@/lib/supabase/fetch-all'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { hospedarBase64 } from '@/lib/storage/hospedar-base64'
@@ -326,12 +326,13 @@ export async function adicionarQuestoes(bancoId: string, questaoIds: string[]): 
   if (!questaoIds.length) return { ok: false, error: 'Selecione ao menos uma questão.' }
 
   const svc = createAdminClient()
-  const { data: jaTem } = await svc
+  const jaTem = await fetchAllByIn<{ questao_id: string }>(questaoIds, (chunk) => svc
     .from('simulado_questao_pasta')
     .select('questao_id')
     .eq('pasta_id', bancoId)
-    .in('questao_id', questaoIds)
-  const existentes = new Set((jaTem ?? []).map((r: any) => r.questao_id))
+    .in('questao_id', chunk)
+    .order('questao_id', { ascending: true }))
+  const existentes = new Set(jaTem.map((r: any) => r.questao_id))
   const novas = questaoIds.filter((q) => !existentes.has(q))
   if (!novas.length) return { ok: true, adicionadas: 0 }
 
@@ -472,13 +473,17 @@ export async function removerQuestoes(bancoId: string, questaoIds: string[]): Pr
   if (!g.ok) return g
   if (!questaoIds.length) return { ok: true }
   const svc = createAdminClient()
-  const { error } = await svc
-    .from('simulado_questao_pasta')
-    .delete()
-    .eq('pasta_id', bancoId)
-    .eq('tenant_id', g.tenantId)
-    .in('questao_id', questaoIds)
-  if (error) return { ok: false, error: error.message }
+  // DELETE em chunks de 80: lista grande num único `.in()` gera URL gigante que o proxy pendura ~180s.
+  for (let i = 0; i < questaoIds.length; i += 80) {
+    const slice = questaoIds.slice(i, i + 80)
+    const { error } = await svc
+      .from('simulado_questao_pasta')
+      .delete()
+      .eq('pasta_id', bancoId)
+      .eq('tenant_id', g.tenantId)
+      .in('questao_id', slice)
+    if (error) return { ok: false, error: error.message }
+  }
   revalidatePath(`/admin/banco-questoes/${bancoId}`)
   return { ok: true }
 }
@@ -937,8 +942,8 @@ export async function confirmarImportQuestoes(bancoId: string | null, questoes: 
   // Vincula ao banco (ignora as já vinculadas) — só quando há banco de destino.
   let vinculadas = 0
   if (bancoId && idsParaVincular.length) {
-    const { data: jaTem } = await svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId).in('questao_id', idsParaVincular)
-    const existSet = new Set((jaTem ?? []).map((r: any) => r.questao_id))
+    const jaTem = await fetchAllByIn<{ questao_id: string }>(idsParaVincular, (chunk) => svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId).in('questao_id', chunk).order('questao_id', { ascending: true }))
+    const existSet = new Set(jaTem.map((r: any) => r.questao_id))
     const novos = idsParaVincular.filter((id) => !existSet.has(id))
     if (novos.length) {
       const { error } = await svc.from('simulado_questao_pasta').insert(novos.map((questao_id) => ({ tenant_id: g.tenantId, pasta_id: bancoId, questao_id })))

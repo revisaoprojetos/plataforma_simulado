@@ -130,7 +130,7 @@ async function _estudanteViaPostgrest(svc: SupabaseClient, estId: string, tenant
 
   const simTitulo = new Map<string, string>()
   const simIds = [...new Set(sessoes.map((s) => s.simulado_id).filter(Boolean))]
-  if (simIds.length) { const { data: sims } = await svc.from('simulado_simulados').select('id, titulo').in('id', simIds); for (const s of (sims ?? []) as any[]) simTitulo.set(s.id, s.titulo) }
+  if (simIds.length) { const sims = await fetchAllByIn<any>(simIds, (chunk) => svc.from('simulado_simulados').select('id, titulo').in('id', chunk).order('id')); for (const s of sims as any[]) simTitulo.set(s.id, s.titulo) }
 
   const notas = finalizadas.map((s) => (s.nota != null ? Number(s.nota) : null)).filter((n): n is number => n != null)
   const notaMedia = notas.length ? notas.reduce((a, b) => a + b, 0) / notas.length : null

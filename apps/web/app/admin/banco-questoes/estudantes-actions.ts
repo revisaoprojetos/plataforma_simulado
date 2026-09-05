@@ -40,8 +40,9 @@ export async function vincularEstudantes(bancoId: string, estudanteIds: string[]
   if (!estudanteIds.length) return { ok: false, error: 'Selecione ao menos um aluno.' }
 
   const svc = createAdminClient()
-  const { data: ja } = await svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', bancoId).in('estudante_id', estudanteIds)
-  const existentes = new Set((ja ?? []).map((r: any) => r.estudante_id))
+  const ja = await fetchAllByIn<{ estudante_id: string }>(estudanteIds, (chunk) =>
+    svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', bancoId).in('estudante_id', chunk).order('estudante_id', { ascending: true }))
+  const existentes = new Set(ja.map((r: any) => r.estudante_id))
   const novos = estudanteIds.filter((e) => !existentes.has(e))
   if (!novos.length) return { ok: true, vinculados: 0 }
 
@@ -262,9 +263,10 @@ export async function importarEstudantesLote(
   const svc = createAdminClient()
   const emails = [...new Set(limpos.map((r) => r.email))]
 
-  // Perfis já existentes no tenant (por e-mail).
-  const { data: existentes } = await svc.from('simulado_estudantes').select('id, email').eq('tenant_id', g.tenantId).in('email', emails)
-  const idPorEmail = new Map<string, string>((existentes ?? []).map((e: any) => [String(e.email).toLowerCase(), e.id]))
+  // Perfis já existentes no tenant (por e-mail). Chunked: `emails` pode ter até 10.000 → URL gigante.
+  const existentes = await fetchAllByIn<{ id: string; email: string }>(emails, (chunk) =>
+    svc.from('simulado_estudantes').select('id, email').eq('tenant_id', g.tenantId).in('email', chunk).order('email', { ascending: true }))
+  const idPorEmail = new Map<string, string>(existentes.map((e: any) => [String(e.email).toLowerCase(), e.id]))
 
   // Cria os perfis que faltam.
   const novos = limpos.filter((r) => !idPorEmail.has(r.email))
@@ -285,8 +287,9 @@ export async function importarEstudantesLote(
 
   // Vincula todos ao banco (ignora os já vinculados).
   const estIds = [...new Set(emails.map((e) => idPorEmail.get(e)).filter(Boolean) as string[])]
-  const { data: jaVinc } = await svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', bancoId).in('estudante_id', estIds)
-  const vincSet = new Set((jaVinc ?? []).map((v: any) => v.estudante_id))
+  const jaVinc = await fetchAllByIn<{ estudante_id: string }>(estIds, (chunk) =>
+    svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', bancoId).in('estudante_id', chunk).order('estudante_id', { ascending: true }))
+  const vincSet = new Set(jaVinc.map((v: any) => v.estudante_id))
   const aVincular = estIds.filter((id) => !vincSet.has(id))
   if (aVincular.length) {
     const { error } = await svc.from('simulado_pasta_estudantes').insert(aVincular.map((estudante_id) => ({ tenant_id: g.tenantId, pasta_id: bancoId, estudante_id })))

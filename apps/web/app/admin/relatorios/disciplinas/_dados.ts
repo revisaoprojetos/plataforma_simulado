@@ -99,10 +99,10 @@ async function _disciplinaViaPostgrest(svc: SupabaseClient, discId: string, tena
 
   const simTitulo = new Map<string, string>()
   const simIds = [...acPorSim.keys()]
-  if (simIds.length) { const { data: sims } = await svc.from('simulado_simulados').select('id, titulo').in('id', simIds); for (const s of (sims ?? []) as any[]) simTitulo.set(s.id, s.titulo) }
+  if (simIds.length) { const sims = await fetchAllByIn<any>(simIds, (chunk) => svc.from('simulado_simulados').select('id, titulo').in('id', chunk).order('id')); for (const s of sims as any[]) simTitulo.set(s.id, s.titulo) }
   const assuntoNome = new Map<string, string>()
   const assuntoIds = [...acPorAssunto.keys()].filter((k) => k !== '—')
-  if (assuntoIds.length) { const { data: ass } = await svc.from('simulado_assuntos').select('id, nome').in('id', assuntoIds); for (const a of (ass ?? []) as any[]) assuntoNome.set(a.id, a.nome) }
+  if (assuntoIds.length) { const ass = await fetchAllByIn<any>(assuntoIds, (chunk) => svc.from('simulado_assuntos').select('id, nome').in('id', chunk).order('id')); for (const a of ass as any[]) assuntoNome.set(a.id, a.nome) }
 
   const pct = (v: { ac: number; tt: number }) => (v.tt ? Math.round((v.ac / v.tt) * 100) : 0)
   const porSimulado = [...acPorSim.entries()].map(([id, v]) => ({ titulo: simTitulo.get(id) ?? '—', pct: pct(v), ac: v.ac, tt: v.tt })).sort((a, b) => b.tt - a.tt)

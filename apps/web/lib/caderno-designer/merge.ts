@@ -115,7 +115,15 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
     // Carrega as respostas de TODAS as sessões candidatas (pra saber quais têm respostas).
     const respPorSessao = new Map<string, any[]>()
     if (allSessIds.length) {
-      const resp = await fetchAllByIn<any>(allSessIds, (chunk) => svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta, alternativa_id, snapshot_gabarito').in('sessao_id', chunk).in('questao_id', qids).order('id'))
+      // DUPLO chunk: fetchAllByIn já fatia `allSessIds`, mas o 2º `.in('questao_id', qids)`
+      // pode ter 1000+ ids → URL gigante que pendura. Fatiamos `qids` em lotes de 80 (loop
+      // externo) e chunkamos as sessões dentro de cada lote; concatenamos tudo em `resp`.
+      const resp: any[] = []
+      for (let i = 0; i < qids.length; i += 80) {
+        const qidsChunk = qids.slice(i, i + 80)
+        const parte = await fetchAllByIn<any>(allSessIds, (chunk) => svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta, alternativa_id, snapshot_gabarito').in('sessao_id', chunk).in('questao_id', qidsChunk).order('id'))
+        resp.push(...parte)
+      }
       for (const r of resp) { const arr = respPorSessao.get((r as any).sessao_id) ?? []; arr.push(r); respPorSessao.set((r as any).sessao_id, arr) }
     }
 

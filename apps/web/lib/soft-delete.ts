@@ -31,14 +31,24 @@ export async function softDelete(tabela: SoftDeleteTabela, ids: string | string[
   if (!access.userId) return { error: new Error('Sem sessão.'), count: 0 }
 
   const svc = createAdminClient()
-  let q = svc
-    .from(tabela)
-    .update({ deletado: true, deletado_em: new Date().toISOString(), deletado_por: access.userId })
-    .in('id', arr)
-    .eq('deletado', false)
-  if (access.tenantId) q = q.eq('tenant_id', access.tenantId)
-  const { data, error } = await q.select('id')
-  return { error: (error as Error) ?? null, count: data?.length ?? 0 }
+  const deletadoEm = new Date().toISOString()
+  // UPDATE em lotes de 200: um `.in('id', arr)` com 1000+ ids gera URL gigante que o
+  // proxy do Supabase pendura (~180s). fetchAllByIn é só p/ SELECT; aqui fatiamos à mão.
+  let primeiroErro: Error | null = null
+  let count = 0
+  for (let i = 0; i < arr.length; i += 200) {
+    const loteChunk = arr.slice(i, i + 200)
+    let q = svc
+      .from(tabela)
+      .update({ deletado: true, deletado_em: deletadoEm, deletado_por: access.userId })
+      .in('id', loteChunk)
+      .eq('deletado', false)
+    if (access.tenantId) q = q.eq('tenant_id', access.tenantId)
+    const { data, error } = await q.select('id')
+    if (error && !primeiroErro) primeiroErro = error as Error
+    count += data?.length ?? 0
+  }
+  return { error: primeiroErro, count }
 }
 
 /** Restaura (deletado=false). O trigger limpa deletado_em/por. */

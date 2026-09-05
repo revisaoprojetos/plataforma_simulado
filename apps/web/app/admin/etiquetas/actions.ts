@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
+import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 
@@ -165,27 +166,32 @@ export async function questoesDaEtiqueta(etiquetaId: string): Promise<{ ok: bool
   if (!ids.length) return { ok: true, itens: [] }
 
   // Enunciado (rótulo) + disciplina (embed tolerante). Sem embed, cai só no enunciado.
-  let res = await svc.from('simulado_questoes').select('id, enunciado, disciplinas:simulado_disciplinas(nome)').in('id', ids)
-  if (res.error) res = await svc.from('simulado_questoes').select('id, enunciado').in('id', ids) as any
+  // Chunk das DUAS variantes (embed + fallback) — `ids` = todas as questões da etiqueta, sem teto.
+  let questoesData: any[]
+  try {
+    questoesData = await fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_questoes').select('id, enunciado, disciplinas:simulado_disciplinas(nome)').in('id', chunk))
+  } catch {
+    questoesData = await fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_questoes').select('id, enunciado').in('id', chunk))
+  }
   const snippet = (s: unknown) => String(s ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 140)
 
   // Em quais simulados cada questão aparece (via simulado_prova_questoes) + o NÚMERO dela em cada.
   // Número = posição 1-based por `ordem` dentro do simulado (calculada a partir de TODAS as questões dele).
-  const { data: pqTag } = await svc.from('simulado_prova_questoes').select('simulado_id, questao_id').in('questao_id', ids)
-  const simIds = [...new Set(((pqTag ?? []) as any[]).map((r) => r.simulado_id).filter(Boolean))]
+  const pqTag = await fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_prova_questoes').select('simulado_id, questao_id').in('questao_id', chunk))
+  const simIds = [...new Set((pqTag as any[]).map((r) => r.simulado_id).filter(Boolean))]
   const simInfo = new Map<string, { titulo: string; publicado: boolean }>()
   const rankPorSim = new Map<string, Map<string, number>>() // simulado_id → (questao_id → nº)
   if (simIds.length) {
-    const { data: sims } = await svc.from('simulado_simulados').select('id, titulo, status, deletado, owner_estudante_id').in('id', simIds)
-    for (const s of (sims ?? []) as any[]) {
+    const sims = await fetchAllByIn<any>(simIds, (chunk) => svc.from('simulado_simulados').select('id, titulo, status, deletado, owner_estudante_id').in('id', chunk))
+    for (const s of sims as any[]) {
       if (s.deletado || s.owner_estudante_id) continue // fora: deletados e simulados pessoais do aluno
       simInfo.set(s.id, { titulo: s.titulo ?? 'Simulado', publicado: s.status === 'publicado' })
     }
     const simVivos = [...simInfo.keys()]
     if (simVivos.length) {
-      const { data: pqAll } = await svc.from('simulado_prova_questoes').select('simulado_id, questao_id, ordem').in('simulado_id', simVivos)
+      const pqAll = await fetchAllByIn<any>(simVivos, (chunk) => svc.from('simulado_prova_questoes').select('simulado_id, questao_id, ordem').in('simulado_id', chunk))
       const bySim = new Map<string, any[]>()
-      for (const r of (pqAll ?? []) as any[]) { const a = bySim.get(r.simulado_id) ?? []; a.push(r); bySim.set(r.simulado_id, a) }
+      for (const r of pqAll as any[]) { const a = bySim.get(r.simulado_id) ?? []; a.push(r); bySim.set(r.simulado_id, a) }
       for (const [sid, arr] of bySim) {
         arr.sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0))
         const m = new Map<string, number>(); arr.forEach((r, i) => m.set(r.questao_id, i + 1))
@@ -194,7 +200,7 @@ export async function questoesDaEtiqueta(etiquetaId: string): Promise<{ ok: bool
     }
   }
   const simsPorQ = new Map<string, SimuladoDaQuestao[]>()
-  for (const r of (pqTag ?? []) as any[]) {
+  for (const r of pqTag as any[]) {
     const info = simInfo.get(r.simulado_id); if (!info) continue
     const numero = rankPorSim.get(r.simulado_id)?.get(r.questao_id) ?? 0
     const a = simsPorQ.get(r.questao_id) ?? []
@@ -202,7 +208,7 @@ export async function questoesDaEtiqueta(etiquetaId: string): Promise<{ ok: bool
     simsPorQ.set(r.questao_id, a)
   }
 
-  const itens: QuestaoDaEtiqueta[] = ((res.data ?? []) as any[]).map((q) => ({
+  const itens: QuestaoDaEtiqueta[] = (questoesData as any[]).map((q) => ({
     id: q.id as string,
     titulo: snippet(q.enunciado) || 'Questão sem enunciado',
     disciplina: (q.disciplinas?.nome ?? null) as string | null,

@@ -345,16 +345,20 @@ export async function previaDesvincularGrupo(pacoteId: string, grupoId: string):
   const cronIds = itens.map((i) => i.cronograma_id)
   const jaEmitiram = new Set<string>()
   if (cronIds.length) {
-    const emissoes = await fetchAllByIn<any>(ids, (chunk) =>
-      svc
-        .from('simulado_cronograma_emissoes')
-        .select('estudante_id')
-        .eq('tenant_id', g.tenantId)
-        .in('cronograma_id', cronIds)
-        .in('estudante_id', chunk)
-        .order('id') as any,
-    )
-    for (const e of emissoes) if (!mantidos.has(e.estudante_id)) jaEmitiram.add(e.estudante_id)
+    // Duplo chunk: cronIds também é ilimitado — fatia por fora e usa fetchAllByIn no estudante_id.
+    for (let c = 0; c < cronIds.length; c += 80) {
+      const cronChunk = cronIds.slice(c, c + 80)
+      const emissoes = await fetchAllByIn<any>(ids, (chunk) =>
+        svc
+          .from('simulado_cronograma_emissoes')
+          .select('estudante_id')
+          .eq('tenant_id', g.tenantId)
+          .in('cronograma_id', cronChunk)
+          .in('estudante_id', chunk)
+          .order('id') as any,
+      )
+      for (const e of emissoes) if (!mantidos.has(e.estudante_id)) jaEmitiram.add(e.estudante_id)
+    }
   }
 
   return {
@@ -394,15 +398,21 @@ export async function desvincularGrupo(
       )
       const cronIds = itens.map((i) => i.cronograma_id)
       if (cronIds.length && ids.length) {
-        const emissoes = await fetchAllByIn<any>(ids, (chunk) =>
-          svc
-            .from('simulado_cronograma_emissoes')
-            .select('estudante_id')
-            .eq('tenant_id', g.tenantId)
-            .in('cronograma_id', cronIds)
-            .in('estudante_id', chunk)
-            .order('id') as any,
-        )
+        // Duplo chunk: cronIds também é ilimitado — fatia por fora e usa fetchAllByIn no estudante_id.
+        const emissoes: any[] = []
+        for (let c = 0; c < cronIds.length; c += 80) {
+          const cronChunk = cronIds.slice(c, c + 80)
+          const parcial = await fetchAllByIn<any>(ids, (chunk) =>
+            svc
+              .from('simulado_cronograma_emissoes')
+              .select('estudante_id')
+              .eq('tenant_id', g.tenantId)
+              .in('cronograma_id', cronChunk)
+              .in('estudante_id', chunk)
+              .order('id') as any,
+          )
+          emissoes.push(...parcial)
+        }
         const manter = [...new Set(emissoes.map((e) => e.estudante_id))]
         for (let i = 0; i < manter.length; i += 500) {
           await svc.from('simulado_cronograma_pacote_estudantes').upsert(

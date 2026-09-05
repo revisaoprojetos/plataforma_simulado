@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
-import { fetchAll } from '@/lib/supabase/fetch-all'
+import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { AdicionarCorrecao, type QuestaoCorrecao } from '@/components/admin/adicionar-correcao'
@@ -53,10 +53,10 @@ export async function SimuladoRecorrecao({ simuladoId }: { simuladoId: string })
   const recIds = (recs ?? []).map((r: any) => r.id)
 
   const impactos = recIds.length
-    ? await fetchAll<any>(() => svc
+    ? await fetchAllByIn<any>(recIds, (chunk) => svc
         .from('simulado_recorrecao_impactos')
         .select('recorrecao_id, estudante_id, nota_antes, nota_depois, delta, ranking_antes, ranking_depois, classificacao')
-        .in('recorrecao_id', recIds)
+        .in('recorrecao_id', chunk)
         .order('recorrecao_id'))
     : []
   const estMap = await nomesPorIds(svc, [...new Set(impactos.map((i: any) => i.estudante_id))])

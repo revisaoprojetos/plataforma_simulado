@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Trophy, TrendingDown, BarChart3 } from 'lucide-react'
@@ -43,14 +44,14 @@ export async function SimuladoRelatorio({ simuladoId }: Props) {
     if (q?.id) questoesInfo.set(q.id, { enunciado: q.enunciado ?? '', disciplina: q.disciplinas?.nome ?? 'Sem matéria', ordem: (row as any).ordem ?? 0 })
   }
 
-  // Respostas de todas as sessões finalizadas.
+  // Respostas de todas as sessões finalizadas (chunk — simulado popular = milhares de sessões).
   let respostas: Array<{ questao_id: string; correta: boolean | null }> = []
   if (sessaoIds.length) {
-    const { data } = await svc
+    respostas = await fetchAllByIn<any>(sessaoIds, (chunk) => svc
       .from('simulado_respostas_objetivas')
       .select('questao_id, correta')
-      .in('sessao_id', sessaoIds)
-    respostas = (data as any) ?? []
+      .in('sessao_id', chunk)
+      .order('id', { ascending: true }))
   }
 
   // Erros por questão + acertos por matéria.
