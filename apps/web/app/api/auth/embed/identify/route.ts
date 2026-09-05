@@ -14,6 +14,8 @@ interface RequestBody {
   email: string
   cpf?: string
   telefone?: string
+  /** 'iniciar' (padrão) abre/retoma a prova; 'resultado' leva o aluno que JÁ finalizou ao relatório. */
+  modo?: 'iniciar' | 'resultado'
 }
 
 /** Monta um texto curto de contato a partir dos canais do tenant. */
@@ -149,6 +151,37 @@ export async function POST(request: NextRequest) {
     if (telNorm !== estudanteTelNorm) {
       return bloqueio(tenantId, 'bloqueio_identidade', { nome: estudante.nome ?? '', simulado: tituloSimulado })
     }
+  }
+
+  // 2.5 MODO "VER MEUS RESULTADOS": identidade validada → localiza a sessão FINALIZADA (prova real)
+  //     mais recente e devolve seu id para o cliente abrir a tela de relatório (`?st=`). Pula janela,
+  //     matrícula e tentativas — o aluno já fez a prova; só quer rever o resultado, mesmo fora do prazo.
+  if (body.modo === 'resultado') {
+    const { data: fin } = await supabase
+      .from('simulado_sessoes_prova')
+      .select('id')
+      .eq('simulado_id', simulado.id)
+      .eq('estudante_id', estudante.id)
+      .eq('is_teste', false)
+      .eq('status', 'finalizada')
+      .order('iniciado_em', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (!fin) {
+      return NextResponse.json(
+        {
+          titulo: 'Simulado ainda não realizado',
+          message: `Não encontramos uma tentativa finalizada sua em "${tituloSimulado}". Conclua o simulado para poder ver seus resultados.`,
+          tipo: 'sem_resultado',
+        },
+        { status: 404 },
+      )
+    }
+    await registrarAudit({
+      operacao: 'LOGIN', entidade: 'simulado_resultado', entidadeId: estudante.id, atorTipo: 'estudante', tenantId,
+      depois: { nome: estudante.nome ?? 'Aluno', email: estudante.email ?? null, simulado_id: simulado.id, simulado: tituloSimulado, sessao_id: fin.id, modo: 'resultado' },
+    })
+    return NextResponse.json({ sessao_id: fin.id, resultado: true, estudante_nome: estudante.nome })
   }
 
   // 3. TESTADOR? Se sim, faz o simulado como TESTE: pula status/janela/manutenção/matrícula, sem

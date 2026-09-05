@@ -8,7 +8,7 @@ import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { BookOpen, Loader2, Clock, Calendar, ChevronLeft } from 'lucide-react'
+import { BookOpen, Loader2, Clock, Calendar, ChevronLeft, BarChart3 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { FitaTopo } from '@/components/prova/fita-topo'
@@ -114,6 +114,8 @@ export function EmbedLoginForm({ token, metodo, simuladoTitulo, branding, prova,
   const [erro, setErro] = useState<ErroBloqueio | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [sucesso, setSucesso] = useState(false)
+  // Qual ação está em curso: 'iniciar' (fazer a prova) ou 'resultado' (ver relatório de quem já fez).
+  const [acao, setAcao] = useState<'iniciar' | 'resultado'>('iniciar')
   // Espera pela janela: aluno já se identificou, mas o simulado ainda não começou.
   const [aguardando, setAguardando] = useState<string | null>(null) // data_inicio (ISO)
   const [restante, setRestante] = useState(0) // ms até o início
@@ -129,9 +131,10 @@ export function EmbedLoginForm({ token, metodo, simuladoTitulo, branding, prova,
     formState: { errors },
   } = useForm<FormData>({ resolver: zodResolver(schema) })
 
-  async function onSubmit(data: FormData) {
+  async function onSubmit(data: FormData, modo: 'iniciar' | 'resultado' = 'iniciar') {
     ultimoLogin.current = data
     setErro(null)
+    setAcao(modo)
     setIsLoading(true)
 
     try {
@@ -147,6 +150,7 @@ export function EmbedLoginForm({ token, metodo, simuladoTitulo, branding, prova,
           email: data.email,
           cpf: data.cpf,
           telefone: data.telefone,
+          modo,
         }),
       })
 
@@ -171,10 +175,10 @@ export function EmbedLoginForm({ token, metodo, simuladoTitulo, branding, prova,
         return
       }
       const { sessao_id } = json
-      // Entra na tela "Carregamento" do caderno antes de abrir o simulado.
+      // Entra na tela "Carregamento" do caderno antes de abrir o simulado/relatório.
       setAguardando(null)
       setSucesso(true)
-      toast.success('Login realizado! Entrando no simulado...')
+      toast.success(modo === 'resultado' ? 'Identificado! Abrindo seus resultados...' : 'Login realizado! Entrando no simulado...')
       if (destino === 'simulado') {
         // Navegação client-side: mantém a tela de carregamento temada, sem flash branco do navegador.
         router.push(`/simulado/${token}?st=${sessao_id}`)
@@ -216,7 +220,7 @@ export function EmbedLoginForm({ token, metodo, simuladoTitulo, branding, prova,
     return (
       <div style={hudCssVars(cores, dark) as React.CSSProperties}>
         <ProvaLoading
-          mensagem="Preparando seu simulado..."
+          mensagem={acao === 'resultado' ? 'Abrindo seus resultados...' : 'Preparando seu simulado...'}
           tipo={cores.loadingTipo as EstiloProvaLoading}
           logoUrl={cores.loadingLogoUrl || branding?.logoUrl || null}
           logoBg={cores.loadingLogoUrl ? cores.loadingLogoBg : branding?.logoBg}
@@ -303,7 +307,7 @@ export function EmbedLoginForm({ token, metodo, simuladoTitulo, branding, prova,
         <div className="relative overflow-hidden rounded-2xl border bg-card p-6 shadow-sm">
           <FitaTopo />
           <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold"><BookOpen className="h-5 w-5" style={{ color: 'var(--primary)' }} /> Identifique-se para iniciar</h2>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={handleSubmit((d) => onSubmit(d, 'iniciar'))} className="space-y-4">
             <div className="space-y-1.5">
               <Label htmlFor="email">E-mail cadastrado na <strong className="font-semibold" style={{ color: 'var(--prova-login-destaque, var(--primary))' }}>plataforma do {plataforma}</strong> *</Label>
               <Input
@@ -355,7 +359,7 @@ export function EmbedLoginForm({ token, metodo, simuladoTitulo, branding, prova,
             )}
 
             <Button type="submit" className="w-full" size="lg" disabled={isLoading} style={{ background: 'var(--prova-login-botao, var(--primary))' }}>
-              {isLoading ? (
+              {isLoading && acao === 'iniciar' ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   Verificando...
@@ -364,6 +368,38 @@ export function EmbedLoginForm({ token, metodo, simuladoTitulo, branding, prova,
                 'Iniciar simulado'
               )}
             </Button>
+
+            {/* Separador "ou" */}
+            <div className="flex items-center gap-3 pt-1">
+              <div className="h-px flex-1 bg-border" />
+              <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">ou</span>
+              <div className="h-px flex-1 bg-border" />
+            </div>
+
+            {/* Já finalizou → vai direto para o relatório daquele simulado (mesma identificação). */}
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full"
+              size="lg"
+              disabled={isLoading}
+              onClick={handleSubmit((d) => onSubmit(d, 'resultado'))}
+            >
+              {isLoading && acao === 'resultado' ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Buscando seus resultados...
+                </>
+              ) : (
+                <>
+                  <BarChart3 className="mr-2 h-4 w-4" />
+                  Já fiz — ver meus resultados
+                </>
+              )}
+            </Button>
+            <p className="text-center text-xs text-muted-foreground">
+              Já concluiu este simulado? Veja seu relatório de desempenho.
+            </p>
           </form>
         </div>
       </div>

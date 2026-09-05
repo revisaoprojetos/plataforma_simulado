@@ -112,7 +112,7 @@ export const GRUPOS: HudGrupo[] = [
 /** Situação exibida no selo do login, por tab de pop-up. */
 export const STATUS_POR_TAB: Record<'form' | LoginResultadoTipo, string> = {
   form: 'Em andamento', sucesso: 'Em andamento', email_invalido: 'Em andamento',
-  nao_iniciado: 'Não iniciado', encerrado: 'Encerrado',
+  nao_iniciado: 'Não iniciado', encerrado: 'Encerrado', sem_resultado: 'Em andamento',
 }
 
 /** Questão de exemplo p/ a prévia. */

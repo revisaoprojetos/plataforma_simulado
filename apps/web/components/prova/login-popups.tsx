@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { FitaTopo } from '@/components/prova/fita-topo'
 
-export type LoginResultadoTipo = 'sucesso' | 'email_invalido' | 'nao_iniciado' | 'encerrado'
+export type LoginResultadoTipo = 'sucesso' | 'email_invalido' | 'nao_iniciado' | 'encerrado' | 'sem_resultado'
 
 export interface LoginContato {
   whatsapp?: string | null
@@ -110,6 +110,12 @@ export function LoginResultado({ tipo, nome, mensagem, quando, onVoltar, compact
       titulo: 'Simulado encerrado',
       msg: mensagem ?? 'O período para realizar este simulado já terminou. Não é mais possível iniciar.',
     },
+    // Aluno pediu "ver meus resultados" mas ainda não concluiu nenhuma tentativa deste simulado.
+    sem_resultado: {
+      Icon: Clock, cor: 'var(--prova-aviso, #f59e0b)', loading: false, botao: 'Entendi',
+      titulo: 'Simulado ainda não realizado',
+      msg: mensagem ?? 'Você ainda não concluiu este simulado. Conclua a prova para poder ver seus resultados.',
+    },
   }[tipo]
 
   // "O que verificar" — só no e-mail inválido.
@@ -131,7 +137,7 @@ export function LoginResultado({ tipo, nome, mensagem, quando, onVoltar, compact
         ? cn('z-50 animate-in fade-in bg-black/50 backdrop-blur-sm duration-200', compact ? 'absolute inset-0' : 'fixed inset-0')
         : cn('bg-background', compact ? 'h-full' : 'min-h-screen'),
     )}>
-      <div data-campo={tipo === 'nao_iniciado' ? 'aviso' : tipo === 'sucesso' ? 'sitAndamento' : 'alerta'} className="relative w-full max-w-md animate-in fade-in zoom-in-95 overflow-hidden rounded-2xl border bg-card text-center shadow-xl duration-500">
+      <div data-campo={(tipo === 'nao_iniciado' || tipo === 'sem_resultado') ? 'aviso' : tipo === 'sucesso' ? 'sitAndamento' : 'alerta'} className="relative w-full max-w-md animate-in fade-in zoom-in-95 overflow-hidden rounded-2xl border bg-card text-center shadow-xl duration-500">
         <FitaTopo />
         {/* Cabeçalho — tom da situação */}
         <div className="px-8 pb-6 pt-8" style={{ background: `color-mix(in oklab, ${cfg.cor} 12%, var(--card))` }}>
