@@ -2,6 +2,8 @@
 // que se aplica a cada uma. Uma questão pode ter várias etiquetas — vale a MAIS FORTE.
 // Tolerante à coluna `funcao` ausente (migração pendente) → devolve Map vazio.
 
+import { fetchAllByIn } from '@/lib/supabase/fetch-all'
+
 type AnyClient = { from: (t: string) => any }
 
 export type FuncaoEtiqueta = 'anular' | 'avisar' | 'desconsiderar'
@@ -19,8 +21,14 @@ export async function funcaoEtiquetaPorQuestao(svc: AnyClient, questaoIds: strin
   const ids = [...new Set(questaoIds.filter(Boolean))]
   if (!ids.length) return out
   try {
-    const { data: links } = await svc.from('simulado_questao_etiquetas').select('questao_id, etiqueta_id').in('questao_id', ids)
-    const etIds = [...new Set(((links ?? []) as any[]).map((l) => l.etiqueta_id).filter(Boolean))]
+    // CHUNK obrigatório: `.in('questao_id', ids)` com muitos ids (aluno com dezenas de simulados
+    // concluídos → 1500+ questões) gera uma URL gigante que o proxy do Supabase NÃO rejeita rápido —
+    // ele trava ~3 min antes de falhar, pendurando o SSR da página de resultado. fetchAllByIn fatia.
+    const links = await fetchAllByIn<{ questao_id: string; etiqueta_id: string }>(
+      ids,
+      (chunk) => svc.from('simulado_questao_etiquetas').select('questao_id, etiqueta_id').in('questao_id', chunk).order('questao_id', { ascending: true }),
+    )
+    const etIds = [...new Set(links.map((l) => l.etiqueta_id).filter(Boolean))]
     if (!etIds.length) return out
     const { data: ets, error } = await svc.from('simulado_etiquetas').select('id, nome, cor, funcao').in('id', etIds)
     if (error) return out // coluna `funcao` ainda não existe → sem função
