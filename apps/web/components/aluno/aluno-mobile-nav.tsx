@@ -192,7 +192,7 @@ export function AlunoMobileNav({ navMode, logo, nome = 'Área do Aluno', subtitu
             onClick={(e) => e.stopPropagation()}
           >
             {[
-              { href: '/aluno/simulados', icon: ClipboardCheck, titulo: 'Meus Simulados', desc: meus > 0 ? `${meus} concluído${meus > 1 ? 's' : ''}, com notas` : 'Seus resultados e notas' },
+              { href: '/aluno/simulados', icon: ClipboardCheck, titulo: 'Simulados Realizados', desc: meus > 0 ? `${meus} concluído${meus > 1 ? 's' : ''}, com notas` : 'Seus resultados e notas' },
               { href: '/aluno/recomendado', icon: Sparkles, titulo: 'Recomendado', desc: 'Questões onde você mais erra' },
               { href: '/aluno/questoes', icon: BookOpen, titulo: 'Banco de Questões', desc: 'Pratique com filtros' },
             ].map((o) => {

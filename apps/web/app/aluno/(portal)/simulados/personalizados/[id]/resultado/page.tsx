@@ -54,7 +54,7 @@ export default async function ResultadoPersonalizadoPage({ params }: { params: P
   return (
     <div className="animate-page space-y-5">
       <Link href="/aluno/simulados?aba=personalizados" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-        <ChevronLeft className="h-4 w-4" /> Meus simulados
+        <ChevronLeft className="h-4 w-4" /> Simulados realizados
       </Link>
 
       {/* HERO — igual ao resultado oficial, com Refazer + Editar (personalizado). */}

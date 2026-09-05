@@ -136,7 +136,7 @@ export function MeusSimuladosCatalogo({ itens, grupos, view = 'poster' }: { iten
     <div data-tour="simulados-lista" className="space-y-5">
       {/* Título + (à direita) alternador de visão — só faz sentido na aba da plataforma. */}
       <div className="flex items-center justify-between gap-3">
-        <h1 className="text-2xl font-bold tracking-tight">Meus simulados</h1>
+        <h1 className="text-2xl font-bold tracking-tight">Simulados realizados</h1>
         {aba === 'revisao' && temCatalogo && (
           <div className="flex shrink-0 gap-1 rounded-lg bg-muted p-1">
             {([['quadro', 'Quadro', LayoutGrid], ['catalogo', 'Catálogo', Rows3]] as const).map(([v, label, Icon]) => (

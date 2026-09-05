@@ -140,5 +140,5 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
 }
 
 function Voltar() {
-  return <Link href="/aluno/simulados" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ChevronLeft className="h-4 w-4" /> Meus simulados</Link>
+  return <Link href="/aluno/simulados" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><ChevronLeft className="h-4 w-4" /> Simulados realizados</Link>
 }

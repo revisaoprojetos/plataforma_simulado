@@ -36,7 +36,7 @@ type ItemNav = {
 
 const NAV: ItemNav[] = [
   { href: '/aluno', label: 'Início', icon: Home, exact: true, tour: 'nav-inicio' },
-  { href: '/aluno/simulados', label: 'Meus Simulados', icon: ClipboardList, tour: 'nav-simulados' },
+  { href: '/aluno/simulados', label: 'Simulados Realizados', icon: ClipboardList, tour: 'nav-simulados' },
   { href: '/aluno/trilha', label: 'Trilha', icon: Route, tour: 'nav-trilha' },
   { href: '/aluno/recomendado', label: 'Recomendado', icon: Sparkles, tour: 'nav-recomendado' },
   { href: '/aluno/ligas', label: 'Ligas', icon: Trophy, tour: 'nav-liga' },
