@@ -53,16 +53,40 @@ export function FontScaleControl({
 
   return (
     <div ref={boxRef} className={cn('relative', className)}>
-      <button
-        type="button"
-        onClick={() => (open ? fechar() : abrir())}
-        title="Tamanho do texto"
-        aria-label="Ajustar o tamanho do texto"
-        aria-expanded={open}
-        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        <ALargeSmall className="h-4 w-4" />
-      </button>
+      <div className="group/fs relative">
+        <button
+          type="button"
+          onClick={() => (open ? fechar() : abrir())}
+          aria-label="Ajustar o tamanho do texto"
+          aria-expanded={open}
+          className={cn(
+            'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            open
+              ? 'border-primary/40 bg-primary/10 text-primary'
+              : 'border-border bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground',
+          )}
+        >
+          <ALargeSmall className="h-4 w-4" />
+        </button>
+        {/* Balão (tooltip) — aparece no hover; some quando o popover está aberto */}
+        {!open && (
+          <span
+            role="tooltip"
+            className={cn(
+              'pointer-events-none absolute left-1/2 z-[121] -translate-x-1/2 whitespace-nowrap rounded-md bg-foreground px-2 py-1 text-[11px] font-medium text-background opacity-0 shadow-md transition-opacity duration-150 group-hover/fs:opacity-100',
+              openDir === 'up' ? 'bottom-full mb-1.5' : 'top-full mt-1.5',
+            )}
+          >
+            Tamanho do texto
+            <span
+              className={cn(
+                'absolute left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-foreground',
+                openDir === 'up' ? '-bottom-1' : '-top-1',
+              )}
+            />
+          </span>
+        )}
+      </div>
 
       {montado && (
         <div
