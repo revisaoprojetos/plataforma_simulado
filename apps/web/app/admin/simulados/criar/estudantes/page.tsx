@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Search, Check, Loader2, UsersRound, Trash2, X, Folder, FolderOpen, ChevronRight, ChevronDown, Minus } from 'lucide-react'
+import { Search, Check, Loader2, UsersRound, Trash2, X, Folder, FolderOpen, ChevronRight, ChevronDown, Minus, Globe } from 'lucide-react'
 import type React from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
 import { AdicionarEstudantesDialog, type AlunoSel } from '@/components/admin/adicionar-estudantes-dialog'
 import { listarGruposParaSimulado, contarGruposSimulado, listarMembrosGrupos } from '../acoes'
@@ -26,7 +27,10 @@ function iniciais(n: string) {
 
 export default function EstudantesPage() {
   useGuardStep(3)
-  const { draft, patch } = useCriar()
+  const { draft, patch, patchRegras } = useCriar()
+  // "Liberar para todos" = acesso gratuito (regras.acesso_gratuito). Quando ligado, o simulado fica
+  // disponível para TODOS os alunos da plataforma e a seleção de grupos/estudantes é dispensada.
+  const gratuito = !!(draft.regras as any).acesso_gratuito
   const [busca, setBusca] = useState('')
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [pagina, setPagina] = useState(0)
@@ -114,6 +118,28 @@ export default function EstudantesPage() {
 
   return (
     <div className="space-y-4">
+      {/* Liberar para TODOS os alunos da plataforma (acesso gratuito) — dispensa selecionar grupos/estudantes. */}
+      <div className={cn('rounded-2xl border p-4 shadow-sm transition-colors', gratuito ? 'border-primary/40 bg-primary/5' : 'bg-card')}>
+        <div className="flex items-start gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Globe className="h-5 w-5" /></span>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center justify-between gap-3">
+              <label htmlFor="acesso-gratuito" className="cursor-pointer text-sm font-semibold">Liberar para todos os alunos da plataforma</label>
+              <Switch id="acesso-gratuito" checked={gratuito} onCheckedChange={(v) => patchRegras({ acesso_gratuito: !!v })} />
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">Todos os alunos cadastrados poderão fazer este simulado — <strong>sem precisar selecionar grupos ou estudantes</strong>.</p>
+          </div>
+        </div>
+      </div>
+
+      {gratuito ? (
+        <div className="flex flex-col items-center gap-2 rounded-2xl border border-dashed bg-muted/20 p-10 text-center">
+          <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Globe className="h-6 w-6" /></span>
+          <p className="text-base font-semibold">Liberado para todos os alunos</p>
+          <p className="max-w-md text-sm text-muted-foreground">Este simulado ficará disponível para <strong>todos os alunos da plataforma</strong>. Não é necessário selecionar grupos ou estudantes aqui.</p>
+        </div>
+      ) : (
+      <>
       {/* Texto puro (bloco) → entra na cascata de entrada da página. */}
       <p className="text-sm font-medium text-foreground">
         {merged.length} estudante(s){grupos.length > 0 ? ` · ${grupos.length} grupo(s)` : ''} selecionado(s)
@@ -235,6 +261,8 @@ export default function EstudantesPage() {
           </div>
         )}
       </div>
+      </>
+      )}
     </div>
   )
 }

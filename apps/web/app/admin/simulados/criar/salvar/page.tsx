@@ -47,7 +47,7 @@ export default function SalvarPage() {
           <ResumoLinha label="Simulado" valor={draft.simuladoNome || '—'} />
           <ResumoLinha label="Tipo" valor={draft.tipo === 'discursivo' ? 'Discursivo' : 'Objetivo'} />
           <ResumoLinha label="Questões" valor={qtdQuestoes ? qtdQuestoes.toLocaleString('pt-BR') : '—'} />
-          <ResumoLinha label="Estudantes" valor={qtdAlunos ? qtdAlunos.toLocaleString('pt-BR') : (draft.grupoIds.length ? `${draft.grupoIds.length} grupo(s)` : '—')} />
+          <ResumoLinha label="Estudantes" valor={(draft.regras as any).acesso_gratuito ? 'Todos os alunos' : (qtdAlunos ? qtdAlunos.toLocaleString('pt-BR') : (draft.grupoIds.length ? `${draft.grupoIds.length} grupo(s)` : '—'))} />
           <ResumoLinha label="Cadernos" valor={[draft.folhaModeloId && 'Folha', draft.enunciadoPdf && 'Enunciado', draft.gabaritoPdf && 'Gabarito'].filter(Boolean).join(' · ') || '—'} />
           <div className="border-t pt-3 text-xs text-muted-foreground">Ao criar, o simulado nasce como <strong className="text-foreground">rascunho</strong>. Use o botão <strong className="text-foreground">Criar simulado</strong> no topo.</div>
         </div>
