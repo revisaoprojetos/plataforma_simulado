@@ -9,8 +9,19 @@ import { useEffect } from 'react'
  */
 export function ServiceWorkerRegister() {
   useEffect(() => {
-    if (process.env.NODE_ENV !== 'production') return
     if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return
+
+    // DEV: se sobrou um SW de um build de PRODUÇÃO rodado no mesmo host (ex.: `npm start` em
+    // localhost), ele fica servindo chunks /_next/static antigos (cache-first) e trava a navegação
+    // e o Fast Refresh. O guard abaixo impede REGISTRAR em dev, mas não remove o que já existe —
+    // então aqui desregistramos qualquer SW e limpamos os caches para o dev rodar limpo.
+    if (process.env.NODE_ENV !== 'production') {
+      navigator.serviceWorker.getRegistrations?.()
+        .then((rs) => Promise.all(rs.map((r) => r.unregister())))
+        .catch(() => {})
+      if (typeof caches !== 'undefined') caches.keys?.().then((ks) => ks.forEach((k) => caches.delete(k))).catch(() => {})
+      return
+    }
 
     const registrar = () => { navigator.serviceWorker.register('/sw.js').catch(() => { /* silencioso */ }) }
     if (document.readyState === 'complete') registrar()
