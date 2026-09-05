@@ -5,7 +5,6 @@ import { getSessaoAluno } from '@/lib/aluno-session'
 import { ChevronLeft, Lock, RotateCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { montarItensSimulado } from '@/lib/aluno/simulado-item'
-import { montarComparativo } from '@/lib/simulado/comparativo'
 import { montarResultadoAluno, type SessaoInput } from '@/lib/simulado/resultado-aluno'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
 import { tiposDeSimulados } from '@/lib/simulado/tipo'
@@ -68,12 +67,11 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
     id: s.id, tentativa_num: s.tentativa_num, nota: s.nota, iniciado_em: s.iniciado_em, finalizado_em: s.finalizado_em, posicao_ranking: s.posicao_ranking,
   }))
 
-  // Resultado + comparativo + caderno do aluno, TODOS em paralelo. A resolução do
-  // caderno (regras.caderno_id → banco_base_id → banco das questões que mais cobre a prova e tem
-  // caderno) e suas modalidades rodam junto do resultado pesado, em vez de depois dele.
-  const [{ tentativas, questoes }, comparativo, cadernoInfo] = await Promise.all([
+  // Resultado + caderno do aluno em paralelo. O COMPARATIVO da turma (parte pesada) NÃO é computado
+  // aqui — ele carrega sob demanda (lazy) via /api/aluno/comparativo quando o aluno abre a aba, para
+  // a página de resultado abrir rápido.
+  const [{ tentativas, questoes }, cadernoInfo] = await Promise.all([
     montarResultadoAluno(svc, id, sessoesInput, gabaritoLiberado),
-    montarComparativo(svc, id, { minhaNota: melhor.nota != null ? Number(melhor.nota) : null, minhaSessaoId: melhor.id }, sessao.tenantId),
     (async (): Promise<{ cadernoId: string | null; modalidades: ModalidadeAluno[] }> => {
       // Entrega V2 (fonte única): modalidades vêm do caderno_entrega do banco do simulado.
       const bancoBaseId = (sim.regras as any)?.banco_base_id as string | undefined
@@ -120,7 +118,7 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
       <MeuSimuladoView
         tentativas={tentativas}
         questoes={questoes}
-        comparativo={comparativo}
+        comparativoEndpoint={`/api/aluno/comparativo?simulado=${id}`}
         notaLiberada={notaLiberada}
         gabaritoLiberado={gabaritoLiberado}
         cadernoLiberado={cadernoParaAluno}

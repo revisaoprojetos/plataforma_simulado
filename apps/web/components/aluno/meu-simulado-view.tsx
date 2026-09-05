@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -24,11 +24,14 @@ const ehDiagnostico = (nome: string) => /diagn[oó]stico/i.test(nome)
 const porDiagFim = (a: { nome: string }, b: { nome: string }) => (ehDiagnostico(a.nome) ? 1 : 0) - (ehDiagnostico(b.nome) ? 1 : 0)
 
 export function MeuSimuladoView({
-  tentativas, questoes, comparativo, notaLiberada, gabaritoLiberado, cadernoLiberado, cadernoId, modalidades, estId, simuladoId, simuladoTitulo, adminMode = false, ocultarComparativo = false, cadernosInline = false, feedback,
+  tentativas, questoes, comparativo, comparativoEndpoint, notaLiberada, gabaritoLiberado, cadernoLiberado, cadernoId, modalidades, estId, simuladoId, simuladoTitulo, adminMode = false, ocultarComparativo = false, cadernosInline = false, feedback,
 }: {
   tentativas: TentativaResumo[]
   questoes: QuestaoAgregada[]
-  comparativo: Comparativo
+  /** Comparativo já pronto (admin). No aluno é carregado sob demanda via `comparativoEndpoint`. */
+  comparativo?: Comparativo
+  /** URL da API que devolve `{ notaLiberada, comparativo }` — carregado ao abrir a aba (lazy). */
+  comparativoEndpoint?: string
   notaLiberada: boolean
   gabaritoLiberado: boolean
   cadernoLiberado: boolean
@@ -48,6 +51,27 @@ export function MeuSimuladoView({
 }) {
   const router = useRouter()
   const ordenadas = useMemo(() => [...tentativas].sort((a, b) => (a.n ?? 0) - (b.n ?? 0)), [tentativas])
+
+  // Aba ativa (controlada) + comparativo LAZY: quando `comparativoEndpoint` é dado (aluno), a parte
+  // pesada da turma só é buscada ao abrir a aba "Comparativo" — a página abre rápido. Admin já recebe
+  // `comparativo` pronto (comp inicia preenchido → sem fetch).
+  const [aba, setAba] = useState('geral')
+  const [comp, setComp] = useState<Comparativo | null>(comparativo ?? null)
+  const [compLoading, setCompLoading] = useState(false)
+  const [compErro, setCompErro] = useState(false)
+  const [compRetry, setCompRetry] = useState(0)
+  useEffect(() => {
+    if (aba !== 'turma' || comp || !comparativoEndpoint || !notaLiberada) return
+    let vivo = true
+    setCompLoading(true); setCompErro(false)
+    fetch(comparativoEndpoint)
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error('http'))))
+      .then((j) => { if (vivo && j?.comparativo) setComp(j.comparativo as Comparativo) })
+      .catch(() => { if (vivo) setCompErro(true) })
+      .finally(() => { if (vivo) setCompLoading(false) })
+    return () => { vivo = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aba, comparativoEndpoint, notaLiberada, compRetry])
 
   // Admin: apagar UMA tentativa. Deixa de contar (sai do histórico/resultados/ranking) e o aluno
   // pode refazer; se for a única, o simulado volta a aparecer como "não feito" para ele. Vai p/ a Lixeira.
@@ -156,7 +180,7 @@ export function MeuSimuladoView({
 
   return (
     <>
-    <Tabs defaultValue="geral">
+    <Tabs value={aba} onValueChange={(v) => setAba(String(v))}>
       <TabsList>
         <TabsTrigger value="geral"><LayoutDashboard className="h-4 w-4" /> Visão geral</TabsTrigger>
         <TabsTrigger value="questoes"><ClipboardCheck className="h-4 w-4" /> Questões</TabsTrigger>
@@ -353,10 +377,23 @@ export function MeuSimuladoView({
         <QuestoesAgregadas questoes={questoes} totalTentativas={tentativas.length} revelou={gabaritoLiberado} />
       </TabsContent>
 
-      {/* COMPARATIVO — oculto p/ simulado pessoal (sem turma). */}
+      {/* COMPARATIVO — oculto p/ simulado pessoal (sem turma). Carregado sob demanda no aluno. */}
       {!ocultarComparativo && (
         <TabsContent value="turma" className="pt-1">
-          {notaLiberada ? <ComparativoTurma c={comparativo} /> : <Bloqueado titulo="Comparativo indisponível" msg="O comparativo com a turma aparece quando o resultado for liberado." />}
+          {!notaLiberada ? (
+            <Bloqueado titulo="Comparativo indisponível" msg="O comparativo com a turma aparece quando o resultado for liberado." />
+          ) : comp ? (
+            <ComparativoTurma c={comp} />
+          ) : compErro ? (
+            <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed bg-card p-10 text-center">
+              <p className="text-sm text-muted-foreground">Não foi possível carregar o comparativo agora.</p>
+              <button type="button" onClick={() => { setCompErro(false); setCompRetry((n) => n + 1) }} className="rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors hover:bg-muted">Tentar de novo</button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" /> Carregando comparativo com a turma…
+            </div>
+          )}
         </TabsContent>
       )}
 
