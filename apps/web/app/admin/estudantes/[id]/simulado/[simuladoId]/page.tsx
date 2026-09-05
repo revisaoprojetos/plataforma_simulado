@@ -78,7 +78,7 @@ export default async function EstudanteSimuladoPage({ params }: { params: Promis
   // Admin vê TUDO liberado (nota + gabarito) — por isso montarResultadoAluno recebe revelar=true.
   const [{ tentativas, questoes }, comparativo] = await Promise.all([
     montarResultadoAluno(svc, simuladoId, sessoesInput, true),
-    montarComparativo(svc, simuladoId, { minhaNota: melhor.nota != null ? Number(melhor.nota) : null, minhaSessaoId: melhor.id }),
+    montarComparativo(svc, simuladoId, { minhaNota: melhor.nota != null ? Number(melhor.nota) : null, minhaSessaoId: melhor.id }, tenantId),
   ])
 
   // Cadernos do aluno (entrega V2, fonte única). Aqui o admin vê tudo liberado.

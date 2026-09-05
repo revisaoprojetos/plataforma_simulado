@@ -1,6 +1,6 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
-import { fetchAll } from '@/lib/supabase/fetch-all'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { remember } from '@/lib/cache/relatorio-cache'
 import { diffDocumentos } from './diff'
 import { limparCabecalhoHtml } from './limpar-cabecalho'
@@ -65,16 +65,17 @@ export async function documentosDoAluno(estudanteId: string, tenantId: string): 
     for (const m of (mats ?? []) as any[]) materiaMap.set(m.id, { nome: m.nome, cor: m.cor ?? null })
   }
 
-  // Atribuições
-  const [{ data: dg }, { data: de }, { data: gm }] = await Promise.all([
-    svc.from('simulado_documento_grupos').select('documento_id, grupo_id').in('documento_id', ids),
-    svc.from('simulado_documento_estudantes').select('documento_id, estudante_id').in('documento_id', ids),
+  // Atribuições — CHUNK nos `.in('documento_id', …)`: com muitos documentos no tenant, o `.in()` sem
+  // fatiar gera URL gigante que trava o proxy (~180s). fetchAllByIn fatia em lotes de 80.
+  const [dg, de, { data: gm }] = await Promise.all([
+    fetchAllByIn<{ documento_id: string; grupo_id: string }>(ids, (chunk) => svc.from('simulado_documento_grupos').select('documento_id, grupo_id').in('documento_id', chunk).order('documento_id', { ascending: true })),
+    fetchAllByIn<{ documento_id: string; estudante_id: string }>(ids, (chunk) => svc.from('simulado_documento_estudantes').select('documento_id, estudante_id').in('documento_id', chunk).order('documento_id', { ascending: true })),
     svc.from('simulado_grupo_membros').select('grupo_id').eq('estudante_id', estudanteId),
   ])
   const gruposPorDoc = new Map<string, Set<string>>()
-  for (const r of (dg ?? []) as any[]) (gruposPorDoc.get(r.documento_id) ?? gruposPorDoc.set(r.documento_id, new Set()).get(r.documento_id)!).add(r.grupo_id)
+  for (const r of dg as any[]) (gruposPorDoc.get(r.documento_id) ?? gruposPorDoc.set(r.documento_id, new Set()).get(r.documento_id)!).add(r.grupo_id)
   const estudPorDoc = new Map<string, Set<string>>()
-  for (const r of (de ?? []) as any[]) (estudPorDoc.get(r.documento_id) ?? estudPorDoc.set(r.documento_id, new Set()).get(r.documento_id)!).add(r.estudante_id)
+  for (const r of de as any[]) (estudPorDoc.get(r.documento_id) ?? estudPorDoc.set(r.documento_id, new Set()).get(r.documento_id)!).add(r.estudante_id)
   const meusGrupos = new Set((gm ?? []).map((r: any) => r.grupo_id))
 
   const podeVer = (id: string) => {
@@ -88,16 +89,16 @@ export async function documentosDoAluno(estudanteId: string, tenantId: string): 
   if (!visiveis.length) return []
   const visIds = visiveis.map((d) => d.id)
 
-  // Artigos (versão vigente) + progresso
-  const [{ data: cont }, { data: prog }] = await Promise.all([
-    svc.from('simulado_documento_conteudos').select('documento_id, versao, artigos').in('documento_id', visIds),
-    svc.from('simulado_leitura_progresso').select('documento_id, documento_versao, pct, concluido_em').eq('estudante_id', estudanteId).in('documento_id', visIds),
+  // Artigos (versão vigente) + progresso — mesmo CHUNK nos `.in('documento_id', visIds)`.
+  const [cont, prog] = await Promise.all([
+    fetchAllByIn<{ documento_id: string; versao: number; artigos: number }>(visIds, (chunk) => svc.from('simulado_documento_conteudos').select('documento_id, versao, artigos').in('documento_id', chunk).order('documento_id', { ascending: true })),
+    fetchAllByIn<{ documento_id: string; documento_versao: number; pct: number; concluido_em: string | null }>(visIds, (chunk) => svc.from('simulado_leitura_progresso').select('documento_id, documento_versao, pct, concluido_em').eq('estudante_id', estudanteId).in('documento_id', chunk).order('documento_id', { ascending: true })),
   ])
   const versaoDoc = new Map(visiveis.map((d) => [d.id, d.versao_publicada ?? d.versao]))
   const artigosPorDoc = new Map<string, number>()
-  for (const c of (cont ?? []) as any[]) if (c.versao === versaoDoc.get(c.documento_id)) artigosPorDoc.set(c.documento_id, c.artigos ?? 0)
+  for (const c of cont as any[]) if (c.versao === versaoDoc.get(c.documento_id)) artigosPorDoc.set(c.documento_id, c.artigos ?? 0)
   const progPorDoc = new Map<string, { pct: number; concluido: boolean }>()
-  for (const p of (prog ?? []) as any[]) if (p.documento_versao === versaoDoc.get(p.documento_id)) progPorDoc.set(p.documento_id, { pct: p.pct ?? 0, concluido: !!p.concluido_em })
+  for (const p of prog as any[]) if (p.documento_versao === versaoDoc.get(p.documento_id)) progPorDoc.set(p.documento_id, { pct: p.pct ?? 0, concluido: !!p.concluido_em })
 
   return visiveis.map((d) => {
     const mat = d.materia_id ? materiaMap.get(d.materia_id) : null

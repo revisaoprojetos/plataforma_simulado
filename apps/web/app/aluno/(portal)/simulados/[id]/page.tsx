@@ -73,7 +73,7 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
   // caderno) e suas modalidades rodam junto do resultado pesado, em vez de depois dele.
   const [{ tentativas, questoes }, comparativo, cadernoInfo] = await Promise.all([
     montarResultadoAluno(svc, id, sessoesInput, gabaritoLiberado),
-    montarComparativo(svc, id, { minhaNota: melhor.nota != null ? Number(melhor.nota) : null, minhaSessaoId: melhor.id }),
+    montarComparativo(svc, id, { minhaNota: melhor.nota != null ? Number(melhor.nota) : null, minhaSessaoId: melhor.id }, sessao.tenantId),
     (async (): Promise<{ cadernoId: string | null; modalidades: ModalidadeAluno[] }> => {
       // Entrega V2 (fonte única): modalidades vêm do caderno_entrega do banco do simulado.
       const bancoBaseId = (sim.regras as any)?.banco_base_id as string | undefined

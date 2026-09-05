@@ -30,10 +30,13 @@ export async function funcaoEtiquetaPorQuestao(svc: AnyClient, questaoIds: strin
     )
     const etIds = [...new Set(links.map((l) => l.etiqueta_id).filter(Boolean))]
     if (!etIds.length) return out
-    const { data: ets, error } = await svc.from('simulado_etiquetas').select('id, nome, cor, funcao').in('id', etIds)
-    if (error) return out // coluna `funcao` ainda não existe → sem função
-    const etMap = new Map(((ets ?? []) as any[]).map((e) => [e.id, e]))
-    for (const l of (links ?? []) as any[]) {
+    // Também chunkado: se a coluna `funcao` não existir, fetchAllByIn lança → cai no catch → Map vazio (tolerante).
+    const ets = await fetchAllByIn<{ id: string; nome: string; cor: string | null; funcao: string }>(
+      etIds,
+      (chunk) => svc.from('simulado_etiquetas').select('id, nome, cor, funcao').in('id', chunk),
+    )
+    const etMap = new Map((ets as any[]).map((e) => [e.id, e]))
+    for (const l of links) {
       const e = etMap.get(l.etiqueta_id)
       if (!e || !FUNC_VALIDA(e.funcao)) continue
       const cand: EtiquetaFuncional = { funcao: e.funcao, nome: e.nome, cor: e.cor ?? null }
