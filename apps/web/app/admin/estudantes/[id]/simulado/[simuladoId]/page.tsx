@@ -102,7 +102,6 @@ export default async function EstudanteSimuladoPage({ params }: { params: Promis
         tentativas={tentativas}
         questoes={questoes}
         comparativo={comparativo}
-        desempenho={[]}
         notaLiberada
         gabaritoLiberado
         cadernoLiberado

@@ -13,7 +13,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { ComparativoTurma } from '@/components/simulado/comparativo-turma'
 import type { Comparativo } from '@/lib/simulado/comparativo'
 import type { TentativaResumo, QuestaoAgregada } from '@/lib/simulado/resultado-aluno'
-import type { DesempenhoSimulado } from '@/lib/simulado/desempenho-aluno'
 
 const notaTone = (n: number) => (n >= 70 ? 'text-emerald-600 dark:text-emerald-400' : n >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400')
 const pctBar = (p: number) => (p >= 70 ? 'bg-emerald-500' : p >= 50 ? 'bg-amber-500' : 'bg-rose-500')
@@ -25,12 +24,11 @@ const ehDiagnostico = (nome: string) => /diagn[oó]stico/i.test(nome)
 const porDiagFim = (a: { nome: string }, b: { nome: string }) => (ehDiagnostico(a.nome) ? 1 : 0) - (ehDiagnostico(b.nome) ? 1 : 0)
 
 export function MeuSimuladoView({
-  tentativas, questoes, comparativo, desempenho, notaLiberada, gabaritoLiberado, cadernoLiberado, cadernoId, modalidades, estId, simuladoId, simuladoTitulo, adminMode = false, ocultarComparativo = false, cadernosInline = false, feedback,
+  tentativas, questoes, comparativo, notaLiberada, gabaritoLiberado, cadernoLiberado, cadernoId, modalidades, estId, simuladoId, simuladoTitulo, adminMode = false, ocultarComparativo = false, cadernosInline = false, feedback,
 }: {
   tentativas: TentativaResumo[]
   questoes: QuestaoAgregada[]
   comparativo: Comparativo
-  desempenho: DesempenhoSimulado[]
   notaLiberada: boolean
   gabaritoLiberado: boolean
   cadernoLiberado: boolean

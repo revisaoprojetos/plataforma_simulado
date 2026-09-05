@@ -89,7 +89,6 @@ export default async function ResultadoPersonalizadoPage({ params }: { params: P
         tentativas={tentativas}
         questoes={questoes}
         comparativo={COMPARATIVO_VAZIO}
-        desempenho={[]}
         notaLiberada
         gabaritoLiberado
         cadernoLiberado={false}

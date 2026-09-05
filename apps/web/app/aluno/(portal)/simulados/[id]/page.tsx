@@ -7,7 +7,6 @@ import { cn } from '@/lib/utils'
 import { montarItensSimulado } from '@/lib/aluno/simulado-item'
 import { montarComparativo } from '@/lib/simulado/comparativo'
 import { montarResultadoAluno, type SessaoInput } from '@/lib/simulado/resultado-aluno'
-import { montarDesempenhoAluno } from '@/lib/simulado/desempenho-aluno'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
 import { tiposDeSimulados } from '@/lib/simulado/tipo'
 import { modalidadesDoAlunoV2, temEntregaV2, carregarEntregaBanco, type ModalidadeAluno } from '@/lib/caderno-teste/entrega-aluno'
@@ -69,13 +68,12 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
     id: s.id, tentativa_num: s.tentativa_num, nota: s.nota, iniciado_em: s.iniciado_em, finalizado_em: s.finalizado_em, posicao_ranking: s.posicao_ranking,
   }))
 
-  // Resultado + comparativo + desempenho + caderno do aluno, TODOS em paralelo. A resolução do
+  // Resultado + comparativo + caderno do aluno, TODOS em paralelo. A resolução do
   // caderno (regras.caderno_id → banco_base_id → banco das questões que mais cobre a prova e tem
   // caderno) e suas modalidades rodam junto do resultado pesado, em vez de depois dele.
-  const [{ tentativas, questoes }, comparativo, desempenho, cadernoInfo] = await Promise.all([
+  const [{ tentativas, questoes }, comparativo, cadernoInfo] = await Promise.all([
     montarResultadoAluno(svc, id, sessoesInput, gabaritoLiberado),
     montarComparativo(svc, id, { minhaNota: melhor.nota != null ? Number(melhor.nota) : null, minhaSessaoId: melhor.id }),
-    montarDesempenhoAluno(svc, estId),
     (async (): Promise<{ cadernoId: string | null; modalidades: ModalidadeAluno[] }> => {
       // Entrega V2 (fonte única): modalidades vêm do caderno_entrega do banco do simulado.
       const bancoBaseId = (sim.regras as any)?.banco_base_id as string | undefined
@@ -123,7 +121,6 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
         tentativas={tentativas}
         questoes={questoes}
         comparativo={comparativo}
-        desempenho={desempenho}
         notaLiberada={notaLiberada}
         gabaritoLiberado={gabaritoLiberado}
         cadernoLiberado={cadernoParaAluno}
