@@ -7,7 +7,8 @@ import { checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { softDelete } from '@/lib/soft-delete'
 import { rankearSimulado } from '@/lib/ranking'
-import { invalidarRelatorios } from '@/lib/cache/relatorio-cache'
+import { invalidarRelatorios, remember, chaveRelatorio, esquecer } from '@/lib/cache/relatorio-cache'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { sincronizarGrupoPassaporte } from '@/lib/estudante/grupo-passaporte'
 import { sincronizarGrupoVitalicio } from '@/lib/estudante/grupo-vitalicio'
 
@@ -16,33 +17,63 @@ const TENANT_VAZIO = '00000000-0000-0000-0000-000000000000'
 export type EstudanteBase = {
   id: string; nome: string; email: string | null; cpf: string | null; telefone: string | null
   classificacao: string | null; created_at: string | null; avatar: string | null; avatarCor: string | null
+  feitos: number; media: number | null
+}
+
+export type SortEstudante = { key: 'nome' | 'classificacao' | 'created_at'; dir: 'asc' | 'desc' }
+export type FiltroEstudante = 'todos' | 'passaporte' | 'estudante'
+
+/** Agrega feitos/média (sessões finalizadas, sem teste) SÓ dos estudantes da página — barato. */
+async function agregarSessoes(svc: any, tenantId: string, ids: string[]): Promise<Record<string, { feitos: number; media: number | null }>> {
+  const out: Record<string, { feitos: number; media: number | null }> = {}
+  if (!ids.length) return out
+  const sess = await fetchAllByIn<{ estudante_id: string; nota: number | null }>(ids, (chunk) =>
+    svc.from('simulado_sessoes_prova').select('estudante_id, nota').eq('tenant_id', tenantId).eq('status', 'finalizada').eq('is_teste', false).eq('deletado', false).in('estudante_id', chunk).order('estudante_id', { ascending: true }))
+  const soma: Record<string, number> = {}, cont: Record<string, number> = {}, feitos: Record<string, number> = {}
+  for (const s of sess) {
+    feitos[s.estudante_id] = (feitos[s.estudante_id] ?? 0) + 1
+    if (s.nota != null) { soma[s.estudante_id] = (soma[s.estudante_id] ?? 0) + Number(s.nota); cont[s.estudante_id] = (cont[s.estudante_id] ?? 0) + 1 }
+  }
+  for (const id of ids) out[id] = { feitos: feitos[id] ?? 0, media: cont[id] ? Math.round(((soma[id] ?? 0) / cont[id]) * 10) / 10 : null }
+  return out
+}
+
+/** Aplica o filtro de plano (passaporte / padrão) a uma query de estudantes. */
+function aplicarFiltro(q: any, filtro?: FiltroEstudante) {
+  if (filtro === 'passaporte') return q.eq('classificacao', 'passaporte')
+  if (filtro === 'estudante') return q.or('classificacao.is.null,classificacao.neq.passaporte')
+  return q
 }
 
 /**
- * Um LOTE de estudantes (paginado por range) — usado pela lista para carregar em segundo plano
- * enquanto o usuário já vê os primeiros. Traz só colunas da tabela (leve); os agregados de sessão
- * (feitos/média) vêm de um mapa único calculado uma vez na página. Tenant vem da sessão.
+ * Uma PÁGINA de estudantes (paginação server-side) com os agregados (feitos/média) SÓ dos alunos da
+ * página. Suporta sort (nome/classificação/cadastro) e filtro (passaporte/padrão), tudo no servidor —
+ * a lista não baixa mais os milhares de estudantes de uma vez.
  */
-export async function carregarLoteEstudantes(offset: number, limit: number, comContagem = true): Promise<{ rows: EstudanteBase[]; total: number }> {
+export async function carregarLoteEstudantes(offset: number, limit: number, comContagem = true, opts?: { sort?: SortEstudante; filtro?: FiltroEstudante; comAgregados?: boolean }): Promise<{ rows: EstudanteBase[]; total: number }> {
   if (!(await checkPermission('estudantes:view'))) return { rows: [], total: 0 }
   const svc = await createServiceClient()
   const tenantId = (await getCurrentTenantId()) ?? TENANT_VAZIO
   const lim = Math.min(Math.max(limit, 1), 1000) // teto do PostgREST
-  // `count: 'exact'` faz o Postgres varrer a tabela inteira p/ contar — caro (~1s em 11k+).
-  // Só o 1º lote precisa do total; os demais (loop de fundo) já o conhecem e pedem `comContagem=false`.
-  const { data, count } = await svc
+  let q = svc
     .from('simulado_estudantes')
     .select('id, nome, email, cpf, telefone, classificacao, created_at, avatar, perfil_avatar_cor', comContagem ? { count: 'exact' } : undefined)
     .eq('deletado', false)
     .eq('tenant_id', tenantId)
-    .order('created_at', { ascending: false })
-    .order('id', { ascending: true })
-    .range(offset, offset + lim - 1)
-  const rows = (data ?? []).map((e: any) => ({
+  q = aplicarFiltro(q, opts?.filtro)
+  const col = opts?.sort?.key ?? 'created_at'
+  const asc = opts?.sort ? opts.sort.dir === 'asc' : false
+  q = q.order(col, { ascending: asc }).order('id', { ascending: true }).range(offset, offset + lim - 1)
+  const { data, count } = await q
+  const base = (data ?? []).map((e: any) => ({
     id: e.id, nome: e.nome, email: e.email ?? null, cpf: e.cpf ?? null, telefone: e.telefone ?? null,
     classificacao: e.classificacao ?? null, created_at: e.created_at ?? null,
     avatar: e.avatar ?? null, avatarCor: e.perfil_avatar_cor ?? null,
   }))
+  // Agregados (feitos/média) só quando pedidos (default): outros consumidores (ex.: relatórios) têm
+  // agregados próprios e não devem pagar essa query por lote.
+  const agg = opts?.comAgregados === false ? {} : await agregarSessoes(svc, tenantId, base.map((r: any) => r.id))
+  const rows: EstudanteBase[] = base.map((r: any) => ({ ...r, feitos: agg[r.id]?.feitos ?? 0, media: agg[r.id]?.media ?? null }))
   return { rows, total: count ?? rows.length }
 }
 
@@ -71,10 +102,56 @@ export async function buscarEstudantes(termo: string): Promise<EstudanteBase[]> 
     .or(ors.join(','))
     .order('nome', { ascending: true })
     .limit(200)
-  return (data ?? []).map((e: any) => ({
+  const base = (data ?? []).map((e: any) => ({
     id: e.id, nome: e.nome, email: e.email ?? null, cpf: e.cpf ?? null, telefone: e.telefone ?? null,
     classificacao: e.classificacao ?? null, created_at: e.created_at ?? null,
     avatar: e.avatar ?? null, avatarCor: e.perfil_avatar_cor ?? null,
+  }))
+  const agg = await agregarSessoes(svc, tenantId, base.map((r: any) => r.id))
+  return base.map((r: any) => ({ ...r, feitos: agg[r.id]?.feitos ?? 0, media: agg[r.id]?.media ?? null }))
+}
+
+/** KPIs + e-mails de admin, CACHEADOS (remember, 5 min) — a parte cara (varrer sessões p/ "ativos"
+ *  e resolver e-mails de staff no auth) não recomputa a cada visita/volta à lista. */
+export type KpisEstudantes = { total: number; passaporte: number; feitos: number; ativos: number; adminEmails: string[] }
+export async function kpisEstudantes(): Promise<KpisEstudantes> {
+  if (!(await checkPermission('estudantes:view'))) return { total: 0, passaporte: 0, feitos: 0, ativos: 0, adminEmails: [] }
+  const tenantId = (await getCurrentTenantId()) ?? TENANT_VAZIO
+  return remember(chaveRelatorio(tenantId, 'estudantes-kpis'), 300, async () => {
+    const svc = await createServiceClient()
+    const [{ count: totalRaw }, { count: totalPass }, { count: totalFeitos }, sess, { data: acessos }] = await Promise.all([
+      svc.from('simulado_estudantes').select('id', { count: 'exact', head: true }).eq('deletado', false).eq('tenant_id', tenantId),
+      svc.from('simulado_estudantes').select('id', { count: 'exact', head: true }).eq('deletado', false).eq('tenant_id', tenantId).eq('classificacao', 'passaporte'),
+      svc.from('simulado_sessoes_prova').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq('status', 'finalizada').eq('is_teste', false).eq('deletado', false),
+      fetchAll<{ estudante_id: string }>(() => svc.from('simulado_sessoes_prova').select('estudante_id').eq('tenant_id', tenantId).eq('status', 'finalizada').eq('is_teste', false).eq('deletado', false).order('estudante_id', { ascending: true })),
+      svc.from('simulado_tenant_acessos').select('user_id').eq('tenant_id', tenantId).eq('ativo', true).neq('role', 'estudante'),
+    ])
+    const ativos = new Set(sess.map((s) => s.estudante_id)).size
+    const staffIds = [...new Set((acessos ?? []).map((a: any) => a.user_id).filter(Boolean))] as string[]
+    const adminSet = new Set<string>()
+    await Promise.all(staffIds.map(async (uid) => { try { const { data } = await svc.auth.admin.getUserById(uid); const e = data?.user?.email?.toLowerCase(); if (e) adminSet.add(e) } catch { /* auth indisponível */ } }))
+    const adminEmails = [...adminSet]
+    let adminEstudantes = 0
+    if (adminEmails.length) { const { count } = await svc.from('simulado_estudantes').select('id', { count: 'exact', head: true }).eq('deletado', false).eq('tenant_id', tenantId).in('email', adminEmails); adminEstudantes = count ?? 0 }
+    return { total: Math.max(0, (totalRaw ?? 0) - adminEstudantes), passaporte: totalPass ?? 0, feitos: totalFeitos ?? 0, ativos, adminEmails }
+  })
+}
+
+/** Exporta TODOS os estudantes (com agregados) — sob demanda, só ao clicar em Exportar. */
+export async function exportarTodosEstudantes(): Promise<EstudanteBase[]> {
+  if (!(await checkPermission('estudantes:view'))) return []
+  const svc = await createServiceClient()
+  const tenantId = (await getCurrentTenantId()) ?? TENANT_VAZIO
+  const [base, sess] = await Promise.all([
+    fetchAll<any>(() => svc.from('simulado_estudantes').select('id, nome, email, cpf, telefone, classificacao, created_at, avatar, perfil_avatar_cor').eq('deletado', false).eq('tenant_id', tenantId).order('created_at', { ascending: false }).order('id', { ascending: true })),
+    fetchAll<{ estudante_id: string; nota: number | null }>(() => svc.from('simulado_sessoes_prova').select('estudante_id, nota').eq('tenant_id', tenantId).eq('status', 'finalizada').eq('is_teste', false).eq('deletado', false).order('estudante_id', { ascending: true })),
+  ])
+  const soma: Record<string, number> = {}, cont: Record<string, number> = {}, feitos: Record<string, number> = {}
+  for (const s of sess) { feitos[s.estudante_id] = (feitos[s.estudante_id] ?? 0) + 1; if (s.nota != null) { soma[s.estudante_id] = (soma[s.estudante_id] ?? 0) + Number(s.nota); cont[s.estudante_id] = (cont[s.estudante_id] ?? 0) + 1 } }
+  return base.map((e: any) => ({
+    id: e.id, nome: e.nome, email: e.email ?? null, cpf: e.cpf ?? null, telefone: e.telefone ?? null,
+    classificacao: e.classificacao ?? null, created_at: e.created_at ?? null, avatar: e.avatar ?? null, avatarCor: e.perfil_avatar_cor ?? null,
+    feitos: feitos[e.id] ?? 0, media: cont[e.id] ? Math.round(((soma[e.id] ?? 0) / cont[e.id]) * 10) / 10 : null,
   }))
 }
 
@@ -124,6 +201,7 @@ export async function createEstudanteAction(data: NovoEstudanteData) {
 
   await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_estudantes', entidadeId: userId, depois: { nome: data.nome, email: data.email, classificacao: data.classificacao ?? 'normal' } })
 
+  await esquecer(chaveRelatorio(tenantId, 'estudantes-kpis')) // KPIs (contagens) recomputam na próxima carga
   revalidatePath('/admin/estudantes')
   // NÃO redireciona no servidor: o form mostra o toast de sucesso e navega no cliente (evita cair
   // na tela "Sem acesso" quando o cargo não tem estudantes:view depois de criar).

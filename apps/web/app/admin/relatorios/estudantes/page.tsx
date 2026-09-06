@@ -30,7 +30,7 @@ export default async function RelatorioEstudantesPage({ searchParams }: { search
     // a cada visita à lista; agora fica MEMOIZADO no Redis (TTL) — no cache-hit não toca no banco.
     // Degrada sozinho sem Redis (computa direto). Mesma cadeia dos demais relatórios.
     const [batch, agg] = await Promise.all([
-      carregarLoteEstudantes(0, PRIMEIRA_PAGINA),
+      carregarLoteEstudantes(0, PRIMEIRA_PAGINA, true, { comAgregados: false }),
       remember<Record<string, AgregadoEstudante>>(chaveRelatorio(tenantId, 'estudantes', 'agregados'), TTL_RELATORIO, async () => {
         const sess = await fetchAll<any>(() => svc.from('simulado_sessoes_prova')
           .select('estudante_id, nota, iniciado_em')

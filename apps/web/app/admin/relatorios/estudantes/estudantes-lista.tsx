@@ -73,7 +73,7 @@ export function EstudantesLista({ inicial, agregados, total }: {
     ;(async () => {
       while (!cancel && offsetRef.current < totalRef.current) {
         let lote: EstudanteBase[]
-        try { lote = (await carregarLoteEstudantes(offsetRef.current, LOTE, false)).rows }
+        try { lote = (await carregarLoteEstudantes(offsetRef.current, LOTE, false, { comAgregados: false })).rows }
         catch { await new Promise((r) => setTimeout(r, 600)); continue } // hiccup transitório → retenta
         if (cancel) return
         if (!lote.length) break

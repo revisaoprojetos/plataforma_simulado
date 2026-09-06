@@ -8,22 +8,18 @@ import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
 import { ExcluirEstudanteButton } from '@/components/admin/excluir-estudante-button'
 import { ExportButton } from '@/components/admin/export-button'
 import type { ColunaExport } from '@/lib/exportar'
-import { carregarLoteEstudantes, buscarEstudantes, type EstudanteBase } from '@/app/admin/estudantes/actions'
+import { carregarLoteEstudantes, buscarEstudantes, exportarTodosEstudantes, type EstudanteBase, type SortEstudante, type FiltroEstudante } from '@/app/admin/estudantes/actions'
 import { AvatarEstudante } from '@/components/aluno/avatar-estudante'
 
-export type EstudanteRow = {
-  id: string; nome: string; email: string | null; cpf: string | null; telefone: string | null
-  classificacao: string | null; created_at: string | null; feitos: number; media: number | null
-  avatar: string | null; avatarCor: string | null
-}
-type Agregados = Record<string, { feitos: number; media: number | null }>
+export type EstudanteRow = EstudanteBase
 
-type Filtro = 'todos' | 'passaporte' | 'estudante'
+type Filtro = FiltroEstudante
 type SortKey = 'nome' | 'classificacao' | 'feitos' | 'media' | 'created_at'
 type Sort = { key: SortKey; dir: 'asc' | 'desc' } | null
 
-const POR_PAGINA = 25
-const LOTE = 1000 // teto do PostgREST — carrega o restante em segundo plano
+const POR_PAGINA = 10
+// Colunas que o BANCO sabe ordenar (o resto — feitos/média, que são agregados — ordena a página atual).
+const SORT_SERVIDOR: SortKey[] = ['nome', 'classificacao', 'created_at']
 
 function fmtData(iso: string | null) {
   if (!iso) return '—'
@@ -34,10 +30,33 @@ function notaTom(n: number | null) {
   if (n == null) return 'text-muted-foreground'
   return n >= 70 ? 'text-emerald-600 dark:text-emerald-400' : n >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
 }
+/** Sort do servidor (só para colunas do banco). */
+function sortDb(s: Sort): SortEstudante | undefined {
+  if (s && SORT_SERVIDOR.includes(s.key)) return { key: s.key as SortEstudante['key'], dir: s.dir }
+  return undefined
+}
+/** Ordena um array no cliente por qualquer coluna (busca + feitos/média). */
+function ordenarCliente(arr: EstudanteRow[], s: Sort): EstudanteRow[] {
+  if (!s) return arr
+  const dir = s.dir === 'asc' ? 1 : -1
+  return [...arr].sort((a, b) => {
+    switch (s.key) {
+      case 'nome': return (a.nome || '').localeCompare(b.nome || '', 'pt-BR') * dir
+      case 'classificacao': return (a.classificacao || '').localeCompare(b.classificacao || '', 'pt-BR') * dir
+      case 'feitos': return (a.feitos - b.feitos) * dir
+      case 'media': {
+        if (a.media == null && b.media == null) return 0
+        if (a.media == null) return 1
+        if (b.media == null) return -1
+        return (a.media - b.media) * dir
+      }
+      case 'created_at': return ((a.created_at ? Date.parse(a.created_at) : 0) - (b.created_at ? Date.parse(b.created_at) : 0)) * dir
+    }
+  })
+}
 
-export function EstudantesLista({ inicial, agregados, total, kpis, adminEmails = [] }: {
+export function EstudantesLista({ inicial, total, kpis, adminEmails = [] }: {
   inicial: EstudanteBase[]
-  agregados: Agregados
   total: number
   kpis: { total: number; passaporte: number; feitos: number; ativos: number }
   adminEmails?: string[]
@@ -45,106 +64,77 @@ export function EstudantesLista({ inicial, agregados, total, kpis, adminEmails =
   const adminSet = useMemo(() => new Set(adminEmails.map((e) => e.toLowerCase())), [adminEmails])
   const ehAdmin = (e: EstudanteRow) => !!e.email && adminSet.has(e.email.toLowerCase())
 
-  const aplicar = useMemo(() => (b: EstudanteBase): EstudanteRow => ({
-    ...b, feitos: agregados[b.id]?.feitos ?? 0, media: agregados[b.id]?.media ?? null,
-  }), [agregados])
-
-  const [rows, setRows] = useState<EstudanteRow[]>(() => inicial.map(aplicar))
-  const [carregando, setCarregando] = useState(inicial.length < total)
-  const [q, setQ] = useState('')
+  // Página SERVIDOR (10 por vez) — não baixa mais os milhares de uma vez.
+  const [rows, setRows] = useState<EstudanteRow[]>(inicial)
+  const [totalFiltro, setTotalFiltro] = useState(total)
+  const [pagina, setPagina] = useState(1)
+  const [carregandoPag, setCarregandoPag] = useState(false)
   const [filtro, setFiltro] = useState<Filtro>('todos')
   const [sort, setSort] = useState<Sort>(null)
-  const [pagina, setPagina] = useState(1)
-  // Busca NO SERVIDOR (acha qualquer aluno na hora, mesmo antes do carregamento em segundo plano terminar).
+  // Busca NO SERVIDOR (nome/e-mail/CPF/telefone) — resultados paginados no cliente (≤200).
+  const [q, setQ] = useState('')
   const [busca, setBusca] = useState<EstudanteRow[] | null>(null)
   const [buscando, setBuscando] = useState(false)
   const buscandoAtivo = q.trim().length > 0
+  const reqId = useRef(0)
 
+  // Busca a página do servidor com filtro/sort atuais.
+  async function irPagina(p: number, f: Filtro = filtro, s: Sort = sort) {
+    const id = ++reqId.current
+    setCarregandoPag(true)
+    try {
+      const r = await carregarLoteEstudantes((p - 1) * POR_PAGINA, POR_PAGINA, true, { sort: sortDb(s), filtro: f })
+      if (id !== reqId.current) return // resposta antiga (o usuário já mudou de página) → descarta
+      setRows(r.rows); setTotalFiltro(r.total); setPagina(p)
+    } finally {
+      if (id === reqId.current) setCarregandoPag(false)
+    }
+  }
+
+  function mudarFiltro(f: Filtro) { if (f === filtro) return; setFiltro(f); if (!buscandoAtivo) irPagina(1, f, sort); else setPagina(1) }
+  function ordenarPor(key: SortKey) {
+    const novo: Sort = sort?.key === key ? { key, dir: sort.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }
+    setSort(novo)
+    // Sort de coluna do banco (e sem busca) → refaz a página 1 no servidor; senão ordena no cliente.
+    if (!buscandoAtivo && SORT_SERVIDOR.includes(key)) irPagina(1, filtro, novo)
+    else setPagina(1)
+  }
+
+  // Busca no servidor (debounce). Enquanto há termo, a paginação/ordenação é sobre os resultados.
   useEffect(() => {
     const t = q.trim()
     if (!t) { setBusca(null); setBuscando(false); return }
-    setBuscando(true)
+    setBuscando(true); setPagina(1)
     const id = setTimeout(async () => {
-      try { const res = await buscarEstudantes(t); setBusca(res.map(aplicar)) }
-      catch { setBusca([]) }
-      finally { setBuscando(false) }
+      try { setBusca(await buscarEstudantes(t)) } catch { setBusca([]) } finally { setBuscando(false) }
     }, 300)
     return () => clearTimeout(id)
-  }, [q, aplicar])
-
-  // Carrega o restante dos estudantes em segundo plano (em lotes), sem travar a primeira exibição.
-  // Robusto a: React Strict Mode (double-invoke do dev), mudança de identidade de props e falha
-  // transitória de um lote. Refs compartilhadas SOBREVIVEM ao remount simulado do Strict Mode, então
-  // o 2º efeito retoma de onde o 1º (cancelado pela limpeza) parou — em vez de um "rodouRef" que
-  // bloqueava o restart e deixava a lista travada no 1º lote (30/N). Dedup por id evita duplicar.
-  const offsetRef = useRef(inicial.length)
-  const doneRef = useRef(inicial.length >= total)
-  const totalRef = useRef(total); totalRef.current = total
-  const aplicarRef = useRef(aplicar); aplicarRef.current = aplicar
+  }, [q])
+  // Ao SAIR da busca, recarrega a página 1 do servidor (com filtro/sort atuais).
+  const buscaAntes = useRef(false)
   useEffect(() => {
-    if (doneRef.current) return
-    let cancel = false
-    ;(async () => {
-      while (!cancel && offsetRef.current < totalRef.current) {
-        let lote: EstudanteBase[]
-        try { lote = (await carregarLoteEstudantes(offsetRef.current, LOTE, false)).rows }
-        catch { await new Promise((r) => setTimeout(r, 600)); continue } // hiccup transitório → retenta
-        if (cancel) return
-        if (!lote.length) break
-        offsetRef.current += lote.length
-        setRows((prev) => {
-          const vistos = new Set(prev.map((r) => r.id))
-          const novos = lote.filter((r) => !vistos.has(r.id)).map(aplicarRef.current)
-          return novos.length ? [...prev, ...novos] : prev
-        })
-      }
-      if (!cancel) { doneRef.current = true; setCarregando(false) }
-    })()
-    return () => { cancel = true }
-  }, [])
+    if (buscaAntes.current && !buscandoAtivo) irPagina(1, filtro, sort)
+    buscaAntes.current = buscandoAtivo
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [buscandoAtivo])
 
-  function ordenarPor(key: SortKey) {
-    setSort((prev) => (prev?.key === key ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' }))
-  }
+  // ── Fonte exibida ──
+  // Buscando: resultados do servidor, filtrados + ordenados + paginados no cliente.
+  // Navegando: a página do servidor (10) — só aplica sort de feitos/média no cliente (na página).
+  const buscaFiltrada = useMemo(() => {
+    if (!buscandoAtivo) return []
+    const base = (busca ?? []).filter((e) => filtro === 'todos' || (filtro === 'passaporte' ? e.classificacao === 'passaporte' : e.classificacao !== 'passaporte'))
+    return ordenarCliente(base, sort)
+  }, [buscandoAtivo, busca, filtro, sort])
 
-  const filtrados = useMemo(() => {
-    // Buscando → usa os resultados do SERVIDOR; senão, as linhas já carregadas.
-    const base = buscandoAtivo ? (busca ?? []) : rows
-    return base.filter((e) => filtro === 'todos' || (filtro === 'passaporte' ? e.classificacao === 'passaporte' : e.classificacao !== 'passaporte'))
-  }, [buscandoAtivo, busca, rows, filtro])
-
-  const ordenados = useMemo(() => {
-    if (!sort) return filtrados
-    const dir = sort.dir === 'asc' ? 1 : -1
-    const arr = [...filtrados]
-    arr.sort((a, b) => {
-      switch (sort.key) {
-        case 'nome': return (a.nome || '').localeCompare(b.nome || '', 'pt-BR') * dir
-        case 'classificacao': return (a.classificacao || '').localeCompare(b.classificacao || '', 'pt-BR') * dir
-        case 'feitos': return (a.feitos - b.feitos) * dir
-        case 'media': {
-          if (a.media == null && b.media == null) return 0
-          if (a.media == null) return 1
-          if (b.media == null) return -1
-          return (a.media - b.media) * dir
-        }
-        case 'created_at': {
-          const av = a.created_at ? Date.parse(a.created_at) : 0
-          const bv = b.created_at ? Date.parse(b.created_at) : 0
-          return (av - bv) * dir
-        }
-      }
-    })
-    return arr
-  }, [filtrados, sort])
-
-  // Volta para a 1ª página quando muda busca/filtro/ordenação. Mantém a página válida ao crescer a lista.
-  useEffect(() => { setPagina(1) }, [q, filtro, sort])
-  const totalPaginas = Math.max(1, Math.ceil(ordenados.length / POR_PAGINA))
+  const totalPaginas = buscandoAtivo ? Math.max(1, Math.ceil(buscaFiltrada.length / POR_PAGINA)) : Math.max(1, Math.ceil(totalFiltro / POR_PAGINA))
   const paginaAtual = Math.min(pagina, totalPaginas)
-  const visiveis = ordenados.slice((paginaAtual - 1) * POR_PAGINA, paginaAtual * POR_PAGINA)
-  const primeiroIdx = ordenados.length === 0 ? 0 : (paginaAtual - 1) * POR_PAGINA + 1
-  const ultimoIdx = Math.min(paginaAtual * POR_PAGINA, ordenados.length)
+  const visiveis = buscandoAtivo
+    ? buscaFiltrada.slice((paginaAtual - 1) * POR_PAGINA, paginaAtual * POR_PAGINA)
+    : (sort && !SORT_SERVIDOR.includes(sort.key) ? ordenarCliente(rows, sort) : rows)
+  const totalMostrado = buscandoAtivo ? buscaFiltrada.length : totalFiltro
+  const primeiroIdx = totalMostrado === 0 ? 0 : (paginaAtual - 1) * POR_PAGINA + 1
+  const ultimoIdx = buscandoAtivo ? Math.min(paginaAtual * POR_PAGINA, totalMostrado) : (paginaAtual - 1) * POR_PAGINA + visiveis.length
 
   const colunasExport: ColunaExport<EstudanteRow>[] = [
     { titulo: 'Nome', valor: (e) => e.nome, largura: 32 },
@@ -157,9 +147,15 @@ export function EstudantesLista({ inicial, agregados, total, kpis, adminEmails =
     { titulo: 'Cadastrado em', valor: (e) => fmtData(e.created_at) },
   ]
 
+  function irPaginaSegura(p: number) {
+    const alvo = Math.min(Math.max(1, p), totalPaginas)
+    if (buscandoAtivo) setPagina(alvo)
+    else irPagina(alvo)
+  }
+
   return (
     <div className="space-y-4">
-      {/* KPIs (contagens do servidor — independem do carregamento em segundo plano) */}
+      {/* KPIs (contagens cacheadas do servidor) */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
         <Kpi icon={<Users className="h-5 w-5" />} tom="primary" rotulo="Estudantes" valor={kpis.total} />
         <Kpi icon={<Crown className="h-5 w-5" />} tom="violet" rotulo="Passaporte" valor={kpis.passaporte} />
@@ -179,30 +175,25 @@ export function EstudantesLista({ inicial, agregados, total, kpis, adminEmails =
           </div>
           <div className="flex items-center gap-1.5">
             {([['todos', 'Todos'], ['passaporte', 'Passaporte'], ['estudante', 'Padrão']] as [Filtro, string][]).map(([v, label]) => (
-              <button key={v} type="button" onClick={() => setFiltro(v)}
+              <button key={v} type="button" onClick={() => mudarFiltro(v)}
                 className={cn('rounded-full border px-3 py-1.5 text-xs font-medium transition', filtro === v ? 'border-primary bg-primary text-primary-foreground' : 'hover:bg-muted')}>
                 {label}
               </button>
             ))}
           </div>
-          <ExportButton rows={ordenados} colunas={colunasExport} nomeBase="estudantes" titulo="Estudantes"
-            subtitulo={`${ordenados.length} estudante(s)`} disabled={carregando} />
+          <ExportButton fetchRows={exportarTodosEstudantes} colunas={colunasExport} nomeBase="estudantes" titulo="Estudantes" subtitulo={`${kpis.total} estudante(s)`} />
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs text-muted-foreground">
           <span>
             {buscandoAtivo
-              ? (buscando ? 'Buscando…' : <>{ordenados.length} resultado(s) para "<b className="text-foreground">{q.trim()}</b>"</>)
-              : ordenados.length > 0 ? <>Exibindo <b className="tabular-nums text-foreground">{primeiroIdx}–{ultimoIdx}</b> de <b className="tabular-nums text-foreground">{ordenados.length}</b></> : 'Nenhum estudante'}
+              ? (buscando ? 'Buscando…' : <>{totalMostrado} resultado(s) para "<b className="text-foreground">{q.trim()}</b>"</>)
+              : totalMostrado > 0 ? <>Exibindo <b className="tabular-nums text-foreground">{primeiroIdx}–{ultimoIdx}</b> de <b className="tabular-nums text-foreground">{totalMostrado}</b></> : 'Nenhum estudante'}
           </span>
-          {carregando && !buscandoAtivo && (
-            <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-              <Loader2 className="h-3.5 w-3.5 animate-spin" /> Carregando estudantes… <b className="tabular-nums text-foreground">{rows.length}</b>/<b className="tabular-nums">{total}</b>
-            </span>
-          )}
+          {carregandoPag && <span className="inline-flex items-center gap-1.5"><Loader2 className="h-3.5 w-3.5 animate-spin" /> carregando…</span>}
         </div>
 
-        {/* tabela (só a página atual é renderizada — leve) */}
+        {/* tabela (só a página atual — 10 linhas) */}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-muted/60 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
@@ -218,7 +209,7 @@ export function EstudantesLista({ inicial, agregados, total, kpis, adminEmails =
             </thead>
             <tbody>
               {visiveis.length === 0 ? (
-                <tr><td colSpan={7} className="py-12 text-center text-muted-foreground">{buscando ? 'Buscando…' : (carregando && !buscandoAtivo) ? 'Carregando…' : 'Nenhum estudante encontrado.'}</td></tr>
+                <tr><td colSpan={7} className="py-12 text-center text-muted-foreground">{(buscando || carregandoPag) ? 'Carregando…' : 'Nenhum estudante encontrado.'}</td></tr>
               ) : visiveis.map((e) => (
                 <tr key={e.id} className="group border-b border-border/60 transition-colors last:border-0 hover:bg-muted/40">
                   <td className="px-4 py-2.5">
@@ -255,14 +246,14 @@ export function EstudantesLista({ inicial, agregados, total, kpis, adminEmails =
         </div>
 
         {/* paginação */}
-        {ordenados.length > POR_PAGINA && (
+        {totalPaginas > 1 && (
           <div className="flex flex-wrap items-center justify-between gap-2 border-t p-3 text-sm">
             <span className="text-xs text-muted-foreground">Página <b className="tabular-nums text-foreground">{paginaAtual}</b> de <b className="tabular-nums text-foreground">{totalPaginas}</b></span>
             <div className="flex items-center gap-1">
-              <PagBtn onClick={() => setPagina(1)} disabled={paginaAtual === 1} title="Início"><ChevronsLeft className="h-4 w-4" /></PagBtn>
-              <PagBtn onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={paginaAtual === 1} title="Anterior"><ChevronLeft className="h-4 w-4" /></PagBtn>
-              <PagBtn onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={paginaAtual === totalPaginas} title="Próxima"><ChevronRight className="h-4 w-4" /></PagBtn>
-              <PagBtn onClick={() => setPagina(totalPaginas)} disabled={paginaAtual === totalPaginas} title="Final"><ChevronsRight className="h-4 w-4" /></PagBtn>
+              <PagBtn onClick={() => irPaginaSegura(1)} disabled={paginaAtual === 1 || carregandoPag} title="Início"><ChevronsLeft className="h-4 w-4" /></PagBtn>
+              <PagBtn onClick={() => irPaginaSegura(paginaAtual - 1)} disabled={paginaAtual === 1 || carregandoPag} title="Anterior"><ChevronLeft className="h-4 w-4" /></PagBtn>
+              <PagBtn onClick={() => irPaginaSegura(paginaAtual + 1)} disabled={paginaAtual === totalPaginas || carregandoPag} title="Próxima"><ChevronRight className="h-4 w-4" /></PagBtn>
+              <PagBtn onClick={() => irPaginaSegura(totalPaginas)} disabled={paginaAtual === totalPaginas || carregandoPag} title="Final"><ChevronsRight className="h-4 w-4" /></PagBtn>
             </div>
           </div>
         )}
