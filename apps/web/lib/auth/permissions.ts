@@ -45,20 +45,23 @@ const superAdminMemo = cache((userId: string): Promise<boolean> => consultarSupe
  */
 export const getCurrentAccess = cache(async (): Promise<Access> => {
   const user = await getAuthUser()
+  if (!user) return EMPTY
   const tenantId = await getCurrentTenantId()
 
-  if (!user || !tenantId) return { ...EMPTY, userId: user?.id ?? null, tenantId }
+  // Super-admin GLOBAL (acima dos tenants): acesso TOTAL a QUALQUER plataforma — inclusive quando o
+  // tenant NÃO resolve (entrada neutra / subdomínio sem tenant mapeado). Precisa vir ANTES do guard
+  // de tenant abaixo: senão um `tenantId` nulo zerava o acesso do super-admin (menu vazio + "sem
+  // acesso"). Usa service role REAL (createAdminClient), que bypassa RLS.
+  if (await superAdminMemo(user.id)) {
+    return { userId: user.id, tenantId, role: 'super_admin', isAdmin: true, permissions: ['*'] }
+  }
+
+  if (!tenantId) return { ...EMPTY, userId: user.id, tenantId: null }
 
   // Service role REAL: a checagem do próprio acesso (filtrada por user_id+tenant_id) não
   // pode depender do RLS do banco — em bancos com RLS incompleto (migrados), createServiceClient
   // rodaria como o usuário e falharia, zerando o acesso do admin.
   const svc = createAdminClient()
-
-  // Super-admin GLOBAL: acesso TOTAL a qualquer plataforma (acima dos tenants), mesmo sem
-  // papel no tenant atual. Checado ANTES do papel por-tenant — é o topo da hierarquia.
-  if (await superAdminMemo(user.id)) {
-    return { userId: user.id, tenantId, role: 'super_admin', isAdmin: true, permissions: ['*'] }
-  }
 
   const { data: acesso } = await svc
     .from('simulado_tenant_acessos')
