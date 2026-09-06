@@ -1,7 +1,6 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { redirect } from 'next/navigation'
 import { createServiceClient, createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { checkPermission } from '@/lib/auth/permissions'
@@ -123,10 +122,12 @@ export async function createEstudanteAction(data: NovoEstudanteData) {
     return { error: profileError.message }
   }
 
-  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_estudantes', entidadeId: userId, depois: { nome: data.nome, email: data.email } })
+  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_estudantes', entidadeId: userId, depois: { nome: data.nome, email: data.email, classificacao: data.classificacao ?? 'normal' } })
 
   revalidatePath('/admin/estudantes')
-  redirect('/admin/estudantes')
+  // NÃO redireciona no servidor: o form mostra o toast de sucesso e navega no cliente (evita cair
+  // na tela "Sem acesso" quando o cargo não tem estudantes:view depois de criar).
+  return { ok: true }
 }
 
 interface EditarEstudanteData {

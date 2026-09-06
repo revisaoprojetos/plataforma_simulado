@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -25,6 +26,7 @@ type FormData = z.infer<typeof schema>
 
 export default function NovoEstudantePage() {
   const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter()
 
   const {
     register,
@@ -38,15 +40,11 @@ export default function NovoEstudantePage() {
     setIsLoading(true)
     try {
       const result = await createEstudanteAction(data)
-      if (result?.error) {
-        toast.error(result.error)
-      }
-    } catch (e) {
-      if (e && typeof e === 'object' && 'digest' in e && String((e as { digest?: string }).digest).startsWith('NEXT_REDIRECT')) {
-        throw e
-      }
+      if (result?.error) { toast.error(result.error); setIsLoading(false); return }
+      toast.success(`Estudante "${data.nome}" criado com sucesso!`)
+      router.push('/admin/estudantes')
+    } catch {
       toast.error('Erro ao criar estudante')
-    } finally {
       setIsLoading(false)
     }
   }
