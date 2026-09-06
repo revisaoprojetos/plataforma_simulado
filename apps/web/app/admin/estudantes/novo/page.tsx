@@ -18,6 +18,7 @@ const schema = z.object({
   email: z.string().email('E-mail inválido'),
   cpf: z.string().optional(),
   telefone: z.string().optional(),
+  classificacao: z.enum(['normal', 'passaporte', 'vitalicio']).default('normal'),
 })
 
 type FormData = z.infer<typeof schema>
@@ -116,6 +117,20 @@ export default function NovoEstudantePage() {
                   {...register('telefone')}
                 />
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="classificacao">Classificação</Label>
+              <select
+                id="classificacao"
+                {...register('classificacao')}
+                className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <option value="normal">Normal</option>
+                <option value="passaporte">Passaporte (acesso a todos os simulados)</option>
+                <option value="vitalicio">Passaporte Vitalício</option>
+              </select>
+              <p className="text-xs text-muted-foreground">Passaporte/Vitalício entram no grupo de passaporte e enxergam todos os simulados vinculados.</p>
             </div>
 
             <div className="flex justify-end gap-3 pt-2">

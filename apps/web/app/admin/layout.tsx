@@ -16,6 +16,7 @@ import { TourProvider } from '@/components/admin/tour-guiado'
 import { NavProgress } from '@/components/admin/nav-progress'
 import { AvisoSemAcesso } from '@/components/admin/aviso-sem-acesso'
 import { FontScaleInit } from '@/components/font-scale-init'
+import { Lock } from 'lucide-react'
 import { Suspense } from 'react'
 
 const CURRENT_POLICY_VERSION = '1.0'
@@ -112,11 +113,13 @@ export default async function AdminLayout({
   const pathname = (await headers()).get('x-pathname') ?? ''
 
   // Gate de ROTA por permissão: cargos SEM acesso total que abrem (ou digitam a URL de) uma área
-  // bloqueada na matriz são mandados de volta ao painel. Casa com o menu, que já esconde a área.
+  // bloqueada na matriz veem uma MENSAGEM clara no lugar do conteúdo (não mais um redirect para a
+  // dashboard — que podia renderizar em branco/preto). O menu continua visível.
+  let semAcesso = false
   if (!access.isAdmin) {
     const area = AREA_PERM.find((a) => pathname === a.prefix || pathname.startsWith(a.prefix + '/'))
     if (area && !accessCan(access, area.perm) && !(area.ou && accessCan(access, area.ou))) {
-      redirect('/admin?erro=sem-acesso')
+      semAcesso = true
     }
   }
 
@@ -151,9 +154,16 @@ export default async function AdminLayout({
               <Suspense fallback={null}><NavProgress /></Suspense>
               <Suspense fallback={null}><AvisoSemAcesso /></Suspense>
               <main className="flex-1 overflow-y-auto p-6">
-                {areaEmManutencao
-                  ? <AreaEmManutencao area={areaEmManutencao} podeGerenciar={podeGerenciarManutencao} />
-                  : children}
+                {semAcesso ? (
+                  <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 text-center">
+                    <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/15 text-amber-600 dark:text-amber-400"><Lock className="h-7 w-7" /></span>
+                    <h2 className="text-lg font-semibold">Sem acesso a esta área</h2>
+                    <p className="max-w-md text-sm text-muted-foreground">Seu cargo não tem permissão para acessá-la. Fale com um administrador se precisar de acesso.</p>
+                    <a href="/admin" className="mt-1 inline-flex items-center gap-1.5 rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted">Voltar ao painel</a>
+                  </div>
+                ) : areaEmManutencao ? (
+                  <AreaEmManutencao area={areaEmManutencao} podeGerenciar={podeGerenciarManutencao} />
+                ) : children}
               </main>
             </div>
           </TourProvider>

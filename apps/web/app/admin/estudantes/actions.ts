@@ -84,6 +84,7 @@ interface NovoEstudanteData {
   email: string
   cpf?: string
   telefone?: string
+  classificacao?: 'normal' | 'passaporte' | 'vitalicio'
 }
 
 export async function createEstudanteAction(data: NovoEstudanteData) {
@@ -113,6 +114,7 @@ export async function createEstudanteAction(data: NovoEstudanteData) {
     email: data.email,
     cpf: data.cpf || null,
     telefone: data.telefone || null,
+    classificacao: data.classificacao ?? 'normal',
   })
 
   if (profileError) {
