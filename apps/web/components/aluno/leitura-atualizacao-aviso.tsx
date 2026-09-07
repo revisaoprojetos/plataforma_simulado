@@ -19,12 +19,22 @@ export function LeituraAtualizacaoAviso({ doc }: { doc: DocumentoCarregado }) {
   const [carregando, setCarregando] = useState(false)
   const [diff, setDiff] = useState<DiffDoc | null>(null)
   const [montado, setMontado] = useState(false)
-  useEffect(() => setMontado(true), [])
+  const chaveVisto = `leitura-aviso-visto:${doc.id}:${doc.versao}`
+  useEffect(() => {
+    setMontado(true)
+    try { if (localStorage.getItem(chaveVisto)) setVisivel(false) } catch { /* ok */ }
+  }, [chaveVisto])
+
+  function dispensar() {
+    setVisivel(false)
+    try { localStorage.setItem(chaveVisto, '1') } catch { /* ok */ }
+  }
 
   if (!montado || !doc.atualizacao || !visivel) return null
 
   async function abrir() {
     setAberto(true)
+    try { localStorage.setItem(chaveVisto, '1') } catch { /* ok */ } // viu o que mudou → não reaparece
     if (diff) return
     setCarregando(true)
     try {
@@ -51,7 +61,7 @@ export function LeituraAtualizacaoAviso({ doc }: { doc: DocumentoCarregado }) {
             <button onClick={abrir} className="rounded-full bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground transition hover:opacity-90">
               Ver o que mudou
             </button>
-            <button onClick={() => setVisivel(false)} className="rounded-full p-1 text-muted-foreground hover:bg-muted" aria-label="Dispensar">
+            <button onClick={dispensar} className="rounded-full p-1 text-muted-foreground hover:bg-muted" aria-label="Dispensar">
               <X className="h-4 w-4" />
             </button>
           </div>

@@ -15,7 +15,7 @@ export function QuestaoLeitura({ documentoId, q, corFg, corMuted, onRespondida }
   q: QuestaoLeituraDados
   corFg: string
   corMuted: string
-  onRespondida: (questaoId: string, correta: boolean) => void
+  onRespondida: (docQuestaoId: string, correta: boolean) => void
 }) {
   const [escolhida, setEscolhida] = useState<string | null>(q.resposta?.alternativaId ?? null)
   const [res, setRes] = useState<{ correta: boolean; corretaId: string | null } | null>(q.resposta ? { correta: q.resposta.correta, corretaId: q.resposta.corretaId } : null)
@@ -28,7 +28,7 @@ export function QuestaoLeitura({ documentoId, q, corFg, corMuted, onRespondida }
     try {
       const r = await fetch('/api/leitura/resposta', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ documento_id: documentoId, questao_id: q.questaoId, alternativa_id: escolhida }) })
       const j = await r.json()
-      if (j?.ok) { setRes({ correta: j.correta, corretaId: j.correta_id }); onRespondida(q.questaoId, j.correta) }
+      if (j?.ok) { setRes({ correta: j.correta, corretaId: j.correta_id }); onRespondida(q.docQuestaoId, j.correta) }
       else toast.error(j?.message ?? 'Erro ao responder.')
     } catch { toast.error('Erro ao responder.') } finally { setEnviando(false) }
   }

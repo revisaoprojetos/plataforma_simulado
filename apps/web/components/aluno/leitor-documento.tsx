@@ -52,7 +52,9 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
   const [colW, setColW] = useState(0)
 
   // Questões inline (Fase 2)
-  const [respostas, setRespostas] = useState<Record<string, boolean>>(() => Object.fromEntries((doc.questoes ?? []).filter((q) => q.resposta).map((q) => [q.questaoId, true])))
+  // Indexado por docQuestaoId (slot único) — a MESMA questão pode aparecer em 2 pontos da lei;
+  // indexar por questaoId marcaria os dois ao responder um só.
+  const [respostas, setRespostas] = useState<Record<string, boolean>>(() => Object.fromEntries((doc.questoes ?? []).filter((q) => q.resposta).map((q) => [q.docQuestaoId, true])))
   const [slots, setSlots] = useState<{ q: DocumentoCarregado['questoes'][number]; el: HTMLElement }[]>([])
 
   // Busca dentro da lei
@@ -85,6 +87,10 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
   const contentRef = useRef<HTMLDivElement>(null)
   const overlayRef = useRef<HTMLDivElement>(null)
   const espinhaRef = useRef<Espinha | null>(null)
+  const espinhaHtmlRef = useRef<string>('')      // assinatura p/ reusar a espinha (só refaz quando o HTML muda)
+  const artElsRef = useRef<HTMLElement[]>([])    // cache de [data-art] (evita querySelectorAll por frame de scroll)
+  const dispElsRef = useRef<HTMLElement[]>([])   // cache de [data-disp]
+  const retomouRef = useRef(false)               // retomar o último ponto só uma vez
   const artigoMaxRef = useRef(doc.progresso.artigoMax)
   const tempoRef = useRef(0)          // segundos acumulados desde o último flush
   const pctRef = useRef(doc.progresso.pct)
@@ -110,18 +116,18 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
   // No mobile, começa com o menu fechado (a barra de 256px cobriria a leitura).
   useEffect(() => { if (typeof window !== 'undefined' && window.innerWidth < 768) setMenuAberto(false) }, [])
 
-  // Retomar o último ponto lido (uma vez, após o layout).
+  // Retomar o último ponto lido (uma vez). Sem timeout fixo: reage a colW/modo até o layout ficar
+  // pronto (no modo virar precisa da coluna medida); documentos grandes não caem no topo por atraso.
   useEffect(() => {
-    if (!doc.ultimoDisp) return
-    const t = setTimeout(() => {
-      const el = contentRef.current?.querySelector<HTMLElement>(`[data-disp="${CSS.escape(doc.ultimoDisp!)}"]`)
-      if (!el) return
-      if (modo === 'scroll') el.scrollIntoView({ block: 'start' })
-      else if (colW) irPara(Math.floor(el.offsetLeft / (colW + GAP)))
-    }, 400)
-    return () => clearTimeout(t)
+    if (retomouRef.current || !doc.ultimoDisp) return
+    const el = contentRef.current?.querySelector<HTMLElement>(`[data-disp="${CSS.escape(doc.ultimoDisp)}"]`)
+    if (!el) return
+    if (modo === 'flip' && !colW) return // aguarda a medição da coluna
+    retomouRef.current = true
+    if (modo === 'scroll') el.scrollIntoView({ block: 'start' })
+    else irPara(Math.floor(el.offsetLeft / (colW + GAP)))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [colW, modo, doc.ultimoDisp])
 
   // ── Sumário (TOC): prefere dispositivos ([data-disp], hierárquico); cai em [data-art]. ──
   useIsoLayout(() => {
@@ -145,6 +151,14 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
       label: (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60) || `Seção ${el.getAttribute('data-art')}`,
     })))
   }, [doc.html])
+
+  // Cache dos nós de âncora — o progresso lê [data-art]/[data-disp] a cada frame de scroll; sem o
+  // cache seria um querySelectorAll por frame (trava em leis grandes). Refaz só quando o DOM muda.
+  useIsoLayout(() => {
+    const root = contentRef.current
+    artElsRef.current = root ? Array.from(root.querySelectorAll<HTMLElement>('[data-art]')) : []
+    dispElsRef.current = root ? Array.from(root.querySelectorAll<HTMLElement>('[data-disp]')) : []
+  }, [doc.html, slots])
 
   // ── Injeta as questões inline logo após o artigo indicado (contêiner no DOM; o card é
   //    renderizado por PORTAL). O texto delas é ignorado pela espinha das anotações. ──
@@ -194,7 +208,10 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
   const recomputarGrifos = useCallback(() => {
     const root = contentRef.current, ov = overlayRef.current
     if (!root || !ov) return
-    const esp = construirEspinha(root); espinhaRef.current = esp
+    // A espinha (texto) só muda com o HTML; modo/fonte/colW mudam só o LAYOUT (rects). Reusa a espinha
+    // memoizada nesses refluxos — construí-la varre todos os text nodes (caro em leis grandes).
+    let esp = espinhaRef.current
+    if (!esp || espinhaHtmlRef.current !== doc.html) { esp = construirEspinha(root); espinhaRef.current = esp; espinhaHtmlRef.current = doc.html }
     const base = ov.getBoundingClientRect()
     const map: Record<string, RectRel[]> = {}
     for (const a of anotacoes) {
@@ -209,7 +226,7 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
       if (range) { const rs = rectsDoRange(range, base); if (rs.length) gmap[g.id] = { rects: rs, tipo: g.tipo } }
     }
     setGrifosRects(gmap)
-  }, [anotacoes, grifos])
+  }, [anotacoes, grifos, doc.html])
   useIsoLayout(() => { recomputarGrifos() }, [recomputarGrifos, modo, colW, fonte, doc.html, slots])
 
   // Reflow por RESIZE real da janela E pelo colapso/expansão das caixas STJ/STF (que disparam
@@ -232,45 +249,50 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
   }, [recomputarGrifos, modo, colW])
 
   // ── Busca dentro da lei: acha ocorrências na espinha, gera rects p/ realçar + navegar. ──
+  // Debounce: não reconstrói a espinha/varre a cada tecla (custo alto em leis grandes).
   useIsoLayout(() => {
     const root = contentRef.current, ov = overlayRef.current
     const q = buscaQ.trim()
     if (!root || !ov || q.length < 2) { setMatches([]); return }
-    const esp = espinhaRef.current ?? construirEspinha(root)
-    const base = ov.getBoundingClientRect()
-    const S = esp.S, ql = q.toLowerCase(), Sl = S.toLowerCase()
-    const res: { rects: RectRel[]; el: HTMLElement | null }[] = []
-    let i = Sl.indexOf(ql)
-    while (i >= 0 && res.length < 500) {
-      const range = ancoraParaRange(esp, { inicio: i, fim: i + q.length, exact: S.slice(i, i + q.length), prefix: '', suffix: '' })
-      if (range) { const rs = rectsDoRange(range, base); if (rs.length) res.push({ rects: rs, el: range.startContainer.parentElement }) }
-      i = Sl.indexOf(ql, i + Math.max(1, q.length))
-    }
-    setMatches(res); setMatchIdx(0)
+    const t = setTimeout(() => {
+      const esp = espinhaRef.current ?? construirEspinha(root)
+      const base = ov.getBoundingClientRect()
+      const S = esp.S, ql = q.toLowerCase(), Sl = S.toLowerCase()
+      const res: { rects: RectRel[]; el: HTMLElement | null }[] = []
+      let i = Sl.indexOf(ql)
+      while (i >= 0 && res.length < 500) {
+        const range = ancoraParaRange(esp, { inicio: i, fim: i + q.length, exact: S.slice(i, i + q.length), prefix: '', suffix: '' })
+        if (range) { const rs = rectsDoRange(range, base); if (rs.length) res.push({ rects: rs, el: range.startContainer.parentElement }) }
+        i = Sl.indexOf(ql, i + Math.max(1, q.length))
+      }
+      setMatches(res); setMatchIdx((idx) => Math.min(idx, Math.max(0, res.length - 1)))
+    }, 180)
+    return () => clearTimeout(t)
   }, [buscaQ, modo, colW, fonte, doc.html, slots])
 
   // ── Cálculo de progresso (%, artigo alcançado) ──
   const atualizarProgresso = useCallback(() => {
     const vp = viewportRef.current, ct = contentRef.current
     if (!vp || !ct) return
+    const artEls = artElsRef.current, dispEls = dispElsRef.current
     let p = 0
     if (modo === 'scroll') {
       const max = ct.scrollHeight - vp.clientHeight
-      p = max <= 0 ? 100 : Math.round((vp.scrollTop / max) * 100)
+      // cabe na viewport → 100% (o aluno vê tudo); mas não conta 100% em conteúdo ainda não medido.
+      p = max <= 0 ? (ct.scrollHeight > 4 ? 100 : 0) : Math.round((vp.scrollTop / max) * 100)
       // artigo alcançado: última âncora acima do fim da viewport
       const limite = vp.scrollTop + vp.clientHeight
-      for (const el of ct.querySelectorAll<HTMLElement>('[data-art]')) {
+      for (const el of artEls) {
         if (el.offsetTop <= limite) artigoMaxRef.current = Math.max(artigoMaxRef.current, Number(el.getAttribute('data-art')) || 0)
       }
     } else {
       p = totalPag <= 1 ? 100 : Math.round(((pagina + 1) / totalPag) * 100)
       const limite = (pagina + 1) * (colW + GAP)
-      for (const el of ct.querySelectorAll<HTMLElement>('[data-art]')) {
+      for (const el of artEls) {
         if (el.offsetLeft < limite) artigoMaxRef.current = Math.max(artigoMaxRef.current, Number(el.getAttribute('data-art')) || 0)
       }
     }
     // Último ponto: dispositivo topo visível (para retomar depois).
-    const dispEls = ct.querySelectorAll<HTMLElement>('[data-disp]')
     let topo: string | null = null
     for (const el of dispEls) {
       const passou = modo === 'scroll' ? el.offsetTop <= vp.scrollTop + 8 : el.offsetLeft <= pagina * (colW + GAP) + 8
@@ -310,6 +332,12 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
     // Ao esconder/fechar a aba: envia o tempo pendente via sendBeacon e ZERA (senão o próximo
     // flush contaria o mesmo tempo de novo). Listeners nomeados p/ remover no cleanup (sem leak).
     const onHide = () => {
+      // Último ponto (mesmo sem tempo pendente) — o cleanup do React pode não rodar ao fechar a aba.
+      const d = dispTopRef.current
+      if (d && d !== pontoSalvoRef.current) {
+        pontoSalvoRef.current = d
+        navigator.sendBeacon?.('/api/leitura/ponto', new Blob([JSON.stringify({ documento_id: doc.id, versao: doc.versao, disp_id: d })], { type: 'application/json' }))
+      }
       if (tempoRef.current <= 0) return
       const body = new Blob([JSON.stringify({ documento_id: doc.id, versao: doc.versao, pct: pctRef.current, artigo_max: artigoMaxRef.current, tempo_inc: tempoRef.current })], { type: 'application/json' })
       navigator.sendBeacon?.('/api/leitura/progresso', body)
@@ -397,18 +425,24 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
       return novo
     } catch { return null }
   }
-  async function removerServidor(id: string) {
-    setAnotacoes((p) => p.filter((a) => a.id !== id))
-    try { await fetch(`/api/leitura/anotacao?id=${id}`, { method: 'DELETE' }) } catch { /* ok */ }
+  // Retornam ok:boolean e REVERTEM o estado otimista em falha (rede/servidor) — antes engoliam o
+  // erro e deixavam a UI dessincronizada do banco silenciosamente.
+  async function removerServidor(a: AnotacaoAluno): Promise<boolean> {
+    setAnotacoes((p) => p.filter((x) => x.id !== a.id))
+    try { const r = await fetch(`/api/leitura/anotacao?id=${a.id}`, { method: 'DELETE' }); if (!r.ok) throw 0; return true }
+    catch { setAnotacoes((p) => (p.some((x) => x.id === a.id) ? p : [...p, a])); return false }
   }
-  async function restaurarServidor(a: AnotacaoAluno) {
+  async function restaurarServidor(a: AnotacaoAluno): Promise<boolean> {
     setAnotacoes((p) => (p.some((x) => x.id === a.id) ? p : [...p, a]))
-    try { await fetch('/api/leitura/anotacao', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: a.id, restaurar: true, cor: a.cor, nota: a.nota }) }) } catch { /* ok */ }
+    try { const r = await fetch('/api/leitura/anotacao', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: a.id, restaurar: true, cor: a.cor, nota: a.nota }) }); if (!r.ok) throw 0; return true }
+    catch { setAnotacoes((p) => p.filter((x) => x.id !== a.id)); return false }
   }
-  async function atualizarServidor(id: string, cor: string, nota: string | null) {
+  async function atualizarServidor(id: string, cor: string, nota: string | null, revert?: { cor: string; nota: string | null }): Promise<boolean> {
     setAnotacoes((p) => p.map((a) => (a.id === id ? { ...a, cor, nota } : a)))
-    try { await fetch('/api/leitura/anotacao', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id, cor, nota }) }) } catch { /* otimista */ }
+    try { const r = await fetch('/api/leitura/anotacao', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id, cor, nota }) }); if (!r.ok) throw 0; return true }
+    catch { if (revert) setAnotacoes((p) => p.map((a) => (a.id === id ? { ...a, cor: revert.cor, nota: revert.nota } : a))); return false }
   }
+  const avisarFalha = () => toast.error('Não foi possível salvar tudo. Recarregue a página se algum grifo ficar fora do lugar.')
   const registrar = (b: AcaoGrifo[]) => { if (b.length) { setPassado((p) => [...p, b].slice(-60)); setFuturo([]) } }
 
   // ── Ações do usuário (registram no histórico). opLock evita reentrância (clique/Enter rápido). ──
@@ -429,8 +463,9 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
     const de = { cor: atual.cor, nota: atual.nota }
     const para = { cor: patch.cor ?? atual.cor, nota: 'nota' in patch ? (patch.nota ?? null) : atual.nota }
     opLock.current = true
-    await atualizarServidor(id, para.cor, para.nota)
+    const ok = await atualizarServidor(id, para.cor, para.nota, de)
     opLock.current = false
+    if (!ok) { avisarFalha(); return }
     registrar([{ k: 'upd', id, de, para }])
   }
 
@@ -438,8 +473,9 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
     if (opLock.current) return
     const a = anotacoes.find((x) => x.id === id); if (!a) return
     opLock.current = true
-    await removerServidor(id)
+    const ok = await removerServidor(a)
     opLock.current = false
+    if (!ok) { avisarFalha(); return }
     registrar([{ k: 'del', a }])
   }
 
@@ -448,10 +484,12 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
     const meus = anotacoes.filter((a) => a.origem === 'propria')
     if (!meus.length) { toast.message('Você não tem grifos próprios para resetar.'); return }
     opLock.current = true
-    for (const a of meus) await removerServidor(a.id)
+    const oks = await Promise.all(meus.map((a) => removerServidor(a)))
     opLock.current = false
-    registrar(meus.map((a) => ({ k: 'del' as const, a })))
-    toast.success(`${meus.length} grifo(s) removido(s)`)
+    const removidos = meus.filter((_, i) => oks[i])
+    if (removidos.length) registrar(removidos.map((a) => ({ k: 'del' as const, a })))
+    if (oks.some((o) => !o)) avisarFalha()
+    else toast.success(`${meus.length} grifo(s) removido(s)`)
   }
 
   // ── Voltar / Avançar. Como os ids são estáveis (soft-delete/undelete), o MESMO batch é só
@@ -460,27 +498,35 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
     if (opLock.current) return
     const b = passado[passado.length - 1]; if (!b) return
     opLock.current = true
+    let falhou = false
     for (const ac of [...b].reverse()) {
-      if (ac.k === 'add') await removerServidor(ac.a.id)
-      else if (ac.k === 'del') await restaurarServidor(ac.a)
-      else await atualizarServidor(ac.id, ac.de.cor, ac.de.nota)
+      let ok = true
+      if (ac.k === 'add') ok = await removerServidor(ac.a)
+      else if (ac.k === 'del') ok = await restaurarServidor(ac.a)
+      else ok = await atualizarServidor(ac.id, ac.de.cor, ac.de.nota, ac.para)
+      if (!ok) falhou = true
     }
     opLock.current = false
     setPassado((p) => p.slice(0, -1))
     setFuturo((f) => [...f, b])
+    if (falhou) avisarFalha()
   }
   async function refazer() {
     if (opLock.current) return
     const b = futuro[futuro.length - 1]; if (!b) return
     opLock.current = true
+    let falhou = false
     for (const ac of b) {
-      if (ac.k === 'add') await restaurarServidor(ac.a)
-      else if (ac.k === 'del') await removerServidor(ac.a.id)
-      else await atualizarServidor(ac.id, ac.para.cor, ac.para.nota)
+      let ok = true
+      if (ac.k === 'add') ok = await restaurarServidor(ac.a)
+      else if (ac.k === 'del') ok = await removerServidor(ac.a)
+      else ok = await atualizarServidor(ac.id, ac.para.cor, ac.para.nota, ac.de)
+      if (!ok) falhou = true
     }
     opLock.current = false
     setFuturo((f) => f.slice(0, -1))
     setPassado((p) => [...p, b])
+    if (falhou) avisarFalha()
   }
 
   function pularAnotacao(a: AnotacaoAluno) {
@@ -492,7 +538,7 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
     else irPara(Math.floor(el.offsetLeft / (colW + GAP)))
   }
 
-  const obrigatoriasPendentes = (doc.questoes ?? []).filter((q) => q.obrigatoria && !respostas[q.questaoId]).length
+  const obrigatoriasPendentes = (doc.questoes ?? []).filter((q) => q.obrigatoria && !respostas[q.docQuestaoId]).length
 
   async function concluir() {
     if (obrigatoriasPendentes > 0) { toast.error(`Responda as ${obrigatoriasPendentes} pergunta(s) obrigatória(s) antes de concluir.`); return }
@@ -752,7 +798,7 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
 
       {/* Questões inline: renderizadas DENTRO do conteúdo (portal p/ o contêiner injetado) */}
       {slots.map((s) => createPortal(
-        <QuestaoLeitura key={s.q.docQuestaoId} documentoId={doc.id} q={s.q} corFg={cores.fg} corMuted={cores.muted} onRespondida={(qid) => setRespostas((p) => ({ ...p, [qid]: true }))} />,
+        <QuestaoLeitura key={s.q.docQuestaoId} documentoId={doc.id} q={s.q} corFg={cores.fg} corMuted={cores.muted} onRespondida={(docQid) => setRespostas((p) => ({ ...p, [docQid]: true }))} />,
         s.el,
       ))}
 

@@ -221,9 +221,14 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
     const ant = await svc.from('simulado_documento_conteudos').select('versao').eq('documento_id', documentoId).lt('versao', versao).order('versao', { ascending: false }).limit(1).maybeSingle()
     const va = (ant.data as any)?.versao
     if (va) {
-      let atz: any = null
-      try { const r = await svc.from('simulado_lei_atualizacoes').select('tipo, descricao, criado_em').eq('documento_id', documentoId).eq('versao', versao).maybeSingle(); atz = r.data } catch { /* migração A2 ausente */ }
-      atualizacao = { versaoAnterior: va, atualizadoEm: atz?.criado_em ?? null, tipo: atz?.tipo ?? null, descricao: atz?.descricao ?? null }
+      // Só avisa "foi atualizada" se o aluno LEU a versão anterior (tinha progresso nela). Aluno novo
+      // que nunca viu a versão antiga não deve receber o aviso de "o que mudou".
+      const { data: progAnt } = await svc.from('simulado_leitura_progresso').select('estudante_id').eq('estudante_id', estudanteId).eq('documento_id', documentoId).eq('documento_versao', va).maybeSingle()
+      if (progAnt) {
+        let atz: any = null
+        try { const r = await svc.from('simulado_lei_atualizacoes').select('tipo, descricao, criado_em').eq('documento_id', documentoId).eq('versao', versao).maybeSingle(); atz = r.data } catch { /* migração A2 ausente */ }
+        atualizacao = { versaoAnterior: va, atualizadoEm: atz?.criado_em ?? null, tipo: atz?.tipo ?? null, descricao: atz?.descricao ?? null }
+      }
     }
   }
   // O HTML/artigos de uma (documento, versão) é IMUTÁVEL depois de publicado (nova publicação =
