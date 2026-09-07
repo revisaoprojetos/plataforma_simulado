@@ -332,6 +332,26 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
   }
 }
 
+/**
+ * Gate de ESCRITA do aluno: o documento existe, está publicado, não-deletado e visível para ele.
+ * Espelha exatamente a checagem do caminho de leitura (`carregarDocumentoAluno`). Retorna o doc
+ * com os campos pedidos (default `id`) ou `null` quando o aluno NÃO pode gravar naquele documento.
+ * Usado pelas rotas /api/leitura/* de escrita para fechar o IDOR (aluno gravando em doc alheio).
+ */
+export async function docAcessivelAluno(
+  svc: ReturnType<typeof createAdminClient>,
+  tenantId: string,
+  documentoId: string,
+  estudanteId: string,
+  campos = 'id',
+): Promise<Record<string, any> | null> {
+  const sel = `${campos}, deletado, publicado`
+  const { data: doc } = await svc.from('simulado_documentos').select(sel).eq('id', documentoId).eq('tenant_id', tenantId).maybeSingle()
+  if (!doc || (doc as any).deletado || !(doc as any).publicado) return null
+  if (!(await alunoPodeVer(svc, documentoId, estudanteId))) return null
+  return doc as Record<string, any>
+}
+
 /** Regra de visibilidade do aluno (mesma do catálogo/leitor): sem atribuição = todos. */
 async function alunoPodeVer(svc: ReturnType<typeof createAdminClient>, documentoId: string, estudanteId: string): Promise<boolean> {
   const [{ data: dg }, { data: de }] = await Promise.all([

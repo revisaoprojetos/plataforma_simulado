@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { onLeituraConcluida } from '@/lib/gamificacao'
+import { docAcessivelAluno } from '@/lib/leitura/acesso'
 
 // POST /api/leitura/progresso — auto-save idempotente do progresso de leitura.
 export const dynamic = 'force-dynamic'
@@ -17,11 +18,9 @@ export async function POST(request: NextRequest) {
 
   const svc = createAdminClient()
 
-  // Documento (regras do desafio) — valida acesso/tenant implícito pela leitura da regra.
-  const { data: doc } = await svc.from('simulado_documentos')
-    .select('id, desafio_ativo, desafio_exige_fim, desafio_tempo_min')
-    .eq('id', documento_id).eq('tenant_id', sessao.tenantId).maybeSingle()
-  if (!doc) return NextResponse.json({ message: 'Documento não encontrado.' }, { status: 404 })
+  // Documento + gate anti-IDOR (publicado/visível ao aluno); reusa os campos do desafio.
+  const doc = await docAcessivelAluno(svc, sessao.tenantId, documento_id, sessao.estudanteId, 'id, desafio_ativo, desafio_exige_fim, desafio_tempo_min')
+  if (!doc) return NextResponse.json({ message: 'Sem acesso a este documento.' }, { status: 403 })
 
   // Estado atual (para acumular tempo e manter o máximo de %/artigo).
   const { data: atual } = await svc.from('simulado_leitura_progresso')

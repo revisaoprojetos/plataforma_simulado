@@ -4,9 +4,11 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
-import { fetchAll } from '@/lib/supabase/fetch-all'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { faixaUuidDoCodigo } from '@/lib/codigo-questao'
 import { espinhaDeHtml, reancorar } from '@/lib/leitura/reanchor'
+import { limparCabecalhoHtml } from '@/lib/leitura/limpar-cabecalho'
+import { esquecer } from '@/lib/cache/relatorio-cache'
 
 export type SituacaoEditorial = 'em_preparacao' | 'rascunho' | 'em_revisao' | 'publicada' | 'arquivada' | 'revogada'
 
@@ -145,8 +147,11 @@ async function carryOver(svc: ReturnType<typeof createAdminClient>, tenantId: st
       else { base.ordem = a.ordem; if ('tipo_grifo' in a) { base.tipo_grifo = a.tipo_grifo; base.editorial = a.editorial } }
       return base
     })
-    if (ehAluno) await svc.from(tabela).upsert(novas as any, { onConflict: 'estudante_id,documento_versao,base_id', ignoreDuplicates: true })
-    else await svc.from(tabela).insert(novas as any)
+    // As PRÓPRIAS têm base_id=NULL — NÃO dá para usar upsert com onConflict incluindo base_id
+    // (NULL não conflita de forma confiável → colapsaria/perderia os grifos do aluno). Insert direto,
+    // como o ramo base. Carry-over roda 1x por publicação de versão (vNova nova), então não duplica.
+    const { error: errIns } = await svc.from(tabela).insert(novas as any)
+    if (errIns) console.error('[leitura] carryOver insert', tabela, errIns.message)
   }
 }
 
@@ -154,7 +159,7 @@ async function carryOver(svc: ReturnType<typeof createAdminClient>, tenantId: st
 export async function publicarVersao(documentoId: string, relatorio?: { tipo?: string; descricao?: string; substituir?: boolean; avisar?: boolean }): Promise<{ ok: boolean; versao?: number; error?: string }> {
   const g = await guard('leitura:publicar'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
-  const { data: doc, error: derr } = await svc.from('simulado_documentos').select('versao, versao_publicada, versao_rascunho, publicado').eq('id', documentoId).eq('tenant_id', g.tenantId).maybeSingle()
+  const { data: doc, error: derr } = await svc.from('simulado_documentos').select('titulo, versao, versao_publicada, versao_rascunho, publicado').eq('id', documentoId).eq('tenant_id', g.tenantId).maybeSingle()
   if (derr && /versao_publicada|column/i.test(derr.message)) return { ok: false, error: 'Rode a migração de versionamento (20260823000002).' }
   if (!doc) return { ok: false, error: 'Documento não encontrado.' }
   const pub = (doc as any).versao_publicada ?? (doc as any).versao ?? 1
@@ -164,6 +169,10 @@ export async function publicarVersao(documentoId: string, relatorio?: { tipo?: s
   const { data: cont } = await svc.from('simulado_documento_conteudos').select('html, artigos').eq('documento_id', documentoId).eq('versao', rasc).maybeSingle()
   const html = (cont as any)?.html as string | undefined
   if (!html || !html.replace(/<[^>]+>/g, '').trim()) return { ok: false, error: 'Rascunho vazio — nada a publicar.' }
+  // Coerência mínima: título definido (não o default). Não exigimos ≥1 dispositivo porque documentos
+  // genéricos (não-lei) podem não ter artigos — o conteúdo não-vazio acima já é o piso desses.
+  const titulo = String((doc as any).titulo ?? '').trim()
+  if (!titulo || titulo === 'Documento') return { ok: false, error: 'Defina um título para o documento antes de publicar.' }
 
   // SUBSTITUIR a versão atual: aplica o rascunho SOBRE a versão já publicada, sem criar nova versão
   // nem relatório de "antes/depois" (correção silenciosa — o aluno não vê que mudou). Só faz sentido
@@ -182,6 +191,10 @@ export async function publicarVersao(documentoId: string, relatorio?: { tipo?: s
     try { await svc.from('simulado_lei_dispositivos').delete().eq('documento_id', documentoId).eq('versao', rasc) } catch { /* A3 ausente */ }
     await svc.from('simulado_documento_conteudos').delete().eq('documento_id', documentoId).eq('versao', rasc)
     await svc.from('simulado_documentos').update({ versao_rascunho: pub, versao: pub, versao_publicada: pub, publicado: true, situacao_editorial: 'publicada', atualizado_em: new Date().toISOString() }).eq('id', documentoId).eq('tenant_id', g.tenantId)
+    // CRÍTICO: o leitor cacheia o HTML por (doc, versão) com TTL 1h. Como "substituir" reescreve o
+    // conteúdo MANTENDO o mesmo número de versão, é preciso invalidar a chave — senão o aluno vê o
+    // texto antigo (com o erro) por até 1h. Ver acesso.ts (`leitura:conteudo:...`).
+    await esquecer(`leitura:conteudo:${g.tenantId}:${documentoId}:${pub}`)
     await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_documentos', entidadeId: documentoId, depois: { substituiu_versao: pub }, atorId: g.atorId, tenantId: g.tenantId })
     revalidatePath('/admin/leitura'); revalidatePath(`/admin/leitura/${documentoId}`)
     return { ok: true, versao: pub }

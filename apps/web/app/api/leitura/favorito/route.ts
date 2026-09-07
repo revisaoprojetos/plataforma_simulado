@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
+import { docAcessivelAluno } from '@/lib/leitura/acesso'
 
 // POST /api/leitura/favorito — toggle idempotente do favorito de lei/dispositivo.
 export const dynamic = 'force-dynamic'
@@ -13,6 +14,9 @@ export async function POST(request: NextRequest) {
   if (!b.documento_id) return NextResponse.json({ message: 'documento_id ausente.' }, { status: 400 })
   const disp = b.disp_id ?? ''
   const svc = createAdminClient()
+  if (!(await docAcessivelAluno(svc, sessao.tenantId, b.documento_id, sessao.estudanteId))) {
+    return NextResponse.json({ message: 'Sem acesso a este documento.' }, { status: 403 })
+  }
   const { data: ja } = await svc.from('simulado_lei_favoritos').select('id').eq('estudante_id', sessao.estudanteId).eq('documento_id', b.documento_id).eq('disp_id', disp).maybeSingle()
   if (ja) {
     await svc.from('simulado_lei_favoritos').delete().eq('id', (ja as any).id)

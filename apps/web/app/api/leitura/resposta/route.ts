@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { onPraticaRespondida } from '@/lib/gamificacao'
+import { docAcessivelAluno } from '@/lib/leitura/acesso'
 
 // POST /api/leitura/resposta — responde uma questão inline da leitura (validação server-side).
 export const dynamic = 'force-dynamic'
@@ -16,6 +17,12 @@ export async function POST(request: NextRequest) {
   if (!documento_id || !questao_id || !alternativa_id) return NextResponse.json({ message: 'Dados obrigatórios ausentes.' }, { status: 400 })
 
   const svc = createAdminClient()
+
+  // Gate anti-IDOR: só responde questões de documento publicado/visível ao aluno (evita creditar XP
+  // e vazar gabarito de conteúdo restrito).
+  if (!(await docAcessivelAluno(svc, sessao.tenantId, documento_id, sessao.estudanteId))) {
+    return NextResponse.json({ message: 'Sem acesso a este documento.' }, { status: 403 })
+  }
 
   // A questão precisa estar realmente anexada a este documento (evita responder qualquer questão).
   const { data: vinc } = await svc.from('simulado_documento_questoes')

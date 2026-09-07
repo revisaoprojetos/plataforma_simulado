@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
+import { docAcessivelAluno } from '@/lib/leitura/acesso'
 
 // /api/leitura/anotacao — CRUD de anotações do aluno (grifos/notas).
 export const dynamic = 'force-dynamic'
@@ -28,6 +29,10 @@ export async function POST(request: NextRequest) {
   // Criar uma anotação nova (própria).
   if (!b.documento_id || !b.versao || b.inicio_char == null || b.fim_char == null || !b.exact) {
     return NextResponse.json({ message: 'Dados obrigatórios ausentes.' }, { status: 400 })
+  }
+  // Gate anti-IDOR: só grava em documento publicado/visível ao aluno.
+  if (!(await docAcessivelAluno(svc, sessao.tenantId, b.documento_id, sessao.estudanteId))) {
+    return NextResponse.json({ message: 'Sem acesso a este documento.' }, { status: 403 })
   }
   const { data, error } = await svc.from('simulado_leitura_anotacoes').insert({
     tenant_id: sessao.tenantId, estudante_id: sessao.estudanteId, documento_id: b.documento_id, documento_versao: b.versao,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
+import { docAcessivelAluno } from '@/lib/leitura/acesso'
 
 // POST /api/leitura/ponto — salva o último ponto (dispositivo) lido, por lei.
 export const dynamic = 'force-dynamic'
@@ -12,6 +13,9 @@ export async function POST(request: NextRequest) {
   try { b = await request.json() } catch { return NextResponse.json({ message: 'Requisição inválida.' }, { status: 400 }) }
   if (!b.documento_id) return NextResponse.json({ message: 'documento_id ausente.' }, { status: 400 })
   const svc = createAdminClient()
+  if (!(await docAcessivelAluno(svc, sessao.tenantId, b.documento_id, sessao.estudanteId))) {
+    return NextResponse.json({ message: 'Sem acesso a este documento.' }, { status: 403 })
+  }
   const { error } = await svc.from('simulado_leitura_ultimo_ponto').upsert(
     { tenant_id: sessao.tenantId, estudante_id: sessao.estudanteId, documento_id: b.documento_id, disp_id: b.disp_id ?? null, versao: b.versao ?? null, atualizado_em: new Date().toISOString() },
     { onConflict: 'estudante_id,documento_id' },
