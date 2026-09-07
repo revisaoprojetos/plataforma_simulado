@@ -122,17 +122,19 @@ export async function publicarDocumento(id: string, publicado: boolean): Promise
 async function carryOver(svc: ReturnType<typeof createAdminClient>, tenantId: string, documentoId: string, vAnt: number, vNova: number, htmlNovo: string) {
   if (vAnt === vNova) return
   // Progresso: copia p/ a nova versão (ignora se já existir).
-  const { data: prog } = await svc.from('simulado_leitura_progresso').select('estudante_id, pct, artigo_max, tempo_seg, iniciado_em, concluido_em').eq('documento_id', documentoId).eq('documento_versao', vAnt)
+  const { data: prog } = await svc.from('simulado_leitura_progresso').select('estudante_id, pct, artigo_max, tempo_seg, iniciado_em, concluido_em').eq('tenant_id', tenantId).eq('documento_id', documentoId).eq('documento_versao', vAnt)
   if (prog?.length) await svc.from('simulado_leitura_progresso').upsert((prog as any[]).map((p) => ({ tenant_id: tenantId, estudante_id: p.estudante_id, documento_id: documentoId, documento_versao: vNova, pct: p.pct, artigo_max: p.artigo_max, tempo_seg: p.tempo_seg, iniciado_em: p.iniciado_em, concluido_em: p.concluido_em })), { onConflict: 'estudante_id,documento_id,documento_versao', ignoreDuplicates: true })
   // Questões inline: re-liga à nova versão.
-  const { data: qs } = await svc.from('simulado_documento_questoes').select('questao_id, apos_artigo, obrigatoria, ordem').eq('documento_id', documentoId).eq('documento_versao', vAnt).eq('deletado', false)
+  const { data: qs } = await svc.from('simulado_documento_questoes').select('questao_id, apos_artigo, obrigatoria, ordem').eq('tenant_id', tenantId).eq('documento_id', documentoId).eq('documento_versao', vAnt).eq('deletado', false)
   if (qs?.length) await svc.from('simulado_documento_questoes').upsert((qs as any[]).map((q) => ({ tenant_id: tenantId, documento_id: documentoId, documento_versao: vNova, questao_id: q.questao_id, apos_artigo: q.apos_artigo, obrigatoria: q.obrigatoria, ordem: q.ordem })), { onConflict: 'documento_id,documento_versao,questao_id', ignoreDuplicates: true })
   // Anotações (aluno + base): re-ancora pela espinha da nova versão; falha → revisao_necessaria.
-  const S = espinhaDeHtml(htmlNovo)
+  // Normaliza o cabeçalho ANTES de montar a espinha — o cliente/leitor usa limparCabecalhoHtml, então
+  // ancorar sobre o HTML cru (com DOCTYPE/XML textual) deslocaria todos os offsets da nova versão.
+  const S = espinhaDeHtml(limparCabecalhoHtml(htmlNovo))
   for (const tabela of ['simulado_leitura_anotacoes', 'simulado_documento_anotacoes_base'] as const) {
     const ehAluno = tabela === 'simulado_leitura_anotacoes'
     // Do aluno, carrega só as PRÓPRIAS (grifos base são re-clonados das novas base rows → sem duplicar).
-    let q = svc.from(tabela).select('*').eq('documento_id', documentoId).eq('documento_versao', vAnt).eq('deletado', false)
+    let q = svc.from(tabela).select('*').eq('tenant_id', tenantId).eq('documento_id', documentoId).eq('documento_versao', vAnt).eq('deletado', false)
     if (ehAluno) q = q.eq('origem', 'propria')
     const { data: anots, error } = await q
     if (error || !anots?.length) continue

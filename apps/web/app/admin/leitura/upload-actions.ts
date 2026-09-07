@@ -39,10 +39,22 @@ async function salvarConteudo(tenantId: string, atorId: string | null, documento
     const pub = doc.versao_publicada ?? doc.versao ?? 1
     let rasc = doc.versao_rascunho ?? pub
     if (rasc <= pub) {
-      // aloca rascunho separado da publicada (não muta a imutável).
-      const { data: mx } = await svc.from('simulado_documento_conteudos').select('versao').eq('documento_id', documentoId).order('versao', { ascending: false }).limit(1).maybeSingle()
-      rasc = ((mx as any)?.versao ?? pub) + 1
-      await svc.from('simulado_documentos').update({ versao_rascunho: rasc }).eq('id', documentoId).eq('tenant_id', tenantId)
+      // aloca rascunho separado da publicada (não muta a imutável). Guarda OTIMISTA: o UPDATE só
+      // vence se ninguém já alocou (versao_rascunho nulo ou <= publicada). Dois saves concorrentes
+      // não divergem: quem perde a corrida relê e reaproveita o rascunho já alocado.
+      const { data: mx } = await svc.from('simulado_documento_conteudos').select('versao').eq('tenant_id', tenantId).eq('documento_id', documentoId).order('versao', { ascending: false }).limit(1).maybeSingle()
+      const candidato = ((mx as any)?.versao ?? pub) + 1
+      const { data: ganhou } = await svc.from('simulado_documentos')
+        .update({ versao_rascunho: candidato })
+        .eq('id', documentoId).eq('tenant_id', tenantId)
+        .or(`versao_rascunho.is.null,versao_rascunho.lte.${pub}`)
+        .select('versao_rascunho')
+      if (ganhou && ganhou.length) {
+        rasc = candidato
+      } else {
+        const { data: re } = await svc.from('simulado_documentos').select('versao_rascunho').eq('id', documentoId).eq('tenant_id', tenantId).maybeSingle()
+        rasc = (re as any)?.versao_rascunho ?? candidato
+      }
     }
     versaoAlvo = rasc
   }
@@ -57,7 +69,7 @@ async function salvarConteudo(tenantId: string, atorId: string | null, documento
 
   // Dispositivos estruturados (A3) — regrava para a versão alvo. Tolerante à migração ausente.
   try {
-    await svc.from('simulado_lei_dispositivos').delete().eq('documento_id', documentoId).eq('versao', versaoAlvo)
+    await svc.from('simulado_lei_dispositivos').delete().eq('tenant_id', tenantId).eq('documento_id', documentoId).eq('versao', versaoAlvo)
     if (dispositivos.length) await svc.from('simulado_lei_dispositivos').insert(dispositivos.map((d) => ({
       tenant_id: tenantId, documento_id: documentoId, versao: versaoAlvo, id_estavel: d.id_estavel, tipo: d.tipo, rotulo: d.rotulo,
       caminho: d.caminho, ordem: d.ordem, texto_normalizado: d.texto, hash: createHash('sha1').update(d.texto).digest('hex').slice(0, 16),
