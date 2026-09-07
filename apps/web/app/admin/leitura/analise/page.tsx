@@ -7,20 +7,25 @@ import { formatBrt } from '@/lib/brt'
 
 export const dynamic = 'force-dynamic'
 
-export default async function AnaliseLeituraPage({ searchParams }: { searchParams: Promise<{ doc?: string }> }) {
+export default async function AnaliseLeituraPage({ searchParams }: { searchParams: Promise<{ doc?: string; p?: string }> }) {
   if (!(await checkPermission('relatorios:view'))) redirect('/admin')
   const access = await getCurrentAccess()
   if (!access.tenantId) redirect('/admin')
-  const { doc } = await searchParams
+  const { doc, p } = await searchParams
 
   // ── Detalhe de um documento ──
   if (doc) {
-    const det = await detalheDocumento(access.tenantId, doc)
+    const pagina = Math.max(1, Number(p) || 1)
+    const det = await detalheDocumento(access.tenantId, doc, pagina)
     if (!det) redirect('/admin/leitura/analise')
+    const totalPaginas = Math.max(1, Math.ceil(det.total / det.porPagina))
     return (
       <div className="space-y-5">
         <Link href="/admin/leitura/analise" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Análise · LegProc Digital</Link>
-        <h1 className="text-2xl font-bold tracking-tight">{det.titulo}</h1>
+        <div className="flex flex-wrap items-end justify-between gap-2">
+          <h1 className="text-2xl font-bold tracking-tight">{det.titulo}</h1>
+          <span className="text-sm text-muted-foreground tabular-nums">{det.total} aluno{det.total === 1 ? '' : 's'}</span>
+        </div>
         <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
           <table className="w-full text-sm">
             <thead className="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
@@ -48,6 +53,15 @@ export default async function AnaliseLeituraPage({ searchParams }: { searchParam
             </tbody>
           </table>
         </div>
+        {totalPaginas > 1 && (
+          <div className="flex items-center justify-between gap-2 text-sm">
+            <span className="text-xs text-muted-foreground">Página <b className="tabular-nums text-foreground">{det.pagina}</b> de <b className="tabular-nums text-foreground">{totalPaginas}</b></span>
+            <div className="flex items-center gap-1">
+              <PagLink href={`/admin/leitura/analise?doc=${doc}&p=${det.pagina - 1}`} disabled={det.pagina <= 1}>Anterior</PagLink>
+              <PagLink href={`/admin/leitura/analise?doc=${doc}&p=${det.pagina + 1}`} disabled={det.pagina >= totalPaginas}>Próxima</PagLink>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
@@ -85,4 +99,9 @@ export default async function AnaliseLeituraPage({ searchParams }: { searchParam
       </div>
     </div>
   )
+}
+
+function PagLink({ href, disabled, children }: { href: string; disabled?: boolean; children: React.ReactNode }) {
+  if (disabled) return <span className="inline-flex h-8 items-center rounded-lg border px-3 text-muted-foreground opacity-40">{children}</span>
+  return <Link href={href} className="inline-flex h-8 items-center rounded-lg border px-3 text-muted-foreground transition hover:bg-muted">{children}</Link>
 }

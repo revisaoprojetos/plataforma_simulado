@@ -114,6 +114,7 @@ export async function carregarDiffPadrao(
     .eq('documento_id', documentoId)
     .eq('tenant_id', g.tenantId)
     .order('versao', { ascending: false })
+    .limit(14) // só precisamos da atual + até 13 anteriores; evita puxar o HTML de TODAS as versões (egress)
   const rows = (data ?? []) as { versao: number; html: string | null }[]
   if (rows.length === 0) return { ok: true, vAntes: 1, vDepois: 1, diff: { blocos: [], resumo: RESUMO_ZERO } }
   const dep = rows[0].versao

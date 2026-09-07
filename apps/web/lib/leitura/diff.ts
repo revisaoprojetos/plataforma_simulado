@@ -153,11 +153,36 @@ export function reverterBlocoHtml(htmlRascunho: string, htmlAntes: string, ancho
   return rootR.toString()
 }
 
+/**
+ * Casamento de blocos por CHAVE em O(n+m) — fallback para documentos enormes onde a matriz DP do
+ * LCS (O(n·m)) estouraria memória/tempo. Casa cada key de A com a próxima ocorrência ainda livre em
+ * B; o que sobra vira add/rem. Perde otimalidade de ordenação, mas não trava.
+ */
+function opsPorChaveBlocos(a: any[], b: any[]): Array<{ t: 'eq' | 'rem' | 'add'; a?: any; b?: any }> {
+  const idxB = new Map<string, number[]>()
+  b.forEach((bl, j) => { const arr = idxB.get(bl.key) ?? []; arr.push(j); idxB.set(bl.key, arr) })
+  const ops: Array<{ t: 'eq' | 'rem' | 'add'; a?: any; b?: any }> = []
+  const usados = new Set<number>()
+  let jPrev = -1
+  for (const bl of a) {
+    const cand = (idxB.get(bl.key) ?? []).find((j) => j > jPrev && !usados.has(j))
+    if (cand != null) {
+      for (let j = jPrev + 1; j < cand; j++) if (!usados.has(j)) { ops.push({ t: 'add', b: b[j] }); usados.add(j) }
+      ops.push({ t: 'eq', a: bl, b: b[cand] }); usados.add(cand); jPrev = cand
+    } else {
+      ops.push({ t: 'rem', a: bl })
+    }
+  }
+  for (let j = jPrev + 1; j < b.length; j++) if (!usados.has(j)) ops.push({ t: 'add', b: b[j] })
+  return ops
+}
+
 /** Compara duas versões de HTML (já sanitizado) e devolve só o que MUDOU, em ordem. */
 export function diffDocumentos(htmlAntes: string, htmlDepois: string): DiffDoc {
   const A = extrairBlocos(htmlAntes)
   const B = extrairBlocos(htmlDepois)
-  const ops = lcsOps(A, B, (x, y) => x.key === y.key)
+  // Teto: acima de ~2M pares a DP do LCS de blocos explode → casamento por chave (O(n+m)).
+  const ops = A.length * B.length > 2_000_000 ? opsPorChaveBlocos(A, B) : lcsOps(A, B, (x, y) => x.key === y.key)
   const blocos: BlocoDiff[] = []
   const resumo = { mod: 0, add: 0, rem: 0, igual: 0 }
   for (let i = 0; i < ops.length; i++) {

@@ -509,9 +509,11 @@ export async function listarDocumentosAdmin(): Promise<{ ok: boolean; itens?: Do
   const ids = docs.map((d) => d.id)
   const artigosPorDoc = new Map<string, number>()
   if (ids.length) {
-    const { data: cont } = await svc.from('simulado_documento_conteudos').select('documento_id, versao, artigos').in('documento_id', ids)
+    // Chunk no .in() (LANDMINE do proxy) — o acervo pode crescer para dezenas/centenas de leis.
+    const cont = await fetchAllByIn<any>(ids, (chunk) =>
+      svc.from('simulado_documento_conteudos').select('documento_id, versao, artigos').eq('tenant_id', g.tenantId).in('documento_id', chunk).order('documento_id'))
     const versaoDoc = new Map(docs.map((d) => [d.id, d.versao]))
-    for (const c of (cont ?? []) as any[]) if (c.versao === versaoDoc.get(c.documento_id)) artigosPorDoc.set(c.documento_id, c.artigos ?? 0)
+    for (const c of cont) if (c.versao === versaoDoc.get(c.documento_id)) artigosPorDoc.set(c.documento_id, c.artigos ?? 0)
   }
   return { ok: true, itens: docs.map((d) => ({ ...d, artigos: artigosPorDoc.get(d.id) ?? 0 })) }
 }
