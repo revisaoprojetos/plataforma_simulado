@@ -562,16 +562,20 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
     const cont = contentRef.current
     if (!cont) return
     const onCab = (e: Event) => {
-      const box = (e.currentTarget as HTMLElement).closest('.caixa-colapsavel') as HTMLElement | null
+      const cab = e.currentTarget as HTMLElement
+      const box = cab.closest('.caixa-colapsavel') as HTMLElement | null
       if (!box) return
-      if (box.hasAttribute('data-aberto')) box.removeAttribute('data-aberto')
-      else box.setAttribute('data-aberto', '1')
+      const abrir = !box.hasAttribute('data-aberto')
+      if (abrir) box.setAttribute('data-aberto', '1'); else box.removeAttribute('data-aberto')
+      cab.setAttribute('aria-expanded', abrir ? 'true' : 'false')
       // Nudge imediato + ao FIM da transição, senão o overlay dos grifos mede um estado intermediário.
       window.dispatchEvent(new Event('resize'))
       box.querySelector('.caixa-corpo')?.addEventListener(
         'transitionend', () => window.dispatchEvent(new Event('resize')), { once: true },
       )
     }
+    // Acessibilidade: o cabeçalho é um botão — abre por Enter/Espaço, não só clique de mouse.
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); (e.currentTarget as HTMLElement).click() } }
     const ligados: HTMLElement[] = []
     // Pega data-caixa (novo) E as classes legadas box-stj/box-stf (conteúdo antigo).
     const caixas = Array.from(cont.querySelectorAll<HTMLElement>('[data-caixa="stj"], [data-caixa="stf"], .box-stj, .box-stf'))
@@ -581,6 +585,7 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
       if (filhos.length < 2) continue // sem corpo pra recolher
       const cab = filhos[0] as HTMLElement
       cab.classList.add('caixa-cab')
+      cab.setAttribute('role', 'button'); cab.setAttribute('tabindex', '0')
       const corpo = document.createElement('div'); corpo.className = 'caixa-corpo'
       const inner = document.createElement('div'); inner.className = 'caixa-corpo-in'
       for (const f of filhos.slice(1)) inner.appendChild(f)
@@ -593,9 +598,10 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
       // A caixa de LEGENDA dos grifos abre por padrão (o aluno vê as cores de cara); as demais recolhem.
       if (/^\s*LEGENDA\b/i.test(cab.textContent || '')) box.setAttribute('data-aberto', '1')
       else box.removeAttribute('data-aberto')
-      cab.addEventListener('click', onCab); ligados.push(cab)
+      cab.setAttribute('aria-expanded', box.hasAttribute('data-aberto') ? 'true' : 'false')
+      cab.addEventListener('click', onCab); cab.addEventListener('keydown', onKey); ligados.push(cab)
     }
-    return () => { for (const c of ligados) c.removeEventListener('click', onCab) }
+    return () => { for (const c of ligados) { c.removeEventListener('click', onCab); c.removeEventListener('keydown', onKey) } }
   }, [doc.html])
 
   return (
@@ -708,7 +714,7 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
           <div className="flex items-center gap-2 border-b px-3 py-1.5" style={{ borderColor: '#0000001a' }}>
             <Search className="h-4 w-4 shrink-0" style={{ color: cores.muted }} />
             <input autoFocus value={buscaQ} onChange={(e) => setBuscaQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') irMatch(e.shiftKey ? -1 : 1); if (e.key === 'Escape') { setBuscaAberta(false); setBuscaQ('') } }} placeholder="Buscar nesta lei…" className="min-w-32 flex-1 bg-transparent text-sm outline-none" style={{ color: cores.fg }} />
-            <span className="shrink-0 text-xs tabular-nums" style={{ color: cores.muted }}>{matches.length ? `${matchIdx + 1}/${matches.length}` : (buscaQ.trim().length >= 2 ? '0' : '')}</span>
+            <span className="shrink-0 text-xs tabular-nums" style={{ color: cores.muted }}>{matches.length ? `${matchIdx + 1}/${matches.length}${matches.length >= 500 ? '+' : ''}` : (buscaQ.trim().length >= 2 ? '0' : '')}</span>
             <button onClick={() => irMatch(-1)} disabled={!matches.length} className="rounded p-1 disabled:opacity-30" style={{ color: cores.fg }} aria-label="Anterior"><ChevronUp className="h-4 w-4" /></button>
             <button onClick={() => irMatch(1)} disabled={!matches.length} className="rounded p-1 disabled:opacity-30" style={{ color: cores.fg }} aria-label="Próximo"><ChevronDown className="h-4 w-4" /></button>
             <button onClick={() => { setBuscaAberta(false); setBuscaQ('') }} className="rounded p-1" style={{ color: cores.muted }} aria-label="Fechar busca"><X className="h-4 w-4" /></button>

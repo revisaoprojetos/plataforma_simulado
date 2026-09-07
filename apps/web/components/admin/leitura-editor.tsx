@@ -13,6 +13,7 @@ import {
   Strikethrough, ListOrdered, AlignLeft, AlignCenter, AlignRight, Palette, Eraser, Undo2, Redo2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { confirmar } from '@/components/ui/confirm-dialog'
 import { atualizarDocumento, publicarVersao, type Documento, type Materia, type SituacaoEditorial } from '@/app/admin/leitura/actions'
 import { carregarDiffDocumento, renomearVersao } from '@/app/admin/leitura/alteracoes-actions'
 import { salvarConteudoHtml, importarDocx } from '@/app/admin/leitura/upload-actions'
@@ -130,6 +131,8 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
     const nome = pubDesc.trim()
     setPublicando(true)
     ;(async () => {
+      // Substituir é destrutivo e irreversível (sobrescreve a versão publicada, sem histórico).
+      if (substituir && !(await confirmar({ titulo: 'Substituir a versão publicada?', mensagem: 'Isto sobrescreve o conteúdo da versão atual, sem criar histórico nem antes/depois. Não dá para desfazer.', confirmar: 'Substituir', destrutivo: true }))) { setPublicando(false); return }
       const r = await publicarVersao(documento.id, { tipo: pubTipo, descricao: nome || undefined, substituir, avisar: pubAvisar })
       // Garante que o NOME fique salvo na versão publicada, em QUALQUER modo/toggle.
       if (r.ok && nome && r.versao) await renomearVersao(documento.id, r.versao, nome)
