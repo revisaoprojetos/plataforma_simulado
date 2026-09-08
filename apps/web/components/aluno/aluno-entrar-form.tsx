@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertBox } from '@/components/ui/alert-box'
 import { cn } from '@/lib/utils'
-import { GraduationCap, Loader2, Wrench, Mail, IdCard, Phone, Lock, ArrowRight, CheckCircle2, ShieldCheck } from 'lucide-react'
+import { GraduationCap, Loader2, Wrench, Mail, IdCard, Phone, Lock, ArrowRight, CheckCircle2, ShieldCheck, Eye, EyeOff } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { LOGIN_DEFAULT, fundoLoginStyle, loginVars, corPrimariaLogin, corAccentLogin, entradaClasse, type LoginConfig } from '@/lib/login-config'
 import { LoginLoading } from '@/components/aluno/login-loading'
@@ -359,12 +359,28 @@ function Campo({ icon: Icon, type, placeholder, value, onChange, autoComplete, i
   icon: React.ComponentType<{ className?: string }>; type: string; placeholder: string; value: string
   onChange: (v: string) => void; autoComplete?: string; inputMode?: 'numeric' | 'tel'; required?: boolean; readOnly?: boolean
 }) {
+  // Campos de senha ganham o botão de mostrar/ocultar (ícone de olho).
+  const [verSenha, setVerSenha] = useState(false)
+  const ehSenha = type === 'password'
+  const tipoInput = ehSenha && verSenha ? 'text' : type
   return (
     <div className="group relative">
       <Icon className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
-      <input type={type} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)}
+      <input type={tipoInput} placeholder={placeholder} value={value} onChange={(e) => onChange(e.target.value)}
         autoComplete={autoComplete} inputMode={inputMode} required={required} readOnly={readOnly} tabIndex={readOnly ? -1 : undefined}
-        className="w-full rounded-xl border bg-card py-3 pl-11 pr-3.5 text-sm text-foreground placeholder:text-muted-foreground/70 outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/15" />
+        className={cn('w-full rounded-xl border bg-card py-3 pl-11 text-sm text-foreground placeholder:text-muted-foreground/70 outline-none transition-all focus:border-primary focus:ring-2 focus:ring-primary/15', ehSenha ? 'pr-11' : 'pr-3.5')} />
+      {ehSenha && !readOnly && (
+        <button
+          type="button"
+          onClick={() => setVerSenha((v) => !v)}
+          tabIndex={-1}
+          aria-label={verSenha ? 'Ocultar senha' : 'Mostrar senha'}
+          title={verSenha ? 'Ocultar senha' : 'Mostrar senha'}
+          className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-muted-foreground outline-none transition-colors hover:text-primary focus-visible:ring-2 focus-visible:ring-primary/30"
+        >
+          {verSenha ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+        </button>
+      )}
     </div>
   )
 }
