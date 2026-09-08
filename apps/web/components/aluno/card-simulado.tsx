@@ -69,7 +69,7 @@ export function CardSimulado({ s, dica = false, variant = 'poster' }: { s: ItemS
             ) : (
               <span className="flex flex-1 items-center justify-center rounded-lg bg-muted px-2.5 py-1.5 text-center text-[11px] text-muted-foreground">{s.statusLabel === 'Agendado' ? 'Ainda não abriu' : s.statusLabel === 'Em manutenção' ? '🔧 Em manutenção' : 'Indisponível'}</span>
             )}
-            {s.enunciadoUrl && <span className="relative z-20"><EnunciadoDownloadBotao url={s.enunciadoUrl} /></span>}
+            {s.enunciadoUrl && <span className="relative z-20 flex"><EnunciadoDownloadBotao url={s.enunciadoUrl} tone="claro" /></span>}
           </div>
         </div>
       </div>
