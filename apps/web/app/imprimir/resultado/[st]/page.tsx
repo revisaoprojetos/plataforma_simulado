@@ -97,8 +97,8 @@ export default async function ResultadoImprimirPage({ params, searchParams }: { 
           <div className="rounded border border-black/20 p-2"><div className="text-lg font-bold">{totalParticipantes ?? 0}</div><div className="text-xs">Participantes</div></div>
         </div>
 
-        {/* Por matéria */}
-        {gabaritoLiberado && agg.size > 0 && (
+        {/* Por matéria — usa a correção salva (não revela alternativa correta); mostra junto da nota. */}
+        {agg.size > 0 && (
           <div className="mb-5">
             <h2 className="mb-2 text-sm font-bold">Desempenho por matéria</h2>
             <table className="w-full text-sm">

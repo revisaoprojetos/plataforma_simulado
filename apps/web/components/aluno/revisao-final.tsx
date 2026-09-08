@@ -494,8 +494,8 @@ export function RevisaoFinal({
         {/* NPS — avaliação de satisfação ao concluir a prova (embed). Some após enviar. */}
         <NpsAvaliacao sessaoId={sessionToken} />
 
-        {/* Desempenho por matéria */}
-        {liberado && (data?.stats_por_disciplina?.length ?? 0) > 0 && (
+        {/* Desempenho por matéria — segue a liberação da NOTA (não revela alternativa correta). */}
+        {notaLiberada && (data?.stats_por_disciplina?.length ?? 0) > 0 && (
           <Card className="relative overflow-hidden">
             <FitaTopo />
             <CardContent className="space-y-3 p-5 pt-6">

@@ -21,8 +21,10 @@ function pilarSlugDe(cats: unknown[], disc: string): string {
   return ''
 }
 
-/** Questões do banco (com alternativas) na ordem DESIGNADA (simulado_pastas.ordem_questoes; fallback: id). */
-export async function carregarQuestoesBancoCore(svc: any, tenantId: string, bancoId: string, limite = 80): Promise<PreviewQuestao[]> {
+/** Questões do banco (com alternativas) na ordem DESIGNADA (simulado_pastas.ordem_questoes; fallback: id).
+ *  `limite` alto por padrão (500) para NÃO cortar a folha de respostas/caderno de simulados com 100+
+ *  questões — o corte em 80 fazia a folha do aluno parar na questão 80. */
+export async function carregarQuestoesBancoCore(svc: any, tenantId: string, bancoId: string, limite = 500): Promise<PreviewQuestao[]> {
   if (!bancoId) return []
   const vinc = await fetchAll<{ questao_id: string }>(() => svc.from('simulado_questao_pasta').select('questao_id').eq('pasta_id', bancoId).eq('tenant_id', tenantId).order('questao_id', { ascending: true }))
   let ordemBanco: string[] = []

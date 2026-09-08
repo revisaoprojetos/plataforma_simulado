@@ -107,6 +107,9 @@ export async function GET(request: NextRequest) {
   // Simulado PESSOAL do aluno (owner_estudante_id): gabarito/nota SEMPRE liberados (é o estudo dele).
   const pessoal = !!(simulado as any)?.owner_estudante_id
   const gabaritoLiberado = pessoal || liberacoes.gabaritoLiberado
+  // Nota/desempenho liberado — o "por matéria" usa a correção JÁ salva (não revela a alternativa
+  // correta), então segue a liberação da NOTA, não a do gabarito (senão some com gabarito "após janela").
+  const notaLiberadaR = pessoal || liberacoes.notaLiberada
 
   // Avisos de mudança de gabarito (anulação/troca) neste simulado → faixa no topo da revisão.
   const recorrecoes = (recs ?? []) as any[]
@@ -183,9 +186,10 @@ export async function GET(request: NextRequest) {
   const erros = (respostas ?? []).filter((r) => r.correta === false && !anuladaSet.has(r.questao_id as string) && !desconsideraSet.has(r.questao_id as string)).length
   const tipoCorrecao = (simulado?.regras as any)?.tipo_correcao === 'cebraspe' ? 'cebraspe' : 'pontuacao'
 
-  // Estatística por matéria/disciplina (só quando o gabarito está liberado).
+  // Estatística por matéria/disciplina (quando a NOTA está liberada — usa a correção salva, não
+  // revela a alternativa correta, então não depende do gabarito estar aberto).
   let statsPorDisciplina: Array<{ disciplina: string; acertos: number; total: number; percentual: number }> = []
-  if (gabaritoLiberado) {
+  if (notaLiberadaR) {
     const agg = new Map<string, { acertos: number; total: number }>()
     for (const row of sq ?? []) {
       const q = (row as any).questoes
@@ -274,7 +278,7 @@ export async function GET(request: NextRequest) {
     total_participantes: totalParticipantes ?? 0,
     stats_por_disciplina: statsPorDisciplina,
     gabarito_liberado: gabaritoLiberado,
-    nota_liberada: pessoal || liberacoes.notaLiberada,
+    nota_liberada: notaLiberadaR,
     caderno_liberado: liberacoes.cadernoParaAluno,
     aviso_gabarito: avisoGabarito,
     questoes,
