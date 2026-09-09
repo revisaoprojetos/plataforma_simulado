@@ -62,7 +62,6 @@ export function SecaoMetas({ onEditar, salvando }: { onEditar?: () => void; salv
       descricao="Confira, semana a semana, o que a Montagem gerou. Para editar, reordenar ou adicionar meta de simulado, abra o editor completo — que já traz tudo isso."
       colapsavel
       defaultAberto
-      completo={draft.metas.length > 0}
       acessorio={draft.metas.length > 0 ? <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">{draft.metas.length.toLocaleString('pt-BR')} meta(s)</span> : undefined}
     >
       <div className="space-y-3">

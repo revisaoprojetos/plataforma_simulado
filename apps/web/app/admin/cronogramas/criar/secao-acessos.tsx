@@ -62,7 +62,6 @@ export function SecaoAcessos() {
       descricao="Grupos de acesso que recebem o cronograma — é por eles que o aluno recebe. Opcional; dá para vincular depois."
       colapsavel
       defaultAberto
-      completo={draft.pacoteIds.length > 0}
       acessorio={draft.pacoteIds.length > 0 ? <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">{draft.pacoteIds.length} grupo(s)</span> : undefined}
     >
       {carregando ? (

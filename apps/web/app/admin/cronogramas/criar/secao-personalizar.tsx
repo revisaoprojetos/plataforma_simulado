@@ -19,7 +19,7 @@ export function SecaoPersonalizar() {
   }, [])
 
   return (
-    <Secao numero={1} titulo="Básico" descricao="Como o cronograma aparece no catálogo." colapsavel defaultAberto completo={draft.nome.trim().length >= 3}>
+    <Secao numero={1} titulo="Básico" descricao="Como o cronograma aparece no catálogo." colapsavel defaultAberto>
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1.5 sm:col-span-2">
           <Label>Nome</Label>
