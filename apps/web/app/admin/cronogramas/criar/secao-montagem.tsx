@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, ArrowDown, ArrowDownUp, ArrowUp, BookOpen, Calculator, CheckCircle2, Info, Layers, ListOrdered, Loader2, Plus, Scale, Settings2, Sparkles, Trash2, Wand2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -54,9 +54,27 @@ export function SecaoMontagem() {
         return { ...m, linhas: out, aulasPorSemana: Math.max(1, draft.diasNome.length) }
       })
     })
-    // Semeia uma vez; `draft.diasNome.length` é lido só p/ o padrão inicial de lições/semana.
+    // Semeia uma vez; `draft.diasNome.length` é lido só p/ o padrão inicial de aulas/semana.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setMontagem])
+
+  // Aulas por semana acompanha os DIAS DE CURSO (modelo "1 aula por dia"). Ao mudar os dias na
+  // Estrutura: se estava no padrão (== dias anteriores), segue o novo total; senão, só limita ao
+  // teto (não dá pra ter mais aulas/semana do que dias). Sem isso, reduzir os dias não mexia no
+  // Diagnóstico nem na geração (ficava preso no valor semeado).
+  const diasRef = useRef(draft.diasNome.length)
+  useEffect(() => {
+    const novo = draft.diasNome.length
+    const anterior = diasRef.current
+    if (novo === anterior) return
+    diasRef.current = novo
+    const dias = Math.max(1, novo)
+    setMontagem((m) => {
+      const eraPadrao = m.aulasPorSemana === Math.max(1, anterior)
+      const nv = Math.max(1, eraPadrao ? dias : Math.min(m.aulasPorSemana, dias))
+      return nv === m.aulasPorSemana ? m : { ...m, aulasPorSemana: nv }
+    })
+  }, [draft.diasNome.length, setMontagem])
 
   const rotuloTipo = (slug: string) => tipos.find((t) => t.slug === slug)?.nome ?? slug
   const corTipo = (slug: string) => tipos.find((t) => t.slug === slug)?.cor || null
@@ -85,7 +103,8 @@ export function SecaoMontagem() {
     })
   }
   function setAulasPorSemana(n: number) {
-    setMontagem((m) => ({ ...m, aulasPorSemana: Math.max(1, n || 1) }))
+    const dias = Math.max(1, draft.diasNome.length)
+    setMontagem((m) => ({ ...m, aulasPorSemana: Math.min(dias, Math.max(1, n || 1)) }))
   }
   function removerSelecionado(conjuntoId: string) {
     setMontagem((m) => ({ ...m, selecionados: m.selecionados.filter((s) => s.conjuntoId !== conjuntoId) }))
