@@ -40,6 +40,14 @@ import {
   type EntradaCronograma,
 } from './actions'
 
+// Feedback de interação padrão do catálogo. O `Button` base já tem `active:scale-[0.97]`
+// (press) + transição; aqui reforçamos o HOVER com um "pop" (escala) + fundo tintado da marca,
+// que no tema claro é bem mais visível que o `hover:bg-muted` (quase branco) do ghost.
+const ACAO_BTN = 'hover:scale-110 hover:bg-primary/10 dark:hover:bg-primary/20'
+const ACAO_BTN_DEL = 'hover:scale-110 hover:bg-destructive/10 dark:hover:bg-destructive/20'
+// Chips e botões custom (sem o `Button` base): pop no hover + encolher no press.
+const CHIP_ANIM = 'transition duration-150 hover:scale-105 active:scale-95'
+
 /** Rótulo curto de cada dia da semana, indexado pelo número do dia (0=domingo). */
 const DIAS = [
   { valor: 1, nome: 'Seg' },
@@ -497,7 +505,7 @@ export function CronogramasClient({
           <button
             type="button"
             onClick={() => router.push('/admin/cronogramas/criar')}
-            className="inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+            className={cn('inline-flex items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50', CHIP_ANIM)}
             style={{ background: GRAD_MARCA, boxShadow: GLOW_BTN }}
           >
             <Plus className="h-4 w-4" />
@@ -584,7 +592,8 @@ export function CronogramasClient({
             key={v}
             onClick={() => setFiltro(v)}
             className={cn(
-              'flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition',
+              'flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm',
+              CHIP_ANIM,
               filtro === v ? 'border-transparent bg-primary text-primary-foreground' : 'bg-card hover:bg-muted',
               n === 0 && v !== 'todos' && 'opacity-50',
             )}
@@ -600,7 +609,8 @@ export function CronogramasClient({
             <button
               onClick={() => setCarga('todas')}
               className={cn(
-                'rounded-full border px-3 py-1 text-sm transition',
+                'rounded-full border px-3 py-1 text-sm',
+                CHIP_ANIM,
                 carga === 'todas' ? 'border-transparent bg-primary text-primary-foreground' : 'bg-card hover:bg-muted',
               )}
             >
@@ -611,7 +621,8 @@ export function CronogramasClient({
                 key={h}
                 onClick={() => setCarga(h)}
                 className={cn(
-                  'flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm transition',
+                  'flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm',
+                  CHIP_ANIM,
                   carga === h ? 'border-transparent bg-primary text-primary-foreground' : 'bg-card hover:bg-muted',
                 )}
               >
@@ -857,6 +868,7 @@ export function CronogramasClient({
                         <Button
                           size="sm"
                           variant="ghost"
+                          className={ACAO_BTN}
                           onClick={() => liberar(c)}
                           disabled={ocupado(`lib:${c.id}`) || (c.status !== 'liberado' && c.metas === 0)}
                           title={
@@ -880,19 +892,19 @@ export function CronogramasClient({
                         </Button>
                         <Link
                           href={`/admin/cronogramas/${c.id}`}
-                          className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+                          className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), ACAO_BTN)}
                           title="Metas e pacotes"
                         >
                           <ListChecks className="h-4 w-4" />
                         </Link>
                         <button type="button" title="Mover para outra divisão" onClick={() => setMovendo(c)}
-                          className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+                          className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), ACAO_BTN)}>
                           {ocupado(`mov:${c.id}`) ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderInput className="h-4 w-4" />}
                         </button>
-                        <Button size="sm" variant="ghost" onClick={() => abrirEdicao(c)} disabled={pendente} title="Editar metadados">
+                        <Button size="sm" variant="ghost" className={ACAO_BTN} onClick={() => abrirEdicao(c)} disabled={pendente} title="Editar metadados">
                           <Pencil className="h-4 w-4" />
                         </Button>
-                        <Button size="sm" variant="ghost" onClick={() => excluir(c)} disabled={pendente} title="Excluir">
+                        <Button size="sm" variant="ghost" className={ACAO_BTN_DEL} onClick={() => excluir(c)} disabled={pendente} title="Excluir">
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
                       </div>
