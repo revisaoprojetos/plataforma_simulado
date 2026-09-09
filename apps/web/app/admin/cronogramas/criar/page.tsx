@@ -89,7 +89,7 @@ export default function CriarCronogramaPage() {
             <SecaoPersonalizar />
             <SecaoEstrutura />
             <SecaoMontagem />
-            <SecaoMetas />
+            <SecaoMetas onEditar={criar} salvando={salvando} />
             <SecaoLinks />
             <SecaoAcessos />
           </div>
