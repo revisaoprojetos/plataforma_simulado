@@ -164,7 +164,7 @@ function distribuirLicoes(config: ConfigMontagem, conteudos: ConteudoMontagem[],
       i = i > 0 ? i - 1 : CW.length - 1
     }
     avisos.push(
-      `As disciplinas selecionadas somam mais aulas do que ${config.aulasPorSemana}×${CW.length} semanas comportam — ${carry.length} lição(ões) foram empurradas para as últimas semanas. Aumente as semanas ou reduza os conteúdos.`,
+      `As disciplinas selecionadas somam mais aulas do que ${config.aulasPorSemana}×${CW.length} semanas comportam — ${carry.length} aula(s) foram empurradas para as últimas semanas. Aumente as semanas ou reduza os conteúdos.`,
     )
   }
   return { porSemana, avisos }

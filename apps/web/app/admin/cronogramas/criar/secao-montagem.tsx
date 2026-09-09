@@ -264,7 +264,7 @@ export function SecaoMontagem() {
             className="w-full rounded-xl border bg-muted/10 px-3 py-2.5 text-left transition hover:bg-muted/30"
           >
             <div className="flex items-center justify-between gap-2">
-              <span className="text-sm font-medium">{linhas.length} linha(s) · {aulasPorSemana} lição(ões)/semana</span>
+              <span className="text-sm font-medium">{linhas.length} linha(s) · {aulasPorSemana} aula(s)/semana</span>
               <span className="flex items-center gap-1 text-xs font-medium text-primary"><Settings2 className="h-3.5 w-3.5" /> Gerenciar</span>
             </div>
             <div className="mt-1.5 flex flex-wrap gap-1">
@@ -356,7 +356,7 @@ export function SecaoMontagem() {
                   )}
                   {validacao.sugAulasViavel && (
                     <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setAulasPorSemana(validacao.sugAulas)}>
-                      Lições/semana → {validacao.sugAulas}
+                      Aulas/semana → {validacao.sugAulas}
                     </Button>
                   )}
                 </div>
@@ -562,7 +562,7 @@ function GerenciarLinhas({
         {/* Barra: lições por semana + adicionar linha. */}
         <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
           <div className="flex items-center gap-2">
-            <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Lições por semana</Label>
+            <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Aulas por semana</Label>
             <Input type="number" min={1} max={maxAulas} value={aulasPorSemana} onChange={(e) => onAulasPorSemana(Number(e.target.value))} className="h-8 w-16" />
             <span className="text-xs text-muted-foreground">(1 aula por dia)</span>
           </div>
@@ -581,7 +581,7 @@ function GerenciarLinhas({
                   placeholder="Nome da linha"
                   className="h-7 min-w-0 flex-1 border-transparent bg-transparent px-1 text-sm font-semibold focus-visible:border-input focus-visible:bg-background"
                 />
-                {i === 0 && <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary" title="A 1ª linha é a lição base — é ela que o revezamento distribui.">lição base</span>}
+                {i === 0 && <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary" title="A 1ª linha é a aula base — é ela que o revezamento distribui.">aula base</span>}
                 <div className="flex shrink-0 flex-col">
                   <button onClick={() => onMover(l.id, -1)} disabled={i === 0} className="text-muted-foreground transition hover:text-foreground disabled:opacity-30" title="Subir (ordem no dia)"><ArrowUp className="h-3.5 w-3.5" /></button>
                   <button onClick={() => onMover(l.id, 1)} disabled={i === linhas.length - 1} className="text-muted-foreground transition hover:text-foreground disabled:opacity-30" title="Descer"><ArrowDown className="h-3.5 w-3.5" /></button>
@@ -608,7 +608,7 @@ function GerenciarLinhas({
                 <div className="w-40">
                   <Label className="mb-1 flex items-center gap-1 text-[11px] uppercase tracking-wide text-muted-foreground">
                     Referência
-                    <span className="cursor-help text-muted-foreground" title={'“Semana atual” = a lição desta semana. “N sem. antes” faz esta linha acompanhar as lições de N semanas atrás — ex.: a Resolução perseguir a lição (por isso a semana 1 fica só com a lição).'}>
+                    <span className="cursor-help text-muted-foreground" title={'“Semana atual” = a aula desta semana. “N sem. antes” faz esta linha acompanhar as aulas de N semanas atrás — ex.: a Resolução perseguir a aula (por isso a semana 1 fica só com a aula).'}>
                       <Info className="h-3 w-3" />
                     </span>
                   </Label>
