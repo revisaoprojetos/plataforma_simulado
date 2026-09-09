@@ -353,7 +353,7 @@ export function SecaoMontagem() {
                 <p className={cn('text-lg font-bold tabular-nums', validacao.saldo === 0 ? 'text-emerald-600 dark:text-emerald-400' : validacao.saldo < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-amber-600 dark:text-amber-400')}>
                   {validacao.saldo === 0 ? 'OK' : Math.abs(validacao.saldo).toLocaleString('pt-BR')}
                 </p>
-                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{validacao.saldo === 0 ? 'Compatível' : 'Faltam'}</p>
+                <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{validacao.saldo === 0 ? 'Compatível' : validacao.saldo < 0 ? 'Aulas a mais' : 'Faltam'}</p>
               </div>
             </div>
 
@@ -364,7 +364,7 @@ export function SecaoMontagem() {
                 <p className={cn('flex items-center gap-1.5 text-xs', validacao.saldo < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-amber-600 dark:text-amber-400')}>
                   <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
                   {validacao.saldo < 0
-                    ? `Faltam ${Math.abs(validacao.saldo)} espaço(s) — o excedente é empurrado para as últimas semanas.`
+                    ? `${Math.abs(validacao.saldo)} aula(s) a mais — o excedente é empurrado para as últimas semanas.`
                     : `Faltam ${validacao.saldo} aula(s) para preencher o cronograma (espaços vazios no fim).`}
                 </p>
                 <div className="flex flex-wrap gap-1.5">
