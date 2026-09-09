@@ -24,7 +24,7 @@ export function SecaoAcessos() {
   }
 
   return (
-    <Secao numero={6} titulo="Acessos" descricao="Grupos de acesso que recebem o cronograma — é por eles que o aluno recebe. Opcional; dá para vincular depois." colapsavel defaultAberto={false}>
+    <Secao numero={6} titulo="Acessos" descricao="Grupos de acesso que recebem o cronograma — é por eles que o aluno recebe. Opcional; dá para vincular depois." colapsavel defaultAberto>
       {carregando ? (
         <p className="flex items-center gap-2 py-2 text-sm text-muted-foreground">
           <Loader2 className="h-4 w-4 animate-spin" /> Carregando grupos de acesso…

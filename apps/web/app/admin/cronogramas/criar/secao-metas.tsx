@@ -160,7 +160,7 @@ export function SecaoMetas() {
       titulo="Ajuste fino das metas"
       descricao="Opcional. A Montagem por conteúdos acima já preenche tudo — aqui você revisa semana a semana, corrige ou adiciona metas avulsas. “Repetir semana” leva um padrão adiante (a aula avança sozinha)."
       colapsavel
-      defaultAberto={false}
+      defaultAberto
     >
       <div className="space-y-3">
         {/* Régua de semanas */}
