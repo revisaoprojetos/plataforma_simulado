@@ -72,31 +72,34 @@ export async function listarConteudos(
   const svc = createAdminClient()
   const pai = pastaId ?? null
 
-  // Pastas desta área, no nível atual.
-  const pastasRaw = await fetchAll<any>(() =>
-    svc
-      .from('simulado_pastas')
-      .select('id, nome, pai_id')
-      .eq('tenant_id', g.tenantId)
-      .eq('is_folder', true)
-      .eq('folder_area', AREA)
-      .order('nome') as any,
-  ).catch(() => [] as any[])
-  const pastas: PastaLista[] = (pastasRaw as any[]).filter((p) => (p.pai_id ?? null) === pai).map((p) => ({ id: p.id, nome: p.nome, pai_id: p.pai_id ?? null }))
-
   // Conjuntos no nível atual. Tolerante à coluna `tipo` (migração 20260902000000) ainda não aplicada.
   const selConj = 'id, nome, disciplina, disciplina_id, descricao, cor, pasta_id, ordem'
   const buscarConj = (cols: string) =>
     fetchAll<any>(() =>
       svc.from('simulado_cronograma_conjuntos').select(cols).eq('tenant_id', g.tenantId).eq('deletado', false).order('ordem').order('nome') as any,
     )
-  let conjuntosRaw: any[]
-  try {
-    conjuntosRaw = await buscarConj(`${selConj}, tipo`)
-  } catch (e: any) {
-    if (/tipo|column/i.test(e?.message ?? '')) conjuntosRaw = await buscarConj(selConj)
-    else throw e
-  }
+
+  // Pastas e conjuntos são independentes → carrega em paralelo (menos round-trips em série).
+  const [pastasRaw, conjuntosRaw] = await Promise.all([
+    fetchAll<any>(() =>
+      svc
+        .from('simulado_pastas')
+        .select('id, nome, pai_id')
+        .eq('tenant_id', g.tenantId)
+        .eq('is_folder', true)
+        .eq('folder_area', AREA)
+        .order('nome') as any,
+    ).catch(() => [] as any[]),
+    (async () => {
+      try {
+        return await buscarConj(`${selConj}, tipo`)
+      } catch (e: any) {
+        if (/tipo|column/i.test(e?.message ?? '')) return await buscarConj(selConj)
+        throw e
+      }
+    })(),
+  ])
+  const pastas: PastaLista[] = (pastasRaw as any[]).filter((p) => (p.pai_id ?? null) === pai).map((p) => ({ id: p.id, nome: p.nome, pai_id: p.pai_id ?? null }))
   const doNivel = (conjuntosRaw as any[]).filter((c) => (c.pasta_id ?? null) === pai)
 
   // Contagens por conjunto. "aulas" = DIAS de aula distintos (número da aula normalizado),
@@ -122,9 +125,23 @@ export async function listarConteudos(
       }
     }
     const aulaIds = aulas.map((a) => a.id)
+    // Contar questões por conjunto exige varrer os vínculos aula→questão. Fazer isso com
+    // fetchAllByIn(aulaIds) gera dezenas de lotes .in() (round-trips à Supabase) mesmo quando não
+    // há vínculo nenhum — o que fazia esta aba levar segundos. Primeiro um head-count barato: se o
+    // tenant não tem NENHUM vínculo, pula tudo; se tem, pagina com lotes maiores (menos round-trips).
+    let totalVinculos = 0
     if (aulaIds.length) {
-      const qs = await fetchAllByIn<any>(aulaIds, (chunk) =>
-        svc.from('simulado_cronograma_conjunto_aula_questoes').select('aula_id').eq('tenant_id', g.tenantId).in('aula_id', chunk).order('id') as any,
+      const { count } = await svc
+        .from('simulado_cronograma_conjunto_aula_questoes')
+        .select('*', { count: 'exact', head: true })
+        .eq('tenant_id', g.tenantId)
+      totalVinculos = count ?? 0
+    }
+    if (totalVinculos > 0) {
+      const qs = await fetchAllByIn<any>(
+        aulaIds,
+        (chunk) => svc.from('simulado_cronograma_conjunto_aula_questoes').select('aula_id').eq('tenant_id', g.tenantId).in('aula_id', chunk).order('id') as any,
+        { chunk: 200 },
       )
       const conjuntoDaAula = new Map<string, string>(aulas.map((a) => [a.id, a.conjunto_id]))
       for (const q of qs) {
