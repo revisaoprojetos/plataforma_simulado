@@ -63,9 +63,16 @@ export async function criarDocumento(titulo: string, pastaId?: string | null): P
   const g = await guard('leitura:create'); if (!g.ok) return { ok: false, error: g.error }
   const t = (titulo ?? '').trim() || 'Novo documento'
   const svc = createAdminClient()
+  // ordem = último+1 dentro do módulo (p/ a aula entrar no fim da trilha).
+  let ordem = 0
+  try {
+    const q = svc.from('simulado_documentos').select('ordem').eq('tenant_id', g.tenantId).eq('deletado', false)
+    const r = await (pastaId ? q.eq('pasta_id', pastaId) : q.is('pasta_id', null)).order('ordem', { ascending: false }).limit(1).maybeSingle()
+    ordem = ((r.data as any)?.ordem ?? -1) + 1
+  } catch { /* ordem ausente */ }
   const { data, error } = await svc
     .from('simulado_documentos')
-    .insert({ tenant_id: g.tenantId, titulo: t, pasta_id: pastaId ?? null, criado_por: g.atorId })
+    .insert({ tenant_id: g.tenantId, titulo: t, pasta_id: pastaId ?? null, ordem, criado_por: g.atorId })
     .select('id')
     .single()
   if (error) return { ok: false, error: error.message }
@@ -541,4 +548,137 @@ export async function listarDocumentosAdmin(): Promise<{ ok: boolean; itens?: Do
     for (const c of cont) if (c.versao === versaoDoc.get(c.documento_id)) artigosPorDoc.set(c.documento_id, c.artigos ?? 0)
   }
   return { ok: true, itens: docs.map((d) => ({ ...d, artigos: artigosPorDoc.get(d.id) ?? 0 })) }
+}
+
+// ===================== Banco de Aulas (módulos = pastas folder_area='leitura') =====================
+
+const AREA_LEITURA = 'leitura'
+export type ModuloLeitura = { id: string; nome: string; pai_id: string | null; cor: string | null; icone: string | null; capa_url: string | null; ordem: number; subpastas: number; aulas: number }
+export type BancoAulas = { ok: boolean; error?: string; pastas?: ModuloLeitura[]; aulas?: (Documento & { questoes?: number })[]; breadcrumb?: { id: string; nome: string }[]; modulos?: { id: string; nome: string }[] }
+
+/** `.order('ordem')` tolerante: se a coluna `ordem` ainda não existir, refaz ordenando por nome. */
+async function pastasLeitura(svc: any, tenantId: string): Promise<any[]> {
+  const base = () => svc.from('simulado_pastas').select('id, nome, pai_id, cor, icone, capa_url, ordem').eq('tenant_id', tenantId).eq('is_folder', true).eq('folder_area', AREA_LEITURA)
+  let r = await base().order('ordem', { ascending: true }).order('nome', { ascending: true })
+  if (r.error) r = await base().order('nome', { ascending: true })
+  return (r.data as any[]) ?? []
+}
+
+/** Um nível do banco de aulas: módulos (pastas) + aulas (documentos) + trilha de breadcrumb. */
+export async function listarBancoAulas(pastaId?: string | null): Promise<BancoAulas> {
+  const g = await guard('leitura:view'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const paiAtual = pastaId ?? null
+  const todasPastas = await pastasLeitura(svc, g.tenantId)
+  // Documentos: id+pasta_id de todos (p/ contar por pasta) e os do nível atual (detalhados).
+  const docs = await fetchAll<any>(() => svc.from('simulado_documentos').select('*').eq('tenant_id', g.tenantId).eq('deletado', false))
+  const docsPorPasta = new Map<string, number>()
+  for (const d of docs) { const k = d.pasta_id ?? '__root__'; docsPorPasta.set(k, (docsPorPasta.get(k) ?? 0) + 1) }
+  const subPorPasta = new Map<string, number>()
+  for (const p of todasPastas) { if (p.pai_id) subPorPasta.set(p.pai_id, (subPorPasta.get(p.pai_id) ?? 0) + 1) }
+
+  const pastas: ModuloLeitura[] = todasPastas.filter((p) => (p.pai_id ?? null) === paiAtual).map((p) => ({
+    id: p.id, nome: p.nome, pai_id: p.pai_id ?? null, cor: p.cor ?? null, icone: p.icone ?? null, capa_url: p.capa_url ?? null,
+    ordem: p.ordem ?? 0, subpastas: subPorPasta.get(p.id) ?? 0, aulas: docsPorPasta.get(p.id) ?? 0,
+  }))
+
+  const aulasNivel = docs.filter((d) => (d.pasta_id ?? null) === paiAtual)
+    .sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0) || String(b.atualizado_em).localeCompare(String(a.atualizado_em)))
+  const ids = aulasNivel.map((d) => d.id)
+  const artigosPorDoc = new Map<string, number>()
+  const questoesPorDoc = new Map<string, number>()
+  if (ids.length) {
+    const cont = await fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_documento_conteudos').select('documento_id, versao, artigos').eq('tenant_id', g.tenantId).in('documento_id', chunk).order('documento_id'))
+    const versaoDoc = new Map(aulasNivel.map((d) => [d.id, d.versao]))
+    for (const c of cont) if (c.versao === versaoDoc.get(c.documento_id)) artigosPorDoc.set(c.documento_id, c.artigos ?? 0)
+    const qs = await fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_documento_questoes').select('documento_id').eq('tenant_id', g.tenantId).eq('deletado', false).in('documento_id', chunk))
+    for (const q of qs) questoesPorDoc.set(q.documento_id, (questoesPorDoc.get(q.documento_id) ?? 0) + 1)
+  }
+  const aulas = aulasNivel.map((d) => ({ ...d, artigos: artigosPorDoc.get(d.id) ?? 0, questoes: questoesPorDoc.get(d.id) ?? 0 }))
+
+  // Breadcrumb subindo por pai_id.
+  const mapa = new Map(todasPastas.map((p) => [p.id, p]))
+  const breadcrumb: { id: string; nome: string }[] = []
+  let cur = paiAtual
+  while (cur && mapa.has(cur)) { const p = mapa.get(cur); breadcrumb.unshift({ id: p.id, nome: p.nome }); cur = p.pai_id ?? null }
+
+  return { ok: true, pastas, aulas, breadcrumb, modulos: todasPastas.map((p) => ({ id: p.id, nome: p.nome })) }
+}
+
+async function proximaOrdem(svc: any, tenantId: string, where: (q: any) => any): Promise<number> {
+  const r = await where(svc.from('simulado_pastas').select('ordem').eq('tenant_id', tenantId)).order('ordem', { ascending: false }).limit(1).maybeSingle()
+  return ((r.data as any)?.ordem ?? -1) + 1
+}
+
+export async function criarModuloLeitura(nome: string, paiId?: string | null): Promise<{ ok: boolean; id?: string; error?: string }> {
+  const g = await guard('leitura:create'); if (!g.ok) return { ok: false, error: g.error }
+  const n = (nome ?? '').trim() || 'Novo módulo'
+  const svc = createAdminClient()
+  let ordem = 0
+  try { ordem = await proximaOrdem(svc, g.tenantId, (q) => q.eq('folder_area', AREA_LEITURA).eq('is_folder', true).is('pai_id', paiId ?? null)) } catch { /* coluna ordem ausente */ }
+  const payload: Record<string, unknown> = { tenant_id: g.tenantId, nome: n, is_folder: true, folder_area: AREA_LEITURA, pai_id: paiId ?? null, ordem }
+  let { data, error } = await svc.from('simulado_pastas').insert(payload).select('id').single()
+  if (error && /ordem|column/i.test(error.message)) { delete payload.ordem; ({ data, error } = await svc.from('simulado_pastas').insert(payload).select('id').single()) }
+  if (error) return { ok: false, error: error.message }
+  revalidatePath('/admin/leitura')
+  return { ok: true, id: (data as any).id }
+}
+
+export async function renomearModuloLeitura(id: string, nome: string): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const n = (nome ?? '').trim(); if (!n) return { ok: false, error: 'Nome vazio.' }
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_pastas').update({ nome: n }).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  if (error) return { ok: false, error: error.message }
+  revalidatePath('/admin/leitura'); return { ok: true }
+}
+
+export async function atualizarModuloLeitura(id: string, patch: { cor?: string | null; icone?: string | null; capa_url?: string | null }): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const dados: Record<string, unknown> = {}
+  for (const k of ['cor', 'icone', 'capa_url'] as const) if (k in patch) dados[k] = (patch as any)[k]
+  const { error } = await svc.from('simulado_pastas').update(dados).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  if (error) return { ok: false, error: error.message }
+  revalidatePath('/admin/leitura'); return { ok: true }
+}
+
+export async function excluirModuloLeitura(id: string): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:delete'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const [{ count: subs }, { count: aulas }] = await Promise.all([
+    svc.from('simulado_pastas').select('id', { count: 'exact', head: true }).eq('tenant_id', g.tenantId).eq('pai_id', id),
+    svc.from('simulado_documentos').select('id', { count: 'exact', head: true }).eq('tenant_id', g.tenantId).eq('pasta_id', id).eq('deletado', false),
+  ])
+  if ((subs ?? 0) > 0 || (aulas ?? 0) > 0) return { ok: false, error: 'Esvazie o módulo antes de excluir (mova as aulas/submódulos).' }
+  const { error } = await svc.from('simulado_pastas').delete().eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  if (error) return { ok: false, error: error.message }
+  revalidatePath('/admin/leitura'); return { ok: true }
+}
+
+export async function moverAulaParaModulo(documentoId: string, pastaId: string | null): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_documentos').update({ pasta_id: pastaId, atualizado_em: new Date().toISOString() }).eq('id', documentoId).eq('tenant_id', g.tenantId)
+  if (error) return { ok: false, error: error.message }
+  revalidatePath('/admin/leitura'); return { ok: true }
+}
+
+/** Reordena AULAS (documentos) dentro de um módulo — grava `ordem = índice`. */
+export async function reordenarAulasLeitura(ids: string[]): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  for (let i = 0; i < ids.length; i++) await svc.from('simulado_documentos').update({ ordem: i }).eq('id', ids[i]).eq('tenant_id', g.tenantId)
+  revalidatePath('/admin/leitura'); return { ok: true }
+}
+
+/** Reordena MÓDULOS (pastas) — grava `ordem = índice` (tolerante à coluna ausente). */
+export async function reordenarModulosLeitura(ids: string[]): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  for (let i = 0; i < ids.length; i++) {
+    const { error } = await svc.from('simulado_pastas').update({ ordem: i }).eq('id', ids[i]).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+    if (error && /ordem|column/i.test(error.message)) return { ok: true } // coluna ainda não migrada — ignora silenciosamente
+  }
+  revalidatePath('/admin/leitura'); return { ok: true }
 }

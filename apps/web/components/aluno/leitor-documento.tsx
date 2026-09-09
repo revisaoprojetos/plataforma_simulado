@@ -35,7 +35,12 @@ const CORES_GRIFO = ['#fde047', '#86efac', '#93c5fd', '#f9a8d4', '#fca5a5'] // a
 // useLayoutEffect só faz sentido no cliente (evita warning de SSR do leitor).
 const useIsoLayout = typeof window !== 'undefined' ? useLayoutEffect : useEffect
 
-export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
+export function LeitorDocumento({ doc, trilha }: {
+  doc: DocumentoCarregado
+  // Modo trilha (2 etapas): 'leitura' = leitura pura (SEM questões inline; ao concluir → CTA questões);
+  // 'questoes' = painel read-only de consulta (documento + grifos, sem inline, sem concluir).
+  trilha?: { modo: 'leitura' | 'questoes'; questoesHref?: string; voltarHref?: string }
+}) {
   const [modo, setModo] = useState<Modo>((doc.prefs?.modo as Modo) || 'scroll')
   const [tema, setTema] = useState<Tema>((doc.prefs?.tema as Tema) || 'sepia')
   const [fonte, setFonte] = useState(doc.prefs?.fonte || 18)
@@ -167,7 +172,8 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
   //    renderizado por PORTAL). O texto delas é ignorado pela espinha das anotações. ──
   useIsoLayout(() => {
     const root = contentRef.current
-    if (!root) { setSlots([]); return }
+    // Em modo trilha as questões NÃO são inline (viram etapa separada) → não injeta nada.
+    if (!root || trilha) { setSlots([]); return }
     root.querySelectorAll('[data-leitura-q]').forEach((n) => n.remove())
     if (!doc.questoes?.length) { setSlots([]); return }
     const arts = Array.from(root.querySelectorAll<HTMLElement>('[data-art]'))
@@ -181,7 +187,7 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
       novos.push({ q, el: container })
     }
     setSlots(novos)
-  }, [doc.html, doc.questoes])
+  }, [doc.html, doc.questoes, trilha?.modo])
 
   // ── Medição do modo virar-página ──
   // 1) Largura da coluna = largura da viewport (muda em resize/modo). Ao mudar colW,
@@ -544,7 +550,8 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
   const obrigatoriasPendentes = (doc.questoes ?? []).filter((q) => q.obrigatoria && !respostas[q.docQuestaoId]).length
 
   async function concluir() {
-    if (obrigatoriasPendentes > 0) { toast.error(`Responda as ${obrigatoriasPendentes} pergunta(s) obrigatória(s) antes de concluir.`); return }
+    // Em trilha as obrigatórias são respondidas na ETAPA de questões (não inline) → não bloqueia aqui.
+    if (!trilha && obrigatoriasPendentes > 0) { toast.error(`Responda as ${obrigatoriasPendentes} pergunta(s) obrigatória(s) antes de concluir.`); return }
     if (doc.desafio.exigeFim && pctRef.current < 100) { toast.error('Leia até o fim para concluir.'); return }
     setConcluindo(true)
     try {
@@ -702,11 +709,21 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
               </div>
               <span className="text-xs tabular-nums" style={{ color: cores.muted }}>{pct}%</span>
             </div>
-            {concluido ? (
-              <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/15 px-2.5 py-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400"><CheckCircle2 className="h-4 w-4" /> Concluído</span>
+            {trilha?.modo === 'questoes' ? null : concluido ? (
+              trilha?.modo === 'leitura' && trilha.questoesHref ? (
+                <Link href={trilha.questoesHref} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition hover:opacity-90">
+                  <CheckCircle2 className="h-4 w-4" /> Ir para as questões
+                </Link>
+              ) : (
+                <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/15 px-2.5 py-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400"><CheckCircle2 className="h-4 w-4" /> Concluído</span>
+              )
             ) : doc.desafio.ativo ? (
               <button onClick={concluir} disabled={concluindo} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50">
                 {concluindo ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Concluir leitura
+              </button>
+            ) : trilha?.modo === 'leitura' ? (
+              <button onClick={concluir} disabled={concluindo} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50">
+                {concluindo ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Marcar como lido
               </button>
             ) : null}
           </div>
@@ -818,8 +835,8 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
         </div>
       </div>
 
-      {/* Questões inline: renderizadas DENTRO do conteúdo (portal p/ o contêiner injetado) */}
-      {slots.map((s) => createPortal(
+      {/* Questões inline: renderizadas DENTRO do conteúdo (portal). Em modo trilha NÃO aparecem inline. */}
+      {!trilha && slots.map((s) => createPortal(
         <QuestaoLeitura key={s.q.docQuestaoId} documentoId={doc.id} q={s.q} corFg={cores.fg} corMuted={cores.muted} onRespondida={(docQid) => setRespostas((p) => ({ ...p, [docQid]: true }))} />,
         s.el,
       ))}
