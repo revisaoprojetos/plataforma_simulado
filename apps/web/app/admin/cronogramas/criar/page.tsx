@@ -10,7 +10,6 @@ import { SecaoPersonalizar } from './secao-personalizar'
 import { SecaoEstrutura } from './secao-estrutura'
 import { SecaoMontagem } from './secao-montagem'
 import { SecaoMetas } from './secao-metas'
-import { SecaoLinks } from './secao-links'
 import { SecaoAcessos } from './secao-acessos'
 import { PreviaViva } from './previa-viva'
 
@@ -90,7 +89,6 @@ export default function CriarCronogramaPage() {
             <SecaoEstrutura />
             <SecaoMontagem />
             <SecaoMetas onEditar={criar} salvando={salvando} />
-            <SecaoLinks />
             <SecaoAcessos />
           </div>
         </div>
