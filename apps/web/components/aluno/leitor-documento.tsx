@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import {
-  ArrowLeft, ScrollText, BookOpen, ChevronLeft, ChevronRight, Minus, Plus,
+  ArrowLeft, ScrollText, BookOpen, Rows3, ChevronLeft, ChevronRight, Minus, Plus,
   Sun, Moon, Coffee, CheckCircle2, Loader2, X, PanelLeft, Highlighter, Trash2, StickyNote, Crosshair, Search, ChevronUp, ChevronDown, Star,
   Undo2, Redo2, RotateCcw,
 } from 'lucide-react'
@@ -16,7 +16,7 @@ import { QuestaoLeitura } from '@/components/aluno/questao-leitura'
 import { LeituraAtualizacaoAviso } from '@/components/aluno/leitura-atualizacao-aviso'
 import { GRIFOS, corDoGrifo, ehEstrutural } from '@/lib/leitura/grifos'
 
-type Modo = 'scroll' | 'flip'
+type Modo = 'scroll' | 'flip' | 'capitulo'
 type Tema = 'claro' | 'sepia' | 'escuro'
 interface Secao { id: string; art: number; label: string; tipo: string; nivel: number }
 // #3 — histórico de grifos (voltar/avançar). Cada ação é um "batch" (o reset apaga vários de uma vez).
@@ -45,6 +45,9 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
   const [concluido, setConcluido] = useState(doc.progresso.concluido)
   const [concluindo, setConcluindo] = useState(false)
   const [secoes, setSecoes] = useState<Secao[]>([])
+  // Modo capítulo: navega pelos títulos estruturais (nível 0). capAtual = índice do capítulo atual.
+  const [capAtual, setCapAtual] = useState(0)
+  const capitulos = useMemo(() => secoes.filter((s) => s.nivel === 0), [secoes])
 
   // Modo virar-página
   const [pagina, setPagina] = useState(0)
@@ -124,7 +127,7 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
     if (!el) return
     if (modo === 'flip' && !colW) return // aguarda a medição da coluna
     retomouRef.current = true
-    if (modo === 'scroll') el.scrollIntoView({ block: 'start' })
+    if (modo !== 'flip') el.scrollIntoView({ block: 'start' })
     else irPara(Math.floor(el.offsetLeft / (colW + GAP)))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [colW, modo, doc.ultimoDisp])
@@ -276,7 +279,7 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
     if (!vp || !ct) return
     const artEls = artElsRef.current, dispEls = dispElsRef.current
     let p = 0
-    if (modo === 'scroll') {
+    if (modo !== 'flip') {
       const max = ct.scrollHeight - vp.clientHeight
       // cabe na viewport → 100% (o aluno vê tudo); mas não conta 100% em conteúdo ainda não medido.
       p = max <= 0 ? (ct.scrollHeight > 4 ? 100 : 0) : Math.round((vp.scrollTop / max) * 100)
@@ -295,7 +298,7 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
     // Último ponto: dispositivo topo visível (para retomar depois).
     let topo: string | null = null
     for (const el of dispEls) {
-      const passou = modo === 'scroll' ? el.offsetTop <= vp.scrollTop + 8 : el.offsetLeft <= pagina * (colW + GAP) + 8
+      const passou = modo !== 'flip' ? el.offsetTop <= vp.scrollTop + 8 : el.offsetLeft <= pagina * (colW + GAP) + 8
       if (passou) topo = el.getAttribute('data-disp')
     }
     if (topo) dispTopRef.current = topo
@@ -380,7 +383,7 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
     const root = contentRef.current
     const el = root?.querySelector<HTMLElement>(`[data-disp="${CSS.escape(s.id)}"]`) ?? root?.querySelector<HTMLElement>(`#${CSS.escape(s.id)}`) ?? root?.querySelector<HTMLElement>(`[data-art="${s.art}"]`)
     if (!el) return
-    if (modo === 'scroll') { el.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
+    if (modo !== 'flip') { el.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
     else { const alvo = Math.floor(el.offsetLeft / (colW + GAP)); irPara(alvo) }
     // Pisca o dispositivo alvo (remove+reflow p/ reiniciar a animação em cliques repetidos).
     el.classList.remove('leitura-alvo'); void el.offsetWidth; el.classList.add('leitura-alvo')
@@ -393,7 +396,7 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
     setMatchIdx(n)
     const el = matches[n]?.el
     if (!el) return
-    if (modo === 'scroll') el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    if (modo !== 'flip') el.scrollIntoView({ behavior: 'smooth', block: 'center' })
     else irPara(Math.floor(el.offsetLeft / (colW + GAP)))
   }
 
@@ -534,7 +537,7 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
     const range = ancoraParaRange(esp, { inicio: a.inicio, fim: a.fim, exact: a.exact, prefix: a.prefix, suffix: a.suffix })
     const el = range?.startContainer.parentElement
     if (!el) return
-    if (modo === 'scroll') el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    if (modo !== 'flip') el.scrollIntoView({ behavior: 'smooth', block: 'center' })
     else irPara(Math.floor(el.offsetLeft / (colW + GAP)))
   }
 
@@ -621,7 +624,7 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
           {/* Ajustes de leitura */}
           <div className="space-y-3 border-b px-3 py-3" style={{ borderColor: '#0000001a' }}>
             <div className="flex items-center gap-1 rounded-lg border p-1" style={{ borderColor: '#0000001a' }}>
-              {([['scroll', 'Rolar', ScrollText], ['flip', 'Virar', BookOpen]] as const).map(([m, label, Icon]) => (
+              {([['scroll', 'Rolar', ScrollText], ['capitulo', 'Capítulo', Rows3], ['flip', 'Virar', BookOpen]] as const).map(([m, label, Icon]) => (
                 <button key={m} onClick={() => setModo(m)} className={cn('flex flex-1 items-center justify-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors', modo === m ? 'bg-primary text-primary-foreground' : '')} style={modo === m ? undefined : { color: cores.muted }}>
                   <Icon className="h-3.5 w-3.5" /> {label}
                 </button>
@@ -725,16 +728,16 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
         <div className="relative min-h-0 flex-1">
           <div
             ref={viewportRef}
-            onScroll={modo === 'scroll' ? onScroll : undefined}
+            onScroll={modo !== 'flip' ? onScroll : undefined}
             onTouchStart={modo === 'flip' ? onTouchStart : undefined}
             onTouchEnd={modo === 'flip' ? onTouchEnd : undefined}
             onMouseUp={aoSelecionar}
-            className={cn('h-full', modo === 'scroll' ? 'overflow-y-auto' : 'overflow-hidden')}
+            className={cn('h-full', modo !== 'flip' ? 'overflow-y-auto' : 'overflow-hidden')}
           >
             {/* wrapper posicionado: leva o transform (virar) p/ mover conteúdo E overlay juntos */}
             <div
               ref={wrapperRef}
-              className={cn('relative', modo === 'scroll' && 'mx-auto max-w-3xl')}
+              className={cn('relative', modo !== 'flip' && 'mx-auto max-w-3xl')}
               style={modo === 'flip' ? { height: '100%', transform: `translateX(-${pagina * (colW + GAP)}px)`, transition: 'transform 220ms ease' } : undefined}
             >
               <div
@@ -798,6 +801,19 @@ export function LeitorDocumento({ doc }: { doc: DocumentoCarregado }) {
               <button onClick={() => irPara(pagina + 1)} disabled={pagina >= totalPag - 1} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full border bg-white/70 p-2 shadow-sm backdrop-blur transition disabled:opacity-30 dark:bg-black/40" aria-label="Próxima página"><ChevronRight className="h-5 w-5" /></button>
               <div className="pointer-events-none absolute inset-x-0 bottom-2 text-center text-xs" style={{ color: cores.muted }}>{pagina + 1} / {totalPag}</div>
             </>
+          )}
+
+          {/* Modo CAPÍTULO: barra inferior com ← anterior / próximo → (navega pelos títulos estruturais). */}
+          {modo === 'capitulo' && capitulos.length > 0 && (
+            <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 border-t px-3 py-2" style={{ borderColor: '#0000001a', background: cores.bg }}>
+              <button onClick={() => { const i = Math.max(0, capAtual - 1); setCapAtual(i); pular(capitulos[i]) }} disabled={capAtual <= 0} className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition disabled:opacity-30" style={{ borderColor: '#0000001a', color: cores.fg }}>
+                <ChevronLeft className="h-4 w-4" /> Capítulo anterior
+              </button>
+              <span className="truncate px-2 text-[11px]" style={{ color: cores.muted }} title={capitulos[Math.min(capAtual, capitulos.length - 1)]?.label}>{capitulos[Math.min(capAtual, capitulos.length - 1)]?.label ?? ''}</span>
+              <button onClick={() => { const i = Math.min(capitulos.length - 1, capAtual + 1); setCapAtual(i); pular(capitulos[i]) }} disabled={capAtual >= capitulos.length - 1} className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition disabled:opacity-30" style={{ borderColor: '#0000001a', color: cores.fg }}>
+                Próximo capítulo <ChevronRight className="h-4 w-4" />
+              </button>
+            </div>
           )}
         </div>
       </div>

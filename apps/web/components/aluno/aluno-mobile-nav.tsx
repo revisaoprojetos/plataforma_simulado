@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { createPortal } from 'react-dom'
-import { Home, ClipboardList, Bell, Menu, GraduationCap, Sparkles, BookOpen, ClipboardCheck, ChevronRight } from 'lucide-react'
+import { Home, ClipboardList, Bell, Menu, GraduationCap, Lightbulb, BookOpen, ClipboardCheck, ChevronRight } from 'lucide-react'
 import { useSidebar } from '@/components/ui/sidebar'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useSWRGet } from '@/hooks/use-swr-get'
@@ -193,7 +193,7 @@ export function AlunoMobileNav({ navMode, logo, nome = 'Área do Aluno', subtitu
           >
             {[
               { href: '/aluno/simulados', icon: ClipboardCheck, titulo: 'Simulados Realizados', desc: meus > 0 ? `${meus} concluído${meus > 1 ? 's' : ''}, com notas` : 'Seus resultados e notas' },
-              { href: '/aluno/recomendado', icon: Sparkles, titulo: 'Recomendado', desc: 'Questões onde você mais erra' },
+              { href: '/aluno/recomendado', icon: Lightbulb, titulo: 'Recomendado', desc: 'Questões onde você mais erra' },
               { href: '/aluno/questoes', icon: BookOpen, titulo: 'Banco de Questões', desc: 'Pratique com filtros' },
             ].map((o) => {
               const on = pathname.startsWith(o.href)

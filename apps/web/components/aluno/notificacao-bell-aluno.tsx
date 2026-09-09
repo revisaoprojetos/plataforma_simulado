@@ -30,6 +30,7 @@ export function NotificacaoBellAluno() {
   const [montado, setMontado] = useState(false) // presente no DOM (durante a animação)
   const [visivel, setVisivel] = useState(false)  // classe que dispara enter/exit
   const [pos, setPos] = useState<{ left: number; bottom: number } | null>(null)
+  const [balaoPos, setBalaoPos] = useState<{ left: number; bottom: number } | null>(null) // balão de aviso acima do sino
   const btnRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const fecharTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -75,6 +76,22 @@ export function NotificacaoBellAluno() {
 
   useEffect(() => () => { if (fecharTimer.current) clearTimeout(fecharTimer.current) }, [])
 
+  // Balão de aviso acima do sino: recalcula a posição (centro do sino) quando há não-lidas.
+  // Portal → não é cortado pela sidebar. Some sozinho quando `naoLidas` zera (marcar lidas).
+  useEffect(() => {
+    if (naoLidas <= 0) { setBalaoPos(null); return }
+    const calc = () => {
+      const r = btnRef.current?.getBoundingClientRect()
+      if (!r) return
+      const centro = r.left + r.width / 2
+      const left = Math.min(Math.max(centro, 96), window.innerWidth - 96) // clamp p/ não sair da tela
+      setBalaoPos({ left, bottom: window.innerHeight - r.top + 10 })
+    }
+    calc()
+    window.addEventListener('resize', calc)
+    return () => window.removeEventListener('resize', calc)
+  }, [naoLidas])
+
   async function marcarTodasLidas() {
     setItems((prev) => prev.map((i) => ({ ...i, lida: true })))
     setNaoLidas(0)
@@ -105,13 +122,26 @@ export function NotificacaoBellAluno() {
   const temNaoLidas = naoLidas > 0
   return (
     <>
-      <style>{`@keyframes sinoToca{0%{transform:rotate(0)}8%{transform:rotate(14deg)}16%{transform:rotate(-12deg)}24%{transform:rotate(9deg)}32%{transform:rotate(-6deg)}40%{transform:rotate(3deg)}48%,100%{transform:rotate(0)}}.sino-toca{animation:sinoToca 2.4s ease-in-out infinite;transform-origin:50% 2px}@media (prefers-reduced-motion:reduce){.sino-toca{animation:none}}`}</style>
+      <style>{`@keyframes sinoToca{0%{transform:rotate(0)}8%{transform:rotate(14deg)}16%{transform:rotate(-12deg)}24%{transform:rotate(9deg)}32%{transform:rotate(-6deg)}40%{transform:rotate(3deg)}48%,100%{transform:rotate(0)}}.sino-toca{animation:sinoToca 2.4s ease-in-out infinite;transform-origin:50% 2px}@keyframes balaoPop{0%{transform:translateY(8px) scale(.8);opacity:0}60%{transform:translateY(-2px) scale(1.05)}100%{transform:translateY(0) scale(1);opacity:1}}@keyframes balaoFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}.balao-pill{animation:balaoPop .38s ease-out,balaoFloat 2.2s ease-in-out .38s infinite}@media (prefers-reduced-motion:reduce){.sino-toca,.balao-pill{animation:none}}`}</style>
       <button ref={btnRef} onClick={toggle} aria-label="Notificações" className="relative flex h-9 w-9 items-center justify-center rounded-lg outline-none hover:bg-[color:var(--sidebar-accent)] focus-visible:ring-2 focus-visible:ring-ring">
         <Bell className={cn('h-[1.15rem] w-[1.15rem]', temNaoLidas && 'sino-toca')} fill={temNaoLidas ? 'currentColor' : 'none'} />
         {naoLidas > 0 && (
           <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] animate-in zoom-in items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-sm ring-2 ring-[color:var(--sidebar)]">{naoLidas > 9 ? '9+' : naoLidas}</span>
         )}
       </button>
+
+      {/* Balão de aviso ACIMA do sino — só quando há não-lidas e o painel está fechado. Some ao marcar lidas.
+          A ponta (seta) fica ancorada no sino e o balão cresce para a ESQUERDA. */}
+      {naoLidas > 0 && !montado && balaoPos && typeof document !== 'undefined' && createPortal(
+        <div className="pointer-events-none fixed z-[115] translate-x-1.5" style={{ left: balaoPos.left, bottom: balaoPos.bottom }} aria-hidden>
+          <div className="balao-pill absolute -right-3 bottom-0 flex items-center whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-bold text-white shadow-lg" style={{ background: 'var(--brand-accent, var(--primary))' }}>
+            {naoLidas} {naoLidas === 1 ? 'nova notificação' : 'novas notificações'}
+            {/* ponta apontando pra baixo, alinhada ao sino */}
+            <span className="absolute -bottom-1 right-3 h-2.5 w-2.5 rotate-45" style={{ background: 'var(--brand-accent, var(--primary))' }} />
+          </div>
+        </div>,
+        document.body,
+      )}
 
       {montado && pos && typeof document !== 'undefined' && createPortal(
         <div

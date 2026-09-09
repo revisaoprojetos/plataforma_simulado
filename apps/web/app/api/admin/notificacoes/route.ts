@@ -20,19 +20,23 @@ export async function GET() {
   const svc = createAdminClient()
   const { data } = await svc
     .from('simulado_sessoes_prova')
-    .select('id, finalizado_em, nota, estudantes:simulado_estudantes(nome), simulados:simulado_simulados(titulo)')
+    .select('id, estudante_id, simulado_id, finalizado_em, nota, estudantes:simulado_estudantes(nome, email), simulados:simulado_simulados(titulo)')
     .eq('tenant_id', access.tenantId)
     .eq('is_teste', false)
     .eq('status', 'finalizada')
     .not('finalizado_em', 'is', null)
     .order('finalizado_em', { ascending: false })
-    .limit(20)
+    .limit(100)
 
   const items = (data ?? []).map((s: any) => ({
     id: s.id,
-    titulo: `${s.estudantes?.nome ?? 'Aluno'} finalizou um simulado`,
-    descricao: `${s.simulados?.titulo ?? 'Simulado'} · nota ${(s.nota ?? 0).toFixed(1)}`,
+    tipo: 'simulado_finalizado' as const,
+    nome: s.estudantes?.nome ?? 'Aluno',
+    email: s.estudantes?.email ?? null,
+    descricao: `Finalizou ${s.simulados?.titulo ?? 'um simulado'} · nota ${(s.nota ?? 0).toFixed(1)}`,
     em: s.finalizado_em as string,
+    // Leva o admin ao desempenho DAQUELE aluno NAQUELE simulado, já na tentativa desta sessão.
+    href: (s.estudante_id && s.simulado_id) ? `/admin/estudantes/${s.estudante_id}/simulado/${s.simulado_id}?tentativa=${s.id}` : null,
   }))
 
   return NextResponse.json({ items })

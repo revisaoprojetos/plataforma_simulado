@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import {
   ArrowLeft, Save, Loader2, Eye, EyeOff, Upload, ClipboardPaste, PenLine, FileText,
   Bold, Italic, Underline, Heading, List, Trophy, Scale, Send, ChevronDown,
-  ImagePlus, Trash2, RefreshCw, Users, Settings2, X, Layers, Replace, Check, Bell, BellOff, PencilLine, Plus, Minus,
+  ImagePlus, Trash2, RefreshCw, Users, Settings2, HelpCircle, X, Layers, Replace, Check, Bell, BellOff, PencilLine, Plus, Minus,
   FilePlus2, Ban, SpellCheck,
   Strikethrough, ListOrdered, AlignLeft, AlignCenter, AlignRight, Palette, Eraser, Undo2, Redo2,
 } from 'lucide-react'
@@ -55,7 +55,9 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
 }) {
   const versaoAutoria = versaoEdicao ?? documento.versao
   const router = useRouter()
-  const [aba, setAba] = useState<'conteudo' | 'config' | 'acesso'>('conteudo')
+  // Ao criar/entrar num documento, abre já na CONFIGURAÇÃO (parte técnica): dados do card,
+  // conteúdo da lei e metadados. A aba "Conteúdo" (leitura/grifos) fica a um clique.
+  const [aba, setAba] = useState<'conteudo' | 'config' | 'questoes' | 'acesso'>('config')
   const [capa, setCapa] = useState<string | null>(documento.capa_url ?? null)
   const [processandoCapa, setProcessandoCapa] = useState(false)
   const capaRef = useRef<HTMLInputElement>(null)
@@ -386,21 +388,24 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
         document.body,
       )}
 
-      {/* Abas: Conteúdo · Configuração · Acesso — sublinhado animado */}
+      {/* Abas: Configuração · Conteúdo · Questões · Acesso — sublinhado animado (Configuração à esquerda) */}
       <div className="relative flex border-b text-sm">
-        {([['conteudo', 'Conteúdo', FileText], ['config', 'Configuração', Settings2], ['acesso', 'Acesso dos alunos', Users]] as const).map(([a, label, Icon]) => (
+        {([['config', 'Configuração', Settings2], ['conteudo', 'Conteúdo', FileText], ['questoes', 'Questões', HelpCircle], ['acesso', 'Acesso dos alunos', Users]] as const).map(([a, label, Icon]) => (
           <button key={a} onClick={() => setAba(a)} className={cn('flex flex-1 items-center justify-center gap-1.5 px-3 py-2.5 font-medium transition-colors', aba === a ? 'text-primary' : 'text-muted-foreground hover:text-foreground')}>
             <Icon className="h-4 w-4" /> {label}
           </button>
         ))}
-        <span className="absolute bottom-[-1px] h-0.5 rounded-full bg-primary transition-all duration-300 ease-out" style={{ width: '33.3333%', left: `${(aba === 'conteudo' ? 0 : aba === 'config' ? 1 : 2) * 33.3333}%` }} />
+        <span className="absolute bottom-[-1px] h-0.5 rounded-full bg-primary transition-all duration-300 ease-out" style={{ width: '25%', left: `${(aba === 'config' ? 0 : aba === 'conteudo' ? 1 : aba === 'questoes' ? 2 : 3) * 25}%` }} />
       </div>
 
       {aba === 'acesso' && <LeituraAcesso documentoId={documento.id} />}
 
+      {/* QUESTÕES: índice em blocos com inserção de questões do banco entre os artigos (Fase 2). */}
+      {aba === 'questoes' && <LeituraQuestoesAdmin documentoId={documento.id} versao={versaoAutoria} html={htmlAtual} />}
+
       {/* CONTEÚDO: prévia grande + painel de edição de grifos ao lado */}
       {aba === 'conteudo' && (
-        <LeituraPreviewGrifos documentoId={documento.id} html={htmlAtual} podeEditar={podeEditar} artigos={documento.artigos ?? 0} podeComparar={temRascunhoPendente || publicadaVersao > 1} onGrifoCtl={setGrifoCtl} />
+        <LeituraPreviewGrifos documentoId={documento.id} html={htmlAtual} podeEditar={podeEditar} artigos={documento.artigos ?? 0} podeComparar={temRascunhoPendente || publicadaVersao > 1} onGrifoCtl={setGrifoCtl} versaoQuestoes={versaoAutoria} />
       )}
 
       {/* CONFIGURAÇÃO: dados do card + importação + metadados + desafio + questões */}
@@ -614,10 +619,6 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
             </div>
           </details>
 
-          {/* Questões no meio da leitura (Fase 2) */}
-          {podeEditar && htmlAtual && (
-            <LeituraQuestoesAdmin documentoId={documento.id} versao={versaoAutoria} html={htmlAtual} />
-          )}
         </div>
       </div>
       )}

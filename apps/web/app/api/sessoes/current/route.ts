@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { type HudCores } from '@/lib/caderno-designer/types'
 import { resolverHudConfig } from '@/lib/hud/resolve-hud'
 import { funcaoEtiquetaPorQuestao, funcaoBloqueia } from '@/lib/simulado/etiqueta-funcao'
+import { etiquetasPorQuestao } from '@/lib/aluno/etiquetas-questao'
 
 // GET /api/sessoes/current?token={embed_token}&st={sessao_id}
 // Carrega o estado da sessão para o runner do aluno.
@@ -81,6 +82,7 @@ export async function GET(request: NextRequest) {
     enunciado: row.questoes?.enunciado ?? '',
     disciplina: row.questoes?.disciplinas?.nome ?? null,
     imagem_url: row.questoes?.imagem_url ?? null,
+    etiquetas: [] as { nome: string; cor: string | null }[], // badges de exibição — preenchidas abaixo
     pontuacao_total: null as number | null, // discursiva: preenchido abaixo (tolerante)
     linhas: null as number | null,
     categoria_discursiva: null as string | null,
@@ -109,6 +111,13 @@ export async function GET(request: NextRequest) {
       if (ef) { q.aviso = { nome: ef.nome, cor: ef.cor, funcao: ef.funcao }; if (funcaoBloqueia(ef.funcao)) q.bloqueada = true }
       else if (q.anulada) q.aviso = { nome: 'Questão anulada', cor: '#ef4444', funcao: 'anular' } // anulada do simulado sem etiqueta
     }
+  } catch { /* etiquetas ausentes */ }
+
+  // Etiquetas de EXIBIÇÃO (badges nome + cor) por questão — mostradas no pop-up de expandir.
+  try {
+    const qids = questoes.map((q) => q.id).filter(Boolean)
+    const map = await etiquetasPorQuestao(admin, sessao.tenant_id, qids)
+    for (const q of questoes) q.etiquetas = map.get(q.id) ?? []
   } catch { /* etiquetas ausentes */ }
 
   const respMap: Record<string, string> = {}

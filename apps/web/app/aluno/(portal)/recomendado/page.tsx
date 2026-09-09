@@ -6,7 +6,7 @@ import { QuestaoCard } from '@/components/aluno/questao-card'
 import { etiquetasPorQuestao } from '@/lib/aluno/etiquetas-questao'
 import { provasPorQuestao } from '@/lib/aluno/provas-questao'
 import { Card, CardContent } from '@/components/ui/card'
-import { Sparkles, Lightbulb } from 'lucide-react'
+import { Lightbulb } from 'lucide-react'
 import { DiagnosticoCard } from '@/components/aluno/diagnostico-card'
 
 export default async function RecomendadoPage() {
@@ -113,7 +113,7 @@ export default async function RecomendadoPage() {
     <div className="space-y-5">
       <div>
         <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight">
-          <Sparkles className="h-6 w-6 text-primary" /> Recomendado para você
+          <Lightbulb className="h-6 w-6 text-primary" /> Recomendado para você
         </h1>
         <p className="text-muted-foreground">Questões escolhidas com base no seu desempenho, focando onde você mais erra.</p>
       </div>

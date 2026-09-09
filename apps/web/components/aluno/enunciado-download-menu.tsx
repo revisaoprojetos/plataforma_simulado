@@ -34,19 +34,24 @@ function baixarEnunciado(url: string) {
  * Botão-ícone de download do "Caderno de questões (sem respostas)" — fica AO LADO do botão de
  * iniciar no card. Clica sem navegar (stopPropagation + preventDefault sobre o link do card).
  */
-export function EnunciadoDownloadBotao({ url, tone = 'escuro' }: { url: string; tone?: 'escuro' | 'claro' }) {
+export function EnunciadoDownloadBotao({ url, tone = 'escuro', full = false, dense = false }: { url: string; tone?: 'escuro' | 'claro'; full?: boolean; dense?: boolean }) {
   function baixar(e: React.MouseEvent) {
     e.preventDefault()
     e.stopPropagation()
     baixarEnunciado(url)
   }
-  const base = 'group/dl pointer-events-auto relative flex w-9 shrink-0 self-stretch items-center justify-center overflow-hidden rounded-lg border-[1.5px] py-1.5 transition-all hover:scale-[1.03] sm:py-2'
+  // `full` = botão comprido (largura cheia, com rótulo); senão ícone (w-9). `dense` = compacto (h-8),
+  // pra bater a altura dos botões pequenos do ticket.
+  const forma = !full
+    ? (dense ? 'h-7 w-9' : 'w-9 self-stretch py-1.5 hover:scale-[1.03] sm:py-2')
+    : (dense ? 'h-7 w-full gap-1.5 px-3 text-xs' : 'w-full gap-1.5 px-3 py-1.5 text-[13px] sm:py-2')
+  const base = `group/dl pointer-events-auto relative flex shrink-0 items-center justify-center overflow-hidden rounded-lg border-[1.5px] font-semibold transition-all ${forma}`
   // tone "claro": sobre card claro (variante ticket) → usa tokens do tema (visível em claro E escuro).
   if (tone === 'claro') {
     return (
       <button type="button" onClick={baixar} title="Baixar caderno de questões" aria-label="Baixar caderno de questões"
         className={`${base} border-border bg-card text-muted-foreground hover:border-primary hover:text-primary`}>
-        <FileDown className="relative z-10 h-4 w-4" />
+        <FileDown className="relative z-10 h-4 w-4" />{full && <span className="relative z-10 truncate">Baixar caderno</span>}
       </button>
     )
   }
@@ -55,7 +60,7 @@ export function EnunciadoDownloadBotao({ url, tone = 'escuro' }: { url: string; 
     <button type="button" onClick={baixar} title="Baixar caderno de questões" aria-label="Baixar caderno de questões"
       className={`${base} border-white/80 text-white`}>
       <span className="absolute inset-0 bg-white opacity-0 transition-opacity duration-300 group-hover/dl:opacity-100" />
-      <FileDown className="relative z-10 h-4 w-4 text-white transition-colors group-hover/dl:text-primary" />
+      <FileDown className="relative z-10 h-4 w-4 text-white transition-colors group-hover/dl:text-primary" />{full && <span className="relative z-10 truncate text-white transition-colors group-hover/dl:text-primary">Baixar caderno</span>}
     </button>
   )
 }

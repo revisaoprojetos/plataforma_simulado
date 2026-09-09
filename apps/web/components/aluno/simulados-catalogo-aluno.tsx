@@ -16,6 +16,8 @@ export type ProgressoGrupo = Record<string, { done: number; total: number }>
 const FILEIRA_BASIS = 'shrink-0 basis-[calc((100%-1rem)/2.25)] sm:basis-[calc((100%-2rem)/3.3)] lg:basis-[calc((100%-3rem)/4.3)] xl:basis-[calc((100%-4rem)/4.3)]'
 // Modo "largura total" (gamificação desativada → sem coluna lateral): ~5 cards por linha.
 const FILEIRA_BASIS_FULL = 'shrink-0 basis-[calc((100%-1rem)/2.25)] sm:basis-[calc((100%-2rem)/3.3)] lg:basis-[calc((100%-4rem)/5.3)] xl:basis-[calc((100%-4rem)/5.3)]'
+// Fileira "recentes" no tema TICKET (cards baixos/largos): mostra ~1–3 por vez + espia o próximo.
+const FILEIRA_BASIS_TICKET = 'shrink-0 basis-[calc((100%-1rem)/1.1)] sm:basis-[calc((100%-1.5rem)/1.7)] md:basis-[calc((100%-2rem)/2.3)] xl:basis-[calc((100%-3rem)/3.2)]'
 
 // Seções semânticas do aluno (por estado). Usadas na visão de dentro da pasta.
 const SECOES = [
@@ -190,15 +192,14 @@ export function SimuladosCatalogoAluno({ itens, grupos, progresso, recentes, pas
       {recent.length > 0 ? (
         <section className="space-y-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold"><Play className="h-4 w-4 text-primary" /> Simulados recentes</h2>
-          {view === 'ticket' ? (
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {recent.map((s) => <CardSimulado key={s.id} s={s} dica={s.id === dicaId} variant="ticket" />)}
-            </div>
-          ) : (
-            <FileiraHorizontal>
-              {recent.map((s) => <div key={s.id} className={basis}><CardSimulado s={s} dica={s.id === dicaId} /></div>)}
-            </FileiraHorizontal>
-          )}
+          {/* Fileira estilo Netflix (setas laterais + espia o próximo) — pôster ou ticket, conforme o tema do tenant. */}
+          <FileiraHorizontal>
+            {recent.map((s) => (
+              <div key={s.id} className={view === 'ticket' ? FILEIRA_BASIS_TICKET : basis}>
+                <CardSimulado s={s} dica={s.id === dicaId} variant={view === 'ticket' ? 'ticket' : 'poster'} />
+              </div>
+            ))}
+          </FileiraHorizontal>
         </section>
       ) : recentesConcluidos ? (
         <section className="space-y-3">

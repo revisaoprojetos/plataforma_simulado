@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useState, useTransition, useMemo, useRef } from 'react'
+import { Fragment, useEffect, useState, useTransition, useMemo, useRef, type ReactElement } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -36,6 +36,7 @@ export function AdicionarQuestoesDialog({
   onSelecionar,
   onImportar,
   jaIds,
+  trigger,
 }: {
   bancoId?: string | null
   /** Disciplinas do tenant para o filtro (id + nome). */
@@ -47,6 +48,8 @@ export function AdicionarQuestoesDialog({
   onImportar?: (questoes: QuestaoImport[]) => void
   /** Ids já escolhidos (para não repetir na lista) — usado no modo reutilizável. */
   jaIds?: Set<string>
+  /** Gatilho customizado (ex.: "＋ inserir aqui" na leitura). Sem isto, usa o botão padrão. */
+  trigger?: ReactElement
 }) {
   const [open, setOpen] = useState(false)
   const [modo, setModo] = useState<'existentes' | 'importar'>('existentes')
@@ -135,9 +138,9 @@ export function AdicionarQuestoesDialog({
 
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setSel(new Set()) }}>
-      <DialogTrigger render={<Button />}>
-        <Plus className="mr-2 h-4 w-4" /> Adicionar questões
-      </DialogTrigger>
+      {trigger
+        ? <DialogTrigger render={trigger} />
+        : <DialogTrigger render={<Button />}><Plus className="mr-2 h-4 w-4" /> Adicionar questões</DialogTrigger>}
       <DialogContent className="flex h-[85vh] max-h-[85vh] w-full flex-col gap-0 p-0 sm:max-w-3xl">
         <DialogHeader className="px-6 pt-6">
           <DialogTitle className="flex items-center gap-2"><Plus className="h-5 w-5" /> Adicionar questões ao banco</DialogTitle>
@@ -149,7 +152,7 @@ export function AdicionarQuestoesDialog({
           {([
             { k: 'importar', label: 'Importar questões', icon: Upload },
             { k: 'existentes', label: 'Questões do sistema', icon: ListChecks },
-          ] as const).map((t) => (
+          ] as const).filter((t) => t.k !== 'importar' || bancoId || onImportar).map((t) => (
             <button key={t.k} type="button" onClick={() => setModo(t.k)}
               className={cn('inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
                 modo === t.k ? 'border-primary bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted')}>

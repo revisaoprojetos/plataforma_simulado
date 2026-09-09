@@ -9,6 +9,8 @@ import { faixaUuidDoCodigo } from '@/lib/codigo-questao'
 import { espinhaDeHtml, reancorar } from '@/lib/leitura/reanchor'
 import { limparCabecalhoHtml } from '@/lib/leitura/limpar-cabecalho'
 import { esquecer } from '@/lib/cache/relatorio-cache'
+import { confirmarImportQuestoes } from '@/app/admin/banco-questoes/actions'
+import type { QuestaoImport } from '@/app/admin/banco-questoes/import-types'
 
 export type SituacaoEditorial = 'em_preparacao' | 'rascunho' | 'em_revisao' | 'publicada' | 'arquivada' | 'revogada'
 
@@ -498,6 +500,29 @@ export async function removerQuestaoDocumento(id: string): Promise<{ ok: boolean
   const { error } = await svc.from('simulado_documento_questoes').update({ deletado: true }).eq('id', id).eq('tenant_id', g.tenantId)
   if (error) return { ok: false, error: error.message }
   return { ok: true }
+}
+
+/**
+ * Importa questões de um arquivo (linhas já parseadas) DIRETO na leitura: cria/dedup no sistema
+ * (via confirmarImportQuestoes → questões avulsas) e ancora cada uma depois do artigo `aposArtigo`.
+ */
+export async function importarQuestoesLeitura(documentoId: string, versao: number, aposArtigo: number, rows: QuestaoImport[]): Promise<{ ok: boolean; count?: number; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  if (!rows?.length) return { ok: false, error: 'Nada para importar.' }
+  const imp = await confirmarImportQuestoes(null, rows)
+  if (!imp.ok) return { ok: false, error: imp.error ?? 'Falha ao importar as questões.' }
+  const ids = imp.ids ?? []
+  const svc = createAdminClient()
+  let count = 0
+  for (const questaoId of ids) {
+    const { error } = await svc.from('simulado_documento_questoes').upsert(
+      { tenant_id: g.tenantId, documento_id: documentoId, documento_versao: versao, questao_id: questaoId, apos_artigo: aposArtigo, obrigatoria: true, ordem: aposArtigo, deletado: false },
+      { onConflict: 'documento_id,documento_versao,questao_id' },
+    )
+    if (!error) count++
+  }
+  revalidatePath(`/admin/leitura/${documentoId}`)
+  return { ok: true, count }
 }
 
 /** Lista de documentos do admin (grade), com a contagem de artigos da versão vigente. */

@@ -17,6 +17,7 @@ import { ProvaIntro, ProvaLoading, type EstiloProvaLoading } from '@/components/
 import { toast } from 'sonner'
 import { RevisaoFinal } from '@/components/aluno/revisao-final'
 import { QuestaoDiscursivaEnvio } from '@/components/aluno/questao-discursiva-envio'
+import { FolhaResposta } from '@/components/prova/folha-resposta'
 
 // --- Types ---
 interface Alternativa {
@@ -37,6 +38,7 @@ interface Questao {
   pontuacao_total?: number | null
   linhas?: number | null
   categoria_discursiva?: string | null
+  etiquetas?: { nome: string; cor: string | null }[] // badges de exibição (pop-up da folha)
   alternativas: Alternativa[]
 }
 
@@ -102,6 +104,7 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
 }) {
   const searchParams = useSearchParams()
   const sessionToken = searchParams.get('st')
+  const folhaInicial = searchParams.get('folha') === '1' // veio do login com "responder apenas folha"
   const [dark, toggleDark] = useDarkMode(darkInicial)
 
   const [status, setStatus] = useState<ProvaStatus>('loading')
@@ -117,7 +120,8 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
   const [isFinalizando, setIsFinalizando] = useState(false)
   const [resultado, setResultado] = useState<{ nota: number; acertos: number; total: number } | null>(null)
   const [eliminadas, setEliminadas] = useState<Record<string, string[]>>({}) // tesoura: alternativas eliminadas por questão
-  const [iniciado, setIniciado] = useState(false) // pop-up de entrada confirmado?
+  const [iniciado, setIniciado] = useState(folhaInicial) // pop-up de entrada confirmado? (folha do login pula o pop-up)
+  const [modoFolha, setModoFolha] = useState(folhaInicial) // folha de respostas estilo ENEM (só gabarito)
   // HUD do caderno já resolvido no servidor (vem por prop) — telas de carregamento já nascem temadas, sem flash.
 
   // Tesoura: carrega/salva as eliminações por sessão (localStorage — sobrevive a reload)
@@ -145,12 +149,13 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
     try {
       const raw = localStorage.getItem('prog_' + sessao.id)
       if (raw) {
-        const p = JSON.parse(raw) as { q?: number; marcadas?: string[]; iniciado?: boolean }
+        const p = JSON.parse(raw) as { q?: number; marcadas?: string[]; iniciado?: boolean; folha?: boolean }
         if (typeof p.q === 'number' && sessao.questoes.length) {
           setQuestaoIndex(Math.max(0, Math.min(p.q, sessao.questoes.length - 1)))
         }
         if (Array.isArray(p.marcadas)) setMarcadas(new Set(p.marcadas))
         if (p.iniciado) setIniciado(true)
+        if (p.folha) setModoFolha(true)
       }
     } catch {}
     // Já respondeu algo => já começou: pula a tela de entrada ao retomar.
@@ -166,9 +171,10 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
         q: questaoIndex,
         marcadas: Array.from(marcadas),
         iniciado,
+        folha: modoFolha,
       }))
     } catch {}
-  }, [progHidratado, sessao?.id, questaoIndex, marcadas, iniciado])
+  }, [progHidratado, sessao?.id, questaoIndex, marcadas, iniciado, modoFolha])
 
   // Fetch sessão
   useEffect(() => {
@@ -307,13 +313,17 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
   function handleResponder(questaoId: string, alternativaId: string) {
     // Questão bloqueada (anulada/desconsiderada): não aceita resposta (o ponto é automático/nulo).
     if (sessao?.questoes.find((q) => q.id === questaoId)?.bloqueada) return
+    // Clicar de novo na alternativa já marcada = DESMARCAR (volta a "em branco").
+    const desmarcar = respostas[questaoId] === alternativaId
     setRespostas((prev) => {
-      const next = { ...prev, [questaoId]: alternativaId }
+      const next = { ...prev }
+      if (desmarcar) delete next[questaoId]
+      else next[questaoId] = alternativaId
       // Backup local imediato — sobrevive a fechar a página / queda de internet.
       try { if (sessao?.id) localStorage.setItem('resp_' + sessao.id, JSON.stringify(next)) } catch {}
       return next
     })
-    autoSave(questaoId, alternativaId)
+    autoSave(questaoId, desmarcar ? '' : alternativaId) // alternativa vazia → API apaga a resposta
   }
 
   function toggleMarcar(questaoId: string) {
@@ -513,6 +523,7 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
             tempoLabel={segundosRestantes !== null ? formatTime(segundosRestantes) : null}
             totalQuestoes={totalQuestoes}
             onIniciar={() => setIniciado(true)}
+            onIniciarFolha={() => { setModoFolha(true); setIniciado(true) }}
           />
         </div>
       </div>
@@ -522,6 +533,35 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
   // Vars do HUD da prova. Também aplicadas nos DialogContent abaixo porque o Dialog porta o
   // conteúdo para fora deste wrapper (document.body) — sem isto, os modais caem no tema padrão.
   const provaVars = hudCssVars(efetivarHud(sessao.hudCores, sessao.hudPorPagina, 'prova'), dark) as React.CSSProperties
+
+  // Modo "folha de respostas" (ENEM): uma tela só com bolhas A–E; marca e finaliza direto p/ o resultado.
+  if (modoFolha) {
+    return (
+      <FolhaResposta
+        titulo={sessao.simuladoTitulo ?? 'Simulado'}
+        logoUrl={sessao.branding?.logoUrl ?? null}
+        logoBg={sessao.branding?.logoBg}
+        logoEstilo={sessao.branding?.logoEstilo}
+        questoes={sessao.questoes}
+        respostas={respostas}
+        discPaginas={discPaginas}
+        onResponder={handleResponder}
+        onFinalizar={handleFinalizar}
+        isFinalizando={isFinalizando}
+        tempoLabel={segundosRestantes !== null ? formatTime(segundosRestantes) : null}
+        timerWarning={timerWarning}
+        mostrarTempo={mostrarTempo}
+        onToggleTempo={() => setMostrarTempo((v) => !v)}
+        dark={dark}
+        onToggleDark={toggleDark}
+        fontControl={<FontScaleControl scope={`aluno:${token}`} openDir="down" />}
+        provaVars={provaVars}
+        sessaoId={sessao.id}
+        onDiscCount={(qid, n) => setDiscPaginas((prev) => ({ ...prev, [qid]: n }))}
+      />
+    )
+  }
+
   return (
     <div style={provaVars}>
       {provaHudEl}

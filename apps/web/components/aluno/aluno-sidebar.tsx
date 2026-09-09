@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { LoginLoading } from '@/components/aluno/login-loading'
 import { type LoginConfig } from '@/lib/login-config'
-import { Home, ClipboardList, Sparkles, BookOpen, Star, NotebookPen, GraduationCap, LogOut, Trophy, Flame, Zap, Route, Library, CalendarDays, ChevronRight } from 'lucide-react'
+import { Home, ClipboardList, Lightbulb, BookOpen, Star, NotebookPen, GraduationCap, LogOut, Trophy, Flame, Zap, Route, Library, CalendarDays, ChevronRight } from 'lucide-react'
 import {
   Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupContent,
   SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarMenuSub, SidebarMenuSubItem,
@@ -38,7 +38,7 @@ const NAV: ItemNav[] = [
   { href: '/aluno', label: 'Início', icon: Home, exact: true, tour: 'nav-inicio' },
   { href: '/aluno/simulados', label: 'Simulados Realizados', icon: ClipboardList, tour: 'nav-simulados' },
   { href: '/aluno/trilha', label: 'Trilha', icon: Route, tour: 'nav-trilha' },
-  { href: '/aluno/recomendado', label: 'Recomendado', icon: Sparkles, tour: 'nav-recomendado' },
+  { href: '/aluno/recomendado', label: 'Recomendado', icon: Lightbulb, tour: 'nav-recomendado' },
   { href: '/aluno/ligas', label: 'Ligas', icon: Trophy, tour: 'nav-liga' },
   { href: '/aluno/questoes', label: 'Banco de Questões', icon: BookOpen, tour: 'nav-questoes' },
   { href: '/aluno/leitura', label: 'LegProc Digital', icon: Library, tour: 'nav-leitura' },

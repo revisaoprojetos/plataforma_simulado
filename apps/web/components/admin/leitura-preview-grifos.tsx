@@ -1,15 +1,33 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Pencil, Save, Loader2, Bold, Eraser, X, ListTree, GitCompare, ArrowDown, ArrowUp, Trash2, Search, ChevronDown, Check } from 'lucide-react'
+import { Pencil, Save, Loader2, Bold, Eraser, X, ListTree, GitCompare, ArrowDown, ArrowUp, Trash2, Search, ChevronDown, Check, HelpCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
+import { MarkdownContent } from '@/components/markdown-content'
 import { salvarConteudoHtml } from '@/app/admin/leitura/upload-actions'
 import { DiffEspelho } from '@/components/leitura/diff-espelho'
 import { listarVersoesDocumento, carregarDiffDocumento, reverterAlteracao } from '@/app/admin/leitura/alteracoes-actions'
+import { listarQuestoesDocumento, type QuestaoDoc } from '@/app/admin/leitura/actions'
 import type { BlocoDiff, DiffDoc, VersaoInfo } from '@/lib/leitura/diff-tipos'
+
+/** Card read-only "Questão no contexto" — injetado na prévia do admin no ponto do artigo. */
+function QuestaoContextoPreview({ q }: { q: QuestaoDoc }) {
+  const [aberto, setAberto] = useState(true)
+  return (
+    <div className="my-4 overflow-hidden rounded-xl border-2 border-primary/40 bg-primary/[0.04]">
+      <button type="button" onClick={() => setAberto((v) => !v)} className="flex w-full items-center gap-2 px-3 py-2 text-left text-[11px] font-bold uppercase tracking-wide text-primary">
+        <HelpCircle className="h-3.5 w-3.5" /> Questão no contexto
+        {q.obrigatoria && <span className="rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] normal-case tracking-normal">obrigatória</span>}
+        <ChevronDown className={cn('ml-auto h-4 w-4 shrink-0 transition-transform', !aberto && '-rotate-90')} />
+      </button>
+      {aberto && <div className="border-t border-primary/20 px-3 py-2.5"><MarkdownContent className="text-sm leading-relaxed">{q.enunciado}</MarkdownContent></div>}
+    </div>
+  )
+}
 
 // Editor WYSIWYG de grifos DENTRO da prévia: o admin seleciona um trecho e aplica
 // grifo (núcleo/complemento/prazo/exceção), negrito ou caixa (STJ/STF/Equipe/Atenção),
@@ -82,11 +100,15 @@ const RESUMO_ZERO = { mod: 0, add: 0, rem: 0, igual: 0 }
 /** Controles do editor de grifos expostos p/ a barra de topo do editor (desfazer/refazer). */
 export type GrifoCtl = { dirty: boolean; podeDesfazer: boolean; podeRefazer: boolean; desfazer: () => void; refazer: () => void }
 
-export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 0, podeComparar = false, onGrifoCtl }: {
+export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 0, podeComparar = false, onGrifoCtl, versaoQuestoes }: {
   documentoId: string; html: string; podeEditar: boolean; artigos?: number; podeComparar?: boolean
   onGrifoCtl?: (c: GrifoCtl | null) => void
+  /** Quando definido, carrega as questões inseridas dessa versão e as mostra inline (read-only) na prévia. */
+  versaoQuestoes?: number
 }) {
   const router = useRouter()
+  const [qDoc, setQDoc] = useState<QuestaoDoc[]>([])
+  const [qSlots, setQSlots] = useState<{ q: QuestaoDoc; el: HTMLElement }[]>([])
   const boxRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLDivElement>(null)
   const [editando, setEditando] = useState(false)
@@ -95,6 +117,35 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
   const [maxH, setMaxH] = useState<number>()
   const scrollRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<HTMLDivElement>(null)
+
+  // Questões inseridas (Fase 2) — carrega e mostra inline na prévia, no ponto do artigo (read-only).
+  useEffect(() => {
+    if (versaoQuestoes == null) return
+    let vivo = true
+    listarQuestoesDocumento(documentoId, versaoQuestoes).then((r) => { if (vivo && r.ok) setQDoc(r.itens ?? []) })
+    return () => { vivo = false }
+  }, [documentoId, versaoQuestoes])
+
+  // Injeta um contêiner após o artigo indicado (data-art) e portaliza o card ali. Só no modo VER
+  // (no editar, o conteúdo é contentEditable). A mutação dispara o recálculo dos grifos (MutationObserver).
+  useEffect(() => {
+    const root = viewRef.current
+    if (editando || !root) { setQSlots([]); return }
+    root.querySelectorAll('[data-leitura-q]').forEach((n) => n.remove())
+    if (!qDoc.length) { setQSlots([]); return }
+    const arts = Array.from(root.querySelectorAll<HTMLElement>('[data-art]'))
+    const novos: { q: QuestaoDoc; el: HTMLElement }[] = []
+    for (const q of qDoc) {
+      const container = document.createElement('div')
+      container.setAttribute('data-leitura-q', q.id)
+      const prox = arts.find((el) => Number(el.getAttribute('data-art')) > q.aposArtigo)
+      if (prox && prox.parentElement) prox.parentElement.insertBefore(container, prox)
+      else root.appendChild(container)
+      novos.push({ q, el: container })
+    }
+    setQSlots(novos)
+  }, [html, qDoc, editando])
+
   // Sidebar em abas: Índice × Alterações (antes/depois). O diff carrega sob demanda.
   const [aba, setAba] = useState<'indice' | 'alteracoes'>('indice')
   const [versoes, setVersoes] = useState<VersaoInfo[] | null>(null)
@@ -656,6 +707,9 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
           </div>
         )}
       </div>
+
+      {/* Cards read-only "Questão no contexto" portalizados nos contêineres injetados no ponto do artigo. */}
+      {qSlots.map((s) => createPortal(<QuestaoContextoPreview key={s.q.id} q={s.q} />, s.el))}
     </div>
   )
 }

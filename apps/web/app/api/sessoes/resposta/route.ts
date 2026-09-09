@@ -16,9 +16,11 @@ export async function POST(request: NextRequest) {
   }
 
   const { sessao_id, questao_id, alternativa_id } = body
-  if (!sessao_id || !questao_id || !alternativa_id) {
+  if (!sessao_id || !questao_id) {
     return NextResponse.json({ message: 'Dados obrigatórios ausentes.' }, { status: 400 })
   }
+  // Sem alternativa_id = DESMARCAR (aluno clicou de novo na alternativa já marcada).
+  const limpar = !alternativa_id
 
   const supabase = createAdminClient()
 
@@ -47,6 +49,17 @@ export async function POST(request: NextRequest) {
   const semPunicaoTempo = ((sim?.regras as any)?.permitir_continuar_apos_tempo === true)
   if (sessaoExpirada(sessao.iniciado_em, sim?.tempo_limite_min, sim?.data_fim, semPunicaoTempo)) {
     return NextResponse.json({ message: 'Tempo esgotado — a prova não aceita mais respostas.', expirado: true }, { status: 409 })
+  }
+
+  // DESMARCAR: apaga a resposta da questão (idempotente — some da nota e volta a "em branco").
+  if (limpar) {
+    const { error } = await supabase
+      .from('simulado_respostas_objetivas')
+      .delete()
+      .eq('sessao_id', sessao_id)
+      .eq('questao_id', questao_id)
+    if (error) return NextResponse.json({ message: error.message }, { status: 500 })
+    return NextResponse.json({ saved: true, cleared: true })
   }
 
   // Questão anulada NÃO aceita resposta (ponto garantido a todos). Ignora silenciosamente —

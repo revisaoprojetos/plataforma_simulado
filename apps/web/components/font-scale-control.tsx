@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { ALargeSmall, AArrowDown, AArrowUp, RotateCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
@@ -21,7 +22,21 @@ export function FontScaleControl({
   const [open, setOpen] = useState(false)       // aberto (lógico)
   const [montado, setMontado] = useState(false) // fica no DOM durante a animação de SAÍDA
   const boxRef = useRef<HTMLDivElement>(null)
-  const abrir = () => { setMontado(true); setOpen(true) }
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
+  const [coord, setCoord] = useState<{ left?: number; right?: number; top?: number; bottom?: number }>({})
+  const abrir = () => {
+    const r = triggerRef.current?.getBoundingClientRect()
+    if (r) {
+      const c: { left?: number; right?: number; top?: number; bottom?: number } = {}
+      if (openDir === 'up') c.bottom = window.innerHeight - r.top + 8
+      else c.top = r.bottom + 8
+      if (align === 'start') c.left = r.left
+      else c.right = window.innerWidth - r.right // 'end' (padrão) — ancora pela direita
+      setCoord(c)
+    }
+    setMontado(true); setOpen(true)
+  }
   const fechar = () => setOpen(false) // dispara a animação de saída; desmonta no onAnimationEnd
 
   // Hidrata do localStorage no mount (evita mismatch SSR) + sincroniza entre instâncias.
@@ -35,7 +50,7 @@ export function FontScaleControl({
   // Fecha ao clicar fora / Esc.
   useEffect(() => {
     if (!open) return
-    const onDown = (e: MouseEvent) => { if (boxRef.current && !boxRef.current.contains(e.target as Node)) fechar() }
+    const onDown = (e: MouseEvent) => { const t = e.target as Node; if (boxRef.current?.contains(t) || panelRef.current?.contains(t)) return; fechar() }
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') fechar() }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
@@ -55,15 +70,16 @@ export function FontScaleControl({
     <div ref={boxRef} className={cn('relative', className)}>
       <div className="group/fs relative">
         <button
+          ref={triggerRef}
           type="button"
           onClick={() => (open ? fechar() : abrir())}
           aria-label="Ajustar o tamanho do texto"
           aria-expanded={open}
           className={cn(
-            'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-            open
-              ? 'border-primary/40 bg-primary/10 text-primary'
-              : 'border-border bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground',
+            // Sem preenchimento: só a borda no accent (dourado da marca), com aparência "ativado".
+            // Hover (em qualquer estado) = fundo dourado + ícone branco.
+            'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring border-[color:var(--brand-accent,var(--primary))] text-[color:var(--brand-accent,var(--primary))] hover:bg-[color:var(--brand-accent,var(--primary))] hover:text-white',
+            open ? 'bg-[color:var(--brand-accent,var(--primary))]/15' : 'bg-transparent',
           )}
         >
           <ALargeSmall className="h-4 w-4" />
@@ -88,16 +104,17 @@ export function FontScaleControl({
         )}
       </div>
 
-      {montado && (
+      {montado && typeof document !== 'undefined' && createPortal(
         <div
+          ref={panelRef}
           role="dialog"
           aria-label="Tamanho do texto"
           onAnimationEnd={() => { if (!open) setMontado(false) }}
+          style={coord}
           className={cn(
-            'absolute z-[120] w-56 rounded-xl border bg-card p-3 shadow-xl duration-150',
-            openDir === 'up' ? 'bottom-full mb-2' : 'top-full mt-2',
-            align === 'end' ? 'right-0' : align === 'start' ? 'left-0' : 'left-1/2 -translate-x-1/2',
-            // Entrada quando aberto, saída quando fechando (fica montado até a animação terminar).
+            // Portalado no body (z-125) → fica ACIMA do balão de notificação (z-115) e escapa do
+            // contexto de empilhamento da sidebar (fixed z-10). Posição via `coord` (calculada no abrir).
+            'fixed z-[125] w-56 rounded-xl border bg-card p-3 shadow-xl duration-150',
             open
               ? cn('animate-in fade-in', openDir === 'up' ? 'slide-in-from-bottom-1' : 'slide-in-from-top-1')
               : cn('animate-out fade-out', openDir === 'up' ? 'slide-out-to-bottom-1' : 'slide-out-to-top-1'),
@@ -149,7 +166,8 @@ export function FontScaleControl({
               <RotateCcw className="h-3 w-3" /> Restaurar padrão
             </button>
           )}
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   )

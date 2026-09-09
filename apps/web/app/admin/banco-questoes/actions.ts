@@ -975,7 +975,7 @@ export async function confirmarImportQuestoes(bancoId: string | null, questoes: 
   await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_questoes', entidadeId: bancoId ?? 'sistema', depois: { importadas: criadas, jaExistiam, vinculadas, anuladas: anuladaIds.size } })
   revalidatePath('/admin/questoes')
   if (bancoId) revalidatePath(`/admin/banco-questoes/${bancoId}`)
-  return { ok: true, criadas, jaExistiam, vinculadas }
+  return { ok: true, criadas, jaExistiam, vinculadas, ids: idsParaVincular }
 }
 
 /** Salva a ordem manual das questões dentro de um banco (lista de questao_id). */

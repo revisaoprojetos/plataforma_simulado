@@ -49,4 +49,6 @@ export interface ResultadoImport {
   criadas?: number
   jaExistiam?: number
   vinculadas?: number
+  /** Ids das questões processadas (criadas + já existentes) — usado p/ ancorar na leitura. */
+  ids?: string[]
 }

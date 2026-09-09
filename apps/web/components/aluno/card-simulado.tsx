@@ -36,6 +36,8 @@ export function CardSimulado({ s, dica = false, variant = 'poster' }: { s: ItemS
     if (!label) return null
     return { label, Icon: s.tom === 'sky' ? Clock : StatusIcon }
   })()
+  const feito = s.finalizadas > 0                    // já realizou → oferece "Ver resultados"
+  const resultadoHref = `/aluno/simulados/${s.id}`   // área do simulado realizado (todas as tentativas)
 
   // ===== Variante TICKET: card baixo e retangular — metade esquerda com a imagem, direita com infos. =====
   if (variant === 'ticket') {
@@ -49,27 +51,37 @@ export function CardSimulado({ s, dica = false, variant = 'poster' }: { s: ItemS
         </div>
         {(s.podeFazer || s.podeAguardar) && <Link href={`/simulado/${s.embed_token}`} className="absolute inset-0 z-10" aria-label={s.titulo} />}
         {/* direita: infos */}
-        <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 p-3">
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 p-2.5">
           <div className="flex flex-wrap items-center gap-1.5">
             {s.novo && <span className="inline-block rounded-full bg-rose-500 px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-white">Novo</span>}
             {s.emAndamento && <span className="inline-block rounded bg-amber-500 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-white">Em andamento</span>}
-            {selo && <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-muted-foreground"><selo.Icon className="h-3 w-3" /> {selo.label}</span>}
+            {selo && <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground"><selo.Icon className="h-3 w-3" /> {selo.label}</span>}
           </div>
-          <h3 className="line-clamp-2 text-sm font-bold leading-tight text-foreground sm:text-[15px]">{s.titulo}</h3>
-          {s.refazer && !s.emAndamento && <p className="text-[10px] text-muted-foreground sm:text-[11px]">Já feito {s.finalizadas}x{Number.isFinite(s.restantes) ? ` · ${s.restantes} restante(s)` : ''}</p>}
-          <div className="relative mt-1 flex items-stretch gap-1.5">
+          <h3 className="line-clamp-1 text-sm font-bold leading-tight text-foreground sm:text-[15px]">{s.titulo}</h3>
+          <div className="relative mt-1 flex flex-col gap-1">
             {s.podeFazer ? (
-              <Link href={`/simulado/${s.embed_token}`} className="pointer-events-auto relative z-20 inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 overflow-hidden rounded-lg px-2.5 py-1.5 text-[13px] font-semibold text-white shadow-sm transition-all hover:brightness-110" style={{ background: `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 72%, #000))` }}>
+              <Link href={`/simulado/${s.embed_token}`} className="pointer-events-auto relative z-20 inline-flex h-7 w-full items-center justify-center gap-1.5 overflow-hidden rounded-lg px-2.5 text-[13px] font-semibold text-white shadow-sm transition-all hover:brightness-110" style={{ background: `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 72%, #000))` }}>
                 {s.emAndamento ? <><RotateCcw className="h-4 w-4 shrink-0" /> <span className="truncate">Continuar</span></> : s.refazer ? <><RotateCcw className="h-4 w-4 shrink-0" /> <span className="truncate">Refazer</span></> : <><Play className="h-4 w-4 shrink-0" /> <span className="truncate">Fazer agora</span></>}
               </Link>
             ) : s.podeAguardar ? (
-              <Link href={`/simulado/${s.embed_token}`} className="pointer-events-auto relative z-20 inline-flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-lg border-[1.5px] px-2.5 py-1.5 text-[13px] font-semibold shadow-sm transition-colors hover:bg-muted" style={{ borderColor: cor, color: cor }}>
+              <Link href={`/simulado/${s.embed_token}`} className="pointer-events-auto relative z-20 inline-flex h-7 w-full items-center justify-center gap-1.5 rounded-lg border-[1.5px] px-2.5 text-[13px] font-semibold shadow-sm transition-colors hover:bg-muted" style={{ borderColor: cor, color: cor }}>
                 <Clock className="h-4 w-4 shrink-0" /> <span className="truncate">Aguardar início</span>
               </Link>
             ) : (
-              <span className="flex flex-1 items-center justify-center rounded-lg bg-muted px-2.5 py-1.5 text-center text-[11px] text-muted-foreground">{s.statusLabel === 'Agendado' ? 'Ainda não abriu' : s.statusLabel === 'Em manutenção' ? '🔧 Em manutenção' : 'Indisponível'}</span>
+              <span className="flex h-7 w-full items-center justify-center rounded-lg bg-muted px-2.5 text-center text-[11px] text-muted-foreground">{s.statusLabel === 'Agendado' ? 'Ainda não abriu' : s.statusLabel === 'Em manutenção' ? '🔧 Em manutenção' : 'Indisponível'}</span>
             )}
-            {s.enunciadoUrl && <span className="relative z-20 flex"><EnunciadoDownloadBotao url={s.enunciadoUrl} tone="claro" /></span>}
+            {/* Baixar caderno (comprido, compacto). Se já FEITO, recolhe pro ícone e entra "Ver resultados". */}
+            {feito ? (
+              <div className="flex items-stretch gap-1.5">
+                {s.enunciadoUrl && <span className="relative z-20 flex min-w-0 flex-1"><EnunciadoDownloadBotao url={s.enunciadoUrl} tone="claro" full dense /></span>}
+                <Link href={resultadoHref} className="group/vr pointer-events-auto relative z-20 inline-flex h-7 min-w-0 flex-1 items-center justify-center gap-1.5 overflow-hidden rounded-lg border-[1.5px] px-2.5 text-xs font-semibold shadow-sm transition-colors hover:!text-white active:brightness-95" style={{ borderColor: cor, color: cor, background: `color-mix(in oklab, ${cor} 12%, transparent)` }}>
+                  <span className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover/vr:opacity-100" style={{ background: `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 72%, #000))` }} />
+                  <CircleCheck className="relative z-10 h-4 w-4 shrink-0" /> <span className="relative z-10 truncate">Ver resultados</span>
+                </Link>
+              </div>
+            ) : (
+              s.enunciadoUrl && <span className="relative z-20 flex"><EnunciadoDownloadBotao url={s.enunciadoUrl} tone="claro" full dense /></span>
+            )}
           </div>
         </div>
       </div>
@@ -106,7 +118,7 @@ export function CardSimulado({ s, dica = false, variant = 'poster' }: { s: ItemS
         {/* "Sempre disponível" (aberto/sky) é redundante e polui o card — esconde. Prazo/data/manutenção continuam aparecendo. */}
         {s.quando && s.tom !== 'sky' && <p className="mt-0.5 flex items-start gap-1 text-[11px] leading-snug text-white/80 sm:mt-1 sm:text-xs"><Clock className="mt-0.5 h-3 w-3 shrink-0" /> <span>{s.quando}</span></p>}
         {s.refazer && !s.emAndamento && <p className="text-[10px] text-white/70 sm:text-[11px]">Já feito {s.finalizadas}x{Number.isFinite(s.restantes) ? ` · ${s.restantes} restante(s)` : ''}</p>}
-        <div className="relative mt-2 flex items-stretch gap-1.5 sm:mt-2.5">
+        <div className="relative mt-2 flex flex-col gap-1.5 sm:mt-2.5">
           {/* Balão "Baixe o caderno" como CAMADA por cima, logo acima do botão (o texto do card fica atrás). */}
           {dica && s.enunciadoUrl && (
             <span className="pointer-events-none absolute bottom-full right-0 z-30 mb-1.5 inline-flex animate-bounce items-center gap-1 rounded-full bg-white/85 px-2.5 py-1 text-[10px] font-bold text-slate-900 shadow-md backdrop-blur-sm sm:text-[11px]">
@@ -116,19 +128,30 @@ export function CardSimulado({ s, dica = false, variant = 'poster' }: { s: ItemS
             </span>
           )}
           {s.podeFazer ? (
-            <Link href={`/simulado/${s.embed_token}`} className="group/btn pointer-events-auto relative inline-flex min-w-0 flex-1 items-center justify-center overflow-hidden rounded-lg border-[1.5px] px-2.5 py-1.5 text-[13px] font-semibold text-white shadow-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-lg sm:px-3 sm:py-2 sm:text-sm" style={{ borderColor: cor }}>
+            <Link href={`/simulado/${s.embed_token}`} className="group/btn pointer-events-auto relative inline-flex w-full items-center justify-center overflow-hidden rounded-lg border-[1.5px] px-2.5 py-1.5 text-[13px] font-semibold text-white shadow-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-lg sm:px-3 sm:py-2 sm:text-sm" style={{ borderColor: cor }}>
               <span className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover/btn:opacity-100" style={{ background: `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 72%, #000))` }} />
               <span className="relative z-10 inline-flex min-w-0 max-w-full items-center gap-1.5">{s.emAndamento ? <><RotateCcw className="h-4 w-4 shrink-0" /> <span className="truncate">Continuar</span></> : s.refazer ? <><RotateCcw className="h-4 w-4 shrink-0" /> <span className="truncate">Refazer</span></> : <><Play className="h-4 w-4 shrink-0" /> <span className="truncate">Fazer agora</span></>}</span>
             </Link>
           ) : s.podeAguardar ? (
-            <Link href={`/simulado/${s.embed_token}`} className="group/btn pointer-events-auto relative inline-flex min-w-0 flex-1 items-center justify-center overflow-hidden rounded-lg border-[1.5px] px-2.5 py-1.5 text-[13px] font-semibold text-white shadow-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-lg sm:px-3 sm:py-2 sm:text-sm" style={{ borderColor: cor }}>
+            <Link href={`/simulado/${s.embed_token}`} className="group/btn pointer-events-auto relative inline-flex w-full items-center justify-center overflow-hidden rounded-lg border-[1.5px] px-2.5 py-1.5 text-[13px] font-semibold text-white shadow-sm transition-all duration-300 hover:scale-[1.02] hover:shadow-lg sm:px-3 sm:py-2 sm:text-sm" style={{ borderColor: cor }}>
               <span className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover/btn:opacity-100" style={{ background: `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 72%, #000))` }} />
               <span className="relative z-10 inline-flex min-w-0 max-w-full items-center gap-1.5"><Clock className="h-4 w-4 shrink-0" /> <span className="truncate">Entrar e aguardar início</span></span>
             </Link>
           ) : (
-            <span className="flex flex-1 items-center justify-center rounded-lg bg-black/55 px-2.5 py-1.5 text-center text-[11px] text-white/80 sm:px-3 sm:py-2 sm:text-xs">{s.statusLabel === 'Agendado' ? 'Ainda não abriu' : s.statusLabel === 'Em manutenção' ? '🔧 Em manutenção' : 'Indisponível'}</span>
+            <span className="flex w-full items-center justify-center rounded-lg bg-black/55 px-2.5 py-1.5 text-center text-[11px] text-white/80 sm:px-3 sm:py-2 sm:text-xs">{s.statusLabel === 'Agendado' ? 'Ainda não abriu' : s.statusLabel === 'Em manutenção' ? '🔧 Em manutenção' : 'Indisponível'}</span>
           )}
-          {s.enunciadoUrl && <EnunciadoDownloadBotao url={s.enunciadoUrl} />}
+          {/* Já FEITO → "Ver resultados" + "Baixar caderno" (com rótulo), empilhados. */}
+          {feito ? (
+            <>
+              <Link href={resultadoHref} className="group/vr pointer-events-auto relative z-20 inline-flex w-full items-center justify-center gap-1.5 overflow-hidden rounded-lg border-[1.5px] border-white/80 bg-white/10 px-2.5 py-1.5 text-[13px] font-semibold text-white shadow-sm transition-colors hover:border-white active:brightness-95 sm:py-2 sm:text-sm">
+                <span className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover/vr:opacity-100" style={{ background: `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 72%, #000))` }} />
+                <CircleCheck className="relative z-10 h-4 w-4 shrink-0" /> <span className="relative z-10 truncate">Ver resultados</span>
+              </Link>
+              {s.enunciadoUrl && <EnunciadoDownloadBotao url={s.enunciadoUrl} full />}
+            </>
+          ) : (
+            s.enunciadoUrl && <EnunciadoDownloadBotao url={s.enunciadoUrl} full />
+          )}
         </div>
       </div>
     </div>

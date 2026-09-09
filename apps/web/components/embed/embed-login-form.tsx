@@ -8,7 +8,7 @@ import { z } from 'zod'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { BookOpen, Loader2, Clock, Calendar, ChevronLeft, BarChart3 } from 'lucide-react'
+import { BookOpen, Loader2, Clock, Calendar, ChevronLeft, BarChart3, ListChecks, PlayCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { FitaTopo } from '@/components/prova/fita-topo'
@@ -114,8 +114,9 @@ export function EmbedLoginForm({ token, metodo, simuladoTitulo, branding, prova,
   const [erro, setErro] = useState<ErroBloqueio | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [sucesso, setSucesso] = useState(false)
-  // Qual ação está em curso: 'iniciar' (fazer a prova) ou 'resultado' (ver relatório de quem já fez).
-  const [acao, setAcao] = useState<'iniciar' | 'resultado'>('iniciar')
+  // Qual ação está em curso: 'iniciar' (prova normal), 'folha' (só folha de respostas ENEM) ou 'resultado' (relatório de quem já fez).
+  const [acao, setAcao] = useState<'iniciar' | 'folha' | 'resultado'>('iniciar')
+  const modoRef = useRef<'iniciar' | 'folha' | 'resultado'>('iniciar') // preserva a ação escolhida no auto-retry da espera
   // Espera pela janela: aluno já se identificou, mas o simulado ainda não começou.
   const [aguardando, setAguardando] = useState<string | null>(null) // data_inicio (ISO)
   const [restante, setRestante] = useState(0) // ms até o início
@@ -131,8 +132,10 @@ export function EmbedLoginForm({ token, metodo, simuladoTitulo, branding, prova,
     formState: { errors },
   } = useForm<FormData>({ resolver: zodResolver(schema) })
 
-  async function onSubmit(data: FormData, modo: 'iniciar' | 'resultado' = 'iniciar') {
+  async function onSubmit(data: FormData, modo: 'iniciar' | 'folha' | 'resultado' = 'iniciar') {
+    if (isLoading) return // já há uma ação em curso — evita disparar duas (ex.: clicar iniciar e folha)
     ultimoLogin.current = data
+    modoRef.current = modo
     setErro(null)
     setAcao(modo)
     setIsLoading(true)
@@ -150,7 +153,8 @@ export function EmbedLoginForm({ token, metodo, simuladoTitulo, branding, prova,
           email: data.email,
           cpf: data.cpf,
           telefone: data.telefone,
-          modo,
+          // "folha" abre a mesma sessão que "iniciar"; o servidor só distingue iniciar × resultado.
+          modo: modo === 'folha' ? 'iniciar' : modo,
         }),
       })
 
@@ -178,10 +182,11 @@ export function EmbedLoginForm({ token, metodo, simuladoTitulo, branding, prova,
       // Entra na tela "Carregamento" do caderno antes de abrir o simulado/relatório.
       setAguardando(null)
       setSucesso(true)
-      toast.success(modo === 'resultado' ? 'Identificado! Abrindo seus resultados...' : 'Login realizado! Entrando no simulado...')
+      toast.success(modo === 'resultado' ? 'Identificado! Abrindo seus resultados...' : modo === 'folha' ? 'Login realizado! Abrindo a folha de respostas...' : 'Login realizado! Entrando no simulado...')
       if (destino === 'simulado') {
         // Navegação client-side: mantém a tela de carregamento temada, sem flash branco do navegador.
-        router.push(`/simulado/${token}?st=${sessao_id}`)
+        // `folha=1` faz o runner abrir direto na folha de respostas (estilo ENEM), sem o pop-up de entrada.
+        router.push(`/simulado/${token}?st=${sessao_id}${modo === 'folha' ? '&folha=1' : ''}`)
       } else {
         setTimeout(() => { window.location.href = `/embed/simulado/${token}?sessao_id=${sessao_id}` }, 1600)
       }
@@ -200,7 +205,7 @@ export function EmbedLoginForm({ token, metodo, simuladoTitulo, branding, prova,
       setRestante(ms)
       if (ms <= 0 && !isLoading && Date.now() - ultimaTentativa.current > 6000 && ultimoLogin.current) {
         ultimaTentativa.current = Date.now()
-        onSubmit(ultimoLogin.current)
+        onSubmit(ultimoLogin.current, modoRef.current)
       }
     }
     tick()
@@ -358,16 +363,35 @@ export function EmbedLoginForm({ token, metodo, simuladoTitulo, branding, prova,
               </div>
             )}
 
-            <Button type="submit" className="w-full" size="lg" disabled={isLoading} style={{ background: 'var(--prova-login-botao, var(--primary))' }}>
+            <Button type="submit" className="h-11 w-full text-[15px] font-semibold transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:brightness-110" size="lg" disabled={isLoading && acao === 'iniciar'} style={{ background: 'var(--prova-login-botao, var(--primary))' }}>
               {isLoading && acao === 'iniciar' ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
                   Verificando...
                 </>
               ) : (
-                'Iniciar simulado'
+                <><PlayCircle className="mr-2 h-5 w-5" /> Iniciar simulado</>
               )}
             </Button>
+
+            {/* Alternativa rápida: identifica e abre direto a folha de respostas estilo ENEM (só gabarito).
+                Mesmo tamanho/estilo do "Iniciar simulado" (fundo roxo da marca). */}
+            {destino === 'simulado' && (
+              <Button
+                type="button"
+                className="h-11 w-full text-[15px] font-semibold transition-all duration-300 hover:scale-[1.02] hover:shadow-lg hover:brightness-110"
+                size="lg"
+                disabled={isLoading && acao === 'folha'}
+                onClick={handleSubmit((d) => onSubmit(d, 'folha'))}
+                style={{ background: 'var(--prova-login-botao, var(--primary))' }}
+              >
+                {isLoading && acao === 'folha' ? (
+                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Verificando...</>
+                ) : (
+                  <><ListChecks className="mr-2 h-4 w-4" /> Responder apenas folha de resposta</>
+                )}
+              </Button>
+            )}
 
             {/* Separador "ou" */}
             <div className="flex items-center gap-3 pt-1">
@@ -382,7 +406,7 @@ export function EmbedLoginForm({ token, metodo, simuladoTitulo, branding, prova,
               variant="outline"
               className="w-full"
               size="lg"
-              disabled={isLoading}
+              disabled={isLoading && acao === 'resultado'}
               onClick={handleSubmit((d) => onSubmit(d, 'resultado'))}
             >
               {isLoading && acao === 'resultado' ? (

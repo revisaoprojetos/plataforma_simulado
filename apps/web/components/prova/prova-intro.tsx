@@ -213,6 +213,8 @@ export interface ProvaIntroProps {
   totalQuestoes: number
   descricao?: string
   onIniciar: () => void
+  /** Entra direto na folha de respostas estilo ENEM (só gabarito). Omitido = não oferece a opção. */
+  onIniciarFolha?: () => void
   iniciando?: boolean
   compact?: boolean
   /** entrou depois do horário de início do simulado */
@@ -303,6 +305,14 @@ export function ProvaIntro(p: ProvaIntroProps) {
         <Button data-campo="entradaBotao" className="w-full" size="lg" onClick={p.onIniciar} disabled={p.iniciando} style={{ background: 'var(--prova-entrada-botao, var(--primary))' }}>
           {p.iniciando ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Entrando...</> : 'Iniciar simulado'}
         </Button>
+
+        {/* Alternativa rápida: folha de respostas estilo ENEM (marca só o gabarito, sem navegar questão a questão). */}
+        {p.onIniciarFolha && (
+          <button type="button" onClick={p.onIniciarFolha} disabled={p.iniciando}
+            className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-dashed px-4 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:bg-muted hover:text-foreground disabled:opacity-60">
+            <ListChecks className="h-4 w-4" /> Responder apenas folha de resposta
+          </button>
+        )}
       </div>
     </div>
   )

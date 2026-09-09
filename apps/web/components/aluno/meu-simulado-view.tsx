@@ -184,7 +184,7 @@ export function MeuSimuladoView({
       <TabsList>
         <TabsTrigger value="geral"><LayoutDashboard className="h-4 w-4" /> Visão geral</TabsTrigger>
         <TabsTrigger value="questoes"><ClipboardCheck className="h-4 w-4" /> Questões</TabsTrigger>
-        {!ocultarComparativo && <TabsTrigger value="turma"><Users className="h-4 w-4" /> Comparativo</TabsTrigger>}
+        {!ocultarComparativo && <TabsTrigger value="turma"><Users className="h-4 w-4" /> Ranking</TabsTrigger>}
         {feedback && <TabsTrigger value="avaliacao"><MessageSquare className="h-4 w-4" /> Avaliação</TabsTrigger>}
       </TabsList>
 

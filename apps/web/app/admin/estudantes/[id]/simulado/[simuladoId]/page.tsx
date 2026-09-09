@@ -2,8 +2,7 @@ import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
-import { cn } from '@/lib/utils'
-import { buttonVariants } from '@/components/ui/button'
+import { textoSobre, veuTexto } from '@/lib/cor-contraste'
 import { iconeBanco } from '@/lib/banco-visual'
 import { tiposDeSimulados } from '@/lib/simulado/tipo'
 import { modalidadesDoAlunoV2, temEntregaV2, carregarEntregaBanco, type ModalidadeAluno } from '@/lib/caderno-teste/entrega-aluno'
@@ -121,20 +120,25 @@ function Hero({ est, sim, tipo, visual, Icon, c, id, tentativas }: {
   visual: { cor: string | null; icone: string | null; capa: string | null; bancoId: string | null }
   Icon: React.ComponentType<{ className?: string }>; c: string; id: string; tentativas: number
 }) {
+  // Contraste AUTOMÁTICO: texto/ícones seguem a luminância da COR do banco (que o admin escolhe).
+  // Fundo claro → texto escuro; fundo escuro → texto claro. Com capa (imagem) há véu escuro → texto claro.
+  const txt = visual.capa ? '#ffffff' : textoSobre(c)
+  const veu = (p: number) => (visual.capa ? `rgba(255,255,255,${p / 100})` : veuTexto(c, p))
+  const fundo = visual.capa ? undefined : { background: `linear-gradient(120deg, ${c} 0%, color-mix(in oklab, ${c} 78%, #000) 100%)` }
   return (
     <div className="overflow-hidden rounded-2xl border shadow-sm">
-      <div className="relative flex flex-wrap items-center gap-4 p-5 text-white" style={visual.capa ? undefined : { background: `linear-gradient(120deg, ${c} 0%, #0f172a 130%)` }}>
+      <div className="relative flex flex-wrap items-center gap-4 p-5" style={{ color: txt, ...(fundo ?? {}) }}>
         {visual.capa && <><img src={visual.capa} alt="" className="absolute inset-0 h-full w-full object-cover" /><div className="absolute inset-0 bg-black/55" /></>}
-        <Link href={`/admin/estudantes/${id}`} className={cn(buttonVariants({ variant: 'ghost', size: 'icon-sm' }), 'relative z-10 shrink-0 text-white hover:bg-white/15 hover:text-white')}>
+        <Link href={`/admin/estudantes/${id}`} aria-label="Voltar" className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition hover:opacity-70" style={{ color: txt }}>
           <ArrowLeft className="h-4 w-4" />
         </Link>
-        <span className="relative z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl ring-1 ring-white/25" style={{ background: c }}><Icon className="h-7 w-7" /></span>
+        <span className="relative z-10 flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl" style={{ background: veu(16), color: txt }}><Icon className="h-7 w-7" /></span>
         <div className="relative z-10 min-w-0">
-          <p className="text-[11px] uppercase tracking-wide text-white/70">Desempenho de {est.nome}</p>
-          <div className="flex items-center gap-2"><h1 className="truncate text-2xl font-bold">{sim.titulo}</h1><TipoSimuladoBadge tipo={tipo} /></div>
-          <p className="text-sm text-white/80">{tentativas} tentativa(s)</p>
+          <p className="text-[11px] uppercase tracking-wide" style={{ color: txt, opacity: 0.7 }}>Desempenho de {est.nome}</p>
+          <div className="flex items-center gap-2"><h1 className="truncate text-2xl font-bold" style={{ color: txt }}>{sim.titulo}</h1><TipoSimuladoBadge tipo={tipo} /></div>
+          <p className="text-sm" style={{ color: txt, opacity: 0.8 }}>{tentativas} tentativa(s)</p>
         </div>
-        {visual.bancoId && <Link href={`/admin/banco-questoes/${visual.bancoId}`} className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'relative z-10 ml-auto border-white/30 bg-white/10 text-white hover:bg-white/20')}>Abrir banco</Link>}
+        {visual.bancoId && <Link href={`/admin/banco-questoes/${visual.bancoId}`} className="relative z-10 ml-auto inline-flex items-center rounded-lg border px-3 py-1.5 text-sm font-medium transition hover:opacity-80" style={{ color: txt, borderColor: veu(35), background: veu(12) }}>Abrir banco</Link>}
       </div>
     </div>
   )
