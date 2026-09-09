@@ -15,6 +15,8 @@ export function PreviaMontagem({
   diasNome,
   rotuloTipo,
   usaLinksTipo,
+  links = [],
+  rotuloPlataforma = (s) => s,
 }: {
   metas: MetaMontada[]
   semanas: number[]
@@ -22,9 +24,19 @@ export function PreviaMontagem({
   diasNome: string[]
   rotuloTipo: (s: string) => string
   usaLinksTipo: (s: string) => boolean
+  /** Links (QC/TEC/PDF/vídeo) montados por (disciplina, aula) — para exibir nas linhas com `usaLinks`. */
+  links?: { disciplina: string; aula: string | null; tema: string; urls: Record<string, string> }[]
+  rotuloPlataforma?: (slug: string) => string
 }) {
   // Linhas "informativas" (LegProc): a célula mostra só a informação (a legislação), sem "Aula N".
   const soConteudo = useMemo(() => new Set(linhas.filter((l) => l.somenteComDado).map((l) => l.tipo)), [linhas])
+  // Lookup dos links por (disciplina, aula) — a linha de Resolução guarda os links à parte da meta.
+  const chaveLink = (disc: string, aula: string | null) => `${disc.trim().toLowerCase()}|${(aula ?? '').trim().toLowerCase()}`
+  const linkPorChave = useMemo(() => {
+    const m = new Map<string, { tema: string; urls: Record<string, string> }>()
+    for (const l of links) m.set(chaveLink(l.disciplina, l.aula), { tema: l.tema, urls: l.urls })
+    return m
+  }, [links])
   const porSemana = useMemo(() => {
     const m = new Map<number, MetaMontada[]>()
     for (const x of metas) {
@@ -41,7 +53,29 @@ export function PreviaMontagem({
     if ((m.conteudo ?? '').toUpperCase().startsWith('CONTINUAÇÃO')) return <span className="text-muted-foreground">{m.conteudo}</span>
     // LegProc: mostra a informação (legislação), não "Aula N – Disciplina".
     if (soConteudo.has(m.tipo)) return <span>{m.conteudo || `Aula ${m.aula}`}</span>
-    if (usaLinksTipo(m.tipo)) return <span className="font-medium">{m.disciplina}: Aula {m.aula}</span>
+    if (usaLinksTipo(m.tipo)) {
+      const link = linkPorChave.get(chaveLink(m.disciplina, m.aula))
+      const urls = link ? Object.entries(link.urls).filter(([, u]) => (u ?? '').trim()) : []
+      return (
+        <>
+          <span className="font-medium">{m.disciplina}: Aula {m.aula}</span>
+          {link?.tema ? <span className="block text-muted-foreground">{link.tema}</span> : null}
+          {urls.length > 0 ? (
+            <span className="mt-0.5 flex flex-wrap gap-1">
+              {urls.map(([slug, url]) => (
+                <a key={slug} href={url} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="rounded bg-primary/10 px-1 py-px text-[10px] font-medium text-primary hover:underline">
+                  {rotuloPlataforma(slug)}
+                </a>
+              ))}
+            </span>
+          ) : m.questaoIds?.length ? (
+            <span className="block text-muted-foreground">{m.questaoIds.length} questão(ões)</span>
+          ) : (
+            <span className="block italic text-muted-foreground/60">sem links cadastrados</span>
+          )}
+        </>
+      )
+    }
     return (
       <>
         <span className="font-medium">Aula {m.aula} – {m.disciplina}</span>

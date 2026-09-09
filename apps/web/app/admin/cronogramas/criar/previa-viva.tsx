@@ -40,6 +40,7 @@ export function PreviaViva() {
 
   const rotuloTipo = (slug: string) => tipos.find((t) => t.slug === slug)?.nome ?? slug
   const usaLinksTipo = (slug: string) => montagem.linhas.find((l) => l.tipo === slug)?.usaLinks ?? false
+  const rotuloPlataforma = (slug: string) => plataformas.find((p) => p.slug === slug)?.nome ?? (slug === SLUG_VIDEO ? 'Vídeo' : slug)
 
   // ── MODELO: o revezamento como fica, ao vivo, a partir dos controles ──
   const modelo = useMemo(() => {
@@ -113,7 +114,7 @@ export function PreviaViva() {
           <p key={i} className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-400">{a}</p>
         ))}
         <p className="text-[11px] text-muted-foreground">{modelo.resultado.metas.length.toLocaleString('pt-BR')} metas · {modelo.semanas.length} semanas de conteúdo · sem datas</p>
-        <PreviaMontagem metas={modelo.resultado.metas} semanas={modelo.semanas} linhas={montagem.linhas} diasNome={draft.diasNome} rotuloTipo={rotuloTipo} usaLinksTipo={usaLinksTipo} />
+        <PreviaMontagem metas={modelo.resultado.metas} semanas={modelo.semanas} linhas={montagem.linhas} diasNome={draft.diasNome} rotuloTipo={rotuloTipo} usaLinksTipo={usaLinksTipo} links={modelo.resultado.links} rotuloPlataforma={rotuloPlataforma} />
       </div>
     )
   ) : semMetas ? (
