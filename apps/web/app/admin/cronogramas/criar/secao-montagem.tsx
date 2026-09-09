@@ -46,10 +46,11 @@ export function SecaoMontagem() {
         const legproc = ts.find((t) => t.slug === 'legproc')
         const out = [] as typeof m.linhas
         // Cada aula percorre as semanas: PDFULL (semana W) → PDFLASH (W+1) → Resolução (W+2).
-        if (pdfull) out.push({ id: novoTmpId(), label: 'PDFULL', tipo: pdfull.slug, duracao: '1:30', offset: 0, continuacao: false, usaLinks: false })
-        if (flash) out.push({ id: novoTmpId(), label: 'PDFLASH', tipo: flash.slug, duracao: '30M', offset: 1, continuacao: false, usaLinks: false })
-        if (quest) out.push({ id: novoTmpId(), label: 'Resolução de questões', tipo: quest.slug, duracao: '30M', offset: 2, continuacao: false, usaLinks: true })
-        if (legproc) out.push({ id: novoTmpId(), label: 'LegProc', tipo: legproc.slug, duracao: null, offset: 0, continuacao: false, usaLinks: false, somenteComDado: true })
+        // `usaLinks` (mostrar links de questões) segue o próprio tipo (mostra_links) — sem toggle manual.
+        if (pdfull) out.push({ id: novoTmpId(), label: 'PDFULL', tipo: pdfull.slug, duracao: '1:30', offset: 0, continuacao: false, usaLinks: !!pdfull.mostra_links })
+        if (flash) out.push({ id: novoTmpId(), label: 'PDFLASH', tipo: flash.slug, duracao: '30M', offset: 1, continuacao: false, usaLinks: !!flash.mostra_links })
+        if (quest) out.push({ id: novoTmpId(), label: 'Resolução de questões', tipo: quest.slug, duracao: '30M', offset: 2, continuacao: false, usaLinks: !!quest.mostra_links })
+        if (legproc) out.push({ id: novoTmpId(), label: 'LegProc', tipo: legproc.slug, duracao: null, offset: 0, continuacao: false, usaLinks: !!legproc.mostra_links, somenteComDado: true })
         // 1 aula por dia → lições/semana = nº de dias de curso, para todos os dias terem aula.
         return { ...m, linhas: out, aulasPorSemana: Math.max(1, draft.diasNome.length) }
       })
@@ -615,7 +616,7 @@ function GerenciarLinhas({
               <div className="flex flex-wrap items-end gap-2">
                 <div className="w-40">
                   <Label className="mb-1 block text-[11px] uppercase tracking-wide text-muted-foreground">Tipo</Label>
-                  <Select value={l.tipo} onValueChange={(v) => onPatch(l.id, { tipo: v ?? l.tipo })}>
+                  <Select value={l.tipo} onValueChange={(v) => { const slug = v ?? l.tipo; onPatch(l.id, { tipo: slug, usaLinks: tipos.find((t) => t.slug === slug)?.mostra_links ?? false }) }}>
                     <SelectTrigger className="h-8 w-full min-w-0"><SelectValue>{rotuloTipo(l.tipo)}</SelectValue></SelectTrigger>
                     <SelectContent>{tipos.map((t) => <SelectItem key={t.slug} value={t.slug}>{t.nome}</SelectItem>)}</SelectContent>
                   </Select>
@@ -640,14 +641,6 @@ function GerenciarLinhas({
                     </SelectContent>
                   </Select>
                 </div>
-                <label className="flex items-center gap-1.5 self-center pb-1.5 text-xs" title="Ocupa 2 dias: aula + continuação">
-                  <input type="checkbox" checked={l.continuacao} onChange={(e) => onPatch(l.id, { continuacao: e.target.checked })} className="h-3.5 w-3.5 accent-[var(--primary)]" />
-                  continuação
-                </label>
-                <label className="flex items-center gap-1.5 self-center pb-1.5 text-xs" title="Mostra os links de questões (QC/TEC) da aula">
-                  <input type="checkbox" checked={l.usaLinks} onChange={(e) => onPatch(l.id, { usaLinks: e.target.checked })} className="h-3.5 w-3.5 accent-[var(--primary)]" />
-                  links
-                </label>
               </div>
             </div>
           ))}
