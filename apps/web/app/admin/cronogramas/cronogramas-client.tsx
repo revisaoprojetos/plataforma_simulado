@@ -243,7 +243,7 @@ export function CronogramasClient({
     ...(categoria !== 'todas'
       ? [
           {
-            rotulo: categoria === 'sem' ? 'Sem categoria' : (categorias.find((k) => k.id === categoria)?.nome ?? 'Categoria'),
+            rotulo: categoria === 'sem' ? 'Sem divisão' : (categorias.find((k) => k.id === categoria)?.nome ?? 'Categoria'),
             limpar: () => setCategoria('todas'),
           },
         ]
@@ -262,18 +262,18 @@ export function CronogramasClient({
   )
 
   // Agrupa por CATEGORIA (como na referência: Pós-edital / Extensivo / Reta final).
-  // "Sem categoria" vai por último; a carga vira etiqueta na linha + filtro em pílula.
+  // "Sem divisão" vai por último; a carga vira etiqueta na linha + filtro em pílula.
   const porCategoria = useMemo(() => {
     const mapa = new Map<string, CronogramaLista[]>()
     for (const c of daPagina) {
-      const k = c.categoria_nome ?? 'Sem categoria'
+      const k = c.categoria_nome ?? 'Sem divisão'
       const lista = mapa.get(k)
       if (lista) lista.push(c)
       else mapa.set(k, [c])
     }
     return [...mapa.entries()].sort((a, b) => {
-      if (a[0] === 'Sem categoria') return 1
-      if (b[0] === 'Sem categoria') return -1
+      if (a[0] === 'Sem divisão') return 1
+      if (b[0] === 'Sem divisão') return -1
       return a[0].localeCompare(b[0], 'pt-BR')
     })
   }, [daPagina])
@@ -412,7 +412,7 @@ export function CronogramasClient({
     iniciar(async () => {
       const r = await criarCategoria(nome, null)
       if (!r.ok) { toast.error(r.error ?? 'Não foi possível criar.'); return }
-      toast.success(`Categoria "${nome}" criada`)
+      toast.success(`Divisão "${nome}" criada`)
       setCategorias((xs) => [...xs, { id: (r as any).id, nome, slug: (r as any).slug ?? '', cor: null, ordem: xs.length, usos: 0 }])
       setNovaCategoria('')
     })
@@ -430,17 +430,17 @@ export function CronogramasClient({
   function removerCategoria(c: CategoriaRow) {
     iniciar(async () => {
       const sim = await confirmar({
-        titulo: 'Excluir categoria',
+        titulo: 'Excluir divisão',
         mensagem:
           c.usos > 0
-            ? `"${c.nome}" está em ${c.usos} cronograma(s). Eles não são excluídos — apenas ficam sem categoria.`
-            : `Excluir a categoria "${c.nome}"?`,
+            ? `"${c.nome}" está em ${c.usos} cronograma(s). Eles não são excluídos — apenas ficam sem divisão.`
+            : `Excluir a divisão "${c.nome}"?`,
         destrutivo: true,
       })
       if (!sim) return
       const r = await excluirCategoria(c.id)
       if (!r.ok) { toast.error(r.error ?? 'Não foi possível excluir.'); return }
-      toast.success('Categoria excluída')
+      toast.success('Divisão excluída')
       setCategorias((xs) => xs.filter((x) => x.id !== c.id))
       setItens((xs) => xs.map((x) => (x.categoria_id === c.id ? { ...x, categoria_id: null, categoria_nome: null } : x)))
     })
@@ -488,7 +488,7 @@ export function CronogramasClient({
         </div>
         <div className="flex shrink-0 items-center gap-2">
           <Button variant="outline" onClick={() => setCategoriasAberto(true)}>
-            <Tags className="mr-1 h-4 w-4" /> Categorias
+            <Tags className="mr-1 h-4 w-4" /> Divisões
           </Button>
           <Link href="/admin/cronogramas/importar" className={buttonVariants({ variant: 'outline' })}>
             <Upload className="mr-1 h-4 w-4" /> Importar modelo
@@ -519,7 +519,7 @@ export function CronogramasClient({
           <Input
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar por nome, categoria ou carga — ex.: 12 6h"
+            placeholder="Buscar por nome, divisão ou carga — ex.: 12 6h"
             className="h-9 pl-8 pr-8"
           />
           {busca && (
@@ -538,15 +538,15 @@ export function CronogramasClient({
             <SelectTrigger className="h-9 w-48">
               <SelectValue>
                 {categoria === 'todas'
-                  ? 'Todas as categorias'
+                  ? 'Todas as divisões'
                   : categoria === 'sem'
-                    ? 'Sem categoria'
-                    : (categorias.find((k) => k.id === categoria)?.nome ?? 'Categoria')}
+                    ? 'Sem divisão'
+                    : (categorias.find((k) => k.id === categoria)?.nome ?? 'Divisão')}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="todas">Todas as categorias</SelectItem>
-              <SelectItem value="sem">Sem categoria</SelectItem>
+              <SelectItem value="todas">Todas as divisões</SelectItem>
+              <SelectItem value="sem">Sem divisão</SelectItem>
               {categorias.map((k) => (
                 <SelectItem key={k.id} value={k.id}>
                   {k.nome}
@@ -1050,7 +1050,7 @@ export function CronogramasClient({
 
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label>Categoria</Label>
+                <Label>Divisão</Label>
                 <button type="button" className="text-xs text-primary hover:underline" onClick={() => setCategoriasAberto(true)}>
                   Gerenciar categorias
                 </button>
@@ -1060,10 +1060,10 @@ export function CronogramasClient({
                 onValueChange={(v) => setForm((f) => ({ ...f, categoria_id: v === 'nenhuma' ? null : (v ?? null) }))}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Sem categoria" />
+                  <SelectValue placeholder="Sem divisão" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="nenhuma">Sem categoria</SelectItem>
+                  <SelectItem value="nenhuma">Sem divisão</SelectItem>
                   {categorias.map((c) => (
                     <SelectItem key={c.id} value={c.id}>
                       {c.nome}
@@ -1088,10 +1088,10 @@ export function CronogramasClient({
       <Dialog open={categoriasAberto} onOpenChange={setCategoriasAberto}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>Categorias</DialogTitle>
+            <DialogTitle>Divisões</DialogTitle>
             <DialogDescription>
               Agrupam o catálogo. Renomear conserta em todos os cronogramas de uma vez; excluir não apaga
-              cronograma nenhum, só os deixa sem categoria.
+              cronograma nenhum, só os deixa sem divisão.
             </DialogDescription>
           </DialogHeader>
 
@@ -1123,7 +1123,7 @@ export function CronogramasClient({
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') adicionarCategoria()
                 }}
-                placeholder="Nome da categoria (ex.: Pré-Edital)"
+                placeholder="Nome da divisão (ex.: Pré-Edital)"
               />
               <Button size="sm" onClick={adicionarCategoria} disabled={pendente || !novaCategoria.trim()}>
                 <Plus className="h-4 w-4" />
