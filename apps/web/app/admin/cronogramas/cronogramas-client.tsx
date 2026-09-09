@@ -27,14 +27,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import {
   alternarLiberacao,
   alternarLiberacaoEmLote,
   atualizarCategoria,
@@ -153,6 +145,8 @@ export function CronogramasClient({
   const router = useRouter()
   const [aberto, setAberto] = useState(false)
   const [editando, setEditando] = useState<string | null>(null)
+  // Pop-up "Mover para outra divisão" (substitui o dropdown que dava tela preta).
+  const [movendo, setMovendo] = useState<CronogramaLista | null>(null)
   // Renomear a DIVISÃO (categoria) direto no cabeçalho do grupo.
   const [editandoCat, setEditandoCat] = useState<string | null>(null)
   const [form, setForm] = useState<EntradaCronograma>(vazio())
@@ -464,8 +458,20 @@ export function CronogramasClient({
       if (!r.ok) { toast.error(r.error ?? 'Não foi possível mover.'); return }
       const nome = categorias.find((k) => k.id === categoriaId)?.nome ?? null
       setItens((xs) => xs.map((x) => (x.id === c.id ? { ...x, categoria_id: categoriaId, categoria_nome: nome } : x)))
-      toast.success(categoriaId ? `Movido para "${nome}"` : 'Movido para Sem categoria')
+      toast.success(categoriaId ? `Movido para "${nome}"` : 'Movido para Sem divisão')
     })
+  }
+
+  /** Cria uma DIVISÃO (categoria) e a devolve — usada pelo pop-up de mover ("Nova divisão" no topo). */
+  async function criarDivisaoRetorno(nomeRaw: string): Promise<CategoriaRow | null> {
+    const nome = nomeRaw.trim()
+    if (!nome) return null
+    const r = await criarCategoria(nome, null)
+    if (!r.ok) { toast.error(r.error ?? 'Não foi possível criar a divisão.'); return null }
+    const nova: CategoriaRow = { id: (r as any).id, nome, slug: (r as any).slug ?? '', cor: null, ordem: categorias.length, usos: 0 }
+    setCategorias((xs) => [...xs, nova])
+    toast.success(`Divisão "${nome}" criada`)
+    return nova
   }
 
   return (
@@ -879,23 +885,10 @@ export function CronogramasClient({
                         >
                           <ListChecks className="h-4 w-4" />
                         </Link>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger className={buttonVariants({ variant: 'ghost', size: 'sm' })} title="Mover para outra divisão">
-                            {ocupado(`mov:${c.id}`) ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderInput className="h-4 w-4" />}
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-52">
-                            <DropdownMenuLabel>Mover para a divisão</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => mover(c, null)}>
-                              {!c.categoria_id ? <Check className="mr-2 h-4 w-4" /> : <span className="mr-2 h-4 w-4" />} Sem categoria
-                            </DropdownMenuItem>
-                            {categorias.length > 0 && <DropdownMenuSeparator />}
-                            {categorias.map((k) => (
-                              <DropdownMenuItem key={k.id} onClick={() => mover(c, k.id)}>
-                                {c.categoria_id === k.id ? <Check className="mr-2 h-4 w-4" /> : <span className="mr-2 h-4 w-4" />} {k.nome}
-                              </DropdownMenuItem>
-                            ))}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <button type="button" title="Mover para outra divisão" onClick={() => setMovendo(c)}
+                          className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+                          {ocupado(`mov:${c.id}`) ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderInput className="h-4 w-4" />}
+                        </button>
                         <Button size="sm" variant="ghost" onClick={() => abrirEdicao(c)} disabled={pendente} title="Editar metadados">
                           <Pencil className="h-4 w-4" />
                         </Button>
@@ -1148,6 +1141,86 @@ export function CronogramasClient({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {movendo && (
+        <MoverDivisaoDialog
+          cronograma={movendo}
+          categorias={categorias}
+          onClose={() => setMovendo(null)}
+          onMover={(catId) => { if (movendo) mover(movendo, catId); setMovendo(null) }}
+          onCriar={criarDivisaoRetorno}
+        />
+      )}
     </>
+  )
+}
+
+/** Opção (radio) da lista de divisões — mesmo padrão do "Mover para pasta" do Banco de Simulado. */
+function OpcaoDiv({ ativo, onClick, label }: { ativo: boolean; onClick: () => void; label: string }) {
+  return (
+    <button type="button" onClick={onClick}
+      className={cn('flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors', ativo ? 'border-primary bg-primary/5' : 'hover:border-primary/40')}>
+      <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded-full border', ativo ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>
+        {ativo && <Check className="h-3 w-3" />}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-sm font-medium">{label}</span>
+    </button>
+  )
+}
+
+/** Pop-up de "Mover para outra divisão": criar nova divisão no topo + selecionar a divisão de destino. */
+function MoverDivisaoDialog({ cronograma, categorias, onClose, onMover, onCriar }: {
+  cronograma: CronogramaLista
+  categorias: CategoriaRow[]
+  onClose: () => void
+  onMover: (categoriaId: string | null) => void
+  onCriar: (nome: string) => Promise<CategoriaRow | null>
+}) {
+  const [sel, setSel] = useState<string | null>(cronograma.categoria_id ?? null)
+  const [nova, setNova] = useState('')
+  const [criando, setCriando] = useState(false)
+
+  async function criar() {
+    const nome = nova.trim()
+    if (!nome || criando) return
+    setCriando(true)
+    const cat = await onCriar(nome)
+    setCriando(false)
+    if (cat) { setNova(''); setSel(cat.id) }
+  }
+
+  const semMudanca = (sel ?? null) === (cronograma.categoria_id ?? null)
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose() }}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><FolderInput className="h-4 w-4" /> Mover “{cronograma.nome}”</DialogTitle>
+          <DialogDescription>Escolha a divisão de destino ou crie uma nova.</DialogDescription>
+        </DialogHeader>
+
+        {/* Criar nova divisão (topo) */}
+        <div className="flex items-center gap-2">
+          <Input value={nova} onChange={(e) => setNova(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); criar() } }}
+            placeholder="Nova divisão (ex.: Pré-Edital)…" />
+          <Button type="button" onClick={criar} disabled={criando || !nova.trim()} className="shrink-0">
+            {criando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />} Criar
+          </Button>
+        </div>
+
+        {/* Lista de divisões */}
+        <div className="max-h-[46vh] space-y-1.5 overflow-auto pr-1">
+          <OpcaoDiv ativo={sel === null} onClick={() => setSel(null)} label="Sem divisão" />
+          {categorias.map((k) => (
+            <OpcaoDiv key={k.id} ativo={sel === k.id} onClick={() => setSel(k.id)} label={k.nome} />
+          ))}
+        </div>
+
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button type="button" onClick={() => onMover(sel)} disabled={semMudanca}>Mover</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
