@@ -27,6 +27,7 @@ export function SecaoMontagem() {
   const [tipos, setTipos] = useState<TipoMetaDef[]>([])
   const [pickerAberto, setPickerAberto] = useState(false)
   const [gerenciarAberto, setGerenciarAberto] = useState(false)
+  const [linhasAberto, setLinhasAberto] = useState(false)
   const [autoAplicar, setAutoAplicar] = useState(false)
   const { linhas, selecionados, aulasPorSemana } = montagem
 
@@ -251,81 +252,31 @@ export function SecaoMontagem() {
       acessorio={selecionados.length > 0 ? <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">{selecionados.length} conteúdo(s)</span> : undefined}
     >
       <div className="space-y-4">
-        {/* Linhas (tipos) — a duração aqui vale para todas as semanas */}
+        {/* Linhas da grade — resumo aqui; edição completa (tipo/duração/referência/ordem) no pop-up. */}
         <div>
           <div className="mb-2 flex items-center justify-between">
             <p className="flex items-center gap-1.5 text-sm font-semibold"><Layers className="h-4 w-4 text-primary" /> Linhas da grade</p>
-            <Button size="sm" variant="ghost" className="h-7" onClick={addLinha}><Plus className="mr-1 h-3.5 w-3.5" /> Linha</Button>
+            <Button size="sm" variant="ghost" className="h-7" onClick={() => setLinhasAberto(true)}><Settings2 className="mr-1 h-3.5 w-3.5" /> Gerenciar</Button>
           </div>
-          <div className="space-y-2">
-            {linhas.map((l, i) => (
-              <div key={l.id} className="space-y-2 rounded-xl border bg-muted/20 p-2.5">
-                {/* Cabeçalho da linha: nome amigável editável + reordenar + remover. */}
-                <div className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: corTipo(l.tipo) ?? 'var(--muted-foreground)' }} />
-                  <Input
-                    value={l.label}
-                    onChange={(e) => patchLinha(l.id, { label: e.target.value })}
-                    placeholder="Nome da linha"
-                    className="h-7 min-w-0 flex-1 border-transparent bg-transparent px-1 text-sm font-semibold focus-visible:border-input focus-visible:bg-background"
-                  />
-                  {i === 0 && <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary" title="A 1ª linha é a lição base — é ela que o revezamento distribui.">lição base</span>}
-                  <div className="flex shrink-0 flex-col">
-                    <button onClick={() => moverLinha(l.id, -1)} disabled={i === 0} className="text-muted-foreground hover:text-foreground disabled:opacity-30" title="Subir (ordem no dia)"><ArrowUp className="h-3.5 w-3.5" /></button>
-                    <button onClick={() => moverLinha(l.id, 1)} disabled={i === linhas.length - 1} className="text-muted-foreground hover:text-foreground disabled:opacity-30" title="Descer"><ArrowDown className="h-3.5 w-3.5" /></button>
-                  </div>
-                  {linhas.length > 1 && (
-                    <button onClick={() => removerLinha(l.id)} className="shrink-0 text-muted-foreground hover:text-destructive" title="Remover linha">
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                </div>
-                {/* Controles da linha. */}
-                <div className="flex flex-wrap items-end gap-2">
-                  <div className="w-36">
-                    <Label className="mb-1 block text-[11px] uppercase tracking-wide text-muted-foreground">Tipo</Label>
-                    <Select value={l.tipo} onValueChange={(v) => patchLinha(l.id, { tipo: v ?? l.tipo })}>
-                      <SelectTrigger className="h-8"><SelectValue>{rotuloTipo(l.tipo)}</SelectValue></SelectTrigger>
-                      <SelectContent>{tipos.map((t) => <SelectItem key={t.slug} value={t.slug}>{t.nome}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                  <div className="w-24">
-                    <Label className="mb-1 block text-[11px] uppercase tracking-wide text-muted-foreground">Duração</Label>
-                    <Input value={l.duracao ?? ''} onChange={(e) => patchLinha(l.id, { duracao: e.target.value || null })} placeholder="1:30" className="h-8" />
-                  </div>
-                  <div className="w-40">
-                    <Label className="mb-1 flex items-center gap-1 text-[11px] uppercase tracking-wide text-muted-foreground">
-                      Referência
-                      <span className="cursor-help text-muted-foreground" title={'“Semana atual” = a lição desta semana. “N sem. antes” faz esta linha acompanhar as lições de N semanas atrás — ex.: a Resolução perseguir a lição (por isso a semana 1 fica só com a lição).'}>
-                        <Info className="h-3 w-3" />
-                      </span>
-                    </Label>
-                    <Select value={String(l.offset)} onValueChange={(v) => patchLinha(l.id, { offset: Number(v ?? 0) })}>
-                      <SelectTrigger className="h-8"><SelectValue>{l.offset === 0 ? 'Semana atual' : `${l.offset} sem. antes`}</SelectValue></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="0">Semana atual</SelectItem>
-                        <SelectItem value="1">1 semana antes</SelectItem>
-                        <SelectItem value="2">2 semanas antes</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <label className="flex items-center gap-1.5 self-center pb-1.5 text-xs" title="Ocupa 2 dias: aula + continuação">
-                    <input type="checkbox" checked={l.continuacao} onChange={(e) => patchLinha(l.id, { continuacao: e.target.checked })} className="h-3.5 w-3.5 accent-[var(--primary)]" />
-                    continuação
-                  </label>
-                  <label className="flex items-center gap-1.5 self-center pb-1.5 text-xs" title="Mostra os links de questões (QC/TEC) da aula">
-                    <input type="checkbox" checked={l.usaLinks} onChange={(e) => patchLinha(l.id, { usaLinks: e.target.checked })} className="h-3.5 w-3.5 accent-[var(--primary)]" />
-                    links
-                  </label>
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="mt-2 flex items-center gap-2">
-            <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Lições por semana</Label>
-            <Input type="number" min={1} max={Math.max(1, draft.diasNome.length)} value={aulasPorSemana} onChange={(e) => setAulasPorSemana(Number(e.target.value))} className="h-8 w-16" />
-            <span className="text-xs text-muted-foreground">(1 aula por dia)</span>
-          </div>
+          <button
+            type="button"
+            onClick={() => setLinhasAberto(true)}
+            className="w-full rounded-xl border bg-muted/10 px-3 py-2.5 text-left transition hover:bg-muted/30"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-sm font-medium">{linhas.length} linha(s) · {aulasPorSemana} lição(ões)/semana</span>
+              <span className="flex items-center gap-1 text-xs font-medium text-primary"><Settings2 className="h-3.5 w-3.5" /> Gerenciar</span>
+            </div>
+            <div className="mt-1.5 flex flex-wrap gap-1">
+              {linhas.map((l, i) => (
+                <span key={l.id} className="flex items-center gap-1 rounded-full border bg-background px-2 py-0.5 text-[11px] text-muted-foreground">
+                  <span className="h-2 w-2 rounded-full" style={{ background: corTipo(l.tipo) ?? 'var(--muted-foreground)' }} />
+                  {l.label || rotuloTipo(l.tipo)}
+                  {i === 0 && <span className="text-[9px] font-semibold uppercase text-primary">base</span>}
+                </span>
+              ))}
+            </div>
+          </button>
         </div>
 
         {/* Conteúdos selecionados — resumo aqui; lista completa (ordenar/faixa/adicionar/excluir) no pop-up. */}
@@ -434,6 +385,20 @@ export function SecaoMontagem() {
           Aplicar automaticamente <span className="opacity-70">(sobrescreve ajustes manuais)</span>
         </label>
       </div>
+
+      <GerenciarLinhas
+        aberto={linhasAberto}
+        aoFechar={() => setLinhasAberto(false)}
+        linhas={linhas}
+        tipos={tipos}
+        aulasPorSemana={aulasPorSemana}
+        maxAulas={Math.max(1, draft.diasNome.length)}
+        onAdd={addLinha}
+        onPatch={patchLinha}
+        onRemover={removerLinha}
+        onMover={moverLinha}
+        onAulasPorSemana={setAulasPorSemana}
+      />
 
       <GerenciarConteudos
         aberto={gerenciarAberto}
@@ -545,6 +510,132 @@ function GerenciarConteudos({
           <span className="self-center text-xs text-muted-foreground">
             {selecionados.length} conteúdo(s){invalidas > 0 ? <span className="ml-1 text-destructive">· {invalidas} com faixa inválida</span> : null}
           </span>
+          <Button onClick={aoFechar}>Concluir</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/**
+ * Pop-up "Linhas da grade" — edição completa das linhas (tipo/duração/referência/continuação/links),
+ * reordenar, adicionar/remover e as lições por semana. Mesmo padrão do pop-up de Conteúdos.
+ */
+function GerenciarLinhas({
+  aberto,
+  aoFechar,
+  linhas,
+  tipos,
+  aulasPorSemana,
+  maxAulas,
+  onAdd,
+  onPatch,
+  onRemover,
+  onMover,
+  onAulasPorSemana,
+}: {
+  aberto: boolean
+  aoFechar: () => void
+  linhas: { id: string; label: string; tipo: string; duracao: string | null; offset: number; continuacao: boolean; usaLinks: boolean; somenteComDado?: boolean }[]
+  tipos: TipoMetaDef[]
+  aulasPorSemana: number
+  maxAulas: number
+  onAdd: () => void
+  onPatch: (id: string, p: Partial<{ label: string; tipo: string; duracao: string | null; offset: number; continuacao: boolean; usaLinks: boolean }>) => void
+  onRemover: (id: string) => void
+  onMover: (id: string, dir: -1 | 1) => void
+  onAulasPorSemana: (n: number) => void
+}) {
+  const rotuloTipo = (slug: string) => tipos.find((t) => t.slug === slug)?.nome ?? slug
+  const corTipo = (slug: string) => tipos.find((t) => t.slug === slug)?.cor || null
+
+  return (
+    <Dialog open={aberto} onOpenChange={(o) => !o && aoFechar()}>
+      <DialogContent className="flex max-h-[85vh] w-full flex-col sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><Layers className="h-4 w-4 text-primary" /> Linhas da grade</DialogTitle>
+          <DialogDescription>
+            Cada linha é um tipo de meta por aula. A ordem define a sequência dentro do dia — a 1ª é a lição base que o revezamento distribui.
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* Barra: lições por semana + adicionar linha. */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
+          <div className="flex items-center gap-2">
+            <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Lições por semana</Label>
+            <Input type="number" min={1} max={maxAulas} value={aulasPorSemana} onChange={(e) => onAulasPorSemana(Number(e.target.value))} className="h-8 w-16" />
+            <span className="text-xs text-muted-foreground">(1 aula por dia)</span>
+          </div>
+          <Button size="sm" variant="outline" onClick={onAdd}><Plus className="mr-1 h-3.5 w-3.5" /> Linha</Button>
+        </div>
+
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
+          {linhas.map((l, i) => (
+            <div key={l.id} className="space-y-2 rounded-xl border bg-muted/20 p-2.5">
+              {/* Cabeçalho da linha: nome amigável editável + reordenar + remover. */}
+              <div className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: corTipo(l.tipo) ?? 'var(--muted-foreground)' }} />
+                <Input
+                  value={l.label}
+                  onChange={(e) => onPatch(l.id, { label: e.target.value })}
+                  placeholder="Nome da linha"
+                  className="h-7 min-w-0 flex-1 border-transparent bg-transparent px-1 text-sm font-semibold focus-visible:border-input focus-visible:bg-background"
+                />
+                {i === 0 && <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary" title="A 1ª linha é a lição base — é ela que o revezamento distribui.">lição base</span>}
+                <div className="flex shrink-0 flex-col">
+                  <button onClick={() => onMover(l.id, -1)} disabled={i === 0} className="text-muted-foreground transition hover:text-foreground disabled:opacity-30" title="Subir (ordem no dia)"><ArrowUp className="h-3.5 w-3.5" /></button>
+                  <button onClick={() => onMover(l.id, 1)} disabled={i === linhas.length - 1} className="text-muted-foreground transition hover:text-foreground disabled:opacity-30" title="Descer"><ArrowDown className="h-3.5 w-3.5" /></button>
+                </div>
+                {linhas.length > 1 && (
+                  <button onClick={() => onRemover(l.id)} className="shrink-0 text-muted-foreground transition hover:scale-110 hover:text-destructive" title="Remover linha">
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+              {/* Controles da linha. */}
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="w-40">
+                  <Label className="mb-1 block text-[11px] uppercase tracking-wide text-muted-foreground">Tipo</Label>
+                  <Select value={l.tipo} onValueChange={(v) => onPatch(l.id, { tipo: v ?? l.tipo })}>
+                    <SelectTrigger className="h-8 w-full min-w-0"><SelectValue>{rotuloTipo(l.tipo)}</SelectValue></SelectTrigger>
+                    <SelectContent>{tipos.map((t) => <SelectItem key={t.slug} value={t.slug}>{t.nome}</SelectItem>)}</SelectContent>
+                  </Select>
+                </div>
+                <div className="w-24">
+                  <Label className="mb-1 block text-[11px] uppercase tracking-wide text-muted-foreground">Duração</Label>
+                  <Input value={l.duracao ?? ''} onChange={(e) => onPatch(l.id, { duracao: e.target.value || null })} placeholder="1:30" className="h-8" />
+                </div>
+                <div className="w-40">
+                  <Label className="mb-1 flex items-center gap-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+                    Referência
+                    <span className="cursor-help text-muted-foreground" title={'“Semana atual” = a lição desta semana. “N sem. antes” faz esta linha acompanhar as lições de N semanas atrás — ex.: a Resolução perseguir a lição (por isso a semana 1 fica só com a lição).'}>
+                      <Info className="h-3 w-3" />
+                    </span>
+                  </Label>
+                  <Select value={String(l.offset)} onValueChange={(v) => onPatch(l.id, { offset: Number(v ?? 0) })}>
+                    <SelectTrigger className="h-8 w-full min-w-0"><SelectValue>{l.offset === 0 ? 'Semana atual' : `${l.offset} sem. antes`}</SelectValue></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="0">Semana atual</SelectItem>
+                      <SelectItem value="1">1 semana antes</SelectItem>
+                      <SelectItem value="2">2 semanas antes</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <label className="flex items-center gap-1.5 self-center pb-1.5 text-xs" title="Ocupa 2 dias: aula + continuação">
+                  <input type="checkbox" checked={l.continuacao} onChange={(e) => onPatch(l.id, { continuacao: e.target.checked })} className="h-3.5 w-3.5 accent-[var(--primary)]" />
+                  continuação
+                </label>
+                <label className="flex items-center gap-1.5 self-center pb-1.5 text-xs" title="Mostra os links de questões (QC/TEC) da aula">
+                  <input type="checkbox" checked={l.usaLinks} onChange={(e) => onPatch(l.id, { usaLinks: e.target.checked })} className="h-3.5 w-3.5 accent-[var(--primary)]" />
+                  links
+                </label>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <DialogFooter className="border-t pt-3 sm:justify-between">
+          <span className="self-center text-xs text-muted-foreground">{linhas.length} linha(s)</span>
           <Button onClick={aoFechar}>Concluir</Button>
         </DialogFooter>
       </DialogContent>
