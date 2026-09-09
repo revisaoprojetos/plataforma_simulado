@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { Check, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 /**
@@ -19,6 +19,7 @@ export function Secao({
   colapsavel = false,
   defaultAberto = true,
   acessorio,
+  completo = false,
 }: {
   numero: number
   titulo: string
@@ -28,13 +29,15 @@ export function Secao({
   defaultAberto?: boolean
   /** Conteúdo à direita do cabeçalho (ex.: resumo/contagem), visível mesmo fechado. */
   acessorio?: React.ReactNode
+  /** Marca a seção como concluída — o número vira ✓ verde. */
+  completo?: boolean
 }) {
   const [aberto, setAberto] = useState(defaultAberto)
 
   const cabecalho = (
     <>
-      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-        {numero}
+      <span className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold transition', completo ? 'bg-emerald-500 text-white' : 'bg-primary/10 text-primary')}>
+        {completo ? <Check className="h-4 w-4" /> : numero}
       </span>
       <div className="min-w-0 flex-1 text-left">
         <h2 className="text-sm font-semibold leading-tight">{titulo}</h2>
@@ -47,7 +50,7 @@ export function Secao({
 
   if (!colapsavel) {
     return (
-      <section className="space-y-2.5">
+      <section id={`secao-${numero}`} className="scroll-mt-20 space-y-2.5">
         <div className="flex items-center gap-2.5">{cabecalho}</div>
         {children}
       </section>
@@ -55,7 +58,7 @@ export function Secao({
   }
 
   return (
-    <section>
+    <section id={`secao-${numero}`} className="scroll-mt-20">
       <button type="button" onClick={() => setAberto((v) => !v)} className="flex w-full items-center gap-2.5 py-3 text-left transition hover:opacity-80">
         {cabecalho}
       </button>

@@ -249,6 +249,7 @@ export function SecaoMontagem() {
       descricao="Escolha os conteúdos do banco e as linhas da grade — o revezamento se monta sozinho. Veja o resultado na prévia ao lado e clique em Aplicar para comitar."
       colapsavel
       defaultAberto
+      completo={draft.metas.length > 0}
       acessorio={selecionados.length > 0 ? <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">{selecionados.length} conteúdo(s)</span> : undefined}
     >
       <div className="space-y-4">
