@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowDown, ArrowUp, BookOpen, Calculator, CheckCircle2, Info, Layers, Loader2, Plus, Scale, Sparkles, Trash2, Wand2, X } from 'lucide-react'
+import { AlertTriangle, ArrowDown, ArrowDownUp, ArrowUp, BookOpen, Calculator, CheckCircle2, Info, Layers, ListOrdered, Loader2, Plus, Scale, Settings2, Sparkles, Trash2, Wand2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -26,6 +26,7 @@ export function SecaoMontagem() {
   const { draft, patch, montagem, setMontagem } = useCriar()
   const [tipos, setTipos] = useState<TipoMetaDef[]>([])
   const [pickerAberto, setPickerAberto] = useState(false)
+  const [gerenciarAberto, setGerenciarAberto] = useState(false)
   const [autoAplicar, setAutoAplicar] = useState(false)
   const { linhas, selecionados, aulasPorSemana } = montagem
 
@@ -100,6 +101,19 @@ export function SecaoMontagem() {
       const copia = [...m.selecionados]
       ;[copia[i], copia[j]] = [copia[j], copia[i]]
       return { ...m, selecionados: copia }
+    })
+  }
+  // Reordena TODA a lista (grava a nova ordem — não é só uma exibição). "A→Z" por disciplina,
+  // "aulas" pelas maiores primeiro, "faixa" pela semana de início.
+  function ordenarSelecionados(modo: 'az' | 'aulas' | 'faixa') {
+    setMontagem((m) => {
+      const arr = [...m.selecionados]
+      arr.sort((a, b) => {
+        if (modo === 'az') return a.disciplina.localeCompare(b.disciplina, 'pt-BR')
+        if (modo === 'aulas') return b.qtdAulas - a.qtdAulas || a.disciplina.localeCompare(b.disciplina, 'pt-BR')
+        return a.semInicio - b.semInicio || a.semFim - b.semFim || a.disciplina.localeCompare(b.disciplina, 'pt-BR')
+      })
+      return { ...m, selecionados: arr }
     })
   }
 
@@ -314,36 +328,41 @@ export function SecaoMontagem() {
           </div>
         </div>
 
-        {/* Conteúdos selecionados + faixa de semanas + ordem */}
+        {/* Conteúdos selecionados — resumo aqui; lista completa (ordenar/faixa/adicionar/excluir) no pop-up. */}
         <div>
           <div className="mb-2 flex items-center justify-between">
             <p className="flex items-center gap-1.5 text-sm font-semibold"><Sparkles className="h-4 w-4 text-primary" /> Conteúdos</p>
-            <Button size="sm" variant="outline" className="h-7" onClick={() => setPickerAberto(true)}><Plus className="mr-1 h-3.5 w-3.5" /> Adicionar do banco</Button>
+            <div className="flex items-center gap-1.5">
+              {selecionados.length > 0 && (
+                <Button size="sm" variant="ghost" className="h-7" onClick={() => setGerenciarAberto(true)}><Settings2 className="mr-1 h-3.5 w-3.5" /> Gerenciar</Button>
+              )}
+              <Button size="sm" variant="outline" className="h-7" onClick={() => setPickerAberto(true)}><Plus className="mr-1 h-3.5 w-3.5" /> Adicionar do banco</Button>
+            </div>
           </div>
           {selecionados.length === 0 ? (
             <p className="rounded-xl border border-dashed py-6 text-center text-sm text-muted-foreground">Nenhum conteúdo. Adicione disciplinas do Banco de Conteúdos para montar.</p>
           ) : (
-            <div className="space-y-1.5">
-              {selecionados.map((s, idx) => (
-                <div key={s.conjuntoId} className={cn('flex flex-wrap items-center gap-2 rounded-xl border bg-muted/10 px-3 py-2', s.semInicio > s.semFim && 'border-destructive/50 bg-destructive/5')}>
-                  <div className="flex shrink-0 flex-col">
-                    <button onClick={() => moverSelecionado(s.conjuntoId, -1)} disabled={idx === 0} className="text-muted-foreground hover:text-foreground disabled:opacity-30" title="Subir (entra antes no revezamento)"><ArrowUp className="h-3.5 w-3.5" /></button>
-                    <button onClick={() => moverSelecionado(s.conjuntoId, 1)} disabled={idx === selecionados.length - 1} className="text-muted-foreground hover:text-foreground disabled:opacity-30" title="Descer"><ArrowDown className="h-3.5 w-3.5" /></button>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{s.disciplina}</p>
-                    <p className="truncate text-xs text-muted-foreground">{s.nome} · {s.qtdAulas} aula(s){s.qtdQuestoes > 0 ? ` · ${s.qtdQuestoes} questõe(s)` : ''}</p>
-                  </div>
-                  <div className="flex items-center gap-1 text-xs">
-                    <span className="text-muted-foreground">semana</span>
-                    <Input type="number" min={1} max={draft.totalSemanas} value={s.semInicio} onChange={(e) => patchSelecionado(s.conjuntoId, { semInicio: Math.max(1, Number(e.target.value) || 1) })} className="h-7 w-14" />
-                    <span className="text-muted-foreground">até</span>
-                    <Input type="number" min={1} max={draft.totalSemanas} value={s.semFim} onChange={(e) => patchSelecionado(s.conjuntoId, { semFim: Math.min(draft.totalSemanas, Number(e.target.value) || draft.totalSemanas) })} className="h-7 w-14" />
-                  </div>
-                  <button onClick={() => removerSelecionado(s.conjuntoId)} className="shrink-0 text-muted-foreground hover:text-destructive" title="Remover"><Trash2 className="h-3.5 w-3.5" /></button>
-                </div>
-              ))}
-            </div>
+            <button
+              type="button"
+              onClick={() => setGerenciarAberto(true)}
+              className="w-full rounded-xl border bg-muted/10 px-3 py-2.5 text-left transition hover:bg-muted/30"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-sm font-medium">{selecionados.length} conteúdo(s) selecionado(s)</span>
+                <span className="flex items-center gap-1 text-xs font-medium text-primary"><Settings2 className="h-3.5 w-3.5" /> Gerenciar</span>
+              </div>
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {selecionados.slice(0, 10).map((s) => (
+                  <span
+                    key={s.conjuntoId}
+                    className={cn('rounded-full border px-2 py-0.5 text-[11px]', s.semInicio > s.semFim ? 'border-destructive/50 text-destructive' : 'bg-background text-muted-foreground')}
+                  >
+                    {s.disciplina}
+                  </span>
+                ))}
+                {selecionados.length > 10 && <span className="rounded-full px-2 py-0.5 text-[11px] text-muted-foreground">+{selecionados.length - 10}</span>}
+              </div>
+            </button>
           )}
         </div>
 
@@ -416,6 +435,18 @@ export function SecaoMontagem() {
         </label>
       </div>
 
+      <GerenciarConteudos
+        aberto={gerenciarAberto}
+        aoFechar={() => setGerenciarAberto(false)}
+        selecionados={selecionados}
+        totalSemanas={draft.totalSemanas}
+        onAdicionar={() => setPickerAberto(true)}
+        onRemover={removerSelecionado}
+        onPatch={patchSelecionado}
+        onMover={moverSelecionado}
+        onOrdenar={ordenarSelecionados}
+      />
+
       <PickerConteudos
         aberto={pickerAberto}
         aoFechar={() => setPickerAberto(false)}
@@ -423,6 +454,101 @@ export function SecaoMontagem() {
         onConfirmar={adicionarConteudos}
       />
     </Secao>
+  )
+}
+
+/**
+ * Pop-up "Gerenciar conteúdos" — a lista completa em um só lugar, organizada: reordenar (manual +
+ * ordenações rápidas), configurar a faixa de semanas de cada disciplina, adicionar do banco e excluir.
+ */
+function GerenciarConteudos({
+  aberto,
+  aoFechar,
+  selecionados,
+  totalSemanas,
+  onAdicionar,
+  onRemover,
+  onPatch,
+  onMover,
+  onOrdenar,
+}: {
+  aberto: boolean
+  aoFechar: () => void
+  selecionados: { conjuntoId: string; disciplina: string; nome: string; qtdAulas: number; qtdQuestoes: number; semInicio: number; semFim: number }[]
+  totalSemanas: number
+  onAdicionar: () => void
+  onRemover: (conjuntoId: string) => void
+  onPatch: (conjuntoId: string, p: { semInicio?: number; semFim?: number }) => void
+  onMover: (conjuntoId: string, dir: -1 | 1) => void
+  onOrdenar: (modo: 'az' | 'aulas' | 'faixa') => void
+}) {
+  const invalidas = selecionados.filter((s) => s.semInicio > s.semFim).length
+
+  return (
+    <Dialog open={aberto} onOpenChange={(o) => !o && aoFechar()}>
+      <DialogContent className="flex max-h-[85vh] w-full flex-col sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" /> Conteúdos do cronograma</DialogTitle>
+          <DialogDescription>
+            A ordem define a prioridade no revezamento (quem está acima entra antes). A faixa limita em quais semanas a disciplina aparece.
+          </DialogDescription>
+        </DialogHeader>
+
+        {/* Barra: adicionar + ordenações rápidas. */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
+          <Button size="sm" variant="outline" onClick={onAdicionar}><Plus className="mr-1 h-3.5 w-3.5" /> Adicionar do banco</Button>
+          {selecionados.length > 1 && (
+            <div className="flex items-center gap-1">
+              <span className="mr-0.5 flex items-center gap-1 text-[11px] uppercase tracking-wide text-muted-foreground"><ArrowDownUp className="h-3 w-3" /> Ordenar</span>
+              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onOrdenar('az')} title="Ordem alfabética por disciplina">A→Z</Button>
+              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onOrdenar('aulas')} title="Mais aulas primeiro">Mais aulas</Button>
+              <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => onOrdenar('faixa')} title="Pela semana de início"><ListOrdered className="mr-1 h-3.5 w-3.5" /> Por faixa</Button>
+            </div>
+          )}
+        </div>
+
+        <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto pr-1">
+          {selecionados.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed py-10 text-center">
+              <Sparkles className="h-6 w-6 text-muted-foreground/60" />
+              <p className="text-sm text-muted-foreground">Nenhum conteúdo ainda.</p>
+              <Button size="sm" variant="outline" onClick={onAdicionar}><Plus className="mr-1 h-3.5 w-3.5" /> Adicionar do banco</Button>
+            </div>
+          ) : (
+            selecionados.map((s, idx) => (
+              <div
+                key={s.conjuntoId}
+                className={cn('flex flex-wrap items-center gap-2 rounded-xl border bg-muted/10 px-3 py-2', s.semInicio > s.semFim && 'border-destructive/50 bg-destructive/5')}
+              >
+                <span className="w-5 shrink-0 text-center text-xs font-semibold tabular-nums text-muted-foreground">{idx + 1}</span>
+                <div className="flex shrink-0 flex-col">
+                  <button onClick={() => onMover(s.conjuntoId, -1)} disabled={idx === 0} className="text-muted-foreground transition hover:text-foreground disabled:opacity-30" title="Subir (entra antes no revezamento)"><ArrowUp className="h-3.5 w-3.5" /></button>
+                  <button onClick={() => onMover(s.conjuntoId, 1)} disabled={idx === selecionados.length - 1} className="text-muted-foreground transition hover:text-foreground disabled:opacity-30" title="Descer"><ArrowDown className="h-3.5 w-3.5" /></button>
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium">{s.disciplina}</p>
+                  <p className="truncate text-xs text-muted-foreground">{s.nome} · {s.qtdAulas} aula(s){s.qtdQuestoes > 0 ? ` · ${s.qtdQuestoes} questõe(s)` : ''}</p>
+                </div>
+                <div className="flex items-center gap-1 text-xs">
+                  <span className="text-muted-foreground">semana</span>
+                  <Input type="number" min={1} max={totalSemanas} value={s.semInicio} onChange={(e) => onPatch(s.conjuntoId, { semInicio: Math.max(1, Number(e.target.value) || 1) })} className="h-7 w-14" />
+                  <span className="text-muted-foreground">até</span>
+                  <Input type="number" min={1} max={totalSemanas} value={s.semFim} onChange={(e) => onPatch(s.conjuntoId, { semFim: Math.min(totalSemanas, Number(e.target.value) || totalSemanas) })} className="h-7 w-14" />
+                </div>
+                <button onClick={() => onRemover(s.conjuntoId)} className="shrink-0 text-muted-foreground transition hover:scale-110 hover:text-destructive" title="Remover"><Trash2 className="h-3.5 w-3.5" /></button>
+              </div>
+            ))
+          )}
+        </div>
+
+        <DialogFooter className="border-t pt-3 sm:justify-between">
+          <span className="self-center text-xs text-muted-foreground">
+            {selecionados.length} conteúdo(s){invalidas > 0 ? <span className="ml-1 text-destructive">· {invalidas} com faixa inválida</span> : null}
+          </span>
+          <Button onClick={aoFechar}>Concluir</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }
 
