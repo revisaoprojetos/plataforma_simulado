@@ -59,22 +59,15 @@ export function SecaoMontagem() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setMontagem])
 
-  // Aulas por semana acompanha os DIAS DE CURSO (modelo "1 aula por dia"). Ao mudar os dias na
-  // Estrutura: se estava no padrão (== dias anteriores), segue o novo total; senão, só limita ao
-  // teto (não dá pra ter mais aulas/semana do que dias). Sem isso, reduzir os dias não mexia no
-  // Diagnóstico nem na geração (ficava preso no valor semeado).
+  // Aulas por semana = nº de DIAS DE CURSO (modelo "1 aula por dia"). Não há mais knob próprio:
+  // o valor vem da Estrutura (etapa 2). Mantém em sincronia quando os dias mudam.
   const diasRef = useRef(draft.diasNome.length)
   useEffect(() => {
     const novo = draft.diasNome.length
-    const anterior = diasRef.current
-    if (novo === anterior) return
+    if (novo === diasRef.current) return
     diasRef.current = novo
     const dias = Math.max(1, novo)
-    setMontagem((m) => {
-      const eraPadrao = m.aulasPorSemana === Math.max(1, anterior)
-      const nv = Math.max(1, eraPadrao ? dias : Math.min(m.aulasPorSemana, dias))
-      return nv === m.aulasPorSemana ? m : { ...m, aulasPorSemana: nv }
-    })
+    setMontagem((m) => (m.aulasPorSemana === dias ? m : { ...m, aulasPorSemana: dias }))
   }, [draft.diasNome.length, setMontagem])
 
   const rotuloTipo = (slug: string) => tipos.find((t) => t.slug === slug)?.nome ?? slug
@@ -102,10 +95,6 @@ export function SecaoMontagem() {
       ;[copia[i], copia[j]] = [copia[j], copia[i]]
       return { ...m, linhas: copia }
     })
-  }
-  function setAulasPorSemana(n: number) {
-    const dias = Math.max(1, draft.diasNome.length)
-    setMontagem((m) => ({ ...m, aulasPorSemana: Math.min(dias, Math.max(1, n || 1)) }))
   }
   function removerSelecionado(conjuntoId: string) {
     setMontagem((m) => ({ ...m, selecionados: m.selecionados.filter((s) => s.conjuntoId !== conjuntoId) }))
@@ -374,11 +363,6 @@ export function SecaoMontagem() {
                       {validacao.saldo < 0 ? 'Aumentar' : 'Reduzir'} para {validacao.sugTotal} semanas
                     </Button>
                   )}
-                  {validacao.sugAulasViavel && (
-                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setAulasPorSemana(validacao.sugAulas)}>
-                      Aulas/semana → {validacao.sugAulas}
-                    </Button>
-                  )}
                 </div>
               </div>
             )}
@@ -411,13 +395,10 @@ export function SecaoMontagem() {
         aoFechar={() => setLinhasAberto(false)}
         linhas={linhas}
         tipos={tipos}
-        aulasPorSemana={aulasPorSemana}
-        maxAulas={Math.max(1, draft.diasNome.length)}
         onAdd={addLinha}
         onPatch={patchLinha}
         onRemover={removerLinha}
         onMover={moverLinha}
-        onAulasPorSemana={setAulasPorSemana}
       />
 
       <GerenciarConteudos
@@ -546,25 +527,19 @@ function GerenciarLinhas({
   aoFechar,
   linhas,
   tipos,
-  aulasPorSemana,
-  maxAulas,
   onAdd,
   onPatch,
   onRemover,
   onMover,
-  onAulasPorSemana,
 }: {
   aberto: boolean
   aoFechar: () => void
   linhas: { id: string; label: string; tipo: string; duracao: string | null; offset: number; continuacao: boolean; usaLinks: boolean; somenteComDado?: boolean }[]
   tipos: TipoMetaDef[]
-  aulasPorSemana: number
-  maxAulas: number
   onAdd: () => void
   onPatch: (id: string, p: Partial<{ label: string; tipo: string; duracao: string | null; offset: number; continuacao: boolean; usaLinks: boolean }>) => void
   onRemover: (id: string) => void
   onMover: (id: string, dir: -1 | 1) => void
-  onAulasPorSemana: (n: number) => void
 }) {
   const rotuloTipo = (slug: string) => tipos.find((t) => t.slug === slug)?.nome ?? slug
   const corTipo = (slug: string) => tipos.find((t) => t.slug === slug)?.cor || null
@@ -579,13 +554,8 @@ function GerenciarLinhas({
           </DialogDescription>
         </DialogHeader>
 
-        {/* Barra: lições por semana + adicionar linha. */}
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b pb-3">
-          <div className="flex items-center gap-2">
-            <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Aulas por semana</Label>
-            <Input type="number" min={1} max={maxAulas} value={aulasPorSemana} onChange={(e) => onAulasPorSemana(Number(e.target.value))} className="h-8 w-16" />
-            <span className="text-xs text-muted-foreground">(1 aula por dia)</span>
-          </div>
+        {/* Barra: adicionar linha (as aulas por semana vêm dos dias de curso, na Estrutura). */}
+        <div className="flex items-center justify-end border-b pb-3">
           <Button size="sm" variant="outline" onClick={onAdd}><Plus className="mr-1 h-3.5 w-3.5" /> Linha</Button>
         </div>
 
