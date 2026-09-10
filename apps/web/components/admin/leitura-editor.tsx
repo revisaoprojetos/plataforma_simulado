@@ -240,8 +240,8 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
       {/* Cabeçalho */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Link href="/admin/leitura" className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
-            <ArrowLeft className="h-4 w-4" /> Documentos
+          <Link href={documento.pasta_id ? `/admin/leitura?pasta=${documento.pasta_id}` : '/admin/leitura'} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+            <ArrowLeft className="h-4 w-4" /> Voltar
           </Link>
           <h1 className="text-xl font-bold tracking-tight">{titulo || 'Documento'}</h1>
           {temRascunhoPendente
@@ -410,53 +410,14 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
         <LeituraPreviewGrifos documentoId={documento.id} html={htmlAtual} podeEditar={podeEditar} artigos={documento.artigos ?? 0} podeComparar={temRascunhoPendente || publicadaVersao > 1} onGrifoCtl={setGrifoCtl} versaoQuestoes={versaoAutoria} />
       )}
 
-      {/* CONFIGURAÇÃO: dados do card + importação + metadados + desafio + questões */}
+      {/* CONFIGURAÇÃO: importação de conteúdo + metadados + desafio. Personalização (capa/título/
+          descrição/cor) fica no pop-up "Personalizar aula" do banco de aulas — aqui só o conteúdo. */}
       {aba === 'config' && (
       <div className="grid gap-5 lg:grid-cols-2">
         <div className="space-y-6">
-          {/* Dados do card — com capa */}
-          <section className="space-y-3">
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Dados do card</p>
-            <div>
-              <label className="mb-1.5 block text-xs text-muted-foreground">Capa do card</label>
-              <input ref={capaRef} type="file" accept="image/*" className="hidden" onChange={(e) => { enviarCapa(e.target.files?.[0] ?? null); e.target.value = '' }} />
-              {capa ? (
-                <div className="relative overflow-hidden rounded-xl border">
-                  <img src={capa} alt="Capa" className="h-28 w-full object-cover" />
-                  <div className="absolute right-1.5 top-1.5 flex gap-1">
-                    <button type="button" onClick={() => capaRef.current?.click()} className="inline-flex items-center gap-1 rounded-md bg-black/60 px-2 py-1 text-xs font-medium text-white backdrop-blur hover:bg-black/70"><RefreshCw className="h-3 w-3" /> Trocar</button>
-                    <button type="button" onClick={() => setCapa(null)} className="inline-flex items-center rounded-md bg-black/60 px-1.5 py-1 text-xs font-medium text-white backdrop-blur hover:bg-rose-600" aria-label="Remover capa"><Trash2 className="h-3 w-3" /></button>
-                  </div>
-                </div>
-              ) : (
-                <button type="button" onClick={() => capaRef.current?.click()} disabled={processandoCapa}
-                  className="flex h-24 w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed text-muted-foreground transition-colors hover:border-primary hover:text-foreground disabled:opacity-60">
-                  {processandoCapa ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5" />}
-                  <span className="text-xs font-medium">{processandoCapa ? 'Processando…' : 'Adicionar capa'}</span>
-                </button>
-              )}
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-muted-foreground">Título</label>
-              <input value={titulo} onChange={(e) => setTitulo(e.target.value)} className="w-full rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
-            </div>
-            <div>
-              <label className="mb-1 block text-xs text-muted-foreground">Descrição</label>
-              <textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={2} className="w-full resize-none rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs text-muted-foreground">Cor do card</label>
-              <div className="flex flex-wrap gap-1.5">
-                {CORES.map((cc) => (
-                  <button key={cc} onClick={() => setCor(cc)} className={cn('h-7 w-7 rounded-full border-2 transition', cor === cc ? 'border-foreground' : 'border-transparent')} style={{ background: cc }} aria-label={cc} />
-                ))}
-              </div>
-            </div>
-          </section>
-
           {/* Conteúdo — importar/editar */}
           {podeEditar && (
-            <section className="space-y-2 border-t pt-6">
+            <section className="space-y-2">
               <p className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><FileText className="h-3.5 w-3.5" /> Conteúdo da lei</p>
               <div className="mb-3 flex gap-1 rounded-lg border bg-muted/40 p-1 text-sm">
                 {([['colar', 'HTML', ClipboardPaste], ['word', 'Word', Upload], ['editor', 'Editor', PenLine]] as const).map(([m, label, Icon]) => (

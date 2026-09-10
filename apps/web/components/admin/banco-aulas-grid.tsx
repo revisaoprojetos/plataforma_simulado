@@ -301,7 +301,7 @@ function AulaLinha({ a, i, total, modulos, pending, onOrdem, onExcluir, onPerson
       {/* Filhos: Conteúdo (editor) + Questões do conteúdo (add/importar) */}
       {aberto && (
         <div className="border-t bg-muted/20">
-          <Link href={`/admin/leitura/${a.id}?tab=conteudo`} className="group flex items-center gap-2.5 py-2.5 pl-16 pr-3 text-sm transition-colors hover:bg-muted/50">
+          <Link href={`/admin/leitura/${a.id}?tab=config`} className="group flex items-center gap-2.5 py-2.5 pl-16 pr-3 text-sm transition-colors hover:bg-muted/50">
             <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
             <span className="flex-1 font-medium text-foreground">Conteúdo</span>
             <span className="text-[11px] text-muted-foreground">{(a.artigos ?? 0) > 0 ? `${a.artigos} seção(ões)` : 'inserir conteúdo'}</span>
