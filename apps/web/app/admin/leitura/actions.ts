@@ -43,8 +43,6 @@ export type Documento = {
   situacao_editorial?: SituacaoEditorial | null
 }
 
-export type Materia = { id: string; nome: string; slug: string | null; descricao: string | null; cor: string | null; icone: string | null; ordem: number }
-
 /** slug seguro a partir de um texto (sem acento, minúsculo, hífens). */
 function slugify(s: string): string {
   return (s ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
@@ -236,51 +234,6 @@ export async function arquivarDocumento(documentoId: string, arquivar: boolean):
   if (error) return { ok: false, error: error.message }
   await registrarAudit({ operacao: arquivar ? 'BLOQUEAR' : 'LIBERAR', entidade: 'simulado_documentos', entidadeId: documentoId, depois: { arquivada: arquivar }, atorId: g.atorId, tenantId: g.tenantId })
   revalidatePath('/admin/leitura'); revalidatePath(`/admin/leitura/${documentoId}`)
-  return { ok: true }
-}
-
-// ── Matérias (áreas do direito) — organização do catálogo ────────────────────
-
-export async function listarMaterias(): Promise<{ ok: boolean; itens?: Materia[]; error?: string }> {
-  const g = await guard('leitura:view'); if (!g.ok) return { ok: false, error: g.error }
-  const svc = createAdminClient()
-  const { data, error } = await svc.from('simulado_materias').select('id, nome, slug, descricao, cor, icone, ordem').eq('tenant_id', g.tenantId).eq('deletado', false).order('ordem').order('nome')
-  if (error) return { ok: false, error: error.message }
-  return { ok: true, itens: (data ?? []).map((m: any) => ({ id: m.id, nome: m.nome, slug: m.slug ?? null, descricao: m.descricao ?? null, cor: m.cor ?? null, icone: m.icone ?? null, ordem: m.ordem ?? 0 })) }
-}
-
-export async function criarMateria(nome: string, cor?: string | null, icone?: string | null): Promise<{ ok: boolean; id?: string; error?: string }> {
-  const g = await guard('leitura:create'); if (!g.ok) return { ok: false, error: g.error }
-  const n = (nome ?? '').trim(); if (!n) return { ok: false, error: 'Informe um nome.' }
-  const svc = createAdminClient()
-  const { data, error } = await svc.from('simulado_materias').insert({ tenant_id: g.tenantId, nome: n, slug: slugify(n), cor: cor ?? null, icone: icone ?? null }).select('id').single()
-  if (error) return { ok: false, error: /duplicate|unique/i.test(error.message) ? 'Já existe uma matéria com esse nome.' : error.message }
-  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_materias', entidadeId: (data as any).id, depois: { nome: n }, atorId: g.atorId, tenantId: g.tenantId })
-  revalidatePath('/admin/leitura/materias')
-  return { ok: true, id: (data as any).id }
-}
-
-export async function atualizarMateria(id: string, patch: Partial<Pick<Materia, 'nome' | 'cor' | 'icone' | 'ordem'>>): Promise<{ ok: boolean; error?: string }> {
-  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
-  const svc = createAdminClient()
-  const dados: Record<string, unknown> = { atualizado_em: new Date().toISOString() }
-  for (const k of ['nome', 'cor', 'icone', 'ordem'] as const) if (k in patch) dados[k] = (patch as any)[k]
-  if (typeof dados.nome === 'string') { dados.nome = (dados.nome as string).trim(); dados.slug = slugify(dados.nome as string) }
-  const { error } = await svc.from('simulado_materias').update(dados).eq('id', id).eq('tenant_id', g.tenantId)
-  if (error) return { ok: false, error: error.message }
-  revalidatePath('/admin/leitura/materias')
-  return { ok: true }
-}
-
-export async function excluirMateria(id: string): Promise<{ ok: boolean; error?: string }> {
-  const g = await guard('leitura:delete'); if (!g.ok) return { ok: false, error: g.error }
-  const svc = createAdminClient()
-  // Solta as leis dessa matéria (não apaga leis) + soft-delete da matéria.
-  await svc.from('simulado_documentos').update({ materia_id: null }).eq('materia_id', id).eq('tenant_id', g.tenantId)
-  const { error } = await svc.from('simulado_materias').update({ deletado: true }).eq('id', id).eq('tenant_id', g.tenantId)
-  if (error) return { ok: false, error: error.message }
-  await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_materias', entidadeId: id, atorId: g.atorId, tenantId: g.tenantId })
-  revalidatePath('/admin/leitura/materias')
   return { ok: true }
 }
 

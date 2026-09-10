@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { limparCabecalhoHtml } from '@/lib/leitura/limpar-cabecalho'
 import { LeituraEditor } from '@/components/admin/leitura-editor'
-import { listarMaterias, type Documento } from '../actions'
+import { type Documento } from '../actions'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,7 +39,6 @@ export default async function LeituraEditorPage({ params, searchParams }: { para
     fonte_oficial: d.fonte_oficial ?? null, ultima_verificacao: d.ultima_verificacao ?? null, ordem: d.ordem ?? null,
     situacao_editorial: d.situacao_editorial ?? 'em_preparacao',
   }
-  const materias = (await listarMaterias()).itens ?? []
   const temRascunhoPendente = rascunhoVersao > publicadaVersao
 
   return (
@@ -50,7 +49,6 @@ export default async function LeituraEditorPage({ params, searchParams }: { para
         htmlAtual={limparCabecalhoHtml((cont as any)?.html ?? '')}
         podeEditar={await checkPermission('leitura:update')}
         podePublicar={await checkPermission('leitura:publicar')}
-        materias={materias}
         publicadaVersao={publicadaVersao}
         temRascunhoPendente={temRascunhoPendente}
         versaoEdicao={rascunhoVersao}

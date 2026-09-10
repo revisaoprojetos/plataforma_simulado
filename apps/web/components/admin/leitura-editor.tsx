@@ -14,7 +14,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
-import { atualizarDocumento, publicarVersao, type Documento, type Materia, type SituacaoEditorial } from '@/app/admin/leitura/actions'
+import { atualizarDocumento, publicarVersao, type Documento, type SituacaoEditorial } from '@/app/admin/leitura/actions'
 import { carregarDiffDocumento, renomearVersao } from '@/app/admin/leitura/alteracoes-actions'
 import { salvarConteudoHtml, importarDocx } from '@/app/admin/leitura/upload-actions'
 import { LeituraPreviewGrifos, type GrifoCtl } from '@/components/admin/leitura-preview-grifos'
@@ -50,8 +50,8 @@ const TIPOS_ATUALIZACAO = [
   { v: 'correcao_editorial', label: 'Correção editorial', Icon: SpellCheck },
 ] as const
 
-export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [], podePublicar = false, publicadaVersao = 1, temRascunhoPendente = false, versaoEdicao, abaInicial }: {
-  documento: Documento; htmlAtual: string; podeEditar: boolean; materias?: Materia[]; podePublicar?: boolean; publicadaVersao?: number; temRascunhoPendente?: boolean; versaoEdicao?: number
+export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar = false, publicadaVersao = 1, temRascunhoPendente = false, versaoEdicao, abaInicial }: {
+  documento: Documento; htmlAtual: string; podeEditar: boolean; podePublicar?: boolean; publicadaVersao?: number; temRascunhoPendente?: boolean; versaoEdicao?: number
   abaInicial?: 'conteudo' | 'config' | 'questoes' | 'acesso'
 }) {
   const versaoAutoria = versaoEdicao ?? documento.versao
@@ -515,12 +515,6 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [],
             </summary>
             <div className="space-y-3 pt-3">
               <div className="grid grid-cols-2 gap-2">
-                <label className="col-span-2 text-xs text-muted-foreground">Matéria
-                  <select value={materiaId} onChange={(e) => setMateriaId(e.target.value)} className="mt-1 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring">
-                    <option value="">— sem matéria —</option>
-                    {materias.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
-                  </select>
-                </label>
                 <label className="text-xs text-muted-foreground">Tipo
                   <select value={tipoNorma} onChange={(e) => setTipoNorma(e.target.value)} className="mt-1 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-2 py-1.5 text-sm text-foreground outline-none focus:ring-1 focus:ring-ring">
                     <option value="">—</option>
