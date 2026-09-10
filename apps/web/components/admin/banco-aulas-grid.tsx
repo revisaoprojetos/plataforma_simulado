@@ -12,7 +12,7 @@ import { confirmar } from '@/components/ui/confirm-dialog'
 import { type CardView } from '@/lib/card-view'
 import {
   type BancoAulas, type ModuloLeitura, criarDocumento, excluirModuloLeitura,
-  moverAulaParaModulo, reordenarAulasLeitura, reordenarModulosLeitura,
+  moverAulaParaModulo, reordenarAulasLeitura,
 } from '@/app/admin/leitura/actions'
 import { excluirDocumento } from '@/app/admin/leitura/actions'
 import {
@@ -53,12 +53,6 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster' }: { data
     if (!(await confirmar({ titulo: 'Excluir aula', mensagem: `Excluir a aula "${titulo}"?`, confirmar: 'Excluir', destrutivo: true }))) return
     run(() => excluirDocumento(id))
   }
-  function moverBanco(idx: number, delta: number) {
-    const ids = bancos.map((b) => b.id); const j = idx + delta
-    if (j < 0 || j >= ids.length) return
-    ;[ids[idx], ids[j]] = [ids[j], ids[idx]]
-    run(() => reordenarModulosLeitura(ids))
-  }
   function moverAulaOrdem(idx: number, delta: number) {
     const ids = aulas.map((a) => a.id); const j = idx + delta
     if (j < 0 || j >= ids.length) return
@@ -89,11 +83,9 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster' }: { data
             <div className="rounded-2xl border border-dashed p-12 text-center text-muted-foreground">Nenhum módulo ainda. Crie um <span className="font-medium text-foreground">módulo</span> para guardar as aulas.</div>
           ) : (
             <div className={cardView === 'ticket' ? 'grid gap-3 md:grid-cols-2 xl:grid-cols-3' : 'grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'}>
-              {bancos.map((b, i) => (
+              {bancos.map((b) => (
                 <ModuloCard
-                  key={b.id} m={b} variant={cardView} pending={pending}
-                  podeSubir={i > 0} podeDescer={i < bancos.length - 1}
-                  onSubir={() => moverBanco(i, -1)} onDescer={() => moverBanco(i, 1)}
+                  key={b.id} m={b} variant={cardView}
                   onPersonalizar={() => setEditandoModulo(b)} onExcluir={() => excluirBanco(b)}
                 />
               ))}
@@ -141,14 +133,9 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster' }: { data
  * Card do módulo — espelha o FolderCard do Banco de Simulado (variantes poster/ticket),
  * mas com semântica de módulo (contagem de aulas, rota da leitura) e reordenar no menu.
  */
-function ModuloCard({ m, variant, pending, podeSubir, podeDescer, onSubir, onDescer, onPersonalizar, onExcluir }: {
+function ModuloCard({ m, variant, onPersonalizar, onExcluir }: {
   m: ModuloLeitura
   variant: CardView
-  pending: boolean
-  podeSubir: boolean
-  podeDescer: boolean
-  onSubir: () => void
-  onDescer: () => void
   onPersonalizar: () => void
   onExcluir: () => void
 }) {
@@ -160,8 +147,6 @@ function ModuloCard({ m, variant, pending, podeSubir, podeDescer, onSubir, onDes
     <DropdownMenuContent align="start" className="w-40">
       <DropdownMenuItem render={<Link href={href} />}><FolderOpen className="mr-2 h-4 w-4" /> Abrir</DropdownMenuItem>
       <DropdownMenuItem onClick={onPersonalizar}><Pencil className="mr-2 h-4 w-4" /> Personalizar</DropdownMenuItem>
-      <DropdownMenuItem onClick={onSubir} disabled={!podeSubir || pending}><ChevronUp className="mr-2 h-4 w-4" /> Subir</DropdownMenuItem>
-      <DropdownMenuItem onClick={onDescer} disabled={!podeDescer || pending}><ChevronDown className="mr-2 h-4 w-4" /> Descer</DropdownMenuItem>
       <DropdownMenuSeparator />
       <DropdownMenuItem onClick={onExcluir} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir módulo</DropdownMenuItem>
     </DropdownMenuContent>
