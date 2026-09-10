@@ -78,7 +78,7 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTa
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3">
       {/* Breadcrumb + (dentro do módulo) botão Adicionar aula na MESMA linha */}
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
