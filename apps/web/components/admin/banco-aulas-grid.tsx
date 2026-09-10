@@ -6,9 +6,10 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import { EditarPastaDialog } from '@/components/admin/editar-pasta-dialog'
 import {
-  ChevronRight, ChevronUp, ChevronDown, Home, Library, FolderPlus, FilePlus2, Pencil, Trash2, FolderInput, Pen, Eye, EyeOff, BookOpenText,
+  ChevronRight, ChevronUp, ChevronDown, Home, Library, FolderPlus, FilePlus2, Pencil, Trash2, FolderInput, Pen, Eye, EyeOff, BookOpenText, MoreVertical, FolderOpen,
 } from 'lucide-react'
 import { confirmar } from '@/components/ui/confirm-dialog'
+import { type CardView } from '@/lib/card-view'
 import {
   type BancoAulas, type ModuloLeitura, criarDocumento, excluirModuloLeitura,
   moverAulaParaModulo, reordenarAulasLeitura, reordenarModulosLeitura,
@@ -23,7 +24,7 @@ import {
  *  - Raiz: cards dos BANCOS (containers) + "Novo banco".
  *  - Dentro de um banco: TABELA de aulas (documento HTML + questões), reordenáveis; cada aula abre o editor.
  */
-export function BancoAulasGrid({ data, pastaAtual }: { data: BancoAulas; pastaAtual: string | null }) {
+export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster' }: { data: BancoAulas; pastaAtual: string | null; cardView?: CardView }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [criandoModulo, setCriandoModulo] = useState(false)
@@ -87,34 +88,14 @@ export function BancoAulasGrid({ data, pastaAtual }: { data: BancoAulas; pastaAt
           {bancos.length === 0 ? (
             <div className="rounded-2xl border border-dashed p-12 text-center text-muted-foreground">Nenhum módulo ainda. Crie um <span className="font-medium text-foreground">módulo</span> para guardar as aulas.</div>
           ) : (
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className={cardView === 'ticket' ? 'grid gap-3 md:grid-cols-2 xl:grid-cols-3' : 'grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'}>
               {bancos.map((b, i) => (
-                <div key={b.id} className="group relative flex items-center gap-3 overflow-hidden rounded-2xl border bg-card p-3.5 shadow-sm transition-colors hover:border-primary/40">
-                  {/* Banner largo como fundo suave, quando houver capa. */}
-                  {(b.capa_url || b.capa_card_url) && <img src={(b.capa_url || b.capa_card_url) as string} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-20" />}
-                  <Link href={`/admin/leitura?pasta=${b.id}`} className="absolute inset-0 z-0" aria-label={b.nome} />
-                  {b.capa_card_url ? (
-                    <img src={b.capa_card_url} alt="" className="relative h-12 w-12 shrink-0 rounded-xl object-cover" />
-                  ) : (
-                    <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-white" style={{ background: b.cor ?? '#6d28d9' }}><Library className="h-5 w-5" /></span>
-                  )}
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold">{b.nome}</p>
-                    <p className="text-xs text-muted-foreground">{b.aulas} aula(s)</p>
-                  </div>
-                  <div className="relative z-10 flex items-center gap-0.5">
-                    <button onClick={() => moverBanco(i, -1)} disabled={i === 0 || pending} title="Subir" className="rounded-md p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"><ChevronUp className="h-4 w-4" /></button>
-                    <button onClick={() => moverBanco(i, 1)} disabled={i === bancos.length - 1 || pending} title="Descer" className="rounded-md p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"><ChevronDown className="h-4 w-4" /></button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger className="rounded-md p-1 text-muted-foreground hover:bg-muted"><Pencil className="h-4 w-4" /></DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setEditandoModulo(b)}><Pencil className="mr-2 h-4 w-4" /> Personalizar</DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => excluirBanco(b)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir</DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
+                <ModuloCard
+                  key={b.id} m={b} variant={cardView} pending={pending}
+                  podeSubir={i > 0} podeDescer={i < bancos.length - 1}
+                  onSubir={() => moverBanco(i, -1)} onDescer={() => moverBanco(i, 1)}
+                  onPersonalizar={() => setEditandoModulo(b)} onExcluir={() => excluirBanco(b)}
+                />
               ))}
             </div>
           )}
@@ -142,15 +123,106 @@ export function BancoAulasGrid({ data, pastaAtual }: { data: BancoAulas; pastaAt
       )}
       {/* Criar/personalizar módulo — reusa o editor de pasta do banco (capa do card + banner largo + cor + crop). */}
       {criandoModulo && (
-        <EditarPastaDialog area="leitura" paiId={pastaAtual} onClose={() => setCriandoModulo(false)} onSaved={() => { setCriandoModulo(false); router.refresh() }} />
+        <EditarPastaDialog area="leitura" paiId={pastaAtual} rotulo="módulo" generoM cardView={cardView} onClose={() => setCriandoModulo(false)} onSaved={() => { setCriandoModulo(false); router.refresh() }} />
       )}
       {editandoModulo && (
         <EditarPastaDialog
           pasta={{ id: editandoModulo.id, nome: editandoModulo.nome, cor: editandoModulo.cor, capa: editandoModulo.capa_card_url, capaLarga: editandoModulo.capa_url }}
+          rotulo="módulo" generoM cardView={cardView}
           onClose={() => setEditandoModulo(null)}
           onSaved={() => { setEditandoModulo(null); router.refresh() }}
         />
       )}
+    </div>
+  )
+}
+
+/**
+ * Card do módulo — espelha o FolderCard do Banco de Simulado (variantes poster/ticket),
+ * mas com semântica de módulo (contagem de aulas, rota da leitura) e reordenar no menu.
+ */
+function ModuloCard({ m, variant, pending, podeSubir, podeDescer, onSubir, onDescer, onPersonalizar, onExcluir }: {
+  m: ModuloLeitura
+  variant: CardView
+  pending: boolean
+  podeSubir: boolean
+  podeDescer: boolean
+  onSubir: () => void
+  onDescer: () => void
+  onPersonalizar: () => void
+  onExcluir: () => void
+}) {
+  const c = m.cor ?? '#6d28d9'
+  const capa = m.capa_card_url || m.capa_url
+  const href = `/admin/leitura?pasta=${m.id}`
+  const contagem = `${m.aulas} aula(s)`
+  const menu = (
+    <DropdownMenuContent align="start" className="w-40">
+      <DropdownMenuItem render={<Link href={href} />}><FolderOpen className="mr-2 h-4 w-4" /> Abrir</DropdownMenuItem>
+      <DropdownMenuItem onClick={onPersonalizar}><Pencil className="mr-2 h-4 w-4" /> Personalizar</DropdownMenuItem>
+      <DropdownMenuItem onClick={onSubir} disabled={!podeSubir || pending}><ChevronUp className="mr-2 h-4 w-4" /> Subir</DropdownMenuItem>
+      <DropdownMenuItem onClick={onDescer} disabled={!podeDescer || pending}><ChevronDown className="mr-2 h-4 w-4" /> Descer</DropdownMenuItem>
+      <DropdownMenuSeparator />
+      <DropdownMenuItem onClick={onExcluir} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir módulo</DropdownMenuItem>
+    </DropdownMenuContent>
+  )
+
+  // ===== Variante TICKET: card baixo/retangular — imagem à esquerda, infos+ações à direita. =====
+  if (variant === 'ticket') {
+    return (
+      <div className="group relative flex h-32 overflow-hidden rounded-2xl border bg-card shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg sm:h-36">
+        <div className="relative h-full aspect-[4/3] shrink-0 overflow-hidden">
+          {capa
+            ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105" />
+            : <div className="absolute inset-0 flex items-center justify-center text-white/90" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }}><Library className="h-8 w-8" /></div>}
+          <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `linear-gradient(110deg, transparent 45%, ${c})` }} />
+        </div>
+        <Link href={href} className="absolute inset-0 z-10" aria-label={m.nome} />
+        <div className="pointer-events-auto absolute right-2 top-2 z-30">
+          <DropdownMenu>
+            <DropdownMenuTrigger className="flex h-6 w-6 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground data-popup-open:bg-accent data-popup-open:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring" aria-label="Ações do módulo">
+              <MoreVertical className="h-4 w-4" />
+            </DropdownMenuTrigger>
+            {menu}
+          </DropdownMenu>
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 p-3">
+          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Módulo</p>
+          <h3 className="line-clamp-2 pr-8 text-sm font-bold leading-tight text-foreground sm:text-[15px]">
+            <Link href={href} className="pointer-events-auto relative z-20 transition-opacity hover:opacity-80">{m.nome}</Link>
+          </h3>
+          <span className="inline-flex w-fit items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+            <BookOpenText className="h-3 w-3" /> {contagem}
+          </span>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
+      {capa ? (
+        <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+      ) : (
+        <div className="absolute inset-0 flex items-center justify-center text-white/90" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }}><Library className="h-10 w-10" /></div>
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
+      <Link href={href} className="absolute inset-0 z-10" aria-label={m.nome} />
+      <div className="absolute right-2 top-2 z-30">
+        <DropdownMenu>
+          <DropdownMenuTrigger className="flex h-8 w-8 items-center justify-center rounded-lg text-white/80 outline-none transition-colors hover:bg-white hover:text-neutral-900 data-popup-open:bg-white data-popup-open:text-neutral-900 focus-visible:ring-2 focus-visible:ring-white/50" aria-label="Ações do módulo">
+            <MoreVertical className="h-4 w-4" />
+          </DropdownMenuTrigger>
+          {menu}
+        </DropdownMenu>
+      </div>
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-3">
+        <p className="text-[10px] font-medium uppercase tracking-wide text-white/70">Módulo</p>
+        <h3 className="mt-0.5 line-clamp-2 text-sm font-bold leading-tight text-white drop-shadow-sm">{m.nome}</h3>
+        <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur">
+          <BookOpenText className="h-3 w-3" /> {contagem}
+        </span>
+      </div>
     </div>
   )
 }

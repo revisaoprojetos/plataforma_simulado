@@ -2,12 +2,16 @@ import Link from 'next/link'
 import { Library, Layers } from 'lucide-react'
 import { listarBancoAulas } from './actions'
 import { BancoAulasGrid } from '@/components/admin/banco-aulas-grid'
+import { getCurrentTenant } from '@/lib/tenant'
+import { resolverCardView } from '@/lib/card-view'
 
 export const dynamic = 'force-dynamic'
 
 export default async function LeituraAdminPage({ searchParams }: { searchParams: Promise<{ pasta?: string }> }) {
   const { pasta } = await searchParams
   const data = await listarBancoAulas(pasta ?? null)
+  const temaCards = ((await getCurrentTenant())?.tema as any) ?? {}
+  const cardView = resolverCardView(temaCards.card_view_admin ?? temaCards.card_view)
 
   return (
     <div className="space-y-6">
@@ -22,7 +26,7 @@ export default async function LeituraAdminPage({ searchParams }: { searchParams:
       {!data.ok ? (
         <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{data.error}</p>
       ) : (
-        <BancoAulasGrid data={data} pastaAtual={pasta ?? null} />
+        <BancoAulasGrid data={data} pastaAtual={pasta ?? null} cardView={cardView} />
       )}
     </div>
   )

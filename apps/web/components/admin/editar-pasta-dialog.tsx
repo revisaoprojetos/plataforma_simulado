@@ -35,7 +35,7 @@ async function origParaMeta(o: File | string | null): Promise<string | null> {
  * usada no card pôster = capa_card_url) e a IMAGEM LARGA (banner usado na trilha e no card ticket =
  * capa_url). Cada imagem tem "Ajustar" (arraste + zoom) para posicionar o recorte. A PRÉVIA espelha
  * o estilo de card escolhido no console (pôster ou ticket). */
-export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poster', onClose, onSaved }: {
+export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poster', rotulo, generoM = false, onClose, onSaved }: {
   pasta?: { id?: string; nome?: string; cor?: string | null; capa?: string | null; capaLarga?: string | null } | null
   /** Presente = modo CRIAR: cria a pasta nesta área e já aplica a personalização. */
   area?: 'banco' | 'simulado' | 'caderno' | 'leitura'
@@ -43,10 +43,16 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
   paiId?: string | null
   /** Estilo do card definido no console (tema.card_view / card_view_admin) — a prévia o espelha. */
   cardView?: CardView
+  /** Rótulo do container (default "pasta"; ex.: "módulo" na leitura) + gênero p/ concordância. */
+  rotulo?: string
+  generoM?: boolean
   onClose: () => void
   onSaved: (patch?: PastaPatch) => void
 }) {
   const criar = !pasta?.id
+  const rot = rotulo ?? 'pasta'
+  const Rot = rot.charAt(0).toUpperCase() + rot.slice(1)
+  const gp = (m: string, f: string) => (generoM ? m : f) // concordância de gênero
   const cardRef = useRef<HTMLInputElement>(null)
   const largaRef = useRef<HTMLInputElement>(null)
   const [nome, setNome] = useState(pasta?.nome ?? '')
@@ -128,11 +134,11 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
       if (!r.ok || !r.id) { setSalvando(false); toast.error(r.error ?? 'Erro ao criar'); return }
       await atualizarBanco(r.id, nome.trim(), cor, null, capaLarga, capaCard, meta)
       setSalvando(false)
-      toast.success(paiId ? 'Subpasta criada' : 'Pasta criada'); onSaved(); onClose()
+      toast.success(paiId ? `Sub${rot} ${gp('criado', 'criada')}` : `${Rot} ${gp('criado', 'criada')}`); onSaved(); onClose()
     } else {
       const r = await atualizarBanco(pasta!.id!, nome.trim(), cor, null, capaLarga, capaCard, meta)
       setSalvando(false)
-      if (r.ok) { toast.success('Pasta atualizada'); onSaved({ nome: nome.trim(), cor, capa: capaCard, capaLarga }); onClose() }
+      if (r.ok) { toast.success(`${Rot} ${gp('atualizado', 'atualizada')}`); onSaved({ nome: nome.trim(), cor, capa: capaCard, capaLarga }); onClose() }
       else toast.error(r.error ?? 'Erro ao salvar')
     }
   }
@@ -146,7 +152,7 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
         {/* Form */}
         <div className="min-w-0 overflow-auto">
           <div className="flex items-center justify-between border-b px-5 py-3">
-            <h3 className="flex items-center gap-2 text-sm font-semibold"><Palette className="h-4 w-4" /> {criar ? (paiId ? 'Nova subpasta' : 'Nova pasta') : 'Personalizar pasta'}</h3>
+            <h3 className="flex items-center gap-2 text-sm font-semibold"><Palette className="h-4 w-4" /> {criar ? (paiId ? `${gp('Novo', 'Nova')} sub${rot}` : `${gp('Novo', 'Nova')} ${rot}`) : `Personalizar ${rot}`}</h3>
             <button type="button" onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground md:hidden"><X className="h-4 w-4" /></button>
           </div>
           <div className="space-y-5 p-5">
@@ -224,7 +230,7 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
             <div className="flex justify-end gap-2">
               <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted">Cancelar</button>
               <button type="button" onClick={salvar} disabled={salvando} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
-                {salvando && <Loader2 className="h-4 w-4 animate-spin" />} {criar ? (paiId ? 'Criar subpasta' : 'Criar pasta') : 'Salvar'}
+                {salvando && <Loader2 className="h-4 w-4 animate-spin" />} {criar ? (paiId ? `Criar sub${rot}` : `Criar ${rot}`) : 'Salvar'}
               </button>
             </div>
           </div>
@@ -246,8 +252,8 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
                 <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `linear-gradient(110deg, transparent 45%, ${c})` }} />
               </div>
               <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 p-3">
-                <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Pasta</span>
-                <h3 className="line-clamp-2 text-sm font-bold leading-tight text-foreground">{nome || 'Nome da pasta'}</h3>
+                <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{Rot}</span>
+                <h3 className="line-clamp-2 text-sm font-bold leading-tight text-foreground">{nome || `Nome ${gp('do', 'da')} ${rot}`}</h3>
               </div>
             </div>
           ) : (
@@ -260,8 +266,8 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
               )}
               <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
               <div className="absolute inset-x-0 bottom-0 z-20 p-3">
-                <p className="text-[10px] font-medium uppercase tracking-wide text-white/70">Pasta</p>
-                <h3 className="mt-0.5 line-clamp-2 text-sm font-bold leading-tight text-white drop-shadow-sm">{nome || 'Nome da pasta'}</h3>
+                <p className="text-[10px] font-medium uppercase tracking-wide text-white/70">{Rot}</p>
+                <h3 className="mt-0.5 line-clamp-2 text-sm font-bold leading-tight text-white drop-shadow-sm">{nome || `Nome ${gp('do', 'da')} ${rot}`}</h3>
               </div>
             </div>
           )}
