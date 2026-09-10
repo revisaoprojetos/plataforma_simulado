@@ -6,6 +6,8 @@ import { LEITURA_ATIVA } from '@/lib/flags'
 import { carregarTrilhaLeituraAluno } from '@/lib/leitura/trilha'
 import { TrilhaGigante } from '@/components/aluno/trilha-simulados'
 import { LeituraModulos } from '@/components/aluno/leitura-modulos'
+import { getCurrentTenant } from '@/lib/tenant'
+import { resolverCardView } from '@/lib/card-view'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,6 +18,8 @@ export default async function LeituraAlunoPage({ searchParams }: { searchParams:
   const trilhas = await carregarTrilhaLeituraAluno(sessao.estudanteId, sessao.tenantId)
   const { modulo } = await searchParams
   const sel = modulo ? trilhas.find((t) => t.id === modulo) : null
+  const tema = ((await getCurrentTenant())?.tema as any) ?? {}
+  const cardView = resolverCardView(tema.card_view)
 
   // ===== Módulo aberto: infos + trilha serpenteada dele =====
   if (sel) {
@@ -48,7 +52,7 @@ export default async function LeituraAlunoPage({ searchParams }: { searchParams:
       {trilhas.length === 0 ? (
         <div className="rounded-2xl border border-dashed p-12 text-center text-muted-foreground">Nenhum módulo disponível ainda.</div>
       ) : (
-        <LeituraModulos modulos={trilhas.map((t) => ({ id: t.id, nome: t.nome, cor: t.cor, capa: t.capa ?? null, capaCard: t.capaCard ?? null, total: t.total, done: t.done }))} />
+        <LeituraModulos cardView={cardView} modulos={trilhas.map((t) => ({ id: t.id, nome: t.nome, cor: t.cor, capa: t.capa ?? null, capaCard: t.capaCard ?? null, total: t.total, done: t.done }))} />
       )}
     </div>
   )
