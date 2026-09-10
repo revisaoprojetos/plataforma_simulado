@@ -35,8 +35,8 @@ export function BancoAulasGrid({ data, pastaAtual }: { data: BancoAulas; pastaAt
     start(async () => { const r = await fn(); if (r.ok) { if (okMsg) toast.success(okMsg); router.refresh() } else toast.error(r.error ?? 'Erro') })
 
   function novoBanco() {
-    const nome = window.prompt('Nome do banco:')?.trim(); if (!nome) return
-    run(() => criarModuloLeitura(nome, pastaAtual), 'Banco criado')
+    const nome = window.prompt('Nome do módulo:')?.trim(); if (!nome) return
+    run(() => criarModuloLeitura(nome, pastaAtual), 'Módulo criado')
   }
   function novaAula() {
     start(async () => {
@@ -46,11 +46,11 @@ export function BancoAulasGrid({ data, pastaAtual }: { data: BancoAulas; pastaAt
     })
   }
   function renomearBanco(b: ModuloLeitura) {
-    const nome = window.prompt('Renomear banco:', b.nome)?.trim(); if (!nome || nome === b.nome) return
+    const nome = window.prompt('Renomear módulo:', b.nome)?.trim(); if (!nome || nome === b.nome) return
     run(() => renomearModuloLeitura(b.id, nome))
   }
   async function excluirBanco(b: ModuloLeitura) {
-    if (!(await confirmar({ titulo: 'Excluir banco', mensagem: `Excluir "${b.nome}"? Só é possível se estiver vazio (mova as aulas antes).`, confirmar: 'Excluir', destrutivo: true }))) return
+    if (!(await confirmar({ titulo: 'Excluir módulo', mensagem: `Excluir "${b.nome}"? Só é possível se estiver vazio (mova as aulas antes).`, confirmar: 'Excluir', destrutivo: true }))) return
     run(() => excluirModuloLeitura(b.id))
   }
   async function excluirAula(id: string, titulo: string) {
@@ -74,7 +74,7 @@ export function BancoAulasGrid({ data, pastaAtual }: { data: BancoAulas; pastaAt
     <div className="space-y-5">
       {/* Breadcrumb */}
       <div className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
-        <Link href="/admin/leitura" className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 hover:bg-muted hover:text-foreground"><Home className="h-3.5 w-3.5" /> Bancos</Link>
+        <Link href="/admin/leitura" className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 hover:bg-muted hover:text-foreground"><Home className="h-3.5 w-3.5" /> Módulos</Link>
         {breadcrumb.map((b) => (
           <span key={b.id} className="inline-flex items-center gap-1">
             <ChevronRight className="h-3.5 w-3.5" />
@@ -87,10 +87,10 @@ export function BancoAulasGrid({ data, pastaAtual }: { data: BancoAulas; pastaAt
         // ===================== RAIZ: bancos (containers) =====================
         <>
           <div>
-            <button onClick={novoBanco} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"><FolderPlus className="h-4 w-4" /> Novo banco</button>
+            <button onClick={novoBanco} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"><FolderPlus className="h-4 w-4" /> Novo módulo</button>
           </div>
           {bancos.length === 0 ? (
-            <div className="rounded-2xl border border-dashed p-12 text-center text-muted-foreground">Nenhum banco ainda. Crie um <span className="font-medium text-foreground">banco</span> para guardar as aulas.</div>
+            <div className="rounded-2xl border border-dashed p-12 text-center text-muted-foreground">Nenhum módulo ainda. Crie um <span className="font-medium text-foreground">módulo</span> para guardar as aulas.</div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {bancos.map((b, i) => (
@@ -120,7 +120,7 @@ export function BancoAulasGrid({ data, pastaAtual }: { data: BancoAulas; pastaAt
           {/* Aulas soltas (sem banco) — legadas: uma tabela para mover pra um banco. */}
           {aulas.length > 0 && (
             <div className="space-y-2">
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Aulas sem banco</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Aulas sem módulo</p>
               <TabelaAulas aulas={aulas} modulos={modulos} pending={pending} onOrdem={moverAulaOrdem} onExcluir={excluirAula} run={run} />
             </div>
           )}
@@ -129,7 +129,7 @@ export function BancoAulasGrid({ data, pastaAtual }: { data: BancoAulas; pastaAt
         // ===================== DENTRO DE UM BANCO: tabela de aulas =====================
         <>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm text-muted-foreground">{aulas.length} aula(s) neste banco — a ordem define a sequência na trilha.</p>
+            <p className="text-sm text-muted-foreground">{aulas.length} aula(s) neste módulo — a ordem define a sequência na trilha.</p>
             <button onClick={novaAula} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"><FilePlus2 className="h-4 w-4" /> Adicionar aula</button>
           </div>
           {aulas.length === 0 ? (
@@ -189,9 +189,9 @@ function TabelaAulas({ aulas, modulos, pending, onOrdem, onExcluir, run }: {
                   <button onClick={() => onOrdem(i, 1)} disabled={i === list.length - 1 || pending} title="Descer" className="rounded-md p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"><ChevronDown className="h-4 w-4" /></button>
                   <Link href={`/admin/leitura/${a.id}`} title="Editar" className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><Pen className="h-4 w-4" /></Link>
                   <DropdownMenu>
-                    <DropdownMenuTrigger className="rounded-md p-1 text-muted-foreground hover:bg-muted" title="Mover para banco"><FolderInput className="h-4 w-4" /></DropdownMenuTrigger>
+                    <DropdownMenuTrigger className="rounded-md p-1 text-muted-foreground hover:bg-muted" title="Mover para módulo"><FolderInput className="h-4 w-4" /></DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="max-h-72 overflow-auto">
-                      <DropdownMenuItem onClick={() => run(() => moverAulaParaModulo(a.id, null), 'Movido')}>Sem banco</DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => run(() => moverAulaParaModulo(a.id, null), 'Movido')}>Sem módulo</DropdownMenuItem>
                       <DropdownMenuSeparator />
                       {modulos.filter((mm) => mm.id !== a.pasta_id).map((mm) => (
                         <DropdownMenuItem key={mm.id} onClick={() => run(() => moverAulaParaModulo(a.id, mm.id), 'Movido')}>{mm.nome}</DropdownMenuItem>
