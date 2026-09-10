@@ -506,7 +506,13 @@ export async function listarDocumentosAdmin(): Promise<{ ok: boolean; itens?: Do
 // ===================== Banco de Aulas (módulos = pastas folder_area='leitura') =====================
 
 const AREA_LEITURA = 'leitura'
-export type ModuloLeitura = { id: string; nome: string; pai_id: string | null; cor: string | null; icone: string | null; capa_url: string | null; capa_card_url: string | null; ordem: number; subpastas: number; aulas: number }
+export type PublicacaoModulo = { status: 'rascunho' | 'publicado'; publicarEm: string | null; encerrarEm: string | null }
+const PUBLICACAO_PADRAO: PublicacaoModulo = { status: 'rascunho', publicarEm: null, encerrarEm: null }
+function normPublicacao(v: any): PublicacaoModulo {
+  if (!v || typeof v !== 'object') return PUBLICACAO_PADRAO
+  return { status: v.status === 'publicado' ? 'publicado' : 'rascunho', publicarEm: v.publicarEm ?? null, encerrarEm: v.encerrarEm ?? null }
+}
+export type ModuloLeitura = { id: string; nome: string; pai_id: string | null; cor: string | null; icone: string | null; capa_url: string | null; capa_card_url: string | null; ordem: number; subpastas: number; aulas: number; publicacao: PublicacaoModulo }
 export type BancoAulas = { ok: boolean; error?: string; pastas?: ModuloLeitura[]; aulas?: (Documento & { questoes?: number })[]; breadcrumb?: { id: string; nome: string }[]; modulos?: { id: string; nome: string }[]; moduloAtual?: ModuloLeitura }
 
 /** `.order('ordem')` tolerante: se a coluna `ordem` ainda não existir, refaz ordenando por nome. */
@@ -515,7 +521,8 @@ async function pastasLeitura(svc: any, tenantId: string): Promise<any[]> {
     const b = svc.from('simulado_pastas').select(cols).eq('tenant_id', tenantId).eq('is_folder', true).eq('folder_area', AREA_LEITURA)
     return ordenado ? b.order('ordem', { ascending: true }).order('nome', { ascending: true }) : b.order('nome', { ascending: true })
   }
-  let r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, ordem', true)
+  let r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, ordem, publicacao', true)
+  if (r.error) r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, ordem', true) // publicacao pode não estar migrada
   if (r.error) r = await q('id, nome, pai_id, cor, icone, capa_url', false) // capa_card_url/ordem podem não estar migradas
   return (r.data as any[]) ?? []
 }
@@ -536,7 +543,7 @@ export async function listarBancoAulas(pastaId?: string | null, detalhes: boolea
 
   const pastas: ModuloLeitura[] = todasPastas.filter((p) => (p.pai_id ?? null) === paiAtual).map((p) => ({
     id: p.id, nome: p.nome, pai_id: p.pai_id ?? null, cor: p.cor ?? null, icone: p.icone ?? null, capa_url: p.capa_url ?? null, capa_card_url: p.capa_card_url ?? null,
-    ordem: p.ordem ?? 0, subpastas: subPorPasta.get(p.id) ?? 0, aulas: docsPorPasta.get(p.id) ?? 0,
+    ordem: p.ordem ?? 0, subpastas: subPorPasta.get(p.id) ?? 0, aulas: docsPorPasta.get(p.id) ?? 0, publicacao: normPublicacao(p.publicacao),
   }))
 
   const aulasNivel = docs.filter((d) => (d.pasta_id ?? null) === paiAtual)
@@ -564,7 +571,7 @@ export async function listarBancoAulas(pastaId?: string | null, detalhes: boolea
   const moduloAtual: ModuloLeitura | undefined = raiz ? {
     id: raiz.id, nome: raiz.nome, pai_id: raiz.pai_id ?? null, cor: raiz.cor ?? null, icone: raiz.icone ?? null,
     capa_url: raiz.capa_url ?? null, capa_card_url: raiz.capa_card_url ?? null,
-    ordem: raiz.ordem ?? 0, subpastas: subPorPasta.get(raiz.id) ?? 0, aulas: docsPorPasta.get(raiz.id) ?? 0,
+    ordem: raiz.ordem ?? 0, subpastas: subPorPasta.get(raiz.id) ?? 0, aulas: docsPorPasta.get(raiz.id) ?? 0, publicacao: normPublicacao(raiz.publicacao),
   } : undefined
 
   return { ok: true, pastas, aulas, breadcrumb, modulos: todasPastas.map((p) => ({ id: p.id, nome: p.nome })), moduloAtual }
@@ -618,6 +625,18 @@ export async function excluirModuloLeitura(id: string): Promise<{ ok: boolean; e
   if ((subs ?? 0) > 0 || (aulas ?? 0) > 0) return { ok: false, error: 'Esvazie o módulo antes de excluir (mova as aulas/submódulos).' }
   const { error } = await svc.from('simulado_pastas').delete().eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
   if (error) return { ok: false, error: error.message }
+  revalidatePath('/admin/leitura'); return { ok: true }
+}
+
+/** Publica/agenda/encerra o MÓDULO (jsonb publicacao). Estilo simulado: publicarEm agenda o início,
+ * encerrarEm tira o acesso do aluno ao fim (nada é apagado). */
+export async function salvarPublicacaoModulo(pastaId: string, pub: PublicacaoModulo): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const val: PublicacaoModulo = { status: pub.status === 'publicado' ? 'publicado' : 'rascunho', publicarEm: pub.publicarEm || null, encerrarEm: pub.encerrarEm || null }
+  const { error } = await svc.from('simulado_pastas').update({ publicacao: val }).eq('id', pastaId).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  if (error) return { ok: false, error: /publicacao|column|schema cache/i.test(error.message) ? 'Rode a migração 20260910000002 (publicação do módulo).' : error.message }
+  await registrarAudit({ operacao: val.status === 'publicado' ? 'LIBERAR' : 'BLOQUEAR', entidade: 'simulado_pastas', entidadeId: pastaId, depois: val, atorId: g.atorId, tenantId: g.tenantId })
   revalidatePath('/admin/leitura'); return { ok: true }
 }
 

@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils'
 import { type CardView } from '@/lib/card-view'
 import {
   type BancoAulas, type ModuloLeitura, criarDocumento, excluirModuloLeitura,
-  moverAulaParaModulo, reordenarAulasLeitura,
+  moverAulaParaModulo, reordenarAulasLeitura, publicarDocumento,
 } from '@/app/admin/leitura/actions'
 import { excluirDocumento } from '@/app/admin/leitura/actions'
 import {
@@ -300,9 +300,12 @@ function AulaLinha({ a, i, total, modulos, pending, onOrdem, onExcluir, onPerson
           <p className="truncate text-sm font-semibold text-foreground">{a.titulo}</p>
           {a.descricao ? <p className="truncate text-[11px] text-muted-foreground">{a.descricao}</p> : null}
         </button>
-        {a.publicado
-          ? <span className="hidden shrink-0 items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 sm:inline-flex"><Eye className="h-3 w-3" /> Publicada</span>
-          : <span className="hidden shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground sm:inline-flex"><EyeOff className="h-3 w-3" /> Rascunho</span>}
+        <button type="button" onClick={() => run(() => publicarDocumento(a.id, !a.publicado), a.publicado ? 'Aula em rascunho' : 'Aula publicada')} disabled={pending}
+          title={a.publicado ? 'Publicada — clique para voltar a rascunho' : 'Rascunho — clique para publicar'}
+          className={cn('hidden shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium transition-colors disabled:opacity-50 sm:inline-flex',
+            a.publicado ? 'bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20 dark:text-emerald-400' : 'bg-muted text-muted-foreground hover:bg-muted/70')}>
+          {a.publicado ? <><Eye className="h-3 w-3" /> Publicada</> : <><EyeOff className="h-3 w-3" /> Rascunho</>}
+        </button>
         <div className="flex shrink-0 items-center gap-0.5">
           <button onClick={() => onOrdem(i, -1)} disabled={i === 0 || pending} title="Subir" className="rounded-md p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"><ChevronUp className="h-4 w-4" /></button>
           <button onClick={() => onOrdem(i, 1)} disabled={i === total - 1 || pending} title="Descer" className="rounded-md p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"><ChevronDown className="h-4 w-4" /></button>

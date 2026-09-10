@@ -16,10 +16,20 @@ interface AulaSeq extends AulaStatus { estado: EstadoAula; moduloId: string }
 
 /** `.order('ordem')` tolerante (coluna pode não existir ainda). */
 async function pastasLeitura(svc: any, tenantId: string): Promise<any[]> {
-  const base = () => svc.from('simulado_pastas').select('id, nome, cor, capa_url, pai_id, ordem').eq('tenant_id', tenantId).eq('is_folder', true).eq('folder_area', 'leitura')
-  let r = await base().order('ordem', { ascending: true }).order('nome', { ascending: true })
-  if (r.error) r = await base().order('nome', { ascending: true })
+  const base = (cols: string) => svc.from('simulado_pastas').select(cols).eq('tenant_id', tenantId).eq('is_folder', true).eq('folder_area', 'leitura')
+  let r = await base('id, nome, cor, capa_url, pai_id, ordem, publicacao').order('ordem', { ascending: true }).order('nome', { ascending: true })
+  if (r.error) r = await base('id, nome, cor, capa_url, pai_id, ordem').order('ordem', { ascending: true }).order('nome', { ascending: true })
+  if (r.error) r = await base('id, nome, cor, capa_url, pai_id').order('nome', { ascending: true })
   return (r.data as any[]) ?? []
+}
+
+/** Módulo visível ao aluno AGORA: publicado + dentro da janela (publicarEm..encerrarEm). */
+function moduloPublicadoAgora(pub: any): boolean {
+  if (!pub || pub.status !== 'publicado') return false
+  const agora = Date.now()
+  if (pub.publicarEm && new Date(pub.publicarEm).getTime() > agora) return false // agendado p/ futuro
+  if (pub.encerrarEm && new Date(pub.encerrarEm).getTime() < agora) return false // encerrado
+  return true
 }
 
 /**
@@ -99,7 +109,8 @@ async function sequenciaLeitura(estId: string, tenantId: string) {
   for (const d of docs) { const k = d.pastaId ?? '__geral__'; (byModulo.get(k) ?? byModulo.set(k, []).get(k)!).push(d) }
   for (const arr of byModulo.values()) arr.sort((a, b) => (a.ordem - b.ordem) || a.titulo.localeCompare(b.titulo))
 
-  const todosModulos = pastas.filter((p) => byModulo.has(p.id)).map((p) => ({ id: p.id as string, nome: p.nome as string, cor: (p.cor ?? null) as string | null, capa: (p.capa_url ?? null) as string | null }))
+  // Gate de PUBLICAÇÃO do módulo: rascunho / agendado p/ futuro / encerrado não aparecem (dados ficam salvos).
+  const todosModulos = pastas.filter((p) => byModulo.has(p.id) && moduloPublicadoAgora(p.publicacao)).map((p) => ({ id: p.id as string, nome: p.nome as string, cor: (p.cor ?? null) as string | null, capa: (p.capa_url ?? null) as string | null }))
   // Gate de acesso do módulo (pula os que o aluno não pode ver).
   const acessiveis = await modulosAcessiveis(svc, tenantId, estId, todosModulos.map((m) => m.id))
   const modulos = todosModulos.filter((m) => acessiveis.has(m.id))
