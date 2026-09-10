@@ -32,6 +32,8 @@ export interface DocumentoAluno {
   artigos: number
   pct: number
   concluido: boolean
+  pastaId: string | null
+  ordem: number
   // metadados de lei (A1) — null em documentos genéricos
   materiaId: string | null
   materiaNome: string | null
@@ -51,7 +53,7 @@ export async function documentosDoAluno(estudanteId: string, tenantId: string): 
   const svc = createAdminClient()
   // Detecta colunas de lei (A1) e de versionamento (A2) → select tolerante (memoizado por processo).
   const { temLei, temVers } = await detectarColunasLeitura(svc)
-  const cols = ['id, titulo, descricao, cor, icone, capa_url, versao', temVers && 'versao_publicada', temLei && 'materia_id, tipo_norma, numero, ano, ementa'].filter(Boolean).join(', ')
+  const cols = ['id, titulo, descricao, cor, icone, capa_url, versao, pasta_id, ordem', temVers && 'versao_publicada', temLei && 'materia_id, tipo_norma, numero, ano, ementa'].filter(Boolean).join(', ')
   const docs = await fetchAll<any>(() =>
     svc.from('simulado_documentos').select(cols)
       .eq('tenant_id', tenantId).eq('deletado', false).eq('publicado', true).order('atualizado_em', { ascending: false }))
@@ -107,6 +109,7 @@ export async function documentosDoAluno(estudanteId: string, tenantId: string): 
       artigos: artigosPorDoc.get(d.id) ?? 0,
       pct: progPorDoc.get(d.id)?.pct ?? 0,
       concluido: progPorDoc.get(d.id)?.concluido ?? false,
+      pastaId: d.pasta_id ?? null, ordem: d.ordem ?? 0,
       materiaId: d.materia_id ?? null, materiaNome: mat?.nome ?? null, materiaCor: mat?.cor ?? null,
       tipoNorma: d.tipo_norma ?? null, numero: d.numero ?? null, ano: d.ano ?? null, ementa: d.ementa ?? null,
     }
