@@ -36,7 +36,7 @@ export default async function LeituraAlunoPage({ searchParams }: { searchParams:
             </p>
           </div>
         </div>
-        <div className="overflow-x-auto pb-10"><TrilhaGigante trilhas={[sel]} gamAtivo={false} /></div>
+        <div className="overflow-x-auto pb-10"><TrilhaGigante trilhas={[sel]} gamAtivo={false} reto /></div>
       </div>
     )
   }

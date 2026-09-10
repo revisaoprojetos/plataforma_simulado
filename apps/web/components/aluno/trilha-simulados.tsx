@@ -398,7 +398,7 @@ export function TrilhaSimulados({ trilhas, gamAtivo, estilo = 'cards', visiveis 
 const GAP_HDR = 58   // altura reservada p/ a divisória (nome do grupo)
 const GAP_GRUPO = 44 // respiro extra entre grupos (o pontilhado continua nele)
 
-export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAtivo: boolean }) {
+export function TrilhaGigante({ trilhas, gamAtivo, reto = false }: { trilhas: Trilha[]; gamAtivo: boolean; reto?: boolean }) {
   const flat = trilhas.flatMap((t) => t.nodes)
   const atualId = flat.find((n) => n.estado === 'atual')?.id ?? flat[0]?.id ?? null
   const [aberto, setAberto] = useState<string | null>(atualId)
@@ -439,12 +439,12 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
       // (espaço simétrico acima/abaixo).
       const VPAD = 66
       y += VPAD
-      nodesL.push({ n: t.nodes[0], off: waveOff(gi), y: y + R })
+      nodesL.push({ n: t.nodes[0], off: reto ? 0 : waveOff(gi), y: y + R })
       y += 2 * R + VPAD
       gi++
     } else {
       t.nodes.forEach((n) => {
-        const off = waveOff(gi)
+        const off = reto ? 0 : waveOff(gi)
         nodesL.push({ n, off, y: y + R })
         // Regra anti-colisão: o passo vertical nunca deixa o rótulo (título + linha de status)
         // deste nó alcançar o ícone do próximo — cresce conforme o texto ocupa mais linhas.
