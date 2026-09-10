@@ -675,14 +675,14 @@ export async function definirGruposPasta(pastaId: string, grupoIds: string[]): P
   revalidatePath('/admin/leitura'); return { ok: true }
 }
 
-export async function carregarEstudantesPasta(pastaId: string): Promise<{ ok: boolean; itens?: EstudanteRef[]; error?: string }> {
+export async function carregarEstudantesPasta(pastaId: string): Promise<{ ok: boolean; itens?: EstudanteAcessoLinha[]; error?: string }> {
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
   const { data: at } = await svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', pastaId).eq('tenant_id', g.tenantId)
   const ids = [...new Set((at ?? []).map((r: any) => r.estudante_id))]
   if (!ids.length) return { ok: true, itens: [] }
-  const { data: es } = await svc.from('simulado_estudantes').select('id, nome, email').in('id', ids)
-  return { ok: true, itens: (es ?? []).map((e: any) => ({ id: e.id, nome: e.nome ?? 'Aluno', email: e.email ?? null })) }
+  const es = await fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_estudantes').select('id, nome, email, cpf, classificacao, avatar, perfil_avatar_cor').in('id', chunk).order('nome', { ascending: true }))
+  return { ok: true, itens: (es as any[]).map((e): EstudanteAcessoLinha => ({ id: e.id, nome: e.nome ?? 'Aluno', email: e.email ?? null, cpf: e.cpf ?? null, classificacao: e.classificacao ?? null, avatar: e.avatar ?? null, perfil_avatar_cor: e.perfil_avatar_cor ?? null })) }
 }
 
 export async function definirEstudantesPasta(pastaId: string, estudanteIds: string[]): Promise<{ ok: boolean; error?: string }> {
