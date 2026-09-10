@@ -14,9 +14,14 @@ export default async function LeituraAdminPage({ searchParams }: { searchParams:
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><Library className="h-6 w-6 text-primary" /> LegProc Digital</h1>
-        <p className="text-muted-foreground">Módulos ordenáveis → aulas (documento HTML + questões) que formam a trilha do aluno.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><Library className="h-6 w-6 text-primary" /> LegProc Digital</h1>
+          <p className="text-muted-foreground">Módulos ordenáveis → aulas (documento HTML + questões) que formam a trilha do aluno.</p>
+        </div>
+        {data.ok && pasta && (
+          <p className="max-w-xs text-right text-sm text-muted-foreground">{data.aulas?.length ?? 0} aula(s) neste módulo — a ordem define a sequência na trilha.</p>
+        )}
       </div>
 
       {!data.ok ? (

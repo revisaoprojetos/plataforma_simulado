@@ -71,15 +71,20 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster' }: { data
 
   return (
     <div className="space-y-5">
-      {/* Breadcrumb */}
-      <div className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
-        <Link href="/admin/leitura" className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 hover:bg-muted hover:text-foreground"><Home className="h-3.5 w-3.5" /> Módulos</Link>
-        {breadcrumb.map((b) => (
-          <span key={b.id} className="inline-flex items-center gap-1">
-            <ChevronRight className="h-3.5 w-3.5" />
-            <Link href={`/admin/leitura?pasta=${b.id}`} className="rounded-md px-1.5 py-0.5 font-medium text-foreground hover:bg-muted">{b.nome}</Link>
-          </span>
-        ))}
+      {/* Breadcrumb + (dentro do módulo) botão Adicionar aula na MESMA linha */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
+          <Link href="/admin/leitura" className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 hover:bg-muted hover:text-foreground"><Home className="h-3.5 w-3.5" /> Módulos</Link>
+          {breadcrumb.map((b) => (
+            <span key={b.id} className="inline-flex items-center gap-1">
+              <ChevronRight className="h-3.5 w-3.5" />
+              <Link href={`/admin/leitura?pasta=${b.id}`} className="rounded-md px-1.5 py-0.5 font-medium text-foreground hover:bg-muted">{b.nome}</Link>
+            </span>
+          ))}
+        </div>
+        {dentroDeBanco && (
+          <button onClick={novaAula} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"><FilePlus2 className="h-4 w-4" /> Adicionar aula</button>
+        )}
       </div>
 
       {!dentroDeBanco ? (
@@ -111,10 +116,6 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster' }: { data
       ) : (
         // ===================== DENTRO DE UM BANCO: tabela de aulas =====================
         <>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-sm text-muted-foreground">{aulas.length} aula(s) neste módulo — a ordem define a sequência na trilha.</p>
-            <button onClick={novaAula} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"><FilePlus2 className="h-4 w-4" /> Adicionar aula</button>
-          </div>
           {aulas.length === 0 ? (
             <div className="rounded-2xl border border-dashed p-12 text-center text-muted-foreground">Nenhuma aula ainda. Clique em <span className="font-medium text-foreground">"Adicionar aula"</span> para importar o documento e anexar questões.</div>
           ) : (
