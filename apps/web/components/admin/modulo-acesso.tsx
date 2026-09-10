@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Loader2, Search, UserCheck, Info, Check, Trash2, Globe, Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -30,6 +30,8 @@ export function ModuloAcesso({ pastaId }: { pastaId: string }) {
   const [addingGrupo, setAddingGrupo] = useState(false)
   const [grupos, setGrupos] = useState<Grupo[]>([])
   const [alunos, setAlunos] = useState<Linha[]>([])
+  const alunosRef = useRef<Linha[]>([])
+  alunosRef.current = alunos
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [busca, setBusca] = useState('')
   const [pagina, setPagina] = useState(0)
@@ -64,8 +66,10 @@ export function ModuloAcesso({ pastaId }: { pastaId: string }) {
     setSalvando(false)
     if (!rg.ok || !re.ok) toast.error(rg.error ?? re.error ?? 'Erro ao salvar acesso.')
   }
-  function comitar(fn: (prev: Linha[]) => Linha[]) {
-    setAlunos((prev) => { const next = fn(prev); void persistir(next.map((a) => a.id)); return next })
+  // Aplica a nova lista E persiste — SEM efeito colateral dentro do updater do setState (regra do React).
+  function comitar(next: Linha[]) {
+    setAlunos(next)
+    void persistir(next.map((a) => a.id))
   }
   function mesclar(base: Linha[], novos: Linha[]): Linha[] {
     const map = new Map(base.map((a) => [a.id, a]))
@@ -73,7 +77,7 @@ export function ModuloAcesso({ pastaId }: { pastaId: string }) {
     return [...map.values()].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
   }
   function adicionarAlunos(novos: AlunoSel[]) {
-    comitar((p) => mesclar(p, novos.map((n) => ({ id: n.id, nome: n.nome, email: n.email, cpf: n.cpf, classificacao: n.classificacao, avatar: n.avatar, perfil_avatar_cor: n.perfil_avatar_cor, grupoNome: null }))))
+    comitar(mesclar(alunosRef.current, novos.map((n) => ({ id: n.id, nome: n.nome, email: n.email, cpf: n.cpf, classificacao: n.classificacao, avatar: n.avatar, perfil_avatar_cor: n.perfil_avatar_cor, grupoNome: null }))))
   }
   async function adicionarGrupos(ids: string[]) {
     if (!ids.length) return
@@ -82,15 +86,15 @@ export function ModuloAcesso({ pastaId }: { pastaId: string }) {
     setAddingGrupo(false)
     if (!r.ok) { toast.error(r.error ?? 'Erro ao carregar alunos do grupo'); return }
     const novos = r.itens ?? []
-    comitar((p) => mesclar(p, novos))
+    comitar(mesclar(alunosRef.current, novos))
     if (novos.length) toast.success(`${novos.length.toLocaleString('pt-BR')} aluno(s) do(s) grupo(s) vinculados`)
   }
   function toggleSel(id: string) { setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n }) }
   function toggleTodosFiltrados() {
     setSel((p) => { const n = new Set(p); const todos = filtrados.length > 0 && filtrados.every((a) => n.has(a.id)); filtrados.forEach((a) => (todos ? n.delete(a.id) : n.add(a.id))); return n })
   }
-  function removerSelecionados() { comitar((p) => p.filter((a) => !sel.has(a.id))); setSel(new Set()) }
-  function liberarParaTodos() { setLiberarTodos(true); comitar(() => []) }
+  function removerSelecionados() { comitar(alunosRef.current.filter((a) => !sel.has(a.id))); setSel(new Set()) }
+  function liberarParaTodos() { setLiberarTodos(true); comitar([]) }
 
   const acessoIds = useMemo(() => new Set(alunos.map((a) => a.id)), [alunos])
   const filtradosTodosSel = filtrados.length > 0 && filtrados.every((a) => sel.has(a.id))
