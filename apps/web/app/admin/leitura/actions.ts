@@ -521,13 +521,14 @@ async function pastasLeitura(svc: any, tenantId: string): Promise<any[]> {
 }
 
 /** Um nível do banco de aulas: módulos (pastas) + aulas (documentos) + trilha de breadcrumb. */
-export async function listarBancoAulas(pastaId?: string | null): Promise<BancoAulas> {
+export async function listarBancoAulas(pastaId?: string | null, detalhes: boolean = true): Promise<BancoAulas> {
   const g = await guard('leitura:view'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
   const paiAtual = pastaId ?? null
   const todasPastas = await pastasLeitura(svc, g.tenantId)
   // Documentos: id+pasta_id de todos (p/ contar por pasta) e os do nível atual (detalhados).
-  const docs = await fetchAll<any>(() => svc.from('simulado_documentos').select('*').eq('tenant_id', g.tenantId).eq('deletado', false))
+  // Otimização: abas Acessos/Configurações NÃO usam a lista de aulas → pula o fetch de TODOS os docs.
+  const docs = detalhes ? await fetchAll<any>(() => svc.from('simulado_documentos').select('*').eq('tenant_id', g.tenantId).eq('deletado', false)) : []
   const docsPorPasta = new Map<string, number>()
   for (const d of docs) { const k = d.pasta_id ?? '__root__'; docsPorPasta.set(k, (docsPorPasta.get(k) ?? 0) + 1) }
   const subPorPasta = new Map<string, number>()
@@ -696,4 +697,25 @@ export async function definirEstudantesPasta(pastaId: string, estudanteIds: stri
   }
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_pasta_estudantes', entidadeId: pastaId, depois: { estudantes: ids.length }, atorId: g.atorId, tenantId: g.tenantId })
   revalidatePath('/admin/leitura'); return { ok: true }
+}
+
+// Lista de alunos do tenant PAGINADA SERVER-SIDE (busca + range no banco) p/ a aba Acessos —
+// visual da aba Estudantes (avatar/badge). Evita puxar todos os ~18k alunos de uma vez.
+export type EstudanteAcessoLinha = { id: string; nome: string; email: string | null; cpf: string | null; classificacao: string | null; avatar: string | null; perfil_avatar_cor: string | null }
+
+export async function listarEstudantesTenantPag(q: string, offset: number, limit: number): Promise<{ ok: boolean; itens?: EstudanteAcessoLinha[]; total?: number; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const query = (q ?? '').trim().replace(/[,%()]/g, ' ').trim()
+  const map = (e: any): EstudanteAcessoLinha => ({ id: e.id, nome: e.nome ?? 'Aluno', email: e.email ?? null, cpf: e.cpf ?? null, classificacao: e.classificacao ?? null, avatar: e.avatar ?? null, perfil_avatar_cor: e.perfil_avatar_cor ?? null })
+  const build = (cols: string) => {
+    let s = svc.from('simulado_estudantes').select(cols, { count: 'exact' }).eq('tenant_id', g.tenantId).eq('deletado', false)
+    if (query) s = s.or(`nome.ilike.%${query}%,email.ilike.%${query}%,cpf.ilike.%${query}%`)
+    return s.order('nome', { ascending: true }).range(offset, offset + Math.max(1, limit) - 1)
+  }
+  let r = await build('id, nome, email, cpf, classificacao, avatar, perfil_avatar_cor')
+  // Tolerante: se as colunas de perfil (avatar/classificacao) não existirem, refaz só com o básico.
+  if (r.error && /classificacao|avatar|perfil_avatar_cor|column/i.test(r.error.message)) r = await build('id, nome, email, cpf') as any
+  if (r.error) return { ok: false, error: r.error.message }
+  return { ok: true, itens: (r.data ?? []).map(map), total: r.count ?? 0 }
 }

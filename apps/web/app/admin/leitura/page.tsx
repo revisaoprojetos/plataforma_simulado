@@ -8,10 +8,11 @@ export const dynamic = 'force-dynamic'
 
 export default async function LeituraAdminPage({ searchParams }: { searchParams: Promise<{ pasta?: string; tab?: string }> }) {
   const { pasta, tab } = await searchParams
-  const data = await listarBancoAulas(pasta ?? null)
+  const moduloTab: ModuloTab = tab === 'acessos' || tab === 'config' ? tab : 'aulas'
+  // Otimização: só a aba Aulas (ou a raiz) precisa dos detalhes das aulas — Acessos/Config pulam esse fetch.
+  const data = await listarBancoAulas(pasta ?? null, !pasta || moduloTab === 'aulas')
   const temaCards = ((await getCurrentTenant())?.tema as any) ?? {}
   const cardView = resolverCardView(temaCards.card_view_admin ?? temaCards.card_view)
-  const moduloTab: ModuloTab = tab === 'acessos' || tab === 'config' ? tab : 'aulas'
 
   return (
     <div className="space-y-3">

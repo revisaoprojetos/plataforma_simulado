@@ -121,14 +121,16 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTa
       ) : (
         // ============ DENTRO DE UM MÓDULO: abas Aulas | Acessos | Configurações ============
         <>
-          {/* Abas do módulo (deep-linkáveis por ?tab=) */}
-          <div className="flex border-b text-sm">
+          {/* Abas do módulo (deep-linkáveis por ?tab=) com underline deslizante animado */}
+          <div className="relative flex border-b text-sm">
             {MODULO_TABS.map(({ id, label, Icon }) => (
               <Link key={id} href={`/admin/leitura?pasta=${pastaAtual}&tab=${id}`}
-                className={cn('-mb-px flex items-center gap-1.5 border-b-2 px-4 py-2.5 font-medium transition-colors', moduloTab === id ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>
+                className={cn('flex flex-1 items-center justify-center gap-1.5 px-4 py-2.5 font-medium transition-colors', moduloTab === id ? 'text-primary' : 'text-muted-foreground hover:text-foreground')}>
                 <Icon className="h-4 w-4" /> {label}
               </Link>
             ))}
+            <span className="absolute bottom-[-1px] h-0.5 rounded-full bg-primary transition-all duration-300 ease-out"
+              style={{ width: `${100 / MODULO_TABS.length}%`, left: `${Math.max(0, MODULO_TABS.findIndex((t) => t.id === moduloTab)) * (100 / MODULO_TABS.length)}%` }} />
           </div>
 
           {moduloTab === 'aulas' && (
