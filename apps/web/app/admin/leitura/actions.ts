@@ -740,7 +740,7 @@ export async function listarEstudantesTenantPag(q: string, offset: number, limit
 
 // ── "Questões do conteúdo" = MINI-SIMULADO da aula (separado das questões inline da leitura) ──
 // A tabela usa o MESMO formato de linha da aba Questões do banco (id = questao_id + disciplina/assunto/dif/status).
-export type QuizLinha = { id: string; enunciado: string; tipo: string | null; nivel_dificuldade: string | null; status: string | null; disciplina: string | null; assunto: string | null }
+export type QuizLinha = { id: string; enunciado: string; tipo: string | null; nivel_dificuldade: string | null; status: string | null; disciplina: string | null; assunto: string | null; assuntoDetalhe: string | null; banca: string | null; orgao: string | null; ano: number | null }
 export type QuizConfig = { modo: 'imediato' | 'simulado'; embaralhar: boolean }
 const QUIZ_PADRAO: QuizConfig = { modo: 'imediato', embaralhar: false }
 const QUIZ_SEM_TABELA = (m?: string) => /relation .* does not exist|simulado_documento_quiz_questoes|quiz_config|schema cache/i.test(m ?? '')
@@ -755,13 +755,19 @@ export async function listarQuizConteudo(documentoId: string): Promise<{ ok: boo
   if ((doc as any)?.quiz_config) config = { ...QUIZ_PADRAO, ...(doc as any).quiz_config }
   const ordemIds = (dq ?? []).map((x: any) => x.questao_id)
   if (!ordemIds.length) return { ok: true, itens: [], config }
-  const { data: qs } = await svc.from('simulado_questoes')
-    .select('id, enunciado, tipo, nivel_dificuldade, status, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome)')
-    .eq('tenant_id', g.tenantId).in('id', ordemIds)
+  const SEL = 'id, enunciado, tipo, nivel_dificuldade, status, ano, assunto_detalhe, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome), bancas:simulado_bancas(nome), orgaos:simulado_orgaos(nome)'
+  let qs: any[] | null = null, qerr: any = null
+  ;({ data: qs, error: qerr } = await svc.from('simulado_questoes').select(SEL).eq('tenant_id', g.tenantId).in('id', ordemIds) as any)
+  // Tolerante: assunto_detalhe pode não existir em bases sem a migração.
+  if (qerr && /assunto_detalhe/i.test(qerr.message)) ({ data: qs } = await svc.from('simulado_questoes').select(SEL.replace(', assunto_detalhe', '')).eq('tenant_id', g.tenantId).in('id', ordemIds) as any)
   const byId = new Map((qs ?? []).map((q: any) => [q.id, q]))
   const itens = ordemIds.map((id: string) => {
     const q: any = byId.get(id); if (!q) return null
-    return { id: q.id, enunciado: q.enunciado ?? '', tipo: q.tipo ?? null, nivel_dificuldade: q.nivel_dificuldade ?? null, status: q.status ?? null, disciplina: q.disciplinas?.nome ?? null, assunto: q.assuntos?.nome ?? null } as QuizLinha
+    return {
+      id: q.id, enunciado: q.enunciado ?? '', tipo: q.tipo ?? null, nivel_dificuldade: q.nivel_dificuldade ?? null, status: q.status ?? null,
+      disciplina: q.disciplinas?.nome ?? null, assunto: q.assuntos?.nome ?? null, assuntoDetalhe: q.assunto_detalhe ?? null,
+      banca: q.bancas?.nome ?? null, orgao: q.orgaos?.nome ?? null, ano: q.ano ?? null,
+    } as QuizLinha
   }).filter(Boolean) as QuizLinha[]
   return { ok: true, itens, config }
 }

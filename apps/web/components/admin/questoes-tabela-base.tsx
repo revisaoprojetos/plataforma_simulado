@@ -19,9 +19,14 @@ import { useOrdenacao, SortButton } from '@/components/admin/th-ordenavel'
 const difRank: Record<string, number> = { facil: 0, medio: 1, dificil: 2 }
 const stRank: Record<string, number> = { publicada: 0, rascunho: 1, arquivada: 2 }
 const LETRAS = ['A', 'B', 'C', 'D', 'E', 'F']
+const POR_PAGINA = 10
 
 // Linha base de questão (mesma da aba Questões do banco) — REUTILIZÁVEL por qualquer tabela de questões.
-export interface QuestaoLinha { id: string; enunciado: string; tipo?: string | null; nivel_dificuldade?: string | null; status?: string | null; disciplina?: string | null; assunto?: string | null }
+export interface QuestaoLinha {
+  id: string; enunciado: string; tipo?: string | null; nivel_dificuldade?: string | null; status?: string | null
+  disciplina?: string | null; assunto?: string | null; assuntoDetalhe?: string | null
+  banca?: string | null; orgao?: string | null; ano?: number | null
+}
 
 const difCfg: Record<string, { letra: string; cls: string }> = {
   facil: { letra: 'F', cls: 'text-green-600' },
@@ -63,6 +68,7 @@ export function QuestoesTabelaBase({
   const [dif, setDif] = useState('all')
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [pending, start] = useTransition()
+  const [pagina, setPagina] = useState(0)
 
   const podeRemover = !!onRemover
   const podeReordenar = !!onReordenar
@@ -121,7 +127,13 @@ export function QuestoesTabelaBase({
     })
   }, [filtradas, sort])
 
-  const colSpan = 6 + (podeRemover ? 1 : 0) + (podeReordenar ? 1 : 0)
+  // Paginação (10/página) sobre a lista filtrada/ordenada.
+  const totalPag = Math.max(1, Math.ceil(visiveis.length / POR_PAGINA))
+  const pageItens = useMemo(() => visiveis.slice(pagina * POR_PAGINA, pagina * POR_PAGINA + POR_PAGINA), [visiveis, pagina])
+  useEffect(() => { setPagina(0) }, [busca, disc, status, dif, sort])
+  useEffect(() => { if (pagina > totalPag - 1) setPagina(0) }, [totalPag, pagina])
+
+  const colSpan = 10 + (podeRemover ? 1 : 0) + (podeReordenar ? 1 : 0)
 
   function toggle(id: string) { setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n }) }
   function toggleAll() { setSel((p) => (p.size === visiveis.length ? new Set() : new Set(visiveis.map((q) => q.id)))) }
@@ -201,7 +213,7 @@ export function QuestoesTabelaBase({
 
       <CardContent className="p-0">
         <div className="max-h-[60vh] overflow-auto">
-          <table className="w-full table-fixed caption-bottom text-sm">
+          <table className="w-full min-w-[1180px] caption-bottom text-sm">
             <TableHeader className="sticky top-0 z-10 bg-background">
               <TableRow>
                 {podeRemover && (
@@ -213,9 +225,13 @@ export function QuestoesTabelaBase({
                 )}
                 {podeReordenar && <TableHead className="w-14 text-center">Ordem</TableHead>}
                 <TableHead className="w-10">#</TableHead>
-                <TableHead><SortButton label="Enunciado" k="enunciado" sort={sort} onSort={ordenarPor} /></TableHead>
-                <TableHead className="w-44"><SortButton label="Disciplina" k="disciplina" sort={sort} onSort={ordenarPor} /></TableHead>
-                <TableHead className="w-48"><SortButton label="Assunto" k="assunto" sort={sort} onSort={ordenarPor} /></TableHead>
+                <TableHead className="min-w-[280px]"><SortButton label="Enunciado" k="enunciado" sort={sort} onSort={ordenarPor} /></TableHead>
+                <TableHead className="w-40"><SortButton label="Disciplina" k="disciplina" sort={sort} onSort={ordenarPor} /></TableHead>
+                <TableHead className="w-44"><SortButton label="Assunto" k="assunto" sort={sort} onSort={ordenarPor} /></TableHead>
+                <TableHead className="w-44">Assunto específico</TableHead>
+                <TableHead className="w-40">Banca</TableHead>
+                <TableHead className="w-40">Órgão</TableHead>
+                <TableHead className="w-16 text-center">Ano</TableHead>
                 <TableHead className="w-12 text-center"><SortButton label="Dif." k="dif" sort={sort} onSort={ordenarPor} className="mx-auto" /></TableHead>
                 <TableHead className="w-20"><SortButton label="Status" k="status" sort={sort} onSort={ordenarPor} /></TableHead>
               </TableRow>
@@ -224,7 +240,8 @@ export function QuestoesTabelaBase({
               {visiveis.length === 0 ? (
                 <TableRow><TableCell colSpan={colSpan} className="py-10 text-center text-muted-foreground">Nenhuma questão.</TableCell></TableRow>
               ) : (
-                visiveis.map((q, i) => {
+                pageItens.map((q, localIdx) => {
+                  const i = pagina * POR_PAGINA + localIdx
                   const on = sel.has(q.id)
                   const d = difCfg[q.nivel_dificuldade ?? '']
                   const st = statusCfg[q.status ?? ''] ?? { label: q.status ?? '—', cls: 'bg-muted text-muted-foreground' }
@@ -281,6 +298,10 @@ export function QuestoesTabelaBase({
                         </TableCell>
                         <TableCell className="whitespace-normal break-words text-xs font-medium uppercase text-muted-foreground">{q.disciplina ?? '—'}</TableCell>
                         <TableCell className="whitespace-normal break-words text-xs text-muted-foreground">{q.assunto ?? '—'}</TableCell>
+                        <TableCell className="whitespace-normal break-words text-xs text-muted-foreground">{q.assuntoDetalhe ?? '—'}</TableCell>
+                        <TableCell className="whitespace-normal break-words text-xs text-muted-foreground">{q.banca ?? '—'}</TableCell>
+                        <TableCell className="whitespace-normal break-words text-xs text-muted-foreground">{q.orgao ?? '—'}</TableCell>
+                        <TableCell className="text-center text-xs text-muted-foreground">{q.ano ?? '—'}</TableCell>
                         <TableCell className="text-center font-bold">{d ? <span className={d.cls}>{d.letra}</span> : '—'}</TableCell>
                         <TableCell><span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', st.cls)}>{st.label}</span></TableCell>
                       </TableRow>
@@ -318,7 +339,16 @@ export function QuestoesTabelaBase({
             </tbody>
           </table>
         </div>
-        <div className="border-t px-4 py-2 text-right text-xs text-muted-foreground">{ordered.length} {ordered.length === 1 ? 'questão' : 'questões'}</div>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2 text-xs text-muted-foreground">
+          <span>{visiveis.length.toLocaleString('pt-BR')} de {ordered.length.toLocaleString('pt-BR')} {ordered.length === 1 ? 'questão' : 'questões'}</span>
+          {totalPag > 1 && (
+            <div className="flex items-center gap-1.5">
+              <button type="button" onClick={() => setPagina((p) => Math.max(0, p - 1))} disabled={pagina === 0} className="rounded-md border px-2 py-1 font-medium transition-colors hover:bg-muted disabled:opacity-40">Anterior</button>
+              <span className="px-1 tabular-nums">Pág. {pagina + 1}/{totalPag}</span>
+              <button type="button" onClick={() => setPagina((p) => Math.min(totalPag - 1, p + 1))} disabled={pagina >= totalPag - 1} className="rounded-md border px-2 py-1 font-medium transition-colors hover:bg-muted disabled:opacity-40">Próxima</button>
+            </div>
+          )}
+        </div>
       </CardContent>
     </Card>
   )
