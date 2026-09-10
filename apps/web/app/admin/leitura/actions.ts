@@ -703,6 +703,24 @@ export async function definirEstudantesPasta(pastaId: string, estudanteIds: stri
 // visual da aba Estudantes (avatar/badge). Evita puxar todos os ~18k alunos de uma vez.
 export type EstudanteAcessoLinha = { id: string; nome: string; email: string | null; cpf: string | null; classificacao: string | null; avatar: string | null; perfil_avatar_cor: string | null }
 
+/** Alunos (membros) dos grupos — p/ "Adicionar grupo" linkar os estudantes na tabela (como o banco).
+ * Chunked no `.in()` (LANDMINE do proxy) e deduplicado por estudante; cada um marca o grupo de origem. */
+export async function estudantesDosGrupos(grupoIds: string[]): Promise<{ ok: boolean; itens?: (EstudanteAcessoLinha & { grupoNome: string | null })[]; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const ids = [...new Set((grupoIds ?? []).filter(Boolean))]
+  if (!ids.length) return { ok: true, itens: [] }
+  const svc = createAdminClient()
+  const { data: gs } = await svc.from('simulado_grupos').select('id, nome').in('id', ids)
+  const nomeGrupo = new Map<string, string>((gs ?? []).map((x: any) => [x.id, x.nome]))
+  const mem = await fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_grupo_membros').select('estudante_id, grupo_id').in('grupo_id', chunk).order('estudante_id', { ascending: true }))
+  const grupoDe = new Map<string, string>()
+  for (const m of mem) if (!grupoDe.has(m.estudante_id)) grupoDe.set(m.estudante_id, m.grupo_id)
+  const estIds = [...grupoDe.keys()]
+  if (!estIds.length) return { ok: true, itens: [] }
+  const es = await fetchAllByIn<any>(estIds, (chunk) => svc.from('simulado_estudantes').select('id, nome, email, cpf, classificacao, avatar, perfil_avatar_cor').eq('tenant_id', g.tenantId).eq('deletado', false).in('id', chunk).order('nome', { ascending: true }))
+  return { ok: true, itens: (es as any[]).map((e) => ({ id: e.id, nome: e.nome ?? 'Aluno', email: e.email ?? null, cpf: e.cpf ?? null, classificacao: e.classificacao ?? null, avatar: e.avatar ?? null, perfil_avatar_cor: e.perfil_avatar_cor ?? null, grupoNome: nomeGrupo.get(grupoDe.get(e.id)!) ?? null })) }
+}
+
 export async function listarEstudantesTenantPag(q: string, offset: number, limit: number): Promise<{ ok: boolean; itens?: EstudanteAcessoLinha[]; total?: number; error?: string }> {
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()

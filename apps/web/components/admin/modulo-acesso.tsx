@@ -2,47 +2,50 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Save, Search, Users, UserCheck, Info, Check, Trash2, X } from 'lucide-react'
+import { Loader2, Search, UserCheck, Info, Check, Trash2, Globe, Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
 import { AdicionarEstudantesDialog, type AlunoSel } from '@/components/admin/adicionar-estudantes-dialog'
 import { AdicionarGrupoModuloDialog } from '@/components/admin/adicionar-grupo-modulo-dialog'
 import {
   carregarAtribuicaoPasta, definirGruposPasta,
-  carregarEstudantesPasta, definirEstudantesPasta,
+  carregarEstudantesPasta, definirEstudantesPasta, estudantesDosGrupos,
   type EstudanteAcessoLinha,
 } from '@/app/admin/leitura/actions'
 
 type Grupo = { id: string; nome: string; cor: string | null }
+type Linha = EstudanteAcessoLinha & { grupoNome?: string | null }
 const POR_PAGINA = 50
 
 function iniciais(n: string) {
   return n.split(' ').filter(Boolean).slice(0, 2).map((x) => x[0]?.toUpperCase()).join('')
 }
 
-// Aba "Acessos" do MÓDULO — MESMO padrão da aba Estudantes do banco: mostra QUEM tem acesso
-// (grupos + alunos individuais) com os botões "Adicionar grupo" e "Adicionar estudantes". SEM
-// atribuição = liberado a todos. A lista carregada é só a dos VINCULADOS (leve), nunca os ~18k.
+// Aba "Acessos" do MÓDULO — modelo da aba Estudantes do banco: UMA tabela com quem tem acesso.
+// "Adicionar grupo" LINKA os alunos do grupo na tabela; "Adicionar estudantes" adiciona individuais.
+// "Liberar para todos" = sem restrição (some/acinzenta a adição, todos acessam). Carrega só os vinculados.
 export function ModuloAcesso({ pastaId }: { pastaId: string }) {
   const [carregando, setCarregando] = useState(true)
   const [salvando, setSalvando] = useState(false)
+  const [addingGrupo, setAddingGrupo] = useState(false)
   const [grupos, setGrupos] = useState<Grupo[]>([])
-  const [marcados, setMarcados] = useState<Set<string>>(new Set())
-  const [alunos, setAlunos] = useState<EstudanteAcessoLinha[]>([])
+  const [alunos, setAlunos] = useState<Linha[]>([])
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [busca, setBusca] = useState('')
   const [pagina, setPagina] = useState(0)
+  const [liberarTodos, setLiberarTodos] = useState(false)
 
   useEffect(() => {
     ;(async () => {
       const [a, e] = await Promise.all([carregarAtribuicaoPasta(pastaId), carregarEstudantesPasta(pastaId)])
-      if (a.ok && a.grupos) { setGrupos(a.grupos.map((g) => ({ id: g.id, nome: g.nome, cor: g.cor }))); setMarcados(new Set(a.grupos.filter((g) => g.atribuido).map((g) => g.id))) }
+      if (a.ok && a.grupos) setGrupos(a.grupos.map((g) => ({ id: g.id, nome: g.nome, cor: g.cor })))
+      const temGrupo = a.ok && !!a.grupos?.some((g) => g.atribuido)
       if (e.ok && e.itens) setAlunos(e.itens)
+      // Sem nenhuma atribuição (grupos + alunos) = liberado a todos.
+      setLiberarTodos(!(temGrupo || (e.ok && (e.itens?.length ?? 0) > 0)))
       setCarregando(false)
     })()
   }, [pastaId])
-
-  const gruposComAcesso = useMemo(() => grupos.filter((g) => marcados.has(g.id)), [grupos, marcados])
 
   const filtrados = useMemo(() => {
     const q = busca.trim().toLowerCase()
@@ -53,67 +56,67 @@ export function ModuloAcesso({ pastaId }: { pastaId: string }) {
   useEffect(() => { setPagina(0) }, [busca])
   useEffect(() => { if (pagina > totalPag - 1) setPagina(0) }, [totalPag, pagina])
 
-  function adicionarAlunos(novos: AlunoSel[]) {
-    setAlunos((p) => {
-      const existentes = new Set(p.map((a) => a.id))
-      const add = novos.filter((n) => !existentes.has(n.id)).map((n): EstudanteAcessoLinha => ({ id: n.id, nome: n.nome, email: n.email, cpf: n.cpf, classificacao: n.classificacao, avatar: n.avatar, perfil_avatar_cor: n.perfil_avatar_cor }))
-      return [...add, ...p].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
-    })
+  // AUTO-SAVE: cada mudança persiste na hora (sem botão "Salvar"). definir* substitui o conjunto todo
+  // (idempotente); grupos ficam sempre [] pois os alunos do grupo são materializados na tabela.
+  async function persistir(ids: string[]) {
+    setSalvando(true)
+    const [rg, re] = await Promise.all([definirGruposPasta(pastaId, []), definirEstudantesPasta(pastaId, ids)])
+    setSalvando(false)
+    if (!rg.ok || !re.ok) toast.error(rg.error ?? re.error ?? 'Erro ao salvar acesso.')
   }
-  function adicionarGrupos(ids: string[]) { setMarcados((p) => { const n = new Set(p); ids.forEach((id) => n.add(id)); return n }) }
-  function removerGrupo(id: string) { setMarcados((p) => { const n = new Set(p); n.delete(id); return n }) }
+  function comitar(fn: (prev: Linha[]) => Linha[]) {
+    setAlunos((prev) => { const next = fn(prev); void persistir(next.map((a) => a.id)); return next })
+  }
+  function mesclar(base: Linha[], novos: Linha[]): Linha[] {
+    const map = new Map(base.map((a) => [a.id, a]))
+    for (const n of novos) if (!map.has(n.id)) map.set(n.id, n)
+    return [...map.values()].sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+  }
+  function adicionarAlunos(novos: AlunoSel[]) {
+    comitar((p) => mesclar(p, novos.map((n) => ({ id: n.id, nome: n.nome, email: n.email, cpf: n.cpf, classificacao: n.classificacao, avatar: n.avatar, perfil_avatar_cor: n.perfil_avatar_cor, grupoNome: null }))))
+  }
+  async function adicionarGrupos(ids: string[]) {
+    if (!ids.length) return
+    setAddingGrupo(true)
+    const r = await estudantesDosGrupos(ids)
+    setAddingGrupo(false)
+    if (!r.ok) { toast.error(r.error ?? 'Erro ao carregar alunos do grupo'); return }
+    const novos = r.itens ?? []
+    comitar((p) => mesclar(p, novos))
+    if (novos.length) toast.success(`${novos.length.toLocaleString('pt-BR')} aluno(s) do(s) grupo(s) vinculados`)
+  }
   function toggleSel(id: string) { setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n }) }
   function toggleTodosFiltrados() {
     setSel((p) => { const n = new Set(p); const todos = filtrados.length > 0 && filtrados.every((a) => n.has(a.id)); filtrados.forEach((a) => (todos ? n.delete(a.id) : n.add(a.id))); return n })
   }
-  function removerSelecionados() {
-    setAlunos((p) => p.filter((a) => !sel.has(a.id)))
-    setSel(new Set())
-  }
-
-  async function salvar() {
-    setSalvando(true)
-    const [rg, re] = await Promise.all([definirGruposPasta(pastaId, [...marcados]), definirEstudantesPasta(pastaId, alunos.map((a) => a.id))])
-    setSalvando(false)
-    if (rg.ok && re.ok) toast.success('Acesso do módulo salvo')
-    else toast.error(rg.error ?? re.error ?? 'Erro ao salvar acesso.')
-  }
+  function removerSelecionados() { comitar((p) => p.filter((a) => !sel.has(a.id))); setSel(new Set()) }
+  function liberarParaTodos() { setLiberarTodos(true); comitar(() => []) }
 
   const acessoIds = useMemo(() => new Set(alunos.map((a) => a.id)), [alunos])
-  const semRestricao = marcados.size === 0 && alunos.length === 0
   const filtradosTodosSel = filtrados.length > 0 && filtrados.every((a) => sel.has(a.id))
 
   if (carregando) return <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando acesso…</div>
 
   return (
     <div className="space-y-4">
-      <div className={cn('flex items-start gap-2 rounded-xl border px-4 py-2.5 text-sm', semRestricao ? 'border-sky-500/30 bg-sky-500/5 text-sky-700 dark:text-sky-300' : 'border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-400')}>
-        <Info className="mt-0.5 h-4 w-4 shrink-0" />
-        {semRestricao
-          ? <span>Sem nenhuma atribuição, este módulo fica <strong>liberado para todos</strong> os alunos.</span>
-          : <span>Restrito a <strong>{marcados.size}</strong> {marcados.size === 1 ? 'grupo' : 'grupos'} + <strong>{alunos.length}</strong> {alunos.length === 1 ? 'aluno' : 'alunos'} (a união dos dois).</span>}
+      {/* Aviso + botão "Liberar para todos" à direita */}
+      <div className={cn('flex flex-wrap items-center gap-3 rounded-xl border px-4 py-2.5 text-sm', liberarTodos ? 'border-sky-500/30 bg-sky-500/5 text-sky-700 dark:text-sky-300' : 'border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-400')}>
+        <Info className="h-4 w-4 shrink-0" />
+        <span className="min-w-0 flex-1">
+          {liberarTodos
+            ? <>Sem nenhuma atribuição, este módulo fica <strong>liberado para todos</strong> os alunos.</>
+            : <>Restrito a <strong>{alunos.length}</strong> {alunos.length === 1 ? 'aluno' : 'alunos'} com acesso.</>}
+        </span>
+        {salvando && <span className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> salvando…</span>}
+        <button type="button" onClick={() => (liberarTodos ? setLiberarTodos(false) : liberarParaTodos())}
+          className={cn('inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
+            liberarTodos ? 'border-sky-500 bg-sky-500 text-white hover:opacity-90' : 'border-current/30 hover:bg-foreground/5')}>
+          {liberarTodos ? <><Lock className="h-4 w-4" /> Restringir acesso</> : <><Globe className="h-4 w-4" /> Liberar para todos</>}
+        </button>
       </div>
 
-      {/* Grupos com acesso — chips removíveis */}
-      <div className="space-y-2 rounded-2xl border bg-card p-4 shadow-sm">
-        <p className="flex items-center gap-1.5 text-sm font-semibold"><Users className="h-4 w-4 text-primary" /> Grupos com acesso <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">{gruposComAcesso.length}</span></p>
-        {gruposComAcesso.length === 0 ? (
-          <p className="rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">Nenhum grupo com acesso. Use “Adicionar grupo”.</p>
-        ) : (
-          <div className="flex flex-wrap gap-1.5">
-            {gruposComAcesso.map((g) => (
-              <span key={g.id} className="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[13px] font-medium">
-                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: g.cor ?? '#94a3b8' }} />
-                <span className="max-w-[200px] truncate">{g.nome}</span>
-                <button type="button" onClick={() => removerGrupo(g.id)} className="rounded-full p-0.5 text-muted-foreground hover:bg-rose-500/10 hover:text-rose-600" aria-label="Remover grupo"><X className="h-3.5 w-3.5" /></button>
-              </span>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Alunos com acesso — tabela estilo aba Estudantes do banco */}
-      <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+      {/* Alunos com acesso — tabela estilo aba Estudantes do banco (acinzenta quando "liberar todos") */}
+      <div className={cn('overflow-hidden rounded-2xl border bg-card shadow-sm transition-opacity', liberarTodos && 'pointer-events-none select-none opacity-50')} aria-disabled={liberarTodos}>
         <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3">
           <p className="flex items-center gap-1.5 text-sm font-semibold"><UserCheck className="h-4 w-4 text-primary" /> Alunos com acesso <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">{alunos.length}</span></p>
           <div className="relative ml-auto min-w-48 flex-1 sm:max-w-xs">
@@ -123,7 +126,7 @@ export function ModuloAcesso({ pastaId }: { pastaId: string }) {
           {sel.size > 0 && (
             <button type="button" onClick={removerSelecionados} className="inline-flex items-center gap-1.5 rounded-lg border border-rose-400/50 px-3 py-2 text-sm font-medium text-rose-600 transition-colors hover:bg-rose-500/10 dark:text-rose-400"><Trash2 className="h-4 w-4" /> Remover {sel.size}</button>
           )}
-          <AdicionarGrupoModuloDialog grupos={grupos} jaMarcados={marcados} onSelecionar={adicionarGrupos} />
+          <AdicionarGrupoModuloDialog grupos={grupos} jaMarcados={new Set()} onSelecionar={(ids) => { void adicionarGrupos(ids) }} />
           <AdicionarEstudantesDialog jaIds={acessoIds} onSelecionar={adicionarAlunos} />
         </div>
 
@@ -140,13 +143,16 @@ export function ModuloAcesso({ pastaId }: { pastaId: string }) {
                 <th className="px-3 py-2 font-medium">Nome</th>
                 <th className="hidden px-3 py-2 font-medium sm:table-cell">E-mail</th>
                 <th className="hidden px-3 py-2 font-medium md:table-cell">Documento</th>
+                <th className="hidden px-3 py-2 font-medium lg:table-cell">Grupo</th>
               </tr>
             </thead>
             <tbody>
-              {alunos.length === 0 ? (
-                <tr><td colSpan={4} className="py-10 text-center text-muted-foreground">Nenhum aluno individual. Use “Adicionar estudantes” (ou libere por grupo).</td></tr>
+              {addingGrupo ? (
+                <tr><td colSpan={5} className="py-10 text-center text-muted-foreground"><Loader2 className="mx-auto h-4 w-4 animate-spin" /> Vinculando alunos do grupo…</td></tr>
+              ) : alunos.length === 0 ? (
+                <tr><td colSpan={5} className="py-10 text-center text-muted-foreground">Nenhum aluno individual. Use “Adicionar grupo” ou “Adicionar estudantes” (ou libere para todos).</td></tr>
               ) : filtrados.length === 0 ? (
-                <tr><td colSpan={4} className="py-10 text-center text-muted-foreground">Nenhum aluno encontrado.</td></tr>
+                <tr><td colSpan={5} className="py-10 text-center text-muted-foreground">Nenhum aluno encontrado.</td></tr>
               ) : paginaItens.map((a) => {
                 const on = sel.has(a.id)
                 return (
@@ -167,6 +173,11 @@ export function ModuloAcesso({ pastaId }: { pastaId: string }) {
                     </td>
                     <td className="hidden px-3 py-2 text-muted-foreground sm:table-cell"><span className="block truncate">{a.email ?? '—'}</span></td>
                     <td className="hidden px-3 py-2 font-mono text-xs text-muted-foreground md:table-cell">{a.cpf ?? '—'}</td>
+                    <td className="hidden px-3 py-2 lg:table-cell">
+                      {a.grupoNome
+                        ? <span className="inline-flex max-w-[160px] items-center gap-1 truncate rounded-full border px-2 py-0.5 text-[11px] font-medium text-muted-foreground" title={a.grupoNome}>{a.grupoNome}</span>
+                        : <span className="text-xs text-muted-foreground" title="Adicionado individualmente">Direto</span>}
+                    </td>
                   </tr>
                 )
               })}
@@ -184,12 +195,6 @@ export function ModuloAcesso({ pastaId }: { pastaId: string }) {
             </div>
           )}
         </div>
-      </div>
-
-      <div className="flex justify-end">
-        <button onClick={salvar} disabled={salvando} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50">
-          {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar acesso
-        </button>
       </div>
     </div>
   )
