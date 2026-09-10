@@ -110,7 +110,7 @@ export function ModuloAcesso({ pastaId }: { pastaId: string }) {
         {salvando && <span className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> salvando…</span>}
         <button type="button" onClick={() => (liberarTodos ? setLiberarTodos(false) : liberarParaTodos())}
           className={cn('inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
-            liberarTodos ? 'border-sky-500 bg-sky-500 text-white hover:opacity-90' : 'border-current/30 hover:bg-foreground/5')}>
+            liberarTodos ? 'border-primary bg-primary text-primary-foreground hover:opacity-90' : 'border-current/30 hover:bg-foreground/5')}>
           {liberarTodos ? <><Lock className="h-4 w-4" /> Restringir acesso</> : <><Globe className="h-4 w-4" /> Liberar para todos</>}
         </button>
       </div>
