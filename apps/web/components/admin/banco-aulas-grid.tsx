@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -47,6 +47,19 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTa
   const breadcrumb = data.breadcrumb ?? []
   const moduloAtual = data.moduloAtual ?? null
   const dentroDeBanco = !!pastaAtual
+
+  // Underline deslizante das abas (compactas): mede a posição/largura da aba ativa.
+  const tabsRef = useRef<HTMLDivElement>(null)
+  const [ind, setInd] = useState<{ left: number; width: number }>({ left: 0, width: 0 })
+  useEffect(() => {
+    const medir = () => {
+      const el = tabsRef.current?.querySelector<HTMLElement>('[data-tab-ativo="1"]')
+      if (el) setInd({ left: el.offsetLeft, width: el.offsetWidth })
+    }
+    medir()
+    window.addEventListener('resize', medir)
+    return () => window.removeEventListener('resize', medir)
+  }, [moduloTab, dentroDeBanco])
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>, okMsg?: string) =>
     start(async () => { const r = await fn(); if (r.ok) { if (okMsg) toast.success(okMsg); router.refresh() } else toast.error(r.error ?? 'Erro') })
@@ -121,16 +134,15 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTa
       ) : (
         // ============ DENTRO DE UM MÓDULO: abas Aulas | Acessos | Configurações ============
         <>
-          {/* Abas do módulo (deep-linkáveis por ?tab=) com underline deslizante animado */}
-          <div className="relative flex border-b text-sm">
+          {/* Abas do módulo (compactas, deep-linkáveis por ?tab=) com underline deslizante animado */}
+          <div ref={tabsRef} className="relative flex gap-1 border-b text-sm">
             {MODULO_TABS.map(({ id, label, Icon }) => (
-              <Link key={id} href={`/admin/leitura?pasta=${pastaAtual}&tab=${id}`}
-                className={cn('flex flex-1 items-center justify-center gap-1.5 px-4 py-2.5 font-medium transition-colors', moduloTab === id ? 'text-primary' : 'text-muted-foreground hover:text-foreground')}>
+              <Link key={id} data-tab-ativo={moduloTab === id ? '1' : '0'} href={`/admin/leitura?pasta=${pastaAtual}&tab=${id}`}
+                className={cn('inline-flex items-center gap-1.5 px-3 py-2 font-medium transition-colors', moduloTab === id ? 'text-primary' : 'text-muted-foreground hover:text-foreground')}>
                 <Icon className="h-4 w-4" /> {label}
               </Link>
             ))}
-            <span className="absolute bottom-[-1px] h-0.5 rounded-full bg-primary transition-all duration-300 ease-out"
-              style={{ width: `${100 / MODULO_TABS.length}%`, left: `${Math.max(0, MODULO_TABS.findIndex((t) => t.id === moduloTab)) * (100 / MODULO_TABS.length)}%` }} />
+            <span className="absolute bottom-[-1px] h-0.5 rounded-full bg-primary transition-all duration-300 ease-out" style={{ left: ind.left, width: ind.width }} />
           </div>
 
           {/* As 3 abas ficam MONTADAS (só escondemos as inativas): Acessos/Configurações pré-carregam ao
