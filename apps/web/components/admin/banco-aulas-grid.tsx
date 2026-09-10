@@ -1,9 +1,12 @@
 'use client'
 
-import { useTransition } from 'react'
+import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import {
   ChevronRight, ChevronUp, ChevronDown, Home, Library, FolderPlus, FilePlus2, Pencil, Trash2, FolderInput, Pen, Eye, EyeOff, BookOpenText,
 } from 'lucide-react'
@@ -25,6 +28,7 @@ import {
 export function BancoAulasGrid({ data, pastaAtual }: { data: BancoAulas; pastaAtual: string | null }) {
   const router = useRouter()
   const [pending, start] = useTransition()
+  const [dlg, setDlg] = useState<{ tipo: 'novo' | 'rename'; id?: string; nome: string } | null>(null)
   const bancos = data.pastas ?? []
   const aulas = data.aulas ?? []
   const modulos = data.modulos ?? []
@@ -34,9 +38,11 @@ export function BancoAulasGrid({ data, pastaAtual }: { data: BancoAulas; pastaAt
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>, okMsg?: string) =>
     start(async () => { const r = await fn(); if (r.ok) { if (okMsg) toast.success(okMsg); router.refresh() } else toast.error(r.error ?? 'Erro') })
 
-  function novoBanco() {
-    const nome = window.prompt('Nome do módulo:')?.trim(); if (!nome) return
-    run(() => criarModuloLeitura(nome, pastaAtual), 'Módulo criado')
+  function salvarDlg() {
+    const nome = (dlg?.nome ?? '').trim(); if (!nome || !dlg) return
+    if (dlg.tipo === 'novo') run(() => criarModuloLeitura(nome, pastaAtual), 'Módulo criado')
+    else if (dlg.id) run(() => renomearModuloLeitura(dlg.id!, nome))
+    setDlg(null)
   }
   function novaAula() {
     start(async () => {
@@ -44,10 +50,6 @@ export function BancoAulasGrid({ data, pastaAtual }: { data: BancoAulas; pastaAt
       if (r.ok && r.id) router.push(`/admin/leitura/${r.id}`)
       else toast.error(r.error ?? 'Erro ao criar aula')
     })
-  }
-  function renomearBanco(b: ModuloLeitura) {
-    const nome = window.prompt('Renomear módulo:', b.nome)?.trim(); if (!nome || nome === b.nome) return
-    run(() => renomearModuloLeitura(b.id, nome))
   }
   async function excluirBanco(b: ModuloLeitura) {
     if (!(await confirmar({ titulo: 'Excluir módulo', mensagem: `Excluir "${b.nome}"? Só é possível se estiver vazio (mova as aulas antes).`, confirmar: 'Excluir', destrutivo: true }))) return
@@ -87,7 +89,7 @@ export function BancoAulasGrid({ data, pastaAtual }: { data: BancoAulas; pastaAt
         // ===================== RAIZ: bancos (containers) =====================
         <>
           <div>
-            <button onClick={novoBanco} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"><FolderPlus className="h-4 w-4" /> Novo módulo</button>
+            <button onClick={() => setDlg({ tipo: 'novo', nome: '' })} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"><FolderPlus className="h-4 w-4" /> Novo módulo</button>
           </div>
           {bancos.length === 0 ? (
             <div className="rounded-2xl border border-dashed p-12 text-center text-muted-foreground">Nenhum módulo ainda. Crie um <span className="font-medium text-foreground">módulo</span> para guardar as aulas.</div>
@@ -107,7 +109,7 @@ export function BancoAulasGrid({ data, pastaAtual }: { data: BancoAulas; pastaAt
                     <DropdownMenu>
                       <DropdownMenuTrigger className="rounded-md p-1 text-muted-foreground hover:bg-muted"><Pencil className="h-4 w-4" /></DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => renomearBanco(b)}><Pencil className="mr-2 h-4 w-4" /> Renomear</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setDlg({ tipo: 'rename', id: b.id, nome: b.nome })}><Pencil className="mr-2 h-4 w-4" /> Renomear</DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => excluirBanco(b)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir</DropdownMenuItem>
                       </DropdownMenuContent>
@@ -139,6 +141,16 @@ export function BancoAulasGrid({ data, pastaAtual }: { data: BancoAulas; pastaAt
           )}
         </>
       )}
+      <Dialog open={!!dlg} onOpenChange={(o) => !o && setDlg(null)}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{dlg?.tipo === 'novo' ? 'Novo módulo' : 'Renomear módulo'}</DialogTitle></DialogHeader>
+          <Input autoFocus value={dlg?.nome ?? ''} onChange={(e) => setDlg((d) => (d ? { ...d, nome: e.target.value } : d))} onKeyDown={(e) => { if (e.key === 'Enter') salvarDlg() }} placeholder="Nome do módulo" />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDlg(null)}>Cancelar</Button>
+            <Button onClick={salvarDlg} disabled={!(dlg?.nome ?? '').trim() || pending}>{dlg?.tipo === 'novo' ? 'Criar' : 'Salvar'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
