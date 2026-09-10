@@ -158,7 +158,7 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
           <div className="space-y-5 p-5">
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Nome</label>
-              <input value={nome} onChange={(e) => setNome(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') salvar() }} autoFocus
+              <input value={nome} onChange={(e) => setNome(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') salvar() }} autoFocus={!inline}
                 className="w-full rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
             </div>
 

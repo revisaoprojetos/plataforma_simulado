@@ -133,23 +133,32 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTa
               style={{ width: `${100 / MODULO_TABS.length}%`, left: `${Math.max(0, MODULO_TABS.findIndex((t) => t.id === moduloTab)) * (100 / MODULO_TABS.length)}%` }} />
           </div>
 
-          {moduloTab === 'aulas' && (
-            aulas.length === 0 ? (
+          {/* As 3 abas ficam MONTADAS (só escondemos as inativas): Acessos/Configurações pré-carregam ao
+              entrar no módulo e ficam em memória enquanto navega; desmontam (limpam) ao sair do módulo. */}
+          <div className={cn(moduloTab !== 'aulas' && 'hidden')}>
+            {aulas.length === 0 ? (
               <div className="rounded-2xl border border-dashed p-12 text-center text-muted-foreground">Nenhuma aula ainda. Clique em <span className="font-medium text-foreground">"Adicionar aula"</span> para importar o documento e anexar questões.</div>
             ) : (
               <TabelaAulas aulas={aulas} modulos={modulos} pending={pending} onOrdem={moverAulaOrdem} onExcluir={excluirAula} onPersonalizar={personalizarAula} run={run} />
-            )
+            )}
+          </div>
+
+          {pastaAtual && (
+            <div className={cn(moduloTab !== 'acessos' && 'hidden')}>
+              <ModuloAcesso key={pastaAtual} pastaId={pastaAtual} />
+            </div>
           )}
 
-          {moduloTab === 'acessos' && pastaAtual && <ModuloAcesso pastaId={pastaAtual} />}
-
-          {moduloTab === 'config' && moduloAtual && (
-            <EditarPastaDialog
-              inline rotulo="módulo" generoM cardView={cardView}
-              pasta={{ id: moduloAtual.id, nome: moduloAtual.nome, cor: moduloAtual.cor, capa: moduloAtual.capa_card_url, capaLarga: moduloAtual.capa_url }}
-              onClose={() => {}}
-              onSaved={() => router.refresh()}
-            />
+          {moduloAtual && (
+            <div className={cn(moduloTab !== 'config' && 'hidden')}>
+              <EditarPastaDialog
+                key={moduloAtual.id}
+                inline rotulo="módulo" generoM cardView={cardView}
+                pasta={{ id: moduloAtual.id, nome: moduloAtual.nome, cor: moduloAtual.cor, capa: moduloAtual.capa_card_url, capaLarga: moduloAtual.capa_url }}
+                onClose={() => {}}
+                onSaved={() => router.refresh()}
+              />
+            </div>
           )}
         </>
       )}
