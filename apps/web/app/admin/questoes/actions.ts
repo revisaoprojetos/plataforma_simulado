@@ -253,10 +253,16 @@ async function buildQuestaoFields(supabase: SupabaseClient, tenantId: string, da
   }
 }
 
-// Remove colunas que podem não estar migradas (fallback tolerante em insert/update).
-function semColunasNovas<T extends Record<string, any>>(fields: T) {
-  const { imagem_url: _i, pontuacao_total: _p, linhas: _l, categoria_discursiva: _c, assunto_detalhe: _ad, formato: _f, cargo: _cg, ...resto } = fields
-  return resto
+// Fallback tolerante: se o banco não tem alguma coluna nova (migração pendente), remove APENAS a
+// coluna citada no erro e tenta de novo — sem derrubar as demais. Antes um `formato` faltando fazia
+// o save reinserir sem NENHUMA coluna nova, zerando `assunto_detalhe` (que existe) — "salvava" vazio.
+function colunaFaltante(msg?: string): string | null {
+  if (!msg) return null
+  return (
+    /could not find the '([a-z0-9_]+)' column/i.exec(msg)?.[1] ??
+    /column\s+(?:[\w.]+\.)?"?([a-z0-9_]+)"?\s+does not exist/i.exec(msg)?.[1] ??
+    null
+  )
 }
 
 /**
@@ -292,15 +298,17 @@ export async function createQuestaoAction(data: QuestaoData) {
   const supabase = await createClient()
   const fields = await buildQuestaoFields(supabase, tenantId, data)
 
-  let { data: questao, error } = await supabase
-    .from('simulado_questoes')
-    .insert(fields)
-    .select()
-    .single()
-
-  // Tolerante: se alguma coluna nova (imagem_url/pontuacao_total/linhas/categoria_discursiva) ainda não foi migrada, reinsere sem elas.
-  if (error && /imagem_url|pontuacao_total|linhas|categoria_discursiva|assunto_detalhe|formato|cargo|column/i.test(error.message)) {
-    ;({ data: questao, error } = await supabase.from('simulado_questoes').insert(semColunasNovas(fields)).select().single())
+  // Insert tolerante: remove SÓ a coluna faltante do erro e tenta de novo (preserva as demais).
+  let campos: Record<string, any> = { ...fields }
+  let questao: any
+  let error: any
+  for (let i = 0; i < 12; i++) {
+    ;({ data: questao, error } = await supabase.from('simulado_questoes').insert(campos).select().single())
+    if (!error) break
+    const col = colunaFaltante(error.message)
+    if (!col || !(col in campos)) break
+    const { [col]: _drop, ...resto } = campos
+    campos = resto
   }
 
   if (error) {
@@ -354,14 +362,16 @@ export async function updateQuestaoAction(id: string, data: QuestaoData) {
   const { data: antes } = await supabase.from('simulado_questoes').select('*').eq('id', id).maybeSingle()
   if (!antes) return { error: 'Questão não encontrada.' }
 
-  let { error } = await supabase
-    .from('simulado_questoes')
-    .update(fields)
-    .eq('id', id)
-
-  // Tolerante: colunas novas (imagem_url/pontuacao_total/linhas/categoria_discursiva) ainda não migradas → atualiza sem elas.
-  if (error && /imagem_url|pontuacao_total|linhas|categoria_discursiva|assunto_detalhe|formato|cargo|column/i.test(error.message)) {
-    ;({ error } = await supabase.from('simulado_questoes').update(semColunasNovas(fields)).eq('id', id))
+  // Update tolerante: remove SÓ a coluna faltante do erro e tenta de novo (preserva as demais).
+  let campos: Record<string, any> = { ...fields }
+  let error: any
+  for (let i = 0; i < 12; i++) {
+    ;({ error } = await supabase.from('simulado_questoes').update(campos).eq('id', id))
+    if (!error) break
+    const col = colunaFaltante(error.message)
+    if (!col || !(col in campos)) break
+    const { [col]: _drop, ...resto } = campos
+    campos = resto
   }
 
   if (error) {
