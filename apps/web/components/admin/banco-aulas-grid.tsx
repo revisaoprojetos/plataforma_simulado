@@ -329,10 +329,9 @@ function AulaLinha({ a, i, total, modulos, pending, onOrdem, onExcluir, onPerson
             <span className="text-[11px] text-muted-foreground">{(a.artigos ?? 0) > 0 ? `${a.artigos} seção(ões)` : 'inserir conteúdo'}</span>
             <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
           </Link>
-          <Link href={`/admin/leitura/${a.id}?tab=questoes`} className="group flex items-center gap-2.5 border-t py-2.5 pl-16 pr-3 text-sm transition-colors hover:bg-muted/50">
+          <Link href={`/admin/leitura/${a.id}/questoes`} className="group flex items-center gap-2.5 border-t py-2.5 pl-16 pr-3 text-sm transition-colors hover:bg-muted/50">
             <HelpCircle className="h-4 w-4 shrink-0 text-muted-foreground" />
             <span className="flex-1 font-medium text-foreground">Questões do conteúdo</span>
-            <span className="text-[11px] text-muted-foreground">{a.questoes ?? 0} questão(ões)</span>
             <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
           </Link>
         </div>

@@ -737,3 +737,70 @@ export async function listarEstudantesTenantPag(q: string, offset: number, limit
   if (r.error) return { ok: false, error: r.error.message }
   return { ok: true, itens: (r.data ?? []).map(map), total: r.count ?? 0 }
 }
+
+// ── "Questões do conteúdo" = MINI-SIMULADO da aula (separado das questões inline da leitura) ──
+export type QuizQuestao = { id: string; questaoId: string; enunciado: string; ordem: number }
+export type QuizConfig = { modo: 'imediato' | 'simulado'; embaralhar: boolean }
+const QUIZ_PADRAO: QuizConfig = { modo: 'imediato', embaralhar: false }
+const QUIZ_SEM_TABELA = (m?: string) => /relation .* does not exist|simulado_documento_quiz_questoes|quiz_config|schema cache/i.test(m ?? '')
+
+export async function listarQuizConteudo(documentoId: string): Promise<{ ok: boolean; itens?: QuizQuestao[]; config?: QuizConfig; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { data: dq, error } = await svc.from('simulado_documento_quiz_questoes').select('id, questao_id, ordem').eq('tenant_id', g.tenantId).eq('documento_id', documentoId).eq('deletado', false).order('ordem', { ascending: true })
+  if (error) return { ok: false, error: QUIZ_SEM_TABELA(error.message) ? 'Rode a migração 20260910000001 (Questões do conteúdo).' : error.message }
+  const ids = [...new Set((dq ?? []).map((x: any) => x.questao_id))]
+  const enun = new Map<string, string>()
+  if (ids.length) { const { data: qs } = await svc.from('simulado_questoes').select('id, enunciado').in('id', ids); for (const q of (qs ?? []) as any[]) enun.set(q.id, snippet(q.enunciado)) }
+  let config = QUIZ_PADRAO
+  const { data: doc } = await svc.from('simulado_documentos').select('quiz_config').eq('id', documentoId).eq('tenant_id', g.tenantId).maybeSingle()
+  if ((doc as any)?.quiz_config) config = { ...QUIZ_PADRAO, ...(doc as any).quiz_config }
+  return { ok: true, itens: (dq ?? []).map((x: any) => ({ id: x.id, questaoId: x.questao_id, enunciado: enun.get(x.questao_id) || 'Questão', ordem: x.ordem })), config }
+}
+
+export async function adicionarQuizQuestoes(documentoId: string, questaoIds: string[]): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const ids = [...new Set((questaoIds ?? []).filter(Boolean))]
+  if (!ids.length) return { ok: true }
+  const svc = createAdminClient()
+  const { data: mx } = await svc.from('simulado_documento_quiz_questoes').select('ordem').eq('tenant_id', g.tenantId).eq('documento_id', documentoId).order('ordem', { ascending: false }).limit(1).maybeSingle()
+  let ordem = ((mx as any)?.ordem ?? -1) + 1
+  const { error } = await svc.from('simulado_documento_quiz_questoes').upsert(ids.map((questao_id) => ({ tenant_id: g.tenantId, documento_id: documentoId, questao_id, ordem: ordem++, deletado: false })), { onConflict: 'documento_id,questao_id' })
+  if (error) return { ok: false, error: QUIZ_SEM_TABELA(error.message) ? 'Rode a migração 20260910000001 (Questões do conteúdo).' : error.message }
+  revalidatePath(`/admin/leitura/${documentoId}/questoes`); return { ok: true }
+}
+
+export async function removerQuizQuestao(id: string): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_documento_quiz_questoes').update({ deletado: true }).eq('id', id).eq('tenant_id', g.tenantId)
+  if (error) return { ok: false, error: error.message }
+  return { ok: true }
+}
+
+export async function reordenarQuizQuestoes(ids: string[]): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  for (let i = 0; i < ids.length; i++) await svc.from('simulado_documento_quiz_questoes').update({ ordem: i }).eq('id', ids[i]).eq('tenant_id', g.tenantId)
+  return { ok: true }
+}
+
+export async function importarQuizQuestoes(documentoId: string, rows: QuestaoImport[]): Promise<{ ok: boolean; count?: number; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  if (!rows?.length) return { ok: false, error: 'Nada para importar.' }
+  const imp = await confirmarImportQuestoes(null, rows)
+  if (!imp.ok) return { ok: false, error: imp.error ?? 'Falha ao importar as questões.' }
+  const r = await adicionarQuizQuestoes(documentoId, imp.ids ?? [])
+  if (!r.ok) return { ok: false, error: r.error }
+  return { ok: true, count: (imp.ids ?? []).length }
+}
+
+export async function salvarQuizConfig(documentoId: string, config: Partial<QuizConfig>): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { data: doc } = await svc.from('simulado_documentos').select('quiz_config').eq('id', documentoId).eq('tenant_id', g.tenantId).maybeSingle()
+  const merged = { ...QUIZ_PADRAO, ...((doc as any)?.quiz_config ?? {}), ...config }
+  const { error } = await svc.from('simulado_documentos').update({ quiz_config: merged, atualizado_em: new Date().toISOString() }).eq('id', documentoId).eq('tenant_id', g.tenantId)
+  if (error) return { ok: false, error: QUIZ_SEM_TABELA(error.message) ? 'Rode a migração 20260910000001 (Questões do conteúdo).' : error.message }
+  revalidatePath(`/admin/leitura/${documentoId}/questoes`); return { ok: true }
+}
