@@ -7,8 +7,12 @@ import { listarMaterias, type Documento } from '../actions'
 
 export const dynamic = 'force-dynamic'
 
-export default async function LeituraEditorPage({ params }: { params: Promise<{ id: string }> }) {
+const ABAS = ['conteudo', 'config', 'questoes', 'acesso'] as const
+
+export default async function LeituraEditorPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
   const { id } = await params
+  const { tab } = await searchParams
+  const abaInicial = (ABAS as readonly string[]).includes(tab ?? '') ? (tab as (typeof ABAS)[number]) : undefined
   if (!(await checkPermission('leitura:view'))) redirect('/admin')
   const access = await getCurrentAccess()
   if (!access.tenantId) redirect('/admin')
@@ -50,6 +54,7 @@ export default async function LeituraEditorPage({ params }: { params: Promise<{ 
         publicadaVersao={publicadaVersao}
         temRascunhoPendente={temRascunhoPendente}
         versaoEdicao={rascunhoVersao}
+        abaInicial={abaInicial}
       />
     </div>
   )

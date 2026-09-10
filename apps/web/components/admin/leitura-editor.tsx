@@ -50,14 +50,16 @@ const TIPOS_ATUALIZACAO = [
   { v: 'correcao_editorial', label: 'Correção editorial', Icon: SpellCheck },
 ] as const
 
-export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [], podePublicar = false, publicadaVersao = 1, temRascunhoPendente = false, versaoEdicao }: {
+export function LeituraEditor({ documento, htmlAtual, podeEditar, materias = [], podePublicar = false, publicadaVersao = 1, temRascunhoPendente = false, versaoEdicao, abaInicial }: {
   documento: Documento; htmlAtual: string; podeEditar: boolean; materias?: Materia[]; podePublicar?: boolean; publicadaVersao?: number; temRascunhoPendente?: boolean; versaoEdicao?: number
+  abaInicial?: 'conteudo' | 'config' | 'questoes' | 'acesso'
 }) {
   const versaoAutoria = versaoEdicao ?? documento.versao
   const router = useRouter()
   // Ao criar/entrar num documento, abre já na CONFIGURAÇÃO (parte técnica): dados do card,
   // conteúdo da lei e metadados. A aba "Conteúdo" (leitura/grifos) fica a um clique.
-  const [aba, setAba] = useState<'conteudo' | 'config' | 'questoes' | 'acesso'>('config')
+  // A trilha (banco de aulas) faz deep-link direto p/ Conteúdo/Questões via `abaInicial`.
+  const [aba, setAba] = useState<'conteudo' | 'config' | 'questoes' | 'acesso'>(abaInicial ?? 'config')
   const [capa, setCapa] = useState<string | null>(documento.capa_url ?? null)
   const [processandoCapa, setProcessandoCapa] = useState(false)
   const capaRef = useRef<HTMLInputElement>(null)

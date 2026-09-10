@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { EditarPastaDialog } from '@/components/admin/editar-pasta-dialog'
+import { PersonalizarAulaDialog } from '@/components/admin/personalizar-aula-dialog'
 import {
-  ChevronRight, ChevronUp, ChevronDown, Home, Library, FolderPlus, FilePlus2, Pencil, Trash2, FolderInput, Pen, Eye, EyeOff, BookOpenText, MoreVertical, FolderOpen,
+  ChevronRight, ChevronUp, ChevronDown, Home, Library, FolderPlus, FilePlus2, Pencil, Trash2, FolderInput, Eye, EyeOff, BookOpenText, MoreVertical, FolderOpen, FileText, HelpCircle,
 } from 'lucide-react'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { type CardView } from '@/lib/card-view'
@@ -19,6 +20,9 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
+type AulaItem = NonNullable<BancoAulas['aulas']>[number]
+type PersonalizarAula = { id: string; titulo: string; descricao: string | null; capa_url: string | null; cor: string | null }
+
 /**
  * Banco de aulas do LegProc no modelo "banco → tabela de aulas":
  *  - Raiz: cards dos BANCOS (containers) + "Novo banco".
@@ -29,6 +33,7 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster' }: { data
   const [pending, start] = useTransition()
   const [criandoModulo, setCriandoModulo] = useState(false)
   const [editandoModulo, setEditandoModulo] = useState<ModuloLeitura | null>(null)
+  const [personalizandoAula, setPersonalizandoAula] = useState<PersonalizarAula | null>(null)
   const bancos = data.pastas ?? []
   const aulas = data.aulas ?? []
   const modulos = data.modulos ?? []
@@ -41,9 +46,13 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster' }: { data
   function novaAula() {
     start(async () => {
       const r = await criarDocumento('Nova aula', pastaAtual)
-      if (r.ok && r.id) router.push(`/admin/leitura/${r.id}`)
+      // Não navega: abre o pop-up de personalização (nome/descrição/capa) da aula recém-criada.
+      if (r.ok && r.id) { router.refresh(); setPersonalizandoAula({ id: r.id, titulo: 'Nova aula', descricao: null, capa_url: null, cor: null }) }
       else toast.error(r.error ?? 'Erro ao criar aula')
     })
+  }
+  function personalizarAula(a: AulaItem) {
+    setPersonalizandoAula({ id: a.id, titulo: a.titulo, descricao: a.descricao ?? null, capa_url: a.capa_url ?? null, cor: a.cor ?? null })
   }
   async function excluirBanco(b: ModuloLeitura) {
     if (!(await confirmar({ titulo: 'Excluir módulo', mensagem: `Excluir "${b.nome}"? Só é possível se estiver vazio (mova as aulas antes).`, confirmar: 'Excluir', destrutivo: true }))) return
@@ -95,7 +104,7 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster' }: { data
           {aulas.length > 0 && (
             <div className="space-y-2">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Aulas sem módulo</p>
-              <TabelaAulas aulas={aulas} modulos={modulos} pending={pending} onOrdem={moverAulaOrdem} onExcluir={excluirAula} run={run} />
+              <TabelaAulas aulas={aulas} modulos={modulos} pending={pending} onOrdem={moverAulaOrdem} onExcluir={excluirAula} onPersonalizar={personalizarAula} run={run} />
             </div>
           )}
         </>
@@ -109,7 +118,7 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster' }: { data
           {aulas.length === 0 ? (
             <div className="rounded-2xl border border-dashed p-12 text-center text-muted-foreground">Nenhuma aula ainda. Clique em <span className="font-medium text-foreground">"Adicionar aula"</span> para importar o documento e anexar questões.</div>
           ) : (
-            <TabelaAulas aulas={aulas} modulos={modulos} pending={pending} onOrdem={moverAulaOrdem} onExcluir={excluirAula} run={run} />
+            <TabelaAulas aulas={aulas} modulos={modulos} pending={pending} onOrdem={moverAulaOrdem} onExcluir={excluirAula} onPersonalizar={personalizarAula} run={run} />
           )}
         </>
       )}
@@ -123,6 +132,14 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster' }: { data
           rotulo="módulo" generoM cardView={cardView}
           onClose={() => setEditandoModulo(null)}
           onSaved={() => { setEditandoModulo(null); router.refresh() }}
+        />
+      )}
+      {/* Personalizar aula (nome/descrição/capa/cor) — abre ao criar aula e pelo "Personalizar" da tabela. */}
+      {personalizandoAula && (
+        <PersonalizarAulaDialog
+          aula={personalizandoAula}
+          onClose={() => setPersonalizandoAula(null)}
+          onSaved={() => { setPersonalizandoAula(null); router.refresh() }}
         />
       )}
     </div>
@@ -212,68 +229,92 @@ function ModuloCard({ m, variant, onPersonalizar, onExcluir }: {
   )
 }
 
-/** Tabela de aulas (documento + questões), reordenável; cada linha abre o editor. */
-function TabelaAulas({ aulas, modulos, pending, onOrdem, onExcluir, run }: {
+/** Tabela de aulas em HIERARQUIA: cada aula → "Conteúdo" e "Questões do conteúdo" (como o cronograma). */
+function TabelaAulas({ aulas, modulos, pending, onOrdem, onExcluir, onPersonalizar, run }: {
   aulas: NonNullable<BancoAulas['aulas']>
   modulos: { id: string; nome: string }[]
   pending: boolean
   onOrdem: (idx: number, delta: number) => void
   onExcluir: (id: string, titulo: string) => void
+  onPersonalizar: (a: AulaItem) => void
   run: (fn: () => Promise<{ ok: boolean; error?: string }>, okMsg?: string) => void
 }) {
   const list = aulas ?? []
   return (
     <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-      <table className="w-full table-fixed text-sm">
-        <colgroup><col className="w-14" /><col /><col className="w-24" /><col className="w-28" /><col className="w-40" /></colgroup>
-        <thead className="border-b bg-muted/40 text-xs uppercase tracking-wide text-muted-foreground">
-          <tr>
-            <th className="px-3 py-2 text-left font-semibold">#</th>
-            <th className="px-3 py-2 text-left font-semibold">Aula (documento)</th>
-            <th className="px-3 py-2 text-left font-semibold">Questões</th>
-            <th className="px-3 py-2 text-left font-semibold">Status</th>
-            <th className="px-3 py-2 text-right font-semibold">Ações</th>
-          </tr>
-        </thead>
-        <tbody>
-          {list.map((a, i) => (
-            <tr key={a.id} className="border-b transition-colors last:border-0 hover:bg-muted/30">
-              <td className="px-3 py-2 font-mono text-xs text-muted-foreground">{i + 1}</td>
-              <td className="px-3 py-2">
-                <Link href={`/admin/leitura/${a.id}`} className="flex min-w-0 items-center gap-2 font-medium text-foreground hover:text-primary">
-                  <BookOpenText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                  <span className="truncate" title={a.titulo}>{a.titulo}</span>
-                </Link>
-                {(a.artigos ?? 0) > 0 && <span className="ml-6 text-[11px] text-muted-foreground">{a.artigos} artigo(s)</span>}
-              </td>
-              <td className="px-3 py-2 text-muted-foreground">{a.questoes ?? 0}</td>
-              <td className="px-3 py-2">
-                {a.publicado
-                  ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400"><Eye className="h-3 w-3" /> Publicada</span>
-                  : <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground"><EyeOff className="h-3 w-3" /> Rascunho</span>}
-              </td>
-              <td className="px-3 py-2">
-                <div className="flex items-center justify-end gap-0.5">
-                  <button onClick={() => onOrdem(i, -1)} disabled={i === 0 || pending} title="Subir" className="rounded-md p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"><ChevronUp className="h-4 w-4" /></button>
-                  <button onClick={() => onOrdem(i, 1)} disabled={i === list.length - 1 || pending} title="Descer" className="rounded-md p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"><ChevronDown className="h-4 w-4" /></button>
-                  <Link href={`/admin/leitura/${a.id}`} title="Editar" className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><Pen className="h-4 w-4" /></Link>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger className="rounded-md p-1 text-muted-foreground hover:bg-muted" title="Mover para módulo"><FolderInput className="h-4 w-4" /></DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="max-h-72 overflow-auto">
-                      <DropdownMenuItem onClick={() => run(() => moverAulaParaModulo(a.id, null), 'Movido')}>Sem módulo</DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                      {modulos.filter((mm) => mm.id !== a.pasta_id).map((mm) => (
-                        <DropdownMenuItem key={mm.id} onClick={() => run(() => moverAulaParaModulo(a.id, mm.id), 'Movido')}>{mm.nome}</DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                  <button onClick={() => onExcluir(a.id, a.titulo)} title="Excluir" className="rounded-md p-1 text-muted-foreground hover:bg-rose-500/10 hover:text-rose-600"><Trash2 className="h-4 w-4" /></button>
-                </div>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {list.map((a, i) => (
+        <AulaLinha key={a.id} a={a} i={i} total={list.length} modulos={modulos} pending={pending} onOrdem={onOrdem} onExcluir={onExcluir} onPersonalizar={onPersonalizar} run={run} />
+      ))}
+    </div>
+  )
+}
+
+/** Uma aula: cabeçalho (personalizar/mover/ordenar/excluir) + 2 filhos que levam a cada área. */
+function AulaLinha({ a, i, total, modulos, pending, onOrdem, onExcluir, onPersonalizar, run }: {
+  a: AulaItem
+  i: number
+  total: number
+  modulos: { id: string; nome: string }[]
+  pending: boolean
+  onOrdem: (idx: number, delta: number) => void
+  onExcluir: (id: string, titulo: string) => void
+  onPersonalizar: (a: AulaItem) => void
+  run: (fn: () => Promise<{ ok: boolean; error?: string }>, okMsg?: string) => void
+}) {
+  const [aberto, setAberto] = useState(true)
+  const c = a.cor ?? '#6d28d9'
+  return (
+    <div className="border-b last:border-0">
+      {/* Cabeçalho da aula */}
+      <div className="flex items-center gap-2 px-3 py-2.5 hover:bg-muted/30">
+        <span className="w-5 shrink-0 text-center font-mono text-xs text-muted-foreground">{i + 1}</span>
+        <button onClick={() => setAberto((v) => !v)} className="shrink-0 rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label={aberto ? 'Recolher' : 'Expandir'}>
+          {aberto ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+        </button>
+        {a.capa_url
+          ? <img src={a.capa_url} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
+          : <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white" style={{ background: c }}><BookOpenText className="h-4 w-4" /></span>}
+        <button onClick={() => onPersonalizar(a)} className="min-w-0 flex-1 text-left" title="Personalizar aula">
+          <p className="truncate text-sm font-semibold text-foreground">{a.titulo}</p>
+          {a.descricao ? <p className="truncate text-[11px] text-muted-foreground">{a.descricao}</p> : null}
+        </button>
+        {a.publicado
+          ? <span className="hidden shrink-0 items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 sm:inline-flex"><Eye className="h-3 w-3" /> Publicada</span>
+          : <span className="hidden shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground sm:inline-flex"><EyeOff className="h-3 w-3" /> Rascunho</span>}
+        <div className="flex shrink-0 items-center gap-0.5">
+          <button onClick={() => onOrdem(i, -1)} disabled={i === 0 || pending} title="Subir" className="rounded-md p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"><ChevronUp className="h-4 w-4" /></button>
+          <button onClick={() => onOrdem(i, 1)} disabled={i === total - 1 || pending} title="Descer" className="rounded-md p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"><ChevronDown className="h-4 w-4" /></button>
+          <button onClick={() => onPersonalizar(a)} title="Personalizar" className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><Pencil className="h-4 w-4" /></button>
+          <DropdownMenu>
+            <DropdownMenuTrigger className="rounded-md p-1 text-muted-foreground hover:bg-muted" title="Mover para módulo"><FolderInput className="h-4 w-4" /></DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="max-h-72 overflow-auto">
+              <DropdownMenuItem onClick={() => run(() => moverAulaParaModulo(a.id, null), 'Movido')}>Sem módulo</DropdownMenuItem>
+              <DropdownMenuSeparator />
+              {modulos.filter((mm) => mm.id !== a.pasta_id).map((mm) => (
+                <DropdownMenuItem key={mm.id} onClick={() => run(() => moverAulaParaModulo(a.id, mm.id), 'Movido')}>{mm.nome}</DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <button onClick={() => onExcluir(a.id, a.titulo)} title="Excluir" className="rounded-md p-1 text-muted-foreground hover:bg-rose-500/10 hover:text-rose-600"><Trash2 className="h-4 w-4" /></button>
+        </div>
+      </div>
+      {/* Filhos: Conteúdo (editor) + Questões do conteúdo (add/importar) */}
+      {aberto && (
+        <div className="border-t bg-muted/20">
+          <Link href={`/admin/leitura/${a.id}?tab=conteudo`} className="group flex items-center gap-2.5 py-2.5 pl-16 pr-3 text-sm transition-colors hover:bg-muted/50">
+            <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <span className="flex-1 font-medium text-foreground">Conteúdo</span>
+            <span className="text-[11px] text-muted-foreground">{(a.artigos ?? 0) > 0 ? `${a.artigos} seção(ões)` : 'inserir conteúdo'}</span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+          </Link>
+          <Link href={`/admin/leitura/${a.id}?tab=questoes`} className="group flex items-center gap-2.5 border-t py-2.5 pl-16 pr-3 text-sm transition-colors hover:bg-muted/50">
+            <HelpCircle className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <span className="flex-1 font-medium text-foreground">Questões do conteúdo</span>
+            <span className="text-[11px] text-muted-foreground">{a.questoes ?? 0} questão(ões)</span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+          </Link>
+        </div>
+      )}
     </div>
   )
 }
