@@ -31,9 +31,6 @@ export default async function LeituraAdminPage({ searchParams }: { searchParams:
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-3">
-          {data.ok && pasta && moduloTab === 'aulas' && (
-            <p className="max-w-xs text-right text-sm text-muted-foreground">{data.aulas?.length ?? 0} aula(s) neste módulo — a ordem define a sequência na trilha.</p>
-          )}
           {data.ok && pasta && data.moduloAtual && (
             <PublicarModuloBotao pastaId={pasta} publicacao={data.moduloAtual.publicacao} />
           )}

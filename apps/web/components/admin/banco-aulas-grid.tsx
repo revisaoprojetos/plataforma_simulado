@@ -147,7 +147,8 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTa
 
           {/* As 3 abas ficam MONTADAS (só escondemos as inativas): Acessos/Configurações pré-carregam ao
               entrar no módulo e ficam em memória enquanto navega; desmontam (limpam) ao sair do módulo. */}
-          <div className={cn(moduloTab !== 'aulas' && 'hidden')}>
+          <div className={cn('space-y-2', moduloTab !== 'aulas' && 'hidden')}>
+            <p className="text-sm text-muted-foreground">{aulas.length} aula(s) neste módulo</p>
             {aulas.length === 0 ? (
               <div className="rounded-2xl border border-dashed p-12 text-center text-muted-foreground">Nenhuma aula ainda. Clique em <span className="font-medium text-foreground">"Adicionar aula"</span> para importar o documento e anexar questões.</div>
             ) : (
