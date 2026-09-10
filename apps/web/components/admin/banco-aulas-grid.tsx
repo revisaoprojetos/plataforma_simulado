@@ -4,15 +4,13 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
+import { EditarPastaDialog } from '@/components/admin/editar-pasta-dialog'
 import {
   ChevronRight, ChevronUp, ChevronDown, Home, Library, FolderPlus, FilePlus2, Pencil, Trash2, FolderInput, Pen, Eye, EyeOff, BookOpenText,
 } from 'lucide-react'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import {
-  type BancoAulas, type ModuloLeitura, criarDocumento, criarModuloLeitura, renomearModuloLeitura, excluirModuloLeitura,
+  type BancoAulas, type ModuloLeitura, criarDocumento, excluirModuloLeitura,
   moverAulaParaModulo, reordenarAulasLeitura, reordenarModulosLeitura,
 } from '@/app/admin/leitura/actions'
 import { excluirDocumento } from '@/app/admin/leitura/actions'
@@ -28,7 +26,8 @@ import {
 export function BancoAulasGrid({ data, pastaAtual }: { data: BancoAulas; pastaAtual: string | null }) {
   const router = useRouter()
   const [pending, start] = useTransition()
-  const [dlg, setDlg] = useState<{ tipo: 'novo' | 'rename'; id?: string; nome: string } | null>(null)
+  const [criandoModulo, setCriandoModulo] = useState(false)
+  const [editandoModulo, setEditandoModulo] = useState<ModuloLeitura | null>(null)
   const bancos = data.pastas ?? []
   const aulas = data.aulas ?? []
   const modulos = data.modulos ?? []
@@ -38,12 +37,6 @@ export function BancoAulasGrid({ data, pastaAtual }: { data: BancoAulas; pastaAt
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>, okMsg?: string) =>
     start(async () => { const r = await fn(); if (r.ok) { if (okMsg) toast.success(okMsg); router.refresh() } else toast.error(r.error ?? 'Erro') })
 
-  function salvarDlg() {
-    const nome = (dlg?.nome ?? '').trim(); if (!nome || !dlg) return
-    if (dlg.tipo === 'novo') run(() => criarModuloLeitura(nome, pastaAtual), 'Módulo criado')
-    else if (dlg.id) run(() => renomearModuloLeitura(dlg.id!, nome))
-    setDlg(null)
-  }
   function novaAula() {
     start(async () => {
       const r = await criarDocumento('Nova aula', pastaAtual)
@@ -89,16 +82,22 @@ export function BancoAulasGrid({ data, pastaAtual }: { data: BancoAulas; pastaAt
         // ===================== RAIZ: bancos (containers) =====================
         <>
           <div>
-            <button onClick={() => setDlg({ tipo: 'novo', nome: '' })} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"><FolderPlus className="h-4 w-4" /> Novo módulo</button>
+            <button onClick={() => setCriandoModulo(true)} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"><FolderPlus className="h-4 w-4" /> Novo módulo</button>
           </div>
           {bancos.length === 0 ? (
             <div className="rounded-2xl border border-dashed p-12 text-center text-muted-foreground">Nenhum módulo ainda. Crie um <span className="font-medium text-foreground">módulo</span> para guardar as aulas.</div>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {bancos.map((b, i) => (
-                <div key={b.id} className="group relative flex items-center gap-3 rounded-2xl border bg-card p-3.5 shadow-sm transition-colors hover:border-primary/40">
+                <div key={b.id} className="group relative flex items-center gap-3 overflow-hidden rounded-2xl border bg-card p-3.5 shadow-sm transition-colors hover:border-primary/40">
+                  {/* Banner largo como fundo suave, quando houver capa. */}
+                  {(b.capa_url || b.capa_card_url) && <img src={(b.capa_url || b.capa_card_url) as string} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-20" />}
                   <Link href={`/admin/leitura?pasta=${b.id}`} className="absolute inset-0 z-0" aria-label={b.nome} />
-                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-white" style={{ background: b.cor ?? '#6d28d9' }}><Library className="h-5 w-5" /></span>
+                  {b.capa_card_url ? (
+                    <img src={b.capa_card_url} alt="" className="relative h-12 w-12 shrink-0 rounded-xl object-cover" />
+                  ) : (
+                    <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-white" style={{ background: b.cor ?? '#6d28d9' }}><Library className="h-5 w-5" /></span>
+                  )}
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold">{b.nome}</p>
                     <p className="text-xs text-muted-foreground">{b.aulas} aula(s)</p>
@@ -109,7 +108,7 @@ export function BancoAulasGrid({ data, pastaAtual }: { data: BancoAulas; pastaAt
                     <DropdownMenu>
                       <DropdownMenuTrigger className="rounded-md p-1 text-muted-foreground hover:bg-muted"><Pencil className="h-4 w-4" /></DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => setDlg({ tipo: 'rename', id: b.id, nome: b.nome })}><Pencil className="mr-2 h-4 w-4" /> Renomear</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setEditandoModulo(b)}><Pencil className="mr-2 h-4 w-4" /> Personalizar</DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => excluirBanco(b)} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir</DropdownMenuItem>
                       </DropdownMenuContent>
@@ -141,16 +140,17 @@ export function BancoAulasGrid({ data, pastaAtual }: { data: BancoAulas; pastaAt
           )}
         </>
       )}
-      <Dialog open={!!dlg} onOpenChange={(o) => !o && setDlg(null)}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>{dlg?.tipo === 'novo' ? 'Novo módulo' : 'Renomear módulo'}</DialogTitle></DialogHeader>
-          <Input autoFocus value={dlg?.nome ?? ''} onChange={(e) => setDlg((d) => (d ? { ...d, nome: e.target.value } : d))} onKeyDown={(e) => { if (e.key === 'Enter') salvarDlg() }} placeholder="Nome do módulo" />
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setDlg(null)}>Cancelar</Button>
-            <Button onClick={salvarDlg} disabled={!(dlg?.nome ?? '').trim() || pending}>{dlg?.tipo === 'novo' ? 'Criar' : 'Salvar'}</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Criar/personalizar módulo — reusa o editor de pasta do banco (capa do card + banner largo + cor + crop). */}
+      {criandoModulo && (
+        <EditarPastaDialog area="leitura" paiId={pastaAtual} onClose={() => setCriandoModulo(false)} onSaved={() => { setCriandoModulo(false); router.refresh() }} />
+      )}
+      {editandoModulo && (
+        <EditarPastaDialog
+          pasta={{ id: editandoModulo.id, nome: editandoModulo.nome, cor: editandoModulo.cor, capa: editandoModulo.capa_card_url, capaLarga: editandoModulo.capa_url }}
+          onClose={() => setEditandoModulo(null)}
+          onSaved={() => { setEditandoModulo(null); router.refresh() }}
+        />
+      )}
     </div>
   )
 }

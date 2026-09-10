@@ -80,7 +80,7 @@ export async function criarBanco(nome: string, tipo: string = 'objetiva', paiId?
 
 /** Cria uma PASTA (folder) para organizar bancos OU simulados. `area` separa onde ela aparece
  * ('banco' = Banco de Simulado, 'simulado' = Aplicação de Simulado). */
-export async function criarPastaFolder(nome: string, paiId?: string | null, area?: 'banco' | 'simulado' | 'caderno'): Promise<{ ok: boolean; id?: string; error?: string }> {
+export async function criarPastaFolder(nome: string, paiId?: string | null, area?: 'banco' | 'simulado' | 'caderno' | 'leitura'): Promise<{ ok: boolean; id?: string; error?: string }> {
   const g = await guard()
   if (!g.ok) return g
   const titulo = nome.trim()

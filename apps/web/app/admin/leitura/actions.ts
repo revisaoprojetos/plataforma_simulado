@@ -553,14 +553,17 @@ export async function listarDocumentosAdmin(): Promise<{ ok: boolean; itens?: Do
 // ===================== Banco de Aulas (módulos = pastas folder_area='leitura') =====================
 
 const AREA_LEITURA = 'leitura'
-export type ModuloLeitura = { id: string; nome: string; pai_id: string | null; cor: string | null; icone: string | null; capa_url: string | null; ordem: number; subpastas: number; aulas: number }
+export type ModuloLeitura = { id: string; nome: string; pai_id: string | null; cor: string | null; icone: string | null; capa_url: string | null; capa_card_url: string | null; ordem: number; subpastas: number; aulas: number }
 export type BancoAulas = { ok: boolean; error?: string; pastas?: ModuloLeitura[]; aulas?: (Documento & { questoes?: number })[]; breadcrumb?: { id: string; nome: string }[]; modulos?: { id: string; nome: string }[] }
 
 /** `.order('ordem')` tolerante: se a coluna `ordem` ainda não existir, refaz ordenando por nome. */
 async function pastasLeitura(svc: any, tenantId: string): Promise<any[]> {
-  const base = () => svc.from('simulado_pastas').select('id, nome, pai_id, cor, icone, capa_url, ordem').eq('tenant_id', tenantId).eq('is_folder', true).eq('folder_area', AREA_LEITURA)
-  let r = await base().order('ordem', { ascending: true }).order('nome', { ascending: true })
-  if (r.error) r = await base().order('nome', { ascending: true })
+  const q = (cols: string, ordenado: boolean) => {
+    const b = svc.from('simulado_pastas').select(cols).eq('tenant_id', tenantId).eq('is_folder', true).eq('folder_area', AREA_LEITURA)
+    return ordenado ? b.order('ordem', { ascending: true }).order('nome', { ascending: true }) : b.order('nome', { ascending: true })
+  }
+  let r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, ordem', true)
+  if (r.error) r = await q('id, nome, pai_id, cor, icone, capa_url', false) // capa_card_url/ordem podem não estar migradas
   return (r.data as any[]) ?? []
 }
 
@@ -578,7 +581,7 @@ export async function listarBancoAulas(pastaId?: string | null): Promise<BancoAu
   for (const p of todasPastas) { if (p.pai_id) subPorPasta.set(p.pai_id, (subPorPasta.get(p.pai_id) ?? 0) + 1) }
 
   const pastas: ModuloLeitura[] = todasPastas.filter((p) => (p.pai_id ?? null) === paiAtual).map((p) => ({
-    id: p.id, nome: p.nome, pai_id: p.pai_id ?? null, cor: p.cor ?? null, icone: p.icone ?? null, capa_url: p.capa_url ?? null,
+    id: p.id, nome: p.nome, pai_id: p.pai_id ?? null, cor: p.cor ?? null, icone: p.icone ?? null, capa_url: p.capa_url ?? null, capa_card_url: p.capa_card_url ?? null,
     ordem: p.ordem ?? 0, subpastas: subPorPasta.get(p.id) ?? 0, aulas: docsPorPasta.get(p.id) ?? 0,
   }))
 

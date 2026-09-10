@@ -38,7 +38,7 @@ async function origParaMeta(o: File | string | null): Promise<string | null> {
 export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poster', onClose, onSaved }: {
   pasta?: { id?: string; nome?: string; cor?: string | null; capa?: string | null; capaLarga?: string | null } | null
   /** Presente = modo CRIAR: cria a pasta nesta área e já aplica a personalização. */
-  area?: 'banco' | 'simulado' | 'caderno'
+  area?: 'banco' | 'simulado' | 'caderno' | 'leitura'
   /** Pasta-pai — quando definido, cria uma SUBPASTA dentro dela. */
   paiId?: string | null
   /** Estilo do card definido no console (tema.card_view / card_view_admin) — a prévia o espelha. */
