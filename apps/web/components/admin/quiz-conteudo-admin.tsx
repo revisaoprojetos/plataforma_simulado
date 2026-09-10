@@ -80,22 +80,22 @@ export function QuizConteudoAdmin({ documentoId }: { documentoId: string }) {
       {/* Configuração do mini-simulado */}
       <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
         <p className="flex items-center gap-2 text-sm font-semibold">Configuração {pending && <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground" />}</p>
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="flex flex-wrap items-center gap-2">
           {MODOS.map(({ v, label, desc, Icon }) => (
-            <button key={v} type="button" onClick={() => aplicarConfig({ modo: v })}
-              className={cn('flex items-start gap-3 rounded-xl border p-3 text-left transition-colors', config.modo === v ? 'border-primary bg-primary/5' : 'hover:border-primary/40')}>
+            <button key={v} type="button" onClick={() => aplicarConfig({ modo: v })} title={desc}
+              className={cn('flex max-w-xs items-center gap-2.5 rounded-xl border px-3 py-2 text-left transition-colors', config.modo === v ? 'border-primary bg-primary/5' : 'hover:border-primary/40')}>
               <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', config.modo === v ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}><Icon className="h-4 w-4" /></span>
               <span className="min-w-0">
                 <span className="block text-sm font-semibold">{label}</span>
-                <span className="block text-xs text-muted-foreground">{desc}</span>
+                <span className="block truncate text-xs text-muted-foreground">{desc}</span>
               </span>
             </button>
           ))}
+          <label className="ml-auto flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2.5 text-sm transition-colors hover:border-primary/40">
+            <input type="checkbox" checked={config.embaralhar} onChange={(e) => aplicarConfig({ embaralhar: e.target.checked })} className="h-4 w-4 rounded border" />
+            <Shuffle className="h-4 w-4 text-muted-foreground" /> Embaralhar a ordem das questões
+          </label>
         </div>
-        <label className="flex cursor-pointer items-center gap-2 text-sm">
-          <input type="checkbox" checked={config.embaralhar} onChange={(e) => aplicarConfig({ embaralhar: e.target.checked })} className="h-4 w-4 rounded border" />
-          <Shuffle className="h-4 w-4 text-muted-foreground" /> Embaralhar a ordem das questões
-        </label>
       </div>
 
       {/* Tabela de questões — a MESMA do banco (base reutilizável) */}
@@ -104,6 +104,7 @@ export function QuizConteudoAdmin({ documentoId }: { documentoId: string }) {
         titulo="Questões do conteúdo"
         subtitulo="mini-simulado da aula"
         icone={<HelpCircle className="h-5 w-5" />}
+        semCabecalho
         onRemover={onRemover}
         onReordenar={onReordenar}
         acao={

@@ -42,7 +42,7 @@ const statusCfg: Record<string, { label: string; cls: string }> = {
  */
 export function QuestoesTabelaBase({
   questoes, titulo, subtitulo, acao, cor = '#6d28d9', icone, editHrefBase = '/admin/questoes',
-  carregarDetalhe = carregarDetalhePadrao, onRemover, onReordenar,
+  carregarDetalhe = carregarDetalhePadrao, onRemover, onReordenar, semCabecalho = false,
 }: {
   questoes: QuestaoLinha[]
   titulo: string
@@ -54,6 +54,8 @@ export function QuestoesTabelaBase({
   carregarDetalhe?: (id: string) => Promise<{ ok: boolean; detalhe?: DetalheQuestao; error?: string }>
   onRemover?: (ids: string[]) => Promise<{ ok: boolean; error?: string }>
   onReordenar?: (ids: string[]) => Promise<{ ok: boolean; error?: string }>
+  /** Oculta o cabeçalho da seção (título/contagem) — ex.: quando a página já tem o título. */
+  semCabecalho?: boolean
 }) {
   const [busca, setBusca] = useState('')
   const [disc, setDisc] = useState('all')
@@ -144,13 +146,15 @@ export function QuestoesTabelaBase({
 
   return (
     <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
-      <div className="flex items-center gap-3 border-b px-4 py-3.5" style={{ background: `linear-gradient(90deg, ${cor}1f, transparent 55%)` }}>
-        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: cor }}>{icone ?? <ListChecks className="h-5 w-5" />}</span>
-        <div>
-          <h3 className="text-sm font-semibold leading-tight">{titulo}</h3>
-          <p className="text-xs text-muted-foreground">{ordered.length} {ordered.length === 1 ? 'questão' : 'questões'}{subtitulo ? ` · ${subtitulo}` : ''}</p>
+      {!semCabecalho && (
+        <div className="flex items-center gap-3 border-b px-4 py-3.5" style={{ background: `linear-gradient(90deg, ${cor}1f, transparent 55%)` }}>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: cor }}>{icone ?? <ListChecks className="h-5 w-5" />}</span>
+          <div>
+            <h3 className="text-sm font-semibold leading-tight">{titulo}</h3>
+            <p className="text-xs text-muted-foreground">{ordered.length} {ordered.length === 1 ? 'questão' : 'questões'}{subtitulo ? ` · ${subtitulo}` : ''}</p>
+          </div>
         </div>
-      </div>
+      )}
 
       <div className="flex flex-wrap items-center gap-2 px-4 pb-2 pt-3">
         <div className="relative min-w-48 flex-1">
