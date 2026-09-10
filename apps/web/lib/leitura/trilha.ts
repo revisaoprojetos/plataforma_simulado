@@ -55,6 +55,36 @@ async function statusAulas(svc: any, tenantId: string, estId: string, docs: Docu
 }
 
 /**
+ * Acesso a nível de MÓDULO (pasta): SEM atribuição = liberado a todos; COM = união grupos/alunos.
+ * Tolerante: se as tabelas simulado_pasta_grupos/estudantes ainda não migraram, tudo fica acessível.
+ */
+async function modulosAcessiveis(svc: any, tenantId: string, estId: string, pastaIds: string[]): Promise<Set<string>> {
+  const set = new Set<string>()
+  if (!pastaIds.length) return set
+  try {
+    const [dg, de, gm] = await Promise.all([
+      fetchAllByIn<{ pasta_id: string; grupo_id: string }>(pastaIds, (chunk) => svc.from('simulado_pasta_grupos').select('pasta_id, grupo_id').eq('tenant_id', tenantId).in('pasta_id', chunk).order('pasta_id', { ascending: true })),
+      fetchAllByIn<{ pasta_id: string; estudante_id: string }>(pastaIds, (chunk) => svc.from('simulado_pasta_estudantes').select('pasta_id, estudante_id').eq('tenant_id', tenantId).in('pasta_id', chunk).order('pasta_id', { ascending: true })),
+      svc.from('simulado_grupo_membros').select('grupo_id').eq('estudante_id', estId),
+    ])
+    const gruposPorPasta = new Map<string, Set<string>>()
+    for (const r of dg as any[]) (gruposPorPasta.get(r.pasta_id) ?? gruposPorPasta.set(r.pasta_id, new Set()).get(r.pasta_id)!).add(r.grupo_id)
+    const estudPorPasta = new Map<string, Set<string>>()
+    for (const r of de as any[]) (estudPorPasta.get(r.pasta_id) ?? estudPorPasta.set(r.pasta_id, new Set()).get(r.pasta_id)!).add(r.estudante_id)
+    const meusGrupos = new Set(((gm as any)?.data ?? []).map((r: any) => r.grupo_id))
+    for (const id of pastaIds) {
+      const g = gruposPorPasta.get(id), e = estudPorPasta.get(id)
+      if ((!g || g.size === 0) && (!e || e.size === 0)) { set.add(id); continue } // sem regra = todos
+      if (g && [...g].some((x) => meusGrupos.has(x))) { set.add(id); continue }
+      if (e && e.has(estId)) set.add(id)
+    }
+  } catch {
+    for (const id of pastaIds) set.add(id) // tabelas ausentes → tudo liberado
+  }
+  return set
+}
+
+/**
  * Sequência ordenada da trilha: módulos (pastas 'leitura' por ordem) → aulas (por ordem). Aplica o
  * desbloqueio RÍGIDO global: a 1ª aula não-concluída de toda a sequência = 'atual'; antes = 'concluido';
  * depois = 'bloqueado' (exatamente um nó aberto por vez).
@@ -69,7 +99,10 @@ async function sequenciaLeitura(estId: string, tenantId: string) {
   for (const d of docs) { const k = d.pastaId ?? '__geral__'; (byModulo.get(k) ?? byModulo.set(k, []).get(k)!).push(d) }
   for (const arr of byModulo.values()) arr.sort((a, b) => (a.ordem - b.ordem) || a.titulo.localeCompare(b.titulo))
 
-  const modulos = pastas.filter((p) => byModulo.has(p.id)).map((p) => ({ id: p.id as string, nome: p.nome as string, cor: (p.cor ?? null) as string | null, capa: (p.capa_url ?? null) as string | null }))
+  const todosModulos = pastas.filter((p) => byModulo.has(p.id)).map((p) => ({ id: p.id as string, nome: p.nome as string, cor: (p.cor ?? null) as string | null, capa: (p.capa_url ?? null) as string | null }))
+  // Gate de acesso do módulo (pula os que o aluno não pode ver).
+  const acessiveis = await modulosAcessiveis(svc, tenantId, estId, todosModulos.map((m) => m.id))
+  const modulos = todosModulos.filter((m) => acessiveis.has(m.id))
   if (byModulo.has('__geral__')) modulos.push({ id: '__geral__', nome: 'Geral', cor: null, capa: null })
 
   const seqByModulo = new Map<string, AulaSeq[]>()

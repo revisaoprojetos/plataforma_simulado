@@ -35,7 +35,7 @@ async function origParaMeta(o: File | string | null): Promise<string | null> {
  * usada no card pôster = capa_card_url) e a IMAGEM LARGA (banner usado na trilha e no card ticket =
  * capa_url). Cada imagem tem "Ajustar" (arraste + zoom) para posicionar o recorte. A PRÉVIA espelha
  * o estilo de card escolhido no console (pôster ou ticket). */
-export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poster', rotulo, generoM = false, onClose, onSaved }: {
+export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poster', rotulo, generoM = false, inline = false, onClose, onSaved }: {
   pasta?: { id?: string; nome?: string; cor?: string | null; capa?: string | null; capaLarga?: string | null } | null
   /** Presente = modo CRIAR: cria a pasta nesta área e já aplica a personalização. */
   area?: 'banco' | 'simulado' | 'caderno' | 'leitura'
@@ -46,6 +46,8 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
   /** Rótulo do container (default "pasta"; ex.: "módulo" na leitura) + gênero p/ concordância. */
   rotulo?: string
   generoM?: boolean
+  /** inline=true renderiza o form direto (sem modal/overlay) — usado na aba "Configurações" do módulo. */
+  inline?: boolean
   onClose: () => void
   onSaved: (patch?: PastaPatch) => void
 }) {
@@ -145,15 +147,13 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
 
   const btnOverlay = 'inline-flex items-center gap-1 rounded-md bg-black/60 px-2 py-1 text-xs font-medium text-white backdrop-blur hover:bg-black/70'
 
-  return createPortal(
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
-      <div className="animate-page absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onClose} />
-      <div role="dialog" aria-modal="true" className="animate-pop relative grid max-h-[88vh] w-full max-w-2xl grid-cols-1 overflow-hidden rounded-2xl border bg-card shadow-2xl md:grid-cols-[1fr_260px]">
+  const dialogo = (
+      <div role="dialog" aria-modal={!inline} className={cn('relative grid grid-cols-1 overflow-hidden rounded-2xl border bg-card md:grid-cols-[1fr_260px]', inline ? '' : 'animate-pop max-h-[88vh] w-full max-w-2xl shadow-2xl')}>
         {/* Form */}
         <div className="min-w-0 overflow-auto">
           <div className="flex items-center justify-between border-b px-5 py-3">
             <h3 className="flex items-center gap-2 text-sm font-semibold"><Palette className="h-4 w-4" /> {criar ? (paiId ? `${gp('Novo', 'Nova')} sub${rot}` : `${gp('Novo', 'Nova')} ${rot}`) : `Personalizar ${rot}`}</h3>
-            <button type="button" onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground md:hidden"><X className="h-4 w-4" /></button>
+            {!inline && <button type="button" onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground md:hidden"><X className="h-4 w-4" /></button>}
           </div>
           <div className="space-y-5 p-5">
             <div className="space-y-1.5">
@@ -228,7 +228,7 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
             </div>
 
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted">Cancelar</button>
+              {!inline && <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted">Cancelar</button>}
               <button type="button" onClick={salvar} disabled={salvando} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
                 {salvando && <Loader2 className="h-4 w-4 animate-spin" />} {criar ? (paiId ? `Criar sub${rot}` : `Criar ${rot}`) : 'Salvar'}
               </button>
@@ -273,8 +273,17 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
           )}
         </div>
       </div>
+  )
 
-      {cropper && <ImageCropper file={cropper.file} src={cropper.src} aspect={cropper.aspect} titulo={cropper.titulo} initialZoom={cropper.zoom} initialCenter={cropper.center} onCancel={() => setCropper(null)} onConfirm={aplicarCrop} />}
+  const cropperEl = cropper && <ImageCropper file={cropper.file} src={cropper.src} aspect={cropper.aspect} titulo={cropper.titulo} initialZoom={cropper.zoom} initialCenter={cropper.center} onCancel={() => setCropper(null)} onConfirm={aplicarCrop} />
+
+  if (inline) return <>{dialogo}{cropperEl}</>
+
+  return createPortal(
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+      <div className="animate-page absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onClose} />
+      {dialogo}
+      {cropperEl}
     </div>,
     document.body,
   )

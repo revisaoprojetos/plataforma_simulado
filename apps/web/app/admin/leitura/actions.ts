@@ -507,7 +507,7 @@ export async function listarDocumentosAdmin(): Promise<{ ok: boolean; itens?: Do
 
 const AREA_LEITURA = 'leitura'
 export type ModuloLeitura = { id: string; nome: string; pai_id: string | null; cor: string | null; icone: string | null; capa_url: string | null; capa_card_url: string | null; ordem: number; subpastas: number; aulas: number }
-export type BancoAulas = { ok: boolean; error?: string; pastas?: ModuloLeitura[]; aulas?: (Documento & { questoes?: number })[]; breadcrumb?: { id: string; nome: string }[]; modulos?: { id: string; nome: string }[] }
+export type BancoAulas = { ok: boolean; error?: string; pastas?: ModuloLeitura[]; aulas?: (Documento & { questoes?: number })[]; breadcrumb?: { id: string; nome: string }[]; modulos?: { id: string; nome: string }[]; moduloAtual?: ModuloLeitura }
 
 /** `.order('ordem')` tolerante: se a coluna `ordem` ainda não existir, refaz ordenando por nome. */
 async function pastasLeitura(svc: any, tenantId: string): Promise<any[]> {
@@ -558,7 +558,15 @@ export async function listarBancoAulas(pastaId?: string | null): Promise<BancoAu
   let cur = paiAtual
   while (cur && mapa.has(cur)) { const p = mapa.get(cur); breadcrumb.unshift({ id: p.id, nome: p.nome }); cur = p.pai_id ?? null }
 
-  return { ok: true, pastas, aulas, breadcrumb, modulos: todasPastas.map((p) => ({ id: p.id, nome: p.nome })) }
+  // Módulo atual (quando dentro de um) — dados completos p/ a aba Configurações (personalização).
+  const raiz = paiAtual ? todasPastas.find((p) => p.id === paiAtual) : null
+  const moduloAtual: ModuloLeitura | undefined = raiz ? {
+    id: raiz.id, nome: raiz.nome, pai_id: raiz.pai_id ?? null, cor: raiz.cor ?? null, icone: raiz.icone ?? null,
+    capa_url: raiz.capa_url ?? null, capa_card_url: raiz.capa_card_url ?? null,
+    ordem: raiz.ordem ?? 0, subpastas: subPorPasta.get(raiz.id) ?? 0, aulas: docsPorPasta.get(raiz.id) ?? 0,
+  } : undefined
+
+  return { ok: true, pastas, aulas, breadcrumb, modulos: todasPastas.map((p) => ({ id: p.id, nome: p.nome })), moduloAtual }
 }
 
 async function proximaOrdem(svc: any, tenantId: string, where: (q: any) => any): Promise<number> {
@@ -636,5 +644,56 @@ export async function reordenarModulosLeitura(ids: string[]): Promise<{ ok: bool
     const { error } = await svc.from('simulado_pastas').update({ ordem: i }).eq('id', ids[i]).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
     if (error && /ordem|column/i.test(error.message)) return { ok: true } // coluna ainda não migrada — ignora silenciosamente
   }
+  revalidatePath('/admin/leitura'); return { ok: true }
+}
+
+// ── Acesso do MÓDULO (pasta) — grupos + alunos. Vazio = liberado a todos; união dos dois. ──
+// Tolerante: se as tabelas simulado_pasta_grupos/estudantes não migraram, o SELECT retorna vazio.
+const SEM_TABELA = (m?: string) => /relation .* does not exist|simulado_pasta_(grupos|estudantes)|schema cache/i.test(m ?? '')
+
+export async function carregarAtribuicaoPasta(pastaId: string): Promise<{ ok: boolean; grupos?: { id: string; nome: string; cor: string | null; atribuido: boolean }[]; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { data: todos } = await svc.from('simulado_grupos').select('id, nome, cor').eq('tenant_id', g.tenantId).eq('deletado', false).order('nome')
+  const { data: atrib } = await svc.from('simulado_pasta_grupos').select('grupo_id').eq('pasta_id', pastaId)
+  const set = new Set((atrib ?? []).map((r: any) => r.grupo_id))
+  return { ok: true, grupos: (todos ?? []).map((x: any) => ({ id: x.id, nome: x.nome, cor: x.cor ?? null, atribuido: set.has(x.id) })) }
+}
+
+export async function definirGruposPasta(pastaId: string, grupoIds: string[]): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const ids = [...new Set((grupoIds ?? []).filter(Boolean))]
+  const del = await svc.from('simulado_pasta_grupos').delete().eq('pasta_id', pastaId).eq('tenant_id', g.tenantId)
+  if (del.error && SEM_TABELA(del.error.message)) return { ok: false, error: 'Rode a migração de acesso do módulo (20260909000002).' }
+  if (ids.length) {
+    const { error } = await svc.from('simulado_pasta_grupos').insert(ids.map((grupo_id) => ({ tenant_id: g.tenantId, pasta_id: pastaId, grupo_id })))
+    if (error) return { ok: false, error: error.message }
+  }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_pasta_grupos', entidadeId: pastaId, depois: { grupos: ids.length }, atorId: g.atorId, tenantId: g.tenantId })
+  revalidatePath('/admin/leitura'); return { ok: true }
+}
+
+export async function carregarEstudantesPasta(pastaId: string): Promise<{ ok: boolean; itens?: EstudanteRef[]; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { data: at } = await svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', pastaId).eq('tenant_id', g.tenantId)
+  const ids = [...new Set((at ?? []).map((r: any) => r.estudante_id))]
+  if (!ids.length) return { ok: true, itens: [] }
+  const { data: es } = await svc.from('simulado_estudantes').select('id, nome, email').in('id', ids)
+  return { ok: true, itens: (es ?? []).map((e: any) => ({ id: e.id, nome: e.nome ?? 'Aluno', email: e.email ?? null })) }
+}
+
+export async function definirEstudantesPasta(pastaId: string, estudanteIds: string[]): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const ids = [...new Set((estudanteIds ?? []).filter(Boolean))]
+  const del = await svc.from('simulado_pasta_estudantes').delete().eq('pasta_id', pastaId).eq('tenant_id', g.tenantId)
+  if (del.error && SEM_TABELA(del.error.message)) return { ok: false, error: 'Rode a migração de acesso do módulo (20260909000002).' }
+  if (ids.length) {
+    const { error } = await svc.from('simulado_pasta_estudantes').insert(ids.map((estudante_id) => ({ tenant_id: g.tenantId, pasta_id: pastaId, estudante_id })))
+    if (error) return { ok: false, error: error.message }
+  }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_pasta_estudantes', entidadeId: pastaId, depois: { estudantes: ids.length }, atorId: g.atorId, tenantId: g.tenantId })
   revalidatePath('/admin/leitura'); return { ok: true }
 }

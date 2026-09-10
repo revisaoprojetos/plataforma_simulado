@@ -6,10 +6,12 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import { EditarPastaDialog } from '@/components/admin/editar-pasta-dialog'
 import { PersonalizarAulaDialog } from '@/components/admin/personalizar-aula-dialog'
+import { ModuloAcesso } from '@/components/admin/modulo-acesso'
 import {
-  ChevronRight, ChevronUp, ChevronDown, Home, Library, FolderPlus, FilePlus2, Pencil, Trash2, FolderInput, Eye, EyeOff, BookOpenText, MoreVertical, FolderOpen, FileText, HelpCircle,
+  ChevronRight, ChevronUp, ChevronDown, Home, Library, FolderPlus, FilePlus2, Pencil, Trash2, FolderInput, Eye, EyeOff, BookOpenText, MoreVertical, FolderOpen, FileText, HelpCircle, Settings2, Users,
 } from 'lucide-react'
 import { confirmar } from '@/components/ui/confirm-dialog'
+import { cn } from '@/lib/utils'
 import { type CardView } from '@/lib/card-view'
 import {
   type BancoAulas, type ModuloLeitura, criarDocumento, excluirModuloLeitura,
@@ -22,22 +24,28 @@ import {
 
 type AulaItem = NonNullable<BancoAulas['aulas']>[number]
 type PersonalizarAula = { id: string; titulo: string; descricao: string | null; capa_url: string | null; cor: string | null }
+export type ModuloTab = 'aulas' | 'acessos' | 'config'
+const MODULO_TABS: { id: ModuloTab; label: string; Icon: typeof BookOpenText }[] = [
+  { id: 'aulas', label: 'Aulas', Icon: BookOpenText },
+  { id: 'acessos', label: 'Acessos', Icon: Users },
+  { id: 'config', label: 'Configurações', Icon: Settings2 },
+]
 
 /**
  * Banco de aulas do LegProc no modelo "banco → tabela de aulas":
  *  - Raiz: cards dos BANCOS (containers) + "Novo banco".
  *  - Dentro de um banco: TABELA de aulas (documento HTML + questões), reordenáveis; cada aula abre o editor.
  */
-export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster' }: { data: BancoAulas; pastaAtual: string | null; cardView?: CardView }) {
+export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTab = 'aulas' }: { data: BancoAulas; pastaAtual: string | null; cardView?: CardView; moduloTab?: ModuloTab }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [criandoModulo, setCriandoModulo] = useState(false)
-  const [editandoModulo, setEditandoModulo] = useState<ModuloLeitura | null>(null)
   const [personalizandoAula, setPersonalizandoAula] = useState<PersonalizarAula | null>(null)
   const bancos = data.pastas ?? []
   const aulas = data.aulas ?? []
   const modulos = data.modulos ?? []
   const breadcrumb = data.breadcrumb ?? []
+  const moduloAtual = data.moduloAtual ?? null
   const dentroDeBanco = !!pastaAtual
 
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>, okMsg?: string) =>
@@ -82,7 +90,7 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster' }: { data
             </span>
           ))}
         </div>
-        {dentroDeBanco && (
+        {dentroDeBanco && moduloTab === 'aulas' && (
           <button onClick={novaAula} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"><FilePlus2 className="h-4 w-4" /> Adicionar aula</button>
         )}
       </div>
@@ -98,10 +106,7 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster' }: { data
           ) : (
             <div className={cardView === 'ticket' ? 'grid gap-3 md:grid-cols-2 xl:grid-cols-3' : 'grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'}>
               {bancos.map((b) => (
-                <ModuloCard
-                  key={b.id} m={b} variant={cardView}
-                  onPersonalizar={() => setEditandoModulo(b)} onExcluir={() => excluirBanco(b)}
-                />
+                <ModuloCard key={b.id} m={b} variant={cardView} onExcluir={() => excluirBanco(b)} />
               ))}
             </div>
           )}
@@ -114,26 +119,41 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster' }: { data
           )}
         </>
       ) : (
-        // ===================== DENTRO DE UM BANCO: tabela de aulas =====================
+        // ============ DENTRO DE UM MÓDULO: abas Aulas | Acessos | Configurações ============
         <>
-          {aulas.length === 0 ? (
-            <div className="rounded-2xl border border-dashed p-12 text-center text-muted-foreground">Nenhuma aula ainda. Clique em <span className="font-medium text-foreground">"Adicionar aula"</span> para importar o documento e anexar questões.</div>
-          ) : (
-            <TabelaAulas aulas={aulas} modulos={modulos} pending={pending} onOrdem={moverAulaOrdem} onExcluir={excluirAula} onPersonalizar={personalizarAula} run={run} />
+          {/* Abas do módulo (deep-linkáveis por ?tab=) */}
+          <div className="flex border-b text-sm">
+            {MODULO_TABS.map(({ id, label, Icon }) => (
+              <Link key={id} href={`/admin/leitura?pasta=${pastaAtual}&tab=${id}`}
+                className={cn('-mb-px flex items-center gap-1.5 border-b-2 px-4 py-2.5 font-medium transition-colors', moduloTab === id ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>
+                <Icon className="h-4 w-4" /> {label}
+              </Link>
+            ))}
+          </div>
+
+          {moduloTab === 'aulas' && (
+            aulas.length === 0 ? (
+              <div className="rounded-2xl border border-dashed p-12 text-center text-muted-foreground">Nenhuma aula ainda. Clique em <span className="font-medium text-foreground">"Adicionar aula"</span> para importar o documento e anexar questões.</div>
+            ) : (
+              <TabelaAulas aulas={aulas} modulos={modulos} pending={pending} onOrdem={moverAulaOrdem} onExcluir={excluirAula} onPersonalizar={personalizarAula} run={run} />
+            )
+          )}
+
+          {moduloTab === 'acessos' && pastaAtual && <ModuloAcesso pastaId={pastaAtual} />}
+
+          {moduloTab === 'config' && moduloAtual && (
+            <EditarPastaDialog
+              inline rotulo="módulo" generoM cardView={cardView}
+              pasta={{ id: moduloAtual.id, nome: moduloAtual.nome, cor: moduloAtual.cor, capa: moduloAtual.capa_card_url, capaLarga: moduloAtual.capa_url }}
+              onClose={() => {}}
+              onSaved={() => router.refresh()}
+            />
           )}
         </>
       )}
       {/* Criar/personalizar módulo — reusa o editor de pasta do banco (capa do card + banner largo + cor + crop). */}
       {criandoModulo && (
         <EditarPastaDialog area="leitura" paiId={pastaAtual} rotulo="módulo" generoM cardView={cardView} onClose={() => setCriandoModulo(false)} onSaved={() => { setCriandoModulo(false); router.refresh() }} />
-      )}
-      {editandoModulo && (
-        <EditarPastaDialog
-          pasta={{ id: editandoModulo.id, nome: editandoModulo.nome, cor: editandoModulo.cor, capa: editandoModulo.capa_card_url, capaLarga: editandoModulo.capa_url }}
-          rotulo="módulo" generoM cardView={cardView}
-          onClose={() => setEditandoModulo(null)}
-          onSaved={() => { setEditandoModulo(null); router.refresh() }}
-        />
       )}
       {/* Personalizar aula (nome/descrição/capa/cor) — abre ao criar aula e pelo "Personalizar" da tabela. */}
       {personalizandoAula && (
@@ -151,10 +171,9 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster' }: { data
  * Card do módulo — espelha o FolderCard do Banco de Simulado (variantes poster/ticket),
  * mas com semântica de módulo (contagem de aulas, rota da leitura) e reordenar no menu.
  */
-function ModuloCard({ m, variant, onPersonalizar, onExcluir }: {
+function ModuloCard({ m, variant, onExcluir }: {
   m: ModuloLeitura
   variant: CardView
-  onPersonalizar: () => void
   onExcluir: () => void
 }) {
   const c = m.cor ?? '#6d28d9'
@@ -164,7 +183,7 @@ function ModuloCard({ m, variant, onPersonalizar, onExcluir }: {
   const menu = (
     <DropdownMenuContent align="start" className="w-40">
       <DropdownMenuItem render={<Link href={href} />}><FolderOpen className="mr-2 h-4 w-4" /> Abrir</DropdownMenuItem>
-      <DropdownMenuItem onClick={onPersonalizar}><Pencil className="mr-2 h-4 w-4" /> Personalizar</DropdownMenuItem>
+      <DropdownMenuItem render={<Link href={`${href}&tab=config`} />}><Pencil className="mr-2 h-4 w-4" /> Personalizar</DropdownMenuItem>
       <DropdownMenuSeparator />
       <DropdownMenuItem onClick={onExcluir} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir módulo</DropdownMenuItem>
     </DropdownMenuContent>
