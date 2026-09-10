@@ -22,6 +22,12 @@ export interface TrilhaNode {
   capa: string | null
   capaBanner: string | null
   cadernoUrl: string | null
+  // LEITURA (2 passos): quando definidos, o balão mostra 2 botões — Leitura + Questões do conteúdo
+  // (o de questões só libera quando a leitura foi concluída). Simulados não usam (ficam undefined).
+  hrefLeitura?: string | null
+  acaoLeitura?: string
+  hrefQuestoes?: string | null
+  questoesLiberada?: boolean
 }
 export interface Trilha {
   id: string
@@ -218,7 +224,29 @@ function TrilhaCaminho({ t, gamAtivo }: { t: Trilha; gamAtivo: boolean }) {
                 {gamAtivo && open.xp > 0 && open.estado !== 'concluido' && <span className="inline-flex items-center gap-1 font-semibold text-primary"><Zap className="h-3.5 w-3.5" /> +{open.xp} XP</span>}
                 {open.estado === 'atual' && <span className="inline-flex items-center rounded-full border border-primary/50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">Comece aqui</span>}
               </div>
-              {open.href && (
+              {open.hrefLeitura !== undefined ? (
+                // LEITURA (2 passos): Leitura em cima + Questões do conteúdo embaixo (libera após a leitura).
+                <div className="mt-1 space-y-2">
+                  {open.hrefLeitura ? (
+                    <Link href={open.hrefLeitura} style={{ background: BTN }}
+                      className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
+                      <Play className="h-4 w-4" /> {open.acaoLeitura ?? 'Leitura'}
+                    </Link>
+                  ) : (
+                    <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed px-4 py-2 text-sm font-medium text-muted-foreground">🔒 Conclua a aula anterior</span>
+                  )}
+                  {open.hrefLeitura && (
+                    open.questoesLiberada && open.hrefQuestoes ? (
+                      <Link href={open.hrefQuestoes} style={{ ['--btn' as any]: BTN }}
+                        className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border-[1.5px] border-[var(--btn)] px-4 py-2 text-sm font-semibold text-[var(--btn)] transition hover:bg-[color-mix(in_oklab,var(--btn)_12%,transparent)]">
+                        Questões do conteúdo
+                      </Link>
+                    ) : (
+                      <span title="Conclua a leitura para liberar as questões" className="inline-flex w-full cursor-not-allowed items-center justify-center gap-1.5 rounded-xl border border-dashed px-4 py-2 text-sm font-medium text-muted-foreground">🔒 Questões do conteúdo</span>
+                    )
+                  )}
+                </div>
+              ) : open.href ? (
                 <div className="mt-1 flex items-center gap-2">
                   <Link href={open.href} style={{ ['--btn' as any]: BTN }}
                     className="group/btn relative inline-flex flex-1 items-center justify-center gap-1.5 overflow-hidden rounded-xl border-[1.5px] border-[var(--btn)] px-4 py-2 text-sm font-semibold text-[var(--btn)] transition-all duration-300 hover:scale-[1.02] hover:text-white">
@@ -233,7 +261,7 @@ function TrilhaCaminho({ t, gamAtivo }: { t: Trilha; gamAtivo: boolean }) {
                     </a>
                   )}
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
         </div>
@@ -571,7 +599,29 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
                 {gamAtivo && open.xp > 0 && open.estado !== 'concluido' && <span className="inline-flex items-center gap-1 font-semibold text-primary"><Zap className="h-3.5 w-3.5" /> +{open.xp} XP</span>}
                 {open.estado === 'atual' && <span className="inline-flex items-center rounded-full border border-primary/50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">Comece aqui</span>}
               </div>
-              {open.href && (
+              {open.hrefLeitura !== undefined ? (
+                // LEITURA (2 passos): Leitura em cima + Questões do conteúdo embaixo (libera após a leitura).
+                <div className="mt-1 space-y-2">
+                  {open.hrefLeitura ? (
+                    <Link href={open.hrefLeitura} style={{ background: BTN }}
+                      className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90">
+                      <Play className="h-4 w-4" /> {open.acaoLeitura ?? 'Leitura'}
+                    </Link>
+                  ) : (
+                    <span className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-dashed px-4 py-2 text-sm font-medium text-muted-foreground">🔒 Conclua a aula anterior</span>
+                  )}
+                  {open.hrefLeitura && (
+                    open.questoesLiberada && open.hrefQuestoes ? (
+                      <Link href={open.hrefQuestoes} style={{ ['--btn' as any]: BTN }}
+                        className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border-[1.5px] border-[var(--btn)] px-4 py-2 text-sm font-semibold text-[var(--btn)] transition hover:bg-[color-mix(in_oklab,var(--btn)_12%,transparent)]">
+                        Questões do conteúdo
+                      </Link>
+                    ) : (
+                      <span title="Conclua a leitura para liberar as questões" className="inline-flex w-full cursor-not-allowed items-center justify-center gap-1.5 rounded-xl border border-dashed px-4 py-2 text-sm font-medium text-muted-foreground">🔒 Questões do conteúdo</span>
+                    )
+                  )}
+                </div>
+              ) : open.href ? (
                 <div className="mt-1 flex items-center gap-2">
                   <Link href={open.href} style={{ ['--btn' as any]: BTN }}
                     className="group/btn relative inline-flex flex-1 items-center justify-center gap-1.5 overflow-hidden rounded-xl border-[1.5px] border-[var(--btn)] px-4 py-2 text-sm font-semibold text-[var(--btn)] transition-all duration-300 hover:scale-[1.02] hover:text-white">
@@ -586,7 +636,7 @@ export function TrilhaGigante({ trilhas, gamAtivo }: { trilhas: Trilha[]; gamAti
                     </a>
                   )}
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
         </div>

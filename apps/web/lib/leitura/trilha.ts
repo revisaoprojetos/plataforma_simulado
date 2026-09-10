@@ -17,8 +17,8 @@ interface AulaSeq extends AulaStatus { estado: EstadoAula; moduloId: string }
 /** `.order('ordem')` tolerante (coluna pode não existir ainda). */
 async function pastasLeitura(svc: any, tenantId: string): Promise<any[]> {
   const base = (cols: string) => svc.from('simulado_pastas').select(cols).eq('tenant_id', tenantId).eq('is_folder', true).eq('folder_area', 'leitura')
-  let r = await base('id, nome, cor, capa_url, pai_id, ordem, publicacao').order('ordem', { ascending: true }).order('nome', { ascending: true })
-  if (r.error) r = await base('id, nome, cor, capa_url, pai_id, ordem').order('ordem', { ascending: true }).order('nome', { ascending: true })
+  let r = await base('id, nome, cor, capa_url, capa_card_url, pai_id, ordem, publicacao').order('ordem', { ascending: true }).order('nome', { ascending: true })
+  if (r.error) r = await base('id, nome, cor, capa_url, capa_card_url, pai_id, ordem').order('ordem', { ascending: true }).order('nome', { ascending: true })
   if (r.error) r = await base('id, nome, cor, capa_url, pai_id').order('nome', { ascending: true })
   return (r.data as any[]) ?? []
 }
@@ -110,11 +110,11 @@ async function sequenciaLeitura(estId: string, tenantId: string) {
   for (const arr of byModulo.values()) arr.sort((a, b) => (a.ordem - b.ordem) || a.titulo.localeCompare(b.titulo))
 
   // Gate de PUBLICAÇÃO do módulo: rascunho / agendado p/ futuro / encerrado não aparecem (dados ficam salvos).
-  const todosModulos = pastas.filter((p) => byModulo.has(p.id) && moduloPublicadoAgora(p.publicacao)).map((p) => ({ id: p.id as string, nome: p.nome as string, cor: (p.cor ?? null) as string | null, capa: (p.capa_url ?? null) as string | null }))
+  const todosModulos = pastas.filter((p) => byModulo.has(p.id) && moduloPublicadoAgora(p.publicacao)).map((p) => ({ id: p.id as string, nome: p.nome as string, cor: (p.cor ?? null) as string | null, capa: (p.capa_url ?? null) as string | null, capaCard: (p.capa_card_url ?? null) as string | null }))
   // Gate de acesso do módulo (pula os que o aluno não pode ver).
   const acessiveis = await modulosAcessiveis(svc, tenantId, estId, todosModulos.map((m) => m.id))
   const modulos = todosModulos.filter((m) => acessiveis.has(m.id))
-  if (byModulo.has('__geral__')) modulos.push({ id: '__geral__', nome: 'Geral', cor: null, capa: null })
+  if (byModulo.has('__geral__')) modulos.push({ id: '__geral__', nome: 'Geral', cor: null, capa: null, capaCard: null })
 
   const seqByModulo = new Map<string, AulaSeq[]>()
   let jaAbriu = false // já achou o "atual"
@@ -135,21 +135,21 @@ async function sequenciaLeitura(estId: string, tenantId: string) {
 
 function nodeDe(a: AulaSeq): TrilhaNode {
   const id = a.doc.id
-  let href: string | null, acao: string, statusLabel: string
-  if (a.estado === 'bloqueado') { href = null; acao = 'Bloqueado'; statusLabel = 'Bloqueado' }
-  else if (a.aulaConcluida) { href = `/aluno/leitura/${id}`; acao = 'Revisar'; statusLabel = 'Concluída' }
-  else if (a.leituraConcluida) { href = `/aluno/leitura/${id}/questoes`; acao = 'Responder'; statusLabel = 'Questões liberadas' }
-  else if (a.doc.pct > 0) { href = `/aluno/leitura/${id}`; acao = 'Continuar'; statusLabel = 'Lendo' }
-  else { href = `/aluno/leitura/${id}`; acao = 'Começar'; statusLabel = 'Leitura' }
-  // A TrilhaGigante trata 'disponivel' como BLOQUEADO (círculo apagado; sem ação quando href=null).
+  const bloqueado = a.estado === 'bloqueado'
+  // 2 passos: LEITURA (sempre, se desbloqueada) + QUESTÕES DO CONTEÚDO (só após concluir a leitura).
+  const hrefLeitura = bloqueado ? null : `/aluno/leitura/${id}`
+  const hrefQuestoes = bloqueado ? null : `/aluno/leitura/${id}/questoes`
+  const acaoLeitura = a.aulaConcluida || a.leituraConcluida ? 'Reler' : a.doc.pct > 0 ? 'Continuar leitura' : 'Começar leitura'
+  const statusLabel = bloqueado ? 'Bloqueado' : a.aulaConcluida ? 'Concluída' : a.leituraConcluida ? 'Questões liberadas' : a.doc.pct > 0 ? 'Lendo' : 'Leitura'
+  // A TrilhaGigante trata 'disponivel' como BLOQUEADO (círculo apagado).
   const estadoNode: TrilhaNode['estado'] = a.estado === 'bloqueado' ? 'disponivel' : a.estado
-  const quando = a.estado === 'bloqueado' ? '🔒 Conclua a aula anterior'
-    : statusLabel === 'Questões liberadas' ? 'Questões liberadas'
-    : (statusLabel === 'Leitura' || statusLabel === 'Lendo') ? 'Leitura' : null
+  const quando = bloqueado ? '🔒 Conclua a aula anterior'
+    : a.leituraConcluida ? 'Questões liberadas' : 'Leitura'
   return {
     id, titulo: a.doc.titulo, quando,
     estado: estadoNode, acerto: null, nota: null, tentativas: 0, statusLabel, questoes: a.questoesTotal, xp: 0,
-    href, acao, capa: a.doc.capa_url, capaBanner: a.doc.capa_url, cadernoUrl: null,
+    href: hrefLeitura, acao: acaoLeitura, capa: a.doc.capa_url, capaBanner: a.doc.capa_url, cadernoUrl: null,
+    hrefLeitura, acaoLeitura, hrefQuestoes, questoesLiberada: a.leituraConcluida && !bloqueado,
   }
 }
 
@@ -158,7 +158,7 @@ export async function carregarTrilhaLeituraAluno(estId: string, tenantId: string
   const { modulos, seqByModulo } = await sequenciaLeitura(estId, tenantId)
   return modulos.map((m) => {
     const nodes = (seqByModulo.get(m.id) ?? []).map(nodeDe)
-    return { id: m.id, nome: m.nome, cor: m.cor, capa: m.capa, capaCard: null, total: nodes.length, done: nodes.filter((n) => n.estado === 'concluido').length, trilhaXp: 0, nodes }
+    return { id: m.id, nome: m.nome, cor: m.cor, capa: m.capa, capaCard: m.capaCard, total: nodes.length, done: nodes.filter((n) => n.estado === 'concluido').length, trilhaXp: 0, nodes }
   }).filter((t) => t.nodes.length > 0)
 }
 
