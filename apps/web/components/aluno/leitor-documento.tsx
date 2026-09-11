@@ -26,6 +26,7 @@ type AcaoGrifo =
   | { k: 'add'; a: AnotacaoAluno }
   | { k: 'del'; a: AnotacaoAluno }
   | { k: 'upd'; id: string; de: { cor: string; nota: string | null }; para: { cor: string; nota: string | null } }
+  | { k: 'ocultarGrifo'; id: string } // ocultar (visualmente) um grifo do Revisão — só no cliente
 
 // bg = painéis (aside/topo) · desk = "mesa" atrás do papel · sheet = a folha da leitura.
 const TEMAS: Record<Tema, { bg: string; fg: string; muted: string; desk: string; sheet: string }> = {
@@ -149,6 +150,7 @@ export function LeitorDocumento({ doc, trilha }: {
   // Modo caneta: cor armada (hex) ou 'apagar' ou null. Escolhe a ferramenta e DEPOIS seleciona o texto.
   const [ferramenta, setFerramenta] = useState<string | null>(null)
   const [grifosRects, setGrifosRects] = useState<Record<string, { rects: RectRel[]; tipo: string }>>({})
+  const [grifosOcultos, setGrifosOcultos] = useState<Set<string>>(new Set()) // grifos do Revisão ocultados pela borracha (cliente)
 
   // Anotações (grifos/notas)
   const [anotacoes, setAnotacoes] = useState<AnotacaoAluno[]>(doc.anotacoes ?? [])
@@ -582,15 +584,12 @@ export function LeitorDocumento({ doc, trilha }: {
   // ── Primitivas (API + estado). IDs são ESTÁVEIS: exclusão é soft-delete e "voltar" é undelete
   //    do MESMO id (nunca recria) — então os batches do histórico podem ser reusados sem
   //    reescrever ids, e o vínculo base_id/origem é preservado. ──
-  async function inserirServidor(a: AnotacaoAluno): Promise<AnotacaoAluno | null> {
-    // Única fonte de IDs NOVOS: a ação de grifar do usuário.
+  // POST no servidor; devolve só o id novo (SEM tocar no estado — o estado é otimista no grifarAncora).
+  async function postAnotacao(a: AnotacaoAluno): Promise<string | null> {
     try {
       const res = await fetch('/api/leitura/anotacao', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ documento_id: doc.id, versao: doc.versao, inicio_char: a.inicio, fim_char: a.fim, exact: a.exact, prefix: a.prefix, suffix: a.suffix, cor: a.cor, nota: a.nota }) })
       const j = await res.json()
-      if (!j?.ok) return null
-      const novo: AnotacaoAluno = { ...a, id: j.id, origem: 'propria' }
-      setAnotacoes((p) => [...p, novo])
-      return novo
+      return j?.ok ? (j.id as string) : null
     } catch { return null }
   }
   // Retornam ok:boolean e REVERTEM o estado otimista em falha (rede/servidor) — antes engoliam o
@@ -614,14 +613,20 @@ export function LeitorDocumento({ doc, trilha }: {
   const registrar = (b: AcaoGrifo[]) => { if (b.length) { setPassado((p) => [...p, b].slice(-60)); setFuturo([]) } }
 
   // ── Ações do usuário (registram no histórico). opLock evita reentrância (clique/Enter rápido). ──
-  // Grifa uma âncora (trecho) na cor dada — usada tanto pelo modo caneta quanto pelo popover.
+  // Grifa uma âncora na cor dada — OTIMISTA: aparece na hora (id temporário) e só depois troca pelo
+  // id real do servidor. Em falha, remove. Sem esperar o round-trip → sem atraso visual.
   async function grifarAncora(a: { inicio: number; fim: number; exact: string; prefix: string; suffix: string }, cor: string) {
     if (opLock.current) return
+    const tmpId = `tmp-${Date.now()}-${Math.round(Math.random() * 1e6)}`
+    const otim: AnotacaoAluno = { id: tmpId, inicio: a.inicio, fim: a.fim, exact: a.exact, prefix: a.prefix, suffix: a.suffix, cor, nota: null, origem: 'propria' }
+    setAnotacoes((p) => [...p, otim])
     opLock.current = true
-    const novo = await inserirServidor({ id: 'tmp', inicio: a.inicio, fim: a.fim, exact: a.exact, prefix: a.prefix, suffix: a.suffix, cor, nota: null, origem: 'propria' })
+    const id = await postAnotacao(otim)
     opLock.current = false
-    if (!novo) { toast.error('Erro ao grifar.'); return }
-    registrar([{ k: 'add', a: novo }])
+    if (!id) { setAnotacoes((p) => p.filter((x) => x.id !== tmpId)); toast.error('Erro ao grifar.'); return }
+    const real: AnotacaoAluno = { ...otim, id }
+    setAnotacoes((p) => p.map((x) => (x.id === tmpId ? real : x)))
+    registrar([{ k: 'add', a: real }])
   }
   async function criarAnotacao(cor: string) {
     if (!sel) return
@@ -629,17 +634,26 @@ export function LeitorDocumento({ doc, trilha }: {
     setSel(null); window.getSelection()?.removeAllRanges()
     await grifarAncora(a, cor)
   }
-  // Apaga os grifos PRÓPRIOS que tocam um intervalo (borracha do modo caneta).
+  // Borracha: apaga os grifos PRÓPRIOS (servidor) E oculta os grifos do REVISÃO (cliente) que tocam
+  // o intervalo. Tudo num batch → o undo/reset traz ambos de volta.
   async function apagarNoRange(inicio: number, fim: number) {
     if (opLock.current) return
-    const alvos = anotacoes.filter((a) => a.origem === 'propria' && a.inicio < fim && a.fim > inicio)
-    if (!alvos.length) return
-    opLock.current = true
-    const oks = await Promise.all(alvos.map((a) => removerServidor(a)))
-    opLock.current = false
-    const removidos = alvos.filter((_, i) => oks[i])
-    if (removidos.length) registrar(removidos.map((a) => ({ k: 'del' as const, a })))
-    if (oks.some((o) => !o)) avisarFalha()
+    const meus = anotacoes.filter((a) => a.origem === 'propria' && a.inicio < fim && a.fim > inicio)
+    const editoriais = grifos.filter((g) => !grifosOcultos.has(g.id) && g.inicio < fim && g.fim > inicio)
+    if (!meus.length && !editoriais.length) return
+    const batch: AcaoGrifo[] = []
+    if (editoriais.length) {
+      setGrifosOcultos((s) => { const n = new Set(s); editoriais.forEach((g) => n.add(g.id)); return n })
+      editoriais.forEach((g) => batch.push({ k: 'ocultarGrifo', id: g.id }))
+    }
+    if (meus.length) {
+      opLock.current = true
+      const oks = await Promise.all(meus.map((a) => removerServidor(a)))
+      opLock.current = false
+      meus.forEach((a, i) => { if (oks[i]) batch.push({ k: 'del', a }) })
+      if (oks.some((o) => !o)) avisarFalha()
+    }
+    if (batch.length) registrar(batch)
   }
 
   async function atualizarAnotacao(id: string, patch: Partial<Pick<AnotacaoAluno, 'cor' | 'nota'>>) {
@@ -664,11 +678,13 @@ export function LeitorDocumento({ doc, trilha }: {
     registrar([{ k: 'del', a }])
   }
 
-  // Reset "Grifos do Revisão": volta ao padrão (todos visíveis). Confirma se houver alteração (ocultos).
+  // Reset "Grifos do Revisão": volta ao padrão (todos visíveis: mostra os ocultos + liga a exibição).
   async function resetarRevisao() {
-    if (!semGrifos) { toast.message('Os grifos do Revisão já estão no padrão.'); return }
+    const temOcultos = grifosOcultos.size > 0
+    if (!semGrifos && !temOcultos) { toast.message('Os grifos do Revisão já estão no padrão.'); return }
     if (!(await confirmar({ titulo: 'Restaurar os grifos do Revisão?', mensagem: 'Todos os grifos do Revisão voltam a aparecer, como no início.', confirmar: 'Restaurar' }))) return
     setSemGrifos(false)
+    setGrifosOcultos(new Set())
     toast.success('Grifos do Revisão restaurados.')
   }
   // Reset "Meus grifos": apaga TODOS os grifos do aluno (volta em branco). Confirma se houver algum.
@@ -703,6 +719,7 @@ export function LeitorDocumento({ doc, trilha }: {
       let ok = true
       if (ac.k === 'add') ok = await removerServidor(ac.a)
       else if (ac.k === 'del') ok = await restaurarServidor(ac.a)
+      else if (ac.k === 'ocultarGrifo') setGrifosOcultos((s) => { const n = new Set(s); n.delete(ac.id); return n }) // desfazer ocultar = mostrar
       else ok = await atualizarServidor(ac.id, ac.de.cor, ac.de.nota, ac.para)
       if (!ok) falhou = true
     }
@@ -720,6 +737,7 @@ export function LeitorDocumento({ doc, trilha }: {
       let ok = true
       if (ac.k === 'add') ok = await restaurarServidor(ac.a)
       else if (ac.k === 'del') ok = await removerServidor(ac.a)
+      else if (ac.k === 'ocultarGrifo') setGrifosOcultos((s) => { const n = new Set(s); n.add(ac.id); return n }) // refazer ocultar = ocultar de novo
       else ok = await atualizarServidor(ac.id, ac.para.cor, ac.para.nota, ac.de)
       if (!ok) falhou = true
     }
@@ -779,6 +797,7 @@ export function LeitorDocumento({ doc, trilha }: {
   const grifosOverlay = useMemo(() => (
     <div className="pointer-events-none absolute inset-0" aria-hidden>
       {grifos.map((g) => {
+        if (grifosOcultos.has(g.id)) return null // ocultado pela borracha
         if (semGrifos && !ehEstrutural(g.tipo)) return null
         const gr = grifosRects[g.id]; if (!gr) return null
         const info = (GRIFOS as any)[g.tipo]
@@ -792,7 +811,7 @@ export function LeitorDocumento({ doc, trilha }: {
         ))
       })}
     </div>
-  ), [grifos, grifosRects, semGrifos, blendGrifo])
+  ), [grifos, grifosRects, semGrifos, blendGrifo, grifosOcultos])
 
   // Overlay dos grifos PRÓPRIOS do aluno. A div (overlayRef) é a BASE de coordenadas de TODOS os
   // grifos (inclusive os do Revisão) → sempre montada; o toggle "Meus grifos" oculta só os retângulos.
