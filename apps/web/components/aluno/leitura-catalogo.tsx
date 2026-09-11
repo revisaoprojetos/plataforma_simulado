@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { BookOpenText, CheckCircle2, Search, Scale } from 'lucide-react'
 import type { DocumentoAluno } from '@/lib/leitura/acesso'
+import { capaComPos } from '@/lib/leitura/capa-pos'
 
 const SEM_MATERIA = '__sem__'
 
@@ -90,15 +91,16 @@ export function LeituraCatalogo({ docs }: { docs: DocumentoAluno[] }) {
 function CardLei({ d }: { d: DocumentoAluno }) {
   const c = d.cor ?? '#6d28d9'
   const subtitulo = [d.tipoNorma, d.numero && `nº ${d.numero}`, d.ano].filter(Boolean).join(' ')
+  const cap = capaComPos(d.capa_url)
   return (
     <Link href={`/aluno/leitura/${d.id}`} className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
-      {d.capa_url ? (
+      {cap.src ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={d.capa_url} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+        <img src={cap.src} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" style={{ objectPosition: cap.pos }} />
       ) : (
         <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }} />
       )}
-      {!d.capa_url && <Scale className="absolute -right-6 -top-6 h-40 w-40 text-white/10" />}
+      {!cap.src && <Scale className="absolute -right-6 -top-6 h-40 w-40 text-white/10" />}
       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
 
       <div className="absolute right-2 top-2 z-20">

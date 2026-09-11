@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
-import { Loader2, X, ImagePlus, RefreshCw, Trash2, Check } from 'lucide-react'
+import { Loader2, X, ImagePlus, RefreshCw, Trash2, Check, Move } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { atualizarDocumento } from '@/app/admin/leitura/actions'
+import { capaComPos, posNumerica, comPosicao } from '@/lib/leitura/capa-pos'
 
 const CORES = ['#6d28d9', '#2563eb', '#0891b2', '#059669', '#ca8a04', '#dc2626', '#db2777', '#475569']
 
@@ -34,10 +35,13 @@ export function PersonalizarAulaDialog({ aula, onClose, onSaved }: {
   const capaRef = useRef<HTMLInputElement>(null)
   const [titulo, setTitulo] = useState(aula.titulo ?? '')
   const [descricao, setDescricao] = useState(aula.descricao ?? '')
-  const [capa, setCapa] = useState<string | null>(aula.capa_url ?? null)
+  // `capa` guarda só a URL BASE (sem o fragmento de posição); `pos` é o object-position (0–100).
+  const [capa, setCapa] = useState<string | null>(() => capaComPos(aula.capa_url).src)
+  const [pos, setPos] = useState(() => posNumerica(aula.capa_url))
   const [cor, setCor] = useState<string | null>(aula.cor ?? null)
   const [processando, setProcessando] = useState(false)
   const [salvando, setSalvando] = useState(false)
+  const arrasteRef = useRef<{ px: number; py: number; x: number; y: number; w: number; h: number } | null>(null)
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -48,14 +52,30 @@ export function PersonalizarAulaDialog({ aula, onClose, onSaved }: {
   async function enviarCapa(file: File | null) {
     if (!file) return
     setProcessando(true)
-    try { setCapa(await redimensionarImagem(file)) } catch { toast.error('Falha ao processar a imagem.') } finally { setProcessando(false) }
+    try { setCapa(await redimensionarImagem(file)); setPos({ x: 50, y: 50 }) } catch { toast.error('Falha ao processar a imagem.') } finally { setProcessando(false) }
   }
+
+  // Arrastar a imagem dentro do quadro → ajusta object-position (invertido: puxar p/ baixo revela o topo).
+  function onArrastarInicio(e: React.PointerEvent<HTMLDivElement>) {
+    if (!capa) return
+    const r = e.currentTarget.getBoundingClientRect()
+    arrasteRef.current = { px: e.clientX, py: e.clientY, x: pos.x, y: pos.y, w: r.width, h: r.height }
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+  function onArrastarMover(e: React.PointerEvent<HTMLDivElement>) {
+    const a = arrasteRef.current; if (!a) return
+    const nx = a.x - ((e.clientX - a.px) / a.w) * 100
+    const ny = a.y - ((e.clientY - a.py) / a.h) * 100
+    setPos({ x: Math.max(0, Math.min(100, Math.round(nx))), y: Math.max(0, Math.min(100, Math.round(ny))) })
+  }
+  function onArrastarFim() { arrasteRef.current = null }
 
   async function salvar() {
     const t = titulo.trim()
     if (!t) { toast.error('Informe um nome para a aula.'); return }
     setSalvando(true)
-    const r = await atualizarDocumento(aula.id, { titulo: t, descricao: descricao.trim() || null, capa_url: capa, cor })
+    const capaFinal = capa ? comPosicao(capa, pos.x, pos.y) : null
+    const r = await atualizarDocumento(aula.id, { titulo: t, descricao: descricao.trim() || null, capa_url: capaFinal, cor })
     setSalvando(false)
     if (r.ok) { toast.success('Aula personalizada'); onSaved() } else toast.error(r.error ?? 'Erro ao salvar')
   }
@@ -75,10 +95,19 @@ export function PersonalizarAulaDialog({ aula, onClose, onSaved }: {
             <input ref={capaRef} type="file" accept="image/*" className="hidden" onChange={(e) => { enviarCapa(e.target.files?.[0] ?? null); e.target.value = '' }} />
             {capa ? (
               <div className="relative overflow-hidden rounded-xl border">
-                <img src={capa} alt="Capa" className="h-32 w-full object-cover" />
+                <div
+                  className="h-32 w-full cursor-move touch-none select-none"
+                  onPointerDown={onArrastarInicio} onPointerMove={onArrastarMover} onPointerUp={onArrastarFim} onPointerCancel={onArrastarFim}
+                  title="Arraste para ajustar a posição da imagem"
+                >
+                  <img src={capa} alt="Capa" draggable={false} className="pointer-events-none h-full w-full object-cover" style={{ objectPosition: `${pos.x}% ${pos.y}%` }} />
+                </div>
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 bg-gradient-to-t from-black/55 to-transparent px-2 py-1 text-[11px] font-medium text-white">
+                  <Move className="h-3 w-3" /> arraste para posicionar
+                </div>
                 <div className="absolute right-1.5 top-1.5 flex gap-1">
                   <button type="button" onClick={() => capaRef.current?.click()} className="inline-flex items-center gap-1 rounded-md bg-black/60 px-2 py-1 text-xs font-medium text-white backdrop-blur hover:bg-black/70"><RefreshCw className="h-3 w-3" /> Trocar</button>
-                  <button type="button" onClick={() => setCapa(null)} className="inline-flex items-center rounded-md bg-black/60 px-1.5 py-1 text-xs text-white backdrop-blur hover:bg-rose-600" aria-label="Remover capa"><Trash2 className="h-3 w-3" /></button>
+                  <button type="button" onClick={() => { setCapa(null); setPos({ x: 50, y: 50 }) }} className="inline-flex items-center rounded-md bg-black/60 px-1.5 py-1 text-xs text-white backdrop-blur hover:bg-rose-600" aria-label="Remover capa"><Trash2 className="h-3 w-3" /></button>
                 </div>
               </div>
             ) : (

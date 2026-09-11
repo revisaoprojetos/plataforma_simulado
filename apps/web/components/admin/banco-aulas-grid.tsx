@@ -4,6 +4,7 @@ import { useState, useTransition, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
+import { capaComPos } from '@/lib/leitura/capa-pos'
 import { EditarPastaDialog } from '@/components/admin/editar-pasta-dialog'
 import { PersonalizarAulaDialog } from '@/components/admin/personalizar-aula-dialog'
 import { ModuloAcesso } from '@/components/admin/modulo-acesso'
@@ -307,6 +308,7 @@ function AulaLinha({ a, i, total, modulos, pending, onOrdem, onExcluir, onPerson
 }) {
   const [aberto, setAberto] = useState(true)
   const c = a.cor ?? '#6d28d9'
+  const cap = capaComPos(a.capa_url)
   return (
     <div className="border-b last:border-0">
       {/* Cabeçalho da aula */}
@@ -315,8 +317,8 @@ function AulaLinha({ a, i, total, modulos, pending, onOrdem, onExcluir, onPerson
         <button onClick={() => setAberto((v) => !v)} className="shrink-0 rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label={aberto ? 'Recolher' : 'Expandir'}>
           {aberto ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </button>
-        {a.capa_url
-          ? <img src={a.capa_url} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
+        {cap.src
+          ? <img src={cap.src} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" style={{ objectPosition: cap.pos }} />
           : <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white" style={{ background: c }}><BookOpenText className="h-4 w-4" /></span>}
         <button onClick={() => onPersonalizar(a)} className="min-w-0 flex-1 text-left" title="Personalizar aula">
           <p className="truncate text-sm font-semibold text-foreground">{a.titulo}</p>
