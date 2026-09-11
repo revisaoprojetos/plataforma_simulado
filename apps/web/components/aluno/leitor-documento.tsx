@@ -36,6 +36,30 @@ const CORES_GRIFO = ['#fde047', '#86efac', '#93c5fd', '#f9a8d4', '#fca5a5'] // a
 // useLayoutEffect só faz sentido no cliente (evita warning de SSR do leitor).
 const useIsoLayout = typeof window !== 'undefined' ? useLayoutEffect : useEffect
 
+// Barra de LEGENDA dos grifos — FIXA no topo da leitura (sticky). Ao rolar, fica colada no topo;
+// no topo do documento, aparece "separada" (respiro + sombra leve). Substitui a caixa LEGENDA inline.
+function LegendaBar({ cores, escuro, noTopo }: { cores: { fg: string; muted: string; sheet: string }; escuro: boolean; noTopo: boolean }) {
+  const chip = 'rounded px-1.5 py-[3px] text-[11px] font-semibold leading-none'
+  const tag = 'px-0.5 text-[11px] font-bold leading-none'
+  return (
+    <div className={cn('pointer-events-none sticky top-0 z-20 flex justify-center transition-[padding] duration-200', noTopo ? 'pt-3' : 'pt-2')}>
+      <div className={cn('pointer-events-auto flex max-w-full flex-wrap items-center justify-center gap-x-1.5 gap-y-1 rounded-full border px-3 py-1.5 backdrop-blur transition-shadow duration-200', noTopo ? 'shadow-sm' : 'shadow-md')}
+        style={{ background: `${cores.sheet}${escuro ? 'e6' : 'f2'}`, borderColor: escuro ? 'rgba(255,255,255,.10)' : 'rgba(0,0,0,.08)' }}>
+        <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: cores.muted }}>Legenda</span>
+        <span className={chip} style={{ background: '#fff35c', color: '#111' }}>Núcleo</span>
+        <span className={chip} style={{ background: '#a8d08d', color: '#111' }}>Complemento</span>
+        <span className={chip} style={{ background: '#cc99ff', color: '#111' }}>Prazos</span>
+        <span className={tag} style={{ color: cores.fg }}>crucial</span>
+        <span className={tag} style={{ color: escuro ? '#f9a8a8' : '#c00000' }}>exceção</span>
+        <span className="px-0.5 leading-none" style={{ color: cores.muted }}>·</span>
+        <span className={tag} style={{ color: escuro ? '#8fb7f0' : '#2f6fd0' }}>STF</span>
+        <span className={tag} style={{ color: escuro ? '#f0c65a' : '#c98a00' }}>STJ</span>
+        <span className="px-0.5 text-[11px] font-medium leading-none" style={{ color: cores.muted }}>Equipe</span>
+      </div>
+    </div>
+  )
+}
+
 export function LeitorDocumento({ doc, trilha }: {
   doc: DocumentoCarregado
   // Modo trilha (2 etapas): 'leitura' = leitura pura (SEM questões inline; ao concluir → CTA questões);
@@ -76,6 +100,7 @@ export function LeitorDocumento({ doc, trilha }: {
   const [pagina, setPagina] = useState(0)
   const [totalPag, setTotalPag] = useState(1)
   const [colW, setColW] = useState(0)
+  const [noTopo, setNoTopo] = useState(true) // documento no topo → barra de legenda "separada"
 
   // Questões inline (Fase 2)
   // Indexado por docQuestaoId (slot único) — a MESMA questão pode aparecer em 2 pontos da lei;
@@ -306,6 +331,7 @@ export function LeitorDocumento({ doc, trilha }: {
     const artEls = artElsRef.current, dispEls = dispElsRef.current
     let p = 0
     if (modo !== 'flip') {
+      setNoTopo(vp.scrollTop <= 2) // barra de legenda: separada no topo, colada ao rolar
       const max = ct.scrollHeight - vp.clientHeight
       // cabe na viewport → 100% (o aluno vê tudo); mas não conta 100% em conteúdo ainda não medido.
       p = max <= 0 ? (ct.scrollHeight > 4 ? 100 : 0) : Math.round((vp.scrollTop / max) * 100)
@@ -658,31 +684,41 @@ export function LeitorDocumento({ doc, trilha }: {
     // Acessibilidade: o cabeçalho é um botão — abre por Enter/Espaço, não só clique de mouse.
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); (e.currentTarget as HTMLElement).click() } }
     const ligados: HTMLElement[] = []
-    // Pega data-caixa (novo) E as classes legadas box-stj/box-stf (conteúdo antigo).
-    const caixas = Array.from(cont.querySelectorAll<HTMLElement>('[data-caixa="stj"], [data-caixa="stf"], .box-stj, .box-stf'))
-    for (const box of caixas) {
-      if (box.classList.contains('caixa-colapsavel')) continue
-      const filhos = Array.from(box.children)
-      if (filhos.length < 2) continue // sem corpo pra recolher
-      const cab = filhos[0] as HTMLElement
-      cab.classList.add('caixa-cab')
-      cab.setAttribute('role', 'button'); cab.setAttribute('tabindex', '0')
-      const corpo = document.createElement('div'); corpo.className = 'caixa-corpo'
-      const inner = document.createElement('div'); inner.className = 'caixa-corpo-in'
-      for (const f of filhos.slice(1)) inner.appendChild(f)
-      corpo.appendChild(inner); box.appendChild(corpo)
-      // Prévia (começo do corpo) ao lado do título, pra diferenciar as caixas recolhidas.
-      // Vai num data-attr → renderizada via CSS ::before (sem nó de texto → não mexe na espinha das âncoras).
-      const previa = (inner.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 160)
-      if (previa) cab.setAttribute('data-previa', previa)
-      box.classList.add('caixa-colapsavel')
-      // A caixa de LEGENDA dos grifos abre por padrão (o aluno vê as cores de cara); as demais recolhem.
-      if (/^\s*LEGENDA\b/i.test(cab.textContent || '')) box.setAttribute('data-aberto', '1')
-      else box.removeAttribute('data-aberto')
-      cab.setAttribute('aria-expanded', box.hasAttribute('data-aberto') ? 'true' : 'false')
-      cab.addEventListener('click', onCab); cab.addEventListener('keydown', onKey); ligados.push(cab)
+    // `aplicar` idempotente + rAF + MutationObserver (igual ao admin): garante o recolhimento mesmo
+    // se o conteúdo montar/mutar depois (era o motivo de "não recolher igual no admin" no aluno).
+    const aplicar = () => {
+      // Pega data-caixa (novo) E as classes legadas box-stj/box-stf (conteúdo antigo).
+      const caixas = Array.from(cont.querySelectorAll<HTMLElement>('[data-caixa="stj"], [data-caixa="stf"], .box-stj, .box-stf'))
+      for (const box of caixas) {
+        if (box.classList.contains('caixa-colapsavel') || box.hasAttribute('data-legenda-oculta')) continue
+        // A LEGENDA virou a BARRA FIXA do topo → esconde a caixa inline (não duplicar).
+        if (/^\s*LEGENDA\b/i.test((box.textContent || '').slice(0, 40))) { box.setAttribute('data-legenda-oculta', '1'); box.style.display = 'none'; continue }
+        const filhos = Array.from(box.children)
+        if (filhos.length < 2) continue // sem corpo pra recolher
+        const cab = filhos[0] as HTMLElement
+        cab.classList.add('caixa-cab')
+        cab.setAttribute('role', 'button'); cab.setAttribute('tabindex', '0')
+        const corpo = document.createElement('div'); corpo.className = 'caixa-corpo'
+        const inner = document.createElement('div'); inner.className = 'caixa-corpo-in'
+        for (const f of filhos.slice(1)) inner.appendChild(f)
+        corpo.appendChild(inner); box.appendChild(corpo)
+        // Prévia (começo do corpo) ao lado do título, pra diferenciar as caixas recolhidas.
+        // Vai num data-attr → renderizada via CSS ::before (sem nó de texto → não mexe na espinha das âncoras).
+        const previa = (inner.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 160)
+        if (previa) cab.setAttribute('data-previa', previa)
+        box.classList.add('caixa-colapsavel')
+        box.removeAttribute('data-aberto') // recolhida por padrão (igual ao admin)
+        cab.setAttribute('aria-expanded', 'false')
+        cab.addEventListener('click', onCab); cab.addEventListener('keydown', onKey); ligados.push(cab)
+      }
     }
-    return () => { for (const c of ligados) { c.removeEventListener('click', onCab); c.removeEventListener('keydown', onKey) } }
+    aplicar()
+    const raf = requestAnimationFrame(aplicar)
+    // Esconder a LEGENDA + recolher as caixas muda o layout → realinha os grifos uma vez.
+    const raf2 = requestAnimationFrame(() => window.dispatchEvent(new Event('resize')))
+    const mo = new MutationObserver(aplicar)
+    mo.observe(cont, { childList: true, subtree: true })
+    return () => { cancelAnimationFrame(raf); cancelAnimationFrame(raf2); mo.disconnect(); for (const c of ligados) { c.removeEventListener('click', onCab); c.removeEventListener('keydown', onKey) } }
   }, [doc.html])
 
   return (
@@ -872,13 +908,15 @@ export function LeitorDocumento({ doc, trilha }: {
             className={cn('h-full', modo !== 'flip' ? 'overflow-y-auto px-3 md:px-8' : 'overflow-hidden')}
             style={modo !== 'flip' ? { background: cores.desk } : undefined}
           >
+            {/* Barra de LEGENDA fixa (sticky) — some no modo virar (sem rolagem vertical). */}
+            {modo !== 'flip' && <LegendaBar cores={cores} escuro={tema === 'escuro'} noTopo={noTopo} />}
             {/* wrapper posicionado: no modo virar leva o transform; nos demais é a FOLHA (papel) flutuante. */}
             <div
               ref={wrapperRef}
-              className={cn('relative', modo !== 'flip' && 'mx-auto my-5 max-w-3xl rounded-lg md:my-8')}
+              className={cn('relative', modo !== 'flip' && 'mx-auto mb-6 mt-3 max-w-3xl rounded-lg')}
               style={modo === 'flip'
                 ? { height: '100%', transform: `translateX(-${pagina * (colW + GAP)}px)`, transition: 'transform 220ms ease' }
-                : { background: cores.sheet, border: `1px solid ${tema === 'escuro' ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)'}`, boxShadow: tema === 'escuro' ? '0 10px 34px rgba(0,0,0,.5)' : '0 1px 2px rgba(0,0,0,.05), 0 18px 44px rgba(0,0,0,.12)' }}
+                : { background: cores.sheet, border: `1px solid ${tema === 'escuro' ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)'}`, boxShadow: tema === 'escuro' ? '0 6px 20px rgba(0,0,0,.4)' : '0 1px 2px rgba(0,0,0,.04), 0 8px 22px rgba(0,0,0,.08)' }}
             >
               {conteudoEl}
               {/* Overlay de GRIFOS EDITORIAIS (conteúdo). Some no "modo sem grifos" (exceto estruturais). */}
