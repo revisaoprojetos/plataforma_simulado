@@ -394,6 +394,18 @@ export async function buscarQuestoesForaBanco(bancoId: string | null, filtros: F
     banca: r.bancas?.nome ?? null, orgao: r.orgaos?.nome ?? null, ano: r.ano ?? null, etiquetas: [],
   }))
 
+  // Formato (C/E) pelas ALTERNATIVAS quando a coluna `formato` não veio (base sem a migração):
+  // 2 opções "Certo"/"Errado". Só para os itens da página (≤ limite) e só os sem formato definido.
+  try {
+    const semFormato = itens.filter((i) => !i.formato && i.tipo !== 'discursiva').map((i) => i.id)
+    if (semFormato.length) {
+      const { data: alts } = await svc.from('simulado_alternativas').select('questao_id, texto').in('questao_id', semFormato)
+      const textos = new Map<string, string[]>()
+      for (const a of (alts ?? []) as any[]) { const arr = textos.get(a.questao_id) ?? []; arr.push(a.texto ?? ''); textos.set(a.questao_id, arr) }
+      for (const it of itens) if (!it.formato && textos.has(it.id)) it.formato = alternativasSaoCertoErrado(textos.get(it.id)!) ? 'certo_errado' : 'multipla'
+    }
+  } catch { /* tolerante */ }
+
   // Etiquetas por questão (uma consulta a mais, só para os itens da página). Tolerante.
   try {
     const ids = itens.map((i) => i.id)

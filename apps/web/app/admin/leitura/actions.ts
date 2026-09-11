@@ -9,6 +9,7 @@ import { faixaUuidDoCodigo } from '@/lib/codigo-questao'
 import { espinhaDeHtml, reancorar } from '@/lib/leitura/reanchor'
 import { limparCabecalhoHtml } from '@/lib/leitura/limpar-cabecalho'
 import { esquecer } from '@/lib/cache/relatorio-cache'
+import { classificarFormato } from '@/lib/simulado/formato'
 import { confirmarImportQuestoes } from '@/app/admin/banco-questoes/actions'
 import type { QuestaoImport } from '@/app/admin/banco-questoes/import-types'
 
@@ -764,20 +765,28 @@ export type QuizConfig = { modo: 'imediato' | 'simulado'; embaralhar: boolean }
 const QUIZ_PADRAO: QuizConfig = { modo: 'imediato', embaralhar: false }
 const QUIZ_SEM_TABELA = (m?: string) => /relation .* does not exist|simulado_documento_quiz_questoes|quiz_config|schema cache/i.test(m ?? '')
 
-/** Monta as linhas da tabela (na ordem de `ids`) — tolerante a bases sem `formato`/`assunto_detalhe`. */
+/** Monta as linhas da tabela (na ordem de `ids`). Formato (C/E × múltipla) vem das ALTERNATIVAS —
+ *  a coluna `simulado_questoes.formato` não existe em todas as bases. Tolerante a `assunto_detalhe`. */
 async function montarQuizLinhas(svc: ReturnType<typeof createAdminClient>, tenantId: string, ids: string[]): Promise<QuizLinha[]> {
   if (!ids.length) return []
-  const SEL = 'id, enunciado, tipo, formato, nivel_dificuldade, status, ano, assunto_detalhe, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome), bancas:simulado_bancas(nome), orgaos:simulado_orgaos(nome)'
+  const SEL = 'id, enunciado, tipo, nivel_dificuldade, status, ano, assunto_detalhe, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome), bancas:simulado_bancas(nome), orgaos:simulado_orgaos(nome)'
   let qs: any[] | null = null, qerr: any = null
   ;({ data: qs, error: qerr } = await svc.from('simulado_questoes').select(SEL).eq('tenant_id', tenantId).in('id', ids) as any)
-  if (qerr && /(assunto_detalhe|formato)/i.test(qerr.message)) {
-    ;({ data: qs } = await svc.from('simulado_questoes').select(SEL.replace(', formato', '').replace(', assunto_detalhe', '')).eq('tenant_id', tenantId).in('id', ids) as any)
+  if (qerr && /assunto_detalhe/i.test(qerr.message)) {
+    ;({ data: qs } = await svc.from('simulado_questoes').select(SEL.replace(', assunto_detalhe', '')).eq('tenant_id', tenantId).in('id', ids) as any)
   }
+  // Alternativas → detecta Certo/Errado (2 opções "Certo"/"Errado"). Chunk no .in (LANDMINE do proxy).
+  const alts = await fetchAllByIn<{ questao_id: string; texto: string | null }>(ids, (chunk) =>
+    svc.from('simulado_alternativas').select('questao_id, texto').in('questao_id', chunk))
+  const textosPorQ = new Map<string, string[]>()
+  for (const a of alts) { const arr = textosPorQ.get(a.questao_id) ?? []; arr.push(a.texto ?? ''); textosPorQ.set(a.questao_id, arr) }
   const byId = new Map((qs ?? []).map((q: any) => [q.id, q]))
   return ids.map((id) => {
     const q: any = byId.get(id); if (!q) return null
     return {
-      id: q.id, enunciado: q.enunciado ?? '', tipo: q.tipo ?? null, formato: q.formato ?? null, nivel_dificuldade: q.nivel_dificuldade ?? null, status: q.status ?? null,
+      id: q.id, enunciado: q.enunciado ?? '', tipo: q.tipo ?? null,
+      formato: q.tipo === 'discursiva' ? null : classificarFormato(null, textosPorQ.get(id) ?? []),
+      nivel_dificuldade: q.nivel_dificuldade ?? null, status: q.status ?? null,
       disciplina: q.disciplinas?.nome ?? null, assunto: q.assuntos?.nome ?? null, assuntoDetalhe: q.assunto_detalhe ?? null,
       banca: q.bancas?.nome ?? null, orgao: q.orgaos?.nome ?? null, ano: q.ano ?? null,
     } as QuizLinha
