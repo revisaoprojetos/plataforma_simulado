@@ -691,11 +691,12 @@ export function LeitorDocumento({ doc, trilha }: {
       const caixas = Array.from(cont.querySelectorAll<HTMLElement>('[data-caixa="stj"], [data-caixa="stf"], .box-stj, .box-stf'))
       for (const box of caixas) {
         if (box.classList.contains('caixa-colapsavel') || box.hasAttribute('data-legenda-oculta')) continue
-        // A LEGENDA virou a BARRA FIXA do topo → esconde a caixa inline (não duplicar).
-        if (/^\s*LEGENDA\b/i.test((box.textContent || '').slice(0, 40))) { box.setAttribute('data-legenda-oculta', '1'); box.style.display = 'none'; continue }
         const filhos = Array.from(box.children)
-        if (filhos.length < 2) continue // sem corpo pra recolher
-        const cab = filhos[0] as HTMLElement
+        const cab = filhos[0] as HTMLElement | undefined
+        // A LEGENDA virou a BARRA FIXA do topo → esconde a caixa inline (não duplicar). Detecta pelo
+        // TÍTULO (1º filho); usar o texto do box inteiro juntava "LEGENDA"+"AMARELO…" e quebrava o \b.
+        if (cab && /^\s*LEGENDA\b/i.test((cab.textContent || '').replace(/\s+/g, ' ').trim())) { box.setAttribute('data-legenda-oculta', '1'); box.style.display = 'none'; continue }
+        if (!cab || filhos.length < 2) continue // sem corpo pra recolher
         cab.classList.add('caixa-cab')
         cab.setAttribute('role', 'button'); cab.setAttribute('tabindex', '0')
         const corpo = document.createElement('div'); corpo.className = 'caixa-corpo'
