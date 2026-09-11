@@ -345,7 +345,10 @@ export function LeitorDocumento({ doc, trilha }: {
     // A espinha (texto) só muda com o HTML; modo/fonte/colW mudam só o LAYOUT (rects). Reusa a espinha
     // memoizada nesses refluxos — construí-la varre todos os text nodes (caro em leis grandes).
     let esp = espinhaRef.current
-    if (!esp || espinhaHtmlRef.current !== doc.html) { esp = construirEspinha(root); espinhaRef.current = esp; espinhaHtmlRef.current = doc.html }
+    // Reconstrói se: não há espinha, o HTML mudou, OU os nós ficaram "soltos" (DOM re-renderizado) —
+    // com nós soltos, ancoraParaRange falharia e os grifos não apareceriam.
+    const solta = !!esp && esp.nodes.length > 0 && !root.contains(esp.nodes[0].node)
+    if (!esp || solta || espinhaHtmlRef.current !== doc.html) { esp = construirEspinha(root); espinhaRef.current = esp; espinhaHtmlRef.current = doc.html }
     const base = ov.getBoundingClientRect()
     const map: Record<string, RectRel[]> = {}
     for (const a of anotacoes) {
@@ -558,9 +561,14 @@ export function LeitorDocumento({ doc, trilha }: {
     if (!s || s.isCollapsed || s.rangeCount === 0 || !root || !cont) { setSel(null); return }
     const range = s.getRangeAt(0)
     if (!root.contains(range.commonAncestorContainer)) return
-    const esp = espinhaRef.current ?? construirEspinha(root)
+    // Espinha SEMPRE fresca aqui: garante que os text nodes batem com o DOM atual (a cache pode ter
+    // nós "soltos" se o conteúdo foi re-renderizado) → senão rangeParaAncora falharia e nada grifava.
+    const esp = construirEspinha(root)
     const anc = rangeParaAncora(root, esp, range)
-    if (!anc || !anc.exact.trim()) return
+    if (!anc || !anc.exact.trim()) {
+      if (ferramenta && ferramenta !== 'apagar') toast.message('Não consegui marcar esse trecho — selecione o texto de novo.')
+      return
+    }
     // Modo CANETA: a ferramenta (cor ou borracha) já está escolhida → aplica direto na seleção.
     if (ferramenta) {
       s.removeAllRanges(); setSel(null)
