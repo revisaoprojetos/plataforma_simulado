@@ -35,8 +35,8 @@ function moduloPublicadoAgora(pub: any): boolean {
 /**
  * Status de conclusão de cada aula (documento):
  *  - leituraConcluida = progresso.concluido_em (vem de documentosDoAluno.concluido)
- *  - questoesFeitas = todas as OBRIGATÓRIAS respondidas (derivado; sem coluna nova)
- *  - aulaConcluida = leitura + questões
+ *  - questoesFeitas = todas as questões do QUIZ ("Questões do conteúdo") respondidas
+ *  - aulaConcluida = leitura + questões do quiz
  */
 async function statusAulas(svc: any, tenantId: string, estId: string, docs: DocumentoAluno[]): Promise<Map<string, AulaStatus>> {
   const map = new Map<string, AulaStatus>()
@@ -45,11 +45,15 @@ async function statusAulas(svc: any, tenantId: string, estId: string, docs: Docu
   const totalPorDoc = new Map<string, number>()
   const respPorDoc = new Map<string, Set<string>>()
   if (ids.length) {
-    const qs = await fetchAllByIn<{ documento_id: string; questao_id: string; obrigatoria: boolean }>(ids, (chunk) =>
-      svc.from('simulado_documento_questoes').select('documento_id, questao_id, obrigatoria').eq('tenant_id', tenantId).eq('deletado', false).in('documento_id', chunk).order('documento_id', { ascending: true }))
+    // "Questões do conteúdo" = mini-simulado (simulado_documento_quiz_questoes). Tolerante à tabela ausente.
+    let qs: { documento_id: string; questao_id: string }[] = []
+    try {
+      qs = await fetchAllByIn<{ documento_id: string; questao_id: string }>(ids, (chunk) =>
+        svc.from('simulado_documento_quiz_questoes').select('documento_id, questao_id').eq('tenant_id', tenantId).eq('deletado', false).in('documento_id', chunk).order('documento_id', { ascending: true }))
+    } catch { qs = [] }
     for (const q of qs) {
       totalPorDoc.set(q.documento_id, (totalPorDoc.get(q.documento_id) ?? 0) + 1)
-      if (q.obrigatoria) { const s = obrigPorDoc.get(q.documento_id) ?? new Set<string>(); s.add(q.questao_id); obrigPorDoc.set(q.documento_id, s) }
+      const s = obrigPorDoc.get(q.documento_id) ?? new Set<string>(); s.add(q.questao_id); obrigPorDoc.set(q.documento_id, s)
     }
     const rs = await fetchAllByIn<{ documento_id: string; questao_id: string }>(ids, (chunk) =>
       svc.from('simulado_leitura_respostas').select('documento_id, questao_id').eq('tenant_id', tenantId).eq('estudante_id', estId).in('documento_id', chunk).order('documento_id', { ascending: true }))

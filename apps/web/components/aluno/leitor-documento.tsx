@@ -52,14 +52,16 @@ export function LeitorDocumento({ doc, trilha }: {
   const [secoes, setSecoes] = useState<Secao[]>([])
   // Modo capítulo: navega pelos títulos estruturais (nível 0). capAtual = índice do capítulo atual.
   const [capAtual, setCapAtual] = useState(0)
-  const capitulos = useMemo(() => secoes.filter((s) => s.tipo === 'capitulo'), [secoes])
-  // Índice/sumário: SÓ capítulos (expansíveis) + artigos. Ignora livro/§/inciso/… (e "Livros do Tombo",
-  // que são tabelas). Cada artigo guarda o capítulo-pai; capítulos começam recolhidos.
+  // Capítulo = cabeçalho estrutural cujo rótulo começa por "Capítulo" (robusto ao tipo do parser).
+  // Índice/sumário: SÓ capítulos (expansíveis) + artigos. §/inciso e "Livros do Tombo" (tabelas) ficam
+  // de fora. Cada artigo guarda o capítulo-pai; capítulos começam recolhidos.
+  const ehCap = (s: Secao) => s.tipo !== 'artigo' && /^\s*cap[íi]tulo\b/i.test(s.label)
+  const capitulos = useMemo(() => secoes.filter(ehCap), [secoes])
   const tocItens = useMemo(() => {
     const out: { s: Secao; isCap: boolean; parentCap: string | null }[] = []
     let cur: string | null = null
     for (const s of secoes) {
-      if (s.tipo === 'capitulo') { cur = s.id; out.push({ s, isCap: true, parentCap: null }) }
+      if (ehCap(s)) { cur = s.id; out.push({ s, isCap: true, parentCap: null }) }
       else if (s.tipo === 'artigo') out.push({ s, isCap: false, parentCap: cur })
     }
     return out

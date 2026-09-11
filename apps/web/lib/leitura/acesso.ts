@@ -340,6 +340,38 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
   }
 }
 
+/** Questões do MINI-SIMULADO da aula ("Questões do conteúdo" = simulado_documento_quiz_questoes),
+ * no formato que o QuestaoLeitura espera. Separado das questões inline (durante a leitura). */
+export async function carregarQuizAluno(documentoId: string, estudanteId: string, tenantId: string): Promise<QuestaoLeituraDados[]> {
+  const svc = createAdminClient()
+  let dq: any[] | null = null
+  try {
+    const r = await svc.from('simulado_documento_quiz_questoes').select('questao_id, ordem').eq('tenant_id', tenantId).eq('documento_id', documentoId).eq('deletado', false).order('ordem', { ascending: true })
+    dq = r.data as any[]
+  } catch { return [] }
+  if (!dq?.length) return []
+  const qids = [...new Set(dq.map((x) => x.questao_id))]
+  const [{ data: qs }, { data: alts }, { data: resp }] = await Promise.all([
+    svc.from('simulado_questoes').select('id, enunciado, comentario_professor').in('id', qids),
+    svc.from('simulado_alternativas').select('id, questao_id, texto, ordem').in('questao_id', qids).order('ordem'),
+    svc.from('simulado_leitura_respostas').select('questao_id, alternativa_id, correta, snapshot_gabarito').eq('estudante_id', estudanteId).eq('documento_id', documentoId).in('questao_id', qids),
+  ])
+  const qMap = new Map((qs ?? []).map((q: any) => [q.id, q]))
+  const altsPorQ = new Map<string, AltLeitura[]>()
+  for (const a of (alts ?? []) as any[]) (altsPorQ.get(a.questao_id) ?? altsPorQ.set(a.questao_id, []).get(a.questao_id)!).push({ id: a.id, texto: a.texto })
+  const respPorQ = new Map((resp ?? []).map((r: any) => [r.questao_id, r]))
+  return dq.map((x) => {
+    const q: any = qMap.get(x.questao_id)
+    const r: any = respPorQ.get(x.questao_id)
+    return {
+      docQuestaoId: x.questao_id, questaoId: x.questao_id, aposArtigo: 0, obrigatoria: true,
+      enunciado: q?.enunciado ?? '', comentario: q?.comentario_professor ?? null,
+      alternativas: altsPorQ.get(x.questao_id) ?? [],
+      resposta: r ? { alternativaId: r.alternativa_id, correta: !!r.correta, corretaId: (r.snapshot_gabarito?.correta_id ?? null) } : undefined,
+    }
+  }).filter((x) => x.alternativas.length > 0)
+}
+
 /**
  * Gate de ESCRITA do aluno: o documento existe, está publicado, não-deletado e visível para ele.
  * Espelha exatamente a checagem do caminho de leitura (`carregarDocumentoAluno`). Retorna o doc

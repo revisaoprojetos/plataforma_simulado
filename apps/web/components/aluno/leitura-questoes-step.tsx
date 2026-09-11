@@ -4,15 +4,14 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, BookOpenText, CheckCircle2 } from 'lucide-react'
 import { QuestaoLeitura } from '@/components/aluno/questao-leitura'
-import type { DocumentoCarregado } from '@/lib/leitura/acesso'
+import type { DocumentoCarregado, QuestaoLeituraDados } from '@/lib/leitura/acesso'
 
 /**
- * Etapa de QUESTÕES da aula (liberada após concluir a leitura). Mostra as questões da aula; para
- * consultar o documento COM os grifos (padrão + pessoal), o botão "Consultar o documento" abre o
- * leitor. Ao responder todas as obrigatórias, a próxima aula é liberada na trilha.
+ * Etapa de QUESTÕES da aula = mini-simulado "Questões do conteúdo" (liberada após concluir a leitura).
+ * O botão "Consultar o documento" abre o leitor com os grifos. Ao responder todas, a próxima aula é
+ * liberada na trilha.
  */
-export function LeituraQuestoesStep({ doc }: { doc: DocumentoCarregado }) {
-  const questoes = doc.questoes ?? []
+export function LeituraQuestoesStep({ doc, questoes }: { doc: DocumentoCarregado; questoes: QuestaoLeituraDados[] }) {
   const [respondidas, setRespondidas] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(questoes.filter((q) => q.resposta).map((q) => [q.docQuestaoId, true])))
   const obrig = questoes.filter((q) => q.obrigatoria)

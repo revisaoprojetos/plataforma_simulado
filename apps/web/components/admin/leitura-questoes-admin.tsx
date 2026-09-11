@@ -44,12 +44,10 @@ export function LeituraQuestoesAdmin({ documentoId, versao, html }: { documentoI
         const tipo = el.getAttribute('data-disp-tipo') || 'artigo'
         const nivel = disp.length ? (NIVEL[tipo] ?? 1) : 1
         const isArtigo = disp.length ? tipo === 'artigo' : true
-        return {
-          key: dispId || artId || String(i),
-          artId, nivel, isArtigo, isCap: disp.length ? tipo === 'capitulo' : false,
-          label: (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 90) || (dispId || artId || `Item ${i + 1}`),
-        }
-        // filtro abaixo mantém só capítulo + artigo
+        const label = (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 90) || (dispId || artId || `Item ${i + 1}`)
+        // Capítulo detectado pelo RÓTULO ("Capítulo…") — robusto ao tipo do parser; "Livros do Tombo" (tabelas) ficam fora.
+        const isCap = disp.length ? (tipo !== 'artigo' && /^\s*cap[íi]tulo\b/i.test(label)) : false
+        return { key: dispId || artId || String(i), artId, nivel, isArtigo, isCap, label }
       }).filter((o) => o.isCap || o.isArtigo)
     } catch { return [] }
   }, [html])

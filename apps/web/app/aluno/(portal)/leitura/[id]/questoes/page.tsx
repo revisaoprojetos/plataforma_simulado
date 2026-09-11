@@ -1,6 +1,6 @@
 import { notFound, redirect } from 'next/navigation'
 import { getSessaoAluno } from '@/lib/aluno-session'
-import { carregarDocumentoAluno } from '@/lib/leitura/acesso'
+import { carregarDocumentoAluno, carregarQuizAluno } from '@/lib/leitura/acesso'
 import { statusAulaAluno } from '@/lib/leitura/trilha'
 import { LEITURA_ATIVA } from '@/lib/flags'
 import { LeituraQuestoesStep } from '@/components/aluno/leitura-questoes-step'
@@ -18,6 +18,8 @@ export default async function QuestoesLeituraPage({ params }: { params: Promise<
   if (!st.leituraConcluida) redirect(`/aluno/leitura/${id}`) // precisa concluir a leitura antes
   const doc = await carregarDocumentoAluno(id, sessao.estudanteId, sessao.tenantId)
   if (!doc) notFound()
+  // "Questões do conteúdo" = mini-simulado (quiz), separado das questões inline da leitura.
+  const questoes = await carregarQuizAluno(id, sessao.estudanteId, sessao.tenantId)
 
-  return <LeituraQuestoesStep doc={doc} />
+  return <LeituraQuestoesStep doc={doc} questoes={questoes} />
 }
