@@ -87,8 +87,10 @@ export function LeitorDocumento({ doc, trilha }: {
   const [matches, setMatches] = useState<{ rects: RectRel[]; el: HTMLElement | null }[]>([])
   const [matchIdx, setMatchIdx] = useState(0)
 
-  // Grifos editoriais (conteúdo compartilhado) + modo sem grifos
-  const grifos = doc.grifos ?? []
+  // Grifos editoriais (conteúdo compartilhado) + modo sem grifos.
+  // Memoizado: `doc.grifos ?? []` gerava um array NOVO a cada render → recomputarGrifos era recriado
+  // e o efeito de layout repintava os grifos em TODO re-render (piscar ao expandir/clicar no sumário).
+  const grifos = useMemo(() => doc.grifos ?? [], [doc.grifos])
   // Grifos "assados" no HTML (importados no padrão MAC → data-grifo/data-caixa;
   // ou o formato cru hl-*/box-* de importações antigas), além do overlay (doc.grifos).
   const temGrifosBaked = /data-grifo=|data-caixa=|\bhl-[ygr]\b|\bbox-(stj|stf|cinza|atencao)/.test(doc.html)
