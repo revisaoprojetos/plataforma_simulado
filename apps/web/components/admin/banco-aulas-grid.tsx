@@ -37,7 +37,7 @@ const MODULO_TABS: { id: ModuloTab; label: string; Icon: typeof BookOpenText }[]
  *  - Raiz: cards dos BANCOS (containers) + "Novo banco".
  *  - Dentro de um banco: TABELA de aulas (documento HTML + questões), reordenáveis; cada aula abre o editor.
  */
-export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTab = 'aulas' }: { data: BancoAulas; pastaAtual: string | null; cardView?: CardView; moduloTab?: ModuloTab }) {
+export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTab = 'aulas', semBreadcrumb = false }: { data: BancoAulas; pastaAtual: string | null; cardView?: CardView; moduloTab?: ModuloTab; semBreadcrumb?: boolean }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [criandoModulo, setCriandoModulo] = useState(false)
@@ -110,18 +110,20 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTa
 
   return (
     <div className="space-y-3">
-      {/* Breadcrumb + (dentro do módulo) botão Adicionar aula na MESMA linha */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
-          <Link href="/admin/leitura" className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 hover:bg-muted hover:text-foreground"><Home className="h-3.5 w-3.5" /> Módulos</Link>
-          {breadcrumb.map((b) => (
-            <span key={b.id} className="inline-flex items-center gap-1">
-              <ChevronRight className="h-3.5 w-3.5" />
-              <Link href={`/admin/leitura?pasta=${b.id}`} className="rounded-md px-1.5 py-0.5 font-medium text-foreground hover:bg-muted">{b.nome}</Link>
-            </span>
-          ))}
+      {/* Breadcrumb — omitido quando a página já o renderiza dentro do banner do topo (semBreadcrumb). */}
+      {!semBreadcrumb && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
+            <Link href="/admin/leitura" className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 hover:bg-muted hover:text-foreground"><Home className="h-3.5 w-3.5" /> Módulos</Link>
+            {breadcrumb.map((b) => (
+              <span key={b.id} className="inline-flex items-center gap-1">
+                <ChevronRight className="h-3.5 w-3.5" />
+                <Link href={`/admin/leitura?pasta=${b.id}`} className="rounded-md px-1.5 py-0.5 font-medium text-foreground hover:bg-muted">{b.nome}</Link>
+              </span>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       {!dentroDeBanco ? (
         // ===================== RAIZ: bancos (containers) =====================

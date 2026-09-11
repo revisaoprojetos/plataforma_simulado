@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Library, ArrowLeft } from 'lucide-react'
+import { Library, ArrowLeft, Home, ChevronRight } from 'lucide-react'
 import { listarBancoAulas } from './actions'
 import { BancoAulasGrid, type ModuloTab } from '@/components/admin/banco-aulas-grid'
 import { PublicarModuloBotao } from '@/components/admin/publicar-modulo-botao'
@@ -16,31 +16,72 @@ export default async function LeituraAdminPage({ searchParams }: { searchParams:
   const temaCards = ((await getCurrentTenant())?.tema as any) ?? {}
   const cardView = resolverCardView(temaCards.card_view_admin ?? temaCards.card_view)
 
+  // Banner do módulo (imagem larga) — usado como FUNDO do topo quando dentro de um módulo que o tenha.
+  const banner = data.ok && pasta && data.moduloAtual?.capa_url ? data.moduloAtual.capa_url : null
+  const breadcrumb = data.ok ? (data.breadcrumb ?? []) : []
+
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex items-start gap-2">
-          {pasta && (
-            <Link href="/admin/leitura" aria-label="Voltar aos módulos" title="Voltar aos módulos" className="mt-1 inline-flex shrink-0 items-center justify-center rounded-lg border bg-card p-2 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-          )}
-          <div>
-            <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><Library className="h-6 w-6 text-primary" /> LegProc Digital</h1>
-            <p className="text-muted-foreground">Módulos ordenáveis → aulas (documento HTML + questões) que formam a trilha do aluno.</p>
+      {banner ? (
+        // ===== TOPO com o BANNER do módulo como imagem de fundo (título/descrição/botões + breadcrumb) =====
+        <div className="relative overflow-hidden rounded-2xl border shadow-sm">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={banner} alt="" className="absolute inset-0 h-full w-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/55 to-black/30" />
+          <div className="relative flex flex-col gap-2.5 p-5 text-white">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex items-start gap-2">
+                <Link href="/admin/leitura" aria-label="Voltar aos módulos" title="Voltar aos módulos" className="mt-1 inline-flex shrink-0 items-center justify-center rounded-lg border border-white/25 bg-white/15 p-2 text-white shadow-sm backdrop-blur transition-colors hover:bg-white/25">
+                  <ArrowLeft className="h-4 w-4" />
+                </Link>
+                <div>
+                  <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight drop-shadow"><Library className="h-6 w-6" /> LegProc Digital</h1>
+                  <p className="text-white/80">Módulos ordenáveis → aulas (documento HTML + questões) que formam a trilha do aluno.</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center justify-end gap-3">
+                {data.ok && pasta && data.moduloAtual && (
+                  <PublicarModuloBotao pastaId={pasta} publicacao={data.moduloAtual.publicacao} />
+                )}
+              </div>
+            </div>
+            {/* Breadcrumb (branco) — a página o renderiza aqui dentro do banner; o grid recebe semBreadcrumb. */}
+            <div className="flex flex-wrap items-center gap-1 text-sm text-white/75">
+              <Link href="/admin/leitura" className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 transition-colors hover:bg-white/15 hover:text-white"><Home className="h-3.5 w-3.5" /> Módulos</Link>
+              {breadcrumb.map((b) => (
+                <span key={b.id} className="inline-flex items-center gap-1">
+                  <ChevronRight className="h-3.5 w-3.5" />
+                  <Link href={`/admin/leitura?pasta=${b.id}`} className="rounded-md px-1.5 py-0.5 font-medium text-white transition-colors hover:bg-white/15">{b.nome}</Link>
+                </span>
+              ))}
+            </div>
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-3">
-          {data.ok && pasta && data.moduloAtual && (
-            <PublicarModuloBotao pastaId={pasta} publicacao={data.moduloAtual.publicacao} />
-          )}
+      ) : (
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="flex items-start gap-2">
+            {pasta && (
+              <Link href="/admin/leitura" aria-label="Voltar aos módulos" title="Voltar aos módulos" className="mt-1 inline-flex shrink-0 items-center justify-center rounded-lg border bg-card p-2 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground">
+                <ArrowLeft className="h-4 w-4" />
+              </Link>
+            )}
+            <div>
+              <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><Library className="h-6 w-6 text-primary" /> LegProc Digital</h1>
+              <p className="text-muted-foreground">Módulos ordenáveis → aulas (documento HTML + questões) que formam a trilha do aluno.</p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            {data.ok && pasta && data.moduloAtual && (
+              <PublicarModuloBotao pastaId={pasta} publicacao={data.moduloAtual.publicacao} />
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {!data.ok ? (
         <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{data.error}</p>
       ) : (
-        <BancoAulasGrid data={data} pastaAtual={pasta ?? null} cardView={cardView} moduloTab={moduloTab} />
+        <BancoAulasGrid data={data} pastaAtual={pasta ?? null} cardView={cardView} moduloTab={moduloTab} semBreadcrumb={!!banner} />
       )}
     </div>
   )
