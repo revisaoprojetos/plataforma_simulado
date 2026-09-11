@@ -30,7 +30,7 @@ export function MiniPrevia({ modalidade, modeloId, larg = 240, alt = 316 }: { mo
   )
 }
 
-export function ModeloPicker({ open, onClose, atual, onSelecionar, onEmBranco, onSelecionarBiblioteca, travarModalidade = false }: {
+export function ModeloPicker({ open, onClose, atual, onSelecionar, onEmBranco, onSelecionarBiblioteca, biblioteca, travarModalidade = false }: {
   open: boolean
   onClose: () => void
   atual: { modalidade: Modalidade; modelo: string }
@@ -39,6 +39,8 @@ export function ModeloPicker({ open, onClose, atual, onSelecionar, onEmBranco, o
   onEmBranco: () => void
   /** Aplica um modelo da BIBLIOTECA (área "Modelos de Caderno") — carrega a config salva. */
   onSelecionarBiblioteca?: (modeloId: string) => void
+  /** Biblioteca PRÉ-CARREGADA (pelo construtor, ao montar) — evita esperar o fetch ao abrir. */
+  biblioteca?: { modelos: ModeloRow[]; pastas: PastaModeloRow[] } | null
   /** Trava na modalidade do caderno (edição): esconde as abas e mostra só os modelos dela. */
   travarModalidade?: boolean
 }) {
@@ -48,8 +50,10 @@ export function ModeloPicker({ open, onClose, atual, onSelecionar, onEmBranco, o
   const [busca, setBusca] = useState('')
   useEffect(() => { if (open) { setTab(atual.modalidade); setVista(MODELOS_CADERNO_ATIVO && onSelecionarBiblioteca ? 'meus' : 'padroes'); setPastaAtual(null); setBusca('') } }, [open, atual.modalidade, onSelecionarBiblioteca])
 
-  // Biblioteca "Modelos de Caderno" (tabela própria + pastas) — carregada 1× ao abrir.
-  const [bib, setBib] = useState<{ modelos: ModeloRow[]; pastas: PastaModeloRow[] } | null>(null)
+  // Biblioteca "Modelos de Caderno": usa a versão PRÉ-CARREGADA pelo construtor (instantâneo); só
+  // busca aqui como fallback (se o construtor não passou nada), 1× ao abrir.
+  const [bib, setBib] = useState<{ modelos: ModeloRow[]; pastas: PastaModeloRow[] } | null>(biblioteca ?? null)
+  useEffect(() => { if (biblioteca) setBib(biblioteca) }, [biblioteca])
   useEffect(() => {
     if (!open || !MODELOS_CADERNO_ATIVO || !onSelecionarBiblioteca || bib) return
     carregarModelosArea().then((r) => { if (r.ok) setBib({ modelos: r.modelos, pastas: r.pastas }) }).catch(() => {})
@@ -87,7 +91,7 @@ export function ModeloPicker({ open, onClose, atual, onSelecionar, onEmBranco, o
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
-      <div className="flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="flex h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border bg-background shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between gap-3 border-b px-5 py-3.5">
           <div className="min-w-0">
             <h2 className="text-lg font-bold">Escolher modelo</h2>

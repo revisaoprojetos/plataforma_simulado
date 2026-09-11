@@ -12,7 +12,8 @@ import { HexColorField } from '@/components/admin/hex-color-field'
 import { Previa, outlineDoItem, type DiagEntrada, type TipoBloco } from '@/lib/caderno-teste/previa'
 import { PreviaBlocos, capaPadraoDoPreset, docDoPreset, idsDeterministicos } from '@/lib/caderno-teste/previa-blocos'
 import { ModeloPicker } from '@/components/admin/caderno-teste/modelo-picker'
-import { abrirModelo } from '@/app/admin/modelos-caderno/actions'
+import { abrirModelo, carregarModelosArea, type ModeloRow, type PastaModeloRow } from '@/app/admin/modelos-caderno/actions'
+import { MODELOS_CADERNO_ATIVO } from '@/lib/flags'
 import { BancoPicker, type BancoOpcao } from '@/components/admin/caderno-teste/banco-picker'
 import { metaDaModalidade, itemAtivo, novoItem, novoItemVazio, presetDoItem, CAPA_PADRAO, CORES_PILAR_PADRAO, type BuilderV3, type BuilderAjustes, type CapaConfig, type Modalidade, type PreviewQuestao, type ItemCaderno } from '@/lib/caderno-teste/tipos'
 import { camposDoBloco, aplicarCampoBloco, podeRemoverParte, removerParteDiag, type CampoTexto } from '@/lib/caderno-teste/edicao'
@@ -101,6 +102,13 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
   const lastTsRef = useRef(0)
   const [, forceRender] = useState(0)
   const bump = () => forceRender((x) => x + 1)
+  // Pré-carrega a biblioteca de modelos ao MONTAR o construtor (aquece o cache Redis + entrega
+  // pronta ao pop-up "Escolher modelo" — o admin não espera o fetch ao abrir).
+  const [biblioteca, setBiblioteca] = useState<{ modelos: ModeloRow[]; pastas: PastaModeloRow[] } | null>(null)
+  useEffect(() => {
+    if (!MODELOS_CADERNO_ATIVO) return
+    carregarModelosArea().then((r) => { if (r.ok) setBiblioteca({ modelos: r.modelos, pastas: r.pastas }) }).catch(() => {})
+  }, [])
   const builder = histRef.current[idxRef.current]
   const setBuilder = (updater: BuilderV3 | ((b: BuilderV3) => BuilderV3)) => {
     const prev = histRef.current[idxRef.current]
@@ -204,7 +212,7 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
             </div>
           </div>
         </div>
-        <ModeloPicker open={pickerOpen} onClose={() => setPickerOpen(false)} atual={{ modalidade: 'caderno_questoes', modelo: 'classico' }} onSelecionar={onPicker} onEmBranco={criarEmBranco} onSelecionarBiblioteca={onPickerBiblioteca} />
+        <ModeloPicker open={pickerOpen} onClose={() => setPickerOpen(false)} atual={{ modalidade: 'caderno_questoes', modelo: 'classico' }} onSelecionar={onPicker} onEmBranco={criarEmBranco} onSelecionarBiblioteca={onPickerBiblioteca} biblioteca={biblioteca} />
       </div>
     )
   }
@@ -637,7 +645,7 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
         </div>
       </div>
 
-      <ModeloPicker open={pickerOpen} onClose={() => setPickerOpen(false)} atual={{ modalidade: ativo.modalidade, modelo: ativo.modelo }} onSelecionar={onPicker} onEmBranco={criarEmBranco} onSelecionarBiblioteca={onPickerBiblioteca} travarModalidade />
+      <ModeloPicker open={pickerOpen} onClose={() => setPickerOpen(false)} atual={{ modalidade: ativo.modalidade, modelo: ativo.modelo }} onSelecionar={onPicker} onEmBranco={criarEmBranco} onSelecionarBiblioteca={onPickerBiblioteca} biblioteca={biblioteca} travarModalidade />
       <BancoPicker open={bancoPickerOpen} onClose={() => setBancoPickerOpen(false)} bancos={bancos} atual={builder.bancoId} onSelecionar={trocarBanco} />
       {pickerCor && (() => {
         const campos = camposDoBloco(ativo, pickerCor.parte, pickerCor.label)
