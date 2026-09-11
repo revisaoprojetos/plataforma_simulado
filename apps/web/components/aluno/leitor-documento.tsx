@@ -632,7 +632,9 @@ export function LeitorDocumento({ doc, trilha }: {
 
   return (
     <div ref={containerRef} className={cn('relative flex overflow-hidden', trilha
-      ? 'fixed inset-0 z-50 h-[100dvh]' // LegProc: leitura imersiva em tela cheia (sem card/margens)
+      // LegProc: preenche a ÁREA INTERNA (à direita da sidebar) — cancela o padding do <main>
+      // (p-4/md:p-6) com margens negativas e ocupa a altura cheia, sem card. A sidebar continua.
+      ? '-m-4 h-[100dvh] md:-m-6'
       : 'h-[calc(100dvh-7rem)] min-h-[420px] rounded-2xl border shadow-sm')} style={{ background: cores.bg }}>
       {/* Aviso "esta lei foi atualizada" + espelho do que mudou (flutua via portal). */}
       <LeituraAtualizacaoAviso doc={doc} />
