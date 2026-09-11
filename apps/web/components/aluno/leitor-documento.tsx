@@ -428,13 +428,15 @@ export function LeitorDocumento({ doc, trilha }: {
       let i = Sl.indexOf(ql)
       while (i >= 0 && res.length < 500) {
         const range = ancoraParaRange(esp, { inicio: i, fim: i + q.length, exact: S.slice(i, i + q.length), prefix: '', suffix: '' })
-        if (range) { const rs = rectsDoRange(range, base); if (rs.length) res.push({ rects: rs, el: range.startContainer.parentElement }) }
+        // Inclui TODOS os matches (mesmo sem rects — ex.: em capítulo oculto no modo Capítulo) para o
+        // contador ficar completo e a navegação conseguir levar ao capítulo/página certo pelo `el`.
+        if (range) res.push({ rects: rectsDoRange(range, base), el: range.startContainer.parentElement })
         i = Sl.indexOf(ql, i + Math.max(1, q.length))
       }
       setMatches(res); setMatchIdx((idx) => Math.min(idx, Math.max(0, res.length - 1)))
     }, 180)
     return () => clearTimeout(t)
-  }, [buscaQ, modo, colW, fonte, doc.html, slots])
+  }, [buscaQ, modo, colW, fonte, doc.html, slots, capAtual])
 
   // ── Cálculo de progresso (%, artigo alcançado) ──
   const atualizarProgresso = useCallback(() => {
@@ -573,14 +575,36 @@ export function LeitorDocumento({ doc, trilha }: {
     flashAlvo(el)
   }
 
+  // Capítulo (índice) que contém um elemento — p/ a busca saltar ao capítulo certo no modo Capítulo.
+  const capituloDoEl = (el: HTMLElement | null): number => {
+    const root = contentRef.current
+    if (!el || !root || capitulos.length === 0) return capAtual
+    const capEls = Array.from(root.querySelectorAll<HTMLElement>('[data-disp]')).filter((e) => {
+      const tipo = e.getAttribute('data-disp-tipo') || 'artigo'
+      return tipo !== 'artigo' && /^\s*cap[íi]tulo\b/i.test((e.textContent || '').replace(/\s+/g, ' ').trim())
+    })
+    let ci = 0
+    for (let k = 0; k < capEls.length; k++) {
+      if (el === capEls[k] || capEls[k].contains(el) || (capEls[k].compareDocumentPosition(el) & Node.DOCUMENT_POSITION_FOLLOWING)) ci = k
+    }
+    return ci
+  }
   function irMatch(delta: number) {
     if (!matches.length) return
     const n = (matchIdx + delta + matches.length) % matches.length
     setMatchIdx(n)
     const el = matches[n]?.el
     if (!el) return
-    if (modo !== 'flip') el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-    else irPara(Math.floor(el.offsetLeft / (colW + GAP)))
+    const levar = () => {
+      if (modo === 'flip') irPara(Math.floor(el.offsetLeft / (colW + GAP)))
+      else el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+    // Modo Capítulo: se o match está em OUTRO capítulo (oculto), troca de capítulo e depois rola.
+    if (modo === 'capitulo') {
+      const ci = capituloDoEl(el)
+      if (ci !== capAtual) { setCapAtual(ci); requestAnimationFrame(() => requestAnimationFrame(levar)); return }
+    }
+    levar()
   }
 
   // ── Anotações: seleção → (modo caneta aplica direto | senão popover), criar/editar/excluir, pular ──
@@ -875,11 +899,13 @@ export function LeitorDocumento({ doc, trilha }: {
     </div>
   ), [anotacoes, rectsPorId, blendGrifo, mostrarMeus])
 
+  // Realce estilo "busca de PDF": todos os matches como uma SELEÇÃO azul; o ATUAL destacado em âmbar.
   const matchesOverlay = useMemo(() => matches.length === 0 ? null : (
     <div className="pointer-events-none absolute inset-0" aria-hidden>
-      {matches.map((m, mi) => m.rects.map((r, i) => (
-        <div key={`m-${mi}-${i}`} className="absolute rounded-[2px]" style={{ left: r.left, top: r.top, width: r.width, height: r.height, background: '#f97316', opacity: mi === matchIdx ? 0.6 : 0.32, mixBlendMode: blendGrifo, outline: mi === matchIdx ? '1px solid #ea580c' : 'none' }} />
-      )))}
+      {matches.map((m, mi) => m.rects.map((r, i) => {
+        const atual = mi === matchIdx
+        return <div key={`m-${mi}-${i}`} className="absolute rounded-[2px]" style={{ left: r.left, top: r.top, width: r.width, height: r.height, background: atual ? '#f59e0b' : '#3b82f6', opacity: atual ? 0.55 : 0.3, mixBlendMode: blendGrifo, outline: atual ? '1.5px solid #d97706' : 'none' }} />
+      }))}
     </div>
   ), [matches, matchIdx, blendGrifo])
 
