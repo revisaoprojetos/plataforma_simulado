@@ -741,7 +741,7 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
   transform:translateY(-70%) rotate(45deg); opacity:.55;
 }
 .leitura-prosa .caixa-colapsavel.caixa-tabela[data-aberto] .caixa-cab::after { transform:translateY(-30%) rotate(-135deg); }
-.leitura-prosa .caixa-colapsavel.caixa-tabela:not([data-aberto]) tr:not(:first-of-type) { display:none; }
+.leitura-prosa .caixa-colapsavel.caixa-tabela:not([data-aberto]) .caixa-linha-corpo { display:none; }
 
 /* Scrollbars da área de leitura combinando com o tema (thumb/track vêm de CSS vars no container:
    --leitura-scroll-thumb / --leitura-scroll-track, derivados da cor de texto do tema). */

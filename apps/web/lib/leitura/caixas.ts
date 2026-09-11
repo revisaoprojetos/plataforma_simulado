@@ -26,16 +26,19 @@ export function prepararCaixasTabela(cont: HTMLElement, onToggle?: () => void): 
 
   for (const tab of Array.from(cont.querySelectorAll<HTMLTableElement>('table'))) {
     if (tab.classList.contains('caixa-colapsavel')) continue
-    const rows = Array.from(tab.querySelectorAll<HTMLTableRowElement>(':scope > tbody > tr, :scope > tr'))
+    const rows = Array.from(tab.rows) // nativo (cobre tbody/thead automaticamente) — robusto entre navegadores
     if (rows.length < 2) continue
-    if (rows.some((r) => r.children.length !== 1)) continue // não é 1 coluna → tabela de dados, ignora
-    const head = rows[0].children[0] as HTMLElement
+    // Cabeçalho = 1ª linha com UMA célula (faixa colorida do título). O corpo pode ter várias colunas
+    // (ex.: caixa "DIFERENCIAÇÃO" com tabela comparativa dentro) → não exigimos 1 coluna em todas.
+    if (rows[0].cells.length !== 1) continue
+    const head = rows[0].cells[0] as HTMLElement
     const temFundo = /background/i.test(head.getAttribute('style') || '') || /background/i.test(rows[0].getAttribute('style') || '')
     const txt = (head.textContent || '').replace(/\s+/g, ' ').trim()
     if (!(temFundo && (RE_DESTAQUE.test(txt) || txt.length <= 80))) continue // não parece caixa de destaque
     tab.classList.add('caixa-colapsavel', 'caixa-tabela')
     head.classList.add('caixa-cab')
     head.setAttribute('role', 'button'); head.setAttribute('tabindex', '0'); head.setAttribute('aria-expanded', 'false')
+    for (let i = 1; i < rows.length; i++) rows[i].classList.add('caixa-linha-corpo') // linhas do corpo (escondidas ao recolher)
     tab.removeAttribute('data-aberto') // recolhida por padrão
     const clique = () => alternar(tab, head)
     head.addEventListener('click', clique); head.addEventListener('keydown', onKey)
