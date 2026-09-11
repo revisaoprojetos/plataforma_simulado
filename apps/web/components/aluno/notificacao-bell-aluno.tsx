@@ -148,10 +148,10 @@ export function NotificacaoBellAluno({ diagonal = false }: { diagonal?: boolean 
       {naoLidas > 0 && !montado && balaoPos && typeof document !== 'undefined' && createPortal(
         diagonal ? (
           <div className="pointer-events-none fixed z-[115]" style={{ left: balaoPos.left, bottom: balaoPos.bottom }} aria-hidden>
-            <div className="balao-pill absolute bottom-0 left-1 flex items-center whitespace-nowrap rounded-full rounded-bl-md px-3 py-1.5 text-xs font-bold text-white shadow-lg" style={{ background: 'var(--brand-accent, var(--primary))' }}>
+            <div className="balao-pill absolute bottom-0 left-1 flex items-center whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-bold text-white shadow-lg" style={{ background: 'var(--brand-accent, var(--primary))' }}>
               {naoLidas} {naoLidas === 1 ? 'nova notificação' : 'novas notificações'}
-              {/* ponta DIAGONAL: triângulo (não losango) apontando p/ baixo-esquerda, em direção ao sino */}
-              <span className="absolute bottom-0 left-1.5 h-2.5 w-2.5" aria-hidden style={{ background: 'var(--brand-accent, var(--primary))', clipPath: 'polygon(0 0, 100% 0, 50% 100%)', transform: 'translateY(70%) rotate(45deg)' }} />
+              {/* ponta DIAGONAL única: triângulo encostado no balão apontando p/ baixo-esquerda (o sino) */}
+              <span className="absolute h-2.5 w-2.5" aria-hidden style={{ left: '8px', bottom: '2px', background: 'var(--brand-accent, var(--primary))', clipPath: 'polygon(0 0, 100% 0, 50% 100%)', transform: 'translateY(60%) rotate(45deg)' }} />
             </div>
           </div>
         ) : (
