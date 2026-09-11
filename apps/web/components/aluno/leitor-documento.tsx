@@ -21,13 +21,15 @@ import { confirmar } from '@/components/ui/confirm-dialog'
 type Modo = 'scroll' | 'flip' | 'capitulo'
 type Tema = 'claro' | 'sepia' | 'escuro'
 interface Secao { id: string; art: number; label: string; tipo: string; nivel: number }
+// Grifo do Revisão (assado no HTML) apagado pela borracha — aparece na lista com etiqueta + restaurar.
+interface RevApagado { id: string; el: HTMLElement; texto: string; tipo: string }
 // #3 — histórico de grifos (voltar/avançar). Cada ação é um "batch" (o reset apaga vários de uma vez).
 type AcaoGrifo =
   | { k: 'add'; a: AnotacaoAluno }
   | { k: 'del'; a: AnotacaoAluno }
   | { k: 'upd'; id: string; de: { cor: string; nota: string | null }; para: { cor: string; nota: string | null } }
   | { k: 'ocultarGrifo'; id: string } // ocultar um grifo do Revisão OVERLAY (doc.grifos) — só no cliente
-  | { k: 'ocultarBaked'; els: HTMLElement[] } // ocultar grifos do Revisão ASSADOS no HTML (spans data-grifo)
+  | { k: 'ocultarBaked'; items: RevApagado[] } // ocultar grifos do Revisão ASSADOS no HTML (spans data-grifo)
 
 // bg = painéis (aside/topo) · desk = "mesa" atrás do papel · sheet = a folha da leitura.
 const TEMAS: Record<Tema, { bg: string; fg: string; muted: string; desk: string; sheet: string }> = {
@@ -173,7 +175,9 @@ export function LeitorDocumento({ doc, trilha }: {
   // Modo caneta: cor armada (hex) ou 'apagar' ou null. Escolhe a ferramenta e DEPOIS seleciona o texto.
   const [ferramenta, setFerramenta] = useState<string | null>(null)
   const [grifosRects, setGrifosRects] = useState<Record<string, { rects: RectRel[]; tipo: string }>>({})
-  const [grifosOcultos, setGrifosOcultos] = useState<Set<string>>(new Set()) // grifos do Revisão ocultados pela borracha (cliente)
+  const [grifosOcultos, setGrifosOcultos] = useState<Set<string>>(new Set()) // grifos do Revisão OVERLAY ocultados pela borracha
+  const [revApagados, setRevApagados] = useState<RevApagado[]>([]) // grifos do Revisão ASSADOS apagados (aparecem na lista c/ etiqueta)
+  const revIdRef = useRef(0)
 
   // Anotações (grifos/notas)
   const [anotacoes, setAnotacoes] = useState<AnotacaoAluno[]>(doc.anotacoes ?? [])
@@ -674,7 +678,12 @@ export function LeitorDocumento({ doc, trilha }: {
     }
     if (!meus.length && !editoriais.length && !bakedEls.length) return
     const batch: AcaoGrifo[] = []
-    if (bakedEls.length) { bakedEls.forEach(ocultarGrifoBaked); batch.push({ k: 'ocultarBaked', els: bakedEls }) }
+    if (bakedEls.length) {
+      const items: RevApagado[] = bakedEls.map((el) => ({ id: `rev-${++revIdRef.current}`, el, texto: (el.textContent || '').replace(/\s+/g, ' ').trim(), tipo: el.getAttribute('data-grifo') || 'excecao' }))
+      items.forEach((it) => ocultarGrifoBaked(it.el))
+      setRevApagados((p) => [...p, ...items])
+      batch.push({ k: 'ocultarBaked', items })
+    }
     if (editoriais.length) {
       setGrifosOcultos((s) => { const n = new Set(s); editoriais.forEach((g) => n.add(g.id)); return n })
       editoriais.forEach((g) => batch.push({ k: 'ocultarGrifo', id: g.id }))
@@ -720,7 +729,13 @@ export function LeitorDocumento({ doc, trilha }: {
     setSemGrifos(false)
     setGrifosOcultos(new Set())
     bakedOff.forEach(mostrarGrifoBaked)
+    setRevApagados([])
     toast.success('Grifos do Revisão restaurados.')
+  }
+  // Restaura UM grifo do Revisão apagado (da lista) — volta o span e some da lista.
+  function restaurarRevApagado(item: RevApagado) {
+    mostrarGrifoBaked(item.el)
+    setRevApagados((p) => p.filter((x) => x.id !== item.id))
   }
   // Reset "Meus grifos": apaga TODOS os grifos do aluno (volta em branco). Confirma se houver algum.
   async function resetarMeus() {
@@ -755,7 +770,7 @@ export function LeitorDocumento({ doc, trilha }: {
       if (ac.k === 'add') ok = await removerServidor(ac.a)
       else if (ac.k === 'del') ok = await restaurarServidor(ac.a)
       else if (ac.k === 'ocultarGrifo') setGrifosOcultos((s) => { const n = new Set(s); n.delete(ac.id); return n }) // desfazer ocultar = mostrar
-      else if (ac.k === 'ocultarBaked') ac.els.forEach(mostrarGrifoBaked) // desfazer = volta o grifo assado
+      else if (ac.k === 'ocultarBaked') { ac.items.forEach((it) => mostrarGrifoBaked(it.el)); setRevApagados((p) => p.filter((x) => !ac.items.some((it) => it.el === x.el))) } // desfazer = volta o grifo assado
       else ok = await atualizarServidor(ac.id, ac.de.cor, ac.de.nota, ac.para)
       if (!ok) falhou = true
     }
@@ -774,7 +789,7 @@ export function LeitorDocumento({ doc, trilha }: {
       if (ac.k === 'add') ok = await restaurarServidor(ac.a)
       else if (ac.k === 'del') ok = await removerServidor(ac.a)
       else if (ac.k === 'ocultarGrifo') setGrifosOcultos((s) => { const n = new Set(s); n.add(ac.id); return n }) // refazer ocultar = ocultar de novo
-      else if (ac.k === 'ocultarBaked') ac.els.forEach(ocultarGrifoBaked) // refazer = oculta de novo
+      else if (ac.k === 'ocultarBaked') { ac.items.forEach((it) => ocultarGrifoBaked(it.el)); setRevApagados((p) => [...p, ...ac.items.filter((it) => !p.some((x) => x.el === it.el))]) } // refazer = oculta de novo
       else ok = await atualizarServidor(ac.id, ac.para.cor, ac.para.nota, ac.de)
       if (!ok) falhou = true
     }
@@ -1213,9 +1228,23 @@ export function LeitorDocumento({ doc, trilha }: {
           </div>
 
           <div className="leitura-scroll min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
-            {anotacoes.length === 0 ? (
+            {anotacoes.length === 0 && revApagados.length === 0 ? (
               <p className="px-2 py-6 text-center text-xs" style={{ color: cores.muted }}>Nenhuma anotação ainda. Selecione um trecho e escolha uma cor acima.</p>
-            ) : [...anotacoes].sort((a, b) => a.inicio - b.inicio).map((a) => (
+            ) : (<>
+              {/* Grifos do REVISÃO apagados pela borracha — etiqueta p/ diferenciar + restaurar. */}
+              {revApagados.map((item) => (
+                <div key={item.id} className="rounded-lg border border-dashed p-2" style={{ borderColor: '#0000001a' }}>
+                  <div className="flex items-start gap-2">
+                    <span className="mt-0.5 h-3 w-3 shrink-0 rounded-full opacity-60" style={{ background: corDoGrifo(item.tipo) }} />
+                    <div className="min-w-0 flex-1">
+                      <span className="inline-flex w-fit items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">Grifo do Revisão</span>
+                      <p className="mt-1 line-clamp-3 text-xs leading-snug line-through opacity-70" style={{ color: cores.fg }}>{item.texto}</p>
+                    </div>
+                    <button onClick={() => restaurarRevApagado(item)} title="Restaurar este grifo do Revisão" className="shrink-0 rounded p-1 text-muted-foreground hover:text-foreground"><RotateCcw className="h-3.5 w-3.5" /></button>
+                  </div>
+                </div>
+              ))}
+              {[...anotacoes].sort((a, b) => a.inicio - b.inicio).map((a) => (
               <div key={a.id} className="rounded-lg border p-2" style={{ borderColor: '#0000001a' }}>
                 <div className="flex items-start gap-2">
                   <span className="mt-0.5 h-3 w-3 shrink-0 rounded-full" style={{ background: a.cor }} />
@@ -1244,6 +1273,7 @@ export function LeitorDocumento({ doc, trilha }: {
                 ) : null}
               </div>
             ))}
+            </>)}
           </div>
         </aside>
       )}
