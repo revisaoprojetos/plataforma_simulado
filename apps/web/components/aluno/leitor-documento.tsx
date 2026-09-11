@@ -26,7 +26,8 @@ type AcaoGrifo =
   | { k: 'add'; a: AnotacaoAluno }
   | { k: 'del'; a: AnotacaoAluno }
   | { k: 'upd'; id: string; de: { cor: string; nota: string | null }; para: { cor: string; nota: string | null } }
-  | { k: 'ocultarGrifo'; id: string } // ocultar (visualmente) um grifo do Revisão — só no cliente
+  | { k: 'ocultarGrifo'; id: string } // ocultar um grifo do Revisão OVERLAY (doc.grifos) — só no cliente
+  | { k: 'ocultarBaked'; els: HTMLElement[] } // ocultar grifos do Revisão ASSADOS no HTML (spans data-grifo)
 
 // bg = painéis (aside/topo) · desk = "mesa" atrás do papel · sheet = a folha da leitura.
 const TEMAS: Record<Tema, { bg: string; fg: string; muted: string; desk: string; sheet: string }> = {
@@ -573,8 +574,8 @@ export function LeitorDocumento({ doc, trilha }: {
     }
     // Modo CANETA: a ferramenta (cor ou borracha) já está escolhida → aplica direto na seleção.
     if (ferramenta) {
+      if (ferramenta === 'apagar') apagarNoRange(anc.inicio, anc.fim, range); else grifarAncora(anc, ferramenta)
       s.removeAllRanges(); setSel(null)
-      if (ferramenta === 'apagar') apagarNoRange(anc.inicio, anc.fim); else grifarAncora(anc, ferramenta)
       return
     }
     const rc = range.getBoundingClientRect(), cr = cont.getBoundingClientRect()
@@ -634,14 +635,24 @@ export function LeitorDocumento({ doc, trilha }: {
     setSel(null); window.getSelection()?.removeAllRanges()
     await grifarAncora(a, cor)
   }
-  // Borracha: apaga os grifos PRÓPRIOS (servidor) E oculta os grifos do REVISÃO (cliente) que tocam
-  // o intervalo. Tudo num batch → o undo/reset traz ambos de volta.
-  async function apagarNoRange(inicio: number, fim: number) {
+  // Borracha: apaga os grifos PRÓPRIOS (servidor) E oculta os grifos do REVISÃO — tanto o overlay
+  // (doc.grifos) quanto os ASSADOS no HTML (spans data-grifo, via classe) — que a seleção toca.
+  // Tudo num batch → o undo/reset traz tudo de volta.
+  async function apagarNoRange(inicio: number, fim: number, range?: Range) {
     if (opLock.current) return
     const meus = anotacoes.filter((a) => a.origem === 'propria' && a.inicio < fim && a.fim > inicio)
     const editoriais = grifos.filter((g) => !grifosOcultos.has(g.id) && g.inicio < fim && g.fim > inicio)
-    if (!meus.length && !editoriais.length) return
+    // Grifos assados no HTML: acha os spans [data-grifo] que a seleção cruza (interseção de DOM).
+    const bakedEls: HTMLElement[] = []
+    const root = contentRef.current
+    if (range && root) {
+      root.querySelectorAll<HTMLElement>('[data-grifo], .exc').forEach((el) => {
+        if (!el.classList.contains('grifo-off-aluno') && range.intersectsNode(el)) bakedEls.push(el)
+      })
+    }
+    if (!meus.length && !editoriais.length && !bakedEls.length) return
     const batch: AcaoGrifo[] = []
+    if (bakedEls.length) { bakedEls.forEach((el) => el.classList.add('grifo-off-aluno')); batch.push({ k: 'ocultarBaked', els: bakedEls }) }
     if (editoriais.length) {
       setGrifosOcultos((s) => { const n = new Set(s); editoriais.forEach((g) => n.add(g.id)); return n })
       editoriais.forEach((g) => batch.push({ k: 'ocultarGrifo', id: g.id }))
@@ -680,11 +691,13 @@ export function LeitorDocumento({ doc, trilha }: {
 
   // Reset "Grifos do Revisão": volta ao padrão (todos visíveis: mostra os ocultos + liga a exibição).
   async function resetarRevisao() {
-    const temOcultos = grifosOcultos.size > 0
+    const bakedOff = contentRef.current?.querySelectorAll<HTMLElement>('[data-grifo].grifo-off-aluno, .exc.grifo-off-aluno') ?? []
+    const temOcultos = grifosOcultos.size > 0 || bakedOff.length > 0
     if (!semGrifos && !temOcultos) { toast.message('Os grifos do Revisão já estão no padrão.'); return }
     if (!(await confirmar({ titulo: 'Restaurar os grifos do Revisão?', mensagem: 'Todos os grifos do Revisão voltam a aparecer, como no início.', confirmar: 'Restaurar' }))) return
     setSemGrifos(false)
     setGrifosOcultos(new Set())
+    bakedOff.forEach((el) => el.classList.remove('grifo-off-aluno'))
     toast.success('Grifos do Revisão restaurados.')
   }
   // Reset "Meus grifos": apaga TODOS os grifos do aluno (volta em branco). Confirma se houver algum.
@@ -720,6 +733,7 @@ export function LeitorDocumento({ doc, trilha }: {
       if (ac.k === 'add') ok = await removerServidor(ac.a)
       else if (ac.k === 'del') ok = await restaurarServidor(ac.a)
       else if (ac.k === 'ocultarGrifo') setGrifosOcultos((s) => { const n = new Set(s); n.delete(ac.id); return n }) // desfazer ocultar = mostrar
+      else if (ac.k === 'ocultarBaked') ac.els.forEach((el) => el.classList.remove('grifo-off-aluno')) // desfazer = volta o grifo assado
       else ok = await atualizarServidor(ac.id, ac.de.cor, ac.de.nota, ac.para)
       if (!ok) falhou = true
     }
@@ -738,6 +752,7 @@ export function LeitorDocumento({ doc, trilha }: {
       if (ac.k === 'add') ok = await restaurarServidor(ac.a)
       else if (ac.k === 'del') ok = await removerServidor(ac.a)
       else if (ac.k === 'ocultarGrifo') setGrifosOcultos((s) => { const n = new Set(s); n.add(ac.id); return n }) // refazer ocultar = ocultar de novo
+      else if (ac.k === 'ocultarBaked') ac.els.forEach((el) => el.classList.add('grifo-off-aluno')) // refazer = oculta de novo
       else ok = await atualizarServidor(ac.id, ac.para.cor, ac.para.nota, ac.de)
       if (!ok) falhou = true
     }
