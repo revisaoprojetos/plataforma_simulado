@@ -5,6 +5,7 @@ import { QuestaoForm } from '@/components/admin/questao-form'
 import { EtiquetaPicker } from '@/components/admin/etiqueta-picker'
 import { etiquetasDaQuestao } from '@/app/admin/etiquetas/actions'
 import { codigoQuestao } from '@/lib/codigo-questao'
+import { classificarFormato } from '@/lib/simulado/formato'
 import { updateQuestaoAction } from '../../actions'
 import { notFound } from 'next/navigation'
 
@@ -117,7 +118,8 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
 
   const initialData = {
     tipo: questao.tipo as 'objetiva' | 'discursiva',
-    formato: ((questao.formato as string | null) === 'certo_errado' ? 'certo_errado' : 'multipla') as 'multipla' | 'certo_errado',
+    // A coluna `formato` pode não existir na base → deriva das alternativas (2 opções Certo/Errado).
+    formato: classificarFormato((questao.formato as string | null) ?? null, (alternativas ?? []).map((a: any) => a.texto ?? '')),
     enunciado: questao.enunciado,
     banca: (questao.bancas as { nome?: string } | null)?.nome ?? undefined,
     orgao: (questao.orgaos as { nome?: string } | null)?.nome ?? undefined,
