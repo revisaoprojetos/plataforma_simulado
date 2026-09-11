@@ -26,7 +26,7 @@ function tempoRelativoLongo(iso: string): string {
  *  Painel em PORTAL, ancorado ao sino (rodapé da sidebar), abre PARA CIMA com animação.
  *  `diagonal` (sidebar recolhida): o balão de aviso fica na diagonal superior-DIREITA do sino,
  *  com a ponta diagonal apontando pro ícone — sem isso ele buga colado na borda esquerda. */
-export function NotificacaoBellAluno({ diagonal = false }: { diagonal?: boolean }) {
+export function NotificacaoBellAluno({ diagonal = false, colapsada = false }: { diagonal?: boolean; colapsada?: boolean }) {
   const [items, setItems] = useState<NotifItem[]>([])
   const [naoLidas, setNaoLidas] = useState(0)
   const [montado, setMontado] = useState(false) // presente no DOM (durante a animação)
@@ -98,11 +98,15 @@ export function NotificacaoBellAluno({ diagonal = false }: { diagonal?: boolean 
       }
     }
     calc()
+    // Ao recolher/expandir a sidebar o BOTÃO muda de posição (não de tamanho) durante a animação
+    // (~300ms) → o ResizeObserver não pega. Recalcula no meio e no fim p/ o balão acompanhar.
+    const t1 = setTimeout(calc, 200)
+    const t2 = setTimeout(calc, 380)
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(calc) : null
     if (ro && btnRef.current) ro.observe(btnRef.current)
     window.addEventListener('resize', calc)
-    return () => { ro?.disconnect(); window.removeEventListener('resize', calc) }
-  }, [naoLidas, diagonal])
+    return () => { clearTimeout(t1); clearTimeout(t2); ro?.disconnect(); window.removeEventListener('resize', calc) }
+  }, [naoLidas, diagonal, colapsada])
 
   async function marcarTodasLidas() {
     setItems((prev) => prev.map((i) => ({ ...i, lida: true })))
@@ -145,7 +149,7 @@ export function NotificacaoBellAluno({ diagonal = false }: { diagonal?: boolean 
       {/* Balão de aviso — só quando há não-lidas e o painel está fechado. Some ao marcar lidas.
           Normal: acima do sino, cresce p/ a ESQUERDA, ponta pra baixo.
           Diagonal (sidebar recolhida): na diagonal superior-DIREITA do sino, ponta diagonal p/ o ícone. */}
-      {naoLidas > 0 && !montado && balaoPos && typeof document !== 'undefined' && createPortal(
+      {naoLidas > 0 && !montado && balaoPos && (diagonal ? colapsada : !colapsada) && typeof document !== 'undefined' && createPortal(
         diagonal ? (
           <div className="pointer-events-none fixed z-[115]" style={{ left: balaoPos.left, bottom: balaoPos.bottom }} aria-hidden>
             <div className="balao-pill absolute bottom-0 left-1 flex items-center whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-bold text-white shadow-lg" style={{ background: 'var(--brand-accent, var(--primary))' }}>

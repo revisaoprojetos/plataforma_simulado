@@ -259,7 +259,15 @@ export function LeitorDocumento({ doc, trilha }: {
     if (modo !== 'flip') { setTotalPag(1); return }
     const ct = contentRef.current
     if (!ct || !colW) return
-    const total = Math.max(1, Math.round(ct.scrollWidth / (colW + GAP)))
+    const passo = colW + GAP
+    let total = Math.max(1, Math.round(ct.scrollWidth / passo))
+    // Evita a "página vazia" no fim (margem/whitespace no fim do texto empurra p/ uma coluna a mais):
+    // limita o total pela coluna do ÚLTIMO elemento com conteúdo (offsetLeft é imune ao transform).
+    let maxOff = 0
+    for (const el of ct.querySelectorAll<HTMLElement>('p, h1, h2, h3, h4, h5, li, td, th, blockquote, img, table')) {
+      if (el.offsetLeft > maxOff) maxOff = el.offsetLeft
+    }
+    if (maxOff > 0) total = Math.min(total, Math.floor(maxOff / passo) + 1)
     setTotalPag(total)
     setPagina((p) => Math.min(p, total - 1))
   }, [modo, colW, fonte, doc.html, slots])

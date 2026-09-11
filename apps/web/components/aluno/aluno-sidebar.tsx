@@ -83,7 +83,8 @@ export function AlunoSidebar({
 }) {
   const pathname = usePathname()
   const router = useRouter()
-  const { setOpenMobile } = useSidebar()
+  const { setOpenMobile, state: sidebarState } = useSidebar()
+  const sidebarColapsada = sidebarState === 'collapsed'
   const [saindo, setSaindo] = useState(false)
   // Ao navegar (ex.: tocar num item pelo "Mais" no mobile), fecha o menu lateral (Sheet).
   useEffect(() => { setOpenMobile(false) }, [pathname, setOpenMobile])
@@ -227,7 +228,7 @@ export function AlunoSidebar({
           </Link>
           {/* sem overflow-hidden: o badge do sino (-top/-right) precisa aparecer inteiro. Ao recolher,
               some por completo (não só w-0) p/ NÃO desalinhar o avatar — há um sino próprio na versão fechada. */}
-          <div className="shrink-0 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-data-[collapsible=icon]:hidden"><NotificacaoBellAluno /></div>
+          <div className="shrink-0 transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-data-[collapsible=icon]:hidden"><NotificacaoBellAluno colapsada={sidebarColapsada} /></div>
         </div>
 
         <div className="flex w-full items-center gap-2 group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:gap-2">
@@ -243,7 +244,7 @@ export function AlunoSidebar({
             <button type="button" onClick={sair} className={btnFooter}>Sair</button>
           </div>
           {/* colapsada: sino de notificações (abaixo do tema) — balão em diagonal (não há espaço à esquerda) */}
-          <div className="hidden group-data-[collapsible=icon]:block"><NotificacaoBellAluno diagonal /></div>
+          <div className="hidden group-data-[collapsible=icon]:block"><NotificacaoBellAluno diagonal colapsada={sidebarColapsada} /></div>
           {/* colapsada: ícone de sair */}
           <button type="button" onClick={sair} title="Sair" aria-label="Sair" className="hidden h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-[color:var(--sidebar-accent)] group-data-[collapsible=icon]:flex">
             <LogOut className="h-4 w-4" />
