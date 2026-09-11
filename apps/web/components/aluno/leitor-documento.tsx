@@ -235,13 +235,21 @@ export function LeitorDocumento({ doc, trilha }: {
   }, [doc.html, doc.questoes, trilha?.modo])
 
   // ── Medição do modo virar-página ──
-  // 1) Largura da coluna = largura da viewport (muda em resize/modo). Ao mudar colW,
-  //    o React aplica columnWidth no DOM; SÓ ENTÃO (efeito 2) medimos o total de páginas —
-  //    senão o scrollWidth seria lido antes das colunas existirem (total errado = 1).
+  // 1) Largura da coluna = largura REAL da coluna = caixa de conteúdo do texto (clientWidth do
+  //    conteúdo MENOS o padding horizontal). Usar a largura da viewport ignorava o `px-6` (48px):
+  //    a coluna saía com colW-48 mas o translate/totalPag usavam colW → desalinhava e a página
+  //    seguinte "vazava" na borda direita. Medir a caixa de conteúdo casa coluna×paginação.
   useIsoLayout(() => {
-    const medirColW = () => { const vp = viewportRef.current; if (vp) setColW(vp.clientWidth) }
+    const medirColW = () => {
+      const el = contentRef.current
+      if (!el) return
+      const cs = getComputedStyle(el)
+      const padX = (parseFloat(cs.paddingLeft) || 0) + (parseFloat(cs.paddingRight) || 0)
+      setColW(Math.max(0, el.clientWidth - padX))
+    }
     medirColW()
     const ro = new ResizeObserver(medirColW)
+    if (contentRef.current) ro.observe(contentRef.current)
     if (viewportRef.current) ro.observe(viewportRef.current)
     return () => ro.disconnect()
   }, [modo])
