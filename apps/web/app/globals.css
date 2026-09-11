@@ -731,12 +731,14 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 .leitura-prosa .caixa-colapsavel[data-aberto] > .caixa-corpo { grid-template-rows:1fr; }
 .leitura-prosa .caixa-colapsavel > .caixa-corpo > .caixa-corpo-in { overflow:hidden; min-height:0; }
 
-/* Destaque ao navegar pelo índice: o dispositivo alvo pisca na cor da marca. */
+/* Destaque ao navegar pelo índice: o dispositivo alvo sinaliza na cor da marca —
+   pulso do fundo + barra lateral (tipo marcador) + anel, tudo desaparecendo suave. */
 @keyframes leitura-flash {
-  0%   { background-color: color-mix(in oklab, var(--primary) 32%, transparent); box-shadow: 0 0 0 4px color-mix(in oklab, var(--primary) 18%, transparent); }
-  100% { background-color: transparent; box-shadow: 0 0 0 4px transparent; }
+  0%   { background-color: color-mix(in oklab, var(--primary) 38%, transparent); box-shadow: -4px 0 0 0 var(--primary), 0 0 0 6px color-mix(in oklab, var(--primary) 16%, transparent); }
+  22%  { background-color: color-mix(in oklab, var(--primary) 30%, transparent); box-shadow: -4px 0 0 0 var(--primary), 0 0 0 6px color-mix(in oklab, var(--primary) 14%, transparent); }
+  100% { background-color: transparent; box-shadow: -4px 0 0 0 transparent, 0 0 0 6px transparent; }
 }
-.leitura-prosa .leitura-alvo { animation: leitura-flash 1.6s ease-out; border-radius: 4px; }
+.leitura-prosa .leitura-alvo { animation: leitura-flash 1.8s ease-out; border-radius: 4px; }
 /* Ao pular pelo índice, deixa um respiro acima do alvo (não cola no topo do container). */
 .leitura-prosa [data-disp], .leitura-prosa [data-art] { scroll-margin-top: 1.75rem; }
 

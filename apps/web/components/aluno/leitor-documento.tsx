@@ -25,10 +25,11 @@ type AcaoGrifo =
   | { k: 'del'; a: AnotacaoAluno }
   | { k: 'upd'; id: string; de: { cor: string; nota: string | null }; para: { cor: string; nota: string | null } }
 
-const TEMAS: Record<Tema, { bg: string; fg: string; muted: string }> = {
-  claro: { bg: '#ffffff', fg: '#1f2937', muted: '#6b7280' },
-  sepia: { bg: '#f5ecd9', fg: '#4b3f2f', muted: '#8a7a5c' },
-  escuro: { bg: '#1a1a1e', fg: '#d8d8dc', muted: '#8a8a92' },
+// bg = painéis (aside/topo) · desk = "mesa" atrás do papel · sheet = a folha da leitura.
+const TEMAS: Record<Tema, { bg: string; fg: string; muted: string; desk: string; sheet: string }> = {
+  claro: { bg: '#ffffff', fg: '#1f2937', muted: '#6b7280', desk: '#eef0f3', sheet: '#ffffff' },
+  sepia: { bg: '#f5ecd9', fg: '#4b3f2f', muted: '#8a7a5c', desk: '#e6d8ba', sheet: '#fbf6ea' },
+  escuro: { bg: '#1a1a1e', fg: '#d8d8dc', muted: '#8a8a92', desk: '#0f0f12', sheet: '#26262c' },
 }
 const GAP = 48 // entre "páginas" no modo virar
 const CORES_GRIFO = ['#fde047', '#86efac', '#93c5fd', '#f9a8d4', '#fca5a5'] // amarelo/verde/azul/rosa/vermelho
@@ -57,16 +58,17 @@ export function LeitorDocumento({ doc, trilha }: {
   // de fora. Cada artigo guarda o capítulo-pai; capítulos começam recolhidos.
   const ehCap = (s: Secao) => s.tipo !== 'artigo' && /^\s*cap[íi]tulo\b/i.test(s.label)
   const capitulos = useMemo(() => secoes.filter(ehCap), [secoes])
-  const tocItens = useMemo(() => {
-    const out: { s: Secao; isCap: boolean; parentCap: string | null }[] = []
-    let cur: string | null = null
+  // Agrupa o sumário em capítulos → artigos-filhos (artigos antes de qualquer capítulo caem em `cap:null`),
+  // pra renderizar cada grupo num contêiner que anima abrir/fechar (grid-rows) com a linha de hierarquia.
+  const tocGrupos = useMemo(() => {
+    const grupos: { cap: Secao | null; artigos: Secao[] }[] = []
+    let atual: { cap: Secao | null; artigos: Secao[] } | null = null
     for (const s of secoes) {
-      if (ehCap(s)) { cur = s.id; out.push({ s, isCap: true, parentCap: null }) }
-      else if (s.tipo === 'artigo') out.push({ s, isCap: false, parentCap: cur })
+      if (ehCap(s)) { atual = { cap: s, artigos: [] }; grupos.push(atual) }
+      else if (s.tipo === 'artigo') { if (!atual) { atual = { cap: null, artigos: [] }; grupos.push(atual) } atual.artigos.push(s) }
     }
-    return out
+    return grupos
   }, [secoes])
-  const capsComFilhos = useMemo(() => { const set = new Set<string>(); for (const it of tocItens) if (!it.isCap && it.parentCap) set.add(it.parentCap); return set }, [tocItens])
   const [tocAberto, setTocAberto] = useState<Set<string>>(new Set())
   const toggleCap = (id: string) => setTocAberto((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
 
@@ -744,31 +746,51 @@ export function LeitorDocumento({ doc, trilha }: {
             </div>
           </div>
 
-          {/* Sumário */}
+          {/* Sumário — capítulos expansíveis (animado) + artigos ligados por linha de hierarquia. */}
           <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
             <p className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide" style={{ color: cores.muted }}>Sumário</p>
-            {tocItens.length === 0 ? (
+            {tocGrupos.length === 0 ? (
               <p className="px-1 text-xs" style={{ color: cores.muted }}>Sem seções detectadas.</p>
-            ) : tocItens.map((it, i) => {
-              if (it.isCap) {
-                const tem = capsComFilhos.has(it.s.id)
-                const aberto = tocAberto.has(it.s.id)
-                return (
-                  <div key={`${it.s.id}-${i}`} className="flex items-center gap-0.5">
-                    <button onClick={() => pular(it.s)} className="min-w-0 flex-1 truncate rounded py-1 pl-2 pr-1 text-left text-xs font-semibold transition-colors hover:bg-black/5" style={{ color: cores.fg }} title={it.s.label}>{it.s.label}</button>
+            ) : tocGrupos.map((g, gi) => {
+              // Artigos soltos (antes de qualquer capítulo): lista simples, sem cabeçalho.
+              if (!g.cap) return (
+                <div key={`solto-${gi}`}>
+                  {g.artigos.map((s, i) => (
+                    <button key={`${s.id}-${i}`} onClick={() => pular(s)} className="block w-full truncate rounded py-1 pl-2 pr-2 text-left text-xs font-medium transition-colors hover:bg-black/5" style={{ color: cores.fg }} title={s.label}>{s.label}</button>
+                  ))}
+                </div>
+              )
+              const cap = g.cap
+              const tem = g.artigos.length > 0
+              const aberto = tocAberto.has(cap.id)
+              return (
+                <div key={`${cap.id}-${gi}`}>
+                  <div className="flex items-center gap-0.5">
+                    <button onClick={() => pular(cap)} className="min-w-0 flex-1 truncate rounded py-1 pl-2 pr-1 text-left text-xs font-semibold transition-colors hover:bg-black/5" style={{ color: cores.fg }} title={cap.label}>{cap.label}</button>
                     {tem && (
-                      <button onClick={() => toggleCap(it.s.id)} aria-label={aberto ? 'Recolher capítulo' : 'Expandir capítulo'} className="shrink-0 rounded p-1 transition-colors hover:bg-black/5" style={{ color: cores.muted }}>
-                        {aberto ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                      <button onClick={() => toggleCap(cap.id)} aria-label={aberto ? 'Recolher capítulo' : 'Expandir capítulo'} aria-expanded={aberto} className="shrink-0 rounded p-1 transition-colors hover:bg-black/5">
+                        <ChevronDown className="h-3.5 w-3.5 transition-transform duration-300 ease-out" style={{ transform: aberto ? 'rotate(180deg)' : 'none', color: cores.muted }} />
                       </button>
                     )}
                   </div>
-                )
-              }
-              if (it.parentCap && !tocAberto.has(it.parentCap)) return null
-              return (
-                <button key={`${it.s.id}-${i}`} onClick={() => pular(it.s)} className="block w-full truncate rounded py-1 pl-6 pr-2 text-left text-xs font-medium transition-colors hover:bg-black/5" style={{ color: cores.fg }} title={it.s.label}>
-                  {it.s.label}
-                </button>
+                  {/* Contêiner que anima 0fr↔1fr (mesma técnica das caixas STJ) — sem "salto" ao abrir/fechar. */}
+                  {tem && (
+                    <div className="grid transition-[grid-template-rows] duration-300 ease-out" style={{ gridTemplateRows: aberto ? '1fr' : '0fr' }}>
+                      <div className="min-h-0 overflow-hidden">
+                        {/* Linha de hierarquia (vertical) ligando os artigos ao capítulo. */}
+                        <div className="relative ml-3 mb-1 mt-0.5 pl-3" style={{ borderLeft: `1.5px solid ${cores.muted}33` }}>
+                          {g.artigos.map((s, i) => (
+                            <button key={`${s.id}-${i}`} onClick={() => pular(s)} title={s.label}
+                              className="relative block w-full truncate rounded py-1 pl-2 pr-2 text-left text-xs font-medium transition-colors hover:bg-black/5" style={{ color: cores.fg }}>
+                              <span aria-hidden className="absolute -left-3 top-1/2 h-px w-3" style={{ background: `${cores.muted}33` }} />
+                              {s.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               )
             })}
           </div>
@@ -839,13 +861,16 @@ export function LeitorDocumento({ doc, trilha }: {
             onTouchStart={modo === 'flip' ? onTouchStart : undefined}
             onTouchEnd={modo === 'flip' ? onTouchEnd : undefined}
             onMouseUp={aoSelecionar}
-            className={cn('h-full', modo !== 'flip' ? 'overflow-y-auto' : 'overflow-hidden')}
+            className={cn('h-full', modo !== 'flip' ? 'overflow-y-auto px-3 md:px-8' : 'overflow-hidden')}
+            style={modo !== 'flip' ? { background: cores.desk } : undefined}
           >
-            {/* wrapper posicionado: leva o transform (virar) p/ mover conteúdo E overlay juntos */}
+            {/* wrapper posicionado: no modo virar leva o transform; nos demais é a FOLHA (papel) flutuante. */}
             <div
               ref={wrapperRef}
-              className={cn('relative', modo !== 'flip' && 'mx-auto max-w-3xl')}
-              style={modo === 'flip' ? { height: '100%', transform: `translateX(-${pagina * (colW + GAP)}px)`, transition: 'transform 220ms ease' } : undefined}
+              className={cn('relative', modo !== 'flip' && 'mx-auto my-5 max-w-3xl rounded-lg md:my-8')}
+              style={modo === 'flip'
+                ? { height: '100%', transform: `translateX(-${pagina * (colW + GAP)}px)`, transition: 'transform 220ms ease' }
+                : { background: cores.sheet, border: `1px solid ${tema === 'escuro' ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)'}`, boxShadow: tema === 'escuro' ? '0 10px 34px rgba(0,0,0,.5)' : '0 1px 2px rgba(0,0,0,.05), 0 18px 44px rgba(0,0,0,.12)' }}
             >
               {conteudoEl}
               {/* Overlay de GRIFOS EDITORIAIS (conteúdo). Some no "modo sem grifos" (exceto estruturais). */}
