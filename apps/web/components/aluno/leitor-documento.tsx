@@ -144,6 +144,7 @@ export function LeitorDocumento({ doc, trilha }: {
   // ou o formato cru hl-*/box-* de importações antigas), além do overlay (doc.grifos).
   const temGrifosBaked = /data-grifo=|data-caixa=|\bhl-[ygr]\b|\bbox-(stj|stf|cinza|atencao)/.test(doc.html)
   const [semGrifos, setSemGrifos] = useState(!!doc.prefs?.semGrifos)
+  const [mostrarMeus, setMostrarMeus] = useState(true) // "Meus grifos": ligado por padrão; desligar oculta os grifos do aluno
   const [grifosRects, setGrifosRects] = useState<Record<string, { rects: RectRel[]; tipo: string }>>({})
 
   // Anotações (grifos/notas)
@@ -720,6 +721,9 @@ export function LeitorDocumento({ doc, trilha }: {
   }
 
   const proseStyle = useMemo<React.CSSProperties>(() => ({ fontSize: fonte, lineHeight: 1.7, color: cores.fg }), [fonte, cores.fg])
+  // Blend do overlay de grifos: multiply escurece (ok em fundo claro), mas some no tema ESCURO
+  // (cor × preto = preto). No escuro usa 'screen' (clareia) → o grifo aparece sobre o fundo escuro.
+  const blendGrifo = (tema === 'escuro' ? 'screen' : 'multiply') as React.CSSProperties['mixBlendMode']
 
   // ── Conteúdo + overlays MEMOIZADOS (anti-flash). ──
   // Sem isto, QUALQUER re-render (ex.: expandir/recolher um capítulo no sumário → muda `tocAberto`)
@@ -746,7 +750,7 @@ export function LeitorDocumento({ doc, trilha }: {
         const info = (GRIFOS as any)[g.tipo]
         const label = info?.label ?? 'Grifo'
         return gr.rects.map((r, i) => (
-          <div key={`g-${g.id}-${i}`} className="absolute rounded-[2px]" title={label} style={{ left: r.left, top: r.top, width: r.width, height: r.height, background: corDoGrifo(g.tipo), opacity: 0.42, mixBlendMode: 'multiply' }}>
+          <div key={`g-${g.id}-${i}`} className="absolute rounded-[2px]" title={label} style={{ left: r.left, top: r.top, width: r.width, height: r.height, background: corDoGrifo(g.tipo), opacity: 0.42, mixBlendMode: blendGrifo }}>
             {i === 0 && ehEstrutural(g.tipo) && (
               <span className="absolute -top-4 left-0 whitespace-nowrap rounded px-1 text-[9px] font-bold uppercase tracking-wide text-white" style={{ background: corDoGrifo(g.tipo), mixBlendMode: 'normal' }}>{label}</span>
             )}
@@ -754,23 +758,25 @@ export function LeitorDocumento({ doc, trilha }: {
         ))
       })}
     </div>
-  ), [grifos, grifosRects, semGrifos])
+  ), [grifos, grifosRects, semGrifos, blendGrifo])
 
+  // Overlay dos grifos PRÓPRIOS do aluno. A div (overlayRef) é a BASE de coordenadas de TODOS os
+  // grifos (inclusive os do Revisão) → sempre montada; o toggle "Meus grifos" oculta só os retângulos.
   const anotacoesOverlay = useMemo(() => (
     <div ref={overlayRef} className="pointer-events-none absolute inset-0" aria-hidden>
-      {anotacoes.map((a) => (rectsPorId[a.id] ?? []).map((r, i) => (
-        <div key={`${a.id}-${i}`} className="absolute rounded-[2px]" style={{ left: r.left, top: r.top, width: r.width, height: r.height, background: a.cor, opacity: 0.4, mixBlendMode: 'multiply' }} />
+      {mostrarMeus && anotacoes.map((a) => (rectsPorId[a.id] ?? []).map((r, i) => (
+        <div key={`${a.id}-${i}`} className="absolute rounded-[2px]" style={{ left: r.left, top: r.top, width: r.width, height: r.height, background: a.cor, opacity: 0.42, mixBlendMode: blendGrifo }} />
       )))}
     </div>
-  ), [anotacoes, rectsPorId])
+  ), [anotacoes, rectsPorId, blendGrifo, mostrarMeus])
 
   const matchesOverlay = useMemo(() => matches.length === 0 ? null : (
     <div className="pointer-events-none absolute inset-0" aria-hidden>
       {matches.map((m, mi) => m.rects.map((r, i) => (
-        <div key={`m-${mi}-${i}`} className="absolute rounded-[2px]" style={{ left: r.left, top: r.top, width: r.width, height: r.height, background: '#f97316', opacity: mi === matchIdx ? 0.6 : 0.32, outline: mi === matchIdx ? '1px solid #ea580c' : 'none' }} />
+        <div key={`m-${mi}-${i}`} className="absolute rounded-[2px]" style={{ left: r.left, top: r.top, width: r.width, height: r.height, background: '#f97316', opacity: mi === matchIdx ? 0.6 : 0.32, mixBlendMode: blendGrifo, outline: mi === matchIdx ? '1px solid #ea580c' : 'none' }} />
       )))}
     </div>
-  ), [matches, matchIdx])
+  ), [matches, matchIdx, blendGrifo])
 
   // #4 — caixas "ENTENDIMENTO DO STJ/STF" viram ACORDEÃO: recolhidas mostram só o cabeçalho;
   // clicar no cabeçalho abre o corpo (envolvido em .caixa-corpo/.caixa-corpo-in, grid-rows).
@@ -1081,6 +1087,11 @@ export function LeitorDocumento({ doc, trilha }: {
                 <input type="checkbox" checked={!semGrifos} onChange={(e) => setSemGrifos(!e.target.checked)} className="h-4 w-4 rounded border" />
               </label>
             )}
+            {/* Meus grifos: ligado por padrão; desligar OCULTA (bloqueia) os grifos do próprio aluno. */}
+            <label className="flex cursor-pointer items-center justify-between text-xs" style={{ color: cores.muted }}>
+              <span className="inline-flex items-center gap-1"><StickyNote className="h-3.5 w-3.5" /> Meus grifos</span>
+              <input type="checkbox" checked={mostrarMeus} onChange={(e) => setMostrarMeus(e.target.checked)} className="h-4 w-4 rounded border" />
+            </label>
             <div>
               <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide" style={{ color: cores.muted }}>Grifar seleção</p>
               {/* preventDefault no mousedown p/ não perder a seleção do texto ao clicar aqui. */}
@@ -1093,7 +1104,7 @@ export function LeitorDocumento({ doc, trilha }: {
               {!sel && <p className="mt-1.5 text-[11px]" style={{ color: cores.muted }}>Selecione um trecho no texto para grifar.</p>}
             </div>
             <div className="flex items-center justify-between gap-1 text-xs" style={{ color: cores.muted }}>
-              <span className="inline-flex items-center gap-1"><StickyNote className="h-3.5 w-3.5" /> Meus grifos</span>
+              <span className="inline-flex items-center gap-1"><RotateCcw className="h-3.5 w-3.5" /> Histórico</span>
               <div className="flex items-center gap-1">
                 <button onClick={desfazer} disabled={!passado.length} title="Voltar (desfazer)" className="rounded border p-1 transition disabled:opacity-40" style={{ borderColor: '#0000001a', color: cores.fg }}><Undo2 className="h-3.5 w-3.5" /></button>
                 <button onClick={refazer} disabled={!futuro.length} title="Avançar (refazer)" className="rounded border p-1 transition disabled:opacity-40" style={{ borderColor: '#0000001a', color: cores.fg }}><Redo2 className="h-3.5 w-3.5" /></button>
