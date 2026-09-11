@@ -40,6 +40,28 @@ const CORES_GRIFO = ['#fde047', '#86efac', '#93c5fd', '#f9a8d4', '#fca5a5'] // a
 // useLayoutEffect só faz sentido no cliente (evita warning de SSR do leitor).
 const useIsoLayout = typeof window !== 'undefined' ? useLayoutEffect : useEffect
 
+// Borracha em grifos do Revisão ASSADOS no HTML: neutraliza por ESTILO INLINE (à prova de cache de
+// CSS) e restaura removendo as props. Marca com data-grifo-off p/ não reprocessar e p/ o reset achar.
+function ocultarGrifoBaked(el: HTMLElement) {
+  el.style.setProperty('background', 'transparent', 'important')
+  el.style.setProperty('background-color', 'transparent', 'important')
+  el.style.setProperty('color', 'inherit', 'important')
+  el.style.setProperty('padding', '0', 'important')
+  el.style.setProperty('font-weight', 'inherit', 'important')
+  el.setAttribute('data-grifo-off', '1')
+}
+function mostrarGrifoBaked(el: HTMLElement) {
+  for (const p of ['background', 'background-color', 'color', 'padding', 'font-weight']) el.style.removeProperty(p)
+  el.removeAttribute('data-grifo-off')
+}
+// Sobreposição robusta entre a seleção e um elemento (sem depender de intersectsNode).
+function elNoRange(el: HTMLElement, range: Range): boolean {
+  try {
+    const er = document.createRange(); er.selectNodeContents(el)
+    return range.compareBoundaryPoints(Range.END_TO_START, er) < 0 && range.compareBoundaryPoints(Range.START_TO_END, er) > 0
+  } catch { return false }
+}
+
 // Barra de LEGENDA dos grifos — FIXA no topo da leitura (sticky). Ao rolar, fica colada no topo;
 // no topo do documento, aparece "separada" (respiro + sombra leve). Substitui a caixa LEGENDA inline.
 function LegendaBar({ cores, escuro, noTopo }: { cores: { fg: string; muted: string; sheet: string }; escuro: boolean; noTopo: boolean }) {
@@ -647,12 +669,12 @@ export function LeitorDocumento({ doc, trilha }: {
     const root = contentRef.current
     if (range && root) {
       root.querySelectorAll<HTMLElement>('[data-grifo], .exc').forEach((el) => {
-        if (!el.classList.contains('grifo-off-aluno') && range.intersectsNode(el)) bakedEls.push(el)
+        if (!el.hasAttribute('data-grifo-off') && elNoRange(el, range)) bakedEls.push(el)
       })
     }
     if (!meus.length && !editoriais.length && !bakedEls.length) return
     const batch: AcaoGrifo[] = []
-    if (bakedEls.length) { bakedEls.forEach((el) => el.classList.add('grifo-off-aluno')); batch.push({ k: 'ocultarBaked', els: bakedEls }) }
+    if (bakedEls.length) { bakedEls.forEach(ocultarGrifoBaked); batch.push({ k: 'ocultarBaked', els: bakedEls }) }
     if (editoriais.length) {
       setGrifosOcultos((s) => { const n = new Set(s); editoriais.forEach((g) => n.add(g.id)); return n })
       editoriais.forEach((g) => batch.push({ k: 'ocultarGrifo', id: g.id }))
@@ -691,13 +713,13 @@ export function LeitorDocumento({ doc, trilha }: {
 
   // Reset "Grifos do Revisão": volta ao padrão (todos visíveis: mostra os ocultos + liga a exibição).
   async function resetarRevisao() {
-    const bakedOff = contentRef.current?.querySelectorAll<HTMLElement>('[data-grifo].grifo-off-aluno, .exc.grifo-off-aluno') ?? []
+    const bakedOff = Array.from(contentRef.current?.querySelectorAll<HTMLElement>('[data-grifo-off]') ?? [])
     const temOcultos = grifosOcultos.size > 0 || bakedOff.length > 0
     if (!semGrifos && !temOcultos) { toast.message('Os grifos do Revisão já estão no padrão.'); return }
     if (!(await confirmar({ titulo: 'Restaurar os grifos do Revisão?', mensagem: 'Todos os grifos do Revisão voltam a aparecer, como no início.', confirmar: 'Restaurar' }))) return
     setSemGrifos(false)
     setGrifosOcultos(new Set())
-    bakedOff.forEach((el) => el.classList.remove('grifo-off-aluno'))
+    bakedOff.forEach(mostrarGrifoBaked)
     toast.success('Grifos do Revisão restaurados.')
   }
   // Reset "Meus grifos": apaga TODOS os grifos do aluno (volta em branco). Confirma se houver algum.
@@ -733,7 +755,7 @@ export function LeitorDocumento({ doc, trilha }: {
       if (ac.k === 'add') ok = await removerServidor(ac.a)
       else if (ac.k === 'del') ok = await restaurarServidor(ac.a)
       else if (ac.k === 'ocultarGrifo') setGrifosOcultos((s) => { const n = new Set(s); n.delete(ac.id); return n }) // desfazer ocultar = mostrar
-      else if (ac.k === 'ocultarBaked') ac.els.forEach((el) => el.classList.remove('grifo-off-aluno')) // desfazer = volta o grifo assado
+      else if (ac.k === 'ocultarBaked') ac.els.forEach(mostrarGrifoBaked) // desfazer = volta o grifo assado
       else ok = await atualizarServidor(ac.id, ac.de.cor, ac.de.nota, ac.para)
       if (!ok) falhou = true
     }
@@ -752,7 +774,7 @@ export function LeitorDocumento({ doc, trilha }: {
       if (ac.k === 'add') ok = await restaurarServidor(ac.a)
       else if (ac.k === 'del') ok = await removerServidor(ac.a)
       else if (ac.k === 'ocultarGrifo') setGrifosOcultos((s) => { const n = new Set(s); n.add(ac.id); return n }) // refazer ocultar = ocultar de novo
-      else if (ac.k === 'ocultarBaked') ac.els.forEach((el) => el.classList.add('grifo-off-aluno')) // refazer = oculta de novo
+      else if (ac.k === 'ocultarBaked') ac.els.forEach(ocultarGrifoBaked) // refazer = oculta de novo
       else ok = await atualizarServidor(ac.id, ac.para.cor, ac.para.nota, ac.de)
       if (!ok) falhou = true
     }

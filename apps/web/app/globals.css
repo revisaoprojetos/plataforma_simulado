@@ -788,8 +788,3 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 .leitura-prosa.sem-grifos [data-grifo="excecao"], .leitura-prosa.sem-grifos .exc {
   font-weight:inherit !important;
 }
-
-/* Grifo do Revisão APAGADO pela borracha do aluno (por-span, restaurável no undo/Restaurar). */
-.leitura-prosa [data-grifo].grifo-off-aluno, .leitura-prosa .exc.grifo-off-aluno {
-  background:transparent !important; padding:0 !important; color:inherit !important; font-weight:inherit !important;
-}
