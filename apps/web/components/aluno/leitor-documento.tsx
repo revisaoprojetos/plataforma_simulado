@@ -631,7 +631,9 @@ export function LeitorDocumento({ doc, trilha }: {
   }, [doc.html])
 
   return (
-    <div ref={containerRef} className="relative flex h-[calc(100dvh-7rem)] min-h-[420px] overflow-hidden rounded-2xl border shadow-sm" style={{ background: cores.bg }}>
+    <div ref={containerRef} className={cn('relative flex overflow-hidden', trilha
+      ? 'fixed inset-0 z-50 h-[100dvh]' // LegProc: leitura imersiva em tela cheia (sem card/margens)
+      : 'h-[calc(100dvh-7rem)] min-h-[420px] rounded-2xl border shadow-sm')} style={{ background: cores.bg }}>
       {/* Aviso "esta lei foi atualizada" + espelho do que mudou (flutua via portal). */}
       <LeituraAtualizacaoAviso doc={doc} />
       {/* Barra esquerda: navegação/sumário + ajustes */}
