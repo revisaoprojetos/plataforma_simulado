@@ -46,7 +46,7 @@ export function ModeloPicker({ open, onClose, atual, onSelecionar, onEmBranco, o
   const [vista, setVista] = useState<'padroes' | 'meus'>('padroes')
   const [pastaAtual, setPastaAtual] = useState<string | null>(null) // pasta aberta na biblioteca
   const [busca, setBusca] = useState('')
-  useEffect(() => { if (open) { setTab(atual.modalidade); setVista('padroes'); setPastaAtual(null); setBusca('') } }, [open, atual.modalidade])
+  useEffect(() => { if (open) { setTab(atual.modalidade); setVista(MODELOS_CADERNO_ATIVO && onSelecionarBiblioteca ? 'meus' : 'padroes'); setPastaAtual(null); setBusca('') } }, [open, atual.modalidade, onSelecionarBiblioteca])
 
   // Biblioteca "Modelos de Caderno" (tabela própria + pastas) — carregada 1× ao abrir.
   const [bib, setBib] = useState<{ modelos: ModeloRow[]; pastas: PastaModeloRow[] } | null>(null)
@@ -193,36 +193,44 @@ export function ModeloPicker({ open, onClose, atual, onSelecionar, onEmBranco, o
               ) : subpastas.length === 0 && modelosNivel.length === 0 ? (
                 <p className="rounded-lg border border-dashed py-8 text-center text-xs text-muted-foreground">{q ? `Nada encontrado para “${busca}”.` : 'Pasta vazia. Crie modelos na área Modelos de Caderno.'}</p>
               ) : (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {subpastas.map((p) => (
-                    <button key={p.id} type="button" onClick={() => setPastaAtual(p.id)}
-                      className="flex items-center gap-2.5 rounded-xl border bg-muted/40 px-3 py-3 text-left transition hover:border-primary/50 hover:bg-primary/10">
-                      <FolderIcon className="h-5 w-5 shrink-0" style={{ color: p.cor ?? 'var(--primary)' }} fill={p.cor ?? 'var(--primary)'} fillOpacity={0.85} />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">{p.nome}</span>
-                        <span className="block text-[11px] text-muted-foreground">{countPasta(p.id)} modelo(s)</span>
-                      </span>
-                    </button>
-                  ))}
-                  {modelosNivel.map((m) => {
-                    const it = itemDoModelo(m)
-                    return (
-                      <button key={m.id} type="button" onClick={() => onSelecionarBiblioteca?.(m.id)}
-                        className="group flex flex-col overflow-hidden rounded-xl border bg-card text-left transition-all hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md">
-                        <div className="relative aspect-[3/4] overflow-hidden border-b bg-muted/40">
-                          {it?.modalidade
-                            ? <ModeloMiniPrevia item={it} />
-                            : m.capa_card_url
-                              ? <img src={m.capa_card_url} alt="" className="absolute inset-0 h-full w-full object-cover object-top" />
-                              : <BarChart3 className="absolute left-1/2 top-1/2 h-10 w-10 -translate-x-1/2 -translate-y-1/2 text-muted-foreground/40" />}
-                        </div>
-                        <div className="px-3 py-2">
-                          <p className="truncate text-sm font-semibold leading-tight">{m.nome}</p>
-                          <p className="mt-0.5 text-[11px] text-muted-foreground">{metaDaModalidade((m.modalidade as Modalidade) || tab).nome}</p>
-                        </div>
-                      </button>
-                    )
-                  })}
+                <div className="space-y-3">
+                  {/* Pastas — cards CURTOS numa linha, separados dos modelos (igual à área Modelos de Caderno). */}
+                  {subpastas.length > 0 && (
+                    <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                      {subpastas.map((p) => (
+                        <button key={p.id} type="button" onClick={() => setPastaAtual(p.id)}
+                          className="flex items-center gap-2.5 rounded-xl border bg-muted/40 px-3 py-2.5 text-left transition hover:border-primary/50 hover:bg-primary/10">
+                          <FolderIcon className="h-5 w-5 shrink-0" style={{ color: p.cor ?? 'var(--primary)' }} fill={p.cor ?? 'var(--primary)'} fillOpacity={0.9} />
+                          <span className="min-w-0 flex-1 truncate text-sm font-medium" title={`${p.nome} · ${countPasta(p.id)} modelo(s)`}>{p.nome}</span>
+                          <span className="shrink-0 text-[11px] text-muted-foreground">{countPasta(p.id)}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {/* Modelos — grade de cards com o preview da 1ª folha. */}
+                  {modelosNivel.length > 0 && (
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                      {modelosNivel.map((m) => {
+                        const it = itemDoModelo(m)
+                        return (
+                          <button key={m.id} type="button" onClick={() => onSelecionarBiblioteca?.(m.id)}
+                            className="group flex flex-col overflow-hidden rounded-xl border bg-card text-left transition-all hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md">
+                            <div className="relative aspect-[3/4] overflow-hidden border-b bg-muted/40">
+                              {it?.modalidade
+                                ? <ModeloMiniPrevia item={it} />
+                                : m.capa_card_url
+                                  ? <img src={m.capa_card_url} alt="" className="absolute inset-0 h-full w-full object-cover object-top" />
+                                  : <BarChart3 className="absolute left-1/2 top-1/2 h-10 w-10 -translate-x-1/2 -translate-y-1/2 text-muted-foreground/40" />}
+                            </div>
+                            <div className="px-3 py-2">
+                              <p className="truncate text-sm font-semibold leading-tight">{m.nome}</p>
+                              <p className="mt-0.5 text-[11px] text-muted-foreground">{metaDaModalidade((m.modalidade as Modalidade) || tab).nome}</p>
+                            </div>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
