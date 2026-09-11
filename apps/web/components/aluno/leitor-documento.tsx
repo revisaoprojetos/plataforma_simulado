@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
+import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
 import {
   ArrowLeft, ScrollText, BookOpen, Rows3, ChevronLeft, ChevronRight, Minus, Plus,
   Sun, Moon, Coffee, CheckCircle2, Loader2, X, PanelLeft, Highlighter, Trash2, StickyNote, Crosshair, Search, ChevronUp, ChevronDown, Star,
-  Undo2, Redo2, RotateCcw,
+  Undo2, Redo2, RotateCcw, Eraser,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { DocumentoCarregado, AnotacaoAluno } from '@/lib/leitura/acesso'
@@ -67,7 +68,22 @@ export function LeitorDocumento({ doc, trilha }: {
   trilha?: { modo: 'leitura' | 'questoes'; questoesHref?: string; voltarHref?: string }
 }) {
   const [modo, setModo] = useState<Modo>((doc.prefs?.modo as Modo) || 'scroll')
-  const [tema, setTema] = useState<Tema>((doc.prefs?.tema as Tema) || 'sepia')
+  // Tema da leitura sincronizado com o claro/escuro do sistema (next-themes). Café (sepia) é override
+  // manual e NÃO acompanha o sistema. Sem preferência salva, o inicial é o tema do sistema.
+  const { resolvedTheme, setTheme } = useTheme()
+  const temaSalvo = (doc.prefs?.tema as Tema) || null
+  const [tema, setTema] = useState<Tema>(temaSalvo ?? 'claro')
+  const seguirSistema = useRef(temaSalvo == null || temaSalvo === 'claro' || temaSalvo === 'escuro')
+  useEffect(() => {
+    if (!resolvedTheme || !seguirSistema.current) return
+    setTema(resolvedTheme === 'dark' ? 'escuro' : 'claro')
+  }, [resolvedTheme])
+  // Escolha do tema no leitor: claro/escuro também mudam o sistema (mantém sincronizado); café só o leitor.
+  const escolherTema = (t: Tema) => {
+    setTema(t)
+    if (t === 'sepia') seguirSistema.current = false
+    else { seguirSistema.current = true; setTheme(t === 'escuro' ? 'dark' : 'light') }
+  }
   const [fonte, setFonte] = useState(doc.prefs?.fonte || 18)
   const [favorito, setFavorito] = useState(!!doc.favorito)
   const [menuAberto, setMenuAberto] = useState(true)
@@ -613,6 +629,21 @@ export function LeitorDocumento({ doc, trilha }: {
     registrar([{ k: 'del', a }])
   }
 
+  // Apaga os grifos PRÓPRIOS que tocam a seleção atual (ferramenta borracha do painel Anotações).
+  async function apagarGrifoSelecao() {
+    if (!sel || opLock.current) return
+    const { inicio, fim } = sel.anc
+    const alvos = anotacoes.filter((a) => a.origem === 'propria' && a.inicio < fim && a.fim > inicio)
+    setSel(null); window.getSelection()?.removeAllRanges()
+    if (!alvos.length) { toast.message('Nenhum grifo seu na seleção.'); return }
+    opLock.current = true
+    const oks = await Promise.all(alvos.map((a) => removerServidor(a)))
+    opLock.current = false
+    const removidos = alvos.filter((_, i) => oks[i])
+    if (removidos.length) registrar(removidos.map((a) => ({ k: 'del' as const, a })))
+    if (oks.some((o) => !o)) avisarFalha()
+  }
+
   async function resetarGrifos() {
     if (opLock.current) return
     const meus = anotacoes.filter((a) => a.origem === 'propria')
@@ -806,7 +837,9 @@ export function LeitorDocumento({ doc, trilha }: {
       // LegProc: preenche a ÁREA INTERNA (à direita da sidebar) — cancela o padding do <main>
       // (p-4/md:p-6) com margens negativas e ocupa a altura cheia, sem card. A sidebar continua.
       ? '-m-4 h-[100dvh] md:-m-6'
-      : 'h-[calc(100dvh-7rem)] min-h-[420px] rounded-2xl border shadow-sm')} style={{ background: cores.bg }}>
+      : 'h-[calc(100dvh-7rem)] min-h-[420px] rounded-2xl border shadow-sm')}
+      // Scrollbars da leitura combinam com o tema (thumb/track derivados de cores.fg via CSS vars).
+      style={{ background: cores.bg, ['--leitura-scroll-thumb' as string]: `color-mix(in srgb, ${cores.fg} 26%, transparent)`, ['--leitura-scroll-track' as string]: `color-mix(in srgb, ${cores.fg} 7%, transparent)` } as React.CSSProperties}>
       {/* Aviso "esta lei foi atualizada" + espelho do que mudou (flutua via portal). */}
       <LeituraAtualizacaoAviso doc={doc} />
       {/* Barra esquerda: navegação/sumário + ajustes */}
@@ -840,30 +873,14 @@ export function LeitorDocumento({ doc, trilha }: {
               <span className="text-xs" style={{ color: cores.muted }}>Tema</span>
               <div className="flex items-center gap-1">
                 {([['claro', Sun], ['sepia', Coffee], ['escuro', Moon]] as const).map(([t, Icon]) => (
-                  <button key={t} onClick={() => setTema(t)} className={cn('rounded border p-1.5 transition', tema === t && 'ring-2 ring-primary')} style={{ borderColor: '#0000001a', color: cores.fg }} aria-label={t}><Icon className="h-3.5 w-3.5" /></button>
+                  <button key={t} onClick={() => escolherTema(t)} className={cn('rounded border p-1.5 transition', tema === t && 'ring-2 ring-primary')} style={{ borderColor: '#0000001a', color: cores.fg }} aria-label={t}><Icon className="h-3.5 w-3.5" /></button>
                 ))}
-              </div>
-            </div>
-            {(grifos.length > 0 || temGrifosBaked) && (
-              <label className="flex items-center justify-between text-xs" style={{ color: cores.muted }}>
-                <span className="inline-flex items-center gap-1"><Highlighter className="h-3.5 w-3.5" /> Grifos do Revisão</span>
-                {/* Marcado = MOSTRAR os grifos do Revisão; desmarcado = ler sem grifo. */}
-                <input type="checkbox" checked={!semGrifos} onChange={(e) => setSemGrifos(!e.target.checked)} className="h-4 w-4 rounded border" />
-              </label>
-            )}
-            {/* #3 — Meus grifos: voltar/avançar (undo/redo) + resetar. */}
-            <div className="flex items-center justify-between gap-1 text-xs" style={{ color: cores.muted }}>
-              <span className="inline-flex items-center gap-1"><StickyNote className="h-3.5 w-3.5" /> Meus grifos</span>
-              <div className="flex items-center gap-1">
-                <button onClick={desfazer} disabled={!passado.length} title="Voltar (desfazer)" className="rounded border p-1 transition disabled:opacity-40" style={{ borderColor: '#0000001a', color: cores.fg }}><Undo2 className="h-3.5 w-3.5" /></button>
-                <button onClick={refazer} disabled={!futuro.length} title="Avançar (refazer)" className="rounded border p-1 transition disabled:opacity-40" style={{ borderColor: '#0000001a', color: cores.fg }}><Redo2 className="h-3.5 w-3.5" /></button>
-                <button onClick={resetarGrifos} title="Resetar meus grifos" className="rounded border p-1 transition hover:text-destructive" style={{ borderColor: '#0000001a', color: cores.fg }}><RotateCcw className="h-3.5 w-3.5" /></button>
               </div>
             </div>
           </div>
 
           {/* Sumário — capítulos expansíveis (animado) + artigos ligados por linha de hierarquia. */}
-          <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+          <div className="leitura-scroll min-h-0 flex-1 overflow-y-auto px-2 py-2">
             <p className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide" style={{ color: cores.muted }}>Sumário</p>
             {tocGrupos.length === 0 ? (
               <p className="px-1 text-xs" style={{ color: cores.muted }}>Sem seções detectadas.</p>
@@ -993,7 +1010,7 @@ export function LeitorDocumento({ doc, trilha }: {
             onTouchStart={modo === 'flip' ? onTouchStart : undefined}
             onTouchEnd={modo === 'flip' ? onTouchEnd : undefined}
             onMouseUp={aoSelecionar}
-            className={cn('h-full', modo !== 'flip' ? 'overflow-y-auto px-3 md:px-8' : 'overflow-hidden')}
+            className={cn('leitura-scroll h-full', modo !== 'flip' ? 'overflow-y-auto px-3 md:px-8' : 'overflow-hidden')}
             style={modo !== 'flip' ? { background: cores.desk } : undefined}
           >
             {/* Barra de LEGENDA fixa (sticky) — some no modo virar (sem rolagem vertical). */}
@@ -1054,9 +1071,40 @@ export function LeitorDocumento({ doc, trilha }: {
             <span className="inline-flex items-center gap-1.5 text-sm font-semibold" style={{ color: cores.fg }}><Highlighter className="h-4 w-4" /> Anotações</span>
             <button onClick={() => setBarraDir(false)} className="rounded p-1" style={{ color: cores.muted }} aria-label="Fechar"><X className="h-4 w-4" /></button>
           </div>
-          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
+
+          {/* Ferramentas de grifo (planejadas): Grifos do Revisão + grifar/apagar seleção + desfazer/refazer/resetar. */}
+          <div className="space-y-3 border-b px-3 py-3" style={{ borderColor: '#0000001a' }}>
+            {(grifos.length > 0 || temGrifosBaked) && (
+              <label className="flex cursor-pointer items-center justify-between text-xs" style={{ color: cores.muted }}>
+                <span className="inline-flex items-center gap-1"><Highlighter className="h-3.5 w-3.5" /> Grifos do Revisão</span>
+                {/* Marcado = MOSTRAR os grifos do Revisão; desmarcado = ler sem grifo. */}
+                <input type="checkbox" checked={!semGrifos} onChange={(e) => setSemGrifos(!e.target.checked)} className="h-4 w-4 rounded border" />
+              </label>
+            )}
+            <div>
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide" style={{ color: cores.muted }}>Grifar seleção</p>
+              {/* preventDefault no mousedown p/ não perder a seleção do texto ao clicar aqui. */}
+              <div className="flex items-center gap-1.5" onMouseDown={(e) => e.preventDefault()}>
+                {CORES_GRIFO.map((c) => (
+                  <button key={c} onClick={() => criarAnotacao(c)} disabled={!sel} title={sel ? `Grifar em ${c}` : 'Selecione um trecho primeiro'} className="h-6 w-6 rounded-full border border-black/10 transition enabled:hover:scale-110 disabled:opacity-30" style={{ background: c }} aria-label={`Grifar em ${c}`} />
+                ))}
+                <button onClick={apagarGrifoSelecao} disabled={!sel} title="Apagar grifo da seleção" className="ml-auto rounded-md border p-1.5 transition enabled:hover:text-destructive disabled:opacity-30" style={{ borderColor: '#0000001a', color: cores.fg }}><Eraser className="h-3.5 w-3.5" /></button>
+              </div>
+              {!sel && <p className="mt-1.5 text-[11px]" style={{ color: cores.muted }}>Selecione um trecho no texto para grifar.</p>}
+            </div>
+            <div className="flex items-center justify-between gap-1 text-xs" style={{ color: cores.muted }}>
+              <span className="inline-flex items-center gap-1"><StickyNote className="h-3.5 w-3.5" /> Meus grifos</span>
+              <div className="flex items-center gap-1">
+                <button onClick={desfazer} disabled={!passado.length} title="Voltar (desfazer)" className="rounded border p-1 transition disabled:opacity-40" style={{ borderColor: '#0000001a', color: cores.fg }}><Undo2 className="h-3.5 w-3.5" /></button>
+                <button onClick={refazer} disabled={!futuro.length} title="Avançar (refazer)" className="rounded border p-1 transition disabled:opacity-40" style={{ borderColor: '#0000001a', color: cores.fg }}><Redo2 className="h-3.5 w-3.5" /></button>
+                <button onClick={resetarGrifos} title="Resetar meus grifos" className="rounded border p-1 transition hover:text-destructive" style={{ borderColor: '#0000001a', color: cores.fg }}><RotateCcw className="h-3.5 w-3.5" /></button>
+              </div>
+            </div>
+          </div>
+
+          <div className="leitura-scroll min-h-0 flex-1 space-y-2 overflow-y-auto p-2">
             {anotacoes.length === 0 ? (
-              <p className="px-2 py-6 text-center text-xs" style={{ color: cores.muted }}>Selecione um trecho do texto para grifar. Suas anotações aparecem aqui.</p>
+              <p className="px-2 py-6 text-center text-xs" style={{ color: cores.muted }}>Nenhuma anotação ainda. Selecione um trecho e escolha uma cor acima.</p>
             ) : [...anotacoes].sort((a, b) => a.inicio - b.inicio).map((a) => (
               <div key={a.id} className="rounded-lg border p-2" style={{ borderColor: '#0000001a' }}>
                 <div className="flex items-start gap-2">

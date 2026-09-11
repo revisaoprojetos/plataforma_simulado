@@ -731,6 +731,14 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 .leitura-prosa .caixa-colapsavel[data-aberto] > .caixa-corpo { grid-template-rows:1fr; }
 .leitura-prosa .caixa-colapsavel > .caixa-corpo > .caixa-corpo-in { overflow:hidden; min-height:0; }
 
+/* Scrollbars da área de leitura combinando com o tema (thumb/track vêm de CSS vars no container:
+   --leitura-scroll-thumb / --leitura-scroll-track, derivados da cor de texto do tema). */
+.leitura-scroll { scrollbar-width: thin; scrollbar-color: var(--leitura-scroll-thumb, rgba(120,120,120,.4)) transparent; }
+.leitura-scroll::-webkit-scrollbar { width: 10px; height: 10px; }
+.leitura-scroll::-webkit-scrollbar-track { background: var(--leitura-scroll-track, transparent); border-radius: 8px; }
+.leitura-scroll::-webkit-scrollbar-thumb { background: var(--leitura-scroll-thumb, rgba(120,120,120,.4)); border-radius: 8px; border: 2px solid transparent; background-clip: padding-box; }
+.leitura-scroll::-webkit-scrollbar-thumb:hover { background: var(--leitura-scroll-thumb-hover, var(--leitura-scroll-thumb, rgba(120,120,120,.6))); background-clip: padding-box; }
+
 /* Destaque ao navegar pelo índice: o dispositivo alvo sinaliza na cor da marca —
    pulso do fundo + barra lateral (tipo marcador) + anel, tudo desaparecendo suave. */
 @keyframes leitura-flash {
