@@ -777,10 +777,14 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 /* Modo sem grifos: some o decorativo (grifos inline); mantém caixas, tabelas e cobrança (§10.3).
    IMPORTANTE: além do fundo, RESETA a cor do texto (os grifos assam color:#111) — senão, no tema
    escuro, o texto grifado ficaria escuro sobre fundo escuro e sumiria. */
-.leitura-prosa.sem-grifos [data-grifo], .leitura-prosa.sem-grifos .hl-y,
-.leitura-prosa.sem-grifos .hl-g, .leitura-prosa.sem-grifos .hl-r {
+.leitura-prosa.sem-grifos [data-grifo], .leitura-prosa.sem-grifos [data-grifo] *,
+.leitura-prosa.sem-grifos .hl-y, .leitura-prosa.sem-grifos .hl-y *,
+.leitura-prosa.sem-grifos .hl-g, .leitura-prosa.sem-grifos .hl-g *,
+.leitura-prosa.sem-grifos .hl-r, .leitura-prosa.sem-grifos .hl-r *,
+.leitura-prosa.sem-grifos .exc, .leitura-prosa.sem-grifos .exc * {
   background:transparent !important; padding:0 !important; color:inherit !important;
 }
+/* Exceção (negrito vermelho) volta a negrito/cor normais; negritos DENTRO de grifos ficam. */
 .leitura-prosa.sem-grifos [data-grifo="excecao"], .leitura-prosa.sem-grifos .exc {
-  color:inherit !important; font-weight:inherit !important;
+  font-weight:inherit !important;
 }
