@@ -4,11 +4,11 @@ import { useEffect, useMemo, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Loader2, Search, ArrowUpDown, Users, UserMinus } from 'lucide-react'
+import { Loader2, Search, ArrowUpDown, Users, UserMinus, Globe, Lock, Info } from 'lucide-react'
 import { toast } from 'sonner'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/utils'
-import { listarEstudantesSimulado, removerPassaportesIndevidos, type EstudanteLinkado } from '@/app/admin/simulados/actions'
+import { listarEstudantesSimulado, removerPassaportesIndevidos, definirAcessoGratuitoSimulado, type EstudanteLinkado } from '@/app/admin/simulados/actions'
 
 type Campo = 'nome' | 'email' | 'situacao' | 'nota'
 const POR_PAGINA = 11
@@ -19,10 +19,26 @@ const situacaoCfg: Record<string, { label: string; cls: string }> = {
   nao_iniciou: { label: 'Não iniciou', cls: 'bg-muted text-muted-foreground' },
 }
 
-export function SimuladoEstudantes({ simuladoId }: { simuladoId: string }) {
+export function SimuladoEstudantes({ simuladoId, acessoGratuitoInicial = false }: { simuladoId: string; acessoGratuitoInicial?: boolean }) {
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [dados, setDados] = useState<EstudanteLinkado[]>([])
+
+  // "Acesso para todos" (acesso_gratuito) — mesmo controle do acesso do LegProc: liberado = todos os
+  // alunos da plataforma acessam (sem matrícula) e a lista de vinculados fica só informativa.
+  const [liberarTodos, setLiberarTodos] = useState(acessoGratuitoInicial)
+  const [salvandoAcesso, setSalvandoAcesso] = useState(false)
+  async function alternarLiberarTodos() {
+    const novo = !liberarTodos
+    setLiberarTodos(novo)
+    setSalvandoAcesso(true)
+    try {
+      const r = await definirAcessoGratuitoSimulado(simuladoId, novo)
+      if (r?.error) { setLiberarTodos(!novo); toast.error(r.error) }
+      else toast.success(novo ? 'Liberado para todos os alunos' : 'Acesso restrito aos vinculados')
+    } catch { setLiberarTodos(!novo); toast.error('Falha ao salvar o acesso.') }
+    finally { setSalvandoAcesso(false) }
+  }
 
   const [busca, setBusca] = useState('')
   const [fClass, setFClass] = useState<'todos' | 'passaporte' | 'normal'>('todos')
@@ -113,6 +129,23 @@ export function SimuladoEstudantes({ simuladoId }: { simuladoId: string }) {
 
   return (
     <div className="space-y-4">
+      {/* Acesso para todos — mesmo formato do acesso do LegProc (botão Liberar / Restringir). */}
+      <div className={cn('flex flex-wrap items-center gap-3 rounded-xl border px-4 py-2.5 text-sm', liberarTodos ? 'border-sky-500/30 bg-sky-500/5 text-sky-700 dark:text-sky-300' : 'border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-400')}>
+        <Info className="h-4 w-4 shrink-0" />
+        <span className="min-w-0 flex-1">
+          {liberarTodos
+            ? <>Liberado para <strong>todos</strong> os alunos da plataforma — sem precisar de matrícula.</>
+            : <>Restrito aos <strong>{dados.length}</strong> aluno(s) vinculado(s) a este simulado.</>}
+        </span>
+        {salvandoAcesso && <span className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground"><Loader2 className="h-3 w-3 animate-spin" /> salvando…</span>}
+        <button type="button" onClick={alternarLiberarTodos} disabled={salvandoAcesso}
+          className={cn('inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-60', liberarTodos ? 'border-primary bg-primary text-primary-foreground hover:opacity-90' : 'border-current/30 hover:bg-foreground/5')}>
+          {liberarTodos ? <><Lock className="h-4 w-4" /> Restringir acesso</> : <><Globe className="h-4 w-4" /> Liberar para todos</>}
+        </button>
+      </div>
+
+      {/* Lista de vinculados — acinzenta quando "liberado para todos" (acesso não depende dela). */}
+      <div className={cn('space-y-4 transition-opacity', liberarTodos && 'pointer-events-none select-none opacity-50')} aria-disabled={liberarTodos}>
       <div className="flex flex-wrap items-center gap-2">
         <div className="relative min-w-56 flex-1">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -207,6 +240,7 @@ export function SimuladoEstudantes({ simuladoId }: { simuladoId: string }) {
           </div>
         </div>
       )}
+      </div>
     </div>
   )
 }

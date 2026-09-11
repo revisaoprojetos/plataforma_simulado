@@ -842,6 +842,23 @@ export async function liberarItemAction(id: string, item: 'nota' | 'gabarito' | 
   revalidatePath(`/admin/simulados/${id}`)
 }
 
+/** "Acesso para todos" (acesso_gratuito) do simulado — controlado na aba Estudantes (formato LegProc).
+ *  Mescla em `regras` (preserva as demais chaves), audita e revalida. */
+export async function definirAcessoGratuitoSimulado(id: string, valor: boolean): Promise<{ ok?: boolean; error?: string }> {
+  if (!(await checkPermission('simulados:update'))) return { error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
+  const supabase = await createClient()
+  const { data: s } = await supabase.from('simulado_simulados').select('regras').eq('id', id).eq('tenant_id', tenantId ?? SEM_TENANT).maybeSingle()
+  if (!s) return { error: 'Simulado não encontrado.' }
+  const regras = { ...(((s?.regras as Record<string, unknown>) ?? {})), acesso_gratuito: valor }
+  const { error } = await supabase.from('simulado_simulados').update({ regras }).eq('id', id).eq('tenant_id', tenantId ?? SEM_TENANT)
+  if (error) return { error: error.message }
+  await registrarAudit({ operacao: valor ? 'LIBERAR' : 'BLOQUEAR', entidade: 'simulado_simulados', entidadeId: id, depois: { acesso_gratuito: valor } })
+  revalidatePath('/admin/simulados')
+  revalidatePath(`/admin/simulados/${id}`)
+  return { ok: true }
+}
+
 /** Cria notificações in-app p/ quem finalizou o simulado quando a nota/gabarito é liberado. */
 async function notificarLiberacao(simuladoId: string, item: 'nota' | 'gabarito', titulo: string, tenantId: string | null) {
   const svc = createAdminClient()

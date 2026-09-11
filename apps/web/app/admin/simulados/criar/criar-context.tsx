@@ -125,6 +125,8 @@ export function draftVazio(): CriarDraft {
       politica_anulacao: 'pontua_todos',
       // Tipo de correção: 'pontuacao' (normal, +1 por acerto) ou 'cebraspe' (acertos − erros).
       tipo_correcao: 'pontuacao',
+      // Padrão: já nasce liberado para TODOS os alunos da plataforma (acinzenta o "adicionar" na etapa Estudantes).
+      acesso_gratuito: true,
     },
     simuladoFolder: { mode: 'raiz' },
     bancoFolder: { mode: 'raiz' },

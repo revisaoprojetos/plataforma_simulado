@@ -126,6 +126,10 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
         if (data.regras.retentativas_ilimitadas) data.regras.retentativas = 0
         // Tolerância de atraso só vale com "iniciar atrasado" ligado.
         if (!data.regras.iniciar_atrasado) data.regras.tolerancia_atraso_min = undefined
+        // "Acesso para todos" (acesso_gratuito) agora é controlado na aba Estudantes. O form NÃO
+        // escreve mais essa chave — o updateSimuladoAction mescla regras, então o valor da aba é
+        // preservado (evita este form sobrescrever com um valor velho).
+        delete (data.regras as { acesso_gratuito?: boolean }).acesso_gratuito
       }
       const result = await onSubmit(data)
       if (result?.error) {
@@ -206,19 +210,8 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
             )}
           </div>
 
-          {/* Acesso gratuito: classificação PRÓPRIA (≠ modo "Aberto"). Libera para TODOS os
-              alunos do tenant, sem matrícula — o simulado aparece no portal de todos. */}
-          <div className="flex items-start gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3">
-            <Switch
-              id="acesso_gratuito"
-              defaultChecked={initialData?.regras?.acesso_gratuito ?? false}
-              onCheckedChange={(v) => setValue('regras.acesso_gratuito', v)}
-            />
-            <div>
-              <Label htmlFor="acesso_gratuito">Acesso gratuito (liberado para todos)</Label>
-              <p className="text-xs text-muted-foreground">Todo aluno do tenant vê e pode fazer este simulado sem precisar de matrícula. Use no simulado gratuito de vitrine. Diferente do modo <strong>Aberto</strong>, que ainda exige matrícula.</p>
-            </div>
-          </div>
+          {/* "Acesso para todos" (acesso_gratuito) foi movido para a aba ESTUDANTES — no formato do
+              acesso do LegProc (botão Liberar para todos / Restringir acesso). */}
 
           {(modo === 'janela_fixa') && (
             <div className="space-y-1.5">

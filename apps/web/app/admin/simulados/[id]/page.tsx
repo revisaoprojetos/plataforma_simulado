@@ -352,7 +352,7 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
               <CardDescription>Todos os estudantes matriculados (linkados) neste simulado, com busca, filtros e ordenação.</CardDescription>
             </CardHeader>
             <CardContent>
-              <SimuladoEstudantes simuladoId={id} />
+              <SimuladoEstudantes simuladoId={id} acessoGratuitoInicial={!!(simulado.regras as { acesso_gratuito?: boolean } | null)?.acesso_gratuito} />
             </CardContent>
           </Card>
         </TabsContent>
