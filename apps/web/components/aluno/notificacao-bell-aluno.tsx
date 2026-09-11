@@ -150,8 +150,8 @@ export function NotificacaoBellAluno({ diagonal = false }: { diagonal?: boolean 
           <div className="pointer-events-none fixed z-[115]" style={{ left: balaoPos.left, bottom: balaoPos.bottom }} aria-hidden>
             <div className="balao-pill absolute bottom-0 left-1 flex items-center whitespace-nowrap rounded-full rounded-bl-md px-3 py-1.5 text-xs font-bold text-white shadow-lg" style={{ background: 'var(--brand-accent, var(--primary))' }}>
               {naoLidas} {naoLidas === 1 ? 'nova notificação' : 'novas notificações'}
-              {/* ponta DIAGONAL no canto inferior-esquerdo, apontando p/ o sino (baixo-esquerda) */}
-              <span className="absolute -bottom-1 -left-1 h-3 w-3 rotate-45 rounded-[3px]" style={{ background: 'var(--brand-accent, var(--primary))' }} />
+              {/* ponta DIAGONAL: triângulo (não losango) apontando p/ baixo-esquerda, em direção ao sino */}
+              <span className="absolute bottom-0 left-1.5 h-2.5 w-2.5" aria-hidden style={{ background: 'var(--brand-accent, var(--primary))', clipPath: 'polygon(0 0, 100% 0, 50% 100%)', transform: 'translateY(70%) rotate(45deg)' }} />
             </div>
           </div>
         ) : (
