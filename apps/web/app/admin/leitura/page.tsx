@@ -23,12 +23,13 @@ export default async function LeituraAdminPage({ searchParams }: { searchParams:
   return (
     <div className="space-y-3">
       {banner ? (
-        // ===== TOPO com o BANNER do módulo como imagem de fundo (título/descrição/botões + breadcrumb) =====
-        <div className="relative overflow-hidden rounded-2xl border shadow-sm">
+        // ===== TOPO com o BANNER do módulo como fundo, EDGE-TO-EDGE (estilo banner do aluno) =====
+        // -mx-6 -mt-6 cancela o padding do <main class="p-6"> → ocupa todo o topo, sem bordas brancas.
+        <div className="relative -mx-6 -mt-6 overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={banner} alt="" className="absolute inset-0 h-full w-full object-cover" />
           <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/55 to-black/30" />
-          <div className="relative flex flex-col gap-2.5 p-5 text-white">
+          <div className="relative flex flex-col gap-2.5 px-6 py-6 text-white">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-start gap-2">
                 <Link href="/admin/leitura" aria-label="Voltar aos módulos" title="Voltar aos módulos" className="mt-1 inline-flex shrink-0 items-center justify-center rounded-lg border border-white/25 bg-white/15 p-2 text-white shadow-sm backdrop-blur transition-colors hover:bg-white/25">
