@@ -16,6 +16,7 @@ import { construirEspinha, rangeParaAncora, ancoraParaRange, rectsDoRange, type 
 import { QuestaoLeitura } from '@/components/aluno/questao-leitura'
 import { LeituraAtualizacaoAviso } from '@/components/aluno/leitura-atualizacao-aviso'
 import { GRIFOS, corDoGrifo, ehEstrutural } from '@/lib/leitura/grifos'
+import { prepararCaixasTabela } from '@/lib/leitura/caixas'
 import { confirmar } from '@/components/ui/confirm-dialog'
 
 type Modo = 'scroll' | 'flip' | 'capitulo'
@@ -931,6 +932,9 @@ export function LeitorDocumento({ doc, trilha }: {
     // Acessibilidade: o cabeçalho é um botão — abre por Enter/Espaço, não só clique de mouse.
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); (e.currentTarget as HTMLElement).click() } }
     const ligados: HTMLElement[] = []
+    const limpezasTab: (() => void)[] = []
+    // Caixas em TABELA recolhem via helper compartilhado; ao alternar, realinha os grifos.
+    const onTabToggle = () => { window.dispatchEvent(new Event('resize')); setTimeout(() => window.dispatchEvent(new Event('resize')), 320) }
     // `aplicar` idempotente + rAF + MutationObserver (igual ao admin): garante o recolhimento mesmo
     // se o conteúdo montar/mutar depois (era o motivo de "não recolher igual no admin" no aluno).
     const aplicar = () => {
@@ -959,6 +963,8 @@ export function LeitorDocumento({ doc, trilha }: {
         cab.setAttribute('aria-expanded', 'false')
         cab.addEventListener('click', onCab); cab.addEventListener('keydown', onKey); ligados.push(cab)
       }
+      // Caixas em TABELA (ENTENDIMENTO importado do Word) — mesmo recolher/expandir, via helper compartilhado.
+      limpezasTab.push(prepararCaixasTabela(cont, onTabToggle))
     }
     aplicar()
     const raf = requestAnimationFrame(aplicar)
@@ -966,7 +972,7 @@ export function LeitorDocumento({ doc, trilha }: {
     const raf2 = requestAnimationFrame(() => window.dispatchEvent(new Event('resize')))
     const mo = new MutationObserver(aplicar)
     mo.observe(cont, { childList: true, subtree: true })
-    return () => { cancelAnimationFrame(raf); cancelAnimationFrame(raf2); mo.disconnect(); for (const c of ligados) { c.removeEventListener('click', onCab); c.removeEventListener('keydown', onKey) } }
+    return () => { cancelAnimationFrame(raf); cancelAnimationFrame(raf2); mo.disconnect(); for (const c of ligados) { c.removeEventListener('click', onCab); c.removeEventListener('keydown', onKey) }; for (const l of limpezasTab) l() }
   }, [doc.html])
 
   return (

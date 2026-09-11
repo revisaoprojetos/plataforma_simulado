@@ -12,6 +12,7 @@ import { salvarConteudoHtml } from '@/app/admin/leitura/upload-actions'
 import { DiffEspelho } from '@/components/leitura/diff-espelho'
 import { listarVersoesDocumento, carregarDiffDocumento, reverterAlteracao } from '@/app/admin/leitura/alteracoes-actions'
 import { listarQuestoesDocumento, type QuestaoDoc } from '@/app/admin/leitura/actions'
+import { prepararCaixasTabela } from '@/lib/leitura/caixas'
 import type { BlocoDiff, DiffDoc, VersaoInfo } from '@/lib/leitura/diff-tipos'
 
 /** Card read-only "Questão no contexto" — injetado na prévia do admin no ponto do artigo. */
@@ -171,7 +172,10 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
       else box.setAttribute('data-aberto', '1')
     }
     const ligados: HTMLElement[] = []
+    const limpezasTab: (() => void)[] = []
     const aplicar = () => {
+      // Caixas em TABELA (ENTENDIMENTO importado do Word) — mesmo recolher/expandir, via helper compartilhado.
+      limpezasTab.push(prepararCaixasTabela(cont))
       // Pega data-caixa (novo) E as classes legadas box-stj/box-stf (conteúdo antigo).
       const caixas = Array.from(cont.querySelectorAll<HTMLElement>('[data-caixa="stj"], [data-caixa="stf"], .box-stj, .box-stf'))
       for (const box of caixas) {
@@ -199,15 +203,14 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
     const raf = requestAnimationFrame(aplicar)
     const mo = new MutationObserver(aplicar)
     mo.observe(cont, { childList: true, subtree: true })
-    return () => { cancelAnimationFrame(raf); mo.disconnect(); for (const c of ligados) c.removeEventListener('click', onCab) }
+    return () => { cancelAnimationFrame(raf); mo.disconnect(); for (const c of ligados) c.removeEventListener('click', onCab); for (const l of limpezasTab) l() }
   }, [editando, html])
 
-  // Índice (CAPÍTULO→Art→§) do conteúdo, para o professor navegar a prévia (mesma hierarquia do leitor).
+  // Índice IGUAL AO DO ALUNO: só CAPÍTULOS (expansíveis) + ARTIGOS (títulos/§/incisos ficam de fora).
+  type Sec = { id: string; dispId: string | null; artId: string | null; tipo: string; label: string }
   const secoes = useMemo(() => {
-    type Sec = { dispId: string | null; artId: string | null; nivel: number; label: string }
     if (typeof window === 'undefined' || !html) return [] as Sec[]
     const parsed = new DOMParser().parseFromString(html, 'text/html')
-    const NIVEL: Record<string, number> = { livro: 0, parte: 0, titulo: 0, capitulo: 0, secao: 0, subsecao: 0, artigo: 1, paragrafo: 2, inciso: 3, alinea: 4, item: 4 }
     const disp = Array.from(parsed.querySelectorAll('[data-disp]'))
     const src = disp.length ? disp : Array.from(parsed.querySelectorAll('[data-art]'))
     return src.map((el): Sec => {
@@ -215,10 +218,22 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
       const artId = el.getAttribute('data-art')
       const tipo = el.getAttribute('data-disp-tipo') || 'artigo'
       const id = dispId || `art-${artId}`
-      const nivel = disp.length ? (NIVEL[tipo] ?? Math.min(4, (id.match(/\./g) || []).length + 1)) : 0
-      return { dispId, artId, nivel, label: (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60) || id }
+      return { id, dispId, artId, tipo, label: (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 70) || id }
     })
   }, [html])
+  // Agrupa em capítulo → artigos (mesma regra do leitor): capítulo pelo rótulo; só artigos entram.
+  const ehCap = (s: Sec) => s.tipo !== 'artigo' && /^\s*cap[íi]tulo\b/i.test(s.label)
+  const tocGrupos = useMemo(() => {
+    const grupos: { cap: Sec | null; artigos: Sec[] }[] = []
+    let atual: { cap: Sec | null; artigos: Sec[] } | null = null
+    for (const s of secoes) {
+      if (ehCap(s)) { atual = { cap: s, artigos: [] }; grupos.push(atual) }
+      else if (s.tipo === 'artigo') { if (!atual) { atual = { cap: null, artigos: [] }; grupos.push(atual) } atual.artigos.push(s) }
+    }
+    return grupos
+  }, [secoes])
+  const [tocAberto, setTocAberto] = useState<Set<string>>(new Set())
+  const toggleCap = (id: string) => setTocAberto((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
   function pular(s: { dispId: string | null; artId: string | null }) {
     const cont = scrollRef.current; if (!cont) return
     const alvo = (s.dispId ? cont.querySelector(`[data-disp="${CSS.escape(s.dispId)}"]`) : s.artId ? cont.querySelector(`[data-art="${s.artId}"]`) : null) as HTMLElement | null
@@ -592,29 +607,53 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
               </p>
             )}
 
-            {/* Painel ÍNDICE */}
+            {/* Painel ÍNDICE — IGUAL AO DO ALUNO: capítulos expansíveis + artigos (árvore de hierarquia). */}
             {(!podeComparar || aba === 'indice') && (
-              secoes.length > 0 ? (
-                <div className="min-h-0 flex-1 space-y-px overflow-y-auto pr-1">
-                  {secoes.map((s, i) => (
-                    <div key={i}>
-                      {/* Divisória tracejada antes de cada CAPÍTULO/TÍTULO/SEÇÃO (menos o primeiro). */}
-                      {s.nivel === 0 && i > 0 && <div className="mx-1 my-1.5 border-t border-dashed border-border" />}
-                      <button
-                        onClick={() => pular(s)}
-                        className={cn(
-                          'block w-full truncate rounded-md py-1 pr-1.5 text-left leading-tight transition',
-                          s.nivel === 0
-                            ? 'bg-muted/40 text-xs font-bold text-foreground hover:bg-primary/10 hover:text-primary'
-                            : 'text-[11px] text-muted-foreground hover:bg-muted hover:text-foreground',
+              tocGrupos.length > 0 ? (
+                <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                  {tocGrupos.map((g, gi) => {
+                    // Artigos soltos (antes de qualquer capítulo): lista simples, sem cabeçalho.
+                    if (!g.cap) return (
+                      <div key={`solto-${gi}`}>
+                        {g.artigos.map((s, i) => (
+                          <button key={`${s.id}-${i}`} onClick={() => pular(s)} title={s.label} className="block w-full truncate rounded py-1 pl-2 pr-2 text-left text-xs font-medium text-foreground transition-colors hover:bg-muted">{s.label}</button>
+                        ))}
+                      </div>
+                    )
+                    const cap = g.cap
+                    const tem = g.artigos.length > 0
+                    const aberto = tocAberto.has(cap.id)
+                    return (
+                      <div key={`${cap.id}-${gi}`}>
+                        <div className="flex items-center gap-0.5">
+                          <button onClick={() => pular(cap)} className="min-w-0 flex-1 truncate rounded py-1 pl-2 pr-1 text-left text-xs font-semibold text-foreground transition-colors hover:bg-muted" title={cap.label}>{cap.label}</button>
+                          {tem && (
+                            <button onClick={() => toggleCap(cap.id)} aria-label={aberto ? 'Recolher capítulo' : 'Expandir capítulo'} aria-expanded={aberto} className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted">
+                              <ChevronDown className="h-3.5 w-3.5 transition-transform duration-300 ease-out" style={{ transform: aberto ? 'rotate(180deg)' : 'none' }} />
+                            </button>
+                          )}
+                        </div>
+                        {tem && (
+                          <div className="grid transition-[grid-template-rows] duration-300 ease-out" style={{ gridTemplateRows: aberto ? '1fr' : '0fr' }}>
+                            <div className="min-h-0 overflow-hidden">
+                              <div className="mb-1 mt-0.5 ml-3">
+                                {g.artigos.map((s, i) => {
+                                  const ultimo = i === g.artigos.length - 1
+                                  return (
+                                    <div key={`${s.id}-${i}`} className="relative pl-4">
+                                      <span aria-hidden className="absolute left-0 w-px bg-border" style={{ top: 0, bottom: ultimo ? '50%' : 0 }} />
+                                      <span aria-hidden className="absolute left-0 top-1/2 h-px w-4 bg-border" />
+                                      <button onClick={() => pular(s)} title={s.label} className="block w-full truncate rounded py-1 pl-1 pr-2 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">{s.label}</button>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          </div>
                         )}
-                        style={{ paddingLeft: 8 + s.nivel * 12, fontWeight: s.nivel === 1 ? 600 : undefined, opacity: s.nivel >= 3 ? 0.75 : 1 }}
-                        title={s.label}
-                      >
-                        {s.label}
-                      </button>
-                    </div>
-                  ))}
+                      </div>
+                    )
+                  })}
                 </div>
               ) : (
                 <p className="px-1 py-2 text-xs text-muted-foreground">Sem seções detectadas neste conteúdo.</p>
