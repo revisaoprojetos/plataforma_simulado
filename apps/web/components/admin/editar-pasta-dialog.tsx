@@ -165,6 +165,9 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
             {/* Capa do card (imagem inteira, 4:5) */}
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Capa (imagem inteira — usada no card)</label>
+              <p className="text-[11px] text-muted-foreground/70">
+                {cardView === 'ticket' ? 'Proporção 4:3 (horizontal) · ex.: 1200×900px' : 'Proporção 4:5 (vertical) · ex.: 1000×1250px'} · JPG, PNG ou WebP
+              </p>
               <input ref={cardRef} type="file" accept="image/*" className="hidden" onChange={(e) => { abrirCropper(e.target.files?.[0] ?? null, 'card'); e.target.value = '' }} />
               {capaCard ? (
                 // Miniatura na PROPORÇÃO do card do modo ativo (pôster 4:5 / ticket 4:3), altura fixa
@@ -182,6 +185,7 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
                   className="flex h-32 w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed text-muted-foreground transition-colors hover:border-primary hover:text-foreground">
                   <ImagePlus className="h-6 w-6" />
                   <span className="text-sm font-medium">Adicionar capa do card</span>
+                  <span className="text-[11px] text-muted-foreground/70">{cardView === 'ticket' ? '4:3 · ex.: 1200×900px' : '4:5 · ex.: 1000×1250px'}</span>
                 </button>
               )}
             </div>
@@ -189,6 +193,7 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
             {/* Imagem larga (banner 16:4 — trilha e card ticket) */}
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Imagem larga (banner — usada na trilha e no card ticket)</label>
+              <p className="text-[11px] text-muted-foreground/70">Bem larga (~7:1, horizontal) · ex.: 2740×400px · JPG, PNG ou WebP</p>
               <input ref={largaRef} type="file" accept="image/*" className="hidden" onChange={(e) => { abrirCropper(e.target.files?.[0] ?? null, 'banner'); e.target.value = '' }} />
               {capaLarga ? (
                 // Banner largo: tira de largura total na proporção real (~2740×400) — fica baixa, nunca gigante.
@@ -205,6 +210,7 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
                   className="flex h-24 w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed text-muted-foreground transition-colors hover:border-primary hover:text-foreground">
                   <ImagePlus className="h-6 w-6" />
                   <span className="text-sm font-medium">Adicionar imagem larga</span>
+                  <span className="text-[11px] text-muted-foreground/70">~7:1 · ex.: 2740×400px</span>
                 </button>
               )}
             </div>
