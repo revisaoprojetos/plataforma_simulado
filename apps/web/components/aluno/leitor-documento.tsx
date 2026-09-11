@@ -583,6 +583,57 @@ export function LeitorDocumento({ doc, trilha }: {
 
   const proseStyle = useMemo<React.CSSProperties>(() => ({ fontSize: fonte, lineHeight: 1.7, color: cores.fg }), [fonte, cores.fg])
 
+  // ── Conteúdo + overlays MEMOIZADOS (anti-flash). ──
+  // Sem isto, QUALQUER re-render (ex.: expandir/recolher um capítulo no sumário → muda `tocAberto`)
+  // recria o div do conteúdo E os overlays com `mix-blend-mode: multiply`. O navegador então
+  // re-rasteriza a camada blendada da lei INTEIRA e, em documentos grandes, pinta um FRAME BRANCO
+  // ("piscar"/"apagar"). Memoizados pelos SEUS dados → cliques que não os afetam reusam o MESMO
+  // elemento (React pula a subárvore por igualdade referencial) e nada re-rasteriza.
+  const conteudoEl = useMemo(() => (
+    <div
+      ref={contentRef}
+      className={cn('leitura-conteudo leitura-prosa px-6 py-6 [&_a]:underline [&_h1]:mb-3 [&_h1]:mt-4 [&_h1]:text-2xl [&_h1]:font-bold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-xl [&_h2]:font-bold [&_h3]:mb-1 [&_h3]:mt-3 [&_h3]:text-lg [&_h3]:font-semibold [&_li]:ml-6 [&_li]:list-disc [&_p]:mb-3 [&_table]:my-3 [&_table]:w-full [&_td]:border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:px-2 [&_th]:py-1', semGrifos && 'sem-grifos')}
+      style={modo === 'flip'
+        ? { ...proseStyle, columnWidth: colW || undefined, columnGap: GAP, columnFill: 'auto', height: '100%' }
+        : proseStyle}
+      dangerouslySetInnerHTML={{ __html: doc.html }}
+    />
+  ), [doc.html, semGrifos, modo, colW, proseStyle])
+
+  const grifosOverlay = useMemo(() => (
+    <div className="pointer-events-none absolute inset-0" aria-hidden>
+      {grifos.map((g) => {
+        if (semGrifos && !ehEstrutural(g.tipo)) return null
+        const gr = grifosRects[g.id]; if (!gr) return null
+        const info = (GRIFOS as any)[g.tipo]
+        const label = info?.label ?? 'Grifo'
+        return gr.rects.map((r, i) => (
+          <div key={`g-${g.id}-${i}`} className="absolute rounded-[2px]" title={label} style={{ left: r.left, top: r.top, width: r.width, height: r.height, background: corDoGrifo(g.tipo), opacity: 0.42, mixBlendMode: 'multiply' }}>
+            {i === 0 && ehEstrutural(g.tipo) && (
+              <span className="absolute -top-4 left-0 whitespace-nowrap rounded px-1 text-[9px] font-bold uppercase tracking-wide text-white" style={{ background: corDoGrifo(g.tipo), mixBlendMode: 'normal' }}>{label}</span>
+            )}
+          </div>
+        ))
+      })}
+    </div>
+  ), [grifos, grifosRects, semGrifos])
+
+  const anotacoesOverlay = useMemo(() => (
+    <div ref={overlayRef} className="pointer-events-none absolute inset-0" aria-hidden>
+      {anotacoes.map((a) => (rectsPorId[a.id] ?? []).map((r, i) => (
+        <div key={`${a.id}-${i}`} className="absolute rounded-[2px]" style={{ left: r.left, top: r.top, width: r.width, height: r.height, background: a.cor, opacity: 0.4, mixBlendMode: 'multiply' }} />
+      )))}
+    </div>
+  ), [anotacoes, rectsPorId])
+
+  const matchesOverlay = useMemo(() => matches.length === 0 ? null : (
+    <div className="pointer-events-none absolute inset-0" aria-hidden>
+      {matches.map((m, mi) => m.rects.map((r, i) => (
+        <div key={`m-${mi}-${i}`} className="absolute rounded-[2px]" style={{ left: r.left, top: r.top, width: r.width, height: r.height, background: '#f97316', opacity: mi === matchIdx ? 0.6 : 0.32, outline: mi === matchIdx ? '1px solid #ea580c' : 'none' }} />
+      )))}
+    </div>
+  ), [matches, matchIdx])
+
   // #4 — caixas "ENTENDIMENTO DO STJ/STF" viram ACORDEÃO: recolhidas mostram só o cabeçalho;
   // clicar no cabeçalho abre o corpo (envolvido em .caixa-corpo/.caixa-corpo-in, grid-rows).
   // Envolver o corpo não muda ordem/texto dos nós → a "espinha" das âncoras dos grifos fica intacta.
@@ -796,44 +847,13 @@ export function LeitorDocumento({ doc, trilha }: {
               className={cn('relative', modo !== 'flip' && 'mx-auto max-w-3xl')}
               style={modo === 'flip' ? { height: '100%', transform: `translateX(-${pagina * (colW + GAP)}px)`, transition: 'transform 220ms ease' } : undefined}
             >
-              <div
-                ref={contentRef}
-                className={cn('leitura-conteudo leitura-prosa px-6 py-6 [&_a]:underline [&_h1]:mb-3 [&_h1]:mt-4 [&_h1]:text-2xl [&_h1]:font-bold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-xl [&_h2]:font-bold [&_h3]:mb-1 [&_h3]:mt-3 [&_h3]:text-lg [&_h3]:font-semibold [&_li]:ml-6 [&_li]:list-disc [&_p]:mb-3 [&_table]:my-3 [&_table]:w-full [&_td]:border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:px-2 [&_th]:py-1', semGrifos && 'sem-grifos')}
-                style={modo === 'flip'
-                  ? { ...proseStyle, columnWidth: colW || undefined, columnGap: GAP, columnFill: 'auto', height: '100%' }
-                  : proseStyle}
-                dangerouslySetInnerHTML={{ __html: doc.html }}
-              />
+              {conteudoEl}
               {/* Overlay de GRIFOS EDITORIAIS (conteúdo). Some no "modo sem grifos" (exceto estruturais). */}
-              <div className="pointer-events-none absolute inset-0" aria-hidden>
-                {grifos.map((g) => {
-                  if (semGrifos && !ehEstrutural(g.tipo)) return null
-                  const gr = grifosRects[g.id]; if (!gr) return null
-                  const info = (GRIFOS as any)[g.tipo]
-                  const label = info?.label ?? 'Grifo'
-                  return gr.rects.map((r, i) => (
-                    <div key={`g-${g.id}-${i}`} className="absolute rounded-[2px]" title={label} style={{ left: r.left, top: r.top, width: r.width, height: r.height, background: corDoGrifo(g.tipo), opacity: 0.42, mixBlendMode: 'multiply' }}>
-                      {i === 0 && ehEstrutural(g.tipo) && (
-                        <span className="absolute -top-4 left-0 whitespace-nowrap rounded px-1 text-[9px] font-bold uppercase tracking-wide text-white" style={{ background: corDoGrifo(g.tipo), mixBlendMode: 'normal' }}>{label}</span>
-                      )}
-                    </div>
-                  ))
-                })}
-              </div>
+              {grifosOverlay}
               {/* Overlay das anotações PESSOAIS (por cima dos grifos) */}
-              <div ref={overlayRef} className="pointer-events-none absolute inset-0" aria-hidden>
-                {anotacoes.map((a) => (rectsPorId[a.id] ?? []).map((r, i) => (
-                  <div key={`${a.id}-${i}`} className="absolute rounded-[2px]" style={{ left: r.left, top: r.top, width: r.width, height: r.height, background: a.cor, opacity: 0.4, mixBlendMode: 'multiply' }} />
-                )))}
-              </div>
+              {anotacoesOverlay}
               {/* Overlay dos resultados de busca (realce laranja; atual mais forte) */}
-              {matches.length > 0 && (
-                <div className="pointer-events-none absolute inset-0" aria-hidden>
-                  {matches.map((m, mi) => m.rects.map((r, i) => (
-                    <div key={`m-${mi}-${i}`} className="absolute rounded-[2px]" style={{ left: r.left, top: r.top, width: r.width, height: r.height, background: '#f97316', opacity: mi === matchIdx ? 0.6 : 0.32, outline: mi === matchIdx ? '1px solid #ea580c' : 'none' }} />
-                  )))}
-                </div>
-              )}
+              {matchesOverlay}
             </div>
           </div>
 
