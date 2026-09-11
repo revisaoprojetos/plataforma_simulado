@@ -52,7 +52,21 @@ export function LeitorDocumento({ doc, trilha }: {
   const [secoes, setSecoes] = useState<Secao[]>([])
   // Modo capítulo: navega pelos títulos estruturais (nível 0). capAtual = índice do capítulo atual.
   const [capAtual, setCapAtual] = useState(0)
-  const capitulos = useMemo(() => secoes.filter((s) => s.nivel === 0), [secoes])
+  const capitulos = useMemo(() => secoes.filter((s) => s.tipo === 'capitulo'), [secoes])
+  // Índice/sumário: SÓ capítulos (expansíveis) + artigos. Ignora livro/§/inciso/… (e "Livros do Tombo",
+  // que são tabelas). Cada artigo guarda o capítulo-pai; capítulos começam recolhidos.
+  const tocItens = useMemo(() => {
+    const out: { s: Secao; isCap: boolean; parentCap: string | null }[] = []
+    let cur: string | null = null
+    for (const s of secoes) {
+      if (s.tipo === 'capitulo') { cur = s.id; out.push({ s, isCap: true, parentCap: null }) }
+      else if (s.tipo === 'artigo') out.push({ s, isCap: false, parentCap: cur })
+    }
+    return out
+  }, [secoes])
+  const capsComFilhos = useMemo(() => { const set = new Set<string>(); for (const it of tocItens) if (!it.isCap && it.parentCap) set.add(it.parentCap); return set }, [tocItens])
+  const [tocAberto, setTocAberto] = useState<Set<string>>(new Set())
+  const toggleCap = (id: string) => setTocAberto((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
 
   // Modo virar-página
   const [pagina, setPagina] = useState(0)
@@ -674,13 +688,30 @@ export function LeitorDocumento({ doc, trilha }: {
           {/* Sumário */}
           <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
             <p className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide" style={{ color: cores.muted }}>Sumário</p>
-            {secoes.length === 0 ? (
+            {tocItens.length === 0 ? (
               <p className="px-1 text-xs" style={{ color: cores.muted }}>Sem seções detectadas.</p>
-            ) : secoes.map((s, i) => (
-              <button key={`${s.id}-${i}`} onClick={() => pular(s)} className="block w-full truncate rounded py-1 pr-2 text-left text-xs transition-colors hover:bg-black/5" style={{ color: cores.fg, paddingLeft: 8 + s.nivel * 12, fontWeight: s.tipo === 'secao' || s.tipo === 'artigo' ? 600 : 400, opacity: s.nivel >= 2 ? 0.8 : 1 }} title={s.label}>
-                {s.label}
-              </button>
-            ))}
+            ) : tocItens.map((it, i) => {
+              if (it.isCap) {
+                const tem = capsComFilhos.has(it.s.id)
+                const aberto = tocAberto.has(it.s.id)
+                return (
+                  <div key={`${it.s.id}-${i}`} className="flex items-center gap-0.5">
+                    <button onClick={() => pular(it.s)} className="min-w-0 flex-1 truncate rounded py-1 pl-2 pr-1 text-left text-xs font-semibold transition-colors hover:bg-black/5" style={{ color: cores.fg }} title={it.s.label}>{it.s.label}</button>
+                    {tem && (
+                      <button onClick={() => toggleCap(it.s.id)} aria-label={aberto ? 'Recolher capítulo' : 'Expandir capítulo'} className="shrink-0 rounded p-1 transition-colors hover:bg-black/5" style={{ color: cores.muted }}>
+                        {aberto ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                      </button>
+                    )}
+                  </div>
+                )
+              }
+              if (it.parentCap && !tocAberto.has(it.parentCap)) return null
+              return (
+                <button key={`${it.s.id}-${i}`} onClick={() => pular(it.s)} className="block w-full truncate rounded py-1 pl-6 pr-2 text-left text-xs font-medium transition-colors hover:bg-black/5" style={{ color: cores.fg }} title={it.s.label}>
+                  {it.s.label}
+                </button>
+              )
+            })}
           </div>
         </aside>
       )}

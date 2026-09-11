@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { HelpCircle, Trash2, Star, Plus, ListTree } from 'lucide-react'
+import { HelpCircle, Trash2, Star, Plus, ListTree, ChevronUp, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { MarkdownContent } from '@/components/markdown-content'
 import { AdicionarQuestoesDialog } from '@/components/admin/adicionar-questoes-dialog'
@@ -13,8 +13,8 @@ import {
   type QuestaoDoc,
 } from '@/app/admin/leitura/actions'
 
-// Item do índice (mesma hierarquia do leitor: CAPÍTULO → Art. → §…).
-interface OutlineItem { key: string; artId: string | null; nivel: number; isArtigo: boolean; label: string }
+// Item do índice — SÓ capítulos (expansíveis) + artigos (§/inciso/"Livros do Tombo" ficam de fora).
+interface OutlineItem { key: string; artId: string | null; nivel: number; isArtigo: boolean; isCap: boolean; label: string }
 
 const NIVEL: Record<string, number> = { livro: 0, parte: 0, titulo: 0, capitulo: 0, secao: 0, subsecao: 0, artigo: 1, paragrafo: 2, inciso: 3, alinea: 4, item: 4 }
 
@@ -27,6 +27,8 @@ export function LeituraQuestoesAdmin({ documentoId, versao, html }: { documentoI
   const [itens, setItens] = useState<QuestaoDoc[]>([])
   const [disciplinas, setDisciplinas] = useState<{ id: string; nome: string }[]>([])
   const [carregando, setCarregando] = useState(true)
+  const [capAberto, setCapAberto] = useState<Set<string>>(new Set())
+  const toggleCap = (k: string) => setCapAberto((p) => { const n = new Set(p); n.has(k) ? n.delete(k) : n.add(k); return n })
   const [, start] = useTransition()
 
   // Índice (CAPÍTULO→Art→§) parseado do HTML salvo — só artigos (data-art) recebem inserção.
@@ -41,14 +43,14 @@ export function LeituraQuestoesAdmin({ documentoId, versao, html }: { documentoI
         const artId = el.getAttribute('data-art')
         const tipo = el.getAttribute('data-disp-tipo') || 'artigo'
         const nivel = disp.length ? (NIVEL[tipo] ?? 1) : 1
+        const isArtigo = disp.length ? tipo === 'artigo' : true
         return {
           key: dispId || artId || String(i),
-          artId,
-          nivel,
-          isArtigo: disp.length ? tipo === 'artigo' : true,
+          artId, nivel, isArtigo, isCap: disp.length ? tipo === 'capitulo' : false,
           label: (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 90) || (dispId || artId || `Item ${i + 1}`),
         }
-      })
+        // filtro abaixo mantém só capítulo + artigo
+      }).filter((o) => o.isCap || o.isArtigo)
     } catch { return [] }
   }, [html])
 
@@ -71,6 +73,14 @@ export function LeituraQuestoesAdmin({ documentoId, versao, html }: { documentoI
     for (const q of itens) { const arr = m.get(q.aposArtigo) ?? []; arr.push(q); m.set(q.aposArtigo, arr) }
     return m
   }, [itens])
+  // Índice em 2 níveis: capítulo (expansível) → artigos. Cada artigo guarda o capítulo-pai.
+  const tocItens = useMemo(() => {
+    const out: { o: OutlineItem; parentCap: string | null }[] = []
+    let cur: string | null = null
+    for (const o of outline) { if (o.isCap) { cur = o.key; out.push({ o, parentCap: null }) } else out.push({ o, parentCap: cur }) }
+    return out
+  }, [outline])
+  const capsComFilhos = useMemo(() => { const s = new Set<string>(); for (const it of tocItens) if (!it.o.isCap && it.parentCap) s.add(it.parentCap); return s }, [tocItens])
 
   function inserir(items: QuestaoBancoBuscaItem[], apos: number) {
     start(async () => {
@@ -120,33 +130,31 @@ export function LeituraQuestoesAdmin({ documentoId, versao, html }: { documentoI
       </div>
 
       <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-        {outline.map((item) => {
+        {tocItens.map((it) => {
+          const item = it.o
+
+          // Capítulo — cabeçalho em negrito com seta de expandir/recolher à direita.
+          if (item.isCap) {
+            const tem = capsComFilhos.has(item.key)
+            const aberto = capAberto.has(item.key)
+            return (
+              <div key={item.key} className="flex items-center gap-1 border-b bg-muted/40 px-4 py-2.5">
+                <span className="min-w-0 flex-1 truncate text-[13px] font-bold uppercase tracking-wide text-foreground">{item.label}</span>
+                {tem && (
+                  <button type="button" onClick={() => toggleCap(item.key)} aria-label={aberto ? 'Recolher capítulo' : 'Expandir capítulo'} className="shrink-0 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                    {aberto ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                  </button>
+                )}
+              </div>
+            )
+          }
+
+          // Artigo — só aparece se o capítulo-pai estiver expandido (ou se não tiver capítulo).
+          if (it.parentCap && !capAberto.has(it.parentCap)) return null
           const apos = item.artId ? Number(item.artId) : null
           const placed = apos != null ? (porArtigo.get(apos) ?? []) : []
-
-          // Cabeçalho estrutural (CAPÍTULO/TÍTULO/LIVRO) — separador em negrito.
-          if (item.nivel === 0) {
-            return (
-              <div key={item.key} className="border-b bg-muted/40 px-4 py-2.5 text-[13px] font-bold uppercase tracking-wide text-foreground">
-                {item.label}
-              </div>
-            )
-          }
-
-          const indent = { paddingLeft: `${0.75 + Math.min(item.nivel - 1, 3) * 1.1}rem` }
-
-          // Sub-itens (§, inciso, alínea): contexto do índice, sem inserção.
-          if (!item.isArtigo) {
-            return (
-              <div key={item.key} className="border-b py-1.5 pr-4 text-xs text-muted-foreground last:border-0" style={indent}>
-                {item.label}
-              </div>
-            )
-          }
-
-          // Artigo: rótulo + questões inseridas + botão de inserir.
           return (
-            <div key={item.key} className="border-b py-2.5 pr-4 last:border-0" style={indent}>
+            <div key={item.key} className="border-b py-2.5 pl-6 pr-4 last:border-0">
               <p className="text-sm font-medium text-foreground">{item.label}</p>
 
               {apos != null && (
