@@ -16,6 +16,7 @@ import { construirEspinha, rangeParaAncora, ancoraParaRange, rectsDoRange, type 
 import { QuestaoLeitura } from '@/components/aluno/questao-leitura'
 import { LeituraAtualizacaoAviso } from '@/components/aluno/leitura-atualizacao-aviso'
 import { GRIFOS, corDoGrifo, ehEstrutural } from '@/lib/leitura/grifos'
+import { confirmar } from '@/components/ui/confirm-dialog'
 
 type Modo = 'scroll' | 'flip' | 'capitulo'
 type Tema = 'claro' | 'sepia' | 'escuro'
@@ -145,6 +146,8 @@ export function LeitorDocumento({ doc, trilha }: {
   const temGrifosBaked = /data-grifo=|data-caixa=|\bhl-[ygr]\b|\bbox-(stj|stf|cinza|atencao)/.test(doc.html)
   const [semGrifos, setSemGrifos] = useState(!!doc.prefs?.semGrifos)
   const [mostrarMeus, setMostrarMeus] = useState(true) // "Meus grifos": ligado por padrão; desligar oculta os grifos do aluno
+  // Modo caneta: cor armada (hex) ou 'apagar' ou null. Escolhe a ferramenta e DEPOIS seleciona o texto.
+  const [ferramenta, setFerramenta] = useState<string | null>(null)
   const [grifosRects, setGrifosRects] = useState<Record<string, { rects: RectRel[]; tipo: string }>>({})
 
   // Anotações (grifos/notas)
@@ -548,7 +551,7 @@ export function LeitorDocumento({ doc, trilha }: {
     else irPara(Math.floor(el.offsetLeft / (colW + GAP)))
   }
 
-  // ── Anotações: seleção → popover, criar/editar/excluir, pular ──
+  // ── Anotações: seleção → (modo caneta aplica direto | senão popover), criar/editar/excluir, pular ──
   function aoSelecionar() {
     const s = window.getSelection()
     const root = contentRef.current, cont = containerRef.current
@@ -558,6 +561,12 @@ export function LeitorDocumento({ doc, trilha }: {
     const esp = espinhaRef.current ?? construirEspinha(root)
     const anc = rangeParaAncora(root, esp, range)
     if (!anc || !anc.exact.trim()) return
+    // Modo CANETA: a ferramenta (cor ou borracha) já está escolhida → aplica direto na seleção.
+    if (ferramenta) {
+      s.removeAllRanges(); setSel(null)
+      if (ferramenta === 'apagar') apagarNoRange(anc.inicio, anc.fim); else grifarAncora(anc, ferramenta)
+      return
+    }
     const rc = range.getBoundingClientRect(), cr = cont.getBoundingClientRect()
     setSel({ anc, x: Math.min(Math.max(60, rc.left + rc.width / 2 - cr.left), cr.width - 60), y: rc.bottom - cr.top + 6 })
   }
@@ -597,15 +606,32 @@ export function LeitorDocumento({ doc, trilha }: {
   const registrar = (b: AcaoGrifo[]) => { if (b.length) { setPassado((p) => [...p, b].slice(-60)); setFuturo([]) } }
 
   // ── Ações do usuário (registram no histórico). opLock evita reentrância (clique/Enter rápido). ──
-  async function criarAnotacao(cor: string) {
-    if (!sel || opLock.current) return
-    const a = sel.anc
-    setSel(null); window.getSelection()?.removeAllRanges()
+  // Grifa uma âncora (trecho) na cor dada — usada tanto pelo modo caneta quanto pelo popover.
+  async function grifarAncora(a: { inicio: number; fim: number; exact: string; prefix: string; suffix: string }, cor: string) {
+    if (opLock.current) return
     opLock.current = true
     const novo = await inserirServidor({ id: 'tmp', inicio: a.inicio, fim: a.fim, exact: a.exact, prefix: a.prefix, suffix: a.suffix, cor, nota: null, origem: 'propria' })
     opLock.current = false
     if (!novo) { toast.error('Erro ao grifar.'); return }
     registrar([{ k: 'add', a: novo }])
+  }
+  async function criarAnotacao(cor: string) {
+    if (!sel) return
+    const a = sel.anc
+    setSel(null); window.getSelection()?.removeAllRanges()
+    await grifarAncora(a, cor)
+  }
+  // Apaga os grifos PRÓPRIOS que tocam um intervalo (borracha do modo caneta).
+  async function apagarNoRange(inicio: number, fim: number) {
+    if (opLock.current) return
+    const alvos = anotacoes.filter((a) => a.origem === 'propria' && a.inicio < fim && a.fim > inicio)
+    if (!alvos.length) return
+    opLock.current = true
+    const oks = await Promise.all(alvos.map((a) => removerServidor(a)))
+    opLock.current = false
+    const removidos = alvos.filter((_, i) => oks[i])
+    if (removidos.length) registrar(removidos.map((a) => ({ k: 'del' as const, a })))
+    if (oks.some((o) => !o)) avisarFalha()
   }
 
   async function atualizarAnotacao(id: string, patch: Partial<Pick<AnotacaoAluno, 'cor' | 'nota'>>) {
@@ -630,19 +656,19 @@ export function LeitorDocumento({ doc, trilha }: {
     registrar([{ k: 'del', a }])
   }
 
-  // Apaga os grifos PRÓPRIOS que tocam a seleção atual (ferramenta borracha do painel Anotações).
-  async function apagarGrifoSelecao() {
-    if (!sel || opLock.current) return
-    const { inicio, fim } = sel.anc
-    const alvos = anotacoes.filter((a) => a.origem === 'propria' && a.inicio < fim && a.fim > inicio)
-    setSel(null); window.getSelection()?.removeAllRanges()
-    if (!alvos.length) { toast.message('Nenhum grifo seu na seleção.'); return }
-    opLock.current = true
-    const oks = await Promise.all(alvos.map((a) => removerServidor(a)))
-    opLock.current = false
-    const removidos = alvos.filter((_, i) => oks[i])
-    if (removidos.length) registrar(removidos.map((a) => ({ k: 'del' as const, a })))
-    if (oks.some((o) => !o)) avisarFalha()
+  // Reset "Grifos do Revisão": volta ao padrão (todos visíveis). Confirma se houver alteração (ocultos).
+  async function resetarRevisao() {
+    if (!semGrifos) { toast.message('Os grifos do Revisão já estão no padrão.'); return }
+    if (!(await confirmar({ titulo: 'Restaurar os grifos do Revisão?', mensagem: 'Todos os grifos do Revisão voltam a aparecer, como no início.', confirmar: 'Restaurar' }))) return
+    setSemGrifos(false)
+    toast.success('Grifos do Revisão restaurados.')
+  }
+  // Reset "Meus grifos": apaga TODOS os grifos do aluno (volta em branco). Confirma se houver algum.
+  async function resetarMeus() {
+    const meus = anotacoes.filter((a) => a.origem === 'propria')
+    if (!meus.length) { toast.message('Você não tem grifos para apagar.'); return }
+    if (!(await confirmar({ titulo: 'Apagar todos os seus grifos?', mensagem: `Isso remove ${meus.length} grifo(s) seu(s) e deixa em branco. Dá pra desfazer no histórico.`, confirmar: 'Apagar tudo', destrutivo: true }))) return
+    resetarGrifos()
   }
 
   async function resetarGrifos() {
@@ -1078,37 +1104,46 @@ export function LeitorDocumento({ doc, trilha }: {
             <button onClick={() => setBarraDir(false)} className="rounded p-1" style={{ color: cores.muted }} aria-label="Fechar"><X className="h-4 w-4" /></button>
           </div>
 
-          {/* Ferramentas de grifo (planejadas): Grifos do Revisão + grifar/apagar seleção + desfazer/refazer/resetar. */}
+          {/* Ferramentas de grifo: toggles (com reset) do Revisão e Meus grifos + caneta + histórico. */}
           <div className="space-y-3 border-b px-3 py-3" style={{ borderColor: '#0000001a' }}>
             {(grifos.length > 0 || temGrifosBaked) && (
-              <label className="flex cursor-pointer items-center justify-between text-xs" style={{ color: cores.muted }}>
+              <div className="flex items-center justify-between text-xs" style={{ color: cores.muted }}>
                 <span className="inline-flex items-center gap-1"><Highlighter className="h-3.5 w-3.5" /> Grifos do Revisão</span>
-                {/* Marcado = MOSTRAR os grifos do Revisão; desmarcado = ler sem grifo. */}
-                <input type="checkbox" checked={!semGrifos} onChange={(e) => setSemGrifos(!e.target.checked)} className="h-4 w-4 rounded border" />
-              </label>
+                <div className="flex items-center gap-2">
+                  <button onClick={resetarRevisao} title="Restaurar os grifos do Revisão" className="rounded p-0.5 transition hover:text-foreground"><RotateCcw className="h-3.5 w-3.5" /></button>
+                  {/* Marcado = MOSTRAR os grifos do Revisão; desmarcado = ler sem grifo. */}
+                  <input type="checkbox" checked={!semGrifos} onChange={(e) => setSemGrifos(!e.target.checked)} className="h-4 w-4 rounded border" aria-label="Mostrar grifos do Revisão" />
+                </div>
+              </div>
             )}
             {/* Meus grifos: ligado por padrão; desligar OCULTA (bloqueia) os grifos do próprio aluno. */}
-            <label className="flex cursor-pointer items-center justify-between text-xs" style={{ color: cores.muted }}>
+            <div className="flex items-center justify-between text-xs" style={{ color: cores.muted }}>
               <span className="inline-flex items-center gap-1"><StickyNote className="h-3.5 w-3.5" /> Meus grifos</span>
-              <input type="checkbox" checked={mostrarMeus} onChange={(e) => setMostrarMeus(e.target.checked)} className="h-4 w-4 rounded border" />
-            </label>
+              <div className="flex items-center gap-2">
+                <button onClick={resetarMeus} title="Apagar todos os meus grifos (voltar em branco)" className="rounded p-0.5 transition hover:text-destructive"><RotateCcw className="h-3.5 w-3.5" /></button>
+                <input type="checkbox" checked={mostrarMeus} onChange={(e) => setMostrarMeus(e.target.checked)} className="h-4 w-4 rounded border" aria-label="Mostrar meus grifos" />
+              </div>
+            </div>
             <div>
               <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide" style={{ color: cores.muted }}>Grifar seleção</p>
-              {/* preventDefault no mousedown p/ não perder a seleção do texto ao clicar aqui. */}
-              <div className="flex items-center gap-1.5" onMouseDown={(e) => e.preventDefault()}>
+              {/* Modo caneta: escolhe a ferramenta (cor ou borracha) e DEPOIS seleciona o texto no leitor. */}
+              <div className="flex items-center gap-1.5">
                 {CORES_GRIFO.map((c) => (
-                  <button key={c} onClick={() => criarAnotacao(c)} disabled={!sel} title={sel ? `Grifar em ${c}` : 'Selecione um trecho primeiro'} className="h-6 w-6 rounded-full border border-black/10 transition enabled:hover:scale-110 disabled:opacity-30" style={{ background: c }} aria-label={`Grifar em ${c}`} />
+                  <button key={c} onClick={() => setFerramenta(ferramenta === c ? null : c)} title={`Grifar em ${c}`} className={cn('h-6 w-6 rounded-full transition hover:scale-110', ferramenta === c ? 'ring-2 ring-primary ring-offset-1 ring-offset-transparent' : 'border border-black/10')} style={{ background: c }} aria-label={`Grifar em ${c}`} />
                 ))}
-                <button onClick={apagarGrifoSelecao} disabled={!sel} title="Apagar grifo da seleção" className="ml-auto rounded-md border p-1.5 transition enabled:hover:text-destructive disabled:opacity-30" style={{ borderColor: '#0000001a', color: cores.fg }}><Eraser className="h-3.5 w-3.5" /></button>
+                <button onClick={() => setFerramenta(ferramenta === 'apagar' ? null : 'apagar')} title="Borracha: apagar grifo ao selecionar" className={cn('ml-auto rounded-md border p-1.5 transition', ferramenta === 'apagar' ? 'text-destructive ring-2 ring-primary' : 'hover:text-destructive')} style={{ borderColor: '#0000001a', color: ferramenta === 'apagar' ? undefined : cores.fg }}><Eraser className="h-3.5 w-3.5" /></button>
               </div>
-              {!sel && <p className="mt-1.5 text-[11px]" style={{ color: cores.muted }}>Selecione um trecho no texto para grifar.</p>}
+              <p className="mt-1.5 text-[11px]" style={{ color: cores.muted }}>
+                {ferramenta === 'apagar' ? 'Agora selecione o texto para apagar o grifo.'
+                  : ferramenta ? 'Agora selecione o texto para grifar.'
+                  : 'Escolha uma cor e depois selecione o texto.'}
+              </p>
             </div>
             <div className="flex items-center justify-between gap-1 text-xs" style={{ color: cores.muted }}>
-              <span className="inline-flex items-center gap-1"><RotateCcw className="h-3.5 w-3.5" /> Histórico</span>
+              <span className="inline-flex items-center gap-1"><Undo2 className="h-3.5 w-3.5" /> Histórico</span>
               <div className="flex items-center gap-1">
                 <button onClick={desfazer} disabled={!passado.length} title="Voltar (desfazer)" className="rounded border p-1 transition disabled:opacity-40" style={{ borderColor: '#0000001a', color: cores.fg }}><Undo2 className="h-3.5 w-3.5" /></button>
                 <button onClick={refazer} disabled={!futuro.length} title="Avançar (refazer)" className="rounded border p-1 transition disabled:opacity-40" style={{ borderColor: '#0000001a', color: cores.fg }}><Redo2 className="h-3.5 w-3.5" /></button>
-                <button onClick={resetarGrifos} title="Resetar meus grifos" className="rounded border p-1 transition hover:text-destructive" style={{ borderColor: '#0000001a', color: cores.fg }}><RotateCcw className="h-3.5 w-3.5" /></button>
               </div>
             </div>
           </div>
