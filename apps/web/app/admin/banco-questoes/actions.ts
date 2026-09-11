@@ -6,6 +6,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
+import { invalidarBoardVisual } from '@/lib/cache/relatorio-cache'
 import { hospedarBase64 } from '@/lib/storage/hospedar-base64'
 import { softDelete } from '@/lib/soft-delete'
 import { tipoEhCertoErrado, alternativasSaoCertoErrado } from '@/lib/simulado/formato'
@@ -193,8 +194,12 @@ export async function atualizarBanco(id: string, nome: string, cor: string | nul
   if (error) return { ok: false, error: error.message }
 
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_pastas', entidadeId: id, depois: { nome: titulo, cor, icone, capa: !!capaUrl, capaCard: !!capaCardUrl } })
+  // O board de simulados cacheia o visual (capa/cor/ícone) sob `board-tv`, cuja chave não muda ao
+  // anexar uma capa nova — sem esta invalidação a imagem só apareceria após o TTL (30 min) ou nunca.
+  await invalidarBoardVisual(g.tenantId).catch(() => {})
   revalidatePath('/admin/banco-questoes')
   revalidatePath(`/admin/banco-questoes/${id}`)
+  revalidatePath('/admin/simulados')
   return { ok: true }
 }
 

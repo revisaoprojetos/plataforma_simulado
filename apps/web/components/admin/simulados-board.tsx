@@ -281,8 +281,9 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
         'group relative flex h-32 overflow-hidden rounded-2xl border bg-card shadow-sm transition-all duration-300 sm:h-36',
         selecionado ? 'ring-2 ring-primary' : 'ring-1 ring-black/5 hover:-translate-y-0.5 hover:shadow-lg',
       )}>
-        {/* metade esquerda: imagem/degradê */}
-        <div className="relative w-[38%] max-w-[12rem] shrink-0 overflow-hidden">
+        {/* metade esquerda: imagem/degradê. Aspecto 4:3 = o MESMO recorte que o cropper usa p/ o card
+            no modo ticket → object-cover não re-corta (o enquadramento do admin aparece igual). */}
+        <div className="relative aspect-[4/3] h-full shrink-0 overflow-hidden">
           {capaT
             ? <img src={capaT} alt="" className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105" />
             : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}

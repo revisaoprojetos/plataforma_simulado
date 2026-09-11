@@ -118,6 +118,16 @@ export async function invalidarRelatoriosSimulado(tenantId: string | null, simul
   await invalidarPorPadrao(tenantId, `*${simuladoId}*`)
 }
 
+/**
+ * Invalida SÓ o cache do "visual" do board de simulados (`relatorio:{tenant}:board-tv:*`) —
+ * tipos + capas/cores/ícones. Chamado quando o visual de um banco muda (capa/cor/ícone via
+ * `atualizarBanco`): a chave inclui `hashIds(simIds)`, que NÃO muda quando só a capa é anexada,
+ * então sem isto a imagem nova fica presa no cache (degradê) por até TTL_RELATORIO (30 min).
+ */
+export async function invalidarBoardVisual(tenantId: string | null): Promise<void> {
+  await invalidarPorPadrao(tenantId, 'board-tv:*')
+}
+
 async function invalidarPorPadrao(tenantId: string | null, sufixo: string): Promise<void> {
   const r = redis()
   if (!r || !tenantId) return
