@@ -82,6 +82,12 @@ export function LeitorDocumento({ doc, trilha }: {
   // de fora. Cada artigo guarda o capítulo-pai; capítulos começam recolhidos.
   const ehCap = (s: Secao) => s.tipo !== 'artigo' && /^\s*cap[íi]tulo\b/i.test(s.label)
   const capitulos = useMemo(() => secoes.filter(ehCap), [secoes])
+  // Capítulo (índice) de cada seção — usado no modo Capítulo p/ o sumário saltar ao capítulo certo.
+  const capDeSecao = useMemo(() => {
+    const m = new Map<string, number>(); let ci = -1
+    for (const s of secoes) { if (ehCap(s)) ci++; m.set(s.id, Math.max(0, ci)) }
+    return m
+  }, [secoes])
   // Agrupa o sumário em capítulos → artigos-filhos (artigos antes de qualquer capítulo caem em `cap:null`),
   // pra renderizar cada grupo num contêiner que anima abrir/fechar (grid-rows) com a linha de hierarquia.
   const tocGrupos = useMemo(() => {
@@ -233,6 +239,30 @@ export function LeitorDocumento({ doc, trilha }: {
     }
     setSlots(novos)
   }, [doc.html, doc.questoes, trilha?.modo])
+
+  // ── Modo CAPÍTULO: mostra SÓ o capítulo atual (esconde os demais blocos do conteúdo). ──
+  // Cada capítulo vira uma "parte" separada; navega-se pela barra do topo. Restaura tudo ao sair.
+  // Roda ANTES da medição do modo Virar p/ o total de páginas ser medido com tudo visível.
+  useIsoLayout(() => {
+    const ct = contentRef.current
+    if (!ct) return
+    const kids = Array.from(ct.children) as HTMLElement[]
+    const restaura = () => kids.forEach((k) => { if (!k.hasAttribute('data-legenda-oculta')) k.style.removeProperty('display') })
+    if (modo !== 'capitulo' || capitulos.length === 0) { restaura(); return }
+    // Índice do filho-direto do conteúdo que contém cada capítulo (sobe até ser filho direto).
+    const idxCap = capitulos.map((c) => {
+      let n: HTMLElement | null = ct.querySelector<HTMLElement>(`[data-disp="${CSS.escape(c.id)}"]`)
+      while (n && n.parentElement !== ct) n = n.parentElement
+      return n ? kids.indexOf(n) : -1
+    })
+    const cur = Math.min(Math.max(0, capAtual), capitulos.length - 1)
+    // 1º capítulo inclui a introdução (decreto/preâmbulo) antes dele; demais começam no próprio capítulo.
+    const ini = cur === 0 ? 0 : (idxCap[cur] >= 0 ? idxCap[cur] : 0)
+    let fim = kids.length
+    for (let j = cur + 1; j < idxCap.length; j++) { if (idxCap[j] >= 0) { fim = idxCap[j]; break } }
+    kids.forEach((k, i) => { if (!k.hasAttribute('data-legenda-oculta')) k.style.display = (i >= ini && i < fim) ? '' : 'none' })
+    window.dispatchEvent(new Event('resize')) // realinha os grifos para o capítulo visível
+  }, [modo, capAtual, capitulos, doc.html, slots])
 
   // ── Medição do modo virar-página ──
   // 1) Largura da coluna = largura REAL da coluna = caixa de conteúdo do texto (clientWidth do
@@ -446,16 +476,35 @@ export function LeitorDocumento({ doc, trilha }: {
     touchX.current = null
   }
 
+  const flashAlvo = (el: HTMLElement) => {
+    el.classList.remove('leitura-alvo'); void el.offsetWidth; el.classList.add('leitura-alvo')
+    window.setTimeout(() => el.classList.remove('leitura-alvo'), 1700)
+  }
+
+  // Modo Capítulo: navega trocando o capítulo mostrado (um por vez) + volta ao topo.
+  const irCapitulo = useCallback((i: number) => {
+    setCapAtual(Math.max(0, Math.min(capitulos.length - 1, i)))
+    requestAnimationFrame(() => viewportRef.current?.scrollTo({ top: 0 }))
+  }, [capitulos.length])
+
   // ── Pular para uma seção (sumário) ──
   function pular(s: Secao) {
     const root = contentRef.current
+    // No modo Capítulo, o alvo pode estar num capítulo oculto → troca de capítulo primeiro e rola depois.
+    if (modo === 'capitulo') {
+      setCapAtual(capDeSecao.get(s.id) ?? 0)
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const el = contentRef.current?.querySelector<HTMLElement>(`[data-disp="${CSS.escape(s.id)}"]`) ?? contentRef.current?.querySelector<HTMLElement>(`[data-art="${s.art}"]`)
+        if (!el) return
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' }); flashAlvo(el)
+      }))
+      return
+    }
     const el = root?.querySelector<HTMLElement>(`[data-disp="${CSS.escape(s.id)}"]`) ?? root?.querySelector<HTMLElement>(`#${CSS.escape(s.id)}`) ?? root?.querySelector<HTMLElement>(`[data-art="${s.art}"]`)
     if (!el) return
     if (modo !== 'flip') { el.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
     else { const alvo = Math.floor(el.offsetLeft / (colW + GAP)); irPara(alvo) }
-    // Pisca o dispositivo alvo (remove+reflow p/ reiniciar a animação em cliques repetidos).
-    el.classList.remove('leitura-alvo'); void el.offsetWidth; el.classList.add('leitura-alvo')
-    window.setTimeout(() => el.classList.remove('leitura-alvo'), 1700)
+    flashAlvo(el)
   }
 
   function irMatch(delta: number) {
@@ -861,11 +910,19 @@ export function LeitorDocumento({ doc, trilha }: {
       {/* Área central */}
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Topo: progresso + concluir */}
-        <div className="flex items-center gap-3 border-b px-3 py-2" style={{ borderColor: '#0000001a' }}>
+        <div className="relative flex items-center gap-3 border-b px-3 py-2" style={{ borderColor: '#0000001a' }}>
           {!menuAberto && (
             <button onClick={() => setMenuAberto(true)} className="rounded p-1" style={{ color: cores.muted }} aria-label="Abrir menu"><PanelLeft className="h-4 w-4" /></button>
           )}
           <span className="truncate text-sm font-semibold" style={{ color: cores.fg }}>{doc.titulo}</span>
+          {/* Modo CAPÍTULO: navegar ← anterior / próximo → centralizado na top bar. */}
+          {modo === 'capitulo' && capitulos.length > 0 && (
+            <div className="absolute left-1/2 top-1/2 flex max-w-[46vw] -translate-x-1/2 -translate-y-1/2 items-center gap-1 rounded-lg border px-1 py-0.5 shadow-sm" style={{ borderColor: '#0000001a', background: cores.bg }}>
+              <button onClick={() => irCapitulo(capAtual - 1)} disabled={capAtual <= 0} className="shrink-0 rounded-md p-1 transition disabled:opacity-30" style={{ color: cores.fg }} aria-label="Capítulo anterior"><ChevronLeft className="h-4 w-4" /></button>
+              <span className="min-w-0 truncate px-1 text-xs font-semibold" style={{ color: cores.fg }} title={capitulos[Math.min(capAtual, capitulos.length - 1)]?.label}>{capitulos[Math.min(capAtual, capitulos.length - 1)]?.label ?? ''}</span>
+              <button onClick={() => irCapitulo(capAtual + 1)} disabled={capAtual >= capitulos.length - 1} className="shrink-0 rounded-md p-1 transition disabled:opacity-30" style={{ color: cores.fg }} aria-label="Próximo capítulo"><ChevronRight className="h-4 w-4" /></button>
+            </div>
+          )}
           <div className="ml-auto flex items-center gap-3">
             <button onClick={toggleFavorito} title={favorito ? 'Remover dos favoritos' : 'Favoritar'} className="rounded-lg border p-1.5 transition-colors" style={{ borderColor: '#0000001a', color: favorito ? '#f59e0b' : cores.fg }} aria-label="Favoritar">
               <Star className={cn('h-4 w-4', favorito && 'fill-amber-400')} />
@@ -967,18 +1024,6 @@ export function LeitorDocumento({ doc, trilha }: {
             </>
           )}
 
-          {/* Modo CAPÍTULO: barra inferior com ← anterior / próximo → (navega pelos títulos estruturais). */}
-          {modo === 'capitulo' && capitulos.length > 0 && (
-            <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 border-t px-3 py-2" style={{ borderColor: '#0000001a', background: cores.bg }}>
-              <button onClick={() => { const i = Math.max(0, capAtual - 1); setCapAtual(i); pular(capitulos[i]) }} disabled={capAtual <= 0} className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition disabled:opacity-30" style={{ borderColor: '#0000001a', color: cores.fg }}>
-                <ChevronLeft className="h-4 w-4" /> Capítulo anterior
-              </button>
-              <span className="truncate px-2 text-[11px]" style={{ color: cores.muted }} title={capitulos[Math.min(capAtual, capitulos.length - 1)]?.label}>{capitulos[Math.min(capAtual, capitulos.length - 1)]?.label ?? ''}</span>
-              <button onClick={() => { const i = Math.min(capitulos.length - 1, capAtual + 1); setCapAtual(i); pular(capitulos[i]) }} disabled={capAtual >= capitulos.length - 1} className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 text-xs font-medium transition disabled:opacity-30" style={{ borderColor: '#0000001a', color: cores.fg }}>
-                Próximo capítulo <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          )}
         </div>
       </div>
 
