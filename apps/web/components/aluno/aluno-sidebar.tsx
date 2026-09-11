@@ -242,8 +242,8 @@ export function AlunoSidebar({
             )} />
             <button type="button" onClick={sair} className={btnFooter}>Sair</button>
           </div>
-          {/* colapsada: sino de notificações (abaixo do tema) */}
-          <div className="hidden group-data-[collapsible=icon]:block"><NotificacaoBellAluno /></div>
+          {/* colapsada: sino de notificações (abaixo do tema) — balão em diagonal (não há espaço à esquerda) */}
+          <div className="hidden group-data-[collapsible=icon]:block"><NotificacaoBellAluno diagonal /></div>
           {/* colapsada: ícone de sair */}
           <button type="button" onClick={sair} title="Sair" aria-label="Sair" className="hidden h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-[color:var(--sidebar-accent)] group-data-[collapsible=icon]:flex">
             <LogOut className="h-4 w-4" />

@@ -23,8 +23,10 @@ function tempoRelativoLongo(iso: string): string {
 }
 
 /** Sino de notificações do aluno — lê /api/aluno/notificacoes (estado `lida` real, persistido).
- *  Painel em PORTAL, ancorado ao sino (rodapé da sidebar), abre PARA CIMA com animação. */
-export function NotificacaoBellAluno() {
+ *  Painel em PORTAL, ancorado ao sino (rodapé da sidebar), abre PARA CIMA com animação.
+ *  `diagonal` (sidebar recolhida): o balão de aviso fica na diagonal superior-DIREITA do sino,
+ *  com a ponta diagonal apontando pro ícone — sem isso ele buga colado na borda esquerda. */
+export function NotificacaoBellAluno({ diagonal = false }: { diagonal?: boolean }) {
   const [items, setItems] = useState<NotifItem[]>([])
   const [naoLidas, setNaoLidas] = useState(0)
   const [montado, setMontado] = useState(false) // presente no DOM (durante a animação)
@@ -76,21 +78,31 @@ export function NotificacaoBellAluno() {
 
   useEffect(() => () => { if (fecharTimer.current) clearTimeout(fecharTimer.current) }, [])
 
-  // Balão de aviso acima do sino: recalcula a posição (centro do sino) quando há não-lidas.
+  // Balão de aviso acima do sino: recalcula a posição quando há não-lidas.
   // Portal → não é cortado pela sidebar. Some sozinho quando `naoLidas` zera (marcar lidas).
+  // ResizeObserver no botão: ao recolher/expandir a sidebar (o sino é display-togglado entre duas
+  // instâncias) o tamanho muda de 0↔36 → recalcula/limpa sem depender de um resize da janela.
   useEffect(() => {
     if (naoLidas <= 0) { setBalaoPos(null); return }
     const calc = () => {
       const r = btnRef.current?.getBoundingClientRect()
-      if (!r) return
-      const centro = r.left + r.width / 2
-      const left = Math.min(Math.max(centro, 96), window.innerWidth - 96) // clamp p/ não sair da tela
-      setBalaoPos({ left, bottom: window.innerHeight - r.top + 10 })
+      if (!r || !r.width) { setBalaoPos(null); return } // instância oculta (sidebar no outro estado)
+      if (diagonal) {
+        // Ancora no canto superior-direito do sino; o balão cresce p/ a direita e p/ cima.
+        const left = Math.min(r.right - 2, window.innerWidth - 210)
+        setBalaoPos({ left, bottom: window.innerHeight - r.top + 4 })
+      } else {
+        const centro = r.left + r.width / 2
+        const left = Math.min(Math.max(centro, 96), window.innerWidth - 96) // clamp p/ não sair da tela
+        setBalaoPos({ left, bottom: window.innerHeight - r.top + 10 })
+      }
     }
     calc()
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(calc) : null
+    if (ro && btnRef.current) ro.observe(btnRef.current)
     window.addEventListener('resize', calc)
-    return () => window.removeEventListener('resize', calc)
-  }, [naoLidas])
+    return () => { ro?.disconnect(); window.removeEventListener('resize', calc) }
+  }, [naoLidas, diagonal])
 
   async function marcarTodasLidas() {
     setItems((prev) => prev.map((i) => ({ ...i, lida: true })))
@@ -130,16 +142,27 @@ export function NotificacaoBellAluno() {
         )}
       </button>
 
-      {/* Balão de aviso ACIMA do sino — só quando há não-lidas e o painel está fechado. Some ao marcar lidas.
-          A ponta (seta) fica ancorada no sino e o balão cresce para a ESQUERDA. */}
+      {/* Balão de aviso — só quando há não-lidas e o painel está fechado. Some ao marcar lidas.
+          Normal: acima do sino, cresce p/ a ESQUERDA, ponta pra baixo.
+          Diagonal (sidebar recolhida): na diagonal superior-DIREITA do sino, ponta diagonal p/ o ícone. */}
       {naoLidas > 0 && !montado && balaoPos && typeof document !== 'undefined' && createPortal(
-        <div className="pointer-events-none fixed z-[115] translate-x-1.5" style={{ left: balaoPos.left, bottom: balaoPos.bottom }} aria-hidden>
-          <div className="balao-pill absolute -right-3 bottom-0 flex items-center whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-bold text-white shadow-lg" style={{ background: 'var(--brand-accent, var(--primary))' }}>
-            {naoLidas} {naoLidas === 1 ? 'nova notificação' : 'novas notificações'}
-            {/* ponta apontando pra baixo, alinhada ao sino */}
-            <span className="absolute -bottom-1 right-3 h-2.5 w-2.5 rotate-45" style={{ background: 'var(--brand-accent, var(--primary))' }} />
+        diagonal ? (
+          <div className="pointer-events-none fixed z-[115]" style={{ left: balaoPos.left, bottom: balaoPos.bottom }} aria-hidden>
+            <div className="balao-pill absolute bottom-0 left-1 flex items-center whitespace-nowrap rounded-full rounded-bl-md px-3 py-1.5 text-xs font-bold text-white shadow-lg" style={{ background: 'var(--brand-accent, var(--primary))' }}>
+              {naoLidas} {naoLidas === 1 ? 'nova notificação' : 'novas notificações'}
+              {/* ponta DIAGONAL no canto inferior-esquerdo, apontando p/ o sino (baixo-esquerda) */}
+              <span className="absolute -bottom-1 -left-1 h-3 w-3 rotate-45 rounded-[3px]" style={{ background: 'var(--brand-accent, var(--primary))' }} />
+            </div>
           </div>
-        </div>,
+        ) : (
+          <div className="pointer-events-none fixed z-[115] translate-x-1.5" style={{ left: balaoPos.left, bottom: balaoPos.bottom }} aria-hidden>
+            <div className="balao-pill absolute -right-3 bottom-0 flex items-center whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-bold text-white shadow-lg" style={{ background: 'var(--brand-accent, var(--primary))' }}>
+              {naoLidas} {naoLidas === 1 ? 'nova notificação' : 'novas notificações'}
+              {/* ponta apontando pra baixo, alinhada ao sino */}
+              <span className="absolute -bottom-1 right-3 h-2.5 w-2.5 rotate-45" style={{ background: 'var(--brand-accent, var(--primary))' }} />
+            </div>
+          </div>
+        ),
         document.body,
       )}
 
