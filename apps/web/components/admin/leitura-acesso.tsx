@@ -1,69 +1,64 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Save, Search, Users, UserCheck, Info, Check, ArrowUp, ArrowDown, ChevronsUpDown } from 'lucide-react'
+import { Loader2, Save, Search, Users, UserCheck, Info, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
   carregarAtribuicao, definirGruposDocumento,
-  carregarEstudantesDocumento, definirEstudantesDocumento, listarEstudantesTenant,
-  type EstudanteLinha,
+  carregarEstudantesDocumento, definirEstudantesDocumento, listarEstudantesTenantPag,
+  type EstudanteAcessoLinha,
 } from '@/app/admin/leitura/actions'
 
 type Grupo = { id: string; nome: string; cor: string | null; atribuido: boolean }
-type OrdCampo = 'nome' | 'email' | 'cpf'
 const POR_PAGINA = 50
 
-// Aba "Acesso": define QUEM lê esta leitura — grupos (turmas) + tabela de alunos
-// (estilo aba Estudantes do banco). Sem nenhuma atribuição = liberado a todos.
+// Aba "Acesso": define QUEM lê esta leitura — grupos (turmas) + alunos. Sem nenhuma atribuição =
+// liberado a todos. Alunos são PAGINADOS server-side (busca + range) — antes carregava TODOS os
+// ~18k alunos no cliente e filtrava/paginava no front (travava a aba). Padrão da lista de Estudantes.
 export function LeituraAcesso({ documentoId }: { documentoId: string }) {
   const [carregando, setCarregando] = useState(true)
   const [salvando, setSalvando] = useState(false)
   const [grupos, setGrupos] = useState<Grupo[]>([])
   const [marcados, setMarcados] = useState<Set<string>>(new Set())
-  const [alunos, setAlunos] = useState<EstudanteLinha[]>([])
   const [acesso, setAcesso] = useState<Set<string>>(new Set())
+  // Página atual de alunos (server-side).
+  const [alunos, setAlunos] = useState<EstudanteAcessoLinha[]>([])
+  const [total, setTotal] = useState(0)
   const [busca, setBusca] = useState('')
-  const [ordCampo, setOrdCampo] = useState<OrdCampo>('nome')
-  const [ordDir, setOrdDir] = useState<'asc' | 'desc'>('asc')
   const [pagina, setPagina] = useState(0)
+  const [carregandoAlunos, setCarregandoAlunos] = useState(false)
 
+  // Grupos + alunos JÁ liberados (conjunto pequeno) — uma vez ao abrir.
   useEffect(() => {
     ;(async () => {
-      const [a, e, todos] = await Promise.all([carregarAtribuicao(documentoId), carregarEstudantesDocumento(documentoId), listarEstudantesTenant()])
+      const [a, e] = await Promise.all([carregarAtribuicao(documentoId), carregarEstudantesDocumento(documentoId)])
       if (a.ok && a.grupos) { setGrupos(a.grupos); setMarcados(new Set(a.grupos.filter((g) => g.atribuido).map((g) => g.id))) }
       if (e.ok && e.itens) setAcesso(new Set(e.itens.map((x) => x.id)))
-      if (todos.ok && todos.itens) setAlunos(todos.itens)
       setCarregando(false)
     })()
   }, [documentoId])
 
-  function ordenar(campo: OrdCampo) {
-    if (ordCampo === campo) setOrdDir((d) => (d === 'asc' ? 'desc' : 'asc'))
-    else { setOrdCampo(campo); setOrdDir('asc') }
-  }
+  // Página de alunos: busca (debounce) + range no SERVIDOR — nunca puxa a base inteira.
+  useEffect(() => {
+    let vivo = true
+    setCarregandoAlunos(true)
+    const t = setTimeout(async () => {
+      const r = await listarEstudantesTenantPag(busca.trim(), pagina * POR_PAGINA, POR_PAGINA)
+      if (!vivo) return
+      if (r.ok) { setAlunos(r.itens ?? []); setTotal(r.total ?? 0) }
+      setCarregandoAlunos(false)
+    }, busca ? 300 : 0)
+    return () => { vivo = false; clearTimeout(t) }
+  }, [busca, pagina])
 
-  const filtrados = useMemo(() => {
-    const q = busca.toLowerCase().trim()
-    const base = q ? alunos.filter((a) => a.nome.toLowerCase().includes(q) || (a.email ?? '').toLowerCase().includes(q) || (a.cpf ?? '').includes(q)) : alunos
-    const dir = ordDir === 'asc' ? 1 : -1
-    return [...base].sort((x, y) => String(x[ordCampo] ?? '').localeCompare(String(y[ordCampo] ?? ''), 'pt-BR') * dir)
-  }, [alunos, busca, ordCampo, ordDir])
+  useEffect(() => { setPagina(0) }, [busca])
 
-  const totalPag = Math.max(1, Math.ceil(filtrados.length / POR_PAGINA))
-  const paginaItens = useMemo(() => filtrados.slice(pagina * POR_PAGINA, pagina * POR_PAGINA + POR_PAGINA), [filtrados, pagina])
-  useEffect(() => { setPagina(0) }, [busca, ordCampo, ordDir])
-  useEffect(() => { if (pagina > totalPag - 1) setPagina(0) }, [totalPag, pagina])
-
-  const filtradosTodosMarcados = filtrados.length > 0 && filtrados.every((a) => acesso.has(a.id))
+  const totalPag = Math.max(1, Math.ceil(total / POR_PAGINA))
+  const paginaTodosMarcados = alunos.length > 0 && alunos.every((a) => acesso.has(a.id))
   function toggleAcesso(id: string) { setAcesso((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n }) }
-  function toggleFiltrados() {
-    setAcesso((p) => {
-      const n = new Set(p)
-      if (filtradosTodosMarcados) filtrados.forEach((a) => n.delete(a.id))
-      else filtrados.forEach((a) => n.add(a.id))
-      return n
-    })
+  function togglePagina() {
+    setAcesso((p) => { const n = new Set(p); if (paginaTodosMarcados) alunos.forEach((a) => n.delete(a.id)); else alunos.forEach((a) => n.add(a.id)); return n })
   }
   function toggleGrupo(id: string) { setMarcados((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n }) }
 
@@ -79,18 +74,6 @@ export function LeituraAcesso({ documentoId }: { documentoId: string }) {
   }
 
   const semRestricao = marcados.size === 0 && acesso.size === 0
-
-  const SortHead = ({ label, campo, className }: { label: string; campo: OrdCampo; className?: string }) => {
-    const ativo = ordCampo === campo
-    return (
-      <th className={cn('px-3 py-2 text-left font-medium', className)}>
-        <button type="button" onClick={() => ordenar(campo)} className={cn('group -ml-1 flex items-center gap-1 rounded px-1 py-0.5 hover:text-foreground', ativo ? 'text-foreground' : 'text-muted-foreground')}>
-          <span>{label}</span>
-          {ativo ? (ordDir === 'asc' ? <ArrowUp className="h-3.5 w-3.5" /> : <ArrowDown className="h-3.5 w-3.5" />) : <ChevronsUpDown className="h-3.5 w-3.5 opacity-40 group-hover:opacity-70" />}
-        </button>
-      </th>
-    )
-  }
 
   if (carregando) return <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando acesso…</div>
 
@@ -121,7 +104,7 @@ export function LeituraAcesso({ documentoId }: { documentoId: string }) {
         )}
       </div>
 
-      {/* Alunos — tabela (estilo aba Estudantes do banco) */}
+      {/* Alunos — paginado server-side (busca + range) */}
       <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
         <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3">
           <p className="flex items-center gap-1.5 text-sm font-semibold"><UserCheck className="h-4 w-4 text-primary" /> Alunos com acesso <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">{acesso.size}</span></p>
@@ -136,20 +119,22 @@ export function LeituraAcesso({ documentoId }: { documentoId: string }) {
             <thead className="sticky top-0 z-10 bg-background">
               <tr className="border-b">
                 <th className="w-10 px-3 py-2">
-                  <button type="button" onClick={toggleFiltrados} title="Marcar/desmarcar os filtrados"
-                    className={cn('flex h-4 w-4 items-center justify-center rounded border', filtradosTodosMarcados ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>
-                    {filtradosTodosMarcados && <Check className="h-3 w-3" />}
+                  <button type="button" onClick={togglePagina} title="Marcar/desmarcar os desta página"
+                    className={cn('flex h-4 w-4 items-center justify-center rounded border', paginaTodosMarcados ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>
+                    {paginaTodosMarcados && <Check className="h-3 w-3" />}
                   </button>
                 </th>
-                <SortHead label="Nome" campo="nome" />
-                <SortHead label="E-mail" campo="email" className="hidden sm:table-cell" />
-                <SortHead label="CPF" campo="cpf" className="hidden md:table-cell" />
+                <th className="px-3 py-2 text-left font-medium text-muted-foreground">Nome</th>
+                <th className="hidden px-3 py-2 text-left font-medium text-muted-foreground sm:table-cell">E-mail</th>
+                <th className="hidden px-3 py-2 text-left font-medium text-muted-foreground md:table-cell">CPF</th>
               </tr>
             </thead>
             <tbody>
-              {filtrados.length === 0 ? (
-                <tr><td colSpan={4} className="py-10 text-center text-muted-foreground">{alunos.length === 0 ? 'Nenhum aluno cadastrado neste tenant.' : 'Nenhum aluno encontrado.'}</td></tr>
-              ) : paginaItens.map((a) => {
+              {carregandoAlunos ? (
+                <tr><td colSpan={4} className="py-10 text-center text-muted-foreground"><Loader2 className="mx-auto h-4 w-4 animate-spin" /></td></tr>
+              ) : alunos.length === 0 ? (
+                <tr><td colSpan={4} className="py-10 text-center text-muted-foreground">{busca.trim() ? 'Nenhum aluno encontrado.' : 'Nenhum aluno cadastrado neste tenant.'}</td></tr>
+              ) : alunos.map((a) => {
                 const on = acesso.has(a.id)
                 return (
                   <tr key={a.id} onClick={() => toggleAcesso(a.id)} className={cn('cursor-pointer border-b transition-colors hover:bg-muted/40', on && 'bg-primary/5')}>
@@ -167,12 +152,12 @@ export function LeituraAcesso({ documentoId }: { documentoId: string }) {
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2 text-xs text-muted-foreground">
-          <span>{filtrados.length.toLocaleString('pt-BR')} de {alunos.length.toLocaleString('pt-BR')} aluno(s)</span>
+          <span>{total.toLocaleString('pt-BR')} aluno(s){busca.trim() ? ' encontrados' : ''}</span>
           {totalPag > 1 && (
             <div className="flex items-center gap-1.5">
-              <button type="button" onClick={() => setPagina((p) => Math.max(0, p - 1))} disabled={pagina === 0} className="rounded-md border px-2 py-1 font-medium transition-colors hover:bg-muted disabled:opacity-40">Anterior</button>
+              <button type="button" onClick={() => setPagina((p) => Math.max(0, p - 1))} disabled={pagina === 0 || carregandoAlunos} className="rounded-md border px-2 py-1 font-medium transition-colors hover:bg-muted disabled:opacity-40">Anterior</button>
               <span className="px-1 tabular-nums">Pág. {pagina + 1}/{totalPag}</span>
-              <button type="button" onClick={() => setPagina((p) => Math.min(totalPag - 1, p + 1))} disabled={pagina >= totalPag - 1} className="rounded-md border px-2 py-1 font-medium transition-colors hover:bg-muted disabled:opacity-40">Próxima</button>
+              <button type="button" onClick={() => setPagina((p) => Math.min(totalPag - 1, p + 1))} disabled={pagina >= totalPag - 1 || carregandoAlunos} className="rounded-md border px-2 py-1 font-medium transition-colors hover:bg-muted disabled:opacity-40">Próxima</button>
             </div>
           )}
         </div>

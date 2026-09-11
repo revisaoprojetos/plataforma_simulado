@@ -62,6 +62,23 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTa
     return () => window.removeEventListener('resize', medir)
   }, [moduloTab, dentroDeBanco])
 
+  // Pré-carrega EM 2º PLANO as áreas de cada aula do módulo (Conteúdo + Questões) — navegar fica
+  // instantâneo. Escalonado (não dispara tudo junto) p/ não sobrecarregar o dev/servidor. Cancela ao
+  // sair do módulo e refaz ao voltar (o efeito re-roda quando muda o conjunto de aulas/módulo).
+  const aulaIdsKey = aulas.map((a) => a.id).join(',')
+  useEffect(() => {
+    if (!dentroDeBanco || moduloTab !== 'aulas' || !aulaIdsKey) return
+    const rotas = aulaIdsKey.split(',').flatMap((id) => [`/admin/leitura/${id}?tab=config`, `/admin/leitura/${id}/questoes`])
+    let i = 0, cancel = false, timer: ReturnType<typeof setTimeout>
+    const tick = () => {
+      if (cancel || i >= rotas.length) return
+      try { router.prefetch(rotas[i]) } catch { /* ignora */ }
+      i++; timer = setTimeout(tick, 120)
+    }
+    timer = setTimeout(tick, 300) // deixa a UI pintar antes de aquecer as rotas
+    return () => { cancel = true; clearTimeout(timer) }
+  }, [dentroDeBanco, moduloTab, aulaIdsKey, router])
+
   const run = (fn: () => Promise<{ ok: boolean; error?: string }>, okMsg?: string) =>
     start(async () => { const r = await fn(); if (r.ok) { if (okMsg) toast.success(okMsg); router.refresh() } else toast.error(r.error ?? 'Erro') })
 
