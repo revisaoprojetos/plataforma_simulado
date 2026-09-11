@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { limparCabecalhoHtml } from '@/lib/leitura/limpar-cabecalho'
 import { LeituraEditor } from '@/components/admin/leitura-editor'
+import { PrefetchRotas } from '@/components/admin/prefetch-rotas'
 import { type Documento } from '../actions'
 
 export const dynamic = 'force-dynamic'
@@ -54,6 +55,8 @@ export default async function LeituraEditorPage({ params, searchParams }: { para
         versaoEdicao={rascunhoVersao}
         abaInicial={abaInicial}
       />
+      {/* Ao abrir o LegProc, aquece as áreas irmãs (Questões do conteúdo · Alterações) em 2º plano. */}
+      <PrefetchRotas rotas={[`/admin/leitura/${id}/questoes`, `/admin/leitura/${id}/alteracoes`]} />
     </div>
   )
 }

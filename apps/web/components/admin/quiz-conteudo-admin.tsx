@@ -19,16 +19,21 @@ const MODOS: { v: QuizConfig['modo']; label: string; desc: string; Icon: typeof 
 ]
 
 /** Admin da "Questões do conteúdo" (mini-simulado da aula): configuração + a MESMA tabela de questões
- * do banco (QuestoesTabelaBase: busca/filtros/expandir/reordenar/remover) + adicionar do sistema/importar. */
-export function QuizConteudoAdmin({ documentoId }: { documentoId: string }) {
-  const [itens, setItens] = useState<QuizLinha[]>([])
-  const [config, setConfig] = useState<QuizConfig>({ modo: 'imediato', embaralhar: false })
-  const [disciplinas, setDisciplinas] = useState<{ id: string; nome: string }[]>([])
-  const [carregando, setCarregando] = useState(true)
+ * do banco (QuestoesTabelaBase: busca/filtros/expandir/reordenar/remover) + adicionar do sistema/importar.
+ * `initial` (SSR) evita o spinner/waterfall: a área já vem carregada com a página. */
+export function QuizConteudoAdmin({ documentoId, initial }: {
+  documentoId: string
+  initial?: { itens: QuizLinha[]; config: QuizConfig; disciplinas: { id: string; nome: string }[] }
+}) {
+  const [itens, setItens] = useState<QuizLinha[]>(initial?.itens ?? [])
+  const [config, setConfig] = useState<QuizConfig>(initial?.config ?? { modo: 'imediato', embaralhar: false })
+  const [disciplinas, setDisciplinas] = useState<{ id: string; nome: string }[]>(initial?.disciplinas ?? [])
+  const [carregando, setCarregando] = useState(!initial)
   const [erro, setErro] = useState<string | null>(null)
   const [pending, start] = useTransition()
 
   useEffect(() => {
+    if (initial) return // veio pronto do servidor (SSR) — sem spinner/waterfall
     let vivo = true
     ;(async () => {
       const [q, d] = await Promise.allSettled([listarQuizConteudo(documentoId), listarDisciplinasFiltro()])
@@ -38,7 +43,7 @@ export function QuizConteudoAdmin({ documentoId }: { documentoId: string }) {
       setCarregando(false)
     })()
     return () => { vivo = false }
-  }, [documentoId])
+  }, [documentoId, initial])
 
   const jaIds = useMemo(() => new Set(itens.map((i) => i.id)), [itens])
 
