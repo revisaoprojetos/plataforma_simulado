@@ -85,7 +85,7 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
     // fetchAllByIn: além de não truncar em 1000, evita estourar a URL do .in() com muitos ids.
     questoes = await fetchAllByIn<any>(ids, (chunk) =>
       svc.from('simulado_questoes')
-        .select('id, enunciado, tipo, nivel_dificuldade, status, ano, assunto_detalhe, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome), bancas:simulado_bancas(nome), orgaos:simulado_orgaos(nome)')
+        .select('id, enunciado, tipo, formato, nivel_dificuldade, status, ano, assunto_detalhe, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome), bancas:simulado_bancas(nome), orgaos:simulado_orgaos(nome)')
         .in('id', chunk).eq('tenant_id', tidB).order('created_at', { ascending: true }))
   }
 
@@ -263,7 +263,7 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
               cor={corBanco}
               acao={<AdicionarQuestoesDialog bancoId={id} disciplinas={disciplinasFiltro} />}
               questoes={questoes.map((q: any) => ({
-                id: q.id, enunciado: q.enunciado ?? '', nivel_dificuldade: q.nivel_dificuldade,
+                id: q.id, enunciado: q.enunciado ?? '', tipo: q.tipo ?? null, formato: q.formato ?? null, nivel_dificuldade: q.nivel_dificuldade,
                 status: q.status, disciplina: q.disciplinas?.nome ?? null, assunto: q.assuntos?.nome ?? null,
                 assuntoDetalhe: q.assunto_detalhe ?? null, banca: q.bancas?.nome ?? null, orgao: q.orgaos?.nome ?? null, ano: q.ano ?? null,
               }))}

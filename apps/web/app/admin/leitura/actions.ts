@@ -759,10 +759,30 @@ export async function listarEstudantesTenantPag(q: string, offset: number, limit
 
 // ── "Questões do conteúdo" = MINI-SIMULADO da aula (separado das questões inline da leitura) ──
 // A tabela usa o MESMO formato de linha da aba Questões do banco (id = questao_id + disciplina/assunto/dif/status).
-export type QuizLinha = { id: string; enunciado: string; tipo: string | null; nivel_dificuldade: string | null; status: string | null; disciplina: string | null; assunto: string | null; assuntoDetalhe: string | null; banca: string | null; orgao: string | null; ano: number | null }
+export type QuizLinha = { id: string; enunciado: string; tipo: string | null; formato: string | null; nivel_dificuldade: string | null; status: string | null; disciplina: string | null; assunto: string | null; assuntoDetalhe: string | null; banca: string | null; orgao: string | null; ano: number | null }
 export type QuizConfig = { modo: 'imediato' | 'simulado'; embaralhar: boolean }
 const QUIZ_PADRAO: QuizConfig = { modo: 'imediato', embaralhar: false }
 const QUIZ_SEM_TABELA = (m?: string) => /relation .* does not exist|simulado_documento_quiz_questoes|quiz_config|schema cache/i.test(m ?? '')
+
+/** Monta as linhas da tabela (na ordem de `ids`) — tolerante a bases sem `formato`/`assunto_detalhe`. */
+async function montarQuizLinhas(svc: ReturnType<typeof createAdminClient>, tenantId: string, ids: string[]): Promise<QuizLinha[]> {
+  if (!ids.length) return []
+  const SEL = 'id, enunciado, tipo, formato, nivel_dificuldade, status, ano, assunto_detalhe, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome), bancas:simulado_bancas(nome), orgaos:simulado_orgaos(nome)'
+  let qs: any[] | null = null, qerr: any = null
+  ;({ data: qs, error: qerr } = await svc.from('simulado_questoes').select(SEL).eq('tenant_id', tenantId).in('id', ids) as any)
+  if (qerr && /(assunto_detalhe|formato)/i.test(qerr.message)) {
+    ;({ data: qs } = await svc.from('simulado_questoes').select(SEL.replace(', formato', '').replace(', assunto_detalhe', '')).eq('tenant_id', tenantId).in('id', ids) as any)
+  }
+  const byId = new Map((qs ?? []).map((q: any) => [q.id, q]))
+  return ids.map((id) => {
+    const q: any = byId.get(id); if (!q) return null
+    return {
+      id: q.id, enunciado: q.enunciado ?? '', tipo: q.tipo ?? null, formato: q.formato ?? null, nivel_dificuldade: q.nivel_dificuldade ?? null, status: q.status ?? null,
+      disciplina: q.disciplinas?.nome ?? null, assunto: q.assuntos?.nome ?? null, assuntoDetalhe: q.assunto_detalhe ?? null,
+      banca: q.bancas?.nome ?? null, orgao: q.orgaos?.nome ?? null, ano: q.ano ?? null,
+    } as QuizLinha
+  }).filter(Boolean) as QuizLinha[]
+}
 
 export async function listarQuizConteudo(documentoId: string): Promise<{ ok: boolean; itens?: QuizLinha[]; config?: QuizConfig; error?: string }> {
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
@@ -774,33 +794,22 @@ export async function listarQuizConteudo(documentoId: string): Promise<{ ok: boo
   if ((doc as any)?.quiz_config) config = { ...QUIZ_PADRAO, ...(doc as any).quiz_config }
   const ordemIds = (dq ?? []).map((x: any) => x.questao_id)
   if (!ordemIds.length) return { ok: true, itens: [], config }
-  const SEL = 'id, enunciado, tipo, nivel_dificuldade, status, ano, assunto_detalhe, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome), bancas:simulado_bancas(nome), orgaos:simulado_orgaos(nome)'
-  let qs: any[] | null = null, qerr: any = null
-  ;({ data: qs, error: qerr } = await svc.from('simulado_questoes').select(SEL).eq('tenant_id', g.tenantId).in('id', ordemIds) as any)
-  // Tolerante: assunto_detalhe pode não existir em bases sem a migração.
-  if (qerr && /assunto_detalhe/i.test(qerr.message)) ({ data: qs } = await svc.from('simulado_questoes').select(SEL.replace(', assunto_detalhe', '')).eq('tenant_id', g.tenantId).in('id', ordemIds) as any)
-  const byId = new Map((qs ?? []).map((q: any) => [q.id, q]))
-  const itens = ordemIds.map((id: string) => {
-    const q: any = byId.get(id); if (!q) return null
-    return {
-      id: q.id, enunciado: q.enunciado ?? '', tipo: q.tipo ?? null, nivel_dificuldade: q.nivel_dificuldade ?? null, status: q.status ?? null,
-      disciplina: q.disciplinas?.nome ?? null, assunto: q.assuntos?.nome ?? null, assuntoDetalhe: q.assunto_detalhe ?? null,
-      banca: q.bancas?.nome ?? null, orgao: q.orgaos?.nome ?? null, ano: q.ano ?? null,
-    } as QuizLinha
-  }).filter(Boolean) as QuizLinha[]
+  const itens = await montarQuizLinhas(svc, g.tenantId, ordemIds)
   return { ok: true, itens, config }
 }
 
-export async function adicionarQuizQuestoes(documentoId: string, questaoIds: string[]): Promise<{ ok: boolean; error?: string }> {
+export async function adicionarQuizQuestoes(documentoId: string, questaoIds: string[]): Promise<{ ok: boolean; error?: string; linhas?: QuizLinha[] }> {
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
   const ids = [...new Set((questaoIds ?? []).filter(Boolean))]
-  if (!ids.length) return { ok: true }
+  if (!ids.length) return { ok: true, linhas: [] }
   const svc = createAdminClient()
   const { data: mx } = await svc.from('simulado_documento_quiz_questoes').select('ordem').eq('tenant_id', g.tenantId).eq('documento_id', documentoId).order('ordem', { ascending: false }).limit(1).maybeSingle()
   let ordem = ((mx as any)?.ordem ?? -1) + 1
   const { error } = await svc.from('simulado_documento_quiz_questoes').upsert(ids.map((questao_id) => ({ tenant_id: g.tenantId, documento_id: documentoId, questao_id, ordem: ordem++, deletado: false })), { onConflict: 'documento_id,questao_id' })
   if (error) return { ok: false, error: QUIZ_SEM_TABELA(error.message) ? 'Rode a migração 20260910000001 (Questões do conteúdo).' : error.message }
-  revalidatePath(`/admin/leitura/${documentoId}/questoes`); return { ok: true }
+  revalidatePath(`/admin/leitura/${documentoId}/questoes`)
+  // Retorna só as linhas ADICIONADAS (o cliente anexa sem refetch da lista inteira — evita a demora).
+  return { ok: true, linhas: await montarQuizLinhas(svc, g.tenantId, ids) }
 }
 
 /** Remove do quiz por QUESTÃO (a tabela base seleciona por questao_id). */
@@ -822,14 +831,14 @@ export async function reordenarQuizQuestoes(documentoId: string, questaoIds: str
   return { ok: true }
 }
 
-export async function importarQuizQuestoes(documentoId: string, rows: QuestaoImport[]): Promise<{ ok: boolean; count?: number; error?: string }> {
+export async function importarQuizQuestoes(documentoId: string, rows: QuestaoImport[]): Promise<{ ok: boolean; count?: number; error?: string; linhas?: QuizLinha[] }> {
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
   if (!rows?.length) return { ok: false, error: 'Nada para importar.' }
   const imp = await confirmarImportQuestoes(null, rows)
   if (!imp.ok) return { ok: false, error: imp.error ?? 'Falha ao importar as questões.' }
   const r = await adicionarQuizQuestoes(documentoId, imp.ids ?? [])
   if (!r.ok) return { ok: false, error: r.error }
-  return { ok: true, count: (imp.ids ?? []).length }
+  return { ok: true, count: (imp.ids ?? []).length, linhas: r.linhas }
 }
 
 export async function salvarQuizConfig(documentoId: string, config: Partial<QuizConfig>): Promise<{ ok: boolean; error?: string }> {

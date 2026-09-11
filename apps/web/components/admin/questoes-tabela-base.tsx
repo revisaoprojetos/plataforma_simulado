@@ -15,6 +15,7 @@ import { CopiarCodigo } from '@/components/admin/copiar-codigo'
 import { MarkdownContent } from '@/components/markdown-content'
 import { codigoQuestao } from '@/lib/codigo-questao'
 import { useOrdenacao, SortButton } from '@/components/admin/th-ordenavel'
+import { classificarFormato } from '@/lib/simulado/formato'
 
 const difRank: Record<string, number> = { facil: 0, medio: 1, dificil: 2 }
 const stRank: Record<string, number> = { publicada: 0, rascunho: 1, arquivada: 2 }
@@ -23,9 +24,15 @@ const POR_PAGINA = 10
 
 // Linha base de questão (mesma da aba Questões do banco) — REUTILIZÁVEL por qualquer tabela de questões.
 export interface QuestaoLinha {
-  id: string; enunciado: string; tipo?: string | null; nivel_dificuldade?: string | null; status?: string | null
+  id: string; enunciado: string; tipo?: string | null; formato?: string | null; nivel_dificuldade?: string | null; status?: string | null
   disciplina?: string | null; assunto?: string | null; assuntoDetalhe?: string | null
   banca?: string | null; orgao?: string | null; ano?: number | null
+}
+
+/** Rótulo curto do tipo da questão: Discursiva, C/E (certo-errado) ou Múltipla (escolha). */
+function tipoLabel(q: QuestaoLinha): string {
+  if (q.tipo === 'discursiva') return 'Discursiva'
+  return classificarFormato(q.formato, []) === 'certo_errado' ? 'C/E' : 'Múltipla'
 }
 
 const difCfg: Record<string, { letra: string; cls: string }> = {
@@ -133,7 +140,7 @@ export function QuestoesTabelaBase({
   useEffect(() => { setPagina(0) }, [busca, disc, status, dif, sort])
   useEffect(() => { if (pagina > totalPag - 1) setPagina(0) }, [totalPag, pagina])
 
-  const colSpan = 10 + (podeRemover ? 1 : 0) + (podeReordenar ? 1 : 0)
+  const colSpan = 11 + (podeRemover ? 1 : 0) + (podeReordenar ? 1 : 0)
 
   function toggle(id: string) { setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n }) }
   function toggleAll() { setSel((p) => (p.size === visiveis.length ? new Set() : new Set(visiveis.map((q) => q.id)))) }
@@ -213,7 +220,7 @@ export function QuestoesTabelaBase({
 
       <CardContent className="p-0">
         <div className="max-h-[60vh] overflow-auto">
-          <table className="w-full min-w-[1180px] caption-bottom text-sm">
+          <table className="w-full min-w-[1280px] caption-bottom text-sm">
             <TableHeader className="sticky top-0 z-10 bg-background">
               <TableRow>
                 {podeRemover && (
@@ -226,6 +233,7 @@ export function QuestoesTabelaBase({
                 {podeReordenar && <TableHead className="w-14 text-center">Ordem</TableHead>}
                 <TableHead className="w-10">#</TableHead>
                 <TableHead className="min-w-[280px]"><SortButton label="Enunciado" k="enunciado" sort={sort} onSort={ordenarPor} /></TableHead>
+                <TableHead className="w-24 text-center">Tipo</TableHead>
                 <TableHead className="w-40"><SortButton label="Disciplina" k="disciplina" sort={sort} onSort={ordenarPor} /></TableHead>
                 <TableHead className="w-44"><SortButton label="Assunto" k="assunto" sort={sort} onSort={ordenarPor} /></TableHead>
                 <TableHead className="w-44">Assunto específico</TableHead>
@@ -295,6 +303,9 @@ export function QuestoesTabelaBase({
                               <Link href={`${editHrefBase}/${q.id}/editar`} onClick={(e) => e.stopPropagation()} className="block transition-colors hover:text-primary hover:underline">{enun}</Link>
                             </div>
                           </div>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className="inline-block whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{tipoLabel(q)}</span>
                         </TableCell>
                         <TableCell className="whitespace-normal break-words text-xs font-medium uppercase text-muted-foreground">{q.disciplina ?? '—'}</TableCell>
                         <TableCell className="whitespace-normal break-words text-xs text-muted-foreground">{q.assunto ?? '—'}</TableCell>

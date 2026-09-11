@@ -42,19 +42,24 @@ export function QuizConteudoAdmin({ documentoId }: { documentoId: string }) {
 
   const jaIds = useMemo(() => new Set(itens.map((i) => i.id)), [itens])
 
-  function recarregar() { start(async () => { const q = await listarQuizConteudo(documentoId); if (q.ok) setItens(q.itens ?? []) }) }
+  // Anexa só as linhas NOVAS (dedup por id) — evita refetch da lista inteira, que fazia as questões
+  // recém-adicionadas "demorarem a aparecer".
+  const anexar = (linhas?: QuizLinha[]) => {
+    if (!linhas?.length) return
+    setItens((prev) => { const tem = new Set(prev.map((p) => p.id)); return [...prev, ...linhas.filter((l) => !tem.has(l.id))] })
+  }
   function adicionar(items: QuestaoBancoBuscaItem[]) {
     start(async () => {
       const r = await adicionarQuizQuestoes(documentoId, items.map((i) => i.id))
       if (!r.ok) { toast.error(r.error ?? 'Erro'); return }
-      recarregar(); toast.success(`${items.length} questão(ões) adicionada(s)`)
+      anexar(r.linhas); toast.success(`${items.length} questão(ões) adicionada(s)`)
     })
   }
   function importar(rows: QuestaoImport[]) {
     start(async () => {
       const r = await importarQuizQuestoes(documentoId, rows)
       if (!r.ok) { toast.error(r.error ?? 'Erro'); return }
-      recarregar(); toast.success(`${r.count ?? 0} questão(ões) importada(s)`)
+      anexar(r.linhas); toast.success(`${r.count ?? 0} questão(ões) importada(s)`)
     })
   }
   async function onRemover(ids: string[]) {
