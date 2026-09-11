@@ -249,18 +249,32 @@ export function LeitorDocumento({ doc, trilha }: {
     const kids = Array.from(ct.children) as HTMLElement[]
     const restaura = () => kids.forEach((k) => { if (!k.hasAttribute('data-legenda-oculta')) k.style.removeProperty('display') })
     if (modo !== 'capitulo' || capitulos.length === 0) { restaura(); return }
-    // Índice do filho-direto do conteúdo que contém cada capítulo (sobe até ser filho direto).
-    const idxCap = capitulos.map((c) => {
-      let n: HTMLElement | null = ct.querySelector<HTMLElement>(`[data-disp="${CSS.escape(c.id)}"]`)
-      while (n && n.parentElement !== ct) n = n.parentElement
-      return n ? kids.indexOf(n) : -1
+    // Títulos de capítulo direto do DOM VIVO (mesma regra do sumário) — não depende dos ids salvos.
+    const capEls = Array.from(ct.querySelectorAll<HTMLElement>('[data-disp]')).filter((el) => {
+      const tipo = el.getAttribute('data-disp-tipo') || 'artigo'
+      const label = (el.textContent || '').replace(/\s+/g, ' ').trim()
+      return tipo !== 'artigo' && /^\s*cap[íi]tulo\b/i.test(label)
     })
-    const cur = Math.min(Math.max(0, capAtual), capitulos.length - 1)
-    // 1º capítulo inclui a introdução (decreto/preâmbulo) antes dele; demais começam no próprio capítulo.
-    const ini = cur === 0 ? 0 : (idxCap[cur] >= 0 ? idxCap[cur] : 0)
-    let fim = kids.length
-    for (let j = cur + 1; j < idxCap.length; j++) { if (idxCap[j] >= 0) { fim = idxCap[j]; break } }
-    kids.forEach((k, i) => { if (!k.hasAttribute('data-legenda-oculta')) k.style.display = (i >= ini && i < fim) ? '' : 'none' })
+    if (capEls.length === 0) { restaura(); return }
+    // Capítulo de cada bloco, por ORDEM no documento: quando um bloco É/CONTÉM um título de capítulo,
+    // o capítulo corrente passa a ser aquele; blocos antes do 1º capítulo ficam em -1 (introdução).
+    const capDoBloco: number[] = []
+    let atual = -1
+    for (const k of kids) {
+      for (let ci = 0; ci < capEls.length; ci++) { const ce = capEls[ci]; if (ce === k || k.contains(ce)) atual = ci }
+      capDoBloco.push(atual)
+    }
+    const cur = Math.min(Math.max(0, capAtual), capEls.length - 1)
+    let algumVisivel = false
+    kids.forEach((k, i) => {
+      if (k.hasAttribute('data-legenda-oculta')) return
+      const cap = capDoBloco[i]
+      const visivel = cap === cur || (cur === 0 && cap === -1) // intro acompanha o 1º capítulo
+      if (visivel) algumVisivel = true
+      k.style.display = visivel ? '' : 'none'
+    })
+    // Segurança: se a estrutura não permitiu isolar (nada visível), mostra tudo em vez de tela vazia.
+    if (!algumVisivel) restaura()
     window.dispatchEvent(new Event('resize')) // realinha os grifos para o capítulo visível
   }, [modo, capAtual, capitulos, doc.html, slots])
 
@@ -496,13 +510,13 @@ export function LeitorDocumento({ doc, trilha }: {
       requestAnimationFrame(() => requestAnimationFrame(() => {
         const el = contentRef.current?.querySelector<HTMLElement>(`[data-disp="${CSS.escape(s.id)}"]`) ?? contentRef.current?.querySelector<HTMLElement>(`[data-art="${s.art}"]`)
         if (!el) return
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' }); flashAlvo(el)
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' }); flashAlvo(el)
       }))
       return
     }
     const el = root?.querySelector<HTMLElement>(`[data-disp="${CSS.escape(s.id)}"]`) ?? root?.querySelector<HTMLElement>(`#${CSS.escape(s.id)}`) ?? root?.querySelector<HTMLElement>(`[data-art="${s.art}"]`)
     if (!el) return
-    if (modo !== 'flip') { el.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
+    if (modo !== 'flip') { el.scrollIntoView({ behavior: 'smooth', block: 'center' }) }
     else { const alvo = Math.floor(el.offsetLeft / (colW + GAP)); irPara(alvo) }
     flashAlvo(el)
   }
