@@ -777,15 +777,23 @@ export function LeitorDocumento({ doc, trilha }: {
                   {tem && (
                     <div className="grid transition-[grid-template-rows] duration-300 ease-out" style={{ gridTemplateRows: aberto ? '1fr' : '0fr' }}>
                       <div className="min-h-0 overflow-hidden">
-                        {/* Linha de hierarquia (vertical) ligando os artigos ao capítulo. */}
-                        <div className="relative ml-3 mb-1 mt-0.5 pl-3" style={{ borderLeft: `1.5px solid ${cores.muted}33` }}>
-                          {g.artigos.map((s, i) => (
-                            <button key={`${s.id}-${i}`} onClick={() => pular(s)} title={s.label}
-                              className="relative block w-full truncate rounded py-1 pl-2 pr-2 text-left text-xs font-medium transition-colors hover:bg-black/5" style={{ color: cores.fg }}>
-                              <span aria-hidden className="absolute -left-3 top-1/2 h-px w-3" style={{ background: `${cores.muted}33` }} />
-                              {s.label}
-                            </button>
-                          ))}
+                        {/* Árvore de hierarquia: tronco vertical (para no ÚLTIMO artigo, sem sobra) +
+                            galho horizontal por item. Spans IRMÃOS do botão — o `truncate` do botão
+                            (overflow:hidden) recortava o galho quando ele ficava dentro dele. */}
+                        <div className="mb-1 mt-0.5 ml-3">
+                          {g.artigos.map((s, i) => {
+                            const ultimo = i === g.artigos.length - 1
+                            return (
+                              <div key={`${s.id}-${i}`} className="relative pl-4">
+                                <span aria-hidden className="absolute left-0 w-px" style={{ background: `${cores.muted}40`, top: 0, bottom: ultimo ? '50%' : 0 }} />
+                                <span aria-hidden className="absolute left-0 top-1/2 h-px w-4" style={{ background: `${cores.muted}40` }} />
+                                <button onClick={() => pular(s)} title={s.label}
+                                  className="block w-full truncate rounded py-1 pl-1 pr-2 text-left text-xs font-medium transition-colors hover:bg-black/5" style={{ color: cores.fg }}>
+                                  {s.label}
+                                </button>
+                              </div>
+                            )
+                          })}
                         </div>
                       </div>
                     </div>
