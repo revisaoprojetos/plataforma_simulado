@@ -12,6 +12,7 @@ import { HexColorField } from '@/components/admin/hex-color-field'
 import { Previa, outlineDoItem, type DiagEntrada, type TipoBloco } from '@/lib/caderno-teste/previa'
 import { PreviaBlocos, capaPadraoDoPreset, docDoPreset, idsDeterministicos } from '@/lib/caderno-teste/previa-blocos'
 import { ModeloPicker } from '@/components/admin/caderno-teste/modelo-picker'
+import { abrirModelo } from '@/app/admin/modelos-caderno/actions'
 import { BancoPicker, type BancoOpcao } from '@/components/admin/caderno-teste/banco-picker'
 import { metaDaModalidade, itemAtivo, novoItem, novoItemVazio, presetDoItem, CAPA_PADRAO, CORES_PILAR_PADRAO, type BuilderV3, type BuilderAjustes, type CapaConfig, type Modalidade, type PreviewQuestao, type ItemCaderno } from '@/lib/caderno-teste/tipos'
 import { camposDoBloco, aplicarCampoBloco, podeRemoverParte, removerParteDiag, type CampoTexto } from '@/lib/caderno-teste/edicao'
@@ -203,7 +204,7 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
             </div>
           </div>
         </div>
-        <ModeloPicker open={pickerOpen} onClose={() => setPickerOpen(false)} atual={{ modalidade: 'caderno_questoes', modelo: 'classico' }} onSelecionar={onPicker} onEmBranco={criarEmBranco} />
+        <ModeloPicker open={pickerOpen} onClose={() => setPickerOpen(false)} atual={{ modalidade: 'caderno_questoes', modelo: 'classico' }} onSelecionar={onPicker} onEmBranco={criarEmBranco} onSelecionarBiblioteca={onPickerBiblioteca} />
       </div>
     )
   }
@@ -334,6 +335,23 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
       }) }
     })
     setPickerOpen(false)
+  }
+  // Aplica um modelo da BIBLIOTECA ("Modelos de Caderno"): carrega a config salva e substitui o slot
+  // ativo pelo item dela (mesmo mecanismo do "Importar"). Reaproveita o item salvo (docEdit/ajustes/capa).
+  async function onPickerBiblioteca(modeloId: string) {
+    try {
+      const r = await abrirModelo(modeloId)
+      const item = (r?.config as { item?: ItemCaderno } | null)?.item
+      if (!r?.ok || !item) { toast.error(r?.error ?? 'Não foi possível abrir o modelo.'); return }
+      setBuilder((b) => {
+        if (pickerMode === 'add' || b.itens.length === 0) {
+          const novo = { ...item, id: crypto.randomUUID() }
+          return { ...b, itens: [...b.itens, novo], ativo: novo.id }
+        }
+        return { ...b, itens: b.itens.map((x) => (x.id === b.ativo ? { ...item, id: x.id } : x)), ativo: b.ativo }
+      })
+      setPickerOpen(false)
+    } catch (e) { console.error('onPickerBiblioteca', e); toast.error('Erro ao aplicar o modelo.') }
   }
   function trocarBanco(bancoId: string | null) {
     setBuilder((b) => ({ ...b, bancoId }))
@@ -619,7 +637,7 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
         </div>
       </div>
 
-      <ModeloPicker open={pickerOpen} onClose={() => setPickerOpen(false)} atual={{ modalidade: ativo.modalidade, modelo: ativo.modelo }} onSelecionar={onPicker} onEmBranco={criarEmBranco} travarModalidade />
+      <ModeloPicker open={pickerOpen} onClose={() => setPickerOpen(false)} atual={{ modalidade: ativo.modalidade, modelo: ativo.modelo }} onSelecionar={onPicker} onEmBranco={criarEmBranco} onSelecionarBiblioteca={onPickerBiblioteca} travarModalidade />
       <BancoPicker open={bancoPickerOpen} onClose={() => setBancoPickerOpen(false)} bancos={bancos} atual={builder.bancoId} onSelecionar={trocarBanco} />
       {pickerCor && (() => {
         const campos = camposDoBloco(ativo, pickerCor.parte, pickerCor.label)
