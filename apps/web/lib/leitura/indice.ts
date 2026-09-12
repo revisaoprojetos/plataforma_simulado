@@ -52,20 +52,23 @@ export function normalizarTiposIndice(bruto: unknown): string[] {
   return out.length ? out : [...TIPOS_INDICE_PADRAO]
 }
 
+/** Tipos ESTRUTURAIS (nível 0), do mais alto ao mais baixo — candidatos a cabeçalho de grupo recolhível. */
+const ESTRUTURAIS = ['livro', 'parte', 'titulo', 'capitulo', 'secao', 'subsecao']
+
 /**
- * Agrupa as seções em capítulo → itens (mesma UX expansível): um grupo começa em cada CAPÍTULO
- * (se 'capitulo' estiver selecionado); os demais tipos selecionados entram como itens do grupo
- * corrente (indentados por nível). Itens antes de qualquer capítulo formam um grupo sem cabeçalho.
- * Genérico no tipo do item (só precisa de `.tipo`).
+ * Agrupa as seções em CABEÇALHO (recolhível) → itens, para a UX expansível igual à do aluno. O
+ * cabeçalho é o tipo estrutural MAIS ALTO que está selecionado E existe no conteúdo (ex.: TÍTULO se
+ * não houver CAPÍTULO). Os demais tipos selecionados entram como itens do grupo corrente (indentados
+ * por nível). Itens antes do 1º cabeçalho formam um grupo sem cabeçalho. Genérico no tipo do item.
  */
 export function montarGruposToc<T extends { tipo: string }>(secoes: T[], tipos: string[]): { cap: T | null; itens: T[] }[] {
   const set = new Set(tipos.length ? tipos : TIPOS_INDICE_PADRAO)
-  const usarCap = set.has('capitulo')
+  const tipoGrupo = ESTRUTURAIS.find((t) => set.has(t) && secoes.some((s) => s.tipo === t)) || null
   const grupos: { cap: T | null; itens: T[] }[] = []
   let atual: { cap: T | null; itens: T[] } | null = null
   for (const s of secoes) {
     if (!set.has(s.tipo)) continue
-    if (usarCap && s.tipo === 'capitulo') { atual = { cap: s, itens: [] }; grupos.push(atual) }
+    if (tipoGrupo && s.tipo === tipoGrupo) { atual = { cap: s, itens: [] }; grupos.push(atual) }
     else { if (!atual) { atual = { cap: null, itens: [] }; grupos.push(atual) } atual.itens.push(s) }
   }
   return grupos
