@@ -13,7 +13,8 @@ import { DiffEspelho } from '@/components/leitura/diff-espelho'
 import { listarVersoesDocumento, carregarDiffDocumento, reverterAlteracao } from '@/app/admin/leitura/alteracoes-actions'
 import { listarQuestoesDocumento, type QuestaoDoc } from '@/app/admin/leitura/actions'
 import { prepararCaixasTabela } from '@/lib/leitura/caixas'
-import { NIVEL_TIPO, montarGruposToc } from '@/lib/leitura/indice'
+import { NIVEL_TIPO, montarArvoreToc, type NoToc } from '@/lib/leitura/indice'
+import { IndiceArvore, type NoIndiceView } from '@/components/leitura/indice-arvore'
 import type { BlocoDiff, DiffDoc, VersaoInfo } from '@/lib/leitura/diff-tipos'
 
 /** Card read-only "Questão no contexto" — injetado na prévia do admin no ponto do artigo. */
@@ -225,9 +226,14 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
       return { id, dispId, artId, tipo, nivel: NIVEL_TIPO[tipo] ?? 1, label: (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 70) || id }
     })
   }, [html])
-  const tocGrupos = useMemo(() => montarGruposToc(secoes, indiceTipos), [secoes, indiceTipos])
-  const [tocAberto, setTocAberto] = useState<Set<string>>(new Set())
-  const toggleCap = (id: string) => setTocAberto((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const tocArvore = useMemo(() => montarArvoreToc(secoes, indiceTipos), [secoes, indiceTipos])
+  const secaoPorId = useMemo(() => new Map(secoes.map((s) => [s.id, s])), [secoes])
+  const tocView = useMemo<NoIndiceView[]>(() => {
+    const conv = (no: NoToc<Sec>): NoIndiceView => ({ id: no.item.id, label: no.item.label, nivel: no.item.nivel, filhos: no.filhos.map(conv) })
+    return tocArvore.map(conv)
+  }, [tocArvore])
+  const [recolhidos, setRecolhidos] = useState<Set<string>>(new Set())
+  const toggleToc = (id: string) => setRecolhidos((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
   function pular(s: { dispId: string | null; artId: string | null }) {
     const cont = scrollRef.current; if (!cont) return
     const alvo = (s.dispId ? cont.querySelector(`[data-disp="${CSS.escape(s.dispId)}"]`) : s.artId ? cont.querySelector(`[data-art="${s.artId}"]`) : null) as HTMLElement | null
@@ -601,46 +607,12 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
               </p>
             )}
 
-            {/* Painel ÍNDICE — IGUAL AO DO ALUNO: capítulos expansíveis + artigos (árvore de hierarquia). */}
+            {/* Painel ÍNDICE — árvore recolhível (mesma do aluno), conforme os tipos configurados. */}
             {(!podeComparar || aba === 'indice') && (
-              tocGrupos.length > 0 ? (
+              tocView.length > 0 ? (
                 <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-                  {tocGrupos.map((g, gi) => {
-                    // Itens soltos (antes de qualquer capítulo): lista indentada por nível, sem cabeçalho.
-                    if (!g.cap) return (
-                      <div key={`solto-${gi}`}>
-                        {g.itens.map((s, i) => (
-                          <button key={`${s.id}-${i}`} onClick={() => pular(s)} title={s.label} className="block w-full truncate rounded py-1 pr-2 text-left text-xs font-medium text-foreground transition-colors hover:bg-muted" style={{ paddingLeft: 8 + Math.max(0, s.nivel - 1) * 12 }}>{s.label}</button>
-                        ))}
-                      </div>
-                    )
-                    const cap = g.cap
-                    const tem = g.itens.length > 0
-                    const aberto = tocAberto.has(cap.id)
-                    return (
-                      <div key={`${cap.id}-${gi}`}>
-                        <div className="flex items-center gap-0.5">
-                          <button onClick={() => pular(cap)} className="min-w-0 flex-1 truncate rounded py-1 pl-2 pr-1 text-left text-xs font-semibold text-foreground transition-colors hover:bg-muted" title={cap.label}>{cap.label}</button>
-                          {tem && (
-                            <button onClick={() => toggleCap(cap.id)} aria-label={aberto ? 'Recolher capítulo' : 'Expandir capítulo'} aria-expanded={aberto} className="shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted">
-                              <ChevronDown className="h-3.5 w-3.5 transition-transform duration-300 ease-out" style={{ transform: aberto ? 'rotate(180deg)' : 'none' }} />
-                            </button>
-                          )}
-                        </div>
-                        {tem && (
-                          <div className="grid transition-[grid-template-rows] duration-300 ease-out" style={{ gridTemplateRows: aberto ? '1fr' : '0fr' }}>
-                            <div className="min-h-0 overflow-hidden">
-                              <div className="mb-1 mt-0.5 ml-2 border-l border-border pl-1">
-                                {g.itens.map((s, i) => (
-                                  <button key={`${s.id}-${i}`} onClick={() => pular(s)} title={s.label} className="block w-full truncate rounded py-1 pr-2 text-left text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" style={{ paddingLeft: 8 + Math.max(0, s.nivel - 1) * 12 }}>{s.label}</button>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
+                  <IndiceArvore nodes={tocView} estaAberto={(id) => !recolhidos.has(id)} onToggle={toggleToc}
+                    onPular={(id) => { const s = secaoPorId.get(id); if (s) pular(s) }} />
                 </div>
               ) : (
                 <p className="px-1 py-2 text-xs text-muted-foreground">Sem seções detectadas neste conteúdo.</p>

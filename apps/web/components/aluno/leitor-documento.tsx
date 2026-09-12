@@ -17,7 +17,8 @@ import { QuestaoLeitura } from '@/components/aluno/questao-leitura'
 import { LeituraAtualizacaoAviso } from '@/components/aluno/leitura-atualizacao-aviso'
 import { GRIFOS, corDoGrifo, ehEstrutural } from '@/lib/leitura/grifos'
 import { prepararCaixasTabela } from '@/lib/leitura/caixas'
-import { montarGruposToc } from '@/lib/leitura/indice'
+import { montarArvoreToc, type NoToc } from '@/lib/leitura/indice'
+import { IndiceArvore, type NoIndiceView } from '@/components/leitura/indice-arvore'
 import { confirmar } from '@/components/ui/confirm-dialog'
 
 type Modo = 'scroll' | 'flip' | 'capitulo'
@@ -135,9 +136,16 @@ export function LeitorDocumento({ doc, trilha }: {
   }, [secoes])
   // Sumário CONFIGURÁVEL: mostra os tipos escolhidos pelo admin (doc.indiceTipos), na hierarquia;
   // agrupa por capítulo (expansível) quando 'capitulo' está selecionado. `itens` = filhos do grupo.
-  const tocGrupos = useMemo(() => montarGruposToc(secoes, doc.indiceTipos ?? []), [secoes, doc.indiceTipos])
-  const [tocAberto, setTocAberto] = useState<Set<string>>(new Set())
-  const toggleCap = (id: string) => setTocAberto((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
+  // Sumário CONFIGURÁVEL em ÁRVORE: tipos escolhidos aninhados por hierarquia; qualquer nó com filhos
+  // recolhe (aberto por padrão; `recolhidos` guarda os fechados). secaoPorId liga o clique ao pular().
+  const tocArvore = useMemo(() => montarArvoreToc(secoes, doc.indiceTipos ?? []), [secoes, doc.indiceTipos])
+  const secaoPorId = useMemo(() => new Map(secoes.map((s) => [s.id, s])), [secoes])
+  const tocView = useMemo<NoIndiceView[]>(() => {
+    const conv = (no: NoToc<Secao>): NoIndiceView => ({ id: no.item.id, label: no.item.label, nivel: no.item.nivel, filhos: no.filhos.map(conv) })
+    return tocArvore.map(conv)
+  }, [tocArvore])
+  const [recolhidos, setRecolhidos] = useState<Set<string>>(new Set())
+  const toggleToc = (id: string) => setRecolhidos((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
 
   // Modo virar-página
   const [pagina, setPagina] = useState(0)
@@ -1015,54 +1023,15 @@ export function LeitorDocumento({ doc, trilha }: {
             </div>
           </div>
 
-          {/* Sumário — capítulos expansíveis (animado) + artigos ligados por linha de hierarquia. */}
+          {/* Sumário — árvore recolhível (capítulos/artigos/§/incisos conforme a config do índice). */}
           <div className="leitura-scroll min-h-0 flex-1 overflow-y-auto px-2 py-2">
             <p className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide" style={{ color: cores.muted }}>Sumário</p>
-            {tocGrupos.length === 0 ? (
+            {tocView.length === 0 ? (
               <p className="px-1 text-xs" style={{ color: cores.muted }}>Sem seções detectadas.</p>
-            ) : tocGrupos.map((g, gi) => {
-              // Itens soltos (antes de qualquer capítulo): lista indentada por nível, sem cabeçalho.
-              if (!g.cap) return (
-                <div key={`solto-${gi}`}>
-                  {g.itens.map((s, i) => (
-                    <button key={`${s.id}-${i}`} onClick={() => pular(s)} className="block w-full truncate rounded py-1 pr-2 text-left text-xs font-medium transition-colors hover:bg-black/5" style={{ color: cores.fg, paddingLeft: 8 + Math.max(0, s.nivel - 1) * 12 }} title={s.label}>{s.label}</button>
-                  ))}
-                </div>
-              )
-              const cap = g.cap
-              const tem = g.itens.length > 0
-              const aberto = tocAberto.has(cap.id)
-              return (
-                <div key={`${cap.id}-${gi}`}>
-                  <div className="flex items-center gap-0.5">
-                    <button onClick={() => pular(cap)} className="min-w-0 flex-1 truncate rounded py-1 pl-2 pr-1 text-left text-xs font-semibold transition-colors hover:bg-black/5" style={{ color: cores.fg }} title={cap.label}>{cap.label}</button>
-                    {tem && (
-                      <button onClick={() => toggleCap(cap.id)} aria-label={aberto ? 'Recolher capítulo' : 'Expandir capítulo'} aria-expanded={aberto} className="shrink-0 rounded p-1 transition-colors hover:bg-black/5">
-                        <ChevronDown className="h-3.5 w-3.5 transition-transform duration-300 ease-out" style={{ transform: aberto ? 'rotate(180deg)' : 'none', color: cores.muted }} />
-                      </button>
-                    )}
-                  </div>
-                  {/* Contêiner que anima 0fr↔1fr (mesma técnica das caixas STJ) — sem "salto" ao abrir/fechar. */}
-                  {tem && (
-                    <div className="grid transition-[grid-template-rows] duration-300 ease-out" style={{ gridTemplateRows: aberto ? '1fr' : '0fr' }}>
-                      <div className="min-h-0 overflow-hidden">
-                        {/* Árvore de hierarquia: tronco vertical (para no ÚLTIMO artigo, sem sobra) +
-                            galho horizontal por item. Spans IRMÃOS do botão — o `truncate` do botão
-                            (overflow:hidden) recortava o galho quando ele ficava dentro dele. */}
-                        <div className="mb-1 mt-0.5 ml-3 border-l" style={{ borderColor: `${cores.muted}33` }}>
-                          {g.itens.map((s, i) => (
-                            <button key={`${s.id}-${i}`} onClick={() => pular(s)} title={s.label}
-                              className="block w-full truncate rounded py-1 pr-2 text-left text-xs font-medium transition-colors hover:bg-black/5" style={{ color: cores.fg, paddingLeft: 8 + Math.max(0, s.nivel - 1) * 12 }}>
-                              {s.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+            ) : (
+              <IndiceArvore nodes={tocView} estaAberto={(id) => !recolhidos.has(id)} onToggle={toggleToc}
+                onPular={(id) => { const s = secaoPorId.get(id); if (s) pular(s) }} cor={{ fg: cores.fg, muted: cores.muted }} />
+            )}
           </div>
         </aside>
       )}

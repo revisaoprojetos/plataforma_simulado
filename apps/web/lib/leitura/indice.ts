@@ -52,24 +52,24 @@ export function normalizarTiposIndice(bruto: unknown): string[] {
   return out.length ? out : [...TIPOS_INDICE_PADRAO]
 }
 
-/** Tipos ESTRUTURAIS (nível 0), do mais alto ao mais baixo — candidatos a cabeçalho de grupo recolhível. */
-const ESTRUTURAIS = ['livro', 'parte', 'titulo', 'capitulo', 'secao', 'subsecao']
+export type NoToc<T> = { item: T; filhos: NoToc<T>[] }
 
 /**
- * Agrupa as seções em CABEÇALHO (recolhível) → itens, para a UX expansível igual à do aluno. O
- * cabeçalho é o tipo estrutural MAIS ALTO que está selecionado E existe no conteúdo (ex.: TÍTULO se
- * não houver CAPÍTULO). Os demais tipos selecionados entram como itens do grupo corrente (indentados
- * por nível). Itens antes do 1º cabeçalho formam um grupo sem cabeçalho. Genérico no tipo do item.
+ * Monta a ÁRVORE do índice (aninhada por nível) a partir das seções filtradas pelos tipos escolhidos.
+ * Cada item vira filho do último item de nível MENOR (ex.: TÍTULO → Art. → inciso). Qualquer nó com
+ * filhos é recolhível no render. Genérico no tipo do item (usa `.nivel`, ou deriva de `.tipo`).
  */
-export function montarGruposToc<T extends { tipo: string }>(secoes: T[], tipos: string[]): { cap: T | null; itens: T[] }[] {
+export function montarArvoreToc<T extends { tipo: string; nivel?: number }>(secoes: T[], tipos: string[]): NoToc<T>[] {
   const set = new Set(tipos.length ? tipos : TIPOS_INDICE_PADRAO)
-  const tipoGrupo = ESTRUTURAIS.find((t) => set.has(t) && secoes.some((s) => s.tipo === t)) || null
-  const grupos: { cap: T | null; itens: T[] }[] = []
-  let atual: { cap: T | null; itens: T[] } | null = null
+  const nivel = (s: T) => (typeof s.nivel === 'number' ? s.nivel : (NIVEL_TIPO[s.tipo] ?? 1))
+  const roots: NoToc<T>[] = []
+  const pilha: NoToc<T>[] = []
   for (const s of secoes) {
     if (!set.has(s.tipo)) continue
-    if (tipoGrupo && s.tipo === tipoGrupo) { atual = { cap: s, itens: [] }; grupos.push(atual) }
-    else { if (!atual) { atual = { cap: null, itens: [] }; grupos.push(atual) } atual.itens.push(s) }
+    const no: NoToc<T> = { item: s, filhos: [] }
+    while (pilha.length && nivel(pilha[pilha.length - 1].item) >= nivel(s)) pilha.pop()
+    if (pilha.length) pilha[pilha.length - 1].filhos.push(no); else roots.push(no)
+    pilha.push(no)
   }
-  return grupos
+  return roots
 }
