@@ -1,15 +1,24 @@
 /**
- * Recolher/expandir das caixas de destaque em formato TABELA (importadas do Word: 1 coluna, `<td>`
- * com background — ex.: "ENTENDIMENTO DO STF/STJ"). É o formato que o enhancer de DIV (data-caixa /
- * .box-stj|stf) NÃO cobria. Compartilhado pelo leitor do aluno E pela prévia do admin, para o
- * recolher/expandir ficar IDÊNTICO nos dois.
+ * Caixas de destaque importadas como TABELA (Word: 1 coluna, `<td>` com background — ex.:
+ * "ENTENDIMENTO DO STF/STJ"). O acervo antigo usa `<div data-caixa>` (renderizado como card nativo:
+ * cantos arredondados, cabeçalho + prévia + seta + animação de recolher). Aqui CONVERTEMOS a tabela
+ * nessa MESMA estrutura DIV (`[data-caixa]` + `.caixa-colapsavel` + `.caixa-cab` + `.caixa-corpo`),
+ * reusando 100% do CSS nativo → as importadas ficam idênticas às nativas (cor por tipo: STJ creme,
+ * STF azul), com recolher/expandir animado.
  *
- * Não envolve/reordena nós (só classes + CSS escondendo as linhas seguintes) → a "espinha" das
- * âncoras dos grifos permanece intacta. `onToggle` roda após abrir/fechar (recompor overlay/layout).
- * Idempotente (pula tabelas já preparadas) → pode ser chamado dentro de MutationObserver/rAF.
- * Retorna a limpeza dos listeners que ESTA chamada adicionou.
+ * Move os nós preservando a ORDEM do texto → a "espinha" das âncoras dos grifos permanece intacta.
+ * `onToggle` roda após abrir/fechar (recompor overlay/layout). Retorna a limpeza dos listeners.
+ * Compartilhado pelo leitor do aluno E pela prévia do admin, para ficar igual nos dois.
  */
-const RE_DESTAQUE = /ENTENDIMENTO|S[ÚU]MULA|ATEN[ÇC]|OBSERVA|IMPORTANTE|\bDICA\b|JURISPRUD|INFORMATIVO|PRECEDENTE|\bTESE\b/i
+const RE_DESTAQUE = /ENTENDIMENTO|S[ÚU]MULA|ATEN[ÇC]|OBSERVA|IMPORTANTE|\bDICA\b|JURISPRUD|INFORMATIVO|PRECEDENTE|\bTESE\b|N[ÃA]O ESQUE|DEPORTA|EXPULS|EXTRADI/i
+
+function tipoCaixa(titulo: string): string {
+  const t = titulo.toUpperCase()
+  if (/\bSTJ\b/.test(t)) return 'stj'
+  if (/\bSTF\b/.test(t)) return 'stf'
+  if (/ATEN[ÇC]|N[ÃA]O ESQUE|IMPORTANTE|CUIDADO/.test(t)) return 'alerta'
+  return 'comentario'
+}
 
 export function prepararCaixasTabela(cont: HTMLElement, onToggle?: () => void): () => void {
   const ligados: { el: HTMLElement; ev: 'click' | 'keydown'; fn: (e: Event) => void }[] = []
@@ -25,24 +34,33 @@ export function prepararCaixasTabela(cont: HTMLElement, onToggle?: () => void): 
   }
 
   for (const tab of Array.from(cont.querySelectorAll<HTMLTableElement>('table'))) {
-    if (tab.classList.contains('caixa-colapsavel')) continue
-    const rows = Array.from(tab.rows) // nativo (cobre tbody/thead automaticamente) — robusto entre navegadores
+    const rows = Array.from(tab.rows) // nativo (cobre tbody/thead) — robusto entre navegadores
     if (rows.length < 2) continue
-    // Cabeçalho = 1ª linha com UMA célula (faixa colorida do título). O corpo pode ter várias colunas
-    // (ex.: caixa "DIFERENCIAÇÃO" com tabela comparativa dentro) → não exigimos 1 coluna em todas.
-    if (rows[0].cells.length !== 1) continue
-    const head = rows[0].cells[0] as HTMLElement
-    const temFundo = /background/i.test(head.getAttribute('style') || '') || /background/i.test(rows[0].getAttribute('style') || '')
-    const txt = (head.textContent || '').replace(/\s+/g, ' ').trim()
+    if (rows.some((r) => r.cells.length !== 1)) continue // só caixas de 1 coluna (ENTENDIMENTO etc.)
+    const headCell = rows[0].cells[0] as HTMLElement
+    const temFundo = /background/i.test(headCell.getAttribute('style') || '') || /background/i.test(rows[0].getAttribute('style') || '')
+    const txt = (headCell.textContent || '').replace(/\s+/g, ' ').trim()
     if (!(temFundo && (RE_DESTAQUE.test(txt) || txt.length <= 80))) continue // não parece caixa de destaque
-    tab.classList.add('caixa-colapsavel', 'caixa-tabela')
-    head.classList.add('caixa-cab')
-    head.setAttribute('role', 'button'); head.setAttribute('tabindex', '0'); head.setAttribute('aria-expanded', 'false')
-    for (let i = 1; i < rows.length; i++) rows[i].classList.add('caixa-linha-corpo') // linhas do corpo (escondidas ao recolher)
-    tab.removeAttribute('data-aberto') // recolhida por padrão
-    const clique = () => alternar(tab, head)
-    head.addEventListener('click', clique); head.addEventListener('keydown', onKey)
-    ligados.push({ el: head, ev: 'click', fn: clique }, { el: head, ev: 'keydown', fn: onKey })
+
+    // Converte a TABELA na estrutura de caixa DIV nativa (mesmo card das antigas).
+    const div = document.createElement('div')
+    div.setAttribute('data-caixa', tipoCaixa(txt))
+    div.classList.add('caixa-colapsavel')
+    const cab = document.createElement('div'); cab.className = 'caixa-cab'
+    while (headCell.firstChild) cab.appendChild(headCell.firstChild) // conteúdo do cabeçalho (título)
+    div.appendChild(cab)
+    const corpo = document.createElement('div'); corpo.className = 'caixa-corpo'
+    const inner = document.createElement('div'); inner.className = 'caixa-corpo-in'
+    for (let i = 1; i < rows.length; i++) { const cell = rows[i].cells[0]; while (cell.firstChild) inner.appendChild(cell.firstChild) }
+    corpo.appendChild(inner); div.appendChild(corpo)
+    const previa = (inner.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 160)
+    if (previa) cab.setAttribute('data-previa', previa)
+    cab.setAttribute('role', 'button'); cab.setAttribute('tabindex', '0'); cab.setAttribute('aria-expanded', 'false')
+    div.removeAttribute('data-aberto') // recolhida por padrão
+    tab.replaceWith(div)
+    const clique = () => alternar(div, cab)
+    cab.addEventListener('click', clique); cab.addEventListener('keydown', onKey)
+    ligados.push({ el: cab, ev: 'click', fn: clique }, { el: cab, ev: 'keydown', fn: onKey })
   }
 
   return () => { for (const { el, ev, fn } of ligados) el.removeEventListener(ev, fn) }

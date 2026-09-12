@@ -731,17 +731,6 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 .leitura-prosa .caixa-colapsavel[data-aberto] > .caixa-corpo { grid-template-rows:1fr; }
 .leitura-prosa .caixa-colapsavel > .caixa-corpo > .caixa-corpo-in { overflow:hidden; min-height:0; }
 
-/* Caixas de destaque importadas como TABELA (1 coluna, td colorido — ex.: "ENTENDIMENTO DO STF"):
-   o cabeçalho é a 1ª célula (.caixa-cab); recolhido esconde as linhas seguintes. Seta indica estado. */
-.leitura-prosa .caixa-colapsavel.caixa-tabela .caixa-cab { position:relative; cursor:pointer; user-select:none; padding-right:26px; }
-.leitura-prosa .caixa-colapsavel.caixa-tabela .caixa-cab:hover { opacity:.85; }
-.leitura-prosa .caixa-colapsavel.caixa-tabela .caixa-cab::after {
-  content:''; position:absolute; right:12px; top:50%; width:7px; height:7px;
-  border-right:2px solid currentColor; border-bottom:2px solid currentColor;
-  transform:translateY(-70%) rotate(45deg); opacity:.55;
-}
-.leitura-prosa .caixa-colapsavel.caixa-tabela[data-aberto] .caixa-cab::after { transform:translateY(-30%) rotate(-135deg); }
-.leitura-prosa .caixa-colapsavel.caixa-tabela:not([data-aberto]) .caixa-linha-corpo { display:none; }
 
 /* Scrollbars da área de leitura combinando com o tema (thumb/track vêm de CSS vars no container:
    --leitura-scroll-thumb / --leitura-scroll-track, derivados da cor de texto do tema). */

@@ -174,8 +174,8 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
     const ligados: HTMLElement[] = []
     const limpezasTab: (() => void)[] = []
     const aplicar = () => {
-      // Caixas em TABELA (ENTENDIMENTO importado do Word) — mesmo recolher/expandir, via helper compartilhado.
-      limpezasTab.push(prepararCaixasTabela(cont))
+      // Caixas em TABELA (ENTENDIMENTO importado do Word) → vira card DIV nativo, via helper compartilhado.
+      limpezasTab.push(prepararCaixasTabela(cont, () => window.dispatchEvent(new Event('resize'))))
       // Pega data-caixa (novo) E as classes legadas box-stj/box-stf (conteúdo antigo).
       const caixas = Array.from(cont.querySelectorAll<HTMLElement>('[data-caixa="stj"], [data-caixa="stf"], .box-stj, .box-stf'))
       for (const box of caixas) {
