@@ -25,14 +25,23 @@ export const LABEL_TIPO: Record<string, string> = Object.fromEntries(TIPOS_INDIC
 /** Padrão (retrocompat): capítulos como grupo + artigos. */
 export const TIPOS_INDICE_PADRAO = ['capitulo', 'artigo']
 
-/** Tipos de dispositivo PRESENTES no HTML, em ordem de hierarquia (client-side; usa DOMParser). */
-export function tiposPresentesNoHtml(html: string): string[] {
-  if (typeof window === 'undefined' || !html) return []
+/** Quantidade de cada tipo de dispositivo no HTML (client-side; usa DOMParser). */
+export function contarTiposNoHtml(html: string): Record<string, number> {
+  if (typeof window === 'undefined' || !html) return {}
   const doc = new DOMParser().parseFromString(html, 'text/html')
-  const presentes = new Set<string>()
-  for (const el of Array.from(doc.querySelectorAll('[data-disp]'))) presentes.add(el.getAttribute('data-disp-tipo') || 'artigo')
-  if (!presentes.size && doc.querySelector('[data-art]')) presentes.add('artigo') // conteúdo antigo sem data-disp
-  return TIPOS_INDICE.filter((t) => presentes.has(t.tipo)).map((t) => t.tipo)
+  const counts: Record<string, number> = {}
+  for (const el of Array.from(doc.querySelectorAll('[data-disp]'))) {
+    const t = el.getAttribute('data-disp-tipo') || 'artigo'
+    counts[t] = (counts[t] ?? 0) + 1
+  }
+  if (!Object.keys(counts).length) { const n = doc.querySelectorAll('[data-art]').length; if (n) counts.artigo = n } // conteúdo antigo
+  return counts
+}
+
+/** Tipos de dispositivo PRESENTES no HTML, em ordem de hierarquia. */
+export function tiposPresentesNoHtml(html: string): string[] {
+  const c = contarTiposNoHtml(html)
+  return TIPOS_INDICE.filter((t) => (c[t.tipo] ?? 0) > 0).map((t) => t.tipo)
 }
 
 /** Normaliza a config vinda do banco (array de tipos válidos) ou o padrão. */

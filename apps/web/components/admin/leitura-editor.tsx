@@ -15,7 +15,7 @@ import {
 import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { atualizarDocumento, publicarVersao, salvarIndiceTipos, type Documento, type SituacaoEditorial } from '@/app/admin/leitura/actions'
-import { TIPOS_INDICE, tiposPresentesNoHtml } from '@/lib/leitura/indice'
+import { TIPOS_INDICE, contarTiposNoHtml } from '@/lib/leitura/indice'
 import { ListTree } from 'lucide-react'
 import { carregarDiffDocumento, renomearVersao } from '@/app/admin/leitura/alteracoes-actions'
 import { salvarConteudoHtml, importarDocx } from '@/app/admin/leitura/upload-actions'
@@ -97,7 +97,9 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
   const [savingMeta, startMeta] = useTransition()
   // Índice configurável: tipos disponíveis (detectados no conteúdo) × tipos selecionados (persistidos).
   const [indiceTipos, setIndiceTipos] = useState<string[]>(indiceTiposProp)
-  const tiposDisponiveis = useMemo(() => tiposPresentesNoHtml(htmlAtual), [htmlAtual])
+  // Contagem por tipo — memoizada (cacheada enquanto o conteúdo não muda). Disponíveis = os com >0.
+  const tiposContagem = useMemo(() => contarTiposNoHtml(htmlAtual), [htmlAtual])
+  const tiposDisponiveis = useMemo(() => TIPOS_INDICE.filter((t) => (tiposContagem[t.tipo] ?? 0) > 0).map((t) => t.tipo), [tiposContagem])
   function alternarTipoIndice(tipo: string) {
     // Computa fora do updater (updater deve ser puro; disparar a transição dentro dele dá erro no console).
     const next = indiceTipos.includes(tipo) ? indiceTipos.filter((t) => t !== tipo) : [...indiceTipos, tipo]
@@ -604,7 +606,8 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
                   {TIPOS_INDICE.filter((t) => tiposDisponiveis.includes(t.tipo)).map((t) => (
                     <label key={t.tipo} className={cn('flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1.5 text-sm transition-colors', indiceTipos.includes(t.tipo) ? 'border-primary/40 bg-primary/5' : 'hover:bg-muted/40')} style={{ marginLeft: t.nivel * 12 }}>
                       <input type="checkbox" checked={indiceTipos.includes(t.tipo)} onChange={() => alternarTipoIndice(t.tipo)} className="h-4 w-4 rounded border" />
-                      <span className="truncate">{t.label}</span>
+                      <span className="min-w-0 flex-1 truncate">{t.label}</span>
+                      <span className="shrink-0 rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-medium tabular-nums text-muted-foreground">{tiposContagem[t.tipo] ?? 0}</span>
                     </label>
                   ))}
                 </div>
