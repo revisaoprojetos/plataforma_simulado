@@ -145,10 +145,14 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
     progresso[g.id] = { total: inGrp.length, done: inGrp.filter((s) => feitosSet.has(s.id)).length }
   }
 
-  // Recentes: disponíveis/agendados ainda NÃO feitos, mais novos primeiro.
+  // Recentes: disponíveis/agendados, mais novos primeiro. Mostra os NÃO feitos E TAMBÉM os
+  // RECÉM-PUBLICADOS (últimos 7 dias) mesmo já feitos — senão um simulado novo somia do bloco no
+  // instante em que o aluno o concluísse (era o caso do ENAP: publicado e já feito no mesmo dia).
   const lancamento = (i: any) => new Date(i.regras?.publicado_em ?? i.created_at ?? 0).getTime()
+  const SETE_DIAS = 7 * 24 * 60 * 60 * 1000
+  const recemPublicado = (i: any) => { const t = lancamento(i); return t > 0 && Date.now() - t < SETE_DIAS }
   const recentes = itensCat
-    .filter((i) => (i.podeFazer || i.emAndamento || i.statusLabel === 'Agendado') && !feitosSet.has(i.id))
+    .filter((i) => (i.podeFazer || i.emAndamento || i.statusLabel === 'Agendado') && (!feitosSet.has(i.id) || recemPublicado(i)))
     .sort((a, b) => lancamento(b) - lancamento(a))
     .slice(0, 12)
   // Banners de simulado (VITRINE): aparecem para TODOS os alunos com a QUANTIDADE de simulados da
