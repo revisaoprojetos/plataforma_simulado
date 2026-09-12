@@ -23,21 +23,18 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
+import { ModuloTabsBar, type ModuloTab } from '@/components/admin/modulo-tabs-bar'
+
 type AulaItem = NonNullable<BancoAulas['aulas']>[number]
 type PersonalizarAula = { id: string; titulo: string; descricao: string | null; capa_url: string | null; cor: string | null }
-export type ModuloTab = 'aulas' | 'acessos' | 'config'
-const MODULO_TABS: { id: ModuloTab; label: string; Icon: typeof BookOpenText }[] = [
-  { id: 'aulas', label: 'Aulas', Icon: BookOpenText },
-  { id: 'acessos', label: 'Acessos', Icon: Users },
-  { id: 'config', label: 'Configurações', Icon: Settings2 },
-]
+export type { ModuloTab }
 
 /**
  * Banco de aulas do LegProc no modelo "banco → tabela de aulas":
  *  - Raiz: cards dos BANCOS (containers) + "Novo banco".
  *  - Dentro de um banco: TABELA de aulas (documento HTML + questões), reordenáveis; cada aula abre o editor.
  */
-export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTab = 'aulas', semBreadcrumb = false }: { data: BancoAulas; pastaAtual: string | null; cardView?: CardView; moduloTab?: ModuloTab; semBreadcrumb?: boolean }) {
+export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTab = 'aulas', semBreadcrumb = false, semTabs = false }: { data: BancoAulas; pastaAtual: string | null; cardView?: CardView; moduloTab?: ModuloTab; semBreadcrumb?: boolean; semTabs?: boolean }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [criandoModulo, setCriandoModulo] = useState(false)
@@ -48,19 +45,6 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTa
   const breadcrumb = data.breadcrumb ?? []
   const moduloAtual = data.moduloAtual ?? null
   const dentroDeBanco = !!pastaAtual
-
-  // Underline deslizante das abas (compactas): mede a posição/largura da aba ativa.
-  const tabsRef = useRef<HTMLDivElement>(null)
-  const [ind, setInd] = useState<{ left: number; width: number }>({ left: 0, width: 0 })
-  useEffect(() => {
-    const medir = () => {
-      const el = tabsRef.current?.querySelector<HTMLElement>('[data-tab-ativo="1"]')
-      if (el) setInd({ left: el.offsetLeft, width: el.offsetWidth })
-    }
-    medir()
-    window.addEventListener('resize', medir)
-    return () => window.removeEventListener('resize', medir)
-  }, [moduloTab, dentroDeBanco])
 
   // Pré-carrega EM 2º PLANO as áreas de cada aula do módulo (Conteúdo + Questões) — navegar fica
   // instantâneo. Escalonado (não dispara tudo junto) p/ não sobrecarregar o dev/servidor. Cancela ao
@@ -151,16 +135,8 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTa
       ) : (
         // ============ DENTRO DE UM MÓDULO: abas Aulas | Acessos | Configurações ============
         <>
-          {/* Abas do módulo (compactas, deep-linkáveis por ?tab=) com underline deslizante animado */}
-          <div ref={tabsRef} className="relative flex gap-8 border-b pl-3 text-sm">
-            {MODULO_TABS.map(({ id, label, Icon }) => (
-              <Link key={id} data-tab-ativo={moduloTab === id ? '1' : '0'} href={`/admin/leitura?pasta=${pastaAtual}&tab=${id}`}
-                className={cn('inline-flex items-center gap-1.5 rounded-md py-2 font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/40', moduloTab === id ? 'text-primary' : 'text-muted-foreground hover:text-foreground')}>
-                <Icon className="h-4 w-4" /> {label}
-              </Link>
-            ))}
-            <span className="absolute bottom-[-1px] h-0.5 rounded-full bg-primary transition-all duration-300 ease-out" style={{ left: ind.left, width: ind.width }} />
-          </div>
+          {/* Abas do módulo — omitidas quando a página as renderiza DENTRO do banner (semTabs). */}
+          {!semTabs && pastaAtual && <ModuloTabsBar pastaAtual={pastaAtual} moduloTab={moduloTab} />}
 
           {/* As 3 abas ficam MONTADAS (só escondemos as inativas): Acessos/Configurações pré-carregam ao
               entrar no módulo e ficam em memória enquanto navega; desmontam (limpam) ao sair do módulo. */}

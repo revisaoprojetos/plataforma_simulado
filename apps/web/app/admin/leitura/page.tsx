@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Library, ArrowLeft, Home, ChevronRight } from 'lucide-react'
 import { listarBancoAulas } from './actions'
 import { BancoAulasGrid, type ModuloTab } from '@/components/admin/banco-aulas-grid'
+import { ModuloTabsBar } from '@/components/admin/modulo-tabs-bar'
 import { PublicarModuloBotao } from '@/components/admin/publicar-modulo-botao'
 import { getCurrentTenant } from '@/lib/tenant'
 import { resolverCardView } from '@/lib/card-view'
@@ -25,11 +26,12 @@ export default async function LeituraAdminPage({ searchParams }: { searchParams:
       {banner ? (
         // ===== TOPO com o BANNER do módulo como fundo, EDGE-TO-EDGE (estilo banner do aluno) =====
         // -mx-6 -mt-6 cancela o padding do <main class="p-6"> → ocupa todo o topo, sem bordas brancas.
-        <div className="relative -mx-6 -mt-6 flex min-h-[13rem] overflow-hidden">
+        <div className="relative -mx-6 -mt-6 flex min-h-[12.5rem] overflow-hidden">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={banner} alt="" className="absolute inset-0 h-full w-full object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/50 to-black/25" />
-          <div className="relative flex w-full flex-col justify-end gap-2.5 px-6 pb-5 pt-8 text-white">
+          <img src={banner} alt="" className="absolute inset-0 h-full w-full object-cover object-center" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/15" />
+          {/* Conteúdo: cabeçalho no TOPO e abas RENTE à borda de baixo (mt-auto). */}
+          <div className="relative flex w-full flex-col px-6 pt-4 text-white">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-start gap-2">
                 <Link href="/admin/leitura" aria-label="Voltar aos módulos" title="Voltar aos módulos" className="mt-1 inline-flex shrink-0 items-center justify-center rounded-lg border border-white/25 bg-white/15 p-2 text-white shadow-sm backdrop-blur transition-colors hover:bg-white/25">
@@ -37,7 +39,7 @@ export default async function LeituraAdminPage({ searchParams }: { searchParams:
                 </Link>
                 <div>
                   <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight drop-shadow"><Library className="h-6 w-6" /> LegProc Digital</h1>
-                  <p className="text-white/80">Módulos ordenáveis → aulas (documento HTML + questões) que formam a trilha do aluno.</p>
+                  <p className="text-white/80 drop-shadow-sm">Módulos ordenáveis → aulas (documento HTML + questões) que formam a trilha do aluno.</p>
                 </div>
               </div>
               <div className="flex flex-wrap items-center justify-end gap-3">
@@ -46,8 +48,8 @@ export default async function LeituraAdminPage({ searchParams }: { searchParams:
                 )}
               </div>
             </div>
-            {/* Breadcrumb (branco) — a página o renderiza aqui dentro do banner; o grid recebe semBreadcrumb. */}
-            <div className="flex flex-wrap items-center gap-1 text-sm text-white/75">
+            {/* Breadcrumb (branco) — renderizado aqui dentro do banner (o grid recebe semBreadcrumb). */}
+            <div className="mt-1.5 flex flex-wrap items-center gap-1 text-sm text-white/75">
               <Link href="/admin/leitura" className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 transition-colors hover:bg-white/15 hover:text-white"><Home className="h-3.5 w-3.5" /> Módulos</Link>
               {breadcrumb.map((b) => (
                 <span key={b.id} className="inline-flex items-center gap-1">
@@ -55,6 +57,10 @@ export default async function LeituraAdminPage({ searchParams }: { searchParams:
                   <Link href={`/admin/leitura?pasta=${b.id}`} className="rounded-md px-1.5 py-0.5 font-medium text-white transition-colors hover:bg-white/15">{b.nome}</Link>
                 </span>
               ))}
+            </div>
+            {/* Abas DENTRO do banner, rente à borda inferior (mesmo design + animação, em branco). */}
+            <div className="mt-auto pt-3">
+              <ModuloTabsBar pastaAtual={pasta!} moduloTab={moduloTab} claro />
             </div>
           </div>
         </div>
@@ -82,7 +88,7 @@ export default async function LeituraAdminPage({ searchParams }: { searchParams:
       {!data.ok ? (
         <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{data.error}</p>
       ) : (
-        <BancoAulasGrid data={data} pastaAtual={pasta ?? null} cardView={cardView} moduloTab={moduloTab} semBreadcrumb={!!banner} />
+        <BancoAulasGrid data={data} pastaAtual={pasta ?? null} cardView={cardView} moduloTab={moduloTab} semBreadcrumb={!!banner} semTabs={!!banner} />
       )}
     </div>
   )
