@@ -99,11 +99,10 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
   const [indiceTipos, setIndiceTipos] = useState<string[]>(indiceTiposProp)
   const tiposDisponiveis = useMemo(() => tiposPresentesNoHtml(htmlAtual), [htmlAtual])
   function alternarTipoIndice(tipo: string) {
-    setIndiceTipos((prev) => {
-      const next = prev.includes(tipo) ? prev.filter((t) => t !== tipo) : [...prev, tipo]
-      startMeta(async () => { const r = await salvarIndiceTipos(documento.id, next); if (!r.ok) toast.error(r.error ?? 'Erro ao salvar índice') })
-      return next
-    })
+    // Computa fora do updater (updater deve ser puro; disparar a transição dentro dele dá erro no console).
+    const next = indiceTipos.includes(tipo) ? indiceTipos.filter((t) => t !== tipo) : [...indiceTipos, tipo]
+    setIndiceTipos(next)
+    startMeta(async () => { const r = await salvarIndiceTipos(documento.id, next); if (!r.ok) toast.error(r.error ?? 'Erro ao salvar índice') })
   }
 
   const [modo, setModo] = useState<Modo>('colar')
