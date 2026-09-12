@@ -17,6 +17,7 @@ import { QuestaoLeitura } from '@/components/aluno/questao-leitura'
 import { LeituraAtualizacaoAviso } from '@/components/aluno/leitura-atualizacao-aviso'
 import { GRIFOS, corDoGrifo, ehEstrutural } from '@/lib/leitura/grifos'
 import { prepararCaixasTabela } from '@/lib/leitura/caixas'
+import { montarGruposToc } from '@/lib/leitura/indice'
 import { confirmar } from '@/components/ui/confirm-dialog'
 
 type Modo = 'scroll' | 'flip' | 'capitulo'
@@ -132,17 +133,9 @@ export function LeitorDocumento({ doc, trilha }: {
     for (const s of secoes) { if (ehCap(s)) ci++; m.set(s.id, Math.max(0, ci)) }
     return m
   }, [secoes])
-  // Agrupa o sumário em capítulos → artigos-filhos (artigos antes de qualquer capítulo caem em `cap:null`),
-  // pra renderizar cada grupo num contêiner que anima abrir/fechar (grid-rows) com a linha de hierarquia.
-  const tocGrupos = useMemo(() => {
-    const grupos: { cap: Secao | null; artigos: Secao[] }[] = []
-    let atual: { cap: Secao | null; artigos: Secao[] } | null = null
-    for (const s of secoes) {
-      if (ehCap(s)) { atual = { cap: s, artigos: [] }; grupos.push(atual) }
-      else if (s.tipo === 'artigo') { if (!atual) { atual = { cap: null, artigos: [] }; grupos.push(atual) } atual.artigos.push(s) }
-    }
-    return grupos
-  }, [secoes])
+  // Sumário CONFIGURÁVEL: mostra os tipos escolhidos pelo admin (doc.indiceTipos), na hierarquia;
+  // agrupa por capítulo (expansível) quando 'capitulo' está selecionado. `itens` = filhos do grupo.
+  const tocGrupos = useMemo(() => montarGruposToc(secoes, doc.indiceTipos ?? []), [secoes, doc.indiceTipos])
   const [tocAberto, setTocAberto] = useState<Set<string>>(new Set())
   const toggleCap = (id: string) => setTocAberto((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
 
@@ -1028,16 +1021,16 @@ export function LeitorDocumento({ doc, trilha }: {
             {tocGrupos.length === 0 ? (
               <p className="px-1 text-xs" style={{ color: cores.muted }}>Sem seções detectadas.</p>
             ) : tocGrupos.map((g, gi) => {
-              // Artigos soltos (antes de qualquer capítulo): lista simples, sem cabeçalho.
+              // Itens soltos (antes de qualquer capítulo): lista indentada por nível, sem cabeçalho.
               if (!g.cap) return (
                 <div key={`solto-${gi}`}>
-                  {g.artigos.map((s, i) => (
-                    <button key={`${s.id}-${i}`} onClick={() => pular(s)} className="block w-full truncate rounded py-1 pl-2 pr-2 text-left text-xs font-medium transition-colors hover:bg-black/5" style={{ color: cores.fg }} title={s.label}>{s.label}</button>
+                  {g.itens.map((s, i) => (
+                    <button key={`${s.id}-${i}`} onClick={() => pular(s)} className="block w-full truncate rounded py-1 pr-2 text-left text-xs font-medium transition-colors hover:bg-black/5" style={{ color: cores.fg, paddingLeft: 8 + Math.max(0, s.nivel - 1) * 12 }} title={s.label}>{s.label}</button>
                   ))}
                 </div>
               )
               const cap = g.cap
-              const tem = g.artigos.length > 0
+              const tem = g.itens.length > 0
               const aberto = tocAberto.has(cap.id)
               return (
                 <div key={`${cap.id}-${gi}`}>
@@ -1056,20 +1049,13 @@ export function LeitorDocumento({ doc, trilha }: {
                         {/* Árvore de hierarquia: tronco vertical (para no ÚLTIMO artigo, sem sobra) +
                             galho horizontal por item. Spans IRMÃOS do botão — o `truncate` do botão
                             (overflow:hidden) recortava o galho quando ele ficava dentro dele. */}
-                        <div className="mb-1 mt-0.5 ml-3">
-                          {g.artigos.map((s, i) => {
-                            const ultimo = i === g.artigos.length - 1
-                            return (
-                              <div key={`${s.id}-${i}`} className="relative pl-4">
-                                <span aria-hidden className="absolute left-0 w-px" style={{ background: `${cores.muted}40`, top: 0, bottom: ultimo ? '50%' : 0 }} />
-                                <span aria-hidden className="absolute left-0 top-1/2 h-px w-4" style={{ background: `${cores.muted}40` }} />
-                                <button onClick={() => pular(s)} title={s.label}
-                                  className="block w-full truncate rounded py-1 pl-1 pr-2 text-left text-xs font-medium transition-colors hover:bg-black/5" style={{ color: cores.fg }}>
-                                  {s.label}
-                                </button>
-                              </div>
-                            )
-                          })}
+                        <div className="mb-1 mt-0.5 ml-3 border-l" style={{ borderColor: `${cores.muted}33` }}>
+                          {g.itens.map((s, i) => (
+                            <button key={`${s.id}-${i}`} onClick={() => pular(s)} title={s.label}
+                              className="block w-full truncate rounded py-1 pr-2 text-left text-xs font-medium transition-colors hover:bg-black/5" style={{ color: cores.fg, paddingLeft: 8 + Math.max(0, s.nivel - 1) * 12 }}>
+                              {s.label}
+                            </button>
+                          ))}
                         </div>
                       </div>
                     </div>

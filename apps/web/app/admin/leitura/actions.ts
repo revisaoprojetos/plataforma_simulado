@@ -859,3 +859,15 @@ export async function salvarQuizConfig(documentoId: string, config: Partial<Quiz
   if (error) return { ok: false, error: QUIZ_SEM_TABELA(error.message) ? 'Rode a migração 20260910000001 (Questões do conteúdo).' : error.message }
   revalidatePath(`/admin/leitura/${documentoId}/questoes`); return { ok: true }
 }
+
+/** Salva os TIPOS de dispositivo que aparecem no índice do conteúdo (em quiz_config.indice_tipos). */
+export async function salvarIndiceTipos(documentoId: string, tipos: string[]): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { data: doc } = await svc.from('simulado_documentos').select('quiz_config').eq('id', documentoId).eq('tenant_id', g.tenantId).maybeSingle()
+  const merged = { ...((doc as any)?.quiz_config ?? {}), indice_tipos: [...new Set((tipos ?? []).filter((t) => typeof t === 'string'))] }
+  const { error } = await svc.from('simulado_documentos').update({ quiz_config: merged, atualizado_em: new Date().toISOString() }).eq('id', documentoId).eq('tenant_id', g.tenantId)
+  if (error) return { ok: false, error: QUIZ_SEM_TABELA(error.message) ? 'Rode a migração 20260910000001.' : error.message }
+  revalidatePath(`/admin/leitura/${documentoId}`)
+  return { ok: true }
+}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -14,7 +14,9 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
-import { atualizarDocumento, publicarVersao, type Documento, type SituacaoEditorial } from '@/app/admin/leitura/actions'
+import { atualizarDocumento, publicarVersao, salvarIndiceTipos, type Documento, type SituacaoEditorial } from '@/app/admin/leitura/actions'
+import { TIPOS_INDICE, tiposPresentesNoHtml } from '@/lib/leitura/indice'
+import { ListTree } from 'lucide-react'
 import { carregarDiffDocumento, renomearVersao } from '@/app/admin/leitura/alteracoes-actions'
 import { salvarConteudoHtml, importarDocx } from '@/app/admin/leitura/upload-actions'
 import { LeituraPreviewGrifos, type GrifoCtl } from '@/components/admin/leitura-preview-grifos'
@@ -50,9 +52,10 @@ const TIPOS_ATUALIZACAO = [
   { v: 'correcao_editorial', label: 'Correção editorial', Icon: SpellCheck },
 ] as const
 
-export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar = false, publicadaVersao = 1, temRascunhoPendente = false, versaoEdicao, abaInicial }: {
+export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar = false, publicadaVersao = 1, temRascunhoPendente = false, versaoEdicao, abaInicial, indiceTipos: indiceTiposProp = [] }: {
   documento: Documento; htmlAtual: string; podeEditar: boolean; podePublicar?: boolean; publicadaVersao?: number; temRascunhoPendente?: boolean; versaoEdicao?: number
   abaInicial?: 'conteudo' | 'config' | 'questoes' | 'acesso'
+  indiceTipos?: string[]
 }) {
   const versaoAutoria = versaoEdicao ?? documento.versao
   const router = useRouter()
@@ -92,6 +95,16 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
   const [fonteOficial, setFonteOficial] = useState(documento.fonte_oficial ?? '')
   const [situacao, setSituacao] = useState<SituacaoEditorial>(documento.situacao_editorial ?? 'em_preparacao')
   const [savingMeta, startMeta] = useTransition()
+  // Índice configurável: tipos disponíveis (detectados no conteúdo) × tipos selecionados (persistidos).
+  const [indiceTipos, setIndiceTipos] = useState<string[]>(indiceTiposProp)
+  const tiposDisponiveis = useMemo(() => tiposPresentesNoHtml(htmlAtual), [htmlAtual])
+  function alternarTipoIndice(tipo: string) {
+    setIndiceTipos((prev) => {
+      const next = prev.includes(tipo) ? prev.filter((t) => t !== tipo) : [...prev, tipo]
+      startMeta(async () => { const r = await salvarIndiceTipos(documento.id, next); if (!r.ok) toast.error(r.error ?? 'Erro ao salvar índice') })
+      return next
+    })
+  }
 
   const [modo, setModo] = useState<Modo>('colar')
   const [htmlColar, setHtmlColar] = useState('')
@@ -407,7 +420,7 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
 
       {/* CONTEÚDO: prévia grande + painel de edição de grifos ao lado */}
       {aba === 'conteudo' && (
-        <LeituraPreviewGrifos documentoId={documento.id} html={htmlAtual} podeEditar={podeEditar} artigos={documento.artigos ?? 0} podeComparar={temRascunhoPendente || publicadaVersao > 1} onGrifoCtl={setGrifoCtl} versaoQuestoes={versaoAutoria} />
+        <LeituraPreviewGrifos documentoId={documento.id} html={htmlAtual} podeEditar={podeEditar} artigos={documento.artigos ?? 0} podeComparar={temRascunhoPendente || publicadaVersao > 1} onGrifoCtl={setGrifoCtl} versaoQuestoes={versaoAutoria} indiceTipos={indiceTipos} />
       )}
 
       {/* CONFIGURAÇÃO: importação de conteúdo + metadados + desafio. Personalização (capa/título/
@@ -573,6 +586,30 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
                 <input type="number" min={0} disabled={!desafioAtivo} value={tempoMin} onChange={(e) => setTempoMin(Math.max(0, Number(e.target.value) || 0))} className="w-16 rounded-lg border bg-[var(--input-bg,transparent)] px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring" />
                 <span className="text-muted-foreground">min</span>
               </div>
+            </div>
+          </details>
+
+          {/* Índice do conteúdo — recolhível. Marca quais tipos aparecem no índice (admin + aluno). */}
+          <details className="group border-t pt-4">
+            <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground [&::-webkit-details-marker]:hidden">
+              <ListTree className="h-3.5 w-3.5 text-primary" /> Índice do conteúdo
+              {savingMeta && <Loader2 className="h-3 w-3 animate-spin" />}
+              <ChevronDown className="ml-auto h-4 w-4 transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="space-y-2 pt-3">
+              <p className="text-xs text-muted-foreground">Marque os tipos que aparecem no índice (do admin e do aluno). O sistema detecta só os que existem neste conteúdo, na ordem da hierarquia.</p>
+              {tiposDisponiveis.length === 0 ? (
+                <p className="rounded-lg border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">Nenhum dispositivo detectado. Salve o conteúdo (com artigos/capítulos marcados) para configurar o índice.</p>
+              ) : (
+                <div className="grid gap-1.5 sm:grid-cols-2">
+                  {TIPOS_INDICE.filter((t) => tiposDisponiveis.includes(t.tipo)).map((t) => (
+                    <label key={t.tipo} className={cn('flex cursor-pointer items-center gap-2 rounded-lg border px-2.5 py-1.5 text-sm transition-colors', indiceTipos.includes(t.tipo) ? 'border-primary/40 bg-primary/5' : 'hover:bg-muted/40')} style={{ marginLeft: t.nivel * 12 }}>
+                      <input type="checkbox" checked={indiceTipos.includes(t.tipo)} onChange={() => alternarTipoIndice(t.tipo)} className="h-4 w-4 rounded border" />
+                      <span className="truncate">{t.label}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
           </details>
 

@@ -4,6 +4,7 @@ import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { remember } from '@/lib/cache/relatorio-cache'
 import { diffDocumentos } from './diff'
 import { limparCabecalhoHtml } from './limpar-cabecalho'
+import { normalizarTiposIndice } from './indice'
 import type { DiffDoc } from './diff-tipos'
 
 /**
@@ -156,6 +157,7 @@ export interface DocumentoCarregado {
   ultimoDisp: string | null
   favorito: boolean
   atualizacao: AtualizacaoInfo | null
+  indiceTipos: string[]
 }
 
 export interface GrifoLei { id: string; inicio: number; fim: number; exact: string; prefix: string; suffix: string; tipo: string; nota: string | null }
@@ -191,9 +193,9 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
   const svc = createAdminClient()
   // Tolerante: `versao_publicada` só existe após a migração A2.
   let dsel = await svc.from('simulado_documentos')
-    .select('id, titulo, descricao, versao, versao_publicada, publicado, deletado, desafio_ativo, desafio_exige_fim, desafio_tempo_min')
+    .select('id, titulo, descricao, versao, versao_publicada, publicado, deletado, desafio_ativo, desafio_exige_fim, desafio_tempo_min, quiz_config')
     .eq('id', documentoId).eq('tenant_id', tenantId).maybeSingle()
-  if (dsel.error && /versao_publicada|column/i.test(String(dsel.error.message))) {
+  if (dsel.error && /versao_publicada|quiz_config|column/i.test(String(dsel.error.message))) {
     dsel = await svc.from('simulado_documentos').select('id, titulo, descricao, versao, publicado, deletado, desafio_ativo, desafio_exige_fim, desafio_tempo_min').eq('id', documentoId).eq('tenant_id', tenantId).maybeSingle() as any
   }
   const doc = dsel.data
@@ -337,6 +339,7 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
     ultimoDisp,
     favorito,
     atualizacao,
+    indiceTipos: normalizarTiposIndice((doc as any).quiz_config?.indice_tipos),
   }
 }
 
