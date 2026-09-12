@@ -46,6 +46,10 @@ export function BannerCropper({
 
   const baseScale = nat && frame.w ? Math.max(frame.w / nat.w, frame.h / nat.h) : 1
   const effScale = baseScale * zoom // natural px → frame px
+  // Zoom mínimo = "caber a imagem inteira" (fit). Fica ≤ 1 (o 1 é "cobrir") → deixa DIMINUIR o zoom
+  // p/ mostrar a imagem toda (com um respiro de fundo), em vez de forçar o recorte "cobrindo".
+  const fitScale = nat && frame.w ? Math.min(frame.w / nat.w, frame.h / nat.h) : 1
+  const minZoom = baseScale ? Math.min(1, fitScale / baseScale) : 1
 
   const clamp = useCallback((x: number, y: number) => {
     if (!nat || !frame.w) return { x, y }
@@ -83,6 +87,9 @@ export function BannerCropper({
       const ctx = canvas.getContext('2d')
       if (!ctx) throw new Error('canvas')
       ctx.imageSmoothingQuality = 'high'
+      // Fundo (preto) para o "respiro" quando a imagem é menor que o molde (zoom < cobrir) — senão
+      // as bordas ficariam transparentes e o JPEG as renderizaria como preto/ruído.
+      ctx.fillStyle = '#000'; ctx.fillRect(0, 0, outWpx, outHpx)
       ctx.drawImage(img, sx, sy, sw, sh, 0, 0, outWpx, outHpx)
       onApply(canvas.toDataURL('image/jpeg', 0.95))
     } catch {
@@ -115,7 +122,7 @@ export function BannerCropper({
 
           <div className="mt-4 flex items-center gap-3">
             <ZoomIn className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <input type="range" min={1} max={3} step={0.01} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} className="h-1.5 flex-1 cursor-pointer accent-primary" />
+            <input type="range" min={minZoom} max={3} step={0.01} value={zoom} onChange={(e) => setZoom(Number(e.target.value))} className="h-1.5 flex-1 cursor-pointer accent-primary" />
             <span className="w-10 shrink-0 text-right text-xs tabular-nums text-muted-foreground">{zoom.toFixed(1)}×</span>
           </div>
         </div>
