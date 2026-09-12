@@ -192,8 +192,8 @@ export function SimuladosCatalogoAluno({ itens, grupos, progresso, recentes, pas
       {recent.length > 0 ? (
         <section className="space-y-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold"><Play className="h-4 w-4 text-primary" /> Simulados recentes</h2>
-          {/* Fileira estilo Netflix (setas laterais + espia o próximo) — pôster ou ticket, conforme o tema do tenant. */}
-          <FileiraHorizontal>
+          {/* Fileira com setas FORA (nas laterais, sem degradê) — os tickets ficam entre as 2 setas. */}
+          <FileiraHorizontal setasFora>
             {recent.map((s) => (
               <div key={s.id} className={view === 'ticket' ? FILEIRA_BASIS_TICKET : basis}>
                 <CardSimulado s={s} dica={s.id === dicaId} variant={view === 'ticket' ? 'ticket' : 'poster'} />

@@ -2,15 +2,18 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type React from 'react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { SetaDegrade } from '@/components/seta-degrade'
 
 /**
  * Fileira horizontal estilo Netflix (reutilizável admin + aluno): rola exatamente UM card por
  * clique; setas cinza com degradê que fundem na borda dos cards e expandem no hover. Os cards
  * (children) definem a própria largura — normalmente via `basis-[...]` para espiar o próximo.
+ *
+ * `setasFora`: setas FORA dos cards (nas laterais), sem degradê — os cards ficam ENTRE as 2 setas.
  */
-export function FileiraHorizontal({ titulo, count, children }: {
-  titulo?: string; count?: number; children: React.ReactNode
+export function FileiraHorizontal({ titulo, count, children, setasFora = false }: {
+  titulo?: string; count?: number; children: React.ReactNode; setasFora?: boolean
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const [canL, setCanL] = useState(false)
@@ -40,13 +43,32 @@ export function FileiraHorizontal({ titulo, count, children }: {
     const passo = primeiro ? primeiro.offsetWidth + 16 : el.clientWidth
     el.scrollBy({ left: dir * passo, behavior: 'smooth' })
   }
+  const Cabecalho = titulo ? (
+    <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+      {titulo}{count != null && <span className="text-xs font-normal text-muted-foreground">({count})</span>}
+    </h3>
+  ) : null
+
+  // Setas FORA: linha [seta ◀] [scroll dos cards] [seta ▶] — sem degradê, cards entre as setas.
+  if (setasFora) {
+    const setaCls = 'flex w-9 shrink-0 items-center justify-center self-stretch rounded-xl border bg-card text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground disabled:pointer-events-none disabled:opacity-25'
+    return (
+      <section className="space-y-2">
+        {Cabecalho}
+        <div className="flex items-stretch gap-2">
+          <button type="button" onClick={() => rolar(-1)} disabled={!canL} aria-label="Ver anteriores" className={setaCls}><ChevronLeft className="h-5 w-5" /></button>
+          <div ref={ref} className="-my-2 flex min-w-0 flex-1 gap-4 overflow-x-auto px-0.5 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {children}
+          </div>
+          <button type="button" onClick={() => rolar(1)} disabled={!canR} aria-label="Ver próximos" className={setaCls}><ChevronRight className="h-5 w-5" /></button>
+        </div>
+      </section>
+    )
+  }
+
   return (
     <section className="space-y-2">
-      {titulo && (
-        <h3 className="flex items-center gap-1.5 text-sm font-semibold">
-          {titulo}{count != null && <span className="text-xs font-normal text-muted-foreground">({count})</span>}
-        </h3>
-      )}
+      {Cabecalho}
       <div className="group relative">
         {/* py-2 dá folga vertical: overflow-x-auto também recorta na vertical, então sem isso o
             card cortaria no topo ao subir no hover (-translate-y). O -my-2 mantém o alinhamento. */}
