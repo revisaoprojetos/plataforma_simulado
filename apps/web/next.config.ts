@@ -20,6 +20,11 @@ const nextConfig: NextConfig = {
     ],
   },
   experimental: {
+    // Turbopack no Windows: a escrita/compactação do cache PERSISTENTE de disco em dev estoura a RAM
+    // (chega a ~20GB e trava o PC). Com TURBOPACK_FS_CACHE=off o dev roda SEM esse cache — cold start
+    // fica um pouco mais lento, mas sem o pico de memória. Inerte para CI/build (usa outra flag) e p/
+    // quem não define a env. Ligado pelo script de subir o localhost nesta máquina.
+    ...(process.env.TURBOPACK_FS_CACHE === "off" ? { turbopackFileSystemCacheForDev: false } : {}),
     serverActions: {
       allowedOrigins: ["localhost:3000"],
       // Cadernos do designer podem chegar grandes no PRIMEIRO save (fundos em base64, antes de
