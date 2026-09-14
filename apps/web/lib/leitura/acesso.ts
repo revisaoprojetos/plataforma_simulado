@@ -50,15 +50,17 @@ export interface DocumentoAluno {
  * SEM nenhuma atribuição = liberado a todos; COM atribuição = só grupos/estudantes
  * atribuídos. Já traz artigos (versão vigente), progresso e metadados de lei/matéria.
  */
-export async function documentosDoAluno(estudanteId: string, tenantId: string): Promise<DocumentoAluno[]> {
+export async function documentosDoAluno(estudanteId: string, tenantId: string, opts?: { leve?: boolean }): Promise<DocumentoAluno[]> {
   const svc = createAdminClient()
+  // `leve`: pula matérias e a contagem de artigos (a TRILHA não usa nenhum dos dois) → menos round-trips.
+  const leve = opts?.leve ?? false
   // Detecta colunas de lei (A1) e de versionamento (A2) → select tolerante (memoizado por processo).
   const { temLei, temVers } = await detectarColunasLeitura(svc)
   const cols = ['id, titulo, descricao, cor, icone, capa_url, versao, pasta_id, ordem', temVers && 'versao_publicada', temLei && 'materia_id, tipo_norma, numero, ano, ementa'].filter(Boolean).join(', ')
   // docs + matérias são independentes → paralelo (menos round-trips ao DB remoto).
   const [docs, matsRes] = await Promise.all([
     fetchAll<any>(() => svc.from('simulado_documentos').select(cols).eq('tenant_id', tenantId).eq('deletado', false).eq('publicado', true).order('atualizado_em', { ascending: false })),
-    temLei ? svc.from('simulado_materias').select('id, nome, cor').eq('tenant_id', tenantId).eq('deletado', false) : Promise.resolve({ data: [] as any[] } as any),
+    (temLei && !leve) ? svc.from('simulado_materias').select('id, nome, cor').eq('tenant_id', tenantId).eq('deletado', false) : Promise.resolve({ data: [] as any[] } as any),
   ])
   if (!docs.length) return []
   const ids = docs.map((d) => d.id)
@@ -93,7 +95,7 @@ export async function documentosDoAluno(estudanteId: string, tenantId: string): 
 
   // Artigos (versão vigente) + progresso — mesmo CHUNK nos `.in('documento_id', visIds)`.
   const [cont, prog] = await Promise.all([
-    fetchAllByIn<{ documento_id: string; versao: number; artigos: number }>(visIds, (chunk) => svc.from('simulado_documento_conteudos').select('documento_id, versao, artigos').in('documento_id', chunk).order('documento_id', { ascending: true })),
+    leve ? Promise.resolve([] as { documento_id: string; versao: number; artigos: number }[]) : fetchAllByIn<{ documento_id: string; versao: number; artigos: number }>(visIds, (chunk) => svc.from('simulado_documento_conteudos').select('documento_id, versao, artigos').in('documento_id', chunk).order('documento_id', { ascending: true })),
     fetchAllByIn<{ documento_id: string; documento_versao: number; pct: number; concluido_em: string | null }>(visIds, (chunk) => svc.from('simulado_leitura_progresso').select('documento_id, documento_versao, pct, concluido_em').eq('estudante_id', estudanteId).in('documento_id', chunk).order('documento_id', { ascending: true })),
   ])
   const versaoDoc = new Map(visiveis.map((d) => [d.id, d.versao_publicada ?? d.versao]))

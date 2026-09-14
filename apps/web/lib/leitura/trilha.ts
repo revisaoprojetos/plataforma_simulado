@@ -108,8 +108,8 @@ async function modulosAcessiveis(svc: any, tenantId: string, estId: string, past
  */
 async function sequenciaLeitura(estId: string, tenantId: string) {
   const svc = createAdminClient()
-  // docs e pastas são independentes → paralelo (menos round-trips ao DB remoto).
-  const [docs, pastas] = await Promise.all([documentosDoAluno(estId, tenantId), pastasLeitura(svc, tenantId)])
+  // docs e pastas em paralelo; docs em modo LEVE (trilha não usa matérias/artigos) → menos round-trips.
+  const [docs, pastas] = await Promise.all([documentosDoAluno(estId, tenantId, { leve: true }), pastasLeitura(svc, tenantId)])
   const st = await statusAulas(svc, tenantId, estId, docs)
 
   const byModulo = new Map<string, DocumentoAluno[]>()
