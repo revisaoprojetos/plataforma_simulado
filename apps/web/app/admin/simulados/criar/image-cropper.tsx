@@ -87,7 +87,9 @@ export function ImageCropper({ file, src, aspect, titulo, initialZoom, initialCe
     if (!img) return
     setSalvando(true)
     try {
-      const long = 1600
+      // Banners LARGOS (ex.: 16:4) são exibidos em LARGURA CHEIA → precisam de mais resolução (senão
+      // borram, ainda mais em telas retina). Imagens largas saem com lado maior 2560; demais, 1600.
+      const long = aspect >= 1.6 ? 2560 : 1600
       const outW = aspect >= 1 ? long : Math.round(long * aspect)
       const outH = aspect >= 1 ? Math.round(long / aspect) : long
       const canvas = document.createElement('canvas')
