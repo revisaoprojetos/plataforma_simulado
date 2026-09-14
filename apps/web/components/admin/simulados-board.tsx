@@ -638,46 +638,26 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
         <SecoesStatus sims={filtrados} online={online} appUrl={appUrl} onMover={podeMover ? (s) => setMovendo(s) : undefined}
           recolhidas={recolhidas} toggleSecao={toggleSecao} selecao={selecao} onSelecionar={setSel} variant={cardView} />
       ) : vista === 'pastas' && !atual ? (
-        cardView === 'ticket' ? (
-          // TICKET: grade agrupada por pasta (mesmo agrupamento das Linhas, porém em grade).
-          <div className="space-y-8">
-            {secoesPasta.pastas.map(({ folder, sims }) => (
-              folder && <PastaSection key={folder.id} folder={folder} sims={sims} online={online} appUrl={appUrl}
-                aberto={!recolhidas.has(`p:${folder.id}`)} toggle={() => toggleSecao(`p:${folder.id}`)}
-                onGerenciar={() => setEditandoPasta(folder)} onExcluir={() => excluirPasta(folder)}
-                onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel}
-                variant={cardView} layout="grade" />
-            ))}
-            {secoesPasta.semPasta.length > 0 && (
-              <SecaoSimples titulo="Sem pasta" icone={FolderInput} sims={secoesPasta.semPasta} online={online} appUrl={appUrl}
-                aberto={!recolhidas.has('sem-pasta')} toggle={() => toggleSecao('sem-pasta')}
-                onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel} variant={cardView} layout="grade" />
-            )}
-            {secoesPasta.pastas.length === 0 && secoesPasta.semPasta.length === 0 && (
-              <p className="rounded-2xl border border-dashed py-14 text-center text-sm text-muted-foreground">Nenhuma pasta ainda. Crie a primeira em “Nova pasta”.</p>
-            )}
-          </div>
-        ) : (
-          // PÔSTER: só os TILES de pasta (clicar entra na pasta e mostra os simulados de dentro).
-          <div className="space-y-6">
-            {secoesPasta.pastas.length > 0 && (
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                {secoesPasta.pastas.map(({ folder, sims }) => folder && (
-                  <FolderTile key={folder.id} folder={folder} count={sims.length} appUrl={appUrl}
-                    onPersonalizar={() => setEditandoPasta(folder)} onExcluir={() => excluirPasta(folder)} variant={cardView} />
-                ))}
-              </div>
-            )}
-            {secoesPasta.semPasta.length > 0 && (
-              <SecaoSimples titulo="Sem pasta" icone={FolderInput} sims={secoesPasta.semPasta} online={online} appUrl={appUrl}
-                aberto={!recolhidas.has('sem-pasta')} toggle={() => toggleSecao('sem-pasta')}
-                onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel} variant={cardView} />
-            )}
-            {secoesPasta.pastas.length === 0 && secoesPasta.semPasta.length === 0 && (
-              <p className="rounded-2xl border border-dashed py-14 text-center text-sm text-muted-foreground">Nenhuma pasta ainda. Crie a primeira em “Nova pasta”.</p>
-            )}
-          </div>
-        )
+        // Visão PASTAS: só os CARDS/TICKETS de pasta (igual ao Banco de Simulado) — clicar ENTRA na
+        // pasta (?pasta=id) e mostra os simulados de dentro. O estilo (pôster/ticket) segue o console.
+        <div className="space-y-6">
+          {secoesPasta.pastas.length > 0 && (
+            <div className={gradeCls(cardView)}>
+              {secoesPasta.pastas.map(({ folder, sims }) => folder && (
+                <FolderTile key={folder.id} folder={folder} count={sims.length} appUrl={appUrl}
+                  onPersonalizar={() => setEditandoPasta(folder)} onExcluir={() => excluirPasta(folder)} variant={cardView} />
+              ))}
+            </div>
+          )}
+          {secoesPasta.semPasta.length > 0 && (
+            <SecaoSimples titulo="Sem pasta" icone={FolderInput} sims={secoesPasta.semPasta} online={online} appUrl={appUrl}
+              aberto={!recolhidas.has('sem-pasta')} toggle={() => toggleSecao('sem-pasta')}
+              onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel} variant={cardView} />
+          )}
+          {secoesPasta.pastas.length === 0 && secoesPasta.semPasta.length === 0 && (
+            <p className="rounded-2xl border border-dashed py-14 text-center text-sm text-muted-foreground">Nenhuma pasta ainda. Crie a primeira em “Nova pasta”.</p>
+          )}
+        </div>
       ) : (
         <div className="space-y-8">
           {secoesPasta.pastas.map(({ folder, sims }) => (
