@@ -4,7 +4,7 @@ import { Fragment, useMemo, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { HexColorField } from '@/components/admin/hex-color-field'
-import { Search, RotateCcw, ChevronDown, Copy, ClipboardPaste, Loader2, Save, Sparkles, Palette, Layers, ArrowLeft, ImagePlus, Trash2 } from 'lucide-react'
+import { Search, RotateCcw, ChevronDown, Copy, ClipboardPaste, Loader2, Save, Sparkles, Layers, ArrowLeft, ImagePlus, Trash2 } from 'lucide-react'
 import { redimensionarImagem } from '@/lib/imagem'
 import { hospedarImagemQuestaoAction } from '@/app/admin/questoes/actions'
 import { ESTILOS_PROVA_LOADING } from '@/components/prova/prova-intro'
@@ -143,11 +143,7 @@ export function BancoHudDesigner({ bancoId, titulo, baseInicial, porPaginaInicia
               <ArrowLeft className="h-4 w-4" /> Voltar
             </Link>
           )}
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: cor }}><Palette className="h-5 w-5" /></span>
-          <div>
-            <h3 className="text-sm font-semibold leading-tight">HUD do simulado</h3>
-            <p className="text-xs text-muted-foreground">Tema de cores da prova do aluno — vale p/ os simulados deste banco</p>
-          </div>
+          <span className="text-sm font-medium text-muted-foreground">Tema de cores da prova</span>
         </div>
         <button onClick={salvar} disabled={salvando} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 disabled:opacity-60">
           {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar HUD

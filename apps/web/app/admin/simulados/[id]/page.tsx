@@ -419,25 +419,36 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
           {aba === 'manutencao' && <SimuladoManutencao simuladoId={id} inicial={(simulado.regras as any)?.manutencao ?? null} />}
         </TabsContent>
 
-        {/* Configurações — personalização (capa/cor/card) + título/modo/datas/regras */}
-        <TabsContent value="configuracoes" className="space-y-6">
+        {/* Configurações — duas seções claras: Aparência (capa/cor/card) e Aplicação (título/modo/regras) */}
+        <TabsContent value="configuracoes" className="space-y-8">
           {aba === 'configuracoes' && (
             <>
-              {bancoVisual ? (
-                <BancoPersonalizar
-                  banco={{ id: bancoVisual.id, nome: simulado.titulo, cor: bancoVisual.cor, icone: bancoVisual.icone, capa_url: bancoVisual.capa_url, capa_card_url: bancoVisual.capa_card_url, total: totalQuestoes ?? 0 }}
-                  cardView={cardView}
-                  titulo="Personalizar simulado"
-                  subtitulo="Capa, cor e imagem do card do simulado"
-                  badge="Simulado"
-                  mostrarNome={false}
-                />
-              ) : semBancoCTA('Este simulado ainda não tem um espaço de conteúdo próprio. Prepare-o para editar a capa, a cor e a imagem do card aqui mesmo.')}
+              <section className="space-y-3">
+                <div className="space-y-0.5">
+                  <h2 className="text-base font-semibold tracking-tight">Aparência do card</h2>
+                  <p className="text-sm text-muted-foreground">A capa, a cor e a imagem que aparecem no card do simulado (aluno e board).</p>
+                </div>
+                {bancoVisual ? (
+                  <BancoPersonalizar
+                    banco={{ id: bancoVisual.id, nome: simulado.titulo, cor: bancoVisual.cor, icone: bancoVisual.icone, capa_url: bancoVisual.capa_url, capa_card_url: bancoVisual.capa_card_url, total: totalQuestoes ?? 0 }}
+                    cardView={cardView}
+                    badge="Simulado"
+                    mostrarNome={false}
+                    semCabecalho
+                  />
+                ) : semBancoCTA('Este simulado ainda não tem um espaço de conteúdo próprio. Prepare-o para editar a capa, a cor e a imagem do card aqui mesmo.')}
+              </section>
 
-              <SimuladoForm
-                initialData={initialFormData as any}
-                onSubmit={updateSimuladoAction.bind(null, id)}
-              />
+              <section className="space-y-3 border-t pt-6">
+                <div className="space-y-0.5">
+                  <h2 className="text-base font-semibold tracking-tight">Configurações da aplicação</h2>
+                  <p className="text-sm text-muted-foreground">Título, modo de aplicação, datas, tempo, regras e identificação do aluno.</p>
+                </div>
+                <SimuladoForm
+                  initialData={initialFormData as any}
+                  onSubmit={updateSimuladoAction.bind(null, id)}
+                />
+              </section>
             </>
           )}
         </TabsContent>

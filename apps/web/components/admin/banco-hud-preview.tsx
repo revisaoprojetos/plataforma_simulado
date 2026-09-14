@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { Pencil, Palette, Maximize2, X } from 'lucide-react'
+import { Pencil, Maximize2, X } from 'lucide-react'
 import { type HudCores, type HudPorPagina, efetivarHud } from '@/lib/caderno-designer/types'
 import { hudCssVars } from '@/lib/caderno-designer/hud'
 import { ProvaHud } from '@/components/prova/prova-hud'
@@ -79,18 +79,9 @@ export function BancoHudPreview({ bancoId, titulo, base, porPagina, questoesInic
     return demoHud
   }
 
-  const corTopo = efetivarHud(base, porPagina, 'prova').primaria
-
   return (
     <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b px-4 py-3" style={{ background: `linear-gradient(90deg, ${corTopo}1f, transparent 55%)` }}>
-        <div className="flex items-center gap-3">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: corTopo }}><Palette className="h-5 w-5" /></span>
-          <div>
-            <h3 className="text-sm font-semibold leading-tight">HUD do simulado</h3>
-            <p className="text-xs text-muted-foreground">Tema de cores da prova do aluno — vale p/ os simulados deste banco</p>
-          </div>
-        </div>
+      <div className="flex items-center justify-end gap-3 border-b px-4 py-2.5">
         <Link href={editHref ?? `/admin/banco-questoes/${bancoId}/hud`} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90">
           <Pencil className="h-4 w-4" /> Editar HUD
         </Link>

@@ -41,6 +41,7 @@ export function BancoPersonalizar({
   subtitulo = 'Cor, ícone e imagem de capa',
   badge = 'Banco de questões',
   mostrarNome = true,
+  semCabecalho = false,
 }: {
   banco: Banco
   cardView?: CardView
@@ -50,6 +51,8 @@ export function BancoPersonalizar({
   badge?: string
   /** Oculta o campo "Nome" (no simulado o nome é editado em Configurações). O nome salvo mantém o valor recebido. */
   mostrarNome?: boolean
+  /** Oculta o cabeçalho interno do card (quando a área já tem um título de seção próprio). */
+  semCabecalho?: boolean
 }) {
   const router = useRouter()
   const bannerRef = useRef<HTMLInputElement>(null)
@@ -132,13 +135,15 @@ export function BancoPersonalizar({
     <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
       {/* Formulário */}
       <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
-        <div className="flex items-center gap-3 border-b px-5 py-3.5" style={{ background: `linear-gradient(90deg, ${c}1f, transparent 55%)` }}>
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: c }}><Palette className="h-5 w-5" /></span>
-          <div>
-            <h3 className="text-sm font-semibold leading-tight">{titulo}</h3>
-            <p className="text-xs text-muted-foreground">{subtitulo}</p>
+        {!semCabecalho && (
+          <div className="flex items-center gap-3 border-b px-5 py-3.5" style={{ background: `linear-gradient(90deg, ${c}1f, transparent 55%)` }}>
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: c }}><Palette className="h-5 w-5" /></span>
+            <div>
+              <h3 className="text-sm font-semibold leading-tight">{titulo}</h3>
+              <p className="text-xs text-muted-foreground">{subtitulo}</p>
+            </div>
           </div>
-        </div>
+        )}
         <CardContent className="space-y-6 px-5 py-5">
           {mostrarNome && (
             <div className="space-y-1.5">
