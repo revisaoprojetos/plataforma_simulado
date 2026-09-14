@@ -1,9 +1,10 @@
 import { Suspense } from 'react'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId, getCurrentTenant } from '@/lib/tenant'
-import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { fetchAll } from '@/lib/supabase/fetch-all'
 import { resolverCardView } from '@/lib/card-view'
-import { alternativasSaoCertoErrado } from '@/lib/simulado/formato'
+import { getTenantTheme } from '@/lib/tenant-theme'
+import { Loader, type EstiloLoader } from '@/components/admin/loaders'
 import { BancoPersonalizar } from '@/components/admin/banco-personalizar'
 import { PrepararConteudoSimulado } from '@/components/admin/preparar-conteudo-simulado'
 import { BancoTabsShell } from '@/components/admin/banco-tabs-shell'
@@ -13,9 +14,7 @@ import { TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { SimuladoForm } from '@/components/admin/simulado-form'
 import { SimuladoActions } from '@/components/admin/simulado-actions'
-import { SimuladoQuestoesTable } from '@/components/admin/simulado-questoes-table'
-import { type QuestaoLinha } from '@/components/admin/questoes-tabela-base'
-import { listarDisciplinasFiltro } from '@/app/admin/banco-questoes/actions'
+import { SimuladoQuestoesData } from '@/components/admin/simulado-questoes-data'
 import { simuladosDoBanco } from '@/lib/simulado/banco-do-simulado'
 import { SimuladoEstudantesData } from '@/components/admin/simulado-estudantes-data'
 import { SimuladoManutencao } from '@/components/admin/simulado-manutencao'
@@ -42,22 +41,6 @@ const statusConfig: Record<string, { label: string; class: string }> = {
 }
 
 const ABAS = ['visao-geral', 'questoes', 'estudantes', 'caderno', 'hud', 'relatorio', 'manutencao', 'configuracoes'] as const
-
-/** Esqueleto exibido enquanto a aba (Suspense) carrega seus dados. */
-function AbaCarregando() {
-  return (
-    <div className="animate-pulse space-y-4 py-4">
-      <div className="flex items-center justify-between">
-        <div className="h-6 w-56 rounded-md bg-muted" />
-        <div className="h-9 w-40 rounded-lg bg-muted" />
-      </div>
-      <div className="h-10 w-full rounded-lg bg-muted/70" />
-      <div className="space-y-2 rounded-xl border p-3">
-        {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-10 w-full rounded-md bg-muted/60" />)}
-      </div>
-    </div>
-  )
-}
 
 export default async function SimuladoDetailPage({ params, searchParams }: PageProps) {
   const { id } = await params
@@ -100,6 +83,10 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
   }
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  // Loader configurado no tenant (mesma "linha que passa" do carregamento de rota) — usado nos
+  // fallbacks de Suspense das abas, para a animação de carregamento ser consistente.
+  const loaderEstilo = (((await getTenantTheme()).tema as Record<string, unknown> | null)?.loading_estilo as EstiloLoader) ?? 'skeleton'
+  const fallbackAba = <Loader estilo={loaderEstilo} className="py-2" />
 
   const modoLabelMap: Record<string, string> = {
     janela_fixa: 'Janela fixa',
@@ -166,37 +153,8 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
     cardView = resolverCardView((temaAdmin.card_view_admin ?? temaAdmin.card_view) as string | undefined)
   }
 
-  // ── Questões: linha rica da TABELA BASE (só na aba). C/E vem das alternativas.
-  let questoesLinha: QuestaoLinha[] = []
-  let disciplinasFiltro: { id: string; nome: string }[] = []
-  if (aba === 'questoes') {
-    // Carga RICA da prova só aqui (joins de disciplina/assunto/banca/órgão + C/E via alternativas).
-    const provaRica = await fetchAll<any>(() =>
-      supabase.from('simulado_prova_questoes').select(`
-        id, ordem, peso, anulada,
-        questoes:simulado_questoes(id, tipo, enunciado, nivel_dificuldade, status, ano, assunto_detalhe, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome), bancas:simulado_bancas(nome), orgaos:simulado_orgaos(nome))
-      `).eq('simulado_id', id).eq('tenant_id', tid).order('ordem'))
-    const ceSet = new Set<string>()
-    const qids = provaRica.map((sq: any) => sq.questoes?.id).filter(Boolean) as string[]
-    const [alts, discs] = await Promise.all([
-      qids.length ? fetchAllByIn<any>(qids, (chunk) => supabase.from('simulado_alternativas').select('questao_id, texto').in('questao_id', chunk)) : Promise.resolve([]),
-      listarDisciplinasFiltro(),
-    ])
-    disciplinasFiltro = discs
-    const textos = new Map<string, string[]>()
-    for (const a of alts) { const arr = textos.get(a.questao_id) ?? []; arr.push(a.texto ?? ''); textos.set(a.questao_id, arr) }
-    for (const [qid, ts] of textos) if (alternativasSaoCertoErrado(ts)) ceSet.add(qid)
-    questoesLinha = provaRica.map((sq: any) => {
-      const q = sq.questoes ?? {}
-      return {
-        id: q.id, enunciado: q.enunciado ?? '', tipo: q.tipo ?? null,
-        formato: q.tipo === 'discursiva' ? null : (ceSet.has(q.id) ? 'certo_errado' : 'multipla'),
-        nivel_dificuldade: q.nivel_dificuldade ?? null, status: q.status ?? null,
-        disciplina: q.disciplinas?.nome ?? null, assunto: q.assuntos?.nome ?? null,
-        assuntoDetalhe: q.assunto_detalhe ?? null, banca: q.bancas?.nome ?? null, orgao: q.orgaos?.nome ?? null, ano: q.ano ?? null,
-      }
-    }).filter((q: QuestaoLinha) => q.id)
-  }
+  // Questões: a carga rica (joins + alternativas) foi movida para <SimuladoQuestoesData> (Suspense),
+  // para o loader aparecer na troca de aba em vez de bloquear a página no await.
 
   function formatDate(date: string | null) {
     if (!date) return '—'
@@ -409,16 +367,12 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
           </Card>
         </TabsContent>
 
-        {/* Questões — tabela rica com filtros/reordenar/adicionar/importar (opera na prova) */}
+        {/* Questões — tabela rica (opera na prova); carregada em Suspense com o loader do tenant. */}
         <TabsContent value="questoes" className="space-y-4">
           {aba === 'questoes' && (
-            <SimuladoQuestoesTable
-              simuladoId={id}
-              bancoId={bancoBaseId}
-              questoes={questoesLinha}
-              disciplinas={disciplinasFiltro}
-              cor={bancoVisual?.cor ?? undefined}
-            />
+            <Suspense fallback={fallbackAba}>
+              <SimuladoQuestoesData simuladoId={id} bancoId={bancoBaseId} cor={bancoVisual?.cor ?? undefined} />
+            </Suspense>
           )}
         </TabsContent>
 
@@ -426,7 +380,7 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
             e streamados via Suspense; assim o prefetch pré-carrega e não há spinner no 1º acesso. */}
         <TabsContent value="estudantes">
           {aba === 'estudantes' && (
-            <Suspense fallback={<AbaCarregando />}>
+            <Suspense fallback={fallbackAba}>
               <SimuladoEstudantesData simuladoId={id} acessoGratuitoInicial={!!(simulado.regras as { acesso_gratuito?: boolean } | null)?.acesso_gratuito} bancoBaseId={bancoBaseId} />
             </Suspense>
           )}
@@ -435,7 +389,7 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
         {/* Caderno — folha/enunciado/gabarito de entrega (opera no banco container) */}
         <TabsContent value="caderno">
           {aba === 'caderno' && (bancoBaseId ? (
-            <Suspense fallback={<AbaCarregando />}>
+            <Suspense fallback={fallbackAba}>
               <BancoCadernoTeste bancoId={bancoBaseId} cor={bancoVisual?.cor ?? undefined} />
             </Suspense>
           ) : semBancoCTA('Este simulado ainda não tem um espaço de conteúdo próprio. Prepare-o para montar a folha de respostas e os cadernos aqui mesmo.'))}
@@ -444,7 +398,7 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
         {/* HUD — tema visual da prova (opera no banco container) */}
         <TabsContent value="hud">
           {aba === 'hud' && (bancoBaseId ? (
-            <Suspense fallback={<AbaCarregando />}>
+            <Suspense fallback={fallbackAba}>
               <BancoHud bancoId={bancoBaseId} cor={bancoVisual?.cor ?? undefined} editHref={`/admin/simulados/${id}/hud`} />
             </Suspense>
           ) : semBancoCTA('Este simulado ainda não tem um espaço de conteúdo próprio. Prepare-o para configurar o HUD da prova aqui mesmo.'))}
@@ -454,7 +408,7 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
             shell aparecer na hora e o relatório streamar; fora do prefetch p/ não varrer em todo acesso. */}
         <TabsContent value="relatorio">
           {aba === 'relatorio' && (
-            <Suspense fallback={<AbaCarregando />}>
+            <Suspense fallback={fallbackAba}>
               <SimuladoRelatorio simuladoId={id} />
             </Suspense>
           )}

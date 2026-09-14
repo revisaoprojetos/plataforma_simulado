@@ -1,7 +1,7 @@
 'use client'
 
 import type React from 'react'
-import { useEffect, useTransition } from 'react'
+import { useEffect } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Tabs } from '@/components/ui/tabs'
 
@@ -17,7 +17,6 @@ export function BancoTabsShell({ value, children, prefetch }: { value: string; c
   const router = useRouter()
   const sp = useSearchParams()
   const pathname = usePathname()
-  const [pending, startTransition] = useTransition()
 
   useEffect(() => {
     if (!prefetch?.length || !pathname) return
@@ -31,26 +30,19 @@ export function BancoTabsShell({ value, children, prefetch }: { value: string; c
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname])
 
+  // SEM startTransition de propósito: a transição suprimia o fallback de Suspense (o React manteria o
+  // conteúdo antigo). Com push direto, ao trocar de aba a nova aba mostra seu loader (o mesmo da rota)
+  // enquanto carrega — a animação de carregamento aparece.
   return (
-    <>
-      {/* Barra de progresso na troca de aba: MESMA "linha que passa" do loader de rota (loading-bar) e
-          com loader-atrasado (fica invisível por ~400ms) → em troca rápida/prefetchada não pisca; só
-          aparece, suave, quando demora. */}
-      {pending && (
-        <div className="loader-atrasado fixed inset-x-0 top-0 z-[60] h-0.5 overflow-hidden bg-primary/15" aria-hidden>
-          <div className="loading-bar-fill h-full bg-primary" />
-        </div>
-      )}
-      <Tabs
-        value={value}
-        onValueChange={(v: string) => {
-          const p = new URLSearchParams(sp?.toString() ?? '')
-          p.set('tab', v)
-          startTransition(() => router.push(`?${p.toString()}`, { scroll: false }))
-        }}
-      >
-        {children}
-      </Tabs>
-    </>
+    <Tabs
+      value={value}
+      onValueChange={(v: string) => {
+        const p = new URLSearchParams(sp?.toString() ?? '')
+        p.set('tab', v)
+        router.push(`?${p.toString()}`, { scroll: false })
+      }}
+    >
+      {children}
+    </Tabs>
   )
 }
