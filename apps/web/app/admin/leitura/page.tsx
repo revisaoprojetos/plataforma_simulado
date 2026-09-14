@@ -7,6 +7,7 @@ import { ModuloBanner } from '@/components/admin/modulo-banner'
 import { PublicarModuloBotao } from '@/components/admin/publicar-modulo-botao'
 import { getCurrentTenant } from '@/lib/tenant'
 import { resolverCardView } from '@/lib/card-view'
+import { cn } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,7 +24,7 @@ export default async function LeituraAdminPage({ searchParams }: { searchParams:
   const breadcrumb = data.ok ? (data.breadcrumb ?? []) : []
 
   return (
-    <div className={banner ? 'space-y-2' : 'space-y-3'}>
+    <div className={cn(banner ? 'space-y-2' : 'space-y-3', banner && '[overflow-anchor:none]')}>
       {banner ? (
         // Banner colapsável (ModuloBanner): imagem única + tabs na base; ao rolar, o topo sobe e sobra a
         // faixa com um cabeçalho COMPACTO (Voltar + título, sem descrição) + as tabs.
