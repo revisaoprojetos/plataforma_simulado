@@ -19,13 +19,14 @@ export function SimuladoQuestoesTable({
   bancoId,
   questoes,
   disciplinas,
-  cor = '#6d28d9',
+  cor,
 }: {
   simuladoId: string
   /** Banco container (para o pop-up excluir da busca o que já está na prova). Pode ser null. */
   bancoId: string | null
   questoes: QuestaoLinha[]
   disciplinas: { id: string; nome: string }[]
+  /** Cor de acento; se ausente, a TABELA BASE aplica o token de marca padrão. */
   cor?: string
 }) {
   const router = useRouter()

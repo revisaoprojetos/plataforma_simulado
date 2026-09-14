@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId, getCurrentTenant } from '@/lib/tenant'
-import { fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { resolverCardView } from '@/lib/card-view'
 import { alternativasSaoCertoErrado } from '@/lib/simulado/formato'
 import { BancoPersonalizar } from '@/components/admin/banco-personalizar'
@@ -115,19 +115,24 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
     email_telefone: 'E-mail + telefone',
   }
 
-  // Base (sempre): questões (p/ contagem + tipo + nomes de disciplina) e sessões (contagem + nota média).
-  const [
-    { data: questoes, count: totalQuestoes },
-    { data: sessoes, count: totalSessoes },
-  ] = await Promise.all([
+  // Base (sempre): questões (p/ tipo + nomes de disciplina) e sessões (contagem + nota média).
+  // fetchAll nas questões para NÃO truncar em 1000 numa prova grande; a contagem vem por head count.
+  const [questoes, { count: totalQuestoes }, { data: sessoes, count: totalSessoes }] = await Promise.all([
+    fetchAll<any>(() =>
+      supabase
+        .from('simulado_prova_questoes')
+        .select(`
+          id, ordem, peso, anulada,
+          questoes:simulado_questoes(id, tipo, enunciado, nivel_dificuldade, status, ano, assunto_detalhe, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome), bancas:simulado_bancas(nome), orgaos:simulado_orgaos(nome))
+        `)
+        .eq('simulado_id', id)
+        .eq('tenant_id', tid)
+        .order('ordem')),
     supabase
       .from('simulado_prova_questoes')
-      .select(`
-        id, ordem, peso, anulada,
-        questoes:simulado_questoes(id, tipo, enunciado, nivel_dificuldade, status, ano, assunto_detalhe, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome), bancas:simulado_bancas(nome), orgaos:simulado_orgaos(nome))
-      `, { count: 'exact' })
+      .select('id', { count: 'exact', head: true })
       .eq('simulado_id', id)
-      .order('ordem'),
+      .eq('tenant_id', tid),
     supabase
       .from('simulado_sessoes_prova')
       .select(`id, status, nota, iniciado_em, finalizado_em, is_teste`, { count: 'exact' })
@@ -147,16 +152,25 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
   const bancoBaseId = (simulado.regras as { banco_base_id?: string } | null)?.banco_base_id ?? null
 
   // ── Visual do banco container (capa/cor/card) — resolvido por banco_base_id. Só nas abas de conteúdo.
+  // Na aba Grupos, traz também `grupos` na MESMA query (evita 2ª round-trip à mesma linha).
   const abasConteudo = ['personalizar', 'questoes', 'caderno', 'hud', 'grupos']
   let bancoVisual: { id: string; cor: string | null; icone: string | null; capa_url: string | null; capa_card_url: string | null } | null = null
+  let gruposIniciais: GrupoBanco[] = []
+  let disciplinasGrupos: string[] = []
   if (bancoBaseId && abasConteudo.includes(aba)) {
     const svcAdmin = createAdminClient()
-    const r = await svcAdmin.from('simulado_pastas').select('id, cor, icone, capa_url, capa_card_url, is_folder, deletado').eq('id', bancoBaseId).eq('tenant_id', tid).maybeSingle()
+    const colsBase = 'id, cor, icone, capa_url, capa_card_url, is_folder, deletado'
+    const cols = aba === 'grupos' ? `${colsBase}, grupos` : colsBase
+    const r = await svcAdmin.from('simulado_pastas').select(cols).eq('id', bancoBaseId).eq('tenant_id', tid).maybeSingle()
     let row: Record<string, any> | null = r.data as any
-    if (r.error && /cor|icone|capa_url|capa_card_url|is_folder|deletado|column/i.test(r.error.message)) {
+    if (r.error && /cor|icone|capa_url|capa_card_url|is_folder|deletado|grupos|column/i.test(r.error.message)) {
       row = (await svcAdmin.from('simulado_pastas').select('id').eq('id', bancoBaseId).eq('tenant_id', tid).maybeSingle()).data as any
     }
     if (row && !row.deletado && row.is_folder !== true) bancoVisual = { id: row.id, cor: row.cor ?? null, icone: row.icone ?? null, capa_url: row.capa_url ?? null, capa_card_url: row.capa_card_url ?? null }
+    if (aba === 'grupos') {
+      gruposIniciais = Array.isArray((row as any)?.grupos) ? (row as any).grupos as GrupoBanco[] : []
+      disciplinasGrupos = [...new Set((questoes ?? []).map((sq: any) => sq.questoes?.disciplinas?.nome).filter(Boolean))] as string[]
+    }
   }
 
   // ── cardView (espelha o console) — só na aba Personalizar.
@@ -194,16 +208,6 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
 
   // ── Sessões (todas, com nome do aluno) — só na aba.
   const sessoesTab = aba === 'sessoes' ? ((await listarSessoesSimulado(id)).sessoes ?? []) : []
-
-  // ── Grupos de disciplinas (armazenados no banco) — só na aba.
-  let gruposIniciais: GrupoBanco[] = []
-  let disciplinasGrupos: string[] = []
-  if (aba === 'grupos' && bancoBaseId) {
-    const svcAdmin = createAdminClient()
-    const { data: gRow } = await svcAdmin.from('simulado_pastas').select('grupos').eq('id', bancoBaseId).eq('tenant_id', tid).maybeSingle()
-    gruposIniciais = Array.isArray((gRow as any)?.grupos) ? (gRow as any).grupos as GrupoBanco[] : []
-    disciplinasGrupos = [...new Set((questoes ?? []).map((sq: any) => sq.questoes?.disciplinas?.nome).filter(Boolean))] as string[]
-  }
 
   function formatDate(date: string | null) {
     if (!date) return '—'
@@ -257,7 +261,7 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
         </div>
 
         <div className="flex items-center justify-between gap-3">
-          <TabsList className="h-auto flex-wrap">
+          <TabsList className="max-w-full flex-nowrap overflow-x-auto">
             <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
             <TabsTrigger value="personalizar">Personalizar</TabsTrigger>
             <TabsTrigger value="questoes">Questões ({totalQuestoes ?? 0})</TabsTrigger>

@@ -10,7 +10,22 @@ import { cn } from '@/lib/utils'
 const CORES = ['#4f7fff', '#8b5cf6', '#ef4444', '#10b981', '#f59e0b', '#ec4899', '#06b6d4', '#84cc16']
 const ROMANOS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X']
 
-export function BancoGrupos({ bancoId, disciplinas, gruposIniciais, cor = '#6d28d9' }: { bancoId: string; disciplinas: string[]; gruposIniciais: GrupoBanco[]; cor?: string }) {
+export function BancoGrupos({
+  bancoId,
+  disciplinas,
+  gruposIniciais,
+  cor = '#6d28d9',
+  subtitulo = 'Agrupe as disciplinas do banco — salvas automaticamente.',
+  textoVazio = 'O banco não tem disciplinas ainda.',
+}: {
+  bancoId: string
+  disciplinas: string[]
+  gruposIniciais: GrupoBanco[]
+  cor?: string
+  /** Rótulos sobrepostos p/ reuso fora do Banco (ex.: aba Grupos do simulado). */
+  subtitulo?: string
+  textoVazio?: string
+}) {
   const [grupos, setGrupos] = useState<GrupoBanco[]>(gruposIniciais)
   const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'erro'>('idle')
   const primeira = useRef(true)
@@ -55,7 +70,7 @@ export function BancoGrupos({ bancoId, disciplinas, gruposIniciais, cor = '#6d28
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: cor }}><Layers className="h-5 w-5" /></span>
           <div>
             <h3 className="text-sm font-semibold leading-tight">Grupos de disciplinas</h3>
-            <p className="text-xs text-muted-foreground">Agrupe as disciplinas do banco — salvas automaticamente.</p>
+            <p className="text-xs text-muted-foreground">{subtitulo}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -67,7 +82,7 @@ export function BancoGrupos({ bancoId, disciplinas, gruposIniciais, cor = '#6d28
       </div>
       <CardContent className="space-y-3 px-4 py-4">
         {disciplinas.length === 0 ? (
-          <p className="py-6 text-center text-sm text-muted-foreground">O banco não tem disciplinas ainda.</p>
+          <p className="py-6 text-center text-sm text-muted-foreground">{textoVazio}</p>
         ) : grupos.length === 0 ? (
           <div className="rounded-lg border border-dashed p-8 text-center">
             <Layers className="mx-auto mb-2 h-8 w-8 text-muted-foreground/50" />
