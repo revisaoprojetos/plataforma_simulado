@@ -39,6 +39,9 @@ export function BancoTabsShell({ value, children, prefetch }: { value: string; c
       onValueChange={(v: string) => {
         const p = new URLSearchParams(sp?.toString() ?? '')
         p.set('tab', v)
+        // Dispara a linha de progresso global (NavProgress) — a troca de aba é router.push (não <a>),
+        // então precisa avisar; ela some quando a nova aba termina (search muda).
+        try { window.dispatchEvent(new Event('navprogress:start')) } catch { /* ssr */ }
         router.push(`?${p.toString()}`, { scroll: false })
       }}
     >

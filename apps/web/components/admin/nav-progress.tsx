@@ -43,12 +43,17 @@ export function NavProgress() {
       } catch { /* href inválido */ }
     }
     const onPop = () => start()
+    // Navegações PROGRAMÁTICAS (router.push) que não passam por <a> — ex.: troca de aba do simulado
+    // (TabsTrigger é <button>). Quem navega dispara este evento para a linha aparecer também.
+    const onStart = () => start()
 
     document.addEventListener('click', onClick, true)
     window.addEventListener('popstate', onPop)
+    window.addEventListener('navprogress:start', onStart)
     return () => {
       document.removeEventListener('click', onClick, true)
       window.removeEventListener('popstate', onPop)
+      window.removeEventListener('navprogress:start', onStart)
       clearTimeout(timer)
     }
   }, [])
