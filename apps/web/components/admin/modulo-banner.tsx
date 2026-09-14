@@ -31,6 +31,7 @@ export function ModuloBanner({ banner, titulo, subtitulo, topoDireita, breadcrum
     const DIST = 140 // px de scroll p/ recolher por completo
     const EXP = 240  // altura expandida (15rem)
     const COMP = 96  // altura recolhida (6rem) — cabe título + tabs sem cortar
+    const padTop = parseFloat(getComputedStyle(root).paddingTop) || 0 // p-6 do <main> (referência do sticky)
     let raf = 0
     let naturalH = 0
 
@@ -48,9 +49,11 @@ export function ModuloBanner({ banner, titulo, subtitulo, topoDireita, breadcrum
       col.style.maxHeight = `${naturalH * (1 - t)}px`
       col.style.opacity = String(Math.max(0, 1 - t * 1.4)) // some um pouco antes → degradê mais forte
       col.style.transform = `translateY(${-6 * t}px)`
-      // Publica o RODAPÉ do banner (topo -24px do sticky -top-6 + altura) p/ a toolbar "Adicionar aula"
-      // grudar exatamente embaixo dele em qualquer ponto do scroll (evita a toolbar entrar no banner).
-      root.style.setProperty('--lp-banner-bottom', `${h - 24}px`)
+      // Publica o RODAPÉ REAL do banner (medido, relativo ao topo do content-box do <main>) p/ a toolbar
+      // "Adicionar aula" grudar EXATAMENTE embaixo dele em qualquer ponto do scroll — mesmo espaçamento no
+      // topo e recolhido, sem sobrepor. Medir (getBoundingClientRect) evita depender de offset "mágico".
+      const bottom = banner.getBoundingClientRect().bottom - root.getBoundingClientRect().top - padTop
+      root.style.setProperty('--lp-banner-bottom', `${bottom}px`)
     }
     const onScroll = () => { if (!raf) raf = requestAnimationFrame(aplicar) }
     const onResize = () => { medir(); aplicar() }
