@@ -10,6 +10,7 @@ import { onlinePorSimulado } from '@/app/admin/simulados/actions'
 import { tiposDeSimulados, type TipoSimulado } from '@/lib/simulado/tipo'
 import { resolverVisualSimulados, type VisualSim } from '@/lib/aluno/simulado-visual'
 import { resolverCardView } from '@/lib/card-view'
+import { getAdminPrefs } from '@/lib/admin/prefs'
 import { ehPastaBanco } from '@/lib/simulado/pasta-area'
 import { getOcultarDiscursiva } from '@/lib/sistema/manutencao-areas-server'
 import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
@@ -188,8 +189,14 @@ async function BoardData({ pastaParam }: { pastaParam?: string }) {
   const temaCards = ((await getCurrentTenant())?.tema as any) ?? {}
   const cardView = resolverCardView(temaCards.card_view_admin ?? temaCards.card_view)
 
+  // Tipo de exibição salvo POR ADMIN (individual). Admin novo = sem pref → o board cai no padrão.
+  const prefs = await getAdminPrefs()
+  const vistaInicial = (['linhas', 'pastas', 'status'] as const).includes(prefs.simulados_vista as any)
+    ? (prefs.simulados_vista as 'linhas' | 'pastas' | 'status') : undefined
+
   return (
     <SimuladosBoard
+      vistaInicial={vistaInicial}
       simulados={simsNivel as SimuladoCard[]}
       appUrl={appUrl}
       onlineInicial={online}

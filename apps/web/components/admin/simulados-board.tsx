@@ -55,6 +55,7 @@ import {
 import { cn } from '@/lib/utils'
 import { iconeBanco } from '@/lib/banco-visual'
 import { type CardView } from '@/lib/card-view'
+import { salvarAdminPref } from '@/app/admin/prefs-actions'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
 import { abrirLinkTemado } from '@/lib/hud/abrir-temado'
 import { copiarTexto } from '@/lib/clipboard'
@@ -500,12 +501,14 @@ type PastaSim = { id: string; nome: string; cor?: string | null; icone?: string 
 type DestinoSim = { id: string; nome: string }
 export type SimuladoCatalogo = SimuladoCard & { grupoId: string | null }
 
-export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders = [], destinos = [], atual = null, catalogo, cardView = 'poster' }: {
+export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders = [], destinos = [], atual = null, catalogo, cardView = 'poster', vistaInicial }: {
   simulados: SimuladoCard[]; appUrl: string; onlineInicial?: Record<string, number>
   folders?: PastaSim[]; destinos?: DestinoSim[]; atual?: { id: string; nome: string } | null
   catalogo?: { sims: SimuladoCatalogo[]; grupos: PastaSim[] }
   /** Estilo dos cards definido no console (tema.card_view). O admin não troca por conta própria. */
   cardView?: CardView
+  /** Tipo de exibição SALVO por este admin (individual). Undefined = admin novo → cai no padrão. */
+  vistaInicial?: 'linhas' | 'pastas' | 'status'
 }) {
   const router = useRouter()
   const [, start] = useTransition()
@@ -522,9 +525,9 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
 
   // Vista: "linhas" (fileiras por pasta, estilo catálogo — padrão), "pastas" (só as pastas em tiles;
   // clicar entra nela) ou "status" (grade por Em andamento/A iniciar/Encerrado).
-  const [vista, setVista] = useState<'linhas' | 'pastas' | 'status'>('linhas')
-  useEffect(() => { const v = localStorage.getItem('simulados-vista-3'); if (v === 'linhas' || v === 'pastas' || v === 'status') setVista(v) }, [])
-  useEffect(() => { localStorage.setItem('simulados-vista-3', vista) }, [vista])
+  // Preferência SALVA por admin (server, individual) — inicia dela; admin novo cai no padrão 'linhas'.
+  const [vista, setVista] = useState<'linhas' | 'pastas' | 'status'>(vistaInicial ?? 'linhas')
+  const escolherVista = (v: 'linhas' | 'pastas' | 'status') => { setVista(v); salvarAdminPref('simulados_vista', v).catch(() => {}) }
 
   // Seções recolhidas.
   const [recolhidas, setRecolhidas] = useState<Set<string>>(new Set())
@@ -607,7 +610,7 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
           {!atual && (
             <div className="flex gap-1 rounded-lg bg-[var(--tab-bg,var(--muted))] p-1">
               {([['linhas', 'Linhas', GalleryHorizontalEnd], ['pastas', 'Pastas', FolderTree], ['status', 'Status', Rows3]] as const).map(([v, label, Icon]) => (
-                <button key={v} type="button" onClick={() => setVista(v)} aria-pressed={vista === v}
+                <button key={v} type="button" onClick={() => escolherVista(v)} aria-pressed={vista === v}
                   className={cn('inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-colors',
                     vista === v ? 'bg-[var(--tab-active,var(--background))] text-[color:var(--tab-active-foreground,var(--foreground))] shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
                   <Icon className="h-4 w-4" /> {label}
