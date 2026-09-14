@@ -3,6 +3,7 @@ import { Library, ArrowLeft, Home, ChevronRight } from 'lucide-react'
 import { listarBancoAulas } from './actions'
 import { BancoAulasGrid, type ModuloTab } from '@/components/admin/banco-aulas-grid'
 import { ModuloTabsBar } from '@/components/admin/modulo-tabs-bar'
+import { ModuloBanner } from '@/components/admin/modulo-banner'
 import { PublicarModuloBotao } from '@/components/admin/publicar-modulo-botao'
 import { getCurrentTenant } from '@/lib/tenant'
 import { resolverCardView } from '@/lib/card-view'
@@ -24,32 +25,15 @@ export default async function LeituraAdminPage({ searchParams }: { searchParams:
   return (
     <div className={banner ? 'space-y-2' : 'space-y-3'}>
       {banner ? (
-        // ===== BANNER do módulo (edge-to-edge) — UMA imagem só (sem corte), tabs na base sobre a imagem.
-        // Colapsa no scroll por CSS PURO: `sticky` com top NEGATIVO → a parte de cima "sobe" e sobra a
-        // BASE (imagem + tabs) grudada no topo. Altura fixa (nada anima) → sem flicker. -mx/-mt-6 cancelam
-        // o padding do <main class="p-6">. O top ≈ -(altura - faixa visível): 15rem - ~5rem ≈ -11.5rem.
-        <div className="sticky -top-[11.5rem] z-30 -mx-6 -mt-6 flex h-[15rem] overflow-hidden bg-neutral-950">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={banner} alt="" className="absolute inset-0 h-full w-full object-cover object-center" />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/15" />
-          <div className="relative flex w-full flex-col px-6 pt-4 text-white">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="flex items-start gap-2">
-                <Link href="/admin/leitura" aria-label="Voltar aos módulos" title="Voltar aos módulos" className="mt-1 inline-flex shrink-0 items-center justify-center rounded-lg border border-white/25 bg-white/15 p-2 text-white shadow-sm backdrop-blur transition-colors hover:bg-white/25">
-                  <ArrowLeft className="h-4 w-4" />
-                </Link>
-                <div>
-                  <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight drop-shadow"><Library className="h-6 w-6" /> LegProc Digital</h1>
-                  <p className="text-white/80 drop-shadow-sm">Módulos ordenáveis → aulas (documento HTML + questões) que formam a trilha do aluno.</p>
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center justify-end gap-3">
-                {data.ok && pasta && data.moduloAtual && (
-                  <PublicarModuloBotao pastaId={pasta} publicacao={data.moduloAtual.publicacao} />
-                )}
-              </div>
-            </div>
-            <div className="mt-1.5 flex flex-wrap items-center gap-1 text-sm text-white/75">
+        // Banner colapsável (ModuloBanner): imagem única + tabs na base; ao rolar, o topo sobe e sobra a
+        // faixa com um cabeçalho COMPACTO (Voltar + título, sem descrição) + as tabs.
+        <ModuloBanner
+          banner={banner}
+          titulo="LegProc Digital"
+          subtitulo="Módulos ordenáveis → aulas (documento HTML + questões) que formam a trilha do aluno."
+          topoDireita={data.ok && pasta && data.moduloAtual ? <PublicarModuloBotao pastaId={pasta} publicacao={data.moduloAtual.publicacao} /> : null}
+          breadcrumb={
+            <>
               <Link href="/admin/leitura" className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 transition-colors hover:bg-white/15 hover:text-white"><Home className="h-3.5 w-3.5" /> Módulos</Link>
               {breadcrumb.map((b) => (
                 <span key={b.id} className="inline-flex items-center gap-1">
@@ -57,13 +41,10 @@ export default async function LeituraAdminPage({ searchParams }: { searchParams:
                   <Link href={`/admin/leitura?pasta=${b.id}`} className="rounded-md px-1.5 py-0.5 font-medium text-white transition-colors hover:bg-white/15">{b.nome}</Link>
                 </span>
               ))}
-            </div>
-            {/* Tabs na BASE, sobre a imagem (mt-auto) — ficam na faixa que permanece grudada ao rolar. */}
-            <div className="mt-auto pt-3">
-              <ModuloTabsBar pastaAtual={pasta!} moduloTab={moduloTab} claro />
-            </div>
-          </div>
-        </div>
+            </>
+          }
+          tabs={<ModuloTabsBar pastaAtual={pasta!} moduloTab={moduloTab} claro />}
+        />
       ) : (
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-start gap-2">
