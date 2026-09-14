@@ -1,4 +1,7 @@
 import 'server-only'
+import type { EstudanteLinkadoRow } from 'data'
+
+const apiBase = () => (process.env.API_INTERNAL_URL ?? process.env.RELATORIOS_API_URL)?.replace(/\/$/, '')
 
 /**
  * Cliente das ESCRITAS de simulado na API dedicada (strangler — Fase 7). Quando `API_INTERNAL_URL`
@@ -10,7 +13,7 @@ import 'server-only'
  * interna confiável, como os relatórios/crons).
  */
 async function apiPost<T>(path: string, body: unknown): Promise<T | null> {
-  const base = (process.env.API_INTERNAL_URL ?? process.env.RELATORIOS_API_URL)?.replace(/\/$/, '')
+  const base = apiBase()
   if (!base) return null
   try {
     const r = await fetch(`${base}${path}`, {
@@ -25,6 +28,29 @@ async function apiPost<T>(path: string, body: unknown): Promise<T | null> {
   } catch {
     return null
   }
+}
+
+async function apiGet<T>(path: string, params: Record<string, string>): Promise<T | null> {
+  const base = apiBase()
+  if (!base) return null
+  try {
+    const qs = new URLSearchParams(params).toString()
+    const r = await fetch(`${base}${path}?${qs}`, {
+      headers: { 'x-api-secret': process.env.API_INTERNAL_SECRET ?? '' },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(8_000),
+    })
+    if (!r.ok) return null
+    return (await r.json()) as T
+  } catch {
+    return null
+  }
+}
+
+/** Estudantes linkados via API dedicada (1 query JOIN). `null` = indisponível → fallback local. */
+export async function estudantesLinkadosViaApi(tenantId: string, simuladoId: string): Promise<EstudanteLinkadoRow[] | null> {
+  const j = await apiGet<{ rows?: EstudanteLinkadoRow[] | null }>('/v1/simulados/estudantes', { tenantId, simuladoId })
+  return j && Array.isArray(j.rows) ? j.rows : null
 }
 
 /** Reordena a prova via API dedicada. `true` = a API cuidou; `null` = indisponível/fallback → local. */

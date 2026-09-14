@@ -31,6 +31,45 @@ export async function simuladosTiposSql(simuladoIds: string[], tenantId: string)
  * afetadas, ou `null` quando o SQL direto não está disponível → o chamador cai no PostgREST.
  * Filtra `tenant_id` explicitamente (isolamento na aplicação).
  */
+export type EstudanteLinkadoRow = {
+  id: string
+  nome: string | null
+  email: string | null
+  cpf: string | null
+  telefone: string | null
+  classificacao: string | null
+  liberado: boolean | null
+  sess_status: string | null
+  sess_nota: number | string | null
+}
+
+/**
+ * Estudantes matriculados num simulado + situação (melhor sessão) + nota, em UMA query com JOIN —
+ * escala pelos MATRICULADOS do simulado (índice em matriculas), não pelos ~milhares de estudantes do
+ * tenant (o caminho PostgREST antigo varria todos os alunos do tenant → lento). Filtra tenant_id.
+ * Retorna `null` quando o SQL direto não está disponível → o chamador cai no PostgREST.
+ */
+export async function estudantesLinkadosSql(tenantId: string, simuladoId: string): Promise<EstudanteLinkadoRow[] | null> {
+  return sqlQuery<EstudanteLinkadoRow>(
+    `SELECT DISTINCT ON (e.id)
+            e.id, e.nome, e.email, e.cpf, e.telefone, e.classificacao,
+            m.liberado, s.status AS sess_status, s.nota AS sess_nota
+       FROM simulado_matriculas m
+       JOIN simulado_estudantes e
+         ON e.id = m.estudante_id AND e.tenant_id = m.tenant_id AND e.deletado = false
+       LEFT JOIN LATERAL (
+         SELECT sp.status, sp.nota
+           FROM simulado_sessoes_prova sp
+          WHERE sp.simulado_id = m.simulado_id AND sp.estudante_id = m.estudante_id AND sp.deletado = false
+          ORDER BY (sp.status = 'finalizada') DESC, sp.nota DESC NULLS LAST
+          LIMIT 1
+       ) s ON true
+      WHERE m.tenant_id = $1 AND m.simulado_id = $2
+      ORDER BY e.id`,
+    [tenantId, simuladoId],
+  )
+}
+
 export async function reordenarProvaSql(tenantId: string, simuladoId: string, ordem: string[]): Promise<number | null> {
   if (!ordem.length) return 0
   const rows = await sqlQuery<{ id: string }>(

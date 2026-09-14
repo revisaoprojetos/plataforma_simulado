@@ -21,10 +21,11 @@ const situacaoCfg: Record<string, { label: string; cls: string }> = {
   nao_iniciou: { label: 'Não iniciou', cls: 'bg-muted text-muted-foreground' },
 }
 
-export function SimuladoEstudantes({ simuladoId, acessoGratuitoInicial = false, bancoBaseId = null }: { simuladoId: string; acessoGratuitoInicial?: boolean; bancoBaseId?: string | null }) {
-  const [carregando, setCarregando] = useState(true)
-  const [erro, setErro] = useState<string | null>(null)
-  const [dados, setDados] = useState<EstudanteLinkado[]>([])
+export function SimuladoEstudantes({ simuladoId, acessoGratuitoInicial = false, bancoBaseId = null, estudantesIniciais = null, erroInicial = null }: { simuladoId: string; acessoGratuitoInicial?: boolean; bancoBaseId?: string | null; estudantesIniciais?: EstudanteLinkado[] | null; erroInicial?: string | null }) {
+  // Quando o servidor já entrega os estudantes (estudantesIniciais), inicia SEM spinner e sem re-buscar.
+  const [carregando, setCarregando] = useState(estudantesIniciais == null)
+  const [erro, setErro] = useState<string | null>(erroInicial)
+  const [dados, setDados] = useState<EstudanteLinkado[]>(estudantesIniciais ?? [])
 
   // "Acesso para todos" (acesso_gratuito) — mesmo controle do acesso do LegProc: liberado = todos os
   // alunos da plataforma acessam (sem matrícula) e a lista de vinculados fica só informativa.
@@ -59,7 +60,8 @@ export function SimuladoEstudantes({ simuladoId, acessoGratuitoInicial = false, 
       .catch(() => setErro('Falha ao carregar estudantes.'))
       .finally(() => setCarregando(false))
   }, [simuladoId])
-  useEffect(() => { carregar() }, [carregar])
+  // 1º load só quando o servidor NÃO pré-carregou (fallback). Reloads pós-vínculo usam `carregar`.
+  useEffect(() => { if (estudantesIniciais == null) carregar() }, [carregar, estudantesIniciais])
 
   async function limparPassaportes() {
     const ok = await confirmar({

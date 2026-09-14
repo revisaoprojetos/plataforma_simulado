@@ -17,7 +17,7 @@ import { SimuladoQuestoesTable } from '@/components/admin/simulado-questoes-tabl
 import { type QuestaoLinha } from '@/components/admin/questoes-tabela-base'
 import { listarDisciplinasFiltro } from '@/app/admin/banco-questoes/actions'
 import { simuladosDoBanco } from '@/lib/simulado/banco-do-simulado'
-import { SimuladoEstudantes } from '@/components/admin/simulado-estudantes'
+import { SimuladoEstudantesData } from '@/components/admin/simulado-estudantes-data'
 import { SimuladoManutencao } from '@/components/admin/simulado-manutencao'
 import { SimuladoRelatorio } from '@/components/admin/simulado-relatorio'
 import { SimuladoLiberacoes } from '@/components/admin/simulado-liberacoes'
@@ -112,19 +112,10 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
     email_telefone: 'E-mail + telefone',
   }
 
-  // Base (sempre): questões (p/ tipo + nomes de disciplina) e sessões (contagem + nota média p/ a Visão Geral).
-  // fetchAll nas questões para NÃO truncar em 1000 numa prova grande; a contagem vem por head count.
-  const [questoes, { count: totalQuestoes }, { data: sessoes, count: totalSessoes }] = await Promise.all([
-    fetchAll<any>(() =>
-      supabase
-        .from('simulado_prova_questoes')
-        .select(`
-          id, ordem, peso, anulada,
-          questoes:simulado_questoes(id, tipo, enunciado, nivel_dificuldade, status, ano, assunto_detalhe, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome), bancas:simulado_bancas(nome), orgaos:simulado_orgaos(nome))
-        `)
-        .eq('simulado_id', id)
-        .eq('tenant_id', tid)
-        .order('ordem')),
+  // Base (sempre, LEVE): contagem de questões (head), sessões (contagem + nota p/ a Visão Geral) e só o
+  // TIPO de cada questão (p/ o badge do cabeçalho). A carga RICA das questões (joins + alternativas) só
+  // roda na aba Questões — não pesa as demais abas.
+  const [{ count: totalQuestoes }, { data: sessoes, count: totalSessoes }, tiposRows] = await Promise.all([
     supabase
       .from('simulado_prova_questoes')
       .select('id', { count: 'exact', head: true })
@@ -137,9 +128,11 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
       .eq('deletado', false)
       .order('iniciado_em', { ascending: false })
       .limit(50),
+    fetchAll<any>(() =>
+      supabase.from('simulado_prova_questoes').select('questoes:simulado_questoes(tipo)').eq('simulado_id', id).eq('tenant_id', tid).order('ordem')),
   ])
 
-  const tipoSim = tipoDoSimulado((questoes ?? []).map((sq: any) => sq.questoes?.tipo))
+  const tipoSim = tipoDoSimulado((tiposRows ?? []).map((sq: any) => sq.questoes?.tipo))
   const sessoesFinalizadas = sessoes?.filter((s) => s.status === 'finalizada') ?? []
   const notaMedia =
     sessoesFinalizadas.length > 0
@@ -177,8 +170,14 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
   let questoesLinha: QuestaoLinha[] = []
   let disciplinasFiltro: { id: string; nome: string }[] = []
   if (aba === 'questoes') {
+    // Carga RICA da prova só aqui (joins de disciplina/assunto/banca/órgão + C/E via alternativas).
+    const provaRica = await fetchAll<any>(() =>
+      supabase.from('simulado_prova_questoes').select(`
+        id, ordem, peso, anulada,
+        questoes:simulado_questoes(id, tipo, enunciado, nivel_dificuldade, status, ano, assunto_detalhe, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome), bancas:simulado_bancas(nome), orgaos:simulado_orgaos(nome))
+      `).eq('simulado_id', id).eq('tenant_id', tid).order('ordem'))
     const ceSet = new Set<string>()
-    const qids = (questoes ?? []).map((sq: any) => sq.questoes?.id).filter(Boolean) as string[]
+    const qids = provaRica.map((sq: any) => sq.questoes?.id).filter(Boolean) as string[]
     const [alts, discs] = await Promise.all([
       qids.length ? fetchAllByIn<any>(qids, (chunk) => supabase.from('simulado_alternativas').select('questao_id, texto').in('questao_id', chunk)) : Promise.resolve([]),
       listarDisciplinasFiltro(),
@@ -187,7 +186,7 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
     const textos = new Map<string, string[]>()
     for (const a of alts) { const arr = textos.get(a.questao_id) ?? []; arr.push(a.texto ?? ''); textos.set(a.questao_id, arr) }
     for (const [qid, ts] of textos) if (alternativasSaoCertoErrado(ts)) ceSet.add(qid)
-    questoesLinha = (questoes ?? []).map((sq: any) => {
+    questoesLinha = provaRica.map((sq: any) => {
       const q = sq.questoes ?? {}
       return {
         id: q.id, enunciado: q.enunciado ?? '', tipo: q.tipo ?? null,
@@ -227,7 +226,7 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
   )
 
   return (
-    <BancoTabsShell value={aba}>
+    <BancoTabsShell value={aba} prefetch={[...ABAS]}>
       {/* Cabeçalho + abas — fixos no topo ao rolar o conteúdo. A linha do TabsList é a própria
           divisória (largura cheia); as abas ficam "no corte", como na área de questões. */}
       <div className="sticky -top-6 z-40 -mx-6 -mt-6 space-y-3 bg-background px-6 pt-6 shadow-sm">
@@ -421,10 +420,13 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
           )}
         </TabsContent>
 
-        {/* Estudantes linkados (matriculados) + adicionar aluno/turma */}
+        {/* Estudantes linkados (matriculados) + adicionar aluno/turma — carregados no servidor (SQL/API)
+            e streamados via Suspense; assim o prefetch pré-carrega e não há spinner no 1º acesso. */}
         <TabsContent value="estudantes">
           {aba === 'estudantes' && (
-            <SimuladoEstudantes simuladoId={id} acessoGratuitoInicial={!!(simulado.regras as { acesso_gratuito?: boolean } | null)?.acesso_gratuito} bancoBaseId={bancoBaseId} />
+            <Suspense fallback={<AbaCarregando />}>
+              <SimuladoEstudantesData simuladoId={id} acessoGratuitoInicial={!!(simulado.regras as { acesso_gratuito?: boolean } | null)?.acesso_gratuito} bancoBaseId={bancoBaseId} />
+            </Suspense>
           )}
         </TabsContent>
 

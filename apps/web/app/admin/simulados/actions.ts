@@ -13,7 +13,8 @@ import { computarResumoAoVivo, computarOnlinePorSimulado, JANELA_ATIVO_MIN, type
 import { garantirBancoDoSimulado, bancoDoSimulado } from '@/lib/simulado/banco-do-simulado'
 import { confirmarImportQuestoes } from '@/app/admin/banco-questoes/actions'
 import type { QuestaoImport } from '@/app/admin/banco-questoes/import-types'
-import { reordenarProvaViaApi } from '@/lib/data/simulados-api'
+import { reordenarProvaViaApi, estudantesLinkadosViaApi } from '@/lib/data/simulados-api'
+import { estudantesLinkadosSql } from '@/lib/data/relatorios.repo'
 import { criarNotificacoesEmMassa } from '@/lib/notificacoes/criar'
 
 // Sentinela p/ escopo de tenant: com tenantId null, o filtro vira um uuid impossível →
@@ -196,9 +197,28 @@ export async function listarEstudantesSimulado(simuladoId: string): Promise<{ ok
   if (tenantId && (sim as any).tenant_id && (sim as any).tenant_id !== tenantId) return { error: 'Sem acesso a este simulado.' }
   const tid = tenantId ?? (sim as any).tenant_id
 
-  // Tudo em paralelo. Em vez de buscar estudantes por lotes de ids (dezenas de idas
-  // ao banco quando há milhares de passaportes), varremos os estudantes do tenant
-  // paginados (poucas páginas) e cruzamos em memória com as matrículas — bem mais rápido.
+  // Otimizado (SQL/API): 1 query com JOIN que escala pelos MATRICULADOS do simulado, não pelos
+  // ~milhares de estudantes do tenant. Tenta API dedicada → SQL direto local → PostgREST (fallback).
+  // Ownership já validado acima.
+  const rows = (await estudantesLinkadosViaApi(tid, simuladoId)) ?? (await estudantesLinkadosSql(tid, simuladoId))
+  if (rows) {
+    const estudantes: EstudanteLinkado[] = rows.map((r) => ({
+      id: r.id,
+      nome: r.nome ?? 'Estudante',
+      email: r.email ?? null,
+      cpf: r.cpf ?? null,
+      telefone: r.telefone ?? null,
+      classificacao: r.classificacao ?? 'normal',
+      liberado: !!r.liberado,
+      situacao: (r.sess_status === 'finalizada' ? 'finalizou' : r.sess_status ? 'em_andamento' : 'nao_iniciou') as EstudanteLinkado['situacao'],
+      nota: r.sess_status === 'finalizada' && r.sess_nota != null ? Number(r.sess_nota) : null,
+    })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+    return { ok: true, estudantes }
+  }
+
+  // ── Fallback PostgREST (SQL/API indisponíveis). Em vez de buscar estudantes por lotes de ids
+  // (dezenas de idas ao banco quando há milhares de passaportes), varremos os estudantes do tenant
+  // paginados (poucas páginas) e cruzamos em memória com as matrículas.
   const [matriculas, estRows, sessRows] = await Promise.all([
     fetchAll<{ estudante_id: string; liberado: boolean }>(() =>
       svc.from('simulado_matriculas').select('estudante_id, liberado').eq('simulado_id', simuladoId).eq('tenant_id', tid).order('estudante_id')),

@@ -1,5 +1,5 @@
-import { BadRequestException, Body, Controller, Headers, Post, UnauthorizedException } from '@nestjs/common'
-import { reordenarProvaSql } from 'data'
+import { BadRequestException, Body, Controller, Get, Headers, Post, Query, UnauthorizedException } from '@nestjs/common'
+import { reordenarProvaSql, estudantesLinkadosSql } from 'data'
 
 /**
  * Escritas de simulado servidas pela API dedicada (strangler — Fase 7). Fronteira interna confiável:
@@ -13,6 +13,19 @@ export class SimuladosController {
   private gate(secret?: string): void {
     const esperado = process.env.API_INTERNAL_SECRET
     if (!esperado || secret !== esperado) throw new UnauthorizedException('segredo inválido')
+  }
+
+  /** Estudantes matriculados de um simulado (situação + nota), em 1 query com JOIN — escala pelos
+   * matriculados, não pelos alunos do tenant. Devolve rows crus; o Next monta o formato. */
+  @Get('estudantes')
+  async estudantes(
+    @Query('tenantId') tenantId: string,
+    @Query('simuladoId') simuladoId: string,
+    @Headers('x-api-secret') secret?: string,
+  ) {
+    this.gate(secret)
+    if (!tenantId || !simuladoId) throw new BadRequestException('tenantId e simuladoId são obrigatórios')
+    return { rows: await estudantesLinkadosSql(tenantId, simuladoId) }
   }
 
   @Post('prova/reordenar')
