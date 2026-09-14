@@ -395,6 +395,26 @@ export async function docAcessivelAluno(
   return doc as Record<string, any>
 }
 
+/**
+ * Gate LEVE do quiz do aluno: doc publicado + visível + LEITURA concluída — SEM carregar HTML/anotações
+ * nem varrer a trilha inteira (`sequenciaLeitura`). É seguro dispensar a sequência porque
+ * `leituraConcluida ⟹ aula não bloqueada` (aula bloqueada não tem como ter a leitura concluída).
+ * Retorna título + pastaId (módulo, p/ o "voltar à trilha"). null = sem acesso.
+ */
+export async function gateQuizAluno(documentoId: string, estudanteId: string, tenantId: string): Promise<{ titulo: string; pastaId: string | null; leituraConcluida: boolean } | null> {
+  const svc = createAdminClient()
+  let dsel = await svc.from('simulado_documentos').select('id, titulo, pasta_id, versao, versao_publicada, publicado, deletado').eq('id', documentoId).eq('tenant_id', tenantId).maybeSingle()
+  if (dsel.error && /versao_publicada|column/i.test(String(dsel.error.message))) {
+    dsel = await svc.from('simulado_documentos').select('id, titulo, pasta_id, versao, publicado, deletado').eq('id', documentoId).eq('tenant_id', tenantId).maybeSingle() as any
+  }
+  const doc: any = dsel.data
+  if (!doc || doc.deletado || !doc.publicado) return null
+  if (!(await alunoPodeVer(svc, documentoId, estudanteId))) return null
+  const versao = doc.versao_publicada ?? doc.versao ?? 1
+  const { data: prog } = await svc.from('simulado_leitura_progresso').select('concluido_em').eq('estudante_id', estudanteId).eq('documento_id', documentoId).eq('documento_versao', versao).maybeSingle()
+  return { titulo: doc.titulo, pastaId: doc.pasta_id ?? null, leituraConcluida: !!(prog as any)?.concluido_em }
+}
+
 /** Regra de visibilidade do aluno (mesma do catálogo/leitor): sem atribuição = todos. */
 async function alunoPodeVer(svc: ReturnType<typeof createAdminClient>, documentoId: string, estudanteId: string): Promise<boolean> {
   const [{ data: dg }, { data: de }] = await Promise.all([
