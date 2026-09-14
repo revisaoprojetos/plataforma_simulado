@@ -29,7 +29,10 @@ async function apiPost<T>(path: string, body: unknown): Promise<T | null> {
 
 /** Reordena a prova via API dedicada. `true` = a API cuidou; `null` = indisponível/fallback → local. */
 export async function reordenarProvaViaApi(tenantId: string, simuladoId: string, ordem: string[]): Promise<boolean | null> {
-  const j = await apiPost<{ ok?: boolean; fallback?: boolean }>('/v1/simulados/prova/reordenar', { tenantId, simuladoId, ordem })
-  if (!j || j.fallback) return null
-  return j.ok === true
+  const j = await apiPost<{ ok?: boolean; fallback?: boolean; afetados?: number }>('/v1/simulados/prova/reordenar', { tenantId, simuladoId, ordem })
+  if (!j || j.fallback || j.ok !== true) return null
+  // Sucesso PARCIAL (algum questao_id não estava na prova) → cai no local, deixando o caminho COM
+  // flag idêntico ao SEM flag (sem divergência silenciosa entre a prova e o espelho `ordem_questoes`).
+  if (typeof j.afetados === 'number' && j.afetados < ordem.length) return null
+  return true
 }
