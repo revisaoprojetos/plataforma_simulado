@@ -10,7 +10,9 @@ import { registrarAudit } from '@/lib/audit'
 import { softDelete } from '@/lib/soft-delete'
 import { brtLocalParaIso } from '@/lib/brt'
 import { computarResumoAoVivo, computarOnlinePorSimulado, JANELA_ATIVO_MIN, type ResumoAoVivo } from '@/lib/simulado/ao-vivo'
-import { garantirBancoDoSimulado } from '@/lib/simulado/banco-do-simulado'
+import { garantirBancoDoSimulado, bancoDoSimulado } from '@/lib/simulado/banco-do-simulado'
+import { confirmarImportQuestoes } from '@/app/admin/banco-questoes/actions'
+import type { QuestaoImport } from '@/app/admin/banco-questoes/import-types'
 import { criarNotificacoesEmMassa } from '@/lib/notificacoes/criar'
 
 // Sentinela p/ escopo de tenant: com tenantId null, o filtro vira um uuid impossível →
@@ -767,6 +769,104 @@ export async function removeQuestaoFromSimulado(simuladoQuestaoId: string, simul
   if (error) return { error: error.message }
   revalidatePath(`/admin/simulados/${simuladoId}`)
   return { ok: true }
+}
+
+// ───────────────────────── Questões da prova (aba Questões consolidada) ─────────────────────────
+// Canônico = simulado_prova_questoes (a prova que o aluno faz). O banco container (banco_base_id) é
+// espelhado em best-effort p/ manter o 1:1 enquanto a área Banco coexiste — falha no espelho nunca
+// derruba a edição da prova.
+
+/** Anexa questões (por questao_id) ao FIM da prova, herdando `anulada` do banco. Ignora as já presentes. */
+export async function adicionarQuestoesSimulado(simuladoId: string, questaoIds: string[]): Promise<{ ok: boolean; adicionadas?: number; error?: string }> {
+  if (!(await checkPermission('simulados:update'))) return { ok: false, error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const ids = [...new Set((questaoIds ?? []).filter(Boolean))]
+  if (!ids.length) return { ok: true, adicionadas: 0 }
+  const svc = createAdminClient()
+  // Só questões DO tenant (evita vínculo cross-tenant); herda anulada.
+  const { data: valida } = await svc.from('simulado_questoes').select('id, anulada').eq('tenant_id', tenantId).in('id', ids)
+  const validMap = new Map(((valida ?? []) as any[]).map((r) => [r.id as string, r.anulada === true]))
+  const { data: jaRows } = await svc.from('simulado_prova_questoes').select('questao_id, ordem').eq('simulado_id', simuladoId).eq('tenant_id', tenantId)
+  const ja = new Set(((jaRows ?? []) as any[]).map((r) => r.questao_id as string))
+  let maxOrdem = -1
+  for (const r of (jaRows ?? []) as any[]) if ((r.ordem ?? -1) > maxOrdem) maxOrdem = r.ordem ?? -1
+  const novos = ids.filter((id) => validMap.has(id) && !ja.has(id))
+  if (!novos.length) return { ok: true, adicionadas: 0 }
+  const rows = novos.map((questao_id, i) => ({ tenant_id: tenantId, simulado_id: simuladoId, questao_id, ordem: maxOrdem + 1 + i, ...(validMap.get(questao_id) ? { anulada: true } : {}) }))
+  let ins = await svc.from('simulado_prova_questoes').insert(rows)
+  if (ins.error && /anulada/i.test(ins.error.message)) ins = await svc.from('simulado_prova_questoes').insert(novos.map((questao_id, i) => ({ tenant_id: tenantId, simulado_id: simuladoId, questao_id, ordem: maxOrdem + 1 + i })))
+  if (ins.error) return { ok: false, error: ins.error.message }
+  // Espelho no banco container (best-effort).
+  const banco = await bancoDoSimulado(svc, tenantId, simuladoId)
+  if (banco) {
+    try {
+      const r = await svc.from('simulado_questao_pasta').upsert(novos.map((questao_id) => ({ tenant_id: tenantId, pasta_id: banco, questao_id })), { onConflict: 'tenant_id,pasta_id,questao_id', ignoreDuplicates: true })
+      if (r.error && /no unique|on conflict|42P10/i.test(r.error.message)) await svc.from('simulado_questao_pasta').insert(novos.map((questao_id) => ({ tenant_id: tenantId, pasta_id: banco, questao_id })))
+    } catch { /* espelho best-effort */ }
+  }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_simulados', entidadeId: simuladoId, depois: { questoes_adicionadas: novos.length } })
+  revalidatePath(`/admin/simulados/${simuladoId}`)
+  return { ok: true, adicionadas: novos.length }
+}
+
+/** Remove questões (por questao_id) da prova. Espelha a remoção no banco container (best-effort). */
+export async function removerQuestoesSimulado(simuladoId: string, questaoIds: string[]): Promise<{ ok: boolean; error?: string }> {
+  if (!(await checkPermission('simulados:update'))) return { ok: false, error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const ids = [...new Set((questaoIds ?? []).filter(Boolean))]
+  if (!ids.length) return { ok: true }
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_prova_questoes').delete().eq('simulado_id', simuladoId).eq('tenant_id', tenantId).in('questao_id', ids)
+  if (error) return { ok: false, error: error.message }
+  const banco = await bancoDoSimulado(svc, tenantId, simuladoId)
+  if (banco) { try { await svc.from('simulado_questao_pasta').delete().eq('pasta_id', banco).eq('tenant_id', tenantId).in('questao_id', ids) } catch { /* espelho best-effort */ } }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_simulados', entidadeId: simuladoId, depois: { questoes_removidas: ids.length } })
+  revalidatePath(`/admin/simulados/${simuladoId}`)
+  return { ok: true }
+}
+
+/** Salva a ordem da prova (lista COMPLETA de questao_id na nova ordem). Espelha em ordem_questoes do banco. */
+export async function reordenarQuestoesSimulado(simuladoId: string, questaoIds: string[]): Promise<{ ok: boolean; error?: string }> {
+  if (!(await checkPermission('simulados:update'))) return { ok: false, error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const ordem = (questaoIds ?? []).filter(Boolean)
+  if (!ordem.length) return { ok: true }
+  const svc = createAdminClient()
+  let erro: string | null = null
+  for (let i = 0; i < ordem.length; i += 25) {
+    const chunk = ordem.slice(i, i + 25)
+    await Promise.all(chunk.map(async (questao_id, j) => {
+      const r = await svc.from('simulado_prova_questoes').update({ ordem: i + j }).eq('simulado_id', simuladoId).eq('tenant_id', tenantId).eq('questao_id', questao_id)
+      if (r.error && !erro) erro = r.error.message
+    }))
+  }
+  if (erro) return { ok: false, error: erro }
+  const banco = await bancoDoSimulado(svc, tenantId, simuladoId)
+  if (banco) { try { await svc.from('simulado_pastas').update({ ordem_questoes: ordem }).eq('id', banco).eq('tenant_id', tenantId) } catch { /* espelho best-effort */ } }
+  revalidatePath(`/admin/simulados/${simuladoId}`)
+  return { ok: true }
+}
+
+/** Importa questões de planilha PARA o simulado: cria/atualiza no banco container e anexa as novas à prova. */
+export async function importarQuestoesSimulado(simuladoId: string, questoes: QuestaoImport[]): Promise<{ ok: boolean; criadas?: number; jaExistiam?: number; adicionadas?: number; error?: string }> {
+  if (!(await checkPermission('simulados:update'))) return { ok: false, error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  if (!questoes?.length) return { ok: false, error: 'Nada para importar.' }
+  const svc = createAdminClient()
+  const g = await garantirBancoDoSimulado(svc, tenantId, simuladoId)
+  if (!g.bancoId) return { ok: false, error: g.error ?? 'Não foi possível preparar o banco do simulado.' }
+  const r = await confirmarImportQuestoes(g.bancoId, questoes)
+  if (!r.ok) return { ok: false, error: r.error }
+  // Anexa à prova as questões importadas que ainda não estão nela.
+  let adicionadas = 0
+  const ids = (r.ids ?? []).filter(Boolean)
+  if (ids.length) { const add = await adicionarQuestoesSimulado(simuladoId, ids); adicionadas = add.adicionadas ?? 0 }
+  revalidatePath(`/admin/simulados/${simuladoId}`)
+  return { ok: true, criadas: r.criadas, jaExistiam: r.jaExistiam, adicionadas }
 }
 
 /**

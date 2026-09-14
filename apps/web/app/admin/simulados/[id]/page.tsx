@@ -1,13 +1,17 @@
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId, getCurrentTenant } from '@/lib/tenant'
+import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { resolverCardView } from '@/lib/card-view'
+import { alternativasSaoCertoErrado } from '@/lib/simulado/formato'
 import { BancoPersonalizar } from '@/components/admin/banco-personalizar'
 import { PrepararConteudoSimulado } from '@/components/admin/preparar-conteudo-simulado'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { SimuladoForm } from '@/components/admin/simulado-form'
 import { SimuladoActions } from '@/components/admin/simulado-actions'
-import { SimuladoQuestoesManager } from '@/components/admin/simulado-questoes-manager'
+import { SimuladoQuestoesTable } from '@/components/admin/simulado-questoes-table'
+import { type QuestaoLinha } from '@/components/admin/questoes-tabela-base'
+import { listarDisciplinasFiltro } from '@/app/admin/banco-questoes/actions'
 import { SimuladoEstudantes } from '@/components/admin/simulado-estudantes'
 import { SimuladoSessoes } from '@/components/admin/simulado-sessoes'
 import { SimuladoManutencao } from '@/components/admin/simulado-manutencao'
@@ -92,7 +96,7 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
       .from('simulado_prova_questoes')
       .select(`
         id, ordem, peso, anulada,
-        questoes:simulado_questoes(id, tipo, enunciado, disciplinas:simulado_disciplinas(nome))
+        questoes:simulado_questoes(id, tipo, enunciado, nivel_dificuldade, status, ano, assunto_detalhe, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome), bancas:simulado_bancas(nome), orgaos:simulado_orgaos(nome))
       `, { count: 'exact' })
       .eq('simulado_id', id)
       .order('ordem'),
@@ -115,15 +119,29 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
   // Tipo do simulado (objetiva/discursiva/mista) derivado das questões vinculadas.
   const tipoSim = tipoDoSimulado((questoes ?? []).map((sq: any) => sq.questoes?.tipo))
 
-  const questoesNoSimulado = (questoes ?? []).map((sq: any) => ({
-    id: sq.id,
-    ordem: sq.ordem ?? 0,
-    peso: sq.peso ?? 1,
-    anulada: sq.anulada ?? false,
-    questao_id: sq.questoes?.id,
-    enunciado: sq.questoes?.enunciado ?? '',
-    disciplina: sq.questoes?.disciplinas?.nome,
-  }))
+  // Aba Questões consolidada: monta a linha rica da TABELA BASE (mesma do banco) a partir da PROVA.
+  // C/E vem das alternativas (não há coluna `formato` em toda base). Disciplinas p/ o filtro do pop-up.
+  const ceSet = new Set<string>()
+  const qids = (questoes ?? []).map((sq: any) => sq.questoes?.id).filter(Boolean) as string[]
+  const [alts, disciplinasFiltro] = await Promise.all([
+    qids.length ? fetchAllByIn<any>(qids, (chunk) => supabase.from('simulado_alternativas').select('questao_id, texto').in('questao_id', chunk)) : Promise.resolve([]),
+    listarDisciplinasFiltro(),
+  ])
+  {
+    const textos = new Map<string, string[]>()
+    for (const a of alts) { const arr = textos.get(a.questao_id) ?? []; arr.push(a.texto ?? ''); textos.set(a.questao_id, arr) }
+    for (const [qid, ts] of textos) if (alternativasSaoCertoErrado(ts)) ceSet.add(qid)
+  }
+  const questoesLinha: QuestaoLinha[] = (questoes ?? []).map((sq: any) => {
+    const q = sq.questoes ?? {}
+    return {
+      id: q.id, enunciado: q.enunciado ?? '', tipo: q.tipo ?? null,
+      formato: q.tipo === 'discursiva' ? null : (ceSet.has(q.id) ? 'certo_errado' : 'multipla'),
+      nivel_dificuldade: q.nivel_dificuldade ?? null, status: q.status ?? null,
+      disciplina: q.disciplinas?.nome ?? null, assunto: q.assuntos?.nome ?? null,
+      assuntoDetalhe: q.assunto_detalhe ?? null, banca: q.bancas?.nome ?? null, orgao: q.orgaos?.nome ?? null, ano: q.ano ?? null,
+    }
+  }).filter((q: QuestaoLinha) => q.id)
   const sessoesFinalizadas = sessoes?.filter((s) => s.status === 'finalizada') ?? []
   const notaMedia =
     sessoesFinalizadas.length > 0
@@ -363,22 +381,15 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
           )}
         </TabsContent>
 
-        {/* Questões */}
+        {/* Questões — tabela rica com filtros/reordenar/adicionar/importar (opera na prova) */}
         <TabsContent value="questoes" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Questões do Simulado</CardTitle>
-              <CardDescription>
-                Adicione questões do banco (do seu tenant) e gerencie as incluídas neste simulado
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <SimuladoQuestoesManager
-                simuladoId={id}
-                questoesNoSimulado={questoesNoSimulado}
-              />
-            </CardContent>
-          </Card>
+          <SimuladoQuestoesTable
+            simuladoId={id}
+            bancoId={bancoBaseId}
+            questoes={questoesLinha}
+            disciplinas={disciplinasFiltro}
+            cor={(bancoVisual?.cor ?? undefined) as string | undefined}
+          />
         </TabsContent>
 
         {/* Estudantes linkados (matriculados) */}
