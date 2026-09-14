@@ -16,6 +16,7 @@ export type AreaManutencao = {
   label: string
   descricao: string
   href: string          // rota base da área — usada p/ esconder do menu e bloquear o acesso
+  hrefs?: string[]      // rotas EXTRA da mesma área (ex.: Gamificação = trilha + ligas + recomendado)
   discursiva?: boolean  // área especial: além da rota, esconde as opções de discursiva espalhadas
 }
 
@@ -34,13 +35,77 @@ export const AREAS_MANUTENCAO: AreaManutencao[] = [
   { key: 'estudantes', label: 'Estudantes', descricao: 'Cadastro e gestão de alunos.', href: '/admin/estudantes' },
 ]
 
-export type ManutencaoAreas = Record<string, boolean>
+/**
+ * Áreas do PORTAL DO ALUNO que podem ser colocadas em manutenção. Diferente do admin, aqui a
+ * manutenção pode LIBERAR alguns alunos (allowlist) — guardado em `tema.manutencao_aluno` (ativos)
+ * + `tema.manutencao_aluno_liberados` (ids de estudantes que ainda enxergam a área).
+ */
+export const AREAS_MANUTENCAO_ALUNO: AreaManutencao[] = [
+  { key: 'questoes', label: 'Banco de Questões', descricao: 'Prática de questões avulsas (/aluno/questoes).', href: '/aluno/questoes' },
+  { key: 'leitura', label: 'LegProc Digital', descricao: 'Biblioteca e leitor de documentos (/aluno/leitura).', href: '/aluno/leitura' },
+  { key: 'cronograma', label: 'Cronograma', descricao: 'Gerar e acompanhar cronogramas (/aluno/cronograma).', href: '/aluno/cronograma' },
+  { key: 'gamificacao', label: 'Gamificação', descricao: 'Trilha, ligas e recomendados (XP/níveis/missões).', href: '/aluno/trilha', hrefs: ['/aluno/ligas', '/aluno/recomendado'] },
+]
 
-/** Higieniza o objeto cru do banco para o formato canônico (só as chaves conhecidas). */
-export function normalizarManutencaoAreas(raw: unknown): ManutencaoAreas {
+export type ManutencaoAreas = Record<string, boolean>
+/** Allowlist por área: quem (ids de usuário/estudante) ainda pode visualizar a área em manutenção. */
+export type ManutencaoLiberados = Record<string, string[]>
+
+/** Higieniza um mapa {key: boolean} para as chaves conhecidas de um conjunto de áreas. */
+export function normalizarMapaAreas(raw: unknown, areas: AreaManutencao[]): Record<string, boolean> {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
-  const out: ManutencaoAreas = {}
-  for (const a of AREAS_MANUTENCAO) out[a.key] = !!r[a.key]
+  const out: Record<string, boolean> = {}
+  for (const a of areas) out[a.key] = !!r[a.key]
+  return out
+}
+
+/** Higieniza o allowlist {key: string[]} para as chaves conhecidas de um conjunto de áreas. */
+export function normalizarLiberados(raw: unknown, areas: AreaManutencao[]): ManutencaoLiberados {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  const out: ManutencaoLiberados = {}
+  for (const a of areas) {
+    const v = r[a.key]
+    out[a.key] = Array.isArray(v) ? (v as unknown[]).filter((x): x is string => typeof x === 'string') : []
+  }
+  return out
+}
+
+/** Higieniza o objeto cru do banco (áreas do ADMIN) para o formato canônico. */
+export function normalizarManutencaoAreas(raw: unknown): ManutencaoAreas {
+  return normalizarMapaAreas(raw, AREAS_MANUTENCAO)
+}
+
+/** true se o pathname pertence à área (rota base OU qualquer rota extra). */
+function pathBateArea(pathname: string, a: AreaManutencao): boolean {
+  const alvos = [a.href, ...(a.hrefs ?? [])]
+  return alvos.some((h) => pathname === h || pathname.startsWith(h + '/'))
+}
+
+/**
+ * ALUNO: retorna a área em manutenção que "possui" o caminho E na qual o aluno NÃO está liberado
+ * (fora do allowlist) — ou null. Alunos no allowlist enxergam a área normalmente.
+ */
+export function areaAlunoBloqueadaDoPath(
+  pathname: string, ativos: Record<string, boolean>, liberados: ManutencaoLiberados, estudanteId: string | null,
+): AreaManutencao | null {
+  for (const a of AREAS_MANUTENCAO_ALUNO) {
+    if (!ativos[a.key]) continue
+    if (estudanteId && (liberados[a.key] ?? []).includes(estudanteId)) continue // liberado individualmente
+    if (pathBateArea(pathname, a)) return a
+  }
+  return null
+}
+
+/** ALUNO: rotas a esconder do menu agora (áreas em manutenção onde ESTE aluno não está liberado). */
+export function hrefsBloqueadosAluno(
+  ativos: Record<string, boolean>, liberados: ManutencaoLiberados, estudanteId: string | null,
+): string[] {
+  const out: string[] = []
+  for (const a of AREAS_MANUTENCAO_ALUNO) {
+    if (!ativos[a.key]) continue
+    if (estudanteId && (liberados[a.key] ?? []).includes(estudanteId)) continue
+    out.push(a.href, ...(a.hrefs ?? []))
+  }
   return out
 }
 
@@ -52,17 +117,26 @@ export function ocultarDiscursivaDe(m: ManutencaoAreas): boolean {
   return OCULTAR_DISCURSIVA || !!m.discursiva
 }
 
-/** Retorna a área em manutenção que "possui" o caminho (ou null). Usado no gate de rota do layout. */
-export function areaBloqueadaDoPath(pathname: string, m: ManutencaoAreas): AreaManutencao | null {
+/**
+ * ADMIN: retorna a área em manutenção que "possui" o caminho (ou null). Usado no gate de rota do
+ * layout. `liberados` (opcional): se o admin atual estiver no allowlist da área, ela NÃO bloqueia.
+ */
+export function areaBloqueadaDoPath(
+  pathname: string, m: ManutencaoAreas, liberados?: ManutencaoLiberados, userId?: string | null,
+): AreaManutencao | null {
   for (const a of AREAS_MANUTENCAO) {
     const bloqueada = a.discursiva ? ocultarDiscursivaDe(m) : !!m[a.key]
     if (!bloqueada) continue
-    if (pathname === a.href || pathname.startsWith(a.href + '/')) return a
+    if (userId && liberados && (liberados[a.key] ?? []).includes(userId)) continue // admin liberado
+    if (pathBateArea(pathname, a)) return a
   }
   return null
 }
 
-/** Lista de rotas base bloqueadas agora — o menu lateral esconde os itens que casam. */
-export function hrefsBloqueados(m: ManutencaoAreas): string[] {
-  return AREAS_MANUTENCAO.filter((a) => (a.discursiva ? ocultarDiscursivaDe(m) : !!m[a.key])).map((a) => a.href)
+/** Lista de rotas base bloqueadas agora — o menu lateral esconde os itens que casam. Respeita o allowlist. */
+export function hrefsBloqueados(m: ManutencaoAreas, liberados?: ManutencaoLiberados, userId?: string | null): string[] {
+  return AREAS_MANUTENCAO
+    .filter((a) => (a.discursiva ? ocultarDiscursivaDe(m) : !!m[a.key]))
+    .filter((a) => !(userId && liberados && (liberados[a.key] ?? []).includes(userId)))
+    .map((a) => a.href)
 }

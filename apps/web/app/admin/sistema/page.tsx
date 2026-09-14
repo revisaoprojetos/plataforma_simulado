@@ -1,6 +1,7 @@
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { getManutencaoSistema } from '@/lib/sistema/manutencao'
-import { getManutencaoAreas } from '@/lib/sistema/manutencao-areas-server'
+import { getManutencaoAreas, getManutencaoAreasLiberados, getManutencaoAluno } from '@/lib/sistema/manutencao-areas-server'
+import { resolverNomesAdmins, resolverNomesEstudantes } from './actions'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { ServerCog } from 'lucide-react'
 import { SistemaTabs } from './sistema-tabs'
@@ -18,7 +19,13 @@ export default async function SistemaPage() {
     )
   }
 
-  const [manutencao, areas] = await Promise.all([getManutencaoSistema(), getManutencaoAreas()])
+  const [manutencao, adminAtivos, adminLiberados, alunoBloco] = await Promise.all([
+    getManutencaoSistema(), getManutencaoAreas(), getManutencaoAreasLiberados(), getManutencaoAluno(),
+  ])
+  // Resolve os nomes dos liberados (admins + estudantes) p/ os chips/contagens dos cards.
+  const idsAdmin = [...new Set(Object.values(adminLiberados).flat())]
+  const idsAluno = [...new Set(Object.values(alunoBloco.liberados).flat())]
+  const [nomesAdmin, nomesAluno] = await Promise.all([resolverNomesAdmins(idsAdmin), resolverNomesEstudantes(idsAluno)])
 
   return (
     <div className="space-y-6">
@@ -32,7 +39,11 @@ export default async function SistemaPage() {
         </div>
       </div>
 
-      <SistemaTabs manutencao={manutencao} areas={areas} />
+      <SistemaTabs
+        manutencao={manutencao}
+        admin={{ ativos: adminAtivos, liberados: adminLiberados, nomes: nomesAdmin }}
+        aluno={{ ativos: alunoBloco.ativos, liberados: alunoBloco.liberados, nomes: nomesAluno }}
+      />
     </div>
   )
 }

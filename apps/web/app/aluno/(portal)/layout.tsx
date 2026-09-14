@@ -4,6 +4,8 @@ import { getSessaoAluno } from '@/lib/aluno-session'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getTenantTheme } from '@/lib/tenant-theme'
 import { normalizarManutencao, emManutencaoAgora } from '@/lib/sistema/manutencao'
+import { normalizarMapaAreas, normalizarLiberados, areaAlunoBloqueadaDoPath, hrefsBloqueadosAluno, AREAS_MANUTENCAO_ALUNO } from '@/lib/sistema/manutencao-areas'
+import { AreaEmManutencao } from '@/components/admin/area-em-manutencao'
 import { Suspense } from 'react'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { SidebarEdgeToggle } from '@/components/ui/sidebar-collapse'
@@ -93,6 +95,14 @@ export default async function AlunoPortalLayout({ children }: { children: React.
     )
   }
 
+  // Manutenção POR ÁREA do ALUNO: some do menu e bloqueia a rota — exceto os alunos no allowlist.
+  const alunoAtivos = normalizarMapaAreas(t.manutencao_aluno, AREAS_MANUTENCAO_ALUNO)
+  const alunoLiberados = normalizarLiberados(t.manutencao_aluno_liberados, AREAS_MANUTENCAO_ALUNO)
+  const hManut = await headers()
+  const pathAtual = (hManut.get('x-full-path') || hManut.get('x-pathname') || '').split('?')[0]
+  const areaAlunoBloqueada = areaAlunoBloqueadaDoPath(pathAtual, alunoAtivos, alunoLiberados, sessao.estudanteId)
+  const hrefsOcultosAluno = hrefsBloqueadosAluno(alunoAtivos, alunoLiberados, sessao.estudanteId)
+
   return (
     <>
       {css && <style dangerouslySetInnerHTML={{ __html: css }} />}
@@ -103,14 +113,14 @@ export default async function AlunoPortalLayout({ children }: { children: React.
       <GuiaTourRunner gamAtivo={gamAtivo} />
       <SidebarProvider>
         <div className="flex h-screen w-full overflow-hidden">
-          <AlunoSidebar logo={t.logo_url ?? null} nome={t.nome_site ?? tenantNome ?? 'Área do Aluno'} subtitulo={t.subtitulo_site ?? 'Área do aluno'} logoBg={t.logo_png_bg ?? '#ffffff'} logoEstilo={t.logo_estilo ?? 'arredondado'} logoFiltro={t.logo_filtro_sistema ?? t.logo_filtro ?? 'none'} usuarioNome={sessao.nome} usuarioEmail={sessao.email} avatar={avatarUsuario} avatarCor={avatarCorUsuario} counts={counts} simuladosPersonalizados={simuladosPersonalizados} loginConfig={resolverLoginConfig(t.login)} progresso={progresso} gamAtivo={gamAtivo} />
+          <AlunoSidebar logo={t.logo_url ?? null} nome={t.nome_site ?? tenantNome ?? 'Área do Aluno'} subtitulo={t.subtitulo_site ?? 'Área do aluno'} logoBg={t.logo_png_bg ?? '#ffffff'} logoEstilo={t.logo_estilo ?? 'arredondado'} logoFiltro={t.logo_filtro_sistema ?? t.logo_filtro ?? 'none'} usuarioNome={sessao.nome} usuarioEmail={sessao.email} avatar={avatarUsuario} avatarCor={avatarCorUsuario} counts={counts} simuladosPersonalizados={simuladosPersonalizados} loginConfig={resolverLoginConfig(t.login)} progresso={progresso} gamAtivo={gamAtivo} hrefsOcultos={hrefsOcultosAluno} />
           <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
             {/* Toggle de recolher a sidebar: só no desktop (no mobile vale o chrome abaixo). */}
             <SidebarEdgeToggle hideOnMobile />
             <Suspense fallback={null}><NavProgress /></Suspense>
             {/* Folga no mobile conforme o modo: 'menu' → app bar no topo (pt); 'tabs' → barra embaixo (pb). */}
             <main className={cn('flex-1 overflow-y-auto p-4 md:p-6', navMode === 'menu' ? 'pt-[4.5rem] md:pt-6' : 'pb-24 md:pb-6')}>
-              {children}
+              {areaAlunoBloqueada ? <AreaEmManutencao area={areaAlunoBloqueada} /> : children}
             </main>
           </div>
         </div>
@@ -127,6 +137,7 @@ export default async function AlunoPortalLayout({ children }: { children: React.
           avatar={avatarUsuario}
           avatarCor={avatarCorUsuario}
           counts={counts}
+          hrefsOcultos={hrefsOcultosAluno}
         />
       </SidebarProvider>
     </>

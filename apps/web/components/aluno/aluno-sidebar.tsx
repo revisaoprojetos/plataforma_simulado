@@ -76,10 +76,10 @@ export interface ProgressoAluno { streak: number; xpTotal: number; nivel: number
 
 export function AlunoSidebar({
   logo, nome = 'Área do Aluno', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none',
-  usuarioNome = 'Aluno', usuarioEmail, avatar, avatarCor, counts, simuladosPersonalizados = 0, loginConfig, progresso, gamAtivo = false,
+  usuarioNome = 'Aluno', usuarioEmail, avatar, avatarCor, counts, simuladosPersonalizados = 0, loginConfig, progresso, gamAtivo = false, hrefsOcultos = [],
 }: {
   logo?: string | null; nome?: string; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string
-  usuarioNome?: string; usuarioEmail?: string | null; avatar?: string | null; avatarCor?: string | null; counts?: Record<string, number>; simuladosPersonalizados?: number; loginConfig: LoginConfig; progresso?: ProgressoAluno | null; gamAtivo?: boolean
+  usuarioNome?: string; usuarioEmail?: string | null; avatar?: string | null; avatarCor?: string | null; counts?: Record<string, number>; simuladosPersonalizados?: number; loginConfig: LoginConfig; progresso?: ProgressoAluno | null; gamAtivo?: boolean; hrefsOcultos?: string[]
 }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -99,7 +99,9 @@ export function AlunoSidebar({
     !(OCULTAR_ALUNO_EXTRAS && ROTAS_ALUNO_OCULTAS.includes(n.href)) &&
     // Cronograma tem DOIS gates: esta flag (enquanto o módulo está em construção) e a coluna
     // `ativo` de simulado_cronograma_config, que liga por tenant — respeitada dentro da página.
-    !(OCULTAR_CRONOGRAMA && n.href === '/aluno/cronograma'),
+    !(OCULTAR_CRONOGRAMA && n.href === '/aluno/cronograma') &&
+    // Manutenção por área do aluno: esconde o item quando a área está em manutenção p/ este aluno.
+    !hrefsOcultos.includes(n.href),
   )
 
   async function sair() {

@@ -80,7 +80,7 @@ function ClipboardSolido({ className, cor, furo }: SolidProps) {
 interface Props {
   navMode: NavMode
   logo?: string | null; nome?: string; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string
-  usuarioNome?: string; avatar?: string | null; avatarCor?: string | null; counts?: Record<string, number>
+  usuarioNome?: string; avatar?: string | null; avatarCor?: string | null; counts?: Record<string, number>; hrefsOcultos?: string[]
 }
 
 /**
@@ -89,7 +89,7 @@ interface Props {
  *  - 'menu' → app bar no topo (hambúrguer + marca + sino + avatar) que abre o drawer lateral, sem barra inferior.
  * Só renderiza no mobile (md-). No desktop vale a sidebar. Cores via tokens white-label (--sidebar-*).
  */
-export function AlunoMobileNav({ navMode, logo, nome = 'Área do Aluno', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none', usuarioNome = 'Aluno', avatar, avatarCor, counts }: Props) {
+export function AlunoMobileNav({ navMode, logo, nome = 'Área do Aluno', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none', usuarioNome = 'Aluno', avatar, avatarCor, counts, hrefsOcultos = [] }: Props) {
   const pathname = usePathname()
   const isMobile = useIsMobile()
   const { setOpenMobile } = useSidebar()
@@ -195,7 +195,7 @@ export function AlunoMobileNav({ navMode, logo, nome = 'Área do Aluno', subtitu
               { href: '/aluno/simulados', icon: ClipboardCheck, titulo: 'Simulados Realizados', desc: meus > 0 ? `${meus} concluído${meus > 1 ? 's' : ''}, com notas` : 'Seus resultados e notas' },
               { href: '/aluno/recomendado', icon: Lightbulb, titulo: 'Recomendado', desc: 'Questões onde você mais erra' },
               { href: '/aluno/questoes', icon: BookOpen, titulo: 'Banco de Questões', desc: 'Pratique com filtros' },
-            ].map((o) => {
+            ].filter((o) => !hrefsOcultos.includes(o.href)).map((o) => {
               const on = pathname.startsWith(o.href)
               return (
                 <Link key={o.href} href={o.href} onClick={() => setPopup(false)} className={cn('flex items-center gap-3 rounded-2xl p-3 transition-colors active:scale-[.98]', on ? 'bg-muted' : 'hover:bg-muted/60')}>

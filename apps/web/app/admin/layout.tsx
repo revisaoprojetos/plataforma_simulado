@@ -5,7 +5,7 @@ import { AdminSidebar } from '@/components/admin/sidebar'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { SidebarEdgeToggle } from '@/components/ui/sidebar-collapse'
 import { CanProvider } from '@/components/auth/can-provider'
-import { normalizarManutencaoAreas, areaBloqueadaDoPath, hrefsBloqueados, ocultarDiscursivaDe } from '@/lib/sistema/manutencao-areas'
+import { normalizarManutencaoAreas, normalizarLiberados, areaBloqueadaDoPath, hrefsBloqueados, ocultarDiscursivaDe, AREAS_MANUTENCAO } from '@/lib/sistema/manutencao-areas'
 import { AreaEmManutencao } from '@/components/admin/area-em-manutencao'
 import { getCurrentAccess, isSuperAdmin, accessCan, getAuthUser } from '@/lib/auth/permissions'
 import { getTenantTheme } from '@/lib/tenant-theme'
@@ -126,9 +126,11 @@ export default async function AdminLayout({
   // Manutenção POR ÁREA (por-tenant): esconde do menu + bloqueia a rota. A discursiva, além disso,
   // esconde as opções espalhadas (via `ocultarDiscursiva` no CanProvider). Guardado em tema.manutencao_areas.
   const manutencaoAreas = normalizarManutencaoAreas((ti as { manutencao_areas?: unknown }).manutencao_areas)
+  const manutencaoLiberados = normalizarLiberados((ti as { manutencao_areas_liberados?: unknown }).manutencao_areas_liberados, AREAS_MANUTENCAO)
   const ocultarDiscursiva = ocultarDiscursivaDe(manutencaoAreas)
-  const areasBloqueadas = hrefsBloqueados(manutencaoAreas)
-  const areaEmManutencao = areaBloqueadaDoPath(pathname, manutencaoAreas)
+  // O admin no allowlist da área continua vendo o item no menu E acessando a rota.
+  const areasBloqueadas = hrefsBloqueados(manutencaoAreas, manutencaoLiberados, access.userId)
+  const areaEmManutencao = areaBloqueadaDoPath(pathname, manutencaoAreas, manutencaoLiberados, access.userId)
   const podeGerenciarManutencao = access.isAdmin || access.permissions.includes('configuracoes:view')
 
   return (
