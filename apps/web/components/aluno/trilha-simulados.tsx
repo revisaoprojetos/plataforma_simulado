@@ -210,10 +210,10 @@ function TrilhaCaminho({ t, gamAtivo }: { t: Trilha; gamAtivo: boolean }) {
 
       {/* Card do simulado — no lado com mais espaço, alinhado ao nó */}
       {open && openPt && (
-        <div ref={cardRef} key={open.id} className="group/card absolute z-10 w-[400px] transition-transform duration-200 will-change-transform motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:hover:scale-[1.03]"
+        <div ref={cardRef} key={open.id} className="group/card absolute z-10 w-[400px] transition-transform duration-200 will-change-transform motion-safe:animate-in motion-safe:fade-in motion-safe:duration-100 motion-safe:hover:scale-[1.03]"
           style={{ top: cardTop, ...(side === 'right' ? { left: LANE + 20 } : { right: LANE + 20 }) }}>
           <span className={cn('absolute h-3 w-3 rotate-45 border bg-card', side === 'right' ? '-left-1.5 border-b-0 border-r-0' : '-right-1.5 border-l-0 border-t-0')} style={{ top: arrowY - 6 }} />
-          <div className={cn('overflow-hidden rounded-2xl border bg-card shadow-xl motion-safe:animate-[trilha-card-pulse_2.2s_ease-in-out_infinite]', open.estado === 'atual' && 'border-primary/40')}>
+          <div className={cn('overflow-hidden rounded-2xl border bg-card shadow-xl', open.estado === 'atual' && 'border-primary/40')}>
             {open.capaBanner && <div className="relative h-28"><img src={open.capaBanner} alt="" className="absolute inset-0 h-full w-full object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" /></div>}
             <div className="space-y-2 p-4">
               <div className="font-semibold leading-tight">{open.titulo}</div>
@@ -586,10 +586,10 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
 
       {/* Card do simulado — no lado com mais espaço, alinhado ao nó */}
       {open && openPt && (
-        <div ref={cardRef} key={open.id} className="group/card absolute z-10 w-[400px] transition-transform duration-200 will-change-transform motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95 motion-safe:hover:scale-[1.03]"
+        <div ref={cardRef} key={open.id} className="group/card absolute z-10 w-[400px] transition-transform duration-200 will-change-transform motion-safe:animate-in motion-safe:fade-in motion-safe:duration-100 motion-safe:hover:scale-[1.03]"
           style={{ top: cardTop, ...(side === 'right' ? { left: LANE + 20 } : { right: LANE + 20 }) }}>
           <span className={cn('absolute h-3 w-3 rotate-45 border bg-card', side === 'right' ? '-left-1.5 border-b-0 border-r-0' : '-right-1.5 border-l-0 border-t-0')} style={{ top: arrowY - 6 }} />
-          <div className={cn('overflow-hidden rounded-2xl border bg-card shadow-xl motion-safe:animate-[trilha-card-pulse_2.2s_ease-in-out_infinite]', open.estado === 'atual' && 'border-primary/40')}>
+          <div className={cn('overflow-hidden rounded-2xl border bg-card shadow-xl', open.estado === 'atual' && 'border-primary/40')}>
             {open.capaBanner && <div className="relative h-28"><img src={open.capaBanner} alt="" className="absolute inset-0 h-full w-full object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" /></div>}
             <div className="space-y-2 p-4">
               <div className="font-semibold leading-tight">{open.titulo}</div>
