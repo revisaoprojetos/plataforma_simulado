@@ -51,6 +51,7 @@ export function SimuladoQuestoesTable({
       titulo="Questões do simulado"
       subtitulo="filtre, reordene, adicione e importe"
       cor={cor}
+      semCabecalho
       acao={<AdicionarQuestoesDialog bancoId={bancoId} disciplinas={disciplinas} onSelecionar={onSelecionar} onImportar={onImportar} jaIds={jaIds} />}
       onRemover={async (ids) => { const r = await removerQuestoesSimulado(simuladoId, ids); if (r.ok) router.refresh(); return r }}
       onReordenar={(ids) => reordenarQuestoesSimulado(simuladoId, ids)}

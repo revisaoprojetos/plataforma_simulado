@@ -228,10 +228,11 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
 
   return (
     <BancoTabsShell value={aba}>
-      {/* Cabeçalho + abas — fixos no topo ao rolar o conteúdo */}
-      <div className="sticky -top-6 z-40 -mx-6 -mt-6 space-y-3 border-b bg-background px-6 pb-3 pt-6 shadow-sm">
-        <div className="flex items-start justify-between">
-          <div>
+      {/* Cabeçalho + abas — fixos no topo ao rolar o conteúdo. A linha do TabsList é a própria
+          divisória (largura cheia); as abas ficam "no corte", como na área de questões. */}
+      <div className="sticky -top-6 z-40 -mx-6 -mt-6 space-y-3 bg-background px-6 pt-6 shadow-sm">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
             <Link
               href={(simulado as any).pasta_id ? `/admin/simulados?pasta=${(simulado as any).pasta_id}` : '/admin/simulados'}
               className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
@@ -239,7 +240,7 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
               <ChevronLeft className="h-4 w-4" />
               {(simulado as any).pasta_id ? 'Voltar para a pasta' : 'Voltar para Simulados'}
             </Link>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-2xl font-bold tracking-tight">{simulado.titulo}</h1>
               <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusCfg.class}`}>
                 {statusCfg.label}
@@ -247,25 +248,25 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
               <TipoSimuladoBadge tipo={tipoSim} />
             </div>
           </div>
-          <SimuladoActions simuladoId={id} status={simulado.status} />
+          <div className="flex shrink-0 items-center gap-2">
+            <Link href={`/admin/simulados/${id}/embed`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+              <Code className="mr-2 h-3.5 w-3.5" />
+              Embed
+            </Link>
+            <SimuladoActions simuladoId={id} status={simulado.status} />
+          </div>
         </div>
 
-        <div className="flex items-center justify-between gap-3">
-          <TabsList className="max-w-full flex-nowrap overflow-x-auto">
-            <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
-            <TabsTrigger value="questoes">Questões ({totalQuestoes ?? 0})</TabsTrigger>
-            <TabsTrigger value="estudantes">Estudantes</TabsTrigger>
-            <TabsTrigger value="caderno">Caderno</TabsTrigger>
-            <TabsTrigger value="hud">HUD</TabsTrigger>
-            <TabsTrigger value="relatorio">Relatório</TabsTrigger>
-            <TabsTrigger value="manutencao">Manutenção</TabsTrigger>
-            <TabsTrigger value="configuracoes">Configurações</TabsTrigger>
-          </TabsList>
-          <Link href={`/admin/simulados/${id}/embed`} className={buttonVariants({ variant: 'outline', size: 'sm' }) + ' shrink-0'}>
-            <Code className="mr-2 h-3.5 w-3.5" />
-            Embed
-          </Link>
-        </div>
+        <TabsList className="max-w-full flex-nowrap overflow-x-auto">
+          <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
+          <TabsTrigger value="questoes">Questões ({totalQuestoes ?? 0})</TabsTrigger>
+          <TabsTrigger value="estudantes">Estudantes</TabsTrigger>
+          <TabsTrigger value="caderno">Caderno</TabsTrigger>
+          <TabsTrigger value="hud">HUD</TabsTrigger>
+          <TabsTrigger value="relatorio">Relatório</TabsTrigger>
+          <TabsTrigger value="manutencao">Manutenção</TabsTrigger>
+          <TabsTrigger value="configuracoes">Configurações</TabsTrigger>
+        </TabsList>
       </div>
 
       <div className="pt-6">
@@ -423,15 +424,7 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
         {/* Estudantes linkados (matriculados) + adicionar aluno/turma */}
         <TabsContent value="estudantes">
           {aba === 'estudantes' && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Estudantes do Simulado</CardTitle>
-                <CardDescription>Todos os estudantes matriculados (linkados) neste simulado, com busca, filtros e ordenação.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <SimuladoEstudantes simuladoId={id} acessoGratuitoInicial={!!(simulado.regras as { acesso_gratuito?: boolean } | null)?.acesso_gratuito} bancoBaseId={bancoBaseId} />
-              </CardContent>
-            </Card>
+            <SimuladoEstudantes simuladoId={id} acessoGratuitoInicial={!!(simulado.regras as { acesso_gratuito?: boolean } | null)?.acesso_gratuito} bancoBaseId={bancoBaseId} />
           )}
         </TabsContent>
 
