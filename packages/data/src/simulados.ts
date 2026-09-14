@@ -24,3 +24,23 @@ export async function simuladosTiposSql(simuladoIds: string[], tenantId: string)
     [simuladoIds, tenantId],
   )
 }
+
+/**
+ * Reordena a prova (`simulado_prova_questoes.ordem`) em UMA query, a partir da lista de `questao_id`
+ * na nova ordem (0-based). Substitui os N updates do caminho PostgREST. Retorna o nº de linhas
+ * afetadas, ou `null` quando o SQL direto não está disponível → o chamador cai no PostgREST.
+ * Filtra `tenant_id` explicitamente (isolamento na aplicação).
+ */
+export async function reordenarProvaSql(tenantId: string, simuladoId: string, ordem: string[]): Promise<number | null> {
+  if (!ordem.length) return 0
+  const rows = await sqlQuery<{ id: string }>(
+    `UPDATE simulado_prova_questoes p
+        SET ordem = nova.ordem
+       FROM (SELECT qid, (ord - 1)::int AS ordem
+               FROM unnest($3::uuid[]) WITH ORDINALITY AS t(qid, ord)) AS nova
+      WHERE p.tenant_id = $1 AND p.simulado_id = $2 AND p.questao_id = nova.qid
+      RETURNING p.id`,
+    [tenantId, simuladoId, ordem],
+  )
+  return rows === null ? null : rows.length
+}

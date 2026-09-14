@@ -13,6 +13,7 @@ import { computarResumoAoVivo, computarOnlinePorSimulado, JANELA_ATIVO_MIN, type
 import { garantirBancoDoSimulado, bancoDoSimulado } from '@/lib/simulado/banco-do-simulado'
 import { confirmarImportQuestoes } from '@/app/admin/banco-questoes/actions'
 import type { QuestaoImport } from '@/app/admin/banco-questoes/import-types'
+import { reordenarProvaViaApi } from '@/lib/data/simulados-api'
 import { criarNotificacoesEmMassa } from '@/lib/notificacoes/criar'
 
 // Sentinela p/ escopo de tenant: com tenantId null, o filtro vira um uuid impossível →
@@ -775,15 +776,20 @@ export async function reordenarQuestoesSimulado(simuladoId: string, questaoIds: 
   if (!ordem.length) return { ok: true }
   const svc = createAdminClient()
   if (!(await assertSimuladoDoTenant(svc, tenantId, simuladoId))) return { ok: false, error: 'Simulado não encontrado.' }
-  let erro: string | null = null
-  for (let i = 0; i < ordem.length; i += 25) {
-    const chunk = ordem.slice(i, i + 25)
-    await Promise.all(chunk.map(async (questao_id, j) => {
-      const r = await svc.from('simulado_prova_questoes').update({ ordem: i + j }).eq('simulado_id', simuladoId).eq('tenant_id', tenantId).eq('questao_id', questao_id)
-      if (r.error && !erro) erro = r.error.message
-    }))
+  // Strangler (Fase 7): tenta reordenar pela API dedicada (1 query SQL). `null` = API indisponível →
+  // cai no fallback local (N updates PostgREST). Permissão/ownership já validados acima.
+  const viaApi = await reordenarProvaViaApi(tenantId, simuladoId, ordem)
+  if (viaApi !== true) {
+    let erro: string | null = null
+    for (let i = 0; i < ordem.length; i += 25) {
+      const chunk = ordem.slice(i, i + 25)
+      await Promise.all(chunk.map(async (questao_id, j) => {
+        const r = await svc.from('simulado_prova_questoes').update({ ordem: i + j }).eq('simulado_id', simuladoId).eq('tenant_id', tenantId).eq('questao_id', questao_id)
+        if (r.error && !erro) erro = r.error.message
+      }))
+    }
+    if (erro) return { ok: false, error: erro }
   }
-  if (erro) return { ok: false, error: erro }
   const banco = await bancoDoSimulado(svc, tenantId, simuladoId)
   if (banco) { try { await svc.from('simulado_pastas').update({ ordem_questoes: ordem }).eq('id', banco).eq('tenant_id', tenantId) } catch { /* espelho best-effort */ } }
   revalidatePath(`/admin/simulados/${simuladoId}`)
