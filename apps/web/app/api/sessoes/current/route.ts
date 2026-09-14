@@ -34,6 +34,9 @@ export async function GET(request: NextRequest) {
     .from('simulado_prova_questoes')
     .select(`ordem, anulada, questoes:simulado_questoes(${cols})`)
     .eq('simulado_id', sessao.simulado_id)
+    // Defesa em profundidade: só serve questões DO tenant da sessão (service role bypassa RLS;
+    // impede que uma linha cross-tenant eventualmente injetada na prova apareça na prova do aluno).
+    .eq('tenant_id', (sessao as { tenant_id?: string }).tenant_id ?? '00000000-0000-0000-0000-000000000000')
     // Anuladas NÃO são escondidas: aparecem no runner com as assertivas, porém bloqueadas
     // para resposta (ponto garantido a todos). A flag `anulada` vai no payload.
     .order('ordem')

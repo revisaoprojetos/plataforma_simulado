@@ -776,6 +776,17 @@ export async function removeQuestaoFromSimulado(simuladoQuestaoId: string, simul
 // espelhado em best-effort p/ manter o 1:1 enquanto a área Banco coexiste — falha no espelho nunca
 // derruba a edição da prova.
 
+/**
+ * OWNERSHIP: como estas actions usam createAdminClient (service role, BYPASSA RLS) e não há trigger
+ * de coerência de tenant em simulado_prova_questoes, é OBRIGATÓRIO validar que o `simuladoId` é do
+ * tenant do chamador ANTES de qualquer escrita — senão um admin do tenant A injetaria/alteraria a
+ * prova de um simulado do tenant B (o runner do aluno carrega a prova só por simulado_id).
+ */
+async function assertSimuladoDoTenant(svc: ReturnType<typeof createAdminClient>, tenantId: string, simuladoId: string): Promise<boolean> {
+  const { data } = await svc.from('simulado_simulados').select('id').eq('id', simuladoId).eq('tenant_id', tenantId).maybeSingle()
+  return !!data
+}
+
 /** Anexa questões (por questao_id) ao FIM da prova, herdando `anulada` do banco. Ignora as já presentes. */
 export async function adicionarQuestoesSimulado(simuladoId: string, questaoIds: string[]): Promise<{ ok: boolean; adicionadas?: number; error?: string }> {
   if (!(await checkPermission('simulados:update'))) return { ok: false, error: 'Sem permissão.' }
@@ -784,6 +795,7 @@ export async function adicionarQuestoesSimulado(simuladoId: string, questaoIds: 
   const ids = [...new Set((questaoIds ?? []).filter(Boolean))]
   if (!ids.length) return { ok: true, adicionadas: 0 }
   const svc = createAdminClient()
+  if (!(await assertSimuladoDoTenant(svc, tenantId, simuladoId))) return { ok: false, error: 'Simulado não encontrado.' }
   // Só questões DO tenant (evita vínculo cross-tenant); herda anulada.
   const { data: valida } = await svc.from('simulado_questoes').select('id, anulada').eq('tenant_id', tenantId).in('id', ids)
   const validMap = new Map(((valida ?? []) as any[]).map((r) => [r.id as string, r.anulada === true]))
@@ -818,6 +830,7 @@ export async function removerQuestoesSimulado(simuladoId: string, questaoIds: st
   const ids = [...new Set((questaoIds ?? []).filter(Boolean))]
   if (!ids.length) return { ok: true }
   const svc = createAdminClient()
+  if (!(await assertSimuladoDoTenant(svc, tenantId, simuladoId))) return { ok: false, error: 'Simulado não encontrado.' }
   const { error } = await svc.from('simulado_prova_questoes').delete().eq('simulado_id', simuladoId).eq('tenant_id', tenantId).in('questao_id', ids)
   if (error) return { ok: false, error: error.message }
   const banco = await bancoDoSimulado(svc, tenantId, simuladoId)
@@ -835,6 +848,7 @@ export async function reordenarQuestoesSimulado(simuladoId: string, questaoIds: 
   const ordem = (questaoIds ?? []).filter(Boolean)
   if (!ordem.length) return { ok: true }
   const svc = createAdminClient()
+  if (!(await assertSimuladoDoTenant(svc, tenantId, simuladoId))) return { ok: false, error: 'Simulado não encontrado.' }
   let erro: string | null = null
   for (let i = 0; i < ordem.length; i += 25) {
     const chunk = ordem.slice(i, i + 25)
