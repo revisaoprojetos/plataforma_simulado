@@ -61,22 +61,24 @@ export function QuestaoLeitura({ documentoId, q, corFg, corMuted, onRespondida }
                 !certa && !erradaEscolhida && escolha && 'border-primary bg-primary text-primary-foreground',
               )} style={{ borderColor: !certa && !erradaEscolhida && !escolha ? '#00000030' : undefined }}>{LETRA[i] ?? i + 1}</span>
               <MarkdownContent inline className="flex-1 pt-0.5">{alt.texto}</MarkdownContent>
-              {certa && <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 dark:text-emerald-400" />}
-              {erradaEscolhida && <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600 dark:text-rose-400" />}
+              {certa && <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 motion-safe:animate-in motion-safe:zoom-in-50 motion-safe:duration-300 dark:text-emerald-400" />}
+              {erradaEscolhida && <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600 motion-safe:animate-in motion-safe:zoom-in-50 motion-safe:duration-300 dark:text-rose-400" />}
             </button>
           )
         })}
       </div>
 
       {!respondido ? (
-        <button onClick={responder} disabled={!escolhida || enviando} className="mt-3 inline-flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50">
-          {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Responder
-        </button>
+        <div className="mt-3 flex justify-end">
+          <button onClick={responder} disabled={!escolhida || enviando} className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50">
+            {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />} Responder
+          </button>
+        </div>
       ) : (
-        <div className="mt-3 space-y-2">
+        <div className="mt-3 space-y-2 motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-top-1 motion-safe:duration-300">
           <div className={cn('flex items-center gap-2 rounded-lg border p-2.5 text-sm font-semibold',
             res!.correta ? 'border-emerald-500/40 bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-400' : 'border-rose-500/40 bg-rose-50 text-rose-700 dark:bg-rose-950/30 dark:text-rose-400')}>
-            {res!.correta ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+            {res!.correta ? <CheckCircle2 className="h-4 w-4 motion-safe:animate-in motion-safe:zoom-in-50 motion-safe:duration-300" /> : <XCircle className="h-4 w-4 motion-safe:animate-in motion-safe:zoom-in-50 motion-safe:duration-300" />}
             {res!.correta ? 'Você acertou!' : 'Resposta incorreta.'}
           </div>
           {q.comentario && (

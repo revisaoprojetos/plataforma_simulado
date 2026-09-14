@@ -20,6 +20,8 @@ export default async function QuestoesLeituraPage({ params }: { params: Promise<
   if (!doc) notFound()
   // "Questões do conteúdo" = mini-simulado (quiz), separado das questões inline da leitura.
   const questoes = await carregarQuizAluno(id, sessao.estudanteId, sessao.tenantId)
+  // "Voltar" leva à TRILHA do módulo (não à seleção de módulos). __geral__ não tem trilha própria.
+  const trilhaHref = st.moduloId && st.moduloId !== '__geral__' ? `/aluno/leitura?modulo=${st.moduloId}` : '/aluno/leitura'
 
-  return <LeituraQuestoesStep doc={doc} questoes={questoes} />
+  return <LeituraQuestoesStep doc={doc} questoes={questoes} trilhaHref={trilhaHref} />
 }

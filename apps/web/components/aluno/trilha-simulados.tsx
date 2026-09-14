@@ -398,7 +398,7 @@ export function TrilhaSimulados({ trilhas, gamAtivo, estilo = 'cards', visiveis 
 const GAP_HDR = 58   // altura reservada p/ a divisória (nome do grupo)
 const GAP_GRUPO = 44 // respiro extra entre grupos (o pontilhado continua nele)
 
-export function TrilhaGigante({ trilhas, gamAtivo, reto = false }: { trilhas: Trilha[]; gamAtivo: boolean; reto?: boolean }) {
+export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = false }: { trilhas: Trilha[]; gamAtivo: boolean; reto?: boolean; semFundo?: boolean }) {
   const flat = trilhas.flatMap((t) => t.nodes)
   const atualId = flat.find((n) => n.estado === 'atual')?.id ?? flat[0]?.id ?? null
   const [aberto, setAberto] = useState<string | null>(atualId)
@@ -497,8 +497,9 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false }: { trilhas: Tr
 
   return (
     <div ref={rootRef} className="relative mx-auto" style={{ width: LANE, height }}>
-      {/* Fundo por grupo — capa do banco (quase às bordas), quadrada com fade em todas as bordas */}
-      {segmentos.map((s) => s.capa && (
+      {/* Fundo por grupo — capa do banco (quase às bordas), quadrada com fade em todas as bordas.
+          `semFundo` desliga (ex.: trilha da Leitura/LegProc, que não usa capa de fundo). */}
+      {!semFundo && segmentos.map((s) => s.capa && (
         <div key={s.id} className="pointer-events-none absolute left-1/2 z-0 -translate-x-1/2 overflow-hidden" style={{ top: s.yTop, height: Math.max(0, s.yBot - s.yTop), width: coverW, WebkitMaskImage: 'linear-gradient(to right, transparent 0%, #000 2%, #000 98%, transparent 100%)', maskImage: 'linear-gradient(to right, transparent 0%, #000 2%, #000 98%, transparent 100%)' }}>
           <img src={s.capa} alt="" loading="lazy" decoding="async" className="h-full w-full scale-105 object-cover object-[center_30%] opacity-100 blur-[5px] dark:opacity-[0.75]" style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 22px), transparent 100%)', maskImage: 'linear-gradient(to bottom, transparent 0, #000 32px, #000 calc(100% - 22px), transparent 100%)' }} />
         </div>
