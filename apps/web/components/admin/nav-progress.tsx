@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { usePathname, useSearchParams } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 
@@ -13,17 +13,25 @@ export function NavProgress() {
   const pathname = usePathname()
   const search = useSearchParams()
   const [loading, setLoading] = useState(false)
+  const startedAt = useRef(0)
 
-  // Rota concluída (pathname/query mudaram) → esconde.
-  useEffect(() => { setLoading(false) }, [pathname, search])
+  // Navegação concluída (pathname/query mudou) → esconde, garantindo um tempo MÍNIMO visível para a
+  // barra não sumir ANTES de aparecer em navegações rápidas (ex.: troca de aba prefetchada).
+  useEffect(() => {
+    if (startedAt.current === 0) return
+    const restante = Math.max(0, 420 - (Date.now() - startedAt.current))
+    const t = setTimeout(() => { startedAt.current = 0; setLoading(false) }, restante)
+    return () => clearTimeout(t)
+  }, [pathname, search])
 
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined
     const start = () => {
+      startedAt.current = Date.now()
       setLoading(true)
       clearTimeout(timer)
       // Trava de segurança: some sozinho se a navegação demorar/cancelar.
-      timer = setTimeout(() => setLoading(false), 15000)
+      timer = setTimeout(() => { startedAt.current = 0; setLoading(false) }, 15000)
     }
 
     // Cliques em links same-origin que realmente trocam de rota.
