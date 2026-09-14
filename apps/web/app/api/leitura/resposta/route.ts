@@ -24,10 +24,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Sem acesso a este documento.' }, { status: 403 })
   }
 
-  // A questão precisa estar realmente anexada a este documento (evita responder qualquer questão).
-  const { data: vinc } = await svc.from('simulado_documento_questoes')
-    .select('id').eq('tenant_id', sessao.tenantId).eq('documento_id', documento_id).eq('questao_id', questao_id).eq('deletado', false).maybeSingle()
-  if (!vinc) return NextResponse.json({ message: 'Questão não pertence a este documento.' }, { status: 400 })
+  // A questão precisa estar realmente anexada a este documento (evita responder qualquer questão) —
+  // seja como questão INLINE da leitura (simulado_documento_questoes) OU como "Questões do conteúdo"
+  // do mini-simulado (simulado_documento_quiz_questoes). Aceitar as duas fontes.
+  const [vincInline, vincQuiz] = await Promise.all([
+    svc.from('simulado_documento_questoes').select('id').eq('tenant_id', sessao.tenantId).eq('documento_id', documento_id).eq('questao_id', questao_id).eq('deletado', false).maybeSingle(),
+    svc.from('simulado_documento_quiz_questoes').select('id').eq('tenant_id', sessao.tenantId).eq('documento_id', documento_id).eq('questao_id', questao_id).eq('deletado', false).maybeSingle(),
+  ])
+  if (!vincInline.data && !vincQuiz.data) return NextResponse.json({ message: 'Questão não pertence a este documento.' }, { status: 400 })
 
   // Resolve correta/letra pelas alternativas (autoridade do servidor).
   const { data: alts } = await svc.from('simulado_alternativas').select('id, correta, ordem').eq('questao_id', questao_id).order('ordem')
