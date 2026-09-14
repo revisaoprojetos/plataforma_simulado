@@ -67,7 +67,10 @@ export async function GET(request: NextRequest) {
 
   let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null
   try {
-    browser = await puppeteer.launch({ executablePath: exec, headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox'] })
+    // --disable-dev-shm-usage é ESSENCIAL em container: o /dev/shm padrão do Docker é minúsculo (64MB)
+    // e o Chromium crasha ao renderizar a página em alta resolução (deviceScaleFactor 2 + timbre),
+    // devolvendo 500 "Falha ao gerar o PDF". Escreve a memória compartilhada em /tmp. +GPU off (headless).
+    browser = await puppeteer.launch({ executablePath: exec, headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] })
     const page = await browser.newPage()
     await page.setCacheEnabled(false)
     await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 2 })
