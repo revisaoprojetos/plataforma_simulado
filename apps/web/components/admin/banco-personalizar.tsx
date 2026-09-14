@@ -86,6 +86,10 @@ export function BancoPersonalizar({
   const c = cor ?? '#6d28d9'
   // O card usa a imagem própria (capa_card_url); se vazia, cai para o banner (capa_url).
   const imgCard = capaCard ?? capa
+  // Dimensões recomendadas (px) por imagem — o banner é fixo; o card acompanha o modo (pôster 4:5 / ticket 4:3).
+  const dimBanner = '2740 × 400 px'
+  const dimCard = cardView === 'ticket' ? '1200 × 900 px' : '1080 × 1350 px'
+  const chipDim = 'rounded bg-muted px-1.5 py-0.5 text-[11px] font-normal tabular-nums text-muted-foreground'
   const tituloCrop = (alvo: 'card' | 'banner') => (alvo === 'banner' ? 'Ajustar imagem de capa' : 'Ajustar imagem do card')
   // O recorte segue o CARD VIEW ATIVO: em TICKET tudo é PAISAGEM (4:3, deitado, como o card ticket
   // exibe a imagem); em PÔSTER o banner fica largo (16:4) e a imagem do card 4:5.
@@ -180,33 +184,12 @@ export function BancoPersonalizar({
             </div>
           )}
 
-          {/* Capa (banner largo 16:4) */}
+          {/* Imagem do card — pôster (4:5) ou ticket (paisagem), conforme o console. Fica ACIMA do banner. */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Imagem de capa (banner largo / capa comprida)</label>
-            <input ref={bannerRef} type="file" accept="image/*" className="hidden" onChange={(e) => { abrirCropper(e.target.files?.[0] ?? null, 'banner'); e.target.value = '' }} />
-            {capa ? (
-              // Banner largo: tira de largura total na proporção real (~2740×400) — fica baixa, nunca gigante.
-              <div className="relative w-full overflow-hidden rounded-xl border" style={{ aspectRatio: String(aspectDe('banner')) }}>
-                <img src={capa} alt="Capa" className="absolute inset-0 h-full w-full object-cover" />
-                <div className="absolute right-2 top-2 flex gap-1.5">
-                  <button type="button" onClick={() => ajustarAtual('banner')} className={btnOverlay}><Crop className="h-3.5 w-3.5" /> Ajustar</button>
-                  <button type="button" onClick={() => bannerRef.current?.click()} className={btnOverlay}><RefreshCw className="h-3.5 w-3.5" /> Trocar</button>
-                  <button type="button" onClick={() => setCapa(null)} className={cn(btnOverlay, 'hover:bg-rose-600')}><Trash2 className="h-3.5 w-3.5" /> Remover</button>
-                </div>
-              </div>
-            ) : (
-              <button type="button" onClick={() => bannerRef.current?.click()}
-                className="flex h-40 w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed text-muted-foreground transition-colors hover:border-primary hover:text-foreground">
-                <ImagePlus className="h-7 w-7" />
-                <span className="text-sm font-medium">Adicionar imagem de capa</span>
-                <span className="text-xs">Banner largo (capa comprida) — topo do banco e fundo na trilha. Alta resolução.</span>
-              </button>
-            )}
-          </div>
-
-          {/* Imagem do card — pôster (4:5) ou ticket (paisagem), conforme o console */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Imagem do card ({cardView === 'ticket' ? 'ticket' : 'pôster'})</label>
+            <label className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              Imagem do card ({cardView === 'ticket' ? 'ticket' : 'pôster'})
+              <span className={chipDim}>{dimCard}</span>
+            </label>
             <input ref={cardInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { abrirCropper(e.target.files?.[0] ?? null, 'card'); e.target.value = '' }} />
             {capaCard ? (
               // Miniatura na PROPORÇÃO do card do modo ativo (pôster 4:5 / ticket 4:3), altura fixa
@@ -224,7 +207,34 @@ export function BancoPersonalizar({
                 className="flex h-40 w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed text-muted-foreground transition-colors hover:border-primary hover:text-foreground">
                 <ImagePlus className="h-7 w-7" />
                 <span className="text-sm font-medium">Adicionar imagem do card</span>
-                <span className="text-xs">{cardView === 'ticket' ? 'Ideal deitada (paisagem). Se vazio, usa a capa do banner.' : 'Ideal vertical (pôster 4:5). Se vazio, usa a capa do banner.'}</span>
+                <span className="text-xs">{cardView === 'ticket' ? `Ideal deitada (paisagem) — ${dimCard}. Se vazio, usa a capa do banner.` : `Ideal vertical (pôster 4:5) — ${dimCard}. Se vazio, usa a capa do banner.`}</span>
+              </button>
+            )}
+          </div>
+
+          {/* Capa (banner largo 16:4) — abaixo do card */}
+          <div className="space-y-1.5">
+            <label className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              Imagem de capa (banner largo / capa comprida)
+              <span className={chipDim}>{dimBanner}</span>
+            </label>
+            <input ref={bannerRef} type="file" accept="image/*" className="hidden" onChange={(e) => { abrirCropper(e.target.files?.[0] ?? null, 'banner'); e.target.value = '' }} />
+            {capa ? (
+              // Banner largo: tira de largura total na proporção real (~2740×400) — fica baixa, nunca gigante.
+              <div className="relative w-full overflow-hidden rounded-xl border" style={{ aspectRatio: String(aspectDe('banner')) }}>
+                <img src={capa} alt="Capa" className="absolute inset-0 h-full w-full object-cover" />
+                <div className="absolute right-2 top-2 flex gap-1.5">
+                  <button type="button" onClick={() => ajustarAtual('banner')} className={btnOverlay}><Crop className="h-3.5 w-3.5" /> Ajustar</button>
+                  <button type="button" onClick={() => bannerRef.current?.click()} className={btnOverlay}><RefreshCw className="h-3.5 w-3.5" /> Trocar</button>
+                  <button type="button" onClick={() => setCapa(null)} className={cn(btnOverlay, 'hover:bg-rose-600')}><Trash2 className="h-3.5 w-3.5" /> Remover</button>
+                </div>
+              </div>
+            ) : (
+              <button type="button" onClick={() => bannerRef.current?.click()}
+                className="flex h-40 w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed text-muted-foreground transition-colors hover:border-primary hover:text-foreground">
+                <ImagePlus className="h-7 w-7" />
+                <span className="text-sm font-medium">Adicionar imagem de capa</span>
+                <span className="text-xs">Banner largo (capa comprida) — {dimBanner}. Topo do banco e fundo na trilha.</span>
               </button>
             )}
           </div>
@@ -267,7 +277,10 @@ export function BancoPersonalizar({
 
       {/* Pré-visualização do card — espelha o estilo do console (pôster × ticket). */}
       <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Prévia do card{cardView === 'ticket' ? ' · ticket' : ''}</p>
+        <p className="flex flex-wrap items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Prévia do card{cardView === 'ticket' ? ' · ticket' : ''}
+          <span className={cn(chipDim, 'normal-case tracking-normal')}>{dimCard}</span>
+        </p>
         {cardView === 'ticket' ? (
           // Ticket: imagem deitada à esquerda + infos à direita (usa a imagem do card, deitada).
           <div className="relative flex h-32 w-full overflow-hidden rounded-2xl border bg-card shadow-sm sm:h-36">
