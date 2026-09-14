@@ -44,7 +44,8 @@ export const AREAS_MANUTENCAO_ALUNO: AreaManutencao[] = [
   { key: 'questoes', label: 'Banco de Questões', descricao: 'Prática de questões avulsas (/aluno/questoes).', href: '/aluno/questoes' },
   { key: 'leitura', label: 'LegProc Digital', descricao: 'Biblioteca e leitor de documentos (/aluno/leitura).', href: '/aluno/leitura' },
   { key: 'cronograma', label: 'Cronograma', descricao: 'Gerar e acompanhar cronogramas (/aluno/cronograma).', href: '/aluno/cronograma' },
-  { key: 'gamificacao', label: 'Gamificação', descricao: 'Trilha, ligas e recomendados (XP/níveis/missões).', href: '/aluno/trilha', hrefs: ['/aluno/ligas', '/aluno/recomendado'] },
+  { key: 'gamificacao', label: 'Gamificação', descricao: 'Trilha e ligas (XP/níveis/missões).', href: '/aluno/trilha', hrefs: ['/aluno/ligas'] },
+  { key: 'recomendado', label: 'Recomendado', descricao: 'Questões recomendadas pelo desempenho do aluno (/aluno/recomendado).', href: '/aluno/recomendado' },
 ]
 
 export type ManutencaoAreas = Record<string, boolean>
