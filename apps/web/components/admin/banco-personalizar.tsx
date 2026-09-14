@@ -34,7 +34,23 @@ async function origParaMeta(o: File | string | null): Promise<string | null> {
 /** Aba "Personalizar" de um banco: nome, cor e duas imagens — a CAPA/banner (capa_url, horizontal) e a
  * imagem do CARD (capa_card_url). Cada uma tem "Ajustar" (arraste + zoom). A PRÉVIA e o aspecto do
  * recorte da imagem do card seguem o estilo escolhido no console (pôster 4:5 × ticket paisagem). */
-export function BancoPersonalizar({ banco, cardView = 'poster' }: { banco: Banco; cardView?: CardView }) {
+export function BancoPersonalizar({
+  banco,
+  cardView = 'poster',
+  titulo = 'Personalizar banco',
+  subtitulo = 'Cor, ícone e imagem de capa',
+  badge = 'Banco de questões',
+  mostrarNome = true,
+}: {
+  banco: Banco
+  cardView?: CardView
+  /** Rótulos sobrepostos p/ reuso fora do Banco (ex.: aba Personalizar do simulado). */
+  titulo?: string
+  subtitulo?: string
+  badge?: string
+  /** Oculta o campo "Nome" (no simulado o nome é editado em Configurações). O nome salvo mantém o valor recebido. */
+  mostrarNome?: boolean
+}) {
   const router = useRouter()
   const bannerRef = useRef<HTMLInputElement>(null)
   const cardInputRef = useRef<HTMLInputElement>(null)
@@ -119,16 +135,18 @@ export function BancoPersonalizar({ banco, cardView = 'poster' }: { banco: Banco
         <div className="flex items-center gap-3 border-b px-5 py-3.5" style={{ background: `linear-gradient(90deg, ${c}1f, transparent 55%)` }}>
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: c }}><Palette className="h-5 w-5" /></span>
           <div>
-            <h3 className="text-sm font-semibold leading-tight">Personalizar banco</h3>
-            <p className="text-xs text-muted-foreground">Cor, ícone e imagem de capa</p>
+            <h3 className="text-sm font-semibold leading-tight">{titulo}</h3>
+            <p className="text-xs text-muted-foreground">{subtitulo}</p>
           </div>
         </div>
         <CardContent className="space-y-6 px-5 py-5">
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">Nome</label>
-            <input value={nome} onChange={(e) => setNome(e.target.value)}
-              className="w-full rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
-          </div>
+          {mostrarNome && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-muted-foreground">Nome</label>
+              <input value={nome} onChange={(e) => setNome(e.target.value)}
+                className="w-full rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
+            </div>
+          )}
 
           {/* Capa (banner largo 16:4) */}
           <div className="space-y-1.5">
@@ -220,7 +238,7 @@ export function BancoPersonalizar({ banco, cardView = 'poster' }: { banco: Banco
               <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `linear-gradient(110deg, transparent 45%, ${c})` }} />
             </div>
             <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 p-3">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Banco de questões</p>
+              <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{badge}</p>
               <h3 className="line-clamp-2 text-sm font-bold leading-tight text-foreground sm:text-[15px]">{nome || 'Nome do banco'}</h3>
               <span className="inline-flex w-fit items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{banco.total} {banco.total === 1 ? 'questão' : 'questões'}</span>
             </div>
@@ -235,7 +253,7 @@ export function BancoPersonalizar({ banco, cardView = 'poster' }: { banco: Banco
             )}
             <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
             <div className="absolute inset-x-0 bottom-0 p-4">
-              <p className="text-[11px] font-medium uppercase tracking-wide text-white/70">Banco de questões</p>
+              <p className="text-[11px] font-medium uppercase tracking-wide text-white/70">{badge}</p>
               <h3 className="mt-0.5 line-clamp-2 text-lg font-bold leading-tight text-white drop-shadow-sm">{nome || 'Nome do banco'}</h3>
               <span className="mt-2 inline-flex items-center rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium text-white backdrop-blur">{banco.total} {banco.total === 1 ? 'questão' : 'questões'}</span>
             </div>

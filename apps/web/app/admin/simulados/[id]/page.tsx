@@ -1,5 +1,8 @@
-import { createClient } from '@/lib/supabase/server'
-import { getCurrentTenantId } from '@/lib/tenant'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { getCurrentTenantId, getCurrentTenant } from '@/lib/tenant'
+import { resolverCardView } from '@/lib/card-view'
+import { BancoPersonalizar } from '@/components/admin/banco-personalizar'
+import { PrepararConteudoSimulado } from '@/components/admin/preparar-conteudo-simulado'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { SimuladoForm } from '@/components/admin/simulado-form'
@@ -129,6 +132,23 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
 
   const statusCfg = statusConfig[simulado.status] ?? statusConfig.rascunho
 
+  // ── Personalização: o visual (capa/cor/card) mora no banco container, resolvido por banco_base_id
+  // (consolidação "Banco dentro da Aplicação" — edita aqui, sem migração). cardView espelha o console.
+  const temaAdmin = ((await getCurrentTenant())?.tema as Record<string, unknown> | null) ?? {}
+  const cardView = resolverCardView((temaAdmin.card_view_admin ?? temaAdmin.card_view) as string | undefined)
+  const bancoBaseId = (simulado.regras as { banco_base_id?: string } | null)?.banco_base_id ?? null
+  let bancoVisual: { id: string; cor: string | null; icone: string | null; capa_url: string | null; capa_card_url: string | null } | null = null
+  if (bancoBaseId) {
+    const svcAdmin = createAdminClient()
+    const tid = tenantId ?? '00000000-0000-0000-0000-000000000000'
+    const r = await svcAdmin.from('simulado_pastas').select('id, cor, icone, capa_url, capa_card_url, is_folder, deletado').eq('id', bancoBaseId).eq('tenant_id', tid).maybeSingle()
+    let row: Record<string, any> | null = r.data as any
+    if (r.error && /cor|icone|capa_url|capa_card_url|is_folder|deletado|column/i.test(r.error.message)) {
+      row = (await svcAdmin.from('simulado_pastas').select('id').eq('id', bancoBaseId).eq('tenant_id', tid).maybeSingle()).data as any
+    }
+    if (row && !row.deletado && row.is_folder !== true) bancoVisual = { id: row.id, cor: row.cor ?? null, icone: row.icone ?? null, capa_url: row.capa_url ?? null, capa_card_url: row.capa_card_url ?? null }
+  }
+
   function formatDate(date: string | null) {
     if (!date) return '—'
     // Sempre no horário de Brasília, independente do fuso do servidor.
@@ -179,6 +199,7 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
         <div className="flex items-center justify-between">
           <TabsList>
             <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
+            <TabsTrigger value="personalizar">Personalizar</TabsTrigger>
             <TabsTrigger value="questoes">Questões ({totalQuestoes ?? 0})</TabsTrigger>
             <TabsTrigger value="estudantes">Estudantes</TabsTrigger>
             <TabsTrigger value="sessoes">Sessões ({totalSessoes ?? 0})</TabsTrigger>
@@ -324,6 +345,22 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
               />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Personalizar — capa/cor/card do simulado (opera no banco container) */}
+        <TabsContent value="personalizar">
+          {bancoVisual ? (
+            <BancoPersonalizar
+              banco={{ id: bancoVisual.id, nome: simulado.titulo, cor: bancoVisual.cor, icone: bancoVisual.icone, capa_url: bancoVisual.capa_url, capa_card_url: bancoVisual.capa_card_url, total: totalQuestoes ?? 0 }}
+              cardView={cardView}
+              titulo="Personalizar simulado"
+              subtitulo="Capa, cor e imagem do card do simulado"
+              badge="Simulado"
+              mostrarNome={false}
+            />
+          ) : (
+            <PrepararConteudoSimulado simuladoId={id} descricao="Este simulado ainda não tem um espaço de conteúdo próprio. Prepare-o para editar a capa, a cor e a imagem do card aqui mesmo." />
+          )}
         </TabsContent>
 
         {/* Questões */}

@@ -10,6 +10,7 @@ import { registrarAudit } from '@/lib/audit'
 import { softDelete } from '@/lib/soft-delete'
 import { brtLocalParaIso } from '@/lib/brt'
 import { computarResumoAoVivo, computarOnlinePorSimulado, JANELA_ATIVO_MIN, type ResumoAoVivo } from '@/lib/simulado/ao-vivo'
+import { garantirBancoDoSimulado } from '@/lib/simulado/banco-do-simulado'
 import { criarNotificacoesEmMassa } from '@/lib/notificacoes/criar'
 
 // Sentinela p/ escopo de tenant: com tenantId null, o filtro vira um uuid impossível →
@@ -429,6 +430,26 @@ export async function moverSimuladoParaPasta(simuladoId: string, pastaId: string
   }
   revalidatePath('/admin/simulados')
   return { ok: true }
+}
+
+/**
+ * Garante que o simulado tenha um banco container de conteúdo (as questões/HUD/caderno/grupos/visual
+ * moram no banco, resolvido por `regras.banco_base_id`). Cria + faz backfill sob demanda p/ simulados
+ * antigos/avulsos. É o gate que habilita as abas de conteúdo (Personalizar, Import, Reordenar,
+ * Caderno, HUD, Grupos) da tela do simulado. Idempotente.
+ */
+export async function garantirBancoSimuladoAction(simuladoId: string): Promise<{ ok: boolean; bancoId?: string; criado?: boolean; error?: string }> {
+  if (!(await checkPermission('simulados:update'))) return { ok: false, error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const svc = createAdminClient()
+  const r = await garantirBancoDoSimulado(svc, tenantId, simuladoId)
+  if (!r.bancoId) return { ok: false, error: r.error ?? 'Falha ao preparar o conteúdo.' }
+  if (r.criado) {
+    await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_pastas', entidadeId: r.bancoId, depois: { banco_container: true, simulado_id: simuladoId } })
+    revalidatePath(`/admin/simulados/${simuladoId}`)
+  }
+  return { ok: true, bancoId: r.bancoId, criado: r.criado }
 }
 
 // ───────────────────────── Acesso de teste (testadores) ─────────────────────────
