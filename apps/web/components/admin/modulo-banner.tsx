@@ -43,10 +43,14 @@ export function ModuloBanner({ banner, titulo, subtitulo, topoDireita, breadcrum
     const aplicar = () => {
       raf = 0
       const t = Math.min(1, Math.max(0, root.scrollTop / DIST)) // 0 (topo) → 1 (recolhido)
-      banner.style.minHeight = `${EXP - (EXP - COMP) * t}px`
+      const h = EXP - (EXP - COMP) * t
+      banner.style.minHeight = `${h}px`
       col.style.maxHeight = `${naturalH * (1 - t)}px`
       col.style.opacity = String(Math.max(0, 1 - t * 1.4)) // some um pouco antes → degradê mais forte
       col.style.transform = `translateY(${-6 * t}px)`
+      // Publica o RODAPÉ do banner (topo -24px do sticky -top-6 + altura) p/ a toolbar "Adicionar aula"
+      // grudar exatamente embaixo dele em qualquer ponto do scroll (evita a toolbar entrar no banner).
+      root.style.setProperty('--lp-banner-bottom', `${h - 24}px`)
     }
     const onScroll = () => { if (!raf) raf = requestAnimationFrame(aplicar) }
     const onResize = () => { medir(); aplicar() }
@@ -58,6 +62,7 @@ export function ModuloBanner({ banner, titulo, subtitulo, topoDireita, breadcrum
     return () => {
       root.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onResize)
+      root.style.removeProperty('--lp-banner-bottom')
       if (raf) cancelAnimationFrame(raf)
     }
   }, [])
