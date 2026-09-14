@@ -26,7 +26,7 @@ export default async function LeituraAdminPage({ searchParams }: { searchParams:
       {banner ? (
         // ===== TOPO com o BANNER do módulo como fundo, EDGE-TO-EDGE (estilo banner do aluno) =====
         // -mx-6 -mt-6 cancela o padding do <main class="p-6"> → ocupa todo o topo, sem bordas brancas.
-        <div className="relative -mx-6 -mt-6 flex min-h-[12.5rem] overflow-hidden">
+        <div className="relative -mx-6 -mt-6 flex min-h-[15rem] overflow-hidden bg-neutral-950">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={banner} alt="" className="absolute inset-0 h-full w-full object-cover object-center" />
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/15" />
