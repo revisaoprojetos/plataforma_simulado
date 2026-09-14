@@ -435,6 +435,7 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
                     badge="Simulado"
                     mostrarNome={false}
                     semCabecalho
+                    autoSalvar
                   />
                 ) : semBancoCTA('Este simulado ainda não tem um espaço de conteúdo próprio. Prepare-o para editar a capa, a cor e a imagem do card aqui mesmo.')}
               </section>

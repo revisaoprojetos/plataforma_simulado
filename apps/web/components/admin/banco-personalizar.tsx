@@ -42,6 +42,7 @@ export function BancoPersonalizar({
   badge = 'Banco de questões',
   mostrarNome = true,
   semCabecalho = false,
+  autoSalvar = false,
 }: {
   banco: Banco
   cardView?: CardView
@@ -53,6 +54,8 @@ export function BancoPersonalizar({
   mostrarNome?: boolean
   /** Oculta o cabeçalho interno do card (quando a área já tem um título de seção próprio). */
   semCabecalho?: boolean
+  /** Salva sozinho (debounce) ao mudar cor/imagens e esconde o botão — usado na aba Configurações do simulado. */
+  autoSalvar?: boolean
 }) {
   const router = useRouter()
   const bannerRef = useRef<HTMLInputElement>(null)
@@ -121,13 +124,37 @@ export function BancoPersonalizar({
     return { card, banner }
   }
 
-  async function salvar() {
-    if (!nome.trim()) { toast.error('Informe um nome.'); return }
-    setSalvando(true)
+  // Estado do auto-save (quando `autoSalvar`): substitui o botão por um indicador discreto.
+  const [autoStatus, setAutoStatus] = useState<'idle' | 'salvando' | 'salvo' | 'erro'>('idle')
+
+  async function salvar(auto = false) {
+    if (!nome.trim()) { if (!auto) toast.error('Informe um nome.'); return }
+    if (auto) setAutoStatus('salvando'); else setSalvando(true)
     const r = await atualizarBanco(banco.id, nome, cor, null, capa, capaCard, await montarMeta())
-    setSalvando(false)
-    if (r.ok) { toast.success('Personalização salva'); router.refresh() } else toast.error(r.error ?? 'Erro ao salvar')
+    if (auto) {
+      // Auto-save silencioso: sem toast/refresh (a prévia já reflete a mudança ao vivo).
+      setAutoStatus(r.ok ? 'salvo' : 'erro')
+      if (!r.ok) toast.error(r.error ?? 'Erro ao salvar')
+    } else {
+      setSalvando(false)
+      if (r.ok) { toast.success('Personalização salva'); router.refresh() } else toast.error(r.error ?? 'Erro ao salvar')
+    }
   }
+
+  // Auto-save (debounce) ao mudar cor/imagens/nome. Pula a montagem e não salva no meio do recorte.
+  const salvarRef = useRef(salvar)
+  salvarRef.current = salvar
+  const autoTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const montadoRef = useRef(false)
+  useEffect(() => {
+    if (!autoSalvar) return
+    if (!montadoRef.current) { montadoRef.current = true; return }
+    if (cropper) return // recorte aberto → espera aplicar/cancelar
+    clearTimeout(autoTimer.current)
+    autoTimer.current = setTimeout(() => void salvarRef.current(true), 1000)
+    return () => clearTimeout(autoTimer.current)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nome, cor, capa, capaCard, autoSalvar])
 
   const btnOverlay = 'inline-flex items-center gap-1 rounded-md bg-black/60 px-2 py-1 text-xs font-medium text-white backdrop-blur hover:bg-black/70'
 
@@ -220,11 +247,21 @@ export function BancoPersonalizar({
             </div>
           </div>
 
-          <div className="flex justify-end">
-            <button type="button" onClick={salvar} disabled={salvando} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
-              {salvando && <Loader2 className="h-4 w-4 animate-spin" />} Salvar personalização
-            </button>
-          </div>
+          {autoSalvar ? (
+            // Sem botão: salva sozinho. Indicador discreto do estado.
+            <div className="flex items-center justify-end gap-1.5 text-xs text-muted-foreground" aria-live="polite">
+              {autoStatus === 'salvando' && (<><Loader2 className="h-3.5 w-3.5 animate-spin" /> Salvando…</>)}
+              {autoStatus === 'salvo' && (<><Check className="h-3.5 w-3.5 text-emerald-500" /> Alterações salvas automaticamente</>)}
+              {autoStatus === 'erro' && (<span className="text-destructive">Não foi possível salvar a personalização.</span>)}
+              {autoStatus === 'idle' && <span>As alterações são salvas automaticamente.</span>}
+            </div>
+          ) : (
+            <div className="flex justify-end">
+              <button type="button" onClick={() => salvar()} disabled={salvando} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
+                {salvando && <Loader2 className="h-4 w-4 animate-spin" />} Salvar personalização
+              </button>
+            </div>
+          )}
         </CardContent>
       </Card>
 

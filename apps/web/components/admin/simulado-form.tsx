@@ -3,9 +3,7 @@
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { Button } from '@/components/ui/button'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -24,7 +22,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion'
-import { Loader2 } from 'lucide-react'
+import { Loader2, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { BRT_LABEL } from '@/lib/brt'
 
@@ -69,14 +67,12 @@ interface SimuladoFormProps {
 }
 
 export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
-  const [isLoading, setIsLoading] = useState(false)
-  const router = useRouter()
-
   const {
     register,
-    handleSubmit,
     watch,
     setValue,
+    getValues,
+    trigger,
     formState: { errors },
   } = useForm<SimuladoFormData>({
     resolver: zodResolver(simuladoSchema),
@@ -115,48 +111,73 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
   const pad = (n: number) => String(n).padStart(2, '0')
   const [tempoProva, setTempoProva] = useState(minIniciais ? `${pad(Math.floor(minIniciais / 60))}:${pad(minIniciais % 60)}` : '')
 
-  async function handleFormSubmit(data: SimuladoFormData) {
-    setIsLoading(true)
+  // Aplica as transformações de negócio (tempo em minutos, retentativas ilimitadas, etc.) sobre os
+  // valores do form. Usado tanto pelo auto-save quanto pelo submit por Enter.
+  function montarPayload(data: SimuladoFormData): SimuladoFormData {
+    const [h, m] = tempoProva.split(':')
+    const totalMin = (Number(h) || 0) * 60 + (Number(m) || 0)
+    data.tempo_limite_min = totalMin > 0 ? totalMin : undefined
+    if (data.regras) {
+      // Ilimitadas = sem teto (o motor trata retentativas<=0 como ilimitado).
+      if (data.regras.retentativas_ilimitadas) data.regras.retentativas = 0
+      // Tolerância de atraso só vale com "iniciar atrasado" ligado.
+      if (!data.regras.iniciar_atrasado) data.regras.tolerancia_atraso_min = undefined
+      // "Acesso para todos" (acesso_gratuito) agora é controlado na aba Estudantes. O form NÃO
+      // escreve mais essa chave — o updateSimuladoAction mescla regras, então o valor da aba é
+      // preservado (evita este form sobrescrever com um valor velho).
+      delete (data.regras as { acesso_gratuito?: boolean }).acesso_gratuito
+    }
+    return data
+  }
+
+  // Estado do auto-save (substitui o botão "Salvar"): a aba de Configurações salva sozinha.
+  const [status, setStatus] = useState<'idle' | 'salvando' | 'salvo' | 'erro'>('idle')
+  const timerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+  const montadoRef = useRef(false)
+
+  // Salva de fato: valida em silêncio (erros ficam inline); se inválido, não grava.
+  const salvarAuto = useCallback(async () => {
+    const valido = await trigger()
+    if (!valido) { setStatus('idle'); return }
+    setStatus('salvando')
     try {
-      const [h, m] = tempoProva.split(':')
-      const totalMin = (Number(h) || 0) * 60 + (Number(m) || 0)
-      data.tempo_limite_min = totalMin > 0 ? totalMin : undefined
-      if (data.regras) {
-        // Ilimitadas = sem teto (o motor trata retentativas<=0 como ilimitado).
-        if (data.regras.retentativas_ilimitadas) data.regras.retentativas = 0
-        // Tolerância de atraso só vale com "iniciar atrasado" ligado.
-        if (!data.regras.iniciar_atrasado) data.regras.tolerancia_atraso_min = undefined
-        // "Acesso para todos" (acesso_gratuito) agora é controlado na aba Estudantes. O form NÃO
-        // escreve mais essa chave — o updateSimuladoAction mescla regras, então o valor da aba é
-        // preservado (evita este form sobrescrever com um valor velho).
-        delete (data.regras as { acesso_gratuito?: boolean }).acesso_gratuito
-      }
-      const result = await onSubmit(data)
-      if (result?.error) {
-        toast.error(result.error)
-      } else {
-        // Edição bem-sucedida (a criação faz redirect e não chega aqui): confirma e recarrega.
-        toast.success('Simulado salvo com sucesso')
-        router.refresh()
-      }
+      const result = await onSubmit(montarPayload(getValues()))
+      setStatus(result?.error ? 'erro' : 'salvo')
+      if (result?.error) toast.error(result.error)
     } catch (e) {
       // redirect() em server action lança NEXT_REDIRECT — deixar o Next navegar.
-      if (e && typeof e === 'object' && 'digest' in e && String((e as { digest?: string }).digest).startsWith('NEXT_REDIRECT')) {
-        throw e
-      }
+      if (e && typeof e === 'object' && 'digest' in e && String((e as { digest?: string }).digest).startsWith('NEXT_REDIRECT')) throw e
+      setStatus('erro')
       toast.error('Erro ao salvar simulado')
-    } finally {
-      setIsLoading(false)
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trigger, getValues, onSubmit, tempoProva])
 
-  // Bloqueou por validação → o usuário precisa saber (senão "clica em salvar e nada acontece").
-  function onInvalid() {
-    toast.error('Verifique os campos destacados antes de salvar.')
-  }
+  // Mantém a última versão de salvarAuto acessível sem re-inscrever o watch a cada render.
+  const salvarRef = useRef(salvarAuto)
+  salvarRef.current = salvarAuto
+  const agendarSalvar = useCallback(() => {
+    clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => salvarRef.current(), 900)
+  }, [])
+
+  // Auto-save ao mudar qualquer campo do form (watch só dispara em mudanças, não na montagem).
+  useEffect(() => {
+    const sub = watch(() => { if (montadoRef.current) agendarSalvar() })
+    return () => sub.unsubscribe()
+  }, [watch, agendarSalvar])
+
+  // O tempo de prova mora num state separado (HH:mm) — também dispara o auto-save (pula a montagem).
+  useEffect(() => {
+    if (!montadoRef.current) { montadoRef.current = true; return }
+    agendarSalvar()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tempoProva])
+
+  useEffect(() => () => clearTimeout(timerRef.current), [])
 
   return (
-    <form onSubmit={handleSubmit(handleFormSubmit, onInvalid)} className="space-y-6">
+    <form onSubmit={(e) => { e.preventDefault(); void salvarAuto() }} className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>Informações Gerais</CardTitle>
@@ -506,20 +527,12 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
         </CardContent>
       </Card>
 
-      <div className="flex justify-end gap-3">
-        <Button type="button" variant="outline" onClick={() => history.back()}>
-          Cancelar
-        </Button>
-        <Button type="submit" disabled={isLoading}>
-          {isLoading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Salvando...
-            </>
-          ) : (
-            'Salvar Simulado'
-          )}
-        </Button>
+      {/* Sem botão de salvar: a aba salva sozinha. Indicador discreto do estado do auto-save. */}
+      <div className="flex items-center justify-end gap-1.5 text-xs text-muted-foreground" aria-live="polite">
+        {status === 'salvando' && (<><Loader2 className="h-3.5 w-3.5 animate-spin" /> Salvando…</>)}
+        {status === 'salvo' && (<><Check className="h-3.5 w-3.5 text-emerald-500" /> Alterações salvas automaticamente</>)}
+        {status === 'erro' && (<span className="text-destructive">Não foi possível salvar — revise os campos destacados.</span>)}
+        {status === 'idle' && <span>As alterações são salvas automaticamente.</span>}
       </div>
     </form>
   )
