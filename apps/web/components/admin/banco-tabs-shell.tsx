@@ -1,7 +1,7 @@
 'use client'
 
 import type React from 'react'
-import { useEffect } from 'react'
+import { useEffect, useTransition } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Tabs } from '@/components/ui/tabs'
 
@@ -17,6 +17,7 @@ export function BancoTabsShell({ value, children, prefetch }: { value: string; c
   const router = useRouter()
   const sp = useSearchParams()
   const pathname = usePathname()
+  const [pending, startTransition] = useTransition()
 
   useEffect(() => {
     if (!prefetch?.length || !pathname) return
@@ -31,15 +32,23 @@ export function BancoTabsShell({ value, children, prefetch }: { value: string; c
   }, [pathname])
 
   return (
-    <Tabs
-      value={value}
-      onValueChange={(v: string) => {
-        const p = new URLSearchParams(sp?.toString() ?? '')
-        p.set('tab', v)
-        router.push(`?${p.toString()}`, { scroll: false })
-      }}
-    >
-      {children}
-    </Tabs>
+    <>
+      {/* Barra de progresso durante a troca de aba (feedback imediato até o conteúdo novo chegar). */}
+      {pending && (
+        <div className="fixed inset-x-0 top-0 z-[60] h-0.5 overflow-hidden bg-primary/15" aria-hidden>
+          <div className="h-full w-1/3 bg-primary" style={{ animation: 'barra-carregando 1s ease-in-out infinite' }} />
+        </div>
+      )}
+      <Tabs
+        value={value}
+        onValueChange={(v: string) => {
+          const p = new URLSearchParams(sp?.toString() ?? '')
+          p.set('tab', v)
+          startTransition(() => router.push(`?${p.toString()}`, { scroll: false }))
+        }}
+      >
+        {children}
+      </Tabs>
+    </>
   )
 }
