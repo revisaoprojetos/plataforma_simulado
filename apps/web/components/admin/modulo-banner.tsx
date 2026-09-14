@@ -19,23 +19,25 @@ export function ModuloBanner({ banner, titulo, subtitulo, topoDireita, breadcrum
   breadcrumb: ReactNode
   tabs: ReactNode
 }) {
-  const sentinelaRef = useRef<HTMLDivElement>(null)
+  const bannerRef = useRef<HTMLDivElement>(null)
   const [compacto, setCompacto] = useState(false)
 
   useEffect(() => {
-    const el = sentinelaRef.current
-    const root = (el?.closest('main') as HTMLElement | null) ?? null
-    if (!el || !root) return
-    // Compacto quando a sentinela (no topo, fora do sticky) sai da viewport → rolou para baixo. A folga
-    // (-24px) afasta o gatilho da borda exata → menos jitter no topo.
-    const io = new IntersectionObserver(([e]) => setCompacto(!e.isIntersecting), { root, rootMargin: '-24px 0px 0px 0px' })
-    io.observe(el)
-    return () => io.disconnect()
+    const root = (bannerRef.current?.closest('main') as HTMLElement | null) ?? null
+    if (!root) return
+    // Modo compacto por posição de scroll do <main>, com HISTERESE (zona morta 30–90px): recolhe ao passar
+    // de 90px e só volta abaixo de 30px → nada de liga/desliga na borda. Como o container tem
+    // overflow-anchor:none, encolher não mexe no scrollTop → sem feedback/flicker. No topo (0) = expandido.
+    const onScroll = () => { const y = root.scrollTop; setCompacto((c) => (c ? y > 30 : y > 90)) }
+    onScroll()
+    root.addEventListener('scroll', onScroll, { passive: true })
+    return () => root.removeEventListener('scroll', onScroll)
   }, [])
 
   return (
     <>
       <div
+        ref={bannerRef}
         className="sticky -top-6 z-30 -mx-6 -mt-6 flex flex-col overflow-hidden bg-neutral-950 transition-[min-height] duration-[450ms] ease-in-out [overflow-anchor:none]"
         style={{ minHeight: compacto ? '5rem' : '15rem' }}
       >
@@ -73,9 +75,6 @@ export function ModuloBanner({ banner, titulo, subtitulo, topoDireita, breadcrum
           <div className="mt-auto pt-3">{tabs}</div>
         </div>
       </div>
-      {/* Sentinela ABSOLUTA no topo do container da página (que é `relative`) — não ocupa layout (não
-          cria linha branca) e sai da viewport ao rolar → aciona o modo compacto. */}
-      <div ref={sentinelaRef} aria-hidden className="pointer-events-none absolute left-0 top-0 h-4 w-px" />
     </>
   )
 }
