@@ -141,7 +141,10 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTa
           {/* As 3 abas ficam MONTADAS (só escondemos as inativas): Acessos/Configurações pré-carregam ao
               entrar no módulo e ficam em memória enquanto navega; desmontam (limpam) ao sair do módulo. */}
           <div className={cn('space-y-2', moduloTab !== 'aulas' && 'hidden')}>
-            <div className="flex flex-wrap items-center justify-between gap-2">
+            {/* Toolbar sticky: cola logo abaixo do banner recolhido → "Adicionar aula" fica sempre visível
+                ao rolar. Fosca e edge-to-edge (-mx-6/px-6 cancelam o padding do <main>). top ≈ altura do
+                banner recolhido; z-20 fica abaixo do banner (z-30). */}
+            <div className="sticky top-[4.5rem] z-20 -mx-6 flex flex-wrap items-center justify-between gap-2 border-b bg-background/85 px-6 py-2.5 backdrop-blur-md">
               <p className="text-sm text-muted-foreground">{aulas.length} aula(s) neste módulo</p>
               <button onClick={novaAula} disabled={pending} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60"><FilePlus2 className="h-4 w-4" /> Adicionar aula</button>
             </div>
