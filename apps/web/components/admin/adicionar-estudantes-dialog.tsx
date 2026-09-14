@@ -43,12 +43,14 @@ function parseCsv(text: string): Record<string, string>[] {
 
 const MODELO = 'email,nome,telefone,documento,classificacao\njoao@exemplo.com,João Silva,11999990000,12345678900,normal\n'
 
-export function AdicionarEstudantesDialog({ bancoId, onSelecionar, jaIds }: {
+export function AdicionarEstudantesDialog({ bancoId, onSelecionar, jaIds, onVinculado }: {
   bancoId?: string
   /** Modo REUTILIZÁVEL (criação de simulado): em vez de vincular no banco, devolve os alunos escolhidos. */
   onSelecionar?: (alunos: AlunoSel[]) => void
   /** Ids já escolhidos (para marcar como "já vinculado" e não repetir) — modo reutilizável. */
   jaIds?: Set<string>
+  /** Chamado após vincular/importar no banco (ex.: recarregar a lista da aba Estudantes do simulado). */
+  onVinculado?: () => void
 }) {
   const [open, setOpen] = useState(false)
   const [busca, setBusca] = useState('')
@@ -96,7 +98,7 @@ export function AdicionarEstudantesDialog({ bancoId, onSelecionar, jaIds }: {
     }
     start(async () => {
       const r = await vincularEstudantes(bancoId as string, [...sel])
-      if (r.ok) { toast.success(`${r.vinculados ?? 0} vinculado(s)`); setOpen(false); setSel(new Set()); router.refresh() }
+      if (r.ok) { toast.success(`${r.vinculados ?? 0} vinculado(s)`); setOpen(false); setSel(new Set()); router.refresh(); onVinculado?.() }
       else toast.error(r.error ?? 'Erro')
     })
   }
@@ -116,7 +118,7 @@ export function AdicionarEstudantesDialog({ bancoId, onSelecionar, jaIds }: {
       if (!mapped.some((r) => r.email)) { toast.error('CSV sem coluna "email" ou vazio.'); return }
       start(async () => {
         const res = await importarEstudantesLote(bancoId as string, mapped)
-        if (res.ok) { toast.success(`${res.criados ?? 0} criado(s), ${res.vinculados ?? 0} vinculado(s)`); setOpen(false); router.refresh() }
+        if (res.ok) { toast.success(`${res.criados ?? 0} criado(s), ${res.vinculados ?? 0} vinculado(s)`); setOpen(false); router.refresh(); onVinculado?.() }
         else toast.error(res.error ?? 'Erro ao importar')
       })
     }

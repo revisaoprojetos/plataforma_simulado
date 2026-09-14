@@ -34,7 +34,7 @@ export interface GrupoOpc {
   is_mestre?: boolean
 }
 
-export function AdicionarGrupoBancoDialog({ bancoId }: { bancoId: string }) {
+export function AdicionarGrupoBancoDialog({ bancoId, onVinculado }: { bancoId: string; onVinculado?: () => void }) {
   const [open, setOpen] = useState(false)
   const [grupos, setGrupos] = useState<GrupoOpc[]>([])
   const [carregandoGrupos, setCarregandoGrupos] = useState(false)
@@ -137,8 +137,8 @@ export function AdicionarGrupoBancoDialog({ bancoId }: { bancoId: string }) {
         if (!r.ok) { toast.error(r.error ?? 'Erro ao vincular grupo'); return }
         total += r.vinculados ?? 0
       }
-      toast.success(`${sel.size} grupo(s) vinculado(s) · ${total} estudante(s) ligado(s) ao banco`)
-      setOpen(false); setSel(new Set()); router.refresh()
+      toast.success(`${sel.size} grupo(s) vinculado(s) · ${total} estudante(s) ligado(s)`)
+      setOpen(false); setSel(new Set()); router.refresh(); onVinculado?.()
     })
   }
 

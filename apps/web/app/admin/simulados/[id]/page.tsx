@@ -458,7 +458,7 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
         {/* Grupos de disciplinas (usados nos relatórios por grupo) */}
         <TabsContent value="grupos">
           {aba === 'grupos' && (bancoBaseId ? (
-            <BancoGrupos bancoId={bancoBaseId} disciplinas={disciplinasGrupos} gruposIniciais={gruposIniciais} cor={bancoVisual?.cor ?? undefined} />
+            <BancoGrupos bancoId={bancoBaseId} disciplinas={disciplinasGrupos} gruposIniciais={gruposIniciais} cor={bancoVisual?.cor ?? undefined} subtitulo="Agrupe as disciplinas do simulado — salvas automaticamente." textoVazio="O simulado ainda não tem disciplinas." />
           ) : semBancoCTA('Este simulado ainda não tem um espaço de conteúdo próprio. Prepare-o para agrupar as disciplinas aqui mesmo.'))}
         </TabsContent>
 
@@ -471,7 +471,7 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
                 <CardDescription>Todos os estudantes matriculados (linkados) neste simulado, com busca, filtros e ordenação.</CardDescription>
               </CardHeader>
               <CardContent>
-                <SimuladoEstudantes simuladoId={id} acessoGratuitoInicial={!!(simulado.regras as { acesso_gratuito?: boolean } | null)?.acesso_gratuito} />
+                <SimuladoEstudantes simuladoId={id} acessoGratuitoInicial={!!(simulado.regras as { acesso_gratuito?: boolean } | null)?.acesso_gratuito} bancoBaseId={bancoBaseId} />
               </CardContent>
             </Card>
           )}

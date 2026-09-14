@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
@@ -9,6 +9,8 @@ import { toast } from 'sonner'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/utils'
 import { listarEstudantesSimulado, removerPassaportesIndevidos, definirAcessoGratuitoSimulado, type EstudanteLinkado } from '@/app/admin/simulados/actions'
+import { AdicionarEstudantesDialog } from '@/components/admin/adicionar-estudantes-dialog'
+import { AdicionarGrupoBancoDialog } from '@/components/admin/adicionar-grupo-banco-dialog'
 
 type Campo = 'nome' | 'email' | 'situacao' | 'nota'
 const POR_PAGINA = 11
@@ -19,7 +21,7 @@ const situacaoCfg: Record<string, { label: string; cls: string }> = {
   nao_iniciou: { label: 'Não iniciou', cls: 'bg-muted text-muted-foreground' },
 }
 
-export function SimuladoEstudantes({ simuladoId, acessoGratuitoInicial = false }: { simuladoId: string; acessoGratuitoInicial?: boolean }) {
+export function SimuladoEstudantes({ simuladoId, acessoGratuitoInicial = false, bancoBaseId = null }: { simuladoId: string; acessoGratuitoInicial?: boolean; bancoBaseId?: string | null }) {
   const [carregando, setCarregando] = useState(true)
   const [erro, setErro] = useState<string | null>(null)
   const [dados, setDados] = useState<EstudanteLinkado[]>([])
@@ -49,15 +51,15 @@ export function SimuladoEstudantes({ simuladoId, acessoGratuitoInicial = false }
 
   const [limpando, setLimpando] = useState(false)
 
-  useEffect(() => {
-    let vivo = true
+  // Recarregável: usado no 1º load E após vincular estudantes/grupo (router.refresh não re-roda o efeito).
+  const carregar = useCallback(() => {
     setCarregando(true)
-    listarEstudantesSimulado(simuladoId)
-      .then((r) => { if (!vivo) return; if (r.error) setErro(r.error); else setDados(r.estudantes ?? []) })
-      .catch(() => vivo && setErro('Falha ao carregar estudantes.'))
-      .finally(() => vivo && setCarregando(false))
-    return () => { vivo = false }
+    return listarEstudantesSimulado(simuladoId)
+      .then((r) => { if (r.error) setErro(r.error); else { setErro(null); setDados(r.estudantes ?? []) } })
+      .catch(() => setErro('Falha ao carregar estudantes.'))
+      .finally(() => setCarregando(false))
   }, [simuladoId])
+  useEffect(() => { carregar() }, [carregar])
 
   async function limparPassaportes() {
     const ok = await confirmar({
@@ -143,6 +145,16 @@ export function SimuladoEstudantes({ simuladoId, acessoGratuitoInicial = false }
           {liberarTodos ? <><Lock className="h-4 w-4" /> Restringir acesso</> : <><Globe className="h-4 w-4" /> Liberar para todos</>}
         </button>
       </div>
+
+      {/* Adicionar estudantes/turmas — vincula ao banco container do simulado, que auto-matricula
+          aqui (mesmo caminho da criação). Recarrega a lista ao concluir. */}
+      {bancoBaseId && (
+        <div className="flex flex-wrap items-center gap-2">
+          <AdicionarEstudantesDialog bancoId={bancoBaseId} onVinculado={carregar} />
+          <AdicionarGrupoBancoDialog bancoId={bancoBaseId} onVinculado={carregar} />
+          <span className="text-xs text-muted-foreground">Vincule alunos ou uma turma inteira — a matrícula neste simulado é automática.</span>
+        </div>
+      )}
 
       {/* Lista de vinculados — acinzenta quando "liberado para todos" (acesso não depende dela). */}
       <div className={cn('space-y-4 transition-opacity', liberarTodos && 'pointer-events-none select-none opacity-50')} aria-disabled={liberarTodos}>
