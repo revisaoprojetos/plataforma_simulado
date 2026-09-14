@@ -1,5 +1,5 @@
 import 'server-only'
-import type { EstudanteLinkadoRow } from 'data'
+import type { EstudanteLinkadoRow, RelatorioRespostaAggRow } from 'data'
 
 const apiBase = () => (process.env.API_INTERNAL_URL ?? process.env.RELATORIOS_API_URL)?.replace(/\/$/, '')
 
@@ -50,6 +50,12 @@ async function apiGet<T>(path: string, params: Record<string, string>): Promise<
 /** Estudantes linkados via API dedicada (1 query JOIN). `null` = indisponível → fallback local. */
 export async function estudantesLinkadosViaApi(tenantId: string, simuladoId: string): Promise<EstudanteLinkadoRow[] | null> {
   const j = await apiGet<{ rows?: EstudanteLinkadoRow[] | null }>('/v1/simulados/estudantes', { tenantId, simuladoId })
+  return j && Array.isArray(j.rows) ? j.rows : null
+}
+
+/** Respostas agregadas por questão (relatório) via API. `null` = indisponível → fallback local. */
+export async function relatorioRespostasAggViaApi(tenantId: string, simuladoId: string): Promise<RelatorioRespostaAggRow[] | null> {
+  const j = await apiGet<{ rows?: RelatorioRespostaAggRow[] | null }>('/v1/simulados/relatorio-respostas', { tenantId, simuladoId })
   return j && Array.isArray(j.rows) ? j.rows : null
 }
 

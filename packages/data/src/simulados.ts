@@ -31,6 +31,29 @@ export async function simuladosTiposSql(simuladoIds: string[], tenantId: string)
  * afetadas, ou `null` quando o SQL direto não está disponível → o chamador cai no PostgREST.
  * Filtra `tenant_id` explicitamente (isolamento na aplicação).
  */
+export type RelatorioRespostaAggRow = { questao_id: string; total: number | string; erros: number | string; acertos: number | string }
+
+/**
+ * Agrega as respostas objetivas do simulado POR QUESTÃO (total/erros/acertos) diretamente no banco —
+ * substitui carregar dezenas de milhares de respostas e agregar em JS (o relatório de simulado popular
+ * levava ~18s). Só sessões finalizadas, não-teste, do tenant. Retorna ~1 linha por questão, ou `null`
+ * quando o SQL direto não está disponível → o chamador cai no PostgREST. Filtra tenant_id.
+ */
+export async function relatorioRespostasAggSql(tenantId: string, simuladoId: string): Promise<RelatorioRespostaAggRow[] | null> {
+  return sqlQuery<RelatorioRespostaAggRow>(
+    `SELECT ro.questao_id,
+            count(*)::int AS total,
+            count(*) FILTER (WHERE ro.correta = false)::int AS erros,
+            count(*) FILTER (WHERE ro.correta = true)::int  AS acertos
+       FROM simulado_respostas_objetivas ro
+       JOIN simulado_sessoes_prova sp ON sp.id = ro.sessao_id
+      WHERE sp.tenant_id = $1 AND sp.simulado_id = $2
+        AND sp.is_teste = false AND sp.status = 'finalizada' AND sp.deletado = false
+      GROUP BY ro.questao_id`,
+    [tenantId, simuladoId],
+  )
+}
+
 export type EstudanteLinkadoRow = {
   id: string
   nome: string | null

@@ -1,9 +1,12 @@
 import { createAdminClient } from '@/lib/supabase/server'
+import { getCurrentTenantId } from '@/lib/tenant'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Trophy, TrendingDown, BarChart3 } from 'lucide-react'
 import { calcularRanking } from '@/lib/ranking'
+import { relatorioRespostasAggViaApi } from '@/lib/data/simulados-api'
+import { relatorioRespostasAggSql } from '@/lib/data/relatorios.repo'
 
 interface Props {
   simuladoId: string
@@ -12,6 +15,8 @@ interface Props {
 /** Relatório de desempenho do simulado: ranking, questões com maior erro e matérias. */
 export async function SimuladoRelatorio({ simuladoId }: Props) {
   const svc = createAdminClient()
+  const tenantId = await getCurrentTenantId()
+  const tid = tenantId ?? '00000000-0000-0000-0000-000000000000'
 
   // Sessões finalizadas (exceto testes) com aluno.
   const { data: sessoes } = await svc
@@ -44,30 +49,35 @@ export async function SimuladoRelatorio({ simuladoId }: Props) {
     if (q?.id) questoesInfo.set(q.id, { enunciado: q.enunciado ?? '', disciplina: q.disciplinas?.nome ?? 'Sem matéria', ordem: (row as any).ordem ?? 0 })
   }
 
-  // Respostas de todas as sessões finalizadas (chunk — simulado popular = milhares de sessões).
-  let respostas: Array<{ questao_id: string; correta: boolean | null }> = []
-  if (sessaoIds.length) {
-    respostas = await fetchAllByIn<any>(sessaoIds, (chunk) => svc
-      .from('simulado_respostas_objetivas')
-      .select('questao_id, correta')
-      .in('sessao_id', chunk)
-      .order('id', { ascending: true }))
-  }
-
-  // Erros por questão + acertos por matéria.
+  // Erros por questão + acertos por matéria. Caminho RÁPIDO: agregação SQL/API (GROUP BY no banco →
+  // ~1 linha por questão) em vez de carregar dezenas de milhares de respostas. Fallback: PostgREST.
   const porQuestao = new Map<string, { erros: number; total: number }>()
   const porMateria = new Map<string, { acertos: number; total: number }>()
-  for (const r of respostas) {
-    const pqs = porQuestao.get(r.questao_id) ?? { erros: 0, total: 0 }
-    pqs.total += 1
-    if (!r.correta) pqs.erros += 1
-    porQuestao.set(r.questao_id, pqs)
-
-    const disc = questoesInfo.get(r.questao_id)?.disciplina ?? 'Sem matéria'
-    const pm = porMateria.get(disc) ?? { acertos: 0, total: 0 }
-    pm.total += 1
-    if (r.correta) pm.acertos += 1
-    porMateria.set(disc, pm)
+  const agg = (await relatorioRespostasAggViaApi(tid, simuladoId)) ?? (await relatorioRespostasAggSql(tid, simuladoId))
+  if (agg) {
+    for (const r of agg) {
+      const total = Number(r.total) || 0, erros = Number(r.erros) || 0, acertos = Number(r.acertos) || 0
+      porQuestao.set(r.questao_id, { erros, total })
+      const disc = questoesInfo.get(r.questao_id)?.disciplina ?? 'Sem matéria'
+      const pm = porMateria.get(disc) ?? { acertos: 0, total: 0 }
+      pm.total += total; pm.acertos += acertos
+      porMateria.set(disc, pm)
+    }
+  } else if (sessaoIds.length) {
+    // Fallback PostgREST: carrega as respostas (chunk) e agrega em JS.
+    const respostas = await fetchAllByIn<any>(sessaoIds, (chunk) => svc
+      .from('simulado_respostas_objetivas').select('questao_id, correta').in('sessao_id', chunk).order('id', { ascending: true }))
+    for (const r of respostas) {
+      const pqs = porQuestao.get(r.questao_id) ?? { erros: 0, total: 0 }
+      pqs.total += 1
+      if (!r.correta) pqs.erros += 1
+      porQuestao.set(r.questao_id, pqs)
+      const disc = questoesInfo.get(r.questao_id)?.disciplina ?? 'Sem matéria'
+      const pm = porMateria.get(disc) ?? { acertos: 0, total: 0 }
+      pm.total += 1
+      if (r.correta) pm.acertos += 1
+      porMateria.set(disc, pm)
+    }
   }
 
   const questoesMaiorErro = [...porQuestao.entries()]

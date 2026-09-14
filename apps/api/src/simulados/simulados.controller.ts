@@ -1,5 +1,5 @@
 import { BadRequestException, Body, Controller, Get, Headers, Post, Query, UnauthorizedException } from '@nestjs/common'
-import { reordenarProvaSql, estudantesLinkadosSql } from 'data'
+import { reordenarProvaSql, estudantesLinkadosSql, relatorioRespostasAggSql } from 'data'
 
 /**
  * Escritas de simulado servidas pela API dedicada (strangler — Fase 7). Fronteira interna confiável:
@@ -26,6 +26,18 @@ export class SimuladosController {
     this.gate(secret)
     if (!tenantId || !simuladoId) throw new BadRequestException('tenantId e simuladoId são obrigatórios')
     return { rows: await estudantesLinkadosSql(tenantId, simuladoId) }
+  }
+
+  /** Respostas objetivas agregadas por questão (total/erros/acertos) — para o relatório do simulado. */
+  @Get('relatorio-respostas')
+  async relatorioRespostas(
+    @Query('tenantId') tenantId: string,
+    @Query('simuladoId') simuladoId: string,
+    @Headers('x-api-secret') secret?: string,
+  ) {
+    this.gate(secret)
+    if (!tenantId || !simuladoId) throw new BadRequestException('tenantId e simuladoId são obrigatórios')
+    return { rows: await relatorioRespostasAggSql(tenantId, simuladoId) }
   }
 
   @Post('prova/reordenar')
