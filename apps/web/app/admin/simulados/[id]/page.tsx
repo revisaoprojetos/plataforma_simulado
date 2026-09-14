@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId, getCurrentTenant } from '@/lib/tenant'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
@@ -5,13 +6,17 @@ import { resolverCardView } from '@/lib/card-view'
 import { alternativasSaoCertoErrado } from '@/lib/simulado/formato'
 import { BancoPersonalizar } from '@/components/admin/banco-personalizar'
 import { PrepararConteudoSimulado } from '@/components/admin/preparar-conteudo-simulado'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { BancoTabsShell } from '@/components/admin/banco-tabs-shell'
+import { BancoCadernoTeste } from '@/components/admin/banco-caderno-teste'
+import { BancoHud } from '@/components/admin/banco-hud'
+import { BancoGrupos } from '@/components/admin/banco-grupos'
+import { TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { SimuladoForm } from '@/components/admin/simulado-form'
 import { SimuladoActions } from '@/components/admin/simulado-actions'
 import { SimuladoQuestoesTable } from '@/components/admin/simulado-questoes-table'
 import { type QuestaoLinha } from '@/components/admin/questoes-tabela-base'
-import { listarDisciplinasFiltro } from '@/app/admin/banco-questoes/actions'
+import { listarDisciplinasFiltro, type GrupoBanco } from '@/app/admin/banco-questoes/actions'
 import { SimuladoEstudantes } from '@/components/admin/simulado-estudantes'
 import { SimuladoSessoes } from '@/components/admin/simulado-sessoes'
 import { SimuladoManutencao } from '@/components/admin/simulado-manutencao'
@@ -30,6 +35,7 @@ import { isoParaBrtLocal } from '@/lib/brt'
 
 interface PageProps {
   params: Promise<{ id: string }>
+  searchParams: Promise<{ tab?: string }>
 }
 
 const statusConfig: Record<string, { label: string; class: string }> = {
@@ -38,16 +44,37 @@ const statusConfig: Record<string, { label: string; class: string }> = {
   encerrado: { label: 'Encerrado', class: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' },
 }
 
-export default async function SimuladoDetailPage({ params }: PageProps) {
+const ABAS = ['visao-geral', 'personalizar', 'questoes', 'caderno', 'hud', 'grupos', 'estudantes', 'sessoes', 'relatorio', 'recorrecao', 'acessos', 'manutencao', 'configuracoes'] as const
+
+/** Esqueleto exibido enquanto a aba (Suspense) carrega seus dados. */
+function AbaCarregando() {
+  return (
+    <div className="animate-pulse space-y-4 py-4">
+      <div className="flex items-center justify-between">
+        <div className="h-6 w-56 rounded-md bg-muted" />
+        <div className="h-9 w-40 rounded-lg bg-muted" />
+      </div>
+      <div className="h-10 w-full rounded-lg bg-muted/70" />
+      <div className="space-y-2 rounded-xl border p-3">
+        {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-10 w-full rounded-md bg-muted/60" />)}
+      </div>
+    </div>
+  )
+}
+
+export default async function SimuladoDetailPage({ params, searchParams }: PageProps) {
   const { id } = await params
+  const tabParam = (await searchParams).tab
+  const aba = (ABAS as readonly string[]).includes(tabParam ?? '') ? (tabParam as string) : 'visao-geral'
   const supabase = await createClient()
   const tenantId = await getCurrentTenantId()
+  const tid = tenantId ?? '00000000-0000-0000-0000-000000000000'
 
   const { data: simulado } = await supabase
     .from('simulado_simulados')
     .select('*')
     .eq('id', id)
-    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
+    .eq('tenant_id', tid)
     .maybeSingle()
 
   if (!simulado) {
@@ -88,6 +115,7 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
     email_telefone: 'E-mail + telefone',
   }
 
+  // Base (sempre): questões (p/ contagem + tipo + nomes de disciplina) e sessões (contagem + nota média).
   const [
     { data: questoes, count: totalQuestoes },
     { data: sessoes, count: totalSessoes },
@@ -102,69 +130,79 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
       .order('ordem'),
     supabase
       .from('simulado_sessoes_prova')
-      .select(`
-        id, status, nota, iniciado_em, finalizado_em, is_teste,
-        estudantes:simulado_estudantes(nome, user_id)
-      `, { count: 'exact' })
+      .select(`id, status, nota, iniciado_em, finalizado_em, is_teste`, { count: 'exact' })
       .eq('simulado_id', id)
       .eq('deletado', false)
       .order('iniciado_em', { ascending: false })
       .limit(50),
   ])
 
-
-  // Sessões da aba (todas, com nome do aluno) — renderizadas no servidor, sem spinner no client.
-  const sessoesTab = (await listarSessoesSimulado(id)).sessoes ?? []
-
-  // Tipo do simulado (objetiva/discursiva/mista) derivado das questões vinculadas.
   const tipoSim = tipoDoSimulado((questoes ?? []).map((sq: any) => sq.questoes?.tipo))
-
-  // Aba Questões consolidada: monta a linha rica da TABELA BASE (mesma do banco) a partir da PROVA.
-  // C/E vem das alternativas (não há coluna `formato` em toda base). Disciplinas p/ o filtro do pop-up.
-  const ceSet = new Set<string>()
-  const qids = (questoes ?? []).map((sq: any) => sq.questoes?.id).filter(Boolean) as string[]
-  const [alts, disciplinasFiltro] = await Promise.all([
-    qids.length ? fetchAllByIn<any>(qids, (chunk) => supabase.from('simulado_alternativas').select('questao_id, texto').in('questao_id', chunk)) : Promise.resolve([]),
-    listarDisciplinasFiltro(),
-  ])
-  {
-    const textos = new Map<string, string[]>()
-    for (const a of alts) { const arr = textos.get(a.questao_id) ?? []; arr.push(a.texto ?? ''); textos.set(a.questao_id, arr) }
-    for (const [qid, ts] of textos) if (alternativasSaoCertoErrado(ts)) ceSet.add(qid)
-  }
-  const questoesLinha: QuestaoLinha[] = (questoes ?? []).map((sq: any) => {
-    const q = sq.questoes ?? {}
-    return {
-      id: q.id, enunciado: q.enunciado ?? '', tipo: q.tipo ?? null,
-      formato: q.tipo === 'discursiva' ? null : (ceSet.has(q.id) ? 'certo_errado' : 'multipla'),
-      nivel_dificuldade: q.nivel_dificuldade ?? null, status: q.status ?? null,
-      disciplina: q.disciplinas?.nome ?? null, assunto: q.assuntos?.nome ?? null,
-      assuntoDetalhe: q.assunto_detalhe ?? null, banca: q.bancas?.nome ?? null, orgao: q.orgaos?.nome ?? null, ano: q.ano ?? null,
-    }
-  }).filter((q: QuestaoLinha) => q.id)
   const sessoesFinalizadas = sessoes?.filter((s) => s.status === 'finalizada') ?? []
   const notaMedia =
     sessoesFinalizadas.length > 0
       ? sessoesFinalizadas.reduce((acc, s) => acc + (s.nota ?? 0), 0) / sessoesFinalizadas.length
       : null
-
   const statusCfg = statusConfig[simulado.status] ?? statusConfig.rascunho
-
-  // ── Personalização: o visual (capa/cor/card) mora no banco container, resolvido por banco_base_id
-  // (consolidação "Banco dentro da Aplicação" — edita aqui, sem migração). cardView espelha o console.
-  const temaAdmin = ((await getCurrentTenant())?.tema as Record<string, unknown> | null) ?? {}
-  const cardView = resolverCardView((temaAdmin.card_view_admin ?? temaAdmin.card_view) as string | undefined)
   const bancoBaseId = (simulado.regras as { banco_base_id?: string } | null)?.banco_base_id ?? null
+
+  // ── Visual do banco container (capa/cor/card) — resolvido por banco_base_id. Só nas abas de conteúdo.
+  const abasConteudo = ['personalizar', 'questoes', 'caderno', 'hud', 'grupos']
   let bancoVisual: { id: string; cor: string | null; icone: string | null; capa_url: string | null; capa_card_url: string | null } | null = null
-  if (bancoBaseId) {
+  if (bancoBaseId && abasConteudo.includes(aba)) {
     const svcAdmin = createAdminClient()
-    const tid = tenantId ?? '00000000-0000-0000-0000-000000000000'
     const r = await svcAdmin.from('simulado_pastas').select('id, cor, icone, capa_url, capa_card_url, is_folder, deletado').eq('id', bancoBaseId).eq('tenant_id', tid).maybeSingle()
     let row: Record<string, any> | null = r.data as any
     if (r.error && /cor|icone|capa_url|capa_card_url|is_folder|deletado|column/i.test(r.error.message)) {
       row = (await svcAdmin.from('simulado_pastas').select('id').eq('id', bancoBaseId).eq('tenant_id', tid).maybeSingle()).data as any
     }
     if (row && !row.deletado && row.is_folder !== true) bancoVisual = { id: row.id, cor: row.cor ?? null, icone: row.icone ?? null, capa_url: row.capa_url ?? null, capa_card_url: row.capa_card_url ?? null }
+  }
+
+  // ── cardView (espelha o console) — só na aba Personalizar.
+  let cardView = resolverCardView(undefined)
+  if (aba === 'personalizar') {
+    const temaAdmin = (((await getCurrentTenant())?.tema as Record<string, unknown> | null) ?? {})
+    cardView = resolverCardView((temaAdmin.card_view_admin ?? temaAdmin.card_view) as string | undefined)
+  }
+
+  // ── Questões: linha rica da TABELA BASE (só na aba). C/E vem das alternativas.
+  let questoesLinha: QuestaoLinha[] = []
+  let disciplinasFiltro: { id: string; nome: string }[] = []
+  if (aba === 'questoes') {
+    const ceSet = new Set<string>()
+    const qids = (questoes ?? []).map((sq: any) => sq.questoes?.id).filter(Boolean) as string[]
+    const [alts, discs] = await Promise.all([
+      qids.length ? fetchAllByIn<any>(qids, (chunk) => supabase.from('simulado_alternativas').select('questao_id, texto').in('questao_id', chunk)) : Promise.resolve([]),
+      listarDisciplinasFiltro(),
+    ])
+    disciplinasFiltro = discs
+    const textos = new Map<string, string[]>()
+    for (const a of alts) { const arr = textos.get(a.questao_id) ?? []; arr.push(a.texto ?? ''); textos.set(a.questao_id, arr) }
+    for (const [qid, ts] of textos) if (alternativasSaoCertoErrado(ts)) ceSet.add(qid)
+    questoesLinha = (questoes ?? []).map((sq: any) => {
+      const q = sq.questoes ?? {}
+      return {
+        id: q.id, enunciado: q.enunciado ?? '', tipo: q.tipo ?? null,
+        formato: q.tipo === 'discursiva' ? null : (ceSet.has(q.id) ? 'certo_errado' : 'multipla'),
+        nivel_dificuldade: q.nivel_dificuldade ?? null, status: q.status ?? null,
+        disciplina: q.disciplinas?.nome ?? null, assunto: q.assuntos?.nome ?? null,
+        assuntoDetalhe: q.assunto_detalhe ?? null, banca: q.bancas?.nome ?? null, orgao: q.orgaos?.nome ?? null, ano: q.ano ?? null,
+      }
+    }).filter((q: QuestaoLinha) => q.id)
+  }
+
+  // ── Sessões (todas, com nome do aluno) — só na aba.
+  const sessoesTab = aba === 'sessoes' ? ((await listarSessoesSimulado(id)).sessoes ?? []) : []
+
+  // ── Grupos de disciplinas (armazenados no banco) — só na aba.
+  let gruposIniciais: GrupoBanco[] = []
+  let disciplinasGrupos: string[] = []
+  if (aba === 'grupos' && bancoBaseId) {
+    const svcAdmin = createAdminClient()
+    const { data: gRow } = await svcAdmin.from('simulado_pastas').select('grupos').eq('id', bancoBaseId).eq('tenant_id', tid).maybeSingle()
+    gruposIniciais = Array.isArray((gRow as any)?.grupos) ? (gRow as any).grupos as GrupoBanco[] : []
+    disciplinasGrupos = [...new Set((questoes ?? []).map((sq: any) => sq.questoes?.disciplinas?.nome).filter(Boolean))] as string[]
   }
 
   function formatDate(date: string | null) {
@@ -190,8 +228,12 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
     regras: simulado.regras ?? undefined,
   }
 
+  const semBancoCTA = (o: string) => (
+    <PrepararConteudoSimulado simuladoId={id} descricao={o} />
+  )
+
   return (
-    <Tabs defaultValue="visao-geral">
+    <BancoTabsShell value={aba}>
       {/* Cabeçalho + abas — fixos no topo ao rolar o conteúdo */}
       <div className="sticky -top-6 z-40 -mx-6 -mt-6 space-y-3 border-b bg-background px-6 pb-3 pt-6 shadow-sm">
         <div className="flex items-start justify-between">
@@ -214,11 +256,14 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
           <SimuladoActions simuladoId={id} status={simulado.status} />
         </div>
 
-        <div className="flex items-center justify-between">
-          <TabsList>
+        <div className="flex items-center justify-between gap-3">
+          <TabsList className="h-auto flex-wrap">
             <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
             <TabsTrigger value="personalizar">Personalizar</TabsTrigger>
             <TabsTrigger value="questoes">Questões ({totalQuestoes ?? 0})</TabsTrigger>
+            <TabsTrigger value="caderno">Caderno</TabsTrigger>
+            <TabsTrigger value="hud">HUD</TabsTrigger>
+            <TabsTrigger value="grupos">Grupos</TabsTrigger>
             <TabsTrigger value="estudantes">Estudantes</TabsTrigger>
             <TabsTrigger value="sessoes">Sessões ({totalSessoes ?? 0})</TabsTrigger>
             <TabsTrigger value="relatorio">Relatório</TabsTrigger>
@@ -227,7 +272,7 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
             <TabsTrigger value="manutencao">Manutenção</TabsTrigger>
             <TabsTrigger value="configuracoes">Configurações</TabsTrigger>
           </TabsList>
-          <Link href={`/admin/simulados/${id}/embed`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
+          <Link href={`/admin/simulados/${id}/embed`} className={buttonVariants({ variant: 'outline', size: 'sm' }) + ' shrink-0'}>
             <Code className="mr-2 h-3.5 w-3.5" />
             Embed
           </Link>
@@ -367,7 +412,7 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
 
         {/* Personalizar — capa/cor/card do simulado (opera no banco container) */}
         <TabsContent value="personalizar">
-          {bancoVisual ? (
+          {aba === 'personalizar' && (bancoVisual ? (
             <BancoPersonalizar
               banco={{ id: bancoVisual.id, nome: simulado.titulo, cor: bancoVisual.cor, icone: bancoVisual.icone, capa_url: bancoVisual.capa_url, capa_card_url: bancoVisual.capa_card_url, total: totalQuestoes ?? 0 }}
               cardView={cardView}
@@ -376,72 +421,102 @@ export default async function SimuladoDetailPage({ params }: PageProps) {
               badge="Simulado"
               mostrarNome={false}
             />
-          ) : (
-            <PrepararConteudoSimulado simuladoId={id} descricao="Este simulado ainda não tem um espaço de conteúdo próprio. Prepare-o para editar a capa, a cor e a imagem do card aqui mesmo." />
-          )}
+          ) : semBancoCTA('Este simulado ainda não tem um espaço de conteúdo próprio. Prepare-o para editar a capa, a cor e a imagem do card aqui mesmo.'))}
         </TabsContent>
 
         {/* Questões — tabela rica com filtros/reordenar/adicionar/importar (opera na prova) */}
         <TabsContent value="questoes" className="space-y-4">
-          <SimuladoQuestoesTable
-            simuladoId={id}
-            bancoId={bancoBaseId}
-            questoes={questoesLinha}
-            disciplinas={disciplinasFiltro}
-            cor={(bancoVisual?.cor ?? undefined) as string | undefined}
-          />
+          {aba === 'questoes' && (
+            <SimuladoQuestoesTable
+              simuladoId={id}
+              bancoId={bancoBaseId}
+              questoes={questoesLinha}
+              disciplinas={disciplinasFiltro}
+              cor={bancoVisual?.cor ?? undefined}
+            />
+          )}
+        </TabsContent>
+
+        {/* Caderno — folha/enunciado/gabarito de entrega (opera no banco container) */}
+        <TabsContent value="caderno">
+          {aba === 'caderno' && (bancoBaseId ? (
+            <Suspense fallback={<AbaCarregando />}>
+              <BancoCadernoTeste bancoId={bancoBaseId} cor={bancoVisual?.cor ?? undefined} />
+            </Suspense>
+          ) : semBancoCTA('Este simulado ainda não tem um espaço de conteúdo próprio. Prepare-o para montar a folha de respostas e os cadernos aqui mesmo.'))}
+        </TabsContent>
+
+        {/* HUD — tema visual da prova (opera no banco container) */}
+        <TabsContent value="hud">
+          {aba === 'hud' && (bancoBaseId ? (
+            <Suspense fallback={<AbaCarregando />}>
+              <BancoHud bancoId={bancoBaseId} cor={bancoVisual?.cor ?? undefined} />
+            </Suspense>
+          ) : semBancoCTA('Este simulado ainda não tem um espaço de conteúdo próprio. Prepare-o para configurar o HUD da prova aqui mesmo.'))}
+        </TabsContent>
+
+        {/* Grupos de disciplinas (usados nos relatórios por grupo) */}
+        <TabsContent value="grupos">
+          {aba === 'grupos' && (bancoBaseId ? (
+            <BancoGrupos bancoId={bancoBaseId} disciplinas={disciplinasGrupos} gruposIniciais={gruposIniciais} cor={bancoVisual?.cor ?? undefined} />
+          ) : semBancoCTA('Este simulado ainda não tem um espaço de conteúdo próprio. Prepare-o para agrupar as disciplinas aqui mesmo.'))}
         </TabsContent>
 
         {/* Estudantes linkados (matriculados) */}
         <TabsContent value="estudantes">
-          <Card>
-            <CardHeader>
-              <CardTitle>Estudantes do Simulado</CardTitle>
-              <CardDescription>Todos os estudantes matriculados (linkados) neste simulado, com busca, filtros e ordenação.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <SimuladoEstudantes simuladoId={id} acessoGratuitoInicial={!!(simulado.regras as { acesso_gratuito?: boolean } | null)?.acesso_gratuito} />
-            </CardContent>
-          </Card>
+          {aba === 'estudantes' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Estudantes do Simulado</CardTitle>
+                <CardDescription>Todos os estudantes matriculados (linkados) neste simulado, com busca, filtros e ordenação.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <SimuladoEstudantes simuladoId={id} acessoGratuitoInicial={!!(simulado.regras as { acesso_gratuito?: boolean } | null)?.acesso_gratuito} />
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         {/* Sessões */}
         <TabsContent value="sessoes">
-          <Card>
-            <CardHeader>
-              <CardTitle>Sessões de Prova</CardTitle>
-              <CardDescription>Todas as sessões deste simulado, com busca, filtros e ordenação.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <SimuladoSessoes sessoes={sessoesTab} />
-            </CardContent>
-          </Card>
+          {aba === 'sessoes' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Sessões de Prova</CardTitle>
+                <CardDescription>Todas as sessões deste simulado, com busca, filtros e ordenação.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <SimuladoSessoes sessoes={sessoesTab} />
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
-        {/* Configurações */}
         <TabsContent value="relatorio">
-          <SimuladoRelatorio simuladoId={id} />
+          {aba === 'relatorio' && <SimuladoRelatorio simuladoId={id} />}
         </TabsContent>
 
         <TabsContent value="recorrecao">
-          <SimuladoRecorrecao simuladoId={id} />
+          {aba === 'recorrecao' && <SimuladoRecorrecao simuladoId={id} />}
         </TabsContent>
 
         <TabsContent value="acessos">
-          <SimuladoAcessos simuladoId={id} modoAplicacao={simulado.modo_aplicacao} />
+          {aba === 'acessos' && <SimuladoAcessos simuladoId={id} modoAplicacao={simulado.modo_aplicacao} />}
         </TabsContent>
 
         <TabsContent value="manutencao">
-          <SimuladoManutencao simuladoId={id} inicial={(simulado.regras as any)?.manutencao ?? null} />
+          {aba === 'manutencao' && <SimuladoManutencao simuladoId={id} inicial={(simulado.regras as any)?.manutencao ?? null} />}
         </TabsContent>
 
         <TabsContent value="configuracoes">
-          <SimuladoForm
-            initialData={initialFormData as any}
-            onSubmit={updateSimuladoAction.bind(null, id)}
-          />
+          {aba === 'configuracoes' && (
+            <SimuladoForm
+              initialData={initialFormData as any}
+              onSubmit={updateSimuladoAction.bind(null, id)}
+            />
+          )}
         </TabsContent>
       </div>
-    </Tabs>
+    </BancoTabsShell>
   )
 }
