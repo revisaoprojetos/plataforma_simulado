@@ -255,7 +255,7 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
       <DropdownMenuSeparator />
       <DropdownMenuItem onClick={() => router.push(`/admin/simulados/${s.id}/ao-vivo`)}><Radio className="mr-2 h-4 w-4" /> Ao vivo (online/progresso)</DropdownMenuItem>
       <DropdownMenuItem onClick={() => router.push(detalhe)}><Pencil className="mr-2 h-4 w-4" /> Editar</DropdownMenuItem>
-      <DropdownMenuItem render={<Link href={`/admin/simulados/${s.id}?tab=personalizar`} />}><Palette className="mr-2 h-4 w-4" /> Personalizar</DropdownMenuItem>
+      <DropdownMenuItem render={<Link href={`/admin/simulados/${s.id}?tab=configuracoes`} />}><Palette className="mr-2 h-4 w-4" /> Personalizar</DropdownMenuItem>
       <DropdownMenuItem onClick={() => router.push(detalhe)}><Trophy className="mr-2 h-4 w-4" /> Ranking</DropdownMenuItem>
       <DropdownMenuSeparator />
       <DropdownMenuItem onClick={copiarLink}><Copy className="mr-2 h-4 w-4" /> Copiar link</DropdownMenuItem>

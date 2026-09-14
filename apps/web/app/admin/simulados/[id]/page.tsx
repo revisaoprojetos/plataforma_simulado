@@ -9,24 +9,20 @@ import { PrepararConteudoSimulado } from '@/components/admin/preparar-conteudo-s
 import { BancoTabsShell } from '@/components/admin/banco-tabs-shell'
 import { BancoCadernoTeste } from '@/components/admin/banco-caderno-teste'
 import { BancoHud } from '@/components/admin/banco-hud'
-import { BancoGrupos } from '@/components/admin/banco-grupos'
 import { TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { SimuladoForm } from '@/components/admin/simulado-form'
 import { SimuladoActions } from '@/components/admin/simulado-actions'
 import { SimuladoQuestoesTable } from '@/components/admin/simulado-questoes-table'
 import { type QuestaoLinha } from '@/components/admin/questoes-tabela-base'
-import { listarDisciplinasFiltro, type GrupoBanco } from '@/app/admin/banco-questoes/actions'
+import { listarDisciplinasFiltro } from '@/app/admin/banco-questoes/actions'
 import { simuladosDoBanco } from '@/lib/simulado/banco-do-simulado'
 import { SimuladoEstudantes } from '@/components/admin/simulado-estudantes'
-import { SimuladoSessoes } from '@/components/admin/simulado-sessoes'
 import { SimuladoManutencao } from '@/components/admin/simulado-manutencao'
 import { SimuladoRelatorio } from '@/components/admin/simulado-relatorio'
-import { SimuladoRecorrecao } from '@/components/admin/simulado-recorrecao'
-import { SimuladoAcessos } from '@/components/admin/simulado-acessos'
 import { SimuladoLiberacoes } from '@/components/admin/simulado-liberacoes'
 import { CopyLink } from '@/components/admin/copy-link'
-import { updateSimuladoAction, listarSessoesSimulado } from '../actions'
+import { updateSimuladoAction } from '../actions'
 import Link from 'next/link'
 import { ChevronLeft, Code, Layers, CalendarClock, Clock, KeyRound, Link2, AlertTriangle } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
@@ -45,7 +41,7 @@ const statusConfig: Record<string, { label: string; class: string }> = {
   encerrado: { label: 'Encerrado', class: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' },
 }
 
-const ABAS = ['visao-geral', 'personalizar', 'questoes', 'caderno', 'hud', 'grupos', 'estudantes', 'sessoes', 'relatorio', 'recorrecao', 'acessos', 'manutencao', 'configuracoes'] as const
+const ABAS = ['visao-geral', 'questoes', 'estudantes', 'caderno', 'hud', 'relatorio', 'manutencao', 'configuracoes'] as const
 
 /** Esqueleto exibido enquanto a aba (Suspense) carrega seus dados. */
 function AbaCarregando() {
@@ -116,7 +112,7 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
     email_telefone: 'E-mail + telefone',
   }
 
-  // Base (sempre): questões (p/ tipo + nomes de disciplina) e sessões (contagem + nota média).
+  // Base (sempre): questões (p/ tipo + nomes de disciplina) e sessões (contagem + nota média p/ a Visão Geral).
   // fetchAll nas questões para NÃO truncar em 1000 numa prova grande; a contagem vem por head count.
   const [questoes, { count: totalQuestoes }, { data: sessoes, count: totalSessoes }] = await Promise.all([
     fetchAll<any>(() =>
@@ -152,35 +148,27 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
   const statusCfg = statusConfig[simulado.status] ?? statusConfig.rascunho
   const bancoBaseId = (simulado.regras as { banco_base_id?: string } | null)?.banco_base_id ?? null
 
-  // ── Visual do banco container (capa/cor/card) — resolvido por banco_base_id. Só nas abas de conteúdo.
-  // Na aba Grupos, traz também `grupos` na MESMA query (evita 2ª round-trip à mesma linha).
-  const abasConteudo = ['personalizar', 'questoes', 'caderno', 'hud', 'grupos']
+  // ── Visual do banco container (capa/cor/card) — resolvido por banco_base_id. Só nas abas de conteúdo
+  // (Questões/Caderno/HUD/Configurações — a personalização vive em Configurações).
+  const abasConteudo = ['questoes', 'caderno', 'hud', 'configuracoes']
   let bancoVisual: { id: string; cor: string | null; icone: string | null; capa_url: string | null; capa_card_url: string | null } | null = null
-  let gruposIniciais: GrupoBanco[] = []
-  let disciplinasGrupos: string[] = []
   // Salvaguarda D1: normalmente o banco é 1:1 com o simulado. Se ele alimentar >1 simulado, editar o
-  // CONTEÚDO aqui (questões/caderno/HUD/grupos/visual) afeta todos → avisa nas abas de conteúdo.
+  // CONTEÚDO aqui (questões/caderno/HUD/capa) afeta todos → avisa nas abas de conteúdo.
   let bancoCompartilhadoN = 1
   if (bancoBaseId && abasConteudo.includes(aba)) {
     const svcAdmin = createAdminClient()
-    const colsBase = 'id, cor, icone, capa_url, capa_card_url, is_folder, deletado'
-    const cols = aba === 'grupos' ? `${colsBase}, grupos` : colsBase
-    const r = await svcAdmin.from('simulado_pastas').select(cols).eq('id', bancoBaseId).eq('tenant_id', tid).maybeSingle()
+    const r = await svcAdmin.from('simulado_pastas').select('id, cor, icone, capa_url, capa_card_url, is_folder, deletado').eq('id', bancoBaseId).eq('tenant_id', tid).maybeSingle()
     let row: Record<string, any> | null = r.data as any
-    if (r.error && /cor|icone|capa_url|capa_card_url|is_folder|deletado|grupos|column/i.test(r.error.message)) {
+    if (r.error && /cor|icone|capa_url|capa_card_url|is_folder|deletado|column/i.test(r.error.message)) {
       row = (await svcAdmin.from('simulado_pastas').select('id').eq('id', bancoBaseId).eq('tenant_id', tid).maybeSingle()).data as any
     }
     if (row && !row.deletado && row.is_folder !== true) bancoVisual = { id: row.id, cor: row.cor ?? null, icone: row.icone ?? null, capa_url: row.capa_url ?? null, capa_card_url: row.capa_card_url ?? null }
     if (tenantId) bancoCompartilhadoN = (await simuladosDoBanco(svcAdmin, tenantId, bancoBaseId)).length || 1
-    if (aba === 'grupos') {
-      gruposIniciais = Array.isArray((row as any)?.grupos) ? (row as any).grupos as GrupoBanco[] : []
-      disciplinasGrupos = [...new Set((questoes ?? []).map((sq: any) => sq.questoes?.disciplinas?.nome).filter(Boolean))] as string[]
-    }
   }
 
-  // ── cardView (espelha o console) — só na aba Personalizar.
+  // ── cardView (espelha o console) — a personalização (capa/card) vive em Configurações.
   let cardView = resolverCardView(undefined)
-  if (aba === 'personalizar') {
+  if (aba === 'configuracoes') {
     const temaAdmin = (((await getCurrentTenant())?.tema as Record<string, unknown> | null) ?? {})
     cardView = resolverCardView((temaAdmin.card_view_admin ?? temaAdmin.card_view) as string | undefined)
   }
@@ -210,9 +198,6 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
       }
     }).filter((q: QuestaoLinha) => q.id)
   }
-
-  // ── Sessões (todas, com nome do aluno) — só na aba.
-  const sessoesTab = aba === 'sessoes' ? ((await listarSessoesSimulado(id)).sessoes ?? []) : []
 
   function formatDate(date: string | null) {
     if (!date) return '—'
@@ -268,16 +253,11 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
         <div className="flex items-center justify-between gap-3">
           <TabsList className="max-w-full flex-nowrap overflow-x-auto">
             <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
-            <TabsTrigger value="personalizar">Personalizar</TabsTrigger>
             <TabsTrigger value="questoes">Questões ({totalQuestoes ?? 0})</TabsTrigger>
+            <TabsTrigger value="estudantes">Estudantes</TabsTrigger>
             <TabsTrigger value="caderno">Caderno</TabsTrigger>
             <TabsTrigger value="hud">HUD</TabsTrigger>
-            <TabsTrigger value="grupos">Grupos</TabsTrigger>
-            <TabsTrigger value="estudantes">Estudantes</TabsTrigger>
-            <TabsTrigger value="sessoes">Sessões ({totalSessoes ?? 0})</TabsTrigger>
             <TabsTrigger value="relatorio">Relatório</TabsTrigger>
-            <TabsTrigger value="recorrecao">Re-correção</TabsTrigger>
-            <TabsTrigger value="acessos">Acessos</TabsTrigger>
             <TabsTrigger value="manutencao">Manutenção</TabsTrigger>
             <TabsTrigger value="configuracoes">Configurações</TabsTrigger>
           </TabsList>
@@ -293,7 +273,7 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
         {bancoCompartilhadoN > 1 && abasConteudo.includes(aba) && (
           <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-            <span>Este conteúdo é <strong>compartilhado com {bancoCompartilhadoN} simulados</strong>. Editar questões, caderno, HUD, grupos ou capa aqui afeta <strong>todos</strong> eles. Para mudar só este, será preciso desmembrá-lo (em breve).</span>
+            <span>Este conteúdo é <strong>compartilhado com {bancoCompartilhadoN} simulados</strong>. Editar questões, caderno, HUD ou a capa aqui afeta <strong>todos</strong> eles. Para mudar só este, será preciso desmembrá-lo (em breve).</span>
           </div>
         )}
 
@@ -427,20 +407,6 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
           </Card>
         </TabsContent>
 
-        {/* Personalizar — capa/cor/card do simulado (opera no banco container) */}
-        <TabsContent value="personalizar">
-          {aba === 'personalizar' && (bancoVisual ? (
-            <BancoPersonalizar
-              banco={{ id: bancoVisual.id, nome: simulado.titulo, cor: bancoVisual.cor, icone: bancoVisual.icone, capa_url: bancoVisual.capa_url, capa_card_url: bancoVisual.capa_card_url, total: totalQuestoes ?? 0 }}
-              cardView={cardView}
-              titulo="Personalizar simulado"
-              subtitulo="Capa, cor e imagem do card do simulado"
-              badge="Simulado"
-              mostrarNome={false}
-            />
-          ) : semBancoCTA('Este simulado ainda não tem um espaço de conteúdo próprio. Prepare-o para editar a capa, a cor e a imagem do card aqui mesmo.'))}
-        </TabsContent>
-
         {/* Questões — tabela rica com filtros/reordenar/adicionar/importar (opera na prova) */}
         <TabsContent value="questoes" className="space-y-4">
           {aba === 'questoes' && (
@@ -451,6 +417,21 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
               disciplinas={disciplinasFiltro}
               cor={bancoVisual?.cor ?? undefined}
             />
+          )}
+        </TabsContent>
+
+        {/* Estudantes linkados (matriculados) + adicionar aluno/turma */}
+        <TabsContent value="estudantes">
+          {aba === 'estudantes' && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Estudantes do Simulado</CardTitle>
+                <CardDescription>Todos os estudantes matriculados (linkados) neste simulado, com busca, filtros e ordenação.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <SimuladoEstudantes simuladoId={id} acessoGratuitoInicial={!!(simulado.regras as { acesso_gratuito?: boolean } | null)?.acesso_gratuito} bancoBaseId={bancoBaseId} />
+              </CardContent>
+            </Card>
           )}
         </TabsContent>
 
@@ -472,65 +453,36 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
           ) : semBancoCTA('Este simulado ainda não tem um espaço de conteúdo próprio. Prepare-o para configurar o HUD da prova aqui mesmo.'))}
         </TabsContent>
 
-        {/* Grupos de disciplinas (usados nos relatórios por grupo) */}
-        <TabsContent value="grupos">
-          {aba === 'grupos' && (bancoBaseId ? (
-            <BancoGrupos bancoId={bancoBaseId} disciplinas={disciplinasGrupos} gruposIniciais={gruposIniciais} cor={bancoVisual?.cor ?? undefined} subtitulo="Agrupe as disciplinas do simulado — salvas automaticamente." textoVazio="O simulado ainda não tem disciplinas." />
-          ) : semBancoCTA('Este simulado ainda não tem um espaço de conteúdo próprio. Prepare-o para agrupar as disciplinas aqui mesmo.'))}
-        </TabsContent>
-
-        {/* Estudantes linkados (matriculados) */}
-        <TabsContent value="estudantes">
-          {aba === 'estudantes' && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Estudantes do Simulado</CardTitle>
-                <CardDescription>Todos os estudantes matriculados (linkados) neste simulado, com busca, filtros e ordenação.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <SimuladoEstudantes simuladoId={id} acessoGratuitoInicial={!!(simulado.regras as { acesso_gratuito?: boolean } | null)?.acesso_gratuito} bancoBaseId={bancoBaseId} />
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
-        {/* Sessões */}
-        <TabsContent value="sessoes">
-          {aba === 'sessoes' && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Sessões de Prova</CardTitle>
-                <CardDescription>Todas as sessões deste simulado, com busca, filtros e ordenação.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <SimuladoSessoes sessoes={sessoesTab} />
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-
+        {/* Relatório — desempenho, sessões e estatísticas do simulado */}
         <TabsContent value="relatorio">
           {aba === 'relatorio' && <SimuladoRelatorio simuladoId={id} />}
         </TabsContent>
 
-        <TabsContent value="recorrecao">
-          {aba === 'recorrecao' && <SimuladoRecorrecao simuladoId={id} />}
-        </TabsContent>
-
-        <TabsContent value="acessos">
-          {aba === 'acessos' && <SimuladoAcessos simuladoId={id} modoAplicacao={simulado.modo_aplicacao} />}
-        </TabsContent>
-
+        {/* Manutenção — bloquear o simulado num período */}
         <TabsContent value="manutencao">
           {aba === 'manutencao' && <SimuladoManutencao simuladoId={id} inicial={(simulado.regras as any)?.manutencao ?? null} />}
         </TabsContent>
 
-        <TabsContent value="configuracoes">
+        {/* Configurações — personalização (capa/cor/card) + título/modo/datas/regras */}
+        <TabsContent value="configuracoes" className="space-y-6">
           {aba === 'configuracoes' && (
-            <SimuladoForm
-              initialData={initialFormData as any}
-              onSubmit={updateSimuladoAction.bind(null, id)}
-            />
+            <>
+              {bancoVisual ? (
+                <BancoPersonalizar
+                  banco={{ id: bancoVisual.id, nome: simulado.titulo, cor: bancoVisual.cor, icone: bancoVisual.icone, capa_url: bancoVisual.capa_url, capa_card_url: bancoVisual.capa_card_url, total: totalQuestoes ?? 0 }}
+                  cardView={cardView}
+                  titulo="Personalizar simulado"
+                  subtitulo="Capa, cor e imagem do card do simulado"
+                  badge="Simulado"
+                  mostrarNome={false}
+                />
+              ) : semBancoCTA('Este simulado ainda não tem um espaço de conteúdo próprio. Prepare-o para editar a capa, a cor e a imagem do card aqui mesmo.')}
+
+              <SimuladoForm
+                initialData={initialFormData as any}
+                onSubmit={updateSimuladoAction.bind(null, id)}
+              />
+            </>
           )}
         </TabsContent>
       </div>
