@@ -3,7 +3,6 @@ import { Library, ArrowLeft, Home, ChevronRight } from 'lucide-react'
 import { listarBancoAulas } from './actions'
 import { BancoAulasGrid, type ModuloTab } from '@/components/admin/banco-aulas-grid'
 import { ModuloTabsBar } from '@/components/admin/modulo-tabs-bar'
-import { ModuloBanner } from '@/components/admin/modulo-banner'
 import { PublicarModuloBotao } from '@/components/admin/publicar-modulo-botao'
 import { getCurrentTenant } from '@/lib/tenant'
 import { resolverCardView } from '@/lib/card-view'
@@ -25,11 +24,16 @@ export default async function LeituraAdminPage({ searchParams }: { searchParams:
   return (
     <div className={banner ? 'space-y-2' : 'space-y-3'}>
       {banner ? (
-        // ===== TOPO com o BANNER do módulo — sticky + colapsável no scroll (ModuloBanner). =====
-        <ModuloBanner
-          banner={banner}
-          topo={
-            <>
+        // ===== BANNER do módulo (edge-to-edge) — CSS puro, sem JS de scroll (sem flicker). =====
+        // O HERO (imagem + título) rola normalmente para cima; a BARRA DE TABS fica sticky no topo
+        // (altura fixa → nada anima em loop). -mx-6/-mt-6 cancelam o padding do <main class="p-6">.
+        <div className="-mx-6 -mt-6">
+          <div className="relative min-h-[13rem] overflow-hidden bg-neutral-950">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={banner} alt="" className="absolute inset-0 h-full w-full object-cover object-center" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/15" />
+            {/* pb-16 reserva espaço p/ a barra de tabs que se sobrepõe (-mt-12) na base do hero. */}
+            <div className="relative px-6 pb-16 pt-4 text-white">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex items-start gap-2">
                   <Link href="/admin/leitura" aria-label="Voltar aos módulos" title="Voltar aos módulos" className="mt-1 inline-flex shrink-0 items-center justify-center rounded-lg border border-white/25 bg-white/15 p-2 text-white shadow-sm backdrop-blur transition-colors hover:bg-white/25">
@@ -55,10 +59,14 @@ export default async function LeituraAdminPage({ searchParams }: { searchParams:
                   </span>
                 ))}
               </div>
-            </>
-          }
-          tabs={<ModuloTabsBar pastaAtual={pasta!} moduloTab={moduloTab} claro />}
-        />
+            </div>
+          </div>
+          {/* BARRA DE TABS — sticky no topo do <main> (flush via -top-6). Sobrepõe a base do hero
+              (-mt-12) e, ao rolar, o hero sobe atrás; a barra fica fixa com fundo fosco. */}
+          <div className="sticky -top-6 z-30 -mt-12 border-b border-white/10 bg-black/45 px-6 py-1 backdrop-blur-md">
+            <ModuloTabsBar pastaAtual={pasta!} moduloTab={moduloTab} claro />
+          </div>
+        </div>
       ) : (
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-start gap-2">
