@@ -33,10 +33,12 @@ export function BancoTabsShell({ value, children, prefetch }: { value: string; c
 
   return (
     <>
-      {/* Barra de progresso durante a troca de aba (feedback imediato até o conteúdo novo chegar). */}
+      {/* Barra de progresso na troca de aba: MESMA "linha que passa" do loader de rota (loading-bar) e
+          com loader-atrasado (fica invisível por ~400ms) → em troca rápida/prefetchada não pisca; só
+          aparece, suave, quando demora. */}
       {pending && (
-        <div className="fixed inset-x-0 top-0 z-[60] h-0.5 overflow-hidden bg-primary/15" aria-hidden>
-          <div className="h-full w-1/3 bg-primary" style={{ animation: 'barra-carregando 1s ease-in-out infinite' }} />
+        <div className="loader-atrasado fixed inset-x-0 top-0 z-[60] h-0.5 overflow-hidden bg-primary/15" aria-hidden>
+          <div className="loading-bar-fill h-full bg-primary" />
         </div>
       )}
       <Tabs
