@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { CadernoTesteBuilder } from '@/components/admin/caderno-teste/builder'
 import { normalizarBuilder, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
+import { simuladosDoBanco } from '@/lib/simulado/banco-do-simulado'
 import { previewQuestoesBanco, dadosBancoTeste } from '../actions'
 
 export const dynamic = 'force-dynamic'
@@ -38,13 +39,21 @@ export default async function CadernoTesteEditorPage({ params, searchParams }: {
   let questoes: PreviewQuestao[] = []
   let registros: any[] = []
   let disciplinas: any[] = []
+  // Consolidação: o caderno vive no banco container 1:1 do simulado → "Voltar" retorna para a aba
+  // Caderno do SIMULADO dono (não para a área Banco). Resolve o simulado pelo banco_base_id.
+  let voltarHref: string | undefined
   if (builder.bancoId) {
-    const [rq, rd] = await Promise.all([previewQuestoesBanco(builder.bancoId), dadosBancoTeste(builder.bancoId)])
+    const [rq, rd, sims] = await Promise.all([
+      previewQuestoesBanco(builder.bancoId),
+      dadosBancoTeste(builder.bancoId),
+      access.tenantId ? simuladosDoBanco(svc, access.tenantId, builder.bancoId) : Promise.resolve([] as string[]),
+    ])
     questoes = rq.questoes ?? []
     if (rd.ok) { registros = rd.registros; disciplinas = rd.disciplinas }
+    if (sims[0]) voltarHref = `/admin/simulados/${sims[0]}?tab=caderno`
   }
 
   return (
-    <CadernoTesteBuilder cadernoId={caderno.id} builderInicial={builder} bancos={(bancos ?? []) as { id: string; nome: string }[]} questoesIniciais={questoes} registrosIniciais={registros} disciplinasIniciais={disciplinas} />
+    <CadernoTesteBuilder cadernoId={caderno.id} builderInicial={builder} bancos={(bancos ?? []) as { id: string; nome: string }[]} questoesIniciais={questoes} registrosIniciais={registros} disciplinasIniciais={disciplinas} voltarHref={voltarHref} />
   )
 }

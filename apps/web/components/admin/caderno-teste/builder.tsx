@@ -87,7 +87,7 @@ export function CadernoTesteBuilder(props: Parameters<typeof CadernoTesteBuilder
   return <EditorBoundary><CadernoTesteBuilderBase {...props} /></EditorBoundary>
 }
 
-function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIniciais, registrosIniciais = [], disciplinasIniciais = [], abrirPickerInicial = false }: {
+function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIniciais, registrosIniciais = [], disciplinasIniciais = [], abrirPickerInicial = false, voltarHref: voltarHrefProp }: {
   cadernoId: string
   builderInicial: BuilderV3
   bancos: BancoOpcao[]
@@ -95,6 +95,8 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
   registrosIniciais?: RegistroTeste[]
   disciplinasIniciais?: DiscBancoTeste[]
   abrirPickerInicial?: boolean
+  /** Destino do botão "Voltar" (default = aba Caderno do banco). A Aplicação passa a aba do simulado. */
+  voltarHref?: string
 }) {
   // Histórico p/ desfazer/refazer (igual ao v1): `builder` = entrada atual da pilha.
   const histRef = useRef<BuilderV3[]>([builderInicial])
@@ -147,10 +149,9 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
   const [pending, start] = useTransition()
   const { ref, zoom } = useZoomAjustado()
   const router = useRouter()
-  // Voltar SEMPRE para o banco a que este caderno pertence (aba "Caderno"). Cadernos só existem
-  // dentro de um banco — a lista standalone /admin/cadernos-teste não é destino. Sem banco (caso
-  // raro/órfão), cai na lista de bancos.
-  const voltarHref = builder.bancoId ? `/admin/banco-questoes/${builder.bancoId}?tab=caderno-teste` : '/admin/banco-questoes'
+  // Voltar para a aba "Caderno" de onde veio: a Aplicação passa a aba do SIMULADO dono (consolidação);
+  // sem override, cai no editor interno do banco (cadernos só existem dentro de um banco).
+  const voltarHref = voltarHrefProp ?? (builder.bancoId ? `/admin/banco-questoes/${builder.bancoId}?tab=caderno-teste` : '/admin/banco-questoes')
   // "Salvo × não salvo": salvoRef guarda o último builder persistido. A comparação por referência
   // casa com o histórico de undo/redo e evita perda silenciosa de edições ao sair do editor.
   const salvoRef = useRef<BuilderV3>(builderInicial)
