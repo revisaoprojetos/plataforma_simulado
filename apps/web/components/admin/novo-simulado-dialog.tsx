@@ -36,9 +36,11 @@ export function NovoSimuladoDialog({ trigger, origem = 'aplicacao' }: { trigger:
     startTransition(() => router.push(destino))
   }
 
+  // "Gerar simulado" é a porta PRINCIPAL (do zero, em etapas). Reaproveitar questões/estudantes de um
+  // simulado já pronto é a opção secundária — sem expor a antiga área "Banco" como conceito separado.
   const OPCOES = [
-    { key: 'banco' as const, icon: Library, titulo: 'Criar com um banco existente', desc: 'Aproveite um banco já pronto (questões e estudantes) e configure a aplicação.', cta: 'Continuar', destino: '/admin/simulados/novo', limpar: false },
-    { key: 'novo' as const, icon: FilePlus2, titulo: 'Gerar simulado', desc: 'Monte do zero em etapas: personalização, questões, cadernos, estudantes e regras.', cta: 'Começar', destino: `/admin/simulados/criar/personalizar?de=${origem}`, limpar: true },
+    { key: 'novo' as const, icon: FilePlus2, titulo: 'Criar novo simulado', desc: 'Monte em etapas: personalização, questões, cadernos, estudantes e regras.', cta: 'Começar', destino: `/admin/simulados/criar/personalizar?de=${origem}`, limpar: true },
+    { key: 'banco' as const, icon: Library, titulo: 'A partir de um já pronto', desc: 'Reaproveite as questões e os estudantes de um simulado existente e configure a nova aplicação.', cta: 'Continuar', destino: '/admin/simulados/novo', limpar: false },
   ]
 
   return (
@@ -61,7 +63,7 @@ export function NovoSimuladoDialog({ trigger, origem = 'aplicacao' }: { trigger:
             </span>
             <div className="space-y-0.5">
               <p className="text-sm font-semibold">Preparando…</p>
-              <p className="text-xs text-muted-foreground">{carregando === 'banco' ? 'Abrindo a criação com banco existente.' : 'Abrindo o gerador de simulado.'}</p>
+              <p className="text-xs text-muted-foreground">{carregando === 'banco' ? 'Abrindo a criação a partir de um simulado pronto.' : 'Abrindo o gerador de simulado.'}</p>
             </div>
           </div>
         ) : (
