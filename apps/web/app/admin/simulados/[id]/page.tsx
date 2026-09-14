@@ -226,7 +226,9 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
   )
 
   return (
-    <BancoTabsShell value={aba} prefetch={[...ABAS]}>
+    // Pré-carrega as abas no acesso p/ troca instantânea — EXCETO 'relatorio' (pesado: varreria as
+    // respostas em todo acesso, aumentando egress). O Relatório carrega sob demanda (com Suspense).
+    <BancoTabsShell value={aba} prefetch={ABAS.filter((t) => t !== 'relatorio')}>
       {/* Cabeçalho + abas — fixos no topo ao rolar o conteúdo. A linha do TabsList é a própria
           divisória (largura cheia); as abas ficam "no corte", como na área de questões. */}
       <div className="sticky -top-6 z-40 -mx-6 -mt-6 space-y-3 bg-background px-6 pt-6 shadow-sm">
@@ -448,9 +450,14 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
           ) : semBancoCTA('Este simulado ainda não tem um espaço de conteúdo próprio. Prepare-o para configurar o HUD da prova aqui mesmo.'))}
         </TabsContent>
 
-        {/* Relatório — desempenho, sessões e estatísticas do simulado */}
+        {/* Relatório — desempenho, ranking e estatísticas. PESADO (varre respostas) → Suspense p/ o
+            shell aparecer na hora e o relatório streamar; fora do prefetch p/ não varrer em todo acesso. */}
         <TabsContent value="relatorio">
-          {aba === 'relatorio' && <SimuladoRelatorio simuladoId={id} />}
+          {aba === 'relatorio' && (
+            <Suspense fallback={<AbaCarregando />}>
+              <SimuladoRelatorio simuladoId={id} />
+            </Suspense>
+          )}
         </TabsContent>
 
         {/* Manutenção — bloquear o simulado num período */}
