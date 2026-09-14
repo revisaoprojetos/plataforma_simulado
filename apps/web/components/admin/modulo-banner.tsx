@@ -35,8 +35,6 @@ export function ModuloBanner({ banner, titulo, subtitulo, topoDireita, breadcrum
 
   return (
     <>
-      {/* Sentinela no topo (fora do sticky) — some da viewport ao rolar → aciona o modo compacto. */}
-      <div ref={sentinelaRef} aria-hidden className="pointer-events-none -mb-px h-px w-full" />
       <div
         className="sticky -top-6 z-30 -mx-6 -mt-6 flex flex-col overflow-hidden bg-neutral-950 transition-[min-height] duration-[450ms] ease-in-out [overflow-anchor:none]"
         style={{ minHeight: compacto ? '5rem' : '15rem' }}
@@ -75,6 +73,9 @@ export function ModuloBanner({ banner, titulo, subtitulo, topoDireita, breadcrum
           <div className="mt-auto pt-3">{tabs}</div>
         </div>
       </div>
+      {/* Sentinela ABSOLUTA no topo do container da página (que é `relative`) — não ocupa layout (não
+          cria linha branca) e sai da viewport ao rolar → aciona o modo compacto. */}
+      <div ref={sentinelaRef} aria-hidden className="pointer-events-none absolute left-0 top-0 h-4 w-px" />
     </>
   )
 }

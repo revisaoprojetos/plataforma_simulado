@@ -24,7 +24,7 @@ export default async function LeituraAdminPage({ searchParams }: { searchParams:
   const breadcrumb = data.ok ? (data.breadcrumb ?? []) : []
 
   return (
-    <div className={cn(banner ? 'space-y-2' : 'space-y-3', banner && '[overflow-anchor:none]')}>
+    <div className={cn(banner ? 'relative space-y-2' : 'space-y-3', banner && '[overflow-anchor:none]')}>
       {banner ? (
         // Banner colapsável (ModuloBanner): imagem única + tabs na base; ao rolar, o topo sobe e sobra a
         // faixa com um cabeçalho COMPACTO (Voltar + título, sem descrição) + as tabs.
