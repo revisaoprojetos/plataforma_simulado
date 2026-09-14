@@ -17,6 +17,7 @@ import { SimuladoActions } from '@/components/admin/simulado-actions'
 import { SimuladoQuestoesTable } from '@/components/admin/simulado-questoes-table'
 import { type QuestaoLinha } from '@/components/admin/questoes-tabela-base'
 import { listarDisciplinasFiltro, type GrupoBanco } from '@/app/admin/banco-questoes/actions'
+import { simuladosDoBanco } from '@/lib/simulado/banco-do-simulado'
 import { SimuladoEstudantes } from '@/components/admin/simulado-estudantes'
 import { SimuladoSessoes } from '@/components/admin/simulado-sessoes'
 import { SimuladoManutencao } from '@/components/admin/simulado-manutencao'
@@ -27,7 +28,7 @@ import { SimuladoLiberacoes } from '@/components/admin/simulado-liberacoes'
 import { CopyLink } from '@/components/admin/copy-link'
 import { updateSimuladoAction, listarSessoesSimulado } from '../actions'
 import Link from 'next/link'
-import { ChevronLeft, Code, Layers, CalendarClock, Clock, KeyRound, Link2 } from 'lucide-react'
+import { ChevronLeft, Code, Layers, CalendarClock, Clock, KeyRound, Link2, AlertTriangle } from 'lucide-react'
 import { buttonVariants } from '@/components/ui/button'
 import { TipoSimuladoBadge } from '@/components/admin/tipo-simulado-badge'
 import { tipoDoSimulado } from '@/lib/simulado/tipo'
@@ -157,6 +158,9 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
   let bancoVisual: { id: string; cor: string | null; icone: string | null; capa_url: string | null; capa_card_url: string | null } | null = null
   let gruposIniciais: GrupoBanco[] = []
   let disciplinasGrupos: string[] = []
+  // Salvaguarda D1: normalmente o banco é 1:1 com o simulado. Se ele alimentar >1 simulado, editar o
+  // CONTEÚDO aqui (questões/caderno/HUD/grupos/visual) afeta todos → avisa nas abas de conteúdo.
+  let bancoCompartilhadoN = 1
   if (bancoBaseId && abasConteudo.includes(aba)) {
     const svcAdmin = createAdminClient()
     const colsBase = 'id, cor, icone, capa_url, capa_card_url, is_folder, deletado'
@@ -167,6 +171,7 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
       row = (await svcAdmin.from('simulado_pastas').select('id').eq('id', bancoBaseId).eq('tenant_id', tid).maybeSingle()).data as any
     }
     if (row && !row.deletado && row.is_folder !== true) bancoVisual = { id: row.id, cor: row.cor ?? null, icone: row.icone ?? null, capa_url: row.capa_url ?? null, capa_card_url: row.capa_card_url ?? null }
+    if (tenantId) bancoCompartilhadoN = (await simuladosDoBanco(svcAdmin, tenantId, bancoBaseId)).length || 1
     if (aba === 'grupos') {
       gruposIniciais = Array.isArray((row as any)?.grupos) ? (row as any).grupos as GrupoBanco[] : []
       disciplinasGrupos = [...new Set((questoes ?? []).map((sq: any) => sq.questoes?.disciplinas?.nome).filter(Boolean))] as string[]
@@ -284,6 +289,14 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
       </div>
 
       <div className="pt-6">
+        {/* Salvaguarda D1: banco compartilhado por >1 simulado → editar conteúdo afeta todos. */}
+        {bancoCompartilhadoN > 1 && abasConteudo.includes(aba) && (
+          <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>Este conteúdo é <strong>compartilhado com {bancoCompartilhadoN} simulados</strong>. Editar questões, caderno, HUD, grupos ou capa aqui afeta <strong>todos</strong> eles. Para mudar só este, será preciso desmembrá-lo (em breve).</span>
+          </div>
+        )}
+
         {/* Visão Geral */}
         <TabsContent value="visao-geral" className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
