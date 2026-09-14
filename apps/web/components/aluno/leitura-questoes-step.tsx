@@ -6,7 +6,7 @@ import { createPortal } from 'react-dom'
 import { ArrowLeft, ArrowRight, BookOpenText, CheckCircle2, Bookmark, Flag, RotateCcw, Eye, Check, X, PartyPopper } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { QuestaoLeitura } from '@/components/aluno/questao-leitura'
-import type { DocumentoCarregado, QuestaoLeituraDados } from '@/lib/leitura/acesso'
+import type { QuestaoLeituraDados } from '@/lib/leitura/acesso'
 
 /**
  * Etapa de QUESTÕES da aula = mini-simulado "Questões do conteúdo" (liberada após concluir a leitura).
@@ -15,7 +15,7 @@ import type { DocumentoCarregado, QuestaoLeituraDados } from '@/lib/leitura/aces
  * contabilizada. "Refazer" NÃO apaga as respostas no servidor (mantém a trilha destravada) — só reinicia
  * o quiz no cliente, gravando uma nova tentativa ao concluir de novo.
  */
-export function LeituraQuestoesStep({ doc, questoes, trilhaHref }: { doc: DocumentoCarregado; questoes: QuestaoLeituraDados[]; trilhaHref: string }) {
+export function LeituraQuestoesStep({ doc, questoes, trilhaHref }: { doc: { id: string; titulo: string }; questoes: QuestaoLeituraDados[]; trilhaHref: string }) {
   const total = questoes.length
   const jaCompletoInicial = total > 0 && questoes.filter((q) => q.resposta).length >= total
 

@@ -1,6 +1,6 @@
-import { notFound, redirect } from 'next/navigation'
+import { redirect } from 'next/navigation'
 import { getSessaoAluno } from '@/lib/aluno-session'
-import { carregarDocumentoAluno, carregarQuizAluno } from '@/lib/leitura/acesso'
+import { carregarQuizAluno } from '@/lib/leitura/acesso'
 import { statusAulaAluno } from '@/lib/leitura/trilha'
 import { LEITURA_ATIVA } from '@/lib/flags'
 import { LeituraQuestoesStep } from '@/components/aluno/leitura-questoes-step'
@@ -16,12 +16,11 @@ export default async function QuestoesLeituraPage({ params }: { params: Promise<
   const st = await statusAulaAluno(sessao.estudanteId, sessao.tenantId, id)
   if (!st.visivel || st.estado === 'bloqueado') redirect('/aluno/leitura')
   if (!st.leituraConcluida) redirect(`/aluno/leitura/${id}`) // precisa concluir a leitura antes
-  const doc = await carregarDocumentoAluno(id, sessao.estudanteId, sessao.tenantId)
-  if (!doc) notFound()
-  // "Questões do conteúdo" = mini-simulado (quiz), separado das questões inline da leitura.
+  // Perf: o quiz só precisa do TÍTULO (o `statusAulaAluno` já o traz) — NÃO carregamos o documento
+  // inteiro (HTML da lei + anotações + grifos), que era o gargalo ao abrir a aula.
   const questoes = await carregarQuizAluno(id, sessao.estudanteId, sessao.tenantId)
   // "Voltar" leva à TRILHA do módulo (não à seleção de módulos). __geral__ não tem trilha própria.
   const trilhaHref = st.moduloId && st.moduloId !== '__geral__' ? `/aluno/leitura?modulo=${st.moduloId}` : '/aluno/leitura'
 
-  return <LeituraQuestoesStep doc={doc} questoes={questoes} trilhaHref={trilhaHref} />
+  return <LeituraQuestoesStep doc={{ id, titulo: st.titulo ?? 'Questões da aula' }} questoes={questoes} trilhaHref={trilhaHref} />
 }

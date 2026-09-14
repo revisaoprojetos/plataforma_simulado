@@ -166,10 +166,11 @@ export async function carregarTrilhaLeituraAluno(estId: string, tenantId: string
   }).filter((t) => t.nodes.length > 0)
 }
 
-/** Gate rígido p/ o servidor: onde a aula está na sequência (bloqueada? leitura ok?) + o módulo dela
- * (p/ montar o "voltar à trilha" = /aluno/leitura?modulo=<moduloId>). */
-export async function statusAulaAluno(estId: string, tenantId: string, documentoId: string): Promise<{ visivel: boolean; estado: EstadoAula | 'ausente'; leituraConcluida: boolean; questoesFeitas: boolean; moduloId: string | null }> {
+/** Gate rígido p/ o servidor: onde a aula está na sequência (bloqueada? leitura ok?) + módulo e título
+ * (p/ o "voltar à trilha" = /aluno/leitura?modulo=<moduloId> e evitar recarregar o documento inteiro só
+ * pelo título). */
+export async function statusAulaAluno(estId: string, tenantId: string, documentoId: string): Promise<{ visivel: boolean; estado: EstadoAula | 'ausente'; leituraConcluida: boolean; questoesFeitas: boolean; moduloId: string | null; titulo: string | null }> {
   const { seqByModulo } = await sequenciaLeitura(estId, tenantId)
-  for (const arr of seqByModulo.values()) for (const a of arr) if (a.doc.id === documentoId) return { visivel: true, estado: a.estado, leituraConcluida: a.leituraConcluida, questoesFeitas: a.questoesFeitas, moduloId: a.moduloId }
-  return { visivel: false, estado: 'ausente', leituraConcluida: false, questoesFeitas: false, moduloId: null }
+  for (const arr of seqByModulo.values()) for (const a of arr) if (a.doc.id === documentoId) return { visivel: true, estado: a.estado, leituraConcluida: a.leituraConcluida, questoesFeitas: a.questoesFeitas, moduloId: a.moduloId, titulo: a.doc.titulo }
+  return { visivel: false, estado: 'ausente', leituraConcluida: false, questoesFeitas: false, moduloId: null, titulo: null }
 }
