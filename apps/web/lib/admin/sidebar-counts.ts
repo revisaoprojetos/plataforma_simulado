@@ -16,10 +16,10 @@ export async function contagensSidebar(tenantId: string | null): Promise<Record<
     const svc = createAdminClient()
     const cont = (b: any): Promise<number> => b.then((r: any) => r.count ?? 0, () => 0)
     const head = (tabela: string) => svc.from(tabela).select('id', { count: 'exact', head: true }).eq('tenant_id', tid)
-    const [simulados, questoes, bancos, cadernos, estudantes, grupos, matriculas] = await Promise.all([
+    // "Banco de Simulado" saiu do menu (consolidado na Aplicação) → sem badge próprio.
+    const [simulados, questoes, cadernos, estudantes, grupos, matriculas] = await Promise.all([
       cont(head('simulado_simulados').eq('deletado', false)),
       cont(head('simulado_questoes').eq('deletado', false)),
-      cont(head('simulado_pastas').eq('deletado', false).eq('is_folder', false)),
       cont(head('simulado_cadernos_designer')),
       cont(head('simulado_estudantes').eq('deletado', false)),
       cont(head('simulado_grupos').eq('deletado', false)),
@@ -28,7 +28,6 @@ export async function contagensSidebar(tenantId: string | null): Promise<Record<
     return {
       '/admin/simulados': simulados,
       '/admin/questoes': questoes,
-      '/admin/banco-questoes': bancos,
       '/admin/cadernos': cadernos,
       '/admin/estudantes': estudantes,
       '/admin/grupos': grupos,

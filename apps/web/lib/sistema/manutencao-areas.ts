@@ -24,7 +24,8 @@ export const AREAS_MANUTENCAO: AreaManutencao[] = [
   { key: 'discursiva', label: 'Correção discursiva', descricao: 'Envio e correção de respostas discursivas (foto). Bloqueia /admin/correcao e esconde TODAS as opções de discursiva (tipo, filtros, wizard, banco, relatórios) — volta a ficar "como era antes".', href: '/admin/correcao', discursiva: true },
   { key: 'simulados', label: 'Aplicação de Simulado', descricao: 'Criação e gestão de simulados.', href: '/admin/simulados' },
   { key: 'questoes', label: 'Questões', descricao: 'Cadastro e edição de questões.', href: '/admin/questoes' },
-  { key: 'banco', label: 'Banco de Simulado', descricao: 'Bancos de questões e cadernos.', href: '/admin/banco-questoes' },
+  // "Banco de Simulado" foi consolidado dentro da Aplicação (editores internos em /admin/banco-questoes/[id]);
+  // não é mais uma área navegável, então saiu da manutenção por área (o toggle bloquearia os editores do simulado).
   { key: 'relatorios', label: 'Relatórios', descricao: 'Relatórios e estatísticas.', href: '/admin/relatorios' },
   { key: 'gamificacao', label: 'Gamificação', descricao: 'XP, níveis, ligas, missões e conquistas.', href: '/admin/gamificacao' },
   { key: 'matriculas', label: 'Matrículas', descricao: 'Matrículas e planos dos alunos.', href: '/admin/matriculas' },
