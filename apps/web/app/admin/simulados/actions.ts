@@ -586,45 +586,6 @@ export async function vincularCadernoSimulado(simuladoId: string, cadernoId: str
   return { ok: true }
 }
 
-export async function addQuestaoToSimulado(simuladoId: string, questaoId: string) {
-  if (!(await checkPermission('simulados:update'))) return { error: 'Sem permissão.' }
-  const tenantId = await getCurrentTenantId()
-  if (!tenantId) return { error: 'Tenant não resolvido.' }
-
-  const supabase = await createClient()
-  // Só adiciona questão DO tenant a simulado DO tenant (evita vínculo cross-tenant).
-  const [{ data: simOk }, { data: qOk }] = await Promise.all([
-    supabase.from('simulado_simulados').select('id').eq('id', simuladoId).eq('tenant_id', tenantId).maybeSingle(),
-    supabase.from('simulado_questoes').select('id').eq('id', questaoId).eq('tenant_id', tenantId).maybeSingle(),
-  ])
-  if (!simOk) return { error: 'Simulado não encontrado.' }
-  if (!qOk) return { error: 'Questão não encontrada.' }
-  // Próxima ordem = MAX(ordem)+1 (não `count`) — evita reusar `ordem` após remoções e
-  // colidir com uma linha existente.
-  const { data: maxRow } = await supabase
-    .from('simulado_prova_questoes')
-    .select('ordem')
-    .eq('simulado_id', simuladoId)
-    .eq('tenant_id', tenantId)
-    .order('ordem', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-  const proximaOrdem = (((maxRow?.ordem as number) ?? -1) + 1)
-
-  // Herança do banco: se a questão está anulada no banco, entra já anulada neste simulado.
-  const { data: anulRow } = await supabase.from('simulado_questoes').select('anulada').eq('id', questaoId).eq('tenant_id', tenantId).maybeSingle()
-  const row: Record<string, unknown> = { tenant_id: tenantId, simulado_id: simuladoId, questao_id: questaoId, ordem: proximaOrdem }
-  if ((anulRow as any)?.anulada === true) row.anulada = true
-  let { error } = await supabase.from('simulado_prova_questoes').insert(row)
-  if (error && /anulada/i.test(error.message)) {
-    ;({ error } = await supabase.from('simulado_prova_questoes').insert({ tenant_id: tenantId, simulado_id: simuladoId, questao_id: questaoId, ordem: proximaOrdem }))
-  }
-
-  if (error) return { error: error.message }
-  revalidatePath(`/admin/simulados/${simuladoId}`)
-  return { ok: true }
-}
-
 // ─────────── Busca server-side sob demanda (evita carregar todo o banco/estudantes no load) ───────────
 
 export type EstudanteBuscaItem = { id: string; nome: string; email: string | null; telefone: string | null; cpf: string | null; classificacao: string | null; avatar: string | null; perfil_avatar_cor: string | null }
@@ -676,26 +637,6 @@ export async function contarBancosWizard(bancoIds: string[]): Promise<{ ok: bool
     out[id] = { q: q.count ?? 0, e: e.count ?? 0 }
   }))
   return { ok: true, counts: out }
-}
-
-export type QuestaoBuscaItem = { id: string; enunciado: string; status: string | null; disciplina: string | null }
-
-/** Busca questões do tenant que NÃO estão no simulado (para o picker "Adicionar questões"), limitada. */
-export async function buscarQuestoesForaSimulado(simuladoId: string, busca: string, limite = 40): Promise<{ ok: boolean; itens?: QuestaoBuscaItem[]; error?: string }> {
-  if (!(await checkPermission('simulados:update'))) return { ok: false, error: 'Sem permissão.' }
-  const tenantId = await getCurrentTenantId()
-  if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
-  const svc = createAdminClient()
-  const jaNo = await fetchAll<{ questao_id: string }>(() => svc.from('simulado_prova_questoes').select('questao_id').eq('simulado_id', simuladoId).eq('tenant_id', tenantId).order('questao_id', { ascending: true }))
-  const noSet = new Set(jaNo.map((r) => r.questao_id))
-  const safe = busca.replace(/[,()%*]/g, ' ').trim()
-  let q = svc.from('simulado_questoes').select('id, enunciado, status, disciplinas:simulado_disciplinas(nome)').eq('tenant_id', tenantId).eq('deletado', false)
-  if (safe) q = q.ilike('enunciado', `%${safe}%`)
-  const { data, error } = await q.order('created_at', { ascending: false }).limit(Math.min(200, Math.max(limite * 4, 80)))
-  if (error) return { ok: false, error: error.message }
-  const itens = (data ?? []).filter((r: any) => !noSet.has(r.id)).slice(0, limite)
-    .map((r: any) => ({ id: r.id, enunciado: r.enunciado ?? '', status: r.status ?? null, disciplina: r.disciplinas?.nome ?? null }))
-  return { ok: true, itens }
 }
 
 /**
@@ -754,21 +695,6 @@ export async function listarDisciplinasWizard(): Promise<{ id: string; nome: str
   const svc = createAdminClient()
   const rows = await fetchAll<{ id: string; nome: string }>(() => svc.from('simulado_disciplinas').select('id, nome').eq('tenant_id', tenantId).order('nome', { ascending: true }))
   return rows.map((d) => ({ id: d.id, nome: d.nome ?? '—' }))
-}
-
-export async function removeQuestaoFromSimulado(simuladoQuestaoId: string, simuladoId: string) {
-  if (!(await checkPermission('simulados:update'))) return { error: 'Sem permissão.' }
-  const tenantId = await getCurrentTenantId()
-  const supabase = await createClient()
-  const { error } = await supabase
-    .from('simulado_prova_questoes')
-    .delete()
-    .eq('id', simuladoQuestaoId)
-    .eq('tenant_id', tenantId ?? SEM_TENANT)
-
-  if (error) return { error: error.message }
-  revalidatePath(`/admin/simulados/${simuladoId}`)
-  return { ok: true }
 }
 
 // ───────────────────────── Questões da prova (aba Questões consolidada) ─────────────────────────

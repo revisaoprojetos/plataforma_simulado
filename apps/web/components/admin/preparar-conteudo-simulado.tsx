@@ -11,7 +11,7 @@ import { garantirBancoSimuladoAction } from '@/app/admin/simulados/actions'
  * container (onde moram questões/HUD/caderno/grupos/visual). Este CTA cria + faz o backfill sob
  * demanda e recarrega. Simulados criados pelo wizard já nascem com banco → este CTA nem aparece.
  */
-export function PrepararConteudoSimulado({ simuladoId, titulo = 'Preparar personalização', descricao }: { simuladoId: string; titulo?: string; descricao?: string }) {
+export function PrepararConteudoSimulado({ simuladoId, titulo = 'Preparar conteúdo', cta = 'Preparar agora', descricao }: { simuladoId: string; titulo?: string; cta?: string; descricao?: string }) {
   const router = useRouter()
   const [pending, start] = useTransition()
 
@@ -33,7 +33,7 @@ export function PrepararConteudoSimulado({ simuladoId, titulo = 'Preparar person
       </div>
       <button type="button" onClick={preparar} disabled={pending}
         className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
-        {pending && <Loader2 className="h-4 w-4 animate-spin" />} {titulo}
+        {pending && <Loader2 className="h-4 w-4 animate-spin" />} {cta}
       </button>
     </div>
   )
