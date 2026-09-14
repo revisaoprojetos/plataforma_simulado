@@ -14,9 +14,11 @@ import { SCREENS, STATUS_POR_TAB, DEMO_Q, type ScreenKey } from '@/lib/hud/campo
 type QPrev = { id: string; enunciado: string; disciplina?: string | null; imagem_url?: string | null; alternativas: { id: string; texto: string }[] }
 
 /** Aba "HUD do simulado": prévia de TODAS as telas (lado a lado, expansíveis) + botão que abre o editor. */
-export function BancoHudPreview({ bancoId, titulo, base, porPagina, questoesIniciais }: {
+export function BancoHudPreview({ bancoId, titulo, base, porPagina, questoesIniciais, editHref }: {
   bancoId: string; titulo: string; base: Partial<HudCores>; porPagina: HudPorPagina
   questoesIniciais?: QPrev[] | null
+  /** Destino do botão "Editar HUD". Default = editor da área Banco; a Aplicação passa a rota interna do simulado. */
+  editHref?: string
 }) {
   const noop = () => {}
   const questoes: QPrev[] = questoesIniciais && questoesIniciais.length ? questoesIniciais : [DEMO_Q as QPrev]
@@ -89,7 +91,7 @@ export function BancoHudPreview({ bancoId, titulo, base, porPagina, questoesInic
             <p className="text-xs text-muted-foreground">Tema de cores da prova do aluno — vale p/ os simulados deste banco</p>
           </div>
         </div>
-        <Link href={`/admin/banco-questoes/${bancoId}/hud`} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90">
+        <Link href={editHref ?? `/admin/banco-questoes/${bancoId}/hud`} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90">
           <Pencil className="h-4 w-4" /> Editar HUD
         </Link>
       </div>

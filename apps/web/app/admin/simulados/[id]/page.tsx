@@ -454,7 +454,7 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
         <TabsContent value="hud">
           {aba === 'hud' && (bancoBaseId ? (
             <Suspense fallback={<AbaCarregando />}>
-              <BancoHud bancoId={bancoBaseId} cor={bancoVisual?.cor ?? undefined} />
+              <BancoHud bancoId={bancoBaseId} cor={bancoVisual?.cor ?? undefined} editHref={`/admin/simulados/${id}/hud`} />
             </Suspense>
           ) : semBancoCTA('Este simulado ainda não tem um espaço de conteúdo próprio. Prepare-o para configurar o HUD da prova aqui mesmo.'))}
         </TabsContent>

@@ -4,7 +4,7 @@ import { carregarHudBanco } from '@/app/admin/banco-questoes/actions'
 import { BancoHudPreview } from '@/components/admin/banco-hud-preview'
 
 /** Aba "HUD do simulado" do banco: mostra a prévia do tema salvo; edição fica na rota /hud dedicada. */
-export async function BancoHud({ bancoId }: { bancoId: string; cor?: string }) {
+export async function BancoHud({ bancoId, editHref }: { bancoId: string; cor?: string; editHref?: string }) {
   const { base, porPagina } = await carregarHudBanco(bancoId)
   const svc = createAdminClient()
   const tid = (await getCurrentTenantId()) ?? '00000000-0000-0000-0000-000000000000'
@@ -33,5 +33,5 @@ export async function BancoHud({ bancoId }: { bancoId: string; cor?: string }) {
       .filter((q) => q.alternativas.length)
   }
 
-  return <BancoHudPreview bancoId={bancoId} titulo={titulo} base={base} porPagina={porPagina} questoesIniciais={questoesIniciais} />
+  return <BancoHudPreview bancoId={bancoId} titulo={titulo} base={base} porPagina={porPagina} questoesIniciais={questoesIniciais} editHref={editHref} />
 }

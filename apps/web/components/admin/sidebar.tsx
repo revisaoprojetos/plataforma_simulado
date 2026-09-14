@@ -11,7 +11,6 @@ import {
   Users,
   UsersRound,
   BarChart3,
-  Database,
   ClipboardCheck,
   CreditCard,
   MessageSquare,
@@ -119,7 +118,8 @@ const navGroups: NavGroup[] = [
       { label: 'Aplicação de Simulado', href: '/admin/simulados', icon: ClipboardList, perm: 'simulados:view' },
       { label: 'Correção (discursivas)', href: '/admin/correcao', icon: PenLine, perm: 'questoes:view' },
       { label: 'Questões', href: '/admin/questoes', icon: BookOpen, perm: 'questoes:view' },
-      { label: 'Banco de Simulado', href: '/admin/banco-questoes', icon: Database, perm: 'questoes:view' },
+      // "Banco de Simulado" foi consolidado DENTRO da Aplicação de Simulado (abas do detalhe do
+      // simulado). A área deixou de ser um item de menu; /admin/banco-questoes redireciona p/ lá.
       { label: 'Modelos de Caderno', href: '/admin/modelos-caderno', icon: LayoutTemplate, perm: 'questoes:view', oculto: !MODELOS_CADERNO_ATIVO },
     ],
   },
