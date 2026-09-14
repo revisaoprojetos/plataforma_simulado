@@ -55,18 +55,17 @@ export async function documentosDoAluno(estudanteId: string, tenantId: string): 
   // Detecta colunas de lei (A1) e de versionamento (A2) → select tolerante (memoizado por processo).
   const { temLei, temVers } = await detectarColunasLeitura(svc)
   const cols = ['id, titulo, descricao, cor, icone, capa_url, versao, pasta_id, ordem', temVers && 'versao_publicada', temLei && 'materia_id, tipo_norma, numero, ano, ementa'].filter(Boolean).join(', ')
-  const docs = await fetchAll<any>(() =>
-    svc.from('simulado_documentos').select(cols)
-      .eq('tenant_id', tenantId).eq('deletado', false).eq('publicado', true).order('atualizado_em', { ascending: false }))
+  // docs + matérias são independentes → paralelo (menos round-trips ao DB remoto).
+  const [docs, matsRes] = await Promise.all([
+    fetchAll<any>(() => svc.from('simulado_documentos').select(cols).eq('tenant_id', tenantId).eq('deletado', false).eq('publicado', true).order('atualizado_em', { ascending: false })),
+    temLei ? svc.from('simulado_materias').select('id, nome, cor').eq('tenant_id', tenantId).eq('deletado', false) : Promise.resolve({ data: [] as any[] } as any),
+  ])
   if (!docs.length) return []
   const ids = docs.map((d) => d.id)
 
   // Matérias (id → nome/cor)
   const materiaMap = new Map<string, { nome: string; cor: string | null }>()
-  if (temLei) {
-    const { data: mats } = await svc.from('simulado_materias').select('id, nome, cor').eq('tenant_id', tenantId).eq('deletado', false)
-    for (const m of (mats ?? []) as any[]) materiaMap.set(m.id, { nome: m.nome, cor: m.cor ?? null })
-  }
+  for (const m of (((matsRes as any).data ?? []) as any[])) materiaMap.set(m.id, { nome: m.nome, cor: m.cor ?? null })
 
   // Atribuições — CHUNK nos `.in('documento_id', …)`: com muitos documentos no tenant, o `.in()` sem
   // fatiar gera URL gigante que trava o proxy (~180s). fetchAllByIn fatia em lotes de 80.

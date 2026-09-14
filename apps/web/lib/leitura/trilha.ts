@@ -45,18 +45,21 @@ async function statusAulas(svc: any, tenantId: string, estId: string, docs: Docu
   const totalPorDoc = new Map<string, number>()
   const respPorDoc = new Map<string, Set<string>>()
   if (ids.length) {
-    // "Questões do conteúdo" = mini-simulado (simulado_documento_quiz_questoes). Tolerante à tabela ausente.
-    let qs: { documento_id: string; questao_id: string }[] = []
-    try {
-      qs = await fetchAllByIn<{ documento_id: string; questao_id: string }>(ids, (chunk) =>
-        svc.from('simulado_documento_quiz_questoes').select('documento_id, questao_id').eq('tenant_id', tenantId).eq('deletado', false).in('documento_id', chunk).order('documento_id', { ascending: true }))
-    } catch { qs = [] }
+    // "Questões do conteúdo" (quiz) + respostas em PARALELO (independentes) → menos round-trips.
+    const [qs, rs] = await Promise.all([
+      (async () => {
+        try {
+          return await fetchAllByIn<{ documento_id: string; questao_id: string }>(ids, (chunk) =>
+            svc.from('simulado_documento_quiz_questoes').select('documento_id, questao_id').eq('tenant_id', tenantId).eq('deletado', false).in('documento_id', chunk).order('documento_id', { ascending: true }))
+        } catch { return [] as { documento_id: string; questao_id: string }[] }
+      })(),
+      fetchAllByIn<{ documento_id: string; questao_id: string }>(ids, (chunk) =>
+        svc.from('simulado_leitura_respostas').select('documento_id, questao_id').eq('tenant_id', tenantId).eq('estudante_id', estId).in('documento_id', chunk).order('documento_id', { ascending: true })),
+    ])
     for (const q of qs) {
       totalPorDoc.set(q.documento_id, (totalPorDoc.get(q.documento_id) ?? 0) + 1)
       const s = obrigPorDoc.get(q.documento_id) ?? new Set<string>(); s.add(q.questao_id); obrigPorDoc.set(q.documento_id, s)
     }
-    const rs = await fetchAllByIn<{ documento_id: string; questao_id: string }>(ids, (chunk) =>
-      svc.from('simulado_leitura_respostas').select('documento_id, questao_id').eq('tenant_id', tenantId).eq('estudante_id', estId).in('documento_id', chunk).order('documento_id', { ascending: true }))
     for (const r of rs) { const s = respPorDoc.get(r.documento_id) ?? new Set<string>(); s.add(r.questao_id); respPorDoc.set(r.documento_id, s) }
   }
   for (const d of docs) {
