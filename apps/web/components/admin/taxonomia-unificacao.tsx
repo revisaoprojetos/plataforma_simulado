@@ -12,8 +12,25 @@ import { unificarTaxonomia, previewUnificacaoTax } from '@/app/admin/questoes/ta
 import type { TipoTaxonomia, ItemTax } from '@/app/admin/questoes/taxonomia-tipos'
 import { desfazerUnificacao, type UnificacaoRecente } from '@/app/admin/questoes/disciplinas-actions'
 
-// Normaliza p/ detectar duplicatas: sem acento, minúsculo, sem pontuação, espaços colapsados.
-const norm = (s: string) => (s ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+// Canoniza abreviações jurídicas equivalentes p/ UM token só — assim "art."/"arts."/"artigo(s)"
+// (ou "inciso"/"inc.", "§"/"parágrafo", "alínea"/"al.") não geram duplicatas separadas.
+const ABREV: Record<string, string> = {
+  arts: 'art', artigo: 'art', artigos: 'art',
+  incs: 'inc', inciso: 'inc', incisos: 'inc',
+  paragrafo: 'par', paragrafos: 'par', pars: 'par',
+  alinea: 'al', alineas: 'al', als: 'al',
+  leis: 'lei',
+}
+// Normaliza p/ detectar duplicatas: sem acento, minúsculo, sem pontuação (o "." final some junto),
+// espaços colapsados e abreviações equivalentes unificadas.
+const norm = (s: string) =>
+  (s ?? '')
+    .normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ').trim()
+    .split(' ').map((t) => ABREV[t] ?? t).join(' ')
+// Nome-BASE: tira a anotação entre parênteses/colchetes do fim (ex.: "(arts. 18 a 36 da CF/1988)").
+// Serve p/ juntar o MESMO assunto que só difere na faixa de artigos/lei citada.
+const normBase = (s: string) => norm((s ?? '').replace(/\s*[([].*$/, ''))
 // Escolhe a "melhor" p/ manter: mais questões, depois mais "extra" (assuntos), depois nome mais curto.
 const melhor = (g: ItemTax[]) => [...g].sort((a, b) => b.questoes - a.questoes || (b.extra ?? 0) - (a.extra ?? 0) || a.nome.length - b.nome.length)[0]
 
@@ -45,11 +62,22 @@ export function TaxonomiaUnificacao({ tipo, itens, recentes = [] }: { tipo: Tipo
     else { setCampoRec(campo); setDirRec(campo === 'mantida' ? 'asc' : 'desc') }
   }
 
-  // Clusters de possíveis duplicatas (mesmo nome normalizado, 2+ variações).
+  // Clusters de possíveis duplicatas (mesmo nome normalizado, 2+ variações). Alta confiança.
   const clusters = useMemo(() => {
     const map = new Map<string, ItemTax[]>()
     for (const d of itens) { const k = norm(d.nome); const g = map.get(k) ?? []; g.push(d); map.set(k, g) }
     return [...map.values()].filter((g) => g.length > 1).sort((a, b) => b.length - a.length)
+  }, [itens])
+
+  // Clusters por NOME-BASE (sem o parêntese final) que os `clusters` acima NÃO pegam — ou seja, itens
+  // que só diferem na anotação (faixa de artigos, lei citada). Requer 2+ nomes normalizados distintos
+  // p/ não repetir o que já está nas sugestões de alta confiança. Revise antes de unificar.
+  const clustersBase = useMemo(() => {
+    const map = new Map<string, ItemTax[]>()
+    for (const d of itens) { const k = normBase(d.nome); const g = map.get(k) ?? []; g.push(d); map.set(k, g) }
+    return [...map.values()]
+      .filter((g) => g.length > 1 && new Set(g.map((d) => norm(d.nome))).size > 1)
+      .sort((a, b) => b.length - a.length)
   }, [itens])
 
   const filtrados = useMemo(() => {
@@ -170,6 +198,19 @@ export function TaxonomiaUnificacao({ tipo, itens, recentes = [] }: { tipo: Tipo
           <div className="max-h-[58vh] overflow-y-auto rounded-2xl border bg-muted/10 p-2">
             <div className="grid gap-2 lg:grid-cols-2">
               {clusters.map((g, i) => <ClusterCard key={i} grupo={g} meta={m} salvando={salvando} onUnificar={unificar} />)}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Semelhantes por nome-base — mesmo assunto que só difere na anotação (faixa de artigos/lei). REVISAR. */}
+      {clustersBase.length > 0 && (
+        <div className="space-y-2">
+          <p className="flex items-center gap-1.5 text-sm font-semibold"><Sparkles className="h-4 w-4 text-amber-500" /> Mesmo {m.singular}, detalhes diferentes <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">{clustersBase.length}</span></p>
+          <p className="text-xs text-muted-foreground">Mesmo nome-base, variando só o trecho entre parênteses (ex.: <em>«{m.singular} (arts. 18 a 36…)»</em> × <em>«… (arts. 18 a 43…)»</em>). <strong>Confira antes</strong> — pode ser a mesma coisa com faixa/lei diferente.</p>
+          <div className="max-h-[58vh] overflow-y-auto rounded-2xl border border-amber-500/30 bg-amber-500/5 p-2">
+            <div className="grid gap-2 lg:grid-cols-2">
+              {clustersBase.map((g, i) => <ClusterCard key={i} grupo={g} meta={m} salvando={salvando} onUnificar={unificar} />)}
             </div>
           </div>
         </div>
