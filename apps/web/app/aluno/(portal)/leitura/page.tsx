@@ -1,6 +1,5 @@
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Library, ArrowLeft } from 'lucide-react'
+import { Library } from 'lucide-react'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { LEITURA_ATIVA } from '@/lib/flags'
 import { carregarTrilhaLeituraAluno, carregarModuloCompleto } from '@/lib/leitura/trilha'
@@ -21,22 +20,8 @@ export default async function LeituraAlunoPage({ searchParams }: { searchParams:
   if (modulo) {
     const mod = await carregarModuloCompleto(sessao.estudanteId, sessao.tenantId, modulo)
     if (mod.trilha) {
-      return (
-        <div className="space-y-6">
-          <div className="flex items-center gap-3">
-            <Link href="/aluno/leitura" aria-label="Voltar aos módulos" title="Voltar aos módulos" className="inline-flex shrink-0 items-center justify-center rounded-lg border bg-card p-2 text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground">
-              <ArrowLeft className="h-4 w-4" />
-            </Link>
-            <div>
-              <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><Library className="h-6 w-6 text-primary" /> {mod.nome}</h1>
-              <p className="text-muted-foreground">
-                Leia cada aula e desbloqueie as questões. <span className="font-semibold text-foreground">{mod.trilha.done}/{mod.trilha.total}</span> concluída(s).
-              </p>
-            </div>
-          </div>
-          <LeituraModuloView modulo={modulo} trilha={mod.trilha} desempenho={mod.desempenho} pendentes={mod.pendentes} aulasPendentes={mod.aulasPendentes} />
-        </div>
-      )
+      // O cabeçalho (título/voltar/subtítulo) agora vive DENTRO do banner colapsável.
+      return <LeituraModuloView modulo={modulo} trilha={mod.trilha} desempenho={mod.desempenho} pendentes={mod.pendentes} aulasPendentes={mod.aulasPendentes} />
     }
     // módulo inexistente/sem acesso → cai na lista
   }

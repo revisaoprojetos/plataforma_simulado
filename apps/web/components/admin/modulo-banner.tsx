@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, type ReactNode } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Library } from 'lucide-react'
+import { ArrowLeft, Library, type LucideIcon } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 /**
  * Banner do módulo com collapse ATRELADO AO SCROLL (scroll-linked): o título + botão Voltar + tabs ficam
@@ -10,50 +11,74 @@ import { ArrowLeft, Library } from 'lucide-react'
  * exata medida do scroll (sem relógio próprio), então parece "encaixado" e não descolado. Ao voltar ao
  * topo, reaparecem. É sticky no topo do <main>; overflow-anchor:none (no container da página) evita que
  * encolher mexa no scrollTop.
+ *
+ * Reutilizável: `banner` pode ser null (cai no degradê de `cor`); `voltarHref`/`voltarLabel`/`icone`
+ * configuram o cabeçalho; `tituloBadges` adiciona selos ao lado do título (sempre visíveis).
  */
-export function ModuloBanner({ banner, titulo, subtitulo, topoDireita, breadcrumb, tabs }: {
-  banner: string
+export function ModuloBanner({ banner, cor, titulo, subtitulo, topoDireita, breadcrumb, tabs, voltarHref = '/admin/leitura', voltarLabel = 'Voltar aos módulos', icone: Icone = Library, tituloBadges, className }: {
+  banner: string | null
+  cor?: string | null
   titulo: string
   subtitulo: string
   topoDireita?: ReactNode
   breadcrumb: ReactNode
   tabs: ReactNode
+  voltarHref?: string
+  voltarLabel?: string
+  icone?: LucideIcon | null
+  tituloBadges?: ReactNode
+  /** Override do "bleed" (margens negativas/sticky) p/ casar com o padding do <main> do contexto
+   * (admin = p-6; aluno = p-4 md:p-6). Default segue o admin. */
+  className?: string
 }) {
   const bannerRef = useRef<HTMLDivElement>(null)
   const colapsavelRef = useRef<HTMLDivElement>(null)
+  const spacerRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const banner = bannerRef.current
     const col = colapsavelRef.current
+    const spacerEl = spacerRef.current
     const root = (banner?.closest('main') as HTMLElement | null) ?? null
-    if (!banner || !col || !root) return
+    if (!banner || !col || !spacerEl || !root) return
 
-    const DIST = 140 // px de scroll p/ recolher por completo
+    const DIST = 140 // px de scroll p/ recolher por completo (≤ EXP-COMP p/ o conteúdo nunca ser tampado)
     const EXP = 240  // altura expandida (15rem)
     const COMP = 96  // altura recolhida (6rem) — cabe título + tabs sem cortar
     const padTop = parseFloat(getComputedStyle(root).paddingTop) || 0 // p-6 do <main> (referência do sticky)
+    const padBottom0 = parseFloat(getComputedStyle(root).paddingBottom) || 0
     let raf = 0
     let naturalH = 0
+    let rootTop = 0 // topo do <main> na viewport (constante durante o scroll) — cacheado p/ não ler no frame
 
     const medir = () => {
+      rootTop = root.getBoundingClientRect().top
       const prev = col.style.maxHeight
       col.style.maxHeight = 'none'
       naturalH = col.scrollHeight
       col.style.maxHeight = prev
+      // Garante rolagem suficiente p/ recolher por completo (DIST) mesmo em página curta. O espaço extra
+      // vai no FIM (padding-bottom do <main>), longe do topo, então não tampa nada. Como o fluxo é constante
+      // (banner + spacer = EXP sempre), medir com banner=EXP/spacer=0 dá o mesmo scrollHeight de uso.
+      banner.style.minHeight = `${EXP}px`; spacerEl.style.height = '0px'
+      root.style.paddingBottom = `${padBottom0}px`
+      const maxScroll = root.scrollHeight - root.clientHeight
+      root.style.paddingBottom = `${padBottom0 + Math.max(0, DIST + 8 - maxScroll)}px`
     }
     const aplicar = () => {
       raf = 0
+      // LEITURA primeiro (usa o layout já pintado do frame anterior) → NÃO força reflow no meio do frame.
+      // O `bottom` (p/ a toolbar do LegProc) fica 1 frame atrás, imperceptível. Depois só ESCRITAS.
+      const bottom = banner.getBoundingClientRect().bottom - rootTop - padTop
       const t = Math.min(1, Math.max(0, root.scrollTop / DIST)) // 0 (topo) → 1 (recolhido)
-      const h = EXP - (EXP - COMP) * t
-      banner.style.minHeight = `${h}px`
+      root.style.setProperty('--lp-banner-bottom', `${bottom}px`)
+      banner.style.minHeight = `${EXP - (EXP - COMP) * t}px`
+      // Spacer logo após o banner CRESCE na mesma medida que o banner encolhe → o topo do conteúdo fica
+      // SEMPRE reservado em EXP (não sobe por baixo do banner) e o fluxo não muda de tamanho (sem flicker).
+      spacerEl.style.height = `${(EXP - COMP) * t}px`
       col.style.maxHeight = `${naturalH * (1 - t)}px`
       col.style.opacity = String(Math.max(0, 1 - t * 1.4)) // some um pouco antes → degradê mais forte
       col.style.transform = `translateY(${-6 * t}px)`
-      // Publica o RODAPÉ REAL do banner (medido, relativo ao topo do content-box do <main>) p/ a toolbar
-      // "Adicionar aula" grudar EXATAMENTE embaixo dele em qualquer ponto do scroll — mesmo espaçamento no
-      // topo e recolhido, sem sobrepor. Medir (getBoundingClientRect) evita depender de offset "mágico".
-      const bottom = banner.getBoundingClientRect().bottom - root.getBoundingClientRect().top - padTop
-      root.style.setProperty('--lp-banner-bottom', `${bottom}px`)
     }
     const onScroll = () => { if (!raf) raf = requestAnimationFrame(aplicar) }
     const onResize = () => { medir(); aplicar() }
@@ -66,32 +91,42 @@ export function ModuloBanner({ banner, titulo, subtitulo, topoDireita, breadcrum
       root.removeEventListener('scroll', onScroll)
       window.removeEventListener('resize', onResize)
       root.style.removeProperty('--lp-banner-bottom')
+      root.style.paddingBottom = ''
       if (raf) cancelAnimationFrame(raf)
     }
   }, [])
 
   return (
+    <>
     <div
       ref={bannerRef}
-      className="sticky -top-6 z-30 -mx-6 -mt-6 flex flex-col overflow-hidden bg-neutral-950 [overflow-anchor:none]"
+      className={cn('sticky -top-6 z-30 -mx-6 -mt-6 flex flex-col overflow-hidden bg-neutral-950 [overflow-anchor:none]', className)}
       style={{ minHeight: '15rem' }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={banner} alt="" className="absolute inset-0 h-full w-full object-cover object-center" />
-      {/* Degradê principal (topo→base) + reforço na base p/ fundir a imagem nas tabs (corte macio). */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-black/30" />
+      {/* Fundo: imagem do banner alocado OU degradê da cor da marca (quando não há banner). */}
+      {banner
+        // eslint-disable-next-line @next/next/no-img-element
+        ? <img src={banner} alt="" className="absolute inset-0 h-full w-full object-cover object-center" />
+        : <div className="absolute inset-0" style={cor ? { background: `linear-gradient(140deg, ${cor} 0%, #0a0a0a 130%)` } : undefined} />}
+      {/* Scrims p/ CONTRASTE garantido em qualquer imagem: base (funde nas tabs) + topo (título/ações). */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/55 to-black/45" />
+      <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/65 via-black/25 to-transparent" />
       <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/70 to-transparent" />
 
       <div className="relative flex flex-1 flex-col px-6 pt-4 text-white">
         {/* Linha do título — SEMPRE visível (título + Voltar + ação). */}
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="flex items-start gap-2">
-            <Link href="/admin/leitura" aria-label="Voltar aos módulos" title="Voltar aos módulos" className="mt-1 inline-flex shrink-0 items-center justify-center rounded-lg border border-white/25 bg-white/15 p-2 text-white shadow-sm backdrop-blur transition-colors hover:bg-white/25">
+            <Link href={voltarHref} aria-label={voltarLabel} title={voltarLabel} className="mt-1 inline-flex shrink-0 items-center justify-center rounded-lg border border-white/25 bg-white/15 p-2 text-white shadow-sm backdrop-blur transition-colors hover:bg-white/25">
               <ArrowLeft className="h-4 w-4" />
             </Link>
-            <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight drop-shadow"><Library className="h-6 w-6 shrink-0" /> {titulo}</h1>
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              {Icone ? <Icone className="h-6 w-6 shrink-0 drop-shadow" /> : null}
+              <h1 className="text-2xl font-bold tracking-tight drop-shadow">{titulo}</h1>
+              {tituloBadges}
+            </div>
           </div>
-          {topoDireita && <div className="flex flex-wrap items-center justify-end gap-3">{topoDireita}</div>}
+          {topoDireita && <div className="flex flex-wrap items-center justify-end gap-2">{topoDireita}</div>}
         </div>
 
         {/* Subtítulo + breadcrumb — encolhem/somem atrelados ao scroll (max-height + opacidade + subida). */}
@@ -104,5 +139,9 @@ export function ModuloBanner({ banner, titulo, subtitulo, topoDireita, breadcrum
         <div className="mt-auto pt-3">{tabs}</div>
       </div>
     </div>
+    {/* Spacer que reserva no fluxo a altura que o banner perde ao recolher → conteúdo do topo nunca é
+        tampado e o fluxo fica constante (sem flicker). Altura controlada via JS (aplicar). */}
+    <div ref={spacerRef} aria-hidden className="shrink-0 [overflow-anchor:none]" />
+    </>
   )
 }
