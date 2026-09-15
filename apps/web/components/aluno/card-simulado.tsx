@@ -47,7 +47,6 @@ export function CardSimulado({ s, dica = false, variant = 'poster' }: { s: ItemS
             entra se não houver banner (nesse caso o object-cover corta o meio). */}
         <div className="relative w-[42%] max-w-[11rem] shrink-0 overflow-hidden">
           <CapaCard capa={capa ?? s.vis?.capaBanner} cor={cor} icone={s.vis?.icone} />
-          <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `linear-gradient(110deg, transparent 40%, ${cor})` }} />
         </div>
         {(s.podeFazer || s.podeAguardar) && <Link href={`/simulado/${s.embed_token}`} className="absolute inset-0 z-10" aria-label={s.titulo} />}
         {/* direita: infos */}

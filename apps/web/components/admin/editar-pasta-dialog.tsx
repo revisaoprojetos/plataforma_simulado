@@ -66,7 +66,7 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
   const [salvando, setSalvando] = useState(false)
   // Fade lateral do card DESTA pasta (por-pasta, tema.card_fade_pastas[id]). Só p/ simulados/bancos.
   const mostrarFade = area == null || area === 'simulado' || area === 'banco'
-  const [fadeAtivo, setFadeAtivo] = useState<boolean>((cardFade as any)?.ativo !== false)
+  const [fadeAtivo, setFadeAtivo] = useState<boolean>((cardFade as any)?.ativo === true)
   const [fadeCor, setFadeCor] = useState<string>(typeof (cardFade as any)?.cor === 'string' ? (cardFade as any).cor : '')
   // Editor de recorte (posição + zoom) na proporção certa, aberto ao escolher OU ao "Ajustar".
   const [cropper, setCropper] = useState<{ file?: File; src?: string; alvo: 'card' | 'banner'; aspect: number; titulo: string; zoom?: number; center?: { x: number; y: number } } | null>(null)

@@ -287,7 +287,6 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
             ? <img src={capaT} alt="" className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105" />
             : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
           {!capa && <BancoIcon className="absolute -right-4 -top-4 h-28 w-28 text-white/10" />}
-          <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `linear-gradient(110deg, transparent 45%, ${cor})` }} />
           {online > 0 && (
             <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-md bg-emerald-500/90 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur" title={`${online} aluno(s) fazendo agora`}>
               <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" /><span className="relative inline-flex h-2 w-2 rounded-full bg-white" /></span>
@@ -718,8 +717,8 @@ function FolderTile({ folder, count, appUrl, onPersonalizar, onExcluir, variant 
   // Capa efetiva: a da PASTA (card→banner); se não tiver, cai na capa de um SIMULADO de dentro (fallback)
   // → pastas sem capa própria não ficam com o gradiente "vazio".
   const capaEff = folder.capa ?? folder.capaLarga ?? capaFallback ?? null
-  // Fade lateral POR PASTA (tema.card_fade_pastas[id]) — cada pasta liga/desliga e escolhe a cor.
-  const fadeOn = folder.cardFade?.ativo !== false
+  // Fade lateral POR PASTA (tema.card_fade_pastas[id]) — DESLIGADO por padrão; liga só quem marcar.
+  const fadeOn = folder.cardFade?.ativo === true
   const fadeCor = folder.cardFade?.cor || cor
   const href = `/admin/simulados?pasta=${folder.id}`
   async function copiarLink() {
