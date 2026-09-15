@@ -42,8 +42,8 @@ export default async function SimuladosPage({ searchParams }: { searchParams: Pr
           <NovoSimuladoDialog
             trigger={
               <button type="button"
-                className="inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold text-white shadow-md ring-1 ring-white/15 transition-all hover:brightness-110 hover:shadow-lg active:scale-[0.98]"
-                style={{ background: 'linear-gradient(135deg, var(--brand-primary, var(--primary)), color-mix(in oklab, var(--brand-primary, var(--primary)) 72%, #000))' }}>
+                className="inline-flex items-center justify-center gap-2 rounded-lg px-8 py-2.5 text-sm font-semibold text-white shadow-md ring-1 ring-white/15 transition-all hover:brightness-110 hover:shadow-lg active:scale-[0.98]"
+                style={{ background: 'linear-gradient(135deg, #6d28d9, color-mix(in oklab, #6d28d9 72%, #000))' }}>
                 <Plus className="h-4 w-4" />
                 Novo simulado
               </button>
