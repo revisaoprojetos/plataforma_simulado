@@ -6,6 +6,7 @@ import { buttonVariants } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import { SimuladosBoard, type SimuladoCard } from '@/components/admin/simulados-board'
 import { NovoSimuladoDialog } from '@/components/admin/novo-simulado-dialog'
+import { VoltarSimulados, NovaPastaBtn } from '@/components/admin/simulados-header-extras'
 import { onlinePorSimulado } from '@/app/admin/simulados/actions'
 import { tiposDeSimulados, type TipoSimulado } from '@/lib/simulado/tipo'
 import { resolverVisualSimulados, type VisualSim } from '@/lib/aluno/simulado-visual'
@@ -29,19 +30,25 @@ export default async function SimuladosPage({ searchParams }: { searchParams: Pr
   const { pasta: pastaParam } = await searchParams
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Simulados</h1>
-          <p className="text-muted-foreground">Gerencie provas, agendamentos e publicações.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-2">
+          <VoltarSimulados pastaId={pastaParam ?? null} />
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">Simulados</h1>
+            <p className="text-muted-foreground">Gerencie provas, agendamentos e publicações.</p>
+          </div>
         </div>
-        <NovoSimuladoDialog
-          trigger={
-            <button type="button" className={buttonVariants()}>
-              <Plus className="mr-2 h-4 w-4" />
-              Novo simulado
-            </button>
-          }
-        />
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <NovaPastaBtn pastaId={pastaParam ?? null} />
+          <NovoSimuladoDialog
+            trigger={
+              <button type="button" className={buttonVariants()}>
+                <Plus className="mr-2 h-4 w-4" />
+                Novo simulado
+              </button>
+            }
+          />
+        </div>
       </div>
 
       {/* O shell (título + botão) aparece na hora; o board (leituras pesadas) entra por streaming. */}
@@ -221,7 +228,6 @@ async function BoardData({ pastaParam }: { pastaParam?: string }) {
       destinos={destinos}
       atual={current ? { id: current.id, nome: current.nome } : null}
       breadcrumb={breadcrumb}
-      paiAtual={current?.id ?? null}
       catalogo={{ sims: catalogoSims as (SimuladoCard & { grupoId: string | null })[], grupos: catalogoGrupos }}
       cardView={cardView}
     />

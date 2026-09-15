@@ -34,11 +34,9 @@ import {
   Lock,
   Unlock,
   Radio,
-  FolderPlus,
   Folder,
   FolderOpen,
   FolderCog,
-  ChevronLeft,
   ChevronRight,
   Home,
   ChevronDown,
@@ -500,7 +498,7 @@ type PastaSim = { id: string; nome: string; cor?: string | null; icone?: string 
 type DestinoSim = { id: string; nome: string }
 export type SimuladoCatalogo = SimuladoCard & { grupoId: string | null }
 
-export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders = [], destinos = [], atual = null, catalogo, cardView = 'poster', vistaInicial, breadcrumb = [], paiAtual = null }: {
+export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders = [], destinos = [], atual = null, catalogo, cardView = 'poster', vistaInicial, breadcrumb = [] }: {
   simulados: SimuladoCard[]; appUrl: string; onlineInicial?: Record<string, number>
   folders?: PastaSim[]; destinos?: DestinoSim[]; atual?: { id: string; nome: string } | null
   catalogo?: { sims: SimuladoCatalogo[]; grupos: PastaSim[] }
@@ -510,8 +508,6 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
   vistaInicial?: 'linhas' | 'pastas' | 'status'
   /** Caminho de pastas (Início → … → atual) para o breadcrumb de navegação aninhada. */
   breadcrumb?: { id: string; nome: string }[]
-  /** Pasta do nível atual (pai das novas subpastas). null = raiz. */
-  paiAtual?: string | null
 }) {
   const router = useRouter()
   const [, start] = useTransition()
@@ -519,7 +515,6 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
   const [modo, setModo] = useState<string>('todos')
   const [movendo, setMovendo] = useState<SimuladoCard | null>(null)
   const [editandoPasta, setEditandoPasta] = useState<PastaSim | null>(null)
-  const [criandoPasta, setCriandoPasta] = useState(false)
   const [selecao, setSelecao] = useState<Set<string>>(new Set())
 
   // Fonte de dados: quando estamos numa pasta (?pasta=id) usamos os simulados daquele nível;
@@ -602,12 +597,8 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
       {/* Barra de ferramentas */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-1 flex-wrap items-center gap-2">
-          {atual && (
-            <Link href={breadcrumb.length > 1 ? `/admin/simulados?pasta=${breadcrumb[breadcrumb.length - 2].id}` : '/admin/simulados'}
-              className="inline-flex items-center gap-1 rounded-lg border bg-card px-2.5 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-muted" title="Voltar"><ChevronLeft className="h-4 w-4" /></Link>
-          )}
-          {/* Nova pasta cria SEMPRE no nível atual (subpasta da pasta aberta). */}
-          <button type="button" onClick={() => setCriandoPasta(true)} className="inline-flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-muted"><FolderPlus className="h-4 w-4" /> {atual ? 'Nova subpasta' : 'Nova pasta'}</button>
+          {/* Seta de voltar e "Nova (sub)pasta" agora ficam no cabeçalho da página (ao lado do título /
+              do "Novo simulado"). Aqui fica só a busca. */}
           <Input placeholder={atual ? `Buscar em “${atual.nome}”…` : 'Buscar simulado…'} value={busca} onChange={(e) => setBusca(e.target.value)} className="min-w-[180px] flex-1 lg:max-w-md" />
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -729,9 +720,6 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
           onClose={() => setEditandoPasta(null)}
           onSaved={() => router.refresh()}
         />
-      )}
-      {criandoPasta && (
-        <EditarPastaDialog area="simulado" paiId={paiAtual} cardView={cardView} onClose={() => setCriandoPasta(false)} onSaved={() => router.refresh()} />
       )}
     </div>
   )
