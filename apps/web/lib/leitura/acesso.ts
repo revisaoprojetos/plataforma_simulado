@@ -154,7 +154,7 @@ export interface DocumentoCarregado {
   anotacoes: AnotacaoAluno[]
   questoes: QuestaoLeituraDados[]
   grifos: GrifoLei[]
-  prefs: { tema: string | null; fonte: number | null; modo: string | null; semGrifos: boolean | null } | null
+  prefs: { tema: string | null; fonte: number | null; modo: string | null; semGrifos: boolean | null; grifoRotulos: Record<string, string> | null } | null
   ultimoDisp: string | null
   favorito: boolean
   atualizacao: AtualizacaoInfo | null
@@ -309,12 +309,16 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
   let ultimoDisp: string | null = null
   let favorito = false
   try {
-    const [pf, up, fv] = await Promise.all([
-      svc.from('simulado_leitura_preferencias').select('tema, fonte, modo, sem_grifos').eq('estudante_id', estudanteId).maybeSingle(),
+    let [pf, up, fv] = await Promise.all([
+      svc.from('simulado_leitura_preferencias').select('tema, fonte, modo, sem_grifos, grifo_rotulos').eq('estudante_id', estudanteId).maybeSingle(),
       svc.from('simulado_leitura_ultimo_ponto').select('disp_id').eq('estudante_id', estudanteId).eq('documento_id', documentoId).maybeSingle(),
       svc.from('simulado_lei_favoritos').select('id').eq('estudante_id', estudanteId).eq('documento_id', documentoId).eq('disp_id', '').maybeSingle(),
     ])
-    if (pf.data) prefs = { tema: (pf.data as any).tema ?? null, fonte: (pf.data as any).fonte ?? null, modo: (pf.data as any).modo ?? null, semGrifos: (pf.data as any).sem_grifos ?? null }
+    // `grifo_rotulos` é coluna nova (migração leitura_grifo_rotulos) — fallback tolerante sem ela.
+    if (pf.error && /grifo_rotulos|column/i.test(String(pf.error.message))) {
+      pf = await svc.from('simulado_leitura_preferencias').select('tema, fonte, modo, sem_grifos').eq('estudante_id', estudanteId).maybeSingle() as any
+    }
+    if (pf.data) prefs = { tema: (pf.data as any).tema ?? null, fonte: (pf.data as any).fonte ?? null, modo: (pf.data as any).modo ?? null, semGrifos: (pf.data as any).sem_grifos ?? null, grifoRotulos: (pf.data as any).grifo_rotulos ?? null }
     ultimoDisp = (up.data as any)?.disp_id ?? null
     favorito = !!fv.data
   } catch { /* migração A6 ausente */ }

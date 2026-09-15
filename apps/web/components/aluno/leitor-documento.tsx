@@ -42,6 +42,10 @@ const TEMAS: Record<Tema, { bg: string; fg: string; muted: string; desk: string;
 }
 const GAP = 48 // entre "páginas" no modo virar
 const CORES_GRIFO = ['#fde047', '#86efac', '#93c5fd', '#f9a8d4', '#fca5a5'] // amarelo/verde/azul/rosa/vermelho
+// Rótulos-padrão da legenda das cores do aluno (renomeáveis; salvos por aluno nas preferências).
+const ROTULOS_GRIFO_PADRAO: Record<string, string> = {
+  '#fde047': 'Importante', '#86efac': 'Revisar', '#93c5fd': 'Conceito', '#f9a8d4': 'Dúvida', '#fca5a5': 'Exceção',
+}
 // useLayoutEffect só faz sentido no cliente (evita warning de SSR do leitor).
 const useIsoLayout = typeof window !== 'undefined' ? useLayoutEffect : useEffect
 
@@ -179,6 +183,14 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
   const temGrifosBaked = /data-grifo=|data-caixa=|\bhl-[ygr]\b|\bbox-(stj|stf|cinza|atencao)/.test(doc.html)
   const [semGrifos, setSemGrifos] = useState(!!doc.prefs?.semGrifos)
   const [mostrarMeus, setMostrarMeus] = useState(true) // "Meus grifos": ligado por padrão; desligar oculta os grifos do aluno
+  // Legenda das cores do aluno (renomeável): padrão + o que o aluno já salvou. Salva debounced.
+  const [rotulos, setRotulos] = useState<Record<string, string>>(() => ({ ...ROTULOS_GRIFO_PADRAO, ...((doc.prefs?.grifoRotulos as Record<string, string> | null) ?? {}) }))
+  const rotulosMontou = useRef(false)
+  useEffect(() => {
+    if (!rotulosMontou.current) { rotulosMontou.current = true; return }
+    const t = setTimeout(() => { fetch('/api/leitura/preferencias', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ grifo_rotulos: rotulos }) }).catch(() => {}) }, 800)
+    return () => clearTimeout(t)
+  }, [rotulos])
   // Modo caneta: cor armada (hex) ou 'apagar' ou null. Escolhe a ferramenta e DEPOIS seleciona o texto.
   const [ferramenta, setFerramenta] = useState<string | null>(null)
   const [grifosRects, setGrifosRects] = useState<Record<string, { rects: RectRel[]; tipo: string }>>({})
@@ -1216,6 +1228,20 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
                   : ferramenta ? 'Agora selecione o texto para grifar.'
                   : 'Escolha uma cor e depois selecione o texto.'}
               </p>
+            </div>
+            {/* Legenda das MINHAS cores — o aluno nomeia o que cada cor significa (salva sozinho). */}
+            <div>
+              <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide" style={{ color: cores.muted }}>Legenda (minhas cores)</p>
+              <div className="space-y-1">
+                {CORES_GRIFO.map((c) => (
+                  <div key={c} className="flex items-center gap-2">
+                    <span className="h-4 w-4 shrink-0 rounded-full border border-black/10" style={{ background: c }} />
+                    <input value={rotulos[c] ?? ''} onChange={(e) => setRotulos((p) => ({ ...p, [c]: e.target.value }))}
+                      maxLength={24} placeholder="Nomear…" aria-label={`Nome da cor ${c}`}
+                      className="min-w-0 flex-1 rounded-md border bg-transparent px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-ring" style={{ borderColor: '#0000001a', color: cores.fg }} />
+                  </div>
+                ))}
+              </div>
             </div>
             <div className="flex items-center justify-between gap-1 text-xs" style={{ color: cores.muted }}>
               <span className="inline-flex items-center gap-1"><Undo2 className="h-3.5 w-3.5" /> Histórico</span>

@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
   try { b = await request.json() } catch { return NextResponse.json({ message: 'Requisição inválida.' }, { status: 400 }) }
   const svc = createAdminClient()
   const row: Record<string, unknown> = { tenant_id: sessao.tenantId, estudante_id: sessao.estudanteId, atualizado_em: new Date().toISOString() }
-  for (const k of ['tema', 'fonte', 'espacamento', 'largura', 'sem_grifos', 'painel', 'modo'] as const) if (k in b) row[k] = b[k]
+  for (const k of ['tema', 'fonte', 'espacamento', 'largura', 'sem_grifos', 'painel', 'modo', 'grifo_rotulos'] as const) if (k in b) row[k] = b[k]
   const { error } = await svc.from('simulado_leitura_preferencias').upsert(row, { onConflict: 'estudante_id' })
   if (error) return NextResponse.json({ message: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
