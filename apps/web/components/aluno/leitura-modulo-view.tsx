@@ -1,14 +1,13 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { Route, BarChart3, Check, Lock, AlertTriangle, ArrowRight, Search, Loader2, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { TrilhaGigante, type Trilha } from '@/components/aluno/trilha-simulados'
 import type { AulaDesempenho } from '@/lib/leitura/trilha'
 import { buscarNaTrilha, type ResultadoBuscaTrilha } from '@/app/aluno/(portal)/leitura/busca-actions'
-
-type Aba = 'trilha' | 'desempenho'
 
 /** Visão de um módulo do LegProc Digital: tabs Trilha | Desempenho + aviso de questões pendentes. */
 export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulasPendentes }: {
@@ -18,7 +17,6 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
   pendentes: number
   aulasPendentes: number
 }) {
-  const [aba, setAba] = useState<Aba>('trilha')
   // 1ª aula com questões pendentes (leitura feita) → alvo do CTA do aviso.
   const alvoPend = desempenho.find((a) => a.leituraConcluida && a.questoesPendentes > 0)
 
@@ -27,6 +25,7 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
   const [resultados, setResultados] = useState<ResultadoBuscaTrilha[] | null>(null)
   const [buscando, iniciarBusca] = useTransition()
   const estadoDe = new Map(desempenho.map((a) => [a.id, a.estado]))
+  const buscaRef = useRef<HTMLDivElement>(null)
   function onBuscar(e: React.FormEvent) {
     e.preventDefault()
     const termo = q.trim()
@@ -37,58 +36,16 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
     })
   }
   function limparBusca() { setQ(''); setResultados(null) }
+  // Fecha o dropdown de resultados ao clicar fora.
+  useEffect(() => {
+    if (resultados === null) return
+    const onDown = (e: MouseEvent) => { if (buscaRef.current && !buscaRef.current.contains(e.target as Node)) setResultados(null) }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [resultados])
 
   return (
     <div className="space-y-4">
-      {/* Busca: artigo ou palavra → abre a aula no ponto pesquisado */}
-      <div className="rounded-xl border bg-card p-2 shadow-sm">
-        <form onSubmit={onBuscar} className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar artigo ou palavra nas aulas…"
-              className="w-full rounded-lg border bg-[var(--input-bg,transparent)] py-2 pl-9 pr-8 text-sm outline-none focus:ring-1 focus:ring-ring" />
-            {q && (
-              <button type="button" onClick={limparBusca} aria-label="Limpar" className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
-            )}
-          </div>
-          <button type="submit" disabled={buscando || q.trim().length < 2}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50">
-            {buscando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />} Buscar
-          </button>
-        </form>
-
-        {resultados !== null && (
-          <div className="mt-2 space-y-1.5 border-t pt-2">
-            {buscando ? (
-              <p className="px-1 py-3 text-center text-sm text-muted-foreground">Buscando…</p>
-            ) : resultados.length === 0 ? (
-              <p className="px-1 py-3 text-center text-sm text-muted-foreground">Nada encontrado nas aulas deste módulo.</p>
-            ) : resultados.map((r) => {
-              const bloqueada = estadoDe.get(r.docId) === 'bloqueado'
-              const inner = (
-                <>
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-sm font-medium">{r.titulo}</span>
-                    <span className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary">{r.ocorrencias}×</span>
-                  </div>
-                  <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{r.trecho}</p>
-                </>
-              )
-              return bloqueada ? (
-                <div key={r.docId} className="cursor-not-allowed rounded-lg border border-dashed px-3 py-2 opacity-60" title="Conclua a aula anterior para abrir">
-                  <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Lock className="h-3 w-3" /> Bloqueada</div>
-                  {inner}
-                </div>
-              ) : (
-                <Link key={r.docId} href={`/aluno/leitura/${r.docId}?busca=${encodeURIComponent(q.trim())}`}
-                  className="block rounded-lg border px-3 py-2 transition-colors hover:border-primary/50 hover:bg-muted/40">
-                  {inner}
-                </Link>
-              )
-            })}
-          </div>
-        )}
-      </div>
       {/* Aviso de questões pendentes */}
       {pendentes > 0 && (
         <div className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
@@ -106,22 +63,69 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
         </div>
       )}
 
-      {/* Tabs */}
-      <div className="flex items-center gap-1 rounded-xl border bg-muted/40 p-1 text-sm">
-        {([['trilha', 'Trilha', Route], ['desempenho', 'Desempenho', BarChart3]] as const).map(([k, label, Icon]) => (
-          <button key={k} onClick={() => setAba(k)}
-            className={cn('inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 font-medium transition-colors',
-              aba === k ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
-            <Icon className="h-4 w-4" /> {label}
-          </button>
-        ))}
-      </div>
+      <Tabs defaultValue="trilha">
+        {/* Mesma linha: tabs sublinhadas (esquerda) + busca compacta (direita).
+            items-end → o indicador da trilha encosta na linha de baixo (borda do wrapper). */}
+        <div className="flex items-end justify-between gap-3 border-b">
+          <TabsList className="w-fit border-b-0">
+            <TabsTrigger value="trilha"><Route className="h-4 w-4" /> Trilha</TabsTrigger>
+            <TabsTrigger value="desempenho"><BarChart3 className="h-4 w-4" /> Desempenho</TabsTrigger>
+          </TabsList>
 
-      {aba === 'trilha' ? (
-        <div className="overflow-x-auto pb-10"><TrilhaGigante trilhas={[trilha]} gamAtivo={false} reto semFundo /></div>
-      ) : (
-        <DesempenhoModulo desempenho={desempenho} />
-      )}
+          <div ref={buscaRef} className="relative mb-1.5 w-full max-w-[15rem] shrink-0">
+            <form onSubmit={onBuscar}>
+              {buscando
+                ? <Loader2 className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+                : <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />}
+              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar nas aulas…" aria-label="Buscar artigo ou palavra nas aulas"
+                className="h-9 w-full rounded-lg border bg-[var(--input-bg,transparent)] pl-8 pr-8 text-sm outline-none focus:ring-1 focus:ring-ring" />
+              {q && (
+                <button type="button" onClick={limparBusca} aria-label="Limpar" className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+              )}
+            </form>
+
+            {/* Resultados em dropdown (sem empurrar o layout) */}
+            {resultados !== null && (
+              <div className="absolute right-0 top-full z-30 mt-1.5 max-h-[60vh] w-80 max-w-[85vw] space-y-1.5 overflow-y-auto rounded-xl border bg-card p-1.5 shadow-lg">
+                {buscando ? (
+                  <p className="px-1 py-3 text-center text-sm text-muted-foreground">Buscando…</p>
+                ) : resultados.length === 0 ? (
+                  <p className="px-1 py-3 text-center text-sm text-muted-foreground">Nada encontrado nas aulas deste módulo.</p>
+                ) : resultados.map((r) => {
+                  const bloqueada = estadoDe.get(r.docId) === 'bloqueado'
+                  const inner = (
+                    <>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate text-sm font-medium">{r.titulo}</span>
+                        <span className="shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary">{r.ocorrencias}×</span>
+                      </div>
+                      <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{r.trecho}</p>
+                    </>
+                  )
+                  return bloqueada ? (
+                    <div key={r.docId} className="cursor-not-allowed rounded-lg border border-dashed px-3 py-2 opacity-60" title="Conclua a aula anterior para abrir">
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><Lock className="h-3 w-3" /> Bloqueada</div>
+                      {inner}
+                    </div>
+                  ) : (
+                    <Link key={r.docId} href={`/aluno/leitura/${r.docId}?busca=${encodeURIComponent(q.trim())}`}
+                      className="block rounded-lg border px-3 py-2 transition-colors hover:border-primary/50 hover:bg-muted/40">
+                      {inner}
+                    </Link>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <TabsContent value="trilha" className="pt-4">
+          <div className="overflow-x-auto pb-10"><TrilhaGigante trilhas={[trilha]} gamAtivo={false} reto semFundo /></div>
+        </TabsContent>
+        <TabsContent value="desempenho" className="pt-4">
+          <DesempenhoModulo desempenho={desempenho} />
+        </TabsContent>
+      </Tabs>
     </div>
   )
 }
