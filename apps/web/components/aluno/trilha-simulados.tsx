@@ -512,9 +512,11 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
           um path próprio p/ manter a cor (concluído x pendente), mas as tangentes são compartilhadas
           com os vizinhos → sem "quebras" nas junções. */}
       <svg className="absolute left-0 top-0 overflow-visible" width={LANE} height={height} aria-hidden>
-        {/* Conector do topo (banner) até o 1º dia — só quando não há divisória (LegProc). */}
+        {/* Conector do topo (banner) até o 1º dia — só quando não há divisória (LegProc). Começa acima de 0
+            (por trás do banner, com overflow-visible no container) → um ponto fica sob o banner e o 1º
+            ponto visível aparece INTEIRO logo abaixo, "emergindo" do banner sem corte. */}
         {semDivisoria && nodesL[0] && (
-          <path d={`M ${cx(nodesL[0].off)} 0 L ${cx(nodesL[0].off)} ${nodesL[0].y}`} fill="none" strokeWidth={6} strokeLinecap="round" strokeDasharray="0.1 16"
+          <path d={`M ${cx(nodesL[0].off)} -8 L ${cx(nodesL[0].off)} ${nodesL[0].y}`} fill="none" strokeWidth={6} strokeLinecap="round" strokeDasharray="0.1 16"
             stroke={nodesL[0].n.estado === 'concluido' ? COR : 'var(--border)'} />
         )}
         {allPts.slice(0, -1).map((p, i) => {
