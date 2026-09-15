@@ -24,16 +24,20 @@ async function guard() {
   return { ok: true as const, tenantId: access.tenantId, atorId: access.userId ?? null }
 }
 
-/** Salva a config GLOBAL do "fade" lateral dos cards (tema.card_fade). Chamada pelo diálogo Personalizar. */
-export async function salvarCardFadeAction(input: { ativo: boolean; cor: string | null }): Promise<{ ok: boolean; error?: string }> {
+/** Salva o "fade" lateral do card de UMA pasta (por pasta) em tema.card_fade_pastas[pastaId].
+ * Migration-free (jsonb no tema) — não depende de coluna nova em simulado_pastas. */
+export async function salvarPastaCardFade(pastaId: string, cf: { ativo: boolean; cor: string | null }): Promise<{ ok: boolean; error?: string }> {
   const g = await guard()
   if (!g.ok) return g
+  if (!pastaId) return { ok: false, error: 'Pasta inválida.' }
   const svc = createAdminClient()
   const { data: t } = await svc.from('simulado_tenants').select('tema').eq('id', g.tenantId).maybeSingle()
-  const tema = { ...(((t as any)?.tema) ?? {}), card_fade: { ativo: !!input.ativo, cor: input.cor || null } }
-  const { error } = await svc.from('simulado_tenants').update({ tema }).eq('id', g.tenantId)
+  const tema = (((t as any)?.tema) ?? {}) as Record<string, any>
+  const map = { ...(tema.card_fade_pastas ?? {}) } as Record<string, unknown>
+  map[pastaId] = { ativo: !!cf.ativo, cor: cf.cor || null }
+  const { error } = await svc.from('simulado_tenants').update({ tema: { ...tema, card_fade_pastas: map } }).eq('id', g.tenantId)
   if (error) return { ok: false, error: error.message }
-  revalidatePath('/admin/simulados'); revalidatePath('/', 'layout')
+  revalidatePath('/admin/simulados')
   return { ok: true }
 }
 

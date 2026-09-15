@@ -166,8 +166,10 @@ async function BoardData({ pastaParam }: { pastaParam?: string }) {
   const foldersNivel = current ? [] : folders
 
   const capa = (b: any) => (b.capa_card_url ?? b.capa_url) ?? null
+  // Fade lateral POR PASTA (tema.card_fade_pastas[id]) — getCurrentTenant é memoizado (sem 2ª query).
+  const cardFadePastas = (((await getCurrentTenant())?.tema as any)?.card_fade_pastas ?? {}) as Record<string, { ativo?: boolean; cor?: string | null }>
   // `capa` = pôster (card 4:5, prefere capa_card_url); `capaLarga` = banner (capa_url) usado no card ticket.
-  const foldersOut = foldersNivel.map((f) => ({ id: f.id, nome: f.nome, cor: f.cor ?? null, icone: f.icone ?? null, capa: capa(f), capaLarga: f.capa_url ?? null, count: contPasta.get(f.id) ?? 0 }))
+  const foldersOut = foldersNivel.map((f) => ({ id: f.id, nome: f.nome, cor: f.cor ?? null, icone: f.icone ?? null, capa: capa(f), capaLarga: f.capa_url ?? null, count: contPasta.get(f.id) ?? 0, cardFade: cardFadePastas[f.id] ?? null }))
   const destinos = folders.map((f) => ({ id: f.id, nome: f.nome }))
 
   // Catálogo (view horizontal estilo Netflix): simulados agrupados pela PASTA DO BANCO de simulado
@@ -205,7 +207,6 @@ async function BoardData({ pastaParam }: { pastaParam?: string }) {
       atual={current ? { id: current.id, nome: current.nome } : null}
       catalogo={{ sims: catalogoSims as (SimuladoCard & { grupoId: string | null })[], grupos: catalogoGrupos }}
       cardView={cardView}
-      cardFade={temaCards.card_fade ?? null}
     />
   )
 }

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
-import { atualizarBanco, criarPastaFolder, lerCapaMeta, salvarCardFadeAction } from '@/app/admin/banco-questoes/actions'
+import { atualizarBanco, criarPastaFolder, lerCapaMeta, salvarPastaCardFade } from '@/app/admin/banco-questoes/actions'
 import { type CapaMetaIn } from '@/lib/capa-meta'
 import { BANCO_CORES } from '@/lib/banco-visual'
 import { Loader2, X, Check, Palette, ImagePlus, Trash2, RefreshCw, Crop } from 'lucide-react'
@@ -64,18 +64,10 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
   const [capaCard, setCapaCard] = useState<string | null>(pasta?.capa ?? null)
   const [capaLarga, setCapaLarga] = useState<string | null>(pasta?.capaLarga ?? null)
   const [salvando, setSalvando] = useState(false)
-  // Fade lateral dos cards (GLOBAL, tema.card_fade). Só faz sentido p/ simulados/bancos.
+  // Fade lateral do card DESTA pasta (por-pasta, tema.card_fade_pastas[id]). Só p/ simulados/bancos.
   const mostrarFade = area == null || area === 'simulado' || area === 'banco'
   const [fadeAtivo, setFadeAtivo] = useState<boolean>((cardFade as any)?.ativo !== false)
   const [fadeCor, setFadeCor] = useState<string>(typeof (cardFade as any)?.cor === 'string' ? (cardFade as any).cor : '')
-  // Aplica a var na hora (feedback imediato nos cards atrás e na prévia) — persistência é no salvar.
-  function aplicarFadeVar(ativo: boolean, corV: string) {
-    if (typeof document === 'undefined') return
-    const el = document.documentElement
-    if (!ativo) el.style.setProperty('--sim-card-fade', 'transparent')
-    else if (corV) el.style.setProperty('--sim-card-fade', corV)
-    else el.style.removeProperty('--sim-card-fade')
-  }
   // Editor de recorte (posição + zoom) na proporção certa, aberto ao escolher OU ao "Ajustar".
   const [cropper, setCropper] = useState<{ file?: File; src?: string; alvo: 'card' | 'banner'; aspect: number; titulo: string; zoom?: number; center?: { x: number; y: number } } | null>(null)
   // Fonte ORIGINAL + estado do recorte por imagem — p/ REEDITAR de onde parou (re-recorta do original).
@@ -144,17 +136,18 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
   async function salvar() {
     if (!nome.trim()) { toast.error('Informe um nome.'); return }
     setSalvando(true)
-    // Fade é config global (independe da pasta): persiste best-effort + aplica na hora.
-    if (mostrarFade) { aplicarFadeVar(fadeAtivo, fadeCor.trim()); void salvarCardFadeAction({ ativo: fadeAtivo, cor: fadeCor.trim() || null }).catch(() => {}) }
     const meta = await montarMeta()
+    const cf = { ativo: fadeAtivo, cor: fadeCor.trim() || null }
     if (criar) {
       const r = await criarPastaFolder(nome.trim(), paiId, area)
       if (!r.ok || !r.id) { setSalvando(false); toast.error(r.error ?? 'Erro ao criar'); return }
       await atualizarBanco(r.id, nome.trim(), cor, null, capaLarga, capaCard, meta)
+      if (mostrarFade) await salvarPastaCardFade(r.id, cf) // fade só desta pasta
       setSalvando(false)
       toast.success(paiId ? `Sub${rot} ${gp('criado', 'criada')}` : `${Rot} ${gp('criado', 'criada')}`); onSaved(); onClose()
     } else {
       const r = await atualizarBanco(pasta!.id!, nome.trim(), cor, null, capaLarga, capaCard, meta)
+      if (mostrarFade && r.ok) await salvarPastaCardFade(pasta!.id!, cf) // fade só desta pasta
       setSalvando(false)
       if (r.ok) { toast.success(`${Rot} ${gp('atualizado', 'atualizada')}`); onSaved({ nome: nome.trim(), cor, capa: capaCard, capaLarga }); onClose() }
       else toast.error(r.error ?? 'Erro ao salvar')
@@ -249,24 +242,24 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
               </div>
             </div>
 
-            {/* Fade lateral dos cards (GLOBAL) — abaixo da Cor. Desliga / troca a cor do degradê à direita. */}
+            {/* Fade lateral do card DESTA pasta — abaixo da Cor. Desliga / troca a cor do degradê à direita. */}
             {mostrarFade && (
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-muted-foreground">Fade lateral dos cards <span className="font-normal normal-case">(afeta todos os cards)</span></label>
+                <label className="text-xs font-medium text-muted-foreground">Fade lateral do card <span className="font-normal normal-case">(só esta pasta)</span></label>
                 <div className="flex flex-wrap items-center gap-3">
                   <label className="flex cursor-pointer items-center gap-2 text-sm">
-                    <input type="checkbox" checked={fadeAtivo} onChange={(e) => { setFadeAtivo(e.target.checked); aplicarFadeVar(e.target.checked, fadeCor.trim()) }} className="h-4 w-4 accent-[var(--primary)]" />
+                    <input type="checkbox" checked={fadeAtivo} onChange={(e) => setFadeAtivo(e.target.checked)} className="h-4 w-4 accent-[var(--primary)]" />
                     Mostrar o fade
                   </label>
                   {fadeAtivo && (
                     <span className="inline-flex items-center gap-2">
                       <label className="relative inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border" title="Cor do fade">
                         <span className="absolute inset-0" style={{ background: fadeCor || 'conic-gradient(from 0deg, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)' }} />
-                        <input type="color" value={fadeCor || '#6d28d9'} onChange={(e) => { setFadeCor(e.target.value); aplicarFadeVar(fadeAtivo, e.target.value) }} className="absolute inset-0 cursor-pointer opacity-0" />
+                        <input type="color" value={fadeCor || '#6d28d9'} onChange={(e) => setFadeCor(e.target.value)} className="absolute inset-0 cursor-pointer opacity-0" />
                       </label>
                       {fadeCor
-                        ? <button type="button" onClick={() => { setFadeCor(''); aplicarFadeVar(fadeAtivo, '') }} className="text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground">usar a cor de cada card</button>
-                        : <span className="text-xs text-muted-foreground">(cor de cada card)</span>}
+                        ? <button type="button" onClick={() => setFadeCor('')} className="text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground">usar a cor da pasta</button>
+                        : <span className="text-xs text-muted-foreground">(cor da pasta)</span>}
                     </span>
                   )}
                 </div>

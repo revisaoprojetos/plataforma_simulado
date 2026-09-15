@@ -287,7 +287,7 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
             ? <img src={capaT} alt="" className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105" />
             : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
           {!capa && <BancoIcon className="absolute -right-4 -top-4 h-28 w-28 text-white/10" />}
-          <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `linear-gradient(110deg, transparent 45%, var(--sim-card-fade, ${cor}))` }} />
+          <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `linear-gradient(110deg, transparent 45%, ${cor})` }} />
           {online > 0 && (
             <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-md bg-emerald-500/90 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur" title={`${online} aluno(s) fazendo agora`}>
               <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" /><span className="relative inline-flex h-2 w-2 rounded-full bg-white" /></span>
@@ -495,11 +495,11 @@ function NovoTile({ pastaNome, variant = 'poster' }: { pastaNome?: string; varia
   )
 }
 
-type PastaSim = { id: string; nome: string; cor?: string | null; icone?: string | null; capa?: string | null; capaLarga?: string | null; count: number }
+type PastaSim = { id: string; nome: string; cor?: string | null; icone?: string | null; capa?: string | null; capaLarga?: string | null; count: number; cardFade?: { ativo?: boolean; cor?: string | null } | null }
 type DestinoSim = { id: string; nome: string }
 export type SimuladoCatalogo = SimuladoCard & { grupoId: string | null }
 
-export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders = [], destinos = [], atual = null, catalogo, cardView = 'poster', vistaInicial, cardFade = null }: {
+export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders = [], destinos = [], atual = null, catalogo, cardView = 'poster', vistaInicial }: {
   simulados: SimuladoCard[]; appUrl: string; onlineInicial?: Record<string, number>
   folders?: PastaSim[]; destinos?: DestinoSim[]; atual?: { id: string; nome: string } | null
   catalogo?: { sims: SimuladoCatalogo[]; grupos: PastaSim[] }
@@ -507,8 +507,6 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
   cardView?: CardView
   /** Tipo de exibição SALVO por este admin (individual). Undefined = admin novo → cai no padrão. */
   vistaInicial?: 'linhas' | 'pastas' | 'status'
-  /** Config global do fade lateral dos cards (tema.card_fade) — editável no diálogo Personalizar. */
-  cardFade?: { ativo?: boolean; cor?: string | null } | null
 }) {
   const router = useRouter()
   const [, start] = useTransition()
@@ -697,13 +695,13 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
       {editandoPasta && (
         <EditarPastaDialog
           pasta={{ id: editandoPasta.id, nome: editandoPasta.nome, cor: editandoPasta.cor ?? null, capa: editandoPasta.capa ?? null, capaLarga: (editandoPasta as any).capaLarga ?? null }}
-          cardView={cardView} cardFade={cardFade}
+          cardView={cardView} cardFade={editandoPasta.cardFade ?? null}
           onClose={() => setEditandoPasta(null)}
           onSaved={() => router.refresh()}
         />
       )}
       {criandoPasta && (
-        <EditarPastaDialog area="simulado" cardView={cardView} cardFade={cardFade} onClose={() => setCriandoPasta(false)} onSaved={() => router.refresh()} />
+        <EditarPastaDialog area="simulado" cardView={cardView} onClose={() => setCriandoPasta(false)} onSaved={() => router.refresh()} />
       )}
     </div>
   )
@@ -720,6 +718,9 @@ function FolderTile({ folder, count, appUrl, onPersonalizar, onExcluir, variant 
   // Capa efetiva: a da PASTA (card→banner); se não tiver, cai na capa de um SIMULADO de dentro (fallback)
   // → pastas sem capa própria não ficam com o gradiente "vazio".
   const capaEff = folder.capa ?? folder.capaLarga ?? capaFallback ?? null
+  // Fade lateral POR PASTA (tema.card_fade_pastas[id]) — cada pasta liga/desliga e escolhe a cor.
+  const fadeOn = folder.cardFade?.ativo !== false
+  const fadeCor = folder.cardFade?.cor || cor
   const href = `/admin/simulados?pasta=${folder.id}`
   async function copiarLink() {
     const url = `${appUrl}/aluno?pasta=${folder.id}`
@@ -745,7 +746,7 @@ function FolderTile({ folder, count, appUrl, onPersonalizar, onExcluir, variant 
             ? <img src={capaT} alt="" className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105" />
             : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
           {!capaT && <Icon className="absolute -right-4 -top-4 h-28 w-28 text-white/10" />}
-          <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `linear-gradient(110deg, transparent 45%, var(--sim-card-fade, ${cor}))` }} />
+          {fadeOn && <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `linear-gradient(110deg, transparent 45%, ${fadeCor})` }} />}
         </div>
         <Link href={href} className="absolute inset-0 z-10" aria-label={folder.nome} />
         <div className="absolute right-2 top-2 z-30">
