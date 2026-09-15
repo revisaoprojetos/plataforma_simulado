@@ -91,11 +91,13 @@ function LegendaBar({ cores, escuro, noTopo }: { cores: { fg: string; muted: str
   )
 }
 
-export function LeitorDocumento({ doc, trilha }: {
+export function LeitorDocumento({ doc, trilha, buscaInicial }: {
   doc: DocumentoCarregado
   // Modo trilha (2 etapas): 'leitura' = leitura pura (SEM questões inline; ao concluir → CTA questões);
   // 'questoes' = painel read-only de consulta (documento + grifos, sem inline, sem concluir).
   trilha?: { modo: 'leitura' | 'questoes'; questoesHref?: string; voltarHref?: string }
+  // Termo vindo da busca da trilha (?busca=): abre a busca já preenchida e pula ao 1º resultado.
+  buscaInicial?: string
 }) {
   const [modo, setModo] = useState<Modo>((doc.prefs?.modo as Modo) || 'scroll')
   // Tema da leitura sincronizado com o claro/escuro do sistema (next-themes). Café (sepia) é override
@@ -160,10 +162,13 @@ export function LeitorDocumento({ doc, trilha }: {
   const [slots, setSlots] = useState<{ q: DocumentoCarregado['questoes'][number]; el: HTMLElement }[]>([])
 
   // Busca dentro da lei
-  const [buscaAberta, setBuscaAberta] = useState(false)
-  const [buscaQ, setBuscaQ] = useState('')
+  const buscaIni = (buscaInicial ?? '').trim()
+  const [buscaAberta, setBuscaAberta] = useState(!!buscaIni)
+  const [buscaQ, setBuscaQ] = useState(buscaIni)
   const [matches, setMatches] = useState<{ rects: RectRel[]; el: HTMLElement | null }[]>([])
   const [matchIdx, setMatchIdx] = useState(0)
+  // Pulo automático ao 1º resultado quando a busca veio da trilha (?busca=) — só 1 vez, após montar os matches.
+  const buscaAutoRef = useRef(!buscaIni)
 
   // Grifos editoriais (conteúdo compartilhado) + modo sem grifos.
   // Memoizado: `doc.grifos ?? []` gerava um array NOVO a cada render → recomputarGrifos era recriado
@@ -608,6 +613,13 @@ export function LeitorDocumento({ doc, trilha }: {
     }
     levar()
   }
+
+  // Busca vinda da trilha (?busca=): quando os matches ficam prontos, pula ao 1º UMA vez.
+  useEffect(() => {
+    if (buscaAutoRef.current) return
+    if (matches.length > 0) { buscaAutoRef.current = true; irMatch(0) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [matches])
 
   // ── Anotações: seleção → (modo caneta aplica direto | senão popover), criar/editar/excluir, pular ──
   function aoSelecionar() {

@@ -7,9 +7,10 @@ import { LeitorDocumento } from '@/components/aluno/leitor-documento'
 
 export const dynamic = 'force-dynamic'
 
-export default async function LeitorPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function LeitorPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ busca?: string }> }) {
   if (!LEITURA_ATIVA) redirect('/aluno')
   const { id } = await params
+  const { busca } = await searchParams
   const sessao = await getSessaoAluno()
   if (!sessao) redirect('/aluno/entrar')
   // Gate rígido: aula bloqueada (anterior não concluída) → volta à trilha.
@@ -18,5 +19,5 @@ export default async function LeitorPage({ params }: { params: Promise<{ id: str
   const doc = await carregarDocumentoAluno(id, sessao.estudanteId, sessao.tenantId)
   if (!doc) notFound()
 
-  return <LeitorDocumento doc={doc} trilha={{ modo: 'leitura', questoesHref: `/aluno/leitura/${id}/questoes`, voltarHref: '/aluno/leitura' }} />
+  return <LeitorDocumento doc={doc} buscaInicial={busca ?? undefined} trilha={{ modo: 'leitura', questoesHref: `/aluno/leitura/${id}/questoes`, voltarHref: '/aluno/leitura' }} />
 }
