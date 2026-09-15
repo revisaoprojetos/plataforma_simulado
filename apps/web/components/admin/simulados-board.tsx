@@ -646,6 +646,7 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
             <div className={gradeCls(cardView)}>
               {secoesPasta.pastas.map(({ folder, sims }) => folder && (
                 <FolderTile key={folder.id} folder={folder} count={sims.length} appUrl={appUrl}
+                  capaFallback={sims.map((s) => s.vis?.capa ?? s.vis?.capaBanner ?? null).find(Boolean) ?? null}
                   onPersonalizar={() => setEditandoPasta(folder)} onExcluir={() => excluirPasta(folder)} variant={cardView} />
               ))}
             </div>
@@ -709,11 +710,14 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
 /** Uma seção de PASTA: cabeçalho (nome + contagem + status + ações em massa) e grade de cards. */
 /** Tile de PASTA (view "Pastas"): pôster que leva para dentro da pasta (?pasta=id) → simulados de lá.
  *  Menu de 3 pontos: personalizar, copiar link e excluir. */
-function FolderTile({ folder, count, appUrl, onPersonalizar, onExcluir, variant = 'poster' }: {
-  folder: PastaSim; count: number; appUrl: string; onPersonalizar: () => void; onExcluir: () => void; variant?: CardView
+function FolderTile({ folder, count, appUrl, onPersonalizar, onExcluir, variant = 'poster', capaFallback = null }: {
+  folder: PastaSim; count: number; appUrl: string; onPersonalizar: () => void; onExcluir: () => void; variant?: CardView; capaFallback?: string | null
 }) {
   const cor = folder.cor ?? '#6d28d9'
   const Icon = iconeBanco(folder.icone)
+  // Capa efetiva: a da PASTA (card→banner); se não tiver, cai na capa de um SIMULADO de dentro (fallback)
+  // → pastas sem capa própria não ficam com o gradiente "vazio".
+  const capaEff = folder.capa ?? folder.capaLarga ?? capaFallback ?? null
   const href = `/admin/simulados?pasta=${folder.id}`
   async function copiarLink() {
     const url = `${appUrl}/aluno?pasta=${folder.id}`
@@ -731,7 +735,7 @@ function FolderTile({ folder, count, appUrl, onPersonalizar, onExcluir, variant 
 
   // ===== Variante TICKET: retangular baixo — imagem à esquerda, nome/contagem/ação à direita. =====
   if (variant === 'ticket') {
-    const capaT = folder.capa ?? folder.capaLarga // IMAGEM DO CARD (capa_card_url) primeiro; banner só se não houver
+    const capaT = capaEff // capa da pasta (card→banner) ou, se não houver, de um simulado de dentro
     return (
       <div className="group relative flex h-32 overflow-hidden rounded-2xl border bg-card shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg sm:h-36">
         <div className="relative w-[38%] max-w-[12rem] shrink-0 overflow-hidden">
@@ -773,13 +777,13 @@ function FolderTile({ folder, count, appUrl, onPersonalizar, onExcluir, variant 
     <div className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
       {/* Pôster clicável (entra na pasta). */}
       <Link href={href} className="absolute inset-0 flex flex-col justify-end outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
-        {folder.capa ? (
+        {capaEff ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={folder.capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+          <img src={capaEff} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
         ) : (
           <div className="absolute inset-0" style={{ background: `linear-gradient(150deg, ${cor} 0%, #0f172a 150%)` }} />
         )}
-        {!folder.capa && <Icon className="pointer-events-none absolute -right-4 -top-4 h-24 w-24 text-white/10" />}
+        {!capaEff && <Icon className="pointer-events-none absolute -right-4 -top-4 h-24 w-24 text-white/10" />}
         <div className="relative bg-gradient-to-t from-black/85 via-black/45 to-transparent p-3 pt-8">
           <p className="line-clamp-2 text-[13px] font-bold leading-tight text-white">{folder.nome}</p>
           <p className="mt-0.5 text-[11px] font-medium text-white/80">{count} simulado(s)</p>
