@@ -11,6 +11,7 @@ interface AulaStatus {
   questoesFeitas: boolean
   aulaConcluida: boolean
   questoesTotal: number
+  questoesRespondidas: number
 }
 interface AulaSeq extends AulaStatus { estado: EstadoAula; moduloId: string }
 
@@ -66,7 +67,8 @@ async function statusAulas(svc: any, tenantId: string, estId: string, docs: Docu
     const obrig = obrigPorDoc.get(d.id) ?? new Set<string>()
     const resp = respPorDoc.get(d.id) ?? new Set<string>()
     const questoesFeitas = [...obrig].every((qid) => resp.has(qid))
-    map.set(d.id, { doc: d, leituraConcluida: d.concluido, questoesFeitas, aulaConcluida: d.concluido && questoesFeitas, questoesTotal: totalPorDoc.get(d.id) ?? 0 })
+    const questoesRespondidas = [...obrig].filter((qid) => resp.has(qid)).length
+    map.set(d.id, { doc: d, leituraConcluida: d.concluido, questoesFeitas, aulaConcluida: d.concluido && questoesFeitas, questoesTotal: totalPorDoc.get(d.id) ?? 0, questoesRespondidas })
   }
   return map
 }
@@ -167,6 +169,46 @@ export async function carregarTrilhaLeituraAluno(estId: string, tenantId: string
     const nodes = (seqByModulo.get(m.id) ?? []).map(nodeDe)
     return { id: m.id, nome: m.nome, cor: m.cor, capa: m.capa, capaCard: m.capaCard, total: nodes.length, done: nodes.filter((n) => n.estado === 'concluido').length, trilhaXp: 0, nodes }
   }).filter((t) => t.nodes.length > 0)
+}
+
+export interface AulaDesempenho {
+  id: string
+  titulo: string
+  estado: EstadoAula
+  leituraPct: number
+  leituraConcluida: boolean
+  questoesTotal: number
+  questoesRespondidas: number
+  questoesPendentes: number
+}
+export interface ModuloCompleto {
+  trilha: Trilha | null
+  nome: string | null
+  desempenho: AulaDesempenho[]
+  /** Total de questões liberadas (leitura concluída) ainda NÃO respondidas — base do aviso de pendências. */
+  pendentes: number
+  /** Quantas aulas têm ao menos 1 questão pendente. */
+  aulasPendentes: number
+}
+
+/** Módulo aberto: a trilha (serpenteada) + o desempenho por aula + o resumo de pendências — numa passada. */
+export async function carregarModuloCompleto(estId: string, tenantId: string, moduloId: string): Promise<ModuloCompleto> {
+  const { modulos, seqByModulo } = await sequenciaLeitura(estId, tenantId)
+  const m = modulos.find((x) => x.id === moduloId)
+  if (!m) return { trilha: null, nome: null, desempenho: [], pendentes: 0, aulasPendentes: 0 }
+  const arr = seqByModulo.get(m.id) ?? []
+  const nodes = arr.map(nodeDe)
+  const trilha: Trilha = { id: m.id, nome: m.nome, cor: m.cor, capa: m.capa, capaCard: m.capaCard, total: nodes.length, done: nodes.filter((n) => n.estado === 'concluido').length, trilhaXp: 0, nodes }
+  const desempenho: AulaDesempenho[] = arr.map((a) => ({
+    id: a.doc.id, titulo: a.doc.titulo, estado: a.estado,
+    leituraPct: a.doc.pct, leituraConcluida: a.leituraConcluida,
+    questoesTotal: a.questoesTotal, questoesRespondidas: a.questoesRespondidas,
+    questoesPendentes: Math.max(0, a.questoesTotal - a.questoesRespondidas),
+  }))
+  // Pendência ACIONÁVEL = leitura concluída (questões liberadas) mas ainda faltam responder.
+  const comPend = arr.filter((a) => a.leituraConcluida && a.questoesTotal - a.questoesRespondidas > 0)
+  const pendentes = comPend.reduce((s, a) => s + (a.questoesTotal - a.questoesRespondidas), 0)
+  return { trilha, nome: m.nome, desempenho, pendentes, aulasPendentes: comPend.length }
 }
 
 /** Gate rígido p/ o servidor: onde a aula está na sequência (bloqueada? leitura ok?) + módulo e título
