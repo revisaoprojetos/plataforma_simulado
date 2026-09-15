@@ -39,6 +39,8 @@ import {
   FolderOpen,
   FolderCog,
   ChevronLeft,
+  ChevronRight,
+  Home,
   ChevronDown,
   FolderInput,
   Palette,
@@ -498,7 +500,7 @@ type PastaSim = { id: string; nome: string; cor?: string | null; icone?: string 
 type DestinoSim = { id: string; nome: string }
 export type SimuladoCatalogo = SimuladoCard & { grupoId: string | null }
 
-export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders = [], destinos = [], atual = null, catalogo, cardView = 'poster', vistaInicial }: {
+export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders = [], destinos = [], atual = null, catalogo, cardView = 'poster', vistaInicial, breadcrumb = [], paiAtual = null }: {
   simulados: SimuladoCard[]; appUrl: string; onlineInicial?: Record<string, number>
   folders?: PastaSim[]; destinos?: DestinoSim[]; atual?: { id: string; nome: string } | null
   catalogo?: { sims: SimuladoCatalogo[]; grupos: PastaSim[] }
@@ -506,6 +508,10 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
   cardView?: CardView
   /** Tipo de exibição SALVO por este admin (individual). Undefined = admin novo → cai no padrão. */
   vistaInicial?: 'linhas' | 'pastas' | 'status'
+  /** Caminho de pastas (Início → … → atual) para o breadcrumb de navegação aninhada. */
+  breadcrumb?: { id: string; nome: string }[]
+  /** Pasta do nível atual (pai das novas subpastas). null = raiz. */
+  paiAtual?: string | null
 }) {
   const router = useRouter()
   const [, start] = useTransition()
@@ -596,11 +602,12 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
       {/* Barra de ferramentas */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-1 flex-wrap items-center gap-2">
-          {atual ? (
-            <Link href="/admin/simulados" className="inline-flex items-center gap-1 rounded-lg border bg-card px-3 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-muted"><ChevronLeft className="h-4 w-4" /> Todas as pastas</Link>
-          ) : (
-            <button type="button" onClick={() => setCriandoPasta(true)} className="inline-flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-muted"><FolderPlus className="h-4 w-4" /> Nova pasta</button>
+          {atual && (
+            <Link href={breadcrumb.length > 1 ? `/admin/simulados?pasta=${breadcrumb[breadcrumb.length - 2].id}` : '/admin/simulados'}
+              className="inline-flex items-center gap-1 rounded-lg border bg-card px-2.5 py-2 text-sm font-medium shadow-sm transition-colors hover:bg-muted" title="Voltar"><ChevronLeft className="h-4 w-4" /></Link>
           )}
+          {/* Nova pasta cria SEMPRE no nível atual (subpasta da pasta aberta). */}
+          <button type="button" onClick={() => setCriandoPasta(true)} className="inline-flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-muted"><FolderPlus className="h-4 w-4" /> {atual ? 'Nova subpasta' : 'Nova pasta'}</button>
           <Input placeholder={atual ? `Buscar em “${atual.nome}”…` : 'Buscar simulado…'} value={busca} onChange={(e) => setBusca(e.target.value)} className="min-w-[180px] flex-1 lg:max-w-md" />
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -628,8 +635,17 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
       </div>
 
       {atual && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <FolderOpen className="h-4 w-4" /> <span className="font-medium text-foreground">{atual.nome}</span> — {totalFiltrado} simulado(s)
+        <div className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
+          <Link href="/admin/simulados" className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors hover:bg-muted hover:text-foreground"><Home className="h-3.5 w-3.5" /> Início</Link>
+          {breadcrumb.map((c, i) => (
+            <span key={c.id} className="inline-flex items-center gap-1">
+              <ChevronRight className="h-3.5 w-3.5" />
+              {i < breadcrumb.length - 1
+                ? <Link href={`/admin/simulados?pasta=${c.id}`} className="rounded px-1.5 py-0.5 font-medium transition-colors hover:bg-muted hover:text-foreground">{c.nome}</Link>
+                : <span className="rounded px-1.5 py-0.5 font-semibold text-foreground">{c.nome}</span>}
+            </span>
+          ))}
+          <span className="ml-1 text-muted-foreground">— {totalFiltrado} simulado(s)</span>
         </div>
       )}
 
@@ -644,7 +660,7 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
           {secoesPasta.pastas.length > 0 && (
             <div className={gradeCls(cardView)}>
               {secoesPasta.pastas.map(({ folder, sims }) => folder && (
-                <FolderTile key={folder.id} folder={folder} count={sims.length} appUrl={appUrl}
+                <FolderTile key={folder.id} folder={folder} count={folder.count} appUrl={appUrl}
                   capaFallback={sims.map((s) => s.vis?.capa ?? s.vis?.capaBanner ?? null).find(Boolean) ?? null}
                   onPersonalizar={() => setEditandoPasta(folder)} onExcluir={() => excluirPasta(folder)} variant={cardView} />
               ))}
@@ -659,6 +675,23 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
             <p className="rounded-2xl border border-dashed py-14 text-center text-sm text-muted-foreground">Nenhuma pasta ainda. Crie a primeira em “Nova pasta”.</p>
           )}
         </div>
+      ) : atual ? (
+        // DENTRO de uma pasta (estilo Drive): SUBPASTAS em cima (tiles) + simulados desta pasta abaixo.
+        <div className="space-y-6">
+          {secoesPasta.pastas.length > 0 && (
+            <div className={gradeCls(cardView)}>
+              {secoesPasta.pastas.map(({ folder, sims }) => folder && (
+                <FolderTile key={folder.id} folder={folder} count={folder.count} appUrl={appUrl}
+                  capaFallback={sims.map((s) => s.vis?.capa ?? s.vis?.capaBanner ?? null).find(Boolean) ?? null}
+                  onPersonalizar={() => setEditandoPasta(folder)} onExcluir={() => excluirPasta(folder)} variant={cardView} />
+              ))}
+            </div>
+          )}
+          <SecaoSimples titulo={atual.nome} icone={FolderOpen} sims={secoesPasta.semPasta} online={online} appUrl={appUrl}
+            aberto={!recolhidas.has('sem-pasta')} toggle={() => toggleSecao('sem-pasta')}
+            onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel}
+            mostrarNovo variant={cardView} />
+        </div>
       ) : (
         <div className="space-y-8">
           {secoesPasta.pastas.map(({ folder, sims }) => (
@@ -668,16 +701,14 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
               onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel} variant={cardView} />
           ))}
 
-          {/* Sem pasta (ou o conteúdo de dentro de uma pasta aberta) */}
-          {(atual || secoesPasta.semPasta.length > 0) && (
-            <SecaoSimples titulo={atual ? atual.nome : 'Sem pasta'} icone={atual ? FolderOpen : FolderInput}
+          {secoesPasta.semPasta.length > 0 && (
+            <SecaoSimples titulo="Sem pasta" icone={FolderInput}
               sims={secoesPasta.semPasta} online={online} appUrl={appUrl}
               aberto={!recolhidas.has('sem-pasta')} toggle={() => toggleSecao('sem-pasta')}
-              onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel}
-              mostrarNovo={!!atual} variant={cardView} />
+              onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel} variant={cardView} />
           )}
 
-          {folders.length === 0 && secoesPasta.semPasta.length === 0 && !atual && (
+          {folders.length === 0 && secoesPasta.semPasta.length === 0 && (
             <p className="rounded-2xl border border-dashed py-14 text-center text-sm text-muted-foreground">Nenhum simulado ainda. Crie o primeiro em “Novo simulado”.</p>
           )}
         </div>
@@ -700,7 +731,7 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
         />
       )}
       {criandoPasta && (
-        <EditarPastaDialog area="simulado" cardView={cardView} onClose={() => setCriandoPasta(false)} onSaved={() => router.refresh()} />
+        <EditarPastaDialog area="simulado" paiId={paiAtual} cardView={cardView} onClose={() => setCriandoPasta(false)} onSaved={() => router.refresh()} />
       )}
     </div>
   )

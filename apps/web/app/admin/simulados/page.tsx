@@ -89,7 +89,8 @@ async function BoardData({ pastaParam }: { pastaParam?: string }) {
     // Pastas da Aplicação de Simulado (is_folder + folder_area='simulado'), tolerante a colunas ausentes.
     (async (): Promise<any[]> => {
       const selP = (cols: string) => supabase.from('simulado_pastas').select(cols).eq('deletado', false).eq('tenant_id', tid).order('nome')
-      let r: { data: any[] | null; error: { message: string } | null } = await selP('id, nome, cor, icone, capa_url, capa_card_url, is_folder, folder_area')
+      let r: { data: any[] | null; error: { message: string } | null } = await selP('id, nome, cor, icone, capa_url, capa_card_url, is_folder, folder_area, pai_id')
+      if (r.error) r = await selP('id, nome, cor, icone, capa_url, is_folder, folder_area, pai_id')
       if (r.error) r = await selP('id, nome, cor, icone, capa_url, is_folder, folder_area')
       return r.error ? [] : (r.data ?? []).filter((p: any) => p.is_folder && p.folder_area === 'simulado')
     })(),
@@ -156,20 +157,34 @@ async function BoardData({ pastaParam }: { pastaParam?: string }) {
   const comTipo = simulados.map((s) => ({ ...s, tipo: tipos.get(s.id) ?? null, vis: visual.get(s.id) ?? null }))
     .filter((s) => !ocultarDiscursiva || s.tipo !== 'discursiva')
 
-  // Nº de simulados por pasta.
+  // Nº de simulados DIRETOS por pasta.
   const contPasta = new Map<string, number>()
   for (const s of comTipo) if (s.pasta_id) contPasta.set(s.pasta_id, (contPasta.get(s.pasta_id) ?? 0) + 1)
+  // Contagem RECURSIVA (simulados diretos + de TODAS as subpastas) — usada nos cards de pasta.
+  const filhosDe = new Map<string, string[]>()
+  for (const f of folders) if (f.pai_id) (filhosDe.get(f.pai_id) ?? filhosDe.set(f.pai_id, []).get(f.pai_id)!).push(f.id)
+  const contRecMemo = new Map<string, number>()
+  const contRec = (id: string): number => {
+    const hit = contRecMemo.get(id); if (hit !== undefined) return hit
+    let n = contPasta.get(id) ?? 0
+    for (const c of (filhosDe.get(id) ?? [])) n += contRec(c)
+    contRecMemo.set(id, n); return n
+  }
 
-  // Nível atual: dentro de uma pasta (?pasta=id) ou raiz. Pastas de nível único.
+  // Nível atual: dentro de uma pasta (?pasta=id) ou raiz. Subpastas aninhadas por pai_id.
   const current = pastaParam ? folders.find((f) => f.id === pastaParam) ?? null : null
   const simsNivel = current ? comTipo.filter((s) => s.pasta_id === current.id) : comTipo.filter((s) => !s.pasta_id)
-  const foldersNivel = current ? [] : folders
+  const foldersNivel = folders.filter((f) => current ? f.pai_id === current.id : !f.pai_id)
+  // Breadcrumb: Início → … → pasta atual (subindo por pai_id).
+  const folderById = new Map<string, any>(folders.map((f) => [f.id, f]))
+  const breadcrumb: { id: string; nome: string }[] = []
+  { let n: any = current; const seen = new Set<string>(); while (n && !seen.has(n.id)) { seen.add(n.id); breadcrumb.unshift({ id: n.id, nome: n.nome }); n = n.pai_id ? folderById.get(n.pai_id) ?? null : null } }
 
   const capa = (b: any) => (b.capa_card_url ?? b.capa_url) ?? null
   // Fade lateral POR PASTA (tema.card_fade_pastas[id]) — getCurrentTenant é memoizado (sem 2ª query).
   const cardFadePastas = (((await getCurrentTenant())?.tema as any)?.card_fade_pastas ?? {}) as Record<string, { ativo?: boolean; cor?: string | null }>
   // `capa` = pôster (card 4:5, prefere capa_card_url); `capaLarga` = banner (capa_url) usado no card ticket.
-  const foldersOut = foldersNivel.map((f) => ({ id: f.id, nome: f.nome, cor: f.cor ?? null, icone: f.icone ?? null, capa: capa(f), capaLarga: f.capa_url ?? null, count: contPasta.get(f.id) ?? 0, cardFade: cardFadePastas[f.id] ?? null }))
+  const foldersOut = foldersNivel.map((f) => ({ id: f.id, nome: f.nome, cor: f.cor ?? null, icone: f.icone ?? null, capa: capa(f), capaLarga: f.capa_url ?? null, count: contRec(f.id), cardFade: cardFadePastas[f.id] ?? null }))
   const destinos = folders.map((f) => ({ id: f.id, nome: f.nome }))
 
   // Catálogo (view horizontal estilo Netflix): simulados agrupados pela PASTA DO BANCO de simulado
@@ -205,6 +220,8 @@ async function BoardData({ pastaParam }: { pastaParam?: string }) {
       folders={foldersOut}
       destinos={destinos}
       atual={current ? { id: current.id, nome: current.nome } : null}
+      breadcrumb={breadcrumb}
+      paiAtual={current?.id ?? null}
       catalogo={{ sims: catalogoSims as (SimuladoCard & { grupoId: string | null })[], grupos: catalogoGrupos }}
       cardView={cardView}
     />
