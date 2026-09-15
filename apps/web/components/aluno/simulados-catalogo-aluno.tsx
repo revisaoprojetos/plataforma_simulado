@@ -143,7 +143,7 @@ function CardPasta({ g, count, prog, variant = 'poster' }: { g: GrupoCatalogo; c
  * com progresso no hover). Ao abrir uma pasta (?pasta=id), mostra os simulados de dentro.
  * Os sem pasta (avulsos) aparecem em grade. A área "Simulados" foi absorvida por aqui.
  */
-export function SimuladosCatalogoAluno({ itens, grupos, progresso, recentes, pastaAtiva, pastaInfo, full, recentesConcluidos, view = 'poster' }: {
+export function SimuladosCatalogoAluno({ itens, grupos, progresso, recentes, pastaAtiva, pastaInfo, subpastas = [], breadcrumb = [], full, recentesConcluidos, view = 'poster' }: {
   itens: ItemSimuladoCat[]
   grupos: GrupoCatalogo[]
   progresso?: ProgressoGrupo
@@ -151,6 +151,10 @@ export function SimuladosCatalogoAluno({ itens, grupos, progresso, recentes, pas
   pastaAtiva?: string | null
   /** Nome/cor da pasta ativa quando ela é uma pasta manual do admin (não um grupo do catálogo). */
   pastaInfo?: { nome: string | null; cor: string | null } | null
+  /** Subpastas (admin) da pasta atual — tiles em cima, estilo Drive; count é recursivo (sims acessíveis). */
+  subpastas?: { id: string; nome: string; cor: string | null; capa: string | null; count: number }[]
+  /** Caminho Início → … → pasta atual. */
+  breadcrumb?: { id: string; nome: string }[]
   /** Largura total (gamificação desativada, sem coluna lateral) → grades de 5 por linha. */
   full?: boolean
   /** Aluno já fez todos os simulados recentes disponíveis (sem pendentes, mas com histórico). */
@@ -166,15 +170,45 @@ export function SimuladosCatalogoAluno({ itens, grupos, progresso, recentes, pas
     const its = itens.filter((s) => s.grupoId === pastaAtiva || s.pastaId === pastaAtiva)
     return (
       <div className="space-y-5">
-        <Link href="/aluno" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Início</Link>
+        {/* Breadcrumb: Início → … → atual */}
+        <div className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
+          <Link href="/aluno" className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 transition-colors hover:bg-muted hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Início</Link>
+          {breadcrumb.map((c, i) => (
+            <span key={c.id} className="inline-flex items-center gap-1">
+              <span className="opacity-50">/</span>
+              {i < breadcrumb.length - 1
+                ? <Link href={`/aluno?pasta=${c.id}`} className="rounded px-1.5 py-0.5 font-medium transition-colors hover:bg-muted hover:text-foreground">{c.nome}</Link>
+                : <span className="rounded px-1.5 py-0.5 font-semibold text-foreground">{c.nome}</span>}
+            </span>
+          ))}
+        </div>
         <div className="flex items-center gap-3">
           <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-white shadow-sm" style={{ background: cor }}><FolderOpen className="h-5 w-5" /></span>
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-2xl font-bold tracking-tight">{nome}</h1>
-            <p className="text-muted-foreground">{its.length} simulado(s) nesta pasta.</p>
+            <p className="text-muted-foreground">{its.length} simulado(s) nesta pasta{subpastas.length ? ` · ${subpastas.length} subpasta(s)` : ''}.</p>
           </div>
         </div>
-        <SecoesGrid itens={its} view={view} />
+        {/* Subpastas em cima (estilo Drive) — cada uma leva a ?pasta=id com contagem recursiva. */}
+        {subpastas.length > 0 && (
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {subpastas.map((sp) => (
+              <Link key={sp.id} href={`/aluno?pasta=${sp.id}`} className="group relative flex h-24 overflow-hidden rounded-2xl border bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
+                <div className="relative w-24 shrink-0 overflow-hidden">
+                  {sp.capa
+                    ? <img src={sp.capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    : <div className="absolute inset-0" style={{ background: `linear-gradient(150deg, ${sp.cor ?? '#6d28d9'} 0%, #0f172a 150%)` }} />}
+                </div>
+                <div className="flex min-w-0 flex-1 flex-col justify-center p-3">
+                  <span className="inline-flex w-fit items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground"><FolderOpen className="h-3 w-3" /> Pasta</span>
+                  <span className="mt-1 line-clamp-2 text-sm font-bold leading-tight">{sp.nome}</span>
+                  <span className="text-[11px] text-muted-foreground">{sp.count} simulado(s)</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+        {its.length > 0 && <SecoesGrid itens={its} view={view} />}
       </div>
     )
   }

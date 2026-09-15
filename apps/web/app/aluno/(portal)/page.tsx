@@ -261,14 +261,32 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   // (banco→pai) OU pelo pasta_id do admin (link "Copiar link da pasta" da Aplicação de Simulado).
   if (pasta) {
     const naPasta = itensCat.filter((i) => i.grupoId === pasta || i.pastaId === pasta)
+    // SUBPASTAS (admin, folder_area='simulado') desta pasta + contagem RECURSIVA (só sims acessíveis) + breadcrumb.
+    let subpastas: { id: string; nome: string; cor: string | null; capa: string | null; count: number }[] = []
+    let breadcrumbP: { id: string; nome: string }[] = []
+    try {
+      const rf = await svc.from('simulado_pastas').select('id, nome, cor, capa_url, capa_card_url, pai_id, folder_area').eq('tenant_id', sessao!.tenantId).eq('is_folder', true).eq('deletado', false)
+      const allF = ((rf.data ?? []) as any[]).filter((f) => f.folder_area === 'simulado')
+      const contDir = new Map<string, number>()
+      for (const i of itensCat) if (i.pastaId) contDir.set(i.pastaId, (contDir.get(i.pastaId) ?? 0) + 1)
+      const filhos = new Map<string, string[]>()
+      for (const f of allF) if (f.pai_id) (filhos.get(f.pai_id) ?? filhos.set(f.pai_id, []).get(f.pai_id)!).push(f.id)
+      const memo = new Map<string, number>()
+      const rec = (id: string): number => { const h = memo.get(id); if (h !== undefined) return h; let n = contDir.get(id) ?? 0; for (const c of (filhos.get(id) ?? [])) n += rec(c); memo.set(id, n); return n }
+      subpastas = allF.filter((f) => f.pai_id === pasta).map((f) => ({ id: f.id, nome: f.nome, cor: f.cor ?? null, capa: (f.capa_card_url ?? f.capa_url) ?? null, count: rec(f.id) })).filter((s) => s.count > 0)
+      const fById = new Map(allF.map((f) => [f.id, f]))
+      { let n: any = fById.get(pasta); const seen = new Set<string>(); while (n && !seen.has(n.id)) { seen.add(n.id); breadcrumbP.unshift({ id: n.id, nome: n.nome }); n = n.pai_id ? fById.get(n.pai_id) ?? null : null } }
+    } catch { /* tolerante */ }
     // Cabeçalho: grupo do catálogo, senão a pasta manual do admin (nome/cor vindos de simulado_pastas).
     const grupoInfo = grupos.find((g) => g.id === pasta) ?? null
     let pastaInfo: { nome: string | null; cor: string | null } | null = grupoInfo ? { nome: grupoInfo.nome, cor: grupoInfo.cor } : null
     let semAcesso: React.ReactNode = null
-    if (!pastaInfo || naPasta.length === 0) {
+    // "Sem acesso" só quando NÃO há sims diretos E NÃO há subpastas com conteúdo (senão é uma pasta-container).
+    const vazio = naPasta.length === 0 && subpastas.length === 0
+    if (!pastaInfo || vazio) {
       const { data: pRow } = await svc.from('simulado_pastas').select('nome, cor, capa_url').eq('id', pasta).maybeSingle()
       if (!pastaInfo && pRow) pastaInfo = { nome: (pRow as any).nome ?? null, cor: (pRow as any).cor ?? null }
-      if (naPasta.length === 0) {
+      if (vazio) {
         // Chegou por um link/banner mas não tem acesso → pop-up com dados da pasta + suporte.
         const { data: contatoRow } = await svc.from('simulado_tenant_contatos').select('whatsapp, email_suporte, link_ajuda, horario_atendimento').eq('tenant_id', sessao!.tenantId).maybeSingle().then((r) => r, () => ({ data: null } as any))
         const ct = (contatoRow ?? null) as any
@@ -285,7 +303,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
     }
     return (
       <div className="animate-page">
-        <SimuladosCatalogoAluno itens={itensCat} grupos={grupos} progresso={progresso} pastaAtiva={pasta} pastaInfo={pastaInfo} view={cardView} />
+        <SimuladosCatalogoAluno itens={itensCat} grupos={grupos} progresso={progresso} pastaAtiva={pasta} pastaInfo={pastaInfo} subpastas={subpastas} breadcrumb={breadcrumbP} view={cardView} />
         {semAcesso}
       </div>
     )
