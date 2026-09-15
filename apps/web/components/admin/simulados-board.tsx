@@ -592,6 +592,17 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
 
   const totalFiltrado = filtrados.length
 
+  // Grade de tiles das pastas/subpastas deste nível — reusada pelas 3 vistas (raiz e dentro de pasta).
+  const tilesGrid = secoesPasta.pastas.length > 0 ? (
+    <div className={gradeCls(cardView)}>
+      {secoesPasta.pastas.map(({ folder, sims }) => folder && (
+        <FolderTile key={folder.id} folder={folder} count={folder.count} appUrl={appUrl}
+          capaFallback={sims.map((s) => s.vis?.capa ?? s.vis?.capaBanner ?? null).find(Boolean) ?? null}
+          onPersonalizar={() => setEditandoPasta(folder)} onExcluir={() => excluirPasta(folder)} variant={cardView} />
+      ))}
+    </div>
+  ) : null
+
   return (
     <div className="space-y-6">
       {/* Barra de ferramentas */}
@@ -602,17 +613,15 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
           <Input placeholder={atual ? `Buscar em “${atual.nome}”…` : 'Buscar simulado…'} value={busca} onChange={(e) => setBusca(e.target.value)} className="min-w-[180px] flex-1 lg:max-w-md" />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {!atual && (
-            <div className="flex gap-1 rounded-lg bg-[var(--tab-bg,var(--muted))] p-1">
-              {([['linhas', 'Linhas', GalleryHorizontalEnd], ['pastas', 'Pastas', FolderTree], ['status', 'Status', Rows3]] as const).map(([v, label, Icon]) => (
-                <button key={v} type="button" onClick={() => escolherVista(v)} aria-pressed={vista === v}
-                  className={cn('inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-colors',
-                    vista === v ? 'bg-[var(--tab-active,var(--background))] text-[color:var(--tab-active-foreground,var(--foreground))] shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
-                  <Icon className="h-4 w-4" /> {label}
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="flex gap-1 rounded-lg bg-[var(--tab-bg,var(--muted))] p-1">
+            {([['linhas', 'Linhas', GalleryHorizontalEnd], ['pastas', 'Pastas', FolderTree], ['status', 'Status', Rows3]] as const).map(([v, label, Icon]) => (
+              <button key={v} type="button" onClick={() => escolherVista(v)} aria-pressed={vista === v}
+                className={cn('inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-colors',
+                  vista === v ? 'bg-[var(--tab-active,var(--background))] text-[color:var(--tab-active-foreground,var(--foreground))] shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+                <Icon className="h-4 w-4" /> {label}
+              </button>
+            ))}
+          </div>
           <div className="flex flex-wrap gap-1 rounded-lg bg-[var(--tab-bg,var(--muted))] p-1">
             {filtros.map((f) => (
               <button key={f.v} onClick={() => setModo(f.v)}
@@ -640,50 +649,43 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
         </div>
       )}
 
-      {/* Conteúdo */}
-      {vista === 'status' && !atual ? (
-        <SecoesStatus sims={filtrados} online={online} appUrl={appUrl} onMover={podeMover ? (s) => setMovendo(s) : undefined}
-          recolhidas={recolhidas} toggleSecao={toggleSecao} selecao={selecao} onSelecionar={setSel} variant={cardView} />
-      ) : vista === 'pastas' && !atual ? (
-        // Visão PASTAS: só os CARDS/TICKETS de pasta (igual ao Banco de Simulado) — clicar ENTRA na
-        // pasta (?pasta=id) e mostra os simulados de dentro. O estilo (pôster/ticket) segue o console.
+      {/* Conteúdo — as 3 vistas (Linhas/Pastas/Status) valem na RAIZ e DENTRO de uma pasta.
+          Dentro de uma pasta, as SUBPASTAS aparecem em cima (tiles) e os simulados daquela pasta seguem
+          a vista escolhida (fileira/grade/status). */}
+      {vista === 'status' ? (
         <div className="space-y-6">
-          {secoesPasta.pastas.length > 0 && (
-            <div className={gradeCls(cardView)}>
-              {secoesPasta.pastas.map(({ folder, sims }) => folder && (
-                <FolderTile key={folder.id} folder={folder} count={folder.count} appUrl={appUrl}
-                  capaFallback={sims.map((s) => s.vis?.capa ?? s.vis?.capaBanner ?? null).find(Boolean) ?? null}
-                  onPersonalizar={() => setEditandoPasta(folder)} onExcluir={() => excluirPasta(folder)} variant={cardView} />
-              ))}
-            </div>
-          )}
-          {secoesPasta.semPasta.length > 0 && (
+          {atual && tilesGrid}
+          <SecoesStatus sims={filtrados} online={online} appUrl={appUrl} onMover={podeMover ? (s) => setMovendo(s) : undefined}
+            recolhidas={recolhidas} toggleSecao={toggleSecao} selecao={selecao} onSelecionar={setSel} variant={cardView} />
+        </div>
+      ) : vista === 'pastas' ? (
+        // Visão PASTAS: os tiles das pastas/subpastas deste nível + os simulados soltos (grade).
+        <div className="space-y-6">
+          {tilesGrid}
+          {atual ? (
+            <SecaoSimples titulo={atual.nome} icone={FolderOpen} sims={secoesPasta.semPasta} online={online} appUrl={appUrl}
+              aberto={!recolhidas.has('sem-pasta')} toggle={() => toggleSecao('sem-pasta')}
+              onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel} mostrarNovo layout="grade" variant={cardView} />
+          ) : secoesPasta.semPasta.length > 0 ? (
             <SecaoSimples titulo="Sem pasta" icone={FolderInput} sims={secoesPasta.semPasta} online={online} appUrl={appUrl}
               aberto={!recolhidas.has('sem-pasta')} toggle={() => toggleSecao('sem-pasta')}
-              onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel} variant={cardView} />
-          )}
+              onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel} layout="grade" variant={cardView} />
+          ) : null}
           {secoesPasta.pastas.length === 0 && secoesPasta.semPasta.length === 0 && (
-            <p className="rounded-2xl border border-dashed py-14 text-center text-sm text-muted-foreground">Nenhuma pasta ainda. Crie a primeira em “Nova pasta”.</p>
+            <p className="rounded-2xl border border-dashed py-14 text-center text-sm text-muted-foreground">{atual ? 'Pasta vazia.' : 'Nenhuma pasta ainda. Crie a primeira em “Nova pasta”.'}</p>
           )}
         </div>
       ) : atual ? (
-        // DENTRO de uma pasta (estilo Drive): SUBPASTAS em cima (tiles) + simulados desta pasta abaixo.
+        // LINHAS dentro de uma pasta: subpastas em cima (tiles) + simulados da pasta em fileira.
         <div className="space-y-6">
-          {secoesPasta.pastas.length > 0 && (
-            <div className={gradeCls(cardView)}>
-              {secoesPasta.pastas.map(({ folder, sims }) => folder && (
-                <FolderTile key={folder.id} folder={folder} count={folder.count} appUrl={appUrl}
-                  capaFallback={sims.map((s) => s.vis?.capa ?? s.vis?.capaBanner ?? null).find(Boolean) ?? null}
-                  onPersonalizar={() => setEditandoPasta(folder)} onExcluir={() => excluirPasta(folder)} variant={cardView} />
-              ))}
-            </div>
-          )}
+          {tilesGrid}
           <SecaoSimples titulo={atual.nome} icone={FolderOpen} sims={secoesPasta.semPasta} online={online} appUrl={appUrl}
             aberto={!recolhidas.has('sem-pasta')} toggle={() => toggleSecao('sem-pasta')}
             onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel}
-            mostrarNovo variant={cardView} />
+            mostrarNovo layout="fileira" variant={cardView} />
         </div>
       ) : (
+        // LINHAS na raiz: fileira por pasta + "Sem pasta".
         <div className="space-y-8">
           {secoesPasta.pastas.map(({ folder, sims }) => (
             folder && <PastaSection key={folder.id} folder={folder} sims={sims} online={online} appUrl={appUrl}

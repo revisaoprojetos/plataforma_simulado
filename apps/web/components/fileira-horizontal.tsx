@@ -30,10 +30,19 @@ export function FileiraHorizontal({ titulo, count, children, setasFora = false }
     if (!el) return
     el.addEventListener('scroll', atualiza, { passive: true })
     window.addEventListener('resize', atualiza)
+    // Roda do mouse VERTICAL → rola o carrossel na HORIZONTAL (só quando há overflow horizontal e o gesto
+    // é predominantemente vertical; trackpad horizontal segue nativo). passive:false p/ poder preventDefault.
+    const onWheel = (e: WheelEvent) => {
+      if (el.scrollWidth <= el.clientWidth + 4) return
+      if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return
+      el.scrollLeft += e.deltaY
+      e.preventDefault()
+    }
+    el.addEventListener('wheel', onWheel, { passive: false })
     // Reavalia quando o conteúdo muda de tamanho (imagens carregando, etc.).
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(atualiza) : null
     ro?.observe(el)
-    return () => { el.removeEventListener('scroll', atualiza); window.removeEventListener('resize', atualiza); ro?.disconnect() }
+    return () => { el.removeEventListener('scroll', atualiza); el.removeEventListener('wheel', onWheel); window.removeEventListener('resize', atualiza); ro?.disconnect() }
   }, [])
   // Rola exatamente UM card por vez (largura do 1º card + gap de 1rem).
   const rolar = (dir: -1 | 1) => {
