@@ -2,7 +2,6 @@ import { Suspense } from 'react'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentTenantId, getCurrentTenant } from '@/lib/tenant'
 import { fetchAll } from '@/lib/supabase/fetch-all'
-import { buttonVariants } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
 import { SimuladosBoard, type SimuladoCard } from '@/components/admin/simulados-board'
 import { NovoSimuladoDialog } from '@/components/admin/novo-simulado-dialog'
@@ -42,8 +41,10 @@ export default async function SimuladosPage({ searchParams }: { searchParams: Pr
           <NovaPastaBtn pastaId={pastaParam ?? null} />
           <NovoSimuladoDialog
             trigger={
-              <button type="button" className={buttonVariants()}>
-                <Plus className="mr-2 h-4 w-4" />
+              <button type="button"
+                className="inline-flex items-center justify-center gap-2 rounded-lg px-5 py-2.5 text-sm font-semibold text-white shadow-md ring-1 ring-white/15 transition-all hover:brightness-110 hover:shadow-lg active:scale-[0.98]"
+                style={{ background: 'linear-gradient(135deg, var(--brand-primary, var(--primary)), color-mix(in oklab, var(--brand-primary, var(--primary)) 72%, #000))' }}>
+                <Plus className="h-4 w-4" />
                 Novo simulado
               </button>
             }

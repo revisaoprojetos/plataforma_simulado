@@ -11,8 +11,8 @@ export function VoltarSimulados({ pastaId }: { pastaId?: string | null }) {
   if (!pastaId) return null
   return (
     <button type="button" onClick={() => router.back()} title="Voltar" aria-label="Voltar"
-      className="mt-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border bg-card text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground">
-      <ChevronLeft className="h-5 w-5" />
+      className="-ml-1 mt-0.5 inline-flex shrink-0 items-center justify-center rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground">
+      <ChevronLeft className="h-7 w-7" />
     </button>
   )
 }
@@ -24,8 +24,8 @@ export function NovaPastaBtn({ pastaId }: { pastaId?: string | null }) {
   return (
     <>
       <button type="button" onClick={() => setAberto(true)}
-        className="inline-flex items-center gap-2 rounded-lg border bg-card px-3 py-2 text-sm font-semibold shadow-sm transition-colors hover:bg-muted">
-        <FolderPlus className="h-4 w-4" /> {pastaId ? 'Nova subpasta' : 'Nova pasta'}
+        className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-[13px] font-medium text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground">
+        <FolderPlus className="h-3.5 w-3.5" /> {pastaId ? 'Nova subpasta' : 'Nova pasta'}
       </button>
       {aberto && (
         <EditarPastaDialog area="simulado" paiId={pastaId ?? null}
