@@ -431,10 +431,12 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
   trilhas.forEach((t, ti) => {
     if (ti > 0) y += GAP_GRUPO
     const dy = y
-    // semDivisoria (LegProc): sem a pílula "nome N/N" — a trilha "puxa" do banner até o 1º dia (conector
-    // reto no topo). Mantém só um respiro pequeno em vez da faixa do cabeçalho.
+    // semDivisoria (LegProc): sem a pílula "nome N/N" — a trilha "puxa" do banner até o 1º dia. Mantém a
+    // MESMA distância de antes (o 1º dia ficava a ~90px do banner com pt-4+gap), mas agora o conector do
+    // topo preenche TODO o espaço com pontinhos (sem área em branco): pt-0 no container + gap 26 aqui
+    // (PAD 34 + 26 + R 30 = 90).
     if (!semDivisoria) { dividers.push({ id: t.id, nome: t.nome, done: t.done, total: t.total, y: dy }); y += GAP_HDR }
-    else y += 10
+    else y += 26
     if (t.nodes.length === 1) {
       // Grupo com um único simulado → segue o mesmo meandro lateral (waveOff) p/ acompanhar as
       // curvas acentuadas da trilha, e fica verticalmente centralizado na faixa do grupo
