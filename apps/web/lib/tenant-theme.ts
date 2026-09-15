@@ -36,6 +36,21 @@ function safeColor(raw?: string): string | null {
 }
 
 /** Sanitiza o nome da fonte (só letras/números/espaço/hífen). */
+/**
+ * CSS var do "fade" lateral (gradiente transparente→cor à direita) dos cards ticket. Configurável por
+ * tenant em `tema.card_fade = { ativo?, cor? }`:
+ *  - ausente / default → NÃO define a var → cada card usa sua própria cor (comportamento atual).
+ *  - `ativo: false`    → `--sim-card-fade: transparent` → fade some.
+ *  - `cor` válida      → `--sim-card-fade: <cor>` → todos os cards usam essa cor no fade.
+ */
+function cardFadeCss(tema: unknown): string {
+  const f = (tema as any)?.card_fade
+  if (!f || typeof f !== 'object') return ''
+  if (f.ativo === false) return `\n:root, .dark { --sim-card-fade: transparent; }`
+  const cor = safeColor(f.cor)
+  return cor ? `\n:root, .dark { --sim-card-fade: ${cor}; }` : ''
+}
+
 function safeFont(raw?: string): string | null {
   if (!raw) return null
   const v = raw.trim()
@@ -232,7 +247,7 @@ export const getTenantTheme = cache(async (): Promise<TenantThemeResult> => {
     if (cores && typeof cores === 'object') {
       const css = construirPaletaCompleta(cores, (tema as any).cores_dark ?? null, safeFont((tema as any).fonte))
       if (css) {
-        return { css, tema, tenantId: data.id as string, tenantNome: data.nome as string, favicon: (tema as any).favicon ?? null, modoPadrao }
+        return { css: css + cardFadeCss(tema), tema, tenantId: data.id as string, tenantNome: data.nome as string, favicon: (tema as any).favicon ?? null, modoPadrao }
       }
     }
 
@@ -285,7 +300,8 @@ export const getTenantTheme = cache(async (): Promise<TenantThemeResult> => {
       lines.push(`  --brand-secondary: ${hexToOklch(corSecundaria)};`)
     }
 
-    const css = lines.length > 0 ? `${fontImport(fonte)}:root, .dark {\n${lines.join('\n')}\n}` : ''
+    const cssBase = lines.length > 0 ? `${fontImport(fonte)}:root, .dark {\n${lines.join('\n')}\n}` : ''
+    const css = cssBase + cardFadeCss(tema)
 
     return {
       css,

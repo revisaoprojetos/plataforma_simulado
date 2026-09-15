@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Save, LayoutGrid, StretchHorizontal, Check, GraduationCap, ShieldCheck } from 'lucide-react'
+import { Loader2, Save, LayoutGrid, StretchHorizontal, Check, GraduationCap, ShieldCheck, Palette } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { resolverCardView, type CardView } from '@/lib/card-view'
 
@@ -73,12 +73,16 @@ function SeletorEstilo({ valor, onEscolher }: { valor: CardView; onEscolher: (v:
 export function CardViewForm({ tema, salvarTema }: { tema: any; salvarTema: (t: Record<string, unknown>) => Promise<{ ok?: boolean } | void> }) {
   const [aluno, setAluno] = useState<CardView>(resolverCardView(tema?.card_view))
   const [admin, setAdmin] = useState<CardView>(resolverCardView(tema?.card_view_admin ?? tema?.card_view))
+  // Fade lateral dos cards ticket (tema.card_fade = { ativo, cor }). ativo default true; cor vazia = usa a cor de cada card.
+  const cf = (tema?.card_fade ?? {}) as { ativo?: boolean; cor?: string | null }
+  const [fadeAtivo, setFadeAtivo] = useState<boolean>(cf.ativo !== false)
+  const [fadeCor, setFadeCor] = useState<string>(typeof cf.cor === 'string' ? cf.cor : '')
   const [dirty, setDirty] = useState(false)
   const [pending, start] = useTransition()
 
   function salvar() {
     start(async () => {
-      try { await salvarTema({ card_view: aluno, card_view_admin: admin }); setDirty(false); toast.success('Estilo dos cards salvo!') }
+      try { await salvarTema({ card_view: aluno, card_view_admin: admin, card_fade: { ativo: fadeAtivo, cor: fadeCor.trim() || null } }); setDirty(false); toast.success('Estilo dos cards salvo!') }
       catch (err) { toast.error(err instanceof Error ? err.message : 'Erro ao salvar') }
     })
   }
@@ -107,6 +111,28 @@ export function CardViewForm({ tema, salvarTema }: { tema: any; salvarTema: (t: 
         </div>
         <p className="mb-3 text-xs text-muted-foreground">Cards dos simulados no board de gestão (Simulados).</p>
         <SeletorEstilo valor={admin} onEscolher={(v) => { setAdmin(v); setDirty(true) }} />
+      </div>
+
+      {/* Fade lateral dos cards (ticket) — desligar / trocar a cor */}
+      <div className="rounded-xl border bg-card p-4 shadow-sm">
+        <div className="mb-1 flex items-center gap-2">
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary"><Palette className="h-4 w-4" /></span>
+          <span className="text-sm font-semibold">Fade lateral dos cards</span>
+        </div>
+        <p className="mb-3 text-xs text-muted-foreground">O degradê que funde a imagem à direita nos cards no estilo <span className="font-medium text-foreground">ticket</span> (capas de pasta e simulados). Você pode desligar ou trocar a cor.</p>
+        <label className="flex w-fit cursor-pointer items-center gap-2 text-sm">
+          <input type="checkbox" checked={fadeAtivo} onChange={(e) => { setFadeAtivo(e.target.checked); setDirty(true) }} className="h-4 w-4 accent-[var(--primary)]" />
+          Mostrar o fade
+        </label>
+        {fadeAtivo && (
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <span className="text-xs text-muted-foreground">Cor do fade:</span>
+            <input type="color" value={fadeCor || '#6d28d9'} onChange={(e) => { setFadeCor(e.target.value); setDirty(true) }} className="h-8 w-12 cursor-pointer rounded border bg-transparent" aria-label="Cor do fade" />
+            {fadeCor
+              ? <button type="button" onClick={() => { setFadeCor(''); setDirty(true) }} className="text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground">usar a cor de cada card</button>
+              : <span className="text-xs text-muted-foreground">(usando a cor de cada card)</span>}
+          </div>
+        )}
       </div>
 
       <button type="button" onClick={salvar} disabled={pending || !dirty}
