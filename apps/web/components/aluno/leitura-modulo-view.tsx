@@ -117,7 +117,7 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
       )}
 
       <TabsContent value="trilha" className="pt-4">
-        <div className="overflow-x-auto pb-10"><TrilhaGigante trilhas={[trilha]} gamAtivo={false} reto semFundo /></div>
+        <div className="overflow-x-auto pb-10"><TrilhaGigante trilhas={[trilha]} gamAtivo={false} reto semFundo semDivisoria /></div>
       </TabsContent>
       <TabsContent value="desempenho" className="pt-4">
         <DesempenhoModulo desempenho={desempenho} />

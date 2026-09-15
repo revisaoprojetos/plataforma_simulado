@@ -398,7 +398,7 @@ export function TrilhaSimulados({ trilhas, gamAtivo, estilo = 'cards', visiveis 
 const GAP_HDR = 58   // altura reservada p/ a divisória (nome do grupo)
 const GAP_GRUPO = 44 // respiro extra entre grupos (o pontilhado continua nele)
 
-export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = false }: { trilhas: Trilha[]; gamAtivo: boolean; reto?: boolean; semFundo?: boolean }) {
+export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = false, semDivisoria = false }: { trilhas: Trilha[]; gamAtivo: boolean; reto?: boolean; semFundo?: boolean; semDivisoria?: boolean }) {
   const flat = trilhas.flatMap((t) => t.nodes)
   const atualId = flat.find((n) => n.estado === 'atual')?.id ?? flat[0]?.id ?? null
   const [aberto, setAberto] = useState<string | null>(atualId)
@@ -431,8 +431,10 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
   trilhas.forEach((t, ti) => {
     if (ti > 0) y += GAP_GRUPO
     const dy = y
-    dividers.push({ id: t.id, nome: t.nome, done: t.done, total: t.total, y: dy })
-    y += GAP_HDR
+    // semDivisoria (LegProc): sem a pílula "nome N/N" — a trilha "puxa" do banner até o 1º dia (conector
+    // reto no topo). Mantém só um respiro pequeno em vez da faixa do cabeçalho.
+    if (!semDivisoria) { dividers.push({ id: t.id, nome: t.nome, done: t.done, total: t.total, y: dy }); y += GAP_HDR }
+    else y += 10
     if (t.nodes.length === 1) {
       // Grupo com um único simulado → segue o mesmo meandro lateral (waveOff) p/ acompanhar as
       // curvas acentuadas da trilha, e fica verticalmente centralizado na faixa do grupo
@@ -509,6 +511,11 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
           um path próprio p/ manter a cor (concluído x pendente), mas as tangentes são compartilhadas
           com os vizinhos → sem "quebras" nas junções. */}
       <svg className="absolute left-0 top-0 overflow-visible" width={LANE} height={height} aria-hidden>
+        {/* Conector do topo (banner) até o 1º dia — só quando não há divisória (LegProc). */}
+        {semDivisoria && nodesL[0] && (
+          <path d={`M ${cx(nodesL[0].off)} 0 L ${cx(nodesL[0].off)} ${nodesL[0].y}`} fill="none" strokeWidth={6} strokeLinecap="round" strokeDasharray="0.1 16"
+            stroke={nodesL[0].n.estado === 'concluido' ? COR : 'var(--border)'} />
+        )}
         {allPts.slice(0, -1).map((p, i) => {
           const P0 = allPts[i - 1] ?? p
           const P2 = allPts[i + 1]
