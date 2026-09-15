@@ -731,6 +731,28 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 .leitura-prosa .caixa-colapsavel[data-aberto] > .caixa-corpo { grid-template-rows:1fr; }
 .leitura-prosa .caixa-colapsavel > .caixa-corpo > .caixa-corpo-in { overflow:hidden; min-height:0; }
 
+/* "Artigos já cobrados em prova" (LegProc): selo + chevron de recolher no cabeçalho do artigo.
+   O rótulo vem de CSS content (::before) → SEM nó de texto, não entra na espinha das âncoras. */
+.leitura-prosa .art-cobrado-barra {
+  display:inline-flex; align-items:center; gap:.35em; vertical-align:middle; margin-right:.5em;
+  cursor:pointer; user-select:none; line-height:1;
+}
+.leitura-prosa .art-cobrado-barra:focus-visible { outline:2px solid var(--primary); outline-offset:2px; border-radius:9999px; }
+.leitura-prosa .art-cobrado-selo::before {
+  content:"Cobrado em prova"; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.03em;
+  color:#92400e; background:#fef3c7; border:1px solid #fcd34d; padding:2px 7px; border-radius:9999px; white-space:nowrap;
+}
+.dark .leitura-prosa .art-cobrado-selo::before,
+.leitura-prosa[data-tema="escuro"] .art-cobrado-selo::before { color:#fcd34d; background:rgba(252,211,77,.12); border-color:rgba(252,211,77,.3); }
+.leitura-prosa .art-cobrado-chev {
+  width:14px; height:14px; display:inline-flex; align-items:center; justify-content:center;
+  border:1px solid rgba(120,120,120,.35); border-radius:5px; position:relative;
+}
+.leitura-prosa .art-cobrado-chev::before {
+  content:""; width:6px; height:6px; margin-top:-2px; border-right:2px solid currentColor; border-bottom:2px solid currentColor;
+  opacity:.7; transform:rotate(45deg); transition:transform .2s ease;
+}
+.leitura-prosa [data-art-fechado] .art-cobrado-chev::before { margin-top:0; transform:rotate(-45deg); }
 
 /* Scrollbars da área de leitura combinando com o tema (thumb/track vêm de CSS vars no container:
    --leitura-scroll-thumb / --leitura-scroll-track, derivados da cor de texto do tema). */

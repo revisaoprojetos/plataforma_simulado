@@ -17,6 +17,7 @@ import { QuestaoLeitura } from '@/components/aluno/questao-leitura'
 import { LeituraAtualizacaoAviso } from '@/components/aluno/leitura-atualizacao-aviso'
 import { GRIFOS, corDoGrifo, ehEstrutural } from '@/lib/leitura/grifos'
 import { prepararCaixasTabela } from '@/lib/leitura/caixas'
+import { prepararArtigosCobrados } from '@/lib/leitura/artigos-cobrados'
 import { montarArvoreToc, type NoToc } from '@/lib/leitura/indice'
 import { IndiceArvore, type NoIndiceView } from '@/components/leitura/indice-arvore'
 import { confirmar } from '@/components/ui/confirm-dialog'
@@ -178,6 +179,8 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
   // Memoizado: `doc.grifos ?? []` gerava um array NOVO a cada render → recomputarGrifos era recriado
   // e o efeito de layout repintava os grifos em TODO re-render (piscar ao expandir/clicar no sumário).
   const grifos = useMemo(() => doc.grifos ?? [], [doc.grifos])
+  // "Cobrado em prova" = artigos com QUESTÃO ancorada (aposArtigo). Alimenta o recolher/expandir.
+  const artigosCobrados = useMemo(() => new Set((doc.questoes ?? []).map((q) => q.aposArtigo).filter((n) => n > 0)), [doc.questoes])
   // Grifos "assados" no HTML (importados no padrão MAC → data-grifo/data-caixa;
   // ou o formato cru hl-*/box-* de importações antigas), além do overlay (doc.grifos).
   const temGrifosBaked = /data-grifo=|data-caixa=|\bhl-[ygr]\b|\bbox-(stj|stf|cinza|atencao)/.test(doc.html)
@@ -990,6 +993,8 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
       }
       // Caixas em TABELA (ENTENDIMENTO importado do Word) — mesmo recolher/expandir, via helper compartilhado.
       limpezasTab.push(prepararCaixasTabela(cont, onTabToggle))
+      // Artigos já cobrados em prova (com questão ancorada): selo + recolher/expandir (default aberto).
+      limpezasTab.push(prepararArtigosCobrados(cont, artigosCobrados, onTabToggle))
     }
     aplicar()
     const raf = requestAnimationFrame(aplicar)
@@ -998,7 +1003,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
     const mo = new MutationObserver(aplicar)
     mo.observe(cont, { childList: true, subtree: true })
     return () => { cancelAnimationFrame(raf); cancelAnimationFrame(raf2); mo.disconnect(); for (const c of ligados) { c.removeEventListener('click', onCab); c.removeEventListener('keydown', onKey) }; for (const l of limpezasTab) l() }
-  }, [doc.html])
+  }, [doc.html, artigosCobrados])
 
   return (
     <div ref={containerRef} className={cn('relative flex overflow-hidden', trilha
