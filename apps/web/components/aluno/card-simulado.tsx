@@ -42,7 +42,7 @@ export function CardSimulado({ s, dica = false, variant = 'poster' }: { s: ItemS
   // ===== Variante TICKET: card baixo e retangular — metade esquerda com a imagem, direita com infos. =====
   if (variant === 'ticket') {
     return (
-      <div className={cn('group relative flex h-28 overflow-hidden rounded-2xl border bg-card shadow-sm ring-1 ring-black/5 transition duration-300 sm:h-32', s.podeFazer && 'hover:-translate-y-0.5 hover:shadow-lg')}>
+      <div className={cn('group/card relative flex h-28 overflow-hidden rounded-2xl border bg-card shadow-sm ring-1 ring-black/5 transition duration-300 sm:h-32', s.podeFazer && 'hover:-translate-y-0.5 hover:shadow-lg')}>
         {/* metade esquerda: imagem paisagem — prefere o BANNER largo (capa_url); o pôster 4:5 só
             entra se não houver banner (nesse caso o object-cover corta o meio). */}
         <div className="relative w-[42%] max-w-[11rem] shrink-0 overflow-hidden">
@@ -88,10 +88,10 @@ export function CardSimulado({ s, dica = false, variant = 'poster' }: { s: ItemS
   }
 
   return (
-    <div className={cn('group relative aspect-[4/5] transform-gpu overflow-hidden rounded-2xl border shadow-sm ring-1 ring-black/5 transition duration-300', s.podeFazer && 'hover:-translate-y-1 hover:shadow-xl hover:ring-white/25')}>
+    <div className={cn('group/card relative aspect-[4/5] transform-gpu overflow-hidden rounded-2xl border shadow-sm ring-1 ring-black/5 transition duration-300', s.podeFazer && 'hover:-translate-y-1 hover:shadow-xl hover:ring-white/25')}>
       <CapaCard capa={capa} cor={cor} icone={s.vis?.icone} />
       {/* glow da cor da marca no rodapé — dá profundidade e identidade */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 opacity-50 transition-opacity duration-300 group-hover:opacity-70" style={{ background: `linear-gradient(to top, ${cor}, transparent)` }} />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 opacity-50 transition-opacity duration-300 group-hover/card:opacity-70" style={{ background: `linear-gradient(to top, ${cor}, transparent)` }} />
       {/* escurecimento p/ legibilidade do texto */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/5" />
 

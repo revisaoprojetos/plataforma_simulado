@@ -13,13 +13,13 @@ import { cn } from '@/lib/utils'
  * `insetY` = classe de altura vertical (padrão `inset-y-0`); use ex. `inset-y-2` quando o container
  * tem folga vertical (padding) e o degradê precisa casar com a altura real dos cards.
  */
-export function SetaDegrade({ dir, onClick, label, insetY = 'inset-y-0' }: { dir: 'left' | 'right'; onClick: () => void; label?: string; insetY?: string }) {
+export function SetaDegrade({ dir, onClick, label, insetY = 'inset-y-0', semDegrade = false }: { dir: 'left' | 'right'; onClick: () => void; label?: string; insetY?: string; semDegrade?: boolean }) {
   const isL = dir === 'left'
   const Icon = isL ? ChevronLeft : ChevronRight
   return (
     <>
-      {/* Degradê estático (travado): nunca se mexe/encolhe/corta. */}
-      <div aria-hidden className={cn('pointer-events-none absolute z-20 hidden w-20 from-black/45 via-black/12 to-transparent sm:block sm:w-28', insetY, isL ? 'left-0 bg-gradient-to-r' : 'right-0 bg-gradient-to-l')} />
+      {/* Degradê estático (travado): nunca se mexe/encolhe/corta. `semDegrade` remove o fade lateral (só a seta). */}
+      {!semDegrade && <div aria-hidden className={cn('pointer-events-none absolute z-20 hidden w-20 from-black/45 via-black/12 to-transparent sm:block sm:w-28', insetY, isL ? 'left-0 bg-gradient-to-r' : 'right-0 bg-gradient-to-l')} />}
       {/* Seta: botão transparente por cima — única coisa que reage ao mouse. */}
       <button type="button" onClick={onClick} aria-label={label ?? (isL ? 'Anterior' : 'Próximo')}
         className={cn('group/nav absolute z-30 hidden w-20 items-center text-white sm:flex sm:w-28', insetY, isL ? 'left-0 justify-start pl-3' : 'right-0 justify-end pr-3')}>

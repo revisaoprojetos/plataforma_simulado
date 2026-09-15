@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type React from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { SetaDegrade } from '@/components/seta-degrade'
 
 /**
  * Fileira horizontal estilo Netflix (reutilizável admin + aluno): rola exatamente UM card por
@@ -30,19 +29,32 @@ export function FileiraHorizontal({ titulo, count, children, setasFora = false }
     if (!el) return
     el.addEventListener('scroll', atualiza, { passive: true })
     window.addEventListener('resize', atualiza)
-    // Roda do mouse VERTICAL → rola o carrossel na HORIZONTAL (só quando há overflow horizontal e o gesto
-    // é predominantemente vertical; trackpad horizontal segue nativo). passive:false p/ poder preventDefault.
+    // Roda do mouse VERTICAL → rola o carrossel na HORIZONTAL, com INTERPOLAÇÃO SUAVE (rAF):
+    // acumula o delta num alvo e desliza o scrollLeft até ele (lerp) → movimento fluido, sem "pulos".
+    // Só quando há overflow horizontal e o gesto é predominantemente vertical (trackpad horizontal segue nativo).
+    let alvo: number | null = null
+    let raf: number | null = null
+    const desliza = () => {
+      if (alvo == null) { raf = null; return }
+      const dif = alvo - el.scrollLeft
+      if (Math.abs(dif) < 0.5) { el.scrollLeft = alvo; alvo = null; raf = null; return }
+      el.scrollLeft += dif * 0.18 // fator de suavidade (menor = mais suave/lento)
+      raf = requestAnimationFrame(desliza)
+    }
     const onWheel = (e: WheelEvent) => {
       if (el.scrollWidth <= el.clientWidth + 4) return
       if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return
-      el.scrollLeft += e.deltaY
       e.preventDefault()
+      const max = el.scrollWidth - el.clientWidth
+      const base = alvo == null ? el.scrollLeft : alvo
+      alvo = Math.max(0, Math.min(max, base + e.deltaY))
+      if (raf == null) raf = requestAnimationFrame(desliza)
     }
     el.addEventListener('wheel', onWheel, { passive: false })
     // Reavalia quando o conteúdo muda de tamanho (imagens carregando, etc.).
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(atualiza) : null
     ro?.observe(el)
-    return () => { el.removeEventListener('scroll', atualiza); el.removeEventListener('wheel', onWheel); window.removeEventListener('resize', atualiza); ro?.disconnect() }
+    return () => { el.removeEventListener('scroll', atualiza); el.removeEventListener('wheel', onWheel); window.removeEventListener('resize', atualiza); ro?.disconnect(); if (raf != null) cancelAnimationFrame(raf) }
   }, [])
   // Rola exatamente UM card por vez (largura do 1º card + gap de 1rem).
   const rolar = (dir: -1 | 1) => {
@@ -83,13 +95,24 @@ export function FileiraHorizontal({ titulo, count, children, setasFora = false }
       <div className="group relative">
         {/* py-2 dá folga vertical: overflow-x-auto também recorta na vertical, então sem isso o
             card cortaria no topo ao subir no hover (-translate-y). O -my-2 mantém o alinhamento. */}
-        <div ref={ref} className="-my-2 flex gap-4 overflow-x-auto px-0.5 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {/* rounded-[2rem]: as pontas cortadas dos cards seguem o cantinho arredondado (sem corte reto). */}
+        <div ref={ref} className="-my-2 flex gap-4 overflow-x-auto rounded-[2rem] px-0.5 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {children}
         </div>
-        {/* Setas DEPOIS dos cards no DOM → a cascata de entrada dá índice ALTO (entram junto/depois dos
-            cards, não antes). insetY inset-y-2 casa o degradê com a altura real dos cards (desconta o py-2). */}
-        {canL && <SetaDegrade dir="left" onClick={() => rolar(-1)} label="Ver anteriores" insetY="inset-y-2" />}
-        {canR && <SetaDegrade dir="right" onClick={() => rolar(1)} label="Ver próximos" insetY="inset-y-2" />}
+        {/* Seta = botão circular COMPACTO com borda (aparece no hover): borda + bg-card p/ não ficar
+            "branco no branco" sobre o card; centrado na vertical p/ não cobrir o espaçamento entre cards. */}
+        {canL && (
+          <button type="button" onClick={() => rolar(-1)} aria-label="Ver anteriores"
+            className="absolute left-2 top-1/2 z-30 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border bg-card/95 text-foreground opacity-0 shadow-md backdrop-blur transition-all duration-200 hover:scale-105 hover:bg-card group-hover:opacity-100 sm:flex">
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+        )}
+        {canR && (
+          <button type="button" onClick={() => rolar(1)} aria-label="Ver próximos"
+            className="absolute right-2 top-1/2 z-30 hidden h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full border bg-card/95 text-foreground opacity-0 shadow-md backdrop-blur transition-all duration-200 hover:scale-105 hover:bg-card group-hover:opacity-100 sm:flex">
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        )}
       </div>
     </section>
   )

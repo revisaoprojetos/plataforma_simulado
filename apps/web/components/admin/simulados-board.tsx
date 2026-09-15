@@ -277,14 +277,14 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
     return (
       <>
       <div className={cn(
-        'group relative flex h-32 overflow-hidden rounded-2xl border bg-card shadow-sm transition-all duration-300 sm:h-36',
+        'group/card relative flex h-32 overflow-hidden rounded-2xl border bg-card shadow-sm transition-all duration-300 sm:h-36',
         selecionado ? 'ring-2 ring-primary' : 'ring-1 ring-black/5 hover:-translate-y-0.5 hover:shadow-lg',
       )}>
         {/* metade esquerda: imagem/degradê. Aspecto 4:3 = o MESMO recorte que o cropper usa p/ o card
             no modo ticket → object-cover não re-corta (o enquadramento do admin aparece igual). */}
         <div className="relative aspect-[4/3] h-full shrink-0 overflow-hidden">
           {capaT
-            ? <img src={capaT} alt="" className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105" />
+            ? <img src={capaT} alt="" className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover/card:scale-105" />
             : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
           {!capa && <BancoIcon className="absolute -right-4 -top-4 h-28 w-28 text-white/10" />}
           {online > 0 && (
@@ -310,14 +310,18 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
             <DropdownMenuContent align="start" className="w-52">{menuItens}</DropdownMenuContent>
           </DropdownMenu>
         </div>
-        {/* direita: infos + ações */}
-        <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 p-3">
-          <span className={cn('inline-flex w-fit items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white', dotClass[s.status])}>{statusLabel[s.status] ?? s.status}</span>
-          <h3 className="line-clamp-2 pr-8 text-sm font-bold leading-tight text-foreground sm:text-[15px]">
-            <Link href={detalhe} className="pointer-events-auto relative z-20 transition-opacity hover:opacity-80">{s.titulo}</Link>
-          </h3>
-          <p className="line-clamp-1 text-[11px] text-muted-foreground">{subtituloSim(s)}</p>
-          <div className="pointer-events-auto relative z-20 mt-1 flex items-center gap-1.5">
+        {/* direita: status no topo (alinhado c/ os 3 pontos), infos no meio, ações coladas no rodapé */}
+        <div className="flex min-w-0 flex-1 flex-col justify-between px-3 pb-2 pt-2">
+          <div className="flex min-h-6 items-center">
+            <span className={cn('inline-flex w-fit items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white', dotClass[s.status])}>{statusLabel[s.status] ?? s.status}</span>
+          </div>
+          <div className="min-w-0">
+            <h3 className="line-clamp-2 pr-8 text-sm font-bold leading-tight text-foreground sm:text-[15px]">
+              <Link href={detalhe} className="pointer-events-auto relative z-20 transition-opacity hover:opacity-80">{s.titulo}</Link>
+            </h3>
+            <p className="line-clamp-1 text-[11px] text-muted-foreground">{subtituloSim(s)}</p>
+          </div>
+          <div className="pointer-events-auto relative z-20 flex items-center gap-1.5">
             <button type="button" onClick={abrirSimulado} disabled={!linkAcesso}
               className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] font-semibold text-white shadow-sm transition-all hover:brightness-110 disabled:opacity-50"
               style={{ background: `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 72%, #000))` }}>
@@ -338,16 +342,16 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
   return (
     <>
     <div className={cn(
-      'group relative flex aspect-[4/5] flex-col overflow-hidden rounded-2xl border shadow-sm transition-all duration-300',
+      'group/card relative flex aspect-[4/5] flex-col overflow-hidden rounded-2xl border shadow-sm transition-all duration-300',
       selecionado ? 'ring-2 ring-primary' : 'ring-1 ring-black/5 hover:-translate-y-1 hover:shadow-xl hover:ring-white/25',
     )}>
       {/* Fundo: imagem preenchendo o card inteiro (ou degradê da marca) */}
       {capa
-        ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105" />
+        ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover/card:scale-105" />
         : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
-      {!capa && <BancoIcon className="absolute -right-6 -top-6 h-40 w-40 text-white/10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3" />}
+      {!capa && <BancoIcon className="absolute -right-6 -top-6 h-40 w-40 text-white/10 transition-transform duration-500 group-hover/card:scale-110 group-hover/card:rotate-3" />}
       {/* glow da cor da marca + escurecimento p/ legibilidade do texto */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 opacity-50 transition-opacity duration-300 group-hover:opacity-70" style={{ background: `linear-gradient(to top, ${cor}, transparent)` }} />
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 opacity-50 transition-opacity duration-300 group-hover/card:opacity-70" style={{ background: `linear-gradient(to top, ${cor}, transparent)` }} />
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/5" />
 
       {/* Link cobre o card (abaixo dos controles) */}
