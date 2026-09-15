@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
-import { atualizarBanco, criarPastaFolder, lerCapaMeta } from '@/app/admin/banco-questoes/actions'
+import { atualizarBanco, criarPastaFolder, lerCapaMeta, salvarCardFadeAction } from '@/app/admin/banco-questoes/actions'
 import { type CapaMetaIn } from '@/lib/capa-meta'
 import { BANCO_CORES } from '@/lib/banco-visual'
 import { Loader2, X, Check, Palette, ImagePlus, Trash2, RefreshCw, Crop } from 'lucide-react'
@@ -35,10 +35,12 @@ async function origParaMeta(o: File | string | null): Promise<string | null> {
  * usada no card pôster = capa_card_url) e a IMAGEM LARGA (banner usado na trilha e no card ticket =
  * capa_url). Cada imagem tem "Ajustar" (arraste + zoom) para posicionar o recorte. A PRÉVIA espelha
  * o estilo de card escolhido no console (pôster ou ticket). */
-export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poster', rotulo, generoM = false, inline = false, onClose, onSaved }: {
+export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poster', cardFade = null, rotulo, generoM = false, inline = false, onClose, onSaved }: {
   pasta?: { id?: string; nome?: string; cor?: string | null; capa?: string | null; capaLarga?: string | null } | null
   /** Presente = modo CRIAR: cria a pasta nesta área e já aplica a personalização. */
   area?: 'banco' | 'simulado' | 'caderno' | 'leitura'
+  /** Config GLOBAL do fade lateral dos cards (tema.card_fade) — editável aqui p/ simulados/bancos. */
+  cardFade?: { ativo?: boolean; cor?: string | null } | null
   /** Pasta-pai — quando definido, cria uma SUBPASTA dentro dela. */
   paiId?: string | null
   /** Estilo do card definido no console (tema.card_view / card_view_admin) — a prévia o espelha. */
@@ -62,6 +64,18 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
   const [capaCard, setCapaCard] = useState<string | null>(pasta?.capa ?? null)
   const [capaLarga, setCapaLarga] = useState<string | null>(pasta?.capaLarga ?? null)
   const [salvando, setSalvando] = useState(false)
+  // Fade lateral dos cards (GLOBAL, tema.card_fade). Só faz sentido p/ simulados/bancos.
+  const mostrarFade = area == null || area === 'simulado' || area === 'banco'
+  const [fadeAtivo, setFadeAtivo] = useState<boolean>((cardFade as any)?.ativo !== false)
+  const [fadeCor, setFadeCor] = useState<string>(typeof (cardFade as any)?.cor === 'string' ? (cardFade as any).cor : '')
+  // Aplica a var na hora (feedback imediato nos cards atrás e na prévia) — persistência é no salvar.
+  function aplicarFadeVar(ativo: boolean, corV: string) {
+    if (typeof document === 'undefined') return
+    const el = document.documentElement
+    if (!ativo) el.style.setProperty('--sim-card-fade', 'transparent')
+    else if (corV) el.style.setProperty('--sim-card-fade', corV)
+    else el.style.removeProperty('--sim-card-fade')
+  }
   // Editor de recorte (posição + zoom) na proporção certa, aberto ao escolher OU ao "Ajustar".
   const [cropper, setCropper] = useState<{ file?: File; src?: string; alvo: 'card' | 'banner'; aspect: number; titulo: string; zoom?: number; center?: { x: number; y: number } } | null>(null)
   // Fonte ORIGINAL + estado do recorte por imagem — p/ REEDITAR de onde parou (re-recorta do original).
@@ -130,6 +144,8 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
   async function salvar() {
     if (!nome.trim()) { toast.error('Informe um nome.'); return }
     setSalvando(true)
+    // Fade é config global (independe da pasta): persiste best-effort + aplica na hora.
+    if (mostrarFade) { aplicarFadeVar(fadeAtivo, fadeCor.trim()); void salvarCardFadeAction({ ativo: fadeAtivo, cor: fadeCor.trim() || null }).catch(() => {}) }
     const meta = await montarMeta()
     if (criar) {
       const r = await criarPastaFolder(nome.trim(), paiId, area)
@@ -148,7 +164,7 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
   const btnOverlay = 'inline-flex items-center gap-1 rounded-md bg-black/60 px-2 py-1 text-xs font-medium text-white backdrop-blur hover:bg-black/70'
 
   const dialogo = (
-      <div role="dialog" aria-modal={!inline} className={cn('relative grid grid-cols-1 overflow-hidden rounded-2xl border bg-card md:grid-cols-[1fr_260px]', inline ? '' : 'animate-pop max-h-[88vh] w-full max-w-2xl shadow-2xl')}>
+      <div role="dialog" aria-modal={!inline} className={cn('relative grid grid-cols-1 overflow-hidden rounded-2xl border bg-card md:grid-cols-[1fr_260px]', inline ? '' : 'animate-pop max-h-[88vh] w-full max-w-3xl shadow-2xl')}>
         {/* Form */}
         <div className="min-w-0 overflow-auto">
           <div className="flex items-center justify-between border-b px-5 py-3">
@@ -215,23 +231,47 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
               )}
             </div>
 
-            {/* Cor */}
+            {/* Cor — todas numa linha só (pop-up mais largo) */}
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Cor</label>
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 {BANCO_CORES.map((cc) => (
                   <button key={cc} type="button" onClick={() => setCor(cc)} title={cc}
-                    className={cn('flex h-8 w-8 items-center justify-center rounded-full transition-transform hover:scale-110', cor === cc && 'ring-2 ring-foreground ring-offset-2 ring-offset-card')}
+                    className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-full transition-transform hover:scale-110', cor === cc && 'ring-2 ring-foreground ring-offset-2 ring-offset-card')}
                     style={{ background: cc }}>
-                    {cor === cc && <Check className="h-4 w-4 text-white" />}
+                    {cor === cc && <Check className="h-3.5 w-3.5 text-white" />}
                   </button>
                 ))}
-                <label className="relative inline-flex h-8 w-8 cursor-pointer items-center justify-center overflow-hidden rounded-full border" title="Cor personalizada">
+                <label className="relative inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border" title="Cor personalizada">
                   <span className="absolute inset-0" style={{ background: cor && !BANCO_CORES.includes(cor) ? cor : 'conic-gradient(from 0deg, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)' }} />
                   <input type="color" value={cor ?? '#6d28d9'} onChange={(e) => setCor(e.target.value)} className="absolute inset-0 cursor-pointer opacity-0" />
                 </label>
               </div>
             </div>
+
+            {/* Fade lateral dos cards (GLOBAL) — abaixo da Cor. Desliga / troca a cor do degradê à direita. */}
+            {mostrarFade && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Fade lateral dos cards <span className="font-normal normal-case">(afeta todos os cards)</span></label>
+                <div className="flex flex-wrap items-center gap-3">
+                  <label className="flex cursor-pointer items-center gap-2 text-sm">
+                    <input type="checkbox" checked={fadeAtivo} onChange={(e) => { setFadeAtivo(e.target.checked); aplicarFadeVar(e.target.checked, fadeCor.trim()) }} className="h-4 w-4 accent-[var(--primary)]" />
+                    Mostrar o fade
+                  </label>
+                  {fadeAtivo && (
+                    <span className="inline-flex items-center gap-2">
+                      <label className="relative inline-flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-full border" title="Cor do fade">
+                        <span className="absolute inset-0" style={{ background: fadeCor || 'conic-gradient(from 0deg, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)' }} />
+                        <input type="color" value={fadeCor || '#6d28d9'} onChange={(e) => { setFadeCor(e.target.value); aplicarFadeVar(fadeAtivo, e.target.value) }} className="absolute inset-0 cursor-pointer opacity-0" />
+                      </label>
+                      {fadeCor
+                        ? <button type="button" onClick={() => { setFadeCor(''); aplicarFadeVar(fadeAtivo, '') }} className="text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground">usar a cor de cada card</button>
+                        : <span className="text-xs text-muted-foreground">(cor de cada card)</span>}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
 
             <div className="flex justify-end gap-2">
               {!inline && <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted">Cancelar</button>}
@@ -255,7 +295,7 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
                 ) : (
                   <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }} />
                 )}
-                <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `linear-gradient(110deg, transparent 45%, ${c})` }} />
+                {fadeAtivo && <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `linear-gradient(110deg, transparent 45%, ${fadeCor || c})` }} />}
               </div>
               <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 p-3">
                 <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{Rot}</span>

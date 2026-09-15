@@ -499,7 +499,7 @@ type PastaSim = { id: string; nome: string; cor?: string | null; icone?: string 
 type DestinoSim = { id: string; nome: string }
 export type SimuladoCatalogo = SimuladoCard & { grupoId: string | null }
 
-export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders = [], destinos = [], atual = null, catalogo, cardView = 'poster', vistaInicial }: {
+export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders = [], destinos = [], atual = null, catalogo, cardView = 'poster', vistaInicial, cardFade = null }: {
   simulados: SimuladoCard[]; appUrl: string; onlineInicial?: Record<string, number>
   folders?: PastaSim[]; destinos?: DestinoSim[]; atual?: { id: string; nome: string } | null
   catalogo?: { sims: SimuladoCatalogo[]; grupos: PastaSim[] }
@@ -507,6 +507,8 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
   cardView?: CardView
   /** Tipo de exibição SALVO por este admin (individual). Undefined = admin novo → cai no padrão. */
   vistaInicial?: 'linhas' | 'pastas' | 'status'
+  /** Config global do fade lateral dos cards (tema.card_fade) — editável no diálogo Personalizar. */
+  cardFade?: { ativo?: boolean; cor?: string | null } | null
 }) {
   const router = useRouter()
   const [, start] = useTransition()
@@ -695,13 +697,13 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
       {editandoPasta && (
         <EditarPastaDialog
           pasta={{ id: editandoPasta.id, nome: editandoPasta.nome, cor: editandoPasta.cor ?? null, capa: editandoPasta.capa ?? null, capaLarga: (editandoPasta as any).capaLarga ?? null }}
-          cardView={cardView}
+          cardView={cardView} cardFade={cardFade}
           onClose={() => setEditandoPasta(null)}
           onSaved={() => router.refresh()}
         />
       )}
       {criandoPasta && (
-        <EditarPastaDialog area="simulado" cardView={cardView} onClose={() => setCriandoPasta(false)} onSaved={() => router.refresh()} />
+        <EditarPastaDialog area="simulado" cardView={cardView} cardFade={cardFade} onClose={() => setCriandoPasta(false)} onSaved={() => router.refresh()} />
       )}
     </div>
   )

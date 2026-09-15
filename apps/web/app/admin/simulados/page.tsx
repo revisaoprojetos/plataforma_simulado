@@ -205,6 +205,7 @@ async function BoardData({ pastaParam }: { pastaParam?: string }) {
       atual={current ? { id: current.id, nome: current.nome } : null}
       catalogo={{ sims: catalogoSims as (SimuladoCard & { grupoId: string | null })[], grupos: catalogoGrupos }}
       cardView={cardView}
+      cardFade={temaCards.card_fade ?? null}
     />
   )
 }
