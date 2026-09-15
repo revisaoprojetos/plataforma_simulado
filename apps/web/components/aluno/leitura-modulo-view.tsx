@@ -116,7 +116,8 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
         </div>
       )}
 
-      <TabsContent value="trilha" className="pt-4">
+      {/* pt-0: a trilha encosta no banner (o conector do topo "puxa" do banner até o 1º dia sem gap). */}
+      <TabsContent value="trilha" className="pt-0">
         <div className="overflow-x-auto pb-10"><TrilhaGigante trilhas={[trilha]} gamAtivo={false} reto semFundo semDivisoria /></div>
       </TabsContent>
       <TabsContent value="desempenho" className="pt-4">
