@@ -87,15 +87,16 @@ export function CapiAjudanteTrilha({ pontos = [] }: { pontos?: PontoTrilha[] }) 
     const dy = Math.round(Math.random() * 56 - 24) // -24..+32 → às vezes acima, às vezes ao lado/abaixo
     const reais = pontosRef.current.filter((p) => !p.intro)
     if (!reais.length) { const f = semRepetir([...INCENTIVOS, ...DICAS]); return { naDireita, dy, pose: f.pose, msg: f.msg } }
-    const atual = reais.find((p) => p.estado === 'atual') ?? reais[0]
-    const concluidos = reais.filter((p) => p.estado === 'concluido')
-    // Destino: fica no ATUAL (onde o aluno está) e só às vezes sobe a um CONCLUÍDO p/ comemorar.
-    // NUNCA desce a aulas futuras/bloqueadas (o aluno ainda não chegou lá).
-    const ponto = concluidos.length && Math.random() < 0.3 ? rnd(concluidos) : atual
-    // Fala: comemora se concluído; senão sorteia entre DICAS (foco) / INCENTIVOS / DIRECIONAIS.
+    // FICA no nó ATUAL (onde o aluno está / o que está em vista): não sobe/desce a outros nós — assim
+    // nunca "some" saindo da tela. A comemoração de concluídas vira só MENSAGEM, sem se deslocar.
+    const ponto = reais.find((p) => p.estado === 'atual') ?? reais[0]
+    const temConcl = reais.some((p) => p.estado === 'concluido')
+    const cat = Math.random()
     let fala: Fala
-    if (ponto.estado === 'concluido') fala = semRepetir(CELEBRA)
-    else { const cat = Math.random(); fala = semRepetir(cat < 0.42 ? DICAS : cat < 0.76 ? INCENTIVOS : DIRECIONAIS) }
+    if (temConcl && cat < 0.18) fala = semRepetir(CELEBRA)
+    else if (cat < 0.55) fala = semRepetir(DICAS)
+    else if (cat < 0.82) fala = semRepetir(INCENTIVOS)
+    else fala = semRepetir(DIRECIONAIS)
     return { x: ponto.x, y: ponto.y, naDireita, dy, pose: fala.pose, msg: fala.msg }
   }, [semRepetir])
 

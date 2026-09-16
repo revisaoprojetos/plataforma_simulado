@@ -695,8 +695,8 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
       )}
 
       {/* Capivara ajudante autônoma (LegProc) — fica à esquerda dos nós e reage. Liga/desliga por aluno.
-          INDEPENDENTE do card do dia (fica sempre à esquerda; o card abre à direita). */}
-      {ajudante && <CapiAjudanteTrilha pontos={nodesL.map((x) => ({ x: cx(x.off), y: x.y, estado: x.n.estado, intro: !!x.n.intro }))} />}
+          key ESTÁVEL: sem ela, abrir/fechar o card (nó vizinho) remontava a Capi (ela + o botão sumiam). */}
+      {ajudante && <CapiAjudanteTrilha key="capi-ajudante" pontos={nodesL.map((x) => ({ x: cx(x.off), y: x.y, estado: x.n.estado, intro: !!x.n.intro }))} />}
     </div>
   )
 }
