@@ -694,8 +694,9 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
         </div>
       )}
 
-      {/* Capivara ajudante autônoma (LegProc) — anda ao lado dos nós e reage. Liga/desliga por aluno. */}
-      {ajudante && <CapiAjudanteTrilha pontos={nodesL.map((x) => ({ x: cx(x.off), y: x.y, estado: x.n.estado, intro: !!x.n.intro }))} />}
+      {/* Capivara ajudante autônoma (LegProc) — anda ao lado dos nós e reage. Liga/desliga por aluno.
+          Com um card aberto, ela vai pro lado OPOSTO (ladoCard) p/ não ficar atrás dele. */}
+      {ajudante && <CapiAjudanteTrilha ladoCard={open ? side : null} pontos={nodesL.map((x) => ({ x: cx(x.off), y: x.y, estado: x.n.estado, intro: !!x.n.intro }))} />}
     </div>
   )
 }

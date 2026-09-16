@@ -55,7 +55,7 @@ type Passo = { x?: number; y?: number; naDireita: boolean; dy: number; pose: Rea
  * a próxima. Sem geometria (lista/mapa) fica num canto flutuando e trocando de fala. Reusa o <Mascote>,
  * liga/desliga por aluno (localStorage) e respeita prefers-reduced-motion.
  */
-export function CapiAjudanteTrilha({ pontos = [] }: { pontos?: PontoTrilha[] }) {
+export function CapiAjudanteTrilha({ pontos = [], ladoCard = null }: { pontos?: PontoTrilha[]; ladoCard?: 'left' | 'right' | null }) {
   const [ligado, setLigado] = useState(true)
   const [montado, setMontado] = useState(false)
   const [passo, setPasso] = useState<Passo | null>(null)
@@ -116,10 +116,13 @@ export function CapiAjudanteTrilha({ pontos = [] }: { pontos?: PontoTrilha[] }) 
 
   if (!montado || !ligado || !passo) return <BotaoAjudante ligado={ligado} onToggle={toggle} />
 
+  // Com um card de dia ABERTO, vai pro lado OPOSTO (o card tem z maior e cobriria a Capi).
+  const naDireita = ladoCard ? ladoCard === 'left' : passo.naDireita
+
   // key={ciclo} reinicia o arco de "voo" (mergulha e sobe) a cada troca.
   const mascote = (
     <div key={ciclo} className="motion-safe:animate-[capi-mergulho_1.2s_ease-in-out]">
-      <Mascote reacao={passo.pose} tamanho={74} mensagem={passo.msg} flutua={!reduzir.current} entra={false} espelhar={passo.naDireita} className="[&_img]:mt-3" />
+      <Mascote reacao={passo.pose} tamanho={74} mensagem={passo.msg} flutua={!reduzir.current} entra={false} espelhar={naDireita} className="[&_img]:mt-3" />
     </div>
   )
 
@@ -128,7 +131,7 @@ export function CapiAjudanteTrilha({ pontos = [] }: { pontos?: PontoTrilha[] }) 
       {temGeo && passo.x != null && passo.y != null ? (
         // Voo pela trilha: camada 1 (ancora no nó, transita) → camada 2 (deslize lateral distante) → arco.
         <div className="pointer-events-none absolute z-[3] transition-[left,top] duration-[900ms] ease-in-out" style={{ left: passo.x, top: passo.y + passo.dy }} aria-hidden>
-          <div className="transition-transform duration-[1400ms] ease-in-out" style={{ transform: `translate(-50%, -66%) translateX(${passo.naDireita ? 215 : -215}px)` }}>
+          <div className="transition-transform duration-[1400ms] ease-in-out" style={{ transform: `translate(-50%, -66%) translateX(${naDireita ? 215 : -215}px)` }}>
             {mascote}
           </div>
         </div>
