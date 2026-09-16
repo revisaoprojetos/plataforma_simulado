@@ -8,6 +8,7 @@ import { capaComPos } from '@/lib/leitura/capa-pos'
 import { EditarPastaDialog } from '@/components/admin/editar-pasta-dialog'
 import { PersonalizarAulaDialog } from '@/components/admin/personalizar-aula-dialog'
 import { ModuloAdesivoForm } from '@/components/admin/modulo-adesivo-form'
+import { ModuloPontuacaoForm } from '@/components/admin/modulo-pontuacao-form'
 import { ModuloAcesso } from '@/components/admin/modulo-acesso'
 import {
   ChevronRight, ChevronUp, ChevronDown, Home, Library, FolderPlus, FilePlus2, Pencil, Trash2, FolderInput, Eye, EyeOff, BookOpenText, MoreVertical, FolderOpen, FileText, HelpCircle, Settings2, Users,
@@ -175,6 +176,7 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTa
                 onSaved={() => router.refresh()}
               />
               <ModuloAdesivoForm pastaId={moduloAtual.id} atual={moduloAtual.adesivo_url} />
+              <ModuloPontuacaoForm pastaId={moduloAtual.id} atual={moduloAtual.pontuacao} />
             </div>
           )}
         </>
