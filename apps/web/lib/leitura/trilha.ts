@@ -12,13 +12,16 @@ interface AulaStatus {
   aulaConcluida: boolean
   questoesTotal: number
   questoesRespondidas: number
+  gabaritou: boolean
 }
 interface AulaSeq extends AulaStatus { estado: EstadoAula; moduloId: string }
 
 /** `.order('ordem')` tolerante (coluna pode não existir ainda). */
 async function pastasLeitura(svc: any, tenantId: string): Promise<any[]> {
   const base = (cols: string) => svc.from('simulado_pastas').select(cols).eq('tenant_id', tenantId).eq('is_folder', true).eq('folder_area', 'leitura')
-  let r = await base('id, nome, cor, capa_url, capa_card_url, pai_id, ordem, publicacao').order('ordem', { ascending: true }).order('nome', { ascending: true })
+  // 1ª tentativa inclui adesivo_url (coluna nova, tolerante — cai nas próximas se ausente).
+  let r = await base('id, nome, cor, capa_url, capa_card_url, pai_id, ordem, publicacao, adesivo_url').order('ordem', { ascending: true }).order('nome', { ascending: true })
+  if (r.error) r = await base('id, nome, cor, capa_url, capa_card_url, pai_id, ordem, publicacao').order('ordem', { ascending: true }).order('nome', { ascending: true })
   if (r.error) r = await base('id, nome, cor, capa_url, capa_card_url, pai_id, ordem').order('ordem', { ascending: true }).order('nome', { ascending: true })
   if (r.error) r = await base('id, nome, cor, capa_url, pai_id').order('nome', { ascending: true })
   return (r.data as any[]) ?? []
@@ -45,6 +48,7 @@ async function statusAulas(svc: any, tenantId: string, estId: string, docs: Docu
   const obrigPorDoc = new Map<string, Set<string>>()
   const totalPorDoc = new Map<string, number>()
   const respPorDoc = new Map<string, Set<string>>()
+  const acertoPorDoc = new Map<string, Set<string>>() // questões respondidas CORRETAMENTE (p/ "gabaritou")
   if (ids.length) {
     // "Questões do conteúdo" (quiz) + respostas em PARALELO (independentes) → menos round-trips.
     const [qs, rs] = await Promise.all([
@@ -54,21 +58,28 @@ async function statusAulas(svc: any, tenantId: string, estId: string, docs: Docu
             svc.from('simulado_documento_quiz_questoes').select('documento_id, questao_id').eq('tenant_id', tenantId).eq('deletado', false).in('documento_id', chunk).order('documento_id', { ascending: true }))
         } catch { return [] as { documento_id: string; questao_id: string }[] }
       })(),
-      fetchAllByIn<{ documento_id: string; questao_id: string }>(ids, (chunk) =>
-        svc.from('simulado_leitura_respostas').select('documento_id, questao_id').eq('tenant_id', tenantId).eq('estudante_id', estId).in('documento_id', chunk).order('documento_id', { ascending: true })),
+      fetchAllByIn<{ documento_id: string; questao_id: string; correta: boolean }>(ids, (chunk) =>
+        svc.from('simulado_leitura_respostas').select('documento_id, questao_id, correta').eq('tenant_id', tenantId).eq('estudante_id', estId).in('documento_id', chunk).order('documento_id', { ascending: true })),
     ])
     for (const q of qs) {
       totalPorDoc.set(q.documento_id, (totalPorDoc.get(q.documento_id) ?? 0) + 1)
       const s = obrigPorDoc.get(q.documento_id) ?? new Set<string>(); s.add(q.questao_id); obrigPorDoc.set(q.documento_id, s)
     }
-    for (const r of rs) { const s = respPorDoc.get(r.documento_id) ?? new Set<string>(); s.add(r.questao_id); respPorDoc.set(r.documento_id, s) }
+    for (const r of rs) {
+      const s = respPorDoc.get(r.documento_id) ?? new Set<string>(); s.add(r.questao_id); respPorDoc.set(r.documento_id, s)
+      if (r.correta) { const a = acertoPorDoc.get(r.documento_id) ?? new Set<string>(); a.add(r.questao_id); acertoPorDoc.set(r.documento_id, a) }
+    }
   }
   for (const d of docs) {
     const obrig = obrigPorDoc.get(d.id) ?? new Set<string>()
     const resp = respPorDoc.get(d.id) ?? new Set<string>()
+    const acer = acertoPorDoc.get(d.id) ?? new Set<string>()
     const questoesFeitas = [...obrig].every((qid) => resp.has(qid))
     const questoesRespondidas = [...obrig].filter((qid) => resp.has(qid)).length
-    map.set(d.id, { doc: d, leituraConcluida: d.concluido, questoesFeitas, aulaConcluida: d.concluido && questoesFeitas, questoesTotal: totalPorDoc.get(d.id) ?? 0, questoesRespondidas })
+    const questoesTotal = totalPorDoc.get(d.id) ?? 0
+    // Gabaritou = tem quiz, todas respondidas E todas corretas (máximo de pontos da aula).
+    const gabaritou = questoesTotal > 0 && questoesFeitas && [...obrig].every((qid) => acer.has(qid))
+    map.set(d.id, { doc: d, leituraConcluida: d.concluido, questoesFeitas, aulaConcluida: d.concluido && questoesFeitas, questoesTotal, questoesRespondidas, gabaritou })
   }
   return map
 }
@@ -119,11 +130,11 @@ async function sequenciaLeitura(estId: string, tenantId: string) {
   for (const arr of byModulo.values()) arr.sort((a, b) => (a.ordem - b.ordem) || a.titulo.localeCompare(b.titulo))
 
   // Gate de PUBLICAÇÃO do módulo: rascunho / agendado p/ futuro / encerrado não aparecem (dados ficam salvos).
-  const todosModulos = pastas.filter((p) => byModulo.has(p.id) && moduloPublicadoAgora(p.publicacao)).map((p) => ({ id: p.id as string, nome: p.nome as string, cor: (p.cor ?? null) as string | null, capa: (p.capa_url ?? null) as string | null, capaCard: (p.capa_card_url ?? null) as string | null }))
+  const todosModulos = pastas.filter((p) => byModulo.has(p.id) && moduloPublicadoAgora(p.publicacao)).map((p) => ({ id: p.id as string, nome: p.nome as string, cor: (p.cor ?? null) as string | null, capa: (p.capa_url ?? null) as string | null, capaCard: (p.capa_card_url ?? null) as string | null, adesivo: (p.adesivo_url ?? null) as string | null }))
   // Gate de acesso do módulo (pula os que o aluno não pode ver).
   const acessiveis = await modulosAcessiveis(svc, tenantId, estId, todosModulos.map((m) => m.id))
   const modulos = todosModulos.filter((m) => acessiveis.has(m.id))
-  if (byModulo.has('__geral__')) modulos.push({ id: '__geral__', nome: 'Geral', cor: null, capa: null, capaCard: null })
+  if (byModulo.has('__geral__')) modulos.push({ id: '__geral__', nome: 'Geral', cor: null, capa: null, capaCard: null, adesivo: null })
 
   const seqByModulo = new Map<string, AulaSeq[]>()
   let jaAbriu = false // já achou o "atual"
@@ -156,7 +167,7 @@ function nodeDe(a: AulaSeq): TrilhaNode {
     : a.leituraConcluida ? 'Questões liberadas' : 'Leitura'
   return {
     id, titulo: a.doc.titulo, quando,
-    estado: estadoNode, acerto: null, nota: null, tentativas: 0, statusLabel, questoes: a.questoesTotal, xp: 0,
+    estado: estadoNode, acerto: a.gabaritou ? 100 : null, nota: null, tentativas: 0, statusLabel, questoes: a.questoesTotal, xp: 0,
     href: hrefLeitura, acao: acaoLeitura, capa: a.doc.capa_url, capaBanner: a.doc.capa_url, cadernoUrl: null,
     hrefLeitura, acaoLeitura, hrefQuestoes, questoesLiberada: a.leituraConcluida && !bloqueado,
   }
@@ -173,7 +184,7 @@ export async function carregarTrilhaLeituraAluno(estId: string, tenantId: string
   return modulos.map((m) => {
     const arr = seqByModulo.get(m.id) ?? []
     const nodes = arr.map(nodeDe)
-    return { id: m.id, nome: m.nome, cor: m.cor, capa: m.capa, capaCard: m.capaCard, total: nodes.length, done: nodes.filter((n) => n.estado === 'concluido').length, trilhaXp: 0, pendentes: pendenciasDe(arr), nodes }
+    return { id: m.id, nome: m.nome, cor: m.cor, capa: m.capa, capaCard: m.capaCard, total: nodes.length, done: nodes.filter((n) => n.estado === 'concluido').length, trilhaXp: 0, pendentes: pendenciasDe(arr), adesivoUrl: m.adesivo ?? null, nodes }
   }).filter((t) => t.nodes.length > 0)
 }
 
@@ -212,7 +223,7 @@ export async function carregarModuloCompleto(estId: string, tenantId: string, mo
   if (!m) return { trilha: null, nome: null, desempenho: [], pendentes: 0, aulasPendentes: 0 }
   const arr = seqByModulo.get(m.id) ?? []
   const nodes = arr.map(nodeDe)
-  const trilha: Trilha = { id: m.id, nome: m.nome, cor: m.cor, capa: m.capa, capaCard: m.capaCard, total: nodes.length, done: nodes.filter((n) => n.estado === 'concluido').length, trilhaXp: 0, nodes }
+  const trilha: Trilha = { id: m.id, nome: m.nome, cor: m.cor, capa: m.capa, capaCard: m.capaCard, total: nodes.length, done: nodes.filter((n) => n.estado === 'concluido').length, trilhaXp: 0, adesivoUrl: m.adesivo ?? null, nodes }
   const desempenho: AulaDesempenho[] = arr.map((a) => ({
     id: a.doc.id, titulo: a.doc.titulo, estado: a.estado,
     leituraPct: a.doc.pct, leituraConcluida: a.leituraConcluida,

@@ -53,6 +53,7 @@ export interface Trilha {
   trilhaXp: number
   bauResgatado?: boolean // baú já resgatado (evento de chest no ledger) — vem do servidor
   pendentes?: number // LegProc: questões liberadas (leitura concluída) ainda não respondidas
+  adesivoUrl?: string | null // LegProc: adesivo de conquista exibido sobre o balão da aula gabaritada
   nodes: TrilhaNode[]
 }
 
@@ -437,7 +438,7 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
   const SMOOTH = 0.22
 
   // Layout: percorre grupos empilhando divisória + nós, guardando as posições.
-  const nodesL: { n: TrilhaNode; off: number; y: number }[] = []
+  const nodesL: { n: TrilhaNode; off: number; y: number; adesivo?: string | null }[] = []
   const dividers: { id: string; nome: string; done: number; total: number; y: number }[] = []
   // Fundo por grupo: capa INTEIRA do banco (capa_url); começa abaixo da divisória e termina antes da próxima.
   const segMeta: { id: string; capa: string | null; dy: number; total: number }[] = []
@@ -456,13 +457,13 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
       // (espaço simétrico acima/abaixo).
       const VPAD = 66
       y += VPAD
-      nodesL.push({ n: t.nodes[0], off: reto ? 0 : waveOff(gi), y: y + R })
+      nodesL.push({ n: t.nodes[0], off: reto ? 0 : waveOff(gi), y: y + R, adesivo: t.adesivoUrl ?? null })
       y += 2 * R + VPAD
       gi++
     } else {
       t.nodes.forEach((n) => {
         const off = reto ? 0 : waveOff(gi)
-        nodesL.push({ n, off, y: y + R })
+        nodesL.push({ n, off, y: y + R, adesivo: t.adesivoUrl ?? null })
         // Regra anti-colisão: o passo vertical nunca deixa o rótulo (título + linha de status)
         // deste nó alcançar o ícone do próximo — cresce conforme o texto ocupa mais linhas.
         const linhas = Math.min(2, Math.max(1, Math.ceil((n.titulo?.length ?? 0) / 20)))
@@ -561,7 +562,7 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
       ))}
 
       {/* Nós */}
-      {nodesL.map(({ n, off, y: cyv }) => {
+      {nodesL.map(({ n, off, y: cyv, adesivo }) => {
         const concluido = n.estado === 'concluido'
         const ouro = concluido && n.acerto === 100   // nota 100% → tema dourado + coroa
         const atual = n.estado === 'atual'
@@ -588,6 +589,11 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
             </button>
             {/* Rótulo cresce lateralmente (largura por conteúdo, teto 260px); título no máx. 2 linhas. */}
             <div className="relative z-[1] mt-1.5 inline-block max-w-full rounded-lg border bg-background/85 px-2 py-0.5 shadow-sm backdrop-blur-sm">
+              {/* Adesivo de conquista: aula GABARITADA (100%) exibe o selo do módulo sobre o balão, à direita. */}
+              {ouro && adesivo && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={adesivo} alt="Conquista" title="Aula gabaritada!" className="pointer-events-none absolute -right-4 -top-4 z-10 h-11 w-11 -rotate-12 object-contain drop-shadow-[0_2px_4px_rgba(0,0,0,.35)] motion-safe:animate-[mascote-in_.5s_cubic-bezier(.34,1.56,.64,1)_both]" />
+              )}
               <span className={cn('block text-xs font-semibold leading-snug [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden', bloqueado && 'text-muted-foreground')} title={n.titulo}>{n.titulo}</span>
               <span className="block text-[11px] text-muted-foreground">
                 {concluido ? `Concluído${n.acerto != null ? ` · ${n.acerto}%` : ''}` : (n.quando ?? 'Disponível')}

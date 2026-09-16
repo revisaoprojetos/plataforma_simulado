@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { capaComPos } from '@/lib/leitura/capa-pos'
 import { EditarPastaDialog } from '@/components/admin/editar-pasta-dialog'
 import { PersonalizarAulaDialog } from '@/components/admin/personalizar-aula-dialog'
+import { ModuloAdesivoForm } from '@/components/admin/modulo-adesivo-form'
 import { ModuloAcesso } from '@/components/admin/modulo-acesso'
 import {
   ChevronRight, ChevronUp, ChevronDown, Home, Library, FolderPlus, FilePlus2, Pencil, Trash2, FolderInput, Eye, EyeOff, BookOpenText, MoreVertical, FolderOpen, FileText, HelpCircle, Settings2, Users,
@@ -165,7 +166,7 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTa
           )}
 
           {moduloAtual && (
-            <div className={cn(moduloTab !== 'config' && 'hidden')}>
+            <div className={cn('space-y-4', moduloTab !== 'config' && 'hidden')}>
               <EditarPastaDialog
                 key={moduloAtual.id}
                 inline rotulo="módulo" generoM cardView={cardView}
@@ -173,6 +174,7 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTa
                 onClose={() => {}}
                 onSaved={() => router.refresh()}
               />
+              <ModuloAdesivoForm pastaId={moduloAtual.id} atual={moduloAtual.adesivo_url} />
             </div>
           )}
         </>
