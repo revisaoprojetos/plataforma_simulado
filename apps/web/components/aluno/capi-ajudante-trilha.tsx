@@ -6,43 +6,43 @@ import { Mascote, type ReacaoMascote } from '@/components/mascote/mascote'
 export type PontoTrilha = { x: number; y: number; estado: 'concluido' | 'atual' | 'disponivel'; intro?: boolean }
 
 type Fala = { pose: ReacaoMascote; msg: string }
-// Incentivo geral.
+// Incentivo geral (frases curtas — o balão é estreito, evita quebrar em várias linhas).
 const INCENTIVOS: Fala[] = [
-  { pose: 'ideia', msg: 'Bora pra próxima aula?' },
-  { pose: 'estudante', msg: 'Tô de olho no seu progresso!' },
-  { pose: 'satisfeita', msg: 'Cada aula te deixa mais afiado.' },
-  { pose: 'joinha', msg: 'Mandou bem até aqui!' },
-  { pose: 'feliz', msg: 'Constância vence — segue firme!' },
-  { pose: 'estudante', msg: 'Passo a passo você chega lá.' },
+  { pose: 'ideia', msg: 'Bora pra próxima!' },
+  { pose: 'estudante', msg: 'Tô de olho em você!' },
+  { pose: 'satisfeita', msg: 'Cada aula conta.' },
+  { pose: 'joinha', msg: 'Mandou bem!' },
+  { pose: 'feliz', msg: 'Segue firme! 💪' },
+  { pose: 'estudante', msg: 'Você chega lá!' },
 ]
 // Dicas de estudo / no que focar.
 const DICAS: Fala[] = [
-  { pose: 'ideia', msg: 'Grifa o que for mais cobrado enquanto lê.' },
-  { pose: 'pensando', msg: 'Foca nos artigos que mais caem em prova.' },
-  { pose: 'balanca', msg: 'Atenção às exceções — elas caem muito.' },
-  { pose: 'ideia', msg: 'Prazos e competências: decora esses!' },
-  { pose: 'estudante', msg: 'Errou no quiz? Volta no artigo e revisa.' },
-  { pose: 'meditando', msg: 'Uma aula por dia já te leva longe.' },
-  { pose: 'escrevendo', msg: 'Anota as dúvidas pra revisar depois.' },
-  { pose: 'pensando', msg: 'Leu? Testa no quiz pra fixar de vez.' },
-  { pose: 'ideia', msg: 'Revisa os grifos antes de responder.' },
-  { pose: 'estudante', msg: 'Reler em voz alta ajuda a memorizar.' },
+  { pose: 'ideia', msg: 'Grifa o que mais cai.' },
+  { pose: 'pensando', msg: 'Foca nos artigos-chave.' },
+  { pose: 'balanca', msg: 'Cuidado com as exceções.' },
+  { pose: 'ideia', msg: 'Decora prazos e competências.' },
+  { pose: 'estudante', msg: 'Errou? Revisa o artigo.' },
+  { pose: 'meditando', msg: 'Uma aula por dia já vale.' },
+  { pose: 'escrevendo', msg: 'Anota as dúvidas.' },
+  { pose: 'pensando', msg: 'Testa no quiz pra fixar.' },
+  { pose: 'ideia', msg: 'Revisa os grifos antes.' },
+  { pose: 'estudante', msg: 'Ler em voz alta ajuda.' },
 ]
 // Comemorações (nó concluído).
 const CELEBRA: Fala[] = [
   { pose: 'joinha', msg: 'Aula concluída! 🎉' },
-  { pose: 'satisfeita', msg: 'Boa, essa você fechou!' },
-  { pose: 'joinha', msg: 'Mais uma na conta! 👏' },
+  { pose: 'satisfeita', msg: 'Essa você fechou!' },
+  { pose: 'joinha', msg: 'Mais uma! 👏' },
   { pose: 'coracao', msg: 'Tá voando! ✨' },
-  { pose: 'feliz', msg: 'Fechou com chave de ouro!' },
+  { pose: 'feliz', msg: 'Chave de ouro! 🏆' },
 ]
 // Anúncios direcionais (próxima aula abaixo / do outro lado).
 const DIRECIONAIS: Fala[] = [
-  { pose: 'ideia', msg: 'Próxima aula logo abaixo 👇' },
-  { pose: 'ideia', msg: 'Tem mais ali embaixo 👇' },
+  { pose: 'ideia', msg: 'Próxima ali embaixo 👇' },
+  { pose: 'ideia', msg: 'Tem mais abaixo 👇' },
   { pose: 'ideia', msg: 'Continua descendo 👇' },
-  { pose: 'feliz', msg: 'Tô do outro lado agora 👋' },
-  { pose: 'ideia', msg: 'Bora que a próxima te espera!' },
+  { pose: 'feliz', msg: 'Tô do outro lado 👋' },
+  { pose: 'ideia', msg: 'A próxima te espera!' },
 ]
 
 function rnd<T>(a: T[]): T { return a[Math.floor(Math.random() * a.length)] }
@@ -124,13 +124,13 @@ export function CapiAjudanteTrilha({ pontos = [], ladoCard = null }: { pontos?: 
         // UM só elemento persistente: desliza suave por left/top (sem remontar → sem teleporte). O lado
         // já entra no `left` (nunca fica "em cima" da trilha). Com um card de dia ABERTO, ela dá um FADE
         // (sai de cena discretamente, sem ficar atrás do card) e reaparece ao fechar.
-        <div className="pointer-events-none absolute z-[3]" aria-hidden
+        <div className="pointer-events-none absolute z-[3] w-max" aria-hidden
           style={{ left: passo.x + (naDireita ? 215 : -215), top: passo.y + passo.dy, transform: 'translate(-50%, -60%)', opacity: ladoCard ? 0 : 1, transition: 'left 1.1s ease-in-out, top 1.1s ease-in-out, opacity .3s ease' }}>
           {mascote}
         </div>
       ) : (
         // Modo canto (formatos lista/mapa, sem geometria de nós): fixa flutuando.
-        <div className="pointer-events-none fixed bottom-28 left-4 z-30 md:bottom-8" aria-hidden>{mascote}</div>
+        <div className="pointer-events-none fixed bottom-28 left-4 z-30 w-max md:bottom-8" aria-hidden>{mascote}</div>
       )}
       <BotaoAjudante ligado={ligado} onToggle={toggle} />
     </>
