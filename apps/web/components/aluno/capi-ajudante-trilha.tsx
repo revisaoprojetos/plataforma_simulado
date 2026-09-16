@@ -55,7 +55,7 @@ type Passo = { x?: number; y?: number; naDireita: boolean; dy: number; pose: Rea
  * a próxima. Sem geometria (lista/mapa) fica num canto flutuando e trocando de fala. Reusa o <Mascote>,
  * liga/desliga por aluno (localStorage) e respeita prefers-reduced-motion.
  */
-export function CapiAjudanteTrilha({ pontos = [], ladoCard = null }: { pontos?: PontoTrilha[]; ladoCard?: 'left' | 'right' | null }) {
+export function CapiAjudanteTrilha({ pontos = [] }: { pontos?: PontoTrilha[] }) {
   const [ligado, setLigado] = useState(true)
   const [montado, setMontado] = useState(false)
   const [passo, setPasso] = useState<Passo | null>(null)
@@ -116,11 +116,10 @@ export function CapiAjudanteTrilha({ pontos = [], ladoCard = null }: { pontos?: 
     <>
       {temGeo && passo.x != null && passo.y != null ? (
         // Fica SEMPRE à esquerda da trilha (nunca em cima, nem atrás do card, que abre à direita) e
-        // acompanha só a ALTURA do nó atual — desliza suave por top (sem remontar → sem teleporte). O
-        // -translate-x-full deixa a borda direita ~70px à esquerda do nó. Fade só se um card abrir no
-        // MESMO lado (esquerda) — raro; com card à direita ela continua visível.
+        // acompanha só a ALTURA do nó atual — desliza suave por top (sem remontar → sem teleporte).
+        // INDEPENDENTE do card do dia: não abre/fecha junto com ele.
         <div className="pointer-events-none absolute z-[3] w-max -translate-x-full" aria-hidden
-          style={{ left: passo.x - 110, top: passo.y + passo.dy, opacity: ladoCard === 'left' ? 0 : 1, transition: 'left 1.1s ease-in-out, top 1.1s ease-in-out, opacity .3s ease' }}>
+          style={{ left: passo.x - 110, top: passo.y + passo.dy, transition: 'left 1.1s ease-in-out, top 1.1s ease-in-out' }}>
           {mascote}
         </div>
       ) : (
