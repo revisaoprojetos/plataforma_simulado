@@ -63,8 +63,9 @@ export function CapiAjudanteTrilha({ pontos }: { pontos: PontoTrilha[] }) {
   return (
     <>
       <div className="pointer-events-none absolute z-[3] transition-[left,top] duration-1000 ease-in-out"
-        style={{ left: parada.x, top: parada.y, transform: `translate(${esquerda ? 'calc(-100% - 88px)' : '88px'}, -80%)` }} aria-hidden>
-        <Mascote reacao={fala.pose} tamanho={76} mensagem={fala.msg} flutua={!reduzir.current} entra={false} espelhar={!esquerda} />
+        style={{ left: parada.x, top: parada.y, transform: `translate(${esquerda ? 'calc(-100% - 110px)' : '110px'}, -74%)` }} aria-hidden>
+        {/* [&_img]:mt-3 → afasta a imagem do bico do balão (a flutuação não cobre mais a ponta). */}
+        <Mascote reacao={fala.pose} tamanho={76} mensagem={fala.msg} flutua={!reduzir.current} entra={false} espelhar={!esquerda} className="[&_img]:mt-3" />
       </div>
       <BotaoAjudante ligado={ligado} onToggle={toggle} />
     </>
