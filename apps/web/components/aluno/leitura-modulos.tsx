@@ -1,8 +1,19 @@
 import Link from 'next/link'
-import { Library, ChevronRight } from 'lucide-react'
+import { Library, ChevronRight, AlertTriangle } from 'lucide-react'
 import { type CardView } from '@/lib/card-view'
 
-export type ModuloAlunoCard = { id: string; nome: string; cor: string | null; capa: string | null; capaCard: string | null; total: number; done: number }
+export type ModuloAlunoCard = { id: string; nome: string; cor: string | null; capa: string | null; capaCard: string | null; total: number; done: number; pendentes?: number }
+
+/** Selo âmbar de questões pendentes (aparece no card do módulo quando há quiz liberado não respondido). */
+function SeloPendentes({ n, claro }: { n: number; claro?: boolean }) {
+  if (!n) return null
+  return (
+    <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${claro ? 'bg-amber-400/90 text-amber-950' : 'bg-amber-500/15 text-amber-600 dark:text-amber-400'}`}
+      title={`${n} ${n === 1 ? 'questão pendente' : 'questões pendentes'}`}>
+      <AlertTriangle className="h-3 w-3" /> {n} pendente{n > 1 ? 's' : ''}
+    </span>
+  )
+}
 
 /** Seleção de MÓDULOS do aluno (grid de cards) — antes de abrir a trilha. Segue o card_view do tenant
  * (pôster × ticket). Cada card leva a `/aluno/leitura?modulo=<id>` (infos + trilha serpenteada). */
@@ -46,7 +57,10 @@ function ModuloCardAluno({ m, variant }: { m: ModuloAlunoCard; variant: CardView
           <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `linear-gradient(110deg, transparent 45%, ${c})` }} />
         </div>
         <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 p-2.5">
-          <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Módulo</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Módulo</p>
+            <SeloPendentes n={m.pendentes ?? 0} />
+          </div>
           <h3 className="line-clamp-2 text-sm font-bold leading-tight text-foreground">{m.nome}</h3>
           <Progresso done={m.done} total={m.total} />
         </div>

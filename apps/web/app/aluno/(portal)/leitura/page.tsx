@@ -43,7 +43,7 @@ export default async function LeituraAlunoPage({ searchParams }: { searchParams:
       {trilhas.length === 0 ? (
         <div className="rounded-2xl border border-dashed p-12 text-center text-muted-foreground">Nenhum módulo disponível ainda.</div>
       ) : (
-        <LeituraModulos cardView={cardView} modulos={trilhas.map((t) => ({ id: t.id, nome: t.nome, cor: t.cor, capa: t.capa ?? null, capaCard: t.capaCard ?? null, total: t.total, done: t.done }))} />
+        <LeituraModulos cardView={cardView} modulos={trilhas.map((t) => ({ id: t.id, nome: t.nome, cor: t.cor, capa: t.capa ?? null, capaCard: t.capaCard ?? null, total: t.total, done: t.done, pendentes: t.pendentes ?? 0 }))} />
       )}
     </div>
   )

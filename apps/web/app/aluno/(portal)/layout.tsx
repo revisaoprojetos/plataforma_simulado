@@ -19,6 +19,8 @@ import { TelaManutencao } from '@/components/aluno/tela-manutencao'
 import { MonitorManutencao } from '@/components/aluno/monitor-manutencao'
 import { getGamConfig } from '@/lib/gamificacao'
 import { resumoGamificacao } from '@/lib/gamificacao/leitura'
+import { LEITURA_ATIVA } from '@/lib/flags'
+import { totalPendenciasLeitura } from '@/lib/leitura/trilha'
 import { lerPersonalizacaoEstudante } from '@/lib/aluno/personalizacao'
 import { FontScaleInit } from '@/components/font-scale-init'
 import type { ProgressoAluno } from '@/components/aluno/aluno-sidebar'
@@ -38,7 +40,7 @@ export default async function AlunoPortalLayout({ children }: { children: React.
   // tema + contagens da sidebar + progresso de gamificação + personalização. Antes eram 4
   // round-trips em série; agora 1 cliente reutilizado e um único Promise.all.
   const svc = createAdminClient()
-  const [themeData, contadores, gamData, persData] = await Promise.all([
+  const [themeData, contadores, gamData, persData, pendLeitura] = await Promise.all([
     getTenantTheme(),
     // Contagens da sidebar: "Meus Simulados" = oficiais distintos finalizados (badge da esquerda) +
     // personalizados criados (badge da direita, "X | Y"); "Favoritos".
@@ -73,6 +75,8 @@ export default async function AlunoPortalLayout({ children }: { children: React.
       try { const p = await lerPersonalizacaoEstudante(svc, sessao.estudanteId); return { avatar: p.avatar, avatarCor: p.avatarCor } }
       catch { return { avatar: null, avatarCor: null } }
     })(),
+    // Pendências do LegProc (selo na sidebar) — só quando a Leitura está ativa; tolerante.
+    (async (): Promise<number> => (LEITURA_ATIVA ? totalPendenciasLeitura(sessao.estudanteId, sessao.tenantId) : 0))(),
   ])
 
   const { css, tema, tenantNome } = themeData
@@ -113,7 +117,7 @@ export default async function AlunoPortalLayout({ children }: { children: React.
       <GuiaTourRunner gamAtivo={gamAtivo} />
       <SidebarProvider>
         <div className="flex h-screen w-full overflow-hidden">
-          <AlunoSidebar logo={t.logo_url ?? null} nome={t.nome_site ?? tenantNome ?? 'Área do Aluno'} subtitulo={t.subtitulo_site ?? 'Área do aluno'} logoBg={t.logo_png_bg ?? '#ffffff'} logoEstilo={t.logo_estilo ?? 'arredondado'} logoFiltro={t.logo_filtro_sistema ?? t.logo_filtro ?? 'none'} usuarioNome={sessao.nome} usuarioEmail={sessao.email} avatar={avatarUsuario} avatarCor={avatarCorUsuario} counts={counts} simuladosPersonalizados={simuladosPersonalizados} loginConfig={resolverLoginConfig(t.login)} progresso={progresso} gamAtivo={gamAtivo} hrefsOcultos={hrefsOcultosAluno} />
+          <AlunoSidebar logo={t.logo_url ?? null} nome={t.nome_site ?? tenantNome ?? 'Área do Aluno'} subtitulo={t.subtitulo_site ?? 'Área do aluno'} logoBg={t.logo_png_bg ?? '#ffffff'} logoEstilo={t.logo_estilo ?? 'arredondado'} logoFiltro={t.logo_filtro_sistema ?? t.logo_filtro ?? 'none'} usuarioNome={sessao.nome} usuarioEmail={sessao.email} avatar={avatarUsuario} avatarCor={avatarCorUsuario} counts={counts} simuladosPersonalizados={simuladosPersonalizados} loginConfig={resolverLoginConfig(t.login)} progresso={progresso} gamAtivo={gamAtivo} hrefsOcultos={hrefsOcultosAluno} pendenciasLeitura={pendLeitura} />
           <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
             {/* Toggle de recolher a sidebar: só no desktop (no mobile vale o chrome abaixo). */}
             <SidebarEdgeToggle hideOnMobile />

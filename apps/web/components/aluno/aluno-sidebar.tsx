@@ -76,10 +76,10 @@ export interface ProgressoAluno { streak: number; xpTotal: number; nivel: number
 
 export function AlunoSidebar({
   logo, nome = 'Área do Aluno', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none',
-  usuarioNome = 'Aluno', usuarioEmail, avatar, avatarCor, counts, simuladosPersonalizados = 0, loginConfig, progresso, gamAtivo = false, hrefsOcultos = [],
+  usuarioNome = 'Aluno', usuarioEmail, avatar, avatarCor, counts, simuladosPersonalizados = 0, loginConfig, progresso, gamAtivo = false, hrefsOcultos = [], pendenciasLeitura = 0,
 }: {
   logo?: string | null; nome?: string; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string
-  usuarioNome?: string; usuarioEmail?: string | null; avatar?: string | null; avatarCor?: string | null; counts?: Record<string, number>; simuladosPersonalizados?: number; loginConfig: LoginConfig; progresso?: ProgressoAluno | null; gamAtivo?: boolean; hrefsOcultos?: string[]
+  usuarioNome?: string; usuarioEmail?: string | null; avatar?: string | null; avatarCor?: string | null; counts?: Record<string, number>; simuladosPersonalizados?: number; loginConfig: LoginConfig; progresso?: ProgressoAluno | null; gamAtivo?: boolean; hrefsOcultos?: string[]; pendenciasLeitura?: number
 }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -187,6 +187,9 @@ export function AlunoSidebar({
                         <span className="nav-badge ml-auto pr-1.5 text-xs font-medium tabular-nums text-sidebar-foreground/45 group-data-[collapsible=icon]:hidden">
                           {c ?? 0} <span className="opacity-40">|</span> {simuladosPersonalizados}
                         </span>
+                      ) : n.href === '/aluno/leitura' && pendenciasLeitura > 0 ? (
+                        // Pendências do LegProc: badge âmbar de atenção (questões liberadas não respondidas).
+                        <span className="nav-badge ml-auto inline-flex min-w-4 items-center justify-center rounded-full bg-amber-500/20 px-1.5 text-[10px] font-bold tabular-nums text-amber-500 group-data-[collapsible=icon]:hidden" title={`${pendenciasLeitura} ${pendenciasLeitura === 1 ? 'questão pendente' : 'questões pendentes'}`}>{pendenciasLeitura}</span>
                       ) : c != null && c > 0 ? (
                         <span className="nav-badge ml-auto pr-1.5 text-xs font-medium tabular-nums text-sidebar-foreground/45 group-data-[collapsible=icon]:hidden">{c}</span>
                       ) : null}

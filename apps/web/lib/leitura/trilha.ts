@@ -162,13 +162,27 @@ function nodeDe(a: AulaSeq): TrilhaNode {
   }
 }
 
+/** Pendências de um conjunto de aulas: quiz liberado (leitura concluída) mas não 100% respondido. */
+function pendenciasDe(arr: AulaSeq[]): number {
+  return arr.reduce((s, a) => s + (a.leituraConcluida ? Math.max(0, a.questoesTotal - a.questoesRespondidas) : 0), 0)
+}
+
 /** Trilha(s) do aluno p/ o caminho serpenteado (TrilhaGigante) — uma por módulo. */
 export async function carregarTrilhaLeituraAluno(estId: string, tenantId: string): Promise<Trilha[]> {
   const { modulos, seqByModulo } = await sequenciaLeitura(estId, tenantId)
   return modulos.map((m) => {
-    const nodes = (seqByModulo.get(m.id) ?? []).map(nodeDe)
-    return { id: m.id, nome: m.nome, cor: m.cor, capa: m.capa, capaCard: m.capaCard, total: nodes.length, done: nodes.filter((n) => n.estado === 'concluido').length, trilhaXp: 0, nodes }
+    const arr = seqByModulo.get(m.id) ?? []
+    const nodes = arr.map(nodeDe)
+    return { id: m.id, nome: m.nome, cor: m.cor, capa: m.capa, capaCard: m.capaCard, total: nodes.length, done: nodes.filter((n) => n.estado === 'concluido').length, trilhaXp: 0, pendentes: pendenciasDe(arr), nodes }
   }).filter((t) => t.nodes.length > 0)
+}
+
+/** Total de questões pendentes do aluno em TODO o LegProc (para o selo na sidebar). Tolerante a erro. */
+export async function totalPendenciasLeitura(estId: string, tenantId: string): Promise<number> {
+  try {
+    const { modulos, seqByModulo } = await sequenciaLeitura(estId, tenantId)
+    return modulos.reduce((s, m) => s + pendenciasDe(seqByModulo.get(m.id) ?? []), 0)
+  } catch { return 0 }
 }
 
 export interface AulaDesempenho {

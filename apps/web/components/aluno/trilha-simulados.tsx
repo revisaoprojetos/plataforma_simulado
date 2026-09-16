@@ -52,6 +52,7 @@ export interface Trilha {
   done: number
   trilhaXp: number
   bauResgatado?: boolean // baú já resgatado (evento de chest no ledger) — vem do servidor
+  pendentes?: number // LegProc: questões liberadas (leitura concluída) ainda não respondidas
   nodes: TrilhaNode[]
 }
 
