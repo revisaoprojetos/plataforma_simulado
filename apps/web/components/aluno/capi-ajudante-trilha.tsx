@@ -42,10 +42,10 @@ export function CapiAjudanteTrilha({ pontos }: { pontos: PontoTrilha[] }) {
     return { base: atual ?? reais[0] ?? pontos[0] ?? null, concl: [...reais].reverse().find((p) => p.estado === 'concluido') ?? null }
   }, [pontos])
 
-  // Troca de pose/fala a cada 7s (sem reduce-motion → fica parada).
+  // Voa/troca de lado + pose a cada 5s (sem reduce-motion → fica parada).
   useEffect(() => {
     if (!ligado || reduzir.current) return
-    const t = setInterval(() => setI((v) => v + 1), 7000)
+    const t = setInterval(() => setI((v) => v + 1), 5000)
     return () => clearInterval(t)
   }, [ligado])
 
@@ -58,14 +58,22 @@ export function CapiAjudanteTrilha({ pontos }: { pontos: PontoTrilha[] }) {
   const fala = noConcluido
     ? { pose: 'joinha' as ReacaoMascote, msg: CELEBRA[Math.floor(i / 3) % CELEBRA.length] }
     : FALAS[i % FALAS.length]
-  const esquerda = parada.x > 40 // trilha do LegProc é central → Capi fica à esquerda do nó
+  // Alterna o LADO a cada ciclo → a Capi "voa" da direita p/ a esquerda cruzando o nó, longe do card
+  // do dia (que abre bem à direita). Sem movimento no reduce-motion (fica à esquerda, estática).
+  const naDireita = !reduzir.current && i % 2 === 1
 
   return (
     <>
-      <div className="pointer-events-none absolute z-[3] transition-[left,top] duration-1000 ease-in-out"
-        style={{ left: parada.x, top: parada.y, transform: `translate(${esquerda ? 'calc(-100% - 110px)' : '110px'}, -74%)` }} aria-hidden>
-        {/* [&_img]:mt-3 → afasta a imagem do bico do balão (a flutuação não cobre mais a ponta). */}
-        <Mascote reacao={fala.pose} tamanho={76} mensagem={fala.msg} flutua={!reduzir.current} entra={false} espelhar={!esquerda} className="[&_img]:mt-3" />
+      {/* Camada 1: ancorada no nó (transita suave entre nós). */}
+      <div className="pointer-events-none absolute z-[3] transition-[left,top] duration-700 ease-in-out" style={{ left: parada.x, top: parada.y }} aria-hidden>
+        {/* Camada 2: deslize lateral esquerda↔direita cruzando o nó (transição do transform). */}
+        <div className="transition-transform duration-[1100ms] ease-in-out" style={{ transform: `translate(-50%, -64%) translateX(${naDireita ? 108 : -108}px)` }}>
+          {/* Camada 3: arco de "voo" (mergulha e sobe) a cada travessia — key={i} reinicia a animação. */}
+          <div key={i} className="motion-safe:animate-[capi-mergulho_1.1s_ease-in-out]">
+            {/* [&_img]:mt-3 → afasta a imagem do bico do balão (a flutuação não cobre a ponta). */}
+            <Mascote reacao={fala.pose} tamanho={76} mensagem={fala.msg} flutua={!reduzir.current} entra={false} espelhar={naDireita} className="[&_img]:mt-3" />
+          </div>
+        </div>
       </div>
       <BotaoAjudante ligado={ligado} onToggle={toggle} />
     </>

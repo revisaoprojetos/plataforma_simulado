@@ -346,6 +346,8 @@
 }
 /* Mascote (capivara): flutua suave, entra e o balão de fala aparece. */
 @keyframes mascote-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-7px); } }
+/* Capi ajudante (LegProc): "voo" ao trocar de lado — mergulha um pouco e sobe (arco em U). */
+@keyframes capi-mergulho { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(26px); } }
 @keyframes mascote-in { from { opacity: 0; transform: translateY(18px) scale(.9); } to { opacity: 1; transform: translateY(0) scale(1); } }
 @keyframes mascote-balao { from { opacity: 0; transform: translateY(6px) scale(.96); } to { opacity: 1; transform: none; } }
 @keyframes mascote-tchau { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-11deg); } 60% { transform: rotate(9deg); } }
