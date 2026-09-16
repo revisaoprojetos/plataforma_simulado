@@ -87,16 +87,11 @@ export function CapiAjudanteTrilha({ pontos = [], ladoCard = null }: { pontos?: 
     const dy = Math.round(Math.random() * 56 - 24) // -24..+32 → às vezes acima, às vezes ao lado/abaixo
     const reais = pontosRef.current.filter((p) => !p.intro)
     if (!reais.length) { const f = semRepetir([...INCENTIVOS, ...DICAS]); return { naDireita, dy, pose: f.pose, msg: f.msg } }
-    const iAt = reais.findIndex((p) => p.estado === 'atual')
-    const atual = reais[iAt] ?? reais[0]
-    const concl = [...reais].reverse().find((p) => p.estado === 'concluido')
-    const prox = iAt >= 0 ? reais[iAt + 1] : undefined
-    // Destino: geralmente o atual; às vezes um concluído (comemora), a próxima, ou um nó qualquer.
-    const r = Math.random()
-    let ponto = atual
-    if (concl && r < 0.28) ponto = concl
-    else if (prox && r < 0.5) ponto = prox
-    else if (r < 0.62) ponto = rnd(reais)
+    const atual = reais.find((p) => p.estado === 'atual') ?? reais[0]
+    const concluidos = reais.filter((p) => p.estado === 'concluido')
+    // Destino: fica no ATUAL (onde o aluno está) e só às vezes sobe a um CONCLUÍDO p/ comemorar.
+    // NUNCA desce a aulas futuras/bloqueadas (o aluno ainda não chegou lá).
+    const ponto = concluidos.length && Math.random() < 0.3 ? rnd(concluidos) : atual
     // Fala: comemora se concluído; senão sorteia entre DICAS (foco) / INCENTIVOS / DIRECIONAIS.
     let fala: Fala
     if (ponto.estado === 'concluido') fala = semRepetir(CELEBRA)
@@ -115,17 +110,17 @@ export function CapiAjudanteTrilha({ pontos = [], ladoCard = null }: { pontos?: 
 
   if (!montado || !ligado || !passo) return <BotaoAjudante ligado={ligado} onToggle={toggle} />
 
-  const naDireita = passo.naDireita
-  const mascote = <Mascote reacao={passo.pose} tamanho={74} mensagem={passo.msg} flutua={!reduzir.current} entra={false} espelhar={naDireita} className="[&_img]:mt-3" />
+  const mascote = <Mascote reacao={passo.pose} tamanho={74} mensagem={passo.msg} flutua={!reduzir.current} entra={false} className="[&_img]:mt-3" />
 
   return (
     <>
       {temGeo && passo.x != null && passo.y != null ? (
-        // UM só elemento persistente: desliza suave por left/top (sem remontar → sem teleporte). O lado
-        // já entra no `left` (nunca fica "em cima" da trilha). Com um card de dia ABERTO, ela dá um FADE
-        // (sai de cena discretamente, sem ficar atrás do card) e reaparece ao fechar.
-        <div className="pointer-events-none absolute z-[3] w-max" aria-hidden
-          style={{ left: passo.x + (naDireita ? 215 : -215), top: passo.y + passo.dy, transform: 'translate(-50%, -60%)', opacity: ladoCard ? 0 : 1, transition: 'left 1.1s ease-in-out, top 1.1s ease-in-out, opacity .3s ease' }}>
+        // Fica SEMPRE à esquerda da trilha (nunca em cima, nem atrás do card, que abre à direita) e
+        // acompanha só a ALTURA do nó atual — desliza suave por top (sem remontar → sem teleporte). O
+        // -translate-x-full deixa a borda direita ~70px à esquerda do nó. Fade só se um card abrir no
+        // MESMO lado (esquerda) — raro; com card à direita ela continua visível.
+        <div className="pointer-events-none absolute z-[3] w-max -translate-x-full" aria-hidden
+          style={{ left: passo.x - 110, top: passo.y + passo.dy, opacity: ladoCard === 'left' ? 0 : 1, transition: 'left 1.1s ease-in-out, top 1.1s ease-in-out, opacity .3s ease' }}>
           {mascote}
         </div>
       ) : (
