@@ -3,6 +3,7 @@ import { Library } from 'lucide-react'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { LEITURA_ATIVA } from '@/lib/flags'
 import { carregarTrilhaLeituraAluno, carregarModuloCompleto } from '@/lib/leitura/trilha'
+import { carregarRankingModulo } from '@/lib/leitura/ranking'
 import { LeituraModulos } from '@/components/aluno/leitura-modulos'
 import { LeituraModuloView } from '@/components/aluno/leitura-modulo-view'
 import { getCurrentTenant } from '@/lib/tenant'
@@ -20,11 +21,14 @@ export default async function LeituraAlunoPage({ searchParams }: { searchParams:
 
   // ===== Módulo aberto: infos + tabs (trilha / desempenho) =====
   if (modulo) {
-    const mod = await carregarModuloCompleto(sessao.estudanteId, sessao.tenantId, modulo)
+    const [mod, ranking] = await Promise.all([
+      carregarModuloCompleto(sessao.estudanteId, sessao.tenantId, modulo),
+      carregarRankingModulo(modulo, sessao.tenantId),
+    ])
     if (mod.trilha) {
       // O cabeçalho (título/voltar/subtítulo) agora vive DENTRO do banner colapsável.
       const temaMod = (await getCurrentTenant())?.tema
-      return <LeituraModuloView modulo={modulo} trilha={mod.trilha} desempenho={mod.desempenho} pendentes={mod.pendentes} aulasPendentes={mod.aulasPendentes} formato={resolverTrilhaFormato(temaMod)} simbolos={resolverTrilhaSimbolos(temaMod)} />
+      return <LeituraModuloView modulo={modulo} trilha={mod.trilha} desempenho={mod.desempenho} pendentes={mod.pendentes} aulasPendentes={mod.aulasPendentes} ranking={ranking} meuId={sessao.estudanteId} formato={resolverTrilhaFormato(temaMod)} simbolos={resolverTrilhaSimbolos(temaMod)} />
     }
     // módulo inexistente/sem acesso → cai na lista
   }

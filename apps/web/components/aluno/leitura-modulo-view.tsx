@@ -3,24 +3,28 @@
 import { useState, useTransition, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { Route, BarChart3, Check, Lock, AlertTriangle, ArrowRight, Search, Loader2, X, Library } from 'lucide-react'
+import { Route, BarChart3, Check, Lock, AlertTriangle, ArrowRight, Search, Loader2, X, Library, Trophy } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ModuloBanner } from '@/components/admin/modulo-banner'
 import { TrilhaSistema, type Trilha } from '@/components/aluno/trilha-simulados'
+import { LeituraRanking } from '@/components/aluno/leitura-ranking'
 import { DEFAULT_TRILHA_SIMBOLOS, type TrilhaSimbolos } from '@/lib/gamificacao/trilha-simbolos'
 import { DEFAULT_TRILHA_FORMATO, type TrilhaFormato } from '@/lib/gamificacao/trilha-formato'
 import type { AulaDesempenho } from '@/lib/leitura/trilha'
+import type { RankingLeitura } from '@/lib/leitura/ranking'
 import { buscarNaTrilha, type ResultadoBuscaTrilha } from '@/app/aluno/(portal)/leitura/busca-actions'
 
 /** Visão de um módulo do LegProc Digital: banner colapsável (igual ao admin) com tabs Trilha | Desempenho
  * e busca, + aviso de questões pendentes. */
-export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulasPendentes, formato = DEFAULT_TRILHA_FORMATO, simbolos = DEFAULT_TRILHA_SIMBOLOS }: {
+export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulasPendentes, ranking, meuId, formato = DEFAULT_TRILHA_FORMATO, simbolos = DEFAULT_TRILHA_SIMBOLOS }: {
   modulo: string
   trilha: Trilha
   desempenho: AulaDesempenho[]
   pendentes: number
   aulasPendentes: number
+  ranking: RankingLeitura
+  meuId?: string | null
   formato?: TrilhaFormato
   simbolos?: TrilhaSimbolos
 }) {
@@ -85,6 +89,7 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
             <TabsList className="w-fit border-white/20 [&_[data-slot=tabs-trigger]]:text-white/70 [&_[data-slot=tabs-trigger]:hover]:text-white [&_[data-slot=tabs-trigger][data-active]]:text-white">
               <TabsTrigger value="trilha"><Route className="h-4 w-4" /> Trilha</TabsTrigger>
               <TabsTrigger value="desempenho"><BarChart3 className="h-4 w-4" /> Desempenho</TabsTrigger>
+              <TabsTrigger value="ranking"><Trophy className="h-4 w-4" /> Ranking</TabsTrigger>
             </TabsList>
 
             <div ref={buscaRef} className="relative mb-1 w-full max-w-[14rem] shrink-0">
@@ -127,6 +132,9 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
       </TabsContent>
       <TabsContent value="desempenho" className="pt-4">
         <DesempenhoModulo desempenho={desempenho} />
+      </TabsContent>
+      <TabsContent value="ranking" className="pt-4">
+        <LeituraRanking ranking={ranking} meuId={meuId} />
       </TabsContent>
 
       {/* Resultados da busca (portal fixo, fora do overflow do banner) */}

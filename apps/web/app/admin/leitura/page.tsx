@@ -5,7 +5,9 @@ import { BancoAulasGrid, type ModuloTab } from '@/components/admin/banco-aulas-g
 import { ModuloTabsBar } from '@/components/admin/modulo-tabs-bar'
 import { ModuloBanner } from '@/components/admin/modulo-banner'
 import { PublicarModuloBotao } from '@/components/admin/publicar-modulo-botao'
-import { getCurrentTenant } from '@/lib/tenant'
+import { LeituraRanking } from '@/components/aluno/leitura-ranking'
+import { carregarRankingModulo } from '@/lib/leitura/ranking'
+import { getCurrentTenant, getCurrentTenantId } from '@/lib/tenant'
 import { resolverCardView } from '@/lib/card-view'
 import { cn } from '@/lib/utils'
 
@@ -13,7 +15,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function LeituraAdminPage({ searchParams }: { searchParams: Promise<{ pasta?: string; tab?: string }> }) {
   const { pasta, tab } = await searchParams
-  const moduloTab: ModuloTab = tab === 'acessos' || tab === 'config' ? tab : 'aulas'
+  const moduloTab: ModuloTab = tab === 'acessos' || tab === 'config' || tab === 'ranking' ? tab : 'aulas'
   // Otimização: só a aba Aulas (ou a raiz) precisa dos detalhes das aulas — Acessos/Config pulam esse fetch.
   const data = await listarBancoAulas(pasta ?? null, !pasta || moduloTab === 'aulas')
   const temaCards = ((await getCurrentTenant())?.tema as any) ?? {}
@@ -70,7 +72,13 @@ export default async function LeituraAdminPage({ searchParams }: { searchParams:
       {!data.ok ? (
         <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{data.error}</p>
       ) : (
-        <BancoAulasGrid data={data} pastaAtual={pasta ?? null} cardView={cardView} moduloTab={moduloTab} semBreadcrumb={!!banner} semTabs={!!banner} />
+        <>
+          <BancoAulasGrid data={data} pastaAtual={pasta ?? null} cardView={cardView} moduloTab={moduloTab} semBreadcrumb={!!banner} semTabs={!!banner} />
+          {/* Ranking do módulo (por acertos no quiz; pontos quando a gamificação estiver ativa). */}
+          {moduloTab === 'ranking' && pasta && (
+            <LeituraRanking ranking={await carregarRankingModulo(pasta, (await getCurrentTenantId()) ?? '')} />
+          )}
+        </>
       )}
     </div>
   )
