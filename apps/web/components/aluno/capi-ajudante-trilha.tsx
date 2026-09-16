@@ -59,7 +59,6 @@ export function CapiAjudanteTrilha({ pontos = [], ladoCard = null }: { pontos?: 
   const [ligado, setLigado] = useState(true)
   const [montado, setMontado] = useState(false)
   const [passo, setPasso] = useState<Passo | null>(null)
-  const [ciclo, setCiclo] = useState(0)
   const reduzir = useRef(false)
   const pontosRef = useRef(pontos)
   pontosRef.current = pontos
@@ -84,7 +83,7 @@ export function CapiAjudanteTrilha({ pontos = [], ladoCard = null }: { pontos?: 
 
   // Escolhe o próximo destino/pose/fala — ALEATÓRIO (só no cliente, após montar), sem repetir mensagem.
   const proximoPasso = useCallback((): Passo => {
-    const naDireita = Math.random() < 0.5
+    const naDireita = Math.random() < 0.4 // viés à esquerda (troca de lado com menos frequência)
     const dy = Math.round(Math.random() * 56 - 24) // -24..+32 → às vezes acima, às vezes ao lado/abaixo
     const reais = pontosRef.current.filter((p) => !p.intro)
     if (!reais.length) { const f = semRepetir([...INCENTIVOS, ...DICAS]); return { naDireita, dy, pose: f.pose, msg: f.msg } }
@@ -108,9 +107,9 @@ export function CapiAjudanteTrilha({ pontos = [], ladoCard = null }: { pontos?: 
   // Troca a cada 8s (mais devagar). Sem reduce-motion → só o 1º passo, sem intervalo.
   useEffect(() => {
     if (!montado || !ligado) return
-    setPasso(proximoPasso()); setCiclo((c) => c + 1)
+    setPasso(proximoPasso())
     if (reduzir.current) return
-    const t = setInterval(() => { setPasso(proximoPasso()); setCiclo((c) => c + 1) }, 8000)
+    const t = setInterval(() => setPasso(proximoPasso()), 8000)
     return () => clearInterval(t)
   }, [montado, ligado, proximoPasso])
 
@@ -118,22 +117,16 @@ export function CapiAjudanteTrilha({ pontos = [], ladoCard = null }: { pontos?: 
 
   // Com um card de dia ABERTO, vai pro lado OPOSTO (o card tem z maior e cobriria a Capi).
   const naDireita = ladoCard ? ladoCard === 'left' : passo.naDireita
-
-  // key={ciclo} reinicia o arco de "voo" (mergulha e sobe) a cada troca.
-  const mascote = (
-    <div key={ciclo} className="motion-safe:animate-[capi-mergulho_1.2s_ease-in-out]">
-      <Mascote reacao={passo.pose} tamanho={74} mensagem={passo.msg} flutua={!reduzir.current} entra={false} espelhar={naDireita} className="[&_img]:mt-3" />
-    </div>
-  )
+  const mascote = <Mascote reacao={passo.pose} tamanho={74} mensagem={passo.msg} flutua={!reduzir.current} entra={false} espelhar={naDireita} className="[&_img]:mt-3" />
 
   return (
     <>
       {temGeo && passo.x != null && passo.y != null ? (
-        // Voo pela trilha: camada 1 (ancora no nó, transita) → camada 2 (deslize lateral distante) → arco.
-        <div className="pointer-events-none absolute z-[3] transition-[left,top] duration-[900ms] ease-in-out" style={{ left: passo.x, top: passo.y + passo.dy }} aria-hidden>
-          <div className="transition-transform duration-[1400ms] ease-in-out" style={{ transform: `translate(-50%, -66%) translateX(${naDireita ? 215 : -215}px)` }}>
-            {mascote}
-          </div>
+        // UM só elemento persistente: desliza suave por left/top (sem remontar → sem teleporte). O lado
+        // (esquerda/direita) já entra no `left`, então nunca fica "em cima" da trilha.
+        <div className="pointer-events-none absolute z-[3] transition-[left,top] duration-[1100ms] ease-in-out"
+          style={{ left: passo.x + (naDireita ? 215 : -215), top: passo.y + passo.dy, transform: 'translate(-50%, -60%)' }} aria-hidden>
+          {mascote}
         </div>
       ) : (
         // Modo canto (formatos lista/mapa, sem geometria de nós): fixa flutuando.
