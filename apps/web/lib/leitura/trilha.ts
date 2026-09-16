@@ -2,6 +2,7 @@ import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { documentosDoAluno, type DocumentoAluno } from '@/lib/leitura/acesso'
+import { normalizarIntro, introHref, introExterno, type IntroConfig } from '@/lib/leitura/intro'
 import type { Trilha, TrilhaNode } from '@/components/aluno/trilha-simulados'
 
 type EstadoAula = 'concluido' | 'atual' | 'bloqueado'
@@ -19,8 +20,9 @@ interface AulaSeq extends AulaStatus { estado: EstadoAula; moduloId: string }
 /** `.order('ordem')` tolerante (coluna pode não existir ainda). */
 async function pastasLeitura(svc: any, tenantId: string): Promise<any[]> {
   const base = (cols: string) => svc.from('simulado_pastas').select(cols).eq('tenant_id', tenantId).eq('is_folder', true).eq('folder_area', 'leitura')
-  // 1ª tentativa inclui adesivo_url (coluna nova, tolerante — cai nas próximas se ausente).
-  let r = await base('id, nome, cor, capa_url, capa_card_url, pai_id, ordem, publicacao, adesivo_url').order('ordem', { ascending: true }).order('nome', { ascending: true })
+  // 1ª tentativa inclui adesivo_url/intro_config (colunas novas, tolerante — cai nas próximas se ausentes).
+  let r = await base('id, nome, cor, capa_url, capa_card_url, pai_id, ordem, publicacao, adesivo_url, intro_config').order('ordem', { ascending: true }).order('nome', { ascending: true })
+  if (r.error) r = await base('id, nome, cor, capa_url, capa_card_url, pai_id, ordem, publicacao, adesivo_url').order('ordem', { ascending: true }).order('nome', { ascending: true })
   if (r.error) r = await base('id, nome, cor, capa_url, capa_card_url, pai_id, ordem, publicacao').order('ordem', { ascending: true }).order('nome', { ascending: true })
   if (r.error) r = await base('id, nome, cor, capa_url, capa_card_url, pai_id, ordem').order('ordem', { ascending: true }).order('nome', { ascending: true })
   if (r.error) r = await base('id, nome, cor, capa_url, pai_id').order('nome', { ascending: true })
@@ -130,11 +132,11 @@ async function sequenciaLeitura(estId: string, tenantId: string) {
   for (const arr of byModulo.values()) arr.sort((a, b) => (a.ordem - b.ordem) || a.titulo.localeCompare(b.titulo))
 
   // Gate de PUBLICAÇÃO do módulo: rascunho / agendado p/ futuro / encerrado não aparecem (dados ficam salvos).
-  const todosModulos = pastas.filter((p) => byModulo.has(p.id) && moduloPublicadoAgora(p.publicacao)).map((p) => ({ id: p.id as string, nome: p.nome as string, cor: (p.cor ?? null) as string | null, capa: (p.capa_url ?? null) as string | null, capaCard: (p.capa_card_url ?? null) as string | null, adesivo: (p.adesivo_url ?? null) as string | null }))
+  const todosModulos = pastas.filter((p) => byModulo.has(p.id) && moduloPublicadoAgora(p.publicacao)).map((p) => ({ id: p.id as string, nome: p.nome as string, cor: (p.cor ?? null) as string | null, capa: (p.capa_url ?? null) as string | null, capaCard: (p.capa_card_url ?? null) as string | null, adesivo: (p.adesivo_url ?? null) as string | null, intro: normalizarIntro(p.intro_config) }))
   // Gate de acesso do módulo (pula os que o aluno não pode ver).
   const acessiveis = await modulosAcessiveis(svc, tenantId, estId, todosModulos.map((m) => m.id))
   const modulos = todosModulos.filter((m) => acessiveis.has(m.id))
-  if (byModulo.has('__geral__')) modulos.push({ id: '__geral__', nome: 'Geral', cor: null, capa: null, capaCard: null, adesivo: null })
+  if (byModulo.has('__geral__')) modulos.push({ id: '__geral__', nome: 'Geral', cor: null, capa: null, capaCard: null, adesivo: null, intro: normalizarIntro(null) })
 
   const seqByModulo = new Map<string, AulaSeq[]>()
   let jaAbriu = false // já achou o "atual"
@@ -173,6 +175,18 @@ function nodeDe(a: AulaSeq): TrilhaNode {
   }
 }
 
+/** Nó "Comece por aqui" (pré-aula) no topo — só se ativo e bem configurado. Fora do gate/contador. */
+function introNodeDe(intro: IntroConfig, moduloId: string): TrilhaNode | null {
+  const href = introHref(intro)
+  if (!href) return null
+  return {
+    id: `intro:${moduloId}`, titulo: intro.titulo || 'Comece por aqui', quando: 'Introdução',
+    estado: 'concluido', acerto: null, nota: null, tentativas: 0, statusLabel: 'Comece por aqui', questoes: 0, xp: 0,
+    href, acao: 'Abrir', capa: null, capaBanner: null, cadernoUrl: null,
+    intro: { tipo: intro.tipo, href, externo: introExterno(intro) },
+  }
+}
+
 /** Pendências de um conjunto de aulas: quiz liberado (leitura concluída) mas não 100% respondido. */
 function pendenciasDe(arr: AulaSeq[]): number {
   return arr.reduce((s, a) => s + (a.leituraConcluida ? Math.max(0, a.questoesTotal - a.questoesRespondidas) : 0), 0)
@@ -183,8 +197,10 @@ export async function carregarTrilhaLeituraAluno(estId: string, tenantId: string
   const { modulos, seqByModulo } = await sequenciaLeitura(estId, tenantId)
   return modulos.map((m) => {
     const arr = seqByModulo.get(m.id) ?? []
-    const nodes = arr.map(nodeDe)
-    return { id: m.id, nome: m.nome, cor: m.cor, capa: m.capa, capaCard: m.capaCard, total: nodes.length, done: nodes.filter((n) => n.estado === 'concluido').length, trilhaXp: 0, pendentes: pendenciasDe(arr), adesivoUrl: m.adesivo ?? null, nodes }
+    const aulaNodes = arr.map(nodeDe)
+    const intro = introNodeDe(m.intro, m.id)
+    const nodes = intro ? [intro, ...aulaNodes] : aulaNodes
+    return { id: m.id, nome: m.nome, cor: m.cor, capa: m.capa, capaCard: m.capaCard, total: aulaNodes.length, done: aulaNodes.filter((n) => n.estado === 'concluido').length, trilhaXp: 0, pendentes: pendenciasDe(arr), adesivoUrl: m.adesivo ?? null, nodes }
   }).filter((t) => t.nodes.length > 0)
 }
 
@@ -222,8 +238,10 @@ export async function carregarModuloCompleto(estId: string, tenantId: string, mo
   const m = modulos.find((x) => x.id === moduloId)
   if (!m) return { trilha: null, nome: null, desempenho: [], pendentes: 0, aulasPendentes: 0 }
   const arr = seqByModulo.get(m.id) ?? []
-  const nodes = arr.map(nodeDe)
-  const trilha: Trilha = { id: m.id, nome: m.nome, cor: m.cor, capa: m.capa, capaCard: m.capaCard, total: nodes.length, done: nodes.filter((n) => n.estado === 'concluido').length, trilhaXp: 0, adesivoUrl: m.adesivo ?? null, nodes }
+  const aulaNodes = arr.map(nodeDe)
+  const intro = introNodeDe(m.intro, m.id)
+  const nodes = intro ? [intro, ...aulaNodes] : aulaNodes
+  const trilha: Trilha = { id: m.id, nome: m.nome, cor: m.cor, capa: m.capa, capaCard: m.capaCard, total: aulaNodes.length, done: aulaNodes.filter((n) => n.estado === 'concluido').length, trilhaXp: 0, adesivoUrl: m.adesivo ?? null, nodes }
   const desempenho: AulaDesempenho[] = arr.map((a) => ({
     id: a.doc.id, titulo: a.doc.titulo, estado: a.estado,
     leituraPct: a.doc.pct, leituraConcluida: a.leituraConcluida,

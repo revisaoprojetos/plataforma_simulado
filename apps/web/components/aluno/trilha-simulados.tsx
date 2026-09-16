@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
-import { Play, Route, Zap, Trophy, CircleCheck, Download, Crown } from 'lucide-react'
+import { Play, Route, Zap, Trophy, CircleCheck, Download, Crown, BookOpen, ExternalLink } from 'lucide-react'
 import { BauTrilha } from '@/components/aluno/bau-trilha'
 import { SimboloNo } from '@/components/gamificacao/simbolo-no'
 import { DEFAULT_TRILHA_SIMBOLOS, coresNo, type TrilhaSimbolos, type SimboloEstado, type SimboloConfig } from '@/lib/gamificacao/trilha-simbolos'
@@ -41,6 +41,8 @@ export interface TrilhaNode {
   acaoLeitura?: string
   hrefQuestoes?: string | null
   questoesLiberada?: boolean
+  // Nó "Comece por aqui" (LegProc): pré-aula no topo, sempre acessível, abre direto (sem card lateral).
+  intro?: { tipo: 'leitura' | 'video' | 'link'; href: string; externo: boolean }
 }
 export interface Trilha {
   id: string
@@ -563,6 +565,24 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
 
       {/* Nós */}
       {nodesL.map(({ n, off, y: cyv, adesivo }) => {
+        // Nó "Comece por aqui" (pré-aula): visual próprio, sempre acessível, abre direto (sem card lateral).
+        if (n.intro) {
+          const IconIntro = n.intro.tipo === 'video' ? Play : n.intro.tipo === 'link' ? ExternalLink : BookOpen
+          const clsBtn = 'relative flex items-center justify-center rounded-full border-4 shadow-sm transition-transform hover:scale-105 focus:outline-none'
+          const styleBtn = { width: R * 2, height: R * 2, background: `color-mix(in oklab, ${COR} 18%, var(--card))`, borderColor: COR, color: COR } as React.CSSProperties
+          const inner = (<><span className="pointer-events-none absolute inset-[-5px] rounded-full border-2 opacity-50 motion-safe:animate-ping" style={{ borderColor: COR }} /><IconIntro className="h-6 w-6" /></>)
+          return (
+            <div key={n.id} className="absolute z-[1] flex w-max max-w-[260px] -translate-x-1/2 flex-col items-center text-center" style={{ left: cx(off), top: cyv - R }}>
+              {n.intro.externo
+                ? <a href={n.intro.href} target="_blank" rel="noopener noreferrer" className={clsBtn} style={styleBtn} aria-label={n.titulo}>{inner}</a>
+                : <Link href={n.intro.href} className={clsBtn} style={styleBtn} aria-label={n.titulo}>{inner}</Link>}
+              <div className="relative z-[1] mt-1.5 inline-block max-w-full rounded-lg border bg-background/85 px-2 py-0.5 shadow-sm backdrop-blur-sm">
+                <span className="block text-xs font-semibold leading-snug" style={{ color: COR }} title={n.titulo}>{n.titulo}</span>
+                <span className="block text-[11px] text-muted-foreground">Comece por aqui</span>
+              </div>
+            </div>
+          )
+        }
         const concluido = n.estado === 'concluido'
         const ouro = concluido && n.acerto === 100   // nota 100% → tema dourado + coroa
         const atual = n.estado === 'atual'
