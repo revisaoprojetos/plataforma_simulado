@@ -8,6 +8,8 @@ import { normalizarPontuacaoLeitura, pontuarLegProc, type PontuacaoLeitura } fro
 export interface RankingLeituraItem {
   estudanteId: string
   nome: string
+  email: string | null
+  avatar: string | null
   avatarCor: string | null
   acertos: number
   aulasConcluidas: number
@@ -77,13 +79,13 @@ export async function carregarRankingModulo(moduloId: string, tenantId: string):
     }).filter((x) => x.acertos > 0 || x.aulasConcluidas > 0)
     if (!brutos.length) return { itens: [], gamAtivo, pontuacao }
 
-    // Nome + cor do avatar (para as iniciais).
-    const ests = await fetchAllByIn<{ id: string; nome: string; perfil_avatar_cor: string | null }>(brutos.map((b) => b.estudanteId), (chunk) =>
-      svc.from('simulado_estudantes').select('id, nome, perfil_avatar_cor').in('id', chunk))
+    // Nome + e-mail + foto/cor do avatar.
+    const ests = await fetchAllByIn<{ id: string; nome: string; email: string | null; avatar: string | null; perfil_avatar_cor: string | null }>(brutos.map((b) => b.estudanteId), (chunk) =>
+      svc.from('simulado_estudantes').select('id, nome, email, avatar, perfil_avatar_cor').in('id', chunk))
     const estDe = new Map(ests.map((e) => [e.id, e]))
 
     const itens: RankingLeituraItem[] = brutos
-      .map((b) => ({ ...b, nome: estDe.get(b.estudanteId)?.nome ?? 'Aluno', avatarCor: estDe.get(b.estudanteId)?.perfil_avatar_cor ?? null }))
+      .map((b) => { const e = estDe.get(b.estudanteId); return { ...b, nome: e?.nome ?? 'Aluno', email: e?.email ?? null, avatar: e?.avatar ?? null, avatarCor: e?.perfil_avatar_cor ?? null } })
       .sort((a, b) => b.score - a.score || b.aulasConcluidas - a.aulasConcluidas || a.nome.localeCompare(b.nome, 'pt-BR'))
       .map((b, i) => ({ ...b, posicao: i + 1 }))
     return { itens, gamAtivo, pontuacao }
