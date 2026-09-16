@@ -62,7 +62,6 @@ export function CapiAjudanteTrilha({ pontos = [] }: { pontos?: PontoTrilha[] }) 
   const reduzir = useRef(false)
   const pontosRef = useRef(pontos)
   pontosRef.current = pontos
-  const temGeo = pontos.length > 0
 
   useEffect(() => {
     setMontado(true)
@@ -115,18 +114,9 @@ export function CapiAjudanteTrilha({ pontos = [] }: { pontos?: PontoTrilha[] }) 
 
   return (
     <>
-      {temGeo && passo.x != null && passo.y != null ? (
-        // Fica SEMPRE à esquerda da trilha (nunca em cima, nem atrás do card, que abre à direita) e
-        // acompanha só a ALTURA do nó atual — desliza suave por top (sem remontar → sem teleporte).
-        // INDEPENDENTE do card do dia: não abre/fecha junto com ele.
-        <div className="pointer-events-none absolute z-[3] w-max -translate-x-full" aria-hidden
-          style={{ left: passo.x - 110, top: passo.y + passo.dy, transition: 'left 1.1s ease-in-out, top 1.1s ease-in-out' }}>
-          {mascote}
-        </div>
-      ) : (
-        // Modo canto (formatos lista/mapa, sem geometria de nós): fixa flutuando.
-        <div className="pointer-events-none fixed bottom-28 left-4 z-30 w-max md:bottom-8" aria-hidden>{mascote}</div>
-      )}
+      {/* Ajudante FIXO no canto (acima do botão): sempre visível — não some por scroll/card/remontagem
+          nem fica em cima da trilha. Flutua e troca de fala/pose sozinho. */}
+      <div className="pointer-events-none fixed bottom-28 right-4 z-30 w-max md:bottom-20" aria-hidden>{mascote}</div>
       <BotaoAjudante ligado={ligado} onToggle={toggle} />
     </>
   )
