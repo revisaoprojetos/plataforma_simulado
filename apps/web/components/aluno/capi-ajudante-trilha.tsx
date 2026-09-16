@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react'
 import { Mascote, type ReacaoMascote } from '@/components/mascote/mascote'
 
 export type PontoTrilha = { x: number; y: number; estado: 'concluido' | 'atual' | 'disponivel'; intro?: boolean }
@@ -55,13 +55,27 @@ type Passo = { x?: number; y?: number; naDireita: boolean; dy: number; pose: Rea
  * a próxima. Sem geometria (lista/mapa) fica num canto flutuando e trocando de fala. Reusa o <Mascote>,
  * liga/desliga por aluno (localStorage) e respeita prefers-reduced-motion.
  */
-export function CapiAjudanteTrilha({ pontos = [] }: { pontos?: PontoTrilha[] }) {
+export function CapiAjudanteTrilha({ pontos = [], containerRef }: { pontos?: PontoTrilha[]; containerRef?: RefObject<HTMLElement | null> }) {
   const [ligado, setLigado] = useState(true)
   const [montado, setMontado] = useState(false)
   const [passo, setPasso] = useState<Passo | null>(null)
+  const [box, setBox] = useState<{ left: number } | null>(null) // borda esquerda da trilha (viewport)
   const reduzir = useRef(false)
   const pontosRef = useRef(pontos)
   pontosRef.current = pontos
+
+  // Mede a posição HORIZONTAL da trilha para a Capi ficar à esquerda dela (o vertical é fixo → não some
+  // no scroll). Re-mede em resize e quando o container muda de largura (ex.: recolher a sidebar).
+  useEffect(() => {
+    const el = containerRef?.current
+    if (!el) return
+    const medir = () => setBox({ left: el.getBoundingClientRect().left })
+    medir()
+    window.addEventListener('resize', medir)
+    const ro = new ResizeObserver(medir)
+    ro.observe(el.parentElement ?? el)
+    return () => { window.removeEventListener('resize', medir); ro.disconnect() }
+  }, [containerRef, montado])
 
   useEffect(() => {
     setMontado(true)
@@ -112,11 +126,16 @@ export function CapiAjudanteTrilha({ pontos = [] }: { pontos?: PontoTrilha[] }) 
 
   const mascote = <Mascote reacao={passo.pose} tamanho={74} mensagem={passo.msg} flutua={!reduzir.current} entra={false} className="[&_img]:mt-3" />
 
+  // À ESQUERDA da trilha (posição medida), com o VERTICAL fixo no viewport → fica junto da trilha e
+  // nunca some por scroll/clipping/remontagem. Borda direita ~24px à esquerda da trilha; clamp p/ não
+  // entrar na sidebar/sair da tela em telas estreitas.
+  const leftPx = Math.max(210, (box?.left ?? 420) - 24)
   return (
     <>
-      {/* Ajudante FIXO no canto (acima do botão): sempre visível — não some por scroll/card/remontagem
-          nem fica em cima da trilha. Flutua e troca de fala/pose sozinho. */}
-      <div className="pointer-events-none fixed bottom-28 right-4 z-30 w-max md:bottom-20" aria-hidden>{mascote}</div>
+      <div className="pointer-events-none fixed z-30 w-max" aria-hidden
+        style={{ left: leftPx, top: '50%', transform: 'translate(-100%, -50%)', transition: 'left .4s ease' }}>
+        {mascote}
+      </div>
       <BotaoAjudante ligado={ligado} onToggle={toggle} />
     </>
   )
