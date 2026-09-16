@@ -13,6 +13,8 @@ const FALAS: { pose: ReacaoMascote; msg: string }[] = [
   { pose: 'satisfeita', msg: 'Cada aula te deixa mais afiado.' },
   { pose: 'joinha', msg: 'Mandou bem até aqui!' },
 ]
+// Comemorações (variam a cada visita a um nó concluído — sem repetir sempre a mesma).
+const CELEBRA = ['Aula concluída! 🎉', 'Boa, essa você fechou!', 'Mais uma na conta! 👏', 'Tá voando! ✨']
 
 /**
  * Capivara ajudante AUTÔNOMA da trilha do LegProc: fica ao lado do nó atual, "anda" até um nó concluído
@@ -33,34 +35,35 @@ export function CapiAjudanteTrilha({ pontos }: { pontos: PontoTrilha[] }) {
   }, [])
   function toggle() { setLigado((v) => { const n = !v; try { localStorage.setItem('legproc:capi-ajudante', n ? '1' : '0') } catch { /* ignore */ }; return n }) }
 
-  // Paradas: nó ATUAL + o último CONCLUÍDO (p/ andar entre eles e comemorar). Sem atual → 1º nó real.
-  const paradas = useMemo(() => {
+  // Nó BASE (onde a Capi fica): o atual; + o último CONCLUÍDO (p/ comemorar de vez em quando).
+  const { base, concl } = useMemo(() => {
     const reais = pontos.filter((p) => !p.intro)
     const atual = reais.find((p) => p.estado === 'atual')
-    const concl = [...reais].reverse().find((p) => p.estado === 'concluido')
-    const base = atual ?? reais[0] ?? pontos[0]
-    return [base, concl].filter((p): p is PontoTrilha => !!p)
+    return { base: atual ?? reais[0] ?? pontos[0] ?? null, concl: [...reais].reverse().find((p) => p.estado === 'concluido') ?? null }
   }, [pontos])
 
-  // Alterna parada/fala a cada 6s (só se houver >1 parada e sem reduce-motion).
+  // Troca de pose/fala a cada 7s (sem reduce-motion → fica parada).
   useEffect(() => {
-    if (!ligado || paradas.length < 2 || reduzir.current) return
-    const t = setInterval(() => setI((v) => v + 1), 6000)
+    if (!ligado || reduzir.current) return
+    const t = setInterval(() => setI((v) => v + 1), 7000)
     return () => clearInterval(t)
-  }, [ligado, paradas.length])
+  }, [ligado])
 
   if (!montado) return null
-  if (!ligado || paradas.length === 0) return <BotaoAjudante ligado={ligado} onToggle={toggle} />
+  if (!ligado || !base) return <BotaoAjudante ligado={ligado} onToggle={toggle} />
 
-  const parada = paradas[i % paradas.length]
-  const celebra = parada.estado === 'concluido'
-  const fala = celebra ? { pose: 'joinha' as ReacaoMascote, msg: 'Aula concluída! 🎉' } : FALAS[i % FALAS.length]
+  // Fica no ATUAL incentivando; só 1 a cada 3 ciclos hopa até o concluído p/ comemorar (msg varia).
+  const noConcluido = !!concl && i % 3 === 2
+  const parada = noConcluido ? concl! : base
+  const fala = noConcluido
+    ? { pose: 'joinha' as ReacaoMascote, msg: CELEBRA[Math.floor(i / 3) % CELEBRA.length] }
+    : FALAS[i % FALAS.length]
   const esquerda = parada.x > 40 // trilha do LegProc é central → Capi fica à esquerda do nó
 
   return (
     <>
       <div className="pointer-events-none absolute z-[3] transition-[left,top] duration-1000 ease-in-out"
-        style={{ left: parada.x, top: parada.y, transform: `translate(${esquerda ? 'calc(-100% - 24px)' : '24px'}, -80%)` }} aria-hidden>
+        style={{ left: parada.x, top: parada.y, transform: `translate(${esquerda ? 'calc(-100% - 88px)' : '88px'}, -80%)` }} aria-hidden>
         <Mascote reacao={fala.pose} tamanho={76} mensagem={fala.msg} flutua={!reduzir.current} entra={false} espelhar={!esquerda} />
       </div>
       <BotaoAjudante ligado={ligado} onToggle={toggle} />
