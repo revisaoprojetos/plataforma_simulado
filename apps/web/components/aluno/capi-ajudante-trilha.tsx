@@ -1,11 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Mascote, type ReacaoMascote } from '@/components/mascote/mascote'
 
 export type PontoTrilha = { x: number; y: number; estado: 'concluido' | 'atual' | 'disponivel'; intro?: boolean }
 
-// Falas de incentivo (determinísticas por índice — sem Math.random p/ não "piscar" a cada render).
 const FALAS: { pose: ReacaoMascote; msg: string }[] = [
   { pose: 'ideia', msg: 'Bora pra próxima aula?' },
   { pose: 'estudante', msg: 'Tô de olho no seu progresso!' },
@@ -13,20 +12,29 @@ const FALAS: { pose: ReacaoMascote; msg: string }[] = [
   { pose: 'satisfeita', msg: 'Cada aula te deixa mais afiado.' },
   { pose: 'joinha', msg: 'Mandou bem até aqui!' },
 ]
-// Comemorações (variam a cada visita a um nó concluído — sem repetir sempre a mesma).
 const CELEBRA = ['Aula concluída! 🎉', 'Boa, essa você fechou!', 'Mais uma na conta! 👏', 'Tá voando! ✨']
+// Anúncios direcionais (próxima aula abaixo / do outro lado).
+const DIRECIONAIS = ['Próxima aula logo abaixo 👇', 'Tem mais ali embaixo 👇', 'Continua descendo 👇', 'Tô do outro lado agora 👋', 'Bora que a próxima te espera!']
+
+function rnd<T>(a: T[]): T { return a[Math.floor(Math.random() * a.length)] }
+
+type Passo = { x?: number; y?: number; naDireita: boolean; dy: number; pose: ReacaoMascote; msg: string }
 
 /**
- * Capivara ajudante AUTÔNOMA da trilha do LegProc: fica ao lado do nó atual, "anda" até um nó concluído
- * pra comemorar e volta, trocando de pose/fala. Reusa o <Mascote> (poses + balão) e as animações CSS.
- * Liga/desliga por aluno (localStorage). Respeita prefers-reduced-motion (fica parada, sem andar).
- * Renderizada DENTRO do container da trilha (posições vêm prontas — não mede o DOM nem altera o layout).
+ * Capivara ajudante AUTÔNOMA do LegProc. Com geometria de nós (serpentina/reta) ela "voa" em arco
+ * (mergulha e sobe) entre pontos aleatórios da trilha — cima, lados, comemorando concluídos e anunciando
+ * a próxima. Sem geometria (lista/mapa) fica num canto flutuando e trocando de fala. Reusa o <Mascote>,
+ * liga/desliga por aluno (localStorage) e respeita prefers-reduced-motion.
  */
-export function CapiAjudanteTrilha({ pontos }: { pontos: PontoTrilha[] }) {
+export function CapiAjudanteTrilha({ pontos = [] }: { pontos?: PontoTrilha[] }) {
   const [ligado, setLigado] = useState(true)
-  const [i, setI] = useState(0)
   const [montado, setMontado] = useState(false)
+  const [passo, setPasso] = useState<Passo | null>(null)
+  const [ciclo, setCiclo] = useState(0)
   const reduzir = useRef(false)
+  const pontosRef = useRef(pontos)
+  pontosRef.current = pontos
+  const temGeo = pontos.length > 0
 
   useEffect(() => {
     setMontado(true)
@@ -35,46 +43,60 @@ export function CapiAjudanteTrilha({ pontos }: { pontos: PontoTrilha[] }) {
   }, [])
   function toggle() { setLigado((v) => { const n = !v; try { localStorage.setItem('legproc:capi-ajudante', n ? '1' : '0') } catch { /* ignore */ }; return n }) }
 
-  // Nó BASE (onde a Capi fica): o atual; + o último CONCLUÍDO (p/ comemorar de vez em quando).
-  const { base, concl } = useMemo(() => {
-    const reais = pontos.filter((p) => !p.intro)
-    const atual = reais.find((p) => p.estado === 'atual')
-    return { base: atual ?? reais[0] ?? pontos[0] ?? null, concl: [...reais].reverse().find((p) => p.estado === 'concluido') ?? null }
-  }, [pontos])
+  // Escolhe o próximo destino/pose/fala — ALEATÓRIO (só no cliente, após montar).
+  const proximoPasso = useCallback((): Passo => {
+    const naDireita = Math.random() < 0.5
+    const dy = Math.round(Math.random() * 56 - 24) // -24..+32 → às vezes acima, às vezes ao lado/abaixo
+    const reais = pontosRef.current.filter((p) => !p.intro)
+    if (!reais.length) { const f = rnd(FALAS); return { naDireita, dy, pose: f.pose, msg: f.msg } }
+    const iAt = reais.findIndex((p) => p.estado === 'atual')
+    const atual = reais[iAt] ?? reais[0]
+    const concl = [...reais].reverse().find((p) => p.estado === 'concluido')
+    const prox = iAt >= 0 ? reais[iAt + 1] : undefined
+    // Destino: geralmente o atual; às vezes um concluído (comemora), a próxima, ou um nó qualquer.
+    const r = Math.random()
+    let ponto = atual
+    if (concl && r < 0.28) ponto = concl
+    else if (prox && r < 0.5) ponto = prox
+    else if (r < 0.62) ponto = rnd(reais)
+    let pose: ReacaoMascote, msg: string
+    if (ponto.estado === 'concluido') { pose = 'joinha'; msg = rnd(CELEBRA) }
+    else if (Math.random() < 0.45) { pose = 'ideia'; msg = rnd(DIRECIONAIS) }
+    else { const f = rnd(FALAS); pose = f.pose; msg = f.msg }
+    return { x: ponto.x, y: ponto.y, naDireita, dy, pose, msg }
+  }, [])
 
-  // Voa/troca de lado + pose a cada 5s (sem reduce-motion → fica parada).
+  // Troca a cada 8s (mais devagar). Sem reduce-motion → só o 1º passo, sem intervalo.
   useEffect(() => {
-    if (!ligado || reduzir.current) return
-    const t = setInterval(() => setI((v) => v + 1), 5000)
+    if (!montado || !ligado) return
+    setPasso(proximoPasso()); setCiclo((c) => c + 1)
+    if (reduzir.current) return
+    const t = setInterval(() => { setPasso(proximoPasso()); setCiclo((c) => c + 1) }, 8000)
     return () => clearInterval(t)
-  }, [ligado])
+  }, [montado, ligado, proximoPasso])
 
-  if (!montado) return null
-  if (!ligado || !base) return <BotaoAjudante ligado={ligado} onToggle={toggle} />
+  if (!montado || !ligado || !passo) return <BotaoAjudante ligado={ligado} onToggle={toggle} />
 
-  // Fica no ATUAL incentivando; só 1 a cada 3 ciclos hopa até o concluído p/ comemorar (msg varia).
-  const noConcluido = !!concl && i % 3 === 2
-  const parada = noConcluido ? concl! : base
-  const fala = noConcluido
-    ? { pose: 'joinha' as ReacaoMascote, msg: CELEBRA[Math.floor(i / 3) % CELEBRA.length] }
-    : FALAS[i % FALAS.length]
-  // Alterna o LADO a cada ciclo → a Capi "voa" da direita p/ a esquerda cruzando o nó, longe do card
-  // do dia (que abre bem à direita). Sem movimento no reduce-motion (fica à esquerda, estática).
-  const naDireita = !reduzir.current && i % 2 === 1
+  // key={ciclo} reinicia o arco de "voo" (mergulha e sobe) a cada troca.
+  const mascote = (
+    <div key={ciclo} className="motion-safe:animate-[capi-mergulho_1.2s_ease-in-out]">
+      <Mascote reacao={passo.pose} tamanho={74} mensagem={passo.msg} flutua={!reduzir.current} entra={false} espelhar={passo.naDireita} className="[&_img]:mt-3" />
+    </div>
+  )
 
   return (
     <>
-      {/* Camada 1: ancorada no nó (transita suave entre nós). */}
-      <div className="pointer-events-none absolute z-[3] transition-[left,top] duration-700 ease-in-out" style={{ left: parada.x, top: parada.y }} aria-hidden>
-        {/* Camada 2: deslize lateral esquerda↔direita cruzando o nó (transição do transform). */}
-        <div className="transition-transform duration-[1100ms] ease-in-out" style={{ transform: `translate(-50%, -64%) translateX(${naDireita ? 108 : -108}px)` }}>
-          {/* Camada 3: arco de "voo" (mergulha e sobe) a cada travessia — key={i} reinicia a animação. */}
-          <div key={i} className="motion-safe:animate-[capi-mergulho_1.1s_ease-in-out]">
-            {/* [&_img]:mt-3 → afasta a imagem do bico do balão (a flutuação não cobre a ponta). */}
-            <Mascote reacao={fala.pose} tamanho={76} mensagem={fala.msg} flutua={!reduzir.current} entra={false} espelhar={naDireita} className="[&_img]:mt-3" />
+      {temGeo && passo.x != null && passo.y != null ? (
+        // Voo pela trilha: camada 1 (ancora no nó, transita) → camada 2 (deslize lateral distante) → arco.
+        <div className="pointer-events-none absolute z-[3] transition-[left,top] duration-[900ms] ease-in-out" style={{ left: passo.x, top: passo.y + passo.dy }} aria-hidden>
+          <div className="transition-transform duration-[1400ms] ease-in-out" style={{ transform: `translate(-50%, -66%) translateX(${passo.naDireita ? 150 : -150}px)` }}>
+            {mascote}
           </div>
         </div>
-      </div>
+      ) : (
+        // Modo canto (formatos lista/mapa, sem geometria de nós): fixa flutuando.
+        <div className="pointer-events-none fixed bottom-28 left-4 z-30 md:bottom-8" aria-hidden>{mascote}</div>
+      )}
       <BotaoAjudante ligado={ligado} onToggle={toggle} />
     </>
   )

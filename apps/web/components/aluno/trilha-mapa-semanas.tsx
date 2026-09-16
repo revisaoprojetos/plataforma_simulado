@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import type { Trilha, TrilhaNode } from '@/components/aluno/trilha-simulados'
 import { SimboloNo } from '@/components/gamificacao/simbolo-no'
 import { coresNo, DEFAULT_TRILHA_SIMBOLOS, type TrilhaSimbolos, type SimboloEstado } from '@/lib/gamificacao/trilha-simbolos'
+import { CapiAjudanteTrilha } from '@/components/aluno/capi-ajudante-trilha'
 
 const MIN_STEP = 210    // largura mínima de uma "célula" (nó + card) → define quantos cabem por linha
 const STEP_Y = 168
@@ -126,9 +127,10 @@ function Secao({ t, simbolos }: { t: Trilha; simbolos: TrilhaSimbolos }) {
 }
 
 /** Formato "Trilha horizontal": segue na horizontal e curva só no fim da linha (largura dinâmica). */
-export function TrilhaMapaSemanas({ trilhas, simbolos = DEFAULT_TRILHA_SIMBOLOS }: { trilhas: Trilha[]; simbolos?: TrilhaSimbolos }) {
+export function TrilhaMapaSemanas({ trilhas, simbolos = DEFAULT_TRILHA_SIMBOLOS, ajudante = false }: { trilhas: Trilha[]; simbolos?: TrilhaSimbolos; ajudante?: boolean }) {
   return (
     <div className="space-y-8">
+      {ajudante && <CapiAjudanteTrilha />}
       {trilhas.map((t) => <Secao key={t.id} t={t} simbolos={simbolos} />)}
     </div>
   )

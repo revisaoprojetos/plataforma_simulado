@@ -707,8 +707,8 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
 export function TrilhaSistema({ trilhas, gamAtivo, simbolos = DEFAULT_TRILHA_SIMBOLOS, formato = 'serpentina', semFundo = false, semDivisoria = false, ajudante = false }: {
   trilhas: Trilha[]; gamAtivo: boolean; simbolos?: TrilhaSimbolos; formato?: TrilhaFormato; semFundo?: boolean; semDivisoria?: boolean; ajudante?: boolean
 }) {
-  if (formato === 'lista') return <TrilhaLista trilhas={trilhas} gamAtivo={gamAtivo} simbolos={simbolos} />
-  if (formato === 'mapa_semanas') return <TrilhaMapaSemanas trilhas={trilhas} simbolos={simbolos} />
+  if (formato === 'lista') return <TrilhaLista trilhas={trilhas} gamAtivo={gamAtivo} simbolos={simbolos} ajudante={ajudante} />
+  if (formato === 'mapa_semanas') return <TrilhaMapaSemanas trilhas={trilhas} simbolos={simbolos} ajudante={ajudante} />
   return (
     <TrilhaGigante trilhas={trilhas} gamAtivo={gamAtivo} reto={formato === 'reta'} semFundo={semFundo}
       semDivisoria={semDivisoria} ajudante={ajudante} simbolos={simbolos} />

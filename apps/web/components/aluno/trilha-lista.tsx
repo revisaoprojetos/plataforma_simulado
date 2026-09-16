@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils'
 import type { Trilha, TrilhaNode } from '@/components/aluno/trilha-simulados'
 import { SimboloNo } from '@/components/gamificacao/simbolo-no'
 import { DEFAULT_TRILHA_SIMBOLOS, coresNo, type TrilhaSimbolos, type SimboloEstado } from '@/lib/gamificacao/trilha-simbolos'
+import { CapiAjudanteTrilha } from '@/components/aluno/capi-ajudante-trilha'
 
 const estadoDe = (n: TrilhaNode): SimboloEstado => n.estado === 'concluido' ? 'concluido' : n.estado === 'atual' ? 'atual' : 'disponivel'
 
@@ -69,8 +70,8 @@ function Stat({ icon: Icon, valor, rotulo }: { icon: any; valor: string; rotulo:
 }
 
 /** Formato "Lista compacta" (1c): estatísticas no topo + tabela por aula (status, acertos, ação). */
-export function TrilhaLista({ trilhas, gamAtivo, simbolos = DEFAULT_TRILHA_SIMBOLOS }: {
-  trilhas: Trilha[]; gamAtivo: boolean; simbolos?: TrilhaSimbolos
+export function TrilhaLista({ trilhas, gamAtivo, simbolos = DEFAULT_TRILHA_SIMBOLOS, ajudante = false }: {
+  trilhas: Trilha[]; gamAtivo: boolean; simbolos?: TrilhaSimbolos; ajudante?: boolean
 }) {
   const total = trilhas.reduce((a, t) => a + t.total, 0)
   const done = trilhas.reduce((a, t) => a + t.done, 0)
@@ -81,6 +82,7 @@ export function TrilhaLista({ trilhas, gamAtivo, simbolos = DEFAULT_TRILHA_SIMBO
 
   return (
     <div className="space-y-4">
+      {ajudante && <CapiAjudanteTrilha />}
       {/* Estatísticas no topo */}
       <div className="grid grid-cols-2 gap-4 rounded-2xl border bg-card p-4 shadow-sm sm:grid-cols-4">
         <Stat icon={Target} valor={`${pct}%`} rotulo={`${done} de ${total} aulas`} />
