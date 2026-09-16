@@ -128,7 +128,7 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
       {/* pt-0 + overflow-visible: a trilha encosta no banner e os pontos do topo passam POR TRÁS do banner
           (emergem dele) sem corte. overflow-x-auto cortaria o topo do 1º ponto (overflow-y vira auto). */}
       <TabsContent value="trilha" className="pt-0">
-        <div className="overflow-visible pb-10"><TrilhaSistema trilhas={[trilha]} gamAtivo={false} formato={formato} simbolos={simbolos} semFundo semDivisoria /></div>
+        <div className="overflow-visible pb-10"><TrilhaSistema trilhas={[trilha]} gamAtivo={false} formato={formato} simbolos={simbolos} semFundo semDivisoria ajudante /></div>
       </TabsContent>
       <TabsContent value="desempenho" className="pt-4">
         <DesempenhoModulo desempenho={desempenho} />

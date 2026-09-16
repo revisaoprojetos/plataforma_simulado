@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { Play, Route, Zap, Trophy, CircleCheck, Download, Crown, BookOpen, ExternalLink } from 'lucide-react'
 import { BauTrilha } from '@/components/aluno/bau-trilha'
+import { CapiAjudanteTrilha } from '@/components/aluno/capi-ajudante-trilha'
 import { SimboloNo } from '@/components/gamificacao/simbolo-no'
 import { DEFAULT_TRILHA_SIMBOLOS, coresNo, type TrilhaSimbolos, type SimboloEstado, type SimboloConfig } from '@/lib/gamificacao/trilha-simbolos'
 import { TrilhaLista } from '@/components/aluno/trilha-lista'
@@ -415,7 +416,7 @@ export function TrilhaSimulados({ trilhas, gamAtivo, estilo = 'cards', visiveis 
 const GAP_HDR = 58   // altura reservada p/ a divisória (nome do grupo)
 const GAP_GRUPO = 44 // respiro extra entre grupos (o pontilhado continua nele)
 
-export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = false, semDivisoria = false, simbolos = DEFAULT_TRILHA_SIMBOLOS }: { trilhas: Trilha[]; gamAtivo: boolean; reto?: boolean; semFundo?: boolean; semDivisoria?: boolean; simbolos?: TrilhaSimbolos }) {
+export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = false, semDivisoria = false, ajudante = false, simbolos = DEFAULT_TRILHA_SIMBOLOS }: { trilhas: Trilha[]; gamAtivo: boolean; reto?: boolean; semFundo?: boolean; semDivisoria?: boolean; ajudante?: boolean; simbolos?: TrilhaSimbolos }) {
   const flat = trilhas.flatMap((t) => t.nodes)
   const atualId = flat.find((n) => n.estado === 'atual')?.id ?? flat[0]?.id ?? null
   const [aberto, setAberto] = useState<string | null>(atualId)
@@ -692,6 +693,9 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
           </div>
         </div>
       )}
+
+      {/* Capivara ajudante autônoma (LegProc) — anda ao lado dos nós e reage. Liga/desliga por aluno. */}
+      {ajudante && <CapiAjudanteTrilha pontos={nodesL.map((x) => ({ x: cx(x.off), y: x.y, estado: x.n.estado, intro: !!x.n.intro }))} />}
     </div>
   )
 }
@@ -700,13 +704,13 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
  * Entrada única das trilhas do sistema: escolhe o LAYOUT pelo formato configurado no console/aparência.
  * serpentina/reta/mapa_semanas → TrilhaGigante (props); lista → TrilhaLista (tabela compacta).
  */
-export function TrilhaSistema({ trilhas, gamAtivo, simbolos = DEFAULT_TRILHA_SIMBOLOS, formato = 'serpentina', semFundo = false, semDivisoria = false }: {
-  trilhas: Trilha[]; gamAtivo: boolean; simbolos?: TrilhaSimbolos; formato?: TrilhaFormato; semFundo?: boolean; semDivisoria?: boolean
+export function TrilhaSistema({ trilhas, gamAtivo, simbolos = DEFAULT_TRILHA_SIMBOLOS, formato = 'serpentina', semFundo = false, semDivisoria = false, ajudante = false }: {
+  trilhas: Trilha[]; gamAtivo: boolean; simbolos?: TrilhaSimbolos; formato?: TrilhaFormato; semFundo?: boolean; semDivisoria?: boolean; ajudante?: boolean
 }) {
   if (formato === 'lista') return <TrilhaLista trilhas={trilhas} gamAtivo={gamAtivo} simbolos={simbolos} />
   if (formato === 'mapa_semanas') return <TrilhaMapaSemanas trilhas={trilhas} simbolos={simbolos} />
   return (
     <TrilhaGigante trilhas={trilhas} gamAtivo={gamAtivo} reto={formato === 'reta'} semFundo={semFundo}
-      semDivisoria={semDivisoria} simbolos={simbolos} />
+      semDivisoria={semDivisoria} ajudante={ajudante} simbolos={simbolos} />
   )
 }
