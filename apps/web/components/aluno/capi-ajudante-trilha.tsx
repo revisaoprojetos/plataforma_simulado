@@ -89,7 +89,7 @@ export function CapiAjudanteTrilha({ pontos = [] }: { pontos?: PontoTrilha[] }) 
       {temGeo && passo.x != null && passo.y != null ? (
         // Voo pela trilha: camada 1 (ancora no nó, transita) → camada 2 (deslize lateral distante) → arco.
         <div className="pointer-events-none absolute z-[3] transition-[left,top] duration-[900ms] ease-in-out" style={{ left: passo.x, top: passo.y + passo.dy }} aria-hidden>
-          <div className="transition-transform duration-[1400ms] ease-in-out" style={{ transform: `translate(-50%, -66%) translateX(${passo.naDireita ? 150 : -150}px)` }}>
+          <div className="transition-transform duration-[1400ms] ease-in-out" style={{ transform: `translate(-50%, -66%) translateX(${passo.naDireita ? 215 : -215}px)` }}>
             {mascote}
           </div>
         </div>
