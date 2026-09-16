@@ -27,11 +27,23 @@ function hashIds(ids: string[]): string {
 
 export default async function SimuladosPage({ searchParams }: { searchParams: Promise<{ pasta?: string }> }) {
   const { pasta: pastaParam } = await searchParams
+  // Href do "voltar" (seta <) do header: SOBE um nível de verdade — pasta pai da atual, ou raiz. Assim não
+  // depende do histórico (que voltaria pro simulado de onde o admin veio). Consulta única e barata por PK.
+  let voltarHref = '/admin/simulados'
+  if (pastaParam) {
+    try {
+      const tid = await getCurrentTenantId()
+      const svc = await createServiceClient()
+      const r = await svc.from('simulado_pastas').select('pai_id').eq('id', pastaParam).eq('tenant_id', tid).maybeSingle()
+      const pai = (r.data as { pai_id?: string | null } | null)?.pai_id
+      voltarHref = pai ? `/admin/simulados?pasta=${pai}` : '/admin/simulados'
+    } catch { /* pai_id pode não existir em algum ambiente → cai na raiz */ }
+  }
   return (
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-2">
-          <VoltarSimulados pastaId={pastaParam ?? null} />
+          <VoltarSimulados pastaId={pastaParam ?? null} voltarHref={voltarHref} />
           <div>
             <h1 className="text-2xl font-bold tracking-tight">Simulados</h1>
             <p className="text-muted-foreground">Gerencie provas, agendamentos e publicações.</p>

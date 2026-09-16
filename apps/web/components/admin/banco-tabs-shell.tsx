@@ -13,7 +13,7 @@ import { Tabs } from '@/components/ui/tabs'
  * Com isso, quando o admin abre o simulado, as demais abas já vão sendo preparadas no servidor e a
  * troca fica instantânea (o conteúdo já está no cache do Next). Cada aba deve ter carga otimizada.
  */
-export function BancoTabsShell({ value, children, prefetch }: { value: string; children: React.ReactNode; prefetch?: string[] }) {
+export function BancoTabsShell({ value, children, prefetch, className }: { value: string; children: React.ReactNode; prefetch?: string[]; className?: string }) {
   const router = useRouter()
   const sp = useSearchParams()
   const pathname = usePathname()
@@ -36,6 +36,7 @@ export function BancoTabsShell({ value, children, prefetch }: { value: string; c
   return (
     <Tabs
       value={value}
+      className={className}
       onValueChange={(v: string) => {
         const p = new URLSearchParams(sp?.toString() ?? '')
         p.set('tab', v)

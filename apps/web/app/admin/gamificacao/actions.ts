@@ -7,8 +7,29 @@ import { checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { rebuildCacheTenant } from '@/lib/gamificacao/cache'
 import { DEFAULT_CONFIG, type XpRegras, type NivelCurva, type LigaDef, type MissaoDef, type MissoesConfig, type ConquistaDef } from '@/lib/gamificacao/config'
+import type { TrilhaSimbolos } from '@/lib/gamificacao/trilha-simbolos'
+import type { TrilhaFormato } from '@/lib/gamificacao/trilha-formato'
 
 const SEM_TENANT = '00000000-0000-0000-0000-000000000000'
+
+/**
+ * Aparência da trilha: salva os símbolos dos nós + o FORMATO (layout) no `tema` do tenant
+ * (`gam_trilha_simbolos` + `trilha_formato`) — migration-free. Lido no admin e no portal do aluno.
+ */
+export async function salvarTrilhaSimbolos(simbolos: TrilhaSimbolos, formato?: TrilhaFormato): Promise<{ ok?: boolean; error?: string }> {
+  if (!(await checkPermission('gamificacao:manage'))) return { error: 'Você não tem permissão para gerenciar a gamificação.' }
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return { error: 'Tenant não resolvido.' }
+  const svc = createAdminClient()
+  const { data: t } = await svc.from('simulado_tenants').select('tema').eq('id', tenantId).maybeSingle()
+  const tema = ((t?.tema as Record<string, unknown> | null) ?? {})
+  const novo = { ...tema, gam_trilha_simbolos: simbolos, ...(formato ? { trilha_formato: formato } : {}) }
+  const { error } = await svc.from('simulado_tenants').update({ tema: novo }).eq('id', tenantId)
+  if (error) return { error: error.message }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_tenants', entidadeId: tenantId, depois: { gam_trilha_simbolos: simbolos, trilha_formato: formato } })
+  revalidatePath('/admin/gamificacao'); revalidatePath('/aluno')
+  return { ok: true }
+}
 
 // Carrega a config atual (ou os defaults) e faz merge das colunas alteradas, preservando o resto.
 async function salvarSlice(patch: Record<string, unknown>): Promise<{ ok?: boolean; error?: string }> {

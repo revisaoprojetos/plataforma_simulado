@@ -3,8 +3,21 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
-import { Check, Play, Star, Route, Zap, Trophy, CircleCheck, Download, Crown } from 'lucide-react'
+import { Play, Route, Zap, Trophy, CircleCheck, Download, Crown } from 'lucide-react'
 import { BauTrilha } from '@/components/aluno/bau-trilha'
+import { SimboloNo } from '@/components/gamificacao/simbolo-no'
+import { DEFAULT_TRILHA_SIMBOLOS, coresNo, type TrilhaSimbolos, type SimboloEstado, type SimboloConfig } from '@/lib/gamificacao/trilha-simbolos'
+import { TrilhaLista } from '@/components/aluno/trilha-lista'
+import { TrilhaMapaSemanas } from '@/components/aluno/trilha-mapa-semanas'
+import { type TrilhaFormato } from '@/lib/gamificacao/trilha-formato'
+
+/** Símbolo do nó conforme o estado + config do tenant. `escala` acompanha o tamanho do nó na variante. */
+function noEstado(concluido: boolean, atual: boolean): SimboloEstado { return concluido ? 'concluido' : atual ? 'atual' : 'disponivel' }
+/** Override da cor de FUNDO do nó (mantém o "ouro" 100% intacto). A cor do símbolo vai direto no SimboloNo. */
+function corFundoOverride(cc: SimboloConfig, ouro: boolean): Record<string, string> {
+  if (ouro || !cc.corFundo) return {}
+  return { background: cc.corFundo, borderColor: `color-mix(in oklab, ${cc.corFundo} 82%, #000)` }
+}
 
 export interface TrilhaNode {
   id: string
@@ -138,7 +151,7 @@ function NodeCard({ n, gamAtivo }: { n: TrilhaNode; gamAtivo: boolean }) {
 const LANE = 300, ROW = 150, R = 30, PAD = 34
 const OFFS = [0, 66, 98, 66, 0, -66, -98, -66]
 
-function TrilhaCaminho({ t, gamAtivo }: { t: Trilha; gamAtivo: boolean }) {
+function TrilhaCaminho({ t, gamAtivo, simbolos }: { t: Trilha; gamAtivo: boolean; simbolos: TrilhaSimbolos }) {
   // Início: nenhum card aberto ao entrar — só abre quando o aluno clica em um nó.
   const [aberto, setAberto] = useState<string | null>(null)
   const cx = (off: number) => LANE / 2 + off
@@ -183,14 +196,14 @@ function TrilhaCaminho({ t, gamAtivo }: { t: Trilha; gamAtivo: boolean }) {
               style={{ width: R * 2, height: R * 2, ...(ouro ? { background: 'radial-gradient(circle at 50% 36%, #ffe680 0%, #ffcf33 46%, #f0b000 78%, #d99200 100%)', borderColor: '#c07f08', color: '#c2680a', boxShadow: '0 0 13px 2px rgba(250,204,21,.5), 0 0 28px 6px rgba(250,204,21,.22), 0 6px 16px -5px rgba(217,119,6,.55)' }
                 : concluido ? { background: '#10b981', borderColor: '#059669', color: '#fff' }
                 : atual ? { background: `color-mix(in oklab, ${COR} 16%, var(--card))`, borderColor: COR, color: COR }
-                : { background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }) }}>
+                : { background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }), ...corFundoOverride(simbolos[noEstado(concluido, atual)], ouro) }}>
               {atual && <span className="pointer-events-none absolute inset-[-5px] rounded-full border-2 opacity-60 motion-safe:animate-ping" style={{ borderColor: COR }} />}
               {ouro && (<>
                 <Crown className="pointer-events-none absolute -top-[23px] left-1/2 h-[26px] w-[22px] -translate-x-1/2" fill="#ffd24a" strokeWidth={1.75} style={{ color: '#a75d09', filter: 'drop-shadow(0 1px 2px rgba(90,45,0,.5)) drop-shadow(0 0 5px rgba(250,204,21,.55))' }} />
                 <span className="pointer-events-none absolute inset-[4px] rounded-full" style={{ background: 'radial-gradient(circle at 50% 34%, #fff2b0 0%, #ffd93b 44%, #f2b800 100%)', boxShadow: 'inset 0 -3px 6px rgba(170,105,10,.5), inset 0 2px 3px rgba(255,255,255,.7)' }} />
                 <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-full"><span className="absolute inset-0" style={{ background: 'linear-gradient(122deg, transparent 30%, rgba(255,255,255,.7) 44%, rgba(255,255,255,.2) 55%, transparent 67%)' }} /></span>
               </>)}
-              <span className="relative" style={ouro ? { color: '#c2680a' } : undefined}>{concluido ? <Check className="h-7 w-7" strokeWidth={ouro ? 3.25 : 2.5} /> : atual ? <Star className="h-7 w-7" /> : <Play className="h-6 w-6" />}</span>
+              <span className="relative" style={ouro ? { color: '#c2680a' } : undefined}><SimboloNo config={simbolos[noEstado(concluido, atual)]} escala={1} cor={ouro ? '#c2680a' : coresNo(noEstado(concluido, atual), simbolos[noEstado(concluido, atual)]).simbolo} strokeWidth={concluido && ouro ? 3.25 : 2.5} /></span>
             </button>
             {/* Rótulo com fundo próprio p/ não se misturar ao pontilhado que passa atrás. */}
             <div className="relative z-[1] mt-1.5 inline-block max-w-full rounded-lg border bg-background/85 px-2 py-0.5 shadow-sm backdrop-blur-sm">
@@ -270,7 +283,7 @@ function TrilhaCaminho({ t, gamAtivo }: { t: Trilha; gamAtivo: boolean }) {
   )
 }
 
-export function TrilhaSimulados({ trilhas, gamAtivo, estilo = 'cards', visiveis = 3 }: { trilhas: Trilha[]; gamAtivo: boolean; estilo?: 'cards' | 'caminho'; visiveis?: number }) {
+export function TrilhaSimulados({ trilhas, gamAtivo, estilo = 'cards', visiveis = 3, simbolos = DEFAULT_TRILHA_SIMBOLOS }: { trilhas: Trilha[]; gamAtivo: boolean; estilo?: 'cards' | 'caminho'; visiveis?: number; simbolos?: TrilhaSimbolos }) {
   const caminho = estilo === 'caminho'
   const [ativa, setAtiva] = useState(trilhas[0]?.id)
   const t = trilhas.find((x) => x.id === ativa) ?? trilhas[0]
@@ -346,7 +359,7 @@ export function TrilhaSimulados({ trilhas, gamAtivo, estilo = 'cards', visiveis 
             </div>
           )}
           {caminho ? (
-            <TrilhaCaminho t={t} gamAtivo={gamAtivo} />
+            <TrilhaCaminho t={t} gamAtivo={gamAtivo} simbolos={simbolos} />
           ) : (<>
           {t.nodes.map((n, i) => {
             const concluido = n.estado === 'concluido'
@@ -359,14 +372,14 @@ export function TrilhaSimulados({ trilhas, gamAtivo, estilo = 'cards', visiveis 
                     style={{ width: 52, height: 52, ...(ouro ? { background: 'radial-gradient(circle at 50% 36%, #ffe680 0%, #ffcf33 46%, #f0b000 78%, #d99200 100%)', borderColor: '#c07f08', color: '#c2680a', boxShadow: '0 0 11px 2px rgba(250,204,21,.5), 0 5px 14px -5px rgba(217,119,6,.55)' }
                       : concluido ? { background: '#10b981', borderColor: '#059669', color: '#fff' }
                       : atual ? { background: `color-mix(in oklab, ${COR} 16%, var(--card))`, borderColor: COR, color: COR }
-                      : { background: 'var(--card)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }) }}>
+                      : { background: 'var(--card)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }), ...corFundoOverride(simbolos[noEstado(concluido, atual)], ouro) }}>
                     {atual && <span className="pointer-events-none absolute inset-[-5px] rounded-full border-2 opacity-60 motion-safe:animate-ping" style={{ borderColor: COR }} />}
                     {ouro && (<>
                       <Crown className="pointer-events-none absolute -top-[19px] left-1/2 h-[22px] w-[19px] -translate-x-1/2" fill="#ffd24a" strokeWidth={1.75} style={{ color: '#a75d09', filter: 'drop-shadow(0 1px 2px rgba(90,45,0,.5)) drop-shadow(0 0 4px rgba(250,204,21,.55))' }} />
                       <span className="pointer-events-none absolute inset-[3px] rounded-full" style={{ background: 'radial-gradient(circle at 50% 34%, #fff2b0 0%, #ffd93b 44%, #f2b800 100%)', boxShadow: 'inset 0 -2px 5px rgba(170,105,10,.5), inset 0 2px 3px rgba(255,255,255,.7)' }} />
                       <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-full"><span className="absolute inset-0" style={{ background: 'linear-gradient(122deg, transparent 30%, rgba(255,255,255,.7) 44%, rgba(255,255,255,.2) 55%, transparent 67%)' }} /></span>
                     </>)}
-                    <span className="relative" style={ouro ? { color: '#c2680a' } : undefined}>{concluido ? <Check className="h-6 w-6" strokeWidth={ouro ? 3 : 2.5} /> : atual ? <Star className="h-6 w-6" /> : <Play className="h-5 w-5" />}</span>
+                    <span className="relative" style={ouro ? { color: '#c2680a' } : undefined}><SimboloNo config={simbolos[noEstado(concluido, atual)]} escala={0.85} cor={ouro ? '#c2680a' : coresNo(noEstado(concluido, atual), simbolos[noEstado(concluido, atual)]).simbolo} strokeWidth={concluido && ouro ? 3 : 2.5} /></span>
                   </span>
                   {i < t.nodes.length - 1 && <span className="my-1 flex-1" style={{ width: 6, minHeight: 24, backgroundImage: `radial-gradient(circle, ${concluido ? '#10b981' : 'var(--border)'} 40%, transparent 44%)`, backgroundSize: '6px 12px', backgroundRepeat: 'repeat-y' }} />}
                 </div>
@@ -398,7 +411,7 @@ export function TrilhaSimulados({ trilhas, gamAtivo, estilo = 'cards', visiveis 
 const GAP_HDR = 58   // altura reservada p/ a divisória (nome do grupo)
 const GAP_GRUPO = 44 // respiro extra entre grupos (o pontilhado continua nele)
 
-export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = false, semDivisoria = false }: { trilhas: Trilha[]; gamAtivo: boolean; reto?: boolean; semFundo?: boolean; semDivisoria?: boolean }) {
+export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = false, semDivisoria = false, simbolos = DEFAULT_TRILHA_SIMBOLOS }: { trilhas: Trilha[]; gamAtivo: boolean; reto?: boolean; semFundo?: boolean; semDivisoria?: boolean; simbolos?: TrilhaSimbolos }) {
   const flat = trilhas.flatMap((t) => t.nodes)
   const atualId = flat.find((n) => n.estado === 'atual')?.id ?? flat[0]?.id ?? null
   const [aberto, setAberto] = useState<string | null>(atualId)
@@ -560,7 +573,7 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
               style={{ width: R * 2, height: R * 2, ...(ouro ? { background: 'radial-gradient(circle at 50% 36%, #ffe680 0%, #ffcf33 46%, #f0b000 78%, #d99200 100%)', borderColor: '#c07f08', color: '#c2680a', boxShadow: '0 0 13px 2px rgba(250,204,21,.5), 0 0 28px 6px rgba(250,204,21,.22), 0 6px 16px -5px rgba(217,119,6,.55)' }
                 : concluido ? { background: '#10b981', borderColor: '#059669', color: '#fff' }
                 : atual ? { background: `color-mix(in oklab, ${COR} 16%, var(--card))`, borderColor: COR, color: COR }
-                : { background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }) }}>
+                : { background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }), ...corFundoOverride(simbolos[noEstado(concluido, atual)], ouro) }}>
               {atual && <span className="pointer-events-none absolute inset-[-5px] rounded-full border-2 opacity-60 motion-safe:animate-ping" style={{ borderColor: COR }} />}
               {ouro && (<>
                 {/* Coroa (só 100%) — flutua acima da moeda, dourada com contorno âmbar e leve glow */}
@@ -570,7 +583,7 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
                 {/* Faixa de brilho diagonal (verniz), recortada no círculo */}
                 <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-full"><span className="absolute inset-0" style={{ background: 'linear-gradient(122deg, transparent 30%, rgba(255,255,255,.7) 44%, rgba(255,255,255,.2) 55%, transparent 67%)' }} /></span>
               </>)}
-              <span className="relative" style={ouro ? { color: '#c2680a' } : undefined}>{concluido ? <Check className="h-7 w-7" strokeWidth={ouro ? 3.25 : 2.5} /> : atual ? <Star className="h-7 w-7" /> : <Play className="h-6 w-6" />}</span>
+              <span className="relative" style={ouro ? { color: '#c2680a' } : undefined}><SimboloNo config={simbolos[noEstado(concluido, atual)]} escala={1} cor={ouro ? '#c2680a' : coresNo(noEstado(concluido, atual), simbolos[noEstado(concluido, atual)]).simbolo} strokeWidth={concluido && ouro ? 3.25 : 2.5} /></span>
             </button>
             {/* Rótulo cresce lateralmente (largura por conteúdo, teto 260px); título no máx. 2 linhas. */}
             <div className="relative z-[1] mt-1.5 inline-block max-w-full rounded-lg border bg-background/85 px-2 py-0.5 shadow-sm backdrop-blur-sm">
@@ -653,5 +666,20 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
         </div>
       )}
     </div>
+  )
+}
+
+/**
+ * Entrada única das trilhas do sistema: escolhe o LAYOUT pelo formato configurado no console/aparência.
+ * serpentina/reta/mapa_semanas → TrilhaGigante (props); lista → TrilhaLista (tabela compacta).
+ */
+export function TrilhaSistema({ trilhas, gamAtivo, simbolos = DEFAULT_TRILHA_SIMBOLOS, formato = 'serpentina', semFundo = false, semDivisoria = false }: {
+  trilhas: Trilha[]; gamAtivo: boolean; simbolos?: TrilhaSimbolos; formato?: TrilhaFormato; semFundo?: boolean; semDivisoria?: boolean
+}) {
+  if (formato === 'lista') return <TrilhaLista trilhas={trilhas} gamAtivo={gamAtivo} simbolos={simbolos} />
+  if (formato === 'mapa_semanas') return <TrilhaMapaSemanas trilhas={trilhas} simbolos={simbolos} />
+  return (
+    <TrilhaGigante trilhas={trilhas} gamAtivo={gamAtivo} reto={formato === 'reta'} semFundo={semFundo}
+      semDivisoria={semDivisoria} simbolos={simbolos} />
   )
 }

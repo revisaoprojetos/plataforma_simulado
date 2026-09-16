@@ -7,6 +7,8 @@ import { LeituraModulos } from '@/components/aluno/leitura-modulos'
 import { LeituraModuloView } from '@/components/aluno/leitura-modulo-view'
 import { getCurrentTenant } from '@/lib/tenant'
 import { resolverCardView } from '@/lib/card-view'
+import { resolverTrilhaSimbolos } from '@/lib/gamificacao/trilha-simbolos'
+import { resolverTrilhaFormato } from '@/lib/gamificacao/trilha-formato'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,7 +23,8 @@ export default async function LeituraAlunoPage({ searchParams }: { searchParams:
     const mod = await carregarModuloCompleto(sessao.estudanteId, sessao.tenantId, modulo)
     if (mod.trilha) {
       // O cabeçalho (título/voltar/subtítulo) agora vive DENTRO do banner colapsável.
-      return <LeituraModuloView modulo={modulo} trilha={mod.trilha} desempenho={mod.desempenho} pendentes={mod.pendentes} aulasPendentes={mod.aulasPendentes} />
+      const temaMod = (await getCurrentTenant())?.tema
+      return <LeituraModuloView modulo={modulo} trilha={mod.trilha} desempenho={mod.desempenho} pendentes={mod.pendentes} aulasPendentes={mod.aulasPendentes} formato={resolverTrilhaFormato(temaMod)} simbolos={resolverTrilhaSimbolos(temaMod)} />
     }
     // módulo inexistente/sem acesso → cai na lista
   }

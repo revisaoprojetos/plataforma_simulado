@@ -7,18 +7,22 @@ import { Route, BarChart3, Check, Lock, AlertTriangle, ArrowRight, Search, Loade
 import { cn } from '@/lib/utils'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ModuloBanner } from '@/components/admin/modulo-banner'
-import { TrilhaGigante, type Trilha } from '@/components/aluno/trilha-simulados'
+import { TrilhaSistema, type Trilha } from '@/components/aluno/trilha-simulados'
+import { DEFAULT_TRILHA_SIMBOLOS, type TrilhaSimbolos } from '@/lib/gamificacao/trilha-simbolos'
+import { DEFAULT_TRILHA_FORMATO, type TrilhaFormato } from '@/lib/gamificacao/trilha-formato'
 import type { AulaDesempenho } from '@/lib/leitura/trilha'
 import { buscarNaTrilha, type ResultadoBuscaTrilha } from '@/app/aluno/(portal)/leitura/busca-actions'
 
 /** Visão de um módulo do LegProc Digital: banner colapsável (igual ao admin) com tabs Trilha | Desempenho
  * e busca, + aviso de questões pendentes. */
-export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulasPendentes }: {
+export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulasPendentes, formato = DEFAULT_TRILHA_FORMATO, simbolos = DEFAULT_TRILHA_SIMBOLOS }: {
   modulo: string
   trilha: Trilha
   desempenho: AulaDesempenho[]
   pendentes: number
   aulasPendentes: number
+  formato?: TrilhaFormato
+  simbolos?: TrilhaSimbolos
 }) {
   // 1ª aula com questões pendentes (leitura feita) → alvo do CTA do aviso.
   const alvoPend = desempenho.find((a) => a.leituraConcluida && a.questoesPendentes > 0)
@@ -119,7 +123,7 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
       {/* pt-0 + overflow-visible: a trilha encosta no banner e os pontos do topo passam POR TRÁS do banner
           (emergem dele) sem corte. overflow-x-auto cortaria o topo do 1º ponto (overflow-y vira auto). */}
       <TabsContent value="trilha" className="pt-0">
-        <div className="overflow-visible pb-10"><TrilhaGigante trilhas={[trilha]} gamAtivo={false} reto semFundo semDivisoria /></div>
+        <div className="overflow-visible pb-10"><TrilhaSistema trilhas={[trilha]} gamAtivo={false} formato={formato} simbolos={simbolos} semFundo semDivisoria /></div>
       </TabsContent>
       <TabsContent value="desempenho" className="pt-4">
         <DesempenhoModulo desempenho={desempenho} />

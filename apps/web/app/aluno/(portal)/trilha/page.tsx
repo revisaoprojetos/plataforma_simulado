@@ -1,14 +1,20 @@
 import { redirect } from 'next/navigation'
 import { Route } from 'lucide-react'
 import { carregarTrilhasAluno } from '@/lib/aluno/trilhas'
-import { TrilhaGigante } from '@/components/aluno/trilha-simulados'
+import { TrilhaSistema } from '@/components/aluno/trilha-simulados'
 import { GamificacaoRail } from '@/components/aluno/gamificacao-rail'
 import { MascoteTour } from '@/components/mascote/mascote-tour'
+import { getCurrentTenant } from '@/lib/tenant'
+import { resolverTrilhaSimbolos } from '@/lib/gamificacao/trilha-simbolos'
+import { resolverTrilhaFormato } from '@/lib/gamificacao/trilha-formato'
 
 export default async function TrilhaAlunoPage() {
   const { trilhas, gamAtivo, gam } = await carregarTrilhasAluno()
   // Trilha é recurso de gamificação — some por completo quando a gamificação está desativada.
   if (!gamAtivo) redirect('/aluno')
+  const tema = (await getCurrentTenant())?.tema
+  const simbolosTrilha = resolverTrilhaSimbolos(tema)
+  const formatoTrilha = resolverTrilhaFormato(tema)
   const totalSims = trilhas.reduce((a, t) => a + t.total, 0)
   const totalDone = trilhas.reduce((a, t) => a + t.done, 0)
 
@@ -32,7 +38,7 @@ export default async function TrilhaAlunoPage() {
         <div data-tour="trilha-pagina" className="min-w-0">
           {trilhas.length > 0 ? (
             <div className="overflow-x-auto pb-10">
-              <TrilhaGigante trilhas={trilhas} gamAtivo={gamAtivo} />
+              <TrilhaSistema trilhas={trilhas} gamAtivo={gamAtivo} simbolos={simbolosTrilha} formato={formatoTrilha} />
             </div>
           ) : (
             <div className="rounded-2xl border bg-muted/30 p-10 text-center text-sm text-muted-foreground">

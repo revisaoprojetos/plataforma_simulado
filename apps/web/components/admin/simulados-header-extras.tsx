@@ -2,18 +2,21 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { ChevronLeft, FolderPlus } from 'lucide-react'
 import { EditarPastaDialog } from '@/components/admin/editar-pasta-dialog'
 
-/** Seta de voltar ao lado do título (só dentro de uma pasta). Volta um nível (histórico). */
-export function VoltarSimulados({ pastaId }: { pastaId?: string | null }) {
-  const router = useRouter()
+/**
+ * Seta de voltar ao lado do título (só dentro de uma pasta). SOBE um nível de verdade (link p/ a pasta
+ * pai ou raiz) — NÃO usa histórico (router.back), que voltaria pro simulado de onde o admin veio.
+ */
+export function VoltarSimulados({ pastaId, voltarHref = '/admin/simulados' }: { pastaId?: string | null; voltarHref?: string }) {
   if (!pastaId) return null
   return (
-    <button type="button" onClick={() => router.back()} title="Voltar" aria-label="Voltar"
+    <Link href={voltarHref} title="Voltar" aria-label="Voltar"
       className="-ml-1 mt-0.5 inline-flex shrink-0 items-center justify-center rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground">
       <ChevronLeft className="h-7 w-7" />
-    </button>
+    </Link>
   )
 }
 

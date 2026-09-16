@@ -23,7 +23,9 @@ import { SimuladoLiberacoes } from '@/components/admin/simulado-liberacoes'
 import { CopyLink } from '@/components/admin/copy-link'
 import { updateSimuladoAction } from '../actions'
 import Link from 'next/link'
-import { ChevronLeft, Code, Layers, CalendarClock, Clock, KeyRound, Link2, AlertTriangle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Home, Code, Layers, CalendarClock, Clock, KeyRound, Link2, AlertTriangle } from 'lucide-react'
+import { ModuloBanner } from '@/components/admin/modulo-banner'
+import { cn } from '@/lib/utils'
 import { buttonVariants } from '@/components/ui/button'
 import { TipoSimuladoBadge } from '@/components/admin/tipo-simulado-badge'
 import { tipoDoSimulado } from '@/lib/simulado/tipo'
@@ -31,7 +33,7 @@ import { isoParaBrtLocal } from '@/lib/brt'
 
 interface PageProps {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ tab?: string }>
+  searchParams: Promise<{ tab?: string; voltar?: string }>
 }
 
 const statusConfig: Record<string, { label: string; class: string }> = {
@@ -44,7 +46,9 @@ const ABAS = ['visao-geral', 'questoes', 'estudantes', 'caderno', 'hud', 'relato
 
 export default async function SimuladoDetailPage({ params, searchParams }: PageProps) {
   const { id } = await params
-  const tabParam = (await searchParams).tab
+  const sp = await searchParams
+  const tabParam = sp.tab
+  const voltarParam = sp.voltar
   const aba = (ABAS as readonly string[]).includes(tabParam ?? '') ? (tabParam as string) : 'visao-geral'
   const supabase = await createClient()
   const tenantId = await getCurrentTenantId()
@@ -132,18 +136,26 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
   // (Questões/Caderno/HUD/Configurações — a personalização vive em Configurações).
   const abasConteudo = ['questoes', 'caderno', 'hud', 'configuracoes']
   let bancoVisual: { id: string; cor: string | null; icone: string | null; capa_url: string | null; capa_card_url: string | null } | null = null
+  // Banner do topo (capa larga + cor do banco) — resolvido SEMPRE (query única barata) p/ o banner
+  // aparecer em todas as abas, não só nas de conteúdo.
+  let bannerCapa: string | null = null
+  let bannerCor: string | null = null
   // Salvaguarda D1: normalmente o banco é 1:1 com o simulado. Se ele alimentar >1 simulado, editar o
   // CONTEÚDO aqui (questões/caderno/HUD/capa) afeta todos → avisa nas abas de conteúdo.
   let bancoCompartilhadoN = 1
-  if (bancoBaseId && abasConteudo.includes(aba)) {
+  if (bancoBaseId) {
     const svcAdmin = createAdminClient()
     const r = await svcAdmin.from('simulado_pastas').select('id, cor, icone, capa_url, capa_card_url, is_folder, deletado').eq('id', bancoBaseId).eq('tenant_id', tid).maybeSingle()
     let row: Record<string, any> | null = r.data as any
     if (r.error && /cor|icone|capa_url|capa_card_url|is_folder|deletado|column/i.test(r.error.message)) {
       row = (await svcAdmin.from('simulado_pastas').select('id').eq('id', bancoBaseId).eq('tenant_id', tid).maybeSingle()).data as any
     }
-    if (row && !row.deletado && row.is_folder !== true) bancoVisual = { id: row.id, cor: row.cor ?? null, icone: row.icone ?? null, capa_url: row.capa_url ?? null, capa_card_url: row.capa_card_url ?? null }
-    if (tenantId) bancoCompartilhadoN = (await simuladosDoBanco(svcAdmin, tenantId, bancoBaseId)).length || 1
+    if (row && !row.deletado && row.is_folder !== true) {
+      bannerCapa = row.capa_url ?? null
+      bannerCor = row.cor ?? null
+      if (abasConteudo.includes(aba)) bancoVisual = { id: row.id, cor: row.cor ?? null, icone: row.icone ?? null, capa_url: row.capa_url ?? null, capa_card_url: row.capa_card_url ?? null }
+    }
+    if (abasConteudo.includes(aba) && tenantId) bancoCompartilhadoN = (await simuladosDoBanco(svcAdmin, tenantId, bancoBaseId)).length || 1
   }
 
   // ── cardView (espelha o console) — a personalização (capa/card) vive em Configurações.
@@ -183,50 +195,94 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
     <PrepararConteudoSimulado simuladoId={id} descricao={o} />
   )
 
+  // Abas reutilizadas nos dois cabeçalhos (com/sem banner). `claro` = tema claro sobre o banner escuro.
+  // Sempre sem barra de rolagem visível (só o scroll horizontal em telas estreitas).
+  const listaTabs = (claro: boolean) => (
+    <TabsList className={cn(
+      'max-w-full flex-nowrap overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
+      claro && 'border-white/20 [&_[data-slot=tabs-trigger]]:text-white/70 [&_[data-slot=tabs-trigger]:hover]:text-white [&_[data-slot=tabs-trigger][data-active]]:text-white',
+    )}>
+      <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
+      <TabsTrigger value="questoes">Questões ({totalQuestoes ?? 0})</TabsTrigger>
+      <TabsTrigger value="estudantes">Estudantes</TabsTrigger>
+      <TabsTrigger value="caderno">Caderno</TabsTrigger>
+      <TabsTrigger value="hud">HUD</TabsTrigger>
+      <TabsTrigger value="relatorio">Relatório</TabsTrigger>
+      <TabsTrigger value="manutencao">Manutenção</TabsTrigger>
+      <TabsTrigger value="configuracoes">Configurações</TabsTrigger>
+    </TabsList>
+  )
+
+  // Volta: prioriza a ORIGEM da navegação (?voltar=, setado pelo card conforme onde o admin estava),
+  // caindo na pasta do simulado só como fallback. Validado (deve apontar p/ /admin/simulados) contra open-redirect.
+  const voltarSeguro = voltarParam && voltarParam.startsWith('/admin/simulados') ? voltarParam : null
+  const voltarHref = voltarSeguro ?? ((simulado as any).pasta_id ? `/admin/simulados?pasta=${(simulado as any).pasta_id}` : '/admin/simulados')
+  const voltarLabel = (voltarSeguro ? voltarSeguro.includes('pasta=') : !!(simulado as any).pasta_id) ? 'Voltar para a pasta' : 'Voltar para Simulados'
+
   return (
     // Pré-carrega as abas no acesso p/ troca instantânea — EXCETO 'relatorio' (pesado: varreria as
     // respostas em todo acesso, aumentando egress). O Relatório carrega sob demanda (com Suspense).
-    <BancoTabsShell value={aba} prefetch={ABAS.filter((t) => t !== 'relatorio')}>
-      {/* Cabeçalho + abas — fixos no topo ao rolar o conteúdo. A linha do TabsList é a própria
-          divisória (largura cheia); as abas ficam "no corte", como na área de questões. */}
-      <div className="sticky -top-6 z-40 -mx-6 -mt-6 space-y-3 bg-background px-6 pt-6 shadow-sm">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0">
-            <Link
-              href={(simulado as any).pasta_id ? `/admin/simulados?pasta=${(simulado as any).pasta_id}` : '/admin/simulados'}
-              className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-            >
-              <ChevronLeft className="h-4 w-4" />
-              {(simulado as any).pasta_id ? 'Voltar para a pasta' : 'Voltar para Simulados'}
-            </Link>
-            <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-2xl font-bold tracking-tight">{simulado.titulo}</h1>
-              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusCfg.class}`}>
-                {statusCfg.label}
-              </span>
+    <BancoTabsShell value={aba} prefetch={ABAS.filter((t) => t !== 'relatorio')} className={bannerCapa ? '[overflow-anchor:none]' : undefined}>
+      {bannerCapa ? (
+        // COM imagem alocada: banner no topo recolhendo/expandindo no scroll (abas claras na base).
+        <ModuloBanner
+          banner={bannerCapa}
+          cor={bannerCor}
+          icone={null}
+          titulo={simulado.titulo}
+          subtitulo={simulado.descricao || 'Gerencie questões, caderno, estudantes e configurações deste simulado.'}
+          voltarHref={voltarHref}
+          voltarLabel={voltarLabel}
+          tituloBadges={
+            <>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusCfg.class}`}>{statusCfg.label}</span>
               <TipoSimuladoBadge tipo={tipoSim} />
+            </>
+          }
+          topoDireita={
+            <>
+              <Link href={`/admin/simulados/${id}/embed`} className={buttonVariants({ variant: 'outline', size: 'sm', className: 'text-foreground' })}>
+                <Code className="mr-2 h-3.5 w-3.5" /> Embed
+              </Link>
+              <SimuladoActions simuladoId={id} status={simulado.status} />
+            </>
+          }
+          breadcrumb={
+            <>
+              <Link href="/admin/simulados" className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 transition-colors hover:bg-white/15 hover:text-white"><Home className="h-3.5 w-3.5" /> Simulados</Link>
+              <span className="inline-flex items-center gap-1"><ChevronRight className="h-3.5 w-3.5" /><span className="rounded-md px-1.5 py-0.5 font-medium text-white">{simulado.titulo}</span></span>
+            </>
+          }
+          tabs={listaTabs(true)}
+        />
+      ) : (
+        // SEM imagem: cabeçalho claro seguindo o tema do sistema (bg-background), sticky no topo.
+        <div className="sticky -top-6 z-40 -mx-6 -mt-6 space-y-3 bg-background px-6 pt-6 shadow-sm">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <Link
+                href={voltarHref}
+                className="mb-2 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+              >
+                <ChevronLeft className="h-4 w-4" />
+                {voltarLabel}
+              </Link>
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-2xl font-bold tracking-tight">{simulado.titulo}</h1>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${statusCfg.class}`}>{statusCfg.label}</span>
+                <TipoSimuladoBadge tipo={tipoSim} />
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center gap-2">
+              <Link href={`/admin/simulados/${id}/embed`} className={buttonVariants({ variant: 'outline', size: 'sm', className: 'text-foreground' })}>
+                <Code className="mr-2 h-3.5 w-3.5" /> Embed
+              </Link>
+              <SimuladoActions simuladoId={id} status={simulado.status} />
             </div>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <Link href={`/admin/simulados/${id}/embed`} className={buttonVariants({ variant: 'outline', size: 'sm' })}>
-              <Code className="mr-2 h-3.5 w-3.5" />
-              Embed
-            </Link>
-            <SimuladoActions simuladoId={id} status={simulado.status} />
-          </div>
+          {listaTabs(false)}
         </div>
-
-        <TabsList className="max-w-full flex-nowrap overflow-x-auto">
-          <TabsTrigger value="visao-geral">Visão Geral</TabsTrigger>
-          <TabsTrigger value="questoes">Questões ({totalQuestoes ?? 0})</TabsTrigger>
-          <TabsTrigger value="estudantes">Estudantes</TabsTrigger>
-          <TabsTrigger value="caderno">Caderno</TabsTrigger>
-          <TabsTrigger value="hud">HUD</TabsTrigger>
-          <TabsTrigger value="relatorio">Relatório</TabsTrigger>
-          <TabsTrigger value="manutencao">Manutenção</TabsTrigger>
-          <TabsTrigger value="configuracoes">Configurações</TabsTrigger>
-        </TabsList>
-      </div>
+      )}
 
       <div className="pt-6">
         {/* Salvaguarda D1: banco compartilhado por >1 simulado → editar conteúdo afeta todos. */}

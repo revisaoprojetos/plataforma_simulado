@@ -5,7 +5,7 @@ import { useState, useTransition, useMemo, useEffect } from 'react'
 import type React from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { EditarPastaDialog } from '@/components/admin/editar-pasta-dialog'
 import { FileiraHorizontal } from '@/components/fileira-horizontal'
@@ -187,6 +187,7 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
   onMover?: () => void; selecionado: boolean; onSelecionar: (v: boolean) => void; variant?: CardView
 }) {
   const router = useRouter()
+  const sp = useSearchParams()
   const [pending, startTransition] = useTransition()
   const [detalhes, setDetalhes] = useState(false)
   // Estado efetivo (modo configurado + override manual do admin).
@@ -246,7 +247,11 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
   const BancoIcon = iconeBanco(s.vis?.icone)
   // Card pôster (4:5) → prefere o recorte pôster (capa_card_url) e cai no banner.
   const capa = s.vis?.capa ?? s.vis?.capaBanner
-  const detalhe = `/admin/simulados/${s.id}`
+  // Volta = ONDE o admin está agora (raiz ou dentro de ?pasta=X), não a pasta do simulado. Assim, clicar
+  // um simulado na raiz volta pra raiz; dentro de uma pasta/subpasta, volta pra aquele caminho.
+  const pastaAtual = sp?.get('pasta') ?? null
+  const voltar = pastaAtual ? `/admin/simulados?pasta=${pastaAtual}` : '/admin/simulados'
+  const detalhe = `/admin/simulados/${s.id}?voltar=${encodeURIComponent(voltar)}`
 
   // Itens do menu de 3 pontos — compartilhados entre pôster e ticket.
   const menuItens = (
