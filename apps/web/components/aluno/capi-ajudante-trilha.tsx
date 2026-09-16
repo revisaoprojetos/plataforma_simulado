@@ -115,17 +115,17 @@ export function CapiAjudanteTrilha({ pontos = [], ladoCard = null }: { pontos?: 
 
   if (!montado || !ligado || !passo) return <BotaoAjudante ligado={ligado} onToggle={toggle} />
 
-  // Com um card de dia ABERTO, vai pro lado OPOSTO (o card tem z maior e cobriria a Capi).
-  const naDireita = ladoCard ? ladoCard === 'left' : passo.naDireita
+  const naDireita = passo.naDireita
   const mascote = <Mascote reacao={passo.pose} tamanho={74} mensagem={passo.msg} flutua={!reduzir.current} entra={false} espelhar={naDireita} className="[&_img]:mt-3" />
 
   return (
     <>
       {temGeo && passo.x != null && passo.y != null ? (
         // UM só elemento persistente: desliza suave por left/top (sem remontar → sem teleporte). O lado
-        // (esquerda/direita) já entra no `left`, então nunca fica "em cima" da trilha.
-        <div className="pointer-events-none absolute z-[3] transition-[left,top] duration-[1100ms] ease-in-out"
-          style={{ left: passo.x + (naDireita ? 215 : -215), top: passo.y + passo.dy, transform: 'translate(-50%, -60%)' }} aria-hidden>
+        // já entra no `left` (nunca fica "em cima" da trilha). Com um card de dia ABERTO, ela dá um FADE
+        // (sai de cena discretamente, sem ficar atrás do card) e reaparece ao fechar.
+        <div className="pointer-events-none absolute z-[3]" aria-hidden
+          style={{ left: passo.x + (naDireita ? 215 : -215), top: passo.y + passo.dy, transform: 'translate(-50%, -60%)', opacity: ladoCard ? 0 : 1, transition: 'left 1.1s ease-in-out, top 1.1s ease-in-out, opacity .3s ease' }}>
           {mascote}
         </div>
       ) : (
