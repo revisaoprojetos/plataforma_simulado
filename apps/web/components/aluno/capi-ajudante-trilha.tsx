@@ -5,16 +5,45 @@ import { Mascote, type ReacaoMascote } from '@/components/mascote/mascote'
 
 export type PontoTrilha = { x: number; y: number; estado: 'concluido' | 'atual' | 'disponivel'; intro?: boolean }
 
-const FALAS: { pose: ReacaoMascote; msg: string }[] = [
+type Fala = { pose: ReacaoMascote; msg: string }
+// Incentivo geral.
+const INCENTIVOS: Fala[] = [
   { pose: 'ideia', msg: 'Bora pra próxima aula?' },
   { pose: 'estudante', msg: 'Tô de olho no seu progresso!' },
-  { pose: 'pensando', msg: 'Foca no que falta — você consegue.' },
   { pose: 'satisfeita', msg: 'Cada aula te deixa mais afiado.' },
   { pose: 'joinha', msg: 'Mandou bem até aqui!' },
+  { pose: 'feliz', msg: 'Constância vence — segue firme!' },
+  { pose: 'estudante', msg: 'Passo a passo você chega lá.' },
 ]
-const CELEBRA = ['Aula concluída! 🎉', 'Boa, essa você fechou!', 'Mais uma na conta! 👏', 'Tá voando! ✨']
+// Dicas de estudo / no que focar.
+const DICAS: Fala[] = [
+  { pose: 'ideia', msg: 'Grifa o que for mais cobrado enquanto lê.' },
+  { pose: 'pensando', msg: 'Foca nos artigos que mais caem em prova.' },
+  { pose: 'balanca', msg: 'Atenção às exceções — elas caem muito.' },
+  { pose: 'ideia', msg: 'Prazos e competências: decora esses!' },
+  { pose: 'estudante', msg: 'Errou no quiz? Volta no artigo e revisa.' },
+  { pose: 'meditando', msg: 'Uma aula por dia já te leva longe.' },
+  { pose: 'escrevendo', msg: 'Anota as dúvidas pra revisar depois.' },
+  { pose: 'pensando', msg: 'Leu? Testa no quiz pra fixar de vez.' },
+  { pose: 'ideia', msg: 'Revisa os grifos antes de responder.' },
+  { pose: 'estudante', msg: 'Reler em voz alta ajuda a memorizar.' },
+]
+// Comemorações (nó concluído).
+const CELEBRA: Fala[] = [
+  { pose: 'joinha', msg: 'Aula concluída! 🎉' },
+  { pose: 'satisfeita', msg: 'Boa, essa você fechou!' },
+  { pose: 'joinha', msg: 'Mais uma na conta! 👏' },
+  { pose: 'coracao', msg: 'Tá voando! ✨' },
+  { pose: 'feliz', msg: 'Fechou com chave de ouro!' },
+]
 // Anúncios direcionais (próxima aula abaixo / do outro lado).
-const DIRECIONAIS = ['Próxima aula logo abaixo 👇', 'Tem mais ali embaixo 👇', 'Continua descendo 👇', 'Tô do outro lado agora 👋', 'Bora que a próxima te espera!']
+const DIRECIONAIS: Fala[] = [
+  { pose: 'ideia', msg: 'Próxima aula logo abaixo 👇' },
+  { pose: 'ideia', msg: 'Tem mais ali embaixo 👇' },
+  { pose: 'ideia', msg: 'Continua descendo 👇' },
+  { pose: 'feliz', msg: 'Tô do outro lado agora 👋' },
+  { pose: 'ideia', msg: 'Bora que a próxima te espera!' },
+]
 
 function rnd<T>(a: T[]): T { return a[Math.floor(Math.random() * a.length)] }
 
@@ -43,12 +72,22 @@ export function CapiAjudanteTrilha({ pontos = [] }: { pontos?: PontoTrilha[] }) 
   }, [])
   function toggle() { setLigado((v) => { const n = !v; try { localStorage.setItem('legproc:capi-ajudante', n ? '1' : '0') } catch { /* ignore */ }; return n }) }
 
-  // Escolhe o próximo destino/pose/fala — ALEATÓRIO (só no cliente, após montar).
+  // Inteligência anti-repetição: guarda as últimas falas e evita repetir as recentes.
+  const usadasRef = useRef<string[]>([])
+  const semRepetir = useCallback((pool: Fala[]): Fala => {
+    const recentes = usadasRef.current
+    const livres = pool.filter((p) => !recentes.includes(p.msg))
+    const escolha = rnd(livres.length ? livres : pool)
+    usadasRef.current = [escolha.msg, ...recentes].slice(0, 7)
+    return escolha
+  }, [])
+
+  // Escolhe o próximo destino/pose/fala — ALEATÓRIO (só no cliente, após montar), sem repetir mensagem.
   const proximoPasso = useCallback((): Passo => {
     const naDireita = Math.random() < 0.5
     const dy = Math.round(Math.random() * 56 - 24) // -24..+32 → às vezes acima, às vezes ao lado/abaixo
     const reais = pontosRef.current.filter((p) => !p.intro)
-    if (!reais.length) { const f = rnd(FALAS); return { naDireita, dy, pose: f.pose, msg: f.msg } }
+    if (!reais.length) { const f = semRepetir([...INCENTIVOS, ...DICAS]); return { naDireita, dy, pose: f.pose, msg: f.msg } }
     const iAt = reais.findIndex((p) => p.estado === 'atual')
     const atual = reais[iAt] ?? reais[0]
     const concl = [...reais].reverse().find((p) => p.estado === 'concluido')
@@ -59,12 +98,12 @@ export function CapiAjudanteTrilha({ pontos = [] }: { pontos?: PontoTrilha[] }) 
     if (concl && r < 0.28) ponto = concl
     else if (prox && r < 0.5) ponto = prox
     else if (r < 0.62) ponto = rnd(reais)
-    let pose: ReacaoMascote, msg: string
-    if (ponto.estado === 'concluido') { pose = 'joinha'; msg = rnd(CELEBRA) }
-    else if (Math.random() < 0.45) { pose = 'ideia'; msg = rnd(DIRECIONAIS) }
-    else { const f = rnd(FALAS); pose = f.pose; msg = f.msg }
-    return { x: ponto.x, y: ponto.y, naDireita, dy, pose, msg }
-  }, [])
+    // Fala: comemora se concluído; senão sorteia entre DICAS (foco) / INCENTIVOS / DIRECIONAIS.
+    let fala: Fala
+    if (ponto.estado === 'concluido') fala = semRepetir(CELEBRA)
+    else { const cat = Math.random(); fala = semRepetir(cat < 0.42 ? DICAS : cat < 0.76 ? INCENTIVOS : DIRECIONAIS) }
+    return { x: ponto.x, y: ponto.y, naDireita, dy, pose: fala.pose, msg: fala.msg }
+  }, [semRepetir])
 
   // Troca a cada 8s (mais devagar). Sem reduce-motion → só o 1º passo, sem intervalo.
   useEffect(() => {
