@@ -1,20 +1,17 @@
 'use client'
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Zap, Trophy, Award, Target, SlidersHorizontal, BarChart3, Palette } from 'lucide-react'
+import { Zap, Trophy, Award, Target, SlidersHorizontal, BarChart3 } from 'lucide-react'
 import type { GamConfig } from '@/lib/gamificacao/config'
 import type { MetricasGam } from '@/lib/gamificacao/metricas'
-import type { TrilhaSimbolos } from '@/lib/gamificacao/trilha-simbolos'
-import type { TrilhaFormato } from '@/lib/gamificacao/trilha-formato'
 import { XpNiveisForm } from './forms/xp-niveis-form'
 import { LigasForm } from './forms/ligas-form'
 import { ConquistasForm } from './forms/conquistas-form'
 import { MissoesForm } from './forms/missoes-form'
 import { RegrasGeraisForm } from './forms/regras-gerais-form'
 import { MetricasView } from './forms/metricas-view'
-import { AparenciaForm } from './forms/aparencia-form'
 
-export function GamificacaoTabs({ config, podeGerenciar, metricas, simbolos, formato, trilhaLiberadaAdmin }: { config: GamConfig; podeGerenciar: boolean; metricas: MetricasGam; simbolos: TrilhaSimbolos; formato?: TrilhaFormato; trilhaLiberadaAdmin?: boolean }) {
+export function GamificacaoTabs({ config, podeGerenciar, metricas }: { config: GamConfig; podeGerenciar: boolean; metricas: MetricasGam }) {
   return (
     <Tabs defaultValue="xp">
       <TabsList className="flex-wrap">
@@ -22,7 +19,6 @@ export function GamificacaoTabs({ config, podeGerenciar, metricas, simbolos, for
         <TabsTrigger value="ligas"><Trophy /> Ligas & Divisões</TabsTrigger>
         <TabsTrigger value="conquistas"><Award /> Conquistas</TabsTrigger>
         <TabsTrigger value="missoes"><Target /> Missões</TabsTrigger>
-        {trilhaLiberadaAdmin && <TabsTrigger value="aparencia"><Palette /> Aparência</TabsTrigger>}
         <TabsTrigger value="regras"><SlidersHorizontal /> Regras gerais</TabsTrigger>
         <TabsTrigger value="metricas"><BarChart3 /> Métricas</TabsTrigger>
       </TabsList>
@@ -31,7 +27,6 @@ export function GamificacaoTabs({ config, podeGerenciar, metricas, simbolos, for
       <TabsContent value="ligas" keepMounted className="pt-1 pb-1"><LigasForm config={config} podeGerenciar={podeGerenciar} /></TabsContent>
       <TabsContent value="conquistas" keepMounted className="pt-1 pb-1"><ConquistasForm config={config} podeGerenciar={podeGerenciar} /></TabsContent>
       <TabsContent value="missoes" keepMounted className="pt-1 pb-1"><MissoesForm config={config} podeGerenciar={podeGerenciar} /></TabsContent>
-      {trilhaLiberadaAdmin && <TabsContent value="aparencia" keepMounted className="pt-1 pb-1"><AparenciaForm simbolos={simbolos} formato={formato} podeGerenciar={podeGerenciar} /></TabsContent>}
       <TabsContent value="regras" keepMounted className="pt-1 pb-1"><RegrasGeraisForm config={config} podeGerenciar={podeGerenciar} /></TabsContent>
       <TabsContent value="metricas" keepMounted className="pt-1 pb-1"><MetricasView m={metricas} /></TabsContent>
     </Tabs>

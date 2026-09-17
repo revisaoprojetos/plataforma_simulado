@@ -135,7 +135,7 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: 'LegProc Digital',
+    label: 'Desafio de Lei Seca',
     icon: Library,
     items: [
       { label: 'Biblioteca', href: '/admin/leitura', icon: Library, perm: 'leitura:view', oculto: !LEITURA_ATIVA },

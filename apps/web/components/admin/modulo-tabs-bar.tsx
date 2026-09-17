@@ -2,12 +2,14 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { BookOpenText, Users, Settings2, Trophy } from 'lucide-react'
+import { BookOpenText, Users, Settings2, Trophy, Route, ScrollText } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-export type ModuloTab = 'aulas' | 'acessos' | 'config' | 'ranking'
+export type ModuloTab = 'aulas' | 'acessos' | 'config' | 'ranking' | 'trilha' | 'regulamento'
 export const MODULO_TABS: { id: ModuloTab; label: string; Icon: typeof BookOpenText }[] = [
   { id: 'aulas', label: 'Aulas', Icon: BookOpenText },
+  { id: 'trilha', label: 'Editar trilha', Icon: Route },
+  { id: 'regulamento', label: 'Regulamento', Icon: ScrollText },
   { id: 'acessos', label: 'Acessos', Icon: Users },
   { id: 'ranking', label: 'Ranking', Icon: Trophy },
   { id: 'config', label: 'Configurações', Icon: Settings2 },

@@ -5,6 +5,7 @@ import { documentosDoAluno, type DocumentoAluno } from '@/lib/leitura/acesso'
 import { normalizarIntro, introHref, introExterno, type IntroConfig } from '@/lib/leitura/intro'
 import { normalizarRegulamento, type RegulamentoConfig } from '@/lib/leitura/regulamento'
 import { normalizarPontuacaoLeitura, type PontuacaoLeitura } from '@/lib/leitura/pontuacao'
+import { resolverTrilhaAparencia, DEFAULT_TRILHA_APARENCIA, type TrilhaAparencia } from '@/lib/leitura/trilha-aparencia'
 import type { Trilha, TrilhaNode } from '@/components/aluno/trilha-simulados'
 
 type EstadoAula = 'concluido' | 'atual' | 'bloqueado'
@@ -17,13 +18,14 @@ interface AulaStatus {
   questoesRespondidas: number
   gabaritou: boolean
 }
-interface AulaSeq extends AulaStatus { estado: EstadoAula; moduloId: string }
+interface AulaSeq extends AulaStatus { estado: EstadoAula; moduloId: string; naoLiberada?: boolean }
 
 /** `.order('ordem')` tolerante (coluna pode não existir ainda). */
 async function pastasLeitura(svc: any, tenantId: string): Promise<any[]> {
   const base = (cols: string) => svc.from('simulado_pastas').select(cols).eq('tenant_id', tenantId).eq('is_folder', true).eq('folder_area', 'leitura')
   // 1ª tentativa inclui adesivo_url/intro_config (colunas novas, tolerante — cai nas próximas se ausentes).
-  let r = await base('id, nome, cor, capa_url, capa_card_url, pai_id, ordem, publicacao, adesivo_url, intro_config, pontuacao, regulamento').order('ordem', { ascending: true }).order('nome', { ascending: true })
+  let r = await base('id, nome, cor, capa_url, capa_card_url, pai_id, ordem, publicacao, adesivo_url, intro_config, pontuacao, regulamento, trilha_aparencia').order('ordem', { ascending: true }).order('nome', { ascending: true })
+  if (r.error) r = await base('id, nome, cor, capa_url, capa_card_url, pai_id, ordem, publicacao, adesivo_url, intro_config, pontuacao, regulamento').order('ordem', { ascending: true }).order('nome', { ascending: true })
   if (r.error) r = await base('id, nome, cor, capa_url, capa_card_url, pai_id, ordem, publicacao, adesivo_url, intro_config, pontuacao').order('ordem', { ascending: true }).order('nome', { ascending: true })
   if (r.error) r = await base('id, nome, cor, capa_url, capa_card_url, pai_id, ordem, publicacao, adesivo_url, intro_config').order('ordem', { ascending: true }).order('nome', { ascending: true })
   if (r.error) r = await base('id, nome, cor, capa_url, capa_card_url, pai_id, ordem, publicacao, adesivo_url').order('ordem', { ascending: true }).order('nome', { ascending: true })
@@ -136,11 +138,11 @@ async function sequenciaLeitura(estId: string, tenantId: string) {
   for (const arr of byModulo.values()) arr.sort((a, b) => (a.ordem - b.ordem) || a.titulo.localeCompare(b.titulo))
 
   // Gate de PUBLICAÇÃO do módulo: rascunho / agendado p/ futuro / encerrado não aparecem (dados ficam salvos).
-  const todosModulos = pastas.filter((p) => byModulo.has(p.id) && moduloPublicadoAgora(p.publicacao)).map((p) => ({ id: p.id as string, nome: p.nome as string, cor: (p.cor ?? null) as string | null, capa: (p.capa_url ?? null) as string | null, capaCard: (p.capa_card_url ?? null) as string | null, adesivo: (p.adesivo_url ?? null) as string | null, intro: normalizarIntro(p.intro_config), regulamento: normalizarRegulamento(p.regulamento), pontuacao: normalizarPontuacaoLeitura(p.pontuacao) }))
+  const todosModulos = pastas.filter((p) => byModulo.has(p.id) && moduloPublicadoAgora(p.publicacao)).map((p) => ({ id: p.id as string, nome: p.nome as string, cor: (p.cor ?? null) as string | null, capa: (p.capa_url ?? null) as string | null, capaCard: (p.capa_card_url ?? null) as string | null, adesivo: (p.adesivo_url ?? null) as string | null, intro: normalizarIntro(p.intro_config), regulamento: normalizarRegulamento(p.regulamento), pontuacao: normalizarPontuacaoLeitura(p.pontuacao), trilhaAparencia: resolverTrilhaAparencia(p.trilha_aparencia) }))
   // Gate de acesso do módulo (pula os que o aluno não pode ver).
   const acessiveis = await modulosAcessiveis(svc, tenantId, estId, todosModulos.map((m) => m.id))
   const modulos = todosModulos.filter((m) => acessiveis.has(m.id))
-  if (byModulo.has('__geral__')) modulos.push({ id: '__geral__', nome: 'Geral', cor: null, capa: null, capaCard: null, adesivo: null, intro: normalizarIntro(null), regulamento: normalizarRegulamento(null), pontuacao: normalizarPontuacaoLeitura(null) })
+  if (byModulo.has('__geral__')) modulos.push({ id: '__geral__', nome: 'Geral', cor: null, capa: null, capaCard: null, adesivo: null, intro: normalizarIntro(null), regulamento: normalizarRegulamento(null), pontuacao: normalizarPontuacaoLeitura(null), trilhaAparencia: DEFAULT_TRILHA_APARENCIA })
 
   const seqByModulo = new Map<string, AulaSeq[]>()
   let jaAbriu = false // já achou o "atual"
@@ -148,6 +150,8 @@ async function sequenciaLeitura(estId: string, tenantId: string) {
     const arr: AulaSeq[] = []
     for (const d of byModulo.get(m.id) ?? []) {
       const s = st.get(d.id)!
+      // Aula VISUALIZÁVEL: aparece bloqueada ("ainda não liberada") e NÃO entra na sequência (não vira "atual").
+      if (d.visualizavel) { arr.push({ ...s, estado: 'bloqueado', naoLiberada: true, moduloId: m.id }); continue }
       let estado: EstadoAula
       if (s.aulaConcluida) estado = 'concluido'
       else if (!jaAbriu) { estado = 'atual'; jaAbriu = true }
@@ -166,10 +170,11 @@ function nodeDe(a: AulaSeq): TrilhaNode {
   const hrefLeitura = bloqueado ? null : `/aluno/leitura/${id}`
   const hrefQuestoes = bloqueado ? null : `/aluno/leitura/${id}/questoes`
   const acaoLeitura = a.aulaConcluida || a.leituraConcluida ? 'Reler' : a.doc.pct > 0 ? 'Continuar leitura' : 'Começar leitura'
-  const statusLabel = bloqueado ? 'Bloqueado' : a.aulaConcluida ? 'Concluída' : a.leituraConcluida ? 'Questões liberadas' : a.doc.pct > 0 ? 'Lendo' : 'Leitura'
+  const statusLabel = a.naoLiberada ? 'Ainda não liberada' : bloqueado ? 'Bloqueado' : a.aulaConcluida ? 'Concluída' : a.leituraConcluida ? 'Questões liberadas' : a.doc.pct > 0 ? 'Lendo' : 'Leitura'
   // A TrilhaGigante trata 'disponivel' como BLOQUEADO (círculo apagado).
   const estadoNode: TrilhaNode['estado'] = a.estado === 'bloqueado' ? 'disponivel' : a.estado
-  const quando = bloqueado ? '🔒 Conclua a aula anterior'
+  const quando = a.naoLiberada ? '🔒 Ainda não liberada'
+    : bloqueado ? '🔒 Conclua a aula anterior'
     : a.leituraConcluida ? 'Questões liberadas' : 'Leitura'
   return {
     id, titulo: a.doc.titulo, quando,
@@ -237,13 +242,15 @@ export interface ModuloCompleto {
   /** Regulamento do módulo (aba descritiva) + pontuação (p/ as metas/ganhos exibidas nele). */
   regulamento: RegulamentoConfig
   pontuacao: PontuacaoLeitura
+  /** Aparência da trilha DO MÓDULO (símbolos + formato) — editada na aba "Editar trilha". */
+  trilhaAparencia: TrilhaAparencia
 }
 
 /** Módulo aberto: a trilha (serpenteada) + o desempenho por aula + o resumo de pendências — numa passada. */
 export async function carregarModuloCompleto(estId: string, tenantId: string, moduloId: string): Promise<ModuloCompleto> {
   const { modulos, seqByModulo } = await sequenciaLeitura(estId, tenantId)
   const m = modulos.find((x) => x.id === moduloId)
-  if (!m) return { trilha: null, nome: null, desempenho: [], pendentes: 0, aulasPendentes: 0, regulamento: normalizarRegulamento(null), pontuacao: normalizarPontuacaoLeitura(null) }
+  if (!m) return { trilha: null, nome: null, desempenho: [], pendentes: 0, aulasPendentes: 0, regulamento: normalizarRegulamento(null), pontuacao: normalizarPontuacaoLeitura(null), trilhaAparencia: DEFAULT_TRILHA_APARENCIA }
   const arr = seqByModulo.get(m.id) ?? []
   const aulaNodes = arr.map(nodeDe)
   const intro = introNodeDe(m.intro, m.id)
@@ -258,7 +265,7 @@ export async function carregarModuloCompleto(estId: string, tenantId: string, mo
   // Pendência ACIONÁVEL = leitura concluída (questões liberadas) mas ainda faltam responder.
   const comPend = arr.filter((a) => a.leituraConcluida && a.questoesTotal - a.questoesRespondidas > 0)
   const pendentes = comPend.reduce((s, a) => s + (a.questoesTotal - a.questoesRespondidas), 0)
-  return { trilha, nome: m.nome, desempenho, pendentes, aulasPendentes: comPend.length, regulamento: m.regulamento, pontuacao: m.pontuacao }
+  return { trilha, nome: m.nome, desempenho, pendentes, aulasPendentes: comPend.length, regulamento: m.regulamento, pontuacao: m.pontuacao, trilhaAparencia: m.trilhaAparencia }
 }
 
 /** Gate rígido p/ o servidor: onde a aula está na sequência (bloqueada? leitura ok?) + módulo e título

@@ -4,6 +4,7 @@ import { useEffect, useRef, type ReactNode } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Library, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { DEFAULT_TRILHA_DEGRADE, type TrilhaDegrade } from '@/lib/leitura/trilha-aparencia'
 
 /**
  * Banner do módulo com collapse ATRELADO AO SCROLL (scroll-linked): o título + botão Voltar + tabs ficam
@@ -15,7 +16,7 @@ import { cn } from '@/lib/utils'
  * Reutilizável: `banner` pode ser null (cai no degradê de `cor`); `voltarHref`/`voltarLabel`/`icone`
  * configuram o cabeçalho; `tituloBadges` adiciona selos ao lado do título (sempre visíveis).
  */
-export function ModuloBanner({ banner, cor, titulo, subtitulo, topoDireita, breadcrumb, tabs, voltarHref = '/admin/leitura', voltarLabel = 'Voltar aos módulos', icone: Icone = Library, tituloBadges, className }: {
+export function ModuloBanner({ banner, cor, titulo, subtitulo, topoDireita, breadcrumb, tabs, voltarHref = '/admin/leitura', voltarLabel = 'Voltar aos módulos', icone: Icone = Library, tituloBadges, degrade, spacerEscuro = false, className }: {
   banner: string | null
   cor?: string | null
   titulo: string
@@ -27,6 +28,11 @@ export function ModuloBanner({ banner, cor, titulo, subtitulo, topoDireita, brea
   voltarLabel?: string
   icone?: LucideIcon | null
   tituloBadges?: ReactNode
+  /** Degradê escuro sobre o banner (liga/desliga + intensidade). */
+  degrade?: TrilhaDegrade
+  /** Spacer com fundo escuro (mesma cor do banner) — evita "faixa branca" quando o conteúdo abaixo é
+   * uma imagem full-bleed escura (ex.: trilha personalizada do aluno) durante o recolher/expandir. */
+  spacerEscuro?: boolean
   /** Override do "bleed" (margens negativas/sticky) p/ casar com o padding do <main> do contexto
    * (admin = p-6; aluno = p-4 md:p-6). Default segue o admin. */
   className?: string
@@ -106,13 +112,18 @@ export function ModuloBanner({ banner, cor, titulo, subtitulo, topoDireita, brea
       {/* Fundo: imagem do banner alocado OU degradê da cor da marca (quando não há banner). */}
       {banner
         // eslint-disable-next-line @next/next/no-img-element
-        ? <img src={banner} alt="" className="absolute inset-0 h-full w-full object-cover object-center" />
+        ? <img src={banner} alt="" className="absolute inset-0 h-full w-full object-cover object-[center_86%]" />
         : <div className="absolute inset-0" style={cor ? { background: `linear-gradient(140deg, ${cor} 0%, #0a0a0a 130%)` } : undefined} />}
-      {/* Scrims p/ CONTRASTE garantido em qualquer imagem: base (funde nas tabs) + topo (título/ações). */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/55 to-black/45" />
-      <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-b from-black/65 via-black/25 to-transparent" />
-      <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/70 to-transparent" />
+      {/* Degradê GERAL controlado (liga/desliga + intensidade) — some mais claro que antes. */}
+      {(() => { const d = degrade ?? DEFAULT_TRILHA_DEGRADE; const k = d.ativo ? d.intensidade / 100 : 0; return (
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, #000 0%, rgba(0,0,0,0.42) 55%, rgba(0,0,0,0.28) 100%)', opacity: k }} />
+      ) })()}
+      {/* Scrims de borda LEVES sempre ativos (garantem legibilidade do título/tabs mesmo com degradê off). */}
+      <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/40 to-transparent" />
+      <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/55 to-transparent" />
 
+      {/* Título + subtítulo no TOPO; tabs rente à base (mt-auto). Ao recolher, a imagem mostra a parte de
+          baixo (object-position) e o subtítulo colapsa. */}
       <div className="relative flex flex-1 flex-col px-6 pt-4 text-white">
         {/* Linha do título — SEMPRE visível (título + Voltar + ação). */}
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -141,7 +152,7 @@ export function ModuloBanner({ banner, cor, titulo, subtitulo, topoDireita, brea
     </div>
     {/* Spacer que reserva no fluxo a altura que o banner perde ao recolher → conteúdo do topo nunca é
         tampado e o fluxo fica constante (sem flicker). Altura controlada via JS (aplicar). */}
-    <div ref={spacerRef} aria-hidden className="shrink-0 [overflow-anchor:none]" />
+    <div ref={spacerRef} aria-hidden className={cn('shrink-0 [overflow-anchor:none]', spacerEscuro && '-mx-4 bg-neutral-950 md:-mx-6')} />
     </>
   )
 }

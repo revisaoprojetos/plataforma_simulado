@@ -9,14 +9,14 @@ import { SimboloNo } from '@/components/gamificacao/simbolo-no'
 import { coresNo, DEFAULT_TRILHA_SIMBOLOS, type TrilhaSimbolos, type SimboloEstado } from '@/lib/gamificacao/trilha-simbolos'
 import { CapiAjudanteTrilha } from '@/components/aluno/capi-ajudante-trilha'
 
-const MIN_STEP = 210    // largura mínima de uma "célula" (nó + card) → define quantos cabem por linha
-const STEP_Y = 168
+const MIN_STEP = 250    // largura mínima de uma "célula" (nó + card) → define quantos cabem por linha
+const STEP_Y = 212      // distância vertical entre linhas (espaçamento maior)
 const R = 30            // raio do nó
-const PAD_TOP = 40
+const PAD_TOP = 48
 
 const estadoDe = (n: TrilhaNode): SimboloEstado => n.estado === 'concluido' ? 'concluido' : n.estado === 'atual' ? 'atual' : 'disponivel'
 
-function Secao({ t, simbolos }: { t: Trilha; simbolos: TrilhaSimbolos }) {
+function Secao({ t, simbolos, capa }: { t: Trilha; simbolos: TrilhaSimbolos; capa?: string | null }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const [w, setW] = useState(0)
   const [aberto, setAberto] = useState<string | null>(t.nodes.find((n) => n.estado === 'atual')?.id ?? null)
@@ -59,7 +59,14 @@ function Secao({ t, simbolos }: { t: Trilha; simbolos: TrilhaSimbolos }) {
 
       <div ref={wrapRef} className="relative w-full">
         {w > 0 && (
-          <div className="relative" style={{ height }}>
+          <div className="relative overflow-hidden rounded-2xl" style={{ height }}>
+            {/* Imagem de fundo do módulo (formato horizontal) — cobre toda a área da trilha + degradê p/ contraste. */}
+            {capa && (
+              <div className="pointer-events-none absolute inset-0 z-0">
+                <img src={capa} alt="" className="h-full w-full object-cover" />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/10 to-black/25" />
+              </div>
+            )}
             {/* Conectores: linhas pontilhadas na horizontal + curva em U só no fim da linha. */}
             <svg className="absolute left-0 top-0" width={w} height={height} aria-hidden>
               {todos.slice(0, -1).map((p, k) => {
@@ -127,11 +134,11 @@ function Secao({ t, simbolos }: { t: Trilha; simbolos: TrilhaSimbolos }) {
 }
 
 /** Formato "Trilha horizontal": segue na horizontal e curva só no fim da linha (largura dinâmica). */
-export function TrilhaMapaSemanas({ trilhas, simbolos = DEFAULT_TRILHA_SIMBOLOS, ajudante = false }: { trilhas: Trilha[]; simbolos?: TrilhaSimbolos; ajudante?: boolean }) {
+export function TrilhaMapaSemanas({ trilhas, simbolos = DEFAULT_TRILHA_SIMBOLOS, ajudante = false, capa }: { trilhas: Trilha[]; simbolos?: TrilhaSimbolos; ajudante?: boolean; capa?: string | null }) {
   return (
     <div className="space-y-8">
       {ajudante && <CapiAjudanteTrilha />}
-      {trilhas.map((t) => <Secao key={t.id} t={t} simbolos={simbolos} />)}
+      {trilhas.map((t) => <Secao key={t.id} t={t} simbolos={simbolos} capa={capa ?? t.capa ?? t.capaCard ?? null} />)}
     </div>
   )
 }

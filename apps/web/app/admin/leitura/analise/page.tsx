@@ -21,7 +21,7 @@ export default async function AnaliseLeituraPage({ searchParams }: { searchParam
     const totalPaginas = Math.max(1, Math.ceil(det.total / det.porPagina))
     return (
       <div className="space-y-5">
-        <Link href="/admin/leitura/analise" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Análise · LegProc Digital</Link>
+        <Link href="/admin/leitura/analise" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Análise · Desafio de Lei Seca</Link>
         <div className="flex flex-wrap items-end justify-between gap-2">
           <h1 className="text-2xl font-bold tracking-tight">{det.titulo}</h1>
           <span className="text-sm text-muted-foreground tabular-nums">{det.total} aluno{det.total === 1 ? '' : 's'}</span>
@@ -71,7 +71,7 @@ export default async function AnaliseLeituraPage({ searchParams }: { searchParam
   return (
     <div className="space-y-5">
       <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><BarChart3 className="h-6 w-6 text-primary" /> Análise · LegProc Digital</h1>
+        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><BarChart3 className="h-6 w-6 text-primary" /> Análise · Desafio de Lei Seca</h1>
         <p className="text-muted-foreground">Quem começou e concluiu cada documento, com progresso e tempo médios.</p>
       </div>
       <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">

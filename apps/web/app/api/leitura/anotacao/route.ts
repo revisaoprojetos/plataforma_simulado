@@ -34,13 +34,17 @@ export async function POST(request: NextRequest) {
   if (!(await docAcessivelAluno(svc, sessao.tenantId, b.documento_id, sessao.estudanteId))) {
     return NextResponse.json({ message: 'Sem acesso a este documento.' }, { status: 403 })
   }
-  const { data, error } = await svc.from('simulado_leitura_anotacoes').insert({
+  const base = {
     tenant_id: sessao.tenantId, estudante_id: sessao.estudanteId, documento_id: b.documento_id, documento_versao: b.versao,
     inicio_char: b.inicio_char, fim_char: b.fim_char, exact: String(b.exact).slice(0, 4000),
     prefix: b.prefix ?? null, suffix: b.suffix ?? null, cor: b.cor || COR_PADRAO, nota: b.nota || null, origem: 'propria',
-  }).select('id').single()
-  if (error) return NextResponse.json({ message: error.message }, { status: 500 })
-  return NextResponse.json({ ok: true, id: (data as any).id })
+  }
+  const tipo = b.tipo === 'nota' ? 'nota' : 'grifo'
+  // Insere com `tipo` (coluna nova); se a migração ainda não rodou, refaz sem ela (não bloqueia grifar/anotar).
+  let r = await svc.from('simulado_leitura_anotacoes').insert({ ...base, tipo }).select('id').single()
+  if (r.error && /tipo/i.test(r.error.message)) r = await svc.from('simulado_leitura_anotacoes').insert(base).select('id').single()
+  if (r.error) return NextResponse.json({ message: r.error.message }, { status: 500 })
+  return NextResponse.json({ ok: true, id: (r.data as any).id })
 }
 
 export async function DELETE(request: NextRequest) {

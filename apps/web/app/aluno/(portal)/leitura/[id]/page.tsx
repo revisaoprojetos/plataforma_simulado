@@ -13,11 +13,17 @@ export default async function LeitorPage({ params, searchParams }: { params: Pro
   const { busca } = await searchParams
   const sessao = await getSessaoAluno()
   if (!sessao) redirect('/aluno/entrar')
-  // Gate rígido: aula bloqueada (anterior não concluída) → volta à trilha.
-  const st = await statusAulaAluno(sessao.estudanteId, sessao.tenantId, id)
+  // Gate (aula bloqueada) e conteúdo são INDEPENDENTES → carrega em PARALELO (antes era em série, o gate
+  // pesado atrasava a abertura). Se bloqueada, redireciona; o conteúdo carregado à toa é raro (só quando
+  // bloqueada) e some no redirect.
+  const [st, doc] = await Promise.all([
+    statusAulaAluno(sessao.estudanteId, sessao.tenantId, id),
+    carregarDocumentoAluno(id, sessao.estudanteId, sessao.tenantId),
+  ])
   if (st.visivel && st.estado === 'bloqueado') redirect('/aluno/leitura')
-  const doc = await carregarDocumentoAluno(id, sessao.estudanteId, sessao.tenantId)
   if (!doc) notFound()
 
-  return <LeitorDocumento doc={doc} buscaInicial={busca ?? undefined} trilha={{ modo: 'leitura', questoesHref: `/aluno/leitura/${id}/questoes`, voltarHref: '/aluno/leitura' }} />
+  // "Voltar" leva à TRILHA do módulo (não à biblioteca/início do LegProc). Sem módulo → biblioteca.
+  const voltarHref = st.moduloId && st.moduloId !== '__geral__' ? `/aluno/leitura?modulo=${st.moduloId}` : '/aluno/leitura'
+  return <LeitorDocumento doc={doc} buscaInicial={busca ?? undefined} trilha={{ modo: 'leitura', questoesHref: `/aluno/leitura/${id}/questoes`, voltarHref }} />
 }

@@ -113,8 +113,37 @@ export function LeituraQuestoesStep({ doc, questoes, trilhaHref }: { doc: { id: 
 
   const q = questoes[idx]
 
+  // Botões de navegação: Anterior + Próxima/Finalizar na MESMA linha; Revisar full-width embaixo.
+  // Ficam abaixo do "Navegador de questões" (desktop) e no fim do conteúdo (mobile).
+  const botoesNav = (
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 gap-2">
+        <button type="button" onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0}
+          className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border bg-card px-3 py-2.5 text-sm font-medium shadow-sm transition-colors hover:bg-muted disabled:opacity-40">
+          <ArrowLeft className="h-4 w-4" /> Anterior
+        </button>
+        {idx >= total - 1 ? (
+          <button type="button" onClick={finalizar}
+            className={cn('inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary px-3 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 hover:shadow-md', !completo && !revisando && 'opacity-50')}>
+            {revisando ? <><RotateCcw className="h-4 w-4" /> Refazer</> : <><Flag className="h-4 w-4" /> Finalizar</>}
+          </button>
+        ) : (
+          <button type="button" onClick={() => setIdx((i) => Math.min(total - 1, i + 1))}
+            className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary px-3 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 hover:shadow-md">
+            Próxima <ArrowRight className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+      <button type="button" onClick={() => q && toggleMarcar(q.docQuestaoId)} title={q && marcadas.has(q.docQuestaoId) ? 'Desmarcar revisão' : 'Marcar para revisar'}
+        className={cn('inline-flex w-full items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 text-sm font-medium text-amber-700 shadow-sm transition-colors dark:text-amber-400',
+          q && marcadas.has(q.docQuestaoId) ? 'border-amber-500 bg-amber-500/25 dark:text-amber-300' : 'border-amber-400/60 bg-amber-400/10 hover:bg-amber-400/20')}>
+        <Bookmark className={cn('h-4 w-4', q && marcadas.has(q.docQuestaoId) && 'fill-current')} /> Revisar
+      </button>
+    </div>
+  )
+
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-muted dark:bg-background" style={{ ['--primary' as any]: 'var(--brand-primary)' }}>
+    <div className="fixed inset-0 z-[130] flex flex-col bg-muted dark:bg-background" style={{ ['--primary' as any]: 'var(--brand-primary)' }}>
       {/* Top bar (3 zonas): voltar · título · finalizar/refazer */}
       <div className="flex items-center gap-2 border-b bg-card px-3 py-2.5 sm:px-5">
         <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -153,7 +182,7 @@ export function LeituraQuestoesStep({ doc, questoes, trilhaHref }: { doc: { id: 
 
       {/* Conteúdo */}
       <div className="flex min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-5xl px-3 py-4 sm:px-4 sm:py-5">
+        <div className="mx-auto w-full max-w-5xl px-3 pt-4 pb-24 sm:px-4 sm:pt-5 sm:pb-28">
           {total === 0 ? (
             <div className="rounded-2xl border border-dashed p-10 text-center text-muted-foreground">Esta aula não tem questões.</div>
           ) : entrada ? (
@@ -185,45 +214,21 @@ export function LeituraQuestoesStep({ doc, questoes, trilhaHref }: { doc: { id: 
                   escolhida={escolhas[q.docQuestaoId] ?? null} resultado={resultados[q.docQuestaoId] ?? null}
                   onEscolher={onEscolher} onRespondida={onRespondida} />
 
-                <div className="flex items-center gap-2">
-                  <div className="flex flex-1 justify-start">
-                    <button type="button" onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0}
-                      className="inline-flex items-center gap-1.5 rounded-xl border bg-card px-4 py-2.5 text-sm font-medium shadow-sm transition-colors hover:bg-muted disabled:opacity-40">
-                      <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">Anterior</span>
-                    </button>
-                  </div>
-                  <button type="button" onClick={() => toggleMarcar(q.docQuestaoId)} title={marcadas.has(q.docQuestaoId) ? 'Desmarcar revisão' : 'Marcar para revisar'}
-                    className={cn('inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-4 py-2.5 text-sm font-medium shadow-sm transition-colors',
-                      marcadas.has(q.docQuestaoId) ? 'border-amber-500/50 bg-amber-500/15 text-amber-600 dark:text-amber-400' : 'bg-card hover:bg-muted')}>
-                    <Bookmark className={cn('h-4 w-4', marcadas.has(q.docQuestaoId) && 'fill-current')} /> Revisar
-                  </button>
-                  <div className="flex flex-1 justify-end">
-                    {idx >= total - 1 ? (
-                      <button type="button" onClick={finalizar}
-                        className={cn('inline-flex items-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 hover:shadow-md', !completo && !revisando && 'opacity-50')}>
-                        {revisando ? <><RotateCcw className="h-4 w-4" /> Refazer</> : <><Flag className="h-4 w-4" /> Finalizar</>}
-                      </button>
-                    ) : (
-                      <button type="button" onClick={() => setIdx((i) => Math.min(total - 1, i + 1))}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 hover:shadow-md">
-                        <span className="hidden sm:inline">Próxima</span> <ArrowRight className="h-4 w-4" />
-                      </button>
-                    )}
-                  </div>
-                </div>
+                {/* Mobile: botões no fim do conteúdo (no desktop ficam abaixo do navegador, à direita). */}
+                <div className="lg:hidden">{botoesNav}</div>
               </div>
 
               <aside className="hidden lg:block">
-                <div className="sticky top-4">{navegadorCard}</div>
+                <div className="sticky top-4 space-y-3">{navegadorCard}{botoesNav}</div>
               </aside>
             </div>
           )}
         </div>
       </div>
 
-      {/* Pop-up de conclusão */}
+      {/* Pop-up de conclusão — acima do runner (z-[130]) senão fica escondido atrás e "não finaliza". */}
       {mostrarPopup && createPortal(
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm motion-safe:animate-in motion-safe:fade-in" onClick={verResultados}>
+        <div className="fixed inset-0 z-[140] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm motion-safe:animate-in motion-safe:fade-in" onClick={verResultados}>
           <div className="relative w-full max-w-sm overflow-hidden rounded-2xl border bg-card p-6 text-center shadow-2xl motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:fade-in motion-safe:duration-300" onClick={(e) => e.stopPropagation()}>
             <button type="button" onClick={verResultados} aria-label="Fechar" className="absolute right-3 top-3 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
             <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center">

@@ -74,7 +74,7 @@ export function ModuloRegulamentoForm({ pastaId, atual, pontuacao }: { pastaId: 
               <li>• <strong className="text-foreground">+{pontuacao.pontos_acerto}</strong> pts por acerto no quiz</li>
               {pontuacao.combo_ativo && <li>• <strong className="text-foreground">+{pontuacao.combo_bonus}</strong> pts de bônus ao gabaritar uma aula</li>}
             </ul>
-            <p className="mt-1.5 text-[11px] text-muted-foreground/80">Edite esses valores na seção "Pontuação" abaixo.</p>
+            <p className="mt-1.5 text-[11px] text-muted-foreground/80">Edite esses valores na aba "Configurações" → Pontuação.</p>
           </div>
         </div>
       )}

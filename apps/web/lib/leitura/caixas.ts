@@ -22,19 +22,8 @@ function tipoCaixa(titulo: string): string {
   return 'comentario'
 }
 
-export function prepararCaixasTabela(cont: HTMLElement, onToggle?: () => void): () => void {
-  const ligados: { el: HTMLElement; ev: 'click' | 'keydown'; fn: (e: Event) => void }[] = []
-  const alternar = (box: HTMLElement, cab: HTMLElement) => {
-    const aberto = !box.hasAttribute('data-aberto')
-    if (aberto) box.setAttribute('data-aberto', '1'); else box.removeAttribute('data-aberto')
-    cab.setAttribute('aria-expanded', aberto ? 'true' : 'false')
-    onToggle?.()
-  }
-  const onKey = (e: Event) => {
-    const k = (e as KeyboardEvent).key
-    if (k === 'Enter' || k === ' ') { e.preventDefault(); (e.currentTarget as HTMLElement).click() }
-  }
-
+export function prepararCaixasTabela(cont: HTMLElement, _onToggle?: () => void): () => void {
+  // Clique/tecla são tratados por DELEGAÇÃO única no leitor (não anexa listener por caixa → sem duplicar).
   for (const tab of Array.from(cont.querySelectorAll<HTMLTableElement>('table'))) {
     const rows = Array.from(tab.rows) // nativo (cobre tbody/thead) — robusto entre navegadores
     if (rows.length < 2) continue
@@ -70,12 +59,84 @@ export function prepararCaixasTabela(cont: HTMLElement, onToggle?: () => void): 
 
     const previa = (inner.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 160)
     if (previa) cab.setAttribute('data-previa', previa)
+    const tit = (cab.textContent || '').replace(/\s+/g, ' ').trim()
+    if (tit && !/[:：]$/.test(tit)) cab.setAttribute('data-add-colon', '1')
     cab.setAttribute('role', 'button'); cab.setAttribute('tabindex', '0'); cab.setAttribute('aria-expanded', 'false')
-    div.removeAttribute('data-aberto') // recolhida por padrão
-    const clique = () => alternar(div, cab)
-    cab.addEventListener('click', clique); cab.addEventListener('keydown', onKey)
-    ligados.push({ el: cab, ev: 'click', fn: clique }, { el: cab, ev: 'keydown', fn: onKey })
+    div.removeAttribute('data-aberto') // recolhida por padrão (clique via delegação no leitor)
   }
 
-  return () => { for (const { el, ev, fn } of ligados) el.removeEventListener(ev, fn) }
+  return () => {}
+}
+
+/**
+ * "📌 Já cobrado em prova:" — parágrafos que começam com esse rótulo viram CAIXAS COLAPSÁVEIS no MESMO
+ * estilo das outras (cabeçalho = o rótulo; corpo = o resto do parágrafo). Só MOVE nós (divide o text node
+ * do rótulo no ':'), preservando a ORDEM do texto → a "espinha" das âncoras dos grifos fica intacta.
+ * Recolhido por padrão. Idempotente (pula o que já está dentro de caixa).
+ */
+const RE_COBRADO = /^\s*📌?\s*j[áa]\s+cobrad[oa]s?\s+em\s+prova\s*:?/i
+
+export function prepararCaixasCobrado(cont: HTMLElement, _onToggle?: () => void): () => void {
+  // Clique/tecla tratados por DELEGAÇÃO única no leitor (não anexa listener por caixa → sem duplicar).
+  let els: HTMLElement[] = []
+  try { els = Array.from(cont.querySelectorAll<HTMLElement>('p, li')) } catch { return () => {} }
+  for (const el of els) {
+    try {
+      if (!el.isConnected || el.closest('.caixa-colapsavel')) continue
+      if (Array.from(el.children).some((c) => /^(P|DIV|LI|TABLE|UL|OL|BLOCKQUOTE)$/.test(c.tagName))) continue
+      const full = el.textContent || ''
+      const m = RE_COBRADO.exec(full)
+      if (!m) continue
+      const k = m[0].length // fim do rótulo (inclui o ':' se houver)
+
+      const box = document.createElement('div')
+      box.setAttribute('data-caixa', 'cobrado')
+      box.classList.add('caixa-colapsavel')
+      const cab = document.createElement('div'); cab.className = 'caixa-cab'
+      const titulo = document.createElement('span'); cab.appendChild(titulo) // :first-child = título (rótulo)
+      const corpo = document.createElement('div'); corpo.className = 'caixa-corpo'
+      const inner = document.createElement('div'); inner.className = 'caixa-corpo-in'; corpo.appendChild(inner)
+
+      // Acha o ponto de corte (offset k) na árvore de texto do parágrafo — mesmo quando o rótulo+lista
+      // estão dentro de um <strong> — e usa Range.extractContents (divide subárvores corretamente):
+      // fragmento até k = TÍTULO; o restante do parágrafo = CORPO. Não remove/adiciona texto (espinha ok).
+      const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
+      let acc = 0
+      let boundNode: Text | null = null, boundOff = 0, tn: Node | null = null
+      while ((tn = walker.nextNode())) {
+        const len = (tn.textContent || '').length
+        if (acc + len >= k) { boundNode = tn as Text; boundOff = Math.max(0, Math.min(len, k - acc)); break }
+        acc += len
+      }
+      if (boundNode) {
+        const range = document.createRange()
+        range.setStart(el, 0)
+        range.setEnd(boundNode, boundOff)
+        titulo.appendChild(range.extractContents()) // rótulo (com wrappers preservados)
+      }
+      while (el.firstChild) inner.appendChild(el.firstChild) // resto do parágrafo → corpo
+
+      box.appendChild(cab); box.appendChild(corpo)
+      el.replaceWith(box)
+
+      // Se o rótulo estava sozinho no parágrafo, a lista costuma vir nos parágrafos SEGUINTES → absorve-os
+      // no corpo (até um limite/estrutura), preservando a ordem do texto.
+      if (!(inner.textContent || '').trim()) {
+        let s = box.nextElementSibling as HTMLElement | null
+        let n = 0
+        while (s && n < 6 && !s.hasAttribute('data-art') && !s.classList.contains('caixa-colapsavel') && !/^(H1|H2|H3|TABLE)$/.test(s.tagName) && !RE_COBRADO.test(s.textContent || '')) {
+          const prox = s.nextElementSibling as HTMLElement | null
+          inner.appendChild(s); s = prox; n++
+        }
+      }
+
+      // Prévia (começo da lista) ao lado do título — igual aos ENTENDIMENTOS; some ao expandir.
+      const previa = (inner.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 160)
+      if (previa) cab.setAttribute('data-previa', previa)
+      cab.setAttribute('role', 'button'); cab.setAttribute('tabindex', '0'); cab.setAttribute('aria-expanded', 'false')
+      box.removeAttribute('data-aberto') // recolhida por padrão (clique via delegação no leitor)
+    } catch { /* não deixa 1 elemento quebrar os demais nem o resto do leitor */ }
+  }
+
+  return () => {}
 }

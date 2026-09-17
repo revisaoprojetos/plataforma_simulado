@@ -10,7 +10,9 @@ import { SimboloNo } from '@/components/gamificacao/simbolo-no'
 import { DEFAULT_TRILHA_SIMBOLOS, coresNo, type TrilhaSimbolos, type SimboloEstado, type SimboloConfig } from '@/lib/gamificacao/trilha-simbolos'
 import { TrilhaLista } from '@/components/aluno/trilha-lista'
 import { TrilhaMapaSemanas } from '@/components/aluno/trilha-mapa-semanas'
+import { TrilhaLivre } from '@/components/aluno/trilha-livre'
 import { type TrilhaFormato } from '@/lib/gamificacao/trilha-formato'
+import { type TrilhaLivreConfig, type TrilhaDegrade } from '@/lib/leitura/trilha-aparencia'
 
 /** Símbolo do nó conforme o estado + config do tenant. `escala` acompanha o tamanho do nó na variante. */
 function noEstado(concluido: boolean, atual: boolean): SimboloEstado { return concluido ? 'concluido' : atual ? 'atual' : 'disponivel' }
@@ -416,7 +418,7 @@ export function TrilhaSimulados({ trilhas, gamAtivo, estilo = 'cards', visiveis 
 const GAP_HDR = 58   // altura reservada p/ a divisória (nome do grupo)
 const GAP_GRUPO = 44 // respiro extra entre grupos (o pontilhado continua nele)
 
-export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = false, semDivisoria = false, ajudante = false, simbolos = DEFAULT_TRILHA_SIMBOLOS }: { trilhas: Trilha[]; gamAtivo: boolean; reto?: boolean; semFundo?: boolean; semDivisoria?: boolean; ajudante?: boolean; simbolos?: TrilhaSimbolos }) {
+export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = false, semDivisoria = false, ajudante = false, inverter = false, simbolos = DEFAULT_TRILHA_SIMBOLOS }: { trilhas: Trilha[]; gamAtivo: boolean; reto?: boolean; semFundo?: boolean; semDivisoria?: boolean; ajudante?: boolean; inverter?: boolean; simbolos?: TrilhaSimbolos }) {
   const flat = trilhas.flatMap((t) => t.nodes)
   const atualId = flat.find((n) => n.estado === 'atual')?.id ?? flat[0]?.id ?? null
   const [aberto, setAberto] = useState<string | null>(atualId)
@@ -487,6 +489,15 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
     yBot: (i < segMeta.length - 1 ? segMeta[i + 1].dy - 4 : chest.y - 24),   // quase encostando na próxima divisória (ou no baú)
   }))
   const height = chest.y + R + 48
+  // "Começar de baixo": espelha verticalmente todo o layout (nós, divisórias, fundos e baú).
+  // O 1º nó vai para a base e a trilha "sobe"; o baú/fim fica no topo.
+  if (inverter) {
+    const H = height
+    for (const x of nodesL) x.y = H - x.y
+    for (const d of dividers) d.y = H - d.y
+    for (const s of segmentos) { const t = s.yTop; s.yTop = H - s.yBot; s.yBot = H - t }
+    chest.y = H - chest.y
+  }
   const allPts = [...nodesL.map((x) => ({ off: x.off, y: x.y, estado: x.n.estado })), { off: chest.off, y: chest.y, estado: 'disponivel' as const }]
 
   const openL = nodesL.find((x) => x.n.id === aberto) ?? null
@@ -533,7 +544,7 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
         {/* Conector do topo (banner) até o 1º dia — só quando não há divisória (LegProc). Começa acima de 0
             (por trás do banner, com overflow-visible no container) → um ponto fica sob o banner e o 1º
             ponto visível aparece INTEIRO logo abaixo, "emergindo" do banner sem corte. */}
-        {semDivisoria && nodesL[0] && (
+        {semDivisoria && !inverter && nodesL[0] && (
           <path d={`M ${cx(nodesL[0].off)} -8 L ${cx(nodesL[0].off)} ${nodesL[0].y}`} fill="none" strokeWidth={6} strokeLinecap="round" strokeDasharray="0.1 16"
             stroke={nodesL[0].n.estado === 'concluido' ? COR : 'var(--border)'} />
         )}
@@ -705,13 +716,22 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
  * Entrada única das trilhas do sistema: escolhe o LAYOUT pelo formato configurado no console/aparência.
  * serpentina/reta/mapa_semanas → TrilhaGigante (props); lista → TrilhaLista (tabela compacta).
  */
-export function TrilhaSistema({ trilhas, gamAtivo, simbolos = DEFAULT_TRILHA_SIMBOLOS, formato = 'serpentina', semFundo = false, semDivisoria = false, ajudante = false }: {
-  trilhas: Trilha[]; gamAtivo: boolean; simbolos?: TrilhaSimbolos; formato?: TrilhaFormato; semFundo?: boolean; semDivisoria?: boolean; ajudante?: boolean
+export function TrilhaSistema({ trilhas, gamAtivo, simbolos = DEFAULT_TRILHA_SIMBOLOS, formato = 'serpentina', semFundo = false, semDivisoria = false, ajudante = false, inverter = false, livre, capa, semMoldura = false, degradeTopo }: {
+  trilhas: Trilha[]; gamAtivo: boolean; simbolos?: TrilhaSimbolos; formato?: TrilhaFormato; semFundo?: boolean; semDivisoria?: boolean; ajudante?: boolean; inverter?: boolean
+  livre?: TrilhaLivreConfig; capa?: string | null; semMoldura?: boolean; degradeTopo?: TrilhaDegrade
 }) {
   if (formato === 'lista') return <TrilhaLista trilhas={trilhas} gamAtivo={gamAtivo} simbolos={simbolos} ajudante={ajudante} />
-  if (formato === 'mapa_semanas') return <TrilhaMapaSemanas trilhas={trilhas} simbolos={simbolos} ajudante={ajudante} />
+  if (formato === 'mapa_semanas') return <TrilhaMapaSemanas trilhas={trilhas} simbolos={simbolos} ajudante={ajudante} capa={capa ?? trilhas[0]?.capa ?? null} />
+  if (formato === 'livre') {
+    const nos = trilhas.flatMap((t) => t.nodes).map((n) => ({
+      id: n.id, titulo: n.titulo, estado: n.estado, href: n.hrefLeitura ?? n.href, acao: n.acaoLeitura ?? n.acao,
+      quando: n.quando, questoes: n.questoes, acerto: n.acerto,
+      hrefLeitura: n.hrefLeitura, acaoLeitura: n.acaoLeitura, hrefQuestoes: n.hrefQuestoes, questoesLiberada: n.questoesLiberada,
+    }))
+    return <TrilhaLivre nodes={nos} livre={livre ?? { nos: {}, curvas: {} }} capa={capa ?? trilhas[0]?.capa ?? null} simbolos={simbolos} semMoldura={semMoldura} degradeTopo={degradeTopo} />
+  }
   return (
     <TrilhaGigante trilhas={trilhas} gamAtivo={gamAtivo} reto={formato === 'reta'} semFundo={semFundo}
-      semDivisoria={semDivisoria} ajudante={ajudante} simbolos={simbolos} />
+      semDivisoria={semDivisoria} ajudante={ajudante} inverter={inverter} simbolos={simbolos} />
   )
 }

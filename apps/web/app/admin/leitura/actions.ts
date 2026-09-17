@@ -12,12 +12,24 @@ import { hospedarBase64 } from '@/lib/storage/hospedar-base64'
 import { normalizarPontuacaoLeitura, type PontuacaoLeitura } from '@/lib/leitura/pontuacao'
 import { normalizarIntro, type IntroConfig } from '@/lib/leitura/intro'
 import { normalizarRegulamento, type RegulamentoConfig } from '@/lib/leitura/regulamento'
+import { resolverTrilhaAparencia, type TrilhaAparencia, type TrilhaFundoConfig, type TrilhaDegrade } from '@/lib/leitura/trilha-aparencia'
 import { esquecer } from '@/lib/cache/relatorio-cache'
 import { classificarFormato } from '@/lib/simulado/formato'
 import { confirmarImportQuestoes } from '@/app/admin/banco-questoes/actions'
 import type { QuestaoImport } from '@/app/admin/banco-questoes/import-types'
 
 export type SituacaoEditorial = 'em_preparacao' | 'rascunho' | 'em_revisao' | 'publicada' | 'arquivada' | 'revogada'
+
+/** Estado de publicação da AULA. 'visualizavel' = aluno vê na trilha, porém BLOQUEADA ("ainda não liberada"). */
+export type DocEstado = 'rascunho' | 'visualizavel' | 'publicada'
+export type DocPublicacao = { estado: DocEstado; publicarEm: string | null }
+function normDocPublicacao(v: any, publicado: boolean): DocPublicacao {
+  if (v && typeof v === 'object') {
+    const e: DocEstado = v.estado === 'visualizavel' || v.estado === 'publicada' || v.estado === 'rascunho' ? v.estado : (publicado ? 'publicada' : 'rascunho')
+    return { estado: e, publicarEm: typeof v.publicarEm === 'string' ? v.publicarEm : null }
+  }
+  return { estado: publicado ? 'publicada' : 'rascunho', publicarEm: null }
+}
 
 export type Documento = {
   id: string
@@ -46,6 +58,7 @@ export type Documento = {
   ultima_verificacao?: string | null
   ordem?: number | null
   situacao_editorial?: SituacaoEditorial | null
+  publicacao?: DocPublicacao
 }
 
 /** slug seguro a partir de um texto (sem acento, minúsculo, hífens). */
@@ -126,6 +139,34 @@ export async function atualizarDocumento(
 
 export async function publicarDocumento(id: string, publicado: boolean): Promise<{ ok: boolean; error?: string }> {
   return atualizarDocumento(id, { publicado })
+}
+
+/**
+ * Define o estado de publicação da AULA (rascunho / visualizável / publicada) + agendamento opcional.
+ * - publicarEm no FUTURO → guarda o estado escolhido agora e publica sozinho quando a data vencer (flip
+ *   preguiçoso na leitura). Ex.: "visualizável" agendado = visível bloqueada até a data, depois liberada.
+ * - Mantém o booleano `publicado` coerente (fonte de "liberada" p/ todas as queries existentes).
+ */
+export async function definirPublicacaoDocumento(id: string, patch: { estado: DocEstado; publicarEm?: string | null }): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const ts = patch.publicarEm && !Number.isNaN(Date.parse(patch.publicarEm)) ? new Date(patch.publicarEm).toISOString() : null
+  const agendadoFuturo = !!ts && Date.parse(ts) > Date.now()
+  const estado: DocEstado = patch.estado
+  const publicado = estado === 'publicada' && !agendadoFuturo
+  const publicacao: DocPublicacao = { estado, publicarEm: agendadoFuturo ? ts : null }
+  const situacao: SituacaoEditorial = publicado ? 'publicada' : 'rascunho'
+  const { error } = await svc.from('simulado_documentos').update({ publicado, publicacao, situacao_editorial: situacao, atualizado_em: new Date().toISOString() }).eq('id', id).eq('tenant_id', g.tenantId)
+  if (error) return { ok: false, error: /publicacao|column|schema cache/i.test(error.message) ? 'Rode a migração 20260918000000 (publicação da aula).' : error.message }
+  revalidatePath('/admin/leitura'); revalidatePath('/aluno/leitura'); return { ok: true }
+}
+
+/** Aplica o mesmo estado/agendamento a VÁRIAS aulas de uma vez. */
+export async function definirPublicacaoDocumentos(ids: string[], patch: { estado: DocEstado; publicarEm?: string | null }): Promise<{ ok: boolean; error?: string; ok_count?: number }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  let ok = 0
+  for (const id of ids) { const r = await definirPublicacaoDocumento(id, patch); if (r.ok) ok++; else return { ok: false, error: r.error, ok_count: ok } }
+  return { ok: true, ok_count: ok }
 }
 
 // ── Versionamento / publicação (A2) ──────────────────────────────────────────
@@ -517,7 +558,7 @@ function normPublicacao(v: any): PublicacaoModulo {
   if (!v || typeof v !== 'object') return PUBLICACAO_PADRAO
   return { status: v.status === 'publicado' ? 'publicado' : 'rascunho', publicarEm: v.publicarEm ?? null, encerrarEm: v.encerrarEm ?? null }
 }
-export type ModuloLeitura = { id: string; nome: string; pai_id: string | null; cor: string | null; icone: string | null; capa_url: string | null; capa_card_url: string | null; adesivo_url: string | null; pontuacao: PontuacaoLeitura; intro: IntroConfig; regulamento: RegulamentoConfig; ordem: number; subpastas: number; aulas: number; publicacao: PublicacaoModulo }
+export type ModuloLeitura = { id: string; nome: string; pai_id: string | null; cor: string | null; icone: string | null; capa_url: string | null; capa_card_url: string | null; adesivo_url: string | null; pontuacao: PontuacaoLeitura; intro: IntroConfig; regulamento: RegulamentoConfig; trilhaAparencia: TrilhaAparencia; ordem: number; subpastas: number; aulas: number; publicacao: PublicacaoModulo }
 export type BancoAulas = { ok: boolean; error?: string; pastas?: ModuloLeitura[]; aulas?: (Documento & { questoes?: number })[]; breadcrumb?: { id: string; nome: string }[]; modulos?: { id: string; nome: string }[]; moduloAtual?: ModuloLeitura }
 
 /** `.order('ordem')` tolerante: se a coluna `ordem` ainda não existir, refaz ordenando por nome. */
@@ -526,7 +567,8 @@ async function pastasLeitura(svc: any, tenantId: string): Promise<any[]> {
     const b = svc.from('simulado_pastas').select(cols).eq('tenant_id', tenantId).eq('is_folder', true).eq('folder_area', AREA_LEITURA)
     return ordenado ? b.order('ordem', { ascending: true }).order('nome', { ascending: true }) : b.order('nome', { ascending: true })
   }
-  let r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, adesivo_url, pontuacao, intro_config, regulamento, ordem, publicacao', true)
+  let r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, adesivo_url, pontuacao, intro_config, regulamento, trilha_aparencia, ordem, publicacao', true)
+  if (r.error) r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, adesivo_url, pontuacao, intro_config, regulamento, ordem, publicacao', true) // trilha_aparencia pode não estar migrado
   if (r.error) r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, adesivo_url, pontuacao, intro_config, ordem, publicacao', true) // regulamento pode não estar migrado
   if (r.error) r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, adesivo_url, pontuacao, ordem, publicacao', true) // intro_config pode não estar migrado
   if (r.error) r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, adesivo_url, ordem, publicacao', true) // pontuacao pode não estar migrada
@@ -545,13 +587,24 @@ export async function listarBancoAulas(pastaId?: string | null, detalhes: boolea
   // Documentos: id+pasta_id de todos (p/ contar por pasta) e os do nível atual (detalhados).
   // Otimização: abas Acessos/Configurações NÃO usam a lista de aulas → pula o fetch de TODOS os docs.
   const docs = detalhes ? await fetchAll<any>(() => svc.from('simulado_documentos').select('*').eq('tenant_id', g.tenantId).eq('deletado', false)) : []
+  // Flip preguiçoso de agendamentos vencidos (publicarEm <= agora) → publica de fato (sem cron).
+  if (detalhes && docs.length) {
+    const agora = new Date().toISOString()
+    const vencidos = docs.filter((d) => { const p = d.publicacao; return p && typeof p === 'object' && typeof p.publicarEm === 'string' && p.publicarEm <= agora && !d.publicado })
+    for (const d of vencidos) {
+      try {
+        await svc.from('simulado_documentos').update({ publicado: true, publicacao: { estado: 'publicada', publicarEm: null }, situacao_editorial: 'publicada', atualizado_em: agora }).eq('id', d.id).eq('tenant_id', g.tenantId)
+        d.publicado = true; d.publicacao = { estado: 'publicada', publicarEm: null }
+      } catch { /* coluna ausente / migração pendente — ignora */ }
+    }
+  }
   const docsPorPasta = new Map<string, number>()
   for (const d of docs) { const k = d.pasta_id ?? '__root__'; docsPorPasta.set(k, (docsPorPasta.get(k) ?? 0) + 1) }
   const subPorPasta = new Map<string, number>()
   for (const p of todasPastas) { if (p.pai_id) subPorPasta.set(p.pai_id, (subPorPasta.get(p.pai_id) ?? 0) + 1) }
 
   const pastas: ModuloLeitura[] = todasPastas.filter((p) => (p.pai_id ?? null) === paiAtual).map((p) => ({
-    id: p.id, nome: p.nome, pai_id: p.pai_id ?? null, cor: p.cor ?? null, icone: p.icone ?? null, capa_url: p.capa_url ?? null, capa_card_url: p.capa_card_url ?? null, adesivo_url: p.adesivo_url ?? null, pontuacao: normalizarPontuacaoLeitura(p.pontuacao), intro: normalizarIntro(p.intro_config), regulamento: normalizarRegulamento(p.regulamento),
+    id: p.id, nome: p.nome, pai_id: p.pai_id ?? null, cor: p.cor ?? null, icone: p.icone ?? null, capa_url: p.capa_url ?? null, capa_card_url: p.capa_card_url ?? null, adesivo_url: p.adesivo_url ?? null, pontuacao: normalizarPontuacaoLeitura(p.pontuacao), intro: normalizarIntro(p.intro_config), regulamento: normalizarRegulamento(p.regulamento), trilhaAparencia: resolverTrilhaAparencia(p.trilha_aparencia),
     ordem: p.ordem ?? 0, subpastas: subPorPasta.get(p.id) ?? 0, aulas: docsPorPasta.get(p.id) ?? 0, publicacao: normPublicacao(p.publicacao),
   }))
 
@@ -567,7 +620,7 @@ export async function listarBancoAulas(pastaId?: string | null, detalhes: boolea
     const qs = await fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_documento_questoes').select('documento_id').eq('tenant_id', g.tenantId).eq('deletado', false).in('documento_id', chunk))
     for (const q of qs) questoesPorDoc.set(q.documento_id, (questoesPorDoc.get(q.documento_id) ?? 0) + 1)
   }
-  const aulas = aulasNivel.map((d) => ({ ...d, artigos: artigosPorDoc.get(d.id) ?? 0, questoes: questoesPorDoc.get(d.id) ?? 0 }))
+  const aulas = aulasNivel.map((d) => ({ ...d, artigos: artigosPorDoc.get(d.id) ?? 0, questoes: questoesPorDoc.get(d.id) ?? 0, publicacao: normDocPublicacao(d.publicacao, !!d.publicado) }))
 
   // Breadcrumb subindo por pai_id.
   const mapa = new Map(todasPastas.map((p) => [p.id, p]))
@@ -579,7 +632,7 @@ export async function listarBancoAulas(pastaId?: string | null, detalhes: boolea
   const raiz = paiAtual ? todasPastas.find((p) => p.id === paiAtual) : null
   const moduloAtual: ModuloLeitura | undefined = raiz ? {
     id: raiz.id, nome: raiz.nome, pai_id: raiz.pai_id ?? null, cor: raiz.cor ?? null, icone: raiz.icone ?? null,
-    capa_url: raiz.capa_url ?? null, capa_card_url: raiz.capa_card_url ?? null, adesivo_url: raiz.adesivo_url ?? null, pontuacao: normalizarPontuacaoLeitura(raiz.pontuacao), intro: normalizarIntro(raiz.intro_config), regulamento: normalizarRegulamento(raiz.regulamento),
+    capa_url: raiz.capa_url ?? null, capa_card_url: raiz.capa_card_url ?? null, adesivo_url: raiz.adesivo_url ?? null, pontuacao: normalizarPontuacaoLeitura(raiz.pontuacao), intro: normalizarIntro(raiz.intro_config), regulamento: normalizarRegulamento(raiz.regulamento), trilhaAparencia: resolverTrilhaAparencia(raiz.trilha_aparencia),
     ordem: raiz.ordem ?? 0, subpastas: subPorPasta.get(raiz.id) ?? 0, aulas: docsPorPasta.get(raiz.id) ?? 0, publicacao: normPublicacao(raiz.publicacao),
   } : undefined
 
@@ -669,6 +722,33 @@ export async function salvarRegulamentoModulo(id: string, cfg: RegulamentoConfig
   const { error } = await svc.from('simulado_pastas').update({ regulamento: normalizarRegulamento(cfg) }).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
   if (error) return { ok: false, error: /regulamento|column|schema cache/i.test(error.message) ? 'Migração do regulamento pendente (coluna regulamento jsonb em simulado_pastas).' : error.message }
   revalidatePath('/admin/leitura'); return { ok: true }
+}
+
+/** Aparência da trilha DO MÓDULO (símbolos + formato). Tolerante à migração `trilha_aparencia` (jsonb) ausente. */
+export async function salvarTrilhaAparenciaModulo(id: string, cfg: TrilhaAparencia): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_pastas').update({ trilha_aparencia: resolverTrilhaAparencia(cfg) }).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  if (error) return { ok: false, error: /trilha_aparencia|column|schema cache/i.test(error.message) ? 'Migração da aparência da trilha pendente (coluna trilha_aparencia jsonb em simulado_pastas).' : error.message }
+  revalidatePath('/admin/leitura'); revalidatePath('/aluno/leitura'); return { ok: true }
+}
+
+/**
+ * Salva SÓ a imagem de fundo da trilha (+ proporção do canvas), MESCLANDO na aparência atual — não
+ * apaga posições dos nós, curvas, escala, símbolos nem formato. Usado na aba Configurações do módulo.
+ */
+export async function salvarTrilhaFundoModulo(id: string, patch: { fundo: TrilhaFundoConfig; aspecto?: number; degrade?: TrilhaDegrade }): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  let atual: TrilhaAparencia
+  try {
+    const { data } = await svc.from('simulado_pastas').select('trilha_aparencia').eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA).maybeSingle()
+    atual = resolverTrilhaAparencia((data as any)?.trilha_aparencia)
+  } catch { atual = resolverTrilhaAparencia(null) }
+  const next: TrilhaAparencia = { ...atual, livre: { ...atual.livre, fundo: patch.fundo, aspecto: patch.aspecto ?? atual.livre.aspecto }, degrade: patch.degrade ?? atual.degrade }
+  const { error } = await svc.from('simulado_pastas').update({ trilha_aparencia: resolverTrilhaAparencia(next) }).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  if (error) return { ok: false, error: /trilha_aparencia|column|schema cache/i.test(error.message) ? 'Migração da aparência da trilha pendente (coluna trilha_aparencia jsonb em simulado_pastas).' : error.message }
+  revalidatePath('/admin/leitura'); revalidatePath('/aluno/leitura'); return { ok: true }
 }
 
 export async function excluirModuloLeitura(id: string): Promise<{ ok: boolean; error?: string }> {

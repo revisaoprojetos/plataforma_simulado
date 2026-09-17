@@ -18,7 +18,6 @@ import { MetaDiariaCard } from '@/components/aluno/meta-diaria-card'
 import { MissoesLista } from '@/components/aluno/missoes-lista'
 import { StreakCalendario } from '@/components/aluno/streak-calendario'
 import { TrilhaSimulados, type Trilha } from '@/components/aluno/trilha-simulados'
-import { resolverTrilhaSimbolos } from '@/lib/gamificacao/trilha-simbolos'
 import { LigaPainel } from '@/components/aluno/liga-painel'
 import { RankingLiga } from '@/components/aluno/ranking-liga'
 import { ConquistasProgressoLista } from '@/components/aluno/conquistas-progresso'
@@ -50,8 +49,6 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   const mostrarDesempenhoBanner = (tenantRow?.tema as any)?.banners_desempenho === true
   // Estilo dos cards de simulado, definido no console (tema.card_view) — o aluno apenas obedece.
   const cardView = resolverCardView((tenantRow?.tema as any)?.card_view)
-  // Símbolos dos nós da trilha (Aparência da gamificação) — do tema do tenant.
-  const simbolosTrilha = resolverTrilhaSimbolos(tenantRow?.tema)
   // Config por-banner do rótulo "Em destaque para você" (ativo + texto). Default: ativo, texto padrão.
   const destaquesBanner = ((tenantRow?.tema as any)?.banner_destaques ?? {}) as Record<string, { ativo?: boolean; texto?: string; fadeAtivo?: boolean; fadeNivel?: number }>
   const destaqueDe = (id: string) => ({
@@ -430,7 +427,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
             </div>
           )}
 
-          {gamResumo && trilhas.length > 0 && <TrilhaSimulados trilhas={trilhas} gamAtivo={!!gamResumo} estilo={gamConfig?.trilha_estilo ?? 'cards'} visiveis={gamConfig?.trilha_visiveis ?? 3} simbolos={simbolosTrilha} />}
+          {gamResumo && trilhas.length > 0 && <TrilhaSimulados trilhas={trilhas} gamAtivo={!!gamResumo} estilo={gamConfig?.trilha_estilo ?? 'cards'} visiveis={gamConfig?.trilha_visiveis ?? 3} />}
 
           {/* Divisória horizontal (quase às bordas) separando a trilha dos simulados recentes. */}
           {gamResumo && trilhas.length > 0 && <div className="mx-auto h-px w-[92%]" style={{ background: 'linear-gradient(90deg, transparent, color-mix(in oklab, var(--foreground) 24%, transparent) 18%, color-mix(in oklab, var(--foreground) 24%, transparent) 82%, transparent)' }} />}

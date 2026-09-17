@@ -84,10 +84,11 @@ export function LeituraRanking({ ranking, meuId, modo = 'aluno' }: { ranking: Ra
         </div>
       )}
 
-      {/* Tabela */}
+      {/* Tabela — 10 por página (paginada) + cabeçalho fixo com rolagem de segurança. */}
       <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+        <div className="max-h-[60vh] overflow-y-auto">
         <table className="w-full text-sm">
-          <thead className="border-b bg-muted/30 text-left text-muted-foreground">
+          <thead className="sticky top-0 z-10 border-b bg-muted text-left text-muted-foreground shadow-sm">
             <tr>
               <Th c="posicao" className="w-14 text-center">#</Th>
               <th className="px-3 py-2.5 font-medium">Aluno</th>
@@ -99,6 +100,7 @@ export function LeituraRanking({ ranking, meuId, modo = 'aluno' }: { ranking: Ra
             {visiveis.map((it) => <LinhaRanking key={it.estudanteId} it={it} eu={!!meuId && it.estudanteId === meuId} modo={modo} />)}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Paginação */}

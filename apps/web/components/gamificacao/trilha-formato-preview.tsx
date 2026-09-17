@@ -20,13 +20,15 @@ const MOCK: Trilha = {
  * Prévia AO VIVO do formato: renderiza a trilha de exemplo no formato selecionado, com os balões/cards
  * reais (o nó "em andamento" abre o balão sozinho). Muda na hora ao trocar o formato ou os símbolos.
  */
-export function TrilhaFormatoPreview({ formato, simbolos }: { formato: TrilhaFormato; simbolos: TrilhaSimbolos }) {
+export function TrilhaFormatoPreview({ formato, simbolos, trilha, capa, inverter = false }: { formato: TrilhaFormato; simbolos: TrilhaSimbolos; trilha?: Trilha; capa?: string | null; inverter?: boolean }) {
+  const t = trilha && trilha.nodes.length > 0 ? trilha : MOCK
+  const real = t !== MOCK
   return (
     <div className="rounded-2xl border bg-muted/30 p-4">
-      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prévia do formato — exemplo</p>
-      <p className="mb-3 text-[11px] text-muted-foreground">Trilha fictícia só para demonstração. Clique nos nós para ver os balões.</p>
-      <div className="max-h-[520px] overflow-auto rounded-xl border bg-background p-4">
-        <TrilhaSistema trilhas={[MOCK]} gamAtivo simbolos={simbolos} formato={formato} semFundo />
+      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prévia do formato{real ? ' — aulas do módulo' : ' — exemplo'}</p>
+      <p className="mb-3 text-[11px] text-muted-foreground">{real ? 'Aulas reais do módulo neste formato. Clique nos nós para ver os balões.' : 'Trilha fictícia só para demonstração. Clique nos nós para ver os balões.'}</p>
+      <div className="max-h-[560px] overflow-auto rounded-xl border bg-background p-4">
+        <TrilhaSistema trilhas={[t]} gamAtivo simbolos={simbolos} formato={formato} capa={capa} inverter={inverter} semFundo />
       </div>
     </div>
   )

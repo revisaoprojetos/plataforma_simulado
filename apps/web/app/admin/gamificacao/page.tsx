@@ -1,10 +1,8 @@
 import { getCurrentAccess } from '@/lib/auth/permissions'
-import { getCurrentTenantId, getCurrentTenant } from '@/lib/tenant'
+import { getCurrentTenantId } from '@/lib/tenant'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getGamConfig } from '@/lib/gamificacao'
 import { metricasGamificacao } from '@/lib/gamificacao/metricas'
-import { resolverTrilhaSimbolos } from '@/lib/gamificacao/trilha-simbolos'
-import { resolverTrilhaFormato } from '@/lib/gamificacao/trilha-formato'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { GamificacaoTabs } from './gamificacao-tabs'
 import { Trophy } from 'lucide-react'
@@ -28,11 +26,6 @@ export default async function GamificacaoPage() {
   const config = await getGamConfig(svc, tenantId)
   const podeGerenciar = access.isAdmin || access.permissions.includes('gamificacao:manage')
   const metricas = config && tenantId ? await metricasGamificacao(svc, tenantId, config) : null
-  const tema = (await getCurrentTenant())?.tema
-  const simbolos = resolverTrilhaSimbolos(tema)
-  const formato = resolverTrilhaFormato(tema)
-  // A aba "Aparência" (símbolos da trilha) só aparece p/ o admin se o super-admin liberar no console.
-  const trilhaLiberadaAdmin = (tema as { gam_trilha_admin?: boolean } | null)?.gam_trilha_admin === true
 
   return (
     <div className="space-y-6">
@@ -49,7 +42,7 @@ export default async function GamificacaoPage() {
         </span>
       </div>
 
-      {config && metricas && <GamificacaoTabs config={config} podeGerenciar={podeGerenciar} metricas={metricas} simbolos={simbolos} formato={formato} trilhaLiberadaAdmin={trilhaLiberadaAdmin} />}
+      {config && metricas && <GamificacaoTabs config={config} podeGerenciar={podeGerenciar} metricas={metricas} />}
     </div>
   )
 }

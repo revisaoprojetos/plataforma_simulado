@@ -265,6 +265,11 @@
   from { opacity: 0; transform: translateY(14px); }
   to { opacity: 1; transform: none; }
 }
+/* Balão do dia (trilha personalizada) — flutuação suave sobe/desce enquanto aberto. */
+@keyframes trilha-flutua {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
 /* ===== Level Up v2 (modal de subida de nível — animações contidas e estáveis) ===== */
 @keyframes lu-in { from { opacity: 0; } to { opacity: 1; } }
 @keyframes lu-out { from { opacity: 1; transform: scale(1); } to { opacity: 0; transform: scale(.96); } }
@@ -698,18 +703,40 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 .leitura-prosa [data-grifo="complemento"], .leitura-prosa .hl-g { background:#a8d08d; color:#111; padding:0 1px; border-radius:2px; }
 .leitura-prosa [data-grifo="prazo"],       .leitura-prosa .hl-r { background:#cc99ff; color:#111; padding:0 1px; border-radius:2px; }
 .leitura-prosa [data-grifo="excecao"],     .leitura-prosa .exc  { color:#c00000; font-weight:700; }
+/* No tema ESCURO do leitor o vermelho-escuro (#c00000) some sobre a folha escura → tom claro legível. */
+.leitura-prosa[data-leitura-tema="escuro"] [data-grifo="excecao"],
+.leitura-prosa[data-leitura-tema="escuro"] .exc { color:#f9a8a8; }
+
+/* Grifos BAKED = <span> com FUNDO inline (marca-texto do editor) + `.hl-*`/`mark`. Esses spans não
+   definem `color` → herdam a cor CLARA do tema escuro e somem sobre o próprio realce. No tema escuro,
+   força o texto grifado para PRETO (o realce claro fica legível). Sem grifo (sem fundo), texto normal. */
+.leitura-prosa[data-leitura-tema="escuro"] span[style*="background"],
+.leitura-prosa[data-leitura-tema="escuro"] font[style*="background"],
+.leitura-prosa[data-leitura-tema="escuro"] b[style*="background"],
+.leitura-prosa[data-leitura-tema="escuro"] strong[style*="background"],
+.leitura-prosa[data-leitura-tema="escuro"] mark,
+.leitura-prosa[data-leitura-tema="escuro"] .hl-y,
+.leitura-prosa[data-leitura-tema="escuro"] .hl-g,
+.leitura-prosa[data-leitura-tema="escuro"] .hl-r { color:#111 !important; }
 
 /* Caixas de destaque (estruturais — permanecem no "modo sem grifos") */
 .leitura-prosa [data-caixa],
 .leitura-prosa .box-stj, .leitura-prosa .box-stf, .leitura-prosa .box-cinza,
 .leitura-prosa .box-cinza-esc, .leitura-prosa .box-atencao {
-  color:#111; padding:10px 14px; margin:18px 0 24px; border:1px solid #999; border-radius:8px; font-size:.95em;
+  color:#111; padding:10px 14px; margin:8px 0 10px; border:1px solid #999; border-radius:8px; font-size:.95em;
 }
 .leitura-prosa [data-caixa="stj"],        .leitura-prosa .box-stj      { background:#fff2cc; border-color:#c8a200; }
 .leitura-prosa [data-caixa="stf"],        .leitura-prosa .box-stf      { background:#bdd6ee; border-color:#2060a0; }
 .leitura-prosa [data-caixa="alerta"],     .leitura-prosa .box-atencao  { background:#fde9d9; border-color:#c06000; }
 .leitura-prosa [data-caixa="comentario"], .leitura-prosa .box-cinza,
 .leitura-prosa .box-cinza-esc { background:#d0cece; border-color:#999; }
+.leitura-prosa [data-caixa="cobrado"] { background:#efeafc; border-color:#b9a6ee; }
+/* Corpo da caixa "já cobrado" mais CLARO (a lista aparece só na expansão), quebrando linha; anula o
+   negrito herdado de <strong> que às vezes envolve o texto. */
+.leitura-prosa [data-caixa="cobrado"] > .caixa-corpo .caixa-corpo-in,
+.leitura-prosa [data-caixa="cobrado"] > .caixa-corpo .caixa-corpo-in * { color:#5b5b5b; font-weight:400; white-space:normal; overflow-wrap:anywhere; }
+/* Título = só "📌 Já cobrado em prova" (sem prévia). */
+.leitura-prosa [data-caixa="cobrado"] > .caixa-cab > :first-child { color:#5a4bbd; font-weight:600; }
 .leitura-prosa [data-caixa] > :first-child, .leitura-prosa [data-caixa] > :last-child,
 .leitura-prosa [class*="box-"] > :first-child, .leitura-prosa [class*="box-"] > :last-child { margin-top:0; margin-bottom:0; }
 
@@ -717,7 +744,17 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
    abre o corpo com animação (grid-rows 0fr↔1fr, sem cortar texto no meio). O JS envolve o corpo
    em .caixa-corpo/.caixa-corpo-in e marca o 1º filho como .caixa-cab (não muda o texto → âncoras
    e "espinha" intactas). */
-.leitura-prosa .caixa-colapsavel > .caixa-cab { position:relative; display:flex; align-items:baseline; gap:.45em; margin:0; padding-right:26px; cursor:pointer; user-select:none; }
+.leitura-prosa .caixa-colapsavel > .caixa-cab { position:relative; display:flex; align-items:center; gap:.4em; margin:0 !important; padding:0 26px 0 0 !important; line-height:1.4; cursor:pointer; user-select:none; }
+/* Corpo recolhido não reserva altura → cabeçalho fica centrado (sem "sobra" embaixo). */
+.leitura-prosa .caixa-colapsavel:not([data-aberto]) > .caixa-corpo { margin:0; }
+/* PADRONIZA o título (o acervo importado do Word traz font-size/line-height/margem/padding próprios que
+   desalinhavam e jogavam o título acima do meio): mesmo tamanho/linha, sem margem/padding → título +
+   prévia sempre na MESMA linha e o cabeçalho centrado verticalmente na caixa. */
+.leitura-prosa .caixa-colapsavel > .caixa-cab > :first-child { font-size:1em !important; line-height:1.4 !important; margin:0 !important; padding:0 !important; }
+.leitura-prosa .caixa-colapsavel > .caixa-cab::before { line-height:1.4; }
+/* Adiciona ":" após o título quando ele não termina em ":" (ex.: DESAPROPRIAÇÃO → DESAPROPRIAÇÃO:).
+   Via CSS content → não entra na "espinha" das âncoras dos grifos. */
+.leitura-prosa .caixa-colapsavel > .caixa-cab[data-add-colon] > :first-child::after { content:":"; }
 .leitura-prosa .caixa-colapsavel > .caixa-cab:hover { opacity:.85; }
 /* Título ("ENTENDIMENTO DO STJ:") não encolhe; a prévia (começo do corpo) trunca em 1 linha e some ao abrir.
    A prévia é um ::before com content:attr(data-previa) — SEM nó de texto, então não entra na "espinha"
@@ -738,6 +775,8 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 .leitura-prosa .caixa-colapsavel > .caixa-corpo { display:grid; grid-template-rows:0fr; transition:grid-template-rows .3s ease; }
 .leitura-prosa .caixa-colapsavel[data-aberto] > .caixa-corpo { grid-template-rows:1fr; }
 .leitura-prosa .caixa-colapsavel > .caixa-corpo > .caixa-corpo-in { overflow:hidden; min-height:0; }
+/* ABERTA: libera o overflow para o conteúdo aparecer INTEIRO (senão parte do texto "falta"/fica cortada). */
+.leitura-prosa .caixa-colapsavel[data-aberto] > .caixa-corpo > .caixa-corpo-in { overflow:visible; }
 
 /* "Artigos já cobrados em prova" (LegProc): selo + chevron de recolher no cabeçalho do artigo.
    O rótulo vem de CSS content (::before) → SEM nó de texto, não entra na espinha das âncoras. */
@@ -793,6 +832,20 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
   display:inline-block; background:rgba(37,99,235,.08); border-left:3px solid #2563eb;
   padding:2px 10px; margin:4px 0; border-radius:4px; font-size:.9em; color:inherit;
 }
+
+/* Tabelas comparativas (RESERVA LEGAL × LEGALIDADE etc.): cantos ARREDONDADOS + borda + fundo DIFERENTE
+   do cinza das caixas de recolher. Preserva .mac-tbl (que tem estilo próprio). */
+.leitura-prosa table:not(.mac-tbl) {
+  border-collapse:separate !important; border-spacing:0; width:100%; margin:10px 0;
+  border:1px solid #bfe0d3; border-radius:12px; overflow:hidden;
+}
+.leitura-prosa table:not(.mac-tbl) td, .leitura-prosa table:not(.mac-tbl) th {
+  border:1px solid #d8eee2 !important; background:#f0faf5 !important; padding:8px 11px !important; vertical-align:top;
+}
+.leitura-prosa table:not(.mac-tbl) tr:first-child > * { background:#dcf2e8 !important; font-weight:600; }
+.dark .leitura-prosa table:not(.mac-tbl) { border-color:#3b3a4d; }
+.dark .leitura-prosa table:not(.mac-tbl) td, .dark .leitura-prosa table:not(.mac-tbl) th { background:rgba(255,255,255,.04) !important; border-color:#3a3948 !important; }
+.dark .leitura-prosa table:not(.mac-tbl) tr:first-child > * { background:rgba(255,255,255,.08) !important; }
 
 /* Tabelas do padrão MAC (cabeçalho marinho + zebra) */
 .leitura-prosa .mac-tbl { width:100%; border-collapse:collapse; font-size:.9em; margin:6px 0; }

@@ -15,9 +15,9 @@ export const dynamic = 'force-dynamic'
 
 export default async function LeituraAdminPage({ searchParams }: { searchParams: Promise<{ pasta?: string; tab?: string }> }) {
   const { pasta, tab } = await searchParams
-  const moduloTab: ModuloTab = tab === 'acessos' || tab === 'config' || tab === 'ranking' ? tab : 'aulas'
-  // Otimização: só a aba Aulas (ou a raiz) precisa dos detalhes das aulas — Acessos/Config pulam esse fetch.
-  const data = await listarBancoAulas(pasta ?? null, !pasta || moduloTab === 'aulas')
+  const moduloTab: ModuloTab = tab === 'acessos' || tab === 'config' || tab === 'ranking' || tab === 'trilha' || tab === 'regulamento' ? tab : 'aulas'
+  // Otimização: só as abas Aulas/Editar trilha (ou a raiz) precisam dos detalhes das aulas — Acessos/Config pulam esse fetch.
+  const data = await listarBancoAulas(pasta ?? null, !pasta || moduloTab === 'aulas' || moduloTab === 'trilha')
   const temaCards = ((await getCurrentTenant())?.tema as any) ?? {}
   const cardView = resolverCardView(temaCards.card_view_admin ?? temaCards.card_view)
 
@@ -32,7 +32,8 @@ export default async function LeituraAdminPage({ searchParams }: { searchParams:
         // faixa com um cabeçalho COMPACTO (Voltar + título, sem descrição) + as tabs.
         <ModuloBanner
           banner={banner}
-          titulo="LegProc Digital"
+          degrade={data.ok && pasta ? data.moduloAtual?.trilhaAparencia.degrade : undefined}
+          titulo="Desafio de Lei Seca"
           subtitulo="Módulos ordenáveis → aulas (documento HTML + questões) que formam a trilha do aluno."
           topoDireita={data.ok && pasta && data.moduloAtual ? <PublicarModuloBotao pastaId={pasta} publicacao={data.moduloAtual.publicacao} /> : null}
           breadcrumb={
@@ -57,7 +58,7 @@ export default async function LeituraAdminPage({ searchParams }: { searchParams:
               </Link>
             )}
             <div>
-              <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><Library className="h-6 w-6 text-primary" /> LegProc Digital</h1>
+              <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><Library className="h-6 w-6 text-primary" /> Desafio de Lei Seca</h1>
               <p className="text-muted-foreground">Módulos ordenáveis → aulas (documento HTML + questões) que formam a trilha do aluno.</p>
             </div>
           </div>

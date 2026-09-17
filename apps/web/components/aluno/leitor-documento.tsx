@@ -16,7 +16,7 @@ import { construirEspinha, rangeParaAncora, ancoraParaRange, rectsDoRange, type 
 import { QuestaoLeitura } from '@/components/aluno/questao-leitura'
 import { LeituraAtualizacaoAviso } from '@/components/aluno/leitura-atualizacao-aviso'
 import { GRIFOS, corDoGrifo, ehEstrutural } from '@/lib/leitura/grifos'
-import { prepararCaixasTabela } from '@/lib/leitura/caixas'
+import { prepararCaixasTabela, prepararCaixasCobrado } from '@/lib/leitura/caixas'
 import { prepararArtigosCobrados } from '@/lib/leitura/artigos-cobrados'
 import { montarArvoreToc, type NoToc } from '@/lib/leitura/indice'
 import { IndiceArvore, type NoIndiceView } from '@/components/leitura/indice-arvore'
@@ -43,6 +43,7 @@ const TEMAS: Record<Tema, { bg: string; fg: string; muted: string; desk: string;
 }
 const GAP = 48 // entre "páginas" no modo virar
 const CORES_GRIFO = ['#fde047', '#86efac', '#93c5fd', '#f9a8d4', '#fca5a5'] // amarelo/verde/azul/rosa/vermelho
+const COR_NOTA_PADRAO = '#60a5fa' // cor inicial do sublinhado/ponto de uma NOTA (editável depois)
 // Rótulos-padrão da legenda das cores do aluno (renomeáveis; salvos por aluno nas preferências).
 const ROTULOS_GRIFO_PADRAO: Record<string, string> = {
   '#fde047': 'Importante', '#86efac': 'Revisar', '#93c5fd': 'Conceito', '#f9a8d4': 'Dúvida', '#fca5a5': 'Exceção',
@@ -122,6 +123,8 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
     else { seguirSistema.current = true; setTheme(t === 'escuro' ? 'dark' : 'light') }
   }
   const [fonte, setFonte] = useState(doc.prefs?.fonte || 18)
+  const [zoomPag, setZoomPag] = useState(1) // zoom da PÁGINA (estilo Word) — separado do zoom da fonte
+  const [todasAbertas, setTodasAbertas] = useState(false) // expandir/recolher TODAS as caixas de uma vez
   const [favorito, setFavorito] = useState(!!doc.favorito)
   const [menuAberto, setMenuAberto] = useState(true)
   const [pct, setPct] = useState(doc.progresso.pct)
@@ -208,11 +211,25 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
   const [barraDir, setBarraDir] = useState(false)
   const [sel, setSel] = useState<{ anc: { inicio: number; fim: number; exact: string; prefix: string; suffix: string }; x: number; y: number } | null>(null)
   const [notaEdit, setNotaEdit] = useState<{ id: string; valor: string } | null>(null)
+  const [notaAberta, setNotaAberta] = useState<{ ids: string[]; idx: number; porHover?: boolean } | null>(null) // balão: notas da MESMA linha + qual está visível (setas); porHover = aberto passando o mouse
+  const notaAbertaRef = useRef<typeof notaAberta>(null); notaAbertaRef.current = notaAberta
+  const hoverNotaTimer = useRef<number | null>(null)
 
   const containerRef = useRef<HTMLDivElement>(null)
   const viewportRef = useRef<HTMLDivElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
+  // Expandir/recolher TODAS as caixas colapsáveis de uma vez (STJ/STF, tabela, "já cobrado", etc.).
+  const alternarTodasCaixas = (abrir: boolean) => {
+    const cont = contentRef.current; if (!cont) return
+    for (const box of Array.from(cont.querySelectorAll<HTMLElement>('.caixa-colapsavel'))) {
+      if (abrir) box.setAttribute('data-aberto', '1'); else box.removeAttribute('data-aberto')
+      box.querySelector('.caixa-cab')?.setAttribute('aria-expanded', abrir ? 'true' : 'false')
+    }
+    setTodasAbertas(abrir)
+    window.dispatchEvent(new Event('resize'))
+    setTimeout(() => window.dispatchEvent(new Event('resize')), 340)
+  }
   const overlayRef = useRef<HTMLDivElement>(null)
   const espinhaRef = useRef<Espinha | null>(null)
   const espinhaHtmlRef = useRef<string>('')      // assinatura p/ reusar a espinha (só refaz quando o HTML muda)
@@ -383,7 +400,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
     if (maxOff > 0) total = Math.min(total, Math.floor(maxOff / passo) + 1)
     setTotalPag(total)
     setPagina((p) => Math.min(p, total - 1))
-  }, [modo, colW, fonte, doc.html, slots])
+  }, [modo, colW, fonte, zoomPag, doc.html, slots])
 
   // ── Grifos: (re)calcula os retângulos do overlay. Coords LOCAIS ao overlay → imunes ao
   // translateX (virar) e ao scroll (as diferenças cancelam a transformação); por isso só
@@ -413,7 +430,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
     }
     setGrifosRects(gmap)
   }, [anotacoes, grifos, doc.html])
-  useIsoLayout(() => { recomputarGrifos() }, [recomputarGrifos, modo, colW, fonte, doc.html, slots])
+  useIsoLayout(() => { recomputarGrifos() }, [recomputarGrifos, modo, colW, fonte, zoomPag, doc.html, slots])
 
   // Reflow por RESIZE real da janela E pelo colapso/expansão das caixas STJ/STF (que disparam
   // um 'resize' sintético): sem isto o overlay de grifos desalinha e a paginação (flip) fica
@@ -459,7 +476,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
       setMatches(res); setMatchIdx((idx) => Math.min(idx, Math.max(0, res.length - 1)))
     }, 180)
     return () => clearTimeout(t)
-  }, [buscaQ, modo, colW, fonte, doc.html, slots, capAtual])
+  }, [buscaQ, modo, colW, fonte, zoomPag, doc.html, slots, capAtual])
 
   // ── Cálculo de progresso (%, artigo alcançado) ──
   const atualizarProgresso = useCallback(() => {
@@ -668,7 +685,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
   // POST no servidor; devolve só o id novo (SEM tocar no estado — o estado é otimista no grifarAncora).
   async function postAnotacao(a: AnotacaoAluno): Promise<string | null> {
     try {
-      const res = await fetch('/api/leitura/anotacao', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ documento_id: doc.id, versao: doc.versao, inicio_char: a.inicio, fim_char: a.fim, exact: a.exact, prefix: a.prefix, suffix: a.suffix, cor: a.cor, nota: a.nota }) })
+      const res = await fetch('/api/leitura/anotacao', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ documento_id: doc.id, versao: doc.versao, inicio_char: a.inicio, fim_char: a.fim, exact: a.exact, prefix: a.prefix, suffix: a.suffix, cor: a.cor, nota: a.nota, tipo: a.tipo }) })
       const j = await res.json()
       return j?.ok ? (j.id as string) : null
     } catch { return null }
@@ -696,24 +713,34 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
   // ── Ações do usuário (registram no histórico). opLock evita reentrância (clique/Enter rápido). ──
   // Grifa uma âncora na cor dada — OTIMISTA: aparece na hora (id temporário) e só depois troca pelo
   // id real do servidor. Em falha, remove. Sem esperar o round-trip → sem atraso visual.
-  async function grifarAncora(a: { inicio: number; fim: number; exact: string; prefix: string; suffix: string }, cor: string) {
-    if (opLock.current) return
+  async function grifarAncora(a: { inicio: number; fim: number; exact: string; prefix: string; suffix: string }, cor: string, tipo: 'grifo' | 'nota' = 'grifo', nota: string | null = null): Promise<string | null> {
+    if (opLock.current) return null
     const tmpId = `tmp-${Date.now()}-${Math.round(Math.random() * 1e6)}`
-    const otim: AnotacaoAluno = { id: tmpId, inicio: a.inicio, fim: a.fim, exact: a.exact, prefix: a.prefix, suffix: a.suffix, cor, nota: null, origem: 'propria' }
+    const otim: AnotacaoAluno = { id: tmpId, inicio: a.inicio, fim: a.fim, exact: a.exact, prefix: a.prefix, suffix: a.suffix, cor, nota, origem: 'propria', tipo }
     setAnotacoes((p) => [...p, otim])
     opLock.current = true
     const id = await postAnotacao(otim)
     opLock.current = false
-    if (!id) { setAnotacoes((p) => p.filter((x) => x.id !== tmpId)); toast.error('Erro ao grifar.'); return }
+    if (!id) { setAnotacoes((p) => p.filter((x) => x.id !== tmpId)); toast.error(tipo === 'nota' ? 'Erro ao anotar.' : 'Erro ao grifar.'); return null }
     const real: AnotacaoAluno = { ...otim, id }
     setAnotacoes((p) => p.map((x) => (x.id === tmpId ? real : x)))
     registrar([{ k: 'add', a: real }])
+    return id
   }
   async function criarAnotacao(cor: string) {
     if (!sel) return
     const a = sel.anc
     setSel(null); window.getSelection()?.removeAllRanges()
     await grifarAncora(a, cor)
+  }
+  // NOTA: cria uma anotação tipo 'nota' (sublinhado + ponto na margem) e abre o balão em edição para
+  // o aluno digitar o comentário referente ao trecho selecionado.
+  async function criarNota() {
+    if (!sel) return
+    const a = sel.anc
+    setSel(null); window.getSelection()?.removeAllRanges()
+    const id = await grifarAncora(a, COR_NOTA_PADRAO, 'nota', '')
+    if (id) { setNotaAberta({ ids: [id], idx: 0 }); setNotaEdit({ id, valor: '' }) }
   }
   // Borracha: apaga os grifos PRÓPRIOS (servidor) E oculta os grifos do REVISÃO — tanto o overlay
   // (doc.grifos) quanto os ASSADOS no HTML (spans data-grifo, via classe) — que a seleção toca.
@@ -879,9 +906,19 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
   }
 
   const proseStyle = useMemo<React.CSSProperties>(() => ({ fontSize: fonte, lineHeight: 1.7, color: cores.fg }), [fonte, cores.fg])
-  // Blend do overlay de grifos: multiply escurece (ok em fundo claro), mas some no tema ESCURO
-  // (cor × preto = preto). No escuro usa 'screen' (clareia) → o grifo aparece sobre o fundo escuro.
-  const blendGrifo = (tema === 'escuro' ? 'screen' : 'multiply') as React.CSSProperties['mixBlendMode']
+  // Blend do overlay de grifos. O overlay fica ATRÁS do texto (conteúdo é `relative z-[1]`), então o
+  // texto NUNCA é lavado pelo blend — ele pinta opaco por cima e permanece legível nos dois temas.
+  //  - claro: 'multiply' → realce saturado (highlighter) sobre a folha branca, texto escuro por cima.
+  //  - escuro: 'normal'  → realce colorido translúcido sobre a folha escura (mistura só com a folha,
+  //    não com as letras), texto claro nítido por cima. ('screen' clareava demais → baixo contraste.)
+  const escuro = tema === 'escuro'
+  // Overlay dos grifos fica POR CIMA do texto (para grifo/nota do aluno aparecerem sobre os grifos do
+  // Revisão, que são fundos "assados" no HTML). No claro usa 'multiply' (marca-texto clássico, o texto
+  // escuro passa por baixo). No escuro usa opacidade baixa + 'normal' → tingido leve, o texto claro
+  // continua visível por baixo. (O texto PRETO dos grifos do Revisão vem do CSS `[style*=background]`.)
+  const blendGrifo = (escuro ? 'normal' : 'multiply') as React.CSSProperties['mixBlendMode']
+  const corRealce = (c: string) => c
+  const opacRealce = escuro ? 0.4 : 0.42
 
   // ── Conteúdo + overlays MEMOIZADOS (anti-flash). ──
   // Sem isto, QUALQUER re-render (ex.: expandir/recolher um capítulo no sumário → muda `tocAberto`)
@@ -892,6 +929,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
   const conteudoEl = useMemo(() => (
     <div
       ref={contentRef}
+      data-leitura-tema={tema}
       className={cn('leitura-conteudo leitura-prosa px-6 py-6 [&_a]:underline [&_h1]:mb-3 [&_h1]:mt-4 [&_h1]:text-2xl [&_h1]:font-bold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-xl [&_h2]:font-bold [&_h3]:mb-1 [&_h3]:mt-3 [&_h3]:text-lg [&_h3]:font-semibold [&_li]:ml-6 [&_li]:list-disc [&_p]:mb-3 [&_table]:my-3 [&_table]:w-full [&_td]:border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:px-2 [&_th]:py-1', semGrifos && 'sem-grifos')}
       style={modo === 'flip'
         ? { ...proseStyle, columnWidth: colW || undefined, columnGap: GAP, columnFill: 'auto', height: '100%' }
@@ -909,7 +947,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
         const info = (GRIFOS as any)[g.tipo]
         const label = info?.label ?? 'Grifo'
         return gr.rects.map((r, i) => (
-          <div key={`g-${g.id}-${i}`} className="absolute rounded-[2px]" title={label} style={{ left: r.left, top: r.top, width: r.width, height: r.height, background: corDoGrifo(g.tipo), opacity: 0.42, mixBlendMode: blendGrifo }}>
+          <div key={`g-${g.id}-${i}`} className="absolute rounded-[2px]" title={label} style={{ left: r.left, top: r.top, width: r.width, height: r.height, background: corRealce(corDoGrifo(g.tipo)), opacity: opacRealce, mixBlendMode: blendGrifo }}>
             {i === 0 && ehEstrutural(g.tipo) && (
               <span className="absolute -top-4 left-0 whitespace-nowrap rounded px-1 text-[9px] font-bold uppercase tracking-wide text-white" style={{ background: corDoGrifo(g.tipo), mixBlendMode: 'normal' }}>{label}</span>
             )}
@@ -924,17 +962,129 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
   const anotacoesOverlay = useMemo(() => (
     <div ref={overlayRef} className="pointer-events-none absolute inset-0" aria-hidden>
       {mostrarMeus && anotacoes.map((a) => (rectsPorId[a.id] ?? []).map((r, i) => (
-        <div key={`${a.id}-${i}`} className="absolute rounded-[2px]" style={{ left: r.left, top: r.top, width: r.width, height: r.height, background: a.cor, opacity: 0.42, mixBlendMode: blendGrifo }} />
+        a.tipo === 'nota'
+          // NOTA: só sublinha o trecho (linha na cor da nota, na base do texto). Sem realce cheio → o
+          // texto mantém a cor do tema. O ponto na margem + balão ficam em camadas próprias (abaixo).
+          ? <div key={`${a.id}-${i}`} className="absolute" style={{ left: r.left, top: r.top + r.height - 2, width: r.width, height: 2, background: a.cor, borderRadius: 2 }} />
+          : <div key={`${a.id}-${i}`} className="absolute rounded-[2px]" style={{ left: r.left, top: r.top, width: r.width, height: r.height, background: corRealce(a.cor), opacity: opacRealce, mixBlendMode: blendGrifo }} />
       )))}
     </div>
   ), [anotacoes, rectsPorId, blendGrifo, mostrarMeus])
+
+  // PONTOS de nota: UM por LINHA, no lado DIREITO FORA da folha. Se a linha tiver várias notas, o
+  // ponto mostra a contagem e o balão ganha SETAS para navegar. (botões pointer-events-auto; z acima do texto.)
+  const notasDots = useMemo(() => {
+    if (!mostrarMeus) return null
+    const notas = anotacoes.filter((a) => a.tipo === 'nota' && (rectsPorId[a.id]?.length))
+    if (!notas.length) return null
+    // agrupa por faixa vertical (linha): 1 ponto por linha; ids em ordem de leitura.
+    const bandas = new Map<number, { top: number; ids: string[] }>()
+    for (const a of [...notas].sort((x, y) => x.inicio - y.inicio)) {
+      const r = rectsPorId[a.id][0]
+      const key = Math.round(r.top / 16)
+      const b = bandas.get(key)
+      if (b) b.ids.push(a.id)
+      else bandas.set(key, { top: r.top, ids: [a.id] })
+    }
+    const openId = notaAberta ? notaAberta.ids[notaAberta.idx] : null
+    const abrir = (ids: string[], idx: number) => { const id = ids[idx]; const a = anotacoes.find((x) => x.id === id); setNotaAberta({ ids, idx }); setNotaEdit({ id, valor: a?.nota ?? '' }) }
+    return (
+      <div className="pointer-events-none absolute inset-0 z-[2]" aria-hidden>
+        {[...bandas.values()].flatMap((b) => {
+          const first = anotacoes.find((a) => a.id === b.ids[0]); if (!first) return []
+          // Até 4 notas na linha → um ponto POR nota (cor de cada). 5+ → um ponto com o NÚMERO.
+          if (b.ids.length > 4) {
+            const aberto = openId != null && b.ids.includes(openId)
+            return [(
+              <button key={`nd-${b.ids[0]}`} type="button" data-nota-dot
+                onClick={(e) => { e.stopPropagation(); if (aberto) { setNotaAberta(null); setNotaEdit(null) } else abrir(b.ids, 0) }}
+                title={`${b.ids.length} notas nesta linha`} aria-label="Abrir notas da linha"
+                className="pointer-events-auto absolute flex items-center justify-center rounded-full border border-white/70 text-[8px] font-bold leading-none text-white transition hover:scale-125"
+                style={{ right: -26, top: b.top + 1, height: 16, width: 16, background: first.cor, boxShadow: aberto ? `0 0 0 3px ${first.cor}55` : '0 1px 2px rgba(0,0,0,.3)' }}>
+                {b.ids.length}
+              </button>
+            )]
+          }
+          return b.ids.map((id, i) => {
+            const a = anotacoes.find((x) => x.id === id); if (!a) return null
+            const aberto = openId === id
+            return (
+              <button key={`nd-${id}`} type="button" data-nota-dot
+                onClick={(e) => { e.stopPropagation(); if (aberto) { setNotaAberta(null); setNotaEdit(null) } else abrir(b.ids, i) }}
+                title={a.nota || 'Nota'} aria-label="Abrir nota"
+                className="pointer-events-auto absolute rounded-full border border-white/70 transition hover:scale-125"
+                style={{ right: -22 - i * 14, top: b.top + 3, height: 11, width: 11, background: a.cor, boxShadow: aberto ? `0 0 0 3px ${a.cor}55` : '0 1px 2px rgba(0,0,0,.3)' }} />
+            )
+          })
+        })}
+      </div>
+    )
+  }, [anotacoes, rectsPorId, mostrarMeus, notaAberta])
+
+  // Fecha o balão de nota ao clicar fora (mantém aberto ao clicar no próprio balão ou num ponto).
+  useEffect(() => {
+    if (!notaAberta) return
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as HTMLElement | null
+      if (t && (t.closest('[data-nota-balao]') || t.closest('[data-nota-dot]'))) return
+      setNotaAberta(null); setNotaEdit(null)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [notaAberta])
+
+  // HOVER: passar o mouse sobre um grifo/nota DO ESTUDANTE também abre o balão (espiar). Detecta por
+  // GEOMETRIA — os overlays são pointer-events-none p/ não quebrar a seleção de texto. Fecha ao sair
+  // (carência); entrar no balão o mantém; clicar dentro "fixa" (não fecha mais no hover).
+  useEffect(() => {
+    const cont = contentRef.current, ov = overlayRef.current
+    if (!cont || !ov) return
+    let raf = 0
+    const achar = (cx: number, cy: number): string | null => {
+      const base = ov.getBoundingClientRect()
+      const x = cx - base.left, y = cy - base.top
+      for (const a of anotacoes) {
+        if (a.origem !== 'propria' || a.tipo !== 'nota') continue // só NOTAS do estudante têm balão
+        const rs = rectsPorId[a.id]; if (!rs) continue
+        // Área de detecção esticada 18px PRA CIMA → cobre o "vão" entre o sublinhado e o balão (que
+        // abre acima), evitando o flicker abre/fecha ao subir o mouse em direção ao balão.
+        if (rs.some((r) => x >= r.left - 2 && x <= r.left + r.width + 2 && y >= r.top - 18 && y <= r.top + r.height + 2)) return a.id
+      }
+      return null
+    }
+    const onMove = (e: MouseEvent) => {
+      if (raf) return
+      const cx = e.clientX, cy = e.clientY
+      raf = requestAnimationFrame(() => {
+        raf = 0
+        if (!mostrarMeus) return
+        const hit = achar(cx, cy)
+        const cur = notaAbertaRef.current
+        if (hit) {
+          if (hoverNotaTimer.current) { clearTimeout(hoverNotaTimer.current); hoverNotaTimer.current = null }
+          if (cur && cur.ids[cur.idx] === hit) return // já aberto nessa anotação
+          if (cur && !cur.porHover) return             // não rouba de um balão fixado (clicado)
+          const a = anotacoes.find((x) => x.id === hit)
+          setNotaAberta({ ids: [hit], idx: 0, porHover: true })
+          setNotaEdit({ id: hit, valor: a?.nota ?? '' })
+        } else if (cur?.porHover && !hoverNotaTimer.current) {
+          hoverNotaTimer.current = window.setTimeout(() => {
+            hoverNotaTimer.current = null
+            if (notaAbertaRef.current?.porHover) { setNotaAberta(null); setNotaEdit(null) }
+          }, 280)
+        }
+      })
+    }
+    cont.addEventListener('mousemove', onMove)
+    return () => { cont.removeEventListener('mousemove', onMove); if (raf) cancelAnimationFrame(raf); if (hoverNotaTimer.current) clearTimeout(hoverNotaTimer.current) }
+  }, [anotacoes, rectsPorId, mostrarMeus])
 
   // Realce estilo "busca de PDF": todos os matches como uma SELEÇÃO azul; o ATUAL destacado em âmbar.
   const matchesOverlay = useMemo(() => matches.length === 0 ? null : (
     <div className="pointer-events-none absolute inset-0" aria-hidden>
       {matches.map((m, mi) => m.rects.map((r, i) => {
         const atual = mi === matchIdx
-        return <div key={`m-${mi}-${i}`} className="absolute rounded-[2px]" style={{ left: r.left, top: r.top, width: r.width, height: r.height, background: atual ? '#f59e0b' : '#3b82f6', opacity: atual ? 0.55 : 0.3, mixBlendMode: blendGrifo, outline: atual ? '1.5px solid #d97706' : 'none' }} />
+        return <div key={`m-${mi}-${i}`} className="absolute rounded-[2px]" style={{ left: r.left, top: r.top, width: r.width, height: r.height, background: corRealce(atual ? '#f59e0b' : '#3b82f6'), opacity: escuro ? (atual ? 0.7 : 0.5) : (atual ? 0.55 : 0.3), mixBlendMode: blendGrifo, outline: atual ? '1.5px solid #d97706' : 'none' }} />
       }))}
     </div>
   ), [matches, matchIdx, blendGrifo])
@@ -945,28 +1095,47 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
   useEffect(() => {
     const cont = contentRef.current
     if (!cont) return
+    // DELEGAÇÃO única no container: 1 só handler para TODAS as caixas (STJ/STF, tabela, "já cobrado").
+    // Antes cada cabeçalho tinha o próprio listener — dava pra duplicar/sobrepor (a "zona que anima mas não
+    // expande"). Guard `data-toggling` ignora um 2º disparo no mesmo clique → nunca fecha de volta.
     const onCab = (e: Event) => {
-      const cab = e.currentTarget as HTMLElement
+      const cab = (e.target as HTMLElement)?.closest?.('.caixa-cab') as HTMLElement | null
+      if (!cab || !cont.contains(cab)) return
       const box = cab.closest('.caixa-colapsavel') as HTMLElement | null
       if (!box) return
+      if (box.hasAttribute('data-toggling')) return
+      box.setAttribute('data-toggling', '1'); setTimeout(() => box.removeAttribute('data-toggling'), 380)
       const abrir = !box.hasAttribute('data-aberto')
       if (abrir) box.setAttribute('data-aberto', '1'); else box.removeAttribute('data-aberto')
       cab.setAttribute('aria-expanded', abrir ? 'true' : 'false')
       // Nudge imediato + ao FIM da transição, senão o overlay dos grifos mede um estado intermediário.
       window.dispatchEvent(new Event('resize'))
-      box.querySelector('.caixa-corpo')?.addEventListener(
-        'transitionend', () => window.dispatchEvent(new Event('resize')), { once: true },
-      )
+      box.querySelector('.caixa-corpo')?.addEventListener('transitionend', () => window.dispatchEvent(new Event('resize')), { once: true })
     }
-    // Acessibilidade: o cabeçalho é um botão — abre por Enter/Espaço, não só clique de mouse.
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); (e.currentTarget as HTMLElement).click() } }
-    const ligados: HTMLElement[] = []
+    // Acessibilidade: cabeçalho é botão — abre por Enter/Espaço.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return
+      const cab = (e.target as HTMLElement)?.closest?.('.caixa-cab')
+      if (!cab || !cont.contains(cab)) return
+      e.preventDefault(); onCab(e)
+    }
+    cont.addEventListener('click', onCab)
+    cont.addEventListener('keydown', onKey)
     const limpezasTab: (() => void)[] = []
     // Caixas em TABELA recolhem via helper compartilhado; ao alternar, realinha os grifos.
     const onTabToggle = () => { window.dispatchEvent(new Event('resize')); setTimeout(() => window.dispatchEvent(new Event('resize')), 320) }
     // `aplicar` idempotente + rAF + MutationObserver (igual ao admin): garante o recolhimento mesmo
     // se o conteúdo montar/mutar depois (era o motivo de "não recolher igual no admin" no aluno).
-    const aplicar = () => {
+    let mo: MutationObserver | null = null
+    let rodando = false
+    const aplicarCore = () => {
+      // Recolhe os VÃOS grandes entre blocos: parágrafos vazios (só espaço/br, sem imagem/tabela) somem do
+      // layout (display:none) — NÃO removidos do DOM, então a "espinha" das âncoras dos grifos fica intacta.
+      for (const p of Array.from(cont.querySelectorAll<HTMLElement>('p'))) {
+        if (p.hasAttribute('data-vazio') || p.closest('.caixa-colapsavel')) continue
+        if (p.querySelector('img, table, iframe')) continue
+        if ((p.textContent || '').replace(/ /g, ' ').trim() === '') { p.setAttribute('data-vazio', '1'); p.style.display = 'none' }
+      }
       // Pega data-caixa (novo) E as classes legadas box-stj/box-stf (conteúdo antigo).
       const caixas = Array.from(cont.querySelectorAll<HTMLElement>('[data-caixa="stj"], [data-caixa="stf"], .box-stj, .box-stf'))
       for (const box of caixas) {
@@ -987,23 +1156,34 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
         // Vai num data-attr → renderizada via CSS ::before (sem nó de texto → não mexe na espinha das âncoras).
         const previa = (inner.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 160)
         if (previa) cab.setAttribute('data-previa', previa)
+        const tit = (cab.textContent || '').replace(/\s+/g, ' ').trim()
+        if (tit && !/[:：]$/.test(tit)) cab.setAttribute('data-add-colon', '1')
         box.classList.add('caixa-colapsavel')
         box.removeAttribute('data-aberto') // recolhida por padrão (igual ao admin)
-        cab.setAttribute('aria-expanded', 'false')
-        cab.addEventListener('click', onCab); cab.addEventListener('keydown', onKey); ligados.push(cab)
+        cab.setAttribute('aria-expanded', 'false') // clique/tecla tratados por delegação no container
       }
       // Caixas em TABELA (ENTENDIMENTO importado do Word) — mesmo recolher/expandir, via helper compartilhado.
       limpezasTab.push(prepararCaixasTabela(cont, onTabToggle))
+      // "📌 Já cobrado em prova:" → caixa colapsável no mesmo estilo.
+      limpezasTab.push(prepararCaixasCobrado(cont, onTabToggle))
       // Artigos já cobrados em prova (com questão ancorada): selo + recolher/expandir (default aberto).
       limpezasTab.push(prepararArtigosCobrados(cont, artigosCobrados, onTabToggle))
+    }
+    // Envelope: desconecta o observer enquanto muta (senão as PRÓPRIAS mutações dos transforms re-disparam
+    // o observer → reprocessa/reinicia as caixas, o que quebrava o expandir). Guard re-entrante também.
+    const aplicar = () => {
+      if (rodando) return
+      rodando = true
+      mo?.disconnect()
+      try { aplicarCore() } finally { mo?.observe(cont, { childList: true, subtree: true }); rodando = false }
     }
     aplicar()
     const raf = requestAnimationFrame(aplicar)
     // Esconder a LEGENDA + recolher as caixas muda o layout → realinha os grifos uma vez.
     const raf2 = requestAnimationFrame(() => window.dispatchEvent(new Event('resize')))
-    const mo = new MutationObserver(aplicar)
+    mo = new MutationObserver(() => aplicar())
     mo.observe(cont, { childList: true, subtree: true })
-    return () => { cancelAnimationFrame(raf); cancelAnimationFrame(raf2); mo.disconnect(); for (const c of ligados) { c.removeEventListener('click', onCab); c.removeEventListener('keydown', onKey) }; for (const l of limpezasTab) l() }
+    return () => { cancelAnimationFrame(raf); cancelAnimationFrame(raf2); mo?.disconnect(); cont.removeEventListener('click', onCab); cont.removeEventListener('keydown', onKey); for (const l of limpezasTab) l() }
   }, [doc.html, artigosCobrados])
 
   return (
@@ -1020,8 +1200,8 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
       {menuAberto && (
         <aside className="flex w-64 shrink-0 flex-col border-r" style={{ borderColor: '#0000001a', background: cores.bg }}>
           <div className="flex items-center justify-between border-b px-3 py-2.5" style={{ borderColor: '#0000001a' }}>
-            <Link href="/aluno/leitura" className="inline-flex items-center gap-1 text-sm font-medium" style={{ color: cores.muted }}>
-              <ArrowLeft className="h-4 w-4" /> Biblioteca
+            <Link href={trilha?.voltarHref ?? '/aluno/leitura'} className="inline-flex items-center gap-1 text-sm font-medium" style={{ color: cores.muted }}>
+              <ArrowLeft className="h-4 w-4" /> {trilha?.voltarHref && trilha.voltarHref !== '/aluno/leitura' ? 'Trilha' : 'Biblioteca'}
             </Link>
             <button onClick={() => setMenuAberto(false)} className="rounded p-1" style={{ color: cores.muted }} aria-label="Fechar menu"><X className="h-4 w-4" /></button>
           </div>
@@ -1034,6 +1214,20 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
                   <Icon className="h-3.5 w-3.5" /> {label}
                 </button>
               ))}
+            </div>
+            <button type="button" onClick={() => alternarTodasCaixas(!todasAbertas)}
+              className="flex w-full items-center justify-center gap-1.5 rounded-lg border py-1.5 text-xs font-medium transition-colors hover:bg-black/[0.03]"
+              style={{ borderColor: '#0000001a', color: cores.fg }}>
+              {todasAbertas ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              {todasAbertas ? 'Recolher tudo' : 'Expandir tudo'}
+            </button>
+            <div className="flex items-center justify-between">
+              <span className="text-xs" style={{ color: cores.muted }}>Zoom</span>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setZoomPag((z) => Math.max(0.7, Math.round((z - 0.1) * 10) / 10))} className="rounded border p-1" style={{ borderColor: '#0000001a', color: cores.fg }} aria-label="Diminuir zoom"><Minus className="h-3.5 w-3.5" /></button>
+                <span className="w-10 text-center text-xs tabular-nums" style={{ color: cores.fg }}>{Math.round(zoomPag * 100)}%</span>
+                <button onClick={() => setZoomPag((z) => Math.min(2.5, Math.round((z + 0.1) * 10) / 10))} className="rounded border p-1" style={{ borderColor: '#0000001a', color: cores.fg }} aria-label="Aumentar zoom"><Plus className="h-3.5 w-3.5" /></button>
+              </div>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-xs" style={{ color: cores.muted }}>Fonte</span>
@@ -1149,7 +1343,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
               className={cn('relative', modo !== 'flip' && 'mx-auto mb-6 mt-3 max-w-3xl rounded-lg')}
               style={modo === 'flip'
                 ? { height: '100%', transform: `translateX(-${pagina * (colW + GAP)}px)`, transition: 'transform 220ms ease' }
-                : { background: cores.sheet, border: `1px solid ${tema === 'escuro' ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)'}`, boxShadow: tema === 'escuro' ? '0 6px 20px rgba(0,0,0,.4)' : '0 1px 2px rgba(0,0,0,.04), 0 8px 22px rgba(0,0,0,.08)' }}
+                : { background: cores.sheet, border: `1px solid ${tema === 'escuro' ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)'}`, boxShadow: tema === 'escuro' ? '0 6px 20px rgba(0,0,0,.4)' : '0 1px 2px rgba(0,0,0,.04), 0 8px 22px rgba(0,0,0,.08)', zoom: zoomPag }}
             >
               {conteudoEl}
               {/* Overlay de GRIFOS EDITORIAIS (conteúdo). Some no "modo sem grifos" (exceto estruturais). */}
@@ -1158,6 +1352,57 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
               {anotacoesOverlay}
               {/* Overlay dos resultados de busca (realce laranja; atual mais forte) */}
               {matchesOverlay}
+              {/* Pontos de nota na margem */}
+              {notasDots}
+              {/* Balão da NOTA — sobre o trecho. Setas navegam entre notas da MESMA linha; troca de cor da linha. */}
+              {notaAberta && (() => {
+                const id = notaAberta.ids[notaAberta.idx]
+                const a = anotacoes.find((x) => x.id === id)
+                const rs = a ? rectsPorId[a.id] : null
+                if (!a || !rs || !rs.length) return null
+                const r = rs[0]
+                const larg = wrapperRef.current?.clientWidth ?? 700
+                const left = Math.max(6, Math.min(r.left, larg - 262))
+                const varias = notaAberta.ids.length > 1
+                const irPara = (d: number) => {
+                  const n = (notaAberta.idx + d + notaAberta.ids.length) % notaAberta.ids.length
+                  const nid = notaAberta.ids[n]; const na = anotacoes.find((x) => x.id === nid)
+                  setNotaAberta({ ids: notaAberta.ids, idx: n }); setNotaEdit({ id: nid, valor: na?.nota ?? '' })
+                }
+                return (
+                  <div data-nota-balao className="absolute z-40 w-64 rounded-xl border bg-popover p-2 text-popover-foreground shadow-xl" style={{ left, top: Math.max(6, r.top - 8), transform: 'translateY(-100%)' }}
+                    onMouseDown={(e) => { e.stopPropagation(); setNotaAberta((c) => (c ? { ...c, porHover: false } : c)) /* clicar dentro fixa */ }}
+                    onMouseEnter={() => { if (hoverNotaTimer.current) { clearTimeout(hoverNotaTimer.current); hoverNotaTimer.current = null } }}
+                    onMouseLeave={() => { if (hoverNotaTimer.current || !notaAbertaRef.current?.porHover) return; hoverNotaTimer.current = window.setTimeout(() => { hoverNotaTimer.current = null; if (notaAbertaRef.current?.porHover) { setNotaAberta(null); setNotaEdit(null) } }, 240) }}>
+                    <div className="mb-1.5 flex items-center gap-1.5">
+                      <StickyNote className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Nota</span>
+                      {varias && (
+                        <div className="ml-auto flex items-center gap-0.5">
+                          <button onClick={() => irPara(-1)} className="rounded p-0.5 text-muted-foreground transition hover:bg-muted hover:text-foreground" aria-label="Nota anterior"><ChevronLeft className="h-3.5 w-3.5" /></button>
+                          <span className="min-w-[1.75rem] text-center text-[10px] font-medium tabular-nums text-muted-foreground">{notaAberta.idx + 1}/{notaAberta.ids.length}</span>
+                          <button onClick={() => irPara(1)} className="rounded p-0.5 text-muted-foreground transition hover:bg-muted hover:text-foreground" aria-label="Próxima nota"><ChevronRight className="h-3.5 w-3.5" /></button>
+                        </div>
+                      )}
+                    </div>
+                    <textarea value={notaEdit?.id === a.id ? notaEdit.valor : (a.nota ?? '')} onChange={(e) => setNotaEdit({ id: a.id, valor: e.target.value })} rows={3} autoFocus placeholder="Escreva sua nota…" className="w-full resize-none rounded-md border bg-transparent px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-ring" />
+                    {/* Cor da linha (sublinhado + ponto) */}
+                    <div className="mt-1.5 flex items-center gap-1.5">
+                      <span className="text-[10px] font-medium text-muted-foreground">Cor:</span>
+                      {CORES_GRIFO.map((c) => (
+                        <button key={c} onClick={() => atualizarAnotacao(a.id, { cor: c })} className={cn('h-4 w-4 rounded-full transition hover:scale-110', a.cor === c ? 'ring-2 ring-primary' : 'border border-black/10')} style={{ background: c }} aria-label={`Cor ${c}`} />
+                      ))}
+                    </div>
+                    <div className="mt-2 flex items-center justify-between">
+                      <button onClick={() => { const restam = notaAberta.ids.filter((x) => x !== a.id); excluirAnotacao(a.id); if (restam.length) { const nid = restam[Math.min(notaAberta.idx, restam.length - 1)]; const na = anotacoes.find((x) => x.id === nid); setNotaAberta({ ids: restam, idx: Math.min(notaAberta.idx, restam.length - 1) }); setNotaEdit({ id: nid, valor: na?.nota ?? '' }) } else { setNotaAberta(null); setNotaEdit(null) } }} className="rounded p-1 text-muted-foreground transition hover:text-destructive" title="Excluir nota"><Trash2 className="h-3.5 w-3.5" /></button>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => { setNotaAberta(null); setNotaEdit(null) }} className="rounded px-2 py-1 text-xs text-muted-foreground transition hover:bg-muted">Fechar</button>
+                        <button onClick={() => { atualizarAnotacao(a.id, { nota: (notaEdit?.valor ?? '') || null }); setNotaAberta(null); setNotaEdit(null) }} className="rounded bg-primary px-2 py-1 text-xs font-medium text-primary-foreground transition hover:opacity-90">Salvar</button>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
           </div>
 
@@ -1169,6 +1414,8 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
                 {CORES_GRIFO.map((c) => (
                   <button key={c} onClick={() => criarAnotacao(c)} className="h-6 w-6 rounded-full border border-black/10 transition hover:scale-110" style={{ background: c }} aria-label={`Grifar em ${c}`} />
                 ))}
+                <span className="mx-0.5 h-5 w-px bg-border" />
+                <button onClick={criarNota} className="inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground" title="Adicionar nota ao trecho"><StickyNote className="h-4 w-4" /> Nota</button>
                 <button onClick={() => { setSel(null); window.getSelection()?.removeAllRanges() }} className="ml-0.5 rounded-md p-1 text-muted-foreground hover:bg-muted" aria-label="Cancelar"><X className="h-4 w-4" /></button>
               </div>
             </div>
@@ -1278,8 +1525,11 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
               {[...anotacoes].sort((a, b) => a.inicio - b.inicio).map((a) => (
               <div key={a.id} className="rounded-lg border p-2" style={{ borderColor: '#0000001a' }}>
                 <div className="flex items-start gap-2">
-                  <span className="mt-0.5 h-3 w-3 shrink-0 rounded-full" style={{ background: a.cor }} />
+                  {a.tipo === 'nota'
+                    ? <span className="mt-1.5 h-1 w-3 shrink-0 rounded-full" style={{ background: a.cor }} title="Nota" />
+                    : <span className="mt-0.5 h-3 w-3 shrink-0 rounded-full" style={{ background: a.cor }} />}
                   <button onClick={() => pularAnotacao(a)} className="min-w-0 flex-1 text-left text-xs leading-snug" style={{ color: cores.fg }} title="Ir ao trecho">
+                    {a.tipo === 'nota' && <span className="mr-1 inline-flex items-center gap-0.5 rounded-full bg-primary/10 px-1.5 py-px align-middle text-[9px] font-semibold text-primary"><StickyNote className="h-2.5 w-2.5" /> Nota</span>}
                     <span className="line-clamp-3">{a.exact}</span>
                   </button>
                   <button onClick={() => pularAnotacao(a)} className="shrink-0 rounded p-1" style={{ color: cores.muted }} aria-label="Ir ao trecho"><Crosshair className="h-3.5 w-3.5" /></button>

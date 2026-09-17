@@ -86,12 +86,17 @@ function normalizar(base: SimboloConfig, raw: unknown): SimboloConfig {
   return { tipo: tipo === 'imagem' && !imagemUrl ? 'icone' : tipo, icone, imagemUrl, tamanho, corFundo, corSimbolo }
 }
 
-/** Resolve os símbolos a partir do tema do tenant (jsonb), com fallback aos defaults. */
-export function resolverTrilhaSimbolos(tema: unknown): TrilhaSimbolos {
-  const raw = ((tema as { gam_trilha_simbolos?: unknown } | null)?.gam_trilha_simbolos ?? {}) as Record<string, unknown>
+/** Resolve os símbolos a partir do jsonb cru (`{ concluido, atual, disponivel }`), com fallback aos defaults. */
+export function resolverSimbolosRaw(raw0: unknown): TrilhaSimbolos {
+  const raw = (raw0 ?? {}) as Record<string, unknown>
   return {
     concluido: normalizar(DEFAULT_TRILHA_SIMBOLOS.concluido, raw.concluido),
     atual: normalizar(DEFAULT_TRILHA_SIMBOLOS.atual, raw.atual),
     disponivel: normalizar(DEFAULT_TRILHA_SIMBOLOS.disponivel, raw.disponivel),
   }
+}
+
+/** Resolve os símbolos a partir do tema do tenant (jsonb `gam_trilha_simbolos`). */
+export function resolverTrilhaSimbolos(tema: unknown): TrilhaSimbolos {
+  return resolverSimbolosRaw((tema as { gam_trilha_simbolos?: unknown } | null)?.gam_trilha_simbolos)
 }

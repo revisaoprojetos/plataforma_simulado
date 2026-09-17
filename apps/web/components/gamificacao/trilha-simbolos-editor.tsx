@@ -43,10 +43,12 @@ function ColorField({ label, value, defaultHex, onChange, disabled }: {
  * Editor reutilizável dos símbolos da trilha (prévia + 3 estados: ícone/imagem, tamanho, cor de fundo e cor
  * do símbolo). Controlado: recebe `value` + `onChange`. Reusado no console (super) e no admin da plataforma.
  */
-export function TrilhaSimbolosEditor({ value, onChange, disabled }: {
+export function TrilhaSimbolosEditor({ value, onChange, disabled, stacked = false }: {
   value: TrilhaSimbolos
   onChange: (v: TrilhaSimbolos) => void
   disabled?: boolean
+  /** Empilha os 3 estados em 1 coluna (para caber em rails/painéis estreitos). */
+  stacked?: boolean
 }) {
   const set = (estado: SimboloEstado, patch: Partial<SimboloConfig>) =>
     onChange({ ...value, [estado]: { ...value[estado], ...patch } })
@@ -54,12 +56,12 @@ export function TrilhaSimbolosEditor({ value, onChange, disabled }: {
   return (
     <div className="space-y-5">
       {/* Prévia dos 3 nós, como aparecem na trilha */}
-      <div className="rounded-2xl border bg-muted/30 p-5">
+      <div className={cn('rounded-2xl border bg-muted/30', stacked ? 'p-4' : 'p-5')}>
         <p className="mb-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Prévia</p>
-        <div className="flex flex-wrap items-start justify-center gap-8">
+        <div className={cn('flex flex-wrap items-start justify-center', stacked ? 'gap-5' : 'gap-8')}>
           {SIMBOLO_ESTADOS.map((e) => (
             <div key={e.id} className="flex flex-col items-center gap-2">
-              <NoPreview estado={e.id} config={value[e.id]} tam={64} />
+              <NoPreview estado={e.id} config={value[e.id]} tam={stacked ? 48 : 64} />
               <span className="text-[11px] font-medium text-muted-foreground">{e.label}</span>
             </div>
           ))}
@@ -67,7 +69,7 @@ export function TrilhaSimbolosEditor({ value, onChange, disabled }: {
       </div>
 
       {/* Editores por estado */}
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className={cn('grid gap-4', stacked ? 'grid-cols-1' : 'lg:grid-cols-3')}>
         {SIMBOLO_ESTADOS.map((e) => (
           <EstadoEditor key={e.id} estado={e} config={value[e.id]} onChange={(p) => set(e.id, p)} disabled={disabled} />
         ))}

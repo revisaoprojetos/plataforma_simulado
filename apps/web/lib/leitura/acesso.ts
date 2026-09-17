@@ -12,14 +12,15 @@ import type { DiffDoc } from './diff-tipos'
  * POR PROCESSO — o schema não muda em runtime, então roda 1x em vez de 2 round-trips a CADA
  * carregamento do catálogo do aluno.
  */
-let _colsLeitura: { temLei: boolean; temVers: boolean } | null = null
-async function detectarColunasLeitura(svc: ReturnType<typeof createAdminClient>): Promise<{ temLei: boolean; temVers: boolean }> {
+let _colsLeitura: { temLei: boolean; temVers: boolean; temPub: boolean } | null = null
+async function detectarColunasLeitura(svc: ReturnType<typeof createAdminClient>): Promise<{ temLei: boolean; temVers: boolean; temPub: boolean }> {
   if (_colsLeitura) return _colsLeitura
-  const [pLei, pVers] = await Promise.all([
+  const [pLei, pVers, pPub] = await Promise.all([
     svc.from('simulado_documentos').select('materia_id').limit(1),
     svc.from('simulado_documentos').select('versao_publicada').limit(1),
+    svc.from('simulado_documentos').select('publicacao').limit(1),
   ])
-  _colsLeitura = { temLei: !pLei.error, temVers: !pVers.error }
+  _colsLeitura = { temLei: !pLei.error, temVers: !pVers.error, temPub: !pPub.error }
   return _colsLeitura
 }
 
@@ -43,6 +44,8 @@ export interface DocumentoAluno {
   numero: string | null
   ano: number | null
   ementa: string | null
+  /** Aula "visualizável": aparece na trilha mas BLOQUEADA ("ainda não liberada"). */
+  visualizavel?: boolean
 }
 
 /**
@@ -55,11 +58,13 @@ export async function documentosDoAluno(estudanteId: string, tenantId: string, o
   // `leve`: pula matérias e a contagem de artigos (a TRILHA não usa nenhum dos dois) → menos round-trips.
   const leve = opts?.leve ?? false
   // Detecta colunas de lei (A1) e de versionamento (A2) → select tolerante (memoizado por processo).
-  const { temLei, temVers } = await detectarColunasLeitura(svc)
-  const cols = ['id, titulo, descricao, cor, icone, capa_url, versao, pasta_id, ordem', temVers && 'versao_publicada', temLei && 'materia_id, tipo_norma, numero, ano, ementa'].filter(Boolean).join(', ')
+  const { temLei, temVers, temPub } = await detectarColunasLeitura(svc)
+  const cols = ['id, titulo, descricao, cor, icone, capa_url, versao, pasta_id, ordem, publicado', temPub && 'publicacao', temVers && 'versao_publicada', temLei && 'materia_id, tipo_norma, numero, ano, ementa'].filter(Boolean).join(', ')
+  // Inclui PUBLICADAS + VISUALIZÁVEIS (aparecem bloqueadas). Sem a coluna publicacao → só publicadas.
+  const filtro = (q: any) => temPub ? q.or('publicado.eq.true,publicacao->>estado.eq.visualizavel') : q.eq('publicado', true)
   // docs + matérias são independentes → paralelo (menos round-trips ao DB remoto).
   const [docs, matsRes] = await Promise.all([
-    fetchAll<any>(() => svc.from('simulado_documentos').select(cols).eq('tenant_id', tenantId).eq('deletado', false).eq('publicado', true).order('atualizado_em', { ascending: false })),
+    fetchAll<any>(() => filtro(svc.from('simulado_documentos').select(cols).eq('tenant_id', tenantId).eq('deletado', false)).order('atualizado_em', { ascending: false })),
     (temLei && !leve) ? svc.from('simulado_materias').select('id, nome, cor').eq('tenant_id', tenantId).eq('deletado', false) : Promise.resolve({ data: [] as any[] } as any),
   ])
   if (!docs.length) return []
@@ -114,6 +119,7 @@ export async function documentosDoAluno(estudanteId: string, tenantId: string, o
       pastaId: d.pasta_id ?? null, ordem: d.ordem ?? 0,
       materiaId: d.materia_id ?? null, materiaNome: mat?.nome ?? null, materiaCor: mat?.cor ?? null,
       tipoNorma: d.tipo_norma ?? null, numero: d.numero ?? null, ano: d.ano ?? null, ementa: d.ementa ?? null,
+      visualizavel: !d.publicado && (d.publicacao && typeof d.publicacao === 'object' ? d.publicacao.estado === 'visualizavel' : false),
     }
   })
 }
@@ -128,6 +134,7 @@ export interface AnotacaoAluno {
   cor: string
   nota: string | null
   origem: 'propria' | 'base'
+  tipo: 'grifo' | 'nota'   // grifo = realce cheio; nota = sublinhado + ponto na margem + balão
 }
 
 export interface AltLeitura { id: string; texto: string }
@@ -221,107 +228,113 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
   // Aluno lê a versão PUBLICADA vigente (A2); genéricos usam a versão única.
   const versao = (doc as any).versao_publicada ?? (doc as any).versao ?? 1
 
-  // "O que mudou": há uma versão publicada ANTERIOR? (qualquer versão < a vigente é publicada).
-  let atualizacao: AtualizacaoInfo | null = null
-  if (versao > 1) {
-    const ant = await svc.from('simulado_documento_conteudos').select('versao').eq('documento_id', documentoId).lt('versao', versao).order('versao', { ascending: false }).limit(1).maybeSingle()
-    const va = (ant.data as any)?.versao
-    if (va) {
-      // Só avisa "foi atualizada" se o aluno LEU a versão anterior (tinha progresso nela). Aluno novo
-      // que nunca viu a versão antiga não deve receber o aviso de "o que mudou".
+  // Tudo abaixo depende só de (documento, versão, aluno) e é INDEPENDENTE entre si → carrega em PARALELO
+  // (antes eram ~7 grupos de queries em série, cada um um round-trip ao Supabase remoto).
+  const [atualizacao, cont, prog, anotacoes, questoes, grifos, estudo] = await Promise.all([
+    // "O que mudou": há uma versão publicada ANTERIOR que o aluno leu?
+    (async (): Promise<AtualizacaoInfo | null> => {
+      if (versao <= 1) return null
+      const ant = await svc.from('simulado_documento_conteudos').select('versao').eq('documento_id', documentoId).lt('versao', versao).order('versao', { ascending: false }).limit(1).maybeSingle()
+      const va = (ant.data as any)?.versao
+      if (!va) return null
       const { data: progAnt } = await svc.from('simulado_leitura_progresso').select('estudante_id').eq('estudante_id', estudanteId).eq('documento_id', documentoId).eq('documento_versao', va).maybeSingle()
-      if (progAnt) {
-        let atz: any = null
-        try { const r = await svc.from('simulado_lei_atualizacoes').select('tipo, descricao, criado_em').eq('documento_id', documentoId).eq('versao', versao).maybeSingle(); atz = r.data } catch { /* migração A2 ausente */ }
-        atualizacao = { versaoAnterior: va, atualizadoEm: atz?.criado_em ?? null, tipo: atz?.tipo ?? null, descricao: atz?.descricao ?? null }
-      }
-    }
-  }
-  // O HTML/artigos de uma (documento, versão) é IMUTÁVEL depois de publicado (nova publicação =
-  // nova versão = nova chave). Cacheia → não relê a lei inteira do banco a cada abertura (egress).
-  const cont = await remember<{ html: string; artigos: number }>(
-    `leitura:conteudo:${tenantId}:${documentoId}:${versao}`,
-    3600,
-    async () => {
-      const { data } = await svc.from('simulado_documento_conteudos').select('html, artigos').eq('documento_id', documentoId).eq('versao', versao).maybeSingle()
-      return { html: (data as any)?.html ?? '', artigos: (data as any)?.artigos ?? 0 }
-    },
-  )
-  const { data: prog } = await svc.from('simulado_leitura_progresso')
-    .select('pct, artigo_max, tempo_seg, concluido_em').eq('estudante_id', estudanteId).eq('documento_id', documentoId).eq('documento_versao', versao).maybeSingle()
-
-  // Clona as anotações base do admin (idempotente) e carrega as do aluno. Tolerante:
-  // se a migração de anotações (Fase 1b) ainda não rodou, degrada sem quebrar o leitor.
-  let anotacoes: AnotacaoAluno[] = []
-  try {
-    await garantirAnotacoesBase(svc, tenantId, documentoId, versao, estudanteId)
-    const { data: anot } = await svc.from('simulado_leitura_anotacoes')
-      .select('id, inicio_char, fim_char, exact, prefix, suffix, cor, nota, origem')
-      .eq('estudante_id', estudanteId).eq('documento_id', documentoId).eq('documento_versao', versao).eq('deletado', false)
-    anotacoes = ((anot ?? []) as any[]).map((a) => ({
-      id: a.id, inicio: a.inicio_char, fim: a.fim_char, exact: a.exact, prefix: a.prefix ?? '', suffix: a.suffix ?? '',
-      cor: a.cor, nota: a.nota ?? null, origem: (a.origem === 'base' ? 'base' : 'propria') as 'base' | 'propria',
-    }))
-  } catch { /* migração de anotações ausente */ }
-
-  // Questões inline (Fase 2) + respostas do aluno. Tolerante se a migração ainda não rodou.
-  let questoes: QuestaoLeituraDados[] = []
-  try {
-    const { data: dq } = await svc.from('simulado_documento_questoes')
-      .select('id, questao_id, apos_artigo, obrigatoria, ordem')
-      .eq('tenant_id', tenantId).eq('documento_id', documentoId).eq('documento_versao', versao).eq('deletado', false)
-      .order('apos_artigo').order('ordem')
-    if (dq?.length) {
-      const qids = [...new Set((dq as any[]).map((x) => x.questao_id))]
-      const [{ data: qs }, { data: alts }, { data: resp }] = await Promise.all([
-        svc.from('simulado_questoes').select('id, enunciado, comentario_professor').in('id', qids),
-        svc.from('simulado_alternativas').select('id, questao_id, texto, ordem').in('questao_id', qids).order('ordem'),
-        svc.from('simulado_leitura_respostas').select('questao_id, alternativa_id, correta, snapshot_gabarito').eq('estudante_id', estudanteId).eq('documento_id', documentoId).in('questao_id', qids),
-      ])
-      const qMap = new Map((qs ?? []).map((q: any) => [q.id, q]))
-      const altsPorQ = new Map<string, AltLeitura[]>()
-      for (const a of (alts ?? []) as any[]) (altsPorQ.get(a.questao_id) ?? altsPorQ.set(a.questao_id, []).get(a.questao_id)!).push({ id: a.id, texto: a.texto })
-      const respPorQ = new Map((resp ?? []).map((r: any) => [r.questao_id, r]))
-      questoes = (dq as any[]).map((x) => {
-        const q: any = qMap.get(x.questao_id)
-        const r: any = respPorQ.get(x.questao_id)
-        return {
-          docQuestaoId: x.id, questaoId: x.questao_id, aposArtigo: x.apos_artigo, obrigatoria: !!x.obrigatoria,
-          enunciado: q?.enunciado ?? '', comentario: q?.comentario_professor ?? null,
-          alternativas: altsPorQ.get(x.questao_id) ?? [],
-          resposta: r ? { alternativaId: r.alternativa_id, correta: !!r.correta, corretaId: (r.snapshot_gabarito?.correta_id ?? null) } : undefined,
+      if (!progAnt) return null
+      let atz: any = null
+      try { const r = await svc.from('simulado_lei_atualizacoes').select('tipo, descricao, criado_em').eq('documento_id', documentoId).eq('versao', versao).maybeSingle(); atz = r.data } catch { /* migração A2 ausente */ }
+      return { versaoAnterior: va, atualizadoEm: atz?.criado_em ?? null, tipo: atz?.tipo ?? null, descricao: atz?.descricao ?? null }
+    })(),
+    // HTML/artigos — IMUTÁVEL por (doc, versão) → cacheado (não relê a lei inteira a cada abertura; egress).
+    remember<{ html: string; artigos: number }>(
+      `leitura:conteudo:${tenantId}:${documentoId}:${versao}`,
+      3600,
+      async () => {
+        const { data } = await svc.from('simulado_documento_conteudos').select('html, artigos').eq('documento_id', documentoId).eq('versao', versao).maybeSingle()
+        return { html: (data as any)?.html ?? '', artigos: (data as any)?.artigos ?? 0 }
+      },
+    ),
+    // Progresso do aluno nesta versão.
+    svc.from('simulado_leitura_progresso').select('pct, artigo_max, tempo_seg, concluido_em').eq('estudante_id', estudanteId).eq('documento_id', documentoId).eq('documento_versao', versao).maybeSingle().then((r: any) => r.data),
+    // Anotações (clona as base do admin, idempotente) — tolerante.
+    (async (): Promise<AnotacaoAluno[]> => {
+      try {
+        await garantirAnotacoesBase(svc, tenantId, documentoId, versao, estudanteId)
+        // Select tolerante: `tipo` é coluna nova (migração pode não ter rodado) → tenta com ela e cai
+        // para sem ela em erro, sem perder as anotações.
+        let anot: any[] | null = null
+        {
+          const r = await svc.from('simulado_leitura_anotacoes')
+            .select('id, inicio_char, fim_char, exact, prefix, suffix, cor, nota, origem, tipo')
+            .eq('estudante_id', estudanteId).eq('documento_id', documentoId).eq('documento_versao', versao).eq('deletado', false)
+          if (r.error) {
+            const r2 = await svc.from('simulado_leitura_anotacoes')
+              .select('id, inicio_char, fim_char, exact, prefix, suffix, cor, nota, origem')
+              .eq('estudante_id', estudanteId).eq('documento_id', documentoId).eq('documento_versao', versao).eq('deletado', false)
+            anot = r2.data as any[] | null
+          } else anot = r.data as any[] | null
         }
-      }).filter((x) => x.alternativas.length > 0)
-    }
-  } catch { /* migração fase 2 ausente */ }
-
-  // Grifos editoriais (A4) — conteúdo compartilhado, pintado por tipo. Tolerante.
-  let grifos: GrifoLei[] = []
-  try {
-    const { data: gs } = await svc.from('simulado_documento_anotacoes_base')
-      .select('id, inicio_char, fim_char, exact, prefix, suffix, nota, tipo_grifo')
-      .eq('documento_id', documentoId).eq('documento_versao', versao).eq('editorial', true).eq('deletado', false)
-    grifos = ((gs ?? []) as any[]).map((g) => ({ id: g.id, inicio: g.inicio_char, fim: g.fim_char, exact: g.exact, prefix: g.prefix ?? '', suffix: g.suffix ?? '', tipo: g.tipo_grifo ?? 'nucleo', nota: g.nota ?? null }))
-  } catch { /* migração A4 ausente */ }
-
-  // Estudo pessoal (A6): preferências (global) + último ponto (por lei) + favorito. Tolerante.
-  let prefs: DocumentoCarregado['prefs'] = null
-  let ultimoDisp: string | null = null
-  let favorito = false
-  try {
-    let [pf, up, fv] = await Promise.all([
-      svc.from('simulado_leitura_preferencias').select('tema, fonte, modo, sem_grifos, grifo_rotulos').eq('estudante_id', estudanteId).maybeSingle(),
-      svc.from('simulado_leitura_ultimo_ponto').select('disp_id').eq('estudante_id', estudanteId).eq('documento_id', documentoId).maybeSingle(),
-      svc.from('simulado_lei_favoritos').select('id').eq('estudante_id', estudanteId).eq('documento_id', documentoId).eq('disp_id', '').maybeSingle(),
-    ])
-    // `grifo_rotulos` é coluna nova (migração leitura_grifo_rotulos) — fallback tolerante sem ela.
-    if (pf.error && /grifo_rotulos|column/i.test(String(pf.error.message))) {
-      pf = await svc.from('simulado_leitura_preferencias').select('tema, fonte, modo, sem_grifos').eq('estudante_id', estudanteId).maybeSingle() as any
-    }
-    if (pf.data) prefs = { tema: (pf.data as any).tema ?? null, fonte: (pf.data as any).fonte ?? null, modo: (pf.data as any).modo ?? null, semGrifos: (pf.data as any).sem_grifos ?? null, grifoRotulos: (pf.data as any).grifo_rotulos ?? null }
-    ultimoDisp = (up.data as any)?.disp_id ?? null
-    favorito = !!fv.data
-  } catch { /* migração A6 ausente */ }
+        return ((anot ?? []) as any[]).map((a) => ({
+          id: a.id, inicio: a.inicio_char, fim: a.fim_char, exact: a.exact, prefix: a.prefix ?? '', suffix: a.suffix ?? '',
+          cor: a.cor, nota: a.nota ?? null, origem: (a.origem === 'base' ? 'base' : 'propria') as 'base' | 'propria',
+          tipo: (a.tipo === 'nota' ? 'nota' : 'grifo') as 'grifo' | 'nota',
+        }))
+      } catch { return [] }
+    })(),
+    // Questões inline (Fase 2) + respostas — tolerante.
+    (async (): Promise<QuestaoLeituraDados[]> => {
+      try {
+        const { data: dq } = await svc.from('simulado_documento_questoes')
+          .select('id, questao_id, apos_artigo, obrigatoria, ordem')
+          .eq('tenant_id', tenantId).eq('documento_id', documentoId).eq('documento_versao', versao).eq('deletado', false)
+          .order('apos_artigo').order('ordem')
+        if (!dq?.length) return []
+        const qids = [...new Set((dq as any[]).map((x) => x.questao_id))]
+        const [{ data: qs }, { data: alts }, { data: resp }] = await Promise.all([
+          svc.from('simulado_questoes').select('id, enunciado, comentario_professor').in('id', qids),
+          svc.from('simulado_alternativas').select('id, questao_id, texto, ordem').in('questao_id', qids).order('ordem'),
+          svc.from('simulado_leitura_respostas').select('questao_id, alternativa_id, correta, snapshot_gabarito').eq('estudante_id', estudanteId).eq('documento_id', documentoId).in('questao_id', qids),
+        ])
+        const qMap = new Map((qs ?? []).map((q: any) => [q.id, q]))
+        const altsPorQ = new Map<string, AltLeitura[]>()
+        for (const a of (alts ?? []) as any[]) (altsPorQ.get(a.questao_id) ?? altsPorQ.set(a.questao_id, []).get(a.questao_id)!).push({ id: a.id, texto: a.texto })
+        const respPorQ = new Map((resp ?? []).map((r: any) => [r.questao_id, r]))
+        return (dq as any[]).map((x) => {
+          const q: any = qMap.get(x.questao_id)
+          const r: any = respPorQ.get(x.questao_id)
+          return {
+            docQuestaoId: x.id, questaoId: x.questao_id, aposArtigo: x.apos_artigo, obrigatoria: !!x.obrigatoria,
+            enunciado: q?.enunciado ?? '', comentario: q?.comentario_professor ?? null,
+            alternativas: altsPorQ.get(x.questao_id) ?? [],
+            resposta: r ? { alternativaId: r.alternativa_id, correta: !!r.correta, corretaId: (r.snapshot_gabarito?.correta_id ?? null) } : undefined,
+          }
+        }).filter((x) => x.alternativas.length > 0)
+      } catch { return [] }
+    })(),
+    // Grifos editoriais (A4) — tolerante.
+    (async (): Promise<GrifoLei[]> => {
+      try {
+        const { data: gs } = await svc.from('simulado_documento_anotacoes_base')
+          .select('id, inicio_char, fim_char, exact, prefix, suffix, nota, tipo_grifo')
+          .eq('documento_id', documentoId).eq('documento_versao', versao).eq('editorial', true).eq('deletado', false)
+        return ((gs ?? []) as any[]).map((g) => ({ id: g.id, inicio: g.inicio_char, fim: g.fim_char, exact: g.exact, prefix: g.prefix ?? '', suffix: g.suffix ?? '', tipo: g.tipo_grifo ?? 'nucleo', nota: g.nota ?? null }))
+      } catch { return [] }
+    })(),
+    // Estudo pessoal (A6): preferências + último ponto + favorito — tolerante.
+    (async (): Promise<{ prefs: DocumentoCarregado['prefs']; ultimoDisp: string | null; favorito: boolean }> => {
+      try {
+        let [pf, up, fv] = await Promise.all([
+          svc.from('simulado_leitura_preferencias').select('tema, fonte, modo, sem_grifos, grifo_rotulos').eq('estudante_id', estudanteId).maybeSingle(),
+          svc.from('simulado_leitura_ultimo_ponto').select('disp_id').eq('estudante_id', estudanteId).eq('documento_id', documentoId).maybeSingle(),
+          svc.from('simulado_lei_favoritos').select('id').eq('estudante_id', estudanteId).eq('documento_id', documentoId).eq('disp_id', '').maybeSingle(),
+        ])
+        if (pf.error && /grifo_rotulos|column/i.test(String(pf.error.message))) {
+          pf = await svc.from('simulado_leitura_preferencias').select('tema, fonte, modo, sem_grifos').eq('estudante_id', estudanteId).maybeSingle() as any
+        }
+        const prefs = pf.data ? { tema: (pf.data as any).tema ?? null, fonte: (pf.data as any).fonte ?? null, modo: (pf.data as any).modo ?? null, semGrifos: (pf.data as any).sem_grifos ?? null, grifoRotulos: (pf.data as any).grifo_rotulos ?? null } : null
+        return { prefs, ultimoDisp: (up.data as any)?.disp_id ?? null, favorito: !!fv.data }
+      } catch { return { prefs: null, ultimoDisp: null, favorito: false } }
+    })(),
+  ])
+  const { prefs, ultimoDisp, favorito } = estudo
 
   return {
     id: documentoId,
