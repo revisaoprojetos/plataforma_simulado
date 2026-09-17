@@ -1,77 +1,81 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import Link from 'next/link'
 import { createPortal } from 'react-dom'
-import { ArrowLeft, ArrowRight, BookOpenText, CheckCircle2, Bookmark, Flag, RotateCcw, Eye, Check, X, PartyPopper } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CheckCircle2, Bookmark, Flag, RotateCcw, Eye, Check, X, PartyPopper } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { QuestaoLeitura } from '@/components/aluno/questao-leitura'
 import type { QuestaoLeituraDados } from '@/lib/leitura/acesso'
 
+type Resultado = { correta: boolean; corretaId: string | null }
+
 /**
- * Etapa de QUESTÕES da aula = mini-simulado "Questões do conteúdo" (liberada após concluir a leitura).
- * UMA questão por vez com Anterior/Próxima e navegador numerado (estilo do simulado real) que sinaliza
- * acerto/erro. Ao concluir: pop-up animado com nota + Refazer. Cada conclusão vira uma tentativa
- * contabilizada. "Refazer" NÃO apaga as respostas no servidor (mantém a trilha destravada) — só reinicia
- * o quiz no cliente, gravando uma nova tentativa ao concluir de novo.
+ * Etapa de QUESTÕES da aula = mini-simulado "Questões do conteúdo" — IDENTIDADE VISUAL do runner do simulado:
+ * tela cheia imersiva (fixed inset-0), top bar com barra de progresso animada, navegador à direita e o
+ * FINALIZAR no topo (só habilita com todas respondidas; senão mostra um balão). Estado das respostas vive
+ * aqui (no pai) → não some ao navegar. Ao finalizar: registra a tentativa e abre o pop-up com a nota.
  */
 export function LeituraQuestoesStep({ doc, questoes, trilhaHref }: { doc: { id: string; titulo: string }; questoes: QuestaoLeituraDados[]; trilhaHref: string }) {
   const total = questoes.length
   const jaCompletoInicial = total > 0 && questoes.filter((q) => q.resposta).length >= total
 
   const [idx, setIdx] = useState(0)
-  const [respondidas, setRespondidas] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(questoes.filter((q) => q.resposta).map((q) => [q.docQuestaoId, true])))
-  const [resultados, setResultados] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(questoes.filter((q) => q.resposta).map((q) => [q.docQuestaoId, !!q.resposta!.correta])))
+  const [escolhas, setEscolhas] = useState<Record<string, string>>(() =>
+    Object.fromEntries(questoes.filter((q) => q.resposta?.alternativaId).map((q) => [q.docQuestaoId, q.resposta!.alternativaId!])))
+  const [resultados, setResultados] = useState<Record<string, Resultado>>(() =>
+    Object.fromEntries(questoes.filter((q) => q.resposta).map((q) => [q.docQuestaoId, { correta: !!q.resposta!.correta, corretaId: q.resposta!.corretaId }])))
   const [marcadas, setMarcadas] = useState<Set<string>>(new Set())
-  const [entrada, setEntrada] = useState(jaCompletoInicial) // já respondeu no load → tela "Ver resultados / Refazer"
-  const [revisando, setRevisando] = useState(false)          // vendo resultados de tentativa concluída
-  const [refazendo, setRefazendo] = useState(false)          // refazendo (ignora as respostas antigas no cliente)
+  const [entrada, setEntrada] = useState(jaCompletoInicial)
+  const [revisando, setRevisando] = useState(false)
   const [mostrarPopup, setMostrarPopup] = useState(false)
+  const [balao, setBalao] = useState(false)
   const registradoRef = useRef(false)
+  const balaoRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const feitasTotal = questoes.filter((q) => respondidas[q.docQuestaoId]).length
-  const acertosTotal = questoes.filter((q) => resultados[q.docQuestaoId]).length
+  const feitasTotal = Object.keys(resultados).length
+  const acertosTotal = Object.values(resultados).filter((r) => r.correta).length
   const completo = total > 0 && feitasTotal >= total
   const obrig = questoes.filter((q) => q.obrigatoria)
-  const feitasObrig = obrig.filter((q) => respondidas[q.docQuestaoId]).length
+  const feitasObrig = obrig.filter((q) => resultados[q.docQuestaoId]).length
   const pct = total > 0 ? Math.round((acertosTotal / total) * 100) : 0
+  const pctFeitas = total > 0 ? Math.round((feitasTotal / total) * 100) : 0
 
   const toggleMarcar = (id: string) => setMarcadas((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const onEscolher = (id: string, altId: string) => setEscolhas((p) => ({ ...p, [id]: altId }))
+  const onRespondida = (id: string, r: Resultado) => setResultados((p) => ({ ...p, [id]: r }))
 
-  // Ao concluir (fresh/refazer): registra a tentativa e abre o pop-up. Não registra no load nem revisando.
-  useEffect(() => {
-    if (!completo || revisando || entrada || registradoRef.current) return
-    registradoRef.current = true
+  function finalizar() {
+    if (!completo) {
+      setBalao(true)
+      if (balaoRef.current) clearTimeout(balaoRef.current)
+      balaoRef.current = setTimeout(() => setBalao(false), 2600)
+      return
+    }
+    if (!registradoRef.current) {
+      registradoRef.current = true
+      const respostasMap = Object.fromEntries(questoes.map((q) => [q.questaoId, !!resultados[q.docQuestaoId]?.correta]))
+      fetch('/api/leitura/quiz-tentativa', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ documento_id: doc.id, acertos: acertosTotal, total, respostas: respostasMap }),
+      }).catch(() => { /* tolerante: migração de tentativas pode não ter rodado */ })
+    }
     setMostrarPopup(true)
-    const acertos = questoes.filter((q) => resultados[q.docQuestaoId]).length
-    const respostasMap = Object.fromEntries(questoes.map((q) => [q.questaoId, !!resultados[q.docQuestaoId]]))
-    fetch('/api/leitura/quiz-tentativa', {
-      method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ documento_id: doc.id, acertos, total, respostas: respostasMap }),
-    }).catch(() => { /* tolerante: migração de tentativas pode não ter rodado */ })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [completo, revisando, entrada])
+  }
 
   const refazer = () => {
-    setMostrarPopup(false); setEntrada(false); setRevisando(false)
-    setRespondidas({}); setResultados({}); setMarcadas(new Set()); setIdx(0)
+    setMostrarPopup(false); setEntrada(false); setRevisando(false); setBalao(false)
+    setEscolhas({}); setResultados({}); setMarcadas(new Set()); setIdx(0)
     registradoRef.current = false
-    setRefazendo(true)
   }
   const verResultados = () => { setMostrarPopup(false); setEntrada(false); setRevisando(true) }
 
-  const onRespondida = (id: string, correta: boolean) => {
-    setResultados((p) => ({ ...p, [id]: correta }))
-    setRespondidas((p) => ({ ...p, [id]: true }))
-  }
-
-  // Navegador (topo no mobile / coluna à direita no desktop) — sinaliza acerto (verde ✓) / erro (vermelho ✗).
+  // Navegador — sinaliza acerto (verde ✓) / erro (vermelho ✗) / marcada (âmbar).
   const navBtns = questoes.map((q, i) => {
-    const feito = !!respondidas[q.docQuestaoId]
-    const acertou = feito && resultados[q.docQuestaoId]
-    const errou = feito && !resultados[q.docQuestaoId]
+    const r = resultados[q.docQuestaoId]
+    const feito = !!r
+    const acertou = feito && r.correta
+    const errou = feito && !r.correta
     const marcada = marcadas.has(q.docQuestaoId)
     return (
       <button key={q.docQuestaoId} type="button" onClick={() => setIdx(i)} title={`Questão ${i + 1}`}
@@ -108,89 +112,116 @@ export function LeituraQuestoesStep({ doc, questoes, trilhaHref }: { doc: { id: 
   )
 
   const q = questoes[idx]
-  const qView = refazendo ? { ...q, resposta: undefined } : q
 
   return (
-    <div className="mx-auto max-w-5xl space-y-4 py-1">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <Link href={trilhaHref} className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Voltar à trilha</Link>
-        <Link href={`/aluno/leitura/${doc.id}`} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"><BookOpenText className="h-4 w-4" /> Consultar o documento</Link>
-      </div>
-
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">{doc.titulo}</h1>
-        <p className="text-sm text-muted-foreground">Questões da aula {obrig.length > 0 && <>· <span className="font-semibold text-foreground">{feitasObrig}/{obrig.length}</span> obrigatórias respondidas</>}</p>
-      </div>
-
-      {total === 0 ? (
-        <div className="rounded-2xl border border-dashed p-10 text-center text-muted-foreground">Esta aula não tem questões.</div>
-      ) : entrada ? (
-        // Já respondeu (no load): 2 botões — Ver resultados / Refazer.
-        <div className="mx-auto flex max-w-md flex-col items-center gap-3 rounded-2xl border bg-card p-8 text-center shadow-sm motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95">
-          <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"><CheckCircle2 className="h-7 w-7" /></span>
-          <div>
-            <p className="text-lg font-bold">Você já respondeu este quiz</p>
-            <p className="text-sm text-muted-foreground">Acertos: <span className="font-semibold text-foreground">{acertosTotal}/{total}</span> ({pct}%)</p>
-          </div>
-          <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
-            <button type="button" onClick={verResultados} className="inline-flex items-center gap-1.5 rounded-xl border bg-card px-4 py-2.5 text-sm font-semibold shadow-sm transition-colors hover:bg-muted"><Eye className="h-4 w-4" /> Ver resultados</button>
-            <button type="button" onClick={refazer} className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90"><RotateCcw className="h-4 w-4" /> Refazer</button>
-          </div>
+    <div className="fixed inset-0 z-50 flex flex-col bg-muted dark:bg-background" style={{ ['--primary' as any]: 'var(--brand-primary)' }}>
+      {/* Top bar (3 zonas): voltar · título · finalizar/refazer */}
+      <div className="flex items-center gap-2 border-b bg-card px-3 py-2.5 sm:px-5">
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <Link href={trilhaHref} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+            <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">Trilha</span>
+          </Link>
         </div>
-      ) : (
-        <div className="grid gap-4 lg:grid-cols-[1fr_13rem] lg:gap-8">
-          <div className="flex min-w-0 flex-col gap-4">
-            <div className="lg:hidden">
-              <p className="mb-1.5 text-xs font-semibold text-muted-foreground">Navegador de questões</p>
-              <div className="flex flex-wrap gap-1.5">{navBtns}</div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="flex h-6 items-center rounded-lg bg-primary px-2 text-xs font-bold tabular-nums text-primary-foreground">{idx + 1} / {total}</span>
-              <span className="text-xs text-muted-foreground">Questão do conteúdo</span>
-              {revisando && <button type="button" onClick={refazer} className="ml-auto inline-flex items-center gap-1.5 rounded-lg border px-3 py-1 text-xs font-semibold transition-colors hover:bg-muted"><RotateCcw className="h-3.5 w-3.5" /> Refazer</button>}
-            </div>
-
-            <QuestaoLeitura key={`${q.docQuestaoId}-${refazendo ? 'r' : 'o'}`} documentoId={doc.id} q={qView} corFg="var(--foreground)" corMuted="var(--muted-foreground)"
-              onRespondida={onRespondida} />
-
-            <div className="flex items-center gap-2">
-              <div className="flex flex-1 justify-start">
-                <button type="button" onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0}
-                  className="inline-flex items-center gap-1.5 rounded-xl border bg-card px-4 py-2.5 text-sm font-medium shadow-sm transition-colors hover:bg-muted disabled:opacity-40">
-                  <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">Anterior</span>
-                </button>
-              </div>
-              <button type="button" onClick={() => toggleMarcar(q.docQuestaoId)} title={marcadas.has(q.docQuestaoId) ? 'Desmarcar revisão' : 'Marcar para revisar'}
-                className={cn('inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-4 py-2.5 text-sm font-medium shadow-sm transition-colors',
-                  marcadas.has(q.docQuestaoId) ? 'border-amber-500/50 bg-amber-500/15 text-amber-600 dark:text-amber-400' : 'bg-card hover:bg-muted')}>
-                <Bookmark className={cn('h-4 w-4', marcadas.has(q.docQuestaoId) && 'fill-current')} /> Revisar
+        <div className="min-w-0 text-center">
+          <p className="truncate text-sm font-semibold">{doc.titulo}</p>
+          <p className="text-[11px] text-muted-foreground">Questões da aula{obrig.length > 0 && ` · ${feitasObrig}/${obrig.length} obrigatórias`}</p>
+        </div>
+        <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+          {revisando ? (
+            <button type="button" onClick={refazer} className="inline-flex shrink-0 items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-sm font-semibold shadow-sm transition-colors hover:bg-muted"><RotateCcw className="h-4 w-4" /> <span className="hidden sm:inline">Refazer</span></button>
+          ) : !entrada && total > 0 ? (
+            <div className="relative">
+              <button type="button" onClick={finalizar}
+                className={cn('inline-flex shrink-0 items-center gap-1.5 rounded-full bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition-all hover:opacity-90 hover:shadow-md', !completo && 'opacity-50')}>
+                <Flag className="h-4 w-4" /> <span className="hidden sm:inline">Finalizar</span>
               </button>
-              <div className="flex flex-1 justify-end">
-                <button type="button" onClick={() => setIdx((i) => Math.min(total - 1, i + 1))} disabled={idx >= total - 1}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 hover:shadow-md disabled:opacity-40">
-                  <span className="hidden sm:inline">Próxima</span> <ArrowRight className="h-4 w-4" />
-                </button>
+              {balao && (
+                <div className="absolute right-0 top-full z-20 mt-2 w-56 rounded-lg border bg-card p-2.5 text-left text-xs text-foreground shadow-lg motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95">
+                  <span className="absolute -top-1 right-4 h-2 w-2 rotate-45 border-l border-t bg-card" />
+                  Responda todas as questões para finalizar — faltam <strong>{total - feitasTotal}</strong>.
+                </div>
+              )}
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      {/* Barra de progresso animada */}
+      <div className="h-1 w-full bg-muted">
+        <div className="h-full bg-primary transition-all duration-300 ease-out" style={{ width: `${pctFeitas}%` }} />
+      </div>
+
+      {/* Conteúdo */}
+      <div className="flex min-h-0 flex-1 overflow-y-auto">
+        <div className="mx-auto w-full max-w-5xl px-3 py-4 sm:px-4 sm:py-5">
+          {total === 0 ? (
+            <div className="rounded-2xl border border-dashed p-10 text-center text-muted-foreground">Esta aula não tem questões.</div>
+          ) : entrada ? (
+            <div className="mx-auto mt-6 flex max-w-md flex-col items-center gap-3 rounded-2xl border bg-card p-8 text-center shadow-sm motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-95">
+              <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"><CheckCircle2 className="h-7 w-7" /></span>
+              <div>
+                <p className="text-lg font-bold">Você já respondeu este quiz</p>
+                <p className="text-sm text-muted-foreground">Acertos: <span className="font-semibold text-foreground">{acertosTotal}/{total}</span> ({pct}%)</p>
+              </div>
+              <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
+                <button type="button" onClick={verResultados} className="inline-flex items-center gap-1.5 rounded-xl border bg-card px-4 py-2.5 text-sm font-semibold shadow-sm transition-colors hover:bg-muted"><Eye className="h-4 w-4" /> Ver resultados</button>
+                <button type="button" onClick={refazer} className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90"><RotateCcw className="h-4 w-4" /> Refazer</button>
               </div>
             </div>
+          ) : (
+            <div className="grid gap-4 lg:grid-cols-[1fr_13rem] lg:gap-8">
+              <div className="flex min-w-0 flex-col gap-4">
+                <div className="lg:hidden">
+                  <p className="mb-1.5 text-xs font-semibold text-muted-foreground">Navegador de questões</p>
+                  <div className="flex flex-wrap gap-1.5">{navBtns}</div>
+                </div>
 
-            {completo && !mostrarPopup && (
-              <div className="flex flex-wrap items-center justify-center gap-2 rounded-2xl border border-emerald-500/40 bg-emerald-50 p-4 text-center dark:bg-emerald-950/30">
-                <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                <span className="font-semibold text-emerald-700 dark:text-emerald-400">Quiz concluído · {acertosTotal}/{total} ({pct}%)</span>
-                <button type="button" onClick={refazer} className="inline-flex items-center gap-1.5 rounded-xl border bg-card px-3 py-1.5 text-sm font-semibold transition-colors hover:bg-muted"><RotateCcw className="h-4 w-4" /> Refazer</button>
-                <Link href={trilhaHref} className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground transition hover:opacity-90"><Flag className="h-4 w-4" /> Voltar à trilha</Link>
+                <div className="flex items-center gap-2">
+                  <span className="flex h-6 items-center rounded-lg bg-primary px-2 text-xs font-bold tabular-nums text-primary-foreground">{idx + 1} / {total}</span>
+                  <span className="text-xs text-muted-foreground">Questão do conteúdo</span>
+                </div>
+
+                <QuestaoLeitura key={q.docQuestaoId} documentoId={doc.id} q={q} corFg="var(--foreground)" corMuted="var(--muted-foreground)"
+                  escolhida={escolhas[q.docQuestaoId] ?? null} resultado={resultados[q.docQuestaoId] ?? null}
+                  onEscolher={onEscolher} onRespondida={onRespondida} />
+
+                <div className="flex items-center gap-2">
+                  <div className="flex flex-1 justify-start">
+                    <button type="button" onClick={() => setIdx((i) => Math.max(0, i - 1))} disabled={idx === 0}
+                      className="inline-flex items-center gap-1.5 rounded-xl border bg-card px-4 py-2.5 text-sm font-medium shadow-sm transition-colors hover:bg-muted disabled:opacity-40">
+                      <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">Anterior</span>
+                    </button>
+                  </div>
+                  <button type="button" onClick={() => toggleMarcar(q.docQuestaoId)} title={marcadas.has(q.docQuestaoId) ? 'Desmarcar revisão' : 'Marcar para revisar'}
+                    className={cn('inline-flex shrink-0 items-center gap-1.5 rounded-xl border px-4 py-2.5 text-sm font-medium shadow-sm transition-colors',
+                      marcadas.has(q.docQuestaoId) ? 'border-amber-500/50 bg-amber-500/15 text-amber-600 dark:text-amber-400' : 'bg-card hover:bg-muted')}>
+                    <Bookmark className={cn('h-4 w-4', marcadas.has(q.docQuestaoId) && 'fill-current')} /> Revisar
+                  </button>
+                  <div className="flex flex-1 justify-end">
+                    {idx >= total - 1 ? (
+                      <button type="button" onClick={finalizar}
+                        className={cn('inline-flex items-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 hover:shadow-md', !completo && !revisando && 'opacity-50')}>
+                        {revisando ? <><RotateCcw className="h-4 w-4" /> Refazer</> : <><Flag className="h-4 w-4" /> Finalizar</>}
+                      </button>
+                    ) : (
+                      <button type="button" onClick={() => setIdx((i) => Math.min(total - 1, i + 1))}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 hover:shadow-md">
+                        <span className="hidden sm:inline">Próxima</span> <ArrowRight className="h-4 w-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
               </div>
-            )}
-          </div>
 
-          <aside className="hidden lg:block">
-            <div className="sticky top-4">{navegadorCard}</div>
-          </aside>
+              <aside className="hidden lg:block">
+                <div className="sticky top-4">{navegadorCard}</div>
+              </aside>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
-      {/* Pop-up de conclusão — animado, com nota e Refazer. */}
+      {/* Pop-up de conclusão */}
       {mostrarPopup && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm motion-safe:animate-in motion-safe:fade-in" onClick={verResultados}>
           <div className="relative w-full max-w-sm overflow-hidden rounded-2xl border bg-card p-6 text-center shadow-2xl motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:fade-in motion-safe:duration-300" onClick={(e) => e.stopPropagation()}>

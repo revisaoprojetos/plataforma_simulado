@@ -10,6 +10,8 @@ import { getCurrentTenant } from '@/lib/tenant'
 import { resolverCardView } from '@/lib/card-view'
 import { resolverTrilhaSimbolos } from '@/lib/gamificacao/trilha-simbolos'
 import { resolverTrilhaFormato } from '@/lib/gamificacao/trilha-formato'
+import { carregarGamRail } from '@/lib/aluno/trilhas'
+import { createAdminClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,7 +30,8 @@ export default async function LeituraAlunoPage({ searchParams }: { searchParams:
     if (mod.trilha) {
       // O cabeçalho (título/voltar/subtítulo) agora vive DENTRO do banner colapsável.
       const temaMod = (await getCurrentTenant())?.tema
-      return <LeituraModuloView modulo={modulo} trilha={mod.trilha} desempenho={mod.desempenho} pendentes={mod.pendentes} aulasPendentes={mod.aulasPendentes} ranking={ranking} meuId={sessao.estudanteId} formato={resolverTrilhaFormato(temaMod)} simbolos={resolverTrilhaSimbolos(temaMod)} />
+      const gam = await carregarGamRail(createAdminClient(), sessao.tenantId, sessao.estudanteId)
+      return <LeituraModuloView modulo={modulo} trilha={mod.trilha} desempenho={mod.desempenho} pendentes={mod.pendentes} aulasPendentes={mod.aulasPendentes} ranking={ranking} meuId={sessao.estudanteId} formato={resolverTrilhaFormato(temaMod)} simbolos={resolverTrilhaSimbolos(temaMod)} regulamento={mod.regulamento} pontuacao={mod.pontuacao} gam={gam} />
     }
     // módulo inexistente/sem acesso → cai na lista
   }

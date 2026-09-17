@@ -9,18 +9,32 @@ import type { QuestaoLeituraDados } from '@/lib/leitura/acesso'
 
 const LETRA = ['A', 'B', 'C', 'D', 'E', 'F']
 
-/** Questão inserida no meio da leitura. Validação no servidor (não expõe o gabarito). */
-export function QuestaoLeitura({ documentoId, q, corFg, corMuted, onRespondida }: {
+type Resultado = { correta: boolean; corretaId: string | null }
+
+/**
+ * Questão inserida no meio da leitura. Validação no servidor (não expõe o gabarito).
+ * Funciona em 2 modos: CONTROLADA (escolha/resultado no pai — quiz, persiste ao navegar) quando `onEscolher`
+ * é passado; ou INTERNA (leitor inline) com estado próprio.
+ */
+export function QuestaoLeitura({ documentoId, q, corFg, corMuted, escolhida: escolhidaProp, resultado: resultadoProp, onEscolher, onRespondida }: {
   documentoId: string
   q: QuestaoLeituraDados
   corFg: string
   corMuted: string
-  onRespondida: (docQuestaoId: string, correta: boolean) => void
+  escolhida?: string | null
+  resultado?: Resultado | null
+  onEscolher?: (docQuestaoId: string, altId: string) => void
+  onRespondida: (docQuestaoId: string, r: Resultado) => void
 }) {
-  const [escolhida, setEscolhida] = useState<string | null>(q.resposta?.alternativaId ?? null)
-  const [res, setRes] = useState<{ correta: boolean; corretaId: string | null } | null>(q.resposta ? { correta: q.resposta.correta, corretaId: q.resposta.corretaId } : null)
+  const controlado = onEscolher !== undefined
+  const [escInterna, setEscInterna] = useState<string | null>(q.resposta?.alternativaId ?? null)
+  const [resInterno, setResInterno] = useState<Resultado | null>(q.resposta ? { correta: q.resposta.correta, corretaId: q.resposta.corretaId } : null)
   const [enviando, setEnviando] = useState(false)
+  const escolhida = controlado ? (escolhidaProp ?? null) : escInterna
+  const res = controlado ? (resultadoProp ?? null) : resInterno
   const respondido = !!res
+
+  const escolher = (altId: string) => { if (controlado) onEscolher!(q.docQuestaoId, altId); else setEscInterna(altId) }
 
   async function responder() {
     if (!escolhida || respondido) return
@@ -28,7 +42,7 @@ export function QuestaoLeitura({ documentoId, q, corFg, corMuted, onRespondida }
     try {
       const r = await fetch('/api/leitura/resposta', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ documento_id: documentoId, questao_id: q.questaoId, alternativa_id: escolhida }) })
       const j = await r.json()
-      if (j?.ok) { setRes({ correta: j.correta, corretaId: j.correta_id }); onRespondida(q.docQuestaoId, j.correta) }
+      if (j?.ok) { const rr = { correta: j.correta, corretaId: j.correta_id }; if (!controlado) setResInterno(rr); onRespondida(q.docQuestaoId, rr) }
       else toast.error(j?.message ?? 'Erro ao responder.')
     } catch { toast.error('Erro ao responder.') } finally { setEnviando(false) }
   }
@@ -47,7 +61,7 @@ export function QuestaoLeitura({ documentoId, q, corFg, corMuted, onRespondida }
           const certa = respondido && res!.corretaId === alt.id
           const erradaEscolhida = respondido && escolha && !res!.correta
           return (
-            <button key={alt.id} disabled={respondido} onClick={() => setEscolhida(alt.id)}
+            <button key={alt.id} disabled={respondido} onClick={() => escolher(alt.id)}
               className={cn('flex w-full items-start gap-3 rounded-xl border p-3 text-left text-sm transition-all',
                 !respondido && escolha && 'border-primary bg-primary/[0.06] ring-1 ring-primary/30',
                 !respondido && !escolha && 'hover:border-primary/40 hover:bg-black/[0.03]',

@@ -17,6 +17,19 @@ export interface GamRail { resumo: ResumoGamificacao; missoes: MissaoView[]; sem
  * Monta as trilhas de simulados do aluno (por grupo/pasta, nós concluído → atual → disponível),
  * o mesmo dado usado na Início. Extraído para ser reaproveitado pela página dedicada /aluno/trilha.
  */
+/** Monta o resumo de gamificação (rail) p/ um aluno — reutilizado na Home, na Trilha e no módulo LegProc. */
+export async function carregarGamRail(svc: any, tenantId: string, estId: string): Promise<GamRail | null> {
+  const gamConfig = await getGamConfig(svc, tenantId)
+  if (!gamConfig?.ativo) return null
+  const [resumo, missoes, semana, conquistas] = await Promise.all([
+    resumoGamificacao(svc, tenantId, estId, gamConfig),
+    missoesHoje(svc, tenantId, estId, gamConfig),
+    atividadeSemana(svc, tenantId, estId, gamConfig.timezone),
+    conquistasProgresso(svc, tenantId, estId, gamConfig),
+  ])
+  return resumo ? { resumo, missoes, semana, conquistas, config: gamConfig } : null
+}
+
 export async function carregarTrilhasAluno(): Promise<{ trilhas: Trilha[]; gamAtivo: boolean; nome: string; gam: GamRail | null }> {
   const sessao = await getSessaoAluno()
   if (!sessao) return { trilhas: [], gamAtivo: false, nome: 'Aluno', gam: null }

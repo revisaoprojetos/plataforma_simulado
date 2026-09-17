@@ -3,7 +3,7 @@
 import { useState, useTransition, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { Route, BarChart3, Check, Lock, AlertTriangle, ArrowRight, Search, Loader2, X, Library, Trophy } from 'lucide-react'
+import { Route, BarChart3, Check, Lock, AlertTriangle, ArrowRight, Search, Loader2, X, Library, Trophy, ScrollText, Zap, Play } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ModuloBanner } from '@/components/admin/modulo-banner'
@@ -11,13 +11,17 @@ import { TrilhaSistema, type Trilha } from '@/components/aluno/trilha-simulados'
 import { LeituraRanking } from '@/components/aluno/leitura-ranking'
 import { DEFAULT_TRILHA_SIMBOLOS, type TrilhaSimbolos } from '@/lib/gamificacao/trilha-simbolos'
 import { DEFAULT_TRILHA_FORMATO, type TrilhaFormato } from '@/lib/gamificacao/trilha-formato'
+import { GamificacaoRail } from '@/components/aluno/gamificacao-rail'
+import { type RegulamentoConfig, embedVideoUrl } from '@/lib/leitura/regulamento'
+import { type PontuacaoLeitura } from '@/lib/leitura/pontuacao'
+import type { GamRail } from '@/lib/aluno/trilhas'
 import type { AulaDesempenho } from '@/lib/leitura/trilha'
 import type { RankingLeitura } from '@/lib/leitura/ranking'
 import { buscarNaTrilha, type ResultadoBuscaTrilha } from '@/app/aluno/(portal)/leitura/busca-actions'
 
 /** Visão de um módulo do LegProc Digital: banner colapsável (igual ao admin) com tabs Trilha | Desempenho
  * e busca, + aviso de questões pendentes. */
-export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulasPendentes, ranking, meuId, formato = DEFAULT_TRILHA_FORMATO, simbolos = DEFAULT_TRILHA_SIMBOLOS }: {
+export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulasPendentes, ranking, meuId, formato = DEFAULT_TRILHA_FORMATO, simbolos = DEFAULT_TRILHA_SIMBOLOS, regulamento, pontuacao, gam = null }: {
   modulo: string
   trilha: Trilha
   desempenho: AulaDesempenho[]
@@ -27,6 +31,9 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
   meuId?: string | null
   formato?: TrilhaFormato
   simbolos?: TrilhaSimbolos
+  regulamento?: RegulamentoConfig
+  pontuacao?: PontuacaoLeitura
+  gam?: GamRail | null
 }) {
   // 1ª aula com questões pendentes (leitura feita) → alvo do CTA do aviso.
   const alvoPend = desempenho.find((a) => a.leituraConcluida && a.questoesPendentes > 0)
@@ -69,6 +76,8 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
   }, [resultados])
 
   const subtitulo = `Leia cada aula e desbloqueie as questões. ${trilha.done}/${trilha.total} concluída(s).`
+  const regAtivo = regulamento?.ativo === true
+  const embedReg = regulamento ? embedVideoUrl(regulamento.video_url) : null
 
   return (
     <Tabs defaultValue="trilha">
@@ -88,6 +97,7 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
           <div className="flex items-end justify-between gap-3">
             <TabsList className="w-fit border-white/20 [&_[data-slot=tabs-trigger]]:text-white/70 [&_[data-slot=tabs-trigger]:hover]:text-white [&_[data-slot=tabs-trigger][data-active]]:text-white">
               <TabsTrigger value="trilha"><Route className="h-4 w-4" /> Trilha</TabsTrigger>
+              {regAtivo && <TabsTrigger value="regulamento"><ScrollText className="h-4 w-4" /> Regulamento</TabsTrigger>}
               <TabsTrigger value="desempenho"><BarChart3 className="h-4 w-4" /> Desempenho</TabsTrigger>
               <TabsTrigger value="ranking"><Trophy className="h-4 w-4" /> Ranking</TabsTrigger>
             </TabsList>
@@ -128,8 +138,39 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
       {/* pt-0 + overflow-visible: a trilha encosta no banner e os pontos do topo passam POR TRÁS do banner
           (emergem dele) sem corte. overflow-x-auto cortaria o topo do 1º ponto (overflow-y vira auto). */}
       <TabsContent value="trilha" className="pt-0">
-        <div className="overflow-visible pb-10"><TrilhaSistema trilhas={[trilha]} gamAtivo={false} formato={formato} simbolos={simbolos} semFundo semDivisoria ajudante /></div>
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="min-w-0 overflow-visible pb-10"><TrilhaSistema trilhas={[trilha]} gamAtivo={false} formato={formato} simbolos={simbolos} semFundo semDivisoria ajudante /></div>
+          {/* Rail de gamificação (metas/streak/XP/medalha) — desktop, quando a gamificação está ativa. */}
+          {gam && <aside className="hidden lg:block"><GamificacaoRail resumo={gam.resumo} missoes={gam.missoes} semana={gam.semana} conquistas={gam.conquistas} config={gam.config} /></aside>}
+        </div>
       </TabsContent>
+
+      {regAtivo && (
+        <TabsContent value="regulamento" className="pt-4">
+          <div className="mx-auto max-w-3xl space-y-4">
+            {regulamento?.titulo && <h2 className="text-xl font-bold tracking-tight">{regulamento.titulo}</h2>}
+            {embedReg ? (
+              <div className="overflow-hidden rounded-2xl border shadow-sm"><div className="aspect-video w-full"><iframe src={embedReg} className="h-full w-full" title="Vídeo do módulo" allowFullScreen /></div></div>
+            ) : regulamento?.video_url ? (
+              <a href={regulamento.video_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90"><Play className="h-4 w-4" /> Assistir ao vídeo</a>
+            ) : null}
+            {regulamento?.descricao && (
+              <div className="whitespace-pre-wrap rounded-2xl border bg-card p-5 text-sm leading-relaxed shadow-sm">{regulamento.descricao}</div>
+            )}
+            {pontuacao && (
+              <div className="rounded-2xl border bg-card p-5 shadow-sm">
+                <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold"><Zap className="h-4 w-4 text-primary" /> Ganhos & metas</h3>
+                <ul className="grid gap-2 text-sm sm:grid-cols-2">
+                  <li className="flex items-center gap-2 rounded-xl border bg-muted/30 px-3 py-2"><span className="font-bold text-primary">+{pontuacao.pontos_aula}</span> pts por aula concluída</li>
+                  <li className="flex items-center gap-2 rounded-xl border bg-muted/30 px-3 py-2"><span className="font-bold text-primary">+{pontuacao.pontos_acerto}</span> pts por acerto no quiz</li>
+                  {pontuacao.combo_ativo && <li className="flex items-center gap-2 rounded-xl border bg-muted/30 px-3 py-2 sm:col-span-2"><span className="font-bold text-primary">+{pontuacao.combo_bonus}</span> pts de bônus ao gabaritar uma aula (todas certas)</li>}
+                </ul>
+              </div>
+            )}
+          </div>
+        </TabsContent>
+      )}
+
       <TabsContent value="desempenho" className="pt-4">
         <DesempenhoModulo desempenho={desempenho} />
       </TabsContent>

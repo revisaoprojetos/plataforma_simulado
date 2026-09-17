@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import {
   ArrowLeft, ScrollText, BookOpen, Rows3, ChevronLeft, ChevronRight, Minus, Plus,
   Sun, Moon, Coffee, CheckCircle2, Loader2, X, PanelLeft, Highlighter, Trash2, StickyNote, Crosshair, Search, ChevronUp, ChevronDown, Star,
-  Undo2, Redo2, RotateCcw, Eraser,
+  Undo2, Redo2, RotateCcw, Eraser, PartyPopper, BookOpenCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { DocumentoCarregado, AnotacaoAluno } from '@/lib/leitura/acesso'
@@ -127,6 +127,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
   const [pct, setPct] = useState(doc.progresso.pct)
   const [concluido, setConcluido] = useState(doc.progresso.concluido)
   const [concluindo, setConcluindo] = useState(false)
+  const [mostrarConcluido, setMostrarConcluido] = useState(false) // pop-up de conclusão (redireciona p/ as questões)
   const [secoes, setSecoes] = useState<Secao[]>([])
   // Modo capítulo: navega pelos títulos estruturais (nível 0). capAtual = índice do capítulo atual.
   const [capAtual, setCapAtual] = useState(0)
@@ -181,9 +182,6 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
   const grifos = useMemo(() => doc.grifos ?? [], [doc.grifos])
   // "Cobrado em prova" = artigos com QUESTÃO ancorada (aposArtigo). Alimenta o recolher/expandir.
   const artigosCobrados = useMemo(() => new Set((doc.questoes ?? []).map((q) => q.aposArtigo).filter((n) => n > 0)), [doc.questoes])
-  // Grifos "assados" no HTML (importados no padrão MAC → data-grifo/data-caixa;
-  // ou o formato cru hl-*/box-* de importações antigas), além do overlay (doc.grifos).
-  const temGrifosBaked = /data-grifo=|data-caixa=|\bhl-[ygr]\b|\bbox-(stj|stf|cinza|atencao)/.test(doc.html)
   const [semGrifos, setSemGrifos] = useState(!!doc.prefs?.semGrifos)
   const [mostrarMeus, setMostrarMeus] = useState(true) // "Meus grifos": ligado por padrão; desligar oculta os grifos do aluno
   // Legenda das cores do aluno (renomeável): padrão + o que o aluno já salvou. Salva debounced.
@@ -445,7 +443,10 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
     const t = setTimeout(() => {
       const esp = espinhaRef.current ?? construirEspinha(root)
       const base = ov.getBoundingClientRect()
-      const S = esp.S, ql = q.toLowerCase(), Sl = S.toLowerCase()
+      // Busca acento-insensível: "dobra" cada char no seu base (á→a, ç→c) mantendo o COMPRIMENTO 1:1,
+      // então os índices continuam mapeando os rects corretamente. Ex.: "orgao" acha "órgão".
+      const fold = (s: string) => s.normalize('NFC').replace(/[À-ſ]/g, (c) => c.normalize('NFD')[0]).toLowerCase()
+      const S = esp.S, ql = fold(q), Sl = fold(S)
       const res: { rects: RectRel[]; el: HTMLElement | null }[] = []
       let i = Sl.indexOf(ql)
       while (i >= 0 && res.length < 500) {
@@ -871,7 +872,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
     try {
       const r = await flush(true)
       const j = await r.json().catch(() => ({}))
-      if (j?.concluido) { setConcluido(true); toast.success('Leitura concluída! 🎉') }
+      if (j?.concluido) { setConcluido(true); setMostrarConcluido(true) }
       else if (doc.desafio.tempoMin) toast.error(`Continue lendo por pelo menos ${doc.desafio.tempoMin} min.`)
       else toast.error('Ainda não foi possível concluir.')
     } finally { setConcluindo(false) }
@@ -1201,16 +1202,16 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
 
           {/* Ferramentas de grifo: toggles (com reset) do Revisão e Meus grifos + caneta + histórico. */}
           <div className="space-y-3 border-b px-3 py-3" style={{ borderColor: '#0000001a' }}>
-            {(grifos.length > 0 || temGrifosBaked) && (
-              <div className="flex items-center justify-between text-xs" style={{ color: cores.muted }}>
-                <span className="inline-flex items-center gap-1"><Highlighter className="h-3.5 w-3.5" /> Grifos do Revisão</span>
-                <div className="flex items-center gap-2">
-                  <button onClick={resetarRevisao} title="Restaurar os grifos do Revisão" className="rounded p-0.5 transition hover:text-foreground"><RotateCcw className="h-3.5 w-3.5" /></button>
-                  {/* Marcado = MOSTRAR os grifos do Revisão; desmarcado = ler sem grifo. */}
-                  <input type="checkbox" checked={!semGrifos} onChange={(e) => setSemGrifos(!e.target.checked)} className="h-4 w-4 rounded border" aria-label="Mostrar grifos do Revisão" />
-                </div>
+            {/* SEMPRE visível (acima de "Meus grifos"): ocultar/mostrar os grifos do Revisão. Antes ficava
+                escondido por uma detecção que falhava em alguns docs. */}
+            <div className="flex items-center justify-between text-xs" style={{ color: cores.muted }}>
+              <span className="inline-flex items-center gap-1"><Highlighter className="h-3.5 w-3.5" /> Grifos do Revisão</span>
+              <div className="flex items-center gap-2">
+                <button onClick={resetarRevisao} title="Restaurar os grifos do Revisão" className="rounded p-0.5 transition hover:text-foreground"><RotateCcw className="h-3.5 w-3.5" /></button>
+                {/* Marcado = MOSTRAR os grifos do Revisão; desmarcado = ler sem grifo. */}
+                <input type="checkbox" checked={!semGrifos} onChange={(e) => setSemGrifos(!e.target.checked)} className="h-4 w-4 rounded border" aria-label="Mostrar grifos do Revisão" />
               </div>
-            )}
+            </div>
             {/* Meus grifos: ligado por padrão; desligar OCULTA (bloqueia) os grifos do próprio aluno. */}
             <div className="flex items-center justify-between text-xs" style={{ color: cores.muted }}>
               <span className="inline-flex items-center gap-1"><StickyNote className="h-3.5 w-3.5" /> Meus grifos</span>
@@ -1306,6 +1307,26 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
             </>)}
           </div>
         </aside>
+      )}
+
+      {/* Pop-up de conclusão da leitura — visível e com CTA p/ as questões (antes era só um toast). */}
+      {mostrarConcluido && createPortal(
+        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm motion-safe:animate-in motion-safe:fade-in" onClick={() => setMostrarConcluido(false)}>
+          <div className="relative w-full max-w-sm overflow-hidden rounded-2xl border bg-card p-6 text-center shadow-2xl motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:fade-in motion-safe:duration-300" onClick={(e) => e.stopPropagation()}>
+            <button type="button" onClick={() => setMostrarConcluido(false)} aria-label="Fechar" className="absolute right-3 top-3 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
+            <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center">
+              <span className="absolute h-16 w-16 rounded-full bg-emerald-500/20 motion-safe:animate-ping" />
+              <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400"><PartyPopper className="h-8 w-8 motion-safe:animate-bounce" /></span>
+            </div>
+            <h2 className="text-xl font-bold">Leitura concluída! 🎉</h2>
+            <p className="mt-1 text-sm text-muted-foreground">{trilha?.questoesHref ? 'Agora responda as questões do conteúdo para fixar e liberar a próxima aula.' : 'Boa! Você concluiu esta leitura.'}</p>
+            <div className="mt-4 flex flex-col gap-2">
+              {trilha?.questoesHref && <Link href={trilha.questoesHref} className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90"><BookOpenCheck className="h-4 w-4" /> Ir para as questões</Link>}
+              <button type="button" onClick={() => setMostrarConcluido(false)} className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border bg-card px-4 py-2.5 text-sm font-semibold shadow-sm transition-colors hover:bg-muted">Continuar lendo</button>
+            </div>
+          </div>
+        </div>,
+        document.body,
       )}
     </div>
   )

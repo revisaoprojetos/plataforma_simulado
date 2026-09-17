@@ -687,6 +687,12 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
    data-cobranca). Também cobre o formato cru (classes hl- e box- ) de conteúdos
    importados ANTES do mapeamento. Escopo: prévia do editor e leitor (.leitura-prosa). */
 
+/* Zoom da fonte do leitor: o HTML importado (Word/PDF) traz font-size INLINE fixo (px/pt) que ignora o
+   controle de tamanho do leitor — o texto não crescia (só o line-height). Forçamos o conteúdo a HERDAR o
+   tamanho do container (.leitura-conteudo, que recebe `fontSize: fonte`). Títulos/caixas via classe/`em`
+   seguem escalando normalmente. Só no leitor (não na prévia do editor). */
+.leitura-conteudo [style*="font-size"] { font-size: inherit !important; }
+
 /* Grifos inline (decorativos) — cores do padrão MAC */
 .leitura-prosa [data-grifo="nucleo"],      .leitura-prosa .hl-y { background:#fff35c; color:#111; padding:0 1px; border-radius:2px; }
 .leitura-prosa [data-grifo="complemento"], .leitura-prosa .hl-g { background:#a8d08d; color:#111; padding:0 1px; border-radius:2px; }

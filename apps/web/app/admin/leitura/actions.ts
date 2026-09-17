@@ -11,6 +11,7 @@ import { limparCabecalhoHtml } from '@/lib/leitura/limpar-cabecalho'
 import { hospedarBase64 } from '@/lib/storage/hospedar-base64'
 import { normalizarPontuacaoLeitura, type PontuacaoLeitura } from '@/lib/leitura/pontuacao'
 import { normalizarIntro, type IntroConfig } from '@/lib/leitura/intro'
+import { normalizarRegulamento, type RegulamentoConfig } from '@/lib/leitura/regulamento'
 import { esquecer } from '@/lib/cache/relatorio-cache'
 import { classificarFormato } from '@/lib/simulado/formato'
 import { confirmarImportQuestoes } from '@/app/admin/banco-questoes/actions'
@@ -516,7 +517,7 @@ function normPublicacao(v: any): PublicacaoModulo {
   if (!v || typeof v !== 'object') return PUBLICACAO_PADRAO
   return { status: v.status === 'publicado' ? 'publicado' : 'rascunho', publicarEm: v.publicarEm ?? null, encerrarEm: v.encerrarEm ?? null }
 }
-export type ModuloLeitura = { id: string; nome: string; pai_id: string | null; cor: string | null; icone: string | null; capa_url: string | null; capa_card_url: string | null; adesivo_url: string | null; pontuacao: PontuacaoLeitura; intro: IntroConfig; ordem: number; subpastas: number; aulas: number; publicacao: PublicacaoModulo }
+export type ModuloLeitura = { id: string; nome: string; pai_id: string | null; cor: string | null; icone: string | null; capa_url: string | null; capa_card_url: string | null; adesivo_url: string | null; pontuacao: PontuacaoLeitura; intro: IntroConfig; regulamento: RegulamentoConfig; ordem: number; subpastas: number; aulas: number; publicacao: PublicacaoModulo }
 export type BancoAulas = { ok: boolean; error?: string; pastas?: ModuloLeitura[]; aulas?: (Documento & { questoes?: number })[]; breadcrumb?: { id: string; nome: string }[]; modulos?: { id: string; nome: string }[]; moduloAtual?: ModuloLeitura }
 
 /** `.order('ordem')` tolerante: se a coluna `ordem` ainda não existir, refaz ordenando por nome. */
@@ -525,7 +526,8 @@ async function pastasLeitura(svc: any, tenantId: string): Promise<any[]> {
     const b = svc.from('simulado_pastas').select(cols).eq('tenant_id', tenantId).eq('is_folder', true).eq('folder_area', AREA_LEITURA)
     return ordenado ? b.order('ordem', { ascending: true }).order('nome', { ascending: true }) : b.order('nome', { ascending: true })
   }
-  let r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, adesivo_url, pontuacao, intro_config, ordem, publicacao', true)
+  let r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, adesivo_url, pontuacao, intro_config, regulamento, ordem, publicacao', true)
+  if (r.error) r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, adesivo_url, pontuacao, intro_config, ordem, publicacao', true) // regulamento pode não estar migrado
   if (r.error) r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, adesivo_url, pontuacao, ordem, publicacao', true) // intro_config pode não estar migrado
   if (r.error) r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, adesivo_url, ordem, publicacao', true) // pontuacao pode não estar migrada
   if (r.error) r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, ordem, publicacao', true) // adesivo_url pode não estar migrado
@@ -549,7 +551,7 @@ export async function listarBancoAulas(pastaId?: string | null, detalhes: boolea
   for (const p of todasPastas) { if (p.pai_id) subPorPasta.set(p.pai_id, (subPorPasta.get(p.pai_id) ?? 0) + 1) }
 
   const pastas: ModuloLeitura[] = todasPastas.filter((p) => (p.pai_id ?? null) === paiAtual).map((p) => ({
-    id: p.id, nome: p.nome, pai_id: p.pai_id ?? null, cor: p.cor ?? null, icone: p.icone ?? null, capa_url: p.capa_url ?? null, capa_card_url: p.capa_card_url ?? null, adesivo_url: p.adesivo_url ?? null, pontuacao: normalizarPontuacaoLeitura(p.pontuacao), intro: normalizarIntro(p.intro_config),
+    id: p.id, nome: p.nome, pai_id: p.pai_id ?? null, cor: p.cor ?? null, icone: p.icone ?? null, capa_url: p.capa_url ?? null, capa_card_url: p.capa_card_url ?? null, adesivo_url: p.adesivo_url ?? null, pontuacao: normalizarPontuacaoLeitura(p.pontuacao), intro: normalizarIntro(p.intro_config), regulamento: normalizarRegulamento(p.regulamento),
     ordem: p.ordem ?? 0, subpastas: subPorPasta.get(p.id) ?? 0, aulas: docsPorPasta.get(p.id) ?? 0, publicacao: normPublicacao(p.publicacao),
   }))
 
@@ -577,7 +579,7 @@ export async function listarBancoAulas(pastaId?: string | null, detalhes: boolea
   const raiz = paiAtual ? todasPastas.find((p) => p.id === paiAtual) : null
   const moduloAtual: ModuloLeitura | undefined = raiz ? {
     id: raiz.id, nome: raiz.nome, pai_id: raiz.pai_id ?? null, cor: raiz.cor ?? null, icone: raiz.icone ?? null,
-    capa_url: raiz.capa_url ?? null, capa_card_url: raiz.capa_card_url ?? null, adesivo_url: raiz.adesivo_url ?? null, pontuacao: normalizarPontuacaoLeitura(raiz.pontuacao), intro: normalizarIntro(raiz.intro_config),
+    capa_url: raiz.capa_url ?? null, capa_card_url: raiz.capa_card_url ?? null, adesivo_url: raiz.adesivo_url ?? null, pontuacao: normalizarPontuacaoLeitura(raiz.pontuacao), intro: normalizarIntro(raiz.intro_config), regulamento: normalizarRegulamento(raiz.regulamento),
     ordem: raiz.ordem ?? 0, subpastas: subPorPasta.get(raiz.id) ?? 0, aulas: docsPorPasta.get(raiz.id) ?? 0, publicacao: normPublicacao(raiz.publicacao),
   } : undefined
 
@@ -657,6 +659,15 @@ export async function salvarIntroModulo(id: string, cfg: IntroConfig): Promise<{
   const svc = createAdminClient()
   const { error } = await svc.from('simulado_pastas').update({ intro_config: normalizarIntro(cfg) }).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
   if (error) return { ok: false, error: /intro_config|column|schema cache/i.test(error.message) ? 'Migração do "Comece por aqui" pendente (intro_config).' : error.message }
+  revalidatePath('/admin/leitura'); return { ok: true }
+}
+
+/** Regulamento do módulo (descrição + vídeo). Tolerante à migração `regulamento` (jsonb) ausente. */
+export async function salvarRegulamentoModulo(id: string, cfg: RegulamentoConfig): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_pastas').update({ regulamento: normalizarRegulamento(cfg) }).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  if (error) return { ok: false, error: /regulamento|column|schema cache/i.test(error.message) ? 'Migração do regulamento pendente (coluna regulamento jsonb em simulado_pastas).' : error.message }
   revalidatePath('/admin/leitura'); return { ok: true }
 }
 
