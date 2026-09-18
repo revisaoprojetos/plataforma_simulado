@@ -17,7 +17,7 @@ import { ModuloTrilhaForm } from '@/components/admin/modulo-trilha-form'
 import { ModuloTrilhaFundoForm } from '@/components/admin/modulo-trilha-fundo-form'
 import { ModuloAcesso } from '@/components/admin/modulo-acesso'
 import {
-  ChevronRight, ChevronUp, ChevronDown, Home, Library, FolderPlus, FilePlus2, Pencil, Trash2, FolderInput, Eye, EyeOff, BookOpenText, MoreVertical, FolderOpen, FileText, HelpCircle, Settings2, Users, X, Clock, CalendarClock, Link2,
+  ChevronRight, ChevronUp, ChevronDown, Home, Library, FolderPlus, FilePlus2, Pencil, Trash2, FolderInput, Eye, EyeOff, BookOpenText, MoreVertical, FolderOpen, FileText, HelpCircle, Settings2, Users, X, Clock, CalendarClock, Link2, Copy,
 } from 'lucide-react'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/utils'
@@ -307,6 +307,11 @@ function ModuloCard({ m, variant, onExcluir }: {
             <BookOpenText className="h-3 w-3" /> {contagem}
           </span>
         </div>
+        {/* Copiar link da trilha — canto inferior direito (igual aos simulados). */}
+        <button type="button" onClick={copiarLinkTrilha} title="Copiar link da trilha (aluno)"
+          className="pointer-events-auto absolute bottom-2 right-2 z-30 flex h-7 w-7 items-center justify-center rounded-lg border bg-card text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground">
+          <Copy className="h-3.5 w-3.5" />
+        </button>
       </div>
     )
   }
@@ -330,11 +335,16 @@ function ModuloCard({ m, variant, onExcluir }: {
       </div>
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-3">
         <p className="text-[10px] font-medium uppercase tracking-wide text-white/70">Módulo</p>
-        <h3 className="mt-0.5 line-clamp-2 text-sm font-bold leading-tight text-white drop-shadow-sm">{m.nome}</h3>
+        <h3 className="mt-0.5 line-clamp-2 pr-9 text-sm font-bold leading-tight text-white drop-shadow-sm">{m.nome}</h3>
         <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur">
           <BookOpenText className="h-3 w-3" /> {contagem}
         </span>
       </div>
+      {/* Copiar link da trilha — canto inferior direito (igual aos simulados). */}
+      <button type="button" onClick={copiarLinkTrilha} title="Copiar link da trilha (aluno)"
+        className="pointer-events-auto absolute bottom-2 right-2 z-30 flex h-8 w-8 items-center justify-center rounded-lg bg-white/15 text-white backdrop-blur transition-colors hover:bg-white hover:text-neutral-900">
+        <Copy className="h-4 w-4" />
+      </button>
     </div>
   )
 }
