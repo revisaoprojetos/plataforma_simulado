@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { Loader2, Save, Check } from 'lucide-react'
 
@@ -20,6 +20,9 @@ export function ConfigModuloSalvarProvider({ children }: { children: ReactNode }
   const recomputar = useCallback(() => setTick((n) => n + 1), [])
   const registrar = useCallback((id: string, e: Entry) => { entriesRef.current.set(id, e); recomputar() }, [recomputar])
   const desregistrar = useCallback((id: string) => { entriesRef.current.delete(id); recomputar() }, [recomputar])
+  // IDENTIDADE ESTÁVEL do contexto: sem isto, o value recriado a cada render muda o `ctx` e faz o
+  // useRegistrarSalvavel re-registrar em loop (setTick → render → …) — travava a aba Configurações.
+  const ctxValue = useMemo(() => ({ registrar, desregistrar, marcar: recomputar }), [registrar, desregistrar, recomputar])
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _ = tick
@@ -44,7 +47,7 @@ export function ConfigModuloSalvarProvider({ children }: { children: ReactNode }
   }, [anyDirty])
 
   return (
-    <CtxSalvar.Provider value={{ registrar, desregistrar, marcar: recomputar }}>
+    <CtxSalvar.Provider value={ctxValue}>
       <div className="space-y-4">
         {anyDirty && (
           <div className="sticky top-2 z-30 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-sm shadow-sm backdrop-blur">
