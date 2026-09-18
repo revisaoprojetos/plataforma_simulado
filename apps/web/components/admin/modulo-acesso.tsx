@@ -2,8 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Search, UserCheck, Info, Check, Trash2, Globe, Lock } from 'lucide-react'
+import { Loader2, Search, UserCheck, Info, Check, Trash2, Globe, Lock, Link2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { CopyLink } from '@/components/admin/copy-link'
 import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
 import { AdicionarEstudantesDialog, type AlunoSel } from '@/components/admin/adicionar-estudantes-dialog'
 import { AdicionarGrupoModuloDialog } from '@/components/admin/adicionar-grupo-modulo-dialog'
@@ -36,6 +37,11 @@ export function ModuloAcesso({ pastaId }: { pastaId: string }) {
   const [busca, setBusca] = useState('')
   const [pagina, setPagina] = useState(0)
   const [liberarTodos, setLiberarTodos] = useState(false)
+  // Link direto para a trilha interna do módulo (para enviar aos alunos). Origem: URL configurada do
+  // app ou a do navegador (dev). Resolvida no cliente p/ não quebrar no SSR.
+  const [origem, setOrigem] = useState('')
+  useEffect(() => { setOrigem(process.env.NEXT_PUBLIC_APP_URL || window.location.origin) }, [])
+  const linkTrilha = origem ? `${origem}/aluno/leitura?modulo=${pastaId}` : ''
 
   useEffect(() => {
     ;(async () => {
@@ -103,6 +109,15 @@ export function ModuloAcesso({ pastaId }: { pastaId: string }) {
 
   return (
     <div className="space-y-4">
+      {/* Link direto para a trilha interna do módulo — para enviar aos alunos. */}
+      <div className="space-y-1.5 rounded-xl border bg-card px-4 py-3 shadow-sm">
+        <p className="flex items-center gap-1.5 text-sm font-semibold"><Link2 className="h-4 w-4 text-primary" /> Link direto para a trilha</p>
+        <p className="text-xs text-muted-foreground">Envie este link aos alunos com acesso — abre direto a trilha deste módulo (pede login se o aluno ainda não estiver logado).</p>
+        {linkTrilha
+          ? <CopyLink url={linkTrilha} />
+          : <div className="h-9 animate-pulse rounded bg-muted" />}
+      </div>
+
       {/* Aviso + botão "Liberar para todos" à direita */}
       <div className={cn('flex flex-wrap items-center gap-3 rounded-xl border px-4 py-2.5 text-sm', liberarTodos ? 'border-sky-500/30 bg-sky-500/5 text-sky-700 dark:text-sky-300' : 'border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-400')}>
         <Info className="h-4 w-4 shrink-0" />
