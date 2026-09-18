@@ -46,9 +46,9 @@ export interface TrilhaLivreConfig {
 export const ESCALA_MIN = 0.4
 export const ESCALA_MAX = 3
 
-/** Degradê escuro do banner + o degradê no topo da imagem que liga a trilha ao banner. */
-export interface TrilhaDegrade { ativo: boolean; intensidade: number }
-export const DEFAULT_TRILHA_DEGRADE: TrilhaDegrade = { ativo: true, intensidade: 45 }
+/** Degradê do banner + o degradê no topo da imagem que liga a trilha ao banner (liga/desliga, intensidade e cor). */
+export interface TrilhaDegrade { ativo: boolean; intensidade: number; cor: string }
+export const DEFAULT_TRILHA_DEGRADE: TrilhaDegrade = { ativo: true, intensidade: 45, cor: '#000000' }
 
 /** Cores dos grifos do módulo (realces de fundo + cores de texto). O conteúdo usa cores INLINE; a
  *  aplicação classifica cada cor por matiz e reaplica a configurada (ver lib recolorir-grifos). */
@@ -83,7 +83,7 @@ function resolverEscala(v: unknown): number | undefined {
 function resolverDegrade(raw: unknown): TrilhaDegrade {
   if (raw == null || typeof raw !== 'object') return { ...DEFAULT_TRILHA_DEGRADE }
   const r = raw as Partial<TrilhaDegrade>
-  return { ativo: r.ativo !== false, intensidade: num(r.intensidade, 0, 100, DEFAULT_TRILHA_DEGRADE.intensidade) }
+  return { ativo: r.ativo !== false, intensidade: num(r.intensidade, 0, 100, DEFAULT_TRILHA_DEGRADE.intensidade), cor: hex6(r.cor, DEFAULT_TRILHA_DEGRADE.cor) }
 }
 function resolverFundo(raw: unknown): TrilhaFundoConfig | undefined {
   if (raw == null || typeof raw !== 'object') return undefined

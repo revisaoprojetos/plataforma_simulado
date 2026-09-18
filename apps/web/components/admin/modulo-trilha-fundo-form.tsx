@@ -144,6 +144,13 @@ export function ModuloTrilhaFundoForm({ pastaId, atual, capa }: { pastaId: strin
               <span className="mb-1 flex items-center justify-between text-[11px] font-medium text-muted-foreground"><span>Intensidade do degradê</span><span className="tabular-nums">{degrade.intensidade}%</span></span>
               <input type="range" min={0} max={100} step={1} value={degrade.intensidade} disabled={!degrade.ativo} onChange={(e) => setDegrade((d) => ({ ...d, intensidade: Number(e.target.value) }))} className="w-full accent-[var(--primary)]" />
             </label>
+            <label className={cn('flex items-center justify-between gap-3', !degrade.ativo && 'pointer-events-none opacity-50')}>
+              <span className="text-[11px] font-medium text-muted-foreground">Cor do degradê</span>
+              <span className="inline-flex items-center gap-2">
+                <span className="text-[11px] tabular-nums text-muted-foreground">{degrade.cor}</span>
+                <input type="color" value={degrade.cor} disabled={!degrade.ativo} onChange={(e) => setDegrade((d) => ({ ...d, cor: e.target.value }))} className="h-7 w-10 cursor-pointer rounded border bg-transparent p-0.5" />
+              </span>
+            </label>
           </div>
           <div className="rounded-xl border border-dashed bg-muted/20 p-3 text-[11px] leading-relaxed text-muted-foreground">
             A <strong>proporção</strong> e o <strong>enquadramento</strong> vêm do <strong>Ajustar</strong>: arraste o quadro para posicionar e puxe as alças das bordas para mudar o formato. Proporção atual: <strong className="tabular-nums">{aspecto.toFixed(2)}:1</strong>.

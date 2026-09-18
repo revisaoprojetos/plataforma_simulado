@@ -114,9 +114,9 @@ export function ModuloBanner({ banner, cor, titulo, subtitulo, topoDireita, brea
         // eslint-disable-next-line @next/next/no-img-element
         ? <img src={banner} alt="" className="absolute inset-0 h-full w-full object-cover object-[center_86%]" />
         : <div className="absolute inset-0" style={cor ? { background: `linear-gradient(140deg, ${cor} 0%, #0a0a0a 130%)` } : undefined} />}
-      {/* Degradê GERAL controlado (liga/desliga + intensidade) — some mais claro que antes. */}
-      {(() => { const d = degrade ?? DEFAULT_TRILHA_DEGRADE; const k = d.ativo ? d.intensidade / 100 : 0; return (
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, #000 0%, rgba(0,0,0,0.42) 55%, rgba(0,0,0,0.28) 100%)', opacity: k }} />
+      {/* Degradê GERAL controlado (liga/desliga + intensidade + cor). */}
+      {(() => { const d = degrade ?? DEFAULT_TRILHA_DEGRADE; const k = d.ativo ? d.intensidade / 100 : 0; const cor = d.cor || '#000000'; return (
+        <div className="absolute inset-0" style={{ background: `linear-gradient(to top, ${cor} 0%, color-mix(in srgb, ${cor} 42%, transparent) 55%, color-mix(in srgb, ${cor} 28%, transparent) 100%)`, opacity: k }} />
       ) })()}
       {/* Scrims de borda LEVES sempre ativos (garantem legibilidade do título/tabs mesmo com degradê off). */}
       <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-black/40 to-transparent" />
