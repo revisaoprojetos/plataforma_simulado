@@ -16,6 +16,7 @@ import { ModuloDescricaoForm } from '@/components/admin/modulo-descricao-form'
 import { ModuloRegulamentoForm } from '@/components/admin/modulo-regulamento-form'
 import { ModuloTrilhaForm } from '@/components/admin/modulo-trilha-form'
 import { ModuloTrilhaFundoForm } from '@/components/admin/modulo-trilha-fundo-form'
+import { ModuloFadeBannerForm } from '@/components/admin/modulo-fade-banner-form'
 import { ConfigModuloSalvarProvider } from '@/components/admin/config-modulo-salvar'
 import { ModuloAcesso } from '@/components/admin/modulo-acesso'
 import {
@@ -226,6 +227,7 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTa
                   onClose={() => {}}
                   onSaved={() => router.refresh()}
                 />
+                <ModuloFadeBannerForm key={`fade-${moduloAtual.id}`} pastaId={moduloAtual.id} atual={moduloAtual.trilhaAparencia.degrade} banner={moduloAtual.capa_url ?? moduloAtual.capa_card_url ?? null} cor={moduloAtual.cor} />
                 <ModuloDescricaoForm key={`desc-${moduloAtual.id}`} pastaId={moduloAtual.id} atual={moduloAtual.trilhaAparencia.descricao} />
                 <ModuloTrilhaFundoForm key={`fundo-${moduloAtual.id}`} pastaId={moduloAtual.id} atual={moduloAtual.trilhaAparencia} capa={moduloAtual.capa_url ?? moduloAtual.capa_card_url ?? null} />
                 <ModuloIntroForm pastaId={moduloAtual.id} atual={moduloAtual.intro} />

@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { Loader2, Save, ImagePlus, Trash2, ImageIcon, Crop } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { salvarTrilhaFundoModulo } from '@/app/admin/leitura/actions'
-import { DEFAULT_TRILHA_FUNDO, DEFAULT_TRILHA_DEGRADE, type TrilhaAparencia, type TrilhaFundoConfig, type TrilhaCrop, type TrilhaDegrade } from '@/lib/leitura/trilha-aparencia'
+import { DEFAULT_TRILHA_FUNDO, DEFAULT_TRILHA_DEGRADE_IMAGEM, DEGRADE_DIRS, estiloDegrade, type TrilhaAparencia, type TrilhaFundoConfig, type TrilhaCrop, type TrilhaDegrade } from '@/lib/leitura/trilha-aparencia'
 import { TrilhaFundoCropper } from '@/components/admin/trilha-fundo-cropper'
 import { useRegistrarSalvavel } from '@/components/admin/config-modulo-salvar'
 
@@ -35,15 +35,15 @@ function estiloFundo(fundo: TrilhaFundoConfig, url: string): React.CSSProperties
 export function ModuloTrilhaFundoForm({ pastaId, atual, capa }: { pastaId: string; atual: TrilhaAparencia; capa?: string | null }) {
   const [fundo, setFundoState] = useState<TrilhaFundoConfig>(atual.livre.fundo ?? DEFAULT_TRILHA_FUNDO)
   const [aspecto, setAspecto] = useState<number>(atual.livre.aspecto ?? 0.8)
-  const [degrade, setDegrade] = useState<TrilhaDegrade>(atual.degrade ?? DEFAULT_TRILHA_DEGRADE)
+  const [degradeTrilha, setDegradeTrilha] = useState<TrilhaDegrade>(atual.degradeTrilha ?? DEFAULT_TRILHA_DEGRADE_IMAGEM)
   const [pending, start] = useTransition()
   const fileRef = useRef<HTMLInputElement>(null)
   const [enviando, setEnviando] = useState(false)
   const [cropAberto, setCropAberto] = useState(false)
   const setFundo = (patch: Partial<TrilhaFundoConfig>) => setFundoState((f) => ({ ...f, ...patch }))
   const preview = fundo.url ?? capa ?? null
-  const baseRef = useRef(JSON.stringify({ fundo: atual.livre.fundo ?? DEFAULT_TRILHA_FUNDO, aspecto: atual.livre.aspecto ?? 0.8, degrade: atual.degrade ?? DEFAULT_TRILHA_DEGRADE }))
-  const dirty = JSON.stringify({ fundo, aspecto, degrade }) !== baseRef.current
+  const baseRef = useRef(JSON.stringify({ fundo: atual.livre.fundo ?? DEFAULT_TRILHA_FUNDO, aspecto: atual.livre.aspecto ?? 0.8, degradeTrilha: atual.degradeTrilha ?? DEFAULT_TRILHA_DEGRADE_IMAGEM }))
+  const dirty = JSON.stringify({ fundo, aspecto, degradeTrilha }) !== baseRef.current
 
   async function enviar(file: File) {
     setEnviando(true)
@@ -71,8 +71,8 @@ export function ModuloTrilhaFundoForm({ pastaId, atual, capa }: { pastaId: strin
   }
 
   async function salvarCore(): Promise<boolean> {
-    const r = await salvarTrilhaFundoModulo(pastaId, { fundo, aspecto, degrade })
-    if (r.ok) { baseRef.current = JSON.stringify({ fundo, aspecto, degrade }); return true }
+    const r = await salvarTrilhaFundoModulo(pastaId, { fundo, aspecto, degradeTrilha })
+    if (r.ok) { baseRef.current = JSON.stringify({ fundo, aspecto, degradeTrilha }); return true }
     return false
   }
   function salvar() {
@@ -110,6 +110,8 @@ export function ModuloTrilhaFundoForm({ pastaId, atual, capa }: { pastaId: strin
             {preview
               ? <div className="absolute inset-0" style={estiloFundo(fundo, preview)} />
               : <div className="flex h-full items-center justify-center p-4 text-center text-xs text-muted-foreground">Sem imagem — usa a capa do módulo.</div>}
+            {/* Degradê ao vivo por cima da prévia (mesma fórmula da trilha do aluno). */}
+            {degradeTrilha.ativo && <div className="pointer-events-none absolute inset-0" style={estiloDegrade(degradeTrilha)} />}
           </div>
           <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp,image/avif,image/gif" className="hidden"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) enviar(f); e.target.value = '' }} />
@@ -147,22 +149,33 @@ export function ModuloTrilhaFundoForm({ pastaId, atual, capa }: { pastaId: strin
           <div className="space-y-2 rounded-xl border bg-muted/20 p-3">
             <label className="flex cursor-pointer items-center justify-between gap-3">
               <span className="min-w-0">
-                <span className="block text-xs font-semibold">Degradê (banner + topo da imagem)</span>
-                <span className="block text-[11px] text-muted-foreground">Escurece o banner e liga a imagem a ele. Desligue para deixar tudo mais claro.</span>
+                <span className="block text-xs font-semibold">Degradê no topo da imagem</span>
+                <span className="block text-[11px] text-muted-foreground">Escurece o topo da imagem da trilha p/ ligá-la ao banner. Independente do fade do banner. Desligue p/ deixar a imagem mais clara.</span>
               </span>
-              <input type="checkbox" checked={degrade.ativo} onChange={(e) => setDegrade((d) => ({ ...d, ativo: e.target.checked }))} className="h-4 w-4 shrink-0 accent-[var(--primary)]" />
+              <input type="checkbox" checked={degradeTrilha.ativo} onChange={(e) => setDegradeTrilha((d) => ({ ...d, ativo: e.target.checked }))} className="h-4 w-4 shrink-0 accent-[var(--primary)]" />
             </label>
-            <label className={cn('block', !degrade.ativo && 'pointer-events-none opacity-50')}>
-              <span className="mb-1 flex items-center justify-between text-[11px] font-medium text-muted-foreground"><span>Intensidade do degradê</span><span className="tabular-nums">{degrade.intensidade}%</span></span>
-              <input type="range" min={0} max={100} step={1} value={degrade.intensidade} disabled={!degrade.ativo} onChange={(e) => setDegrade((d) => ({ ...d, intensidade: Number(e.target.value) }))} className="w-full accent-[var(--primary)]" />
+            <label className={cn('block', !degradeTrilha.ativo && 'pointer-events-none opacity-50')}>
+              <span className="mb-1 flex items-center justify-between text-[11px] font-medium text-muted-foreground"><span>Intensidade do degradê</span><span className="tabular-nums">{degradeTrilha.intensidade}%</span></span>
+              <input type="range" min={0} max={100} step={1} value={degradeTrilha.intensidade} disabled={!degradeTrilha.ativo} onChange={(e) => setDegradeTrilha((d) => ({ ...d, intensidade: Number(e.target.value) }))} className="w-full accent-[var(--primary)]" />
             </label>
-            <label className={cn('flex items-center justify-between gap-3', !degrade.ativo && 'pointer-events-none opacity-50')}>
-              <span className="text-[11px] font-medium text-muted-foreground">Cor do degradê</span>
-              <span className="inline-flex items-center gap-2">
-                <span className="text-[11px] tabular-nums text-muted-foreground">{degrade.cor}</span>
-                <input type="color" value={degrade.cor} disabled={!degrade.ativo} onChange={(e) => setDegrade((d) => ({ ...d, cor: e.target.value }))} className="h-7 w-10 cursor-pointer rounded border bg-transparent p-0.5" />
-              </span>
+            <label className={cn('block', !degradeTrilha.ativo && 'pointer-events-none opacity-50')}>
+              <span className="mb-1 flex items-center justify-between text-[11px] font-medium text-muted-foreground"><span>Comprimento do degradê</span><span className="tabular-nums">{degradeTrilha.comprimento}%</span></span>
+              <input type="range" min={5} max={100} step={1} value={degradeTrilha.comprimento} disabled={!degradeTrilha.ativo} onChange={(e) => setDegradeTrilha((d) => ({ ...d, comprimento: Number(e.target.value) }))} className="w-full accent-[var(--primary)]" />
             </label>
+            <div className={cn('flex flex-wrap items-center justify-between gap-3', !degradeTrilha.ativo && 'pointer-events-none opacity-50')}>
+              <label className="inline-flex min-w-[160px] flex-1 items-center gap-2">
+                <span className="text-[11px] font-medium text-muted-foreground">Direção</span>
+                <select value={degradeTrilha.direcao} disabled={!degradeTrilha.ativo} onChange={(e) => setDegradeTrilha((d) => ({ ...d, direcao: e.target.value as TrilhaDegrade['direcao'] }))}
+                  className="h-8 flex-1 rounded-lg border bg-[var(--input-bg,transparent)] px-2 text-xs outline-none focus:ring-1 focus:ring-ring">
+                  {DEGRADE_DIRS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
+                </select>
+              </label>
+              <label className="inline-flex items-center gap-2">
+                <span className="text-[11px] font-medium text-muted-foreground">Cor</span>
+                <span className="text-[11px] tabular-nums text-muted-foreground">{degradeTrilha.cor}</span>
+                <input type="color" value={degradeTrilha.cor} disabled={!degradeTrilha.ativo} onChange={(e) => setDegradeTrilha((d) => ({ ...d, cor: e.target.value }))} className="h-7 w-10 cursor-pointer rounded border bg-transparent p-0.5" />
+              </label>
+            </div>
           </div>
           <div className="rounded-xl border border-dashed bg-muted/20 p-3 text-[11px] leading-relaxed text-muted-foreground">
             A <strong>proporção</strong> e o <strong>enquadramento</strong> vêm do <strong>Ajustar</strong>: arraste o quadro para posicionar e puxe as alças das bordas para mudar o formato. Proporção atual: <strong className="tabular-nums">{aspecto.toFixed(2)}:1</strong>.

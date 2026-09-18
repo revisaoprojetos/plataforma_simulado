@@ -20,7 +20,7 @@ import type { RankingLeitura } from '@/lib/leitura/ranking'
 
 /** Visão de um módulo do LegProc Digital: banner colapsável (igual ao admin) com tabs Trilha | Desempenho
  * e busca, + aviso de questões pendentes. */
-export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulasPendentes, ranking, meuId, formato = DEFAULT_TRILHA_FORMATO, simbolos = DEFAULT_TRILHA_SIMBOLOS, livre, inverter = false, degrade, descricao, regulamento, pontuacao, gam = null }: {
+export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulasPendentes, ranking, meuId, formato = DEFAULT_TRILHA_FORMATO, simbolos = DEFAULT_TRILHA_SIMBOLOS, livre, inverter = false, degrade, degradeTrilha, descricao, regulamento, pontuacao, gam = null }: {
   modulo: string
   trilha: Trilha
   desempenho: AulaDesempenho[]
@@ -33,6 +33,7 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
   livre?: TrilhaLivreConfig
   inverter?: boolean
   degrade?: TrilhaDegrade
+  degradeTrilha?: TrilhaDegrade
   descricao?: string
   regulamento?: RegulamentoConfig
   pontuacao?: PontuacaoLeitura
@@ -98,7 +99,7 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
           // brancas do padding). Escapa o padding do portal (p-4/p-6) como o banner. O rail de metas flutua
           // por cima no canto (desktop) para não roubar largura da imagem.
           <div className="relative -mx-4 -mb-24 -mt-4 min-w-0 overflow-visible bg-neutral-950 md:-mx-6 md:-mb-6 md:-mt-6">
-            <TrilhaSistema trilhas={[trilha]} gamAtivo={false} formato={formato} simbolos={simbolos} livre={livre} inverter={inverter} capa={trilha.capa ?? trilha.capaCard ?? null} semFundo semDivisoria ajudante semMoldura degradeTopo={degrade} />
+            <TrilhaSistema trilhas={[trilha]} gamAtivo={false} formato={formato} simbolos={simbolos} livre={livre} inverter={inverter} capa={trilha.capa ?? trilha.capaCard ?? null} semFundo semDivisoria ajudante semMoldura degradeTopo={degradeTrilha ?? degrade} />
             {gam && (
               <aside className="pointer-events-auto absolute right-2 top-2 z-20 hidden max-h-[calc(100vh-150px)] w-[300px] overflow-auto rounded-2xl border bg-background/85 p-2 shadow-xl backdrop-blur lg:block">
                 <GamificacaoRail resumo={gam.resumo} missoes={gam.missoes} semana={gam.semana} conquistas={gam.conquistas} config={gam.config} />

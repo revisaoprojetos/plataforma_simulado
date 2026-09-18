@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { SimboloNo } from '@/components/gamificacao/simbolo-no'
 import { coresNo, type TrilhaSimbolos, type SimboloEstado } from '@/lib/gamificacao/trilha-simbolos'
-import type { TrilhaLivreConfig, PosXY, TrilhaDegrade } from '@/lib/leitura/trilha-aparencia'
+import { estiloDegrade, type TrilhaLivreConfig, type PosXY, type TrilhaDegrade } from '@/lib/leitura/trilha-aparencia'
 
 export type NoLivre = {
   id: string; titulo: string; estado: SimboloEstado; href?: string | null; acao?: string
@@ -208,9 +208,9 @@ export function TrilhaLivre({ nodes, livre, capa, simbolos, editavel = false, on
       {/* Scrim BEM sutil (só um leve vinheta topo/base) — os rótulos já têm fundo próprio, então a imagem
           fica nítida. */}
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/15 via-transparent to-black/20" />
-      {/* Degradê do TOPO da imagem → "liga" a trilha ao banner (some ao descer). */}
+      {/* Degradê da imagem (direção + comprimento configuráveis) → "liga" a trilha ao banner. */}
       {!ocultarFundo && degradeTopo?.ativo && (
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-1/3" style={{ background: 'linear-gradient(to bottom, #000 0%, transparent 100%)', opacity: Math.min(1, degradeTopo.intensidade / 100) }} />
+        <div className="pointer-events-none absolute inset-0" style={estiloDegrade(degradeTopo)} />
       )}
 
       {size.w > 0 && (

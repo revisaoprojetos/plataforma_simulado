@@ -39,7 +39,7 @@ export function ModuloTrilhaForm({ pastaId, atual, capa, aulas }: {
 
   function salvar() {
     start(async () => {
-      const r = await salvarTrilhaAparenciaModulo(pastaId, { simbolos, formato, livre, inverter, degrade: atual.degrade })
+      const r = await salvarTrilhaAparenciaModulo(pastaId, { simbolos, formato, livre, inverter, degrade: atual.degrade, degradeTrilha: atual.degradeTrilha })
       if (r.ok) toast.success('Aparência da trilha salva.')
       else toast.error(r.error ?? 'Erro ao salvar')
     })

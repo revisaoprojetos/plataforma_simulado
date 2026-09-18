@@ -56,7 +56,7 @@ export function TrilhaBuilder({ pastaId, moduloNome, capa, aulas, atual }: {
 
   function salvar() {
     start(async () => {
-      const r = await salvarTrilhaAparenciaModulo(pastaId, { simbolos, formato: 'livre', livre, inverter: atual.inverter, degrade: atual.degrade })
+      const r = await salvarTrilhaAparenciaModulo(pastaId, { simbolos, formato: 'livre', livre, inverter: atual.inverter, degrade: atual.degrade, degradeTrilha: atual.degradeTrilha })
       if (r.ok) toast.success('Trilha personalizada salva.')
       else toast.error(r.error ?? 'Erro ao salvar')
     })

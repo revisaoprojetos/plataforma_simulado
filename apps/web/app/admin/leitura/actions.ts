@@ -742,6 +742,21 @@ export async function salvarDescricaoModulo(id: string, descricao: string): Prom
   revalidatePath('/admin/leitura'); revalidatePath('/aluno/leitura'); return { ok: true }
 }
 
+/** Degradê/fade do BANNER do módulo — MERGE em trilha_aparencia.degrade (migration-free). */
+export async function salvarDegradeModulo(id: string, degrade: TrilhaDegrade): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  let atual: TrilhaAparencia
+  try {
+    const { data } = await svc.from('simulado_pastas').select('trilha_aparencia').eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA).maybeSingle()
+    atual = resolverTrilhaAparencia((data as any)?.trilha_aparencia)
+  } catch { atual = resolverTrilhaAparencia(null) }
+  const next = resolverTrilhaAparencia({ ...atual, degrade })
+  const { error } = await svc.from('simulado_pastas').update({ trilha_aparencia: next }).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  if (error) return { ok: false, error: /trilha_aparencia|column|schema cache/i.test(error.message) ? 'Migração da aparência da trilha pendente (coluna trilha_aparencia jsonb em simulado_pastas).' : error.message }
+  revalidatePath('/admin/leitura'); revalidatePath('/aluno/leitura'); return { ok: true }
+}
+
 /** Cores dos grifos do módulo (realces + textos) — MERGE em trilha_aparencia.grifoCores (migration-free). */
 export async function salvarGrifoCoresModulo(id: string, cores: GrifoCores): Promise<{ ok: boolean; error?: string }> {
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
@@ -776,7 +791,7 @@ export async function salvarTrilhaAparenciaModulo(id: string, cfg: Omit<TrilhaAp
  * Salva SÓ a imagem de fundo da trilha (+ proporção do canvas), MESCLANDO na aparência atual — não
  * apaga posições dos nós, curvas, escala, símbolos nem formato. Usado na aba Configurações do módulo.
  */
-export async function salvarTrilhaFundoModulo(id: string, patch: { fundo: TrilhaFundoConfig; aspecto?: number; degrade?: TrilhaDegrade }): Promise<{ ok: boolean; error?: string }> {
+export async function salvarTrilhaFundoModulo(id: string, patch: { fundo: TrilhaFundoConfig; aspecto?: number; degradeTrilha?: TrilhaDegrade }): Promise<{ ok: boolean; error?: string }> {
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
   let atual: TrilhaAparencia
@@ -784,7 +799,7 @@ export async function salvarTrilhaFundoModulo(id: string, patch: { fundo: Trilha
     const { data } = await svc.from('simulado_pastas').select('trilha_aparencia').eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA).maybeSingle()
     atual = resolverTrilhaAparencia((data as any)?.trilha_aparencia)
   } catch { atual = resolverTrilhaAparencia(null) }
-  const next: TrilhaAparencia = { ...atual, livre: { ...atual.livre, fundo: patch.fundo, aspecto: patch.aspecto ?? atual.livre.aspecto }, degrade: patch.degrade ?? atual.degrade }
+  const next: TrilhaAparencia = { ...atual, livre: { ...atual.livre, fundo: patch.fundo, aspecto: patch.aspecto ?? atual.livre.aspecto }, degradeTrilha: patch.degradeTrilha ?? atual.degradeTrilha }
   const { error } = await svc.from('simulado_pastas').update({ trilha_aparencia: resolverTrilhaAparencia(next) }).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
   if (error) return { ok: false, error: /trilha_aparencia|column|schema cache/i.test(error.message) ? 'Migração da aparência da trilha pendente (coluna trilha_aparencia jsonb em simulado_pastas).' : error.message }
   revalidatePath('/admin/leitura'); revalidatePath('/aluno/leitura'); return { ok: true }
@@ -867,6 +882,19 @@ export async function definirGruposPasta(pastaId: string, grupoIds: string[]): P
   }
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_pasta_grupos', entidadeId: pastaId, depois: { grupos: ids.length }, atorId: g.atorId, tenantId: g.tenantId })
   revalidatePath('/admin/leitura'); return { ok: true }
+}
+
+/** Contagem (viva) de membros por grupo — p/ mostrar nos chips de "grupos vinculados". */
+export async function contarMembrosGrupos(grupoIds: string[]): Promise<{ ok: boolean; contagem?: Record<string, number>; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const ids = [...new Set((grupoIds ?? []).filter(Boolean))]
+  const out: Record<string, number> = {}
+  await Promise.all(ids.map(async (id) => {
+    const { count } = await svc.from('simulado_grupo_membros').select('estudante_id', { count: 'exact', head: true }).eq('grupo_id', id)
+    out[id] = count ?? 0
+  }))
+  return { ok: true, contagem: out }
 }
 
 export async function carregarEstudantesPasta(pastaId: string): Promise<{ ok: boolean; itens?: EstudanteAcessoLinha[]; error?: string }> {
