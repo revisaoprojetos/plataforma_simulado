@@ -874,6 +874,13 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 .leitura-prosa.sem-grifos .hl-y, .leitura-prosa.sem-grifos .hl-y *,
 .leitura-prosa.sem-grifos .hl-g, .leitura-prosa.sem-grifos .hl-g *,
 .leitura-prosa.sem-grifos .hl-r, .leitura-prosa.sem-grifos .hl-r *,
+/* Grifos "assados" como SPAN com fundo inline (marca-texto do editor) — precisam entrar no reset,
+   senão o "ocultar grifos do Revisão" não os apagava. NÃO inclui td/th (faixa das caixas estruturais). */
+.leitura-prosa.sem-grifos span[style*="background"], .leitura-prosa.sem-grifos span[style*="background"] *,
+.leitura-prosa.sem-grifos font[style*="background"], .leitura-prosa.sem-grifos font[style*="background"] *,
+.leitura-prosa.sem-grifos b[style*="background"], .leitura-prosa.sem-grifos b[style*="background"] *,
+.leitura-prosa.sem-grifos strong[style*="background"], .leitura-prosa.sem-grifos strong[style*="background"] *,
+.leitura-prosa.sem-grifos mark, .leitura-prosa.sem-grifos mark *,
 .leitura-prosa.sem-grifos .exc, .leitura-prosa.sem-grifos .exc * {
   background:transparent !important; padding:0 !important; color:inherit !important;
 }

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useTransition, type 
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Pencil, Save, Loader2, Bold, Eraser, X, ListTree, GitCompare, ArrowDown, ArrowUp, Trash2, Search, ChevronDown, Check, HelpCircle } from 'lucide-react'
+import { Pencil, Save, Loader2, Bold, Eraser, X, ListTree, GitCompare, ArrowDown, ArrowUp, Trash2, Search, ChevronDown, Check, HelpCircle, Eye, EyeOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { MarkdownContent } from '@/components/markdown-content'
@@ -12,7 +12,10 @@ import { salvarConteudoHtml } from '@/app/admin/leitura/upload-actions'
 import { DiffEspelho } from '@/components/leitura/diff-espelho'
 import { listarVersoesDocumento, carregarDiffDocumento, reverterAlteracao } from '@/app/admin/leitura/alteracoes-actions'
 import { listarQuestoesDocumento, type QuestaoDoc } from '@/app/admin/leitura/actions'
+import { DEFAULT_GRIFO_CORES, type GrifoCores } from '@/lib/leitura/trilha-aparencia'
+import { aplicarGrifos } from '@/lib/leitura/recolorir-grifos'
 import { prepararCaixasTabela, prepararCaixasCobrado } from '@/lib/leitura/caixas'
+import { DEFAULT_BLOCOS, type BlocoDef } from '@/lib/leitura/blocos'
 import { NIVEL_TIPO, montarArvoreToc, type NoToc } from '@/lib/leitura/indice'
 import { IndiceArvore, type NoIndiceView } from '@/components/leitura/indice-arvore'
 import type { BlocoDiff, DiffDoc, VersaoInfo } from '@/lib/leitura/diff-tipos'
@@ -103,7 +106,7 @@ const RESUMO_ZERO = { mod: 0, add: 0, rem: 0, igual: 0 }
 /** Controles do editor de grifos expostos p/ a barra de topo do editor (desfazer/refazer). */
 export type GrifoCtl = { dirty: boolean; podeDesfazer: boolean; podeRefazer: boolean; desfazer: () => void; refazer: () => void }
 
-export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 0, podeComparar = false, onGrifoCtl, versaoQuestoes, indiceTipos = [], espacamento = 2.2, espacamentoTexto = 1 }: {
+export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 0, podeComparar = false, onGrifoCtl, versaoQuestoes, indiceTipos = [], espacamento = 2.2, espacamentoTexto = 1, grifoCores = DEFAULT_GRIFO_CORES, blocos = DEFAULT_BLOCOS }: {
   documentoId: string; html: string; podeEditar: boolean; artigos?: number; podeComparar?: boolean
   onGrifoCtl?: (c: GrifoCtl | null) => void
   /** Quando definido, carrega as questões inseridas dessa versão e as mostra inline (read-only) na prévia. */
@@ -114,6 +117,10 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
   espacamento?: number
   /** Espaçamento entre textos/parágrafos (multiplicador). */
   espacamentoTexto?: number
+  /** Cores dos grifos do módulo — recolore os grifos inline na prévia. */
+  grifoCores?: GrifoCores
+  /** Blocos de destaque configuráveis (detecção por palavras-chave + cor + prévia por bloco). */
+  blocos?: BlocoDef[]
 }) {
   const router = useRouter()
   const [qDoc, setQDoc] = useState<QuestaoDoc[]>([])
@@ -126,6 +133,19 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
   const [maxH, setMaxH] = useState<number>()
   const scrollRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<HTMLDivElement>(null)
+  // Prévia dos toggles do aluno: ocultar grifos do Revisão (spans com fundo inline) e "meus grifos"
+  // (não há grifos pessoais no admin → o toggle existe por paridade, sem efeito visível).
+  const [semGrifos, setSemGrifos] = useState(false)
+  const [mostrarMeus, setMostrarMeus] = useState(true)
+  const blocosRef = useRef(blocos); blocosRef.current = blocos // box-prep lê o valor atual sem re-assinar
+  // Oculta e/ou RECOLORE os grifos (fundo inline) na prévia — mesmo mecanismo/cores do leitor do aluno.
+  // Reaplica em rAF + timeout: o box-prep (caixas/vazios) roda depois e pode reprocessar o conteúdo.
+  useEffect(() => {
+    if (editando) return
+    const run = () => aplicarGrifos(viewRef.current, { ocultar: semGrifos, cores: grifoCores })
+    run(); const r = requestAnimationFrame(run); const t = setTimeout(run, 180)
+    return () => { cancelAnimationFrame(r); clearTimeout(t) }
+  }, [semGrifos, grifoCores, html, editando])
 
   // Questões inseridas (Fase 2) — carrega e mostra inline na prévia, no ponto do artigo (read-only).
   useEffect(() => {
@@ -194,13 +214,15 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
         if ((p.textContent || '').replace(/ /g, ' ').trim() === '') { p.setAttribute('data-vazio', '1'); p.style.display = 'none' }
       }
       // Caixas em TABELA (ENTENDIMENTO importado do Word) → vira card DIV nativo, via helper compartilhado.
-      limpezasTab.push(prepararCaixasTabela(cont, () => window.dispatchEvent(new Event('resize'))))
+      limpezasTab.push(prepararCaixasTabela(cont, blocosRef.current, () => window.dispatchEvent(new Event('resize'))))
       // "📌 Já cobrado em prova:" (parágrafos) → caixa colapsável, igual ao aluno.
-      limpezasTab.push(prepararCaixasCobrado(cont, () => window.dispatchEvent(new Event('resize'))))
+      limpezasTab.push(prepararCaixasCobrado(cont, blocosRef.current, () => window.dispatchEvent(new Event('resize'))))
       // Pega data-caixa (novo) E as classes legadas box-stj/box-stf (conteúdo antigo).
       const caixas = Array.from(cont.querySelectorAll<HTMLElement>('[data-caixa="stj"], [data-caixa="stf"], .box-stj, .box-stf'))
       for (const box of caixas) {
-        if (box.classList.contains('caixa-colapsavel')) continue
+        if (box.classList.contains('caixa-colapsavel') || box.hasAttribute('data-legenda-oculta')) continue
+        // A caixa "LEGENDA" inline some — a legenda é mostrada na BARRA flutuante (sticky), como no aluno.
+        if (/^\s*LEGENDA\b/i.test(((box.children[0] as HTMLElement)?.textContent || '').replace(/\s+/g, ' ').trim())) { box.setAttribute('data-legenda-oculta', '1'); box.style.display = 'none'; continue }
         const filhos = Array.from(box.children)
         if (filhos.length < 2) continue // sem corpo pra recolher
         const cab = filhos[0] as HTMLElement
@@ -214,9 +236,7 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
         const previa = (inner.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 160)
         if (previa) cab.setAttribute('data-previa', previa)
         box.classList.add('caixa-colapsavel')
-        // A caixa de LEGENDA dos grifos abre por padrão (o aluno vê as cores de cara); as demais recolhem.
-        if (/^\s*LEGENDA\b/i.test(cab.textContent || '')) box.setAttribute('data-aberto', '1')
-        else box.removeAttribute('data-aberto')
+        box.removeAttribute('data-aberto') // recolhida por padrão
       }
     }
     aplicar()
@@ -707,6 +727,33 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
 
       {/* DIREITA: prévia grande sobre canvas pontilhado (igual ao construtor) */}
       <div ref={scrollRef} className={cn('overflow-auto p-5', CANVAS_DOTS)}>
+        {/* Barra de LEGENDA (sticky) — mesma do leitor do aluno; referência das cores dos grifos. */}
+        {html && !editando && (
+          <div className="pointer-events-none sticky top-0 z-20 mb-2 flex justify-center">
+            <div className="pointer-events-auto flex max-w-full flex-wrap items-center justify-center gap-x-1.5 gap-y-1 rounded-full border bg-card/95 px-3 py-1.5 shadow-sm backdrop-blur">
+              <span className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Legenda</span>
+              <span className="rounded px-1.5 py-[3px] text-[11px] font-semibold leading-none" style={{ background: grifoCores.nucleo, color: '#111' }}>Núcleo</span>
+              <span className="rounded px-1.5 py-[3px] text-[11px] font-semibold leading-none" style={{ background: grifoCores.complemento, color: '#111' }}>Complemento</span>
+              <span className="rounded px-1.5 py-[3px] text-[11px] font-semibold leading-none" style={{ background: grifoCores.prazo, color: '#111' }}>Prazos</span>
+              <span className="px-0.5 text-[11px] font-bold leading-none text-foreground">crucial</span>
+              <span className="px-0.5 text-[11px] font-bold leading-none" style={{ color: grifoCores.excecao }}>exceção</span>
+              <span className="px-0.5 leading-none text-muted-foreground">·</span>
+              <span className="px-0.5 text-[11px] font-bold leading-none" style={{ color: grifoCores.stf }}>STF</span>
+              <span className="px-0.5 text-[11px] font-bold leading-none" style={{ color: grifoCores.stj }}>STJ</span>
+              <span className="px-0.5 text-[11px] font-medium leading-none text-muted-foreground">Equipe</span>
+              {/* Toggles de exibição — iguais aos do aluno (prévia). */}
+              <span className="mx-0.5 h-3.5 w-px shrink-0 bg-border" />
+              <button type="button" onClick={() => setSemGrifos((v) => !v)} title={semGrifos ? 'Mostrar grifos do Revisão' : 'Ocultar grifos do Revisão'} aria-pressed={!semGrifos}
+                className={cn('inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-medium leading-none transition hover:opacity-80', semGrifos ? 'text-muted-foreground' : 'text-foreground')}>
+                {semGrifos ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />} Grifos do Revisão
+              </button>
+              <button type="button" onClick={() => setMostrarMeus((v) => !v)} title={mostrarMeus ? 'Ocultar meus grifos' : 'Mostrar meus grifos'} aria-pressed={mostrarMeus}
+                className={cn('inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-medium leading-none transition hover:opacity-80', mostrarMeus ? 'text-foreground' : 'text-muted-foreground')}>
+                {mostrarMeus ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />} Meus grifos
+              </button>
+            </div>
+          </div>
+        )}
         {editando ? (
           <div className="mx-auto max-w-3xl overflow-hidden rounded-lg border bg-card shadow-sm">
             <div ref={boxRef} contentEditable suppressContentEditableWarning spellCheck={false} onInput={() => { setDirty(true); snapshotDebounced() }}
@@ -714,7 +761,7 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
           </div>
         ) : html ? (
           <div className="mx-auto max-w-3xl overflow-hidden rounded-lg border bg-card shadow-sm">
-            <div ref={viewRef} className={CONTENT_CLASS} style={{ ['--leitura-espaco']: espacamento, ['--leitura-espaco-texto']: espacamentoTexto } as any} dangerouslySetInnerHTML={{ __html: html }} />
+            <div ref={viewRef} className={cn(CONTENT_CLASS, semGrifos && 'sem-grifos')} style={{ ['--leitura-espaco']: espacamento, ['--leitura-espaco-texto']: espacamentoTexto } as any} dangerouslySetInnerHTML={{ __html: html }} />
           </div>
         ) : (
           <div className="flex h-full items-center justify-center">

@@ -5,6 +5,8 @@ import { limparCabecalhoHtml } from '@/lib/leitura/limpar-cabecalho'
 import { LeituraEditor } from '@/components/admin/leitura-editor'
 import { PrefetchRotas } from '@/components/admin/prefetch-rotas'
 import { normalizarTiposIndice } from '@/lib/leitura/indice'
+import { resolverGrifoCores } from '@/lib/leitura/trilha-aparencia'
+import { resolverBlocos } from '@/lib/leitura/blocos'
 import { type Documento } from '../actions'
 
 export const dynamic = 'force-dynamic'
@@ -27,6 +29,8 @@ export default async function LeituraEditorPage({ params, searchParams }: { para
   const rascunhoVersao = (doc as any).versao_rascunho ?? versao
   // O admin edita/pré-visualiza o RASCUNHO (A2); genéricos usam a versão única.
   const { data: cont } = await svc.from('simulado_documento_conteudos').select('html, artigos').eq('documento_id', id).eq('versao', rascunhoVersao).maybeSingle()
+  // Cores dos grifos por DOCUMENTO (quiz_config.grifoCores) — refletidas na prévia + no aluno.
+  const grifoCores = resolverGrifoCores((doc as any).quiz_config?.grifoCores)
 
   const d = doc as any
   const documento: Documento = {
@@ -58,6 +62,8 @@ export default async function LeituraEditorPage({ params, searchParams }: { para
         indiceTipos={normalizarTiposIndice(d.quiz_config?.indice_tipos)}
         espacamentoInicial={Number(d.quiz_config?.espacamento) || null}
         espacamentoTextoInicial={Number(d.quiz_config?.espacamento_texto) || null}
+        grifoCoresInicial={grifoCores}
+        blocosInicial={resolverBlocos(d.quiz_config?.blocos)}
       />
       {/* Ao abrir o LegProc, aquece as áreas irmãs (Questões do conteúdo · Alterações) em 2º plano. */}
       <PrefetchRotas rotas={[`/admin/leitura/${id}/questoes`, `/admin/leitura/${id}/alteracoes`]} />

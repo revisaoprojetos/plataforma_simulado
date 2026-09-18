@@ -25,5 +25,6 @@ export default async function LeitorPage({ params, searchParams }: { params: Pro
 
   // "Voltar" leva à TRILHA do módulo (não à biblioteca/início do LegProc). Sem módulo → biblioteca.
   const voltarHref = st.moduloId && st.moduloId !== '__geral__' ? `/aluno/leitura?modulo=${st.moduloId}` : '/aluno/leitura'
-  return <LeitorDocumento doc={doc} buscaInicial={busca ?? undefined} trilha={{ modo: 'leitura', questoesHref: `/aluno/leitura/${id}/questoes`, voltarHref }} />
+  // Cores dos grifos definidas por DOCUMENTO (aba Configuração → quiz_config.grifoCores).
+  return <LeitorDocumento doc={doc} buscaInicial={busca ?? undefined} grifoCores={doc.grifoCores} trilha={{ modo: 'leitura', questoesHref: `/aluno/leitura/${id}/questoes`, voltarHref }} />
 }

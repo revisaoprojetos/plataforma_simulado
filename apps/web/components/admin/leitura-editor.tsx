@@ -10,11 +10,14 @@ import {
   Bold, Italic, Underline, Heading, List, Trophy, Scale, Send, ChevronDown,
   ImagePlus, Trash2, RefreshCw, Settings2, HelpCircle, X, Layers, Replace, Check, Bell, BellOff, PencilLine, Plus, Minus,
   FilePlus2, Ban, SpellCheck,
-  Strikethrough, ListOrdered, AlignLeft, AlignCenter, AlignRight, Palette, Eraser, Undo2, Redo2,
+  Strikethrough, ListOrdered, AlignLeft, AlignCenter, AlignRight, Palette, Eraser, Undo2, Redo2, RotateCcw, Captions, CaptionsOff,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { atualizarDocumento, publicarVersao, salvarIndiceTipos, salvarEspacamentoDocumento, type Documento, type SituacaoEditorial } from '@/app/admin/leitura/actions'
+import { salvarGrifoCoresDocumento, salvarBlocosDocumento, aplicarConfigTodasAulas } from '@/app/admin/leitura/actions'
+import { DEFAULT_GRIFO_CORES, type GrifoCores } from '@/lib/leitura/trilha-aparencia'
+import { DEFAULT_BLOCOS, type BlocoDef } from '@/lib/leitura/blocos'
 import { TIPOS_INDICE, contarTiposNoHtml } from '@/lib/leitura/indice'
 import { ListTree } from 'lucide-react'
 import { carregarDiffDocumento, renomearVersao } from '@/app/admin/leitura/alteracoes-actions'
@@ -51,12 +54,14 @@ const TIPOS_ATUALIZACAO = [
   { v: 'correcao_editorial', label: 'Correção editorial', Icon: SpellCheck },
 ] as const
 
-export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar = false, publicadaVersao = 1, temRascunhoPendente = false, versaoEdicao, abaInicial, indiceTipos: indiceTiposProp = [], espacamentoInicial = null, espacamentoTextoInicial = null }: {
+export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar = false, publicadaVersao = 1, temRascunhoPendente = false, versaoEdicao, abaInicial, indiceTipos: indiceTiposProp = [], espacamentoInicial = null, espacamentoTextoInicial = null, grifoCoresInicial = null, blocosInicial = null }: {
   documento: Documento; htmlAtual: string; podeEditar: boolean; podePublicar?: boolean; publicadaVersao?: number; temRascunhoPendente?: boolean; versaoEdicao?: number
   abaInicial?: 'conteudo' | 'config' | 'questoes'
   indiceTipos?: string[]
   espacamentoInicial?: number | null
   espacamentoTextoInicial?: number | null
+  grifoCoresInicial?: GrifoCores | null
+  blocosInicial?: BlocoDef[] | null
 }) {
   const versaoAutoria = versaoEdicao ?? documento.versao
   const router = useRouter()
@@ -96,6 +101,9 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
   const [fonteOficial, setFonteOficial] = useState(documento.fonte_oficial ?? '')
   const [situacao, setSituacao] = useState<SituacaoEditorial>(documento.situacao_editorial ?? 'em_preparacao')
   const [savingMeta, startMeta] = useTransition()
+  const [savingIndice, startIndice] = useTransition()   // indicador PRÓPRIO do Índice
+  const [savingEspaco, startEspaco] = useTransition()   // indicador PRÓPRIO do Espaçamento
+  const [savingCores, startCores] = useTransition()     // indicador PRÓPRIO das Cores dos grifos
   // Índice configurável: tipos disponíveis (detectados no conteúdo) × tipos selecionados (persistidos).
   const [indiceTipos, setIndiceTipos] = useState<string[]>(indiceTiposProp)
   // Espaçamento entre blocos (multiplicador) — padrão do leitor do aluno, ajustável pelo admin aqui.
@@ -105,13 +113,41 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
     const v = Math.max(0.6, Math.min(4.4, Math.round((espacamento + delta) * 100) / 100))
     if (v === espacamento) return
     setEspacamento(v)
-    startMeta(async () => { const r = await salvarEspacamentoDocumento(documento.id, { blocos: v }); if (!r.ok) toast.error(r.error ?? 'Erro ao salvar espaçamento') })
+    startEspaco(async () => { const r = await salvarEspacamentoDocumento(documento.id, { blocos: v }); if (!r.ok) toast.error(r.error ?? 'Erro ao salvar espaçamento') })
   }
   const ajustarEspacoTexto = (delta: number) => {
     const v = Math.max(0.5, Math.min(3, Math.round((espacamentoTexto + delta) * 100) / 100))
     if (v === espacamentoTexto) return
     setEspacamentoTexto(v)
-    startMeta(async () => { const r = await salvarEspacamentoDocumento(documento.id, { texto: v }); if (!r.ok) toast.error(r.error ?? 'Erro ao salvar espaçamento') })
+    startEspaco(async () => { const r = await salvarEspacamentoDocumento(documento.id, { texto: v }); if (!r.ok) toast.error(r.error ?? 'Erro ao salvar espaçamento') })
+  }
+  // Cores dos grifos (realces + textos) — recolore os grifos inline do HTML; prévia na aba Conteúdo.
+  const [grifoCores, setGrifoCores] = useState<GrifoCores>(grifoCoresInicial ?? DEFAULT_GRIFO_CORES)
+  const setCorGrifo = (k: keyof GrifoCores, v: string) => {
+    const next = { ...grifoCores, [k]: v }
+    setGrifoCores(next)
+    startCores(async () => { const r = await salvarGrifoCoresDocumento(documento.id, next); if (!r.ok) toast.error(r.error ?? 'Erro ao salvar cores') })
+  }
+  const resetarCores = () => { setGrifoCores(DEFAULT_GRIFO_CORES); startCores(async () => { const r = await salvarGrifoCoresDocumento(documento.id, DEFAULT_GRIFO_CORES); if (!r.ok) toast.error(r.error ?? 'Erro ao salvar cores') }) }
+  const CAMPOS_GRIFO: { key: keyof GrifoCores; label: string; fundo: boolean }[] = [
+    { key: 'nucleo', label: 'Núcleo', fundo: true }, { key: 'complemento', label: 'Complemento', fundo: true }, { key: 'prazo', label: 'Prazos', fundo: true },
+    { key: 'excecao', label: 'Exceção', fundo: false }, { key: 'stf', label: 'STF', fundo: false }, { key: 'stj', label: 'STJ', fundo: false },
+  ]
+  // Blocos configuráveis (rótulo + palavras-chave + cor). Detecção data-driven em caixas.ts.
+  const [savingBlocos, startBlocos] = useTransition()
+  const [blocos, setBlocos] = useState<BlocoDef[]>(blocosInicial ?? DEFAULT_BLOCOS)
+  const persistirBlocos = (next: BlocoDef[]) => { setBlocos(next); startBlocos(async () => { const r = await salvarBlocosDocumento(documento.id, { blocos: next }); if (!r.ok) toast.error(r.error ?? 'Erro ao salvar blocos') }) }
+  const editarBloco = (id: string, patch: Partial<BlocoDef>) => persistirBlocos(blocos.map((b) => (b.id === id ? { ...b, ...patch } : b)))
+  const addBloco = () => persistirBlocos([...blocos, { id: `bloco-${Date.now().toString(36)}`, rotulo: 'Novo bloco', palavras: '', cor: '#eef1f4', corTitulo: '#111111', previa: true }])
+  const removerBloco = (id: string) => persistirBlocos(blocos.filter((b) => b.id !== id))
+  const resetarBlocos = () => persistirBlocos(DEFAULT_BLOCOS.map((b) => ({ ...b })))
+  // Padronizar espaçamento/blocos desta aula em TODAS as outras.
+  const [aplicandoTodas, startAplicarTodas] = useTransition()
+  const aplicarTodasAulas = (campos: { espacamento?: boolean; blocos?: boolean }, oque: string) => {
+    confirmar({ titulo: `Aplicar ${oque} a todas as aulas?`, mensagem: `Isso sobrescreve ${oque} em TODAS as outras aulas do Desafio de Lei Seca com o desta aula. Não dá pra desfazer em massa.`, confirmar: 'Aplicar a todas' }).then((ok) => {
+      if (!ok) return
+      startAplicarTodas(async () => { const r = await aplicarConfigTodasAulas(documento.id, campos); if (r.ok) toast.success(`Aplicado em ${r.total ?? 0} aula(s).`); else toast.error(r.error ?? 'Erro ao aplicar') })
+    })
   }
   // Contagem por tipo — memoizada (cacheada enquanto o conteúdo não muda). Disponíveis = os com >0.
   const tiposContagem = useMemo(() => contarTiposNoHtml(htmlAtual), [htmlAtual])
@@ -120,7 +156,7 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
     // Computa fora do updater (updater deve ser puro; disparar a transição dentro dele dá erro no console).
     const next = indiceTipos.includes(tipo) ? indiceTipos.filter((t) => t !== tipo) : [...indiceTipos, tipo]
     setIndiceTipos(next)
-    startMeta(async () => { const r = await salvarIndiceTipos(documento.id, next); if (!r.ok) toast.error(r.error ?? 'Erro ao salvar índice') })
+    startIndice(async () => { const r = await salvarIndiceTipos(documento.id, next); if (!r.ok) toast.error(r.error ?? 'Erro ao salvar índice') })
   }
 
   const [modo, setModo] = useState<Modo>('colar')
@@ -436,7 +472,7 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
 
       {/* CONTEÚDO: prévia grande + painel de edição de grifos ao lado */}
       {aba === 'conteudo' && (
-        <LeituraPreviewGrifos documentoId={documento.id} html={htmlAtual} podeEditar={podeEditar} artigos={documento.artigos ?? 0} podeComparar={temRascunhoPendente || publicadaVersao > 1} onGrifoCtl={setGrifoCtl} versaoQuestoes={versaoAutoria} indiceTipos={indiceTipos} espacamento={espacamento} espacamentoTexto={espacamentoTexto} />
+        <LeituraPreviewGrifos documentoId={documento.id} html={htmlAtual} podeEditar={podeEditar} artigos={documento.artigos ?? 0} podeComparar={temRascunhoPendente || publicadaVersao > 1} onGrifoCtl={setGrifoCtl} versaoQuestoes={versaoAutoria} indiceTipos={indiceTipos} espacamento={espacamento} espacamentoTexto={espacamentoTexto} grifoCores={grifoCores} blocos={blocos} />
       )}
 
       {/* CONFIGURAÇÃO: importação de conteúdo + metadados + desafio. Personalização (capa/título/
@@ -609,7 +645,7 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
           <details className="group border-t pt-4">
             <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground [&::-webkit-details-marker]:hidden">
               <ListTree className="h-3.5 w-3.5 text-primary" /> Índice do conteúdo
-              {savingMeta && <Loader2 className="h-3 w-3 animate-spin" />}
+              {savingIndice && <Loader2 className="h-3 w-3 animate-spin" />}
               <ChevronDown className="ml-auto h-4 w-4 transition-transform group-open:rotate-180" />
             </summary>
             <div className="space-y-2 pt-3">
@@ -634,7 +670,7 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
           <details className="group border-t pt-4">
             <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground [&::-webkit-details-marker]:hidden">
               <ListTree className="h-3.5 w-3.5 text-primary" /> Espaçamento
-              {savingMeta && <Loader2 className="h-3 w-3 animate-spin" />}
+              {savingEspaco && <Loader2 className="h-3 w-3 animate-spin" />}
               <ChevronDown className="ml-auto h-4 w-4 transition-transform group-open:rotate-180" />
             </summary>
             <div className="space-y-3 pt-3">
@@ -662,6 +698,80 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
                   <span className="w-12 text-center text-sm font-medium tabular-nums">{Math.round(espacamentoTexto * 100)}%</span>
                   <button type="button" onClick={() => ajustarEspacoTexto(0.1)} className="rounded-lg border p-1.5 transition hover:bg-muted" aria-label="Aumentar espaçamento do texto"><Plus className="h-4 w-4" /></button>
                 </div>
+              </div>
+              <button type="button" onClick={() => aplicarTodasAulas({ espacamento: true }, 'o espaçamento')} disabled={aplicandoTodas} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50">
+                {aplicandoTodas ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Layers className="h-3.5 w-3.5" />} Aplicar a todas as aulas
+              </button>
+            </div>
+          </details>
+
+          {/* Cores dos grifos — recolore os grifos INLINE do HTML (por matiz); sincroniza prévia + aluno + legenda. */}
+          <details className="group border-t pt-4">
+            <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground [&::-webkit-details-marker]:hidden">
+              <Palette className="h-3.5 w-3.5 text-primary" /> Cores dos grifos
+              {savingCores && <Loader2 className="h-3 w-3 animate-spin" />}
+              <ChevronDown className="ml-auto h-4 w-4 transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="space-y-2 pt-3">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs text-muted-foreground">Realces (fundo) e cores de texto dos grifos do conteúdo. Prévia na aba <span className="font-medium text-foreground">Conteúdo</span>; vale também para o aluno e para a legenda.</p>
+                <button type="button" onClick={resetarCores} className="inline-flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"><RotateCcw className="h-3.5 w-3.5" /> Restaurar padrão</button>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {CAMPOS_GRIFO.map((c) => (
+                  <div key={c.key} className="flex items-center gap-2 rounded-lg border px-2.5 py-1.5">
+                    <span className="inline-flex h-6 w-9 shrink-0 items-center justify-center rounded text-[11px] font-bold" style={c.fundo ? { background: grifoCores[c.key], color: '#111' } : { color: grifoCores[c.key] }}>Aa</span>
+                    <span className="min-w-0 flex-1 truncate text-sm">{c.label} <span className="text-[11px] text-muted-foreground">{c.fundo ? '(realce)' : '(texto)'}</span></span>
+                    <label className="relative h-7 w-7 shrink-0 cursor-pointer overflow-hidden rounded-md border" title={`Cor de ${c.label}`}>
+                      <span className="absolute inset-0" style={{ background: grifoCores[c.key] }} />
+                      <input type="color" value={grifoCores[c.key]} onChange={(e) => setCorGrifo(c.key, e.target.value)} className="absolute inset-0 cursor-pointer opacity-0" aria-label={`Cor de ${c.label}`} />
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </details>
+
+          {/* Blocos — lista editável (rótulo + palavras-chave + cor). Detecta no HTML e vira card colapsável. */}
+          <details className="group border-t pt-4">
+            <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground [&::-webkit-details-marker]:hidden">
+              <Layers className="h-3.5 w-3.5 text-primary" /> Blocos
+              {savingBlocos && <Loader2 className="h-3 w-3 animate-spin" />}
+              <ChevronDown className="ml-auto h-4 w-4 transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="space-y-2 pt-3">
+              <div className="flex items-start justify-between gap-2">
+                <p className="text-xs text-muted-foreground">Um trecho vira bloco quando o <span className="font-medium text-foreground">título</span> (tabela) ou o <span className="font-medium text-foreground">início do parágrafo</span> contém uma das palavras-chave. Prévia na aba <span className="font-medium text-foreground">Conteúdo</span> (ao trocar de aba).</p>
+                <button type="button" onClick={resetarBlocos} className="inline-flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"><RotateCcw className="h-3.5 w-3.5" /> Restaurar padrão</button>
+              </div>
+              <div className="space-y-2">
+                {blocos.map((b) => (
+                  <div key={b.id} className="rounded-lg border p-2">
+                    <div className="flex items-center gap-2">
+                      <label className="relative h-7 w-7 shrink-0 cursor-pointer overflow-hidden rounded-md border" title="Cor do bloco (fundo)">
+                        <span className="absolute inset-0" style={{ background: b.cor }} />
+                        <input type="color" value={b.cor} onChange={(e) => editarBloco(b.id, { cor: e.target.value })} className="absolute inset-0 cursor-pointer opacity-0" aria-label="Cor do bloco" />
+                      </label>
+                      <label className="relative flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-md border text-[11px] font-bold" title="Cor do texto do título" style={{ background: b.cor, color: b.corTitulo }}>
+                        Aa
+                        <input type="color" value={b.corTitulo} onChange={(e) => editarBloco(b.id, { corTitulo: e.target.value })} className="absolute inset-0 cursor-pointer opacity-0" aria-label="Cor do título" />
+                      </label>
+                      <input value={b.rotulo} onChange={(e) => editarBloco(b.id, { rotulo: e.target.value })} placeholder="Nome do bloco" className="min-w-0 flex-1 rounded-md border bg-[var(--input-bg,transparent)] px-2 py-1 text-sm outline-none focus:ring-1 focus:ring-ring" />
+                      {/* Prévia DESTE bloco (descrição recolhida) */}
+                      <button type="button" onClick={() => editarBloco(b.id, { previa: !b.previa })} title={b.previa ? 'Prévia ligada (mostra a descrição recolhida)' : 'Prévia desligada'} aria-pressed={b.previa} className={cn('shrink-0 rounded-md p-1.5 transition', b.previa ? 'text-primary hover:bg-muted' : 'text-muted-foreground hover:bg-muted')}>
+                        {b.previa ? <Captions className="h-4 w-4" /> : <CaptionsOff className="h-4 w-4" />}
+                      </button>
+                      <button type="button" onClick={() => removerBloco(b.id)} title="Remover bloco" className="shrink-0 rounded-md p-1.5 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+                    </div>
+                    <input value={b.palavras} onChange={(e) => editarBloco(b.id, { palavras: e.target.value })} placeholder="Palavras-chave (separadas por vírgula) — ex.: STF, entendimento do stf" className="mt-1.5 w-full rounded-md border bg-[var(--input-bg,transparent)] px-2 py-1 text-xs outline-none focus:ring-1 focus:ring-ring" />
+                  </div>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" onClick={addBloco} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"><Plus className="h-3.5 w-3.5" /> Adicionar bloco</button>
+                <button type="button" onClick={() => aplicarTodasAulas({ blocos: true }, 'os blocos')} disabled={aplicandoTodas} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50">
+                  {aplicandoTodas ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Layers className="h-3.5 w-3.5" />} Aplicar a todas as aulas
+                </button>
               </div>
             </div>
           </details>

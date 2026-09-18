@@ -5,6 +5,8 @@ import { remember } from '@/lib/cache/relatorio-cache'
 import { diffDocumentos } from './diff'
 import { limparCabecalhoHtml } from './limpar-cabecalho'
 import { normalizarTiposIndice } from './indice'
+import { resolverGrifoCores, type GrifoCores } from './trilha-aparencia'
+import { resolverBlocos, type BlocoDef } from './blocos'
 import type { DiffDoc } from './diff-tipos'
 
 /**
@@ -168,6 +170,8 @@ export interface DocumentoCarregado {
   indiceTipos: string[]
   espacamento: number | null       // espaçamento entre BLOCOS definido pelo ADMIN (quiz_config.espacamento); default do leitor
   espacamentoTexto: number | null  // espaçamento dos TEXTOS (parágrafos) definido pelo ADMIN (quiz_config.espacamento_texto)
+  grifoCores: GrifoCores           // cores dos grifos definidas pelo ADMIN (quiz_config.grifoCores)
+  blocos: BlocoDef[]               // blocos de destaque configuráveis (quiz_config.blocos); prévia é por bloco
 }
 
 export interface GrifoLei { id: string; inicio: number; fim: number; exact: string; prefix: string; suffix: string; tipo: string; nota: string | null }
@@ -362,6 +366,8 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
     indiceTipos: normalizarTiposIndice((doc as any).quiz_config?.indice_tipos),
     espacamento: (() => { const v = Number((doc as any).quiz_config?.espacamento); return Number.isFinite(v) && v > 0 ? v : null })(),
     espacamentoTexto: (() => { const v = Number((doc as any).quiz_config?.espacamento_texto); return Number.isFinite(v) && v > 0 ? v : null })(),
+    grifoCores: resolverGrifoCores((doc as any).quiz_config?.grifoCores),
+    blocos: resolverBlocos((doc as any).quiz_config?.blocos),
   }
 }
 

@@ -50,9 +50,23 @@ export const ESCALA_MAX = 3
 export interface TrilhaDegrade { ativo: boolean; intensidade: number }
 export const DEFAULT_TRILHA_DEGRADE: TrilhaDegrade = { ativo: true, intensidade: 45 }
 
-export interface TrilhaAparencia { simbolos: TrilhaSimbolos; formato: TrilhaFormato; livre: TrilhaLivreConfig; inverter: boolean; degrade: TrilhaDegrade; descricao: string }
+/** Cores dos grifos do módulo (realces de fundo + cores de texto). O conteúdo usa cores INLINE; a
+ *  aplicação classifica cada cor por matiz e reaplica a configurada (ver lib recolorir-grifos). */
+export interface GrifoCores { nucleo: string; complemento: string; prazo: string; excecao: string; stf: string; stj: string }
+export const DEFAULT_GRIFO_CORES: GrifoCores = { nucleo: '#fff35c', complemento: '#a8d08d', prazo: '#cc99ff', excecao: '#c00000', stf: '#2f6fd0', stj: '#c98a00' }
+const hex6 = (v: unknown, def: string): string => (typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v.trim()) ? v.trim().toLowerCase() : def)
+export function resolverGrifoCores(raw: unknown): GrifoCores {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Partial<GrifoCores>
+  return {
+    nucleo: hex6(r.nucleo, DEFAULT_GRIFO_CORES.nucleo), complemento: hex6(r.complemento, DEFAULT_GRIFO_CORES.complemento),
+    prazo: hex6(r.prazo, DEFAULT_GRIFO_CORES.prazo), excecao: hex6(r.excecao, DEFAULT_GRIFO_CORES.excecao),
+    stf: hex6(r.stf, DEFAULT_GRIFO_CORES.stf), stj: hex6(r.stj, DEFAULT_GRIFO_CORES.stj),
+  }
+}
 
-export const DEFAULT_TRILHA_APARENCIA: TrilhaAparencia = { simbolos: DEFAULT_TRILHA_SIMBOLOS, formato: DEFAULT_TRILHA_FORMATO, livre: { nos: {}, curvas: {} }, inverter: false, degrade: DEFAULT_TRILHA_DEGRADE, descricao: '' }
+export interface TrilhaAparencia { simbolos: TrilhaSimbolos; formato: TrilhaFormato; livre: TrilhaLivreConfig; inverter: boolean; degrade: TrilhaDegrade; descricao: string; grifoCores: GrifoCores }
+
+export const DEFAULT_TRILHA_APARENCIA: TrilhaAparencia = { simbolos: DEFAULT_TRILHA_SIMBOLOS, formato: DEFAULT_TRILHA_FORMATO, livre: { nos: {}, curvas: {} }, inverter: false, degrade: DEFAULT_TRILHA_DEGRADE, descricao: '', grifoCores: DEFAULT_GRIFO_CORES }
 
 const clamp = (n: unknown): number => (typeof n === 'number' && Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : NaN)
 /** Proporção do canvas (largura/altura) entre 0.25 (bem alto) e 4 (bem largo); indefinido = padrão. */
@@ -101,5 +115,6 @@ export function resolverTrilhaAparencia(raw: unknown): TrilhaAparencia {
     inverter: r.inverter === true,
     degrade: resolverDegrade((r as { degrade?: unknown }).degrade),
     descricao: typeof (r as { descricao?: unknown }).descricao === 'string' ? ((r as { descricao: string }).descricao).slice(0, 400) : '',
+    grifoCores: resolverGrifoCores((r as { grifoCores?: unknown }).grifoCores),
   }
 }

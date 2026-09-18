@@ -1,44 +1,45 @@
 /**
- * Caixas de destaque importadas como TABELA (Word: `<td>` com background — ex.: "ENTENDIMENTO DO
- * STF/STJ", "NATUREZA JURÍDICA DO PREÂMBULO"). O acervo antigo usa `<div data-caixa>` (card nativo:
- * cantos arredondados, cabeçalho + prévia + seta + animação de recolher). Aqui CONVERTEMOS a tabela
- * nessa MESMA estrutura DIV, reusando 100% do CSS nativo → as importadas ficam idênticas às nativas.
- *
- * Dois formatos:
- *  - 1 coluna (ENTENDIMENTO…): o corpo é o texto das células, achatado (parágrafos direto no card).
- *  - multi-coluna (comparativos: NATUREZA/DIFERENCIAÇÃO): mantém a TABELA (sem a linha do título)
- *    dentro do corpo, preservando o comparativo.
- *
- * Move os nós preservando a ORDEM do texto → a "espinha" das âncoras dos grifos permanece intacta.
- * `onToggle` roda após abrir/fechar (recompor overlay/layout). Compartilhado leitor + prévia admin.
+ * Blocos de destaque configuráveis. O tipo/cor de cada bloco vem da config do documento (blocos.ts) —
+ * a detecção casa por PALAVRAS-CHAVE no título (tabela) ou no início (parágrafo). A ESTRUTURA visual
+ * (card colapsável: cabeçalho + prévia + seta + animação) é a mesma de sempre; a COR é aplicada inline
+ * a partir do bloco. Move nós preservando a ordem do texto → a "espinha" das âncoras dos grifos fica ok.
+ * `onToggle` roda após abrir/fechar. Compartilhado leitor + prévia admin.
  */
-const RE_DESTAQUE = /ENTENDIMENTO|S[ÚU]MULA|ATEN[ÇC]|OBSERVA|IMPORTANTE|\bDICA\b|JURISPRUD|INFORMATIVO|PRECEDENTE|\bTESE\b|N[ÃA]O ESQUE|DEPORTA|EXPULS|EXTRADI|NATUREZA|DIFEREN|CLASSIFICA|CONCEITO|REQUISITO|CARACTER|DISTIN/i
+import { DEFAULT_BLOCOS, acharBlocoPorTitulo, acharBlocoPorInicio, estiloBloco, type BlocoDef } from './blocos'
 
-function tipoCaixa(titulo: string): string {
-  const t = titulo.toUpperCase()
-  if (/\bSTJ\b/.test(t)) return 'stj'
-  if (/\bSTF\b/.test(t)) return 'stf'
-  if (/ATEN[ÇC]|N[ÃA]O ESQUE|IMPORTANTE|CUIDADO/.test(t)) return 'alerta'
-  return 'comentario'
+function pintar(div: HTMLElement, bloco: BlocoDef) {
+  const e = estiloBloco(bloco.cor)
+  div.style.setProperty('background', e.background)
+  div.style.setProperty('border-color', e.borderColor)
+}
+// Cor do TEXTO do título no cabeçalho (aplicada no cab e no 1º filho, p/ vencer CSS específico).
+function pintarTitulo(cab: HTMLElement, corTitulo: string) {
+  cab.style.setProperty('color', corTitulo, 'important')
+  const f = cab.firstElementChild as HTMLElement | null
+  if (f) f.style.setProperty('color', corTitulo, 'important')
 }
 
-export function prepararCaixasTabela(cont: HTMLElement, _onToggle?: () => void): () => void {
-  // Clique/tecla são tratados por DELEGAÇÃO única no leitor (não anexa listener por caixa → sem duplicar).
+/** Caixas em TABELA (cabeçalho de 1 célula com fundo) → card colapsável do bloco que casar no título. */
+export function prepararCaixasTabela(cont: HTMLElement, blocos: BlocoDef[] = DEFAULT_BLOCOS, _onToggle?: () => void): () => void {
+  const generico: BlocoDef = blocos.find((b) => b.id === 'destaque') ?? blocos[blocos.length - 1] ?? { id: 'destaque', rotulo: 'Destaque', palavras: '', cor: '#eef1f4', corTitulo: '#111111', previa: true }
   for (const tab of Array.from(cont.querySelectorAll<HTMLTableElement>('table'))) {
-    const rows = Array.from(tab.rows) // nativo (cobre tbody/thead) — robusto entre navegadores
+    const rows = Array.from(tab.rows)
     if (rows.length < 2) continue
     if (rows[0].cells.length !== 1) continue // cabeçalho = 1ª linha, uma faixa (título)
     const headCell = rows[0].cells[0] as HTMLElement
     const temFundo = /background/i.test(headCell.getAttribute('style') || '') || /background/i.test(rows[0].getAttribute('style') || '')
     const txt = (headCell.textContent || '').replace(/\s+/g, ' ').trim()
-    if (!(temFundo && (RE_DESTAQUE.test(txt) || txt.length <= 80))) continue // não parece caixa de destaque
+    if (!temFundo) continue
+    const bloco = acharBlocoPorTitulo(txt, blocos) ?? (txt.length <= 80 ? generico : null)
+    if (!bloco) continue
 
-    // Estrutura de caixa DIV nativa (mesmo card das antigas).
     const div = document.createElement('div')
-    div.setAttribute('data-caixa', tipoCaixa(txt))
+    div.setAttribute('data-caixa', bloco.id)
     div.classList.add('caixa-colapsavel')
+    pintar(div, bloco)
     const cab = document.createElement('div'); cab.className = 'caixa-cab'
     while (headCell.firstChild) cab.appendChild(headCell.firstChild) // título
+    pintarTitulo(cab, bloco.corTitulo)
     div.appendChild(cab)
     const corpo = document.createElement('div'); corpo.className = 'caixa-corpo'
     const inner = document.createElement('div'); inner.className = 'caixa-corpo-in'
@@ -46,38 +47,31 @@ export function prepararCaixasTabela(cont: HTMLElement, _onToggle?: () => void):
     const bodyRows = rows.slice(1)
     const multiCol = bodyRows.some((r) => r.cells.length > 1)
     if (multiCol) {
-      // Comparativo: preserva a TABELA (remove só a linha do título) dentro do corpo.
       rows[0].remove()
       tab.replaceWith(div)
       inner.appendChild(tab)
     } else {
-      // 1 coluna: achata o texto das células direto no corpo (parágrafos, sem borda de tabela).
       for (const r of bodyRows) { const cell = r.cells[0]; while (cell && cell.firstChild) inner.appendChild(cell.firstChild) }
       tab.replaceWith(div)
     }
     corpo.appendChild(inner); div.appendChild(corpo)
 
     const previa = (inner.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 160)
-    if (previa) cab.setAttribute('data-previa', previa)
+    if (previa && bloco.previa) cab.setAttribute("data-previa", previa)
     const tit = (cab.textContent || '').replace(/\s+/g, ' ').trim()
     if (tit && !/[:：]$/.test(tit)) cab.setAttribute('data-add-colon', '1')
     cab.setAttribute('role', 'button'); cab.setAttribute('tabindex', '0'); cab.setAttribute('aria-expanded', 'false')
-    div.removeAttribute('data-aberto') // recolhida por padrão (clique via delegação no leitor)
+    div.removeAttribute('data-aberto')
   }
-
   return () => {}
 }
 
 /**
- * "📌 Já cobrado em prova:" — parágrafos que começam com esse rótulo viram CAIXAS COLAPSÁVEIS no MESMO
- * estilo das outras (cabeçalho = o rótulo; corpo = o resto do parágrafo). Só MOVE nós (divide o text node
- * do rótulo no ':'), preservando a ORDEM do texto → a "espinha" das âncoras dos grifos fica intacta.
- * Recolhido por padrão. Idempotente (pula o que já está dentro de caixa).
+ * Parágrafos/`<li>` cujo INÍCIO casa com as palavras de um bloco (ex.: "📌 Já cobrado em prova:") viram
+ * card colapsável (cabeçalho = o rótulo; corpo = o resto). Só MOVE nós (divide no fim do rótulo),
+ * preservando a ordem do texto → espinha intacta. Recolhido por padrão. Idempotente.
  */
-const RE_COBRADO = /^\s*📌?\s*j[áa]\s+cobrad[oa]s?\s+em\s+prova\s*:?/i
-
-export function prepararCaixasCobrado(cont: HTMLElement, _onToggle?: () => void): () => void {
-  // Clique/tecla tratados por DELEGAÇÃO única no leitor (não anexa listener por caixa → sem duplicar).
+export function prepararCaixasParagrafo(cont: HTMLElement, blocos: BlocoDef[] = DEFAULT_BLOCOS, _onToggle?: () => void): () => void {
   let els: HTMLElement[] = []
   try { els = Array.from(cont.querySelectorAll<HTMLElement>('p, li')) } catch { return () => {} }
   for (const el of els) {
@@ -85,21 +79,19 @@ export function prepararCaixasCobrado(cont: HTMLElement, _onToggle?: () => void)
       if (!el.isConnected || el.closest('.caixa-colapsavel')) continue
       if (Array.from(el.children).some((c) => /^(P|DIV|LI|TABLE|UL|OL|BLOCKQUOTE)$/.test(c.tagName))) continue
       const full = el.textContent || ''
-      const m = RE_COBRADO.exec(full)
-      if (!m) continue
-      const k = m[0].length // fim do rótulo (inclui o ':' se houver)
+      const hit = acharBlocoPorInicio(full, blocos)
+      if (!hit) continue
+      const bloco = hit.bloco, k = hit.tam // fim do rótulo no texto original
 
       const box = document.createElement('div')
-      box.setAttribute('data-caixa', 'cobrado')
+      box.setAttribute('data-caixa', bloco.id)
       box.classList.add('caixa-colapsavel')
+      pintar(box, bloco)
       const cab = document.createElement('div'); cab.className = 'caixa-cab'
-      const titulo = document.createElement('span'); cab.appendChild(titulo) // :first-child = título (rótulo)
+      const titulo = document.createElement('span'); titulo.style.setProperty('color', bloco.corTitulo, 'important'); cab.appendChild(titulo)
       const corpo = document.createElement('div'); corpo.className = 'caixa-corpo'
       const inner = document.createElement('div'); inner.className = 'caixa-corpo-in'; corpo.appendChild(inner)
 
-      // Acha o ponto de corte (offset k) na árvore de texto do parágrafo — mesmo quando o rótulo+lista
-      // estão dentro de um <strong> — e usa Range.extractContents (divide subárvores corretamente):
-      // fragmento até k = TÍTULO; o restante do parágrafo = CORPO. Não remove/adiciona texto (espinha ok).
       const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT)
       let acc = 0
       let boundNode: Text | null = null, boundOff = 0, tn: Node | null = null
@@ -112,31 +104,32 @@ export function prepararCaixasCobrado(cont: HTMLElement, _onToggle?: () => void)
         const range = document.createRange()
         range.setStart(el, 0)
         range.setEnd(boundNode, boundOff)
-        titulo.appendChild(range.extractContents()) // rótulo (com wrappers preservados)
+        titulo.appendChild(range.extractContents())
       }
-      while (el.firstChild) inner.appendChild(el.firstChild) // resto do parágrafo → corpo
+      while (el.firstChild) inner.appendChild(el.firstChild)
 
       box.appendChild(cab); box.appendChild(corpo)
       el.replaceWith(box)
 
-      // Se o rótulo estava sozinho no parágrafo, a lista costuma vir nos parágrafos SEGUINTES → absorve-os
-      // no corpo (até um limite/estrutura), preservando a ordem do texto.
       if (!(inner.textContent || '').trim()) {
         let s = box.nextElementSibling as HTMLElement | null
         let n = 0
-        while (s && n < 6 && !s.hasAttribute('data-art') && !s.classList.contains('caixa-colapsavel') && !/^(H1|H2|H3|TABLE)$/.test(s.tagName) && !RE_COBRADO.test(s.textContent || '')) {
+        while (s && n < 6 && !s.hasAttribute('data-art') && !s.classList.contains('caixa-colapsavel') && !/^(H1|H2|H3|TABLE)$/.test(s.tagName) && !acharBlocoPorInicio(s.textContent || '', blocos)) {
           const prox = s.nextElementSibling as HTMLElement | null
           inner.appendChild(s); s = prox; n++
         }
       }
 
-      // Prévia (começo da lista) ao lado do título — igual aos ENTENDIMENTOS; some ao expandir.
       const previa = (inner.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 160)
-      if (previa) cab.setAttribute('data-previa', previa)
+      if (previa && bloco.previa) cab.setAttribute("data-previa", previa)
+      const tit = (cab.textContent || '').replace(/\s+/g, ' ').trim()
+      if (tit && !/[:：]$/.test(tit)) cab.setAttribute('data-add-colon', '1')
       cab.setAttribute('role', 'button'); cab.setAttribute('tabindex', '0'); cab.setAttribute('aria-expanded', 'false')
-      box.removeAttribute('data-aberto') // recolhida por padrão (clique via delegação no leitor)
-    } catch { /* não deixa 1 elemento quebrar os demais nem o resto do leitor */ }
+      box.removeAttribute('data-aberto')
+    } catch { /* não deixa 1 elemento quebrar os demais */ }
   }
-
   return () => {}
 }
+
+/** Alias de compat: nome antigo. */
+export const prepararCaixasCobrado = prepararCaixasParagrafo
