@@ -123,6 +123,8 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
     else { seguirSistema.current = true; setTheme(t === 'escuro' ? 'dark' : 'light') }
   }
   const [fonte, setFonte] = useState(doc.prefs?.fonte || 18)
+  const [espaco, setEspaco] = useState<number>(doc.prefs?.espacamento ?? doc.espacamento ?? 2.2) // espaçamento entre BLOCOS (mult): pref do aluno > padrão do admin > 2.2 (=100% na UI)
+  const [espacoTexto, setEspacoTexto] = useState<number>(doc.prefs?.espacamentoTexto ?? doc.espacamentoTexto ?? 1) // espaçamento dos TEXTOS (mult; 1 = 100%)
   const [zoomPag, setZoomPag] = useState(1) // zoom da PÁGINA (estilo Word) — separado do zoom da fonte
   const [todasAbertas, setTodasAbertas] = useState(false) // expandir/recolher TODAS as caixas de uma vez
   const [favorito, setFavorito] = useState(!!doc.favorito)
@@ -248,9 +250,9 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
   // Salva preferências (debounced) ao mudar tema/fonte/modo/sem-grifos.
   useEffect(() => {
     if (!prefsRef.current) { prefsRef.current = true; return }
-    const t = setTimeout(() => { fetch('/api/leitura/preferencias', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ tema, fonte, modo, sem_grifos: semGrifos }) }).catch(() => {}) }, 800)
+    const t = setTimeout(() => { fetch('/api/leitura/preferencias', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ tema, fonte, modo, sem_grifos: semGrifos, espacamento: espaco, espacamento_texto: espacoTexto }) }).catch(() => {}) }, 800)
     return () => clearTimeout(t)
-  }, [tema, fonte, modo, semGrifos])
+  }, [tema, fonte, modo, semGrifos, espaco, espacoTexto])
 
   // Favoritar a lei.
   async function toggleFavorito() {
@@ -905,7 +907,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
     } finally { setConcluindo(false) }
   }
 
-  const proseStyle = useMemo<React.CSSProperties>(() => ({ fontSize: fonte, lineHeight: 1.7, color: cores.fg }), [fonte, cores.fg])
+  const proseStyle = useMemo<React.CSSProperties>(() => ({ fontSize: fonte, lineHeight: 1.7, color: cores.fg, ['--leitura-espaco' as string]: espaco, ['--leitura-espaco-texto' as string]: espacoTexto } as React.CSSProperties), [fonte, cores.fg, espaco, espacoTexto])
   // Blend do overlay de grifos. O overlay fica ATRÁS do texto (conteúdo é `relative z-[1]`), então o
   // texto NUNCA é lavado pelo blend — ele pinta opaco por cima e permanece legível nos dois temas.
   //  - claro: 'multiply' → realce saturado (highlighter) sobre a folha branca, texto escuro por cima.
@@ -1235,6 +1237,22 @@ export function LeitorDocumento({ doc, trilha, buscaInicial }: {
                 <button onClick={() => setFonte((f) => Math.max(13, f - 1))} className="rounded border p-1" style={{ borderColor: '#0000001a', color: cores.fg }}><Minus className="h-3.5 w-3.5" /></button>
                 <span className="w-8 text-center text-xs tabular-nums" style={{ color: cores.fg }}>{fonte}</span>
                 <button onClick={() => setFonte((f) => Math.min(28, f + 1))} className="rounded border p-1" style={{ borderColor: '#0000001a', color: cores.fg }}><Plus className="h-3.5 w-3.5" /></button>
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs" style={{ color: cores.muted }}>Espaço · blocos</span>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setEspaco((e) => Math.max(0.6, Math.round((e - 0.22) * 100) / 100))} className="rounded border p-1" style={{ borderColor: '#0000001a', color: cores.fg }} aria-label="Diminuir espaçamento dos blocos"><Minus className="h-3.5 w-3.5" /></button>
+                <span className="w-10 text-center text-xs tabular-nums" style={{ color: cores.fg }}>{Math.round(espaco / 2.2 * 100)}%</span>
+                <button onClick={() => setEspaco((e) => Math.min(4.4, Math.round((e + 0.22) * 100) / 100))} className="rounded border p-1" style={{ borderColor: '#0000001a', color: cores.fg }} aria-label="Aumentar espaçamento dos blocos"><Plus className="h-3.5 w-3.5" /></button>
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-xs" style={{ color: cores.muted }}>Espaço · texto</span>
+              <div className="flex items-center gap-1">
+                <button onClick={() => setEspacoTexto((e) => Math.max(0.5, Math.round((e - 0.1) * 100) / 100))} className="rounded border p-1" style={{ borderColor: '#0000001a', color: cores.fg }} aria-label="Diminuir espaçamento do texto"><Minus className="h-3.5 w-3.5" /></button>
+                <span className="w-10 text-center text-xs tabular-nums" style={{ color: cores.fg }}>{Math.round(espacoTexto * 100)}%</span>
+                <button onClick={() => setEspacoTexto((e) => Math.min(3, Math.round((e + 0.1) * 100) / 100))} className="rounded border p-1" style={{ borderColor: '#0000001a', color: cores.fg }} aria-label="Aumentar espaçamento do texto"><Plus className="h-3.5 w-3.5" /></button>
               </div>
             </div>
             <div className="flex items-center justify-between">

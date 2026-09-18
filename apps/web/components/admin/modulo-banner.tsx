@@ -20,7 +20,7 @@ export function ModuloBanner({ banner, cor, titulo, subtitulo, topoDireita, brea
   banner: string | null
   cor?: string | null
   titulo: string
-  subtitulo: string
+  subtitulo?: string
   topoDireita?: ReactNode
   breadcrumb: ReactNode
   tabs: ReactNode
@@ -142,7 +142,7 @@ export function ModuloBanner({ banner, cor, titulo, subtitulo, topoDireita, brea
 
         {/* Subtítulo + breadcrumb — encolhem/somem atrelados ao scroll (max-height + opacidade + subida). */}
         <div ref={colapsavelRef} className="overflow-hidden" style={{ willChange: 'max-height, opacity, transform' }}>
-          <p className="pt-1 text-white/80 drop-shadow-sm">{subtitulo}</p>
+          {subtitulo ? <p className="pt-1 text-white/80 drop-shadow-sm">{subtitulo}</p> : null}
           <div className="mt-1.5 flex flex-wrap items-center gap-1 text-sm text-white/75">{breadcrumb}</div>
         </div>
 

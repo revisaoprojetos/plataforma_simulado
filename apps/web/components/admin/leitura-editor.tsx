@@ -8,20 +8,19 @@ import { toast } from 'sonner'
 import {
   ArrowLeft, Save, Loader2, Eye, EyeOff, Upload, ClipboardPaste, PenLine, FileText,
   Bold, Italic, Underline, Heading, List, Trophy, Scale, Send, ChevronDown,
-  ImagePlus, Trash2, RefreshCw, Users, Settings2, HelpCircle, X, Layers, Replace, Check, Bell, BellOff, PencilLine, Plus, Minus,
+  ImagePlus, Trash2, RefreshCw, Settings2, HelpCircle, X, Layers, Replace, Check, Bell, BellOff, PencilLine, Plus, Minus,
   FilePlus2, Ban, SpellCheck,
   Strikethrough, ListOrdered, AlignLeft, AlignCenter, AlignRight, Palette, Eraser, Undo2, Redo2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
-import { atualizarDocumento, publicarVersao, salvarIndiceTipos, type Documento, type SituacaoEditorial } from '@/app/admin/leitura/actions'
+import { atualizarDocumento, publicarVersao, salvarIndiceTipos, salvarEspacamentoDocumento, type Documento, type SituacaoEditorial } from '@/app/admin/leitura/actions'
 import { TIPOS_INDICE, contarTiposNoHtml } from '@/lib/leitura/indice'
 import { ListTree } from 'lucide-react'
 import { carregarDiffDocumento, renomearVersao } from '@/app/admin/leitura/alteracoes-actions'
 import { salvarConteudoHtml, importarDocx } from '@/app/admin/leitura/upload-actions'
 import { LeituraPreviewGrifos, type GrifoCtl } from '@/components/admin/leitura-preview-grifos'
 import { LeituraQuestoesAdmin } from '@/components/admin/leitura-questoes-admin'
-import { LeituraAcesso } from '@/components/admin/leitura-acesso'
 
 // Redimensiona a imagem no cliente → data URL leve (WebP/JPEG). Mesmo padrão do banco.
 async function redimensionarImagem(file: File, max = 1600): Promise<string> {
@@ -52,17 +51,19 @@ const TIPOS_ATUALIZACAO = [
   { v: 'correcao_editorial', label: 'Correção editorial', Icon: SpellCheck },
 ] as const
 
-export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar = false, publicadaVersao = 1, temRascunhoPendente = false, versaoEdicao, abaInicial, indiceTipos: indiceTiposProp = [] }: {
+export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar = false, publicadaVersao = 1, temRascunhoPendente = false, versaoEdicao, abaInicial, indiceTipos: indiceTiposProp = [], espacamentoInicial = null, espacamentoTextoInicial = null }: {
   documento: Documento; htmlAtual: string; podeEditar: boolean; podePublicar?: boolean; publicadaVersao?: number; temRascunhoPendente?: boolean; versaoEdicao?: number
-  abaInicial?: 'conteudo' | 'config' | 'questoes' | 'acesso'
+  abaInicial?: 'conteudo' | 'config' | 'questoes'
   indiceTipos?: string[]
+  espacamentoInicial?: number | null
+  espacamentoTextoInicial?: number | null
 }) {
   const versaoAutoria = versaoEdicao ?? documento.versao
   const router = useRouter()
   // Ao criar/entrar num documento, abre já na CONFIGURAÇÃO (parte técnica): dados do card,
   // conteúdo da lei e metadados. A aba "Conteúdo" (leitura/grifos) fica a um clique.
   // A trilha (banco de aulas) faz deep-link direto p/ Conteúdo/Questões via `abaInicial`.
-  const [aba, setAba] = useState<'conteudo' | 'config' | 'questoes' | 'acesso'>(abaInicial ?? 'config')
+  const [aba, setAba] = useState<'conteudo' | 'config' | 'questoes'>(abaInicial ?? 'config')
   const [capa, setCapa] = useState<string | null>(documento.capa_url ?? null)
   const [processandoCapa, setProcessandoCapa] = useState(false)
   const capaRef = useRef<HTMLInputElement>(null)
@@ -97,6 +98,21 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
   const [savingMeta, startMeta] = useTransition()
   // Índice configurável: tipos disponíveis (detectados no conteúdo) × tipos selecionados (persistidos).
   const [indiceTipos, setIndiceTipos] = useState<string[]>(indiceTiposProp)
+  // Espaçamento entre blocos (multiplicador) — padrão do leitor do aluno, ajustável pelo admin aqui.
+  const [espacamento, setEspacamento] = useState<number>(espacamentoInicial ?? 2.2) // BLOCOS (mult; 2.2 = 100% na UI)
+  const [espacamentoTexto, setEspacamentoTexto] = useState<number>(espacamentoTextoInicial ?? 1) // TEXTO (mult; 1 = 100%)
+  const ajustarEspaco = (delta: number) => {
+    const v = Math.max(0.6, Math.min(4.4, Math.round((espacamento + delta) * 100) / 100))
+    if (v === espacamento) return
+    setEspacamento(v)
+    startMeta(async () => { const r = await salvarEspacamentoDocumento(documento.id, { blocos: v }); if (!r.ok) toast.error(r.error ?? 'Erro ao salvar espaçamento') })
+  }
+  const ajustarEspacoTexto = (delta: number) => {
+    const v = Math.max(0.5, Math.min(3, Math.round((espacamentoTexto + delta) * 100) / 100))
+    if (v === espacamentoTexto) return
+    setEspacamentoTexto(v)
+    startMeta(async () => { const r = await salvarEspacamentoDocumento(documento.id, { texto: v }); if (!r.ok) toast.error(r.error ?? 'Erro ao salvar espaçamento') })
+  }
   // Contagem por tipo — memoizada (cacheada enquanto o conteúdo não muda). Disponíveis = os com >0.
   const tiposContagem = useMemo(() => contarTiposNoHtml(htmlAtual), [htmlAtual])
   const tiposDisponiveis = useMemo(() => TIPOS_INDICE.filter((t) => (tiposContagem[t.tipo] ?? 0) > 0).map((t) => t.tipo), [tiposContagem])
@@ -404,24 +420,23 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
         document.body,
       )}
 
-      {/* Abas: Configuração · Conteúdo · Questões · Acesso — sublinhado animado (Configuração à esquerda) */}
+      {/* Abas: Configuração · Conteúdo · Questões — sublinhado animado (Configuração à esquerda).
+          O "Acesso dos alunos" saiu daqui: o controle de acesso é feito na área do MÓDULO. */}
       <div className="relative flex border-b text-sm">
-        {([['config', 'Configuração', Settings2], ['conteudo', 'Conteúdo', FileText], ['questoes', 'Questões', HelpCircle], ['acesso', 'Acesso dos alunos', Users]] as const).map(([a, label, Icon]) => (
+        {([['config', 'Configuração', Settings2], ['conteudo', 'Conteúdo', FileText], ['questoes', 'Questões', HelpCircle]] as const).map(([a, label, Icon]) => (
           <button key={a} onClick={() => setAba(a)} className={cn('flex flex-1 items-center justify-center gap-1.5 px-3 py-2.5 font-medium transition-colors', aba === a ? 'text-primary' : 'text-muted-foreground hover:text-foreground')}>
             <Icon className="h-4 w-4" /> {label}
           </button>
         ))}
-        <span className="absolute bottom-[-1px] h-0.5 rounded-full bg-primary transition-all duration-300 ease-out" style={{ width: '25%', left: `${(aba === 'config' ? 0 : aba === 'conteudo' ? 1 : aba === 'questoes' ? 2 : 3) * 25}%` }} />
+        <span className="absolute bottom-[-1px] h-0.5 rounded-full bg-primary transition-all duration-300 ease-out" style={{ width: '33.333%', left: `${(aba === 'config' ? 0 : aba === 'conteudo' ? 1 : 2) * 33.333}%` }} />
       </div>
-
-      {aba === 'acesso' && <LeituraAcesso documentoId={documento.id} />}
 
       {/* QUESTÕES: índice em blocos com inserção de questões do banco entre os artigos (Fase 2). */}
       {aba === 'questoes' && <LeituraQuestoesAdmin documentoId={documento.id} versao={versaoAutoria} html={htmlAtual} />}
 
       {/* CONTEÚDO: prévia grande + painel de edição de grifos ao lado */}
       {aba === 'conteudo' && (
-        <LeituraPreviewGrifos documentoId={documento.id} html={htmlAtual} podeEditar={podeEditar} artigos={documento.artigos ?? 0} podeComparar={temRascunhoPendente || publicadaVersao > 1} onGrifoCtl={setGrifoCtl} versaoQuestoes={versaoAutoria} indiceTipos={indiceTipos} />
+        <LeituraPreviewGrifos documentoId={documento.id} html={htmlAtual} podeEditar={podeEditar} artigos={documento.artigos ?? 0} podeComparar={temRascunhoPendente || publicadaVersao > 1} onGrifoCtl={setGrifoCtl} versaoQuestoes={versaoAutoria} indiceTipos={indiceTipos} espacamento={espacamento} espacamentoTexto={espacamentoTexto} />
       )}
 
       {/* CONFIGURAÇÃO: importação de conteúdo + metadados + desafio. Personalização (capa/título/
@@ -612,6 +627,42 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
                   ))}
                 </div>
               )}
+            </div>
+          </details>
+
+          {/* Espaçamento — BLOCOS (caixas) e TEXTO (parágrafos), separados. Padrão que o aluno vê. */}
+          <details className="group border-t pt-4">
+            <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground [&::-webkit-details-marker]:hidden">
+              <ListTree className="h-3.5 w-3.5 text-primary" /> Espaçamento
+              {savingMeta && <Loader2 className="h-3 w-3 animate-spin" />}
+              <ChevronDown className="ml-auto h-4 w-4 transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="space-y-3 pt-3">
+              <p className="text-xs text-muted-foreground">Padrão para o aluno (ele pode ajustar no próprio leitor). Prévia na aba <span className="font-medium text-foreground">Conteúdo</span>.</p>
+              {/* BLOCOS (entre caixas) */}
+              <div className="space-y-1">
+                <span className="text-[11px] font-medium text-muted-foreground">Entre blocos (caixas)</span>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => ajustarEspaco(-0.22)} className="rounded-lg border p-1.5 transition hover:bg-muted" aria-label="Diminuir espaçamento dos blocos"><Minus className="h-4 w-4" /></button>
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                    <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.round(((espacamento - 0.6) / (4.4 - 0.6)) * 100)}%` }} />
+                  </div>
+                  <span className="w-12 text-center text-sm font-medium tabular-nums">{Math.round(espacamento / 2.2 * 100)}%</span>
+                  <button type="button" onClick={() => ajustarEspaco(0.22)} className="rounded-lg border p-1.5 transition hover:bg-muted" aria-label="Aumentar espaçamento dos blocos"><Plus className="h-4 w-4" /></button>
+                </div>
+              </div>
+              {/* TEXTO (entre parágrafos) */}
+              <div className="space-y-1">
+                <span className="text-[11px] font-medium text-muted-foreground">Entre textos (parágrafos)</span>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => ajustarEspacoTexto(-0.1)} className="rounded-lg border p-1.5 transition hover:bg-muted" aria-label="Diminuir espaçamento do texto"><Minus className="h-4 w-4" /></button>
+                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                    <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.round(((espacamentoTexto - 0.5) / (3 - 0.5)) * 100)}%` }} />
+                  </div>
+                  <span className="w-12 text-center text-sm font-medium tabular-nums">{Math.round(espacamentoTexto * 100)}%</span>
+                  <button type="button" onClick={() => ajustarEspacoTexto(0.1)} className="rounded-lg border p-1.5 transition hover:bg-muted" aria-label="Aumentar espaçamento do texto"><Plus className="h-4 w-4" /></button>
+                </div>
+              </div>
             </div>
           </details>
 

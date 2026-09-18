@@ -9,7 +9,7 @@ import { type Documento } from '../actions'
 
 export const dynamic = 'force-dynamic'
 
-const ABAS = ['conteudo', 'config', 'questoes', 'acesso'] as const
+const ABAS = ['conteudo', 'config', 'questoes'] as const
 
 export default async function LeituraEditorPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
   const { id } = await params
@@ -56,6 +56,8 @@ export default async function LeituraEditorPage({ params, searchParams }: { para
         versaoEdicao={rascunhoVersao}
         abaInicial={abaInicial}
         indiceTipos={normalizarTiposIndice(d.quiz_config?.indice_tipos)}
+        espacamentoInicial={Number(d.quiz_config?.espacamento) || null}
+        espacamentoTextoInicial={Number(d.quiz_config?.espacamento_texto) || null}
       />
       {/* Ao abrir o LegProc, aquece as áreas irmãs (Questões do conteúdo · Alterações) em 2º plano. */}
       <PrefetchRotas rotas={[`/admin/leitura/${id}/questoes`, `/admin/leitura/${id}/alteracoes`]} />

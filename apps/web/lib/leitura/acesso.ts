@@ -161,11 +161,13 @@ export interface DocumentoCarregado {
   anotacoes: AnotacaoAluno[]
   questoes: QuestaoLeituraDados[]
   grifos: GrifoLei[]
-  prefs: { tema: string | null; fonte: number | null; modo: string | null; semGrifos: boolean | null; grifoRotulos: Record<string, string> | null } | null
+  prefs: { tema: string | null; fonte: number | null; modo: string | null; semGrifos: boolean | null; grifoRotulos: Record<string, string> | null; espacamento: number | null; espacamentoTexto: number | null } | null
   ultimoDisp: string | null
   favorito: boolean
   atualizacao: AtualizacaoInfo | null
   indiceTipos: string[]
+  espacamento: number | null       // espaçamento entre BLOCOS definido pelo ADMIN (quiz_config.espacamento); default do leitor
+  espacamentoTexto: number | null  // espaçamento dos TEXTOS (parágrafos) definido pelo ADMIN (quiz_config.espacamento_texto)
 }
 
 export interface GrifoLei { id: string; inicio: number; fim: number; exact: string; prefix: string; suffix: string; tipo: string; nota: string | null }
@@ -329,7 +331,7 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
         if (pf.error && /grifo_rotulos|column/i.test(String(pf.error.message))) {
           pf = await svc.from('simulado_leitura_preferencias').select('tema, fonte, modo, sem_grifos').eq('estudante_id', estudanteId).maybeSingle() as any
         }
-        const prefs = pf.data ? { tema: (pf.data as any).tema ?? null, fonte: (pf.data as any).fonte ?? null, modo: (pf.data as any).modo ?? null, semGrifos: (pf.data as any).sem_grifos ?? null, grifoRotulos: (pf.data as any).grifo_rotulos ?? null } : null
+        const prefs = pf.data ? { tema: (pf.data as any).tema ?? null, fonte: (pf.data as any).fonte ?? null, modo: (pf.data as any).modo ?? null, semGrifos: (pf.data as any).sem_grifos ?? null, grifoRotulos: (pf.data as any).grifo_rotulos ?? null, espacamento: (pf.data as any).espacamento ?? null, espacamentoTexto: (pf.data as any).espacamento_texto ?? null } : null
         return { prefs, ultimoDisp: (up.data as any)?.disp_id ?? null, favorito: !!fv.data }
       } catch { return { prefs: null, ultimoDisp: null, favorito: false } }
     })(),
@@ -358,6 +360,8 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
     favorito,
     atualizacao,
     indiceTipos: normalizarTiposIndice((doc as any).quiz_config?.indice_tipos),
+    espacamento: (() => { const v = Number((doc as any).quiz_config?.espacamento); return Number.isFinite(v) && v > 0 ? v : null })(),
+    espacamentoTexto: (() => { const v = Number((doc as any).quiz_config?.espacamento_texto); return Number.isFinite(v) && v > 0 ? v : null })(),
   }
 }
 

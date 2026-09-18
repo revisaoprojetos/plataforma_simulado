@@ -50,9 +50,9 @@ export const ESCALA_MAX = 3
 export interface TrilhaDegrade { ativo: boolean; intensidade: number }
 export const DEFAULT_TRILHA_DEGRADE: TrilhaDegrade = { ativo: true, intensidade: 45 }
 
-export interface TrilhaAparencia { simbolos: TrilhaSimbolos; formato: TrilhaFormato; livre: TrilhaLivreConfig; inverter: boolean; degrade: TrilhaDegrade }
+export interface TrilhaAparencia { simbolos: TrilhaSimbolos; formato: TrilhaFormato; livre: TrilhaLivreConfig; inverter: boolean; degrade: TrilhaDegrade; descricao: string }
 
-export const DEFAULT_TRILHA_APARENCIA: TrilhaAparencia = { simbolos: DEFAULT_TRILHA_SIMBOLOS, formato: DEFAULT_TRILHA_FORMATO, livre: { nos: {}, curvas: {} }, inverter: false, degrade: DEFAULT_TRILHA_DEGRADE }
+export const DEFAULT_TRILHA_APARENCIA: TrilhaAparencia = { simbolos: DEFAULT_TRILHA_SIMBOLOS, formato: DEFAULT_TRILHA_FORMATO, livre: { nos: {}, curvas: {} }, inverter: false, degrade: DEFAULT_TRILHA_DEGRADE, descricao: '' }
 
 const clamp = (n: unknown): number => (typeof n === 'number' && Number.isFinite(n) ? Math.max(0, Math.min(100, n)) : NaN)
 /** Proporção do canvas (largura/altura) entre 0.25 (bem alto) e 4 (bem largo); indefinido = padrão. */
@@ -100,5 +100,6 @@ export function resolverTrilhaAparencia(raw: unknown): TrilhaAparencia {
     livre: { nos: resolverPontos(r.livre?.nos), curvas: resolverPontos(r.livre?.curvas), aspecto: resolverAspecto((r.livre as { aspecto?: unknown })?.aspecto), fundo: resolverFundo((r.livre as { fundo?: unknown })?.fundo), escala: resolverEscala((r.livre as { escala?: unknown })?.escala) },
     inverter: r.inverter === true,
     degrade: resolverDegrade((r as { degrade?: unknown }).degrade),
+    descricao: typeof (r as { descricao?: unknown }).descricao === 'string' ? ((r as { descricao: string }).descricao).slice(0, 400) : '',
   }
 }

@@ -12,7 +12,7 @@ import { salvarConteudoHtml } from '@/app/admin/leitura/upload-actions'
 import { DiffEspelho } from '@/components/leitura/diff-espelho'
 import { listarVersoesDocumento, carregarDiffDocumento, reverterAlteracao } from '@/app/admin/leitura/alteracoes-actions'
 import { listarQuestoesDocumento, type QuestaoDoc } from '@/app/admin/leitura/actions'
-import { prepararCaixasTabela } from '@/lib/leitura/caixas'
+import { prepararCaixasTabela, prepararCaixasCobrado } from '@/lib/leitura/caixas'
 import { NIVEL_TIPO, montarArvoreToc, type NoToc } from '@/lib/leitura/indice'
 import { IndiceArvore, type NoIndiceView } from '@/components/leitura/indice-arvore'
 import type { BlocoDiff, DiffDoc, VersaoInfo } from '@/lib/leitura/diff-tipos'
@@ -103,13 +103,17 @@ const RESUMO_ZERO = { mod: 0, add: 0, rem: 0, igual: 0 }
 /** Controles do editor de grifos expostos p/ a barra de topo do editor (desfazer/refazer). */
 export type GrifoCtl = { dirty: boolean; podeDesfazer: boolean; podeRefazer: boolean; desfazer: () => void; refazer: () => void }
 
-export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 0, podeComparar = false, onGrifoCtl, versaoQuestoes, indiceTipos = [] }: {
+export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 0, podeComparar = false, onGrifoCtl, versaoQuestoes, indiceTipos = [], espacamento = 2.2, espacamentoTexto = 1 }: {
   documentoId: string; html: string; podeEditar: boolean; artigos?: number; podeComparar?: boolean
   onGrifoCtl?: (c: GrifoCtl | null) => void
   /** Quando definido, carrega as questões inseridas dessa versão e as mostra inline (read-only) na prévia. */
   versaoQuestoes?: number
   /** Tipos de dispositivo que aparecem no índice (config do documento). Vazio = padrão. */
   indiceTipos?: string[]
+  /** Espaçamento entre blocos (multiplicador) — reflete a config do admin na prévia. */
+  espacamento?: number
+  /** Espaçamento entre textos/parágrafos (multiplicador). */
+  espacamentoTexto?: number
 }) {
   const router = useRouter()
   const [qDoc, setQDoc] = useState<QuestaoDoc[]>([])
@@ -169,17 +173,30 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
     if (editando) return
     const cont = viewRef.current
     if (!cont) return
-    const onCab = (e: Event) => {
-      const box = (e.currentTarget as HTMLElement).closest('.caixa-colapsavel') as HTMLElement | null
+    // DELEGAÇÃO única (igual ao leitor do aluno): 1 clique numa .caixa-cab abre/fecha a caixa —
+    // cobre TODAS (tabela, "já cobrado", stj/stf). As caixas de caixas.ts não anexam mais listener
+    // próprio (passaram a depender de delegação) → sem isto, no admin elas não abriam.
+    const onContClick = (e: MouseEvent) => {
+      const alvo = (e.target as HTMLElement | null)?.closest?.('.caixa-cab') as HTMLElement | null
+      if (!alvo || !cont.contains(alvo)) return
+      const box = alvo.closest('.caixa-colapsavel') as HTMLElement | null
       if (!box) return
       if (box.hasAttribute('data-aberto')) box.removeAttribute('data-aberto')
       else box.setAttribute('data-aberto', '1')
     }
-    const ligados: HTMLElement[] = []
     const limpezasTab: (() => void)[] = []
     const aplicar = () => {
+      // Recolhe os VÃOS grandes: parágrafos vazios (só espaço/br) somem do layout (display:none) — igual
+      // ao leitor do aluno. Sem isto, a prévia do admin fica com espaços enormes entre os blocos.
+      for (const p of Array.from(cont.querySelectorAll<HTMLElement>('p'))) {
+        if (p.hasAttribute('data-vazio') || p.closest('.caixa-colapsavel')) continue
+        if (p.querySelector('img, table, iframe')) continue
+        if ((p.textContent || '').replace(/ /g, ' ').trim() === '') { p.setAttribute('data-vazio', '1'); p.style.display = 'none' }
+      }
       // Caixas em TABELA (ENTENDIMENTO importado do Word) → vira card DIV nativo, via helper compartilhado.
       limpezasTab.push(prepararCaixasTabela(cont, () => window.dispatchEvent(new Event('resize'))))
+      // "📌 Já cobrado em prova:" (parágrafos) → caixa colapsável, igual ao aluno.
+      limpezasTab.push(prepararCaixasCobrado(cont, () => window.dispatchEvent(new Event('resize'))))
       // Pega data-caixa (novo) E as classes legadas box-stj/box-stf (conteúdo antigo).
       const caixas = Array.from(cont.querySelectorAll<HTMLElement>('[data-caixa="stj"], [data-caixa="stf"], .box-stj, .box-stf'))
       for (const box of caixas) {
@@ -200,14 +217,14 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
         // A caixa de LEGENDA dos grifos abre por padrão (o aluno vê as cores de cara); as demais recolhem.
         if (/^\s*LEGENDA\b/i.test(cab.textContent || '')) box.setAttribute('data-aberto', '1')
         else box.removeAttribute('data-aberto')
-        cab.addEventListener('click', onCab); ligados.push(cab)
       }
     }
     aplicar()
     const raf = requestAnimationFrame(aplicar)
     const mo = new MutationObserver(aplicar)
     mo.observe(cont, { childList: true, subtree: true })
-    return () => { cancelAnimationFrame(raf); mo.disconnect(); for (const c of ligados) c.removeEventListener('click', onCab); for (const l of limpezasTab) l() }
+    cont.addEventListener('click', onContClick)
+    return () => { cancelAnimationFrame(raf); mo.disconnect(); cont.removeEventListener('click', onContClick); for (const l of limpezasTab) l() }
   }, [editando, html])
 
   // Índice CONFIGURÁVEL (mesma lógica do aluno): mostra os tipos escolhidos, na hierarquia; agrupa
@@ -697,7 +714,7 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
           </div>
         ) : html ? (
           <div className="mx-auto max-w-3xl overflow-hidden rounded-lg border bg-card shadow-sm">
-            <div ref={viewRef} className={CONTENT_CLASS} dangerouslySetInnerHTML={{ __html: html }} />
+            <div ref={viewRef} className={CONTENT_CLASS} style={{ ['--leitura-espaco']: espacamento, ['--leitura-espaco-texto']: espacamentoTexto } as any} dangerouslySetInnerHTML={{ __html: html }} />
           </div>
         ) : (
           <div className="flex h-full items-center justify-center">

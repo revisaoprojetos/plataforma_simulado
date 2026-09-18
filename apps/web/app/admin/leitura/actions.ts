@@ -725,10 +725,33 @@ export async function salvarRegulamentoModulo(id: string, cfg: RegulamentoConfig
 }
 
 /** Aparência da trilha DO MÓDULO (símbolos + formato). Tolerante à migração `trilha_aparencia` (jsonb) ausente. */
-export async function salvarTrilhaAparenciaModulo(id: string, cfg: TrilhaAparencia): Promise<{ ok: boolean; error?: string }> {
+/** Descrição do banner do módulo (abaixo do título, na visão do aluno). MERGE em trilha_aparencia.descricao
+ *  (não sobrescreve símbolos/formato/nós/fundo). Migration-free (reusa a coluna trilha_aparencia jsonb). */
+export async function salvarDescricaoModulo(id: string, descricao: string): Promise<{ ok: boolean; error?: string }> {
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
-  const { error } = await svc.from('simulado_pastas').update({ trilha_aparencia: resolverTrilhaAparencia(cfg) }).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  let atual: TrilhaAparencia
+  try {
+    const { data } = await svc.from('simulado_pastas').select('trilha_aparencia').eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA).maybeSingle()
+    atual = resolverTrilhaAparencia((data as any)?.trilha_aparencia)
+  } catch { atual = resolverTrilhaAparencia(null) }
+  const next = resolverTrilhaAparencia({ ...atual, descricao: (descricao ?? '').slice(0, 400) })
+  const { error } = await svc.from('simulado_pastas').update({ trilha_aparencia: next }).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  if (error) return { ok: false, error: /trilha_aparencia|column|schema cache/i.test(error.message) ? 'Migração da aparência da trilha pendente (coluna trilha_aparencia jsonb em simulado_pastas).' : error.message }
+  revalidatePath('/admin/leitura'); revalidatePath('/aluno/leitura'); return { ok: true }
+}
+
+export async function salvarTrilhaAparenciaModulo(id: string, cfg: Omit<TrilhaAparencia, 'descricao'> & { descricao?: string }): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  // Os builders da trilha não gerenciam a descrição do banner → preserva a existente se cfg não a trouxer.
+  let curDesc = ''
+  try {
+    const { data } = await svc.from('simulado_pastas').select('trilha_aparencia').eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA).maybeSingle()
+    curDesc = resolverTrilhaAparencia((data as any)?.trilha_aparencia).descricao
+  } catch { /* mantém '' */ }
+  const next = resolverTrilhaAparencia({ ...cfg, descricao: cfg.descricao ?? curDesc })
+  const { error } = await svc.from('simulado_pastas').update({ trilha_aparencia: next }).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
   if (error) return { ok: false, error: /trilha_aparencia|column|schema cache/i.test(error.message) ? 'Migração da aparência da trilha pendente (coluna trilha_aparencia jsonb em simulado_pastas).' : error.message }
   revalidatePath('/admin/leitura'); revalidatePath('/aluno/leitura'); return { ok: true }
 }
@@ -1001,6 +1024,21 @@ export async function salvarIndiceTipos(documentoId: string, tipos: string[]): P
   const svc = createAdminClient()
   const { data: doc } = await svc.from('simulado_documentos').select('quiz_config').eq('id', documentoId).eq('tenant_id', g.tenantId).maybeSingle()
   const merged = { ...((doc as any)?.quiz_config ?? {}), indice_tipos: [...new Set((tipos ?? []).filter((t) => typeof t === 'string'))] }
+  const { error } = await svc.from('simulado_documentos').update({ quiz_config: merged, atualizado_em: new Date().toISOString() }).eq('id', documentoId).eq('tenant_id', g.tenantId)
+  if (error) return { ok: false, error: QUIZ_SEM_TABELA(error.message) ? 'Rode a migração 20260910000001.' : error.message }
+  revalidatePath(`/admin/leitura/${documentoId}`)
+  return { ok: true }
+}
+
+/** Espaçamento definido pelo ADMIN — vira o padrão do leitor do aluno (o aluno ainda ajusta pra si).
+ *  `blocos` = entre caixas/blocos; `texto` = entre parágrafos. Guardado em quiz_config (migration-free). */
+export async function salvarEspacamentoDocumento(documentoId: string, patch: { blocos?: number; texto?: number }): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { data: doc } = await svc.from('simulado_documentos').select('quiz_config').eq('id', documentoId).eq('tenant_id', g.tenantId).maybeSingle()
+  const merged: any = { ...((doc as any)?.quiz_config ?? {}) }
+  if (patch.blocos != null) merged.espacamento = Math.max(0.6, Math.min(4.4, Math.round(Number(patch.blocos) * 100) / 100))
+  if (patch.texto != null) merged.espacamento_texto = Math.max(0.5, Math.min(3, Math.round(Number(patch.texto) * 100) / 100))
   const { error } = await svc.from('simulado_documentos').update({ quiz_config: merged, atualizado_em: new Date().toISOString() }).eq('id', documentoId).eq('tenant_id', g.tenantId)
   if (error) return { ok: false, error: QUIZ_SEM_TABELA(error.message) ? 'Rode a migração 20260910000001.' : error.message }
   revalidatePath(`/admin/leitura/${documentoId}`)

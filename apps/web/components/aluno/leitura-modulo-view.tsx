@@ -20,7 +20,7 @@ import type { RankingLeitura } from '@/lib/leitura/ranking'
 
 /** Visão de um módulo do LegProc Digital: banner colapsável (igual ao admin) com tabs Trilha | Desempenho
  * e busca, + aviso de questões pendentes. */
-export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulasPendentes, ranking, meuId, formato = DEFAULT_TRILHA_FORMATO, simbolos = DEFAULT_TRILHA_SIMBOLOS, livre, inverter = false, degrade, regulamento, pontuacao, gam = null }: {
+export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulasPendentes, ranking, meuId, formato = DEFAULT_TRILHA_FORMATO, simbolos = DEFAULT_TRILHA_SIMBOLOS, livre, inverter = false, degrade, descricao, regulamento, pontuacao, gam = null }: {
   modulo: string
   trilha: Trilha
   desempenho: AulaDesempenho[]
@@ -33,6 +33,7 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
   livre?: TrilhaLivreConfig
   inverter?: boolean
   degrade?: TrilhaDegrade
+  descricao?: string
   regulamento?: RegulamentoConfig
   pontuacao?: PontuacaoLeitura
   gam?: GamRail | null
@@ -40,7 +41,8 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
   // 1ª aula com questões pendentes (leitura feita) → alvo do CTA do aviso.
   const alvoPend = desempenho.find((a) => a.leituraConcluida && a.questoesPendentes > 0)
 
-  const subtitulo = `Leia cada aula e desbloqueie as questões. ${trilha.done}/${trilha.total} concluída(s).`
+  // Descrição do banner: SÓ a configurada pelo admin (aba Configurações do módulo). Vazio → sem subtítulo.
+  const subtitulo = (descricao && descricao.trim()) ? descricao : undefined
   const regAtivo = regulamento?.ativo === true
   const embedReg = regulamento ? embedVideoUrl(regulamento.video_url) : null
   const [tabAtiva, setTabAtiva] = useState('trilha')

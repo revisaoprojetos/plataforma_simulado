@@ -703,34 +703,43 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 .leitura-prosa [data-grifo="complemento"], .leitura-prosa .hl-g { background:#a8d08d; color:#111; padding:0 1px; border-radius:2px; }
 .leitura-prosa [data-grifo="prazo"],       .leitura-prosa .hl-r { background:#cc99ff; color:#111; padding:0 1px; border-radius:2px; }
 .leitura-prosa [data-grifo="excecao"],     .leitura-prosa .exc  { color:#c00000; font-weight:700; }
-/* No tema ESCURO do leitor o vermelho-escuro (#c00000) some sobre a folha escura → tom claro legível. */
+/* No tema ESCURO o vermelho-escuro (#c00000) some sobre a folha escura → tom claro legível. Leitor do
+   aluno usa o próprio tema (data-leitura-tema); a prévia do admin (sem esse atributo) segue o .dark do app. */
 .leitura-prosa[data-leitura-tema="escuro"] [data-grifo="excecao"],
-.leitura-prosa[data-leitura-tema="escuro"] .exc { color:#f9a8a8; }
+.leitura-prosa[data-leitura-tema="escuro"] .exc,
+.dark .leitura-prosa:not([data-leitura-tema]) [data-grifo="excecao"],
+.dark .leitura-prosa:not([data-leitura-tema]) .exc { color:#f9a8a8; }
 
 /* Grifos BAKED = <span> com FUNDO inline (marca-texto do editor) + `.hl-*`/`mark`. Esses spans não
-   definem `color` → herdam a cor CLARA do tema escuro e somem sobre o próprio realce. No tema escuro,
-   força o texto grifado para PRETO (o realce claro fica legível). Sem grifo (sem fundo), texto normal. */
-.leitura-prosa[data-leitura-tema="escuro"] span[style*="background"],
-.leitura-prosa[data-leitura-tema="escuro"] font[style*="background"],
-.leitura-prosa[data-leitura-tema="escuro"] b[style*="background"],
-.leitura-prosa[data-leitura-tema="escuro"] strong[style*="background"],
-.leitura-prosa[data-leitura-tema="escuro"] mark,
-.leitura-prosa[data-leitura-tema="escuro"] .hl-y,
-.leitura-prosa[data-leitura-tema="escuro"] .hl-g,
-.leitura-prosa[data-leitura-tema="escuro"] .hl-r { color:#111 !important; }
+   definem `color` → herdam a cor do tema e, no escuro, somem sobre o próprio realce. Como o fundo do
+   grifo é SEMPRE claro (amarelo/verde/roxo), força o texto grifado para PRETO em QUALQUER tema/contexto
+   (leitor do aluno E prévia do admin — o admin não tem data-leitura-tema). Sem fundo → texto normal. */
+.leitura-prosa span[style*="background"],
+.leitura-prosa font[style*="background"],
+.leitura-prosa b[style*="background"],
+.leitura-prosa strong[style*="background"],
+.leitura-prosa mark { color:#111 !important; }
+
+/* Espaçamento entre BLOCOS ajustável (controle "Espaçamento") — multiplicador --leitura-espaco.
+   Default 2.2 = 100% na UI (a UI mostra mult/2.2*100). Escala margem das caixas (acima) e dos
+   parágrafos; !important vence o mb-3 do Tailwind. O leitor/admin injeta o valor via style inline. */
+.leitura-prosa { --leitura-espaco: 2.2; --leitura-espaco-texto: 1; }
+/* Espaçamento dos TEXTOS (entre parágrafos) = variável PRÓPRIA (--leitura-espaco-texto, default 1 = 100%),
+   independente do espaçamento dos BLOCOS/caixas (--leitura-espaco). */
+.leitura-prosa p { margin-bottom: calc(0.72rem * var(--leitura-espaco-texto,1)) !important; }
 
 /* Caixas de destaque (estruturais — permanecem no "modo sem grifos") */
 .leitura-prosa [data-caixa],
 .leitura-prosa .box-stj, .leitura-prosa .box-stf, .leitura-prosa .box-cinza,
 .leitura-prosa .box-cinza-esc, .leitura-prosa .box-atencao {
-  color:#111; padding:10px 14px; margin:8px 0 10px; border:1px solid #999; border-radius:8px; font-size:.95em;
+  color:#111; padding:10px 14px; margin:calc(8px * var(--leitura-espaco,2.2)) 0 calc(10px * var(--leitura-espaco,2.2)); border:1px solid #999; border-radius:8px; font-size:.95em;
 }
 .leitura-prosa [data-caixa="stj"],        .leitura-prosa .box-stj      { background:#fff2cc; border-color:#c8a200; }
 .leitura-prosa [data-caixa="stf"],        .leitura-prosa .box-stf      { background:#bdd6ee; border-color:#2060a0; }
 .leitura-prosa [data-caixa="alerta"],     .leitura-prosa .box-atencao  { background:#fde9d9; border-color:#c06000; }
 .leitura-prosa [data-caixa="comentario"], .leitura-prosa .box-cinza,
 .leitura-prosa .box-cinza-esc { background:#d0cece; border-color:#999; }
-.leitura-prosa [data-caixa="cobrado"] { background:#efeafc; border-color:#b9a6ee; }
+.leitura-prosa [data-caixa="cobrado"] { background:#efeafc; border-color:#b9a6ee; margin-top:calc(12px * var(--leitura-espaco,2.2)) !important; margin-bottom:calc(12px * var(--leitura-espaco,2.2)) !important; }
 /* Corpo da caixa "já cobrado" mais CLARO (a lista aparece só na expansão), quebrando linha; anula o
    negrito herdado de <strong> que às vezes envolve o texto. */
 .leitura-prosa [data-caixa="cobrado"] > .caixa-corpo .caixa-corpo-in,

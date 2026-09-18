@@ -12,6 +12,7 @@ import { PersonalizarAulaDialog } from '@/components/admin/personalizar-aula-dia
 import { ModuloAdesivoForm } from '@/components/admin/modulo-adesivo-form'
 import { ModuloPontuacaoForm } from '@/components/admin/modulo-pontuacao-form'
 import { ModuloIntroForm } from '@/components/admin/modulo-intro-form'
+import { ModuloDescricaoForm } from '@/components/admin/modulo-descricao-form'
 import { ModuloRegulamentoForm } from '@/components/admin/modulo-regulamento-form'
 import { ModuloTrilhaForm } from '@/components/admin/modulo-trilha-form'
 import { ModuloTrilhaFundoForm } from '@/components/admin/modulo-trilha-fundo-form'
@@ -223,6 +224,7 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTa
                 onClose={() => {}}
                 onSaved={() => router.refresh()}
               />
+              <ModuloDescricaoForm key={`desc-${moduloAtual.id}`} pastaId={moduloAtual.id} atual={moduloAtual.trilhaAparencia.descricao} />
               <ModuloTrilhaFundoForm key={`fundo-${moduloAtual.id}`} pastaId={moduloAtual.id} atual={moduloAtual.trilhaAparencia} capa={moduloAtual.capa_url ?? moduloAtual.capa_card_url ?? null} />
               <ModuloIntroForm pastaId={moduloAtual.id} atual={moduloAtual.intro} />
               <ModuloAdesivoForm pastaId={moduloAtual.id} atual={moduloAtual.adesivo_url} />
