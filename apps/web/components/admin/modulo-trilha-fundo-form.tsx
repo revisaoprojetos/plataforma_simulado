@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { salvarTrilhaFundoModulo } from '@/app/admin/leitura/actions'
 import { DEFAULT_TRILHA_FUNDO, DEFAULT_TRILHA_DEGRADE, type TrilhaAparencia, type TrilhaFundoConfig, type TrilhaCrop, type TrilhaDegrade } from '@/lib/leitura/trilha-aparencia'
 import { TrilhaFundoCropper } from '@/components/admin/trilha-fundo-cropper'
+import { useRegistrarSalvavel } from '@/components/admin/config-modulo-salvar'
 
 /** Estilo CSS que reproduz o recorte (mesma lógica do render da trilha). */
 function estiloFundo(fundo: TrilhaFundoConfig, url: string): React.CSSProperties {
@@ -41,6 +42,8 @@ export function ModuloTrilhaFundoForm({ pastaId, atual, capa }: { pastaId: strin
   const [cropAberto, setCropAberto] = useState(false)
   const setFundo = (patch: Partial<TrilhaFundoConfig>) => setFundoState((f) => ({ ...f, ...patch }))
   const preview = fundo.url ?? capa ?? null
+  const baseRef = useRef(JSON.stringify({ fundo: atual.livre.fundo ?? DEFAULT_TRILHA_FUNDO, aspecto: atual.livre.aspecto ?? 0.8, degrade: atual.degrade ?? DEFAULT_TRILHA_DEGRADE }))
+  const dirty = JSON.stringify({ fundo, aspecto, degrade }) !== baseRef.current
 
   async function enviar(file: File) {
     setEnviando(true)
@@ -67,13 +70,20 @@ export function ModuloTrilhaFundoForm({ pastaId, atual, capa }: { pastaId: strin
     toast.success('Recorte aplicado — clique em Salvar para publicar.')
   }
 
+  async function salvarCore(): Promise<boolean> {
+    const r = await salvarTrilhaFundoModulo(pastaId, { fundo, aspecto, degrade })
+    if (r.ok) { baseRef.current = JSON.stringify({ fundo, aspecto, degrade }); return true }
+    return false
+  }
   function salvar() {
     start(async () => {
-      const r = await salvarTrilhaFundoModulo(pastaId, { fundo, aspecto, degrade })
-      if (r.ok) toast.success('Imagem de fundo da trilha salva.')
-      else toast.error(r.error ?? 'Erro ao salvar')
+      const ok = await salvarCore()
+      if (ok) toast.success('Imagem de fundo da trilha salva.')
+      else toast.error('Erro ao salvar')
     })
   }
+  // Salvar único da aba Config: esconde o botão próprio e registra dirty + salvar.
+  const noSalvarUnico = useRegistrarSalvavel(`${pastaId}:trilha-fundo`, dirty, salvarCore)
 
   return (
     <div className="space-y-4 rounded-2xl border bg-card p-4 shadow-sm">
@@ -85,10 +95,12 @@ export function ModuloTrilhaFundoForm({ pastaId, atual, capa }: { pastaId: strin
             <p className="max-w-2xl text-xs text-muted-foreground">Fundo da trilha <strong>Personalizada</strong>. Envie a imagem e use <strong>Ajustar</strong> para recortar e mudar a proporção. Sem imagem própria, usa a capa do módulo.</p>
           </div>
         </div>
-        <button type="button" onClick={salvar} disabled={pending}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50">
-          {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Salvar
-        </button>
+        {!noSalvarUnico && (
+          <button type="button" onClick={salvar} disabled={pending}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-1.5 text-xs font-semibold text-primary-foreground shadow-sm transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50">
+            {pending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />} Salvar
+          </button>
+        )}
       </div>
 
       <div className="grid gap-4 sm:grid-cols-[260px_minmax(0,1fr)]">

@@ -16,6 +16,7 @@ import { ModuloDescricaoForm } from '@/components/admin/modulo-descricao-form'
 import { ModuloRegulamentoForm } from '@/components/admin/modulo-regulamento-form'
 import { ModuloTrilhaForm } from '@/components/admin/modulo-trilha-form'
 import { ModuloTrilhaFundoForm } from '@/components/admin/modulo-trilha-fundo-form'
+import { ConfigModuloSalvarProvider } from '@/components/admin/config-modulo-salvar'
 import { ModuloAcesso } from '@/components/admin/modulo-acesso'
 import {
   ChevronRight, ChevronUp, ChevronDown, Home, Library, FolderPlus, FilePlus2, Pencil, Trash2, FolderInput, Eye, EyeOff, BookOpenText, MoreVertical, FolderOpen, FileText, HelpCircle, Settings2, Users, X, Clock, CalendarClock, Link2, Copy,
@@ -216,19 +217,21 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTa
           )}
 
           {moduloAtual && (
-            <div className={cn('space-y-4', moduloTab !== 'config' && 'hidden')}>
-              <EditarPastaDialog
-                key={moduloAtual.id}
-                inline rotulo="módulo" generoM cardView={cardView}
-                pasta={{ id: moduloAtual.id, nome: moduloAtual.nome, cor: moduloAtual.cor, capa: moduloAtual.capa_card_url, capaLarga: moduloAtual.capa_url }}
-                onClose={() => {}}
-                onSaved={() => router.refresh()}
-              />
-              <ModuloDescricaoForm key={`desc-${moduloAtual.id}`} pastaId={moduloAtual.id} atual={moduloAtual.trilhaAparencia.descricao} />
-              <ModuloTrilhaFundoForm key={`fundo-${moduloAtual.id}`} pastaId={moduloAtual.id} atual={moduloAtual.trilhaAparencia} capa={moduloAtual.capa_url ?? moduloAtual.capa_card_url ?? null} />
-              <ModuloIntroForm pastaId={moduloAtual.id} atual={moduloAtual.intro} />
-              <ModuloAdesivoForm pastaId={moduloAtual.id} atual={moduloAtual.adesivo_url} />
-              <ModuloPontuacaoForm pastaId={moduloAtual.id} atual={moduloAtual.pontuacao} />
+            <div className={cn(moduloTab !== 'config' && 'hidden')}>
+              <ConfigModuloSalvarProvider key={`cfg-${moduloAtual.id}`}>
+                <EditarPastaDialog
+                  key={moduloAtual.id}
+                  inline rotulo="módulo" generoM cardView={cardView}
+                  pasta={{ id: moduloAtual.id, nome: moduloAtual.nome, cor: moduloAtual.cor, capa: moduloAtual.capa_card_url, capaLarga: moduloAtual.capa_url }}
+                  onClose={() => {}}
+                  onSaved={() => router.refresh()}
+                />
+                <ModuloDescricaoForm key={`desc-${moduloAtual.id}`} pastaId={moduloAtual.id} atual={moduloAtual.trilhaAparencia.descricao} />
+                <ModuloTrilhaFundoForm key={`fundo-${moduloAtual.id}`} pastaId={moduloAtual.id} atual={moduloAtual.trilhaAparencia} capa={moduloAtual.capa_url ?? moduloAtual.capa_card_url ?? null} />
+                <ModuloIntroForm pastaId={moduloAtual.id} atual={moduloAtual.intro} />
+                <ModuloAdesivoForm pastaId={moduloAtual.id} atual={moduloAtual.adesivo_url} />
+                <ModuloPontuacaoForm pastaId={moduloAtual.id} atual={moduloAtual.pontuacao} />
+              </ConfigModuloSalvarProvider>
             </div>
           )}
         </>

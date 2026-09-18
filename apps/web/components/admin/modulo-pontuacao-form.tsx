@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Loader2, Sparkles, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { salvarPontuacaoModulo } from '@/app/admin/leitura/actions'
 import { type PontuacaoLeitura } from '@/lib/leitura/pontuacao'
+import { useRegistrarSalvavel } from '@/components/admin/config-modulo-salvar'
 
 /**
  * Config de PONTUAÇÃO do módulo (LegProc) — usada pelo ranking/gamificação. Fica DORMENTE enquanto a
@@ -15,17 +16,26 @@ import { type PontuacaoLeitura } from '@/lib/leitura/pontuacao'
 export function ModuloPontuacaoForm({ pastaId, atual }: { pastaId: string; atual: PontuacaoLeitura }) {
   const [cfg, setCfg] = useState<PontuacaoLeitura>(atual)
   const [salvando, setSalvando] = useState(false)
+  const baseRef = useRef(JSON.stringify(atual))
+  const dirty = JSON.stringify(cfg) !== baseRef.current
 
   function setNum(k: 'pontos_aula' | 'pontos_acerto' | 'combo_bonus', v: string) {
     const n = Math.max(0, Math.round(Number(v) || 0))
     setCfg((c) => ({ ...c, [k]: n }))
   }
-  async function salvar() {
+  async function salvar(): Promise<boolean> {
     setSalvando(true)
     const r = await salvarPontuacaoModulo(pastaId, cfg)
     setSalvando(false)
-    if (r.ok) { toast.success('Pontuação salva') } else { toast.error(r.error ?? 'Erro ao salvar') }
+    if (r.ok) { baseRef.current = JSON.stringify(cfg); return true }
+    return false
   }
+  async function salvarSozinho() {
+    const ok = await salvar()
+    if (ok) toast.success('Pontuação salva'); else toast.error('Erro ao salvar')
+  }
+  // No salvar único da aba Config, esconde o botão próprio e registra dirty + salvar.
+  const noSalvarUnico = useRegistrarSalvavel(`${pastaId}:pontuacao`, dirty, salvar)
 
   const campo = (label: string, k: 'pontos_aula' | 'pontos_acerto' | 'combo_bonus', dica: string) => (
     <label className="space-y-1">
@@ -57,12 +67,14 @@ export function ModuloPontuacaoForm({ pastaId, atual }: { pastaId: string; atual
         <span>Ligar o <strong>combo</strong> (bônus por aula gabaritada)</span>
       </label>
 
-      <div className="flex justify-end">
-        <button type="button" onClick={salvar} disabled={salvando}
-          className={cn('inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50')}>
-          {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Salvar pontuação
-        </button>
-      </div>
+      {!noSalvarUnico && (
+        <div className="flex justify-end">
+          <button type="button" onClick={salvarSozinho} disabled={salvando}
+            className={cn('inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50')}>
+            {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Salvar pontuação
+          </button>
+        </div>
+      )}
     </div>
   )
 }

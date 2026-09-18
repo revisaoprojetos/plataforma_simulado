@@ -1,11 +1,12 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Loader2, Check, Play, BookOpen, ExternalLink, Rocket } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { salvarIntroModulo, listarAulasDoModulo } from '@/app/admin/leitura/actions'
 import { type IntroConfig, type IntroTipo } from '@/lib/leitura/intro'
+import { useRegistrarSalvavel } from '@/components/admin/config-modulo-salvar'
 
 const TIPOS: { id: IntroTipo; label: string; Icon: typeof Play }[] = [
   { id: 'video', label: 'Vídeo', Icon: Play },
@@ -21,6 +22,8 @@ export function ModuloIntroForm({ pastaId, atual }: { pastaId: string; atual: In
   const [cfg, setCfg] = useState<IntroConfig>(atual)
   const [salvando, setSalvando] = useState(false)
   const [aulas, setAulas] = useState<{ id: string; titulo: string }[] | null>(null)
+  const baseRef = useRef(JSON.stringify(atual))
+  const dirty = JSON.stringify(cfg) !== baseRef.current
 
   // Carrega as aulas do módulo (para o seletor de leitura) sob demanda.
   useEffect(() => {
@@ -28,12 +31,18 @@ export function ModuloIntroForm({ pastaId, atual }: { pastaId: string; atual: In
     listarAulasDoModulo(pastaId).then(setAulas).catch(() => setAulas([]))
   }, [cfg.tipo, aulas, pastaId])
 
-  async function salvar() {
+  async function salvar(): Promise<boolean> {
     setSalvando(true)
     const r = await salvarIntroModulo(pastaId, cfg)
     setSalvando(false)
-    if (r.ok) { toast.success('“Comece por aqui” salvo') } else { toast.error(r.error ?? 'Erro ao salvar') }
+    if (r.ok) { baseRef.current = JSON.stringify(cfg); return true }
+    return false
   }
+  async function salvarSozinho() {
+    const ok = await salvar()
+    if (ok) toast.success('“Comece por aqui” salvo'); else toast.error('Erro ao salvar')
+  }
+  const noSalvarUnico = useRegistrarSalvavel(`${pastaId}:intro`, dirty, salvar)
 
   return (
     <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
@@ -97,12 +106,14 @@ export function ModuloIntroForm({ pastaId, atual }: { pastaId: string; atual: In
         </div>
       )}
 
-      <div className="flex justify-end">
-        <button type="button" onClick={salvar} disabled={salvando}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50">
-          {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Salvar
-        </button>
-      </div>
+      {!noSalvarUnico && (
+        <div className="flex justify-end">
+          <button type="button" onClick={salvarSozinho} disabled={salvando}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50">
+            {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Salvar
+          </button>
+        </div>
+      )}
     </div>
   )
 }

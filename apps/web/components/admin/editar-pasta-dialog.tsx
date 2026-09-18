@@ -10,6 +10,7 @@ import { Loader2, X, Check, Palette, ImagePlus, Trash2, RefreshCw, Crop } from '
 import { cn } from '@/lib/utils'
 import { ImageCropper, type CropState } from '@/app/admin/simulados/criar/image-cropper'
 import { type CardView } from '@/lib/card-view'
+import { useRegistrarSalvavel } from '@/components/admin/config-modulo-salvar'
 
 export type PastaPatch = { nome: string; cor: string | null; capa: string | null; capaLarga: string | null }
 
@@ -75,6 +76,10 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
   const origBanner = useRef<File | string | null>(pasta?.capaLarga ?? null)
   const cropCard = useRef<CropState | null>(null)
   const cropBanner = useRef<CropState | null>(null)
+  // Salvar único (aba Config do módulo): compara com o snapshot inicial p/ saber se há pendência.
+  const snap = () => JSON.stringify({ nome: nome.trim(), cor, capaCard, capaLarga, fadeAtivo, fadeCor })
+  const baseRef = useRef(JSON.stringify({ nome: (pasta?.nome ?? '').trim(), cor: pasta?.cor ?? null, capaCard: pasta?.capa ?? null, capaLarga: pasta?.capaLarga ?? null, fadeAtivo: (cardFade as any)?.ativo === true, fadeCor: typeof (cardFade as any)?.cor === 'string' ? (cardFade as any).cor : '' }))
+  const dirty = !criar && snap() !== baseRef.current
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -154,6 +159,24 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
     }
   }
 
+  // Persistência usada pelo salvar ÚNICO da aba Config: grava sem toast/onClose e atualiza o baseline.
+  async function salvarRegistrado(): Promise<boolean> {
+    if (criar || !pasta?.id) return true
+    if (!nome.trim()) return false
+    setSalvando(true)
+    const meta = await montarMeta()
+    const cf = { ativo: fadeAtivo, cor: fadeCor.trim() || null }
+    const r = await atualizarBanco(pasta.id, nome.trim(), cor, null, capaLarga, capaCard, meta)
+    if (mostrarFade && r.ok) await salvarPastaCardFade(pasta.id, cf)
+    setSalvando(false)
+    // NÃO chama onSaved aqui: ele faz router.refresh() e remontaria os demais forms no meio do salvar
+    // único (perdendo pendências). O estado local já reflete o salvo; a página recarrega ao navegar.
+    if (r.ok) { baseRef.current = snap(); return true }
+    return false
+  }
+  // Dentro do provider (aba Config) esconde o botão próprio e entra no salvar único; fora, sem efeito.
+  const noSalvarUnico = useRegistrarSalvavel(`${pasta?.id ?? 'novo'}:pasta`, dirty, salvarRegistrado)
+
   const btnOverlay = 'inline-flex items-center gap-1 rounded-md bg-black/60 px-2 py-1 text-xs font-medium text-white backdrop-blur hover:bg-black/70'
 
   const dialogo = (
@@ -167,7 +190,7 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
           <div className="space-y-5 p-5">
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Nome</label>
-              <input value={nome} onChange={(e) => setNome(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') salvar() }} autoFocus={!inline}
+              <input value={nome} onChange={(e) => setNome(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !noSalvarUnico) salvar() }} autoFocus={!inline}
                 className="w-full rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
             </div>
 
@@ -266,12 +289,14 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
               </div>
             )}
 
-            <div className="flex justify-end gap-2">
-              {!inline && <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted">Cancelar</button>}
-              <button type="button" onClick={salvar} disabled={salvando} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
-                {salvando && <Loader2 className="h-4 w-4 animate-spin" />} {criar ? (paiId ? `Criar sub${rot}` : `Criar ${rot}`) : 'Salvar'}
-              </button>
-            </div>
+            {!noSalvarUnico && (
+              <div className="flex justify-end gap-2">
+                {!inline && <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted">Cancelar</button>}
+                <button type="button" onClick={salvar} disabled={salvando} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
+                  {salvando && <Loader2 className="h-4 w-4 animate-spin" />} {criar ? (paiId ? `Criar sub${rot}` : `Criar ${rot}`) : 'Salvar'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

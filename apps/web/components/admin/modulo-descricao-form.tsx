@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Loader2, Check, Text } from 'lucide-react'
 import { salvarDescricaoModulo } from '@/app/admin/leitura/actions'
+import { useRegistrarSalvavel } from '@/components/admin/config-modulo-salvar'
 
 /**
  * Descrição do módulo que aparece ABAIXO do título no BANNER do aluno (aba Trilha). Guardada em
@@ -12,13 +13,21 @@ import { salvarDescricaoModulo } from '@/app/admin/leitura/actions'
 export function ModuloDescricaoForm({ pastaId, atual }: { pastaId: string; atual: string }) {
   const [descricao, setDescricao] = useState(atual ?? '')
   const [salvando, setSalvando] = useState(false)
+  const baseRef = useRef((atual ?? '').trim())
+  const dirty = descricao.trim() !== baseRef.current
 
-  async function salvar() {
+  async function salvar(): Promise<boolean> {
     setSalvando(true)
     const r = await salvarDescricaoModulo(pastaId, descricao.trim())
     setSalvando(false)
-    if (r.ok) toast.success('Descrição salva'); else toast.error(r.error ?? 'Erro ao salvar')
+    if (r.ok) { baseRef.current = descricao.trim(); return true }
+    return false
   }
+  async function salvarSozinho() {
+    const ok = await salvar()
+    if (ok) toast.success('Descrição salva'); else toast.error('Erro ao salvar')
+  }
+  const noSalvarUnico = useRegistrarSalvavel(`${pastaId}:descricao`, dirty, salvar)
 
   return (
     <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
@@ -36,12 +45,14 @@ export function ModuloDescricaoForm({ pastaId, atual }: { pastaId: string; atual
           className="w-full rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
       </label>
 
-      <div className="flex justify-end">
-        <button type="button" onClick={salvar} disabled={salvando}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50">
-          {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Salvar
-        </button>
-      </div>
+      {!noSalvarUnico && (
+        <div className="flex justify-end">
+          <button type="button" onClick={salvarSozinho} disabled={salvando}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50">
+            {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Salvar
+          </button>
+        </div>
+      )}
     </div>
   )
 }
