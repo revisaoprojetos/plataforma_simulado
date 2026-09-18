@@ -6,7 +6,7 @@ import { EtiquetaPicker } from '@/components/admin/etiqueta-picker'
 import { etiquetasDaQuestao } from '@/app/admin/etiquetas/actions'
 import { codigoQuestao } from '@/lib/codigo-questao'
 import { classificarFormato } from '@/lib/simulado/formato'
-import { updateQuestaoAction } from '../../actions'
+import { updateQuestaoAction, excluirQuestoes } from '../../actions'
 import { notFound } from 'next/navigation'
 
 interface PageProps {
@@ -158,6 +158,7 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
       assuntosDetalheSugestoes={assuntosDetalheSugestoes}
       bancosDaQuestao={bancosDaQuestao}
       onSubmit={updateQuestaoAction.bind(null, id)}
+      onExcluir={excluirQuestoes.bind(null, [id])}
       sidebarExtra={<EtiquetaPicker questaoId={id} todas={et.todas ?? []} ativasIniciais={et.ativas ?? []} />}
     />
   )

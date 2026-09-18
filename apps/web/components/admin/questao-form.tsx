@@ -196,6 +196,8 @@ interface QuestaoFormProps {
   /** Conteúdo extra da barra lateral (ex.: seletor de etiquetas). */
   sidebarExtra?: ReactNode
   onSubmit: (data: QuestaoFormData) => Promise<{ error?: string } | void>
+  /** Só na EDIÇÃO: exclui a questão (soft delete → lixeira). Sem isto, o botão Excluir não aparece. */
+  onExcluir?: () => Promise<{ ok: boolean; error?: string; count?: number }>
 }
 
 const LETRA = ['A', 'B', 'C', 'D', 'E']
@@ -422,7 +424,7 @@ function StatusBadge({ status }: { status?: string }) {
   return <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', cfg.cls)}>{cfg.label}</span>
 }
 
-export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], orgaosSugestoes = [], cargosSugestoes = [], disciplinasSugestoes = [], assuntosSugestoes = [], assuntosDetalheSugestoes = [], bancosDaQuestao = [], sidebarExtra, onSubmit }: QuestaoFormProps) {
+export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], orgaosSugestoes = [], cargosSugestoes = [], disciplinasSugestoes = [], assuntosSugestoes = [], assuntosDetalheSugestoes = [], bancosDaQuestao = [], sidebarExtra, onSubmit, onExcluir }: QuestaoFormProps) {
   const ocultarDiscursiva = useOcultarDiscursiva()
   const [isLoading, setIsLoading] = useState(false)
   const [, forcar] = useReducer((x: number) => x + 1, 0) // força re-render (reverte o <select> Tipo ao cancelar)
@@ -579,6 +581,17 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], orgaosS
   // Saídas que não passam por um <a> (voltar/cancelar): confirma descartar antes de sair.
   async function sair() { if (await confirmarDescartarAlteracoes()) history.back() }
 
+  const [excluindo, setExcluindo] = useState(false)
+  async function excluirQuestao() {
+    if (!onExcluir || excluindo) return
+    const ok = await confirmar({ titulo: 'Excluir questão', mensagem: 'A questão vai para a lixeira (reversível). Deseja continuar?', confirmar: 'Excluir', destrutivo: true })
+    if (!ok) return
+    setExcluindo(true)
+    const r = await onExcluir()
+    if (r.ok) { toast.success('Questão excluída'); window.location.assign('/admin/questoes') }
+    else { setExcluindo(false); toast.error(r.error ?? 'Erro ao excluir') }
+  }
+
   async function handleFormSubmit(data: QuestaoFormData) {
     setIsLoading(true)
     try {
@@ -618,6 +631,12 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], orgaosS
           <Button type="button" variant="ghost" size="sm" onClick={desfazer} disabled={!sujo} title="Desfazer todas as alterações">
             <Undo2 className="mr-1.5 h-4 w-4" /> Desfazer
           </Button>
+          {onExcluir && (
+            <Button type="button" variant="outline" size="sm" onClick={excluirQuestao} disabled={excluindo}
+              className="border-destructive/40 text-destructive hover:bg-destructive hover:text-destructive-foreground">
+              {excluindo ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Trash2 className="mr-1.5 h-4 w-4" />} Excluir
+            </Button>
+          )}
           <Button type="button" variant="outline" size="sm" onClick={sair}>Cancelar</Button>
           <Button type="submit" size="sm" disabled={isLoading}>
             {isLoading ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Check className="mr-1.5 h-4 w-4" />} Salvar questão

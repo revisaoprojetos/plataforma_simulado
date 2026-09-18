@@ -27,6 +27,7 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -67,6 +68,8 @@
   --accent: oklch(0.95 0.03 293);
   --accent-foreground: oklch(0.38 0.12 293);
   --destructive: oklch(0.577 0.245 27.325);
+  /* Texto sobre o vermelho de "destructive" — branco nos dois temas (o vermelho é escuro o bastante). */
+  --destructive-foreground: oklch(0.985 0 0);
   --border: oklch(0.915 0.008 300);
   --input: oklch(0.915 0.008 300);
   --ring: oklch(0.47 0.17 293);
