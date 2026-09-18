@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
+import { copiarTexto } from '@/lib/clipboard'
 import { capaComPos } from '@/lib/leitura/capa-pos'
 import { EditarPastaDialog } from '@/components/admin/editar-pasta-dialog'
 import { PersonalizarAulaDialog } from '@/components/admin/personalizar-aula-dialog'
@@ -16,7 +17,7 @@ import { ModuloTrilhaForm } from '@/components/admin/modulo-trilha-form'
 import { ModuloTrilhaFundoForm } from '@/components/admin/modulo-trilha-fundo-form'
 import { ModuloAcesso } from '@/components/admin/modulo-acesso'
 import {
-  ChevronRight, ChevronUp, ChevronDown, Home, Library, FolderPlus, FilePlus2, Pencil, Trash2, FolderInput, Eye, EyeOff, BookOpenText, MoreVertical, FolderOpen, FileText, HelpCircle, Settings2, Users, X, Clock, CalendarClock,
+  ChevronRight, ChevronUp, ChevronDown, Home, Library, FolderPlus, FilePlus2, Pencil, Trash2, FolderInput, Eye, EyeOff, BookOpenText, MoreVertical, FolderOpen, FileText, HelpCircle, Settings2, Users, X, Clock, CalendarClock, Link2,
 } from 'lucide-react'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/utils'
@@ -263,10 +264,16 @@ function ModuloCard({ m, variant, onExcluir }: {
   const capa = m.capa_card_url || m.capa_url
   const href = `/admin/leitura?pasta=${m.id}`
   const contagem = `${m.aulas} aula(s)`
+  async function copiarLinkTrilha() {
+    const base = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+    if (await copiarTexto(`${base}/aluno/leitura?modulo=${m.id}`)) toast.success('Link da trilha copiado')
+    else toast.error('Não foi possível copiar o link.')
+  }
   const menu = (
-    <DropdownMenuContent align="start" className="w-40">
+    <DropdownMenuContent align="start" className="w-44">
       <DropdownMenuItem render={<Link href={href} />}><FolderOpen className="mr-2 h-4 w-4" /> Abrir</DropdownMenuItem>
       <DropdownMenuItem render={<Link href={`${href}&tab=config`} />}><Pencil className="mr-2 h-4 w-4" /> Personalizar</DropdownMenuItem>
+      <DropdownMenuItem onClick={copiarLinkTrilha}><Link2 className="mr-2 h-4 w-4" /> Copiar link da trilha</DropdownMenuItem>
       <DropdownMenuSeparator />
       <DropdownMenuItem onClick={onExcluir} className="text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir módulo</DropdownMenuItem>
     </DropdownMenuContent>
