@@ -98,6 +98,9 @@
   --topbar-foreground: var(--sidebar-foreground);
   --brand-primary: oklch(0.47 0.17 293);
   --brand-accent: oklch(0.84 0.15 82);
+  /* Cor da GAMIFICAÇÃO — default = roxo base da sidebar; sobrescrita pelo tenant (cores.gam) no console. */
+  --gam-primary: var(--sidebar);
+  --gam-primary-foreground: var(--sidebar-foreground);
 }
 
 .dark {
@@ -144,6 +147,17 @@
   --topbar-foreground: var(--sidebar-foreground);
   --brand-primary: oklch(0.62 0.17 293);
   --brand-accent: oklch(0.84 0.15 82);
+}
+
+/* Escopo de cor da GAMIFICAÇÃO: aplicar `class="tema-gam"` num container recolore TUDO dentro
+   (rail, hero, níveis, ligas, missões, conquistas) para --gam-primary — sem editar cada componente.
+   Default de --gam-primary = roxo da sidebar; editável por tenant no console (cores.gam). */
+.tema-gam {
+  --primary: var(--gam-primary);
+  --primary-foreground: var(--gam-primary-foreground);
+  --brand-primary: var(--gam-primary);
+  --brand-accent: var(--gam-primary);
+  --ring: var(--gam-primary);
 }
 
 /* Tema escopado por plataforma (usado no login): força claro/escuro num subtree,

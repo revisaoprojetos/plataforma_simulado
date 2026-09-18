@@ -3,11 +3,13 @@ import { diaLocal } from './datas'
 import { missoesDoDia } from './rodizio'
 import { awardXp } from './xp'
 
-type Evento = 'finalizou_simulado' | 'acertou_questao' | 'praticou'
+type Evento = 'finalizou_simulado' | 'acertou_questao' | 'praticou' | 'concluiu_aula_leitura' | 'gabaritou_quiz_leitura'
 const MAP: Record<Evento, MissaoTipo> = {
   finalizou_simulado: 'finalizar_simulado',
   acertou_questao: 'acertar_n',
   praticou: 'praticar_n',
+  concluiu_aula_leitura: 'concluir_aula_leitura',
+  gabaritou_quiz_leitura: 'gabaritar_quiz_leitura',
 }
 
 /**

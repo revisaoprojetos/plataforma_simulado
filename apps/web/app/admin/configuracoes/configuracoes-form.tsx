@@ -45,6 +45,7 @@ interface Cores {
   sidebar: string; sidetext: string; sidetextHover: string; sidetextActive: string; icon: string; iconHover: string; iconAtivo: string; active: string; topbar: string; sborder: string
   bg: string; text: string; titulo: string; card: string; cborder: string; inputBg: string; btn: string; accent: string; cronograma?: string
   tabBg: string; tabAtivo: string; tabTexto: string  // fundo das tabs, tab selecionada, texto (hover/ativo)
+  gam?: string  // cor da GAMIFICAÇÃO (rail, XP, ligas…); default = cor da sidebar
 }
 
 /** Gera as CSS variables (em hex/color-mix) de uma paleta, para aplicar ao vivo no app.
@@ -53,6 +54,7 @@ function cssVarsFromCores(c: Cores): string {
   const fg = (hex: string) => contraste(hex)
   return [
     `--primary:${c.btn}`, `--primary-foreground:${fg(c.btn)}`, `--ring:${c.btn}`, `--brand-primary:${c.btn}`, `--brand-accent:${c.accent}`,
+    `--gam-primary:${c.gam || c.sidebar}`, `--gam-primary-foreground:${c.gam ? fg(c.gam) : c.sidetext}`,
     ...(c.cronograma ? [`--crono-cor:${c.cronograma}`] : []),
     `--sidebar-primary:${c.active}`, `--sidebar-primary-foreground:${fg(c.active)}`, `--sidebar-accent:${c.active}`, `--sidebar-accent-foreground:${fg(c.active)}`,
     `--sidebar-icon-hover:${c.iconHover}`, `--sidebar-icon-active:${c.iconAtivo}`, `--sidebar-text-hover:${c.sidetextHover}`, `--sidebar-text-active:${c.sidetextActive}`,
@@ -531,6 +533,7 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
               {CONTEUDO_CAMPOS.map(([k, label]) => (<Field key={k} label={label}><ColorControl value={c[k] ?? ''} onChange={(v) => setCor(k, v)} /></Field>))}
               {/* Cor DEDICADA do módulo Cronograma (gerador rápido + CTAs) → --crono-cor. */}
               <Field label="Cronograma (gerador/CTAs)"><ColorControl value={c.cronograma ?? '#6a54e0'} onChange={(v) => setCor('cronograma', v)} /></Field>
+              <Field label="Gamificação (rail, XP, ligas)"><ColorControl value={c.gam ?? c.sidebar ?? ''} onChange={(v) => setCor('gam', v)} /></Field>
             </div>
           </Secao>
         </div>

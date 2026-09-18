@@ -16,7 +16,7 @@ export function GamificacaoHero({ nome, resumo }: { nome: string; resumo: Resumo
   const dash = circ * (progresso.pct / 100)
 
   return (
-    <div className="overflow-hidden rounded-2xl border bg-gradient-to-br from-card to-muted/30 shadow-sm">
+    <div className="tema-gam overflow-hidden rounded-2xl border bg-gradient-to-br from-card to-muted/30 shadow-sm">
       <div className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:justify-between">
         {/* Nível: anel + XP */}
         <div className="flex items-center gap-4">

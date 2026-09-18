@@ -6,7 +6,7 @@ import { montarRelatorioEstudante } from '@/app/admin/relatorios/estudantes/_dad
 import { RelatorioEstudanteView } from '@/app/admin/relatorios/estudantes/relatorio-estudante-view'
 import { KpiCard } from '@/components/admin/relatorios/viz'
 import { Mail, Phone, BarChart3, ArrowRight, Flame, Zap, Trophy, ClipboardList, Target, Clock, Award, Medal } from 'lucide-react'
-import { getGamConfig } from '@/lib/gamificacao'
+import { getGamConfig, gamAtivaParaAluno } from '@/lib/gamificacao'
 import { resumoGamificacao, conquistasDoAluno, posicaoNaLiga } from '@/lib/gamificacao/leitura'
 import { ConquistasGrid } from '@/components/aluno/conquistas-grid'
 import { MascoteTour } from '@/components/mascote/mascote-tour'
@@ -32,11 +32,12 @@ export default async function PerfilAlunoPage() {
 
   const svc = createAdminClient()
   const gamConfig = await getGamConfig(svc, sessao.tenantId)
+  const gamAtivo = await gamAtivaParaAluno(svc, sessao.tenantId, sessao.estudanteId, gamConfig)
   const [{ data: est }, dados, gamResumo, gamConquistas, pers, { data: temaRow }] = await Promise.all([
     svc.from('simulado_estudantes').select('nome, email, telefone').eq('id', sessao.estudanteId).maybeSingle(),
     montarRelatorioEstudante(svc, sessao.estudanteId, sessao.tenantId),
-    gamConfig?.ativo ? resumoGamificacao(svc, sessao.tenantId, sessao.estudanteId, gamConfig) : Promise.resolve(null),
-    gamConfig?.ativo ? conquistasDoAluno(svc, sessao.tenantId, sessao.estudanteId, gamConfig) : Promise.resolve([]),
+    gamAtivo ? resumoGamificacao(svc, sessao.tenantId, sessao.estudanteId, gamConfig!) : Promise.resolve(null),
+    gamAtivo ? conquistasDoAluno(svc, sessao.tenantId, sessao.estudanteId, gamConfig!) : Promise.resolve([]),
     lerPersonalizacaoEstudante(svc, sessao.estudanteId),
     svc.from('simulado_tenants').select('tema').eq('id', sessao.tenantId).maybeSingle(),
   ])
@@ -220,7 +221,7 @@ export default async function PerfilAlunoPage() {
       )}
 
       {/* Continuação do tour (capítulo Perfil → sinaliza a Ajuda e encerra). */}
-      {gamConfig?.ativo && <MascoteTour ativo />}
+      {gamAtivo && <MascoteTour ativo />}
     </div>
   )
 }

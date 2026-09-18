@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { docAcessivelAluno } from '@/lib/leitura/acesso'
+import { onQuizConcluido } from '@/lib/gamificacao'
 
 // POST /api/leitura/quiz-tentativa — registra UMA tentativa concluída do quiz "Questões do conteúdo".
 // Cada conclusão (inclusive refazer) vira uma tentativa contabilizada. Tolerante: se a migração da
@@ -36,6 +37,9 @@ export async function POST(request: NextRequest) {
       tentativa_num: tentativaNum, acertos, total, nota, respostas: b.respostas ?? null,
     })
     if (error) return NextResponse.json({ ok: false, message: error.message })
+    // Gamificação: atividade + bônus de COMBO por gabaritar a aula (uma vez por documento; per-acerto já
+    // é creditado nas respostas inline). Fire-and-forget: nunca quebra o registro da tentativa.
+    void onQuizConcluido(svc, { tenantId: sessao.tenantId, estudanteId: sessao.estudanteId, documentoId: documento_id, acertos, total })
     return NextResponse.json({ ok: true, tentativa_num: tentativaNum, acertos, total, nota })
   } catch (e: any) {
     // Migração ausente → não quebra o quiz.

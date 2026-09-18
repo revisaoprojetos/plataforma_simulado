@@ -4,13 +4,15 @@ import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
-import { Power, Flame, Gift, Shield, CalendarDays, Target, Clock, Sparkles, Route, Check } from 'lucide-react'
+import { Power, Flame, Gift, Shield, CalendarDays, Target, Clock, Sparkles, Route, Check, MoreVertical, Users } from 'lucide-react'
 import type { GamConfig, TrilhaEstilo } from '@/lib/gamificacao/config'
 import { cn } from '@/lib/utils'
 import { salvarRegrasGerais } from '../actions'
 import { NumberField, TextField, SaveBar } from './_campos'
 import { useUnsavedGuard } from '@/components/admin/use-unsaved-guard'
 import { confirmar } from '@/components/ui/confirm-dialog'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
+import { useRouter } from 'next/navigation'
 
 // Card de regra "inovador": faixa colorida + ícone + toggle opcional, com o corpo desabilitável.
 function RuleCard({ icon: Icon, tom, titulo, descricao, ativo, onToggle, disabled, children }: {
@@ -36,6 +38,7 @@ function RuleCard({ icon: Icon, tom, titulo, descricao, ativo, onToggle, disable
 }
 
 export function RegrasGeraisForm({ config, podeGerenciar }: { config: GamConfig; podeGerenciar: boolean }) {
+  const router = useRouter()
   const [ativo, setAtivo] = useState(config.ativo)
   const [timezone, setTimezone] = useState(config.timezone)
   const [streak, setStreak] = useState(config.xp_regras.streak)
@@ -93,7 +96,21 @@ export function RegrasGeraisForm({ config, podeGerenciar }: { config: GamConfig;
             <p className="mt-0.5 text-xs text-muted-foreground">Liga XP, níveis, ligas, streak, missões e conquistas para os alunos desta plataforma.</p>
           </div>
         </div>
-        <Switch checked={ativo} onCheckedChange={pedirToggleAtivo} disabled={dis} />
+        <div className="flex items-center gap-1.5">
+          <DropdownMenu>
+            <DropdownMenuTrigger
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-muted-foreground transition-colors hover:bg-muted hover:text-foreground data-popup-open:bg-muted"
+              title="Gerenciador de gamificação" aria-label="Gerenciador de gamificação">
+              <MoreVertical className="h-5 w-5" />
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-60">
+              <DropdownMenuItem onClick={() => router.push('/admin/gamificacao/publico')}>
+                <Users className="mr-2 h-4 w-4" /> Gerenciar
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Switch checked={ativo} onCheckedChange={pedirToggleAtivo} disabled={dis} />
+        </div>
       </div>
 
       {/* Grade de regras */}

@@ -20,6 +20,8 @@ const TIPOS: { v: MissaoTipo; label: string }[] = [
   { v: 'finalizar_simulado', label: 'Concluir simulados' },
   { v: 'acertar_n', label: 'Acertar questões' },
   { v: 'praticar_n', label: 'Praticar questões' },
+  { v: 'concluir_aula_leitura', label: 'Concluir aulas de leitura' },
+  { v: 'gabaritar_quiz_leitura', label: 'Gabaritar quiz de leitura' },
 ]
 const selectCls = 'h-9 w-full rounded-lg border bg-background px-2 text-sm disabled:cursor-not-allowed disabled:opacity-60'
 

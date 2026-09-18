@@ -72,18 +72,18 @@ export function FileiraHorizontal({ titulo, count, children, setasFora = false }
 
   // Setas FORA: linha [seta ◀] [scroll dos cards] [seta ▶] — sem degradê, cards entre as setas.
   if (setasFora) {
-    // Setas SEMPRE ativas (não "bloqueiam"): nas pontas o scroll só não anda (clamp), mas dá pra clicar.
-    const setaCls = 'flex w-9 shrink-0 items-center justify-center self-stretch rounded-xl border bg-card text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground'
+    // Setas refletem o estado real: habilitam só quando há para onde rolar (senão ficam esmaecidas).
+    const setaCls = 'flex w-9 shrink-0 items-center justify-center self-stretch rounded-xl border bg-card text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground disabled:cursor-default disabled:opacity-40 disabled:hover:bg-card disabled:hover:text-muted-foreground'
     return (
       <section className="space-y-2">
         {Cabecalho}
         <div className="flex items-stretch gap-2">
-          <button type="button" onClick={() => rolar(-1)} aria-label="Ver anteriores" className={setaCls}><ChevronLeft className="h-5 w-5" /></button>
+          <button type="button" onClick={() => rolar(-1)} disabled={!canL} aria-label="Ver anteriores" className={setaCls}><ChevronLeft className="h-5 w-5" /></button>
           {/* rounded-2xl: as pontas cortadas dos cards seguem o cantinho arredondado (sem corte reto). */}
           <div ref={ref} className="-my-2 flex min-w-0 flex-1 gap-4 overflow-x-auto rounded-2xl px-0.5 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {children}
           </div>
-          <button type="button" onClick={() => rolar(1)} aria-label="Ver próximos" className={setaCls}><ChevronRight className="h-5 w-5" /></button>
+          <button type="button" onClick={() => rolar(1)} disabled={!canR} aria-label="Ver próximos" className={setaCls}><ChevronRight className="h-5 w-5" /></button>
         </div>
       </section>
     )

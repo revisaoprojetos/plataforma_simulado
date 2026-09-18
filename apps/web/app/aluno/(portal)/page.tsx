@@ -11,13 +11,12 @@ import { idsSimuladosGratuitos } from '@/lib/simulado/gratuito'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { SimuladosCatalogoAluno, type ItemSimuladoCat, type ProgressoGrupo } from '@/components/aluno/simulados-catalogo-aluno'
 import { SemAcessoModal } from '@/components/aluno/sem-acesso-modal'
-import { getGamConfig } from '@/lib/gamificacao'
+import { getGamConfig, gamAtivaParaAluno } from '@/lib/gamificacao'
 import { resumoGamificacao, missoesHoje, atividadeSemana, conquistasProgresso } from '@/lib/gamificacao/leitura'
 import { NivelCard } from '@/components/aluno/nivel-card'
 import { MetaDiariaCard } from '@/components/aluno/meta-diaria-card'
 import { MissoesLista } from '@/components/aluno/missoes-lista'
 import { StreakCalendario } from '@/components/aluno/streak-calendario'
-import { TrilhaSimulados, type Trilha } from '@/components/aluno/trilha-simulados'
 import { LigaPainel } from '@/components/aluno/liga-painel'
 import { RankingLiga } from '@/components/aluno/ranking-liga'
 import { ConquistasProgressoLista } from '@/components/aluno/conquistas-progresso'
@@ -154,7 +153,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   const recentes = itensCat
     .filter((i) => (i.podeFazer || i.emAndamento || i.statusLabel === 'Agendado') && (!feitosSet.has(i.id) || recemPublicado(i)))
     .sort((a, b) => lancamento(b) - lancamento(a))
-    .slice(0, 12)
+    .slice(0, 5)
   // Banners de simulado (VITRINE): aparecem para TODOS os alunos com a QUANTIDADE de simulados da
   // pasta e a descrição — pra mostrar que há mais conteúdo. O bloqueio real acontece ao clicar
   // (destino sem acesso → pop-up "sem acesso"). Contagem é tenant-wide (não depende do acesso do aluno).
@@ -315,7 +314,9 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
 
   // Gamificação (hero + missões + calendário de sequência) — só quando o tenant ativou.
   const gamConfig = await getGamConfig(svc, sessao!.tenantId)
-  const [gamResumo, gamMissoes, gamSemana, gamConquistas] = gamConfig?.ativo
+  // gamAtivo é POR ALUNO (respeita o público 'selecionados' — grupos/alunos vinculados).
+  const gamAtivo = await gamAtivaParaAluno(svc, sessao!.tenantId, estId, gamConfig)
+  const [gamResumo, gamMissoes, gamSemana, gamConquistas] = gamConfig && gamAtivo
     ? await Promise.all([
         resumoGamificacao(svc, sessao!.tenantId, estId, gamConfig),
         missoesHoje(svc, sessao!.tenantId, estId, gamConfig),
@@ -323,54 +324,6 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
         conquistasProgresso(svc, sessao!.tenantId, estId, gamConfig),
       ])
     : [null, [], [], []]
-
-  // Trilhas de simulados (estilo Duolingo): por grupo, nós concluído → atual → bloqueado.
-  const baseXp = gamConfig?.ativo ? (gamConfig.xp_regras.simulado.base || 0) : 0
-  // Contagem de questões por simulado (trilha: "· N questões") + baús de trilha já resgatados:
-  // leituras independentes (prova_questoes × xp_eventos) → em PARALELO (antes eram 2 em série).
-  const idsTrilha = [...new Set(itensCat.map((i) => i.id))]
-  const [cntRows, bausRows] = await Promise.all([
-    idsTrilha.length ? fetchAllByIn<any>(idsTrilha, (chunk) => svc.from('simulado_prova_questoes').select('simulado_id, anulada').in('simulado_id', chunk).order('simulado_id')) : Promise.resolve([] as any[]),
-    gamConfig?.ativo
-      ? svc.from('simulado_xp_eventos').select('ref_id').eq('tenant_id', sessao!.tenantId).eq('estudante_id', estId).eq('origem', 'chest').like('ref_id', 'trilha:%').then((r: any) => r.data ?? [], () => [])
-      : Promise.resolve([] as any[]),
-  ])
-  const cntQ = new Map<string, number>()
-  for (const r of cntRows as any[]) if (!r.anulada) cntQ.set(r.simulado_id, (cntQ.get(r.simulado_id) ?? 0) + 1)
-  const bausResgatados = new Set<string>((bausRows as any[]).map((r: any) => String(r.ref_id).slice('trilha:'.length)))
-
-  const lanc = (i: any) => new Date(i.regras?.publicado_em ?? i.created_at ?? 0).getTime()
-  // Ordem da trilha: prioriza a DATA no título ("DD/MM/AAAA – …"); senão, publicado_em/created_at.
-  const dataTitulo = (tit?: string) => { const m = /(\d{2})\/(\d{2})\/(\d{4})/.exec(tit || ''); return m ? Date.UTC(+m[3], +m[2] - 1, +m[1]) : null }
-  const ordKey = (i: any) => dataTitulo(i.titulo) ?? lanc(i)
-
-  const trilhas: Trilha[] = grupos.map((g) => {
-    const its = itensCat.filter((i) => i.grupoId === g.id).sort((a, b) => ordKey(a) - ordKey(b) || (a.titulo || '').localeCompare(b.titulo || ''))
-    // Sem bloqueio: todos os simulados ficam disponíveis em qualquer ordem. O 1º não feito
-    // ganha o destaque "atual" (Comece aqui), mas todos podem ser feitos.
-    let primeiroPendente = true
-    const nodes = its.map((i) => {
-      const sess = sessoesPorSim.get(i.id) ?? []
-      const notas = sess.filter((s: any) => s.status === 'finalizada' && s.nota != null).map((s: any) => Number(s.nota))
-      const done = feitosSet.has(i.id)
-      const acerto = notas.length ? Math.round(Math.max(...notas)) : null
-      let estado: 'concluido' | 'atual' | 'disponivel'
-      if (done) estado = 'concluido'
-      else if (primeiroPendente) { estado = 'atual'; primeiroPendente = false }
-      else estado = 'disponivel'
-      const runner = i.embed_token ? `/simulado/${i.embed_token}` : `/aluno/simulados/${i.id}`
-      const podeRefazer = i.refazer || i.podeFazer || i.emAndamento
-      const href = done ? (podeRefazer ? runner : `/aluno/simulados/${i.id}`) : runner
-      const acao = done ? (podeRefazer ? 'Refazer' : 'Ver resultado') : i.emAndamento ? 'Continuar' : 'Fazer agora'
-      const vis = visual.get(i.id)
-      const capa = vis?.capa ?? null
-      // Banner "comprido" do banco (capa_url) — encaixa no card largo da trilha como fundo.
-      const capaBanner = vis?.capaBanner ?? vis?.capa ?? null
-      const nota = notas.length ? Math.max(...notas) : null
-      return { id: i.id, titulo: i.titulo, quando: i.quando, estado, acerto, nota, tentativas: notas.length, statusLabel: i.statusLabel, questoes: cntQ.get(i.id) ?? 0, xp: baseXp, href, acao, capa, capaBanner, cadernoUrl: i.enunciadoUrl ?? null }
-    })
-    return { id: g.id, nome: g.nome, cor: g.cor ?? null, capa: (g as any).capa ?? null, capaCard: (g as any).capaCard ?? null, total: nodes.length, done: nodes.filter((n) => n.estado === 'concluido').length, trilhaXp: baseXp * nodes.length, bauResgatado: bausResgatados.has(g.id), nodes }
-  }).filter((tr) => tr.nodes.length > 0)
 
   const chest = gamConfig?.xp_regras.chest
   const proxima = gamResumo?.proxima ?? null
@@ -426,11 +379,6 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
               <p className="mt-1 text-muted-foreground">Bem-vindo à sua área de estudos.</p>
             </div>
           )}
-
-          {gamResumo && trilhas.length > 0 && <TrilhaSimulados trilhas={trilhas} gamAtivo={!!gamResumo} estilo={gamConfig?.trilha_estilo ?? 'cards'} visiveis={gamConfig?.trilha_visiveis ?? 3} />}
-
-          {/* Divisória horizontal (quase às bordas) separando a trilha dos simulados recentes. */}
-          {gamResumo && trilhas.length > 0 && <div className="mx-auto h-px w-[92%]" style={{ background: 'linear-gradient(90deg, transparent, color-mix(in oklab, var(--foreground) 24%, transparent) 18%, color-mix(in oklab, var(--foreground) 24%, transparent) 82%, transparent)' }} />}
 
           <SimuladosCatalogoAluno itens={itensCat} grupos={grupos} progresso={progresso} recentes={recentes} full={!gamResumo} recentesConcluidos={recentes.length === 0 && feitosSet.size > 0} view={cardView} />
         </div>

@@ -34,16 +34,13 @@ type ItemNav = {
   filhos?: { href: string; label: string; exact?: boolean }[]
 }
 
+// Ordem da sidebar do aluno: Início · Simulados Realizados · Desafio de Lei Seca · Cronograma ·
+// Recomendado · Banco de Questões · Ligas. (Trilha fica desativada — filtrada abaixo; Favoritos/Cadernos
+// seguem ocultos por flag, ao final.)
 const NAV: ItemNav[] = [
   { href: '/aluno', label: 'Início', icon: Home, exact: true, tour: 'nav-inicio' },
   { href: '/aluno/simulados', label: 'Simulados Realizados', icon: ClipboardList, tour: 'nav-simulados' },
-  { href: '/aluno/trilha', label: 'Trilha', icon: Route, tour: 'nav-trilha' },
-  { href: '/aluno/recomendado', label: 'Recomendado', icon: Lightbulb, tour: 'nav-recomendado' },
-  { href: '/aluno/ligas', label: 'Ligas', icon: Trophy, tour: 'nav-liga' },
-  { href: '/aluno/questoes', label: 'Banco de Questões', icon: BookOpen, tour: 'nav-questoes' },
   { href: '/aluno/leitura', label: 'Desafio de Lei Seca', icon: Library, tour: 'nav-leitura' },
-  { href: '/aluno/favoritos', label: 'Favoritos', icon: Star, tour: 'nav-favoritos' },
-  { href: '/aluno/cadernos', label: 'Cadernos', icon: NotebookPen, tour: 'nav-cadernos' },
   {
     href: '/aluno/cronograma',
     label: 'Cronograma',
@@ -56,6 +53,12 @@ const NAV: ItemNav[] = [
       { href: '/aluno/cronograma/meus', label: 'Meus cronogramas' },
     ],
   },
+  { href: '/aluno/recomendado', label: 'Recomendado', icon: Lightbulb, tour: 'nav-recomendado' },
+  { href: '/aluno/questoes', label: 'Banco de Questões', icon: BookOpen, tour: 'nav-questoes' },
+  { href: '/aluno/ligas', label: 'Ligas', icon: Trophy, tour: 'nav-liga' },
+  { href: '/aluno/trilha', label: 'Trilha', icon: Route, tour: 'nav-trilha' },
+  { href: '/aluno/favoritos', label: 'Favoritos', icon: Star, tour: 'nav-favoritos' },
+  { href: '/aluno/cadernos', label: 'Cadernos', icon: NotebookPen, tour: 'nav-cadernos' },
 ]
 
 function filtroLogo(f?: string): string | undefined {
@@ -92,9 +95,10 @@ export function AlunoSidebar({
   // O grupo abre sozinho quando se está dentro dele — e continua aberto se o aluno abrir na mão.
   const [abertos, setAbertos] = useState<Record<string, boolean>>({})
   const expandido = (n: ItemNav) => abertos[n.href] ?? ativo(n)
-  // Trilha e Ligas (gamificação) só aparecem quando ativa; + oculta os extras configurados.
+  // Trilha DESATIVADA por ora (nunca aparece). Ligas (gamificação) só aparece quando ativa; + oculta os extras.
   const nav = NAV.filter((n) =>
-    (gamAtivo || (n.href !== '/aluno/trilha' && n.href !== '/aluno/ligas')) &&
+    n.href !== '/aluno/trilha' &&
+    (gamAtivo || n.href !== '/aluno/ligas') &&
     (LEITURA_ATIVA || n.href !== '/aluno/leitura') &&
     !(OCULTAR_ALUNO_EXTRAS && ROTAS_ALUNO_OCULTAS.includes(n.href)) &&
     // Cronograma tem DOIS gates: esta flag (enquanto o módulo está em construção) e a coluna

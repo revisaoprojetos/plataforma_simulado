@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
-import { getGamConfig } from '@/lib/gamificacao'
+import { getGamConfig, gamAtivaParaAluno } from '@/lib/gamificacao'
 import { awardXp } from '@/lib/gamificacao/xp'
 import { carregarTrilhasAluno } from '@/lib/aluno/trilhas'
 
@@ -21,7 +21,7 @@ export async function POST(req: Request) {
   try {
     const svc = createAdminClient()
     const config = await getGamConfig(svc, sessao.tenantId)
-    if (!config?.ativo) return NextResponse.json({ ok: false, motivo: 'gam_inativa' }, { status: 400 })
+    if (!(await gamAtivaParaAluno(svc, sessao.tenantId, sessao.estudanteId, config))) return NextResponse.json({ ok: false, motivo: 'gam_inativa' }, { status: 400 })
 
     // Valida no servidor: a trilha existe e está 100% concluída por este aluno.
     const { trilhas } = await carregarTrilhasAluno()

@@ -1,4 +1,50 @@
 export type GrupoCatalogo = { id: string; nome: string; cor: string | null; icone: string | null; capa: string | null; capaCard: string | null }
+/** Pasta na ÁRVORE de organização (com o pai, p/ montar subpastas como no admin). */
+export type PastaCatalogo = GrupoCatalogo & { paiId: string | null }
+
+/**
+ * Monta a ÁRVORE de pastas dos simulados (espelha o admin): simulado → banco (regras.banco_base_id)
+ * → pasta que o contém (pai do banco) → sobe a cadeia `pai_id` coletando TODAS as pastas ancestrais.
+ * `pastaPorSim` = pasta-folha (a que contém o banco). `pastas` = todas as pastas da cadeia (com paiId),
+ * das quais o componente monta a hierarquia (raízes + subpastas). Tolerante ao schema; escopado aos ids.
+ */
+export async function resolverPastasArvore(
+  svc: any,
+  itens: { id: string; regras: any }[],
+): Promise<{ pastaPorSim: Map<string, string | null>; pastas: PastaCatalogo[] }> {
+  const pastaPorSim = new Map<string, string | null>()
+  const pastas = new Map<string, PastaCatalogo>()
+  try {
+    const bancoIds = [...new Set(itens.map((i) => (i.regras as any)?.banco_base_id).filter(Boolean))] as string[]
+    if (!bancoIds.length) return { pastaPorSim, pastas: [] }
+    const { data: bancos } = await svc.from('simulado_pastas').select('id, pai_id').in('id', bancoIds)
+    const bancoById = new Map<string, any>((bancos ?? []).map((b: any) => [b.id, b]))
+    for (const i of itens) {
+      const bid = (i.regras as any)?.banco_base_id
+      const b = bid ? bancoById.get(bid) : null
+      pastaPorSim.set(i.id, b?.pai_id ?? null)
+    }
+    // Sobe a cadeia de pais em ondas (batches), sem revisitar.
+    let front = [...new Set((bancos ?? []).map((b: any) => b.pai_id).filter(Boolean))] as string[]
+    const visitadas = new Set<string>()
+    while (front.length) {
+      const faltam = front.filter((id) => !visitadas.has(id))
+      if (!faltam.length) break
+      faltam.forEach((id) => visitadas.add(id))
+      let r = await svc.from('simulado_pastas').select('id, nome, is_folder, cor, icone, capa_url, capa_card_url, pai_id').in('id', faltam)
+      if (r.error) r = await svc.from('simulado_pastas').select('id, nome, is_folder, pai_id').in('id', faltam)
+      const rows = (r.data ?? []) as any[]
+      const prox: string[] = []
+      for (const p of rows) {
+        if (p.is_folder === false) continue // container de banco → não é pasta de organização
+        pastas.set(p.id, { id: p.id, nome: p.nome, cor: p.cor ?? null, icone: p.icone ?? null, capa: p.capa_url ?? null, capaCard: p.capa_card_url ?? null, paiId: p.pai_id ?? null })
+        if (p.pai_id) prox.push(p.pai_id)
+      }
+      front = prox
+    }
+  } catch { /* schema sem is_folder/pai_id → sem árvore */ }
+  return { pastaPorSim, pastas: [...pastas.values()] }
+}
 
 /**
  * Resolve o "grupo" (pasta is_folder do banco) de cada simulado, para as PASTAS do catálogo

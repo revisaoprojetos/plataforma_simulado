@@ -6,7 +6,7 @@ import { resolverGruposCatalogo } from '@/lib/aluno/grupos-catalogo'
 import { resolverEnunciadoUrls } from '@/lib/aluno/enunciado'
 import { idsSimuladosGratuitos } from '@/lib/simulado/gratuito'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
-import { getGamConfig } from '@/lib/gamificacao'
+import { getGamConfig, gamAtivaParaAluno } from '@/lib/gamificacao'
 import { resumoGamificacao, missoesHoje, atividadeSemana, conquistasProgresso, type ResumoGamificacao, type MissaoView, type DiaAtivo, type ConquistaProgresso } from '@/lib/gamificacao/leitura'
 import type { GamConfig } from '@/lib/gamificacao/config'
 import type { Trilha } from '@/components/aluno/trilha-simulados'
@@ -20,14 +20,15 @@ export interface GamRail { resumo: ResumoGamificacao; missoes: MissaoView[]; sem
 /** Monta o resumo de gamificação (rail) p/ um aluno — reutilizado na Home, na Trilha e no módulo LegProc. */
 export async function carregarGamRail(svc: any, tenantId: string, estId: string): Promise<GamRail | null> {
   const gamConfig = await getGamConfig(svc, tenantId)
-  if (!gamConfig?.ativo) return null
+  if (!(await gamAtivaParaAluno(svc, tenantId, estId, gamConfig))) return null
+  const cfg = gamConfig!
   const [resumo, missoes, semana, conquistas] = await Promise.all([
-    resumoGamificacao(svc, tenantId, estId, gamConfig),
-    missoesHoje(svc, tenantId, estId, gamConfig),
-    atividadeSemana(svc, tenantId, estId, gamConfig.timezone),
-    conquistasProgresso(svc, tenantId, estId, gamConfig),
+    resumoGamificacao(svc, tenantId, estId, cfg),
+    missoesHoje(svc, tenantId, estId, cfg),
+    atividadeSemana(svc, tenantId, estId, cfg.timezone),
+    conquistasProgresso(svc, tenantId, estId, cfg),
   ])
-  return resumo ? { resumo, missoes, semana, conquistas, config: gamConfig } : null
+  return resumo ? { resumo, missoes, semana, conquistas, config: cfg } : null
 }
 
 export async function carregarTrilhasAluno(): Promise<{ trilhas: Trilha[]; gamAtivo: boolean; nome: string; gam: GamRail | null }> {
@@ -83,10 +84,12 @@ export async function carregarTrilhasAluno(): Promise<{ trilhas: Trilha[]; gamAt
   })
 
   // Gamificação: baseXp só quando ativo + bundle da coluna direita (meta/sequência/missões/liga/conquistas).
+  // gamAtivo é POR ALUNO (respeita o público 'selecionados' — grupos/alunos vinculados).
   const gamConfig = await getGamConfig(svc, sessao.tenantId)
-  const baseXp = gamConfig?.ativo ? (gamConfig.xp_regras.simulado.base || 0) : 0
+  const gamAtivo = await gamAtivaParaAluno(svc, sessao.tenantId, estId, gamConfig)
+  const baseXp = gamAtivo ? (gamConfig!.xp_regras.simulado.base || 0) : 0
   let gam: GamRail | null = null
-  if (gamConfig?.ativo) {
+  if (gamAtivo && gamConfig) {
     const [resumo, missoes, semana, conquistas] = await Promise.all([
       resumoGamificacao(svc, sessao.tenantId, estId, gamConfig),
       missoesHoje(svc, sessao.tenantId, estId, gamConfig),
@@ -112,7 +115,7 @@ export async function carregarTrilhasAluno(): Promise<{ trilhas: Trilha[]; gamAt
 
   // Baús já resgatados (evento de chest 'trilha:<grupo>' no ledger) — estado autoritativo do servidor.
   let bausResgatados = new Set<string>()
-  if (gamConfig?.ativo) {
+  if (gamAtivo) {
     try {
       const { data } = await svc.from('simulado_xp_eventos').select('ref_id').eq('tenant_id', sessao.tenantId).eq('estudante_id', estId).eq('origem', 'chest').like('ref_id', 'trilha:%')
       bausResgatados = new Set((data ?? []).map((r: any) => String(r.ref_id).slice('trilha:'.length)))
@@ -144,5 +147,5 @@ export async function carregarTrilhasAluno(): Promise<{ trilhas: Trilha[]; gamAt
     return { id: g.id, nome: g.nome, cor: g.cor ?? null, capa: (g as any).capa ?? null, capaCard: (g as any).capaCard ?? null, total: nodes.length, done: nodes.filter((n) => n.estado === 'concluido').length, trilhaXp: baseXp * nodes.length, bauResgatado: bausResgatados.has(g.id), nodes }
   }).filter((tr) => tr.nodes.length > 0)
 
-  return { trilhas, gamAtivo: !!gamConfig?.ativo, nome: sessao.nome, gam }
+  return { trilhas, gamAtivo, nome: sessao.nome, gam }
 }

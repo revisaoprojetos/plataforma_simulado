@@ -76,7 +76,7 @@ export function NivelCard({ nome, resumo }: { nome: string; resumo: ResumoGamifi
   }, [])
 
   return (
-    <div className="space-y-4">
+    <div className="tema-gam space-y-4">
       <div>
         <div className="mb-1.5 flex items-center gap-2">
           <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--brand-accent)', boxShadow: '0 0 10px 1px color-mix(in oklab, var(--brand-accent) 60%, transparent)' }} />

@@ -17,7 +17,7 @@ import { resolverLoginConfig } from '@/lib/login-config'
 import { NavProgress } from '@/components/admin/nav-progress'
 import { TelaManutencao } from '@/components/aluno/tela-manutencao'
 import { MonitorManutencao } from '@/components/aluno/monitor-manutencao'
-import { getGamConfig } from '@/lib/gamificacao'
+import { getGamConfig, gamAtivaParaAluno } from '@/lib/gamificacao'
 import { resumoGamificacao } from '@/lib/gamificacao/leitura'
 import { LEITURA_ATIVA } from '@/lib/flags'
 import { totalPendenciasLeitura } from '@/lib/leitura/trilha'
@@ -65,8 +65,8 @@ export default async function AlunoPortalLayout({ children }: { children: React.
     (async (): Promise<{ progresso: ProgressoAluno | null; gamAtivo: boolean }> => {
       try {
         const cfg = await getGamConfig(svc, sessao.tenantId)
-        if (!cfg?.ativo) return { progresso: null, gamAtivo: false }
-        const r = await resumoGamificacao(svc, sessao.tenantId, sessao.estudanteId, cfg)
+        if (!(await gamAtivaParaAluno(svc, sessao.tenantId, sessao.estudanteId, cfg))) return { progresso: null, gamAtivo: false }
+        const r = await resumoGamificacao(svc, sessao.tenantId, sessao.estudanteId, cfg!)
         return { progresso: r ? { streak: r.streakAtual, xpTotal: r.xpTotal, nivel: r.progresso.nivel, liga: r.liga.nome, ligaCor: r.liga.cor } : null, gamAtivo: true }
       } catch { return { progresso: null, gamAtivo: false } }
     })(),

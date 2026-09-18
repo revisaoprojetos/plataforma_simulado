@@ -13,7 +13,7 @@ export interface XpRegras {
 export interface TituloNivel { nivel_min: number; titulo: string }
 export interface NivelCurva { tipo: string; base: number; incremento: number; nivel_max: number; titulos: TituloNivel[] }
 export interface LigaDef { id: string; nome: string; xp_min: number; cor: string }
-export type MissaoTipo = 'finalizar_simulado' | 'acertar_n' | 'praticar_n'
+export type MissaoTipo = 'finalizar_simulado' | 'acertar_n' | 'praticar_n' | 'concluir_aula_leitura' | 'gabaritar_quiz_leitura'
 export interface MissaoDef { id: string; titulo: string; tipo: MissaoTipo; meta: number; xp: number; ativa?: boolean }
 /** Como as missões aparecem por dia: 'todas' as ativas, ou 'rodizio' de N por dia. */
 export interface MissoesConfig { modo: 'todas' | 'rodizio'; por_dia: number }
@@ -21,9 +21,12 @@ export type ConquistaRegraTipo = 'xp_total' | 'streak' | 'simulados_concluidos' 
 export interface ConquistaDef { id: string; titulo: string; descricao: string; icone: string; cor?: string; regra: { tipo: ConquistaRegraTipo; meta: number }; xp: number }
 
 export type TrilhaEstilo = 'cards' | 'caminho'
+/** Público da gamificação: 'todos' (padrão) = toda a plataforma; 'selecionados' = só grupos/alunos vinculados. */
+export type PublicoModo = 'todos' | 'selecionados'
 export interface GamConfig {
   tenantId: string
   ativo: boolean
+  publicoModo: PublicoModo
   timezone: string
   trilha_estilo: TrilhaEstilo
   trilha_visiveis: number
@@ -73,6 +76,8 @@ export const DEFAULT_MISSOES: MissaoDef[] = [
   { id: 'm_pratica5', titulo: 'Pratique 5 questões', tipo: 'praticar_n', meta: 5, xp: 8, ativa: true },
   { id: 'm_pratica', titulo: 'Pratique 10 questões', tipo: 'praticar_n', meta: 10, xp: 15, ativa: true },
   { id: 'm_pratica20', titulo: 'Pratique 20 questões', tipo: 'praticar_n', meta: 20, xp: 25, ativa: true },
+  { id: 'm_leitura_aula', titulo: 'Conclua 1 aula de leitura', tipo: 'concluir_aula_leitura', meta: 1, xp: 15, ativa: true },
+  { id: 'm_leitura_gab', titulo: 'Gabarite 1 quiz de leitura', tipo: 'gabaritar_quiz_leitura', meta: 1, xp: 20, ativa: true },
 ]
 export const DEFAULT_MISSOES_CONFIG: MissoesConfig = { modo: 'todas', por_dia: 3 }
 export const DEFAULT_CONQUISTAS: ConquistaDef[] = [
@@ -107,6 +112,7 @@ export const DEFAULT_CONQUISTAS: ConquistaDef[] = [
 
 export const DEFAULT_CONFIG = {
   ativo: false,
+  publicoModo: 'todos' as PublicoModo,
   timezone: 'America/Sao_Paulo',
   trilha_estilo: 'cards' as TrilhaEstilo,
   trilha_visiveis: 3,
@@ -144,6 +150,7 @@ export const getGamConfig = cache(async (svc: any, tenantId: string | null): Pro
   return {
     tenantId,
     ativo: r.ativo === true,
+    publicoModo: (r.publico_modo === 'selecionados' ? 'selecionados' : 'todos') as PublicoModo,
     timezone: r.timezone || DEFAULT_CONFIG.timezone,
     trilha_estilo: (r.trilha_estilo === 'caminho' ? 'caminho' : 'cards') as TrilhaEstilo,
     trilha_visiveis: Number.isFinite(Number(r.trilha_visiveis)) ? Math.max(0, Math.trunc(Number(r.trilha_visiveis))) : 3,

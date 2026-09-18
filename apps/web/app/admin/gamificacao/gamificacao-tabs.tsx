@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Zap, Trophy, Award, Target, SlidersHorizontal, BarChart3 } from 'lucide-react'
 import type { GamConfig } from '@/lib/gamificacao/config'
@@ -11,9 +12,18 @@ import { MissoesForm } from './forms/missoes-form'
 import { RegrasGeraisForm } from './forms/regras-gerais-form'
 import { MetricasView } from './forms/metricas-view'
 
-export function GamificacaoTabs({ config, podeGerenciar, metricas }: { config: GamConfig; podeGerenciar: boolean; metricas: MetricasGam }) {
+const TABS_VALIDAS = ['xp', 'ligas', 'conquistas', 'missoes', 'regras', 'metricas']
+
+export function GamificacaoTabs({ config, podeGerenciar, metricas, tabInicial }: { config: GamConfig; podeGerenciar: boolean; metricas: MetricasGam; tabInicial?: string }) {
+  const [tab, setTab] = useState(tabInicial && TABS_VALIDAS.includes(tabInicial) ? tabInicial : 'xp')
+  // Reflete a aba na URL (?tab=) SEM criar entrada no histórico → o "voltar" do navegador (após abrir o
+  // Gerenciador) retorna à aba onde o usuário estava, não à primeira.
+  function mudarTab(v: string) {
+    setTab(v)
+    try { const u = new URL(window.location.href); u.searchParams.set('tab', v); window.history.replaceState(null, '', u.toString()) } catch { /* noop */ }
+  }
   return (
-    <Tabs defaultValue="xp">
+    <Tabs value={tab} onValueChange={mudarTab}>
       <TabsList className="flex-wrap">
         <TabsTrigger value="xp"><Zap /> XP & Níveis</TabsTrigger>
         <TabsTrigger value="ligas"><Trophy /> Ligas & Divisões</TabsTrigger>

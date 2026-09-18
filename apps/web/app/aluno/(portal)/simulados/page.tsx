@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
-import { resolverGruposCatalogo } from '@/lib/aluno/grupos-catalogo'
+import { resolverPastasArvore } from '@/lib/aluno/grupos-catalogo'
 import { resolverCardView } from '@/lib/card-view'
 import { MeusSimuladosCatalogo } from '@/components/aluno/meus-simulados-catalogo'
 
@@ -61,15 +61,15 @@ export default async function MeusSimuladosPage() {
   // Sempre renderiza o catálogo (com as abas) — mesmo sem concluídos, para a aba "Personalizados"
   // continuar acessível (ex.: "Voltar" da tela de fazer personalizado). A aba Revisão mostra o vazio.
 
-  // Visual (capa/cor) + grupo (pasta) de cada concluído — leituras independentes, em PARALELO.
-  const [visual, { grupoPorSim, grupos }] = await Promise.all([
+  // Visual (capa/cor) + ÁRVORE de pastas (pasta-folha + ancestrais) de cada concluído — em PARALELO.
+  const [visual, { pastaPorSim, pastas }] = await Promise.all([
     resolverVisualSimulados(svc, concluidos.map((s: any) => ({ id: s.id, regras: s.regras }))),
-    resolverGruposCatalogo(svc, concluidos.map((s: any) => ({ id: s.id, regras: s.regras }))),
+    resolverPastasArvore(svc, concluidos.map((s: any) => ({ id: s.id, regras: s.regras }))),
   ])
   const concluidosCat = concluidos.map((s: any) => ({
     id: s.id, titulo: s.titulo, modo_aplicacao: s.modo_aplicacao, tentativas: s.tentativas,
-    melhor: s.melhor, notaLiberada: s.notaLiberada, vis: visual.get(s.id) ?? null, grupoId: grupoPorSim.get(s.id) ?? null,
+    melhor: s.melhor, notaLiberada: s.notaLiberada, vis: visual.get(s.id) ?? null, grupoId: pastaPorSim.get(s.id) ?? null,
   }))
 
-  return <MeusSimuladosCatalogo itens={concluidosCat} grupos={grupos} view={cardView} />
+  return <MeusSimuladosCatalogo itens={concluidosCat} pastas={pastas} view={cardView} />
 }

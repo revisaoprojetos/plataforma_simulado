@@ -4,7 +4,9 @@ import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { documentosDoAluno, type DocumentoAluno } from '@/lib/leitura/acesso'
 import { normalizarIntro, introHref, introExterno, type IntroConfig } from '@/lib/leitura/intro'
 import { normalizarRegulamento, type RegulamentoConfig } from '@/lib/leitura/regulamento'
-import { normalizarPontuacaoLeitura, type PontuacaoLeitura } from '@/lib/leitura/pontuacao'
+import { normalizarPontuacaoLeitura, type PontuacaoLeitura, type DesempenhoLeitura } from '@/lib/leitura/pontuacao'
+import { normalizarDesafios, type DesafioModulo } from '@/lib/leitura/desafios'
+import { desempenhoLeituraAluno } from '@/lib/leitura/desafios-eval'
 import { resolverTrilhaAparencia, DEFAULT_TRILHA_APARENCIA, type TrilhaAparencia } from '@/lib/leitura/trilha-aparencia'
 import type { Trilha, TrilhaNode } from '@/components/aluno/trilha-simulados'
 
@@ -242,6 +244,9 @@ export interface ModuloCompleto {
   /** Regulamento do módulo (aba descritiva) + pontuação (p/ as metas/ganhos exibidas nele). */
   regulamento: RegulamentoConfig
   pontuacao: PontuacaoLeitura
+  /** Desafios do módulo + desempenho do aluno (p/ mostrar progresso e selo). */
+  desafios: DesafioModulo[]
+  desempenhoDesafios: DesempenhoLeitura
   /** Aparência da trilha DO MÓDULO (símbolos + formato) — editada na aba "Editar trilha". */
   trilhaAparencia: TrilhaAparencia
 }
@@ -250,7 +255,7 @@ export interface ModuloCompleto {
 export async function carregarModuloCompleto(estId: string, tenantId: string, moduloId: string): Promise<ModuloCompleto> {
   const { modulos, seqByModulo } = await sequenciaLeitura(estId, tenantId)
   const m = modulos.find((x) => x.id === moduloId)
-  if (!m) return { trilha: null, nome: null, desempenho: [], pendentes: 0, aulasPendentes: 0, regulamento: normalizarRegulamento(null), pontuacao: normalizarPontuacaoLeitura(null), trilhaAparencia: DEFAULT_TRILHA_APARENCIA }
+  if (!m) return { trilha: null, nome: null, desempenho: [], pendentes: 0, aulasPendentes: 0, regulamento: normalizarRegulamento(null), pontuacao: normalizarPontuacaoLeitura(null), desafios: [], desempenhoDesafios: { acertos: 0, aulasConcluidas: 0, aulasGabaritadas: 0 }, trilhaAparencia: DEFAULT_TRILHA_APARENCIA }
   const arr = seqByModulo.get(m.id) ?? []
   const aulaNodes = arr.map(nodeDe)
   const intro = introNodeDe(m.intro, m.id)
@@ -265,7 +270,12 @@ export async function carregarModuloCompleto(estId: string, tenantId: string, mo
   // Pendência ACIONÁVEL = leitura concluída (questões liberadas) mas ainda faltam responder.
   const comPend = arr.filter((a) => a.leituraConcluida && a.questoesTotal - a.questoesRespondidas > 0)
   const pendentes = comPend.reduce((s, a) => s + (a.questoesTotal - a.questoesRespondidas), 0)
-  return { trilha, nome: m.nome, desempenho, pendentes, aulasPendentes: comPend.length, regulamento: m.regulamento, pontuacao: m.pontuacao, trilhaAparencia: m.trilhaAparencia }
+  // Desafios do módulo (tolerante à coluna ausente) + desempenho do aluno p/ progresso/selo.
+  const svc = createAdminClient()
+  let desafios: DesafioModulo[] = []
+  try { const { data } = await svc.from('simulado_pastas').select('desafios').eq('id', moduloId).eq('tenant_id', tenantId).maybeSingle(); desafios = normalizarDesafios((data as any)?.desafios) } catch { /* migração pendente */ }
+  const desempenhoDesafios: DesempenhoLeitura = desafios.length ? await desempenhoLeituraAluno(svc, tenantId, estId, moduloId) : { acertos: 0, aulasConcluidas: 0, aulasGabaritadas: 0 }
+  return { trilha, nome: m.nome, desempenho, pendentes, aulasPendentes: comPend.length, regulamento: m.regulamento, pontuacao: m.pontuacao, desafios, desempenhoDesafios, trilhaAparencia: m.trilhaAparencia }
 }
 
 /** Gate rígido p/ o servidor: onde a aula está na sequência (bloqueada? leitura ok?) + módulo e título

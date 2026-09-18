@@ -10,7 +10,8 @@ import { Trophy } from 'lucide-react'
 export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Gamificação' }
 
-export default async function GamificacaoPage() {
+export default async function GamificacaoPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
+  const { tab } = await searchParams
   const access = await getCurrentAccess()
   if (!(access.isAdmin || access.permissions.includes('gamificacao:view'))) {
     return (
@@ -28,7 +29,7 @@ export default async function GamificacaoPage() {
   const metricas = config && tenantId ? await metricasGamificacao(svc, tenantId, config) : null
 
   return (
-    <div className="space-y-6">
+    <div className="tema-gam space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="mb-1 flex items-center gap-2">
@@ -42,7 +43,7 @@ export default async function GamificacaoPage() {
         </span>
       </div>
 
-      {config && metricas && <GamificacaoTabs config={config} podeGerenciar={podeGerenciar} metricas={metricas} />}
+      {config && metricas && <GamificacaoTabs config={config} podeGerenciar={podeGerenciar} metricas={metricas} tabInicial={tab} />}
     </div>
   )
 }

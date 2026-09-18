@@ -11,16 +11,17 @@ import { LeituraRanking } from '@/components/aluno/leitura-ranking'
 import { DEFAULT_TRILHA_SIMBOLOS, type TrilhaSimbolos } from '@/lib/gamificacao/trilha-simbolos'
 import { DEFAULT_TRILHA_FORMATO, type TrilhaFormato } from '@/lib/gamificacao/trilha-formato'
 import { type TrilhaLivreConfig, type TrilhaDegrade } from '@/lib/leitura/trilha-aparencia'
-import { GamificacaoRail } from '@/components/aluno/gamificacao-rail'
+import { LeituraTrilhaRail } from '@/components/aluno/leitura-trilha-rail'
 import { type RegulamentoConfig, embedVideoUrl } from '@/lib/leitura/regulamento'
-import { type PontuacaoLeitura } from '@/lib/leitura/pontuacao'
+import { type PontuacaoLeitura, type DesempenhoLeitura } from '@/lib/leitura/pontuacao'
+import { progressoDesafio, DESAFIO_TIPOS, type DesafioModulo } from '@/lib/leitura/desafios'
 import type { GamRail } from '@/lib/aluno/trilhas'
 import type { AulaDesempenho } from '@/lib/leitura/trilha'
 import type { RankingLeitura } from '@/lib/leitura/ranking'
 
 /** Visão de um módulo do LegProc Digital: banner colapsável (igual ao admin) com tabs Trilha | Desempenho
  * e busca, + aviso de questões pendentes. */
-export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulasPendentes, ranking, meuId, formato = DEFAULT_TRILHA_FORMATO, simbolos = DEFAULT_TRILHA_SIMBOLOS, livre, inverter = false, degrade, degradeTrilha, descricao, regulamento, pontuacao, gam = null }: {
+export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulasPendentes, ranking, meuId, formato = DEFAULT_TRILHA_FORMATO, simbolos = DEFAULT_TRILHA_SIMBOLOS, livre, inverter = false, degrade, degradeTrilha, descricao, regulamento, pontuacao, desafios, desempenhoDesafios, gam = null, diasLeitura = [] }: {
   modulo: string
   trilha: Trilha
   desempenho: AulaDesempenho[]
@@ -37,8 +38,13 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
   descricao?: string
   regulamento?: RegulamentoConfig
   pontuacao?: PontuacaoLeitura
+  desafios?: DesafioModulo[]
+  desempenhoDesafios?: DesempenhoLeitura
   gam?: GamRail | null
+  diasLeitura?: string[]
 }) {
+  const desafiosAtivos = (desafios ?? []).filter((d) => d.ativo)
+  const desemp = desempenhoDesafios ?? { acertos: 0, aulasConcluidas: 0, aulasGabaritadas: 0 }
   // 1ª aula com questões pendentes (leitura feita) → alvo do CTA do aviso.
   const alvoPend = desempenho.find((a) => a.leituraConcluida && a.questoesPendentes > 0)
 
@@ -68,6 +74,7 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
           <TabsList className="w-fit border-white/20 [&_[data-slot=tabs-trigger]]:text-white/70 [&_[data-slot=tabs-trigger]:hover]:text-white [&_[data-slot=tabs-trigger][data-active]]:text-white">
             <TabsTrigger value="trilha"><Route className="h-4 w-4" /> Trilha</TabsTrigger>
             {regAtivo && <TabsTrigger value="regulamento"><ScrollText className="h-4 w-4" /> Regulamento</TabsTrigger>}
+            {desafiosAtivos.length > 0 && <TabsTrigger value="desafios"><Trophy className="h-4 w-4" /> Desafios</TabsTrigger>}
             <TabsTrigger value="desempenho"><BarChart3 className="h-4 w-4" /> Desempenho</TabsTrigger>
             <TabsTrigger value="ranking"><Trophy className="h-4 w-4" /> Ranking</TabsTrigger>
           </TabsList>
@@ -101,8 +108,12 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
           <div className="relative -mx-4 -mb-24 -mt-4 min-w-0 overflow-visible bg-neutral-950 md:-mx-6 md:-mb-6 md:-mt-6">
             <TrilhaSistema trilhas={[trilha]} gamAtivo={false} formato={formato} simbolos={simbolos} livre={livre} inverter={inverter} capa={trilha.capa ?? trilha.capaCard ?? null} semFundo semDivisoria ajudante semMoldura degradeTopo={degradeTrilha ?? degrade} />
             {gam && (
-              <aside className="pointer-events-auto absolute right-2 top-2 z-20 hidden max-h-[calc(100vh-150px)] w-[300px] overflow-auto rounded-2xl border bg-background/85 p-2 shadow-xl backdrop-blur lg:block">
-                <GamificacaoRail resumo={gam.resumo} missoes={gam.missoes} semana={gam.semana} conquistas={gam.conquistas} config={gam.config} />
+              <aside className="pointer-events-auto absolute inset-y-0 right-2 z-20 hidden w-[300px] lg:block">
+                {/* Sticky ANCORADO na base ATUAL do banner (--lp-banner-bottom, atualizado no scroll) → mantém a
+                    MESMA distância relativa quer o banner esteja expandido quer recolhido. */}
+                <div className="sticky overflow-auto pb-4" style={{ top: 'calc(var(--lp-banner-bottom, 6rem) + 0.75rem)', maxHeight: 'calc(100vh - var(--lp-banner-bottom, 6rem) - 3rem)' }}>
+                  <LeituraTrilhaRail done={trilha.done} total={trilha.total} gam={gam} desafios={desafiosAtivos} desemp={desemp} dias={diasLeitura} />
+                </div>
               </aside>
             )}
           </div>
@@ -110,7 +121,7 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
           <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
             <div className="min-w-0 overflow-visible pb-10"><TrilhaSistema trilhas={[trilha]} gamAtivo={false} formato={formato} simbolos={simbolos} livre={livre} inverter={inverter} capa={trilha.capa ?? trilha.capaCard ?? null} semFundo semDivisoria ajudante /></div>
             {/* Rail de gamificação (metas/streak/XP/medalha) — desktop, quando a gamificação está ativa. */}
-            {gam && <aside className="hidden lg:block"><GamificacaoRail resumo={gam.resumo} missoes={gam.missoes} semana={gam.semana} conquistas={gam.conquistas} config={gam.config} /></aside>}
+            {gam && <aside className="hidden lg:block lg:sticky lg:self-start lg:overflow-auto lg:pb-4" style={{ top: 'calc(var(--lp-banner-bottom, 6rem) + 0.75rem)', maxHeight: 'calc(100vh - var(--lp-banner-bottom, 6rem) - 3rem)' }}><LeituraTrilhaRail done={trilha.done} total={trilha.total} gam={gam} desafios={desafiosAtivos} desemp={desemp} dias={diasLeitura} /></aside>}
           </div>
         )}
       </TabsContent>
@@ -141,6 +152,12 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
         </TabsContent>
       )}
 
+      {desafiosAtivos.length > 0 && (
+        <TabsContent value="desafios" className="pt-4">
+          <DesafiosModulo desafios={desafiosAtivos} desemp={desemp} />
+        </TabsContent>
+      )}
+
       <TabsContent value="desempenho" className="pt-4">
         <DesempenhoModulo desempenho={desempenho} />
       </TabsContent>
@@ -148,6 +165,43 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
         <LeituraRanking ranking={ranking} meuId={meuId} />
       </TabsContent>
     </Tabs>
+  )
+}
+
+function DesafiosModulo({ desafios, desemp }: { desafios: DesafioModulo[]; desemp: DesempenhoLeitura }) {
+  const unidade = (t: DesafioModulo['tipo']) => DESAFIO_TIPOS.find((x) => x.v === t)?.unidade ?? ''
+  const concluidos = desafios.filter((d) => progressoDesafio(d, desemp) >= d.meta).length
+  return (
+    <div className="mx-auto max-w-3xl space-y-4">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="flex items-center gap-1.5 text-lg font-bold tracking-tight"><Trophy className="h-5 w-5 text-primary" /> Desafios do módulo</h2>
+        <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">{concluidos}/{desafios.length} concluído(s)</span>
+      </div>
+      <div className="grid gap-3">
+        {desafios.map((d) => {
+          const prog = Math.min(progressoDesafio(d, desemp), d.meta)
+          const pct = d.meta > 0 ? Math.round((prog / d.meta) * 100) : 0
+          const done = progressoDesafio(d, desemp) >= d.meta
+          return (
+            <div key={d.id} className={cn('rounded-2xl border bg-card p-4 shadow-sm', done && 'border-emerald-500/40 bg-emerald-500/[0.04]')}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="flex items-center gap-1.5 text-sm font-semibold">
+                    {done && <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />} {d.titulo}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{prog}/{d.meta} {unidade(d.tipo)}</p>
+                </div>
+                <span className={cn('shrink-0 rounded-full px-2.5 py-1 text-xs font-bold', done ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-primary/10 text-primary')}>+{d.xp} XP</span>
+              </div>
+              <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div className={cn('h-full rounded-full transition-all', done ? 'bg-emerald-500' : 'bg-primary')} style={{ width: `${pct}%` }} />
+              </div>
+              {done && <p className="mt-2 text-xs font-medium text-emerald-700 dark:text-emerald-400">Desafio concluído — bônus de XP creditado! 🎉</p>}
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 

@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
-import { getGamConfig } from '@/lib/gamificacao'
+import { getGamConfig, gamAtivaParaAluno } from '@/lib/gamificacao'
 import { resumoGamificacao, posicaoNaLiga, membrosDaLiga, xpPorDiaSemana, leaderboardLiga } from '@/lib/gamificacao/leitura'
 import { EscudoLiga } from '@/components/aluno/escudo-liga'
 import { LigaRankingFull } from '@/components/aluno/liga-ranking-full'
@@ -19,7 +19,7 @@ export default async function LigasPage() {
   const svc = createAdminClient()
   const config = await getGamConfig(svc, sessao.tenantId)
 
-  if (!config?.ativo) {
+  if (!(await gamAtivaParaAluno(svc, sessao.tenantId, sessao.estudanteId, config))) {
     return (
       <div className="animate-page mx-auto max-w-lg py-16 text-center">
         <Trophy className="mx-auto mb-4 h-10 w-10 text-muted-foreground" />
@@ -29,8 +29,9 @@ export default async function LigasPage() {
     )
   }
 
-  const resumo = await resumoGamificacao(svc, sessao!.tenantId, sessao!.estudanteId, config)
-  const ligasOrd = [...config.ligas].sort((a, b) => a.xp_min - b.xp_min)
+  const cfg = config!
+  const resumo = await resumoGamificacao(svc, sessao!.tenantId, sessao!.estudanteId, cfg)
+  const ligasOrd = [...cfg.ligas].sort((a, b) => a.xp_min - b.xp_min)
   const liga = resumo?.liga ?? ligasOrd[0]
   const proxima = resumo?.proxima ?? null
   const xpTotal = resumo?.xpTotal ?? 0
@@ -39,7 +40,7 @@ export default async function LigasPage() {
   const [posicao, membros, semana, podioBruto] = await Promise.all([
     resumo ? posicaoNaLiga(svc, sessao!.tenantId, liga.id, xpTotal) : Promise.resolve(1),
     membrosDaLiga(svc, sessao!.tenantId, liga.id),
-    xpPorDiaSemana(svc, sessao!.tenantId, sessao!.estudanteId, config.timezone),
+    xpPorDiaSemana(svc, sessao!.tenantId, sessao!.estudanteId, cfg.timezone),
     leaderboardLiga(svc, sessao!.tenantId, liga.id, sessao!.estudanteId, 3),
   ])
   const totalNaLiga = Math.max(1, membros.size)
@@ -50,7 +51,7 @@ export default async function LigasPage() {
   const teto = proxima?.xp_min ?? Math.max(xpTotal, piso + 1)
   const pctTier = proxima ? Math.min(100, Math.max(0, Math.round(((xpTotal - piso) / Math.max(1, teto - piso)) * 100))) : 100
   const faltam = proxima ? Math.max(0, teto - xpTotal) : 0
-  const baseSim = config.xp_regras?.simulado?.base || 0
+  const baseSim = cfg.xp_regras?.simulado?.base || 0
   const simsFaltam = baseSim > 0 ? Math.ceil(faltam / baseSim) : 0
 
   // Avatares do pódio (tolerante a colunas ausentes).
@@ -68,7 +69,7 @@ export default async function LigasPage() {
   const nodeFut = 'color-mix(in oklab, var(--brand-primary, var(--primary)) 20%, #0b1020)'
 
   return (
-    <div className="animate-page space-y-6">
+    <div className="tema-gam animate-page space-y-6">
       {/* ── BANNER (full-bleed no topo) ── */}
       <section data-tour="liga-escada" className="-mx-6 -mt-6 text-white shadow-sm" style={{ background: HERO_BG }}>
         <div className="px-6 pt-7">

@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Wrench, Loader2, ShieldAlert, MoreVertical, UserCheck,
-  PenLine, ClipboardList, BookOpen, BookMarked, Database, BarChart3, Trophy, GraduationCap, Users, Layers, Plug, CalendarRange,
+  PenLine, ClipboardList, BookOpen, BookMarked, Database, BarChart3, Trophy, GraduationCap, Users, Layers, Plug, CalendarRange, Route, Sparkles,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { AlertBox } from '@/components/ui/alert-box'
@@ -17,6 +17,7 @@ const ICONES: Record<string, React.ComponentType<{ className?: string }>> = {
   discursiva: PenLine, simulados: ClipboardList, questoes: BookOpen, banco: Database,
   relatorios: BarChart3, gamificacao: Trophy, matriculas: GraduationCap, grupos: Layers,
   integracoes: Plug, estudantes: Users, leitura: BookMarked, cronograma: CalendarRange,
+  trilha: Route, ligas: Trophy, recomendado: Sparkles,
 }
 
 /**

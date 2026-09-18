@@ -19,7 +19,7 @@ export function GamificacaoRail({ resumo, missoes, semana, conquistas, config }:
   const chest = config.xp_regras.chest
   const proxima = resumo.proxima ?? null
   return (
-    <aside data-tour="rail" className="space-y-4 lg:sticky lg:top-6 lg:self-start">
+    <aside data-tour="rail" className="tema-gam space-y-4 lg:sticky lg:top-6 lg:self-start">
       {resumo.metaDiaXp > 0 && <div data-tour="meta"><MetaDiariaCard xpHoje={resumo.xpHoje} meta={resumo.metaDiaXp} /></div>}
       <div data-tour="sequencia"><StreakCalendario dias={semana} streak={resumo.streakAtual} feitoHoje={resumo.feitoHoje} chestXp={chest?.xp ?? 0} chestCadaN={chest?.cada_n_dias ?? 0} /></div>
       {missoes.length > 0 && <div data-tour="missoes"><MissoesLista missoes={missoes} renova="meia-noite" /></div>}
