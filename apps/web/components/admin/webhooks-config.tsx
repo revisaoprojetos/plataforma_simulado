@@ -148,10 +148,22 @@ function exemploPayload(evento: string) {
     'estudante.nao_finalizou': 'nao_finalizado',
     'estudante.visualizou_relatorio': 'relatorio_visualizado',
     'estudante.baixou_relatorio': 'relatorio_baixado',
+    'engajamento.inativo': 'inativo',
+    'engajamento.sequencia': 'sequencia',
+    'engajamento.marco': 'marco',
   }
   const finalizado = evento === 'estudante.finalizou'
+  const ehEngaj = evento.startsWith('engajamento.')
+  // Bloco de engajamento (eventos engajamento.*) — populado por tipo; null nos demais (estrutura fixa).
+  const engajamento = evento === 'engajamento.inativo'
+    ? { tipo: 'inativo', dias: 1, marco: null, streak_atual: 3, streak_maior: 12, mensagem: 'Oi João! Notamos que faz 1 dia que você não aparece por aqui. Bora voltar e retomar sua rotina de estudos? 💪' }
+    : evento === 'engajamento.sequencia'
+      ? { tipo: 'sequencia', dias: 4, marco: null, streak_atual: 4, streak_maior: 12, mensagem: 'Mandou bem, João! Já são 4 dias seguidos estudando. Continue firme e não perca o ritmo! 🔥' }
+      : evento === 'engajamento.marco'
+        ? { tipo: 'marco', dias: null, marco: 7, streak_atual: 7, streak_maior: 12, mensagem: 'Parabéns, João! 🏆 Você completou 7 dias consecutivos de estudo. Que constância!' }
+        : { tipo: null, dias: null, marco: null, streak_atual: null, streak_maior: null, mensagem: null }
   return {
-    id: '3f9a1c7e-0b2d-4e6a-9c11-8d5e2a7b4f10',
+    id: ehEngaj ? null : '3f9a1c7e-0b2d-4e6a-9c11-8d5e2a7b4f10',
     type: 'estudante',
     webhook_type: 'progressao_estudante',
     plataforma: { id: 'ce74e4ab-dea1-4aaf-9122-992075d0912a', nome: 'Plataforma Simulado', slug: 'simulado' },
@@ -168,15 +180,17 @@ function exemploPayload(evento: string) {
       phone_local_code: '71',
       plano: 'passaporte',
     },
-    simulado: { id: 'b2c4d6e8-1a3b-5c7d-9e0f-2b4d6f8a0c11', name: 'Simulado PGE — 1ª fase' },
+    // Nos eventos de engajamento não há sessão/simulado → esses campos vão null (igual ao envio real).
+    simulado: ehEngaj ? { id: null, name: null } : { id: 'b2c4d6e8-1a3b-5c7d-9e0f-2b4d6f8a0c11', name: 'Simulado PGE — 1ª fase' },
     resultado: {
-      sessao_id: '3f9a1c7e-0b2d-4e6a-9c11-8d5e2a7b4f10',
+      sessao_id: ehEngaj ? null : '3f9a1c7e-0b2d-4e6a-9c11-8d5e2a7b4f10',
       nota: finalizado ? 8.5 : null,
       acertos: finalizado ? 17 : null,
       total: finalizado ? 20 : null,
-      tentativa: 1,
+      tentativa: ehEngaj ? null : 1,
       motivo: evento === 'estudante.nao_finalizou' ? 'tempo_esgotado' : null,
     },
+    engajamento,
   }
 }
 
