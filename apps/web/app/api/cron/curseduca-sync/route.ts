@@ -36,8 +36,10 @@ export async function POST(req: NextRequest) {
     if (!venceu) continue
     if (rodadas >= 3) break // poucas por tick; o resto vem no próximo
 
-    // Lock otimista: só assume se ultima_execucao continua igual ao que lemos.
-    let lockQ = svc.from('simulado_curseduca_sync').update({ ultima_execucao: nowISO }).eq('id', r.id)
+    // Lock otimista: só assume se ultima_execucao continua igual ao que lemos. Já grava um marcador
+    // "em andamento" no ultimo_resultado — assim, se o request for cortado (proxy 5min) antes do fim,
+    // o admin vê que a execução foi INTERROMPIDA, em vez de continuar vendo o resultado antigo.
+    let lockQ = svc.from('simulado_curseduca_sync').update({ ultima_execucao: nowISO, ultimo_resultado: { ok: null, status: 'em_andamento', iniciado_em: nowISO } }).eq('id', r.id)
     lockQ = r.ultima_execucao ? lockQ.eq('ultima_execucao', r.ultima_execucao) : lockQ.is('ultima_execucao', null)
     const { data: lock } = await lockQ.select('id')
     if (!lock?.length) continue // outro tick pegou

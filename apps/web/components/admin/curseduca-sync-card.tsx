@@ -36,6 +36,9 @@ export function CurseducaSyncCard({ grupos, sistema = [], inicialAtivo, inicialI
   // Só grupos comuns podem casar com a Curseduca (pastas/mestre não são destino de sync).
   const comuns = useMemo(() => sistema.filter((s) => !s.is_mestre), [sistema])
   const vinculados = useMemo(() => calcVinculados(grupos, comuns), [grupos, comuns])
+  // Canais da Curseduca SEM grupo de mesmo nome no sistema → NÃO são sincronizados (alunos ficam de
+  // fora, silenciosamente). Mostramos a contagem para o admin não ser pego de surpresa (landmine 25/253).
+  const naoVinculados = Math.max(0, grupos.length - vinculados.length)
   const [ativo, setAtivo] = useState(inicialAtivo)
   const [intervalo, setIntervalo] = useState(String(inicialIntervalo || 30))
   const [sel, setSel] = useState<Set<number>>(() => {
@@ -74,6 +77,13 @@ export function CurseducaSyncCard({ grupos, sistema = [], inicialAtivo, inicialI
         <h3 className="flex items-center gap-2 text-base font-semibold"><RefreshCw className="h-4 w-4 text-primary" /> Sincronização Curseduca</h3>
         <p className="text-sm text-muted-foreground">Mantém os grupos do sistema atualizados com os canais de acesso da Curseduca de <b>mesmo nome</b>. Só adiciona alunos novos — <b>nunca</b> remove nem sincroniza a conta inteira.</p>
       </div>
+
+      {naoVinculados > 0 && vinculados.length > 0 && (
+        <div className="flex items-start gap-2 rounded-xl border border-sky-500/30 bg-sky-500/5 p-3 text-xs text-sky-700 dark:text-sky-300">
+          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span><b>{naoVinculados}</b> de <b>{grupos.length}</b> canais da Curseduca <b>não</b> têm um grupo de mesmo nome no sistema — os alunos desses canais <b>não são sincronizados</b>. Se algum aluno não estiver entrando, crie um grupo com o <b>mesmo nome</b> do canal para incluí-lo. (Canais de amostra/grátis/teste podem ser ignorados de propósito.)</span>
+        </div>
+      )}
 
       {vinculados.length === 0 ? (
         <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-700 dark:text-amber-400">

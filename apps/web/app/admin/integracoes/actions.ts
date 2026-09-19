@@ -586,7 +586,10 @@ export async function reprocessarEvento(provider: string, id: string): Promise<{
   const { data: ev } = await svc.from('simulado_integracao_eventos').select('payload').eq('id', id).eq('tenant_id', g.tenantId).eq('provider', provider).maybeSingle()
   if (!ev) return { ok: false, error: 'Evento não encontrado.' }
   const adapter = getAdapter(provider)
-  const evento = adapter?.parseWebhook ? await adapter.parseWebhook((ev as any).payload, {}, { provider, baseUrl: '', credenciais: {} }) : null
+  // Reprocessa com a cfg COM mapa dinâmico (não com cfg vazia) — senão perde o mapa_json do tenant e
+  // pode marcar como "ignorado" um evento que o webhook original processou.
+  const cfg = (await resolverProviderCfg(g.tenantId, provider, { ignorarAtivo: true })) ?? { provider, baseUrl: '', credenciais: {} }
+  const evento = adapter?.parseWebhook ? await adapter.parseWebhook((ev as any).payload, {}, cfg) : null
   if (!evento) { await svc.from('simulado_integracao_eventos').update({ status: 'ignorado', processado_em: new Date().toISOString() }).eq('id', id); return { ok: true } }
   const r = await processarEvento(g.tenantId, provider, evento)
   await svc.from('simulado_integracao_eventos').update({ status: r.ok ? 'processado' : 'erro', erro: r.error ?? null, processado_em: new Date().toISOString() }).eq('id', id)

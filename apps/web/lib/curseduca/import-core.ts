@@ -74,8 +74,21 @@ export async function executarImport(
 
   try {
     // 1) Coleta os membros de todos os grupos (dedupe entre grupos pelo id da Curseduca).
+    // TOLERÂNCIA POR-GRUPO: se UM grupo falhar (ex.: 502 do gateway da Curseduca), pula esse grupo
+    // e segue os demais — antes, o erro de um único grupo abortava a sincronização inteira dos 228.
     const porId = new Map<number, MembroCurseduca>()
-    for (const gid of ids) for (const m of await listarMembrosDoGrupo(g.cfg, gid)) if (!porId.has(m.id)) porId.set(m.id, m)
+    const gruposFalhos: { gid: number; erro: string }[] = []
+    for (const gid of ids) {
+      try {
+        for (const m of await listarMembrosDoGrupo(g.cfg, gid)) if (!porId.has(m.id)) porId.set(m.id, m)
+      } catch (e: any) {
+        gruposFalhos.push({ gid, erro: String(e?.message ?? e).slice(0, 160) })
+      }
+    }
+    // Só aborta se NENHUM grupo pôde ser lido (falha geral de credencial/rede) — aí não há o que importar.
+    if (gruposFalhos.length === ids.length && ids.length > 0) {
+      return { ok: false, error: `Nenhum grupo pôde ser lido na Curseduca (${gruposFalhos.length} falharam). Ex.: ${gruposFalhos[0].erro}` } as ResultadoImportCurseduca
+    }
     // Ignora contas de SISTEMA da Curseduca (ex.: apps@/contato@curseduca.com) que são membros
     // de vários canais e apareciam em "todos os grupos". Real aluno nunca usa o domínio da Curseduca.
     const ehContaSistema = (m: MembroCurseduca) => /@curseduca\.com$/i.test((m.email ?? '').trim().toLowerCase())
@@ -280,7 +293,8 @@ export async function executarImport(
     revalidatePath('/admin/estudantes'); revalidatePath('/admin/grupos', 'layout')
     if (grupoDestinoId) revalidatePath(`/admin/grupos/${grupoDestinoId}`)
     await invalidarRelatorios(g.tenantId) // rosters/matrículas mudaram → recalcula contagens dos relatórios
-    return { ok: true, total, novos, jaExistiam, atualizados, vinculados, removidos, semIdentificador, semDetalhe, restante, grupoNome }
+    return { ok: true, total, novos, jaExistiam, atualizados, vinculados, removidos, semIdentificador, semDetalhe, restante, grupoNome,
+      ...(gruposFalhos.length ? { gruposFalhos: gruposFalhos.length, gruposFalhosDetalhe: gruposFalhos.slice(0, 10) } : {}) }
   } catch (e: any) {
     return { ok: false, error: e?.message ?? 'Falha na importação.' }
   }

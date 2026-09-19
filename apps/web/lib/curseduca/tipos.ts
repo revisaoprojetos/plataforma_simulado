@@ -6,4 +6,6 @@ export type ResultadoImportCurseduca = {
   total?: number; novos?: number; jaExistiam?: number; atualizados?: number
   vinculados?: number; removidos?: number; semIdentificador?: number
   semDetalhe?: number; restante?: number; grupoNome?: string | null
+  /** Grupos que falharam ao serem lidos (ex.: 502 do gateway) — a sync seguiu com os demais. */
+  gruposFalhos?: number; gruposFalhosDetalhe?: { gid: number; erro: string }[]
 }

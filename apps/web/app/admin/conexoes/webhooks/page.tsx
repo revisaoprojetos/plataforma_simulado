@@ -51,7 +51,7 @@ export default async function WebhooksPage() {
         webhooks={webhooks.map((w) => ({
           id: w.id, nome: w.nome, url: w.url,
           eventos: Array.isArray(w.eventos) ? w.eventos : [],
-          secret: w.secret ?? null, ativo: !!w.ativo,
+          temSecret: !!w.secret, ativo: !!w.ativo, // NUNCA envia o segredo ao browser — só se existe
           ultimoStatus: w.ultimo_status ?? null, ultimoEnvio: w.ultimo_envio ?? null,
           enviosSimultaneos: w.envios_simultaneos ?? 5,
           filtroSimulados: Array.isArray(w.filtro_simulados) ? w.filtro_simulados : [],

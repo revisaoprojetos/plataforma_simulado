@@ -1,6 +1,7 @@
 import 'server-only'
 import crypto from 'crypto'
 import { createAdminClient } from '@/lib/supabase/server'
+import { descriptografar } from '@/lib/crypto'
 import { rodarAutomacoes } from '@/lib/automacoes/run'
 
 export const EVENTOS_WEBHOOK = [
@@ -131,7 +132,9 @@ export async function dispararWebhook(tenantId: string | null | undefined, event
 
     await Promise.allSettled(alvos.map(async (e: any) => {
       const headers: Record<string, string> = { 'Content-Type': 'application/json', 'X-Webhook-Evento': evento }
-      if (e.secret) headers['X-Webhook-Signature'] = 'sha256=' + crypto.createHmac('sha256', e.secret).update(corpo).digest('hex')
+      // Segredo guardado CRIPTOGRAFADO em repouso → descriptografa só aqui p/ assinar (texto puro legado passa direto).
+      const seg = descriptografar(e.secret)
+      if (seg) headers['X-Webhook-Signature'] = 'sha256=' + crypto.createHmac('sha256', seg).update(corpo).digest('hex')
       const status = await enviarComRetry(e.url, headers, corpo)
       await svc.from('simulado_webhook_saida').update({ ultimo_status: status, ultimo_envio: new Date().toISOString() }).eq('id', e.id)
     }))

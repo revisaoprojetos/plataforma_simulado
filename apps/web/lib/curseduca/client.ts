@@ -111,7 +111,9 @@ async function api(cfg: CurseducaCfg, path: string): Promise<any> {
     if (r.ok) return r.json()
     ultimo = r.status
     // Rate limit / indisponibilidade temporária → backoff exponencial com jitter e tenta de novo.
-    if (r.status === 429 || r.status === 503 || r.status === 500) {
+    // Inclui 502/504 (Bad Gateway / Gateway Timeout): são os erros de GATEWAY mais comuns da API
+    // da Curseduca e ANTES não eram retentados — um 502 transitório abortava a sync inteira.
+    if (r.status === 429 || r.status === 500 || r.status === 502 || r.status === 503 || r.status === 504) {
       await dormir(Math.min(8_000, 500 * 2 ** tentativa) + Math.floor(Math.random() * 250))
       continue
     }

@@ -18,9 +18,22 @@ function autorizado(req: NextRequest): boolean {
   return h === segredo
 }
 
+// Jobs travados em `processando` há mais que isto voltam para `pendente` (o processo que os
+// pegou morreu no meio — corte de proxy, réplica reiniciada). Generoso porque um import pode
+// legitimamente demorar vários minutos; 20 min é bem acima do normal.
+const LOCK_TTL_MIN = 20
+
 export async function POST(req: NextRequest) {
   if (!autorizado(req)) return NextResponse.json({ message: 'Não autorizado.' }, { status: 401 })
   const svc = createAdminClient()
+
+  // 0) Recupera jobs presos: `processando` com `locked_at` mais velho que o TTL → volta p/ `pendente`.
+  // Tolerante: se a coluna `locked_at` ainda não foi migrada, apenas pula a recuperação (nunca usa
+  // `created_at` como proxy, para não reprocessar um import longo que ainda está rodando).
+  try {
+    const corte = new Date(Date.now() - LOCK_TTL_MIN * 60_000).toISOString()
+    await svc.from('simulado_curseduca_jobs').update({ status: 'pendente' }).eq('status', 'processando').lt('locked_at', corte)
+  } catch { /* coluna locked_at ausente → sem recuperação até migrar */ }
 
   // Poucos por tick (cada import pode demorar). O próximo tick pega o resto.
   const { data: jobs } = await svc
@@ -32,9 +45,13 @@ export async function POST(req: NextRequest) {
 
   let processados = 0
   for (const job of (jobs ?? []) as any[]) {
-    // Lock: só assume se ainda estiver pendente (evita corrida entre réplicas do worker).
-    const { data: lock } = await svc.from('simulado_curseduca_jobs').update({ status: 'processando' }).eq('id', job.id).eq('status', 'pendente').select('id')
-    if (!lock?.length) continue
+    // Lock: só assume se ainda estiver pendente (evita corrida entre réplicas do worker). Carimba
+    // `locked_at` p/ a recuperação de lock preso; tolerante se a coluna ainda não foi migrada.
+    let lockRes = await svc.from('simulado_curseduca_jobs').update({ status: 'processando', locked_at: new Date().toISOString() }).eq('id', job.id).eq('status', 'pendente').select('id')
+    if (lockRes.error && /locked_at|column/i.test(lockRes.error.message)) {
+      lockRes = await svc.from('simulado_curseduca_jobs').update({ status: 'processando' }).eq('id', job.id).eq('status', 'pendente').select('id')
+    }
+    if (!lockRes.data?.length) continue
 
     try {
       const cfg = await resolverCfgCurseduca(job.tenant_id)

@@ -1,4 +1,5 @@
 import 'server-only'
+import { timingSafeEqual } from 'node:crypto'
 import { aguardarVaga, idCredencial } from '@/lib/integracoes/ratelimit'
 import { getStr } from '@/lib/integracoes/jsonpath'
 import { normalizarPorMapa } from '@/lib/integracoes/normalizar-mapa'
@@ -50,8 +51,10 @@ function normalizarAssinatura(s: any): PessoaEntitlement | null {
   if (!externalPessoa) return null
   const produtoRef = firstStr(product.marketplace_id, product.internal_id, product.id, s.product_id)
   if (!produtoRef) return null
-  // Na listagem, mantém o status real; se não mapear, assume 'ativo' (está na lista de assinaturas).
-  const status = mapStatus(firstStr(s.last_status, s.status, s.subscription?.last_status)) ?? 'ativo'
+  // Status real da assinatura; se NÃO mapear, NÃO assume 'ativo' (evita conceder acesso por status
+  // desconhecido). Só 'ativo' concede/reaplica; qualquer outro não libera. Under-grant é preferível
+  // a over-grant (aluno reembolsado/pendente não deve manter acesso por um status não reconhecido).
+  const status = mapStatus(firstStr(s.last_status, s.status, s.subscription?.last_status)) ?? 'expirado'
   const entExternalId = firstStr(s.id, s.internal_id, s.subscription_code, s.code) ?? `${produtoRef}:${externalPessoa}`
   return {
     pessoa: {
@@ -150,9 +153,15 @@ export const guruAdapter: ProviderAdapter = {
    */
   validarWebhook(rawBody, headers, segredo) {
     if (!segredo) return true
+    // Comparação constant-time (evita timing side-channel na descoberta do Account Token).
+    const bate = (v?: string | null) => {
+      if (!v) return false
+      const a = Buffer.from(String(v)); const b = Buffer.from(segredo)
+      return a.length === b.length && timingSafeEqual(a, b)
+    }
     try {
       const j = JSON.parse(rawBody)
-      if (j?.api_token === segredo || j?.token === segredo || j?.webhook?.token === segredo) return true
+      if (bate(j?.api_token) || bate(j?.token) || bate(j?.webhook?.token)) return true
     } catch { /* ignora */ }
     // fallback: header (caso a conta use assinatura por header)
     const cand = headers['x-guru-signature'] || headers['x-webhook-secret'] || headers['authorization'] || ''

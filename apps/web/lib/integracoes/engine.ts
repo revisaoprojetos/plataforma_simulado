@@ -100,6 +100,9 @@ async function resolverEstudante(svc: any, tenantId: string, provider: Provider,
     }
     const { data, error } = await svc.from('simulado_estudantes').insert(row).select('id').single()
     if (error) {
+      // Loga o erro REAL antes do fallback: se não for corrida (ex.: coluna ausente, NOT NULL), o
+      // reencontro por email/cpf falha e o aluno some silenciosamente — agora fica rastreável.
+      logIntegracao(error, 'insert estudante (integração)')
       // corrida/conflito: tenta reencontrar por email/cpf
       await acha('email', email); await acha('cpf', cpf)
       if (!id) return null
@@ -137,10 +140,13 @@ async function promoverEmailDaCompra(svc: any, tenantId: string, estudanteId: st
     if (!data) return
     const principal = (data.email ?? '').trim().toLowerCase()
     if (email === principal) return // já é o principal
-    // não promove se OUTRO cadastro já usa esse e-mail (principal ou secundário)
+    // não promove se OUTRO cadastro já usa esse e-mail (principal ou secundário).
+    // Sanitiza o e-mail (vem do payload do webhook, não confiável): chars como , ( ) * % { } quebram
+    // o parser do .or() do PostgREST — um e-mail malformado poderia alterar o filtro (injection).
+    const emailSafe = email.replace(/[,()%*{}]/g, ' ').trim()
     const { data: outros } = await svc.from('simulado_estudantes').select('id')
       .eq('tenant_id', tenantId).eq('deletado', false)
-      .or(`email.ilike.${email},emails_secundarios.cs.{${email}}`)
+      .or(`email.ilike.${emailSafe},emails_secundarios.cs.{${emailSafe}}`)
     if ((outros ?? []).some((r: any) => r.id !== estudanteId)) return
 
     const secsAtuais: string[] = (data.emails_secundarios ?? []).map((x: string) => String(x).toLowerCase())

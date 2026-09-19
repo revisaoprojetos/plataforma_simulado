@@ -106,12 +106,12 @@ export async function POST(req: Request, { params }: { params: Promise<{ token: 
     const r = await processarEvento(tenantId, 'guru', evento)
     await svc.from('simulado_integracao_eventos')
       .update({ status: r.ok ? 'processado' : 'erro', erro: r.error ?? null, processado_em: new Date().toISOString() })
-      .eq('provider', 'guru').eq('event_id', evento.eventId)
+      .eq('tenant_id', tenantId).eq('provider', 'guru').eq('event_id', evento.eventId)
     return finish(r.ok ? 200 : 500, { ok: r.ok, resultado: r }, r.ok ? `processado: ${evento.tipo}` : `erro ao aplicar: ${r.error ?? ''}`)
   } catch (e) {
     await svc.from('simulado_integracao_eventos')
       .update({ status: 'erro', erro: (e as Error).message, processado_em: new Date().toISOString() })
-      .eq('provider', 'guru').eq('event_id', evento.eventId)
+      .eq('tenant_id', tenantId).eq('provider', 'guru').eq('event_id', evento.eventId)
     return finish(500, { error: (e as Error).message }, `exceção: ${(e as Error).message}`)
   }
 }

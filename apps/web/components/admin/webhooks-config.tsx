@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils'
 import { Webhook, Plus, Trash2, Pencil, Loader2, Check, Zap, RefreshCw, AlertTriangle, Search, X, Lock, ListFilter, ChevronDown, FileJson, Copy } from 'lucide-react'
 import { criarWebhook, atualizarWebhook, toggleWebhook, excluirWebhook } from '@/app/admin/conexoes/webhooks/actions'
 
-type Wh = { id: string; nome: string; url: string; eventos: string[]; secret: string | null; ativo: boolean; ultimoStatus: string | null; ultimoEnvio: string | null; enviosSimultaneos: number; filtroSimulados: string[] }
+type Wh = { id: string; nome: string; url: string; eventos: string[]; temSecret: boolean; ativo: boolean; ultimoStatus: string | null; ultimoEnvio: string | null; enviosSimultaneos: number; filtroSimulados: string[] }
 type Evt = { chave: string; label: string }
 type Sim = { id: string; titulo: string }
 
@@ -101,7 +101,7 @@ export function WebhooksConfig({ webhooks, eventos, simulados, precisaMigrar }: 
                       <div className="min-w-0">
                         <p className="truncate font-medium">{w.nome}</p>
                         <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                          {w.secret && <span className="inline-flex items-center gap-0.5"><Lock className="h-3 w-3" /> assinado</span>}
+                          {w.temSecret && <span className="inline-flex items-center gap-0.5"><Lock className="h-3 w-3" /> assinado</span>}
                           {w.filtroSimulados.length > 0 && <span className="inline-flex items-center gap-0.5"><ListFilter className="h-3 w-3" /> {w.filtroSimulados.length} simulado(s)</span>}
                         </p>
                       </div>
@@ -189,9 +189,9 @@ function PayloadDialog({ wh, eventos, onClose }: { wh: Wh; eventos: Evt[]; onClo
   const corpo = useMemo(() => JSON.stringify(exemploPayload(evento), null, 2), [evento])
   const headers = useMemo(() => {
     const h: Record<string, string> = { 'Content-Type': 'application/json', 'X-Webhook-Evento': evento }
-    if (wh.secret) h['X-Webhook-Signature'] = 'sha256=e3b0c44298fc1c149afbf4c8996fb924…'
+    if (wh.temSecret) h['X-Webhook-Signature'] = 'sha256=e3b0c44298fc1c149afbf4c8996fb924…'
     return JSON.stringify(h, null, 2)
-  }, [evento, wh.secret])
+  }, [evento, wh.temSecret])
 
   const copiar = (txt: string) => { navigator.clipboard.writeText(txt).then(() => toast.success('Copiado!')).catch(() => toast.error('Não foi possível copiar')) }
 
@@ -222,7 +222,7 @@ function PayloadDialog({ wh, eventos, onClose }: { wh: Wh; eventos: Evt[]; onClo
           <BlocoCodigo titulo="Headers" texto={headers} onCopy={() => copiar(headers)} />
           <BlocoCodigo titulo="Body (JSON)" texto={corpo} onCopy={() => copiar(corpo)} />
 
-          {wh.secret ? (
+          {wh.temSecret ? (
             <p className="flex items-start gap-1.5 text-xs text-muted-foreground"><Lock className="mt-0.5 h-3 w-3 shrink-0" /> Este webhook está assinado: o corpo é validado no header <code className="rounded bg-muted px-1">X-Webhook-Signature</code> com HMAC-SHA256 do segredo.</p>
           ) : (
             <p className="text-xs text-muted-foreground">Este webhook não tem segredo, então não enviamos assinatura. Adicione um segredo na edição para assinar o corpo.</p>
@@ -252,7 +252,8 @@ function BlocoCodigo({ titulo, texto, onCopy }: { titulo: string; texto: string;
 function WebhookDialog({ modo, wh, eventos, simulados, onClose }: { modo: 'novo' | 'editar'; wh?: Wh; eventos: Evt[]; simulados: Sim[]; onClose: () => void }) {
   const [nome, setNome] = useState(wh?.nome ?? '')
   const [url, setUrl] = useState(wh?.url ?? '')
-  const [secret, setSecret] = useState(wh?.secret ?? '')
+  // O segredo NUNCA chega ao browser (só `temSecret`). Campo começa vazio: em branco = manter o atual.
+  const [secret, setSecret] = useState('')
   const [ativo, setAtivo] = useState(wh?.ativo ?? true)
   const [envios, setEnvios] = useState(wh?.enviosSimultaneos ?? 5)
   const [sel, setSel] = useState<Set<string>>(new Set(wh?.eventos ?? eventos.map((e) => e.chave)))
@@ -350,9 +351,10 @@ function WebhookDialog({ modo, wh, eventos, simulados, onClose }: { modo: 'novo'
           <div className="space-y-1.5">
             <Label>Segredo (opcional — assina o corpo com HMAC)</Label>
             <div className="flex gap-2">
-              <Input value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="deixe em branco para não assinar" />
+              <Input value={secret} onChange={(e) => setSecret(e.target.value)} placeholder={wh?.temSecret ? '•••••• (deixe em branco para manter o atual)' : 'deixe em branco para não assinar'} />
               <Button type="button" variant="outline" onClick={() => setSecret(gerarSecret())}><RefreshCw className="mr-1 h-4 w-4" /> Gerar</Button>
             </div>
+            {wh?.temSecret && <p className="text-xs text-muted-foreground">Já existe um segredo salvo (oculto). Preencha só para trocá-lo.</p>}
           </div>
 
           <div className="flex items-center gap-2"><Switch checked={ativo} onCheckedChange={setAtivo} id="wh-ativo" /><Label htmlFor="wh-ativo" className="cursor-pointer">Ativo</Label></div>

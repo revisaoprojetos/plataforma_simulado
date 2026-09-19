@@ -4,8 +4,11 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
+import { criptografar } from '@/lib/crypto'
 import { revalidatePath } from 'next/cache'
 
+// `secret` semântica no UPDATE: undefined = MANTER o atual (o client não reenvia o segredo, que nunca
+// chega ao browser); string vazia = limpar; string = novo segredo (guardado CRIPTOGRAFADO).
 type WebhookInput = { nome: string; url: string; eventos: string[]; secret?: string; ativo?: boolean; enviosSimultaneos?: number; filtroSimulados?: string[] }
 
 /** Webhooks carregam segredo HMAC e apontam para URLs externas → exigem permissão de configuração. */
@@ -33,7 +36,7 @@ export async function criarWebhook(data: WebhookInput): Promise<{ ok: boolean; i
     nome: data.nome.trim(),
     url: data.url.trim(),
     eventos: data.eventos ?? [],
-    secret: data.secret?.trim() || null,
+    secret: criptografar(data.secret?.trim() || null), // CRIPTOGRAFADO em repouso (AES-256-GCM)
     ativo: data.ativo ?? true,
   }
   const extra = { envios_simultaneos: data.enviosSimultaneos ?? 5, filtro_simulados: data.filtroSimulados ?? [] }
@@ -56,13 +59,14 @@ export async function atualizarWebhook(id: string, data: WebhookInput): Promise<
   if (err) return { ok: false, error: err }
 
   const svc = await createServiceClient()
-  const base = {
+  const base: Record<string, unknown> = {
     nome: data.nome.trim(),
     url: data.url.trim(),
     eventos: data.eventos ?? [],
-    secret: data.secret?.trim() || null,
     ativo: data.ativo ?? true,
   }
+  // undefined = manter o segredo atual; senão grava o novo CRIPTOGRAFADO ('' limpa).
+  if (data.secret !== undefined) base.secret = criptografar(data.secret.trim() || null)
   const extra = { envios_simultaneos: data.enviosSimultaneos ?? 5, filtro_simulados: data.filtroSimulados ?? [] }
   let { error } = await svc.from('simulado_webhook_saida').update({ ...base, ...extra }).eq('id', id).eq('tenant_id', tenantId)
   if (error && /envios_simultaneos|filtro_simulados|column/i.test(error.message)) {
