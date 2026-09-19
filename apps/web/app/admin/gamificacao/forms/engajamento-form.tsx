@@ -81,25 +81,25 @@ export function EngajamentoForm({ config, podeGerenciar }: { config: GamConfig; 
         <Webhook className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
         <div className="space-y-1 text-muted-foreground">
           <p className="font-medium text-foreground">Como funciona</p>
-          <p>Quando um gatilho abaixo é atingido, a plataforma envia o evento <code className="font-mono text-xs">engajamento.*</code> (com o contato do aluno + a mensagem já montada) para os <strong>webhooks/automações</strong> que assinam esse evento — daí você roteia para WhatsApp/e-mail no seu fluxo.</p>
-          <p>Configure o destino em <Link href="/admin/conexoes/webhooks" className="font-medium text-primary underline underline-offset-2">Conexões → Webhooks</Link> (ou na aba n8n) marcando os eventos <code className="font-mono text-xs">engajamento.inativo/sequencia/marco</code>. Requer a gamificação ativa e a migração <code className="font-mono text-xs">20260919000000</code> aplicada.</p>
+          <p>Quando um gatilho abaixo é atingido, a plataforma envia o evento <code className="font-mono text-xs">gamificacao.*</code> (com o contato do aluno + a mensagem já montada) para os <strong>webhooks/automações</strong> que assinam esse evento — daí você roteia para WhatsApp/e-mail no seu fluxo.</p>
+          <p>Configure o destino em <Link href="/admin/conexoes/webhooks" className="font-medium text-primary underline underline-offset-2">Conexões → Webhooks</Link> (ou na aba n8n) — no filtro escolha <strong>Gamificação</strong> e marque os eventos <code className="font-mono text-xs">gamificacao.inativo/sequencia/marco</code>. Requer a gamificação ativa e a migração <code className="font-mono text-xs">20260919000000</code> aplicada.</p>
         </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3">
-        <GatilhoCard icon={UserX} tom="#f43f5e" titulo="Parou de entrar (inatividade)" evento="engajamento.inativo"
+        <GatilhoCard icon={UserX} tom="#f43f5e" titulo="Parou de entrar (inatividade)" evento="gamificacao.inativo"
           descricao="Chama o aluno de volta quando ele fica sem entrar após ter iniciado." ativo={inativo.ativo} onToggle={(v) => setInativo({ ...inativo, ativo: v })} disabled={dis}>
           <NumberField stacked label="Enviar após" value={inativo.dias ?? 1} onChange={(v) => setInativo({ ...inativo, dias: Math.max(1, v) })} suffix="dia(s) sem entrar" min={1} disabled={dis} />
           <CampoMensagem value={inativo.mensagem} onChange={(v) => setInativo({ ...inativo, mensagem: v })} disabled={dis} />
         </GatilhoCard>
 
-        <GatilhoCard icon={Flame} tom="#f97316" titulo="Sequência em andamento" evento="engajamento.sequencia"
+        <GatilhoCard icon={Flame} tom="#f97316" titulo="Sequência em andamento" evento="gamificacao.sequencia"
           descricao="Incentiva quando o aluno atinge N dias consecutivos." ativo={sequencia.ativo} onToggle={(v) => setSequencia({ ...sequencia, ativo: v })} disabled={dis}>
           <NumberField stacked label="Ao atingir" value={sequencia.dias ?? 4} onChange={(v) => setSequencia({ ...sequencia, dias: Math.max(2, v) })} suffix="dias seguidos" min={2} disabled={dis} />
           <CampoMensagem value={sequencia.mensagem} onChange={(v) => setSequencia({ ...sequencia, mensagem: v })} disabled={dis} />
         </GatilhoCard>
 
-        <GatilhoCard icon={Trophy} tom="#8b5cf6" titulo="Marcos de sequência" evento="engajamento.marco"
+        <GatilhoCard icon={Trophy} tom="#8b5cf6" titulo="Marcos de sequência" evento="gamificacao.marco"
           descricao="Parabeniza a cada marco atingido (ex.: 7, 14, 21, 30 dias)." ativo={marco.ativo} onToggle={(v) => setMarco({ ...marco, ativo: v })} disabled={dis}>
           <label className="block space-y-1">
             <span className="text-xs font-medium text-muted-foreground">Marcos (dias)</span>

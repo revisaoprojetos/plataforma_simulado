@@ -61,7 +61,7 @@ export default async function WebhooksPage() {
           passos: Array.isArray(a.passos) ? a.passos : [],
           ultimoStatus: a.ultimo_status ?? null, ultimoRun: a.ultimo_run ?? null,
         }))}
-        eventos={EVENTOS_WEBHOOK.map((e) => ({ chave: e.chave, label: e.label }))}
+        eventos={EVENTOS_WEBHOOK.map((e) => ({ chave: e.chave, label: e.label, descricao: e.descricao, grupo: e.grupo }))}
         simulados={(sims ?? []).map((s: any) => ({ id: s.id, titulo: s.titulo ?? 'Simulado' }))}
         precisaMigrar={precisaMigrar}
         appUrl={appUrl}

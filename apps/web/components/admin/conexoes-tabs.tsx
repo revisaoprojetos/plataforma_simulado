@@ -6,7 +6,7 @@ import { WebhooksConfig } from '@/components/admin/webhooks-config'
 import { N8nBuilder } from '@/components/admin/n8n-builder'
 import { RecebidosInbox } from '@/components/admin/recebidos-inbox'
 
-type Evt = { chave: string; label: string }
+type Evt = { chave: string; label: string; descricao?: string; grupo?: string }
 type Sim = { id: string; titulo: string }
 
 export function ConexoesTabs({ webhooks, automacoes, eventos, simulados, precisaMigrar, appUrl, inboundToken }: {

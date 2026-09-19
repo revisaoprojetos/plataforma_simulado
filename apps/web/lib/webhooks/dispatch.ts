@@ -5,15 +5,15 @@ import { descriptografar } from '@/lib/crypto'
 import { rodarAutomacoes } from '@/lib/automacoes/run'
 
 export const EVENTOS_WEBHOOK = [
-  { chave: 'estudante.iniciou', label: 'Estudante iniciou o simulado' },
-  { chave: 'estudante.finalizou', label: 'Estudante finalizou o simulado' },
-  { chave: 'estudante.visualizou_relatorio', label: 'Estudante visualizou o relatório' },
-  { chave: 'estudante.baixou_relatorio', label: 'Estudante baixou o relatório' },
-  { chave: 'estudante.nao_finalizou', label: 'Estudante não finalizou (abandonou/expirou)' },
-  // Engajamento / gamificação (sequência/status) — disparados pelo streak e pelo cron de inatividade.
-  { chave: 'engajamento.inativo', label: 'Engajamento: aluno parou de entrar (inativo)' },
-  { chave: 'engajamento.sequencia', label: 'Engajamento: sequência de dias consecutivos' },
-  { chave: 'engajamento.marco', label: 'Engajamento: marco de sequência (7/14/21/30…)' },
+  { chave: 'estudante.iniciou', label: 'Estudante iniciou o simulado', grupo: 'entrega', descricao: 'Quando o aluno abre e começa o simulado.' },
+  { chave: 'estudante.finalizou', label: 'Estudante finalizou o simulado', grupo: 'entrega', descricao: 'Quando o aluno envia/conclui o simulado (com nota e acertos).' },
+  { chave: 'estudante.visualizou_relatorio', label: 'Estudante visualizou o relatório', grupo: 'entrega', descricao: 'Quando o aluno abre a tela de resultado/relatório.' },
+  { chave: 'estudante.baixou_relatorio', label: 'Estudante baixou o relatório', grupo: 'entrega', descricao: 'Quando o aluno baixa o PDF do relatório final.' },
+  { chave: 'estudante.nao_finalizou', label: 'Estudante não finalizou (abandonou/expirou)', grupo: 'entrega', descricao: 'Quando o aluno abandona ou o tempo/prazo expira sem envio.' },
+  // Gamificação (sequência/status) — disparados pelo streak (tempo real) e pelo cron de inatividade.
+  { chave: 'gamificacao.inativo', label: 'Gamificação: aluno parou de entrar (inativo)', grupo: 'gamificacao', descricao: 'Aluno ficou N dia(s) sem entrar depois de ter iniciado — chamada para voltar.' },
+  { chave: 'gamificacao.sequencia', label: 'Gamificação: sequência de dias consecutivos', grupo: 'gamificacao', descricao: 'Aluno atingiu N dias consecutivos de estudo — incentivo para continuar.' },
+  { chave: 'gamificacao.marco', label: 'Gamificação: marco de sequência (7/14/21/30…)', grupo: 'gamificacao', descricao: 'Aluno completou um marco de sequência (ex.: 7, 14, 21, 30 dias) — parabenização.' },
 ] as const
 
 export type WebhookEvento = (typeof EVENTOS_WEBHOOK)[number]['chave']
@@ -51,9 +51,9 @@ const STATUS_EVENTO: Record<WebhookEvento, string> = {
   'estudante.nao_finalizou': 'nao_finalizado',
   'estudante.visualizou_relatorio': 'relatorio_visualizado',
   'estudante.baixou_relatorio': 'relatorio_baixado',
-  'engajamento.inativo': 'inativo',
-  'engajamento.sequencia': 'sequencia',
-  'engajamento.marco': 'marco',
+  'gamificacao.inativo': 'inativo',
+  'gamificacao.sequencia': 'sequencia',
+  'gamificacao.marco': 'marco',
 }
 
 /**

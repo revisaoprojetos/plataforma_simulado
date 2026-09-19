@@ -12,7 +12,7 @@ import { Webhook, Plus, Trash2, Pencil, Loader2, Check, Zap, RefreshCw, AlertTri
 import { criarWebhook, atualizarWebhook, toggleWebhook, excluirWebhook } from '@/app/admin/conexoes/webhooks/actions'
 
 type Wh = { id: string; nome: string; url: string; eventos: string[]; temSecret: boolean; ativo: boolean; ultimoStatus: string | null; ultimoEnvio: string | null; enviosSimultaneos: number; filtroSimulados: string[] }
-type Evt = { chave: string; label: string }
+type Evt = { chave: string; label: string; descricao?: string; grupo?: string }
 type Sim = { id: string; titulo: string }
 
 function gerarSecret() {
@@ -148,18 +148,18 @@ function exemploPayload(evento: string) {
     'estudante.nao_finalizou': 'nao_finalizado',
     'estudante.visualizou_relatorio': 'relatorio_visualizado',
     'estudante.baixou_relatorio': 'relatorio_baixado',
-    'engajamento.inativo': 'inativo',
-    'engajamento.sequencia': 'sequencia',
-    'engajamento.marco': 'marco',
+    'gamificacao.inativo': 'inativo',
+    'gamificacao.sequencia': 'sequencia',
+    'gamificacao.marco': 'marco',
   }
   const finalizado = evento === 'estudante.finalizou'
-  const ehEngaj = evento.startsWith('engajamento.')
-  // Bloco de engajamento (eventos engajamento.*) — populado por tipo; null nos demais (estrutura fixa).
-  const engajamento = evento === 'engajamento.inativo'
+  const ehEngaj = evento.startsWith('gamificacao.')
+  // Bloco de gamificação (eventos gamificacao.*) — populado por tipo; null nos demais (estrutura fixa).
+  const engajamento = evento === 'gamificacao.inativo'
     ? { tipo: 'inativo', dias: 1, marco: null, streak_atual: 3, streak_maior: 12, mensagem: 'Oi João! Notamos que faz 1 dia que você não aparece por aqui. Bora voltar e retomar sua rotina de estudos? 💪' }
-    : evento === 'engajamento.sequencia'
+    : evento === 'gamificacao.sequencia'
       ? { tipo: 'sequencia', dias: 4, marco: null, streak_atual: 4, streak_maior: 12, mensagem: 'Mandou bem, João! Já são 4 dias seguidos estudando. Continue firme e não perca o ritmo! 🔥' }
-      : evento === 'engajamento.marco'
+      : evento === 'gamificacao.marco'
         ? { tipo: 'marco', dias: null, marco: 7, streak_atual: 7, streak_maior: 12, mensagem: 'Parabéns, João! 🏆 Você completou 7 dias consecutivos de estudo. Que constância!' }
         : { tipo: null, dias: null, marco: null, streak_atual: null, streak_maior: null, mensagem: null }
   return {
@@ -271,9 +271,21 @@ function WebhookDialog({ modo, wh, eventos, simulados, onClose }: { modo: 'novo'
   const [ativo, setAtivo] = useState(wh?.ativo ?? true)
   const [envios, setEnvios] = useState(wh?.enviosSimultaneos ?? 5)
   const [sel, setSel] = useState<Set<string>>(new Set(wh?.eventos ?? eventos.map((e) => e.chave)))
-  const [filtroModo, setFiltroModo] = useState<'todos' | 'especificos'>((wh?.filtroSimulados?.length ?? 0) > 0 ? 'especificos' : 'todos')
+  // Chaves dos eventos de gamificação (para o filtro "por gamificação" e para agrupar o picker).
+  const chavesGamif = eventos.filter((e) => e.grupo === 'gamificacao').map((e) => e.chave)
+  const soGamif = (arr?: string[]) => !!arr?.length && arr.every((c) => chavesGamif.includes(c))
+  // Filtro: 'todos' | 'simulado' | 'gamificacao'. Deriva o modo inicial dos dados salvos.
+  const [filtroModo, setFiltroModo] = useState<'todos' | 'simulado' | 'gamificacao'>(
+    (wh?.filtroSimulados?.length ?? 0) > 0 ? 'simulado' : soGamif(wh?.eventos) ? 'gamificacao' : 'todos',
+  )
   const [simSel, setSimSel] = useState<Set<string>>(new Set(wh?.filtroSimulados ?? []))
   const [pending, start] = useTransition()
+
+  // Ao escolher "por gamificação", escopa o webhook aos 3 gatilhos de gamificação (e some o filtro de simulado).
+  function escolherModo(m: 'todos' | 'simulado' | 'gamificacao') {
+    setFiltroModo(m)
+    if (m === 'gamificacao') setSel(new Set(chavesGamif))
+  }
 
   const toggleEvt = (c: string) => setSel((p) => { const n = new Set(p); n.has(c) ? n.delete(c) : n.add(c); return n })
   const toggleSim = (id: string) => setSimSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
@@ -288,7 +300,7 @@ function WebhookDialog({ modo, wh, eventos, simulados, onClose }: { modo: 'novo'
       const data = {
         nome, url, eventos: [...sel], secret: secret || undefined, ativo,
         enviosSimultaneos: envios,
-        filtroSimulados: filtroModo === 'especificos' ? [...simSel] : [],
+        filtroSimulados: filtroModo === 'simulado' ? [...simSel] : [],
       }
       const r = modo === 'novo' ? await criarWebhook(data) : await atualizarWebhook(wh!.id, data)
       if (r.ok) location.reload()
@@ -329,10 +341,11 @@ function WebhookDialog({ modo, wh, eventos, simulados, onClose }: { modo: 'novo'
           <div className="space-y-1.5">
             <Label>Filtrar por</Label>
             <div className="flex flex-wrap gap-4 text-sm">
-              <label className="flex cursor-pointer items-center gap-1.5"><input type="radio" name="filtro" checked={filtroModo === 'todos'} onChange={() => setFiltroModo('todos')} className="accent-primary" /> Todos os simulados</label>
-              <label className="flex cursor-pointer items-center gap-1.5"><input type="radio" name="filtro" checked={filtroModo === 'especificos'} onChange={() => setFiltroModo('especificos')} className="accent-primary" /> Simulados específicos</label>
+              <label className="flex cursor-pointer items-center gap-1.5"><input type="radio" name="filtro" checked={filtroModo === 'todos'} onChange={() => escolherModo('todos')} className="accent-primary" /> Todos</label>
+              <label className="flex cursor-pointer items-center gap-1.5"><input type="radio" name="filtro" checked={filtroModo === 'simulado'} onChange={() => escolherModo('simulado')} className="accent-primary" /> Simulado</label>
+              <label className="flex cursor-pointer items-center gap-1.5"><input type="radio" name="filtro" checked={filtroModo === 'gamificacao'} onChange={() => escolherModo('gamificacao')} className="accent-primary" /> Gamificação</label>
             </div>
-            {filtroModo === 'especificos' && (
+            {filtroModo === 'simulado' && (
               <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border p-2">
                 {simulados.length === 0 ? <p className="px-1 py-2 text-xs text-muted-foreground">Nenhum simulado cadastrado.</p> : simulados.map((s) => {
                   const on = simSel.has(s.id)
@@ -345,17 +358,24 @@ function WebhookDialog({ modo, wh, eventos, simulados, onClose }: { modo: 'novo'
                 })}
               </div>
             )}
+            {filtroModo === 'gamificacao' && (
+              <p className="rounded-lg border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground">Eventos de gamificação não têm simulado. Escolha os gatilhos (inatividade, sequência, marco) na lista de eventos abaixo.</p>
+            )}
           </div>
 
           <div className="space-y-1.5">
             <Label>Eventos que disparam</Label>
             <div className="space-y-1 rounded-lg border p-2">
-              {eventos.map((e) => {
+              {/* Só mostra os eventos do grupo do filtro (gamificação → só os 3 gatilhos; senão todos). */}
+              {eventos.filter((e) => filtroModo !== 'gamificacao' || e.grupo === 'gamificacao').map((e) => {
                 const on = sel.has(e.chave)
                 return (
-                  <button key={e.chave} type="button" onClick={() => toggleEvt(e.chave)} className={cn('flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors', on ? 'bg-primary/5' : 'hover:bg-muted')}>
-                    <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded border', on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>{on && <Check className="h-3 w-3" />}</span>
-                    {e.label}
+                  <button key={e.chave} type="button" onClick={() => toggleEvt(e.chave)} className={cn('flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors', on ? 'bg-primary/5' : 'hover:bg-muted')}>
+                    <span className={cn('mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border', on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>{on && <Check className="h-3 w-3" />}</span>
+                    <span className="min-w-0">
+                      <span className="block text-sm leading-tight">{e.label}</span>
+                      {e.descricao && <span className="block text-[11px] leading-snug text-muted-foreground">{e.descricao}</span>}
+                    </span>
                   </button>
                 )
               })}

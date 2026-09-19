@@ -33,14 +33,14 @@ export const DEFAULT_ENGAJAMENTO: EngajamentoConfig = {
   marco: { ativo: false, marcos: [7, 14, 21, 30], mensagem: 'Parabéns, {{nome}}! 🏆 Você completou {{marco}} dias consecutivos de estudo. Que constância! Siga assim e vá ainda mais longe.' },
 }
 
-/** Catálogo dos eventos de engajamento (chave usada nos webhooks/automações + rótulo no admin). */
+/** Catálogo dos eventos de gamificação (chave usada nos webhooks/automações + rótulo no admin). */
 export const EVENTOS_ENGAJAMENTO = [
-  { chave: 'engajamento.inativo', label: 'Engajamento: aluno parou de entrar (inativo)' },
-  { chave: 'engajamento.sequencia', label: 'Engajamento: sequência de dias consecutivos' },
-  { chave: 'engajamento.marco', label: 'Engajamento: marco de sequência (7/14/21/30…)' },
+  { chave: 'gamificacao.inativo', label: 'Gamificação: aluno parou de entrar (inativo)' },
+  { chave: 'gamificacao.sequencia', label: 'Gamificação: sequência de dias consecutivos' },
+  { chave: 'gamificacao.marco', label: 'Gamificação: marco de sequência (7/14/21/30…)' },
 ] as const
 
-export const eventoDoTipo = (tipo: EngajamentoTipo) => `engajamento.${tipo}` as const
+export const eventoDoTipo = (tipo: EngajamentoTipo) => `gamificacao.${tipo}` as const
 
 const intNum = (v: unknown, def: number, lo = 1, hi = 3650): number => {
   const n = Math.trunc(Number(v))
