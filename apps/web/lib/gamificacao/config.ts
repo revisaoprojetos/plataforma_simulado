@@ -1,4 +1,5 @@
 import { cache } from 'react'
+import { resolverEngajamento, DEFAULT_ENGAJAMENTO, type EngajamentoConfig } from './engajamento-tipos'
 
 // Tipos da CONFIG de gamificação (espelham o JSONB de simulado_gamificacao_config).
 export interface XpRegras {
@@ -36,6 +37,8 @@ export interface GamConfig {
   missoes_def: MissaoDef[]
   missoes_config: MissoesConfig
   conquistas_def: ConquistaDef[]
+  /** Gatilhos de engajamento (webhook por sequência/inatividade/marco). Vive em xp_regras.engajamento. */
+  engajamento: EngajamentoConfig
 }
 
 // Defaults — ESPELHAM o seed da migração 20260812000001_gamificacao.sql. Usados como fallback
@@ -122,6 +125,7 @@ export const DEFAULT_CONFIG = {
   missoes_def: DEFAULT_MISSOES,
   missoes_config: DEFAULT_MISSOES_CONFIG,
   conquistas_def: DEFAULT_CONQUISTAS,
+  engajamento: DEFAULT_ENGAJAMENTO,
 }
 
 /**
@@ -167,5 +171,7 @@ export const getGamConfig = cache(async (svc: any, tenantId: string | null): Pro
     missoes_def: Array.isArray(r.missoes_def) ? r.missoes_def : DEFAULT_MISSOES,
     missoes_config: { ...DEFAULT_MISSOES_CONFIG, ...(r.missoes_config ?? {}) },
     conquistas_def: Array.isArray(r.conquistas_def) ? r.conquistas_def : DEFAULT_CONQUISTAS,
+    // Engajamento fica DENTRO de xp_regras (migration-free). Tolerante: ausente → defaults (desligado).
+    engajamento: resolverEngajamento((xr as any).engajamento),
   }
 })

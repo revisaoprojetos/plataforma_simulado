@@ -2,6 +2,7 @@ import { getGamConfig } from './config'
 import { diaLocal } from './datas'
 import { ensureCacheRow } from './cache'
 import { awardXp } from './xp'
+import { dispararEngajamento } from './engajamento'
 
 const diaNum = (dia: string) => Math.floor(Date.parse(dia + 'T00:00:00Z') / 86_400_000)
 
@@ -48,5 +49,15 @@ export async function registrarAtividade(svc: any, { tenantId, estudanteId }: { 
   const n = config.xp_regras.chest.cada_n_dias
   if (n > 0 && streak % n === 0) {
     await awardXp(svc, { tenantId, estudanteId, origem: 'chest', refId: `chest-${streak}`, xp: config.xp_regras.chest.xp, meta: { streak } })
+  }
+
+  // Engajamento em tempo real (webhook): sequência (N dias) + marcos (7/14/21/30…). Idempotente pelo
+  // log; fire-and-forget para não segurar o fluxo do aluno. A INATIVIDADE fica no cron de engajamento.
+  const eng = config.engajamento
+  if (eng.sequencia.ativo && streak === (eng.sequencia.dias ?? 0)) {
+    void dispararEngajamento(svc, { tenantId, estudanteId, tipo: 'sequencia', ref: `seq-${streak}`, gatilho: eng.sequencia, streakAtual: streak, streakMaior: maior })
+  }
+  if (eng.marco.ativo && (eng.marco.marcos ?? []).includes(streak)) {
+    void dispararEngajamento(svc, { tenantId, estudanteId, tipo: 'marco', ref: `marco-${streak}`, gatilho: eng.marco, streakAtual: streak, streakMaior: maior, marco: streak })
   }
 }

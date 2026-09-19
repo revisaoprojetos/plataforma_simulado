@@ -60,6 +60,8 @@ export async function rodarAutomacoes(tenantId: string | null | undefined, event
         tentativa: dados.tentativa ?? null,
         motivo: dados.motivo ?? null,
       },
+      // Bloco de engajamento (eventos engajamento.*) — permite {{engajamento.mensagem}} no fluxo/n8n.
+      engajamento: dados.engajamento ?? null,
     }
 
     for (const a of autos as any[]) {

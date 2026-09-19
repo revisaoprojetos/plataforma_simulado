@@ -9,6 +9,10 @@ export const EVENTOS_WEBHOOK = [
   { chave: 'estudante.visualizou_relatorio', label: 'Estudante visualizou o relatório' },
   { chave: 'estudante.baixou_relatorio', label: 'Estudante baixou o relatório' },
   { chave: 'estudante.nao_finalizou', label: 'Estudante não finalizou (abandonou/expirou)' },
+  // Engajamento / gamificação (sequência/status) — disparados pelo streak e pelo cron de inatividade.
+  { chave: 'engajamento.inativo', label: 'Engajamento: aluno parou de entrar (inativo)' },
+  { chave: 'engajamento.sequencia', label: 'Engajamento: sequência de dias consecutivos' },
+  { chave: 'engajamento.marco', label: 'Engajamento: marco de sequência (7/14/21/30…)' },
 ] as const
 
 export type WebhookEvento = (typeof EVENTOS_WEBHOOK)[number]['chave']
@@ -46,6 +50,9 @@ const STATUS_EVENTO: Record<WebhookEvento, string> = {
   'estudante.nao_finalizou': 'nao_finalizado',
   'estudante.visualizou_relatorio': 'relatorio_visualizado',
   'estudante.baixou_relatorio': 'relatorio_baixado',
+  'engajamento.inativo': 'inativo',
+  'engajamento.sequencia': 'sequencia',
+  'engajamento.marco': 'marco',
 }
 
 /**
@@ -109,6 +116,16 @@ export async function dispararWebhook(tenantId: string | null | undefined, event
         total: d.total ?? null,
         tentativa: d.tentativa ?? null,
         motivo: d.motivo ?? null,
+      },
+      // Bloco de engajamento/gamificação (sequência/status) — preenchido nos eventos `engajamento.*`,
+      // null nos demais (estrutura fixa p/ o n8n não quebrar por campo ausente).
+      engajamento: {
+        tipo: d.engajamento?.tipo ?? null,
+        dias: d.engajamento?.dias ?? null,
+        marco: d.engajamento?.marco ?? null,
+        streak_atual: d.engajamento?.streak_atual ?? null,
+        streak_maior: d.engajamento?.streak_maior ?? null,
+        mensagem: d.engajamento?.mensagem ?? null,
       },
     })
 

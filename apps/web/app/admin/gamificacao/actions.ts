@@ -10,6 +10,7 @@ import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { selecionarGrupos } from '@/lib/simulado/grupos'
 import { grupoContagensSql } from 'data'
 import { DEFAULT_CONFIG, type XpRegras, type NivelCurva, type LigaDef, type MissaoDef, type MissoesConfig, type ConquistaDef, type PublicoModo } from '@/lib/gamificacao/config'
+import { resolverEngajamento, type EngajamentoConfig } from '@/lib/gamificacao/engajamento-tipos'
 import type { EstudanteAcessoLinha } from '@/app/admin/leitura/actions'
 
 /** Grupo no seletor do público, com hierarquia (pasta mestre/pai), contagem, origem e se já está vinculado. */
@@ -69,6 +70,14 @@ export async function salvarRegrasGerais(d: { ativo: boolean; timezone: string; 
 
 export async function salvarLigas(ligas: LigaDef[]) {
   return salvarSlice({ ligas: [...ligas].sort((a, b) => a.xp_min - b.xp_min) })
+}
+
+/** Gatilhos de engajamento (webhook por sequência/inatividade/marco) — guardados em xp_regras.engajamento. */
+export async function salvarEngajamento(engajamento: EngajamentoConfig) {
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return { error: 'Tenant não resolvido.' }
+  const xp = await xpRegrasAtual(createAdminClient(), tenantId)
+  return salvarSlice({ xp_regras: { ...xp, engajamento: resolverEngajamento(engajamento) } })
 }
 
 export async function salvarConquistas(conquistas_def: ConquistaDef[]) {
