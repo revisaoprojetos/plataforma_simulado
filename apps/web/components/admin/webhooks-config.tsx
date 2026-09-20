@@ -8,8 +8,8 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogClose } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
-import { Webhook, Plus, Trash2, Pencil, Loader2, Check, Zap, RefreshCw, AlertTriangle, Search, X, Lock, ListFilter, ChevronDown, FileJson, Copy } from 'lucide-react'
-import { criarWebhook, atualizarWebhook, toggleWebhook, excluirWebhook } from '@/app/admin/conexoes/webhooks/actions'
+import { Webhook, Plus, Trash2, Pencil, Loader2, Check, Zap, RefreshCw, AlertTriangle, Search, X, Lock, ListFilter, ChevronDown, FileJson, Copy, Send } from 'lucide-react'
+import { criarWebhook, atualizarWebhook, toggleWebhook, excluirWebhook, testarWebhook } from '@/app/admin/conexoes/webhooks/actions'
 
 type Wh = { id: string; nome: string; url: string; eventos: string[]; temSecret: boolean; ativo: boolean; ultimoStatus: string | null; ultimoEnvio: string | null; enviosSimultaneos: number; filtroSimulados: string[] }
 type Evt = { chave: string; label: string; descricao?: string; grupo?: string }
@@ -40,6 +40,14 @@ export function WebhooksConfig({ webhooks, eventos, simulados, precisaMigrar }: 
   function excluir(id: string) {
     if (!confirm('Excluir este webhook?')) return
     start(async () => { const r = await excluirWebhook(id); if (r.ok) location.reload(); else toast.error(r.error ?? 'Erro') })
+  }
+  const [testando, setTestando] = useState<string | null>(null)
+  async function testar(w: Wh, evento?: string) {
+    setTestando(w.id)
+    const r = await testarWebhook(w.id, evento)
+    setTestando(null)
+    if (r.ok) toast.success(`Teste enviado (${r.evento}) — HTTP ${r.status} em ${r.ms}ms`)
+    else toast.error(`Falha no teste${r.evento ? ` (${r.evento})` : ''}: ${r.error ?? 'erro'}`)
   }
 
   return (
@@ -119,6 +127,7 @@ export function WebhooksConfig({ webhooks, eventos, simulados, precisaMigrar }: 
                   <td className="px-4 py-3"><div className="flex justify-center"><Switch checked={w.ativo} onCheckedChange={() => toggle(w)} disabled={pending} /></div></td>
                   <td className="px-4 py-3">
                     <div className="flex justify-end gap-1.5">
+                      <Button variant="outline" size="icon" onClick={() => testar(w)} disabled={testando === w.id} aria-label="Testar" title="Enviar um POST de teste (payload de exemplo)">{testando === w.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}</Button>
                       <Button variant="outline" size="icon" onClick={() => setPayloadWh(w)} aria-label="Ver payload" title="Ver payload enviado"><FileJson className="h-4 w-4" /></Button>
                       <Button variant="outline" size="icon" onClick={() => setDialog({ modo: 'editar', wh: w })} aria-label="Editar"><Pencil className="h-4 w-4" /></Button>
                       <Button variant="outline" size="icon" onClick={() => excluir(w.id)} disabled={pending} aria-label="Excluir" className="text-destructive"><Trash2 className="h-4 w-4" /></Button>
@@ -198,6 +207,7 @@ function exemploPayload(evento: string) {
 function PayloadDialog({ wh, eventos, onClose }: { wh: Wh; eventos: Evt[]; onClose: () => void }) {
   const eventosDoWh = wh.eventos.length ? wh.eventos : eventos.map((e) => e.chave)
   const [evento, setEvento] = useState(eventosDoWh[0] ?? 'estudante.finalizou')
+  const [testando, setTestando] = useState(false)
   const labelEvento = (c: string) => eventos.find((e) => e.chave === c)?.label ?? c
 
   const corpo = useMemo(() => JSON.stringify(exemploPayload(evento), null, 2), [evento])
@@ -244,6 +254,13 @@ function PayloadDialog({ wh, eventos, onClose }: { wh: Wh; eventos: Evt[]; onClo
         </div>
 
         <div className="flex justify-end gap-2 border-t bg-muted/30 p-3">
+          <Button type="button" variant="outline" disabled={testando} onClick={async () => {
+            setTestando(true)
+            const r = await testarWebhook(wh.id, evento)
+            setTestando(false)
+            if (r.ok) toast.success(`Teste enviado (${r.evento}) — HTTP ${r.status} em ${r.ms}ms`)
+            else toast.error(`Falha no teste: ${r.error ?? 'erro'}`)
+          }}>{testando ? <Loader2 className="mr-1.5 h-4 w-4 animate-spin" /> : <Send className="mr-1.5 h-4 w-4" />} Enviar teste</Button>
           <DialogClose render={<Button type="button" variant="outline" />}>Fechar</DialogClose>
         </div>
       </DialogContent>

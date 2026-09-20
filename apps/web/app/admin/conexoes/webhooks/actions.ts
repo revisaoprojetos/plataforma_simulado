@@ -4,8 +4,9 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
-import { criptografar } from '@/lib/crypto'
+import { criptografar, descriptografar } from '@/lib/crypto'
 import { revalidatePath } from 'next/cache'
+import { montarCorpoWebhook, dadosExemploWebhook, enviarWebhookHttp } from '@/lib/webhooks/envelope'
 
 // `secret` semântica no UPDATE: undefined = MANTER o atual (o client não reenvia o segredo, que nunca
 // chega ao browser); string vazia = limpar; string = novo segredo (guardado CRIPTOGRAFADO).
@@ -88,6 +89,28 @@ export async function toggleWebhook(id: string, ativo: boolean): Promise<{ ok: b
   if (error) return { ok: false, error: error.message }
   revalidatePath('/admin/conexoes/webhooks')
   return { ok: true }
+}
+
+/**
+ * Envia um POST de TESTE para o webhook (payload de exemplo do evento, assinado igual ao real) e
+ * retorna o resultado HTTP — sem gravar nada. Usa a URL/segredo salvos; `evento` default = 1º assinado.
+ */
+export async function testarWebhook(id: string, evento?: string): Promise<{ ok: boolean; status?: number | null; ms?: number; evento?: string; error?: string }> {
+  if (!(await podeGerenciar())) return { ok: false, error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const svc = await createServiceClient()
+  const { data: wh } = await svc.from('simulado_webhook_saida').select('url, secret, eventos').eq('id', id).eq('tenant_id', tenantId).maybeSingle()
+  if (!wh?.url) return { ok: false, error: 'Webhook não encontrado.' }
+  const ev = evento || (Array.isArray(wh.eventos) && wh.eventos[0]) || 'estudante.finalizou'
+  const { data: tnt } = await svc.from('simulado_tenants').select('nome, slug').eq('id', tenantId).maybeSingle()
+  const corpo = JSON.stringify(montarCorpoWebhook(ev, { id: tenantId, nome: (tnt as any)?.nome ?? null, slug: (tnt as any)?.slug ?? null }, tenantId, dadosExemploWebhook(ev), new Date().toISOString()))
+  const r = await enviarWebhookHttp(wh.url, ev, corpo, descriptografar(wh.secret))
+  // Registra o resultado do teste no status do webhook (visível na lista) e audita.
+  await svc.from('simulado_webhook_saida').update({ ultimo_status: `teste: ${r.texto}`, ultimo_envio: new Date().toISOString() }).eq('id', id).eq('tenant_id', tenantId)
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_webhook_saida', entidadeId: id, depois: { teste: r.texto, evento: ev } })
+  revalidatePath('/admin/conexoes/webhooks')
+  return { ok: r.ok, status: r.status, ms: r.ms, evento: ev, error: r.ok ? undefined : r.texto }
 }
 
 export async function excluirWebhook(id: string): Promise<{ ok: boolean; error?: string }> {

@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import { createAdminClient } from '@/lib/supabase/server'
 import { descriptografar } from '@/lib/crypto'
 import { rodarAutomacoes } from '@/lib/automacoes/run'
+import { montarCorpoWebhook } from './envelope'
 
 export const EVENTOS_WEBHOOK = [
   { chave: 'estudante.iniciou', label: 'Estudante iniciou o simulado', grupo: 'entrega', descricao: 'Quando o aluno abre e começa o simulado.' },
@@ -44,18 +45,6 @@ async function enviarComRetry(url: string, headers: Record<string, string>, corp
   return 'erro'
 }
 
-// Status "humano" de cada evento (estilo `status` do payload da Guru).
-const STATUS_EVENTO: Record<WebhookEvento, string> = {
-  'estudante.iniciou': 'iniciado',
-  'estudante.finalizou': 'finalizado',
-  'estudante.nao_finalizou': 'nao_finalizado',
-  'estudante.visualizou_relatorio': 'relatorio_visualizado',
-  'estudante.baixou_relatorio': 'relatorio_baixado',
-  'gamificacao.inativo': 'inativo',
-  'gamificacao.sequencia': 'sequencia',
-  'gamificacao.marco': 'marco',
-}
-
 /**
  * Dispara um evento de progressão para os webhooks de saída ativos do tenant que
  * assinam esse evento. Best-effort: nunca lança (não quebra o fluxo do aluno) e
@@ -88,47 +77,7 @@ export async function dispararWebhook(tenantId: string | null | undefined, event
     // não quebrar por campo ausente.
     const d = dados as any
     const agora = new Date().toISOString()
-    const corpo = JSON.stringify({
-      id: d.sessao_id ?? null,
-      type: 'estudante',
-      webhook_type: 'progressao_estudante',
-      plataforma: { id: tenantId, nome: (tnt as any)?.nome ?? null, slug: (tnt as any)?.slug ?? null },
-      event: evento,
-      status: STATUS_EVENTO[evento] ?? evento,
-      dates: { created_at: agora, occurred_at: agora },
-      tenant_id: tenantId,
-      contact: {
-        id: d.contact?.id ?? null,
-        name: d.contact?.name ?? null,
-        email: d.contact?.email ?? null,
-        doc: d.contact?.doc ?? null,
-        phone_number: d.contact?.phone_number ?? null,
-        phone_local_code: d.contact?.phone_local_code ?? null,
-        plano: d.contact?.plano ?? null,
-      },
-      simulado: {
-        id: d.simulado?.id ?? null,
-        name: d.simulado?.name ?? null,
-      },
-      resultado: {
-        sessao_id: d.sessao_id ?? null,
-        nota: d.nota ?? null,
-        acertos: d.acertos ?? null,
-        total: d.total ?? null,
-        tentativa: d.tentativa ?? null,
-        motivo: d.motivo ?? null,
-      },
-      // Bloco de engajamento/gamificação (sequência/status) — preenchido nos eventos `engajamento.*`,
-      // null nos demais (estrutura fixa p/ o n8n não quebrar por campo ausente).
-      engajamento: {
-        tipo: d.engajamento?.tipo ?? null,
-        dias: d.engajamento?.dias ?? null,
-        marco: d.engajamento?.marco ?? null,
-        streak_atual: d.engajamento?.streak_atual ?? null,
-        streak_maior: d.engajamento?.streak_maior ?? null,
-        mensagem: d.engajamento?.mensagem ?? null,
-      },
-    })
+    const corpo = JSON.stringify(montarCorpoWebhook(evento, { id: tenantId, nome: (tnt as any)?.nome ?? null, slug: (tnt as any)?.slug ?? null }, tenantId, d, agora))
 
     await Promise.allSettled(alvos.map(async (e: any) => {
       const headers: Record<string, string> = { 'Content-Type': 'application/json', 'X-Webhook-Evento': evento }
