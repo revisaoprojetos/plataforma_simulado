@@ -2,13 +2,17 @@ import { cache } from 'react'
 import { resolverEngajamento, DEFAULT_ENGAJAMENTO, type EngajamentoConfig } from './engajamento-tipos'
 
 // Tipos da CONFIG de gamificação (espelham o JSONB de simulado_gamificacao_config).
+/** Bônus extra de sequência num marco específico (ex.: 14 dias → +15). Soma com o baú semanal. */
+export interface MarcoStreak { dias: number; xp: number }
 export interface XpRegras {
   simulado: { base: number; por_acerto: number; bonus_nota_max: number }
   pratica: { por_acerto: number; bonus_disc_fraca: number }
-  streak: { por_dia: number; cap: number; tolerancia_dias: number }
+  streak: { por_dia: number; cap: number; tolerancia_dias: number; marcos?: MarcoStreak[] }
   chest: { cada_n_dias: number; xp: number }
   fim_semana: { ativo: boolean; multiplicador: number }
   meta_dia: { xp: number; bonus: number }
+  /** Teto de XP por dia (0 = sem teto). Soma tudo que o aluno ganha no dia. */
+  limite_dia?: number
 }
 /** Cargo/título exibido a partir de um nível (ex.: nível 6+ = "Júnior"). */
 export interface TituloNivel { nivel_min: number; titulo: string }
@@ -43,13 +47,17 @@ export interface GamConfig {
 
 // Defaults — ESPELHAM o seed da migração 20260812000001_gamificacao.sql. Usados como fallback
 // quando a config do tenant ainda não existe/está incompleta e no "restaurar padrões" do admin.
+// Marcos-padrão de sequência (somam com o baú semanal): 2 semanas +15, 21 dias +35, mês +50.
+export const DEFAULT_MARCOS_STREAK: MarcoStreak[] = [{ dias: 14, xp: 15 }, { dias: 21, xp: 35 }, { dias: 30, xp: 50 }]
 export const DEFAULT_XP_REGRAS: XpRegras = {
   simulado: { base: 20, por_acerto: 2, bonus_nota_max: 30 },
   pratica: { por_acerto: 5, bonus_disc_fraca: 3 },
-  streak: { por_dia: 10, cap: 50, tolerancia_dias: 0 },
-  chest: { cada_n_dias: 7, xp: 100 },
+  // Login diário sem XP fixo (os pontos do dia vêm das atividades); baú SEMANAL +10 + marcos que somam.
+  streak: { por_dia: 0, cap: 300, tolerancia_dias: 0, marcos: DEFAULT_MARCOS_STREAK },
+  chest: { cada_n_dias: 7, xp: 10 },
   fim_semana: { ativo: false, multiplicador: 2 },
   meta_dia: { xp: 50, bonus: 0 },
+  limite_dia: 300, // teto de XP por dia
 }
 export const DEFAULT_TITULOS: TituloNivel[] = [
   { nivel_min: 1, titulo: 'Aprendiz' },
@@ -161,10 +169,11 @@ export const getGamConfig = cache(async (svc: any, tenantId: string | null): Pro
     xp_regras: {
       simulado: { ...DEFAULT_XP_REGRAS.simulado, ...(xr.simulado ?? {}) },
       pratica: { ...DEFAULT_XP_REGRAS.pratica, ...(xr.pratica ?? {}) },
-      streak: { ...DEFAULT_XP_REGRAS.streak, ...(xr.streak ?? {}) },
+      streak: { ...DEFAULT_XP_REGRAS.streak, ...(xr.streak ?? {}), marcos: Array.isArray(xr.streak?.marcos) ? xr.streak.marcos : DEFAULT_MARCOS_STREAK },
       chest: { ...DEFAULT_XP_REGRAS.chest, ...(xr.chest ?? {}) },
       fim_semana: { ...DEFAULT_XP_REGRAS.fim_semana, ...(xr.fim_semana ?? {}) },
       meta_dia: { ...DEFAULT_XP_REGRAS.meta_dia, ...(xr.meta_dia ?? {}) },
+      limite_dia: Number.isFinite(Number(xr.limite_dia)) ? Math.max(0, Math.trunc(Number(xr.limite_dia))) : DEFAULT_XP_REGRAS.limite_dia,
     },
     nivel_curva: { ...DEFAULT_NIVEL_CURVA, ...(r.nivel_curva ?? {}) },
     ligas: Array.isArray(r.ligas) && r.ligas.length ? r.ligas : DEFAULT_LIGAS,

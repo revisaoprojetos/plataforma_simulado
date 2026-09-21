@@ -134,9 +134,11 @@ export async function onLeituraConcluida(
     if (!config || !(await gamAtivaParaAluno(svc, tenantId, estudanteId, config))) return
     // XP por AULA concluída = pontos_aula do módulo (configurável). Idempotente por documento (refId).
     const ctx = await contextoLeituraDoc(svc, tenantId, documentoId)
-    const mult = multiplicadorDia(config, diaLocal(config.timezone))
+    const dia = diaLocal(config.timezone)
+    const mult = multiplicadorDia(config, dia)
+    const limiteDia = config.xp_regras.limite_dia || 0
     const xp = Math.round(Math.max(0, ctx.pontuacao.pontos_aula) * mult)
-    await awardXp(svc, { tenantId, estudanteId, origem: 'leitura', refId: documentoId, xp, meta: { documentoId, pontos_aula: ctx.pontuacao.pontos_aula, mult } })
+    await awardXp(svc, { tenantId, estudanteId, origem: 'leitura', refId: documentoId, xp, meta: { documentoId, pontos_aula: ctx.pontuacao.pontos_aula, mult }, dia, limiteDia })
     await registrarAtividade(svc, { tenantId, estudanteId })
     await progredirMissoes(svc, { tenantId, estudanteId, evento: 'concluiu_aula_leitura' })
     if (ctx.pastaId) await avaliarDesafiosModulo(svc, config, tenantId, estudanteId, ctx.pastaId, ctx.desafios)
@@ -162,11 +164,17 @@ export async function onQuizConcluido(
     if (!config || !(await gamAtivaParaAluno(svc, tenantId, estudanteId, config))) return
     await registrarAtividade(svc, { tenantId, estudanteId }) // concluir o quiz conta como atividade do dia
     const ctx = await contextoLeituraDoc(svc, tenantId, documentoId)
+    const dia = diaLocal(config.timezone)
+    const mult = multiplicadorDia(config, dia)
+    const limiteDia = config.xp_regras.limite_dia || 0
+    // Pontos por CONCLUIR o quiz (independe de acerto), 1× por documento (refId sem tentativa → não farma).
+    if (ctx.pontuacao.pontos_quiz > 0) {
+      await awardXp(svc, { tenantId, estudanteId, origem: 'leitura', refId: `quiz:${documentoId}`, xp: Math.round(ctx.pontuacao.pontos_quiz * mult), meta: { documentoId, quiz: true, mult }, dia, limiteDia })
+    }
     if (total > 0 && acertos >= total) {
       await progredirMissoes(svc, { tenantId, estudanteId, evento: 'gabaritou_quiz_leitura' })
       if (ctx.pontuacao.combo_ativo && ctx.pontuacao.combo_bonus > 0) {
-        const mult = multiplicadorDia(config, diaLocal(config.timezone))
-        await awardXp(svc, { tenantId, estudanteId, origem: 'leitura', refId: `combo:${documentoId}`, xp: Math.round(ctx.pontuacao.combo_bonus * mult), meta: { documentoId, combo: true, mult } })
+        await awardXp(svc, { tenantId, estudanteId, origem: 'leitura', refId: `combo:${documentoId}`, xp: Math.round(ctx.pontuacao.combo_bonus * mult), meta: { documentoId, combo: true, mult }, dia, limiteDia })
       }
     }
     if (ctx.pastaId) await avaliarDesafiosModulo(svc, config, tenantId, estudanteId, ctx.pastaId, ctx.desafios)

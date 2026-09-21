@@ -50,11 +50,11 @@ export async function salvarXpNiveis(d: { simulado: XpRegras['simulado']; pratic
   return salvarSlice({ xp_regras: { ...xp, simulado: d.simulado, pratica: d.pratica }, nivel_curva: d.nivel_curva })
 }
 
-export async function salvarRegrasGerais(d: { ativo: boolean; timezone: string; streak: XpRegras['streak']; chest: XpRegras['chest']; fim_semana: XpRegras['fim_semana']; meta_dia: XpRegras['meta_dia']; trilha_estilo?: 'cards' | 'caminho'; trilha_visiveis?: number }) {
+export async function salvarRegrasGerais(d: { ativo: boolean; timezone: string; streak: XpRegras['streak']; chest: XpRegras['chest']; fim_semana: XpRegras['fim_semana']; meta_dia: XpRegras['meta_dia']; limite_dia?: number; trilha_estilo?: 'cards' | 'caminho'; trilha_visiveis?: number }) {
   const tenantId = await getCurrentTenantId()
   if (!tenantId) return { error: 'Tenant não resolvido.' }
   const xp = await xpRegrasAtual(createAdminClient(), tenantId)
-  const base = { ativo: d.ativo, timezone: d.timezone, xp_regras: { ...xp, streak: d.streak, chest: d.chest, fim_semana: d.fim_semana, meta_dia: d.meta_dia } }
+  const base = { ativo: d.ativo, timezone: d.timezone, xp_regras: { ...xp, streak: d.streak, chest: d.chest, fim_semana: d.fim_semana, meta_dia: d.meta_dia, limite_dia: Math.max(0, Math.trunc(d.limite_dia ?? (xp as any).limite_dia ?? 0)) } }
   const extra: Record<string, unknown> = {}
   if (d.trilha_estilo) extra.trilha_estilo = d.trilha_estilo
   if (d.trilha_visiveis != null) extra.trilha_visiveis = Math.max(0, Math.trunc(d.trilha_visiveis))

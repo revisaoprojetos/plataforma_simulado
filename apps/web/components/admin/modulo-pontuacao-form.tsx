@@ -19,7 +19,7 @@ export function ModuloPontuacaoForm({ pastaId, atual }: { pastaId: string; atual
   const baseRef = useRef(JSON.stringify(atual))
   const dirty = JSON.stringify(cfg) !== baseRef.current
 
-  function setNum(k: 'pontos_aula' | 'pontos_acerto' | 'combo_bonus', v: string) {
+  function setNum(k: 'pontos_aula' | 'pontos_quiz' | 'pontos_acerto' | 'combo_bonus', v: string) {
     const n = Math.max(0, Math.round(Number(v) || 0))
     setCfg((c) => ({ ...c, [k]: n }))
   }
@@ -37,7 +37,7 @@ export function ModuloPontuacaoForm({ pastaId, atual }: { pastaId: string; atual
   // No salvar único da aba Config, esconde o botão próprio e registra dirty + salvar.
   const noSalvarUnico = useRegistrarSalvavel(`${pastaId}:pontuacao`, dirty, salvar)
 
-  const campo = (label: string, k: 'pontos_aula' | 'pontos_acerto' | 'combo_bonus', dica: string) => (
+  const campo = (label: string, k: 'pontos_aula' | 'pontos_quiz' | 'pontos_acerto' | 'combo_bonus', dica: string) => (
     <label className="space-y-1">
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
       <input type="number" min={0} value={cfg[k]} onChange={(e) => setNum(k, e.target.value)}
@@ -56,9 +56,10 @@ export function ModuloPontuacaoForm({ pastaId, atual }: { pastaId: string; atual
         </div>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-3">
-        {campo('Pontos por aula', 'pontos_aula', 'Ao concluir a aula (leitura + quiz).')}
-        {campo('Pontos por acerto', 'pontos_acerto', 'Cada questão certa no quiz.')}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {campo('Pontos por leitura', 'pontos_aula', 'Ao concluir a leitura da aula.')}
+        {campo('Pontos por quiz', 'pontos_quiz', 'Ao concluir o quiz (independe de acerto).')}
+        {campo('Pontos por acerto', 'pontos_acerto', 'Cada questão certa no quiz (0 = desligado).')}
         {campo('Bônus de combo', 'combo_bonus', 'Por aula gabaritada (100%).')}
       </div>
 

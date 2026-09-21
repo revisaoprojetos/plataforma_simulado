@@ -40,15 +40,26 @@ export async function registrarAtividade(svc: any, { tenantId, estudanteId }: { 
     .update({ streak_atual: streak, streak_maior: maior, ultimo_dia_ativo: hoje, atualizado_em: new Date().toISOString() })
     .eq('tenant_id', tenantId).eq('estudante_id', estudanteId)
 
-  // XP diário de streak: cresce com a sequência, limitado pelo cap.
-  const { por_dia, cap } = config.xp_regras.streak
-  const xpDia = Math.min(Math.max(1, por_dia) * streak, Math.max(por_dia, cap))
-  await awardXp(svc, { tenantId, estudanteId, origem: 'streak', refId: hoje, xp: xpDia, meta: { streak } })
+  const limiteDia = config.xp_regras.limite_dia || 0
 
-  // Baú a cada N dias de sequência.
+  // XP diário de streak (login): cresce com a sequência, limitado pelo cap. Com por_dia=0 fica sem XP fixo.
+  const { por_dia, cap } = config.xp_regras.streak
+  if (por_dia > 0) {
+    const xpDia = Math.min(por_dia * streak, Math.max(por_dia, cap))
+    await awardXp(svc, { tenantId, estudanteId, origem: 'streak', refId: hoje, xp: xpDia, meta: { streak }, dia: hoje, limiteDia })
+  }
+
+  // Baú a cada N dias de sequência (ex.: semanal +10 a cada 7 dias).
   const n = config.xp_regras.chest.cada_n_dias
   if (n > 0 && streak % n === 0) {
-    await awardXp(svc, { tenantId, estudanteId, origem: 'chest', refId: `chest-${streak}`, xp: config.xp_regras.chest.xp, meta: { streak } })
+    await awardXp(svc, { tenantId, estudanteId, origem: 'chest', refId: `chest-${streak}`, xp: config.xp_regras.chest.xp, meta: { streak }, dia: hoje, limiteDia })
+  }
+
+  // Marcos de sequência (somam com o baú): ex.: 14 dias +15, 21 dias +35, 30 dias +50. Uma vez por marco.
+  for (const m of config.xp_regras.streak.marcos ?? []) {
+    if (m && m.dias === streak && m.xp > 0) {
+      await awardXp(svc, { tenantId, estudanteId, origem: 'chest', refId: `marco-${m.dias}`, xp: m.xp, meta: { streak, marco: m.dias }, dia: hoje, limiteDia })
+    }
   }
 
   // Engajamento em tempo real (webhook): sequência (N dias) + marcos (7/14/21/30…). Idempotente pelo

@@ -4,8 +4,10 @@
 // em `simulado_pastas.pontuacao` (jsonb) — dormentes até a gamificação ser ativada.
 
 export interface PontuacaoLeitura {
-  /** Pontos por AULA concluída (leitura + quiz respondido). */
+  /** Pontos por LEITURA concluída (ler a aula). */
   pontos_aula: number
+  /** Pontos por concluir o QUIZ da aula (independe de acerto). */
+  pontos_quiz: number
   /** Pontos por ACERTO no quiz da aula. */
   pontos_acerto: number
   /** Liga o bônus de COMBO por aula GABARITADA (100% do quiz). */
@@ -14,7 +16,8 @@ export interface PontuacaoLeitura {
   combo_bonus: number
 }
 
-export const PONTUACAO_LEITURA_PADRAO: PontuacaoLeitura = { pontos_aula: 10, pontos_acerto: 2, combo_ativo: true, combo_bonus: 5 }
+// Padrão = tabela pedida: 5 por leitura, 5 por concluir o quiz, sem pontos por acerto e sem combo.
+export const PONTUACAO_LEITURA_PADRAO: PontuacaoLeitura = { pontos_aula: 5, pontos_quiz: 5, pontos_acerto: 0, combo_ativo: false, combo_bonus: 0 }
 
 /** Higieniza o jsonb cru (do banco) para o formato canônico, caindo nos padrões. */
 export function normalizarPontuacaoLeitura(raw: unknown): PontuacaoLeitura {
@@ -22,6 +25,7 @@ export function normalizarPontuacaoLeitura(raw: unknown): PontuacaoLeitura {
   const num = (v: unknown, d: number) => (typeof v === 'number' && Number.isFinite(v) ? v : d)
   return {
     pontos_aula: num(r.pontos_aula, PONTUACAO_LEITURA_PADRAO.pontos_aula),
+    pontos_quiz: num(r.pontos_quiz, PONTUACAO_LEITURA_PADRAO.pontos_quiz),
     pontos_acerto: num(r.pontos_acerto, PONTUACAO_LEITURA_PADRAO.pontos_acerto),
     combo_ativo: r.combo_ativo == null ? PONTUACAO_LEITURA_PADRAO.combo_ativo : !!r.combo_ativo,
     combo_bonus: num(r.combo_bonus, PONTUACAO_LEITURA_PADRAO.combo_bonus),

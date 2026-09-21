@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Switch } from '@/components/ui/switch'
 import { Label } from '@/components/ui/label'
-import { Power, Flame, Gift, Shield, CalendarDays, Target, Clock, Sparkles, Route, Check, MoreVertical, Users } from 'lucide-react'
+import { Power, Flame, Gift, Shield, CalendarDays, Target, Clock, Sparkles, Route, Check, MoreVertical, Users, Trophy, Plus, Trash2, Gauge } from 'lucide-react'
 import type { GamConfig, TrilhaEstilo } from '@/lib/gamificacao/config'
 import { cn } from '@/lib/utils'
 import { salvarRegrasGerais } from '../actions'
@@ -45,10 +45,13 @@ export function RegrasGeraisForm({ config, podeGerenciar }: { config: GamConfig;
   const [chest, setChest] = useState(config.xp_regras.chest)
   const [fimSemana, setFimSemana] = useState(config.xp_regras.fim_semana)
   const [metaDia, setMetaDia] = useState(config.xp_regras.meta_dia)
+  const [limiteDia, setLimiteDia] = useState<number>(config.xp_regras.limite_dia ?? 0)
+  const marcos = streak.marcos ?? []
+  const setMarcos = (m: { dias: number; xp: number }[]) => setStreak({ ...streak, marcos: m })
   const [trilhaEstilo, setTrilhaEstilo] = useState<TrilhaEstilo>(config.trilha_estilo)
   const [trilhaVisiveis, setTrilhaVisiveis] = useState<number>(config.trilha_visiveis)
   const [salvando, start] = useTransition()
-  const { dirty, markSaved } = useUnsavedGuard({ ativo, timezone, streak, chest, fimSemana, metaDia, trilhaEstilo, trilhaVisiveis })
+  const { dirty, markSaved } = useUnsavedGuard({ ativo, timezone, streak, chest, fimSemana, metaDia, limiteDia, trilhaEstilo, trilhaVisiveis })
 
   // Ativar/desativar a gamificação exige confirmação (impacto amplo no portal do aluno).
   async function pedirToggleAtivo(v: boolean) {
@@ -70,7 +73,7 @@ export function RegrasGeraisForm({ config, podeGerenciar }: { config: GamConfig;
     const trilhaMudou = trilhaEstilo !== config.trilha_estilo || trilhaVisiveis !== config.trilha_visiveis
     start(async () => {
       const r: any = await salvarRegrasGerais({
-        ativo, timezone, streak, chest, fim_semana: fimSemana, meta_dia: metaDia,
+        ativo, timezone, streak, chest, fim_semana: fimSemana, meta_dia: metaDia, limite_dia: limiteDia,
         ...(trilhaMudou ? { trilha_estilo: trilhaEstilo, trilha_visiveis: trilhaVisiveis } : {}),
       })
       if (r?.error) toast.error(r.error); else { toast.success(r?.aviso ?? 'Regras gerais salvas.'); markSaved() }
@@ -124,9 +127,23 @@ export function RegrasGeraisForm({ config, podeGerenciar }: { config: GamConfig;
           <NumberField stacked label="Dias de tolerância" value={streak.tolerancia_dias} onChange={(v) => setStreak({ ...streak, tolerancia_dias: Math.max(0, v) })} suffix="dias de folga" hint="0 = perde ao faltar 1 dia. 1 = pode faltar 1 dia." disabled={dis} />
         </RuleCard>
 
-        <RuleCard icon={Gift} tom="#8b5cf6" titulo="Baú de sequência" descricao="Prêmio extra em XP a cada ciclo de dias de sequência.">
+        <RuleCard icon={Gift} tom="#8b5cf6" titulo="Bônus de semana (baú)" descricao="Prêmio em XP a cada ciclo de dias de sequência (ex.: +10 a cada 7 dias).">
           <NumberField stacked label="A cada N dias" value={chest.cada_n_dias} onChange={(v) => setChest({ ...chest, cada_n_dias: v })} suffix="dias" min={1} disabled={dis} />
-          <NumberField stacked label="XP do baú" value={chest.xp} onChange={(v) => setChest({ ...chest, xp: v })} suffix="XP" disabled={dis} />
+          <NumberField stacked label="XP do bônus" value={chest.xp} onChange={(v) => setChest({ ...chest, xp: v })} suffix="XP" disabled={dis} />
+        </RuleCard>
+
+        <RuleCard icon={Trophy} tom="#f59e0b" titulo="Marcos de sequência" descricao="Bônus EXTRA em dias específicos (soma com o bônus de semana). Ex.: 14 dias +15, 21 +35, 30 +50.">
+          <div className="space-y-2">
+            {marcos.length === 0 && <p className="text-[11px] text-muted-foreground">Nenhum marco. Adicione abaixo.</p>}
+            {marcos.map((m, i) => (
+              <div key={i} className="flex items-end gap-2">
+                <NumberField stacked label="Dia" value={m.dias} onChange={(v) => setMarcos(marcos.map((x, j) => (j === i ? { ...x, dias: Math.max(1, v) } : x)))} suffix="dia" min={1} disabled={dis} />
+                <NumberField stacked label="Bônus" value={m.xp} onChange={(v) => setMarcos(marcos.map((x, j) => (j === i ? { ...x, xp: Math.max(0, v) } : x)))} suffix="XP" disabled={dis} />
+                <button type="button" onClick={() => setMarcos(marcos.filter((_, j) => j !== i))} disabled={dis} className="mb-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-muted-foreground transition-colors hover:border-destructive/40 hover:text-destructive disabled:opacity-50" title="Remover"><Trash2 className="h-3.5 w-3.5" /></button>
+              </div>
+            ))}
+            <button type="button" onClick={() => setMarcos([...marcos, { dias: (marcos[marcos.length - 1]?.dias ?? 0) + 7, xp: 10 }])} disabled={dis} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted disabled:opacity-50"><Plus className="h-3.5 w-3.5" /> Adicionar marco</button>
+          </div>
         </RuleCard>
 
         <RuleCard icon={CalendarDays} tom="#f59e0b" titulo="Bônus de fim de semana" descricao="Multiplica o XP de simulados e prática aos sábados e domingos." ativo={fimSemana.ativo} onToggle={(v) => setFimSemana({ ...fimSemana, ativo: v })} disabled={dis}>
@@ -138,6 +155,10 @@ export function RegrasGeraisForm({ config, podeGerenciar }: { config: GamConfig;
             <NumberField stacked label="Alvo do dia" value={metaDia.xp} onChange={(v) => setMetaDia({ ...metaDia, xp: Math.max(0, v) })} suffix="XP/dia" hint="0 = oculta a meta." disabled={dis} />
             <NumberField stacked label="Bônus ao atingir" value={metaDia.bonus} onChange={(v) => setMetaDia({ ...metaDia, bonus: Math.max(0, v) })} suffix="XP" hint="0 = só exibição, sem bônus." disabled={dis} />
           </div>
+        </RuleCard>
+
+        <RuleCard icon={Gauge} tom="#0ea5e9" titulo="Teto diário de XP" descricao="Máximo de pontos que um aluno acumula por dia (somando tudo). Evita farm. 0 = sem teto.">
+          <NumberField stacked label="Máximo por dia" value={limiteDia} onChange={(v) => setLimiteDia(Math.max(0, v))} suffix="XP/dia" min={0} hint="Ex.: 300. Cada tarefa (leitura/quiz) já conta uma única vez." disabled={dis} />
         </RuleCard>
 
         <RuleCard icon={Clock} tom="#64748b" titulo="Fuso horário" descricao="Define a virada do dia para streak, missões e meta diária.">
