@@ -15,6 +15,7 @@ import {
 import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { atualizarDocumento, publicarVersao, salvarIndiceTipos, salvarEspacamentoDocumento, type Documento, type SituacaoEditorial } from '@/app/admin/leitura/actions'
+import { DEFAULT_ESPACAMENTO, ESP_LIMITES, type EspacamentoDoc } from '@/lib/leitura/espacamento'
 import { salvarGrifoCoresDocumento, salvarBlocosDocumento, aplicarConfigTodasAulas } from '@/app/admin/leitura/actions'
 import { DEFAULT_GRIFO_CORES, type GrifoCores } from '@/lib/leitura/trilha-aparencia'
 import { DEFAULT_BLOCOS, type BlocoDef } from '@/lib/leitura/blocos'
@@ -54,12 +55,11 @@ const TIPOS_ATUALIZACAO = [
   { v: 'correcao_editorial', label: 'Correção editorial', Icon: SpellCheck },
 ] as const
 
-export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar = false, publicadaVersao = 1, temRascunhoPendente = false, versaoEdicao, abaInicial, indiceTipos: indiceTiposProp = [], espacamentoInicial = null, espacamentoTextoInicial = null, grifoCoresInicial = null, blocosInicial = null }: {
+export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar = false, publicadaVersao = 1, temRascunhoPendente = false, versaoEdicao, abaInicial, indiceTipos: indiceTiposProp = [], espInicial = null, grifoCoresInicial = null, blocosInicial = null }: {
   documento: Documento; htmlAtual: string; podeEditar: boolean; podePublicar?: boolean; publicadaVersao?: number; temRascunhoPendente?: boolean; versaoEdicao?: number
   abaInicial?: 'conteudo' | 'config' | 'questoes'
   indiceTipos?: string[]
-  espacamentoInicial?: number | null
-  espacamentoTextoInicial?: number | null
+  espInicial?: EspacamentoDoc | null
   grifoCoresInicial?: GrifoCores | null
   blocosInicial?: BlocoDef[] | null
 }) {
@@ -106,21 +106,17 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
   const [savingCores, startCores] = useTransition()     // indicador PRÓPRIO das Cores dos grifos
   // Índice configurável: tipos disponíveis (detectados no conteúdo) × tipos selecionados (persistidos).
   const [indiceTipos, setIndiceTipos] = useState<string[]>(indiceTiposProp)
-  // Espaçamento entre blocos (multiplicador) — padrão do leitor do aluno, ajustável pelo admin aqui.
-  const [espacamento, setEspacamento] = useState<number>(espacamentoInicial ?? 2.2) // BLOCOS (mult; 2.2 = 100% na UI)
-  const [espacamentoTexto, setEspacamentoTexto] = useState<number>(espacamentoTextoInicial ?? 1) // TEXTO (mult; 1 = 100%)
-  const ajustarEspaco = (delta: number) => {
-    const v = Math.max(0.6, Math.min(4.4, Math.round((espacamento + delta) * 100) / 100))
-    if (v === espacamento) return
-    setEspacamento(v)
-    startEspaco(async () => { const r = await salvarEspacamentoDocumento(documento.id, { blocos: v }); if (!r.ok) toast.error(r.error ?? 'Erro ao salvar espaçamento') })
+  // Espaçamento GRANULAR (entrelinha + parágrafo/bloco sup/inf) — padrão do leitor; o aluno ainda escala.
+  const [esp, setEsp] = useState<EspacamentoDoc>(espInicial ?? DEFAULT_ESPACAMENTO)
+  const ajustarEsp = (k: keyof EspacamentoDoc, delta: number) => {
+    const lim = ESP_LIMITES[k]
+    const v = Math.max(lim.min, Math.min(lim.max, Math.round((esp[k] + delta) * 100) / 100))
+    if (v === esp[k]) return
+    const next = { ...esp, [k]: v }
+    setEsp(next)
+    startEspaco(async () => { const r = await salvarEspacamentoDocumento(documento.id, { esp: next }); if (!r.ok) toast.error(r.error ?? 'Erro ao salvar espaçamento') })
   }
-  const ajustarEspacoTexto = (delta: number) => {
-    const v = Math.max(0.5, Math.min(3, Math.round((espacamentoTexto + delta) * 100) / 100))
-    if (v === espacamentoTexto) return
-    setEspacamentoTexto(v)
-    startEspaco(async () => { const r = await salvarEspacamentoDocumento(documento.id, { texto: v }); if (!r.ok) toast.error(r.error ?? 'Erro ao salvar espaçamento') })
-  }
+  const resetarEsp = () => { setEsp(DEFAULT_ESPACAMENTO); startEspaco(async () => { const r = await salvarEspacamentoDocumento(documento.id, { esp: DEFAULT_ESPACAMENTO }); if (!r.ok) toast.error(r.error ?? 'Erro ao salvar espaçamento') }) }
   // Cores dos grifos (realces + textos) — recolore os grifos inline do HTML; prévia na aba Conteúdo.
   const [grifoCores, setGrifoCores] = useState<GrifoCores>(grifoCoresInicial ?? DEFAULT_GRIFO_CORES)
   const setCorGrifo = (k: keyof GrifoCores, v: string) => {
@@ -472,7 +468,7 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
 
       {/* CONTEÚDO: prévia grande + painel de edição de grifos ao lado */}
       {aba === 'conteudo' && (
-        <LeituraPreviewGrifos documentoId={documento.id} html={htmlAtual} podeEditar={podeEditar} artigos={documento.artigos ?? 0} podeComparar={temRascunhoPendente || publicadaVersao > 1} onGrifoCtl={setGrifoCtl} versaoQuestoes={versaoAutoria} indiceTipos={indiceTipos} espacamento={espacamento} espacamentoTexto={espacamentoTexto} grifoCores={grifoCores} blocos={blocos} />
+        <LeituraPreviewGrifos documentoId={documento.id} html={htmlAtual} podeEditar={podeEditar} artigos={documento.artigos ?? 0} podeComparar={temRascunhoPendente || publicadaVersao > 1} onGrifoCtl={setGrifoCtl} versaoQuestoes={versaoAutoria} indiceTipos={indiceTipos} esp={esp} grifoCores={grifoCores} blocos={blocos} />
       )}
 
       {/* CONFIGURAÇÃO: importação de conteúdo + metadados + desafio. Personalização (capa/título/
@@ -674,34 +670,35 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
               <ChevronDown className="ml-auto h-4 w-4 transition-transform group-open:rotate-180" />
             </summary>
             <div className="space-y-3 pt-3">
-              <p className="text-xs text-muted-foreground">Padrão para o aluno (ele pode ajustar no próprio leitor). Prévia na aba <span className="font-medium text-foreground">Conteúdo</span>.</p>
-              {/* BLOCOS (entre caixas) */}
-              <div className="space-y-1">
-                <span className="text-[11px] font-medium text-muted-foreground">Entre blocos (caixas)</span>
-                <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => ajustarEspaco(-0.22)} className="rounded-lg border p-1.5 transition hover:bg-muted" aria-label="Diminuir espaçamento dos blocos"><Minus className="h-4 w-4" /></button>
-                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-                    <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.round(((espacamento - 0.6) / (4.4 - 0.6)) * 100)}%` }} />
+              <p className="text-xs text-muted-foreground">Controle total — entrelinha, e espaço <strong>acima/abaixo</strong> de parágrafos e blocos. Padrão para o aluno (ele ainda escala no leitor). Prévia na aba <span className="font-medium text-foreground">Conteúdo</span>.</p>
+              {([
+                { k: 'linha', label: 'Entrelinha do texto', step: 0.1, base: 1 },
+                { k: 'parTop', label: 'Parágrafo — espaço acima', step: 0.25, base: 1 },
+                { k: 'parBot', label: 'Parágrafo — espaço abaixo', step: 0.25, base: 1 },
+                { k: 'blocoBloco', label: 'Distância entre blocos', step: 0.22, base: 2.2 },
+                { k: 'blocoTextoTop', label: 'Bloco e texto — acima', step: 0.22, base: 2.2 },
+                { k: 'blocoTextoBot', label: 'Bloco e texto — abaixo', step: 0.22, base: 2.2 },
+              ] as { k: keyof EspacamentoDoc; label: string; step: number; base: number }[]).map(({ k, label, step, base }) => {
+                const lim = ESP_LIMITES[k]
+                const barra = Math.max(0, Math.min(100, Math.round(((esp[k] - lim.min) / (lim.max - lim.min)) * 100)))
+                return (
+                  <div key={k} className="space-y-1">
+                    <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
+                    <div className="flex items-center gap-2">
+                      <button type="button" onClick={() => ajustarEsp(k, -step)} className="rounded-lg border p-1.5 transition hover:bg-muted" aria-label={`Diminuir ${label}`}><Minus className="h-4 w-4" /></button>
+                      <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-all" style={{ width: `${barra}%` }} /></div>
+                      <span className="w-12 text-center text-sm font-medium tabular-nums">{Math.round((esp[k] / base) * 100)}%</span>
+                      <button type="button" onClick={() => ajustarEsp(k, step)} className="rounded-lg border p-1.5 transition hover:bg-muted" aria-label={`Aumentar ${label}`}><Plus className="h-4 w-4" /></button>
+                    </div>
                   </div>
-                  <span className="w-12 text-center text-sm font-medium tabular-nums">{Math.round(espacamento / 2.2 * 100)}%</span>
-                  <button type="button" onClick={() => ajustarEspaco(0.22)} className="rounded-lg border p-1.5 transition hover:bg-muted" aria-label="Aumentar espaçamento dos blocos"><Plus className="h-4 w-4" /></button>
-                </div>
+                )
+              })}
+              <div className="flex flex-wrap gap-2 pt-1">
+                <button type="button" onClick={() => aplicarTodasAulas({ espacamento: true }, 'o espaçamento')} disabled={aplicandoTodas} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50">
+                  {aplicandoTodas ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Layers className="h-3.5 w-3.5" />} Aplicar a todas as aulas
+                </button>
+                <button type="button" onClick={resetarEsp} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"><RotateCcw className="h-3.5 w-3.5" /> Restaurar padrão</button>
               </div>
-              {/* TEXTO (entre parágrafos) */}
-              <div className="space-y-1">
-                <span className="text-[11px] font-medium text-muted-foreground">Entre textos (parágrafos)</span>
-                <div className="flex items-center gap-2">
-                  <button type="button" onClick={() => ajustarEspacoTexto(-0.1)} className="rounded-lg border p-1.5 transition hover:bg-muted" aria-label="Diminuir espaçamento do texto"><Minus className="h-4 w-4" /></button>
-                  <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
-                    <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.round(((espacamentoTexto - 0.5) / (3 - 0.5)) * 100)}%` }} />
-                  </div>
-                  <span className="w-12 text-center text-sm font-medium tabular-nums">{Math.round(espacamentoTexto * 100)}%</span>
-                  <button type="button" onClick={() => ajustarEspacoTexto(0.1)} className="rounded-lg border p-1.5 transition hover:bg-muted" aria-label="Aumentar espaçamento do texto"><Plus className="h-4 w-4" /></button>
-                </div>
-              </div>
-              <button type="button" onClick={() => aplicarTodasAulas({ espacamento: true }, 'o espaçamento')} disabled={aplicandoTodas} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50">
-                {aplicandoTodas ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Layers className="h-3.5 w-3.5" />} Aplicar a todas as aulas
-              </button>
             </div>
           </details>
 

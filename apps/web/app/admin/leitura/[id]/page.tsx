@@ -7,6 +7,7 @@ import { PrefetchRotas } from '@/components/admin/prefetch-rotas'
 import { normalizarTiposIndice } from '@/lib/leitura/indice'
 import { resolverGrifoCores } from '@/lib/leitura/trilha-aparencia'
 import { resolverBlocos } from '@/lib/leitura/blocos'
+import { normalizarEspacamento } from '@/lib/leitura/espacamento'
 import { type Documento } from '../actions'
 
 export const dynamic = 'force-dynamic'
@@ -60,8 +61,7 @@ export default async function LeituraEditorPage({ params, searchParams }: { para
         versaoEdicao={rascunhoVersao}
         abaInicial={abaInicial}
         indiceTipos={normalizarTiposIndice(d.quiz_config?.indice_tipos)}
-        espacamentoInicial={Number(d.quiz_config?.espacamento) || null}
-        espacamentoTextoInicial={Number(d.quiz_config?.espacamento_texto) || null}
+        espInicial={normalizarEspacamento(d.quiz_config)}
         grifoCoresInicial={grifoCores}
         blocosInicial={resolverBlocos(d.quiz_config?.blocos)}
       />

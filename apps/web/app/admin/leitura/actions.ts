@@ -13,6 +13,7 @@ import { normalizarPontuacaoLeitura, type PontuacaoLeitura } from '@/lib/leitura
 import { normalizarIntro, type IntroConfig } from '@/lib/leitura/intro'
 import { normalizarRegulamento, type RegulamentoConfig } from '@/lib/leitura/regulamento'
 import { normalizarDesafios, type DesafioModulo } from '@/lib/leitura/desafios'
+import { resolverEspacamento, type EspacamentoDoc } from '@/lib/leitura/espacamento'
 import { resolverTrilhaAparencia, resolverGrifoCores, type TrilhaAparencia, type TrilhaFundoConfig, type TrilhaDegrade, type GrifoCores } from '@/lib/leitura/trilha-aparencia'
 import { resolverBlocos, type BlocoDef } from '@/lib/leitura/blocos'
 import { esquecer } from '@/lib/cache/relatorio-cache'
@@ -1121,7 +1122,7 @@ export async function aplicarConfigTodasAulas(origemId: string, campos: { espaca
   const { data: orig } = await svc.from('simulado_documentos').select('quiz_config').eq('id', origemId).eq('tenant_id', g.tenantId).maybeSingle()
   const qc: any = (orig as any)?.quiz_config ?? {}
   const patch: any = {}
-  if (campos.espacamento) { if (qc.espacamento != null) patch.espacamento = qc.espacamento; if (qc.espacamento_texto != null) patch.espacamento_texto = qc.espacamento_texto }
+  if (campos.espacamento) { if (qc.esp != null) patch.esp = qc.esp; if (qc.espacamento != null) patch.espacamento = qc.espacamento; if (qc.espacamento_texto != null) patch.espacamento_texto = qc.espacamento_texto }
   if (campos.blocos) patch.blocos = resolverBlocos(qc.blocos)
   if (!Object.keys(patch).length) return { ok: true, total: 0 }
   const docs = await fetchAll<any>(() => svc.from('simulado_documentos').select('id, quiz_config').eq('tenant_id', g.tenantId).eq('deletado', false).order('id', { ascending: true }))
@@ -1136,13 +1137,15 @@ export async function aplicarConfigTodasAulas(origemId: string, campos: { espaca
   return { ok: true, total: n }
 }
 
-/** Espaçamento definido pelo ADMIN — vira o padrão do leitor do aluno (o aluno ainda ajusta pra si).
- *  `blocos` = entre caixas/blocos; `texto` = entre parágrafos. Guardado em quiz_config (migration-free). */
-export async function salvarEspacamentoDocumento(documentoId: string, patch: { blocos?: number; texto?: number }): Promise<{ ok: boolean; error?: string }> {
+/** Espaçamento definido pelo ADMIN — vira o padrão do leitor do aluno (o aluno ainda escala pra si).
+ *  GRANULAR (`esp`: entrelinha + parágrafo/bloco sup/inf) em quiz_config.esp; `blocos`/`texto` legados
+ *  seguem aceitos p/ compat. Migration-free (jsonb). */
+export async function salvarEspacamentoDocumento(documentoId: string, patch: { blocos?: number; texto?: number; esp?: EspacamentoDoc }): Promise<{ ok: boolean; error?: string }> {
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
   const { data: doc } = await svc.from('simulado_documentos').select('quiz_config').eq('id', documentoId).eq('tenant_id', g.tenantId).maybeSingle()
   const merged: any = { ...((doc as any)?.quiz_config ?? {}) }
+  if (patch.esp != null) merged.esp = resolverEspacamento(patch.esp)
   if (patch.blocos != null) merged.espacamento = Math.max(0.6, Math.min(4.4, Math.round(Number(patch.blocos) * 100) / 100))
   if (patch.texto != null) merged.espacamento_texto = Math.max(0.5, Math.min(3, Math.round(Number(patch.texto) * 100) / 100))
   const { error } = await svc.from('simulado_documentos').update({ quiz_config: merged, atualizado_em: new Date().toISOString() }).eq('id', documentoId).eq('tenant_id', g.tenantId)

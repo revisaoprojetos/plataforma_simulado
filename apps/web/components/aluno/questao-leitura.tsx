@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { CheckCircle2, XCircle, HelpCircle, Loader2 } from 'lucide-react'
+import { CheckCircle2, XCircle, HelpCircle, Loader2, Scissors } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { MarkdownContent } from '@/components/markdown-content'
 import type { QuestaoLeituraDados } from '@/lib/leitura/acesso'
@@ -30,11 +30,13 @@ export function QuestaoLeitura({ documentoId, q, corFg, corMuted, escolhida: esc
   const [escInterna, setEscInterna] = useState<string | null>(q.resposta?.alternativaId ?? null)
   const [resInterno, setResInterno] = useState<Resultado | null>(q.resposta ? { correta: q.resposta.correta, corretaId: q.resposta.corretaId } : null)
   const [enviando, setEnviando] = useState(false)
+  const [eliminadas, setEliminadas] = useState<Set<string>>(new Set())
   const escolhida = controlado ? (escolhidaProp ?? null) : escInterna
   const res = controlado ? (resultadoProp ?? null) : resInterno
   const respondido = !!res
 
   const escolher = (altId: string) => { if (controlado) onEscolher!(q.docQuestaoId, altId); else setEscInterna(altId) }
+  const eliminar = (altId: string) => setEliminadas((prev) => { const n = new Set(prev); n.has(altId) ? n.delete(altId) : n.add(altId); return n })
 
   async function responder() {
     if (!escolhida || respondido) return
@@ -60,24 +62,36 @@ export function QuestaoLeitura({ documentoId, q, corFg, corMuted, escolhida: esc
           const escolha = escolhida === alt.id
           const certa = respondido && res!.corretaId === alt.id
           const erradaEscolhida = respondido && escolha && !res!.correta
+          const cortada = eliminadas.has(alt.id) && !respondido
           return (
-            <button key={alt.id} disabled={respondido} onClick={() => escolher(alt.id)}
-              className={cn('flex w-full items-start gap-3 rounded-xl border p-3 text-left text-sm transition-all',
-                !respondido && escolha && 'border-primary bg-primary/[0.06] ring-1 ring-primary/30',
-                !respondido && !escolha && 'hover:border-primary/40 hover:bg-black/[0.03]',
-                certa && 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30',
-                erradaEscolhida && 'border-rose-500 bg-rose-50 dark:bg-rose-950/30',
+            <div key={alt.id} className="flex items-stretch gap-2">
+              {!respondido && (
+                <button type="button" onClick={() => eliminar(alt.id)}
+                  aria-label={cortada ? 'Restaurar alternativa' : 'Eliminar alternativa'} title="Eliminar (tesoura)"
+                  className={cn('flex w-9 shrink-0 items-center justify-center rounded-xl border transition-colors sm:w-10',
+                    cortada ? 'border-primary/40 bg-primary/10 text-primary' : 'border-border/70 text-muted-foreground hover:border-primary/40 hover:bg-muted hover:text-foreground')}>
+                  <Scissors className={cn('h-4 w-4 transition-transform', cortada && '-rotate-12')} />
+                </button>
               )}
-              style={{ color: corFg, borderColor: certa || erradaEscolhida ? undefined : '#0000001f' }}>
-              <span className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold',
-                certa && 'border-emerald-500 bg-emerald-500 text-white',
-                erradaEscolhida && 'border-rose-500 bg-rose-500 text-white',
-                !certa && !erradaEscolhida && escolha && 'border-primary bg-primary text-primary-foreground',
-              )} style={{ borderColor: !certa && !erradaEscolhida && !escolha ? '#00000030' : undefined }}>{LETRA[i] ?? i + 1}</span>
-              <MarkdownContent inline className="flex-1 pt-0.5">{alt.texto}</MarkdownContent>
-              {certa && <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 motion-safe:animate-in motion-safe:zoom-in-50 motion-safe:duration-300 dark:text-emerald-400" />}
-              {erradaEscolhida && <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600 motion-safe:animate-in motion-safe:zoom-in-50 motion-safe:duration-300 dark:text-rose-400" />}
-            </button>
+              <button disabled={respondido || cortada} onClick={() => escolher(alt.id)}
+                className={cn('flex flex-1 items-start gap-3 rounded-xl border p-3 text-left text-sm transition-all',
+                  !respondido && escolha && 'border-primary bg-primary/[0.06] ring-1 ring-primary/30',
+                  !respondido && !escolha && !cortada && 'hover:border-primary/40 hover:bg-black/[0.03]',
+                  certa && 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30',
+                  erradaEscolhida && 'border-rose-500 bg-rose-50 dark:bg-rose-950/30',
+                  cortada && 'opacity-45',
+                )}
+                style={{ color: corFg, borderColor: certa || erradaEscolhida ? undefined : '#0000001f' }}>
+                <span className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold',
+                  certa && 'border-emerald-500 bg-emerald-500 text-white',
+                  erradaEscolhida && 'border-rose-500 bg-rose-500 text-white',
+                  !certa && !erradaEscolhida && escolha && 'border-primary bg-primary text-primary-foreground',
+                )} style={{ borderColor: !certa && !erradaEscolhida && !escolha ? '#00000030' : undefined }}>{LETRA[i] ?? i + 1}</span>
+                <MarkdownContent inline className={cn('flex-1 pt-0.5', cortada && 'line-through')}>{alt.texto}</MarkdownContent>
+                {certa && <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600 motion-safe:animate-in motion-safe:zoom-in-50 motion-safe:duration-300 dark:text-emerald-400" />}
+                {erradaEscolhida && <XCircle className="mt-0.5 h-5 w-5 shrink-0 text-rose-600 motion-safe:animate-in motion-safe:zoom-in-50 motion-safe:duration-300 dark:text-rose-400" />}
+              </button>
+            </div>
           )
         })}
       </div>

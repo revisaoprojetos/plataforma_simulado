@@ -16,6 +16,7 @@ import { DEFAULT_GRIFO_CORES, type GrifoCores } from '@/lib/leitura/trilha-apare
 import { aplicarGrifos } from '@/lib/leitura/recolorir-grifos'
 import { prepararCaixasTabela, prepararCaixasCobrado } from '@/lib/leitura/caixas'
 import { DEFAULT_BLOCOS, type BlocoDef } from '@/lib/leitura/blocos'
+import { DEFAULT_ESPACAMENTO, estiloEspacamento, type EspacamentoDoc } from '@/lib/leitura/espacamento'
 import { NIVEL_TIPO, montarArvoreToc, type NoToc } from '@/lib/leitura/indice'
 import { IndiceArvore, type NoIndiceView } from '@/components/leitura/indice-arvore'
 import type { BlocoDiff, DiffDoc, VersaoInfo } from '@/lib/leitura/diff-tipos'
@@ -106,17 +107,15 @@ const RESUMO_ZERO = { mod: 0, add: 0, rem: 0, igual: 0 }
 /** Controles do editor de grifos expostos p/ a barra de topo do editor (desfazer/refazer). */
 export type GrifoCtl = { dirty: boolean; podeDesfazer: boolean; podeRefazer: boolean; desfazer: () => void; refazer: () => void }
 
-export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 0, podeComparar = false, onGrifoCtl, versaoQuestoes, indiceTipos = [], espacamento = 2.2, espacamentoTexto = 1, grifoCores = DEFAULT_GRIFO_CORES, blocos = DEFAULT_BLOCOS }: {
+export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 0, podeComparar = false, onGrifoCtl, versaoQuestoes, indiceTipos = [], esp = DEFAULT_ESPACAMENTO, grifoCores = DEFAULT_GRIFO_CORES, blocos = DEFAULT_BLOCOS }: {
   documentoId: string; html: string; podeEditar: boolean; artigos?: number; podeComparar?: boolean
   onGrifoCtl?: (c: GrifoCtl | null) => void
   /** Quando definido, carrega as questões inseridas dessa versão e as mostra inline (read-only) na prévia. */
   versaoQuestoes?: number
   /** Tipos de dispositivo que aparecem no índice (config do documento). Vazio = padrão. */
   indiceTipos?: string[]
-  /** Espaçamento entre blocos (multiplicador) — reflete a config do admin na prévia. */
-  espacamento?: number
-  /** Espaçamento entre textos/parágrafos (multiplicador). */
-  espacamentoTexto?: number
+  /** Espaçamento GRANULAR do admin (entrelinha + parágrafo/bloco sup/inf) — reflete na prévia. */
+  esp?: EspacamentoDoc
   /** Cores dos grifos do módulo — recolore os grifos inline na prévia. */
   grifoCores?: GrifoCores
   /** Blocos de destaque configuráveis (detecção por palavras-chave + cor + prévia por bloco). */
@@ -761,7 +760,7 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
           </div>
         ) : html ? (
           <div className="mx-auto max-w-3xl overflow-hidden rounded-lg border bg-card shadow-sm">
-            <div ref={viewRef} className={cn(CONTENT_CLASS, semGrifos && 'sem-grifos')} style={{ ['--leitura-espaco']: espacamento, ['--leitura-espaco-texto']: espacamentoTexto } as any} dangerouslySetInnerHTML={{ __html: html }} />
+            <div ref={viewRef} className={cn(CONTENT_CLASS, semGrifos && 'sem-grifos')} style={estiloEspacamento(esp) as any} dangerouslySetInnerHTML={{ __html: html }} />
           </div>
         ) : (
           <div className="flex h-full items-center justify-center">

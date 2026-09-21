@@ -7,6 +7,7 @@ import { limparCabecalhoHtml } from './limpar-cabecalho'
 import { normalizarTiposIndice } from './indice'
 import { resolverGrifoCores, type GrifoCores } from './trilha-aparencia'
 import { resolverBlocos, type BlocoDef } from './blocos'
+import { normalizarEspacamento, type EspacamentoDoc } from './espacamento'
 import type { DiffDoc } from './diff-tipos'
 
 /**
@@ -168,8 +169,9 @@ export interface DocumentoCarregado {
   favorito: boolean
   atualizacao: AtualizacaoInfo | null
   indiceTipos: string[]
-  espacamento: number | null       // espaçamento entre BLOCOS definido pelo ADMIN (quiz_config.espacamento); default do leitor
-  espacamentoTexto: number | null  // espaçamento dos TEXTOS (parágrafos) definido pelo ADMIN (quiz_config.espacamento_texto)
+  espacamento: number | null       // (legado) espaçamento entre BLOCOS — mantido p/ compat
+  espacamentoTexto: number | null  // (legado) espaçamento dos TEXTOS — mantido p/ compat
+  esp: EspacamentoDoc              // espaçamento GRANULAR do ADMIN (quiz_config.esp; deriva dos legados se ausente)
   grifoCores: GrifoCores           // cores dos grifos definidas pelo ADMIN (quiz_config.grifoCores)
   blocos: BlocoDef[]               // blocos de destaque configuráveis (quiz_config.blocos); prévia é por bloco
 }
@@ -366,6 +368,7 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
     indiceTipos: normalizarTiposIndice((doc as any).quiz_config?.indice_tipos),
     espacamento: (() => { const v = Number((doc as any).quiz_config?.espacamento); return Number.isFinite(v) && v > 0 ? v : null })(),
     espacamentoTexto: (() => { const v = Number((doc as any).quiz_config?.espacamento_texto); return Number.isFinite(v) && v > 0 ? v : null })(),
+    esp: normalizarEspacamento((doc as any).quiz_config),
     grifoCores: resolverGrifoCores((doc as any).quiz_config?.grifoCores),
     blocos: resolverBlocos((doc as any).quiz_config?.blocos),
   }

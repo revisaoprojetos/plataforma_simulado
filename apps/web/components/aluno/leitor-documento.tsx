@@ -13,6 +13,7 @@ import {
 import { cn } from '@/lib/utils'
 import type { DocumentoCarregado, AnotacaoAluno } from '@/lib/leitura/acesso'
 import { DEFAULT_GRIFO_CORES, type GrifoCores } from '@/lib/leitura/trilha-aparencia'
+import { estiloEspacamento, DEFAULT_ESPACAMENTO } from '@/lib/leitura/espacamento'
 import { aplicarGrifos } from '@/lib/leitura/recolorir-grifos'
 import { construirEspinha, rangeParaAncora, ancoraParaRange, rectsDoRange, type Espinha, type RectRel } from '@/lib/leitura/anotacoes-engine'
 import { QuestaoLeitura } from '@/components/aluno/questao-leitura'
@@ -139,8 +140,9 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
     else { seguirSistema.current = true; setTheme(t === 'escuro' ? 'dark' : 'light') }
   }
   const [fonte, setFonte] = useState(doc.prefs?.fonte || 18)
-  const [espaco, setEspaco] = useState<number>(doc.prefs?.espacamento ?? doc.espacamento ?? 2.2) // espaçamento entre BLOCOS (mult): pref do aluno > padrão do admin > 2.2 (=100% na UI)
-  const [espacoTexto, setEspacoTexto] = useState<number>(doc.prefs?.espacamentoTexto ?? doc.espacamentoTexto ?? 1) // espaçamento dos TEXTOS (mult; 1 = 100%)
+  // ESCALA do aluno (por cima do padrão granular do admin): blocos e texto. Default neutro (2.2/1 = 100%).
+  const [espaco, setEspaco] = useState<number>(doc.prefs?.espacamento ?? 2.2) // escala dos BLOCOS (2.2 = 100%)
+  const [espacoTexto, setEspacoTexto] = useState<number>(doc.prefs?.espacamentoTexto ?? 1) // escala do TEXTO (1 = 100%)
   const [zoomPag, setZoomPag] = useState(1) // zoom da PÁGINA (estilo Word) — separado do zoom da fonte
   const [todasAbertas, setTodasAbertas] = useState(false) // expandir/recolher TODAS as caixas de uma vez
   const [favorito, setFavorito] = useState(!!doc.favorito)
@@ -932,7 +934,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
     } finally { setConcluindo(false) }
   }
 
-  const proseStyle = useMemo<React.CSSProperties>(() => ({ fontSize: fonte, lineHeight: 1.7, color: cores.fg, ['--leitura-espaco' as string]: espaco, ['--leitura-espaco-texto' as string]: espacoTexto } as React.CSSProperties), [fonte, cores.fg, espaco, espacoTexto])
+  const proseStyle = useMemo<React.CSSProperties>(() => ({ fontSize: fonte, lineHeight: 1.7, color: cores.fg, ...estiloEspacamento(doc.esp ?? DEFAULT_ESPACAMENTO), ['--esc-blocos' as string]: espaco / 2.2, ['--esc-texto' as string]: espacoTexto } as React.CSSProperties), [fonte, cores.fg, espaco, espacoTexto, doc.esp])
   // Blend do overlay de grifos. O overlay fica ATRÁS do texto (conteúdo é `relative z-[1]`), então o
   // texto NUNCA é lavado pelo blend — ele pinta opaco por cima e permanece legível nos dois temas.
   //  - claro: 'multiply' → realce saturado (highlighter) sobre a folha branca, texto escuro por cima.

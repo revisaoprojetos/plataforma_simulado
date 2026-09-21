@@ -737,26 +737,41 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 .leitura-prosa strong[style*="background"],
 .leitura-prosa mark { color:#111 !important; }
 
-/* Espaçamento entre BLOCOS ajustável (controle "Espaçamento") — multiplicador --leitura-espaco.
-   Default 2.2 = 100% na UI (a UI mostra mult/2.2*100). Escala margem das caixas (acima) e dos
-   parágrafos; !important vence o mb-3 do Tailwind. O leitor/admin injeta o valor via style inline. */
-.leitura-prosa { --leitura-espaco: 2.2; --leitura-espaco-texto: 1; }
-/* Espaçamento dos TEXTOS (entre parágrafos) = variável PRÓPRIA (--leitura-espaco-texto, default 1 = 100%),
-   independente do espaçamento dos BLOCOS/caixas (--leitura-espaco). */
-.leitura-prosa p { margin-bottom: calc(0.72rem * var(--leitura-espaco-texto,1)) !important; }
+/* Espaçamento GRANULAR (controle total do admin, quiz_config.esp → lib/leitura/espacamento.ts):
+   entrelinha (--lp-linha) + parágrafo superior/inferior (--lp-par-top/-bot) + bloco superior/inferior
+   (--lp-bloco-top/-bot). O aluno ainda ESCALA por cima via --esc-texto/--esc-blocos (default 1).
+   Legados --leitura-espaco/--leitura-espaco-texto seguem como fallback dos --lp-* (retrocompat). */
+.leitura-prosa {
+  --leitura-espaco: 2.2; --leitura-espaco-texto: 1;
+  --lp-linha: 1;
+  --lp-par-top: 0; --lp-par-bot: var(--leitura-espaco-texto, 1);
+  /* Distância dos blocos: ENTRE blocos × do bloco com o TEXTO (acima/abaixo). Fallback = legado. */
+  --lp-bloco-bloco: var(--leitura-espaco, 2.2);
+  --lp-bloco-texto-top: var(--leitura-espaco, 2.2); --lp-bloco-texto-bot: var(--leitura-espaco, 2.2);
+  --esc-texto: 1; --esc-blocos: 1;
+}
+.leitura-prosa p {
+  line-height: calc(1.6 * var(--lp-linha, 1));
+  margin-top: calc(0.72rem * var(--lp-par-top, 0) * var(--esc-texto, 1)) !important;
+  margin-bottom: calc(0.72rem * var(--lp-par-bot, 1) * var(--esc-texto, 1)) !important;
+}
 
 /* Caixas de destaque (estruturais — permanecem no "modo sem grifos") */
 .leitura-prosa [data-caixa],
 .leitura-prosa .box-stj, .leitura-prosa .box-stf, .leitura-prosa .box-cinza,
 .leitura-prosa .box-cinza-esc, .leitura-prosa .box-atencao {
-  color:#111; padding:10px 14px; margin:calc(8px * var(--leitura-espaco,2.2)) 0 calc(10px * var(--leitura-espaco,2.2)); border:1px solid #999; border-radius:8px; font-size:.95em;
+  color:#111; padding:10px 14px; margin-top:calc(8px * var(--lp-bloco-texto-top,2.2) * var(--esc-blocos,1)); margin-bottom:calc(10px * var(--lp-bloco-texto-bot,2.2) * var(--esc-blocos,1)); margin-left:0; margin-right:0; border:1px solid #999; border-radius:8px; font-size:.95em;
 }
+/* Bloco↔bloco: quando um bloco vem logo após outro, o gap vem do "entre blocos" (o de cima zera o
+   margin-bottom p/ não colapsar/duplicar com o texto). Cobre todas as variações de caixa via :is(). */
+.leitura-prosa :is([data-caixa],.box-stj,.box-stf,.box-cinza,.box-cinza-esc,.box-atencao):has(+ :is([data-caixa],.box-stj,.box-stf,.box-cinza,.box-cinza-esc,.box-atencao)) { margin-bottom: 0 !important; }
+.leitura-prosa :is([data-caixa],.box-stj,.box-stf,.box-cinza,.box-cinza-esc,.box-atencao) + :is([data-caixa],.box-stj,.box-stf,.box-cinza,.box-cinza-esc,.box-atencao) { margin-top: calc(8px * var(--lp-bloco-bloco,2.2) * var(--esc-blocos,1)) !important; }
 .leitura-prosa [data-caixa="stj"],        .leitura-prosa .box-stj      { background:#fff2cc; border-color:#c8a200; }
 .leitura-prosa [data-caixa="stf"],        .leitura-prosa .box-stf      { background:#bdd6ee; border-color:#2060a0; }
 .leitura-prosa [data-caixa="alerta"],     .leitura-prosa .box-atencao  { background:#fde9d9; border-color:#c06000; }
 .leitura-prosa [data-caixa="comentario"], .leitura-prosa .box-cinza,
 .leitura-prosa .box-cinza-esc { background:#d0cece; border-color:#999; }
-.leitura-prosa [data-caixa="cobrado"] { background:#efeafc; border-color:#b9a6ee; margin-top:calc(12px * var(--leitura-espaco,2.2)) !important; margin-bottom:calc(12px * var(--leitura-espaco,2.2)) !important; }
+.leitura-prosa [data-caixa="cobrado"] { background:#efeafc; border-color:#b9a6ee; margin-top:calc(12px * var(--lp-bloco-texto-top,2.2) * var(--esc-blocos,1)) !important; margin-bottom:calc(12px * var(--lp-bloco-texto-bot,2.2) * var(--esc-blocos,1)) !important; }
 /* Corpo da caixa "já cobrado" mais CLARO (a lista aparece só na expansão), quebrando linha; anula o
    negrito herdado de <strong> que às vezes envolve o texto. */
 .leitura-prosa [data-caixa="cobrado"] > .caixa-corpo .caixa-corpo-in,
