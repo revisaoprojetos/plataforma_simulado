@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Route, BarChart3, Check, Lock, AlertTriangle, ArrowRight, Library, Trophy, ScrollText, Zap, Play, FileText, ExternalLink } from 'lucide-react'
+import { Route, BarChart3, Check, Lock, AlertTriangle, ArrowRight, Library, Trophy, ScrollText, Zap, Play, FileText, ExternalLink, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ModuloBanner } from '@/components/admin/modulo-banner'
@@ -128,29 +128,34 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
 
       {regAtivo && (
         <TabsContent value="regulamento" className="pt-4">
-          <div className="mx-auto max-w-3xl space-y-4">
-            {regulamento?.titulo && <h2 className="text-xl font-bold tracking-tight">{regulamento.titulo}</h2>}
-            {embedReg ? (
-              <div className="overflow-hidden rounded-2xl border shadow-sm"><div className="aspect-video w-full"><iframe src={embedReg} className="h-full w-full" title="Vídeo do módulo" allowFullScreen /></div></div>
-            ) : regulamento?.video_url ? (
-              <a href={regulamento.video_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90"><Play className="h-4 w-4" /> Assistir ao vídeo</a>
-            ) : null}
+          <div className="mx-auto max-w-4xl space-y-5">
+            {/* Cabeçalho de leitura: título + link do vídeo (em cima) + baixar/abrir o PDF (ícones). */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
+              <h2 className="text-xl font-bold tracking-tight">{regulamento?.titulo || 'Regulamento'}</h2>
+              <div className="flex items-center gap-2">
+                {regulamento?.video_url && (
+                  <a href={regulamento.video_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90"><Play className="h-4 w-4" /> Assistir ao vídeo</a>
+                )}
+                {regulamento?.documento_url && (
+                  <>
+                    <a href={`${regulamento.documento_url}${regulamento.documento_url.includes('?') ? '&' : '?'}download`} title="Baixar PDF" aria-label="Baixar PDF" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><Download className="h-4 w-4" /></a>
+                    <a href={regulamento.documento_url} target="_blank" rel="noopener noreferrer" title="Abrir em nova aba" aria-label="Abrir em nova aba" className="inline-flex h-9 w-9 items-center justify-center rounded-lg border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><ExternalLink className="h-4 w-4" /></a>
+                  </>
+                )}
+              </div>
+            </div>
+
             {regulamento?.descricao && (
-              <div className="whitespace-pre-wrap rounded-2xl border bg-card p-5 text-sm leading-relaxed shadow-sm">{regulamento.descricao}</div>
+              <div className="whitespace-pre-wrap text-sm leading-relaxed text-foreground/90">{regulamento.descricao}</div>
             )}
+
+            {/* PDF — área de leitura: o documento inteiro com rolagem, fundo cinza (estilo Drive). */}
             {regulamento?.documento_url && (
-              // Visualizador do PDF DENTRO da plataforma — fundo cinza (estilo Drive) + página centralizada.
-              <div className="overflow-hidden rounded-2xl border shadow-sm">
-                <div className="flex items-center gap-2 border-b bg-card px-4 py-2.5 text-sm">
-                  <FileText className="h-4 w-4 shrink-0 text-primary" />
-                  <span className="min-w-0 flex-1 truncate font-medium">{regulamento.documento_nome || 'Regulamento (PDF)'}</span>
-                  <a href={regulamento.documento_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-muted"><ExternalLink className="h-3.5 w-3.5" /> Abrir</a>
-                </div>
-                <div className="bg-neutral-200 p-2 dark:bg-neutral-900 sm:p-4">
-                  <iframe src={`${regulamento.documento_url}#view=FitH`} title="Regulamento (PDF)" className="h-[78vh] w-full rounded-lg border-0 bg-white shadow-md" />
-                </div>
+              <div className="overflow-hidden rounded-2xl border bg-neutral-200 shadow-sm dark:bg-neutral-900">
+                <iframe src={`${regulamento.documento_url}#view=FitH`} title="Regulamento (PDF)" className="h-[85vh] w-full border-0 bg-white" />
               </div>
             )}
+
             {regulamento?.tabela && regulamento.tabela.length > 0 && (
               // Tabela nativa vista DENTRO do sistema (sem PDF). 1ª linha = cabeçalho.
               <div className="overflow-x-auto rounded-2xl border bg-card shadow-sm">
@@ -167,12 +172,19 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
                 </table>
               </div>
             )}
+
+            {/* Player do vídeo (se link reconhecido) — abaixo, para quem quiser assistir sem sair. */}
+            {embedReg && (
+              <div className="overflow-hidden rounded-2xl border shadow-sm"><div className="aspect-video w-full"><iframe src={embedReg} className="h-full w-full" title="Vídeo do módulo" allowFullScreen /></div></div>
+            )}
+
             {pontuacao && (
               <div className="rounded-2xl border bg-card p-5 shadow-sm">
                 <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold"><Zap className="h-4 w-4 text-primary" /> Ganhos & metas</h3>
                 <ul className="grid gap-2 text-sm sm:grid-cols-2">
-                  <li className="flex items-center gap-2 rounded-xl border bg-muted/30 px-3 py-2"><span className="font-bold text-primary">+{pontuacao.pontos_aula}</span> pts por aula concluída</li>
-                  <li className="flex items-center gap-2 rounded-xl border bg-muted/30 px-3 py-2"><span className="font-bold text-primary">+{pontuacao.pontos_acerto}</span> pts por acerto no quiz</li>
+                  <li className="flex items-center gap-2 rounded-xl border bg-muted/30 px-3 py-2"><span className="font-bold text-primary">+{pontuacao.pontos_aula}</span> pts por leitura</li>
+                  <li className="flex items-center gap-2 rounded-xl border bg-muted/30 px-3 py-2"><span className="font-bold text-primary">+{pontuacao.pontos_quiz}</span> pts por concluir o quiz</li>
+                  {pontuacao.pontos_acerto > 0 && <li className="flex items-center gap-2 rounded-xl border bg-muted/30 px-3 py-2"><span className="font-bold text-primary">+{pontuacao.pontos_acerto}</span> pts por acerto no quiz</li>}
                   {pontuacao.combo_ativo && <li className="flex items-center gap-2 rounded-xl border bg-muted/30 px-3 py-2 sm:col-span-2"><span className="font-bold text-primary">+{pontuacao.combo_bonus}</span> pts de bônus ao gabaritar uma aula (todas certas)</li>}
                 </ul>
               </div>

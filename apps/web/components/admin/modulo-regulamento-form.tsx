@@ -1,16 +1,37 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Check, ScrollText, Zap, Upload, FileText, Trash2, ExternalLink, Table as TableIcon, Plus, X } from 'lucide-react'
+import { Loader2, Check, ScrollText, Zap, Upload, FileText, Trash2, ExternalLink, Table as TableIcon, Plus, X, Play, Type } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { salvarRegulamentoModulo } from '@/app/admin/leitura/actions'
 import { type RegulamentoConfig, embedVideoUrl } from '@/lib/leitura/regulamento'
 import { type PontuacaoLeitura } from '@/lib/leitura/pontuacao'
 
+/** Seção do editor — cabeçalho com ícone + título/descrição + ação opcional à direita. */
+function Secao({ icon: Icon, titulo, desc, acao, children }: { icon: typeof FileText; titulo: string; desc?: string; acao?: ReactNode; children: ReactNode }) {
+  return (
+    <section className="rounded-xl border bg-card p-3.5 shadow-sm">
+      <div className="mb-2.5 flex items-start justify-between gap-2">
+        <div className="flex items-start gap-2">
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Icon className="h-4 w-4" /></span>
+          <div className="min-w-0">
+            <h4 className="text-xs font-semibold leading-tight">{titulo}</h4>
+            {desc && <p className="mt-0.5 text-[11px] text-muted-foreground">{desc}</p>}
+          </div>
+        </div>
+        {acao}
+      </div>
+      {children}
+    </section>
+  )
+}
+
+const INPUT = 'h-9 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-3 text-sm outline-none focus:ring-1 focus:ring-ring'
+
 /**
- * Regulamento do módulo (LegProc): área descritiva que o aluno consulta na aba "Regulamento" — título,
- * descrição, vídeo (YouTube/Vimeo) e as metas/ganhos (derivados AUTOMATICAMENTE da pontuação do módulo).
+ * Regulamento do módulo (LegProc) — repaginado em seções: título/descrição, vídeo, PDF (lido dentro da
+ * plataforma), tabela nativa (sem PDF) e a prévia de ganhos/metas (da pontuação do módulo).
  */
 export function ModuloRegulamentoForm({ pastaId, atual, pontuacao }: { pastaId: string; atual: RegulamentoConfig; pontuacao: PontuacaoLeitura }) {
   const [cfg, setCfg] = useState<RegulamentoConfig>(atual)
@@ -53,51 +74,48 @@ export function ModuloRegulamentoForm({ pastaId, atual, pontuacao }: { pastaId: 
   }
 
   return (
-    <div className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3">
+    <div className="space-y-3">
+      {/* Cabeçalho + liga/desliga */}
+      <div className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border bg-card p-4 shadow-sm">
         <div className="flex items-start gap-2.5">
           <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><ScrollText className="h-5 w-5" /></span>
           <div>
             <h3 className="text-sm font-semibold tracking-tight">Regulamento do módulo</h3>
-            <p className="text-xs text-muted-foreground">Aba que o aluno consulta: descrição do conteúdo, um vídeo e os ganhos/metas (puxados da pontuação abaixo).</p>
+            <p className="max-w-xl text-xs text-muted-foreground">Aba de leitura que o aluno consulta: texto, vídeo, PDF (lido dentro da plataforma), tabela e os ganhos/metas.</p>
           </div>
         </div>
-        <label className="inline-flex shrink-0 cursor-pointer items-center gap-2 text-sm">
-          <input type="checkbox" checked={cfg.ativo} onChange={(e) => setCfg((c) => ({ ...c, ativo: e.target.checked }))} className="h-4 w-4 rounded border" />
+        <label className="inline-flex shrink-0 cursor-pointer items-center gap-2 text-sm font-medium">
+          <input type="checkbox" checked={cfg.ativo} onChange={(e) => setCfg((c) => ({ ...c, ativo: e.target.checked }))} className="h-4 w-4 rounded border accent-[var(--primary)]" />
           Ativo
         </label>
       </div>
 
-      {cfg.ativo && (
+      {!cfg.ativo ? (
+        <p className="rounded-xl border border-dashed bg-muted/20 p-4 text-center text-sm text-muted-foreground">Ative acima para configurar o regulamento que o aluno verá.</p>
+      ) : (
         <div className="space-y-3">
-          <label className="space-y-1 block">
-            <span className="text-xs font-medium text-muted-foreground">Título</span>
-            <input value={cfg.titulo} onChange={(e) => setCfg((c) => ({ ...c, titulo: e.target.value }))} maxLength={80} placeholder="Regulamento do desafio"
-              className="h-9 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-3 text-sm outline-none focus:ring-1 focus:ring-ring" />
-          </label>
-
-          <label className="space-y-1 block">
-            <span className="text-xs font-medium text-muted-foreground">Descrição</span>
-            <textarea value={cfg.descricao} onChange={(e) => setCfg((c) => ({ ...c, descricao: e.target.value }))} rows={5} placeholder="Explique como funciona o módulo, o que o aluno precisa saber, prazos, etc."
-              className="w-full rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
-          </label>
-
-          <label className="space-y-1 block">
-            <span className="text-xs font-medium text-muted-foreground">Vídeo (YouTube ou Vimeo)</span>
-            <input value={cfg.video_url} onChange={(e) => setCfg((c) => ({ ...c, video_url: e.target.value }))} placeholder="https://youtube.com/watch?v=…"
-              className="h-9 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-3 text-sm outline-none focus:ring-1 focus:ring-ring" />
-            {cfg.video_url && !embed && <span className="text-[11px] text-amber-600 dark:text-amber-400">Link não reconhecido como YouTube/Vimeo — o aluno verá um botão "Assistir".</span>}
-          </label>
-
-          {embed && (
-            <div className="overflow-hidden rounded-xl border">
-              <div className="aspect-video w-full"><iframe src={embed} className="h-full w-full" title="Prévia do vídeo" allowFullScreen /></div>
+          {/* Texto */}
+          <Secao icon={Type} titulo="Título e descrição">
+            <div className="space-y-2.5">
+              <input value={cfg.titulo} onChange={(e) => setCfg((c) => ({ ...c, titulo: e.target.value }))} maxLength={80} placeholder="Título (ex.: Regulamento do desafio)" className={INPUT} />
+              <textarea value={cfg.descricao} onChange={(e) => setCfg((c) => ({ ...c, descricao: e.target.value }))} rows={4} placeholder="Explique como funciona o módulo, prazos, o que o aluno precisa saber…"
+                className="w-full rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
             </div>
-          )}
+          </Secao>
 
-          {/* Documento (PDF) — visto dentro da plataforma pelo aluno (visualizador estilo Drive). */}
-          <div className="space-y-2">
-            <span className="text-xs font-medium text-muted-foreground">Documento (PDF)</span>
+          {/* Vídeo */}
+          <Secao icon={Play} titulo="Vídeo" desc="YouTube ou Vimeo — vira um link no topo da leitura do aluno.">
+            <input value={cfg.video_url} onChange={(e) => setCfg((c) => ({ ...c, video_url: e.target.value }))} placeholder="https://youtube.com/watch?v=…" className={INPUT} />
+            {cfg.video_url && !embed && <span className="mt-1 block text-[11px] text-amber-600 dark:text-amber-400">Link não reconhecido como YouTube/Vimeo — o aluno verá o botão "Assistir".</span>}
+            {embed && (
+              <div className="mt-2.5 overflow-hidden rounded-xl border">
+                <div className="aspect-video w-full"><iframe src={embed} className="h-full w-full" title="Prévia do vídeo" allowFullScreen /></div>
+              </div>
+            )}
+          </Secao>
+
+          {/* Documento PDF */}
+          <Secao icon={FileText} titulo="Documento (PDF)" desc="O aluno lê o PDF inteiro dentro da plataforma (estilo Drive) + baixa por ícone. Até ~8 MB.">
             <input ref={fileRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) enviarPdf(f); e.target.value = '' }} />
             {cfg.documento_url ? (
               <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-muted/30 p-2.5">
@@ -113,15 +131,11 @@ export function ModuloRegulamentoForm({ pastaId, atual, pontuacao }: { pastaId: 
                 {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Enviar PDF do regulamento
               </button>
             )}
-            <span className="block text-[11px] text-muted-foreground">O aluno vê o PDF dentro da plataforma (estilo Drive). PDF até ~8 MB. Word: exporte como PDF antes.</span>
-          </div>
+          </Secao>
 
-          {/* Tabela nativa — vista DENTRO do sistema (sem PDF). 1ª linha = cabeçalho. */}
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><TableIcon className="h-3.5 w-3.5" /> Tabela (vista no sistema, sem PDF)</span>
-              {tabela.length > 0 && <button type="button" onClick={() => setTabela([])} className="text-[11px] font-medium text-muted-foreground underline underline-offset-2 hover:text-destructive">Remover tabela</button>}
-            </div>
+          {/* Tabela */}
+          <Secao icon={TableIcon} titulo="Tabela (vista no sistema, sem PDF)" desc="A 1ª linha é o cabeçalho. Aumente com “+ Linha” / “+ Coluna”."
+            acao={tabela.length > 0 ? <button type="button" onClick={() => setTabela([])} className="text-[11px] font-medium text-muted-foreground underline underline-offset-2 hover:text-destructive">Remover tabela</button> : undefined}>
             {tabela.length === 0 ? (
               <button type="button" onClick={criarTabela}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed py-3 text-sm font-medium text-muted-foreground transition-colors hover:border-primary hover:text-foreground">
@@ -154,28 +168,26 @@ export function ModuloRegulamentoForm({ pastaId, atual, pontuacao }: { pastaId: 
                   <button type="button" onClick={addColuna} className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-muted"><Plus className="h-3.5 w-3.5" /> Coluna</button>
                   {cols > 1 && <button type="button" onClick={() => delColuna(cols - 1)} className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"><X className="h-3.5 w-3.5" /> Coluna</button>}
                 </div>
-                <span className="block text-[11px] text-muted-foreground">A 1ª linha é o cabeçalho. Aumente com “+ Linha” / “+ Coluna”. O aluno vê a tabela direto no sistema.</span>
               </div>
             )}
-          </div>
+          </Secao>
 
-          {/* Prévia das metas/ganhos — derivadas da pontuação do módulo (read-only). */}
-          <div className="rounded-xl border bg-muted/30 p-3">
-            <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><Zap className="h-3.5 w-3.5 text-primary" /> Ganhos & metas (da pontuação do módulo)</p>
+          {/* Ganhos & metas (read-only, da pontuação) */}
+          <Secao icon={Zap} titulo="Ganhos & metas" desc='Puxados da aba "Configurações" → Pontuação.'>
             <ul className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
-              <li>• <strong className="text-foreground">+{pontuacao.pontos_aula}</strong> pts por aula concluída</li>
-              <li>• <strong className="text-foreground">+{pontuacao.pontos_acerto}</strong> pts por acerto no quiz</li>
-              {pontuacao.combo_ativo && <li>• <strong className="text-foreground">+{pontuacao.combo_bonus}</strong> pts de bônus ao gabaritar uma aula</li>}
+              <li>• <strong className="text-foreground">+{pontuacao.pontos_aula}</strong> pts por leitura</li>
+              <li>• <strong className="text-foreground">+{pontuacao.pontos_quiz}</strong> pts por concluir o quiz</li>
+              {pontuacao.pontos_acerto > 0 && <li>• <strong className="text-foreground">+{pontuacao.pontos_acerto}</strong> pts por acerto no quiz</li>}
+              {pontuacao.combo_ativo && <li>• <strong className="text-foreground">+{pontuacao.combo_bonus}</strong> pts de bônus ao gabaritar</li>}
             </ul>
-            <p className="mt-1.5 text-[11px] text-muted-foreground/80">Edite esses valores na aba "Configurações" → Pontuação.</p>
-          </div>
+          </Secao>
         </div>
       )}
 
       <div className="flex justify-end">
         <button type="button" onClick={salvar} disabled={salvando}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50">
-          {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Salvar
+          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-5 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 disabled:opacity-50">
+          {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Salvar regulamento
         </button>
       </div>
     </div>
