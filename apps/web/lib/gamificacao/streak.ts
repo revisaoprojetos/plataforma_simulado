@@ -1,5 +1,5 @@
 import { getGamConfig } from './config'
-import { diaLocal } from './datas'
+import { diaLocal, diaAnterior } from './datas'
 import { ensureCacheRow } from './cache'
 import { awardXp } from './xp'
 import { dispararEngajamento } from './engajamento'
@@ -66,7 +66,11 @@ export async function registrarAtividade(svc: any, { tenantId, estudanteId }: { 
   // log; fire-and-forget para não segurar o fluxo do aluno. A INATIVIDADE fica no cron de engajamento.
   const eng = config.engajamento
   if (eng.sequencia.ativo && streak === (eng.sequencia.dias ?? 0)) {
-    void dispararEngajamento(svc, { tenantId, estudanteId, tipo: 'sequencia', ref: `seq-${streak}`, gatilho: eng.sequencia, streakAtual: streak, streakMaior: maior })
+    // Re-incentiva a CADA nova sequência: a chave usa a DATA DE INÍCIO do streak (não o valor), então
+    // quebrar e refazer os N dias dispara de novo (início diferente = ref diferente).
+    let inicio = hoje
+    for (let i = 0; i < streak - 1; i++) inicio = diaAnterior(inicio)
+    void dispararEngajamento(svc, { tenantId, estudanteId, tipo: 'sequencia', ref: `seq-${inicio}`, gatilho: eng.sequencia, streakAtual: streak, streakMaior: maior })
   }
   if (eng.marco.ativo && (eng.marco.marcos ?? []).includes(streak)) {
     void dispararEngajamento(svc, { tenantId, estudanteId, tipo: 'marco', ref: `marco-${streak}`, gatilho: eng.marco, streakAtual: streak, streakMaior: maior, marco: streak })
