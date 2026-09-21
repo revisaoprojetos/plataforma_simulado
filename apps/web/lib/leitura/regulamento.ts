@@ -8,9 +8,12 @@ export interface RegulamentoConfig {
   titulo: string
   descricao: string
   video_url: string
+  /** PDF do regulamento (visualizado dentro da plataforma, estilo Drive). */
+  documento_url: string
+  documento_nome: string
 }
 
-export const REGULAMENTO_PADRAO: RegulamentoConfig = { ativo: false, titulo: '', descricao: '', video_url: '' }
+export const REGULAMENTO_PADRAO: RegulamentoConfig = { ativo: false, titulo: '', descricao: '', video_url: '', documento_url: '', documento_nome: '' }
 
 export function normalizarRegulamento(raw: unknown): RegulamentoConfig {
   const r = (raw ?? {}) as Partial<RegulamentoConfig>
@@ -19,6 +22,8 @@ export function normalizarRegulamento(raw: unknown): RegulamentoConfig {
     titulo: typeof r.titulo === 'string' ? r.titulo : '',
     descricao: typeof r.descricao === 'string' ? r.descricao : '',
     video_url: typeof r.video_url === 'string' ? r.video_url : '',
+    documento_url: typeof r.documento_url === 'string' ? r.documento_url : '',
+    documento_nome: typeof r.documento_nome === 'string' ? r.documento_nome : '',
   }
 }
 

@@ -20,7 +20,7 @@ export const maxDuration = 60
  */
 export async function POST(req: NextRequest) {
   const access = await getCurrentAccess()
-  if (!access.tenantId || !(access.isAdmin || access.permissions.includes('questoes:update') || access.permissions.includes('simulados:create'))) {
+  if (!access.tenantId || !(access.isAdmin || access.permissions.includes('questoes:update') || access.permissions.includes('simulados:create') || access.permissions.includes('leitura:update'))) {
     return NextResponse.json({ ok: false, error: 'Sem permissão.' }, { status: 403 })
   }
 

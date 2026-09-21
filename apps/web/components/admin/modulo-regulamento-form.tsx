@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Check, ScrollText, Zap } from 'lucide-react'
+import { Loader2, Check, ScrollText, Zap, Upload, FileText, Trash2, ExternalLink } from 'lucide-react'
 import { salvarRegulamentoModulo } from '@/app/admin/leitura/actions'
 import { type RegulamentoConfig, embedVideoUrl } from '@/lib/leitura/regulamento'
 import { type PontuacaoLeitura } from '@/lib/leitura/pontuacao'
@@ -14,7 +14,24 @@ import { type PontuacaoLeitura } from '@/lib/leitura/pontuacao'
 export function ModuloRegulamentoForm({ pastaId, atual, pontuacao }: { pastaId: string; atual: RegulamentoConfig; pontuacao: PontuacaoLeitura }) {
   const [cfg, setCfg] = useState<RegulamentoConfig>(atual)
   const [salvando, setSalvando] = useState(false)
+  const [enviando, setEnviando] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
   const embed = embedVideoUrl(cfg.video_url)
+
+  async function enviarPdf(file: File) {
+    if (file.type && file.type !== 'application/pdf') { toast.error('Envie um PDF. (Documentos Word: exporte como PDF antes.)'); return }
+    if (file.size > 8 * 1024 * 1024) { toast.error('PDF muito grande (máx. ~8 MB).'); return }
+    setEnviando(true)
+    try {
+      const fd = new FormData(); fd.append('file', file); fd.append('alvo', 'draft'); fd.append('slot', 'material')
+      const res = await fetch('/api/admin/material-pdf', { method: 'POST', body: fd })
+      const j = await res.json()
+      if (!res.ok || !j.ok) throw new Error(j?.error || 'Falha no upload.')
+      setCfg((c) => ({ ...c, documento_url: j.url, documento_nome: j.nome || 'Regulamento.pdf' }))
+      toast.success('PDF enviado — clique em Salvar para publicar.')
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Falha no upload.') }
+    finally { setEnviando(false) }
+  }
 
   async function salvar() {
     setSalvando(true)
@@ -65,6 +82,27 @@ export function ModuloRegulamentoForm({ pastaId, atual, pontuacao }: { pastaId: 
               <div className="aspect-video w-full"><iframe src={embed} className="h-full w-full" title="Prévia do vídeo" allowFullScreen /></div>
             </div>
           )}
+
+          {/* Documento (PDF) — visto dentro da plataforma pelo aluno (visualizador estilo Drive). */}
+          <div className="space-y-2">
+            <span className="text-xs font-medium text-muted-foreground">Documento (PDF)</span>
+            <input ref={fileRef} type="file" accept="application/pdf" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) enviarPdf(f); e.target.value = '' }} />
+            {cfg.documento_url ? (
+              <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-muted/30 p-2.5">
+                <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><FileText className="h-4 w-4" /></span>
+                <span className="min-w-0 flex-1 truncate text-sm">{cfg.documento_nome || 'Regulamento.pdf'}</span>
+                <a href={cfg.documento_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-lg border bg-card px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-muted"><ExternalLink className="h-3.5 w-3.5" /> Abrir</a>
+                <button type="button" disabled={enviando} onClick={() => fileRef.current?.click()} className="inline-flex items-center gap-1 rounded-lg border bg-card px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-muted disabled:opacity-50">{enviando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />} Trocar</button>
+                <button type="button" onClick={() => setCfg((c) => ({ ...c, documento_url: '', documento_nome: '' }))} title="Remover" className="inline-flex h-8 w-8 items-center justify-center rounded-lg border bg-card text-muted-foreground transition-colors hover:border-destructive/40 hover:text-destructive"><Trash2 className="h-3.5 w-3.5" /></button>
+              </div>
+            ) : (
+              <button type="button" disabled={enviando} onClick={() => fileRef.current?.click()}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed py-3 text-sm font-medium text-muted-foreground transition-colors hover:border-primary hover:text-foreground disabled:opacity-50">
+                {enviando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} Enviar PDF do regulamento
+              </button>
+            )}
+            <span className="block text-[11px] text-muted-foreground">O aluno vê o PDF dentro da plataforma (estilo Drive). PDF até ~8 MB. Word: exporte como PDF antes.</span>
+          </div>
 
           {/* Prévia das metas/ganhos — derivadas da pontuação do módulo (read-only). */}
           <div className="rounded-xl border bg-muted/30 p-3">

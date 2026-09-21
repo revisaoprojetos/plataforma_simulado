@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Route, BarChart3, Check, Lock, AlertTriangle, ArrowRight, Library, Trophy, ScrollText, Zap, Play } from 'lucide-react'
+import { Route, BarChart3, Check, Lock, AlertTriangle, ArrowRight, Library, Trophy, ScrollText, Zap, Play, FileText, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ModuloBanner } from '@/components/admin/modulo-banner'
@@ -137,6 +137,19 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
             ) : null}
             {regulamento?.descricao && (
               <div className="whitespace-pre-wrap rounded-2xl border bg-card p-5 text-sm leading-relaxed shadow-sm">{regulamento.descricao}</div>
+            )}
+            {regulamento?.documento_url && (
+              // Visualizador do PDF DENTRO da plataforma — fundo cinza (estilo Drive) + página centralizada.
+              <div className="overflow-hidden rounded-2xl border shadow-sm">
+                <div className="flex items-center gap-2 border-b bg-card px-4 py-2.5 text-sm">
+                  <FileText className="h-4 w-4 shrink-0 text-primary" />
+                  <span className="min-w-0 flex-1 truncate font-medium">{regulamento.documento_nome || 'Regulamento (PDF)'}</span>
+                  <a href={regulamento.documento_url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-muted"><ExternalLink className="h-3.5 w-3.5" /> Abrir</a>
+                </div>
+                <div className="bg-neutral-200 p-2 dark:bg-neutral-900 sm:p-4">
+                  <iframe src={`${regulamento.documento_url}#view=FitH`} title="Regulamento (PDF)" className="h-[78vh] w-full rounded-lg border-0 bg-white shadow-md" />
+                </div>
+              </div>
             )}
             {pontuacao && (
               <div className="rounded-2xl border bg-card p-5 shadow-sm">
