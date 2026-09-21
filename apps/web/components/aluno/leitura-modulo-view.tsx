@@ -128,7 +128,7 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
 
       {regAtivo && (
         <TabsContent value="regulamento" className="pt-4">
-          <div className="mx-auto max-w-4xl space-y-5">
+          <div className="space-y-5">
             {/* Cabeçalho de leitura: título + link do vídeo (em cima) + baixar/abrir o PDF (ícones). */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-3">
               <h2 className="text-xl font-bold tracking-tight">{regulamento?.titulo || 'Regulamento'}</h2>
@@ -178,17 +178,42 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
               <div className="overflow-hidden rounded-2xl border shadow-sm"><div className="aspect-video w-full"><iframe src={embedReg} className="h-full w-full" title="Vídeo do módulo" allowFullScreen /></div></div>
             )}
 
-            {pontuacao && (
-              <div className="rounded-2xl border bg-card p-5 shadow-sm">
-                <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold"><Zap className="h-4 w-4 text-primary" /> Ganhos & metas</h3>
-                <ul className="grid gap-2 text-sm sm:grid-cols-2">
-                  <li className="flex items-center gap-2 rounded-xl border bg-muted/30 px-3 py-2"><span className="font-bold text-primary">+{pontuacao.pontos_aula}</span> pts por leitura</li>
-                  <li className="flex items-center gap-2 rounded-xl border bg-muted/30 px-3 py-2"><span className="font-bold text-primary">+{pontuacao.pontos_quiz}</span> pts por concluir o quiz</li>
-                  {pontuacao.pontos_acerto > 0 && <li className="flex items-center gap-2 rounded-xl border bg-muted/30 px-3 py-2"><span className="font-bold text-primary">+{pontuacao.pontos_acerto}</span> pts por acerto no quiz</li>}
-                  {pontuacao.combo_ativo && <li className="flex items-center gap-2 rounded-xl border bg-muted/30 px-3 py-2 sm:col-span-2"><span className="font-bold text-primary">+{pontuacao.combo_bonus}</span> pts de bônus ao gabaritar uma aula (todas certas)</li>}
-                </ul>
-              </div>
-            )}
+            {pontuacao && (() => {
+              const xr = gam?.config.xp_regras
+              const chest = xr?.chest
+              const marcos = xr?.streak?.marcos ?? []
+              const limiteDia = xr?.limite_dia ?? 0
+              return (
+                <div className="rounded-2xl border bg-card p-5 shadow-sm">
+                  <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold"><Zap className="h-4 w-4 text-primary" /> Ganhos & metas</h3>
+                  <div className="grid gap-3 md:grid-cols-2">
+                    {/* Por atividade (dia) */}
+                    <div className="rounded-xl border bg-muted/20 p-3">
+                      <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Por atividade (no dia)</p>
+                      <ul className="space-y-1.5 text-sm">
+                        <li className="flex items-center gap-2"><span className="inline-flex min-w-[3.25rem] justify-center rounded-md bg-primary/10 px-1.5 py-0.5 text-xs font-bold text-primary">+{pontuacao.pontos_aula}</span> por leitura</li>
+                        <li className="flex items-center gap-2"><span className="inline-flex min-w-[3.25rem] justify-center rounded-md bg-primary/10 px-1.5 py-0.5 text-xs font-bold text-primary">+{pontuacao.pontos_quiz}</span> por concluir o quiz</li>
+                        {pontuacao.pontos_acerto > 0 && <li className="flex items-center gap-2"><span className="inline-flex min-w-[3.25rem] justify-center rounded-md bg-primary/10 px-1.5 py-0.5 text-xs font-bold text-primary">+{pontuacao.pontos_acerto}</span> por acerto no quiz</li>}
+                        {pontuacao.combo_ativo && <li className="flex items-center gap-2"><span className="inline-flex min-w-[3.25rem] justify-center rounded-md bg-primary/10 px-1.5 py-0.5 text-xs font-bold text-primary">+{pontuacao.combo_bonus}</span> ao gabaritar a aula</li>}
+                      </ul>
+                    </div>
+                    {/* Sequência (login diário) */}
+                    {(chest || marcos.length > 0) && (
+                      <div className="rounded-xl border bg-muted/20 p-3">
+                        <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Sequência (login diário)</p>
+                        <ul className="space-y-1.5 text-sm">
+                          {chest && chest.xp > 0 && <li className="flex items-center gap-2"><span className="inline-flex min-w-[3.25rem] justify-center rounded-md bg-amber-500/15 px-1.5 py-0.5 text-xs font-bold text-amber-600 dark:text-amber-400">+{chest.xp}</span> a cada {chest.cada_n_dias} dias seguidos</li>}
+                          {marcos.map((m) => (
+                            <li key={m.dias} className="flex items-center gap-2"><span className="inline-flex min-w-[3.25rem] justify-center rounded-md bg-amber-500/15 px-1.5 py-0.5 text-xs font-bold text-amber-600 dark:text-amber-400">+{m.xp}</span> ao completar {m.dias} dias</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+                  {limiteDia > 0 && <p className="mt-3 text-xs text-muted-foreground">Máximo de <strong className="text-foreground">{limiteDia}</strong> pontos por dia — cada tarefa conta uma única vez.</p>}
+                </div>
+              )
+            })()}
           </div>
         </TabsContent>
       )}
