@@ -151,6 +151,22 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
                 </div>
               </div>
             )}
+            {regulamento?.tabela && regulamento.tabela.length > 0 && (
+              // Tabela nativa vista DENTRO do sistema (sem PDF). 1ª linha = cabeçalho.
+              <div className="overflow-x-auto rounded-2xl border bg-card shadow-sm">
+                <table className="w-full border-collapse text-sm">
+                  <tbody>
+                    {regulamento.tabela.map((row, i) => (
+                      <tr key={i} className={i === 0 ? 'bg-muted/60' : i % 2 === 0 ? 'bg-muted/20' : undefined}>
+                        {row.map((cel, j) => (i === 0
+                          ? <th key={j} className="border px-3 py-2 text-left font-semibold">{cel}</th>
+                          : <td key={j} className="border px-3 py-2 align-top">{cel}</td>))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
             {pontuacao && (
               <div className="rounded-2xl border bg-card p-5 shadow-sm">
                 <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold"><Zap className="h-4 w-4 text-primary" /> Ganhos & metas</h3>

@@ -2,7 +2,8 @@
 
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Check, ScrollText, Zap, Upload, FileText, Trash2, ExternalLink } from 'lucide-react'
+import { Loader2, Check, ScrollText, Zap, Upload, FileText, Trash2, ExternalLink, Table as TableIcon, Plus, X } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { salvarRegulamentoModulo } from '@/app/admin/leitura/actions'
 import { type RegulamentoConfig, embedVideoUrl } from '@/lib/leitura/regulamento'
 import { type PontuacaoLeitura } from '@/lib/leitura/pontuacao'
@@ -32,6 +33,17 @@ export function ModuloRegulamentoForm({ pastaId, atual, pontuacao }: { pastaId: 
     } catch (e) { toast.error(e instanceof Error ? e.message : 'Falha no upload.') }
     finally { setEnviando(false) }
   }
+
+  // Edição da tabela nativa (linhas × colunas). 1ª linha = cabeçalho.
+  const tabela = cfg.tabela ?? []
+  const cols = tabela[0]?.length ?? 0
+  const setTabela = (t: string[][]) => setCfg((c) => ({ ...c, tabela: t }))
+  const criarTabela = () => setTabela([['Coluna 1', 'Coluna 2'], ['', ''], ['', '']])
+  const addLinha = () => setTabela([...tabela, Array(Math.max(1, cols)).fill('')])
+  const addColuna = () => setTabela(tabela.map((r) => [...r, '']))
+  const delLinha = (i: number) => setTabela(tabela.filter((_, k) => k !== i))
+  const delColuna = (j: number) => { const t = tabela.map((r) => r.filter((_, k) => k !== j)); setTabela(t.some((r) => r.length) ? t : []) }
+  const setCel = (i: number, j: number, v: string) => setTabela(tabela.map((r, ri) => (ri === i ? r.map((c, ci) => (ci === j ? v : c)) : r)))
 
   async function salvar() {
     setSalvando(true)
@@ -102,6 +114,49 @@ export function ModuloRegulamentoForm({ pastaId, atual, pontuacao }: { pastaId: 
               </button>
             )}
             <span className="block text-[11px] text-muted-foreground">O aluno vê o PDF dentro da plataforma (estilo Drive). PDF até ~8 MB. Word: exporte como PDF antes.</span>
+          </div>
+
+          {/* Tabela nativa — vista DENTRO do sistema (sem PDF). 1ª linha = cabeçalho. */}
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><TableIcon className="h-3.5 w-3.5" /> Tabela (vista no sistema, sem PDF)</span>
+              {tabela.length > 0 && <button type="button" onClick={() => setTabela([])} className="text-[11px] font-medium text-muted-foreground underline underline-offset-2 hover:text-destructive">Remover tabela</button>}
+            </div>
+            {tabela.length === 0 ? (
+              <button type="button" onClick={criarTabela}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed py-3 text-sm font-medium text-muted-foreground transition-colors hover:border-primary hover:text-foreground">
+                <Plus className="h-4 w-4" /> Adicionar tabela
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <div className="overflow-x-auto rounded-xl border">
+                  <table className="border-collapse text-sm">
+                    <tbody>
+                      {tabela.map((row, i) => (
+                        <tr key={i}>
+                          {row.map((cel, j) => (
+                            <td key={j} className={cn('border p-0', i === 0 && 'bg-muted/60')}>
+                              <input value={cel} onChange={(e) => setCel(i, j, e.target.value)} placeholder={i === 0 ? `Coluna ${j + 1}` : '—'}
+                                className={cn('w-full min-w-[9rem] bg-transparent px-2.5 py-1.5 outline-none focus:bg-primary/5', i === 0 && 'font-semibold')} />
+                            </td>
+                          ))}
+                          <td className="whitespace-nowrap border-0 pl-1">
+                            <button type="button" onClick={() => delLinha(i)} disabled={tabela.length <= 1} title="Remover linha"
+                              className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive disabled:opacity-30"><X className="h-3.5 w-3.5" /></button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={addLinha} className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-muted"><Plus className="h-3.5 w-3.5" /> Linha</button>
+                  <button type="button" onClick={addColuna} className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors hover:bg-muted"><Plus className="h-3.5 w-3.5" /> Coluna</button>
+                  {cols > 1 && <button type="button" onClick={() => delColuna(cols - 1)} className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted"><X className="h-3.5 w-3.5" /> Coluna</button>}
+                </div>
+                <span className="block text-[11px] text-muted-foreground">A 1ª linha é o cabeçalho. Aumente com “+ Linha” / “+ Coluna”. O aluno vê a tabela direto no sistema.</span>
+              </div>
+            )}
           </div>
 
           {/* Prévia das metas/ganhos — derivadas da pontuação do módulo (read-only). */}

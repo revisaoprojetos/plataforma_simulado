@@ -11,9 +11,20 @@ export interface RegulamentoConfig {
   /** PDF do regulamento (visualizado dentro da plataforma, estilo Drive). */
   documento_url: string
   documento_nome: string
+  /** Tabela nativa (vista no sistema, sem PDF): linhas × colunas de texto. 1ª linha = cabeçalho. */
+  tabela: string[][]
 }
 
-export const REGULAMENTO_PADRAO: RegulamentoConfig = { ativo: false, titulo: '', descricao: '', video_url: '', documento_url: '', documento_nome: '' }
+export const REGULAMENTO_PADRAO: RegulamentoConfig = { ativo: false, titulo: '', descricao: '', video_url: '', documento_url: '', documento_nome: '', tabela: [] }
+
+/** Higieniza a tabela: máx. 60 linhas × 12 colunas, células string; deixa retangular (linhas do mesmo tamanho). */
+export function normalizarTabela(raw: unknown): string[][] {
+  if (!Array.isArray(raw)) return []
+  const linhas = raw.slice(0, 60).map((row) => (Array.isArray(row) ? row.slice(0, 12).map((c) => (typeof c === 'string' ? c.slice(0, 1000) : '')) : []))
+  const cols = linhas.reduce((m, r) => Math.max(m, r.length), 0)
+  if (!cols || !linhas.length) return []
+  return linhas.map((r) => { const nr = r.slice(); while (nr.length < cols) nr.push(''); return nr })
+}
 
 export function normalizarRegulamento(raw: unknown): RegulamentoConfig {
   const r = (raw ?? {}) as Partial<RegulamentoConfig>
@@ -24,6 +35,7 @@ export function normalizarRegulamento(raw: unknown): RegulamentoConfig {
     video_url: typeof r.video_url === 'string' ? r.video_url : '',
     documento_url: typeof r.documento_url === 'string' ? r.documento_url : '',
     documento_nome: typeof r.documento_nome === 'string' ? r.documento_nome : '',
+    tabela: normalizarTabela(r.tabela),
   }
 }
 
