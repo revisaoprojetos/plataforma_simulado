@@ -11,6 +11,9 @@ export async function propagarGrupoAosBancos(
   tenantId: string,
   grupoId: string,
   estudanteIds: string[],
+  /** Quando vindo de uma integração (Curseduca), marca `simulado_pasta_estudantes.origem='integracao'`
+   *  para revogação segura (nunca apaga acesso manual). Omitido = default do banco ('manual'). */
+  origem?: string,
 ): Promise<void> {
   const ids = [...new Set((estudanteIds ?? []).filter(Boolean))]
   if (!ids.length || !grupoId) return
@@ -27,7 +30,13 @@ export async function propagarGrupoAosBancos(
       }
       const novos = ids.filter((id) => !ja.has(id))
       for (let i = 0; i < novos.length; i += 500) {
-        await svc.from('simulado_pasta_estudantes').insert(novos.slice(i, i + 500).map((estudante_id: string) => ({ tenant_id: tenantId, pasta_id: pastaId, estudante_id })))
+        const base = novos.slice(i, i + 500).map((estudante_id: string) => ({ tenant_id: tenantId, pasta_id: pastaId, estudante_id }))
+        if (origem) {
+          const r = await svc.from('simulado_pasta_estudantes').insert(base.map((x: Record<string, unknown>) => ({ ...x, origem })))
+          if (r.error && /origem|column/i.test(r.error.message)) await svc.from('simulado_pasta_estudantes').insert(base)
+        } else {
+          await svc.from('simulado_pasta_estudantes').insert(base)
+        }
       }
       // Matricula nos simulados que herdam do banco (idempotente).
       try { await matricularEmSimuladosDoBanco(svc, tenantId, pastaId, ids) } catch { /* best-effort */ }

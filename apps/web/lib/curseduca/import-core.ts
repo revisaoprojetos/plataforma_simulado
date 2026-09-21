@@ -72,6 +72,15 @@ export async function executarImport(
 ): Promise<ResultadoImportCurseduca> {
   const svc = createAdminClient()
 
+  // Vínculos concedidos PELA INTEGRAÇÃO carregam `origem='integracao'` (migração 20260926000000) para que
+  // a sincronização/revogação só apague o que a integração inseriu — NUNCA um acesso dado à mão pelo admin.
+  // Tolerante à coluna ausente: sem `origem`, cai no insert antigo (mantém compat).
+  const inserirMembros = async (rows: Record<string, unknown>[]) => {
+    if (!rows.length) return { error: null as any }
+    const r = await svc.from('simulado_grupo_membros').insert(rows.map((x) => ({ ...x, origem: 'integracao' })))
+    return (r.error && /origem|column/i.test(r.error.message)) ? svc.from('simulado_grupo_membros').insert(rows) : r
+  }
+
   try {
     // 1) Coleta os membros de todos os grupos (dedupe entre grupos pelo id da Curseduca).
     // TOLERÂNCIA POR-GRUPO: se UM grupo falhar (ex.: 502 do gateway da Curseduca), pula esse grupo
@@ -260,14 +269,16 @@ export async function executarImport(
       const set = new Set(jaTem.map((r) => r.estudante_id))
       const novosVinc = unicos.filter((id) => !set.has(id))
       if (novosVinc.length) {
-        const { error } = await svc.from('simulado_grupo_membros').insert(novosVinc.map((estudante_id) => ({ tenant_id: g.tenantId, grupo_id: grupoDestinoId, estudante_id })))
-        if (!error) { vinculados = novosVinc.length; await propagarGrupoAosBancos(svc, g.tenantId, grupoDestinoId, novosVinc) }
+        const { error } = await inserirMembros(novosVinc.map((estudante_id) => ({ tenant_id: g.tenantId, grupo_id: grupoDestinoId, estudante_id })))
+        if (!error) { vinculados = novosVinc.length; await propagarGrupoAosBancos(svc, g.tenantId, grupoDestinoId, novosVinc, 'integracao') }
       }
     }
 
     // 5) Sincronização (opt-in, só p/ grupo existente): DESVINCULA do grupo quem veio da
     //    Curseduca (tem matricula_externa) mas NÃO está mais nos grupos selecionados.
     //    Nunca apaga o aluno; alunos sem matrícula Curseduca (add manual) são preservados.
+    //    E só remove vínculos com origem='integracao' — um aluno Curseduca que o admin adicionou
+    //    à MÃO a este grupo (origem='manual') é preservado (tolerante à coluna ausente).
     let removidos = 0
     if (sincronizar && destino.tipo === 'existente' && grupoDestinoId) {
       const curseducaIds = new Set(membros.map((m) => String(m.id)))
@@ -284,8 +295,10 @@ export async function executarImport(
         // Deleta em lotes (o `.in()` com muitos ids estoura a URL).
         for (let i = 0; i < paraRemover.length; i += 200) {
           const lote = paraRemover.slice(i, i + 200)
-          const { error } = await svc.from('simulado_grupo_membros').delete().eq('grupo_id', grupoDestinoId).eq('tenant_id', g.tenantId).in('estudante_id', lote)
-          if (!error) removidos += lote.length
+          const del = () => svc.from('simulado_grupo_membros').delete().eq('grupo_id', grupoDestinoId).eq('tenant_id', g.tenantId).in('estudante_id', lote)
+          let r = await del().eq('origem', 'integracao')
+          if (r.error && /origem|column/i.test(r.error.message)) r = await del() // coluna ausente → comportamento antigo
+          if (!r.error) removidos += lote.length
         }
       }
     }
@@ -307,9 +320,9 @@ export async function executarImport(
           svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grId).order('estudante_id', { ascending: true }))).map((r) => r.estudante_id))
         const novos = ids.filter((id) => !jaNo.has(id))
         for (let i = 0; i < novos.length; i += 200) {
-          await svc.from('simulado_grupo_membros').insert(novos.slice(i, i + 200).map((estudante_id) => ({ tenant_id: g.tenantId, grupo_id: grId, estudante_id })))
+          await inserirMembros(novos.slice(i, i + 200).map((estudante_id) => ({ tenant_id: g.tenantId, grupo_id: grId, estudante_id })))
         }
-        if (novos.length) await propagarGrupoAosBancos(svc, g.tenantId, grId, novos)
+        if (novos.length) await propagarGrupoAosBancos(svc, g.tenantId, grId, novos, 'integracao')
       }
       await entrarNoGrupo('passaporte', passIds)             // Passaporte (comum a passaporte+vitalício)
       await entrarNoGrupo('Passaporte Vitalício', vitIds)    // grupo Vitalício (só os vitalícios)

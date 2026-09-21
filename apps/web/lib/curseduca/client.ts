@@ -75,7 +75,9 @@ async function token(cfg: CurseducaCfg): Promise<string> {
   const resp = await fetch(`${cfg.base}/login`, {
     method: 'POST',
     headers: { accept: 'application/json', 'content-type': 'application/json', api_key: cfg.apiKey },
-    body: JSON.stringify({ username: cfg.user, password: cfg.pass, device: { app: { uuid: 'revisao' }, device: 'server', registrationToken: 'server' }, accessTokenValidity: 'string' }),
+    // Body enxuto: `username`/`password` + `device`. (O antigo `accessTokenValidity:'string'` era um
+    // placeholder do Swagger — a API o ignorava; sondado: remover não muda o login, que segue 201.)
+    body: JSON.stringify({ username: cfg.user, password: cfg.pass, device: { app: { uuid: 'revisao' }, device: 'server', registrationToken: 'server' } }),
     cache: 'no-store',
     signal: AbortSignal.timeout(TIMEOUT_MS),
   }).catch((e) => { throw new Error(e?.name === 'TimeoutError' ? 'Curseduca: login expirou (sem resposta em 15s)' : `Curseduca: falha de rede no login (${e?.message ?? e})`) })
