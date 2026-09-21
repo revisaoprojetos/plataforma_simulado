@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Flame, Zap, Award, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Flame, Zap, Award, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { GamRail } from '@/lib/aluno/trilhas'
 import { progressoDesafio, DESAFIO_TIPOS, type DesafioModulo } from '@/lib/leitura/desafios'
@@ -48,6 +48,7 @@ export function LeituraTrilhaRail({ done, total, gam, desafios = [], desemp, dia
   const { resumo } = gam
   const [calAberto, setCalAberto] = useState(false)
   const [mesOffset, setMesOffset] = useState(0)
+  const [recolhido, setRecolhido] = useState(false) // recolhe/expande TODOS os cards da coluna
   const pctTrilha = total > 0 ? Math.round((done / total) * 100) : 0
   const restantes = Math.max(0, total - done)
   const nivelMax = gam.config.nivel_curva?.nivel_max ?? 30
@@ -83,6 +84,10 @@ export function LeituraTrilhaRail({ done, total, gam, desafios = [], desemp, dia
 
   return (
     <div className="tema-gam space-y-3">
+      {/* Todos os cards ficam numa região que RECOLHE/EXPANDE com animação de altura (0fr↔1fr). */}
+      <div className={cn('grid transition-[grid-template-rows] duration-500 ease-out', recolhido ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]')}>
+        <div className={cn('overflow-hidden transition-opacity duration-300', recolhido ? 'opacity-0' : 'opacity-100')}>
+          <div className="space-y-3">
       {/* Progresso da trilha */}
       <Card label="Progresso da trilha">
         <div className="flex items-end justify-between gap-2">
@@ -175,6 +180,16 @@ export function LeituraTrilhaRail({ done, total, gam, desafios = [], desemp, dia
           </div>
         </Card>
       )}
+          </div>
+        </div>
+      </div>
+
+      {/* Card BAIXO (mesma largura) para recolher/expandir todos os cards — seta ao centro que inverte. */}
+      <button type="button" onClick={() => setRecolhido((v) => !v)} aria-expanded={!recolhido}
+        aria-label={recolhido ? 'Expandir os cards' : 'Recolher os cards'} title={recolhido ? 'Expandir' : 'Recolher'}
+        className="group flex w-full items-center justify-center rounded-2xl border bg-card/75 py-2 shadow-sm backdrop-blur-md transition-colors hover:bg-card">
+        <ChevronUp className={cn('h-5 w-5 text-muted-foreground transition-transform duration-300 group-hover:text-foreground', recolhido && 'rotate-180')} />
+      </button>
     </div>
   )
 }
