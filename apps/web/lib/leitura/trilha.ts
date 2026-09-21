@@ -20,7 +20,7 @@ interface AulaStatus {
   questoesRespondidas: number
   gabaritou: boolean
 }
-interface AulaSeq extends AulaStatus { estado: EstadoAula; moduloId: string; naoLiberada?: boolean }
+interface AulaSeq extends AulaStatus { estado: EstadoAula; moduloId: string; naoLiberada?: boolean; proxima?: boolean }
 
 /** `.order('ordem')` tolerante (coluna pode não existir ainda). */
 async function pastasLeitura(svc: any, tenantId: string): Promise<any[]> {
@@ -148,12 +148,14 @@ async function sequenciaLeitura(estId: string, tenantId: string) {
 
   const seqByModulo = new Map<string, AulaSeq[]>()
   let jaAbriu = false // já achou o "atual"
+  let jaProxima = false // já achou a PRÓXIMA a liberar (1ª aula ainda não liberada de toda a sequência)
   for (const m of modulos) {
     const arr: AulaSeq[] = []
     for (const d of byModulo.get(m.id) ?? []) {
       const s = st.get(d.id)!
       // Aula VISUALIZÁVEL: aparece bloqueada ("ainda não liberada") e NÃO entra na sequência (não vira "atual").
-      if (d.visualizavel) { arr.push({ ...s, estado: 'bloqueado', naoLiberada: true, moduloId: m.id }); continue }
+      // A 1ª delas é a PRÓXIMA a liberar → recebe destaque ("aula de amanhã/hoje") na trilha.
+      if (d.visualizavel) { const proxima = !jaProxima; jaProxima = true; arr.push({ ...s, estado: 'bloqueado', naoLiberada: true, proxima, moduloId: m.id }); continue }
       let estado: EstadoAula
       if (s.aulaConcluida) estado = 'concluido'
       else if (!jaAbriu) { estado = 'atual'; jaAbriu = true }
@@ -183,6 +185,7 @@ function nodeDe(a: AulaSeq): TrilhaNode {
     estado: estadoNode, acerto: a.gabaritou ? 100 : null, nota: null, tentativas: 0, statusLabel, questoes: a.questoesTotal, xp: 0,
     href: hrefLeitura, acao: acaoLeitura, capa: a.doc.capa_url, capaBanner: a.doc.capa_url, cadernoUrl: null,
     hrefLeitura, acaoLeitura, hrefQuestoes, questoesLiberada: a.leituraConcluida && !bloqueado,
+    naoLiberada: a.naoLiberada, proxima: a.proxima, liberaEm: a.doc.liberaEm ?? null,
   }
 }
 

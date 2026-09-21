@@ -11,6 +11,7 @@ import { DEFAULT_TRILHA_SIMBOLOS, coresNo, type TrilhaSimbolos, type SimboloEsta
 import { TrilhaLista } from '@/components/aluno/trilha-lista'
 import { TrilhaMapaSemanas } from '@/components/aluno/trilha-mapa-semanas'
 import { scrollSuaveAte } from '@/lib/aluno/scroll-trilha'
+import { rotuloProximaAula } from '@/lib/aluno/proxima-aula'
 import { TrilhaLivre } from '@/components/aluno/trilha-livre'
 import { type TrilhaFormato } from '@/lib/gamificacao/trilha-formato'
 import { type TrilhaLivreConfig, type TrilhaDegrade } from '@/lib/leitura/trilha-aparencia'
@@ -47,6 +48,11 @@ export interface TrilhaNode {
   questoesLiberada?: boolean
   // Nó "Comece por aqui" (LegProc): pré-aula no topo, sempre acessível, abre direto (sem card lateral).
   intro?: { tipo: 'leitura' | 'video' | 'link'; href: string; externo: boolean }
+  /** Aula ainda não liberada (agendada dia a dia). `proxima` = a PRÓXIMA a liberar (destaque na trilha);
+   *  `liberaEm` = data agendada (ISO) → o rótulo "aula de amanhã/hoje" é calculado no cliente. */
+  naoLiberada?: boolean
+  proxima?: boolean
+  liberaEm?: string | null
 }
 export interface Trilha {
   id: string
@@ -617,8 +623,12 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
         const atual = n.estado === 'atual'
         const bloqueado = n.estado === 'disponivel'
         const sel = n.id === aberto
+        const proxima = !!n.proxima // PRÓXIMA a liberar (agendada) — pulsa em âmbar + "aula de amanhã/hoje"
+        const ehAlvo = n.id === alvoNodeId // onde o aluno "está" (atual ou última concluída) → referência
         return (
           <div key={n.id} ref={n.id === alvoNodeId ? alvoRef : undefined} className="absolute z-[1] flex w-max max-w-[260px] -translate-x-1/2 flex-col items-center text-center" style={{ left: cx(off), top: cyv - R }}>
+            {ehAlvo && !atual && <span className="mb-1 whitespace-nowrap rounded-full bg-primary px-2 py-0.5 text-[11px] font-bold text-primary-foreground shadow">você está aqui</span>}
+            {proxima && <span className="mb-1 whitespace-nowrap rounded-full bg-amber-500 px-2 py-0.5 text-[11px] font-bold text-white shadow motion-safe:animate-pulse">{rotuloProximaAula(n.liberaEm)}</span>}
             <button type="button" data-trilha-node onClick={() => setAberto(n.id)} aria-label={n.titulo}
               className={cn('relative flex items-center justify-center rounded-full border-4 shadow-sm transition-transform hover:scale-105 focus:outline-none', sel && 'ring-4 ring-primary/25')}
               style={{ width: R * 2, height: R * 2, ...(ouro ? { background: 'radial-gradient(circle at 50% 36%, #ffe680 0%, #ffcf33 46%, #f0b000 78%, #d99200 100%)', borderColor: '#c07f08', color: '#c2680a', boxShadow: '0 0 13px 2px rgba(250,204,21,.5), 0 0 28px 6px rgba(250,204,21,.22), 0 6px 16px -5px rgba(217,119,6,.55)' }
@@ -744,6 +754,7 @@ export function TrilhaSistema({ trilhas, gamAtivo, simbolos = DEFAULT_TRILHA_SIM
       id: n.id, titulo: n.titulo, estado: n.estado, href: n.hrefLeitura ?? n.href, acao: n.acaoLeitura ?? n.acao,
       quando: n.quando, questoes: n.questoes, acerto: n.acerto,
       hrefLeitura: n.hrefLeitura, acaoLeitura: n.acaoLeitura, hrefQuestoes: n.hrefQuestoes, questoesLiberada: n.questoesLiberada,
+      naoLiberada: n.naoLiberada, proxima: n.proxima, liberaEm: n.liberaEm,
     }))
     return <TrilhaLivre nodes={nos} livre={livre ?? { nos: {}, curvas: {} }} capa={capa ?? trilhas[0]?.capa ?? null} simbolos={simbolos} semMoldura={semMoldura} degradeTopo={degradeTopo} />
   }

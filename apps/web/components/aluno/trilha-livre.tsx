@@ -7,6 +7,7 @@ import { SimboloNo } from '@/components/gamificacao/simbolo-no'
 import { coresNo, type TrilhaSimbolos, type SimboloEstado } from '@/lib/gamificacao/trilha-simbolos'
 import { estiloDegrade, type TrilhaLivreConfig, type PosXY, type TrilhaDegrade } from '@/lib/leitura/trilha-aparencia'
 import { scrollSuaveAte } from '@/lib/aluno/scroll-trilha'
+import { rotuloProximaAula } from '@/lib/aluno/proxima-aula'
 
 export type NoLivre = {
   id: string; titulo: string; estado: SimboloEstado; href?: string | null; acao?: string
@@ -19,6 +20,9 @@ export type NoLivre = {
   hrefQuestoes?: string | null
   questoesLiberada?: boolean
   naoLiberada?: boolean
+  /** Próxima aula a liberar + data agendada (ISO) → rótulo "aula de amanhã/hoje". */
+  proxima?: boolean
+  liberaEm?: string | null
 }
 
 const clampPct = (n: number) => Math.max(0, Math.min(100, n))
@@ -218,9 +222,12 @@ export function TrilhaLivre({ nodes, livre, capa, simbolos, editavel = false, on
         const p = posDe(i)
         const cor = coresNo(n.estado, simbolos[n.estado])
         const atual = n.estado === 'atual'
+        const proxima = !!n.proxima && !editavel // PRÓXIMA a liberar (agendada) — pulsa + "aula de amanhã/hoje"
+        const ehAlvo = i === alvoIdx && !editavel // onde o aluno "está" (atual ou última concluída) → referência
         return (
           <div key={n.id} ref={i === alvoIdx ? alvoRef : undefined} className="absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center" style={{ left: `${p.x}%`, top: `${p.y}%` }}>
-            {atual && !editavel && <span className="mb-1 whitespace-nowrap rounded-full bg-primary px-2 py-0.5 font-bold text-primary-foreground shadow" style={{ fontSize: Math.max(9, labelFs - 1) }}>você está aqui</span>}
+            {ehAlvo && <span className="mb-1 whitespace-nowrap rounded-full bg-primary px-2 py-0.5 font-bold text-primary-foreground shadow" style={{ fontSize: Math.max(9, labelFs - 1) }}>você está aqui</span>}
+            {proxima && <span className="mb-1 whitespace-nowrap rounded-full bg-amber-500 px-2 py-0.5 font-bold text-white shadow motion-safe:animate-pulse" style={{ fontSize: Math.max(9, labelFs - 1) }}>{rotuloProximaAula(n.liberaEm)}</span>}
             <button type="button" data-trilha-no
               onPointerDown={editavel ? (e) => { e.preventDefault(); dragRef.current = { tipo: 'no', id: n.id } } : undefined}
               onClick={!editavel ? () => setAberto((v) => v === n.id ? null : n.id) : undefined}
@@ -230,6 +237,11 @@ export function TrilhaLivre({ nodes, livre, capa, simbolos, editavel = false, on
               {atual && !editavel && (<>
                 <span className="pointer-events-none absolute rounded-full border-2 opacity-70 motion-safe:animate-ping" style={{ inset: -Math.round(nodeSize * 0.12), borderColor: cor.borda }} />
                 <span className="pointer-events-none absolute rounded-full opacity-40 motion-safe:animate-ping [animation-delay:600ms]" style={{ inset: -Math.round(nodeSize * 0.05), background: `radial-gradient(circle, ${cor.borda}33 0%, transparent 70%)` }} />
+              </>)}
+              {/* Nó PRÓXIMA aula (a liberar): anéis pulsando em ÂMBAR p/ chamar atenção mesmo bloqueada. */}
+              {proxima && (<>
+                <span className="pointer-events-none absolute rounded-full border-2 border-amber-400 opacity-80 motion-safe:animate-ping" style={{ inset: -Math.round(nodeSize * 0.12) }} />
+                <span className="pointer-events-none absolute rounded-full opacity-45 motion-safe:animate-ping [animation-delay:600ms]" style={{ inset: -Math.round(nodeSize * 0.05), background: 'radial-gradient(circle, rgba(245,158,11,0.32) 0%, transparent 70%)' }} />
               </>)}
               <SimboloNo config={simbolos[n.estado]} escala={iconEscala} cor={cor.simbolo} />
             </button>

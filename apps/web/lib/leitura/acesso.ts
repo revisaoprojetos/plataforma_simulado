@@ -49,6 +49,8 @@ export interface DocumentoAluno {
   ementa: string | null
   /** Aula "visualizável": aparece na trilha mas BLOQUEADA ("ainda não liberada"). */
   visualizavel?: boolean
+  /** Data agendada de liberação (publicacao.publicarEm) — para "aula de amanhã/hoje" na trilha. */
+  liberaEm?: string | null
 }
 
 /**
@@ -123,6 +125,7 @@ export async function documentosDoAluno(estudanteId: string, tenantId: string, o
       materiaId: d.materia_id ?? null, materiaNome: mat?.nome ?? null, materiaCor: mat?.cor ?? null,
       tipoNorma: d.tipo_norma ?? null, numero: d.numero ?? null, ano: d.ano ?? null, ementa: d.ementa ?? null,
       visualizavel: !d.publicado && (d.publicacao && typeof d.publicacao === 'object' ? d.publicacao.estado === 'visualizavel' : false),
+      liberaEm: (d.publicacao && typeof d.publicacao === 'object' ? (d.publicacao.publicarEm ?? null) : null),
     }
   })
 }
