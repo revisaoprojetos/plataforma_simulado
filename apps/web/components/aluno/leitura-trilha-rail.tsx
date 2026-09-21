@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Flame, Zap, Award, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { GamRail } from '@/lib/aluno/trilhas'
@@ -49,6 +49,18 @@ export function LeituraTrilhaRail({ done, total, gam, desafios = [], desemp, dia
   const [calAberto, setCalAberto] = useState(false)
   const [mesOffset, setMesOffset] = useState(0)
   const [recolhido, setRecolhido] = useState(false) // recolhe/expande TODOS os cards da coluna
+  // Altura REAL do conteúdo (medida) p/ animar em pixels — grid-rows(fr) não interpola suave em todo
+  // navegador ("corta"). ResizeObserver mantém a altura atualizada (ex.: quando o calendário abre).
+  const conteudoRef = useRef<HTMLDivElement>(null)
+  const [alturaConteudo, setAlturaConteudo] = useState(0)
+  useEffect(() => {
+    const el = conteudoRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setAlturaConteudo(el.scrollHeight))
+    ro.observe(el)
+    setAlturaConteudo(el.scrollHeight)
+    return () => ro.disconnect()
+  }, [])
   const pctTrilha = total > 0 ? Math.round((done / total) * 100) : 0
   const restantes = Math.max(0, total - done)
   const nivelMax = gam.config.nivel_curva?.nivel_max ?? 30
@@ -84,10 +96,11 @@ export function LeituraTrilhaRail({ done, total, gam, desafios = [], desemp, dia
 
   return (
     <div className="tema-gam space-y-3">
-      {/* Todos os cards ficam numa região que RECOLHE/EXPANDE com animação de altura (0fr↔1fr). */}
-      <div className={cn('grid transition-[grid-template-rows] duration-500 ease-out', recolhido ? 'grid-rows-[0fr]' : 'grid-rows-[1fr]')}>
-        <div className={cn('overflow-hidden transition-opacity duration-300', recolhido ? 'opacity-0' : 'opacity-100')}>
-          <div className="space-y-3">
+      {/* Região que RECOLHE/EXPANDE: anima a ALTURA em pixels (medida) — suave em qualquer navegador.
+          Antes de medir, height=auto (sem animar no 1º paint); depois vira px e o recolher anima px→0. */}
+      <div className="overflow-hidden transition-[height,opacity] duration-500 ease-out"
+        style={{ height: recolhido ? 0 : (alturaConteudo || undefined), opacity: recolhido ? 0 : 1 }}>
+        <div ref={conteudoRef} className="space-y-3">
       {/* Progresso da trilha */}
       <Card label="Progresso da trilha">
         <div className="flex items-end justify-between gap-2">
@@ -180,7 +193,6 @@ export function LeituraTrilhaRail({ done, total, gam, desafios = [], desemp, dia
           </div>
         </Card>
       )}
-          </div>
         </div>
       </div>
 
