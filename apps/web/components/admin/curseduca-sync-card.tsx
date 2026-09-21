@@ -30,8 +30,8 @@ function calcVinculados(grupos: { id: number; nome: string }[], sistema: { id: s
  * "vinculados" por nome e o admin confirma quais entram. `salvarSyncSimples` recebe
  * apenas os ids marcados.
  */
-export function CurseducaSyncCard({ grupos, sistema = [], inicialAtivo, inicialIntervalo, inicialGrupos = [] }: {
-  grupos: GrupoCurseducaDTO[]; sistema?: GrupoSistema[]; inicialAtivo: boolean; inicialIntervalo: number; inicialGrupos?: number[]
+export function CurseducaSyncCard({ grupos, sistema = [], inicialAtivo, inicialIntervalo, inicialGrupos = [], inicialAgrupar = false }: {
+  grupos: GrupoCurseducaDTO[]; sistema?: GrupoSistema[]; inicialAtivo: boolean; inicialIntervalo: number; inicialGrupos?: number[]; inicialAgrupar?: boolean
 }) {
   // Só grupos comuns podem casar com a Curseduca (pastas/mestre não são destino de sync).
   const comuns = useMemo(() => sistema.filter((s) => !s.is_mestre), [sistema])
@@ -40,6 +40,7 @@ export function CurseducaSyncCard({ grupos, sistema = [], inicialAtivo, inicialI
   // fora, silenciosamente). Mostramos a contagem para o admin não ser pego de surpresa (landmine 25/253).
   const naoVinculados = Math.max(0, grupos.length - vinculados.length)
   const [ativo, setAtivo] = useState(inicialAtivo)
+  const [agrupar, setAgrupar] = useState(inicialAgrupar)
   const [intervalo, setIntervalo] = useState(String(inicialIntervalo || 30))
   const [sel, setSel] = useState<Set<number>>(() => {
     const ids = calcVinculados(grupos, comuns).map((v) => v.id)
@@ -65,8 +66,8 @@ export function CurseducaSyncCard({ grupos, sistema = [], inicialAtivo, inicialI
   function salvar() {
     if (ativo && sel.size === 0) { toast.error('Marque ao menos um grupo vinculado para sincronizar.'); return }
     start(async () => {
-      const r = await salvarSyncSimples(Number(intervalo), ativo, [...sel])
-      if (r.ok) toast.success(ativo ? `Automático ativado · a cada ${INTERVALOS[intervalo]} · ${sel.size} grupo(s)` : 'Sincronização automática desligada')
+      const r = await salvarSyncSimples(Number(intervalo), ativo, [...sel], agrupar)
+      if (r.ok) toast.success(ativo ? `Automático ativado · a cada ${INTERVALOS[intervalo]} · ${sel.size} grupo(s)${agrupar ? ' · agrupando por nome' : ''}` : 'Sincronização automática desligada')
       else toast.error(r.error ?? 'Erro ao salvar')
     })
   }
@@ -149,6 +150,13 @@ export function CurseducaSyncCard({ grupos, sistema = [], inicialAtivo, inicialI
                 {salvando ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />} Salvar
               </Button>
             </div>
+            {/* Agrupamento automático por nome: o servidor vincula cada canal ao grupo de MESMO nome. */}
+            <label className={cn('flex items-start gap-2 rounded-xl border p-2.5 text-xs transition-opacity', !ativo && 'pointer-events-none opacity-50', agrupar ? 'border-primary/40 bg-primary/5' : '')}>
+              <input type="checkbox" checked={agrupar} onChange={(e) => setAgrupar(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border" />
+              <span>
+                <span className="font-medium text-foreground">Agrupar automaticamente por nome</span> — além de atualizar os cadastros, o servidor <b>coloca cada aluno no grupo do sistema de mesmo nome do canal</b> (e propaga o acesso), em lotes. Sem isso, a automática só atualiza os cadastros e o vínculo ao grupo depende do “Sincronizar agora”. Nunca remove ninguém.
+              </span>
+            </label>
             <p className="text-[11px] leading-snug text-muted-foreground">Quando ativa, roda sozinha no servidor no intervalo escolhido — só os grupos vinculados marcados. Desmarque <b>Ativar</b> e salve para desligar.</p>
           </div>
 

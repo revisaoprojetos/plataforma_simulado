@@ -340,6 +340,7 @@ export async function statusImportacaoCurseduca(jobId: string): Promise<{ ok: bo
 export type RegraSyncDTO = {
   id: string; grupos: number[]; destino: DestinoImport; sincronizar: boolean; intervalo_min: number
   ativo: boolean; ultima_execucao: string | null; ultimo_resultado: ResultadoImportCurseduca | null; grupoDestinoNome: string | null
+  agruparPorNome: boolean
 }
 const INTERVALOS_OK = new Set([15, 30, 60, 120, 240])
 
@@ -350,7 +351,14 @@ export async function listarRegrasSync(): Promise<{ ok: boolean; error?: string;
   if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   const svc = createAdminClient()
   try {
-    const { data } = await svc.from('simulado_curseduca_sync').select('id, grupos, destino, sincronizar, intervalo_min, ativo, ultima_execucao, ultimo_resultado').eq('tenant_id', access.tenantId).order('created_at', { ascending: false })
+    let data: any[] | null = null
+    {
+      const r1 = await svc.from('simulado_curseduca_sync').select('id, grupos, destino, sincronizar, intervalo_min, ativo, ultima_execucao, ultimo_resultado, agrupar_por_nome').eq('tenant_id', access.tenantId).order('created_at', { ascending: false })
+      if (r1.error && /agrupar_por_nome|column/i.test(r1.error.message)) {
+        const r2 = await svc.from('simulado_curseduca_sync').select('id, grupos, destino, sincronizar, intervalo_min, ativo, ultima_execucao, ultimo_resultado').eq('tenant_id', access.tenantId).order('created_at', { ascending: false })
+        data = r2.data as any[]
+      } else data = r1.data as any[]
+    }
     const rows = (data ?? []) as any[]
     const gids = [...new Set(rows.map((r) => r.destino?.grupoId).filter(Boolean))]
     const nomes = new Map<string, string>()
@@ -362,6 +370,7 @@ export async function listarRegrasSync(): Promise<{ ok: boolean; error?: string;
       id: r.id, grupos: r.grupos ?? [], destino: r.destino ?? { tipo: 'nenhum' }, sincronizar: !!r.sincronizar,
       intervalo_min: r.intervalo_min ?? 30, ativo: !!r.ativo, ultima_execucao: r.ultima_execucao ?? null,
       ultimo_resultado: r.ultimo_resultado ?? null, grupoDestinoNome: r.destino?.grupoId ? (nomes.get(r.destino.grupoId) ?? null) : null,
+      agruparPorNome: !!r.agrupar_por_nome,
     }))
     return { ok: true, regras }
   } catch {
@@ -406,7 +415,7 @@ export async function getSyncSimples(): Promise<{ ok: boolean; ativo: boolean; i
  * e define o intervalo. Mantém UMA regra "global" — destino 'nenhum', sincronizar=false
  * (só adiciona alunos novos, nunca remove). Substitui a UI de regras avançada (oculta por ora).
  */
-export async function salvarSyncSimples(intervaloMin: number, ativo: boolean, grupos: number[]): Promise<{ ok: boolean; error?: string }> {
+export async function salvarSyncSimples(intervaloMin: number, ativo: boolean, grupos: number[], agruparPorNome = false): Promise<{ ok: boolean; error?: string }> {
   if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
   const access = await getCurrentAccess()
   if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
@@ -424,11 +433,18 @@ export async function salvarSyncSimples(intervaloMin: number, ativo: boolean, gr
     const { data: existentes } = await svc.from('simulado_curseduca_sync').select('id').eq('tenant_id', access.tenantId).order('created_at', { ascending: true })
     const lista = (existentes ?? []) as any[]
     if (lista.length) {
-      await svc.from('simulado_curseduca_sync').update({ intervalo_min: intervalo, ativo, grupos, destino: { tipo: 'nenhum' }, sincronizar: false }).eq('id', lista[0].id).eq('tenant_id', access.tenantId)
+      const patch: Record<string, unknown> = { intervalo_min: intervalo, ativo, grupos, destino: { tipo: 'nenhum' }, sincronizar: false, agrupar_por_nome: agruparPorNome }
+      let up = await svc.from('simulado_curseduca_sync').update(patch).eq('id', lista[0].id).eq('tenant_id', access.tenantId)
+      if (up.error && /agrupar_por_nome|column/i.test(up.error.message)) { // coluna nova ainda não migrada
+        delete patch.agrupar_por_nome
+        await svc.from('simulado_curseduca_sync').update(patch).eq('id', lista[0].id).eq('tenant_id', access.tenantId)
+      }
       if (lista.length > 1) await svc.from('simulado_curseduca_sync').delete().in('id', lista.slice(1).map((r) => r.id)).eq('tenant_id', access.tenantId)
     } else if (ativo) {
       if (!grupos.length) return { ok: false, error: 'Carregue os grupos antes de ativar.' }
-      await svc.from('simulado_curseduca_sync').insert({ tenant_id: access.tenantId, grupos, destino: { tipo: 'nenhum' }, sincronizar: false, intervalo_min: intervalo, ativo: true, criado_por: access.userId ?? null })
+      const base: Record<string, unknown> = { tenant_id: access.tenantId, grupos, destino: { tipo: 'nenhum' }, sincronizar: false, intervalo_min: intervalo, ativo: true, criado_por: access.userId ?? null }
+      let ins = await svc.from('simulado_curseduca_sync').insert({ ...base, agrupar_por_nome: agruparPorNome })
+      if (ins.error && /agrupar_por_nome|column/i.test(ins.error.message)) await svc.from('simulado_curseduca_sync').insert(base)
     }
     revalidatePath('/admin/integracoes/curseduca')
     return { ok: true }

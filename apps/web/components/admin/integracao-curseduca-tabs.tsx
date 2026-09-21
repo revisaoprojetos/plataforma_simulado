@@ -80,7 +80,7 @@ export function IntegracaoCurseducaTabs({ configurado, inativo = false, regras }
               <Loader2 className="h-6 w-6 animate-spin" /> Carregando grupos da Curseduca…
             </div>
           ) : erroGrupos ? aviso('Não foi possível carregar os grupos', erroGrupos)
-            : <CurseducaSyncCard grupos={grupos} sistema={sistema} inicialAtivo={!!regra0?.ativo} inicialIntervalo={regra0?.intervalo_min ?? 30} inicialGrupos={regra0?.grupos ?? []} />
+            : <CurseducaSyncCard grupos={grupos} sistema={sistema} inicialAtivo={!!regra0?.ativo} inicialIntervalo={regra0?.intervalo_min ?? 30} inicialGrupos={regra0?.grupos ?? []} inicialAgrupar={!!regra0?.agruparPorNome} />
       )}
       {aba === 'credenciais' && <div className="max-w-3xl"><CurseducaConfig inicialAberto semColapso /></div>}
     </div>
