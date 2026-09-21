@@ -147,7 +147,15 @@ export function TrilhaLivre({ nodes, livre, capa, simbolos, editavel = false, on
   // Rolagem automática (devagar) até o nó ATUAL (ponto de progressão dos dias) ao abrir a trilha.
   // Se todos concluídos, vai ao último. Só no aluno (não no construtor).
   const alvoRef = useRef<HTMLDivElement>(null)
-  const alvoIdx = (() => { const i = nodes.findIndex((n) => n.estado === 'atual'); return i >= 0 ? i : nodes.length - 1 })()
+  // Alvo da rolagem = onde o aluno "parou": a aula ATUAL; se não houver (ex.: o próximo dia ainda não
+  // foi liberado), a ÚLTIMA CONCLUÍDA; senão o 1º nó. (Antes caía no último nó — Dia 30 no futuro.)
+  const alvoIdx = (() => {
+    const at = nodes.findIndex((n) => n.estado === 'atual')
+    if (at >= 0) return at
+    let ult = -1
+    nodes.forEach((n, i) => { if (n.estado === 'concluido') ult = i })
+    return ult >= 0 ? ult : 0
+  })()
   useEffect(() => {
     if (editavel || size.w === 0) return
     const el = alvoRef.current; if (!el) return

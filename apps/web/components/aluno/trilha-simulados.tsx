@@ -426,20 +426,20 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
   const [aberto, setAberto] = useState<string | null>(atualId)
   const cx = (off: number) => LANE / 2 + off
 
-  // Ao abrir a trilha, rola DEVAGAR até a aula ATUAL (onde o aluno parou) — só quando existe uma aula
-  // "atual" de fato (senão a trilha ficaria pulando para o 1º nó de quem ainda não começou). O ref é
-  // anexado ao nó atual no render; o pequeno delay dá tempo do layout (imagens/fundos) assentar.
+  // Ao abrir a trilha, rola DEVAGAR até onde o aluno "parou": a aula ATUAL; se não houver (ex.: o
+  // próximo dia ainda não liberado), a ÚLTIMA CONCLUÍDA. O ref é anexado a esse nó no render; o
+  // pequeno delay dá tempo do layout (imagens/fundos) assentar. offsetParent null = instância escondida.
   const alvoRef = useRef<HTMLDivElement>(null)
-  const temAtual = !!noAtual
+  const alvoNodeId = noAtual?.id ?? [...flat].reverse().find((n) => n.estado === 'concluido')?.id ?? null
   useEffect(() => {
-    if (!temAtual) return
+    if (!alvoNodeId) return
     const t = setTimeout(() => {
       const el = alvoRef.current
-      if (!el || el.offsetParent === null) return // pula a instância escondida (layout mobile/desktop duplicado)
+      if (!el || el.offsetParent === null) return
       scrollSuaveAte(el)
     }, 550)
     return () => clearTimeout(t)
-  }, [atualId, temAtual])
+  }, [alvoNodeId])
 
   // Trilha aberta: mais distância vertical entre os nós e zigue-zague mais largo na horizontal.
   // Só quando fica MUITO grande (>16 nós) encurta um pouco p/ não virar um comprimento absurdo.
@@ -618,7 +618,7 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
         const bloqueado = n.estado === 'disponivel'
         const sel = n.id === aberto
         return (
-          <div key={n.id} ref={atual ? alvoRef : undefined} className="absolute z-[1] flex w-max max-w-[260px] -translate-x-1/2 flex-col items-center text-center" style={{ left: cx(off), top: cyv - R }}>
+          <div key={n.id} ref={n.id === alvoNodeId ? alvoRef : undefined} className="absolute z-[1] flex w-max max-w-[260px] -translate-x-1/2 flex-col items-center text-center" style={{ left: cx(off), top: cyv - R }}>
             <button type="button" data-trilha-node onClick={() => setAberto(n.id)} aria-label={n.titulo}
               className={cn('relative flex items-center justify-center rounded-full border-4 shadow-sm transition-transform hover:scale-105 focus:outline-none', sel && 'ring-4 ring-primary/25')}
               style={{ width: R * 2, height: R * 2, ...(ouro ? { background: 'radial-gradient(circle at 50% 36%, #ffe680 0%, #ffcf33 46%, #f0b000 78%, #d99200 100%)', borderColor: '#c07f08', color: '#c2680a', boxShadow: '0 0 13px 2px rgba(250,204,21,.5), 0 0 28px 6px rgba(250,204,21,.22), 0 6px 16px -5px rgba(217,119,6,.55)' }
