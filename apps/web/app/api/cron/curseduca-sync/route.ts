@@ -24,12 +24,12 @@ export async function POST(req: NextRequest) {
 
   // Colunas novas (agrupar_por_nome/sync_cursor) são opcionais: se a migração ainda não rodou,
   // o select cai no formato antigo e o agrupamento fica desligado (comportamento anterior).
-  const COLS = 'id, tenant_id, grupos, destino, sincronizar, intervalo_min, ultima_execucao, agrupar_por_nome, sync_cursor'
+  const COLS = 'id, tenant_id, grupos, destino, sincronizar, intervalo_min, ultima_execucao, ultimo_resultado, agrupar_por_nome, sync_cursor'
   let regras: any[] | null = null
   {
     const r1 = await svc.from('simulado_curseduca_sync').select(COLS).eq('ativo', true).order('ultima_execucao', { ascending: true, nullsFirst: true }).limit(50)
     if (r1.error && /agrupar_por_nome|sync_cursor|column/i.test(r1.error.message)) {
-      const r2 = await svc.from('simulado_curseduca_sync').select('id, tenant_id, grupos, destino, sincronizar, intervalo_min, ultima_execucao').eq('ativo', true).order('ultima_execucao', { ascending: true, nullsFirst: true }).limit(50)
+      const r2 = await svc.from('simulado_curseduca_sync').select('id, tenant_id, grupos, destino, sincronizar, intervalo_min, ultima_execucao, ultimo_resultado').eq('ativo', true).order('ultima_execucao', { ascending: true, nullsFirst: true }).limit(50)
       regras = r2.data as any[]
     } else regras = r1.data as any[]
   }
@@ -44,6 +44,13 @@ export async function POST(req: NextRequest) {
     const venceu = auto || !r.ultima_execucao || (agora - new Date(r.ultima_execucao).getTime()) >= (r.intervalo_min ?? 30) * 60_000
     if (!venceu) continue
     if (rodadas >= 3) break // poucas por tick; o resto vem no próximo
+
+    // Anti-sobreposição (agrupar roda TODO tick, mas cada lote pode durar >1 min): se o tick anterior
+    // ainda está `em_andamento` e começou há pouco, PULA — evita 2 ticks reprocessando os mesmos canais
+    // (releitura dos ~18k cadastros + chamadas à API duplicadas). Se o marcador está velho (>10min), o
+    // tick anterior travou → segue (retoma).
+    if (auto && r.ultimo_resultado && (r.ultimo_resultado as any).status === 'em_andamento'
+      && r.ultima_execucao && (agora - new Date(r.ultima_execucao).getTime()) < 10 * 60_000) continue
 
     // Lock otimista: só assume se ultima_execucao continua igual ao que lemos. Já grava um marcador
     // "em andamento" no ultimo_resultado — assim, se o request for cortado (proxy 5min) antes do fim,
