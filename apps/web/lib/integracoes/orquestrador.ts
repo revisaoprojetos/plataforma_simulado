@@ -1,10 +1,83 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
-import { fetchAll } from '@/lib/supabase/fetch-all'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { resolverProviderCfg } from '@/lib/integracoes/config'
 import { getAdapter } from '@/lib/integracoes/registry'
 import { aplicarEntitlement } from '@/lib/integracoes/engine'
 import type { Provider, EventoNormalizado, PessoaEntitlement } from '@/lib/integracoes/tipos'
+
+const soDig = (s?: string | null) => (s ? s.replace(/\D/g, '') : '')
+
+/**
+ * Análise das divergências de CONCESSÃO (dry-run): por produto, quantos já TÊM o acesso do mapeamento
+ * (aplicar seria no-op) vs quantos GANHARIAM de fato (aluno existe mas sem o acesso, ou cadastro novo).
+ * Tudo via lote no banco — não chama a API do provedor.
+ */
+async function analisarConcederia(svc: any, tenantId: string, provider: Provider, pes: PessoaEntitlement[]) {
+  // 1) Mapeamentos produto→destino (grupo/pasta/classificacao).
+  const refs = [...new Set(pes.map((p) => p.entitlement.produtoRef))]
+  const mapPorRef = new Map<string, { grupoId: string | null; pastaId: string | null; classificacao: string | null } | null>()
+  if (refs.length) {
+    const maps = await fetchAllByIn<any>(refs, (chunk) =>
+      svc.from('simulado_integracao_mapeamentos').select('fonte_ref, grupo_id, pasta_id, classificacao, ativo').eq('tenant_id', tenantId).eq('provider', provider).in('fonte_ref', chunk).order('fonte_ref', { ascending: true }))
+    for (const m of maps) if (m.ativo) mapPorRef.set(String(m.fonte_ref), { grupoId: m.grupo_id ?? null, pastaId: m.pasta_id ?? null, classificacao: m.classificacao ?? null })
+  }
+
+  // 2) Resolve estudante de cada pessoa (por email/cpf/matricula_externa) — sem criar.
+  const emails = [...new Set(pes.map((p) => (p.pessoa.email ?? '').trim().toLowerCase()).filter(Boolean))]
+  const cpfs = [...new Set(pes.map((p) => soDig(p.pessoa.cpf)).filter(Boolean))]
+  const exts = [...new Set(pes.map((p) => p.pessoa.externalId).filter(Boolean))]
+  const idPorEmail = new Map<string, string>(), idPorCpf = new Map<string, string>(), idPorExt = new Map<string, string>()
+  const classifPorId = new Map<string, string | null>()
+  const registrar = (rows: any[]) => {
+    for (const e of rows) {
+      classifPorId.set(e.id, e.classificacao ?? null)
+      if (e.email) idPorEmail.set(String(e.email).toLowerCase(), e.id)
+      for (const se of (e.emails_secundarios ?? [])) if (se) idPorEmail.set(String(se).toLowerCase(), e.id)
+      if (e.cpf) idPorCpf.set(soDig(e.cpf), e.id)
+      if (e.matricula_externa) idPorExt.set(String(e.matricula_externa), e.id)
+    }
+  }
+  if (emails.length) registrar(await fetchAllByIn<any>(emails, (c) => svc.from('simulado_estudantes').select('id, email, emails_secundarios, cpf, matricula_externa, classificacao').eq('tenant_id', tenantId).eq('deletado', false).in('email', c).order('id', { ascending: true })))
+  if (cpfs.length) registrar(await fetchAllByIn<any>(cpfs, (c) => svc.from('simulado_estudantes').select('id, email, emails_secundarios, cpf, matricula_externa, classificacao').eq('tenant_id', tenantId).eq('deletado', false).in('cpf', c).order('id', { ascending: true })))
+  if (exts.length) registrar(await fetchAllByIn<any>(exts, (c) => svc.from('simulado_estudantes').select('id, email, emails_secundarios, cpf, matricula_externa, classificacao').eq('tenant_id', tenantId).eq('deletado', false).in('matricula_externa', c).order('id', { ascending: true })))
+  const resolver = (p: PessoaEntitlement): string | null =>
+    idPorExt.get(p.pessoa.externalId) || (p.pessoa.email ? idPorEmail.get(p.pessoa.email.trim().toLowerCase()) : null) || (soDig(p.pessoa.cpf) ? idPorCpf.get(soDig(p.pessoa.cpf)) : null) || null
+
+  // 3) Acesso atual dos estudantes resolvidos (membros de grupo + pastas).
+  const idsResolvidos = [...new Set(pes.map(resolver).filter(Boolean))] as string[]
+  const grupoDe = new Set<string>(), pastaDe = new Set<string>()
+  if (idsResolvidos.length) {
+    for (const r of await fetchAllByIn<any>(idsResolvidos, (c) => svc.from('simulado_grupo_membros').select('estudante_id, grupo_id').in('estudante_id', c).order('estudante_id', { ascending: true }))) grupoDe.add(`${r.estudante_id}|${r.grupo_id}`)
+    for (const r of await fetchAllByIn<any>(idsResolvidos, (c) => svc.from('simulado_pasta_estudantes').select('estudante_id, pasta_id').in('estudante_id', c).order('estudante_id', { ascending: true }))) pastaDe.add(`${r.estudante_id}|${r.pasta_id}`)
+  }
+
+  // 4) Agrega por produto.
+  const agg = new Map<string, { produto: string; total: number; semEstudante: number; semMapeamento: number; jaTem: number; ganharia: number }>()
+  for (const p of pes) {
+    const ref = p.entitlement.produtoRef
+    const nome = p.entitlement.produtoNome ?? ref
+    const a = agg.get(ref) ?? { produto: nome, total: 0, semEstudante: 0, semMapeamento: 0, jaTem: 0, ganharia: 0 }
+    a.total++
+    const estId = resolver(p)
+    const map = mapPorRef.get(ref)
+    if (!estId) { a.semEstudante++; a.ganharia++ }        // cadastro novo → ganha acesso
+    else if (!map) { a.semMapeamento++; a.ganharia++ }     // sem mapeamento → auto-cria grupo e concede
+    else {
+      const temGrupo = map.grupoId ? grupoDe.has(`${estId}|${map.grupoId}`) : false
+      const temPasta = map.pastaId ? pastaDe.has(`${estId}|${map.pastaId}`) : false
+      const temClassif = (map.classificacao === 'passaporte' && ['passaporte', 'vitalicio'].includes(classifPorId.get(estId) ?? '')) || (map.classificacao === 'vitalicio' && classifPorId.get(estId) === 'vitalicio')
+      // "já tem" só quando o mapeamento define um destino e o aluno já o possui.
+      const temDestino = !!(map.grupoId || map.pastaId || map.classificacao)
+      if (temDestino && (temGrupo || temPasta || temClassif)) a.jaTem++
+      else a.ganharia++
+    }
+    agg.set(ref, a)
+  }
+  const porProduto = [...agg.values()].sort((x, y) => y.ganharia - x.ganharia)
+  const tot = porProduto.reduce((s, p) => ({ total: s.total + p.total, semEstudante: s.semEstudante + p.semEstudante, semMapeamento: s.semMapeamento + p.semMapeamento, jaTem: s.jaTem + p.jaTem, ganharia: s.ganharia + p.ganharia }), { total: 0, semEstudante: 0, semMapeamento: 0, jaTem: 0, ganharia: 0 })
+  return { totais: tot, porProduto }
+}
 
 /**
  * Orquestração agnóstica de provedor. Liga adaptador (pull/push) → engine.
@@ -61,6 +134,7 @@ export interface ReconcileResult {
   pull: number; concederia: number; revogaria: number; semMudanca: number
   aplicado?: { concedidos: number; revogados: number; ignorados: number; erros: number }
   divergencias: ReconcileDivergencia[]
+  analiseConceder?: { totais: { total: number; semEstudante: number; semMapeamento: number; jaTem: number; ganharia: number }; porProduto: { produto: string; total: number; semEstudante: number; semMapeamento: number; jaTem: number; ganharia: number }[] }
 }
 
 /**
@@ -124,7 +198,12 @@ export async function reconciliarPull(
     estudanteEmail: d.estudanteId ? (nomes.get(d.estudanteId)?.email ?? null) : null,
   }))
 
-  if (opts.dry) return { ok: true, dry: true, pull: pessoas.length, concederia, revogaria, semMudanca, divergencias }
+  if (opts.dry) {
+    // Relatório de decisão: dos que "concederia", quantos já têm o acesso vs ganhariam (por produto).
+    const pesConceder = divergentes.filter((d) => d.acao === 'conceder').map((d) => d.pe)
+    const analiseConceder = await analisarConcederia(svc, tenantId, provider, pesConceder)
+    return { ok: true, dry: true, pull: pessoas.length, concederia, revogaria, semMudanca, divergencias, analiseConceder }
+  }
 
   // APLICA só as divergências (idempotente; aplicarEntitlement respeita origem/outraAtiva).
   let concedidos = 0, revogados = 0, ignorados = 0, erros = 0

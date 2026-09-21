@@ -128,7 +128,9 @@ export const guruAdapter: ProviderAdapter = {
     const cursoresVistos = new Set<string>()
     let truncou = false
     for (let pag = 0; pag < MAX_PAGINAS; pag++) {
-      await aguardarVaga('guru', key, RATE)
+      // Pull é job de FUNDO (reconciliação): espera COM PACIÊNCIA por vaga (o rate é compartilhado com o
+      // tráfego real do Guru) em vez de desistir em 15s — assim a varredura completa não trunca sob concorrência.
+      await aguardarVaga('guru', key, { ...RATE, esperaMaxMs: 90_000 })
       const url = new URL(`${cfg.baseUrl}/api/v2/subscriptions`)
       if (cursor) url.searchParams.set('cursor', cursor)
       let j: any

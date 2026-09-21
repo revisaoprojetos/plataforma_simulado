@@ -106,12 +106,12 @@ Fecham as deficiências de plataforma que antes apareciam como "riscos futuros" 
 
 ## 2.B.1. Resultado do dry-run do B1 (reconcile-pull) — 21/09
 
-Rodado `guru-reconcile?pull=1` (dry-run, só leitura) no tenant Revisão. Achados:
+Rodado `guru-reconcile?pull=1` (dry-run, só leitura) no tenant Revisão. **Varredura COMPLETA: 6042 assinaturas** (após corrigir o truncamento — ver abaixo).
 
-- **`revogaria = 0`** no conjunto puxado → **nenhum** aluno ativo localmente que o Guru diga estar cancelado/reembolsado. **Sem evidência de webhook de revogação perdido** (o webhook de revogação está OK).
-- **⚠️ Truncamento de paginação confirmado:** o pull trouxe **exatamente 2500** (= 50 páginas × ~50, o teto de segurança antigo). A base tem ~4,7k ativas → **não trouxe tudo**. **Corrigido** (teto elevado p/ 1000 páginas + guarda anti-loop por cursor repetido + aviso de truncamento). Só com a varredura completa dá para afirmar `revogaria` global.
-- **`concederia = 1617`** (todas sem registro local): assinaturas ATIVAS no Guru **sem `simulado_assinaturas`** — Passaporte/Vitalício/Extensivo. São compras que nunca entraram por webhook ou anteriores à integração. Aplicar reaplicaria o acesso (idempotente; muitos já têm acesso via Curseduca). **Decisão de negócio antes de `?aplicar=1`.**
-- **Rate limit:** a API do Guru é **60 req/min** — a varredura completa (~94 páginas) leva ~1–2 min e é sensível a chamadas concorrentes (bater 2x seguidas satura a janela). O reconcile deve rodar espaçado.
+- **`revogaria = 0` sobre as 6042** → **nenhum** aluno ativo localmente que o Guru diga estar cancelado/reembolsado. **Confirmado (base inteira): não há acesso preso por webhook de revogação perdido.** O webhook de revogação está saudável.
+- **`concederia = 1618`, mas apenas 104 GANHARIAM acesso de fato** (os outros **1514 já têm** — aplicar seria no-op). Dos 104: 3 cadastro novo, 6 sem mapeamento (auto-criaria grupo), 95 alunos existentes sem o acesso do produto. Top produtos com ganho real: Extensivo Black Março 2026 (37), Passaporte Vitalício 2026 (33), demais 0–5. **Decisão de negócio antes de `?aplicar=1` — mas o risco é bem menor do que os 1618 sugeriam.** O dry-run já traz esse quebra-por-produto (`analiseConceder`).
+- **Bug de paginação encontrado e corrigido:** o pull truncava em **2500** (= 50 páginas × ~50, teto antigo). Elevado p/ 1000 páginas + guarda anti-loop (cursor repetido) + aviso de truncamento → agora traz as 6042.
+- **Rate limit compartilhado:** a cota do Guru (**60 req/min**) é compartilhada via Redis com o tráfego real (inclusive produção). O pull do reconcile passou a **esperar com paciência** por vaga (esperaMax 90s) em vez de desistir em 15s — assim a varredura completa não trunca sob concorrência.
 
 ## 2.C. 📞 Responsabilidade da GURU (pontos para o contato)
 
