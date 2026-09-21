@@ -28,6 +28,25 @@ function logIntegracao(e: unknown, ctx?: string): void {
 
 const soDigitos = (s?: string | null) => (s ? s.replace(/\D/g, '') : '')
 
+/**
+ * Concessões/remoções da integração carregam `origem='integracao'` para que a REVOGAÇÃO só
+ * apague o que a integração concedeu — nunca um acesso dado MANUALMENTE (ex.: admin adicionou o
+ * aluno ao grupo à mão). Tolerante à coluna ausente (migração 20260926000000): se `origem` ainda
+ * não existe, cai no comportamento antigo (insere/deleta sem o filtro).
+ */
+async function inserirIntegracao(svc: any, tabela: string, row: Record<string, unknown>) {
+  const r = await svc.from(tabela).insert({ ...row, origem: 'integracao' })
+  if (r.error && /origem|column/i.test(r.error.message)) return svc.from(tabela).insert(row)
+  return r
+}
+async function deletarIntegracao(svc: any, tabela: string, filtros: Record<string, string>) {
+  const montar = () => { let q = svc.from(tabela).delete(); for (const [k, v] of Object.entries(filtros)) q = q.eq(k, v); return q }
+  const r = await montar().eq('origem', 'integracao')
+  // Sem a coluna `origem` (migração pendente) → apaga sem o filtro (comportamento anterior).
+  if (r.error && /origem|column/i.test(r.error.message)) return montar()
+  return r
+}
+
 /** Mapeamento produto/grupo → destino (classificação/grupo/pasta/simulado). Tolerante a `pasta_id` ausente. */
 async function resolverMapeamento(svc: any, tenantId: string, provider: Provider, fonteRef: string): Promise<Mapeamento | null> {
   const ler = async (cols: string) => svc.from('simulado_integracao_mapeamentos').select(cols)
@@ -195,7 +214,11 @@ async function outraAtivaConcede(svc: any, tenantId: string, estudanteId: string
 async function matricular(svc: any, tenantId: string, estudanteId: string, simuladoId: string) {
   try {
     const { data } = await svc.from('simulado_matriculas').select('id').eq('simulado_id', simuladoId).eq('estudante_id', estudanteId).maybeSingle()
-    if (!data) await svc.from('simulado_matriculas').upsert({ tenant_id: tenantId, estudante_id: estudanteId, simulado_id: simuladoId, liberado: true }, { onConflict: 'tenant_id,estudante_id,simulado_id', ignoreDuplicates: true })
+    if (!data) {
+      const base = { tenant_id: tenantId, estudante_id: estudanteId, simulado_id: simuladoId, liberado: true }
+      const r = await svc.from('simulado_matriculas').upsert({ ...base, origem: 'integracao' }, { onConflict: 'tenant_id,estudante_id,simulado_id', ignoreDuplicates: true })
+      if (r.error && /origem|column/i.test(r.error.message)) await svc.from('simulado_matriculas').upsert(base, { onConflict: 'tenant_id,estudante_id,simulado_id', ignoreDuplicates: true })
+    }
   } catch (e) { logIntegracao(e) }
 }
 
@@ -210,7 +233,7 @@ async function propagarGrupoAosBancos(svc: any, tenantId: string, grupoId: strin
     const bancoIds = [...new Set((links ?? []).map((l: any) => l.pasta_id).filter(Boolean))] as string[]
     for (const pastaId of bancoIds) {
       const { data: ja } = await svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', pastaId).eq('estudante_id', estudanteId).maybeSingle()
-      if (!ja) await svc.from('simulado_pasta_estudantes').insert({ tenant_id: tenantId, pasta_id: pastaId, estudante_id: estudanteId })
+      if (!ja) await inserirIntegracao(svc, 'simulado_pasta_estudantes', { tenant_id: tenantId, pasta_id: pastaId, estudante_id: estudanteId })
       for (const sid of await simuladosVivosDaPasta(svc, tenantId, pastaId)) await matricular(svc, tenantId, estudanteId, sid)
     }
   } catch (e) { logIntegracao(e) }
@@ -220,7 +243,7 @@ async function propagarGrupoAosBancos(svc: any, tenantId: string, grupoId: strin
 async function entrarGrupo(svc: any, tenantId: string, grupoId: string, estudanteId: string) {
   try {
     const { data } = await svc.from('simulado_grupo_membros').select('id').eq('grupo_id', grupoId).eq('estudante_id', estudanteId).maybeSingle()
-    if (!data) await svc.from('simulado_grupo_membros').insert({ tenant_id: tenantId, grupo_id: grupoId, estudante_id: estudanteId })
+    if (!data) await inserirIntegracao(svc, 'simulado_grupo_membros', { tenant_id: tenantId, grupo_id: grupoId, estudante_id: estudanteId })
   } catch (e) { logIntegracao(e) }
   await propagarGrupoAosBancos(svc, tenantId, grupoId, estudanteId)
 }
@@ -246,7 +269,7 @@ async function conceder(svc: any, tenantId: string, estudanteId: string, m: Mape
   if (m.pastaId) {
     try {
       const { data } = await svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', m.pastaId).eq('estudante_id', estudanteId).maybeSingle()
-      if (!data) await svc.from('simulado_pasta_estudantes').insert({ tenant_id: tenantId, pasta_id: m.pastaId, estudante_id: estudanteId })
+      if (!data) await inserirIntegracao(svc, 'simulado_pasta_estudantes', { tenant_id: tenantId, pasta_id: m.pastaId, estudante_id: estudanteId })
     } catch (e) { logIntegracao(e) }
     for (const sid of await simuladosVivosDaPasta(svc, tenantId, m.pastaId)) await matricular(svc, tenantId, estudanteId, sid)
   }
@@ -255,28 +278,27 @@ async function conceder(svc: any, tenantId: string, estudanteId: string, m: Mape
 }
 
 async function revogar(svc: any, tenantId: string, estudanteId: string, excetoExternalId: string, m: Mapeamento) {
-  // Só remove o que ESTE mapeamento concede E que nenhuma outra assinatura ativa ainda garante.
-  // (Limitação conhecida: se houver acesso MANUAL ao mesmo grupo/simulado, ele também sai —
-  //  refinar depois com coluna `origem` em grupo_membros/matriculas.)
+  // Só remove o que ESTE mapeamento concede, que nenhuma outra assinatura ativa ainda garante E que
+  // foi concedido PELA INTEGRAÇÃO (origem='integracao') — nunca um acesso manual (via deletarIntegracao).
   if (m.grupoId && !(await outraAtivaConcede(svc, tenantId, estudanteId, excetoExternalId, { grupoId: m.grupoId }))) {
-    try { await svc.from('simulado_grupo_membros').delete().eq('tenant_id', tenantId).eq('grupo_id', m.grupoId).eq('estudante_id', estudanteId) } catch (e) { logIntegracao(e) }
+    try { await deletarIntegracao(svc, 'simulado_grupo_membros', { tenant_id: tenantId, grupo_id: m.grupoId, estudante_id: estudanteId }) } catch (e) { logIntegracao(e) }
   }
   if (m.pastaId && !(await outraAtivaConcede(svc, tenantId, estudanteId, excetoExternalId, { pastaId: m.pastaId }))) {
-    try { await svc.from('simulado_pasta_estudantes').delete().eq('tenant_id', tenantId).eq('pasta_id', m.pastaId).eq('estudante_id', estudanteId) } catch (e) { logIntegracao(e) }
+    try { await deletarIntegracao(svc, 'simulado_pasta_estudantes', { tenant_id: tenantId, pasta_id: m.pastaId, estudante_id: estudanteId }) } catch (e) { logIntegracao(e) }
     for (const sid of await simuladosVivosDaPasta(svc, tenantId, m.pastaId)) {
-      try { await svc.from('simulado_matriculas').delete().eq('tenant_id', tenantId).eq('simulado_id', sid).eq('estudante_id', estudanteId) } catch (e) { logIntegracao(e) }
+      try { await deletarIntegracao(svc, 'simulado_matriculas', { tenant_id: tenantId, simulado_id: sid, estudante_id: estudanteId }) } catch (e) { logIntegracao(e) }
     }
   }
   if (m.simuladoId && !(await outraAtivaConcede(svc, tenantId, estudanteId, excetoExternalId, { simuladoId: m.simuladoId }))) {
-    try { await svc.from('simulado_matriculas').delete().eq('tenant_id', tenantId).eq('simulado_id', m.simuladoId).eq('estudante_id', estudanteId) } catch (e) { logIntegracao(e) }
+    try { await deletarIntegracao(svc, 'simulado_matriculas', { tenant_id: tenantId, simulado_id: m.simuladoId, estudante_id: estudanteId }) } catch (e) { logIntegracao(e) }
   }
   // Rebaixa classificação e sai dos grupos Passaporte/Vitalício só se nenhuma outra assinatura ativa concede.
   if ((m.classificacao === 'passaporte' || m.classificacao === 'vitalicio') && !(await outraAtivaConcede(svc, tenantId, estudanteId, excetoExternalId, { passaporte: true }))) {
     try { await svc.from('simulado_estudantes').update({ classificacao: 'normal' }).eq('id', estudanteId).eq('tenant_id', tenantId) } catch (e) { logIntegracao(e) }
     const gp = await grupoPassaporte(svc, tenantId)
-    if (gp) { try { await svc.from('simulado_grupo_membros').delete().eq('tenant_id', tenantId).eq('grupo_id', gp).eq('estudante_id', estudanteId) } catch (e) { logIntegracao(e) } }
+    if (gp) { try { await deletarIntegracao(svc, 'simulado_grupo_membros', { tenant_id: tenantId, grupo_id: gp, estudante_id: estudanteId }) } catch (e) { logIntegracao(e) } }
     const gv = await grupoVitalicio(svc, tenantId)
-    if (gv) { try { await svc.from('simulado_grupo_membros').delete().eq('tenant_id', tenantId).eq('grupo_id', gv).eq('estudante_id', estudanteId) } catch (e) { logIntegracao(e) } }
+    if (gv) { try { await deletarIntegracao(svc, 'simulado_grupo_membros', { tenant_id: tenantId, grupo_id: gv, estudante_id: estudanteId }) } catch (e) { logIntegracao(e) } }
   }
 }
 
@@ -393,4 +415,37 @@ export async function reaplicarLiberacoes(tenantId: string, provider: Provider, 
   }
   await registrarAudit({ operacao: 'LIBERAR', entidade: 'simulado_assinaturas', entidadeId: tenantId, tenantId, depois: { acao: 'reprocessar', provider, soProduto: soProduto ?? null, total: ativas.length, concedidos, semMapeamento, erros } }).catch(() => {})
   return { total: ativas.length, concedidos, semMapeamento, semEstudante, erros, produtosSemMapa: [...produtosSemMapa] }
+}
+
+export interface ResumoExpiracao { total: number; revogados: number; erros: number; dry: boolean; amostra: { estudanteId: string; produtoRef: string; externalId: string; expiraEm: string | null }[] }
+
+/**
+ * EXPIRA por DATA as assinaturas ATIVAS cujo `expira_em` já passou (sem depender de um evento de
+ * expiração do provedor). Marca `status='expirado'` e REVOGA o acesso (escopado ao mapeamento +
+ * `outraAtivaConcede` + `origem='integracao'`). Como RETIRA acesso, use `dry=true` para só listar
+ * o que expiraria antes de aplicar. Idempotente.
+ */
+export async function expirarVencidas(tenantId: string, provider: Provider, opts: { dry: boolean; limite?: number }): Promise<ResumoExpiracao> {
+  const svc = createAdminClient()
+  const agora = new Date().toISOString()
+  const vencidas = await fetchAll<{ estudante_id: string | null; produto_ref: string; external_id: string; expira_em: string | null }>(() =>
+    svc.from('simulado_assinaturas').select('estudante_id, produto_ref, external_id, expira_em')
+      .eq('tenant_id', tenantId).eq('provider', provider).eq('status', 'ativo')
+      .not('expira_em', 'is', null).lt('expira_em', agora).order('expira_em', { ascending: true }))
+
+  const amostra = vencidas.slice(0, opts.limite ?? 200).map((a) => ({ estudanteId: a.estudante_id ?? '', produtoRef: a.produto_ref, externalId: a.external_id, expiraEm: a.expira_em }))
+  if (opts.dry) return { total: vencidas.length, revogados: 0, erros: 0, dry: true, amostra }
+
+  let revogados = 0, erros = 0
+  for (const a of vencidas) {
+    if (!a.estudante_id) continue
+    try {
+      await svc.from('simulado_assinaturas').update({ status: 'expirado', atualizado_em: new Date().toISOString() }).eq('tenant_id', tenantId).eq('provider', provider).eq('external_id', a.external_id)
+      const m = await resolverMapeamento(svc, tenantId, provider, a.produto_ref)
+      if (m) await revogar(svc, tenantId, a.estudante_id, a.external_id, m)
+      revogados++
+    } catch (e) { erros++; logIntegracao(e, 'expirarVencidas') }
+  }
+  await registrarAudit({ operacao: 'BLOQUEAR', entidade: 'simulado_assinaturas', entidadeId: tenantId, tenantId, depois: { acao: 'expirar_vencidas', provider, total: vencidas.length, revogados, erros } }).catch(() => {})
+  return { total: vencidas.length, revogados, erros, dry: false, amostra }
 }

@@ -24,7 +24,7 @@ export async function POST(req: NextRequest) {
 
   // Colunas novas (agrupar_por_nome/sync_cursor) são opcionais: se a migração ainda não rodou,
   // o select cai no formato antigo e o agrupamento fica desligado (comportamento anterior).
-  const COLS = 'id, tenant_id, grupos, destino, sincronizar, intervalo_min, ultima_execucao, ultimo_resultado, agrupar_por_nome, sync_cursor'
+  const COLS = 'id, tenant_id, grupos, destino, sincronizar, intervalo_min, ultima_execucao, ultimo_resultado, agrupar_por_nome, sync_cursor, descobrir_canais'
   let regras: any[] | null = null
   {
     const r1 = await svc.from('simulado_curseduca_sync').select(COLS).eq('ativo', true).order('ultima_execucao', { ascending: true, nullsFirst: true }).limit(50)
@@ -68,12 +68,35 @@ export async function POST(req: NextRequest) {
       }
       if (auto) {
         // Agrupamento automático por nome (lote por tick): vincula canal → grupo de mesmo nome.
-        const { resultado, proximoCursor } = await agruparPorNomeTick(svc, r.tenant_id, cfg, (r.grupos ?? []) as number[], Number(r.sync_cursor ?? 0))
+        const { resultado, proximoCursor } = await agruparPorNomeTick(svc, r.tenant_id, cfg, (r.grupos ?? []) as number[], Number(r.sync_cursor ?? 0), !!r.descobrir_canais)
         let upd = await svc.from('simulado_curseduca_sync').update({ ultimo_resultado: resultado, sync_cursor: proximoCursor }).eq('id', r.id)
         if (upd.error && /sync_cursor|column/i.test(upd.error.message)) { await svc.from('simulado_curseduca_sync').update({ ultimo_resultado: resultado }).eq('id', r.id) }
       } else {
-        const resultado = await executarImport({ tenantId: r.tenant_id, cfg }, (r.grupos ?? []) as number[], r.destino ?? { tipo: 'nenhum' }, !!r.sincronizar, Number.MAX_SAFE_INTEGER)
-        await svc.from('simulado_curseduca_sync').update({ ultimo_resultado: resultado }).eq('id', r.id)
+        // ENFILEIRA em vez de rodar inline: o import de TODOS os grupos pode levar minutos e estourar
+        // o corte de 5 min do proxy dentro deste request. O cron /api/cron/curseduca-jobs processa em
+        // background (sem limite de detalhe) e já tem recuperação de lock preso. Dedup: se já existe job
+        // pendente/processando cobrindo estes grupos, não cria outro (evita pile-up a cada tick).
+        const grupos = (r.grupos ?? []) as number[]
+        if (!grupos.length) {
+          await svc.from('simulado_curseduca_sync').update({ ultimo_resultado: { ok: true, status: 'sem_grupos', obs: 'nenhum grupo selecionado', atualizado_em: nowISO } }).eq('id', r.id)
+          rodadas++; continue
+        }
+        const { data: pend } = await svc.from('simulado_curseduca_jobs').select('id')
+          .eq('tenant_id', r.tenant_id).in('status', ['pendente', 'processando']).contains('grupos', grupos).limit(1).maybeSingle()
+        if (pend?.id) {
+          await svc.from('simulado_curseduca_sync').update({ ultimo_resultado: { ok: null, status: 'agendado', jobId: (pend as any).id, dedup: true, atualizado_em: nowISO } }).eq('id', r.id)
+        } else {
+          const ins = await svc.from('simulado_curseduca_jobs')
+            .insert({ tenant_id: r.tenant_id, status: 'pendente', grupos, destino: r.destino ?? { tipo: 'nenhum' }, sincronizar: !!r.sincronizar, criado_por: null })
+            .select('id').single()
+          if (ins.error) {
+            // Tabela de jobs ausente (migração não rodada) → roda inline COM limite p/ não estourar o timeout.
+            const resultado = await executarImport({ tenantId: r.tenant_id, cfg }, grupos, r.destino ?? { tipo: 'nenhum' }, !!r.sincronizar, 400)
+            await svc.from('simulado_curseduca_sync').update({ ultimo_resultado: resultado }).eq('id', r.id)
+          } else {
+            await svc.from('simulado_curseduca_sync').update({ ultimo_resultado: { ok: null, status: 'agendado', jobId: (ins.data as any).id, atualizado_em: nowISO } }).eq('id', r.id)
+          }
+        }
       }
       rodadas++
     } catch (e: any) {

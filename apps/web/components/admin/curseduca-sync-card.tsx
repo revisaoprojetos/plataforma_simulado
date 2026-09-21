@@ -30,8 +30,8 @@ function calcVinculados(grupos: { id: number; nome: string }[], sistema: { id: s
  * "vinculados" por nome e o admin confirma quais entram. `salvarSyncSimples` recebe
  * apenas os ids marcados.
  */
-export function CurseducaSyncCard({ grupos, sistema = [], inicialAtivo, inicialIntervalo, inicialGrupos = [], inicialAgrupar = false }: {
-  grupos: GrupoCurseducaDTO[]; sistema?: GrupoSistema[]; inicialAtivo: boolean; inicialIntervalo: number; inicialGrupos?: number[]; inicialAgrupar?: boolean
+export function CurseducaSyncCard({ grupos, sistema = [], inicialAtivo, inicialIntervalo, inicialGrupos = [], inicialAgrupar = false, inicialDescobrir = false }: {
+  grupos: GrupoCurseducaDTO[]; sistema?: GrupoSistema[]; inicialAtivo: boolean; inicialIntervalo: number; inicialGrupos?: number[]; inicialAgrupar?: boolean; inicialDescobrir?: boolean
 }) {
   // Só grupos comuns podem casar com a Curseduca (pastas/mestre não são destino de sync).
   const comuns = useMemo(() => sistema.filter((s) => !s.is_mestre), [sistema])
@@ -41,6 +41,7 @@ export function CurseducaSyncCard({ grupos, sistema = [], inicialAtivo, inicialI
   const naoVinculados = Math.max(0, grupos.length - vinculados.length)
   const [ativo, setAtivo] = useState(inicialAtivo)
   const [agrupar, setAgrupar] = useState(inicialAgrupar)
+  const [descobrir, setDescobrir] = useState(inicialDescobrir)
   const [intervalo, setIntervalo] = useState(String(inicialIntervalo || 30))
   const [sel, setSel] = useState<Set<number>>(() => {
     const ids = calcVinculados(grupos, comuns).map((v) => v.id)
@@ -66,8 +67,8 @@ export function CurseducaSyncCard({ grupos, sistema = [], inicialAtivo, inicialI
   function salvar() {
     if (ativo && sel.size === 0) { toast.error('Marque ao menos um grupo vinculado para sincronizar.'); return }
     start(async () => {
-      const r = await salvarSyncSimples(Number(intervalo), ativo, [...sel], agrupar)
-      if (r.ok) toast.success(ativo ? `Automático ativado · a cada ${INTERVALOS[intervalo]} · ${sel.size} grupo(s)${agrupar ? ' · agrupando por nome' : ''}` : 'Sincronização automática desligada')
+      const r = await salvarSyncSimples(Number(intervalo), ativo, [...sel], agrupar, agrupar && descobrir)
+      if (r.ok) toast.success(ativo ? `Automático ativado · a cada ${INTERVALOS[intervalo]} · ${sel.size} grupo(s)${agrupar ? ' · agrupando por nome' : ''}${agrupar && descobrir ? ' · descobrindo canais' : ''}` : 'Sincronização automática desligada')
       else toast.error(r.error ?? 'Erro ao salvar')
     })
   }
@@ -155,6 +156,14 @@ export function CurseducaSyncCard({ grupos, sistema = [], inicialAtivo, inicialI
               <input type="checkbox" checked={agrupar} onChange={(e) => setAgrupar(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border" />
               <span>
                 <span className="font-medium text-foreground">Agrupar automaticamente por nome</span> — além de atualizar os cadastros, o servidor <b>coloca cada aluno no grupo do sistema de mesmo nome do canal</b> (e propaga o acesso), em lotes. Sem isso, a automática só atualiza os cadastros e o vínculo ao grupo depende do “Sincronizar agora”. Nunca remove ninguém.
+              </span>
+            </label>
+            {/* Descoberta automática de canais: em vez da lista marcada, considera TODOS os canais da
+                Curseduca que tiverem grupo de mesmo nome/id no sistema (canal novo entra sozinho). */}
+            <label className={cn('ml-6 flex items-start gap-2 rounded-xl border p-2.5 text-xs transition-opacity', (!ativo || !agrupar) && 'pointer-events-none opacity-50', descobrir ? 'border-primary/40 bg-primary/5' : '')}>
+              <input type="checkbox" checked={descobrir} disabled={!agrupar} onChange={(e) => setDescobrir(e.target.checked)} className="mt-0.5 h-4 w-4 rounded border" />
+              <span>
+                <span className="font-medium text-foreground">Descobrir canais novos automaticamente</span> — não se limita aos grupos marcados: <b>todos</b> os canais da Curseduca que tiverem um grupo de mesmo nome no sistema passam a sincronizar sozinhos (um canal novo entra sem precisar voltar aqui). Os canais sem grupo correspondente continuam de fora.
               </span>
             </label>
             <p className="text-[11px] leading-snug text-muted-foreground">Quando ativa, roda sozinha no servidor no intervalo escolhido — só os grupos vinculados marcados. Desmarque <b>Ativar</b> e salve para desligar.</p>

@@ -145,6 +145,10 @@ export type MembroCurseduca = {
   ultimoAcesso: string | null
   cidade: string | null
   uf: string | null
+  /** Nomes de TODOS os grupos/produtos do membro — a LISTA /members já os retorna
+   *  (`groups: [{groupId,name}]`), então dá pra classificar (passaporte/vitalício) SEM
+   *  chamar /members/{id} por membro. É a correção que elimina o fan-out por-membro. */
+  grupos: string[]
 }
 
 /** Lista TODOS os grupos de acesso (pagina até acabar). São ~230 → poucas requisições. */
@@ -162,11 +166,19 @@ export async function listarTodosGrupos(cfg: CurseducaCfg): Promise<GrupoCursedu
   return out
 }
 
-export type MatriculaGrupo = { entrouEm: string | null; expiraEm: string | null }
+export type MatriculaGrupo = {
+  entrouEm: string | null
+  expiraEm: string | null
+  /** Flag AUTORITATIVO de acesso vigente ao grupo (verificado na API real). ATENÇÃO: `expiraEm=null`
+   *  NÃO garante acesso — há membros com expiração nula porém `temAcesso=false` (acesso revogado). */
+  temAcesso: boolean | null
+}
 
 /**
- * Mapa de matrícula por membro no grupo via `/groups/{id}/members`, que traz
- * `enteredAt` (entrada no grupo) e `expiresAt` (null = vitalício, ou data de expiração).
+ * Mapa de matrícula por membro no grupo via `/groups/{id}/members`, que traz `enteredAt` (entrada),
+ * `expiresAt`/`accessExpiresAt` (data de expiração; iguais na prática — null = sem data) e `hasAccess`
+ * (acesso vigente). Sondagem da API real: `expiresAt === accessExpiresAt` sempre, e `hasAccess` é o
+ * único indicador confiável de acesso (não dá pra inferir só do `expiresAt`).
  */
 export async function mapaMatriculasGrupo(cfg: CurseducaCfg, groupId: number, maxPaginas = 100): Promise<Map<number, MatriculaGrupo>> {
   const limit = 200
@@ -175,7 +187,11 @@ export async function mapaMatriculasGrupo(cfg: CurseducaCfg, groupId: number, ma
   for (let p = 0; p < maxPaginas; p++) {
     const j = await api(cfg, `/groups/${groupId}/members?limit=${limit}&offset=${offset}`)
     const data = (j.data ?? []) as any[]
-    for (const x of data) mapa.set(x.id, { entrouEm: x.enteredAt ?? null, expiraEm: x.expiresAt ?? null })
+    for (const x of data) mapa.set(x.id, {
+      entrouEm: x.enteredAt ?? null,
+      expiraEm: x.expiresAt ?? x.accessExpiresAt ?? null,
+      temAcesso: typeof x.hasAccess === 'boolean' ? x.hasAccess : null,
+    })
     if (!j.metadata?.hasMore || data.length === 0) break
     offset += limit
   }
@@ -201,6 +217,11 @@ const extrairCpf = (doc: any): string | null =>
 const extrairTelefone = (p: any): string | null =>
   p == null ? null : (typeof p === 'string' ? (soDigitos(p) || null) : fmtTelefone(p))
 
+/** Nomes dos grupos do membro — tolerante aos dois formatos da API:
+ *  LISTA `/members` → `{ groupId, name }`; DETALHE `/members/{id}` → `{ group: { name } }`. */
+const extrairGrupos = (groups: any): string[] =>
+  Array.isArray(groups) ? groups.map((x: any) => (x?.name ?? x?.group?.name ?? '')).filter(Boolean) : []
+
 const mapMembro = (m: any): MembroCurseduca => ({
   id: m.id,
   nome: (m.name ?? '').trim(),
@@ -212,6 +233,7 @@ const mapMembro = (m: any): MembroCurseduca => ({
   ultimoAcesso: m.lastAccess ?? null,
   cidade: m.address?.city ?? null,
   uf: m.address?.state ?? null,
+  grupos: extrairGrupos(m.groups),
 })
 
 /** Lista TODOS os membros de um grupo (paginando). Cap de segurança em maxPaginas. */
@@ -236,10 +258,7 @@ export async function detalheMembro(cfg: CurseducaCfg, id: number): Promise<Deta
   try {
     const j = await api(cfg, `/members/${id}`)
     const m = j?.data ?? j
-    const gruposNomes = Array.isArray(m?.groups)
-      ? m.groups.map((g: any) => g?.group?.name ?? g?.name).filter(Boolean) as string[]
-      : []
-    return { ok: true, cpf: extrairCpf(m?.document), telefone: extrairTelefone(m?.phone), gruposNomes }
+    return { ok: true, cpf: extrairCpf(m?.document), telefone: extrairTelefone(m?.phone), gruposNomes: extrairGrupos(m?.groups) }
   } catch {
     return { ok: false, cpf: null, telefone: null, gruposNomes: [] }
   }

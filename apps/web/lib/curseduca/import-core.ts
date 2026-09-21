@@ -6,7 +6,7 @@ import { registrarAudit } from '@/lib/audit'
 import { invalidarRelatorios } from '@/lib/cache/relatorio-cache'
 import { ehProdutoPassaporte, ehProdutoVitalicio } from '@/lib/integracoes/normalizar-mapa'
 import { propagarGrupoAosBancos } from '@/lib/simulado/propagar-grupo'
-import { configDoEnv, listarMembrosDoGrupo, detalheMembro, type CurseducaCfg, type MembroCurseduca, type DetalheMembro } from '@/lib/curseduca/client'
+import { configDoEnv, listarMembrosDoGrupo, mapaMatriculasGrupo, detalheMembro, type CurseducaCfg, type MembroCurseduca, type DetalheMembro } from '@/lib/curseduca/client'
 import type { DestinoImport, ResultadoImportCurseduca } from '@/lib/curseduca/tipos'
 import { descriptografar } from '@/lib/crypto'
 
@@ -78,9 +78,22 @@ export async function executarImport(
     // e segue os demais — antes, o erro de um único grupo abortava a sincronização inteira dos 228.
     const porId = new Map<number, MembroCurseduca>()
     const gruposFalhos: { gid: number; erro: string }[] = []
+    // Acesso vigente por membro (hasAccess de /groups/{id}/members). A LISTA /members NÃO filtra por
+    // acesso (traz expirados), então buscamos as matrículas em paralelo. Regra: acesso = true se o
+    // membro tem hasAccess=true em QUALQUER grupo sincronizado; só fica false se conhecido e nunca true;
+    // null (sem dado / grupo de matrícula falhou) = desconhecido → NÃO filtra (conservador).
+    const temAcessoPorId = new Map<number, boolean | null>()
     for (const gid of ids) {
       try {
-        for (const m of await listarMembrosDoGrupo(g.cfg, gid)) if (!porId.has(m.id)) porId.set(m.id, m)
+        const [lista, mat] = await Promise.all([
+          listarMembrosDoGrupo(g.cfg, gid),
+          mapaMatriculasGrupo(g.cfg, gid).catch(() => new Map<number, { temAcesso: boolean | null }>()),
+        ])
+        for (const m of lista) if (!porId.has(m.id)) porId.set(m.id, m)
+        for (const [mid, info] of mat) {
+          if (info.temAcesso === true) temAcessoPorId.set(mid, true)
+          else if (!temAcessoPorId.has(mid)) temAcessoPorId.set(mid, info.temAcesso ?? null)
+        }
       } catch (e: any) {
         gruposFalhos.push({ gid, erro: String(e?.message ?? e).slice(0, 160) })
       }
@@ -120,15 +133,24 @@ export async function executarImport(
         : nomes.some((n) => ehProdutoPassaporte(n)) ? 'passaporte'
           : 'normal'
 
+    // Política de acesso (escolha do tenant): NÃO conceder acesso a quem já está EXPIRADO na Curseduca
+    // (hasAccess=false), mas NUNCA remover quem já está no sistema. `expirado` só é true quando a API
+    // AFIRMA hasAccess=false; desconhecido (null) não filtra. Expirados: não são criados nem vinculados
+    // (não entram em `idsResolvidos`), porém continuam em `membros` — logo a etapa de sincronização (5)
+    // os vê como "presentes no canal" e não os remove.
+    const expirado = (m: MembroCurseduca) => temAcessoPorId.get(m.id) === false
+
     // 3) Separa novos × existentes. Já existentes SEM CPF/telefone entram no backfill.
     const idsResolvidos: string[] = []
-    let novos = 0, jaExistiam = 0, semIdentificador = 0
+    let novos = 0, jaExistiam = 0, semIdentificador = 0, semAcesso = 0
     const novosMembros: MembroCurseduca[] = []
     const paraBackfill: { estudanteId: string; curseducaId: number }[] = []
     for (const m of membros) {
       const ex = acharExistente(m)
       if (ex) {
-        idsResolvidos.push(ex); jaExistiam++
+        jaExistiam++
+        // Não vincula/promove a NOVOS grupos quem está expirado (mas não remove: só não entra em idsResolvidos).
+        if (!expirado(m)) idsResolvidos.push(ex)
         const rec = recPorId.get(ex)
         // Promoção de e-mail: o e-mail que veio da Curseduca vira o PRINCIPAL e o anterior vai para
         // secundários (mesmo perfil/nota). Preserva secundários já existentes (não perde nenhum).
@@ -147,56 +169,62 @@ export async function executarImport(
         if (rec && (!rec.cpf || !rec.telefone || !rec.classificacao)) paraBackfill.push({ estudanteId: ex, curseducaId: m.id })
         continue
       }
-      if (!m.email) { semIdentificador++; continue } // sem e-mail → não dá pra cadastrar (a lista não traz CPF)
+      if (!m.email) { semIdentificador++; continue } // sem e-mail → não dá pra cadastrar
+      if (expirado(m)) { semAcesso++; continue }      // acesso expirado na Curseduca → não cria (política do tenant)
       novosMembros.push(m)
     }
 
-    // Orçamento de buscas de DETALHE por execução — evita timeout da server action em grupos grandes.
-    // O que passar do limite entra com dados básicos (contado em `restante`); reimportar completa via backfill.
+    // CORREÇÃO DE CAUSA-RAIZ: a LISTA /members?groupId= JÁ retorna, por membro, `document` (CPF),
+    // `phone` e `groups` (todos os produtos do aluno). Logo, CPF/telefone/classificação saem da lista
+    // — NÃO precisamos mais chamar /members/{id} por membro (o antigo fan-out de ~1 request por aluno
+    // era o que gerava 502/rate-limit/timeout e importações incompletas). O detalhe fica só como
+    // FALLBACK para o caso raro de a lista vir sem grupos ou sem CPF para algum membro.
     let usadosDetalhe = 0
-    let restante = 0 // membros que ficaram sem detalhe por causa do limite (não é falha da API)
-
-    // 3b) Enriquece os novos com o DETALHE de cada membro (CPF, telefone, grupos → classificação).
-    let semDetalhe = 0 // detalhes que FALHARAM (ex.: rate limit) → CPF/telefone podem faltar
+    let restante = 0 // membros que ficaram sem detalhe (fallback) por causa do limite — não é falha da API
+    let semDetalhe = 0 // detalhes de fallback que FALHARAM (ex.: rate limit)
     const detalhePorId = new Map<number, DetalheMembro>()
-    for (let i = 0; i < novosMembros.length && usadosDetalhe < limiteDetalhe; i += 8) {
-      const bloco = novosMembros.slice(i, i + 8)
+
+    const precisaDetalhe = (m: MembroCurseduca) => m.grupos.length === 0 || !m.cpf // lista incompleta p/ este membro
+    const alvosFallback = new Map<number, MembroCurseduca>()
+    for (const m of novosMembros) if (precisaDetalhe(m)) alvosFallback.set(m.id, m)
+    for (const b of paraBackfill) { const m = porId.get(b.curseducaId); if (m && precisaDetalhe(m)) alvosFallback.set(m.id, m) }
+    const alvos = [...alvosFallback.values()]
+    for (let i = 0; i < alvos.length && usadosDetalhe < limiteDetalhe; i += 8) {
+      const bloco = alvos.slice(i, i + 8)
       usadosDetalhe += bloco.length
       const res = await Promise.all(bloco.map((m) => detalheMembro(g.cfg, m.id)))
       bloco.forEach((m, k) => { detalhePorId.set(m.id, res[k]); if (!res[k].ok) semDetalhe++ })
     }
-    restante += Math.max(0, novosMembros.length - detalhePorId.size)
+    restante += Math.max(0, alvos.length - detalhePorId.size)
 
-    // 3c) Backfill: preenche CPF/telefone/classificação de quem já existia mas estava vazio.
+    // Fontes efetivas por membro: LISTA primeiro, detalhe (fallback) depois.
+    const cpfDe = (m: MembroCurseduca) => m.cpf ?? detalhePorId.get(m.id)?.cpf ?? null
+    const telDe = (m: MembroCurseduca) => m.telefone ?? detalhePorId.get(m.id)?.telefone ?? null
+    const gruposDe = (m: MembroCurseduca) => (m.grupos.length ? m.grupos : (detalhePorId.get(m.id)?.gruposNomes ?? []))
+
+    // 3c) Backfill: preenche CPF/telefone/classificação de quem já existia mas estava vazio (da LISTA).
     let atualizados = 0
-    for (let i = 0; i < paraBackfill.length && usadosDetalhe < limiteDetalhe; i += 8) {
-      const bloco = paraBackfill.slice(i, i + 8)
-      usadosDetalhe += bloco.length
-      const res = await Promise.all(bloco.map((b) => detalheMembro(g.cfg, b.curseducaId)))
-      for (let k = 0; k < bloco.length; k++) {
-        const rec = recPorId.get(bloco[k].estudanteId); const d = res[k]; const patch: Record<string, unknown> = {}
-        if (!d.ok) semDetalhe++
-        if (!rec?.cpf && d.cpf) patch.cpf = d.cpf
-        if (!rec?.telefone && d.telefone) patch.telefone = d.telefone
-        if (!rec?.classificacao) patch.classificacao = classificar(d.gruposNomes)
-        if (Object.keys(patch).length) {
-          const { error } = await svc.from('simulado_estudantes').update(patch).eq('id', bloco[k].estudanteId).eq('tenant_id', g.tenantId)
-          if (!error) atualizados++
-        }
+    for (const b of paraBackfill) {
+      const m = porId.get(b.curseducaId); if (!m) continue
+      const rec = recPorId.get(b.estudanteId); const patch: Record<string, unknown> = {}
+      const cpf = cpfDe(m), tel = telDe(m)
+      if (!rec?.cpf && cpf) patch.cpf = cpf
+      if (!rec?.telefone && tel) patch.telefone = tel
+      if (!rec?.classificacao) patch.classificacao = classificar(gruposDe(m))
+      if (Object.keys(patch).length) {
+        const { error } = await svc.from('simulado_estudantes').update(patch).eq('id', b.estudanteId).eq('tenant_id', g.tenantId)
+        if (!error) atualizados++
       }
     }
 
-    const paraInserir: Record<string, unknown>[] = novosMembros.map((m) => {
-      const d = detalhePorId.get(m.id)
-      return {
-        tenant_id: g.tenantId, user_id: null,
-        nome: m.nome || m.email || 'Aluno', email: m.email,
-        cpf: m.cpf ?? d?.cpf ?? null,
-        telefone: m.telefone ?? d?.telefone ?? null,
-        classificacao: classificar(d?.gruposNomes ?? []),
-        matricula_externa: String(m.id),
-      }
-    })
+    const paraInserir: Record<string, unknown>[] = novosMembros.map((m) => ({
+      tenant_id: g.tenantId, user_id: null,
+      nome: m.nome || m.email || 'Aluno', email: m.email,
+      cpf: cpfDe(m),
+      telefone: telDe(m),
+      classificacao: classificar(gruposDe(m)),
+      matricula_externa: String(m.id),
+    }))
 
     for (let i = 0; i < paraInserir.length; i += 200) {
       const lote = paraInserir.slice(i, i + 200)
@@ -287,13 +315,13 @@ export async function executarImport(
       await entrarNoGrupo('Passaporte Vitalício', vitIds)    // grupo Vitalício (só os vitalícios)
     }
 
-    await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_estudantes', entidadeId: grupoDestinoId ?? 'curseduca', tenantId: g.tenantId, depois: { curseduca_grupos: ids, total, novos, jaExistiam, atualizados, vinculados, removidos, semDetalhe, restante } })
+    await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_estudantes', entidadeId: grupoDestinoId ?? 'curseduca', tenantId: g.tenantId, depois: { curseduca_grupos: ids, total, novos, jaExistiam, atualizados, vinculados, removidos, semDetalhe, semAcesso, restante } })
     // 'layout' cobre também o detalhe /admin/grupos/[id] (senão os membros recém-vinculados
     // ficam invisíveis por cache até o TTL — foi o que pareceu "não foi pro grupo").
     revalidatePath('/admin/estudantes'); revalidatePath('/admin/grupos', 'layout')
     if (grupoDestinoId) revalidatePath(`/admin/grupos/${grupoDestinoId}`)
     await invalidarRelatorios(g.tenantId) // rosters/matrículas mudaram → recalcula contagens dos relatórios
-    return { ok: true, total, novos, jaExistiam, atualizados, vinculados, removidos, semIdentificador, semDetalhe, restante, grupoNome,
+    return { ok: true, total, novos, jaExistiam, atualizados, vinculados, removidos, semIdentificador, semDetalhe, semAcesso, restante, grupoNome,
       ...(gruposFalhos.length ? { gruposFalhos: gruposFalhos.length, gruposFalhosDetalhe: gruposFalhos.slice(0, 10) } : {}) }
   } catch (e: any) {
     return { ok: false, error: e?.message ?? 'Falha na importação.' }

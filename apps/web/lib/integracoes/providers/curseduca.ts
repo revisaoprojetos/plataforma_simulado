@@ -52,12 +52,16 @@ export const curseducaAdapter: ProviderAdapter = {
       for (const m of membros) {
         if (!m.email && !m.cpf) continue // sem identificador → descarta
         const mat = matriculas.get(m.id)
+        // `/members?groupId=` NÃO filtra por acesso (traz expirados). O acesso vigente é o `hasAccess`
+        // de `/groups/{id}/members` (sondado na API real): `expiraEm=null` NÃO garante acesso. Só marcamos
+        // 'expirado' quando a API afirma `hasAccess=false`; sem esse dado, mantém 'ativo' (não revoga no escuro).
+        const status: 'ativo' | 'expirado' = mat?.temAcesso === false ? 'expirado' : 'ativo'
         out.push({
           pessoa: { nome: m.nome, email: m.email ?? null, cpf: m.cpf ?? null, telefone: m.telefone ?? null, externalId: String(m.id) },
           entitlement: {
             externalId: `curseduca:${groupId}:${m.id}`,
             produtoRef: String(groupId),
-            status: 'ativo', // presença no grupo = ativo (a ausência vira revogação na reconciliação)
+            status,
             inicioEm: mat?.entrouEm ?? null,
             expiraEm: mat?.expiraEm ?? null,
           },

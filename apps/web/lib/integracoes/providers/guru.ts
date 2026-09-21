@@ -121,7 +121,13 @@ export const guruAdapter: ProviderAdapter = {
     const refSet = new Set((refs ?? []).filter(Boolean))
     const out: PessoaEntitlement[] = []
     let cursor: string | null = null
-    for (let pag = 0; pag < 50; pag++) { // teto de segurança (50 páginas)
+    // Teto de segurança ALTO (a base tem ~4,7k+ assinaturas; 50 páginas × ~50 truncava em 2500). Para a
+    // reconciliação por pull ser CONFIÁVEL para revogar, precisa varrer tudo. Guarda dupla: nº de páginas
+    // e total de itens; e detecta cursor REPETIDO (se a API não avançar, para em vez de loopar).
+    const MAX_PAGINAS = 1000, MAX_ITENS = 100_000
+    const cursoresVistos = new Set<string>()
+    let truncou = false
+    for (let pag = 0; pag < MAX_PAGINAS; pag++) {
       await aguardarVaga('guru', key, RATE)
       const url = new URL(`${cfg.baseUrl}/api/v2/subscriptions`)
       if (cursor) url.searchParams.set('cursor', cursor)
@@ -139,10 +145,15 @@ export const guruAdapter: ProviderAdapter = {
         if (refSet.size && !refSet.has(pe.entitlement.produtoRef)) continue
         out.push(pe)
       }
+      if (out.length >= MAX_ITENS) { truncou = true; break }
       cursor = firstStr(j?.next_cursor, j?.meta?.next_cursor, j?.links?.next)
       const temMais = j?.has_more_pages ?? j?.has_more ?? !!cursor
       if (!temMais || !cursor) break
+      if (cursoresVistos.has(cursor)) break // cursor repetido → API não avançou; evita loop infinito
+      cursoresVistos.add(cursor)
+      if (pag === MAX_PAGINAS - 1) truncou = true
     }
+    if (truncou) console.warn(`[guru.listarPessoas] varredura pode ter truncado em ${out.length} itens (teto de segurança).`)
     return out
   },
 

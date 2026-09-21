@@ -1,24 +1,21 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { reaplicarLiberacoes } from '@/lib/integracoes/engine'
+import { reconciliarPull } from '@/lib/integracoes/orquestrador'
 
 export const dynamic = 'force-dynamic'
 
 /**
  * Reconciliação de acessos da Guru (rede de segurança). Protegido por CRON_SECRET.
  *
- * Reaplica as liberações de TODAS as assinaturas ATIVAS conhecidas localmente
- * (`reaplicarLiberacoes`), recuperando alunos que ficaram sem acesso por falha silenciosa
- * de escrita (as que agora logamos) ou por um webhook de compra que não aplicou. É idempotente
- * e só CONCEDE (nunca revoga), então é seguro rodar periodicamente.
- *
- * Não substitui um pull do Guru (que pegaria assinaturas nunca recebidas e cancelamentos
- * perdidos) — isso depende de verificar os endpoints da API Guru (`guru.ts` marca "⚠️ VERIFICAR").
- *
- * INCREMENTAL por padrão: só reaplica assinaturas ativas ALTERADAS nas últimas 48h (barato,
- * pega os webhooks recém-falhados). Isso evita reprocessar milhares de assinaturas por dia
- * (o tenant tem ~4,7k ativas) num único request. `?full=1` reprocessa TODAS (uso manual/ocasional).
- * Aceita `?tenant=<id>` para reconciliar um tenant específico.
+ * DOIS modos:
+ *  - PADRÃO (`reaplicarLiberacoes`): reaplica as liberações das assinaturas ATIVAS conhecidas
+ *    LOCALMENTE, recuperando alunos sem acesso por falha silenciosa de escrita / webhook de compra
+ *    que não aplicou. Idempotente e só CONCEDE — seguro para rodar periodicamente.
+ *    INCREMENTAL por padrão (últimas 48h); `?full=1` reprocessa TODAS. `?tenant=<id>` limita.
+ *  - PULL (`?pull=1`): puxa as assinaturas da API do Guru (fonte da verdade), compara com o local e
+ *    também **REVOGA** cancelamentos/reembolsos cujo webhook se PERDEU. Como isto pode RETIRAR acesso,
+ *    roda em **dry-run por padrão** (só relatório do que mudaria); passe `?aplicar=1` para efetivar.
  */
 function autorizado(req: NextRequest): boolean {
   const segredo = process.env.CRON_SECRET
@@ -44,6 +41,23 @@ export async function POST(req: NextRequest) {
     tenantIds = [...new Set((data ?? []).map((r: any) => r.tenant_id).filter(Boolean))]
   }
 
+  // MODO PULL: puxa da API do Guru e revoga divergências (dry-run por padrão).
+  if (sp.get('pull') === '1') {
+    const dry = sp.get('aplicar') !== '1'
+    const pull: any[] = []
+    for (const tenantId of tenantIds) {
+      try {
+        const r = await reconciliarPull(tenantId, 'guru', { dry })
+        pull.push({ tenantId, ...r })
+      } catch (e: any) {
+        pull.push({ tenantId, ok: false, error: e?.message ?? String(e) })
+        // eslint-disable-next-line no-console
+        console.error('[guru-reconcile pull] tenant', tenantId, e?.message ?? e)
+      }
+    }
+    return NextResponse.json({ ok: true, modo: 'pull', dry, tenants: tenantIds.length, resultados: pull })
+  }
+
   const resultados: Array<{ tenantId: string; total: number; concedidos: number; erros: number; semMapeamento: number }> = []
   for (const tenantId of tenantIds) {
     try {
@@ -56,5 +70,5 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, tenants: tenantIds.length, resultados })
+  return NextResponse.json({ ok: true, modo: 'reaplicar', tenants: tenantIds.length, resultados })
 }

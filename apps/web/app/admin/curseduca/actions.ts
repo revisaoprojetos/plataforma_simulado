@@ -8,8 +8,10 @@ import { configDoEnv, testarCredenciais, listarTodosGrupos, contarMembros, lista
 import { resolverCfg, executarImport, envAplicaAoTenant } from '@/lib/curseduca/import-core'
 import type { DestinoImport, ResultadoImportCurseduca } from '@/lib/curseduca/tipos'
 import { criptografar, descriptografar, estaCriptografado, criptografiaAtiva } from '@/lib/crypto'
+import { resolverCfgCurseduca } from '@/lib/curseduca/cfg'
 import { selecionarGrupos } from '@/lib/simulado/grupos'
 import { fetchAll } from '@/lib/supabase/fetch-all'
+import { randomBytes } from 'crypto'
 
 export type GrupoCurseducaDTO = { id: number; nome: string; criadoEm: string | null }
 export type GrupoSistema = { id: string; nome: string; cor: string | null; pai_id: string | null; is_mestre: boolean; membros: number }
@@ -100,6 +102,14 @@ export async function getCurseducaConfig(): Promise<{ ok: boolean; error?: strin
   const doEnv = (): CurseducaConfigDTO => ({ base_url: env?.base || 'https://prof.curseduca.pro', usuario: env?.user || '', ativo: !!env, temApiKey: !!env?.apiKey, temSenha: !!env?.pass, usandoEnv: !!env, existe: false, criptografado: false, criptografiaAtiva: cripAtiva })
   try {
     const svc = createAdminClient()
+    // FONTE CANÔNICA: simulado_integracao_config (provider=curseduca). O painel legado passou a ler/gravar
+    // aqui — `simulado_curseduca_config` fica só como fallback de leitura (tenants ainda não migrados).
+    const { data: novo } = await svc.from('simulado_integracao_config').select('base_url, credenciais, ativo').eq('tenant_id', access.tenantId).eq('provider', 'curseduca').maybeSingle()
+    const cred = ((novo as any)?.credenciais ?? {}) as Record<string, string>
+    if (novo && (cred.api_key || cred.usuario || cred.senha)) {
+      return { ok: true, config: { base_url: (novo as any).base_url || 'https://prof.curseduca.pro', usuario: descriptografar(cred.usuario) || '', ativo: !!(novo as any).ativo, temApiKey: !!cred.api_key, temSenha: !!cred.senha, usandoEnv: false, existe: true, criptografado: estaCriptografado(cred.api_key) || estaCriptografado(cred.senha), criptografiaAtiva: cripAtiva } }
+    }
+    // Fallback: config legada.
     const { data } = await svc.from('simulado_curseduca_config').select('base_url, api_key, usuario, senha, ativo').eq('tenant_id', access.tenantId).maybeSingle()
     const d = data as any
     if (d) return { ok: true, config: { base_url: d.base_url || 'https://prof.curseduca.pro', usuario: d.usuario || '', ativo: !!d.ativo, temApiKey: !!d.api_key, temSenha: !!d.senha, usandoEnv: false, existe: true, criptografado: estaCriptografado(d.api_key) || estaCriptografado(d.senha), criptografiaAtiva: cripAtiva } }
@@ -125,9 +135,13 @@ export async function curseducaEstado(): Promise<{ configurado: boolean; inativo
   const access = await getCurrentAccess()
   if (!access.tenantId || !(await checkPermission('estudantes:view'))) return { configurado: false, inativo: false }
   try {
-    if (await resolverCfg(access.tenantId)) return { configurado: true, inativo: false }
-    // Não resolveu: existe uma linha com credenciais completas porém desativada?
+    if (await resolverCfgCurseduca(access.tenantId)) return { configurado: true, inativo: false }
+    // Não resolveu: existe uma linha com credenciais completas porém desativada? Checa a fonte canônica
+    // (integracao_config) e depois o legado.
     const svc = createAdminClient()
+    const { data: novo } = await svc.from('simulado_integracao_config').select('credenciais, ativo').eq('tenant_id', access.tenantId).eq('provider', 'curseduca').maybeSingle()
+    const cn = ((novo as any)?.credenciais ?? {}) as Record<string, string>
+    if (novo && cn.api_key && cn.usuario && cn.senha && !(novo as any).ativo) return { configurado: false, inativo: true }
     const { data } = await svc.from('simulado_curseduca_config').select('api_key, usuario, senha, ativo').eq('tenant_id', access.tenantId).maybeSingle()
     const d = data as any
     return { configurado: false, inativo: !!(d && d.api_key && d.usuario && d.senha && !d.ativo) }
@@ -141,29 +155,32 @@ export async function salvarCurseducaConfig(dados: { base_url?: string; api_key?
   if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   const svc = createAdminClient()
   try {
-    const { data: atual } = await svc.from('simulado_curseduca_config').select('base_url, api_key, usuario, senha, ativo').eq('tenant_id', access.tenantId).maybeSingle()
-    const a = atual as any
-    const base = dados.base_url?.trim() || a?.base_url || 'https://prof.curseduca.pro'
-    const usuario = dados.usuario?.trim() || a?.usuario || ''
-    // Valores em PLAINTEXT: do formulário, ou os já salvos (descriptografados) quando o campo vem em branco.
-    const apiKey = dados.api_key?.trim() || (descriptografar(a?.api_key) ?? '')
-    const senha = dados.senha?.trim() || (descriptografar(a?.senha) ?? '')
-    const ativo = dados.ativo ?? a?.ativo ?? true
+    // FONTE CANÔNICA: grava em simulado_integracao_config (provider=curseduca) — o mesmo lugar que a tela
+    // Integrações usa e que resolverCfg prefere. Antes, este painel gravava no legado
+    // (simulado_curseduca_config) e, se houvesse config no novo, a edição não tinha efeito (novo vence).
+    // Preserva o webhook_token existente (não invalida a URL de webhook do tenant).
+    const { data: atualNovo } = await svc.from('simulado_integracao_config').select('credenciais, webhook_token, ativo').eq('tenant_id', access.tenantId).eq('provider', 'curseduca').maybeSingle()
+    // Baseline efetivo (novo → legado → env) para os campos deixados em branco.
+    const efetiva = await resolverCfgCurseduca(access.tenantId)
+    const base = dados.base_url?.trim() || efetiva?.base || 'https://prof.curseduca.pro'
+    const usuario = dados.usuario?.trim() || efetiva?.user || ''
+    const apiKey = dados.api_key?.trim() || efetiva?.apiKey || ''
+    const senha = dados.senha?.trim() || efetiva?.pass || ''
+    const ativo = dados.ativo ?? (atualNovo as any)?.ativo ?? true
     if (!apiKey || !usuario || !senha) return { ok: false, error: 'Informe API key, usuário e senha.' }
     if (ativo) {
       const teste = await testarCredenciais({ base, apiKey, user: usuario, pass: senha })
       if (!teste.ok) return { ok: false, error: `Credenciais inválidas: ${teste.error ?? 'login falhou'}` }
     }
-    // Grava CRIPTOGRAFADO em repouso (AES-256-GCM). Sem APP_ENCRYPTION_KEY, cai para texto puro (com aviso).
-    const { error } = await svc.from('simulado_curseduca_config').upsert(
-      { tenant_id: access.tenantId, base_url: base, api_key: criptografar(apiKey), usuario, senha: criptografar(senha), ativo, atualizado_em: new Date().toISOString() },
-      { onConflict: 'tenant_id' },
+    const webhookToken = (atualNovo as any)?.webhook_token ?? randomBytes(24).toString('hex')
+    // Cada credencial CRIPTOGRAFADA em repouso (AES-256-GCM), no jsonb `credenciais` — mesmo formato do
+    // sistema de Integrações. Sem APP_ENCRYPTION_KEY, cai para texto puro (com aviso).
+    const { error } = await svc.from('simulado_integracao_config').upsert(
+      { tenant_id: access.tenantId, provider: 'curseduca', base_url: base, credenciais: { api_key: criptografar(apiKey), usuario: criptografar(usuario), senha: criptografar(senha) }, ativo, webhook_token: webhookToken, atualizado_em: new Date().toISOString() },
+      { onConflict: 'tenant_id,provider' },
     )
-    if (error) {
-      if (/relation|does not exist|schema cache|column/i.test(error.message)) return { ok: false, error: 'Rode a migration da tabela simulado_curseduca_config (SQL fornecido) e tente de novo.' }
-      return { ok: false, error: error.message }
-    }
-    await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_curseduca_config', entidadeId: access.tenantId, depois: { usuario, ativo, base } })
+    if (error) return { ok: false, error: error.message }
+    await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_integracao_config', entidadeId: access.tenantId, tenantId: access.tenantId, depois: { provider: 'curseduca', usuario, ativo, base } })
     revalidatePath('/admin/curseduca')
     return { ok: true }
   } catch (e: any) {
@@ -175,8 +192,9 @@ export type MembroPreview = {
   id: number; nome: string; email: string | null; cpf: string | null; telefone: string | null
   situacao: string | null; criadoEm: string | null; ultimoAcesso: string | null; cidade: string | null; uf: string | null
   entrouEm: string | null       // entrada no grupo (enteredAt)
-  expiraEm: string | null       // data de expiração (null quando vitalício)
+  expiraEm: string | null       // data de expiração (== accessExpiresAt; null = sem data, NÃO garante acesso)
   temMatricula: boolean         // se há registro de matrícula no grupo (p/ distinguir vitalício de desconhecido)
+  temAcesso: boolean | null     // hasAccess da API — acesso vigente ao grupo (autoritativo)
 }
 
 /** Lista os membros de um grupo (perfil + matrícula: entrada/expiração no grupo) para pré-visualização. */
@@ -190,7 +208,7 @@ export async function previewMembrosGrupo(groupId: number): Promise<{ ok: boolea
       return {
         id: m.id, nome: m.nome, email: m.email, cpf: m.cpf, telefone: m.telefone,
         situacao: m.situacao, criadoEm: m.criadoEm, ultimoAcesso: m.ultimoAcesso, cidade: m.cidade, uf: m.uf,
-        entrouEm: mat?.entrouEm ?? null, expiraEm: mat?.expiraEm ?? null, temMatricula: !!mat,
+        entrouEm: mat?.entrouEm ?? null, expiraEm: mat?.expiraEm ?? null, temMatricula: !!mat, temAcesso: mat?.temAcesso ?? null,
       }
     })
     return { ok: true, membros }
@@ -340,7 +358,7 @@ export async function statusImportacaoCurseduca(jobId: string): Promise<{ ok: bo
 export type RegraSyncDTO = {
   id: string; grupos: number[]; destino: DestinoImport; sincronizar: boolean; intervalo_min: number
   ativo: boolean; ultima_execucao: string | null; ultimo_resultado: ResultadoImportCurseduca | null; grupoDestinoNome: string | null
-  agruparPorNome: boolean
+  agruparPorNome: boolean; descobrirCanais: boolean
 }
 const INTERVALOS_OK = new Set([15, 30, 60, 120, 240])
 
@@ -353,8 +371,8 @@ export async function listarRegrasSync(): Promise<{ ok: boolean; error?: string;
   try {
     let data: any[] | null = null
     {
-      const r1 = await svc.from('simulado_curseduca_sync').select('id, grupos, destino, sincronizar, intervalo_min, ativo, ultima_execucao, ultimo_resultado, agrupar_por_nome').eq('tenant_id', access.tenantId).order('created_at', { ascending: false })
-      if (r1.error && /agrupar_por_nome|column/i.test(r1.error.message)) {
+      const r1 = await svc.from('simulado_curseduca_sync').select('id, grupos, destino, sincronizar, intervalo_min, ativo, ultima_execucao, ultimo_resultado, agrupar_por_nome, descobrir_canais').eq('tenant_id', access.tenantId).order('created_at', { ascending: false })
+      if (r1.error && /agrupar_por_nome|descobrir_canais|column/i.test(r1.error.message)) {
         const r2 = await svc.from('simulado_curseduca_sync').select('id, grupos, destino, sincronizar, intervalo_min, ativo, ultima_execucao, ultimo_resultado').eq('tenant_id', access.tenantId).order('created_at', { ascending: false })
         data = r2.data as any[]
       } else data = r1.data as any[]
@@ -370,7 +388,7 @@ export async function listarRegrasSync(): Promise<{ ok: boolean; error?: string;
       id: r.id, grupos: r.grupos ?? [], destino: r.destino ?? { tipo: 'nenhum' }, sincronizar: !!r.sincronizar,
       intervalo_min: r.intervalo_min ?? 30, ativo: !!r.ativo, ultima_execucao: r.ultima_execucao ?? null,
       ultimo_resultado: r.ultimo_resultado ?? null, grupoDestinoNome: r.destino?.grupoId ? (nomes.get(r.destino.grupoId) ?? null) : null,
-      agruparPorNome: !!r.agrupar_por_nome,
+      agruparPorNome: !!r.agrupar_por_nome, descobrirCanais: !!r.descobrir_canais,
     }))
     return { ok: true, regras }
   } catch {
@@ -415,7 +433,7 @@ export async function getSyncSimples(): Promise<{ ok: boolean; ativo: boolean; i
  * e define o intervalo. Mantém UMA regra "global" — destino 'nenhum', sincronizar=false
  * (só adiciona alunos novos, nunca remove). Substitui a UI de regras avançada (oculta por ora).
  */
-export async function salvarSyncSimples(intervaloMin: number, ativo: boolean, grupos: number[], agruparPorNome = false): Promise<{ ok: boolean; error?: string }> {
+export async function salvarSyncSimples(intervaloMin: number, ativo: boolean, grupos: number[], agruparPorNome = false, descobrirCanais = false): Promise<{ ok: boolean; error?: string }> {
   if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
   const access = await getCurrentAccess()
   if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
@@ -433,18 +451,18 @@ export async function salvarSyncSimples(intervaloMin: number, ativo: boolean, gr
     const { data: existentes } = await svc.from('simulado_curseduca_sync').select('id').eq('tenant_id', access.tenantId).order('created_at', { ascending: true })
     const lista = (existentes ?? []) as any[]
     if (lista.length) {
-      const patch: Record<string, unknown> = { intervalo_min: intervalo, ativo, grupos, destino: { tipo: 'nenhum' }, sincronizar: false, agrupar_por_nome: agruparPorNome }
+      const patch: Record<string, unknown> = { intervalo_min: intervalo, ativo, grupos, destino: { tipo: 'nenhum' }, sincronizar: false, agrupar_por_nome: agruparPorNome, descobrir_canais: descobrirCanais }
       let up = await svc.from('simulado_curseduca_sync').update(patch).eq('id', lista[0].id).eq('tenant_id', access.tenantId)
-      if (up.error && /agrupar_por_nome|column/i.test(up.error.message)) { // coluna nova ainda não migrada
-        delete patch.agrupar_por_nome
+      if (up.error && /agrupar_por_nome|descobrir_canais|column/i.test(up.error.message)) { // colunas novas ainda não migradas
+        delete patch.agrupar_por_nome; delete patch.descobrir_canais
         await svc.from('simulado_curseduca_sync').update(patch).eq('id', lista[0].id).eq('tenant_id', access.tenantId)
       }
       if (lista.length > 1) await svc.from('simulado_curseduca_sync').delete().in('id', lista.slice(1).map((r) => r.id)).eq('tenant_id', access.tenantId)
     } else if (ativo) {
       if (!grupos.length) return { ok: false, error: 'Carregue os grupos antes de ativar.' }
       const base: Record<string, unknown> = { tenant_id: access.tenantId, grupos, destino: { tipo: 'nenhum' }, sincronizar: false, intervalo_min: intervalo, ativo: true, criado_por: access.userId ?? null }
-      let ins = await svc.from('simulado_curseduca_sync').insert({ ...base, agrupar_por_nome: agruparPorNome })
-      if (ins.error && /agrupar_por_nome|column/i.test(ins.error.message)) await svc.from('simulado_curseduca_sync').insert(base)
+      let ins = await svc.from('simulado_curseduca_sync').insert({ ...base, agrupar_por_nome: agruparPorNome, descobrir_canais: descobrirCanais })
+      if (ins.error && /agrupar_por_nome|descobrir_canais|column/i.test(ins.error.message)) await svc.from('simulado_curseduca_sync').insert(base)
     }
     revalidatePath('/admin/integracoes/curseduca')
     return { ok: true }
