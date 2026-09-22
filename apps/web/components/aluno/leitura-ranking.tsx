@@ -3,7 +3,8 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { Trophy, Sparkles, ArrowUpDown, MoreVertical, X, Loader2, Flame, Zap, BookCheck, Award } from 'lucide-react'
+import { Trophy, Sparkles, ArrowUpDown, MoreVertical, X, Loader2, Flame, Zap, BookCheck, Award, Search, Eye, EyeOff } from 'lucide-react'
+import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { formatBrt } from '@/lib/brt'
 import { AvatarEstudante } from '@/components/aluno/avatar-estudante'
@@ -25,14 +26,25 @@ export function LeituraRanking({ ranking, meuId, modo = 'aluno', moduloId }: { r
   const [campo, setCampo] = useState<Campo>('posicao')
   const [dir, setDir] = useState<'asc' | 'desc'>('asc')
   const [pagina, setPagina] = useState(1)
+  const [busca, setBusca] = useState('')
+  const [mostrarOcultos, setMostrarOcultos] = useState(true)
   const [detalhe, setDetalhe] = useState<RankingLeituraItem | null>(null)
   // Só o admin (com o módulo resolvido) abre o pop-up de detalhe do aluno.
   const expandir = modo === 'admin' && moduloId ? setDetalhe : undefined
 
   // Aluno NÃO vê contas de teste (ocultas); admin vê, marcadas. Ocultos nunca no pódio nem no "você".
   const reaisList = useMemo(() => itens.filter((i) => !i.oculto), [itens])
+  const qtdOcultos = useMemo(() => itens.filter((i) => i.oculto).length, [itens])
+  const temOcultos = modo === 'admin' && qtdOcultos > 0
+
   const ordenados = useMemo(() => {
-    const arr = (modo === 'aluno' ? reaisList : [...itens]).slice()
+    // Base: aluno só vê reais; admin alterna entre "com ocultos" e "só reais" pelo toggle.
+    const base = modo === 'aluno' ? reaisList : mostrarOcultos ? itens : reaisList
+    const q = busca.trim().toLowerCase()
+    const filtrada = q
+      ? base.filter((i) => i.nome.toLowerCase().includes(q) || (modo === 'admin' && (i.email ?? '').toLowerCase().includes(q)))
+      : base
+    const arr = filtrada.slice()
     arr.sort((a, b) => {
       // Ocultos (posição 0) sempre no fim quando ordena por posição.
       if (campo === 'posicao' && a.oculto !== b.oculto) return a.oculto ? 1 : -1
@@ -40,7 +52,10 @@ export function LeituraRanking({ ranking, meuId, modo = 'aluno', moduloId }: { r
       return dir === 'asc' ? c : -c
     })
     return arr
-  }, [itens, reaisList, modo, campo, dir])
+  }, [itens, reaisList, modo, mostrarOcultos, busca, campo, dir])
+
+  // Busca/toggle mudou → volta à 1ª página (evita ficar numa página que não existe mais).
+  useEffect(() => { setPagina(1) }, [busca, mostrarOcultos])
 
   function ordenar(c: Campo) {
     if (campo === c) setDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -112,6 +127,25 @@ export function LeituraRanking({ ranking, meuId, modo = 'aluno', moduloId }: { r
         )
       })()}
 
+      {/* Barra: busca (nome/e-mail) + toggle de contas de teste (admin). */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[12rem] flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder={modo === 'admin' ? 'Buscar por nome ou e-mail…' : 'Buscar aluno…'} className="h-9 pl-9" />
+          {busca && (
+            <button type="button" onClick={() => setBusca('')} aria-label="Limpar busca" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
+          )}
+        </div>
+        {temOcultos && (
+          <button type="button" onClick={() => setMostrarOcultos((v) => !v)}
+            className={cn('inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors', mostrarOcultos ? 'border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'hover:bg-muted')}
+            title={mostrarOcultos ? 'Esconder contas de teste da lista' : 'Mostrar contas de teste na lista'}>
+            {mostrarOcultos ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+            {mostrarOcultos ? 'Ocultar contas de teste' : `Mostrar contas de teste (${qtdOcultos})`}
+          </button>
+        )}
+      </div>
+
       {/* Tabela — 10 por página, TODAS visíveis (sem rolagem interna; a página rola se precisar). */}
       <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
         <table className="w-full text-sm">
@@ -127,7 +161,11 @@ export function LeituraRanking({ ranking, meuId, modo = 'aluno', moduloId }: { r
             </tr>
           </thead>
           <tbody>
-            {visiveis.map((it) => <LinhaRanking key={it.estudanteId} it={it} eu={!!meuId && it.estudanteId === meuId} modo={modo} onExpand={expandir} />)}
+            {visiveis.length === 0 ? (
+              <tr><td colSpan={6} className="px-3 py-10 text-center text-sm text-muted-foreground">Nenhum aluno encontrado{busca ? ` para “${busca}”` : ''}.</td></tr>
+            ) : (
+              visiveis.map((it) => <LinhaRanking key={it.estudanteId} it={it} eu={!!meuId && it.estudanteId === meuId} modo={modo} onExpand={expandir} />)
+            )}
           </tbody>
         </table>
       </div>
