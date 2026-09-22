@@ -298,7 +298,8 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
   useIsoLayout(() => {
     const root = contentRef.current
     if (!root) return
-    const disp = Array.from(root.querySelectorAll<HTMLElement>('[data-disp]'))
+    // Ignora dispositivos citados em tabelas de comparação (não são artigos/incisos da aula).
+    const disp = Array.from(root.querySelectorAll<HTMLElement>('[data-disp]')).filter((el) => !el.closest('table'))
     if (disp.length) {
       // Hierarquia do índice: CAPÍTULO/TÍTULO/SEÇÃO (0) → Art. (1) → § (2) → inciso (3) → alínea (4).
       const NIVEL_TIPO: Record<string, number> = { livro: 0, parte: 0, titulo: 0, capitulo: 0, secao: 0, subsecao: 0, artigo: 1, paragrafo: 2, inciso: 3, alinea: 4, item: 4 }
@@ -310,7 +311,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
       }))
       return
     }
-    const nós = Array.from(root.querySelectorAll<HTMLElement>('[data-art]'))
+    const nós = Array.from(root.querySelectorAll<HTMLElement>('[data-art]')).filter((el) => !el.closest('table'))
     setSecoes(nós.map((el) => ({
       id: el.id || `art-${el.getAttribute('data-art')}`, art: Number(el.getAttribute('data-art')) || 0, tipo: 'artigo', nivel: 0,
       label: (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60) || `Seção ${el.getAttribute('data-art')}`,

@@ -252,8 +252,9 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
   const secoes = useMemo(() => {
     if (typeof window === 'undefined' || !html) return [] as Sec[]
     const parsed = new DOMParser().parseFromString(html, 'text/html')
-    const disp = Array.from(parsed.querySelectorAll('[data-disp]'))
-    const src = disp.length ? disp : Array.from(parsed.querySelectorAll('[data-art]'))
+    // Ignora dispositivos citados em tabelas de comparação (não são artigos/incisos da aula).
+    const disp = Array.from(parsed.querySelectorAll('[data-disp]')).filter((el) => !el.closest('table'))
+    const src = disp.length ? disp : Array.from(parsed.querySelectorAll('[data-art]')).filter((el) => !el.closest('table'))
     return src.map((el): Sec => {
       const dispId = el.getAttribute('data-disp')
       const artId = el.getAttribute('data-art')

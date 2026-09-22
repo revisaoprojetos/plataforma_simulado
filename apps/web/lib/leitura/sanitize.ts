@@ -150,6 +150,17 @@ function mapearMontagem(root: any): void {
 const RE_ARTIGO = /^\s*art(?:igo)?\.?\s*\d+/i
 const TITULOS = new Set(['H1', 'H2', 'H3', 'H4', 'H5', 'H6'])
 
+/**
+ * True se o elemento está DENTRO de uma <table>. Tabelas de comparação (ex.: tipos de desapropriação)
+ * costumam CITAR artigos ("Art. 182, § 4º, III, CF;") — são referências, NÃO os dispositivos da aula.
+ * Sem isto, cada citação virava um "artigo" no índice (inflava a contagem e poluía o sumário).
+ */
+function dentroDeTabela(el: any): boolean {
+  let p = el?.parentNode
+  while (p) { if ((p.tagName || '').toUpperCase() === 'TABLE') return true; p = p.parentNode }
+  return false
+}
+
 // Marca artigos/secoes com id="art-K" + data-art="K" (K sequencial em ordem de
 // documento). Candidatos: titulos (h1-h6) e blocos cujo texto comeca com "Art. N".
 // Retorna a contagem. Idempotente (nao remarca quem ja tem data-art).
@@ -163,6 +174,7 @@ function ancorarArtigos(root: any): number {
     const ehTitulo = TITULOS.has(tag)
     const ehArtigo = (tag === 'P' || tag === 'DIV' || tag === 'LI' || tag === 'SECTION') && RE_ARTIGO.test(el.text || '')
     if (!ehTitulo && !ehArtigo) continue
+    if (dentroDeTabela(el)) continue // citação de artigo dentro de tabela ≠ artigo da aula
     k += 1
     el.setAttribute('data-art', String(k))
     el.setAttribute('id', 'art-' + k)
@@ -194,6 +206,7 @@ function indexarDispositivos(root: any): Dispositivo[] {
     const tag = (el.tagName || '').toUpperCase()
     const txt = (el.text || '').replace(/\s+/g, ' ').trim()
     if (!txt || el.getAttribute('data-disp')) continue
+    if (dentroDeTabela(el)) continue // dispositivos citados em tabelas de comparação não entram no índice
     let tipo = '', id = '', rotulo = ''
     let m: RegExpMatchArray | null
     if (TITULOS.has(tag) || RE_ESTRUT.test(txt)) {

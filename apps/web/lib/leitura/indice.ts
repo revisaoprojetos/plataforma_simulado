@@ -31,10 +31,11 @@ export function contarTiposNoHtml(html: string): Record<string, number> {
   const doc = new DOMParser().parseFromString(html, 'text/html')
   const counts: Record<string, number> = {}
   for (const el of Array.from(doc.querySelectorAll('[data-disp]'))) {
+    if (el.closest('table')) continue // citações de artigos em tabelas de comparação não são dispositivos da aula
     const t = el.getAttribute('data-disp-tipo') || 'artigo'
     counts[t] = (counts[t] ?? 0) + 1
   }
-  if (!Object.keys(counts).length) { const n = doc.querySelectorAll('[data-art]').length; if (n) counts.artigo = n } // conteúdo antigo
+  if (!Object.keys(counts).length) { const n = Array.from(doc.querySelectorAll('[data-art]')).filter((e) => !e.closest('table')).length; if (n) counts.artigo = n } // conteúdo antigo
   return counts
 }
 
