@@ -235,6 +235,12 @@ export interface AulaDesempenho {
   questoesTotal: number
   questoesRespondidas: number
   questoesPendentes: number
+  /** Pontos (XP) ganhos nesta aula (leitura + quiz). */
+  pontos: number
+  /** Sequência (dias consecutivos de atividade) no dia em que fez esta aula; 0 se não fez. */
+  sequencia: number
+  /** Quando concluiu a aula (ISO) — base da sequência + exibição. */
+  data: string | null
 }
 export interface ModuloCompleto {
   trilha: Trilha | null
@@ -264,17 +270,41 @@ export async function carregarModuloCompleto(estId: string, tenantId: string, mo
   const intro = introNodeDe(m.intro, m.id)
   const nodes = intro ? [intro, ...aulaNodes] : aulaNodes
   const trilha: Trilha = { id: m.id, nome: m.nome, cor: m.cor, capa: m.capa, capaCard: m.capaCard, total: aulaNodes.length, done: aulaNodes.filter((n) => n.estado === 'concluido').length, trilhaXp: 0, adesivoUrl: m.adesivo ?? null, nodes }
+
+  const svc = createAdminClient()
+  // Pontos (XP leitura+quiz) + data por aula, e a SEQUÊNCIA (dias consecutivos) no dia de cada aula.
+  const docIds = arr.map((a) => a.doc.id)
+  const refs = [...docIds, ...docIds.map((id) => `quiz:${id}`)]
+  let evs: { ref_id: string; xp: number; criado_em: string }[] = []
+  if (refs.length) { try { const { data } = await svc.from('simulado_xp_eventos').select('ref_id, xp, criado_em').eq('tenant_id', tenantId).eq('estudante_id', estId).eq('origem', 'leitura').in('ref_id', refs); evs = (data ?? []) as any } catch { /* gamificação ausente */ } }
+  const pontosDoc = new Map<string, number>(); const dataDoc = new Map<string, string>()
+  for (const e of evs) {
+    const docId = String(e.ref_id).replace(/^quiz:/, '')
+    pontosDoc.set(docId, (pontosDoc.get(docId) ?? 0) + (e.xp || 0))
+    const prev = dataDoc.get(docId); if (!prev || (e.criado_em && e.criado_em < prev)) dataDoc.set(docId, e.criado_em)
+  }
+  // Sequência = corrida de dias CONSECUTIVOS (fuso Brasília). Falhou um dia → reinicia em 1.
+  const diaDe = (iso: string) => new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
+  const diasOrdenados = [...new Set([...dataDoc.values()].map(diaDe))].sort()
+  const streakDoDia = new Map<string, number>(); let run = 0; let prevDia = ''
+  for (const d of diasOrdenados) {
+    const consecutivo = !!prevDia && Date.parse(d + 'T00:00:00Z') - Date.parse(prevDia + 'T00:00:00Z') === 86_400_000
+    run = consecutivo ? run + 1 : 1; streakDoDia.set(d, run); prevDia = d
+  }
+
   const desempenho: AulaDesempenho[] = arr.map((a) => ({
     id: a.doc.id, titulo: a.doc.titulo, estado: a.estado,
     leituraPct: a.doc.pct, leituraConcluida: a.leituraConcluida,
     questoesTotal: a.questoesTotal, questoesRespondidas: a.questoesRespondidas,
     questoesPendentes: Math.max(0, a.questoesTotal - a.questoesRespondidas),
+    pontos: pontosDoc.get(a.doc.id) ?? 0,
+    data: dataDoc.get(a.doc.id) ?? null,
+    sequencia: dataDoc.has(a.doc.id) ? (streakDoDia.get(diaDe(dataDoc.get(a.doc.id)!)) ?? 0) : 0,
   }))
   // Pendência ACIONÁVEL = leitura concluída (questões liberadas) mas ainda faltam responder.
   const comPend = arr.filter((a) => a.leituraConcluida && a.questoesTotal - a.questoesRespondidas > 0)
   const pendentes = comPend.reduce((s, a) => s + (a.questoesTotal - a.questoesRespondidas), 0)
   // Desafios do módulo (tolerante à coluna ausente) + desempenho do aluno p/ progresso/selo.
-  const svc = createAdminClient()
   let desafios: DesafioModulo[] = []
   try { const { data } = await svc.from('simulado_pastas').select('desafios').eq('id', moduloId).eq('tenant_id', tenantId).maybeSingle(); desafios = normalizarDesafios((data as any)?.desafios) } catch { /* migração pendente */ }
   const desempenhoDesafios: DesempenhoLeitura = desafios.length ? await desempenhoLeituraAluno(svc, tenantId, estId, moduloId) : { acertos: 0, aulasConcluidas: 0, aulasGabaritadas: 0 }

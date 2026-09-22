@@ -90,6 +90,24 @@ export function LeituraRanking({ ranking, meuId, modo = 'aluno', moduloId }: { r
         </div>
       )}
 
+      {/* Card "Você" (aluno) — comprido, fixo abaixo do pódio: acompanha o rank em TODAS as páginas. */}
+      {meuId && (() => {
+        const meuIt = itens.find((i) => i.estudanteId === meuId)
+        if (!meuIt) return null
+        return (
+          <div className="flex items-center gap-3 rounded-2xl border-2 border-primary/50 bg-primary/5 px-4 py-3 shadow-sm">
+            <span className="flex h-8 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-bold tabular-nums text-primary-foreground">{meuIt.posicao}</span>
+            <AvatarEstudante nome={meuIt.nome} avatar={meuIt.avatar} cor={meuIt.avatarCor ?? '#6d28d9'} className="h-9 w-9 shrink-0 text-[11px] text-white" />
+            <span className="min-w-0 flex-1 truncate font-semibold text-primary">Você</span>
+            <div className="flex items-center gap-5 sm:gap-8">
+              <span className="text-center"><span className="block font-bold leading-none tabular-nums">{meuIt.aulasConcluidas}</span><span className="mt-0.5 block text-[10px] text-muted-foreground">aulas</span></span>
+              <span className="text-center"><span className="inline-flex items-center gap-1 font-bold leading-none tabular-nums text-amber-600 dark:text-amber-400"><Flame className="h-3.5 w-3.5" />{meuIt.streakAtual}</span><span className="mt-0.5 block text-[10px] text-muted-foreground">sequência</span></span>
+              <span className="text-center"><span className="block font-bold leading-none tabular-nums text-primary">{meuIt.score}</span><span className="mt-0.5 block text-[10px] text-muted-foreground">{rotulo.toLowerCase()}</span></span>
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Tabela — 10 por página, TODAS visíveis (sem rolagem interna; a página rola se precisar). */}
       <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
         <table className="w-full text-sm">

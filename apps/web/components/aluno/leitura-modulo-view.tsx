@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { Route, BarChart3, Check, Lock, AlertTriangle, ArrowRight, Library, Trophy, ScrollText, Zap, Play, FileText, ExternalLink, Download } from 'lucide-react'
+import { Route, BarChart3, Check, Lock, AlertTriangle, ArrowRight, Library, Trophy, ScrollText, Zap, Play, FileText, ExternalLink, Download, Flame } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { ModuloBanner } from '@/components/admin/modulo-banner'
@@ -298,12 +298,14 @@ function DesempenhoModulo({ desempenho }: { desempenho: AulaDesempenho[] }) {
               <th className="px-4 py-2.5 font-medium">Aula</th>
               <th className="px-4 py-2.5 font-medium">Leitura</th>
               <th className="px-4 py-2.5 font-medium">Questões</th>
+              <th className="px-4 py-2.5 text-center font-medium">Sequência</th>
+              <th className="px-4 py-2.5 text-center font-medium">Pontos</th>
               <th className="px-4 py-2.5 text-right font-medium">Situação</th>
             </tr>
           </thead>
           <tbody>
             {desempenho.length === 0 ? (
-              <tr><td colSpan={4} className="py-10 text-center text-muted-foreground">Nenhuma aula neste módulo.</td></tr>
+              <tr><td colSpan={6} className="py-10 text-center text-muted-foreground">Nenhuma aula neste módulo.</td></tr>
             ) : desempenho.map((a) => {
               const bloqueada = a.estado === 'bloqueado'
               return (
@@ -338,6 +340,14 @@ function DesempenhoModulo({ desempenho }: { desempenho: AulaDesempenho[] }) {
                         )}
                       </span>
                     )}
+                  </td>
+                  <td className="px-4 py-3 text-center tabular-nums">
+                    {a.sequencia > 0 ? (
+                      <span className="inline-flex items-center gap-1 font-semibold text-amber-600 dark:text-amber-400"><Flame className="h-3.5 w-3.5" /> {a.sequencia}</span>
+                    ) : <span className="text-muted-foreground">—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-center tabular-nums">
+                    {a.pontos > 0 ? <span className="font-semibold text-primary">+{a.pontos}</span> : <span className="text-muted-foreground">—</span>}
                   </td>
                   <td className="px-4 py-3 text-right">
                     {a.estado === 'concluido' ? (
