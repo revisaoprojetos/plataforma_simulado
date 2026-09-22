@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { onLeituraConcluida } from '@/lib/gamificacao'
 import { docAcessivelAluno } from '@/lib/leitura/acesso'
+import { invalidarRankingPorDocumento } from '@/lib/leitura/ranking'
 
 // POST /api/leitura/progresso — auto-save idempotente do progresso de leitura.
 export const dynamic = 'force-dynamic'
@@ -52,7 +53,11 @@ export async function POST(request: NextRequest) {
   if (error) return NextResponse.json({ message: error.message }, { status: 500 })
 
   // Gamificação só na PRIMEIRA conclusão (idempotente por documento no ledger de qualquer forma).
-  if (concluiuAgora) void onLeituraConcluida(svc, { tenantId: sessao.tenantId, estudanteId: sessao.estudanteId, documentoId: documento_id })
+  if (concluiuAgora) {
+    void onLeituraConcluida(svc, { tenantId: sessao.tenantId, estudanteId: sessao.estudanteId, documentoId: documento_id })
+    // Concluir a leitura muda o desempenho no ranking/pop-up → invalida o cache do módulo na hora.
+    void invalidarRankingPorDocumento(svc, sessao.tenantId, documento_id)
+  }
 
   return NextResponse.json({ ok: true, pct: pctNovo, concluido: !!concluidoEm })
 }

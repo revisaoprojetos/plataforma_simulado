@@ -36,6 +36,18 @@ export async function invalidarRankingLeitura(tenantId: string, moduloId: string
 }
 
 /**
+ * Invalida o ranking do MÓDULO de um documento — chamar ao CONCLUIR aula/quiz (muda aulas/sequência/
+ * pontos de quem está no ranking). Resolve a pasta do doc e limpa o cache do módulo + o geral.
+ * Best-effort: nunca lança (não pode quebrar o fluxo do aluno).
+ */
+export async function invalidarRankingPorDocumento(svc: any, tenantId: string, documentoId: string): Promise<void> {
+  try {
+    const { data } = await svc.from('simulado_documentos').select('pasta_id').eq('id', documentoId).eq('tenant_id', tenantId).maybeSingle()
+    await invalidarRankingLeitura(tenantId, (data as { pasta_id?: string | null } | null)?.pasta_id ?? '__geral__')
+  } catch { /* best-effort */ }
+}
+
+/**
  * Ranking de um MÓDULO do LegProc por desempenho no quiz das aulas. Métrica visível = ACERTOS (score
  * puro por acertos enquanto a gamificação estiver desligada); com a gamificação ligada, `score` passa a
  * usar a pontuação do módulo (aula + acerto + combo de gabarito). Cacheado (TTL) — o "você" é destacado
