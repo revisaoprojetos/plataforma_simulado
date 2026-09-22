@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Zap, Medal, ArrowRight, Flame, Trophy, Sparkles } from 'lucide-react'
+import { Zap, Medal, ArrowRight, Flame, Trophy } from 'lucide-react'
 import { tituloParaNivel } from '@/lib/gamificacao/niveis'
 import type { NivelCurva } from '@/lib/gamificacao/config'
 import { cn } from '@/lib/utils'
@@ -83,7 +83,7 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
         <button type="button" onClick={fechar} aria-label="Continuar"
           className="absolute right-3 top-3 z-[210] inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold text-white transition hover:brightness-110 sm:right-4 sm:top-4"
           style={{ background: `linear-gradient(135deg, ${A}, ${mix(78, 'black')})`, boxShadow: `0 10px 30px -8px ${mix(55, 'transparent')}`, animation: mascote ? 'lu-rise .5s ease .15s both, lu-btnpulse 1.8s ease-out 1.2s infinite' : 'lu-rise .5s ease .15s both' }}>
-          <Sparkles className="h-4 w-4" /> Continuar <ArrowRight className="h-4 w-4" />
+          Continuar <ArrowRight className="h-4 w-4" />
         </button>
       )}
 
