@@ -185,7 +185,10 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
               const limiteDia = xr?.limite_dia ?? 0
               return (
                 <div className="rounded-2xl border bg-card p-5 shadow-sm">
-                  <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold"><Zap className="h-4 w-4 text-primary" /> Ganhos & metas</h3>
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="flex items-center gap-1.5 text-sm font-semibold"><Zap className="h-4 w-4 text-primary" /> Ganhos & metas</h3>
+                    {gam && <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-sm font-semibold text-primary"><Zap className="h-3.5 w-3.5" /> +{gam.resumo.xpHoje.toLocaleString('pt-BR')} pontos hoje</span>}
+                  </div>
                   <div className="grid gap-3 md:grid-cols-2">
                     {/* Por atividade (dia) */}
                     <div className="rounded-xl border bg-muted/20 p-3">

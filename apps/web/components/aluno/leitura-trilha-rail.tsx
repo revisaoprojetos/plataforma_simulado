@@ -166,10 +166,15 @@ export function LeituraTrilhaRail({ done, total, gam, desafios = [], desemp, dia
       <Card label="Nível">
         <div className="flex items-center gap-3">
           <IconBox><Zap className="h-5 w-5" /></IconBox>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <p className="text-lg font-bold leading-tight">{fmt(resumo.xpTotal)} XP · Nível {resumo.nivel}</p>
             <p className="text-xs text-muted-foreground">{noTopo ? 'Nível máximo alcançado 🏆' : `faltam ${fmt(resumo.progresso.xpParaProximo)} XP para o nível ${resumo.nivel + 1}`}</p>
           </div>
+          {/* Pontos ganhos HOJE — destaque para o aluno ver o que fez no dia. */}
+          <span className="shrink-0 rounded-lg bg-[color-mix(in_oklab,var(--brand-primary,var(--primary))_14%,transparent)] px-2 py-1 text-center text-[var(--brand-primary,var(--primary))]">
+            <span className="block text-sm font-bold leading-none tabular-nums">+{fmt(resumo.xpHoje)}</span>
+            <span className="block text-[10px] font-medium uppercase tracking-wide">hoje</span>
+          </span>
         </div>
         <div className="mt-3"><Barra pct={noTopo ? 100 : resumo.progresso.pct} /></div>
       </Card>
