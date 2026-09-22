@@ -20,7 +20,7 @@ type Campo = 'posicao' | 'aulas' | 'sequencia' | 'acertos'
  * mostra só as iniciais (sem e-mail/sem link). Ambos: fotos de perfil, ordenação (posição/aulas/acertos)
  * e paginação (10/pág).
  */
-export function LeituraRanking({ ranking, meuId, modo = 'aluno', moduloId }: { ranking: RankingLeitura; meuId?: string | null; modo?: 'admin' | 'aluno'; moduloId?: string }) {
+export function LeituraRanking({ ranking, meuId, meuNome, modo = 'aluno', moduloId }: { ranking: RankingLeitura; meuId?: string | null; meuNome?: string | null; modo?: 'admin' | 'aluno'; moduloId?: string }) {
   const { itens, gamAtivo } = ranking
   const rotulo = gamAtivo ? 'Pontos' : 'Acertos'
   const [campo, setCampo] = useState<Campo>('posicao')
@@ -109,42 +109,49 @@ export function LeituraRanking({ ranking, meuId, modo = 'aluno', moduloId }: { r
         </div>
       )}
 
-      {/* Card "Você" (aluno) — comprido, fixo abaixo do pódio: acompanha o rank em TODAS as páginas. */}
-      {meuId && (() => {
+      {/* Card "Você" (aluno) — comprido, fixo abaixo do pódio: acompanha o rank em TODAS as páginas.
+          Aparece SEMPRE que há aluno logado; se ele ainda não pontuou (fora do ranking), mostra 0/0/0
+          com posição "—" para ele saber que ainda não entrou. */}
+      {modo === 'aluno' && meuId && (() => {
         const meuIt = reaisList.find((i) => i.estudanteId === meuId)
-        if (!meuIt) return null
+        const nome = meuIt?.nome ?? meuNome ?? 'Você'
         return (
           <div className="flex items-center gap-3 rounded-2xl border-2 border-primary/50 bg-primary/5 px-4 py-3 shadow-sm">
-            <span className="flex h-8 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-bold tabular-nums text-primary-foreground">{meuIt.posicao}</span>
-            <AvatarEstudante nome={meuIt.nome} avatar={meuIt.avatar} cor={meuIt.avatarCor ?? '#6d28d9'} className="h-9 w-9 shrink-0 text-[11px] text-white" />
-            <span className="min-w-0 flex-1 truncate font-semibold text-primary">Você</span>
+            <span className="flex h-8 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-bold tabular-nums text-primary-foreground">{meuIt ? meuIt.posicao : '—'}</span>
+            <AvatarEstudante nome={nome} avatar={meuIt?.avatar ?? null} cor={meuIt?.avatarCor ?? '#6d28d9'} className="h-9 w-9 shrink-0 text-[11px] text-white" />
+            <span className="min-w-0 flex-1 truncate">
+              <span className="font-semibold text-primary">Você</span>
+              {!meuIt && <span className="ml-2 text-xs font-normal text-muted-foreground">Faça uma aula para entrar no ranking</span>}
+            </span>
             <div className="flex items-center gap-5 sm:gap-8">
-              <span className="text-center"><span className="block font-bold leading-none tabular-nums">{meuIt.aulasConcluidas}</span><span className="mt-0.5 block text-[10px] text-muted-foreground">aulas</span></span>
-              <span className="text-center"><span className="inline-flex items-center gap-1 font-bold leading-none tabular-nums text-amber-600 dark:text-amber-400"><Flame className="h-3.5 w-3.5" />{meuIt.streakAtual}</span><span className="mt-0.5 block text-[10px] text-muted-foreground">sequência</span></span>
-              <span className="text-center"><span className="block font-bold leading-none tabular-nums text-primary">{meuIt.score}</span><span className="mt-0.5 block text-[10px] text-muted-foreground">{rotulo.toLowerCase()}</span></span>
+              <span className="text-center"><span className="block font-bold leading-none tabular-nums">{meuIt?.aulasConcluidas ?? 0}</span><span className="mt-0.5 block text-[10px] text-muted-foreground">aulas</span></span>
+              <span className="text-center"><span className="inline-flex items-center gap-1 font-bold leading-none tabular-nums text-amber-600 dark:text-amber-400"><Flame className="h-3.5 w-3.5" />{meuIt?.streakAtual ?? 0}</span><span className="mt-0.5 block text-[10px] text-muted-foreground">sequência</span></span>
+              <span className="text-center"><span className="block font-bold leading-none tabular-nums text-primary">{meuIt?.score ?? 0}</span><span className="mt-0.5 block text-[10px] text-muted-foreground">{rotulo.toLowerCase()}</span></span>
             </div>
           </div>
         )
       })()}
 
-      {/* Barra: busca (nome/e-mail) + toggle de contas de teste (admin). */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[12rem] flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder={modo === 'admin' ? 'Buscar por nome ou e-mail…' : 'Buscar aluno…'} className="h-9 pl-9" />
-          {busca && (
-            <button type="button" onClick={() => setBusca('')} aria-label="Limpar busca" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
+      {/* Barra (SÓ admin): busca por nome/e-mail + toggle de contas de teste. O aluno não vê busca. */}
+      {modo === 'admin' && (
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[12rem] flex-1">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome ou e-mail…" className="h-9 pl-9" />
+            {busca && (
+              <button type="button" onClick={() => setBusca('')} aria-label="Limpar busca" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
+            )}
+          </div>
+          {temOcultos && (
+            <button type="button" onClick={() => setMostrarOcultos((v) => !v)}
+              className={cn('inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors', mostrarOcultos ? 'border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'hover:bg-muted')}
+              title={mostrarOcultos ? 'Esconder contas de teste da lista' : 'Mostrar contas de teste na lista'}>
+              {mostrarOcultos ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+              {mostrarOcultos ? 'Ocultar contas de teste' : `Mostrar contas de teste (${qtdOcultos})`}
+            </button>
           )}
         </div>
-        {temOcultos && (
-          <button type="button" onClick={() => setMostrarOcultos((v) => !v)}
-            className={cn('inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors', mostrarOcultos ? 'border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'hover:bg-muted')}
-            title={mostrarOcultos ? 'Esconder contas de teste da lista' : 'Mostrar contas de teste na lista'}>
-            {mostrarOcultos ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-            {mostrarOcultos ? 'Ocultar contas de teste' : `Mostrar contas de teste (${qtdOcultos})`}
-          </button>
-        )}
-      </div>
+      )}
 
       {/* Tabela — 10 por página, TODAS visíveis (sem rolagem interna; a página rola se precisar). */}
       <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">

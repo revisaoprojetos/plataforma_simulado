@@ -21,7 +21,7 @@ import type { RankingLeitura } from '@/lib/leitura/ranking'
 
 /** Visão de um módulo do LegProc Digital: banner colapsável (igual ao admin) com tabs Trilha | Desempenho
  * e busca, + aviso de questões pendentes. */
-export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulasPendentes, ranking, meuId, formato = DEFAULT_TRILHA_FORMATO, simbolos = DEFAULT_TRILHA_SIMBOLOS, livre, inverter = false, degrade, degradeTrilha, descricao, regulamento, pontuacao, desafios, desempenhoDesafios, gam = null, diasLeitura = [] }: {
+export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulasPendentes, ranking, meuId, meuNome, formato = DEFAULT_TRILHA_FORMATO, simbolos = DEFAULT_TRILHA_SIMBOLOS, livre, inverter = false, degrade, degradeTrilha, descricao, regulamento, pontuacao, desafios, desempenhoDesafios, gam = null, diasLeitura = [] }: {
   modulo: string
   trilha: Trilha
   desempenho: AulaDesempenho[]
@@ -29,6 +29,7 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
   aulasPendentes: number
   ranking: RankingLeitura
   meuId?: string | null
+  meuNome?: string | null
   formato?: TrilhaFormato
   simbolos?: TrilhaSimbolos
   livre?: TrilhaLivreConfig
@@ -231,7 +232,7 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
         <DesempenhoModulo desempenho={desempenho} />
       </TabsContent>
       <TabsContent value="ranking" className="pt-4">
-        <LeituraRanking ranking={ranking} meuId={meuId} />
+        <LeituraRanking ranking={ranking} meuId={meuId} meuNome={meuNome} />
       </TabsContent>
     </Tabs>
   )

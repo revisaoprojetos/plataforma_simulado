@@ -45,7 +45,7 @@ export default async function LeituraAlunoPage({ searchParams }: { searchParams:
       // sem o "flash preto" enquanto carrega.
       const bgTrilha = mod.trilhaAparencia.livre.fundo?.url ?? mod.trilha.capa ?? mod.trilha.capaCard ?? null
       if (bgTrilha) ReactDOM.preload(bgTrilha, { as: 'image', fetchPriority: 'high' })
-      return <LeituraModuloView modulo={modulo} trilha={mod.trilha} desempenho={mod.desempenho} pendentes={mod.pendentes} aulasPendentes={mod.aulasPendentes} ranking={ranking} meuId={sessao.estudanteId} formato={mod.trilhaAparencia.formato} simbolos={mod.trilhaAparencia.simbolos} livre={mod.trilhaAparencia.livre} inverter={mod.trilhaAparencia.inverter} degrade={mod.trilhaAparencia.degrade} degradeTrilha={mod.trilhaAparencia.degradeTrilha} descricao={mod.trilhaAparencia.descricao} regulamento={mod.regulamento} pontuacao={mod.pontuacao} desafios={mod.desafios} desempenhoDesafios={mod.desempenhoDesafios} gam={gam} diasLeitura={diasLeitura} />
+      return <LeituraModuloView modulo={modulo} trilha={mod.trilha} desempenho={mod.desempenho} pendentes={mod.pendentes} aulasPendentes={mod.aulasPendentes} ranking={ranking} meuId={sessao.estudanteId} meuNome={sessao.nome} formato={mod.trilhaAparencia.formato} simbolos={mod.trilhaAparencia.simbolos} livre={mod.trilhaAparencia.livre} inverter={mod.trilhaAparencia.inverter} degrade={mod.trilhaAparencia.degrade} degradeTrilha={mod.trilhaAparencia.degradeTrilha} descricao={mod.trilhaAparencia.descricao} regulamento={mod.regulamento} pontuacao={mod.pontuacao} desafios={mod.desafios} desempenhoDesafios={mod.desempenhoDesafios} gam={gam} diasLeitura={diasLeitura} />
     }
     // módulo inexistente/sem acesso → cai na lista
   }
