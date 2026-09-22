@@ -37,8 +37,8 @@ export async function carregarRankingModulo(moduloId: string, tenantId: string):
       try { const { data } = await svc.from('simulado_pastas').select('pontuacao').eq('id', moduloId).eq('tenant_id', tenantId).maybeSingle(); pontuacaoRaw = (data as { pontuacao?: unknown } | null)?.pontuacao ?? null } catch { /* coluna ausente */ }
     }
     const pontuacao = normalizarPontuacaoLeitura(pontuacaoRaw)
-    let gamAtivo = false
-    try { const cfg = await getGamConfig(svc, tenantId); gamAtivo = !!cfg?.ativo } catch { /* gamificação ausente */ }
+    let gamAtivo = false; let tz = 'America/Sao_Paulo'
+    try { const cfg = await getGamConfig(svc, tenantId); gamAtivo = !!cfg?.ativo; tz = cfg?.timezone || tz } catch { /* gamificação ausente */ }
 
     // Aulas do módulo.
     let dq = svc.from('simulado_documentos').select('id').eq('tenant_id', tenantId).eq('deletado', false).eq('publicado', true)
@@ -50,48 +50,60 @@ export async function carregarRankingModulo(moduloId: string, tenantId: string):
     const [quiz, resp] = await Promise.all([
       fetchAllByIn<{ documento_id: string; questao_id: string }>(aulaIds, (chunk) =>
         svc.from('simulado_documento_quiz_questoes').select('documento_id, questao_id').eq('tenant_id', tenantId).eq('deletado', false).in('documento_id', chunk).order('documento_id')).catch(() => [] as { documento_id: string; questao_id: string }[]),
-      fetchAllByIn<{ estudante_id: string; documento_id: string; questao_id: string; correta: boolean }>(aulaIds, (chunk) =>
-        svc.from('simulado_leitura_respostas').select('estudante_id, documento_id, questao_id, correta').eq('tenant_id', tenantId).in('documento_id', chunk).order('documento_id')),
+      fetchAllByIn<{ estudante_id: string; documento_id: string; questao_id: string; correta: boolean; respondido_em: string | null }>(aulaIds, (chunk) =>
+        svc.from('simulado_leitura_respostas').select('estudante_id, documento_id, questao_id, correta, respondido_em').eq('tenant_id', tenantId).in('documento_id', chunk).order('documento_id')),
     ])
     const quizPorDoc = new Map<string, Set<string>>()
     for (const q of quiz) (quizPorDoc.get(q.documento_id) ?? quizPorDoc.set(q.documento_id, new Set()).get(q.documento_id)!).add(q.questao_id)
     if (!resp.length) return { itens: [], gamAtivo, pontuacao }
 
-    // Agrega por (aluno, documento) — só questões que pertencem ao quiz do módulo.
-    type Cell = { answered: Set<string>; correct: Set<string> }
+    // Agrega por (aluno, documento) — só questões do quiz do módulo. `ultima` = quando fechou o quiz.
+    type Cell = { answered: Set<string>; correct: Set<string>; ultima: string | null }
     const porAluno = new Map<string, Map<string, Cell>>()
     for (const r of resp) {
       const q = quizPorDoc.get(r.documento_id)
       if (!q || !q.has(r.questao_id)) continue
       const dmap = porAluno.get(r.estudante_id) ?? porAluno.set(r.estudante_id, new Map()).get(r.estudante_id)!
-      const cell = dmap.get(r.documento_id) ?? dmap.set(r.documento_id, { answered: new Set(), correct: new Set() }).get(r.documento_id)!
+      const cell = dmap.get(r.documento_id) ?? dmap.set(r.documento_id, { answered: new Set(), correct: new Set(), ultima: null }).get(r.documento_id)!
       cell.answered.add(r.questao_id); if (r.correta) cell.correct.add(r.questao_id)
+      if (r.respondido_em && (!cell.ultima || r.respondido_em > cell.ultima)) cell.ultima = r.respondido_em
     }
 
+    // Sequência = dias CONSECUTIVOS em que o aluno completou uma AULA COMPLETA (leitura + quiz respondido).
+    // Regra: +1 por DIA (várias aulas no mesmo dia = 1); reinicia ao pular um dia; ZERA se passou um dia
+    // inteiro sem aula (a última aula tem de ser hoje ou ontem, senão a sequência foi perdida).
+    const diaDe = (iso: string) => new Date(iso).toLocaleDateString('en-CA', { timeZone: tz })
+    const hoje = new Date().toLocaleDateString('en-CA', { timeZone: tz })
+    const ontem = new Date(Date.parse(hoje + 'T00:00:00Z') - 86_400_000).toISOString().slice(0, 10)
     const brutos = [...porAluno.entries()].map(([id, dmap]) => {
       let acertos = 0, aulasConcluidas = 0, aulasGabaritadas = 0
+      const diasConcluidos = new Set<string>()
       for (const [docId, cell] of dmap) {
         const qs = quizPorDoc.get(docId)!
         acertos += cell.correct.size
         const feita = qs.size > 0 && [...qs].every((qid) => cell.answered.has(qid))
-        if (feita) { aulasConcluidas++; if ([...qs].every((qid) => cell.correct.has(qid))) aulasGabaritadas++ }
+        if (feita) {
+          aulasConcluidas++
+          if ([...qs].every((qid) => cell.correct.has(qid))) aulasGabaritadas++
+          if (cell.ultima) diasConcluidos.add(diaDe(cell.ultima))
+        }
       }
-      return { estudanteId: id, acertos, aulasConcluidas, aulasGabaritadas, score: pontuarLegProc(pontuacao, { acertos, aulasConcluidas, aulasGabaritadas }, gamAtivo) }
+      const dias = [...diasConcluidos].sort()
+      let run = 0, prev = ''
+      for (const d of dias) { run = prev && Date.parse(d + 'T00:00:00Z') - Date.parse(prev + 'T00:00:00Z') === 86_400_000 ? run + 1 : 1; prev = d }
+      const ultimo = dias[dias.length - 1] ?? ''
+      const streakAtual = ultimo === hoje || ultimo === ontem ? run : 0 // perdeu a sequência se ficou um dia sem aula
+      return { estudanteId: id, acertos, aulasConcluidas, aulasGabaritadas, streakAtual, score: pontuarLegProc(pontuacao, { acertos, aulasConcluidas, aulasGabaritadas }, gamAtivo) }
     }).filter((x) => x.acertos > 0 || x.aulasConcluidas > 0)
     if (!brutos.length) return { itens: [], gamAtivo, pontuacao }
 
-    // Nome + e-mail + foto/cor do avatar + sequência (streak atual) do aluno.
-    const [ests, streaks] = await Promise.all([
-      fetchAllByIn<{ id: string; nome: string; email: string | null; avatar: string | null; perfil_avatar_cor: string | null }>(brutos.map((b) => b.estudanteId), (chunk) =>
-        svc.from('simulado_estudantes').select('id, nome, email, avatar, perfil_avatar_cor').in('id', chunk)),
-      fetchAllByIn<{ estudante_id: string; streak_atual: number }>(brutos.map((b) => b.estudanteId), (chunk) =>
-        svc.from('simulado_gamificacao_estudante').select('estudante_id, streak_atual').eq('tenant_id', tenantId).in('estudante_id', chunk)).catch(() => [] as { estudante_id: string; streak_atual: number }[]),
-    ])
+    // Nome + e-mail + foto/cor do avatar.
+    const ests = await fetchAllByIn<{ id: string; nome: string; email: string | null; avatar: string | null; perfil_avatar_cor: string | null }>(brutos.map((b) => b.estudanteId), (chunk) =>
+      svc.from('simulado_estudantes').select('id, nome, email, avatar, perfil_avatar_cor').in('id', chunk))
     const estDe = new Map(ests.map((e) => [e.id, e]))
-    const streakDe = new Map(streaks.map((s) => [s.estudante_id, s.streak_atual ?? 0]))
 
     const itens: RankingLeituraItem[] = brutos
-      .map((b) => { const e = estDe.get(b.estudanteId); return { ...b, nome: e?.nome ?? 'Aluno', email: e?.email ?? null, avatar: e?.avatar ?? null, avatarCor: e?.perfil_avatar_cor ?? null, streakAtual: streakDe.get(b.estudanteId) ?? 0 } })
+      .map((b) => { const e = estDe.get(b.estudanteId); return { ...b, nome: e?.nome ?? 'Aluno', email: e?.email ?? null, avatar: e?.avatar ?? null, avatarCor: e?.perfil_avatar_cor ?? null } })
       .sort((a, b) => b.score - a.score || b.aulasConcluidas - a.aulasConcluidas || a.nome.localeCompare(b.nome, 'pt-BR'))
       .map((b, i) => ({ ...b, posicao: i + 1 }))
     return { itens, gamAtivo, pontuacao }
