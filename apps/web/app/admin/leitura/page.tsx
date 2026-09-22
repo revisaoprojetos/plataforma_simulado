@@ -8,6 +8,8 @@ import { PublicarModuloBotao } from '@/components/admin/publicar-modulo-botao'
 import { CopiarLinkModuloBotao } from '@/components/admin/copiar-link-modulo-botao'
 import { LeituraRanking } from '@/components/aluno/leitura-ranking'
 import { carregarRankingModulo } from '@/lib/leitura/ranking'
+import { LeituraRelatorio } from '@/components/admin/leitura-relatorio'
+import { carregarRelatorioModulo } from '@/lib/leitura/relatorio'
 import { getCurrentTenant, getCurrentTenantId } from '@/lib/tenant'
 import { resolverCardView } from '@/lib/card-view'
 import { cn } from '@/lib/utils'
@@ -16,7 +18,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function LeituraAdminPage({ searchParams }: { searchParams: Promise<{ pasta?: string; tab?: string }> }) {
   const { pasta, tab } = await searchParams
-  const moduloTab: ModuloTab = tab === 'acessos' || tab === 'config' || tab === 'ranking' || tab === 'trilha' || tab === 'regulamento' ? tab : 'aulas'
+  const moduloTab: ModuloTab = tab === 'acessos' || tab === 'config' || tab === 'ranking' || tab === 'relatorio' || tab === 'trilha' || tab === 'regulamento' ? tab : 'aulas'
   // Otimização: só as abas Aulas/Editar trilha (ou a raiz) precisam dos detalhes das aulas — Acessos/Config pulam esse fetch.
   const data = await listarBancoAulas(pasta ?? null, !pasta || moduloTab === 'aulas' || moduloTab === 'trilha')
   const temaCards = ((await getCurrentTenant())?.tema as any) ?? {}
@@ -82,6 +84,10 @@ export default async function LeituraAdminPage({ searchParams }: { searchParams:
           {/* Ranking do módulo (por acertos no quiz; pontos quando a gamificação estiver ativa). */}
           {moduloTab === 'ranking' && pasta && (
             <LeituraRanking ranking={await carregarRankingModulo(pasta, (await getCurrentTenantId()) ?? '')} modo="admin" moduloId={pasta} />
+          )}
+          {/* Relatório completo do módulo (adesão, sequências, pontuação, tempos + export Excel). */}
+          {moduloTab === 'relatorio' && pasta && (
+            <LeituraRelatorio rel={await carregarRelatorioModulo(pasta, (await getCurrentTenantId()) ?? '')} moduloId={pasta} />
           )}
         </>
       )}
