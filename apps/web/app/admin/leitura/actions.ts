@@ -18,6 +18,7 @@ import { resolverEspacamento, type EspacamentoDoc } from '@/lib/leitura/espacame
 import { resolverTrilhaAparencia, resolverGrifoCores, type TrilhaAparencia, type TrilhaFundoConfig, type TrilhaDegrade, type GrifoCores } from '@/lib/leitura/trilha-aparencia'
 import { resolverBlocos, type BlocoDef } from '@/lib/leitura/blocos'
 import { esquecer } from '@/lib/cache/relatorio-cache'
+import { invalidarRankingLeitura } from '@/lib/leitura/ranking'
 import { classificarFormato } from '@/lib/simulado/formato'
 import { confirmarImportQuestoes } from '@/app/admin/banco-questoes/actions'
 import type { QuestaoImport } from '@/app/admin/banco-questoes/import-types'
@@ -699,6 +700,7 @@ export async function salvarPontuacaoModulo(id: string, cfg: PontuacaoLeitura): 
   const svc = createAdminClient()
   const { error } = await svc.from('simulado_pastas').update({ pontuacao: normalizarPontuacaoLeitura(cfg) }).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
   if (error) return { ok: false, error: /pontuacao|column|schema cache/i.test(error.message) ? 'Migração da pontuação pendente (pontuacao).' : error.message }
+  await invalidarRankingLeitura(g.tenantId, id) // pontuação mudou → recalcula o ranking na hora
   revalidatePath('/admin/leitura'); return { ok: true }
 }
 
@@ -1234,5 +1236,6 @@ export async function salvarRankingOcultos(pastaId: string, cfg: RankingOcultosC
   const val = { estudantes: [...new Set((cfg.estudantes ?? []).filter(Boolean))], grupos: [...new Set((cfg.grupos ?? []).filter(Boolean))], total: cfg.total === true }
   const { error } = await svc.from('simulado_pastas').update({ ranking_ocultos: val }).eq('id', pastaId).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
   if (error) return { ok: false, error: /ranking_ocultos|column|schema cache/i.test(error.message) ? 'Migração pendente (coluna ranking_ocultos jsonb em simulado_pastas).' : error.message }
+  await invalidarRankingLeitura(g.tenantId, pastaId) // reflete na hora (sem esperar o TTL do cache)
   revalidatePath('/admin/leitura'); return { ok: true }
 }

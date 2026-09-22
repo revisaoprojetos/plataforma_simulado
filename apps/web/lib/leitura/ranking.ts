@@ -1,7 +1,7 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
-import { remember } from '@/lib/cache/relatorio-cache'
+import { remember, esquecer } from '@/lib/cache/relatorio-cache'
 import { getGamConfig } from '@/lib/gamificacao'
 import { normalizarPontuacaoLeitura, pontuarLegProc, type PontuacaoLeitura } from '@/lib/leitura/pontuacao'
 
@@ -22,6 +22,19 @@ export interface RankingLeituraItem {
 }
 export interface RankingLeitura { itens: RankingLeituraItem[]; gamAtivo: boolean; pontuacao: PontuacaoLeitura }
 
+/** Chave de cache do ranking de um módulo (mesma usada no `remember`). */
+export const chaveRankingLeitura = (tenantId: string, moduloId: string) => `leitura:ranking:${tenantId}:${moduloId}`
+
+/**
+ * Invalida o cache do ranking de um módulo — chamar em toda mutação que muda quem aparece/posição
+ * (ocultar/desocultar contas de teste, mudar pontuação). Sem isto, o ranking fica preso no valor
+ * cacheado por até o TTL. Também limpa o ranking "geral" (agrega todos os módulos).
+ */
+export async function invalidarRankingLeitura(tenantId: string, moduloId: string): Promise<void> {
+  await esquecer(chaveRankingLeitura(tenantId, moduloId))
+  await esquecer(chaveRankingLeitura(tenantId, '__geral__'))
+}
+
 /**
  * Ranking de um MÓDULO do LegProc por desempenho no quiz das aulas. Métrica visível = ACERTOS (score
  * puro por acertos enquanto a gamificação estiver desligada); com a gamificação ligada, `score` passa a
@@ -29,7 +42,7 @@ export interface RankingLeitura { itens: RankingLeituraItem[]; gamAtivo: boolean
  * no cliente comparando o id da sessão. Segue o padrão de egress do LegProc (fetchAllByIn, nunca fetchAll).
  */
 export async function carregarRankingModulo(moduloId: string, tenantId: string): Promise<RankingLeitura> {
-  return remember<RankingLeitura>(`leitura:ranking:${tenantId}:${moduloId}`, 300, async () => {
+  return remember<RankingLeitura>(chaveRankingLeitura(tenantId, moduloId), 300, async () => {
     const svc = createAdminClient()
     const geral = moduloId === '__geral__'
 
