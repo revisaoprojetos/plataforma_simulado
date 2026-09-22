@@ -39,6 +39,11 @@ FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1
 
+# SHA do commit desta imagem (injetado pelo CI via --build-arg GIT_SHA). Exposto em /api/health
+# para VERIFICAR qual código está no ar após o deploy (curl .../api/health → { sha }).
+ARG GIT_SHA=""
+ENV BUILD_SHA=$GIT_SHA
+
 # Chromium para gerar o PDF dos cadernos/relatórios (puppeteer-core). Sem ele, o download
 # de PDF falha e a UI cairia no "imprimir". Fontes p/ acentuação/emoji corretos no PDF.
 RUN apk add --no-cache chromium nss freetype harfbuzz ca-certificates ttf-freefont font-noto
