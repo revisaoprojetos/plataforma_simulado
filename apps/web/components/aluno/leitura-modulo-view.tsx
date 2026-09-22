@@ -108,11 +108,14 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
           // por cima no canto (desktop) para não roubar largura da imagem.
           <div className="relative -mx-4 -mb-24 -mt-4 min-w-0 overflow-visible bg-neutral-950 md:-mx-6 md:-mb-6 md:-mt-6">
             <TrilhaSistema trilhas={[trilha]} gamAtivo={false} formato={formato} simbolos={simbolos} livre={livre} inverter={inverter} capa={trilha.capa ?? trilha.capaCard ?? null} semFundo semDivisoria ajudante semMoldura degradeTopo={degradeTrilha ?? degrade} />
+            {/* pointer-events-none no CONTÊINER do rail: a coluna (altura inteira da trilha) NÃO pode capturar
+                cliques, senão engole os nós da trilha que ficam sob ela (sobretudo em iframe estreito, ex.:
+                Curseduca). Só o card visível reativa o clique (pointer-events-auto abaixo). */}
             {gam && (
-              <aside className="pointer-events-auto absolute inset-y-0 right-2 z-20 hidden w-[300px] lg:block">
+              <aside className="pointer-events-none absolute inset-y-0 right-2 z-20 hidden w-[300px] lg:block">
                 {/* Sticky ANCORADO na base ATUAL do banner (--lp-banner-bottom, atualizado no scroll) → mantém a
                     MESMA distância relativa quer o banner esteja expandido quer recolhido. */}
-                <div className="sticky overflow-auto pb-4" style={{ top: 'calc(var(--lp-banner-bottom, 6rem) + 0.75rem)', maxHeight: 'calc(100vh - var(--lp-banner-bottom, 6rem) - 3rem)' }}>
+                <div className="pointer-events-auto sticky overflow-auto pb-4" style={{ top: 'calc(var(--lp-banner-bottom, 6rem) + 0.75rem)', maxHeight: 'calc(100vh - var(--lp-banner-bottom, 6rem) - 3rem)' }}>
                   <LeituraTrilhaRail done={trilha.done} total={trilha.total} gam={gam} desafios={desafiosAtivos} desemp={desemp} dias={diasLeitura} />
                 </div>
               </aside>
