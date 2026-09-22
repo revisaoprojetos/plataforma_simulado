@@ -1201,3 +1201,33 @@ export async function salvarEspacamentoDocumento(documentoId: string, patch: { b
   revalidatePath(`/admin/leitura/${documentoId}`)
   return { ok: true }
 }
+
+// ─────────── Ocultar do ranking (contas de teste) ───────────
+export interface RankingOcultosCfg { estudantes: string[]; grupos: string[]; total: boolean }
+
+/** Lê a config de "ocultos do ranking" do módulo (com nomes p/ exibir). Tolerante à coluna ausente. */
+export async function carregarRankingOcultos(pastaId: string): Promise<{ ok: boolean; estudantes?: EstudanteAcessoLinha[]; grupos?: { id: string; nome: string; cor: string | null }[]; total?: boolean; error?: string }> {
+  const g = await guard('leitura:view'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  let raw: any = {}
+  try { const { data } = await svc.from('simulado_pastas').select('ranking_ocultos').eq('id', pastaId).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA).maybeSingle(); raw = (data as any)?.ranking_ocultos ?? {} } catch { raw = {} }
+  const estIds = Array.isArray(raw.estudantes) ? raw.estudantes.filter((x: unknown) => typeof x === 'string') : []
+  const grpIds = Array.isArray(raw.grupos) ? raw.grupos.filter((x: unknown) => typeof x === 'string') : []
+  const total = raw.total === true
+  const estudantes = estIds.length
+    ? await fetchAllByIn<EstudanteAcessoLinha>(estIds, (chunk) => svc.from('simulado_estudantes').select('id, nome, email, cpf, classificacao, avatar, perfil_avatar_cor').in('id', chunk).eq('tenant_id', g.tenantId))
+    : []
+  let grupos: { id: string; nome: string; cor: string | null }[] = []
+  if (grpIds.length) { const { data } = await svc.from('simulado_grupos').select('id, nome, cor').in('id', grpIds).eq('tenant_id', g.tenantId); grupos = (data ?? []) as any }
+  return { ok: true, estudantes, grupos, total }
+}
+
+/** Salva os ocultos do ranking (estudantes + grupos + "ocultar totalmente"). Tolerante à coluna ausente. */
+export async function salvarRankingOcultos(pastaId: string, cfg: RankingOcultosCfg): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const val = { estudantes: [...new Set((cfg.estudantes ?? []).filter(Boolean))], grupos: [...new Set((cfg.grupos ?? []).filter(Boolean))], total: cfg.total === true }
+  const { error } = await svc.from('simulado_pastas').update({ ranking_ocultos: val }).eq('id', pastaId).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  if (error) return { ok: false, error: /ranking_ocultos|column|schema cache/i.test(error.message) ? 'Migração pendente (coluna ranking_ocultos jsonb em simulado_pastas).' : error.message }
+  revalidatePath('/admin/leitura'); return { ok: true }
+}

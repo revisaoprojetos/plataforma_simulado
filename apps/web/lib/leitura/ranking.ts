@@ -17,6 +17,8 @@ export interface RankingLeituraItem {
   score: number
   streakAtual: number
   posicao: number
+  /** Conta de teste marcada em Acessos → não compete por posição (badge "não contabilizado" no admin). */
+  oculto: boolean
 }
 export interface RankingLeitura { itens: RankingLeituraItem[]; gamAtivo: boolean; pontuacao: PontuacaoLeitura }
 
@@ -97,15 +99,29 @@ export async function carregarRankingModulo(moduloId: string, tenantId: string):
     }).filter((x) => x.acertos > 0 || x.aulasConcluidas > 0)
     if (!brutos.length) return { itens: [], gamAtivo, pontuacao }
 
+    // Contas de teste ocultas do ranking (marcadas em Acessos): não competem por posição.
+    const ocultosSet = new Set<string>(); let ocultarTotal = false
+    if (!geral) {
+      try {
+        const { data: ro } = await svc.from('simulado_pastas').select('ranking_ocultos').eq('id', moduloId).eq('tenant_id', tenantId).maybeSingle()
+        const cfg = (ro as any)?.ranking_ocultos ?? {}
+        ocultarTotal = cfg.total === true
+        for (const id of (Array.isArray(cfg.estudantes) ? cfg.estudantes : [])) ocultosSet.add(id)
+        const grps = Array.isArray(cfg.grupos) ? cfg.grupos : []
+        if (grps.length) { const mem = await fetchAllByIn<{ estudante_id: string }>(grps, (chunk) => svc.from('simulado_grupo_membros').select('estudante_id').in('grupo_id', chunk)); for (const m of mem) ocultosSet.add(m.estudante_id) }
+      } catch { /* coluna ranking_ocultos ausente */ }
+    }
+
     // Nome + e-mail + foto/cor do avatar.
     const ests = await fetchAllByIn<{ id: string; nome: string; email: string | null; avatar: string | null; perfil_avatar_cor: string | null }>(brutos.map((b) => b.estudanteId), (chunk) =>
       svc.from('simulado_estudantes').select('id, nome, email, avatar, perfil_avatar_cor').in('id', chunk))
     const estDe = new Map(ests.map((e) => [e.id, e]))
-
-    const itens: RankingLeituraItem[] = brutos
-      .map((b) => { const e = estDe.get(b.estudanteId); return { ...b, nome: e?.nome ?? 'Aluno', email: e?.email ?? null, avatar: e?.avatar ?? null, avatarCor: e?.perfil_avatar_cor ?? null } })
-      .sort((a, b) => b.score - a.score || b.aulasConcluidas - a.aulasConcluidas || a.nome.localeCompare(b.nome, 'pt-BR'))
-      .map((b, i) => ({ ...b, posicao: i + 1 }))
+    const comNome = brutos.map((b) => { const e = estDe.get(b.estudanteId); return { ...b, nome: e?.nome ?? 'Aluno', email: e?.email ?? null, avatar: e?.avatar ?? null, avatarCor: e?.perfil_avatar_cor ?? null } })
+    const ordena = (arr: typeof comNome) => [...arr].sort((a, b) => b.score - a.score || b.aulasConcluidas - a.aulasConcluidas || a.nome.localeCompare(b.nome, 'pt-BR'))
+    // Reais competem por posição (1..N); ocultos vêm depois marcados (ou somem se "ocultar totalmente").
+    const reais = ordena(comNome.filter((b) => !ocultosSet.has(b.estudanteId))).map((b, i) => ({ ...b, posicao: i + 1, oculto: false }))
+    const ocultos = ocultarTotal ? [] : ordena(comNome.filter((b) => ocultosSet.has(b.estudanteId))).map((b) => ({ ...b, posicao: 0, oculto: true }))
+    const itens: RankingLeituraItem[] = [...reais, ...ocultos]
     return { itens, gamAtivo, pontuacao }
   })
 }

@@ -29,14 +29,18 @@ export function LeituraRanking({ ranking, meuId, modo = 'aluno', moduloId }: { r
   // Só o admin (com o módulo resolvido) abre o pop-up de detalhe do aluno.
   const expandir = modo === 'admin' && moduloId ? setDetalhe : undefined
 
+  // Aluno NÃO vê contas de teste (ocultas); admin vê, marcadas. Ocultos nunca no pódio nem no "você".
+  const reaisList = useMemo(() => itens.filter((i) => !i.oculto), [itens])
   const ordenados = useMemo(() => {
-    const arr = [...itens]
+    const arr = (modo === 'aluno' ? reaisList : [...itens]).slice()
     arr.sort((a, b) => {
+      // Ocultos (posição 0) sempre no fim quando ordena por posição.
+      if (campo === 'posicao' && a.oculto !== b.oculto) return a.oculto ? 1 : -1
       const c = campo === 'posicao' ? a.posicao - b.posicao : campo === 'aulas' ? a.aulasConcluidas - b.aulasConcluidas : campo === 'sequencia' ? a.streakAtual - b.streakAtual : a.score - b.score
       return dir === 'asc' ? c : -c
     })
     return arr
-  }, [itens, campo, dir])
+  }, [itens, reaisList, modo, campo, dir])
 
   function ordenar(c: Campo) {
     if (campo === c) setDir((d) => (d === 'asc' ? 'desc' : 'asc'))
@@ -53,7 +57,7 @@ export function LeituraRanking({ ranking, meuId, modo = 'aluno', moduloId }: { r
     )
   }
 
-  const top3 = itens.slice(0, 3)
+  const top3 = reaisList.slice(0, 3)
   const ordemPodio = [top3[1], top3[0], top3[2]].filter(Boolean) // 2º · 1º · 3º
   const medalha = ['#facc15', '#cbd5e1', '#f59e0b']
 
@@ -92,7 +96,7 @@ export function LeituraRanking({ ranking, meuId, modo = 'aluno', moduloId }: { r
 
       {/* Card "Você" (aluno) — comprido, fixo abaixo do pódio: acompanha o rank em TODAS as páginas. */}
       {meuId && (() => {
-        const meuIt = itens.find((i) => i.estudanteId === meuId)
+        const meuIt = reaisList.find((i) => i.estudanteId === meuId)
         if (!meuIt) return null
         return (
           <div className="flex items-center gap-3 rounded-2xl border-2 border-primary/50 bg-primary/5 px-4 py-3 shadow-sm">
@@ -244,9 +248,14 @@ function LinhaRanking({ it, eu, modo, onExpand }: { it: RankingLeituraItem; eu: 
     </div>
   )
   return (
-    <tr className={cn('border-b last:border-0', eu ? 'bg-primary/5' : 'hover:bg-muted/30')}>
-      <td className="px-3 py-2.5 text-center font-bold tabular-nums text-muted-foreground">{it.posicao}</td>
-      <td className="px-3 py-2.5">{identidade}</td>
+    <tr className={cn('border-b last:border-0', it.oculto ? 'bg-muted/20 opacity-70' : eu ? 'bg-primary/5' : 'hover:bg-muted/30')}>
+      <td className="px-3 py-2.5 text-center font-bold tabular-nums text-muted-foreground">{it.oculto ? '—' : it.posicao}</td>
+      <td className="px-3 py-2.5">
+        <div className="flex items-center gap-2">
+          {identidade}
+          {it.oculto && <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400" title="Conta de teste — não conta no ranking">não contabilizado</span>}
+        </div>
+      </td>
       <td className="px-3 py-2.5 text-center tabular-nums text-muted-foreground">{it.aulasConcluidas}</td>
       <td className="px-3 py-2.5 text-center tabular-nums">
         <span className={cn('inline-flex items-center gap-1', it.streakAtual > 0 ? 'font-semibold text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}>

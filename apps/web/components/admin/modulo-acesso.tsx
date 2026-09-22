@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Search, UserCheck, Info, Check, Trash2, Globe, Lock, Link2, Users2, X } from 'lucide-react'
+import { Loader2, Search, UserCheck, Info, Check, Trash2, Globe, Lock, Link2, Users2, X, EyeOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CopyLink } from '@/components/admin/copy-link'
 import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
@@ -11,6 +11,7 @@ import { AdicionarGrupoModuloDialog } from '@/components/admin/adicionar-grupo-m
 import {
   carregarAtribuicaoPasta, definirGruposPasta, contarMembrosGrupos,
   carregarEstudantesPasta, definirEstudantesPasta,
+  carregarRankingOcultos, salvarRankingOcultos,
   type EstudanteAcessoLinha,
 } from '@/app/admin/leitura/actions'
 
@@ -41,6 +42,17 @@ export function ModuloAcesso({ pastaId }: { pastaId: string }) {
   useEffect(() => { setOrigem(process.env.NEXT_PUBLIC_APP_URL || window.location.origin) }, [])
   const linkTrilha = origem ? `${origem}/aluno/leitura?modulo=${pastaId}` : ''
 
+  // Ocultos do ranking (contas de teste): não contam pontos e não aparecem para o aluno.
+  const [ocEst, setOcEst] = useState<EstudanteAcessoLinha[]>([])
+  const [ocGrp, setOcGrp] = useState<{ id: string; nome: string; cor: string | null }[]>([])
+  const [ocTotal, setOcTotal] = useState(false)
+  const ocEstRef = useRef<EstudanteAcessoLinha[]>([]); ocEstRef.current = ocEst
+  const ocGrpRef = useRef<{ id: string; nome: string; cor: string | null }[]>([]); ocGrpRef.current = ocGrp
+  async function salvarOcultos(est: EstudanteAcessoLinha[], grp: { id: string; nome: string; cor: string | null }[], total: boolean) {
+    const r = await salvarRankingOcultos(pastaId, { estudantes: est.map((e) => e.id), grupos: grp.map((g) => g.id), total })
+    if (!r.ok) toast.error(r.error ?? 'Erro ao salvar.')
+  }
+
   useEffect(() => {
     ;(async () => {
       const [a, e] = await Promise.all([carregarAtribuicaoPasta(pastaId), carregarEstudantesPasta(pastaId)])
@@ -51,6 +63,8 @@ export function ModuloAcesso({ pastaId }: { pastaId: string }) {
       setVinc(vincList.map((g) => ({ ...g, count: cont.contagem?.[g.id] ?? 0 })))
       if (e.ok && e.itens) setAlunos(e.itens)
       setLiberarTodos(!(vincList.length || (e.ok && (e.itens?.length ?? 0) > 0)))
+      const oc = await carregarRankingOcultos(pastaId)
+      if (oc.ok) { setOcEst(oc.estudantes ?? []); setOcGrp(oc.grupos ?? []); setOcTotal(oc.total ?? false) }
       setCarregando(false)
     })()
   }, [pastaId])
@@ -220,6 +234,53 @@ export function ModuloAcesso({ pastaId }: { pastaId: string }) {
                 <button type="button" onClick={() => setPagina((p) => Math.max(0, p - 1))} disabled={pagina === 0} className="rounded-md border px-2 py-1 font-medium transition-colors hover:bg-muted disabled:opacity-40">Anterior</button>
                 <span className="px-1 tabular-nums">Pág. {pagina + 1}/{totalPag}</span>
                 <button type="button" onClick={() => setPagina((p) => Math.min(totalPag - 1, p + 1))} disabled={pagina >= totalPag - 1} className="rounded-md border px-2 py-1 font-medium transition-colors hover:bg-muted disabled:opacity-40">Próxima</button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* OCULTAR DO RANKING (contas de teste) — sempre ativo (independe de "liberar para todos"). */}
+      <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+        <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3">
+          <p className="flex items-center gap-1.5 text-sm font-semibold"><EyeOff className="h-4 w-4 text-amber-500" /> Ocultar do ranking (contas de teste)</p>
+        </div>
+        <div className="space-y-3 p-4">
+          <p className="text-xs text-muted-foreground">Alunos/grupos marcados aqui <strong>não contam pontos nem posição</strong> no ranking e <strong>não aparecem para os alunos</strong>. No admin aparecem com a etiqueta “não contabilizado”. Use para as contas de teste dos simulados/desafios.</p>
+          <label className="flex cursor-pointer items-center gap-2 text-sm">
+            <input type="checkbox" checked={ocTotal} onChange={(e) => { setOcTotal(e.target.checked); void salvarOcultos(ocEstRef.current, ocGrpRef.current, e.target.checked) }} className="h-4 w-4 accent-[var(--primary)]" />
+            Ocultar <strong>totalmente</strong> da tabela (nem o admin vê)
+          </label>
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">Grupos</span>
+              <AdicionarGrupoModuloDialog grupos={todosGrupos} jaMarcados={new Set(ocGrp.map((g) => g.id))} onSelecionar={(ids) => { const novos = [...new Map([...ocGrp, ...ids.map((id) => { const g = todosGrupos.find((x) => x.id === id); return { id, nome: g?.nome ?? 'Grupo', cor: g?.cor ?? null } })].map((g) => [g.id, g])).values()]; setOcGrp(novos); void salvarOcultos(ocEstRef.current, novos, ocTotal) }} />
+            </div>
+            {ocGrp.length === 0 ? <p className="text-[11px] text-muted-foreground">Nenhum grupo oculto.</p> : (
+              <div className="flex flex-wrap gap-2">
+                {ocGrp.map((g) => (
+                  <span key={g.id} className="inline-flex items-center gap-1.5 rounded-full border bg-muted/40 py-1 pl-2.5 pr-1 text-sm">
+                    <span className="h-2 w-2 rounded-full" style={{ background: g.cor ?? 'var(--primary)' }} />
+                    <span className="font-medium">{g.nome}</span>
+                    <button type="button" onClick={() => { const novos = ocGrp.filter((x) => x.id !== g.id); setOcGrp(novos); void salvarOcultos(ocEstRef.current, novos, ocTotal) }} className="ml-0.5 rounded-full p-1 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"><X className="h-3.5 w-3.5" /></button>
+                  </span>
+                ))}
+              </div>
+            )}
+          </div>
+          <div>
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className="text-xs font-medium text-muted-foreground">Alunos</span>
+              <AdicionarEstudantesDialog jaIds={new Set(ocEst.map((e) => e.id))} onSelecionar={(novos) => { const map = new Map(ocEst.map((e) => [e.id, e])); for (const n of novos) if (!map.has(n.id)) map.set(n.id, { id: n.id, nome: n.nome, email: n.email, cpf: n.cpf, classificacao: n.classificacao, avatar: n.avatar, perfil_avatar_cor: n.perfil_avatar_cor }); const arr = [...map.values()]; setOcEst(arr); void salvarOcultos(arr, ocGrpRef.current, ocTotal) }} />
+            </div>
+            {ocEst.length === 0 ? <p className="text-[11px] text-muted-foreground">Nenhum aluno oculto.</p> : (
+              <div className="flex flex-wrap gap-2">
+                {ocEst.map((a) => (
+                  <span key={a.id} className="inline-flex items-center gap-1.5 rounded-full border bg-muted/40 py-1 pl-2.5 pr-1 text-sm">
+                    <span className="font-medium">{a.nome}</span>
+                    <button type="button" onClick={() => { const arr = ocEst.filter((x) => x.id !== a.id); setOcEst(arr); void salvarOcultos(arr, ocGrpRef.current, ocTotal) }} className="ml-0.5 rounded-full p-1 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"><X className="h-3.5 w-3.5" /></button>
+                  </span>
+                ))}
               </div>
             )}
           </div>
