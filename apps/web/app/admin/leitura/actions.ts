@@ -817,6 +817,54 @@ export async function salvarTrilhaFundoModulo(id: string, patch: { fundo: Trilha
   revalidatePath('/admin/leitura'); revalidatePath('/aluno/leitura'); return { ok: true }
 }
 
+export interface DetalheAulaRanking { titulo: string; data: string | null; pontos: number }
+export interface DetalheRankingAluno {
+  nome: string; email: string | null
+  streakAtual: number; streakMaior: number; ultimoDiaAtivo: string | null
+  totalAulas: number; aulasConcluidas: number; pontosTotal: number
+  aulas: DetalheAulaRanking[]
+}
+
+/** Detalhe de um aluno no ranking do módulo (pop-up): aulas feitas (data+pontos), sequência e progresso. */
+export async function detalheRankingAluno(moduloId: string, estudanteId: string): Promise<{ ok: boolean; detalhe?: DetalheRankingAluno; error?: string }> {
+  const g = await guard('leitura:view'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const geral = moduloId === '__geral__'
+  let dq = svc.from('simulado_documentos').select('id, titulo, ordem').eq('tenant_id', g.tenantId).eq('deletado', false).eq('publicado', true)
+  dq = geral ? dq.is('pasta_id', null) : dq.eq('pasta_id', moduloId)
+  const { data: docs } = await dq.order('ordem', { ascending: true })
+  const docList = (docs ?? []) as { id: string; titulo: string; ordem: number }[]
+  const docIds = docList.map((d) => d.id)
+
+  // XP de leitura do aluno (leitura + quiz) por documento.
+  const refs = [...docIds, ...docIds.map((id) => `quiz:${id}`)]
+  const { data: ev } = refs.length
+    ? await svc.from('simulado_xp_eventos').select('ref_id, xp, criado_em').eq('tenant_id', g.tenantId).eq('estudante_id', estudanteId).eq('origem', 'leitura').in('ref_id', refs)
+    : { data: [] as { ref_id: string; xp: number; criado_em: string }[] }
+  const porDoc = new Map<string, { pontos: number; data: string | null }>()
+  for (const e of (ev ?? []) as { ref_id: string; xp: number; criado_em: string }[]) {
+    const docId = String(e.ref_id).replace(/^quiz:/, '')
+    const cur = porDoc.get(docId) ?? { pontos: 0, data: null as string | null }
+    cur.pontos += e.xp || 0
+    if (!cur.data || (e.criado_em && e.criado_em < cur.data)) cur.data = e.criado_em ?? cur.data
+    porDoc.set(docId, cur)
+  }
+  const aulas: DetalheAulaRanking[] = docList.filter((d) => porDoc.has(d.id)).map((d) => ({ titulo: d.titulo, data: porDoc.get(d.id)!.data, pontos: porDoc.get(d.id)!.pontos }))
+  const pontosTotal = aulas.reduce((s, a) => s + a.pontos, 0)
+
+  const { data: gamRow } = await svc.from('simulado_gamificacao_estudante').select('streak_atual, streak_maior, ultimo_dia_ativo').eq('tenant_id', g.tenantId).eq('estudante_id', estudanteId).maybeSingle()
+  const { data: est } = await svc.from('simulado_estudantes').select('nome, email').eq('id', estudanteId).eq('tenant_id', g.tenantId).maybeSingle()
+
+  return {
+    ok: true,
+    detalhe: {
+      nome: (est as any)?.nome ?? 'Aluno', email: (est as any)?.email ?? null,
+      streakAtual: (gamRow as any)?.streak_atual ?? 0, streakMaior: (gamRow as any)?.streak_maior ?? 0, ultimoDiaAtivo: (gamRow as any)?.ultimo_dia_ativo ?? null,
+      totalAulas: docList.length, aulasConcluidas: aulas.length, pontosTotal, aulas,
+    },
+  }
+}
+
 export async function excluirModuloLeitura(id: string): Promise<{ ok: boolean; error?: string }> {
   const g = await guard('leitura:delete'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()

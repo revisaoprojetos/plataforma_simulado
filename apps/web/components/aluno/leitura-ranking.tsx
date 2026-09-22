@@ -1,11 +1,14 @@
 'use client'
 
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { Trophy, Sparkles, ArrowUpDown } from 'lucide-react'
+import { Trophy, Sparkles, ArrowUpDown, MoreVertical, X, Loader2, Flame, Zap, BookCheck, Award } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { formatBrt } from '@/lib/brt'
 import { AvatarEstudante } from '@/components/aluno/avatar-estudante'
 import type { RankingLeitura, RankingLeituraItem } from '@/lib/leitura/ranking'
+import { detalheRankingAluno, type DetalheRankingAluno } from '@/app/admin/leitura/actions'
 
 const POR_PAG = 10
 const iniciais = (n: string) => (n || '').split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?'
@@ -16,12 +19,15 @@ type Campo = 'posicao' | 'aulas' | 'acertos'
  * mostra só as iniciais (sem e-mail/sem link). Ambos: fotos de perfil, ordenação (posição/aulas/acertos)
  * e paginação (10/pág).
  */
-export function LeituraRanking({ ranking, meuId, modo = 'aluno' }: { ranking: RankingLeitura; meuId?: string | null; modo?: 'admin' | 'aluno' }) {
+export function LeituraRanking({ ranking, meuId, modo = 'aluno', moduloId }: { ranking: RankingLeitura; meuId?: string | null; modo?: 'admin' | 'aluno'; moduloId?: string }) {
   const { itens, gamAtivo } = ranking
   const rotulo = gamAtivo ? 'Pontos' : 'Acertos'
   const [campo, setCampo] = useState<Campo>('posicao')
   const [dir, setDir] = useState<'asc' | 'desc'>('asc')
   const [pagina, setPagina] = useState(1)
+  const [detalhe, setDetalhe] = useState<RankingLeituraItem | null>(null)
+  // Só o admin (com o módulo resolvido) abre o pop-up de detalhe do aluno.
+  const expandir = modo === 'admin' && moduloId ? setDetalhe : undefined
 
   const ordenados = useMemo(() => {
     const arr = [...itens]
@@ -84,23 +90,23 @@ export function LeituraRanking({ ranking, meuId, modo = 'aluno' }: { ranking: Ra
         </div>
       )}
 
-      {/* Tabela — 10 por página (paginada) + cabeçalho fixo com rolagem de segurança. */}
+      {/* Tabela — 10 por página, TODAS visíveis (sem rolagem interna; a página rola se precisar). */}
       <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-        <div className="max-h-[60vh] overflow-y-auto">
         <table className="w-full text-sm">
-          <thead className="sticky top-0 z-10 border-b bg-muted text-left text-muted-foreground shadow-sm">
+          <thead className="border-b bg-muted text-left text-muted-foreground">
             <tr>
               <Th c="posicao" className="w-14 text-center">#</Th>
               <th className="px-3 py-2.5 font-medium">Aluno</th>
-              <Th c="aulas" className="w-24 text-right justify-end">Aulas</Th>
-              <Th c="acertos" className="w-24 text-right justify-end">{rotulo}</Th>
+              <Th c="aulas" className="w-28 text-center">Aulas</Th>
+              <Th c="acertos" className="w-28 text-center">{rotulo}</Th>
+              {/* Espaço à direita p/ trazer as colunas de número mais para o meio. */}
+              <th className="w-6 sm:w-24" aria-hidden />
             </tr>
           </thead>
           <tbody>
-            {visiveis.map((it) => <LinhaRanking key={it.estudanteId} it={it} eu={!!meuId && it.estudanteId === meuId} modo={modo} />)}
+            {visiveis.map((it) => <LinhaRanking key={it.estudanteId} it={it} eu={!!meuId && it.estudanteId === meuId} modo={modo} onExpand={expandir} />)}
           </tbody>
         </table>
-        </div>
       </div>
 
       {/* Paginação */}
@@ -119,11 +125,90 @@ export function LeituraRanking({ ranking, meuId, modo = 'aluno' }: { ranking: Ra
       {gamAtivo && (
         <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Sparkles className="h-3.5 w-3.5 text-amber-500" /> Pontuação da gamificação ativa — por aula concluída: leitura + quiz (mais acertos/combo, se configurados).</p>
       )}
+
+      {detalhe && moduloId && <DetalheAlunoModal moduloId={moduloId} it={detalhe} onClose={() => setDetalhe(null)} />}
     </div>
   )
 }
 
-function LinhaRanking({ it, eu, modo }: { it: RankingLeituraItem; eu: boolean; modo: 'admin' | 'aluno' }) {
+/** Pop-up com o detalhe do aluno: sequência (atual/maior), progresso e a lista de aulas (data + pontos). */
+function DetalheAlunoModal({ moduloId, it, onClose }: { moduloId: string; it: RankingLeituraItem; onClose: () => void }) {
+  const [d, setD] = useState<DetalheRankingAluno | null>(null)
+  const [erro, setErro] = useState<string | null>(null)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    detalheRankingAluno(moduloId, it.estudanteId).then((r) => { if (r.ok && r.detalhe) setD(r.detalhe); else setErro(r.error ?? 'Erro ao carregar.') }).catch(() => setErro('Erro ao carregar.'))
+    return () => document.removeEventListener('keydown', onKey)
+  }, [moduloId, it.estudanteId, onClose])
+
+  const pctProg = d && d.totalAulas > 0 ? Math.round((d.aulasConcluidas / d.totalAulas) * 100) : 0
+  const Stat = ({ icon: Icon, label, valor }: { icon: typeof Flame; label: string; valor: ReactNode }) => (
+    <div className="rounded-xl border bg-muted/30 p-3 text-center">
+      <Icon className="mx-auto mb-1 h-4 w-4 text-primary" />
+      <div className="text-lg font-bold leading-none tabular-nums">{valor}</div>
+      <div className="mt-1 text-[11px] text-muted-foreground">{label}</div>
+    </div>
+  )
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center gap-3 border-b p-4">
+          <AvatarEstudante nome={it.nome} avatar={it.avatar} cor={it.avatarCor ?? '#6d28d9'} className="h-10 w-10 shrink-0 text-sm text-white" />
+          <div className="min-w-0 flex-1">
+            <h3 className="truncate font-semibold">{it.nome}</h3>
+            {it.email && <p className="truncate text-xs text-muted-foreground">{it.email}</p>}
+          </div>
+          <button type="button" onClick={onClose} aria-label="Fechar" className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
+        </div>
+
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+          {erro ? (
+            <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{erro}</p>
+          ) : !d ? (
+            <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando…</div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+                <Stat icon={Zap} label="pontos" valor={d.pontosTotal.toLocaleString('pt-BR')} />
+                <Stat icon={Flame} label="sequência atual" valor={`${d.streakAtual}d`} />
+                <Stat icon={Award} label="maior sequência" valor={`${d.streakMaior}d`} />
+                <Stat icon={BookCheck} label="aulas" valor={`${d.aulasConcluidas}/${d.totalAulas}`} />
+              </div>
+              <div>
+                <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground"><span>Progresso</span><span className="tabular-nums">{pctProg}%</span></div>
+                <div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${pctProg}%` }} /></div>
+              </div>
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Aulas feitas ({d.aulas.length})</p>
+                {d.aulas.length === 0 ? (
+                  <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">Ainda não fez nenhuma aula.</p>
+                ) : (
+                  <ul className="divide-y rounded-xl border">
+                    {d.aulas.map((a, i) => (
+                      <li key={i} className="flex items-center gap-3 px-3 py-2.5">
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium">{a.titulo}</span>
+                          <span className="block text-[11px] text-muted-foreground">{formatBrt(a.data) ?? '—'}</span>
+                        </span>
+                        <span className="shrink-0 rounded-md bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary tabular-nums">+{a.pontos}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
+function LinhaRanking({ it, eu, modo, onExpand }: { it: RankingLeituraItem; eu: boolean; modo: 'admin' | 'aluno'; onExpand?: (it: RankingLeituraItem) => void }) {
   const avatar = <AvatarEstudante nome={it.nome} avatar={it.avatar} cor={it.avatarCor ?? '#6d28d9'} className="h-9 w-9 shrink-0 text-[11px] text-white" />
   const identidade = modo === 'admin' ? (
     <Link href={`/admin/estudantes/${it.estudanteId}`} className="flex min-w-0 items-center gap-2.5 hover:underline">
@@ -143,8 +228,16 @@ function LinhaRanking({ it, eu, modo }: { it: RankingLeituraItem; eu: boolean; m
     <tr className={cn('border-b last:border-0', eu ? 'bg-primary/5' : 'hover:bg-muted/30')}>
       <td className="px-3 py-2.5 text-center font-bold tabular-nums text-muted-foreground">{it.posicao}</td>
       <td className="px-3 py-2.5">{identidade}</td>
-      <td className="px-3 py-2.5 text-right tabular-nums text-muted-foreground">{it.aulasConcluidas}</td>
-      <td className="px-3 py-2.5 text-right font-semibold tabular-nums">{it.score}</td>
+      <td className="px-3 py-2.5 text-center tabular-nums text-muted-foreground">{it.aulasConcluidas}</td>
+      <td className="px-3 py-2.5 text-center font-semibold tabular-nums">{it.score}</td>
+      <td className="px-2 py-2.5 text-center">
+        {onExpand && (
+          <button type="button" onClick={() => onExpand(it)} aria-label="Ver detalhes do aluno" title="Ver detalhes"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+            <MoreVertical className="h-4 w-4" />
+          </button>
+        )}
+      </td>
     </tr>
   )
 }

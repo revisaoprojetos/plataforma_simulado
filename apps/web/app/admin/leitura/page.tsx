@@ -81,7 +81,7 @@ export default async function LeituraAdminPage({ searchParams }: { searchParams:
           <BancoAulasGrid data={data} pastaAtual={pasta ?? null} cardView={cardView} moduloTab={moduloTab} semBreadcrumb={!!banner} semTabs={!!banner} />
           {/* Ranking do módulo (por acertos no quiz; pontos quando a gamificação estiver ativa). */}
           {moduloTab === 'ranking' && pasta && (
-            <LeituraRanking ranking={await carregarRankingModulo(pasta, (await getCurrentTenantId()) ?? '')} modo="admin" />
+            <LeituraRanking ranking={await carregarRankingModulo(pasta, (await getCurrentTenantId()) ?? '')} modo="admin" moduloId={pasta} />
           )}
         </>
       )}
