@@ -129,11 +129,14 @@ export function AdicionarGrupoModuloDialog({ grupos, jaMarcados, onSelecionar }:
                         <span className="shrink-0 text-xs text-muted-foreground">{filhos.length} grupo(s){totMembros > 0 ? ` · ${totMembros.toLocaleString('pt-BR')}` : ''}</span>
                       </button>
                     </div>
-                    {aberta && (
-                      <div className="space-y-1.5 px-2 pb-2">
-                        {filhos.length === 0 ? <p className="ml-6 py-2 text-xs text-muted-foreground">Pasta vazia.</p> : filhos.map((g) => <GrupoLinha key={g.id} g={g} indent />)}
+                    {/* Expandir/recolher animado (grid-rows 0fr↔1fr → altura suave). */}
+                    <div className={cn('grid transition-[grid-template-rows] duration-300 ease-out', aberta ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}>
+                      <div className="overflow-hidden">
+                        <div className="space-y-1.5 px-2 pb-2">
+                          {filhos.length === 0 ? <p className="ml-6 py-2 text-xs text-muted-foreground">Pasta vazia.</p> : filhos.map((g) => <GrupoLinha key={g.id} g={g} indent />)}
+                        </div>
                       </div>
-                    )}
+                    </div>
                   </div>
                 )
               })}

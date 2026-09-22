@@ -15,7 +15,7 @@ import {
   type EstudanteAcessoLinha,
 } from '@/app/admin/leitura/actions'
 
-type Grupo = { id: string; nome: string; cor: string | null }
+type Grupo = { id: string; nome: string; cor: string | null; is_mestre?: boolean; pai_id?: string | null; membros?: number }
 type GrupoVinc = Grupo & { count: number }
 const POR_PAGINA = 50
 
@@ -56,7 +56,7 @@ export function ModuloAcesso({ pastaId }: { pastaId: string }) {
   useEffect(() => {
     ;(async () => {
       const [a, e] = await Promise.all([carregarAtribuicaoPasta(pastaId), carregarEstudantesPasta(pastaId)])
-      const grupos = a.ok && a.grupos ? a.grupos.map((g) => ({ id: g.id, nome: g.nome, cor: g.cor })) : []
+      const grupos = a.ok && a.grupos ? a.grupos.map((g) => ({ id: g.id, nome: g.nome, cor: g.cor, is_mestre: g.is_mestre, pai_id: g.pai_id, membros: g.membros })) : []
       setTodosGrupos(grupos)
       const vincList = a.ok && a.grupos ? a.grupos.filter((g) => g.atribuido).map((g) => ({ id: g.id, nome: g.nome, cor: g.cor })) : []
       const cont = vincList.length ? await contarMembrosGrupos(vincList.map((g) => g.id)) : { ok: true, contagem: {} as Record<string, number> }

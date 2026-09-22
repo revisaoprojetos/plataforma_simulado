@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { selecionarGrupos, contarMembrosGrupos as contarMembrosGruposSql } from '@/lib/simulado/grupos'
 import { faixaUuidDoCodigo } from '@/lib/codigo-questao'
 import { espinhaDeHtml, reancorar } from '@/lib/leitura/reanchor'
 import { limparCabecalhoHtml } from '@/lib/leitura/limpar-cabecalho'
@@ -921,13 +922,17 @@ export async function reordenarModulosLeitura(ids: string[]): Promise<{ ok: bool
 // Tolerante: se as tabelas simulado_pasta_grupos/estudantes não migraram, o SELECT retorna vazio.
 const SEM_TABELA = (m?: string) => /relation .* does not exist|simulado_pasta_(grupos|estudantes)|schema cache/i.test(m ?? '')
 
-export async function carregarAtribuicaoPasta(pastaId: string): Promise<{ ok: boolean; grupos?: { id: string; nome: string; cor: string | null; atribuido: boolean }[]; error?: string }> {
+export async function carregarAtribuicaoPasta(pastaId: string): Promise<{ ok: boolean; grupos?: { id: string; nome: string; cor: string | null; atribuido: boolean; is_mestre: boolean; pai_id: string | null; membros: number }[]; error?: string }> {
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
-  const { data: todos } = await svc.from('simulado_grupos').select('id, nome, cor').eq('tenant_id', g.tenantId).eq('deletado', false).order('nome')
-  const { data: atrib } = await svc.from('simulado_pasta_grupos').select('grupo_id').eq('pasta_id', pastaId)
-  const set = new Set((atrib ?? []).map((r: any) => r.grupo_id))
-  return { ok: true, grupos: (todos ?? []).map((x: any) => ({ id: x.id, nome: x.nome, cor: x.cor ?? null, atribuido: set.has(x.id) })) }
+  // selecionarGrupos traz a HIERARQUIA (pastas mestres × subgrupos + pai_id) → o picker vira árvore.
+  const [todos, counts, atrib] = await Promise.all([
+    selecionarGrupos(svc, g.tenantId),
+    contarMembrosGruposSql(svc, g.tenantId),
+    svc.from('simulado_pasta_grupos').select('grupo_id').eq('pasta_id', pastaId),
+  ])
+  const set = new Set(((atrib.data as any[]) ?? []).map((r) => r.grupo_id))
+  return { ok: true, grupos: todos.map((x) => ({ id: x.id, nome: x.nome, cor: x.cor ?? null, atribuido: set.has(x.id), is_mestre: x.is_mestre, pai_id: x.pai_id, membros: counts[x.id] ?? 0 })) }
 }
 
 export async function definirGruposPasta(pastaId: string, grupoIds: string[]): Promise<{ ok: boolean; error?: string }> {
