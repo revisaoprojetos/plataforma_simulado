@@ -117,7 +117,7 @@ export function LeituraRanking({ ranking, meuId, modo = 'aluno' }: { ranking: Ra
       )}
 
       {gamAtivo && (
-        <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Sparkles className="h-3.5 w-3.5 text-amber-500" /> Pontuação da gamificação ativa — aulas, acertos e combos de gabarito.</p>
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Sparkles className="h-3.5 w-3.5 text-amber-500" /> Pontuação da gamificação ativa — por aula concluída: leitura + quiz (mais acertos/combo, se configurados).</p>
       )}
     </div>
   )

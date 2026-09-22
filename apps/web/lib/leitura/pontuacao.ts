@@ -40,5 +40,7 @@ export interface DesempenhoLeitura { acertos: number; aulasConcluidas: number; a
  */
 export function pontuarLegProc(cfg: PontuacaoLeitura | null | undefined, d: DesempenhoLeitura, gamAtivo: boolean): number {
   if (!gamAtivo || !cfg) return d.acertos
-  return d.aulasConcluidas * cfg.pontos_aula + d.acertos * cfg.pontos_acerto + (cfg.combo_ativo ? d.aulasGabaritadas * cfg.combo_bonus : 0)
+  // Cada aula concluída = respondeu todo o quiz → vale a LEITURA + o QUIZ (pontos_aula + pontos_quiz),
+  // igual ao XP real (5+5). Mais os pontos por acerto e o combo de gabarito, quando configurados.
+  return d.aulasConcluidas * (cfg.pontos_aula + cfg.pontos_quiz) + d.acertos * cfg.pontos_acerto + (cfg.combo_ativo ? d.aulasGabaritadas * cfg.combo_bonus : 0)
 }
