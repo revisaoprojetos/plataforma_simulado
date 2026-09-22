@@ -76,6 +76,17 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
 
   return createPortal(
     <div className="fixed inset-0 z-[200] flex overflow-hidden" style={{ background: 'radial-gradient(circle at 50% 34%, #1a1730 0%, #0b0912 62%)', color: FG, animation: saindo ? 'lu-out .38s cubic-bezier(.4,0,.2,1) forwards' : 'lu-in .3s ease both' }}>
+      {/* Botão "Continuar" FIXO no canto superior direito: em iframe curto (Curseduca) o conteúdo é
+          centralizado e cortado em cima/embaixo — pinado ao canto do overlay ele fica SEMPRE visível
+          e clicável. Aparece assim que a animação termina (done). */}
+      {done && (
+        <button type="button" onClick={fechar} aria-label="Continuar"
+          className="absolute right-3 top-3 z-[210] inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold text-white transition hover:brightness-110 sm:right-4 sm:top-4"
+          style={{ background: `linear-gradient(135deg, ${A}, ${mix(78, 'black')})`, boxShadow: `0 10px 30px -8px ${mix(55, 'transparent')}`, animation: mascote ? 'lu-rise .5s ease .15s both, lu-btnpulse 1.8s ease-out 1.2s infinite' : 'lu-rise .5s ease .15s both' }}>
+          <Sparkles className="h-4 w-4" /> Continuar <ArrowRight className="h-4 w-4" />
+        </button>
+      )}
+
       {/* Fundo: auroras + estrelas (contidas) */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">
         <div className="absolute rounded-full blur-3xl" style={{ left: '18%', top: '10%', width: 520, height: 520, background: mix(45, 'transparent'), opacity: 0.5, animation: 'lu-aurora1 14s ease-in-out infinite' }} />
@@ -217,10 +228,6 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
               <span className="inline-flex items-center gap-1.5"><Flame className="h-3.5 w-3.5" style={{ color: '#fb923c' }} />{streak} dias</span>
             </div>
 
-            <button type="button" onClick={fechar} className="mt-0.5 inline-flex items-center gap-2 rounded-xl px-5 py-2.5 text-sm font-bold text-white transition hover:brightness-110"
-              style={{ background: `linear-gradient(135deg, ${A}, ${mix(78, 'black')})`, boxShadow: `0 10px 30px -8px ${mix(55, 'transparent')}`, animation: mascote ? 'lu-rise .6s ease 1.95s both, lu-btnpulse 1.8s ease-out 2.7s infinite' : 'lu-rise .6s ease 1.95s both' }}>
-              <Sparkles className="h-4 w-4" /> Continuar estudando <ArrowRight className="h-4 w-4" />
-            </button>
           </div>
         )}
         {st.playing && <div className="text-[12px] uppercase tracking-[0.14em]" style={{ color: MUT }}>Ganhando XP…</div>}
