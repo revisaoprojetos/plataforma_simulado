@@ -1239,3 +1239,15 @@ export async function salvarRankingOcultos(pastaId: string, cfg: RankingOcultosC
   await invalidarRankingLeitura(g.tenantId, pastaId) // reflete na hora (sem esperar o TTL do cache)
   revalidatePath('/admin/leitura'); return { ok: true }
 }
+
+/**
+ * Recalcula o ranking AGORA: limpa o cache (Redis) da chave EXATA do módulo exibido + o geral e
+ * revalida a página — sem esperar o TTL de 5 min. Usa o MESMO moduloId que a tabela carrega, então
+ * acerta a chave certa (o "salvar pontuação" pode invalidar um id diferente conforme o formulário).
+ */
+export async function recalcularRankingLeitura(moduloId: string): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:view'); if (!g.ok) return { ok: false, error: g.error }
+  await invalidarRankingLeitura(g.tenantId, moduloId || '__geral__')
+  revalidatePath('/admin/leitura')
+  return { ok: true }
+}

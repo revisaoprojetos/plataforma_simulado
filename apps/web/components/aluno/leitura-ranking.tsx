@@ -2,14 +2,16 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Trophy, Sparkles, ArrowUpDown, MoreVertical, X, Loader2, Flame, Zap, BookCheck, Award, Search, Eye, EyeOff } from 'lucide-react'
+import { toast } from 'sonner'
+import { Trophy, Sparkles, ArrowUpDown, MoreVertical, X, Loader2, Flame, Zap, BookCheck, Award, Search, Eye, EyeOff, RotateCw } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { formatBrt } from '@/lib/brt'
 import { AvatarEstudante } from '@/components/aluno/avatar-estudante'
 import type { RankingLeitura, RankingLeituraItem } from '@/lib/leitura/ranking'
-import { detalheRankingAluno, type DetalheRankingAluno } from '@/app/admin/leitura/actions'
+import { detalheRankingAluno, recalcularRankingLeitura, type DetalheRankingAluno } from '@/app/admin/leitura/actions'
 
 const POR_PAG = 10
 const iniciais = (n: string) => (n || '').split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?'
@@ -29,8 +31,21 @@ export function LeituraRanking({ ranking, meuId, meuNome, modo = 'aluno', modulo
   const [busca, setBusca] = useState('')
   const [mostrarOcultos, setMostrarOcultos] = useState(true)
   const [detalhe, setDetalhe] = useState<RankingLeituraItem | null>(null)
+  const [recalc, setRecalc] = useState(false)
+  const router = useRouter()
   // Só o admin (com o módulo resolvido) abre o pop-up de detalhe do aluno.
   const expandir = modo === 'admin' && moduloId ? setDetalhe : undefined
+
+  // Recalcular AGORA: limpa o cache da chave EXATA deste módulo e recarrega — sem esperar o TTL.
+  async function recalcular() {
+    if (!moduloId || recalc) return
+    setRecalc(true)
+    try {
+      const r = await recalcularRankingLeitura(moduloId)
+      if (r.ok) { toast.success('Ranking recalculado.'); router.refresh() }
+      else toast.error(r.error ?? 'Falha ao recalcular.')
+    } catch { toast.error('Falha ao recalcular.') } finally { setRecalc(false) }
+  }
 
   // Aluno NÃO vê contas de teste (ocultas); admin vê, marcadas. Ocultos nunca no pódio nem no "você".
   const reaisList = useMemo(() => itens.filter((i) => !i.oculto), [itens])
@@ -148,6 +163,14 @@ export function LeituraRanking({ ranking, meuId, meuNome, modo = 'aluno', modulo
               title={mostrarOcultos ? 'Esconder contas de teste da lista' : 'Mostrar contas de teste na lista'}>
               {mostrarOcultos ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
               {mostrarOcultos ? 'Ocultar contas de teste' : `Mostrar contas de teste (${qtdOcultos})`}
+            </button>
+          )}
+          {moduloId && (
+            <button type="button" onClick={recalcular} disabled={recalc}
+              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-60"
+              title="Limpa o cache e recalcula o ranking agora (aulas/sequência/pontos), sem esperar os 5 min.">
+              {recalc ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
+              Recalcular
             </button>
           )}
         </div>
