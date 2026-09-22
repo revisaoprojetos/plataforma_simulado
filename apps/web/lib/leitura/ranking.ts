@@ -75,10 +75,13 @@ export async function carregarRankingModulo(moduloId: string, tenantId: string):
     if (!aulaIds.length) return { itens: [], gamAtivo, pontuacao }
 
     const [quiz, resp] = await Promise.all([
+      // ⚠️ ORDER por `id` (ÚNICO): paginar com `.order('documento_id')` (só 2 valores p/ ~12k linhas) faz o
+      // PostgREST DUPLICAR e PERDER linhas entre páginas (ordem não-estável) → respostas somem e o aluno é
+      // subcontado (aulas/sequência/pontos errados). Ordem única = paginação consistente.
       fetchAllByIn<{ documento_id: string; questao_id: string }>(aulaIds, (chunk) =>
-        svc.from('simulado_documento_quiz_questoes').select('documento_id, questao_id').eq('tenant_id', tenantId).eq('deletado', false).in('documento_id', chunk).order('documento_id')).catch(() => [] as { documento_id: string; questao_id: string }[]),
+        svc.from('simulado_documento_quiz_questoes').select('documento_id, questao_id').eq('tenant_id', tenantId).eq('deletado', false).in('documento_id', chunk).order('id')).catch(() => [] as { documento_id: string; questao_id: string }[]),
       fetchAllByIn<{ estudante_id: string; documento_id: string; questao_id: string; correta: boolean; respondido_em: string | null }>(aulaIds, (chunk) =>
-        svc.from('simulado_leitura_respostas').select('estudante_id, documento_id, questao_id, correta, respondido_em').eq('tenant_id', tenantId).in('documento_id', chunk).order('documento_id')),
+        svc.from('simulado_leitura_respostas').select('estudante_id, documento_id, questao_id, correta, respondido_em').eq('tenant_id', tenantId).in('documento_id', chunk).order('id')),
     ])
     const quizPorDoc = new Map<string, Set<string>>()
     for (const q of quiz) (quizPorDoc.get(q.documento_id) ?? quizPorDoc.set(q.documento_id, new Set()).get(q.documento_id)!).add(q.questao_id)

@@ -19,9 +19,9 @@ export async function desempenhoLeituraAluno(svc: any, tenantId: string, estudan
 
     const [quiz, resp] = await Promise.all([
       fetchAllByIn<{ documento_id: string; questao_id: string }>(aulaIds, (chunk) =>
-        svc.from('simulado_documento_quiz_questoes').select('documento_id, questao_id').eq('tenant_id', tenantId).eq('deletado', false).in('documento_id', chunk).order('documento_id')).catch(() => [] as any[]),
+        svc.from('simulado_documento_quiz_questoes').select('documento_id, questao_id').eq('tenant_id', tenantId).eq('deletado', false).in('documento_id', chunk).order('id')).catch(() => [] as any[]),
       fetchAllByIn<{ documento_id: string; questao_id: string; correta: boolean }>(aulaIds, (chunk) =>
-        svc.from('simulado_leitura_respostas').select('documento_id, questao_id, correta').eq('tenant_id', tenantId).eq('estudante_id', estudanteId).in('documento_id', chunk).order('documento_id')),
+        svc.from('simulado_leitura_respostas').select('documento_id, questao_id, correta').eq('tenant_id', tenantId).eq('estudante_id', estudanteId).in('documento_id', chunk).order('id')),
     ])
     const quizPorDoc = new Map<string, Set<string>>()
     for (const q of quiz) (quizPorDoc.get(q.documento_id) ?? quizPorDoc.set(q.documento_id, new Set()).get(q.documento_id)!).add(q.questao_id)

@@ -64,12 +64,13 @@ async function statusAulas(svc: any, tenantId: string, estId: string, docs: Docu
     const [qs, rs] = await Promise.all([
       (async () => {
         try {
+          // ORDER por `id` (único): `.order('documento_id')` não é estável e a paginação perde/duplica linhas.
           return await fetchAllByIn<{ documento_id: string; questao_id: string }>(ids, (chunk) =>
-            svc.from('simulado_documento_quiz_questoes').select('documento_id, questao_id').eq('tenant_id', tenantId).eq('deletado', false).in('documento_id', chunk).order('documento_id', { ascending: true }))
+            svc.from('simulado_documento_quiz_questoes').select('documento_id, questao_id').eq('tenant_id', tenantId).eq('deletado', false).in('documento_id', chunk).order('id', { ascending: true }))
         } catch { return [] as { documento_id: string; questao_id: string }[] }
       })(),
       fetchAllByIn<{ documento_id: string; questao_id: string; correta: boolean }>(ids, (chunk) =>
-        svc.from('simulado_leitura_respostas').select('documento_id, questao_id, correta').eq('tenant_id', tenantId).eq('estudante_id', estId).in('documento_id', chunk).order('documento_id', { ascending: true })),
+        svc.from('simulado_leitura_respostas').select('documento_id, questao_id, correta').eq('tenant_id', tenantId).eq('estudante_id', estId).in('documento_id', chunk).order('id', { ascending: true })),
     ])
     for (const q of qs) {
       totalPorDoc.set(q.documento_id, (totalPorDoc.get(q.documento_id) ?? 0) + 1)

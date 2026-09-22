@@ -52,15 +52,17 @@ async function carregarBase(moduloId: string, tenantId: string) {
   if (!geral) { try { const { data } = await svc.from('simulado_pastas').select('pontuacao').eq('id', moduloId).eq('tenant_id', tenantId).maybeSingle(); pontuacaoRaw = (data as any)?.pontuacao ?? null } catch { /* ignore */ } }
   const pontuacao = normalizarPontuacaoLeitura(pontuacaoRaw)
 
+  // ⚠️ ORDER por `id` (ÚNICO) em TODAS: sem ordem estável, a paginação do fetchAllByIn (PostgREST .range)
+  // DUPLICA e PERDE linhas quando passa de 1000 (ex.: respostas ~12k) → relatório/Excel subcontam.
   const [quiz, resp, prog, xp] = await Promise.all([
     fetchAllByIn<{ documento_id: string; questao_id: string }>(docIds, (chunk) =>
-      svc.from('simulado_documento_quiz_questoes').select('documento_id, questao_id').eq('tenant_id', tenantId).eq('deletado', false).in('documento_id', chunk)).catch(() => []),
+      svc.from('simulado_documento_quiz_questoes').select('documento_id, questao_id').eq('tenant_id', tenantId).eq('deletado', false).in('documento_id', chunk).order('id')).catch(() => []),
     fetchAllByIn<{ estudante_id: string; documento_id: string; questao_id: string; correta: boolean; respondido_em: string | null }>(docIds, (chunk) =>
-      svc.from('simulado_leitura_respostas').select('estudante_id, documento_id, questao_id, correta, respondido_em').eq('tenant_id', tenantId).in('documento_id', chunk)),
+      svc.from('simulado_leitura_respostas').select('estudante_id, documento_id, questao_id, correta, respondido_em').eq('tenant_id', tenantId).in('documento_id', chunk).order('id')),
     fetchAllByIn<{ estudante_id: string; documento_id: string; iniciado_em: string | null; concluido_em: string | null; tempo_seg: number | null }>(docIds, (chunk) =>
-      svc.from('simulado_leitura_progresso').select('estudante_id, documento_id, iniciado_em, concluido_em, tempo_seg').eq('tenant_id', tenantId).in('documento_id', chunk)).catch(() => []),
+      svc.from('simulado_leitura_progresso').select('estudante_id, documento_id, iniciado_em, concluido_em, tempo_seg').eq('tenant_id', tenantId).in('documento_id', chunk).order('id')).catch(() => []),
     fetchAllByIn<{ estudante_id: string; ref_id: string; xp: number }>([...docIds, ...docIds.map((id) => `quiz:${id}`)], (chunk) =>
-      svc.from('simulado_xp_eventos').select('estudante_id, ref_id, xp').eq('tenant_id', tenantId).eq('origem', 'leitura').in('ref_id', chunk)).catch(() => []),
+      svc.from('simulado_xp_eventos').select('estudante_id, ref_id, xp').eq('tenant_id', tenantId).eq('origem', 'leitura').in('ref_id', chunk).order('id')).catch(() => []),
   ])
   const quizPorDoc = new Map<string, Set<string>>()
   for (const q of quiz) (quizPorDoc.get(q.documento_id) ?? quizPorDoc.set(q.documento_id, new Set()).get(q.documento_id)!).add(q.questao_id)
