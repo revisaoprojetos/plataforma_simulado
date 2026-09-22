@@ -12,7 +12,7 @@ import { detalheRankingAluno, type DetalheRankingAluno } from '@/app/admin/leitu
 
 const POR_PAG = 10
 const iniciais = (n: string) => (n || '').split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?'
-type Campo = 'posicao' | 'aulas' | 'acertos'
+type Campo = 'posicao' | 'aulas' | 'sequencia' | 'acertos'
 
 /**
  * Ranking do módulo LegProc. `modo='admin'` mostra nome + e-mail e leva ao perfil do aluno; `modo='aluno'`
@@ -32,7 +32,7 @@ export function LeituraRanking({ ranking, meuId, modo = 'aluno', moduloId }: { r
   const ordenados = useMemo(() => {
     const arr = [...itens]
     arr.sort((a, b) => {
-      const c = campo === 'posicao' ? a.posicao - b.posicao : campo === 'aulas' ? a.aulasConcluidas - b.aulasConcluidas : a.score - b.score
+      const c = campo === 'posicao' ? a.posicao - b.posicao : campo === 'aulas' ? a.aulasConcluidas - b.aulasConcluidas : campo === 'sequencia' ? a.streakAtual - b.streakAtual : a.score - b.score
       return dir === 'asc' ? c : -c
     })
     return arr
@@ -97,8 +97,9 @@ export function LeituraRanking({ ranking, meuId, modo = 'aluno', moduloId }: { r
             <tr>
               <Th c="posicao" className="w-14 text-center">#</Th>
               <th className="px-3 py-2.5 font-medium">Aluno</th>
-              <Th c="aulas" className="w-28 text-center">Aulas</Th>
-              <Th c="acertos" className="w-28 text-center">{rotulo}</Th>
+              <Th c="aulas" className="w-24 text-center">Aulas</Th>
+              <Th c="sequencia" className="w-28 text-center">Sequência</Th>
+              <Th c="acertos" className="w-24 text-center">{rotulo}</Th>
               {/* Espaço à direita p/ trazer as colunas de número mais para o meio. */}
               <th className="w-6 sm:w-24" aria-hidden />
             </tr>
@@ -229,6 +230,11 @@ function LinhaRanking({ it, eu, modo, onExpand }: { it: RankingLeituraItem; eu: 
       <td className="px-3 py-2.5 text-center font-bold tabular-nums text-muted-foreground">{it.posicao}</td>
       <td className="px-3 py-2.5">{identidade}</td>
       <td className="px-3 py-2.5 text-center tabular-nums text-muted-foreground">{it.aulasConcluidas}</td>
+      <td className="px-3 py-2.5 text-center tabular-nums">
+        <span className={cn('inline-flex items-center gap-1', it.streakAtual > 0 ? 'font-semibold text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}>
+          <Flame className="h-3.5 w-3.5" /> {it.streakAtual}
+        </span>
+      </td>
       <td className="px-3 py-2.5 text-center font-semibold tabular-nums">{it.score}</td>
       <td className="px-2 py-2.5 text-center">
         {onExpand && (

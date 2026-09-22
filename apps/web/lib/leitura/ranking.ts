@@ -15,6 +15,7 @@ export interface RankingLeituraItem {
   aulasConcluidas: number
   aulasGabaritadas: number
   score: number
+  streakAtual: number
   posicao: number
 }
 export interface RankingLeitura { itens: RankingLeituraItem[]; gamAtivo: boolean; pontuacao: PontuacaoLeitura }
@@ -79,13 +80,18 @@ export async function carregarRankingModulo(moduloId: string, tenantId: string):
     }).filter((x) => x.acertos > 0 || x.aulasConcluidas > 0)
     if (!brutos.length) return { itens: [], gamAtivo, pontuacao }
 
-    // Nome + e-mail + foto/cor do avatar.
-    const ests = await fetchAllByIn<{ id: string; nome: string; email: string | null; avatar: string | null; perfil_avatar_cor: string | null }>(brutos.map((b) => b.estudanteId), (chunk) =>
-      svc.from('simulado_estudantes').select('id, nome, email, avatar, perfil_avatar_cor').in('id', chunk))
+    // Nome + e-mail + foto/cor do avatar + sequência (streak atual) do aluno.
+    const [ests, streaks] = await Promise.all([
+      fetchAllByIn<{ id: string; nome: string; email: string | null; avatar: string | null; perfil_avatar_cor: string | null }>(brutos.map((b) => b.estudanteId), (chunk) =>
+        svc.from('simulado_estudantes').select('id, nome, email, avatar, perfil_avatar_cor').in('id', chunk)),
+      fetchAllByIn<{ estudante_id: string; streak_atual: number }>(brutos.map((b) => b.estudanteId), (chunk) =>
+        svc.from('simulado_gamificacao_estudante').select('estudante_id, streak_atual').eq('tenant_id', tenantId).in('estudante_id', chunk)).catch(() => [] as { estudante_id: string; streak_atual: number }[]),
+    ])
     const estDe = new Map(ests.map((e) => [e.id, e]))
+    const streakDe = new Map(streaks.map((s) => [s.estudante_id, s.streak_atual ?? 0]))
 
     const itens: RankingLeituraItem[] = brutos
-      .map((b) => { const e = estDe.get(b.estudanteId); return { ...b, nome: e?.nome ?? 'Aluno', email: e?.email ?? null, avatar: e?.avatar ?? null, avatarCor: e?.perfil_avatar_cor ?? null } })
+      .map((b) => { const e = estDe.get(b.estudanteId); return { ...b, nome: e?.nome ?? 'Aluno', email: e?.email ?? null, avatar: e?.avatar ?? null, avatarCor: e?.perfil_avatar_cor ?? null, streakAtual: streakDe.get(b.estudanteId) ?? 0 } })
       .sort((a, b) => b.score - a.score || b.aulasConcluidas - a.aulasConcluidas || a.nome.localeCompare(b.nome, 'pt-BR'))
       .map((b, i) => ({ ...b, posicao: i + 1 }))
     return { itens, gamAtivo, pontuacao }
