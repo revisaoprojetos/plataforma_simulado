@@ -316,7 +316,7 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
               <p className="mt-1 flex items-center gap-1.5 truncate text-sm text-muted-foreground"><Mail className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{est.email}</span></p>
             </div>
             <div className="ml-auto flex shrink-0 items-center gap-2">
-              <ImpersonationLauncher estudanteId={est.id} estudanteNome={est.nome} />
+              <ImpersonationLauncher aluno={{ id: est.id, nome: est.nome, email: est.email ?? null, avatar: est.avatar ?? null, avatarCor: est.perfil_avatar_cor ?? null }} />
               <EditarEstudanteButton estudante={{ id: est.id, nome: est.nome, email: est.email, cpf: est.cpf, telefone: est.telefone, data_nascimento: est.data_nascimento, classificacao: est.classificacao, matricula_externa: est.matricula_externa, created_at: est.created_at }} />
             </div>
           </div>

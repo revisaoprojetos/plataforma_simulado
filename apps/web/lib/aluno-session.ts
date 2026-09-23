@@ -50,9 +50,26 @@ export async function criarSessaoAluno(s: AlunoSession): Promise<void> {
 }
 
 /** Lê e valida a sessão do aluno. Retorna null se ausente/inválida/expirada.
- *  Fallback: quando NÃO há sessão real de aluno mas há um cookie de VISUALIZAÇÃO (admin
- *  impersonando), devolve a sessão do aluno visualizado marcada com `impersonation`. */
+ *  PRIORIDADE: a VISUALIZAÇÃO (admin impersonando) vence a sessão real quando seu cookie está
+ *  presente — o admin iniciou a visão deliberadamente e, no navegador dele, pode haver um resíduo
+ *  de `aluno_session` de teste. Alunos reais nunca recebem o cookie de visualização (httpOnly, só
+ *  criado pela ação do admin), então isso não afeta o aluno de verdade. */
 export async function getSessaoAluno(): Promise<AlunoSession | null> {
+  // 1) Visualização (impersonation) tem prioridade.
+  try {
+    const imp = await lerSessaoImpersonation()
+    if (imp) {
+      return {
+        estudanteId: imp.estudanteId,
+        tenantId: imp.tenantId,
+        nome: imp.nome,
+        impersonation: { por: imp.impersonatedBy, sessaoId: imp.sessionId, actionLevel: imp.actionLevel },
+      }
+    }
+  } catch {
+    // sem visualização → cai na sessão real
+  }
+  // 2) Sessão real do aluno.
   try {
     const jar = await cookies()
     const token = jar.get(COOKIE)?.value
@@ -68,21 +85,7 @@ export async function getSessaoAluno(): Promise<AlunoSession | null> {
       }
     }
   } catch {
-    // token inválido → tenta a visualização abaixo
-  }
-  // Sem sessão real → o admin pode estar visualizando (cookie separado). Nunca sobrepõe o aluno real.
-  try {
-    const imp = await lerSessaoImpersonation()
-    if (imp) {
-      return {
-        estudanteId: imp.estudanteId,
-        tenantId: imp.tenantId,
-        nome: imp.nome,
-        impersonation: { por: imp.impersonatedBy, sessaoId: imp.sessionId, actionLevel: imp.actionLevel },
-      }
-    }
-  } catch {
-    // ignora — sem visualização
+    // token inválido
   }
   return null
 }

@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { diaLocal, diaAnterior } from '@/lib/gamificacao/datas'
-import { resolverEngajamento } from '@/lib/gamificacao/engajamento-tipos'
-import { dispararEngajamento } from '@/lib/gamificacao/engajamento'
+import { avaliarEngajamentoInatividade } from '@/lib/gamificacao/engajamento-webhooks'
 
 /**
  * POST /api/cron/gamificacao-engajamento — dispara o webhook de INATIVIDADE: aluno que parou de entrar
@@ -22,41 +20,16 @@ export async function POST(req: NextRequest) {
   if (!autorizado(req)) return NextResponse.json({ message: 'Não autorizado.' }, { status: 401 })
   try {
     const svc = createAdminClient()
+    // Por tenant com gamificação ativa: cada WEBHOOK que assina gamificacao.inativo avalia SUAS regras
+    // (dias próprios) e dispara na sua URL. Idempotente pelo log.
     const { data: configs } = await svc
       .from('simulado_gamificacao_config')
-      .select('tenant_id, timezone, ativo, xp_regras')
+      .select('tenant_id, timezone, ativo')
       .eq('ativo', true)
 
     let enviados = 0
     for (const c of (configs ?? []) as any[]) {
-      const eng = resolverEngajamento(c.xp_regras?.engajamento)
-      if (!eng.inativo.ativo) continue
-      const dias = Math.max(1, eng.inativo.dias ?? 1)
-
-      // Alvo = hoje - `dias`: quem teve a última atividade nesse dia está inativo há exatamente `dias`.
-      let alvo = diaLocal(c.timezone)
-      for (let i = 0; i < dias; i++) alvo = diaAnterior(alvo)
-
-      const { data: alunos } = await svc
-        .from('simulado_gamificacao_estudante')
-        .select('estudante_id, streak_atual, streak_maior, ultimo_dia_ativo')
-        .eq('tenant_id', c.tenant_id)
-        .eq('ultimo_dia_ativo', alvo)
-        .limit(2000)
-
-      for (const a of (alunos ?? []) as any[]) {
-        const ok = await dispararEngajamento(svc, {
-          tenantId: c.tenant_id,
-          estudanteId: a.estudante_id,
-          tipo: 'inativo',
-          ref: `inativo-${a.ultimo_dia_ativo}`,
-          gatilho: eng.inativo,
-          streakAtual: a.streak_atual ?? 0,
-          streakMaior: a.streak_maior ?? 0,
-          diasInativo: dias,
-        })
-        if (ok) enviados++
-      }
+      enviados += await avaliarEngajamentoInatividade(svc, c.tenant_id, c.timezone || 'America/Sao_Paulo')
     }
     return NextResponse.json({ ok: true, enviados })
   } catch (e: any) {

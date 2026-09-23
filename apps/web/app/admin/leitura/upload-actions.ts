@@ -6,6 +6,7 @@ import mammoth from 'mammoth'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
+import { esquecer } from '@/lib/cache/relatorio-cache'
 import { sanitizarDocumento } from '@/lib/leitura/sanitize'
 import { validateFile, PRESETS } from '@/lib/storage/validate'
 
@@ -78,6 +79,9 @@ async function salvarConteudo(tenantId: string, atorId: string | null, documento
 
   await svc.from('simulado_documentos').update({ atualizado_em: new Date().toISOString() }).eq('id', documentoId).eq('tenant_id', tenantId)
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_documento_conteudos', entidadeId: documentoId, depois: { versao: versaoAlvo, artigos, rascunho: temVers }, atorId, tenantId })
+  // Invalida o cache do CONTEÚDO da versão salva — senão o aluno vê o texto ANTIGO (TTL 1h) mesmo
+  // após salvar. Em doc sem A2 (versão única), a versão salva É a que o aluno lê → reflete na hora.
+  try { await esquecer(`leitura:conteudo:${tenantId}:${documentoId}:${versaoAlvo}`) } catch { /* best-effort */ }
   revalidatePath(`/admin/leitura/${documentoId}`)
   return { ok: true as const, artigos, versao: versaoAlvo }
 }

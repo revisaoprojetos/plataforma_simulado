@@ -17,8 +17,9 @@ async function guardImpersonation(request: NextRequest): Promise<NextResponse | 
   const { pathname } = request.nextUrl
   if (!SUPERFICIES_ALUNO.some((p) => pathname === p || pathname.startsWith(p + '/'))) return null
   const imp = request.cookies.get(COOKIE_IMPERSONATION)?.value
-  const real = request.cookies.get('aluno_session')?.value
-  if (!imp || real) return null
+  // Cookie de visualização presente → a VISUALIZAÇÃO tem prioridade (mesmo com uma `aluno_session`
+  // residual no navegador do admin). Alunos reais nunca têm esse cookie.
+  if (!imp) return null
   const claims = await verificarTokenImpersonation(imp)
   if (!claims) return null
   const d = decisaoImpersonation(claims.action_level, request.method, pathname)

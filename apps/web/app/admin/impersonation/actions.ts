@@ -7,7 +7,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { registrarAudit } from '@/lib/audit'
 import { getModoNotificacao, type NotifMode } from '@/lib/impersonation/notification'
 
-export interface AlunoBusca { id: string; nome: string; email: string | null }
+export interface AlunoBusca { id: string; nome: string; email: string | null; avatar: string | null; avatarCor: string | null }
 
 /** Busca alunos do tenant para o console de visualização (só quem pode visualizar). */
 export async function buscarAlunosImpersonacao(query: string): Promise<{ ok: boolean; alunos?: AlunoBusca[]; error?: string }> {
@@ -17,10 +17,11 @@ export async function buscarAlunosImpersonacao(query: string): Promise<{ ok: boo
   if (!perm) return { ok: false, error: 'Sem permissão para visualizar alunos.' }
   const svc = createAdminClient()
   const q = (query ?? '').trim().replace(/[,%()]/g, ' ').trim()
-  let sel = svc.from('simulado_estudantes').select('id, nome, email').eq('tenant_id', access.tenantId).order('nome').limit(40)
+  let sel = svc.from('simulado_estudantes').select('id, nome, email, avatar, perfil_avatar_cor').eq('tenant_id', access.tenantId).order('nome').limit(40)
   if (q) sel = sel.or(`nome.ilike.%${q}%,email.ilike.%${q}%`)
   const { data } = await sel
-  return { ok: true, alunos: (data ?? []) as AlunoBusca[] }
+  const alunos: AlunoBusca[] = (data ?? []).map((a: any) => ({ id: a.id, nome: a.nome, email: a.email ?? null, avatar: a.avatar ?? null, avatarCor: a.perfil_avatar_cor ?? null }))
+  return { ok: true, alunos }
 }
 
 // Só administradores (admin/super_admin/admin_geral) configuram QUEM pode visualizar alunos.

@@ -22,13 +22,13 @@ export default async function WebhooksPage() {
 
   let webhooks: any[] = []
   let precisaMigrar = false
-  // Tolerante às colunas novas (envios_simultaneos, filtro_simulados).
+  // Tolerante às colunas novas (envios_simultaneos, filtro_simulados, engajamento_regras).
   let r: any = await svc
     .from('simulado_webhook_saida')
-    .select('id, nome, url, eventos, secret, ativo, ultimo_status, ultimo_envio, envios_simultaneos, filtro_simulados')
+    .select('id, nome, url, eventos, secret, ativo, ultimo_status, ultimo_envio, envios_simultaneos, filtro_simulados, engajamento_regras')
     .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
     .order('criado_em', { ascending: false })
-  if (r.error && /envios_simultaneos|filtro_simulados|column/i.test(r.error.message)) {
+  if (r.error && /envios_simultaneos|filtro_simulados|engajamento_regras|column/i.test(r.error.message)) {
     r = await svc.from('simulado_webhook_saida').select('id, nome, url, eventos, secret, ativo, ultimo_status, ultimo_envio').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('criado_em', { ascending: false })
   }
   if (r.error) precisaMigrar = /webhook_saida|relation|does not exist/i.test(r.error.message)
@@ -40,6 +40,16 @@ export default async function WebhooksPage() {
   let automacoes: any[] = []
   const ra = await svc.from('simulado_automacoes').select('id, nome, ativo, gatilho, passos, ultimo_status, ultimo_run').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('criado_em', { ascending: false })
   if (!ra.error) automacoes = ra.data ?? []
+
+  // Logs de saída (sub-aba) — últimas 200 entregas; tolerante à tabela não migrada.
+  let logsSaida: any[] = []
+  let logsPrecisaMigrar = false
+  const rl = await svc.from('simulado_webhook_saida_logs')
+    .select('id, nome, url, evento, status, http_status, ms, erro, criado_em')
+    .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
+    .order('criado_em', { ascending: false }).limit(200)
+  if (rl.error) logsPrecisaMigrar = /webhook_saida_logs|relation|does not exist/i.test(rl.error.message)
+  else logsSaida = rl.data ?? []
 
   return (
     <div className="animate-page space-y-5">
@@ -55,6 +65,7 @@ export default async function WebhooksPage() {
           ultimoStatus: w.ultimo_status ?? null, ultimoEnvio: w.ultimo_envio ?? null,
           enviosSimultaneos: w.envios_simultaneos ?? 5,
           filtroSimulados: Array.isArray(w.filtro_simulados) ? w.filtro_simulados : [],
+          engajamentoRegras: w.engajamento_regras ?? {},
         }))}
         automacoes={automacoes.map((a) => ({
           id: a.id, nome: a.nome, ativo: !!a.ativo, gatilho: a.gatilho ?? null,
@@ -66,6 +77,8 @@ export default async function WebhooksPage() {
         precisaMigrar={precisaMigrar}
         appUrl={appUrl}
         inboundToken={inboundToken}
+        logsSaida={logsSaida.map((l: any) => ({ id: l.id, nome: l.nome ?? null, url: l.url, evento: l.evento ?? null, status: l.status ?? null, httpStatus: l.http_status ?? null, ms: l.ms ?? null, erro: l.erro ?? null, criadoEm: l.criado_em ?? null }))}
+        logsPrecisaMigrar={logsPrecisaMigrar}
       />
     </div>
   )

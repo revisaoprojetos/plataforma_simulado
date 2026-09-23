@@ -24,25 +24,55 @@ export type WebhookEvento = (typeof EVENTOS_WEBHOOK)[number]['chave']
  * (até 3 tentativas: 0ms → 500ms → 1000ms); NÃO repete em 4xx (exceto 429), pois é erro do payload.
  * Retorna o texto de status a gravar em `ultimo_status`.
  */
-async function enviarComRetry(url: string, headers: Record<string, string>, corpo: string): Promise<string> {
+type EnvioResultado = { status: string; ok: boolean; httpStatus: number | null; ms: number }
+async function enviarComRetry(url: string, headers: Record<string, string>, corpo: string): Promise<EnvioResultado> {
   const MAX = 3
+  const t0 = Date.now()
   for (let tentativa = 1; tentativa <= MAX; tentativa++) {
     const ctrl = new AbortController()
     const timer = setTimeout(() => ctrl.abort(), 8000)
     try {
       const res = await fetch(url, { method: 'POST', headers, body: corpo, signal: ctrl.signal })
       clearTimeout(timer)
-      if (res.ok) return tentativa > 1 ? `ok (${res.status}) na tentativa ${tentativa}` : `ok (${res.status})`
+      if (res.ok) return { status: tentativa > 1 ? `ok (${res.status}) na tentativa ${tentativa}` : `ok (${res.status})`, ok: true, httpStatus: res.status, ms: Date.now() - t0 }
       // 4xx (menos 429) é erro do request — não adianta repetir.
-      if (res.status < 500 && res.status !== 429) return `erro (${res.status})`
-      if (tentativa === MAX) return `erro (${res.status}) após ${MAX} tentativas`
+      if (res.status < 500 && res.status !== 429) return { status: `erro (${res.status})`, ok: false, httpStatus: res.status, ms: Date.now() - t0 }
+      if (tentativa === MAX) return { status: `erro (${res.status}) após ${MAX} tentativas`, ok: false, httpStatus: res.status, ms: Date.now() - t0 }
     } catch {
       clearTimeout(timer)
-      if (tentativa === MAX) return `erro de rede após ${MAX} tentativas`
+      if (tentativa === MAX) return { status: `erro de rede após ${MAX} tentativas`, ok: false, httpStatus: null, ms: Date.now() - t0 }
     }
     await new Promise((r) => setTimeout(r, 500 * 2 ** (tentativa - 1)))
   }
-  return 'erro'
+  return { status: 'erro', ok: false, httpStatus: null, ms: Date.now() - t0 }
+}
+
+export type PlataformaWh = { id: string; nome: string | null; slug: string | null }
+
+/**
+ * Envia UM evento para uma URL de webhook ESPECÍFICA (usado pelos webhooks de engajamento, que têm
+ * regras/URL próprias). Monta o mesmo envelope, assina com HMAC (secret CRIPTOGRAFADO), grava
+ * ultimo_status e o log de saída. Best-effort: nunca lança.
+ */
+export async function enviarWebhookDireto(
+  svc: any, tenantId: string, plataforma: PlataformaWh, evento: WebhookEvento,
+  dados: Record<string, unknown>, alvo: { webhookId: string; nome: string | null; url: string; secret: string | null },
+): Promise<boolean> {
+  try {
+    const corpo = JSON.stringify(montarCorpoWebhook(evento, plataforma, tenantId, dados as any, new Date().toISOString()))
+    const headers: Record<string, string> = { 'Content-Type': 'application/json', 'X-Webhook-Evento': evento }
+    const seg = descriptografar(alvo.secret)
+    if (seg) headers['X-Webhook-Signature'] = 'sha256=' + crypto.createHmac('sha256', seg).update(corpo).digest('hex')
+    const r = await enviarComRetry(alvo.url, headers, corpo)
+    await svc.from('simulado_webhook_saida').update({ ultimo_status: r.status, ultimo_envio: new Date().toISOString() }).eq('id', alvo.webhookId)
+    try {
+      await svc.from('simulado_webhook_saida_logs').insert({
+        tenant_id: tenantId, webhook_id: alvo.webhookId, nome: alvo.nome ?? null, url: alvo.url, evento,
+        status: r.ok ? 'ok' : 'erro', http_status: r.httpStatus, ms: r.ms, erro: r.ok ? null : r.status,
+      })
+    } catch { /* tabela de log ausente → ignora */ }
+    return r.ok
+  } catch { return false }
 }
 
 /**
@@ -58,7 +88,7 @@ export async function dispararWebhook(tenantId: string | null | undefined, event
     const svc = createAdminClient()
     const { data: eps } = await svc
       .from('simulado_webhook_saida')
-      .select('id, url, eventos, secret, filtro_simulados')
+      .select('id, nome, url, eventos, secret, filtro_simulados')
       .eq('tenant_id', tenantId)
       .eq('ativo', true)
     const simId = (dados as any)?.simulado?.id
@@ -84,8 +114,15 @@ export async function dispararWebhook(tenantId: string | null | undefined, event
       // Segredo guardado CRIPTOGRAFADO em repouso → descriptografa só aqui p/ assinar (texto puro legado passa direto).
       const seg = descriptografar(e.secret)
       if (seg) headers['X-Webhook-Signature'] = 'sha256=' + crypto.createHmac('sha256', seg).update(corpo).digest('hex')
-      const status = await enviarComRetry(e.url, headers, corpo)
-      await svc.from('simulado_webhook_saida').update({ ultimo_status: status, ultimo_envio: new Date().toISOString() }).eq('id', e.id)
+      const r = await enviarComRetry(e.url, headers, corpo)
+      await svc.from('simulado_webhook_saida').update({ ultimo_status: r.status, ultimo_envio: new Date().toISOString() }).eq('id', e.id)
+      // Log de entrega (histórico p/ a sub-aba "Logs de saída"). Best-effort + tolerante à tabela ausente.
+      try {
+        await svc.from('simulado_webhook_saida_logs').insert({
+          tenant_id: tenantId, webhook_id: e.id, nome: e.nome ?? null, url: e.url, evento,
+          status: r.ok ? 'ok' : 'erro', http_status: r.httpStatus, ms: r.ms, erro: r.ok ? null : r.status,
+        })
+      } catch { /* tabela ainda não migrada → ignora */ }
     }))
   } catch {
     // best-effort — ignora

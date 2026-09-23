@@ -10,6 +10,8 @@ import { AreaEmManutencao } from '@/components/admin/area-em-manutencao'
 import { getCurrentAccess, isSuperAdmin, accessCan, getAuthUser } from '@/lib/auth/permissions'
 import { getTenantTheme } from '@/lib/tenant-theme'
 import { resolverLoginConfig } from '@/lib/login-config'
+import { getImpersonationPermission } from '@/lib/impersonation/permissions'
+import { ImpersonationDockProvider } from '@/components/admin/impersonation/impersonation-dock'
 import { contagensSidebar } from '@/lib/admin/sidebar-counts'
 import { SplashSistema } from '@/components/admin/splash-sistema'
 import { TourProvider } from '@/components/admin/tour-guiado'
@@ -133,6 +135,18 @@ export default async function AdminLayout({
   const areaEmManutencao = areaBloqueadaDoPath(pathname, manutencaoAreas, manutencaoLiberados, access.userId)
   const podeGerenciarManutencao = access.isAdmin || access.permissions.includes('configuracoes:view')
 
+  // Visualização de aluno (impersonation): dono global da sessão + janela flutuante (persiste ao
+  // navegar). Config de carregamento branded = mesma marca do login.
+  const impPerm = await getImpersonationPermission(access)
+  const impLoading = {
+    config: resolverLoginConfig(ti.login),
+    logo: ti.logo_url ?? null,
+    logoBg: ti.logo_png_bg ?? '#ffffff',
+    logoEstilo: ti.logo_estilo ?? 'arredondado',
+    logoFiltro: ti.logo_filtro_sistema ?? ti.logo_filtro ?? 'none',
+    plataforma: ti.nome_site ?? tenantNome ?? 'Plataforma',
+  }
+
   return (
     <>
     {/* Anti-flash: aplica a escala de fonte salva (por usuário) antes do 1º paint. */}
@@ -147,6 +161,7 @@ export default async function AdminLayout({
         nome={ti.nome_site ?? tenantNome ?? 'Plataforma'}
         mensagem={ti.splash_mensagem ?? 'Carregando o sistema…'}
       />
+      <ImpersonationDockProvider podeAbrir={!!impPerm} isAdmin={access.isAdmin} loading={impLoading}>
       <SidebarProvider>
         <div className="flex h-screen w-full overflow-hidden">
           <AdminSidebar logo={ti.logo_url ?? null} nome={ti.nome_site ?? tenantNome ?? 'Plataforma'} subtitulo={ti.subtitulo_site ?? null} logoBg={ti.logo_png_bg ?? '#ffffff'} logoEstilo={ti.logo_estilo ?? 'arredondado'} logoFiltro={ti.logo_filtro_sistema ?? ti.logo_filtro ?? 'none'} isSuperAdmin={superAdmin} userName={userName} userEmail={userEmail} loginConfig={resolverLoginConfig(ti.login)} counts={counts} areasBloqueadas={areasBloqueadas} />
@@ -171,6 +186,7 @@ export default async function AdminLayout({
           </TourProvider>
         </div>
       </SidebarProvider>
+      </ImpersonationDockProvider>
     </CanProvider>
     </>
   )

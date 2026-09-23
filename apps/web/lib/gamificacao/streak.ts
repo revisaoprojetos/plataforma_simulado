@@ -1,8 +1,8 @@
 import { getGamConfig } from './config'
-import { diaLocal, diaAnterior } from './datas'
+import { diaLocal } from './datas'
 import { ensureCacheRow } from './cache'
 import { awardXp } from './xp'
-import { dispararEngajamento } from './engajamento'
+import { avaliarEngajamentoAoEstudar } from './engajamento-webhooks'
 
 const diaNum = (dia: string) => Math.floor(Date.parse(dia + 'T00:00:00Z') / 86_400_000)
 
@@ -62,17 +62,8 @@ export async function registrarAtividade(svc: any, { tenantId, estudanteId }: { 
     }
   }
 
-  // Engajamento em tempo real (webhook): sequência (N dias) + marcos (7/14/21/30…). Idempotente pelo
-  // log; fire-and-forget para não segurar o fluxo do aluno. A INATIVIDADE fica no cron de engajamento.
-  const eng = config.engajamento
-  if (eng.sequencia.ativo && streak === (eng.sequencia.dias ?? 0)) {
-    // Re-incentiva a CADA nova sequência: a chave usa a DATA DE INÍCIO do streak (não o valor), então
-    // quebrar e refazer os N dias dispara de novo (início diferente = ref diferente).
-    let inicio = hoje
-    for (let i = 0; i < streak - 1; i++) inicio = diaAnterior(inicio)
-    void dispararEngajamento(svc, { tenantId, estudanteId, tipo: 'sequencia', ref: `seq-${inicio}`, gatilho: eng.sequencia, streakAtual: streak, streakMaior: maior })
-  }
-  if (eng.marco.ativo && (eng.marco.marcos ?? []).includes(streak)) {
-    void dispararEngajamento(svc, { tenantId, estudanteId, tipo: 'marco', ref: `marco-${streak}`, gatilho: eng.marco, streakAtual: streak, streakMaior: maior, marco: streak })
-  }
+  // Engajamento em tempo real: cada WEBHOOK que assina gamificacao.sequencia/marco avalia SUAS regras
+  // (dias/marcos próprios) e dispara na sua URL. Idempotente pelo log (ref inclui o id do webhook);
+  // fire-and-forget para não segurar o fluxo do aluno. A INATIVIDADE fica no cron de engajamento.
+  void avaliarEngajamentoAoEstudar(svc, { tenantId, estudanteId, streakAtual: streak, streakMaior: maior, hoje })
 }

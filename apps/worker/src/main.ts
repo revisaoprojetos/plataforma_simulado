@@ -64,6 +64,9 @@ if (WEB_INTERNAL_URL && CRON_SECRET) {
   setInterval(() => { void chamarCron('/api/cron/curseduca-jobs', 'cron curseduca', (j) => !!j.processados) }, 60_000)
   setInterval(() => { void chamarCron('/api/cron/curseduca-sync', 'cron curseduca-sync', (j) => !!j.rodadas) }, 60_000)
   setInterval(() => { void chamarCron('/api/cron/integracoes-eventos', 'cron integracoes-eventos', (j) => !!(j.processados || j.erros)) }, 60_000)
+  // Leitura: publica as aulas AGENDADAS cuja data (publicarEm) já chegou → publicado=true (vale em todos
+  // os gates/ranking). Sem isto, aula agendada ficava travada até publicar à mão. Idempotente, a cada 60s.
+  setInterval(() => { void chamarCron('/api/cron/leitura-publicar', 'cron leitura-publicar', (j) => !!j.publicadas) }, 60_000)
   // Self-healing do elo grupo→banco: destrava alunos que entraram no grupo mas ficaram sem
   // pasta/matrícula (lag de deploy, banco vinculado depois, erro transitório). Idempotente.
   setInterval(() => { void chamarCron('/api/cron/sincronizar-grupos-bancos', 'cron sync grupos→bancos', (j) => !!(j.pastaInseridos || j.matriculasInseridas)) }, 180_000)

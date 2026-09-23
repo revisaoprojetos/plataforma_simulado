@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,10 +9,11 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogClose } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
-import { Webhook, Plus, Trash2, Pencil, Loader2, Check, Zap, RefreshCw, AlertTriangle, Search, X, Lock, ListFilter, ChevronDown, FileJson, Copy, Send } from 'lucide-react'
+import { Webhook, Plus, Trash2, Pencil, Loader2, Check, Zap, RefreshCw, AlertTriangle, Search, X, Lock, ListFilter, ChevronDown, FileJson, Copy, Send, Flame } from 'lucide-react'
 import { criarWebhook, atualizarWebhook, toggleWebhook, excluirWebhook, testarWebhook } from '@/app/admin/conexoes/webhooks/actions'
+import { resolverRegras } from '@/lib/webhooks/engajamento-regras'
 
-type Wh = { id: string; nome: string; url: string; eventos: string[]; temSecret: boolean; ativo: boolean; ultimoStatus: string | null; ultimoEnvio: string | null; enviosSimultaneos: number; filtroSimulados: string[] }
+type Wh = { id: string; nome: string; url: string; eventos: string[]; temSecret: boolean; ativo: boolean; ultimoStatus: string | null; ultimoEnvio: string | null; enviosSimultaneos: number; filtroSimulados: string[]; engajamentoRegras?: unknown }
 type Evt = { chave: string; label: string; descricao?: string; grupo?: string }
 type Sim = { id: string; titulo: string }
 
@@ -27,6 +29,7 @@ export function WebhooksConfig({ webhooks, eventos, simulados, precisaMigrar }: 
   const [busca, setBusca] = useState('')
   const [guiaAberta, setGuiaAberta] = useState(false)
   const [pending, start] = useTransition()
+  const router = useRouter()
   const labelEvento = (c: string) => eventos.find((e) => e.chave === c)?.label ?? c
 
   const filtrados = useMemo(() => {
@@ -35,11 +38,11 @@ export function WebhooksConfig({ webhooks, eventos, simulados, precisaMigrar }: 
   }, [webhooks, busca])
 
   function toggle(w: Wh) {
-    start(async () => { const r = await toggleWebhook(w.id, !w.ativo); if (r.ok) location.reload(); else toast.error(r.error ?? 'Erro') })
+    start(async () => { const r = await toggleWebhook(w.id, !w.ativo); if (r.ok) router.refresh(); else toast.error(r.error ?? 'Erro') })
   }
   function excluir(id: string) {
     if (!confirm('Excluir este webhook?')) return
-    start(async () => { const r = await excluirWebhook(id); if (r.ok) location.reload(); else toast.error(r.error ?? 'Erro') })
+    start(async () => { const r = await excluirWebhook(id); if (r.ok) { toast.success('Webhook excluído.'); router.refresh() } else toast.error(r.error ?? 'Erro') })
   }
   const [testando, setTestando] = useState<string | null>(null)
   async function testar(w: Wh, evento?: string) {
@@ -280,6 +283,21 @@ function BlocoCodigo({ titulo, texto, onCopy }: { titulo: string; texto: string;
   )
 }
 
+/** "7, 14 21;30" → [7,14,21,30] */
+function parseMarcos(s: string): number[] {
+  return [...new Set(s.split(/[^\d]+/).map((x) => parseInt(x, 10)).filter((n) => Number.isFinite(n) && n > 0))].sort((a, b) => a - b)
+}
+
+function CampoMensagemWh({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <label className="block space-y-1">
+      <span className="text-[11px] font-medium text-muted-foreground">Mensagem</span>
+      <textarea value={value} onChange={(e) => onChange(e.target.value)} rows={2} className="w-full rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
+      <span className="block text-[10px] text-muted-foreground">Variáveis: <code className="font-mono">{'{{nome}}'}</code> <code className="font-mono">{'{{dias}}'}</code> <code className="font-mono">{'{{marco}}'}</code> <code className="font-mono">{'{{streak}}'}</code> <code className="font-mono">{'{{maior}}'}</code></span>
+    </label>
+  )
+}
+
 function WebhookDialog({ modo, wh, eventos, simulados, onClose }: { modo: 'novo' | 'editar'; wh?: Wh; eventos: Evt[]; simulados: Sim[]; onClose: () => void }) {
   const [nome, setNome] = useState(wh?.nome ?? '')
   const [url, setUrl] = useState(wh?.url ?? '')
@@ -287,48 +305,100 @@ function WebhookDialog({ modo, wh, eventos, simulados, onClose }: { modo: 'novo'
   const [secret, setSecret] = useState('')
   const [ativo, setAtivo] = useState(wh?.ativo ?? true)
   const [envios, setEnvios] = useState(wh?.enviosSimultaneos ?? 5)
-  const [sel, setSel] = useState<Set<string>>(new Set(wh?.eventos ?? eventos.map((e) => e.chave)))
-  // Chaves dos eventos de gamificação (para o filtro "por gamificação" e para agrupar o picker).
-  const chavesGamif = eventos.filter((e) => e.grupo === 'gamificacao').map((e) => e.chave)
-  const soGamif = (arr?: string[]) => !!arr?.length && arr.every((c) => chavesGamif.includes(c))
-  // Filtro: 'todos' | 'simulado' | 'gamificacao'. Deriva o modo inicial dos dados salvos.
-  const [filtroModo, setFiltroModo] = useState<'todos' | 'simulado' | 'gamificacao'>(
-    (wh?.filtroSimulados?.length ?? 0) > 0 ? 'simulado' : soGamif(wh?.eventos) ? 'gamificacao' : 'todos',
-  )
+  // NOVO webhook começa só com eventos de SIMULADO (não marca gamificação por padrão → evita
+  // "webhook de entrega veio com gamificação"). Ao editar, mantém o que estava salvo.
+  const [sel, setSel] = useState<Set<string>>(new Set(wh?.eventos ?? eventos.filter((e) => e.grupo !== 'gamificacao').map((e) => e.chave)))
+  const [filtrarSim, setFiltrarSim] = useState<boolean>((wh?.filtroSimulados?.length ?? 0) > 0)
   const [simSel, setSimSel] = useState<Set<string>>(new Set(wh?.filtroSimulados ?? []))
+  // Regras de engajamento POR WEBHOOK — aparecem inline quando o evento gamificacao.* é marcado.
+  const regras0 = resolverRegras(wh?.engajamentoRegras)
+  const [inativoDias, setInativoDias] = useState(regras0.inativo.dias ?? 1)
+  const [inativoMsg, setInativoMsg] = useState(regras0.inativo.mensagem)
+  const [seqDias, setSeqDias] = useState(regras0.sequencia.dias ?? 4)
+  const [seqMsg, setSeqMsg] = useState(regras0.sequencia.mensagem)
+  const [marcosTxt, setMarcosTxt] = useState((regras0.marco.marcos ?? []).join(', '))
+  const [marcoMsg, setMarcoMsg] = useState(regras0.marco.mensagem)
   const [pending, start] = useTransition()
-
-  // Ao escolher "por gamificação", escopa o webhook aos 3 gatilhos de gamificação (e some o filtro de simulado).
-  function escolherModo(m: 'todos' | 'simulado' | 'gamificacao') {
-    setFiltroModo(m)
-    if (m === 'gamificacao') setSel(new Set(chavesGamif))
-  }
+  const router = useRouter()
 
   const toggleEvt = (c: string) => setSel((p) => { const n = new Set(p); n.has(c) ? n.delete(c) : n.add(c); return n })
   const toggleSim = (id: string) => setSimSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
 
   const urlOk = /^https?:\/\/.+/i.test(url.trim())
   const nomeOk = nome.trim().length >= 3
+  const grupoSim = eventos.filter((e) => e.grupo !== 'gamificacao')
+  const grupoGamif = eventos.filter((e) => e.grupo === 'gamificacao')
+  const temSimSel = grupoSim.some((e) => sel.has(e.chave))
 
   function salvar() {
     if (!nomeOk) return toast.error('O nome deve ter no mínimo 3 caracteres.')
     if (!urlOk) return toast.error('Informe uma URL válida (http/https).')
+    if (sel.size === 0) return toast.error('Selecione ao menos um evento.')
     start(async () => {
       const data = {
         nome, url, eventos: [...sel], secret: secret || undefined, ativo,
         enviosSimultaneos: envios,
-        filtroSimulados: filtroModo === 'simulado' ? [...simSel] : [],
+        filtroSimulados: filtrarSim ? [...simSel] : [],
+        // Regras salvas sempre (só valem para os eventos gamificacao.* que o webhook assina).
+        engajamentoRegras: {
+          inativo: { dias: inativoDias, mensagem: inativoMsg },
+          sequencia: { dias: seqDias, mensagem: seqMsg },
+          marco: { marcos: parseMarcos(marcosTxt), mensagem: marcoMsg },
+        },
       }
       const r = modo === 'novo' ? await criarWebhook(data) : await atualizarWebhook(wh!.id, data)
-      if (r.ok) location.reload()
+      if (r.ok) { toast.success(modo === 'novo' ? 'Webhook criado.' : 'Webhook atualizado.'); onClose(); router.refresh() }
       else toast.error(r.error ?? 'Erro ao salvar')
     })
+  }
+
+  // Campo de regra exibido inline sob um evento de gamificação marcado.
+  function RegraGamif({ chave }: { chave: string }) {
+    if (chave === 'gamificacao.inativo') return (
+      <div className="mt-1 space-y-2 rounded-lg border border-dashed bg-muted/20 p-2.5">
+        <label className="flex items-center gap-2 text-xs"><span className="text-muted-foreground">Enviar após</span>
+          <Input type="number" min={1} value={inativoDias} onChange={(e) => setInativoDias(Math.max(1, Number(e.target.value) || 1))} className="h-8 w-20 text-center" /><span className="text-muted-foreground">dia(s) sem entrar</span></label>
+        <CampoMensagemWh value={inativoMsg} onChange={setInativoMsg} />
+      </div>
+    )
+    if (chave === 'gamificacao.sequencia') return (
+      <div className="mt-1 space-y-2 rounded-lg border border-dashed bg-muted/20 p-2.5">
+        <label className="flex items-center gap-2 text-xs"><span className="text-muted-foreground">Ao atingir</span>
+          <Input type="number" min={2} value={seqDias} onChange={(e) => setSeqDias(Math.max(2, Number(e.target.value) || 2))} className="h-8 w-20 text-center" /><span className="text-muted-foreground">dias seguidos</span></label>
+        <CampoMensagemWh value={seqMsg} onChange={setSeqMsg} />
+      </div>
+    )
+    if (chave === 'gamificacao.marco') return (
+      <div className="mt-1 space-y-2 rounded-lg border border-dashed bg-muted/20 p-2.5">
+        <label className="block space-y-1"><span className="text-[11px] font-medium text-muted-foreground">Marcos (dias) — editável</span>
+          <Input value={marcosTxt} onChange={(e) => setMarcosTxt(e.target.value)} placeholder="7, 14, 21, 30" className="h-8 tabular-nums" />
+          <span className="block text-[10px] text-muted-foreground">Aplicados: <strong className="tabular-nums">{parseMarcos(marcosTxt).join(', ') || '—'}</strong></span></label>
+        <CampoMensagemWh value={marcoMsg} onChange={setMarcoMsg} />
+      </div>
+    )
+    return null
+  }
+
+  const linhaEvento = (e: Evt) => {
+    const on = sel.has(e.chave)
+    return (
+      <div key={e.chave}>
+        <button type="button" onClick={() => toggleEvt(e.chave)} className={cn('flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors', on ? 'bg-primary/5' : 'hover:bg-muted')}>
+          <span className={cn('mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border', on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>{on && <Check className="h-3 w-3" />}</span>
+          <span className="min-w-0">
+            <span className="block text-sm leading-tight">{e.label}</span>
+            {e.descricao && <span className="block text-[11px] leading-snug text-muted-foreground">{e.descricao}</span>}
+          </span>
+        </button>
+        {/* Regras aparecem quando o evento de gamificação é marcado (editáveis por webhook). */}
+        {on && e.grupo === 'gamificacao' && <div className="pl-6"><RegraGamif chave={e.chave} /></div>}
+      </div>
+    )
   }
 
   return (
     <Dialog open onOpenChange={(o) => !o && onClose()}>
       <DialogContent showCloseButton={false} className="max-w-2xl gap-0 overflow-hidden p-0 sm:max-w-2xl">
-        {/* Cabeçalho (barra colorida) */}
         <div className="flex items-center justify-between bg-primary px-5 py-3 text-primary-foreground">
           <h2 className="text-base font-semibold">{modo === 'novo' ? 'Adicionar Webhook' : 'Editar Webhook'}</h2>
           <DialogClose render={<button type="button" aria-label="Fechar" className="rounded-md p-1 transition-colors hover:bg-white/20" />}><X className="h-4 w-4" /></DialogClose>
@@ -355,49 +425,38 @@ function WebhookDialog({ modo, wh, eventos, simulados, onClose }: { modo: 'novo'
             </div>
           </div>
 
+          {/* Eventos de SIMULADO */}
           <div className="space-y-1.5">
-            <Label>Filtrar por</Label>
-            <div className="flex flex-wrap gap-4 text-sm">
-              <label className="flex cursor-pointer items-center gap-1.5"><input type="radio" name="filtro" checked={filtroModo === 'todos'} onChange={() => escolherModo('todos')} className="accent-primary" /> Todos</label>
-              <label className="flex cursor-pointer items-center gap-1.5"><input type="radio" name="filtro" checked={filtroModo === 'simulado'} onChange={() => escolherModo('simulado')} className="accent-primary" /> Simulado</label>
-              <label className="flex cursor-pointer items-center gap-1.5"><input type="radio" name="filtro" checked={filtroModo === 'gamificacao'} onChange={() => escolherModo('gamificacao')} className="accent-primary" /> Gamificação</label>
-            </div>
-            {filtroModo === 'simulado' && (
-              <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border p-2">
-                {simulados.length === 0 ? <p className="px-1 py-2 text-xs text-muted-foreground">Nenhum simulado cadastrado.</p> : simulados.map((s) => {
-                  const on = simSel.has(s.id)
-                  return (
-                    <button key={s.id} type="button" onClick={() => toggleSim(s.id)} className={cn('flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors', on ? 'bg-primary/5' : 'hover:bg-muted')}>
-                      <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded border', on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>{on && <Check className="h-3 w-3" />}</span>
-                      <span className="truncate">{s.titulo}</span>
-                    </button>
-                  )
-                })}
+            <Label className="flex items-center gap-1.5"><Send className="h-3.5 w-3.5" /> Eventos de simulado</Label>
+            <div className="space-y-1 rounded-lg border p-2">{grupoSim.map(linhaEvento)}</div>
+            {temSimSel && (
+              <div className="space-y-1.5 pt-1">
+                <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={filtrarSim} onChange={(e) => setFiltrarSim(e.target.checked)} className="accent-primary" /> Enviar só de simulados específicos</label>
+                {filtrarSim && (
+                  <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border p-2">
+                    {simulados.length === 0 ? <p className="px-1 py-2 text-xs text-muted-foreground">Nenhum simulado cadastrado.</p> : simulados.map((s) => {
+                      const on = simSel.has(s.id)
+                      return (
+                        <button key={s.id} type="button" onClick={() => toggleSim(s.id)} className={cn('flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors', on ? 'bg-primary/5' : 'hover:bg-muted')}>
+                          <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded border', on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>{on && <Check className="h-3 w-3" />}</span>
+                          <span className="truncate">{s.titulo}</span>
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
-            )}
-            {filtroModo === 'gamificacao' && (
-              <p className="rounded-lg border border-dashed bg-muted/30 px-3 py-2 text-xs text-muted-foreground">Eventos de gamificação não têm simulado. Escolha os gatilhos (inatividade, sequência, marco) na lista de eventos abaixo.</p>
             )}
           </div>
 
-          <div className="space-y-1.5">
-            <Label>Eventos que disparam</Label>
-            <div className="space-y-1 rounded-lg border p-2">
-              {/* Só mostra os eventos do grupo do filtro (gamificação → só os 3 gatilhos; senão todos). */}
-              {eventos.filter((e) => filtroModo !== 'gamificacao' || e.grupo === 'gamificacao').map((e) => {
-                const on = sel.has(e.chave)
-                return (
-                  <button key={e.chave} type="button" onClick={() => toggleEvt(e.chave)} className={cn('flex w-full items-start gap-2 rounded-md px-2 py-1.5 text-left transition-colors', on ? 'bg-primary/5' : 'hover:bg-muted')}>
-                    <span className={cn('mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border', on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>{on && <Check className="h-3 w-3" />}</span>
-                    <span className="min-w-0">
-                      <span className="block text-sm leading-tight">{e.label}</span>
-                      {e.descricao && <span className="block text-[11px] leading-snug text-muted-foreground">{e.descricao}</span>}
-                    </span>
-                  </button>
-                )
-              })}
+          {/* Eventos de GAMIFICAÇÃO (engajamento) — com regras editáveis por evento marcado */}
+          {grupoGamif.length > 0 && (
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5"><Flame className="h-3.5 w-3.5" /> Gamificação (engajamento)</Label>
+              <div className="space-y-1 rounded-lg border p-2">{grupoGamif.map(linhaEvento)}</div>
+              <p className="text-[11px] text-muted-foreground">Marque um gatilho para editar as regras dele (dias/marcos/mensagem). As regras valem só para este webhook.</p>
             </div>
-          </div>
+          )}
 
           <div className="space-y-1.5">
             <Label>Segredo (opcional — assina o corpo com HMAC)</Label>

@@ -10,7 +10,7 @@ import { montarCorpoWebhook, dadosExemploWebhook, enviarWebhookHttp } from '@/li
 
 // `secret` semântica no UPDATE: undefined = MANTER o atual (o client não reenvia o segredo, que nunca
 // chega ao browser); string vazia = limpar; string = novo segredo (guardado CRIPTOGRAFADO).
-type WebhookInput = { nome: string; url: string; eventos: string[]; secret?: string; ativo?: boolean; enviosSimultaneos?: number; filtroSimulados?: string[] }
+type WebhookInput = { nome: string; url: string; eventos: string[]; secret?: string; ativo?: boolean; enviosSimultaneos?: number; filtroSimulados?: string[]; engajamentoRegras?: Record<string, unknown> }
 
 /** Webhooks carregam segredo HMAC e apontam para URLs externas → exigem permissão de configuração. */
 async function podeGerenciar(): Promise<boolean> {
@@ -40,9 +40,9 @@ export async function criarWebhook(data: WebhookInput): Promise<{ ok: boolean; i
     secret: criptografar(data.secret?.trim() || null), // CRIPTOGRAFADO em repouso (AES-256-GCM)
     ativo: data.ativo ?? true,
   }
-  const extra = { envios_simultaneos: data.enviosSimultaneos ?? 5, filtro_simulados: data.filtroSimulados ?? [] }
+  const extra = { envios_simultaneos: data.enviosSimultaneos ?? 5, filtro_simulados: data.filtroSimulados ?? [], engajamento_regras: data.engajamentoRegras ?? {} }
   let { data: row, error } = await svc.from('simulado_webhook_saida').insert({ ...base, ...extra }).select('id').single()
-  if (error && /envios_simultaneos|filtro_simulados|column/i.test(error.message)) {
+  if (error && /envios_simultaneos|filtro_simulados|engajamento_regras|column/i.test(error.message)) {
     ({ data: row, error } = await svc.from('simulado_webhook_saida').insert(base).select('id').single())
   }
   if (error || !row) return { ok: false, error: error?.message ?? 'Erro ao salvar' }
@@ -68,9 +68,9 @@ export async function atualizarWebhook(id: string, data: WebhookInput): Promise<
   }
   // undefined = manter o segredo atual; senão grava o novo CRIPTOGRAFADO ('' limpa).
   if (data.secret !== undefined) base.secret = criptografar(data.secret.trim() || null)
-  const extra = { envios_simultaneos: data.enviosSimultaneos ?? 5, filtro_simulados: data.filtroSimulados ?? [] }
+  const extra = { envios_simultaneos: data.enviosSimultaneos ?? 5, filtro_simulados: data.filtroSimulados ?? [], engajamento_regras: data.engajamentoRegras ?? {} }
   let { error } = await svc.from('simulado_webhook_saida').update({ ...base, ...extra }).eq('id', id).eq('tenant_id', tenantId)
-  if (error && /envios_simultaneos|filtro_simulados|column/i.test(error.message)) {
+  if (error && /envios_simultaneos|filtro_simulados|engajamento_regras|column/i.test(error.message)) {
     ({ error } = await svc.from('simulado_webhook_saida').update(base).eq('id', id).eq('tenant_id', tenantId))
   }
   if (error) return { ok: false, error: error.message }

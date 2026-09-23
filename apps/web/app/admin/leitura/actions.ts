@@ -828,7 +828,12 @@ export interface DetalheRankingAluno {
   aulas: DetalheAulaRanking[]
 }
 
-/** Detalhe de um aluno no ranking do módulo (pop-up): aulas feitas (data+pontos), sequência e progresso. */
+/**
+ * Detalhe de um aluno no ranking do módulo (pop-up). CALCULA DAS RESPOSTAS (mesma fonte, fórmula e
+ * ordenação `id` da TABELA do ranking) → pop-up e tabela SEMPRE batem. Antes lia o ledger de XP
+ * (histórico, com combos antigos/lacunas) e divergia da tabela (ex.: 35 no pop-up × 30 na tabela;
+ * ou 0 no pop-up para quem tinha respostas mas nenhum evento de XP).
+ */
 export async function detalheRankingAluno(moduloId: string, estudanteId: string): Promise<{ ok: boolean; detalhe?: DetalheRankingAluno; error?: string }> {
   const g = await guard('leitura:view'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
@@ -839,30 +844,64 @@ export async function detalheRankingAluno(moduloId: string, estudanteId: string)
   const docList = (docs ?? []) as { id: string; titulo: string; ordem: number }[]
   const docIds = docList.map((d) => d.id)
 
-  // XP de leitura do aluno (leitura + quiz) por documento.
-  const refs = [...docIds, ...docIds.map((id) => `quiz:${id}`)]
-  const { data: ev } = refs.length
-    ? await svc.from('simulado_xp_eventos').select('ref_id, xp, criado_em').eq('tenant_id', g.tenantId).eq('estudante_id', estudanteId).eq('origem', 'leitura').in('ref_id', refs)
-    : { data: [] as { ref_id: string; xp: number; criado_em: string }[] }
-  const porDoc = new Map<string, { pontos: number; data: string | null }>()
-  for (const e of (ev ?? []) as { ref_id: string; xp: number; criado_em: string }[]) {
-    const docId = String(e.ref_id).replace(/^quiz:/, '')
-    const cur = porDoc.get(docId) ?? { pontos: 0, data: null as string | null }
-    cur.pontos += e.xp || 0
-    if (!cur.data || (e.criado_em && e.criado_em < cur.data)) cur.data = e.criado_em ?? cur.data
-    porDoc.set(docId, cur)
-  }
-  const aulas: DetalheAulaRanking[] = docList.filter((d) => porDoc.has(d.id)).map((d) => ({ titulo: d.titulo, data: porDoc.get(d.id)!.data, pontos: porDoc.get(d.id)!.pontos }))
-  const pontosTotal = aulas.reduce((s, a) => s + a.pontos, 0)
+  // Pontuação do módulo + gamificação ativa/timezone — MESMA base do ranking (números batem).
+  const pontuacao = geral ? normalizarPontuacaoLeitura(null)
+    : normalizarPontuacaoLeitura(((await svc.from('simulado_pastas').select('pontuacao').eq('id', moduloId).eq('tenant_id', g.tenantId).maybeSingle()).data as any)?.pontuacao ?? null)
+  let gamAtivo = false, tz = 'America/Sao_Paulo'
+  try { const { data: cfg } = await svc.from('simulado_gamificacao_config').select('ativo, timezone').eq('tenant_id', g.tenantId).maybeSingle(); gamAtivo = !!(cfg as any)?.ativo; tz = (cfg as any)?.timezone || tz } catch { /* config ausente */ }
 
-  const { data: gamRow } = await svc.from('simulado_gamificacao_estudante').select('streak_atual, streak_maior, ultimo_dia_ativo').eq('tenant_id', g.tenantId).eq('estudante_id', estudanteId).maybeSingle()
+  // Quiz do módulo + respostas do ALUNO (order id → paginação estável). Mesma fonte da tabela.
+  let quiz: { documento_id: string; questao_id: string }[] = []
+  let resp: { documento_id: string; questao_id: string; correta: boolean; respondido_em: string | null }[] = []
+  if (docIds.length) {
+    const [q, r] = await Promise.all([
+      fetchAllByIn<{ documento_id: string; questao_id: string }>(docIds, (chunk) => svc.from('simulado_documento_quiz_questoes').select('documento_id, questao_id').eq('tenant_id', g.tenantId).eq('deletado', false).in('documento_id', chunk).order('id')).catch(() => [] as { documento_id: string; questao_id: string }[]),
+      fetchAllByIn<{ documento_id: string; questao_id: string; correta: boolean; respondido_em: string | null }>(docIds, (chunk) => svc.from('simulado_leitura_respostas').select('documento_id, questao_id, correta, respondido_em').eq('tenant_id', g.tenantId).eq('estudante_id', estudanteId).in('documento_id', chunk).order('id')),
+    ])
+    quiz = q; resp = r
+  }
+  const quizPorDoc = new Map<string, Set<string>>()
+  for (const q of quiz) (quizPorDoc.get(q.documento_id) ?? quizPorDoc.set(q.documento_id, new Set()).get(q.documento_id)!).add(q.questao_id)
+  type Cell = { answered: Set<string>; correct: Set<string>; ultima: string | null }
+  const cellPorDoc = new Map<string, Cell>()
+  for (const r of resp) {
+    const qq = quizPorDoc.get(r.documento_id); if (!qq || !qq.has(r.questao_id)) continue
+    const c = cellPorDoc.get(r.documento_id) ?? cellPorDoc.set(r.documento_id, { answered: new Set(), correct: new Set(), ultima: null }).get(r.documento_id)!
+    c.answered.add(r.questao_id); if (r.correta) c.correct.add(r.questao_id)
+    if (r.respondido_em && (!c.ultima || r.respondido_em > c.ultima)) c.ultima = r.respondido_em
+  }
+
+  const diaDe = (iso: string) => new Date(iso).toLocaleDateString('en-CA', { timeZone: tz })
+  const hoje = new Date().toLocaleDateString('en-CA', { timeZone: tz })
+  const ontem = new Date(Date.parse(hoje + 'T00:00:00Z') - 86_400_000).toISOString().slice(0, 10)
+  const aulas: DetalheAulaRanking[] = []
+  const diasConcluidos = new Set<string>()
+  for (const d of docList) {
+    const c = cellPorDoc.get(d.id); const qs = quizPorDoc.get(d.id)
+    if (!c || !qs || qs.size === 0 || ![...qs].every((qid) => c.answered.has(qid))) continue // só aulas FEITAS (quiz completo)
+    const gabaritou = [...qs].every((qid) => c.correct.has(qid))
+    const pontos = gamAtivo
+      ? (pontuacao.pontos_aula + pontuacao.pontos_quiz) + c.correct.size * pontuacao.pontos_acerto + (pontuacao.combo_ativo && gabaritou ? pontuacao.combo_bonus : 0)
+      : c.correct.size
+    aulas.push({ titulo: d.titulo, data: c.ultima, pontos })
+    if (c.ultima) diasConcluidos.add(diaDe(c.ultima))
+  }
+  const pontosTotal = aulas.reduce((s, a) => s + a.pontos, 0)
+  // Sequência = dias consecutivos (mesma regra da tabela) → a coluna Sequência bate com o pop-up.
+  const dias = [...diasConcluidos].sort()
+  let run = 0, prev = ''
+  for (const dd of dias) { run = prev && Date.parse(dd + 'T00:00:00Z') - Date.parse(prev + 'T00:00:00Z') === 86_400_000 ? run + 1 : 1; prev = dd }
+  const ultimo = dias[dias.length - 1] ?? ''
+  const streakAtual = ultimo === hoje || ultimo === ontem ? run : 0
+
+  const { data: gamRow } = await svc.from('simulado_gamificacao_estudante').select('streak_maior, ultimo_dia_ativo').eq('tenant_id', g.tenantId).eq('estudante_id', estudanteId).maybeSingle()
   const { data: est } = await svc.from('simulado_estudantes').select('nome, email').eq('id', estudanteId).eq('tenant_id', g.tenantId).maybeSingle()
 
   return {
     ok: true,
     detalhe: {
       nome: (est as any)?.nome ?? 'Aluno', email: (est as any)?.email ?? null,
-      streakAtual: (gamRow as any)?.streak_atual ?? 0, streakMaior: (gamRow as any)?.streak_maior ?? 0, ultimoDiaAtivo: (gamRow as any)?.ultimo_dia_ativo ?? null,
+      streakAtual, streakMaior: Math.max((gamRow as any)?.streak_maior ?? 0, streakAtual), ultimoDiaAtivo: (gamRow as any)?.ultimo_dia_ativo ?? null,
       totalAulas: docList.length, aulasConcluidas: aulas.length, pontosTotal, aulas,
     },
   }

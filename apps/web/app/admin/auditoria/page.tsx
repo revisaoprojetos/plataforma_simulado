@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase/server'
+import { listarLogsImpersonation } from '@/lib/impersonation/logs'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -24,6 +25,7 @@ interface PageProps {
 
 const ACESSO_OPS = ['LOGIN', 'LOGOUT', 'BLOQUEIO_AUTOMATICO']
 const MODIFICACAO_OPS = ['INSERT', 'UPDATE', 'DELETE', 'LIBERAR', 'BLOQUEAR', 'ANULAR', 'RECORRIGIR']
+const REASON_IMP: Record<string, string> = { closed_by_admin: 'Fechada pelo admin', expired: 'Expirou', renewed_into_new_session: 'Renovada' }
 
 const acaoVariant: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   INSERT: 'default', UPDATE: 'secondary', DELETE: 'destructive', LOGIN: 'outline', LOGOUT: 'outline',
@@ -89,6 +91,51 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
   const tenantId = await getCurrentTenantId()
   const tid = tenantId ?? '00000000-0000-0000-0000-000000000000'
   const offset = (page - 1) * ITEMS_PER_PAGE
+
+  // ── Aba "Visualizações de aluno" (impersonation): tabela própria (simulado_impersonation_logs). ──
+  if (params.tipo === 'visualizacoes') {
+    const logs = await listarLogsImpersonation(tid)
+    const adminIds = [...new Set(logs.map((l) => l.adminId))]
+    const adminEmail = new Map<string, string>()
+    for (const id of adminIds) {
+      try { const { data } = await supabase.auth.admin.getUserById(id); if (data?.user?.email) adminEmail.set(id, data.user.email) } catch { /* ignore */ }
+    }
+    return (
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Auditoria · Visualizações de aluno</h1>
+          <p className="text-muted-foreground">Quando um admin abriu e operou a conta de um aluno — {logs.length} registro(s)</p>
+        </div>
+        <Card className="overflow-hidden" style={{ ['--card-spacing' as any]: '0px' }}>
+          <SecaoHeader icon={ScrollText} titulo="Visualizações de aluno" subtitulo={`${logs.length} sessão(ões) · registro imutável`} />
+          <CardContent className="p-0">
+            <div className="overflow-x-auto">
+              <Table className="w-full table-fixed text-sm [&_td]:py-2 [&_th]:h-9 [&_th]:py-0">
+                <colgroup><col style={{ width: '22%' }} /><col style={{ width: '22%' }} /><col style={{ width: '15%' }} /><col style={{ width: '15%' }} /><col style={{ width: '14%' }} /><col style={{ width: '12%' }} /></colgroup>
+                <TableHeader><TableRow>
+                  <TableHead>Aluno</TableHead><TableHead>Admin</TableHead><TableHead>Início</TableHead><TableHead>Fim</TableHead><TableHead>Motivo</TableHead><TableHead>IP</TableHead>
+                </TableRow></TableHeader>
+                <TableBody>
+                  {logs.length === 0 ? (
+                    <TableRow><TableCell colSpan={6} className="py-8 text-center text-muted-foreground">Nenhuma visualização registrada ainda.</TableCell></TableRow>
+                  ) : logs.map((l) => (
+                    <TableRow key={l.id}>
+                      <TableCell className="truncate"><Link href={`/admin/estudantes/${l.estudanteId}`} className="font-medium hover:underline">{l.estudanteNome}</Link>{l.estudanteEmail && <span className="block truncate text-xs text-muted-foreground">{l.estudanteEmail}</span>}</TableCell>
+                      <TableCell className="truncate text-muted-foreground">{adminEmail.get(l.adminId) ?? `${l.adminId.slice(0, 8)}…`}</TableCell>
+                      <TableCell><DataHora iso={l.startedAt} /></TableCell>
+                      <TableCell>{l.endedAt ? <DataHora iso={l.endedAt} /> : <Badge variant="secondary">em aberto</Badge>}</TableCell>
+                      <TableCell className="truncate">{l.endReason ? (REASON_IMP[l.endReason] ?? l.endReason) : '—'}</TableCell>
+                      <TableCell className="truncate tabular-nums text-xs text-muted-foreground">{l.ip ?? '—'}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   const tipo = params.tipo === 'acessos' ? 'acessos' : params.tipo === 'modificacoes' ? 'modificacoes' : params.tipo === 'automacoes' ? 'automacoes' : 'todos'
   const ehAuto = tipo === 'automacoes'

@@ -12,7 +12,6 @@ import {
   UsersRound,
   BarChart3,
   ClipboardCheck,
-  CreditCard,
   MessageSquare,
   KeyRound,
   GraduationCap,
@@ -148,9 +147,8 @@ const navGroups: NavGroup[] = [
     icon: GraduationCap,
     items: [
       { label: 'Estudantes', href: '/admin/estudantes', icon: Users, perm: 'estudantes:view' },
-      { label: 'Visualizações de aluno', href: '/admin/impersonation', icon: Eye, perm: 'estudantes:view' },
       { label: 'Grupos', href: '/admin/grupos', icon: UsersRound, perm: 'grupos:view' },
-      { label: 'Matrículas', href: '/admin/matriculas', icon: CreditCard, perm: 'matriculas:view' },
+      { label: 'Visualizações de aluno', href: '/admin/impersonation', icon: Eye, perm: 'estudantes:view' },
     ],
   },
   {
@@ -180,6 +178,7 @@ const navGroups: NavGroup[] = [
       { label: 'Acessos', href: '/admin/auditoria?tipo=acessos', icon: LogIn, perm: 'auditoria:view' },
       { label: 'Modificações', href: '/admin/auditoria?tipo=modificacoes', icon: FilePen, perm: 'auditoria:view' },
       { label: 'Automações', href: '/admin/auditoria?tipo=automacoes', icon: Zap, perm: 'auditoria:view' },
+      { label: 'Visualizações', href: '/admin/auditoria?tipo=visualizacoes', icon: Eye, perm: 'auditoria:view' },
     ],
   },
   {
