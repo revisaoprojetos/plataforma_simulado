@@ -16,6 +16,9 @@ export const STATUS_EVENTO: Record<string, string> = {
   'gamificacao.inativo': 'inativo',
   'gamificacao.sequencia': 'sequencia',
   'gamificacao.marco': 'marco',
+  'leitura.inativo': 'inativo',
+  'leitura.sequencia': 'sequencia',
+  'leitura.marco': 'marco',
 }
 
 export function montarCorpoWebhook(
@@ -24,12 +27,20 @@ export function montarCorpoWebhook(
   tenantId: string,
   d: any,
   agoraISO: string,
+  /** Identidade do webhook que está enviando — para o n8n distinguir a origem (Lei Seca × plataforma…). */
+  wh?: { id: string | null; nome: string | null; origem: string | null },
 ): Record<string, unknown> {
   return {
     id: d.sessao_id ?? null,
     type: 'estudante',
     webhook_type: 'progressao_estudante',
     plataforma,
+    // Bloco de identidade do webhook (origem = rótulo escolhido no admin). Roteie no n8n por webhook.origem.
+    webhook: {
+      id: wh?.id ?? null,
+      nome: wh?.nome ?? null,
+      origem: wh?.origem ?? null,
+    },
     event: evento,
     status: STATUS_EVENTO[evento] ?? evento,
     dates: { created_at: agoraISO, occurred_at: agoraISO },
@@ -46,6 +57,11 @@ export function montarCorpoWebhook(
     simulado: {
       id: d.simulado?.id ?? null,
       name: d.simulado?.name ?? null,
+    },
+    // Módulo de leitura (eventos leitura.*) — id/nome da pasta; null nos demais eventos.
+    modulo: {
+      id: d.modulo?.id ?? null,
+      nome: d.modulo?.nome ?? null,
     },
     resultado: {
       sessao_id: d.sessao_id ?? null,
@@ -71,6 +87,8 @@ export function montarCorpoWebhook(
 export function dadosExemploWebhook(evento: string): any {
   const finalizado = evento === 'estudante.finalizou'
   const ehGam = evento.startsWith('gamificacao.')
+  const ehLeitura = evento.startsWith('leitura.')
+  const ehEngaj = ehGam || ehLeitura
   const contact = { id: 'a17b93c2-4d8e-4f1a-b6c0-2e9f7d3a5c88', name: 'João da Silva (teste)', email: 'joao.teste@example.com', doc: '12345678900', phone_number: '5571999670570', phone_local_code: '71', plano: 'passaporte' }
   const engajamento = evento === 'gamificacao.inativo'
     ? { tipo: 'inativo', dias: 1, marco: null, streak_atual: 3, streak_maior: 12, mensagem: 'Oi João! Faz 1 dia que você não aparece — bora voltar? 💪' }
@@ -78,15 +96,22 @@ export function dadosExemploWebhook(evento: string): any {
       ? { tipo: 'sequencia', dias: 4, marco: null, streak_atual: 4, streak_maior: 12, mensagem: 'Mandou bem, João! 4 dias seguidos. Continue firme! 🔥' }
       : evento === 'gamificacao.marco'
         ? { tipo: 'marco', dias: null, marco: 7, streak_atual: 7, streak_maior: 12, mensagem: 'Parabéns, João! 🏆 7 dias consecutivos!' }
-        : undefined
+        : evento === 'leitura.inativo'
+          ? { tipo: 'inativo', dias: 1, marco: null, streak_atual: 2, streak_maior: 9, mensagem: 'Oi João! Faz 1 dia que você não faz aula de Lei Seca — bora continuar? 📚' }
+          : evento === 'leitura.sequencia'
+            ? { tipo: 'sequencia', dias: 4, marco: null, streak_atual: 4, streak_maior: 9, mensagem: 'Mandou bem, João! 4 dias seguidos na Lei Seca. Continue! 🔥' }
+            : evento === 'leitura.marco'
+              ? { tipo: 'marco', dias: null, marco: 7, streak_atual: 7, streak_maior: 9, mensagem: 'Parabéns, João! 🏆 7 dias consecutivos na Lei Seca!' }
+              : undefined
   return {
-    sessao_id: ehGam ? null : '3f9a1c7e-0b2d-4e6a-9c11-8d5e2a7b4f10',
+    sessao_id: ehEngaj ? null : '3f9a1c7e-0b2d-4e6a-9c11-8d5e2a7b4f10',
     contact,
-    simulado: ehGam ? undefined : { id: 'b2c4d6e8-1a3b-5c7d-9e0f-2b4d6f8a0c11', name: 'Simulado de teste' },
+    simulado: ehEngaj ? undefined : { id: 'b2c4d6e8-1a3b-5c7d-9e0f-2b4d6f8a0c11', name: 'Simulado de teste' },
+    modulo: ehLeitura ? { id: 'd4e6f8a0-2b4d-6f8a-0c11-3e5f7a9b1d22', nome: 'Desafio de Lei Seca' } : undefined,
     nota: finalizado ? 8.5 : undefined,
     acertos: finalizado ? 17 : undefined,
     total: finalizado ? 20 : undefined,
-    tentativa: ehGam ? undefined : 1,
+    tentativa: ehEngaj ? undefined : 1,
     motivo: evento === 'estudante.nao_finalizou' ? 'tempo_esgotado' : undefined,
     engajamento,
   }

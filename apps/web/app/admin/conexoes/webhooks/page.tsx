@@ -22,13 +22,13 @@ export default async function WebhooksPage() {
 
   let webhooks: any[] = []
   let precisaMigrar = false
-  // Tolerante às colunas novas (envios_simultaneos, filtro_simulados, engajamento_regras).
+  // Tolerante às colunas novas (envios_simultaneos, filtro_simulados, filtro_modulos, engajamento_regras, origem).
   let r: any = await svc
     .from('simulado_webhook_saida')
-    .select('id, nome, url, eventos, secret, ativo, ultimo_status, ultimo_envio, envios_simultaneos, filtro_simulados, engajamento_regras')
+    .select('id, nome, url, eventos, secret, ativo, ultimo_status, ultimo_envio, envios_simultaneos, filtro_simulados, filtro_modulos, engajamento_regras, origem')
     .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
     .order('criado_em', { ascending: false })
-  if (r.error && /envios_simultaneos|filtro_simulados|engajamento_regras|column/i.test(r.error.message)) {
+  if (r.error && /envios_simultaneos|filtro_simulados|filtro_modulos|engajamento_regras|origem|column/i.test(r.error.message)) {
     r = await svc.from('simulado_webhook_saida').select('id, nome, url, eventos, secret, ativo, ultimo_status, ultimo_envio').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('criado_em', { ascending: false })
   }
   if (r.error) precisaMigrar = /webhook_saida|relation|does not exist/i.test(r.error.message)
@@ -36,18 +36,27 @@ export default async function WebhooksPage() {
 
   const { data: sims } = await svc.from('simulado_simulados').select('id, titulo').eq('deletado', false).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').is('owner_estudante_id', null).order('titulo')
 
+  // Módulos de leitura (Lei Seca) para o filtro dos eventos leitura.* — pastas folder_area='leitura'.
+  const { data: mods } = await svc.from('simulado_pastas').select('id, nome').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').eq('is_folder', true).eq('folder_area', 'leitura').order('ordem', { ascending: true }).order('nome', { ascending: true })
+
   // Automações (aba n8n) — tolerante se a tabela ainda não foi migrada.
   let automacoes: any[] = []
   const ra = await svc.from('simulado_automacoes').select('id, nome, ativo, gatilho, passos, ultimo_status, ultimo_run').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('criado_em', { ascending: false })
   if (!ra.error) automacoes = ra.data ?? []
 
-  // Logs de saída (sub-aba) — últimas 200 entregas; tolerante à tabela não migrada.
+  // Origens já usadas (para o seletor do diálogo sugerir "criar novas" sem duplicar).
+  const origensExistentes = [...new Set((webhooks as any[]).map((w) => (w.origem ?? '').trim()).filter(Boolean))].sort()
+
+  // Logs de saída (sub-aba) — últimas 200 entregas; tolerante à tabela/coluna não migrada.
   let logsSaida: any[] = []
   let logsPrecisaMigrar = false
-  const rl = await svc.from('simulado_webhook_saida_logs')
-    .select('id, nome, url, evento, status, http_status, ms, erro, criado_em')
+  let rl: any = await svc.from('simulado_webhook_saida_logs')
+    .select('id, nome, origem, url, evento, status, http_status, ms, erro, criado_em')
     .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
     .order('criado_em', { ascending: false }).limit(200)
+  if (rl.error && /origem|column/i.test(rl.error.message)) {
+    rl = await svc.from('simulado_webhook_saida_logs').select('id, nome, url, evento, status, http_status, ms, erro, criado_em').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('criado_em', { ascending: false }).limit(200)
+  }
   if (rl.error) logsPrecisaMigrar = /webhook_saida_logs|relation|does not exist/i.test(rl.error.message)
   else logsSaida = rl.data ?? []
 
@@ -65,8 +74,12 @@ export default async function WebhooksPage() {
           ultimoStatus: w.ultimo_status ?? null, ultimoEnvio: w.ultimo_envio ?? null,
           enviosSimultaneos: w.envios_simultaneos ?? 5,
           filtroSimulados: Array.isArray(w.filtro_simulados) ? w.filtro_simulados : [],
+          filtroModulos: Array.isArray(w.filtro_modulos) ? w.filtro_modulos : [],
           engajamentoRegras: w.engajamento_regras ?? {},
+          origem: w.origem ?? null,
         }))}
+        origensExistentes={origensExistentes}
+        modulos={(mods ?? []).map((m: any) => ({ id: m.id, titulo: m.nome ?? 'Módulo' }))}
         automacoes={automacoes.map((a) => ({
           id: a.id, nome: a.nome, ativo: !!a.ativo, gatilho: a.gatilho ?? null,
           passos: Array.isArray(a.passos) ? a.passos : [],
@@ -77,7 +90,7 @@ export default async function WebhooksPage() {
         precisaMigrar={precisaMigrar}
         appUrl={appUrl}
         inboundToken={inboundToken}
-        logsSaida={logsSaida.map((l: any) => ({ id: l.id, nome: l.nome ?? null, url: l.url, evento: l.evento ?? null, status: l.status ?? null, httpStatus: l.http_status ?? null, ms: l.ms ?? null, erro: l.erro ?? null, criadoEm: l.criado_em ?? null }))}
+        logsSaida={logsSaida.map((l: any) => ({ id: l.id, nome: l.nome ?? null, origem: l.origem ?? null, url: l.url, evento: l.evento ?? null, status: l.status ?? null, httpStatus: l.http_status ?? null, ms: l.ms ?? null, erro: l.erro ?? null, criadoEm: l.criado_em ?? null }))}
         logsPrecisaMigrar={logsPrecisaMigrar}
       />
     </div>

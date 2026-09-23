@@ -11,18 +11,18 @@ import { diaLocal, diaAnterior } from './datas'
  * então o mesmo marco pode ir para vários webhooks sem repetir em cada um.
  */
 
-type WhGamif = { id: string; nome: string | null; url: string; secret: string | null; eventos: string[]; regras: EngajamentoRegras }
+type WhGamif = { id: string; nome: string | null; url: string; secret: string | null; eventos: string[]; origem: string | null; regras: EngajamentoRegras }
 
 /** Webhooks ATIVOS do tenant que assinam algum evento de gamificação, já com as regras resolvidas. */
 async function carregarWebhooksGamif(svc: any, tenantId: string): Promise<WhGamif[]> {
-  let r = await svc.from('simulado_webhook_saida').select('id, nome, url, secret, eventos, engajamento_regras').eq('tenant_id', tenantId).eq('ativo', true)
-  if (r.error && /engajamento_regras|column/i.test(r.error.message)) {
+  let r = await svc.from('simulado_webhook_saida').select('id, nome, url, secret, eventos, origem, engajamento_regras').eq('tenant_id', tenantId).eq('ativo', true)
+  if (r.error && /engajamento_regras|origem|column/i.test(r.error.message)) {
     r = await svc.from('simulado_webhook_saida').select('id, nome, url, secret, eventos').eq('tenant_id', tenantId).eq('ativo', true)
   }
   if (r.error) return []
   return ((r.data ?? []) as any[])
     .filter((w) => Array.isArray(w.eventos) && w.eventos.some((e: string) => e.startsWith('gamificacao.')))
-    .map((w) => ({ id: w.id, nome: w.nome ?? null, url: w.url, secret: w.secret ?? null, eventos: w.eventos, regras: resolverRegras(w.engajamento_regras) }))
+    .map((w) => ({ id: w.id, nome: w.nome ?? null, url: w.url, secret: w.secret ?? null, eventos: w.eventos, origem: w.origem ?? null, regras: resolverRegras(w.engajamento_regras) }))
 }
 
 async function plataformaDo(svc: any, tenantId: string): Promise<PlataformaWh> {
@@ -47,7 +47,7 @@ async function dispararParaWebhook(
   return enviarWebhookDireto(svc, tenantId, plataforma, `gamificacao.${tipo}` as any, {
     contact: contatoEstudante(est, estudanteId),
     engajamento: { tipo, dias: extra.dias, marco: extra.marco, streak_atual: extra.streakAtual, streak_maior: extra.streakMaior, mensagem },
-  }, { webhookId: wh.id, nome: wh.nome, url: wh.url, secret: wh.secret })
+  }, { webhookId: wh.id, nome: wh.nome, url: wh.url, secret: wh.secret, origem: wh.origem })
 }
 
 /**

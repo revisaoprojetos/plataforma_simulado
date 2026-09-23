@@ -1,6 +1,7 @@
 import { getGamConfig, type GamConfig } from './config'
 import { awardXp } from './xp'
 import { registrarAtividade } from './streak'
+import { avaliarEngajamentoLeituraAoEstudar } from './engajamento-leitura'
 import { progredirMissoes } from './missoes'
 import { avaliarConquistas } from './conquistas'
 import { gamAtivaParaAluno } from './publico'
@@ -142,6 +143,8 @@ export async function onLeituraConcluida(
     await registrarAtividade(svc, { tenantId, estudanteId })
     await progredirMissoes(svc, { tenantId, estudanteId, evento: 'concluiu_aula_leitura' })
     if (ctx.pastaId) await avaliarDesafiosModulo(svc, config, tenantId, estudanteId, ctx.pastaId, ctx.desafios)
+    // Engajamento POR MÓDULO (leitura.sequencia/marco) — sequência de dias fazendo aula no módulo.
+    if (ctx.pastaId) void avaliarEngajamentoLeituraAoEstudar(svc, { tenantId, estudanteId, pastaId: ctx.pastaId, hoje: dia, timezone: config.timezone })
     await avaliarConquistas(svc, { tenantId, estudanteId })
     await verificarMetaDiaria(svc, config, tenantId, estudanteId)
   } catch (e) {
@@ -178,6 +181,8 @@ export async function onQuizConcluido(
       }
     }
     if (ctx.pastaId) await avaliarDesafiosModulo(svc, config, tenantId, estudanteId, ctx.pastaId, ctx.desafios)
+    // Engajamento POR MÓDULO — o quiz é o que fecha a "aula completa" que conta na sequência do módulo.
+    if (ctx.pastaId) void avaliarEngajamentoLeituraAoEstudar(svc, { tenantId, estudanteId, pastaId: ctx.pastaId, hoje: dia, timezone: config.timezone })
     await avaliarConquistas(svc, { tenantId, estudanteId })
     await verificarMetaDiaria(svc, config, tenantId, estudanteId)
   } catch (e) {

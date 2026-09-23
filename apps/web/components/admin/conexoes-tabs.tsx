@@ -10,10 +10,10 @@ import { WebhookLogsSaida, type LogSaida } from '@/components/admin/webhook-logs
 type Evt = { chave: string; label: string; descricao?: string; grupo?: string }
 type Sim = { id: string; titulo: string }
 
-export function ConexoesTabs({ webhooks, automacoes, eventos, simulados, precisaMigrar, appUrl, inboundToken, logsSaida, logsPrecisaMigrar }: {
+export function ConexoesTabs({ webhooks, automacoes, eventos, simulados, precisaMigrar, appUrl, inboundToken, logsSaida, logsPrecisaMigrar, origensExistentes, modulos }: {
   webhooks: any[]; automacoes: any[]; eventos: Evt[]; simulados: Sim[]; precisaMigrar: boolean
   appUrl: string; inboundToken: string | null
-  logsSaida: LogSaida[]; logsPrecisaMigrar: boolean
+  logsSaida: LogSaida[]; logsPrecisaMigrar: boolean; origensExistentes: string[]; modulos: Sim[]
 }) {
   return (
     <Tabs defaultValue="webhook" className="gap-5">
@@ -35,7 +35,7 @@ export function ConexoesTabs({ webhooks, automacoes, eventos, simulados, precisa
           </TabsList>
 
           <TabsContent value="entrega">
-            <WebhooksConfig webhooks={webhooks} eventos={eventos} simulados={simulados} precisaMigrar={precisaMigrar} />
+            <WebhooksConfig webhooks={webhooks} eventos={eventos} simulados={simulados} precisaMigrar={precisaMigrar} origensExistentes={origensExistentes} modulos={modulos} />
           </TabsContent>
 
           <TabsContent value="logs">

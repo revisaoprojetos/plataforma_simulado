@@ -10,7 +10,7 @@ import { montarCorpoWebhook, dadosExemploWebhook, enviarWebhookHttp } from '@/li
 
 // `secret` semântica no UPDATE: undefined = MANTER o atual (o client não reenvia o segredo, que nunca
 // chega ao browser); string vazia = limpar; string = novo segredo (guardado CRIPTOGRAFADO).
-type WebhookInput = { nome: string; url: string; eventos: string[]; secret?: string; ativo?: boolean; enviosSimultaneos?: number; filtroSimulados?: string[]; engajamentoRegras?: Record<string, unknown> }
+type WebhookInput = { nome: string; url: string; eventos: string[]; secret?: string; ativo?: boolean; enviosSimultaneos?: number; filtroSimulados?: string[]; filtroModulos?: string[]; engajamentoRegras?: Record<string, unknown>; origem?: string | null }
 
 /** Webhooks carregam segredo HMAC e apontam para URLs externas → exigem permissão de configuração. */
 async function podeGerenciar(): Promise<boolean> {
@@ -40,9 +40,9 @@ export async function criarWebhook(data: WebhookInput): Promise<{ ok: boolean; i
     secret: criptografar(data.secret?.trim() || null), // CRIPTOGRAFADO em repouso (AES-256-GCM)
     ativo: data.ativo ?? true,
   }
-  const extra = { envios_simultaneos: data.enviosSimultaneos ?? 5, filtro_simulados: data.filtroSimulados ?? [], engajamento_regras: data.engajamentoRegras ?? {} }
+  const extra = { envios_simultaneos: data.enviosSimultaneos ?? 5, filtro_simulados: data.filtroSimulados ?? [], filtro_modulos: data.filtroModulos ?? [], engajamento_regras: data.engajamentoRegras ?? {}, origem: data.origem?.trim() || null }
   let { data: row, error } = await svc.from('simulado_webhook_saida').insert({ ...base, ...extra }).select('id').single()
-  if (error && /envios_simultaneos|filtro_simulados|engajamento_regras|column/i.test(error.message)) {
+  if (error && /envios_simultaneos|filtro_simulados|filtro_modulos|engajamento_regras|origem|column/i.test(error.message)) {
     ({ data: row, error } = await svc.from('simulado_webhook_saida').insert(base).select('id').single())
   }
   if (error || !row) return { ok: false, error: error?.message ?? 'Erro ao salvar' }
@@ -68,9 +68,9 @@ export async function atualizarWebhook(id: string, data: WebhookInput): Promise<
   }
   // undefined = manter o segredo atual; senão grava o novo CRIPTOGRAFADO ('' limpa).
   if (data.secret !== undefined) base.secret = criptografar(data.secret.trim() || null)
-  const extra = { envios_simultaneos: data.enviosSimultaneos ?? 5, filtro_simulados: data.filtroSimulados ?? [], engajamento_regras: data.engajamentoRegras ?? {} }
+  const extra = { envios_simultaneos: data.enviosSimultaneos ?? 5, filtro_simulados: data.filtroSimulados ?? [], filtro_modulos: data.filtroModulos ?? [], engajamento_regras: data.engajamentoRegras ?? {}, origem: data.origem?.trim() || null }
   let { error } = await svc.from('simulado_webhook_saida').update({ ...base, ...extra }).eq('id', id).eq('tenant_id', tenantId)
-  if (error && /envios_simultaneos|filtro_simulados|engajamento_regras|column/i.test(error.message)) {
+  if (error && /envios_simultaneos|filtro_simulados|filtro_modulos|engajamento_regras|origem|column/i.test(error.message)) {
     ({ error } = await svc.from('simulado_webhook_saida').update(base).eq('id', id).eq('tenant_id', tenantId))
   }
   if (error) return { ok: false, error: error.message }
@@ -100,11 +100,16 @@ export async function testarWebhook(id: string, evento?: string): Promise<{ ok: 
   const tenantId = await getCurrentTenantId()
   if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   const svc = await createServiceClient()
-  const { data: wh } = await svc.from('simulado_webhook_saida').select('url, secret, eventos').eq('id', id).eq('tenant_id', tenantId).maybeSingle()
+  // Tolerante à coluna `origem` (adicionada depois).
+  let wr: any = await svc.from('simulado_webhook_saida').select('url, secret, eventos, nome, origem').eq('id', id).eq('tenant_id', tenantId).maybeSingle()
+  if (wr.error && /origem|column/i.test(wr.error.message)) {
+    wr = await svc.from('simulado_webhook_saida').select('url, secret, eventos, nome').eq('id', id).eq('tenant_id', tenantId).maybeSingle()
+  }
+  const wh = wr.data
   if (!wh?.url) return { ok: false, error: 'Webhook não encontrado.' }
   const ev = evento || (Array.isArray(wh.eventos) && wh.eventos[0]) || 'estudante.finalizou'
   const { data: tnt } = await svc.from('simulado_tenants').select('nome, slug').eq('id', tenantId).maybeSingle()
-  const corpo = JSON.stringify(montarCorpoWebhook(ev, { id: tenantId, nome: (tnt as any)?.nome ?? null, slug: (tnt as any)?.slug ?? null }, tenantId, dadosExemploWebhook(ev), new Date().toISOString()))
+  const corpo = JSON.stringify(montarCorpoWebhook(ev, { id: tenantId, nome: (tnt as any)?.nome ?? null, slug: (tnt as any)?.slug ?? null }, tenantId, dadosExemploWebhook(ev), new Date().toISOString(), { id, nome: (wh as any).nome ?? null, origem: (wh as any).origem ?? null }))
   const r = await enviarWebhookHttp(wh.url, ev, corpo, descriptografar(wh.secret))
   // Registra o resultado do teste no status do webhook (visível na lista) e audita.
   await svc.from('simulado_webhook_saida').update({ ultimo_status: `teste: ${r.texto}`, ultimo_envio: new Date().toISOString() }).eq('id', id).eq('tenant_id', tenantId)

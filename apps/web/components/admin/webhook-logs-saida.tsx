@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Search, RefreshCw, AlertTriangle, CheckCircle2, XCircle, ListChecks } from 'lucide-react'
 
 export type LogSaida = {
-  id: string; nome: string | null; url: string; evento: string | null
+  id: string; nome: string | null; origem: string | null; url: string; evento: string | null
   status: string | null; httpStatus: number | null; ms: number | null; erro: string | null; criadoEm: string | null
 }
 
@@ -22,7 +22,7 @@ export function WebhookLogsSaida({ logs, eventos, precisaMigrar }: { logs: LogSa
     return logs.filter((l) => {
       if (filtro !== 'todos' && (l.status ?? '') !== filtro) return false
       if (!q) return true
-      return `${l.nome ?? ''} ${l.url} ${l.evento ?? ''}`.toLowerCase().includes(q)
+      return `${l.nome ?? ''} ${l.origem ?? ''} ${l.url} ${l.evento ?? ''}`.toLowerCase().includes(q)
     })
   }, [logs, busca, filtro])
 
@@ -82,7 +82,10 @@ export function WebhookLogsSaida({ logs, eventos, precisaMigrar }: { logs: LogSa
                 return (
                   <tr key={l.id} className="transition-colors hover:bg-muted/30">
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">{l.criadoEm ? new Date(l.criadoEm).toLocaleString('pt-BR') : '—'}</td>
-                    <td className="px-4 py-3"><span className="block truncate font-medium" title={l.nome ?? ''}>{l.nome ?? '—'}</span></td>
+                    <td className="px-4 py-3">
+                      <span className="block truncate font-medium" title={l.nome ?? ''}>{l.nome ?? '—'}</span>
+                      {l.origem && <span className="mt-0.5 inline-flex items-center rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">{l.origem}</span>}
+                    </td>
                     <td className="px-4 py-3"><span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">{labelEvento(l.evento)}</span></td>
                     <td className="max-w-[240px] px-4 py-3"><span className="block truncate text-xs text-muted-foreground" title={l.url}>{l.url}</span></td>
                     <td className="px-4 py-3">

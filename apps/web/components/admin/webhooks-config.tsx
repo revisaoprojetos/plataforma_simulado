@@ -9,13 +9,16 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogClose } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
-import { Webhook, Plus, Trash2, Pencil, Loader2, Check, Zap, RefreshCw, AlertTriangle, Search, X, Lock, ListFilter, ChevronDown, FileJson, Copy, Send, Flame } from 'lucide-react'
+import { Webhook, Plus, Trash2, Pencil, Loader2, Check, Zap, RefreshCw, AlertTriangle, Search, X, Lock, ListFilter, ChevronDown, FileJson, Copy, Send, Flame, Tag, BookOpen } from 'lucide-react'
 import { criarWebhook, atualizarWebhook, toggleWebhook, excluirWebhook, testarWebhook } from '@/app/admin/conexoes/webhooks/actions'
 import { resolverRegras } from '@/lib/webhooks/engajamento-regras'
 
-type Wh = { id: string; nome: string; url: string; eventos: string[]; temSecret: boolean; ativo: boolean; ultimoStatus: string | null; ultimoEnvio: string | null; enviosSimultaneos: number; filtroSimulados: string[]; engajamentoRegras?: unknown }
+type Wh = { id: string; nome: string; url: string; eventos: string[]; temSecret: boolean; ativo: boolean; ultimoStatus: string | null; ultimoEnvio: string | null; enviosSimultaneos: number; filtroSimulados: string[]; filtroModulos?: string[]; engajamentoRegras?: unknown; origem?: string | null }
 type Evt = { chave: string; label: string; descricao?: string; grupo?: string }
 type Sim = { id: string; titulo: string }
+
+/** Origens sugeridas (o admin pode criar novas digitando). Servem para identificar o webhook. */
+const ORIGENS_PRESET = ['Lei Seca', 'Acesso à plataforma', 'Simulado', 'Outros']
 
 function gerarSecret() {
   const arr = new Uint8Array(24)
@@ -23,7 +26,7 @@ function gerarSecret() {
   return Array.from(arr).map((b) => b.toString(16).padStart(2, '0')).join('')
 }
 
-export function WebhooksConfig({ webhooks, eventos, simulados, precisaMigrar }: { webhooks: Wh[]; eventos: Evt[]; simulados: Sim[]; precisaMigrar: boolean }) {
+export function WebhooksConfig({ webhooks, eventos, simulados, precisaMigrar, origensExistentes = [], modulos = [] }: { webhooks: Wh[]; eventos: Evt[]; simulados: Sim[]; precisaMigrar: boolean; origensExistentes?: string[]; modulos?: Sim[] }) {
   const [dialog, setDialog] = useState<{ modo: 'novo' | 'editar'; wh?: Wh } | null>(null)
   const [payloadWh, setPayloadWh] = useState<Wh | null>(null)
   const [busca, setBusca] = useState('')
@@ -110,10 +113,14 @@ export function WebhooksConfig({ webhooks, eventos, simulados, precisaMigrar }: 
                     <div className="flex items-center gap-2">
                       <span className={cn('flex h-8 w-8 shrink-0 items-center justify-center rounded-lg', w.ativo ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-muted text-muted-foreground')}><Webhook className="h-4 w-4" /></span>
                       <div className="min-w-0">
-                        <p className="truncate font-medium">{w.nome}</p>
+                        <div className="flex items-center gap-1.5">
+                          <p className="truncate font-medium">{w.nome}</p>
+                          {w.origem && <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary" title={`Origem: ${w.origem}`}><Tag className="h-2.5 w-2.5" /> {w.origem}</span>}
+                        </div>
                         <p className="flex items-center gap-2 text-xs text-muted-foreground">
                           {w.temSecret && <span className="inline-flex items-center gap-0.5"><Lock className="h-3 w-3" /> assinado</span>}
                           {w.filtroSimulados.length > 0 && <span className="inline-flex items-center gap-0.5"><ListFilter className="h-3 w-3" /> {w.filtroSimulados.length} simulado(s)</span>}
+                          {(w.filtroModulos?.length ?? 0) > 0 && <span className="inline-flex items-center gap-0.5"><ListFilter className="h-3 w-3" /> {w.filtroModulos!.length} módulo(s)</span>}
                         </p>
                       </div>
                     </div>
@@ -143,7 +150,7 @@ export function WebhooksConfig({ webhooks, eventos, simulados, precisaMigrar }: 
         </div>
       </div>
 
-      {dialog && <WebhookDialog modo={dialog.modo} wh={dialog.wh} eventos={eventos} simulados={simulados} onClose={() => setDialog(null)} />}
+      {dialog && <WebhookDialog modo={dialog.modo} wh={dialog.wh} eventos={eventos} simulados={simulados} modulos={modulos} origensExistentes={origensExistentes} onClose={() => setDialog(null)} />}
       {payloadWh && <PayloadDialog wh={payloadWh} eventos={eventos} onClose={() => setPayloadWh(null)} />}
     </div>
   )
@@ -153,7 +160,7 @@ export function WebhooksConfig({ webhooks, eventos, simulados, precisaMigrar }: 
  * Monta um exemplo do corpo REAL enviado (espelha `lib/webhooks/dispatch.ts`). Estrutura fixa
  * em todos os eventos; os campos de resultado variam conforme o evento (iniciou → nulls).
  */
-function exemploPayload(evento: string) {
+function exemploPayload(evento: string, wh?: { id?: string; nome?: string; origem?: string | null }) {
   const statusEvento: Record<string, string> = {
     'estudante.iniciou': 'iniciado',
     'estudante.finalizou': 'finalizado',
@@ -179,6 +186,7 @@ function exemploPayload(evento: string) {
     type: 'estudante',
     webhook_type: 'progressao_estudante',
     plataforma: { id: 'ce74e4ab-dea1-4aaf-9122-992075d0912a', nome: 'Plataforma Simulado', slug: 'simulado' },
+    webhook: { id: wh?.id ?? 'b8d8ca78-…', nome: wh?.nome ?? 'Webhook (exemplo)', origem: wh?.origem ?? null },
     event: evento,
     status: statusEvento[evento] ?? evento,
     dates: { created_at: '2026-07-16T13:00:00.000Z', occurred_at: '2026-07-16T13:00:00.000Z' },
@@ -213,7 +221,7 @@ function PayloadDialog({ wh, eventos, onClose }: { wh: Wh; eventos: Evt[]; onClo
   const [testando, setTestando] = useState(false)
   const labelEvento = (c: string) => eventos.find((e) => e.chave === c)?.label ?? c
 
-  const corpo = useMemo(() => JSON.stringify(exemploPayload(evento), null, 2), [evento])
+  const corpo = useMemo(() => JSON.stringify(exemploPayload(evento, { id: wh.id, nome: wh.nome, origem: wh.origem ?? null }), null, 2), [evento, wh.id, wh.nome, wh.origem])
   const headers = useMemo(() => {
     const h: Record<string, string> = { 'Content-Type': 'application/json', 'X-Webhook-Evento': evento }
     if (wh.temSecret) h['X-Webhook-Signature'] = 'sha256=e3b0c44298fc1c149afbf4c8996fb924…'
@@ -288,28 +296,34 @@ function parseMarcos(s: string): number[] {
   return [...new Set(s.split(/[^\d]+/).map((x) => parseInt(x, 10)).filter((n) => Number.isFinite(n) && n > 0))].sort((a, b) => a - b)
 }
 
-function CampoMensagemWh({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function CampoMensagemWh({ value, onChange, leitura = false }: { value: string; onChange: (v: string) => void; leitura?: boolean }) {
   return (
     <label className="block space-y-1">
       <span className="text-[11px] font-medium text-muted-foreground">Mensagem</span>
       <textarea value={value} onChange={(e) => onChange(e.target.value)} rows={2} className="w-full rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring" />
-      <span className="block text-[10px] text-muted-foreground">Variáveis: <code className="font-mono">{'{{nome}}'}</code> <code className="font-mono">{'{{dias}}'}</code> <code className="font-mono">{'{{marco}}'}</code> <code className="font-mono">{'{{streak}}'}</code> <code className="font-mono">{'{{maior}}'}</code></span>
+      <span className="block text-[10px] text-muted-foreground">Variáveis: <code className="font-mono">{'{{nome}}'}</code> <code className="font-mono">{'{{dias}}'}</code> <code className="font-mono">{'{{marco}}'}</code> <code className="font-mono">{'{{streak}}'}</code> <code className="font-mono">{'{{maior}}'}</code>{leitura && <> <code className="font-mono">{'{{modulo}}'}</code></>}</span>
     </label>
   )
 }
 
-function WebhookDialog({ modo, wh, eventos, simulados, onClose }: { modo: 'novo' | 'editar'; wh?: Wh; eventos: Evt[]; simulados: Sim[]; onClose: () => void }) {
+function WebhookDialog({ modo, wh, eventos, simulados, modulos = [], origensExistentes = [], onClose }: { modo: 'novo' | 'editar'; wh?: Wh; eventos: Evt[]; simulados: Sim[]; modulos?: Sim[]; origensExistentes?: string[]; onClose: () => void }) {
   const [nome, setNome] = useState(wh?.nome ?? '')
   const [url, setUrl] = useState(wh?.url ?? '')
+  // Origem/identificador do webhook. Lista = presets ∪ origens já usadas ∪ a atual; "＋ Nova origem" abre input.
+  const origensLista = [...new Set([...ORIGENS_PRESET, ...origensExistentes, ...(wh?.origem ? [wh.origem] : [])].map((s) => s.trim()).filter(Boolean))]
+  const [origem, setOrigem] = useState(wh?.origem ?? '')
+  const [origemNova, setOrigemNova] = useState(false)
   // O segredo NUNCA chega ao browser (só `temSecret`). Campo começa vazio: em branco = manter o atual.
   const [secret, setSecret] = useState('')
   const [ativo, setAtivo] = useState(wh?.ativo ?? true)
   const [envios, setEnvios] = useState(wh?.enviosSimultaneos ?? 5)
-  // NOVO webhook começa só com eventos de SIMULADO (não marca gamificação por padrão → evita
-  // "webhook de entrega veio com gamificação"). Ao editar, mantém o que estava salvo.
-  const [sel, setSel] = useState<Set<string>>(new Set(wh?.eventos ?? eventos.filter((e) => e.grupo !== 'gamificacao').map((e) => e.chave)))
+  // NOVO webhook começa só com eventos de SIMULADO (entrega) — não marca gamificação nem leitura por
+  // padrão (evita "webhook de entrega veio com gamificação"). Ao editar, mantém o que estava salvo.
+  const [sel, setSel] = useState<Set<string>>(new Set(wh?.eventos ?? eventos.filter((e) => e.grupo === 'entrega').map((e) => e.chave)))
   const [filtrarSim, setFiltrarSim] = useState<boolean>((wh?.filtroSimulados?.length ?? 0) > 0)
   const [simSel, setSimSel] = useState<Set<string>>(new Set(wh?.filtroSimulados ?? []))
+  const [filtrarMod, setFiltrarMod] = useState<boolean>((wh?.filtroModulos?.length ?? 0) > 0)
+  const [modSel, setModSel] = useState<Set<string>>(new Set(wh?.filtroModulos ?? []))
   // Regras de engajamento POR WEBHOOK — aparecem inline quando o evento gamificacao.* é marcado.
   const regras0 = resolverRegras(wh?.engajamentoRegras)
   const [inativoDias, setInativoDias] = useState(regras0.inativo.dias ?? 1)
@@ -323,12 +337,15 @@ function WebhookDialog({ modo, wh, eventos, simulados, onClose }: { modo: 'novo'
 
   const toggleEvt = (c: string) => setSel((p) => { const n = new Set(p); n.has(c) ? n.delete(c) : n.add(c); return n })
   const toggleSim = (id: string) => setSimSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const toggleMod = (id: string) => setModSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
 
   const urlOk = /^https?:\/\/.+/i.test(url.trim())
   const nomeOk = nome.trim().length >= 3
-  const grupoSim = eventos.filter((e) => e.grupo !== 'gamificacao')
+  const grupoSim = eventos.filter((e) => e.grupo === 'entrega' || (e.grupo !== 'gamificacao' && e.grupo !== 'leitura'))
   const grupoGamif = eventos.filter((e) => e.grupo === 'gamificacao')
+  const grupoLeitura = eventos.filter((e) => e.grupo === 'leitura')
   const temSimSel = grupoSim.some((e) => sel.has(e.chave))
+  const temLeituraSel = grupoLeitura.some((e) => sel.has(e.chave))
 
   function salvar() {
     if (!nomeOk) return toast.error('O nome deve ter no mínimo 3 caracteres.')
@@ -338,7 +355,9 @@ function WebhookDialog({ modo, wh, eventos, simulados, onClose }: { modo: 'novo'
       const data = {
         nome, url, eventos: [...sel], secret: secret || undefined, ativo,
         enviosSimultaneos: envios,
+        origem: origem.trim() || null,
         filtroSimulados: filtrarSim ? [...simSel] : [],
+        filtroModulos: filtrarMod ? [...modSel] : [],
         // Regras salvas sempre (só valem para os eventos gamificacao.* que o webhook assina).
         engajamentoRegras: {
           inativo: { dias: inativoDias, mensagem: inativoMsg },
@@ -352,28 +371,31 @@ function WebhookDialog({ modo, wh, eventos, simulados, onClose }: { modo: 'novo'
     })
   }
 
-  // Campo de regra exibido inline sob um evento de gamificação marcado.
+  // Campo de regra exibido inline sob um evento de engajamento marcado (gamificacao.* ou leitura.*).
+  // As regras são compartilhadas pelo webhook; o texto muda um pouco entre "entrar" (plataforma) e
+  // "fazer aula no módulo" (leitura). `leitura` decide o rótulo.
   function RegraGamif({ chave }: { chave: string }) {
-    if (chave === 'gamificacao.inativo') return (
+    const leitura = chave.startsWith('leitura.')
+    if (chave.endsWith('.inativo')) return (
       <div className="mt-1 space-y-2 rounded-lg border border-dashed bg-muted/20 p-2.5">
         <label className="flex items-center gap-2 text-xs"><span className="text-muted-foreground">Enviar após</span>
-          <Input type="number" min={1} value={inativoDias} onChange={(e) => setInativoDias(Math.max(1, Number(e.target.value) || 1))} className="h-8 w-20 text-center" /><span className="text-muted-foreground">dia(s) sem entrar</span></label>
-        <CampoMensagemWh value={inativoMsg} onChange={setInativoMsg} />
+          <Input type="number" min={1} value={inativoDias} onChange={(e) => setInativoDias(Math.max(1, Number(e.target.value) || 1))} className="h-8 w-20 text-center" /><span className="text-muted-foreground">{leitura ? 'dia(s) sem fazer aula no módulo' : 'dia(s) sem entrar'}</span></label>
+        <CampoMensagemWh value={inativoMsg} onChange={setInativoMsg} leitura={leitura} />
       </div>
     )
-    if (chave === 'gamificacao.sequencia') return (
+    if (chave.endsWith('.sequencia')) return (
       <div className="mt-1 space-y-2 rounded-lg border border-dashed bg-muted/20 p-2.5">
         <label className="flex items-center gap-2 text-xs"><span className="text-muted-foreground">Ao atingir</span>
-          <Input type="number" min={2} value={seqDias} onChange={(e) => setSeqDias(Math.max(2, Number(e.target.value) || 2))} className="h-8 w-20 text-center" /><span className="text-muted-foreground">dias seguidos</span></label>
-        <CampoMensagemWh value={seqMsg} onChange={setSeqMsg} />
+          <Input type="number" min={2} value={seqDias} onChange={(e) => setSeqDias(Math.max(2, Number(e.target.value) || 2))} className="h-8 w-20 text-center" /><span className="text-muted-foreground">{leitura ? 'dias seguidos no módulo' : 'dias seguidos'}</span></label>
+        <CampoMensagemWh value={seqMsg} onChange={setSeqMsg} leitura={leitura} />
       </div>
     )
-    if (chave === 'gamificacao.marco') return (
+    if (chave.endsWith('.marco')) return (
       <div className="mt-1 space-y-2 rounded-lg border border-dashed bg-muted/20 p-2.5">
         <label className="block space-y-1"><span className="text-[11px] font-medium text-muted-foreground">Marcos (dias) — editável</span>
           <Input value={marcosTxt} onChange={(e) => setMarcosTxt(e.target.value)} placeholder="7, 14, 21, 30" className="h-8 tabular-nums" />
           <span className="block text-[10px] text-muted-foreground">Aplicados: <strong className="tabular-nums">{parseMarcos(marcosTxt).join(', ') || '—'}</strong></span></label>
-        <CampoMensagemWh value={marcoMsg} onChange={setMarcoMsg} />
+        <CampoMensagemWh value={marcoMsg} onChange={setMarcoMsg} leitura={leitura} />
       </div>
     )
     return null
@@ -390,8 +412,8 @@ function WebhookDialog({ modo, wh, eventos, simulados, onClose }: { modo: 'novo'
             {e.descricao && <span className="block text-[11px] leading-snug text-muted-foreground">{e.descricao}</span>}
           </span>
         </button>
-        {/* Regras aparecem quando o evento de gamificação é marcado (editáveis por webhook). */}
-        {on && e.grupo === 'gamificacao' && <div className="pl-6"><RegraGamif chave={e.chave} /></div>}
+        {/* Regras aparecem quando o evento de engajamento (gamificação/leitura) é marcado. */}
+        {on && (e.grupo === 'gamificacao' || e.grupo === 'leitura') && <div className="pl-6"><RegraGamif chave={e.chave} /></div>}
       </div>
     )
   }
@@ -409,6 +431,28 @@ function WebhookDialog({ modo, wh, eventos, simulados, onClose }: { modo: 'novo'
             <Label>Nome *</Label>
             <Input value={nome} onChange={(e) => setNome(e.target.value)} placeholder="ex.: n8n — Progressão de estudantes" />
             {!nomeOk && nome.length > 0 && <p className="text-xs text-destructive">O campo deve ter no mínimo 3 caracteres</p>}
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="flex items-center gap-1.5"><Tag className="h-3.5 w-3.5" /> Origem (identifica este webhook)</Label>
+            {origemNova ? (
+              <div className="flex gap-2">
+                <Input value={origem} onChange={(e) => setOrigem(e.target.value)} placeholder="ex.: Lei Seca" autoFocus />
+                <Button type="button" variant="outline" onClick={() => setOrigemNova(false)}>Da lista</Button>
+              </div>
+            ) : (
+              <select
+                value={origensLista.includes(origem) ? origem : (origem ? '__custom__' : '')}
+                onChange={(e) => { const v = e.target.value; if (v === '__nova__') { setOrigem(''); setOrigemNova(true) } else if (v !== '__custom__') setOrigem(v) }}
+                className="h-9 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-3 text-sm outline-none focus:ring-1 focus:ring-ring"
+              >
+                <option value="">Sem origem</option>
+                {origensLista.map((o) => <option key={o} value={o}>{o}</option>)}
+                {origem && !origensLista.includes(origem) && <option value="__custom__">{origem} (atual)</option>}
+                <option value="__nova__">＋ Nova origem…</option>
+              </select>
+            )}
+            <p className="text-[11px] text-muted-foreground">Aparece na etiqueta, nos logs e no payload (<code className="rounded bg-muted px-1">webhook.origem</code>) — para o n8n distinguir Lei Seca × plataforma × outros.</p>
           </div>
 
           <div className="space-y-1.5">
@@ -449,12 +493,39 @@ function WebhookDialog({ modo, wh, eventos, simulados, onClose }: { modo: 'novo'
             )}
           </div>
 
-          {/* Eventos de GAMIFICAÇÃO (engajamento) — com regras editáveis por evento marcado */}
+          {/* Eventos de GAMIFICAÇÃO DA PLATAFORMA (streak global) — com regras editáveis por evento */}
           {grupoGamif.length > 0 && (
             <div className="space-y-1.5">
-              <Label className="flex items-center gap-1.5"><Flame className="h-3.5 w-3.5" /> Gamificação (engajamento)</Label>
+              <Label className="flex items-center gap-1.5"><Flame className="h-3.5 w-3.5" /> Gamificação da plataforma</Label>
               <div className="space-y-1 rounded-lg border p-2">{grupoGamif.map(linhaEvento)}</div>
-              <p className="text-[11px] text-muted-foreground">Marque um gatilho para editar as regras dele (dias/marcos/mensagem). As regras valem só para este webhook.</p>
+              <p className="text-[11px] text-muted-foreground">Sequência/inatividade da plataforma inteira (qualquer atividade). Marque um gatilho para editar as regras dele.</p>
+            </div>
+          )}
+
+          {/* Eventos de LEITURA (Lei Seca) — por MÓDULO, com filtro de módulos + regras editáveis */}
+          {grupoLeitura.length > 0 && (
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5"><BookOpen className="h-3.5 w-3.5" /> Leitura (Lei Seca) — por módulo</Label>
+              <div className="space-y-1 rounded-lg border p-2">{grupoLeitura.map(linhaEvento)}</div>
+              <p className="text-[11px] text-muted-foreground">Sequência/inatividade dentro de um módulo de leitura (dias fazendo aula no módulo).</p>
+              {temLeituraSel && (
+                <div className="space-y-1.5 pt-1">
+                  <label className="flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={filtrarMod} onChange={(e) => setFiltrarMod(e.target.checked)} className="accent-primary" /> Enviar só de módulos específicos</label>
+                  {filtrarMod && (
+                    <div className="max-h-40 space-y-1 overflow-y-auto rounded-lg border p-2">
+                      {modulos.length === 0 ? <p className="px-1 py-2 text-xs text-muted-foreground">Nenhum módulo de leitura cadastrado.</p> : modulos.map((m) => {
+                        const on = modSel.has(m.id)
+                        return (
+                          <button key={m.id} type="button" onClick={() => toggleMod(m.id)} className={cn('flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors', on ? 'bg-primary/5' : 'hover:bg-muted')}>
+                            <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded border', on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>{on && <Check className="h-3 w-3" />}</span>
+                            <span className="truncate">{m.titulo}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 

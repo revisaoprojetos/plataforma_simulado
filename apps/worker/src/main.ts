@@ -82,6 +82,8 @@ if (WEB_INTERNAL_URL && CRON_SECRET) {
   setInterval(() => { void chamarCron('/api/cron/gamificacao-streak', 'cron gamificacao-streak', (j) => !!j.zerados) }, 3_600_000)
   // Engajamento: webhook de inatividade (aluno parou de entrar). De hora em hora (idempotente pelo log).
   setInterval(() => { void chamarCron('/api/cron/gamificacao-engajamento', 'cron gamificacao-engajamento', (j) => !!j.enviados) }, 3_600_000)
+  // Engajamento da LEITURA: webhook de inatividade POR MÓDULO (aluno parou de fazer aula no módulo). 1h.
+  setInterval(() => { void chamarCron('/api/cron/leitura-engajamento', 'cron leitura-engajamento', (j) => !!j.enviados) }, 3_600_000)
   // Armazenamento: recalcula o uso E sincroniza o catálogo simulado_arquivos (auto-cura o que os
   // uploads não registrarem). A cada 6h (idempotente); o console também dispara sob demanda.
   setInterval(() => { void chamarCron('/api/cron/storage-reconcile', 'cron storage', (j) => !!(j.inseridos || j.removidos)) }, 21_600_000)
