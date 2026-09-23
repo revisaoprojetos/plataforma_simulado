@@ -12,7 +12,8 @@ export const dynamic = 'force-dynamic'
 
 const TTL = Number(process.env.IMPERSONATION_TOKEN_TTL_SECONDS ?? 1800)
 const RATE = Number(process.env.IMPERSONATION_RATE_LIMIT_PER_HOUR ?? 20)
-const REAUTH_H = Number(process.env.IMPERSONATION_REQUIRE_REAUTH_AFTER_HOURS ?? 4)
+// Reauth (compliance) DESLIGADO por padrão (0). Só exige novo login se a env for setada > 0.
+const REAUTH_H = Number(process.env.IMPERSONATION_REQUIRE_REAUTH_AFTER_HOURS ?? 0)
 
 // E2/E10 — inicia a visualização do aluno: valida permissão + escopo + reauth + rate limit,
 // abre o log (E5), emite o JWT no cookie `aluno_impersonation` (read_only no MVP) e, se o tenant
@@ -24,15 +25,17 @@ export async function POST(req: NextRequest) {
   const perm = await getImpersonationPermission(access)
   if (!perm) return NextResponse.json({ error: 'no_permission' }, { status: 403 })
 
-  // Reauth (E10): sessão do admin velha demais → exige novo login (compliance). Best-effort.
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    const last = user?.last_sign_in_at ? new Date(user.last_sign_in_at).getTime() : null
-    if (last && Date.now() - last > REAUTH_H * 3_600_000) {
-      return NextResponse.json({ error: 'reauth_required' }, { status: 401 })
-    }
-  } catch { /* sem info de login → não bloqueia */ }
+  // Reauth (E10): só quando explicitamente configurado (REAUTH_H > 0). Best-effort.
+  if (REAUTH_H > 0) {
+    try {
+      const supabase = await createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      const last = user?.last_sign_in_at ? new Date(user.last_sign_in_at).getTime() : null
+      if (last && Date.now() - last > REAUTH_H * 3_600_000) {
+        return NextResponse.json({ error: 'reauth_required' }, { status: 401 })
+      }
+    } catch { /* sem info de login → não bloqueia */ }
+  }
 
   // Rate limit (E10) por admin.
   const rl = checarRateLimit(access.userId, RATE)
