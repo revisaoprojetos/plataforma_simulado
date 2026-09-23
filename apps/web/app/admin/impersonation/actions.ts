@@ -2,9 +2,26 @@
 
 import { revalidatePath } from 'next/cache'
 import { getCurrentAccess } from '@/lib/auth/permissions'
+import { getImpersonationPermission } from '@/lib/impersonation/permissions'
 import { createAdminClient } from '@/lib/supabase/server'
 import { registrarAudit } from '@/lib/audit'
 import { getModoNotificacao, type NotifMode } from '@/lib/impersonation/notification'
+
+export interface AlunoBusca { id: string; nome: string; email: string | null }
+
+/** Busca alunos do tenant para o console de visualização (só quem pode visualizar). */
+export async function buscarAlunosImpersonacao(query: string): Promise<{ ok: boolean; alunos?: AlunoBusca[]; error?: string }> {
+  const access = await getCurrentAccess()
+  if (!access.userId || !access.tenantId) return { ok: false, error: 'Sessão inválida.' }
+  const perm = await getImpersonationPermission(access)
+  if (!perm) return { ok: false, error: 'Sem permissão para visualizar alunos.' }
+  const svc = createAdminClient()
+  const q = (query ?? '').trim().replace(/[,%()]/g, ' ').trim()
+  let sel = svc.from('simulado_estudantes').select('id, nome, email').eq('tenant_id', access.tenantId).order('nome').limit(40)
+  if (q) sel = sel.or(`nome.ilike.%${q}%,email.ilike.%${q}%`)
+  const { data } = await sel
+  return { ok: true, alunos: (data ?? []) as AlunoBusca[] }
+}
 
 // Só administradores (admin/super_admin/admin_geral) configuram QUEM pode visualizar alunos.
 async function guardAdmin() {
@@ -45,7 +62,7 @@ export async function salvarPapelImpersonacao(roleId: string, habilitar: boolean
   try {
     if (habilitar) {
       const { error } = await svc.from('simulado_impersonation_permissions').upsert(
-        { tenant_id: g.access.tenantId, role_id: roleId, scope: 'own_tenant', action_level: 'read_only' },
+        { tenant_id: g.access.tenantId, role_id: roleId, scope: 'own_tenant', action_level: 'read_and_act' },
         { onConflict: 'tenant_id,role_id' },
       )
       if (error) throw error

@@ -87,8 +87,8 @@ export function ImpersonationOverlay({ estudanteId, estudanteNome, onClose }: { 
         className="relative flex h-full w-full flex-col overflow-hidden border bg-card shadow-2xl sm:h-[90vh] sm:max-w-6xl sm:rounded-2xl">
         {/* Barra superior */}
         <div className="flex items-center gap-3 border-b bg-muted/40 px-4 py-2.5">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-600 dark:text-amber-400">
-            <Eye className="h-3.5 w-3.5" /> Visualização (somente leitura)
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-2.5 py-1 text-xs font-semibold text-amber-600 dark:text-amber-400" title="As ações feitas contam como do próprio aluno">
+            <Eye className="h-3.5 w-3.5" /> Operável — edições contam como o aluno
           </span>
           <span className="min-w-0 truncate text-sm text-muted-foreground">Vendo como <span className="font-semibold text-foreground">{estudanteNome}</span></span>
           <button type="button" onClick={() => encerrar('closed_by_admin')} aria-label="Fechar visualização"

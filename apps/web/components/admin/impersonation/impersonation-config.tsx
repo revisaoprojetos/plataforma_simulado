@@ -63,7 +63,7 @@ export function ImpersonationConfig({ roles, modo }: { roles: PapelImpersonacao[
           <Eye className="h-4 w-4 text-primary" />
           <h2 className="text-sm font-semibold">Quem pode visualizar alunos</h2>
         </div>
-        <p className="mb-4 text-xs text-muted-foreground">Papéis habilitados veem o botão “Ver como aluno” no perfil do estudante. A visualização é sempre <b>somente leitura</b>.</p>
+        <p className="mb-4 text-xs text-muted-foreground">Papéis habilitados podem abrir a conta do aluno no console. É <b>modo operável</b>: as ações feitas são gravadas como se fossem do aluno (contam na nota/ranking). Só ações de identidade irreversível (LGPD, e-mail de login, exclusão de conta) ficam bloqueadas.</p>
         <div className="divide-y rounded-xl border">
           {lista.length === 0 ? (
             <p className="p-4 text-center text-sm text-muted-foreground">Nenhum papel neste tenant.</p>

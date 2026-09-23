@@ -3,8 +3,9 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { COOKIE_IMPERSONATION, verificarTokenImpersonation } from '@/lib/impersonation/token'
 import { decisaoImpersonation } from '@/lib/impersonation/guard-rule'
 
-// Superfícies do ALUNO cobertas pelo guard de visualização (impersonation).
-const SUPERFICIES_ALUNO = ['/aluno', '/api/aluno', '/simulado', '/api/simulado', '/embed']
+// Superfícies do ALUNO cobertas pelo guard de visualização (impersonation). Inclui /lgpd para
+// permitir bloquear consentimento/solicitação LGPD no modo operável (identidade do titular).
+const SUPERFICIES_ALUNO = ['/aluno', '/api/aluno', '/simulado', '/api/simulado', '/embed', '/lgpd']
 
 /**
  * Guard GLOBAL da visualização do aluno (impersonation). read_only bloqueia TODA mutação (não-GET)

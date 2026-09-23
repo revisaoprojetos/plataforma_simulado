@@ -1,78 +1,35 @@
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
-import { Eye, ShieldCheck, SlidersHorizontal } from 'lucide-react'
 import { getCurrentAccess, accessCan } from '@/lib/auth/permissions'
+import { getImpersonationPermission } from '@/lib/impersonation/permissions'
 import { listarLogsImpersonation } from '@/lib/impersonation/logs'
-import { formatBrt } from '@/lib/brt'
+import { createAdminClient } from '@/lib/supabase/server'
+import { ImpersonationConsole } from '@/components/admin/impersonation/impersonation-console'
 
 export const dynamic = 'force-dynamic'
 
-const REASON_LABEL: Record<string, string> = {
-  closed_by_admin: 'Fechada pelo admin',
-  expired: 'Expirou',
-  renewed_into_new_session: 'Renovada',
-}
-
-// E8 — consulta (somente leitura) das sessões de visualização do aluno. Trilha de auditoria imutável.
-export default async function ImpersonationLogsPage() {
+// Console de visualização de aluno: escolher aluno → abrir (encaixado / janela flutuante),
+// operando como o aluno. Aba de Logs (auditoria) junto. Config em /admin/impersonation/config.
+export default async function ImpersonationPage() {
   const access = await getCurrentAccess()
   if (!access.userId) redirect('/admin')
-  if (!access.isAdmin && !accessCan(access, 'auditoria:view') && !accessCan(access, 'estudantes:view')) redirect('/admin')
+  const podeVer = access.isAdmin || accessCan(access, 'estudantes:view') || accessCan(access, 'auditoria:view')
+  if (!podeVer) redirect('/admin')
 
-  const logs = access.tenantId ? await listarLogsImpersonation(access.tenantId) : []
+  const perm = await getImpersonationPermission(access)
+  const svc = createAdminClient()
+  const [{ data: alunos }, logs] = await Promise.all([
+    access.tenantId
+      ? svc.from('simulado_estudantes').select('id, nome, email').eq('tenant_id', access.tenantId).order('nome').limit(40)
+      : Promise.resolve({ data: [] as any[] }),
+    access.tenantId ? listarLogsImpersonation(access.tenantId) : Promise.resolve([]),
+  ])
 
   return (
-    <div className="animate-page space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><Eye className="h-6 w-6 text-primary" /> Visualizações de aluno</h1>
-          <p className="text-muted-foreground">Registro imutável de quando um administrador visualizou a conta de um aluno (somente leitura).</p>
-        </div>
-        {access.isAdmin && (
-          <Link href="/admin/impersonation/config" className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors hover:bg-muted">
-            <SlidersHorizontal className="h-4 w-4" /> Configurar
-          </Link>
-        )}
-      </div>
-
-      {logs.length === 0 ? (
-        <div className="rounded-2xl border border-dashed p-12 text-center text-muted-foreground">
-          <ShieldCheck className="mx-auto mb-2 h-8 w-8 opacity-40" />
-          Nenhuma visualização registrada ainda.
-        </div>
-      ) : (
-        <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-          <table className="w-full text-sm">
-            <thead className="border-b bg-muted text-left text-muted-foreground">
-              <tr>
-                <th className="px-3 py-2.5 font-medium">Aluno</th>
-                <th className="px-3 py-2.5 font-medium">Início</th>
-                <th className="px-3 py-2.5 font-medium">Fim</th>
-                <th className="px-3 py-2.5 font-medium">Motivo</th>
-                <th className="px-3 py-2.5 font-medium">Nível</th>
-                <th className="px-3 py-2.5 font-medium">IP</th>
-              </tr>
-            </thead>
-            <tbody>
-              {logs.map((l) => (
-                <tr key={l.id} className="border-b last:border-0 hover:bg-muted/30">
-                  <td className="px-3 py-2.5">
-                    <Link href={`/admin/estudantes/${l.estudanteId}`} className="font-medium hover:underline">{l.estudanteNome}</Link>
-                    {l.estudanteEmail && <span className="block truncate text-xs text-muted-foreground">{l.estudanteEmail}</span>}
-                  </td>
-                  <td className="px-3 py-2.5 tabular-nums text-muted-foreground">{formatBrt(l.startedAt) ?? '—'}</td>
-                  <td className="px-3 py-2.5 tabular-nums text-muted-foreground">{l.endedAt ? formatBrt(l.endedAt) : <span className="text-emerald-600 dark:text-emerald-400">em aberto</span>}</td>
-                  <td className="px-3 py-2.5">{l.endReason ? (REASON_LABEL[l.endReason] ?? l.endReason) : '—'}</td>
-                  <td className="px-3 py-2.5">
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium">{l.actionLevel === 'read_only' ? 'Somente leitura' : l.actionLevel}</span>
-                  </td>
-                  <td className="px-3 py-2.5 tabular-nums text-xs text-muted-foreground">{l.ip ?? '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
+    <ImpersonationConsole
+      podeAbrir={!!perm}
+      isAdmin={access.isAdmin}
+      alunosIniciais={(alunos ?? []) as { id: string; nome: string; email: string | null }[]}
+      logs={logs}
+    />
   )
 }

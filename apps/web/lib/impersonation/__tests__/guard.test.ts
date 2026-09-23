@@ -2,41 +2,47 @@ import { describe, it, expect } from 'vitest'
 import { decisaoImpersonation } from '../guard-rule'
 import { rotaBloqueada, casaPadraoRota, BLOCKED_ROUTES } from '../blocked-routes'
 
-// 7.1 — read_only bloqueia toda mutação (o coração do MVP).
-describe('read_only (MVP)', () => {
+// read_only (modo ainda suportado): bloqueia toda mutação.
+describe('read_only', () => {
   it('permite GET', () => expect(decisaoImpersonation('read_only', 'GET', '/aluno').bloquear).toBe(false))
   it('bloqueia POST com motivo read_only_session', () => {
     const d = decisaoImpersonation('read_only', 'POST', '/aluno/leitura')
     expect(d.bloquear).toBe(true)
     expect(d.motivo).toBe('read_only_session')
   })
-  it('bloqueia PUT/PATCH/DELETE', () => {
-    for (const m of ['PUT', 'PATCH', 'DELETE']) expect(decisaoImpersonation('read_only', m, '/api/aluno/x').bloquear).toBe(true)
-  })
-  it('permite HEAD/OPTIONS (leitura/preflight)', () => {
+  it('permite HEAD/OPTIONS', () => {
     for (const m of ['HEAD', 'OPTIONS']) expect(decisaoImpersonation('read_only', m, '/aluno').bloquear).toBe(false)
   })
 })
 
-// 7.1 — read_and_act consulta a blocklist (rotas sensíveis).
-describe('read_and_act (futuro) — blocklist', () => {
-  it('bloqueia mutação em /api/aluno/*', () => {
-    const d = decisaoImpersonation('read_and_act', 'POST', '/api/aluno/gamificacao/ping')
+// read_and_act (modo OPERÁVEL, padrão): libera tudo, MENOS a blocklist (identidade/irreversível).
+describe('read_and_act (operável)', () => {
+  it('LIBERA responder simulado (grava como o aluno)', () =>
+    expect(decisaoImpersonation('read_and_act', 'POST', '/api/aluno/sessao/resposta').bloquear).toBe(false))
+  it('LIBERA gamificação/leitura/personalização', () => {
+    expect(decisaoImpersonation('read_and_act', 'POST', '/api/aluno/gamificacao/ping').bloquear).toBe(false)
+    expect(decisaoImpersonation('read_and_act', 'POST', '/api/aluno/perfil/personalizar').bloquear).toBe(false)
+  })
+  it('BLOQUEIA consentimento/solicitação LGPD', () => {
+    const d = decisaoImpersonation('read_and_act', 'POST', '/lgpd/consentimento')
     expect(d.bloquear).toBe(true)
     expect(d.motivo).toBe('action_blocked_during_impersonation')
+    expect(decisaoImpersonation('read_and_act', 'DELETE', '/api/aluno/lgpd/solicitacao').bloquear).toBe(true)
   })
-  it('bloqueia submit de simulado (qualquer método)', () =>
-    expect(decisaoImpersonation('read_and_act', 'POST', '/aluno/simulado/123').bloquear).toBe(true))
-  it('permite GET fora da blocklist', () =>
-    expect(decisaoImpersonation('read_and_act', 'GET', '/aluno/leitura').bloquear).toBe(false))
+  it('BLOQUEIA exclusão de conta e troca de e-mail de login', () => {
+    expect(decisaoImpersonation('read_and_act', 'DELETE', '/api/aluno/conta').bloquear).toBe(true)
+    expect(decisaoImpersonation('read_and_act', 'POST', '/api/aluno/perfil/email/trocar').bloquear).toBe(true)
+  })
+  it('PERMITE ver a página de LGPD (GET) — só a submissão é barrada', () =>
+    expect(decisaoImpersonation('read_and_act', 'GET', '/lgpd/consentimento').bloquear).toBe(false))
 })
 
 describe('casaPadraoRota', () => {
   it("'*' casa tudo", () => expect(casaPadraoRota('*', '/qualquer/coisa')).toBe(true))
   it("sufixo '/*' casa base e prefixo", () => {
-    expect(casaPadraoRota('/aluno/simulado/*', '/aluno/simulado')).toBe(true)
-    expect(casaPadraoRota('/aluno/simulado/*', '/aluno/simulado/1')).toBe(true)
-    expect(casaPadraoRota('/aluno/simulado/*', '/aluno/outro')).toBe(false)
+    expect(casaPadraoRota('/api/aluno/conta/*', '/api/aluno/conta')).toBe(true)
+    expect(casaPadraoRota('/api/aluno/conta/*', '/api/aluno/conta/excluir')).toBe(true)
+    expect(casaPadraoRota('/api/aluno/conta/*', '/api/aluno/outro')).toBe(false)
   })
   it('curinga por segmento', () => {
     expect(casaPadraoRota('/a/*/c', '/a/b/c')).toBe(true)
@@ -45,17 +51,20 @@ describe('casaPadraoRota', () => {
 })
 
 describe('rotaBloqueada respeita o método', () => {
-  it('GET em /api/aluno/* NÃO casa a regra POST', () => expect(rotaBloqueada('GET', '/api/aluno/x')).toBeNull())
-  it('POST em /api/aluno/* casa', () => expect(rotaBloqueada('POST', '/api/aluno/x')).not.toBeNull())
+  it('GET em /lgpd/* NÃO casa a regra POST', () => expect(rotaBloqueada('GET', '/lgpd/consentimento')).toBeNull())
+  it('POST em /lgpd/* casa', () => expect(rotaBloqueada('POST', '/lgpd/consentimento')).not.toBeNull())
 })
 
-// 7.2 (contrato) — a MESMA blocklist é a fonte de verdade em runtime; garante que os itens
-// críticos estão presentes (front + middleware + seed do banco derivam desta lista).
-describe('contrato da blocklist', () => {
-  it('cobre as rotas perigosas essenciais', () => {
+// Contrato: a blocklist cobre os pontos de identidade/irreversível (e NADA de simulado).
+describe('contrato da blocklist (operável)', () => {
+  it('cobre LGPD + conta + e-mail de login', () => {
     const chaves = new Set(BLOCKED_ROUTES.map((r) => `${r.method} ${r.pathPattern}`))
-    expect(chaves.has('POST /api/aluno/*')).toBe(true)
-    expect(chaves.has('* /aluno/simulado/*')).toBe(true)
-    expect(chaves.has('* /simulado/*')).toBe(true)
+    expect(chaves.has('POST /lgpd/*')).toBe(true)
+    expect(chaves.has('* /api/aluno/lgpd/*')).toBe(true)
+    expect(chaves.has('* /api/aluno/conta/*')).toBe(true)
+  })
+  it('NÃO bloqueia simulado/leitura (agora são operáveis)', () => {
+    expect(rotaBloqueada('POST', '/aluno/simulado/123')).toBeNull()
+    expect(rotaBloqueada('POST', '/api/aluno/sessao/resposta')).toBeNull()
   })
 })

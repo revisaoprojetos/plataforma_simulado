@@ -1,17 +1,17 @@
-// Blocklist EDGE-SAFE (pura, sem imports de servidor) — fonte de verdade em RUNTIME (o middleware
-// roda no Edge e não consulta o banco). Espelhada em simulado_impersonation_blocked_routes p/ o
-// painel/contrato. No MVP (read_only) o middleware já barra TODO não-GET; esta lista é para o
-// futuro read_and_act e para o teste de contrato front×back.
+// Blocklist EDGE-SAFE (pura). MODO OPERÁVEL (read_and_act): o admin faz TUDO da área do aluno e
+// grava como o aluno. Esta lista é o ÚNICO freio — bloqueia só o IRREVERSÍVEL / IDENTIDADE:
+// LGPD (consentimento/solicitação), troca de e-mail de LOGIN e exclusão de conta. Todo o resto
+// (responder simulado, leitura, gamificação, personalização de perfil…) é liberado.
+// Fonte de verdade em RUNTIME (o middleware roda no Edge e não consulta o banco); espelhada em
+// simulado_impersonation_blocked_routes p/ painel/contrato.
 export interface BlockedRoute { method: string; pathPattern: string; reason: string }
 
 export const BLOCKED_ROUTES: BlockedRoute[] = [
-  { method: 'POST', pathPattern: '/api/aluno/*', reason: 'Mutações do aluno (nota, ranking, XP, perfil, LGPD).' },
-  { method: 'PUT', pathPattern: '/api/aluno/*', reason: 'Mutações do aluno.' },
-  { method: 'PATCH', pathPattern: '/api/aluno/*', reason: 'Mutações do aluno.' },
-  { method: 'DELETE', pathPattern: '/api/aluno/*', reason: 'Mutações do aluno.' },
-  { method: '*', pathPattern: '/aluno/simulado/*', reason: 'Responder/enviar simulado corromperia tentativas, nota e ranking.' },
-  { method: '*', pathPattern: '/simulado/*', reason: 'Runner de simulado por token.' },
-  { method: '*', pathPattern: '/embed/*', reason: 'Área embedável de resposta do aluno.' },
+  { method: 'POST', pathPattern: '/lgpd/*', reason: 'Consentimento/solicitação LGPD — ação de identidade do titular.' },
+  { method: '*', pathPattern: '/api/aluno/lgpd/*', reason: 'Solicitações/consentimento LGPD do aluno.' },
+  { method: '*', pathPattern: '/api/aluno/conta/*', reason: 'Ações de conta irreversíveis (excluir conta / identidade).' },
+  { method: 'POST', pathPattern: '/api/aluno/perfil/email/*', reason: 'Troca de e-mail de login (irreversível / identidade).' },
+  { method: 'PUT', pathPattern: '/api/aluno/perfil/email/*', reason: 'Troca de e-mail de login (irreversível / identidade).' },
 ]
 
 /** Casa um padrão contra um path. Suporta '*' (tudo), sufixo '/*' (prefixo) e '*' por segmento. */
