@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Eye, ShieldCheck } from 'lucide-react'
-import { getCurrentAccess } from '@/lib/auth/permissions'
+import { Eye, ShieldCheck, SlidersHorizontal } from 'lucide-react'
+import { getCurrentAccess, accessCan } from '@/lib/auth/permissions'
 import { listarLogsImpersonation } from '@/lib/impersonation/logs'
 import { formatBrt } from '@/lib/brt'
 
@@ -17,15 +17,22 @@ const REASON_LABEL: Record<string, string> = {
 export default async function ImpersonationLogsPage() {
   const access = await getCurrentAccess()
   if (!access.userId) redirect('/admin')
-  if (!access.isAdmin && !access.permissions.includes('auditoria:view')) redirect('/admin')
+  if (!access.isAdmin && !accessCan(access, 'auditoria:view') && !accessCan(access, 'estudantes:view')) redirect('/admin')
 
   const logs = access.tenantId ? await listarLogsImpersonation(access.tenantId) : []
 
   return (
     <div className="animate-page space-y-5">
-      <div>
-        <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><Eye className="h-6 w-6 text-primary" /> Visualizações de aluno</h1>
-        <p className="text-muted-foreground">Registro imutável de quando um administrador visualizou a conta de um aluno (somente leitura).</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><Eye className="h-6 w-6 text-primary" /> Visualizações de aluno</h1>
+          <p className="text-muted-foreground">Registro imutável de quando um administrador visualizou a conta de um aluno (somente leitura).</p>
+        </div>
+        {access.isAdmin && (
+          <Link href="/admin/impersonation/config" className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors hover:bg-muted">
+            <SlidersHorizontal className="h-4 w-4" /> Configurar
+          </Link>
+        )}
       </div>
 
       {logs.length === 0 ? (

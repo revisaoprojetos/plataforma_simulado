@@ -26,16 +26,18 @@ export async function getImpersonationPermission(access: Access): Promise<Impers
   const clamp = (p: ImpersonationPermission): ImpersonationPermission =>
     MVP_SOMENTE_LEITURA ? { ...p, action_level: 'read_only' } : p
 
-  // Acesso total (super_admin / admin_geral com '*') pode visualizar; super_admin é cross-tenant.
-  const total = access.permissions.includes('*')
+  // super_admin: acesso cross-tenant, sempre disponível (não depende de linha na tabela).
   if (access.role === 'super_admin') return clamp({ scope: 'all_tenants', action_level: 'read_only' })
 
+  // Demais papéis: AUTORITATIVO POR LINHA — só pode se houver uma linha em
+  // simulado_impersonation_permissions para (tenant, papel). É o que a tela de Config edita.
   try {
     const svc = createAdminClient()
-    // role_id do papel neste tenant (papéis de sistema valem para todos os tenants).
+    // Papel do admin NESTE tenant (prefere a cópia do próprio tenant; cai na de sistema).
     const { data: roles } = await svc.from('simulado_roles').select('id, tenant_id, is_sistema').eq('nome', access.role)
-    const roleRow = (roles ?? []).find((r: any) => r.tenant_id === access.tenantId || r.is_sistema)
-    if (!roleRow?.id) return total ? clamp({ scope: 'own_tenant', action_level: 'read_only' }) : null
+    const lista = (roles ?? []) as { id: string; tenant_id: string | null; is_sistema: boolean | null }[]
+    const roleRow = lista.find((r) => r.tenant_id === access.tenantId) ?? lista.find((r) => r.is_sistema)
+    if (!roleRow?.id) return null
 
     const { data: perm } = await svc
       .from('simulado_impersonation_permissions')
@@ -44,11 +46,8 @@ export async function getImpersonationPermission(access: Access): Promise<Impers
       .eq('role_id', roleRow.id)
       .maybeSingle()
 
-    if (perm) return clamp({ scope: perm.scope as ImpersonationScope, action_level: perm.action_level as ImpersonationActionLevel })
-    // Sem linha específica: admin com '*' ainda pode (own_tenant/read_only); demais, não.
-    return total ? clamp({ scope: 'own_tenant', action_level: 'read_only' }) : null
+    return perm ? clamp({ scope: perm.scope as ImpersonationScope, action_level: perm.action_level as ImpersonationActionLevel }) : null
   } catch {
-    // Tabela ainda não aplicada → dormante, mas admin com acesso total continua podendo visualizar.
-    return total ? clamp({ scope: 'own_tenant', action_level: 'read_only' }) : null
+    return null // tabela ausente → feature dormante (só super_admin acessa)
   }
 }

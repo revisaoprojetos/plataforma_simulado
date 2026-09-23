@@ -43,6 +43,7 @@ import {
   CalendarDays,
   Upload,
   LayoutTemplate,
+  Eye,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -147,6 +148,7 @@ const navGroups: NavGroup[] = [
     icon: GraduationCap,
     items: [
       { label: 'Estudantes', href: '/admin/estudantes', icon: Users, perm: 'estudantes:view' },
+      { label: 'Visualizações de aluno', href: '/admin/impersonation', icon: Eye, perm: 'estudantes:view' },
       { label: 'Grupos', href: '/admin/grupos', icon: UsersRound, perm: 'grupos:view' },
       { label: 'Matrículas', href: '/admin/matriculas', icon: CreditCard, perm: 'matriculas:view' },
     ],
