@@ -100,22 +100,29 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Redeploy automático no Portainer (SÓ na main, se o webhook estiver configurado)
+      - name: Redeploy automático no Portainer (SÓ na main, se os webhooks estiverem configurados)
         # Auto-deploy sem colar SHA na mão: o Portainer re-pulla a tag `latest` e reinicia o serviço.
-        # Pré-requisitos (feitos 1x): (1) serviço web apontando para `:latest`; (2) webhook do serviço
-        # criado no Portainer; (3) a URL do webhook salva no secret PORTAINER_WEBHOOK do repositório.
-        # Sem o secret, este passo é um no-op (deploy segue manual). Branches NUNCA disparam (só a main).
+        # Pré-requisitos (feitos 1x): (1) os serviços apontando para as imagens `:latest` do GHCR
+        #   (web → plataforma_simulado:latest, worker → plataforma_simulado-worker:latest);
+        # (2) um webhook por serviço criado no Portainer; (3) as URLs salvas nos secrets do repo:
+        #   PORTAINER_WEBHOOK (web) e PORTAINER_WEBHOOK_WORKER (worker).
+        # Sem os secrets, o passo é no-op (deploy segue manual). Branches NUNCA disparam (só a main).
         if: github.ref == 'refs/heads/main'
         env:
-          HOOK: ${{ secrets.PORTAINER_WEBHOOK }}
+          HOOK_WEB: ${{ secrets.PORTAINER_WEBHOOK }}
+          HOOK_WORKER: ${{ secrets.PORTAINER_WEBHOOK_WORKER }}
         run: |
-          if [ -n "$HOOK" ]; then
-            echo "Disparando redeploy no Portainer (re-pull da :latest + restart do serviço)…"
-            curl -fsSL -X POST "$HOOK"
-            echo "OK — Portainer vai puxar a imagem nova e reiniciar o serviço."
-          else
-            echo "PORTAINER_WEBHOOK ausente — pulando auto-deploy (deploy manual pelo Portainer)."
-          fi
+          disparar() { # $1=url  $2=rótulo
+            if [ -n "$1" ]; then
+              echo "Redeploy $2 (re-pull :latest + restart)…"
+              curl -fsSL -X POST "$1" && echo "OK — $2"
+            else
+              echo "$2: webhook ausente — pulei."
+            fi
+          }
+          disparar "$HOOK_WEB" "web (estudando-junto_app)"
+          disparar "$HOOK_WORKER" "worker"
+          if [ -z "$HOOK_WEB$HOOK_WORKER" ]; then echo "Nenhum PORTAINER_WEBHOOK* configurado — deploy manual pelo Portainer."; fi
 
   deploy:
     needs: build-and-push
