@@ -1,8 +1,39 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { COOKIE_IMPERSONATION, verificarTokenImpersonation } from '@/lib/impersonation/token'
+import { decisaoImpersonation } from '@/lib/impersonation/guard-rule'
+
+// Superfícies do ALUNO cobertas pelo guard de visualização (impersonation).
+const SUPERFICIES_ALUNO = ['/aluno', '/api/aluno', '/simulado', '/api/simulado', '/embed']
+
+/**
+ * Guard GLOBAL da visualização do aluno (impersonation). read_only bloqueia TODA mutação (não-GET)
+ * nas superfícies do aluno — Server Actions inclusive. Ativa SÓ quando há cookie de visualização
+ * (`aluno_impersonation`) e NÃO há sessão real do aluno (que sempre tem prioridade). Retorna a
+ * resposta de bloqueio (403) ou null p/ seguir o fluxo normal.
+ */
+async function guardImpersonation(request: NextRequest): Promise<NextResponse | null> {
+  const { pathname } = request.nextUrl
+  if (!SUPERFICIES_ALUNO.some((p) => pathname === p || pathname.startsWith(p + '/'))) return null
+  const imp = request.cookies.get(COOKIE_IMPERSONATION)?.value
+  const real = request.cookies.get('aluno_session')?.value
+  if (!imp || real) return null
+  const claims = await verificarTokenImpersonation(imp)
+  if (!claims) return null
+  const d = decisaoImpersonation(claims.action_level, request.method, pathname)
+  if (!d.bloquear) return null
+  if (pathname.startsWith('/api/')) return NextResponse.json({ error: d.motivo }, { status: 403 })
+  return new NextResponse('Ação bloqueada durante a visualização do aluno (somente leitura).', {
+    status: 403, headers: { 'content-type': 'text/plain; charset=utf-8' },
+  })
+}
 
 // Next 16: convenção `proxy` (substitui o antigo `middleware`). Mesma lógica.
 export async function proxy(request: NextRequest) {
+  // Visualização do aluno (impersonation) — barra mutações no modo somente leitura antes de tudo.
+  const bloqueio = await guardImpersonation(request)
+  if (bloqueio) return bloqueio
+
   // Expõe o caminho atual aos Server Components (headers().get('x-pathname')) para o gate de rota
   // por permissão no layout do /admin. Reconstruído junto com os cookies do Supabase (sem alterar auth).
   const comPath = () => {

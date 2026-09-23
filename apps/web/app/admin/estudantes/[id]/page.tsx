@@ -19,6 +19,7 @@ import { GamificacaoEstudante } from '@/components/admin/gamificacao-estudante'
 import { getGamConfig } from '@/lib/gamificacao'
 import { resumoGamificacao, conquistasDoAluno } from '@/lib/gamificacao/leitura'
 import { EditarEstudanteButton } from '@/components/admin/editar-estudante-button'
+import { ImpersonationLauncher } from '@/components/admin/impersonation/impersonation-launcher'
 import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
 import type { GrupoBanco } from '@/app/admin/banco-questoes/actions'
 import { modalidadesDoAlunoV2, temEntregaV2, type EntregaSlots, type ModalidadeAluno } from '@/lib/caderno-teste/entrega-aluno'
@@ -314,7 +315,8 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
               </div>
               <p className="mt-1 flex items-center gap-1.5 truncate text-sm text-muted-foreground"><Mail className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{est.email}</span></p>
             </div>
-            <div className="ml-auto shrink-0">
+            <div className="ml-auto flex shrink-0 items-center gap-2">
+              <ImpersonationLauncher estudanteId={est.id} estudanteNome={est.nome} />
               <EditarEstudanteButton estudante={{ id: est.id, nome: est.nome, email: est.email, cpf: est.cpf, telefone: est.telefone, data_nascimento: est.data_nascimento, classificacao: est.classificacao, matricula_externa: est.matricula_externa, created_at: est.created_at }} />
             </div>
           </div>

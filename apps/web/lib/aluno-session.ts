@@ -1,5 +1,6 @@
 import { SignJWT, jwtVerify } from 'jose'
 import { cookies } from 'next/headers'
+import { lerSessaoImpersonation } from '@/lib/impersonation/session'
 
 const COOKIE = 'aluno_session'
 const MAX_AGE = 60 * 60 * 24 * 7 // 7 dias
@@ -17,6 +18,10 @@ export interface AlunoSession {
   tenantId: string
   nome: string
   email?: string
+  /** Preenchido quando um ADMIN está VISUALIZANDO a conta (impersonation). O portal renderiza
+   *  normalmente; a proteção read-only é feita globalmente no middleware. Nunca sobrepõe uma
+   *  sessão real do aluno. */
+  impersonation?: { por: string; sessaoId: string; actionLevel: 'read_only' | 'read_and_act' }
 }
 
 /** Cria a sessão persistente do aluno (cookie httpOnly assinado). */
@@ -44,23 +49,42 @@ export async function criarSessaoAluno(s: AlunoSession): Promise<void> {
   })
 }
 
-/** Lê e valida a sessão do aluno. Retorna null se ausente/inválida/expirada. */
+/** Lê e valida a sessão do aluno. Retorna null se ausente/inválida/expirada.
+ *  Fallback: quando NÃO há sessão real de aluno mas há um cookie de VISUALIZAÇÃO (admin
+ *  impersonando), devolve a sessão do aluno visualizado marcada com `impersonation`. */
 export async function getSessaoAluno(): Promise<AlunoSession | null> {
   try {
     const jar = await cookies()
     const token = jar.get(COOKIE)?.value
-    if (!token) return null
-    const { payload } = await jwtVerify(token, secret())
-    if (!payload.estudanteId || !payload.tenantId) return null
-    return {
-      estudanteId: String(payload.estudanteId),
-      tenantId: String(payload.tenantId),
-      nome: String(payload.nome ?? 'Aluno'),
-      email: payload.email ? String(payload.email) : undefined,
+    if (token) {
+      const { payload } = await jwtVerify(token, secret())
+      if (payload.estudanteId && payload.tenantId) {
+        return {
+          estudanteId: String(payload.estudanteId),
+          tenantId: String(payload.tenantId),
+          nome: String(payload.nome ?? 'Aluno'),
+          email: payload.email ? String(payload.email) : undefined,
+        }
+      }
     }
   } catch {
-    return null
+    // token inválido → tenta a visualização abaixo
   }
+  // Sem sessão real → o admin pode estar visualizando (cookie separado). Nunca sobrepõe o aluno real.
+  try {
+    const imp = await lerSessaoImpersonation()
+    if (imp) {
+      return {
+        estudanteId: imp.estudanteId,
+        tenantId: imp.tenantId,
+        nome: imp.nome,
+        impersonation: { por: imp.impersonatedBy, sessaoId: imp.sessionId, actionLevel: imp.actionLevel },
+      }
+    }
+  } catch {
+    // ignora — sem visualização
+  }
+  return null
 }
 
 export async function limparSessaoAluno(): Promise<void> {
