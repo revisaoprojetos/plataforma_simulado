@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { Loader2, GraduationCap, Mail, Lock, LogOut, ArrowRight, Building2, ShieldCheck, LayoutDashboard } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { molduraSelecao } from '@/lib/selecao-moldura'
+import { dominioCookieDeHost } from '@/lib/supabase/cookie-domain'
 
 // ENTRADA NEUTRA: o login é brand-agnostic — MESMA identidade em toda plataforma (não puxa
 // o tema de nenhum tenant). Tema CLARO/branco, neutro e sóbrio. A marca é só o nome/logo do
@@ -90,10 +91,26 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
     return `${protocol}//${p.slug}.${base}`
   }
 
-  function irParaPlataforma(p: PlatSimples) {
+  async function irParaPlataforma(p: PlatSimples) {
     if (typeof window === 'undefined') return
     if (p.id === tenantAtualId) { router.push('/admin'); return }
-    window.location.href = origemPlataforma(p) + '/admin'
+    const origem = origemPlataforma(p)
+    // Domínio DIFERENTE → cookies não cruzam. Faz SSO handoff: gera um código de uso único no
+    // domínio atual e entrega no destino, que estabelece a sessão sem pedir login de novo.
+    try {
+      // "Mesma base" = mesmo domínio registrável (cookie já compartilhado). Se for diferente, handoff.
+      const alvoDom = dominioCookieDeHost(new URL(origem).host)
+      const atualDom = dominioCookieDeHost(window.location.host)
+      const mesmaBase = !!alvoDom && alvoDom === atualDom
+      if (!mesmaBase) {
+        const r = await fetch('/api/auth/handoff', { method: 'POST' })
+        if (r.ok) {
+          const { code } = await r.json()
+          if (code) { window.location.href = `${origem}/auth/handoff?code=${encodeURIComponent(code)}&to=${encodeURIComponent('/admin')}`; return }
+        }
+      }
+    } catch { /* cai no fluxo normal (pede login no destino) */ }
+    window.location.href = origem + '/admin'
   }
 
   // O console do super-admin (/super) é ISOLADO e independe de tenant — navega SEMPRE na
