@@ -25,6 +25,14 @@ export default async function AlunoEntrarPage({ searchParams }: { searchParams: 
   }
 
   const tema = (tenant?.tema ?? {}) as any
+  // Cor da marca DO TENANT usada DIRETO (hex) no login — sem depender do var(--primary), que pode
+  // cair no padrão (roxo) do globals se o CSS do tema não vencer a especificidade. Garante que a
+  // tela de entrada de CADA plataforma use a própria cor, sem "pegar" a de outro tenant.
+  const corMarca = tema.cor_primaria ?? tema?.cores?.btn ?? null
+  const corDest = tema.cor_accent ?? tema?.cores?.accent ?? corMarca
+  const config = resolverLoginConfig(tema.login)
+  if (corMarca && !config.corPrimaria) config.corPrimaria = corMarca
+  if (corDest && !config.corAccent) config.corAccent = corDest
   return (
     <AlunoEntrarForm
       metodo={metodo}
@@ -34,7 +42,7 @@ export default async function AlunoEntrarPage({ searchParams }: { searchParams: 
       logoBg={tema.logo_png_bg ?? '#ffffff'}
       logoEstilo={tema.logo_estilo ?? 'arredondado'}
       logoFiltro={tema.logo_filtro_sistema ?? tema.logo_filtro ?? 'none'}
-      config={resolverLoginConfig(tema.login)}
+      config={config}
     />
   )
 }
