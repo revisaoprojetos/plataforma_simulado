@@ -1,18 +1,21 @@
 import { createServerClient } from '@supabase/ssr'
 import { createClient as createSupabaseClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
+import { dominioCookieDeHost } from './cookie-domain'
 
 /**
- * Domínio do cookie de sessão. Quando definido (ex.: ".revisaopge.com.br"), a
- * sessão passa a valer em TODOS os subdomínios (login compartilhado entre
- * plataformas). Se vazio (dev/localhost), mantém o comportamento por-host —
- * nada muda. Precisa ser NEXT_PUBLIC_ porque o cliente do navegador também usa.
+ * Domínio do cookie de sessão — DINÂMICO por host. Cada tenant pode ter seu próprio domínio
+ * (ex.: simulados.vikhdigital.com), então o cookie precisa ser escopado ao domínio ATUAL
+ * (.vikhdigital.com), não a um fixo. Um domínio fixo (.revisaopge.com.br) é REJEITADO pelo
+ * navegador em qualquer outro domínio → login não persiste. Resolve o domínio registrável do host.
  */
-const COOKIE_DOMAIN = process.env.NEXT_PUBLIC_COOKIE_DOMAIN?.trim() || undefined
+async function dominioAtual(): Promise<string | undefined> {
+  try { return dominioCookieDeHost((await headers()).get('host')) } catch { return undefined }
+}
 
 /** Injeta o domínio nas opções do cookie (set E delete usam o mesmo escopo). */
-function comDominio(options?: Record<string, unknown>) {
-  return COOKIE_DOMAIN ? { ...(options ?? {}), domain: COOKIE_DOMAIN } : options
+function comDominio(options: Record<string, unknown> | undefined, dom: string | undefined) {
+  return dom ? { ...(options ?? {}), domain: dom } : options
 }
 
 /**
@@ -31,6 +34,7 @@ export function createAdminClient() {
 
 export async function createClient() {
   const cookieStore = await cookies()
+  const dom = await dominioAtual()
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -43,7 +47,7 @@ export async function createClient() {
         setAll(cookiesToSet: Array<{ name: string; value: string; options?: Record<string, unknown> }>) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, comDominio(options) as Parameters<typeof cookieStore.set>[2])
+              cookieStore.set(name, value, comDominio(options, dom) as Parameters<typeof cookieStore.set>[2])
             )
           } catch {}
         },
@@ -54,6 +58,7 @@ export async function createClient() {
 
 export async function createServiceClient() {
   const cookieStore = await cookies()
+  const dom = await dominioAtual()
 
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -66,7 +71,7 @@ export async function createServiceClient() {
         setAll(cookiesToSet: Array<{ name: string; value: string; options?: Record<string, unknown> }>) {
           try {
             cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, comDominio(options) as Parameters<typeof cookieStore.set>[2])
+              cookieStore.set(name, value, comDominio(options, dom) as Parameters<typeof cookieStore.set>[2])
             )
           } catch {}
         },
