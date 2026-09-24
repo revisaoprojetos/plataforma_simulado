@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { sessaoNoTenantDoRequisitante } from '@/lib/simulado/sessao-guard'
 import { rateLimit } from '@/lib/rate-limit'
 
 const TIPOS = ['erro_gabarito', 'enunciado_confuso', 'desatualizada', 'outro']
@@ -38,6 +39,7 @@ export async function POST(request: NextRequest) {
     .eq('id', sessao_id)
     .maybeSingle()
   if (!sessao) return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
+  if (!(await sessaoNoTenantDoRequisitante(sessao))) return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
 
   const { data: vinculo } = await supabase
     .from('simulado_prova_questoes')

@@ -41,6 +41,7 @@ function Tile({ c, fixo, mostrarData, onHover }: { c: ConquistaView; fixo?: bool
         {!c.desbloqueada && <Lock className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full bg-background p-0.5 text-muted-foreground" />}
       </span>
       <span className="line-clamp-2 text-[11px] font-medium leading-tight">{c.def.titulo}</span>
+      {c.origem && <span className="line-clamp-1 max-w-full rounded-full bg-sky-500/10 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-wide text-sky-600 dark:text-sky-400" title={`Módulo: ${c.origem}`}>{c.origem}</span>}
       {/* Reserva a linha da data em todos os tiles do modal → base alinhada mesmo quando bloqueada/sem data. */}
       {mostrarData && <span className="mt-auto pt-0.5 text-[9px] leading-tight tabular-nums text-muted-foreground">{data ?? ' '}</span>}
     </div>

@@ -4,6 +4,7 @@ import { getSessaoAluno } from '@/lib/aluno-session'
 import { onLeituraConcluida } from '@/lib/gamificacao'
 import { docAcessivelAluno } from '@/lib/leitura/acesso'
 import { invalidarRankingPorDocumento } from '@/lib/leitura/ranking'
+import { avaliarMedalhasPorDocumento } from '@/lib/leitura/carimbos'
 
 // POST /api/leitura/progresso — auto-save idempotente do progresso de leitura.
 export const dynamic = 'force-dynamic'
@@ -57,6 +58,8 @@ export async function POST(request: NextRequest) {
     void onLeituraConcluida(svc, { tenantId: sessao.tenantId, estudanteId: sessao.estudanteId, documentoId: documento_id })
     // Concluir a leitura muda o desempenho no ranking/pop-up → invalida o cache do módulo na hora.
     void invalidarRankingPorDocumento(svc, sessao.tenantId, documento_id)
+    // Medalhas do módulo (carimbos + conquistas colecionáveis): avalia/concede na conclusão da aula.
+    void avaliarMedalhasPorDocumento(svc, sessao.tenantId, documento_id, sessao.estudanteId)
   }
 
   return NextResponse.json({ ok: true, pct: pctNovo, concluido: !!concluidoEm })

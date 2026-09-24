@@ -348,14 +348,25 @@ export async function adicionarQuestoes(bancoId: string, questaoIds: string[]): 
   if (!questaoIds.length) return { ok: false, error: 'Selecione ao menos uma questão.' }
 
   const svc = createAdminClient()
-  const jaTem = await fetchAllByIn<{ questao_id: string }>(questaoIds, (chunk) => svc
+  // Isolamento: service role BYPASSA RLS → valida o banco (bancoId do cliente) e restringe às questões
+  // do tenant do ator (questaoIds do cliente) antes de inserir os vínculos N:N.
+  const { data: banco } = await svc.from('simulado_pastas').select('id').eq('id', bancoId).eq('tenant_id', g.tenantId).maybeSingle()
+  if (!banco) return { ok: false, error: 'Não encontrado.' }
+  const doTenant = await fetchAllByIn<{ id: string }>(questaoIds, (chunk) => svc
+    .from('simulado_questoes').select('id').eq('tenant_id', g.tenantId).in('id', chunk).order('id', { ascending: true }))
+  const qidsValidos = new Set(doTenant.map((r: any) => r.id))
+  const questaoIdsSeguros = questaoIds.filter((q) => qidsValidos.has(q))
+  if (!questaoIdsSeguros.length) return { ok: false, error: 'Não encontrado.' }
+
+  const jaTem = await fetchAllByIn<{ questao_id: string }>(questaoIdsSeguros, (chunk) => svc
     .from('simulado_questao_pasta')
     .select('questao_id')
     .eq('pasta_id', bancoId)
+    .eq('tenant_id', g.tenantId)
     .in('questao_id', chunk)
     .order('questao_id', { ascending: true }))
   const existentes = new Set(jaTem.map((r: any) => r.questao_id))
-  const novas = questaoIds.filter((q) => !existentes.has(q))
+  const novas = questaoIdsSeguros.filter((q) => !existentes.has(q))
   if (!novas.length) return { ok: true, adicionadas: 0 }
 
   const { error } = await svc

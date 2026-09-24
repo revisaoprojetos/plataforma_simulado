@@ -8,6 +8,8 @@ import { coresNo, type TrilhaSimbolos, type SimboloEstado } from '@/lib/gamifica
 import { estiloDegrade, type TrilhaLivreConfig, type PosXY, type TrilhaDegrade } from '@/lib/leitura/trilha-aparencia'
 import { scrollSuaveAte } from '@/lib/aluno/scroll-trilha'
 import { rotuloProximaAula } from '@/lib/aluno/proxima-aula'
+import { EstampasNo, EstampasCard } from '@/components/aluno/carimbo-estampa'
+import type { CarimboEstampa } from '@/lib/leitura/carimbos-tipos'
 
 export type NoLivre = {
   id: string; titulo: string; estado: SimboloEstado; href?: string | null; acao?: string
@@ -41,13 +43,15 @@ export function defaultPos(i: number, total: number): PosXY {
  * Trilha PERSONALIZADA (formato 'livre'): nós posicionados em % sobre a imagem de fundo + curvas bézier
  * com ponto de controle por trecho. `editavel` liga o arraste (nós e pontos de curva) → onChange.
  */
-export function TrilhaLivre({ nodes, livre, capa, simbolos, editavel = false, onChange, full = false, ocultarFundo = false, semMoldura = false, degradeTopo }: {
+export function TrilhaLivre({ nodes, livre, capa, simbolos, editavel = false, onChange, full = false, ocultarFundo = false, semMoldura = false, degradeTopo, estampas = [] }: {
   nodes: NoLivre[]
   livre: TrilhaLivreConfig
   capa?: string | null
   simbolos: TrilhaSimbolos
   editavel?: boolean
   onChange?: (livre: TrilhaLivreConfig) => void
+  /** Carimbos GANHOS a estampar no nó ('no') ou no balão de conteúdo ('card'). */
+  estampas?: CarimboEstampa[]
   /** Preenche toda a altura do contêiner (usado no construtor em tela cheia) em vez do aspect-4/5. */
   full?: boolean
   /** Esconde a imagem de fundo (auxílio de edição no construtor). */
@@ -228,7 +232,7 @@ export function TrilhaLivre({ nodes, livre, capa, simbolos, editavel = false, on
           <div key={n.id} ref={i === alvoIdx ? alvoRef : undefined} className="absolute z-10 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center" style={{ left: `${p.x}%`, top: `${p.y}%` }}>
             {ehAlvo && <span className="mb-1 whitespace-nowrap rounded-full bg-primary px-2 py-0.5 font-bold text-primary-foreground shadow" style={{ fontSize: Math.max(9, labelFs - 1) }}>você está aqui</span>}
             {proxima && <span className="mb-1 whitespace-nowrap rounded-full bg-amber-500 px-2 py-0.5 font-bold text-white shadow motion-safe:animate-pulse" style={{ fontSize: Math.max(9, labelFs - 1) }}>{rotuloProximaAula(n.liberaEm)}</span>}
-            <button type="button" data-trilha-no
+            <button type="button" data-trilha-no data-carimbo-alvo={n.id}
               onPointerDown={editavel ? (e) => { e.preventDefault(); dragRef.current = { tipo: 'no', id: n.id } } : undefined}
               onClick={!editavel ? () => setAberto((v) => v === n.id ? null : n.id) : undefined}
               className={cn('relative flex items-center justify-center rounded-full shadow-md', editavel ? 'cursor-move touch-none' : 'cursor-pointer transition-transform hover:scale-105', aberto === n.id && 'ring-4 ring-primary/25')}
@@ -243,7 +247,8 @@ export function TrilhaLivre({ nodes, livre, capa, simbolos, editavel = false, on
                 <span className="pointer-events-none absolute rounded-full border-2 border-amber-400 opacity-80 motion-safe:animate-ping" style={{ inset: -Math.round(nodeSize * 0.12) }} />
                 <span className="pointer-events-none absolute rounded-full opacity-45 motion-safe:animate-ping [animation-delay:600ms]" style={{ inset: -Math.round(nodeSize * 0.05), background: 'radial-gradient(circle, rgba(245,158,11,0.32) 0%, transparent 70%)' }} />
               </>)}
-              <SimboloNo config={simbolos[n.estado]} escala={iconEscala} cor={cor.simbolo} />
+              <span className="relative z-10"><SimboloNo config={simbolos[n.estado]} escala={iconEscala} cor={cor.simbolo} /></span>
+              {!editavel && <EstampasNo estampas={estampas} aulaId={n.id} />}
             </button>
             <span className="mt-1 max-w-[9rem] truncate rounded bg-black/55 px-1.5 py-0.5 text-center font-medium text-white backdrop-blur" style={{ fontSize: labelFs }}>{n.titulo}</span>
           </div>
@@ -270,11 +275,13 @@ export function TrilhaLivre({ nodes, livre, capa, simbolos, editavel = false, on
             <div className={cn('transition-all duration-[280ms] ease-[cubic-bezier(.16,1,.3,1)] will-change-transform', balaoVis ? 'scale-100 opacity-100 translate-y-0' : cn('scale-90 opacity-0', abaixo ? '-translate-y-3' : 'translate-y-3'))}
               style={{ transformOrigin: abaixo ? 'top center' : 'bottom center' }}>
               {/* Flutuação contínua (sobe/desce) enquanto aberto. */}
-              <div className="motion-safe:animate-[trilha-flutua_3.2s_ease-in-out_infinite]">
+              <div className="relative motion-safe:animate-[trilha-flutua_3.2s_ease-in-out_infinite]">
             {/* Seta apontando para o nó */}
-            <span className={cn('absolute h-3.5 w-3.5 rotate-45 border bg-card', abaixo ? '-top-[7px] border-b-0 border-r-0' : '-bottom-[7px] border-l-0 border-t-0')} style={{ left: arrowX - 7 }} />
-            <div className="overflow-hidden rounded-2xl border bg-card shadow-xl">
-              <div className="space-y-2 p-3.5">
+            <span className={cn('absolute z-[5] h-3.5 w-3.5 rotate-45 border bg-card', abaixo ? '-top-[7px] border-b-0 border-r-0' : '-bottom-[7px] border-l-0 border-t-0')} style={{ left: arrowX - 7 }} />
+            <div className="relative rounded-2xl border bg-card shadow-xl">
+              {/* Carimbos GANHOS 'card': DENTRO do card → sobreposição (z) e recorte funcionam. */}
+              <EstampasCard estampas={estampas} aulaId={n.id} />
+              <div className="relative z-10 space-y-2 p-3.5">
                 <div>
                   <p className="text-sm font-bold leading-tight text-foreground">{n.titulo}</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">

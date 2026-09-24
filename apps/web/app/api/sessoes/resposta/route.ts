@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { sessaoNoTenantDoRequisitante } from '@/lib/simulado/sessao-guard'
 import { sessaoExpirada } from '@/lib/simulado/sessao-expiry'
 import { funcaoEtiquetaPorQuestao, funcaoBloqueia } from '@/lib/simulado/etiqueta-funcao'
 
@@ -31,6 +32,10 @@ export async function POST(request: NextRequest) {
     .maybeSingle()
 
   if (!sessao) {
+    return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
+  }
+  // Isolamento: a sessão precisa ser do tenant do requisitante (fecha IDOR cross-tenant).
+  if (!(await sessaoNoTenantDoRequisitante(sessao))) {
     return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
   }
   if (sessao.status === 'finalizada') {

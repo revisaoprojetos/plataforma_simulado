@@ -283,6 +283,7 @@ export async function deleteEstudanteAction(id: string) {
 export async function excluirSessaoAction(sessaoId: string, simuladoId: string, estudanteId: string) {
   if (!(await checkPermission('simulados:update'))) return { error: 'Você não tem permissão.' }
   const tenantId = await getCurrentTenantId()
+  if (!tenantId) return { error: 'Tenant não resolvido. Verifique o acesso.' }
   const svc = createAdminClient()
   const { error } = await softDelete('simulado_sessoes_prova', sessaoId)
   if (error) return { error: error.message }
@@ -293,10 +294,10 @@ export async function excluirSessaoAction(sessaoId: string, simuladoId: string, 
     try {
       const { data: ac } = await svc.from('simulado_acessos')
         .select('id, tentativas_usadas')
-        .eq('simulado_id', simuladoId).eq('estudante_id', estudanteId)
+        .eq('tenant_id', tenantId).eq('simulado_id', simuladoId).eq('estudante_id', estudanteId)
         .order('criado_em', { ascending: false }).limit(1).maybeSingle()
       if (ac && (ac.tentativas_usadas ?? 0) > 0) {
-        await svc.from('simulado_acessos').update({ tentativas_usadas: Math.max(0, (ac.tentativas_usadas ?? 0) - 1) }).eq('id', (ac as any).id)
+        await svc.from('simulado_acessos').update({ tentativas_usadas: Math.max(0, (ac.tentativas_usadas ?? 0) - 1) }).eq('id', (ac as any).id).eq('tenant_id', tenantId)
       }
     } catch { /* ignora — acesso avulso pode não existir */ }
   }

@@ -25,9 +25,16 @@ export async function concederAcesso(
 ): Promise<{ ok: boolean; error?: string }> {
   if (!(await checkPermission('simulados:update'))) return { ok: false, error: 'Sem permissão.' }
   const access = await getCurrentAccess()
+  if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   if (!estudanteId || prazoValor <= 0) return { ok: false, error: 'Informe aluno e prazo.' }
 
   const svc = createAdminClient()
+  // Isolamento: service role BYPASSA RLS → valida que simulado E estudante são do tenant do ator
+  // antes de inserir (o id vem do cliente e não pode carimbar acesso cross-tenant).
+  const { data: sim } = await svc.from('simulado_simulados').select('id').eq('id', simuladoId).eq('tenant_id', access.tenantId).maybeSingle()
+  if (!sim) return { ok: false, error: 'Não encontrado.' }
+  const { data: est } = await svc.from('simulado_estudantes').select('id').eq('id', estudanteId).eq('tenant_id', access.tenantId).maybeSingle()
+  if (!est) return { ok: false, error: 'Não encontrado.' }
   const liberado = new Date()
   const expira = calcExpira(liberado, prazoValor, prazoUnidade)
 

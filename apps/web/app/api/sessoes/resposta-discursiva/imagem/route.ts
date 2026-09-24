@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { sessaoNoTenantDoRequisitante } from '@/lib/simulado/sessao-guard'
 import { getStorage, uploadArquivo, validateFile, PRESETS } from '@/lib/storage'
 
 // Upload das FOTOS da resposta discursiva (o aluno envia imagem em vez de digitar).
@@ -69,6 +70,7 @@ export async function GET(request: NextRequest) {
   const svc = createAdminClient()
   const sessao = await carregarSessao(svc, sessaoId)
   if (!sessao) return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
+  if (!(await sessaoNoTenantDoRequisitante(sessao))) return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
   const respostaId = await acharResposta(svc, sessaoId, questaoId)
   const paginas = respostaId ? await listarPaginas(svc, respostaId) : []
   return NextResponse.json({ paginas })
@@ -87,6 +89,7 @@ export async function POST(request: NextRequest) {
   const svc = createAdminClient()
   const sessao = await carregarSessao(svc, sessaoId)
   if (!sessao) return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
+  if (!(await sessaoNoTenantDoRequisitante(sessao))) return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
   if (sessao.status === 'finalizada') return NextResponse.json({ message: 'Sessão finalizada.' }, { status: 409 })
 
   const respostaId = await garantirResposta(svc, sessao, questaoId)
@@ -135,6 +138,7 @@ export async function DELETE(request: NextRequest) {
   const svc = createAdminClient()
   const sessao = await carregarSessao(svc, sessaoId)
   if (!sessao) return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
+  if (!(await sessaoNoTenantDoRequisitante(sessao))) return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
   if (sessao.status === 'finalizada') return NextResponse.json({ message: 'Sessão finalizada.' }, { status: 409 })
   const respostaId = await acharResposta(svc, sessaoId, questaoId)
   if (!respostaId) return NextResponse.json({ ok: true, paginas: [] })

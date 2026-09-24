@@ -1,14 +1,17 @@
 'use client'
 
 import { useMemo, useState, useTransition } from 'react'
+import Link from 'next/link'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Plus, Trash2, Search, Sparkles, Award } from 'lucide-react'
+import { Plus, Trash2, Search, Sparkles, Award, BookOpenText, ExternalLink } from 'lucide-react'
 import type { GamConfig, ConquistaDef, ConquistaRegraTipo } from '@/lib/gamificacao/config'
 import { DEFAULT_CONQUISTAS } from '@/lib/gamificacao/config'
 import { ICONE_OPCOES, corConquista } from '@/lib/gamificacao/icones'
 import { ConquistaIconeFx } from '@/components/gamificacao/conquista-icone'
+import { CONDICAO_LABEL, usaMeta } from '@/lib/leitura/carimbos-tipos'
+import type { ConquistasModuloOrigem } from '../gamificacao-tabs'
 import { salvarConquistas } from '../actions'
 import { SaveBar, SectionCard } from './_campos'
 import { useUnsavedGuard } from '@/components/admin/use-unsaved-guard'
@@ -24,7 +27,7 @@ const REGRAS: { v: ConquistaRegraTipo; label: string }[] = [
 const regraLabel = (t: string) => REGRAS.find((r) => r.v === t)?.label ?? t
 const selectCls = 'h-9 w-full rounded-lg border bg-background px-2 text-sm disabled:cursor-not-allowed disabled:opacity-60'
 
-export function ConquistasForm({ config, podeGerenciar }: { config: GamConfig; podeGerenciar: boolean }) {
+export function ConquistasForm({ config, podeGerenciar, modulos = [] }: { config: GamConfig; podeGerenciar: boolean; modulos?: ConquistasModuloOrigem[] }) {
   const [lista, setLista] = useState<ConquistaDef[]>(config.conquistas_def)
   const [busca, setBusca] = useState('')
   const [filtro, setFiltro] = useState<'todas' | ConquistaRegraTipo>('todas')
@@ -137,6 +140,43 @@ export function ConquistasForm({ config, podeGerenciar }: { config: GamConfig; p
           )}
         </div>
       </SectionCard>
+
+      {/* Conquistas criadas DENTRO dos módulos de Leitura — read-only aqui (editar no módulo), com etiqueta de origem. */}
+      {modulos.length > 0 && (
+        <SectionCard titulo="Conquistas de módulos" icon={BookOpenText} tom="#0ea5e9" descricao="Conquistas próprias de cada módulo (criadas na aba Medalhas do módulo). Aparecem aqui só para consulta — edite-as no próprio módulo.">
+          <div className="space-y-4">
+            {modulos.map((m) => (
+              <div key={m.pastaId} className="rounded-xl border bg-card p-3 shadow-sm">
+                <div className="mb-2.5 flex items-center justify-between gap-2">
+                  <h4 className="flex items-center gap-1.5 text-sm font-semibold">
+                    <span className="rounded-md bg-sky-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-600 dark:text-sky-400">Módulo</span>
+                    {m.nome}
+                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium tabular-nums text-muted-foreground">{m.conquistas.length}</span>
+                  </h4>
+                  <Link href={`/admin/leitura?pasta=${m.pastaId}&tab=medalhas`} className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:border-primary/40 hover:text-foreground">
+                    Abrir módulo <ExternalLink className="h-3 w-3" />
+                  </Link>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {m.conquistas.map((c) => {
+                    const cor = c.cor || corConquista(c.id)
+                    const cond = usaMeta(c.condicao.tipo) ? CONDICAO_LABEL[c.condicao.tipo].replace('N', String(c.condicao.meta)) : CONDICAO_LABEL[c.condicao.tipo]
+                    return (
+                      <div key={c.id} className="flex items-center gap-2.5 rounded-lg border p-2" style={{ borderColor: `color-mix(in oklab, ${cor} 30%, transparent)`, background: `color-mix(in oklab, ${cor} 6%, transparent)` }}>
+                        <span className="relative flex h-9 w-9 shrink-0 items-center justify-center overflow-visible rounded-full" style={{ background: `color-mix(in oklab, ${cor} 18%, transparent)`, color: cor }}><ConquistaIconeFx icone={c.icone} /></span>
+                        <div className="min-w-0">
+                          <div className="truncate text-xs font-semibold" title={c.titulo}>{c.titulo}</div>
+                          <div className="truncate text-[11px] text-muted-foreground" title={cond}>{cond}{c.xp > 0 ? ` · ${c.xp} XP` : ''}</div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+        </SectionCard>
+      )}
     </form>
   )
 }

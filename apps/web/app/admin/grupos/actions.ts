@@ -29,7 +29,10 @@ export type EstBusca = { id: string; nome: string; email: string | null; classif
 export async function buscarNaoMembros(grupoId: string, busca: string, limite = 30): Promise<{ ok: boolean; itens?: EstBusca[]; error?: string }> {
   const g = await guard(); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
-  const gm = await fetchAll<{ estudante_id: string }>(() => svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grupoId).order('estudante_id', { ascending: true }))
+  // Isolamento: valida que o grupo é do tenant do ator (grupoId vem do cliente) + filtra membros por tenant.
+  const { data: grp } = await svc.from('simulado_grupos').select('id').eq('id', grupoId).eq('tenant_id', g.tenantId).maybeSingle()
+  if (!grp) return { ok: false, error: 'Grupo não encontrado.' }
+  const gm = await fetchAll<{ estudante_id: string }>(() => svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grupoId).eq('tenant_id', g.tenantId).order('estudante_id', { ascending: true }))
   const memberSet = new Set(gm.map((m) => m.estudante_id))
   // Remove chars que quebram o parser do .or() do PostgREST (vírgula/parênteses/curinga).
   const safe = busca.replace(/[,()%*]/g, ' ').trim()
@@ -187,6 +190,10 @@ export async function adicionarMembros(grupoId: string, estudanteIds: string[]):
   const g = await guard(); if (!g.ok) return g
   if (!estudanteIds.length) return { ok: true }
   const svc = createAdminClient()
+  // Isolamento: service role BYPASSA RLS → valida que o grupo é do tenant do ator antes de inserir
+  // membros (o grupoId vem do cliente e não pode vincular alunos a um grupo de outro tenant).
+  const { data: grp } = await svc.from('simulado_grupos').select('id').eq('id', grupoId).eq('tenant_id', g.tenantId).maybeSingle()
+  if (!grp) return { ok: false, error: 'Grupo não encontrado.' }
   const exist = await fetchAll<{ estudante_id: string }>(() =>
     svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grupoId).order('estudante_id', { ascending: true }))
   const ja = new Set(exist.map((r) => r.estudante_id))
@@ -239,6 +246,9 @@ export async function importarMembros(formData: FormData): Promise<{ ok: boolean
   if (!tokens.length) return { ok: false, error: 'Cole uma lista ou envie um arquivo.' }
 
   const svc = createAdminClient()
+  // Isolamento: valida que o grupo é do tenant do ator antes de inserir membros (grupoId vem do cliente).
+  const { data: grp } = await svc.from('simulado_grupos').select('id').eq('id', grupoId).eq('tenant_id', g.tenantId).maybeSingle()
+  if (!grp) return { ok: false, error: 'Grupo não encontrado.' }
   // Carrega estudantes do tenant, PAGINADO (fetchAll) — senão >1000 alunos são cortados e
   // muitos "não encontrados" apareceriam falsamente. cpf é tolerante caso a coluna não exista.
   let estudantes: any[] = []
@@ -327,7 +337,10 @@ export async function salvarConfigGrupo(id: string, nome: string, descricao: str
 export async function engajamentoGrupo(grupoId: string): Promise<{ ok: boolean; mapa?: Record<string, { last: string | null; feitos: number }>; error?: string }> {
   const g = await guard(); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
-  const gm = await fetchAll<{ estudante_id: string }>(() => svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grupoId).order('estudante_id', { ascending: true }))
+  // Isolamento: valida que o grupo é do tenant do ator (grupoId vem do cliente) + filtra membros por tenant.
+  const { data: grp } = await svc.from('simulado_grupos').select('id').eq('id', grupoId).eq('tenant_id', g.tenantId).maybeSingle()
+  if (!grp) return { ok: false, error: 'Grupo não encontrado.' }
+  const gm = await fetchAll<{ estudante_id: string }>(() => svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grupoId).eq('tenant_id', g.tenantId).order('estudante_id', { ascending: true }))
   const ids = [...new Set(gm.map((r) => r.estudante_id).filter(Boolean))]
   if (!ids.length) return { ok: true, mapa: {} }
   const mapa = await remember(chaveRelatorio(g.tenantId, 'grupo-engaj', grupoId, String(ids.length)), TTL_RELATORIO, async () => {

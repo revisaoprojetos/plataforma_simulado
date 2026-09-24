@@ -26,8 +26,9 @@ export async function POST(req: NextRequest) {
   const svc = createAdminClient()
   const agora = Date.now()
 
-  // Candidatas: agendadas (estado 'visualizavel') e ainda não publicadas. Filtro fino de data em JS
-  // (evita quirks de comparar jsonb->>data no PostgREST). São poucas por tenant.
+  // Candidatas: QUALQUER aula agendada (tem `publicacao.publicarEm`) ainda não publicada — não só
+  // 'visualizavel' (se foi agendada como 'publicada', o estado fica 'publicada' e o filtro antigo
+  // a ignorava → nunca liberava). Filtro fino de data em JS (evita quirks de jsonb->>data no PostgREST).
   let cands: any[] = []
   try {
     const { data, error } = await svc
@@ -35,7 +36,7 @@ export async function POST(req: NextRequest) {
       .select('id, tenant_id, pasta_id, publicacao')
       .eq('deletado', false)
       .eq('publicado', false)
-      .eq('publicacao->>estado', 'visualizavel')
+      .not('publicacao', 'is', null)
     if (error) {
       // Coluna publicacao ausente (migração antiga) → nada a fazer.
       if (/publicacao|column|schema cache/i.test(error.message)) return NextResponse.json({ ok: true, publicadas: 0, obs: 'sem coluna publicacao' })

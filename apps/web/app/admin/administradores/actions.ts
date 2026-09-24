@@ -250,6 +250,10 @@ export async function atualizarDadosAdminAction(userId: string, dados: { nome: s
   if (!nome) return { ok: false, error: 'Informe o nome.' }
   if (!email || !EMAIL_RE.test(email)) return { ok: false, error: 'Informe um e-mail válido.' }
   const svc = createAdminClient()
+  // Isolamento: confirma que o alvo pertence a esta plataforma antes de alterar a conta global
+  // (o userId vem do cliente e o updateUserById toca em auth.users — não pode editar de fora do tenant).
+  const { data: alvo } = await svc.from('simulado_tenant_acessos').select('user_id').eq('user_id', userId).eq('tenant_id', tenantId).maybeSingle()
+  if (!alvo) return { ok: false, error: 'Usuário não pertence a esta plataforma.' }
   const { error } = await svc.auth.admin.updateUserById(userId, { email, user_metadata: { full_name: nome } })
   if (error) {
     if (/already.*registered|already.*exists|duplicate|been registered/i.test(error.message)) return { ok: false, error: 'Já existe uma conta com esse e-mail.' }

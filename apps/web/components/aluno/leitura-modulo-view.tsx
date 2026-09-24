@@ -12,6 +12,9 @@ import { DEFAULT_TRILHA_SIMBOLOS, type TrilhaSimbolos } from '@/lib/gamificacao/
 import { DEFAULT_TRILHA_FORMATO, type TrilhaFormato } from '@/lib/gamificacao/trilha-formato'
 import { type TrilhaLivreConfig, type TrilhaDegrade } from '@/lib/leitura/trilha-aparencia'
 import { LeituraTrilhaRail } from '@/components/aluno/leitura-trilha-rail'
+import { CarimbosColecao, type CarimboAlunoView } from '@/components/aluno/carimbos-colecao'
+import { ConquistasModuloColecao, type ConquistaModuloView } from '@/components/aluno/conquistas-modulo-colecao'
+import { usaAula, resolverEscopoAulas, type CarimboEstampa } from '@/lib/leitura/carimbos-tipos'
 import { type RegulamentoConfig, embedVideoUrl } from '@/lib/leitura/regulamento'
 import { type PontuacaoLeitura, type DesempenhoLeitura } from '@/lib/leitura/pontuacao'
 import { progressoDesafio, DESAFIO_TIPOS, type DesafioModulo } from '@/lib/leitura/desafios'
@@ -21,7 +24,7 @@ import type { RankingLeitura } from '@/lib/leitura/ranking'
 
 /** Visão de um módulo do LegProc Digital: banner colapsável (igual ao admin) com tabs Trilha | Desempenho
  * e busca, + aviso de questões pendentes. */
-export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulasPendentes, ranking, meuId, meuNome, formato = DEFAULT_TRILHA_FORMATO, simbolos = DEFAULT_TRILHA_SIMBOLOS, livre, inverter = false, degrade, degradeTrilha, descricao, regulamento, pontuacao, desafios, desempenhoDesafios, gam = null, diasLeitura = [] }: {
+export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulasPendentes, ranking, meuId, meuNome, formato = DEFAULT_TRILHA_FORMATO, simbolos = DEFAULT_TRILHA_SIMBOLOS, livre, inverter = false, degrade, degradeTrilha, descricao, regulamento, pontuacao, desafios, desempenhoDesafios, gam = null, diasLeitura = [], carimbos = [], conquistasModulo = [], progAulas = {} }: {
   modulo: string
   trilha: Trilha
   desempenho: AulaDesempenho[]
@@ -43,11 +46,49 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
   desempenhoDesafios?: DesempenhoLeitura
   gam?: GamRail | null
   diasLeitura?: string[]
+  carimbos?: CarimboAlunoView[]
+  conquistasModulo?: ConquistaModuloView[]
+  /** Progresso por aula (concluida/gabaritada) — para estampar o carimbo só nas aulas realmente feitas. */
+  progAulas?: Record<string, { concluida: boolean; gabaritada: boolean }>
 }) {
   const desafiosAtivos = (desafios ?? []).filter((d) => d.ativo)
   const desemp = desempenhoDesafios ?? { acertos: 0, aulasConcluidas: 0, aulasGabaritadas: 0 }
   // 1ª aula com questões pendentes (leitura feita) → alvo do CTA do aviso.
   const alvoPend = desempenho.find((a) => a.leituraConcluida && a.questoesPendentes > 0)
+  // Carimbos GANHOS estampados sobre a trilha:
+  //  • alvo='no'/'card' → desenhados direto no nó/balão-de-conteúdo pela própria trilha (estampas abaixo).
+  //  • alvo='livre'     → posição % fixa sobre o contêiner (overlay abaixo).
+  const carimbosLivres = carimbos.filter((c) => c.ganho && c.def.url && c.def.alvo === 'livre')
+  const carimbosOverlay = carimbosLivres.length > 0 ? (
+    <div className="pointer-events-none absolute inset-0 z-10 overflow-visible" aria-hidden>
+      {carimbosLivres.map((c) => (
+        <span key={c.def.id} aria-hidden className="absolute" style={{ left: `${c.def.x}%`, top: `${c.def.y}%`, width: c.def.tamanho, height: c.def.tamanho, transform: `translate(-50%,-50%) rotate(${c.def.rotacao}deg)` }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={c.def.url!} alt="" className="h-full w-full object-contain motion-safe:animate-[carimbo-pop_.45s_cubic-bezier(.34,1.56,.64,1)_both]" />
+        </span>
+      ))}
+    </div>
+  ) : null
+  // Estampas 'no'/'card': em quais aulas cada carimbo aparece — 'todas' (menos as ocultas) ou 'especificas'.
+  // Um carimbo pode render em VÁRIAS aulas (1 estampa por aula aplicável).
+  const allIds = trilha.nodes.map((n) => n.id)
+  const estampas: CarimboEstampa[] = carimbos
+    .filter((c) => !!c.def.url && (c.def.alvo === 'no' || c.def.alvo === 'card'))
+    .flatMap((c) => {
+      let aulasAlvo: string[]
+      if (usaAula(c.def.condicao?.tipo)) {
+        // Condição por aula(s): aparece SÓ nas aulas do escopo que o aluno REALMENTE cumpriu (concluiu/gabaritou)
+        // — nunca em aulas não liberadas/não feitas. Independe do award global (é por-aula).
+        const escopo = resolverEscopoAulas(c.def.condicao?.aulaModo, c.def.condicao?.aulaIds, allIds)
+        aulasAlvo = escopo.filter((id) => c.def.condicao?.tipo === 'gabaritar_aula' ? progAulas[id]?.gabaritada : progAulas[id]?.concluida)
+      } else {
+        // Condição de módulo/N: precisa do carimbo GANHO; aparece no placement (todas menos ocultas / específicas).
+        if (!c.ganho) return []
+        const set = resolverEscopoAulas(c.def.alvoModo, c.def.alvoAulaIds, allIds)
+        aulasAlvo = set.length ? set : (c.def.alvoModo === 'especificas' && allIds[0] ? [allIds[0]] : set)
+      }
+      return aulasAlvo.map((aulaId) => ({ id: `${c.def.id}:${aulaId}`, aulaId, url: c.def.url as string, alvo: c.def.alvo as 'no' | 'card', sobreposicao: c.def.sobreposicao, recortar: c.def.recortar, x: c.def.x, y: c.def.y, rotacao: c.def.rotacao, tamanho: c.def.tamanho }))
+    })
 
   // Descrição do banner: SÓ a configurada pelo admin (aba Configurações do módulo). Vazio → sem subtítulo.
   const subtitulo = (descricao && descricao.trim()) ? descricao : undefined
@@ -107,7 +148,8 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
           // brancas do padding). Escapa o padding do portal (p-4/p-6) como o banner. O rail de metas flutua
           // por cima no canto (desktop) para não roubar largura da imagem.
           <div className="relative -mx-4 -mb-24 -mt-4 min-w-0 overflow-visible bg-neutral-950 md:-mx-6 md:-mb-6 md:-mt-6">
-            <TrilhaSistema trilhas={[trilha]} gamAtivo={false} formato={formato} simbolos={simbolos} livre={livre} inverter={inverter} capa={trilha.capa ?? trilha.capaCard ?? null} semFundo semDivisoria ajudante semMoldura degradeTopo={degradeTrilha ?? degrade} />
+            {carimbosOverlay}
+            <TrilhaSistema trilhas={[trilha]} gamAtivo={false} formato={formato} simbolos={simbolos} livre={livre} inverter={inverter} capa={trilha.capa ?? trilha.capaCard ?? null} semFundo semDivisoria ajudante semMoldura degradeTopo={degradeTrilha ?? degrade} estampas={estampas} />
             {/* pointer-events-none no CONTÊINER do rail: a coluna (altura inteira da trilha) NÃO pode capturar
                 cliques, senão engole os nós da trilha que ficam sob ela (sobretudo em iframe estreito, ex.:
                 Curseduca). Só o card visível reativa o clique (pointer-events-auto abaixo). */}
@@ -123,7 +165,7 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
           </div>
         ) : (
           <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-            <div className="min-w-0 overflow-visible pb-10"><TrilhaSistema trilhas={[trilha]} gamAtivo={false} formato={formato} simbolos={simbolos} livre={livre} inverter={inverter} capa={trilha.capa ?? trilha.capaCard ?? null} semFundo semDivisoria ajudante /></div>
+            <div className="relative min-w-0 overflow-visible pb-10">{carimbosOverlay}<TrilhaSistema trilhas={[trilha]} gamAtivo={false} formato={formato} simbolos={simbolos} livre={livre} inverter={inverter} capa={trilha.capa ?? trilha.capaCard ?? null} semFundo semDivisoria ajudante estampas={estampas} /></div>
             {/* Rail de gamificação (metas/streak/XP/medalha) — desktop, quando a gamificação está ativa. */}
             {gam && <aside className="hidden lg:block lg:sticky lg:self-start lg:overflow-auto lg:pb-4" style={{ top: 'calc(var(--lp-banner-bottom, 6rem) + 0.75rem)', maxHeight: 'calc(100vh - var(--lp-banner-bottom, 6rem) - 3rem)' }}><LeituraTrilhaRail done={trilha.done} total={trilha.total} gam={gam} desafios={desafiosAtivos} desemp={desemp} dias={diasLeitura} /></aside>}
           </div>
@@ -231,8 +273,10 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
         </TabsContent>
       )}
 
-      <TabsContent value="desempenho" className="pt-4">
+      <TabsContent value="desempenho" className="space-y-4 pt-4">
         <DesempenhoModulo desempenho={desempenho} />
+        <ConquistasModuloColecao conquistas={conquistasModulo} />
+        <CarimbosColecao carimbos={carimbos} />
       </TabsContent>
       <TabsContent value="ranking" className="pt-4">
         <LeituraRanking ranking={ranking} meuId={meuId} meuNome={meuNome} />

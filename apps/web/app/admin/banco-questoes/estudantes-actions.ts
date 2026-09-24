@@ -40,10 +40,20 @@ export async function vincularEstudantes(bancoId: string, estudanteIds: string[]
   if (!estudanteIds.length) return { ok: false, error: 'Selecione ao menos um aluno.' }
 
   const svc = createAdminClient()
-  const ja = await fetchAllByIn<{ estudante_id: string }>(estudanteIds, (chunk) =>
+  // Isolamento: service role BYPASSA RLS → valida o banco (bancoId do cliente) e restringe aos alunos
+  // do tenant do ator (estudanteIds do cliente) antes de inserir os vínculos.
+  const { data: banco } = await svc.from('simulado_pastas').select('id').eq('id', bancoId).eq('tenant_id', g.tenantId).maybeSingle()
+  if (!banco) return { ok: false, error: 'Não encontrado.' }
+  const doTenant = await fetchAllByIn<{ id: string }>(estudanteIds, (chunk) =>
+    svc.from('simulado_estudantes').select('id').eq('tenant_id', g.tenantId).in('id', chunk).order('id', { ascending: true }))
+  const eidsValidos = new Set(doTenant.map((r: any) => r.id))
+  const estudanteIdsSeguros = estudanteIds.filter((e) => eidsValidos.has(e))
+  if (!estudanteIdsSeguros.length) return { ok: false, error: 'Não encontrado.' }
+
+  const ja = await fetchAllByIn<{ estudante_id: string }>(estudanteIdsSeguros, (chunk) =>
     svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', bancoId).in('estudante_id', chunk).order('estudante_id', { ascending: true }))
   const existentes = new Set(ja.map((r: any) => r.estudante_id))
-  const novos = estudanteIds.filter((e) => !existentes.has(e))
+  const novos = estudanteIdsSeguros.filter((e) => !existentes.has(e))
   if (!novos.length) return { ok: true, vinculados: 0 }
 
   const { error } = await svc.from('simulado_pasta_estudantes').insert(
@@ -68,6 +78,12 @@ export async function vincularGrupoAoBanco(bancoId: string, grupoId: string): Pr
   if (!g.ok) return g
   const svc = createAdminClient()
 
+  // Isolamento: service role BYPASSA RLS → valida que banco E grupo (ids do cliente) são do tenant do ator.
+  const { data: banco } = await svc.from('simulado_pastas').select('id').eq('id', bancoId).eq('tenant_id', g.tenantId).maybeSingle()
+  if (!banco) return { ok: false, error: 'Não encontrado.' }
+  const { data: grupo } = await svc.from('simulado_grupos').select('id').eq('id', grupoId).eq('tenant_id', g.tenantId).maybeSingle()
+  if (!grupo) return { ok: false, error: 'Não encontrado.' }
+
   // Registra o vínculo banco↔grupo (idempotente). Tolerante se a tabela não existir.
   const { error: linkErr } = await svc
     .from('simulado_pasta_grupos')
@@ -80,7 +96,7 @@ export async function vincularGrupoAoBanco(bancoId: string, grupoId: string): Pr
   // Liga os membros atuais do grupo ao banco. PAGINADO: grupo pode ter >1000 membros
   // (senão só os 1000 primeiros eram vinculados ao banco).
   const membros = await fetchAll<{ estudante_id: string }>(() =>
-    svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grupoId).order('estudante_id', { ascending: true }))
+    svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grupoId).eq('tenant_id', g.tenantId).order('estudante_id', { ascending: true }))
   const ids = [...new Set(membros.map((m) => m.estudante_id))]
   let vinculados = 0
   if (ids.length) {

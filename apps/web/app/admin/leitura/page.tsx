@@ -10,6 +10,8 @@ import { LeituraRanking } from '@/components/aluno/leitura-ranking'
 import { carregarRankingModulo } from '@/lib/leitura/ranking'
 import { LeituraRelatorio } from '@/components/admin/leitura-relatorio'
 import { carregarRelatorioModulo } from '@/lib/leitura/relatorio'
+import { ModuloMedalhasForm } from '@/components/admin/modulo-medalhas-form'
+import { carregarCarimbosModulo, carregarConquistasModulo, listarAulasDoModulo } from './actions'
 import { getCurrentTenant, getCurrentTenantId } from '@/lib/tenant'
 import { resolverCardView } from '@/lib/card-view'
 import { cn } from '@/lib/utils'
@@ -18,7 +20,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function LeituraAdminPage({ searchParams }: { searchParams: Promise<{ pasta?: string; tab?: string }> }) {
   const { pasta, tab } = await searchParams
-  const moduloTab: ModuloTab = tab === 'acessos' || tab === 'config' || tab === 'ranking' || tab === 'relatorio' || tab === 'trilha' || tab === 'regulamento' ? tab : 'aulas'
+  const moduloTab: ModuloTab = tab === 'acessos' || tab === 'config' || tab === 'ranking' || tab === 'relatorio' || tab === 'trilha' || tab === 'regulamento' || tab === 'medalhas' ? tab : 'aulas'
   // Otimização: só as abas Aulas/Editar trilha (ou a raiz) precisam dos detalhes das aulas — Acessos/Config pulam esse fetch.
   const data = await listarBancoAulas(pasta ?? null, !pasta || moduloTab === 'aulas' || moduloTab === 'trilha')
   const temaCards = ((await getCurrentTenant())?.tema as any) ?? {}
@@ -89,6 +91,15 @@ export default async function LeituraAdminPage({ searchParams }: { searchParams:
           {moduloTab === 'relatorio' && pasta && (
             <LeituraRelatorio rel={await carregarRelatorioModulo(pasta, (await getCurrentTenantId()) ?? '')} moduloId={pasta} />
           )}
+          {/* Medalhas: conquistas próprias do módulo (ícone + condição) + carimbos (imagem na trilha). */}
+          {moduloTab === 'medalhas' && pasta && await (async () => {
+            const [conq, cari, aulas] = await Promise.all([
+              carregarConquistasModulo(pasta),
+              carregarCarimbosModulo(pasta),
+              listarAulasDoModulo(pasta),
+            ])
+            return <ModuloMedalhasForm pastaId={pasta} conquistas={conq.conquistas ?? []} carimbos={cari.carimbos ?? []} aulas={aulas} />
+          })()}
         </>
       )}
     </div>

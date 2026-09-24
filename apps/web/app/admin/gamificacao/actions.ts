@@ -195,14 +195,17 @@ export async function estudantesDosGruposGam(grupoIds: string[]): Promise<{ ok: 
   const ids = [...new Set((grupoIds ?? []).filter(Boolean))]
   if (!ids.length) return { ok: true, itens: [] }
   const svc = createAdminClient()
-  const { data: gs } = await svc.from('simulado_grupos').select('id, nome').in('id', ids)
+  // Isolamento: service role BYPASSA RLS → filtra grupos, membros e estudantes pelo tenant do ator (grupoIds do cliente).
+  const { data: gs } = await svc.from('simulado_grupos').select('id, nome').eq('tenant_id', tenantId).in('id', ids)
   const nomeGrupo = new Map<string, string>((gs ?? []).map((x: any) => [x.id, x.nome]))
-  const mem = await fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_grupo_membros').select('estudante_id, grupo_id').in('grupo_id', chunk).order('estudante_id', { ascending: true }))
+  const idsTenant = [...nomeGrupo.keys()]
+  if (!idsTenant.length) return { ok: true, itens: [] }
+  const mem = await fetchAllByIn<any>(idsTenant, (chunk) => svc.from('simulado_grupo_membros').select('estudante_id, grupo_id').eq('tenant_id', tenantId).in('grupo_id', chunk).order('estudante_id', { ascending: true }))
   const grupoDe = new Map<string, string>()
   for (const m of mem) if (!grupoDe.has(m.estudante_id)) grupoDe.set(m.estudante_id, m.grupo_id)
   const estIds = [...grupoDe.keys()]
   if (!estIds.length) return { ok: true, itens: [] }
-  const es = await fetchAllByIn<any>(estIds, (chunk) => svc.from('simulado_estudantes').select('id, nome, email, cpf, classificacao, avatar, perfil_avatar_cor').in('id', chunk).order('nome', { ascending: true }))
+  const es = await fetchAllByIn<any>(estIds, (chunk) => svc.from('simulado_estudantes').select('id, nome, email, cpf, classificacao, avatar, perfil_avatar_cor').eq('tenant_id', tenantId).in('id', chunk).order('nome', { ascending: true }))
   return { ok: true, itens: (es as any[]).map((e) => ({ id: e.id, nome: e.nome ?? 'Aluno', email: e.email ?? null, cpf: e.cpf ?? null, classificacao: e.classificacao ?? null, avatar: e.avatar ?? null, perfil_avatar_cor: e.perfil_avatar_cor ?? null, grupoNome: nomeGrupo.get(grupoDe.get(e.id)!) ?? null })) }
 }
 

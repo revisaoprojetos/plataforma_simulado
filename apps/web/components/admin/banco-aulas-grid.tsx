@@ -252,10 +252,12 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTa
           onSaved={() => { setPersonalizandoAula(null); router.refresh() }}
         />
       )}
-      {/* Agendar publicação (1 ou várias aulas). */}
-      {agendarIds && (
-        <AgendarPublicacaoDialog quantidade={agendarIds.length} onCancel={() => setAgendarIds(null)} onConfirm={confirmarAgendamento} />
-      )}
+      {/* Agendar publicação (1 ou várias aulas). Pré-preenche a data quando 1 aula já agendada. */}
+      {agendarIds && (() => {
+        const alvo = agendarIds.length === 1 ? aulas.find((a) => a.id === agendarIds[0]) : null
+        const pub = (alvo as any)?.publicacao as { estado?: DocEstado; publicarEm?: string | null } | undefined
+        return <AgendarPublicacaoDialog quantidade={agendarIds.length} inicialQuando={pub?.publicarEm ?? null} inicialEstado={pub?.estado} onCancel={() => setAgendarIds(null)} onConfirm={confirmarAgendamento} />
+      })()}
     </div>
   )
 }
@@ -368,9 +370,9 @@ function CaixaSelecao({ checked, indeterminate, onChange, label }: { checked: bo
 }
 
 /** Diálogo para AGENDAR a publicação (1 ou várias aulas): data/hora + como fica até lá. */
-function AgendarPublicacaoDialog({ quantidade, onCancel, onConfirm }: { quantidade: number; onCancel: () => void; onConfirm: (patch: { estado: DocEstado; publicarEm: string | null }) => void }) {
-  const [quando, setQuando] = useState('')
-  const [ate, setAte] = useState<'rascunho' | 'visualizavel'>('visualizavel')
+function AgendarPublicacaoDialog({ quantidade, inicialQuando, inicialEstado, onCancel, onConfirm }: { quantidade: number; inicialQuando?: string | null; inicialEstado?: DocEstado; onCancel: () => void; onConfirm: (patch: { estado: DocEstado; publicarEm: string | null }) => void }) {
+  const [quando, setQuando] = useState(() => (inicialQuando ? isoParaLocal(inicialQuando) : ''))
+  const [ate, setAte] = useState<'rascunho' | 'visualizavel'>(inicialEstado === 'rascunho' ? 'rascunho' : 'visualizavel')
   const valido = !!quando && !Number.isNaN(Date.parse(quando)) && Date.parse(quando) > Date.now()
   return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
@@ -380,6 +382,7 @@ function AgendarPublicacaoDialog({ quantidade, onCancel, onConfirm }: { quantida
           <h3 className="flex items-center gap-2 text-sm font-semibold"><CalendarClock className="h-4 w-4 text-primary" /> Agendar publicação {quantidade > 1 ? `(${quantidade} aulas)` : ''}</h3>
           <button onClick={onCancel} aria-label="Fechar" className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
         </div>
+        {inicialQuando && <p className="mb-3 -mt-1 inline-flex items-center gap-1 rounded-md bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-600 dark:text-amber-400"><CalendarClock className="h-3 w-3" /> Já agendada para {fmtAgendada(inicialQuando)}</p>}
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-muted-foreground">Publicar em (data e hora)</span>
           <input type="datetime-local" value={quando} onChange={(e) => setQuando(e.target.value)} className="h-10 w-full rounded-lg border bg-card px-3 text-sm outline-none focus:ring-2 focus:ring-primary/40" />
@@ -464,6 +467,16 @@ function TabelaAulas({ aulas, modulos, pending, onOrdem, onExcluir, onPersonaliz
 }
 
 /** Uma aula: cabeçalho (personalizar/mover/ordenar/excluir) + 2 filhos que levam a cada área. */
+/** Data/hora curta de agendamento (Brasília), ex.: "24/09 10:30". */
+function fmtAgendada(iso: string): string {
+  try { return new Date(iso).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) } catch { return '' }
+}
+
+/** ISO → valor de <input type="datetime-local"> (horário local do navegador). */
+function isoParaLocal(iso: string): string {
+  try { const d = new Date(iso); const p = (n: number) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}` } catch { return '' }
+}
+
 function AulaLinha({ a, i, total, modulos, pending, onOrdem, onExcluir, onPersonalizar, run, selecionavel = false, selecionado = false, onToggleSel, onAplicarEstado, onAgendar }: {
   a: AulaItem
   i: number
@@ -496,6 +509,12 @@ function AulaLinha({ a, i, total, modulos, pending, onOrdem, onExcluir, onPerson
           <CaixaSelecao checked={selecionado} onChange={() => onToggleSel?.(a.id)} label={`Selecionar ${a.titulo}`} />
         )}
         <span className="w-5 shrink-0 text-center font-mono text-xs text-muted-foreground">{i + 1}</span>
+        {/* Etiqueta de agendamento (à esquerda): data/hora da liberação. */}
+        {agendada && pub?.publicarEm && (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-amber-600 dark:text-amber-400" title={`Liberação agendada para ${fmtAgendada(pub.publicarEm)}`}>
+            <CalendarClock className="h-3 w-3" /> {fmtAgendada(pub.publicarEm)}
+          </span>
+        )}
         <button onClick={() => setAberto((v) => !v)} className="shrink-0 rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label={aberto ? 'Recolher' : 'Expandir'}>
           {aberto ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </button>

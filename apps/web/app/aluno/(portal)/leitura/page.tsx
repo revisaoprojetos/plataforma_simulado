@@ -10,6 +10,7 @@ import { LeituraModuloView } from '@/components/aluno/leitura-modulo-view'
 import { getCurrentTenant } from '@/lib/tenant'
 import { resolverCardView } from '@/lib/card-view'
 import { carregarGamRail } from '@/lib/aluno/trilhas'
+import { carimbosDoAluno, conquistasModuloDoAluno, avaliarMedalhasModulo, progressoModuloAluno } from '@/lib/leitura/carimbos'
 import { createAdminClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
@@ -45,7 +46,14 @@ export default async function LeituraAlunoPage({ searchParams }: { searchParams:
       // sem o "flash preto" enquanto carrega.
       const bgTrilha = mod.trilhaAparencia.livre.fundo?.url ?? mod.trilha.capa ?? mod.trilha.capaCard ?? null
       if (bgTrilha) ReactDOM.preload(bgTrilha, { as: 'image', fetchPriority: 'high' })
-      return <LeituraModuloView modulo={modulo} trilha={mod.trilha} desempenho={mod.desempenho} pendentes={mod.pendentes} aulasPendentes={mod.aulasPendentes} ranking={ranking} meuId={sessao.estudanteId} meuNome={sessao.nome} formato={mod.trilhaAparencia.formato} simbolos={mod.trilhaAparencia.simbolos} livre={mod.trilhaAparencia.livre} inverter={mod.trilhaAparencia.inverter} degrade={mod.trilhaAparencia.degrade} degradeTrilha={mod.trilhaAparencia.degradeTrilha} descricao={mod.trilhaAparencia.descricao} regulamento={mod.regulamento} pontuacao={mod.pontuacao} desafios={mod.desafios} desempenhoDesafios={mod.desempenhoDesafios} gam={gam} diasLeitura={diasLeitura} />
+      // Concede retroativamente medalhas já merecidas (quem concluiu antes do carimbo existir) ANTES de ler.
+      await avaliarMedalhasModulo(svc, sessao.tenantId, modulo, sessao.estudanteId)
+      const [carimbos, conquistasModulo, prog] = await Promise.all([
+        carimbosDoAluno(svc, sessao.tenantId, modulo, sessao.estudanteId),
+        conquistasModuloDoAluno(svc, sessao.tenantId, modulo, sessao.estudanteId),
+        progressoModuloAluno(svc, sessao.tenantId, modulo, sessao.estudanteId),
+      ])
+      return <LeituraModuloView modulo={modulo} trilha={mod.trilha} desempenho={mod.desempenho} pendentes={mod.pendentes} aulasPendentes={mod.aulasPendentes} ranking={ranking} meuId={sessao.estudanteId} meuNome={sessao.nome} formato={mod.trilhaAparencia.formato} simbolos={mod.trilhaAparencia.simbolos} livre={mod.trilhaAparencia.livre} inverter={mod.trilhaAparencia.inverter} degrade={mod.trilhaAparencia.degrade} degradeTrilha={mod.trilhaAparencia.degradeTrilha} descricao={mod.trilhaAparencia.descricao} regulamento={mod.regulamento} pontuacao={mod.pontuacao} desafios={mod.desafios} desempenhoDesafios={mod.desempenhoDesafios} gam={gam} diasLeitura={diasLeitura} carimbos={carimbos} conquistasModulo={conquistasModulo} progAulas={prog.porAula} />
     }
     // módulo inexistente/sem acesso → cai na lista
   }

@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   const svc = createAdminClient()
   const estId = sessao.estudanteId
   const [{ data: sim }, { data: sess }, { data: estRow }] = await Promise.all([
-    svc.from('simulado_simulados').select('id, titulo, regras, status, modo_aplicacao, data_inicio, data_fim').eq('id', simuladoId).is('owner_estudante_id', null).maybeSingle(),
+    svc.from('simulado_simulados').select('id, titulo, regras, status, modo_aplicacao, data_inicio, data_fim').eq('id', simuladoId).eq('tenant_id', sessao.tenantId).is('owner_estudante_id', null).maybeSingle(),
     svc.from('simulado_sessoes_prova').select('id, nota, finalizado_em').eq('estudante_id', estId).eq('simulado_id', simuladoId).eq('is_teste', false).eq('deletado', false).eq('status', 'finalizada'),
     svc.from('simulado_estudantes').select('classificacao').eq('id', estId).maybeSingle(),
   ])

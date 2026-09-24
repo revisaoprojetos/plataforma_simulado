@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { sessaoNoTenantDoRequisitante } from '@/lib/simulado/sessao-guard'
 
 // POST /api/sessoes/resposta-discursiva — auto-save da resposta discursiva na prova.
 // Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
@@ -23,6 +24,7 @@ export async function POST(request: NextRequest) {
     .eq('id', sessao_id)
     .maybeSingle()
   if (!sessao) return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
+  if (!(await sessaoNoTenantDoRequisitante(sessao))) return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
   if (sessao.status === 'finalizada') return NextResponse.json({ message: 'Sessão finalizada.' }, { status: 409 })
 
   const { error } = await supabase

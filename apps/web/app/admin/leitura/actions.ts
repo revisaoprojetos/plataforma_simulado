@@ -14,6 +14,7 @@ import { normalizarPontuacaoLeitura, type PontuacaoLeitura } from '@/lib/leitura
 import { normalizarIntro, type IntroConfig } from '@/lib/leitura/intro'
 import { normalizarRegulamento, type RegulamentoConfig } from '@/lib/leitura/regulamento'
 import { normalizarDesafios, type DesafioModulo } from '@/lib/leitura/desafios'
+import { normalizarCarimbos, normalizarConquistasModulo, type CarimboDef, type ModuloConquistaDef } from '@/lib/leitura/carimbos'
 import { resolverEspacamento, type EspacamentoDoc } from '@/lib/leitura/espacamento'
 import { resolverTrilhaAparencia, resolverGrifoCores, type TrilhaAparencia, type TrilhaFundoConfig, type TrilhaDegrade, type GrifoCores } from '@/lib/leitura/trilha-aparencia'
 import { resolverBlocos, type BlocoDef } from '@/lib/leitura/blocos'
@@ -461,7 +462,8 @@ export async function listarQuestoesDocumento(documentoId: string, versao: numbe
   const ids = [...new Set((dq ?? []).map((x: any) => x.questao_id))]
   const enun = new Map<string, string>()
   if (ids.length) {
-    const { data: qs } = await svc.from('simulado_questoes').select('id, enunciado').in('id', ids)
+    // Isolamento: service role BYPASSA RLS → só lê enunciados de questões do tenant do ator.
+    const { data: qs } = await svc.from('simulado_questoes').select('id, enunciado').eq('tenant_id', g.tenantId).in('id', ids)
     for (const q of (qs ?? []) as any[]) enun.set(q.id, snippet(q.enunciado))
   }
   return { ok: true, itens: (dq ?? []).map((x: any) => ({ id: x.id, questaoId: x.questao_id, enunciado: enun.get(x.questao_id) || 'Questão', aposArtigo: x.apos_artigo, obrigatoria: !!x.obrigatoria })) }
@@ -485,6 +487,11 @@ export async function buscarQuestoesLeitura(query: string): Promise<{ ok: boolea
 export async function adicionarQuestaoDocumento(documentoId: string, versao: number, questaoId: string, aposArtigo: number, obrigatoria: boolean): Promise<{ ok: boolean; id?: string; error?: string }> {
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
+  // Isolamento: service role BYPASSA RLS → valida que documento E questão (ids do cliente) são do tenant do ator.
+  const { data: doc } = await svc.from('simulado_documentos').select('id').eq('id', documentoId).eq('tenant_id', g.tenantId).maybeSingle()
+  if (!doc) return { ok: false, error: 'Não encontrado.' }
+  const { data: q } = await svc.from('simulado_questoes').select('id').eq('id', questaoId).eq('tenant_id', g.tenantId).maybeSingle()
+  if (!q) return { ok: false, error: 'Não encontrado.' }
   const { data, error } = await svc.from('simulado_documento_questoes').upsert(
     { tenant_id: g.tenantId, documento_id: documentoId, documento_versao: versao, questao_id: questaoId, apos_artigo: aposArtigo, obrigatoria, ordem: aposArtigo, deletado: false },
     { onConflict: 'documento_id,documento_versao,questao_id' },
@@ -692,6 +699,55 @@ export async function salvarAdesivoModulo(id: string, adesivo: string | null): P
   const { error } = await svc.from('simulado_pastas').update({ adesivo_url: url }).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
   if (error) return { ok: false, error: /adesivo_url|column|schema cache/i.test(error.message) ? 'Migração do adesivo pendente (adesivo_url).' : error.message }
   revalidatePath('/admin/leitura'); return { ok: true, url }
+}
+
+// ── Carimbos (adesivos colecionáveis) do módulo ──────────────────────────────
+/** Lê os carimbos definidos no módulo. Tolerante à coluna ausente. */
+export async function carregarCarimbosModulo(pastaId: string): Promise<{ ok: boolean; carimbos?: CarimboDef[]; error?: string }> {
+  const g = await guard('leitura:view'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  try {
+    const { data } = await svc.from('simulado_pastas').select('carimbos_def').eq('id', pastaId).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA).maybeSingle()
+    return { ok: true, carimbos: normalizarCarimbos((data as any)?.carimbos_def) }
+  } catch { return { ok: true, carimbos: [] } }
+}
+
+/** Salva os carimbos do módulo. Imagens novas (data URL) são hospedadas no storage → URL pública. */
+export async function salvarCarimbosModulo(pastaId: string, carimbos: CarimboDef[]): Promise<{ ok: boolean; carimbos?: CarimboDef[]; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const norm = normalizarCarimbos(carimbos)
+  for (const c of norm) {
+    if (c.url && c.url.startsWith('data:')) {
+      try { c.url = await hospedarBase64(c.url, svc, { tenantId: g.tenantId }) } catch { c.url = null }
+    }
+  }
+  const { error } = await svc.from('simulado_pastas').update({ carimbos_def: norm }).eq('id', pastaId).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  if (error) return { ok: false, error: /carimbos_def|column|schema cache/i.test(error.message) ? 'Migração pendente (carimbos_def) — rode 20260924000000.' : error.message }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_pastas', entidadeId: pastaId, depois: { carimbos: norm.length }, atorId: g.atorId, tenantId: g.tenantId })
+  revalidatePath('/admin/leitura'); return { ok: true, carimbos: norm }
+}
+
+// ── Conquistas PRÓPRIAS do módulo (irmãs dos carimbos, formato "conquista") ──────
+/** Lê as conquistas do módulo. Tolerante à coluna ausente. */
+export async function carregarConquistasModulo(pastaId: string): Promise<{ ok: boolean; conquistas?: ModuloConquistaDef[]; error?: string }> {
+  const g = await guard('leitura:view'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  try {
+    const { data } = await svc.from('simulado_pastas').select('conquistas_def').eq('id', pastaId).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA).maybeSingle()
+    return { ok: true, conquistas: normalizarConquistasModulo((data as any)?.conquistas_def) }
+  } catch { return { ok: true, conquistas: [] } }
+}
+
+/** Salva as conquistas do módulo. */
+export async function salvarConquistasModulo(pastaId: string, conquistas: ModuloConquistaDef[]): Promise<{ ok: boolean; conquistas?: ModuloConquistaDef[]; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const norm = normalizarConquistasModulo(conquistas)
+  const { error } = await svc.from('simulado_pastas').update({ conquistas_def: norm }).eq('id', pastaId).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  if (error) return { ok: false, error: /conquistas_def|column|schema cache/i.test(error.message) ? 'Migração pendente (conquistas_def) — rode 20260924000001.' : error.message }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_pastas', entidadeId: pastaId, depois: { conquistas: norm.length }, atorId: g.atorId, tenantId: g.tenantId })
+  revalidatePath('/admin/leitura'); return { ok: true, conquistas: norm }
 }
 
 /** Pontuação da gamificação do módulo (dormant até a gamificação ativar). Tolerante à migração ausente. */
@@ -996,8 +1052,9 @@ export async function contarMembrosGrupos(grupoIds: string[]): Promise<{ ok: boo
   const svc = createAdminClient()
   const ids = [...new Set((grupoIds ?? []).filter(Boolean))]
   const out: Record<string, number> = {}
+  // Isolamento: service role BYPASSA RLS → conta apenas membros do tenant do ator (grupoIds do cliente).
   await Promise.all(ids.map(async (id) => {
-    const { count } = await svc.from('simulado_grupo_membros').select('estudante_id', { count: 'exact', head: true }).eq('grupo_id', id)
+    const { count } = await svc.from('simulado_grupo_membros').select('estudante_id', { count: 'exact', head: true }).eq('grupo_id', id).eq('tenant_id', g.tenantId)
     out[id] = count ?? 0
   }))
   return { ok: true, contagem: out }
@@ -1038,9 +1095,12 @@ export async function estudantesDosGrupos(grupoIds: string[]): Promise<{ ok: boo
   const ids = [...new Set((grupoIds ?? []).filter(Boolean))]
   if (!ids.length) return { ok: true, itens: [] }
   const svc = createAdminClient()
-  const { data: gs } = await svc.from('simulado_grupos').select('id, nome').in('id', ids)
+  // Isolamento: service role BYPASSA RLS → filtra grupos e membros pelo tenant do ator (grupoIds do cliente).
+  const { data: gs } = await svc.from('simulado_grupos').select('id, nome').eq('tenant_id', g.tenantId).in('id', ids)
   const nomeGrupo = new Map<string, string>((gs ?? []).map((x: any) => [x.id, x.nome]))
-  const mem = await fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_grupo_membros').select('estudante_id, grupo_id').in('grupo_id', chunk).order('estudante_id', { ascending: true }))
+  const idsTenant = [...nomeGrupo.keys()]
+  if (!idsTenant.length) return { ok: true, itens: [] }
+  const mem = await fetchAllByIn<any>(idsTenant, (chunk) => svc.from('simulado_grupo_membros').select('estudante_id, grupo_id').eq('tenant_id', g.tenantId).in('grupo_id', chunk).order('estudante_id', { ascending: true }))
   const grupoDe = new Map<string, string>()
   for (const m of mem) if (!grupoDe.has(m.estudante_id)) grupoDe.set(m.estudante_id, m.grupo_id)
   const estIds = [...grupoDe.keys()]

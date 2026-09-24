@@ -268,7 +268,8 @@ export async function salvarEspelhoQuesito(competenciaId: string, descricao: str
   if (!ok) return { ok: false, error: 'Sem permissão.' }
   if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
   const svc = createAdminClient()
-  const { error } = await svc.from('simulado_competencias').update({ descricao: descricao?.trim() || null }).eq('id', competenciaId)
+  // Escopar por tenant: sem isto, um admin poderia sobrescrever o espelho de uma competência de OUTRO tenant (competenciaId vem do cliente).
+  const { error } = await svc.from('simulado_competencias').update({ descricao: descricao?.trim() || null }).eq('id', competenciaId).eq('tenant_id', access.tenantId)
   if (error) return { ok: false, error: /descricao|column .* does not exist/i.test(error.message) ? 'Rode a migração 20260820000001_correcao_criterion.sql.' : error.message }
   return { ok: true }
 }

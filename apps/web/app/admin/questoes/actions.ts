@@ -63,9 +63,15 @@ async function vincularBancos(tenantId: string, questaoId: string, bancoIds: str
   if (sync) await admin.from('simulado_questao_pasta').delete().eq('questao_id', questaoId).eq('tenant_id', tenantId)
   const ids = [...new Set(bancoIds.filter(Boolean))]
   if (ids.length) {
-    await admin.from('simulado_questao_pasta').insert(
-      ids.map((pasta_id) => ({ tenant_id: tenantId, questao_id: questaoId, pasta_id })),
-    )
+    // Isolamento: service role BYPASSA RLS → só vincula às pastas que são do tenant (ids vêm do cliente).
+    const { data: validas } = await admin.from('simulado_pastas').select('id').eq('tenant_id', tenantId).in('id', ids)
+    const idsValidos = new Set((validas ?? []).map((p: any) => p.id))
+    const alvo = ids.filter((id) => idsValidos.has(id))
+    if (alvo.length) {
+      await admin.from('simulado_questao_pasta').insert(
+        alvo.map((pasta_id) => ({ tenant_id: tenantId, questao_id: questaoId, pasta_id })),
+      )
+    }
   }
 }
 

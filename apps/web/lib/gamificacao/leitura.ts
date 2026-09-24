@@ -3,6 +3,7 @@ import { progressoNivel, ligaParaXp, proximaLiga, type ProgressoNivel } from './
 import { missoesDoDia } from './rodizio'
 import { diaLocal, inicioDaSemanaISO, inicioDoMesISO } from './datas'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { listarConquistasModuloTenant } from '@/lib/leitura/carimbos'
 
 // ─────────── RESUMO (hero do portal) ───────────
 export interface ResumoGamificacao {
@@ -82,21 +83,30 @@ export async function missoesHoje(svc: any, tenantId: string, estudanteId: strin
 }
 
 // ─────────── CONQUISTAS ───────────
-export interface ConquistaView { def: ConquistaDef; desbloqueada: boolean; desbloqueadoEm: string | null }
+// `origem` = etiqueta do módulo de Leitura que criou a conquista (só para as conquistas de módulo).
+export interface ConquistaView { def: ConquistaDef; desbloqueada: boolean; desbloqueadoEm: string | null; origem?: string }
 
 export async function conquistasDoAluno(svc: any, tenantId: string, estudanteId: string, cfg?: GamConfig | null): Promise<ConquistaView[]> {
   const config = cfg ?? (await getGamConfig(svc, tenantId))
   if (!config?.ativo) return []
-  const { data } = await svc
-    .from('simulado_conquista_desbloqueios')
-    .select('conquista_id, desbloqueado_em')
-    .eq('tenant_id', tenantId).eq('estudante_id', estudanteId)
+  const [{ data }, modulos] = await Promise.all([
+    svc.from('simulado_conquista_desbloqueios').select('conquista_id, desbloqueado_em').eq('tenant_id', tenantId).eq('estudante_id', estudanteId),
+    listarConquistasModuloTenant(svc, tenantId),
+  ])
   const porId = new Map<string, string>((data ?? []).map((r: any) => [r.conquista_id, r.desbloqueado_em]))
-  return (config.conquistas_def ?? []).map((def) => ({
+  const globais: ConquistaView[] = (config.conquistas_def ?? []).map((def) => ({
     def,
     desbloqueada: porId.has(def.id),
     desbloqueadoEm: porId.get(def.id) ?? null,
   }))
+  // Conquistas próprias dos módulos de Leitura — mesma coleção, com etiqueta de origem.
+  const doModulo: ConquistaView[] = modulos.flatMap((m) => m.conquistas.map((c) => ({
+    def: { id: c.id, titulo: c.titulo, descricao: c.descricao, icone: c.icone, cor: c.cor, xp: c.xp, regra: { tipo: 'xp_total' as const, meta: 0 } },
+    desbloqueada: porId.has(c.id),
+    desbloqueadoEm: porId.get(c.id) ?? null,
+    origem: m.nome,
+  })))
+  return [...globais, ...doModulo]
 }
 
 // ─────────── LEADERBOARDS ───────────

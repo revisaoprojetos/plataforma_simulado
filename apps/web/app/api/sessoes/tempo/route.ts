@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { sessaoNoTenantDoRequisitante } from '@/lib/simulado/sessao-guard'
 
 // GET /api/sessoes/tempo?st={sessao_id}
 // Endpoint LEVE: devolve o tempo limite ATUAL do simulado da sessão (em minutos).
@@ -14,10 +15,11 @@ export async function GET(request: NextRequest) {
   const svc = createAdminClient()
   const { data: sess } = await svc
     .from('simulado_sessoes_prova')
-    .select('simulado_id, status')
+    .select('simulado_id, status, tenant_id')
     .eq('id', st)
     .maybeSingle()
   if (!sess) return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
+  if (!(await sessaoNoTenantDoRequisitante(sess))) return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
 
   const { data: sim } = await svc
     .from('simulado_simulados')

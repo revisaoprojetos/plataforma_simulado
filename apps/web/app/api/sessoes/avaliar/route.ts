@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
+import { sessaoNoTenantDoRequisitante } from '@/lib/simulado/sessao-guard'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,6 +25,7 @@ export async function POST(req: NextRequest) {
     .eq('id', body.sessao_id)
     .maybeSingle()
   if (!sess) return NextResponse.json({ error: 'Sessão não encontrada.' }, { status: 404 })
+  if (!(await sessaoNoTenantDoRequisitante(sess))) return NextResponse.json({ error: 'Sessão não encontrada.' }, { status: 404 })
   if ((sess as any).is_teste) return NextResponse.json({ ok: true, ignorado: true }) // testador não avalia
   if ((sess as any).status !== 'finalizada') return NextResponse.json({ error: 'Conclua o simulado antes de avaliar.' }, { status: 400 })
 

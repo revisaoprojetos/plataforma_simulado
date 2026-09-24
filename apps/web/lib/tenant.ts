@@ -24,31 +24,33 @@ export interface Tenant {
 // render — sem cache seriam N leituras idênticas de `simulado_tenants`. Host é constante no request.
 export const getCurrentTenant = cache(async (): Promise<Tenant | null> => {
   const h = await headers()
-  const host = (h.get('host') ?? '').split(':')[0]
-  const parts = host.split('.')
+  const host = (h.get('host') ?? '').split(':')[0].toLowerCase()
+  const supabase = createAdminClient()
+  const COLS = 'id, nome, slug, tema, plano, ativo'
 
+  // 1) DOMÍNIO CUSTOMIZADO (white-label): casa o HOST COMPLETO contra `tenants.dominio`.
+  //    Permite cada empresa ter seu próprio domínio (ex.: vocenadefensoria.vnd.com.br) sem depender
+  //    do primeiro rótulo virar slug. É o caminho preferido para onboard de novas empresas.
+  if (host && host !== 'localhost') {
+    const { data } = await supabase.from('simulado_tenants').select(COLS).eq('dominio', host).maybeSingle()
+    if (data) return data as Tenant
+  }
+
+  // 2) FALLBACK por SLUG = primeiro rótulo do host (subdomínio), como antes.
+  //    Dev: {slug}.localhost; Produção: {slug}.dominio.com (ex.: simulado.revisaopge.com.br → "simulado").
+  const parts = host.split('.')
   let slug = process.env.NEXT_PUBLIC_DEFAULT_TENANT_SLUG ?? 'demo'
   if (parts.length === 2 && parts[1] === 'localhost' && parts[0] !== 'www') {
-    // Dev: {slug}.localhost → usa o slug (ex.: revisaopge.localhost)
     slug = parts[0]
   } else if (parts.length >= 3 && !['www', 'localhost'].includes(parts[0])) {
-    // Produção: {slug}.dominio.com
     slug = parts[0]
   }
 
-  const supabase = createAdminClient()
-  const { data } = await supabase
-    .from('simulado_tenants')
-    .select('id, nome, slug, tema, plano, ativo')
-    .eq('slug', slug)
-    .maybeSingle()
-
+  const { data } = await supabase.from('simulado_tenants').select(COLS).eq('slug', slug).maybeSingle()
   if (!data) {
     // Tenant não resolvido: as queries caem no uuid-nulo (estado vazio) em vez de estourar.
-    // Aviso visível no log para diagnosticar slug/subdomínio errado (ver NEXT_PUBLIC_DEFAULT_TENANT_SLUG).
-    console.warn(`[tenant] nenhum tenant com slug "${slug}" (host "${host}") — verifique NEXT_PUBLIC_DEFAULT_TENANT_SLUG ou o subdomínio.`)
+    console.warn(`[tenant] nenhum tenant para o host "${host}" (nem por dominio, nem por slug "${slug}") — verifique tenants.dominio/slug ou NEXT_PUBLIC_DEFAULT_TENANT_SLUG.`)
   }
-
   return (data as Tenant | null) ?? null
 })
 

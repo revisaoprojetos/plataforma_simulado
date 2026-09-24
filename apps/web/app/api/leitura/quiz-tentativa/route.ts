@@ -4,6 +4,7 @@ import { getSessaoAluno } from '@/lib/aluno-session'
 import { docAcessivelAluno } from '@/lib/leitura/acesso'
 import { onQuizConcluido } from '@/lib/gamificacao'
 import { invalidarRankingPorDocumento } from '@/lib/leitura/ranking'
+import { avaliarMedalhasPorDocumento } from '@/lib/leitura/carimbos'
 
 // POST /api/leitura/quiz-tentativa — registra UMA tentativa concluída do quiz "Questões do conteúdo".
 // Cada conclusão (inclusive refazer) vira uma tentativa contabilizada. Tolerante: se a migração da
@@ -41,6 +42,8 @@ export async function POST(request: NextRequest) {
     // Gamificação: atividade + bônus de COMBO por gabaritar a aula (uma vez por documento; per-acerto já
     // é creditado nas respostas inline). Fire-and-forget: nunca quebra o registro da tentativa.
     void onQuizConcluido(svc, { tenantId: sessao.tenantId, estudanteId: sessao.estudanteId, documentoId: documento_id, acertos, total })
+    // Medalhas colecionáveis do módulo (carimbos + conquistas): avalia/concede na conclusão do quiz.
+    void avaliarMedalhasPorDocumento(svc, sessao.tenantId, documento_id, sessao.estudanteId)
     // Concluir o quiz muda aulas/sequência/pontos no ranking → invalida o cache do módulo na hora
     // (o ranking é por respostas; sem isto só atualizava após o TTL de 5 min). Best-effort.
     void invalidarRankingPorDocumento(svc, sessao.tenantId, documento_id)

@@ -73,6 +73,21 @@ export async function documentosDoAluno(estudanteId: string, tenantId: string, o
     (temLei && !leve) ? svc.from('simulado_materias').select('id, nome, cor').eq('tenant_id', tenantId).eq('deletado', false) : Promise.resolve({ data: [] as any[] } as any),
   ])
   if (!docs.length) return []
+
+  // AUTO-CURA de agendamento: aulas cujo `publicarEm` já venceu viram `publicado=true` AQUI mesmo
+  // (não dependemos do cron nem do admin abrir a lista). Sem isto a aula ficava "visualizável"
+  // (bloqueada) para o aluno depois da hora agendada. Idempotente; escreve só na 1ª carga após vencer.
+  if (temPub) {
+    const agora = Date.now()
+    const venceu = docs.filter((d) => !d.publicado && d.publicacao && typeof d.publicacao === 'object' && d.publicacao.publicarEm && Date.parse(String(d.publicacao.publicarEm)) <= agora)
+    for (const d of venceu) {
+      try {
+        await svc.from('simulado_documentos').update({ publicado: true, publicacao: { estado: 'publicada', publicarEm: null }, atualizado_em: new Date().toISOString() }).eq('id', d.id).eq('tenant_id', tenantId)
+        d.publicado = true; d.publicacao = { estado: 'publicada', publicarEm: null }
+      } catch { /* best-effort — segue com o estado em memória */ }
+    }
+  }
+
   const ids = docs.map((d) => d.id)
 
   // Matérias (id → nome/cor)

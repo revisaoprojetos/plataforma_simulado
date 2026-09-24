@@ -13,6 +13,8 @@ import { TrilhaMapaSemanas } from '@/components/aluno/trilha-mapa-semanas'
 import { scrollSuaveAte } from '@/lib/aluno/scroll-trilha'
 import { rotuloProximaAula } from '@/lib/aluno/proxima-aula'
 import { TrilhaLivre } from '@/components/aluno/trilha-livre'
+import { EstampasNo, EstampasCard } from '@/components/aluno/carimbo-estampa'
+import type { CarimboEstampa } from '@/lib/leitura/carimbos-tipos'
 import { type TrilhaFormato } from '@/lib/gamificacao/trilha-formato'
 import { type TrilhaLivreConfig, type TrilhaDegrade } from '@/lib/leitura/trilha-aparencia'
 
@@ -165,7 +167,7 @@ function NodeCard({ n, gamAtivo }: { n: TrilhaNode; gamAtivo: boolean }) {
 const LANE = 300, ROW = 150, R = 30, PAD = 34
 const OFFS = [0, 66, 98, 66, 0, -66, -98, -66]
 
-function TrilhaCaminho({ t, gamAtivo, simbolos }: { t: Trilha; gamAtivo: boolean; simbolos: TrilhaSimbolos }) {
+function TrilhaCaminho({ t, gamAtivo, simbolos, estampas = [] }: { t: Trilha; gamAtivo: boolean; simbolos: TrilhaSimbolos; estampas?: CarimboEstampa[] }) {
   // Início: nenhum card aberto ao entrar — só abre quando o aluno clica em um nó.
   const [aberto, setAberto] = useState<string | null>(null)
   const cx = (off: number) => LANE / 2 + off
@@ -205,7 +207,7 @@ function TrilhaCaminho({ t, gamAtivo, simbolos }: { t: Trilha; gamAtivo: boolean
         const sel = n.id === aberto
         return (
           <div key={n.id} data-trilha-item className="absolute -translate-x-1/2 text-center" style={{ left: cx(p.off), top: p.y - R, width: 200, marginLeft: 0 }}>
-            <button type="button" data-trilha-node onClick={() => setAberto(n.id)} aria-label={n.titulo}
+            <button type="button" data-trilha-node data-carimbo-alvo={n.id} onClick={() => setAberto(n.id)} aria-label={n.titulo}
               className={cn('relative mx-auto flex items-center justify-center rounded-full border-4 shadow-sm transition-transform hover:scale-105 focus:outline-none', sel && 'ring-4 ring-primary/25')}
               style={{ width: R * 2, height: R * 2, ...(ouro ? { background: 'radial-gradient(circle at 50% 36%, #ffe680 0%, #ffcf33 46%, #f0b000 78%, #d99200 100%)', borderColor: '#c07f08', color: '#c2680a', boxShadow: '0 0 13px 2px rgba(250,204,21,.5), 0 0 28px 6px rgba(250,204,21,.22), 0 6px 16px -5px rgba(217,119,6,.55)' }
                 : concluido ? { background: '#10b981', borderColor: '#059669', color: '#fff' }
@@ -239,8 +241,11 @@ function TrilhaCaminho({ t, gamAtivo, simbolos }: { t: Trilha; gamAtivo: boolean
       {open && openPt && (
         <div ref={cardRef} key={open.id} className="group/card absolute z-10 w-[400px] transition-transform duration-200 will-change-transform motion-safe:animate-in motion-safe:fade-in motion-safe:duration-100 motion-safe:hover:scale-[1.03]"
           style={{ top: cardTop, ...(side === 'right' ? { left: LANE + 20 } : { right: LANE + 20 }) }}>
-          <span className={cn('absolute h-3 w-3 rotate-45 border bg-card', side === 'right' ? '-left-1.5 border-b-0 border-r-0' : '-right-1.5 border-l-0 border-t-0')} style={{ top: arrowY - 6 }} />
-          <div className={cn('overflow-hidden rounded-2xl border bg-card shadow-xl', open.estado === 'atual' && 'border-primary/40')}>
+          <span className={cn('absolute z-[5] h-3 w-3 rotate-45 border bg-card', side === 'right' ? '-left-1.5 border-b-0 border-r-0' : '-right-1.5 border-l-0 border-t-0')} style={{ top: arrowY - 6 }} />
+          <div className={cn('relative rounded-2xl border bg-card shadow-xl', open.estado === 'atual' && 'border-primary/40')}>
+            {/* Carimbos 'card' DENTRO do card → sobreposição (z) e recorte funcionam. */}
+            <EstampasCard estampas={estampas} aulaId={open.id} />
+            <div className="relative z-10 overflow-hidden rounded-2xl">
             {open.capaBanner && <div className="relative h-28"><img src={open.capaBanner} alt="" className="absolute inset-0 h-full w-full object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" /></div>}
             <div className="space-y-2 p-4">
               <div className="font-semibold leading-tight">{open.titulo}</div>
@@ -289,6 +294,7 @@ function TrilhaCaminho({ t, gamAtivo, simbolos }: { t: Trilha; gamAtivo: boolean
                   )}
                 </div>
               ) : null}
+            </div>
             </div>
           </div>
         </div>
@@ -425,7 +431,7 @@ export function TrilhaSimulados({ trilhas, gamAtivo, estilo = 'cards', visiveis 
 const GAP_HDR = 58   // altura reservada p/ a divisória (nome do grupo)
 const GAP_GRUPO = 44 // respiro extra entre grupos (o pontilhado continua nele)
 
-export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = false, semDivisoria = false, ajudante = false, inverter = false, simbolos = DEFAULT_TRILHA_SIMBOLOS }: { trilhas: Trilha[]; gamAtivo: boolean; reto?: boolean; semFundo?: boolean; semDivisoria?: boolean; ajudante?: boolean; inverter?: boolean; simbolos?: TrilhaSimbolos }) {
+export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = false, semDivisoria = false, ajudante = false, inverter = false, simbolos = DEFAULT_TRILHA_SIMBOLOS, estampas = [] }: { trilhas: Trilha[]; gamAtivo: boolean; reto?: boolean; semFundo?: boolean; semDivisoria?: boolean; ajudante?: boolean; inverter?: boolean; simbolos?: TrilhaSimbolos; estampas?: CarimboEstampa[] }) {
   const flat = trilhas.flatMap((t) => t.nodes)
   const noAtual = flat.find((n) => n.estado === 'atual')
   const atualId = noAtual?.id ?? flat[0]?.id ?? null
@@ -629,7 +635,7 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
           <div key={n.id} ref={n.id === alvoNodeId ? alvoRef : undefined} className="absolute z-[1] flex w-max max-w-[260px] -translate-x-1/2 flex-col items-center text-center" style={{ left: cx(off), top: cyv - R }}>
             {ehAlvo && !atual && <span className="mb-1 whitespace-nowrap rounded-full bg-primary px-2 py-0.5 text-[11px] font-bold text-primary-foreground shadow">você está aqui</span>}
             {proxima && <span className="mb-1 whitespace-nowrap rounded-full bg-amber-500 px-2 py-0.5 text-[11px] font-bold text-white shadow motion-safe:animate-pulse">{rotuloProximaAula(n.liberaEm)}</span>}
-            <button type="button" data-trilha-node onClick={() => setAberto(n.id)} aria-label={n.titulo}
+            <button type="button" data-trilha-node data-carimbo-alvo={n.id} onClick={() => setAberto(n.id)} aria-label={n.titulo}
               className={cn('relative flex items-center justify-center rounded-full border-4 shadow-sm transition-transform hover:scale-105 focus:outline-none', sel && 'ring-4 ring-primary/25')}
               style={{ width: R * 2, height: R * 2, ...(ouro ? { background: 'radial-gradient(circle at 50% 36%, #ffe680 0%, #ffcf33 46%, #f0b000 78%, #d99200 100%)', borderColor: '#c07f08', color: '#c2680a', boxShadow: '0 0 13px 2px rgba(250,204,21,.5), 0 0 28px 6px rgba(250,204,21,.22), 0 6px 16px -5px rgba(217,119,6,.55)' }
                 : concluido ? { background: '#10b981', borderColor: '#059669', color: '#fff' }
@@ -644,7 +650,8 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
                 {/* Faixa de brilho diagonal (verniz), recortada no círculo */}
                 <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-full"><span className="absolute inset-0" style={{ background: 'linear-gradient(122deg, transparent 30%, rgba(255,255,255,.7) 44%, rgba(255,255,255,.2) 55%, transparent 67%)' }} /></span>
               </>)}
-              <span className="relative" style={ouro ? { color: '#c2680a' } : undefined}><SimboloNo config={simbolos[noEstado(concluido, atual)]} escala={1} cor={ouro ? '#c2680a' : coresNo(noEstado(concluido, atual), simbolos[noEstado(concluido, atual)]).simbolo} strokeWidth={concluido && ouro ? 3.25 : 2.5} /></span>
+              <span className="relative z-10" style={ouro ? { color: '#c2680a' } : undefined}><SimboloNo config={simbolos[noEstado(concluido, atual)]} escala={1} cor={ouro ? '#c2680a' : coresNo(noEstado(concluido, atual), simbolos[noEstado(concluido, atual)]).simbolo} strokeWidth={concluido && ouro ? 3.25 : 2.5} /></span>
+              <EstampasNo estampas={estampas} aulaId={n.id} />
             </button>
             {/* Rótulo cresce lateralmente (largura por conteúdo, teto 260px); título no máx. 2 linhas. */}
             <div className="relative z-[1] mt-1.5 inline-block max-w-full rounded-lg border bg-background/85 px-2 py-0.5 shadow-sm backdrop-blur-sm">
@@ -677,8 +684,11 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
       {open && openPt && (
         <div ref={cardRef} key={open.id} className="group/card absolute z-10 w-[400px] transition-transform duration-200 will-change-transform motion-safe:animate-in motion-safe:fade-in motion-safe:duration-100 motion-safe:hover:scale-[1.03]"
           style={{ top: cardTop, ...(side === 'right' ? { left: LANE + 20 } : { right: LANE + 20 }) }}>
-          <span className={cn('absolute h-3 w-3 rotate-45 border bg-card', side === 'right' ? '-left-1.5 border-b-0 border-r-0' : '-right-1.5 border-l-0 border-t-0')} style={{ top: arrowY - 6 }} />
-          <div className={cn('overflow-hidden rounded-2xl border bg-card shadow-xl', open.estado === 'atual' && 'border-primary/40')}>
+          <span className={cn('absolute z-[5] h-3 w-3 rotate-45 border bg-card', side === 'right' ? '-left-1.5 border-b-0 border-r-0' : '-right-1.5 border-l-0 border-t-0')} style={{ top: arrowY - 6 }} />
+          <div className={cn('relative rounded-2xl border bg-card shadow-xl', open.estado === 'atual' && 'border-primary/40')}>
+            {/* Carimbos 'card' DENTRO do card → sobreposição (z) e recorte funcionam. */}
+            <EstampasCard estampas={estampas} aulaId={open.id} />
+            <div className="relative z-10 overflow-hidden rounded-2xl">
             {open.capaBanner && <div className="relative h-28"><img src={open.capaBanner} alt="" className="absolute inset-0 h-full w-full object-cover" /><div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" /></div>}
             <div className="space-y-2 p-4">
               <div className="font-semibold leading-tight">{open.titulo}</div>
@@ -728,6 +738,7 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
                 </div>
               ) : null}
             </div>
+            </div>
           </div>
         </div>
       )}
@@ -743,9 +754,9 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
  * Entrada única das trilhas do sistema: escolhe o LAYOUT pelo formato configurado no console/aparência.
  * serpentina/reta/mapa_semanas → TrilhaGigante (props); lista → TrilhaLista (tabela compacta).
  */
-export function TrilhaSistema({ trilhas, gamAtivo, simbolos = DEFAULT_TRILHA_SIMBOLOS, formato = 'serpentina', semFundo = false, semDivisoria = false, ajudante = false, inverter = false, livre, capa, semMoldura = false, degradeTopo }: {
+export function TrilhaSistema({ trilhas, gamAtivo, simbolos = DEFAULT_TRILHA_SIMBOLOS, formato = 'serpentina', semFundo = false, semDivisoria = false, ajudante = false, inverter = false, livre, capa, semMoldura = false, degradeTopo, estampas = [] }: {
   trilhas: Trilha[]; gamAtivo: boolean; simbolos?: TrilhaSimbolos; formato?: TrilhaFormato; semFundo?: boolean; semDivisoria?: boolean; ajudante?: boolean; inverter?: boolean
-  livre?: TrilhaLivreConfig; capa?: string | null; semMoldura?: boolean; degradeTopo?: TrilhaDegrade
+  livre?: TrilhaLivreConfig; capa?: string | null; semMoldura?: boolean; degradeTopo?: TrilhaDegrade; estampas?: CarimboEstampa[]
 }) {
   if (formato === 'lista') return <TrilhaLista trilhas={trilhas} gamAtivo={gamAtivo} simbolos={simbolos} ajudante={ajudante} />
   if (formato === 'mapa_semanas') return <TrilhaMapaSemanas trilhas={trilhas} simbolos={simbolos} ajudante={ajudante} capa={capa ?? trilhas[0]?.capa ?? null} />
@@ -756,10 +767,10 @@ export function TrilhaSistema({ trilhas, gamAtivo, simbolos = DEFAULT_TRILHA_SIM
       hrefLeitura: n.hrefLeitura, acaoLeitura: n.acaoLeitura, hrefQuestoes: n.hrefQuestoes, questoesLiberada: n.questoesLiberada,
       naoLiberada: n.naoLiberada, proxima: n.proxima, liberaEm: n.liberaEm,
     }))
-    return <TrilhaLivre nodes={nos} livre={livre ?? { nos: {}, curvas: {} }} capa={capa ?? trilhas[0]?.capa ?? null} simbolos={simbolos} semMoldura={semMoldura} degradeTopo={degradeTopo} />
+    return <TrilhaLivre nodes={nos} livre={livre ?? { nos: {}, curvas: {} }} capa={capa ?? trilhas[0]?.capa ?? null} simbolos={simbolos} semMoldura={semMoldura} degradeTopo={degradeTopo} estampas={estampas} />
   }
   return (
     <TrilhaGigante trilhas={trilhas} gamAtivo={gamAtivo} reto={formato === 'reta'} semFundo={semFundo}
-      semDivisoria={semDivisoria} ajudante={ajudante} inverter={inverter} simbolos={simbolos} />
+      semDivisoria={semDivisoria} ajudante={ajudante} inverter={inverter} simbolos={simbolos} estampas={estampas} />
   )
 }

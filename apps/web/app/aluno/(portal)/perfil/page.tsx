@@ -9,6 +9,9 @@ import { Mail, Phone, BarChart3, ArrowRight, Flame, Zap, Trophy, ClipboardList, 
 import { getGamConfig, gamAtivaParaAluno } from '@/lib/gamificacao'
 import { resumoGamificacao, conquistasDoAluno, posicaoNaLiga } from '@/lib/gamificacao/leitura'
 import { ConquistasGrid } from '@/components/aluno/conquistas-grid'
+import { CarimbosPerfil } from '@/components/aluno/carimbos-perfil'
+import { PerfilAdesivosLayer } from '@/components/aluno/perfil-adesivos-layer'
+import { carimbosGanhosDoAluno } from '@/lib/leitura/carimbos'
 import { MascoteTour } from '@/components/mascote/mascote-tour'
 import { PerfilEditar } from '@/components/aluno/perfil-editar'
 import { lerPersonalizacaoEstudante, lerOpcoesPersonalizacao, ehCorFundo } from '@/lib/aluno/personalizacao'
@@ -33,13 +36,14 @@ export default async function PerfilAlunoPage() {
   const svc = createAdminClient()
   const gamConfig = await getGamConfig(svc, sessao.tenantId)
   const gamAtivo = await gamAtivaParaAluno(svc, sessao.tenantId, sessao.estudanteId, gamConfig)
-  const [{ data: est }, dados, gamResumo, gamConquistas, pers, { data: temaRow }] = await Promise.all([
+  const [{ data: est }, dados, gamResumo, gamConquistas, pers, { data: temaRow }, carimbosPerfil] = await Promise.all([
     svc.from('simulado_estudantes').select('nome, email, telefone').eq('id', sessao.estudanteId).maybeSingle(),
     montarRelatorioEstudante(svc, sessao.estudanteId, sessao.tenantId),
     gamAtivo ? resumoGamificacao(svc, sessao.tenantId, sessao.estudanteId, gamConfig!) : Promise.resolve(null),
     gamAtivo ? conquistasDoAluno(svc, sessao.tenantId, sessao.estudanteId, gamConfig!) : Promise.resolve([]),
     lerPersonalizacaoEstudante(svc, sessao.estudanteId),
     svc.from('simulado_tenants').select('tema').eq('id', sessao.tenantId).maybeSingle(),
+    carimbosGanhosDoAluno(svc, sessao.tenantId, sessao.estudanteId),
   ])
   const opcoes = lerOpcoesPersonalizacao(temaRow?.tema)
   // Personalização visual: cor de destaque (texto/barra/anel), texto legível sobre fundo, sombra.
@@ -69,6 +73,8 @@ export default async function PerfilAlunoPage() {
 
   // Ligas (divisões) por XP total, ordenadas — para a faixa "Ranking e divisões".
   const ligas = [...(gamConfig?.ligas ?? [])].sort((a, b) => a.xp_min - b.xp_min)
+  // Adesivos coletados (para o editor de decoração do header).
+  const colecionadosAdesivos = carimbosPerfil.map((c) => ({ carimboId: c.def.id, url: c.def.url ?? '', titulo: c.def.titulo })).filter((c) => c.url)
 
   return (
     <div className="animate-page space-y-6">
@@ -91,6 +97,9 @@ export default async function PerfilAlunoPage() {
         <div aria-hidden className="pointer-events-none absolute -right-24 -top-28 h-64 w-64 rounded-full bg-primary/25 blur-3xl" />
         <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px" style={{ background: 'linear-gradient(90deg, transparent, color-mix(in oklab, var(--brand-accent) 75%, transparent), transparent)' }} />
 
+        {/* Adesivos-decoração sobre a imagem do card (atrás do conteúdo) + edição in-place no header REAL. */}
+        <PerfilAdesivosLayer adesivosIniciais={pers.adesivos} colecionados={colecionadosAdesivos} />
+
         {/* "Meu perfil" no canto superior esquerdo */}
         <div className="absolute left-5 top-4 z-[2] flex items-center gap-2 sm:left-6">
           <span className="h-1.5 w-1.5 rounded-full" style={{ background: 'var(--brand-accent)' }} />
@@ -102,7 +111,7 @@ export default async function PerfilAlunoPage() {
           <PerfilEditar nome={nome} avatar={pers.avatar} perfilCapa={pers.perfilCapa} perfilTexto={pers.perfilTexto} avatarCor={pers.avatarCor} avatares={opcoes.avatares} fundos={opcoes.fundos} cores={opcoes.cores} />
         </div>
 
-        <div className="relative flex flex-col items-center text-center">
+        <div className="relative z-[2] flex flex-col items-center text-center">
           {/* Avatar com anel de nível + badge Nv */}
           <div className="relative h-[144px] w-[144px]">
             {prog ? (
@@ -150,6 +159,9 @@ export default async function PerfilAlunoPage() {
           )}
         </div>
       </div>
+
+      {/* Adesivos coletados (Leitura) — coleção + expandir (a decoração é editada no próprio header acima). */}
+      <CarimbosPerfil carimbos={carimbosPerfil} />
 
       {dados && dados.simulados > 0 ? (
         <>

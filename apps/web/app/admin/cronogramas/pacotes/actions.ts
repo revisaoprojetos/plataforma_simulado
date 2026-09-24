@@ -268,13 +268,17 @@ export async function vincularGrupo(pacoteId: string, grupoId: string): Promise<
   if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
 
+  // Isolamento: service role BYPASSA RLS → valida que o grupo (grupoId do cliente) é do tenant do ator.
+  const { data: grupo } = await svc.from('simulado_grupos').select('id').eq('id', grupoId).eq('tenant_id', g.tenantId).maybeSingle()
+  if (!grupo) return { ok: false, error: 'Não encontrado.' }
+
   const { error } = await svc
     .from('simulado_cronograma_pacote_grupos')
     .upsert({ tenant_id: g.tenantId, pacote_id: pacoteId, grupo_id: grupoId }, { onConflict: 'pacote_id,grupo_id', ignoreDuplicates: true })
   if (error) return { ok: false, error: error.message }
 
   const membros = await fetchAll<any>(() =>
-    svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grupoId).order('estudante_id') as any,
+    svc.from('simulado_grupo_membros').select('estudante_id').eq('tenant_id', g.tenantId).eq('grupo_id', grupoId).order('estudante_id') as any,
   )
   await registrarAudit({
     operacao: 'LIBERAR',
@@ -310,7 +314,7 @@ export async function previaDesvincularGrupo(pacoteId: string, grupoId: string):
   const svc = createAdminClient()
 
   const membros = await fetchAll<any>(() =>
-    svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grupoId).order('estudante_id') as any,
+    svc.from('simulado_grupo_membros').select('estudante_id').eq('tenant_id', g.tenantId).eq('grupo_id', grupoId).order('estudante_id') as any,
   )
   const ids = [...new Set(membros.map((m) => m.estudante_id))]
   if (!ids.length) return { ok: true, previa: { membros: 0, mantidosPorOutroGrupo: 0, jaEmitiram: 0, perdemAcesso: 0 } }
@@ -327,7 +331,7 @@ export async function previaDesvincularGrupo(pacoteId: string, grupoId: string):
   const mantidos = new Set<string>()
   if (outros.length) {
     const rows = await fetchAllByIn<any>(outros, (chunk) =>
-      svc.from('simulado_grupo_membros').select('estudante_id').in('grupo_id', chunk).order('estudante_id') as any,
+      svc.from('simulado_grupo_membros').select('estudante_id').eq('tenant_id', g.tenantId).in('grupo_id', chunk).order('estudante_id') as any,
     )
     for (const r of rows) if (ids.includes(r.estudante_id)) mantidos.add(r.estudante_id)
   }
@@ -390,7 +394,7 @@ export async function desvincularGrupo(
     const p = await previaDesvincularGrupo(pacoteId, grupoId)
     if (p.ok && p.previa?.jaEmitiram) {
       const membros = await fetchAll<any>(() =>
-        svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grupoId).order('estudante_id') as any,
+        svc.from('simulado_grupo_membros').select('estudante_id').eq('tenant_id', g.tenantId).eq('grupo_id', grupoId).order('estudante_id') as any,
       )
       const ids = [...new Set(membros.map((m) => m.estudante_id))]
       const itens = await fetchAll<any>(() =>
@@ -587,8 +591,11 @@ export async function membrosDoGrupo(
   if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
 
+  // Isolamento: service role BYPASSA RLS → valida o grupo (grupoId do cliente) + filtra membros por tenant.
+  const { data: grupo } = await svc.from('simulado_grupos').select('id').eq('id', grupoId).eq('tenant_id', g.tenantId).maybeSingle()
+  if (!grupo) return { ok: false, error: 'Não encontrado.' }
   const membros = await fetchAll<any>(() =>
-    svc.from('simulado_grupo_membros').select('estudante_id').eq('grupo_id', grupoId).order('estudante_id') as any,
+    svc.from('simulado_grupo_membros').select('estudante_id').eq('tenant_id', g.tenantId).eq('grupo_id', grupoId).order('estudante_id') as any,
   )
   const ids = [...new Set(membros.map((m) => m.estudante_id))]
   if (!ids.length) return { ok: true, itens: [], total: 0 }
@@ -637,10 +644,16 @@ export async function adicionarCronogramas(pacoteId: string, cronogramaIds: stri
 export async function vincularGrupos(pacoteId: string, grupoIds: string[]): Promise<{ ok: boolean; vinculados?: number; alcance?: number; error?: string }> {
   const g = await guard()
   if (!g.ok) return { ok: false, error: g.error }
-  const ids = [...new Set(grupoIds.filter(Boolean))]
-  if (!ids.length) return { ok: true, vinculados: 0, alcance: 0 }
+  const idsRecebidos = [...new Set(grupoIds.filter(Boolean))]
+  if (!idsRecebidos.length) return { ok: true, vinculados: 0, alcance: 0 }
 
   const svc = createAdminClient()
+  // Isolamento: service role BYPASSA RLS → só vincula grupos que são do tenant do ator (grupoIds do cliente).
+  const gruposTenant = await fetchAllByIn<{ id: string }>(idsRecebidos, (chunk) =>
+    svc.from('simulado_grupos').select('id').eq('tenant_id', g.tenantId).in('id', chunk).order('id') as any,
+  )
+  const ids = gruposTenant.map((r) => r.id)
+  if (!ids.length) return { ok: false, error: 'Não encontrado.' }
   const { error } = await svc.from('simulado_cronograma_pacote_grupos').upsert(
     ids.map((grupo_id) => ({ tenant_id: g.tenantId, pacote_id: pacoteId, grupo_id })),
     { onConflict: 'pacote_id,grupo_id', ignoreDuplicates: true },
@@ -649,7 +662,7 @@ export async function vincularGrupos(pacoteId: string, grupoIds: string[]): Prom
 
   // Alcance real: alunos distintos, sem contar duas vezes quem está em mais de um grupo.
   const membros = await fetchAllByIn<any>(ids, (chunk) =>
-    svc.from('simulado_grupo_membros').select('estudante_id').in('grupo_id', chunk).order('estudante_id') as any,
+    svc.from('simulado_grupo_membros').select('estudante_id').eq('tenant_id', g.tenantId).in('grupo_id', chunk).order('estudante_id') as any,
   )
   const alcance = new Set(membros.map((m) => m.estudante_id)).size
 

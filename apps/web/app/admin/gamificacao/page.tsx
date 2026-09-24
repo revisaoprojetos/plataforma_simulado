@@ -3,6 +3,7 @@ import { getCurrentTenantId } from '@/lib/tenant'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getGamConfig } from '@/lib/gamificacao'
 import { metricasGamificacao } from '@/lib/gamificacao/metricas'
+import { listarConquistasModuloTenant } from '@/lib/leitura/carimbos'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { GamificacaoTabs } from './gamificacao-tabs'
 import { Trophy } from 'lucide-react'
@@ -27,6 +28,8 @@ export default async function GamificacaoPage({ searchParams }: { searchParams: 
   const config = await getGamConfig(svc, tenantId)
   const podeGerenciar = access.isAdmin || access.permissions.includes('gamificacao:manage')
   const metricas = config && tenantId ? await metricasGamificacao(svc, tenantId, config) : null
+  // Conquistas criadas DENTRO dos módulos de Leitura — exibidas na aba Conquistas com etiqueta de origem.
+  const conquistasModulos = tenantId ? await listarConquistasModuloTenant(svc, tenantId) : []
 
   return (
     <div className="tema-gam space-y-6">
@@ -43,7 +46,7 @@ export default async function GamificacaoPage({ searchParams }: { searchParams: 
         </span>
       </div>
 
-      {config && metricas && <GamificacaoTabs config={config} podeGerenciar={podeGerenciar} metricas={metricas} tabInicial={tab} />}
+      {config && metricas && <GamificacaoTabs config={config} podeGerenciar={podeGerenciar} metricas={metricas} tabInicial={tab} conquistasModulos={conquistasModulos} />}
     </div>
   )
 }
