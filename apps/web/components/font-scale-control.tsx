@@ -76,10 +76,12 @@ export function FontScaleControl({
           aria-label="Ajustar o tamanho do texto"
           aria-expanded={open}
           className={cn(
-            // Sem preenchimento: só a borda no accent (dourado da marca), com aparência "ativado".
-            // Hover (em qualquer estado) = fundo dourado + ícone branco.
-            'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring border-[color:var(--brand-accent,var(--primary))] text-[color:var(--brand-accent,var(--primary))] hover:bg-[color:var(--brand-accent,var(--primary))] hover:text-white',
-            open ? 'bg-[color:var(--brand-accent,var(--primary))]/15' : 'bg-transparent',
+            // Mesma "ativação" verde do botão de plataforma: borda + fundo + ícone na cor primária
+            // quando ABERTO (ou no hover). Fechado = neutro, sem borda.
+            'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+            open
+              ? 'border-[color:var(--primary)] bg-[color:var(--primary)] text-white [&_svg]:!text-white'
+              : 'border-transparent text-muted-foreground hover:border-[color:var(--primary)] hover:bg-[color:var(--primary)] hover:text-white [&:hover_svg]:!text-white',
           )}
         >
           <ALargeSmall className="h-4 w-4" />

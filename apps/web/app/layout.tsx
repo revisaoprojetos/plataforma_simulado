@@ -18,9 +18,17 @@ const plusJakarta = Plus_Jakarta_Sans({
   variable: '--font-plus-jakarta',
 })
 
-export const metadata: Metadata = {
-  title: 'Plataforma de Simulados',
-  description: 'Plataforma de questões e simulados para concurso',
+// Título da ABA do navegador = `titulo_pagina` do tenant (cai pro nome do site / nome do tenant).
+// ANTES era estático ("Plataforma de Simulados"), então editar "Título da página" não surtia efeito.
+export async function generateMetadata(): Promise<Metadata> {
+  try {
+    const { tema, tenantNome } = await getTenantTheme()
+    const t = (tema ?? {}) as { titulo_pagina?: string; nome_site?: string }
+    const title = t.titulo_pagina?.trim() || t.nome_site?.trim() || tenantNome || 'Plataforma de Simulados'
+    return { title, description: 'Plataforma de questões e simulados para concurso' }
+  } catch {
+    return { title: 'Plataforma de Simulados', description: 'Plataforma de questões e simulados para concurso' }
+  }
 }
 
 // Default CSS variables used when no tenant theme is configured

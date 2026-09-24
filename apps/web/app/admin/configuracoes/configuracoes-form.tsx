@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
 import { confirmar } from '@/components/ui/confirm-dialog'
-import { Save, RotateCcw, ImageIcon, Loader2, Bell, Moon, Sun, Menu, Upload, X, Copy, Check, ClipboardPaste, Palette, ChevronDown, PanelLeft, LayoutGrid, Sparkles, Trash2, Monitor, BookOpen, ClipboardList, Users, Activity, GraduationCap, BarChart3, Database, PenLine, LayoutDashboard, ClipboardCheck, MessagesSquare, SlidersHorizontal, FileText, Search, Trophy, Zap, Flame, Star } from 'lucide-react'
+import { Save, RotateCcw, ImageIcon, Loader2, Bell, Moon, Sun, Menu, Upload, X, Copy, Check, ClipboardPaste, Palette, ChevronDown, PanelLeft, LayoutGrid, Sparkles, Trash2, Monitor, BookOpen, ClipboardList, Users, Activity, GraduationCap, BarChart3, Database, PenLine, LayoutDashboard, ClipboardCheck, MessagesSquare, SlidersHorizontal, FileText, Search, Trophy, Zap, Flame, Star, Calendar, Scale, Share2, Building2, LogOut, HelpCircle } from 'lucide-react'
 
 /**
  * Lê uma variável CSS do sistema e converte para hex. Renderiza a cor (lab,
@@ -552,8 +552,8 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
                 <span className="h-3 w-3 rounded-full bg-red-400" /><span className="h-3 w-3 rounded-full bg-yellow-400" /><span className="h-3 w-3 rounded-full bg-green-400" />
                 <span className="ml-2 flex-1 truncate rounded bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">{t.nome_site.toLowerCase().replace(/\s+/g, '')}.app/admin/banco-questoes</span>
               </div>
-              <div key={modoEdicao} className="animate-pop">
-                <Preview t={t} cores={c} />
+              <div className="animate-pop">
+                <Preview t={t} cores={c} modo={modoEdicao} />
               </div>
             </div>
           </div>
@@ -611,99 +611,65 @@ function LogoRow({ label, desc, value, onChange, onRemove, frame, bg, inicial, i
 }
 
 /** Prévia do dashboard com as cores aplicadas. */
-function Preview({ t, cores }: { t: Tema; cores: Cores }) {
-  const c = cores
-  const [tela, setTela] = useState<'dashboard' | 'estudantes' | 'perfil'>('dashboard')
-  const TELAS = [
-    { id: 'dashboard' as const, nome: 'Dashboard', icon: LayoutDashboard },
-    { id: 'estudantes' as const, nome: 'Estudantes', icon: GraduationCap },
-    { id: 'perfil' as const, nome: 'Perfil', icon: Users },
-  ]
-  const menu = [
-    { nome: 'Dashboard', icon: LayoutDashboard, ativo: true },
-    { nome: 'Simulado', icon: BookOpen, sub: [
-      { nome: 'Aplicação', icon: ClipboardList },
-      { nome: 'Questões', icon: BookOpen },
-      { nome: 'Banco de questões', icon: Database },
-      { nome: 'Correção', icon: PenLine },
-      { nome: 'Cadernos', icon: FileText },
-    ] },
-    { nome: 'Alunos', icon: GraduationCap }, { nome: 'Análise', icon: BarChart3 },
-    { nome: 'Auditoria', icon: ClipboardCheck }, { nome: 'Feedback', icon: MessagesSquare },
-    { nome: 'Configuração', icon: SlidersHorizontal },
-  ]
-  const fgBtn = contraste(c.btn)
+function Preview({ t, cores, modo }: { t: Tema; cores: Cores; modo: 'light' | 'dark' }) {
+  const ref = useRef<HTMLIFrameElement>(null)
+  const [carregando, setCarregando] = useState(true)
+  // Injeta as cores editadas DIRETO no documento do iframe (mesmo domínio) — vence o tema salvo
+  // do tenant lá dentro, em todos os modos. Reaplica a cada mudança de cor/modo/nome/logo e a cada load.
+  const aplicar = () => {
+    const doc = ref.current?.contentDocument
+    if (!doc) return
+    try { doc.documentElement.classList.toggle('dark', modo === 'dark') } catch { return }
+    let st = doc.getElementById('__preview_tema') as HTMLStyleElement | null
+    if (!st) { st = doc.createElement('style'); st.id = '__preview_tema'; doc.head.appendChild(st) }
+    st.textContent = `html:root, html:root:not(.dark), html:root.dark { ${cssVarsFromCores(cores)} }`
+    // Nome/logo EDITADOS (conteúdo, não CSS): sobrescreve o que o tenant salvou, pra o preview
+    // mostrar o que você está editando (e não o nome/logo antigo/errado).
+    try {
+      const nomeEl = doc.querySelector('[data-preview-nome]')
+      if (nomeEl) nomeEl.textContent = t.nome_site || 'Plataforma'
+      const subEl = doc.querySelector('[data-preview-subtitulo]') as HTMLElement | null
+      if (subEl) {
+        subEl.textContent = t.subtitulo_site || ''
+        subEl.classList.toggle('hidden', !t.subtitulo_site)
+      }
+      // Título da página = título da ABA do navegador (o iframe também tem o seu).
+      if (t.titulo_pagina) doc.title = t.titulo_pagina
+      const box = doc.querySelector('[data-preview-logobox]') as HTMLElement | null
+      if (box) {
+        box.replaceChildren()
+        if (t.logo_url) {
+          const img = doc.createElement('img'); img.src = t.logo_url
+          img.style.cssText = 'height:100%;width:100%;object-fit:contain'
+          box.style.background = t.logo_png_bg || '#ffffff'
+        box.appendChild(img)
+        } else {
+          box.style.background = cores.btn
+          box.style.color = contraste(cores.btn)
+          box.textContent = (t.nome_site?.[0] ?? 'P').toUpperCase()
+        }
+      }
+    } catch { /* ignore */ }
+  }
+  // Reaplica a cada mudança E algumas vezes após o load, pra vencer a hidratação do React lá
+  // dentro (que pode reverter nome/subtítulo pro valor salvo do tenant logo após o onLoad).
+  useEffect(() => {
+    aplicar()
+    const t1 = setTimeout(aplicar, 150)
+    const t2 = setTimeout(aplicar, 600)
+    return () => { clearTimeout(t1); clearTimeout(t2) }
+  }, [cores, modo, t])
   return (
-    <div className="flex h-[540px] text-[13px]" style={{ background: c.bg, color: c.text, fontFamily: 'system-ui, sans-serif' }}>
-      {/* sidebar */}
-      <div className="flex w-[180px] shrink-0 flex-col" style={{ background: c.sidebar, borderRight: `1px solid ${c.sborder}` }}>
-        <div className="flex items-center gap-2 px-3 py-3" style={{ borderBottom: `1px solid ${c.sborder}` }}>
-          <span className={`flex h-6 w-6 shrink-0 items-center justify-center overflow-hidden text-[11px] font-bold ${frameLogo(t.logo_estilo)}`} style={{ background: t.logo_url ? t.logo_png_bg : c.btn, color: contraste(t.logo_url ? t.logo_png_bg : c.btn), borderColor: c.cborder }}>
-            {t.logo_url ? <img src={t.logo_url} alt="" className="h-full w-full object-contain" style={{ filter: filtroLogoCss(t.logo_filtro_sistema) }} /> : (t.nome_site[0] ?? 'P').toUpperCase()}
-          </span>
-          <span className="flex min-w-0 flex-col leading-tight">
-            <span className="truncate font-semibold" style={{ color: c.sidetext }}>{t.nome_site}</span>
-            {t.subtitulo_site && <span className="truncate text-[9px] opacity-70" style={{ color: c.sidetext }}>{t.subtitulo_site}</span>}
-          </span>
+    <div className="relative overflow-hidden rounded-xl border bg-background" style={{ height: 560 }}>
+      {carregando && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center gap-2 bg-muted/30 text-xs text-muted-foreground">
+          <Loader2 className="h-4 w-4 animate-spin" /> Carregando o app real…
         </div>
-        <div className="space-y-0.5 px-2 py-2">
-          <p className="px-1.5 py-1 text-[9px] font-semibold uppercase opacity-50" style={{ color: c.sidetext }}>Menu</p>
-          {menu.map((m) => (
-            <div key={m.nome}>
-              <div className="flex items-center gap-1.5 rounded-md px-2 py-1.5" style={m.ativo ? { background: c.active, color: c.sidetextActive } : { color: c.sidetext }}>
-                <m.icon className="h-3 w-3 shrink-0" style={{ color: m.ativo ? c.iconAtivo : c.icon }} />
-                {m.nome}
-              </div>
-              {m.sub && (
-                <div className="ml-2.5 mt-0.5 space-y-0.5 border-l pl-2" style={{ borderColor: c.sborder }}>
-                  {m.sub.map((s) => (
-                    <div key={s.nome} className="flex items-center gap-1.5 rounded-md px-2 py-1" style={{ color: c.sidetext, opacity: 0.85 }}>
-                      <s.icon className="h-3 w-3 shrink-0" style={{ color: c.icon }} />
-                      {s.nome}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* área principal */}
-      <div className="flex flex-1 flex-col">
-        {/* topbar */}
-        <div className="flex items-center justify-between px-4 py-3" style={{ background: c.topbar, borderBottom: `1px solid ${c.sborder}` }}>
-          <Menu className="h-4 w-4" style={{ color: c.icon }} />
-          <div className="flex items-center gap-3.5">
-            <span className="relative">
-              <Bell className="h-4 w-4" style={{ color: c.icon }} />
-              <span className="absolute -right-1.5 -top-1.5 flex h-3 w-3 items-center justify-center rounded-full bg-red-500 text-[6px] font-bold text-white">5</span>
-            </span>
-            <Moon className="h-4 w-4" style={{ color: c.icon }} />
-            <span className="h-6 w-6 rounded-full" style={{ background: c.accent }} />
-          </div>
-        </div>
-        {/* seletor de telas do preview — deixa a montagem cobrir mais blocos/cards/textos */}
-        <div className="flex items-center gap-1 px-3 pt-2" style={{ background: c.bg }}>
-          {TELAS.map((s) => {
-            const on = tela === s.id
-            return (
-              <button key={s.id} type="button" onClick={() => setTela(s.id)}
-                className="flex items-center gap-1.5 rounded-t-lg px-2.5 py-1.5 text-[11px] font-medium transition-colors"
-                style={on ? { background: c.card, color: c.titulo, borderBottom: `2px solid ${c.btn}` } : { color: c.text, opacity: 0.5 }}>
-                <s.icon className="h-3 w-3" /> {s.nome}
-              </button>
-            )
-          })}
-        </div>
-
-        {/* conteúdo da tela selecionada */}
-        <div className="flex-1 overflow-y-auto p-4" style={{ borderTop: `1px solid ${c.cborder}` }}>
-          {tela === 'dashboard' && <TelaDashboard c={c} fgBtn={fgBtn} />}
-          {tela === 'estudantes' && <TelaEstudantes c={c} fgBtn={fgBtn} />}
-          {tela === 'perfil' && <TelaPerfil c={c} fgBtn={fgBtn} />}
-        </div>
-      </div>
+      )}
+      {/* App REAL embedado (mesmo domínio) — todas as telas/funções; as cores editadas são injetadas ao vivo. */}
+      <iframe ref={ref} src="/admin?__preview=1" title="Prévia do sistema — app real"
+        className="h-full w-full border-0"
+        onLoad={() => { setCarregando(false); aplicar() }} />
     </div>
   )
 }
@@ -812,37 +778,154 @@ function TelaDashboard({ c, fgBtn }: PrevScreen) {
   )
 }
 
-/** Lista de estudantes: KPIs + busca + tabela com avatares e badges. */
-function TelaEstudantes({ c, fgBtn }: PrevScreen) {
-  const kpis = [['13.669', 'Estudantes'], ['1.296', 'Passaporte'], ['1.034', 'Ativos']]
-  const alunos: [string, string, string, string][] = [
-    ['Joao', 'joao@gmail.com', 'Passaporte', '#a855f7'],
-    ['Maria Silva', 'maria@gmail.com', 'Vitalício', '#f59e0b'],
-    ['Willian João', 'willian@gmail.com', 'Estudante', '#64748b'],
-  ]
+/** Cabeçalho padrão de tela (título + subtítulo + ações à direita) — igual às áreas reais. */
+function HeaderTela({ c, fgBtn, titulo, sub, breadcrumb, acaoSec, acaoPrim, iconePrim }: PrevScreen & { titulo: string; sub?: string; breadcrumb?: string; acaoSec?: string; acaoPrim?: string; iconePrim?: any }) {
+  const IP = iconePrim
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-2">
+      <div>
+        {breadcrumb && <p className="mb-0.5 text-[9px] opacity-55">{breadcrumb}</p>}
+        <h2 className="text-lg font-bold leading-tight" style={{ color: c.titulo }}>{titulo}</h2>
+        {sub && <p className="text-[11px] opacity-60">{sub}</p>}
+      </div>
+      <div className="flex items-center gap-1.5">
+        {acaoSec && <span className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-[10px] font-medium" style={{ borderColor: c.cborder, color: c.text }}>{acaoSec}</span>}
+        {acaoPrim && <span className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold" style={{ background: c.btn, color: fgBtn }}>{IP && <IP className="h-3 w-3" />}{acaoPrim}</span>}
+      </div>
+    </div>
+  )
+}
+
+/** Card de KPI padrão (ícone tintado + número) — igual aos das áreas reais. */
+function KpiMini({ c, icon: Icon, label, valor }: { c: Cores; icon: any; label: string; valor: string }) {
+  return (
+    <div className="rounded-2xl p-3" style={{ background: c.card, border: `1px solid ${c.cborder}` }}>
+      <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ background: `${c.btn}1f`, color: c.btn }}><Icon className="h-4 w-4" /></span>
+      <p className="mt-2 text-xl font-bold leading-none tabular-nums" style={{ color: c.titulo }}>{valor}</p>
+      <p className="mt-1 text-[8px] font-medium uppercase tracking-wide opacity-60">{label}</p>
+    </div>
+  )
+}
+
+/** Chips de filtro (o 1º ativo). */
+function Chips({ c, fgBtn, itens }: PrevScreen & { itens: string[] }) {
+  return (
+    <div className="flex items-center gap-1">
+      {itens.map((t, i) => (
+        <span key={t} className="rounded-lg px-2.5 py-1 text-[9px] font-medium" style={i === 0 ? { background: c.btn, color: fgBtn } : { color: c.text, opacity: 0.6, border: `1px solid ${c.cborder}` }}>{t}</span>
+      ))}
+    </div>
+  )
+}
+
+/** Busca (placeholder). */
+function Busca({ c, placeholder }: { c: Cores; placeholder: string }) {
+  return (
+    <div className="flex flex-1 items-center gap-1.5 rounded-lg px-2.5 py-2" style={{ background: c.inputBg, border: `1px solid ${c.cborder}` }}>
+      <Search className="h-3 w-3 opacity-50" /><span className="text-[10px] opacity-50">{placeholder}</span>
+    </div>
+  )
+}
+
+/** Simulados — cabeçalho + busca + toggles + filtros + estado vazio (igual ao real). */
+function TelaSimulados({ c, fgBtn }: PrevScreen) {
   return (
     <div className="space-y-3">
-      <div><h2 className="text-lg font-bold leading-tight" style={{ color: c.titulo }}>Estudantes</h2><p className="text-[11px] opacity-60">Gerencie os alunos</p></div>
-      <div className="grid grid-cols-3 gap-2">
-        {kpis.map(([v, l]) => (
-          <div key={l} className="rounded-xl p-2.5" style={{ background: c.card, border: `1px solid ${c.cborder}` }}>
-            <p className="text-lg font-bold leading-none" style={{ color: c.titulo }}>{v}</p>
-            <p className="mt-0.5 text-[8px] font-medium uppercase tracking-wide opacity-60">{l}</p>
-          </div>
+      <HeaderTela c={c} fgBtn={fgBtn} titulo="Simulados" sub="Gerencie provas, agendamentos e publicações." acaoSec="Nova pasta" acaoPrim="Novo simulado" />
+      <div className="flex items-center gap-2">
+        <Busca c={c} placeholder="Buscar simulado…" />
+        <div className="flex items-center gap-1 rounded-lg p-0.5" style={{ background: c.tabBg }}>
+          {['Linhas', 'Pastas', 'Status'].map((t, i) => <span key={t} className="rounded-md px-2 py-1 text-[9px] font-medium" style={i === 0 ? { background: c.tabAtivo, color: c.tabTexto } : { opacity: 0.6 }}>{t}</span>)}
+        </div>
+        <Chips c={c} fgBtn={fgBtn} itens={['Todos', 'Janela fixa', 'Prazo relativo', 'Aberto']} />
+      </div>
+      <div className="flex h-40 items-center justify-center rounded-2xl border border-dashed text-[11px] opacity-55" style={{ borderColor: c.cborder }}>Nenhum simulado ainda. Crie o primeiro em “Novo simulado”.</div>
+    </div>
+  )
+}
+
+/** Questões — cabeçalho + abas + filtros + tabela (colunas reais) + estado vazio. */
+function TelaQuestoes({ c, fgBtn }: PrevScreen) {
+  const cols = ['Código', 'Enunciado', 'Disciplina', 'Assunto', 'Órgão', 'Cargo', 'Ano', 'Banca', 'Dif.', 'Tipo', 'Status']
+  return (
+    <div className="space-y-3">
+      <HeaderTela c={c} fgBtn={fgBtn} titulo="Questões" sub="0 questões cadastradas" acaoSec="Exportar" acaoPrim="Nova Questão" />
+      <div className="flex items-center gap-3 border-b pb-1.5" style={{ borderColor: c.cborder }}>
+        {['Questões', 'Unificação', 'Etiquetas'].map((t, i) => (
+          <span key={t} className="pb-1 text-[11px] font-medium" style={i === 0 ? { color: c.btn, borderBottom: `2px solid ${c.btn}` } : { opacity: 0.55 }}>{t}</span>
         ))}
       </div>
-      <div className="overflow-hidden rounded-xl" style={{ background: c.card, border: `1px solid ${c.cborder}` }}>
-        <div className="flex items-center gap-2 border-b p-2" style={{ borderColor: c.cborder }}>
-          <div className="flex flex-1 items-center gap-1.5 rounded-lg px-2 py-1.5" style={{ background: c.inputBg, border: `1px solid ${c.cborder}` }}>
-            <Search className="h-3 w-3 opacity-50" /><span className="text-[10px] opacity-50">Buscar por nome, e-mail…</span>
-          </div>
-          <span className="rounded-lg px-2.5 py-1.5 text-[10px] font-semibold" style={{ background: c.btn, color: fgBtn }}>+ Novo</span>
+      <div className="flex items-center gap-1.5">
+        <Busca c={c} placeholder="Buscar por código ou enunciado…" />
+        {['Todas as disciplinas', 'Toda dificuldade', 'Todos os tipos', 'Todos os status'].map((t) => (
+          <span key={t} className="inline-flex items-center gap-1 rounded-lg border px-2 py-2 text-[9px]" style={{ borderColor: c.cborder, opacity: 0.75 }}>{t}<ChevronDown className="h-2.5 w-2.5" /></span>
+        ))}
+      </div>
+      <div className="overflow-hidden rounded-2xl" style={{ background: c.card, border: `1px solid ${c.cborder}` }}>
+        <div className="flex items-center gap-2 border-b px-3 py-2 text-[8px] font-semibold uppercase tracking-wide opacity-60" style={{ borderColor: c.cborder, background: c.tabBg }}>
+          <span className="h-2.5 w-2.5 rounded-sm border" style={{ borderColor: c.cborder }} />
+          {cols.map((h) => <span key={h} className="flex-1 truncate">{h}</span>)}
         </div>
-        {alunos.map(([nome, email, plano, cor], i) => (
-          <div key={nome} className="flex items-center gap-2.5 px-3 py-2" style={i > 0 ? { borderTop: `1px solid ${c.cborder}` } : undefined}>
-            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[10px] font-bold" style={{ background: `${c.btn}22`, color: c.btn }}>{nome.slice(0, 1)}</span>
-            <div className="min-w-0 flex-1"><p className="truncate text-[11px] font-medium">{nome}</p><p className="truncate text-[8px] opacity-50">{email}</p></div>
-            <span className="shrink-0 rounded-full px-2 py-0.5 text-[8px] font-bold uppercase" style={{ background: `${cor}22`, color: cor }}>{plano}</span>
+        <div className="py-10 text-center text-[11px] opacity-55">Nenhuma questão encontrada.</div>
+      </div>
+    </div>
+  )
+}
+
+/** Grupos — breadcrumb + 4 KPIs + estado vazio (igual ao real). */
+function TelaGrupos({ c, fgBtn }: PrevScreen) {
+  const kpis: [any, string, string][] = [[Users, '0', 'grupos comuns'], [Database, '0', 'grupos mestre'], [GraduationCap, '0', 'vínculos ativos'], [ClipboardList, '0', 'precisam organização']]
+  return (
+    <div className="space-y-3">
+      <HeaderTela c={c} fgBtn={fgBtn} breadcrumb="Alunos / Grupos / Todos os grupos" titulo="Organização de grupos" sub="Agrupe turmas em pastas (grupos mestre), mova em lote e acompanhe a distribuição." acaoSec="Nova pasta" acaoPrim="Novo grupo" />
+      <div className="grid grid-cols-4 gap-3">
+        {kpis.map(([Icon, v, l]) => <KpiMini key={l} c={c} icon={Icon} valor={v} label={l} />)}
+      </div>
+      <div className="flex h-40 flex-col items-center justify-center gap-1 rounded-2xl border border-dashed" style={{ borderColor: c.cborder }}>
+        <Database className="h-6 w-6 opacity-30" />
+        <p className="text-[11px] opacity-55">Nenhum grupo cadastrado.</p>
+        <p className="text-[11px] font-medium" style={{ color: c.btn }}>Criar o primeiro</p>
+      </div>
+    </div>
+  )
+}
+
+/** Lista de estudantes: 5 KPIs + busca/filtros + tabela (colunas reais). */
+function TelaEstudantes({ c, fgBtn }: PrevScreen) {
+  const kpis: [any, string, string][] = [[Users, '0', 'Estudantes'], [Trophy, '0', 'Passaporte'], [GraduationCap, '0', 'Padrão'], [ClipboardList, '0', 'Simulados feitos'], [Activity, '0', 'Alunos ativos']]
+  const cols = ['Estudante', 'CPF / Telefone', 'Plano', 'Simulados', 'Média', 'Cadastrado', 'Ações']
+  return (
+    <div className="space-y-3">
+      <HeaderTela c={c} fgBtn={fgBtn} titulo="Estudantes" sub="Gerencie os alunos e acesse o dashboard pessoal de cada um." acaoSec="Importar" acaoPrim="Novo Estudante" />
+      <div className="grid grid-cols-5 gap-2.5">
+        {kpis.map(([Icon, v, l]) => <KpiMini key={l} c={c} icon={Icon} valor={v} label={l} />)}
+      </div>
+      <div className="flex items-center gap-1.5">
+        <Busca c={c} placeholder="Buscar por nome, e-mail, CPF ou telefone…" />
+        <Chips c={c} fgBtn={fgBtn} itens={['Todos', 'Passaporte', 'Padrão']} />
+        <span className="inline-flex items-center gap-1 rounded-lg border px-2 py-2 text-[9px]" style={{ borderColor: c.cborder }}>Exportar<ChevronDown className="h-2.5 w-2.5" /></span>
+      </div>
+      <div className="overflow-hidden rounded-2xl" style={{ background: c.card, border: `1px solid ${c.cborder}` }}>
+        <div className="flex items-center gap-2 border-b px-3 py-2 text-[8px] font-semibold uppercase tracking-wide opacity-60" style={{ borderColor: c.cborder, background: c.tabBg }}>
+          {cols.map((h) => <span key={h} className="flex-1 truncate">{h}</span>)}
+        </div>
+        <div className="py-10 text-center text-[11px] opacity-55">Nenhum estudante encontrado.</div>
+      </div>
+    </div>
+  )
+}
+
+/** Área genérica (Cronograma, Conexões, Análise, Auditoria…): cabeçalho + blocos, colorida pelos tokens. */
+function TelaGenerica({ c, fgBtn, nome }: PrevScreen & { nome: string }) {
+  return (
+    <div className="space-y-3">
+      <HeaderTela c={c} fgBtn={fgBtn} titulo={nome} sub="Prévia da área com as cores aplicadas." acaoPrim="Nova ação" />
+      <div className="grid grid-cols-3 gap-3">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="rounded-2xl p-4" style={{ background: c.card, border: `1px solid ${c.cborder}` }}>
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg" style={{ background: `${c.btn}1f`, color: c.btn }}><LayoutGrid className="h-4 w-4" /></span>
+            <p className="mt-2 text-sm font-semibold" style={{ color: c.titulo }}>Bloco {i + 1}</p>
+            <p className="mt-1 text-[10px] opacity-60">Conteúdo de exemplo desta área.</p>
           </div>
         ))}
       </div>

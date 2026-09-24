@@ -30,7 +30,7 @@ export function AjudaButton() {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetTrigger
-        className="flex h-9 w-9 items-center justify-center rounded-md transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="flex h-9 w-9 items-center justify-center rounded-lg border border-transparent text-muted-foreground transition-colors hover:border-[color:var(--primary)] hover:bg-[color:var(--primary)] hover:text-white [&:hover_svg]:!text-white data-[state=open]:border-[color:var(--primary)] data-[state=open]:bg-[color:var(--primary)] data-[state=open]:text-white data-[state=open]:[&_svg]:!text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         title="Ajuda" aria-label="Central de ajuda">
         <HelpCircle className="h-5 w-5" />
       </SheetTrigger>

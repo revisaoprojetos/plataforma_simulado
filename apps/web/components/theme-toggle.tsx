@@ -14,7 +14,7 @@ export function ThemeToggle() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+      <DropdownMenuTrigger className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-transparent text-muted-foreground transition-colors hover:border-[color:var(--primary)] hover:bg-[color:var(--primary)] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-[state=open]:border-[color:var(--primary)] data-[state=open]:bg-[color:var(--primary)] data-[state=open]:text-white [&:hover_svg]:!text-white data-[state=open]:[&_svg]:!text-white">
         <Sun className="h-4 w-4 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
         <Moon className="absolute h-4 w-4 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
         <span className="sr-only">Alternar tema</span>

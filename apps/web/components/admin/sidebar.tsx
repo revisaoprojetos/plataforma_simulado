@@ -269,7 +269,9 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
   // Recolhida (rail de ícones, fora do mobile): grupos com sub-itens abrem em flyout ao lado.
   const recolhida = state === 'collapsed' && !isMobile
   const iniciais = userName.split(' ').filter(Boolean).slice(0, 2).map((n) => n[0]).join('').toUpperCase() || 'A'
-  const btnFooter = 'flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-center text-xs font-medium text-sidebar-foreground/70 transition-colors hover:border-white/20 hover:bg-white/10 hover:text-[color:var(--sidebar-text-active)]'
+  // Hover do "Sair" usa a cor da MARCA (--primary), não --sidebar-text-active (que em sidebar clara
+  // pode ser branco e sumir). O !important vence a regra de hover-svg do rodapé (que pinta o ícone).
+  const btnFooter = 'flex-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-center text-xs font-medium text-sidebar-foreground/70 transition-colors hover:border-[color:var(--primary)] hover:bg-[color:var(--primary)] hover:text-white [&:hover_svg]:!text-white'
 
   // Filtra itens/grupos por permissão do usuário (super-admin gate + áreas em manutenção).
   // `areasBloqueadas` já inclui /admin/correcao quando a discursiva está oculta (env ou manutenção).
@@ -299,7 +301,7 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
     <Sidebar collapsible="icon" className="group-data-[side=left]:border-r-0">
       <SidebarHeader className="flex h-14 flex-row items-center border-b border-sidebar-border px-4 group-data-[collapsible=icon]:px-2">
         <Link href="/admin" className="flex min-w-0 items-center gap-2">
-          <div className={cn('flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden', frameLogo(logoEstilo), !logo && 'bg-primary text-primary-foreground')}
+          <div data-preview-logobox className={cn('flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden', frameLogo(logoEstilo), !logo && 'bg-primary text-primary-foreground')}
             style={logo ? { background: logoBg } : undefined}>
             {logo ? (
               // eslint-disable-next-line @next/next/no-img-element
@@ -309,10 +311,8 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
             )}
           </div>
           <div className="flex min-w-0 flex-col group-data-[collapsible=icon]:hidden">
-            <span className="truncate font-semibold text-sm leading-tight">{nome}</span>
-            {subtitulo && (
-              <span className="truncate text-[11px] leading-tight text-sidebar-foreground/60">{subtitulo}</span>
-            )}
+            <span data-preview-nome className="truncate font-semibold text-sm leading-tight">{nome}</span>
+            <span data-preview-subtitulo className={cn('truncate text-[11px] leading-tight text-sidebar-foreground/60', !subtitulo && 'hidden')}>{subtitulo}</span>
           </div>
         </Link>
       </SidebarHeader>
@@ -461,7 +461,7 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
           <FontScaleControl scope={`admin:${userEmail || 'admin'}`} align="start" />
           <AjudaButton />
           <button type="button" onClick={() => { window.location.href = '/login' }} title="Trocar de plataforma" aria-label="Trocar de plataforma"
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-[color:var(--sidebar-accent)]">
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-transparent transition-colors hover:border-[color:var(--primary)] hover:bg-[color:var(--primary)] hover:text-white [&:hover_svg]:!text-white">
             <Building2 className="h-4 w-4" />
           </button>
           <button type="button" onClick={async () => { if (!(await confirmarDescartarAlteracoes())) return; setSaindo(true); setTimeout(() => { void logoutAction() }, 1100) }} title="Sair" aria-label="Sair"
