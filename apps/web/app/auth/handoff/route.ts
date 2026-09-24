@@ -17,11 +17,17 @@ export async function GET(request: NextRequest) {
   // Evita open redirect: só caminho relativo interno.
   const to = /^\/(?!\/)/.test(toRaw) ? toRaw : '/admin'
 
-  const tokens = code ? await consumirHandoff(code) : null
-  if (!tokens) return NextResponse.redirect(new URL('/login', url.origin))
+  // HOST PÚBLICO (atrás do Traefik, request.url é o endereço interno 0.0.0.0:3000). Usa os headers
+  // encaminhados para montar o redirect e o domínio do cookie no domínio REAL do tenant.
+  const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || url.host
+  const proto = request.headers.get('x-forwarded-proto') || (host.includes('localhost') ? 'http' : 'https')
+  const base = `${proto}://${host}`
 
-  const res = NextResponse.redirect(new URL(to, url.origin))
-  const dom = dominioCookieDeHost(url.host)
+  const tokens = code ? await consumirHandoff(code) : null
+  if (!tokens) return NextResponse.redirect(new URL('/login', base))
+
+  const res = NextResponse.redirect(new URL(to, base))
+  const dom = dominioCookieDeHost(host)
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

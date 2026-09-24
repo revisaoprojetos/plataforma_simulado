@@ -191,10 +191,13 @@ function construirPaletaCompleta(cores: Record<string, unknown>, coresDark: Reco
   const D = coresDark && typeof coresDark === 'object' ? varsDaPaleta(coresDark) : null
 
   // Marca (clara) + fonte nos dois modos; superfícies claras só no claro.
-  let css = `:root, .dark {\n${[...L.marca, fontLine].join('\n')}\n}`
-  css += `\n:root:not(.dark) {\n${L.surf.join('\n')}\n}`
+  // Especificidade `html:root`/`html.dark` (0,1,1) para VENCER o globals.css (`:root` = 0,1,0)
+  // — senão o --primary do tenant empata e o padrão (roxo) do globals sobrescreve (só o Revisão,
+  // que já é roxo, disfarçava o bug; tenants de outra cor apareciam roxos).
+  let css = `html:root, html.dark {\n${[...L.marca, fontLine].join('\n')}\n}`
+  css += `\nhtml:root:not(.dark) {\n${L.surf.join('\n')}\n}`
   // Paleta escura completa (marca + superfícies) só no .dark, se configurada.
-  if (D) css += `\n.dark {\n${[...D.marca, ...D.surf].join('\n')}\n}`
+  if (D) css += `\nhtml.dark {\n${[...D.marca, ...D.surf].join('\n')}\n}`
   return `${fontImport(fonte)}${css}\nmain h1 { color: var(--content-title); }`
 }
 
@@ -287,7 +290,7 @@ export const getTenantTheme = cache(async (): Promise<TenantThemeResult> => {
       lines.push(`  --brand-secondary: ${hexToOklch(corSecundaria)};`)
     }
 
-    const css = lines.length > 0 ? `${fontImport(fonte)}:root, .dark {\n${lines.join('\n')}\n}` : ''
+    const css = lines.length > 0 ? `${fontImport(fonte)}html:root, html.dark {\n${lines.join('\n')}\n}` : ''
 
     return {
       css,
