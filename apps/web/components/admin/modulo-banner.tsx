@@ -1,10 +1,49 @@
 'use client'
 
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, Library, type LucideIcon } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, Library, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { DEFAULT_TRILHA_DEGRADE, estiloDegrade, type TrilhaDegrade } from '@/lib/leitura/trilha-aparencia'
+
+/**
+ * Faixa de tabs com rolagem LATERAL quando não cabem (celular): sem barra de rolagem visível, só o
+ * gesto de deslizar; um degradê sutil nas bordas sinaliza que há mais tabs escondidas p/ aquele lado.
+ * Some sozinho quando tudo cabe (desktop) — os degradês ficam invisíveis (nada a rolar).
+ */
+function TabScroller({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [fade, setFade] = useState({ left: false, right: false })
+  useEffect(() => {
+    const el = ref.current; if (!el) return
+    const upd = () => setFade({ left: el.scrollLeft > 4, right: el.scrollLeft + el.clientWidth < el.scrollWidth - 4 })
+    upd()
+    el.addEventListener('scroll', upd, { passive: true })
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(upd) : null
+    ro?.observe(el)
+    window.addEventListener('resize', upd)
+    return () => { el.removeEventListener('scroll', upd); ro?.disconnect(); window.removeEventListener('resize', upd) }
+  }, [children])
+  const nudge = (dir: number) => ref.current?.scrollBy({ left: dir * 140, behavior: 'smooth' })
+  return (
+    <div className="relative">
+      <div ref={ref} className="flex overflow-x-auto [-ms-overflow-style:none] [-webkit-overflow-scrolling:touch] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {children}
+      </div>
+      {/* Degradê + chevron sinalizando que há MAIS tabs para aquele lado (clicável p/ deslizar). */}
+      <div aria-hidden className={cn('pointer-events-none absolute inset-y-0 left-0 w-10 bg-gradient-to-r from-black/55 to-transparent transition-opacity duration-200', fade.left ? 'opacity-100' : 'opacity-0')} />
+      <div aria-hidden className={cn('pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-black/55 to-transparent transition-opacity duration-200', fade.right ? 'opacity-100' : 'opacity-0')} />
+      <button type="button" aria-label="Ver abas anteriores" onClick={() => nudge(-1)}
+        className={cn('absolute -left-6 top-1/2 z-[2] -translate-y-1/2 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,.8)] transition-opacity duration-200', fade.left ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0')}>
+        <ChevronLeft className="h-5 w-5" />
+      </button>
+      <button type="button" aria-label="Ver mais abas" onClick={() => nudge(1)}
+        className={cn('absolute -right-5 top-1/2 z-[2] -translate-y-1/2 text-white drop-shadow-[0_1px_2px_rgba(0,0,0,.8)] transition-opacity duration-200', fade.right ? 'pointer-events-auto opacity-100 motion-safe:animate-pulse' : 'pointer-events-none opacity-0')}>
+        <ChevronRight className="h-5 w-5" />
+      </button>
+    </div>
+  )
+}
 
 /**
  * Banner do módulo com collapse ATRELADO AO SCROLL (scroll-linked): o título + botão Voltar + tabs ficam
@@ -57,12 +96,15 @@ export function ModuloBanner({ banner, cor, titulo, subtitulo, topoDireita, brea
     let naturalH = 0
     let rootTop = 0 // topo do <main> na viewport (constante durante o scroll) — cacheado p/ não ler no frame
 
+    // CELULAR: tela curta → banner SEMPRE recolhido, sem animação de expandir/recolher no scroll.
+    const isMobile = () => window.innerWidth < 640
     const medir = () => {
       rootTop = root.getBoundingClientRect().top
       const prev = col.style.maxHeight
       col.style.maxHeight = 'none'
       naturalH = col.scrollHeight
       col.style.maxHeight = prev
+      if (isMobile()) { root.style.paddingBottom = `${padBottom0}px`; return } // sem o "empurrão" de scroll
       // Garante rolagem suficiente p/ recolher por completo (DIST) mesmo em página curta. O espaço extra
       // vai no FIM (padding-bottom do <main>), longe do topo, então não tampa nada. Como o fluxo é constante
       // (banner + spacer = EXP sempre), medir com banner=EXP/spacer=0 dá o mesmo scrollHeight de uso.
@@ -73,6 +115,16 @@ export function ModuloBanner({ banner, cor, titulo, subtitulo, topoDireita, brea
     }
     const aplicar = () => {
       raf = 0
+      // CELULAR: fixa no estado recolhido (título + tabs), subtítulo/breadcrumb ocultos, sem spacer.
+      if (isMobile()) {
+        banner.style.minHeight = `${COMP}px`
+        spacerEl.style.height = '0px'
+        col.style.maxHeight = '0px'
+        col.style.opacity = '0'
+        col.style.transform = 'translateY(-6px)'
+        root.style.setProperty('--lp-banner-bottom', `${banner.getBoundingClientRect().bottom - rootTop - padTop}px`)
+        return
+      }
       // LEITURA primeiro (usa o layout já pintado do frame anterior) → NÃO força reflow no meio do frame.
       // O `bottom` (p/ a toolbar do LegProc) fica 1 frame atrás, imperceptível. Depois só ESCRITAS.
       const bottom = banner.getBoundingClientRect().bottom - rootTop - padTop
@@ -144,8 +196,8 @@ export function ModuloBanner({ banner, cor, titulo, subtitulo, topoDireita, brea
           <div className="mt-1.5 flex flex-wrap items-center gap-1 text-sm text-white/75">{breadcrumb}</div>
         </div>
 
-        {/* Tabs — SEMPRE, rente à base. */}
-        <div className="mt-auto pt-3">{tabs}</div>
+        {/* Tabs — SEMPRE, rente à base. Rolagem lateral (sem barra) no celular quando não cabem. */}
+        <div className="mt-auto pt-3"><TabScroller>{tabs}</TabScroller></div>
       </div>
     </div>
     {/* Spacer que reserva no fluxo a altura que o banner perde ao recolher → conteúdo do topo nunca é

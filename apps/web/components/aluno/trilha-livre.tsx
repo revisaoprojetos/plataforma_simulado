@@ -74,9 +74,24 @@ export function TrilhaLivre({ nodes, livre, capa, simbolos, editavel = false, on
     ro?.observe(el); return () => ro?.disconnect()
   }, [])
 
-  const posDe = (i: number): PosXY => livre.nos[nodes[i].id] ?? defaultPos(i, nodes.length)
+  // CELULAR/embed estreito (largura < 640, fora do construtor): as posições artísticas do admin (feitas
+  // p/ um canvas largo) amontoam os dias nas CURVAS. No mobile IGNORAMOS essas posições e usamos uma
+  // serpentina automática com passo vertical IGUAL entre os dias → nunca ficam colados; a onda em x é
+  // suave e contida p/ os rótulos (centrados) não saírem da tela.
+  const mobile = size.w > 0 && size.w < 640 && !editavel
+  const alturaMobile = mobile && !full
+    ? Math.round(Math.max(size.w / (livre.aspecto ?? 0.8), nodes.length * 120 + 140))
+    : undefined
+  const serpMobile = (i: number): PosXY => {
+    const N = Math.max(1, nodes.length)
+    // De BAIXO p/ CIMA: Dia 01 embaixo, último dia no topo — passo vertical igual (não cola nas curvas).
+    const y = N === 1 ? 50 : 96 - (i / (N - 1)) * 92
+    return { x: clampPct(50 + 22 * Math.sin(i * 0.9)), y: clampPct(y) }
+  }
+  const posDe = (i: number): PosXY => mobile ? serpMobile(i) : (livre.nos[nodes[i].id] ?? defaultPos(i, nodes.length))
   const ctrlDe = (i: number): PosXY => {
     const a = posDe(i), b = posDe(i + 1)
+    if (mobile) return { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
     return livre.curvas[nodes[i].id] ?? { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
   }
 
@@ -104,14 +119,15 @@ export function TrilhaLivre({ nodes, livre, capa, simbolos, editavel = false, on
 
   // Tamanho dos nós PROPORCIONAL ao canvas (≈9% da largura) × escala do admin → não fica gigante numa
   // imagem pequena nem minúsculo numa grande. Tudo (borda, curva, ponto de controle, rótulo) acompanha.
+  // No mobile aumenta o piso (nó ~15% da largura, mín. 48px) p/ o toque/leitura.
   const escala = livre.escala ?? 1
   const ref = size.w > 0 ? size.w : 400
-  const nodeSize = Math.round(Math.min(ref * 0.5, Math.max(20, ref * 0.09 * escala)))
+  const nodeSize = Math.round(Math.min(ref * 0.5, Math.max(mobile ? 48 : 20, ref * (mobile ? 0.15 : 0.09) * escala)))
   const iconEscala = nodeSize / 56
   const borda = Math.max(2, Math.round(nodeSize * 0.08))
   const stroke = Math.max(2, nodeSize * 0.1)
   const ctrlSize = Math.max(9, Math.round(nodeSize * 0.28))
-  const labelFs = Math.max(9, Math.round(nodeSize * 0.2))
+  const labelFs = Math.max(mobile ? 13 : 9, Math.round(nodeSize * (mobile ? 0.24 : 0.2)))
 
   // Balão do dia: mede a altura real + máquina de abrir/fechar (mantém montado no fechamento p/ animar a saída).
   const balaoRef = useRef<HTMLDivElement>(null)
@@ -172,7 +188,7 @@ export function TrilhaLivre({ nodes, livre, capa, simbolos, editavel = false, on
   }, [editavel, alvoIdx, size.w])
 
   return (
-    <div ref={wrapRef} className={cn('relative w-full overflow-hidden', semMoldura ? 'bg-transparent' : 'border bg-muted/30', full || semMoldura ? 'rounded-none' : 'rounded-2xl', full && 'h-full')} style={{ aspectRatio: full ? undefined : (livre.aspecto ?? 0.8), touchAction: editavel ? 'none' : undefined }}>
+    <div ref={wrapRef} className={cn('relative w-full', alturaMobile ? 'overflow-visible' : 'overflow-hidden', semMoldura ? 'bg-transparent' : 'border bg-muted/30', full || semMoldura ? 'rounded-none' : 'rounded-2xl', full && 'h-full')} style={{ aspectRatio: (full || alturaMobile) ? undefined : (livre.aspecto ?? 0.8), height: alturaMobile, touchAction: editavel ? 'none' : undefined }}>
       {(() => {
         if (ocultarFundo) return null
         const f = livre.fundo
@@ -181,6 +197,25 @@ export function TrilhaLivre({ nodes, livre, capa, simbolos, editavel = false, on
         const desfoque = f?.desfoque ?? 0
         const opacity = (f?.opacidade ?? 100) / 100
         const filter = desfoque > 0 ? `blur(${desfoque}px)` : undefined
+        // MOBILE (canvas muito alto): a imagem única esticada em `cover` distorce (zoom absurdo). Vira um
+        // FUNDO FIXO (sticky, altura da tela) que fica parado cobrindo a viewport enquanto o caminho rola
+        // por cima — sem distorção, aspecto sempre preservado.
+        if (alturaMobile) {
+          const posX = f?.posX ?? 50, posY = f?.posY ?? 50
+          return (
+            <>
+              {/* Papel de parede: UMA imagem sticky (100svh, sem zoom) que acompanha a rolagem. Sem faixa
+                  embaixo porque o rolamento termina exatamente no fim do canvas (ver -mb no wrapper da
+                  leitura), onde a sticky cobre a tela inteira. (bg-neutral-950 = base se a imagem falhar.) */}
+              <div className="pointer-events-none absolute inset-0 z-0 bg-neutral-950" />
+              <div className="pointer-events-none sticky top-0 z-0 h-[100svh] w-full overflow-hidden">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={url} alt="" loading="eager" fetchPriority="high" decoding="async" className="h-full w-full object-cover"
+                  style={{ objectPosition: `${posX}% ${posY}%`, opacity, filter }} />
+              </div>
+            </>
+          )
+        }
         const blurScale = desfoque > 0 ? 1.06 : 1
         const crop = f?.crop
         // Recorte via CSS background (sem rasterizar/CORS): mostra EXATAMENTE o retângulo escolhido.
@@ -250,7 +285,7 @@ export function TrilhaLivre({ nodes, livre, capa, simbolos, editavel = false, on
               <span className="relative z-10"><SimboloNo config={simbolos[n.estado]} escala={iconEscala} cor={cor.simbolo} /></span>
               {!editavel && <EstampasNo estampas={estampas} aulaId={n.id} />}
             </button>
-            <span className="mt-1 max-w-[9rem] truncate rounded bg-black/55 px-1.5 py-0.5 text-center font-medium text-white backdrop-blur" style={{ fontSize: labelFs }}>{n.titulo}</span>
+            <span className={cn('mt-1 rounded bg-black/60 px-1.5 py-0.5 text-center font-medium text-white backdrop-blur', mobile ? 'max-w-[10.5rem] leading-tight [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden' : 'max-w-[9rem] truncate')} style={{ fontSize: labelFs }}>{n.titulo}</span>
           </div>
         )
       })}

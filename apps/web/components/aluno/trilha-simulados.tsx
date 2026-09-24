@@ -239,9 +239,9 @@ function TrilhaCaminho({ t, gamAtivo, simbolos, estampas = [] }: { t: Trilha; ga
 
       {/* Card do simulado — no lado com mais espaço, alinhado ao nó */}
       {open && openPt && (
-        <div ref={cardRef} key={open.id} className="group/card absolute z-10 w-[400px] transition-transform duration-200 will-change-transform motion-safe:animate-in motion-safe:fade-in motion-safe:duration-100 motion-safe:hover:scale-[1.03]"
+        <div ref={cardRef} key={open.id} className="group/card absolute z-10 w-[400px] transition-transform duration-200 will-change-transform motion-safe:animate-in motion-safe:fade-in motion-safe:duration-100 motion-safe:hover:scale-[1.03] max-sm:!fixed max-sm:!inset-x-3 max-sm:!bottom-3 max-sm:!top-auto max-sm:!z-[60] max-sm:!w-auto max-sm:!mx-auto max-sm:max-w-md max-sm:max-h-[78vh] max-sm:overflow-y-auto max-sm:motion-safe:slide-in-from-bottom-4"
           style={{ top: cardTop, ...(side === 'right' ? { left: LANE + 20 } : { right: LANE + 20 }) }}>
-          <span className={cn('absolute z-[5] h-3 w-3 rotate-45 border bg-card', side === 'right' ? '-left-1.5 border-b-0 border-r-0' : '-right-1.5 border-l-0 border-t-0')} style={{ top: arrowY - 6 }} />
+          <span className={cn('absolute z-[5] h-3 w-3 rotate-45 border bg-card max-sm:hidden', side === 'right' ? '-left-1.5 border-b-0 border-r-0' : '-right-1.5 border-l-0 border-t-0')} style={{ top: arrowY - 6 }} />
           <div className={cn('relative rounded-2xl border bg-card shadow-xl', open.estado === 'atual' && 'border-primary/40')}>
             {/* Carimbos 'card' DENTRO do card → sobreposição (z) e recorte funcionam. */}
             <EstampasCard estampas={estampas} aulaId={open.id} />
@@ -453,11 +453,24 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
     return () => clearTimeout(t)
   }, [alvoNodeId])
 
+  // Responsivo (celular): base = largura da janela (disponível cedo, sem depender da medição do
+  // container). No mobile a faixa fica mais CENTRAL (amplitude do zigue-zague bem menor → os
+  // rótulos param de sair pras bordas e colidir) e o passo vertical maior (rótulos maiores cabem).
+  const [vw, setVw] = useState(0)
+  useEffect(() => {
+    const m = () => setVw(window.innerWidth)
+    m(); window.addEventListener('resize', m)
+    return () => window.removeEventListener('resize', m)
+  }, [])
+  const mobile = vw > 0 && vw < 640
+  // Nó um pouco MAIOR no celular (toque + leitura); `r` substitui a constante R dentro desta trilha.
+  const r = mobile ? 34 : R
+
   // Trilha aberta: mais distância vertical entre os nós e zigue-zague mais largo na horizontal.
   // Só quando fica MUITO grande (>16 nós) encurta um pouco p/ não virar um comprimento absurdo.
   const compacto = flat.length > 16
-  const rowH = compacto ? 138 : 172
-  const AMP = compacto ? 132 : 154
+  const rowH = mobile ? (compacto ? 158 : 178) : (compacto ? 138 : 172)
+  const AMP = mobile ? 54 : (compacto ? 132 : 154)
   // Enrolamento orgânico tipo "estrada sinuosa": curvas fluidas e aparentemente aleatórias, porém
   // DETERMINÍSTICAS (mesmo traçado a cada render/SSR, sem Math.random) e coerentes — soma de senos
   // de frequências incomensuráveis + leve jitter por hash do índice, saturada p/ encostar nos
@@ -491,18 +504,18 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
       // (espaço simétrico acima/abaixo).
       const VPAD = 66
       y += VPAD
-      nodesL.push({ n: t.nodes[0], off: reto ? 0 : waveOff(gi), y: y + R, adesivo: t.adesivoUrl ?? null })
-      y += 2 * R + VPAD
+      nodesL.push({ n: t.nodes[0], off: reto ? 0 : waveOff(gi), y: y + r, adesivo: t.adesivoUrl ?? null })
+      y += 2 * r + VPAD
       gi++
     } else {
       t.nodes.forEach((n) => {
         const off = reto ? 0 : waveOff(gi)
-        nodesL.push({ n, off, y: y + R, adesivo: t.adesivoUrl ?? null })
+        nodesL.push({ n, off, y: y + r, adesivo: t.adesivoUrl ?? null })
         // Regra anti-colisão: o passo vertical nunca deixa o rótulo (título + linha de status)
         // deste nó alcançar o ícone do próximo — cresce conforme o texto ocupa mais linhas.
-        const linhas = Math.min(2, Math.max(1, Math.ceil((n.titulo?.length ?? 0) / 20)))
-        const alturaRotulo = 46 + (linhas - 1) * 16
-        const passoMin = 2 * R + alturaRotulo + 22
+        const linhas = Math.min(2, Math.max(1, Math.ceil((n.titulo?.length ?? 0) / (mobile ? 15 : 20))))
+        const alturaRotulo = (mobile ? 60 : 46) + (linhas - 1) * (mobile ? 18 : 16)
+        const passoMin = 2 * r + alturaRotulo + 22
         y += Math.max(rowH, passoMin)
         gi++
       })
@@ -511,13 +524,13 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
   })
   // Baú SEMPRE centralizado (off 0): é só o marcador de fim e, no centro, nunca fica sob o card
   // lateral do último simulado (que abre em LANE+20).
-  const chest = { off: 0, y: y + R }
+  const chest = { off: 0, y: y + r }
   const segmentos = segMeta.map((s, i) => ({
     id: s.id, capa: s.capa,
     yTop: s.dy + 20,                                                        // logo abaixo da divisória do grupo
     yBot: (i < segMeta.length - 1 ? segMeta[i + 1].dy - 4 : chest.y - 24),   // quase encostando na próxima divisória (ou no baú)
   }))
-  const height = chest.y + R + 48
+  const height = chest.y + r + 48
   // "Começar de baixo": espelha verticalmente todo o layout (nós, divisórias, fundos e baú).
   // O 1º nó vai para a base e a trilha "sobe"; o baú/fim fica no topo.
   if (inverter) {
@@ -610,14 +623,14 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
         if (n.intro) {
           const IconIntro = n.intro.tipo === 'video' ? Play : n.intro.tipo === 'link' ? ExternalLink : BookOpen
           const clsBtn = 'relative flex items-center justify-center rounded-full border-4 shadow-sm transition-transform hover:scale-105 focus:outline-none'
-          const styleBtn = { width: R * 2, height: R * 2, background: `color-mix(in oklab, ${COR} 18%, var(--card))`, borderColor: COR, color: COR } as React.CSSProperties
+          const styleBtn = { width: r * 2, height: r * 2, background: `color-mix(in oklab, ${COR} 18%, var(--card))`, borderColor: COR, color: COR } as React.CSSProperties
           const inner = (<><span className="pointer-events-none absolute inset-[-5px] rounded-full border-2 opacity-50 motion-safe:animate-ping" style={{ borderColor: COR }} /><IconIntro className="h-6 w-6" /></>)
           return (
-            <div key={n.id} className="absolute z-[1] flex w-max max-w-[260px] -translate-x-1/2 flex-col items-center text-center" style={{ left: cx(off), top: cyv - R }}>
+            <div key={n.id} className="absolute z-[1] flex w-max max-w-[176px] -translate-x-1/2 flex-col items-center text-center sm:max-w-[260px]" style={{ left: cx(off), top: cyv - r }}>
               {n.intro.externo
                 ? <a href={n.intro.href} target="_blank" rel="noopener noreferrer" className={clsBtn} style={styleBtn} aria-label={n.titulo}>{inner}</a>
                 : <Link href={n.intro.href} className={clsBtn} style={styleBtn} aria-label={n.titulo}>{inner}</Link>}
-              <div className="relative z-[1] mt-1.5 inline-block max-w-full rounded-lg border bg-background/85 px-2 py-0.5 shadow-sm backdrop-blur-sm">
+              <div className="relative z-[1] mt-1.5 inline-block max-w-full rounded-lg border bg-background/85 px-2.5 py-1 shadow-sm backdrop-blur-sm sm:px-2 sm:py-0.5">
                 <span className="block text-xs font-semibold leading-snug" style={{ color: COR }} title={n.titulo}>{n.titulo}</span>
                 <span className="block text-[11px] text-muted-foreground">Comece por aqui</span>
               </div>
@@ -632,12 +645,12 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
         const proxima = !!n.proxima // PRÓXIMA a liberar (agendada) — pulsa em âmbar + "aula de amanhã/hoje"
         const ehAlvo = n.id === alvoNodeId // onde o aluno "está" (atual ou última concluída) → referência
         return (
-          <div key={n.id} ref={n.id === alvoNodeId ? alvoRef : undefined} className="absolute z-[1] flex w-max max-w-[260px] -translate-x-1/2 flex-col items-center text-center" style={{ left: cx(off), top: cyv - R }}>
+          <div key={n.id} ref={n.id === alvoNodeId ? alvoRef : undefined} className="absolute z-[1] flex w-max max-w-[176px] -translate-x-1/2 flex-col items-center text-center sm:max-w-[260px]" style={{ left: cx(off), top: cyv - r }}>
             {ehAlvo && !atual && <span className="mb-1 whitespace-nowrap rounded-full bg-primary px-2 py-0.5 text-[11px] font-bold text-primary-foreground shadow">você está aqui</span>}
             {proxima && <span className="mb-1 whitespace-nowrap rounded-full bg-amber-500 px-2 py-0.5 text-[11px] font-bold text-white shadow motion-safe:animate-pulse">{rotuloProximaAula(n.liberaEm)}</span>}
             <button type="button" data-trilha-node data-carimbo-alvo={n.id} onClick={() => setAberto(n.id)} aria-label={n.titulo}
               className={cn('relative flex items-center justify-center rounded-full border-4 shadow-sm transition-transform hover:scale-105 focus:outline-none', sel && 'ring-4 ring-primary/25')}
-              style={{ width: R * 2, height: R * 2, ...(ouro ? { background: 'radial-gradient(circle at 50% 36%, #ffe680 0%, #ffcf33 46%, #f0b000 78%, #d99200 100%)', borderColor: '#c07f08', color: '#c2680a', boxShadow: '0 0 13px 2px rgba(250,204,21,.5), 0 0 28px 6px rgba(250,204,21,.22), 0 6px 16px -5px rgba(217,119,6,.55)' }
+              style={{ width: r * 2, height: r * 2, ...(ouro ? { background: 'radial-gradient(circle at 50% 36%, #ffe680 0%, #ffcf33 46%, #f0b000 78%, #d99200 100%)', borderColor: '#c07f08', color: '#c2680a', boxShadow: '0 0 13px 2px rgba(250,204,21,.5), 0 0 28px 6px rgba(250,204,21,.22), 0 6px 16px -5px rgba(217,119,6,.55)' }
                 : concluido ? { background: '#10b981', borderColor: '#059669', color: '#fff' }
                 : atual ? { background: `color-mix(in oklab, ${COR} 16%, var(--card))`, borderColor: COR, color: COR }
                 : { background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }), ...corFundoOverride(simbolos[noEstado(concluido, atual)], ouro) }}>
@@ -654,14 +667,14 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
               <EstampasNo estampas={estampas} aulaId={n.id} />
             </button>
             {/* Rótulo cresce lateralmente (largura por conteúdo, teto 260px); título no máx. 2 linhas. */}
-            <div className="relative z-[1] mt-1.5 inline-block max-w-full rounded-lg border bg-background/85 px-2 py-0.5 shadow-sm backdrop-blur-sm">
+            <div className="relative z-[1] mt-1.5 inline-block max-w-full rounded-lg border bg-background/85 px-2.5 py-1 shadow-sm backdrop-blur-sm sm:px-2 sm:py-0.5">
               {/* Adesivo de conquista: aula GABARITADA (100%) exibe o selo do módulo sobre o balão, à direita. */}
               {ouro && adesivo && (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={adesivo} alt="Conquista" title="Aula gabaritada!" className="pointer-events-none absolute -right-4 -top-4 z-10 h-11 w-11 -rotate-12 object-contain drop-shadow-[0_2px_4px_rgba(0,0,0,.35)] motion-safe:animate-[mascote-in_.5s_cubic-bezier(.34,1.56,.64,1)_both]" />
               )}
-              <span className={cn('block text-xs font-semibold leading-snug [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden', bloqueado && 'text-muted-foreground')} title={n.titulo}>{n.titulo}</span>
-              <span className="block text-[11px] text-muted-foreground">
+              <span className={cn('block text-[13px] font-semibold leading-snug [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden sm:text-xs', bloqueado && 'text-muted-foreground')} title={n.titulo}>{n.titulo}</span>
+              <span className="block text-xs text-muted-foreground sm:text-[11px]">
                 {concluido ? `Concluído${n.acerto != null ? ` · ${n.acerto}%` : ''}` : (n.quando ?? 'Disponível')}
               </span>
             </div>
@@ -670,7 +683,7 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
       })}
 
       {/* Baú final */}
-      <div className="absolute z-[1] -translate-x-1/2 text-center" style={{ left: cx(chest.off), top: chest.y - R, width: 220 }}>
+      <div className="absolute z-[1] -translate-x-1/2 text-center" style={{ left: cx(chest.off), top: chest.y - r, width: 220 }}>
         <span className="mx-auto flex items-center justify-center rounded-2xl border-4" style={{ width: 56, height: 56, background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>
           <Trophy className="h-6 w-6" />
         </span>
@@ -682,9 +695,9 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
 
       {/* Card do simulado — no lado com mais espaço, alinhado ao nó */}
       {open && openPt && (
-        <div ref={cardRef} key={open.id} className="group/card absolute z-10 w-[400px] transition-transform duration-200 will-change-transform motion-safe:animate-in motion-safe:fade-in motion-safe:duration-100 motion-safe:hover:scale-[1.03]"
+        <div ref={cardRef} key={open.id} className="group/card absolute z-10 w-[400px] transition-transform duration-200 will-change-transform motion-safe:animate-in motion-safe:fade-in motion-safe:duration-100 motion-safe:hover:scale-[1.03] max-sm:!fixed max-sm:!inset-x-3 max-sm:!bottom-3 max-sm:!top-auto max-sm:!z-[60] max-sm:!w-auto max-sm:!mx-auto max-sm:max-w-md max-sm:max-h-[78vh] max-sm:overflow-y-auto max-sm:motion-safe:slide-in-from-bottom-4"
           style={{ top: cardTop, ...(side === 'right' ? { left: LANE + 20 } : { right: LANE + 20 }) }}>
-          <span className={cn('absolute z-[5] h-3 w-3 rotate-45 border bg-card', side === 'right' ? '-left-1.5 border-b-0 border-r-0' : '-right-1.5 border-l-0 border-t-0')} style={{ top: arrowY - 6 }} />
+          <span className={cn('absolute z-[5] h-3 w-3 rotate-45 border bg-card max-sm:hidden', side === 'right' ? '-left-1.5 border-b-0 border-r-0' : '-right-1.5 border-l-0 border-t-0')} style={{ top: arrowY - 6 }} />
           <div className={cn('relative rounded-2xl border bg-card shadow-xl', open.estado === 'atual' && 'border-primary/40')}>
             {/* Carimbos 'card' DENTRO do card → sobreposição (z) e recorte funcionam. */}
             <EstampasCard estampas={estampas} aulaId={open.id} />

@@ -113,7 +113,7 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
         className="-top-4 -mx-4 -mt-4 md:-top-6 md:-mx-6 md:-mt-6"
         tituloBadges={<span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-semibold text-white backdrop-blur">{trilha.done}/{trilha.total}</span>}
         tabs={
-          <TabsList className="w-fit border-white/20 [&_[data-slot=tabs-trigger]]:text-white/70 [&_[data-slot=tabs-trigger]:hover]:text-white [&_[data-slot=tabs-trigger][data-active]]:text-white">
+          <TabsList className="w-fit shrink-0 border-white/20 [&_[data-slot=tabs-trigger]]:shrink-0 [&_[data-slot=tabs-trigger]]:whitespace-nowrap [&_[data-slot=tabs-trigger]]:text-white/70 [&_[data-slot=tabs-trigger]:hover]:text-white [&_[data-slot=tabs-trigger][data-active]]:text-white">
             <TabsTrigger value="trilha"><Route className="h-4 w-4" /> Trilha</TabsTrigger>
             {regAtivo && <TabsTrigger value="regulamento"><ScrollText className="h-4 w-4" /> Regulamento</TabsTrigger>}
             {desafiosAtivos.length > 0 && <TabsTrigger value="desafios"><Trophy className="h-4 w-4" /> Desafios</TabsTrigger>}

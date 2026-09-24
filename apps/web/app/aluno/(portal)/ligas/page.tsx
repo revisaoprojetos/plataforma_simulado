@@ -131,7 +131,9 @@ export default async function LigasPage() {
                           borderColor: atual ? l.cor : alc ? `color-mix(in oklab, ${l.cor} 58%, #fff)` : `color-mix(in oklab, ${l.cor} 45%, #0b1020)`,
                         }}
                       >
-                        {atual && <span className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-white px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-slate-900 shadow">Você</span>}
+                        {/* Selo "Você": no MOBILE fica ABAIXO do ícone (o layout compacto fazia ele bater no
+                            texto "XP até…" acima); no desktop continua acima (-top-8). */}
+                        {atual && <span className="absolute left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-white px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-slate-900 shadow top-full mt-1 sm:top-auto sm:bottom-auto sm:-top-8 sm:mt-0">Você</span>}
                         {passou && <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-[#141233]"><Check className="h-2.5 w-2.5 text-white" strokeWidth={3} /></span>}
                         <EscudoLiga cor={l.cor} nome={l.nome} ativo={alc} fundo={false} className={atual ? 'h-9 w-9' : 'h-7 w-7'} />
                         {atual && (
@@ -141,7 +143,7 @@ export default async function LigasPage() {
                         )}
                       </span>
                     </div>
-                    <span className={cn('max-w-full truncate text-[11px] font-semibold', alc ? 'text-white' : 'text-white/45')}>{l.nome}</span>
+                    <span className={cn('max-w-full truncate text-[11px] font-semibold', alc ? 'text-white' : 'text-white/45', atual && 'max-sm:invisible')}>{l.nome}</span>
                     {i > 0 && <span className="text-[9px] text-white/40">{fmt(l.xp_min)} XP</span>}
                   </div>
                 )
