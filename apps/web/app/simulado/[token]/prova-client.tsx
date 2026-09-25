@@ -245,8 +245,12 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
       } catch { /* rede instável — tenta no próximo ciclo */ }
     }
     sync() // ao entrar nesta questão
-    const t = setInterval(sync, 30_000) // rede de segurança
-    return () => { vivo = false; clearInterval(t) }
+    // EGRESS: rede de segurança a cada 30s, só com a aba visível (pausa em document.hidden). Ao voltar
+    // à aba, revalida na hora — o cronômetro local (outro efeito) segue contando normalmente.
+    const t = setInterval(() => { if (!document.hidden) void sync() }, 30_000)
+    const onVis = () => { if (!document.hidden) void sync() }
+    document.addEventListener('visibilitychange', onVis)
+    return () => { vivo = false; clearInterval(t); document.removeEventListener('visibilitychange', onVis) }
   }, [sessionToken, status, questaoIndex])
 
   // Auto-finalizar ao esgotar tempo — com CONFIRMAÇÃO no servidor.

@@ -52,8 +52,11 @@ export function MonitorManutencao({ inicial }: { inicial: { inicio: string | nul
     }
 
     tick()
-    const id = setInterval(tick, 45000)
-    return () => { vivo = false; clearInterval(id) }
+    // EGRESS: 90s e SÓ com a aba visível (pausa em document.hidden). Ao voltar à aba, checa na hora.
+    const id = setInterval(() => { if (!document.hidden) void tick() }, 90000)
+    const onVis = () => { if (!document.hidden) void tick() }
+    document.addEventListener('visibilitychange', onVis)
+    return () => { vivo = false; clearInterval(id); document.removeEventListener('visibilitychange', onVis) }
   }, [inicial.inicio, inicial.avisos])
 
   return null

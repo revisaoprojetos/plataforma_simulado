@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { getGamConfig, gamAtivaParaAluno } from '@/lib/gamificacao'
-import { resumoGamificacao, posicaoNaLiga, membrosDaLiga, xpPorDiaSemana, leaderboardLiga } from '@/lib/gamificacao/leitura'
+import { resumoGamificacao, posicaoNaLiga, contarMembrosLiga, xpPorDiaSemana, leaderboardLiga } from '@/lib/gamificacao/leitura'
 import { EscudoLiga } from '@/components/aluno/escudo-liga'
 import { LigaRankingFull } from '@/components/aluno/liga-ranking-full'
 import { MascoteTour } from '@/components/mascote/mascote-tour'
@@ -39,11 +39,11 @@ export default async function LigasPage() {
 
   const [posicao, membros, semana, podioBruto] = await Promise.all([
     resumo ? posicaoNaLiga(svc, sessao!.tenantId, liga.id, xpTotal) : Promise.resolve(1),
-    membrosDaLiga(svc, sessao!.tenantId, liga.id),
+    contarMembrosLiga(svc, sessao!.tenantId, liga.id), // EGRESS: count (head), não baixa os ids só p/ .size
     xpPorDiaSemana(svc, sessao!.tenantId, sessao!.estudanteId, cfg.timezone),
     leaderboardLiga(svc, sessao!.tenantId, liga.id, sessao!.estudanteId, 3),
   ])
-  const totalNaLiga = Math.max(1, membros.size)
+  const totalNaLiga = Math.max(1, membros)
   const idxAtual = Math.max(0, ligasOrd.findIndex((l) => l.id === liga.id))
 
   // Progresso dentro do tier atual (piso da liga → piso da próxima).

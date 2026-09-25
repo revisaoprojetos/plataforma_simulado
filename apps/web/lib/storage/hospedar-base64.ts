@@ -36,7 +36,7 @@ export async function hospedarBase64(valor: string | null | undefined, svc: any,
   try {
     const { data: lista } = await svc.storage.from(BUCKET_IMAGENS).list('assets', { search: nome, limit: 1 })
     if (!lista?.some((f: any) => f.name === nome)) {
-      await svc.storage.from(BUCKET_IMAGENS).upload(path, buf, { contentType: `image/${tipo}`, upsert: true })
+      await svc.storage.from(BUCKET_IMAGENS).upload(path, buf, { contentType: `image/${tipo}`, upsert: true, cacheControl: '31536000' })
     }
     if (opts?.tenantId) await registrarArquivo(svc, { tenantId: opts.tenantId, nome, tipo: `image/${tipo}`, bucket: BUCKET_IMAGENS, path, tamanho: buf.length, criadoPor: opts.criadoPor })
     return (svc.storage.from(BUCKET_IMAGENS).getPublicUrl(path).data.publicUrl as string) || v

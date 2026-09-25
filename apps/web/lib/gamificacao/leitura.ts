@@ -261,4 +261,10 @@ export async function membrosDaLiga(svc: any, tenantId: string, liga: string): P
   return new Set(((data ?? []) as any[]).map((r) => r.estudante_id as string))
 }
 
+/** Só a CONTAGEM de membros da liga (head, sem trazer os ids) — evita baixar todos só para `.size`. */
+export async function contarMembrosLiga(svc: any, tenantId: string, liga: string): Promise<number> {
+  const { count } = await svc.from('simulado_gamificacao_estudante').select('estudante_id', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq('liga', liga)
+  return count ?? 0
+}
+
 export { inicioDaSemanaISO, inicioDoMesISO }

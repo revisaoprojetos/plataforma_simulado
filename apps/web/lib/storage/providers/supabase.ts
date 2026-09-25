@@ -11,9 +11,13 @@ export function createSupabaseProvider(): StorageProvider {
 
     async upload(p: UploadParams): Promise<UploadResult> {
       const body = p.data instanceof ArrayBuffer ? new Uint8Array(p.data) : p.data
+      // Cache longo p/ caminho imutável (sem upsert → path único por conteúdo) = 1 ano; mutável (upsert
+      // no mesmo path) = 1h p/ não servir versão velha. Corta MUITO egress de imagens/PDFs re-baixados.
+      const cacheControl = p.cacheControl ?? (p.upsert ? '3600' : '31536000')
       const { error } = await sb().storage.from(p.bucket).upload(p.path, body as Uint8Array, {
         contentType: p.contentType,
         upsert: p.upsert ?? false,
+        cacheControl,
       })
       if (error) throw new StorageError(error.message)
 

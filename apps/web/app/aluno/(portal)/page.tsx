@@ -9,6 +9,7 @@ import { BannersPortal, type HeroSimSlide, type BannerChip, type BannerStats } f
 import { tipoDoSimulado } from '@/lib/simulado/tipo'
 import { idsSimuladosGratuitos } from '@/lib/simulado/gratuito'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { remember } from '@/lib/cache/relatorio-cache'
 import { SimuladosCatalogoAluno, type ItemSimuladoCat, type ProgressoGrupo } from '@/components/aluno/simulados-catalogo-aluno'
 import { SemAcessoModal } from '@/components/aluno/sem-acesso-modal'
 import { getGamConfig, gamAtivaParaAluno } from '@/lib/gamificacao'
@@ -34,16 +35,26 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   const svc = createAdminClient()
   const estId = sessao.estudanteId
 
-  const [{ data: mats }, { data: acs }, { data: sessAll }, { data: banRows }, { data: tenantRow }, gratuitoIds] = await Promise.all([
+  // EGRESS: dados de TENANT (banners, tema, simulados gratuitos) são IGUAIS p/ todos os alunos e eram
+  // relidos a cada carregamento de cada aluno. Cacheados por tenant (TTL curto) → 1 leitura por janela
+  // em vez de N (nº de alunos × cargas). As leituras PER-ALUNO seguem ao vivo (variam por estudante).
+  const [{ data: mats }, { data: acs }, { data: sessAll }, tenantBundle] = await Promise.all([
     svc.from('simulado_matriculas').select('simulado_id, liberado').eq('estudante_id', estId),
     svc.from('simulado_acessos').select('simulado_id, expira_em').eq('estudante_id', estId),
     svc.from('simulado_sessoes_prova').select('simulado_id, status, nota, finalizado_em').eq('estudante_id', estId).eq('is_teste', false).eq('deletado', false),
-    // Mesma ordenação do console (ordem asc, empate por criado_em DESC) para o carrossel bater com a lista de Avisos.
-    svc.from('simulado_banners').select('id, tipo, titulo, mensagem, imagem_url, link, cor').eq('tenant_id', sessao!.tenantId).eq('ativo', true).order('ordem', { ascending: true }).order('criado_em', { ascending: false }),
-    svc.from('simulado_tenants').select('tema').eq('id', sessao!.tenantId).maybeSingle(),
-    // Simulados de "acesso gratuito" (aparecem p/ todos) — só dependem do tenant, entram no mesmo lote.
-    idsSimuladosGratuitos(svc, sessao!.tenantId),
+    remember(`aluno-home-tenant:${sessao!.tenantId}`, 120, async () => {
+      const [{ data: banRows }, { data: tenantRow }, gratuitoIds] = await Promise.all([
+        // Mesma ordenação do console (ordem asc, empate por criado_em DESC) para o carrossel bater com a lista de Avisos.
+        svc.from('simulado_banners').select('id, tipo, titulo, mensagem, imagem_url, link, cor').eq('tenant_id', sessao!.tenantId).eq('ativo', true).order('ordem', { ascending: true }).order('criado_em', { ascending: false }),
+        svc.from('simulado_tenants').select('tema').eq('id', sessao!.tenantId).maybeSingle(),
+        idsSimuladosGratuitos(svc, sessao!.tenantId),
+      ])
+      return { banRows: banRows ?? [], tema: (tenantRow?.tema ?? null) as any, gratuitoIds }
+    }),
   ])
+  const banRows = tenantBundle.banRows
+  const tenantRow = { tema: tenantBundle.tema } as { tema: any }
+  const gratuitoIds = tenantBundle.gratuitoIds
   // Painel de desempenho (KPIs) nos banners de simulado: só quando o tenant liga (default OFF).
   const mostrarDesempenhoBanner = (tenantRow?.tema as any)?.banners_desempenho === true
   // Estilo dos cards de simulado, definido no console (tema.card_view) — o aluno apenas obedece.

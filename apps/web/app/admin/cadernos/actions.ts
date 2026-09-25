@@ -201,7 +201,7 @@ export async function hospedarImagemCadernoAction(dataUri: string): Promise<{ ok
   const hash = createHash('sha1').update(buf).digest('hex').slice(0, 24)
   const path = `assets/${hash}.${ext}`
   try { await svc.storage.createBucket(BUCKET_IMAGENS, { public: true }) } catch { /* já existe */ }
-  const { error } = await svc.storage.from(BUCKET_IMAGENS).upload(path, buf, { contentType: `image/${tipo}`, upsert: true })
+  const { error } = await svc.storage.from(BUCKET_IMAGENS).upload(path, buf, { contentType: `image/${tipo}`, upsert: true, cacheControl: '31536000' })
   if (error && !/exists/i.test(error.message)) return { ok: false, error: error.message }
   const url = svc.storage.from(BUCKET_IMAGENS).getPublicUrl(path).data.publicUrl as string
   return { ok: true, url }

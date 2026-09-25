@@ -2,6 +2,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
+import { remember, chaveRelatorio } from '@/lib/cache/relatorio-cache'
 import { CorrecaoCards } from '@/components/admin/correcao-cards'
 import { Inbox } from 'lucide-react'
 import { SemPermissao } from '@/components/ui/alert-box'
@@ -28,42 +29,45 @@ export default async function CorrecaoPage() {
   const svc = createAdminClient()
   const tenantId = access.tenantId ?? ZERO
 
-  // 1) Questões discursivas do tenant → 2) simulados OFICIAIS que as usam.
-  const qd = await fetchAll<any>(() => svc.from('simulado_questoes').select('id').eq('tenant_id', tenantId).eq('tipo', 'discursiva').order('id'))
-  const qdIds = qd.map((q) => q.id)
-  let sims: any[] = []
-  if (qdIds.length) {
-    const pq = await fetchAllByIn<any>(qdIds, (c) => svc.from('simulado_prova_questoes').select('simulado_id').in('questao_id', c))
-    const simIds = [...new Set(pq.map((p) => p.simulado_id).filter(Boolean))] as string[]
-    if (simIds.length) {
-      const rows = await fetchAllByIn<any>(simIds, (c) => svc.from('simulado_simulados').select('id, titulo, status, regras, owner_estudante_id, deletado').in('id', c))
-      sims = rows.filter((s) => !s.owner_estudante_id && !s.deletado)
-    }
-  }
-
-  // 3) Contagem de respostas discursivas por simulado (via sessão) → pendentes/corrigidas.
-  const cont = new Map<string, { pend: number; corr: number }>()
-  if (sims.length) {
-    const resp = await fetchAll<any>(() => svc.from('simulado_respostas_discursivas').select('id, sessao_id, status').eq('tenant_id', tenantId).order('id'))
-    const sessIds = [...new Set(resp.map((r) => r.sessao_id).filter(Boolean))] as string[]
-    const sess = sessIds.length ? await fetchAllByIn<any>(sessIds, (c) => svc.from('simulado_sessoes_prova').select('id, simulado_id, is_teste, deletado').in('id', c)) : []
-    const sessToSim = new Map(sess.filter((s) => !s.is_teste && !s.deletado).map((s) => [s.id, s.simulado_id]))
-    for (const r of resp) {
-      const sim = sessToSim.get(r.sessao_id)
-      if (!sim) continue
-      const c = cont.get(sim) ?? { pend: 0, corr: 0 }
-      if (r.status === 'corrigida') c.corr++
-      else c.pend++
-      cont.set(sim, c)
-    }
-  }
-
-  // Identidade visual (capa/cor do banco de origem) — mesmos cards "pôster" do resto do app.
-  const visual = await resolverVisualSimulados(svc, sims)
-
-  const cards = sims
-    .map((s) => ({ id: s.id, titulo: s.titulo as string, status: s.status as string, pend: cont.get(s.id)?.pend ?? 0, corr: cont.get(s.id)?.corr ?? 0, vis: visual.get(s.id) ?? null }))
-    .sort((a, b) => b.pend - a.pend || a.titulo.localeCompare(b.titulo, 'pt-BR'))
+  // EGRESS: a fila lê TODAS as respostas discursivas do tenant só para contar pendentes/corrigidas por
+  // simulado. Computação memoizada por tenant (2 min) — a fila não precisa ser real-time (a correção em
+  // si é ao vivo em /correcao/sessao/[id]). Degrada sozinho sem Redis.
+  const cards = await remember<{ id: string; titulo: string; status: string; pend: number; corr: number; vis: any }[]>(
+    chaveRelatorio(tenantId, 'correcao', 'cards'), 120, async () => {
+      // 1) Questões discursivas do tenant → 2) simulados OFICIAIS que as usam.
+      const qd = await fetchAll<any>(() => svc.from('simulado_questoes').select('id').eq('tenant_id', tenantId).eq('tipo', 'discursiva').order('id'))
+      const qdIds = qd.map((q) => q.id)
+      let sims: any[] = []
+      if (qdIds.length) {
+        const pq = await fetchAllByIn<any>(qdIds, (c) => svc.from('simulado_prova_questoes').select('simulado_id').in('questao_id', c))
+        const simIds = [...new Set(pq.map((p) => p.simulado_id).filter(Boolean))] as string[]
+        if (simIds.length) {
+          const rows = await fetchAllByIn<any>(simIds, (c) => svc.from('simulado_simulados').select('id, titulo, status, regras, owner_estudante_id, deletado').in('id', c))
+          sims = rows.filter((s) => !s.owner_estudante_id && !s.deletado)
+        }
+      }
+      // 3) Contagem de respostas discursivas por simulado (via sessão) → pendentes/corrigidas.
+      const cont = new Map<string, { pend: number; corr: number }>()
+      if (sims.length) {
+        const resp = await fetchAll<any>(() => svc.from('simulado_respostas_discursivas').select('id, sessao_id, status').eq('tenant_id', tenantId).order('id'))
+        const sessIds = [...new Set(resp.map((r) => r.sessao_id).filter(Boolean))] as string[]
+        const sess = sessIds.length ? await fetchAllByIn<any>(sessIds, (c) => svc.from('simulado_sessoes_prova').select('id, simulado_id, is_teste, deletado').in('id', c)) : []
+        const sessToSim = new Map(sess.filter((s) => !s.is_teste && !s.deletado).map((s) => [s.id, s.simulado_id]))
+        for (const r of resp) {
+          const sim = sessToSim.get(r.sessao_id)
+          if (!sim) continue
+          const c = cont.get(sim) ?? { pend: 0, corr: 0 }
+          if (r.status === 'corrigida') c.corr++
+          else c.pend++
+          cont.set(sim, c)
+        }
+      }
+      // Identidade visual (capa/cor do banco de origem) — mesmos cards "pôster" do resto do app.
+      const visual = await resolverVisualSimulados(svc, sims)
+      return sims
+        .map((s) => ({ id: s.id, titulo: s.titulo as string, status: s.status as string, pend: cont.get(s.id)?.pend ?? 0, corr: cont.get(s.id)?.corr ?? 0, vis: visual.get(s.id) ?? null }))
+        .sort((a, b) => b.pend - a.pend || a.titulo.localeCompare(b.titulo, 'pt-BR'))
+    })
   const totalPend = cards.reduce((n, c) => n + c.pend, 0)
 
   return (

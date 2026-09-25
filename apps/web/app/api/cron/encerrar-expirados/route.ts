@@ -61,6 +61,18 @@ async function processar() {
   const simsJanela = (sims ?? []) as any[]
   const janelaSet = new Set(simsJanela.map((s) => s.id as string))
 
+  // EGRESS/early-exit: em ticks ociosos (fora de janela, sem ninguém provando) não há nada a fazer —
+  // um COUNT barato (head) evita o fetchAll de todas as sessões. Só segue se há sessão em andamento
+  // OU simulado de janela vencido a encerrar.
+  const { count: emAndamentoCount } = await svc
+    .from('simulado_sessoes_prova')
+    .select('id', { count: 'exact', head: true })
+    .eq('status', 'em_andamento')
+    .eq('deletado', false)
+  if (!simsJanela.length && !emAndamentoCount) {
+    return { ok: true, simuladosEncerrados: 0, sessoesEncerradas: 0, simuladosAfetados: 0, early: true }
+  }
+
   // TODAS as sessões em andamento numa ÚNICA leitura PAGINADA — elimina o N+1 (antes: 1 query por
   // simulado de janela fixa) e o teto de 5000 (o cenário-alvo é 1000+ simultâneos em vários simulados).
   const emAndamento = await fetchAll<SessaoMin>(() =>

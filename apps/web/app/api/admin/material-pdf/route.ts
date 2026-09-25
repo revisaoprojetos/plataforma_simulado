@@ -55,8 +55,8 @@ export async function POST(req: NextRequest) {
     const hash = createHash('sha1').update(buf).digest('hex').slice(0, 10)
     const path = `materiais/${access.tenantId}/draft-${chave}-${hash}.pdf`
     try { await svc.storage.createBucket('pdfs', { public: true }) } catch { /* já existe */ }
-    let up = await svc.storage.from('pdfs').upload(path, buf, { contentType: 'application/pdf', upsert: true })
-    if (up.error && /bucket.*not.*found/i.test(up.error.message)) { await svc.storage.createBucket('pdfs', { public: true }).catch(() => {}); up = await svc.storage.from('pdfs').upload(path, buf, { contentType: 'application/pdf', upsert: true }) }
+    let up = await svc.storage.from('pdfs').upload(path, buf, { contentType: 'application/pdf', upsert: true, cacheControl: '31536000' })
+    if (up.error && /bucket.*not.*found/i.test(up.error.message)) { await svc.storage.createBucket('pdfs', { public: true }).catch(() => {}); up = await svc.storage.from('pdfs').upload(path, buf, { contentType: 'application/pdf', upsert: true, cacheControl: '31536000' }) }
     if (up.error) return NextResponse.json({ ok: false, error: up.error.message }, { status: 500 })
     const url = svc.storage.from('pdfs').getPublicUrl(path).data.publicUrl as string
     const nome = ((file.name || 'PDF').replace(/\.pdf$/i, '').trim()) || 'PDF'
@@ -69,8 +69,8 @@ export async function POST(req: NextRequest) {
     const hash = createHash('sha1').update(buf).digest('hex').slice(0, 10)
     const path = `materiais/${access.tenantId}/entrega-${bancoId}-${chave}-${hash}.pdf`
     try { await svc.storage.createBucket('pdfs', { public: true }) } catch { /* já existe */ }
-    let up = await svc.storage.from('pdfs').upload(path, buf, { contentType: 'application/pdf', upsert: true })
-    if (up.error && /bucket.*not.*found/i.test(up.error.message)) { await svc.storage.createBucket('pdfs', { public: true }).catch(() => {}); up = await svc.storage.from('pdfs').upload(path, buf, { contentType: 'application/pdf', upsert: true }) }
+    let up = await svc.storage.from('pdfs').upload(path, buf, { contentType: 'application/pdf', upsert: true, cacheControl: '31536000' })
+    if (up.error && /bucket.*not.*found/i.test(up.error.message)) { await svc.storage.createBucket('pdfs', { public: true }).catch(() => {}); up = await svc.storage.from('pdfs').upload(path, buf, { contentType: 'application/pdf', upsert: true, cacheControl: '31536000' }) }
     if (up.error) return NextResponse.json({ ok: false, error: up.error.message }, { status: 500 })
     const url = svc.storage.from('pdfs').getPublicUrl(path).data.publicUrl as string
     const nome = ((file.name || 'PDF').replace(/\.pdf$/i, '').trim()) || 'PDF'
@@ -91,10 +91,10 @@ export async function POST(req: NextRequest) {
   const suf = slot === 'enunciado' ? 'enunciado-' : ''
   const path = `materiais/${access.tenantId}/${cadernoId}-${suf}${hash}.pdf`
   try { await svc.storage.createBucket('pdfs', { public: true }) } catch { /* já existe */ }
-  let { error: upErr } = await svc.storage.from('pdfs').upload(path, buf, { contentType: 'application/pdf', upsert: true })
+  let { error: upErr } = await svc.storage.from('pdfs').upload(path, buf, { contentType: 'application/pdf', upsert: true, cacheControl: '31536000' })
   if (upErr && /bucket.*not.*found/i.test(upErr.message)) {
     await svc.storage.createBucket('pdfs', { public: true }).catch(() => {})
-    ;({ error: upErr } = await svc.storage.from('pdfs').upload(path, buf, { contentType: 'application/pdf', upsert: true }))
+    ;({ error: upErr } = await svc.storage.from('pdfs').upload(path, buf, { contentType: 'application/pdf', upsert: true, cacheControl: '31536000' }))
   }
   if (upErr) return NextResponse.json({ ok: false, error: upErr.message }, { status: 500 })
   const url = svc.storage.from('pdfs').getPublicUrl(path).data.publicUrl as string

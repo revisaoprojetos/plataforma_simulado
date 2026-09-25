@@ -209,7 +209,7 @@ export function EmbedLoginForm({ token, metodo, simuladoTitulo, branding, prova,
       }
     }
     tick()
-    const t = setInterval(tick, 1000)
+    const t = setInterval(tick, 1000) // egress-ok: relógio local (countdown), não é rede
     return () => clearInterval(t)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aguardando, isLoading])

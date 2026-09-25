@@ -18,8 +18,17 @@ const URL = process.env.DATABASE_URL_REPLICA || process.env.DATABASE_URL
 
 let pool: Pool | null = null
 
+// Observabilidade (O5): loga UMA vez se o SQL agregado está ATIVO ou caiu no PostgREST — assim dá pra
+// saber em produção, pelo log, se o `DATABASE_URL` (o gate real) está setado, sem depender do painel.
+let avisouStatus = false
 export function sqlDisponivel(): boolean {
-  return !DESLIGADO && !!URL
+  const ok = !DESLIGADO && !!URL
+  if (!avisouStatus) {
+    avisouStatus = true
+    if (ok) console.info('[sql] agregado ATIVO (DATABASE_URL presente) — relatórios via SQL direto.')
+    else console.warn(`[sql] agregado INATIVO → relatórios via PostgREST (EGRESS ALTO). Motivo: ${DESLIGADO ? 'REPORT_SQL=off' : 'DATABASE_URL ausente'}.`)
+  }
+  return ok
 }
 
 function getPool(): Pool | null {

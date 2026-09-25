@@ -14,13 +14,17 @@ function fmtFim(iso: string): string {
 /** Tela cheia de manutenção do portal; volta sozinha quando a manutenção termina. */
 export function TelaManutencao({ titulo, mensagem, fim }: { titulo: string; mensagem: string; fim: string | null }) {
   useEffect(() => {
-    const id = setInterval(async () => {
+    const checar = async () => {
       try {
         const r = await fetch('/api/sistema/manutencao', { cache: 'no-store' })
         if (r.ok) { const j = await r.json(); if (!j.agora) window.location.reload() }
       } catch { /* tenta de novo no próximo ciclo */ }
-    }, 30000)
-    return () => clearInterval(id)
+    }
+    // EGRESS: 30s, só com a aba visível (pausa em document.hidden); ao voltar, checa na hora.
+    const id = setInterval(() => { if (!document.hidden) void checar() }, 30000)
+    const onVis = () => { if (!document.hidden) void checar() }
+    document.addEventListener('visibilitychange', onVis)
+    return () => { clearInterval(id); document.removeEventListener('visibilitychange', onVis) }
   }, [])
 
   const fimLabel = fim ? fmtFim(fim) : null

@@ -29,7 +29,9 @@ async function getDados(tenantId: string) {
     svc.from('simulado_simulados').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false).eq('status', 'publicado').is('owner_estudante_id', null),
     svc.from('simulado_estudantes').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false),
     svc.from('simulado_sessoes_prova').select('*', { count: 'exact', head: true }).match(t).eq('deletado', false).eq('is_teste', false).gte('iniciado_em', hojeIso),
-    montarDashboardSerie(svc, tenantId, 'semana'),
+    // EGRESS: a série do dashboard lê todas as sessões dos últimos 7 dias por abertura. Memoizada no
+    // Redis (10 min) — no cache-hit o dashboard não toca no banco. Degrada sozinho sem Redis.
+    remember(chaveRelatorio(tenantId, 'dashboard', 'serie', 'semana'), 600, () => montarDashboardSerie(svc, tenantId, 'semana')),
     svc.from('simulado_simulados').select('id, titulo, status, modo_aplicacao, created_at').match(t).eq('deletado', false).is('owner_estudante_id', null).order('created_at', { ascending: false }).limit(5),
     // Nota média = agregação sobre TODAS as notas finalizadas. Como a agregação do
     // PostgREST está desabilitada e não temos RPC, o cálculo ainda percorre as notas

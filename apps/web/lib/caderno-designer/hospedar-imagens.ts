@@ -27,7 +27,7 @@ export async function hospedarImagensDoc(doc: any, svc: any): Promise<void> {
       // Só sobe se ainda não existe (evita reenviar o arquivo grande a cada geração).
       const { data: lista } = await svc.storage.from(BUCKET_IMAGENS).list('assets', { search: nome, limit: 1 })
       if (!lista?.some((f: any) => f.name === nome)) {
-        await svc.storage.from(BUCKET_IMAGENS).upload(path, buf, { contentType: `image/${tipo}`, upsert: true })
+        await svc.storage.from(BUCKET_IMAGENS).upload(path, buf, { contentType: `image/${tipo}`, upsert: true, cacheControl: '31536000' })
       }
     } catch { /* se falhar o upload/list, mantém base64 (não quebra o PDF) */ return null }
     const url = svc.storage.from(BUCKET_IMAGENS).getPublicUrl(path).data.publicUrl as string

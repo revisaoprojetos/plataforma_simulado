@@ -181,7 +181,7 @@ export async function pdfRelatorioProcessor(job: Job) {
   const fileName = `relatorios/${sessao_id}_${createHash('sha256').update(sessao_id).digest('hex').slice(0, 8)}.pdf`
   const { error: uploadErr } = await supabase.storage
     .from('pdfs')
-    .upload(fileName, pdfBuffer, { contentType: 'application/pdf', upsert: true })
+    .upload(fileName, pdfBuffer, { contentType: 'application/pdf', upsert: true, cacheControl: '86400' })
 
   if (uploadErr) {
     console.error('[pdf-relatorio] Upload falhou:', uploadErr.message)

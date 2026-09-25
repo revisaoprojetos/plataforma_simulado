@@ -4,6 +4,7 @@ import { createHash } from 'crypto'
 import { revalidatePath } from 'next/cache'
 import { createAdminClient, createServiceClient } from '@/lib/supabase/server'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { carregarLote } from '@/lib/paginacao'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { matricularEmSimuladosDoBanco } from '@/lib/simulado/matricular-banco'
@@ -31,6 +32,37 @@ export async function contarEstudantesUnicosGrupos(grupoIds: string[]): Promise<
   const rows = await fetchAllByIn<{ estudante_id: string }>(ids, (chunk) =>
     svc.from('simulado_grupo_membros').select('estudante_id').eq('tenant_id', g.tenantId).in('grupo_id', chunk).order('estudante_id'))
   return { ok: true, distintos: new Set(rows.map((r) => r.estudante_id).filter(Boolean)).size }
+}
+
+/**
+ * Lista estudantes da plataforma PAGINADO + busca NO BANCO (para o seletor "adicionar estudantes").
+ * Antes o page.tsx trazia TODOS (~19k) para o cliente filtrar — over-fetch grande. Agora lê só a
+ * página, com busca por nome/email no banco, e marca `jaVinculado` só dos ids da página.
+ */
+export async function buscarEstudantesLote(
+  bancoId: string,
+  opts: { busca?: string; offset?: number; limit?: number } = {},
+): Promise<{ ok: boolean; rows?: any[]; total?: number; temMais?: boolean; error?: string }> {
+  const g = await guard()
+  if (!g.ok) return g
+  const svc = createAdminClient()
+  const limit = Math.min(Math.max(opts.limit ?? 20, 1), 50)
+  const busca = (opts.busca ?? '').trim().replace(/[%,]/g, ' ')
+  const { rows, total, temMais } = await carregarLote<any>(svc, 'simulado_estudantes', {
+    cols: 'id, nome, email, telefone, classificacao',
+    tenantId: g.tenantId,
+    offset: opts.offset ?? 0,
+    limit,
+    order: { coluna: 'nome', asc: true }, // helper adiciona `id` como desempate (paginação estável)
+    filtros: (q) => (busca ? q.or(`nome.ilike.%${busca}%,email.ilike.%${busca}%`) : q),
+  })
+  const ids = rows.map((r) => r.id)
+  const vinc = ids.length
+    ? await fetchAllByIn<{ estudante_id: string }>(ids, (c) =>
+        svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', bancoId).eq('tenant_id', g.tenantId).in('estudante_id', c).order('estudante_id'))
+    : []
+  const vset = new Set(vinc.map((v) => v.estudante_id))
+  return { ok: true, rows: rows.map((r) => ({ ...r, jaVinculado: vset.has(r.id) })), total, temMais }
 }
 
 /** Vincula estudantes já existentes ao banco (ignora os que já estão). */

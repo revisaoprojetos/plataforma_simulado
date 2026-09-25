@@ -24,10 +24,10 @@ export async function POST(req: NextRequest) {
   const ext = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '') || 'png'
   const path = `${tenantId}/trilha-simbolos/${Date.now()}.${ext}`
   const bucket = 'imagens'
-  let up = await svc.storage.from(bucket).upload(path, buf, { contentType: file.type, upsert: true })
+  let up = await svc.storage.from(bucket).upload(path, buf, { contentType: file.type, upsert: true, cacheControl: '31536000' })
   if (up.error && /bucket.*not.*found/i.test(up.error.message)) {
     await svc.storage.createBucket(bucket, { public: true }).catch(() => {})
-    up = await svc.storage.from(bucket).upload(path, buf, { contentType: file.type, upsert: true })
+    up = await svc.storage.from(bucket).upload(path, buf, { contentType: file.type, upsert: true, cacheControl: '31536000' })
   }
   if (up.error) return NextResponse.json({ error: up.error.message }, { status: 500 })
   const { data } = svc.storage.from(bucket).getPublicUrl(path)

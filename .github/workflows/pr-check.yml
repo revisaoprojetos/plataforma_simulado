@@ -38,6 +38,11 @@ jobs:
       - name: Typecheck do resultado mesclado (código)
         run: pnpm --filter web exec tsc --noEmit
 
+      # Guardrail de EGRESS: falha só se a dívida AUMENTAR vs o baseline (ratchet). Não força limpar o
+      # legado; impede NOVOS select('*'), polling de rede sem pausa em hidden, cron <60s, .range gigante.
+      - name: Guardrail de egress (ratchet)
+        run: pnpm --filter web run lint:egress:ratchet
+
       - name: Build do resultado mesclado (montagem)
         run: pnpm --filter web build
         env:

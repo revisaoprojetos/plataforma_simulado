@@ -7,6 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
+    "lint:egress": "node scripts/check-egress-guardrails.mjs",
+    "lint:egress:ratchet": "node scripts/check-egress-guardrails.mjs --ratchet",
     "clean": "rm -rf .next",
     "test": "vitest run"
   },

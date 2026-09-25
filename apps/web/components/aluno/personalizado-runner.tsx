@@ -126,7 +126,7 @@ export function PersonalizadoRunner({ sessao, onSair }: { sessao: SessaoPessoal;
       if (s <= 0 && !finalizarRef.current) { toast.info('Tempo esgotado — finalizando.'); void finalizar() }
     }
     tick()
-    const t = setInterval(tick, 1000)
+    const t = setInterval(tick, 1000) // egress-ok: relógio local (countdown), não é rede
     return () => clearInterval(t)
   }, [modo, sessao.tempoLimiteMin, sessao.iniciadoEm, finalizar])
 

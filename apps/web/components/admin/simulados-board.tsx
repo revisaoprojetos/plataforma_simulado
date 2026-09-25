@@ -551,7 +551,8 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
     let es: EventSource | null = null
     let poll: ReturnType<typeof setInterval> | null = null
     const tick = async () => { try { const r = await onlinePorSimulado(ids); if (vivo) setOnline(r) } catch { /* silencioso */ } }
-    const iniciarPolling = () => { if (!poll) { void tick(); poll = setInterval(tick, 12_000) } }
+    // EGRESS: o polling de fallback só busca com a aba visível (pausa em document.hidden).
+    const iniciarPolling = () => { if (!poll) { void tick(); poll = setInterval(() => { if (!document.hidden) void tick() }, 12_000) } }
     try {
       es = new EventSource(`/api/stream/online?ids=${encodeURIComponent(ids.join(','))}`)
       es.onmessage = (ev) => { try { const r = JSON.parse(ev.data) as Record<string, number>; if (vivo) setOnline(r) } catch { /* frame inválido */ } }

@@ -34,13 +34,33 @@ export async function POST(req: NextRequest) {
 
   // Tenants com simulado publicado (onde relatórios são consultados de fato) + os simulados
   // publicados mais recentes de cada um (para pré-computar relatório/ranking dos que a demo abre).
-  const { data: sims } = await svc
+  const { data: simsRaw } = await svc
     .from('simulado_simulados')
-    .select('id, tenant_id, created_at')
+    .select('id, tenant_id, created_at, modo_aplicacao, data_inicio')
     .eq('status', 'publicado')
     .eq('deletado', false)
     .order('created_at', { ascending: false })
-  const tenants = [...new Set((sims ?? []).map((s: any) => s.tenant_id).filter(Boolean))] as string[]
+
+  // EGRESS/early-exit: aquecer só o que IMPORTA — simulados com ATIVIDADE RECENTE (sessão iniciada/
+  // finalizada nos últimos ~90min) OU janela_fixa ABRINDO em até 2h (pré-warm da manhã). Fora disso,
+  // recomputar relatório pesado a cada hora só gasta egress (o cache serve on-demand quando alguém abre).
+  const desde = new Date(Date.now() - 90 * 60_000).toISOString()
+  const ate = new Date(Date.now() + 2 * 60 * 60_000).toISOString()
+  const { data: ativRows } = await svc
+    .from('simulado_sessoes_prova')
+    .select('simulado_id')
+    .eq('deletado', false)
+    .or(`iniciado_em.gte.${desde},finalizado_em.gte.${desde}`)
+  const ativos = new Set((ativRows ?? []).map((r: any) => r.simulado_id as string))
+
+  const sims = (simsRaw ?? []).filter((s: any) =>
+    ativos.has(s.id) ||
+    (s.modo_aplicacao === 'janela_fixa' && s.data_inicio && s.data_inicio > agoraIso && s.data_inicio <= ate))
+
+  if (!sims.length) {
+    return NextResponse.json({ ok: true, pulado: true, motivo: 'sem atividade recente nem janela abrindo', tenants: 0 })
+  }
+  const tenants = [...new Set(sims.map((s: any) => s.tenant_id).filter(Boolean))] as string[]
 
   // Já vêm ordenados por created_at desc; pega só os N primeiros por tenant.
   const simsPorTenant = new Map<string, string[]>()

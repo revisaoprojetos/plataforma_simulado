@@ -17,6 +17,9 @@ export interface UploadParams {
   publico?: boolean
   /** Sobrescrever se já existir (default false). */
   upsert?: boolean
+  /** Cache-Control (segundos) do objeto no Storage. Default: caminho imutável (sem upsert) = 1 ano;
+   *  mutável (upsert) = 1h. Cache longo evita re-baixar o mesmo arquivo do Supabase (egress). */
+  cacheControl?: string
 }
 
 export interface UploadResult {

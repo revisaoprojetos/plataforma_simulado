@@ -68,7 +68,7 @@ function useTimer(iniciado_em: string, tempo_limite_min: number | null) {
     }
 
     setSegundosRestantes(calcRestante())
-    const interval = setInterval(() => {
+    const interval = setInterval(() => { // egress-ok: relógio local (countdown), não é rede
       const restante = calcRestante()
       setSegundosRestantes(restante)
       if (restante === 0) clearInterval(interval)

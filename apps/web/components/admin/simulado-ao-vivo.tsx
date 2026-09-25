@@ -29,7 +29,8 @@ export function AoVivoPainel({ simuladoId }: { simuladoId: string }) {
   useEffect(() => {
     carregar() // snapshot imediato
     let es: EventSource | null = null
-    const iniciarPolling = () => { if (!timer.current) timer.current = setInterval(() => carregar(true), INTERVALO_MS) }
+    // EGRESS: o polling de fallback só busca com a aba visível (pausa em document.hidden).
+    const iniciarPolling = () => { if (!timer.current) timer.current = setInterval(() => { if (!document.hidden) carregar(true) }, INTERVALO_MS) }
 
     // Realtime via SSE (Fase 2). onmessage traz o resumo atualizado; em erro (proxy sem SSE,
     // Redis fora) cai no polling de 10s — a UI continua funcionando.

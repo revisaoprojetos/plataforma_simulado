@@ -9,9 +9,19 @@
  * `build` deve devolver um NOVO query builder a cada chamada (a query é
  * reexecutada por página), já com filtros e um `.order()` estável aplicado.
  */
+// Observabilidade de EGRESS: avisa no log quando uma leitura varre MUITAS linhas (o que faltou no
+// incidente — leituras gigantes passavam despercebidas). Limiar via EGRESS_WARN_ROWS (default 20000).
+const EGRESS_WARN_ROWS = Number(process.env.EGRESS_WARN_ROWS ?? 20000)
+function avisarSeGrande(qtd: number, rotulo?: string) {
+  if (EGRESS_WARN_ROWS > 0 && qtd >= EGRESS_WARN_ROWS) {
+    console.warn(`[egress] leitura grande: ${qtd} linhas${rotulo ? ` em "${rotulo}"` : ''} — considere agregar no banco/projetar colunas.`)
+  }
+}
+
 export async function fetchAll<T = any>(
   build: () => { range: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }> },
   pageSize = 1000,
+  rotulo?: string,
 ): Promise<T[]> {
   const all: T[] = []
   for (let from = 0; ; from += pageSize) {
@@ -21,6 +31,7 @@ export async function fetchAll<T = any>(
     all.push(...data)
     if (data.length < pageSize) break
   }
+  avisarSeGrande(all.length, rotulo)
   return all
 }
 
@@ -36,7 +47,7 @@ export async function fetchAll<T = any>(
 export async function fetchAllByIn<T = any>(
   ids: string[],
   build: (idsChunk: string[]) => { range: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }> },
-  { chunk = 80, pageSize = 1000 }: { chunk?: number; pageSize?: number } = {},
+  { chunk = 80, pageSize = 1000, rotulo }: { chunk?: number; pageSize?: number; rotulo?: string } = {},
 ): Promise<T[]> {
   const all: T[] = []
   for (let i = 0; i < ids.length; i += chunk) {
@@ -49,5 +60,6 @@ export async function fetchAllByIn<T = any>(
       if (data.length < pageSize) break
     }
   }
+  avisarSeGrande(all.length, rotulo)
   return all
 }

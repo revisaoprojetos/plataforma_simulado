@@ -51,11 +51,14 @@ export function SimuladoProgresso({ simuladoId }: { simuladoId: string }) {
     else { setDados(r.estudantes ?? []); setTotal(r.total ?? 0); setErro(null); setAtualizadoEm(new Date().toLocaleTimeString('pt-BR')) }
     setCarregando(false)
   }
-  // Ao vivo: carrega ao abrir e atualiza sozinho a cada 15s.
+  // Ao vivo: carrega ao abrir e atualiza sozinho a cada 30s — SÓ com a aba visível (economia de egress;
+  // esta tabela lê todos os estudantes do simulado). Ao voltar à aba, recarrega na hora.
   useEffect(() => {
     carregar()
-    const t = setInterval(() => carregar(true), 15_000)
-    return () => clearInterval(t)
+    const t = setInterval(() => { if (!document.hidden) carregar(true) }, 30_000)
+    const onVis = () => { if (!document.hidden) carregar(true) }
+    document.addEventListener('visibilitychange', onVis)
+    return () => { clearInterval(t); document.removeEventListener('visibilitychange', onVis) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [simuladoId])
 

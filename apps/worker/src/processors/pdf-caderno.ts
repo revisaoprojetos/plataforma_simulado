@@ -37,7 +37,7 @@ export async function pdfCadernoProcessor(job: Job<PdfCadernoData>) {
     const path = `${tenantId}/${jobId}.pdf`
     const { error: upErr } = await supabase.storage
       .from('pdfs')
-      .upload(path, pdf, { contentType: 'application/pdf', upsert: true })
+      .upload(path, pdf, { contentType: 'application/pdf', upsert: true, cacheControl: '31536000' })
     if (upErr) throw new Error(`Upload falhou: ${upErr.message}`)
 
     // 3. URL pública
