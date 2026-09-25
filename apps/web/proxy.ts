@@ -83,17 +83,20 @@ export async function proxy(request: NextRequest) {
     return supabaseResponse
   }
 
-  // Rotas do aluno/login PODEM ser embedadas em plataformas externas (ex.: Curseduca).
-  // O painel /admin continua protegido contra clickjacking (SAMEORIGIN).
-  // ⚠️ frame-ancestors * = qualquer site pode embedar. Para restringir, troque por
-  //    "frame-ancestors 'self' https://revisaopge.curseduca.pro https://*.curseduca.pro".
-  const framavel = ['/login', '/aluno', '/simulado', '/auth'].some(p => pathname === p || pathname.startsWith(p + '/'))
-  if (framavel) {
-    supabaseResponse.headers.delete('X-Frame-Options')
-    supabaseResponse.headers.set('Content-Security-Policy', 'frame-ancestors *')
-  } else {
+  // Framing (embed na Curseduca): default SEGURO = framável. SÓ o painel admin/super é protegido
+  // contra clickjacking (SAMEORIGIN). Antes era o inverso (allowlist de rotas framáveis + "todo o
+  // resto bloqueado"), o que quebrava o embed sempre que o aluno caía numa rota FORA da lista —
+  // inclusive a raiz "/" (que redireciona p/ /login) e qualquer rota pública nova. Como o aluno
+  // acessa QUASE OBRIGATORIAMENTE pela Curseduca, o embed não pode depender de uma allowlist frágil.
+  // ⚠️ frame-ancestors * = qualquer site pode embedar; para restringir, troque por
+  //    "frame-ancestors 'self' https://*.curseduca.pro https://membros.revisaoensinojuridico.com.br".
+  const protegido = pathname.startsWith('/admin') || pathname.startsWith('/super')
+  if (protegido) {
     supabaseResponse.headers.set('X-Frame-Options', 'SAMEORIGIN')
     supabaseResponse.headers.set('Content-Security-Policy', "frame-ancestors 'self'")
+  } else {
+    supabaseResponse.headers.delete('X-Frame-Options')
+    supabaseResponse.headers.set('Content-Security-Policy', 'frame-ancestors *')
   }
 
   if (isAdminPath && !user) {
