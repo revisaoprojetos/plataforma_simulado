@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { existsSync } from 'node:fs'
 import { createAdminClient } from '@/lib/supabase/server'
 import { registrarRelatorioEvento } from '@/lib/relatorio-eventos'
+import { adquirirSlotPdf, liberarSlotPdf } from '@/lib/pdf/chromium-guard'
 import puppeteer from 'puppeteer-core'
 
 export const runtime = 'nodejs'
@@ -65,6 +66,12 @@ export async function GET(request: NextRequest) {
   const qs = new URLSearchParams(comGabarito ? { grupo, sessao, embed: '1' } : { grupo, sessao, semgab: '1', embed: '1' })
   const url = `${WEB_INTERNAL}/imprimir/caderno-teste/${cadernoId}?${qs.toString()}`
 
+  // Limita o Chromium concorrente por réplica (protege a CPU do web contra "PDF storm" que
+  // congelaria o portal de todos). Se não conseguir vaga a tempo, degrada com 503 (retentável).
+  if (!(await adquirirSlotPdf())) {
+    return NextResponse.json({ message: 'Servidor ocupado gerando outros PDFs. Tente novamente em instantes.' }, { status: 503 })
+  }
+
   let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null
   try {
     // --disable-dev-shm-usage é ESSENCIAL em container: o /dev/shm padrão do Docker é minúsculo (64MB)
@@ -116,5 +123,7 @@ export async function GET(request: NextRequest) {
   } catch (e) {
     try { await browser?.close() } catch { /* noop */ }
     return NextResponse.json({ message: 'Falha ao gerar o PDF.', detalhe: (e as Error).message }, { status: 500 })
+  } finally {
+    liberarSlotPdf()
   }
 }

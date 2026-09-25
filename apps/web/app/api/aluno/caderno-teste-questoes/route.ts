@@ -3,6 +3,7 @@ import { existsSync } from 'node:fs'
 import { createAdminClient } from '@/lib/supabase/server'
 import { assinarRenderToken } from '@/lib/pdf/render-token'
 import { carregarEntregaBanco } from '@/lib/caderno-teste/entrega-aluno'
+import { adquirirSlotPdf, liberarSlotPdf } from '@/lib/pdf/chromium-guard'
 import puppeteer from 'puppeteer-core'
 
 export const runtime = 'nodejs'
@@ -81,6 +82,11 @@ export async function GET(request: NextRequest) {
   const url = `${WEB_INTERNAL}/imprimir/caderno-teste/${en.cadernoId}?${qs.toString()}`
   const nomeArquivo = `Caderno de questoes - ${((sim as any).titulo || 'simulado')}`.replace(/[\\/:*?"<>|]+/g, '').slice(0, 120)
 
+  // Limita o Chromium concorrente por réplica (protege a CPU do web contra "PDF storm").
+  if (!(await adquirirSlotPdf())) {
+    return NextResponse.json({ message: 'Servidor ocupado gerando outros PDFs. Tente novamente em instantes.' }, { status: 503 })
+  }
+
   let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null
   try {
     // --disable-dev-shm-usage é ESSENCIAL em container: o /dev/shm padrão do Docker é minúsculo (64MB)
@@ -129,5 +135,7 @@ export async function GET(request: NextRequest) {
   } catch (e) {
     try { await browser?.close() } catch { /* noop */ }
     return NextResponse.json({ message: 'Falha ao gerar o PDF.', detalhe: (e as Error).message }, { status: 500 })
+  } finally {
+    liberarSlotPdf()
   }
 }
