@@ -118,10 +118,25 @@ export async function executarImport(
     const total = membros.length
 
     // 2) Quem já existe no sistema (por matrícula Curseduca, e-mail ou CPF).
-    // PAGINA com fetchAll: com >1000 estudantes o PostgREST cortaria em ~1000 e alunos além
-    // disso não seriam reconhecidos → o import criaria DUPLICATAS de quem já existe.
-    const existentes = await fetchAll<any>(() =>
-      svc.from('simulado_estudantes').select('id, email, emails_secundarios, cpf, telefone, classificacao, matricula_externa').eq('tenant_id', g.tenantId).eq('deletado', false).order('id', { ascending: true }))
+    // OTIMIZAÇÃO DE EGRESS (protege o banco): ANTES varria TODOS os ~18k estudantes a CADA import —
+    // e no agrupamento isso roda POR CANAL (até 8/tick, a cada ~60s) = ~144k linhas/min lidas → foi o
+    // que "acabou com o banco". AGORA busca SÓ os estudantes que casam com os membros DESTE canal
+    // (matrícula/e-mail/CPF/e-mail-secundário): escala com o tamanho do CANAL, não da tabela (não piora
+    // conforme a base cresce). Fresh a cada chamada (sem cache) → enxerga quem um canal anterior criou
+    // no MESMO tick, então continua deduplicando corretamente (não recria quem já existe).
+    const COLS_EST = 'id, email, emails_secundarios, cpf, telefone, classificacao, matricula_externa'
+    const idsMembros = [...new Set(membros.map((m) => String(m.id)))]
+    const emailsMembros = [...new Set(membros.map((m) => (m.email ?? '').trim().toLowerCase()).filter(Boolean))]
+    const cpfsMembros = [...new Set(membros.map((m) => String(m.cpf ?? '').replace(/\D/g, '')).filter((x) => x.length === 11))]
+    const achadosPorId = new Map<string, any>()
+    const merge = (rows: any[] | null) => { for (const e of rows ?? []) achadosPorId.set((e as any).id, e) }
+    // matrícula_externa = id da Curseduca é o match PRINCIPAL (todo membro já sincronizado tem).
+    if (idsMembros.length) merge(await fetchAllByIn<any>(idsMembros, (ch) => svc.from('simulado_estudantes').select(COLS_EST).eq('tenant_id', g.tenantId).eq('deletado', false).in('matricula_externa', ch).order('id', { ascending: true })))
+    // dedup cross-provider (Guru/manual): casa por e-mail principal, CPF ou e-mail SECUNDÁRIO (overlap do array).
+    if (emailsMembros.length) merge(await fetchAllByIn<any>(emailsMembros, (ch) => svc.from('simulado_estudantes').select(COLS_EST).eq('tenant_id', g.tenantId).eq('deletado', false).in('email', ch).order('id', { ascending: true })))
+    if (cpfsMembros.length) merge(await fetchAllByIn<any>(cpfsMembros, (ch) => svc.from('simulado_estudantes').select(COLS_EST).eq('tenant_id', g.tenantId).eq('deletado', false).in('cpf', ch).order('id', { ascending: true })))
+    if (emailsMembros.length) merge(await fetchAllByIn<any>(emailsMembros, (ch) => svc.from('simulado_estudantes').select(COLS_EST).eq('tenant_id', g.tenantId).eq('deletado', false).overlaps('emails_secundarios', ch).order('id', { ascending: true })))
+    const existentes = [...achadosPorId.values()]
     const porEmail = new Map<string, string>(), porCpf = new Map<string, string>(), porExt = new Map<string, string>()
     const recPorId = new Map<string, any>()
     for (const e of existentes ?? []) {
