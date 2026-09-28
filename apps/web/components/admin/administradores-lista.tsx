@@ -231,8 +231,10 @@ export function AdministradoresLista({ membros, cargos, tenantId, super: ehSuper
                     <span className="truncate">{m.nome || '—'}</span>
                     {m.ehVoce && <span className="rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">você</span>}
                     {!m.ativo && <span className="rounded-full border border-amber-500/40 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-600 dark:text-amber-400">inativo</span>}
-                    {/* Etiquetas: plataformas (empresas) deste admin */}
-                    {ehSuper && (m.plataformas ?? []).map((p) => (
+                    {/* Etiquetas: plataformas (empresas) deste admin — SÓ quando ele tem acesso a
+                        MAIS DE UMA plataforma (multi-tenant). Com 1 só de acesso, não mostra nada.
+                        Conta SUPER (acesso global a tudo) é excluída — o badge seria ruído. */}
+                    {ehSuper && m.cargo !== 'super_admin' && (m.plataformas?.length ?? 0) > 1 && (m.plataformas ?? []).map((p) => (
                       <span key={p.id} title={p.nome} className={cn('max-w-[140px] truncate rounded-full px-1.5 py-0.5 text-[10px] font-medium', p.id === tenantId ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground')}>{p.nome}</span>
                     ))}
                   </p>

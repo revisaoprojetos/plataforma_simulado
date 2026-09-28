@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
-import { createServiceClient } from '@/lib/supabase/server'
+import { createServiceClient, createAdminClient } from '@/lib/supabase/server'
 import { AdminSidebar } from '@/components/admin/sidebar'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { SidebarEdgeToggle } from '@/components/ui/sidebar-collapse'
@@ -92,6 +92,18 @@ export default async function AdminLayout({
   // Super-admin GLOBAL (acima das plataformas) — ortogonal ao papel por-tenant.
   const superAdmin = await isSuperAdmin()
 
+  // "Trocar de plataforma" (rodapé da sidebar) só faz sentido p/ super-admin (acessa tudo) ou admin
+  // com acesso a MAIS DE UMA plataforma. Com 1 acesso só, o seletor reentra na MESMA plataforma
+  // ("carrega e volta") — então o botão some. Conta os vínculos ativos (service role: cross-tenant).
+  let podeTrocarPlataforma = superAdmin
+  if (!superAdmin) {
+    const { count } = await createAdminClient()
+      .from('simulado_tenant_acessos')
+      .select('tenant_id', { count: 'exact', head: true })
+      .eq('user_id', user.id).eq('ativo', true)
+    podeTrocarPlataforma = (count ?? 0) > 1
+  }
+
   // Gate de papel (defesa em profundidade): só a EQUIPE entra no /admin. Um usuário
   // autenticado sem papel de staff (ou papel "estudante") é mandado para a área do aluno —
   // impede que qualquer conta logada alcance server actions do admin. As actions também checam.
@@ -164,7 +176,7 @@ export default async function AdminLayout({
       <ImpersonationDockProvider podeAbrir={!!impPerm} isAdmin={access.isAdmin} loading={impLoading}>
       <SidebarProvider>
         <div className="flex h-screen w-full overflow-hidden">
-          <AdminSidebar logo={ti.logo_url ?? null} nome={ti.nome_site ?? tenantNome ?? 'Plataforma'} subtitulo={ti.subtitulo_site ?? null} logoBg={ti.logo_png_bg ?? '#ffffff'} logoEstilo={ti.logo_estilo ?? 'arredondado'} logoFiltro={ti.logo_filtro_sistema ?? ti.logo_filtro ?? 'none'} isSuperAdmin={superAdmin} userName={userName} userEmail={userEmail} loginConfig={resolverLoginConfig(ti.login)} counts={counts} areasBloqueadas={areasBloqueadas} />
+          <AdminSidebar logo={ti.logo_url ?? null} nome={ti.nome_site ?? tenantNome ?? 'Plataforma'} subtitulo={ti.subtitulo_site ?? null} logoBg={ti.logo_png_bg ?? '#ffffff'} logoEstilo={ti.logo_estilo ?? 'arredondado'} logoFiltro={ti.logo_filtro_sistema ?? ti.logo_filtro ?? 'none'} isSuperAdmin={superAdmin} podeTrocarPlataforma={podeTrocarPlataforma} userName={userName} userEmail={userEmail} loginConfig={resolverLoginConfig(ti.login)} counts={counts} areasBloqueadas={areasBloqueadas} />
           <TourProvider>
             <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
               <SidebarEdgeToggle mode="icon" />

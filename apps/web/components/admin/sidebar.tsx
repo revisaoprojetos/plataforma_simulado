@@ -260,7 +260,7 @@ function filtroLogo(f?: string): string | undefined {
   return undefined
 }
 
-export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none', isSuperAdmin = false, userName = 'Administrador', userEmail, loginConfig, counts, areasBloqueadas = [] }: { logo?: string | null; nome?: string; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string; isSuperAdmin?: boolean; userName?: string; userEmail?: string | null; loginConfig?: LoginConfig; counts?: Record<string, number>; areasBloqueadas?: string[] }) {
+export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none', isSuperAdmin = false, podeTrocarPlataforma = true, userName = 'Administrador', userEmail, loginConfig, counts, areasBloqueadas = [] }: { logo?: string | null; nome?: string; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string; isSuperAdmin?: boolean; podeTrocarPlataforma?: boolean; userName?: string; userEmail?: string | null; loginConfig?: LoginConfig; counts?: Record<string, number>; areasBloqueadas?: string[] }) {
   const pathname = usePathname()
   const [saindo, setSaindo] = useState(false)
   const search = useSearchParams()
@@ -460,10 +460,15 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
           <ThemeToggle />
           <FontScaleControl scope={`admin:${userEmail || 'admin'}`} align="start" />
           <AjudaButton />
-          <button type="button" onClick={() => { window.location.href = '/login' }} title="Trocar de plataforma" aria-label="Trocar de plataforma"
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-transparent transition-colors hover:border-[color:var(--primary)] hover:bg-[color:var(--primary)] hover:text-white [&:hover_svg]:!text-white">
-            <Building2 className="h-4 w-4" />
-          </button>
+          {/* "Trocar de plataforma" SÓ aparece p/ quem pode trocar (super-admin OU admin com acesso a
+              >1 plataforma). Com 1 acesso só, trocar levava ao seletor que reentrava na MESMA
+              plataforma ("carrega e volta") — então some. */}
+          {podeTrocarPlataforma && (
+            <button type="button" onClick={() => { window.location.href = '/login' }} title="Trocar de plataforma" aria-label="Trocar de plataforma"
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-transparent transition-colors hover:border-[color:var(--primary)] hover:bg-[color:var(--primary)] hover:text-white [&:hover_svg]:!text-white">
+              <Building2 className="h-4 w-4" />
+            </button>
+          )}
           <button type="button" onClick={async () => { if (!(await confirmarDescartarAlteracoes())) return; setSaindo(true); setTimeout(() => { void logoutAction() }, 1100) }} title="Sair" aria-label="Sair"
             className={cn(btnFooter, 'flex items-center justify-center gap-1.5 group-data-[collapsible=icon]:h-9 group-data-[collapsible=icon]:w-9 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:px-0')}>
             <LogOut className="h-3.5 w-3.5" /> <span className="group-data-[collapsible=icon]:hidden">Sair</span>
