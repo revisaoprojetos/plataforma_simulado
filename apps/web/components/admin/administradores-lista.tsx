@@ -50,26 +50,46 @@ export function AdministradoresLista({ membros, cargos, tenantId, super: ehSuper
     verSenhaAdminCofre(configId).then((r) => { if (r.ok) setCofre({ senha: r.senha ?? null, em: r.atualizadoEm ?? null }) }).catch(() => {})
   }, [configId, ehSuper])
 
+  // Pop-up "adicionar a plataforma": abre com a lista de empresas do sistema.
+  const [addModal, setAddModal] = useState(false)
+  const [addSelPlats, setAddSelPlats] = useState<Set<string>>(new Set())
+
   const toggleUser = (id: string) => setSelUsers((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
 
-  // EM LOTE: adiciona TODOS os admins selecionados a UMA plataforma, importando a função de cada um.
-  function bulkAddPlataforma(tid: string, tnome: string) {
-    const ids = [...selUsers]
-    if (!ids.length) return
+  // EM LOTE — CONFIRMA no pop-up: adiciona os admins selecionados às plataformas escolhidas,
+  // importando a função (cargo) de cada um. Idempotente (pula quem já tem).
+  function confirmarAddPlataformas() {
+    const users = [...selUsers], plats = [...addSelPlats]
+    if (!users.length || !plats.length) { toast.error('Selecione ao menos uma plataforma.'); return }
     setAlvo('bulk')
     start(async () => {
       let add = 0, ja = 0, err = 0
-      for (const uid of ids) {
-        const m = membros.find((x) => x.userId === uid)
-        if (!m) continue
-        const r = await adicionarAdminEmPlataformasAction(uid, [tid], m.cargo)
+      for (const uid of users) {
+        const m = membros.find((x) => x.userId === uid); if (!m) continue
+        const r = await adicionarAdminEmPlataformasAction(uid, plats, m.cargo)
         if (!r.ok) err++; else { add += r.adicionadas ?? 0; ja += r.jaTinha ?? 0 }
       }
       setAlvo(null)
       if (err) toast.error(`${err} falharam.`)
-      toast.success(`${add} adicionado(s) a "${tnome}"${ja ? ` · ${ja} já tinha` : ''}.`)
-      setSelUsers(new Set())
+      toast.success(`${add} vínculo(s) criado(s)${ja ? ` · ${ja} já tinha(m)` : ''}.`)
+      setAddModal(false); setAddSelPlats(new Set()); setSelUsers(new Set())
       router.refresh() // recarrega as etiquetas
+    })
+  }
+
+  // EM LOTE — REMOVE o acesso dos admins selecionados a ESTA plataforma (pula "você"). Confirma antes.
+  async function bulkRemover() {
+    const users = [...selUsers].filter((uid) => membros.find((m) => m.userId === uid && !m.ehVoce))
+    if (!users.length) { toast.error('Nenhum admin removível selecionado (você não pode se remover).'); return }
+    if (!(await confirmar({ titulo: 'Remover acesso em lote', mensagem: `Remover o acesso de ${users.length} administrador(es) a ESTA plataforma? A conta global (login) permanece — só o vínculo com esta plataforma é apagado.`, confirmar: 'Remover acesso', destrutivo: true }))) return
+    setAlvo('bulk')
+    start(async () => {
+      let rem = 0, err = 0
+      for (const uid of users) { const r = await removerAcessoAdminAction(uid, tenantId); if (r.ok) rem++; else err++ }
+      setAlvo(null)
+      if (err) toast.error(`${err} falharam.`)
+      toast.success(`${rem} acesso(s) removido(s).`)
+      setSelUsers(new Set()); router.refresh()
     })
   }
 
@@ -172,19 +192,20 @@ export function AdministradoresLista({ membros, cargos, tenantId, super: ehSuper
         </div>
       )}
 
-      {/* [console super] Ação EM LOTE: selecione vários admins e clique numa plataforma p/ adicionar todos (importa a função de cada um). */}
+      {/* [console super] Barra de AÇÕES em lote dos admins selecionados (adicionar via pop-up · remover). */}
       {ehSuper && selUsers.size > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 p-3">
-          <span className="text-xs font-semibold">{selUsers.size} selecionado(s) · adicionar a:</span>
-          {todasPlats.filter((p) => p.id !== tenantId).map((p) => (
-            <button key={p.id} type="button" disabled={pending} onClick={() => bulkAddPlataforma(p.id, p.nome)}
-              className="inline-flex items-center gap-1 rounded-full border bg-card px-2.5 py-1 text-xs font-medium transition hover:bg-primary hover:text-primary-foreground disabled:opacity-50">
-              <Building2 className="h-3 w-3" /> {p.nome}
-            </button>
-          ))}
-          {todasPlats.filter((p) => p.id !== tenantId).length === 0 && <span className="text-xs text-muted-foreground">nenhuma outra plataforma</span>}
+          <span className="text-xs font-semibold">{selUsers.size} selecionado(s)</span>
+          <button type="button" disabled={pending} onClick={() => { setAddSelPlats(new Set()); setAddModal(true) }}
+            className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-medium transition hover:bg-muted disabled:opacity-50">
+            <Building2 className="h-3.5 w-3.5" /> Adicionar a plataforma
+          </button>
+          <button type="button" disabled={pending} onClick={bulkRemover}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/40 px-3 py-1.5 text-xs font-medium text-rose-600 transition hover:bg-rose-500/10 disabled:opacity-50 dark:text-rose-400">
+            <Trash2 className="h-3.5 w-3.5" /> Remover acesso
+          </button>
           {pending && alvo === 'bulk' && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
-          <button type="button" onClick={() => setSelUsers(new Set())} className="ml-auto text-xs text-muted-foreground hover:text-foreground">limpar</button>
+          <button type="button" onClick={() => setSelUsers(new Set())} className="ml-auto text-xs text-muted-foreground hover:text-foreground">limpar seleção</button>
         </div>
       )}
 
@@ -318,6 +339,41 @@ export function AdministradoresLista({ membros, cargos, tenantId, super: ehSuper
                   {pending && alvo === config.userId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar dados
                 </button>
               </div>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
+
+      {/* [console super] POP-UP "Adicionar a plataforma": lista as empresas do sistema; confirma o vínculo em lote. */}
+      {ehSuper && addModal && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4 backdrop-blur-[2px]" onClick={() => { if (!pending) setAddModal(false) }}>
+          <div className="w-full max-w-md rounded-2xl border bg-card p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-1 flex items-center gap-2">
+              <Building2 className="h-4 w-4 text-primary" />
+              <p className="text-sm font-semibold">Adicionar {selUsers.size} admin(s) a plataformas</p>
+              <button type="button" onClick={() => setAddModal(false)} className="ml-auto rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
+            </div>
+            <p className="mb-3 text-xs text-muted-foreground">Escolha as empresas. Cada admin entra com a <b>função atual dele</b>. Quem já tiver acesso é ignorado.</p>
+            <div className="scroll-claro max-h-64 space-y-1 overflow-y-auto rounded-lg border p-1">
+              {todasPlats.filter((p) => p.id !== tenantId).map((p) => {
+                const on = addSelPlats.has(p.id)
+                return (
+                  <button key={p.id} type="button" onClick={() => setAddSelPlats((s) => { const n = new Set(s); n.has(p.id) ? n.delete(p.id) : n.add(p.id); return n })}
+                    className={cn('flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm transition', on ? 'bg-primary/10' : 'hover:bg-muted')}>
+                    <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded border', on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>{on && <Check className="h-3 w-3" />}</span>
+                    <span className="min-w-0 flex-1 truncate">{p.nome}</span>
+                  </button>
+                )
+              })}
+              {todasPlats.filter((p) => p.id !== tenantId).length === 0 && <p className="px-2 py-3 text-center text-xs text-muted-foreground">Nenhuma outra plataforma no sistema.</p>}
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <button type="button" onClick={() => setAddModal(false)} className="rounded-lg border px-3 py-2 text-sm font-medium transition hover:bg-muted">Cancelar</button>
+              <button type="button" disabled={pending || addSelPlats.size === 0} onClick={confirmarAddPlataformas}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
+                {pending && alvo === 'bulk' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Building2 className="h-4 w-4" />} Adicionar às {addSelPlats.size}
+              </button>
             </div>
           </div>
         </div>,
