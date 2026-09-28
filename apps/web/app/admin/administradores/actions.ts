@@ -3,6 +3,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, accessCan, isSuperAdmin } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
+import { criptografar, descriptografar } from '@/lib/crypto'
 import { revalidatePath } from 'next/cache'
 
 export interface AdminMembro {
@@ -344,6 +345,29 @@ export async function resetarSenhaAdminAction(userId: string, senha?: string, te
   const nova = digitada || gerarSenha()
   const { error } = await svc.auth.admin.updateUserById(userId, { password: nova })
   if (error) return { ok: false, error: error.message }
+  // COFRE: guarda a senha DEFINIDA aqui, CRIPTOGRAFADA (APP_ENCRYPTION_KEY), p/ o super-admin ver depois.
+  // O Auth guarda só o hash (irreversível); o cofre é uma cópia cifrada em repouso — nunca em texto puro.
+  // Tolerante: se a tabela/migração ainda não existe, o reset segue funcionando (só não guarda no cofre).
+  const ator = (await getCurrentAccess()).userId ?? null
+  try {
+    await svc.from('simulado_admin_senha_cofre').upsert({ user_id: userId, senha_cripto: criptografar(nova), definido_por: ator, atualizado_em: new Date().toISOString() }, { onConflict: 'user_id' })
+  } catch { /* tabela ausente → sem cofre */ }
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_tenant_acessos', entidadeId: userId, tenantId, depois: { senha_resetada: true, gerada } })
   return { ok: true, senha: nova, gerada }
+}
+
+/**
+ * [CONSOLE SUPER] Revela a última senha DEFINIDA pelo painel (cofre cifrado). Só super-admin global.
+ * Retorna null se nunca foi definida por aqui (senhas antigas/definidas fora ficam invisíveis — são hash).
+ */
+export async function verSenhaAdminCofre(userId: string): Promise<{ ok: boolean; error?: string; senha?: string | null; atualizadoEm?: string | null }> {
+  if (!(await isSuperAdmin())) return { ok: false, error: 'Ação exclusiva do super-administrador global.' }
+  if (!userId) return { ok: false, error: 'Usuário inválido.' }
+  const svc = createAdminClient()
+  try {
+    const { data } = await svc.from('simulado_admin_senha_cofre').select('senha_cripto, atualizado_em').eq('user_id', userId).maybeSingle()
+    if (!data?.senha_cripto) return { ok: true, senha: null, atualizadoEm: null }
+    await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_admin_senha_cofre', entidadeId: userId, depois: { acao: 'revelou_senha' } }).catch(() => {})
+    return { ok: true, senha: descriptografar(data.senha_cripto), atualizadoEm: (data as any).atualizado_em ?? null }
+  } catch { return { ok: true, senha: null, atualizadoEm: null } }
 }

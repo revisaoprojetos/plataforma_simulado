@@ -4,13 +4,13 @@ import { useEffect, useMemo, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Search, X, Mail, Loader2, ShieldCheck, ShieldOff, Copy, Check, Dices, Settings2, Trash2, Save, Building2 } from 'lucide-react'
+import { Search, X, Mail, Loader2, ShieldCheck, ShieldOff, Copy, Check, Dices, Settings2, Trash2, Save, Building2, Eye, EyeOff, KeyRound } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { rotuloCargo, CARGOS_ACESSO_TOTAL } from '@/lib/rbac-cargos'
 import {
   trocarCargoAction, toggleAtivoAdminAction, resetarSenhaAdminAction, removerAcessoAdminAction, atualizarDadosAdminAction,
-  plataformasParaAdmin, adicionarAdminEmPlataformasAction,
+  plataformasParaAdmin, adicionarAdminEmPlataformasAction, verSenhaAdminCofre,
   type AdminMembro, type CargoOpcao,
 } from '@/app/admin/administradores/actions'
 
@@ -35,11 +35,16 @@ export function AdministradoresLista({ membros, cargos, tenantId, super: ehSuper
   const [selPlat, setSelPlat] = useState<Set<string>>(new Set())
   const [importarCargo, setImportarCargo] = useState(true)
   const [cargoManual, setCargoManual] = useState('')
+  // [console super] cofre de senha (senha definida pelo painel, cifrada) + toggle de revelar.
+  const [cofre, setCofre] = useState<{ senha: string | null; em: string | null } | null>(null)
+  const [revelada, setRevelada] = useState(false)
 
   useEffect(() => {
     if (!ehSuper || !configId) return
     setPlatsOutras(null); setSelPlat(new Set()); setImportarCargo(true); setCargoManual('')
+    setCofre(null); setRevelada(false)
     plataformasParaAdmin(configId).then((r) => { if (r.ok) setPlatsOutras(r.plataformas ?? []) }).catch(() => {})
+    verSenhaAdminCofre(configId).then((r) => { if (r.ok) setCofre({ senha: r.senha ?? null, em: r.atualizadoEm ?? null }) }).catch(() => {})
   }, [configId, ehSuper])
 
   function adicionarPlataformas(m: AdminMembro) {
@@ -98,6 +103,7 @@ export function AdministradoresLista({ membros, cargos, tenantId, super: ehSuper
       setAlvo(null)
       if (erro) { toast.error(erro); return }
       if (s) setCred({ email: e || m.email, senha: s }) // mostra a nova senha para copiar
+      if (s && ehSuper) { setCofre({ senha: s, em: new Date().toISOString() }); setRevelada(true) } // reflete no cofre na hora
       setNovaSenha('')
       toast.success('Salvo.'); router.refresh()
     })
@@ -225,6 +231,22 @@ export function AdministradoresLista({ membros, cargos, tenantId, super: ehSuper
                 {cargos.map((c) => <option key={c.nome} value={c.nome}>{rotuloCargo(c.nome)}</option>)}
               </select>
             </div>
+
+            {/* [console super] Senha ATUAL definida pelo painel (cofre cifrado) — revelar/copiar. */}
+            {ehSuper && cofre && (
+              <div className="mt-4 rounded-lg border bg-muted/30 p-3">
+                <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><KeyRound className="h-3.5 w-3.5" /> Senha atual (definida no painel)</p>
+                {cofre.senha ? (
+                  <div className="mt-2 flex items-center gap-2">
+                    <code className="flex-1 rounded bg-background px-3 py-2 text-xs tracking-wider">{revelada ? cofre.senha : '•'.repeat(Math.min(14, cofre.senha.length))}</code>
+                    <button type="button" onClick={() => setRevelada((v) => !v)} title={revelada ? 'Ocultar' : 'Revelar'} className="inline-flex h-8 w-8 items-center justify-center rounded-lg border hover:bg-muted">{revelada ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}</button>
+                    <button type="button" onClick={() => { navigator.clipboard.writeText(cofre.senha!); toast.success('Senha copiada.') }} title="Copiar" className="inline-flex h-8 w-8 items-center justify-center rounded-lg border hover:bg-muted"><Copy className="h-3.5 w-3.5" /></button>
+                  </div>
+                ) : (
+                  <p className="mt-1 text-[11px] text-muted-foreground">Nenhuma senha registrada aqui ainda. Defina uma abaixo — a partir daí ela fica visível.</p>
+                )}
+              </div>
+            )}
 
             {/* Senha — vazio mantém a atual; preenchida é aplicada ao Salvar */}
             <div className="mt-4 space-y-1.5">
