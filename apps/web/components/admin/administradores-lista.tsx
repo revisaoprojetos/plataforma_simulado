@@ -10,7 +10,7 @@ import { confirmar } from '@/components/ui/confirm-dialog'
 import { rotuloCargo, CARGOS_ACESSO_TOTAL } from '@/lib/rbac-cargos'
 import {
   trocarCargoAction, toggleAtivoAdminAction, resetarSenhaAdminAction, removerAcessoAdminAction, atualizarDadosAdminAction,
-  plataformasParaAdmin, adicionarAdminEmPlataformasAction, verSenhaAdminCofre,
+  listarPlataformasSuper, adicionarAdminEmPlataformasAction, verSenhaAdminCofre,
   type AdminMembro, type CargoOpcao,
 } from '@/app/admin/administradores/actions'
 
@@ -30,35 +30,46 @@ export function AdministradoresLista({ membros, cargos, tenantId, super: ehSuper
   const [novaSenha, setNovaSenha] = useState('')
   const [nomeEdit, setNomeEdit] = useState('')
   const [emailEdit, setEmailEdit] = useState('')
-  // [console super] "Adicionar a outras plataformas" — carrega as plataformas ao abrir o modal.
-  const [platsOutras, setPlatsOutras] = useState<{ id: string; nome: string; ja: boolean }[] | null>(null)
-  const [selPlat, setSelPlat] = useState<Set<string>>(new Set())
-  const [importarCargo, setImportarCargo] = useState(true)
-  const [cargoManual, setCargoManual] = useState('')
   // [console super] cofre de senha (senha definida pelo painel, cifrada) + toggle de revelar.
   const [cofre, setCofre] = useState<{ senha: string | null; em: string | null } | null>(null)
   const [revelada, setRevelada] = useState(false)
+  // [console super] operação EM LOTE na tabela: seleção de admins + todas as plataformas p/ o seletor.
+  const [selUsers, setSelUsers] = useState<Set<string>>(new Set())
+  const [todasPlats, setTodasPlats] = useState<{ id: string; nome: string }[]>([])
 
+  // Carrega TODAS as plataformas uma vez (para o seletor de adicionar em lote).
+  useEffect(() => {
+    if (!ehSuper) return
+    listarPlataformasSuper().then((r) => { if (r.ok) setTodasPlats(r.plataformas ?? []) }).catch(() => {})
+  }, [ehSuper])
+
+  // Cofre: recarrega ao abrir o modal de configuração.
   useEffect(() => {
     if (!ehSuper || !configId) return
-    setPlatsOutras(null); setSelPlat(new Set()); setImportarCargo(true); setCargoManual('')
     setCofre(null); setRevelada(false)
-    plataformasParaAdmin(configId).then((r) => { if (r.ok) setPlatsOutras(r.plataformas ?? []) }).catch(() => {})
     verSenhaAdminCofre(configId).then((r) => { if (r.ok) setCofre({ senha: r.senha ?? null, em: r.atualizadoEm ?? null }) }).catch(() => {})
   }, [configId, ehSuper])
 
-  function adicionarPlataformas(m: AdminMembro) {
-    const ids = [...selPlat]
-    if (!ids.length) { toast.error('Selecione ao menos uma plataforma.'); return }
-    const cargo = importarCargo ? m.cargo : (cargoManual || m.cargo)
-    setAlvo(m.userId)
+  const toggleUser = (id: string) => setSelUsers((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
+
+  // EM LOTE: adiciona TODOS os admins selecionados a UMA plataforma, importando a função de cada um.
+  function bulkAddPlataforma(tid: string, tnome: string) {
+    const ids = [...selUsers]
+    if (!ids.length) return
+    setAlvo('bulk')
     start(async () => {
-      const r = await adicionarAdminEmPlataformasAction(m.userId, ids, cargo)
+      let add = 0, ja = 0, err = 0
+      for (const uid of ids) {
+        const m = membros.find((x) => x.userId === uid)
+        if (!m) continue
+        const r = await adicionarAdminEmPlataformasAction(uid, [tid], m.cargo)
+        if (!r.ok) err++; else { add += r.adicionadas ?? 0; ja += r.jaTinha ?? 0 }
+      }
       setAlvo(null)
-      if (!r.ok) { toast.error(r.error ?? 'Falha.'); return }
-      toast.success(`Adicionado a ${r.adicionadas ?? 0} plataforma(s)${r.jaTinha ? ` · ${r.jaTinha} já tinha` : ''}.`)
-      setSelPlat(new Set())
-      plataformasParaAdmin(m.userId).then((x) => { if (x.ok) setPlatsOutras(x.plataformas ?? []) }).catch(() => {})
+      if (err) toast.error(`${err} falharam.`)
+      toast.success(`${add} adicionado(s) a "${tnome}"${ja ? ` · ${ja} já tinha` : ''}.`)
+      setSelUsers(new Set())
+      router.refresh() // recarrega as etiquetas
     })
   }
 
@@ -161,6 +172,22 @@ export function AdministradoresLista({ membros, cargos, tenantId, super: ehSuper
         </div>
       )}
 
+      {/* [console super] Ação EM LOTE: selecione vários admins e clique numa plataforma p/ adicionar todos (importa a função de cada um). */}
+      {ehSuper && selUsers.size > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-primary/30 bg-primary/5 p-3">
+          <span className="text-xs font-semibold">{selUsers.size} selecionado(s) · adicionar a:</span>
+          {todasPlats.filter((p) => p.id !== tenantId).map((p) => (
+            <button key={p.id} type="button" disabled={pending} onClick={() => bulkAddPlataforma(p.id, p.nome)}
+              className="inline-flex items-center gap-1 rounded-full border bg-card px-2.5 py-1 text-xs font-medium transition hover:bg-primary hover:text-primary-foreground disabled:opacity-50">
+              <Building2 className="h-3 w-3" /> {p.nome}
+            </button>
+          ))}
+          {todasPlats.filter((p) => p.id !== tenantId).length === 0 && <span className="text-xs text-muted-foreground">nenhuma outra plataforma</span>}
+          {pending && alvo === 'bulk' && <Loader2 className="h-4 w-4 animate-spin text-primary" />}
+          <button type="button" onClick={() => setSelUsers(new Set())} className="ml-auto text-xs text-muted-foreground hover:text-foreground">limpar</button>
+        </div>
+      )}
+
       <div className="rounded-2xl border bg-card">
         {lista.length === 0 ? (
           <p className="py-12 text-center text-sm text-muted-foreground">Nenhum administrador encontrado.</p>
@@ -168,12 +195,22 @@ export function AdministradoresLista({ membros, cargos, tenantId, super: ehSuper
           <div className="divide-y">
             {lista.map((m) => (
               <div key={m.userId} className={cn('flex items-center gap-3 p-3', !m.ativo && 'opacity-60')}>
+                {ehSuper && (
+                  <button type="button" onClick={() => toggleUser(m.userId)} title="Selecionar para adicionar em lote"
+                    className={cn('flex h-5 w-5 shrink-0 items-center justify-center rounded border transition', selUsers.has(m.userId) ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40 hover:border-primary')}>
+                    {selUsers.has(m.userId) && <Check className="h-3.5 w-3.5" />}
+                  </button>
+                )}
                 <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{iniciais(m.nome, m.email)}</span>
                 <div className="min-w-0 flex-1">
-                  <p className="flex items-center gap-2 truncate text-sm font-medium">
-                    {m.nome || '—'}
+                  <p className="flex flex-wrap items-center gap-1.5 text-sm font-medium">
+                    <span className="truncate">{m.nome || '—'}</span>
                     {m.ehVoce && <span className="rounded-full border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">você</span>}
                     {!m.ativo && <span className="rounded-full border border-amber-500/40 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-amber-600 dark:text-amber-400">inativo</span>}
+                    {/* Etiquetas: plataformas (empresas) deste admin */}
+                    {ehSuper && (m.plataformas ?? []).map((p) => (
+                      <span key={p.id} title={p.nome} className={cn('max-w-[140px] truncate rounded-full px-1.5 py-0.5 text-[10px] font-medium', p.id === tenantId ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground')}>{p.nome}</span>
+                    ))}
                   </p>
                   <p className="flex items-center gap-1 truncate text-xs text-muted-foreground"><Mail className="h-3 w-3" /> {m.email ?? 'sem e-mail'}</p>
                 </div>
@@ -260,50 +297,6 @@ export function AdministradoresLista({ membros, cargos, tenantId, super: ehSuper
               </div>
               <p className="text-[11px] text-muted-foreground">Preencha para <b>definir uma nova senha</b> (aplicada ao clicar em Salvar). Vazio = mantém a atual. O login é global.</p>
             </div>
-
-            {/* [console super] Adicionar este admin a OUTRAS plataformas, importando a função. */}
-            {ehSuper && (
-              <div className="mt-4 space-y-2 border-t pt-4">
-                <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Building2 className="h-3.5 w-3.5" /> Adicionar a outras plataformas</label>
-                {platsOutras === null ? (
-                  <p className="text-xs text-muted-foreground">Carregando plataformas…</p>
-                ) : platsOutras.filter((p) => p.id !== tenantId).length === 0 ? (
-                  <p className="text-xs text-muted-foreground">Nenhuma outra plataforma disponível.</p>
-                ) : (
-                  <>
-                    <div className="scroll-claro max-h-40 space-y-1 overflow-y-auto rounded-lg border p-1">
-                      {platsOutras.filter((p) => p.id !== tenantId).map((p) => {
-                        const on = selPlat.has(p.id)
-                        return (
-                          <button key={p.id} type="button" disabled={p.ja || pending}
-                            onClick={() => setSelPlat((s) => { const n = new Set(s); n.has(p.id) ? n.delete(p.id) : n.add(p.id); return n })}
-                            className={cn('flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition', p.ja ? 'opacity-50' : on ? 'bg-primary/10' : 'hover:bg-muted')}>
-                            <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded border', on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>{on && <Check className="h-3 w-3" />}</span>
-                            <span className="min-w-0 flex-1 truncate">{p.nome}</span>
-                            {p.ja && <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">já tem</span>}
-                          </button>
-                        )
-                      })}
-                    </div>
-                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <input type="checkbox" checked={importarCargo} onChange={(e) => setImportarCargo(e.target.checked)} />
-                      Importar a função atual (<b>{rotuloCargo(config.cargo)}</b>)
-                    </label>
-                    {!importarCargo && (
-                      <select value={cargoManual || config.cargo} onChange={(e) => setCargoManual(e.target.value)}
-                        className="h-9 w-full rounded-lg border bg-transparent px-2 text-sm outline-none focus:ring-2 focus:ring-ring">
-                        {!cargos.some((c) => c.nome === config.cargo) && <option value={config.cargo}>{rotuloCargo(config.cargo)}</option>}
-                        {cargos.map((c) => <option key={c.nome} value={c.nome}>{rotuloCargo(c.nome)}</option>)}
-                      </select>
-                    )}
-                    <button type="button" disabled={pending || selPlat.size === 0} onClick={() => adicionarPlataformas(config)}
-                      className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition hover:bg-muted disabled:opacity-50">
-                      {pending && alvo === config.userId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Building2 className="h-4 w-4" />} Adicionar às {selPlat.size} selecionada(s)
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
 
             {/* Rodapé: Desativar (esq) · Remover + Salvar (dir) — todos na mesma linha */}
             <div className="mt-5 flex flex-wrap items-center gap-2 border-t pt-4">

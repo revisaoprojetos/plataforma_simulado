@@ -14,6 +14,8 @@ export interface AdminMembro {
   ativo: boolean
   criadoEm: string | null
   ehVoce: boolean
+  /** [console super] plataformas (empresas) a que este admin tem acesso — etiquetas na lista. */
+  plataformas?: { id: string; nome: string }[]
 }
 export interface CargoOpcao { nome: string; descricao: string | null; is_sistema: boolean }
 
@@ -89,6 +91,15 @@ export async function plataformasParaAdmin(userId: string): Promise<{ ok: boolea
   return { ok: true, plataformas: (tenantsRes.data ?? []).map((t: any) => ({ id: t.id, nome: t.nome, ja: ja.has(t.id) })) }
 }
 
+/** [CONSOLE SUPER] Todas as plataformas ATIVAS (para o seletor de adicionar em lote). Só super-admin. */
+export async function listarPlataformasSuper(): Promise<{ ok: boolean; error?: string; plataformas?: { id: string; nome: string }[] }> {
+  if (!(await isSuperAdmin())) return { ok: false, error: 'Ação exclusiva do super-administrador global.' }
+  const svc = createAdminClient()
+  const { data, error } = await svc.from('simulado_tenants').select('id, nome').eq('ativo', true).order('nome', { ascending: true })
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, plataformas: (data ?? []).map((t: any) => ({ id: t.id, nome: t.nome })) }
+}
+
 /**
  * [CONSOLE SUPER] Adiciona um admin a OUTRAS plataformas com o `cargo` informado (importa a função:
  * a UI passa o cargo atual dele, ou um escolhido). Idempotente: pula plataformas onde ele já tem
@@ -156,6 +167,17 @@ export async function listarAdministradores(tenantIdAlvo?: string): Promise<{ ok
       ehVoce: a.user_id === userId,
     }
   })
+
+  // [console super] Etiquetas: plataformas (empresas) de cada admin. 1 lote pelos userIds + nomes dos tenants.
+  if (ctx.ehSuper && userIds.length) {
+    const { data: acc } = await svc.from('simulado_tenant_acessos').select('user_id, tenant_id').in('user_id', userIds)
+    const tids = [...new Set((acc ?? []).map((a: any) => a.tenant_id).filter(Boolean))]
+    const nomes = new Map<string, string>()
+    if (tids.length) { const { data: ts } = await svc.from('simulado_tenants').select('id, nome').in('id', tids); for (const t of ts ?? []) nomes.set((t as any).id, (t as any).nome) }
+    const porUser = new Map<string, { id: string; nome: string }[]>()
+    for (const a of (acc ?? []) as any[]) { const arr = porUser.get(a.user_id) ?? []; arr.push({ id: a.tenant_id, nome: nomes.get(a.tenant_id) ?? '—' }); porUser.set(a.user_id, arr) }
+    for (const m of membros) m.plataformas = (porUser.get(m.userId) ?? []).sort((x, y) => x.nome.localeCompare(y.nome, 'pt-BR'))
+  }
 
   // Cargos = perfis do próprio tenant + perfis de sistema (mesma fonte do RBAC).
   const { data: roles } = await svc
