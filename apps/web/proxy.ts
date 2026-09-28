@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { COOKIE_IMPERSONATION, verificarTokenImpersonation } from '@/lib/impersonation/token'
 import { decisaoImpersonation } from '@/lib/impersonation/guard-rule'
+import { dominioCookieDeHost } from '@/lib/supabase/cookie-domain'
 
 // Superfícies do ALUNO cobertas pelo guard de visualização (impersonation). Inclui /lgpd para
 // permitir bloquear consentimento/solicitação LGPD no modo operável (identidade do titular).
@@ -46,6 +47,13 @@ export async function proxy(request: NextRequest) {
   }
   let supabaseResponse = comPath()
 
+  // Domínio do cookie DINÂMICO por host (multi-domínio) — TEM que casar com o login, o handoff e o
+  // server.ts (todos usam `.vocenadefensoria.com.br` etc.). Se o proxy gravar o cookie renovado SEM
+  // domínio (host-only), fica um DUPLICADO do cookie de domínio (mesmo nome, escopos diferentes) e o
+  // servidor passa a ler uma sessão ambígua → getUser oscila → loop /admin↔/login (quebra o handoff
+  // entre plataformas). Atrás do Traefik, o host real vem em x-forwarded-host (host cru = 0.0.0.0).
+  const cookieDom = dominioCookieDeHost(request.headers.get('x-forwarded-host') || request.headers.get('host'))
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -58,7 +66,7 @@ export async function proxy(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = comPath()
           cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options as Parameters<typeof supabaseResponse.cookies.set>[2])
+            supabaseResponse.cookies.set(name, value, { ...(options ?? {}), ...(cookieDom ? { domain: cookieDom } : {}) } as Parameters<typeof supabaseResponse.cookies.set>[2])
           )
         },
       },
