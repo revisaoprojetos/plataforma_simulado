@@ -198,7 +198,7 @@ export function AdministradoresLista({ membros, cargos, tenantId, super: ehSuper
           <span className="text-xs font-semibold">{selUsers.size} selecionado(s)</span>
           <button type="button" disabled={pending} onClick={() => { setAddSelPlats(new Set()); setAddModal(true) }}
             className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-medium transition hover:bg-muted disabled:opacity-50">
-            <Building2 className="h-3.5 w-3.5" /> Adicionar a plataforma
+            <Building2 className="h-3.5 w-3.5" /> Adicionar em outras plataformas
           </button>
           <button type="button" disabled={pending} onClick={bulkRemover}
             className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/40 px-3 py-1.5 text-xs font-medium text-rose-600 transition hover:bg-rose-500/10 disabled:opacity-50 dark:text-rose-400">
@@ -351,7 +351,7 @@ export function AdministradoresLista({ membros, cargos, tenantId, super: ehSuper
           <div className="w-full max-w-md rounded-2xl border bg-card p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="mb-1 flex items-center gap-2">
               <Building2 className="h-4 w-4 text-primary" />
-              <p className="text-sm font-semibold">Adicionar {selUsers.size} admin(s) a plataformas</p>
+              <p className="text-sm font-semibold">Adicionar {selUsers.size} admin(s) em outras plataformas</p>
               <button type="button" onClick={() => setAddModal(false)} className="ml-auto rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
             </div>
             <p className="mb-3 text-xs text-muted-foreground">Escolha as empresas. Cada admin entra com a <b>função atual dele</b>. Quem já tiver acesso é ignorado.</p>
