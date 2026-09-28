@@ -1,15 +1,16 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useEffect, useMemo, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Search, X, Mail, Loader2, ShieldCheck, ShieldOff, Copy, Check, Dices, Settings2, Trash2, Save } from 'lucide-react'
+import { Search, X, Mail, Loader2, ShieldCheck, ShieldOff, Copy, Check, Dices, Settings2, Trash2, Save, Building2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { rotuloCargo, CARGOS_ACESSO_TOTAL } from '@/lib/rbac-cargos'
 import {
   trocarCargoAction, toggleAtivoAdminAction, resetarSenhaAdminAction, removerAcessoAdminAction, atualizarDadosAdminAction,
+  plataformasParaAdmin, adicionarAdminEmPlataformasAction,
   type AdminMembro, type CargoOpcao,
 } from '@/app/admin/administradores/actions'
 
@@ -18,7 +19,7 @@ function iniciais(nome: string | null, email: string | null) {
   return base.split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((n) => n[0]?.toUpperCase()).join('')
 }
 
-export function AdministradoresLista({ membros, cargos, tenantId }: { membros: AdminMembro[]; cargos: CargoOpcao[]; tenantId?: string }) {
+export function AdministradoresLista({ membros, cargos, tenantId, super: ehSuper = false }: { membros: AdminMembro[]; cargos: CargoOpcao[]; tenantId?: string; super?: boolean }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [q, setQ] = useState('')
@@ -29,6 +30,32 @@ export function AdministradoresLista({ membros, cargos, tenantId }: { membros: A
   const [novaSenha, setNovaSenha] = useState('')
   const [nomeEdit, setNomeEdit] = useState('')
   const [emailEdit, setEmailEdit] = useState('')
+  // [console super] "Adicionar a outras plataformas" — carrega as plataformas ao abrir o modal.
+  const [platsOutras, setPlatsOutras] = useState<{ id: string; nome: string; ja: boolean }[] | null>(null)
+  const [selPlat, setSelPlat] = useState<Set<string>>(new Set())
+  const [importarCargo, setImportarCargo] = useState(true)
+  const [cargoManual, setCargoManual] = useState('')
+
+  useEffect(() => {
+    if (!ehSuper || !configId) return
+    setPlatsOutras(null); setSelPlat(new Set()); setImportarCargo(true); setCargoManual('')
+    plataformasParaAdmin(configId).then((r) => { if (r.ok) setPlatsOutras(r.plataformas ?? []) }).catch(() => {})
+  }, [configId, ehSuper])
+
+  function adicionarPlataformas(m: AdminMembro) {
+    const ids = [...selPlat]
+    if (!ids.length) { toast.error('Selecione ao menos uma plataforma.'); return }
+    const cargo = importarCargo ? m.cargo : (cargoManual || m.cargo)
+    setAlvo(m.userId)
+    start(async () => {
+      const r = await adicionarAdminEmPlataformasAction(m.userId, ids, cargo)
+      setAlvo(null)
+      if (!r.ok) { toast.error(r.error ?? 'Falha.'); return }
+      toast.success(`Adicionado a ${r.adicionadas ?? 0} plataforma(s)${r.jaTinha ? ` · ${r.jaTinha} já tinha` : ''}.`)
+      setSelPlat(new Set())
+      plataformasParaAdmin(m.userId).then((x) => { if (x.ok) setPlatsOutras(x.plataformas ?? []) }).catch(() => {})
+    })
+  }
 
   const lista = useMemo(() => {
     const t = q.trim().toLowerCase()
@@ -211,6 +238,50 @@ export function AdministradoresLista({ membros, cargos, tenantId }: { membros: A
               </div>
               <p className="text-[11px] text-muted-foreground">Preencha para <b>definir uma nova senha</b> (aplicada ao clicar em Salvar). Vazio = mantém a atual. O login é global.</p>
             </div>
+
+            {/* [console super] Adicionar este admin a OUTRAS plataformas, importando a função. */}
+            {ehSuper && (
+              <div className="mt-4 space-y-2 border-t pt-4">
+                <label className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Building2 className="h-3.5 w-3.5" /> Adicionar a outras plataformas</label>
+                {platsOutras === null ? (
+                  <p className="text-xs text-muted-foreground">Carregando plataformas…</p>
+                ) : platsOutras.filter((p) => p.id !== tenantId).length === 0 ? (
+                  <p className="text-xs text-muted-foreground">Nenhuma outra plataforma disponível.</p>
+                ) : (
+                  <>
+                    <div className="scroll-claro max-h-40 space-y-1 overflow-y-auto rounded-lg border p-1">
+                      {platsOutras.filter((p) => p.id !== tenantId).map((p) => {
+                        const on = selPlat.has(p.id)
+                        return (
+                          <button key={p.id} type="button" disabled={p.ja || pending}
+                            onClick={() => setSelPlat((s) => { const n = new Set(s); n.has(p.id) ? n.delete(p.id) : n.add(p.id); return n })}
+                            className={cn('flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition', p.ja ? 'opacity-50' : on ? 'bg-primary/10' : 'hover:bg-muted')}>
+                            <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded border', on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>{on && <Check className="h-3 w-3" />}</span>
+                            <span className="min-w-0 flex-1 truncate">{p.nome}</span>
+                            {p.ja && <span className="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">já tem</span>}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <input type="checkbox" checked={importarCargo} onChange={(e) => setImportarCargo(e.target.checked)} />
+                      Importar a função atual (<b>{rotuloCargo(config.cargo)}</b>)
+                    </label>
+                    {!importarCargo && (
+                      <select value={cargoManual || config.cargo} onChange={(e) => setCargoManual(e.target.value)}
+                        className="h-9 w-full rounded-lg border bg-transparent px-2 text-sm outline-none focus:ring-2 focus:ring-ring">
+                        {!cargos.some((c) => c.nome === config.cargo) && <option value={config.cargo}>{rotuloCargo(config.cargo)}</option>}
+                        {cargos.map((c) => <option key={c.nome} value={c.nome}>{rotuloCargo(c.nome)}</option>)}
+                      </select>
+                    )}
+                    <button type="button" disabled={pending || selPlat.size === 0} onClick={() => adicionarPlataformas(config)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition hover:bg-muted disabled:opacity-50">
+                      {pending && alvo === config.userId ? <Loader2 className="h-4 w-4 animate-spin" /> : <Building2 className="h-4 w-4" />} Adicionar às {selPlat.size} selecionada(s)
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* Rodapé: Desativar (esq) · Remover + Salvar (dir) — todos na mesma linha */}
             <div className="mt-5 flex flex-wrap items-center gap-2 border-t pt-4">

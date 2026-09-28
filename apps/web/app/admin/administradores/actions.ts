@@ -71,6 +71,46 @@ function revalidarRbac(tenantId: string, ehSuper: boolean) {
 }
 
 /**
+ * [CONSOLE SUPER] Plataformas onde este admin AINDA NÃO tem acesso — candidatas para adicioná-lo.
+ * Só super-admin global. Retorna também o cargo ATUAL dele (numa plataforma qualquer) para "importar
+ * a função" ao adicionar. Marca as que ele já tem (`ja`) para o super não duplicar.
+ */
+export async function plataformasParaAdmin(userId: string): Promise<{ ok: boolean; error?: string; plataformas?: { id: string; nome: string; ja: boolean }[] }> {
+  if (!(await isSuperAdmin())) return { ok: false, error: 'Ação exclusiva do super-administrador global.' }
+  if (!userId) return { ok: false, error: 'Usuário inválido.' }
+  const svc = createAdminClient()
+  const [tenantsRes, acessosRes] = await Promise.all([
+    svc.from('simulado_tenants').select('id, nome').eq('ativo', true).order('nome', { ascending: true }),
+    svc.from('simulado_tenant_acessos').select('tenant_id').eq('user_id', userId),
+  ])
+  if (tenantsRes.error) return { ok: false, error: tenantsRes.error.message }
+  const ja = new Set((acessosRes.data ?? []).map((a: any) => a.tenant_id))
+  return { ok: true, plataformas: (tenantsRes.data ?? []).map((t: any) => ({ id: t.id, nome: t.nome, ja: ja.has(t.id) })) }
+}
+
+/**
+ * [CONSOLE SUPER] Adiciona um admin a OUTRAS plataformas com o `cargo` informado (importa a função:
+ * a UI passa o cargo atual dele, ou um escolhido). Idempotente: pula plataformas onde ele já tem
+ * acesso (não sobrescreve o cargo existente). Só super-admin global.
+ */
+export async function adicionarAdminEmPlataformasAction(userId: string, tenantIds: string[], cargo: string): Promise<{ ok: boolean; error?: string; adicionadas?: number; jaTinha?: number }> {
+  if (!(await isSuperAdmin())) return { ok: false, error: 'Ação exclusiva do super-administrador global.' }
+  if (!userId || !Array.isArray(tenantIds) || !tenantIds.length || !cargo?.trim()) return { ok: false, error: 'Selecione ao menos uma plataforma.' }
+  const svc = createAdminClient()
+  let adicionadas = 0, jaTinha = 0
+  for (const tid of [...new Set(tenantIds)]) {
+    const { data: existe } = await svc.from('simulado_tenant_acessos').select('user_id').eq('tenant_id', tid).eq('user_id', userId).maybeSingle()
+    if (existe) { jaTinha++; continue }
+    const { error } = await svc.from('simulado_tenant_acessos').insert({ tenant_id: tid, user_id: userId, role: cargo, ativo: true })
+    if (error) continue
+    adicionadas++
+    await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_tenant_acessos', entidadeId: userId, tenantId: tid, depois: { role: cargo, via: 'super_add_plataforma' } })
+    revalidatePath(`/super/plataformas/${tid}`)
+  }
+  return { ok: true, adicionadas, jaTinha }
+}
+
+/**
  * Lista os membros da equipe do tenant (linhas de simulado_tenant_acessos) com
  * nome/e-mail resolvidos do auth (fonte autoritativa — admins podem não ter perfil),
  * além dos cargos disponíveis para atribuir.

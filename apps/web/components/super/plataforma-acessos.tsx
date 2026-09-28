@@ -35,7 +35,7 @@ export function PlataformaAcessos({ tenantId, membros, cargos }: {
       </div>
 
       <div className="rounded-2xl border bg-card p-4">
-        <AdministradoresLista membros={membros} cargos={cargos} tenantId={tenantId} />
+        <AdministradoresLista membros={membros} cargos={cargos} tenantId={tenantId} super />
       </div>
 
       <Dialog open={novoAberto} onOpenChange={setNovoAberto}>
