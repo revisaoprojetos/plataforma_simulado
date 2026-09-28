@@ -104,6 +104,9 @@ export function AdministradoresLista({ membros, cargos, tenantId, super: ehSuper
 
   // Membro atual do modal — derivado de `membros` para refletir mudanças após refresh.
   const config = configId ? membros.find((m) => m.userId === configId) ?? null : null
+  // Dados do pop-up "adicionar em outras plataformas".
+  const admsSel = membros.filter((m) => selUsers.has(m.userId))
+  const outrasPlats = todasPlats.filter((p) => p.id !== tenantId)
 
   function agir(userId: string, fn: () => Promise<{ ok: boolean; error?: string }>, sucesso: string) {
     setAlvo(userId)
@@ -345,35 +348,75 @@ export function AdministradoresLista({ membros, cargos, tenantId, super: ehSuper
         document.body,
       )}
 
-      {/* [console super] POP-UP "Adicionar a plataforma": lista as empresas do sistema; confirma o vínculo em lote. */}
+      {/* [console super] POP-UP "Adicionar em outras plataformas": mostra quem vai + as empresas; confirma o vínculo em lote. */}
       {ehSuper && addModal && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 p-4 backdrop-blur-[2px]" onClick={() => { if (!pending) setAddModal(false) }}>
-          <div className="w-full max-w-md rounded-2xl border bg-card p-5 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <div className="mb-1 flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-primary" />
-              <p className="text-sm font-semibold">Adicionar {selUsers.size} admin(s) em outras plataformas</p>
-              <button type="button" onClick={() => setAddModal(false)} className="ml-auto rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
+        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/60 p-4 backdrop-blur-[3px]" onClick={() => { if (!pending) setAddModal(false) }}>
+          <div className="w-full max-w-md overflow-hidden rounded-2xl border bg-card shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            {/* Cabeçalho */}
+            <div className="flex items-start gap-3 border-b p-5">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Building2 className="h-5 w-5" /></span>
+              <div className="min-w-0 flex-1">
+                <p className="text-base font-semibold leading-tight">Adicionar em outras plataformas</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">{selUsers.size} administrador(es) · cada um entra com a <span className="font-medium text-foreground">função atual dele</span></p>
+              </div>
+              <button type="button" onClick={() => setAddModal(false)} className="-mr-1 -mt-1 rounded-lg p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
             </div>
-            <p className="mb-3 text-xs text-muted-foreground">Escolha as empresas. Cada admin entra com a <b>função atual dele</b>. Quem já tiver acesso é ignorado.</p>
-            <div className="scroll-claro max-h-64 space-y-1 overflow-y-auto rounded-lg border p-1">
-              {todasPlats.filter((p) => p.id !== tenantId).map((p) => {
-                const on = addSelPlats.has(p.id)
-                return (
-                  <button key={p.id} type="button" onClick={() => setAddSelPlats((s) => { const n = new Set(s); n.has(p.id) ? n.delete(p.id) : n.add(p.id); return n })}
-                    className={cn('flex w-full items-center gap-2 rounded-md px-2 py-2 text-left text-sm transition', on ? 'bg-primary/10' : 'hover:bg-muted')}>
-                    <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded border', on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>{on && <Check className="h-3 w-3" />}</span>
-                    <span className="min-w-0 flex-1 truncate">{p.nome}</span>
-                  </button>
-                )
-              })}
-              {todasPlats.filter((p) => p.id !== tenantId).length === 0 && <p className="px-2 py-3 text-center text-xs text-muted-foreground">Nenhuma outra plataforma no sistema.</p>}
+
+            <div className="space-y-4 p-5">
+              {/* Quem vai — chips de admins com iniciais + cargo */}
+              <div>
+                <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Administradores selecionados</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {admsSel.slice(0, 10).map((m) => (
+                    <span key={m.userId} className="inline-flex items-center gap-1.5 rounded-full border bg-muted/50 py-1 pl-1 pr-2 text-xs">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/15 text-[9px] font-bold text-primary">{iniciais(m.nome, m.email)}</span>
+                      <span className="max-w-[130px] truncate font-medium">{m.nome || m.email}</span>
+                    </span>
+                  ))}
+                  {admsSel.length > 10 && <span className="inline-flex items-center rounded-full border bg-muted/50 px-2 py-1 text-xs text-muted-foreground">+{admsSel.length - 10}</span>}
+                </div>
+              </div>
+
+              {/* Plataformas de destino */}
+              <div>
+                <div className="mb-1.5 flex items-center justify-between">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Plataformas de destino</p>
+                  {outrasPlats.length > 0 && (
+                    <button type="button" onClick={() => setAddSelPlats(addSelPlats.size === outrasPlats.length ? new Set() : new Set(outrasPlats.map((p) => p.id)))}
+                      className="text-[11px] font-medium text-primary transition hover:underline">
+                      {addSelPlats.size === outrasPlats.length ? 'Limpar' : 'Selecionar todas'}
+                    </button>
+                  )}
+                </div>
+                <div className="scroll-claro max-h-56 space-y-1 overflow-y-auto rounded-xl border p-1">
+                  {outrasPlats.map((p) => {
+                    const on = addSelPlats.has(p.id)
+                    return (
+                      <button key={p.id} type="button" onClick={() => setAddSelPlats((s) => { const n = new Set(s); n.has(p.id) ? n.delete(p.id) : n.add(p.id); return n })}
+                        className={cn('flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2.5 text-left text-sm transition', on ? 'bg-primary/10 ring-1 ring-inset ring-primary/30' : 'hover:bg-muted')}>
+                        <span className={cn('flex h-5 w-5 shrink-0 items-center justify-center rounded-md border transition', on ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>{on && <Check className="h-3.5 w-3.5" />}</span>
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground"><Building2 className="h-3.5 w-3.5" /></span>
+                        <span className="min-w-0 flex-1 truncate font-medium">{p.nome}</span>
+                      </button>
+                    )
+                  })}
+                  {outrasPlats.length === 0 && <p className="px-2 py-6 text-center text-xs text-muted-foreground">Nenhuma outra plataforma cadastrada no sistema.</p>}
+                </div>
+              </div>
             </div>
-            <div className="mt-4 flex justify-end gap-2">
-              <button type="button" onClick={() => setAddModal(false)} className="rounded-lg border px-3 py-2 text-sm font-medium transition hover:bg-muted">Cancelar</button>
-              <button type="button" disabled={pending || addSelPlats.size === 0} onClick={confirmarAddPlataformas}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
-                {pending && alvo === 'bulk' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Building2 className="h-4 w-4" />} Adicionar às {addSelPlats.size}
-              </button>
+
+            {/* Rodapé com resumo + ações */}
+            <div className="flex items-center justify-between gap-3 border-t bg-muted/30 px-5 py-4">
+              <span className="text-xs text-muted-foreground">
+                {addSelPlats.size > 0 ? <><b className="text-foreground">{selUsers.size}</b> admin(s) × <b className="text-foreground">{addSelPlats.size}</b> plataforma(s)</> : 'Escolha ao menos uma plataforma'}
+              </span>
+              <div className="flex shrink-0 gap-2">
+                <button type="button" onClick={() => setAddModal(false)} className="rounded-lg border px-3.5 py-2 text-sm font-medium transition hover:bg-muted">Cancelar</button>
+                <button type="button" disabled={pending || addSelPlats.size === 0} onClick={confirmarAddPlataformas}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 disabled:opacity-50">
+                  {pending && alvo === 'bulk' ? <Loader2 className="h-4 w-4 animate-spin" /> : <Building2 className="h-4 w-4" />} Adicionar
+                </button>
+              </div>
             </div>
           </div>
         </div>,
