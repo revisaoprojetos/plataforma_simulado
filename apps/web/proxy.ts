@@ -67,6 +67,16 @@ export async function proxy(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
+  // @supabase/ssr: se o getUser RENOVAR o token (rotação), os novos cookies ficam em
+  // `supabaseResponse`. Ao devolver um redirect (NOVO response), é OBRIGATÓRIO copiar esses
+  // cookies — senão a rotação se perde, a sessão não persiste e o navegador entra em LOOP
+  // /admin↔/login ("carregando e não termina" pós-login). Padrão oficial do Supabase.
+  const redirecionarPreservandoCookies = (url: URL) => {
+    const res = NextResponse.redirect(url)
+    supabaseResponse.cookies.getAll().forEach((c) => res.cookies.set(c.name, c.value, c))
+    return res
+  }
+
   const { pathname } = request.nextUrl
 
   const protectedAdminPaths = ['/admin']
@@ -102,7 +112,7 @@ export async function proxy(request: NextRequest) {
   if (isAdminPath && !user) {
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('redirectTo', pathname + request.nextUrl.search) // preserva a query do link
-    return NextResponse.redirect(loginUrl)
+    return redirecionarPreservandoCookies(loginUrl)
   }
 
   // Já autenticado em /login: NÃO pular direto pro /admin — /login é o SELETOR de plataforma
@@ -111,7 +121,7 @@ export async function proxy(request: NextRequest) {
   if (pathname === '/login' && user) {
     const destino = request.nextUrl.searchParams.get('redirectTo')
     if (destino && destino.startsWith('/') && !destino.startsWith('/login')) {
-      return NextResponse.redirect(new URL(destino, request.url))
+      return redirecionarPreservandoCookies(new URL(destino, request.url))
     }
     return supabaseResponse
   }
