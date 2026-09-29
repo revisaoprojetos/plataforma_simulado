@@ -24,6 +24,31 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Sem acesso a este documento.' }, { status: 403 })
   }
 
+  // Regra SEQUENCIAL (opcional, por módulo — default OFF): se ligada, só aceita resposta de um dia
+  // cujos ANTERIORES (mesma pasta, ordem menor) já tenham o quiz concluído. Fecha o furo de pular a
+  // ordem por URL/aba (a trava da trilha era só visual). Default OFF = liberdade total (não checa).
+  try {
+    const { data: docAtual } = await svc.from('simulado_documentos').select('pasta_id, ordem').eq('id', documento_id).eq('tenant_id', sessao.tenantId).maybeSingle()
+    const pastaId = (docAtual as any)?.pasta_id
+    if (pastaId) {
+      const { data: pasta } = await svc.from('simulado_pastas').select('regra_sequencial').eq('id', pastaId).eq('tenant_id', sessao.tenantId).maybeSingle()
+      if ((pasta as any)?.regra_sequencial === true) {
+        const { data: antes } = await svc.from('simulado_documentos').select('id').eq('tenant_id', sessao.tenantId).eq('pasta_id', pastaId).eq('deletado', false).eq('publicado', true).lt('ordem', (docAtual as any)?.ordem ?? 0)
+        const antesIds = (antes ?? []).map((a: any) => a.id)
+        if (antesIds.length) {
+          const [qz, rp] = await Promise.all([
+            svc.from('simulado_documento_quiz_questoes').select('documento_id, questao_id').eq('tenant_id', sessao.tenantId).eq('deletado', false).in('documento_id', antesIds),
+            svc.from('simulado_leitura_respostas').select('documento_id, questao_id').eq('tenant_id', sessao.tenantId).eq('estudante_id', sessao.estudanteId).in('documento_id', antesIds),
+          ])
+          const qpd = new Map<string, Set<string>>(); for (const q of (qz.data ?? []) as any[]) (qpd.get(q.documento_id) ?? qpd.set(q.documento_id, new Set()).get(q.documento_id)!).add(q.questao_id)
+          const apd = new Map<string, Set<string>>(); for (const r of (rp.data ?? []) as any[]) (apd.get(r.documento_id) ?? apd.set(r.documento_id, new Set()).get(r.documento_id)!).add(r.questao_id)
+          const pendente = antesIds.some((id: string) => { const qs = qpd.get(id); if (!qs || qs.size === 0) return false; const ans = apd.get(id) ?? new Set<string>(); return ![...qs].every((x) => ans.has(x)) })
+          if (pendente) return NextResponse.json({ message: 'Conclua a aula anterior antes de responder esta.' }, { status: 403 })
+        }
+      }
+    }
+  } catch { /* coluna/tabela ausente → não bloqueia (comportamento livre) */ }
+
   // A questão precisa estar realmente anexada a este documento (evita responder qualquer questão) —
   // seja como questão INLINE da leitura (simulado_documento_questoes) OU como "Questões do conteúdo"
   // do mini-simulado (simulado_documento_quiz_questoes). Aceitar as duas fontes.

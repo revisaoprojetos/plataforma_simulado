@@ -92,6 +92,18 @@ services:
         - "traefik.http.routers.plataforma-simulado.tls.domains[0].main=${APP_BASE_DOMAIN:-revisaopge.com.br}"
         - "traefik.http.routers.plataforma-simulado.tls.domains[0].sans=*.${APP_BASE_DOMAIN:-revisaopge.com.br}"
         - "traefik.http.services.plataforma-simulado.loadbalancer.server.port=3000"
+        # ── Domínios PRÓPRIOS de tenant (FORA de *.${APP_BASE_DOMAIN}) ───────────────────────────
+        # O HostRegexp acima só alcança subdomínios do domínio BASE. Um tenant com domínio próprio
+        # (ex.: simulado.vocenadefensoria.com.br) NÃO casa lá → 404 do Traefik. Precisa desta rota
+        # EXPLÍCITA. TEM que ficar AQUI (na stack), não só num label manual do Portainer — senão o
+        # próximo re-deploy da stack apaga e o domínio cai. Vários: `Host(`a`) || Host(`b`)` na env.
+        # Prioridade > catch-all (1) para vencer. Cert individual via HTTP-01 (o wildcard só cobre a base).
+        - "traefik.http.routers.plataforma-simulado-custom.rule=${APP_CUSTOM_HOSTS_RULE:-Host(`simulado.vocenadefensoria.com.br`)}"
+        - "traefik.http.routers.plataforma-simulado-custom.priority=10"
+        - "traefik.http.routers.plataforma-simulado-custom.entrypoints=websecure"
+        - "traefik.http.routers.plataforma-simulado-custom.tls=true"
+        - "traefik.http.routers.plataforma-simulado-custom.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencryptresolver}"
+        - "traefik.http.routers.plataforma-simulado-custom.service=plataforma-simulado"
 
   # API NestJS (relatórios pesados — strangler). INTERNA: sem Traefik; o web a alcança por
   # http://api:3001 na rede `default`. Roda o SQL de relatório fora do web, aliviando-o.

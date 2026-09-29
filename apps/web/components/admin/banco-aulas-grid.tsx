@@ -12,6 +12,7 @@ import { PersonalizarAulaDialog } from '@/components/admin/personalizar-aula-dia
 import { ModuloAdesivoForm } from '@/components/admin/modulo-adesivo-form'
 import { ModuloPontuacaoForm } from '@/components/admin/modulo-pontuacao-form'
 import { ModuloDesafiosForm } from '@/components/admin/modulo-desafios-form'
+import { ModuloRegraSequencialForm } from '@/components/admin/modulo-regra-sequencial-form'
 import { ModuloIntroForm } from '@/components/admin/modulo-intro-form'
 import { ModuloDescricaoForm } from '@/components/admin/modulo-descricao-form'
 import { ModuloRegulamentoForm } from '@/components/admin/modulo-regulamento-form'
@@ -234,6 +235,7 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTa
                 <ModuloIntroForm pastaId={moduloAtual.id} atual={moduloAtual.intro} />
                 <ModuloAdesivoForm pastaId={moduloAtual.id} atual={moduloAtual.adesivo_url} />
                 <ModuloPontuacaoForm pastaId={moduloAtual.id} atual={moduloAtual.pontuacao} />
+                <ModuloRegraSequencialForm key={`seq-${moduloAtual.id}`} pastaId={moduloAtual.id} atual={moduloAtual.regraSequencial} />
                 <ModuloDesafiosForm key={`desafios-${moduloAtual.id}`} pastaId={moduloAtual.id} atual={moduloAtual.desafios} />
               </ConfigModuloSalvarProvider>
             </div>

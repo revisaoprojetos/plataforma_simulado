@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { createAdminClient } from '@/lib/supabase/server'
+import { avatarPadraoDe } from '@/lib/aluno/avatar-padrao'
 import { montarRelatorioEstudante } from '@/app/admin/relatorios/estudantes/_dados'
 import { RelatorioEstudanteView } from '@/app/admin/relatorios/estudantes/relatorio-estudante-view'
 import { KpiCard } from '@/components/admin/relatorios/viz'
@@ -20,9 +21,6 @@ export const dynamic = 'force-dynamic'
 export const metadata = { title: 'Meu perfil' }
 
 const fmt = (n: number) => n.toLocaleString('pt-BR')
-function iniciais(nome: string) {
-  return nome.split(' ').filter(Boolean).slice(0, 2).map((n) => n[0]).join('').toUpperCase() || 'A'
-}
 
 /**
  * Perfil do estudante: cabeçalho (dados + nível/liga/streak) → KPIs → conquistas →
@@ -121,10 +119,8 @@ export default async function PerfilAlunoPage() {
               </svg>
             ) : null}
             <span className="absolute inset-[20px] flex items-center justify-center overflow-hidden rounded-full text-4xl font-bold text-primary shadow-sm ring-1 ring-black/10" style={{ background: pers.avatarCor ?? '#ffffff' }}>
-              {pers.avatar ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={pers.avatar} alt="" className="h-full w-full object-contain object-[center_82%]" />
-              ) : iniciais(nome)}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={pers.avatar || avatarPadraoDe(nome)} alt="" className={`h-full w-full object-contain ${pers.avatar ? 'object-[center_82%]' : 'object-center'}`} />
             </span>
             {prog && (
               <span className="absolute bottom-1.5 left-1/2 -translate-x-1/2 rounded-full border border-primary/40 bg-background px-2.5 py-0.5 text-[11px] font-bold shadow-sm" style={{ color: corNivel }}>Nv {prog.nivel}</span>

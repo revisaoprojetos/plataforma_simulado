@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { LoginLoading } from '@/components/aluno/login-loading'
 import { type LoginConfig } from '@/lib/login-config'
+import { avatarPadraoDe } from '@/lib/aluno/avatar-padrao'
 import { Home, ClipboardList, Lightbulb, BookOpen, Star, NotebookPen, GraduationCap, LogOut, Trophy, Flame, Zap, Route, Library, CalendarDays, ChevronRight } from 'lucide-react'
 import {
   Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -70,9 +71,6 @@ function frameLogo(estilo?: string): string {
   if (estilo === 'quadrado') return 'rounded-none'
   if (estilo === 'borda') return 'rounded-lg border'
   return 'rounded-lg'
-}
-function iniciais(nome: string) {
-  return nome.split(' ').filter(Boolean).slice(0, 2).map((n) => n[0]).join('').toUpperCase() || 'A'
 }
 
 export interface ProgressoAluno { streak: number; xpTotal: number; nivel: number; liga: string; ligaCor: string }
@@ -224,10 +222,8 @@ export function AlunoSidebar({
           {/* Card do perfil (avatar + nome + email) — todo clicável, no estilo dos botões Ajuda/Sair. */}
           <Link data-tour="perfil" href="/aluno/perfil" title="Meu perfil" className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg p-1.5 pr-2.5 transition-colors hover:bg-white/10 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:p-0">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-bold text-primary shadow-sm ring-1 ring-black/10" style={{ background: avatarCor ?? '#ffffff' }}>
-              {avatar ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img src={avatar} alt="" className="h-full w-full object-contain object-[center_82%]" />
-              ) : iniciais(usuarioNome)}
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={avatar || avatarPadraoDe(usuarioNome)} alt="" className={`h-full w-full object-contain ${avatar ? 'object-[center_82%]' : 'object-center'}`} />
             </span>
             {/* nome/email: colapsam largura + opacidade (não somem de golpe) */}
             <div className="min-w-0 flex-1 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:opacity-0">

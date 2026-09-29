@@ -9,12 +9,10 @@ import { useSidebar } from '@/components/ui/sidebar'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useSWRGet } from '@/hooks/use-swr-get'
 import { cn } from '@/lib/utils'
+import { avatarPadraoDe } from '@/lib/aluno/avatar-padrao'
 
 export type NavMode = 'tabs' | 'menu'
 
-function iniciais(nome: string) {
-  return nome.split(' ').filter(Boolean).slice(0, 2).map((n) => n[0]).join('').toUpperCase() || 'A'
-}
 function filtroLogo(f?: string): string | undefined {
   if (f === 'branco') return 'brightness(0) invert(1)'
   if (f === 'preto') return 'brightness(0)'
@@ -114,10 +112,8 @@ export function AlunoMobileNav({ navMode, logo, nome = 'Área do Aluno', subtitu
 
   const avatarEl = (ativo: boolean, tam: string) => (
     <span className={cn('flex items-center justify-center overflow-hidden rounded-full text-[10px] font-bold text-primary', tam, ativo ? 'ring-2 ring-[color:var(--brand-accent)]' : 'ring-1 ring-black/10')} style={{ background: avatarCor ?? '#ffffff' }}>
-      {avatar ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={avatar} alt="" className="h-full w-full object-contain object-[center_82%]" />
-      ) : iniciais(usuarioNome)}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={avatar || avatarPadraoDe(usuarioNome)} alt="" className={cn('h-full w-full object-contain', avatar ? 'object-[center_82%]' : 'object-center')} />
     </span>
   )
 

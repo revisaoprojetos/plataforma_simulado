@@ -6,10 +6,8 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Pencil, X, Check, Loader2, ImageOff, Baseline, CircleOff, ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { avatarPadraoDe } from '@/lib/aluno/avatar-padrao'
 
-function iniciais(nome: string) {
-  return nome.split(' ').filter(Boolean).slice(0, 2).map((n) => n[0]).join('').toUpperCase() || 'A'
-}
 const ehCor = (v: string | null): boolean => !!v && v.startsWith('#')
 
 /**
@@ -49,7 +47,7 @@ export function PerfilEditar({ nome, avatar, perfilCapa, perfilTexto = null, ava
   const previewAvatar = (
     <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border bg-white text-[10px] font-bold text-primary">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      {av ? <img src={av} alt="" className="h-full w-full object-contain object-[center_82%]" /> : iniciais(nome)}
+      <img src={av || avatarPadraoDe(nome)} alt="" className={`h-full w-full object-contain ${av ? 'object-[center_82%]' : 'object-center'}`} />
     </span>
   )
   const previewFundo = capa == null
@@ -79,7 +77,8 @@ export function PerfilEditar({ nome, avatar, perfilCapa, perfilTexto = null, ava
               <Seletor k="foto" label="Foto de perfil" preview={previewAvatar} aberto={exp === 'foto'} onToggle={toggle}>
                 <div className="flex flex-wrap gap-2">
                   <Redonda ativo={av === null} onClick={() => setAv(null)}>
-                    <span className="flex h-full w-full items-center justify-center bg-white text-sm font-bold text-primary">{iniciais(nome)}</span>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={avatarPadraoDe(nome)} alt="Padrão (capivara)" title="Padrão" className="h-full w-full object-contain object-center" />
                   </Redonda>
                   {avatares.map((u) => (
                     <Redonda key={u} ativo={av === u} onClick={() => setAv(u)}>

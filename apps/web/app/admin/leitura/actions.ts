@@ -570,7 +570,7 @@ function normPublicacao(v: any): PublicacaoModulo {
   if (!v || typeof v !== 'object') return PUBLICACAO_PADRAO
   return { status: v.status === 'publicado' ? 'publicado' : 'rascunho', publicarEm: v.publicarEm ?? null, encerrarEm: v.encerrarEm ?? null }
 }
-export type ModuloLeitura = { id: string; nome: string; pai_id: string | null; cor: string | null; icone: string | null; capa_url: string | null; capa_card_url: string | null; adesivo_url: string | null; pontuacao: PontuacaoLeitura; desafios: DesafioModulo[]; intro: IntroConfig; regulamento: RegulamentoConfig; trilhaAparencia: TrilhaAparencia; ordem: number; subpastas: number; aulas: number; publicacao: PublicacaoModulo }
+export type ModuloLeitura = { id: string; nome: string; pai_id: string | null; cor: string | null; icone: string | null; capa_url: string | null; capa_card_url: string | null; adesivo_url: string | null; pontuacao: PontuacaoLeitura; desafios: DesafioModulo[]; intro: IntroConfig; regulamento: RegulamentoConfig; trilhaAparencia: TrilhaAparencia; regraSequencial: boolean; ordem: number; subpastas: number; aulas: number; publicacao: PublicacaoModulo }
 export type BancoAulas = { ok: boolean; error?: string; pastas?: ModuloLeitura[]; aulas?: (Documento & { questoes?: number })[]; breadcrumb?: { id: string; nome: string }[]; modulos?: { id: string; nome: string }[]; moduloAtual?: ModuloLeitura }
 
 /** `.order('ordem')` tolerante: se a coluna `ordem` ainda não existir, refaz ordenando por nome. */
@@ -579,7 +579,8 @@ async function pastasLeitura(svc: any, tenantId: string): Promise<any[]> {
     const b = svc.from('simulado_pastas').select(cols).eq('tenant_id', tenantId).eq('is_folder', true).eq('folder_area', AREA_LEITURA)
     return ordenado ? b.order('ordem', { ascending: true }).order('nome', { ascending: true }) : b.order('nome', { ascending: true })
   }
-  let r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, adesivo_url, pontuacao, intro_config, regulamento, trilha_aparencia, desafios, ordem, publicacao', true)
+  let r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, adesivo_url, pontuacao, intro_config, regulamento, trilha_aparencia, desafios, regra_sequencial, ordem, publicacao', true)
+  if (r.error) r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, adesivo_url, pontuacao, intro_config, regulamento, trilha_aparencia, desafios, ordem, publicacao', true) // regra_sequencial pode não estar migrado
   if (r.error) r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, adesivo_url, pontuacao, intro_config, regulamento, trilha_aparencia, ordem, publicacao', true) // desafios pode não estar migrado
   if (r.error) r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, adesivo_url, pontuacao, intro_config, regulamento, ordem, publicacao', true) // trilha_aparencia pode não estar migrado
   if (r.error) r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, adesivo_url, pontuacao, intro_config, ordem, publicacao', true) // regulamento pode não estar migrado
@@ -617,7 +618,7 @@ export async function listarBancoAulas(pastaId?: string | null, detalhes: boolea
   for (const p of todasPastas) { if (p.pai_id) subPorPasta.set(p.pai_id, (subPorPasta.get(p.pai_id) ?? 0) + 1) }
 
   const pastas: ModuloLeitura[] = todasPastas.filter((p) => (p.pai_id ?? null) === paiAtual).map((p) => ({
-    id: p.id, nome: p.nome, pai_id: p.pai_id ?? null, cor: p.cor ?? null, icone: p.icone ?? null, capa_url: p.capa_url ?? null, capa_card_url: p.capa_card_url ?? null, adesivo_url: p.adesivo_url ?? null, pontuacao: normalizarPontuacaoLeitura(p.pontuacao), desafios: normalizarDesafios(p.desafios), intro: normalizarIntro(p.intro_config), regulamento: normalizarRegulamento(p.regulamento), trilhaAparencia: resolverTrilhaAparencia(p.trilha_aparencia),
+    id: p.id, nome: p.nome, pai_id: p.pai_id ?? null, cor: p.cor ?? null, icone: p.icone ?? null, capa_url: p.capa_url ?? null, capa_card_url: p.capa_card_url ?? null, adesivo_url: p.adesivo_url ?? null, pontuacao: normalizarPontuacaoLeitura(p.pontuacao), desafios: normalizarDesafios(p.desafios), intro: normalizarIntro(p.intro_config), regulamento: normalizarRegulamento(p.regulamento), trilhaAparencia: resolverTrilhaAparencia(p.trilha_aparencia), regraSequencial: !!p.regra_sequencial,
     ordem: p.ordem ?? 0, subpastas: subPorPasta.get(p.id) ?? 0, aulas: docsPorPasta.get(p.id) ?? 0, publicacao: normPublicacao(p.publicacao),
   }))
 
@@ -645,7 +646,7 @@ export async function listarBancoAulas(pastaId?: string | null, detalhes: boolea
   const raiz = paiAtual ? todasPastas.find((p) => p.id === paiAtual) : null
   const moduloAtual: ModuloLeitura | undefined = raiz ? {
     id: raiz.id, nome: raiz.nome, pai_id: raiz.pai_id ?? null, cor: raiz.cor ?? null, icone: raiz.icone ?? null,
-    capa_url: raiz.capa_url ?? null, capa_card_url: raiz.capa_card_url ?? null, adesivo_url: raiz.adesivo_url ?? null, pontuacao: normalizarPontuacaoLeitura(raiz.pontuacao), desafios: normalizarDesafios(raiz.desafios), intro: normalizarIntro(raiz.intro_config), regulamento: normalizarRegulamento(raiz.regulamento), trilhaAparencia: resolverTrilhaAparencia(raiz.trilha_aparencia),
+    capa_url: raiz.capa_url ?? null, capa_card_url: raiz.capa_card_url ?? null, adesivo_url: raiz.adesivo_url ?? null, pontuacao: normalizarPontuacaoLeitura(raiz.pontuacao), desafios: normalizarDesafios(raiz.desafios), intro: normalizarIntro(raiz.intro_config), regulamento: normalizarRegulamento(raiz.regulamento), trilhaAparencia: resolverTrilhaAparencia(raiz.trilha_aparencia), regraSequencial: !!raiz.regra_sequencial,
     ordem: raiz.ordem ?? 0, subpastas: subPorPasta.get(raiz.id) ?? 0, aulas: docsPorPasta.get(raiz.id) ?? 0, publicacao: normPublicacao(raiz.publicacao),
   } : undefined
 
@@ -758,6 +759,15 @@ export async function salvarPontuacaoModulo(id: string, cfg: PontuacaoLeitura): 
   if (error) return { ok: false, error: /pontuacao|column|schema cache/i.test(error.message) ? 'Migração da pontuação pendente (pontuacao).' : error.message }
   await invalidarRankingLeitura(g.tenantId, id) // pontuação mudou → recalcula o ranking na hora
   revalidatePath('/admin/leitura'); return { ok: true }
+}
+
+/** Liga/desliga a REGRA SEQUENCIAL da trilha do módulo (default OFF = livre). Tolerante à coluna ausente. */
+export async function salvarRegraSequencialModulo(id: string, ativo: boolean): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_pastas').update({ regra_sequencial: !!ativo }).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  if (error) return { ok: false, error: /regra_sequencial|column|schema cache/i.test(error.message) ? 'Aplique a migração 20260929000001_pasta_regra_sequencial.' : error.message }
+  revalidatePath('/admin/leitura'); revalidatePath('/aluno/leitura'); return { ok: true }
 }
 
 /** Desafios do módulo (metas de longo prazo com bônus de XP). Tolerante à migração `desafios` (jsonb) ausente. */
@@ -882,6 +892,12 @@ export interface DetalheRankingAluno {
   streakAtual: number; streakMaior: number; ultimoDiaAtivo: string | null
   totalAulas: number; aulasConcluidas: number; pontosTotal: number
   aulas: DetalheAulaRanking[]
+  // Calendário de reconfiguração da sequência (suporte):
+  tz: string                            // fuso do tenant
+  hoje: string                          // 'YYYY-MM-DD' no fuso do tenant
+  diasAuto: string[]                    // dias em que o aluno concluiu ao menos uma aula (automático)
+  overrides: Record<string, boolean>    // ajustes manuais: dia→conta(true)/desconsidera(false)
+  diaAulas: Record<string, string[]>    // dia → títulos das aulas concluídas (tooltip do calendário)
 }
 
 /**
@@ -932,6 +948,7 @@ export async function detalheRankingAluno(moduloId: string, estudanteId: string)
   const ontem = new Date(Date.parse(hoje + 'T00:00:00Z') - 86_400_000).toISOString().slice(0, 10)
   const aulas: DetalheAulaRanking[] = []
   const diasConcluidos = new Set<string>()
+  const diaAulas: Record<string, string[]> = {}
   for (const d of docList) {
     const c = cellPorDoc.get(d.id); const qs = quizPorDoc.get(d.id)
     if (!c || !qs || qs.size === 0 || ![...qs].every((qid) => c.answered.has(qid))) continue // só aulas FEITAS (quiz completo)
@@ -940,27 +957,50 @@ export async function detalheRankingAluno(moduloId: string, estudanteId: string)
       ? (pontuacao.pontos_aula + pontuacao.pontos_quiz) + c.correct.size * pontuacao.pontos_acerto + (pontuacao.combo_ativo && gabaritou ? pontuacao.combo_bonus : 0)
       : c.correct.size
     aulas.push({ titulo: d.titulo, data: c.ultima, pontos })
-    if (c.ultima) diasConcluidos.add(diaDe(c.ultima))
+    if (c.ultima) { const dia = diaDe(c.ultima); diasConcluidos.add(dia); (diaAulas[dia] ??= []).push(d.titulo) }
   }
   const pontosTotal = aulas.reduce((s, a) => s + a.pontos, 0)
-  // Sequência = dias consecutivos (mesma regra da tabela) → a coluna Sequência bate com o pop-up.
-  const dias = [...diasConcluidos].sort()
-  let run = 0, prev = ''
-  for (const dd of dias) { run = prev && Date.parse(dd + 'T00:00:00Z') - Date.parse(prev + 'T00:00:00Z') === 86_400_000 ? run + 1 : 1; prev = dd }
-  const ultimo = dias[dias.length - 1] ?? ''
-  const streakAtual = ultimo === hoje || ultimo === ontem ? run : 0
 
-  const { data: gamRow } = await svc.from('simulado_gamificacao_estudante').select('streak_maior, ultimo_dia_ativo').eq('tenant_id', g.tenantId).eq('estudante_id', estudanteId).maybeSingle()
+  // AJUSTES manuais do suporte (calendário) — sobrepõem o automático. Tolerante (tabela pode não existir).
+  let overrides: Record<string, boolean> = {}
+  try {
+    const { data: aj } = await svc.from('simulado_leitura_sequencia_ajuste').select('overrides').eq('tenant_id', g.tenantId).eq('estudante_id', estudanteId).eq('modulo_id', moduloId).maybeSingle()
+    if (aj && (aj as any).overrides && typeof (aj as any).overrides === 'object') overrides = (aj as any).overrides as Record<string, boolean>
+  } catch { /* migração pendente → sem ajuste */ }
+  const { calcularSequencia } = await import('@/lib/leitura/sequencia')
+  const seq = calcularSequencia(diasConcluidos, overrides, hoje, ontem)
+
+  const { data: gamRow } = await svc.from('simulado_gamificacao_estudante').select('ultimo_dia_ativo').eq('tenant_id', g.tenantId).eq('estudante_id', estudanteId).maybeSingle()
   const { data: est } = await svc.from('simulado_estudantes').select('nome, email').eq('id', estudanteId).eq('tenant_id', g.tenantId).maybeSingle()
 
   return {
     ok: true,
     detalhe: {
       nome: (est as any)?.nome ?? 'Aluno', email: (est as any)?.email ?? null,
-      streakAtual, streakMaior: Math.max((gamRow as any)?.streak_maior ?? 0, streakAtual), ultimoDiaAtivo: (gamRow as any)?.ultimo_dia_ativo ?? null,
+      streakAtual: seq.streakAtual, streakMaior: seq.streakMaior, ultimoDiaAtivo: (gamRow as any)?.ultimo_dia_ativo ?? null,
       totalAulas: docList.length, aulasConcluidas: aulas.length, pontosTotal, aulas,
+      tz, hoje, diasAuto: [...diasConcluidos].sort(), overrides, diaAulas,
     },
   }
+}
+
+/** Salva os AJUSTES manuais da sequência de um aluno (calendário do suporte). `overrides` = dia→bool
+ *  (`true` força a contar / reativa; `false` desconsidera um dia que ele fez). Chaves só 'YYYY-MM-DD'.
+ *  Upsert por (tenant, aluno, módulo). Tolerante à migração ausente (avisa p/ aplicar). */
+export async function salvarSequenciaAjuste(moduloId: string, estudanteId: string, overrides: Record<string, boolean>): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const limpo: Record<string, boolean> = {}
+  for (const [k, v] of Object.entries(overrides ?? {})) if (/^\d{4}-\d{2}-\d{2}$/.test(k)) limpo[k] = !!v
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_leitura_sequencia_ajuste').upsert(
+    { tenant_id: g.tenantId, estudante_id: estudanteId, modulo_id: moduloId, overrides: limpo, atualizado_por: g.atorId, atualizado_em: new Date().toISOString() },
+    { onConflict: 'tenant_id,estudante_id,modulo_id' },
+  )
+  if (error) {
+    if (/does not exist|schema cache|42P01/i.test(error.message)) return { ok: false, error: 'Aplique a migração 20260929000000_leitura_sequencia_ajuste.' }
+    return { ok: false, error: error.message }
+  }
+  return { ok: true }
 }
 
 export async function excluirModuloLeitura(id: string): Promise<{ ok: boolean; error?: string }> {

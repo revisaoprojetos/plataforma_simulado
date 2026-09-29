@@ -105,6 +105,15 @@ export async function carregarRankingModulo(moduloId: string, tenantId: string):
     const diaDe = (iso: string) => new Date(iso).toLocaleDateString('en-CA', { timeZone: tz })
     const hoje = new Date().toLocaleDateString('en-CA', { timeZone: tz })
     const ontem = new Date(Date.parse(hoje + 'T00:00:00Z') - 86_400_000).toISOString().slice(0, 10)
+
+    // Ajustes MANUAIS da sequência (calendário do suporte) por aluno — sobrepõem o automático. Tolerante.
+    const { calcularSequencia } = await import('@/lib/leitura/sequencia')
+    const overridesPorAluno = new Map<string, Record<string, boolean>>()
+    try {
+      const { data: ajs } = await svc.from('simulado_leitura_sequencia_ajuste').select('estudante_id, overrides').eq('tenant_id', tenantId).eq('modulo_id', moduloId)
+      for (const a of ajs ?? []) if ((a as any).overrides && typeof (a as any).overrides === 'object') overridesPorAluno.set((a as any).estudante_id, (a as any).overrides)
+    } catch { /* migração pendente → sem ajuste */ }
+
     const brutos = [...porAluno.entries()].map(([id, dmap]) => {
       let acertos = 0, aulasConcluidas = 0, aulasGabaritadas = 0
       const diasConcluidos = new Set<string>()
@@ -118,11 +127,7 @@ export async function carregarRankingModulo(moduloId: string, tenantId: string):
           if (cell.ultima) diasConcluidos.add(diaDe(cell.ultima))
         }
       }
-      const dias = [...diasConcluidos].sort()
-      let run = 0, prev = ''
-      for (const d of dias) { run = prev && Date.parse(d + 'T00:00:00Z') - Date.parse(prev + 'T00:00:00Z') === 86_400_000 ? run + 1 : 1; prev = d }
-      const ultimo = dias[dias.length - 1] ?? ''
-      const streakAtual = ultimo === hoje || ultimo === ontem ? run : 0 // perdeu a sequência se ficou um dia sem aula
+      const streakAtual = calcularSequencia(diasConcluidos, overridesPorAluno.get(id), hoje, ontem).streakAtual
       return { estudanteId: id, acertos, aulasConcluidas, aulasGabaritadas, streakAtual, score: pontuarLegProc(pontuacao, { acertos, aulasConcluidas, aulasGabaritadas }, gamAtivo) }
     }).filter((x) => x.acertos > 0 || x.aulasConcluidas > 0)
     if (!brutos.length) return { itens: [], gamAtivo, pontuacao }

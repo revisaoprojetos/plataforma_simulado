@@ -26,7 +26,7 @@ interface AulaSeq extends AulaStatus { estado: EstadoAula; moduloId: string; nao
 async function pastasLeitura(svc: any, tenantId: string): Promise<any[]> {
   const base = (cols: string) => svc.from('simulado_pastas').select(cols).eq('tenant_id', tenantId).eq('is_folder', true).eq('folder_area', 'leitura')
   // 1ª tentativa inclui adesivo_url/intro_config (colunas novas, tolerante — cai nas próximas se ausentes).
-  let r = await base('id, nome, cor, capa_url, capa_card_url, pai_id, ordem, publicacao, adesivo_url, intro_config, pontuacao, regulamento, trilha_aparencia').order('ordem', { ascending: true }).order('nome', { ascending: true })
+  let r = await base('id, nome, cor, capa_url, capa_card_url, pai_id, ordem, publicacao, adesivo_url, intro_config, pontuacao, regulamento, trilha_aparencia, regra_sequencial').order('ordem', { ascending: true }).order('nome', { ascending: true })
   if (r.error) r = await base('id, nome, cor, capa_url, capa_card_url, pai_id, ordem, publicacao, adesivo_url, intro_config, pontuacao, regulamento').order('ordem', { ascending: true }).order('nome', { ascending: true })
   if (r.error) r = await base('id, nome, cor, capa_url, capa_card_url, pai_id, ordem, publicacao, adesivo_url, intro_config, pontuacao').order('ordem', { ascending: true }).order('nome', { ascending: true })
   if (r.error) r = await base('id, nome, cor, capa_url, capa_card_url, pai_id, ordem, publicacao, adesivo_url, intro_config').order('ordem', { ascending: true }).order('nome', { ascending: true })
@@ -141,16 +141,20 @@ async function sequenciaLeitura(estId: string, tenantId: string) {
   for (const arr of byModulo.values()) arr.sort((a, b) => (a.ordem - b.ordem) || a.titulo.localeCompare(b.titulo))
 
   // Gate de PUBLICAÇÃO do módulo: rascunho / agendado p/ futuro / encerrado não aparecem (dados ficam salvos).
-  const todosModulos = pastas.filter((p) => byModulo.has(p.id) && moduloPublicadoAgora(p.publicacao)).map((p) => ({ id: p.id as string, nome: p.nome as string, cor: (p.cor ?? null) as string | null, capa: (p.capa_url ?? null) as string | null, capaCard: (p.capa_card_url ?? null) as string | null, adesivo: (p.adesivo_url ?? null) as string | null, intro: normalizarIntro(p.intro_config), regulamento: normalizarRegulamento(p.regulamento), pontuacao: normalizarPontuacaoLeitura(p.pontuacao), trilhaAparencia: resolverTrilhaAparencia(p.trilha_aparencia) }))
+  const todosModulos = pastas.filter((p) => byModulo.has(p.id) && moduloPublicadoAgora(p.publicacao)).map((p) => ({ id: p.id as string, nome: p.nome as string, cor: (p.cor ?? null) as string | null, capa: (p.capa_url ?? null) as string | null, capaCard: (p.capa_card_url ?? null) as string | null, adesivo: (p.adesivo_url ?? null) as string | null, intro: normalizarIntro(p.intro_config), regulamento: normalizarRegulamento(p.regulamento), pontuacao: normalizarPontuacaoLeitura(p.pontuacao), trilhaAparencia: resolverTrilhaAparencia(p.trilha_aparencia), regraSequencial: !!p.regra_sequencial }))
   // Gate de acesso do módulo (pula os que o aluno não pode ver).
   const acessiveis = await modulosAcessiveis(svc, tenantId, estId, todosModulos.map((m) => m.id))
   const modulos = todosModulos.filter((m) => acessiveis.has(m.id))
-  if (byModulo.has('__geral__')) modulos.push({ id: '__geral__', nome: 'Geral', cor: null, capa: null, capaCard: null, adesivo: null, intro: normalizarIntro(null), regulamento: normalizarRegulamento(null), pontuacao: normalizarPontuacaoLeitura(null), trilhaAparencia: DEFAULT_TRILHA_APARENCIA })
+  if (byModulo.has('__geral__')) modulos.push({ id: '__geral__', nome: 'Geral', cor: null, capa: null, capaCard: null, adesivo: null, intro: normalizarIntro(null), regulamento: normalizarRegulamento(null), pontuacao: normalizarPontuacaoLeitura(null), trilhaAparencia: DEFAULT_TRILHA_APARENCIA, regraSequencial: false })
 
   const seqByModulo = new Map<string, AulaSeq[]>()
-  let jaAbriu = false // já achou o "atual"
   let jaProxima = false // já achou a PRÓXIMA a liberar (1ª aula ainda não liberada de toda a sequência)
   for (const m of modulos) {
+    // Regra SEQUENCIAL é POR MÓDULO (config). Default OFF = LIVRE: toda aula liberada e não-concluída
+    // é acessível (o aluno faz em qualquer ordem). ON = desbloqueio rígido: só 1 aula aberta por vez
+    // (a 1ª não-concluída = 'atual', as seguintes = 'bloqueado' com "conclua a anterior").
+    const seq = (m as { regraSequencial?: boolean }).regraSequencial === true
+    let jaAbriu = false
     const arr: AulaSeq[] = []
     for (const d of byModulo.get(m.id) ?? []) {
       const s = st.get(d.id)!
@@ -159,7 +163,8 @@ async function sequenciaLeitura(estId: string, tenantId: string) {
       if (d.visualizavel) { const proxima = !jaProxima; jaProxima = true; arr.push({ ...s, estado: 'bloqueado', naoLiberada: true, proxima, moduloId: m.id }); continue }
       let estado: EstadoAula
       if (s.aulaConcluida) estado = 'concluido'
-      else if (!jaAbriu) { estado = 'atual'; jaAbriu = true }
+      else if (!seq) estado = 'atual'                       // LIVRE: disponível
+      else if (!jaAbriu) { estado = 'atual'; jaAbriu = true } // SEQUENCIAL: só a 1ª não-concluída abre
       else estado = 'bloqueado'
       arr.push({ ...s, estado, moduloId: m.id })
     }

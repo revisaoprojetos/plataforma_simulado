@@ -5,13 +5,14 @@ import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { Trophy, Sparkles, ArrowUpDown, MoreVertical, X, Loader2, Flame, Zap, BookCheck, Award, Search, Eye, EyeOff, RotateCw } from 'lucide-react'
+import { Trophy, Sparkles, ArrowUpDown, MoreVertical, X, Loader2, Flame, Zap, BookCheck, Award, Search, Eye, EyeOff, RotateCw, ChevronLeft, ChevronRight, Save, Check, CalendarDays } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { formatBrt } from '@/lib/brt'
 import { AvatarEstudante } from '@/components/aluno/avatar-estudante'
 import type { RankingLeitura, RankingLeituraItem } from '@/lib/leitura/ranking'
-import { detalheRankingAluno, recalcularRankingLeitura, type DetalheRankingAluno } from '@/app/admin/leitura/actions'
+import { detalheRankingAluno, recalcularRankingLeitura, salvarSequenciaAjuste, type DetalheRankingAluno } from '@/app/admin/leitura/actions'
+import { calcularSequencia } from '@/lib/leitura/sequencia'
 
 const POR_PAG = 10
 const iniciais = (n: string) => (n || '').split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?'
@@ -222,16 +223,24 @@ export function LeituraRanking({ ranking, meuId, meuNome, modo = 'aluno', modulo
   )
 }
 
-/** Pop-up com o detalhe do aluno: sequência (atual/maior), progresso e a lista de aulas (data + pontos). */
+/** Pop-up com o detalhe do aluno. Abas: "Visão geral" (sequência/progresso/aulas) e "Sequência"
+ *  (calendário do suporte: marcar/desconsiderar dias que contam no streak). */
 function DetalheAlunoModal({ moduloId, it, onClose }: { moduloId: string; it: RankingLeituraItem; onClose: () => void }) {
   const [d, setD] = useState<DetalheRankingAluno | null>(null)
   const [erro, setErro] = useState<string | null>(null)
+  const [aba, setAba] = useState<'geral' | 'sequencia'>('geral')
+  const [ovr, setOvr] = useState<Record<string, boolean>>({})
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', onKey)
-    detalheRankingAluno(moduloId, it.estudanteId).then((r) => { if (r.ok && r.detalhe) setD(r.detalhe); else setErro(r.error ?? 'Erro ao carregar.') }).catch(() => setErro('Erro ao carregar.'))
+    detalheRankingAluno(moduloId, it.estudanteId).then((r) => { if (r.ok && r.detalhe) { setD(r.detalhe); setOvr(r.detalhe.overrides ?? {}) } else setErro(r.error ?? 'Erro ao carregar.') }).catch(() => setErro('Erro ao carregar.'))
     return () => document.removeEventListener('keydown', onKey)
   }, [moduloId, it.estudanteId, onClose])
+
+  // Sequência AO VIVO (reflete as edições do calendário antes de salvar).
+  const seqLive = useMemo(() => (d ? calcularSequencia(d.diasAuto, ovr, d.hoje) : null), [d, ovr])
+  const streakAtual = seqLive?.streakAtual ?? d?.streakAtual ?? 0
+  const streakMaior = seqLive?.streakMaior ?? d?.streakMaior ?? 0
 
   const pctProg = d && d.totalAulas > 0 ? Math.round((d.aulasConcluidas / d.totalAulas) * 100) : 0
   const Stat = ({ icon: Icon, label, valor }: { icon: typeof Flame; label: string; valor: ReactNode }) => (
@@ -245,7 +254,7 @@ function DetalheAlunoModal({ moduloId, it, onClose }: { moduloId: string; it: Ra
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative flex max-h-[85vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="relative flex max-h-[88vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-3 border-b p-4">
           <AvatarEstudante nome={it.nome} avatar={it.avatar} cor={it.avatarCor ?? '#6d28d9'} className="h-10 w-10 shrink-0 text-sm text-white" />
           <div className="min-w-0 flex-1">
@@ -255,17 +264,29 @@ function DetalheAlunoModal({ moduloId, it, onClose }: { moduloId: string; it: Ra
           <button type="button" onClick={onClose} aria-label="Fechar" className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+        {d && (
+          <div className="flex gap-1 border-b px-3 pt-2">
+            {([['geral', 'Visão geral'], ['sequencia', 'Sequência']] as const).map(([k, label]) => (
+              <button key={k} type="button" onClick={() => setAba(k)}
+                className={cn('relative rounded-t-lg px-3.5 py-2 text-sm font-medium transition-colors', aba === k ? 'text-foreground' : 'text-muted-foreground hover:text-foreground')}>
+                <span className="inline-flex items-center gap-1.5">{k === 'sequencia' && <CalendarDays className="h-3.5 w-3.5" />}{label}</span>
+                {aba === k && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary" />}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">
           {erro ? (
             <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{erro}</p>
           ) : !d ? (
             <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando…</div>
-          ) : (
-            <>
+          ) : aba === 'geral' ? (
+            <div className="space-y-4">
               <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-4">
                 <Stat icon={Zap} label="pontos" valor={d.pontosTotal.toLocaleString('pt-BR')} />
-                <Stat icon={Flame} label="sequência atual" valor={`${d.streakAtual}d`} />
-                <Stat icon={Award} label="maior sequência" valor={`${d.streakMaior}d`} />
+                <Stat icon={Flame} label="sequência atual" valor={`${streakAtual}d`} />
+                <Stat icon={Award} label="maior sequência" valor={`${streakMaior}d`} />
                 <Stat icon={BookCheck} label="aulas" valor={`${d.aulasConcluidas}/${d.totalAulas}`} />
               </div>
               <div>
@@ -290,12 +311,126 @@ function DetalheAlunoModal({ moduloId, it, onClose }: { moduloId: string; it: Ra
                   </ul>
                 )}
               </div>
-            </>
+            </div>
+          ) : (
+            <CalendarioSequencia
+              d={d} ovr={ovr} setOvr={setOvr} moduloId={moduloId} estudanteId={it.estudanteId}
+              streakAtual={streakAtual} streakMaior={streakMaior}
+              onSaved={(novo) => setD({ ...d, overrides: novo })}
+            />
           )}
         </div>
       </div>
     </div>,
     document.body,
+  )
+}
+
+/** Calendário de reconfiguração da sequência (suporte). Cada dia: verde = conta (o aluno fez);
+ *  tracejado = marcado manualmente (preenche buraco/reativa); acinzentado/riscado = desconsiderado
+ *  (ele fez mas você tirou → quebra a sequência ali). Clique alterna; salva por (aluno, módulo). */
+function CalendarioSequencia({ d, ovr, setOvr, moduloId, estudanteId, streakAtual, streakMaior, onSaved }: {
+  d: DetalheRankingAluno; ovr: Record<string, boolean>; setOvr: (o: Record<string, boolean>) => void
+  moduloId: string; estudanteId: string; streakAtual: number; streakMaior: number; onSaved: (o: Record<string, boolean>) => void
+}) {
+  const autoSet = useMemo(() => new Set(d.diasAuto), [d.diasAuto])
+  const baseDia = d.diasAuto[d.diasAuto.length - 1] || d.hoje
+  const [mes, setMes] = useState<string>(() => baseDia.slice(0, 7)) // 'YYYY-MM'
+  const [salvando, setSalvando] = useState(false)
+  const sujo = useMemo(() => JSON.stringify(ovr) !== JSON.stringify(d.overrides ?? {}), [ovr, d.overrides])
+
+  const [ano, mesN] = mes.split('-').map(Number)
+  const diasNoMes = new Date(Date.UTC(ano, mesN, 0)).getUTCDate()
+  const offsetInicio = new Date(Date.UTC(ano, mesN - 1, 1)).getUTCDay() // 0=Dom
+  const iso = (dia: number) => `${ano}-${String(mesN).padStart(2, '0')}-${String(dia).padStart(2, '0')}`
+  const nomeMes = new Date(Date.UTC(ano, mesN - 1, 1)).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+
+  const estadoDia = (day: string): 'conta-auto' | 'conta-manual' | 'desconsiderado' | 'vazio' => {
+    const auto = autoSet.has(day)
+    const cur = ovr[day]
+    const conta = cur === undefined ? auto : cur
+    if (conta) return auto ? 'conta-auto' : 'conta-manual'
+    return auto ? 'desconsiderado' : 'vazio'
+  }
+  const toggle = (day: string) => {
+    const auto = autoSet.has(day)
+    const cur = ovr[day]
+    const conta = cur === undefined ? auto : cur
+    const novoConta = !conta
+    const novo = { ...ovr }
+    if (novoConta === auto) delete novo[day]
+    else novo[day] = novoConta
+    setOvr(novo)
+  }
+  const mudarMes = (delta: number) => { const dt = new Date(Date.UTC(ano, mesN - 1 + delta, 1)); setMes(`${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}`) }
+  async function salvar() {
+    setSalvando(true)
+    const r = await salvarSequenciaAjuste(moduloId, estudanteId, ovr)
+    setSalvando(false)
+    if (r.ok) { toast.success('Sequência atualizada.'); onSaved(ovr) }
+    else toast.error(r.error ?? 'Não foi possível salvar.')
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2.5">
+        <div className="flex-1 rounded-xl border bg-muted/30 p-3 text-center">
+          <Flame className="mx-auto mb-1 h-4 w-4 text-primary" />
+          <div className="text-lg font-bold leading-none tabular-nums">{streakAtual}d</div>
+          <div className="mt-1 text-[11px] text-muted-foreground">sequência atual</div>
+        </div>
+        <div className="flex-1 rounded-xl border bg-muted/30 p-3 text-center">
+          <Award className="mx-auto mb-1 h-4 w-4 text-primary" />
+          <div className="text-lg font-bold leading-none tabular-nums">{streakMaior}d</div>
+          <div className="mt-1 text-[11px] text-muted-foreground">maior sequência</div>
+        </div>
+      </div>
+
+      <div className="mx-auto flex w-full max-w-[19rem] items-center justify-between">
+        <button type="button" onClick={() => mudarMes(-1)} aria-label="Mês anterior" className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><ChevronLeft className="h-4 w-4" /></button>
+        <span className="text-sm font-semibold capitalize">{nomeMes}</span>
+        <button type="button" onClick={() => mudarMes(1)} aria-label="Próximo mês" className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><ChevronRight className="h-4 w-4" /></button>
+      </div>
+
+      <div className="mx-auto grid w-full max-w-[19rem] grid-cols-7 gap-1 text-center">
+        {['D', 'S', 'T', 'Q', 'Q', 'S', 'S'].map((w, i) => <div key={i} className="pb-0.5 text-[10px] font-medium text-muted-foreground">{w}</div>)}
+        {Array.from({ length: offsetInicio }).map((_, i) => <div key={'e' + i} />)}
+        {Array.from({ length: diasNoMes }).map((_, i) => {
+          const dia = i + 1; const day = iso(dia); const est = estadoDia(day); const ehHoje = day === d.hoje
+          const titles = d.diaAulas[day]
+          const cls = est === 'conta-auto' ? 'border-primary bg-primary text-primary-foreground'
+            : est === 'conta-manual' ? 'border-dashed border-primary bg-primary/15 text-primary'
+            : est === 'desconsiderado' ? 'border-transparent bg-muted text-muted-foreground/60 line-through'
+            : 'border-transparent text-muted-foreground hover:bg-muted'
+          const tip = titles?.length ? titles.join(' · ') : est === 'vazio' ? 'Marcar como dia da sequência' : est === 'desconsiderado' ? 'Desconsiderado — clique p/ reativar' : ''
+          return (
+            <button key={day} type="button" onClick={() => toggle(day)} title={tip}
+              className={cn('relative flex aspect-square items-center justify-center rounded-md border text-xs font-medium transition-colors', cls, ehHoje && 'ring-2 ring-inset ring-primary')}>
+              {dia}
+              {est === 'desconsiderado' && <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-amber-500" title="Fez, mas desconsiderado" />}
+              {est === 'conta-manual' && <Check className="absolute right-0.5 top-0.5 h-2.5 w-2.5" />}
+            </button>
+          )
+        })}
+      </div>
+
+      <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+        <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-primary" /> Conta (fez)</span>
+        <span className="flex items-center gap-1"><span className="h-3 w-3 rounded border border-dashed border-primary bg-primary/15" /> Marcado manual</span>
+        <span className="flex items-center gap-1"><span className="h-3 w-3 rounded bg-muted" /> Desconsiderado</span>
+      </div>
+      <p className="text-[11px] leading-relaxed text-muted-foreground">
+        Clique num dia pra <b className="text-foreground">marcar</b> (conta na sequência, preenche um buraco) ou pra <b className="text-foreground">desconsiderar</b> um dia que ele fez (quebra a sequência ali). Dias feitos e desconsiderados ficam acinzentados, sinalizando o dia.
+      </p>
+
+      <div className="flex items-center justify-end gap-2 border-t pt-3">
+        {sujo && <button type="button" onClick={() => setOvr(d.overrides ?? {})} className="rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-muted">Descartar</button>}
+        <button type="button" onClick={salvar} disabled={salvando || !sujo}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50">
+          {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar
+        </button>
+      </div>
+    </div>
   )
 }
 
