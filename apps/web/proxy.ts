@@ -85,6 +85,20 @@ export async function proxy(request: NextRequest) {
     return res
   }
 
+  // AUTO-CURA do cookie host-only ÓRFÃO que o proxy ANTIGO gravava (sem domínio). Ele fica
+  // DUPLICADO do cookie de DOMÍNIO (mesmo nome, escopo diferente) → o servidor lê sessão ambígua →
+  // o admin loga e VOLTA pro login em loop. SÓ agimos quando NÃO há sessão válida (`!user`): aí
+  // expiramos a variante host-only (Set-Cookie SEM Domain) dos cookies de auth do Supabase, para o
+  // próximo request ler só o cookie de DOMÍNIO. Gatilho em `!user` garante que uma sessão VÁLIDA
+  // nunca é tocada (não desloga ninguém à toa). Só em prod (cookieDom); localhost usa por-host.
+  const finalizar = (res: NextResponse) => {
+    if (user || !cookieDom) return res
+    for (const c of request.cookies.getAll()) {
+      if (/^sb-.+-auth-token(\.\d+)?$/.test(c.name)) res.headers.append('set-cookie', `${c.name}=; Path=/; Max-Age=0; Secure; SameSite=Lax`)
+    }
+    return res
+  }
+
   const { pathname } = request.nextUrl
 
   const protectedAdminPaths = ['/admin']
@@ -98,7 +112,7 @@ export async function proxy(request: NextRequest) {
   if (pathname.startsWith('/embed/')) {
     supabaseResponse.headers.set('X-Frame-Options', 'ALLOWALL')
     supabaseResponse.headers.set('Content-Security-Policy', "frame-ancestors *")
-    return supabaseResponse
+    return finalizar(supabaseResponse)
   }
 
   // Framing (embed na Curseduca): default SEGURO = framável. SÓ o painel admin/super é protegido
@@ -120,7 +134,7 @@ export async function proxy(request: NextRequest) {
   if (isAdminPath && !user) {
     const loginUrl = new URL('/login', request.url)
     loginUrl.searchParams.set('redirectTo', pathname + request.nextUrl.search) // preserva a query do link
-    return redirecionarPreservandoCookies(loginUrl)
+    return finalizar(redirecionarPreservandoCookies(loginUrl))
   }
 
   // Já autenticado em /login: NÃO pular direto pro /admin — /login é o SELETOR de plataforma
@@ -129,12 +143,12 @@ export async function proxy(request: NextRequest) {
   if (pathname === '/login' && user) {
     const destino = request.nextUrl.searchParams.get('redirectTo')
     if (destino && destino.startsWith('/') && !destino.startsWith('/login')) {
-      return redirecionarPreservandoCookies(new URL(destino, request.url))
+      return finalizar(redirecionarPreservandoCookies(new URL(destino, request.url)))
     }
-    return supabaseResponse
+    return finalizar(supabaseResponse)
   }
 
-  return supabaseResponse
+  return finalizar(supabaseResponse)
 }
 
 export const config = {
