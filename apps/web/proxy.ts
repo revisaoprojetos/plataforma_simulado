@@ -53,6 +53,9 @@ export async function proxy(request: NextRequest) {
   // servidor passa a ler uma sessão ambígua → getUser oscila → loop /admin↔/login (quebra o handoff
   // entre plataformas). Atrás do Traefik, o host real vem em x-forwarded-host (host cru = 0.0.0.0).
   const cookieDom = dominioCookieDeHost(request.headers.get('x-forwarded-host') || request.headers.get('host'))
+  // Marca se o getUser RENOVOU o token nesta request (setAll chamado) — nesse caso o cookie de
+  // DOMÍNIO acabou de ser gravado fresco/válido, então dá p/ apagar o órfão host-only com segurança.
+  let renovou = false
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -63,6 +66,7 @@ export async function proxy(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet: Array<{ name: string; value: string; options?: Record<string, unknown> }>) {
+          renovou = true
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
           supabaseResponse = comPath()
           cookiesToSet.forEach(({ name, value, options }) =>
@@ -86,13 +90,15 @@ export async function proxy(request: NextRequest) {
   }
 
   // AUTO-CURA do cookie host-only ÓRFÃO que o proxy ANTIGO gravava (sem domínio). Ele fica
-  // DUPLICADO do cookie de DOMÍNIO (mesmo nome, escopo diferente) → o servidor lê sessão ambígua →
-  // o admin loga e VOLTA pro login em loop. SÓ agimos quando NÃO há sessão válida (`!user`): aí
-  // expiramos a variante host-only (Set-Cookie SEM Domain) dos cookies de auth do Supabase, para o
-  // próximo request ler só o cookie de DOMÍNIO. Gatilho em `!user` garante que uma sessão VÁLIDA
-  // nunca é tocada (não desloga ninguém à toa). Só em prod (cookieDom); localhost usa por-host.
+  // DUPLICADO do cookie de DOMÍNIO (mesmo nome, escopo diferente) e com TOKEN DIVERGENTE → sempre
+  // que o servidor lê o órfão (stale) o getUser falha → a sessão cai a cada ação/navegação, não só
+  // no login. Expiramos a variante host-only (Set-Cookie SEM Domain) dos cookies de auth do Supabase
+  // quando é SEGURO: (a) não há sessão válida (`!user`, o órfão não está segurando nada), ou (b) o
+  // token acabou de ser RENOVADO (`renovou`, o cookie de domínio já foi gravado fresco). Fora esses
+  // casos (sessão válida que não renovou) NÃO mexe — não dá p/ saber qual cookie o getUser leu, então
+  // preserva. O cookie de DOMÍNIO nunca é apagado (chave = nome+domínio+path). Só em prod (cookieDom).
   const finalizar = (res: NextResponse) => {
-    if (user || !cookieDom) return res
+    if (!cookieDom || (user && !renovou)) return res
     for (const c of request.cookies.getAll()) {
       if (/^sb-.+-auth-token(\.\d+)?$/.test(c.name)) res.headers.append('set-cookie', `${c.name}=; Path=/; Max-Age=0; Secure; SameSite=Lax`)
     }
