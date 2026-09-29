@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation'
 import { getSessaoAluno } from '@/lib/aluno-session'
+import { createAdminClient } from '@/lib/supabase/server'
 import { carregarQuizAluno, gateQuizAluno } from '@/lib/leitura/acesso'
 import { LEITURA_ATIVA } from '@/lib/flags'
 import { LeituraQuestoesStep } from '@/components/aluno/leitura-questoes-step'
@@ -21,5 +22,14 @@ export default async function QuestoesLeituraPage({ params }: { params: Promise<
   // "Voltar" leva à TRILHA do módulo (não à seleção de módulos).
   const trilhaHref = g.pastaId ? `/aluno/leitura?modulo=${g.pastaId}` : '/aluno/leitura'
 
-  return <LeituraQuestoesStep doc={{ id, titulo: g.titulo }} questoes={questoes} trilhaHref={trilhaHref} />
+  // Bloquear refazer o quiz (config do módulo) → esconde os botões "Refazer" (o servidor também barra).
+  let bloquearRefazer = false
+  if (g.pastaId) {
+    try {
+      const { data } = await createAdminClient().from('simulado_pastas').select('quiz_bloquear_refazer').eq('id', g.pastaId).eq('tenant_id', sessao.tenantId).maybeSingle()
+      bloquearRefazer = (data as any)?.quiz_bloquear_refazer === true
+    } catch { /* coluna ausente → não bloqueia */ }
+  }
+
+  return <LeituraQuestoesStep doc={{ id, titulo: g.titulo }} questoes={questoes} trilhaHref={trilhaHref} bloquearRefazer={bloquearRefazer} />
 }

@@ -24,14 +24,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Sem acesso a este documento.' }, { status: 403 })
   }
 
-  // Regra SEQUENCIAL (opcional, por módulo — default OFF): se ligada, só aceita resposta de um dia
-  // cujos ANTERIORES (mesma pasta, ordem menor) já tenham o quiz concluído. Fecha o furo de pular a
-  // ordem por URL/aba (a trava da trilha era só visual). Default OFF = liberdade total (não checa).
+  // Regras do módulo (opcionais, default OFF): SEQUENCIAL (só responde um dia com os anteriores
+  // concluídos) e BLOQUEAR REFAZER (questão já respondida não pode ser re-respondida — trava o quiz
+  // após concluir). A flag de refazer é usada logo abaixo, na hora de gravar.
+  let bloquearRefazer = false
   try {
     const { data: docAtual } = await svc.from('simulado_documentos').select('pasta_id, ordem').eq('id', documento_id).eq('tenant_id', sessao.tenantId).maybeSingle()
     const pastaId = (docAtual as any)?.pasta_id
     if (pastaId) {
-      const { data: pasta } = await svc.from('simulado_pastas').select('regra_sequencial').eq('id', pastaId).eq('tenant_id', sessao.tenantId).maybeSingle()
+      const { data: pasta } = await svc.from('simulado_pastas').select('regra_sequencial, quiz_bloquear_refazer').eq('id', pastaId).eq('tenant_id', sessao.tenantId).maybeSingle()
+      bloquearRefazer = (pasta as any)?.quiz_bloquear_refazer === true
       if ((pasta as any)?.regra_sequencial === true) {
         const { data: antes } = await svc.from('simulado_documentos').select('id').eq('tenant_id', sessao.tenantId).eq('pasta_id', pastaId).eq('deletado', false).eq('publicado', true).lt('ordem', (docAtual as any)?.ordem ?? 0)
         const antesIds = (antes ?? []).map((a: any) => a.id)
@@ -75,6 +77,8 @@ export async function POST(request: NextRequest) {
   const { data: jaResp } = await svc.from('simulado_leitura_respostas')
     .select('respondido_em').eq('tenant_id', sessao.tenantId).eq('estudante_id', sessao.estudanteId)
     .eq('documento_id', documento_id).eq('questao_id', questao_id).maybeSingle()
+  // BLOQUEAR REFAZER: questão já respondida + módulo com a trava ligada → não re-responde (quiz travado).
+  if (bloquearRefazer && jaResp) return NextResponse.json({ message: 'Este quiz já foi concluído e não pode ser refeito.', bloqueado: 'refazer' }, { status: 403 })
   const respondidoEm = (jaResp as any)?.respondido_em ?? new Date().toISOString()
 
   const { data: up, error } = await svc.from('simulado_leitura_respostas').upsert(

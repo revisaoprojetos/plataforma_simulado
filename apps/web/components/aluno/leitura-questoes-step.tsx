@@ -16,7 +16,7 @@ type Resultado = { correta: boolean; corretaId: string | null }
  * FINALIZAR no topo (só habilita com todas respondidas; senão mostra um balão). Estado das respostas vive
  * aqui (no pai) → não some ao navegar. Ao finalizar: registra a tentativa e abre o pop-up com a nota.
  */
-export function LeituraQuestoesStep({ doc, questoes, trilhaHref }: { doc: { id: string; titulo: string }; questoes: QuestaoLeituraDados[]; trilhaHref: string }) {
+export function LeituraQuestoesStep({ doc, questoes, trilhaHref, bloquearRefazer = false }: { doc: { id: string; titulo: string }; questoes: QuestaoLeituraDados[]; trilhaHref: string; bloquearRefazer?: boolean }) {
   const total = questoes.length
   const jaCompletoInicial = total > 0 && questoes.filter((q) => q.resposta).length >= total
 
@@ -64,6 +64,7 @@ export function LeituraQuestoesStep({ doc, questoes, trilhaHref }: { doc: { id: 
   }
 
   const refazer = () => {
+    if (bloquearRefazer) return // quiz travado (config do módulo) — não refaz
     setMostrarPopup(false); setEntrada(false); setRevisando(false); setBalao(false)
     setEscolhas({}); setResultados({}); setMarcadas(new Set()); setIdx(0)
     registradoRef.current = false
@@ -123,10 +124,17 @@ export function LeituraQuestoesStep({ doc, questoes, trilhaHref }: { doc: { id: 
           <ArrowLeft className="h-4 w-4" /> Anterior
         </button>
         {idx >= total - 1 ? (
-          <button type="button" onClick={finalizar}
-            className={cn('inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary px-3 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 hover:shadow-md', !completo && !revisando && 'opacity-50')}>
-            {revisando ? <><RotateCcw className="h-4 w-4" /> Refazer</> : <><Flag className="h-4 w-4" /> Finalizar</>}
-          </button>
+          revisando && bloquearRefazer ? (
+            <button type="button" disabled
+              className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border bg-muted px-3 py-2.5 text-sm font-semibold text-muted-foreground opacity-80">
+              <CheckCircle2 className="h-4 w-4" /> Concluído
+            </button>
+          ) : (
+            <button type="button" onClick={finalizar}
+              className={cn('inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary px-3 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 hover:shadow-md', !completo && !revisando && 'opacity-50')}>
+              {revisando ? <><RotateCcw className="h-4 w-4" /> Refazer</> : <><Flag className="h-4 w-4" /> Finalizar</>}
+            </button>
+          )
         ) : (
           <button type="button" onClick={() => setIdx((i) => Math.min(total - 1, i + 1))}
             className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary px-3 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:opacity-90 hover:shadow-md">
@@ -157,7 +165,9 @@ export function LeituraQuestoesStep({ doc, questoes, trilhaHref }: { doc: { id: 
         </div>
         <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
           {revisando ? (
-            <button type="button" onClick={refazer} className="inline-flex shrink-0 items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-sm font-semibold shadow-sm transition-colors hover:bg-muted"><RotateCcw className="h-4 w-4" /> <span className="hidden sm:inline">Refazer</span></button>
+            bloquearRefazer ? null : (
+              <button type="button" onClick={refazer} className="inline-flex shrink-0 items-center gap-1.5 rounded-full border bg-card px-3 py-1.5 text-sm font-semibold shadow-sm transition-colors hover:bg-muted"><RotateCcw className="h-4 w-4" /> <span className="hidden sm:inline">Refazer</span></button>
+            )
           ) : !entrada && total > 0 ? (
             <div className="relative">
               <button type="button" onClick={finalizar}
@@ -194,7 +204,7 @@ export function LeituraQuestoesStep({ doc, questoes, trilhaHref }: { doc: { id: 
               </div>
               <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
                 <button type="button" onClick={verResultados} className="inline-flex items-center gap-1.5 rounded-xl border bg-card px-4 py-2.5 text-sm font-semibold shadow-sm transition-colors hover:bg-muted"><Eye className="h-4 w-4" /> Ver resultados</button>
-                <button type="button" onClick={refazer} className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90"><RotateCcw className="h-4 w-4" /> Refazer</button>
+                {!bloquearRefazer && <button type="button" onClick={refazer} className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90"><RotateCcw className="h-4 w-4" /> Refazer</button>}
               </div>
             </div>
           ) : (

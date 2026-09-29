@@ -235,7 +235,7 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTa
                 <ModuloIntroForm pastaId={moduloAtual.id} atual={moduloAtual.intro} />
                 <ModuloAdesivoForm pastaId={moduloAtual.id} atual={moduloAtual.adesivo_url} />
                 <ModuloPontuacaoForm pastaId={moduloAtual.id} atual={moduloAtual.pontuacao} />
-                <ModuloRegraSequencialForm key={`seq-${moduloAtual.id}`} pastaId={moduloAtual.id} atual={moduloAtual.regraSequencial} />
+                <ModuloRegraSequencialForm key={`seq-${moduloAtual.id}`} pastaId={moduloAtual.id} atual={moduloAtual.regraSequencial} refazerBloqueado={moduloAtual.quizBloquearRefazer} />
                 <ModuloDesafiosForm key={`desafios-${moduloAtual.id}`} pastaId={moduloAtual.id} atual={moduloAtual.desafios} />
               </ConfigModuloSalvarProvider>
             </div>
