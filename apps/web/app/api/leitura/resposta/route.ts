@@ -68,11 +68,20 @@ export async function POST(request: NextRequest) {
 
   const { data: disc } = await svc.from('simulado_questoes').select('disciplina_id').eq('id', questao_id).maybeSingle()
 
+  // PRESERVA a data da 1ª resposta: REFAZER o quiz NÃO pode mover o `respondido_em` pro dia do
+  // refazimento — senão o "dia de conclusão" da aula migra e pode QUEBRAR a sequência do aluno
+  // (foi o bug: aluna refez o desafio e o registro pulou pro dia seguinte). Só a alternativa/acerto
+  // é atualizada; a data fica a da 1ª vez. Questão nunca respondida antes → grava agora.
+  const { data: jaResp } = await svc.from('simulado_leitura_respostas')
+    .select('respondido_em').eq('tenant_id', sessao.tenantId).eq('estudante_id', sessao.estudanteId)
+    .eq('documento_id', documento_id).eq('questao_id', questao_id).maybeSingle()
+  const respondidoEm = (jaResp as any)?.respondido_em ?? new Date().toISOString()
+
   const { data: up, error } = await svc.from('simulado_leitura_respostas').upsert(
     {
       tenant_id: sessao.tenantId, estudante_id: sessao.estudanteId, documento_id, questao_id,
       alternativa_id, correta, snapshot_gabarito: { alternativa_id, correta, letra: LETRA[idx] ?? '?', correta_id: corretaId },
-      respondido_em: new Date().toISOString(),
+      respondido_em: respondidoEm,
     },
     { onConflict: 'estudante_id,documento_id,questao_id' },
   ).select('id').single()
