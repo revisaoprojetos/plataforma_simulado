@@ -1010,6 +1010,9 @@ export async function salvarSequenciaAjuste(moduloId: string, estudanteId: strin
     if (/does not exist|schema cache|42P01/i.test(error.message)) return { ok: false, error: 'Aplique a migração 20260929000000_leitura_sequencia_ajuste.' }
     return { ok: false, error: error.message }
   }
+  // Reflete o ajuste NA HORA no ranking (admin + aluno): invalida o cache (recálculo agora é ~1s via RPC).
+  await invalidarRankingLeitura(g.tenantId, moduloId).catch(() => {})
+  revalidatePath('/admin/leitura'); revalidatePath('/aluno/leitura')
   return { ok: true }
 }
 

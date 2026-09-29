@@ -74,34 +74,8 @@ export async function carregarRankingModulo(moduloId: string, tenantId: string):
     const aulaIds = (docs ?? []).map((d: { id: string }) => d.id)
     if (!aulaIds.length) return { itens: [], gamAtivo, pontuacao }
 
-    const [quiz, resp] = await Promise.all([
-      // ⚠️ ORDER por `id` (ÚNICO): paginar com `.order('documento_id')` (só 2 valores p/ ~12k linhas) faz o
-      // PostgREST DUPLICAR e PERDER linhas entre páginas (ordem não-estável) → respostas somem e o aluno é
-      // subcontado (aulas/sequência/pontos errados). Ordem única = paginação consistente.
-      fetchAllByIn<{ documento_id: string; questao_id: string }>(aulaIds, (chunk) =>
-        svc.from('simulado_documento_quiz_questoes').select('documento_id, questao_id').eq('tenant_id', tenantId).eq('deletado', false).in('documento_id', chunk).order('id')).catch(() => [] as { documento_id: string; questao_id: string }[]),
-      fetchAllByIn<{ estudante_id: string; documento_id: string; questao_id: string; correta: boolean; respondido_em: string | null }>(aulaIds, (chunk) =>
-        svc.from('simulado_leitura_respostas').select('estudante_id, documento_id, questao_id, correta, respondido_em').eq('tenant_id', tenantId).in('documento_id', chunk).order('id')),
-    ])
-    const quizPorDoc = new Map<string, Set<string>>()
-    for (const q of quiz) (quizPorDoc.get(q.documento_id) ?? quizPorDoc.set(q.documento_id, new Set()).get(q.documento_id)!).add(q.questao_id)
-    if (!resp.length) return { itens: [], gamAtivo, pontuacao }
-
-    // Agrega por (aluno, documento) — só questões do quiz do módulo. `ultima` = quando fechou o quiz.
-    type Cell = { answered: Set<string>; correct: Set<string>; ultima: string | null }
-    const porAluno = new Map<string, Map<string, Cell>>()
-    for (const r of resp) {
-      const q = quizPorDoc.get(r.documento_id)
-      if (!q || !q.has(r.questao_id)) continue
-      const dmap = porAluno.get(r.estudante_id) ?? porAluno.set(r.estudante_id, new Map()).get(r.estudante_id)!
-      const cell = dmap.get(r.documento_id) ?? dmap.set(r.documento_id, { answered: new Set(), correct: new Set(), ultima: null }).get(r.documento_id)!
-      cell.answered.add(r.questao_id); if (r.correta) cell.correct.add(r.questao_id)
-      if (r.respondido_em && (!cell.ultima || r.respondido_em > cell.ultima)) cell.ultima = r.respondido_em
-    }
-
     // Sequência = dias CONSECUTIVOS em que o aluno completou uma AULA COMPLETA (leitura + quiz respondido).
-    // Regra: +1 por DIA (várias aulas no mesmo dia = 1); reinicia ao pular um dia; ZERA se passou um dia
-    // inteiro sem aula (a última aula tem de ser hoje ou ontem, senão a sequência foi perdida).
+    // Regra: +1 por DIA; reinicia ao pular um dia; ZERA se a última aula não é hoje nem ontem. Fuso do tenant.
     const diaDe = (iso: string) => new Date(iso).toLocaleDateString('en-CA', { timeZone: tz })
     const hoje = new Date().toLocaleDateString('en-CA', { timeZone: tz })
     const ontem = new Date(Date.parse(hoje + 'T00:00:00Z') - 86_400_000).toISOString().slice(0, 10)
@@ -114,22 +88,48 @@ export async function carregarRankingModulo(moduloId: string, tenantId: string):
       for (const a of ajs ?? []) if ((a as any).overrides && typeof (a as any).overrides === 'object') overridesPorAluno.set((a as any).estudante_id, (a as any).overrides)
     } catch { /* migração pendente → sem ajuste */ }
 
-    const brutos = [...porAluno.entries()].map(([id, dmap]) => {
-      let acertos = 0, aulasConcluidas = 0, aulasGabaritadas = 0
-      const diasConcluidos = new Set<string>()
-      for (const [docId, cell] of dmap) {
-        const qs = quizPorDoc.get(docId)!
-        acertos += cell.correct.size
-        const feita = qs.size > 0 && [...qs].every((qid) => cell.answered.has(qid))
-        if (feita) {
-          aulasConcluidas++
-          if ([...qs].every((qid) => cell.correct.has(qid))) aulasGabaritadas++
-          if (cell.ultima) diasConcluidos.add(diaDe(cell.ultima))
-        }
+    type Bruto = { estudanteId: string; acertos: number; aulasConcluidas: number; aulasGabaritadas: number; streakAtual: number; score: number }
+    const montarBruto = (id: string, acertos: number, aulasConcluidas: number, aulasGabaritadas: number, dias: Iterable<string>): Bruto =>
+      ({ estudanteId: id, acertos, aulasConcluidas, aulasGabaritadas,
+         streakAtual: calcularSequencia(dias, overridesPorAluno.get(id), hoje, ontem).streakAtual,
+         score: pontuarLegProc(pontuacao, { acertos, aulasConcluidas, aulasGabaritadas }, gamAtivo) })
+
+    // AGREGAÇÃO NO BANCO (rpc_leitura_ranking): 1 linha por aluno — evita puxar dezenas de milhares de
+    // respostas pro app (~61k linhas / ~29s no Lei Seca). Fallback pro read paginado se a função não existir.
+    let brutos: Bruto[] = []
+    const rpc = await svc.rpc('rpc_leitura_ranking', { p_tenant: tenantId, p_docs: aulaIds, p_tz: tz })
+    if (!rpc.error && Array.isArray(rpc.data)) {
+      brutos = (rpc.data as any[])
+        .map((r) => montarBruto(r.estudante_id, r.acertos ?? 0, r.aulas_concluidas ?? 0, r.aulas_gabaritadas ?? 0, (r.dias ?? []) as string[]))
+        .filter((x) => x.acertos > 0 || x.aulasConcluidas > 0)
+    } else {
+      // FALLBACK: read paginado (quiz + respostas) + agregação no app — só se a RPC não estiver aplicada.
+      const [quiz, resp] = await Promise.all([
+        fetchAllByIn<{ documento_id: string; questao_id: string }>(aulaIds, (chunk) =>
+          svc.from('simulado_documento_quiz_questoes').select('documento_id, questao_id').eq('tenant_id', tenantId).eq('deletado', false).in('documento_id', chunk).order('id')).catch(() => [] as { documento_id: string; questao_id: string }[]),
+        fetchAllByIn<{ estudante_id: string; documento_id: string; questao_id: string; correta: boolean; respondido_em: string | null }>(aulaIds, (chunk) =>
+          svc.from('simulado_leitura_respostas').select('estudante_id, documento_id, questao_id, correta, respondido_em').eq('tenant_id', tenantId).in('documento_id', chunk).order('id')),
+      ])
+      const quizPorDoc = new Map<string, Set<string>>()
+      for (const q of quiz) (quizPorDoc.get(q.documento_id) ?? quizPorDoc.set(q.documento_id, new Set()).get(q.documento_id)!).add(q.questao_id)
+      const porAluno = new Map<string, Map<string, { answered: Set<string>; correct: Set<string>; ultima: string | null }>>()
+      for (const r of resp) {
+        const q = quizPorDoc.get(r.documento_id); if (!q || !q.has(r.questao_id)) continue
+        const dmap = porAluno.get(r.estudante_id) ?? porAluno.set(r.estudante_id, new Map()).get(r.estudante_id)!
+        const cell = dmap.get(r.documento_id) ?? dmap.set(r.documento_id, { answered: new Set(), correct: new Set(), ultima: null }).get(r.documento_id)!
+        cell.answered.add(r.questao_id); if (r.correta) cell.correct.add(r.questao_id)
+        if (r.respondido_em && (!cell.ultima || r.respondido_em > cell.ultima)) cell.ultima = r.respondido_em
       }
-      const streakAtual = calcularSequencia(diasConcluidos, overridesPorAluno.get(id), hoje, ontem).streakAtual
-      return { estudanteId: id, acertos, aulasConcluidas, aulasGabaritadas, streakAtual, score: pontuarLegProc(pontuacao, { acertos, aulasConcluidas, aulasGabaritadas }, gamAtivo) }
-    }).filter((x) => x.acertos > 0 || x.aulasConcluidas > 0)
+      brutos = [...porAluno.entries()].map(([id, dmap]) => {
+        let acertos = 0, aulasConcluidas = 0, aulasGabaritadas = 0; const dias = new Set<string>()
+        for (const [docId, cell] of dmap) {
+          const qs = quizPorDoc.get(docId)!; acertos += cell.correct.size
+          const feita = qs.size > 0 && [...qs].every((qid) => cell.answered.has(qid))
+          if (feita) { aulasConcluidas++; if ([...qs].every((qid) => cell.correct.has(qid))) aulasGabaritadas++; if (cell.ultima) dias.add(diaDe(cell.ultima)) }
+        }
+        return montarBruto(id, acertos, aulasConcluidas, aulasGabaritadas, dias)
+      }).filter((x) => x.acertos > 0 || x.aulasConcluidas > 0)
+    }
     if (!brutos.length) return { itens: [], gamAtivo, pontuacao }
 
     // Contas de teste ocultas do ranking (marcadas em Acessos): não competem por posição.
