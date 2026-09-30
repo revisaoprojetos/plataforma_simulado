@@ -59,6 +59,8 @@ export const DEFAULT_XP_REGRAS: XpRegras = {
   meta_dia: { xp: 50, bonus: 0 },
   limite_dia: 300, // teto de XP por dia
 }
+// Cargos-padrão: os 9 primeiros mantêm os MESMOS níveis de sempre (ninguém perde/rebaixa cargo);
+// os 6 seguintes são ADITIVOS, estendendo a carreira acima do nível 30 (evolução sem retrabalho).
 export const DEFAULT_TITULOS: TituloNivel[] = [
   { nivel_min: 1, titulo: 'Aprendiz' },
   { nivel_min: 3, titulo: 'Estagiário' },
@@ -69,8 +71,14 @@ export const DEFAULT_TITULOS: TituloNivel[] = [
   { nivel_min: 22, titulo: 'Promotor' },
   { nivel_min: 26, titulo: 'Advogado' },
   { nivel_min: 30, titulo: 'Mestre do Direito' },
+  { nivel_min: 35, titulo: 'Grão-Mestre do Direito' },
+  { nivel_min: 40, titulo: 'Jurista Lendário' },
+  { nivel_min: 45, titulo: 'Ícone dos Concursos' },
+  { nivel_min: 50, titulo: 'Imortal do Direito' },
+  { nivel_min: 55, titulo: 'Lenda Viva' },
+  { nivel_min: 60, titulo: 'Lenda Suprema' },
 ]
-export const DEFAULT_NIVEL_CURVA: NivelCurva = { tipo: 'formula', base: 100, incremento: 40, nivel_max: 30, titulos: DEFAULT_TITULOS }
+export const DEFAULT_NIVEL_CURVA: NivelCurva = { tipo: 'formula', base: 100, incremento: 40, nivel_max: 60, titulos: DEFAULT_TITULOS }
 export const DEFAULT_LIGAS: LigaDef[] = [
   { id: 'bronze', nome: 'Bronze', xp_min: 0, cor: '#a16207' },
   { id: 'prata', nome: 'Prata', xp_min: 500, cor: '#94a3b8' },
