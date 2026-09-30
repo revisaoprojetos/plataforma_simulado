@@ -160,6 +160,14 @@
   --ring: var(--gam-primary);
 }
 
+/* ABAS ligadas aos controles do console: "Fundo da tab ativa" (--tab-active) = cor do sublinhado
+   ativo; "Texto da tab ativa" (--tab-active-foreground) = texto do ativo. Fallback p/ a primária →
+   tenant que NÃO configurar fica idêntico a antes. Centraliza aqui (a base ui/tabs.tsx não fixa mais
+   bg-primary/text-primary). "Fundo das tabs" (--tab-bg) só se aplica a abas estilo pílula (n/a no
+   sublinhado padrão). */
+[data-slot="tabs-indicator"] { background-color: var(--tab-active, var(--primary)); }
+[data-slot="tabs-trigger"][data-active] { color: var(--tab-active-foreground, var(--tab-active, var(--primary))); }
+
 /* Tema escopado por plataforma (usado no login): força claro/escuro num subtree,
    independente do <html>. Define só as superfícies (bg/fg/card/border…); a cor da
    marca (--primary/--ring) continua herdando do tenant. */

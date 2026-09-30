@@ -58,7 +58,8 @@ function TabsList({
       <TabsPrimitive.Indicator
         data-slot="tabs-indicator"
         className={cn(
-          "pointer-events-none absolute rounded-full bg-primary transition-all duration-300 ease-out motion-reduce:transition-none",
+          // cor via [data-slot="tabs-indicator"] no globals.css → segue os controles de aba do console
+          "pointer-events-none absolute rounded-full transition-all duration-300 ease-out motion-reduce:transition-none",
           "group-data-horizontal/tabs:bottom-[-1px] group-data-horizontal/tabs:left-0 group-data-horizontal/tabs:h-0.5 group-data-horizontal/tabs:w-[var(--active-tab-width)] group-data-horizontal/tabs:translate-x-[var(--active-tab-left)]",
           "group-data-vertical/tabs:left-[-1px] group-data-vertical/tabs:top-0 group-data-vertical/tabs:w-0.5 group-data-vertical/tabs:h-[var(--active-tab-height)] group-data-vertical/tabs:translate-y-[var(--active-tab-top)]"
         )}
@@ -72,7 +73,8 @@ function TabsTrigger({ className, ...props }: TabsPrimitive.Tab.Props) {
     <TabsPrimitive.Tab
       data-slot="tabs-trigger"
       className={cn(
-        "-mb-px inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap border-b-2 border-transparent pb-2.5 pt-1 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground data-active:text-primary focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50",
+        // cor do ativo via [data-slot="tabs-trigger"][data-active] no globals.css → controles de aba do console
+        "-mb-px inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap border-b-2 border-transparent pb-2.5 pt-1 text-sm font-semibold text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50",
         "group-data-vertical/tabs:w-full group-data-vertical/tabs:-ml-px group-data-vertical/tabs:justify-start group-data-vertical/tabs:border-b-0 group-data-vertical/tabs:border-l-2 group-data-vertical/tabs:pb-0 group-data-vertical/tabs:pt-0 group-data-vertical/tabs:pl-3",
         "[&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4",
         className
