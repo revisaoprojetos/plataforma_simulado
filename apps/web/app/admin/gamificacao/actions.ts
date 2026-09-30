@@ -28,7 +28,15 @@ async function salvarSlice(patch: Record<string, unknown>): Promise<{ ok?: boole
   const { data: antes } = await svc.from('simulado_gamificacao_config').select('*').eq('tenant_id', tenantId).maybeSingle()
   const base: any = antes ?? { tenant_id: tenantId, ...DEFAULT_CONFIG }
   const row: any = { ...base, ...patch, tenant_id: tenantId }
-  delete row.id; delete row.created_at; delete row.updated_at; delete row.publicoModo
+  delete row.id; delete row.created_at; delete row.updated_at
+  // Chaves auxiliares do DEFAULT_CONFIG que NÃO são colunas top-level (o dado real mora em xp_regras,
+  // ou é dup camelCase de publico_modo). Sem remover, o upsert de um tenant SEM linha ainda — onde
+  // base = DEFAULT_CONFIG — falha com "column ... does not exist" e NADA salva ("não salva nas outras
+  // plataformas", ex.: MEQ). Ver getGamConfig: engajamento vive em xp_regras.engajamento.
+  delete row.publicoModo; delete row.engajamento; delete row.tenantId
+  // `trilha_visiveis` pode não estar migrada. Só mantém quando veio EXPLÍCITO no patch (salvarRegrasGerais,
+  // que tem fallback tolerante); se veio só do DEFAULT_CONFIG (base), remove p/ não quebrar o upsert.
+  if (!('trilha_visiveis' in patch)) delete row.trilha_visiveis
 
   const { error } = await svc.from('simulado_gamificacao_config').upsert(row, { onConflict: 'tenant_id' })
   if (error) return { error: error.message }
