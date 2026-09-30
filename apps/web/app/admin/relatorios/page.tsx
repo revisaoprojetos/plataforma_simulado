@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { PieChart, ClipboardList, BookOpen, GraduationCap, Trophy, ArrowRight, BarChart3 } from 'lucide-react'
+import { PieChart, ClipboardList, BookOpen, GraduationCap, Trophy, Users, ArrowRight, BarChart3 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type Tom = 'primary' | 'amber'
@@ -10,6 +10,7 @@ const areas: { title: string; description: string; icon: any; href: string; tom:
   { title: 'Relatório Disciplina', description: 'Taxa de acerto/erro de uma disciplina, em quais simulados apareceu e a evolução da turma.', icon: BookOpen, href: '/admin/relatorios/disciplinas', tom: 'primary' },
   { title: 'Relatório Estudantes', description: 'Análise por estudante: evolução, progresso por disciplina e comparação com a turma, com gráficos.', icon: GraduationCap, href: '/admin/relatorios/estudantes', tom: 'primary' },
   { title: 'Ranking', description: 'Classificação de pontuação dos estudantes por simulado, com critérios configuráveis e download do caderno.', icon: Trophy, href: '/admin/relatorios/ranking', tom: 'amber' },
+  { title: 'Grupos por aluno', description: 'Em quais grupos cada estudante está, com os mais recentes primeiro. Filtre por grupo e exporte (Excel/CSV).', icon: Users, href: '/admin/relatorios/grupos', tom: 'primary' },
 ]
 
 const TOM: Record<Tom, { accent: string; chip: string; glow: string }> = {

@@ -169,6 +169,7 @@ const navGroups: NavGroup[] = [
       { label: 'Relatório Estudantes', href: '/admin/relatorios/estudantes', icon: GraduationCap, perm: 'relatorios:view' },
       { label: 'Ranking', href: '/admin/relatorios/ranking', icon: Trophy, perm: 'relatorios:view' },
       { label: 'NPS / Satisfação', href: '/admin/relatorios/nps', icon: Star, perm: 'relatorios:view' },
+      { label: 'Grupos por aluno', href: '/admin/relatorios/grupos', icon: Users, perm: 'relatorios:view' },
     ],
   },
   {
