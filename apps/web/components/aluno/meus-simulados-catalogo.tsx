@@ -55,7 +55,7 @@ function Entrada({ i, children, className }: { i: number; children: ReactNode; c
 
 /** Card de um simulado concluído — nota, tentativas e link para o resultado. `variant`: pôster (4:5) ou ticket. */
 function CardConcluido({ s, variant = 'poster' }: { s: MeuSimuladoItem; variant?: CardView }) {
-  const cor = s.vis?.cor ?? '#6d28d9'
+  const cor = s.vis?.cor ?? 'var(--primary)' // sem cor escolhida → segue a marca do tenant
   const BancoIcon = iconeBanco(s.vis?.icone)
   const capa = s.vis?.capa
 
@@ -204,7 +204,7 @@ export function MeusSimuladosCatalogo({ itens, pastas, view = 'poster' }: { iten
   // Tile de PASTA (visão Pasta) — igual ao admin: capa à esquerda, PASTA + nome + contagem + "Abrir pasta".
   function FolderTile({ f }: { f: PastaCatalogo }) {
     const capaEff = capaDaPasta(f.id)
-    const cor = f.cor ?? '#6d28d9'
+    const cor = f.cor ?? 'var(--primary)' // sem cor escolhida → segue a marca do tenant
     const Icon = iconeBanco(f.icone)
     return (
       <button type="button" onClick={() => irParaPasta(f.id)}

@@ -127,7 +127,7 @@ export function RegrasGeraisForm({ config, podeGerenciar }: { config: GamConfig;
           <NumberField stacked label="Dias de tolerância" value={streak.tolerancia_dias} onChange={(v) => setStreak({ ...streak, tolerancia_dias: Math.max(0, v) })} suffix="dias de folga" hint="0 = perde ao faltar 1 dia. 1 = pode faltar 1 dia." disabled={dis} />
         </RuleCard>
 
-        <RuleCard icon={Gift} tom="#8b5cf6" titulo="Bônus de semana (baú)" descricao="Prêmio em XP a cada ciclo de dias de sequência (ex.: +10 a cada 7 dias).">
+        <RuleCard icon={Gift} tom="var(--primary)" titulo="Bônus de semana (baú)" descricao="Prêmio em XP a cada ciclo de dias de sequência (ex.: +10 a cada 7 dias).">
           <NumberField stacked label="A cada N dias" value={chest.cada_n_dias} onChange={(v) => setChest({ ...chest, cada_n_dias: v })} suffix="dias" min={1} disabled={dis} />
           <NumberField stacked label="XP do bônus" value={chest.xp} onChange={(v) => setChest({ ...chest, xp: v })} suffix="XP" disabled={dis} />
         </RuleCard>
@@ -169,7 +169,7 @@ export function RegrasGeraisForm({ config, podeGerenciar }: { config: GamConfig;
       {/* Estilo (designer) da trilha no portal do aluno */}
       <div className="rounded-2xl border bg-card p-5 shadow-sm">
         <div className="mb-3 flex items-start gap-3">
-          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: 'color-mix(in oklab, #6366f1 18%, transparent)', color: '#6366f1' }}><Route style={{ width: 18, height: 18 }} /></span>
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ background: 'color-mix(in oklab, var(--primary) 18%, transparent)', color: 'var(--primary)' }}><Route style={{ width: 18, height: 18 }} /></span>
           <div>
             <h3 className="text-sm font-semibold leading-tight">Estilo da trilha</h3>
             <p className="mt-0.5 text-xs text-muted-foreground">Como a trilha de simulados aparece na Início do aluno.</p>

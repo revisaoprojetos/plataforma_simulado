@@ -99,7 +99,7 @@ export function EngajamentoForm({ config, podeGerenciar }: { config: GamConfig; 
           <CampoMensagem value={sequencia.mensagem} onChange={(v) => setSequencia({ ...sequencia, mensagem: v })} disabled={dis} />
         </GatilhoCard>
 
-        <GatilhoCard icon={Trophy} tom="#8b5cf6" titulo="Marcos de sequência" evento="gamificacao.marco"
+        <GatilhoCard icon={Trophy} tom="var(--primary)" titulo="Marcos de sequência" evento="gamificacao.marco"
           descricao="Parabeniza a cada marco atingido (ex.: 7, 14, 21, 30 dias)." ativo={marco.ativo} onToggle={(v) => setMarco({ ...marco, ativo: v })} disabled={dis}>
           <label className="block space-y-1">
             <span className="text-xs font-medium text-muted-foreground">Marcos (dias)</span>

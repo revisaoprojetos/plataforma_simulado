@@ -67,7 +67,7 @@ export function ConquistasForm({ config, podeGerenciar, modulos = [] }: { config
     <form onSubmit={onSubmit} className="space-y-4">
       {podeGerenciar && <SaveBar salvando={salvando} dirty={dirty} hint="Conquistas do aluno." />}
 
-      <SectionCard titulo="Conquistas" icon={Award} tom="#8b5cf6" descricao="Desbloqueadas uma única vez ao cumprir a regra. Podem conceder XP extra ao desbloquear.">
+      <SectionCard titulo="Conquistas" icon={Award} tom="var(--primary)" descricao="Desbloqueadas uma única vez ao cumprir a regra. Podem conceder XP extra ao desbloquear.">
         {/* Barra de busca + filtro + ações */}
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <div className="relative min-w-[200px] flex-1">

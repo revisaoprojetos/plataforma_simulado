@@ -64,7 +64,7 @@ export function XpNiveisForm({ config, podeGerenciar }: { config: GamConfig; pod
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2 lg:items-stretch">
-        <SectionCard titulo="Curva de níveis" icon={TrendingUp} tom="#8b5cf6" descricao="Custo do nível n→n+1 = base + (n−1) × incremento. Cresce a cada nível." className="flex flex-col lg:h-[34rem]">
+        <SectionCard titulo="Curva de níveis" icon={TrendingUp} tom="var(--primary)" descricao="Custo do nível n→n+1 = base + (n−1) × incremento. Cresce a cada nível." className="flex flex-col lg:h-[34rem]">
           <div className="grid grid-cols-3 gap-2.5">
             <NumberField stacked label="Custo base (1→2)" value={curva.base} onChange={(v) => setCurva({ ...curva, base: v })} suffix="XP" hint="XP para sair do nível 1 para o 2." disabled={!podeGerenciar} />
             <NumberField stacked label="Incremento" value={curva.incremento} onChange={(v) => setCurva({ ...curva, incremento: v })} suffix="XP" hint="Quanto o custo sobe a cada nível." disabled={!podeGerenciar} />

@@ -93,7 +93,7 @@ export function MissoesForm({ config, podeGerenciar }: { config: GamConfig; pode
       </SectionCard>
 
       {/* Catálogo de missões */}
-      <SectionCard titulo="Missões" icon={Target} tom="#8b5cf6" descricao="Ative/desative para escolher quais entram no rodízio. O aluno ganha o XP ao atingir a meta.">
+      <SectionCard titulo="Missões" icon={Target} tom="var(--primary)" descricao="Ative/desative para escolher quais entram no rodízio. O aluno ganha o XP ao atingir a meta.">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <span className="text-xs text-muted-foreground">{missoes.length} missão(ões) · {ativas.length} ativa(s)</span>
           {podeGerenciar && (

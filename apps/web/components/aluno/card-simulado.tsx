@@ -27,7 +27,7 @@ function FitaNovo() {
  *  `variant`: 'poster' (4:5, atual) ou 'ticket' (baixo/retangular: imagem à esquerda, infos à direita). */
 export function CardSimulado({ s, dica = false, variant = 'poster' }: { s: ItemSimulado; dica?: boolean; variant?: 'poster' | 'ticket' }) {
   const StatusIcon = ICON[s.tom] ?? Radio
-  const cor = s.vis?.cor ?? '#6d28d9'
+  const cor = s.vis?.cor ?? 'var(--primary)' // sem cor escolhida → segue a marca do tenant (não roxo fixo)
   const capa = s.vis?.capa
 
   // Selo de status (mesma lógica do pôster): "Sempre disponível" (aberto) usa relógio; demais, o status.

@@ -89,7 +89,7 @@ export function LeituraCatalogo({ docs }: { docs: DocumentoAluno[] }) {
 }
 
 function CardLei({ d }: { d: DocumentoAluno }) {
-  const c = d.cor ?? '#6d28d9'
+  const c = d.cor ?? 'var(--primary)' // sem cor escolhida → segue a marca do tenant
   const subtitulo = [d.tipoNorma, d.numero && `nº ${d.numero}`, d.ano].filter(Boolean).join(' ')
   const cap = capaComPos(d.capa_url)
   return (

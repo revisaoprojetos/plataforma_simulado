@@ -43,7 +43,7 @@ function Progresso({ done, total, claro }: { done: number; total: number; claro?
 
 function ModuloCardAluno({ m, variant }: { m: ModuloAlunoCard; variant: CardView }) {
   const capa = m.capaCard || m.capa
-  const c = m.cor ?? '#6d28d9'
+  const c = m.cor ?? 'var(--primary)' // sem cor escolhida → segue a marca do tenant
   const href = `/aluno/leitura?modulo=${m.id}`
 
   // ===== TICKET: mesmo tamanho dos tickets de "Simulados realizados" (h-28/sm:h-32, imagem w-[42%]). =====

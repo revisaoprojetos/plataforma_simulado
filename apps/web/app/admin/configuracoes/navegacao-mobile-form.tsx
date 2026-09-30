@@ -14,10 +14,10 @@ const OPCOES: { v: NavMode; nome: string; desc: string }[] = [
 
 /** Mini-prévia de um celular mostrando cada layout de navegação. */
 function Previa({ modo }: { modo: NavMode }) {
-  const barra = '#2b2153'
-  const ativo = 'var(--brand-accent, #f6c343)'
+  const barra = 'var(--sidebar)' // barra de navegação = cor da sidebar do tenant (não roxo fixo)
+  const ativo = 'var(--brand-accent, var(--primary))'
   return (
-    <div className="mx-auto flex h-[188px] w-[104px] flex-col overflow-hidden rounded-[16px] border-2 border-muted-foreground/20 bg-[#f6f5fa] shadow-inner">
+    <div className="mx-auto flex h-[188px] w-[104px] flex-col overflow-hidden rounded-[16px] border-2 border-muted-foreground/20 bg-background shadow-inner">
       {modo === 'menu' && (
         <div className="flex h-6 shrink-0 items-center justify-between px-1.5 text-white" style={{ background: barra }}>
           <Menu className="h-3 w-3" />
@@ -25,7 +25,7 @@ function Previa({ modo }: { modo: NavMode }) {
         </div>
       )}
       <div className="flex-1 space-y-1.5 p-1.5">
-        <div className="h-8 rounded-md bg-gradient-to-br from-[#342866] to-[#2b2153]" />
+        <div className="h-8 rounded-md bg-gradient-to-br from-[color:var(--brand-primary)] to-[color:var(--sidebar)]" />
         <div className="h-2 w-2/3 rounded bg-primary/25" />
         <div className="grid grid-cols-2 gap-1">
           <div className="h-9 rounded bg-black/80" />
