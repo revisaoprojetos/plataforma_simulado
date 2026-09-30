@@ -32,19 +32,31 @@ export default async function NpsPage() {
   let semTabela = false
   try {
     dados = await remember<Resultado>(chaveRelatorio(access.tenantId, 'nps'), TTL_RELATORIO, async () => {
-      const avals = await fetchAll<Av>(() => svc.from('simulado_avaliacoes').select('nps, comentario, criado_em, simulado_id, estudante_id').eq('tenant_id', tid).order('criado_em', { ascending: false }))
-      const total = avals.length
-      const promotores = avals.filter((a) => a.nps >= 9).length
-      const neutros = avals.filter((a) => a.nps >= 7 && a.nps <= 8).length
-      const detratores = avals.filter((a) => a.nps <= 6).length
-      const comentariosRaw = avals.filter((a) => (a.comentario ?? '').trim()).slice(0, 40)
+      // AGREGAÇÃO NO BANCO (rpc_nps_resumo) — não puxa todas as avaliações só p/ contar. Fallback
+      // pro fetchAll (só a coluna nps) se a RPC ainda não estiver aplicada.
+      let total: number, promotores: number, neutros: number, detratores: number, soma: number
+      const rpc = await svc.rpc('rpc_nps_resumo', { p_tenant: tid })
+      if (!rpc.error && Array.isArray(rpc.data) && rpc.data[0]) {
+        const r = rpc.data[0] as any
+        total = Number(r.total); promotores = Number(r.promotores); neutros = Number(r.neutros); detratores = Number(r.detratores); soma = Number(r.soma)
+      } else {
+        const avals = await fetchAll<{ nps: number }>(() => svc.from('simulado_avaliacoes').select('nps').eq('tenant_id', tid))
+        total = avals.length
+        promotores = avals.filter((a) => a.nps >= 9).length
+        neutros = avals.filter((a) => a.nps >= 7 && a.nps <= 8).length
+        detratores = avals.filter((a) => a.nps <= 6).length
+        soma = avals.reduce((s, a) => s + a.nps, 0)
+      }
+      // Comentários recentes (só os ~40 exibidos, não tudo): busca leve limitada + títulos.
+      const { data: comsRaw } = await svc.from('simulado_avaliacoes').select('nps, comentario, criado_em, simulado_id').eq('tenant_id', tid).not('comentario', 'is', null).order('criado_em', { ascending: false }).limit(60)
+      const comentariosRaw = ((comsRaw ?? []) as Av[]).filter((a) => (a.comentario ?? '').trim()).slice(0, 40)
       const simIds = [...new Set(comentariosRaw.map((a) => a.simulado_id))]
       const sims = simIds.length ? ((await svc.from('simulado_simulados').select('id, titulo').in('id', simIds)).data ?? []) : []
       const nomeSim = new Map<string, string>((sims as any[]).map((s) => [s.id, s.titulo]))
       return {
         total, promotores, neutros, detratores,
         nps: total ? Math.round(((promotores - detratores) / total) * 100) : null,
-        media: total ? avals.reduce((s, a) => s + a.nps, 0) / total : null,
+        media: total ? soma / total : null,
         comentarios: comentariosRaw.map((a) => ({ nps: a.nps, comentario: a.comentario, simuladoTitulo: nomeSim.get(a.simulado_id) ?? 'Simulado', criado_em: a.criado_em })),
       }
     })
