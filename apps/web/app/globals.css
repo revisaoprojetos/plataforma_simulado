@@ -822,6 +822,13 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 /* ABERTA: libera o overflow para o conteúdo aparecer INTEIRO (senão parte do texto "falta"/fica cortada). */
 .leitura-prosa .caixa-colapsavel[data-aberto] > .caixa-corpo > .caixa-corpo-in { overflow:visible; }
 
+/* "Já cobrado em prova" (só esta caixa): ABRE também ao passar o mouse (além do clique, que continua
+   valendo via [data-aberto]). Ao sair do hover recolhe de novo. Espelha o estado aberto. */
+.leitura-prosa [data-caixa="cobrado"]:hover > .caixa-corpo { grid-template-rows:1fr; }
+.leitura-prosa [data-caixa="cobrado"]:hover > .caixa-corpo > .caixa-corpo-in { overflow:visible; }
+.leitura-prosa [data-caixa="cobrado"]:hover > .caixa-cab::before { content:none; }
+.leitura-prosa [data-caixa="cobrado"]:hover > .caixa-cab::after { transform:rotate(-135deg); }
+
 /* "Artigos já cobrados em prova" (LegProc): selo + chevron de recolher no cabeçalho do artigo.
    O rótulo vem de CSS content (::before) → SEM nó de texto, não entra na espinha das âncoras. */
 .leitura-prosa .art-cobrado-barra {

@@ -521,7 +521,8 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
 
               {modo === 'editor' && (
                 <div className="space-y-2">
-                  <div className="flex flex-wrap items-center gap-1 rounded-lg border bg-muted/40 p-1">
+                  {/* Barra de ferramentas FIXA: cola no topo da área de rolagem ao editar textos longos. */}
+                  <div className="sticky top-0 z-20 flex flex-wrap items-center gap-1 rounded-lg border bg-card p-1 shadow-sm">
                     <button onClick={() => exec('undo')} title="Desfazer" className="rounded-md p-1.5 text-muted-foreground hover:bg-card hover:text-foreground"><Undo2 className="h-4 w-4" /></button>
                     <button onClick={() => exec('redo')} title="Refazer" className="rounded-md p-1.5 text-muted-foreground hover:bg-card hover:text-foreground"><Redo2 className="h-4 w-4" /></button>
                     <span className="mx-0.5 h-5 w-px bg-border" />

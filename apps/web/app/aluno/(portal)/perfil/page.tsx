@@ -6,8 +6,10 @@ import { avatarPadraoDe } from '@/lib/aluno/avatar-padrao'
 import { montarRelatorioEstudante } from '@/app/admin/relatorios/estudantes/_dados'
 import { RelatorioEstudanteView } from '@/app/admin/relatorios/estudantes/relatorio-estudante-view'
 import { KpiCard } from '@/components/admin/relatorios/viz'
-import { Mail, Phone, BarChart3, ArrowRight, Flame, Zap, Trophy, ClipboardList, Target, Clock, Award, Medal } from 'lucide-react'
+import { Mail, Phone, BarChart3, ArrowRight, Flame, Zap, Trophy, ClipboardList, Target, Clock, Award, Medal, BookOpen } from 'lucide-react'
 import { getGamConfig, gamAtivaParaAluno } from '@/lib/gamificacao'
+import { carregarTrilhaLeituraAluno } from '@/lib/leitura/trilha'
+import { LEITURA_ATIVA } from '@/lib/flags'
 import { resumoGamificacao, conquistasDoAluno, posicaoNaLiga } from '@/lib/gamificacao/leitura'
 import { ConquistasGrid } from '@/components/aluno/conquistas-grid'
 import { CarimbosPerfil } from '@/components/aluno/carimbos-perfil'
@@ -43,6 +45,8 @@ export default async function PerfilAlunoPage() {
     svc.from('simulado_tenants').select('tema').eq('id', sessao.tenantId).maybeSingle(),
     carimbosGanhosDoAluno(svc, sessao.tenantId, sessao.estudanteId),
   ])
+  // Desafio de Lei Seca do aluno (progresso por módulo) — só quando a Leitura está ativa. Tolerante.
+  const trilhasLeitura = LEITURA_ATIVA ? await carregarTrilhaLeituraAluno(sessao.estudanteId, sessao.tenantId).catch(() => []) : []
   const opcoes = lerOpcoesPersonalizacao(temaRow?.tema)
   // Personalização visual: cor de destaque (texto/barra/anel), texto legível sobre fundo, sombra.
   const temFundo = !!pers.perfilCapa
@@ -158,6 +162,43 @@ export default async function PerfilAlunoPage() {
 
       {/* Adesivos coletados (Leitura) — coleção + expandir (a decoração é editada no próprio header acima). */}
       <CarimbosPerfil carimbos={carimbosPerfil} />
+
+      {/* ── Meu Desafio de Lei Seca (progresso por módulo) ── */}
+      {trilhasLeitura.length > 0 && (() => {
+        const totalDone = trilhasLeitura.reduce((s, t) => s + t.done, 0)
+        const totalAulas = trilhasLeitura.reduce((s, t) => s + t.total, 0)
+        const totalPend = trilhasLeitura.reduce((s, t) => s + (t.pendentes ?? 0), 0)
+        return (
+          <div className="rounded-2xl border bg-card p-5 shadow-sm">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="flex items-center gap-2 text-sm font-semibold"><BookOpen className="h-4 w-4 text-primary" /> Meu Desafio de Lei Seca</h2>
+              <div className="flex items-center gap-2">
+                {totalPend > 0 && <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-600 dark:text-amber-400">{totalPend} questõe(s) pendente(s)</span>}
+                <span className="text-xs text-muted-foreground tabular-nums">{fmt(totalDone)}/{fmt(totalAulas)} aulas concluídas</span>
+                <Link href="/aluno/leitura" className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground">Ir para a trilha <ArrowRight className="h-3.5 w-3.5" /></Link>
+              </div>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {trilhasLeitura.map((t) => {
+                const pct = t.total ? Math.round((t.done / t.total) * 100) : 0
+                return (
+                  <Link key={t.id} href="/aluno/leitura" className="group rounded-xl border bg-background p-3 transition-colors hover:bg-muted/40">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-sm font-medium" title={t.nome}>{t.nome}</span>
+                      <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{t.done}/{t.total}</span>
+                    </div>
+                    <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${pct}%` }} /></div>
+                    <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground">
+                      <span>{pct}% concluído</span>
+                      {(t.pendentes ?? 0) > 0 && <span className="text-amber-600 dark:text-amber-400">{t.pendentes} pendente(s)</span>}
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })()}
 
       {dados && dados.simulados > 0 ? (
         <>
