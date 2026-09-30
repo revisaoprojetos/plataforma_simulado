@@ -464,7 +464,7 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
               >1 plataforma). Com 1 acesso só, trocar levava ao seletor que reentrava na MESMA
               plataforma ("carrega e volta") — então some. */}
           {podeTrocarPlataforma && (
-            <button type="button" onClick={() => { window.location.href = '/login' }} title="Trocar de plataforma" aria-label="Trocar de plataforma"
+            <button type="button" onClick={() => { window.location.href = '/login?trocar=1' }} title="Trocar de plataforma" aria-label="Trocar de plataforma"
               className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-transparent transition-colors hover:border-[color:var(--primary)] hover:bg-[color:var(--primary)] hover:text-white [&:hover_svg]:!text-white">
               <Building2 className="h-4 w-4" />
             </button>

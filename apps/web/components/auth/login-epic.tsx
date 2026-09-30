@@ -82,6 +82,9 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
   const [semAcesso, setSemAcesso] = useState(false)
 
   const nome = marca?.nome || 'Simulados'
+  // "Trocar de plataforma" (botão da sidebar → /login?trocar=1): força mostrar o SELETOR e NÃO
+  // auto-redireciona o admin comum de volta p/ a plataforma atual (senão a tela "abre e volta").
+  const forcarSelecao = search.get('trocar') === '1'
 
   // Origem (protocol//host) de uma plataforma — mesma lógica de irParaPlataforma.
   function origemPlataforma(p: PlatSimples): string {
@@ -136,8 +139,8 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
         // plataforma desta URL (sem seletor). Super-admin vê a opção de console. Sem acesso a esta
         // plataforma = bloqueado. Em dev (sem tenant resolvido) mantém a lista como fallback.
         if (!sup && tenantAtualId) {
-          if (plats.some((p) => p.id === tenantAtualId)) router.replace('/admin')
-          else setSemAcesso(true)
+          if (!plats.some((p) => p.id === tenantAtualId)) setSemAcesso(true)
+          else if (!forcarSelecao) router.replace('/admin') // ao TROCAR de plataforma, mostra a lista
         }
       })
       .catch(() => { if (vivo) { setErroCarregar(true); toast.error('Não foi possível carregar suas plataformas.') } })
@@ -220,15 +223,16 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
       )
     }
 
-    // Super-admin escolhe (console + plataformas). Em dev sem tenant, mostra a lista como fallback.
-    const mostrarLista = superAdmin || !tenantAtualId
+    // Super-admin escolhe (console + plataformas); admin comum vê a lista ao TROCAR de plataforma.
+    // Em dev sem tenant, mostra a lista como fallback.
+    const mostrarLista = superAdmin || !tenantAtualId || forcarSelecao
     return (
       <Shell wide>
         <div className="mb-7 flex flex-col items-center gap-3 text-center">
           {Emblema}
           <div>
-            <Titulo>{superAdmin ? 'Bem-vindo, administrador' : 'Entrando…'}</Titulo>
-            <p className="mt-1 text-sm text-slate-500">{superAdmin ? 'Abra o console de administração ou entre em uma plataforma.' : 'Levando você para a plataforma…'}</p>
+            <Titulo>{superAdmin ? 'Bem-vindo, administrador' : forcarSelecao ? 'Trocar de plataforma' : 'Entrando…'}</Titulo>
+            <p className="mt-1 text-sm text-slate-500">{superAdmin ? 'Abra o console de administração ou entre em uma plataforma.' : forcarSelecao ? 'Escolha a plataforma para entrar.' : 'Levando você para a plataforma…'}</p>
           </div>
         </div>
 
