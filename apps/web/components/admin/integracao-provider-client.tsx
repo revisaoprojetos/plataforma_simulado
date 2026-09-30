@@ -825,7 +825,7 @@ function Mapeamentos({ provider, mapeamentos, gruposSistema, pastasSistema, simu
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted-foreground">Diga o que cada <strong>produto</strong> comprado concede: a <strong>classificação</strong> (ex.: passaporte), e opcionalmente um <strong>grupo</strong> e/ou um <strong>simulado</strong> (matrícula automática).</p>
+      <p className="text-sm text-muted-foreground">Diga o que cada <strong>produto</strong> comprado concede: o <strong>plano</strong> (passaporte, vitalício ou normal), e opcionalmente um <strong>grupo</strong>, <strong>banco</strong> e/ou <strong>simulado</strong> (matrícula automática).</p>
 
       {/* Reprocessar liberações (recuperação de erro) */}
       <div className="flex flex-wrap items-center gap-3 rounded-lg border border-primary/25 bg-primary/[0.04] p-3">
@@ -843,7 +843,7 @@ function Mapeamentos({ provider, mapeamentos, gruposSistema, pastasSistema, simu
         {[
           <>Gere o <b>User Token</b> na Guru (perfil → aba <b>API</b>) e salve na aba <b>Credenciais</b>. O token só aparece uma vez.</>,
           <>Clique em <b>Carregar produtos/grupos</b> abaixo — a Guru lista seus produtos. (Sem token, dá pra digitar o <b>ID do produto</b> na mão.)</>,
-          <>Para cada produto, defina o destino: <b>classificação</b> (passaporte), e opcional <b>grupo</b>/<b>simulado</b>. Salve.</>,
+          <>Para cada produto, defina o destino: <b>plano</b> (passaporte/vitalício/normal), e opcional <b>grupo</b>/<b>banco</b>/<b>simulado</b>. Salve.</>,
           <>Pronto: o <b>webhook</b> aplica isso <b>automaticamente</b> a cada nova compra (cria o aluno + concede). Na aba <b>Assinaturas</b> você confere/adiciona manualmente quem já comprou.</>,
         ].map((txt, i) => (
           <li key={i} className="flex gap-2.5">
@@ -891,10 +891,14 @@ function Mapeamentos({ provider, mapeamentos, gruposSistema, pastasSistema, simu
             )}
           </div>
           <div className="space-y-1">
-            <label className="text-xs text-muted-foreground">Classificação</label>
-            <Select value={classificacao} onValueChange={(v) => setClassificacao(v ?? 'passaporte')} items={{ passaporte: 'Passaporte', normal: 'Normal' }}>
+            <label className="text-xs text-muted-foreground">Plano</label>
+            <Select value={classificacao} onValueChange={(v) => setClassificacao(v ?? 'passaporte')} items={{ passaporte: 'Passaporte', vitalicio: 'Vitalício', normal: 'Normal' }}>
               <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent><SelectItem value="passaporte">Passaporte</SelectItem><SelectItem value="normal">Normal</SelectItem></SelectContent>
+              <SelectContent>
+                <SelectItem value="passaporte">Passaporte</SelectItem>
+                <SelectItem value="vitalicio">Vitalício (passaporte premium)</SelectItem>
+                <SelectItem value="normal">Normal</SelectItem>
+              </SelectContent>
             </Select>
           </div>
           <div className="space-y-1">
