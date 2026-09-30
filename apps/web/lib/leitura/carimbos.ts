@@ -18,10 +18,11 @@ export async function progressoModuloAluno(svc: any, tenantId: string, moduloId:
   const aulaIds = (docs ?? []).map((d: any) => d.id)
   if (!aulaIds.length) return { total: 0, concluidas: 0, gabaritadas: 0, porAula: {} }
 
+  // ⚠️ `.order('id')` (coluna ÚNICA): `documento_id` não-único faz a paginação perder/duplicar linhas.
   const [quiz, resp, prog] = await Promise.all([
-    fetchAllByIn<{ documento_id: string; questao_id: string }>(aulaIds, (chunk) => svc.from('simulado_documento_quiz_questoes').select('documento_id, questao_id').eq('tenant_id', tenantId).eq('deletado', false).in('documento_id', chunk).order('documento_id')).catch(() => []),
-    fetchAllByIn<{ documento_id: string; questao_id: string; correta: boolean }>(aulaIds, (chunk) => svc.from('simulado_leitura_respostas').select('documento_id, questao_id, correta').eq('estudante_id', estudanteId).in('documento_id', chunk).order('documento_id')).catch(() => []),
-    fetchAllByIn<{ documento_id: string; concluido_em: string | null }>(aulaIds, (chunk) => svc.from('simulado_leitura_progresso').select('documento_id, concluido_em').eq('estudante_id', estudanteId).in('documento_id', chunk).order('documento_id')).catch(() => []),
+    fetchAllByIn<{ documento_id: string; questao_id: string }>(aulaIds, (chunk) => svc.from('simulado_documento_quiz_questoes').select('documento_id, questao_id').eq('tenant_id', tenantId).eq('deletado', false).in('documento_id', chunk).order('id')).catch(() => []),
+    fetchAllByIn<{ documento_id: string; questao_id: string; correta: boolean }>(aulaIds, (chunk) => svc.from('simulado_leitura_respostas').select('documento_id, questao_id, correta').eq('estudante_id', estudanteId).in('documento_id', chunk).order('id')).catch(() => []),
+    fetchAllByIn<{ documento_id: string; concluido_em: string | null }>(aulaIds, (chunk) => svc.from('simulado_leitura_progresso').select('documento_id, concluido_em').eq('estudante_id', estudanteId).in('documento_id', chunk).order('id')).catch(() => []),
   ])
 
   const quizPorDoc = new Map<string, Set<string>>()

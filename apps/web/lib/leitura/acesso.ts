@@ -96,9 +96,11 @@ export async function documentosDoAluno(estudanteId: string, tenantId: string, o
 
   // Atribuições — CHUNK nos `.in('documento_id', …)`: com muitos documentos no tenant, o `.in()` sem
   // fatiar gera URL gigante que trava o proxy (~180s). fetchAllByIn fatia em lotes de 80.
+  // ⚠️ `.order('id')` (coluna ÚNICA): ordenar por `documento_id` (não-único) faz a paginação do
+  // fetchAllByIn perder/duplicar linhas → vínculo some → aluno deixa de ver o desafio (intermitente).
   const [dg, de, { data: gm }] = await Promise.all([
-    fetchAllByIn<{ documento_id: string; grupo_id: string }>(ids, (chunk) => svc.from('simulado_documento_grupos').select('documento_id, grupo_id').in('documento_id', chunk).order('documento_id', { ascending: true })),
-    fetchAllByIn<{ documento_id: string; estudante_id: string }>(ids, (chunk) => svc.from('simulado_documento_estudantes').select('documento_id, estudante_id').in('documento_id', chunk).order('documento_id', { ascending: true })),
+    fetchAllByIn<{ documento_id: string; grupo_id: string }>(ids, (chunk) => svc.from('simulado_documento_grupos').select('documento_id, grupo_id').in('documento_id', chunk).order('id', { ascending: true })),
+    fetchAllByIn<{ documento_id: string; estudante_id: string }>(ids, (chunk) => svc.from('simulado_documento_estudantes').select('documento_id, estudante_id').in('documento_id', chunk).order('id', { ascending: true })),
     svc.from('simulado_grupo_membros').select('grupo_id').eq('estudante_id', estudanteId),
   ])
   const gruposPorDoc = new Map<string, Set<string>>()
@@ -120,8 +122,8 @@ export async function documentosDoAluno(estudanteId: string, tenantId: string, o
 
   // Artigos (versão vigente) + progresso — mesmo CHUNK nos `.in('documento_id', visIds)`.
   const [cont, prog] = await Promise.all([
-    leve ? Promise.resolve([] as { documento_id: string; versao: number; artigos: number }[]) : fetchAllByIn<{ documento_id: string; versao: number; artigos: number }>(visIds, (chunk) => svc.from('simulado_documento_conteudos').select('documento_id, versao, artigos').in('documento_id', chunk).order('documento_id', { ascending: true })),
-    fetchAllByIn<{ documento_id: string; documento_versao: number; pct: number; concluido_em: string | null }>(visIds, (chunk) => svc.from('simulado_leitura_progresso').select('documento_id, documento_versao, pct, concluido_em').eq('estudante_id', estudanteId).in('documento_id', chunk).order('documento_id', { ascending: true })),
+    leve ? Promise.resolve([] as { documento_id: string; versao: number; artigos: number }[]) : fetchAllByIn<{ documento_id: string; versao: number; artigos: number }>(visIds, (chunk) => svc.from('simulado_documento_conteudos').select('documento_id, versao, artigos').in('documento_id', chunk).order('id', { ascending: true })),
+    fetchAllByIn<{ documento_id: string; documento_versao: number; pct: number; concluido_em: string | null }>(visIds, (chunk) => svc.from('simulado_leitura_progresso').select('documento_id, documento_versao, pct, concluido_em').eq('estudante_id', estudanteId).in('documento_id', chunk).order('id', { ascending: true })),
   ])
   const versaoDoc = new Map(visiveis.map((d) => [d.id, d.versao_publicada ?? d.versao]))
   const artigosPorDoc = new Map<string, number>()

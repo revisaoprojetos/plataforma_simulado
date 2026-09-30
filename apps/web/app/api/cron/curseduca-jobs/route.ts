@@ -53,10 +53,12 @@ export async function POST(req: NextRequest) {
     }
     if (!lockRes.data?.length) continue
 
+    const t0 = Date.now()
     try {
       const cfg = await resolverCfgCurseduca(job.tenant_id)
       if (!cfg) {
         await svc.from('simulado_curseduca_jobs').update({ status: 'erro', erro: 'Credenciais Curseduca não configuradas para este tenant.' }).eq('id', job.id)
+        await gravarSyncLog(svc, { tenant_id: job.tenant_id, job_id: job.id, ok: false, erro: 'Credenciais Curseduca não configuradas.', ms: Date.now() - t0 })
         continue
       }
       const resultado = await executarImport(
@@ -71,11 +73,24 @@ export async function POST(req: NextRequest) {
         resultado,
         erro: resultado.ok ? null : (resultado.error ?? 'Falha na importação.'),
       }).eq('id', job.id)
+      const r: any = resultado
+      await gravarSyncLog(svc, {
+        tenant_id: job.tenant_id, job_id: job.id, ok: !!r.ok,
+        novos: r.novos ?? null, ja_existiam: r.jaExistiam ?? null, removidos: r.removidos ?? null,
+        grupos_falhos: Array.isArray(r.gruposFalhos) ? r.gruposFalhos.length : (r.gruposFalhos ?? null),
+        erro: r.ok ? null : (r.error ?? 'Falha na importação.'), detalhe: r, ms: Date.now() - t0,
+      })
       processados++
     } catch (e: any) {
       await svc.from('simulado_curseduca_jobs').update({ status: 'erro', erro: e?.message ?? 'Falha inesperada.' }).eq('id', job.id)
+      await gravarSyncLog(svc, { tenant_id: job.tenant_id, job_id: job.id, ok: false, erro: e?.message ?? 'Falha inesperada.', ms: Date.now() - t0 })
     }
   }
 
   return NextResponse.json({ ok: true, processados })
+}
+
+/** Grava uma linha no histórico de sync (best-effort, tolerante à tabela ausente). */
+async function gravarSyncLog(svc: any, row: Record<string, unknown>): Promise<void> {
+  try { await svc.from('simulado_curseduca_sync_log').insert(row) } catch { /* tabela ausente → ignora */ }
 }
