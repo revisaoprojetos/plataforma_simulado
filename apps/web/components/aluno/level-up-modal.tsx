@@ -86,6 +86,14 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
           Continuar <ArrowRight className="h-4 w-4" />
         </button>
       )}
+      {/* Desativar animações (pedido do aluno): não mostra mais o modal/partículas — só enche a barra. */}
+      {done && (
+        <button type="button"
+          onClick={() => { try { localStorage.setItem('gamAnimacoesOff', '1') } catch { /* ignore */ } fechar() }}
+          className="absolute bottom-3 left-1/2 z-[210] -translate-x-1/2 text-[11px] font-medium text-white/60 underline underline-offset-2 transition hover:text-white/90">
+          Desativar animações
+        </button>
+      )}
 
       {/* Fundo: auroras + estrelas (contidas) */}
       <div className="pointer-events-none absolute inset-0 overflow-hidden">

@@ -96,11 +96,26 @@ export function CelebracaoXp({ assistenteAtivo = false }: { assistenteAtivo?: bo
 
       const nivelKey = `nivelCeleb:${r.est ?? 'x'}`
       const atual = progressoNivel(r.xpTotal, curva).nivel
-      let stored = parseInt(localStorage.getItem(nivelKey) ?? '', 10)
-      if (!Number.isFinite(stored)) stored = 1 // 1º acesso: catch-up a partir do nível 1
+      // Preferência "desativar animações" (por aluno) — pula modal e partículas, só atualiza a barra.
+      const animOff = (() => { try { return localStorage.getItem('gamAnimacoesOff') === '1' } catch { return false } })()
+      // Persiste o nível celebrado no SERVIDOR (fonte da verdade p/ não repetir em outro device/iframe).
+      const persistirNivel = (n: number) => {
+        try { localStorage.setItem(nivelKey, String(n)) } catch { /* ignore */ }
+        fetch('/api/aluno/gamificacao/celebracao', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ nivel: n }) }).catch(() => {})
+      }
+      // Fonte da verdade = servidor. localStorage é só cache otimista (evita reanimar no mesmo device).
+      const servidor = Number.isFinite(Number(r.nivelCelebrado)) && r.nivelCelebrado != null ? Number(r.nivelCelebrado) : null
+      const ls = parseInt(localStorage.getItem(nivelKey) ?? '', 10)
+      let stored: number
+      if (servidor != null) stored = servidor
+      else if (Number.isFinite(ls)) stored = ls
+      else { stored = atual; persistirNivel(atual) } // 1º registro: NÃO faz catch-up retroativo — assume o nível atual como já visto
+      if (Number.isFinite(ls) && ls > stored) stored = ls
 
       // ── SUBIU DE NÍVEL → modal de Level Up ──
       if (atual > stored) {
+        // Animações desativadas: enche a barra e persiste, sem modal fullscreen nem partículas.
+        if (animOff) { marcar(novos); persistirNivel(atual); const de = progressoNivel(Math.max(0, r.xpTotal - (novos.reduce((a, e) => a + e.xp, 0))), curva); const para = progressoNivel(r.xpTotal, curva); window.dispatchEvent(new CustomEvent('nivel:encher', { detail: { de, para, manterCargo: false } })); return true }
         const porOrigem = new Map<string, number>()
         for (const e of novos) porOrigem.set(e.origem, (porOrigem.get(e.origem) ?? 0) + e.xp)
         const gains: GanhoXp[] = [...porOrigem.entries()].map(([origem, xp]) => ({ icon: ICO[origem] ?? <Zap className="h-4 w-4" />, label: LABEL[origem] ?? 'XP', xp, cor: COR[origem] }))
@@ -116,7 +131,7 @@ export function CelebracaoXp({ assistenteAtivo = false }: { assistenteAtivo?: bo
           const de = progressoNivel(Math.max(0, r.xpTotal - sum), curva)
           const para = progressoNivel(r.xpTotal, curva)
           marcar(novos)
-          try { localStorage.setItem(nivelKey, String(atual)) } catch { /* ignore */ }
+          persistirNivel(atual)
           window.dispatchEvent(new CustomEvent('nivel:encher', { detail: { de, para, manterCargo: true } }))
           alvoRef.current = alvo
           spanRefs.current = []
@@ -128,12 +143,12 @@ export function CelebracaoXp({ assistenteAtivo = false }: { assistenteAtivo?: bo
         // Carregamento (catch-up) / reduced motion → modal direto.
         if (esperarPopup) await aguardarPopup()
         marcar(novos)
-        try { localStorage.setItem(nivelKey, String(atual)) } catch { /* ignore */ }
+        persistirNivel(atual)
         setModo(levelModo)
         return true
       }
 
-      try { localStorage.setItem(nivelKey, String(atual)) } catch { /* ignore */ }
+      persistirNivel(atual)
 
       // ── XP novo SEM subir de nível → pontinhos para a barra ──
       if (!novos.length) return false
@@ -145,7 +160,7 @@ export function CelebracaoXp({ assistenteAtivo = false }: { assistenteAtivo?: bo
       if (esperarPopup) await aguardarPopup()
       marcar(novos)
       window.dispatchEvent(new CustomEvent('nivel:encher', { detail: { de, para } }))
-      if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return true
+      if (animOff || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return true
       alvoRef.current = alvo
       spanRefs.current = []
       setModo({ tipo: 'particulas', particulas: origin ? montarParticulasDe(origin, sum) : montarParticulas(novos), xp: sum })
