@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/utils'
+import { brtLocalParaIso, isoParaBrtLocal } from '@/lib/brt'
 import { type CardView } from '@/lib/card-view'
 import {
   type BancoAulas, type ModuloLeitura, type DocEstado, criarDocumento, excluirModuloLeitura,
@@ -373,9 +374,12 @@ function CaixaSelecao({ checked, indeterminate, onChange, label }: { checked: bo
 
 /** Diálogo para AGENDAR a publicação (1 ou várias aulas): data/hora + como fica até lá. */
 function AgendarPublicacaoDialog({ quantidade, inicialQuando, inicialEstado, onCancel, onConfirm }: { quantidade: number; inicialQuando?: string | null; inicialEstado?: DocEstado; onCancel: () => void; onConfirm: (patch: { estado: DocEstado; publicarEm: string | null }) => void }) {
-  const [quando, setQuando] = useState(() => (inicialQuando ? isoParaLocal(inicialQuando) : ''))
+  // Interpreta o <input datetime-local> como horário de BRASÍLIA (não do fuso do navegador do admin),
+  // senão "00:01" pode virar 21:01/03:01 e a aula libera na hora errada.
+  const [quando, setQuando] = useState(() => (inicialQuando ? isoParaBrtLocal(inicialQuando) : ''))
   const [ate, setAte] = useState<'rascunho' | 'visualizavel'>(inicialEstado === 'rascunho' ? 'rascunho' : 'visualizavel')
-  const valido = !!quando && !Number.isNaN(Date.parse(quando)) && Date.parse(quando) > Date.now()
+  const isoQuando = brtLocalParaIso(quando)
+  const valido = !!isoQuando && Date.parse(isoQuando) > Date.now()
   return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onCancel} />
@@ -403,7 +407,7 @@ function AgendarPublicacaoDialog({ quantidade, inicialQuando, inicialEstado, onC
         <p className="mt-3 text-[11px] text-muted-foreground">Na data marcada, a aula é liberada automaticamente.</p>
         <div className="mt-4 flex justify-end gap-2">
           <button onClick={onCancel} className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted">Cancelar</button>
-          <button onClick={() => onConfirm({ estado: ate, publicarEm: new Date(quando).toISOString() })} disabled={!valido}
+          <button onClick={() => onConfirm({ estado: ate, publicarEm: isoQuando })} disabled={!valido}
             className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
             <CalendarClock className="h-4 w-4" /> Agendar
           </button>
@@ -472,11 +476,6 @@ function TabelaAulas({ aulas, modulos, pending, onOrdem, onExcluir, onPersonaliz
 /** Data/hora curta de agendamento (Brasília), ex.: "24/09 10:30". */
 function fmtAgendada(iso: string): string {
   try { return new Date(iso).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) } catch { return '' }
-}
-
-/** ISO → valor de <input type="datetime-local"> (horário local do navegador). */
-function isoParaLocal(iso: string): string {
-  try { const d = new Date(iso); const p = (n: number) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}` } catch { return '' }
 }
 
 function AulaLinha({ a, i, total, modulos, pending, onOrdem, onExcluir, onPersonalizar, run, selecionavel = false, selecionado = false, onToggleSel, onAplicarEstado, onAgendar }: {
