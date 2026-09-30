@@ -767,11 +767,25 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
  * Entrada única das trilhas do sistema: escolhe o LAYOUT pelo formato configurado no console/aparência.
  * serpentina/reta/mapa_semanas → TrilhaGigante (props); lista → TrilhaLista (tabela compacta).
  */
+/** Mobile (<640px): força o layout em LISTA nas trilhas de posicionamento absoluto (serpentina/reta/
+ *  livre/mapa), que ficam "espremidas" e com dias sobrepostos em telas estreitas. */
+function useTrilhaMobile() {
+  const [m, setM] = useState(false)
+  useEffect(() => {
+    const check = () => setM(window.innerWidth < 640)
+    check(); window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+  return m
+}
+
 export function TrilhaSistema({ trilhas, gamAtivo, simbolos = DEFAULT_TRILHA_SIMBOLOS, formato = 'serpentina', semFundo = false, semDivisoria = false, ajudante = false, inverter = false, livre, capa, semMoldura = false, degradeTopo, estampas = [] }: {
   trilhas: Trilha[]; gamAtivo: boolean; simbolos?: TrilhaSimbolos; formato?: TrilhaFormato; semFundo?: boolean; semDivisoria?: boolean; ajudante?: boolean; inverter?: boolean
   livre?: TrilhaLivreConfig; capa?: string | null; semMoldura?: boolean; degradeTopo?: TrilhaDegrade; estampas?: CarimboEstampa[]
 }) {
-  if (formato === 'lista') return <TrilhaLista trilhas={trilhas} gamAtivo={gamAtivo} simbolos={simbolos} ajudante={ajudante} />
+  const mobile = useTrilhaMobile()
+  // No celular, qualquer formato não-lista cai para a lista (responsiva, sem posicionamento absoluto).
+  if (formato === 'lista' || mobile) return <TrilhaLista trilhas={trilhas} gamAtivo={gamAtivo} simbolos={simbolos} ajudante={ajudante} />
   if (formato === 'mapa_semanas') return <TrilhaMapaSemanas trilhas={trilhas} simbolos={simbolos} ajudante={ajudante} capa={capa ?? trilhas[0]?.capa ?? null} />
   if (formato === 'livre') {
     const nos = trilhas.flatMap((t) => t.nodes).map((n) => ({

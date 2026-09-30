@@ -709,6 +709,26 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
     setSel({ anc, x: Math.min(Math.max(60, rc.left + rc.width / 2 - cr.left), cr.width - 60), y: rc.bottom - cr.top + 6 })
   }
 
+  // TOUCH/TABLET: seleção por toque (alças) NÃO dispara `onMouseUp` → o grifo não funcionava no
+  // Samsung/iPad. Escuta `selectionchange` (com debounce até a seleção estabilizar) e reaproveita
+  // `aoSelecionar`. Só no modo rolagem (no flip o toque é para virar página).
+  useEffect(() => {
+    if (modo === 'flip') return
+    let t: ReturnType<typeof setTimeout> | undefined
+    const onSelChange = () => {
+      if (t) clearTimeout(t)
+      t = setTimeout(() => {
+        const s = window.getSelection(); const root = contentRef.current
+        if (!s || s.isCollapsed || s.rangeCount === 0 || !root) return
+        if (!root.contains(s.getRangeAt(0).commonAncestorContainer)) return
+        aoSelecionar()
+      }, 350)
+    }
+    document.addEventListener('selectionchange', onSelChange)
+    return () => { document.removeEventListener('selectionchange', onSelChange); if (t) clearTimeout(t) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modo, ferramenta])
+
   // ── Primitivas (API + estado). IDs são ESTÁVEIS: exclusão é soft-delete e "voltar" é undelete
   //    do MESMO id (nunca recria) — então os batches do histórico podem ser reusados sem
   //    reescrever ids, e o vínculo base_id/origem é preservado. ──
@@ -1378,6 +1398,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
             onTouchStart={modo === 'flip' ? onTouchStart : undefined}
             onTouchEnd={modo === 'flip' ? onTouchEnd : undefined}
             onMouseUp={aoSelecionar}
+            onPointerUp={modo !== 'flip' ? aoSelecionar : undefined}
             className={cn('leitura-scroll h-full', modo !== 'flip' ? 'overflow-y-auto px-3 md:px-8' : 'overflow-hidden')}
             style={modo !== 'flip' ? { background: cores.desk } : undefined}
           >
