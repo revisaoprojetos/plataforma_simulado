@@ -16,7 +16,18 @@ export interface XpRegras {
 }
 /** Cargo/título exibido a partir de um nível (ex.: nível 6+ = "Júnior"). */
 export interface TituloNivel { nivel_min: number; titulo: string }
-export interface NivelCurva { tipo: string; base: number; incremento: number; nivel_max: number; titulos: TituloNivel[] }
+export interface NivelCurva {
+  tipo: string; base: number; incremento: number; nivel_max: number; titulos: TituloNivel[]
+  /**
+   * "Ponto de virada": a partir deste nível o custo de cada nível cresce MAIS (freio anti-inflação
+   * para quem começou no fácil). Níveis ABAIXO dele mantêm o custo de hoje bit-a-bit → ninguém que
+   * está abaixo do ponto muda de nível/XP. Defina-o acima do nível mais alto atual p/ não mexer em
+   * ninguém hoje. 0/ausente = desligado. `incremento_apos` = XP extra que se acumula por nível após
+   * a virada (custo(n) += (n − break + 1) × incremento_apos).
+   */
+  break_nivel?: number
+  incremento_apos?: number
+}
 export interface LigaDef { id: string; nome: string; xp_min: number; cor: string }
 export type MissaoTipo = 'finalizar_simulado' | 'acertar_n' | 'praticar_n' | 'concluir_aula_leitura' | 'gabaritar_quiz_leitura'
 export interface MissaoDef { id: string; titulo: string; tipo: MissaoTipo; meta: number; xp: number; ativa?: boolean }
@@ -59,8 +70,6 @@ export const DEFAULT_XP_REGRAS: XpRegras = {
   meta_dia: { xp: 50, bonus: 0 },
   limite_dia: 300, // teto de XP por dia
 }
-// Cargos-padrão: os 9 primeiros mantêm os MESMOS níveis de sempre (ninguém perde/rebaixa cargo);
-// os 6 seguintes são ADITIVOS, estendendo a carreira acima do nível 30 (evolução sem retrabalho).
 export const DEFAULT_TITULOS: TituloNivel[] = [
   { nivel_min: 1, titulo: 'Aprendiz' },
   { nivel_min: 3, titulo: 'Estagiário' },
@@ -71,14 +80,8 @@ export const DEFAULT_TITULOS: TituloNivel[] = [
   { nivel_min: 22, titulo: 'Promotor' },
   { nivel_min: 26, titulo: 'Advogado' },
   { nivel_min: 30, titulo: 'Mestre do Direito' },
-  { nivel_min: 35, titulo: 'Grão-Mestre do Direito' },
-  { nivel_min: 40, titulo: 'Jurista Lendário' },
-  { nivel_min: 45, titulo: 'Ícone dos Concursos' },
-  { nivel_min: 50, titulo: 'Imortal do Direito' },
-  { nivel_min: 55, titulo: 'Lenda Viva' },
-  { nivel_min: 60, titulo: 'Lenda Suprema' },
 ]
-export const DEFAULT_NIVEL_CURVA: NivelCurva = { tipo: 'formula', base: 100, incremento: 40, nivel_max: 60, titulos: DEFAULT_TITULOS }
+export const DEFAULT_NIVEL_CURVA: NivelCurva = { tipo: 'formula', base: 100, incremento: 40, nivel_max: 30, titulos: DEFAULT_TITULOS }
 export const DEFAULT_LIGAS: LigaDef[] = [
   { id: 'bronze', nome: 'Bronze', xp_min: 0, cor: '#a16207' },
   { id: 'prata', nome: 'Prata', xp_min: 500, cor: '#94a3b8' },

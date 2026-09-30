@@ -11,7 +11,7 @@ import { salvarXpNiveis } from '../actions'
 import { NumberField, SaveBar, SectionCard } from './_campos'
 import { useUnsavedGuard } from '@/components/admin/use-unsaved-guard'
 
-export function XpNiveisForm({ config, podeGerenciar }: { config: GamConfig; podeGerenciar: boolean }) {
+export function XpNiveisForm({ config, podeGerenciar, nivelMaisAlto = 1 }: { config: GamConfig; podeGerenciar: boolean; nivelMaisAlto?: number }) {
   const [simulado, setSimulado] = useState(config.xp_regras.simulado)
   const [pratica, setPratica] = useState(config.xp_regras.pratica)
   const [curva, setCurva] = useState(config.nivel_curva)
@@ -69,6 +69,23 @@ export function XpNiveisForm({ config, podeGerenciar }: { config: GamConfig; pod
             <NumberField stacked label="Custo base (1→2)" value={curva.base} onChange={(v) => setCurva({ ...curva, base: v })} suffix="XP" hint="XP para sair do nível 1 para o 2." disabled={!podeGerenciar} />
             <NumberField stacked label="Incremento" value={curva.incremento} onChange={(v) => setCurva({ ...curva, incremento: v })} suffix="XP" hint="Quanto o custo sobe a cada nível." disabled={!podeGerenciar} />
             <NumberField stacked label="Nível máximo" value={curva.nivel_max} onChange={(v) => setCurva({ ...curva, nivel_max: Math.max(2, Math.min(200, v)) })} suffix="níveis" min={2} hint="Último nível que o aluno pode alcançar." disabled={!podeGerenciar} />
+          </div>
+
+          {/* Ponto de virada: freio anti-inflação a partir de um nível — SEM mexer em quem está abaixo dele. */}
+          <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/[0.05] p-3">
+            <p className="mb-2 text-xs font-semibold text-amber-700 dark:text-amber-400">Dificultar a partir de um nível (anti-inflação)</p>
+            <div className="grid grid-cols-2 gap-2.5">
+              <NumberField stacked label="Ponto de virada" value={curva.break_nivel ?? 0} onChange={(v) => setCurva({ ...curva, break_nivel: Math.max(0, Math.min(curva.nivel_max, v)) })} suffix="nível" min={0} hint="0 = desligado. A partir deste nível cada nível fica mais caro." disabled={!podeGerenciar} />
+              <NumberField stacked label="Custo extra após a virada" value={curva.incremento_apos ?? 0} onChange={(v) => setCurva({ ...curva, incremento_apos: Math.max(0, v) })} suffix="XP / nível (acumula)" hint="Somado e acumulado a cada nível após a virada." disabled={!podeGerenciar} />
+            </div>
+            <p className="mt-2 text-[11px] text-muted-foreground">
+              Nível mais alto de um aluno hoje: <b className="text-foreground tabular-nums">{nivelMaisAlto}</b>. Níveis <b>abaixo</b> do ponto de virada mantêm o custo atual — ninguém abaixo dele muda de nível/XP.
+            </p>
+            {(curva.break_nivel ?? 0) > 0 && (curva.break_nivel ?? 0) <= nivelMaisAlto && (
+              <p className="mt-1 text-[11px] font-medium text-rose-600 dark:text-rose-400">
+                ⚠ O ponto de virada ({curva.break_nivel}) está no nível de alunos atuais (máx. {nivelMaisAlto}) — eles podem recuar de nível. Coloque acima de {nivelMaisAlto} para não afetar ninguém.
+              </p>
+            )}
           </div>
 
           <div className="mt-4 flex min-h-0 flex-1 flex-col">

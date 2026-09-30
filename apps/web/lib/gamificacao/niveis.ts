@@ -3,9 +3,19 @@ import type { LigaDef, NivelCurva, TituloNivel } from './config'
 // Curva de níveis por FÓRMULA: o custo para sair do nível n para n+1 é
 //   custo(n) = base + (n-1) * incremento   (cresce a cada nível — estilo Duolingo).
 // O XP total acumulado define o nível atual e o progresso dentro dele.
+//
+// "Ponto de virada" (break_nivel): a partir dele o custo cresce MAIS, adicionando um termo que se
+// acumula — custo(n) += (n − break + 1) × incremento_apos. É o freio anti-inflação para quem
+// começou no fácil. Como os níveis ABAIXO do ponto não mudam de custo, o XP acumulado para alcançar
+// qualquer nível ≤ break é IDÊNTICO ao de hoje → nenhum aluno abaixo do ponto muda de nível/XP.
+// (Basta colocar o ponto acima do nível mais alto atual para não mexer em ninguém.)
 
 function custoNivel(n: number, curva: NivelCurva): number {
-  return Math.max(1, (curva.base ?? 100) + (n - 1) * (curva.incremento ?? 40))
+  let custo = (curva.base ?? 100) + (n - 1) * (curva.incremento ?? 40)
+  const brk = curva.break_nivel ?? 0
+  const extra = curva.incremento_apos ?? 0
+  if (brk > 0 && extra > 0 && n >= brk) custo += (n - brk + 1) * extra
+  return Math.max(1, Math.round(custo))
 }
 
 /** XP acumulado necessário para ALCANÇAR o nível `nivel` (nível 1 = 0 XP). */

@@ -18,7 +18,7 @@ import { MetricasView } from './forms/metricas-view'
 // 'engajamento' MOVIDO para Conexões → Webhooks (sub-aba Engajamento). Redireciona deep-links antigos.
 const TABS_VALIDAS = ['xp', 'ligas', 'conquistas', 'missoes', 'regras', 'metricas']
 
-export function GamificacaoTabs({ config, podeGerenciar, metricas, tabInicial, conquistasModulos = [] }: { config: GamConfig; podeGerenciar: boolean; metricas: MetricasGam; tabInicial?: string; conquistasModulos?: ConquistasModuloOrigem[] }) {
+export function GamificacaoTabs({ config, podeGerenciar, metricas, tabInicial, conquistasModulos = [], nivelMaisAlto = 1 }: { config: GamConfig; podeGerenciar: boolean; metricas: MetricasGam; tabInicial?: string; conquistasModulos?: ConquistasModuloOrigem[]; nivelMaisAlto?: number }) {
   const [tab, setTab] = useState(tabInicial && TABS_VALIDAS.includes(tabInicial) ? tabInicial : 'xp')
   // Reflete a aba na URL (?tab=) SEM criar entrada no histórico → o "voltar" do navegador (após abrir o
   // Gerenciador) retorna à aba onde o usuário estava, não à primeira.
@@ -37,7 +37,7 @@ export function GamificacaoTabs({ config, podeGerenciar, metricas, tabInicial, c
         <TabsTrigger value="metricas"><BarChart3 /> Métricas</TabsTrigger>
       </TabsList>
 
-      <TabsContent value="xp" keepMounted className="pt-1 pb-1"><XpNiveisForm config={config} podeGerenciar={podeGerenciar} /></TabsContent>
+      <TabsContent value="xp" keepMounted className="pt-1 pb-1"><XpNiveisForm config={config} podeGerenciar={podeGerenciar} nivelMaisAlto={nivelMaisAlto} /></TabsContent>
       <TabsContent value="ligas" keepMounted className="pt-1 pb-1"><LigasForm config={config} podeGerenciar={podeGerenciar} /></TabsContent>
       <TabsContent value="conquistas" keepMounted className="pt-1 pb-1"><ConquistasForm config={config} podeGerenciar={podeGerenciar} modulos={conquistasModulos} /></TabsContent>
       <TabsContent value="missoes" keepMounted className="pt-1 pb-1"><MissoesForm config={config} podeGerenciar={podeGerenciar} /></TabsContent>

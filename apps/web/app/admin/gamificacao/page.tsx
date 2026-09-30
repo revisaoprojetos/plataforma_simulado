@@ -30,6 +30,15 @@ export default async function GamificacaoPage({ searchParams }: { searchParams: 
   const metricas = config && tenantId ? await metricasGamificacao(svc, tenantId, config) : null
   // Conquistas criadas DENTRO dos módulos de Leitura — exibidas na aba Conquistas com etiqueta de origem.
   const conquistasModulos = tenantId ? await listarConquistasModuloTenant(svc, tenantId) : []
+  // Nível mais alto que algum aluno tem HOJE — orienta o "ponto de virada" (colocá-lo acima disso
+  // não mexe em ninguém). Query barata (max de coluna denormalizada).
+  let nivelMaisAlto = 1
+  if (tenantId) {
+    try {
+      const { data } = await svc.from('simulado_gamificacao_estudante').select('nivel').eq('tenant_id', tenantId).order('nivel', { ascending: false }).limit(1).maybeSingle()
+      nivelMaisAlto = Math.max(1, Number((data as any)?.nivel ?? 1))
+    } catch { /* tolerante */ }
+  }
 
   return (
     <div className="tema-gam space-y-6">
@@ -46,7 +55,7 @@ export default async function GamificacaoPage({ searchParams }: { searchParams: 
         </span>
       </div>
 
-      {config && metricas && <GamificacaoTabs config={config} podeGerenciar={podeGerenciar} metricas={metricas} tabInicial={tab} conquistasModulos={conquistasModulos} />}
+      {config && metricas && <GamificacaoTabs config={config} podeGerenciar={podeGerenciar} metricas={metricas} tabInicial={tab} conquistasModulos={conquistasModulos} nivelMaisAlto={nivelMaisAlto} />}
     </div>
   )
 }
