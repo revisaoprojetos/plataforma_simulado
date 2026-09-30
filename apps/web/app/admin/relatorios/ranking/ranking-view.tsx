@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Trophy, SlidersHorizontal, FileSpreadsheet, Crown, Medal, Users, Star, FolderTree, RefreshCw, Download, Shield, RotateCcw } from 'lucide-react'
-import { baixarCsv } from '@/components/admin/relatorios/kit'
+import { BotaoExportar } from '@/components/admin/relatorios/viz'
 import { usePdfDownloads } from '@/components/pdf-downloads-provider'
 import { CriteriosForm } from './criterios-form'
 import { salvarCriteriosRanking } from './actions'
@@ -51,14 +51,13 @@ export function RankingView({ simuladoId, titulo, grupos, totalQuestoes, entrada
   const topo = ranking[0]
   const melhorAcerto = ranking.reduce((m, r) => Math.max(m, r.total ? Math.round((r.acertos / r.total) * 100) : 0), 0)
 
-  function exportar() {
+  function exportar(): (string | number | null)[][] {
     const cab = ['Posição', 'Estudante', 'E-mail', 'Data', 'Pontuação', 'Acertos', '%', ...gruposUsados.map((g) => nomeGrupo(g) ?? 'Grupo'), 'Classificação', 'Idade']
-    const linhas: (string | number | null)[][] = [
+    return [
       ['Ranking', titulo], comRecorrecao ? ['Considerando anulações e trocas'] : ['Sem anulações/trocas'], [],
       cab,
       ...visivel.map((r) => [r.pos, r.nome, r.email ?? '', fmtDataHora(r.data), nota(r.pontuacao), `${r.acertos}/${r.total}`, r.total ? Math.round((r.acertos / r.total) * 100) : 0, ...gruposUsados.map((g) => r.porGrupo[g] ?? 0), r.classificacao ? rotuloClassificacao(r.classificacao) : '', r.idade ?? '—']),
     ]
-    baixarCsv(`${titulo}_ranking`, linhas)
   }
 
   async function baixarPdf() {
@@ -89,9 +88,7 @@ export function RankingView({ simuladoId, titulo, grupos, totalQuestoes, entrada
           <button type="button" onClick={() => router.refresh()} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm hover:bg-muted" title="Atualizar">
             <RefreshCw className="h-4 w-4" /> <span className="hidden sm:inline">Atualizar</span>
           </button>
-          <button type="button" onClick={exportar} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm hover:bg-muted">
-            <FileSpreadsheet className="h-4 w-4" /> CSV
-          </button>
+          <BotaoExportar nome={`${titulo}_ranking`} linhas={exportar} />
           <label className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm text-muted-foreground">
             Até
             <input type="number" min={1} value={ate} onChange={(e) => setAte(Number(e.target.value) || 0)} className="w-14 rounded-md border bg-[var(--input-bg,transparent)] px-2 py-0.5 text-center text-foreground outline-none focus:ring-1 focus:ring-ring" />

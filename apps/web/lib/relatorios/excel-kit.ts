@@ -93,3 +93,33 @@ export function nomeArquivo(base: string, sufixo = '') {
   const limpo = (base.trim() || 'relatorio').replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '_')
   return sufixo ? `${limpo}_${sufixo}` : limpo
 }
+
+/** Excel SIMPLES a partir de uma matriz (mesmos dados do CSV): 1ª linha = cabeçalho roxo, demais
+ *  zebradas, larguras automáticas. Uso: `baixarExcelSimples('nome', linhas, 'Aba')`. Uma aba por
+ *  matriz quando `abas` é passado ([{nome, linhas}]) — senão uma única aba com `linhas`. */
+export async function baixarExcelSimples(
+  nomeArq: string,
+  linhasOuAbas: (string | number | null)[][] | { nome: string; linhas: (string | number | null)[][] }[],
+  sheetName = 'Dados',
+) {
+  const wb = await novoWorkbook()
+  const abas = Array.isArray(linhasOuAbas) && linhasOuAbas.length > 0 && Array.isArray((linhasOuAbas as any)[0])
+    ? [{ nome: sheetName, linhas: linhasOuAbas as (string | number | null)[][] }]
+    : (linhasOuAbas as { nome: string; linhas: (string | number | null)[][] }[])
+  for (const aba of abas) {
+    const ws = wb.addWorksheet((aba.nome || 'Dados').slice(0, 31))
+    const linhas = aba.linhas ?? []
+    if (linhas.length) {
+      cabecalho(ws, (linhas[0] ?? []).map((c) => c ?? ''))
+      for (const l of linhas.slice(1)) ws.addRow(l.map((c) => (c == null ? '' : c)))
+      if (linhas.length > 1) estilizarLinhas(ws, 2, linhas.length, (linhas[0] ?? []).length)
+      // Larguras automáticas (limitadas).
+      const ncols = (linhas[0] ?? []).length
+      for (let c = 1; c <= ncols; c++) {
+        const maxLen = Math.max(...linhas.map((l) => String(l[c - 1] ?? '').length), 8)
+        ws.getColumn(c).width = Math.min(48, maxLen + 2)
+      }
+    }
+  }
+  await baixarWorkbook(wb, nomeArquivo(nomeArq))
+}

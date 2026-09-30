@@ -7,9 +7,10 @@
 // e SVG com `currentColor` — robusto no claro e no escuro, e no estilo do Ranking.
 
 import { useId, useMemo, useState } from 'react'
-import { Inbox, BarChart3, LineChart } from 'lucide-react'
+import { Inbox, BarChart3, LineChart, ChevronDown, FileText, FileSpreadsheet } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { usePdfDownloads } from '@/components/pdf-downloads-provider'
 
 export type Tom = 'primary' | 'emerald' | 'amber' | 'sky' | 'violet' | 'rose' | 'slate'
@@ -418,12 +419,29 @@ export function BotaoBaixarPdf({ sub, refId, titulo, arquivo }: {
 }
 
 /** Botão de exportar CSV padronizado. */
-export function BotaoExportar({ onClick }: { onClick: () => void }) {
+/** Botão de exportação (CSV + Excel .xlsx) a partir de uma matriz de linhas (1ª linha = cabeçalho).
+ *  `linhas` é uma FUNÇÃO (monta só ao clicar). Compat: aceita ainda `onClick` (só CSV) por retrocompat. */
+export function BotaoExportar({ nome, linhas, onClick }: { nome?: string; linhas?: () => (string | number | null)[][]; onClick?: () => void }) {
+  if (!linhas) {
+    return (
+      <button type="button" onClick={onClick} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-muted">
+        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M8 13h2m4 0h2m-8 4h2m4 0h2" /></svg>
+        Exportar
+      </button>
+    )
+  }
+  const arq = nome || 'relatorio'
   return (
-    <button type="button" onClick={onClick} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-muted">
-      <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M8 13h2m4 0h2m-8 4h2m4 0h2" /></svg>
-      Exportar (CSV/Excel)
-    </button>
+    <DropdownMenu>
+      <DropdownMenuTrigger className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-muted">
+        <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6M8 13h2m4 0h2m-8 4h2m4 0h2" /></svg>
+        Exportar <ChevronDown className="h-3.5 w-3.5 opacity-60" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => baixarCsv(arq, linhas())}><FileText className="mr-2 h-4 w-4" /> CSV</DropdownMenuItem>
+        <DropdownMenuItem onClick={async () => { const { baixarExcelSimples } = await import('@/lib/relatorios/excel-kit'); await baixarExcelSimples(arq, linhas()) }}><FileSpreadsheet className="mr-2 h-4 w-4" /> Excel (.xlsx)</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { KpiCard, Painel, Hero, BarrasH, Colunas, AreaSpark, Donut, BotaoExportar, baixarCsv } from '@/components/admin/relatorios/viz'
+import { KpiCard, Painel, Hero, BarrasH, Colunas, AreaSpark, Donut, BotaoExportar } from '@/components/admin/relatorios/viz'
 import { ClipboardList, Users, Activity, CheckCircle2, Trophy, Target, BookOpen, ListChecks, LayoutDashboard, TrendingUp, PieChart, BarChart3 } from 'lucide-react'
 
 type SessaoLite = { data: string | null; nota: number | null; acerto: number | null }
@@ -52,8 +52,8 @@ export function RelatorioGraficoView({ d, print }: { d: DadosRelatorioGrafico; p
 
   const granLabel = GRANS.find((x) => x.id === g)?.label.toLowerCase()
 
-  function exportar() {
-    const linhas: (string | number | null)[][] = [
+  function exportar(): (string | number | null)[][] {
+    return [
       ['Relatório gráfico — visão geral'],
       ['Simulados', d.totais.simulados, 'Estudantes', d.totais.estudantes, 'Sessões', d.totais.sessoes, 'Finalizadas', d.totais.finalizadas],
       ['Nota média', nota(d.notaMediaGeral), 'Acerto médio', d.acertoMedioGeral != null ? `${d.acertoMedioGeral}%` : '—', 'Questões', d.totais.questoes, 'Respostas', d.totais.respostas],
@@ -64,7 +64,6 @@ export function RelatorioGraficoView({ d, print }: { d: DadosRelatorioGrafico; p
       ['Acerto por disciplina'], ['Disciplina', 'Acerto %', 'Respostas'],
       ...d.porDisciplina.map((x) => [x.nome, x.pct, x.tt]),
     ]
-    baixarCsv('relatorio_grafico_geral', linhas)
   }
 
   return (
@@ -79,7 +78,7 @@ export function RelatorioGraficoView({ d, print }: { d: DadosRelatorioGrafico; p
                   className={`rounded-lg px-3.5 py-1.5 text-sm font-medium transition ${g === x.id ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:bg-muted'}`}>{x.label}</button>
               ))}
             </div>
-            <BotaoExportar onClick={exportar} />
+            <BotaoExportar nome="relatorio_grafico_geral" linhas={exportar} />
           </>
         )} />
 

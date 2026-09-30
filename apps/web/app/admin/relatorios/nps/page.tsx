@@ -4,6 +4,7 @@ import { SemPermissao } from '@/components/ui/alert-box'
 import { fetchAll } from '@/lib/supabase/fetch-all'
 import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
 import { formatBrt } from '@/lib/brt'
+import { NpsExport } from './nps-export'
 import { Star, TrendingUp, Minus, TrendingDown } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
@@ -73,12 +74,15 @@ export default async function NpsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-3">
-        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 text-primary"><Star className="h-5 w-5" /></span>
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">NPS — Satisfação do aluno</h1>
-          <p className="text-muted-foreground">Avaliações que os alunos deixam ao concluir um simulado.</p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/15 text-primary"><Star className="h-5 w-5" /></span>
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">NPS — Satisfação do aluno</h1>
+            <p className="text-muted-foreground">Avaliações que os alunos deixam ao concluir um simulado.</p>
+          </div>
         </div>
+        {total > 0 && <NpsExport resumo={{ nps, media, total, promotores, neutros, detratores }} comentarios={comentarios} />}
       </div>
 
       {semTabela ? (

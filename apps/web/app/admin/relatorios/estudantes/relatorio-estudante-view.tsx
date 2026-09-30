@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { KpiCard, Painel, Hero, AreaSpark, EvolucaoNotaChart, BarrasDupla, ListaBusca, BotaoExportar, baixarCsv } from '@/components/admin/relatorios/viz'
+import { KpiCard, Painel, Hero, AreaSpark, EvolucaoNotaChart, BarrasDupla, ListaBusca, BotaoExportar } from '@/components/admin/relatorios/viz'
 import { ClipboardList, Trophy, Target, Clock, TrendingUp, TrendingDown, Minus, GraduationCap, BookOpen, ChevronRight, Award } from 'lucide-react'
 
 export type DadosRelatorioEstudante = {
@@ -21,8 +21,8 @@ export function RelatorioEstudanteView({ d, print, semCabecalho, historicoLink, 
   const sobe = d.evolucao.length >= 2 && d.evolucao[d.evolucao.length - 1].nota >= d.evolucao[0].nota
   const temTend = d.evolucao.length >= 2
 
-  function exportar() {
-    const linhas: (string | number | null)[][] = [
+  function exportar(): (string | number | null)[][] {
+    return [
       ['Relatório do estudante', d.nome],
       ['Simulados', d.simulados, 'Nota média', nota(d.notaMedia), 'Melhor', nota(d.melhorNota), 'Acerto médio', d.acertoMedio != null ? `${d.acertoMedio}%` : '—'],
       [],
@@ -32,7 +32,6 @@ export function RelatorioEstudanteView({ d, print, semCabecalho, historicoLink, 
       ['Acerto por disciplina (aluno x turma)'], ['Disciplina', 'Aluno %', 'Turma %'],
       ...d.porDisciplina.map((x) => [x.nome, x.aluno, x.turma]),
     ]
-    baixarCsv(`${d.nome}_relatorio`, linhas)
   }
 
   // Painéis (reusados em 2 arranjos: admin × perfil do aluno).
@@ -117,7 +116,7 @@ export function RelatorioEstudanteView({ d, print, semCabecalho, historicoLink, 
       {!semCabecalho && (
         <Hero icon={<GraduationCap className="h-6 w-6" />} tom="primary" titulo={d.nome}
           badge={!temTend ? undefined : <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${sobe ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400' : 'bg-rose-500/15 text-rose-600 dark:text-rose-400'}`}>{sobe ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}{sobe ? 'Evoluindo' : 'Em queda'}</span>}
-          subtitulo="Evolução e desempenho vs. a turma" acoes={print ? undefined : <BotaoExportar onClick={exportar} />} />
+          subtitulo="Evolução e desempenho vs. a turma" acoes={print ? undefined : <BotaoExportar nome={`${d.nome}_relatorio`} linhas={exportar} />} />
       )}
 
       {!semKpis && (
