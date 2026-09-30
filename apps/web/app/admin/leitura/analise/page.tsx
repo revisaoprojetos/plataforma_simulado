@@ -1,9 +1,10 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ArrowLeft, CheckCircle2, BarChart3, FileText, CreditCard, Search, Repeat, CircleSlash, ArrowUp, ArrowDown, ArrowUpDown, Maximize2, ExternalLink, Flame } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, BarChart3, FileText, CreditCard, Search, Repeat, CircleSlash, ArrowUp, ArrowDown, ArrowUpDown, Maximize2, ExternalLink, Flame, Users, TrendingUp, Trophy, Zap } from 'lucide-react'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { relatorioLeitura, detalheDocumento, engajamentoKpis, engajamentoLista, engajamentoAlunoDetalhe, modulosLeitura, type EngajSortCol } from './_dados'
 import { carregarRankingModulo } from '@/lib/leitura/ranking'
+import { KpiCard, BarrasH, Painel } from '@/components/admin/relatorios/viz'
 import { AvatarEstudante } from '@/components/aluno/avatar-estudante'
 import { EngajamentoModulosTabela } from '@/components/admin/engajamento-modulos-tabela'
 import { formatBrt } from '@/lib/brt'
@@ -118,7 +119,20 @@ async function SequenciasRelatorio({ tenantId, mod }: { tenantId: string; mod: s
   const rank = await carregarRankingModulo(moduloId, tenantId)
   // Só quem compete (exclui contas de teste ocultas) e tem sequência; ordena por sequência atual desc.
   const linhas = rank.itens.filter((i) => !i.oculto).sort((a, b) => b.streakAtual - a.streakAtual || b.aulasConcluidas - a.aulasConcluidas || a.nome.localeCompare(b.nome, 'pt-BR'))
-  const comSeq = linhas.filter((i) => i.streakAtual > 0).length
+  const comSeqList = linhas.filter((i) => i.streakAtual > 0)
+  const comSeq = comSeqList.length
+  const mediaSeq = comSeq ? Math.round(comSeqList.reduce((s, i) => s + i.streakAtual, 0) / comSeq) : 0
+  const maiorSeq = linhas.reduce((m, i) => Math.max(m, i.streakAtual), 0)
+  const pontosTotais = linhas.reduce((s, i) => s + (i.score ?? 0), 0)
+  // Distribuição da sequência (gráfico) — faixas alinhadas à tabela de bônus (semana/marcos).
+  const BUCKETS = [
+    { rotulo: '1–6 dias', min: 1, max: 6 },
+    { rotulo: '1 semana (7–13)', min: 7, max: 13 },
+    { rotulo: '2 semanas (14–20)', min: 14, max: 20 },
+    { rotulo: '3 semanas (21–29)', min: 21, max: 29 },
+    { rotulo: '1 mês+ (30+)', min: 30, max: Infinity },
+  ]
+  const distSeq = BUCKETS.map((b) => ({ rotulo: b.rotulo, valor: linhas.filter((i) => i.streakAtual >= b.min && i.streakAtual <= b.max).length }))
 
   return (
     <div className="space-y-4">
@@ -134,6 +148,18 @@ async function SequenciasRelatorio({ tenantId, mod }: { tenantId: string; mod: s
         <span className="ml-auto self-center text-xs text-muted-foreground">{fmt(comSeq)} com sequência ativa · {fmt(linhas.length)} no ranking</span>
       </form>
 
+      {/* Métricas dos alunos que estão MANTENDO a sequência + gráfico de distribuição. */}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard icon={<Users className="h-4 w-4" />} label="Com sequência ativa" valor={fmt(comSeq)} sub={`de ${fmt(linhas.length)} no ranking`} />
+        <KpiCard icon={<TrendingUp className="h-4 w-4" />} tom="sky" label="Sequência média" valor={`${mediaSeq}d`} sub="entre quem mantém" />
+        <KpiCard icon={<Trophy className="h-4 w-4" />} tom="amber" label="Maior sequência" valor={`${maiorSeq}d`} />
+        <KpiCard icon={<Zap className="h-4 w-4" />} tom="emerald" label="Pontos no módulo" valor={fmt(pontosTotais)} />
+      </div>
+
+      <Painel titulo="Distribuição da sequência" sub="Quantos alunos em cada faixa de dias consecutivos" icon={<Flame className="h-4 w-4" />} tom="amber">
+        <BarrasH itens={distSeq} tom="amber" max={Math.max(1, ...distSeq.map((d) => d.valor))} />
+      </Painel>
+
       <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
         <table className="w-full text-sm">
           <thead className="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
@@ -142,12 +168,13 @@ async function SequenciasRelatorio({ tenantId, mod }: { tenantId: string; mod: s
               <th className="px-4 py-2.5">Aluno</th>
               <th className="px-4 py-2.5 text-center"><span className="inline-flex items-center gap-1"><Flame className="h-3 w-3" /> Sequência</span></th>
               <th className="px-4 py-2.5 text-center">Aulas concluídas</th>
+              <th className="px-4 py-2.5 text-center">Pontos</th>
               <th className="px-4 py-2.5 text-center">Acertos</th>
             </tr>
           </thead>
           <tbody>
             {linhas.length === 0 ? (
-              <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">Ninguém com atividade neste módulo ainda.</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">Ninguém com atividade neste módulo ainda.</td></tr>
             ) : linhas.map((i, idx) => (
               <tr key={i.estudanteId} className="border-t transition-colors hover:bg-muted/40">
                 <td className="px-4 py-2.5 text-center tabular-nums text-muted-foreground">{idx + 1}</td>
@@ -166,6 +193,7 @@ async function SequenciasRelatorio({ tenantId, mod }: { tenantId: string; mod: s
                     : <span className="text-xs text-muted-foreground">—</span>}
                 </td>
                 <td className="px-4 py-2.5 text-center tabular-nums text-muted-foreground">{i.aulasConcluidas}</td>
+                <td className="px-4 py-2.5 text-center font-semibold tabular-nums">{fmt(i.score)}</td>
                 <td className="px-4 py-2.5 text-center tabular-nums text-muted-foreground">{i.acertos}</td>
               </tr>
             ))}
