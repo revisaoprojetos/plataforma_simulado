@@ -10,7 +10,9 @@ import { dominioCookieDeHost } from './cookie-domain'
  * navegador em qualquer outro domínio → login não persiste. Resolve o domínio registrável do host.
  */
 async function dominioAtual(): Promise<string | undefined> {
-  try { return dominioCookieDeHost((await headers()).get('host')) } catch { return undefined }
+  // Usa x-forwarded-host (host real do aluno atrás do Traefik) antes do host cru, senão o cookie
+  // é escopado ao domínio errado e o login não persiste.
+  try { const h = await headers(); return dominioCookieDeHost(h.get('x-forwarded-host') || h.get('host')) } catch { return undefined }
 }
 
 /** Injeta o domínio nas opções do cookie (set E delete usam o mesmo escopo). */

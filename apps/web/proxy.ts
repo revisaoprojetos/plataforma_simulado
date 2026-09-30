@@ -116,8 +116,10 @@ export async function proxy(request: NextRequest) {
   // after reading allowed origins from the DB. Here we set a permissive default that
   // will be overridden by the layout response headers via next/headers.
   if (pathname.startsWith('/embed/')) {
-    supabaseResponse.headers.set('X-Frame-Options', 'ALLOWALL')
-    supabaseResponse.headers.set('Content-Security-Policy', "frame-ancestors *")
+    // `X-Frame-Options` não tem valor "ALLOWALL" válido (só DENY/SAMEORIGIN) — navegadores ignoram
+    // valores inválidos, então quem manda é o CSP frame-ancestors. Removê-lo evita ambiguidade.
+    supabaseResponse.headers.delete('X-Frame-Options')
+    supabaseResponse.headers.set('Content-Security-Policy', 'frame-ancestors *')
     return finalizar(supabaseResponse)
   }
 

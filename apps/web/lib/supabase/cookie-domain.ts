@@ -10,7 +10,8 @@
  * Brasil (.com.br, .net.br, ...) para não cortar o domínio errado.
  */
 export function dominioCookieDeHost(hostRaw?: string | null): string | undefined {
-  const host = (hostRaw ?? '').split(':')[0].trim().toLowerCase()
+  // x-forwarded-host pode vir como "host1, host2" — usa o primeiro (o do cliente).
+  const host = (hostRaw ?? '').split(',')[0].split(':')[0].trim().toLowerCase()
   if (!host || host === 'localhost' || host.endsWith('.localhost')) return undefined
   if (/^\d{1,3}(\.\d{1,3}){3}$/.test(host)) return undefined // IPv4 → por-host
   if (host.includes(':')) return undefined                    // IPv6 → por-host

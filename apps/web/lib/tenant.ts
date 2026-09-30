@@ -24,7 +24,9 @@ export interface Tenant {
 // render — sem cache seriam N leituras idênticas de `simulado_tenants`. Host é constante no request.
 export const getCurrentTenant = cache(async (): Promise<Tenant | null> => {
   const h = await headers()
-  const host = (h.get('host') ?? '').split(':')[0].toLowerCase()
+  // Atrás do Traefik o `host` cru pode vir interno (ex.: 0.0.0.0) — o host real do aluno chega em
+  // `x-forwarded-host`. Sem isto o tenant não resolve e o login do aluno dá "Plataforma não encontrada".
+  const host = ((h.get('x-forwarded-host') || h.get('host')) ?? '').split(',')[0].split(':')[0].trim().toLowerCase()
   const supabase = createAdminClient()
   const COLS = 'id, nome, slug, tema, plano, ativo'
 
