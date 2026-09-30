@@ -98,8 +98,9 @@ for (const aid of idArr) {
     const ultimo = ord[ord.length - 1] ?? ''
     const streakAtual = ultimo === hoje || ultimo === ontem ? (runByDay.get(ultimo) ?? 0) : 0
     const completas = bloco.aulas.filter((a) => a.leituraEm && (a.temQuiz ? a.quizCompleto : true)).length
-    const datas = bloco.aulas.flatMap((a) => [a.leituraEm, a.quizEm]).filter(Boolean).sort()
-    const ultimaAtiv = datas[datas.length - 1] ?? null
+    // pg devolve timestamptz como Date → ordenar por getTime() (não .sort() lexical, que erra a ordem).
+    const datas = bloco.aulas.flatMap((a) => [a.leituraEm, a.quizEm]).filter(Boolean).map((d) => new Date(d).getTime()).sort((x, y) => x - y)
+    const ultimaAtiv = datas.length ? new Date(datas[datas.length - 1]) : null
     resumo.push([est.nome, est.email, bloco.modulo, completas, streakAtual, fmt(ultimaAtiv)])
     bloco.aulas.sort((a, b) => (a.ordem ?? 1e9) - (b.ordem ?? 1e9))
     for (const a of bloco.aulas) {
