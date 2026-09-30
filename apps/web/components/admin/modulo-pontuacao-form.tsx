@@ -19,7 +19,7 @@ export function ModuloPontuacaoForm({ pastaId, atual }: { pastaId: string; atual
   const baseRef = useRef(JSON.stringify(atual))
   const dirty = JSON.stringify(cfg) !== baseRef.current
 
-  function setNum(k: 'pontos_aula' | 'pontos_quiz' | 'pontos_acerto' | 'combo_bonus', v: string) {
+  function setNum(k: 'pontos_aula' | 'pontos_quiz' | 'pontos_acerto' | 'combo_bonus' | 'bonus_semana' | 'dias_ativo', v: string) {
     const n = Math.max(0, Math.round(Number(v) || 0))
     setCfg((c) => ({ ...c, [k]: n }))
   }
@@ -37,7 +37,7 @@ export function ModuloPontuacaoForm({ pastaId, atual }: { pastaId: string; atual
   // No salvar único da aba Config, esconde o botão próprio e registra dirty + salvar.
   const noSalvarUnico = useRegistrarSalvavel(`${pastaId}:pontuacao`, dirty, salvar)
 
-  const campo = (label: string, k: 'pontos_aula' | 'pontos_quiz' | 'pontos_acerto' | 'combo_bonus', dica: string) => (
+  const campo = (label: string, k: 'pontos_aula' | 'pontos_quiz' | 'pontos_acerto' | 'combo_bonus' | 'bonus_semana' | 'dias_ativo', dica: string) => (
     <label className="space-y-1">
       <span className="text-xs font-medium text-muted-foreground">{label}</span>
       <input type="number" min={0} value={cfg[k]} onChange={(e) => setNum(k, e.target.value)}
@@ -67,6 +67,12 @@ export function ModuloPontuacaoForm({ pastaId, atual }: { pastaId: string; atual
         <input type="checkbox" checked={cfg.combo_ativo} onChange={(e) => setCfg((c) => ({ ...c, combo_ativo: e.target.checked }))} className="h-4 w-4 rounded border" />
         <span>Ligar o <strong>combo</strong> (bônus por aula gabaritada)</span>
       </label>
+
+      {/* Sequência (streak) + janela de "praticando" do ranking. */}
+      <div className="grid gap-3 border-t pt-3 sm:grid-cols-2">
+        {campo('Bônus por semana de sequência', 'bonus_semana', 'A cada 7 dias consecutivos (+ marcos em 14/21/30 dias). Padrão 10.')}
+        {campo('Dias ativos no ranking', 'dias_ativo', 'Só entram os que fizeram aula nos últimos N dias. 0 = todos com atividade.')}
+      </div>
 
       {!noSalvarUnico && (
         <div className="flex justify-end">

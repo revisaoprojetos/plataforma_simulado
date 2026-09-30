@@ -10,7 +10,7 @@ import { faixaUuidDoCodigo } from '@/lib/codigo-questao'
 import { espinhaDeHtml, reancorar } from '@/lib/leitura/reanchor'
 import { limparCabecalhoHtml } from '@/lib/leitura/limpar-cabecalho'
 import { hospedarBase64 } from '@/lib/storage/hospedar-base64'
-import { normalizarPontuacaoLeitura, type PontuacaoLeitura } from '@/lib/leitura/pontuacao'
+import { normalizarPontuacaoLeitura, bonusSequenciaLeitura, type PontuacaoLeitura } from '@/lib/leitura/pontuacao'
 import { normalizarIntro, type IntroConfig } from '@/lib/leitura/intro'
 import { normalizarRegulamento, type RegulamentoConfig } from '@/lib/leitura/regulamento'
 import { normalizarDesafios, type DesafioModulo } from '@/lib/leitura/desafios'
@@ -988,7 +988,7 @@ export async function detalheRankingAluno(moduloId: string, estudanteId: string)
     detalhe: {
       nome: (est as any)?.nome ?? 'Aluno', email: (est as any)?.email ?? null,
       streakAtual: seq.streakAtual, streakMaior: seq.streakMaior, ultimoDiaAtivo: (gamRow as any)?.ultimo_dia_ativo ?? null,
-      totalAulas: docList.length, aulasConcluidas: aulas.length, pontosTotal, aulas,
+      totalAulas: docList.length, aulasConcluidas: aulas.length, pontosTotal: pontosTotal + (gamAtivo ? bonusSequenciaLeitura(seq.streakAtual, pontuacao) : 0), aulas,
       tz, hoje, diasAuto: [...diasConcluidos].sort(), overrides, diaAulas,
     },
   }

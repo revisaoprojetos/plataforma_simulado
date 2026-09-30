@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { remember, esquecer } from '@/lib/cache/relatorio-cache'
 import { getGamConfig } from '@/lib/gamificacao'
-import { normalizarPontuacaoLeitura, pontuarLegProc, type PontuacaoLeitura } from '@/lib/leitura/pontuacao'
+import { normalizarPontuacaoLeitura, pontuarLegProc, bonusSequenciaLeitura, type PontuacaoLeitura } from '@/lib/leitura/pontuacao'
 
 export interface RankingLeituraItem {
   estudanteId: string
@@ -88,11 +88,14 @@ export async function carregarRankingModulo(moduloId: string, tenantId: string):
       for (const a of ajs ?? []) if ((a as any).overrides && typeof (a as any).overrides === 'object') overridesPorAluno.set((a as any).estudante_id, (a as any).overrides)
     } catch { /* migração pendente → sem ajuste */ }
 
-    type Bruto = { estudanteId: string; acertos: number; aulasConcluidas: number; aulasGabaritadas: number; streakAtual: number; score: number }
-    const montarBruto = (id: string, acertos: number, aulasConcluidas: number, aulasGabaritadas: number, dias: Iterable<string>): Bruto =>
-      ({ estudanteId: id, acertos, aulasConcluidas, aulasGabaritadas,
-         streakAtual: calcularSequencia(dias, overridesPorAluno.get(id), hoje, ontem).streakAtual,
-         score: pontuarLegProc(pontuacao, { acertos, aulasConcluidas, aulasGabaritadas }, gamAtivo) })
+    type Bruto = { estudanteId: string; acertos: number; aulasConcluidas: number; aulasGabaritadas: number; streakAtual: number; ultimoDia: string; score: number }
+    const montarBruto = (id: string, acertos: number, aulasConcluidas: number, aulasGabaritadas: number, dias: Iterable<string>): Bruto => {
+      const seq = calcularSequencia(dias, overridesPorAluno.get(id), hoje, ontem)
+      const base = pontuarLegProc(pontuacao, { acertos, aulasConcluidas, aulasGabaritadas }, gamAtivo)
+      // Bônus de SEQUÊNCIA (semana + marcos da tabela) — só quando a pontuação/gamificação está ativa.
+      const score = base + (gamAtivo ? bonusSequenciaLeitura(seq.streakAtual, pontuacao) : 0)
+      return { estudanteId: id, acertos, aulasConcluidas, aulasGabaritadas, streakAtual: seq.streakAtual, ultimoDia: seq.diasEfetivos[seq.diasEfetivos.length - 1] ?? '', score }
+    }
 
     // AGREGAÇÃO NO BANCO (rpc_leitura_ranking): 1 linha por aluno — evita puxar dezenas de milhares de
     // respostas pro app (~61k linhas / ~29s no Lei Seca). Fallback pro read paginado se a função não existir.
@@ -130,6 +133,14 @@ export async function carregarRankingModulo(moduloId: string, tenantId: string):
         return montarBruto(id, acertos, aulasConcluidas, aulasGabaritadas, dias)
       }).filter((x) => x.acertos > 0 || x.aulasConcluidas > 0)
     }
+
+    // Filtro "EFETIVAMENTE PRATICANDO" (recência configurável em pontuacao.dias_ativo): a ÚLTIMA aula
+    // concluída tem de ser dentro dos últimos N dias. 0 = mostra todos com atividade (sem filtro).
+    const diasAtivo = pontuacao.dias_ativo ?? 0
+    if (diasAtivo > 0) {
+      const limite = new Date(Date.parse(hoje + 'T00:00:00Z') - diasAtivo * 86_400_000).toISOString().slice(0, 10)
+      brutos = brutos.filter((b) => b.ultimoDia && b.ultimoDia >= limite)
+    }
     if (!brutos.length) return { itens: [], gamAtivo, pontuacao }
 
     // Contas de teste ocultas do ranking (marcadas em Acessos): não competem por posição.
@@ -150,7 +161,8 @@ export async function carregarRankingModulo(moduloId: string, tenantId: string):
       svc.from('simulado_estudantes').select('id, nome, email, avatar, perfil_avatar_cor').in('id', chunk))
     const estDe = new Map(ests.map((e) => [e.id, e]))
     const comNome = brutos.map((b) => { const e = estDe.get(b.estudanteId); return { ...b, nome: e?.nome ?? 'Aluno', email: e?.email ?? null, avatar: e?.avatar ?? null, avatarCor: e?.perfil_avatar_cor ?? null } })
-    const ordena = (arr: typeof comNome) => [...arr].sort((a, b) => b.score - a.score || b.aulasConcluidas - a.aulasConcluidas || a.nome.localeCompare(b.nome, 'pt-BR'))
+    // Ordena por SEQUÊNCIA (streak) primeiro — pedido do produto — depois pontos, aulas e nome.
+    const ordena = (arr: typeof comNome) => [...arr].sort((a, b) => b.streakAtual - a.streakAtual || b.score - a.score || b.aulasConcluidas - a.aulasConcluidas || a.nome.localeCompare(b.nome, 'pt-BR'))
     // Reais competem por posição (1..N); ocultos vêm depois marcados (ou somem se "ocultar totalmente").
     const reais = ordena(comNome.filter((b) => !ocultosSet.has(b.estudanteId))).map((b, i) => ({ ...b, posicao: i + 1, oculto: false }))
     const ocultos = ocultarTotal ? [] : ordena(comNome.filter((b) => ocultosSet.has(b.estudanteId))).map((b) => ({ ...b, posicao: 0, oculto: true }))

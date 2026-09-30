@@ -112,8 +112,12 @@ export function CelebracaoXp({ assistenteAtivo = false }: { assistenteAtivo?: bo
       else { stored = atual; persistirNivel(atual) } // 1º registro: NÃO faz catch-up retroativo — assume o nível atual como já visto
       if (Number.isFinite(ls) && ls > stored) stored = ls
 
-      // ── SUBIU DE NÍVEL → modal de Level Up ──
-      if (atual > stored) {
+      // ── SUBIU DE NÍVEL → modal de Level Up SÓ quando MUDA DE CARGO (promoção) ──
+      // Subir de nível SEM trocar de cargo agora só enche a barra (como ganho normal de XP) — reduz o
+      // "spam" de animações; a celebração fullscreen fica reservada às mudanças de cargo. Se subiu de
+      // nível mas manteve o cargo, cai no fluxo de "encher barra" abaixo (sem modal).
+      const mudouCargo = tituloParaNivel(stored, curva.titulos) !== tituloParaNivel(atual, curva.titulos)
+      if (atual > stored && mudouCargo) {
         // Animações desativadas: enche a barra e persiste, sem modal fullscreen nem partículas.
         if (animOff) { marcar(novos); persistirNivel(atual); const de = progressoNivel(Math.max(0, r.xpTotal - (novos.reduce((a, e) => a + e.xp, 0))), curva); const para = progressoNivel(r.xpTotal, curva); window.dispatchEvent(new CustomEvent('nivel:encher', { detail: { de, para, manterCargo: false } })); return true }
         const porOrigem = new Map<string, number>()
