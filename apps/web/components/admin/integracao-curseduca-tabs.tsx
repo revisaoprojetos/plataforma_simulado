@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { KeyRound, DownloadCloud, AlertTriangle, Loader2, RefreshCw } from 'lucide-react'
+import { KeyRound, DownloadCloud, AlertTriangle, Loader2, RefreshCw, ShieldCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CurseducaConfig } from '@/components/admin/curseduca-config'
 import { CurseducaImport } from '@/components/admin/curseduca-import'
 import { CurseducaSyncCard } from '@/components/admin/curseduca-sync-card'
+import { CurseducaAutoVinculo } from '@/components/admin/curseduca-auto-vinculo'
 import { listarGruposCurseduca } from '@/app/admin/curseduca/actions'
 
 /**
@@ -14,7 +15,7 @@ import { listarGruposCurseduca } from '@/app/admin/curseduca/actions'
  * (não bloqueiam esperando a API da Curseduca listar/contar centenas de grupos).
  * A aba "Sincronização" completa está oculta; o intervalo fica no card do Importar.
  */
-type Aba = 'importar' | 'sincronizacao' | 'credenciais'
+type Aba = 'importar' | 'sincronizacao' | 'auto-passaporte' | 'credenciais'
 
 export function IntegracaoCurseducaTabs({ configurado, inativo = false, regras }: { configurado: boolean; inativo?: boolean; regras: any[] }) {
   const [aba, setAba] = useState<Aba>(configurado ? 'importar' : 'credenciais')
@@ -36,6 +37,7 @@ export function IntegracaoCurseducaTabs({ configurado, inativo = false, regras }
   const abas: { id: Aba; label: string; Icon: any }[] = [
     { id: 'importar', label: 'Importar', Icon: DownloadCloud },
     { id: 'sincronizacao', label: 'Sincronização', Icon: RefreshCw },
+    { id: 'auto-passaporte', label: 'Auto Passaporte', Icon: ShieldCheck },
     { id: 'credenciais', label: 'Credenciais', Icon: KeyRound },
   ]
 
@@ -81,6 +83,10 @@ export function IntegracaoCurseducaTabs({ configurado, inativo = false, regras }
             </div>
           ) : erroGrupos ? aviso('Não foi possível carregar os grupos', erroGrupos)
             : <CurseducaSyncCard grupos={grupos} sistema={sistema} inicialAtivo={!!regra0?.ativo} inicialIntervalo={regra0?.intervalo_min ?? 30} inicialGrupos={regra0?.grupos ?? []} inicialAgrupar={!!regra0?.agruparPorNome} inicialDescobrir={!!regra0?.descobrirCanais} />
+      )}
+      {aba === 'auto-passaporte' && (
+        !configurado ? aviso('Integração não configurada', 'Configure as credenciais na aba Credenciais.')
+          : <CurseducaAutoVinculo />
       )}
       {aba === 'credenciais' && <div className="max-w-3xl"><CurseducaConfig inicialAberto semColapso /></div>}
     </div>

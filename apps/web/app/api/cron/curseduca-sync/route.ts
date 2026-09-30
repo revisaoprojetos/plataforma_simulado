@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { resolverCfg, executarImport } from '@/lib/curseduca/import-core'
 import { agruparPorNomeTick } from '@/lib/curseduca/agrupar'
+import { processarAutoVinculosDue } from '@/lib/curseduca/auto-vinculo'
 
 export const dynamic = 'force-dynamic'
 
@@ -104,5 +105,11 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ ok: true, rodadas })
+  // Automação "Auto-vínculo Passaporte" (emenda do superior): pega carona neste tick (a cada 300s) e
+  // roda as regras cujo agendamento — horário fixo do dia OU intervalo — venceu. Isolada e tolerante
+  // (se a tabela não existir, é no-op).
+  let autoVinculo = { rodadas: 0 }
+  try { autoVinculo = await processarAutoVinculosDue(svc) } catch { /* não derruba o tick */ }
+
+  return NextResponse.json({ ok: true, rodadas, autoVinculo: autoVinculo.rodadas })
 }

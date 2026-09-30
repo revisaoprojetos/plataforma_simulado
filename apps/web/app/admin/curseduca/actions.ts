@@ -6,6 +6,7 @@ import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { configDoEnv, testarCredenciais, listarTodosGrupos, contarMembros, listarMembrosDoGrupo, mapaMatriculasGrupo, contarMuitosGrupos } from '@/lib/curseduca/client'
 import { resolverCfg, executarImport, envAplicaAoTenant } from '@/lib/curseduca/import-core'
+import { executarAutoVinculo } from '@/lib/curseduca/auto-vinculo'
 import type { DestinoImport, ResultadoImportCurseduca } from '@/lib/curseduca/tipos'
 import { criptografar, descriptografar, estaCriptografado, criptografiaAtiva } from '@/lib/crypto'
 import { resolverCfgCurseduca } from '@/lib/curseduca/cfg'
@@ -506,4 +507,81 @@ export async function rodarRegraSyncAgora(id: string): Promise<{ ok: boolean; er
   await svc.from('simulado_curseduca_sync').update({ ultima_execucao: new Date().toISOString(), ultimo_resultado: resultado }).eq('id', id).eq('tenant_id', g.tenantId)
   revalidatePath('/admin/curseduca/sincronizacao'); revalidatePath('/admin/estudantes')
   return { ok: true, resultado }
+}
+
+// ── Auto-vínculo Passaporte (automação diária configurável — emenda do superior) ──
+export interface AutoVinculoDTO {
+  ativo: boolean
+  modo: 'horario' | 'intervalo'
+  horario: number
+  intervalo_min: number
+  termos_incluir: string[]
+  termos_excluir: string[]
+  ultimaExecucao: string | null
+  ultimoResultado: any | null
+}
+
+const AUTO_VINC_DEFAULT: AutoVinculoDTO = { ativo: false, modo: 'horario', horario: 3, intervalo_min: 1440, termos_incluir: ['passaporte'], termos_excluir: ['amostra'], ultimaExecucao: null, ultimoResultado: null }
+
+export async function getAutoVinculoPassaporte(): Promise<{ ok: boolean; error?: string; dados?: AutoVinculoDTO }> {
+  if (!(await checkPermission('estudantes:view')) && !(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const access = await getCurrentAccess(); if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const svc = createAdminClient()
+  const { data, error } = await svc.from('simulado_auto_vinculo_passaporte')
+    .select('ativo, modo, horario, intervalo_min, termos_incluir, termos_excluir, ultima_execucao, ultimo_resultado')
+    .eq('tenant_id', access.tenantId).maybeSingle()
+  if (error && !/does not exist|schema cache/i.test(error.message)) return { ok: false, error: error.message }
+  const d = data as any
+  if (!d) return { ok: true, dados: AUTO_VINC_DEFAULT }
+  return {
+    ok: true,
+    dados: {
+      ativo: !!d.ativo,
+      modo: d.modo === 'intervalo' ? 'intervalo' : 'horario',
+      horario: Number.isFinite(Number(d.horario)) ? Number(d.horario) : 3,
+      intervalo_min: Number.isFinite(Number(d.intervalo_min)) ? Number(d.intervalo_min) : 1440,
+      termos_incluir: Array.isArray(d.termos_incluir) && d.termos_incluir.length ? d.termos_incluir : ['passaporte'],
+      termos_excluir: Array.isArray(d.termos_excluir) ? d.termos_excluir : ['amostra'],
+      ultimaExecucao: d.ultima_execucao ?? null,
+      ultimoResultado: d.ultimo_resultado ?? null,
+    },
+  }
+}
+
+export async function salvarAutoVinculoPassaporte(cfg: { ativo: boolean; modo: 'horario' | 'intervalo'; horario: number; intervalo_min: number; termos_incluir: string[]; termos_excluir: string[] }): Promise<{ ok: boolean; error?: string }> {
+  if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const access = await getCurrentAccess(); if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const svc = createAdminClient()
+  const incluir = [...new Set((cfg.termos_incluir ?? []).map((s) => s.trim()).filter(Boolean))]
+  const excluir = [...new Set((cfg.termos_excluir ?? []).map((s) => s.trim()).filter(Boolean))]
+  if (cfg.ativo && !incluir.length) return { ok: false, error: 'Adicione ao menos um termo de inclusão (ex.: passaporte).' }
+  const row = {
+    tenant_id: access.tenantId, ativo: !!cfg.ativo,
+    modo: cfg.modo === 'intervalo' ? 'intervalo' : 'horario',
+    horario: Math.min(23, Math.max(0, Math.trunc(cfg.horario ?? 3))),
+    intervalo_min: Math.max(15, Math.trunc(cfg.intervalo_min ?? 1440)),
+    termos_incluir: incluir.length ? incluir : ['passaporte'],
+    termos_excluir: excluir,
+    criado_por: access.userId ?? null,
+  }
+  const { error } = await svc.from('simulado_auto_vinculo_passaporte').upsert(row, { onConflict: 'tenant_id' })
+  if (error) return { ok: false, error: /does not exist|schema cache/i.test(error.message) ? 'Aplique a migração 20260930000003_auto_vinculo_passaporte.' : error.message }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_auto_vinculo_passaporte', entidadeId: access.tenantId, tenantId: access.tenantId, depois: { ativo: cfg.ativo, modo: row.modo, horario: row.horario, intervalo_min: row.intervalo_min, incluir, excluir } }).catch(() => {})
+  revalidatePath('/admin/integracoes/curseduca')
+  return { ok: true }
+}
+
+export async function rodarAutoVinculoPassaporteAgora(): Promise<{ ok: boolean; error?: string; resultado?: any }> {
+  if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
+  const access = await getCurrentAccess(); if (!access.tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const svc = createAdminClient()
+  const { data } = await svc.from('simulado_auto_vinculo_passaporte').select('termos_incluir, termos_excluir').eq('tenant_id', access.tenantId).maybeSingle()
+  const d = data as any
+  const regra = { termos_incluir: d?.termos_incluir ?? ['passaporte'], termos_excluir: d?.termos_excluir ?? ['amostra'], sincronizar: false }
+  try {
+    const resultado = await executarAutoVinculo(svc, access.tenantId, regra)
+    await svc.from('simulado_auto_vinculo_passaporte').update({ ultima_execucao: new Date().toISOString(), ultimo_resultado: resultado }).eq('tenant_id', access.tenantId)
+    revalidatePath('/admin/integracoes/curseduca'); revalidatePath('/admin/estudantes')
+    return { ok: resultado.ok !== false, resultado }
+  } catch (e: any) { return { ok: false, error: e?.message ?? 'Falha ao rodar.' } }
 }
