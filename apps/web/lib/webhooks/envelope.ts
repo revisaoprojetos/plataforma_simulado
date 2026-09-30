@@ -29,11 +29,15 @@ export function montarCorpoWebhook(
   agoraISO: string,
   /** Identidade do webhook que está enviando — para o n8n distinguir a origem (Lei Seca × plataforma…). */
   wh?: { id: string | null; nome: string | null; origem: string | null },
+  /** true = payload do botão "Enviar teste": o n8n DEVE ignorar (não disparar WhatsApp/e-mail real). */
+  teste?: boolean,
 ): Record<string, unknown> {
   return {
     id: d.sessao_id ?? null,
     type: 'estudante',
     webhook_type: 'progressao_estudante',
+    // ⚠️ n8n: quando `teste === true`, NÃO enviar mensagem real — é só o "Enviar teste" do admin.
+    teste: teste === true,
     plataforma,
     // Bloco de identidade do webhook (origem = rótulo escolhido no admin). Roteie no n8n por webhook.origem.
     webhook: {
@@ -89,7 +93,8 @@ export function dadosExemploWebhook(evento: string): any {
   const ehGam = evento.startsWith('gamificacao.')
   const ehLeitura = evento.startsWith('leitura.')
   const ehEngaj = ehGam || ehLeitura
-  const contact = { id: 'a17b93c2-4d8e-4f1a-b6c0-2e9f7d3a5c88', name: 'João da Silva (teste)', email: 'joao.teste@example.com', doc: '12345678900', phone_number: '5571999670570', phone_local_code: '71', plano: 'passaporte' }
+  // Contato claramente FICTÍCIO e não-entregável (telefone inválido) — reforça que o n8n não deve enviar.
+  const contact = { id: 'a17b93c2-4d8e-4f1a-b6c0-2e9f7d3a5c88', name: 'TESTE — não enviar', email: 'teste@example.com', doc: '00000000000', phone_number: '5500000000000', phone_local_code: '00', plano: 'passaporte' }
   const engajamento = evento === 'gamificacao.inativo'
     ? { tipo: 'inativo', dias: 1, marco: null, streak_atual: 3, streak_maior: 12, mensagem: 'Oi João! Faz 1 dia que você não aparece — bora voltar? 💪' }
     : evento === 'gamificacao.sequencia'
@@ -123,9 +128,12 @@ export async function enviarWebhookHttp(
   evento: string,
   corpo: string,
   segredo: string | null,
+  teste?: boolean,
 ): Promise<{ ok: boolean; status: number | null; ms: number; texto: string }> {
   const crypto = await import('crypto')
   const headers: Record<string, string> = { 'Content-Type': 'application/json', 'X-Webhook-Evento': evento }
+  if (teste) headers['X-Webhook-Teste'] = '1' // n8n deve barrar envios reais quando presente
+
   if (segredo) headers['X-Webhook-Signature'] = 'sha256=' + crypto.createHmac('sha256', segredo).update(corpo).digest('hex')
   const ctrl = new AbortController()
   const timer = setTimeout(() => ctrl.abort(), 8000)

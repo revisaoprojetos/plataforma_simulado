@@ -54,13 +54,17 @@ async function enviarComRetry(url: string, headers: Record<string, string>, corp
 
 export type PlataformaWh = { id: string; nome: string | null; slug: string | null }
 
-/** Grava um log de saída (best-effort). Tolerante: se a coluna `origem` ainda não existir, insere sem ela. */
+// Colunas adicionadas depois (migrações posteriores) — removidas no fallback p/ bancos sem a migração.
+const COLS_OPCIONAIS_LOG = ['origem', 'estudante_id', 'contato_nome', 'contato_email', 'contato_telefone', 'mensagem', 'teste']
+
+/** Grava um log de saída (best-effort). Tolerante: se alguma coluna nova ainda não existir, insere sem elas. */
 async function inserirLogSaida(svc: any, row: Record<string, unknown>): Promise<void> {
   try {
     const { error } = await svc.from('simulado_webhook_saida_logs').insert(row)
-    if (error && /origem|column/i.test(error.message)) {
-      const { origem, ...semOrigem } = row
-      await svc.from('simulado_webhook_saida_logs').insert(semOrigem)
+    if (error && /column|does not exist|origem|contato|mensagem|estudante|teste/i.test(error.message)) {
+      const base: Record<string, unknown> = { ...row }
+      for (const c of COLS_OPCIONAIS_LOG) delete base[c]
+      await svc.from('simulado_webhook_saida_logs').insert(base)
     }
   } catch { /* tabela de log ausente → ignora */ }
 }
@@ -81,9 +85,12 @@ export async function enviarWebhookDireto(
     if (seg) headers['X-Webhook-Signature'] = 'sha256=' + crypto.createHmac('sha256', seg).update(corpo).digest('hex')
     const r = await enviarComRetry(alvo.url, headers, corpo)
     await svc.from('simulado_webhook_saida').update({ ultimo_status: r.status, ultimo_envio: new Date().toISOString() }).eq('id', alvo.webhookId)
+    const c = (dados as any)?.contact ?? {}
     await inserirLogSaida(svc, {
       tenant_id: tenantId, webhook_id: alvo.webhookId, nome: alvo.nome ?? null, origem: alvo.origem ?? null, url: alvo.url, evento,
       status: r.ok ? 'ok' : 'erro', http_status: r.httpStatus, ms: r.ms, erro: r.ok ? null : r.status,
+      estudante_id: c.id ?? null, contato_nome: c.name ?? null, contato_email: c.email ?? null, contato_telefone: c.phone_number ?? null,
+      mensagem: (dados as any)?.engajamento?.mensagem ?? null, teste: false,
     })
     return r.ok
   } catch { return false }
@@ -135,9 +142,12 @@ export async function dispararWebhook(tenantId: string | null | undefined, event
       const r = await enviarComRetry(e.url, headers, corpo)
       await svc.from('simulado_webhook_saida').update({ ultimo_status: r.status, ultimo_envio: new Date().toISOString() }).eq('id', e.id)
       // Log de entrega (histórico p/ a sub-aba "Logs de saída"). Best-effort + tolerante à tabela/coluna ausente.
+      const c = d?.contact ?? {}
       await inserirLogSaida(svc, {
         tenant_id: tenantId, webhook_id: e.id, nome: e.nome ?? null, origem: e.origem ?? null, url: e.url, evento,
         status: r.ok ? 'ok' : 'erro', http_status: r.httpStatus, ms: r.ms, erro: r.ok ? null : r.status,
+        estudante_id: c.id ?? null, contato_nome: c.name ?? null, contato_email: c.email ?? null, contato_telefone: c.phone_number ?? null,
+        mensagem: d?.engajamento?.mensagem ?? null, teste: false,
       })
     }))
   } catch {

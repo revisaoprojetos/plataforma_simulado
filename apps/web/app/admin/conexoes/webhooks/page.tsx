@@ -51,10 +51,10 @@ export default async function WebhooksPage() {
   let logsSaida: any[] = []
   let logsPrecisaMigrar = false
   let rl: any = await svc.from('simulado_webhook_saida_logs')
-    .select('id, nome, origem, url, evento, status, http_status, ms, erro, criado_em')
+    .select('id, nome, origem, url, evento, status, http_status, ms, erro, criado_em, contato_nome, contato_email, contato_telefone, mensagem, teste')
     .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
     .order('criado_em', { ascending: false }).limit(200)
-  if (rl.error && /origem|column/i.test(rl.error.message)) {
+  if (rl.error && /column|does not exist|origem|contato|mensagem|teste/i.test(rl.error.message)) {
     rl = await svc.from('simulado_webhook_saida_logs').select('id, nome, url, evento, status, http_status, ms, erro, criado_em').eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('criado_em', { ascending: false }).limit(200)
   }
   if (rl.error) logsPrecisaMigrar = /webhook_saida_logs|relation|does not exist/i.test(rl.error.message)
@@ -90,7 +90,7 @@ export default async function WebhooksPage() {
         precisaMigrar={precisaMigrar}
         appUrl={appUrl}
         inboundToken={inboundToken}
-        logsSaida={logsSaida.map((l: any) => ({ id: l.id, nome: l.nome ?? null, origem: l.origem ?? null, url: l.url, evento: l.evento ?? null, status: l.status ?? null, httpStatus: l.http_status ?? null, ms: l.ms ?? null, erro: l.erro ?? null, criadoEm: l.criado_em ?? null }))}
+        logsSaida={logsSaida.map((l: any) => ({ id: l.id, nome: l.nome ?? null, origem: l.origem ?? null, url: l.url, evento: l.evento ?? null, status: l.status ?? null, httpStatus: l.http_status ?? null, ms: l.ms ?? null, erro: l.erro ?? null, criadoEm: l.criado_em ?? null, contatoNome: l.contato_nome ?? null, contatoEmail: l.contato_email ?? null, contatoTelefone: l.contato_telefone ?? null, mensagem: l.mensagem ?? null, teste: !!l.teste }))}
         logsPrecisaMigrar={logsPrecisaMigrar}
       />
     </div>

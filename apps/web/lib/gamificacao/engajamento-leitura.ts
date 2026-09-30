@@ -163,11 +163,19 @@ async function nomeModulo(svc: any, tenantId: string, pastaId: string): Promise<
   return (data as any)?.nome ?? null
 }
 
+/** Item da prévia (dry-run): quem RECEBERIA a cobrança de inatividade, com a mensagem já renderizada. */
+export type PreviaInatividadeItem = {
+  estudanteId: string; nome: string | null; email: string | null; telefone: string | null
+  modulo: string | null; dias: number; ultimoDia: string; mensagem: string; webhook: string | null
+}
+
 /**
  * Chamado pelo cron: para cada webhook que assina leitura.inativo, acha os alunos que ficaram
  * exatamente `dias` (regra do webhook) sem concluir aula NO módulo e dispara. Retorna nº de envios.
+ * Se `previa` for passado (dry-run), NÃO envia nem grava idempotência — só empilha quem receberia
+ * (com a mensagem interpolada) para conferência antes do disparo real.
  */
-export async function avaliarEngajamentoLeituraInatividade(svc: any, tenantId: string, timezone: string): Promise<number> {
+export async function avaliarEngajamentoLeituraInatividade(svc: any, tenantId: string, timezone: string, previa?: PreviaInatividadeItem[]): Promise<number> {
   let enviados = 0
   try {
     const whs = (await carregarWebhooksLeitura(svc, tenantId)).filter((w) => w.eventos.includes('leitura.inativo'))
@@ -200,6 +208,19 @@ export async function avaliarEngajamentoLeituraInatividade(svc: any, tenantId: s
           if (ultimoDia !== alvo) continue
           const { data: est } = await svc.from('simulado_estudantes').select(COLS_CONTATO).eq('id', estudanteId).eq('tenant_id', tenantId).maybeSingle()
           if (!est) continue
+          if (previa) {
+            // Dry-run: renderiza a mensagem com o nome REAL e empilha, sem enviar nem gravar log.
+            const primeiroNome = ((est as any)?.nome ?? '').split(' ')[0] || 'estudante'
+            const c = contatoEstudante(est, estudanteId)
+            previa.push({
+              estudanteId, nome: (est as any)?.nome ?? null, email: (c as any)?.email ?? null, telefone: (c as any)?.phone_number ?? null,
+              modulo: mod.nome, dias, ultimoDia,
+              mensagem: interpolar(wh.regras.inativo.mensagem, { nome: primeiroNome, dias, marco: '', streak: 0, maior: 0, modulo: mod.nome ?? '' }),
+              webhook: wh.nome,
+            })
+            enviados++
+            continue
+          }
           const ok = await dispararLeitura(svc, tenantId, plataforma, wh, 'inativo', `leitura-inativo-${mod.id}-${ultimoDia}`, est, estudanteId, mod,
             { dias, marco: null, streakAtual: 0, streakMaior: 0, mensagemTpl: wh.regras.inativo.mensagem })
           if (ok) enviados++

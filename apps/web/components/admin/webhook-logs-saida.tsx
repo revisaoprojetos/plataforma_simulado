@@ -5,10 +5,12 @@ import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Search, RefreshCw, AlertTriangle, CheckCircle2, XCircle, ListChecks } from 'lucide-react'
+import { PreviaInatividadeButton } from '@/components/admin/previa-inatividade'
 
 export type LogSaida = {
   id: string; nome: string | null; origem: string | null; url: string; evento: string | null
   status: string | null; httpStatus: number | null; ms: number | null; erro: string | null; criadoEm: string | null
+  contatoNome?: string | null; contatoEmail?: string | null; contatoTelefone?: string | null; mensagem?: string | null; teste?: boolean
 }
 
 /** Sub-aba "Logs de saída": histórico de entregas dos webhooks (evento, status, HTTP, tempo, erro). */
@@ -22,7 +24,7 @@ export function WebhookLogsSaida({ logs, eventos, precisaMigrar }: { logs: LogSa
     return logs.filter((l) => {
       if (filtro !== 'todos' && (l.status ?? '') !== filtro) return false
       if (!q) return true
-      return `${l.nome ?? ''} ${l.origem ?? ''} ${l.url} ${l.evento ?? ''}`.toLowerCase().includes(q)
+      return `${l.nome ?? ''} ${l.origem ?? ''} ${l.url} ${l.evento ?? ''} ${l.contatoNome ?? ''} ${l.contatoEmail ?? ''} ${l.contatoTelefone ?? ''}`.toLowerCase().includes(q)
     })
   }, [logs, busca, filtro])
 
@@ -47,6 +49,7 @@ export function WebhookLogsSaida({ logs, eventos, precisaMigrar }: { logs: LogSa
           <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/10 px-2.5 py-1 font-medium text-rose-600 dark:text-rose-400"><XCircle className="h-3.5 w-3.5" /> {erroN} erro</span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <PreviaInatividadeButton />
           <div className="inline-flex overflow-hidden rounded-lg border text-xs">
             {(['todos', 'ok', 'erro'] as const).map((f) => (
               <button key={f} type="button" onClick={() => setFiltro(f)} className={cn('px-3 py-1.5 font-medium transition-colors', filtro === f ? 'bg-primary text-primary-foreground' : 'hover:bg-muted')}>{f === 'todos' ? 'Todos' : f === 'ok' ? 'OK' : 'Erro'}</button>
@@ -68,15 +71,16 @@ export function WebhookLogsSaida({ logs, eventos, precisaMigrar }: { logs: LogSa
               <tr>
                 <th className="px-4 py-2.5 font-medium">Quando</th>
                 <th className="px-4 py-2.5 font-medium">Webhook</th>
+                <th className="px-4 py-2.5 font-medium">Destinatário</th>
                 <th className="px-4 py-2.5 font-medium">Evento</th>
-                <th className="px-4 py-2.5 font-medium">URL</th>
+                <th className="px-4 py-2.5 font-medium">Mensagem</th>
                 <th className="px-4 py-2.5 text-center font-medium">Status</th>
                 <th className="px-4 py-2.5 text-right font-medium">Tempo</th>
               </tr>
             </thead>
             <tbody className="divide-y">
               {filtrados.length === 0 ? (
-                <tr><td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">{logs.length === 0 ? (<span className="inline-flex items-center gap-2"><ListChecks className="h-4 w-4" /> Nenhuma entrega registrada ainda.</span>) : 'Nenhum log encontrado para o filtro.'}</td></tr>
+                <tr><td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">{logs.length === 0 ? (<span className="inline-flex items-center gap-2"><ListChecks className="h-4 w-4" /> Nenhuma entrega registrada ainda.</span>) : 'Nenhum log encontrado para o filtro.'}</td></tr>
               ) : filtrados.map((l) => {
                 const ok = l.status === 'ok'
                 return (
@@ -84,10 +88,18 @@ export function WebhookLogsSaida({ logs, eventos, precisaMigrar }: { logs: LogSa
                     <td className="whitespace-nowrap px-4 py-3 text-xs text-muted-foreground">{l.criadoEm ? new Date(l.criadoEm).toLocaleString('pt-BR') : '—'}</td>
                     <td className="px-4 py-3">
                       <span className="block truncate font-medium" title={l.nome ?? ''}>{l.nome ?? '—'}</span>
-                      {l.origem && <span className="mt-0.5 inline-flex items-center rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">{l.origem}</span>}
+                      <span className="mt-0.5 flex flex-wrap gap-1">
+                        {l.origem && <span className="inline-flex items-center rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">{l.origem}</span>}
+                        {l.teste && <span className="inline-flex items-center rounded-full bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">teste</span>}
+                      </span>
+                    </td>
+                    <td className="max-w-[180px] px-4 py-3">
+                      {(l.contatoNome || l.contatoTelefone || l.contatoEmail)
+                        ? <><span className="block truncate text-xs font-medium" title={l.contatoNome ?? ''}>{l.contatoNome ?? '—'}</span><span className="block truncate text-[11px] text-muted-foreground" title={l.contatoTelefone ?? l.contatoEmail ?? ''}>{l.contatoTelefone ?? l.contatoEmail ?? ''}</span></>
+                        : <span className="text-xs text-muted-foreground">—</span>}
                     </td>
                     <td className="px-4 py-3"><span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">{labelEvento(l.evento)}</span></td>
-                    <td className="max-w-[240px] px-4 py-3"><span className="block truncate text-xs text-muted-foreground" title={l.url}>{l.url}</span></td>
+                    <td className="max-w-[260px] px-4 py-3"><span className="block truncate text-xs text-muted-foreground" title={l.mensagem ?? l.url}>{l.mensagem ?? <span className="text-muted-foreground/60">{l.url}</span>}</span></td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-center">
                         <span className={cn('inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium', ok ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'bg-rose-500/10 text-rose-600 dark:text-rose-400')} title={l.erro ?? undefined}>

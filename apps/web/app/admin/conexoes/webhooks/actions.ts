@@ -1,12 +1,14 @@
 'use server'
 
-import { createServiceClient } from '@/lib/supabase/server'
+import { createServiceClient, createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { criptografar, descriptografar } from '@/lib/crypto'
 import { revalidatePath } from 'next/cache'
 import { montarCorpoWebhook, dadosExemploWebhook, enviarWebhookHttp } from '@/lib/webhooks/envelope'
+import { avaliarEngajamentoLeituraInatividade, type PreviaInatividadeItem } from '@/lib/gamificacao/engajamento-leitura'
+import { getGamConfig } from '@/lib/gamificacao'
 
 // `secret` semântica no UPDATE: undefined = MANTER o atual (o client não reenvia o segredo, que nunca
 // chega ao browser); string vazia = limpar; string = novo segredo (guardado CRIPTOGRAFADO).
@@ -109,13 +111,35 @@ export async function testarWebhook(id: string, evento?: string): Promise<{ ok: 
   if (!wh?.url) return { ok: false, error: 'Webhook não encontrado.' }
   const ev = evento || (Array.isArray(wh.eventos) && wh.eventos[0]) || 'estudante.finalizou'
   const { data: tnt } = await svc.from('simulado_tenants').select('nome, slug').eq('id', tenantId).maybeSingle()
-  const corpo = JSON.stringify(montarCorpoWebhook(ev, { id: tenantId, nome: (tnt as any)?.nome ?? null, slug: (tnt as any)?.slug ?? null }, tenantId, dadosExemploWebhook(ev), new Date().toISOString(), { id, nome: (wh as any).nome ?? null, origem: (wh as any).origem ?? null }))
-  const r = await enviarWebhookHttp(wh.url, ev, corpo, descriptografar(wh.secret))
+  const corpo = JSON.stringify(montarCorpoWebhook(ev, { id: tenantId, nome: (tnt as any)?.nome ?? null, slug: (tnt as any)?.slug ?? null }, tenantId, dadosExemploWebhook(ev), new Date().toISOString(), { id, nome: (wh as any).nome ?? null, origem: (wh as any).origem ?? null }, true))
+  const r = await enviarWebhookHttp(wh.url, ev, corpo, descriptografar(wh.secret), true)
   // Registra o resultado do teste no status do webhook (visível na lista) e audita.
   await svc.from('simulado_webhook_saida').update({ ultimo_status: `teste: ${r.texto}`, ultimo_envio: new Date().toISOString() }).eq('id', id).eq('tenant_id', tenantId)
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_webhook_saida', entidadeId: id, depois: { teste: r.texto, evento: ev } })
   revalidatePath('/admin/conexoes/webhooks')
   return { ok: r.ok, status: r.status, ms: r.ms, evento: ev, error: r.ok ? undefined : r.texto }
+}
+
+/**
+ * PRÉVIA (dry-run) da cobrança de inatividade da Leitura: lista quem RECEBERIA agora, com a mensagem
+ * já interpolada com o nome real — para conferir "quem realmente não fez" ANTES de qualquer disparo.
+ * Não envia nada nem grava idempotência.
+ */
+export async function previaInatividadeLeitura(): Promise<{ ok: boolean; itens?: PreviaInatividadeItem[]; error?: string }> {
+  if (!(await podeGerenciar())) return { ok: false, error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  try {
+    const svc = createAdminClient()
+    let tz = 'America/Sao_Paulo'
+    try { const cfg = await getGamConfig(svc, tenantId); tz = cfg?.timezone || tz } catch { /* usa default */ }
+    const itens: PreviaInatividadeItem[] = []
+    await avaliarEngajamentoLeituraInatividade(svc, tenantId, tz, itens)
+    itens.sort((a, b) => (a.nome ?? '').localeCompare(b.nome ?? '', 'pt-BR'))
+    return { ok: true, itens }
+  } catch (e: any) {
+    return { ok: false, error: e?.message ?? 'Falha ao gerar a prévia.' }
+  }
 }
 
 export async function excluirWebhook(id: string): Promise<{ ok: boolean; error?: string }> {
