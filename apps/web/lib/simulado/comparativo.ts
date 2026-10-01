@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { funcaoEtiquetaPorQuestao, funcaoBloqueia } from './etiqueta-funcao'
 import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
+import { comparativoTurmaSql } from 'data'
 
 export type Comparativo = {
   participantes: number
@@ -26,7 +27,7 @@ type TurmaAgg = {
   porDiscTurma: { nome: string; turmaPct: number }[]
 }
 
-async function computarTurma(svc: SupabaseClient, simuladoId: string): Promise<TurmaAgg> {
+async function computarTurma(svc: SupabaseClient, simuladoId: string, tenantId: string | null): Promise<TurmaAgg> {
   const { data: pq } = await svc
     .from('simulado_prova_questoes')
     .select('questao_id, questoes:simulado_questoes(disciplinas:simulado_disciplinas(nome))')
@@ -38,6 +39,27 @@ async function computarTurma(svc: SupabaseClient, simuladoId: string): Promise<T
   const totalQ = validas.length
   const discDeQ = new Map<string, string>()
   for (const r of validas) discDeQ.set(r.questao_id, r.questoes?.disciplinas?.nome ?? 'Sem disciplina')
+
+  // ── Caminho RÁPIDO: agrega melhor-sessão-por-aluno + acerto por disciplina + notas NO BANCO (SQL).
+  // Evita baixar TODAS as respostas (ex.: 51k do Concurso AGU ~18s). Cai no PostgREST se indisponível.
+  const sql = tenantId ? await comparativoTurmaSql(tenantId, simuladoId, [...foraSet]).catch(() => null) : null
+  if (sql) {
+    const parse = <T,>(v: unknown, d: T): T => (typeof v === 'string' ? (JSON.parse(v || 'null') ?? d) : (v as T) ?? d)
+    const notas: number[] = parse<number[]>(sql.notas, []).map(Number).filter((n) => Number.isFinite(n))
+    const pd = parse<{ nome: string; ac: number; tt: number }[]>(sql.por_disc, [])
+    const participantes = Number(sql.participantes) || 0
+    const tq = Number(sql.total_q) || 0
+    const totAc = Number(sql.tot_ac) || 0
+    return {
+      participantes,
+      notaMediaTurma: sql.nota_media != null ? Number(sql.nota_media) : null,
+      acertoMedioTurma: participantes && tq ? Math.round((totAc / (participantes * tq)) * 100) : null,
+      notas,
+      discDeQ: [...discDeQ.entries()],
+      fora: [...foraSet],
+      porDiscTurma: pd.map((d) => ({ nome: d.nome, turmaPct: d.tt ? Math.round((d.ac / d.tt) * 100) : 0 })),
+    }
+  }
 
   // fetchAll: um simulado com >1000 sessões truncava → participantes/média da turma errados.
   const sess = await fetchAll<{ id: string; estudante_id: string; nota: number | null }>(() =>
@@ -85,7 +107,7 @@ export async function montarComparativo(
   const turma = await remember(
     chaveRelatorio(tenantId, 'comparativo-turma', simuladoId),
     TTL_RELATORIO,
-    () => computarTurma(svc, simuladoId),
+    () => computarTurma(svc, simuladoId, tenantId),
   )
 
   const notas = turma.notas

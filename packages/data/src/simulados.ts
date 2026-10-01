@@ -93,6 +93,55 @@ export async function estudantesLinkadosSql(tenantId: string, simuladoId: string
   )
 }
 
+export type ComparativoTurmaSqlRow = {
+  participantes: number | string
+  nota_media: number | string | null
+  total_q: number | string
+  tot_ac: number | string
+  notas: number[] | string
+  por_disc: { nome: string; ac: number; tt: number }[] | string
+}
+
+/**
+ * Comparativo da TURMA de um simulado em UMA query agregada (melhor sessão por aluno + acerto por
+ * disciplina + notas p/ percentil), em vez de carregar TODAS as respostas (ex.: Concurso Simulado AGU
+ * = 51k respostas levavam ~18s via PostgREST → ~0,25s aqui). `foraIds` = questões anuladas por etiqueta
+ * funcional (excluídas da comparação). Retorna 1 linha, ou `null` sem DATABASE_URL → cai no PostgREST.
+ */
+export async function comparativoTurmaSql(tenantId: string, simuladoId: string, foraIds: string[]): Promise<ComparativoTurmaSqlRow | null> {
+  const rows = await sqlQuery<ComparativoTurmaSqlRow>(
+    `WITH best AS (
+       SELECT DISTINCT ON (estudante_id) id, nota
+         FROM simulado_sessoes_prova
+        WHERE tenant_id = $1 AND simulado_id = $2 AND is_teste = false AND deletado = false AND status = 'finalizada'
+        ORDER BY estudante_id, nota DESC NULLS LAST, id
+     ),
+     validas AS (
+       SELECT pq.questao_id, d.nome AS disciplina
+         FROM simulado_prova_questoes pq
+         JOIN simulado_questoes q ON q.id = pq.questao_id
+         LEFT JOIN simulado_disciplinas d ON d.id = q.disciplina_id
+        WHERE pq.simulado_id = $2 AND pq.anulada = false
+          AND ($3::uuid[] IS NULL OR pq.questao_id <> ALL($3::uuid[]))
+     ),
+     resp AS (
+       SELECT r.correta, COALESCE(v.disciplina, 'Sem disciplina') AS disciplina
+         FROM best b
+         JOIN simulado_respostas_objetivas r ON r.sessao_id = b.id
+         JOIN validas v ON v.questao_id = r.questao_id
+     ),
+     pd AS (SELECT disciplina, count(*) tt, count(*) FILTER (WHERE correta) ac FROM resp GROUP BY disciplina)
+     SELECT (SELECT count(*) FROM best) AS participantes,
+            (SELECT round(avg(nota)::numeric, 1) FROM best WHERE nota IS NOT NULL) AS nota_media,
+            (SELECT count(*) FROM validas) AS total_q,
+            (SELECT count(*) FILTER (WHERE correta) FROM resp) AS tot_ac,
+            (SELECT COALESCE(json_agg(nota), '[]'::json) FROM best WHERE nota IS NOT NULL) AS notas,
+            (SELECT COALESCE(json_agg(json_build_object('nome', disciplina, 'ac', ac, 'tt', tt)), '[]'::json) FROM pd) AS por_disc`,
+    [tenantId, simuladoId, foraIds.length ? foraIds : null],
+  )
+  return rows && rows.length ? rows[0] : null
+}
+
 export async function reordenarProvaSql(tenantId: string, simuladoId: string, ordem: string[]): Promise<number | null> {
   if (!ordem.length) return 0
   const rows = await sqlQuery<{ id: string }>(
