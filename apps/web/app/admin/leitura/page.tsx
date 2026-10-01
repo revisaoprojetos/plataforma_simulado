@@ -6,7 +6,7 @@ import { ModuloTabsBar } from '@/components/admin/modulo-tabs-bar'
 import { ModuloBanner } from '@/components/admin/modulo-banner'
 import { PublicarModuloBotao } from '@/components/admin/publicar-modulo-botao'
 import { CopiarLinkModuloBotao } from '@/components/admin/copiar-link-modulo-botao'
-import { LeituraRanking } from '@/components/aluno/leitura-ranking'
+import { RankingAdmin } from '@/components/admin/ranking-admin'
 import { carregarRankingModulo } from '@/lib/leitura/ranking'
 import { LeituraRelatorio } from '@/components/admin/leitura-relatorio'
 import { carregarRelatorioModulo } from '@/lib/leitura/relatorio'
@@ -85,7 +85,7 @@ export default async function LeituraAdminPage({ searchParams }: { searchParams:
           <BancoAulasGrid data={data} pastaAtual={pasta ?? null} cardView={cardView} moduloTab={moduloTab} semBreadcrumb={!!banner} semTabs={!!banner} />
           {/* Ranking do módulo (por acertos no quiz; pontos quando a gamificação estiver ativa). */}
           {moduloTab === 'ranking' && pasta && (
-            <LeituraRanking ranking={await carregarRankingModulo(pasta, (await getCurrentTenantId()) ?? '')} modo="admin" moduloId={pasta} />
+            <RankingAdmin inicial={await carregarRankingModulo(pasta, (await getCurrentTenantId()) ?? '')} moduloId={pasta} moduloNome={data.moduloAtual?.nome} />
           )}
           {/* Relatório completo do módulo (adesão, sequências, pontuação, tempos + export Excel). */}
           {moduloTab === 'relatorio' && pasta && (

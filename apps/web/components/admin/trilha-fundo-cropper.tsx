@@ -17,10 +17,15 @@ const clamp01 = (n: number) => Math.max(0, Math.min(1, n))
  * padrão e vira o formato desejado. Ao aplicar, rasteriza só a área do quadro (base64) na proporção
  * escolhida e devolve também a proporção (para casar o canvas da trilha).
  */
-export function TrilhaFundoCropper({ src, aspectInicial, cropInicial, onCancel, onConfirm }: {
+export function TrilhaFundoCropper({ src, aspectInicial, cropInicial, aspectTravado, titulo, onCancel, onConfirm }: {
   src: string
   aspectInicial: number
   cropInicial?: Rect | null
+  /** Quando definido, o quadro MANTÉM este aspecto visual (ex.: 4/5 pôster, 4/3 ticket) ao redimensionar
+   *  — só as alças de canto; o admin posiciona/zooma sem mudar o formato do card. */
+  aspectTravado?: number
+  /** Título do cabeçalho (default: "Ajustar imagem de fundo"). */
+  titulo?: string
   onCancel: () => void
   onConfirm: (crop: Rect, aspect: number) => void
 }) {
@@ -51,8 +56,11 @@ export function TrilhaFundoCropper({ src, aspectInicial, cropInicial, onCancel, 
     const ia = img.naturalWidth / img.naturalHeight
     let w = 1, h = 1
     if (ia >= aspectInicial) { h = 1; w = aspectInicial / ia } else { w = 1; h = ia / aspectInicial }
+    // Com aspecto travado (capa), recua o quadro p/ 80% → as alças ficam SEMPRE visíveis e pegáveis
+    // (senão, numa imagem já no formato do card, o quadro preenche tudo e os pontos somem nas bordas).
+    if (aspectTravado) { w *= 0.8; h *= 0.8 }
     setRect({ x: (1 - w) / 2, y: (1 - h) / 2, w, h })
-  }, [img, aspectInicial, cropInicial])
+  }, [img, aspectInicial, cropInicial, aspectTravado])
 
   function onDown(modo: Modo) {
     return (e: React.PointerEvent) => {
@@ -68,7 +76,22 @@ export function TrilhaFundoCropper({ src, aspectInicial, cropInicial, onCancel, 
     let { x, y, w, h } = d.r
     const m = d.modo
     if (m === 'move') { x = clamp01(d.r.x + dx); y = clamp01(d.r.y + dy); x = Math.min(x, 1 - w); y = Math.min(y, 1 - h) }
-    else {
+    else if (aspectTravado && img) {
+      // Aspecto TRAVADO: só cantos; mantém a razão w/h (em frações) = aspectTravado * (natH/natW),
+      // ancorando no canto OPOSTO. O card não muda de formato — só posiciona/zooma.
+      const k = aspectTravado * (img.naturalHeight / img.naturalWidth)   // w/h desejado em frações
+      const right = d.r.x + d.r.w, bottom = d.r.y + d.r.h
+      let nw = Math.max(MIN, d.r.w + (m.includes('e') ? dx : m.includes('w') ? -dx : 0))
+      // limita pelo bound do canto-âncora, nos dois eixos
+      const maxWX = m.includes('e') ? 1 - d.r.x : right
+      const maxWY = (m.includes('s') ? 1 - d.r.y : bottom) * k
+      nw = Math.min(nw, maxWX, maxWY)
+      const nh = nw / k
+      w = nw; h = nh
+      x = m.includes('w') ? right - w : d.r.x
+      y = m.includes('n') ? bottom - h : d.r.y
+      x = clamp01(x); y = clamp01(y)
+    } else {
       if (m.includes('e')) w = Math.max(MIN, Math.min(1 - d.r.x, d.r.w + dx))
       if (m.includes('s')) h = Math.max(MIN, Math.min(1 - d.r.y, d.r.h + dy))
       if (m.includes('w')) { const nx = Math.min(d.r.x + dx, d.r.x + d.r.w - MIN); x = Math.max(0, nx); w = d.r.w + (d.r.x - x) }
@@ -94,10 +117,10 @@ export function TrilhaFundoCropper({ src, aspectInicial, cropInicial, onCancel, 
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onCancel} />
       <div className="relative w-full max-w-2xl rounded-2xl border bg-card p-4 shadow-2xl">
         <div className="mb-2 flex items-center justify-between">
-          <h3 className="text-sm font-semibold">Ajustar imagem de fundo</h3>
+          <h3 className="text-sm font-semibold">{titulo ?? 'Ajustar imagem de fundo'}</h3>
           <button onClick={onCancel} aria-label="Fechar" className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
         </div>
-        <p className="mb-3 flex items-center gap-1.5 text-xs text-muted-foreground"><Move className="h-3.5 w-3.5" /> Arraste o quadro p/ posicionar e puxe as alças das bordas p/ mudar a proporção. Só a parte clara aparece.</p>
+        <p className="mb-3 flex items-center gap-1.5 text-xs text-muted-foreground"><Move className="h-3.5 w-3.5" /> {aspectTravado ? 'Arraste o quadro p/ posicionar e puxe os cantos p/ ampliar ou reduzir (mantém o formato do card). Só a parte clara aparece.' : 'Arraste o quadro p/ posicionar e puxe as alças das bordas p/ mudar a proporção. Só a parte clara aparece.'}</p>
 
         <div className="relative mx-auto flex max-h-[58vh] items-center justify-center overflow-hidden rounded-xl bg-black/70">
           {src && (
@@ -112,11 +135,14 @@ export function TrilhaFundoCropper({ src, aspectInicial, cropInicial, onCancel, 
               <div className="pointer-events-none absolute inset-0 grid grid-cols-3 grid-rows-3">
                 {Array.from({ length: 9 }).map((_, i) => <div key={i} className="border border-white/25" />)}
               </div>
-              {/* Alças de borda (linhas laterais) + cantos */}
-              <span className={cn(handle, 'left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize')} onPointerDown={onDown('n')} onPointerMove={onMove} onPointerUp={onUp} />
-              <span className={cn(handle, 'bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 cursor-ns-resize')} onPointerDown={onDown('s')} onPointerMove={onMove} onPointerUp={onUp} />
-              <span className={cn(handle, 'right-0 top-1/2 -translate-y-1/2 translate-x-1/2 cursor-ew-resize')} onPointerDown={onDown('e')} onPointerMove={onMove} onPointerUp={onUp} />
-              <span className={cn(handle, 'left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize')} onPointerDown={onDown('w')} onPointerMove={onMove} onPointerUp={onUp} />
+              {/* Alças de borda (linhas laterais) — só quando o aspecto NÃO está travado */}
+              {!aspectTravado && <>
+                <span className={cn(handle, 'left-1/2 top-0 -translate-x-1/2 -translate-y-1/2 cursor-ns-resize')} onPointerDown={onDown('n')} onPointerMove={onMove} onPointerUp={onUp} />
+                <span className={cn(handle, 'bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 cursor-ns-resize')} onPointerDown={onDown('s')} onPointerMove={onMove} onPointerUp={onUp} />
+                <span className={cn(handle, 'right-0 top-1/2 -translate-y-1/2 translate-x-1/2 cursor-ew-resize')} onPointerDown={onDown('e')} onPointerMove={onMove} onPointerUp={onUp} />
+                <span className={cn(handle, 'left-0 top-1/2 -translate-x-1/2 -translate-y-1/2 cursor-ew-resize')} onPointerDown={onDown('w')} onPointerMove={onMove} onPointerUp={onUp} />
+              </>}
+              {/* Cantos */}
               <span className={cn(handle, 'left-0 top-0 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize')} onPointerDown={onDown('nw')} onPointerMove={onMove} onPointerUp={onUp} />
               <span className={cn(handle, 'right-0 top-0 translate-x-1/2 -translate-y-1/2 cursor-nesw-resize')} onPointerDown={onDown('ne')} onPointerMove={onMove} onPointerUp={onUp} />
               <span className={cn(handle, 'bottom-0 left-0 -translate-x-1/2 translate-y-1/2 cursor-nesw-resize')} onPointerDown={onDown('sw')} onPointerMove={onMove} onPointerUp={onUp} />

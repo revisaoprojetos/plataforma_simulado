@@ -1,0 +1,16 @@
+{
+  "tenant": "02195fa6-3db8-49d0-8c07-d21328a26a13",
+  "geradoEm": "2026-09-23T16:57:51.975Z",
+  "webhooks": [
+    {
+      "id": "126527cd-5931-4b01-90ee-588a62f1f36d",
+      "nome": "Webhook Entrega de Eventos Simulado",
+      "eventos": [
+        "gamificacao.inativo",
+        "gamificacao.sequencia",
+        "gamificacao.marco"
+      ],
+      "ativo": true
+    }
+  ]
+}

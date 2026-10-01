@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
+import type { CapaCardMeta } from '@/lib/capa-meta'
 
 // Estado compartilhado da criação de simulado (página-por-página). Vive no layout do grupo
 // de rotas /criar, então SOBREVIVE à navegação entre etapas (o layout não remonta). Espelho
@@ -35,6 +36,8 @@ export interface CriarDraft {
   icone: string | null
   capaUrl: string | null
   capaCardUrl: string | null
+  /** Enquadramento profissional da imagem do card (original + pôster/ticket) — não-destrutivo. */
+  capaCardMeta: CapaCardMeta | null
   // 2. Questões
   questoesSelecionadas: string[]
   questoesImportadas: Record<string, unknown>[]
@@ -81,6 +84,7 @@ export function draftVazio(): CriarDraft {
     icone: null,
     capaUrl: null,
     capaCardUrl: null,
+    capaCardMeta: null,
     questoesSelecionadas: [],
     questoesImportadas: [],
     questoesSelData: [],

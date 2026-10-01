@@ -8,6 +8,8 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { EditarPastaDialog } from '@/components/admin/editar-pasta-dialog'
+import { CapaCard } from '@/components/aluno/capa-card'
+import type { CapaViewCfg } from '@/lib/capa-meta'
 import { FileiraHorizontal } from '@/components/fileira-horizontal'
 import { excluirPastaFolder } from '@/app/admin/banco-questoes/actions'
 import type { TipoSimulado } from '@/lib/simulado/tipo'
@@ -84,7 +86,7 @@ export interface SimuladoCard {
   pasta_id?: string | null
   regras?: { nota_liberada?: boolean; gabarito_liberado?: boolean; caderno_liberado?: boolean } | null
   tipo?: TipoSimulado | null
-  vis?: { cor: string | null; icone: string | null; capa: string | null; capaBanner?: string | null } | null
+  vis?: { cor: string | null; icone: string | null; capa: string | null; capaBanner?: string | null; capaMeta?: { orig: string | null; poster: CapaViewCfg | null; ticket: CapaViewCfg | null } | null } | null
 }
 
 const tipoLabel = (t?: TipoSimulado | null) => (t === 'discursiva' ? 'Discursiva' : t === 'mista' ? 'Mista' : 'Objetiva')
@@ -244,7 +246,6 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
   }
 
   const cor = s.vis?.cor ?? '#6d28d9'
-  const BancoIcon = iconeBanco(s.vis?.icone)
   // Card pôster (4:5) → prefere o recorte pôster (capa_card_url) e cai no banner.
   const capa = s.vis?.capa ?? s.vis?.capaBanner
   // Volta = ONDE o admin está agora (raiz ou dentro de ?pasta=X), não a pasta do simulado. Assim, clicar
@@ -288,10 +289,7 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
         {/* metade esquerda: imagem/degradê. Aspecto 4:3 = o MESMO recorte que o cropper usa p/ o card
             no modo ticket → object-cover não re-corta (o enquadramento do admin aparece igual). */}
         <div className="relative aspect-[4/3] h-full shrink-0 overflow-hidden">
-          {capaT
-            ? <img src={capaT} alt="" className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover/card:scale-105" />
-            : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
-          {!capa && <BancoIcon className="absolute -right-4 -top-4 h-28 w-28 text-white/10" />}
+          <CapaCard capa={capaT} cor={cor} icone={s.vis?.icone} orig={s.vis?.capaMeta?.orig} cfg={s.vis?.capaMeta?.ticket} />
           {online > 0 && (
             <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-md bg-emerald-500/90 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white shadow-sm backdrop-blur" title={`${online} aluno(s) fazendo agora`}>
               <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-white opacity-75" /><span className="relative inline-flex h-2 w-2 rounded-full bg-white" /></span>
@@ -350,11 +348,8 @@ function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecion
       'group/card relative flex aspect-[4/5] flex-col overflow-hidden rounded-2xl border shadow-sm transition-all duration-300',
       selecionado ? 'ring-2 ring-primary' : 'ring-1 ring-black/5 hover:-translate-y-1 hover:shadow-xl hover:ring-white/25',
     )}>
-      {/* Fundo: imagem preenchendo o card inteiro (ou degradê da marca) */}
-      {capa
-        ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover/card:scale-105" />
-        : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
-      {!capa && <BancoIcon className="absolute -right-6 -top-6 h-40 w-40 text-white/10 transition-transform duration-500 group-hover/card:scale-110 group-hover/card:rotate-3" />}
+      {/* Fundo: imagem (enquadramento pôster via CSS, idêntico ao admin) ou degradê+ícone da marca */}
+      <CapaCard capa={capa} cor={cor} icone={s.vis?.icone} orig={s.vis?.capaMeta?.orig} cfg={s.vis?.capaMeta?.poster} />
       {/* glow da cor da marca + escurecimento p/ legibilidade do texto */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 opacity-50 transition-opacity duration-300 group-hover/card:opacity-70" style={{ background: `linear-gradient(to top, ${cor}, transparent)` }} />
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/5" />
@@ -623,20 +618,20 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
           <Input placeholder={atual ? `Buscar em “${atual.nome}”…` : 'Buscar simulado…'} value={busca} onChange={(e) => setBusca(e.target.value)} className="min-w-[180px] flex-1 lg:max-w-md" />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <div className="flex gap-1 rounded-lg bg-[var(--tab-bg,var(--muted))] p-1">
+          <div className="inline-flex rounded-xl border bg-muted/40 p-1">
             {([['linhas', 'Linhas', GalleryHorizontalEnd], ['pastas', 'Pastas', FolderTree], ['status', 'Status', Rows3]] as const).map(([v, label, Icon]) => (
               <button key={v} type="button" onClick={() => escolherVista(v)} aria-pressed={vista === v}
-                className={cn('inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-sm font-medium transition-colors',
-                  vista === v ? 'bg-[var(--tab-active,var(--background))] text-[color:var(--tab-active-foreground,var(--foreground))] shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+                className={cn('inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
+                  vista === v ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
                 <Icon className="h-4 w-4" /> {label}
               </button>
             ))}
           </div>
-          <div className="flex flex-wrap gap-1 rounded-lg bg-[var(--tab-bg,var(--muted))] p-1">
+          <div className="inline-flex flex-wrap rounded-xl border bg-muted/40 p-1">
             {filtros.map((f) => (
               <button key={f.v} onClick={() => setModo(f.v)}
-                className={cn('rounded-md px-3 py-1 text-sm font-medium transition-colors',
-                  modo === f.v ? 'bg-[var(--tab-active,var(--background))] text-[color:var(--tab-active-foreground,var(--foreground))] shadow-sm' : 'text-muted-foreground hover:bg-[var(--tab-active,var(--background))] hover:text-[color:var(--tab-active-foreground,var(--foreground))]')}>
+                className={cn('rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
+                  modo === f.v ? 'bg-primary text-primary-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
                 {f.label}
               </button>
             ))}

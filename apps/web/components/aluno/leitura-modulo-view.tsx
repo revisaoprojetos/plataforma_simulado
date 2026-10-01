@@ -20,17 +20,19 @@ import { type PontuacaoLeitura, type DesempenhoLeitura } from '@/lib/leitura/pon
 import { progressoDesafio, DESAFIO_TIPOS, type DesafioModulo } from '@/lib/leitura/desafios'
 import type { GamRail } from '@/lib/aluno/trilhas'
 import type { AulaDesempenho } from '@/lib/leitura/trilha'
-import type { RankingLeitura } from '@/lib/leitura/ranking'
+import type { RankingLeitura, RankingLeituraItem } from '@/lib/leitura/ranking'
 
 /** Visão de um módulo do LegProc Digital: banner colapsável (igual ao admin) com tabs Trilha | Desempenho
  * e busca, + aviso de questões pendentes. */
-export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulasPendentes, ranking, meuId, meuNome, formato = DEFAULT_TRILHA_FORMATO, simbolos = DEFAULT_TRILHA_SIMBOLOS, livre, inverter = false, degrade, degradeTrilha, descricao, regulamento, pontuacao, desafios, desempenhoDesafios, gam = null, diasLeitura = [], carimbos = [], conquistasModulo = [], progAulas = {} }: {
+export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulasPendentes, ranking, minhaLinha = null, meuId, meuNome, formato = DEFAULT_TRILHA_FORMATO, simbolos = DEFAULT_TRILHA_SIMBOLOS, livre, inverter = false, degrade, degradeTrilha, descricao, regulamento, pontuacao, desafios, desempenhoDesafios, gam = null, diasLeitura = [], carimbos = [], conquistasModulo = [], progAulas = {} }: {
   modulo: string
   trilha: Trilha
   desempenho: AulaDesempenho[]
   pendentes: number
   aulasPendentes: number
   ranking: RankingLeitura
+  /** Linha "Você" calculada fresca (sem cache) — usada quando a lista cacheada ainda não reflete o aluno. */
+  minhaLinha?: RankingLeituraItem | null
   meuId?: string | null
   meuNome?: string | null
   formato?: TrilhaFormato
@@ -279,7 +281,7 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
         <CarimbosColecao carimbos={carimbos} />
       </TabsContent>
       <TabsContent value="ranking" className="pt-4">
-        <LeituraRanking ranking={ranking} meuId={meuId} meuNome={meuNome} />
+        <LeituraRanking ranking={ranking} minhaLinha={minhaLinha} meuId={meuId} meuNome={meuNome} moduloId={modulo} moduloNome={trilha.nome} titulos={gam?.config.nivel_curva.titulos ?? []} totalDesafio={trilha.total} />
       </TabsContent>
     </Tabs>
   )

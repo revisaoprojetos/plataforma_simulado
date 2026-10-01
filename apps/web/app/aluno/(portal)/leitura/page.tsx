@@ -4,7 +4,7 @@ import { Library } from 'lucide-react'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { LEITURA_ATIVA } from '@/lib/flags'
 import { carregarTrilhaLeituraAluno, carregarModuloCompleto } from '@/lib/leitura/trilha'
-import { carregarRankingModulo } from '@/lib/leitura/ranking'
+import { carregarRankingModulo, calcularMinhaLinhaLeitura } from '@/lib/leitura/ranking'
 import { LeituraModulos } from '@/components/aluno/leitura-modulos'
 import { LeituraModuloView } from '@/components/aluno/leitura-modulo-view'
 import { getCurrentTenant } from '@/lib/tenant'
@@ -23,9 +23,12 @@ export default async function LeituraAlunoPage({ searchParams }: { searchParams:
 
   // ===== Módulo aberto: infos + tabs (trilha / desempenho) =====
   if (modulo) {
-    const [mod, ranking] = await Promise.all([
+    const [mod, ranking, minhaLinha] = await Promise.all([
       carregarModuloCompleto(sessao.estudanteId, sessao.tenantId, modulo),
       carregarRankingModulo(modulo, sessao.tenantId),
+      // Linha "Você" fresca (sem cache): garante os números certos na hora, mesmo se a lista cacheada
+      // ainda não refletiu a última aula concluída. Tolerante — nunca quebra a página.
+      calcularMinhaLinhaLeitura(modulo, sessao.tenantId, sessao.estudanteId).catch(() => null),
     ])
     if (mod.trilha) {
       // O cabeçalho (título/voltar/subtítulo) agora vive DENTRO do banner colapsável.
@@ -53,7 +56,7 @@ export default async function LeituraAlunoPage({ searchParams }: { searchParams:
         conquistasModuloDoAluno(svc, sessao.tenantId, modulo, sessao.estudanteId),
         progressoModuloAluno(svc, sessao.tenantId, modulo, sessao.estudanteId),
       ])
-      return <LeituraModuloView modulo={modulo} trilha={mod.trilha} desempenho={mod.desempenho} pendentes={mod.pendentes} aulasPendentes={mod.aulasPendentes} ranking={ranking} meuId={sessao.estudanteId} meuNome={sessao.nome} formato={mod.trilhaAparencia.formato} simbolos={mod.trilhaAparencia.simbolos} livre={mod.trilhaAparencia.livre} inverter={mod.trilhaAparencia.inverter} degrade={mod.trilhaAparencia.degrade} degradeTrilha={mod.trilhaAparencia.degradeTrilha} descricao={mod.trilhaAparencia.descricao} regulamento={mod.regulamento} pontuacao={mod.pontuacao} desafios={mod.desafios} desempenhoDesafios={mod.desempenhoDesafios} gam={gam} diasLeitura={diasLeitura} carimbos={carimbos} conquistasModulo={conquistasModulo} progAulas={prog.porAula} />
+      return <LeituraModuloView modulo={modulo} trilha={mod.trilha} desempenho={mod.desempenho} pendentes={mod.pendentes} aulasPendentes={mod.aulasPendentes} ranking={ranking} minhaLinha={minhaLinha} meuId={sessao.estudanteId} meuNome={sessao.nome} formato={mod.trilhaAparencia.formato} simbolos={mod.trilhaAparencia.simbolos} livre={mod.trilhaAparencia.livre} inverter={mod.trilhaAparencia.inverter} degrade={mod.trilhaAparencia.degrade} degradeTrilha={mod.trilhaAparencia.degradeTrilha} descricao={mod.trilhaAparencia.descricao} regulamento={mod.regulamento} pontuacao={mod.pontuacao} desafios={mod.desafios} desempenhoDesafios={mod.desempenhoDesafios} gam={gam} diasLeitura={diasLeitura} carimbos={carimbos} conquistasModulo={conquistasModulo} progAulas={prog.porAula} />
     }
     // módulo inexistente/sem acesso → cai na lista
   }

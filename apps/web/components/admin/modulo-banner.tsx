@@ -111,7 +111,11 @@ export function ModuloBanner({ banner, cor, titulo, subtitulo, topoDireita, brea
       banner.style.minHeight = `${EXP}px`; spacerEl.style.height = '0px'
       root.style.paddingBottom = `${padBottom0}px`
       const maxScroll = root.scrollHeight - root.clientHeight
-      root.style.paddingBottom = `${padBottom0 + Math.max(0, DIST + 8 - maxScroll)}px`
+      // Só adiciona o "empurrão" p/ recolher quando a página JÁ tem rolagem real (conteúdo longo). Em
+      // páginas curtas (ex.: poucas linhas) não sobra espaço vazio — o banner só fica expandido (não há
+      // o que rolar pra revelar mesmo).
+      const empurrao = maxScroll > 8 ? Math.max(0, DIST + 8 - maxScroll) : 0
+      root.style.paddingBottom = `${padBottom0 + empurrao}px`
     }
     const aplicar = () => {
       raf = 0

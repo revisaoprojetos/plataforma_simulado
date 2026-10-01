@@ -171,7 +171,10 @@ function varsDaPaleta(cores: Record<string, unknown>): { marca: string[]; surf: 
   if (inputBg) surf.push(`  --input-bg: ${ok(inputBg)};`)
   // Tabs: fundo da lista, tab selecionada, texto (hover/ativo)
   if (tabBg) surf.push(`  --tab-bg: ${ok(tabBg)};`)
-  if (tabAtivo) surf.push(`  --tab-active: ${ok(tabAtivo)};`)
+  // Tab ativa: --tab-active = destaque (sublinhado/preenchimento). --tab-active-contrast = texto que
+  // SEMPRE contrasta o preenchimento (p/ abas PÍLULA — senão texto e fundo ficam iguais e "somem").
+  // --tab-active-foreground = "Texto da tab ativa" (abas SUBLINHADAS, cor configurada).
+  if (tabAtivo) surf.push(`  --tab-active: ${ok(tabAtivo)};`, `  --tab-active-contrast: ${fg(tabAtivo)};`)
   if (tabTexto) surf.push(`  --tab-active-foreground: ${ok(tabTexto)};`)
 
   return { marca, surf }

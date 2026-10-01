@@ -19,7 +19,7 @@ import { resolverEspacamento, type EspacamentoDoc } from '@/lib/leitura/espacame
 import { resolverTrilhaAparencia, resolverGrifoCores, type TrilhaAparencia, type TrilhaFundoConfig, type TrilhaDegrade, type GrifoCores } from '@/lib/leitura/trilha-aparencia'
 import { resolverBlocos, type BlocoDef } from '@/lib/leitura/blocos'
 import { esquecer } from '@/lib/cache/relatorio-cache'
-import { invalidarRankingLeitura } from '@/lib/leitura/ranking'
+import { invalidarRankingLeitura, carregarRankingModulo, type RankingLeituraItem } from '@/lib/leitura/ranking'
 import { classificarFormato } from '@/lib/simulado/formato'
 import { confirmarImportQuestoes } from '@/app/admin/banco-questoes/actions'
 import type { QuestaoImport } from '@/app/admin/banco-questoes/import-types'
@@ -1141,6 +1141,69 @@ export async function definirEstudantesPasta(pastaId: string, estudanteIds: stri
 // visual da aba Estudantes (avatar/badge). Evita puxar todos os ~18k alunos de uma vez.
 export type EstudanteAcessoLinha = { id: string; nome: string; email: string | null; cpf: string | null; classificacao: string | null; avatar: string | null; perfil_avatar_cor: string | null }
 
+/** Linha do CONTROLE de acesso: aluno + de qual(is) grupo(s) vinculado(s) ele veio + se é acesso individual. */
+export type ControleAcessoLinha = EstudanteAcessoLinha & { grupos: { id: string; nome: string; cor: string | null }[]; individual: boolean }
+
+/**
+ * CONTROLE de acesso do módulo (tabela única): TODOS os alunos com acesso — membros dos grupos
+ * vinculados + os adicionados individualmente — com a coluna do(s) grupo(s) de cada um. Sem o teto de
+ * 1000 do PostgREST (fetchAll/fetchAllByIn). Substitui a antiga "tabela de avulsos".
+ */
+export async function carregarControleAcesso(pastaId: string): Promise<{ ok: boolean; estudantes?: ControleAcessoLinha[]; grupos?: { id: string; nome: string; cor: string | null }[]; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  try {
+    // 1) Grupos VINCULADOS ao módulo (p/ o filtro por grupo).
+    const { data: pg } = await svc.from('simulado_pasta_grupos').select('grupo_id').eq('pasta_id', pastaId).eq('tenant_id', g.tenantId)
+    const grupoIds = [...new Set(((pg as any[]) ?? []).map((r) => r.grupo_id as string))]
+    let grupos: { id: string; nome: string; cor: string | null }[] = []
+    if (grupoIds.length) {
+      const { data } = await svc.from('simulado_grupos').select('id, nome, cor').in('id', grupoIds).eq('tenant_id', g.tenantId)
+      grupos = ((data as any[]) ?? []).map((x) => ({ id: x.id, nome: x.nome, cor: x.cor ?? null })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+    }
+
+    // PRIMÁRIO: RPC jsonb — 1 agregação no banco, TODOS os alunos (membros dos grupos + individuais)
+    // com o(s) grupo(s) de cada um, sem o teto de 1000. (Um módulo pode ter dezenas de milhares.)
+    const rpc = await svc.rpc('rpc_controle_acesso_json', { p_tenant: g.tenantId, p_pasta: pastaId })
+    if (!rpc.error && Array.isArray(rpc.data)) {
+      const estudantes: ControleAcessoLinha[] = (rpc.data as any[]).map((e) => ({
+        id: e.id, nome: e.nome ?? 'Aluno', email: e.email ?? null, cpf: e.cpf ?? null, classificacao: e.classificacao ?? null,
+        avatar: e.avatar ?? null, perfil_avatar_cor: e.perfil_avatar_cor ?? null,
+        grupos: Array.isArray(e.grupos) ? e.grupos.map((x: any) => ({ id: x.id, nome: x.nome, cor: x.cor ?? null })) : [],
+        individual: !!e.individual,
+      }))
+      return { ok: true, estudantes, grupos }
+    }
+
+    // FALLBACK (RPC não aplicada): lê paginado (fetchAll/fetchAllByIn, também sem cap).
+    // 2) Membros dos grupos vinculados (sem cap — chunked por grupo).
+    const membros = grupoIds.length
+      ? await fetchAllByIn<{ estudante_id: string; grupo_id: string }>(grupoIds, (chunk) =>
+          svc.from('simulado_grupo_membros').select('estudante_id, grupo_id').in('grupo_id', chunk).eq('tenant_id', g.tenantId).order('id'))
+      : []
+    const gruposPorEst = new Map<string, Set<string>>()
+    for (const m of membros) (gruposPorEst.get(m.estudante_id) ?? gruposPorEst.set(m.estudante_id, new Set()).get(m.estudante_id)!).add(m.grupo_id)
+    // 3) Acessos individuais (sem cap).
+    const ind = await fetchAll<{ estudante_id: string }>(() => svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', pastaId).eq('tenant_id', g.tenantId).order('estudante_id'))
+    const indSet = new Set(ind.map((r) => r.estudante_id))
+    // 4) União + detalhes dos alunos.
+    const allIds = [...new Set<string>([...gruposPorEst.keys(), ...indSet])]
+    if (!allIds.length) return { ok: true, estudantes: [], grupos }
+    const es = await fetchAllByIn<any>(allIds, (chunk) =>
+      svc.from('simulado_estudantes').select('id, nome, email, cpf, classificacao, avatar, perfil_avatar_cor').in('id', chunk).eq('deletado', false).order('id'))
+    const grupoDe = new Map(grupos.map((x) => [x.id, x]))
+    const estudantes: ControleAcessoLinha[] = (es as any[]).map((e) => ({
+      id: e.id, nome: e.nome ?? 'Aluno', email: e.email ?? null, cpf: e.cpf ?? null, classificacao: e.classificacao ?? null, avatar: e.avatar ?? null, perfil_avatar_cor: e.perfil_avatar_cor ?? null,
+      grupos: [...(gruposPorEst.get(e.id) ?? [])].map((gid) => grupoDe.get(gid)).filter(Boolean) as { id: string; nome: string; cor: string | null }[],
+      individual: indSet.has(e.id),
+    })).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+    return { ok: true, estudantes, grupos }
+  } catch (e: any) {
+    if (SEM_TABELA(e?.message)) return { ok: true, estudantes: [], grupos: [] }
+    return { ok: false, error: e?.message ?? 'Falha ao carregar o controle de acesso.' }
+  }
+}
+
 /** Alunos (membros) dos grupos — p/ "Adicionar grupo" linkar os estudantes na tabela (como o banco).
  * Chunked no `.in()` (LANDMINE do proxy) e deduplicado por estudante; cada um marca o grupo de origem. */
 export async function estudantesDosGrupos(grupoIds: string[]): Promise<{ ok: boolean; itens?: (EstudanteAcessoLinha & { grupoNome: string | null })[]; error?: string }> {
@@ -1402,4 +1465,18 @@ export async function recalcularRankingLeitura(moduloId: string): Promise<{ ok: 
   await invalidarRankingLeitura(g.tenantId, moduloId || '__geral__')
   revalidatePath('/admin/leitura')
   return { ok: true }
+}
+
+/**
+ * Busca o ranking do módulo para o "ao vivo" (polling do admin). Serve do cache (barato); como a
+ * conclusão de aula/quiz do aluno JÁ invalida o cache, o próximo poll recomputa só quando algo mudou.
+ * `fresco=true` força recálculo (usado quando o admin quer puxar na hora).
+ */
+export async function obterRankingModulo(moduloId: string, fresco = false): Promise<{ ok: boolean; itens?: RankingLeituraItem[]; error?: string }> {
+  const g = await guard('leitura:view'); if (!g.ok) return { ok: false, error: g.error }
+  try {
+    if (fresco) await invalidarRankingLeitura(g.tenantId, moduloId || '__geral__')
+    const r = await carregarRankingModulo(moduloId || '__geral__', g.tenantId)
+    return { ok: true, itens: r.itens }
+  } catch (e: any) { return { ok: false, error: e?.message ?? 'Falha ao carregar o ranking.' } }
 }

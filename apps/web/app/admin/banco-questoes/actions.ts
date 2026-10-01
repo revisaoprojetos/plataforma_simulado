@@ -186,7 +186,13 @@ export async function atualizarBanco(id: string, nome: string, cor: string | nul
   let capaMetaOut: Record<string, unknown> | null = null
   if (capaMeta) {
     capaMetaOut = {}
-    if (capaMeta.card) capaMetaOut.card = { orig: await subirOrig(capaMeta.card.orig), crop: capaMeta.card.crop ?? null }
+    if (capaMeta.card) capaMetaOut.card = {
+      orig: await subirOrig(capaMeta.card.orig),
+      // poster/ticket = enquadramento por formato (só rects/efeitos, sem base64) → gravam direto.
+      poster: capaMeta.card.poster ?? null,
+      ticket: capaMeta.card.ticket ?? null,
+      crop: capaMeta.card.crop ?? null,
+    }
     if (capaMeta.banner) capaMetaOut.banner = { orig: await subirOrig(capaMeta.banner.orig), crop: capaMeta.banner.crop ?? null }
   }
   const upd = (patch: Record<string, unknown>) => svc.from('simulado_pastas').update(patch).eq('id', id).eq('tenant_id', g.tenantId)

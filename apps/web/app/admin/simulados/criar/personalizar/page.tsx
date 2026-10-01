@@ -1,62 +1,74 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { Loader2, ImagePlus, RefreshCw, Trash2, Check, Crop } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { BANCO_CORES } from '@/lib/banco-visual'
-import { hospedarImagemCapa, cardViewAtual } from '../acoes'
+import { hospedarImagemCapa } from '../acoes'
 import { useCriar, useGuardStep } from '../criar-context'
 import { ImageCropper } from '../image-cropper'
-import type { CardView } from '@/lib/card-view'
+import { CapaEditorPro, type CapaEditorValue } from '@/components/admin/capa-editor-pro'
+import { CapaCard } from '@/components/aluno/capa-card'
+import { DEFAULT_CAPA_VIEW } from '@/lib/capa-meta'
+
+/** Redimensiona a imagem em WebP q0.92 até `max` px (base p/ hospedar). */
+async function redimensionar(file: File, max = 2400): Promise<string> {
+  const bitmap = await createImageBitmap(file)
+  const scale = Math.min(1, max / Math.max(bitmap.width, bitmap.height))
+  const canvas = document.createElement('canvas')
+  canvas.width = Math.round(bitmap.width * scale); canvas.height = Math.round(bitmap.height * scale)
+  const ctx = canvas.getContext('2d'); if (!ctx) throw new Error('canvas')
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
+  const webp = canvas.toDataURL('image/webp', 0.92)
+  return webp.startsWith('data:image/webp') ? webp : canvas.toDataURL('image/jpeg', 0.92)
+}
 
 export default function PersonalizarPage() {
   useGuardStep(0)
   const { draft, patch } = useCriar()
   const bannerRef = useRef<HTMLInputElement>(null)
-  const cardRef = useRef<HTMLInputElement>(null)
   const [subBanner, setSubBanner] = useState(false)
-  const [subCard, setSubCard] = useState(false)
-  const [cropper, setCropper] = useState<{ file?: File; src?: string; alvo: 'banner' | 'card'; aspect: number; titulo: string } | null>(null)
-  // Estilo de card do console: em TICKET o recorte da capa é PAISAGEM (4:3), não o card 4:5.
-  const [cardView, setCardView] = useState<CardView>('poster')
-  useEffect(() => { cardViewAtual().then(setCardView).catch(() => {}) }, [])
-  // Banner é SEMPRE largo (~2740×400); só o card adapta ao modo (ticket 4:3 / pôster 4:5).
-  const aspectDe = (alvo: 'banner' | 'card') => (alvo === 'banner' ? 2740 / 400 : cardView === 'ticket' ? 4 / 3 : 4 / 5)
+  const [cropper, setCropper] = useState<{ file?: File; src?: string; aspect: number; titulo: string } | null>(null)
 
   const cor = draft.cor ?? '#6d28d9'
-  const imgCard = draft.capaCardUrl ?? draft.capaUrl
+  const aspectBanner = 2740 / 400
 
-  // Ao escolher um arquivo, abre o editor de recorte (posição + zoom) na proporção certa.
-  function abrirCropper(file: File | null, alvo: 'banner' | 'card') {
-    if (!file) return
-    if (!file.type.startsWith('image/')) { toast.error('Selecione um arquivo de imagem.'); return }
-    setCropper({ file, alvo, aspect: aspectDe(alvo), titulo: alvo === 'banner' ? 'Ajustar banner' : 'Ajustar card' })
+  // Editor profissional do CARD (pôster + ticket, não-destrutivo). Hospeda a original na hora
+  // (URL pequena no rascunho); o enquadramento por formato vai p/ o capa_meta no salvar final.
+  const capaCard: CapaEditorValue = {
+    orig: draft.capaCardMeta?.orig ?? draft.capaCardUrl ?? null,
+    poster: draft.capaCardMeta?.poster ?? { ...DEFAULT_CAPA_VIEW },
+    ticket: draft.capaCardMeta?.ticket ?? { ...DEFAULT_CAPA_VIEW },
+  }
+  function setCapaCard(v: CapaEditorValue) {
+    patch({ capaCardMeta: v.orig ? { orig: v.orig, poster: v.poster, ticket: v.ticket } : null, capaCardUrl: v.orig })
+  }
+  async function prepararImagem(file: File): Promise<string> {
+    const b64 = await redimensionar(file)
+    const r = await hospedarImagemCapa(b64)
+    if (!r.ok || !r.url) throw new Error(r.error ?? 'Falha ao enviar a imagem.')
+    return r.url
   }
 
-  // Recebe o recorte já enquadrado (base64) → hospeda e guarda a URL.
-  async function aplicarCrop(base64: string) {
-    const alvo = cropper?.alvo
-    setCropper(null)
-    if (!alvo) return
-    const setSub = alvo === 'banner' ? setSubBanner : setSubCard
-    setSub(true)
+  // ── Banner (capa larga) — segue com o cropper pan&zoom. ──
+  function abrirCropperBanner(file: File | null) {
+    if (!file) return
+    if (!file.type.startsWith('image/')) { toast.error('Selecione um arquivo de imagem.'); return }
+    setCropper({ file, aspect: aspectBanner, titulo: 'Ajustar banner' })
+  }
+  async function aplicarCropBanner(base64: string) {
+    setCropper(null); setSubBanner(true)
     try {
       const r = await hospedarImagemCapa(base64)
       if (!r.ok || !r.url) { toast.error(r.error ?? 'Falha ao enviar a imagem.'); return }
-      patch(alvo === 'banner' ? { capaUrl: r.url } : { capaCardUrl: r.url })
-    } catch {
-      toast.error('Falha ao enviar a imagem.')
-    } finally {
-      setSub(false)
-    }
+      patch({ capaUrl: r.url })
+    } catch { toast.error('Falha ao enviar a imagem.') } finally { setSubBanner(false) }
   }
-
-  // Reabre o editor na imagem JÁ enviada (reajustar posição/zoom).
-  function ajustarAtual(alvo: 'banner' | 'card') {
-    const url = alvo === 'banner' ? draft.capaUrl : draft.capaCardUrl
-    if (!url) return
-    setCropper({ src: url, alvo, aspect: aspectDe(alvo), titulo: alvo === 'banner' ? 'Ajustar banner' : 'Ajustar card' })
+  function ajustarBanner() {
+    if (!draft.capaUrl) return
+    setCropper({ src: draft.capaUrl, aspect: aspectBanner, titulo: 'Ajustar banner' })
   }
 
   return (
@@ -67,52 +79,43 @@ export default function PersonalizarPage() {
         <div className="grid gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">Nome do banco</label>
-            <input
-              value={draft.bancoNome}
-              onChange={(e) => patch({ bancoNome: e.target.value })}
-              placeholder="Ex.: PGE-SP 2027 — Banco"
-              className="w-full rounded-lg border bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-            />
+            <input value={draft.bancoNome} onChange={(e) => patch({ bancoNome: e.target.value })} placeholder="Ex.: PGE-SP 2027 — Banco"
+              className="w-full rounded-lg border bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
           </div>
           <div className="space-y-1.5">
             <label className="text-xs font-medium text-muted-foreground">Nome do simulado</label>
-            <input
-              value={draft.simuladoNome}
-              onChange={(e) => patch({ simuladoNome: e.target.value })}
-              placeholder="Ex.: 1º Simulado PGE-SP"
-              className="w-full rounded-lg border bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring"
-            />
+            <input value={draft.simuladoNome} onChange={(e) => patch({ simuladoNome: e.target.value })} placeholder="Ex.: 1º Simulado PGE-SP"
+              className="w-full rounded-lg border bg-transparent px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
           </div>
         </div>
 
-        {/* Imagens — cada área NA PROPORÇÃO real (banner largo × card 4:5 vertical) p/ não confundir. */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-          <div className="min-w-0 flex-1">
-            <Dropzone
-              label="Banner (capa larga / horizontal)"
-              hint="Proporção larga (~2740×400) · usado nos banners/trilha, não no card."
-              aspect="aspect-[2740/400]"
-              img={draft.capaUrl}
-              processando={subBanner}
-              inputRef={bannerRef}
-              onPick={(f) => abrirCropper(f, 'banner')}
-              onRemove={() => patch({ capaUrl: null })}
-              onAjustar={() => ajustarAtual('banner')}
-            />
-          </div>
-          <div className="w-full sm:w-56">
-            <Dropzone
-              label="Card (pôster vertical 4:5)"
-              hint="Proporção 4:5 (vertical) · ideal 1280×1600 px."
-              aspect="aspect-[4/5]"
-              img={draft.capaCardUrl}
-              processando={subCard}
-              inputRef={cardRef}
-              onPick={(f) => abrirCropper(f, 'card')}
-              onRemove={() => patch({ capaCardUrl: null })}
-              onAjustar={() => ajustarAtual('card')}
-            />
-          </div>
+        {/* Imagem do card — editor profissional (enquadra pôster e ticket separadamente) */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Imagem do card</label>
+          <CapaEditorPro value={capaCard} onChange={setCapaCard} cor={cor} icone={draft.icone} prepararImagem={prepararImagem} />
+        </div>
+
+        {/* Banner (capa larga / horizontal) */}
+        <div className="space-y-1.5">
+          <label className="text-xs font-medium text-muted-foreground">Banner (capa larga / horizontal)</label>
+          <input ref={bannerRef} type="file" accept="image/*" className="hidden" onChange={(e) => { abrirCropperBanner(e.target.files?.[0] ?? null); e.target.value = '' }} />
+          {draft.capaUrl ? (
+            <div className="relative overflow-hidden rounded-xl border">
+              <img src={draft.capaUrl} alt="" className="aspect-[2740/400] w-full object-cover" />
+              <div className="absolute right-2 top-2 flex gap-1.5">
+                <button type="button" onClick={ajustarBanner} className="inline-flex items-center gap-1 rounded-md bg-black/60 px-2 py-1 text-xs font-medium text-white backdrop-blur hover:bg-black/70"><Crop className="h-3.5 w-3.5" /> Ajustar</button>
+                <button type="button" onClick={() => bannerRef.current?.click()} className="inline-flex items-center gap-1 rounded-md bg-black/60 px-2 py-1 text-xs font-medium text-white backdrop-blur hover:bg-black/70"><RefreshCw className="h-3.5 w-3.5" /> Trocar</button>
+                <button type="button" onClick={() => patch({ capaUrl: null })} className="inline-flex items-center gap-1 rounded-md bg-black/60 px-2 py-1 text-xs font-medium text-white backdrop-blur hover:bg-rose-600"><Trash2 className="h-3.5 w-3.5" /> Remover</button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" onClick={() => bannerRef.current?.click()} disabled={subBanner}
+              className="flex aspect-[2740/400] w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed p-3 text-center text-muted-foreground transition-colors hover:border-primary hover:text-foreground disabled:opacity-60">
+              {subBanner ? <Loader2 className="h-6 w-6 animate-spin" /> : <ImagePlus className="h-6 w-6" />}
+              <span className="text-sm font-medium">{subBanner ? 'Enviando…' : 'Adicionar banner'}</span>
+              <span className="text-[11px]">Proporção larga (~2740×400) · usado nos banners/trilha, não no card.</span>
+            </button>
+          )}
         </div>
 
         {/* Cor */}
@@ -120,14 +123,9 @@ export default function PersonalizarPage() {
           <label className="text-xs font-medium text-muted-foreground">Cor</label>
           <div className="flex flex-wrap items-center gap-2">
             {BANCO_CORES.map((cc) => (
-              <button
-                key={cc}
-                type="button"
-                onClick={() => patch({ cor: cc })}
-                title={cc}
+              <button key={cc} type="button" onClick={() => patch({ cor: cc })} title={cc}
                 className={cn('flex h-8 w-8 items-center justify-center rounded-full transition-transform hover:scale-110', draft.cor === cc && 'ring-2 ring-foreground ring-offset-2 ring-offset-background')}
-                style={{ background: cc }}
-              >
+                style={{ background: cc }}>
                 {draft.cor === cc && <Check className="h-4 w-4 text-white" />}
               </button>
             ))}
@@ -139,15 +137,11 @@ export default function PersonalizarPage() {
         </div>
       </div>
 
-      {/* Prévia do card */}
+      {/* Prévia do card (pôster) — WYSIWYG via CapaCard */}
       <div className="space-y-2">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Prévia do card</p>
-        <div className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl border shadow-sm">
-          {imgCard ? (
-            <img src={imgCard} alt="" className="absolute inset-0 h-full w-full object-cover" />
-          ) : (
-            <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />
-          )}
+        <div className="group/card relative aspect-[4/5] w-full overflow-hidden rounded-2xl border shadow-sm">
+          <CapaCard capa={capaCard.orig ?? draft.capaUrl} cor={cor} icone={draft.icone} orig={capaCard.orig} cfg={capaCard.poster} />
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
           <div className="absolute inset-x-0 bottom-0 p-4">
             <p className="text-[11px] font-medium uppercase tracking-wide text-white/70">Simulado</p>
@@ -157,47 +151,7 @@ export default function PersonalizarPage() {
         </div>
       </div>
     </div>
-    {cropper && <ImageCropper file={cropper.file} src={cropper.src} aspect={cropper.aspect} titulo={cropper.titulo} onCancel={() => setCropper(null)} onConfirm={aplicarCrop} />}
+    {cropper && <ImageCropper file={cropper.file} src={cropper.src} aspect={cropper.aspect} titulo={cropper.titulo} onCancel={() => setCropper(null)} onConfirm={aplicarCropBanner} />}
     </>
-  )
-}
-
-function Dropzone({ label, hint, aspect, img, processando, inputRef, onPick, onRemove, onAjustar }: {
-  label: string
-  hint: string
-  aspect: string
-  img: string | null
-  processando: boolean
-  inputRef: React.RefObject<HTMLInputElement | null>
-  onPick: (f: File | null) => void
-  onRemove: () => void
-  onAjustar: () => void
-}) {
-  return (
-    <div className="space-y-1.5">
-      <label className="text-xs font-medium text-muted-foreground">{label}</label>
-      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={(e) => onPick(e.target.files?.[0] ?? null)} />
-      {img ? (
-        <div className="relative overflow-hidden rounded-xl border">
-          <img src={img} alt="" className={cn('w-full object-cover', aspect)} />
-          <div className="absolute right-2 top-2 flex gap-1.5">
-            <button type="button" onClick={onAjustar} className="inline-flex items-center gap-1 rounded-md bg-black/60 px-2 py-1 text-xs font-medium text-white backdrop-blur hover:bg-black/70"><Crop className="h-3.5 w-3.5" /> Ajustar</button>
-            <button type="button" onClick={() => inputRef.current?.click()} className="inline-flex items-center gap-1 rounded-md bg-black/60 px-2 py-1 text-xs font-medium text-white backdrop-blur hover:bg-black/70"><RefreshCw className="h-3.5 w-3.5" /> Trocar</button>
-            <button type="button" onClick={onRemove} className="inline-flex items-center gap-1 rounded-md bg-black/60 px-2 py-1 text-xs font-medium text-white backdrop-blur hover:bg-rose-600"><Trash2 className="h-3.5 w-3.5" /> Remover</button>
-          </div>
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={() => inputRef.current?.click()}
-          disabled={processando}
-          className={cn('flex w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed p-3 text-center text-muted-foreground transition-colors hover:border-primary hover:text-foreground disabled:opacity-60', aspect)}
-        >
-          {processando ? <Loader2 className="h-6 w-6 animate-spin" /> : <ImagePlus className="h-6 w-6" />}
-          <span className="text-sm font-medium">{processando ? 'Enviando…' : 'Adicionar imagem'}</span>
-          <span className="text-[11px]">{hint}</span>
-        </button>
-      )}
-    </div>
   )
 }

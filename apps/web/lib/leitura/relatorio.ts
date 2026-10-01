@@ -1,6 +1,7 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { remember, esquecer } from '@/lib/cache/relatorio-cache'
 import { getGamConfig } from '@/lib/gamificacao'
 import { normalizarPontuacaoLeitura } from '@/lib/leitura/pontuacao'
 
@@ -137,8 +138,16 @@ function agregar(base: Awaited<ReturnType<typeof carregarBase>>) {
 
 const media = (arr: number[]) => (arr.length ? Math.round(arr.reduce((s, x) => s + x, 0) / arr.length) : 0)
 
-/** Dashboard (agregados) do módulo — sem o detalhe por aluno×aula (esse vai no Excel). */
+/** Chave + invalidação do cache do relatório de um módulo. TTL curto protege o banco em navegação/refresh
+ *  repetidos (o relatório varre TODAS as respostas do módulo). Invalidar nas mutações de conteúdo. */
+export const chaveRelatorioLeitura = (tenantId: string, moduloId: string) => `leitura:relatorio:${tenantId}:${moduloId}`
+export async function invalidarRelatorioLeitura(tenantId: string, moduloId: string): Promise<void> {
+  await esquecer(chaveRelatorioLeitura(tenantId, moduloId)); await esquecer(chaveRelatorioLeitura(tenantId, '__geral__'))
+}
+
+/** Dashboard (agregados) do módulo — sem o detalhe por aluno×aula (esse vai no Excel). CACHEADO (TTL 300s). */
 export async function carregarRelatorioModulo(moduloId: string, tenantId: string): Promise<RelatorioModulo> {
+  return remember<RelatorioModulo>(chaveRelatorioLeitura(tenantId, moduloId), 300, async () => {
   const base = await carregarBase(moduloId, tenantId)
   const ag = agregar(base)
   const alunosIds = [...ag.aulasPorAluno.keys()]
@@ -173,6 +182,7 @@ export async function carregarRelatorioModulo(moduloId: string, tenantId: string
     porDia, seqMedia, seqMaior, seqDistribuicao, topSequencia,
     pontosMedia, pontosMaior, pontosTotal, topPontos, porAula,
   }
+  })
 }
 
 /** Detalhe por aluno×aula (para a aba "Detalhado" do Excel) — com nomes preenchidos. */

@@ -43,10 +43,10 @@ export function CardSimulado({ s, dica = false, variant = 'poster' }: { s: ItemS
   if (variant === 'ticket') {
     return (
       <div className={cn('group/card relative flex h-28 overflow-hidden rounded-2xl border bg-card shadow-sm ring-1 ring-black/5 transition duration-300 sm:h-32', s.podeFazer && 'hover:-translate-y-0.5 hover:shadow-lg')}>
-        {/* metade esquerda: imagem paisagem — prefere o BANNER largo (capa_url); o pôster 4:5 só
-            entra se não houver banner (nesse caso o object-cover corta o meio). */}
-        <div className="relative w-[42%] max-w-[11rem] shrink-0 overflow-hidden">
-          <CapaCard capa={capa ?? s.vis?.capaBanner} cor={cor} icone={s.vis?.icone} />
+        {/* metade esquerda: imagem paisagem no formato do recorte (4:3) — enquadramento do ticket (CSS,
+            idêntico ao admin); sem meta, cai no card/banner com object-cover. */}
+        <div className="group/card relative h-full aspect-[4/3] shrink-0 overflow-hidden">
+          <CapaCard capa={capa ?? s.vis?.capaBanner} cor={cor} icone={s.vis?.icone} orig={s.vis?.capaMeta?.orig} cfg={s.vis?.capaMeta?.ticket} />
         </div>
         {(s.podeFazer || s.podeAguardar) && <Link href={`/simulado/${s.embed_token}`} className="absolute inset-0 z-10" aria-label={s.titulo} />}
         {/* direita: infos */}
@@ -89,7 +89,7 @@ export function CardSimulado({ s, dica = false, variant = 'poster' }: { s: ItemS
 
   return (
     <div className={cn('group/card relative aspect-[4/5] transform-gpu overflow-hidden rounded-2xl border shadow-sm ring-1 ring-black/5 transition duration-300', s.podeFazer && 'hover:-translate-y-1 hover:shadow-xl hover:ring-white/25')}>
-      <CapaCard capa={capa} cor={cor} icone={s.vis?.icone} />
+      <CapaCard capa={capa} cor={cor} icone={s.vis?.icone} orig={s.vis?.capaMeta?.orig} cfg={s.vis?.capaMeta?.poster} />
       {/* glow da cor da marca no rodapé — dá profundidade e identidade */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 opacity-50 transition-opacity duration-300 group-hover/card:opacity-70" style={{ background: `linear-gradient(to top, ${cor}, transparent)` }} />
       {/* escurecimento p/ legibilidade do texto */}

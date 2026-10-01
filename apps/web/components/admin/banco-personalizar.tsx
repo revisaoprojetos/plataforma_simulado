@@ -4,12 +4,14 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { atualizarBanco, lerCapaMeta } from '@/app/admin/banco-questoes/actions'
-import { type CapaMetaIn } from '@/lib/capa-meta'
+import { type CapaMetaIn, type CapaViewCfg, DEFAULT_CAPA_VIEW } from '@/lib/capa-meta'
 import { BANCO_CORES } from '@/lib/banco-visual'
 import { Card, CardContent } from '@/components/ui/card'
 import { Loader2, Check, ImagePlus, Trash2, RefreshCw, Palette, Crop } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ImageCropper, type CropState } from '@/app/admin/simulados/criar/image-cropper'
+import { CapaEditorPro, type CapaEditorValue } from '@/components/admin/capa-editor-pro'
+import { CapaCard } from '@/components/aluno/capa-card'
 import { type CardView } from '@/lib/card-view'
 
 type Banco = { id: string; nome: string; cor: string | null; icone: string | null; capa_url: string | null; capa_card_url: string | null; total: number }
@@ -32,8 +34,8 @@ async function origParaMeta(o: File | string | null): Promise<string | null> {
 }
 
 /** Aba "Personalizar" de um banco: nome, cor e duas imagens — a CAPA/banner (capa_url, horizontal) e a
- * imagem do CARD (capa_card_url). Cada uma tem "Ajustar" (arraste + zoom). A PRÉVIA e o aspecto do
- * recorte da imagem do card seguem o estilo escolhido no console (pôster 4:5 × ticket paisagem). */
+ * imagem do CARD (editor profissional, enquadrada separadamente p/ pôster 4:5 e ticket 4:3). O card do
+ * aluno fica IDÊNTICO às prévias (render não-destrutivo por CSS). */
 export function BancoPersonalizar({
   banco,
   cardView = 'poster',
@@ -59,93 +61,82 @@ export function BancoPersonalizar({
 }) {
   const router = useRouter()
   const bannerRef = useRef<HTMLInputElement>(null)
-  const cardInputRef = useRef<HTMLInputElement>(null)
   const [nome, setNome] = useState(banco.nome)
   const [cor, setCor] = useState<string | null>(banco.cor)
   const [capa, setCapa] = useState<string | null>(banco.capa_url)             // banner largo (capa_url)
-  const [capaCard, setCapaCard] = useState<string | null>(banco.capa_card_url) // imagem do card (capa_card_url)
+  // Imagem do CARD — editor profissional não-destrutivo: original + enquadramento por formato.
+  const [capaCard, setCapaCard] = useState<CapaEditorValue>({ orig: banco.capa_card_url ?? null, poster: { ...DEFAULT_CAPA_VIEW }, ticket: { ...DEFAULT_CAPA_VIEW } })
   const [salvando, setSalvando] = useState(false)
-  // Editor de recorte (posição + zoom) na proporção certa — aberto ao escolher OU ao "Ajustar".
-  const [cropper, setCropper] = useState<{ file?: File; src?: string; alvo: 'card' | 'banner'; aspect: number; titulo: string; zoom?: number; center?: { x: number; y: number } } | null>(null)
-  // Fonte ORIGINAL (não recortada) + estado do recorte por imagem — p/ REEDITAR de onde parou sem
-  // perda progressiva (cada ajuste re-recorta do original). Inicia com a imagem salva.
-  const origCard = useRef<File | string | null>(banco.capa_card_url)
+  // Editor de recorte do BANNER (pan&zoom) — aberto ao escolher OU ao "Ajustar".
+  const [cropper, setCropper] = useState<{ file?: File; src?: string; aspect: number; titulo: string; zoom?: number; center?: { x: number; y: number } } | null>(null)
   const origBanner = useRef<File | string | null>(banco.capa_url)
-  const cropCard = useRef<CropState | null>(null)
   const cropBanner = useRef<CropState | null>(null)
 
-  // Carrega o recorte salvo (imagem ORIGINAL + zoom/posição) → o "Ajustar" reabre de onde parou.
+  // Carrega o capa_meta salvo: original + enquadramento do card (pôster/ticket) e recorte do banner.
   useEffect(() => {
     lerCapaMeta(banco.id).then((meta) => {
-      if (meta?.card) { if (meta.card.orig) origCard.current = meta.card.orig; if (meta.card.crop) cropCard.current = meta.card.crop as CropState }
+      if (meta?.card) {
+        setCapaCard((prev) => ({
+          orig: meta.card?.orig ?? prev.orig,
+          poster: (meta.card?.poster as CapaViewCfg | undefined) ?? prev.poster,
+          ticket: (meta.card?.ticket as CapaViewCfg | undefined) ?? prev.ticket,
+        }))
+      }
       if (meta?.banner) { if (meta.banner.orig) origBanner.current = meta.banner.orig; if (meta.banner.crop) cropBanner.current = meta.banner.crop as CropState }
     }).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [banco.id])
 
   const c = cor ?? '#6d28d9'
-  // O card usa a imagem própria (capa_card_url); se vazia, cai para o banner (capa_url).
-  const imgCard = capaCard ?? capa
-  // Dimensões recomendadas (px) por imagem — o banner é fixo; o card acompanha o modo (pôster 4:5 / ticket 4:3).
   const dimBanner = '2740 × 400 px'
-  const dimCard = cardView === 'ticket' ? '1200 × 900 px' : '1080 × 1350 px'
   const chipDim = 'rounded bg-muted px-1.5 py-0.5 text-[11px] font-normal tabular-nums text-muted-foreground'
-  const tituloCrop = (alvo: 'card' | 'banner') => (alvo === 'banner' ? 'Ajustar imagem de capa' : 'Ajustar imagem do card')
-  // O recorte segue o CARD VIEW ATIVO: em TICKET tudo é PAISAGEM (4:3, deitado, como o card ticket
-  // exibe a imagem); em PÔSTER o banner fica largo (16:4) e a imagem do card 4:5.
-  // O BANNER (capa_url) é SEMPRE largo (~2740×400) — é usado nos banners/trilha, nunca no card/ticket,
-  // então NÃO segue o toggle. Só a imagem do CARD adapta: ticket = paisagem (4:3), pôster = 4:5.
-  const aspectDe = (alvo: 'card' | 'banner') => (alvo === 'banner' ? 2740 / 400 : cardView === 'ticket' ? 4 / 3 : 4 / 5)
+  const aspectBanner = 2740 / 400
 
-  function abrirCropper(f: File | null, alvo: 'card' | 'banner') {
+  function abrirCropperBanner(f: File | null) {
     if (!f) return
     if (!f.type.startsWith('image/')) { toast.error('Selecione um arquivo de imagem.'); return }
-    // Arquivo NOVO → vira o original desta imagem e zera o estado de recorte.
-    if (alvo === 'card') { origCard.current = f; cropCard.current = null } else { origBanner.current = f; cropBanner.current = null }
-    setCropper({ file: f, alvo, aspect: aspectDe(alvo), titulo: tituloCrop(alvo) })
+    origBanner.current = f; cropBanner.current = null
+    setCropper({ file: f, aspect: aspectBanner, titulo: 'Ajustar imagem de capa' })
   }
-  function ajustarAtual(alvo: 'card' | 'banner') {
-    // Reabre a partir do ORIGINAL (não do recorte anterior) + o zoom/posição salvos → continua de onde parou.
-    const base = (alvo === 'card' ? origCard.current : origBanner.current) ?? (alvo === 'card' ? capaCard : capa)
+  function ajustarBanner() {
+    const base = origBanner.current ?? capa
     if (!base) return
-    const est = alvo === 'card' ? cropCard.current : cropBanner.current
-    const comum = { alvo, aspect: aspectDe(alvo), titulo: tituloCrop(alvo), zoom: est?.zoom, center: est ? { x: est.cx, y: est.cy } : undefined }
+    const est = cropBanner.current
+    const comum = { aspect: aspectBanner, titulo: 'Ajustar imagem de capa', zoom: est?.zoom, center: est ? { x: est.cx, y: est.cy } : undefined }
     if (base instanceof File) setCropper({ file: base, ...comum })
     else setCropper({ src: base, ...comum })
   }
-  function aplicarCrop(base64: string, state: CropState) {
-    const alvo = cropper?.alvo
-    setCropper(null)
-    // Guarda o recorte (p/ exibir/salvar) + o estado (p/ reeditar); NÃO mexe no original.
-    if (alvo === 'card') { setCapaCard(base64); cropCard.current = state }
-    else if (alvo === 'banner') { setCapa(base64); cropBanner.current = state }
+  function aplicarCropBanner(base64: string, state: CropState) {
+    setCropper(null); setCapa(base64); cropBanner.current = state
   }
 
-  // Monta o capa_meta (ORIGINAL + params) p/ reeditar depois. `capa` = banner, `capaCard` = card.
+  // Monta o capa_meta (ORIGINAL + enquadramento por formato / recorte do banner) p/ reeditar depois.
   async function montarMeta(): Promise<CapaMetaIn> {
-    const card = capaCard ? { orig: await origParaMeta(origCard.current), crop: cropCard.current } : null
+    const card = capaCard.orig ? { orig: await origParaMeta(capaCard.orig), poster: capaCard.poster, ticket: capaCard.ticket } : null
     const banner = capa ? { orig: await origParaMeta(origBanner.current), crop: cropBanner.current } : null
     return { card, banner }
   }
 
-  // Estado do auto-save (quando `autoSalvar`): substitui o botão por um indicador discreto.
   const [autoStatus, setAutoStatus] = useState<'idle' | 'salvando' | 'salvo' | 'erro'>('idle')
 
+  const pendenteRef = useRef(false) // há mudança aguardando salvar (debounce pendente)?
   async function salvar(auto = false) {
     if (!nome.trim()) { if (!auto) toast.error('Informe um nome.'); return }
     if (auto) setAutoStatus('salvando'); else setSalvando(true)
-    const r = await atualizarBanco(banco.id, nome, cor, null, capa, capaCard, await montarMeta())
+    // capa_card_url (fallback de URL p/ quem não lê o capa_meta) = a ORIGINAL; o enquadramento vem do meta.
+    const r = await atualizarBanco(banco.id, nome, cor, null, capa, capaCard.orig, await montarMeta())
+    if (r.ok) pendenteRef.current = false
     if (auto) {
-      // Auto-save silencioso: sem toast/refresh (a prévia já reflete a mudança ao vivo).
       setAutoStatus(r.ok ? 'salvo' : 'erro')
       if (!r.ok) toast.error(r.error ?? 'Erro ao salvar')
+      else router.refresh() // reflete a mudança nas prévias/board sem recarregar a página
     } else {
       setSalvando(false)
       if (r.ok) { toast.success('Personalização salva'); router.refresh() } else toast.error(r.error ?? 'Erro ao salvar')
     }
   }
 
-  // Auto-save (debounce) ao mudar cor/imagens/nome. Pula a montagem e não salva no meio do recorte.
+  // Auto-save (debounce) ao mudar cor/imagens/nome. Não salva no meio do recorte do banner.
   const salvarRef = useRef(salvar)
   salvarRef.current = salvar
   const autoTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
@@ -153,14 +144,22 @@ export function BancoPersonalizar({
   useEffect(() => {
     if (!autoSalvar) return
     if (!montadoRef.current) { montadoRef.current = true; return }
-    if (cropper) return // recorte aberto → espera aplicar/cancelar
+    if (cropper) return
+    pendenteRef.current = true
     clearTimeout(autoTimer.current)
-    autoTimer.current = setTimeout(() => void salvarRef.current(true), 1000)
+    autoTimer.current = setTimeout(() => void salvarRef.current(true), 800)
     return () => clearTimeout(autoTimer.current)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nome, cor, capa, capaCard, autoSalvar])
 
+  // Flush no DESMONTE: se o usuário sair da aba antes do debounce, salva na hora (senão a mudança
+  // se perdia → parecia "não salvou"). fire-and-forget: o server action conclui + revalida o board.
+  useEffect(() => () => { if (autoSalvar && pendenteRef.current) void salvarRef.current(true) }, [autoSalvar])
+
   const btnOverlay = 'inline-flex items-center gap-1 rounded-md bg-black/60 px-2 py-1 text-xs font-medium text-white backdrop-blur hover:bg-black/70'
+  // Config do formato ATIVO (segue o toggle do console) p/ a prévia "em contexto".
+  const cfgAtivo = cardView === 'ticket' ? capaCard.ticket : capaCard.poster
+  const capaFallback = capaCard.orig ?? capa // sem imagem do card → cai no banner
 
   return (
     <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
@@ -184,32 +183,10 @@ export function BancoPersonalizar({
             </div>
           )}
 
-          {/* Imagem do card — pôster (4:5) ou ticket (paisagem), conforme o console. Fica ACIMA do banner. */}
+          {/* Imagem do card — editor profissional (enquadra pôster e ticket separadamente) */}
           <div className="space-y-1.5">
-            <label className="flex flex-wrap items-center gap-1.5 text-xs font-medium text-muted-foreground">
-              Imagem do card ({cardView === 'ticket' ? 'ticket' : 'pôster'})
-              <span className={chipDim}>{dimCard}</span>
-            </label>
-            <input ref={cardInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { abrirCropper(e.target.files?.[0] ?? null, 'card'); e.target.value = '' }} />
-            {capaCard ? (
-              // Miniatura na PROPORÇÃO do card do modo ativo (pôster 4:5 / ticket 4:3), altura fixa
-              // (um pouco maior p/ os botões do topo não cobrirem a imagem).
-              <div className="relative mx-auto max-w-full overflow-hidden rounded-xl border" style={{ aspectRatio: String(aspectDe('card')), height: 210 }}>
-                <img src={capaCard} alt="Imagem do card" className="absolute inset-0 h-full w-full object-cover" />
-                <div className="absolute right-2 top-2 flex gap-1.5">
-                  <button type="button" onClick={() => ajustarAtual('card')} className={btnOverlay}><Crop className="h-3.5 w-3.5" /> Ajustar</button>
-                  <button type="button" onClick={() => cardInputRef.current?.click()} className={btnOverlay}><RefreshCw className="h-3.5 w-3.5" /> Trocar</button>
-                  <button type="button" onClick={() => setCapaCard(null)} className={cn(btnOverlay, 'hover:bg-rose-600')}><Trash2 className="h-3.5 w-3.5" /> Remover</button>
-                </div>
-              </div>
-            ) : (
-              <button type="button" onClick={() => cardInputRef.current?.click()}
-                className="flex h-40 w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed text-muted-foreground transition-colors hover:border-primary hover:text-foreground">
-                <ImagePlus className="h-7 w-7" />
-                <span className="text-sm font-medium">Adicionar imagem do card</span>
-                <span className="text-xs">{cardView === 'ticket' ? `Ideal deitada (paisagem) — ${dimCard}. Se vazio, usa a capa do banner.` : `Ideal vertical (pôster 4:5) — ${dimCard}. Se vazio, usa a capa do banner.`}</span>
-              </button>
-            )}
+            <label className="text-xs font-medium text-muted-foreground">Imagem do card</label>
+            <CapaEditorPro value={capaCard} onChange={setCapaCard} cor={c} icone={banco.icone} prepararImagem={redimensionar} />
           </div>
 
           {/* Capa (banner largo 16:4) — abaixo do card */}
@@ -218,13 +195,12 @@ export function BancoPersonalizar({
               Imagem de capa (banner largo / capa comprida)
               <span className={chipDim}>{dimBanner}</span>
             </label>
-            <input ref={bannerRef} type="file" accept="image/*" className="hidden" onChange={(e) => { abrirCropper(e.target.files?.[0] ?? null, 'banner'); e.target.value = '' }} />
+            <input ref={bannerRef} type="file" accept="image/*" className="hidden" onChange={(e) => { abrirCropperBanner(e.target.files?.[0] ?? null); e.target.value = '' }} />
             {capa ? (
-              // Banner largo: tira de largura total na proporção real (~2740×400) — fica baixa, nunca gigante.
-              <div className="relative w-full overflow-hidden rounded-xl border" style={{ aspectRatio: String(aspectDe('banner')) }}>
+              <div className="relative w-full overflow-hidden rounded-xl border" style={{ aspectRatio: String(aspectBanner) }}>
                 <img src={capa} alt="Capa" className="absolute inset-0 h-full w-full object-cover" />
                 <div className="absolute right-2 top-2 flex gap-1.5">
-                  <button type="button" onClick={() => ajustarAtual('banner')} className={btnOverlay}><Crop className="h-3.5 w-3.5" /> Ajustar</button>
+                  <button type="button" onClick={ajustarBanner} className={btnOverlay}><Crop className="h-3.5 w-3.5" /> Ajustar</button>
                   <button type="button" onClick={() => bannerRef.current?.click()} className={btnOverlay}><RefreshCw className="h-3.5 w-3.5" /> Trocar</button>
                   <button type="button" onClick={() => setCapa(null)} className={cn(btnOverlay, 'hover:bg-rose-600')}><Trash2 className="h-3.5 w-3.5" /> Remover</button>
                 </div>
@@ -258,7 +234,6 @@ export function BancoPersonalizar({
           </div>
 
           {autoSalvar ? (
-            // Sem botão: salva sozinho. Indicador discreto do estado.
             <div className="flex items-center justify-end gap-1.5 text-xs text-muted-foreground" aria-live="polite">
               {autoStatus === 'salvando' && (<><Loader2 className="h-3.5 w-3.5 animate-spin" /> Salvando…</>)}
               {autoStatus === 'salvo' && (<><Check className="h-3.5 w-3.5 text-emerald-500" /> Alterações salvas automaticamente</>)}
@@ -275,21 +250,15 @@ export function BancoPersonalizar({
         </CardContent>
       </Card>
 
-      {/* Pré-visualização do card — espelha o estilo do console (pôster × ticket). */}
+      {/* Pré-visualização do card "em contexto" — espelha o estilo do console (pôster × ticket). */}
       <div className="space-y-2">
         <p className="flex flex-wrap items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
           Prévia do card{cardView === 'ticket' ? ' · ticket' : ''}
-          <span className={cn(chipDim, 'normal-case tracking-normal')}>{dimCard}</span>
         </p>
         {cardView === 'ticket' ? (
-          // Ticket: imagem deitada à esquerda + infos à direita (usa a imagem do card, deitada).
           <div className="relative flex h-32 w-full overflow-hidden rounded-2xl border bg-card shadow-sm sm:h-36">
-            <div className="relative h-full aspect-[4/3] shrink-0 overflow-hidden">
-              {imgCard ? (
-                <img src={imgCard} alt="" className="absolute inset-0 h-full w-full object-cover object-center" />
-              ) : (
-                <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }} />
-              )}
+            <div className="group/card relative h-full aspect-[4/3] shrink-0 overflow-hidden">
+              <CapaCard capa={capaFallback} cor={c} icone={banco.icone} orig={capaCard.orig} cfg={cfgAtivo} />
               <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `linear-gradient(110deg, transparent 45%, ${c})` }} />
             </div>
             <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 p-3">
@@ -299,13 +268,8 @@ export function BancoPersonalizar({
             </div>
           </div>
         ) : (
-          // Pôster (4:5): a imagem do card preenche tudo, com o nome sobreposto.
-          <div className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl border shadow-sm">
-            {imgCard ? (
-              <img src={imgCard} alt="" className="absolute inset-0 h-full w-full object-cover" />
-            ) : (
-              <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }} />
-            )}
+          <div className="group/card relative aspect-[4/5] w-full overflow-hidden rounded-2xl border shadow-sm">
+            <CapaCard capa={capaFallback} cor={c} icone={banco.icone} orig={capaCard.orig} cfg={cfgAtivo} />
             <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
             <div className="absolute inset-x-0 bottom-0 p-4">
               <p className="text-[11px] font-medium uppercase tracking-wide text-white/70">{badge}</p>
@@ -316,7 +280,7 @@ export function BancoPersonalizar({
         )}
       </div>
 
-      {cropper && <ImageCropper file={cropper.file} src={cropper.src} aspect={cropper.aspect} titulo={cropper.titulo} initialZoom={cropper.zoom} initialCenter={cropper.center} onCancel={() => setCropper(null)} onConfirm={aplicarCrop} />}
+      {cropper && <ImageCropper file={cropper.file} src={cropper.src} aspect={cropper.aspect} titulo={cropper.titulo} initialZoom={cropper.zoom} initialCenter={cropper.center} onCancel={() => setCropper(null)} onConfirm={aplicarCropBanner} />}
     </div>
   )
 }

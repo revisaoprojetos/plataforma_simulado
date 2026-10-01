@@ -21,6 +21,7 @@ interface CriarSimuladoPayload {
   icone: string | null
   capaUrl: string | null
   capaCardUrl: string | null
+  capaCardMeta: import('@/lib/capa-meta').CapaCardMeta | null
   questoesSelecionadas: string[]
   questoesImportadas: any[]
   folhaModeloId: string | null
@@ -80,7 +81,7 @@ export async function criarSimuladoCompletoAction(p: CriarSimuladoPayload): Prom
   const cb = await criarBanco(p.bancoNome.trim(), tipoBanco, bancoFolderId)
   if (!cb.ok || !cb.id) return { error: cb.error ?? 'Falha ao criar o banco.' }
   const bancoId = cb.id
-  try { await atualizarBanco(bancoId, p.bancoNome.trim(), p.cor, p.icone, p.capaUrl, p.capaCardUrl) } catch { /* visual best-effort */ }
+  try { await atualizarBanco(bancoId, p.bancoNome.trim(), p.cor, p.icone, p.capaUrl, p.capaCardUrl, p.capaCardMeta ? { card: p.capaCardMeta, banner: null } : undefined) } catch { /* visual best-effort */ }
 
   // 3) Questões → banco (import cria; seleção vincula).
   if (p.questoesImportadas?.length) {

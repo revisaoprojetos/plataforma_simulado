@@ -48,18 +48,23 @@ export function ConfigModuloSalvarProvider({ children }: { children: ReactNode }
 
   return (
     <CtxSalvar.Provider value={ctxValue}>
-      <div className="space-y-4">
-        {anyDirty && (
-          <div className="sticky top-2 z-30 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-2.5 text-sm shadow-sm backdrop-blur">
+      {/* Conteúdo da aba. */}
+      <div className="space-y-4">{children}</div>
+
+      {/* Barra de "alterações não salvas": FLUTUANTE (fixed), fora do fluxo → aparecer/sumir NÃO
+          empurra nem desloca o conteúdo (antes era sticky no topo e mexia a tela toda). Fica ancorada
+          na base, centralizada, com entrada suave. */}
+      {anyDirty && (
+        <div className="pointer-events-none fixed inset-x-0 bottom-4 z-40 flex justify-center px-4 animate-in fade-in slide-in-from-bottom-2 duration-200">
+          <div className="pointer-events-auto flex flex-wrap items-center justify-between gap-3 rounded-full border border-amber-500/40 bg-amber-500/15 px-4 py-2 text-sm shadow-lg backdrop-blur-md">
             <span className="inline-flex items-center gap-1.5 font-medium text-amber-700 dark:text-amber-300"><Save className="h-4 w-4" /> Você tem alterações não salvas.</span>
             <button type="button" onClick={salvarTudo} disabled={salvando}
-              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:brightness-110 disabled:opacity-50">
+              className="inline-flex items-center gap-1.5 rounded-full bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground shadow-sm transition-all hover:brightness-110 disabled:opacity-50">
               {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Salvar alterações
             </button>
           </div>
-        )}
-        {children}
-      </div>
+        </div>
+      )}
     </CtxSalvar.Provider>
   )
 }

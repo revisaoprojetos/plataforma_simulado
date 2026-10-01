@@ -784,8 +784,12 @@ export function TrilhaSistema({ trilhas, gamAtivo, simbolos = DEFAULT_TRILHA_SIM
   livre?: TrilhaLivreConfig; capa?: string | null; semMoldura?: boolean; degradeTopo?: TrilhaDegrade; estampas?: CarimboEstampa[]
 }) {
   const mobile = useTrilhaMobile()
-  // No celular, qualquer formato não-lista cai para a lista (responsiva, sem posicionamento absoluto).
-  if (formato === 'lista' || mobile) return <TrilhaLista trilhas={trilhas} gamAtivo={gamAtivo} simbolos={simbolos} ajudante={ajudante} />
+  // Serpentina/reta (TrilhaGigante) e livre (TrilhaLivre, posições em %) são responsivos e renderizam no
+  // celular — a livre com a própria imagem de fundo. Só o "mapa de semanas" (grade semanal larga) cai
+  // para a lista em telas estreitas.
+  if (formato === 'lista' || (formato === 'mapa_semanas' && mobile)) {
+    return <TrilhaLista trilhas={trilhas} gamAtivo={gamAtivo} simbolos={simbolos} ajudante={ajudante} />
+  }
   if (formato === 'mapa_semanas') return <TrilhaMapaSemanas trilhas={trilhas} simbolos={simbolos} ajudante={ajudante} capa={capa ?? trilhas[0]?.capa ?? null} />
   if (formato === 'livre') {
     const nos = trilhas.flatMap((t) => t.nodes).map((n) => ({

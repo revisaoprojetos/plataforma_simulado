@@ -1,0 +1,1673 @@
+{
+  "quando": "2026-10-01T15:50:08.844Z",
+  "simulado": {
+    "id": "79813cd6-8d17-4671-b482-d70292678848",
+    "regras": {
+      "publicado_em": "2026-07-21T18:40:08.294Z",
+      "retentativas": 0,
+      "banco_base_id": null,
+      "liberar_gabarito": "imediato",
+      "mostrar_resultado": true,
+      "correcoes_pos_prova": [
+        {
+          "tipo": "anular",
+          "questao_id": "52a606cb-cd95-47fe-a241-826e70f84b49"
+        },
+        {
+          "tipo": "anular",
+          "questao_id": "780f2eb8-5b2b-4339-87fa-c438da964749"
+        },
+        {
+          "tipo": "anular",
+          "questao_id": "aa2fbd80-4a28-40d1-b9fd-59a4bacd6578"
+        },
+        {
+          "tipo": "trocar_gabarito",
+          "questao_id": "481e1fb8-6f3a-43f6-bdfb-0f89a60ad165",
+          "nova_alternativa_id": "fa3c79b6-55d4-497c-8b75-6f7ff4f9dc5e"
+        }
+      ],
+      "embaralhar_questoes": false,
+      "revisao_antes_enviar": true,
+      "embaralhar_alternativas": false,
+      "permitir_atraso_entrada": false,
+      "diagnostico_classificacoes": [
+        "passaporte",
+        "normal"
+      ],
+      "tempo_maximo_atraso_minutos": 240
+    }
+  },
+  "banco": {
+    "id": "6c03f660-a886-46c3-9c20-d377a73080ab",
+    "caderno_entrega": null
+  },
+  "caderno": {
+    "id": "8eaf18c1-e844-4b45-be4a-78c8abd24c3e",
+    "config": {
+      "bancoId": "6c03f660-a886-46c3-9c20-d377a73080ab",
+      "material": {
+        "fonte": "pdf",
+        "pdfUrl": "https://twdrtlxkjvunkdobudev.supabase.co/storage/v1/object/public/pdfs/materiais/02195fa6-3db8-49d0-8c07-d21328a26a13/gabarito/01-simulado-completo-gabarito-comentado-docx-1.pdf",
+        "pdfNome": "01 - Simulado Completo - Gabarito Comentado.docx-1"
+      },
+      "builderV3": {
+        "v": 3,
+        "ativo": "jamsueu8",
+        "itens": [
+          {
+            "id": "jamsueu8",
+            "capa": {
+              "cor": "#ffffff",
+              "posH": 50,
+              "posV": 80,
+              "fonte": "montserrat",
+              "titulo": "CADERNO DE QUESTÕES",
+              "italico": false,
+              "negrito": true,
+              "tamanho": 48,
+              "sublinhado": false,
+              "alinhamento": "center"
+            },
+            "modelo": "agu_perguntas",
+            "ajustes": {
+              "titulo": "Caderno AGU",
+              "capaUrl": "https://twdrtlxkjvunkdobudev.supabase.co/storage/v1/object/public/imagens/cadernos/caderno-agu/caderno-agu-fundo-1.png",
+              "colunas": 2,
+              "compacto": false,
+              "folhaUrl": "https://twdrtlxkjvunkdobudev.supabase.co/storage/v1/object/public/imagens/cadernos/caderno-agu/caderno-agu-fundo-2.png",
+              "coresDisc": {},
+              "rodapeUrl": "",
+              "coresParte": {},
+              "coresPilar": {
+                "doutrina": "#e8850c",
+                "lei_seca": "#c9a227",
+                "jurisprudencia": "#3b5bdb",
+                "lingua_portuguesa": "#1a7a4a"
+              },
+              "fonteParte": {},
+              "corPrimaria": "#2d254f",
+              "estiloParte": {},
+              "cabecalhoUrl": "",
+              "tamanhoParte": {},
+              "corSecundaria": "#f6b420",
+              "coresTextoParte": {},
+              "mostrarGabarito": false,
+              "numAlternativas": 5,
+              "alinhamentoParte": {},
+              "mostrarCabecalho": true,
+              "mostrarDadosAluno": true,
+              "mostrarComentarios": false
+            },
+            "docEdit": {
+              "pages": [
+                {
+                  "id": "page_a23d7ca7",
+                  "kind": "capa",
+                  "blocks": [
+                    {
+                      "id": "plano-fundo_cc53771a",
+                      "type": "plano-fundo",
+                      "attributes": {
+                        "url": "https://twdrtlxkjvunkdobudev.supabase.co/storage/v1/object/public/imagens/cadernos/caderno-agu/caderno-agu-fundo-1.png",
+                        "opacidade": 100
+                      },
+                      "innerBlocks": []
+                    },
+                    {
+                      "id": "espacador_f3cf573d",
+                      "type": "espacador",
+                      "attributes": {
+                        "altura": 749
+                      },
+                      "innerBlocks": []
+                    },
+                    {
+                      "id": "texto-livre_410cf440",
+                      "type": "texto-livre",
+                      "attributes": {
+                        "bold": true,
+                        "size": 48,
+                        "align": "center",
+                        "color": "#ffffff",
+                        "fonte": "montserrat",
+                        "texto": "CADERNO DE QUESTÕES",
+                        "italico": false,
+                        "largura": 100,
+                        "valignV": "center",
+                        "alturaMin": 171,
+                        "lineHeight": 1,
+                        "sublinhado": false,
+                        "espacamento": 0,
+                        "alinhamentoBloco": "left"
+                      },
+                      "innerBlocks": []
+                    }
+                  ],
+                  "titulo": "Capa"
+                },
+                {
+                  "id": "page_f9f5a835",
+                  "kind": "conteudo",
+                  "blocks": [
+                    {
+                      "id": "plano-fundo_61bbf2c5",
+                      "type": "plano-fundo",
+                      "attributes": {
+                        "url": "https://twdrtlxkjvunkdobudev.supabase.co/storage/v1/object/public/imagens/cadernos/caderno-agu/caderno-agu-fundo-2.png",
+                        "opacidade": 100
+                      },
+                      "innerBlocks": []
+                    },
+                    {
+                      "id": "card_da696a77",
+                      "type": "card",
+                      "attributes": {
+                        "fitaCor": "",
+                        "largura": 100,
+                        "padding": 14,
+                        "bordaCor": "",
+                        "corFundo": "#072c94",
+                        "bordaRaio": 0,
+                        "fitaAltura": 0,
+                        "alinhamento": "center",
+                        "bordaLargura": 1
+                      },
+                      "innerBlocks": [
+                        {
+                          "id": "texto-livre_4ba4e493",
+                          "type": "texto-livre",
+                          "attributes": {
+                            "bold": true,
+                            "size": 24,
+                            "align": "left",
+                            "color": "#ffffff",
+                            "fonte": "montserrat",
+                            "texto": "CADERNO DE QUESTÃO\n",
+                            "italico": false,
+                            "largura": 100,
+                            "valignV": "top",
+                            "alturaMin": 0,
+                            "lineHeight": 1.8,
+                            "sublinhado": false,
+                            "espacamento": 0,
+                            "alinhamentoBloco": "left"
+                          },
+                          "innerBlocks": []
+                        },
+                        {
+                          "id": "texto-livre_e404bfb9",
+                          "type": "texto-livre",
+                          "attributes": {
+                            "bold": false,
+                            "size": 20,
+                            "align": "left",
+                            "color": "#ffffff",
+                            "fonte": "montserrat",
+                            "texto": "Simulado 02 - AGU\n",
+                            "italico": false,
+                            "largura": 100,
+                            "valignV": "top",
+                            "alturaMin": 0,
+                            "lineHeight": 1.5,
+                            "sublinhado": false,
+                            "espacamento": 0,
+                            "alinhamentoBloco": "left"
+                          },
+                          "innerBlocks": []
+                        }
+                      ]
+                    },
+                    {
+                      "id": "espacador_ea4be6ad",
+                      "type": "espacador",
+                      "attributes": {
+                        "altura": 4
+                      },
+                      "innerBlocks": []
+                    },
+                    {
+                      "id": "identificacao_8824beb8",
+                      "type": "identificacao",
+                      "attributes": {
+                        "fonte": "montserrat",
+                        "campos": [
+                          {
+                            "valor": "{{data}}",
+                            "rotulo": "Data"
+                          },
+                          {
+                            "valor": "{{inicio}}",
+                            "rotulo": "Início"
+                          },
+                          {
+                            "valor": "{{termino}}",
+                            "rotulo": "Término"
+                          },
+                          {
+                            "valor": "{{tempo_total}}",
+                            "rotulo": "Tempo total"
+                          },
+                          {
+                            "valor": "{{respondidas}}",
+                            "rotulo": "Respondidas"
+                          },
+                          {
+                            "valor": "{{em_branco}}",
+                            "rotulo": "Em branco"
+                          }
+                        ],
+                        "titulo": "DADOS DO ESTUDANTE",
+                        "corBorda": "",
+                        "corErros": "#dc2626",
+                        "corValor": "",
+                        "destaque": [
+                          {
+                            "valor": "{{nome}}",
+                            "rotulo": "Nome"
+                          },
+                          {
+                            "valor": "{{email}}",
+                            "rotulo": "E-mail"
+                          }
+                        ],
+                        "bordaRaio": 0,
+                        "corAcento": "",
+                        "corHeader": "#072c94",
+                        "corRotulo": "",
+                        "mediaLim1": 33,
+                        "mediaLim2": 66,
+                        "corAcertos": "#16a34a",
+                        "desempenho": [
+                          {
+                            "valor": "{{acertos}}",
+                            "rotulo": "Acertos"
+                          },
+                          {
+                            "valor": "{{erros}}",
+                            "rotulo": "Erros"
+                          },
+                          {
+                            "valor": "{{percentual}}",
+                            "rotulo": "Média"
+                          }
+                        ],
+                        "corDestaque": "",
+                        "corMediaMax": "",
+                        "corMediaAlta": "#16a34a",
+                        "corMediaBaixa": "#dc2626",
+                        "corMediaMedia": "#f59e0b",
+                        "corHeaderTexto": "#ffffff",
+                        "mostrarDesempenho": true
+                      },
+                      "innerBlocks": []
+                    },
+                    {
+                      "id": "repeticao_5507a11b",
+                      "type": "repeticao",
+                      "attributes": {
+                        "gap": 16,
+                        "quantidade": null
+                      },
+                      "innerBlocks": [
+                        {
+                          "id": "card_b272593b",
+                          "type": "card",
+                          "attributes": {
+                            "fitaCor": "",
+                            "largura": 20,
+                            "padding": 1,
+                            "bordaCor": "",
+                            "corFundo": "#072c94",
+                            "bordaRaio": 8,
+                            "fitaAltura": 0,
+                            "alinhamento": "left",
+                            "bordaLargura": 1
+                          },
+                          "innerBlocks": [
+                            {
+                              "id": "texto-livre_90101a0e",
+                              "type": "texto-livre",
+                              "attributes": {
+                                "bold": true,
+                                "size": 14,
+                                "align": "center",
+                                "color": "#ffffff",
+                                "fonte": "montserrat",
+                                "texto": "QUESTÃO {q_num}",
+                                "italico": false,
+                                "largura": 100,
+                                "valignV": "top",
+                                "alturaMin": 0,
+                                "lineHeight": 1.5,
+                                "sublinhado": false,
+                                "espacamento": 0,
+                                "alinhamentoBloco": "left"
+                              },
+                              "innerBlocks": []
+                            }
+                          ]
+                        },
+                        {
+                          "id": "texto-livre_e5fc0dd4",
+                          "type": "texto-livre",
+                          "attributes": {
+                            "bold": false,
+                            "size": 12,
+                            "align": "justify",
+                            "color": "",
+                            "fonte": "",
+                            "texto": "{q_enunciado}",
+                            "italico": false,
+                            "largura": 100,
+                            "valignV": "top",
+                            "alturaMin": 0,
+                            "lineHeight": 1.5,
+                            "sublinhado": false,
+                            "espacamento": 0,
+                            "alinhamentoBloco": "left"
+                          },
+                          "innerBlocks": []
+                        },
+                        {
+                          "id": "texto-livre_efd5b4db",
+                          "type": "texto-livre",
+                          "attributes": {
+                            "bold": false,
+                            "size": 12,
+                            "align": "left",
+                            "color": "",
+                            "fonte": "",
+                            "texto": "{q_alt_a}\n{q_alt_b}\n{q_alt_c}\n{q_alt_d}\n{q_alt_e}",
+                            "italico": false,
+                            "largura": 100,
+                            "valignV": "top",
+                            "alturaMin": 0,
+                            "lineHeight": 1.5,
+                            "sublinhado": false,
+                            "espacamento": 0,
+                            "alinhamentoBloco": "left"
+                          },
+                          "innerBlocks": []
+                        },
+                        {
+                          "id": "espacador_dc8e8bb0",
+                          "type": "espacador",
+                          "attributes": {
+                            "altura": 24
+                          },
+                          "innerBlocks": []
+                        }
+                      ]
+                    }
+                  ],
+                  "titulo": "Conteúdo"
+                }
+              ],
+              "rodape": [],
+              "versao": 1,
+              "running": {
+                "rodapeAtivo": true,
+                "rodapeAltura": 40,
+                "rodapePaginas": "exceto_capa",
+                "cabecalhoAtivo": true,
+                "cabecalhoAltura": 75,
+                "cabecalhoPaginas": "exceto_capa",
+                "mostrarNumeroPagina": true
+              },
+              "cabecalho": []
+            },
+            "modalidade": "caderno_questoes"
+          },
+          {
+            "id": "pmrye61w",
+            "capa": {
+              "cor": "#ffffff",
+              "posH": 50,
+              "posV": 80,
+              "fonte": "montserrat",
+              "titulo": "CADERNO DE \nPROVA COMPLETO",
+              "italico": false,
+              "negrito": true,
+              "tamanho": 48,
+              "sublinhado": false,
+              "alinhamento": "center"
+            },
+            "modelo": "agu_completo",
+            "ajustes": {
+              "titulo": "Caderno AGU",
+              "capaUrl": "https://twdrtlxkjvunkdobudev.supabase.co/storage/v1/object/public/imagens/cadernos/caderno-agu/caderno-agu-fundo-1.png",
+              "colunas": 2,
+              "compacto": false,
+              "folhaUrl": "https://twdrtlxkjvunkdobudev.supabase.co/storage/v1/object/public/imagens/cadernos/caderno-agu/caderno-agu-fundo-2.png",
+              "coresDisc": {},
+              "rodapeUrl": "",
+              "coresParte": {},
+              "coresPilar": {
+                "doutrina": "#e8850c",
+                "lei_seca": "#c9a227",
+                "jurisprudencia": "#3b5bdb",
+                "lingua_portuguesa": "#1a7a4a"
+              },
+              "fonteParte": {},
+              "corPrimaria": "#2d254f",
+              "estiloParte": {},
+              "cabecalhoUrl": "",
+              "tamanhoParte": {},
+              "corSecundaria": "#f6b420",
+              "coresTextoParte": {},
+              "mostrarGabarito": false,
+              "numAlternativas": 5,
+              "alinhamentoParte": {},
+              "mostrarCabecalho": true,
+              "mostrarDadosAluno": true,
+              "mostrarComentarios": false
+            },
+            "docEdit": {
+              "pages": [
+                {
+                  "id": "page_327c484b",
+                  "kind": "capa",
+                  "blocks": [
+                    {
+                      "id": "plano-fundo_7b708299",
+                      "type": "plano-fundo",
+                      "attributes": {
+                        "url": "https://twdrtlxkjvunkdobudev.supabase.co/storage/v1/object/public/imagens/cadernos/caderno-agu/caderno-agu-fundo-1.png",
+                        "opacidade": 100
+                      },
+                      "innerBlocks": []
+                    },
+                    {
+                      "id": "espacador_751ab00a",
+                      "type": "espacador",
+                      "attributes": {
+                        "altura": 749
+                      },
+                      "innerBlocks": []
+                    },
+                    {
+                      "id": "texto-livre_5042a465",
+                      "type": "texto-livre",
+                      "attributes": {
+                        "bold": true,
+                        "size": 48,
+                        "align": "center",
+                        "color": "#ffffff",
+                        "fonte": "montserrat",
+                        "texto": "CADERNO DE \nPROVA COMPLETO",
+                        "italico": false,
+                        "largura": 100,
+                        "valignV": "center",
+                        "alturaMin": 171,
+                        "lineHeight": 1,
+                        "sublinhado": false,
+                        "espacamento": 0,
+                        "alinhamentoBloco": "left"
+                      },
+                      "innerBlocks": []
+                    }
+                  ],
+                  "titulo": "Capa"
+                },
+                {
+                  "id": "page_63f32fc3",
+                  "kind": "conteudo",
+                  "blocks": [
+                    {
+                      "id": "plano-fundo_00a9307e",
+                      "type": "plano-fundo",
+                      "attributes": {
+                        "url": "https://twdrtlxkjvunkdobudev.supabase.co/storage/v1/object/public/imagens/cadernos/caderno-agu/caderno-agu-fundo-2.png",
+                        "opacidade": 100
+                      },
+                      "innerBlocks": []
+                    },
+                    {
+                      "id": "card_8953c2b4",
+                      "type": "card",
+                      "attributes": {
+                        "fitaCor": "",
+                        "largura": 100,
+                        "padding": 0,
+                        "bordaCor": "",
+                        "corFundo": "#072c94",
+                        "bordaRaio": 0,
+                        "fitaAltura": 0,
+                        "alinhamento": "center",
+                        "bordaLargura": 0
+                      },
+                      "innerBlocks": [
+                        {
+                          "id": "texto-livre_75a686f9",
+                          "type": "texto-livre",
+                          "attributes": {
+                            "bold": true,
+                            "size": 24,
+                            "align": "left",
+                            "color": "#ffffff",
+                            "fonte": "montserrat",
+                            "texto": " CADERNO DE PROVA COMPLETO",
+                            "italico": false,
+                            "largura": 100,
+                            "valignV": "top",
+                            "alturaMin": 0,
+                            "lineHeight": 1.8,
+                            "sublinhado": false,
+                            "espacamento": 0,
+                            "alinhamentoBloco": "left"
+                          },
+                          "innerBlocks": []
+                        },
+                        {
+                          "id": "texto-livre_9b961233",
+                          "type": "texto-livre",
+                          "attributes": {
+                            "bold": false,
+                            "size": 16,
+                            "align": "left",
+                            "color": "#ffffff",
+                            "fonte": "montserrat",
+                            "texto": "  SIMULADO GRATUITO - PRÉ-EDITAL AGU ",
+                            "italico": false,
+                            "largura": 100,
+                            "valignV": "top",
+                            "alturaMin": 0,
+                            "lineHeight": 1.5,
+                            "sublinhado": false,
+                            "espacamento": 0,
+                            "alinhamentoBloco": "left"
+                          },
+                          "innerBlocks": []
+                        }
+                      ]
+                    },
+                    {
+                      "id": "espacador_ca2d346e",
+                      "type": "espacador",
+                      "attributes": {
+                        "altura": 4
+                      },
+                      "innerBlocks": []
+                    },
+                    {
+                      "id": "espacador_21f1c61e",
+                      "type": "espacador",
+                      "attributes": {
+                        "altura": 10
+                      },
+                      "innerBlocks": []
+                    },
+                    {
+                      "id": "identificacao_c39ba7f3",
+                      "type": "identificacao",
+                      "attributes": {
+                        "fonte": "montserrat",
+                        "campos": [
+                          {
+                            "valor": "{{data}}",
+                            "rotulo": "Data"
+                          },
+                          {
+                            "valor": "{{inicio}}",
+                            "rotulo": "Início"
+                          },
+                          {
+                            "valor": "{{termino}}",
+                            "rotulo": "Término"
+                          },
+                          {
+                            "valor": "{{tempo_total}}",
+                            "rotulo": "Tempo total"
+                          },
+                          {
+                            "valor": "{{respondidas}}",
+                            "rotulo": "Respondidas"
+                          },
+                          {
+                            "valor": "{{em_branco}}",
+                            "rotulo": "Em branco"
+                          }
+                        ],
+                        "titulo": "DADOS DO ESTUDANTE",
+                        "corBorda": "",
+                        "corErros": "#dc2626",
+                        "corValor": "",
+                        "destaque": [
+                          {
+                            "valor": "{{nome}}",
+                            "rotulo": "Nome"
+                          },
+                          {
+                            "valor": "{{email}}",
+                            "rotulo": "E-mail"
+                          }
+                        ],
+                        "bordaRaio": 0,
+                        "corAcento": "",
+                        "corHeader": "#072c94",
+                        "corRotulo": "",
+                        "mediaLim1": 33,
+                        "mediaLim2": 66,
+                        "corAcertos": "#16a34a",
+                        "desempenho": [
+                          {
+                            "valor": "{{acertos}}",
+                            "rotulo": "Acertos"
+                          },
+                          {
+                            "valor": "{{erros}}",
+                            "rotulo": "Erros"
+                          },
+                          {
+                            "valor": "{{percentual}}",
+                            "rotulo": "Média"
+                          }
+                        ],
+                        "corDestaque": "",
+                        "corMediaMax": "",
+                        "corMediaAlta": "#16a34a",
+                        "corMediaBaixa": "#dc2626",
+                        "corMediaMedia": "#f59e0b",
+                        "corHeaderTexto": "#ffffff",
+                        "mostrarDesempenho": true
+                      },
+                      "innerBlocks": []
+                    },
+                    {
+                      "id": "espacador_c7c76cf7",
+                      "type": "espacador",
+                      "attributes": {
+                        "altura": 24
+                      },
+                      "innerBlocks": []
+                    },
+                    {
+                      "id": "repeticao_e7715247",
+                      "type": "repeticao",
+                      "attributes": {
+                        "gap": 16,
+                        "quantidade": null
+                      },
+                      "innerBlocks": [
+                        {
+                          "id": "card_115cdfd8",
+                          "type": "card",
+                          "attributes": {
+                            "fitaCor": "",
+                            "largura": 20,
+                            "padding": 1,
+                            "bordaCor": "",
+                            "corFundo": "#072c94",
+                            "bordaRaio": 8,
+                            "fitaAltura": 0,
+                            "alinhamento": "left",
+                            "bordaLargura": 1
+                          },
+                          "innerBlocks": [
+                            {
+                              "id": "texto-livre_9e9f461c",
+                              "type": "texto-livre",
+                              "attributes": {
+                                "bold": true,
+                                "size": 14,
+                                "align": "center",
+                                "color": "#ffffff",
+                                "fonte": "montserrat",
+                                "texto": "QUESTÃO {q_num}",
+                                "italico": false,
+                                "largura": 100,
+                                "valignV": "top",
+                                "alturaMin": 0,
+                                "lineHeight": 1.5,
+                                "sublinhado": false,
+                                "espacamento": 0,
+                                "alinhamentoBloco": "left"
+                              },
+                              "innerBlocks": []
+                            }
+                          ]
+                        },
+                        {
+                          "id": "espacador_9d3ac967",
+                          "type": "espacador",
+                          "attributes": {
+                            "altura": 10
+                          },
+                          "innerBlocks": []
+                        },
+                        {
+                          "id": "texto-livre_2ca67ab0",
+                          "type": "texto-livre",
+                          "attributes": {
+                            "bold": false,
+                            "size": 12,
+                            "align": "justify",
+                            "color": "",
+                            "fonte": "",
+                            "texto": "{q_enunciado}",
+                            "italico": false,
+                            "largura": 100,
+                            "valignV": "top",
+                            "alturaMin": 0,
+                            "lineHeight": 1.5,
+                            "sublinhado": false,
+                            "espacamento": 0,
+                            "alinhamentoBloco": "left"
+                          },
+                          "innerBlocks": []
+                        },
+                        {
+                          "id": "texto-livre_fd71a9f3",
+                          "type": "texto-livre",
+                          "attributes": {
+                            "bold": false,
+                            "size": 12,
+                            "align": "left",
+                            "color": "",
+                            "fonte": "",
+                            "texto": "{q_alt_a}\n{q_alt_b}\n{q_alt_c}\n{q_alt_d}\n{q_alt_e}",
+                            "italico": false,
+                            "largura": 100,
+                            "valignV": "top",
+                            "alturaMin": 0,
+                            "lineHeight": 1.5,
+                            "sublinhado": false,
+                            "espacamento": 0,
+                            "alinhamentoBloco": "left"
+                          },
+                          "innerBlocks": []
+                        },
+                        {
+                          "id": "espacador_08dcf7ea",
+                          "type": "espacador",
+                          "attributes": {
+                            "altura": 10
+                          },
+                          "innerBlocks": []
+                        },
+                        {
+                          "id": "colunas_86d62001",
+                          "type": "colunas",
+                          "attributes": {
+                            "gap": 16,
+                            "divisoria": false,
+                            "divisoriaCor": "",
+                            "divisoriaEstilo": "solido",
+                            "divisoriaEspessura": 1
+                          },
+                          "innerBlocks": [
+                            {
+                              "id": "coluna_48877d87",
+                              "type": "coluna",
+                              "attributes": {},
+                              "innerBlocks": [
+                                {
+                                  "id": "texto-livre_5613e742",
+                                  "type": "texto-livre",
+                                  "attributes": {
+                                    "bold": false,
+                                    "size": 12,
+                                    "align": "center",
+                                    "color": "",
+                                    "fonte": "",
+                                    "texto": "RESPOSTA MARCADA: ",
+                                    "italico": false,
+                                    "largura": 20,
+                                    "valignV": "center",
+                                    "alturaMin": 0,
+                                    "lineHeight": 3,
+                                    "sublinhado": false,
+                                    "espacamento": 0,
+                                    "alinhamentoBloco": "left"
+                                  },
+                                  "innerBlocks": []
+                                }
+                              ]
+                            },
+                            {
+                              "id": "coluna_6b9be2a6",
+                              "type": "coluna",
+                              "attributes": {},
+                              "innerBlocks": [
+                                {
+                                  "id": "card_0d964c51",
+                                  "type": "card",
+                                  "attributes": {
+                                    "fitaCor": "",
+                                    "largura": 8,
+                                    "padding": 7,
+                                    "bordaCor": "",
+                                    "corFundo": "#072c94",
+                                    "bordaRaio": 8,
+                                    "fitaAltura": 0,
+                                    "alinhamento": "center",
+                                    "bordaLargura": 0
+                                  },
+                                  "innerBlocks": [
+                                    {
+                                      "id": "texto-livre_22dbe9de",
+                                      "type": "texto-livre",
+                                      "attributes": {
+                                        "bold": true,
+                                        "size": 12,
+                                        "align": "center",
+                                        "color": "#ffffff",
+                                        "fonte": "",
+                                        "texto": "{q_resposta_letra}",
+                                        "italico": false,
+                                        "largura": 43,
+                                        "valignV": "center",
+                                        "alturaMin": 0,
+                                        "lineHeight": 1.5,
+                                        "sublinhado": false,
+                                        "espacamento": 0,
+                                        "alinhamentoBloco": "center"
+                                      },
+                                      "innerBlocks": []
+                                    }
+                                  ]
+                                }
+                              ]
+                            }
+                          ]
+                        },
+                        {
+                          "id": "espacador_77917252",
+                          "type": "espacador",
+                          "attributes": {
+                            "altura": 10
+                          },
+                          "innerBlocks": []
+                        },
+                        {
+                          "id": "gabarito-correcao_9a48cdde",
+                          "type": "gabarito-correcao",
+                          "attributes": {
+                            "rotulo": "Sua resposta:",
+                            "mostrarCorreta": true
+                          },
+                          "innerBlocks": []
+                        },
+                        {
+                          "id": "espacador_8828d714",
+                          "type": "espacador",
+                          "attributes": {
+                            "altura": 8
+                          },
+                          "innerBlocks": []
+                        },
+                        {
+                          "id": "q-comentario_7ca616ee",
+                          "type": "q-comentario",
+                          "attributes": {
+                            "modo": "correta",
+                            "fonte": "",
+                            "corLei": "#6b7280",
+                            "titulo": "Comentário",
+                            "padding": 10,
+                            "corBorda": "#c7d7f5",
+                            "corFundo": "#eef4ff",
+                            "corTexto": "#243b53",
+                            "bordaRaio": 8,
+                            "corTitulo": "#1a3a6b",
+                            "soSeTiver": true,
+                            "mostrarLei": true,
+                            "mostrarGabarito": true,
+                            "respeitaGabarito": true
+                          },
+                          "innerBlocks": []
+                        },
+                        {
+                          "id": "espacador_f78a9dbb",
+                          "type": "espacador",
+                          "attributes": {
+                            "altura": 10
+                          },
+                          "innerBlocks": []
+                        },
+                        {
+                          "id": "separador_5e745074",
+                          "type": "separador",
+                          "attributes": {
+                            "cor": "",
+                            "altura": 0,
+                            "estilo": "solido",
+                            "espessura": 1,
+                            "orientacao": "horizontal"
+                          },
+                          "innerBlocks": []
+                        }
+                      ]
+                    }
+                  ],
+                  "titulo": "Conteúdo"
+                }
+              ],
+              "rodape": [],
+              "versao": 1,
+              "running": {
+                "rodapeAtivo": true,
+                "rodapeAltura": 40,
+                "rodapePaginas": "exceto_capa",
+                "cabecalhoAtivo": true,
+                "cabecalhoAltura": 80,
+                "cabecalhoPaginas": "exceto_capa",
+                "mostrarNumeroPagina": true
+              },
+              "cabecalho": []
+            },
+            "modalidade": "caderno_completo"
+          },
+          {
+            "id": "23ob9743",
+            "capa": {
+              "cor": "#ffffff",
+              "posH": 50,
+              "posV": 80,
+              "fonte": "montserrat",
+              "titulo": "CADERNO DE \nPROVA COMPLETO",
+              "italico": false,
+              "negrito": true,
+              "tamanho": 48,
+              "sublinhado": false,
+              "alinhamento": "center"
+            },
+            "modelo": "agu_folha",
+            "ajustes": {
+              "titulo": "Caderno AGU",
+              "capaUrl": "https://twdrtlxkjvunkdobudev.supabase.co/storage/v1/object/public/imagens/cadernos/caderno-agu/caderno-agu-fundo-1.png",
+              "colunas": 2,
+              "compacto": false,
+              "folhaUrl": "https://twdrtlxkjvunkdobudev.supabase.co/storage/v1/object/public/imagens/cadernos/caderno-agu/caderno-agu-fundo-2.png",
+              "coresDisc": {},
+              "rodapeUrl": "",
+              "coresParte": {},
+              "coresPilar": {
+                "doutrina": "#e8850c",
+                "lei_seca": "#c9a227",
+                "jurisprudencia": "#3b5bdb",
+                "lingua_portuguesa": "#1a7a4a"
+              },
+              "fonteParte": {},
+              "corPrimaria": "#2d254f",
+              "estiloParte": {},
+              "cabecalhoUrl": "",
+              "tamanhoParte": {},
+              "corSecundaria": "#f6b420",
+              "coresTextoParte": {},
+              "mostrarGabarito": false,
+              "numAlternativas": 5,
+              "alinhamentoParte": {},
+              "mostrarCabecalho": true,
+              "mostrarDadosAluno": true,
+              "mostrarComentarios": false
+            },
+            "docEdit": {
+              "pages": [
+                {
+                  "id": "page_db6f9142",
+                  "kind": "capa",
+                  "blocks": [
+                    {
+                      "id": "plano-fundo_49b5543d",
+                      "type": "plano-fundo",
+                      "attributes": {
+                        "url": "https://twdrtlxkjvunkdobudev.supabase.co/storage/v1/object/public/imagens/cadernos/caderno-agu/caderno-agu-fundo-1.png",
+                        "opacidade": 100
+                      },
+                      "innerBlocks": []
+                    },
+                    {
+                      "id": "espacador_51c52e1c",
+                      "type": "espacador",
+                      "attributes": {
+                        "altura": 749
+                      },
+                      "innerBlocks": []
+                    },
+                    {
+                      "id": "texto-livre_1d2874cd",
+                      "type": "texto-livre",
+                      "attributes": {
+                        "bold": true,
+                        "size": 48,
+                        "align": "center",
+                        "color": "#ffffff",
+                        "fonte": "montserrat",
+                        "texto": "CADERNO DE \nPROVA COMPLETO",
+                        "italico": false,
+                        "largura": 100,
+                        "valignV": "center",
+                        "alturaMin": 171,
+                        "lineHeight": 1,
+                        "sublinhado": false,
+                        "espacamento": 0,
+                        "alinhamentoBloco": "left"
+                      },
+                      "innerBlocks": []
+                    }
+                  ],
+                  "titulo": "Capa"
+                },
+                {
+                  "id": "page_dbffe98d",
+                  "kind": "conteudo",
+                  "blocks": [
+                    {
+                      "id": "plano-fundo_1fc8b585",
+                      "type": "plano-fundo",
+                      "attributes": {
+                        "url": "https://twdrtlxkjvunkdobudev.supabase.co/storage/v1/object/public/imagens/cadernos/caderno-agu/caderno-agu-fundo-2.png",
+                        "opacidade": 100
+                      },
+                      "innerBlocks": []
+                    },
+                    {
+                      "id": "card_df89a6b6",
+                      "type": "card",
+                      "attributes": {
+                        "fitaCor": "",
+                        "largura": 100,
+                        "padding": 0,
+                        "bordaCor": "",
+                        "corFundo": "#072c94",
+                        "bordaRaio": 0,
+                        "fitaAltura": 0,
+                        "alinhamento": "center",
+                        "bordaLargura": 0
+                      },
+                      "innerBlocks": [
+                        {
+                          "id": "texto-livre_b43d3bf7",
+                          "type": "texto-livre",
+                          "attributes": {
+                            "bold": true,
+                            "size": 24,
+                            "align": "left",
+                            "color": "#ffffff",
+                            "fonte": "montserrat",
+                            "texto": " CADERNO DE PROVA COMPLETO",
+                            "italico": false,
+                            "largura": 100,
+                            "valignV": "top",
+                            "alturaMin": 0,
+                            "lineHeight": 1.8,
+                            "sublinhado": false,
+                            "espacamento": 0,
+                            "alinhamentoBloco": "left"
+                          },
+                          "innerBlocks": []
+                        },
+                        {
+                          "id": "texto-livre_abbf47b6",
+                          "type": "texto-livre",
+                          "attributes": {
+                            "bold": false,
+                            "size": 16,
+                            "align": "left",
+                            "color": "#ffffff",
+                            "fonte": "montserrat",
+                            "texto": "  SIMULADO AGU",
+                            "italico": false,
+                            "largura": 100,
+                            "valignV": "top",
+                            "alturaMin": 0,
+                            "lineHeight": 1.5,
+                            "sublinhado": false,
+                            "espacamento": 0,
+                            "alinhamentoBloco": "left"
+                          },
+                          "innerBlocks": []
+                        }
+                      ]
+                    },
+                    {
+                      "id": "espacador_6b2e0151",
+                      "type": "espacador",
+                      "attributes": {
+                        "altura": 4
+                      },
+                      "innerBlocks": []
+                    },
+                    {
+                      "id": "espacador_552291d2",
+                      "type": "espacador",
+                      "attributes": {
+                        "altura": 10
+                      },
+                      "innerBlocks": []
+                    },
+                    {
+                      "id": "identificacao_8a694139",
+                      "type": "identificacao",
+                      "attributes": {
+                        "fonte": "montserrat",
+                        "campos": [
+                          {
+                            "valor": "{{data}}",
+                            "rotulo": "Data"
+                          },
+                          {
+                            "valor": "{{inicio}}",
+                            "rotulo": "Início"
+                          },
+                          {
+                            "valor": "{{termino}}",
+                            "rotulo": "Término"
+                          },
+                          {
+                            "valor": "{{tempo_total}}",
+                            "rotulo": "Tempo total"
+                          },
+                          {
+                            "valor": "{{respondidas}}",
+                            "rotulo": "Respondidas"
+                          },
+                          {
+                            "valor": "{{em_branco}}",
+                            "rotulo": "Em branco"
+                          }
+                        ],
+                        "titulo": "DADOS DO ESTUDANTE",
+                        "corBorda": "",
+                        "corErros": "#dc2626",
+                        "corValor": "",
+                        "destaque": [
+                          {
+                            "valor": "{{nome}}",
+                            "rotulo": "Nome"
+                          },
+                          {
+                            "valor": "{{email}}",
+                            "rotulo": "E-mail"
+                          }
+                        ],
+                        "bordaRaio": 0,
+                        "corAcento": "#fa9200",
+                        "corHeader": "#072c94",
+                        "corRotulo": "",
+                        "mediaLim1": 33,
+                        "mediaLim2": 66,
+                        "corAcertos": "#16a34a",
+                        "desempenho": [
+                          {
+                            "valor": "{{acertos}}",
+                            "rotulo": "Acertos"
+                          },
+                          {
+                            "valor": "{{erros}}",
+                            "rotulo": "Erros"
+                          },
+                          {
+                            "valor": "{{percentual}}",
+                            "rotulo": "Média"
+                          }
+                        ],
+                        "corDestaque": "",
+                        "corMediaMax": "",
+                        "corMediaAlta": "#16a34a",
+                        "corMediaBaixa": "#dc2626",
+                        "corMediaMedia": "#f59e0b",
+                        "corHeaderTexto": "#ffffff",
+                        "mostrarDesempenho": true
+                      },
+                      "innerBlocks": []
+                    },
+                    {
+                      "id": "espacador_4ec14583",
+                      "type": "espacador",
+                      "attributes": {
+                        "altura": 24
+                      },
+                      "innerBlocks": []
+                    },
+                    {
+                      "id": "gabarito-grid_a0c97444",
+                      "type": "gabarito-grid",
+                      "attributes": {
+                        "fonte": "montserrat",
+                        "origem": "marcado",
+                        "titulo": "",
+                        "fundoPar": "#072c94",
+                        "porLinha": 10,
+                        "textoPar": "#ffffff",
+                        "bordaRaio": 0,
+                        "corHeader": "#072c94",
+                        "fundoImpar": "#f3b53d",
+                        "textoImpar": "#ffffff",
+                        "corMarcadas": "",
+                        "numQuestoes": null,
+                        "corHeaderTexto": "",
+                        "numAlternativas": 5
+                      },
+                      "innerBlocks": []
+                    },
+                    {
+                      "id": "espacador_6aa2fb1c",
+                      "type": "espacador",
+                      "attributes": {
+                        "altura": 40
+                      },
+                      "innerBlocks": []
+                    },
+                    {
+                      "id": "gabarito-grid_6db1fa2e",
+                      "type": "gabarito-grid",
+                      "attributes": {
+                        "fonte": "montserrat",
+                        "origem": "oficial",
+                        "titulo": "",
+                        "fundoPar": "#072c94",
+                        "porLinha": 10,
+                        "textoPar": "#ffffff",
+                        "bordaRaio": 0,
+                        "corHeader": "#009424",
+                        "fundoImpar": "#f3b53d",
+                        "textoImpar": "#ffffff",
+                        "corMarcadas": "",
+                        "numQuestoes": null,
+                        "corHeaderTexto": "",
+                        "numAlternativas": 5
+                      },
+                      "innerBlocks": []
+                    }
+                  ],
+                  "titulo": "Conteúdo"
+                }
+              ],
+              "rodape": [],
+              "versao": 1,
+              "running": {
+                "rodapeAtivo": true,
+                "rodapeAltura": 40,
+                "rodapePaginas": "exceto_capa",
+                "cabecalhoAtivo": true,
+                "cabecalhoAltura": 80,
+                "cabecalhoPaginas": "exceto_capa",
+                "mostrarNumeroPagina": true
+              },
+              "cabecalho": []
+            },
+            "modalidade": "folha_respostas"
+          },
+          {
+            "id": "ecos9z1u",
+            "capa": {
+              "cor": "#ffffff",
+              "posH": 50,
+              "posV": 73,
+              "fonte": "montserrat",
+              "titulo": "DIAGNÓSTICO\nINDIVIDUALIZADO",
+              "italico": false,
+              "negrito": true,
+              "tamanho": 48,
+              "sublinhado": false,
+              "alinhamento": "center"
+            },
+            "modelo": "base_4",
+            "ajustes": {
+              "titulo": "Caderno AGU",
+              "capaUrl": "https://twdrtlxkjvunkdobudev.supabase.co/storage/v1/object/public/imagens/cadernos/caderno-agu/caderno-agu-fundo-1.png",
+              "colunas": 2,
+              "compacto": false,
+              "folhaUrl": "https://twdrtlxkjvunkdobudev.supabase.co/storage/v1/object/public/imagens/cadernos/caderno-agu/caderno-agu-fundo-2.png",
+              "coresDisc": {},
+              "rodapeUrl": "",
+              "coresParte": {},
+              "coresPilar": {
+                "doutrina": "#e8850c",
+                "lei_seca": "#c9a227",
+                "jurisprudencia": "#3b5bdb",
+                "lingua_portuguesa": "#1a7a4a"
+              },
+              "fonteParte": {},
+              "corPrimaria": "#2d254f",
+              "estiloParte": {},
+              "cabecalhoUrl": "",
+              "tamanhoParte": {},
+              "corSecundaria": "#f6b420",
+              "coresTextoParte": {},
+              "mostrarGabarito": false,
+              "numAlternativas": 5,
+              "alinhamentoParte": {},
+              "mostrarCabecalho": true,
+              "mostrarDadosAluno": true,
+              "mostrarComentarios": false
+            },
+            "conteudo": {
+              "intro": [],
+              "pilares": [
+                {
+                  "nome": "LEI SECA",
+                  "chave": "lei_seca",
+                  "bandas": [
+                    {
+                      "faixa": "0-49",
+                      "texto": "O seu desempenho em lei seca ficou abaixo de 50%, um resultado que pode ser considerado ruim. A CEBRASPE cobra texto literal de lei em muitas questões, sendo um dos principais fatores de reprovação entre nossos alunos."
+                    },
+                    {
+                      "faixa": "50-80",
+                      "texto": "O seu desempenho em lei seca foi intermediário. Você tem base, mas ainda está deixando pontos na mesa. A banca cobra o dispositivo exato — foque nos diplomas de maior incidência, com atenção aos detalhes."
+                    },
+                    {
+                      "faixa": "81-100",
+                      "texto": "O seu desempenho em lei seca foi excelente! Esse pode ser o diferencial para sua aprovação. Mantenha-se firme, com revisões periódicas, e estude os conteúdos específicos da AGU com foco na lei seca."
+                    }
+                  ],
+                  "totalTxt": "{acerto_pilar_lei_seca} de {total_pilar_lei_seca} questões"
+                },
+                {
+                  "nome": "JURISPRUDÊNCIA",
+                  "chave": "jurisprudencia",
+                  "bandas": [
+                    {
+                      "faixa": "0-49",
+                      "texto": "O seu desempenho em jurisprudência ficou abaixo de 50%, e isso é muito ruim. A CEBRASPE não abre mão de cobrar informativos. Reforce o estudo pelo DOD, JurisClub ou informativos do STF e STJ."
+                    },
+                    {
+                      "faixa": "50-80",
+                      "texto": "O seu desempenho em jurisprudência foi médio — há espaço relevante para crescimento. As questões de jurisprudência diferenciam os primeiros colocados. Reforce pelo DoD ou pelo JurisClub do Revisão."
+                    },
+                    {
+                      "faixa": "81-100",
+                      "texto": "O seu desempenho em jurisprudência foi maravilhoso! Você acompanha os informativos e aplica os entendimentos com segurança. Mantenha o hábito, com atenção à jurisprudência mais recente e às teses consolidadas."
+                    }
+                  ],
+                  "totalTxt": "{acerto_pilar_jurisprudencia} de {total_pilar_jurisprudencia} questões"
+                },
+                {
+                  "nome": "DOUTRINA",
+                  "chave": "doutrina",
+                  "bandas": [
+                    {
+                      "faixa": "0-49",
+                      "texto": "O desempenho em doutrina ficou abaixo de 50%. Doutrina é a base do raciocínio jurídico — quem não domina classificações, distinções e princípios erra também em lei e jurisprudência. O investimento tem retorno duplo."
+                    },
+                    {
+                      "faixa": "50-80",
+                      "texto": "O desempenho em doutrina foi intermediário. Você acerta nas questões diretas, mas perde nas distinções mais finas. Dominar doutrina ajuda a ganhar pontos também em questões de lei e jurisprudência."
+                    },
+                    {
+                      "faixa": "81-100",
+                      "texto": "O desempenho em doutrina foi excelente. Você domina classificações, distinções conceituais e fundamentos teóricos — o que se reflete também em questões de lei e jurisprudência. Mantenha a solidez."
+                    }
+                  ],
+                  "totalTxt": "{acerto_pilar_doutrina} de {total_pilar_doutrina} questões"
+                }
+              ],
+              "notaTexto": "{acertos} acertos de {total_questoes} questões — {percentual} de aproveitamento",
+              "notaTotal": "{total_questoes}",
+              "subtitulo": "Caderno AGU",
+              "sugestoes": [
+                {
+                  "intro": "As bancas de concurso cobram lei seca de forma direta e literal nas provas de procuradoria — saber o dispositivo exato faz diferença entre acertar e errar. As leis de maior incidência na AGU e nas provas da banca são:",
+                  "itens": [
+                    {
+                      "forte": true,
+                      "texto": "CF/1988 — arts. 44-75 (Poder Legislativo): processo legislativo, medidas provisórias, veto, delegação"
+                    },
+                    {
+                      "forte": true,
+                      "texto": "CF/1988 — arts. 92-126 (Poder Judiciário): competências STF/STJ/TRFs, precatórios, súmulas vinculantes"
+                    },
+                    {
+                      "forte": true,
+                      "texto": "CF/1988 — arts. 165-169 (Orçamento): LOA, LDO, PPA e vedações constitucionais"
+                    },
+                    {
+                      "forte": true,
+                      "texto": "LC 101/2000 (LRF): despesa obrigatória de caráter continuado (arts. 15-17), pessoal, RREO e RGF"
+                    },
+                    {
+                      "forte": true,
+                      "texto": "Lei 14.133/2021 (Nova Lei de Licitações): contratação direta, formalização e extinção de contratos, sanções"
+                    },
+                    {
+                      "forte": true,
+                      "texto": "Lei 11.079/2004 (PPP): modalidades, cláusulas obrigatórias, garantias — item histórico de alta incidência na AGU"
+                    },
+                    {
+                      "forte": false,
+                      "texto": "Lei 8.112/1990 (Estatuto do Servidor Federal): regime disciplinar, PAD, licenças, provimento e vacância"
+                    },
+                    {
+                      "forte": false,
+                      "texto": "Lei 9.784/1999 (Processo Administrativo Federal): competência, impedimento, recurso e anulação"
+                    },
+                    {
+                      "forte": false,
+                      "texto": "Lei 8.429/1992 (Improbidade Administrativa): atos, sanções e prescrição — especialmente após a reforma de 2021"
+                    },
+                    {
+                      "forte": false,
+                      "texto": "CC — arts. 104-184 (Negócio Jurídico): requisitos, defeitos e invalidade"
+                    },
+                    {
+                      "forte": false,
+                      "texto": "CC — arts. 189-211 (Prescrição e Decadência): prazos, causas impeditivas e interruptivas"
+                    },
+                    {
+                      "forte": false,
+                      "texto": "Lei 12.651/2012 (Código Florestal): APP, reserva legal, CAR e disposições transitórias"
+                    }
+                  ],
+                  "titulo": "LEI SECA",
+                  "corTitulo": "#d17a00",
+                  "prioridade": "Prioridade Alta"
+                },
+                {
+                  "intro": "Jurisprudência é o ponto sensível que não pode ser negligenciado. A CEBRASPE cobra informativos e teses fixadas de forma sistemática — quem não acompanha jurisprudência perde questões que se pode errar. Os temas de maior recorrência nas provas da banca são:",
+                  "itens": [
+                    {
+                      "forte": true,
+                      "texto": "Controle de Constitucionalidade (STF): bloco de maior incidência em juris nas provas da banca"
+                    },
+                    {
+                      "forte": true,
+                      "texto": "Recursos Processuais Civis (STJ/STF): agravo de instrumento, embargos de declaração, REsp/RE"
+                    },
+                    {
+                      "forte": true,
+                      "texto": "Lei de Execução Fiscal — jurisprudência STJ: item de altíssima recorrência nas provas da CEBRASPE"
+                    },
+                    {
+                      "forte": true,
+                      "texto": "Responsabilidade Civil do Estado (STF/STJ): teoria do risco, responsabilidade por omissão"
+                    },
+                    {
+                      "forte": true,
+                      "texto": "Improbidade Administrativa (STJ): elemento subjetivo, prescrição, legitimidade ativa"
+                    },
+                    {
+                      "forte": true,
+                      "texto": "Organização Federativa — bens e competências dos entes (STF)"
+                    },
+                    {
+                      "forte": false,
+                      "texto": "Remédios Constitucionais (STF): mandado de segurança, mandado de injunção, habeas data"
+                    },
+                    {
+                      "forte": false,
+                      "texto": "Imunidades Tributárias (STF): imunidade recíproca, templos, entidades de assistência social"
+                    },
+                    {
+                      "forte": false,
+                      "texto": "Cumprimento de Sentença e Execução Contra a Fazenda Pública (STJ)"
+                    },
+                    {
+                      "forte": false,
+                      "texto": "Extinção do Contrato de Trabalho (TST): súmulas consolidadas sobre justa causa, aviso prévio"
+                    }
+                  ],
+                  "titulo": "JURISPRUDÊNCIA",
+                  "corTitulo": "#d17a00",
+                  "prioridade": "Prioridade Alta"
+                },
+                {
+                  "intro": "Doutrina é uma categoria importante e muitas vezes subestimado. Além das questões eminentemente doutrinárias, o conhecimento doutrinário serve de base para você ganhar pontos em questões que, mesmo não sendo de doutrina pura, trazem um elemento conceitual de fundo: uma distinção entre institutos, uma classificação, um princípio que fundamenta o raciocínio. Quem domina a doutrina erra menos mesmo em questões de lei e jurisprudência. Os temas mais cobrados pela banca são:",
+                  "itens": [
+                    {
+                      "forte": true,
+                      "texto": "Interpretação Constitucional: métodos, princípios, proporcionalidade, razoabilidade"
+                    },
+                    {
+                      "forte": true,
+                      "texto": "Teoria Geral do Direito Constitucional: formas de Estado/governo, sistemas de governo, separação de poderes"
+                    },
+                    {
+                      "forte": true,
+                      "texto": "Constituição — conceito, classificação, supremacia, poder constituinte"
+                    },
+                    {
+                      "forte": true,
+                      "texto": "Princípios Tributários (CTN + CF): anterioridade, legalidade, isonomia, capacidade contributiva"
+                    },
+                    {
+                      "forte": true,
+                      "texto": "Princípios Orçamentários: anualidade, exclusividade, equilíbrio, universalidade"
+                    },
+                    {
+                      "forte": true,
+                      "texto": "Princípios e Objetivos da Seguridade Social: universalidade, seletividade, distributividade"
+                    },
+                    {
+                      "forte": false,
+                      "texto": "Princípios do Direito Administrativo: proporcionalidade, eficiência, moralidade, impessoalidade"
+                    },
+                    {
+                      "forte": false,
+                      "texto": "Tombamento — conceito, natureza jurídica e fundamentos (Decreto-Lei 25/1937)"
+                    },
+                    {
+                      "forte": false,
+                      "texto": "Princípios Processuais Civis (arts. 1-12 CPC): cooperação, boa-fé, contraditório"
+                    }
+                  ],
+                  "titulo": "JURISPRUDÊNCIA",
+                  "corTitulo": "#d17a00",
+                  "prioridade": "Prioridade Alta"
+                }
+              ],
+              "fechamento": [],
+              "disciplinas": [
+                {
+                  "nome": "Direito administrativo",
+                  "chave": "direito_administrativo",
+                  "total": "",
+                  "categoria": "Assunto Principal"
+                },
+                {
+                  "nome": "Direito constitucional",
+                  "chave": "direito_constitucional",
+                  "total": "",
+                  "categoria": "Assunto Principal"
+                },
+                {
+                  "nome": "Direito tributario",
+                  "chave": "direito_tributario",
+                  "total": "",
+                  "categoria": "Assunto Principal"
+                },
+                {
+                  "nome": "Direito ambiental",
+                  "chave": "direito_ambiental",
+                  "total": "",
+                  "categoria": "Assunto Principal"
+                },
+                {
+                  "nome": "Legislação da Advocacia-Geral da União, Gestão de Conflito e Governança",
+                  "chave": "legislacao_da_advocacia_geral_da_uniao_gestao_de_conflito_e_governanca",
+                  "total": "",
+                  "categoria": "Assunto Principal"
+                },
+                {
+                  "nome": "Direito financeiro",
+                  "chave": "direito_financeiro",
+                  "total": "",
+                  "categoria": "Assunto Principal"
+                },
+                {
+                  "nome": "Direito processual civil",
+                  "chave": "direito_processual_civil",
+                  "total": "",
+                  "categoria": "Assunto Principal"
+                },
+                {
+                  "nome": "Direito Civil",
+                  "chave": "direito_civil",
+                  "total": "",
+                  "categoria": "Assunto Principal"
+                },
+                {
+                  "nome": "Direito Internacional Público e Privado",
+                  "chave": "direito_internacional_publico_e_privado",
+                  "total": "",
+                  "categoria": "Assunto Principal"
+                },
+                {
+                  "nome": "Legislacao de ensino e ciencia tecnologia e inovacao",
+                  "chave": "legislacao_de_ensino_e_ciencia_tecnologia_e_inovacao",
+                  "total": "",
+                  "categoria": "Assunto Principal"
+                },
+                {
+                  "nome": "Direito Empresarial",
+                  "chave": "direito_empresarial",
+                  "total": "",
+                  "categoria": "Assunto Principal"
+                },
+                {
+                  "nome": "Direito Eleitoral",
+                  "chave": "direito_eleitoral",
+                  "total": "",
+                  "categoria": "Assunto Principal"
+                },
+                {
+                  "nome": "Direito Previdenciário",
+                  "chave": "direito_previdenciario",
+                  "total": "",
+                  "categoria": "Assunto Principal"
+                },
+                {
+                  "nome": "Direito do Trabalho",
+                  "chave": "direito_do_trabalho",
+                  "total": "",
+                  "categoria": "Assunto Principal"
+                },
+                {
+                  "nome": "Direito Processual do Trabalho",
+                  "chave": "direito_processual_do_trabalho",
+                  "total": "",
+                  "categoria": "Assunto Principal"
+                },
+                {
+                  "nome": "Direito Penal",
+                  "chave": "direito_penal",
+                  "total": "",
+                  "categoria": "Assunto Principal"
+                },
+                {
+                  "nome": "Direito Processual Penal",
+                  "chave": "direito_processual_penal",
+                  "total": "",
+                  "categoria": "Assunto Principal"
+                }
+              ],
+              "gabaritoObs": [],
+              "gabaritoIntro": [],
+              "partesOcultas": [
+                "gabarito"
+              ],
+              "gabaritoTitulo": "",
+              "tituloCabecalho": "Diagnóstico de Desempenho",
+              "disciplinasIntro": "A análise a seguir tem foco nos seus pontos de erros. Para cada disciplina, você encontra o desempenho por categoria (lei seca, jurisprudência e doutrina) e uma leitura personalizada do que os erros revelam sobre as lacunas a priorizar."
+            },
+            "modalidade": "diagnostico"
+          }
+        ],
+        "bancoId": "6c03f660-a886-46c3-9c20-d377a73080ab"
+      }
+    }
+  }
+}

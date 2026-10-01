@@ -54,7 +54,7 @@ export function ModuloIntroForm({ pastaId, atual }: { pastaId: string; atual: In
             <p className="text-xs text-muted-foreground">Um nó de introdução no topo da trilha — regulamento, guia ou o “vídeo do REI”. Pode ser vídeo, uma leitura ou um link externo.</p>
           </div>
         </div>
-        <label className="inline-flex shrink-0 cursor-pointer items-center gap-2 text-sm">
+        <label className="mr-8 inline-flex shrink-0 cursor-pointer items-center gap-2 text-sm">
           <input type="checkbox" checked={cfg.ativo} onChange={(e) => setCfg((c) => ({ ...c, ativo: e.target.checked }))} className="h-4 w-4 rounded border" />
           Ativo
         </label>

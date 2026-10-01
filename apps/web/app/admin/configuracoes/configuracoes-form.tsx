@@ -307,7 +307,7 @@ export function ConfiguracoesForm({ tema, salvarTema }: { tema: any; salvarTema:
         topbar: g('--sidebar', fb.topbar), sborder: corDoSistema('--sidebar-border', '--sidebar') ?? fb.sborder,
         bg: g('--background', fb.bg), text: g('--foreground', fb.text), titulo: corDoSistema('--content-title') ?? g('--foreground', fb.titulo),
         card: g('--card', fb.card), cborder: corDoSistema('--border', '--card') ?? fb.cborder, inputBg: corDoSistema('--input-bg', '--card') ?? g('--card', fb.inputBg), btn: g('--primary', fb.btn), accent: g('--primary', fb.accent),
-        tabBg: corDoSistema('--tab-bg', '--muted') ?? g('--muted', fb.tabBg), tabAtivo: corDoSistema('--tab-active', '--background') ?? g('--background', fb.tabAtivo), tabTexto: corDoSistema('--tab-active-foreground') ?? g('--foreground', fb.tabTexto),
+        tabBg: corDoSistema('--tab-bg', '--muted') ?? g('--muted', fb.tabBg), tabAtivo: corDoSistema('--tab-active', '--primary') ?? g('--primary', fb.tabAtivo), tabTexto: corDoSistema('--tab-active-foreground', '--primary-foreground') ?? g('--primary-foreground', fb.tabTexto),
       } }))
     }
     sincronizar()

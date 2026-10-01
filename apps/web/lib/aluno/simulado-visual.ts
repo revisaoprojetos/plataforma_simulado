@@ -1,10 +1,14 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
+import type { CapaViewCfg } from '@/lib/capa-meta'
 
 // `capa` = pôster 4:5 (capa_card_url) para os cards retrato do aluno; `capaBanner` = banner largo
 // (capa_url) para cards paisagem (ex.: board admin), onde o pôster cortaria fora do meio.
-export type VisualSim = { cor: string | null; icone: string | null; capa: string | null; capaBanner: string | null }
+// `capaMeta` = enquadramento não-destrutivo por formato (original + recorte/efeitos do pôster e do
+// ticket) → o card renderiza por CSS, idêntico ao admin. Ausente → cai no `capa` (object-cover).
+export type CapaMetaVis = { orig: string | null; poster: CapaViewCfg | null; ticket: CapaViewCfg | null }
+export type VisualSim = { cor: string | null; icone: string | null; capa: string | null; capaBanner: string | null; capaMeta: CapaMetaVis | null }
 
 /**
  * Resolve a imagem/visual de cada simulado a partir do banco (pasta) de origem:
@@ -46,14 +50,18 @@ export async function resolverVisualSimulados(svc: SupabaseClient, simulados: { 
   const pastaIds = [...new Set([...pastaDeSim.values()])]
   if (pastaIds.length) {
     let pastas: any[] = []
-    // Prefere a capa DO CARD (capa_card_url); cai p/ a capa/banner (capa_url). Tolerante caso
-    // a coluna capa_card_url ainda não exista no ambiente.
-    const r = await svc.from('simulado_pastas').select('id, cor, icone, capa_url, capa_card_url').in('id', pastaIds)
-    if (r.error && /capa_card_url|column/i.test(r.error.message)) {
-      const r2 = await svc.from('simulado_pastas').select('id, cor, icone, capa_url').in('id', pastaIds)
-      pastas = r2.data ?? []
-    } else if (!r.error) pastas = r.data ?? []
-    const vis = new Map<string, VisualSim>(pastas.map((p: any) => [p.id, { cor: p.cor ?? null, icone: p.icone ?? null, capa: (p.capa_card_url ?? p.capa_url) ?? null, capaBanner: p.capa_url ?? null }]))
+    // Prefere a capa DO CARD (capa_card_url); cai p/ a capa/banner (capa_url). `capa_meta` traz o
+    // enquadramento não-destrutivo por formato. Fallback em CASCATA: se só o `capa_meta` faltar no
+    // ambiente, ainda assim mantém `capa_card_url` (senão cards sem banner sumiam → só o gradiente).
+    const r = await svc.from('simulado_pastas').select('id, cor, icone, capa_url, capa_card_url, capa_meta').in('id', pastaIds)
+    if (!r.error) pastas = r.data ?? []
+    else {
+      const r2 = await svc.from('simulado_pastas').select('id, cor, icone, capa_url, capa_card_url').in('id', pastaIds)
+      if (!r2.error) pastas = r2.data ?? []
+      else { const r3 = await svc.from('simulado_pastas').select('id, cor, icone, capa_url').in('id', pastaIds); pastas = r3.data ?? [] }
+    }
+    const metaDe = (cm: any): CapaMetaVis | null => (cm?.orig ? { orig: cm.orig, poster: cm.poster ?? null, ticket: cm.ticket ?? null } : null)
+    const vis = new Map<string, VisualSim>(pastas.map((p: any) => [p.id, { cor: p.cor ?? null, icone: p.icone ?? null, capa: (p.capa_card_url ?? p.capa_url) ?? null, capaBanner: p.capa_url ?? null, capaMeta: metaDe(p.capa_meta?.card) }]))
     for (const [sim, pid] of pastaDeSim) { const v = vis.get(pid); if (v) visual.set(sim, v) }
   }
   return visual

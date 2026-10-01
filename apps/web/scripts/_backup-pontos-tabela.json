@@ -1,0 +1,58 @@
+{
+  "config": {
+    "chest": {
+      "xp": 100,
+      "cada_n_dias": 7
+    },
+    "streak": {
+      "cap": 50,
+      "por_dia": 10,
+      "tolerancia_dias": 0
+    },
+    "pratica": {
+      "por_acerto": 1,
+      "bonus_disc_fraca": 2
+    },
+    "meta_dia": {
+      "xp": 50,
+      "bonus": 0
+    },
+    "simulado": {
+      "base": 10,
+      "por_acerto": 2,
+      "bonus_nota_max": 20
+    },
+    "fim_semana": {
+      "ativo": false,
+      "multiplicador": 2
+    },
+    "engajamento": {
+      "marco": {
+        "ativo": true,
+        "marcos": [
+          7,
+          14,
+          21,
+          30
+        ],
+        "mensagem": "Parabéns, {{nome}}! 🏆 Você completou {{marco}} dias consecutivos de estudo. Que constância! Siga assim e vá ainda mais longe."
+      },
+      "inativo": {
+        "dias": 1,
+        "ativo": true,
+        "mensagem": "Oi {{nome}}! Notamos que faz {{dias}} dia que você não aparece por aqui. Bora voltar e retomar sua rotina de estudos? 💪"
+      },
+      "sequencia": {
+        "dias": 4,
+        "ativo": true,
+        "mensagem": "Mandou bem, {{nome}}! Já são {{streak}} dias seguidos estudando. Continue firme e não perca o ritmo! 🔥"
+      }
+    }
+  },
+  "pastas": [
+    {
+      "id": "c6e147ae-f69a-467e-b09b-0cd8576fb3dd",
+      "pontuacao": null
+    }
+  ]
+}

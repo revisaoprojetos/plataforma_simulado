@@ -166,6 +166,8 @@
    bg-primary/text-primary). "Fundo das tabs" (--tab-bg) só se aplica a abas estilo pílula (n/a no
    sublinhado padrão). */
 [data-slot="tabs-indicator"] { background-color: var(--tab-active, var(--primary)); }
+/* Aba SUBLINHADA: texto ativo = "Texto da tab ativa" (--tab-active-foreground), fallback p/ o destaque.
+   (As abas PÍLULA usam --tab-active-contrast — contraste garantido do preenchimento.) */
 [data-slot="tabs-trigger"][data-active] { color: var(--tab-active-foreground, var(--tab-active, var(--primary))); }
 
 /* Tema escopado por plataforma (usado no login): força claro/escuro num subtree,

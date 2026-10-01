@@ -14,8 +14,9 @@ export interface XpRegras {
   /** Teto de XP por dia (0 = sem teto). Soma tudo que o aluno ganha no dia. */
   limite_dia?: number
 }
-/** Cargo/título exibido a partir de um nível (ex.: nível 6+ = "Júnior"). */
-export interface TituloNivel { nivel_min: number; titulo: string }
+/** Cargo/título exibido a partir de um nível (ex.: nível 6+ = "Júnior"). `icone` = chave da lista em
+ *  `lib/gamificacao/cargo-icones.ts` (editável no admin; default = maleta). */
+export interface TituloNivel { nivel_min: number; titulo: string; icone?: string }
 export interface NivelCurva {
   tipo: string; base: number; incremento: number; nivel_max: number; titulos: TituloNivel[]
   /**
@@ -71,15 +72,15 @@ export const DEFAULT_XP_REGRAS: XpRegras = {
   limite_dia: 300, // teto de XP por dia
 }
 export const DEFAULT_TITULOS: TituloNivel[] = [
-  { nivel_min: 1, titulo: 'Aprendiz' },
-  { nivel_min: 3, titulo: 'Estagiário' },
-  { nivel_min: 6, titulo: 'Júnior' },
-  { nivel_min: 10, titulo: 'Pleno' },
-  { nivel_min: 14, titulo: 'Sênior' },
-  { nivel_min: 18, titulo: 'Procurador' },
-  { nivel_min: 22, titulo: 'Promotor' },
-  { nivel_min: 26, titulo: 'Advogado' },
-  { nivel_min: 30, titulo: 'Mestre do Direito' },
+  { nivel_min: 1, titulo: 'Aprendiz', icone: 'graduation-cap' },
+  { nivel_min: 3, titulo: 'Estagiário', icone: 'book-open' },
+  { nivel_min: 6, titulo: 'Júnior', icone: 'book-marked' },
+  { nivel_min: 10, titulo: 'Pleno', icone: 'briefcase' },
+  { nivel_min: 14, titulo: 'Sênior', icone: 'shield' },
+  { nivel_min: 18, titulo: 'Procurador', icone: 'landmark' },
+  { nivel_min: 22, titulo: 'Promotor', icone: 'scale' },
+  { nivel_min: 26, titulo: 'Advogado', icone: 'gavel' },
+  { nivel_min: 30, titulo: 'Mestre do Direito', icone: 'crown' },
 ]
 export const DEFAULT_NIVEL_CURVA: NivelCurva = { tipo: 'formula', base: 100, incremento: 40, nivel_max: 30, titulos: DEFAULT_TITULOS }
 export const DEFAULT_LIGAS: LigaDef[] = [

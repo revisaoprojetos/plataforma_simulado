@@ -126,6 +126,24 @@ export function ImpersonationDockProvider({ podeAbrir, isAdmin, loading, childre
     return () => { clearTimeout(t1); clearTimeout(t2) }
   }, [sessao, encerrarSessao])
 
+  // Rede de segurança contra SPINNER INFINITO: o overlay de carregamento só some no `onLoad` do iframe.
+  // Se o load não disparar (redirect dentro do iframe, evento perdido, conteúdo em cache, ou o /aluno
+  // demora), libera o overlay por `readyState` (polling) ou por um TETO de tempo — assim a visualização
+  // nunca fica presa no "carregando". Não mexe na sessão; só revela o que o iframe já tem.
+  useEffect(() => {
+    if (!sessao) return
+    let liberado = false
+    const liberar = () => { if (!liberado) { liberado = true; setFrameCarregando(false) } }
+    const iv = setInterval(() => { // egress-ok: só lê readyState do iframe (sem rede) e encerra em ≤12s
+      try {
+        const w = iframeRef.current?.contentWindow
+        if (w && w.location.href !== 'about:blank' && w.document.readyState === 'complete') liberar()
+      } catch { /* cross-origin momentâneo durante a navegação do iframe — ignora */ }
+    }, 400)
+    const teto = setTimeout(liberar, 12_000)
+    return () => { clearInterval(iv); clearTimeout(teto) }
+  }, [sessao])
+
   const renovar = useCallback(() => {
     if (!sessao) return
     fetch(`/api/admin/impersonate/${sessao.session_id}/renew`, { method: 'POST' }).then(async (r) => { const dd = await r.json().catch(() => ({})); if (r.ok && dd?.expires_at) { setSessao((s) => (s ? { ...s, expires_at: dd.expires_at } : s)); setAvisar(false) } }).catch(() => {})

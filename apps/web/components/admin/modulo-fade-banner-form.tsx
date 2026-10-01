@@ -42,7 +42,7 @@ export function ModuloFadeBannerForm({ pastaId, atual, banner, cor }: { pastaId:
             <p className="text-xs text-muted-foreground">Degradê escuro sobre o banner do módulo (admin e aluno). Ligue/desligue, ajuste a <strong>intensidade</strong> e a <strong>cor</strong>. A prévia mostra o efeito ao vivo.</p>
           </div>
         </div>
-        <label className="inline-flex shrink-0 cursor-pointer items-center gap-2 text-sm">
+        <label className="mr-8 inline-flex shrink-0 cursor-pointer items-center gap-2 text-sm">
           <input type="checkbox" checked={degrade.ativo} onChange={(e) => setDegrade((d) => ({ ...d, ativo: e.target.checked }))} className="h-4 w-4 accent-[var(--primary)]" />
           Ativo
         </label>

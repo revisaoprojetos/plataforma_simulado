@@ -1,231 +1,377 @@
 'use client'
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
-import { useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { toast } from 'sonner'
-import { Trophy, Sparkles, ArrowUpDown, MoreVertical, X, Loader2, Flame, Zap, BookCheck, Award, Search, Eye, EyeOff, RotateCw, ChevronLeft, ChevronRight, Save, Check, CalendarDays } from 'lucide-react'
-import { Input } from '@/components/ui/input'
+import { Trophy, Flame, Zap, Award, BookCheck, CalendarDays, X, Loader2, Check, Save, Crown, TrendingUp, ArrowUpDown, ArrowUp, ArrowDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatBrt } from '@/lib/brt'
 import { AvatarEstudante } from '@/components/aluno/avatar-estudante'
 import type { RankingLeitura, RankingLeituraItem } from '@/lib/leitura/ranking'
-import { detalheRankingAluno, recalcularRankingLeitura, salvarSequenciaAjuste, type DetalheRankingAluno } from '@/app/admin/leitura/actions'
+import { detalheRankingAluno, salvarSequenciaAjuste, type DetalheRankingAluno } from '@/app/admin/leitura/actions'
 import { calcularSequencia } from '@/lib/leitura/sequencia'
+import { cargoParaNivel } from '@/lib/gamificacao/niveis'
+import { iconeCargo } from '@/lib/gamificacao/cargo-icones'
+import type { TituloNivel } from '@/lib/gamificacao/config'
 
 const POR_PAG = 10
-const iniciais = (n: string) => (n || '').split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?'
-type Campo = 'posicao' | 'aulas' | 'sequencia' | 'acertos'
+
+/** Nome curto p/ preservar privacidade no ranking do aluno: "João Marcello Pedote" → "J. P.". */
+const nomeCurto = (n: string) => {
+  const ps = (n || '').split(' ').filter(Boolean)
+  if (!ps.length) return '—'
+  const a = ps[0][0]?.toUpperCase() ?? ''
+  const b = ps.length > 1 ? (ps[ps.length - 1][0]?.toUpperCase() ?? '') : ''
+  return b ? `${a}. ${b}.` : `${a}.`
+}
+
+function PagBtn({ children, onClick, disabled, aria }: { children: ReactNode; onClick: () => void; disabled?: boolean; aria: string }) {
+  return (
+    <button type="button" onClick={onClick} disabled={disabled} aria-label={aria}
+      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border transition-colors hover:bg-muted disabled:opacity-40">{children}</button>
+  )
+}
+
+type Aba = 'pontos' | 'sequencia' | 'aulas'
 
 /**
- * Ranking do módulo LegProc. `modo='admin'` mostra nome + e-mail e leva ao perfil do aluno; `modo='aluno'`
- * mostra só as iniciais (sem e-mail/sem link). Ambos: fotos de perfil, ordenação (posição/aulas/acertos)
- * e paginação (10/pág).
+ * Ranking do módulo LegProc para o ALUNO. Layout em duas colunas: à esquerda o cabeçalho + pódio (top 3)
+ * + "Sua posição"; à direita a tabela de Classificação com abas (Pontos/Sequência/Aulas) e paginação.
+ * Regras: nomes abreviados (privacidade; só "Você" aparece por extenso), contas de teste nunca aparecem,
+ * e o próprio aluno sempre aparece — mesmo que a lista cacheada (5 min) ainda esteja defasada — via
+ * `minhaLinha` (calculada fresca no servidor). A "Var." é a variação de posição desde a última visita,
+ * calculada no cliente (localStorage) p/ não precisar pollar o servidor (egress) num desafio ao vivo.
  */
-export function LeituraRanking({ ranking, meuId, meuNome, modo = 'aluno', moduloId }: { ranking: RankingLeitura; meuId?: string | null; meuNome?: string | null; modo?: 'admin' | 'aluno'; moduloId?: string }) {
+export function LeituraRanking({ ranking, minhaLinha = null, meuId, meuNome, moduloId, moduloNome, titulos = [], totalDesafio = 0 }: {
+  ranking: RankingLeitura
+  minhaLinha?: RankingLeituraItem | null
+  meuId?: string | null
+  meuNome?: string | null
+  moduloId?: string
+  moduloNome?: string | null
+  titulos?: TituloNivel[]
+  /** Total de aulas/dias do DESAFIO inteiro (ex.: 30) — denominador do "Progresso do desafio". */
+  totalDesafio?: number
+}) {
   const { itens, gamAtivo } = ranking
-  const rotulo = gamAtivo ? 'Pontos' : 'Acertos'
-  const [campo, setCampo] = useState<Campo>('posicao')
-  const [dir, setDir] = useState<'asc' | 'desc'>('asc')
+  const [ordem, setOrdem] = useState<{ campo: Aba; dir: 'asc' | 'desc' }>({ campo: 'pontos', dir: 'desc' }) // ordenação de EXIBIÇÃO (clique nas colunas)
   const [pagina, setPagina] = useState(1)
-  const [busca, setBusca] = useState('')
-  const [mostrarOcultos, setMostrarOcultos] = useState(true)
-  const [detalhe, setDetalhe] = useState<RankingLeituraItem | null>(null)
-  const [recalc, setRecalc] = useState(false)
-  const router = useRouter()
-  // Só o admin (com o módulo resolvido) abre o pop-up de detalhe do aluno.
-  const expandir = modo === 'admin' && moduloId ? setDetalhe : undefined
 
-  // Recalcular AGORA: limpa o cache da chave EXATA deste módulo e recarrega — sem esperar o TTL.
-  async function recalcular() {
-    if (!moduloId || recalc) return
-    setRecalc(true)
-    try {
-      const r = await recalcularRankingLeitura(moduloId)
-      if (r.ok) { toast.success('Ranking recalculado.'); router.refresh() }
-      else toast.error(r.error ?? 'Falha ao recalcular.')
-    } catch { toast.error('Falha ao recalcular.') } finally { setRecalc(false) }
-  }
+  const metrica = (campo: Aba, it: RankingLeituraItem) => (campo === 'pontos' ? it.score : campo === 'sequencia' ? it.streakAtual : it.aulasConcluidas)
 
-  // Aluno NÃO vê contas de teste (ocultas); admin vê, marcadas. Ocultos nunca no pódio nem no "você".
-  const reaisList = useMemo(() => itens.filter((i) => !i.oculto), [itens])
-  const qtdOcultos = useMemo(() => itens.filter((i) => i.oculto).length, [itens])
-  const temOcultos = modo === 'admin' && qtdOcultos > 0
+  // Aluno nunca vê contas de teste (ocultas).
+  const reais = useMemo(() => itens.filter((i) => !i.oculto), [itens])
 
-  const ordenados = useMemo(() => {
-    // Base: aluno só vê reais; admin alterna entre "com ocultos" e "só reais" pelo toggle.
-    const base = modo === 'aluno' ? reaisList : mostrarOcultos ? itens : reaisList
-    const q = busca.trim().toLowerCase()
-    const filtrada = q
-      ? base.filter((i) => i.nome.toLowerCase().includes(q) || (modo === 'admin' && (i.email ?? '').toLowerCase().includes(q)))
-      : base
-    const arr = filtrada.slice()
-    arr.sort((a, b) => {
-      // Ocultos (posição 0) sempre no fim quando ordena por posição.
-      if (campo === 'posicao' && a.oculto !== b.oculto) return a.oculto ? 1 : -1
-      const c = campo === 'posicao' ? a.posicao - b.posicao : campo === 'aulas' ? a.aulasConcluidas - b.aulasConcluidas : campo === 'sequencia' ? a.streakAtual - b.streakAtual : a.score - b.score
-      return dir === 'asc' ? c : -c
-    })
-    return arr
-  }, [itens, reaisList, modo, mostrarOcultos, busca, campo, dir])
+  // Garante que o PRÓPRIO aluno apareça mesmo se a lista cacheada (5 min) ainda não o reflete.
+  const base = useMemo(() => {
+    if (!meuId) return reais
+    if (reais.some((i) => i.estudanteId === meuId)) return reais
+    if (minhaLinha && minhaLinha.estudanteId === meuId && (minhaLinha.aulasConcluidas > 0 || minhaLinha.acertos > 0)) return [...reais, minhaLinha]
+    return reais
+  }, [reais, meuId, minhaLinha])
 
-  // Busca/toggle mudou → volta à 1ª página (evita ficar numa página que não existe mais).
-  useEffect(() => { setPagina(1) }, [busca, mostrarOcultos])
+  // RANKING CANÔNICO (posição REAL e FIXA de cada aluno) — por pontos, com desempates. O "#" da tabela,
+  // o pódio e o "Sua posição" usam SEMPRE isto: reordenar as colunas muda só a ordem das linhas, nunca o
+  // número de ninguém.
+  const canonicos = useMemo(() => [...base].sort((a, b) =>
+    b.score - a.score || b.streakAtual - a.streakAtual || b.aulasConcluidas - a.aulasConcluidas || a.nome.localeCompare(b.nome, 'pt-BR')
+  ), [base])
+  const rankCanonico = useMemo(() => new Map(canonicos.map((it, i) => [it.estudanteId, i + 1])), [canonicos])
 
-  function ordenar(c: Campo) {
-    if (campo === c) setDir((d) => (d === 'asc' ? 'desc' : 'asc'))
-    else { setCampo(c); setDir(c === 'posicao' ? 'asc' : 'desc') }
-    setPagina(1)
-  }
+  // Ordem de EXIBIÇÃO (clique nas colunas). asc = reverso EXATO do desc → puxa o último pro topo mesmo
+  // quando a métrica empata (o desempate também inverte).
+  const ordenados = useMemo(() => [...base].sort((a, b) => {
+    const t = metrica(ordem.campo, b) - metrica(ordem.campo, a)
+      || b.streakAtual - a.streakAtual || b.score - a.score || b.aulasConcluidas - a.aulasConcluidas || a.nome.localeCompare(b.nome, 'pt-BR')
+    return ordem.dir === 'asc' ? -t : t
+  }), [base, ordem])
+
+  useEffect(() => { setPagina(1) }, [ordem])
 
   if (!itens.length) {
     return (
       <div className="rounded-2xl border border-dashed p-12 text-center text-muted-foreground">
         <Trophy className="mx-auto mb-2 h-8 w-8 opacity-40" />
-        Ainda não há ranking neste módulo. {modo === 'admin' ? 'Os alunos precisam responder o quiz das aulas.' : 'Responda o quiz das aulas para pontuar.'}
+        Ainda não há ranking neste módulo. Responda o quiz das aulas para pontuar.
       </div>
     )
   }
 
-  const top3 = reaisList.slice(0, 3)
-  const ordemPodio = [top3[1], top3[0], top3[2]].filter(Boolean) // 2º · 1º · 3º
-  const medalha = ['#facc15', '#cbd5e1', '#f59e0b']
+  // Pódio / Sua posição / minha linha vêm do CANÔNICO (não da ordem de exibição da tabela).
+  const top3 = canonicos.slice(0, 3)
+  const meuIt = meuId ? canonicos.find((i) => i.estudanteId === meuId) ?? null : null
+  const minhaPos = meuIt ? rankCanonico.get(meuIt.estudanteId) ?? 0 : 0
 
   const totalPag = Math.max(1, Math.ceil(ordenados.length / POR_PAG))
   const pag = Math.min(pagina, totalPag)
-  const visiveis = ordenados.slice((pag - 1) * POR_PAG, pag * POR_PAG)
+  const ini = (pag - 1) * POR_PAG
+  const visiveis = ordenados.slice(ini, ini + POR_PAG)
 
-  const Th = ({ c, children, className }: { c: Campo; children: ReactNode; className?: string }) => (
-    <th className={cn('px-3 py-2.5 font-medium', className)}>
-      <button type="button" onClick={() => ordenar(c)} className="inline-flex items-center gap-1 hover:text-foreground">
-        {children}<ArrowUpDown className={cn('h-3 w-3', campo === c ? 'text-primary' : 'text-muted-foreground/50')} />
-      </button>
-    </th>
-  )
+  const cargoDe = (nivel: number) => {
+    const c = cargoParaNivel(nivel, titulos)
+    return c && c.titulo ? { titulo: c.titulo, Icon: iconeCargo(c.icone) } : null
+  }
+  const corPodio = ['#f5c518', '#c7cdd6', '#cd8d4e'] // 1º ouro · 2º prata · 3º bronze (iguais ao admin)
+
+  // Cabeçalho ordenável: clica → ordena a EXIBIÇÃO por esta coluna; clica de novo → inverte (↑/↓).
+  // O número (#) é sempre a posição canônica, então a ordem muda só as linhas, não o rank de ninguém.
+  const ThSort = ({ campo, children }: { campo: Aba; children: ReactNode }) => {
+    const ativo = ordem.campo === campo
+    const Seta = ativo ? (ordem.dir === 'asc' ? ArrowUp : ArrowDown) : ArrowUpDown
+    return (
+      <th className="w-16 px-2 py-2.5 text-center font-medium sm:w-28 sm:px-4">
+        <button type="button"
+          onClick={() => setOrdem((prev) => {
+            // Mesma coluna → inverte. Coluna nova → desc; mas se desc deixar a ordem IGUAL (valores
+            // empatados), já vai pra asc, pra todo clique mudar algo na hora.
+            if (prev.campo === campo) return { campo, dir: prev.dir === 'desc' ? 'asc' : 'desc' }
+            const idsPor = (dir: 'asc' | 'desc') => [...base].sort((a, b) => {
+              const t = metrica(campo, b) - metrica(campo, a) || b.streakAtual - a.streakAtual || b.score - a.score || b.aulasConcluidas - a.aulasConcluidas || a.nome.localeCompare(b.nome, 'pt-BR')
+              return dir === 'asc' ? -t : t
+            }).map((x) => x.estudanteId).join(',')
+            const atual = ordenados.map((x) => x.estudanteId).join(',')
+            return { campo, dir: idsPor('desc') === atual ? 'asc' : 'desc' }
+          })}
+          title="Ordenar por esta coluna (clique de novo para inverter)"
+          className={cn('mx-auto inline-flex items-center gap-1 whitespace-nowrap transition-colors hover:text-foreground', ativo && 'text-primary')}>
+          {children}<Seta className={cn('h-3 w-3', ativo ? 'text-primary' : 'text-muted-foreground/40')} />
+        </button>
+      </th>
+    )
+  }
 
   return (
-    <div className="space-y-4">
-      {/* Pódio (top 3 por posição) */}
-      {top3.length >= 3 && (
-        <div className="grid grid-cols-3 items-end gap-3">
-          {ordemPodio.map((it) => {
-            const eu = !!meuId && it.estudanteId === meuId
-            return (
-              <div key={it.estudanteId} className={cn('flex flex-col items-center rounded-2xl border bg-card p-3 text-center shadow-sm', it.posicao === 1 ? 'pt-2' : 'pt-6', eu && 'border-primary/50 bg-primary/5')}>
-                <span className="relative">
-                  <AvatarEstudante nome={it.nome} avatar={it.avatar} cor={it.avatarCor ?? '#6d28d9'} className={cn('text-white ring-2 ring-offset-2 ring-offset-card', it.posicao === 1 ? 'h-14 w-14 text-base' : 'h-11 w-11 text-sm')} />
-                  <span className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full text-[11px] font-black text-black shadow" style={{ background: medalha[it.posicao - 1] }}>{it.posicao}</span>
-                </span>
-                <span className="mt-2 line-clamp-1 text-sm font-semibold">{modo === 'aluno' ? (eu ? 'Você' : iniciais(it.nome)) : it.nome}</span>
-                <span className="text-xs font-bold tabular-nums text-primary">{it.score} {rotulo.toLowerCase()}</span>
-              </div>
-            )
-          })}
+    <div className="grid grid-cols-1 gap-4 pb-24 sm:gap-5 lg:grid-cols-[30rem_minmax(0,1fr)] lg:pb-0">
+      {/* ESQUERDA — cabeçalho + pódio + sua posição (card em volta do "Ranking geral", fundo animado) */}
+      <div className="relative flex min-w-0 flex-col overflow-hidden rounded-2xl border bg-gradient-to-br from-primary/[0.1] via-card to-card p-4 shadow-sm sm:p-5">
+        {/* Fundo animado (aurora na cor da marca) — igual ao admin. */}
+        <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute -left-12 -top-16 h-52 w-52 rounded-full bg-primary/30 blur-3xl" style={{ animation: 'rankBlobA 11s ease-in-out infinite' }} />
+          <div className="absolute -top-10 right-0 h-44 w-44 rounded-full bg-primary/20 blur-3xl" style={{ animation: 'rankBlobB 14s ease-in-out infinite' }} />
+          <div className="absolute -bottom-20 left-1/4 h-52 w-52 rounded-full bg-primary/15 blur-3xl" style={{ animation: 'rankBlobA 17s ease-in-out infinite reverse' }} />
+          <div className="rank-sheen absolute -inset-y-10 -left-1/3 w-1/3 rotate-12 bg-gradient-to-r from-transparent via-white/5 to-transparent" style={{ animation: 'rankSheen 9s ease-in-out infinite' }} />
         </div>
-      )}
-
-      {/* Card "Você" (aluno) — comprido, fixo abaixo do pódio: acompanha o rank em TODAS as páginas.
-          Aparece SEMPRE que há aluno logado; se ele ainda não pontuou (fora do ranking), mostra 0/0/0
-          com posição "—" para ele saber que ainda não entrou. */}
-      {modo === 'aluno' && meuId && (() => {
-        const meuIt = reaisList.find((i) => i.estudanteId === meuId)
-        const nome = meuIt?.nome ?? meuNome ?? 'Você'
-        return (
-          <div className="flex items-center gap-3 rounded-2xl border-2 border-primary/50 bg-primary/5 px-4 py-3 shadow-sm">
-            <span className="flex h-8 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-sm font-bold tabular-nums text-primary-foreground">{meuIt ? meuIt.posicao : '—'}</span>
-            <AvatarEstudante nome={nome} avatar={meuIt?.avatar ?? null} cor={meuIt?.avatarCor ?? '#6d28d9'} className="h-9 w-9 shrink-0 text-[11px] text-white" />
-            <span className="min-w-0 flex-1 truncate">
-              <span className="font-semibold text-primary">Você</span>
-              {!meuIt && <span className="ml-2 text-xs font-normal text-muted-foreground">Faça uma aula para entrar no ranking</span>}
+        <style>{`
+          @keyframes rankBlobA{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(22px,-16px) scale(1.16)}}
+          @keyframes rankBlobB{0%,100%{transform:translate(0,0) scale(1.1)}50%{transform:translate(-24px,12px) scale(.92)}}
+          @keyframes rankSheen{0%{transform:translateX(0) rotate(12deg);opacity:0}15%{opacity:1}50%{transform:translateX(380%) rotate(12deg)}60%,100%{transform:translateX(380%) rotate(12deg);opacity:0}}
+          @media (prefers-reduced-motion: reduce){.rank-sheen{display:none}}
+        `}</style>
+        <div className="relative flex flex-1 flex-col gap-4">
+        <div>
+          {moduloNome && <p className="truncate text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">{moduloNome}</p>}
+          <h2 className="text-2xl font-bold leading-tight">Ranking geral</h2>
+          <div className="mt-1.5 flex items-center gap-2 text-xs text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+              </span>
+              Ao vivo
             </span>
-            <div className="flex items-center gap-5 sm:gap-8">
-              <span className="text-center"><span className="block font-bold leading-none tabular-nums">{meuIt?.aulasConcluidas ?? 0}</span><span className="mt-0.5 block text-[10px] text-muted-foreground">aulas</span></span>
-              <span className="text-center"><span className="inline-flex items-center gap-1 font-bold leading-none tabular-nums text-amber-600 dark:text-amber-400"><Flame className="h-3.5 w-3.5" />{meuIt?.streakAtual ?? 0}</span><span className="mt-0.5 block text-[10px] text-muted-foreground">sequência</span></span>
-              <span className="text-center"><span className="block font-bold leading-none tabular-nums text-primary">{meuIt?.score ?? 0}</span><span className="mt-0.5 block text-[10px] text-muted-foreground">{rotulo.toLowerCase()}</span></span>
-            </div>
+            <span aria-hidden>·</span>
+            <span><b className="text-foreground tabular-nums">{reais.length}</b> {reais.length === 1 ? 'aluno' : 'alunos'}</span>
           </div>
-        )
-      })()}
+        </div>
 
-      {/* Barra (SÓ admin): busca por nome/e-mail + toggle de contas de teste. O aluno não vê busca. */}
-      {modo === 'admin' && (
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-[12rem] flex-1">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome ou e-mail…" className="h-9 pl-9" />
-            {busca && (
-              <button type="button" onClick={() => setBusca('')} aria-label="Limpar busca" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-3.5 w-3.5" /></button>
-            )}
+        {/* Pódio + card do aluno — ocupam o espaço central do card; o card fica "colado" na base do pódio */}
+        <div className="flex flex-1 flex-col justify-center">
+          {top3.length >= 3 && (
+          <div className="grid w-full grid-cols-3 items-end gap-1.5 sm:gap-2.5">
+            {[top3[1], top3[0], top3[2]].map((it, i) => {
+              if (!it) return <div key={i} />
+              const lugar = [2, 1, 3][i]
+              const eu = !!meuId && it.estudanteId === meuId
+              const cor = corPodio[lugar - 1]
+              const h = lugar === 1 ? 'h-16 sm:h-32' : lugar === 2 ? 'h-11 sm:h-24' : 'h-8 sm:h-20'
+              return (
+                <div key={it.estudanteId} className="flex min-w-0 flex-col items-center text-center">
+                  <span className="relative mb-2 inline-flex rounded-full ring-2 ring-offset-2 ring-offset-card" style={{ '--tw-ring-color': cor } as CSSProperties}>
+                    {lugar === 1 && <Crown className="absolute -top-4 left-1/2 z-10 h-4 w-4 -translate-x-1/2 sm:-top-5 sm:h-5 sm:w-5" style={{ color: cor }} />}
+                    <AvatarEstudante nome={it.nome} avatar={it.avatar} cor={it.avatarCor ?? '#6d28d9'} className={cn('text-white shadow-md', lugar === 1 ? 'h-12 w-12 text-sm sm:h-16 sm:w-16 sm:text-lg' : 'h-10 w-10 text-xs sm:h-12 sm:w-12 sm:text-sm')} />
+                  </span>
+                  <span className={cn('line-clamp-1 max-w-full text-xs font-semibold sm:text-sm', eu && 'text-primary')}>{eu ? 'Você' : nomeCurto(it.nome)}</span>
+                  <span className="flex flex-wrap items-center justify-center gap-x-1 text-[10px] font-bold tabular-nums sm:gap-x-1.5 sm:text-xs">
+                    <span className="text-primary">{it.score} pts</span>
+                    <span className="text-muted-foreground/40">·</span>
+                    <span className="inline-flex items-center gap-0.5 text-amber-600 dark:text-amber-400"><Flame className="h-3 w-3 sm:h-3.5 sm:w-3.5" />{it.streakAtual}</span>
+                  </span>
+                  <div className={cn('mt-2 flex w-full items-start justify-center rounded-t-xl border border-b-0 pt-1.5 text-base font-black sm:pt-2 sm:text-lg', h)}
+                    style={{ background: `linear-gradient(to top, ${cor}2e, ${cor}0a)`, borderColor: `${cor}66`, color: cor }}>
+                    {lugar}º
+                  </div>
+                </div>
+              )
+            })}
           </div>
-          {temOcultos && (
-            <button type="button" onClick={() => setMostrarOcultos((v) => !v)}
-              className={cn('inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors', mostrarOcultos ? 'border-amber-500/40 bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'hover:bg-muted')}
-              title={mostrarOcultos ? 'Esconder contas de teste da lista' : 'Mostrar contas de teste na lista'}>
-              {mostrarOcultos ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-              {mostrarOcultos ? 'Ocultar contas de teste' : `Mostrar contas de teste (${qtdOcultos})`}
-            </button>
           )}
-          {moduloId && (
-            <button type="button" onClick={recalcular} disabled={recalc}
-              className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium transition-colors hover:bg-muted disabled:opacity-60"
-              title="Limpa o cache e recalcula o ranking agora (aulas/sequência/pontos), sem esperar os 5 min.">
-              {recalc ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCw className="h-4 w-4" />}
-              Recalcular
-            </button>
+
+          {/* Card do aluno (eu) — posição à esquerda + identidade + stats espaçados.
+              z-10 + margem negativa sobrepõem a base dos pedestais (fundo sólido) → o pódio "nasce"
+              de dentro do card, conectado, sem ficar flutuando. */}
+          {meuIt && (
+            <div className="relative z-10 mt-2 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border bg-card p-3 shadow-sm sm:-mt-4 sm:gap-x-4 sm:p-3.5">
+              {/* posição à esquerda */}
+              <div className="flex shrink-0 flex-col items-center">
+                <span className="text-xl font-black leading-none tabular-nums sm:text-2xl">{minhaPos}º</span>
+                <span className="mt-1 text-[10px] uppercase tracking-wide text-muted-foreground">posição</span>
+              </div>
+              <div className="hidden h-11 w-px shrink-0 bg-border sm:block" />
+              {/* identidade */}
+              <span className="relative shrink-0">
+                <AvatarEstudante nome={meuNome ?? meuIt.nome} avatar={meuIt.avatar} cor={meuIt.avatarCor ?? '#6d28d9'} className="h-11 w-11 text-sm text-white" />
+                {gamAtivo && meuIt.nivel > 0 && <span className="absolute -bottom-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-0.5 text-[9px] font-bold text-primary-foreground ring-2 ring-card">{meuIt.nivel}</span>}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-1.5">
+                  <span className="truncate font-semibold">{meuNome ?? meuIt.nome}</span>
+                  <span className="shrink-0 rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">você</span>
+                </div>
+                {gamAtivo && (() => { const c = cargoDe(meuIt.nivel); if (!c) return null; const CargoIcon = c.Icon; return <span className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-muted-foreground"><span className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-primary/10 text-primary"><CargoIcon className="h-3 w-3" /></span><span className="truncate">{c.titulo}</span></span> })()}
+              </div>
+              {/* stats bem espaçados, com divisórias — no mobile quebram p/ a linha de baixo, centralizados */}
+              <div className="flex w-full items-center justify-center divide-x divide-border/70 text-center sm:ml-auto sm:w-auto sm:justify-start">
+                <div className="px-3 sm:px-3.5"><div className="text-base font-bold leading-none tabular-nums">{meuIt.aulasConcluidas}</div><div className="mt-1 text-[10px] text-muted-foreground">aulas</div></div>
+                <div className="px-3 sm:px-3.5"><div className="inline-flex items-center gap-0.5 text-base font-bold leading-none tabular-nums text-amber-600 dark:text-amber-400"><Flame className="h-3.5 w-3.5" />{meuIt.streakAtual}</div><div className="mt-1 text-[10px] text-muted-foreground">seq.</div></div>
+                <div className="px-3 sm:px-3.5"><div className="text-base font-bold leading-none tabular-nums text-primary">{meuIt.score}</div><div className="mt-1 text-[10px] text-muted-foreground">pts</div></div>
+              </div>
+            </div>
           )}
         </div>
-      )}
 
-      {/* Tabela — 10 por página, TODAS visíveis (sem rolagem interna; a página rola se precisar). */}
-      <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-        <table className="w-full text-sm">
-          <thead className="border-b bg-muted text-left text-muted-foreground">
-            <tr>
-              <Th c="posicao" className="w-14 text-center">#</Th>
-              <th className="px-3 py-2.5 font-medium">Aluno</th>
-              <Th c="aulas" className="w-24 text-center">Aulas</Th>
-              <Th c="sequencia" className="w-28 text-center">Sequência</Th>
-              <Th c="acertos" className="w-24 text-center">{rotulo}</Th>
-              {/* Espaço à direita p/ trazer as colunas de número mais para o meio. */}
-              <th className="w-6 sm:w-24" aria-hidden />
-            </tr>
-          </thead>
-          <tbody>
-            {visiveis.length === 0 ? (
-              <tr><td colSpan={6} className="px-3 py-10 text-center text-sm text-muted-foreground">Nenhum aluno encontrado{busca ? ` para “${busca}”` : ''}.</td></tr>
-            ) : (
-              visiveis.map((it) => <LinhaRanking key={it.estudanteId} it={it} eu={!!meuId && it.estudanteId === meuId} modo={modo} onExpand={expandir} />)
-            )}
-          </tbody>
-        </table>
+        {/* Progresso do desafio — info COMPLEMENTAR ao card (sem repetir posição/nome/pts). */}
+        <div className="rounded-xl border bg-muted/30 p-3.5">
+          {meuIt ? (() => {
+            // Progresso sobre o DESAFIO INTEIRO (todas as aulas/dias do módulo, ex.: 30), não só as
+            // aulas já publicadas. Fallback p/ o total do ranking.
+            const total = Math.max(totalDesafio || 0, meuIt.totalAulas, meuIt.aulasConcluidas, 1)
+            const feitas = meuIt.aulasConcluidas
+            const pct = Math.round((feitas / total) * 100)
+            // Próximo objetivo: quanto falta (em PONTOS — métrica do ranking) p/ alcançar quem está acima.
+            const acima = minhaPos > 1 ? canonicos[minhaPos - 2] : null
+            const delta = acima ? acima.score - meuIt.score : 0
+            const unidade = 'pts'
+            return (
+              <>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="font-medium">Progresso do desafio</span>
+                  <span className="font-semibold tabular-nums text-primary">{pct}%</span>
+                </div>
+                <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-muted">
+                  <div className="h-full rounded-full bg-primary transition-[width] duration-500" style={{ width: `${pct}%` }} />
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground"><b className="text-foreground tabular-nums">{feitas}</b> de {total} aulas concluídas</p>
+                <div className="mt-3 flex items-center gap-2 border-t pt-3 text-xs text-muted-foreground">
+                  {!acima ? (
+                    <><Crown className="h-4 w-4 shrink-0 text-amber-500" /> <span>Você lidera o ranking!</span></>
+                  ) : delta > 0 ? (
+                    <><TrendingUp className="h-4 w-4 shrink-0 text-emerald-500" /> <span>Faltam <b className="text-foreground tabular-nums">{delta}</b> {unidade} para o <b className="text-foreground">{minhaPos - 1}º</b></span></>
+                  ) : (
+                    <><TrendingUp className="h-4 w-4 shrink-0 text-emerald-500" /> <span>Empatado com o <b className="text-foreground">{minhaPos - 1}º</b> — avance para desempatar</span></>
+                  )}
+                </div>
+              </>
+            )
+          })() : (
+            <div className="flex items-center gap-3">
+              <AvatarEstudante nome={meuNome ?? 'Você'} avatar={null} cor="#6d28d9" className="h-9 w-9 shrink-0 text-[11px] text-white" />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-primary">Você</p>
+                <p className="text-xs text-muted-foreground">Faça uma aula para entrar no ranking.</p>
+              </div>
+            </div>
+          )}
+        </div>
+        </div>
       </div>
 
-      {/* Paginação */}
-      {totalPag > 1 && (
-        <div className="flex items-center justify-between text-sm">
-          <span className="text-muted-foreground">Página {pag} de {totalPag} · {ordenados.length} alunos</span>
-          <div className="flex gap-1.5">
-            <button onClick={() => setPagina(1)} disabled={pag <= 1} className="rounded-lg border px-2.5 py-1 hover:bg-muted disabled:opacity-40">Início</button>
-            <button onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={pag <= 1} className="rounded-lg border px-2.5 py-1 hover:bg-muted disabled:opacity-40">Anterior</button>
-            <button onClick={() => setPagina((p) => Math.min(totalPag, p + 1))} disabled={pag >= totalPag} className="rounded-lg border px-2.5 py-1 hover:bg-muted disabled:opacity-40">Próxima</button>
-            <button onClick={() => setPagina(totalPag)} disabled={pag >= totalPag} className="rounded-lg border px-2.5 py-1 hover:bg-muted disabled:opacity-40">Final</button>
+      {/* DIREITA — classificação */}
+      <div className="min-w-0 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-lg font-semibold">Classificação</h3>
+          <span className="text-xs text-muted-foreground">Clique numa coluna para ordenar</span>
+        </div>
+
+        <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full min-w-[25rem] text-sm">
+            <thead className="border-b bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <tr>
+                <th className="w-14 px-3 py-2.5 text-center font-medium">#</th>
+                <th className="px-3 py-2.5 font-medium">Aluno</th>
+                <ThSort campo="aulas">Aulas</ThSort>
+                <ThSort campo="sequencia">Sequência</ThSort>
+                <ThSort campo="pontos">Pontos</ThSort>
+              </tr>
+            </thead>
+            <tbody>
+              {visiveis.map((it) => {
+                const pos = rankCanonico.get(it.estudanteId) ?? 0
+                const eu = !!meuId && it.estudanteId === meuId
+                const cargo = gamAtivo ? cargoDe(it.nivel) : null
+                return (
+                  <tr key={it.estudanteId} className={cn('border-b last:border-0 transition-colors', eu ? 'bg-primary/5' : 'hover:bg-muted/30')}>
+                    <td className="px-3 py-2.5 text-center">
+                      <span className={cn('inline-flex h-7 min-w-7 items-center justify-center rounded-lg px-1 text-xs font-bold tabular-nums',
+                        pos === 1 ? 'bg-primary text-primary-foreground' : pos <= 3 ? 'bg-primary/15 text-primary' : 'bg-muted text-muted-foreground')}>{pos}</span>
+                    </td>
+                    <td className="px-3 py-2.5">
+                      <div className="flex min-w-0 items-center gap-2.5">
+                        <span className="relative shrink-0">
+                          <AvatarEstudante nome={it.nome} avatar={it.avatar} cor={it.avatarCor ?? '#6d28d9'} className="h-9 w-9 text-[11px] text-white" />
+                          {gamAtivo && it.nivel > 0 && <span className="absolute -bottom-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-0.5 text-[9px] font-bold text-primary-foreground ring-2 ring-card">{it.nivel}</span>}
+                        </span>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className={cn('truncate font-medium', eu && 'text-primary')}>{eu ? (meuNome ?? it.nome) : nomeCurto(it.nome)}</span>
+                            {eu && <span className="shrink-0 rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">você</span>}
+                          </div>
+                          {cargo && (
+                            <span className="mt-0.5 flex items-center gap-1.5 truncate text-xs text-muted-foreground">
+                              <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded bg-primary/10 text-primary"><cargo.Icon className="h-3 w-3" /></span>
+                              <span className="truncate">{cargo.titulo}</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="w-16 px-2 py-2.5 text-center sm:w-28 sm:px-4 tabular-nums text-muted-foreground">{it.aulasConcluidas}</td>
+                    <td className="w-16 px-2 py-2.5 text-center sm:w-28 sm:px-4">
+                      <span className={cn('inline-flex items-center gap-1 tabular-nums', it.streakAtual > 0 ? 'font-semibold text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}>
+                        <Flame className="h-3.5 w-3.5" />{it.streakAtual}
+                      </span>
+                    </td>
+                    <td className="w-16 px-2 py-2.5 text-center sm:w-28 sm:px-4 font-bold tabular-nums">{it.score}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+          </div>
+          {/* Rodapé: contagem + paginação (estilo admin) */}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t px-4 py-2.5 text-sm">
+            <span className="text-xs text-muted-foreground">
+              {ordenados.length > 0 ? <>Mostrando <b className="tabular-nums text-foreground">{ini + 1}–{Math.min(ini + POR_PAG, ordenados.length)}</b> de <b className="tabular-nums text-foreground">{ordenados.length}</b></> : 'Nenhum aluno'}
+            </span>
+            {totalPag > 1 && (
+              <div className="flex w-full items-center justify-center gap-1 sm:w-auto">
+                <PagBtn onClick={() => setPagina(1)} disabled={pag <= 1} aria="Primeira"><ChevronsLeft className="h-4 w-4" /></PagBtn>
+                <PagBtn onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={pag <= 1} aria="Anterior"><ChevronLeft className="h-4 w-4" /></PagBtn>
+                <span className="px-2 text-xs tabular-nums text-muted-foreground">{pag}/{totalPag}</span>
+                <PagBtn onClick={() => setPagina((p) => Math.min(totalPag, p + 1))} disabled={pag >= totalPag} aria="Próxima"><ChevronRight className="h-4 w-4" /></PagBtn>
+                <PagBtn onClick={() => setPagina(totalPag)} disabled={pag >= totalPag} aria="Última"><ChevronsRight className="h-4 w-4" /></PagBtn>
+              </div>
+            )}
           </div>
         </div>
-      )}
-
-      {gamAtivo && (
-        <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Sparkles className="h-3.5 w-3.5 text-amber-500" /> Pontuação da gamificação ativa — por aula concluída: leitura + quiz (mais acertos/combo, se configurados).</p>
-      )}
-
-      {detalhe && moduloId && <DetalheAlunoModal moduloId={moduloId} it={detalhe} onClose={() => setDetalhe(null)} />}
+      </div>
     </div>
   )
 }
 
 /** Pop-up com o detalhe do aluno. Abas: "Visão geral" (sequência/progresso/aulas) e "Sequência"
  *  (calendário do suporte: marcar/desconsiderar dias que contam no streak). */
-function DetalheAlunoModal({ moduloId, it, onClose }: { moduloId: string; it: RankingLeituraItem; onClose: () => void }) {
+export function DetalheAlunoModal({ moduloId, it, onClose }: { moduloId: string; it: RankingLeituraItem; onClose: () => void }) {
   const [d, setD] = useState<DetalheRankingAluno | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [aba, setAba] = useState<'geral' | 'sequencia'>('geral')
@@ -431,49 +577,5 @@ function CalendarioSequencia({ d, ovr, setOvr, moduloId, estudanteId, streakAtua
         </button>
       </div>
     </div>
-  )
-}
-
-function LinhaRanking({ it, eu, modo, onExpand }: { it: RankingLeituraItem; eu: boolean; modo: 'admin' | 'aluno'; onExpand?: (it: RankingLeituraItem) => void }) {
-  const avatar = <AvatarEstudante nome={it.nome} avatar={it.avatar} cor={it.avatarCor ?? '#6d28d9'} className="h-9 w-9 shrink-0 text-[11px] text-white" />
-  const identidade = modo === 'admin' ? (
-    <Link href={`/admin/estudantes/${it.estudanteId}`} className="flex min-w-0 items-center gap-2.5 hover:underline">
-      {avatar}
-      <span className="min-w-0">
-        <span className="block truncate font-medium">{it.nome}</span>
-        {it.email && <span className="block truncate text-xs text-muted-foreground">{it.email}</span>}
-      </span>
-    </Link>
-  ) : (
-    <div className="flex min-w-0 items-center gap-2.5">
-      {avatar}
-      <span className={cn('truncate font-medium', eu && 'text-primary')}>{eu ? 'Você' : iniciais(it.nome)}</span>
-    </div>
-  )
-  return (
-    <tr className={cn('border-b last:border-0', it.oculto ? 'bg-muted/20 opacity-70' : eu ? 'bg-primary/5' : 'hover:bg-muted/30')}>
-      <td className="px-3 py-2.5 text-center font-bold tabular-nums text-muted-foreground">{it.oculto ? '—' : it.posicao}</td>
-      <td className="px-3 py-2.5">
-        <div className="flex items-center gap-2">
-          {identidade}
-          {it.oculto && <span className="shrink-0 rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400" title="Conta de teste — não conta no ranking">não contabilizado</span>}
-        </div>
-      </td>
-      <td className="px-3 py-2.5 text-center tabular-nums text-muted-foreground">{it.aulasConcluidas}</td>
-      <td className="px-3 py-2.5 text-center tabular-nums">
-        <span className={cn('inline-flex items-center gap-1', it.streakAtual > 0 ? 'font-semibold text-amber-600 dark:text-amber-400' : 'text-muted-foreground')}>
-          <Flame className="h-3.5 w-3.5" /> {it.streakAtual}
-        </span>
-      </td>
-      <td className="px-3 py-2.5 text-center font-semibold tabular-nums">{it.score}</td>
-      <td className="px-2 py-2.5 text-center">
-        {onExpand && (
-          <button type="button" onClick={() => onExpand(it)} aria-label="Ver detalhes do aluno" title="Ver detalhes"
-            className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-            <MoreVertical className="h-4 w-4" />
-          </button>
-        )}
-      </td>
-    </tr>
   )
 }

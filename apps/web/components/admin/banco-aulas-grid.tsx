@@ -20,6 +20,7 @@ import { ModuloTrilhaForm } from '@/components/admin/modulo-trilha-form'
 import { ModuloTrilhaFundoForm } from '@/components/admin/modulo-trilha-fundo-form'
 import { ModuloFadeBannerForm } from '@/components/admin/modulo-fade-banner-form'
 import { ConfigModuloSalvarProvider } from '@/components/admin/config-modulo-salvar'
+import { BlocoColapsavel } from '@/components/admin/bloco-colapsavel'
 import { ModuloAcesso } from '@/components/admin/modulo-acesso'
 import {
   ChevronRight, ChevronUp, ChevronDown, Home, Library, FolderPlus, FilePlus2, Pencil, Trash2, FolderInput, Eye, EyeOff, BookOpenText, MoreVertical, FolderOpen, FileText, HelpCircle, Settings2, Users, X, Clock, CalendarClock, Link2, Copy,
@@ -48,9 +49,14 @@ export type { ModuloTab }
  *  - Raiz: cards dos BANCOS (containers) + "Novo banco".
  *  - Dentro de um banco: TABELA de aulas (documento HTML + questões), reordenáveis; cada aula abre o editor.
  */
+const BLOCOS_CONFIG = ['identidade', 'fade', 'desc', 'fundo', 'intro', 'adesivo', 'pontuacao', 'regra', 'desafios'] as const
+
 export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTab = 'aulas', semBreadcrumb = false, semTabs = false }: { data: BancoAulas; pastaAtual: string | null; cardView?: CardView; moduloTab?: ModuloTab; semBreadcrumb?: boolean; semTabs?: boolean }) {
   const router = useRouter()
   const [pending, start] = useTransition()
+  // Recolher/expandir os blocos da aba Configurações (ids em BLOCOS_CONFIG).
+  const [cfgRecolhidos, setCfgRecolhidos] = useState<Set<string>>(new Set())
+  const toggleCfg = (id: string) => setCfgRecolhidos((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n })
   const [criandoModulo, setCriandoModulo] = useState(false)
   const [personalizandoAula, setPersonalizandoAula] = useState<PersonalizarAula | null>(null)
   const bancos = data.pastas ?? []
@@ -223,21 +229,50 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTa
           {moduloAtual && (
             <div className={cn(moduloTab !== 'config' && 'hidden')}>
               <ConfigModuloSalvarProvider key={`cfg-${moduloAtual.id}`}>
-                <EditarPastaDialog
-                  key={moduloAtual.id}
-                  inline rotulo="módulo" generoM cardView={cardView}
-                  pasta={{ id: moduloAtual.id, nome: moduloAtual.nome, cor: moduloAtual.cor, capa: moduloAtual.capa_card_url, capaLarga: moduloAtual.capa_url }}
-                  onClose={() => {}}
-                  onSaved={() => router.refresh()}
-                />
-                <ModuloFadeBannerForm key={`fade-${moduloAtual.id}`} pastaId={moduloAtual.id} atual={moduloAtual.trilhaAparencia.degrade} banner={moduloAtual.capa_url ?? moduloAtual.capa_card_url ?? null} cor={moduloAtual.cor} />
-                <ModuloDescricaoForm key={`desc-${moduloAtual.id}`} pastaId={moduloAtual.id} atual={moduloAtual.trilhaAparencia.descricao} />
-                <ModuloTrilhaFundoForm key={`fundo-${moduloAtual.id}`} pastaId={moduloAtual.id} atual={moduloAtual.trilhaAparencia} capa={moduloAtual.capa_url ?? moduloAtual.capa_card_url ?? null} />
-                <ModuloIntroForm pastaId={moduloAtual.id} atual={moduloAtual.intro} />
-                <ModuloAdesivoForm pastaId={moduloAtual.id} atual={moduloAtual.adesivo_url} />
-                <ModuloPontuacaoForm pastaId={moduloAtual.id} atual={moduloAtual.pontuacao} />
-                <ModuloRegraSequencialForm key={`seq-${moduloAtual.id}`} pastaId={moduloAtual.id} atual={moduloAtual.regraSequencial} refazerBloqueado={moduloAtual.quizBloquearRefazer} />
-                <ModuloDesafiosForm key={`desafios-${moduloAtual.id}`} pastaId={moduloAtual.id} atual={moduloAtual.desafios} />
+                {/* Expandir / recolher todos os blocos. */}
+                <div className="flex items-center justify-end gap-1.5">
+                  <button type="button" onClick={() => setCfgRecolhidos(new Set())}
+                    className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                    <ChevronDown className="h-3.5 w-3.5" /> Expandir tudo
+                  </button>
+                  <button type="button" onClick={() => setCfgRecolhidos(new Set(BLOCOS_CONFIG))}
+                    className="inline-flex items-center gap-1 rounded-lg border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
+                    <ChevronUp className="h-3.5 w-3.5" /> Recolher tudo
+                  </button>
+                </div>
+                <BlocoColapsavel titulo="Identidade do módulo" aberto={!cfgRecolhidos.has('identidade')} onToggle={() => toggleCfg('identidade')}>
+                  <EditarPastaDialog
+                    key={moduloAtual.id}
+                    inline rotulo="módulo" generoM cardView={cardView}
+                    pasta={{ id: moduloAtual.id, nome: moduloAtual.nome, cor: moduloAtual.cor, capa: moduloAtual.capa_card_url, capaLarga: moduloAtual.capa_url }}
+                    onClose={() => {}}
+                    onSaved={() => router.refresh()}
+                  />
+                </BlocoColapsavel>
+                <BlocoColapsavel titulo="Fade do banner" aberto={!cfgRecolhidos.has('fade')} onToggle={() => toggleCfg('fade')}>
+                  <ModuloFadeBannerForm key={`fade-${moduloAtual.id}`} pastaId={moduloAtual.id} atual={moduloAtual.trilhaAparencia.degrade} banner={moduloAtual.capa_url ?? moduloAtual.capa_card_url ?? null} cor={moduloAtual.cor} />
+                </BlocoColapsavel>
+                <BlocoColapsavel titulo="Descrição do banner" aberto={!cfgRecolhidos.has('desc')} onToggle={() => toggleCfg('desc')}>
+                  <ModuloDescricaoForm key={`desc-${moduloAtual.id}`} pastaId={moduloAtual.id} atual={moduloAtual.trilhaAparencia.descricao} />
+                </BlocoColapsavel>
+                <BlocoColapsavel titulo="Imagem de fundo da trilha" aberto={!cfgRecolhidos.has('fundo')} onToggle={() => toggleCfg('fundo')}>
+                  <ModuloTrilhaFundoForm key={`fundo-${moduloAtual.id}`} pastaId={moduloAtual.id} atual={moduloAtual.trilhaAparencia} capa={moduloAtual.capa_url ?? moduloAtual.capa_card_url ?? null} />
+                </BlocoColapsavel>
+                <BlocoColapsavel titulo="Comece por aqui (pré-aula)" aberto={!cfgRecolhidos.has('intro')} onToggle={() => toggleCfg('intro')}>
+                  <ModuloIntroForm pastaId={moduloAtual.id} atual={moduloAtual.intro} />
+                </BlocoColapsavel>
+                <BlocoColapsavel titulo="Adesivo de conquista" aberto={!cfgRecolhidos.has('adesivo')} onToggle={() => toggleCfg('adesivo')}>
+                  <ModuloAdesivoForm pastaId={moduloAtual.id} atual={moduloAtual.adesivo_url} />
+                </BlocoColapsavel>
+                <BlocoColapsavel titulo="Pontuação (gamificação)" aberto={!cfgRecolhidos.has('pontuacao')} onToggle={() => toggleCfg('pontuacao')}>
+                  <ModuloPontuacaoForm pastaId={moduloAtual.id} atual={moduloAtual.pontuacao} totalAulas={aulas.length || undefined} />
+                </BlocoColapsavel>
+                <BlocoColapsavel titulo="Regra sequencial da trilha" aberto={!cfgRecolhidos.has('regra')} onToggle={() => toggleCfg('regra')}>
+                  <ModuloRegraSequencialForm key={`seq-${moduloAtual.id}`} pastaId={moduloAtual.id} atual={moduloAtual.regraSequencial} refazerBloqueado={moduloAtual.quizBloquearRefazer} />
+                </BlocoColapsavel>
+                <BlocoColapsavel titulo="Desafios do módulo" aberto={!cfgRecolhidos.has('desafios')} onToggle={() => toggleCfg('desafios')}>
+                  <ModuloDesafiosForm key={`desafios-${moduloAtual.id}`} pastaId={moduloAtual.id} atual={moduloAtual.desafios} />
+                </BlocoColapsavel>
               </ConfigModuloSalvarProvider>
             </div>
           )}

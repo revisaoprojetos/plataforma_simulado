@@ -47,6 +47,14 @@ export function tituloParaNivel(nivel: number, titulos: TituloNivel[]): string {
   return atual
 }
 
+/** Cargo COMPLETO (título + ícone) para um nível — mesma regra do `tituloParaNivel`. */
+export function cargoParaNivel(nivel: number, titulos: TituloNivel[]): TituloNivel | null {
+  const ordenados = [...(titulos ?? [])].sort((a, b) => a.nivel_min - b.nivel_min)
+  let atual: TituloNivel | null = ordenados[0] ?? null
+  for (const t of ordenados) if (nivel >= t.nivel_min) atual = t
+  return atual
+}
+
 export interface ProgressoNivel {
   nivel: number
   titulo: string          // cargo/título do nível atual

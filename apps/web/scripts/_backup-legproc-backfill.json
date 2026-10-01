@@ -1,0 +1,329 @@
+{
+  "timestamp": "2026-09-10T18:42:52.221Z",
+  "tenant": "02195fa6-3db8-49d0-8c07-d21328a26a13",
+  "preCount": 1,
+  "planoRows": [
+    {
+      "conjunto_id": "d8bc6f49-fca5-4173-be4f-bf041079535a",
+      "tipo": "legproc",
+      "aula": "7",
+      "conteudo": "Recuperação",
+      "ordem": 56
+    },
+    {
+      "conjunto_id": "d8bc6f49-fca5-4173-be4f-bf041079535a",
+      "tipo": "legproc",
+      "aula": "8",
+      "conteudo": "Falência",
+      "ordem": 57
+    },
+    {
+      "conjunto_id": "d8bc6f49-fca5-4173-be4f-bf041079535a",
+      "tipo": "legproc",
+      "aula": "9",
+      "conteudo": "Propriedade Industrial",
+      "ordem": 58
+    },
+    {
+      "conjunto_id": "d8bc6f49-fca5-4173-be4f-bf041079535a",
+      "tipo": "legproc",
+      "aula": "1",
+      "conteudo": "Teoria Geral do Direito Empresarial",
+      "ordem": 59
+    },
+    {
+      "conjunto_id": "d8bc6f49-fca5-4173-be4f-bf041079535a",
+      "tipo": "legproc",
+      "aula": "2",
+      "conteudo": "Teoria da Empresa",
+      "ordem": 60
+    },
+    {
+      "conjunto_id": "edb20518-74ed-4880-8674-77b37c3814d7",
+      "tipo": "legproc",
+      "aula": "7",
+      "conteudo": "Procedimentos, sentenças e recursos",
+      "ordem": 40
+    },
+    {
+      "conjunto_id": "ba3ecc8a-63f0-4f91-934e-f1ce25936033",
+      "tipo": "legproc",
+      "aula": "13",
+      "conteudo": "Direito internacional Ambiental... CONAMA",
+      "ordem": 113
+    },
+    {
+      "conjunto_id": "ba3ecc8a-63f0-4f91-934e-f1ce25936033",
+      "tipo": "legproc",
+      "aula": "01",
+      "conteudo": "Introdução ao Direito Ambiental,",
+      "ordem": 114
+    },
+    {
+      "conjunto_id": "ba3ecc8a-63f0-4f91-934e-f1ce25936033",
+      "tipo": "legproc",
+      "aula": "02",
+      "conteudo": "O Direito Ambiental na Constituição",
+      "ordem": 115
+    },
+    {
+      "conjunto_id": "ba3ecc8a-63f0-4f91-934e-f1ce25936033",
+      "tipo": "legproc",
+      "aula": "05",
+      "conteudo": "Espaços Protegidos",
+      "ordem": 116
+    },
+    {
+      "conjunto_id": "ba3ecc8a-63f0-4f91-934e-f1ce25936033",
+      "tipo": "legproc",
+      "aula": "8",
+      "conteudo": "Política Nacional de Recursos Hídricos e Resíduos Sólidos",
+      "ordem": 117
+    },
+    {
+      "conjunto_id": "ba3ecc8a-63f0-4f91-934e-f1ce25936033",
+      "tipo": "legproc",
+      "aula": "9",
+      "conteudo": "Meio Ambiente Cultural, Parcelamento do Solo Urbano",
+      "ordem": 118
+    },
+    {
+      "conjunto_id": "ae7f2e86-96c3-4cd6-8948-ac89c2ba3e26",
+      "tipo": "legproc",
+      "aula": "01",
+      "conteudo": "LINDB e Direito Civil Constitucional",
+      "ordem": 134
+    },
+    {
+      "conjunto_id": "ae7f2e86-96c3-4cd6-8948-ac89c2ba3e26",
+      "tipo": "legproc",
+      "aula": "04",
+      "conteudo": "Domicílio e Bens Princípios Tributários",
+      "ordem": 135
+    },
+    {
+      "conjunto_id": "ae7f2e86-96c3-4cd6-8948-ac89c2ba3e26",
+      "tipo": "legproc",
+      "aula": "9",
+      "conteudo": "Adimplemento das Obrigações",
+      "ordem": 136
+    },
+    {
+      "conjunto_id": "ae7f2e86-96c3-4cd6-8948-ac89c2ba3e26",
+      "tipo": "legproc",
+      "aula": "11",
+      "conteudo": "Teoria Geral dos Contratos",
+      "ordem": 137
+    },
+    {
+      "conjunto_id": "ae7f2e86-96c3-4cd6-8948-ac89c2ba3e26",
+      "tipo": "legproc",
+      "aula": "13",
+      "conteudo": "Contratos em Espécie I",
+      "ordem": 138
+    },
+    {
+      "conjunto_id": "88532aef-d29c-483d-88f1-a5c1be48fdf5",
+      "tipo": "legproc",
+      "aula": "02",
+      "conteudo": "Fenômeno da Incidência Tributária",
+      "ordem": 183
+    },
+    {
+      "conjunto_id": "88532aef-d29c-483d-88f1-a5c1be48fdf5",
+      "tipo": "legproc",
+      "aula": "05",
+      "conteudo": "Imunidades Tributárias",
+      "ordem": 184
+    },
+    {
+      "conjunto_id": "88532aef-d29c-483d-88f1-a5c1be48fdf5",
+      "tipo": "legproc",
+      "aula": "09",
+      "conteudo": "Extinção do Crédito Tributário",
+      "ordem": 185
+    },
+    {
+      "conjunto_id": "88532aef-d29c-483d-88f1-a5c1be48fdf5",
+      "tipo": "legproc",
+      "aula": "11",
+      "conteudo": "Repartição de receitas",
+      "ordem": 186
+    },
+    {
+      "conjunto_id": "88532aef-d29c-483d-88f1-a5c1be48fdf5",
+      "tipo": "legproc",
+      "aula": "15",
+      "conteudo": "ITCMD e IPVA",
+      "ordem": 187
+    },
+    {
+      "conjunto_id": "5e47a35f-32c9-43a8-a649-d6b88b4f02a3",
+      "tipo": "legproc",
+      "aula": "03",
+      "conteudo": "Ação",
+      "ordem": 175
+    },
+    {
+      "conjunto_id": "5e47a35f-32c9-43a8-a649-d6b88b4f02a3",
+      "tipo": "legproc",
+      "aula": "05",
+      "conteudo": "Competência (Parte 1)",
+      "ordem": 176
+    },
+    {
+      "conjunto_id": "5e47a35f-32c9-43a8-a649-d6b88b4f02a3",
+      "tipo": "legproc",
+      "aula": "07",
+      "conteudo": "Sujeitos do Processo I",
+      "ordem": 177
+    },
+    {
+      "conjunto_id": "5e47a35f-32c9-43a8-a649-d6b88b4f02a3",
+      "tipo": "legproc",
+      "aula": "14",
+      "conteudo": "Coisa Julgada e Precedente",
+      "ordem": 178
+    },
+    {
+      "conjunto_id": "8013cfc4-ada6-46b8-bacb-f16cca56074b",
+      "tipo": "legproc",
+      "aula": "04",
+      "conteudo": "Poderes Administrativos",
+      "ordem": 145
+    },
+    {
+      "conjunto_id": "8013cfc4-ada6-46b8-bacb-f16cca56074b",
+      "tipo": "legproc",
+      "aula": "05",
+      "conteudo": "Organização Administrativa - Parte 1",
+      "ordem": 146
+    },
+    {
+      "conjunto_id": "8013cfc4-ada6-46b8-bacb-f16cca56074b",
+      "tipo": "legproc",
+      "aula": "14",
+      "conteudo": "Licitações III",
+      "ordem": 147
+    },
+    {
+      "conjunto_id": "36a1c963-45c5-4ae3-ab81-eee36bbe793d",
+      "tipo": "legproc",
+      "aula": "07",
+      "conteudo": "Controle de Constitucionalidade (Parte 4)",
+      "ordem": 146
+    },
+    {
+      "conjunto_id": "36a1c963-45c5-4ae3-ab81-eee36bbe793d",
+      "tipo": "legproc",
+      "aula": "12",
+      "conteudo": "Direitos Fundamentais II",
+      "ordem": 147
+    },
+    {
+      "conjunto_id": "36a1c963-45c5-4ae3-ab81-eee36bbe793d",
+      "tipo": "legproc",
+      "aula": "14",
+      "conteudo": "Ordem social (parte 1)",
+      "ordem": 148
+    },
+    {
+      "conjunto_id": "84377218-94e1-4c6d-a184-1c1358b0a0a1",
+      "tipo": "legproc",
+      "aula": "03",
+      "conteudo": "Contrato individual de trabalho,",
+      "ordem": 81
+    },
+    {
+      "conjunto_id": "84377218-94e1-4c6d-a184-1c1358b0a0a1",
+      "tipo": "legproc",
+      "aula": "04",
+      "conteudo": "Duração do contrato de trabalho",
+      "ordem": 82
+    },
+    {
+      "conjunto_id": "94d3480b-ebe2-410b-ba80-666ea4916a28",
+      "tipo": "legproc",
+      "aula": "02",
+      "conteudo": "Competência",
+      "ordem": 72
+    },
+    {
+      "conjunto_id": "937e20f1-dc18-4c61-8f65-da72f22a64b4",
+      "tipo": "legproc",
+      "aula": "05",
+      "conteudo": "Despesas Públicas I",
+      "ordem": 47
+    },
+    {
+      "conjunto_id": "937e20f1-dc18-4c61-8f65-da72f22a64b4",
+      "tipo": "legproc",
+      "aula": "6",
+      "conteudo": "Despesas Públicas II",
+      "ordem": 48
+    },
+    {
+      "conjunto_id": "937e20f1-dc18-4c61-8f65-da72f22a64b4",
+      "tipo": "legproc",
+      "aula": "7",
+      "conteudo": "Crédito Público",
+      "ordem": 49
+    },
+    {
+      "conjunto_id": "b1cf346a-de53-441a-8d05-b3788405b9bf",
+      "tipo": "legproc",
+      "aula": "2",
+      "conteudo": "Previdência Social, Custeio e RGPS",
+      "ordem": 37
+    },
+    {
+      "conjunto_id": "f3d3e87e-0460-43d7-bb9c-d711b479b902",
+      "tipo": "legproc",
+      "aula": "2",
+      "conteudo": "Atividade Econômica",
+      "ordem": 32
+    }
+  ],
+  "inseridosIds": [
+    "063b3ee3-be4b-4558-8c78-dfc0de170c84",
+    "8f574714-fa12-4ddd-93b5-9347ac61a622",
+    "2854423a-df78-4ea2-b301-3358294800af",
+    "16f0bb22-03c0-4c94-a24b-6825125f396c",
+    "ba1be1a0-cc9f-415b-bd97-ee13fbe5c876",
+    "89fdccf6-00f2-4ab6-96ac-460c1d4c59f4",
+    "ae7dd86e-2c32-4982-9eab-b849b4db6266",
+    "e9b762b1-f41c-47d7-8db4-911bf052f51d",
+    "423d6dc0-4689-44d9-a3a6-6931fc935e0e",
+    "7788456d-7197-412e-b9d5-e4774c5fd88d",
+    "e59ae73d-8839-486d-a2cc-35a47145d28f",
+    "850e84ae-36c3-433c-b0ee-dcfba3a05503",
+    "a0ae0116-eb0b-43cb-8fa0-216dc58e020a",
+    "8efe72e0-5977-408a-b729-8c1f047a9e2a",
+    "bf4bc442-6029-4a22-a4eb-ff86ea9ff255",
+    "c2e6c9b7-6e22-4065-ad47-6ef699efd350",
+    "c3ba2720-1cb2-4422-869b-14cddc22f479",
+    "902f53d4-ab21-44c7-be11-ddcdfcc4d47c",
+    "11b29a69-ad20-4158-92f4-f0203ab998ec",
+    "8fdc3ddc-3199-48e8-b9b9-9e8e7f089440",
+    "1d9b06fb-0268-4e4b-a371-ea4ec6dcac86",
+    "f8d82bdc-361d-44ca-b9ae-a0a111674a5f",
+    "5c9ebfb2-9ade-4270-9b1b-b98c27101b39",
+    "a93fa66b-d38d-4df2-a065-6674ff7a06e5",
+    "f7611f3f-bb18-43d2-a2bf-b114e60873f2",
+    "e72cb3e3-02bd-4794-aab4-89b05a58693f",
+    "27acad29-ad69-41c0-a78b-8317a3f13fe3",
+    "28b3f3fa-ffde-4689-bd24-1355c0efec93",
+    "ffb906d3-15d3-4205-bf53-ca555610d555",
+    "2098444e-0497-4f0d-bfee-5243e1f5bf53",
+    "96ac9141-d991-45c7-b639-31295079f90f",
+    "2a6c62f9-2ec3-49b9-9733-93258b59e9ef",
+    "caac75a2-a974-4605-8d4a-729e595bf9c7",
+    "4f499616-2e7d-4104-b85d-3bfe694b32aa",
+    "6eaa4d85-6491-4377-a1ed-5553eda34ab3",
+    "0e230545-fb7e-4fbb-9029-36eb12fc18b4",
+    "b4c85e0c-f6fc-47ca-9526-d289d07f1166",
+    "90c8d058-56ba-4983-abb2-7ab7291befda",
+    "ce2866e7-1560-45bf-9a52-9d3de6732dfa",
+    "02c626f5-a8ad-4430-90dc-0ff3e7718457"
+  ]
+}

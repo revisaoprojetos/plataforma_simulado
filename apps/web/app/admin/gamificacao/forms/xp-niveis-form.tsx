@@ -10,6 +10,7 @@ import { xpAcumuladoParaNivel, tituloParaNivel } from '@/lib/gamificacao/niveis'
 import { salvarXpNiveis } from '../actions'
 import { NumberField, SaveBar, SectionCard } from './_campos'
 import { useUnsavedGuard } from '@/components/admin/use-unsaved-guard'
+import { CargoIconePicker } from '@/components/admin/cargo-icone-picker'
 
 export function XpNiveisForm({ config, podeGerenciar, nivelMaisAlto = 1 }: { config: GamConfig; podeGerenciar: boolean; nivelMaisAlto?: number }) {
   const [simulado, setSimulado] = useState(config.xp_regras.simulado)
@@ -64,7 +65,7 @@ export function XpNiveisForm({ config, podeGerenciar, nivelMaisAlto = 1 }: { con
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2 lg:items-stretch">
-        <SectionCard titulo="Curva de níveis" icon={TrendingUp} tom="var(--primary)" descricao="Custo do nível n→n+1 = base + (n−1) × incremento. Cresce a cada nível." className="flex flex-col lg:h-[34rem]">
+        <SectionCard titulo="Curva de níveis" icon={TrendingUp} tom="var(--primary)" descricao="Custo do nível n→n+1 = base + (n−1) × incremento. Cresce a cada nível." className="flex flex-col lg:h-[46rem]">
           <div className="grid grid-cols-3 gap-2.5">
             <NumberField stacked label="Custo base (1→2)" value={curva.base} onChange={(v) => setCurva({ ...curva, base: v })} suffix="XP" hint="XP para sair do nível 1 para o 2." disabled={!podeGerenciar} />
             <NumberField stacked label="Incremento" value={curva.incremento} onChange={(v) => setCurva({ ...curva, incremento: v })} suffix="XP" hint="Quanto o custo sobe a cada nível." disabled={!podeGerenciar} />
@@ -111,13 +112,16 @@ export function XpNiveisForm({ config, podeGerenciar, nivelMaisAlto = 1 }: { con
           </div>
         </SectionCard>
 
-        <SectionCard titulo="Cargos por nível" icon={Briefcase} tom="#10b981" descricao="Título exibido ao aluno a partir de cada nível (ex.: Aprendiz → Júnior → Sênior → Promotor → Advogado). Vale até o próximo cargo." className="flex flex-col lg:h-[34rem]">
+        <SectionCard titulo="Cargos por nível" icon={Briefcase} tom="#10b981" descricao="Título exibido ao aluno a partir de cada nível (ex.: Aprendiz → Júnior → Sênior → Promotor → Advogado). Vale até o próximo cargo." className="flex flex-col lg:h-[46rem]">
           <div className="min-h-0 max-h-[24rem] flex-1 space-y-2 overflow-auto rounded-lg border bg-muted/10 p-2 lg:max-h-none">
             {[...titulos].sort((a, b) => a.nivel_min - b.nivel_min).map((t) => {
               const i = titulos.indexOf(t)
               return (
                 <div key={i} className="flex flex-wrap items-end gap-3 rounded-xl border bg-card p-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Briefcase className="h-5 w-5" /></span>
+                  <label className="space-y-1">
+                    <span className="block text-[11px] font-medium text-muted-foreground">Ícone</span>
+                    <CargoIconePicker value={t.icone} onChange={(k) => setTitulo(i, { icone: k })} disabled={!podeGerenciar} />
+                  </label>
                   <label className="w-28 space-y-1">
                     <span className="block text-[11px] font-medium text-muted-foreground">A partir do nível</span>
                     <Input type="number" min={1} value={t.nivel_min} onChange={(e) => setTitulo(i, { nivel_min: Math.max(1, Number(e.target.value || 1)) })} disabled={!podeGerenciar} />
