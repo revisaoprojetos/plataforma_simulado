@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { headers } from 'next/headers'
 import { createServiceClient, createAdminClient } from '@/lib/supabase/server'
 import { AdminSidebar } from '@/components/admin/sidebar'
+import { resolverSidebarRotulos } from '@/lib/sidebar-rotulos'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { SidebarEdgeToggle } from '@/components/ui/sidebar-collapse'
 import { CanProvider } from '@/components/auth/can-provider'
@@ -176,7 +177,7 @@ export default async function AdminLayout({
       <ImpersonationDockProvider podeAbrir={!!impPerm} isAdmin={access.isAdmin} loading={impLoading}>
       <SidebarProvider>
         <div className="flex h-screen w-full overflow-hidden">
-          <AdminSidebar logo={ti.logo_url ?? null} nome={ti.nome_site ?? tenantNome ?? 'Plataforma'} subtitulo={ti.subtitulo_site ?? null} logoBg={ti.logo_png_bg ?? '#ffffff'} logoEstilo={ti.logo_estilo ?? 'arredondado'} logoFiltro={ti.logo_filtro_sistema ?? ti.logo_filtro ?? 'none'} isSuperAdmin={superAdmin} podeTrocarPlataforma={podeTrocarPlataforma} userName={userName} userEmail={userEmail} loginConfig={resolverLoginConfig(ti.login)} counts={counts} areasBloqueadas={areasBloqueadas} />
+          <AdminSidebar logo={ti.logo_url ?? null} nome={ti.nome_site ?? tenantNome ?? 'Plataforma'} subtitulo={ti.subtitulo_site ?? null} logoBg={ti.logo_png_bg ?? '#ffffff'} logoEstilo={ti.logo_estilo ?? 'arredondado'} logoFiltro={ti.logo_filtro_sistema ?? ti.logo_filtro ?? 'none'} isSuperAdmin={superAdmin} podeTrocarPlataforma={podeTrocarPlataforma} userName={userName} userEmail={userEmail} loginConfig={resolverLoginConfig(ti.login)} counts={counts} areasBloqueadas={areasBloqueadas} rotulos={resolverSidebarRotulos(ti.sidebar_rotulos).admin} />
           <TourProvider>
             <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
               <SidebarEdgeToggle mode="icon" />

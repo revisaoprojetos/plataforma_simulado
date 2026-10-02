@@ -28,7 +28,8 @@ Honestidade metodológica — parte é medição, parte é inferência da audito
   - ⚠️ **Nomes de cobrança TROCADOS vs refs:** cobrança **"app-simulado" = ref `twdrtlxkjvunkdobudev` = a PRODUÇÃO REAL** (o banco que o código usa). "revisao" = ref `tlaxvhcqswiotzibulyo` = projeto antigo/ocioso (sondagem deu "fetch failed" = pausado). **Logo os 1211 GB são a produção de verdade.**
   - Contagem de linhas (produção): respostas_objetivas **169.700** · leitura_respostas 31.335 · xp_eventos 44.740 · estudantes 19.209 · sessoes_prova 3.734 · questoes 3.032 · audit_logs 6.153 · arquivos 432.
   - Padrões no código: `select('*')` (22), pollings de rede (8), crons (frequências), uploads sem cache, `fetchAll` nos relatórios.
-- ❓ **INFERIDO (a confirmar → AÇÃO A0):** a **distribuição do egress por TIPO** (Database/API × Storage × Realtime × Auth × Supavisor) **não foi medida** no painel. A ordem de causas na §4 é **hipótese** baseada no código; é plausível que **Storage** (imagens/PDF a 19k alunos) dispute o topo com os **relatórios**. **Pegar esse breakdown antes de cravar a prioridade.**
+- ❓ **INFERIDO (a confirmar → AÇÃO A0):** a **distribuição do egress por TIPO** (Database/API × Storage × Realtime × Auth × Supavisor) **não foi medida** no painel. A ordem de causas na §4 é **hipótese** baseada no código. **Pegar esse breakdown antes de cravar a prioridade.**
+- 🔬 **PROXY do A0 (2026-09-25, medido no banco):** o **footprint do Storage é minúsculo — 0,23 GB** (pdfs 120MB + imagens 102MB + discursivas 7MB, 433 arquivos no catálogo `simulado_arquivos`). Para o Storage gerar centenas de GB seria preciso baixar cada arquivo milhares de vezes sem cache. **Conclusão forte: os 1211 GB são dominados por LEITURAS DE BANCO** (relatórios varrendo ~170k respostas + crons 24/7 + SSR), não por Storage. ⇒ **T8/T12 (Storage) = BAIXO valor; o lever é A1 (`DATABASE_URL`/SQL agregado) + as otimizações de DB já feitas + T9 (índices).**
 
 ---
 

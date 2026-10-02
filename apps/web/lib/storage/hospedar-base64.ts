@@ -46,6 +46,37 @@ export async function hospedarBase64(valor: string | null | undefined, svc: any,
 }
 
 /**
+ * Igual ao `hospedarBase64`, mas para ÁUDIO (`data:audio/...`) — ex.: música de fundo do Desafio de
+ * Jurisprudência. Sobe para `{BUCKET_IMAGENS}/audio/` (dedupe por hash) e devolve a URL pública. Se já
+ * for URL, devolve inalterado. Best-effort: mantém o valor original se o storage falhar.
+ */
+export async function hospedarAudioBase64(valor: string | null | undefined, svc: any, opts?: { tenantId?: string | null; criadoPor?: string | null }): Promise<string | null> {
+  const v = (valor ?? '').trim()
+  if (!v) return null
+  if (!v.startsWith('data:audio')) return v // já é URL/caminho
+  const m = /^data:audio\/([a-z0-9.+-]+);base64,(.+)$/i.exec(v)
+  if (!m) return v
+  const tipo = m[1].toLowerCase()
+  const ext = tipo === 'mpeg' ? 'mp3' : tipo === 'x-m4a' ? 'm4a' : tipo === 'x-wav' ? 'wav' : tipo
+  const buf = Buffer.from(m[2], 'base64')
+  const nome = `${createHash('sha1').update(buf).digest('hex').slice(0, 24)}.${ext}`
+  const path = `audio/${nome}`
+  const contentType = `audio/${tipo}`
+  // Checa o ERRO do upload (supabase-js não lança) — se o bucket restringe MIME (só imagens), tenta o
+  // bucket de pdfs; se nenhum aceitar, MANTÉM o base64 (toca embutido) em vez de devolver URL inválida.
+  for (const bucket of [BUCKET_IMAGENS, 'pdfs']) {
+    try {
+      const { error } = await svc.storage.from(bucket).upload(path, buf, { contentType, upsert: true, cacheControl: '31536000' })
+      if (error) continue
+      if (opts?.tenantId) await registrarArquivo(svc, { tenantId: opts.tenantId, nome, tipo: contentType, bucket, path, tamanho: buf.length, criadoPor: opts.criadoPor })
+      const url = svc.storage.from(bucket).getPublicUrl(path).data.publicUrl as string
+      if (url) return url
+    } catch { /* tenta o próximo bucket */ }
+  }
+  return v
+}
+
+/**
  * Percorre um objeto (ex.: `tema` jsonb) e troca TODA string base64 de imagem por URL hospedada,
  * mutando in-place. Usado antes de gravar o tema (logo, login, fundos) para não inflar a linha do
  * tenant com data URLs enormes. Best-effort por campo (mantém base64 se o upload falhar).

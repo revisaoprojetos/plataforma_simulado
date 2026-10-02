@@ -1,7 +1,8 @@
 'use client'
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Fingerprint, Palette, LoaderCircle, Settings2, PanelTop, MonitorPlay, LayoutGrid, Sparkles, Contact, Smartphone, StretchHorizontal } from 'lucide-react'
+import { Fingerprint, Palette, LoaderCircle, Settings2, PanelTop, MonitorPlay, LayoutGrid, Sparkles, Contact, Smartphone, StretchHorizontal, PanelLeft } from 'lucide-react'
+import { MenuLateralForm } from './menu-lateral-form'
 import { ConfiguracoesForm } from './configuracoes-form'
 import { CardViewForm } from './card-view-form'
 import { CarregamentoForm } from './carregamento-form'
@@ -24,6 +25,7 @@ export function ConfiguracoesTabs({ tema, salvarTema, capasSistema }: { tema: an
         <TabsTrigger value="selecao"><LayoutGrid /> Seleção</TabsTrigger>
         <TabsTrigger value="tema"><Palette /> Cores &amp; Tema</TabsTrigger>
         <TabsTrigger value="carregamento"><LoaderCircle /> Carregamento</TabsTrigger>
+        <TabsTrigger value="menu"><PanelLeft /> Menu lateral</TabsTrigger>
         <TabsTrigger value="mobile"><Smartphone /> Mobile</TabsTrigger>
         <TabsTrigger value="cards"><StretchHorizontal /> Cards</TabsTrigger>
         <TabsTrigger value="assistente"><Sparkles /> Assistente</TabsTrigger>
@@ -57,6 +59,10 @@ export function ConfiguracoesTabs({ tema, salvarTema, capasSistema }: { tema: an
             <ImersaoForm tema={tema} salvarTema={salvarTema} />
           </TabsContent>
         </Tabs>
+      </TabsContent>
+
+      <TabsContent value="menu">
+        <MenuLateralForm tema={tema} salvarTema={salvarTema} />
       </TabsContent>
 
       <TabsContent value="mobile">

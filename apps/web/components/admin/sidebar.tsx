@@ -76,7 +76,8 @@ import { logoutAction } from '@/app/login/actions'
 import { confirmarDescartarAlteracoes } from '@/components/admin/use-unsaved-guard'
 import { LoginLoading } from '@/components/aluno/login-loading'
 import { LOGIN_DEFAULT, type LoginConfig } from '@/lib/login-config'
-import { LEITURA_ATIVA, MODELOS_CADERNO_ATIVO } from '@/lib/flags'
+import { LEITURA_ATIVA, JURISPRUDENCIA_ATIVA, MODELOS_CADERNO_ATIVO } from '@/lib/flags'
+import { rotuloDe, IconeMenu, RotuloMenu, type SidebarRotulosAdmin } from '@/lib/sidebar-rotulos'
 
 type IconType = React.ComponentType<{ className?: string; style?: React.CSSProperties }>
 
@@ -140,6 +141,16 @@ const navGroups: NavGroup[] = [
     items: [
       { label: 'Biblioteca', href: '/admin/leitura', icon: Library, perm: 'leitura:view', oculto: !LEITURA_ATIVA },
       { label: 'Análise', href: '/admin/leitura/analise', icon: BarChart3, perm: 'relatorios:view', oculto: !LEITURA_ATIVA },
+    ],
+  },
+  {
+    // Desafio de Jurisprudência — 2ª área do motor de desafios (SÓ quiz). Gated por JURISPRUDENCIA_ATIVA.
+    // Rótulo curto na sidebar (cabe em 1 linha); o nome completo fica no título da página.
+    label: 'Jurisprudência',
+    icon: Library,
+    items: [
+      { label: 'Biblioteca', href: '/admin/jurisprudencia', icon: Library, perm: 'leitura:view', oculto: !JURISPRUDENCIA_ATIVA },
+      // 'Análise' volta na F4 (rota /admin/jurisprudencia/analise ainda não existe).
     ],
   },
   {
@@ -261,7 +272,10 @@ function filtroLogo(f?: string): string | undefined {
   return undefined
 }
 
-export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none', isSuperAdmin = false, podeTrocarPlataforma = true, userName = 'Administrador', userEmail, loginConfig, counts, areasBloqueadas = [] }: { logo?: string | null; nome?: string; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string; isSuperAdmin?: boolean; podeTrocarPlataforma?: boolean; userName?: string; userEmail?: string | null; loginConfig?: LoginConfig; counts?: Record<string, number>; areasBloqueadas?: string[] }) {
+export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none', isSuperAdmin = false, podeTrocarPlataforma = true, userName = 'Administrador', userEmail, loginConfig, counts, areasBloqueadas = [], rotulos }: { logo?: string | null; nome?: string; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string; isSuperAdmin?: boolean; podeTrocarPlataforma?: boolean; userName?: string; userEmail?: string | null; loginConfig?: LoginConfig; counts?: Record<string, number>; areasBloqueadas?: string[]; rotulos?: SidebarRotulosAdmin }) {
+  // Rótulos/ícones personalizados por tenant (menu lateral): texto por chave estável, ícone via IconeMenu.
+  const lblGrupo = (g: NavGroup) => rotuloDe(rotulos?.grupos, g.label, g.label)
+  const lblItem = (i: NavItem) => rotuloDe(rotulos?.itens, i.href, i.label)
   const pathname = usePathname()
   const [saindo, setSaindo] = useState(false)
   const search = useSearchParams()
@@ -324,9 +338,9 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
             <SidebarMenu className="gap-1">
               {/* Dashboard (item solto) */}
               <SidebarMenuItem>
-                <SidebarMenuButton className={NAV_STATES} render={<Link href={dashboard.href} />} isActive={itemAtivo(dashboard, pathname, search)} tooltip={dashboard.label}>
-                  <dashboard.icon className="h-4 w-4" />
-                  <span>{dashboard.label}</span>
+                <SidebarMenuButton className={NAV_STATES} render={<Link href={dashboard.href} />} isActive={itemAtivo(dashboard, pathname, search)} tooltip={lblItem(dashboard)}>
+                  <IconeMenu override={rotulos?.itens?.[dashboard.href]?.icone} fallback={dashboard.icon} className="h-4 w-4" ativo={itemAtivo(dashboard, pathname, search)} />
+                  <RotuloMenu map={rotulos?.itens} chave={dashboard.href} fallback={dashboard.label} ativo={itemAtivo(dashboard, pathname, search)} />
                 </SidebarMenuButton>
               </SidebarMenuItem>
 
@@ -342,8 +356,8 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
                     <SidebarMenuItem key={group.label}>
                       <DropdownMenu>
                         <DropdownMenuTrigger
-                          aria-label={group.label}
-                          title={group.label}
+                          aria-label={lblGrupo(group)}
+                          title={lblGrupo(group)}
                           data-active={ativo ? 'true' : undefined}
                           className={cn(
                             'mx-auto flex h-8 w-8 items-center justify-center rounded-md outline-none transition-colors',
@@ -356,7 +370,7 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
                             ativo && 'bg-[color:var(--sidebar-accent)]',
                           )}
                         >
-                          <group.icon className="h-4 w-4" />
+                          <IconeMenu override={rotulos?.grupos?.[group.label]?.icone} fallback={group.icon} className="h-4 w-4" ativo={ativo} />
                         </DropdownMenuTrigger>
                         {/* Flyout em LEQUE que ENVOLVE o ícone: align=center põe o leque na altura
                             do ícone; o recuo em ARCO (meio mais à direita, pontas recuadas para junto
@@ -389,7 +403,7 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
                                   )}
                                 >
                                   <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: cor }} />
-                                  <span className="truncate">{item.label}</span>
+                                  <span className="truncate">{lblItem(item)}</span>
                                   {cnt != null && <span className="ml-auto shrink-0 pl-2 text-xs font-semibold tabular-nums text-neutral-400 dark:text-neutral-500">{cnt.toLocaleString('pt-BR')}</span>}
                                 </DropdownMenuItem>
                               )
@@ -408,10 +422,10 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
                       onClick={() => toggle(group.label)}
                       isActive={ativo}
                       aria-expanded={aberto}
-                      tooltip={group.label}
+                      tooltip={lblGrupo(group)}
                     >
-                      <group.icon className="h-4 w-4" />
-                      <span>{group.label}</span>
+                      <IconeMenu override={rotulos?.grupos?.[group.label]?.icone} fallback={group.icon} className="h-4 w-4" ativo={ativo} />
+                      <RotuloMenu map={rotulos?.grupos} chave={group.label} fallback={group.label} ativo={ativo} />
                       <ChevronDown
                         className={cn('ml-auto h-4 w-4 transition-transform group-data-[collapsible=icon]:hidden', aberto && 'rotate-180')}
                       />
@@ -430,8 +444,8 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
                                 render={<Link href={item.href} />}
                                 isActive={itemAtivo(item, pathname, search)}
                               >
-                                <item.icon className="h-4 w-4" />
-                                <span>{item.label}</span>
+                                <IconeMenu override={rotulos?.itens?.[item.href]?.icone} fallback={item.icon} className="h-4 w-4" ativo={itemAtivo(item, pathname, search)} />
+                                <RotuloMenu map={rotulos?.itens} chave={item.href} fallback={item.label} ativo={itemAtivo(item, pathname, search)} />
                               </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
                           ))}

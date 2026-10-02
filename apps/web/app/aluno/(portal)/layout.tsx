@@ -10,6 +10,7 @@ import { Suspense } from 'react'
 import { SidebarProvider } from '@/components/ui/sidebar'
 import { SidebarEdgeToggle } from '@/components/ui/sidebar-collapse'
 import { AlunoSidebar } from '@/components/aluno/aluno-sidebar'
+import { resolverSidebarRotulos } from '@/lib/sidebar-rotulos'
 import { AlunoMobileNav } from '@/components/aluno/aluno-mobile-nav'
 import { GuiaTourRunner } from '@/components/aluno/guia-tour-runner'
 import { cn } from '@/lib/utils'
@@ -82,6 +83,7 @@ export default async function AlunoPortalLayout({ children }: { children: React.
   const { css, tema, tenantNome } = themeData
   const { counts, personalizados: simuladosPersonalizados } = contadores
   const t = (tema ?? {}) as any
+  const rotulosAluno = resolverSidebarRotulos(t.sidebar_rotulos).aluno
   // Layout de navegação MOBILE, escolhido no console (Aparência → Mobile): 'tabs' | 'menu'.
   const navMode: 'tabs' | 'menu' = t.mobile_nav === 'menu' ? 'menu' : 'tabs'
   const { progresso, gamAtivo } = gamData
@@ -117,7 +119,7 @@ export default async function AlunoPortalLayout({ children }: { children: React.
       <GuiaTourRunner gamAtivo={gamAtivo} />
       <SidebarProvider>
         <div className="flex h-screen w-full overflow-hidden">
-          <AlunoSidebar logo={t.logo_url ?? null} nome={t.nome_site ?? tenantNome ?? 'Área do Aluno'} subtitulo={t.subtitulo_site ?? 'Área do aluno'} logoBg={t.logo_png_bg ?? '#ffffff'} logoEstilo={t.logo_estilo ?? 'arredondado'} logoFiltro={t.logo_filtro_sistema ?? t.logo_filtro ?? 'none'} usuarioNome={sessao.nome} usuarioEmail={sessao.email} avatar={avatarUsuario} avatarCor={avatarCorUsuario} counts={counts} simuladosPersonalizados={simuladosPersonalizados} loginConfig={resolverLoginConfig(t.login)} progresso={progresso} gamAtivo={gamAtivo} hrefsOcultos={hrefsOcultosAluno} pendenciasLeitura={pendLeitura} />
+          <AlunoSidebar logo={t.logo_url ?? null} nome={t.nome_site ?? tenantNome ?? 'Área do Aluno'} subtitulo={t.subtitulo_site ?? 'Área do aluno'} logoBg={t.logo_png_bg ?? '#ffffff'} logoEstilo={t.logo_estilo ?? 'arredondado'} logoFiltro={t.logo_filtro_sistema ?? t.logo_filtro ?? 'none'} usuarioNome={sessao.nome} usuarioEmail={sessao.email} avatar={avatarUsuario} avatarCor={avatarCorUsuario} counts={counts} simuladosPersonalizados={simuladosPersonalizados} loginConfig={resolverLoginConfig(t.login)} progresso={progresso} gamAtivo={gamAtivo} hrefsOcultos={hrefsOcultosAluno} pendenciasLeitura={pendLeitura} rotulos={rotulosAluno} />
           <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
             {/* Toggle de recolher a sidebar: só no desktop (no mobile vale o chrome abaixo). */}
             <SidebarEdgeToggle hideOnMobile />

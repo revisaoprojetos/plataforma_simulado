@@ -1,5 +1,24 @@
 import { sqlQuery } from './sql'
 
+export type DiasLedgerRow = { estudante_id: string; dias: string[] }
+/**
+ * Dias de CONCLUSÃO de aula (IMUTÁVEL) por aluno, do ledger de XP (origem='leitura', eventos de quiz
+ * 'quiz:*'). `meta.dia` é carimbado na 1ª conclusão e NÃO muda ao refazer — por isso é a fonte correta
+ * da SEQUÊNCIA do Desafio (o `respondido_em` era sobrescrito no refazimento e quebrava o streak).
+ * Agregado no banco (1 linha/aluno). `null` sem DATABASE_URL → o chamador cai no PostgREST. Filtra tenant.
+ */
+export async function diasConclusaoLedgerSql(tenantId: string, docIds: string[]): Promise<DiasLedgerRow[] | null> {
+  if (!docIds.length) return []
+  return sqlQuery<DiasLedgerRow>(
+    `SELECT estudante_id, array_agg(DISTINCT meta->>'dia') AS dias
+       FROM simulado_xp_eventos
+      WHERE tenant_id = $1 AND origem = 'leitura' AND ref_id LIKE 'quiz:%'
+        AND meta->>'documentoId' = ANY($2::text[]) AND meta->>'dia' IS NOT NULL
+      GROUP BY estudante_id`,
+    [tenantId, docIds],
+  )
+}
+
 /**
  * Engajamento do Desafio de Lei Seca × ASSINATURA (pagamento recorrente Guru). Cruza, no banco, a base
  * de assinaturas ativas com a atividade na Leitura (todas as pastas folder_area='leitura' do tenant).

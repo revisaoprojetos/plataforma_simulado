@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 112" role="img" aria-label="Selo Constitucional conquistado"><style>@import url("https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,500;0,600;0,800;0,900;1,900&amp;family=VT323&amp;display=swap");</style>
+    <circle cx="50" cy="44" r="34" fill="#0b1150" stroke="#ffc83d" stroke-width="2" opacity=".9"/>
+    <path d="M77.19 31.32A30 30 0 1 1 45.82 14.29" fill="none" stroke="#ffc83d" stroke-width="4" /><path d="M44.48 7.61L55.93 12.87L46.38 21.08Z" fill="#ffc83d" />
+    <text x="50" y="22" text-anchor="middle" font-family="VT323,monospace" font-size="7" fill="#fff" letter-spacing=".5">MATÉRIA 03</text>
+    <g transform="translate(38.3 34.3) scale(2.6)"><path fill="#ffc83d" d="M1 0h1v1h-1zM2 0h1v1h-1zM3 0h1v1h-1zM4 0h1v1h-1zM5 0h1v1h-1zM6 0h1v1h-1zM1 1h1v1h-1zM6 1h1v1h-1zM7 1h1v1h-1zM1 2h1v1h-1zM3 2h1v1h-1zM4 2h1v1h-1zM7 2h1v1h-1zM1 3h1v1h-1zM7 3h1v1h-1zM1 4h1v1h-1zM3 4h1v1h-1zM4 4h1v1h-1zM5 4h1v1h-1zM7 4h1v1h-1zM1 5h1v1h-1zM7 5h1v1h-1zM1 6h1v1h-1zM3 6h1v1h-1zM4 6h1v1h-1zM5 6h1v1h-1zM7 6h1v1h-1zM1 7h1v1h-1zM7 7h1v1h-1zM1 8h1v1h-1zM2 8h1v1h-1zM3 8h1v1h-1zM4 8h1v1h-1zM5 8h1v1h-1zM6 8h1v1h-1zM7 8h1v1h-1z" shape-rendering="crispEdges"/></g>
+    
+    <path d="M10 78 h80 l-5 6 5 6 h-80 l5 -6z" fill="#7c3aed" stroke="#ffc83d" stroke-width="1"/>
+    <text x="50" y="86.5" text-anchor="middle" font-family="Montserrat,sans-serif" font-weight="800" font-size="6" fill="#fff" letter-spacing=".3">CONSTITUCIONAL</text>
+    <text x="50" y="102" text-anchor="middle" font-family="VT323,monospace" font-size="9" fill="#fff" opacity=".8">DIAS 5 E 6</text>
+  </svg>

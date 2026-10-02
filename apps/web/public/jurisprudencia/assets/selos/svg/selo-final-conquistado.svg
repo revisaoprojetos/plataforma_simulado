@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160" role="img" aria-label="Selo final JurisClub conquistado"><style>@import url("https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,500;0,600;0,800;0,900;1,900&amp;family=VT323&amp;display=swap");</style>
+    <defs><linearGradient id="fm4" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#a855f7"/><stop offset="1" stop-color="#3b82f6"/></linearGradient></defs>
+    <circle cx="80" cy="80" r="77" fill="#070b3c"/>
+    <circle cx="80" cy="80" r="64" fill="#140f4c"/>
+    <path d="M143.90 56.74A68 68 0 1 1 75.26 12.17" fill="none" stroke="#ffc83d" stroke-width="7.5" /><path d="M74.10 1.35L91.53 11.03L75.62 23.04Z" fill="#ffc83d" />
+    <text x="80" y="35" text-anchor="middle" font-family="VT323,monospace" font-size="10" letter-spacing="1.6" fill="#ffd86b">SELO FINAL</text>
+    <path d="M34.07 85.81A49 49 0 0 1 75.18 47.48" fill="none" stroke="url(#fm4)" stroke-width="3" /><path d="M73.99 41.89L83.65 46.29L75.58 53.18Z" fill="#3b82f6" />
+    <path d="M44 103 A45 45 0 0 1 52 66" fill="none" stroke="#7c3aed" stroke-width="1.4"/>
+    <path d="M92 131 A37 37 0 0 0 116 109" fill="none" stroke="#7c3aed" stroke-width="1.6"/>
+    <rect x="47.5" y="65.5" width="49.5" height="10" rx="5" fill="#3b82f6"/>
+    <text x="72.2" y="73.3" text-anchor="middle" font-family="Montserrat,sans-serif" font-weight="900" font-size="6.6" textLength="37" lengthAdjust="spacingAndGlyphs" fill="#ffffff">REVISÃO</text>
+    <text x="49" y="91.5" font-family="Montserrat,sans-serif" font-weight="900" font-style="italic" font-size="20" textLength="86" lengthAdjust="spacingAndGlyphs" fill="#ffffff">JurisClub</text>
+    <text x="49.5" y="102.3" font-family="Montserrat,sans-serif" font-weight="500" font-size="9" textLength="62" lengthAdjust="spacingAndGlyphs" fill="#ffffff">O seu Clube de</text>
+    <text x="49.5" y="112.3" font-family="Montserrat,sans-serif" font-weight="800" font-size="9" textLength="58" lengthAdjust="spacingAndGlyphs" fill="#ffffff">Atualizações</text>
+    <text x="49.5" y="126.5" font-family="Montserrat,sans-serif" font-weight="900" font-size="16" textLength="40.5" lengthAdjust="spacingAndGlyphs" fill="#ffffff">2026</text>
+    
+  </svg>

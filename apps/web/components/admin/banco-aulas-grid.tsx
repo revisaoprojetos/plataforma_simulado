@@ -51,7 +51,7 @@ export type { ModuloTab }
  */
 const BLOCOS_CONFIG = ['identidade', 'fade', 'desc', 'fundo', 'intro', 'adesivo', 'pontuacao', 'regra', 'desafios'] as const
 
-export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTab = 'aulas', semBreadcrumb = false, semTabs = false }: { data: BancoAulas; pastaAtual: string | null; cardView?: CardView; moduloTab?: ModuloTab; semBreadcrumb?: boolean; semTabs?: boolean }) {
+export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTab = 'aulas', semBreadcrumb = false, semTabs = false, basePath = '/admin/leitura', areaKey = 'leitura', basePathAluno = '/aluno/leitura', temLeitura = true }: { data: BancoAulas; pastaAtual: string | null; cardView?: CardView; moduloTab?: ModuloTab; semBreadcrumb?: boolean; semTabs?: boolean; basePath?: string; areaKey?: 'leitura' | 'jurisprudencia'; basePathAluno?: string; temLeitura?: boolean }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   // Recolher/expandir os blocos da aba Configurações (ids em BLOCOS_CONFIG).
@@ -72,7 +72,7 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTa
   const aulaIdsKey = aulas.map((a) => a.id).join(',')
   useEffect(() => {
     if (!dentroDeBanco || moduloTab !== 'aulas' || !aulaIdsKey) return
-    const rotas = aulaIdsKey.split(',').flatMap((id) => [`/admin/leitura/${id}?tab=config`, `/admin/leitura/${id}/questoes`])
+    const rotas = aulaIdsKey.split(',').flatMap((id) => [`${basePath}/${id}?tab=config`, `${basePath}/${id}/questoes`])
     let i = 0, cancel = false, timer: ReturnType<typeof setTimeout>
     const tick = () => {
       if (cancel || i >= rotas.length) return
@@ -146,11 +146,11 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTa
       {!semBreadcrumb && (
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
-            <Link href="/admin/leitura" className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 hover:bg-muted hover:text-foreground"><Home className="h-3.5 w-3.5" /> Módulos</Link>
+            <Link href={basePath} className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 hover:bg-muted hover:text-foreground"><Home className="h-3.5 w-3.5" /> Módulos</Link>
             {breadcrumb.map((b) => (
               <span key={b.id} className="inline-flex items-center gap-1">
                 <ChevronRight className="h-3.5 w-3.5" />
-                <Link href={`/admin/leitura?pasta=${b.id}`} className="rounded-md px-1.5 py-0.5 font-medium text-foreground hover:bg-muted">{b.nome}</Link>
+                <Link href={`${basePath}?pasta=${b.id}`} className="rounded-md px-1.5 py-0.5 font-medium text-foreground hover:bg-muted">{b.nome}</Link>
               </span>
             ))}
           </div>
@@ -168,7 +168,7 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTa
           ) : (
             <div className={cardView === 'ticket' ? 'grid gap-3 md:grid-cols-2 xl:grid-cols-3' : 'grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'}>
               {bancos.map((b) => (
-                <ModuloCard key={b.id} m={b} variant={cardView} onExcluir={() => excluirBanco(b)} />
+                <ModuloCard key={b.id} m={b} variant={cardView} onExcluir={() => excluirBanco(b)} basePath={basePath} basePathAluno={basePathAluno} />
               ))}
             </div>
           )}
@@ -176,7 +176,7 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTa
           {aulas.length > 0 && (
             <div className="space-y-2">
               <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Aulas sem módulo</p>
-              <TabelaAulas aulas={aulas} modulos={modulos} pending={pending} onOrdem={moverAulaOrdem} onExcluir={excluirAula} onPersonalizar={personalizarAula} run={run} />
+              <TabelaAulas aulas={aulas} modulos={modulos} pending={pending} onOrdem={moverAulaOrdem} onExcluir={excluirAula} onPersonalizar={personalizarAula} run={run} basePath={basePath} temLeitura={temLeitura} />
             </div>
           )}
         </>
@@ -184,7 +184,7 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTa
         // ============ DENTRO DE UM MÓDULO: abas Aulas | Acessos | Configurações ============
         <>
           {/* Abas do módulo — omitidas quando a página as renderiza DENTRO do banner (semTabs). */}
-          {!semTabs && pastaAtual && <ModuloTabsBar pastaAtual={pastaAtual} moduloTab={moduloTab} />}
+          {!semTabs && pastaAtual && <ModuloTabsBar pastaAtual={pastaAtual} moduloTab={moduloTab} basePath={basePath} />}
 
           {/* As 3 abas ficam MONTADAS (só escondemos as inativas): Acessos/Configurações pré-carregam ao
               entrar no módulo e ficam em memória enquanto navega; desmontam (limpam) ao sair do módulo. */}
@@ -202,7 +202,7 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTa
             {aulas.length === 0 ? (
               <div className="rounded-2xl border border-dashed p-12 text-center text-muted-foreground">Nenhuma aula ainda. Clique em <span className="font-medium text-foreground">"Adicionar aula"</span> para importar o documento e anexar questões.</div>
             ) : (
-              <TabelaAulas aulas={aulas} modulos={modulos} pending={pending} onOrdem={moverAulaOrdem} onExcluir={excluirAula} onPersonalizar={personalizarAula} run={run}
+              <TabelaAulas aulas={aulas} modulos={modulos} pending={pending} onOrdem={moverAulaOrdem} onExcluir={excluirAula} onPersonalizar={personalizarAula} run={run} basePath={basePath} temLeitura={temLeitura}
                 sel={sel} onToggleSel={toggleSel} onToggleTodas={toggleTodas} onExcluirSel={excluirSelecionadas} onPublicarSel={publicarSelecionadas} onLimparSel={limparSel}
                 onAplicarEstado={aplicarEstado} onAgendar={(id) => setAgendarIds([id])} onEstadoSel={aplicarEstadoSel} onAgendarSel={() => setAgendarIds([...sel])} />
             )}
@@ -280,7 +280,7 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTa
       )}
       {/* Criar/personalizar módulo — reusa o editor de pasta do banco (capa do card + banner largo + cor + crop). */}
       {criandoModulo && (
-        <EditarPastaDialog area="leitura" paiId={pastaAtual} rotulo="módulo" generoM cardView={cardView} onClose={() => setCriandoModulo(false)} onSaved={() => { setCriandoModulo(false); router.refresh() }} />
+        <EditarPastaDialog area={areaKey} paiId={pastaAtual} rotulo="módulo" generoM cardView={cardView} onClose={() => setCriandoModulo(false)} onSaved={() => { setCriandoModulo(false); router.refresh() }} />
       )}
       {/* Personalizar aula (nome/descrição/capa/cor) — abre ao criar aula e pelo "Personalizar" da tabela. */}
       {personalizandoAula && (
@@ -304,18 +304,20 @@ export function BancoAulasGrid({ data, pastaAtual, cardView = 'poster', moduloTa
  * Card do módulo — espelha o FolderCard do Banco de Simulado (variantes poster/ticket),
  * mas com semântica de módulo (contagem de aulas, rota da leitura) e reordenar no menu.
  */
-function ModuloCard({ m, variant, onExcluir }: {
+function ModuloCard({ m, variant, onExcluir, basePath = '/admin/leitura', basePathAluno = '/aluno/leitura' }: {
   m: ModuloLeitura
   variant: CardView
   onExcluir: () => void
+  basePath?: string
+  basePathAluno?: string
 }) {
   const c = m.cor ?? '#6d28d9'
   const capa = m.capa_card_url || m.capa_url
-  const href = `/admin/leitura?pasta=${m.id}`
+  const href = `${basePath}?pasta=${m.id}`
   const contagem = `${m.aulas} aula(s)`
   async function copiarLinkTrilha() {
     const base = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
-    if (await copiarTexto(`${base}/aluno/leitura?modulo=${m.id}`)) toast.success('Link da trilha copiado')
+    if (await copiarTexto(`${base}${basePathAluno}?modulo=${m.id}`)) toast.success('Link da trilha copiado')
     else toast.error('Não foi possível copiar o link.')
   }
   const menu = (
@@ -454,10 +456,12 @@ function AgendarPublicacaoDialog({ quantidade, inicialQuando, inicialEstado, onC
 }
 
 /** Tabela de aulas em HIERARQUIA: cada aula → "Conteúdo" e "Questões do conteúdo" (como o cronograma). */
-function TabelaAulas({ aulas, modulos, pending, onOrdem, onExcluir, onPersonalizar, run, sel, onToggleSel, onToggleTodas, onExcluirSel, onPublicarSel, onLimparSel, onAplicarEstado, onAgendar, onEstadoSel, onAgendarSel }: {
+function TabelaAulas({ aulas, modulos, pending, onOrdem, onExcluir, onPersonalizar, run, sel, onToggleSel, onToggleTodas, onExcluirSel, onPublicarSel, onLimparSel, onAplicarEstado, onAgendar, onEstadoSel, onAgendarSel, basePath = '/admin/leitura', temLeitura = true }: {
   aulas: NonNullable<BancoAulas['aulas']>
   modulos: { id: string; nome: string }[]
   pending: boolean
+  basePath?: string
+  temLeitura?: boolean
   onOrdem: (idx: number, delta: number) => void
   onExcluir: (id: string, titulo: string) => void
   onPersonalizar: (a: AulaItem) => void
@@ -499,7 +503,7 @@ function TabelaAulas({ aulas, modulos, pending, onOrdem, onExcluir, onPersonaliz
         </div>
       )}
       {list.map((a, i) => (
-        <AulaLinha key={a.id} a={a} i={i} total={list.length} modulos={modulos} pending={pending} onOrdem={onOrdem} onExcluir={onExcluir} onPersonalizar={onPersonalizar} run={run}
+        <AulaLinha key={a.id} a={a} i={i} total={list.length} modulos={modulos} pending={pending} onOrdem={onOrdem} onExcluir={onExcluir} onPersonalizar={onPersonalizar} run={run} basePath={basePath} temLeitura={temLeitura}
           selecionavel={selecionavel} selecionado={sel?.has(a.id) ?? false} onToggleSel={onToggleSel}
           onAplicarEstado={onAplicarEstado} onAgendar={onAgendar} />
       ))}
@@ -513,10 +517,12 @@ function fmtAgendada(iso: string): string {
   try { return new Date(iso).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) } catch { return '' }
 }
 
-function AulaLinha({ a, i, total, modulos, pending, onOrdem, onExcluir, onPersonalizar, run, selecionavel = false, selecionado = false, onToggleSel, onAplicarEstado, onAgendar }: {
+function AulaLinha({ a, i, total, modulos, pending, onOrdem, onExcluir, onPersonalizar, run, selecionavel = false, selecionado = false, onToggleSel, onAplicarEstado, onAgendar, basePath = '/admin/leitura', temLeitura = true }: {
   a: AulaItem
   i: number
   total: number
+  basePath?: string
+  temLeitura?: boolean
   modulos: { id: string; nome: string }[]
   pending: boolean
   onOrdem: (idx: number, delta: number) => void
@@ -545,12 +551,6 @@ function AulaLinha({ a, i, total, modulos, pending, onOrdem, onExcluir, onPerson
           <CaixaSelecao checked={selecionado} onChange={() => onToggleSel?.(a.id)} label={`Selecionar ${a.titulo}`} />
         )}
         <span className="w-5 shrink-0 text-center font-mono text-xs text-muted-foreground">{i + 1}</span>
-        {/* Etiqueta de agendamento (à esquerda): data/hora da liberação. */}
-        {agendada && pub?.publicarEm && (
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-md bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-amber-600 dark:text-amber-400" title={`Liberação agendada para ${fmtAgendada(pub.publicarEm)}`}>
-            <CalendarClock className="h-3 w-3" /> {fmtAgendada(pub.publicarEm)}
-          </span>
-        )}
         <button onClick={() => setAberto((v) => !v)} className="shrink-0 rounded-md p-0.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground" aria-label={aberto ? 'Recolher' : 'Expandir'}>
           {aberto ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </button>
@@ -571,7 +571,7 @@ function AulaLinha({ a, i, total, modulos, pending, onOrdem, onExcluir, onPerson
                 : 'bg-muted text-muted-foreground hover:bg-muted/70')}>
               {estadoPub === 'publicada' ? <><Eye className="h-3 w-3" /> Publicada</>
                 : estadoPub === 'visualizavel' ? <><Clock className="h-3 w-3" /> Visualizável</>
-                : estadoPub === 'agendada' ? <><CalendarClock className="h-3 w-3" /> Agendada</>
+                : estadoPub === 'agendada' ? <><CalendarClock className="h-3 w-3" /> Agendada{pub?.publicarEm ? ` · ${fmtAgendada(pub.publicarEm)}` : ''}</>
                 : <><EyeOff className="h-3 w-3" /> Rascunho</>}
               <ChevronDown className="h-3 w-3 opacity-70" />
             </DropdownMenuTrigger>
@@ -610,13 +610,15 @@ function AulaLinha({ a, i, total, modulos, pending, onOrdem, onExcluir, onPerson
       {/* Filhos: Conteúdo (editor) + Questões do conteúdo (add/importar) */}
       {aberto && (
         <div className="border-t bg-muted/20">
-          <Link href={`/admin/leitura/${a.id}?tab=config`} className="group flex items-center gap-2.5 py-2.5 pl-16 pr-3 text-sm transition-colors hover:bg-muted/50">
-            <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="flex-1 font-medium text-foreground">Conteúdo</span>
-            <span className="text-[11px] text-muted-foreground">{(a.artigos ?? 0) > 0 ? `${a.artigos} seção(ões)` : 'inserir conteúdo'}</span>
-            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-          </Link>
-          <Link href={`/admin/leitura/${a.id}/questoes`} className="group flex items-center gap-2.5 border-t py-2.5 pl-16 pr-3 text-sm transition-colors hover:bg-muted/50">
+          {temLeitura && (
+            <Link href={`${basePath}/${a.id}?tab=config`} className="group flex items-center gap-2.5 py-2.5 pl-16 pr-3 text-sm transition-colors hover:bg-muted/50">
+              <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+              <span className="flex-1 font-medium text-foreground">Conteúdo</span>
+              <span className="text-[11px] text-muted-foreground">{(a.artigos ?? 0) > 0 ? `${a.artigos} seção(ões)` : 'inserir conteúdo'}</span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+            </Link>
+          )}
+          <Link href={`${basePath}/${a.id}/questoes`} className={cn('group flex items-center gap-2.5 py-2.5 pl-16 pr-3 text-sm transition-colors hover:bg-muted/50', temLeitura && 'border-t')}>
             <HelpCircle className="h-4 w-4 shrink-0 text-muted-foreground" />
             <span className="flex-1 font-medium text-foreground">Questões do conteúdo</span>
             <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />

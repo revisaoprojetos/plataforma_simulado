@@ -91,7 +91,10 @@ if (WEB_INTERNAL_URL && CRON_SECRET) {
   // Armazenamento: BFS de TODO o Storage (caro). A cada 24h (idempotente); o console dispara sob demanda
   // quando precisa reconciliar na hora.
   setInterval(() => { void chamarCron('/api/cron/storage-reconcile', 'cron storage', (j) => !!(j.inseridos || j.removidos)) }, 86_400_000)
-  console.log('[cron] agendado (egress-otimizado): encerramento 180s; curseduca-jobs/integracoes 60s; curseduca-sync/leitura-publicar 300s; sync grupos→bancos 30min; warm-cache 60min; guru-reconcile 6h; gamificacao-streak/engajamento 1h; leitura-engajamento 3h; storage-reconcile 24h')
+  // O4 — monitor de egress: alerta se o SQL agregado cair (causa do incidente) ou o Redis sumir. A cada 6h;
+  // o worker só destaca no log quando NÃO está saudável (o web loga sempre).
+  setInterval(() => { void chamarCron('/api/cron/egress-monitor', 'cron egress-monitor', (j) => j && j.ok === false) }, 21_600_000)
+  console.log('[cron] agendado (egress-otimizado): encerramento 180s; curseduca-jobs/integracoes 60s; curseduca-sync/leitura-publicar 300s; sync grupos→bancos 30min; warm-cache 60min; guru-reconcile 6h; gamificacao-streak/engajamento 1h; leitura-engajamento 3h; storage-reconcile 24h; egress-monitor 6h')
 } else {
   console.warn('[cron] DESATIVADO — defina WEB_INTERNAL_URL e CRON_SECRET')
 }

@@ -66,10 +66,16 @@ export function ModuloAcesso({ pastaId }: { pastaId: string }) {
 
   useEffect(() => {
     ;(async () => {
-      await carregar()
-      const oc = await carregarRankingOcultos(pastaId)
-      if (oc.ok) { setOcEst(oc.estudantes ?? []); setOcGrp(oc.grupos ?? []); setOcTotal(oc.total ?? false) }
-      setCarregando(false)
+      try {
+        await carregar()
+        const oc = await carregarRankingOcultos(pastaId)
+        if (oc.ok) { setOcEst(oc.estudantes ?? []); setOcGrp(oc.grupos ?? []); setOcTotal(oc.total ?? false) }
+      } catch (e) {
+        console.error('[acessos] falha ao carregar:', e)
+        toast.error('Não foi possível carregar os acessos. Tente recarregar.')
+      } finally {
+        setCarregando(false) // nunca ficar preso em "Carregando acesso…"
+      }
     })()
   }, [pastaId])
 

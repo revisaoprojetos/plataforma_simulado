@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Desafio de Jurisprudência</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,500;0,600;0,700;0,800;0,900;1,800;1,900&family=Press+Start+2P&family=VT323&display=swap">
+<link rel="stylesheet" href="css/estilos.css">
+<!-- Produção: esconde as ferramentas de demonstração (o elemento fica no DOM p/ o jogo.js não quebrar). -->
+<style>.demo{display:none!important}</style>
+</head>
+<body>
+
+
+<div id="intro" role="dialog" aria-label="Carregando o Desafio de Jurisprudência">
+  <div class="in-brand"><span class="pill">REVISÃO</span><span class="jc">JurisClub</span></div>
+  <div class="in-mon" id="inMon">
+    <div class="in-bezel">
+      <div class="in-glass">
+        <svg class="in-ring" viewBox="0 0 100 100" aria-hidden="true">
+          <defs><linearGradient id="inGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b48cff"/><stop offset="1" stop-color="#5b3cf0"/></linearGradient></defs>
+          <circle cx="50" cy="50" r="42" fill="#0b0f45" stroke="#1d2170" stroke-width="9"/>
+          <circle id="inArc" cx="50" cy="50" r="42" fill="none" stroke="url(#inGrad)" stroke-width="9" pathLength="100" stroke-dasharray="0 100" transform="rotate(-90 50 50)"/>
+          <g id="inHead"><path d="M47 0 L59 8 L47 16 Z" fill="#c08cff"/></g>
+          <circle cx="50" cy="50" r="35" fill="#1a1450" stroke="#3a2f9a" stroke-width="1"/>
+          <text x="50" y="27" text-anchor="middle" font-family="VT323,monospace" font-size="6.4" letter-spacing=".8" fill="#c9c6ff">SELO FINAL</text>
+          <rect x="31" y="32" width="20" height="6.4" rx="3.2" fill="#3b82f6"/>
+          <text x="41" y="36.9" text-anchor="middle" font-family="Montserrat,sans-serif" font-weight="800" font-size="3.9" fill="#fff">REVISÃO</text>
+          <text x="50" y="50" text-anchor="middle" font-family="Montserrat,sans-serif" font-weight="900" font-style="italic" font-size="13.5" fill="#fff">JurisClub</text>
+          <text x="31.5" y="57.5" font-family="Montserrat,sans-serif" font-weight="600" font-size="4.9" fill="#fff">O seu Clube de</text>
+          <text x="31.5" y="63.5" font-family="Montserrat,sans-serif" font-weight="600" font-size="4.9" fill="#fff">Atualizações</text>
+          <text x="31.5" y="74" font-family="Montserrat,sans-serif" font-weight="900" font-size="9.5" fill="#fff">2026</text>
+        </svg>
+        <div class="in-sub">DESAFIO DE</div>
+        <div class="in-title">JURISPRUDÊNCIA</div>
+        <div class="in-bar" id="inBar"><span><i></i></span><span><i></i></span><span><i></i></span><span><i></i></span><span><i></i></span></div>
+        <div class="in-status" id="inStatus">LIGANDO O GABINETE <b>0%</b></div>
+        <div class="in-mascot" id="inMascot">
+          <canvas id="inMascotCv" width="13" height="14"></canvas>
+          <span class="sp" style="left:-18%;top:-6%"></span>
+          <span class="sp" style="right:-18%;top:-10%;animation-delay:.3s"></span>
+          <span class="sp" style="right:-22%;bottom:4%;animation-delay:.6s"></span>
+        </div>
+      </div>
+      <div class="in-foot"><span class="leds"><i class="on"></i><i></i><i></i></span><span class="slot"><span class="power"></span><b></b></span></div>
+    </div>
+    <div class="in-stand"></div>
+    <div class="in-base"></div>
+  </div>
+  <div class="in-tag">DO JURIS CLUB</div>
+  <button class="in-skip" id="inSkip">PULAR ▸</button>
+  <div class="in-flash"></div>
+</div>
+
+<div class="page">
+  <header class="top">
+    <div class="brand"><span class="pill">REVISÃO</span><span class="jc">JurisClub</span></div>
+    <div class="dj">
+      <svg viewBox="0 0 40 40" aria-hidden="true"><path d="M32.69 14.08A14 14 0 1 1 18.05 6.14" fill="none" stroke="#6d5bd8" stroke-width="3.2"/><path d="M16.90 0.80L26.13 5.00L18.41 11.58Z" fill="#a78bfa"/><text x="20" y="24.5" text-anchor="middle" font-family="Montserrat" font-weight="900" font-size="11" fill="#fff">DJ</text></svg>
+      <div><small>DESAFIO DE</small><b>JURISPRUDÊNCIA</b></div>
+    </div>
+    <nav class="actions">
+      <button class="btn-o" id="btnMap">VER MAPA DO LABIRINTO</button>
+      <button class="btn-o" id="btnRank">RANKING</button>
+    </nav>
+    <div class="rec">
+      <div class="snd-wrap">
+        <button class="snd" id="btnSound" aria-pressed="true" title="Ligar/desligar som (M)">♪ SOM</button>
+        <span class="vol-grp" title="Volume dos efeitos sonoros"><b class="vol-lb">EFX</b><input type="range" class="vol" id="volSfx" min="0" max="100" value="100" aria-label="Volume dos efeitos"></span>
+        <span class="vol-grp" title="Volume da música de fundo"><b class="vol-lb">MÚS</b><input type="range" class="vol" id="volMus" min="0" max="100" value="50" aria-label="Volume da música"></span>
+      </div>
+      <span>Recorde</span><span class="px gold" id="recorde">000000</span><span class="avatar">VC</span>
+    </div>
+  </header>
+  <!-- Música de fundo (opcional): coloque o arquivo em assets/audio/musica-fundo.mp3 — o volume é o controle acima. -->
+  <audio id="bgm" loop preload="none"><source src="assets/audio/musica-fundo.mp3" type="audio/mpeg"></audio>
+
+
+  <main class="layout">
+    <aside class="col-left"><div class="col-left-in">
+      <section class="panel p1" id="p1" aria-label="Seu placar"></section>
+      <section class="panel teses-panel">
+        <h2 class="ptitle"><span class="pt-ico">★</span> TESES DO DIA <span class="pt-count" id="tesesCount">0/4</span></h2>
+        <div id="tesesList"></div>
+      </section>
+    </div></aside>
+
+    <section class="center">
+      <div class="cabinet">
+        <div class="screen" id="screen">
+          <div class="hud">
+            <span>SCORE <b id="hudScore">000000</b></span>
+            <span>DIA <b id="hudDay">1</b>/15</span>
+            <span>TESES <b id="hudTeses">0/4</b></span>
+            <span class="lives" id="hudLives" aria-label="Vidas"></span>
+          </div>
+          <div class="vm" id="vmBar"><i></i></div>
+          <canvas id="game" aria-label="Labirinto do desafio"></canvas>
+
+          <div class="ov" id="ovAttract">
+            <span class="credit">CRÉDITOS 03 · INSERT COIN</span>
+            <div class="big glitch" id="atTitle" data-t="DIA 01">DIA 01</div>
+            <div class="sub" id="atSub">ADMINISTRATIVO 2026</div>
+            <p id="atDesc">Pegue os pontos dourados e responda para dominar as teses. Fuja das armadilhas.</p>
+            <button class="btn-w" id="btnStart">COMEÇAR</button>
+            <span class="hint">PRESSIONE ENTER</span>
+          </div>
+          <div class="ov clear" id="ovReady" hidden><div class="big gold" id="readyTxt">PRONTO?</div></div>
+          <div class="ov" id="ovPause" hidden><div class="big">PAUSA</div><span class="hint">P PARA VOLTAR</span></div>
+          <div class="ov" id="ovOver" hidden>
+            <div class="big glitch" data-t="GAME OVER">GAME OVER</div>
+            <svg class="spin" viewBox="0 0 40 40" aria-hidden="true"><path d="M20 7 a13 13 0 1 1 -9.2 3.8" fill="none" stroke="#7c5cff" stroke-width="5" stroke-linecap="round"/><path d="M20 1.5 l6.5 5.5 -6.5 5.5 z" fill="#7c5cff"/></svg>
+            <div class="cont">CONTINUE? <span class="count" id="overCount">9</span></div>
+            <p>Você volta ao início desta fase com 3 vidas. As teses já dominadas continuam valendo.</p>
+            <button class="btn-w" id="btnContinue">CONTINUAR</button>
+          </div>
+          <div class="ov" id="ovClear" hidden>
+            <div class="big gold" id="clTitle">DIA 01 CONCLUÍDO</div>
+            <div class="tally" id="clTally"></div>
+            <div id="clSelo"></div>
+            <div class="row"><button class="btn-o" id="btnReplay">JOGAR DE NOVO</button><button class="btn-w" id="btnNext">PRÓXIMO DIA</button></div>
+          </div>
+          <div class="crt"></div>
+        </div>
+        <div class="cab-foot">
+          <span class="leds" id="leds"><i></i><i></i><i></i></span>
+          <span class="grille" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          <div class="abtns">
+            <button class="abtn pink" id="abPause" title="Pausa (P)"><span class="cap" id="capPause"><svg viewBox="0 0 10 10" aria-hidden="true"><path fill="currentColor" d="M2 1h2.2v8H2zM5.8 1h2.2v8H5.8z"/></svg></span><small>PAUSA</small></button>
+            <button class="abtn cyan" id="abSound" title="Ligar/desligar efeitos sonoros"><span class="cap">♪</span><small>SOM</small></button>
+            <button class="abtn violet" id="abMusic" title="Ligar/desligar música de fundo"><span class="cap">♫</span><small>MÚSICA</small></button>
+            <button class="abtn gold big" id="btnExpand" aria-pressed="false" title="Tela cheia (F)"><span class="cap"><svg viewBox="0 0 9 9" shape-rendering="crispEdges" aria-hidden="true"><path fill="currentColor" d="M0 0h3v1H1v2H0zM6 0h3v3H8V1H6zM0 6h1v2h2v1H0zM8 6h1v3H6V8h2z"/></svg></span><small>TELA</small></button>
+          </div>
+        </div>
+      </div>
+      <div class="stand"></div>
+      <div class="tv-base"></div>
+      <button class="theater-exit" id="btnExitTheater">✕ SAIR DA TELA CHEIA <kbd>ESC</kbd></button>
+      <div class="controls" aria-label="Controles">
+        <div class="cg"><span class="kk"><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd></span><small>MOVER · WASD</small></div>
+        <div class="cg"><kbd>ENTER</kbd><small>COMEÇAR</small></div>
+        <div class="cg"><span class="kk"><kbd>A</kbd><kbd>B</kbd><kbd>C</kbd></span><small>RESPONDER</small></div>
+        <div class="cg"><kbd>P</kbd><small>PAUSA</small></div>
+        <div class="cg"><kbd>M</kbd><small>SOM</small></div>
+        <div class="cg"><kbd>F</kbd><small>TELA CHEIA</small></div>
+      </div>
+      <div class="dpad" id="dpad">
+        <span></span><button data-d="up" aria-label="Cima">▲</button><span></span>
+        <button data-d="left" aria-label="Esquerda">◀</button><button class="c" id="dpadStart" aria-label="Começar ou pausar">START</button><button data-d="right" aria-label="Direita">▶</button>
+        <span></span><button data-d="down" aria-label="Baixo">▼</button><span></span>
+      </div>
+    </section>
+
+    <aside class="col-right">
+      <div class="panel tabs-panel">
+        <div class="ptabs" role="tablist" aria-label="Painel do desafio">
+          <button class="ptab" role="tab" data-pt="rank" aria-selected="true"><span class="key">1</span>RANKING</button>
+          <button class="ptab" role="tab" data-pt="selos" aria-selected="false"><span class="key">2</span>SELOS</button>
+          <button class="ptab" role="tab" data-pt="arm" aria-selected="false"><span class="key">3</span>ARMADILHAS</button>
+        </div>
+        <div class="pt-body">
+          <div class="pane" data-pane="rank" role="tabpanel">
+            <div class="pane-head"><span>HIGH SCORES</span><span class="px" id="rankDay">ATÉ O DIA 01</span></div>
+            <ol class="rmini" id="rankMini"></ol>
+            <button class="btn-o wide" id="btnRank2">VER RANKING COMPLETO</button>
+            <p class="note">Nomes de exemplo. O ranking real vem da plataforma.</p>
+          </div>
+          <div class="pane" data-pane="selos" role="tabpanel" hidden>
+            <div class="pane-head"><span>COLEÇÃO</span><span class="px" id="selosCount">0/7</span></div>
+            <div id="seloFinal"></div>
+            <div class="selos" id="selos"></div>
+          </div>
+          <div class="pane" data-pane="arm" role="tabpanel" hidden>
+            <div class="pane-head"><span>BESTIÁRIO</span><span class="px">CONHEÇA O INIMIGO</span></div>
+            <div id="trapsList"></div>
+          </div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <section class="stages" aria-label="Seleção de fase">
+    <div class="st-head">
+      <h2 class="ptitle"><span class="pt-ico">▶</span> SELECT STAGE <span class="st-sub">ESCOLHA O CARTUCHO E A FASE</span></h2>
+      <span class="st-hint">CRÉDITOS 03 · 15 FASES · 7 MATÉRIAS</span>
+    </div>
+    <div class="st-body">
+      <div class="st-preview" id="stPreview" aria-live="polite"></div>
+      <div class="st-railwrap">
+        <button class="st-nav" id="stPrev" aria-label="Fase anterior">◀</button>
+        <div class="st-rail" id="stages"></div>
+        <button class="st-nav" id="stNext" aria-label="Próxima fase">▶</button>
+      </div>
+    </div>
+  </section>
+
+  <footer class="demo">
+    <span class="demo-t">FERRAMENTAS DE DEMONSTRAÇÃO</span>
+    <label><input type="checkbox" id="demoAll"> Liberar todos os dias</label>
+    <button id="btnReset">ZERAR PROGRESSO</button>
+  </footer>
+</div>
+
+<!-- pergunta -->
+<div class="modal" id="qModal" hidden>
+  <div class="mcard qcard" role="dialog" aria-modal="true" aria-labelledby="qText">
+    <div class="qtop"><span class="qtag" id="qTag">TESE 1 · DIA 01</span><span class="qtime" id="qTime">25</span></div>
+    <div class="qbar" id="qBar"><i></i></div>
+    <p class="qq" id="qText"></p>
+    <div class="opts" id="qOpts"></div>
+    <div class="qres" id="qRes" hidden>
+      <h4 id="qResT"></h4>
+      <div class="ref" id="qRef"></div>
+      <p id="qTese"></p>
+      <div class="row"><button class="btn-w" id="qNext">CONTINUAR</button></div>
+    </div>
+  </div>
+</div>
+
+<!-- mapa -->
+<div class="modal" id="mapModal" hidden>
+  <div class="mcard">
+    <div class="mapcard">
+      <h2>MAPA DO DESAFIO</h2>
+      <p class="msub">15 pontos · 7 matérias · objetivo final: selo JurisClub no centro do labirinto</p>
+      <div class="mapscroll"><div class="map" id="map"><canvas id="mapCanvas"></canvas><svg class="trail" id="mapTrail" viewBox="0 0 100 100" preserveAspectRatio="none"></svg></div></div>
+    </div>
+    <div class="mclose"><button class="btn-w" data-close="mapModal">FECHAR MAPA</button></div>
+  </div>
+</div>
+
+<!-- ranking -->
+<div class="modal" id="rankModal" hidden>
+  <div class="mcard" style="max-width:760px">
+    <div class="hof" role="dialog" aria-modal="true" aria-labelledby="hofTitle">
+      <div class="hof-in">
+        <div class="hof-head">
+          <span class="hof-ins">★ INSERT COIN ★</span>
+          <h2 class="hof-title glitch" id="hofTitle" data-t="HALL DA FAMA">HALL DA FAMA</h2>
+          <small id="rSub">ACUMULADO ATÉ O DIA 01 · OBJETIVO: SELO JURISCLUB</small>
+        </div>
+        <div class="tabs" role="tablist">
+          <button class="tab" role="tab" data-tab="geral" aria-selected="true">GERAL</button>
+          <button class="tab" role="tab" data-tab="dia" aria-selected="false">DO DIA</button>
+          <button class="tab" role="tab" data-tab="mat" aria-selected="false">POR MATÉRIA</button>
+        </div>
+        <div class="chips" id="rChips" hidden></div>
+        <div class="podium" id="rPodium"></div>
+        <div class="hof-list" id="rTable"></div>
+        <p class="rfoot">Dados de exemplo: o ranking real vem da plataforma. Nomes exibidos como primeiro nome + inicial do sobrenome. Pontos: ponto do labirinto +10 · Vade Mecum +50 · armadilha superada +200 · tese dominada +100 · vida restante +200 ao concluir o dia. Empate: vence quem concluiu antes.</p>
+      </div>
+      <div class="crt"></div>
+    </div>
+    <div class="mclose"><button class="btn-w" data-close="rankModal">FECHAR RANKING</button></div>
+  </div>
+</div>
+
+<!-- detalhe (selo / bestiário) -->
+<div class="modal" id="infoModal" hidden>
+  <div class="mcard" style="max-width:620px">
+    <div class="icard" role="dialog" aria-modal="true" aria-labelledby="infoTitle"><div id="infoBody"></div><div class="crt"></div></div>
+    <div class="mclose"><button class="btn-w" data-close="infoModal">FECHAR</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="js/bootstrap.js"></script>
+</body>
+</html>

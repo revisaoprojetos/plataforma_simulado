@@ -6,14 +6,15 @@ import { usePathname, useRouter } from 'next/navigation'
 import { LoginLoading } from '@/components/aluno/login-loading'
 import { type LoginConfig } from '@/lib/login-config'
 import { avatarPadraoDe } from '@/lib/aluno/avatar-padrao'
-import { Home, ClipboardList, Lightbulb, BookOpen, Star, NotebookPen, GraduationCap, LogOut, Trophy, Flame, Zap, Route, Library, CalendarDays, ChevronRight } from 'lucide-react'
+import { Home, ClipboardList, Lightbulb, BookOpen, Star, NotebookPen, GraduationCap, LogOut, Trophy, Flame, Zap, Route, Library, CalendarDays, ChevronRight, Gavel } from 'lucide-react'
 import {
   Sidebar, SidebarHeader, SidebarContent, SidebarGroup, SidebarGroupContent,
   SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarMenuSub, SidebarMenuSubItem,
   SidebarMenuSubButton, SidebarFooter, useSidebar,
 } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
-import { OCULTAR_ALUNO_EXTRAS, OCULTAR_CRONOGRAMA, ROTAS_ALUNO_OCULTAS, LEITURA_ATIVA } from '@/lib/flags'
+import { OCULTAR_ALUNO_EXTRAS, OCULTAR_CRONOGRAMA, ROTAS_ALUNO_OCULTAS, LEITURA_ATIVA, JURISPRUDENCIA_ATIVA } from '@/lib/flags'
+import { rotuloDe, IconeMenu, RotuloMenu, type SidebarRotulosAluno } from '@/lib/sidebar-rotulos'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { FontScaleControl } from '@/components/font-scale-control'
 import { AnimacoesToggle } from '@/components/aluno/animacoes-toggle'
@@ -43,6 +44,7 @@ const NAV: ItemNav[] = [
   { href: '/aluno', label: 'Início', icon: Home, exact: true, tour: 'nav-inicio' },
   { href: '/aluno/simulados', label: 'Simulados Realizados', icon: ClipboardList, tour: 'nav-simulados' },
   { href: '/aluno/leitura', label: 'Desafio de Lei Seca', icon: Library, tour: 'nav-leitura' },
+  { href: '/aluno/jurisprudencia', label: 'Desafio de Jurisprudência', icon: Gavel, tour: 'nav-jurisprudencia' },
   {
     href: '/aluno/cronograma',
     label: 'Cronograma',
@@ -78,10 +80,10 @@ export interface ProgressoAluno { streak: number; xpTotal: number; nivel: number
 
 export function AlunoSidebar({
   logo, nome = 'Área do Aluno', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none',
-  usuarioNome = 'Aluno', usuarioEmail, avatar, avatarCor, counts, simuladosPersonalizados = 0, loginConfig, progresso, gamAtivo = false, hrefsOcultos = [], pendenciasLeitura = 0,
+  usuarioNome = 'Aluno', usuarioEmail, avatar, avatarCor, counts, simuladosPersonalizados = 0, loginConfig, progresso, gamAtivo = false, hrefsOcultos = [], pendenciasLeitura = 0, rotulos,
 }: {
   logo?: string | null; nome?: string; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string
-  usuarioNome?: string; usuarioEmail?: string | null; avatar?: string | null; avatarCor?: string | null; counts?: Record<string, number>; simuladosPersonalizados?: number; loginConfig: LoginConfig; progresso?: ProgressoAluno | null; gamAtivo?: boolean; hrefsOcultos?: string[]; pendenciasLeitura?: number
+  usuarioNome?: string; usuarioEmail?: string | null; avatar?: string | null; avatarCor?: string | null; counts?: Record<string, number>; simuladosPersonalizados?: number; loginConfig: LoginConfig; progresso?: ProgressoAluno | null; gamAtivo?: boolean; hrefsOcultos?: string[]; pendenciasLeitura?: number; rotulos?: SidebarRotulosAluno
 }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -99,6 +101,7 @@ export function AlunoSidebar({
     n.href !== '/aluno/trilha' &&
     (gamAtivo || n.href !== '/aluno/ligas') &&
     (LEITURA_ATIVA || n.href !== '/aluno/leitura') &&
+    (JURISPRUDENCIA_ATIVA || n.href !== '/aluno/jurisprudencia') &&
     !(OCULTAR_ALUNO_EXTRAS && ROTAS_ALUNO_OCULTAS.includes(n.href)) &&
     // Cronograma tem DOIS gates: esta flag (enquanto o módulo está em construção) e a coluna
     // `ativo` de simulado_cronograma_config, que liga por tenant — respeitada dentro da página.
@@ -106,6 +109,8 @@ export function AlunoSidebar({
     // Manutenção por área do aluno: esconde o item quando a área está em manutenção p/ este aluno.
     !hrefsOcultos.includes(n.href),
   )
+  // Rótulo/ícone personalizados por tenant (chave = href).
+  const lblIt = (n: { href: string; label: string }) => rotuloDe(rotulos?.itens, n.href, n.label)
 
   async function sair() {
     // Mostra a tela de carregamento (branded) na SAÍDA — dá tempo do login (imagem + animações)
@@ -158,10 +163,10 @@ export function AlunoSidebar({
                         className={NAV_STATES}
                         onClick={() => setAbertos((a) => ({ ...a, [n.href]: !aberto }))}
                         isActive={ativo(n)}
-                        tooltip={n.label}
+                        tooltip={lblIt(n)}
                       >
-                        <n.icon className="h-4 w-4" />
-                        <span>{n.label}</span>
+                        <IconeMenu override={rotulos?.itens?.[n.href]?.icone} fallback={n.icon} className="h-4 w-4" ativo={ativo(n)} />
+                        <RotuloMenu map={rotulos?.itens} chave={n.href} fallback={n.label} ativo={ativo(n)} />
                         <ChevronRight
                           className={`ml-auto h-4 w-4 transition-transform group-data-[collapsible=icon]:hidden ${aberto ? 'rotate-90' : ''}`}
                         />
@@ -171,7 +176,7 @@ export function AlunoSidebar({
                           {n.filhos.map((f) => (
                             <SidebarMenuSubItem key={f.href}>
                               <SidebarMenuSubButton render={<Link href={f.href} />} isActive={ativo(f)}>
-                                <span>{f.label}</span>
+                                <span>{rotulos?.filhos?.[f.href]?.label?.trim() || f.label}</span>
                               </SidebarMenuSubButton>
                             </SidebarMenuSubItem>
                           ))}
@@ -182,9 +187,9 @@ export function AlunoSidebar({
                 }
                 return (
                   <SidebarMenuItem key={n.href} data-tour={n.tour}>
-                    <SidebarMenuButton className={NAV_STATES} render={<Link href={n.href} />} isActive={ativo(n)} tooltip={n.label}>
-                      <n.icon className="h-4 w-4" />
-                      <span>{n.label}</span>
+                    <SidebarMenuButton className={NAV_STATES} render={<Link href={n.href} />} isActive={ativo(n)} tooltip={lblIt(n)}>
+                      <IconeMenu override={rotulos?.itens?.[n.href]?.icone} fallback={n.icon} className="h-4 w-4" ativo={ativo(n)} />
+                      <RotuloMenu map={rotulos?.itens} chave={n.href} fallback={n.label} ativo={ativo(n)} />
                       {/* Meus Simulados: "oficiais finalizados | personalizados criados" quando há pessoais. */}
                       {n.href === '/aluno/simulados' && simuladosPersonalizados > 0 ? (
                         <span className="nav-badge ml-auto pr-1.5 text-xs font-medium tabular-nums text-sidebar-foreground/45 group-data-[collapsible=icon]:hidden">

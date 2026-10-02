@@ -108,8 +108,25 @@ export async function carregarRankingModulo(moduloId: string, tenantId: string):
       for (const a of ajs ?? []) if ((a as any).overrides && typeof (a as any).overrides === 'object') overridesPorAluno.set((a as any).estudante_id, (a as any).overrides)
     } catch { /* migração pendente → sem ajuste */ }
 
+    // Dia de CONCLUSÃO da aula IMUTÁVEL (ledger de XP, `meta.dia` do evento de quiz) — REFAZER não move
+    // esse dia, ao contrário do `respondido_em` (que o refazimento sobrescrevia, quebrando o streak de
+    // quem refez). Fonte correta da sequência; fallback p/ os dias das respostas quando não há evento.
+    const diasLedger = new Map<string, Set<string>>()
+    try {
+      const { diasConclusaoLedgerSql } = await import('data')
+      const rows = await diasConclusaoLedgerSql(tenantId, aulaIds).catch(() => null)
+      if (rows) {
+        for (const r of rows) diasLedger.set(r.estudante_id, new Set((r.dias ?? []).filter(Boolean)))
+      } else {
+        const ev = await fetchAllByIn<{ estudante_id: string; meta: any }>(aulaIds, (chunk) =>
+          svc.from('simulado_xp_eventos').select('estudante_id, meta').eq('tenant_id', tenantId).eq('origem', 'leitura').like('ref_id', 'quiz:%').filter('meta->>documentoId', 'in', `(${chunk.join(',')})`).order('id'))
+        for (const e of ev) { const d = (e as any).meta?.dia; if (!d) continue; const s = diasLedger.get(e.estudante_id) ?? diasLedger.set(e.estudante_id, new Set()).get(e.estudante_id)!; s.add(d) }
+      }
+    } catch { /* ledger indisponível → usa os dias das respostas */ }
+
     type Bruto = { estudanteId: string; acertos: number; aulasConcluidas: number; aulasGabaritadas: number; streakAtual: number; ultimoDia: string; score: number }
-    const montarBruto = (id: string, acertos: number, aulasConcluidas: number, aulasGabaritadas: number, dias: Iterable<string>): Bruto => {
+    const montarBruto = (id: string, acertos: number, aulasConcluidas: number, aulasGabaritadas: number, diasResp: Iterable<string>): Bruto => {
+      const dias = diasLedger.get(id) ?? diasResp // prefere o dia imutável do ledger (refazer-safe)
       const seq = calcularSequencia(dias, overridesPorAluno.get(id), hoje, ontem)
       const base = pontuarLegProc(pontuacao, { acertos, aulasConcluidas, aulasGabaritadas }, gamAtivo)
       // Bônus — só com a gamificação ativa. Ambos pelos dias CONSECUTIVOS (streak): conclusão e
@@ -266,8 +283,17 @@ export async function calcularMinhaLinhaLeitura(moduloId: string, tenantId: stri
   // Ajuste MANUAL de sequência (calendário do suporte) deste aluno — sobrepõe o automático.
   let overrides: Record<string, boolean> | undefined
   try { const { data: aj } = await svc.from('simulado_leitura_sequencia_ajuste').select('overrides').eq('tenant_id', tenantId).eq('modulo_id', moduloId).eq('estudante_id', estudanteId).maybeSingle(); const o = (aj as { overrides?: unknown } | null)?.overrides; if (o && typeof o === 'object') overrides = o as Record<string, boolean> } catch { /* migração pendente */ }
+  // Dia de conclusão IMUTÁVEL (ledger de XP, meta.dia do evento de quiz) — refazer não move; corrige o
+  // streak de quem refez (o respondido_em era sobrescrito). Fallback p/ os dias das respostas.
+  let diasLedger: Set<string> | null = null
+  try {
+    const { data: ev } = await svc.from('simulado_xp_eventos').select('meta').eq('tenant_id', tenantId).eq('estudante_id', estudanteId).eq('origem', 'leitura').like('ref_id', 'quiz:%')
+    const s = new Set<string>()
+    for (const e of (ev ?? []) as any[]) { const d = e.meta?.dia, doc = e.meta?.documentoId; if (d && doc && aulaIds.includes(doc)) s.add(d) }
+    if (s.size) diasLedger = s
+  } catch { /* ledger indisponível → usa dias das respostas */ }
   const { calcularSequencia } = await import('@/lib/leitura/sequencia')
-  const seq = calcularSequencia(dias, overrides, hoje, ontem)
+  const seq = calcularSequencia(diasLedger ?? dias, overrides, hoje, ontem)
   const base = pontuarLegProc(pontuacao, { acertos, aulasConcluidas, aulasGabaritadas }, gamAtivo)
   const score = base + (gamAtivo ? bonusSequenciaLeitura(seq.streakAtual, pontuacao) + bonusConclusaoLeitura(seq.streakAtual, pontuacao) : 0)
   const ultimoDia = seq.diasEfetivos[seq.diasEfetivos.length - 1] ?? ''

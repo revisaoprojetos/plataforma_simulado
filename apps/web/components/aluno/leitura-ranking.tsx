@@ -16,6 +16,21 @@ import type { TituloNivel } from '@/lib/gamificacao/config'
 
 const POR_PAG = 10
 
+/** Duração legível a partir de segundos (controle detalhado do suporte). */
+const fmtDur = (s?: number | null): string | null => {
+  if (!s || s <= 0) return null
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60)
+  return h > 0 ? `${h}h ${m}min` : m > 0 ? `${m}min ${sec}s` : `${sec}s`
+}
+/** Intervalo "início → fim" em BRT (só um lado quando igual/ausente). */
+const fmtMomento = (ini?: string | null, fim?: string | null): string => {
+  const a = ini ? formatBrt(ini) : null, b = fim ? formatBrt(fim) : null
+  if (a && b && a !== b) return `${a} → ${b}`
+  return a ?? b ?? '—'
+}
+/** Duração entre dois instantes (p/ o tempo gasto no quiz). */
+const durEntre = (ini?: string | null, fim?: string | null): string | null => (ini && fim ? fmtDur((Date.parse(fim) - Date.parse(ini)) / 1000) : null)
+
 /** Nome curto p/ preservar privacidade no ranking do aluno: "João Marcello Pedote" → "J. P.". */
 const nomeCurto = (n: string) => {
   const ps = (n || '').split(' ').filter(Boolean)
@@ -448,8 +463,9 @@ export function DetalheAlunoModal({ moduloId, it, onClose }: { moduloId: string;
                     {d.aulas.map((a, i) => (
                       <li key={i} className="flex items-center gap-3 px-3 py-2.5">
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium">{a.titulo}</span>
-                          <span className="block text-[11px] text-muted-foreground">{formatBrt(a.data) ?? '—'}</span>
+                          <span className="flex items-center gap-1.5 text-sm font-medium"><span className="truncate">{a.titulo}</span>{a.tentativas > 1 && <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">{a.tentativas} tentativas</span>}</span>
+                          <span className="block text-[11px] text-muted-foreground"><b className="font-semibold text-foreground/70">Leitura:</b> {fmtMomento(a.leituraInicio, a.leituraFim)}{fmtDur(a.leituraTempoSeg) ? ` · ${fmtDur(a.leituraTempoSeg)}` : ''}</span>
+                          <span className="block text-[11px] text-muted-foreground"><b className="font-semibold text-foreground/70">Quiz:</b> {fmtMomento(a.quizInicio, a.quizFim)}{durEntre(a.quizInicio, a.quizFim) ? ` · ${durEntre(a.quizInicio, a.quizFim)}` : ''}</span>
                         </span>
                         <span className="shrink-0 rounded-md bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary tabular-nums">+{a.pontos}</span>
                       </li>

@@ -564,6 +564,10 @@ export async function listarDocumentosAdmin(): Promise<{ ok: boolean; itens?: Do
 // ===================== Banco de Aulas (módulos = pastas folder_area='leitura') =====================
 
 const AREA_LEITURA = 'leitura'
+// Áreas de DESAFIO que compartilham este motor de admin (Lei Seca + Jurisprudência). As actions de
+// CONFIG/CRUD de módulo são escopadas por id+tenant; o folder_area é só GUARDA (bloqueia pastas de
+// outras áreas como simulado/caderno) → aceitam qualquer área de desafio. Ver lib/leitura/areas.ts.
+const AREAS_DESAFIO_FOLDERS = ['leitura', 'jurisprudencia']
 export type PublicacaoModulo = { status: 'rascunho' | 'publicado'; publicarEm: string | null; encerrarEm: string | null }
 const PUBLICACAO_PADRAO: PublicacaoModulo = { status: 'rascunho', publicarEm: null, encerrarEm: null }
 function normPublicacao(v: any): PublicacaoModulo {
@@ -574,9 +578,9 @@ export type ModuloLeitura = { id: string; nome: string; pai_id: string | null; c
 export type BancoAulas = { ok: boolean; error?: string; pastas?: ModuloLeitura[]; aulas?: (Documento & { questoes?: number })[]; breadcrumb?: { id: string; nome: string }[]; modulos?: { id: string; nome: string }[]; moduloAtual?: ModuloLeitura }
 
 /** `.order('ordem')` tolerante: se a coluna `ordem` ainda não existir, refaz ordenando por nome. */
-async function pastasLeitura(svc: any, tenantId: string): Promise<any[]> {
+async function pastasLeitura(svc: any, tenantId: string, area: string = AREA_LEITURA): Promise<any[]> {
   const q = (cols: string, ordenado: boolean) => {
-    const b = svc.from('simulado_pastas').select(cols).eq('tenant_id', tenantId).eq('is_folder', true).eq('folder_area', AREA_LEITURA)
+    const b = svc.from('simulado_pastas').select(cols).eq('tenant_id', tenantId).eq('is_folder', true).eq('folder_area', area)
     return ordenado ? b.order('ordem', { ascending: true }).order('nome', { ascending: true }) : b.order('nome', { ascending: true })
   }
   let r = await q('id, nome, pai_id, cor, icone, capa_url, capa_card_url, adesivo_url, pontuacao, intro_config, regulamento, trilha_aparencia, desafios, regra_sequencial, quiz_bloquear_refazer, ordem, publicacao', true)
@@ -594,11 +598,11 @@ async function pastasLeitura(svc: any, tenantId: string): Promise<any[]> {
 }
 
 /** Um nível do banco de aulas: módulos (pastas) + aulas (documentos) + trilha de breadcrumb. */
-export async function listarBancoAulas(pastaId?: string | null, detalhes: boolean = true): Promise<BancoAulas> {
+export async function listarBancoAulas(pastaId?: string | null, detalhes: boolean = true, area: string = AREA_LEITURA): Promise<BancoAulas> {
   const g = await guard('leitura:view'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
   const paiAtual = pastaId ?? null
-  const todasPastas = await pastasLeitura(svc, g.tenantId)
+  const todasPastas = await pastasLeitura(svc, g.tenantId, area)
   // Documentos: id+pasta_id de todos (p/ contar por pasta) e os do nível atual (detalhados).
   // Otimização: abas Acessos/Configurações NÃO usam a lista de aulas → pula o fetch de TODOS os docs.
   const docs = detalhes ? await fetchAll<any>(() => svc.from('simulado_documentos').select('*').eq('tenant_id', g.tenantId).eq('deletado', false)) : []
@@ -659,13 +663,13 @@ async function proximaOrdem(svc: any, tenantId: string, where: (q: any) => any):
   return ((r.data as any)?.ordem ?? -1) + 1
 }
 
-export async function criarModuloLeitura(nome: string, paiId?: string | null): Promise<{ ok: boolean; id?: string; error?: string }> {
+export async function criarModuloLeitura(nome: string, paiId?: string | null, area: string = AREA_LEITURA): Promise<{ ok: boolean; id?: string; error?: string }> {
   const g = await guard('leitura:create'); if (!g.ok) return { ok: false, error: g.error }
   const n = (nome ?? '').trim() || 'Novo módulo'
   const svc = createAdminClient()
   let ordem = 0
-  try { ordem = await proximaOrdem(svc, g.tenantId, (q) => q.eq('folder_area', AREA_LEITURA).eq('is_folder', true).is('pai_id', paiId ?? null)) } catch { /* coluna ordem ausente */ }
-  const payload: Record<string, unknown> = { tenant_id: g.tenantId, nome: n, is_folder: true, folder_area: AREA_LEITURA, pai_id: paiId ?? null, ordem }
+  try { ordem = await proximaOrdem(svc, g.tenantId, (q) => q.eq('folder_area', area).eq('is_folder', true).is('pai_id', paiId ?? null)) } catch { /* coluna ordem ausente */ }
+  const payload: Record<string, unknown> = { tenant_id: g.tenantId, nome: n, is_folder: true, folder_area: area, pai_id: paiId ?? null, ordem }
   let { data, error } = await svc.from('simulado_pastas').insert(payload).select('id').single()
   if (error && /ordem|column/i.test(error.message)) { delete payload.ordem; ({ data, error } = await svc.from('simulado_pastas').insert(payload).select('id').single()) }
   if (error) return { ok: false, error: error.message }
@@ -677,7 +681,7 @@ export async function renomearModuloLeitura(id: string, nome: string): Promise<{
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
   const n = (nome ?? '').trim(); if (!n) return { ok: false, error: 'Nome vazio.' }
   const svc = createAdminClient()
-  const { error } = await svc.from('simulado_pastas').update({ nome: n }).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  const { error } = await svc.from('simulado_pastas').update({ nome: n }).eq('id', id).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS)
   if (error) return { ok: false, error: error.message }
   revalidatePath('/admin/leitura'); return { ok: true }
 }
@@ -687,7 +691,7 @@ export async function atualizarModuloLeitura(id: string, patch: { cor?: string |
   const svc = createAdminClient()
   const dados: Record<string, unknown> = {}
   for (const k of ['cor', 'icone', 'capa_url'] as const) if (k in patch) dados[k] = (patch as any)[k]
-  const { error } = await svc.from('simulado_pastas').update(dados).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  const { error } = await svc.from('simulado_pastas').update(dados).eq('id', id).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS)
   if (error) return { ok: false, error: error.message }
   revalidatePath('/admin/leitura'); return { ok: true }
 }
@@ -698,7 +702,7 @@ export async function salvarAdesivoModulo(id: string, adesivo: string | null): P
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
   const url = adesivo ? await hospedarBase64(adesivo, svc, { tenantId: g.tenantId }) : null
-  const { error } = await svc.from('simulado_pastas').update({ adesivo_url: url }).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  const { error } = await svc.from('simulado_pastas').update({ adesivo_url: url }).eq('id', id).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS)
   if (error) return { ok: false, error: /adesivo_url|column|schema cache/i.test(error.message) ? 'Migração do adesivo pendente (adesivo_url).' : error.message }
   revalidatePath('/admin/leitura'); return { ok: true, url }
 }
@@ -709,7 +713,7 @@ export async function carregarCarimbosModulo(pastaId: string): Promise<{ ok: boo
   const g = await guard('leitura:view'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
   try {
-    const { data } = await svc.from('simulado_pastas').select('carimbos_def').eq('id', pastaId).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA).maybeSingle()
+    const { data } = await svc.from('simulado_pastas').select('carimbos_def').eq('id', pastaId).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS).maybeSingle()
     return { ok: true, carimbos: normalizarCarimbos((data as any)?.carimbos_def) }
   } catch { return { ok: true, carimbos: [] } }
 }
@@ -724,7 +728,7 @@ export async function salvarCarimbosModulo(pastaId: string, carimbos: CarimboDef
       try { c.url = await hospedarBase64(c.url, svc, { tenantId: g.tenantId }) } catch { c.url = null }
     }
   }
-  const { error } = await svc.from('simulado_pastas').update({ carimbos_def: norm }).eq('id', pastaId).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  const { error } = await svc.from('simulado_pastas').update({ carimbos_def: norm }).eq('id', pastaId).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS)
   if (error) return { ok: false, error: /carimbos_def|column|schema cache/i.test(error.message) ? 'Migração pendente (carimbos_def) — rode 20260924000000.' : error.message }
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_pastas', entidadeId: pastaId, depois: { carimbos: norm.length }, atorId: g.atorId, tenantId: g.tenantId })
   revalidatePath('/admin/leitura'); return { ok: true, carimbos: norm }
@@ -736,7 +740,7 @@ export async function carregarConquistasModulo(pastaId: string): Promise<{ ok: b
   const g = await guard('leitura:view'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
   try {
-    const { data } = await svc.from('simulado_pastas').select('conquistas_def').eq('id', pastaId).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA).maybeSingle()
+    const { data } = await svc.from('simulado_pastas').select('conquistas_def').eq('id', pastaId).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS).maybeSingle()
     return { ok: true, conquistas: normalizarConquistasModulo((data as any)?.conquistas_def) }
   } catch { return { ok: true, conquistas: [] } }
 }
@@ -746,7 +750,7 @@ export async function salvarConquistasModulo(pastaId: string, conquistas: Modulo
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
   const norm = normalizarConquistasModulo(conquistas)
-  const { error } = await svc.from('simulado_pastas').update({ conquistas_def: norm }).eq('id', pastaId).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  const { error } = await svc.from('simulado_pastas').update({ conquistas_def: norm }).eq('id', pastaId).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS)
   if (error) return { ok: false, error: /conquistas_def|column|schema cache/i.test(error.message) ? 'Migração pendente (conquistas_def) — rode 20260924000001.' : error.message }
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_pastas', entidadeId: pastaId, depois: { conquistas: norm.length }, atorId: g.atorId, tenantId: g.tenantId })
   revalidatePath('/admin/leitura'); return { ok: true, conquistas: norm }
@@ -756,7 +760,7 @@ export async function salvarConquistasModulo(pastaId: string, conquistas: Modulo
 export async function salvarPontuacaoModulo(id: string, cfg: PontuacaoLeitura): Promise<{ ok: boolean; error?: string }> {
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
-  const { error } = await svc.from('simulado_pastas').update({ pontuacao: normalizarPontuacaoLeitura(cfg) }).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  const { error } = await svc.from('simulado_pastas').update({ pontuacao: normalizarPontuacaoLeitura(cfg) }).eq('id', id).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS)
   if (error) return { ok: false, error: /pontuacao|column|schema cache/i.test(error.message) ? 'Migração da pontuação pendente (pontuacao).' : error.message }
   await invalidarRankingLeitura(g.tenantId, id) // pontuação mudou → recalcula o ranking na hora
   revalidatePath('/admin/leitura'); return { ok: true }
@@ -766,7 +770,7 @@ export async function salvarPontuacaoModulo(id: string, cfg: PontuacaoLeitura): 
 export async function salvarRegraSequencialModulo(id: string, ativo: boolean): Promise<{ ok: boolean; error?: string }> {
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
-  const { error } = await svc.from('simulado_pastas').update({ regra_sequencial: !!ativo }).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  const { error } = await svc.from('simulado_pastas').update({ regra_sequencial: !!ativo }).eq('id', id).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS)
   if (error) return { ok: false, error: /regra_sequencial|column|schema cache/i.test(error.message) ? 'Aplique a migração 20260929000001_pasta_regra_sequencial.' : error.message }
   revalidatePath('/admin/leitura'); revalidatePath('/aluno/leitura'); return { ok: true }
 }
@@ -775,7 +779,7 @@ export async function salvarRegraSequencialModulo(id: string, ativo: boolean): P
 export async function salvarQuizRefazerModulo(id: string, bloquear: boolean): Promise<{ ok: boolean; error?: string }> {
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
-  const { error } = await svc.from('simulado_pastas').update({ quiz_bloquear_refazer: !!bloquear }).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  const { error } = await svc.from('simulado_pastas').update({ quiz_bloquear_refazer: !!bloquear }).eq('id', id).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS)
   if (error) return { ok: false, error: /quiz_bloquear_refazer|column|schema cache/i.test(error.message) ? 'Aplique a migração 20260929000002_pasta_quiz_bloquear_refazer.' : error.message }
   revalidatePath('/admin/leitura'); revalidatePath('/aluno/leitura'); return { ok: true }
 }
@@ -784,7 +788,7 @@ export async function salvarQuizRefazerModulo(id: string, bloquear: boolean): Pr
 export async function salvarDesafiosModulo(id: string, desafios: DesafioModulo[]): Promise<{ ok: boolean; error?: string }> {
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
-  const { error } = await svc.from('simulado_pastas').update({ desafios: normalizarDesafios(desafios) }).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  const { error } = await svc.from('simulado_pastas').update({ desafios: normalizarDesafios(desafios) }).eq('id', id).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS)
   if (error) return { ok: false, error: /desafios|column|schema cache/i.test(error.message) ? 'Migração dos desafios pendente (coluna desafios jsonb em simulado_pastas).' : error.message }
   revalidatePath('/admin/leitura'); return { ok: true }
 }
@@ -802,7 +806,7 @@ export async function listarAulasDoModulo(pastaId: string): Promise<{ id: string
 export async function salvarIntroModulo(id: string, cfg: IntroConfig): Promise<{ ok: boolean; error?: string }> {
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
-  const { error } = await svc.from('simulado_pastas').update({ intro_config: normalizarIntro(cfg) }).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  const { error } = await svc.from('simulado_pastas').update({ intro_config: normalizarIntro(cfg) }).eq('id', id).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS)
   if (error) return { ok: false, error: /intro_config|column|schema cache/i.test(error.message) ? 'Migração do "Comece por aqui" pendente (intro_config).' : error.message }
   revalidatePath('/admin/leitura'); return { ok: true }
 }
@@ -811,7 +815,7 @@ export async function salvarIntroModulo(id: string, cfg: IntroConfig): Promise<{
 export async function salvarRegulamentoModulo(id: string, cfg: RegulamentoConfig): Promise<{ ok: boolean; error?: string }> {
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
-  const { error } = await svc.from('simulado_pastas').update({ regulamento: normalizarRegulamento(cfg) }).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  const { error } = await svc.from('simulado_pastas').update({ regulamento: normalizarRegulamento(cfg) }).eq('id', id).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS)
   if (error) return { ok: false, error: /regulamento|column|schema cache/i.test(error.message) ? 'Migração do regulamento pendente (coluna regulamento jsonb em simulado_pastas).' : error.message }
   revalidatePath('/admin/leitura'); return { ok: true }
 }
@@ -824,11 +828,11 @@ export async function salvarDescricaoModulo(id: string, descricao: string): Prom
   const svc = createAdminClient()
   let atual: TrilhaAparencia
   try {
-    const { data } = await svc.from('simulado_pastas').select('trilha_aparencia').eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA).maybeSingle()
+    const { data } = await svc.from('simulado_pastas').select('trilha_aparencia').eq('id', id).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS).maybeSingle()
     atual = resolverTrilhaAparencia((data as any)?.trilha_aparencia)
   } catch { atual = resolverTrilhaAparencia(null) }
   const next = resolverTrilhaAparencia({ ...atual, descricao: (descricao ?? '').slice(0, 400) })
-  const { error } = await svc.from('simulado_pastas').update({ trilha_aparencia: next }).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  const { error } = await svc.from('simulado_pastas').update({ trilha_aparencia: next }).eq('id', id).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS)
   if (error) return { ok: false, error: /trilha_aparencia|column|schema cache/i.test(error.message) ? 'Migração da aparência da trilha pendente (coluna trilha_aparencia jsonb em simulado_pastas).' : error.message }
   revalidatePath('/admin/leitura'); revalidatePath('/aluno/leitura'); return { ok: true }
 }
@@ -839,11 +843,11 @@ export async function salvarDegradeModulo(id: string, degrade: TrilhaDegrade): P
   const svc = createAdminClient()
   let atual: TrilhaAparencia
   try {
-    const { data } = await svc.from('simulado_pastas').select('trilha_aparencia').eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA).maybeSingle()
+    const { data } = await svc.from('simulado_pastas').select('trilha_aparencia').eq('id', id).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS).maybeSingle()
     atual = resolverTrilhaAparencia((data as any)?.trilha_aparencia)
   } catch { atual = resolverTrilhaAparencia(null) }
   const next = resolverTrilhaAparencia({ ...atual, degrade })
-  const { error } = await svc.from('simulado_pastas').update({ trilha_aparencia: next }).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  const { error } = await svc.from('simulado_pastas').update({ trilha_aparencia: next }).eq('id', id).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS)
   if (error) return { ok: false, error: /trilha_aparencia|column|schema cache/i.test(error.message) ? 'Migração da aparência da trilha pendente (coluna trilha_aparencia jsonb em simulado_pastas).' : error.message }
   revalidatePath('/admin/leitura'); revalidatePath('/aluno/leitura'); return { ok: true }
 }
@@ -854,11 +858,11 @@ export async function salvarGrifoCoresModulo(id: string, cores: GrifoCores): Pro
   const svc = createAdminClient()
   let atual: TrilhaAparencia
   try {
-    const { data } = await svc.from('simulado_pastas').select('trilha_aparencia').eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA).maybeSingle()
+    const { data } = await svc.from('simulado_pastas').select('trilha_aparencia').eq('id', id).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS).maybeSingle()
     atual = resolverTrilhaAparencia((data as any)?.trilha_aparencia)
   } catch { atual = resolverTrilhaAparencia(null) }
   const next = resolverTrilhaAparencia({ ...atual, grifoCores: resolverGrifoCores(cores) })
-  const { error } = await svc.from('simulado_pastas').update({ trilha_aparencia: next }).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  const { error } = await svc.from('simulado_pastas').update({ trilha_aparencia: next }).eq('id', id).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS)
   if (error) return { ok: false, error: /trilha_aparencia|column|schema cache/i.test(error.message) ? 'Migração da aparência da trilha pendente (coluna trilha_aparencia jsonb em simulado_pastas).' : error.message }
   revalidatePath('/admin/leitura'); revalidatePath('/aluno/leitura'); return { ok: true }
 }
@@ -869,11 +873,11 @@ export async function salvarTrilhaAparenciaModulo(id: string, cfg: Omit<TrilhaAp
   // Os builders da trilha não gerenciam descrição/cores dos grifos → preserva os existentes se cfg não trouxer.
   let cur = resolverTrilhaAparencia(null)
   try {
-    const { data } = await svc.from('simulado_pastas').select('trilha_aparencia').eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA).maybeSingle()
+    const { data } = await svc.from('simulado_pastas').select('trilha_aparencia').eq('id', id).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS).maybeSingle()
     cur = resolverTrilhaAparencia((data as any)?.trilha_aparencia)
   } catch { /* mantém padrão */ }
   const next = resolverTrilhaAparencia({ ...cfg, descricao: cfg.descricao ?? cur.descricao, grifoCores: cfg.grifoCores ?? cur.grifoCores })
-  const { error } = await svc.from('simulado_pastas').update({ trilha_aparencia: next }).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  const { error } = await svc.from('simulado_pastas').update({ trilha_aparencia: next }).eq('id', id).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS)
   if (error) return { ok: false, error: /trilha_aparencia|column|schema cache/i.test(error.message) ? 'Migração da aparência da trilha pendente (coluna trilha_aparencia jsonb em simulado_pastas).' : error.message }
   revalidatePath('/admin/leitura'); revalidatePath('/aluno/leitura'); return { ok: true }
 }
@@ -887,16 +891,22 @@ export async function salvarTrilhaFundoModulo(id: string, patch: { fundo: Trilha
   const svc = createAdminClient()
   let atual: TrilhaAparencia
   try {
-    const { data } = await svc.from('simulado_pastas').select('trilha_aparencia').eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA).maybeSingle()
+    const { data } = await svc.from('simulado_pastas').select('trilha_aparencia').eq('id', id).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS).maybeSingle()
     atual = resolverTrilhaAparencia((data as any)?.trilha_aparencia)
   } catch { atual = resolverTrilhaAparencia(null) }
   const next: TrilhaAparencia = { ...atual, livre: { ...atual.livre, fundo: patch.fundo, aspecto: patch.aspecto ?? atual.livre.aspecto }, degradeTrilha: patch.degradeTrilha ?? atual.degradeTrilha }
-  const { error } = await svc.from('simulado_pastas').update({ trilha_aparencia: resolverTrilhaAparencia(next) }).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  const { error } = await svc.from('simulado_pastas').update({ trilha_aparencia: resolverTrilhaAparencia(next) }).eq('id', id).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS)
   if (error) return { ok: false, error: /trilha_aparencia|column|schema cache/i.test(error.message) ? 'Migração da aparência da trilha pendente (coluna trilha_aparencia jsonb em simulado_pastas).' : error.message }
   revalidatePath('/admin/leitura'); revalidatePath('/aluno/leitura'); return { ok: true }
 }
 
-export interface DetalheAulaRanking { titulo: string; data: string | null; pontos: number }
+export interface DetalheAulaRanking {
+  titulo: string; data: string | null; pontos: number
+  // Controle detalhado (suporte): momentos de LEITURA (início/fim/duração) e de QUIZ (início/fim).
+  leituraInicio: string | null; leituraFim: string | null; leituraTempoSeg: number | null
+  quizInicio: string | null; quizFim: string | null
+  tentativas: number // nº de tentativas do quiz registradas (>1 = o aluno refez)
+}
 export interface DetalheRankingAluno {
   nome: string; email: string | null
   streakAtual: number; streakMaior: number; ultimoDiaAtivo: string | null
@@ -944,18 +954,44 @@ export async function detalheRankingAluno(moduloId: string, estudanteId: string)
   }
   const quizPorDoc = new Map<string, Set<string>>()
   for (const q of quiz) (quizPorDoc.get(q.documento_id) ?? quizPorDoc.set(q.documento_id, new Set()).get(q.documento_id)!).add(q.questao_id)
-  type Cell = { answered: Set<string>; correct: Set<string>; ultima: string | null }
+  type Cell = { answered: Set<string>; correct: Set<string>; ultima: string | null; primeira: string | null }
   const cellPorDoc = new Map<string, Cell>()
   for (const r of resp) {
     const qq = quizPorDoc.get(r.documento_id); if (!qq || !qq.has(r.questao_id)) continue
-    const c = cellPorDoc.get(r.documento_id) ?? cellPorDoc.set(r.documento_id, { answered: new Set(), correct: new Set(), ultima: null }).get(r.documento_id)!
+    const c = cellPorDoc.get(r.documento_id) ?? cellPorDoc.set(r.documento_id, { answered: new Set(), correct: new Set(), ultima: null, primeira: null }).get(r.documento_id)!
     c.answered.add(r.questao_id); if (r.correta) c.correct.add(r.questao_id)
-    if (r.respondido_em && (!c.ultima || r.respondido_em > c.ultima)) c.ultima = r.respondido_em
+    if (r.respondido_em) { if (!c.ultima || r.respondido_em > c.ultima) c.ultima = r.respondido_em; if (!c.primeira || r.respondido_em < c.primeira) c.primeira = r.respondido_em } // MAX=fim, MIN=início do quiz
+  }
+  // Tempo de LEITURA por aula (início/fim/duração) — controle detalhado p/ o suporte. Tolerante.
+  const leituraPorDoc = new Map<string, { inicio: string | null; fim: string | null; tempoSeg: number | null }>()
+  if (docIds.length) {
+    try {
+      const prog = await fetchAllByIn<{ documento_id: string; iniciado_em: string | null; concluido_em: string | null; tempo_seg: number | null }>(docIds, (chunk) =>
+        svc.from('simulado_leitura_progresso').select('documento_id, iniciado_em, concluido_em, tempo_seg').eq('tenant_id', g.tenantId).eq('estudante_id', estudanteId).in('documento_id', chunk).order('id'))
+      for (const p of prog) leituraPorDoc.set(p.documento_id, { inicio: p.iniciado_em, fim: p.concluido_em, tempoSeg: p.tempo_seg != null ? Number(p.tempo_seg) : null })
+    } catch { /* tabela/colunas ausentes */ }
+  }
+  // Nº de TENTATIVAS do quiz por aula (refazimentos ficam aqui, separados do principal). Tolerante.
+  const tentativasPorDoc = new Map<string, number>()
+  if (docIds.length) {
+    try {
+      const tts = await fetchAllByIn<{ documento_id: string }>(docIds, (chunk) =>
+        svc.from('simulado_leitura_quiz_tentativas').select('documento_id').eq('tenant_id', g.tenantId).eq('estudante_id', estudanteId).in('documento_id', chunk).order('id'))
+      for (const t of tts) tentativasPorDoc.set(t.documento_id, (tentativasPorDoc.get(t.documento_id) ?? 0) + 1)
+    } catch { /* tabela ausente */ }
   }
 
   const diaDe = (iso: string) => new Date(iso).toLocaleDateString('en-CA', { timeZone: tz })
   const hoje = new Date().toLocaleDateString('en-CA', { timeZone: tz })
   const ontem = new Date(Date.parse(hoje + 'T00:00:00Z') - 86_400_000).toISOString().slice(0, 10)
+  // Dia de conclusão IMUTÁVEL por documento (ledger de XP, meta.dia do evento de quiz) — refazer NÃO
+  // move esse dia (o respondido_em movia e quebrava o streak/calendário de quem refez). Fallback p/ o
+  // respondido_em quando não há evento.
+  const diaLedgerPorDoc = new Map<string, string>()
+  try {
+    const { data: ev } = await svc.from('simulado_xp_eventos').select('meta').eq('tenant_id', g.tenantId).eq('estudante_id', estudanteId).eq('origem', 'leitura').like('ref_id', 'quiz:%')
+    for (const e of (ev ?? []) as any[]) { const d = e.meta?.dia, doc = e.meta?.documentoId; if (d && doc && !diaLedgerPorDoc.has(doc)) diaLedgerPorDoc.set(doc, d) }
+  } catch { /* ledger indisponível → usa respondido_em */ }
   const aulas: DetalheAulaRanking[] = []
   const diasConcluidos = new Set<string>()
   const diaAulas: Record<string, string[]> = {}
@@ -966,8 +1002,14 @@ export async function detalheRankingAluno(moduloId: string, estudanteId: string)
     const pontos = gamAtivo
       ? (pontuacao.pontos_aula + pontuacao.pontos_quiz) + c.correct.size * pontuacao.pontos_acerto + (pontuacao.combo_ativo && gabaritou ? pontuacao.combo_bonus : 0)
       : c.correct.size
-    aulas.push({ titulo: d.titulo, data: c.ultima, pontos })
-    if (c.ultima) { const dia = diaDe(c.ultima); diasConcluidos.add(dia); (diaAulas[dia] ??= []).push(d.titulo) }
+    const diaConclusao = diaLedgerPorDoc.get(d.id) ?? (c.ultima ? diaDe(c.ultima) : null) // prefere o dia imutável do ledger
+    const prog = leituraPorDoc.get(d.id)
+    aulas.push({
+      titulo: d.titulo, data: c.ultima, pontos,
+      leituraInicio: prog?.inicio ?? null, leituraFim: prog?.fim ?? null, leituraTempoSeg: prog?.tempoSeg ?? null,
+      quizInicio: c.primeira, quizFim: c.ultima, tentativas: tentativasPorDoc.get(d.id) ?? 0,
+    })
+    if (diaConclusao) { diasConcluidos.add(diaConclusao); (diaAulas[diaConclusao] ??= []).push(d.titulo) }
   }
   const pontosTotal = aulas.reduce((s, a) => s + a.pontos, 0)
 
@@ -1024,7 +1066,7 @@ export async function excluirModuloLeitura(id: string): Promise<{ ok: boolean; e
     svc.from('simulado_documentos').select('id', { count: 'exact', head: true }).eq('tenant_id', g.tenantId).eq('pasta_id', id).eq('deletado', false),
   ])
   if ((subs ?? 0) > 0 || (aulas ?? 0) > 0) return { ok: false, error: 'Esvazie o módulo antes de excluir (mova as aulas/submódulos).' }
-  const { error } = await svc.from('simulado_pastas').delete().eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  const { error } = await svc.from('simulado_pastas').delete().eq('id', id).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS)
   if (error) return { ok: false, error: error.message }
   revalidatePath('/admin/leitura'); return { ok: true }
 }
@@ -1035,7 +1077,7 @@ export async function salvarPublicacaoModulo(pastaId: string, pub: PublicacaoMod
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
   const val: PublicacaoModulo = { status: pub.status === 'publicado' ? 'publicado' : 'rascunho', publicarEm: pub.publicarEm || null, encerrarEm: pub.encerrarEm || null }
-  const { error } = await svc.from('simulado_pastas').update({ publicacao: val }).eq('id', pastaId).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  const { error } = await svc.from('simulado_pastas').update({ publicacao: val }).eq('id', pastaId).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS)
   if (error) return { ok: false, error: /publicacao|column|schema cache/i.test(error.message) ? 'Rode a migração 20260910000002 (publicação do módulo).' : error.message }
   await registrarAudit({ operacao: val.status === 'publicado' ? 'LIBERAR' : 'BLOQUEAR', entidade: 'simulado_pastas', entidadeId: pastaId, depois: val, atorId: g.atorId, tenantId: g.tenantId })
   revalidatePath('/admin/leitura'); return { ok: true }
@@ -1062,7 +1104,7 @@ export async function reordenarModulosLeitura(ids: string[]): Promise<{ ok: bool
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
   for (let i = 0; i < ids.length; i++) {
-    const { error } = await svc.from('simulado_pastas').update({ ordem: i }).eq('id', ids[i]).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+    const { error } = await svc.from('simulado_pastas').update({ ordem: i }).eq('id', ids[i]).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS)
     if (error && /ordem|column/i.test(error.message)) return { ok: true } // coluna ainda não migrada — ignora silenciosamente
   }
   revalidatePath('/admin/leitura'); return { ok: true }
@@ -1432,7 +1474,7 @@ export async function carregarRankingOcultos(pastaId: string): Promise<{ ok: boo
   const g = await guard('leitura:view'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
   let raw: any = {}
-  try { const { data } = await svc.from('simulado_pastas').select('ranking_ocultos').eq('id', pastaId).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA).maybeSingle(); raw = (data as any)?.ranking_ocultos ?? {} } catch { raw = {} }
+  try { const { data } = await svc.from('simulado_pastas').select('ranking_ocultos').eq('id', pastaId).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS).maybeSingle(); raw = (data as any)?.ranking_ocultos ?? {} } catch { raw = {} }
   const estIds = Array.isArray(raw.estudantes) ? raw.estudantes.filter((x: unknown) => typeof x === 'string') : []
   const grpIds = Array.isArray(raw.grupos) ? raw.grupos.filter((x: unknown) => typeof x === 'string') : []
   const total = raw.total === true
@@ -1449,7 +1491,7 @@ export async function salvarRankingOcultos(pastaId: string, cfg: RankingOcultosC
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
   const val = { estudantes: [...new Set((cfg.estudantes ?? []).filter(Boolean))], grupos: [...new Set((cfg.grupos ?? []).filter(Boolean))], total: cfg.total === true }
-  const { error } = await svc.from('simulado_pastas').update({ ranking_ocultos: val }).eq('id', pastaId).eq('tenant_id', g.tenantId).eq('folder_area', AREA_LEITURA)
+  const { error } = await svc.from('simulado_pastas').update({ ranking_ocultos: val }).eq('id', pastaId).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS)
   if (error) return { ok: false, error: /ranking_ocultos|column|schema cache/i.test(error.message) ? 'Migração pendente (coluna ranking_ocultos jsonb em simulado_pastas).' : error.message }
   await invalidarRankingLeitura(g.tenantId, pastaId) // reflete na hora (sem esperar o TTL do cache)
   revalidatePath('/admin/leitura'); return { ok: true }

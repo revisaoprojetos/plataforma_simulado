@@ -39,7 +39,7 @@ async function origParaMeta(o: File | string | null): Promise<string | null> {
 export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poster', cardFade = null, rotulo, generoM = false, inline = false, onClose, onSaved }: {
   pasta?: { id?: string; nome?: string; cor?: string | null; capa?: string | null; capaLarga?: string | null } | null
   /** Presente = modo CRIAR: cria a pasta nesta área e já aplica a personalização. */
-  area?: 'banco' | 'simulado' | 'caderno' | 'leitura'
+  area?: 'banco' | 'simulado' | 'caderno' | 'leitura' | 'jurisprudencia'
   /** Config GLOBAL do fade lateral dos cards (tema.card_fade) — editável aqui p/ simulados/bancos. */
   cardFade?: { ativo?: boolean; cor?: string | null } | null
   /** Pasta-pai — quando definido, cria uma SUBPASTA dentro dela. */

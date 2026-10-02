@@ -21,7 +21,7 @@ export const MODULO_TABS: { id: ModuloTab; label: string; Icon: typeof BookOpenT
  * Barra de abas do módulo (Aulas | Acessos | Configurações) com underline deslizante animado.
  * `claro` = versão sobre o banner (texto/underline brancos, sem borda). Navega por ?tab=.
  */
-export function ModuloTabsBar({ pastaAtual, moduloTab, claro = false }: { pastaAtual: string; moduloTab: ModuloTab; claro?: boolean }) {
+export function ModuloTabsBar({ pastaAtual, moduloTab, claro = false, basePath = '/admin/leitura' }: { pastaAtual: string; moduloTab: ModuloTab; claro?: boolean; basePath?: string }) {
   const tabsRef = useRef<HTMLDivElement>(null)
   const [ind, setInd] = useState<{ left: number; width: number }>({ left: 0, width: 0 })
   useEffect(() => {
@@ -36,7 +36,7 @@ export function ModuloTabsBar({ pastaAtual, moduloTab, claro = false }: { pastaA
   return (
     <div ref={tabsRef} className={cn('relative flex gap-8 pl-1 text-sm', claro ? 'border-b border-white/20' : 'border-b')}>
       {MODULO_TABS.map(({ id, label, Icon }) => (
-        <Link key={id} data-tab-ativo={moduloTab === id ? '1' : '0'} href={`/admin/leitura?pasta=${pastaAtual}&tab=${id}`}
+        <Link key={id} data-tab-ativo={moduloTab === id ? '1' : '0'} href={`${basePath}?pasta=${pastaAtual}&tab=${id}`}
           className={cn('inline-flex items-center gap-1.5 rounded-md py-2 font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-ring/40',
             moduloTab === id
               ? (claro ? 'text-white' : 'text-primary')

@@ -70,29 +70,29 @@ export async function POST(request: NextRequest) {
 
   const { data: disc } = await svc.from('simulado_questoes').select('disciplina_id').eq('id', questao_id).maybeSingle()
 
-  // PRESERVA a data da 1ª resposta: REFAZER o quiz NÃO pode mover o `respondido_em` pro dia do
-  // refazimento — senão o "dia de conclusão" da aula migra e pode QUEBRAR a sequência do aluno
-  // (foi o bug: aluna refez o desafio e o registro pulou pro dia seguinte). Só a alternativa/acerto
-  // é atualizada; a data fica a da 1ª vez. Questão nunca respondida antes → grava agora.
+  // PRINCIPAL = WRITE-ONCE: a 1ª resposta de cada questão fica IMUTÁVEL (data, alternativa e acerto).
+  // REFAZER o quiz NUNCA sobrescreve o principal — senão o "dia de conclusão" migra e QUEBRA a
+  // sequência (foi o bug da aluna que refez e o registro pulou de dia). O redo é guardado como
+  // TENTATIVA SEPARADA em /api/leitura/quiz-tentativa (tentativa_num+1), então nada se perde.
   const { data: jaResp } = await svc.from('simulado_leitura_respostas')
-    .select('respondido_em').eq('tenant_id', sessao.tenantId).eq('estudante_id', sessao.estudanteId)
+    .select('id').eq('tenant_id', sessao.tenantId).eq('estudante_id', sessao.estudanteId)
     .eq('documento_id', documento_id).eq('questao_id', questao_id).maybeSingle()
   // BLOQUEAR REFAZER: questão já respondida + módulo com a trava ligada → não re-responde (quiz travado).
   if (bloquearRefazer && jaResp) return NextResponse.json({ message: 'Este quiz já foi concluído e não pode ser refeito.', bloqueado: 'refazer' }, { status: 403 })
-  const respondidoEm = (jaResp as any)?.respondido_em ?? new Date().toISOString()
 
+  // ON CONFLICT DO NOTHING (ignoreDuplicates): insere só na 1ª vez; refazer é IGNORADO (principal intacto).
   const { data: up, error } = await svc.from('simulado_leitura_respostas').upsert(
     {
       tenant_id: sessao.tenantId, estudante_id: sessao.estudanteId, documento_id, questao_id,
       alternativa_id, correta, snapshot_gabarito: { alternativa_id, correta, letra: LETRA[idx] ?? '?', correta_id: corretaId },
-      respondido_em: respondidoEm,
+      respondido_em: new Date().toISOString(),
     },
-    { onConflict: 'estudante_id,documento_id,questao_id' },
-  ).select('id').single()
+    { onConflict: 'estudante_id,documento_id,questao_id', ignoreDuplicates: true },
+  ).select('id').maybeSingle()
   if (error) return NextResponse.json({ message: error.message }, { status: 500 })
 
-  // Gamificação: XP por acerto (idempotente por respostaId no ledger).
-  void onPraticaRespondida(svc, { tenantId: sessao.tenantId, estudanteId: sessao.estudanteId, respostaId: (up as any).id, correta, disciplinaId: (disc as any)?.disciplina_id ?? null })
+  // XP por acerto SÓ quando realmente gravou a 1ª resposta (up != null); refazer (ignorado) não re-credita.
+  if (up) void onPraticaRespondida(svc, { tenantId: sessao.tenantId, estudanteId: sessao.estudanteId, respostaId: (up as any).id, correta, disciplinaId: (disc as any)?.disciplina_id ?? null })
 
-  return NextResponse.json({ ok: true, correta, correta_id: corretaId, letra: LETRA[idx] ?? '?' })
+  return NextResponse.json({ ok: true, correta, correta_id: corretaId, letra: LETRA[idx] ?? '?', jaRespondida: !!jaResp })
 }

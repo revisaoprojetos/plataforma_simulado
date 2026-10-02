@@ -1,0 +1,334 @@
+{
+ "armadilhas": {
+  "linhas": {
+   "peg": [
+    "XXXXXXXXXXX",
+    "XDDDDDDDDDX",
+    "XDWWDDDWWDX",
+    "XDWPDDDWPDX",
+    "XDDDDDDDDDX",
+    "XDXXXXXXXDX",
+    "XDXDXDXDXDX",
+    "XDDDDDDDDDX",
+    "XXXXXXXXXXX",
+    ".X.......X.",
+    "XX.......XX"
+   ],
+   "sum": [
+    ".XXXXXXX...",
+    ".XDDDDDXX..",
+    ".XDWPDWPXX.",
+    ".XDDDDDDDX.",
+    ".XDXXXXXDX.",
+    ".XDDDDDDDX.",
+    ".XDXXXXXDX.",
+    ".XDDDDDDDX.",
+    ".XXXXXXXXX.",
+    "..X.....X..",
+    ".XX.....XX."
+   ],
+   "inf": [
+    "XXXXXXXXXXX",
+    "XDDXXXXXDDX",
+    "XDXXDDDXXDX",
+    "XDDDDDDXXDX",
+    "XDDDDDXXDDX",
+    "XDDDDXXDDDX",
+    "XDDDDXXDDDX",
+    "XDDDDDDDDDX",
+    "XDDDDXXDDDX",
+    "XXXXXXXXXXX",
+    ".X.......X."
+   ]
+  },
+  "paletas": {
+   "normal": {
+    "peg": {
+     "X": "#ff4f9a",
+     "D": "#14072e",
+     "W": "#ffffff",
+     "P": "#120a3a"
+    },
+    "sum": {
+     "X": "#3fd5ff",
+     "D": "#14072e",
+     "W": "#ffffff",
+     "P": "#120a3a"
+    },
+    "inf": {
+     "X": "#b48cff",
+     "D": "#14072e",
+     "W": "#ffffff",
+     "P": "#120a3a"
+    }
+   },
+   "vulneravel": {
+    "X": "#3446ff",
+    "D": "#0b0f45",
+    "W": "#ffffff",
+    "P": "#ffffff"
+   },
+   "vulneravel_acabando": {
+    "X": "#ffffff",
+    "D": "#3446ff",
+    "W": "#ff4f9a",
+    "P": "#ff4f9a"
+   }
+  }
+ },
+ "mascote": {
+  "linhas": {
+   "base": [
+    "....XXXXA....",
+    "..XXXXXXAA...",
+    ".XXDDDDDA..X.",
+    ".XDDDDDDDDXX.",
+    "XXDDWWDWWDDXX",
+    "XXDDWPDWPDDXX",
+    "XXDDDDDDDDDXX",
+    "XXDDDDDDDDDXX",
+    ".XXDDDDDDDXX.",
+    "..XXXDDDXXX..",
+    "....XXXXX...."
+   ],
+   "legsA": [
+    "...X.....X...",
+    "..XX.....XX.."
+   ],
+   "legsB": [
+    "..X.......X..",
+    ".XX.......XX."
+   ]
+  },
+  "variacoes_olhos": {
+   "blink": {
+    "4": "XXDDDDDDDDDXX",
+    "5": "XXDDWWDWWDDXX"
+   },
+   "up": {
+    "4": "XXDDWPDWPDDXX",
+    "5": "XXDDWWDWWDDXX"
+   },
+   "happy": {
+    "4": "XXDDWWDWWDDXX",
+    "5": "XXDDDDDDDDDXX"
+   }
+  },
+  "paletas": {
+   "normal": {
+    "X": "#9b7bff",
+    "A": "#e6ddff",
+    "D": "#14072e",
+    "W": "#ffffff",
+    "P": "#120a3a"
+   },
+   "power": {
+    "X": "#3fd5ff",
+    "A": "#e6fbff",
+    "D": "#07203a",
+    "W": "#ffffff",
+    "P": "#120a3a"
+   },
+   "dead": {
+    "X": "#9b7bff",
+    "A": "#e6ddff",
+    "D": "#14072e",
+    "W": "#ff4f9a",
+    "P": "#ff4f9a"
+   }
+  },
+  "podio": {
+   "1": {
+    "X": "#ffc83d",
+    "A": "#fff3c4",
+    "D": "#2a1800",
+    "W": "#ffffff",
+    "P": "#2a1800"
+   },
+   "2": {
+    "X": "#d3d9ff",
+    "A": "#ffffff",
+    "D": "#161a4a",
+    "W": "#ffffff",
+    "P": "#161a4a"
+   },
+   "3": {
+    "X": "#f0965a",
+    "A": "#ffe0c8",
+    "D": "#2a1206",
+    "W": "#ffffff",
+    "P": "#2a1206"
+   }
+  }
+ },
+ "icones": {
+  "building": [
+   "...XXX...",
+   ".XXXXXXX.",
+   "XXXXXXXXX",
+   ".........",
+   ".X.X.X.X.",
+   ".X.X.X.X.",
+   ".X.X.X.X.",
+   ".........",
+   "XXXXXXXXX"
+  ],
+  "briefcase": [
+   "...XXX...",
+   "...X.X...",
+   "XXXXXXXXX",
+   "X.......X",
+   "XXXXXXXXX",
+   "X...X...X",
+   "X.......X",
+   "XXXXXXXXX",
+   "........."
+  ],
+  "doc": [
+   ".XXXXXX..",
+   ".X....XX.",
+   ".X.XX..X.",
+   ".X.....X.",
+   ".X.XXX.X.",
+   ".X.....X.",
+   ".X.XXX.X.",
+   ".X.....X.",
+   ".XXXXXXX."
+  ],
+  "umbrella": [
+   "....X....",
+   "..XXXXX..",
+   ".XXXXXXX.",
+   "XXXXXXXXX",
+   "X...X...X",
+   "....X....",
+   "....X....",
+   "..X.X....",
+   "...X....."
+  ],
+  "folder": [
+   "XXXX.....",
+   "X..XXXXXX",
+   "XXXXXXXXX",
+   "X.......X",
+   "X.......X",
+   "X.......X",
+   "X.......X",
+   "XXXXXXXXX",
+   "........."
+  ],
+  "hardhat": [
+   ".........",
+   "...XXX...",
+   "..XX.XX..",
+   ".XXX.XXX.",
+   ".XXXXXXX.",
+   ".XXXXXXX.",
+   "XXXXXXXXX",
+   "XXXXXXXXX",
+   "........."
+  ],
+  "dollar": [
+   "....X....",
+   "..XXXXX..",
+   ".XX.X....",
+   ".XX.X....",
+   "..XXXXX..",
+   "....X.XX.",
+   "....X.XX.",
+   "..XXXXX..",
+   "....X...."
+  ],
+  "rg": [
+   "XXX..XXX.",
+   "X..X.X...",
+   "X..X.X...",
+   "XXX..X.XX",
+   "X.X..X..X",
+   "X..X.X..X",
+   "X..X.XXX.",
+   ".........",
+   "........."
+  ],
+  "lock": [
+   "..XXXXX..",
+   ".X.....X.",
+   ".X.....X.",
+   "XXXXXXXXX",
+   "XXXX.XXXX",
+   "XXXX.XXXX",
+   "XXXXXXXXX",
+   "XXXXXXXXX",
+   "........."
+  ],
+  "check": [
+   "........X",
+   ".......XX",
+   "......XX.",
+   "X....XX..",
+   "XX..XX...",
+   ".XXXX....",
+   "..XX.....",
+   ".........",
+   "........."
+  ],
+  "play": [
+   "..X......",
+   "..XX.....",
+   "..XXX....",
+   "..XXXX...",
+   "..XXXXX..",
+   "..XXXX...",
+   "..XXX....",
+   "..XX.....",
+   "..X......"
+  ],
+  "star": [
+   "....X....",
+   "...XXX...",
+   "XXXXXXXXX",
+   ".XXXXXXX.",
+   "..XXXXX..",
+   "..XX.XX..",
+   ".XX...XX.",
+   "X.......X",
+   "........."
+  ],
+  "heart": [
+   ".XX.XX.",
+   "XXXXXXX",
+   "XXXXXXX",
+   ".XXXXX.",
+   "..XXX..",
+   "...X..."
+  ],
+  "book": [
+   "XXXXXXXX.",
+   "X......XX",
+   "X.XXXX.XX",
+   "X......XX",
+   "X.XXXX.XX",
+   "X......XX",
+   "X......XX",
+   "XXXXXXXXX",
+   ".XXXXXXXX"
+  ]
+ },
+ "coroa": [
+  "X...X...X",
+  "XX.XXX.XX",
+  "XXXXXXXXX",
+  "XXXXXXXXX",
+  ".XXXXXXX."
+ ],
+ "cores_materias": {
+  "adm": "#a78bfa",
+  "civ": "#3fd5ff",
+  "con": "#ff6fae",
+  "pre": "#4ef0a0",
+  "pc": "#ffa53d",
+  "tra": "#ff7a59",
+  "tri": "#ffd84d",
+  "rg": "#ffc83d"
+ }
+}

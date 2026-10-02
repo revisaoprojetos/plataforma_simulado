@@ -32,6 +32,13 @@ export const ROTAS_ALUNO_OCULTAS = ['/aluno/favoritos', '/aluno/cadernos']
 export const LEITURA_ATIVA = process.env.NEXT_PUBLIC_LEITURA_ATIVA === 'true'
 
 /**
+ * JURISPRUDENCIA_ATIVA: liga o "Desafio de Jurisprudência" — segunda área do motor de desafios
+ * (mesmo engine da Leitura, porém SÓ QUIZ, sem leitor). Default OFF até popular o conteúdo; defina
+ * NEXT_PUBLIC_JURISPRUDENCIA_ATIVA=true no deploy para liberar.
+ */
+export const JURISPRUDENCIA_ATIVA = process.env.NEXT_PUBLIC_JURISPRUDENCIA_ATIVA === 'true'
+
+/**
  * OCULTAR_CRONOGRAMA: esconde o módulo Cronograma de Estudos (menu do admin + menu do
  * aluno) enquanto as telas estão em construção.
  *
