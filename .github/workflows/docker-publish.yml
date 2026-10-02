@@ -73,6 +73,7 @@ jobs:
             NEXT_PUBLIC_CRONOGRAMA_ATIVO=true
             NEXT_PUBLIC_LEITURA_ATIVA=true
             NEXT_PUBLIC_MODELOS_CADERNO_ATIVO=true
+            NEXT_PUBLIC_JURISPRUDENCIA_ATIVA=true
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
