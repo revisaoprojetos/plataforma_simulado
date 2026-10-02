@@ -75,11 +75,11 @@ export async function temAcessoDesafio(estudanteId: string, tenantId: string, de
   // A pasta precisa existir, ser do tenant e do tipo jurisprudencia.
   const { data: pasta } = await svc
     .from('simulado_pastas')
-    .select('id, folder_area')
+    .select('id, folder_area, deletado')
     .eq('id', desafioId)
     .eq('tenant_id', tenantId)
     .maybeSingle()
-  if (!pasta || (pasta as any).folder_area !== 'jurisprudencia') return false
+  if (!pasta || (pasta as any).folder_area !== 'jurisprudencia' || (pasta as any).deletado) return false
   return pastaAcessivel(svc, desafioId, estudanteId)
 }
 
@@ -118,6 +118,7 @@ export async function desafiosDoAluno(estudanteId: string, tenantId: string): Pr
     .eq('tenant_id', tenantId)
     .eq('folder_area', 'jurisprudencia')
     .eq('is_folder', true)
+    .eq('deletado', false)
     .order('id', { ascending: true })
   const lista = (pastas ?? []) as any[]
   if (!lista.length) return []

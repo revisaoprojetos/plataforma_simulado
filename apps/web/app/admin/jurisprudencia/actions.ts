@@ -74,6 +74,7 @@ export async function listarDesafios(): Promise<DesafioListagem[]> {
     .eq('tenant_id', g.tenantId)
     .eq('folder_area', 'jurisprudencia')
     .eq('is_folder', true)
+    .eq('deletado', false)
     .order('nome', { ascending: true })
   return ((data ?? []) as any[]).map((p) => ({
     id: p.id,
