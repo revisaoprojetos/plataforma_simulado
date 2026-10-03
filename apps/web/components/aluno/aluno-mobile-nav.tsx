@@ -1,15 +1,17 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
-import { Home, ClipboardList, Bell, Menu, GraduationCap, Lightbulb, BookOpen, ClipboardCheck, ChevronRight, Library, Trophy } from 'lucide-react'
+import { Home, ClipboardList, Bell, Menu, GraduationCap, Lightbulb, BookOpen, ClipboardCheck, ChevronRight, Library, Trophy, User, LogOut } from 'lucide-react'
 import { useSidebar } from '@/components/ui/sidebar'
 import { useIsMobile } from '@/hooks/use-mobile'
 import { useSWRGet } from '@/hooks/use-swr-get'
 import { cn } from '@/lib/utils'
 import { avatarPadraoDe } from '@/lib/aluno/avatar-padrao'
+import { LoginLoading } from '@/components/aluno/login-loading'
+import type { LoginConfig } from '@/lib/login-config'
 
 export type NavMode = 'tabs' | 'menu'
 
@@ -75,8 +77,40 @@ function ClipboardSolido({ className, cor, furo }: SolidProps) {
   )
 }
 
+/** Bottom-sheet do portal mobile (usado pelo "Simulados" e pelo "Perfil") — mesmo visual e com
+ *  animação de ABRIR e FECHAR (fade + slide), via estado controlado (monta → entra → sai → desmonta). */
+function BottomSheet({ open, onClose, children }: { open: boolean; onClose: () => void; children: ReactNode }) {
+  const [montado, setMontado] = useState(false)
+  const [entrando, setEntrando] = useState(false)
+  useEffect(() => {
+    if (open) {
+      setMontado(true)
+      const id = requestAnimationFrame(() => setEntrando(true))
+      return () => cancelAnimationFrame(id)
+    }
+    setEntrando(false)
+    const t = setTimeout(() => setMontado(false), 300) // espera a animação de saída terminar
+    return () => clearTimeout(t)
+  }, [open])
+  if (!montado || typeof document === 'undefined') return null
+  return createPortal(
+    <div className="fixed inset-0 z-50 md:hidden" onClick={onClose}>
+      <div className={cn('absolute inset-0 bg-black/40 transition-opacity duration-300', entrando ? 'opacity-100' : 'opacity-0')} />
+      <div
+        className={cn('absolute inset-x-3 rounded-[18px] border bg-card p-2 shadow-2xl transition-all duration-300 ease-out', entrando ? 'translate-y-0 opacity-100' : 'translate-y-4 opacity-0')}
+        style={{ bottom: 'calc(env(safe-area-inset-bottom) + 74px)' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {children}
+      </div>
+    </div>,
+    document.body,
+  )
+}
+
 interface Props {
   navMode: NavMode
+  loginConfig: LoginConfig
   logo?: string | null; nome?: string; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string
   usuarioNome?: string; avatar?: string | null; avatarCor?: string | null; counts?: Record<string, number>; hrefsOcultos?: string[]
 }
@@ -87,19 +121,30 @@ interface Props {
  *  - 'menu' → app bar no topo (hambúrguer + marca + sino + avatar) que abre o drawer lateral, sem barra inferior.
  * Só renderiza no mobile (md-). No desktop vale a sidebar. Cores via tokens white-label (--sidebar-*).
  */
-export function AlunoMobileNav({ navMode, logo, nome = 'Área do Aluno', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none', usuarioNome = 'Aluno', avatar, avatarCor, counts, hrefsOcultos = [] }: Props) {
+export function AlunoMobileNav({ navMode, loginConfig, logo, nome = 'Área do Aluno', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none', usuarioNome = 'Aluno', avatar, avatarCor, counts, hrefsOcultos = [] }: Props) {
   const pathname = usePathname()
   const isMobile = useIsMobile()
   const { setOpenMobile } = useSidebar()
-  const [popup, setPopup] = useState(false)
+  const router = useRouter()
+  const [popup, setPopup] = useState(false)          // bottom-sheet dos Simulados
+  const [popupPerfil, setPopupPerfil] = useState(false) // bottom-sheet do Perfil (Meu perfil / Sair)
+  const [saindo, setSaindo] = useState(false)
+
+  async function sair() {
+    if (saindo) return
+    // Tela de carregamento branded na SAÍDA (igual ao desktop) — dá tempo do login reentrar pronto.
+    setSaindo(true)
+    await fetch('/api/aluno/logout', { method: 'POST' }).catch(() => {})
+    setTimeout(() => { router.push('/aluno/entrar'); router.refresh() }, 1100)
+  }
 
   // Contador de não lidas (dot) via SWR: mostra o último valor do cache NA HORA ao remontar
   // (a cada navegação) e revalida em 2º plano — sem piscar "0". Só busca no mobile.
   const { data: notif } = useSWRGet<{ naoLidas?: number }>(isMobile ? '/api/aluno/notificacoes' : null, { intervalo: 60000 })
   const naoLidas = Number(notif?.naoLidas ?? 0)
 
-  // Trocar de rota fecha o popup de "Simulados".
-  useEffect(() => { setPopup(false) }, [pathname])
+  // Trocar de rota fecha os bottom-sheets.
+  useEffect(() => { setPopup(false); setPopupPerfil(false) }, [pathname])
 
   if (!isMobile) return null
 
@@ -158,13 +203,20 @@ export function AlunoMobileNav({ navMode, logo, nome = 'Área do Aluno', subtitu
   const SZ = 'h-[26px] w-[26px]'
   return (
     <>
+      {/* Tela de carregamento branded ao SAIR (mesma do desktop). */}
+      {saindo && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[200]">
+          <LoginLoading config={loginConfig} plataforma={nome} logo={logo} logoBg={logoBg} logoEstilo={logoEstilo} logoFiltro={logoFiltro} />
+        </div>,
+        document.body,
+      )}
       <nav aria-label="Navegação" className="fixed inset-x-0 bottom-0 z-40 flex items-stretch border-t border-sidebar-border bg-sidebar pb-[env(safe-area-inset-bottom)] text-sidebar-foreground shadow-[0_-4px_16px_-8px_rgba(0,0,0,0.5)] md:hidden">
         <Link href="/aluno" className="flex flex-1 items-center justify-center py-3.5 active:scale-95" aria-label="Início">
           {inicioAtivo
             ? <HomeSolido className={SZ} cor={ACCENT} furo="var(--sidebar)" />
             : <Home className={cn(SZ, 'text-sidebar-foreground/45')} strokeWidth={2} style={{ fill: 'none' }} />}
         </Link>
-        <button aria-label="Simulados" onClick={() => setPopup((v) => !v)} className="relative flex flex-1 items-center justify-center py-3.5 outline-none active:scale-95">
+        <button aria-label="Simulados" onClick={() => { setPopup((v) => !v); setPopupPerfil(false) }} className="relative flex flex-1 items-center justify-center py-3.5 outline-none active:scale-95">
           {emSimulados
             ? <ClipboardSolido className={SZ} cor={ACCENT} furo="var(--sidebar)" />
             : <ClipboardList className={cn(SZ, 'text-sidebar-foreground/45')} strokeWidth={2} style={{ fill: 'none' }} />}
@@ -177,40 +229,51 @@ export function AlunoMobileNav({ navMode, logo, nome = 'Área do Aluno', subtitu
             {naoLidas > 0 && <span className="absolute -right-1 -top-1 h-2 w-2 rounded-full ring-2 ring-[color:var(--sidebar)]" style={{ background: ACCENT }} />}
           </span>
         </Link>
-        <Link href="/aluno/perfil" className="flex flex-1 items-center justify-center py-3.5 active:scale-95" aria-label="Perfil">{avatarEl(perfilAtivo, 'h-[26px] w-[26px]')}</Link>
+        <button aria-label="Perfil" onClick={() => { setPopupPerfil((v) => !v); setPopup(false) }} className="flex flex-1 items-center justify-center py-3.5 outline-none active:scale-95">{avatarEl(perfilAtivo || popupPerfil, 'h-[26px] w-[26px]')}</button>
       </nav>
 
-      {popup && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-50 md:hidden" onClick={() => setPopup(false)}>
-          <div className="absolute inset-0 bg-black/40 animate-in fade-in duration-200" />
-          <div
-            className="absolute inset-x-3 animate-in fade-in slide-in-from-bottom-4 rounded-[18px] border bg-card p-2 shadow-2xl duration-300"
-            style={{ bottom: 'calc(env(safe-area-inset-bottom) + 74px)' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            {[
-              { href: '/aluno/simulados', icon: ClipboardCheck, titulo: 'Simulados Realizados', desc: meus > 0 ? `${meus} concluído${meus > 1 ? 's' : ''}, com notas` : 'Seus resultados e notas' },
-              { href: '/aluno/leitura', icon: Library, titulo: 'Desafio de Lei Seca', desc: 'Leia a lei na trilha e ganhe pontos' },
-              { href: '/aluno/recomendado', icon: Lightbulb, titulo: 'Recomendado', desc: 'Questões onde você mais erra' },
-              { href: '/aluno/questoes', icon: BookOpen, titulo: 'Banco de Questões', desc: 'Pratique com filtros' },
-              { href: '/aluno/ligas', icon: Trophy, titulo: 'Ligas', desc: 'Dispute XP e suba de liga' },
-            ].filter((o) => !hrefsOcultos.includes(o.href)).map((o) => {
-              const on = pathname.startsWith(o.href)
-              return (
-                <Link key={o.href} href={o.href} onClick={() => setPopup(false)} className={cn('flex items-center gap-3 rounded-2xl p-3 transition-colors active:scale-[.98]', on ? 'bg-muted' : 'hover:bg-muted/60')}>
-                  <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><o.icon className="h-5 w-5" /></span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-semibold text-foreground">{o.titulo}</span>
-                    <span className="block truncate text-xs text-muted-foreground">{o.desc}</span>
-                  </span>
-                  <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
-                </Link>
-              )
-            })}
-          </div>
-        </div>,
-        document.body,
-      )}
+      {/* Bottom-sheet dos Simulados */}
+      <BottomSheet open={popup} onClose={() => setPopup(false)}>
+        {[
+          { href: '/aluno/simulados', icon: ClipboardCheck, titulo: 'Simulados Realizados', desc: meus > 0 ? `${meus} concluído${meus > 1 ? 's' : ''}, com notas` : 'Seus resultados e notas' },
+          { href: '/aluno/leitura', icon: Library, titulo: 'Desafio de Lei Seca', desc: 'Leia a lei na trilha e ganhe pontos' },
+          { href: '/aluno/recomendado', icon: Lightbulb, titulo: 'Recomendado', desc: 'Questões onde você mais erra' },
+          { href: '/aluno/questoes', icon: BookOpen, titulo: 'Banco de Questões', desc: 'Pratique com filtros' },
+          { href: '/aluno/ligas', icon: Trophy, titulo: 'Ligas', desc: 'Dispute XP e suba de liga' },
+        ].filter((o) => !hrefsOcultos.includes(o.href)).map((o) => {
+          const on = pathname.startsWith(o.href)
+          return (
+            <Link key={o.href} href={o.href} onClick={() => setPopup(false)} className={cn('flex items-center gap-3 rounded-2xl p-3 transition-colors active:scale-[.98]', on ? 'bg-muted' : 'hover:bg-muted/60')}>
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><o.icon className="h-5 w-5" /></span>
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-semibold text-foreground">{o.titulo}</span>
+                <span className="block truncate text-xs text-muted-foreground">{o.desc}</span>
+              </span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+            </Link>
+          )
+        })}
+      </BottomSheet>
+
+      {/* Bottom-sheet do Perfil — Meu perfil / Sair (mesmo visual e animações do dos Simulados) */}
+      <BottomSheet open={popupPerfil} onClose={() => setPopupPerfil(false)}>
+        <Link href="/aluno/perfil" onClick={() => setPopupPerfil(false)} className={cn('flex items-center gap-3 rounded-2xl p-3 transition-colors active:scale-[.98]', perfilAtivo ? 'bg-muted' : 'hover:bg-muted/60')}>
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><User className="h-5 w-5" /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-foreground">Meu perfil</span>
+            <span className="block truncate text-xs text-muted-foreground">Seus dados, progresso e conquistas</span>
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </Link>
+        <button type="button" onClick={sair} disabled={saindo} className="flex w-full items-center gap-3 rounded-2xl p-3 text-left transition-colors hover:bg-muted/60 active:scale-[.98] disabled:opacity-60">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-rose-500/10 text-rose-600 dark:text-rose-400"><LogOut className="h-5 w-5" /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-foreground">Sair</span>
+            <span className="block truncate text-xs text-muted-foreground">Encerrar a sessão neste aparelho</span>
+          </span>
+          <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+        </button>
+      </BottomSheet>
     </>
   )
 }

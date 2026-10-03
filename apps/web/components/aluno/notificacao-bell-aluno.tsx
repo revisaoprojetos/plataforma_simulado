@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { Bell, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -37,6 +37,10 @@ export function NotificacaoBellAluno({ diagonal = false, colapsada = false }: { 
   const panelRef = useRef<HTMLDivElement>(null)
   const fecharTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const router = useRouter()
+  const pathname = usePathname()
+  // No Desafio de Jurisprudência (jogo em tela cheia / iframe), o balão flutuante ficava sobreposto à
+  // tela do jogo (portal fixo, fora de lugar). Nessa rota, não mostramos o balão.
+  const emJogo = !!pathname && pathname.includes('/jurisprudencia')
 
   const carregar = useCallback(async () => {
     try {
@@ -149,7 +153,7 @@ export function NotificacaoBellAluno({ diagonal = false, colapsada = false }: { 
       {/* Balão de aviso — só quando há não-lidas e o painel está fechado. Some ao marcar lidas.
           Normal: acima do sino, cresce p/ a ESQUERDA, ponta pra baixo.
           Diagonal (sidebar recolhida): na diagonal superior-DIREITA do sino, ponta diagonal p/ o ícone. */}
-      {naoLidas > 0 && !montado && balaoPos && (diagonal ? colapsada : !colapsada) && typeof document !== 'undefined' && createPortal(
+      {naoLidas > 0 && !montado && !emJogo && balaoPos && (diagonal ? colapsada : !colapsada) && typeof document !== 'undefined' && createPortal(
         diagonal ? (
           <div className="pointer-events-none fixed z-[115]" style={{ left: balaoPos.left, bottom: balaoPos.bottom }} aria-hidden>
             <div className="balao-pill absolute bottom-0 left-1 flex items-center whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-bold text-white shadow-lg" style={{ background: 'var(--brand-accent, var(--primary))' }}>

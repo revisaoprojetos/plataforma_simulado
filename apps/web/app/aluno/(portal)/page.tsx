@@ -25,7 +25,6 @@ import { CelebracaoXp } from '@/components/aluno/celebracao-xp'
 import { MascoteTour } from '@/components/mascote/mascote-tour'
 import { getCurrentTenant } from '@/lib/tenant'
 import { resolverCardView } from '@/lib/card-view'
-import { AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export default async function AlunoHome({ searchParams }: { searchParams: Promise<{ pasta?: string }> }) {
@@ -339,36 +338,10 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   const chest = gamConfig?.xp_regras.chest
   const proxima = gamResumo?.proxima ?? null
 
-  // Aviso de mudança de gabarito na home: simulados que o aluno FEZ e que tiveram anulação/troca
-  // de gabarito DEPOIS da sessão dele (nota recalculada). Deriva de simulado_recorrecoes.
-  let avisosGabarito: { id: string; titulo: string }[] = []
-  if (feitosSet.size) {
-    const ultimaPorSim = new Map<string, number>()
-    for (const s of (sessAll ?? []) as any[]) {
-      if (s.status !== 'finalizada' || !s.finalizado_em) continue
-      const t = new Date(s.finalizado_em).getTime()
-      if (!ultimaPorSim.has(s.simulado_id) || t > ultimaPorSim.get(s.simulado_id)!) ultimaPorSim.set(s.simulado_id, t)
-    }
-    const { data: recs } = await svc.from('simulado_recorrecoes').select('simulado_id, executado_em').in('simulado_id', [...feitosSet])
-    const afetados = new Set<string>()
-    for (const r of (recs ?? []) as any[]) {
-      const fin = ultimaPorSim.get(r.simulado_id)
-      if (fin && r.executado_em && new Date(r.executado_em).getTime() > fin) afetados.add(r.simulado_id)
-    }
-    avisosGabarito = sims.filter((s) => afetados.has(s.id)).map((s) => ({ id: s.id, titulo: s.titulo }))
-  }
-
   return (
     <div className="animate-page space-y-6">
-      {avisosGabarito.length > 0 && (
-        <div className="flex items-start gap-2.5 rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-200">
-          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
-          <div>
-            <p className="font-semibold">Mudança de gabarito em {avisosGabarito.length === 1 ? 'um simulado que você fez' : `${avisosGabarito.length} simulados que você fez`}</p>
-            <p className="text-xs opacity-90">{avisosGabarito.map((a) => a.titulo).join(' · ')} — sua nota já foi recalculada; confira o resultado atualizado.</p>
-          </div>
-        </div>
-      )}
+      {/* Aviso de mudança de gabarito saiu da home (era um card intrusivo): a recorreção já gera a
+          notificação no sininho (simulado_notificacoes), então o aluno vê só por lá. */}
       {/* Celebração de XP (partículas voando para o card de nível) quando há XP recém-contabilizado. */}
       {gamResumo && <CelebracaoXp assistenteAtivo={assistente.ativo !== false} />}
       {gamResumo && assistente.ativo !== false && <MascoteTour nome={assistente.nome || 'Capi'} ativo temSimulado={feitosSet.size > 0} nivel={gamResumo.nivel} />}

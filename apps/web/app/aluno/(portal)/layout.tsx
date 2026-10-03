@@ -133,6 +133,7 @@ export default async function AlunoPortalLayout({ children }: { children: React.
         {/* Chrome de navegação mobile (barra inferior OU app bar+drawer), definido no console. */}
         <AlunoMobileNav
           navMode={navMode}
+          loginConfig={resolverLoginConfig(t.login)}
           logo={t.logo_url ?? null}
           nome={t.nome_site ?? tenantNome ?? 'Área do Aluno'}
           subtitulo={t.subtitulo_site ?? 'Área do aluno'}
