@@ -108,6 +108,17 @@ export async function GET(request: NextRequest) {
       bg.forEach((u) => esperas.push(new Promise((r) => { const im = new Image(); im.onload = im.onerror = () => r(null); im.src = u })))
       await Promise.all(esperas)
     }).catch(() => {})
+    // Espera a PAGINAÇÃO assentar antes de capturar: o paginador faz uma 1ª medição ANTES das fontes
+    // carregarem (super-empacotada) e só então re-pagina. Num container frio / sob carga (fonte lenta),
+    // capturar cedo faz o conteúdo transbordar a folha e cruzar a página física SEM respeitar o
+    // cabeçalho/rodapé (o bug do diagnóstico). Aguarda até NENHUMA folha exceder A4 (ou desiste em 8s,
+    // caindo no comportamento antigo). Passa instantâneo quando a paginação já está correta.
+    await page.waitForFunction(() => {
+      const root = document.querySelector('.caderno-pronto')
+      if (!root) return true // cadernos sem paginador (ex.: folha simples) não têm .caderno-pronto
+      const folhas = Array.from(root.children).filter((c) => c.getAttribute('aria-hidden') === null)
+      return folhas.length > 0 && folhas.every((f) => (f as HTMLElement).getBoundingClientRect().height <= 1130)
+    }, { timeout: 8000 }).catch(() => {})
     await new Promise((r) => setTimeout(r, 250))
     await page.emulateMediaType('print')
     const pdf = await page.pdf({ printBackground: true, preferCSSPageSize: true })

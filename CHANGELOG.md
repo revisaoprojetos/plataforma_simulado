@@ -12,6 +12,14 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 2.0.1 — 2026-10-05
+
+- **Fix PDF do Diagnóstico (paginação):** o conteúdo transbordava a folha e cruzava a página sem
+  respeitar cabeçalho/rodapé (com uma linha de corte alta). Causa: num container frio/sob carga a
+  fonte carrega devagar e o Puppeteer capturava o PDF **antes** da re-paginação pós-fonte assentar.
+  A rota de PDF (`/api/aluno/caderno-teste-pdf`) agora **espera a paginação assentar** (nenhuma folha
+  pode exceder A4) antes de capturar — sem efeito quando já está correta.
+
 ## 2.0.0 — 2026-10-05
 
 Baseline do versionamento (estado atual + recentes já no ar):
