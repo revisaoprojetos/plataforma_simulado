@@ -8,6 +8,7 @@ import { GraduationCap, Loader2, Wrench, Mail, IdCard, Phone, Lock, ArrowRight, 
 import { createClient } from '@/lib/supabase/client'
 import { LOGIN_DEFAULT, fundoLoginStyle, loginVars, corPrimariaLogin, corAccentLogin, entradaClasse, type LoginConfig } from '@/lib/login-config'
 import { LoginLoading } from '@/components/aluno/login-loading'
+import { APP_VERSION } from '@/lib/version'
 
 type Metodo = 'email' | 'email_cpf' | 'email_telefone'
 
@@ -351,6 +352,13 @@ export function AlunoEntrarForm({
         className="fixed bottom-4 right-4 z-30 inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-black/25 px-3 py-1.5 text-xs font-medium text-white/80 shadow-sm backdrop-blur transition-colors hover:border-white/30 hover:text-white">
         {ehAdmin ? <><GraduationCap className="h-3.5 w-3.5" /> Área do aluno</> : <><ShieldCheck className="h-3.5 w-3.5" /> Admin</>}
       </button>
+      {/* Versão do sistema (semver) — canto inferior ESQUERDO. Simétrico ao toggle de modo. */}
+      {!preview && (
+        <span aria-label={`Versão ${APP_VERSION}`} title={`Versão ${APP_VERSION}`}
+          className="fixed bottom-4 left-4 z-30 select-none rounded-full border border-white/15 bg-black/25 px-2.5 py-1 text-[11px] font-medium tracking-wide text-white/55 shadow-sm backdrop-blur">
+          v{APP_VERSION}
+        </span>
+      )}
     </>
   )
 }
