@@ -299,9 +299,22 @@ export function RevisaoFinal({
     marcarPdf(key, true)
     toast.loading('Download iniciado — gerando PDF…', { id: key })
     try {
-      const res = await fetch(apiUrl)
-      if (!res.ok) throw new Error('falha')
+      // O PDF sobe um Chromium (1 por réplica) — sob concorrência o servidor responde 503 "ocupado".
+      // Re-tenta algumas vezes com pausa crescente e mostra a mensagem REAL do servidor.
+      let res: Response | null = null
+      for (let tentativa = 0; tentativa < 3; tentativa++) {
+        res = await fetch(apiUrl)
+        if (res.status !== 503) break
+        toast.loading('Servidor ocupado gerando PDFs… tentando de novo', { id: key })
+        await new Promise((r) => setTimeout(r, 2000 * (tentativa + 1)))
+      }
+      if (!res || !res.ok) {
+        let msg = 'Não foi possível gerar o PDF agora. Tente novamente em instantes.'
+        try { const j = await res?.json(); if (j?.message) msg = j.message } catch { /* corpo não-JSON */ }
+        throw new Error(msg)
+      }
       const blob = await res.blob()
+      if (!blob.size || !/pdf/i.test(blob.type)) throw new Error('O PDF gerado veio vazio. Tente novamente em instantes.')
       const objUrl = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = objUrl
@@ -311,9 +324,9 @@ export function RevisaoFinal({
       a.remove()
       setTimeout(() => URL.revokeObjectURL(objUrl), 10_000)
       toast.success('Download concluído', { id: key, description: nome })
-    } catch {
+    } catch (e) {
       // Fallback só p/ caderno V1 (rota de impressão); no V2 o download é sempre a rota gerada.
-      if (md?.cadernoTeste) toast.error('Não foi possível gerar o PDF agora. Tente novamente em instantes.', { id: key })
+      if (md?.cadernoTeste) toast.error(e instanceof Error ? e.message : 'Não foi possível gerar o PDF agora. Tente novamente em instantes.', { id: key })
       else {
         toast.error('Não foi possível gerar o PDF. Abrindo para salvar…', { id: key })
         window.open(`/imprimir/caderno/${data?.caderno_id}?mod=${mod}&sessao=${sessionToken}${data?.estudante_id ? `&aluno=${data.estudante_id}` : ''}&${gab ? 'gabarito=1' : 'semgab=1'}&rawimg=1&print=1`, '_blank', 'noopener,noreferrer')

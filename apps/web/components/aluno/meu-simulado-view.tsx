@@ -162,17 +162,31 @@ export function MeuSimuladoView({
     setBaixando(chave)
     toast.loading('Gerando PDF com o fundo e os cards…', { id: 'cadpdf' })
     try {
-      const res = await fetch(apiUrl)
-      if (!res.ok) throw new Error('falha')
+      // O PDF sobe um Chromium (limitado a 1 por réplica) — sob concorrência o servidor responde
+      // 503 "ocupado". Re-tenta algumas vezes com pausa crescente antes de desistir, e mostra a
+      // mensagem REAL do servidor (ex.: "servidor ocupado", "nenhum navegador…") em vez de genérica.
+      let res: Response | null = null
+      for (let tentativa = 0; tentativa < 3; tentativa++) {
+        res = await fetch(apiUrl)
+        if (res.status !== 503) break
+        toast.loading('Servidor ocupado gerando PDFs… tentando de novo', { id: 'cadpdf' })
+        await new Promise((r) => setTimeout(r, 2000 * (tentativa + 1)))
+      }
+      if (!res || !res.ok) {
+        let msg = 'Não foi possível gerar o PDF agora. Tente novamente em instantes.'
+        try { const j = await res?.json(); if (j?.message) msg = j.message } catch { /* corpo não-JSON */ }
+        throw new Error(msg)
+      }
       const blob = await res.blob()
+      if (!blob.size || !/pdf/i.test(blob.type)) throw new Error('O PDF gerado veio vazio. Tente novamente em instantes.')
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url; a.download = `${arquivo}.pdf`
       document.body.appendChild(a); a.click(); a.remove()
       setTimeout(() => URL.revokeObjectURL(url), 10_000)
       toast.success('Download concluído', { id: 'cadpdf', description: nome })
-    } catch {
-      toast.error('Não foi possível gerar o PDF agora. Tente novamente em instantes.', { id: 'cadpdf' })
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Não foi possível gerar o PDF agora. Tente novamente em instantes.', { id: 'cadpdf' })
     } finally {
       setBaixando(null)
     }
