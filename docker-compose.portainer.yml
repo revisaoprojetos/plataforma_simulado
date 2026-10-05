@@ -66,8 +66,26 @@ services:
     networks:
       - default
       - traefik
+    # Healthcheck LEVE (sem DB) — serve de gate p/ o start-first/rollback: o Swarm só promove a task
+    # nova quando o app responde 200 em /api/health; se não ficar saudável, reverte (não derruba o aluno).
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://127.0.0.1:3000/api/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 45s
     deploy:
       replicas: 1
+      # Deploy SEGURO (sem downtime): sobe a task NOVA antes de derrubar a antiga (start-first) e, se a
+      # nova não ficar saudável (imagem ruim/inexistente/crash), REVERTE p/ a anterior automaticamente.
+      # Isso evita o "404 do Traefik" que acontece com o stop-first padrão quando a imagem não sobe.
+      update_config:
+        order: start-first
+        failure_action: rollback
+        monitor: 45s
+        max_failure_ratio: 0
+      rollback_config:
+        order: start-first
       restart_policy:
         condition: any
       placement:
