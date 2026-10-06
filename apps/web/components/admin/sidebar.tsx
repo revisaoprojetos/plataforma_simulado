@@ -43,6 +43,8 @@ import {
   Upload,
   LayoutTemplate,
   Eye,
+  Scale,
+  CreditCard,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -136,21 +138,15 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
-    label: 'Desafio de Lei Seca',
+    // DESAFIOS — área única do motor de desafios, contendo Lei Seca e Jurisprudência como sub-itens.
+    // (Antes eram 2 grupos separados.) Cada desafio continua gated pela sua flag.
+    label: 'Desafios',
     icon: Library,
     items: [
-      { label: 'Biblioteca', href: '/admin/leitura', icon: Library, perm: 'leitura:view', oculto: !LEITURA_ATIVA },
-      { label: 'Análise', href: '/admin/leitura/analise', icon: BarChart3, perm: 'relatorios:view', oculto: !LEITURA_ATIVA },
-    ],
-  },
-  {
-    // Desafio de Jurisprudência — 2ª área do motor de desafios (SÓ quiz). Gated por JURISPRUDENCIA_ATIVA.
-    // Rótulo curto na sidebar (cabe em 1 linha); o nome completo fica no título da página.
-    label: 'Jurisprudência',
-    icon: Library,
-    items: [
-      { label: 'Biblioteca', href: '/admin/jurisprudencia', icon: Library, perm: 'leitura:view', oculto: !JURISPRUDENCIA_ATIVA },
-      // 'Análise' volta na F4 (rota /admin/jurisprudencia/analise ainda não existe).
+      { label: 'Lei Seca', href: '/admin/leitura', icon: Library, perm: 'leitura:view', oculto: !LEITURA_ATIVA },
+      { label: 'Lei Seca · Análise', href: '/admin/leitura/analise', icon: BarChart3, perm: 'relatorios:view', oculto: !LEITURA_ATIVA },
+      { label: 'Jurisprudência', href: '/admin/jurisprudencia', icon: Scale, perm: 'leitura:view', oculto: !JURISPRUDENCIA_ATIVA },
+      // 'Análise' da Jurisprudência volta na F4 (rota /admin/jurisprudencia/analise ainda não existe).
     ],
   },
   {
@@ -179,6 +175,7 @@ const navGroups: NavGroup[] = [
       { label: 'Relatório Disciplina', href: '/admin/relatorios/disciplinas', icon: BookOpen, perm: 'relatorios:view' },
       { label: 'Relatório Estudantes', href: '/admin/relatorios/estudantes', icon: GraduationCap, perm: 'relatorios:view' },
       { label: 'Ranking', href: '/admin/relatorios/ranking', icon: Trophy, perm: 'relatorios:view' },
+      { label: 'Assinaturas & Engajamento', href: '/admin/relatorios/engajamento', icon: CreditCard, perm: 'relatorios:view' },
       { label: 'NPS / Satisfação', href: '/admin/relatorios/nps', icon: Star, perm: 'relatorios:view' },
       { label: 'Grupos por aluno', href: '/admin/relatorios/grupos', icon: Users, perm: 'relatorios:view' },
     ],
