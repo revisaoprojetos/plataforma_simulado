@@ -13,11 +13,17 @@ import { hudCssVars } from '@/lib/caderno-designer/hud'
 import { useDarkMode } from '@/lib/hud/use-dark'
 import { ProvaHud } from '@/components/prova/prova-hud'
 import { FontScaleControl } from '@/components/font-scale-control'
-import { ProvaIntro, ProvaLoading, type EstiloProvaLoading } from '@/components/prova/prova-intro'
+import { ProvaIntro } from '@/components/prova/prova-intro'
+import { PlatformLoader } from '@/components/brand/platform-loader'
 import { toast } from 'sonner'
 import { RevisaoFinal } from '@/components/aluno/revisao-final'
 import { QuestaoDiscursivaEnvio } from '@/components/aluno/questao-discursiva-envio'
 import { FolhaResposta } from '@/components/prova/folha-resposta'
+import { useAppearance } from '@/lib/brand/use-appearance'
+import { ProvaMeqLive, type ModalProva as ModalProvaMeq } from '@/components/brand/simulado/meq/prova-live'
+import { ProvaRevisaoLive } from '@/components/brand/simulado/revisao/prova-live'
+import { RevisaoFinalNova } from '@/components/aluno/revisao-final-nova'
+import type { SimTheme } from '@/components/brand/simulado/types'
 
 // --- Types ---
 interface Alternativa {
@@ -97,15 +103,33 @@ function formatTime(segundos: number) {
 
 
 // --- Main Component ---
-export function ProvaClient({ token, hudInicial, darkInicial = false }: {
+export function ProvaClient({ token, hudInicial, darkInicial = false, internoAtivo = false }: {
   token: string
   hudInicial: { base: Partial<HudCores>; porPagina: HudPorPagina; branding?: { logoUrl?: string | null; logoBg?: string; logoEstilo?: string } | null }
   darkInicial?: boolean
+  /** Visual interno novo da marca Revisão ligado (resolvido no servidor por tenant). */
+  internoAtivo?: boolean
 }) {
   const searchParams = useSearchParams()
   const sessionToken = searchParams.get('st')
   const folhaInicial = searchParams.get('folha') === '1' // veio do login com "responder apenas folha"
   const [dark, toggleDark] = useDarkMode(darkInicial)
+
+  // Marca do tenant (define a COMPOSIÇÃO do simulado). MEQ usa o SimProva (spec 06 §2) sobre
+  // este mesmo motor; as demais marcas seguem no HUD do caderno-designer (legado) por ora.
+  const appearance = useAppearance()
+  const brand = appearance.brand
+  const isMeq = brand === 'meq'
+  // Revisão com o visual interno novo (gate estrito): só então usamos as telas branded de prova/resultado.
+  const isRevisaoNova = !isMeq && brand === 'revisao' && !!internoAtivo
+  // Tema do SimProva: escuro quando dark; senão o tema padrão da marca (MEQ tem claro/azul).
+  const simTheme: SimTheme = dark ? 'escuro' : (appearance.defaultTheme === 'azul' ? 'azul' : 'claro')
+
+  // Estado dos modais/controles do SimProva MEQ (visual próprio; o motor é o mesmo).
+  const [mdMeq, setMdMeq] = useState<ModalProvaMeq>(null)
+  const [ckMeq, setCkMeq] = useState(false)
+  const [nsMeq, setNsMeq] = useState(false)
+  const [fzMeq, setFzMeq] = useState(0)
 
   const [status, setStatus] = useState<ProvaStatus>('loading')
   const [sessao, setSessao] = useState<SessaoData | null>(null)
@@ -396,23 +420,11 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
     }
   }
 
-  // Tela "Carregamento" do caderno vinculado (estilo + cor) — usada nas transições de ligação.
-  const telaCarregamento = (mensagem: string) => {
-    const cores = efetivarHud(sessao?.hudCores ?? hudInicial?.base, sessao?.hudPorPagina ?? hudInicial?.porPagina, 'loading')
-    const brand = sessao?.branding ?? hudInicial?.branding
-    return (
-      <div style={hudCssVars(cores, dark) as React.CSSProperties}>
-        <ProvaLoading
-          mensagem={mensagem}
-          tipo={cores.loadingTipo as EstiloProvaLoading}
-          logoUrl={cores.loadingLogoUrl || brand?.logoUrl || null}
-          logoBg={cores.loadingLogoUrl ? cores.loadingLogoBg : brand?.logoBg}
-          logoEstilo={cores.loadingLogoUrl ? cores.loadingLogoEstilo : brand?.logoEstilo}
-          logoFiltro={cores.loadingLogoUrl ? cores.loadingLogoFiltro : undefined}
-        />
-      </div>
-    )
-  }
+  // Tela de carregamento da PLATAFORMA (loader padrão) — usada nas transições do simulado
+  // (entrar/gerar prova e enviar/finalizar). Resolve marca/estilo sozinho via /api/public/appearance.
+  const telaCarregamento = (mensagem: string) => (
+    <PlatformLoader brand={brand} message={mensagem} theme={dark ? 'dark' : 'light'} />
+  )
 
   if (status === 'loading') return telaCarregamento('Preparando seu simulado...')
   // Enquanto finaliza, mostra a mesma tela de carregamento ("preparando o resultado").
@@ -435,6 +447,20 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
   }
 
   if (status === 'finalizada') {
+    // Revisão (visual interno novo): resultado branded da marca. Reusa a MESMA fonte de dados
+    // (fetch por sessionToken) do RevisaoFinal; "Refazer" exige novo login (/simulado/{token}).
+    if (isRevisaoNova) {
+      return (
+        <RevisaoFinalNova
+          sessionToken={sessionToken ?? ''}
+          token={token}
+          inicioUrl="/aluno"
+          theme={simTheme}
+          dark={dark}
+          onToggleDark={toggleDark}
+        />
+      )
+    }
     return (
       <div style={hudCssVars(efetivarHud(sessao?.hudCores, sessao?.hudPorPagina, 'encerrada'), dark) as React.CSSProperties}>
         <RevisaoFinal
@@ -512,7 +538,10 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
   )
 
   // Pop-up de entrada aparece POR CIMA do simulado (prova ao fundo, desfocada e inativa).
-  if (!iniciado) {
+  // MEQ não usa este overlay legado (HUD do caderno-designer): o SimProva da marca é
+  // renderizado direto abaixo, com sua própria composição. A entrada branded (SimEntrada)
+  // é tratada antes, na tela de identificação.
+  if (!iniciado && !isMeq && !isRevisaoNova) {
     return (
       <div className="relative" style={hudCssVars(efetivarHud(sessao.hudCores, sessao.hudPorPagina, 'prova'), dark) as React.CSSProperties}>
         <div aria-hidden className="pointer-events-none select-none blur-[3px]">{provaHudEl}</div>
@@ -531,6 +560,110 @@ export function ProvaClient({ token, hudInicial, darkInicial = false }: {
           />
         </div>
       </div>
+    )
+  }
+
+  // ── MEQ: SimProva (spec 06 §2) sobre o motor real ──────────────────────────
+  // Visual próprio da marca MEQ (Certo/Errado Cebraspe, timer regressivo, folha 6 col,
+  // navegador, modais rev/conf/ok). Todo o estado (respostas/flags/tesoura/timer/auto-save)
+  // continua neste ProvaClient; o componente é controlado. O modo caderno/folha é alternável
+  // pelo segmentado do header (inicia conforme `modoFolha`, que respeita a entrada por folha).
+  if (isMeq) {
+    const tempoLabel = segundosRestantes !== null ? formatTime(segundosRestantes) : null
+    const tempoRegressivo = sessao.tempo_limite_min != null
+    return (
+      <ProvaMeqLive
+        theme={simTheme}
+        titulo={sessao.simuladoTitulo ?? 'Simulado'}
+        banca={questaoAtual.disciplina ?? undefined}
+        questoes={sessao.questoes}
+        qi={questaoIndex + 1}
+        respostas={respostas}
+        marcadas={marcadas}
+        eliminadas={eliminadas}
+        discPaginas={discPaginas}
+        modo={modoFolha ? 'folha' : 'cad'}
+        fz={fzMeq}
+        md={mdMeq}
+        ck={ckMeq}
+        ns={nsMeq}
+        tempoLabel={tempoLabel}
+        timerWarning={timerWarning}
+        tempoRegressivo={tempoRegressivo}
+        isFinalizando={isFinalizando}
+        dark={dark}
+        onSetModo={(m) => setModoFolha(m === 'folha')}
+        onCycleFz={() => setFzMeq((v) => (v + 1) % 3)}
+        onToggleDark={toggleDark}
+        onGoto={(n) => setQuestaoIndex(Math.max(0, Math.min(totalQuestoes - 1, n - 1)))}
+        onResponder={handleResponder}
+        onToggleFlag={(qid) => toggleMarcar(qid)}
+        onToggleEliminar={(qid, altId) => toggleEliminar(qid, altId)}
+        onSetMd={setMdMeq}
+        onSetCk={setCkMeq}
+        onSetNs={setNsMeq}
+        onFinalizar={handleFinalizar}
+        slotDiscursiva={questaoAtual.tipo === 'discursiva' ? (
+          <QuestaoDiscursivaEnvio
+            key={questaoAtual.id}
+            sessaoId={sessao.id}
+            questaoId={questaoAtual.id}
+            bloqueada={!!questaoAtual.bloqueada}
+            onCount={(n) => setDiscPaginas((prev) => ({ ...prev, [questaoAtual.id]: n }))}
+          />
+        ) : undefined}
+      />
+    )
+  }
+
+  // ── REVISÃO (visual interno novo): ProvaRevisaoLive sobre o mesmo motor ──────
+  // Drop-in do ProvaMeqLive (contrato idêntico ProvaMeqLiveProps); só o visual muda.
+  // Todo o estado/handlers continuam neste ProvaClient; o componente é controlado.
+  if (isRevisaoNova) {
+    const tempoLabel = segundosRestantes !== null ? formatTime(segundosRestantes) : null
+    const tempoRegressivo = sessao.tempo_limite_min != null
+    return (
+      <ProvaRevisaoLive
+        theme={simTheme}
+        titulo={sessao.simuladoTitulo ?? 'Simulado'}
+        banca={questaoAtual.disciplina ?? undefined}
+        questoes={sessao.questoes}
+        qi={questaoIndex + 1}
+        respostas={respostas}
+        marcadas={marcadas}
+        eliminadas={eliminadas}
+        discPaginas={discPaginas}
+        modo={modoFolha ? 'folha' : 'cad'}
+        fz={fzMeq}
+        md={mdMeq}
+        ck={ckMeq}
+        ns={nsMeq}
+        tempoLabel={tempoLabel}
+        timerWarning={timerWarning}
+        tempoRegressivo={tempoRegressivo}
+        isFinalizando={isFinalizando}
+        dark={dark}
+        onSetModo={(m) => setModoFolha(m === 'folha')}
+        onCycleFz={() => setFzMeq((v) => (v + 1) % 3)}
+        onToggleDark={toggleDark}
+        onGoto={(n) => setQuestaoIndex(Math.max(0, Math.min(totalQuestoes - 1, n - 1)))}
+        onResponder={handleResponder}
+        onToggleFlag={(qid) => toggleMarcar(qid)}
+        onToggleEliminar={(qid, altId) => toggleEliminar(qid, altId)}
+        onSetMd={setMdMeq}
+        onSetCk={setCkMeq}
+        onSetNs={setNsMeq}
+        onFinalizar={handleFinalizar}
+        slotDiscursiva={questaoAtual.tipo === 'discursiva' ? (
+          <QuestaoDiscursivaEnvio
+            key={questaoAtual.id}
+            sessaoId={sessao.id}
+            questaoId={questaoAtual.id}
+            bloqueada={!!questaoAtual.bloqueada}
+            onCount={(n) => setDiscPaginas((prev) => ({ ...prev, [questaoAtual.id]: n }))}
+          />
+        ) : undefined}
+      />
     )
   }
 

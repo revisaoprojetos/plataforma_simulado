@@ -19,7 +19,8 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
-import { ProvaIntro, ProvaLoading } from '@/components/prova/prova-intro'
+import { ProvaIntro } from '@/components/prova/prova-intro'
+import { PlatformLoader } from '@/components/brand/platform-loader'
 import { QuestaoDiscursivaEnvio } from '@/components/aluno/questao-discursiva-envio'
 
 interface Alternativa {
@@ -226,7 +227,7 @@ export function EmbedProvaRunner({ embedToken, sessaoId, simuladoTitulo, brandin
   }
 
   if (status === 'loading') {
-    return <ProvaLoading logoUrl={branding?.logoUrl ?? null} logoBg={branding?.logoBg} logoEstilo={branding?.logoEstilo} />
+    return <PlatformLoader message="Preparando seu simulado..." />
   }
 
   if (status === 'erro') {

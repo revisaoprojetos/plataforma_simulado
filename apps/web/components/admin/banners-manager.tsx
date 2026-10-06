@@ -41,7 +41,7 @@ export type DestinoBanner = { label: string; href: string; grupo?: string }
 
 export type DestaqueMap = Record<string, { ativo?: boolean; texto?: string; fadeAtivo?: boolean; fadeNivel?: number; popupEstilo?: PopupEstilo; popupPontas?: PopupPontas; bannerTextoPos?: BannerTextoPos; bannerTextoCor?: BannerTextoCor; bannerTextoTam?: BannerTextoTam; bannerTextoX?: number; bannerTextoY?: number; bannerOcultarTitulo?: boolean; bannerOcultarMensagem?: boolean }>
 
-export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = false, destaques = {} }: { banners: Banner[]; tenantId?: string; destinos?: DestinoBanner[]; desempenhoAtivo?: boolean; destaques?: DestaqueMap }) {
+export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = false, destaques = {}, bannerAspect = { w: 1920, h: 500 } }: { banners: Banner[]; tenantId?: string; destinos?: DestinoBanner[]; desempenhoAtivo?: boolean; destaques?: DestaqueMap; bannerAspect?: { w: number; h: number } }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [desempenho, setDesempenho] = useState(desempenhoAtivo)
@@ -303,7 +303,7 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
           {imagem && (
             <div className="relative overflow-hidden rounded-lg border">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={imagem} alt="" className={cn('w-full object-cover', tipo === 'popup' ? 'h-20' : 'aspect-[1920/500]')} />
+              <img src={imagem} alt="" className={cn('w-full object-cover', tipo === 'popup' && 'h-20')} style={tipo === 'popup' ? undefined : { aspectRatio: `${bannerAspect.w}/${bannerAspect.h}` }} />
               <div className="absolute right-1.5 top-1.5 flex gap-1.5">
                 {tipo !== 'popup' && (
                   <button type="button" onClick={() => { setCropSrc(cropSrc || imagem); setCropOpen(true) }} title="Ajustar área (recorte)"
@@ -315,7 +315,7 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
             </div>
           )}
           {cropOpen && cropSrc && (
-            <BannerCropper src={cropSrc} onApply={(d) => { setImagem(d); setCropOpen(false) }} onCancel={() => setCropOpen(false)} />
+            <BannerCropper src={cropSrc} outW={bannerAspect.w} outH={bannerAspect.h} onApply={(d) => { setImagem(d); setCropOpen(false) }} onCancel={() => setCropOpen(false)} />
           )}
         </div>
         <div className={cn('space-y-1', uiTipo === 'simulado' && 'hidden')}>
@@ -404,7 +404,7 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
         })}
       </div>
 
-      {editando && <BannerEditModal banner={editando} tenantId={tenantId} destinos={destinos} desempenho={desempenho} onToggleDesempenho={alternarDesempenho} destaqueAtivoInicial={destaques[editando.id]?.ativo !== false} destaqueTextoInicial={destaques[editando.id]?.texto ?? ''} fadeAtivoInicial={destaques[editando.id]?.fadeAtivo !== false} fadeNivelInicial={destaques[editando.id]?.fadeNivel ?? 100} popupEstiloInicial={destaques[editando.id]?.popupEstilo ?? 'classico'} popupPontasInicial={destaques[editando.id]?.popupPontas ?? 'arredondado'} bannerTextoPosInicial={destaques[editando.id]?.bannerTextoPos ?? 'center'} bannerTextoCorInicial={destaques[editando.id]?.bannerTextoCor ?? 'claro'} bannerTextoTamInicial={destaques[editando.id]?.bannerTextoTam ?? 'medio'} bannerTextoXInicial={(destaques[editando.id] as any)?.bannerTextoX ?? null} bannerTextoYInicial={(destaques[editando.id] as any)?.bannerTextoY ?? null} bannerOcultarTituloInicial={(destaques[editando.id] as any)?.bannerOcultarTitulo ?? false} bannerOcultarMensagemInicial={(destaques[editando.id] as any)?.bannerOcultarMensagem ?? false} agendaInicioInicial={(destaques[editando.id] as any)?.agendaInicio ?? ''} agendaFimInicial={(destaques[editando.id] as any)?.agendaFim ?? ''} freqInicial={(destaques[editando.id] as any)?.freq ?? 'login'} onClose={() => setEditando(null)} />}
+      {editando && <BannerEditModal banner={editando} tenantId={tenantId} destinos={destinos} desempenho={desempenho} onToggleDesempenho={alternarDesempenho} destaqueAtivoInicial={destaques[editando.id]?.ativo !== false} destaqueTextoInicial={destaques[editando.id]?.texto ?? ''} fadeAtivoInicial={destaques[editando.id]?.fadeAtivo !== false} fadeNivelInicial={destaques[editando.id]?.fadeNivel ?? 100} popupEstiloInicial={destaques[editando.id]?.popupEstilo ?? 'classico'} popupPontasInicial={destaques[editando.id]?.popupPontas ?? 'arredondado'} bannerTextoPosInicial={destaques[editando.id]?.bannerTextoPos ?? 'center'} bannerTextoCorInicial={destaques[editando.id]?.bannerTextoCor ?? 'claro'} bannerTextoTamInicial={destaques[editando.id]?.bannerTextoTam ?? 'medio'} bannerTextoXInicial={(destaques[editando.id] as any)?.bannerTextoX ?? null} bannerTextoYInicial={(destaques[editando.id] as any)?.bannerTextoY ?? null} bannerOcultarTituloInicial={(destaques[editando.id] as any)?.bannerOcultarTitulo ?? false} bannerOcultarMensagemInicial={(destaques[editando.id] as any)?.bannerOcultarMensagem ?? false} agendaInicioInicial={(destaques[editando.id] as any)?.agendaInicio ?? ''} agendaFimInicial={(destaques[editando.id] as any)?.agendaFim ?? ''} freqInicial={(destaques[editando.id] as any)?.freq ?? 'login'} bannerAspect={bannerAspect} onClose={() => setEditando(null)} />}
     </div>
   )
 }

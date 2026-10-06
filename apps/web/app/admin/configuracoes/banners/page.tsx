@@ -3,6 +3,7 @@ import { getCurrentAccess } from '@/lib/auth/permissions'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { BannersManager, type Banner } from '@/components/admin/banners-manager'
 import { dedupePorLabel } from '@/lib/banner-destinos'
+import { lerAparenciaAuth } from '@/lib/brand/aparencia-auth'
 import { Megaphone } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
@@ -28,9 +29,14 @@ export default async function BannersPage() {
   } catch { /* tabela ainda não migrada */ }
 
   // Flag do painel de desempenho nos banners de simulado (default OFF).
-  const { data: tRow } = await svc.from('simulado_tenants').select('tema').eq('id', tid).maybeSingle()
+  const { data: tRow } = await svc.from('simulado_tenants').select('tema, nome, slug').eq('id', tid).maybeSingle()
   const desempenhoAtivo = (tRow?.tema as any)?.banners_desempenho === true
   const destaques = ((tRow?.tema as any)?.banner_destaques ?? {}) as Record<string, { ativo?: boolean; texto?: string }>
+
+  // Proporção do RECORTE/prévia do banner = a do hero da home DESTA marca, pra o admin refletir
+  // exatamente o que aparece no portal. VND = hero full-width × 360px (≈16:3); demais = 1920×500.
+  const brand = lerAparenciaAuth((tRow as any)?.tema, { nome: (tRow as any)?.nome ?? null, slug: (tRow as any)?.slug ?? null }).brand
+  const bannerAspect = brand === 'vnd' ? { w: 1920, h: 360 } : { w: 1920, h: 500 }
 
   // Destinos rápidos para linkar/escolher no banner: pastas + simulados publicados. Tolerante ao schema.
   const [pastasDest, simsDest] = await Promise.all([
@@ -51,7 +57,7 @@ export default async function BannersPage() {
           <p className="text-muted-foreground">Avisos que aparecem no portal do aluno. Banner = faixa no topo; Pop-up = janela exibida uma vez.</p>
         </div>
       </div>
-      <BannersManager banners={banners} destinos={destinosBanner} desempenhoAtivo={desempenhoAtivo} destaques={destaques} />
+      <BannersManager banners={banners} destinos={destinosBanner} desempenhoAtivo={desempenhoAtivo} destaques={destaques} bannerAspect={bannerAspect} />
     </div>
   )
 }

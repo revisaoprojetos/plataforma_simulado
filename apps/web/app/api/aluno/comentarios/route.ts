@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { rateLimit } from '@/lib/rate-limit'
+import { iniciaisDe } from '@/lib/leitura/ranking'
 
 // GET /api/aluno/comentarios?questao_id=X — comentários do professor + de alunos aprovados.
 // Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
@@ -38,7 +39,12 @@ export async function GET(request: NextRequest) {
     tipo: c.tipo,
     texto: c.texto,
     aprovado: c.aprovado,
-    autor: c.tipo === 'professor' ? 'Professor' : (nomeMap.get(c.autor_id) ?? 'Aluno'),
+    // PRIVACIDADE: terceiros só por INICIAIS; o próprio aluno vê o próprio nome (cliente mostra "Você").
+    autor: c.tipo === 'professor'
+      ? 'Professor'
+      : c.autor_id === sessao.estudanteId
+        ? (nomeMap.get(c.autor_id) ?? 'Você')
+        : iniciaisDe(nomeMap.get(c.autor_id)),
     em: c.criado_em,
     meu: c.autor_id === sessao.estudanteId,
   }))

@@ -1,10 +1,12 @@
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
 import { montarItensSimulado } from '@/lib/aluno/simulado-item'
 import { resolverGruposCatalogo } from '@/lib/aluno/grupos-catalogo'
 import { resolverEnunciadoUrls } from '@/lib/aluno/enunciado'
+import { resolverLiberacoes } from '@/lib/simulado/liberacao'
 import { BannersPortal, type HeroSimSlide, type BannerChip, type BannerStats } from '@/components/aluno/banners-portal'
 import { tipoDoSimulado } from '@/lib/simulado/tipo'
 import { idsSimuladosGratuitos } from '@/lib/simulado/gratuito'
@@ -13,7 +15,7 @@ import { remember } from '@/lib/cache/relatorio-cache'
 import { SimuladosCatalogoAluno, type ItemSimuladoCat, type ProgressoGrupo } from '@/components/aluno/simulados-catalogo-aluno'
 import { SemAcessoModal } from '@/components/aluno/sem-acesso-modal'
 import { getGamConfig, gamAtivaParaAluno } from '@/lib/gamificacao'
-import { resumoGamificacao, missoesHoje, atividadeSemana, conquistasProgresso } from '@/lib/gamificacao/leitura'
+import { resumoGamificacao, missoesHoje, atividadeSemana, conquistasProgresso, posicaoNaLiga } from '@/lib/gamificacao/leitura'
 import { NivelCard } from '@/components/aluno/nivel-card'
 import { MetaDiariaCard } from '@/components/aluno/meta-diaria-card'
 import { MissoesLista } from '@/components/aluno/missoes-lista'
@@ -26,6 +28,14 @@ import { MascoteTour } from '@/components/mascote/mascote-tour'
 import { getCurrentTenant } from '@/lib/tenant'
 import { resolverCardView } from '@/lib/card-view'
 import { cn } from '@/lib/utils'
+import { lerAparenciaAuth } from '@/lib/brand/aparencia-auth'
+import { resolveTemaDark } from '@/lib/hud/resolve-dark'
+import { PlatformHome } from '@/components/brand/interna/home'
+import { PlatformPasta } from '@/components/brand/interna/pasta'
+import { resolverInterno } from '@/lib/aluno/interno-gate'
+import { montarHomeData } from '@/lib/aluno/home-nova'
+import type { InternaTheme } from '@/components/brand/interna/interna-tokens'
+import type { HomeDestaque } from '@/components/brand/interna/home/types'
 
 export default async function AlunoHome({ searchParams }: { searchParams: Promise<{ pasta?: string }> }) {
   const { pasta } = await searchParams
@@ -40,7 +50,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   const [{ data: mats }, { data: acs }, { data: sessAll }, tenantBundle] = await Promise.all([
     svc.from('simulado_matriculas').select('simulado_id, liberado').eq('estudante_id', estId),
     svc.from('simulado_acessos').select('simulado_id, expira_em').eq('estudante_id', estId),
-    svc.from('simulado_sessoes_prova').select('simulado_id, status, nota, finalizado_em').eq('estudante_id', estId).eq('is_teste', false).eq('deletado', false),
+    svc.from('simulado_sessoes_prova').select('id, simulado_id, status, nota, finalizado_em').eq('estudante_id', estId).eq('is_teste', false).eq('deletado', false),
     remember(`aluno-home-tenant:${sessao!.tenantId}`, 120, async () => {
       const [{ data: banRows }, { data: tenantRow }, gratuitoIds] = await Promise.all([
         // Mesma ordenação do console (ordem asc, empate por criado_em DESC) para o carrossel bater com a lista de Avisos.
@@ -310,6 +320,51 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
         )
       }
     }
+    // Visual NOVO: dentro da pasta usa o PlatformPasta (mesma linguagem da Início). Só quando há conteúdo
+    // (se vazio/sem acesso, mantém o fluxo antigo que mostra o SemAcessoModal).
+    const _itPasta = await resolverInterno()
+    if (_itPasta.ativo && !vazio) {
+      // Nota/liberação/data dos JÁ FEITOS desta pasta (p/ o ticket de concluído com nota, igual a
+      // "Simulados realizados"). Vem das sessões já carregadas (sessoesPorSim) — sem query extra.
+      const dmPasta = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '')
+      const notasPasta: Record<string, { nota: number | null; notaLiberada: boolean; data: string; ultimo: string | null }> = {}
+      for (const i of naPasta) {
+        if ((i.finalizadas ?? 0) <= 0) continue
+        const fs = (sessoesPorSim.get(i.id) ?? []).filter((x: any) => x.status === 'finalizada')
+        const ns = fs.map((x: any) => (x.nota != null ? Number(x.nota) : null)).filter((n: any): n is number => n != null)
+        const ultimo = fs.map((x: any) => x.finalizado_em).filter(Boolean).sort().pop() ?? null
+        notasPasta[i.id] = { nota: ns.length ? Math.max(...ns) : null, notaLiberada: !!resolverLiberacoes(i.regras, i).notaLiberada, data: dmPasta(ultimo), ultimo }
+      }
+      // Progresso dos EM ANDAMENTO (questão atual / total / %) — igual a "Simulados realizados". Só para os
+      // poucos em andamento desta pasta (2 counts): total de questões do sim + respondidas na sessão aberta.
+      const emAndPasta = naPasta.filter((i) => i.emAndamento && (i.finalizadas ?? 0) <= 0)
+      const andamentosPasta: Record<string, { questaoAtual: number; total: number; pct: number }> = {}
+      if (emAndPasta.length) {
+        const emIds = emAndPasta.map((i) => i.id)
+        const emSessIds = emAndPasta.map((i) => (sessoesPorSim.get(i.id) ?? []).find((x: any) => x.status !== 'finalizada')?.id).filter(Boolean) as string[]
+        const totalPorSim = new Map<string, number>(); const respPorSess = new Map<string, number>()
+        try {
+          const [{ data: pqRows }, { data: rsRows }] = await Promise.all([
+            svc.from('simulado_prova_questoes').select('simulado_id').in('simulado_id', emIds),
+            emSessIds.length ? svc.from('simulado_respostas_objetivas').select('sessao_id').in('sessao_id', emSessIds) : Promise.resolve({ data: [] as any[] }),
+          ])
+          for (const r of (pqRows ?? []) as any[]) totalPorSim.set(r.simulado_id, (totalPorSim.get(r.simulado_id) ?? 0) + 1)
+          for (const r of (rsRows ?? []) as any[]) respPorSess.set(r.sessao_id, (respPorSess.get(r.sessao_id) ?? 0) + 1)
+        } catch { /* tolerante */ }
+        for (const i of emAndPasta) {
+          const total = totalPorSim.get(i.id) ?? 0
+          const sessId = (sessoesPorSim.get(i.id) ?? []).find((x: any) => x.status !== 'finalizada')?.id
+          const resp = sessId ? (respPorSess.get(sessId) ?? 0) : 0
+          andamentosPasta[i.id] = { questaoAtual: Math.min(resp + 1, total || resp + 1), total, pct: total ? Math.round((resp / total) * 100) : 0 }
+        }
+      }
+      return (
+        <div className="animate-page">
+          <PlatformPasta brand={_itPasta.brand} theme={_itPasta.theme} pastaInfo={{ id: pasta, nome: pastaInfo?.nome ?? 'Simulados', cor: pastaInfo?.cor ?? null, capa: null }} subpastas={subpastas} breadcrumb={breadcrumbP} itens={naPasta} notas={notasPasta} andamentos={andamentosPasta} />
+          {semAcesso}
+        </div>
+      )
+    }
     return (
       <div className="animate-page">
         <SimuladosCatalogoAluno itens={itensCat} grupos={grupos} progresso={progresso} pastaAtiva={pasta} pastaInfo={pastaInfo} subpastas={subpastas} breadcrumb={breadcrumbP} view={cardView} />
@@ -338,6 +393,78 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   const chest = gamConfig?.xp_regras.chest
   const proxima = gamResumo?.proxima ?? null
 
+  // ── NOVO VISUAL INTERNO (opt-in por plataforma): quando o console liga `internoAtivo`, a Início
+  // usa a home redesenhada ligada aos dados reais. Desligado (padrão) → home atual (abaixo). ──
+  const aparencia = lerAparenciaAuth(tenantRow?.tema, { nome: (tenantRow?.tema as any)?.nome_site ?? tenant?.nome ?? null, slug: tenant?.slug ?? null })
+  if (aparencia.internoAtivo) {
+    // Tema interno: claro/escuro via cookie `theme` (espelho do next-themes). O MEQ tem um 3º
+    // tema "azul" (cards brancos sobre fundo gradiente). O seletor de tema fica no SHELL (shared,
+    // não editável aqui); quando ele gravar `theme=azul`, a home já respeita. Fallback: claro/escuro.
+    const temaCookie = (await cookies()).get('theme')?.value
+    const dark = await resolveTemaDark()
+    const theme: InternaTheme =
+      aparencia.brand === 'meq' && temaCookie === 'azul' ? 'azul' : dark ? 'escuro' : 'claro'
+    // Banners REAIS da plataforma (os mesmos do carrossel atual): banners de imagem (sem pop-ups) +
+    // banners de simulado, ordenados pela ordem global do console.
+    const bannerSlides = (bannersSemSim as any[])
+      .filter((b) => b.tipo !== 'popup')
+      .map((b): HomeDestaque & { ordem: number } => {
+        // Respeita "ocultar título/mensagem" do admin (tema.banner_destaques[id]): zera o texto →
+        // a home mostra a imagem limpa (sem overlay de texto). Antes esse config não era aplicado aqui.
+        const cfg = (destaquesBanner[b.id] as any) ?? {}
+        return {
+          eyebrow: '',
+          titulo: cfg.bannerOcultarTitulo ? '' : (b.titulo ?? ''),
+          subtitulo: cfg.bannerOcultarMensagem ? '' : (b.mensagem ?? ''),
+          chips: [], cta: { rotulo: 'Abrir', url: b.link ?? '#' },
+          imagem: b.imagem_url ?? null, cores: b.cor ?? undefined,
+          ordem: ordemGlobal.get(b.id) ?? 0,
+        }
+      })
+    const heroSlides = (heroSims as any[]).map((h): HomeDestaque & { ordem: number } => ({
+      eyebrow: 'DESTAQUE', titulo: h.titulo ?? 'Simulado', subtitulo: h.descricao ?? '',
+      chips: Array.isArray(h.chips) ? h.chips.map((c: any) => c.label).filter(Boolean) : [],
+      cta: { rotulo: h.acao ?? 'Ver', url: h.link ?? '#' },
+      imagem: h.capa ?? null, cores: h.cor ?? undefined,
+      ordem: h.ordem ?? 0,
+    }))
+    const destaquesReais: HomeDestaque[] = [...bannerSlides, ...heroSlides].sort((a, b) => a.ordem - b.ordem)
+    // Posição do aluno na sua liga (KPI "Liga · Nº lugar" no MEQ) — count barato (head:true),
+    // só quando a gamificação está ativa (há liga/xp). Sem isso o KPI mostrava "0º lugar".
+    const posicaoLiga = gamResumo?.liga?.id
+      ? await posicaoNaLiga(svc, sessao!.tenantId, gamResumo.liga.id, gamResumo.xpTotal ?? 0)
+      : 0
+    // KPIs reais da Início: "Questões resolvidas" (total de respostas objetivas do aluno em TODAS as
+    // suas sessões) e "Taxa de acerto" (corretas / resolvidas). Dois counts (head:true) — sem puxar
+    // linhas. A lista de sessões é pequena (dezenas), então `.in()` sem chunk é seguro aqui.
+    let questoesResolvidas = 0
+    let taxaAcerto = 0
+    try {
+      const sessIds = ((sessAll ?? []) as any[]).map((s) => s.id).filter(Boolean)
+      if (sessIds.length) {
+        const baseR = () => svc.from('simulado_respostas_objetivas').select('*', { count: 'exact', head: true }).in('sessao_id', sessIds)
+        const [{ count: tot }, { count: corr }] = await Promise.all([baseR(), baseR().eq('correta', true)])
+        questoesResolvidas = tot ?? 0
+        if (questoesResolvidas > 0) taxaAcerto = Math.round(((corr ?? 0) / questoesResolvidas) * 100)
+      }
+    } catch { /* tolerante: mantém 0 se a contagem falhar */ }
+    const homeData = montarHomeData({
+      nomeCompleto: sessao!.nome,
+      gamResumo, gamMissoes, gamSemana,
+      recentes, grupos, progresso, destaquesReais,
+      feitos: feitosSet.size,
+      questoesResolvidas, taxaAcerto,
+      chest,
+      posicaoLiga,
+      gamAtivo,
+      // Cargos/áreas do "Rumo a …" (rotativo): configurável por tenant. Sem config = estático.
+      rotativo: Array.isArray((tenantRow?.tema as any)?.hero_rotativo) ? (tenantRow?.tema as any).hero_rotativo : undefined,
+      // Marca → slide de boas-vindas (Revisão=redesign; VND/MEQ=plataforma nova).
+      brand: aparencia.brand,
+    })
+    return <PlatformHome brand={aparencia.brand} theme={theme} data={homeData} />
+  }
+
   return (
     <div className="animate-page space-y-6">
       {/* Aviso de mudança de gabarito saiu da home (era um card intrusivo): a recorreção já gera a
@@ -348,7 +475,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
       {/* Banners do tenant — UM carrossel só (banner + destaque + simulado) + pop-up. SÓ na Início. */}
       <BannersPortal banners={bannersSemSim.map((b) => ({ ...b, ordem: ordemGlobal.get(b.id) ?? 0, estilo: (destaquesBanner[b.id] as any)?.popupEstilo ?? null, pontas: (destaquesBanner[b.id] as any)?.popupPontas ?? null, textoPos: (destaquesBanner[b.id] as any)?.bannerTextoPos ?? null, textoCor: (destaquesBanner[b.id] as any)?.bannerTextoCor ?? null, textoTam: (destaquesBanner[b.id] as any)?.bannerTextoTam ?? null, textoX: (destaquesBanner[b.id] as any)?.bannerTextoX ?? null, textoY: (destaquesBanner[b.id] as any)?.bannerTextoY ?? null, ocultarTitulo: (destaquesBanner[b.id] as any)?.bannerOcultarTitulo ?? false, ocultarMensagem: (destaquesBanner[b.id] as any)?.bannerOcultarMensagem ?? false, freq: (destaquesBanner[b.id] as any)?.freq ?? null }))} simulados={heroSims} stats={mostrarDesempenhoBanner ? statsAluno : null} />
 
-      <div className={cn('grid items-start gap-6', gamResumo && 'lg:grid-cols-[minmax(0,1fr)_340px]')}>
+      <div className={cn('grid grid-cols-1 items-start gap-6', gamResumo && 'lg:grid-cols-[minmax(0,1fr)_340px]')}>
         {/* ── Coluna principal: nível + trilha + recentes + cursos e pacotes ── */}
         <div className="min-w-0 space-y-6">
           {gamResumo ? (
@@ -369,7 +496,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
 
         {/* ── Coluna direita: meta, sequência, missões, liga, conquistas ── */}
         {gamResumo && (
-          <aside className="space-y-4 lg:sticky lg:top-6 lg:self-start">
+          <aside className="min-w-0 space-y-4 lg:sticky lg:top-6 lg:self-start">
             {gamResumo.metaDiaXp > 0 && <div data-tour="meta"><MetaDiariaCard xpHoje={gamResumo.xpHoje} meta={gamResumo.metaDiaXp} /></div>}
             <div data-tour="sequencia"><StreakCalendario dias={gamSemana} streak={gamResumo.streakAtual} feitoHoje={gamResumo.feitoHoje} chestXp={chest?.xp ?? 0} chestCadaN={chest?.cada_n_dias ?? 0} /></div>
             {gamMissoes.length > 0 && <div data-tour="missoes"><MissoesLista missoes={gamMissoes} renova="meia-noite" /></div>}

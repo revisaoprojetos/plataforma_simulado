@@ -509,6 +509,11 @@ html.splash-ativo .animate-pop { animation-play-state: paused !important; }
   .stagger > * { animation: none !important; }
 }
 
+/* Down bar mobile da marca Revisão (spec 03 §2.3): entrada do popover + itens (stagger) + overlay. */
+@keyframes bbin { from { opacity: 0; transform: translateY(14px) scale(.96); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes bbit { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes bbo  { from { opacity: 0; } to { opacity: 1; } }
+
 /* Shimmer para skeletons de carregamento. */
 .skeleton-shimmer { position: relative; overflow: hidden; }
 .skeleton-shimmer::after {
@@ -773,8 +778,11 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 .leitura-prosa [data-caixa],
 .leitura-prosa .box-stj, .leitura-prosa .box-stf, .leitura-prosa .box-cinza,
 .leitura-prosa .box-cinza-esc, .leitura-prosa .box-atencao {
-  color:#111; padding:10px 14px; margin-top:calc(8px * var(--lp-bloco-texto-top,2.2) * var(--esc-blocos,1)); margin-bottom:calc(10px * var(--lp-bloco-texto-bot,2.2) * var(--esc-blocos,1)); margin-left:0; margin-right:0; border:1px solid #999; border-radius:8px; font-size:.95em;
+  color:#111; padding:10px 14px; margin-top:calc(5px * var(--lp-bloco-texto-top,2.2) * var(--esc-blocos,1)); margin-bottom:calc(6px * var(--lp-bloco-texto-bot,2.2) * var(--esc-blocos,1)); margin-left:0; margin-right:0; border:1px solid #999; border-radius:8px; font-size:.95em;
 }
+/* Word deixa parágrafos VAZIOS (só espaço/<br>) entre as caixas → vão GIGANTE. Zera a altura deles. */
+.leitura-prosa p:empty,
+.leitura-prosa p:has(> br:only-child) { margin:0 !important; height:0 !important; min-height:0 !important; line-height:0 !important; }
 /* Bloco↔bloco: quando um bloco vem logo após outro, o gap vem do "entre blocos" (o de cima zera o
    margin-bottom p/ não colapsar/duplicar com o texto). Cobre todas as variações de caixa via :is(). */
 .leitura-prosa :is([data-caixa],.box-stj,.box-stf,.box-cinza,.box-cinza-esc,.box-atencao):has(+ :is([data-caixa],.box-stj,.box-stf,.box-cinza,.box-cinza-esc,.box-atencao)) { margin-bottom: 0 !important; }

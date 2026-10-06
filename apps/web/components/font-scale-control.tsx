@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import { ALargeSmall, AArrowDown, AArrowUp, RotateCcw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import {
-  FONT_SCALE_LEVELS, FONT_SCALE_DEFAULT, lerEscala, salvarEscala, aplicarEscala, nivelDe, pctDe,
+  FONT_SCALE_LEVELS, FONT_SCALE_OPCOES, FONT_SCALE_DEFAULT, lerEscala, salvarEscala, aplicarEscala, nivelDe, pctDe,
 } from '@/lib/font-scale'
 
 /**
@@ -138,13 +138,15 @@ export function FontScaleControl({
               <AArrowDown className="h-4 w-4" />
             </button>
             <div className="flex flex-1 items-center gap-1">
-              {FONT_SCALE_LEVELS.map((_, i) => (
+              {/* Opções da lista CANÔNICA (lib/font-scale) — mesma lista em todos os seletores. */}
+              {FONT_SCALE_OPCOES.map((o) => (
                 <button
-                  key={i}
+                  key={o.nivelIndex}
                   type="button"
-                  onClick={() => aplica(i)}
-                  aria-label={`Nível ${i + 1}`}
-                  className={cn('h-2 flex-1 rounded-full transition-colors', i <= idx ? 'bg-primary' : 'bg-muted')}
+                  onClick={() => aplica(o.nivelIndex)}
+                  aria-label={`Tamanho ${o.label}`}
+                  title={o.label}
+                  className={cn('h-2 flex-1 rounded-full transition-colors', o.nivelIndex <= idx ? 'bg-primary' : 'bg-muted')}
                 />
               ))}
             </div>

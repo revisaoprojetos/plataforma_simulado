@@ -9,6 +9,18 @@ export const FONT_SCALE_DEFAULT = 1
 export const FONT_SCALE_MIN = FONT_SCALE_LEVELS[0]
 export const FONT_SCALE_MAX = FONT_SCALE_LEVELS[FONT_SCALE_LEVELS.length - 1]
 
+/**
+ * Lista CANÔNICA de opções de tamanho de texto — fonte única da verdade para TODOS os seletores
+ * (rodapé da sidebar do aluno/admin, top bar do simulado, menu da conta). Antes cada ponto de UI
+ * montava sua própria lista (sidebar mostrava 4, menu da conta 3) e elas divergiam; agora todos
+ * consomem daqui. Cada item aponta para um índice de `FONT_SCALE_LEVELS` — a MATEMÁTICA da escala e
+ * a persistência no localStorage não mudam, só as opções visíveis ficam uniformes. `nivelIndex`
+ * cobre todos os níveis em ordem, então o comportamento continua idêntico ao atual.
+ */
+export const FONT_SCALE_OPCOES: { label: string; nivelIndex: number }[] = FONT_SCALE_LEVELS.map(
+  (_, i) => ({ label: `${pctDe(FONT_SCALE_LEVELS[i])}%`, nivelIndex: i }),
+)
+
 /** Chave do localStorage por escopo (usuário). */
 export function scaleKey(scope?: string | null): string {
   return `plt.fontscale.${scope || 'anon'}`

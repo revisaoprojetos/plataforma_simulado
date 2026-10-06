@@ -12,6 +12,8 @@ import { provasPorQuestao } from '@/lib/aluno/provas-questao'
 import { questoesForaDeJogoTenant } from '@/lib/simulado/questoes-anuladas'
 import { resolverComentarioGabarito } from '@/lib/simulado/comentario-gabarito'
 import { Target, CheckCircle2, Percent } from 'lucide-react'
+import { resolverInterno } from '@/lib/aluno/interno-gate'
+import { PlatformBanco } from '@/components/brand/interna/banco'
 
 const POR_PAGINA = 10
 const COLS_QUESTAO = 'id, tipo, enunciado, disciplina_id, banca_id, ano, nivel_dificuldade, comentario_professor, codigo, numero, assunto_id, imagem_url'
@@ -150,6 +152,84 @@ export default async function AlunoQuestoesPage({ searchParams }: PageProps) {
     alternativas: (altMap.get(x.id) ?? []).map((a) => ({ id: a.id, texto: a.texto, ordem: a.ordem ?? 0, correta: !!a.correta })),
   }))
 
+  // Filtros + cards + paginação (peças FUNCIONAIS) — reusadas no visual atual E no novo.
+  const filtrosEl = (
+    <QuestoesFiltrosAluno
+      disciplinas={(disciplinas ?? []) as any}
+      assuntos={(assuntos ?? []) as any}
+      bancas={(bancas ?? []) as any}
+      anos={anos}
+      total={count ?? 0}
+      params={params}
+    />
+  )
+  const questoesEl = (
+    <CardsComOverlay>
+      {lista.length === 0 ? (
+        <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">Nenhuma questão encontrada com esses filtros.</div>
+      ) : (
+        <div className="space-y-4">{lista.map((qq, i) => <QuestaoCard key={qq.id} questao={qq} numero={offset + i + 1} />)}</div>
+      )}
+      <PaginationControls page={page} totalPages={totalPages} />
+    </CardsComOverlay>
+  )
+
+  // ── NOVO VISUAL INTERNO: Banco redesenhado (header/KPIs + QCore novo) reusando filtros/paginação. ──
+  // Aqui `questoes` é o ARRAY de dados (QCore resolve/favorita de verdade); paginação continua por URL.
+  const _it = await resolverInterno()
+  if (_it.ativo) {
+    const paginacaoEl = <PaginationControls page={page} totalPages={totalPages} />
+
+    // Dados da COLUNA DIREITA do MEQ (spec 04 §3): "Desempenho no filtro" (donut acertos/erros/resolvidas
+    // DENTRO do filtro atual) + "Questões por dia" (Seg–Sex da semana corrente). Só computa p/ MEQ
+    // (as outras marcas não têm essa coluna) e de forma leve: ids do filtro (coluna única) ∩ respostas do aluno.
+    let desempenhoFiltro: { acertos: number; erros: number; resolvidas: number } | undefined
+    let porDia: { label: string; n: number }[] | undefined
+    if (_it.brand === 'meq') {
+      const [idsFiltro, respAluno] = await Promise.all([
+        fetchAll<{ id: string }>(() => aplicarFiltros(svc.from('simulado_questoes').select('id')).order('id', { ascending: true })),
+        fetchAll<{ questao_id: string; correta: boolean; respondido_em: string }>(
+          () => svc.from('simulado_respostas_avulsas').select('questao_id, correta, respondido_em').eq('estudante_id', estId).order('id', { ascending: true }),
+        ),
+      ])
+      const setFiltro = new Set(idsFiltro.map((x) => x.id))
+      // Última resposta por questão (a mais recente decide acerto/erro), só p/ questões no filtro.
+      const ultimaPorQ = new Map<string, boolean>()
+      for (const r of respAluno) {
+        if (!r.questao_id || !setFiltro.has(r.questao_id)) continue
+        ultimaPorQ.set(r.questao_id, !!r.correta) // ordenado por id; mantém a leitura estável
+      }
+      let ac = 0
+      for (const ok of ultimaPorQ.values()) if (ok) ac++
+      const resolvidasNoFiltro = ultimaPorQ.size
+      desempenhoFiltro = { acertos: ac, erros: resolvidasNoFiltro - ac, resolvidas: resolvidasNoFiltro }
+
+      // Questões por dia desta semana (seg→sex). Conta RESPOSTAS (atividade) por dia útil.
+      const agora = new Date()
+      const diaSemana = (agora.getDay() + 6) % 7 // 0 = segunda
+      const segunda = new Date(agora); segunda.setHours(0, 0, 0, 0); segunda.setDate(agora.getDate() - diaSemana)
+      const LABELS = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex']
+      const cont = [0, 0, 0, 0, 0]
+      for (const r of respAluno) {
+        if (!r.respondido_em) continue
+        const d = new Date(r.respondido_em)
+        const idx = Math.floor((d.getTime() - segunda.getTime()) / 86400000)
+        if (idx >= 0 && idx <= 4) cont[idx]++
+      }
+      porDia = LABELS.map((label, i) => ({ label, n: cont[i] }))
+    }
+
+    return (
+      <BancoNavProvider>
+        <PlatformBanco brand={_it.brand} theme={_it.theme}
+          stats={{ resolvidas: praticaTotal, acertos: praticaAcertos, aproveitamento: pct, total: count ?? 0 }}
+          filtros={{ disciplinas: (disciplinas ?? []) as any, assuntos: (assuntos ?? []) as any, bancas: (bancas ?? []) as any, anos, params }}
+          questoes={lista} paginacao={paginacaoEl}
+          desempenhoFiltro={desempenhoFiltro} porDia={porDia} />
+      </BancoNavProvider>
+    )
+  }
+
   return (
     <BancoNavProvider>
       <div className="space-y-5">
@@ -166,28 +246,8 @@ export default async function AlunoQuestoesPage({ searchParams }: PageProps) {
           </div>
         )}
 
-        <QuestoesFiltrosAluno
-          disciplinas={(disciplinas ?? []) as any}
-          assuntos={(assuntos ?? []) as any}
-          bancas={(bancas ?? []) as any}
-          anos={anos}
-          total={count ?? 0}
-          params={params}
-        />
-
-        {/* Cards com overlay de carregamento durante a navegação por filtro. */}
-        <CardsComOverlay>
-          {lista.length === 0 ? (
-            <div className="rounded-lg border border-dashed p-10 text-center text-sm text-muted-foreground">
-              Nenhuma questão encontrada com esses filtros.
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {lista.map((qq, i) => <QuestaoCard key={qq.id} questao={qq} numero={offset + i + 1} />)}
-            </div>
-          )}
-          <PaginationControls page={page} totalPages={totalPages} />
-        </CardsComOverlay>
+        {filtrosEl}
+        {questoesEl}
       </div>
     </BancoNavProvider>
   )

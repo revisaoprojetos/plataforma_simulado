@@ -101,10 +101,14 @@ já validado no VND (ver memória `onboarding-tenant-multidominio`). Legenda: �
 - [ ] `somente_super=false` / visibilidade `todos` ao liberar (senão loop /login↔/admin trava admins não-super).
 
 ## 10. Estado (a preencher conforme avança)
-- Criação do tenant: ⏳
-- DNS + Traefik + TLS: ⏳
-- Marca: ⏳
-- Login + mensagens + contatos: ⏳
-- Integrações: ⏳
-- Conteúdo: ⏳
-- Liberação (visibilidade `todos`): ⏳
+- Criação do tenant: ✅
+- **Gamificação**: ✅ config copiada do Revisão (ativo, público `todos`, nível máx 35, 9 cargos, 3 missões, 25 conquistas) — 2026-10-04.
+- **Tema estrutural**: ✅ copiadas do Revisão (mantendo a marca MEQ): `card_view, card_fade, card_fade_pastas, banners_desempenho, gam_trilha_admin, gam_trilha_simbolos, trilha_formato, personalizacao_aluno, animacao_entrada, sidebar_rotulos`. Backup: `apps/web/scripts/_backup-meq-aplicar-revisao.json`.
+  - ⚠️ `gam_trilha_simbolos` e `sidebar_rotulos` vieram do Revisão — símbolos da trilha e rótulos do menu podem mostrar os do Revisão; ajustar na Personalização se quiser MEQ-específico.
+- DNS + Traefik + TLS: ⏳ (infra, Portainer)
+- Marca (logo/favicon/cores finais): ⏳ (hoje azul `#000a5b` provisório)
+- Login: ✅ `embed_config` criado (metodo=`email`, otp off). Mensagens: ✅ usa defaults do código (como o Revisão, 0 linhas). Contatos: ⏳ (precisa WhatsApp/suporte/horário reais).
+- Integrações (Curseduca + Guru): ⏳ (credenciais)
+- Conteúdo (puxar do Revisão via linhagem): ⏳
+- Liberação (`somente_super=false` / visibilidade `todos`): ⏳
+- **Acesso local p/ ver alterações: `http://meq.localhost:3000`** (Revisão = `localhost:3000`; VND = `vnd.localhost:3000`). NÃO usar o domínio real (vai pro ar via DNS).

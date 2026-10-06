@@ -105,7 +105,7 @@ export async function onPraticaRespondida(
         const { data: hist } = await svc
           .from('simulado_respostas_avulsas')
           .select('correta')
-          .eq('estudante_id', estudanteId).eq('disciplina_id', disciplinaId)
+          .eq('tenant_id', tenantId).eq('estudante_id', estudanteId).eq('disciplina_id', disciplinaId)
           .limit(200)
         const arr = (hist ?? []) as any[]
         if (arr.length >= 5) {

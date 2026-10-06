@@ -5,6 +5,10 @@ import { resolverSidebarRotulos, rotuloDe, IconeMenu } from '@/lib/sidebar-rotul
 import { desafiosDoAluno, temAcessoDesafio } from '@/lib/jurisprudencia/conteudo'
 import { JurisprudenciaJogo } from '@/components/aluno/jurisprudencia-jogo'
 import { JurisprudenciaTickets } from '@/components/aluno/jurisprudencia-ticket'
+import { resolverInterno } from '@/lib/aluno/interno-gate'
+import { InternaPageRoot } from '@/components/brand/interna/page-shell'
+import { PlatformJuris } from '@/components/brand/interna/juris'
+import { JurisprudenciaMeq } from '@/components/aluno/jurisprudencia-meq'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,6 +50,27 @@ export default async function JurisprudenciaAlunoPage({
   const titulo = rotuloDe(rotAluno?.itens, chaveNav, 'Desafio de Jurisprudência')
   const iconeNav = rotAluno?.itens?.[chaveNav]?.icone
 
+  const ticketsEl = desafios.length === 0
+    ? <div className="rounded-2xl border border-dashed p-12 text-center text-muted-foreground">Nenhum desafio disponível para você no momento.</div>
+    : <JurisprudenciaTickets desafios={desafios} />
+
+  // ── NOVO VISUAL INTERNO: lista no design novo (PlatformJuris), fiel ao mockup, com dados reais. ──
+  const _it = await resolverInterno()
+  if (_it.ativo) {
+    const desafiosData = desafios.map((d) => ({ id: d.id, nome: d.nome, imagemTicket: d.imagemTicket ?? null }))
+    const stats = { desafios: desafiosData.length, disponiveis: desafiosData.length }
+    // MEQ tem composição própria (spec 04 §2): o shell da marca (shell-meq) já traz rail + top bar,
+    // então renderizamos só a região de conteúdo (sem o cabeçalho duplicado do InternaPageRoot).
+    if (_it.brand === 'meq') {
+      return <JurisprudenciaMeq theme={_it.theme} titulo={titulo} desafios={desafiosData} stats={stats} />
+    }
+    return (
+      <InternaPageRoot brand={_it.brand} theme={_it.theme}>
+        <PlatformJuris brand={_it.brand} theme={_it.theme} titulo={titulo} desafios={desafiosData} stats={stats} />
+      </InternaPageRoot>
+    )
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -53,11 +78,7 @@ export default async function JurisprudenciaAlunoPage({
         <p className="text-muted-foreground">Escolha um desafio para começar.</p>
       </div>
 
-      {desafios.length === 0 ? (
-        <div className="rounded-2xl border border-dashed p-12 text-center text-muted-foreground">Nenhum desafio disponível para você no momento.</div>
-      ) : (
-        <JurisprudenciaTickets desafios={desafios} />
-      )}
+      {ticketsEl}
     </div>
   )
 }

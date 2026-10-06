@@ -31,15 +31,6 @@ const fmtMomento = (ini?: string | null, fim?: string | null): string => {
 /** Duração entre dois instantes (p/ o tempo gasto no quiz). */
 const durEntre = (ini?: string | null, fim?: string | null): string | null => (ini && fim ? fmtDur((Date.parse(fim) - Date.parse(ini)) / 1000) : null)
 
-/** Nome curto p/ preservar privacidade no ranking do aluno: "João Marcello Pedote" → "J. P.". */
-const nomeCurto = (n: string) => {
-  const ps = (n || '').split(' ').filter(Boolean)
-  if (!ps.length) return '—'
-  const a = ps[0][0]?.toUpperCase() ?? ''
-  const b = ps.length > 1 ? (ps[ps.length - 1][0]?.toUpperCase() ?? '') : ''
-  return b ? `${a}. ${b}.` : `${a}.`
-}
-
 function PagBtn({ children, onClick, disabled, aria }: { children: ReactNode; onClick: () => void; disabled?: boolean; aria: string }) {
   return (
     <button type="button" onClick={onClick} disabled={disabled} aria-label={aria}
@@ -205,7 +196,7 @@ export function LeituraRanking({ ranking, minhaLinha = null, meuId, meuNome, mod
                     {lugar === 1 && <Crown className="absolute -top-4 left-1/2 z-10 h-4 w-4 -translate-x-1/2 sm:-top-5 sm:h-5 sm:w-5" style={{ color: cor }} />}
                     <AvatarEstudante nome={it.nome} avatar={it.avatar} cor={it.avatarCor ?? '#6d28d9'} className={cn('text-white shadow-md', lugar === 1 ? 'h-12 w-12 text-sm sm:h-16 sm:w-16 sm:text-lg' : 'h-10 w-10 text-xs sm:h-12 sm:w-12 sm:text-sm')} />
                   </span>
-                  <span className={cn('line-clamp-1 max-w-full text-xs font-semibold sm:text-sm', eu && 'text-primary')}>{eu ? 'Você' : nomeCurto(it.nome)}</span>
+                  <span className={cn('line-clamp-1 max-w-full text-xs font-semibold sm:text-sm', eu && 'text-primary')}>{eu ? 'Você' : it.nome}</span>
                   <span className="flex flex-wrap items-center justify-center gap-x-1 text-[10px] font-bold tabular-nums sm:gap-x-1.5 sm:text-xs">
                     <span className="text-primary">{it.score} pts</span>
                     <span className="text-muted-foreground/40">·</span>
@@ -338,7 +329,7 @@ export function LeituraRanking({ ranking, minhaLinha = null, meuId, meuNome, mod
                         </span>
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
-                            <span className={cn('truncate font-medium', eu && 'text-primary')}>{eu ? (meuNome ?? it.nome) : nomeCurto(it.nome)}</span>
+                            <span className={cn('truncate font-medium', eu && 'text-primary')}>{eu ? (meuNome ?? it.nome) : it.nome}</span>
                             {eu && <span className="shrink-0 rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">você</span>}
                           </div>
                           {cargo && (

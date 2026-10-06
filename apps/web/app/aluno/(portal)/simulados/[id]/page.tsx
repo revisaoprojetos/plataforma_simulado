@@ -11,6 +11,9 @@ import { tiposDeSimulados } from '@/lib/simulado/tipo'
 import { modalidadesDoAlunoV2, temEntregaV2, carregarEntregaBanco, type ModalidadeAluno } from '@/lib/caderno-teste/entrega-aluno'
 import { MeuSimuladoView } from '@/components/aluno/meu-simulado-view'
 import { AvaliacaoSimulado } from '@/components/aluno/avaliacao-simulado'
+import { resolverInterno } from '@/lib/aluno/interno-gate'
+import { PlatformResultadoInterno } from '@/components/brand/interna/resultado'
+import type { ResultadoInternoData } from '@/components/brand/interna/resultado/data'
 
 const notaTone = (n: number) => (n >= 70 ? 'text-emerald-600 dark:text-emerald-400' : n >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400')
 const nota = (n: number | null) => (n == null ? '—' : Number(n).toFixed(1).replace('.', ','))
@@ -80,6 +83,65 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
     })(),
   ])
   const { cadernoId, modalidades } = cadernoInfo
+
+  // ── NOVO VISUAL INTERNO (ligado aos dados reais): Resultado redesenhado + NPS real (slot). ──
+  const _it = await resolverInterno()
+  if (_it.ativo) {
+    const fmtDur = (ms: number) => { const m = Math.round(ms / 60000); return m >= 60 ? `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}` : `${m}min` }
+    const fmtDm = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) : '')
+    const melhorT = tentativas.find((t) => t.id === melhor.id) ?? tentativas[0]
+    const statusQ = (q: typeof questoes[number]): 'certa' | 'errada' | 'branco' | 'anulada' => q.anulada ? 'anulada' : q.acertou > 0 ? 'certa' : q.errou > 0 ? 'errada' : 'branco'
+    const limpar = (s: string) => (s ?? '').trim().replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '_')
+    // Link do caderno de UMA tentativa específica (cada realização gera os PDFs da SUA sessão).
+    const dlHref = (m: typeof modalidades[number], gab: boolean, ssid: string): string | null => {
+      if (m.pdfUrl) return m.pdfUrl
+      if (!m.cadernoTeste) return null
+      const nome = [sim.titulo, m.nome].map(limpar).filter(Boolean).join('_') || 'caderno'
+      const qs = new URLSearchParams({ caderno: m.cadernoTeste.cadernoId, grupo: m.cadernoTeste.itemId, sessao: ssid, nome })
+      if (gab) qs.set('gabarito', '1')
+      return `/api/aluno/caderno-teste-pdf?${qs.toString()}`
+    }
+    // Downloads de uma sessão (lista de cadernos: sem gabarito + com gabarito quando liberado).
+    const downloadsDe = (ssid: string): ResultadoInternoData['downloads'] => {
+      const out: ResultadoInternoData['downloads'] = []
+      for (const m of modalidades) {
+        if (m.semGab) { const h = dlHref(m, false, ssid); if (h) out.push({ nome: m.nome, href: h, comGab: false }) }
+        if (m.comGab && gabaritoLiberado) { const h = dlHref(m, true, ssid); if (h) out.push({ nome: m.nome, href: h, comGab: true }) }
+      }
+      return out
+    }
+    const downloads = downloadsDe(melhor.id)
+    const resultadoData: ResultadoInternoData = {
+      titulo: sim.titulo,
+      notaLiberada, gabaritoLiberado,
+      refazerHref,
+      melhor: {
+        nota: melhorT?.nota ?? (melhor.nota != null ? Number(melhor.nota) : null),
+        acertos: melhorT?.acertos ?? 0,
+        erros: melhorT ? Math.max(0, melhorT.total - melhorT.acertos) : 0,
+        branco: 0,
+        total: melhorT?.total ?? 0,
+        pct: melhorT?.pct ?? 0,
+        tempo: melhorT ? fmtDur(melhorT.tempoMs) : '—',
+        posicao: melhorT?.posicao ?? null,
+      },
+      tentativas: tentativas.map((t) => ({
+        n: t.n, nota: t.nota, acertos: t.acertos, erros: Math.max(0, t.total - t.acertos), branco: 0, total: t.total, pct: t.pct,
+        tempo: fmtDur(t.tempoMs), posicao: t.posicao, data: fmtDm(t.finalizado),
+        porDisc: t.porDisc.map((d) => ({ nome: d.nome, pct: d.pct, ac: d.ac, tt: d.tt })),
+        downloads: downloadsDe(t.id), // cadernos DESTA realização (cada tentativa com os seus)
+      })),
+      porDisciplina: (melhorT?.porDisc ?? []).map((d) => ({ nome: d.nome, pct: d.pct, ac: d.ac, tt: d.tt })),
+      mapa: questoes.map((q) => ({ ordem: q.ordem, status: statusQ(q) })),
+      correcao: questoes.map((q) => ({
+        ordem: q.ordem, enunciado: q.enunciado, disciplina: q.disciplina, comentario: q.comentario,
+        status: statusQ(q), gabarito: q.alternativas.find((a) => a.correta)?.letra ?? null,
+        alternativas: q.alternativas.map((a) => ({ letra: a.letra, texto: a.texto, correta: a.correta })),
+      })),
+      downloads,
+    }
+    return <PlatformResultadoInterno brand={_it.brand} theme={_it.theme} data={resultadoData} sessaoId={melhor.id} />
+  }
 
   return (
     <div className="animate-page space-y-5">

@@ -3,6 +3,8 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenant } from '@/lib/tenant'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { AlunoEntrarForm } from '@/components/aluno/aluno-entrar-form'
+import { PlatformLogin } from '@/components/brand/platform-login'
+import { lerAparenciaAuth } from '@/lib/brand/aparencia-auth'
 import { resolverLoginConfig } from '@/lib/login-config'
 
 export default async function AlunoEntrarPage({ searchParams }: { searchParams: Promise<{ redirectTo?: string }> }) {
@@ -22,6 +24,27 @@ export default async function AlunoEntrarPage({ searchParams }: { searchParams: 
       .eq('tenant_id', tenant.id)
       .maybeSingle()
     if (data?.metodo_identificacao) metodo = data.metodo_identificacao as typeof metodo
+  }
+
+  // ATIVADOR do novo login (spec 02 §4): se o console ligou `loginAtivo`, usa o PlatformLogin da
+  // marca/estilo escolhido também na entrada do aluno; senão segue o login atual (AlunoEntrarForm).
+  if (tenant) {
+    const aparencia = lerAparenciaAuth(tenant.tema, { slug: tenant.slug, nome: tenant.nome })
+    if (aparencia.loginAtivo) {
+      const tema = (tenant.tema ?? {}) as any
+      return (
+        <PlatformLogin
+          brand={aparencia.brand}
+          theme={aparencia.defaultTheme}
+          style={aparencia.loginStyle}
+          loadingStyle={aparencia.loadingStyle}
+          metodo={metodo}
+          plataforma={tema.nome_site ?? tenant.nome ?? 'Área do Aluno'}
+          logo={tema.logo_url ?? null}
+          modoInicial="aluno"
+        />
+      )
+    }
   }
 
   const tema = (tenant?.tema ?? {}) as any

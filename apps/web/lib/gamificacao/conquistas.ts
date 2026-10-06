@@ -26,7 +26,7 @@ export async function avaliarConquistas(svc: any, { tenantId, estudanteId }: { t
     const { data: sess } = await svc
       .from('simulado_sessoes_prova')
       .select('simulado_id, nota')
-      .eq('estudante_id', estudanteId).eq('status', 'finalizada').eq('is_teste', false).eq('deletado', false)
+      .eq('tenant_id', tenantId).eq('estudante_id', estudanteId).eq('status', 'finalizada').eq('is_teste', false).eq('deletado', false)
     const arr = (sess ?? []) as any[]
     simuladosConcluidos = new Set(arr.map((s) => s.simulado_id)).size
     notaMax = arr.reduce((m, s) => Math.max(m, s.nota != null ? Number(s.nota) : 0), 0)

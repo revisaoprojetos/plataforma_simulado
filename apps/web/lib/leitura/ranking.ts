@@ -31,6 +31,30 @@ export interface RankingLeituraItem {
 }
 export interface RankingLeitura { itens: RankingLeituraItem[]; gamAtivo: boolean; pontuacao: PontuacaoLeitura }
 
+/** Iniciais p/ privacidade: "João Marcello Pedote" → "J. P." (primeiro + último nome). */
+export function iniciaisDe(nome: string | null | undefined): string {
+  const ps = (nome || '').trim().split(/\s+/).filter(Boolean)
+  if (!ps.length) return '—'
+  const a = ps[0][0]?.toUpperCase() ?? ''
+  const b = ps.length > 1 ? (ps[ps.length - 1][0]?.toUpperCase() ?? '') : ''
+  return b ? `${a}. ${b}.` : `${a}.`
+}
+
+/**
+ * PRIVACIDADE (obrigatória): anonimiza o ranking para o ALUNO antes de enviar ao cliente — o nome
+ * COMPLETO de TERCEIROS NUNCA sai do servidor. Para os outros alunos, `nome` vira só as INICIAIS e o
+ * `email` é zerado; a linha do próprio aluno (`meuId`) mantém o nome (o cliente mostra "Você").
+ * Admin NÃO usa isto (precisa do nome/e-mail reais no painel de suporte).
+ */
+export function anonimizarRankingParaAluno(ranking: RankingLeitura, meuId?: string | null): RankingLeitura {
+  return {
+    ...ranking,
+    itens: ranking.itens.map((it) =>
+      it.estudanteId === meuId ? it : { ...it, nome: iniciaisDe(it.nome), email: null },
+    ),
+  }
+}
+
 /** Dias inteiros entre dois YYYY-MM-DD (hoje − dia). */
 function diasEntre(hoje: string, dia: string): number {
   return Math.round((Date.parse(hoje + 'T00:00:00Z') - Date.parse(dia + 'T00:00:00Z')) / 86_400_000)

@@ -3,6 +3,8 @@
 import { GraduationCap } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { fundoLoginStyle, loginVars, corPrimariaLogin, corAccentLogin, type LoginConfig } from '@/lib/login-config'
+import { useAppearance } from '@/lib/brand/use-appearance'
+import { PlatformLoader } from '@/components/brand/platform-loader'
 
 const KF = `
 @keyframes llBar{0%{transform:translateX(-120%)}100%{transform:translateX(320%)}}
@@ -15,13 +17,41 @@ const KF = `
 .ll-orbit{animation:llOrbit 1.4s linear infinite}
 @media (prefers-reduced-motion:reduce){.ll-bar,.ll-pulse,.ll-dot,.ll-orbit{animation:none}}`
 
-/** Tela de carregamento branded (mostrada ao entrar na plataforma). Usa o mesmo fundo/cores da
- *  marca do login e o MODELO escolhido na config (spinner/barra/pulso/pontos/órbita). */
-export function LoginLoading({
-  config, plataforma = '', logo = null, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none', preview = false,
-}: {
+type LoginLoadingProps = {
   config: LoginConfig; plataforma?: string; logo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string; preview?: boolean
-}) {
+}
+
+/**
+ * Tela de carregamento pós-login. Fase 2: quando o tenant tem um ESTILO DE CARREGAMENTO da
+ * plataforma configurado no console (spec 02 §4), renderiza o `PlatformLoader` branded; se nada
+ * resolver (ou enquanto a aparência carrega, ou em `preview`), cai no MODELO GENÉRICO atual.
+ *
+ * O ponto de montagem/desmontagem (e portanto a duração/condição de término) continua sendo do
+ * componente-pai — este wrapper só troca o VISUAL, mantendo o comportamento atual.
+ */
+export function LoginLoading(props: LoginLoadingProps) {
+  // Na prévia do console a config vem explícita do painel — NÃO buscar a aparência do tenant,
+  // senão a prévia ignoraria o estilo que o operador está testando.
+  if (props.preview) return <LoginLoadingGenerico {...props} />
+  return <LoginLoadingResolvido {...props} />
+}
+
+function LoginLoadingResolvido(props: LoginLoadingProps) {
+  const { brand, defaultTheme, loadingStyle, loadingAtivo, loading } = useAppearance()
+  // Enquanto a aparência não chega, mostra o genérico (mesmo fundo/cores da marca) — sem flash.
+  // Ativador desligado no console (loadingAtivo=false) → modelo genérico legado.
+  if (loading || !loadingAtivo || !loadingStyle) return <LoginLoadingGenerico {...props} />
+  // `loadingStyle` resolvido → tela de carregamento DA PLATAFORMA. Passamos brand/theme/style
+  // (já resolvidos pelo hook) p/ o PlatformLoader resolver SÍNCRONO no 1º paint — sem o fundo
+  // NEUTRO roxo nem um novo fetch (era isso que causava o flash de tela roxa no VND).
+  return <PlatformLoader brand={brand} theme={defaultTheme} style={loadingStyle} />
+}
+
+/** Modelo GENÉRICO (legado): mesmo fundo/cores da marca do login e o MODELO escolhido na config
+ *  (spinner/barra/pulso/pontos/órbita). Mantido como fallback do PlatformLoader. */
+function LoginLoadingGenerico({
+  config, plataforma = '', logo = null, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none', preview = false,
+}: LoginLoadingProps) {
   const c = config
   const accent = c.carCorAnim ?? corAccentLogin(c)
   const primaria = corPrimariaLogin(c)

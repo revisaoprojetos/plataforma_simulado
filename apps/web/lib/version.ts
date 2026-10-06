@@ -7,4 +7,4 @@
 //   - MAJOR (X.0.0): mudança grande (ex.: redesign geral do sistema).
 //
 // É exibida no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
-export const APP_VERSION = '2.0.1'
+export const APP_VERSION = '3.0.0'

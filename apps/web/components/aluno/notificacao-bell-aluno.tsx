@@ -31,7 +31,7 @@ export function NotificacaoBellAluno({ diagonal = false, colapsada = false }: { 
   const [naoLidas, setNaoLidas] = useState(0)
   const [montado, setMontado] = useState(false) // presente no DOM (durante a animação)
   const [visivel, setVisivel] = useState(false)  // classe que dispara enter/exit
-  const [pos, setPos] = useState<{ left: number; bottom: number } | null>(null)
+  const [pos, setPos] = useState<{ left: number; bottom?: number; top?: number; dir: 'up' | 'down' } | null>(null)
   const [balaoPos, setBalaoPos] = useState<{ left: number; bottom: number } | null>(null) // balão de aviso acima do sino
   const btnRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
@@ -121,8 +121,14 @@ export function NotificacaoBellAluno({ diagonal = false, colapsada = false }: { 
   function abrir() {
     if (!btnRef.current) return
     const r = btnRef.current.getBoundingClientRect()
-    // Ancora à esquerda (junto à sidebar) e abre PARA CIMA a partir do sino.
-    setPos({ left: Math.max(12, r.left - 8), bottom: window.innerHeight - r.top + 10 })
+    // `left` clampado p/ caber na tela — o sino do TOP BAR fica à direita, não pode vazar p/ fora.
+    const left = Math.min(Math.max(12, r.left - 8), Math.max(12, window.innerWidth - 340 - 12))
+    // Direção: abre p/ BAIXO quando o sino está na metade de cima da tela (top bar); p/ CIMA quando
+    // está embaixo (rodapé da sidebar da Revisão). Antes era sempre p/ cima → saía da tela no topo.
+    const paraBaixo = r.top < window.innerHeight / 2
+    setPos(paraBaixo
+      ? { left, top: r.bottom + 10, dir: 'down' }
+      : { left, bottom: window.innerHeight - r.top + 10, dir: 'up' })
     if (fecharTimer.current) clearTimeout(fecharTimer.current)
     setMontado(true)
     // próximo frame: liga a classe visível → dispara a transição de entrada.
@@ -143,7 +149,7 @@ export function NotificacaoBellAluno({ diagonal = false, colapsada = false }: { 
   return (
     <>
       <style>{`@keyframes sinoToca{0%{transform:rotate(0)}8%{transform:rotate(14deg)}16%{transform:rotate(-12deg)}24%{transform:rotate(9deg)}32%{transform:rotate(-6deg)}40%{transform:rotate(3deg)}48%,100%{transform:rotate(0)}}.sino-toca{animation:sinoToca 2.4s ease-in-out infinite;transform-origin:50% 2px}@keyframes balaoPop{0%{transform:translateY(8px) scale(.8);opacity:0}60%{transform:translateY(-2px) scale(1.05)}100%{transform:translateY(0) scale(1);opacity:1}}@keyframes balaoFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}.balao-pill{animation:balaoPop .38s ease-out,balaoFloat 2.2s ease-in-out .38s infinite}@media (prefers-reduced-motion:reduce){.sino-toca,.balao-pill{animation:none}}`}</style>
-      <button ref={btnRef} onClick={toggle} aria-label="Notificações" className="relative flex h-9 w-9 items-center justify-center rounded-lg outline-none hover:bg-[color:var(--sidebar-accent)] focus-visible:ring-2 focus-visible:ring-ring">
+      <button ref={btnRef} onClick={toggle} aria-label="Notificações" className="relative flex h-9 w-9 items-center justify-center rounded-lg outline-none hover:bg-[color:var(--tabact,var(--sidebar-accent))] focus-visible:ring-2 focus-visible:ring-ring">
         <Bell className={cn('h-[1.15rem] w-[1.15rem]', temNaoLidas && 'sino-toca')} fill={temNaoLidas ? 'currentColor' : 'none'} />
         {naoLidas > 0 && (
           <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] animate-in zoom-in items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-sm ring-2 ring-[color:var(--sidebar)]">{naoLidas > 9 ? '9+' : naoLidas}</span>
@@ -177,10 +183,11 @@ export function NotificacaoBellAluno({ diagonal = false, colapsada = false }: { 
       {montado && pos && typeof document !== 'undefined' && createPortal(
         <div
           ref={panelRef}
-          style={{ left: pos.left, bottom: pos.bottom, background: 'var(--sidebar)', color: 'var(--sidebar-foreground)' }}
+          style={{ left: pos.left, top: pos.top, bottom: pos.bottom, background: 'var(--sidebar)', color: 'var(--sidebar-foreground)' }}
           className={cn(
-            'fixed z-[120] flex max-h-[75vh] w-[340px] origin-bottom-left flex-col overflow-hidden rounded-2xl border border-white/10 shadow-2xl transition-all duration-200 ease-out',
-            visivel ? 'translate-y-0 scale-100 opacity-100' : 'pointer-events-none translate-y-3 scale-95 opacity-0',
+            'fixed z-[120] flex max-h-[75vh] w-[340px] flex-col overflow-hidden rounded-2xl border border-white/10 shadow-2xl transition-all duration-200 ease-out',
+            pos.dir === 'down' ? 'origin-top-left' : 'origin-bottom-left',
+            visivel ? 'translate-y-0 scale-100 opacity-100' : cn('pointer-events-none scale-95 opacity-0', pos.dir === 'down' ? '-translate-y-3' : 'translate-y-3'),
           )}
         >
           <header className="flex items-center justify-between border-b border-white/10 px-5 py-4">

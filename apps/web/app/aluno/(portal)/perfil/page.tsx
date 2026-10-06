@@ -2,11 +2,14 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { createAdminClient } from '@/lib/supabase/server'
+import { resolverInterno } from '@/lib/aluno/interno-gate'
+import { PlatformPerfil } from '@/components/brand/interna/perfil'
+import type { PerfilData } from '@/components/brand/interna/perfil/data'
 import { avatarPadraoDe } from '@/lib/aluno/avatar-padrao'
 import { montarRelatorioEstudante } from '@/app/admin/relatorios/estudantes/_dados'
 import { RelatorioEstudanteView } from '@/app/admin/relatorios/estudantes/relatorio-estudante-view'
 import { KpiCard } from '@/components/admin/relatorios/viz'
-import { Mail, Phone, BarChart3, ArrowRight, Flame, Zap, Trophy, ClipboardList, Target, Clock, Award, Medal, BookOpen } from 'lucide-react'
+import { BarChart3, ArrowRight, Flame, Zap, Trophy, ClipboardList, Target, Clock, Award, Medal, BookOpen } from 'lucide-react'
 import { getGamConfig, gamAtivaParaAluno } from '@/lib/gamificacao'
 import { carregarTrilhaLeituraAluno } from '@/lib/leitura/trilha'
 import { LEITURA_ATIVA } from '@/lib/flags'
@@ -37,7 +40,8 @@ export default async function PerfilAlunoPage() {
   const gamConfig = await getGamConfig(svc, sessao.tenantId)
   const gamAtivo = await gamAtivaParaAluno(svc, sessao.tenantId, sessao.estudanteId, gamConfig)
   const [{ data: est }, dados, gamResumo, gamConquistas, pers, { data: temaRow }, carimbosPerfil] = await Promise.all([
-    svc.from('simulado_estudantes').select('nome, email, telefone').eq('id', sessao.estudanteId).maybeSingle(),
+    // PRIVACIDADE: só o nome é necessário no perfil do aluno (sem e-mail/telefone/CPF/etc.).
+    svc.from('simulado_estudantes').select('nome').eq('id', sessao.estudanteId).maybeSingle(),
     montarRelatorioEstudante(svc, sessao.estudanteId, sessao.tenantId),
     gamAtivo ? resumoGamificacao(svc, sessao.tenantId, sessao.estudanteId, gamConfig!) : Promise.resolve(null),
     gamAtivo ? conquistasDoAluno(svc, sessao.tenantId, sessao.estudanteId, gamConfig!) : Promise.resolve([]),
@@ -58,12 +62,8 @@ export default async function PerfilAlunoPage() {
   const sombraTexto = temFundo ? '0 1px 4px rgba(0,0,0,.55)' : undefined
 
   const nome = est?.nome ?? sessao.nome
-  // Mostra o e-mail que a pessoa usou para entrar (pode ser um secundário), não o principal do banco.
-  const email = sessao.email ?? est?.email
-  const contatos = [
-    email && { icon: Mail, label: email },
-    est?.telefone && { icon: Phone, label: est.telefone },
-  ].filter(Boolean) as { icon: any; label: string }[]
+  // PRIVACIDADE: a área do aluno nunca exibe e-mail/telefone/CPF/cidade/nascimento — nem do próprio aluno.
+  // No lugar dos contatos, mostramos "Nível N · X XP" (dados que a página já tem do resumo de gamificação).
 
   const pos = gamResumo ? await posicaoNaLiga(svc, sessao.tenantId, gamResumo.liga.id, gamResumo.xpTotal) : null
   const nota = (n: number | null) => (n == null ? '—' : n.toFixed(1).replace('.', ','))
@@ -77,6 +77,54 @@ export default async function PerfilAlunoPage() {
   const ligas = [...(gamConfig?.ligas ?? [])].sort((a, b) => a.xp_min - b.xp_min)
   // Adesivos coletados (para o editor de decoração do header).
   const colecionadosAdesivos = carimbosPerfil.map((c) => ({ carimboId: c.def.id, url: c.def.url ?? '', titulo: c.def.titulo })).filter((c) => c.url)
+
+  // ── NOVO VISUAL INTERNO (ligado aos dados reais): Perfil redesenhado. ──
+  const _it = await resolverInterno()
+  if (_it.ativo) {
+    const rel = (dados && (dados as any).dados) ? (dados as any).dados : null
+    const ps = (nome || 'Aluno').trim().split(/\s+/).filter(Boolean)
+    const iniciais = (ps[0]?.[0] ?? 'A').toUpperCase() + (ps.length > 1 ? (ps[ps.length - 1][0] ?? '').toUpperCase() : '')
+    const porDisc = (rel?.porDisciplina ?? []) as { nome: string; aluno: number; turma: number }[]
+    const perfilData: PerfilData = {
+      header: {
+        nome, iniciais,
+        nivel: gamResumo?.nivel ?? 1,
+        tituloNivel: prog?.titulo ?? '',
+        xpNivelAtual: prog?.xpNoNivel ?? 0,
+        xpNivelMax: prog?.xpDoNivel ?? 0,
+        xpTotal: gamResumo?.xpTotal ?? 0,
+        liga: gamResumo?.liga?.nome ?? null,
+        posicaoLiga: pos,
+        streak: gamResumo?.streakAtual ?? 0,
+        recorde: gamResumo?.streakMaior ?? 0,
+        memberSince: null,
+        foco: null,
+        avatarUrl: pers.avatar ?? null,
+        avatarCor: pers.avatarCor ?? null,
+        gamAtivo,
+      },
+      kpis: {
+        simuladosFeitos: rel?.simulados ?? 0,
+        notaMedia: rel?.notaMedia ?? null,
+        acertoMedio: rel?.acertoMedio ?? null,
+        tempoMedioMin: rel?.tempoMedioMin ?? null,
+        melhorNota: rel?.melhorNota ?? null,
+        xpMes: gamResumo?.xpMes ?? null,
+      },
+      porDisciplina: porDisc,
+      evolucao: (rel?.evolucao ?? []).map((e: any) => ({ rotulo: e.rotulo, nota: e.nota })),
+      historico: (rel?.historico ?? []).map((h: any) => ({
+        simulado: h.simulado, quando: h.quando, nota: h.nota, acerto: h.acerto, tempo: h.tempo,
+        href: h.simuladoId ? `/aluno/simulados/${h.simuladoId}` : null,
+      })),
+      conquistas: (gamConquistas ?? []).map((c: any) => ({ titulo: c.def?.titulo ?? 'Conquista', desbloqueada: !!c.desbloqueada, cor: c.def?.cor ?? null, criterio: c.def?.criterio ?? null })),
+      leiSeca: (trilhasLeitura as any[]).map((t) => ({ lei: t.titulo ?? t.nome ?? 'Lei', feitas: t.feitas ?? t.concluidas ?? t.done ?? 0, total: t.total ?? 0, href: '/aluno/leitura' })),
+      matForte: porDisc.length ? porDisc[0].nome : null,
+      matReforcar: porDisc.length ? porDisc[porDisc.length - 1].nome : null,
+      trilhaHref: '/aluno/leitura',
+    }
+    return <PlatformPerfil brand={_it.brand} theme={_it.theme} data={perfilData} />
+  }
 
   return (
     <div className="animate-page space-y-6">
@@ -133,11 +181,12 @@ export default async function PerfilAlunoPage() {
 
           <h1 className="mt-2 truncate text-2xl font-bold tracking-tight sm:text-[2rem]" style={{ color: corTexto, textShadow: sombraTexto }}>{nome}</h1>
 
-          <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground" style={{ color: corTexto, textShadow: sombraTexto }}>
-            {contatos.map((c, i) => (
-              <span key={i} className="inline-flex items-center gap-1.5"><c.icon className="h-4 w-4" /> {c.label}</span>
-            ))}
-          </div>
+          {/* Em vez de contatos (e-mail/telefone), identidade pública: Nível N · X XP. */}
+          {gamResumo && (
+            <div className="mt-2 flex flex-wrap items-center justify-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground" style={{ color: corTexto, textShadow: sombraTexto }}>
+              <span className="inline-flex items-center gap-1.5"><Award className="h-4 w-4" /> Nível {prog?.nivel ?? gamResumo.progresso.nivel} · {fmt(gamResumo.xpTotal)} XP</span>
+            </div>
+          )}
 
           {/* Barra de XP do nível */}
           {prog && (

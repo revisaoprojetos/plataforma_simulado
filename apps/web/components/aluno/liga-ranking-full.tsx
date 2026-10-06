@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Trophy, Loader2, Info } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useSWRGet } from '@/hooks/use-swr-get'
+import { avatarPadraoDe, corAvatarPadrao } from '@/lib/aluno/avatar-padrao'
 
 interface Item { estudanteId: string; nome: string; xp: number; posicao: number; eu: boolean; avatar?: string | null; avatarCor?: string | null }
 
@@ -76,12 +77,17 @@ export function LigaRankingFull({ corLiga }: { corLiga: string }) {
 }
 
 function Avatar({ it }: { it: Item }) {
+  // Sem avatar próprio → capivara PADRÃO (determinística pelo id/nome), nunca a letra solta.
+  // Cor de fundo PADRONIZADA p/ todos: a própria (avatarCor) ou uma determinística pelo id/nome.
+  const seed = it.estudanteId || it.nome
+  const src = it.avatar || avatarPadraoDe(seed)
+  const bg = it.avatarCor || corAvatarPadrao(seed)
   return (
-    <span className={cn('flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-bold uppercase text-white', !it.avatarCor && 'bg-muted !text-foreground')}
-      style={it.avatarCor ? { background: it.avatarCor } : undefined}>
-      {it.avatar
+    <span className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full text-xs font-bold uppercase text-white"
+      style={{ background: bg }}>
+      {src
         // eslint-disable-next-line @next/next/no-img-element
-        ? <img src={it.avatar} alt="" className="h-full w-full object-contain object-[center_82%]" />
+        ? <img src={src} alt="" className="h-full w-full object-contain object-[center_82%]" />
         : it.nome.slice(0, 1)}
     </span>
   )

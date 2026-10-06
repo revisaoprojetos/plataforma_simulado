@@ -112,7 +112,7 @@ function LegendaBar({ cores, escuro, noTopo, semGrifos, onToggleGrifos, mostrarM
   )
 }
 
-export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAULT_GRIFO_CORES }: {
+export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAULT_GRIFO_CORES, interno = false }: {
   doc: DocumentoCarregado
   // Modo trilha (2 etapas): 'leitura' = leitura pura (SEM questões inline; ao concluir → CTA questões);
   // 'questoes' = painel read-only de consulta (documento + grifos, sem inline, sem concluir).
@@ -121,6 +121,9 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
   buscaInicial?: string
   // Cores dos grifos definidas por módulo (recolore os grifos inline por matiz).
   grifoCores?: GrifoCores
+  // Visual novo: o <main> é full-bleed (sem padding) → o leitor preenche a área cheia (sem margens
+  // negativas) e fica centralizado/limitado p/ não ficar um vão enorme nas telas largas.
+  interno?: boolean
 }) {
   const [modo, setModo] = useState<Modo>((doc.prefs?.modo as Modo) || 'scroll')
   // Tema da leitura sincronizado com o claro/escuro do sistema (next-themes). Café (sepia) é override
@@ -469,14 +472,33 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
       }
     }
     window.addEventListener('resize', onResize)
-    return () => window.removeEventListener('resize', onResize)
+    // O ResizeObserver de largura não pega mudanças de ALTURA (ex.: expandir "Já cobrado em prova",
+    // caixas STF/STJ) → os grifos ficavam desalinhados. Observamos o TAMANHO do conteúdo e realinhamos
+    // (coalescido por rAF p/ não disparar a cada frame da animação).
+    const ct = contentRef.current
+    let ro: ResizeObserver | null = null
+    let raf = 0
+    if (ct && typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; onResize() }) })
+      ro.observe(ct)
+    }
+    return () => { window.removeEventListener('resize', onResize); ro?.disconnect(); if (raf) cancelAnimationFrame(raf) }
   }, [recomputarGrifos, modo, colW])
 
   // Grifos do Revisão (cores INLINE do conteúdo): OCULTA (semGrifos) e/ou RECOLORE por matiz com as cores
   // configuradas (grifoCores). Feito por JS. Reaplica em rAF + timeout pois o box-prep (aplicarCore) roda
   // depois e reprocessa o conteúdo (caixas/vazios), o que podia "perder" a recoloração.
   useEffect(() => {
-    const run = () => aplicarGrifos(contentRef.current, { ocultar: semGrifos, cores: grifoCores })
+    const run = () => {
+      const ct = contentRef.current
+      aplicarGrifos(ct, { ocultar: semGrifos, cores: grifoCores })
+      // Colapsa parágrafos SÓ-ESPAÇO (&nbsp;, espaços, <br>) que o Word deixa entre as caixas (ATENÇÃO /
+      // ENTENDIMENTO / NÃO ESQUEÇA / Já cobrado) → eram a causa do vão extra. `trim()` remove o nbsp.
+      if (ct) ct.querySelectorAll('p').forEach((p) => {
+        const vazio = !(p.textContent || '').trim() && !p.querySelector('img,table,hr,svg')
+        if (vazio) { const s = (p as HTMLElement).style; s.margin = '0'; s.height = '0'; s.minHeight = '0'; s.lineHeight = '0'; s.overflow = 'hidden' }
+      })
+    }
     run(); const r = requestAnimationFrame(run); const t = setTimeout(run, 180)
     return () => { cancelAnimationFrame(r); clearTimeout(t) }
   }, [semGrifos, grifoCores, doc.html, slots])
@@ -1238,9 +1260,14 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
 
   return (
     <div ref={containerRef} className={cn('relative flex overflow-hidden', trilha
-      // LegProc: preenche a ÁREA INTERNA (à direita da sidebar) — cancela o padding do <main>
-      // (p-4/md:p-6) com margens negativas e ocupa a altura cheia, sem card. A sidebar continua.
-      ? '-m-4 h-[100dvh] md:-m-6'
+      // Visual NOVO (full-bleed, <main> sem padding): preenche a altura cheia do main SEM margens
+      // negativas e centraliza/limita a largura p/ não deixar um vão enorme nas telas largas.
+      ? (interno
+        // Visual novo: altura FIXA = viewport − top bar (72px) → o leitor se auto-limita, então a
+        // barra lateral (sumário) fica ESTÁTICA com rolagem própria e só a leitura rola. w-full = sem faixas.
+        ? 'h-[calc(100dvh-72px)] w-full'
+        // LegProc (shell antigo): cancela o padding do <main> (p-4/md:p-6) com margens negativas.
+        : '-m-4 h-[100dvh] md:-m-6')
       : 'h-[calc(100dvh-7rem)] min-h-[420px] rounded-2xl border shadow-sm')}
       // Scrollbars da leitura combinam com o tema (thumb/track derivados de cores.fg via CSS vars).
       style={{ background: cores.bg, ['--leitura-scroll-thumb' as string]: `color-mix(in srgb, ${cores.fg} 26%, transparent)`, ['--leitura-scroll-track' as string]: `color-mix(in srgb, ${cores.fg} 7%, transparent)` } as React.CSSProperties}>
@@ -1407,7 +1434,11 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
             {/* wrapper posicionado: no modo virar leva o transform; nos demais é a FOLHA (papel) flutuante. */}
             <div
               ref={wrapperRef}
-              className={cn('relative', modo !== 'flip' && 'mx-auto mb-6 mt-3 max-w-3xl rounded-lg')}
+              // Visual novo: a folha PREENCHE a coluna (sem max-w centralizado) → acabam as 2 faixas
+              // laterais do fundo; o respiro vem do px-8 do container de rolagem.
+              // Visual novo: folha ESTREITA (A4) centralizada → o fundo cinza (desk) aparece nas laterais,
+              // como uma página sobre a mesa. max-w menor = folha mais achatada + mais cinza dos lados.
+              className={cn('relative', modo !== 'flip' && (interno ? 'mx-auto mb-6 mt-3 max-w-3xl rounded-lg' : 'mx-auto mb-6 mt-3 max-w-3xl rounded-lg'))}
               style={modo === 'flip'
                 ? { height: '100%', transform: `translateX(-${pagina * (colW + GAP)}px)`, transition: 'transform 220ms ease' }
                 : { background: cores.sheet, border: `1px solid ${tema === 'escuro' ? 'rgba(255,255,255,.08)' : 'rgba(0,0,0,.08)'}`, boxShadow: tema === 'escuro' ? '0 6px 20px rgba(0,0,0,.4)' : '0 1px 2px rgba(0,0,0,.04), 0 8px 22px rgba(0,0,0,.08)', zoom: zoomPag }}

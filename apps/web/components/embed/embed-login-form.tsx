@@ -13,7 +13,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { FitaTopo } from '@/components/prova/fita-topo'
 import { LoginResultado, type LoginResultadoTipo } from '@/components/prova/login-popups'
-import { ProvaLoading, type EstiloProvaLoading } from '@/components/prova/prova-intro'
+import { PlatformLoader } from '@/components/brand/platform-loader'
 import { ThemeToggle } from '@/components/prova/theme-toggle'
 import { efetivarHud, type HudCores, type HudPorPagina } from '@/lib/caderno-designer/types'
 import { hudCssVars } from '@/lib/caderno-designer/hud'
@@ -219,20 +219,13 @@ export function EmbedLoginForm({ token, metodo, simuladoTitulo, branding, prova,
   const statusSty = statusStyle(statusLabel)
   const duracao = calcDuracao(prova)
 
-  // Sucesso: entra na tela "Carregamento" do caderno (mesmo estilo/cor) antes de abrir o simulado.
+  // Sucesso: entra na tela de carregamento da PLATAFORMA antes de abrir o simulado/resultado.
   if (sucesso) {
-    const cores = efetivarHud(hud?.base, hud?.porPagina, 'loading')
     return (
-      <div style={hudCssVars(cores, dark) as React.CSSProperties}>
-        <ProvaLoading
-          mensagem={acao === 'resultado' ? 'Abrindo seus resultados...' : 'Preparando seu simulado...'}
-          tipo={cores.loadingTipo as EstiloProvaLoading}
-          logoUrl={cores.loadingLogoUrl || branding?.logoUrl || null}
-          logoBg={cores.loadingLogoUrl ? cores.loadingLogoBg : branding?.logoBg}
-          logoEstilo={cores.loadingLogoUrl ? cores.loadingLogoEstilo : branding?.logoEstilo}
-          logoFiltro={cores.loadingLogoUrl ? cores.loadingLogoFiltro : undefined}
-        />
-      </div>
+      <PlatformLoader
+        message={acao === 'resultado' ? 'Abrindo seus resultados...' : 'Preparando seu simulado...'}
+        theme={dark ? 'dark' : 'light'}
+      />
     )
   }
 

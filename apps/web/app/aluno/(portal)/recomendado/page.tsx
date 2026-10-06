@@ -8,6 +8,9 @@ import { provasPorQuestao } from '@/lib/aluno/provas-questao'
 import { Card, CardContent } from '@/components/ui/card'
 import { Lightbulb } from 'lucide-react'
 import { DiagnosticoCard } from '@/components/aluno/diagnostico-card'
+import { resolverInterno } from '@/lib/aluno/interno-gate'
+import { PlatformRecomendado } from '@/components/brand/interna/recomendado'
+import type { RecoData } from '@/components/brand/interna/recomendado/data'
 
 export default async function RecomendadoPage() {
   const sessao = await getSessaoAluno()
@@ -25,12 +28,13 @@ export default async function RecomendadoPage() {
     ? await svc.from('simulado_respostas_objetivas').select('questao_id, correta').in('sessao_id', sessaoIds)
     : { data: [] as any[] }
 
-  // 2) Mapeia questão → disciplina.
+  // 2) Mapeia questão → disciplina + banca.
   const answeredIds = [...new Set((resp ?? []).map((r: any) => r.questao_id))]
   const { data: qDisc } = answeredIds.length
-    ? await svc.from('simulado_questoes').select('id, disciplina_id').in('id', answeredIds)
+    ? await svc.from('simulado_questoes').select('id, disciplina_id, banca_id').in('id', answeredIds)
     : { data: [] as any[] }
   const qDiscMap = new Map((qDisc ?? []).map((q: any) => [q.id, q.disciplina_id]))
+  const qBancaMap = new Map((qDisc ?? []).map((q: any) => [q.id, q.banca_id ?? null]))
 
   // 3) Estatística por disciplina + questões dominadas/erradas.
   const stats = new Map<string, { acertos: number; total: number }>()
@@ -54,6 +58,43 @@ export default async function RecomendadoPage() {
     .filter(([d]) => d !== '__sem')
     .map(([d, v]) => ({ id: d, nome: discNomeMap.get(d) ?? 'Matéria', pct: v.total ? Math.round((v.acertos / v.total) * 100) : 0, acertos: v.acertos, total: v.total }))
     .sort((a, b) => a.pct - b.pct)
+
+  // 3b) Heatmap REAL matéria × banca (MEQ). Acerto por (disciplina, banca); bancas = top por volume.
+  const bancaIds = [...new Set((qDisc ?? []).map((q: any) => q.banca_id).filter(Boolean))] as string[]
+  const { data: bancaNomes } = bancaIds.length
+    ? await svc.from('simulado_bancas').select('id, nome').in('id', bancaIds)
+    : { data: [] as any[] }
+  const bancaNomeMap = new Map((bancaNomes ?? []).map((b: any) => [b.id, b.nome]))
+  // Conta acertos/total por disciplina×banca e volume por banca.
+  const cellStats = new Map<string, { ac: number; tot: number }>() // chave `${disc}|${banca}`
+  const bancaVol = new Map<string, number>()
+  for (const r of resp ?? []) {
+    const disc = qDiscMap.get(r.questao_id)
+    const banca = qBancaMap.get(r.questao_id)
+    if (!disc || disc === '__sem' || !banca) continue
+    const k = `${disc}|${banca}`
+    const cur = cellStats.get(k) ?? { ac: 0, tot: 0 }
+    cur.tot += 1; if (r.correta) cur.ac += 1
+    cellStats.set(k, cur)
+    bancaVol.set(banca, (bancaVol.get(banca) ?? 0) + 1)
+  }
+  // Até 5 bancas por volume (desktop usa 5, mobile corta para 3 no cliente).
+  const topBancas = [...bancaVol.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([id]) => id)
+  const heatmap = topBancas.length
+    ? {
+        bancas: topBancas.map((id) => bancaNomeMap.get(id) ?? 'Banca'),
+        totalRespondidas: diagnostico.reduce((a, d) => a + d.total, 0),
+        linhas: diagnostico.map((d) => ({
+          id: d.id,
+          materia: d.nome,
+          cols: topBancas.map((b) => {
+            const c = cellStats.get(`${d.id}|${b}`)
+            return c && c.tot ? Math.round((c.ac / c.tot) * 100) : null
+          }),
+          geral: d.pct,
+        })),
+      }
+    : undefined
 
   // 4) Disciplinas fracas (≤ 70%) → questões recomendadas (não dominadas).
   const fracas = diagnostico.filter((d) => d.pct <= 70).map((d) => d.id)
@@ -108,6 +149,27 @@ export default async function RecomendadoPage() {
   }
 
   const semHistorico = (resp ?? []).length === 0
+
+  // ── NOVO VISUAL INTERNO (ligado ao real): Recomendado redesenhado + questões funcionais (slot). ──
+  const _it = await resolverInterno()
+  if (_it.ativo) {
+    const prio = (pct: number): RecoData['diagnostico'][number]['prioridade'] => (pct < 30 ? 'alta' : pct < 60 ? 'media' : 'ok')
+    const diag = diagnostico.map((d) => ({ id: d.id, nome: d.nome, ac: d.acertos, tot: d.total, pct: d.pct, prioridade: prio(d.pct) }))
+    const pcts = diag.map((d) => d.pct)
+    const recoData: RecoData = {
+      stats: {
+        materias: diag.length,
+        acertoMedio: pcts.length ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length) : 0,
+        paraReforcar: diag.filter((d) => d.pct <= 70).length,
+        questoesHoje: recomendadas.length,
+      },
+      diagnostico: diag,
+      insight: diag.length ? { materia: diag[0].nome, pct: diag[0].pct, ac: diag[0].ac, tot: diag[0].tot } : null,
+      heatmap,
+    }
+    // `questoes` é o ARRAY de dados (QuestaoAluno[]); o Caderno de reforço mostra uma por vez + filtros.
+    return <PlatformRecomendado brand={_it.brand} theme={_it.theme} data={recoData} questoes={recomendadas} />
+  }
 
   return (
     <div className="space-y-5">

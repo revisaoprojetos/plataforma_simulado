@@ -9,7 +9,8 @@ import { Card } from '@/components/ui/card'
 import { CronogramaClient } from './cronograma-client'
 import { HistoricoTabela, LiberadosTabela } from './cronograma-paineis'
 import { listarMinhasEmissoes } from './emissoes-actions'
-
+import { resolverInterno } from '@/lib/aluno/interno-gate'
+import { InternaPageShell } from '@/components/brand/interna/page-shell'
 export const dynamic = 'force-dynamic'
 
 export default async function CronogramaAlunoPage() {
@@ -44,6 +45,27 @@ export default async function CronogramaAlunoPage() {
   const HERO_BG =
     'linear-gradient(135deg, color-mix(in oklab, var(--brand-primary, var(--primary)) 62%, #17122e) 0%, color-mix(in oklab, var(--brand-primary, var(--primary)) 26%, #14102a) 100%)'
   const ACENTO = 'var(--brand-accent, #f6c343)'
+
+  // ── NOVO VISUAL INTERNO: Cronograma no header/fundo novos, reusando o construtor/tabelas funcionais. ──
+  const _it = await resolverInterno()
+  if (_it.ativo) {
+    return (
+      <InternaPageShell brand={_it.brand} theme={_it.theme} titulo="Cronograma de estudos" subtitulo="Monte, salve e acompanhe seus planos de estudo." icone={<CalendarDays className="h-6 w-6" />}>
+        {!catalogo.length ? (
+          <Card className="px-4 py-12 text-center">
+            <CalendarDays className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
+            <p className="text-sm text-muted-foreground">Nenhum cronograma liberado para você ainda.</p>
+          </Card>
+        ) : (
+          <CronogramaClient catalogo={catalogo} />
+        )}
+        <div className="grid items-start gap-4 lg:grid-cols-2">
+          <HistoricoTabela itens={historico} salvos={salvos} />
+          <LiberadosTabela itens={catalogo} />
+        </div>
+      </InternaPageShell>
+    )
+  }
 
   return (
     <div className="animate-page space-y-6">

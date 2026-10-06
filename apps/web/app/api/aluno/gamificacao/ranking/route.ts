@@ -4,6 +4,7 @@ import { getSessaoAluno } from '@/lib/aluno-session'
 import { getGamConfig } from '@/lib/gamificacao'
 import { ligaParaXp } from '@/lib/gamificacao/niveis'
 import { leaderboardLiga, leaderboardGeral, rankingPeriodo, posicaoNaLiga, posicaoGeral, top10ComVoce, inicioDaSemanaISO, inicioDoMesISO } from '@/lib/gamificacao/leitura'
+import { iniciaisDe } from '@/lib/leitura/ranking'
 
 // GET /api/aluno/gamificacao/ranking
 //  - modo antigo: ?escopo=total|semana|mes (usado no hero da Início)
@@ -76,7 +77,11 @@ export async function GET(req: NextRequest) {
   }
 }
 
-/** Enriquece cada item com avatar + cor atrás da foto (tolerante a colunas ausentes). */
+/**
+ * Enriquece cada item com avatar + cor atrás da foto (tolerante a colunas ausentes) e, por PRIVACIDADE,
+ * reduz o nome dos OUTROS alunos às INICIAIS — o nome completo de terceiros NÃO sai do servidor. A linha
+ * do próprio aluno (`eu`) mantém o nome. O avatar usa só as iniciais como fallback (já é privado).
+ */
 async function enriquecerAvatares(svc: any, itens: any[]): Promise<any[]> {
   const ids = [...new Set(itens.map((i) => i.estudanteId).filter(Boolean))]
   if (!ids.length) return itens
@@ -85,5 +90,8 @@ async function enriquecerAvatares(svc: any, itens: any[]): Promise<any[]> {
   if (!rp.error) perfis = rp.data ?? []
   else { const rp2 = await svc.from('simulado_estudantes').select('id, avatar').in('id', ids); perfis = rp2.data ?? [] }
   const mapa = new Map(perfis.map((p) => [p.id, p]))
-  return itens.map((i) => { const p = mapa.get(i.estudanteId); return { ...i, avatar: p?.avatar ?? null, avatarCor: p?.perfil_avatar_cor ?? null } })
+  return itens.map((i) => {
+    const p = mapa.get(i.estudanteId)
+    return { ...i, nome: i.eu ? i.nome : iniciaisDe(i.nome), avatar: p?.avatar ?? null, avatarCor: p?.perfil_avatar_cor ?? null }
+  })
 }

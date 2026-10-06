@@ -1,8 +1,9 @@
 'use client'
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Fingerprint, Palette, LoaderCircle, Settings2, PanelTop, MonitorPlay, LayoutGrid, Sparkles, Contact, Smartphone, StretchHorizontal, PanelLeft } from 'lucide-react'
+import { Fingerprint, Palette, LoaderCircle, Settings2, PanelTop, MonitorPlay, LayoutGrid, Sparkles, Contact, Smartphone, StretchHorizontal, PanelLeft, LogIn } from 'lucide-react'
 import { MenuLateralForm } from './menu-lateral-form'
+import { AparenciaAuthForm } from './aparencia-auth-form'
 import { ConfiguracoesForm } from './configuracoes-form'
 import { CardViewForm } from './card-view-form'
 import { CarregamentoForm } from './carregamento-form'
@@ -25,6 +26,7 @@ export function ConfiguracoesTabs({ tema, salvarTema, capasSistema }: { tema: an
         <TabsTrigger value="selecao"><LayoutGrid /> Seleção</TabsTrigger>
         <TabsTrigger value="tema"><Palette /> Cores &amp; Tema</TabsTrigger>
         <TabsTrigger value="carregamento"><LoaderCircle /> Carregamento</TabsTrigger>
+        <TabsTrigger value="login-carregamento"><LogIn /> Login e carregamento</TabsTrigger>
         <TabsTrigger value="menu"><PanelLeft /> Menu lateral</TabsTrigger>
         <TabsTrigger value="mobile"><Smartphone /> Mobile</TabsTrigger>
         <TabsTrigger value="cards"><StretchHorizontal /> Cards</TabsTrigger>
@@ -59,6 +61,12 @@ export function ConfiguracoesTabs({ tema, salvarTema, capasSistema }: { tema: an
             <ImersaoForm tema={tema} salvarTema={salvarTema} />
           </TabsContent>
         </Tabs>
+      </TabsContent>
+
+      {/* Ativador (fundação) dos estilos de login/carregamento por marca — spec 02 §4.
+          Os componentes visuais PlatformLogin/PlatformLoader por slug vêm na próxima fase. */}
+      <TabsContent value="login-carregamento">
+        <AparenciaAuthForm tema={tema} salvarTema={salvarTema} />
       </TabsContent>
 
       <TabsContent value="menu">

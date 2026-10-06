@@ -5,26 +5,46 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getTenantTheme } from '@/lib/tenant-theme'
 import { normalizarManutencao, emManutencaoAgora } from '@/lib/sistema/manutencao'
 import { normalizarMapaAreas, normalizarLiberados, areaAlunoBloqueadaDoPath, hrefsBloqueadosAluno, AREAS_MANUTENCAO_ALUNO } from '@/lib/sistema/manutencao-areas'
-import { AreaEmManutencao } from '@/components/admin/area-em-manutencao'
-import { Suspense } from 'react'
-import { SidebarProvider } from '@/components/ui/sidebar'
-import { SidebarEdgeToggle } from '@/components/ui/sidebar-collapse'
-import { AlunoSidebar } from '@/components/aluno/aluno-sidebar'
 import { resolverSidebarRotulos } from '@/lib/sidebar-rotulos'
-import { AlunoMobileNav } from '@/components/aluno/aluno-mobile-nav'
 import { GuiaTourRunner } from '@/components/aluno/guia-tour-runner'
-import { cn } from '@/lib/utils'
 import { resolverLoginConfig } from '@/lib/login-config'
-import { NavProgress } from '@/components/admin/nav-progress'
 import { TelaManutencao } from '@/components/aluno/tela-manutencao'
 import { MonitorManutencao } from '@/components/aluno/monitor-manutencao'
 import { getGamConfig, gamAtivaParaAluno } from '@/lib/gamificacao'
 import { resumoGamificacao } from '@/lib/gamificacao/leitura'
-import { LEITURA_ATIVA } from '@/lib/flags'
+import { LEITURA_ATIVA, JURISPRUDENCIA_ATIVA, OCULTAR_CRONOGRAMA } from '@/lib/flags'
 import { totalPendenciasLeitura } from '@/lib/leitura/trilha'
 import { lerPersonalizacaoEstudante } from '@/lib/aluno/personalizacao'
 import { FontScaleInit } from '@/components/font-scale-init'
 import type { ProgressoAluno } from '@/components/aluno/aluno-sidebar'
+import { getCurrentTenant } from '@/lib/tenant'
+import { lerAparenciaAuth } from '@/lib/brand/aparencia-auth'
+import { brandTokensCss, TEMAS_POR_MARCA } from '@/lib/brand/brand-tokens'
+import { AlunoShell } from '@/components/aluno/shell/aluno-shell'
+import { ShellRevisaoNova } from '@/components/aluno/shell/shell-revisao-nova'
+import { AreaEmManutencao } from '@/components/admin/area-em-manutencao'
+import { resolveTemaDark } from '@/lib/hud/resolve-dark'
+import type { AlunoBrand, AlunoNavItem, AlunoShellUsuario } from '@/components/aluno/shell/types'
+
+/** Iniciais a partir do nome (1ª letra do 1º e do último termo). Fallback do avatar. */
+function iniciaisDe(nome: string): string {
+  const partes = nome.trim().split(/\s+/).filter(Boolean)
+  if (partes.length === 0) return 'A'
+  if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase()
+  return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase()
+}
+
+/**
+ * Escopa um bloco de CSS de tokens (`:root {…}` / `.dark {…}` / `.theme-azul {…}`)
+ * sob `.app[data-brand]`, para os tokens do redesign (`--bg`, `--surface`, `--muted`…)
+ * NÃO vazarem para fora do shell nem colidirem com o `--muted` do tenant-theme.
+ */
+function escoparEmApp(css: string): string {
+  return css
+    .replace(/^:root\s*\{/m, '.app:root, .app {')
+    .replace(/^\.dark\s*\{/m, '.app.dark, .dark .app {')
+    .replace(/^\.theme-azul\s*\{/m, '.app.theme-azul, .theme-azul .app {')
+}
 
 export default async function AlunoPortalLayout({ children }: { children: React.ReactNode }) {
   const sessao = await getSessaoAluno()
@@ -63,13 +83,19 @@ export default async function AlunoPortalLayout({ children }: { children: React.
       } catch { return { counts: {}, personalizados: 0 } }
     })(),
     // Progresso de gamificação + gate de Trilha/Ligas — só quando ativa.
-    (async (): Promise<{ progresso: ProgressoAluno | null; gamAtivo: boolean }> => {
+    // Devolve também `tituloNivel` e `liga` (derivados do MESMO resumo, sem query extra) p/ o usuário do shell.
+    (async (): Promise<{ progresso: ProgressoAluno | null; gamAtivo: boolean; tituloNivel: string | null; liga: string | null }> => {
       try {
         const cfg = await getGamConfig(svc, sessao.tenantId)
-        if (!(await gamAtivaParaAluno(svc, sessao.tenantId, sessao.estudanteId, cfg))) return { progresso: null, gamAtivo: false }
+        if (!(await gamAtivaParaAluno(svc, sessao.tenantId, sessao.estudanteId, cfg))) return { progresso: null, gamAtivo: false, tituloNivel: null, liga: null }
         const r = await resumoGamificacao(svc, sessao.tenantId, sessao.estudanteId, cfg!)
-        return { progresso: r ? { streak: r.streakAtual, xpTotal: r.xpTotal, nivel: r.progresso.nivel, liga: r.liga.nome, ligaCor: r.liga.cor } : null, gamAtivo: true }
-      } catch { return { progresso: null, gamAtivo: false } }
+        return {
+          progresso: r ? { streak: r.streakAtual, xpTotal: r.xpTotal, nivel: r.progresso.nivel, liga: r.liga.nome, ligaCor: r.liga.cor } : null,
+          gamAtivo: true,
+          tituloNivel: r?.progresso.titulo ?? null,
+          liga: r?.liga.nome ?? null,
+        }
+      } catch { return { progresso: null, gamAtivo: false, tituloNivel: null, liga: null } }
     })(),
     // Personalização (avatar + cor) — tolerante se a migração ainda não rodou.
     (async (): Promise<{ avatar: string | null; avatarCor: string | null }> => {
@@ -90,6 +116,12 @@ export default async function AlunoPortalLayout({ children }: { children: React.
   const avatarUsuario = persData.avatar
   const avatarCorUsuario = persData.avatarCor
 
+  // ── MARCA do tenant (Fase 3): lida de `tema.aparencia_auth.brand`; ausente/indef → 'revisao'. ──
+  // getCurrentTenant é memoizado por request (o getTenantTheme já o chamou), então sem round-trip extra.
+  const tenant = await getCurrentTenant()
+  const aparencia = lerAparenciaAuth(tema, { slug: tenant?.slug, nome: tenant?.nome ?? tenantNome })
+  const brand: AlunoBrand = aparencia.brand
+
   // Manutenção da plataforma: bloqueia o PORTAL (não o runner do simulado, que é outro layout).
   const manut = normalizarManutencao(t.manutencao_sistema)
   if (emManutencaoAgora(manut)) {
@@ -109,44 +141,125 @@ export default async function AlunoPortalLayout({ children }: { children: React.
   const areaAlunoBloqueada = areaAlunoBloqueadaDoPath(pathAtual, alunoAtivos, alunoLiberados, sessao.estudanteId)
   const hrefsOcultosAluno = hrefsBloqueadosAluno(alunoAtivos, alunoLiberados, sessao.estudanteId)
 
+  // ── Nav canônico de 8 itens (spec 03 §2.1), p/ os shells VND/MEQ consumirem via contrato. ──
+  // O shell da Revisão continua usando AlunoSidebar/AlunoMobileNav (nav próprio) — este objeto é
+  // inofensivo p/ ela. Mesmos gates de visibilidade da sidebar (flags/gamAtivo/cronograma/manutenção).
+  const navCanonico: AlunoNavItem[] = (
+    [
+      { href: '/aluno', label: 'Início', short: 'Início', icon: 'Home', exact: true },
+      { href: '/aluno/simulados', label: 'Simulados Realizados', short: 'Realizados', icon: 'ClipboardList' },
+      { href: '/aluno/leitura', label: 'Desafio de Lei Seca', short: 'Lei Seca', icon: 'Library', gate: LEITURA_ATIVA },
+      { href: '/aluno/jurisprudencia', label: 'Desafio de Jurisprudência', short: 'Juris', icon: 'Gavel', gate: JURISPRUDENCIA_ATIVA },
+      { href: '/aluno/cronograma', label: 'Cronograma', short: 'Cronograma', icon: 'CalendarDays', gate: !OCULTAR_CRONOGRAMA },
+      { href: '/aluno/recomendado', label: 'Recomendado', short: 'Recomendado', icon: 'Lightbulb' },
+      { href: '/aluno/questoes', label: 'Banco de Questões', short: 'Questões', icon: 'BookOpen' },
+      { href: '/aluno/ligas', label: 'Ligas', short: 'Ligas', icon: 'Trophy', gate: gamAtivo },
+    ] as Array<AlunoNavItem & { exact?: boolean; gate?: boolean }>
+  )
+    .filter((n) => n.gate !== false && !hrefsOcultosAluno.includes(n.href))
+    .map(({ exact, gate, ...n }) => {
+      const c = counts[n.href]
+      const ativo = exact ? pathAtual === n.href : pathAtual.startsWith(n.href)
+      return { ...n, badge: c && c > 0 ? String(c) : undefined, ativo }
+    })
+
+  // ── Usuário do shell (perfil + gamificação) — derivado do que o layout já tem. ──
+  const primeiroNome = (sessao.nome || 'Aluno').trim().split(/\s+/)[0] || 'Aluno'
+  const usuarioShell: AlunoShellUsuario = {
+    primeiroNome,
+    iniciais: iniciaisDe(sessao.nome || 'Aluno'),
+    nivel: progresso?.nivel ?? 1,
+    xpTotal: progresso?.xpTotal ?? 0,
+    tituloNivel: gamData.tituloNivel ?? undefined,
+    liga: gamData.liga,
+    posicaoLiga: null, // não computado neste layout; shells VND/MEQ toleram null
+    avatarUrl: avatarUsuario,
+    avatarCor: avatarCorUsuario,
+    gamAtivo, // config do tenant p/ ESTE aluno — off esconde XP/nível/liga no chrome do shell
+  }
+
+  // ── Tokens de marca (VND/MEQ) escopados em `.app` — resolve a colisão `--muted`. ──
+  // Revisão NÃO injeta brand-tokens: mantém o tema do tenant intacto (css do getTenantTheme).
+  const brandCss = brand === 'revisao'
+    ? ''
+    : TEMAS_POR_MARCA[brand].map((th) => escoparEmApp(brandTokensCss(brand, th))).filter(Boolean).join('\n')
+
+  const shellProps = {
+    brand,
+    nav: navCanonico,
+    usuario: usuarioShell,
+    pathname: pathAtual,
+    logoUrl: t.logo_url ?? null,
+    revisao: {
+      logo: t.logo_url ?? null,
+      nome: t.nome_site ?? tenantNome ?? 'Área do Aluno',
+      subtitulo: t.subtitulo_site ?? 'Área do aluno',
+      logoBg: t.logo_png_bg ?? '#ffffff',
+      logoEstilo: t.logo_estilo ?? 'arredondado',
+      logoFiltro: t.logo_filtro_sistema ?? t.logo_filtro ?? 'none',
+      usuarioNome: sessao.nome,
+      usuarioEmail: sessao.email,
+      avatar: avatarUsuario,
+      avatarCor: avatarCorUsuario,
+      counts,
+      simuladosPersonalizados,
+      loginConfig: resolverLoginConfig(t.login),
+      progresso,
+      gamAtivo,
+      hrefsOcultos: hrefsOcultosAluno,
+      pendenciasLeitura: pendLeitura,
+      rotulos: rotulosAluno,
+      navMode,
+      areaBloqueada: areaAlunoBloqueada || null,
+    },
+  }
+
+  // ── NOVO SHELL INTERNO (opt-in): quando o console liga `internoAtivo` e a marca é Revisão, usa o
+  // shell redesenhado (sidebar nova + top bar + down bar) com o conteúdo FULL-BLEED. Desligado → shell atual. ──
+  if (aparencia.internoAtivo && brand === 'revisao') {
+    const dark = await resolveTemaDark()
+    return (
+      <div className="app contents" data-brand="revisao">
+        {css && <style dangerouslySetInnerHTML={{ __html: css }} />}
+        {/* O tenant injeta `main h1{color:var(--content-title)}` (p/ títulos das páginas legadas) — no
+            redesign os h1 são títulos de BANNER que devem herdar a cor do contexto (branco no banner). */}
+        <style dangerouslySetInnerHTML={{ __html: '.app h1{color:inherit}' }} />
+        <FontScaleInit scope={`aluno:${sessao.email || 'aluno'}`} />
+        <MonitorManutencao inicial={{ inicio: manut.inicio, avisos: manut.avisos }} />
+        <GuiaTourRunner gamAtivo={gamAtivo} />
+        <ShellRevisaoNova
+          theme={dark ? 'escuro' : 'claro'}
+          nav={navCanonico}
+          usuario={usuarioShell}
+          pathname={pathAtual}
+          logo={t.logo_url ?? null}
+          nome={t.nome_site ?? tenantNome ?? 'Área do Aluno'}
+          subtitulo={t.subtitulo_site ?? null}
+        >
+          {areaAlunoBloqueada ? <AreaEmManutencao area={areaAlunoBloqueada} /> : children}
+        </ShellRevisaoNova>
+      </div>
+    )
+  }
+
   return (
-    <>
+    // `.app` + data-brand: escopa os brand-tokens do redesign (VND/MEQ) ao shell do aluno.
+    <div className="app contents" data-brand={brand}>
       {css && <style dangerouslySetInnerHTML={{ __html: css }} />}
+      {brandCss && <style dangerouslySetInnerHTML={{ __html: brandCss }} />}
+      {/* No redesign (internoAtivo), os h1 são títulos de BANNER e devem herdar a cor do contexto —
+          neutraliza o `main h1{color:var(--content-title)}` do tenant (que é p/ as páginas legadas). */}
+      {aparencia.internoAtivo && <style dangerouslySetInnerHTML={{ __html: '.app h1{color:inherit}' }} />}
       {/* Anti-flash: aplica a escala de fonte salva (por aluno) antes do 1º paint. */}
       <FontScaleInit scope={`aluno:${sessao.email || 'aluno'}`} />
       <MonitorManutencao inicial={{ inicio: manut.inicio, avisos: manut.avisos }} />
       {/* Tour guiado da Capi (acionado pelo "Iniciar passo a passo" na Ajuda) — global p/ sobreviver à navegação. */}
       <GuiaTourRunner gamAtivo={gamAtivo} />
-      <SidebarProvider>
-        <div className="flex h-screen w-full overflow-hidden">
-          <AlunoSidebar logo={t.logo_url ?? null} nome={t.nome_site ?? tenantNome ?? 'Área do Aluno'} subtitulo={t.subtitulo_site ?? 'Área do aluno'} logoBg={t.logo_png_bg ?? '#ffffff'} logoEstilo={t.logo_estilo ?? 'arredondado'} logoFiltro={t.logo_filtro_sistema ?? t.logo_filtro ?? 'none'} usuarioNome={sessao.nome} usuarioEmail={sessao.email} avatar={avatarUsuario} avatarCor={avatarCorUsuario} counts={counts} simuladosPersonalizados={simuladosPersonalizados} loginConfig={resolverLoginConfig(t.login)} progresso={progresso} gamAtivo={gamAtivo} hrefsOcultos={hrefsOcultosAluno} pendenciasLeitura={pendLeitura} rotulos={rotulosAluno} />
-          <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
-            {/* Toggle de recolher a sidebar: só no desktop (no mobile vale o chrome abaixo). */}
-            <SidebarEdgeToggle hideOnMobile />
-            <Suspense fallback={null}><NavProgress /></Suspense>
-            {/* Folga no mobile conforme o modo: 'menu' → app bar no topo (pt); 'tabs' → barra embaixo (pb). */}
-            <main className={cn('flex-1 overflow-y-auto p-4 md:p-6', navMode === 'menu' ? 'pt-[4.5rem] md:pt-6' : 'pb-24 md:pb-6')}>
-              {areaAlunoBloqueada ? <AreaEmManutencao area={areaAlunoBloqueada} /> : children}
-            </main>
-          </div>
-        </div>
-        {/* Chrome de navegação mobile (barra inferior OU app bar+drawer), definido no console. */}
-        <AlunoMobileNav
-          navMode={navMode}
-          loginConfig={resolverLoginConfig(t.login)}
-          logo={t.logo_url ?? null}
-          nome={t.nome_site ?? tenantNome ?? 'Área do Aluno'}
-          subtitulo={t.subtitulo_site ?? 'Área do aluno'}
-          logoBg={t.logo_png_bg ?? '#ffffff'}
-          logoEstilo={t.logo_estilo ?? 'arredondado'}
-          logoFiltro={t.logo_filtro_sistema ?? t.logo_filtro ?? 'none'}
-          usuarioNome={sessao.nome}
-          avatar={avatarUsuario}
-          avatarCor={avatarCorUsuario}
-          counts={counts}
-          hrefsOcultos={hrefsOcultosAluno}
-        />
-      </SidebarProvider>
-    </>
+      {/* Manutenção por área do aluno: VND/MEQ (e Revisão legada) bloqueiam o CONTEÚDO da rota aqui —
+          o shell da Revisão interno já trata no seu ramo; aqui cobrimos o caminho dos demais shells. */}
+      <AlunoShell {...shellProps}>
+        {areaAlunoBloqueada ? <AreaEmManutencao area={areaAlunoBloqueada} /> : children}
+      </AlunoShell>
+    </div>
   )
 }

@@ -3,9 +3,13 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { getGamConfig, gamAtivaParaAluno } from '@/lib/gamificacao'
 import { resumoGamificacao, posicaoNaLiga, contarMembrosLiga, xpPorDiaSemana, leaderboardLiga } from '@/lib/gamificacao/leitura'
+import { iniciaisDe } from '@/lib/leitura/ranking'
 import { EscudoLiga } from '@/components/aluno/escudo-liga'
 import { LigaRankingFull } from '@/components/aluno/liga-ranking-full'
 import { MascoteTour } from '@/components/mascote/mascote-tour'
+import { resolverInterno } from '@/lib/aluno/interno-gate'
+import { PlatformLigas } from '@/components/brand/interna/ligas'
+import type { LigaData } from '@/components/brand/interna/ligas/data'
 import { cn } from '@/lib/utils'
 import { Trophy, Crown, Check } from 'lucide-react'
 
@@ -37,12 +41,15 @@ export default async function LigasPage() {
   const xpTotal = resumo?.xpTotal ?? 0
   const n = ligasOrd.length
 
-  const [posicao, membros, semana, podioBruto] = await Promise.all([
+  const [posicao, membros, semana, podioRaw] = await Promise.all([
     resumo ? posicaoNaLiga(svc, sessao!.tenantId, liga.id, xpTotal) : Promise.resolve(1),
     contarMembrosLiga(svc, sessao!.tenantId, liga.id), // EGRESS: count (head), não baixa os ids só p/ .size
     xpPorDiaSemana(svc, sessao!.tenantId, sessao!.estudanteId, cfg.timezone),
     leaderboardLiga(svc, sessao!.tenantId, liga.id, sessao!.estudanteId, 3),
   ])
+  // PRIVACIDADE: o pódio mostra os OUTROS só por INICIAIS — o nome completo de terceiros não sai do
+  // servidor. A linha do próprio aluno (`eu`) mantém o nome.
+  const podioBruto = podioRaw.map((p) => (p.eu ? p : { ...p, nome: iniciaisDe(p.nome) }))
   const totalNaLiga = Math.max(1, membros)
   const idxAtual = Math.max(0, ligasOrd.findIndex((l) => l.id === liga.id))
 
@@ -63,6 +70,21 @@ export default async function LigasPage() {
     for (const r of rows as any[]) avatares.set(r.id, { avatar: r.avatar ?? null, cor: r.perfil_avatar_cor ?? null })
   }
   const maxDia = Math.max(1, ...semana.map((d) => d.xp))
+
+  // ── NOVO VISUAL INTERNO (ligado ao real): Ligas redesenhado + ranking funcional (slot). ──
+  const _it = await resolverInterno()
+  if (_it.ativo) {
+    const ligaData: LigaData = {
+      ligaNome: liga.nome, ligaCor: liga.cor,
+      posicao, membros: totalNaLiga, xpTotal,
+      xpSemana: resumo?.xpSemana ?? 0, streak: resumo?.streakAtual ?? 0,
+      proximaNome: proxima?.nome ?? null, faltam,
+      tiers: ligasOrd.map((l, i) => ({ nome: l.nome, xpMin: l.xp_min, atual: l.id === liga.id, passada: i < idxAtual, cor: l.cor })),
+      podio: podioBruto.map((p, i) => ({ pos: i + 1, iniciais: p.eu ? 'EU' : p.nome, xp: p.xp, eu: p.eu })),
+      semana: semana.map((d) => ({ dia: d.label, xp: d.xp })),
+    }
+    return <PlatformLigas brand={_it.brand} theme={_it.theme} data={ligaData} ranking={<LigaRankingFull corLiga={liga.cor} />} />
+  }
 
   const HERO_BG = 'linear-gradient(135deg, color-mix(in oklab, var(--brand-primary, var(--primary)) 80%, #0b1020) 0%, #0b1226 92%)'
   const nodeAlc = 'color-mix(in oklab, var(--brand-primary, var(--primary)) 46%, #0b1020)'
@@ -231,8 +253,6 @@ function HeroStat({ valor, rotulo }: { valor: string; rotulo: string }) {
 
 function PodioColuna({ item, av, corLiga, altura }: { item: { estudanteId: string; nome: string; xp: number; posicao: number; eu: boolean }; av?: { avatar: string | null; cor: string | null }; corLiga: string; altura: string }) {
   const primeiro = item.posicao === 1
-  const partes = item.nome.split(' ')
-  const nomeCurto = partes[0] + (partes[1] ? ` ${partes[1][0]}.` : '')
   return (
     <div className="flex min-w-0 flex-1 flex-col items-center">
       {primeiro && <Crown className="mb-0.5 h-5 w-5 text-amber-400" fill="#fbbf24" />}
@@ -243,7 +263,7 @@ function PodioColuna({ item, av, corLiga, altura }: { item: { estudanteId: strin
           ? <img src={av.avatar} alt="" className="h-full w-full object-contain object-[center_82%]" />
           : item.nome.slice(0, 1)}
       </span>
-      <p className="mt-1.5 max-w-full truncate text-xs font-semibold">{nomeCurto}{item.eu ? ' (você)' : ''}</p>
+      <p className="mt-1.5 max-w-full truncate text-xs font-semibold">{item.nome}{item.eu ? ' (você)' : ''}</p>
       <p className="text-[11px] font-medium text-muted-foreground">{item.xp.toLocaleString('pt-BR')} XP</p>
       <div className={cn('mt-2 flex w-full items-start justify-center rounded-t-xl border border-b-0 pt-2 text-lg font-black tabular-nums', altura)}
         style={{ background: item.eu ? `color-mix(in oklab, ${corLiga} 14%, var(--muted))` : 'var(--muted)', borderColor: item.eu ? corLiga : 'var(--border)', color: item.eu ? corLiga : 'var(--muted-foreground)' }}>

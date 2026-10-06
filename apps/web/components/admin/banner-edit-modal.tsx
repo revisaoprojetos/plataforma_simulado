@@ -28,7 +28,7 @@ function isoParaInput(iso?: string | null): string {
 
 /** Pop-up de configuração TOTAL de um banner já criado (tipo, título, mensagem, imagem+recorte,
  *  link/destino, cor, ativo). Salva via atualizarBannerAction. */
-export function BannerEditModal({ banner, tenantId, destinos, desempenho, onToggleDesempenho, destaqueAtivoInicial = true, destaqueTextoInicial = '', fadeAtivoInicial = true, fadeNivelInicial = 100, popupEstiloInicial = 'classico', popupPontasInicial = 'arredondado', bannerTextoPosInicial = 'center', bannerTextoCorInicial = 'claro', bannerTextoTamInicial = 'medio', bannerTextoXInicial = null, bannerTextoYInicial = null, bannerOcultarTituloInicial = false, bannerOcultarMensagemInicial = false, agendaInicioInicial = '', agendaFimInicial = '', freqInicial = 'login', onClose }: { banner: Banner; tenantId?: string; destinos?: DestinoBanner[]; desempenho?: boolean; onToggleDesempenho?: (v: boolean) => void; destaqueAtivoInicial?: boolean; destaqueTextoInicial?: string; fadeAtivoInicial?: boolean; fadeNivelInicial?: number; popupEstiloInicial?: PopupEstilo; popupPontasInicial?: PopupPontas; bannerTextoPosInicial?: BannerTextoPos; bannerTextoCorInicial?: BannerTextoCor; bannerTextoTamInicial?: BannerTextoTam; bannerTextoXInicial?: number | null; bannerTextoYInicial?: number | null; bannerOcultarTituloInicial?: boolean; bannerOcultarMensagemInicial?: boolean; agendaInicioInicial?: string; agendaFimInicial?: string; freqInicial?: 'login' | 'sempre' | 'uma_vez'; onClose: () => void }) {
+export function BannerEditModal({ banner, tenantId, destinos, desempenho, onToggleDesempenho, destaqueAtivoInicial = true, destaqueTextoInicial = '', fadeAtivoInicial = true, fadeNivelInicial = 100, popupEstiloInicial = 'classico', popupPontasInicial = 'arredondado', bannerTextoPosInicial = 'center', bannerTextoCorInicial = 'claro', bannerTextoTamInicial = 'medio', bannerTextoXInicial = null, bannerTextoYInicial = null, bannerOcultarTituloInicial = false, bannerOcultarMensagemInicial = false, agendaInicioInicial = '', agendaFimInicial = '', freqInicial = 'login', bannerAspect = { w: 1920, h: 500 }, onClose }: { banner: Banner; tenantId?: string; destinos?: DestinoBanner[]; desempenho?: boolean; onToggleDesempenho?: (v: boolean) => void; destaqueAtivoInicial?: boolean; destaqueTextoInicial?: string; fadeAtivoInicial?: boolean; fadeNivelInicial?: number; popupEstiloInicial?: PopupEstilo; popupPontasInicial?: PopupPontas; bannerTextoPosInicial?: BannerTextoPos; bannerTextoCorInicial?: BannerTextoCor; bannerTextoTamInicial?: BannerTextoTam; bannerTextoXInicial?: number | null; bannerTextoYInicial?: number | null; bannerOcultarTituloInicial?: boolean; bannerOcultarMensagemInicial?: boolean; agendaInicioInicial?: string; agendaFimInicial?: string; freqInicial?: 'login' | 'sempre' | 'uma_vez'; bannerAspect?: { w: number; h: number }; onClose: () => void }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   // Modo da UI: "simulado" é um destaque (hero) que aponta p/ um simulado/pasta. Detecta pelo banner.
@@ -98,7 +98,7 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
   // caixa. Assim o texto/botões ficam nas mesmas proporções do banner real, só que menores.
   // Palco largo (≈ largura real do banner no portal) → escala menor → texto/botão menores na caixa.
   const STAGE_W = 1600
-  const STAGE_H = (STAGE_W * 500) / 1920
+  const STAGE_H = (STAGE_W * bannerAspect.h) / bannerAspect.w
   const previewRef = useRef<HTMLDivElement>(null)
   const [previewScale, setPreviewScale] = useState(0.5)
   useEffect(() => {
@@ -196,7 +196,7 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
 
             {/* Imagem */}
             <div className="space-y-1.5">
-              <label className="text-xs text-muted-foreground">Imagem {tipo === 'popup' ? '(opcional)' : uiTipo === 'simulado' ? '(padrão: fundo do simulado)' : '(molde 1920×500)'}</label>
+              <label className="text-xs text-muted-foreground">Imagem {tipo === 'popup' ? '(opcional)' : uiTipo === 'simulado' ? '(padrão: fundo do simulado)' : `(molde ${bannerAspect.w}×${bannerAspect.h})`}</label>
               <div className="flex gap-2">
                 <Input value={imagem.startsWith('data:') ? '' : imagem} onChange={(e) => setImagem(e.target.value)} placeholder="Cole uma URL ou envie um arquivo →" className="flex-1" />
                 <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => onArquivo(e.target.files?.[0] ?? null)} />
@@ -211,7 +211,7 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
                   <button type="button" onClick={() => setImagem('')} className="inline-flex items-center gap-1 font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"><X className="h-3.5 w-3.5" /> Remover imagem</button>
                 </div>
               )}
-              {cropOpen && cropSrc && <BannerCropper src={cropSrc} onApply={(d) => { setImagem(d); setCropOpen(false) }} onCancel={() => setCropOpen(false)} />}
+              {cropOpen && cropSrc && <BannerCropper src={cropSrc} outW={bannerAspect.w} outH={bannerAspect.h} onApply={(d) => { setImagem(d); setCropOpen(false) }} onCancel={() => setCropOpen(false)} />}
             </div>
 
             {/* Link (não simulado) */}
@@ -397,7 +397,7 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
                 </div>
               </div>
             ) : (
-              <div ref={previewRef} className="relative aspect-[1920/500] w-full overflow-hidden rounded-lg border">
+              <div ref={previewRef} className="relative w-full overflow-hidden rounded-lg border" style={{ aspectRatio: `${bannerAspect.w}/${bannerAspect.h}` }}>
                 {/* Prévia proporcional: renderiza no tamanho real (STAGE 1600px) e escala — o
                     tamanho do texto fica coerente com o banner real na home do aluno. */}
                 {uiTipo === 'simulado'
@@ -407,7 +407,7 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
                     : <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${cor} 0%, #1a1030 75%, #0f0a1e 120%)` }} />}
               </div>
             )}
-            <p className="mt-3 text-[11px] text-muted-foreground">{uiTipo === 'popup' ? 'Assim o aluno vê o pop-up ao entrar.' : uiTipo === 'simulado' ? 'Prévia real do banner no topo da home.' : 'Prévia do banner (molde 1920×500).'}</p>
+            <p className="mt-3 text-[11px] text-muted-foreground">{uiTipo === 'popup' ? 'Assim o aluno vê o pop-up ao entrar.' : uiTipo === 'simulado' ? 'Prévia real do banner no topo da home.' : `Prévia do banner (molde ${bannerAspect.w}×${bannerAspect.h}).`}</p>
           </div>
         </div>
 
@@ -427,7 +427,7 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
           <PopupCard banner={{ titulo: titulo || null, mensagem: mensagem || null, imagem_url: imagem || null, cor, link: link || null, estilo, pontas }} preview onFechar={() => setExpandido(false)} />
         ) : (
           <div className="relative w-full max-w-6xl animate-in fade-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
-            <div className="relative aspect-[1920/500] w-full overflow-hidden rounded-2xl border shadow-2xl">
+            <div className="relative w-full overflow-hidden rounded-2xl border shadow-2xl" style={{ aspectRatio: `${bannerAspect.w}/${bannerAspect.h}` }}>
               <ImgSlide b={previewBannerB} preview />
             </div>
             <button type="button" onClick={() => setExpandido(false)} aria-label="Fechar" className="absolute -right-3 -top-3 flex h-9 w-9 items-center justify-center rounded-full bg-black/70 text-white ring-2 ring-white/30 backdrop-blur transition hover:bg-black/90"><X className="h-4 w-4" /></button>

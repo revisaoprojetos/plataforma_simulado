@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Route, BarChart3, Check, Lock, AlertTriangle, ArrowRight, Library, Trophy, ScrollText, Zap, Play, FileText, ExternalLink, Download, Flame } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -21,10 +21,14 @@ import { progressoDesafio, DESAFIO_TIPOS, type DesafioModulo } from '@/lib/leitu
 import type { GamRail } from '@/lib/aluno/trilhas'
 import type { AulaDesempenho } from '@/lib/leitura/trilha'
 import type { RankingLeitura, RankingLeituraItem } from '@/lib/leitura/ranking'
+import { DesafioLSMeq } from '@/components/aluno/leiseca/desafio-ls-meq'
+import { DesafioLSRevisao } from '@/components/aluno/leiseca/desafio-ls-revisao'
+import { internaTokensStyle, INTERNA_FONT, type Brand, type InternaTheme } from '@/components/brand/interna/interna-tokens'
+import { useTemaInterno } from '@/components/brand/interna/use-tema-interno'
 
 /** Visão de um módulo do LegProc Digital: banner colapsável (igual ao admin) com tabs Trilha | Desempenho
  * e busca, + aviso de questões pendentes. */
-export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulasPendentes, ranking, minhaLinha = null, meuId, meuNome, formato = DEFAULT_TRILHA_FORMATO, simbolos = DEFAULT_TRILHA_SIMBOLOS, livre, inverter = false, degrade, degradeTrilha, descricao, regulamento, pontuacao, desafios, desempenhoDesafios, gam = null, diasLeitura = [], carimbos = [], conquistasModulo = [], progAulas = {} }: {
+export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulasPendentes, ranking, minhaLinha = null, meuId, meuNome, formato = DEFAULT_TRILHA_FORMATO, simbolos = DEFAULT_TRILHA_SIMBOLOS, livre, inverter = false, degrade, degradeTrilha, descricao, regulamento, pontuacao, desafios, desempenhoDesafios, gam = null, diasLeitura = [], carimbos = [], conquistasModulo = [], progAulas = {}, interno = null }: {
   modulo: string
   trilha: Trilha
   desempenho: AulaDesempenho[]
@@ -52,6 +56,9 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
   conquistasModulo?: ConquistaModuloView[]
   /** Progresso por aula (concluida/gabaritada) — para estampar o carimbo só nas aulas realmente feitas. */
   progAulas?: Record<string, { concluida: boolean; gabaritada: boolean }>
+  /** Quando ligado (visual novo por tenant), renderiza o interior NOVO (montanha) na marca/tema do
+   *  tenant — para TODAS as marcas, não só MEQ. Vem de resolverInterno() na página. */
+  interno?: { brand: Brand; theme: InternaTheme } | null
 }) {
   const desafiosAtivos = (desafios ?? []).filter((d) => d.ativo)
   const desemp = desempenhoDesafios ?? { acertos: 0, aulasConcluidas: 0, aulasGabaritadas: 0 }
@@ -97,6 +104,72 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
   const regAtivo = regulamento?.ativo === true
   const embedReg = regulamento ? embedVideoUrl(regulamento.video_url) : null
   const [tabAtiva, setTabAtiva] = useState('trilha')
+  // Tema VIVO do interior novo: segue o toggle claro/escuro (classe .dark) para a montanha adaptar.
+  const liveTemaInterno = useTemaInterno(interno?.theme ?? 'claro')
+
+  // ── MEQ: área interna no VISUAL NOVO (spec 04 §5 — montanha). O shell da marca MEQ marca o
+  //    DOM com data-brand="meq" e data-tema (claro/azul/escuro) no wrapper `.app`. Detectamos no
+  //    cliente (o módulo-view não recebe brand/theme por prop, e o arquivo de página que o renderiza
+  //    está fora do escopo desta tela) e, quando for MEQ, trocamos o banner+tabs legado pela
+  //    composição MEQ, ligada aos MESMOS dados reais já carregados. Demais marcas: visual legado. ──
+  const [meq, setMeq] = useState<null | { theme: 'claro' | 'azul' | 'escuro' }>(null)
+  useEffect(() => {
+    const el = document.querySelector('[data-brand="meq"].app') as HTMLElement | null
+    if (!el) { setMeq(null); return }
+    const t = (el.getAttribute('data-tema') as 'claro' | 'azul' | 'escuro' | null) ?? 'claro'
+    setMeq({ theme: t })
+    // Reage à troca de tema (o shell re-renderiza mudando data-tema no mesmo nó).
+    const obs = new MutationObserver(() => {
+      const nt = (el.getAttribute('data-tema') as 'claro' | 'azul' | 'escuro' | null) ?? 'claro'
+      setMeq({ theme: nt })
+    })
+    obs.observe(el, { attributes: true, attributeFilter: ['data-tema'] })
+    return () => obs.disconnect()
+  }, [])
+
+  // Interior NOVO (montanha): quando o tenant está no visual novo. A prop `interno` (vinda da página,
+  // p/ qualquer marca) tem precedência; o auto-detect do shell MEQ é fallback. CADA MARCA tem seu
+  // PRÓPRIO design de interior (os mockups DesafioLS{Revisao,VND,MEQ} são bem diferentes), então
+  // roteamos por marca: MEQ → DesafioLSMeq; Revisão/VND → DesafioLSRevisao (compartilham a linguagem).
+  const internoNovo: { brand: Brand; theme: InternaTheme } | null = interno ?? (meq ? { brand: 'meq', theme: meq.theme } : null)
+  if (internoNovo) {
+    const Interior = internoNovo.brand === 'meq' ? DesafioLSMeq : DesafioLSRevisao
+    // MEQ já reage via seu próprio data-tema; p/ as demais marcas usamos o tema VIVO (dark toggle).
+    const th: InternaTheme = internoNovo.brand === 'meq' ? internoNovo.theme : liveTemaInterno
+    return (
+      <div
+        style={{
+          ...internaTokensStyle(internoNovo.brand, th),
+          background: 'transparent',
+          fontFamily: INTERNA_FONT[internoNovo.brand],
+        }}
+        data-brand={internoNovo.brand}
+        data-tema={th}
+      >
+        <Interior
+          theme={th}
+          trilha={trilha}
+          desempenho={desempenho}
+          ranking={ranking}
+          minhaLinha={minhaLinha}
+          meuId={meuId ?? null}
+          meuNome={meuNome ?? null}
+          regulamento={regulamento}
+          pontuacao={pontuacao}
+          gam={gam}
+          carimbos={carimbos}
+          diasLeitura={diasLeitura}
+          formato={formato}
+          simbolos={simbolos}
+          livre={livre}
+          inverter={inverter}
+          degrade={degrade}
+          degradeTrilha={degradeTrilha}
+          moduloNome={trilha.nome}
+        />
+      </div>
+    )
+  }
 
   return (
     <Tabs value={tabAtiva} onValueChange={setTabAtiva}>

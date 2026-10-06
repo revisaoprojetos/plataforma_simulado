@@ -15,6 +15,7 @@ import {
 import { cn } from '@/lib/utils'
 import { OCULTAR_ALUNO_EXTRAS, OCULTAR_CRONOGRAMA, ROTAS_ALUNO_OCULTAS, LEITURA_ATIVA, JURISPRUDENCIA_ATIVA } from '@/lib/flags'
 import { rotuloDe, IconeMenu, RotuloMenu, type SidebarRotulosAluno } from '@/lib/sidebar-rotulos'
+import { SidebarEdgeToggle } from '@/components/ui/sidebar-collapse'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { FontScaleControl } from '@/components/font-scale-control'
 import { AnimacoesToggle } from '@/components/aluno/animacoes-toggle'
@@ -129,7 +130,26 @@ export function AlunoSidebar({
         <LoginLoading config={loginConfig} plataforma={nome} logo={logo} logoBg={logoBg} logoEstilo={logoEstilo} logoFiltro={logoFiltro} />
       </div>
     )}
-    <Sidebar collapsible="icon" className="group-data-[side=left]:border-r-0">
+    {/* Redesign REVISÃO (spec 03 §2.2): sidebar recolhível 264 ⇄ 84px com curva .38s.
+        - Sobrescreve as CSS vars de largura (o SidebarProvider as injeta inline no wrapper;
+          por isso precisa de `!important` — declaração inline vence stylesheet sem `!important`).
+        - Troca a curva/tempo da transição de largura (o sidebar.tsx usa .3s cubic(.32,.72,0,1)).
+        - Esconde o toggle genérico do layout (data-edge-toggle=default): aqui usamos o botão
+          redondo roxo da marca, montado dentro da própria barra. */}
+    <style dangerouslySetInnerHTML={{ __html: `
+      [data-slot="sidebar-wrapper"]:has(.aluno-sidebar-root){--sidebar-width:264px!important;--sidebar-width-icon:84px!important}
+      [data-slot="sidebar-wrapper"]:has(.aluno-sidebar-root) [data-slot="sidebar-gap"],
+      [data-slot="sidebar-wrapper"]:has(.aluno-sidebar-root) [data-slot="sidebar-container"]{
+        transition-duration:380ms!important;transition-timing-function:cubic-bezier(.22,1,.36,1)!important}
+      [data-slot="sidebar-wrapper"]:has(.aluno-sidebar-root) [data-edge-toggle="default"]{display:none!important}
+      @media (prefers-reduced-motion: reduce){
+        [data-slot="sidebar-wrapper"]:has(.aluno-sidebar-root) [data-slot="sidebar-gap"],
+        [data-slot="sidebar-wrapper"]:has(.aluno-sidebar-root) [data-slot="sidebar-container"]{transition-duration:0ms!important}
+      }
+    ` }} />
+    {/* Botão redondo roxo da marca (recolher/expandir), na altura do logo — só no desktop. */}
+    <SidebarEdgeToggle variant="revisao" hideOnMobile />
+    <Sidebar collapsible="icon" className="aluno-sidebar-root group-data-[side=left]:border-r-0">
       <SidebarHeader className="flex h-14 flex-row items-center border-b border-sidebar-border px-4 group-data-[collapsible=icon]:px-2">
         <Link href="/aluno" className="flex min-w-0 items-center gap-2">
           <div className={cn('flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden', frameLogo(logoEstilo), !logo && 'bg-primary text-primary-foreground')} style={logo ? { background: logoBg } : undefined}>
@@ -234,7 +254,8 @@ export function AlunoSidebar({
             {/* nome/email: colapsam largura + opacidade (não somem de golpe) */}
             <div className="min-w-0 flex-1 overflow-hidden transition-all duration-300 ease-[cubic-bezier(0.32,0.72,0,1)] group-data-[collapsible=icon]:w-0 group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:opacity-0">
               <p className="truncate text-sm font-medium leading-tight">{usuarioNome}</p>
-              {usuarioEmail && <p className="truncate text-[11px] leading-tight text-sidebar-foreground/55">{usuarioEmail}</p>}
+              {/* PRIVACIDADE: nunca exibir e-mail na área do aluno — mostramos Nível · XP. */}
+              {progresso && <p className="truncate text-[11px] leading-tight text-sidebar-foreground/55">Nível {progresso.nivel} · {progresso.xpTotal.toLocaleString('pt-BR')} XP</p>}
             </div>
           </Link>
           {/* sem overflow-hidden: o badge do sino (-top/-right) precisa aparecer inteiro. Ao recolher,

@@ -14,8 +14,9 @@ interface RequestBody {
   email: string
   cpf?: string
   telefone?: string
-  /** 'iniciar' (padrão) abre/retoma a prova; 'resultado' leva o aluno que JÁ finalizou ao relatório. */
-  modo?: 'iniciar' | 'resultado'
+  /** 'iniciar' (padrão) abre/retoma a prova; 'resultado' leva o aluno que JÁ finalizou ao relatório;
+   *  'validar' só checa identidade/acesso (sem criar sessão) p/ a UI decidir se abre o modal "Tudo pronto". */
+  modo?: 'iniciar' | 'resultado' | 'validar'
 }
 
 /** Monta um texto curto de contato a partir dos canais do tenant. */
@@ -241,6 +242,14 @@ export async function POST(request: NextRequest) {
     if (entradaAntecipada && antesDoInicio) {
       return NextResponse.json({ aguardando: true, data_inicio: simulado.data_inicio, estudante_nome: estudante.nome })
     }
+  }
+
+  // 3.5 MODO "VALIDAR": todas as checagens acima passaram (identidade + status + janela + acesso) →
+  //     o aluno PODE começar. Retorna { ok } SEM criar/retomar sessão. O cliente usa isto para só
+  //     então abrir o modal "Tudo pronto"; e-mail errado/sem acesso já caiu nos bloqueios acima,
+  //     exibindo o erro DIRETO (sem modal).
+  if (body.modo === 'validar') {
+    return NextResponse.json({ ok: true, estudante_nome: estudante.nome })
   }
 
   // 4. Abrir ou retomar sessao_prova (is_teste = ehTeste — teste e prova real não se misturam).

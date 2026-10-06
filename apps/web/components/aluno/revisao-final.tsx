@@ -25,9 +25,8 @@ import {
 } from 'lucide-react'
 import { FitaTopo } from '@/components/prova/fita-topo'
 import { ThemeToggle } from '@/components/prova/theme-toggle'
-import { ProvaLoading, type EstiloProvaLoading } from '@/components/prova/prova-intro'
-import { efetivarHud, type HudCores, type HudPorPagina } from '@/lib/caderno-designer/types'
-import { hudCssVars } from '@/lib/caderno-designer/hud'
+import { PlatformLoader } from '@/components/brand/platform-loader'
+import { type HudCores, type HudPorPagina } from '@/lib/caderno-designer/types'
 
 interface AltRev {
   id: string
@@ -175,20 +174,8 @@ export function RevisaoFinal({
   }, [sessionToken])
 
   if (carregando) {
-    // Tela de carregamento do caderno (mesma "página Carregamento" — estilo + cor).
-    const cores = efetivarHud(hudCores, hudPorPagina, 'loading')
-    return (
-      <div style={hudCssVars(cores, dark) as React.CSSProperties}>
-        <ProvaLoading
-          mensagem="Carregando resultado do simulado..."
-          tipo={cores.loadingTipo as EstiloProvaLoading}
-          logoUrl={cores.loadingLogoUrl || branding?.logoUrl || null}
-          logoBg={cores.loadingLogoUrl ? cores.loadingLogoBg : branding?.logoBg}
-          logoEstilo={cores.loadingLogoUrl ? cores.loadingLogoEstilo : branding?.logoEstilo}
-          logoFiltro={cores.loadingLogoUrl ? cores.loadingLogoFiltro : undefined}
-        />
-      </div>
-    )
+    // Tela de carregamento da PLATAFORMA enquanto busca o resultado do simulado.
+    return <PlatformLoader message="Carregando resultado do simulado..." theme={dark ? 'dark' : 'light'} />
   }
 
   if (erro || !data) {

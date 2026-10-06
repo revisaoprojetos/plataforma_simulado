@@ -12,6 +12,27 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.0.0 — 2026-10-06
+
+**Redesign do portal do aluno (opt-in por tenant via `tema.aparencia_auth.internoAtivo`).** Tudo novo é
+gated: tenants sem o flag e demais marcas continuam no fluxo atual (produção intacta). Pontuações,
+contabilidade, correção, PDFs, acesso por e-mail e integrações (Curseduca/Guru/webhooks) **não foram
+alterados** — validado em check-up (3 revisões adversariais + tsc/build/egress verdes; `lib/simulado/**`
+sem diff).
+
+- **Shell interno novo (Revisão):** sidebar/topbar redesenhados, busca de simulados (Ctrl+K, overlay com
+  resultados "disponíveis × já feitos"), tema claro/escuro.
+- **Início:** home redesenhada ligada a dados reais (recentes/pastas com imagem real; KPIs reais de
+  questões resolvidas e taxa de acerto); cards em ticket; banners sem botão/texto quando não têm.
+- **Dentro da pasta:** 3 colunas (Em andamento / Disponíveis / Já feitos), tickets do mesmo tamanho,
+  ordenação por data (feitos) e por nome.
+- **Fluxo do simulado (Revisão):** login novo (valida o e-mail ANTES do modal; e-mail errado mostra
+  "não encontrado"), carregamento branded, runner novo (`ProvaRevisaoLive`, drop-in sobre o mesmo motor)
+  e resultado novo com Refazer + Ir para o início; cadernos de cada realização na própria linha
+  (sem gabarito × com gabarito).
+- **Lei Seca / Jurisprudência / Ligas / Realizados:** telas internas no design novo; faixa cinza do
+  rodapé no dark corrigida; avatar padrão (capivara) + cor de fundo padronizada no ranking e no pódio.
+
 ## 2.0.1 — 2026-10-05
 
 - **Fix PDF do Diagnóstico (paginação):** o conteúdo transbordava a folha e cruzava a página sem

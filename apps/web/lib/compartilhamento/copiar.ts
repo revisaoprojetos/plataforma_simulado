@@ -31,6 +31,31 @@ async function registrar(svc: SupabaseClient, origem: string, destino: string, t
   )
 }
 
+// ─── Linhagem (FASE 2) ───────────────────────────────────────────────────────
+// Propaga a IDENTIDADE COMUM (linhagem_id) + a plataforma de ORIGEM da cópia. A cópia herda o
+// linhagem_id da origem (irmãs entre plataformas casam por linhagem) e o origem_tenant_id (quem criou
+// primeiro). Se a origem não tem linhagem (linha antiga), a migração já fez backfill; mesmo assim é
+// tolerante a null.
+function linhagemCopia(origemRow: any, origemTenant: string): Record<string, unknown> {
+  const o: Record<string, unknown> = { origem_tenant_id: (origemRow?.origem_tenant_id ?? origemTenant) }
+  if (origemRow?.linhagem_id) o.linhagem_id = origemRow.linhagem_id
+  return o
+}
+// Insert TOLERANTE à Fase 2: tenta com os campos de linhagem; se o destino ainda não aplicou a migração
+// (coluna inexistente), repete sem eles — nunca bloqueia a cópia.
+async function inserirComLinhagem(svc: SupabaseClient, table: string, base: Record<string, unknown>, lin: Record<string, unknown>) {
+  let r = await svc.from(table).insert({ ...base, ...lin }).select('id').single()
+  if (r.error) r = await svc.from(table).insert(base).select('id').single()
+  return r
+}
+// Leitura TOLERANTE das colunas de linhagem (podem não existir se a migração Fase 2 não foi aplicada).
+async function lerLinhagem(svc: SupabaseClient, table: string, id: string, tenantId: string): Promise<any> {
+  try {
+    const { data } = await svc.from(table).select('linhagem_id, origem_tenant_id').eq('id', id).eq('tenant_id', tenantId).maybeSingle()
+    return data ?? {}
+  } catch { return {} }
+}
+
 // ─── Taxonomia (resolve por nome no DESTINO, cria se faltar) ─────────────────
 async function resolveByName(svc: SupabaseClient, table: 'simulado_bancas' | 'simulado_orgaos' | 'simulado_disciplinas', tenantId: string, nome?: string | null): Promise<string | null> {
   const n = nome?.trim()
@@ -78,7 +103,8 @@ export async function copiarQuestao(svc: SupabaseClient, origem: string, destino
     const orgao_id = await resolveByName(svc, 'simulado_orgaos', destino, (q as any).orgaos?.nome)
     const disciplina_id = await resolveByName(svc, 'simulado_disciplinas', destino, (q as any).disciplinas?.nome)
     const assunto_id = await resolveAssunto(svc, destino, (q as any).assuntos?.nome, disciplina_id)
-    const { data: nova, error } = await svc.from('simulado_questoes').insert({
+    // ANTI-EGRESS: imagem_url é copiada COMO ESTÁ (mesma URL do storage compartilhado — sem re-upload).
+    const { data: nova, error } = await inserirComLinhagem(svc, 'simulado_questoes', {
       tenant_id: destino,
       tipo: (q as any).tipo, enunciado: (q as any).enunciado,
       banca_id, orgao_id, disciplina_id, assunto_id,
@@ -86,7 +112,7 @@ export async function copiarQuestao(svc: SupabaseClient, origem: string, destino
       gabarito_tipo: (q as any).gabarito_tipo ?? 'oficial', comentario_professor: (q as any).comentario_professor ?? null,
       status: (q as any).status ?? 'publicada', imagem_url: (q as any).imagem_url ?? null,
       external_id: externalId, created_at: nowIso(),
-    }).select('id').single()
+    }, linhagemCopia(q, origem))
     if (error || !nova) { novaId = await acharCopia(); if (!novaId) return null } // corrida no unique → relê
     else novaId = (nova as any).id
   }
@@ -96,12 +122,16 @@ export async function copiarQuestao(svc: SupabaseClient, origem: string, destino
   // procedência: a próxima execução acha a questão (external_id), vê count=0 e completa.
   const { count } = await svc.from('simulado_alternativas').select('*', { count: 'exact', head: true }).eq('questao_id', novaId).eq('tenant_id', destino)
   if (!count) {
-    const { data: alts } = await svc.from('simulado_alternativas').select('texto, ordem, correta, comentario, lei').eq('questao_id', questaoId).eq('tenant_id', origem).order('ordem')
+    const { data: alts } = await svc.from('simulado_alternativas').select('texto, ordem, correta, comentario, lei, linhagem_id').eq('questao_id', questaoId).eq('tenant_id', origem).order('ordem')
     if (alts && alts.length) {
-      const { error: eAlt } = await svc.from('simulado_alternativas').insert((alts as any[]).map((a) => ({
+      const semLin = (alts as any[]).map((a) => ({
         tenant_id: destino, questao_id: novaId,
         texto: a.texto, ordem: a.ordem, correta: a.correta, comentario: a.comentario ?? null, lei: a.lei ?? null,
-      })))
+      }))
+      // Preserva o linhagem_id de cada alternativa (casa alternativa-a-alternativa na propagação). Tolerante.
+      const comLin = (alts as any[]).map((a, i) => (a.linhagem_id ? { ...semLin[i], linhagem_id: a.linhagem_id } : semLin[i]))
+      let eAlt = (await svc.from('simulado_alternativas').insert(comLin)).error
+      if (eAlt) eAlt = (await svc.from('simulado_alternativas').insert(semLin)).error
       if (eAlt) return novaId
     }
   }
@@ -121,7 +151,8 @@ export async function copiarBanco(svc: SupabaseClient, origem: string, destino: 
   if (!pastaDestino) {
     // Campos tolerantes (cor/icone/capa podem não existir na migração destino).
     const base: Record<string, unknown> = { tenant_id: destino, nome: (p as any).nome, tipo: (p as any).tipo ?? null, is_folder: (p as any).is_folder ?? false, folder_area: (p as any).folder_area ?? null, created_at: nowIso() }
-    for (const c of ['cor', 'icone', 'capa_url', 'capa_card_url']) if ((p as any)[c] != null) base[c] = (p as any)[c]
+    for (const c of ['cor', 'icone', 'capa_url', 'capa_card_url']) if ((p as any)[c] != null) base[c] = (p as any)[c] // ANTI-EGRESS: capas por URL (sem re-upload)
+    Object.assign(base, linhagemCopia(p, origem))
     let ins = await svc.from('simulado_pastas').insert(base).select('id').single()
     if (ins.error) { // repete sem os campos opcionais
       ins = await svc.from('simulado_pastas').insert({ tenant_id: destino, nome: (p as any).nome, created_at: nowIso() }).select('id').single()
@@ -197,7 +228,8 @@ export async function copiarCaderno(svc: SupabaseClient, origem: string, destino
 
   // pasta_id (pasta ORGANIZACIONAL do caderno) não existe no destino → raiz (null).
   const base: Record<string, unknown> = { tenant_id: destino, nome: (c as any).nome, config, pasta_id: null, created_at: nowIso() }
-  for (const k of ['cor', 'icone', 'capa_url']) if ((c as any)[k] != null) base[k] = (c as any)[k]
+  for (const k of ['cor', 'icone', 'capa_url']) if ((c as any)[k] != null) base[k] = (c as any)[k] // ANTI-EGRESS: capa por URL
+  Object.assign(base, linhagemCopia(c, origem))
 
   let ins = await svc.from('simulado_cadernos_designer').insert(base).select('id').single()
   if (ins.error) { // repete sem os campos tolerantes (migração destino pode não ter cor/icone/capa)
@@ -207,4 +239,70 @@ export async function copiarCaderno(svc: SupabaseClient, origem: string, destino
   const novoId = (ins.data as any).id
   await registrar(svc, origem, destino, 'caderno', cadernoId, novoId, por)
   return novoId
+}
+
+// ─── Simulado (definição + banco + composição da prova) ──────────────────────
+// Copia o simulado + o banco de origem (regras.banco_base_id) + a prova (simulado_prova_questoes),
+// preservando a ordem. NÃO copia matrículas/acessos/grupos (são do tenant). Entra como RASCUNHO no
+// destino (nunca publica sozinho). ANTI-EGRESS: capas/imagens no jsonb de regras ficam por URL.
+export async function copiarSimulado(svc: SupabaseClient, origem: string, destino: string, simuladoId: string, por?: string | null): Promise<string | null> {
+  if (origem === destino) return null
+  const existente = await jaCopiado(svc, destino, 'simulado', simuladoId)
+  const { data: s } = await svc.from('simulado_simulados')
+    .select('titulo, descricao, modo_aplicacao, data_inicio, data_fim, tempo_limite_min, metodo_identificacao, embed_ativo, regras')
+    .eq('id', simuladoId).eq('tenant_id', origem).eq('deletado', false).maybeSingle()
+  if (!s) return existente
+  const lin = await lerLinhagem(svc, 'simulado_simulados', simuladoId, origem)
+
+  let novoId = existente
+  if (!novoId) {
+    const regras: Record<string, unknown> = { ...(((s as any).regras as Record<string, unknown>) ?? {}) }
+    const bancoOrigem = (regras.banco_base_id as string) ?? null
+    if (bancoOrigem) { const r = await copiarBanco(svc, origem, destino, bancoOrigem, por); if (r.destinoId) regras.banco_base_id = r.destinoId }
+    const base: Record<string, unknown> = {
+      tenant_id: destino, titulo: (s as any).titulo, descricao: (s as any).descricao ?? null,
+      modo_aplicacao: (s as any).modo_aplicacao ?? 'aberto',
+      data_inicio: (s as any).data_inicio ?? null, data_fim: (s as any).data_fim ?? null,
+      tempo_limite_min: (s as any).tempo_limite_min ?? null,
+      metodo_identificacao: (s as any).metodo_identificacao ?? null, embed_ativo: (s as any).embed_ativo ?? false,
+      regras, status: 'rascunho', pasta_id: null, created_at: nowIso(),
+    }
+    let r = await inserirComLinhagem(svc, 'simulado_simulados', base, linhagemCopia(lin, origem))
+    if (r.error || !r.data) { // schema destino divergente → mínimo
+      r = await svc.from('simulado_simulados').insert({ tenant_id: destino, titulo: (s as any).titulo, modo_aplicacao: (s as any).modo_aplicacao ?? 'aberto', regras, status: 'rascunho', created_at: nowIso() }).select('id').single()
+      if (r.error || !r.data) return null
+    }
+    novoId = (r.data as any).id
+    await registrar(svc, origem, destino, 'simulado', simuladoId, novoId!, por)
+  }
+  if (!novoId) return null
+
+  // Prova: só preenche se vazia (self-heal). Cada questão passa pelo copiarQuestao (idempotente).
+  const { count } = await svc.from('simulado_prova_questoes').select('*', { count: 'exact', head: true }).eq('simulado_id', novoId).eq('tenant_id', destino)
+  if (!count) {
+    const { data: prova } = await svc.from('simulado_prova_questoes').select('questao_id, ordem').eq('simulado_id', simuladoId).eq('tenant_id', origem).order('ordem')
+    const rows: any[] = []
+    for (const pq of (prova ?? []) as any[]) {
+      const qDest = await copiarQuestao(svc, origem, destino, pq.questao_id, por)
+      if (qDest) rows.push({ tenant_id: destino, simulado_id: novoId, questao_id: qDest, ordem: pq.ordem })
+    }
+    if (rows.length) await svc.from('simulado_prova_questoes').insert(rows)
+  }
+  return novoId
+}
+
+// ─── Desafio de Jurisprudência (pasta folder_area='jurisprudencia' + desafio_jogo jsonb) ──
+// Reusa copiarBanco (cria a pasta + linhagem) e copia o jsonb do jogo COMO ESTÁ — teses são
+// self-contained e imagens/áudio ficam por URL do storage compartilhado (anti-egress).
+export async function copiarJurisprudencia(svc: SupabaseClient, origem: string, destino: string, pastaId: string, por?: string | null): Promise<string | null> {
+  if (origem === destino) return null
+  const r = await copiarBanco(svc, origem, destino, pastaId, por)
+  if (!r.destinoId) return null
+  const { data: o } = await svc.from('simulado_pastas').select('desafio_jogo').eq('id', pastaId).eq('tenant_id', origem).maybeSingle()
+  const dj = (o as any)?.desafio_jogo
+  if (dj && typeof dj === 'object') {
+    try { await svc.from('simulado_pastas').update({ desafio_jogo: dj }).eq('id', r.destinoId).eq('tenant_id', destino) } catch { /* coluna desafio_jogo pode não existir no destino */ }
+  }
+  await registrar(svc, origem, destino, 'jurisprudencia', pastaId, r.destinoId, por)
+  return r.destinoId
 }

@@ -195,7 +195,7 @@ export async function conquistasProgresso(svc: any, tenantId: string, estudanteI
   const [cacheRes, desbRes, sessRes] = await Promise.all([
     svc.from('simulado_gamificacao_estudante').select('xp_total, streak_atual').eq('tenant_id', tenantId).eq('estudante_id', estudanteId).maybeSingle(),
     svc.from('simulado_conquista_desbloqueios').select('conquista_id').eq('tenant_id', tenantId).eq('estudante_id', estudanteId),
-    svc.from('simulado_sessoes_prova').select('simulado_id, nota').eq('estudante_id', estudanteId).eq('status', 'finalizada').eq('is_teste', false).eq('deletado', false),
+    svc.from('simulado_sessoes_prova').select('simulado_id, nota').eq('tenant_id', tenantId).eq('estudante_id', estudanteId).eq('status', 'finalizada').eq('is_teste', false).eq('deletado', false),
   ])
   const unlocked = new Set((desbRes.data ?? []).map((r: any) => r.conquista_id))
   const sess = (sessRes.data ?? []) as any[]

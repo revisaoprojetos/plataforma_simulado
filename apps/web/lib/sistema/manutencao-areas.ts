@@ -43,6 +43,7 @@ export const AREAS_MANUTENCAO: AreaManutencao[] = [
 export const AREAS_MANUTENCAO_ALUNO: AreaManutencao[] = [
   { key: 'questoes', label: 'Banco de Questões', descricao: 'Prática de questões avulsas (/aluno/questoes).', href: '/aluno/questoes' },
   { key: 'leitura', label: 'Desafio de Lei Seca', descricao: 'Biblioteca e leitor de documentos (/aluno/leitura).', href: '/aluno/leitura' },
+  { key: 'jurisprudencia', label: 'Desafio de Jurisprudência', descricao: 'Jogo/desafio de jurisprudência (/aluno/jurisprudencia).', href: '/aluno/jurisprudencia' },
   { key: 'cronograma', label: 'Cronograma', descricao: 'Gerar e acompanhar cronogramas (/aluno/cronograma).', href: '/aluno/cronograma' },
   { key: 'trilha', label: 'Trilha', descricao: 'Trilha de simulados/gamificação do aluno (/aluno/trilha).', href: '/aluno/trilha' },
   { key: 'ligas', label: 'Ligas', descricao: 'Ranking por ligas (/aluno/ligas).', href: '/aluno/ligas' },

@@ -2,6 +2,8 @@ import { Suspense } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { LoginEpic } from '@/components/auth/login-epic'
 import { AlunoEntrarForm } from '@/components/aluno/aluno-entrar-form'
+import { PlatformLogin } from '@/components/brand/platform-login'
+import { lerAparenciaAuth } from '@/lib/brand/aparencia-auth'
 import { resolverLoginConfig } from '@/lib/login-config'
 import { getConfigGlobal } from '@/lib/config-global'
 import { getCurrentTenant, getCurrentTenantId } from '@/lib/tenant'
@@ -19,6 +21,22 @@ export default async function LoginPage() {
   // (este caminho /login foi o compartilhado com os estudantes); o admin acessa pelo botão "Admin".
   if (!jaLogado && tenant) {
     const tema = (tenant.tema ?? {}) as any
+    // ATIVADOR do novo login (spec 02 §4): só quando o console liga `loginAtivo`, a tela usa o
+    // PlatformLogin da marca/estilo escolhido; caso contrário segue o login atual (AlunoEntrarForm).
+    const aparencia = lerAparenciaAuth(tenant.tema, { slug: tenant.slug, nome: tenant.nome })
+    if (aparencia.loginAtivo) {
+      return (
+        <PlatformLogin
+          brand={aparencia.brand}
+          theme={aparencia.defaultTheme}
+          style={aparencia.loginStyle}
+          metodo="email"
+          plataforma={tema.nome_site ?? tenant.nome ?? 'Plataforma'}
+          logo={tema.logo_url ?? null}
+          modoInicial="aluno"
+        />
+      )
+    }
     return (
       <AlunoEntrarForm
         modoInicial="aluno"

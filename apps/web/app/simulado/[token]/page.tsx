@@ -6,6 +6,9 @@ import { EmbedLoginForm } from '@/components/embed/embed-login-form'
 import { AlertCircle } from 'lucide-react'
 import { ProvaClient } from './prova-client'
 import { FontScaleInit } from '@/components/font-scale-init'
+import { lerAparenciaAuth } from '@/lib/brand/aparencia-auth'
+import { EntradaReal } from '@/components/brand/simulado/meq/entrada-real'
+import type { SimTheme, TipoResposta } from '@/components/brand/simulado/types'
 
 // Página cheia da prova (acesso pelo portal do aluno ou por link direto).
 // - Sem `?st=`: mostra a tela de identificação (branded) que, ao validar, redireciona
@@ -34,6 +37,41 @@ export default async function ProvaPage({ params, searchParams }: { params: Prom
   if (!st) {
     if (!sim) return <SimuladoNaoEncontrado />
     const metodo = (sim.metodo_identificacao ?? 'email') as 'email' | 'email_cpf' | 'email_telefone'
+
+    // MEQ: a entrada usa o layout "caderno de prova" (spec 06 §1) ligado aos dados reais.
+    // Revisão (quando `internoAtivo`): usa a MESMA entrada no design novo da marca. As demais marcas
+    // (e a Revisão sem internoAtivo) seguem o EmbedLoginForm genérico — produção intacta.
+    const usaEntradaNova = branding?.brand === 'meq' || (branding?.brand === 'revisao' && branding.internoAtivo)
+    if (usaEntradaNova) {
+      const info = await fetchInfoProva(sim.id, sim.tenant_id)
+      return (
+        <>
+          <FontScaleInit scope={`aluno:${token}`} />
+          <EntradaReal
+            token={token}
+            brand={branding!.brand}
+            metodo={metodo}
+            temaInicial={dark ? 'escuro' : branding!.temaInicial}
+            plataforma={branding!.nome}
+            agoraISO={new Date().toISOString()}
+            prova={{
+              titulo: sim.titulo,
+              status: sim.status,
+              dataInicio: sim.data_inicio,
+              dataFim: sim.data_fim,
+              tempoLimiteMin: sim.tempo_limite_min,
+              nQuestoes: info.nQuestoes,
+              tipo: info.tipo,
+              banca: info.tipo === 'CE' ? 'Padrão Cebraspe · Certo ou Errado' : 'Objetiva A–E',
+              subtitulo: '',
+              curto: 'CADERNO DE PROVA · SIMULADO',
+              permiteFolha: info.permiteFolha,
+            }}
+          />
+        </>
+      )
+    }
+
     return (
       <EmbedLoginForm
         token={token}
@@ -56,7 +94,7 @@ export default async function ProvaPage({ params, searchParams }: { params: Prom
     <>
       {/* Anti-flash: aplica a escala de fonte salva (por token do simulado) antes do 1º paint. */}
       <FontScaleInit scope={`aluno:${token}`} />
-      <ProvaClient token={token} hudInicial={{ base, porPagina, branding: brandingSimples }} darkInicial={dark} />
+      <ProvaClient token={token} hudInicial={{ base, porPagina, branding: brandingSimples }} darkInicial={dark} internoAtivo={branding?.brand === 'revisao' && !!branding?.internoAtivo} />
     </>
   )
 }
@@ -96,14 +134,20 @@ async function fetchSimulado(embedToken: string): Promise<{
   }
 }
 
-/** Marca do tenant (logo + nome) para login/prova seguirem a configuração. */
+/** Marca do tenant (logo + nome + brand/tema) para login/prova seguirem a configuração. */
 async function fetchBranding(tenantId: string) {
   try {
     const svc = createAdminClient()
-    const { data: t } = await svc.from('simulado_tenants').select('nome, tema').eq('id', tenantId).maybeSingle()
+    const { data: t } = await svc.from('simulado_tenants').select('nome, slug, tema').eq('id', tenantId).maybeSingle()
     const tema = (t?.tema ?? {}) as any
+    // Marca + tema default do tenant (mesma resolução do portal — lib/brand/aparencia-auth).
+    const ap = lerAparenciaAuth(tema, { slug: (t as any)?.slug ?? null, nome: t?.nome ?? null })
+    const temaInicial: SimTheme = ap.defaultTheme === 'escuro' ? 'escuro' : ap.defaultTheme === 'azul' ? 'azul' : 'claro'
     return {
       nome: tema.nome_site ?? t?.nome ?? 'Simulado',
+      brand: ap.brand,
+      internoAtivo: ap.internoAtivo,
+      temaInicial,
       logoUrl: (tema.logo_url ?? null) as string | null,
       logoGrandeUrl: (tema.logo_grande_url ?? null) as string | null,
       logoBg: (tema.logo_png_bg ?? '#ffffff') as string,
@@ -111,5 +155,31 @@ async function fetchBranding(tenantId: string) {
     }
   } catch {
     return null
+  }
+}
+
+/** Nº de questões, tipo (CE/A–E) e se o simulado permite abrir só a folha de respostas. */
+async function fetchInfoProva(simuladoId: string, tenantId: string): Promise<{ nQuestoes: number | null; tipo: TipoResposta; permiteFolha: boolean }> {
+  try {
+    const svc = createAdminClient()
+    const [{ count }, amostra, simRow] = await Promise.all([
+      svc.from('simulado_prova_questoes').select('questao_id', { count: 'exact', head: true }).eq('simulado_id', simuladoId).eq('tenant_id', tenantId),
+      svc.from('simulado_prova_questoes').select('questao_id').eq('simulado_id', simuladoId).eq('tenant_id', tenantId).limit(30),
+      svc.from('simulado_simulados').select('regras, embed_ativo').eq('id', simuladoId).maybeSingle(),
+    ])
+    // Tipo: amostra os tipos das questões vinculadas; se a maioria é 'ce', trata como Certo/Errado.
+    let tipo: TipoResposta = 'ABCDE'
+    const ids = ((amostra.data ?? []) as any[]).map((r) => r.questao_id)
+    if (ids.length) {
+      const { data: qs } = await svc.from('simulado_questoes').select('tipo').in('id', ids)
+      const ce = ((qs ?? []) as any[]).filter((q) => String(q.tipo ?? '').toLowerCase().includes('ce') || String(q.tipo ?? '').toLowerCase().includes('certo')).length
+      if (ce > ids.length / 2) tipo = 'CE'
+    }
+    const regras = ((simRow.data as any)?.regras ?? {}) as Record<string, unknown>
+    // Folha de respostas: por padrão permitida; desligada por regra explícita.
+    const permiteFolha = regras.permite_folha !== false && regras.folha_ativa !== false
+    return { nQuestoes: count ?? null, tipo, permiteFolha }
+  } catch {
+    return { nQuestoes: null, tipo: 'ABCDE', permiteFolha: true }
   }
 }
