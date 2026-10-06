@@ -12,6 +12,12 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.0.1 — 2026-10-06
+
+- **Fix logout do aluno (shell novo):** o botão "Sair" (sidebar) e "Sair da conta" (menu) apontavam
+  para `/sair` (rota inexistente → 404). Agora fazem o logout real (`POST /api/aluno/logout`, que trata
+  o cookie dinâmico por host) e voltam para `/aluno/entrar`, com loader branded na saída.
+
 ## 3.0.0 — 2026-10-06
 
 **Redesign do portal do aluno (opt-in por tenant via `tema.aparencia_auth.internoAtivo`).** Tudo novo é

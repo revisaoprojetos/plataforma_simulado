@@ -15,6 +15,8 @@ export interface AccountMenuProps {
   onFont: (i: FontIdx) => void
   /** Posicionamento: desktop (fixed topo-direita) ou mobile (acima da down bar / topo). */
   variant: 'desktop' | 'mobile-top' | 'mobile-bottom'
+  /** Logout real (POST /api/aluno/logout + redirect) — vem do shell. */
+  onSair?: () => void
 }
 
 const SEG_ACTIVE: React.CSSProperties = {
@@ -45,7 +47,7 @@ function seg(active: boolean): React.CSSProperties {
   }
 }
 
-export function AccountMenu({ usuario, onClose, themePref, onTheme, fontIdx, onFont, variant }: AccountMenuProps) {
+export function AccountMenu({ usuario, onClose, themePref, onTheme, fontIdx, onFont, variant, onSair }: AccountMenuProps) {
   useEscClose(onClose)
 
   const pos: React.CSSProperties =
@@ -231,13 +233,13 @@ export function AccountMenu({ usuario, onClose, themePref, onTheme, fontIdx, onF
             </Link>
           </div>
           <div style={{ padding: '4px 6px 6px', borderTop: '1px solid var(--line)' }}>
-            <Link href="/sair" className="shr-pmi" onClick={onClose} style={linkStyle('#E5484D')}>
+            <button type="button" className="shr-pmi" onClick={() => { onClose(); onSair?.() }} style={{ ...linkStyle('#E5484D'), width: '100%', border: 0, background: 'none', cursor: 'pointer', font: 'inherit', textAlign: 'left' }}>
               <span style={{ ...tileStyle(), background: 'rgba(229,72,77,.12)', color: '#E5484D' }}>
                 <LogOut style={{ width: 15, height: 15 }} />
               </span>
               <span style={{ flex: 1 }}>Sair da conta</span>
               <ChevronRight style={{ width: 14, height: 14 }} />
-            </Link>
+            </button>
           </div>
         </div>
       </div>

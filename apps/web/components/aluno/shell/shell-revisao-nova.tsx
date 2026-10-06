@@ -41,7 +41,8 @@ import { AccountMenu } from './revisao-nova/account-menu'
 import { NotificationsPanel } from './revisao-nova/notifications'
 import { DownBar } from './revisao-nova/down-bar'
 import { useTheme } from 'next-themes'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { PlatformLoader } from '@/components/brand/platform-loader'
 import { useTemaInterno } from '@/components/brand/interna/use-tema-interno'
 
 export interface ShellRevisaoNovaProps {
@@ -84,6 +85,17 @@ export function ShellRevisaoNova({
     body.style.background = bg
     return () => { html.style.background = prevH; body.style.background = prevB }
   }, [theme])
+
+  // Logout do aluno: reusa o endpoint testado (POST /api/aluno/logout — trata o cookie dinâmico por
+  // host) e volta ao login. O link "/sair" não existe (dava 404). Mostra o loader branded na saída.
+  const router = useRouter()
+  const [saindo, setSaindo] = useState(false)
+  const sair = () => {
+    setSaindo(true)
+    fetch('/api/aluno/logout', { method: 'POST' }).catch(() => {}).finally(() => {
+      setTimeout(() => { router.push('/aluno/entrar'); router.refresh() }, 600)
+    })
+  }
 
   // Busca de simulados (overlay): abre pela barra do topo ou por Ctrl/⌘+K.
   const [buscaAberta, setBuscaAberta] = useState(false)
@@ -157,6 +169,7 @@ export function ShellRevisaoNova({
           onTheme={applyTheme}
           fontIdx={fontIdx}
           onFont={applyFont}
+          onSair={sair}
           onClose={() => setAccount(null)}
         />
       )}
@@ -406,8 +419,10 @@ export function ShellRevisaoNova({
               >
                 <TypeIcon style={{ width: 16, height: 16 }} />
               </button>
-              <Link
-                href="/sair"
+              <button
+                type="button"
+                onClick={sair}
+                disabled={saindo}
                 className="shr-sair"
                 aria-label="Sair"
                 style={{
@@ -419,6 +434,7 @@ export function ShellRevisaoNova({
                   color: '#E6DEFF',
                   fontSize: 13,
                   fontWeight: 700,
+                  cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -427,7 +443,7 @@ export function ShellRevisaoNova({
               >
                 <LogOut style={{ width: 15, height: 15 }} />
                 <span className="shr-lbl">Sair</span>
-              </Link>
+              </button>
 
               {/* Popover Tema */}
               {popTema && (
@@ -714,6 +730,9 @@ export function ShellRevisaoNova({
         {/* Overlay de busca de simulados (Ctrl/⌘+K ou clique na barra do topo) */}
         <BuscaOverlay open={buscaAberta} onClose={() => setBuscaAberta(false)} theme={theme} />
 
+        {/* Loader branded na SAÍDA (logout) */}
+        {saindo && <PlatformLoader brand="revisao" theme={theme === 'escuro' ? 'escuro' : 'claro'} message="Saindo…" />}
+
         {/* Down bar mobile */}
         <div className="shr-downbar">
           <DownBar
@@ -738,6 +757,7 @@ export function ShellRevisaoNova({
           onTheme={applyTheme}
           fontIdx={fontIdx}
           onFont={applyFont}
+          onSair={sair}
           onClose={() => setAccount(null)}
         />
       )}
@@ -749,6 +769,7 @@ export function ShellRevisaoNova({
           onTheme={applyTheme}
           fontIdx={fontIdx}
           onFont={applyFont}
+          onSair={sair}
           onClose={() => setAccount(null)}
         />
       )}
