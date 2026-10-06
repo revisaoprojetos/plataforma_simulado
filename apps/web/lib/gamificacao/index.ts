@@ -167,7 +167,15 @@ export async function onQuizConcluido(
     if (!config || !(await gamAtivaParaAluno(svc, tenantId, estudanteId, config))) return
     await registrarAtividade(svc, { tenantId, estudanteId }) // concluir o quiz conta como atividade do dia
     const ctx = await contextoLeituraDoc(svc, tenantId, documentoId)
-    const dia = diaLocal(config.timezone)
+    // A aula conta para o dia em que foi FEITA (= dia da LEITURA do mesmo doc). Assim, um quiz concluído
+    // logo após a meia-noite (ex.: leitura 23:57, quiz 00:00) NÃO cai no dia seguinte e NÃO quebra a
+    // sequência. Herda o dia do evento de leitura (imutável); se não houver, usa o dia de hoje.
+    let dia = diaLocal(config.timezone)
+    try {
+      const { data: lev } = await svc.from('simulado_xp_eventos').select('meta').eq('tenant_id', tenantId).eq('estudante_id', estudanteId).eq('origem', 'leitura').eq('ref_id', documentoId).maybeSingle()
+      const diaLeitura = (lev?.meta as { dia?: string } | null)?.dia
+      if (diaLeitura && diaLeitura < dia) dia = diaLeitura
+    } catch { /* tolerante: mantém o dia de hoje */ }
     const mult = multiplicadorDia(config, dia)
     const limiteDia = config.xp_regras.limite_dia || 0
     // Pontos por CONCLUIR o quiz (independe de acerto), 1× por documento (refId sem tentativa → não farma).

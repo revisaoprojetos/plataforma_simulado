@@ -530,7 +530,7 @@ export function ShellRevisaoNova({
         >
           <button type="button" className="shr-searchbox" aria-label="Buscar simulados" onClick={() => setBuscaAberta(true)} style={searchBoxStyle()}>
             <Search style={{ width: 17, height: 17 }} />
-            <span style={{ flex: 1, textAlign: 'left' }}>Buscar simulados pelo nome…</span>
+            <span style={{ flex: 1, minWidth: 0, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Buscar simulados pelo nome…</span>
             <kbd
               style={{
                 font: 'inherit',
@@ -879,7 +879,9 @@ function PopOpt({
 function searchBoxStyle(): React.CSSProperties {
   return {
     flex: 1,
+    minWidth: 0, // permite encolher p/ o texto truncar (…) em vez de vazar quando a barra aperta
     maxWidth: 520,
+    overflow: 'hidden',
     display: 'flex',
     alignItems: 'center',
     gap: 10,
