@@ -32,9 +32,13 @@ export default async function LeituraAlunoPage({ searchParams }: { searchParams:
     // ESCRITA de medalhas bloqueante → carimbos, somando round-trips). A escrita de medalhas corre JUNTO
     // (não bloqueia) e, como `carimbos` vem na 2ª leva (depois), já reflete o que foi concedido.
     const svc = createAdminClient()
+    // PERF: no visual novo (interno), o ranking (1000+ alunos) é carregado SOB DEMANDA no cliente (aba
+    // Ranking, via /api/aluno/leitura/ranking) — tira o RPC pesado + o payload grande da leva crítica de
+    // abrir o desafio. A linha "Você" (minhaLinha, barata) continua no servidor p/ a posição imediata.
+    // O legado (não-interno) mantém o ranking no servidor.
     const [mod, rankingRaw, minhaLinha, gam, eventosDia] = await Promise.all([
       carregarModuloCompleto(sessao.estudanteId, sessao.tenantId, modulo),
-      carregarRankingModulo(modulo, sessao.tenantId),
+      _it.ativo ? Promise.resolve(null) : carregarRankingModulo(modulo, sessao.tenantId),
       // Linha "Você" fresca (sem cache): garante os números certos na hora, mesmo se a lista cacheada
       // ainda não refletiu a última aula concluída. Tolerante — nunca quebra a página.
       calcularMinhaLinhaLeitura(modulo, sessao.tenantId, sessao.estudanteId).catch(() => null),
@@ -46,7 +50,10 @@ export default async function LeituraAlunoPage({ searchParams }: { searchParams:
     ])
     // PRIVACIDADE: o aluno só pode receber as INICIAIS dos OUTROS (e sem e-mail); o nome completo de
     // terceiros não sai do servidor. A linha dele próprio ("Você") mantém o nome.
-    const ranking = anonimizarRankingParaAluno(rankingRaw, sessao.estudanteId)
+    // Interno: ranking vazio (lazy no cliente); legado: anonimiza o carregado no servidor.
+    const ranking = rankingRaw
+      ? anonimizarRankingParaAluno(rankingRaw, sessao.estudanteId)
+      : { itens: [], gamAtivo: !!(gam && gam.config), pontuacao: mod.pontuacao ?? null }
     if (mod.trilha) {
       // Aparência (símbolos + formato) vem do MÓDULO (editada na aba "Editar trilha"), não do tenant.
       let diasLeitura: string[] = []

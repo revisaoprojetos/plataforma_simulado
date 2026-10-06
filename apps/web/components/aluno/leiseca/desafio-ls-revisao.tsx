@@ -25,11 +25,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import {
   Flag, BookOpen, BarChart3, Trophy, Play, RotateCcw, Lock, Check, Mountain,
   Plus, Minus, Maximize2, Crosshair, Download, ExternalLink,
-  Flame, Zap, Crown, Target, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronUp, ChevronDown, Scale, FileText, TrendingUp, List,
+  Flame, Zap, Crown, Target, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronUp, ChevronDown, Scale, FileText, TrendingUp, List, Loader2,
 } from 'lucide-react'
 import type { Trilha, TrilhaNode } from '@/components/aluno/trilha-simulados'
 import type { AulaDesempenho } from '@/lib/leitura/trilha'
@@ -118,6 +119,23 @@ export function DesafioLSRevisao({
   useTemaInterno(theme) // reage ao toggle claro/escuro/azul ao vivo
   const [tab, setTab] = useState<Tab>('trilha')
 
+  // Ranking SOB DEMANDA: no interno o servidor manda a lista vazia (abertura do desafio rápida); só
+  // buscamos o ranking (1000+ alunos) quando a aba Ranking abre. A linha "Você" (minhaLinha) já veio.
+  const searchParams = useSearchParams()
+  const moduloId = searchParams.get('modulo')
+  const [rankingLazy, setRankingLazy] = useState<RankingLeitura | null>(null)
+  const [rankLoading, setRankLoading] = useState(false)
+  useEffect(() => {
+    if (tab !== 'rank' || rankingLazy || ranking.itens.length > 0 || !moduloId) return
+    setRankLoading(true)
+    fetch(`/api/aluno/leitura/ranking?modulo=${encodeURIComponent(moduloId)}`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d && Array.isArray(d.itens)) setRankingLazy(d) })
+      .catch(() => {})
+      .finally(() => setRankLoading(false))
+  }, [tab, moduloId, rankingLazy, ranking.itens.length])
+  const rankingAtivo = rankingLazy ?? ranking
+
   // ── Nós reais → geometria da montanha. (REUSO da lógica MEQ.) ──
   const nodes = trilha.nodes.filter((n) => !n.intro)
   const totalDias = trilha.total || nodes.length || 30
@@ -134,7 +152,7 @@ export function DesafioLSRevisao({
 
   const progressoPct = totalDias > 0 ? Math.round((diasConcluidos / totalDias) * 100) : 0
   const pontos = useMemo(() => desempenho.reduce((s, a) => s + (a.pontos || 0), 0), [desempenho])
-  const posicao = minhaLinha?.posicao ?? ranking.itens.find((r) => r.estudanteId === meuId)?.posicao ?? null
+  const posicao = minhaLinha?.posicao ?? rankingAtivo.itens.find((r) => r.estudanteId === meuId)?.posicao ?? null
 
   const TABS: { k: Tab; label: string; icon: React.ReactNode }[] = [
     { k: 'trilha', label: 'Trilha', icon: <Flag size={15} /> },
@@ -157,7 +175,7 @@ export function DesafioLSRevisao({
           )}
           {tab === 'reg' && <AbaRegulamento regulamento={regulamento} pontuacao={pontuacao} gam={gam} moduloNome={moduloNome} />}
           {tab === 'des' && <AbaDesempenho desempenho={desempenho} totalDias={totalDias} diasConcluidos={diasConcluidos} pontos={pontos} progressoPct={progressoPct} carimbos={carimbos} />}
-          {tab === 'rank' && <AbaRanking ranking={ranking} minhaLinha={minhaLinha} meuId={meuId} meuNome={meuNome} progressoPct={progressoPct} totalDias={totalDias} moduloNome={moduloNome} />}
+          {tab === 'rank' && <AbaRanking ranking={rankingAtivo} loading={rankLoading} minhaLinha={minhaLinha} meuId={meuId} meuNome={meuNome} progressoPct={progressoPct} totalDias={totalDias} moduloNome={moduloNome} />}
         </div>
       </div>
 
@@ -1162,9 +1180,9 @@ function RankTh({ label, col, sortBy, dir, onSort, right, brand }: { label: stri
 }
 
 function AbaRanking({
-  ranking, minhaLinha, meuId, meuNome, progressoPct, totalDias, moduloNome,
+  ranking, loading, minhaLinha, meuId, meuNome, progressoPct, totalDias, moduloNome,
 }: {
-  ranking: RankingLeitura; minhaLinha?: RankingLeituraItem | null; meuId?: string | null; meuNome?: string | null
+  ranking: RankingLeitura; loading?: boolean; minhaLinha?: RankingLeituraItem | null; meuId?: string | null; meuNome?: string | null
   progressoPct: number; totalDias: number; moduloNome: string
 }) {
   const itens = ranking.itens.filter((r) => !r.oculto)
@@ -1203,6 +1221,15 @@ function AbaRanking({
     if (col === sortBy) setDir((d) => (d === 'asc' ? 'desc' : 'asc'))
     else { setSortBy(col); setDir(col === 'pos' ? 'asc' : 'desc') } // pos sobe (1,2,3); métricas descem (maior→menor)
     setPage(0)
+  }
+
+  // Ranking carregado sob demanda → enquanto busca (lista ainda vazia) mostra um carregando.
+  if (loading && !itens.length) {
+    return (
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '64px 20px', color: 'var(--muted)', fontSize: 14 }}>
+        <Loader2 size={20} className="animate-spin" style={{ color: 'var(--brand)' }} /> Carregando ranking…
+      </div>
+    )
   }
 
   return (

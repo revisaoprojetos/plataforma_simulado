@@ -12,6 +12,14 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.0.3 — 2026-10-06
+
+- **Perf: abrir o Desafio de Lei Seca ficou lento** porque o ranking (1.000+ alunos) era carregado no
+  servidor em TODA abertura (RPC pesado + payload grande enviado ao cliente, mesmo pra quem só vê a
+  Trilha) — e o cache era invalidado a cada aula concluída. Agora, no visual novo, o ranking é carregado
+  **sob demanda** (só quando a aba **Ranking** abre, via `/api/aluno/leitura/ranking`), com estado de
+  carregando. A linha "Você" (posição) continua instantânea. O legado segue como estava.
+
 ## 3.0.2 — 2026-10-06
 
 - **Fix sequência (streak) do Lei Seca na virada de meia-noite:** um quiz concluído logo após 00:00
