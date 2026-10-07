@@ -12,6 +12,26 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.2.0 — 2026-10-07
+
+- **Admin · Questões · importar entre plataformas (super-admin):** nova aba **"Plataformas"** no
+  botão _Nova Questão_ — escolhe a plataforma de origem, **busca/filtra** (disciplina/status/dificuldade,
+  paginação server-side) e **importa questões selecionadas** para o banco da plataforma atual. Tabela
+  com **scroll horizontal (arrastar)** + linhas **expansíveis** (enunciado completo + alternativas com
+  gabarito). As cópias recebem **código novo** e a **banca da plataforma de destino** (no lugar da
+  origem), preservando o vínculo com a origem (`external_id`); o editor mostra **"Importada de …"** (só
+  no admin). Reusa o motor idempotente `copiarQuestao` — reimportar não duplica.
+- **Aluno · carregamento/login (white-label):** portados fielmente do handoff os loadings **VND**
+  (clássico+SIMULA, circuito/circuito-vertical ±SIMULA) e **Revisão** (formas, quadrados, circuito +
+  efeitos/quadrados). Correção: o **carregamento real pós-login** passou a usar o **estilo escolhido no
+  console** (antes caía sempre no clássico da marca) e sumiu o **flash de tela roxa** no login de marcas
+  não-roxas.
+- **Aluno · VND:** gamificação **desligável por tenant** (XP/nível/sequência/missões/liga somem quando
+  off); **banners de imagem** renderizam na home (sem botão quando é só imagem) respeitando o "ocultar
+  título"; texto rotativo **"Rumo a …"** com animação corrigida; capivara não vaza entre tenants.
+- **Admin · estudantes/engajamento:** refinamentos no perfil do estudante (abas, assinaturas, desafios,
+  adesivos) e no relatório de engajamento geral.
+
 ## 3.1.0 — 2026-10-06
 
 - **Admin · sidebar unificada:** os dois desafios viraram um grupo único **"Desafios"** (Lei Seca +

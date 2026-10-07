@@ -116,6 +116,18 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
 
   const statusAtual = (questao.status ?? 'rascunho') as 'rascunho' | 'publicada' | 'arquivada'
 
+  // Procedência (só admin): questões importadas têm external_id `cp:{origem}:{id}` → resolve o nome
+  // da plataforma de origem para exibir "Importada de …".
+  let procedencia: { plataforma: string } | null = null
+  const extId = (questao as { external_id?: string | null }).external_id
+  if (extId && extId.startsWith('cp:')) {
+    const origemId = extId.split(':')[1]
+    if (origemId && origemId !== tenantId) {
+      const { data: tOrig } = await admin.from('simulado_tenants').select('nome').eq('id', origemId).maybeSingle()
+      if ((tOrig as { nome?: string } | null)?.nome) procedencia = { plataforma: (tOrig as { nome: string }).nome }
+    }
+  }
+
   const initialData = {
     tipo: questao.tipo as 'objetiva' | 'discursiva',
     // A coluna `formato` pode não existir na base → deriva das alternativas (2 opções Certo/Errado).
@@ -157,6 +169,7 @@ export default async function EditarQuestaoPage({ params }: PageProps) {
       assuntosSugestoes={assuntosSugestoes}
       assuntosDetalheSugestoes={assuntosDetalheSugestoes}
       bancosDaQuestao={bancosDaQuestao}
+      procedencia={procedencia}
       onSubmit={updateQuestaoAction.bind(null, id)}
       onExcluir={excluirQuestoes.bind(null, [id])}
       sidebarExtra={<EtiquetaPicker questaoId={id} todas={et.todas ?? []} ativasIniciais={et.ativas ?? []} />}

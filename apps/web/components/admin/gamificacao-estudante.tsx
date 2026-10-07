@@ -2,23 +2,25 @@ import { Card } from '@/components/ui/card'
 import { Zap, Flame, Trophy } from 'lucide-react'
 import { EscudoLiga } from '@/components/aluno/escudo-liga'
 import { ConquistasGrid } from '@/components/aluno/conquistas-grid'
+import { AdesivosEstudante, type AdesivoView } from '@/components/admin/adesivos-estudante'
 import type { ResumoGamificacao } from '@/lib/gamificacao/leitura'
 
 const fmt = (n: number) => n.toLocaleString('pt-BR')
 
 /**
- * Painel de gamificação do estudante no ADMIN: nível + barra de XP, cargo, liga e conquistas —
+ * Painel de gamificação do estudante no ADMIN: nível + barra de XP, cargo, liga, conquistas e adesivos —
  * para o admin conferir sem entrar na conta do aluno. Só aparece quando a gamificação está ativa.
  */
-export function GamificacaoEstudante({ resumo, conquistas }: { resumo: ResumoGamificacao; conquistas: any[] }) {
+export function GamificacaoEstudante({ resumo, conquistas, adesivos = [] }: { resumo: ResumoGamificacao; conquistas: any[]; adesivos?: AdesivoView[] }) {
   const p = resumo.progresso
   return (
     <Card className="overflow-hidden">
-      <div className="flex items-center gap-2 border-b px-4 py-2.5">
-        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary"><Trophy className="h-4 w-4" /></span>
+      {/* Cabeçalho no mesmo padrão dos demais cards (px-4 py-1.5 + ícone h-7). */}
+      <div className="flex items-center gap-2.5 border-b px-4 py-1.5">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Trophy className="h-3.5 w-3.5" /></span>
         <div className="min-w-0 leading-tight">
           <p className="text-sm font-semibold">Gamificação</p>
-          <p className="text-[11px] text-muted-foreground">Nível, cargo, liga e conquistas do aluno</p>
+          <p className="text-[11px] text-muted-foreground">Nível, cargo, liga, conquistas e adesivos do aluno</p>
         </div>
       </div>
 
@@ -68,6 +70,9 @@ export function GamificacaoEstudante({ resumo, conquistas }: { resumo: ResumoGam
           <ConquistasGrid conquistas={conquistas} />
         </div>
       )}
+
+      {/* Adesivos (carimbos) conquistados — abaixo das conquistas, no mesmo card. */}
+      <AdesivosEstudante adesivos={adesivos} />
     </Card>
   )
 }

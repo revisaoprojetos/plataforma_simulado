@@ -1,8 +1,8 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import {
-  ArrowLeft, CreditCard, Search, Repeat, CircleSlash, ArrowUp, ArrowDown, ArrowUpDown,
-  Maximize2, ExternalLink, Users, TrendingUp, AlertTriangle, Target, CheckCircle2, ClipboardList, Library, Scale,
+  ExternalLink, CreditCard, Search, Repeat, CircleSlash, ArrowUp, ArrowDown, ArrowUpDown,
+  Users, TrendingUp, AlertTriangle, Target, CheckCircle2, ClipboardList, Library,
 } from 'lucide-react'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { KpiCard } from '@/components/admin/relatorios/viz'
@@ -10,7 +10,7 @@ import { AvatarEstudante } from '@/components/aluno/avatar-estudante'
 import { formatBrt } from '@/lib/brt'
 import { cn } from '@/lib/utils'
 import {
-  engajamentoKpis, engajamentoLista, engajamentoAlunoDetalhe, opcoesEngajamento,
+  engajamentoKpis, engajamentoLista, opcoesEngajamento,
   normArea, normSituacao, type EngajArea, type EngajSituacao, type EngajGeralSortCol,
 } from './_dados'
 
@@ -21,7 +21,7 @@ const ROTA = '/admin/relatorios/engajamento'
 
 const AREA_LABEL: Record<EngajArea, string> = { todos: 'Todos', simulados: 'Simulados', desafios: 'Desafios' }
 const SITUACAO_LABEL: Record<EngajSituacao, string> = {
-  todos: 'Todos', churn: 'Risco de churn', conversao: 'Oportunidade', pagantes: 'Pagantes', ativos: 'Ativos',
+  todos: 'Todos', churn: 'Risco de cancelamento', conversao: 'Oportunidade', pagantes: 'Recorrentes', ativos: 'Ativos',
 }
 
 type SP = {
@@ -35,20 +35,6 @@ export default async function EngajamentoPage({ searchParams }: { searchParams: 
   const sp = await searchParams
   const area = normArea(sp.area)
   const alvo = (sp.alvo ?? '').trim() || null
-
-  // Drill-down de um aluno (preserva os filtros no "voltar").
-  if (sp.aluno) {
-    const voltar = new URLSearchParams()
-    if (sp.area) voltar.set('area', sp.area)
-    if (sp.alvo) voltar.set('alvo', sp.alvo)
-    if (sp.situacao) voltar.set('situacao', sp.situacao)
-    if (sp.q) voltar.set('q', sp.q)
-    if (sp.pg) voltar.set('pg', sp.pg)
-    if (sp.sort) voltar.set('sort', sp.sort)
-    if (sp.dir) voltar.set('dir', sp.dir)
-    const qs = voltar.toString()
-    return <AlunoDetalhe tenantId={access.tenantId} estudanteId={sp.aluno} voltarHref={qs ? `${ROTA}?${qs}` : ROTA} />
-  }
 
   return (
     <EngajamentoLista
@@ -77,7 +63,7 @@ async function EngajamentoLista({ tenantId, area, alvo, situacao, q, pgina, sort
   const header = (
     <div>
       <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight"><CreditCard className="h-6 w-6 text-primary" /> Assinaturas &amp; Engajamento</h1>
-      <p className="text-muted-foreground">Quem <b>paga</b> (assinatura recorrente ativa) × quem está <b>engajado</b> — por área. Identifica risco de churn e oportunidades de conversão.</p>
+      <p className="text-muted-foreground">Quem é <b>recorrente</b> (está numa assinatura ativa) × quem está <b>engajado</b> — por área. Identifica risco de cancelamento e oportunidades de conversão.</p>
     </div>
   )
 
@@ -171,9 +157,9 @@ async function EngajamentoLista({ tenantId, area, alvo, situacao, q, pgina, sort
 
       {/* KPIs — foco em churn/conversão/cobertura */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <KpiCard icon={<Repeat className="h-4 w-4" />} tom="emerald" label="Pagantes ativos" valor={fmt(k.pagantes)} sub={`de ${fmt(k.baseTotal)} alunos na base`} />
-        <KpiCard icon={<AlertTriangle className="h-4 w-4" />} tom="rose" label="Risco de churn" valor={fmt(k.pagantesSemAtividade)} sub="pagam, mas não engajam" />
-        <KpiCard icon={<Target className="h-4 w-4" />} tom="violet" label="Oportunidade de conversão" valor={fmt(k.engajadosNaoPagantes)} sub="engajam, mas não pagam" />
+        <KpiCard icon={<Repeat className="h-4 w-4" />} tom="emerald" label="Recorrentes ativos" valor={fmt(k.pagantes)} sub={`de ${fmt(k.baseTotal)} alunos na base`} />
+        <KpiCard icon={<AlertTriangle className="h-4 w-4" />} tom="rose" label="Risco de cancelamento" valor={fmt(k.pagantesSemAtividade)} sub="recorrentes, mas não engajam" />
+        <KpiCard icon={<Target className="h-4 w-4" />} tom="violet" label="Oportunidade de conversão" valor={fmt(k.engajadosNaoPagantes)} sub="engajam, mas não são recorrentes" />
         <KpiCard icon={<TrendingUp className="h-4 w-4" />} tom="sky" label="Cobertura da base" valor={`${coberturaPct}%`} sub={`${fmt(k.engajados)} engajados no escopo`} />
       </div>
 
@@ -213,7 +199,7 @@ async function EngajamentoLista({ tenantId, area, alvo, situacao, q, pgina, sort
           <thead className="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
               <th className="px-4 py-2.5">{th('nome', 'Aluno', 'asc')}</th>
-              <th className="px-4 py-2.5">{th('situacao', 'Paga?', 'desc')}</th>
+              <th className="px-4 py-2.5">{th('situacao', 'Recorrente?', 'desc')}</th>
               <th className="px-4 py-2.5">Engajado?</th>
               <th className="px-4 py-2.5">Áreas ativas</th>
               <th className="px-4 py-2.5">{th('ultima', 'Última atividade', 'desc')}</th>
@@ -236,8 +222,8 @@ async function EngajamentoLista({ tenantId, area, alvo, situacao, q, pgina, sort
                 </td>
                 <td className="px-4 py-2.5">
                   {a.paga
-                    ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400"><Repeat className="h-3 w-3" /> Paga</span>
-                    : <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><CircleSlash className="h-3 w-3" /> Não paga</span>}
+                    ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400"><Repeat className="h-3 w-3" /> Recorrente</span>
+                    : <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><CircleSlash className="h-3 w-3" /> Não recorrente</span>}
                 </td>
                 <td className="px-4 py-2.5">
                   {a.engajado
@@ -257,9 +243,9 @@ async function EngajamentoLista({ tenantId, area, alvo, situacao, q, pgina, sort
                 </td>
                 <td className="px-4 py-2.5 text-xs text-muted-foreground">{a.ultimaAtividade ? formatBrt(a.ultimaAtividade) : '—'}</td>
                 <td className="px-4 py-2.5 text-right">
-                  <Link href={mkHref({}).includes('?') ? `${mkHref({})}&aluno=${a.id}` : `${ROTA}?aluno=${a.id}`} title="Expandir informações do aluno" aria-label={`Expandir informações de ${a.nome}`}
+                  <Link href={`/admin/estudantes/${a.id}?tab=assinaturas`} title="Abrir perfil do aluno (assinaturas & histórico)" aria-label={`Abrir perfil de ${a.nome}`}
                     className="inline-flex h-7 w-7 items-center justify-center rounded-lg border text-muted-foreground transition hover:bg-muted hover:text-foreground">
-                    <Maximize2 className="h-3.5 w-3.5" />
+                    <ExternalLink className="h-3.5 w-3.5" />
                   </Link>
                 </td>
               </tr>
@@ -280,116 +266,6 @@ async function EngajamentoLista({ tenantId, area, alvo, situacao, q, pgina, sort
           </div>
         </div>
       )}
-    </div>
-  )
-}
-
-async function AlunoDetalhe({ tenantId, estudanteId, voltarHref }: { tenantId: string; estudanteId: string; voltarHref: string }) {
-  const det = await engajamentoAlunoDetalhe(tenantId, estudanteId)
-  if (!det) redirect(voltarHref)
-  const { info, simulados, desafios, sqlOff } = det
-
-  if (sqlOff) {
-    return (
-      <div className="space-y-5">
-        <Link href={voltarHref} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Assinaturas &amp; Engajamento</Link>
-        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-6 text-sm text-amber-700 dark:text-amber-300">O detalhe do aluno depende do <b>SQL agregado</b> (DATABASE_URL), indisponível no momento.</div>
-      </div>
-    )
-  }
-
-  const totalTentativas = simulados.reduce((s, x) => s + x.tentativas, 0)
-  const totalAulas = desafios.reduce((s, d) => s + d.aulasConcluidas, 0)
-  const totalQuiz = desafios.reduce((s, d) => s + d.quizzesRespondidos, 0)
-  const datas = [...simulados.map((s) => s.ultima), ...desafios.map((d) => d.ultima)].filter(Boolean) as string[]
-  const ultima = datas.length ? datas.reduce((mx, d) => (d > mx ? d : mx)) : null
-
-  return (
-    <div className="space-y-5">
-      <Link href={voltarHref} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Assinaturas &amp; Engajamento</Link>
-
-      {/* Cabeçalho do aluno */}
-      <div className="flex flex-wrap items-start justify-between gap-3 rounded-2xl border bg-card p-5 shadow-sm">
-        <div className="flex min-w-0 items-center gap-4">
-          <AvatarEstudante nome={info.nome} avatar={info.avatar} cor={info.avatarCor} className="h-16 w-16 border bg-muted text-xl text-muted-foreground" />
-          <div className="min-w-0">
-            <h1 className="truncate text-2xl font-bold tracking-tight">{info.nome}</h1>
-            {info.email && <div className="mt-0.5 truncate text-sm text-muted-foreground">{info.email}</div>}
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              {info.paga
-                ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400"><Repeat className="h-3 w-3" /> Assinatura recorrente ativa</span>
-                : <span className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"><CircleSlash className="h-3 w-3" /> Não paga</span>}
-            </div>
-          </div>
-        </div>
-        <Link href={`/admin/estudantes/${info.id}`} className="inline-flex h-9 items-center gap-1.5 rounded-lg border px-3 text-sm font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground">
-          <ExternalLink className="h-4 w-4" /> Perfil completo
-        </Link>
-      </div>
-
-      {/* Resumo */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <KpiCard icon={<ClipboardList className="h-4 w-4" />} tom="primary" label="Simulados finalizados" valor={fmt(simulados.length)} sub={`${fmt(totalTentativas)} tentativa(s)`} />
-        <KpiCard icon={<Library className="h-4 w-4" />} tom="sky" label="Aulas concluídas" valor={fmt(totalAulas)} />
-        <KpiCard icon={<CheckCircle2 className="h-4 w-4" />} tom="emerald" label="Quizzes respondidos" valor={fmt(totalQuiz)} />
-        <div className="rounded-2xl border bg-card p-4 shadow-sm">
-          <div className="text-xs font-medium text-muted-foreground">Última atividade</div>
-          <div className="mt-1 text-sm font-semibold text-foreground">{ultima ? formatBrt(ultima) : '—'}</div>
-        </div>
-      </div>
-
-      {/* Simulados */}
-      <section className="space-y-2">
-        <h2 className="flex items-center gap-2 text-sm font-semibold"><ClipboardList className="h-4 w-4 text-primary" /> Simulados finalizados</h2>
-        <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-          <table className="w-full text-sm">
-            <thead className="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
-              <tr><th className="px-4 py-2.5">Simulado</th><th className="px-4 py-2.5 text-center">Tentativas</th><th className="px-4 py-2.5 text-center">Melhor nota</th><th className="px-4 py-2.5">Última</th></tr>
-            </thead>
-            <tbody>
-              {simulados.length === 0 ? (
-                <tr><td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">Nenhum simulado finalizado.</td></tr>
-              ) : simulados.map((s) => (
-                <tr key={s.simuladoId} className="border-t">
-                  <td className="px-4 py-2.5 font-medium">{s.titulo}</td>
-                  <td className="px-4 py-2.5 text-center tabular-nums text-muted-foreground">{s.tentativas}</td>
-                  <td className="px-4 py-2.5 text-center tabular-nums">{s.melhorNota == null ? '—' : s.melhorNota.toFixed(1).replace('.', ',')}</td>
-                  <td className="px-4 py-2.5 text-xs text-muted-foreground">{s.ultima ? formatBrt(s.ultima) : '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
-
-      {/* Desafios */}
-      <section className="space-y-2">
-        <h2 className="flex items-center gap-2 text-sm font-semibold"><Library className="h-4 w-4 text-primary" /> Desafios por módulo</h2>
-        <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-          <table className="w-full text-sm">
-            <thead className="border-b bg-muted/30 text-left text-xs uppercase tracking-wide text-muted-foreground">
-              <tr><th className="px-4 py-2.5">Módulo</th><th className="px-4 py-2.5">Área</th><th className="px-4 py-2.5 text-center">Aulas concluídas</th><th className="px-4 py-2.5 text-center">Quizzes</th><th className="px-4 py-2.5">Última</th></tr>
-            </thead>
-            <tbody>
-              {desafios.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">Nenhuma atividade em desafios.</td></tr>
-              ) : desafios.map((d) => (
-                <tr key={d.moduloId} className="border-t">
-                  <td className="px-4 py-2.5 font-medium">{d.moduloNome}</td>
-                  <td className="px-4 py-2.5">
-                    <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-                      {d.area === 'jurisprudencia' ? <Scale className="h-3 w-3" /> : <Library className="h-3 w-3" />} {d.area === 'jurisprudencia' ? 'Jurisprudência' : 'Lei Seca'}
-                    </span>
-                  </td>
-                  <td className="px-4 py-2.5 text-center tabular-nums text-muted-foreground">{d.aulasConcluidas}</td>
-                  <td className="px-4 py-2.5 text-center tabular-nums text-muted-foreground">{d.quizzesRespondidos}</td>
-                  <td className="px-4 py-2.5 text-xs text-muted-foreground">{d.ultima ? formatBrt(d.ultima) : '—'}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
     </div>
   )
 }

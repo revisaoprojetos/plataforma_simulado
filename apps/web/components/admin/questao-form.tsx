@@ -8,7 +8,7 @@ import { createPortal } from 'react-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
-  Loader2, Plus, Trash2, RefreshCw, ArrowLeft, Undo2, Check, ChevronDown,
+  Loader2, Plus, Trash2, RefreshCw, ArrowLeft, ArrowLeftRight, Undo2, Check, ChevronDown,
   Bold, Italic, List, Link2, Code, Image as ImageIcon, MessageSquare, Eye, Pencil, Database, X,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -195,6 +195,8 @@ interface QuestaoFormProps {
   bancosDaQuestao?: BancoSync[]
   /** Conteúdo extra da barra lateral (ex.: seletor de etiquetas). */
   sidebarExtra?: ReactNode
+  /** Procedência (só admin): se a questão foi importada de outra plataforma, qual. */
+  procedencia?: { plataforma: string } | null
   onSubmit: (data: QuestaoFormData) => Promise<{ error?: string } | void>
   /** Só na EDIÇÃO: exclui a questão (soft delete → lixeira). Sem isto, o botão Excluir não aparece. */
   onExcluir?: () => Promise<{ ok: boolean; error?: string; count?: number }>
@@ -424,7 +426,7 @@ function StatusBadge({ status }: { status?: string }) {
   return <span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', cfg.cls)}>{cfg.label}</span>
 }
 
-export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], orgaosSugestoes = [], cargosSugestoes = [], disciplinasSugestoes = [], assuntosSugestoes = [], assuntosDetalheSugestoes = [], bancosDaQuestao = [], sidebarExtra, onSubmit, onExcluir }: QuestaoFormProps) {
+export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], orgaosSugestoes = [], cargosSugestoes = [], disciplinasSugestoes = [], assuntosSugestoes = [], assuntosDetalheSugestoes = [], bancosDaQuestao = [], sidebarExtra, procedencia, onSubmit, onExcluir }: QuestaoFormProps) {
   const ocultarDiscursiva = useOcultarDiscursiva()
   const [isLoading, setIsLoading] = useState(false)
   const [, forcar] = useReducer((x: number) => x + 1, 0) // força re-render (reverte o <select> Tipo ao cancelar)
@@ -619,6 +621,11 @@ export function QuestaoForm({ initialData, codigo, bancasSugestoes = [], orgaosS
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <h1 className="text-base font-semibold leading-tight">{codigo ? 'Editar questão' : 'Nova questão'}</h1>
             {codigo && <span className="rounded-md bg-muted px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">{codigo}</span>}
+            {procedencia && (
+              <span title={`Questão importada da plataforma ${procedencia.plataforma}`} className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                <ArrowLeftRight className="h-3 w-3" /> Importada de {procedencia.plataforma}
+              </span>
+            )}
             <StatusBadge status={status} />
           </div>
         </div>

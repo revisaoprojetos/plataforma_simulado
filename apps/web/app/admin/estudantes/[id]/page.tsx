@@ -3,24 +3,27 @@ import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
-import { getCurrentTenantId } from '@/lib/tenant'
+import { getCurrentTenantId, getCurrentTenant } from '@/lib/tenant'
+import { resolverCardView } from '@/lib/card-view'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
-import { ArrowLeft, Mail, Phone, IdCard, Calendar, FolderOpen, User, ListChecks, ClipboardList, FileText, FileCheck2, Star, Trophy, Target, GraduationCap, Hash } from 'lucide-react'
+import { ArrowLeft, Mail, Phone, IdCard, Calendar, FolderOpen, User, ListChecks, ClipboardList, FileText, FileCheck2, Star, Trophy, Target, GraduationCap, Hash, Repeat, BookOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { type SessaoRow } from '@/components/admin/historico-estudante'
 import { SimuladosFeitosCards } from '@/components/admin/simulados-feitos-cards'
-import { HistoricoSimples } from '@/components/admin/historico-simples'
-import { BancosVinculadosPopup } from '@/components/admin/bancos-vinculados-popup'
-import { GruposVinculadosPopup } from '@/components/admin/grupos-vinculados-popup'
-import { SimuladosPendentesCard } from '@/components/admin/simulados-pendentes-card'
 import { GamificacaoEstudante } from '@/components/admin/gamificacao-estudante'
 import { getGamConfig } from '@/lib/gamificacao'
 import { resumoGamificacao, conquistasDoAluno } from '@/lib/gamificacao/leitura'
+import { carimbosGanhosDoAluno } from '@/lib/leitura/carimbos'
 import { EditarEstudanteButton } from '@/components/admin/editar-estudante-button'
 import { ImpersonationLauncher } from '@/components/admin/impersonation/impersonation-launcher'
 import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
+import { EstudantePerfilTabs } from '@/components/admin/estudante-perfil-tabs'
+import { DesafiosFeitosCards, type DesafioVisual } from '@/components/admin/desafios-feitos-cards'
+import { desafiosAlunoSql, assinaturasAlunoSql, desafiosPendentesAlunoSql, simuladosVinculadosAlunoSql, gruposVinculadosAlunoSql, pagamentosAlunoSql } from 'data'
+import { VinculosAluno } from '@/components/admin/vinculos-aluno'
+import { EstudanteAssinaturas } from '@/components/admin/estudante-assinaturas'
 import type { GrupoBanco } from '@/app/admin/banco-questoes/actions'
 import { modalidadesDoAlunoV2, temEntregaV2, type EntregaSlots, type ModalidadeAluno } from '@/lib/caderno-teste/entrega-aluno'
 import { tipoDoSimulado, filtrarModsPorTipo, type TipoSimulado } from '@/lib/simulado/tipo'
@@ -53,8 +56,9 @@ const statusCfg: Record<string, { label: string; variant: 'default' | 'secondary
   aguardando: { label: 'Aguardando', variant: 'outline' },
 }
 
-export default async function EstudantePerfilPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EstudantePerfilPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
   const { id } = await params
+  const { tab } = await searchParams
   const tenantId = await getCurrentTenantId()
   const svc = createAdminClient()
 
@@ -62,15 +66,13 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
 
   // ── Batch inicial: tudo que depende só de id/tenant vai num único round-trip paralelo
   // (perfil, sessões, vínculos de banco/grupo, matrículas e acessos avulsos). ──
-  const [estRes, sessoesRes, peRes, gmRes, matsRes, acesRes] = await Promise.all([
+  const [estRes, sessoesRes, matsRes, acesRes] = await Promise.all([
     svc.from('simulado_estudantes')
       .select('id, nome, email, cpf, telefone, data_nascimento, classificacao, matricula_externa, created_at, avatar, perfil_avatar_cor')
       .eq('id', id).eq('tenant_id', TID).maybeSingle(),
     svc.from('simulado_sessoes_prova')
       .select('id, status, nota, posicao_ranking, iniciado_em, finalizado_em, tentativa_num, is_teste, simulado_id, simulados:simulado_simulados(titulo)')
       .eq('estudante_id', id).eq('deletado', false).order('iniciado_em', { ascending: false }),
-    svc.from('simulado_pasta_estudantes').select('pasta_id').eq('estudante_id', id),
-    svc.from('simulado_grupo_membros').select('grupo_id').eq('estudante_id', id),
     svc.from('simulado_matriculas').select('simulado_id').eq('estudante_id', id).eq('tenant_id', TID),
     svc.from('simulado_acessos').select('simulado_id, expira_em').eq('estudante_id', id).eq('tenant_id', TID),
   ])
@@ -78,38 +80,14 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
   if (!est) notFound()
   const sessoes = sessoesRes.data
 
-  // ── Segundo batch (paralelo): respostas do aluno + bancos + grupos — independentes entre si. ──
+  // ── Respostas do aluno (fetchAllByIn: histórico grande passa de 1000 → `.in()` cortaria os KPIs). ──
   const sessIds = (sessoes ?? []).map((s: any) => s.id)
   const acertos = new Map<string, number>()
   const totais = new Map<string, number>()
-  const [respAll, bancos, grupos] = await Promise.all([
-    // Respostas (fetchAllByIn: aluno com muito histórico passa de 1000 → `.in()` cortaria e subestimaria os KPIs).
-    sessIds.length
-      ? fetchAllByIn<{ sessao_id: string; questao_id: string; correta: boolean }>(sessIds, (chunk) =>
-          svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('sessao_id', chunk).order('sessao_id'))
-      : Promise.resolve([] as { sessao_id: string; questao_id: string; correta: boolean }[]),
-    // Bancos vinculados (tolerante caso a tabela não exista).
-    (async (): Promise<{ id: string; nome: string }[]> => {
-      const { data: pe, error: peErr } = peRes
-      if (peErr || !pe?.length) return []
-      const ids = pe.map((p: any) => p.pasta_id)
-      const { data } = await svc.from('simulado_pastas').select('id, nome').in('id', ids)
-      return (data ?? []) as any
-    })(),
-    // Grupos vinculados (de que o aluno é membro) — sem pastas mestres. Tolerante ao schema.
-    (async (): Promise<{ id: string; nome: string; cor: string | null }[]> => {
-      const { data: gm, error: gmErr } = gmRes
-      if (gmErr || !gm?.length) return []
-      const gids = [...new Set(gm.map((r: any) => r.grupo_id).filter(Boolean))]
-      const sel = (cols: string) => svc.from('simulado_grupos').select(cols).in('id', gids).eq('deletado', false)
-      let r = await sel('id, nome, cor, is_mestre')
-      if (r.error) r = await sel('id, nome')
-      return (r.data ?? [])
-        .filter((g: any) => !g.is_mestre)
-        .map((g: any) => ({ id: g.id, nome: g.nome, cor: g.cor ?? null }))
-        .sort((a: any, b: any) => a.nome.localeCompare(b.nome, 'pt-BR'))
-    })(),
-  ])
+  const respAll = sessIds.length
+    ? await fetchAllByIn<{ sessao_id: string; questao_id: string; correta: boolean }>(sessIds, (chunk) =>
+        svc.from('simulado_respostas_objetivas').select('sessao_id, questao_id, correta').in('sessao_id', chunk).order('sessao_id'))
+    : [] as { sessao_id: string; questao_id: string; correta: boolean }[]
   for (const r of respAll) {
     totais.set(r.sessao_id, (totais.get(r.sessao_id) ?? 0) + 1)
     if (r.correta) acertos.set(r.sessao_id, (acertos.get(r.sessao_id) ?? 0) + 1)
@@ -262,9 +240,67 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
 
   // Gamificação do aluno (o admin confere sem entrar na conta) — só quando ativa no tenant.
   const gamConfig = await getGamConfig(svc, TID)
-  const [gamResumo, gamConquistas] = gamConfig?.ativo
-    ? await Promise.all([resumoGamificacao(svc, TID, id, gamConfig), conquistasDoAluno(svc, TID, id, gamConfig)])
-    : [null, [] as any[]]
+  const [gamResumo, gamConquistas, carimbosGanhos] = gamConfig?.ativo
+    ? await Promise.all([resumoGamificacao(svc, TID, id, gamConfig), conquistasDoAluno(svc, TID, id, gamConfig), carimbosGanhosDoAluno(svc, TID, id)])
+    : [null, [] as any[], [] as any[]]
+  // Adesivos (carimbos) conquistados → coleção no card de gamificação.
+  const adesivos = (carimbosGanhos as { def: { id: string; url?: string | null; titulo: string; texto?: string | null }; modulo: string; ganhoEm: string | null }[])
+    .map((c, i) => ({ id: `${c.modulo}:${c.def.id}:${i}`, url: c.def.url ?? null, titulo: c.def.titulo, texto: c.def.texto ?? null, modulo: c.modulo, ganhoEm: c.ganhoEm }))
+
+  // Histórico de desafios (Lei Seca/Jurisprudência) + assinaturas recorrentes — SQL agregado
+  // (nasce otimizado). `null` = SQL indisponível → a aba degrada com aviso; tolerante a erro.
+  const [desafiosAluno, assinaturasAluno, desafiosPendRaw, simVincRaw, grpVincRaw, pagamentosRaw] = await Promise.all([
+    desafiosAlunoSql(TID, id).catch(() => null),
+    assinaturasAlunoSql(TID, id).catch(() => null),
+    desafiosPendentesAlunoSql(TID, id).catch(() => null),
+    simuladosVinculadosAlunoSql(TID, id).catch(() => null),
+    gruposVinculadosAlunoSql(TID, id).catch(() => null),
+    pagamentosAlunoSql(TID, est.email, est.cpf).catch(() => null),
+  ])
+  const desafios = desafiosAluno ?? []
+  const assinaturas = assinaturasAluno ?? []
+  const assAtivas = assinaturas.filter((a) => a.status === 'ativo').length
+
+  // Vínculos (aba): simulados que o aluno acessa + grupos (com nº de alunos).
+  const simuladosVinc = (simVincRaw ?? []).map((s) => ({ id: s.id, titulo: s.titulo || 'Simulado', status: s.status || '' }))
+  const gruposVinc = (grpVincRaw ?? []).map((g) => ({ id: g.id, nome: g.nome || 'Grupo', cor: g.cor ?? null, membros: Number(g.membros) || 0 }))
+
+  // Assinaturas + pagamentos (aba). Datas absurdas (início corrompido) viram null.
+  const isoSane = (d: string | Date | null) => { if (!d) return null; const t = new Date(d as any); const y = t.getFullYear(); return y >= 2000 && y <= 2100 ? t.toISOString() : null }
+  const assinaturasItens = assinaturas.map((a) => ({
+    produtoNome: a.produto_nome ?? null, produtoRef: a.produto_ref ?? null, status: a.status ?? null, provider: a.provider ?? null,
+    // "Início" = data real (inicio_em); se faltar/estiver corrompida, cai no criado_em (quando entrou no sistema).
+    inicioEm: isoSane(a.inicio_em) ?? isoSane(a.criado_em), expiraEm: isoSane(a.expira_em),
+  }))
+  const pagamentos = (pagamentosRaw ?? []).map((p) => ({
+    id: p.id, pagoEm: isoSane(p.pago_em), status: p.status ?? null, produto: p.produto ?? null, produtoRef: p.produto_ref ?? null,
+    valor: p.valor != null && p.valor !== '' ? Number(p.valor) : null, metodo: p.metodo ?? null,
+    recorrente: !!p.recorrente, parcelas: p.parcelas != null ? Number(p.parcelas) : null, ciclo: p.ciclo != null ? Number(p.ciclo) : null,
+  }))
+
+  // Pendentes (chip no cabeçalho dos cards). Simulados: mapeia os já computados; desafios: SQL dedicado.
+  const simuladosPendentesChip = pendentes.map((p) => ({
+    id: p.id, titulo: p.titulo, iniciado: p.iniciado, href: `/admin/simulados/${p.id}`,
+    sub: `${p.iniciado ? 'Em andamento' : 'Não iniciado'}${p.expira ? ` · expira ${fmtData(p.expira)}` : ''}`,
+  }))
+  const desafiosPendentesChip = (desafiosPendRaw ?? []).map((d) => ({
+    id: d.modulo_id, titulo: d.modulo_nome || 'Módulo', iniciado: (Number(d.feitas) || 0) > 0,
+    href: `/admin/estudantes/${id}/desafio/${d.modulo_id}`,
+    sub: `${Number(d.feitas) || 0}/${Number(d.total) || 0} aulas · ${d.area === 'jurisprudencia' ? 'Jurisprudência' : 'Lei Seca'}`,
+  }))
+
+  // Estilo dos cards (pôster × ticket) definido pelo tenant (tema.card_view) — mesmo do resto do sistema.
+  const cardView = resolverCardView((((await getCurrentTenant())?.tema as any) ?? {}).card_view)
+
+  // Visual (capa/cor/ícone) dos módulos de desafio — para os cards da aba Histórico. Tolerante às colunas.
+  const desafioVisual: Record<string, DesafioVisual> = {}
+  if (desafios.length) {
+    const dids = [...new Set(desafios.map((d) => d.modulo_id))]
+    for (const cols of ['id, cor, icone, capa_url, capa_card_url', 'id, cor, icone, capa_url', 'id, cor, icone']) {
+      const r = await svc.from('simulado_pastas').select(cols).in('id', dids)
+      if (!r.error) { for (const p of (r.data ?? []) as any[]) desafioVisual[p.id] = { capa: p.capa_card_url ?? p.capa_url ?? null, cor: p.cor ?? null, icone: p.icone ?? null }; break }
+    }
+  }
 
   const iniciais = (est.nome ?? '?').split(' ').filter(Boolean).slice(0, 2).map((n: string) => n[0]?.toUpperCase()).join('')
   const notaTone = (n: number) => n >= 70 ? 'text-emerald-600 dark:text-emerald-400' : n >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'
@@ -331,39 +367,84 @@ export default async function EstudantePerfilPage({ params }: { params: Promise<
         </div>
       </div>
 
-      {/* SIMULADOS PENDENTES: cartão clicável → abre pop-up com a lista (não polui o perfil) */}
-      <SimuladosPendentesCard pendentes={pendentes} />
-
-      {/* GAMIFICAÇÃO: nível, cargo, liga e conquistas do aluno (só quando ativa) */}
-      {gamResumo && <GamificacaoEstudante resumo={gamResumo} conquistas={gamConquistas} />}
-
-      {/* Conteúdo: esquerda (Informações + Simulados feitos) | direita (Bancos + Histórico) */}
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <div className="min-w-0 space-y-5">
-          <Card className="overflow-hidden">
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base"><span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary"><User className="h-4 w-4" /></span> Informações</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <Info icon={Mail} label="E-mail" value={est.email ?? '—'} />
-              <Info icon={Phone} label="Telefone" value={est.telefone ?? '—'} />
-              <Info icon={IdCard} label="CPF" value={est.cpf ?? '—'} />
-              <Info icon={Calendar} label="Nascimento" value={fmtData(est.data_nascimento)} />
-              <Info icon={Hash} label="Matrícula externa" value={est.matricula_externa ?? '—'} />
-              <Info icon={GraduationCap} label="Classificação" value={classLabel} />
-            </CardContent>
-          </Card>
-
-          {rows.length > 0
-            ? <SimuladosFeitosCards rows={rows} estudanteId={id} estudanteNome={est.nome} visuais={visualPorSim} sempreAberto />
-            : <div className="rounded-2xl border bg-card p-8 text-center text-sm text-muted-foreground">Nenhum simulado realizado ainda.</div>}
-        </div>
-        <div className="space-y-4">
-          <BancosVinculadosPopup bancos={bancos} />
-          <GruposVinculadosPopup grupos={grupos} />
-          <HistoricoSimples rows={rows} estudanteId={id} />
-        </div>
-      </div>
+      {/* ABAS do perfil: Perfil · Histórico · Vínculos · Assinaturas (troca client-side; dados no SSR) */}
+      <EstudantePerfilTabs
+        inicial={tab}
+        tabs={[
+          {
+            key: 'perfil',
+            label: 'Perfil',
+            icon: <User className="h-4 w-4" />,
+            panel: (
+              <div className="space-y-5">
+                <Card className="overflow-hidden">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="flex items-center gap-2 text-base"><span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary"><User className="h-4 w-4" /></span> Informações pessoais</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                    <Info icon={Mail} label="E-mail" value={est.email ?? '—'} />
+                    <Info icon={Phone} label="Telefone" value={est.telefone ?? '—'} />
+                    <Info icon={IdCard} label="CPF" value={est.cpf ?? '—'} />
+                    <Info icon={Calendar} label="Nascimento" value={fmtData(est.data_nascimento)} />
+                    <Info icon={Hash} label="Matrícula externa" value={est.matricula_externa ?? '—'} />
+                    <Info icon={GraduationCap} label="Classificação" value={classLabel} />
+                  </CardContent>
+                </Card>
+                {gamResumo
+                  ? <GamificacaoEstudante resumo={gamResumo} conquistas={gamConquistas} adesivos={adesivos} />
+                  : <div className="rounded-2xl border bg-card p-8 text-center text-sm text-muted-foreground">Gamificação não está ativa neste tenant.</div>}
+              </div>
+            ),
+          },
+          {
+            key: 'historico',
+            label: 'Histórico',
+            icon: <ListChecks className="h-4 w-4" />,
+            count: reais.length,
+            panel: (
+              <div className="space-y-5">
+                <section className="space-y-2">
+                  <h2 className="flex items-center gap-2 text-sm font-semibold"><ListChecks className="h-4 w-4 text-primary" /> Simulados realizados</h2>
+                  {rows.length > 0 || simuladosPendentesChip.length > 0
+                    ? <SimuladosFeitosCards rows={rows} estudanteId={id} estudanteNome={est.nome} visuais={visualPorSim} sempreAberto cardView={cardView} pendentes={simuladosPendentesChip} />
+                    : <div className="rounded-2xl border bg-card p-8 text-center text-sm text-muted-foreground">Nenhum simulado realizado ainda.</div>}
+                </section>
+                <section className="space-y-2">
+                  <h2 className="flex items-center gap-2 text-sm font-semibold"><BookOpen className="h-4 w-4 text-primary" /> Desafios</h2>
+                  {desafiosAluno == null ? (
+                    <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-6 text-sm text-amber-700 dark:text-amber-300">O histórico de desafios depende do SQL agregado (DATABASE_URL), indisponível no momento.</div>
+                  ) : (
+                    <DesafiosFeitosCards
+                      estudanteId={id}
+                      cardView={cardView}
+                      visuais={desafioVisual}
+                      pendentes={desafiosPendentesChip}
+                      desafios={desafios.map((d) => ({
+                        moduloId: d.modulo_id, nome: d.modulo_nome || 'Módulo', area: d.area || 'leitura',
+                        aulasConcluidas: Number(d.aulas_concluidas) || 0, quizzesRespondidos: Number(d.quizzes_respondidos) || 0,
+                      }))}
+                    />
+                  )}
+                </section>
+              </div>
+            ),
+          },
+          {
+            key: 'vinculos',
+            label: 'Vínculos',
+            icon: <FolderOpen className="h-4 w-4" />,
+            count: simuladosVinc.length + gruposVinc.length,
+            panel: <VinculosAluno simulados={simuladosVinc} grupos={gruposVinc} />,
+          },
+          {
+            key: 'assinaturas',
+            label: 'Assinaturas',
+            icon: <Repeat className="h-4 w-4" />,
+            count: assAtivas,
+            panel: <EstudanteAssinaturas assinaturas={assinaturasItens} pagamentos={pagamentos} sqlOff={assinaturasAluno == null} />,
+          },
+        ]}
+      />
     </div>
   )
 }

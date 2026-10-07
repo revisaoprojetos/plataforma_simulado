@@ -23,24 +23,30 @@ export type EngajFiltro = { area: EngajArea; alvoId?: string | null }
 // Documentos de desafio em escopo. $1 = tenant. Se alvoPasta != '' → só daquela pasta; senão todas as
 // pastas de desafio (leitura + jurisprudência). Parâmetro posicional da pasta passado como alvoParam.
 function ldocsCte(alvoParam: string) {
+  // Sem alvo (alvoParam === "''") → sem filtro de pasta. NUNCA gerar `''::uuid` (o Postgres avalia o
+  // cast do literal no planejamento e estoura "invalid input syntax for type uuid", mesmo que o OR
+  // jamais o alcance logicamente). Só quando há alvo ($2) é que comparamos p.id.
+  const filtro = alvoParam === "''" ? 'TRUE' : `p.id = ${alvoParam}::uuid`
   return `ldocs AS (
      SELECT d.id FROM simulado_documentos d
        JOIN simulado_pastas p ON p.id = d.pasta_id
       WHERE d.tenant_id = $1 AND d.deletado = false
         AND p.folder_area IN ('leitura','jurisprudencia')
-        AND (${alvoParam} = '' OR p.id = ${alvoParam}::uuid)
+        AND (${filtro})
    )`
 }
 
 // Sessões finalizadas em escopo. $1 = tenant. alvoSim != '' → só daquele simulado.
 function sfinCte(alvoParam: string) {
+  // Idem ldocsCte: sem alvo → sem filtro (TRUE); nunca gerar `''::uuid`.
+  const filtro = alvoParam === "''" ? 'TRUE' : `sp.simulado_id = ${alvoParam}::uuid`
   return `sfin AS (
      SELECT DISTINCT sp.estudante_id, sp.id AS sessao_id, sp.simulado_id, sp.finalizado_em, sp.iniciado_em
        FROM simulado_sessoes_prova sp
        JOIN simulado_simulados sim ON sim.id = sp.simulado_id AND sim.tenant_id = $1 AND sim.deletado = false
       WHERE sp.status = 'finalizada' AND sp.is_teste = false AND sp.deletado = false
         AND sp.estudante_id IS NOT NULL
-        AND (${alvoParam} = '' OR sp.simulado_id = ${alvoParam}::uuid)
+        AND (${filtro})
    )`
 }
 
@@ -272,7 +278,14 @@ export async function engajamentoGeralAlunoDetalheSql(
     [tenantId, estudanteId],
   )
 
-  const desafios = await sqlQuery<EngajGeralDesafioRow>(
+  const desafios = await desafiosAlunoSql(tenantId, estudanteId)
+
+  return { info: info[0] ?? null, simulados: simulados ?? [], desafios: desafios ?? [] }
+}
+
+/** Histórico de desafios (Lei Seca + Jurisprudência) de um aluno, por módulo. Reaproveitável no perfil. */
+export async function desafiosAlunoSql(tenantId: string, estudanteId: string): Promise<EngajGeralDesafioRow[] | null> {
+  return sqlQuery<EngajGeralDesafioRow>(
     `WITH ldocs AS (
        SELECT d.id, d.pasta_id, p.nome AS pasta_nome, p.folder_area AS area
          FROM simulado_documentos d JOIN simulado_pastas p ON p.id = d.pasta_id
@@ -300,8 +313,169 @@ export async function engajamentoGeralAlunoDetalheSql(
       ORDER BY m.area ASC, m.pasta_nome ASC`,
     [tenantId, estudanteId],
   )
+}
 
-  return { info: info[0] ?? null, simulados: simulados ?? [], desafios: desafios ?? [] }
+// ── Desafios PENDENTES de um aluno (módulos ainda não concluídos 100%) ───────────────────────────
+export type DesafioPendenteRow = {
+  modulo_id: string
+  modulo_nome: string | null
+  area: string | null
+  total: string | number
+  feitas: string | number
+}
+
+/** Módulos de desafio (leitura/jurisprudência) com aulas publicadas em que o aluno NÃO concluiu todas. */
+export async function desafiosPendentesAlunoSql(tenantId: string, estudanteId: string): Promise<DesafioPendenteRow[] | null> {
+  return sqlQuery<DesafioPendenteRow>(
+    `WITH mods AS (
+       SELECT p.id, p.nome, p.folder_area AS area, COUNT(d.id) AS total
+         FROM simulado_pastas p
+         JOIN simulado_documentos d ON d.pasta_id = p.id AND d.tenant_id = p.tenant_id AND d.deletado = false AND d.publicado = true
+        WHERE p.tenant_id = $1 AND p.folder_area IN ('leitura','jurisprudencia') AND p.deletado = false
+        GROUP BY p.id, p.nome, p.folder_area
+     ),
+     done AS (
+       SELECT l.pasta_id, COUNT(DISTINCT lp.documento_id) AS feitas
+         FROM simulado_leitura_progresso lp
+         JOIN simulado_documentos l ON l.id = lp.documento_id
+        WHERE lp.estudante_id = $2 AND lp.concluido_em IS NOT NULL
+        GROUP BY l.pasta_id
+     )
+     SELECT m.id AS modulo_id, m.nome AS modulo_nome, m.area, m.total, COALESCE(dn.feitas, 0) AS feitas
+       FROM mods m LEFT JOIN done dn ON dn.pasta_id = m.id
+      WHERE COALESCE(dn.feitas, 0) < m.total
+      ORDER BY m.area ASC, m.nome ASC`,
+    [tenantId, estudanteId],
+  )
+}
+
+// ── Assinaturas de um aluno (aba "Assinaturas" do perfil) ────────────────────────────────────────
+export type AssinaturaAlunoRow = {
+  produto_ref: string | null
+  produto_nome: string | null
+  external_id: string | null
+  status: string | null
+  provider: string | null
+  inicio_em: string | Date | null
+  criado_em: string | Date | null   // fallback p/ "início" quando inicio_em falta/está corrompido
+  expira_em: string | Date | null
+  confirmado_curseduca: boolean | null
+}
+
+/**
+ * Assinaturas de um aluno (recorrentes ativas primeiro) + nome do produto/benefício resolvido pelo
+ * MAPEAMENTO da integração (`fonte_ref → fonte_nome` ou o grupo concedido, ex.: "Assinatura Ilimitada
+ * PGE/RS"). Duas etapas tolerantes: sem mapeamento, a lista ainda volta (só com o ref). `null` = SQL
+ * agregado indisponível.
+ */
+export async function assinaturasAlunoSql(tenantId: string, estudanteId: string): Promise<AssinaturaAlunoRow[] | null> {
+  const rows = await sqlQuery<AssinaturaAlunoRow>(
+    `SELECT produto_ref, external_id, status, provider, inicio_em, criado_em, expira_em, confirmado_curseduca
+       FROM simulado_assinaturas
+      WHERE tenant_id = $1 AND estudante_id = $2
+      ORDER BY (status = 'ativo') DESC, expira_em DESC NULLS LAST`,
+    [tenantId, estudanteId],
+  )
+  if (rows == null) return null
+  if (!rows.length) return []
+  const refs = [...new Set(rows.map((r) => r.produto_ref).filter(Boolean))] as string[]
+  const nomes = refs.length
+    ? await sqlQuery<{ produto_ref: string; produto_nome: string | null }>(
+        `SELECT DISTINCT ON (m.fonte_ref) m.fonte_ref AS produto_ref,
+                COALESCE(NULLIF(m.fonte_nome, ''), g.nome) AS produto_nome
+           FROM simulado_integracao_mapeamentos m
+           LEFT JOIN simulado_grupos g ON g.id = m.grupo_id
+          WHERE m.tenant_id = $1 AND m.fonte_ref = ANY($2)
+          ORDER BY m.fonte_ref, m.ativo DESC`,
+        [tenantId, refs],
+      )
+    : []
+  const mapaNome = new Map((nomes ?? []).map((n) => [n.produto_ref, n.produto_nome]))
+  return rows.map((r) => ({ ...r, produto_nome: r.produto_ref ? mapaNome.get(r.produto_ref) ?? null : null }))
+}
+
+// ── Histórico de PAGAMENTOS de um aluno (todos os webhooks de transação da Guru) ─────────────────
+export type PagamentoAlunoRow = {
+  id: string
+  pago_em: string | null
+  status: string | null
+  produto: string | null
+  produto_ref: string | null
+  valor: string | number | null       // valor REAL pago (payment.gross) — 0 em cupom 100%/grátis
+  metodo: string | null               // free | credit_card | pix | billet
+  recorrente: boolean | null          // é cobrança de assinatura (subscription presente)
+  parcelas: string | number | null    // nº de parcelas do cartão (installments.qty)
+  ciclo: string | number | null       // nº da cobrança recorrente (subscription.charged_times)
+  recebido_em: string | Date | null
+}
+
+/**
+ * Todos os pagamentos/transações do aluno — extraídos dos webhooks da Guru (`simulado_integracao_eventos`),
+ * casados por e-mail OU CPF (os eventos não guardam estudante_id). Base para análise financeira do aluno.
+ * `null` = SQL agregado indisponível. Retorna [] se não houver e-mail nem CPF para casar.
+ */
+export async function pagamentosAlunoSql(tenantId: string, email: string | null, cpf: string | null): Promise<PagamentoAlunoRow[] | null> {
+  const mail = (email ?? '').trim().toLowerCase()
+  const doc = (cpf ?? '').replace(/\D/g, '')
+  if (!mail && !doc) return []
+  return sqlQuery<PagamentoAlunoRow>(
+    `SELECT event_id AS id,
+            COALESCE(payload->'dates'->>'confirmed_at', payload->'dates'->>'ordered_at', payload->'dates'->>'created_at') AS pago_em,
+            payload->>'status' AS status,
+            payload->'items'->0->>'name' AS produto,
+            payload->'items'->0->>'marketplace_id' AS produto_ref,
+            payload->'payment'->>'gross' AS valor,
+            payload->'payment'->>'method' AS metodo,
+            (jsonb_typeof(payload->'subscription') = 'object') AS recorrente,
+            payload->'payment'->'installments'->>'qty' AS parcelas,
+            payload->'subscription'->>'charged_times' AS ciclo,
+            recebido_em
+       FROM simulado_integracao_eventos
+      WHERE tenant_id = $1
+        AND payload->'contact' IS NOT NULL
+        AND ( ($2 <> '' AND lower(payload->'contact'->>'email') = $2)
+           OR ($3 <> '' AND regexp_replace(COALESCE(payload->'contact'->>'doc', ''), '\\D', '', 'g') = $3) )
+      ORDER BY COALESCE(payload->'dates'->>'confirmed_at', payload->'dates'->>'ordered_at', recebido_em::text) DESC
+      LIMIT 500`,
+    [tenantId, mail, doc],
+  )
+}
+
+// ── Vínculos do aluno (aba "Vínculos" do perfil) ─────────────────────────────────────────────────
+export type SimuladoVinculadoRow = { id: string; titulo: string | null; status: string | null }
+
+/** Simulados a que o aluno tem acesso: matrícula + acesso avulso + simulados dos grupos dele. */
+export async function simuladosVinculadosAlunoSql(tenantId: string, estudanteId: string): Promise<SimuladoVinculadoRow[] | null> {
+  return sqlQuery<SimuladoVinculadoRow>(
+    `WITH g AS (SELECT grupo_id FROM simulado_grupo_membros WHERE estudante_id = $2),
+     ids AS (
+       SELECT simulado_id FROM simulado_matriculas WHERE tenant_id = $1 AND estudante_id = $2 AND simulado_id IS NOT NULL
+       UNION
+       SELECT simulado_id FROM simulado_acessos WHERE tenant_id = $1 AND estudante_id = $2 AND simulado_id IS NOT NULL
+       UNION
+       SELECT gs.simulado_id FROM simulado_grupo_simulado gs JOIN g ON g.grupo_id = gs.grupo_id WHERE gs.simulado_id IS NOT NULL
+     )
+     SELECT s.id, s.titulo, s.status
+       FROM simulado_simulados s JOIN ids ON ids.simulado_id = s.id
+      WHERE s.tenant_id = $1 AND s.deletado = false
+      ORDER BY s.titulo ASC`,
+    [tenantId, estudanteId],
+  )
+}
+
+export type GrupoVinculadoRow = { id: string; nome: string | null; cor: string | null; membros: string | number }
+
+/** Grupos (não-mestre) de que o aluno é membro, com a contagem de alunos de cada grupo. */
+export async function gruposVinculadosAlunoSql(tenantId: string, estudanteId: string): Promise<GrupoVinculadoRow[] | null> {
+  return sqlQuery<GrupoVinculadoRow>(
+    `SELECT g.id, g.nome, g.cor,
+            (SELECT count(*) FROM simulado_grupo_membros m WHERE m.grupo_id = g.id) AS membros
+       FROM simulado_grupos g
+       JOIN simulado_grupo_membros gm ON gm.grupo_id = g.id AND gm.estudante_id = $2
+      WHERE g.tenant_id = $1 AND g.deletado = false AND COALESCE(g.is_mestre, false) = false
+      ORDER BY g.nome ASC`,
+    [tenantId, estudanteId],
+  )
 }
 
 // ── Opções dos sub-filtros ─────────────────────────────────────────────────────────────────────

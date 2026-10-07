@@ -1,5 +1,6 @@
 import { createServiceClient, createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
+import { isSuperAdmin } from '@/lib/auth/permissions'
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -57,6 +58,8 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
 
   const supabase = await createServiceClient()
   const tenantId = await getCurrentTenantId()
+  // Super-admin: libera a aba "Plataformas" do "Nova Questão" (importar questões de outro tenant).
+  const podeImportarPlataforma = await isSuperAdmin()
 
   // ── Aba QUESTÕES: filtro (disciplinas) + lista paginada (só busca aqui) ──
   let disciplinas: { id: string; nome: string }[] = []
@@ -148,7 +151,7 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
         {tab === 'questoes' && (
           <div className="flex items-center gap-2">
             <ExportQuestoesButton filtros={{ q, status, disciplina, dificuldade, tipo }} />
-            <NovaQuestaoDialog />
+            <NovaQuestaoDialog podeImportarPlataforma={podeImportarPlataforma} />
           </div>
         )}
       </div>
