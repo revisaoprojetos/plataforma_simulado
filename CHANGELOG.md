@@ -12,6 +12,17 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.3.0 — 2026-10-07
+
+- **Aluno · Desafio de Lei Seca (trilha) — balão de ação por aula:** clicar num dia na trilha abre um
+  **balão sobre o nó** com **Iniciar aula / Continuar / Revisar** (ou "Libera em breve") linkando direto
+  pra aula — some a confusão de ter que olhar só o card lateral (desktop e mobile). O balão **aparece com
+  "pop"**, **pula** (bob) enquanto aberto, o **botão reage a hover/clique**, e **fecha com encolher+fade**.
+  "Você está aqui" some enquanto o balão está aberto; "Libera amanhã" só some quando o balão está nesse
+  mesmo nó. Vale pra Revisão e MEQ.
+- **Login novo (3 marcas) · versão visível:** o número da versão (`v{APP_VERSION}`) voltou a aparecer no
+  **canto superior direito** do login novo (PlatformLogin) — Revisão, VND e MEQ (não só no login antigo).
+
 ## 3.2.1 — 2026-10-07
 
 - **Aluno · Lei Seca (leitor) — texto vazando pra fora da folha:** o HTML das aulas (importado do

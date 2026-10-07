@@ -17,6 +17,7 @@ import { LoginRevisao } from './login/login-revisao'
 import { LoginVND } from './login/login-vnd'
 import { LoginMEQ } from './login/login-meq'
 import type { Brand, LoginTheme, Metodo } from './login/types'
+import { APP_VERSION } from '@/lib/version'
 
 export interface PlatformLoginProps {
   brand: Brand
@@ -54,6 +55,12 @@ export function PlatformLogin({
   return (
     <>
       {tela}
+      {/* Versão do sistema — canto superior direito do login (as 3 marcas). Oculta no preview. */}
+      {!preview && (
+        <span className="pointer-events-none fixed right-3 top-3 z-50 select-none rounded-full bg-black/25 px-2.5 py-1 text-[11px] font-semibold text-white/85 shadow-sm backdrop-blur-sm">
+          v{APP_VERSION}
+        </span>
+      )}
       {core.entrando && !preview && (
         <div className="fixed inset-0 z-[60]">
           {/* brand/theme/style EXPLÍCITOS → o loader resolve SÍNCRONO (sem piscar o NEUTRO_BG) e usa o

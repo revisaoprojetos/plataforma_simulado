@@ -207,6 +207,18 @@ export function DesafioLSRevisao({
         /* Transição do CONTEÚDO ao trocar de aba — DESLIZAMENTO (entra da direita) + fade. */
         [data-ls-rev] .lsr-tabpane{ animation:lsrTabIn .34s cubic-bezier(.22,1,.36,1) both; }
         @keyframes lsrTabIn{ from{ opacity:0; transform:translateX(34px); } to{ opacity:1; transform:none; } }
+        /* Balão de ação do nó: "pop" ao abrir e encolher+fade ao fechar, escalando da base (seta/nó). */
+        .lsr-balao-in{ animation:lsrBalaoIn .22s cubic-bezier(.2,.9,.3,1.4) both; transform-origin:50% 100%; }
+        .lsr-balao-out{ animation:lsrBalaoOut .14s ease-in both; transform-origin:50% 100%; }
+        @keyframes lsrBalaoIn{ 0%{ opacity:0; transform:scale(.55) translateY(14px); } 60%{ opacity:1; } 100%{ opacity:1; transform:none; } }
+        @keyframes lsrBalaoOut{ 0%{ opacity:1; transform:none; } 100%{ opacity:0; transform:scale(.7) translateY(8px); } }
+        /* Pulo contínuo do balão (sobe/desce) — só depois do "pop" de entrada. */
+        .lsr-balao-wrap{ animation:lsrBalaoBob 1.7s ease-in-out .28s infinite; }
+        @keyframes lsrBalaoBob{ 0%,100%{ transform:translate(-50%, calc(-100% - 48px)); } 50%{ transform:translate(-50%, calc(-100% - 58px)); } }
+        /* Botão de ação do balão: realce no HOVER e "pressionar" no CLIQUE. */
+        .lsr-balao-cta{ transition:transform .12s ease, filter .12s ease, box-shadow .12s ease; }
+        .lsr-balao-cta:hover{ filter:brightness(1.06); transform:translateY(-1px); box-shadow:0 10px 20px -10px rgba(0,0,0,.55); }
+        .lsr-balao-cta:active{ transform:translateY(1px) scale(.97); filter:brightness(.95); }
         @media (prefers-reduced-motion: reduce){ [data-ls-rev] .lsr-tabpane{ animation:none; } }
         @media (prefers-reduced-motion: reduce){ [data-ls-rev] *{ animation:none !important; } }
       `}</style>
@@ -320,7 +332,7 @@ function AbaTrilha({
   return (
     <div className="lsr-trilha-wrap" style={{ display: 'flex', gap: 18, alignItems: 'stretch' }}>
       {/* ── Palco da montanha (com barra de início acoplada) ── */}
-      <PalcoMontanha nodes={nodes} dy={dy} setDy={setDy} idxAtual={idxAtual} diasConcluidos={diasConcluidos} totalDias={totalDias} progressoPct={progressoPct} sel={sel} selDesemp={selDesemp} />
+      <PalcoMontanha nodes={nodes} dy={dy} setDy={setDy} idxAtual={idxAtual} diasConcluidos={diasConcluidos} totalDias={totalDias} progressoPct={progressoPct} sel={sel} selDesemp={selDesemp} desempenho={desempenho} />
 
       {/* ── Coluna lateral DIREITA ── */}
       <aside className="lsr-side" style={{ flex: '0 0 336px', width: 336, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 14, position: 'sticky', top: 90 }}>
@@ -500,14 +512,25 @@ function SuaEnergia({ desempenho, gam, diasLeitura = [] }: { desempenho: AulaDes
 // (Motor de zoom/pan e mapeamento de nós = REUSO do MEQ.)
 // ─────────────────────────────────────────────────────────────────────────────
 function PalcoMontanha({
-  nodes, dy, setDy, idxAtual, diasConcluidos, totalDias, progressoPct, sel, selDesemp,
+  nodes, dy, setDy, idxAtual, diasConcluidos, totalDias, progressoPct, sel, selDesemp, desempenho = [],
 }: {
   nodes: TrilhaNode[]; dy: number; setDy: (i: number) => void; idxAtual: number
-  diasConcluidos: number; totalDias: number; progressoPct: number; sel?: TrilhaNode; selDesemp?: AulaDesempenho
+  diasConcluidos: number; totalDias: number; progressoPct: number; sel?: TrilhaNode; selDesemp?: AulaDesempenho; desempenho?: AulaDesempenho[]
 }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const [zoom, setZoom] = useState(1)
+  // Balão de ação ancorado ao nó clicado (Iniciar/Continuar/Revisar) — reduz a confusão de ter que
+  // olhar o card lateral. `null` = nenhum aberto. Fecha ao arrastar/dar zoom.
+  const [balaoNode, setBalaoNode] = useState<number | null>(null)
+  // Estado VISUAL do balão (mantém montado durante a animação de SAÍDA). `saindo` dispara a animação.
+  const [balaoVis, setBalaoVis] = useState<{ i: number; saindo: boolean } | null>(null)
+  const balaoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (balaoTimer.current) { clearTimeout(balaoTimer.current); balaoTimer.current = null }
+    if (balaoNode !== null) setBalaoVis({ i: balaoNode, saindo: false })
+    else { setBalaoVis((p) => (p ? { i: p.i, saindo: true } : null)); balaoTimer.current = setTimeout(() => setBalaoVis(null), 170) }
+  }, [balaoNode])
   const zoomRef = useRef(1) // espelho síncrono do zoom p/ o transform imperativo (evita closure velha)
   const panRef = useRef({ x: 0, y: 0 })
   const dragRef = useRef<{ active: boolean; sx: number; sy: number; ox: number; oy: number }>({ active: false, sx: 0, sy: 0, ox: 0, oy: 0 })
@@ -608,6 +631,7 @@ function PalcoMontanha({
     return () => { el.removeEventListener('wheel', onWheel); pararRolagemSuave() }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
   function onPointerDown(e: React.PointerEvent) {
+    setBalaoNode(null) // arrastar/clicar vazio fecha o balão; clicar num nó reabre no onClick do nó
     pararRolagemSuave() // arrastar cancela a rolagem suave em curso
     setAnim(false) // arrasto = sem animação (segue o dedo)
     dragRef.current = { active: true, sx: e.clientX, sy: e.clientY, ox: panRef.current.x, oy: panRef.current.y }
@@ -667,7 +691,6 @@ function PalcoMontanha({
     setAnim(true)
     applyTransform()
   }
-
   return (
     <div style={{ position: 'relative', flex: '1 1 auto', minWidth: 0, display: 'flex', flexDirection: 'column', borderRadius: 20, overflow: 'hidden', background: 'var(--surface)', boxShadow: '0 0 0 1px var(--line)' }}>
       {/* Palco com zoom/pan */}
@@ -710,7 +733,7 @@ function PalcoMontanha({
               <button
                 key={node.id}
                 type="button"
-                onClick={() => setDy(i)}
+                onClick={() => { setDy(i); setBalaoNode(i) }}
                 title={`Dia ${String(i + 1).padStart(2, '0')} · ${node.titulo}`}
                 style={{
                   position: 'absolute',
@@ -745,16 +768,16 @@ function PalcoMontanha({
             )
           })}
 
-          {/* Rótulo "Você está aqui" — logo acima do nó atual */}
-          {nodePts[idxAtual] && (
+          {/* Rótulo "Você está aqui" — logo acima do nó atual (some quando um balão de aula está aberto). */}
+          {!balaoVis && nodePts[idxAtual] && (
             <span aria-hidden style={{ position: 'absolute', left: `${(nodePts[idxAtual].x / IMG_W) * 100}%`, top: `${(nodePts[idxAtual].y / IMG_H) * 100}%`, transform: 'translate(-50%, calc(-50% - 50px))', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', height: 22, padding: '0 9px', borderRadius: 99, background: 'var(--brand)', color: '#fff', fontSize: 11, fontWeight: 800, boxShadow: '0 6px 14px -6px rgba(0,0,0,.6)', zIndex: 7 }}>
               Você está aqui
               {/* Ponta (triângulo) logo ABAIXO do balão → aponta p/ o círculo do nó atual (sem invadir o texto). */}
               <span aria-hidden style={{ position: 'absolute', left: '50%', top: '100%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '7px solid var(--brand)' }} />
             </span>
           )}
-          {/* Balão "Libera amanhã" — EM CIMA do círculo da PRÓXIMA aula bloqueada (centralizado, acima). */}
-          {libIdx >= 0 && nodePts[libIdx] && (
+          {/* Balão "Libera amanhã" — some SÓ quando o balão da aula aberto está NO PRÓPRIO nó bloqueado. */}
+          {libIdx >= 0 && nodePts[libIdx] && !(balaoVis && balaoVis.i === libIdx) && (
             <span aria-hidden style={{ position: 'absolute', left: `${(nodePts[libIdx].x / IMG_W) * 100}%`, top: `${(nodePts[libIdx].y / IMG_H) * 100}%`, transform: 'translate(-50%, calc(-50% - 46px))', display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', height: 26, padding: '0 11px 0 6px', borderRadius: 99, background: '#fff', color: '#1A1530', fontSize: 11.5, fontWeight: 800, boxShadow: '0 10px 22px -10px rgba(0,0,0,.6)', zIndex: 9, animation: 'lsrBobLib 2.6s ease-in-out infinite' }}>
               <span style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--brand)', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Lock size={11} /></span>
               {libLabel}
@@ -762,6 +785,34 @@ function PalcoMontanha({
               <span aria-hidden style={{ position: 'absolute', left: '50%', top: '100%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '7px solid #fff' }} />
             </span>
           )}
+
+          {/* Balão de AÇÃO ao clicar num nó: Iniciar aula / Continuar / Revisar (ou bloqueado). */}
+          {balaoVis && nodePts[balaoVis.i] && (() => {
+            const np = nodePts[balaoVis.i]
+            const nd = np.node
+            const d = desempenho.find((x) => x.id === nd.id)
+            const lp = d ? Math.round(d.leituraPct) : 0
+            const concl = nd.estado === 'concluido'
+            const bloq = nd.estado === 'disponivel' && !!nd.naoLiberada
+            const lab = concl ? 'Revisar aula' : lp > 0 ? 'Continuar' : 'Iniciar aula'
+            const href = nd.hrefLeitura ?? nd.href ?? '#'
+            return (
+              <div className={balaoVis.saindo ? undefined : 'lsr-balao-wrap'} onPointerDown={(e) => e.stopPropagation()} style={{ position: 'absolute', left: `${(np.x / IMG_W) * 100}%`, top: `${(np.y / IMG_H) * 100}%`, transform: 'translate(-50%, calc(-100% - 48px))', zIndex: 14, width: 216 }}>
+                <div className={balaoVis.saindo ? 'lsr-balao-out' : 'lsr-balao-in'} style={{ position: 'relative', borderRadius: 14, padding: '11px 12px', background: '#fff', color: '#1A1530', boxShadow: '0 16px 34px -14px rgba(0,0,0,.72)' }}>
+                  <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.12em', color: 'var(--brand)' }}>DIA {String(balaoVis.i + 1).padStart(2, '0')}</span>
+                  <b style={{ display: 'block', margin: '2px 0 9px', fontSize: 13, lineHeight: 1.25, letterSpacing: '-0.01em' }}>{nd.titulo}</b>
+                  {bloq ? (
+                    <span style={{ display: 'inline-flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 6, height: 38, borderRadius: 10, background: 'rgba(30,17,80,.08)', color: '#6B5EA8', fontSize: 12.5, fontWeight: 700 }}><Lock size={13} /> Libera em breve</span>
+                  ) : (
+                    <Link href={href} onClick={() => setBalaoNode(null)} className="lsr-balao-cta" style={{ display: 'inline-flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 8, height: 40, borderRadius: 10, background: concl ? 'var(--brand)' : GOLD, color: concl ? '#fff' : '#2A1A55', fontSize: 13.5, fontWeight: 800 }}>
+                      {concl ? <RotateCcw size={14} /> : <Play size={13} />} {lab}
+                    </Link>
+                  )}
+                  <span aria-hidden style={{ position: 'absolute', left: '50%', top: '100%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '7px solid transparent', borderRight: '7px solid transparent', borderTop: '8px solid #fff' }} />
+                </div>
+              </div>
+            )
+          })()}
         </div>
 
         {/* ── Overlay "Subindo a montanha" (topo) ── */}
