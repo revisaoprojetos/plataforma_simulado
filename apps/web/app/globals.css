@@ -733,6 +733,26 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
    seguem escalando normalmente. Só no leitor (não na prévia do editor). */
 .leitura-conteudo [style*="font-size"] { font-size: inherit !important; }
 
+/* Fix (2026-10-07): o HTML do Word usa TABELAS (<table>) sem largura de coluna e com células cujo
+   texto não quebra — ex.: o box "NÃO ESQUEÇA" (<table><td><p>…</p></td></table>). Com `table-layout:auto`
+   a tabela CRESCE até caber o texto e estoura a folha (texto cortado à direita). Trava a tabela na
+   largura da folha + força as células a quebrarem. Também neutraliza nowrap/larguras inline do Word.
+   Só no leitor (.leitura-prosa). */
+.leitura-prosa { overflow-wrap: anywhere; }
+/* Catch-all: NENHUM bloco/elemento pode exceder a largura da folha (cobre todos os blocos, não só o
+   "NÃO ESQUEÇA"). `overflow-wrap: anywhere` é herdado → quebra palavras/URLs longas em qualquer bloco. */
+.leitura-prosa * { max-width: 100% !important; min-width: 0 !important; }
+/* Tabelas (box do Word): travadas na folha, colunas sem largura fixa, células sempre quebrando. */
+.leitura-prosa table { table-layout: fixed !important; width: 100% !important; }
+.leitura-prosa col, .leitura-prosa colgroup { width: auto !important; }
+.leitura-prosa td, .leitura-prosa th { overflow-wrap: anywhere; word-break: break-word; white-space: normal !important; }
+/* Pré-formatado: preserva as quebras mas também quebra linhas longas (senão estoura). */
+.leitura-prosa pre { white-space: pre-wrap !important; overflow-wrap: anywhere; }
+/* Neutraliza `white-space:nowrap` e larguras fixas (width/height attr) herdadas do Word. */
+.leitura-prosa [style*="nowrap"] { white-space: normal !important; }
+.leitura-prosa [width] { width: auto !important; }
+.leitura-prosa img, .leitura-prosa svg, .leitura-prosa video, .leitura-prosa iframe { height: auto; }
+
 /* Grifos inline (decorativos) — cores do padrão MAC */
 .leitura-prosa [data-grifo="nucleo"],      .leitura-prosa .hl-y { background:#fff35c; color:#111; padding:0 1px; border-radius:2px; }
 .leitura-prosa [data-grifo="complemento"], .leitura-prosa .hl-g { background:#a8d08d; color:#111; padding:0 1px; border-radius:2px; }

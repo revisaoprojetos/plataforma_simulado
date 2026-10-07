@@ -12,6 +12,15 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.2.1 — 2026-10-07
+
+- **Aluno · Lei Seca (leitor) — texto vazando pra fora da folha:** o HTML das aulas (importado do
+  Word) usa **tabelas** sem largura de coluna (ex.: o box "NÃO ESQUEÇA") que, com `table-layout:auto`,
+  cresciam até caber o texto e **estouravam a folha** (conteúdo cortado à direita). Correção de CSS
+  (`.leitura-prosa`, só no leitor): trava as tabelas na largura da folha + força quebra nas células,
+  e um catch-all `max-width:100%` + `overflow-wrap:anywhere` garante que **nenhum bloco** (tabela, pré,
+  imagem, texto, nowrap/larguras fixas do Word) exceda a folha. Vale pra Revisão e MEQ, claro/escuro.
+
 ## 3.2.0 — 2026-10-07
 
 - **Admin · Questões · importar entre plataformas (super-admin):** nova aba **"Plataformas"** no
