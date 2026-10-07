@@ -170,6 +170,7 @@ export default async function AlunoPortalLayout({ children }: { children: React.
     iniciais: iniciaisDe(sessao.nome || 'Aluno'),
     nivel: progresso?.nivel ?? 1,
     xpTotal: progresso?.xpTotal ?? 0,
+    streak: progresso?.streak ?? 0,
     tituloNivel: gamData.tituloNivel ?? undefined,
     liga: gamData.liga,
     posicaoLiga: null, // não computado neste layout; shells VND/MEQ toleram null

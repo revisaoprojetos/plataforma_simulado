@@ -1091,7 +1091,7 @@ function AbaDesempenho({
       {/* Tabela de desempenho (grid rows, estilo Revisão) */}
       <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 20, padding: 18 }}>
         <div style={{ display: 'grid', gridTemplateColumns: DES_COLS, gap: 12, padding: '0 10px 10px', borderBottom: '1px solid var(--line)' }}>
-          {['Dia', 'Aula', 'Leitura', 'Questões', 'Sequência', 'Pontos', 'Situação'].map((h) => (
+          {['Dia', 'Aula', 'Feito em', 'Leitura', 'Questões', 'Sequência', 'Pontos', 'Situação'].map((h) => (
             <span key={h} style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>{h}</span>
           ))}
         </div>
@@ -1111,6 +1111,8 @@ function AbaDesempenho({
                     <Link href={`/aluno/leitura/${a.id}`} style={{ display: 'block', fontSize: 13, color: 'var(--ink)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textDecoration: 'none' }}>{a.titulo}</Link>
                   )}
                 </div>
+                {/* Feito em (dia imutável de conclusão) */}
+                <span style={{ fontSize: 12, color: a.diaFeito ? 'var(--ink)' : 'var(--muted)', whiteSpace: 'nowrap' }}>{fmtDiaFeito(a.diaFeito)}</span>
                 {/* Leitura */}
                 {concl || a.leituraConcluida ? (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 700, color: '#1FA868' }}><Check size={13} strokeWidth={3} /> 100%</span>
@@ -1175,7 +1177,14 @@ function AbaDesempenho({
   )
 }
 
-const DES_COLS = '60px minmax(0,2fr) 1.2fr 0.8fr 0.8fr 0.7fr 120px'
+const DES_COLS = '60px minmax(0,2fr) 0.9fr 1.2fr 0.8fr 0.8fr 0.7fr 120px'
+
+/** 'YYYY-MM-DD' → 'DD/MM/AA' (fuso já aplicado na origem). Vazio → travessão. */
+function fmtDiaFeito(d: string | null): string {
+  if (!d) return '—'
+  const [y, m, dd] = d.split('-')
+  return y && m && dd ? `${dd}/${m}/${y.slice(2)}` : '—'
+}
 
 function PillR({ cor, icon, children }: { cor: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (

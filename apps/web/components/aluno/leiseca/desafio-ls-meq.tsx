@@ -958,6 +958,7 @@ function AbaDesempenho({ desempenho, totalDias, diasConcluidos, pontos, carimbos
               <tr style={{ textAlign: 'left', color: 'var(--muted)' }}>
                 <th style={thSt}>Dia</th>
                 <th style={thSt}>Aula / tema</th>
+                <th style={thSt}>Feito em</th>
                 <th style={thSt}>Leitura</th>
                 <th style={thSt}>Questões</th>
                 <th style={{ ...thSt, textAlign: 'center' }}>Sequência</th>
@@ -967,7 +968,7 @@ function AbaDesempenho({ desempenho, totalDias, diasConcluidos, pontos, carimbos
             </thead>
             <tbody>
               {desempenho.length === 0 ? (
-                <tr><td colSpan={7} style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Nenhuma aula neste módulo.</td></tr>
+                <tr><td colSpan={8} style={{ padding: 40, textAlign: 'center', color: 'var(--muted)' }}>Nenhuma aula neste módulo.</td></tr>
               ) : desempenho.map((a, i) => {
                 const bloqueada = a.estado === 'bloqueado'
                 return (
@@ -980,6 +981,7 @@ function AbaDesempenho({ desempenho, totalDias, diasConcluidos, pontos, carimbos
                         <Link href={`/aluno/leitura/${a.id}`} style={{ color: 'var(--ink)', fontWeight: 600, textDecoration: 'none' }}>{a.titulo}</Link>
                       )}
                     </td>
+                    <td style={{ ...tdSt, color: a.diaFeito ? 'var(--ink)' : 'var(--muted)', whiteSpace: 'nowrap' }}>{fmtDiaFeito(a.diaFeito)}</td>
                     <td style={tdSt}>
                       {a.leituraConcluida ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#1FA868' }}><Check size={13} /> 100%</span>
                         : bloqueada ? <span style={{ color: 'var(--muted)' }}>—</span>
@@ -1071,6 +1073,13 @@ function AbaDesempenho({ desempenho, totalDias, diasConcluidos, pontos, carimbos
 
 const thSt: React.CSSProperties = { padding: '11px 14px', fontWeight: 600, fontSize: 12 }
 const tdSt: React.CSSProperties = { padding: '11px 14px', color: 'var(--ink)' }
+
+/** 'YYYY-MM-DD' → 'DD/MM/AA' (fuso já aplicado na origem). Vazio → travessão. */
+function fmtDiaFeito(d: string | null): string {
+  if (!d) return '—'
+  const [y, m, dd] = d.split('-')
+  return y && m && dd ? `${dd}/${m}/${y.slice(2)}` : '—'
+}
 
 function Pill({ cor, icon, children }: { cor: string; icon?: React.ReactNode; children: React.ReactNode }) {
   return (

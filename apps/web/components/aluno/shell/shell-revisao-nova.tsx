@@ -547,13 +547,17 @@ export function ShellRevisaoNova({
           </button>
 
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={streakChip()}>
-              <Flame style={{ width: 15, height: 15 }} />0 dias
-            </span>
-            <span style={xpChip()}>
-              <Zap style={{ width: 15, height: 15 }} />
-              {xpFmt} XP
-            </span>
+            {usuario.gamAtivo !== false && (
+              <>
+                <span style={streakChip()}>
+                  <Flame style={{ width: 15, height: 15 }} />{usuario.streak ?? 0} {(usuario.streak ?? 0) === 1 ? 'dia' : 'dias'}
+                </span>
+                <span style={xpChip()}>
+                  <Zap style={{ width: 15, height: 15 }} />
+                  {xpFmt} XP
+                </span>
+              </>
+            )}
             <button
               type="button"
               aria-label="Notificações"

@@ -247,6 +247,9 @@ export interface AulaDesempenho {
   sequencia: number
   /** Quando concluiu a aula (ISO) — base da sequência + exibição. */
   data: string | null
+  /** Dia em que a aula CONTA como feita ('YYYY-MM-DD', fuso do tenant) — dia IMUTÁVEL do ledger
+   *  (meta.dia do quiz), igual ao streak; fallback p/ o dia do `data`. Coluna "Feito em" da tabela. */
+  diaFeito: string | null
 }
 export interface ModuloCompleto {
   trilha: Trilha | null
@@ -281,13 +284,17 @@ export async function carregarModuloCompleto(estId: string, tenantId: string, mo
   // Pontos (XP leitura+quiz) + data por aula, e a SEQUÊNCIA (dias consecutivos) no dia de cada aula.
   const docIds = arr.map((a) => a.doc.id)
   const refs = [...docIds, ...docIds.map((id) => `quiz:${id}`)]
-  let evs: { ref_id: string; xp: number; criado_em: string }[] = []
-  if (refs.length) { try { const { data } = await svc.from('simulado_xp_eventos').select('ref_id, xp, criado_em').eq('tenant_id', tenantId).eq('estudante_id', estId).eq('origem', 'leitura').in('ref_id', refs); evs = (data ?? []) as any } catch { /* gamificação ausente */ } }
+  let evs: { ref_id: string; xp: number; criado_em: string; meta?: { dia?: string } | null }[] = []
+  if (refs.length) { try { const { data } = await svc.from('simulado_xp_eventos').select('ref_id, xp, criado_em, meta').eq('tenant_id', tenantId).eq('estudante_id', estId).eq('origem', 'leitura').in('ref_id', refs); evs = (data ?? []) as any } catch { /* gamificação ausente */ } }
   const pontosDoc = new Map<string, number>(); const dataDoc = new Map<string, string>()
+  // Dia IMUTÁVEL de conclusão (meta.dia do evento de QUIZ) — mesma fonte do streak; p/ a coluna "Feito em".
+  const diaFeitoDoc = new Map<string, string>()
   for (const e of evs) {
+    const isQuiz = /^quiz:/.test(String(e.ref_id))
     const docId = String(e.ref_id).replace(/^quiz:/, '')
     pontosDoc.set(docId, (pontosDoc.get(docId) ?? 0) + (e.xp || 0))
     const prev = dataDoc.get(docId); if (!prev || (e.criado_em && e.criado_em < prev)) dataDoc.set(docId, e.criado_em)
+    if (isQuiz && e.meta?.dia) diaFeitoDoc.set(docId, e.meta.dia)
   }
   // Sequência = corrida de dias CONSECUTIVOS (fuso Brasília). Falhou um dia → reinicia em 1.
   const diaDe = (iso: string) => new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
@@ -305,6 +312,7 @@ export async function carregarModuloCompleto(estId: string, tenantId: string, mo
     questoesPendentes: Math.max(0, a.questoesTotal - a.questoesRespondidas),
     pontos: pontosDoc.get(a.doc.id) ?? 0,
     data: dataDoc.get(a.doc.id) ?? null,
+    diaFeito: diaFeitoDoc.get(a.doc.id) ?? (dataDoc.has(a.doc.id) ? diaDe(dataDoc.get(a.doc.id)!) : null),
     sequencia: dataDoc.has(a.doc.id) ? (streakDoDia.get(diaDe(dataDoc.get(a.doc.id)!)) ?? 0) : 0,
   }))
   // Pendência ACIONÁVEL = leitura concluída (questões liberadas) mas ainda faltam responder.

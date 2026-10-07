@@ -36,6 +36,8 @@ export interface AlunoShellUsuario {
   iniciais: string
   nivel: number
   xpTotal: number
+  /** Sequência (streak) atual em dias — recomputada do ledger imutável (casa com ranking/áreas). */
+  streak?: number
   tituloNivel?: string
   liga?: string | null
   posicaoLiga?: number | null

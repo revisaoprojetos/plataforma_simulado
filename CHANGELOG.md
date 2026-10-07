@@ -12,6 +12,18 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.3.1 — 2026-10-07
+
+- **Aluno · Desafio de Lei Seca — streak (sequência) consistente entre as áreas:** o número de "dias"
+  da **top bar** e o card **"Sua energia"** agora usam a MESMA fonte do ranking — o **dia imutável do
+  ledger** (meta.dia dos eventos de quiz) — em vez do campo `streak_atual` armazenado (que subcontava na
+  virada de meia-noite e ao refazer aula). Correções: `resumoGamificacao` recomputa o streak do ledger
+  (une módulos + ajustes do suporte); o shell novo lia `0 dias` fixo (agora recebe o valor real e esconde
+  os chips quando a gamificação está off); a faixa semanal do "Sua energia" marcava dias por `criado_em`
+  de qualquer evento de leitura (agora por `meta.dia` dos eventos de quiz).
+- **Aluno · tabela de desempenho — coluna "Feito em":** nova coluna à direita do nome da aula com o dia
+  em que a aula foi concluída (mesmo dia imutável do streak), formato `DD/MM/AA`. Revisão e MEQ.
+
 ## 3.3.0 — 2026-10-07
 
 - **Aluno · Desafio de Lei Seca (trilha) — balão de ação por aula:** clicar num dia na trilha abre um

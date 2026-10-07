@@ -4,6 +4,7 @@ import { missoesDoDia } from './rodizio'
 import { diaLocal, inicioDaSemanaISO, inicioDoMesISO } from './datas'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { listarConquistasModuloTenant } from '@/lib/leitura/carimbos'
+import { calcularSequencia } from '@/lib/leitura/sequencia'
 
 // ─────────── RESUMO (hero do portal) ───────────
 export interface ResumoGamificacao {
@@ -32,6 +33,47 @@ async function somaPeriodo(svc: any, tenantId: string, estudanteId: string, desd
   return ((data ?? []) as any[]).reduce((a, r) => a + (Number(r.xp) || 0), 0)
 }
 
+/** Streak GLOBAL do aluno a partir do dia IMUTÁVEL do ledger de XP (meta.dia dos eventos de quiz da
+ *  leitura) — a MESMA fonte do ranking/sequência (ver ranking.ts / aluno-desafio-detalhe.ts). A top bar
+ *  lia o `streak_atual` ARMAZENADO, que subcontava na virada de meia-noite e ao refazer aula; aqui
+ *  recomputamos para a top bar/hero casarem com as áreas. Une todos os módulos e os overrides manuais do
+ *  suporte (calendário): `true` força o dia a contar (vence `false`). `vazio=true` → não há ledger (aluno
+ *  legado antes do backfill): o chamador mantém o valor armazenado como fallback. */
+async function streakLedgerGlobal(
+  svc: any, tenantId: string, estudanteId: string, tz: string,
+): Promise<{ streakAtual: number; streakMaior: number; vazio: boolean }> {
+  const hoje = diaLocal(tz)
+  const ontem = new Date(Date.parse(hoje + 'T00:00:00Z') - 86_400_000).toISOString().slice(0, 10)
+  const dias = new Set<string>()
+  try {
+    const { data: ev } = await svc
+      .from('simulado_xp_eventos')
+      .select('meta')
+      .eq('tenant_id', tenantId).eq('estudante_id', estudanteId)
+      .eq('origem', 'leitura').like('ref_id', 'quiz:%')
+    for (const e of (ev ?? []) as any[]) { const d = e?.meta?.dia; if (d) dias.add(d) }
+  } catch { return { streakAtual: 0, streakMaior: 0, vazio: true } }
+  // Overrides manuais (calendário do suporte) de TODOS os módulos deste aluno; true vence false.
+  let overrides: Record<string, boolean> | undefined
+  try {
+    const { data: aj } = await svc
+      .from('simulado_leitura_sequencia_ajuste')
+      .select('overrides')
+      .eq('tenant_id', tenantId).eq('estudante_id', estudanteId)
+    for (const row of (aj ?? []) as any[]) {
+      const o = row?.overrides; if (!o || typeof o !== 'object') continue
+      for (const [dia, conta] of Object.entries(o as Record<string, boolean>)) {
+        overrides ??= {}
+        if (conta) overrides[dia] = true
+        else if (overrides[dia] !== true) overrides[dia] = false
+      }
+    }
+  } catch { /* migração pendente */ }
+  if (dias.size === 0 && !overrides) return { streakAtual: 0, streakMaior: 0, vazio: true }
+  const seq = calcularSequencia(dias, overrides, hoje, ontem)
+  return { streakAtual: seq.streakAtual, streakMaior: seq.streakMaior, vazio: false }
+}
+
 /** Resumo de gamificação do aluno para o hero (cache + XP semana/mês). Retorna null se inativo. */
 export async function resumoGamificacao(svc: any, tenantId: string, estudanteId: string, cfg?: GamConfig | null): Promise<ResumoGamificacao | null> {
   const config = cfg ?? (await getGamConfig(svc, tenantId))
@@ -42,11 +84,15 @@ export async function resumoGamificacao(svc: any, tenantId: string, estudanteId:
     .eq('tenant_id', tenantId).eq('estudante_id', estudanteId)
     .maybeSingle()
   const xpTotal = row?.xp_total ?? 0
-  const [xpSemana, xpMes, xpHoje] = await Promise.all([
+  const [xpSemana, xpMes, xpHoje, streak] = await Promise.all([
     somaPeriodo(svc, tenantId, estudanteId, inicioDaSemanaISO()),
     somaPeriodo(svc, tenantId, estudanteId, inicioDoMesISO()),
     svc.rpc('rpc_xp_dia', { p_tenant: tenantId, p_estudante: estudanteId, p_tz: config.timezone }).then((r: any) => Number(r?.data ?? 0)).catch(() => 0),
+    streakLedgerGlobal(svc, tenantId, estudanteId, config.timezone),
   ])
+  // Streak recomputado do ledger imutável (casa com ranking/áreas); fallback ao armazenado p/ legado sem ledger.
+  const streakAtual = streak.vazio ? (row?.streak_atual ?? 0) : streak.streakAtual
+  const streakMaior = streak.vazio ? (row?.streak_maior ?? 0) : Math.max(streak.streakMaior, row?.streak_maior ?? 0)
   return {
     ativo: true,
     xpTotal,
@@ -54,8 +100,8 @@ export async function resumoGamificacao(svc: any, tenantId: string, estudanteId:
     progresso: progressoNivel(xpTotal, config.nivel_curva),
     liga: ligaParaXp(xpTotal, config.ligas),
     proxima: proximaLiga(xpTotal, config.ligas),
-    streakAtual: row?.streak_atual ?? 0,
-    streakMaior: row?.streak_maior ?? 0,
+    streakAtual,
+    streakMaior,
     feitoHoje: (row?.ultimo_dia_ativo ?? null) === diaLocal(config.timezone),
     xpSemana,
     xpMes,

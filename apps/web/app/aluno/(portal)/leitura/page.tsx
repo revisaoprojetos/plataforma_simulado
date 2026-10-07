@@ -43,8 +43,10 @@ export default async function LeituraAlunoPage({ searchParams }: { searchParams:
       // ainda não refletiu a última aula concluída. Tolerante — nunca quebra a página.
       calcularMinhaLinhaLeitura(modulo, sessao.tenantId, sessao.estudanteId).catch(() => null),
       carregarGamRail(svc, sessao.tenantId, sessao.estudanteId),
-      // Dias com atividade de LEITURA (Ofensiva/calendário) — buscados em paralelo (formatados abaixo).
-      svc.from('simulado_xp_eventos').select('criado_em').eq('tenant_id', sessao.tenantId).eq('estudante_id', sessao.estudanteId).eq('origem', 'leitura').order('criado_em', { ascending: false }).limit(600).then((r) => r.data ?? [], () => []),
+      // Dias de CONCLUSÃO do quiz (Ofensiva/calendário) — MESMA fonte do streak (ledger imutável: eventos
+      // `quiz:%`, `meta.dia`). Antes usava `criado_em` de TODO evento de leitura → a faixa marcava dias
+      // diferentes do número da sequência (virada de meia-noite / leitura sem quiz). Formatados abaixo.
+      svc.from('simulado_xp_eventos').select('ref_id, meta, criado_em').eq('tenant_id', sessao.tenantId).eq('estudante_id', sessao.estudanteId).eq('origem', 'leitura').like('ref_id', 'quiz:%').order('criado_em', { ascending: false }).limit(600).then((r) => r.data ?? [], () => []),
       // Concede retroativamente medalhas merecidas — corre em paralelo (não segura o render).
       avaliarMedalhasModulo(svc, sessao.tenantId, modulo, sessao.estudanteId).then(() => null, () => null),
     ])
@@ -60,7 +62,10 @@ export default async function LeituraAlunoPage({ searchParams }: { searchParams:
       try {
         const tz = gam?.config.timezone || 'America/Sao_Paulo'
         const fmt = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' })
-        diasLeitura = [...new Set((eventosDia as { criado_em: string }[]).map((r) => fmt.format(new Date(r.criado_em))))]
+        // Prefere o dia IMUTÁVEL do carimbo (meta.dia); fallback p/ criado_em no fuso do tenant.
+        diasLeitura = [...new Set((eventosDia as { meta?: { dia?: string }; criado_em: string }[])
+          .map((r) => r.meta?.dia || fmt.format(new Date(r.criado_em)))
+          .filter(Boolean))]
       } catch { /* tolerante */ }
       // Pré-carrega a imagem de fundo da trilha (alta prioridade) → ao voltar do quiz ela já está pronta,
       // sem o "flash preto" enquanto carrega.
