@@ -25,7 +25,7 @@ import {
   ClipboardCheck,
 } from 'lucide-react'
 import { simTokensStyle } from '../sim-tokens'
-import type { EstadoEntrada, SimScreenProps } from '../types'
+import type { EstadoEntrada, SimScreenProps, SimEntradaReal } from '../types'
 import {
   Bgfx,
   ghostBtnStyle,
@@ -45,7 +45,7 @@ const P = 'sve'
 
 type Modal = null | 'ini' | 'ret'
 
-export function EntradaVND({ theme, data, es = 'aberto', preview }: SimScreenProps) {
+export function EntradaVND({ theme, data, es = 'aberto', preview, real }: SimScreenProps) {
   const [estado, setEstado] = useState<EstadoEntrada>(es)
   const [md, setMd] = useState<Modal>(null)
   const [mo, setMo] = useState<'cad' | 'folha'>('cad')
@@ -65,8 +65,14 @@ export function EntradaVND({ theme, data, es = 'aberto', preview }: SimScreenPro
           ? 'Encerrado'
           : 'Em andamento'
 
-  function openIni(modo: 'cad' | 'folha') {
+  async function openIni(modo: 'cad' | 'folha') {
     setMo(modo)
+    // Com wiring real: VALIDA o e-mail/acesso ANTES de abrir o modal. E-mail errado/bloqueio → o erro
+    // aparece no form e o modal NÃO abre (antes abria sem validar nada). Sem real (preview) → abre direto.
+    if (real) {
+      const ok = await (real.onValidar?.() ?? Promise.resolve(true))
+      if (!ok) return
+    }
     setMd('ini')
   }
 
@@ -119,7 +125,7 @@ export function EntradaVND({ theme, data, es = 'aberto', preview }: SimScreenPro
 
         {/* Voltar — FIXO no canto superior ESQUERDO da tela (fora do wrap centralizado), responsivo
             via clamp() p/ adaptar a qualquer viewport e à Curseduca (iframe). */}
-        <a href="#" className={`${P}-back`}>
+        <a href={real?.voltarHref || '#'} className={`${P}-back`}>
           <ChevronLeft size={15} /> Voltar
         </a>
 
@@ -149,9 +155,10 @@ export function EntradaVND({ theme, data, es = 'aberto', preview }: SimScreenPro
                   {badge}
                 </span>
                 <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.24em', color: '#F1D48A' }}>
-                  {info.subtitulo}
+                  {info.curto || info.subtitulo}
                 </span>
-                <h1 className={`${P}-h1`}>{info.curto.replace('SIMULADO NACIONAL', 'Simulado Nacional')}</h1>
+                {/* Nome REAL do simulado (info.titulo), não o rótulo genérico (curto). */}
+                <h1 className={`${P}-h1`}>{info.titulo}</h1>
                 <div className={`${P}-chips`}>
                   <span className={`${P}-chip`}>
                     <Clock size={14} />
@@ -190,7 +197,7 @@ export function EntradaVND({ theme, data, es = 'aberto', preview }: SimScreenPro
               <div style={{ height: 1, background: 'var(--line)' }} />
               <b style={{ fontSize: 18, letterSpacing: '-0.02em', color: 'var(--ink)' }}>Pronto para a missão?</b>
 
-              {estado === 'aberto' && <FormAberto onIni={() => openIni('cad')} onFolha={() => openIni('folha')} />}
+              {estado === 'aberto' && <FormAberto real={real} onIni={() => openIni('cad')} onFolha={() => openIni('folha')} onResultado={() => real?.onIdentificar('resultado')} />}
               {estado === 'agendado' && (
                 <FormAgendado countdown={countdown} nf={nf} onNf={() => setNf((v) => !v)} />
               )}
@@ -203,7 +210,7 @@ export function EntradaVND({ theme, data, es = 'aberto', preview }: SimScreenPro
                   onRet={() => setMd('ret')}
                 />
               )}
-              {estado === 'encerrado' && <FormEncerrado fim={fimLabel} />}
+              {estado === 'encerrado' && <FormEncerrado fim={fimLabel} real={real} />}
 
               <span className={`${P}-foot`}>
                 Ao iniciar você concorda com as regras do simulado. Seus dados não são exibidos no ranking — apenas as
@@ -226,8 +233,8 @@ export function EntradaVND({ theme, data, es = 'aberto', preview }: SimScreenPro
         >
           <div style={{ padding: '16px 24px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <Kpi label="Tempo" value="4h00" sub="começa ao iniciar" valueColor="var(--brand)" />
-              <Kpi label="Questões" value={String(info.n)} sub="objetiva A–E" />
+              <Kpi label="Tempo" value={info.duracaoMin ? `${Math.floor(info.duracaoMin / 60)}h${String(info.duracaoMin % 60).padStart(2, '0')}` : 'Sem limite'} sub={info.duracaoMin ? 'começa ao iniciar' : 'sem cronômetro'} valueColor="var(--brand)" />
+              <Kpi label="Questões" value={String(info.n)} sub={info.tipo === 'CE' ? 'Certo ou Errado' : 'objetiva A–E'} />
             </div>
             <span className={`${P}-section`}>Como você quer responder?</span>
             <RadioCard
@@ -249,20 +256,21 @@ export function EntradaVND({ theme, data, es = 'aberto', preview }: SimScreenPro
               onToggle={() => setAg((v) => !v)}
               text="Li as regras e estou pronto. Sei que o tempo não para depois de iniciar."
             />
-            <a
-              href="#"
+            <button
+              type="button"
+              disabled={!ag || !!real?.carregando}
+              onClick={() => { if (real) real.onIdentificar(mo === 'folha' ? 'folha' : 'iniciar') }}
               className={`${P}-sbtn`}
               style={{
-                ...primaryBtnStyle({ height: 52, borderRadius: 16, fontSize: 15 }),
+                ...primaryBtnStyle({ width: '100%', height: 52, borderRadius: 16, fontSize: 15 }),
                 opacity: ag ? 1 : 0.45,
-                pointerEvents: ag ? 'auto' : 'none',
+                pointerEvents: ag && !real?.carregando ? 'auto' : 'none',
                 transition: 'opacity .2s',
-                textDecoration: 'none',
               }}
             >
               <Play size={16} />
-              Começar agora
-            </a>
+              {real?.carregando ? 'Entrando…' : 'Começar agora'}
+            </button>
           </div>
         </ModalShell>
       )}
@@ -373,22 +381,54 @@ function EmailField({ value = '', error = false }: { value?: string; error?: boo
   )
 }
 
-function FormAberto({ onIni, onFolha }: { onIni: () => void; onFolha: () => void }) {
+// Campo controlado real (reaproveita o visual do EmailField mock).
+function CampoReal({ label, icon, type, value, onChange, placeholder, inputMode }: { label: string; icon: React.ReactNode; type?: string; value: string; onChange: (v: string) => void; placeholder: string; inputMode?: 'numeric' | 'tel' }) {
+  return (
+    <label style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>{label} <b style={{ color: '#E5484D' }}>*</b></span>
+      <span style={{ display: 'flex', alignItems: 'center', gap: 10, height: 50, padding: '0 14px', borderRadius: 14, border: '1.5px solid var(--line2)', background: 'var(--surface)', color: 'var(--muted)' }}>
+        {icon}
+        <input type={type ?? 'text'} inputMode={inputMode} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} autoComplete={type === 'email' ? 'email' : undefined} style={{ flex: 1, minWidth: 0, border: 0, outline: 0, background: 'transparent', font: 'inherit', fontSize: 14.5, color: 'var(--ink)' }} />
+      </span>
+    </label>
+  )
+}
+
+function CamposReais({ real }: { real: SimEntradaReal }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <CampoReal label={`E-mail cadastrado${real.plataforma ? ` em ${real.plataforma}` : ''}`} icon={<Mail size={17} />} type="email" value={real.email} onChange={real.setEmail} placeholder="seu@email.com" />
+      {real.metodo === 'email_cpf' && <CampoReal label="CPF" icon={<User size={17} />} value={real.cpf} onChange={real.setCpf} placeholder="000.000.000-00" inputMode="numeric" />}
+      {real.metodo === 'email_telefone' && <CampoReal label="Telefone" icon={<User size={17} />} value={real.telefone} onChange={real.setTelefone} placeholder="(00) 00000-0000" inputMode="tel" />}
+    </div>
+  )
+}
+
+function FormAberto({ onIni, onFolha, onResultado, real }: { onIni: () => void; onFolha: () => void; onResultado: () => void; real?: SimEntradaReal }) {
+  const carregando = !!real?.carregando
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <EmailField />
-      <button type="button" onClick={onIni} className={`${P}-sbtn`} style={primaryBtnStyle({ width: '100%', height: 52, borderRadius: 16, fontSize: 14.5 })}>
-        <Play size={17} /> Iniciar simulado
+      {real ? <CamposReais real={real} /> : <EmailField />}
+      {real?.erro ? (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '10px 12px', borderRadius: 12, background: 'rgba(229,72,77,.08)', border: '1px solid rgba(229,72,77,.3)', fontSize: 12.5, color: '#E5484D' }}>
+          <CircleAlert size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+          <span>{real.erro.titulo ? <b>{real.erro.titulo} </b> : null}{real.erro.mensagem}</span>
+        </div>
+      ) : null}
+      <button type="button" disabled={carregando} onClick={onIni} className={`${P}-sbtn`} style={primaryBtnStyle({ width: '100%', height: 52, borderRadius: 16, fontSize: 14.5 })}>
+        <Play size={17} /> {carregando ? 'Validando…' : 'Iniciar simulado'}
       </button>
-      <button type="button" onClick={onFolha} className={`${P}-sbtn`} style={ghostBtnStyle({ width: '100%', height: 48, borderRadius: 16, fontSize: 14.5 })}>
-        <List size={17} /> Responder só a folha de respostas
-      </button>
+      {(!real || real.permiteFolha) && (
+        <button type="button" disabled={carregando} onClick={onFolha} className={`${P}-sbtn`} style={ghostBtnStyle({ width: '100%', height: 48, borderRadius: 16, fontSize: 14.5 })}>
+          <List size={17} /> Responder só a folha de respostas
+        </button>
+      )}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 11.5, fontWeight: 700, color: 'var(--muted)' }}>
         <span style={{ flex: 1, height: 1, background: 'var(--line)' }} />
         OU
         <span style={{ flex: 1, height: 1, background: 'var(--line)' }} />
       </div>
-      <a href="#" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 13.5, fontWeight: 700, color: 'var(--brand)' }}>
+      <a href="#" onClick={(e) => { e.preventDefault(); onResultado() }} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, fontSize: 13.5, fontWeight: 700, color: 'var(--brand)' }}>
         <TrendingUp size={15} /> Já fiz — ver meus resultados
       </a>
     </div>
@@ -516,21 +556,27 @@ function FormRetomar({
   )
 }
 
-function FormEncerrado({ fim }: { fim: string }) {
+function FormEncerrado({ fim, real }: { fim: string; real?: SimEntradaReal }) {
+  const carregando = !!real?.carregando
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 14px', borderRadius: 12, background: 'var(--surface2)', color: 'var(--ink)', fontSize: 13, fontWeight: 600 }}>
         <Flag size={17} /> O prazo terminou em {fim}. Você ainda pode treinar sem valer para o ranking.
       </div>
-      <EmailField />
-      <button type="button" className={`${P}-sbtn`} style={primaryBtnStyle({ width: '100%', height: 52, borderRadius: 16, fontSize: 14.5 })}>
-        <TrendingUp size={17} /> Ver meu resultado
-      </button>
-      <button type="button" className={`${P}-sbtn`} style={ghostBtnStyle({ width: '100%', height: 48, borderRadius: 16, fontSize: 14.5 })}>
-        <BookOpenCheck size={17} /> Gabarito comentado
+      {real ? <CamposReais real={real} /> : <EmailField />}
+      {real?.erro ? (
+        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '10px 12px', borderRadius: 12, background: 'rgba(229,72,77,.08)', border: '1px solid rgba(229,72,77,.3)', fontSize: 12.5, color: '#E5484D' }}>
+          <CircleAlert size={15} style={{ flexShrink: 0, marginTop: 1 }} />
+          <span>{real.erro.titulo ? <b>{real.erro.titulo} </b> : null}{real.erro.mensagem}</span>
+        </div>
+      ) : null}
+      <button type="button" disabled={carregando} onClick={() => real?.onIdentificar('resultado')} className={`${P}-sbtn`} style={primaryBtnStyle({ width: '100%', height: 52, borderRadius: 16, fontSize: 14.5 })}>
+        <TrendingUp size={17} /> {carregando ? 'Validando…' : 'Ver meu resultado'}
       </button>
       <button
         type="button"
+        disabled={carregando}
+        onClick={() => real?.onIdentificar('iniciar')}
         className={`${P}-sbtn`}
         style={{ width: '100%', height: 48, border: 0, borderRadius: 16, background: VND_GOLD, color: VND_GOLD_INK, boxShadow: VND_GOLD_SHADOW, font: 'inherit', fontSize: 14.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9, cursor: 'pointer' }}
       >

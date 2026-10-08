@@ -12,6 +12,19 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.4.7 — 2026-10-08
+
+- **Entrada do simulado do VND agora é FUNCIONAL (não mais mock).** O "ticket verde" do VND era só
+  visual: sem campo de e-mail real, sem validação (e-mail errado abria o modal mesmo assim) e com
+  título/duração chumbados. Ligado ao backend (igual ao MEQ):
+  - **Campos reais** (e-mail + CPF/telefone conforme o método) ligados ao estado + **erro do backend**.
+  - **Valida antes de abrir o modal** ("Tudo pronto"): e-mail errado/bloqueio mostra o erro e NÃO abre
+    o modal (via `onValidar`); "Começar agora" cria a sessão de verdade (`onIdentificar`).
+  - **Título real** no card (`info.titulo`, ex.: "Simulado teste") e **duração/questões reais** no modal
+    (antes "4h00" fixo).
+  - Estado **encerrado**: "Ver meu resultado" / "Fazer como treino" validam e navegam de verdade.
+  - "Voltar" usa o destino real (`voltarHref`).
+
 ## 3.4.6 — 2026-10-08
 
 - **Link do admin para o simulado (`/aluno/login?token=`) agora usa a entrada BRANDED da marca.** Esse

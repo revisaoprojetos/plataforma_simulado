@@ -9,8 +9,8 @@ import { EntradaVND } from './vnd/entrada'
 import { ProvaVND } from './vnd/prova'
 import { ResultadoVND } from './vnd/resultado'
 
-export function SimuladoVND({ tela, theme, data, preview, es, mo }: SimScreenProps & { tela: Tela }) {
+export function SimuladoVND({ tela, theme, data, preview, es, mo, real }: SimScreenProps & { tela: Tela }) {
   if (tela === 'prova') return <ProvaVND theme={theme} data={data} preview={preview} es={es} mo={mo} />
   if (tela === 'resultado') return <ResultadoVND theme={theme} data={data} preview={preview} es={es} mo={mo} />
-  return <EntradaVND theme={theme} data={data} preview={preview} es={es} mo={mo} />
+  return <EntradaVND theme={theme} data={data} preview={preview} es={es} mo={mo} real={real} />
 }
