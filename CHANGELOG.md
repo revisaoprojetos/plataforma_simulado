@@ -12,6 +12,15 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.4.3 — 2026-10-08
+
+- **Login do SIMULADO no VND com o design novo da marca:** ao abrir um link de simulado
+  (`/simulado/<token>`) sem sessão, o **VND** estava caindo no formulário **genérico** (`EmbedLoginForm`)
+  em vez da entrada branded (`EntradaReal` → `SimuladoVND`). Agora VND (quando `internoAtivo`) usa a
+  mesma entrada nova da marca que o MEQ já usava. (Config: login do PORTAL do VND também foi ajustado
+  para a variante **Centralizado** e o do MEQ confirmado em **Circuito** — via `tema.aparencia_auth`,
+  sem deploy.)
+
 ## 3.4.2 — 2026-10-08
 
 - **VND e MEQ · acesso ao simulado na home:** os cards de "Simulados recentes" das plataformas novas

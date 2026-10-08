@@ -39,9 +39,10 @@ export default async function ProvaPage({ params, searchParams }: { params: Prom
     const metodo = (sim.metodo_identificacao ?? 'email') as 'email' | 'email_cpf' | 'email_telefone'
 
     // MEQ: a entrada usa o layout "caderno de prova" (spec 06 §1) ligado aos dados reais.
-    // Revisão (quando `internoAtivo`): usa a MESMA entrada no design novo da marca. As demais marcas
-    // (e a Revisão sem internoAtivo) seguem o EmbedLoginForm genérico — produção intacta.
-    const usaEntradaNova = branding?.brand === 'meq' || (branding?.brand === 'revisao' && branding.internoAtivo)
+    // Revisão e VND (quando `internoAtivo`): usam a MESMA entrada no design novo da marca. As demais
+    // (e Revisão/VND sem internoAtivo) seguem o EmbedLoginForm genérico — produção intacta.
+    // Antes o VND ficava de fora → o login do SIMULADO do VND caía no form genérico (não branded).
+    const usaEntradaNova = branding?.brand === 'meq' || ((branding?.brand === 'revisao' || branding?.brand === 'vnd') && !!branding.internoAtivo)
     if (usaEntradaNova) {
       const info = await fetchInfoProva(sim.id, sim.tenant_id)
       return (
