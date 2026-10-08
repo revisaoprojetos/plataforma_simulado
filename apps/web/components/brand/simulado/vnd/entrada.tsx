@@ -45,7 +45,7 @@ const P = 'sve'
 
 type Modal = null | 'ini' | 'ret'
 
-export function EntradaVND({ theme, data, es = 'aberto' }: SimScreenProps) {
+export function EntradaVND({ theme, data, es = 'aberto', preview }: SimScreenProps) {
   const [estado, setEstado] = useState<EstadoEntrada>(es)
   const [md, setMd] = useState<Modal>(null)
   const [mo, setMo] = useState<'cad' | 'folha'>('cad')
@@ -77,39 +77,42 @@ export function EntradaVND({ theme, data, es = 'aberto' }: SimScreenProps) {
     >
       <style>{css}</style>
 
-      {/* chips de pré-visualização — barra do mock (removida em produção) */}
-      <div className={`${P}-demobar`}>
-        <span className={`${P}-demolabel`}>
-          <Info size={14} /> PRÉ-VISUALIZAR ESTADO
-        </span>
-        <div className={`${P}-hs`} style={{ display: 'flex', gap: 6, overflowX: 'auto' }}>
-          {(
-            [
-              ['aberto', 'Aberto'],
-              ['agendado', 'Ainda não abriu'],
-              ['semcad', 'Sem cadastro'],
-              ['retomar', 'Já iniciado'],
-              ['encerrado', 'Encerrado'],
-            ] as [EstadoEntrada, string][]
-          ).map(([k, label]) => {
-            const on = estado === k
-            return (
-              <button
-                key={k}
-                type="button"
-                onClick={() => {
-                  setEstado(k)
-                  setMd(null)
-                }}
-                className={`${P}-demochip`}
-                style={{ background: on ? 'var(--brand)' : 'transparent', color: on ? '#fff' : 'var(--muted)' }}
-              >
-                {label}
-              </button>
-            )
-          })}
+      {/* chips de PRÉ-VISUALIZAR ESTADO — ferramenta de MOCK/preview; só aparece no preview, NUNCA no
+          acesso real do aluno (antes vazava em produção porque não estava gated). */}
+      {preview && (
+        <div className={`${P}-demobar`}>
+          <span className={`${P}-demolabel`}>
+            <Info size={14} /> PRÉ-VISUALIZAR ESTADO
+          </span>
+          <div className={`${P}-hs`} style={{ display: 'flex', gap: 6, overflowX: 'auto' }}>
+            {(
+              [
+                ['aberto', 'Aberto'],
+                ['agendado', 'Ainda não abriu'],
+                ['semcad', 'Sem cadastro'],
+                ['retomar', 'Já iniciado'],
+                ['encerrado', 'Encerrado'],
+              ] as [EstadoEntrada, string][]
+            ).map(([k, label]) => {
+              const on = estado === k
+              return (
+                <button
+                  key={k}
+                  type="button"
+                  onClick={() => {
+                    setEstado(k)
+                    setMd(null)
+                  }}
+                  className={`${P}-demochip`}
+                  style={{ background: on ? 'var(--brand)' : 'transparent', color: on ? '#fff' : 'var(--muted)' }}
+                >
+                  {label}
+                </button>
+              )
+            })}
+          </div>
         </div>
-      </div>
+      )}
 
       <div style={{ position: 'relative', minHeight: 820 }}>
         <Bgfx prefix={P} variant="entrada" />

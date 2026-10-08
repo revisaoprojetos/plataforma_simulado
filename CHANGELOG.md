@@ -12,6 +12,12 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.4.4 — 2026-10-08
+
+- **VND · entrada do simulado: barra "PRÉ-VISUALIZAR ESTADO" não aparece mais no acesso real.** A barra
+  de troca de estado (Aberto/Encerrado/…) é ferramenta de **preview/mock** e estava vazando no acesso
+  do aluno — agora só aparece quando `preview` (rota de prévia). (MEQ/Revisão não tinham o problema.)
+
 ## 3.4.3 — 2026-10-08
 
 - **Login do SIMULADO no VND com o design novo da marca:** ao abrir um link de simulado
