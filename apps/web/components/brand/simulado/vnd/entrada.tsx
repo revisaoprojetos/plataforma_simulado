@@ -117,22 +117,22 @@ export function EntradaVND({ theme, data, es = 'aberto', preview }: SimScreenPro
       <div style={{ position: 'relative', minHeight: 820 }}>
         <Bgfx prefix={P} variant="entrada" />
 
+        {/* Voltar — FIXO no canto superior ESQUERDO da tela (fora do wrap centralizado), responsivo
+            via clamp() p/ adaptar a qualquer viewport e à Curseduca (iframe). */}
+        <a href="#" className={`${P}-back`}>
+          <ChevronLeft size={15} /> Voltar
+        </a>
+
         <div className={`${P}-wrap`}>
-          {/* topo: voltar + lockup */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <a href="#" className={`${P}-back`}>
-              <ChevronLeft size={15} /> Voltar
-            </a>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 11, flexShrink: 0, whiteSpace: 'nowrap' }}>
-              <MarcaVND size={22} radius={13} />
-              <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
-                <span style={{ fontWeight: 800, fontSize: 14, color: '#FFFFFF' }}>Você na Defensoria</span>
-                <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.18em', color: '#F1D48A' }}>
-                  SIMULA VND
-                </span>
-              </div>
+          {/* topo: lockup centralizado */}
+          <div className={`${P}-lockup`}>
+            <MarcaVND size={22} radius={13} />
+            <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
+              <span style={{ fontWeight: 800, fontSize: 14, color: '#FFFFFF' }}>Você na Defensoria</span>
+              <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.18em', color: '#F1D48A' }}>
+                SIMULA VND
+              </span>
             </div>
-            <span style={{ width: 60 }} />
           </div>
 
           {/* ticket */}
@@ -632,7 +632,10 @@ ${modalSheetCss(P)}
 .${P}-demolabel{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:800;letter-spacing:.1em;color:var(--muted);white-space:nowrap}
 .${P}-demochip{flex-shrink:0;height:30px;padding:0 12px;border:1px solid var(--line);border-radius:99px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
 .${P}-wrap{position:relative;max-width:760px;margin:0 auto;padding:40px 24px 64px;display:flex;flex-direction:column;gap:26px}
-.${P}-back{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:700;color:#CFE3D7}
+/* Voltar no canto superior ESQUERDO da tela; clamp() adapta a posição ao viewport/iframe. */
+.${P}-back{position:absolute;z-index:6;left:clamp(12px,3vw,32px);top:clamp(14px,2.4vw,26px);display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:700;color:#CFE3D7;text-decoration:none}
+.${P}-back:hover{color:#fff}
+.${P}-lockup{display:flex;align-items:center;justify-content:center;gap:11px;flex-shrink:0;white-space:nowrap}
 .${P}-ticket{border-radius:28px;overflow:hidden;background:var(--surface);border:2px solid var(--line);box-shadow:0 8px 0 var(--line),0 40px 70px -40px rgba(4,26,16,.6)}
 .${P}-top{position:relative;overflow:hidden;padding:34px 36px 38px;background:${VND_HERO_BG};color:#fff;text-align:center}
 .${P}-topdots{position:absolute;inset:0;background-image:radial-gradient(circle,rgba(185,245,212,.16) 1.2px,transparent 1.8px);background-size:22px 22px}
@@ -642,9 +645,12 @@ ${modalSheetCss(P)}
 .${P}-h1{margin:0;font-size:36px;font-weight:800;letter-spacing:-.045em;line-height:1.08}
 .${P}-chips{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:4px}
 .${P}-chip{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:99px;background:rgba(255,255,255,.1);border:1px solid rgba(185,245,212,.25);font-size:12.5px;font-weight:700;color:#fff}
-.${P}-picote{position:relative;height:0;border-top:2px dashed var(--line2);margin:0 24px}
-.${P}-notch{position:absolute;top:-17px;width:32px;height:32px;border-radius:50%;background:var(--bg)}
-.${P}-notch-l{left:-40px}.${P}-notch-r{right:-40px}
+/* picote (linha tracejada) + FUROS laterais: círculos da cor do fundo centrados na borda do ticket
+   (metade fica por fora e é cortada pelo overflow:hidden → dá o recorte do ingresso). Sombra interna
+   sutil p/ o furo "afundar" e ler como buraco em qualquer fundo. */
+.${P}-picote{position:relative;height:0;border-top:2px dashed var(--line2);margin:0 22px}
+.${P}-notch{position:absolute;top:-19px;width:38px;height:38px;border-radius:50%;background:var(--bg);box-shadow:inset -2px 0 4px -2px rgba(4,26,16,.25),inset 2px 0 4px -2px rgba(4,26,16,.25)}
+.${P}-notch-l{left:-41px}.${P}-notch-r{right:-41px}
 .${P}-dates{display:flex;gap:10px}
 .${P}-datetile{flex:1;padding:12px;border-radius:16px;border:2px solid var(--line);border-bottom-width:4px;background:var(--surface)}
 .${P}-datelbl{font-size:10.5px;font-weight:800;letter-spacing:.1em;color:var(--muted)}

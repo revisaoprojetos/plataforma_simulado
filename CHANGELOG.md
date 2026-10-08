@@ -12,6 +12,14 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.4.5 — 2026-10-08
+
+- **VND · entrada do simulado — "Voltar" no canto superior esquerdo + responsivo:** saiu de dentro do
+  bloco centralizado e foi fixado no **canto esquerdo da tela** com `clamp()`, adaptando a posição a
+  qualquer viewport e à Curseduca (iframe). O lockup "Você na Defensoria / SIMULA VND" fica centralizado.
+- **VND · furos laterais do ticket reforçados:** os recortes (picote/ingresso) nas laterais do card
+  ficaram maiores e com sombra interna sutil p/ ler como "furo" em qualquer fundo.
+
 ## 3.4.4 — 2026-10-08
 
 - **VND · entrada do simulado: barra "PRÉ-VISUALIZAR ESTADO" não aparece mais no acesso real.** A barra
