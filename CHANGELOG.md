@@ -12,6 +12,17 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.4.2 — 2026-10-08
+
+- **VND e MEQ · acesso ao simulado na home:** os cards de "Simulados recentes" das plataformas novas
+  estavam como **mockup** (`href="#"`/`<span>`), então **"Fazer agora"/"Continuar"/"Refazer" e o
+  download do caderno não funcionavam**. Agora usam os links reais (`fazerUrl` → `/simulado/<token>`,
+  `cadernoUrl` → caderno em nova aba) e as **pastas** levam para `/aluno?pasta=<id>`. (O Revisão já
+  estava ligado.)
+- **Notificação (top bar VND/MEQ):** o balão de "X novas notificações" abria **para cima** (design da
+  sidebar) e saía da tela no topo. Agora, quando o sino está no topo, o balão abre **para baixo** com a
+  **seta apontando para cima** (mesma regra do dropdown).
+
 ## 3.4.1 — 2026-10-08 (hotfix de estabilidade)
 
 Corrige a instabilidade que apareceu após a v3.4.0 (áreas abrindo mas sem carregar, logout travando,

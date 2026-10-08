@@ -500,7 +500,7 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
             </div>
             <div className="hvn-grid4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
               {pastasFilt.map((p, i) => (
-                <a key={p.id} href="#" onClick={onClickSafe} className="hvn-lift" style={{ display: 'flex', flexDirection: 'column', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 22, overflow: 'hidden' }}>
+                <a key={p.id} {...(preview ? { href: '#', onClick: onClickSafe } : { href: `/aluno?pasta=${encodeURIComponent(p.id)}` })} className="hvn-lift" style={{ display: 'flex', flexDirection: 'column', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 22, overflow: 'hidden' }}>
                   <div style={{ height: 120 }}><Cover rotulo={p.rotuloCapa} sub={p.subCapa} grad={COVER_BG[i % COVER_BG.length]} big={26} /></div>
                   <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                     <div style={{ minWidth: 0 }}>
@@ -752,11 +752,12 @@ function RecenteCard({ s, grad }: { s: HomeData['recentes'][number]; grad: strin
           <b style={{ display: 'block', marginTop: 4, fontSize: 14.5, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.titulo}</b>
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 'auto' }}>
-          <a className="hvn-cta" href="#" onClick={(e) => e.preventDefault()} style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7, height: 40, borderRadius: 12, color: '#FFFFFF', fontSize: 13, fontWeight: 800 }}>
+          {/* Link REAL do runner quando houver token (fazerUrl); sem url (ex.: preview/mock) = no-op. */}
+          <a className="hvn-cta" {...(s.fazerUrl ? { href: s.fazerUrl } : { href: '#', onClick: (e: React.MouseEvent) => e.preventDefault() })} style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7, height: 40, borderRadius: 12, color: '#FFFFFF', fontSize: 13, fontWeight: 800 }}>
             <Play size={12} fill="currentColor" stroke="none" />{emAndamento ? 'Continuar' : s.status === 'Concluído' ? 'Refazer' : 'Fazer agora'}
           </a>
           {s.cadernoUrl && (
-            <a href="#" onClick={(e) => e.preventDefault()} aria-label="Baixar caderno" title="Baixar caderno" style={{ width: 40, height: 40, borderRadius: 12, border: '1px solid var(--line)', color: 'var(--muted)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><FileDown size={16} /></a>
+            <a href={s.cadernoUrl} target="_blank" rel="noopener noreferrer" aria-label="Baixar caderno" title="Baixar caderno" style={{ width: 40, height: 40, borderRadius: 12, border: '1px solid var(--line)', color: 'var(--muted)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><FileDown size={16} /></a>
           )}
         </div>
       </div>

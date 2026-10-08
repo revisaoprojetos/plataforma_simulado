@@ -32,7 +32,7 @@ export function NotificacaoBellAluno({ diagonal = false, colapsada = false }: { 
   const [montado, setMontado] = useState(false) // presente no DOM (durante a animação)
   const [visivel, setVisivel] = useState(false)  // classe que dispara enter/exit
   const [pos, setPos] = useState<{ left: number; bottom?: number; top?: number; dir: 'up' | 'down' } | null>(null)
-  const [balaoPos, setBalaoPos] = useState<{ left: number; bottom: number } | null>(null) // balão de aviso acima do sino
+  const [balaoPos, setBalaoPos] = useState<{ left: number; top?: number; bottom?: number; dir: 'up' | 'down' } | null>(null) // balão de aviso (acima no rodapé da sidebar; ABAIXO no top bar)
   const btnRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
   const fecharTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -91,14 +91,16 @@ export function NotificacaoBellAluno({ diagonal = false, colapsada = false }: { 
     const calc = () => {
       const r = btnRef.current?.getBoundingClientRect()
       if (!r || !r.width) { setBalaoPos(null); return } // instância oculta (sidebar no outro estado)
+      // Mesma regra do dropdown: sino na metade de CIMA da tela (top bar VND/MEQ) → balão ABAIXO do
+      // sino com a ponta p/ cima; sino embaixo (rodapé da sidebar) → balão ACIMA com a ponta p/ baixo.
+      const paraBaixo = r.top < window.innerHeight / 2
       if (diagonal) {
-        // Ancora no canto superior-direito do sino; o balão cresce p/ a direita e p/ cima.
         const left = Math.min(r.right - 2, window.innerWidth - 210)
-        setBalaoPos({ left, bottom: window.innerHeight - r.top + 4 })
+        setBalaoPos(paraBaixo ? { left, top: r.bottom + 4, dir: 'down' } : { left, bottom: window.innerHeight - r.top + 4, dir: 'up' })
       } else {
         const centro = r.left + r.width / 2
         const left = Math.min(Math.max(centro, 96), window.innerWidth - 96) // clamp p/ não sair da tela
-        setBalaoPos({ left, bottom: window.innerHeight - r.top + 10 })
+        setBalaoPos(paraBaixo ? { left, top: r.bottom + 10, dir: 'down' } : { left, bottom: window.innerHeight - r.top + 10, dir: 'up' })
       }
     }
     calc()
@@ -161,19 +163,19 @@ export function NotificacaoBellAluno({ diagonal = false, colapsada = false }: { 
           Diagonal (sidebar recolhida): na diagonal superior-DIREITA do sino, ponta diagonal p/ o ícone. */}
       {naoLidas > 0 && !montado && !emJogo && balaoPos && (diagonal ? colapsada : !colapsada) && typeof document !== 'undefined' && createPortal(
         diagonal ? (
-          <div className="pointer-events-none fixed z-[115]" style={{ left: balaoPos.left, bottom: balaoPos.bottom }} aria-hidden>
-            <div className="balao-pill absolute bottom-0 left-1 flex items-center whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-bold text-white shadow-lg" style={{ background: 'var(--brand-accent, var(--primary))' }}>
+          <div className="pointer-events-none fixed z-[115]" style={{ left: balaoPos.left, top: balaoPos.top, bottom: balaoPos.bottom }} aria-hidden>
+            <div className={cn('balao-pill absolute left-1 flex items-center whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-bold text-white shadow-lg', balaoPos.dir === 'down' ? 'top-0' : 'bottom-0')} style={{ background: 'var(--brand-accent, var(--primary))' }}>
               {naoLidas} {naoLidas === 1 ? 'nova notificação' : 'novas notificações'}
-              {/* ponta DIAGONAL única: triângulo encostado no balão apontando p/ baixo-esquerda (o sino) */}
-              <span className="absolute h-2.5 w-2.5" aria-hidden style={{ left: '8px', bottom: '2px', background: 'var(--brand-accent, var(--primary))', clipPath: 'polygon(0 0, 100% 0, 50% 100%)', transform: 'translateY(60%) rotate(45deg)' }} />
+              {/* ponta apontando p/ o sino (p/ cima quando o balão está abaixo; p/ baixo quando acima) */}
+              <span className={cn('absolute left-2 h-2.5 w-2.5 rotate-45', balaoPos.dir === 'down' ? '-top-1' : '-bottom-1')} aria-hidden style={{ background: 'var(--brand-accent, var(--primary))' }} />
             </div>
           </div>
         ) : (
-          <div className="pointer-events-none fixed z-[115] translate-x-1.5" style={{ left: balaoPos.left, bottom: balaoPos.bottom }} aria-hidden>
-            <div className="balao-pill absolute -right-3 bottom-0 flex items-center whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-bold text-white shadow-lg" style={{ background: 'var(--brand-accent, var(--primary))' }}>
+          <div className="pointer-events-none fixed z-[115] translate-x-1.5" style={{ left: balaoPos.left, top: balaoPos.top, bottom: balaoPos.bottom }} aria-hidden>
+            <div className={cn('balao-pill absolute -right-3 flex items-center whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-bold text-white shadow-lg', balaoPos.dir === 'down' ? 'top-0' : 'bottom-0')} style={{ background: 'var(--brand-accent, var(--primary))' }}>
               {naoLidas} {naoLidas === 1 ? 'nova notificação' : 'novas notificações'}
-              {/* ponta apontando pra baixo, alinhada ao sino */}
-              <span className="absolute -bottom-1 right-3 h-2.5 w-2.5 rotate-45" style={{ background: 'var(--brand-accent, var(--primary))' }} />
+              {/* ponta alinhada ao sino: p/ cima se balão abaixo, p/ baixo se acima */}
+              <span className={cn('absolute right-3 h-2.5 w-2.5 rotate-45', balaoPos.dir === 'down' ? '-top-1' : '-bottom-1')} style={{ background: 'var(--brand-accent, var(--primary))' }} />
             </div>
           </div>
         ),

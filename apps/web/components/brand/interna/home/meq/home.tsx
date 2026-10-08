@@ -128,7 +128,7 @@ function acaoLabel(status: string) {
 // substituível por data.rotativo quando houver fonte real (foco/objetivo do aluno).
 const ROTATIVO_PADRAO_MEQ = ['Concursos', 'Tribunais', 'a Magistratura', 'o Ministério Público', 'carreiras jurídicas']
 
-export function HomeMeq({ theme, data }: { theme: InternaTheme; data: HomeData; preview?: boolean }) {
+export function HomeMeq({ theme, data, preview }: { theme: InternaTheme; data: HomeData; preview?: boolean }) {
   // Tema RESOLVIDO no cliente (reage ao toggle do shell AO VIVO: .dark / .theme-azul), usando o `theme`
   // do servidor (cookie) como fallback no 1º paint. Sem isto a Início só trocava de tema ao navegar.
   const resolvido = useTemaInterno(theme)
@@ -537,7 +537,7 @@ export function HomeMeq({ theme, data }: { theme: InternaTheme; data: HomeData; 
               {pastasFiltradas.map((p, i) => {
                 const done = p.concluidos ?? 0
                 return (
-                  <a key={p.id} href="#" className="hmq-tile hmq-lift" onClick={(e) => e.preventDefault()}>
+                  <a key={p.id} {...(preview ? { href: '#', onClick: (e: React.MouseEvent) => e.preventDefault() } : { href: `/aluno?pasta=${encodeURIComponent(p.id)}` })} className="hmq-tile hmq-lift">
                     <div style={{ width: 70, height: 70, borderRadius: 11, overflow: 'hidden', flexShrink: 0 }}>
                       <Capa rotulo={p.rotuloCapa} grad={CAPA_GRADS[i % CAPA_GRADS.length]} radius={11} fs={14} />
                     </div>
@@ -686,12 +686,14 @@ function LinhaRecente({ r, grad }: { r: HomeSimuladoCard; grad: string }) {
         <Segs total={10} preenchidos={segsPreench} altura={6} />
         <span style={{ fontSize: 11, color: 'var(--muted)' }}>{r.progresso}%</span>
       </div>
-      {/* Ações */}
+      {/* Ações — links REAIS do runner/caderno quando houver (fazerUrl/cadernoUrl); sem url = inerte. */}
       <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-        <span className="hmq-cta" style={{ height: 34, borderRadius: 10, fontSize: 12.5, padding: '0 12px' }}>{label}</span>
-        <span className="hmq-icobtn" aria-label="Baixar caderno" title="Baixar caderno">
-          <Download className="hmq-i" style={{ width: 15, height: 15 }} />
-        </span>
+        {r.fazerUrl
+          ? <a className="hmq-cta" href={r.fazerUrl} style={{ height: 34, borderRadius: 10, fontSize: 12.5, padding: '0 12px', textDecoration: 'none' }}>{label}</a>
+          : <span className="hmq-cta" style={{ height: 34, borderRadius: 10, fontSize: 12.5, padding: '0 12px' }}>{label}</span>}
+        {r.cadernoUrl
+          ? <a className="hmq-icobtn" href={r.cadernoUrl} target="_blank" rel="noopener noreferrer" aria-label="Baixar caderno" title="Baixar caderno"><Download className="hmq-i" style={{ width: 15, height: 15 }} /></a>
+          : <span className="hmq-icobtn" aria-label="Baixar caderno" title="Baixar caderno"><Download className="hmq-i" style={{ width: 15, height: 15 }} /></span>}
       </div>
     </div>
   )
