@@ -10,6 +10,11 @@ export interface HudConfigResolvido {
 
 const VAZIO: HudConfigResolvido = { base: HUD_CORES_PADRAO, porPagina: {}, cadernoId: null }
 
+// HUD DESATIVADA (decisão: usar SÓ os modelos novos do designer como padrão). Com `false`, o
+// resolverHudConfig retorna sempre o PADRÃO (ignora a config armazenada) — vale p/ login/loading/
+// runner/embed do simulado. NÃO afeta o caderno impresso. Reversível: voltar p/ `true`.
+const HUD_ATIVA = false
+
 function montar(config: any, cadernoId: string | null): HudConfigResolvido {
   const hc = config?.hudCores
   const base = hc ? { ...HUD_CORES_PADRAO, ...hc } : HUD_CORES_PADRAO
@@ -22,6 +27,7 @@ function montar(config: any, cadernoId: string | null): HudConfigResolvido {
  * → `simulado_pastas.hud`. Cai no padrão quando o banco não tem HUD. (`tenantId` mantido por compat.)
  */
 export async function resolverHudConfig(simuladoId: string, _tenantId?: string | null): Promise<HudConfigResolvido> {
+  if (!HUD_ATIVA) return VAZIO // HUD desativada → padrão (sem queries).
   try {
     const svc = createAdminClient()
     const { data: sim } = await svc.from('simulado_simulados').select('regras').eq('id', simuladoId).maybeSingle()

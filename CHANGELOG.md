@@ -12,6 +12,15 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.4.9 — 2026-10-08
+
+- **HUD do simulado DESATIVADA (padrão sempre).** `resolverHudConfig` passou a retornar sempre o padrão
+  (flag `HUD_ATIVA = false`), ignorando a config armazenada — vale p/ login/loading/runner/embed do
+  simulado. Não afeta o caderno impresso. Reversível (flag p/ `true`).
+- **Carregamento do simulado mais leve (code-split por marca).** `PlatformSimulado` importava as 3
+  marcas (cada uma com entrada+prova+resultado) de forma estática → toda página de simulado baixava/
+  compilava as 3 (no dev, >1min no 1º acesso). Agora via `next/dynamic` só a marca usada é carregada.
+
 ## 3.4.8 — 2026-10-08
 
 - **HUD do simulado substituída pelos modelos novos (designer novo) como PADRÃO.** Por enquanto, o
