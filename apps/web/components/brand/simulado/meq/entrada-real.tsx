@@ -216,6 +216,7 @@ export function EntradaReal(props: EntradaRealProps) {
       duracaoMin: prova.tempoLimiteMin,
       inicioISO: prova.dataInicio ?? agoraISO,
       fimISO: prova.dataFim ?? agoraISO,
+      semJanela: !prova.dataInicio && !prova.dataFim, // sem data de início/fim → "Sempre aberto"
       inscritos: 0,
       regras: [],
       recompensa: '',

@@ -147,17 +147,12 @@ export function EntradaVND({ theme, data, es = 'aberto', preview, real }: SimScr
             <div className={`${P}-top`}>
               <span aria-hidden="true" className={`${P}-topdots`} />
               <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>
-                <span className={`${P}-okpop ${P}-tile`}>
-                  <ClipboardCheck size={34} />
-                </span>
                 <span className={`${P}-statusbadge`}>
                   <span className={`${P}-statusdot`} />
                   {badge}
                 </span>
-                <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.24em', color: '#F1D48A' }}>
-                  {info.curto || info.subtitulo}
-                </span>
-                {/* Nome REAL do simulado (info.titulo), não o rótulo genérico (curto). */}
+                {/* Nome REAL do simulado (info.titulo). (Ícone de prancheta e rótulo "CADERNO DE PROVA"
+                    removidos a pedido.) */}
                 <h1 className={`${P}-h1`}>{info.titulo}</h1>
                 <div className={`${P}-chips`}>
                   <span className={`${P}-chip`}>
@@ -185,14 +180,23 @@ export function EntradaVND({ theme, data, es = 'aberto', preview, real }: SimScr
             {/* corpo */}
             <div style={{ padding: '28px 32px', display: 'flex', flexDirection: 'column', gap: 18 }}>
               <div className={`${P}-dates`}>
-                <div className={`${P}-datetile`}>
-                  <span className={`${P}-datelbl`}>ABRE</span>
-                  <b className={`${P}-dateval`}>{iniLabel}</b>
-                </div>
-                <div className={`${P}-datetile`}>
-                  <span className={`${P}-datelbl`}>ENCERRA</span>
-                  <b className={`${P}-dateval`}>{fimLabel}</b>
-                </div>
+                {info.semJanela ? (
+                  <div className={`${P}-datetile`} style={{ flex: 1 }}>
+                    <span className={`${P}-datelbl`}>DISPONIBILIDADE</span>
+                    <b className={`${P}-dateval`}>Sempre aberto · sem prazo</b>
+                  </div>
+                ) : (
+                  <>
+                    <div className={`${P}-datetile`}>
+                      <span className={`${P}-datelbl`}>ABRE</span>
+                      <b className={`${P}-dateval`}>{iniLabel}</b>
+                    </div>
+                    <div className={`${P}-datetile`}>
+                      <span className={`${P}-datelbl`}>ENCERRA</span>
+                      <b className={`${P}-dateval`}>{fimLabel}</b>
+                    </div>
+                  </>
+                )}
               </div>
               <div style={{ height: 1, background: 'var(--line)' }} />
               <b style={{ fontSize: 18, letterSpacing: '-0.02em', color: 'var(--ink)' }}>Pronto para a missão?</b>

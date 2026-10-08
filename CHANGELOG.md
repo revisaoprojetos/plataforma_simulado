@@ -12,6 +12,14 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.4.10 — 2026-10-08
+
+- **Entrada do simulado VND — ajustes de conteúdo:**
+  - Simulado **sem janela** (sem data de início/fim) agora mostra **"Sempre aberto · sem prazo"** no
+    lugar das tiles ABRE/ENCERRA (antes exibia a data atual como fallback, sem sentido). (`SimInfo.semJanela`.)
+  - Removido o **ícone de prancheta** acima do status e o rótulo **"CADERNO DE PROVA · SIMULADO"** — o
+    card mostra o status ("Em andamento") + o nome real do simulado.
+
 ## 3.4.9 — 2026-10-08
 
 - **HUD do simulado DESATIVADA (padrão sempre).** `resolverHudConfig` passou a retornar sempre o padrão

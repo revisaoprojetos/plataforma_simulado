@@ -27,6 +27,8 @@ export interface SimInfo {
   duracaoMin: number | null // null = sem limite
   inicioISO: string
   fimISO: string
+  /** Simulado SEM janela (sem data de início/fim) → UI mostra "Sempre aberto · sem prazo". */
+  semJanela?: boolean
   inscritos: number
   regras: string[]
   recompensa: string
