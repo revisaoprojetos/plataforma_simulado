@@ -16,6 +16,7 @@ import { LEITURA_ATIVA } from '@/lib/flags'
 import { resumoGamificacao, conquistasDoAluno, posicaoNaLiga, posicaoGeral } from '@/lib/gamificacao/leitura'
 import { montarPerfilAnalytics } from '@/lib/aluno/perfil-analytics'
 import { lerPerfilPrefs } from '@/lib/aluno/perfil-prefs'
+import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
 import { ConquistasGrid } from '@/components/aluno/conquistas-grid'
 import { CarimbosPerfil } from '@/components/aluno/carimbos-perfil'
 import { PerfilAdesivosLayer } from '@/components/aluno/perfil-adesivos-layer'
@@ -91,15 +92,21 @@ export default async function PerfilAlunoPage() {
     const iniciais = (ps[0]?.[0] ?? 'A').toUpperCase() + (ps.length > 1 ? (ps[ps.length - 1][0] ?? '').toUpperCase() : '')
     const porDisc = (rel?.porDisciplina ?? []) as { nome: string; aluno: number; turma: number }[]
 
-    // ── Blocos ricos (dado real): turma (nota média amostrada), posição percentil, prefs, analytics. ──
-    const [turmaNotaRes, totalEstRes, perfilPrefs] = await Promise.all([
-      svc.from('simulado_sessoes_prova').select('nota').eq('tenant_id', sessao.tenantId).not('nota', 'is', null).eq('is_teste', false).eq('deletado', false).limit(3000),
-      svc.from('simulado_estudantes').select('id', { count: 'exact', head: true }).eq('tenant_id', sessao.tenantId),
+    // ── Blocos ricos (dado real): turma (nota média + total) é de TENANT, não de aluno → CACHEADA
+    // (1 cálculo a cada TTL por plataforma, não a cada abertura de perfil). Evita martelar o banco. ──
+    const [turmaStats, perfilPrefs] = await Promise.all([
+      remember(chaveRelatorio(sessao.tenantId, 'perfil-turma'), TTL_RELATORIO, async () => {
+        const [notasRes, totalRes] = await Promise.all([
+          svc.from('simulado_sessoes_prova').select('nota').eq('tenant_id', sessao.tenantId).not('nota', 'is', null).eq('is_teste', false).eq('deletado', false).limit(2000),
+          svc.from('simulado_estudantes').select('id', { count: 'exact', head: true }).eq('tenant_id', sessao.tenantId),
+        ])
+        const notas = (notasRes.data ?? []).map((r: any) => Number(r.nota)).filter((n: number) => !Number.isNaN(n))
+        return { turmaNota: notas.length ? notas.reduce((a, b) => a + b, 0) / notas.length : null, totalEst: totalRes.count ?? 0 }
+      }),
       lerPerfilPrefs(svc, sessao.estudanteId),
     ])
-    const notasTurma = (turmaNotaRes.data ?? []).map((r: any) => Number(r.nota)).filter((n: number) => !Number.isNaN(n))
-    const turmaNota = notasTurma.length ? notasTurma.reduce((a, b) => a + b, 0) / notasTurma.length : null
-    const totalEst = totalEstRes.count ?? 0
+    const turmaNota = turmaStats.turmaNota
+    const totalEst = turmaStats.totalEst
     const posGeral = gamResumo ? await posicaoGeral(svc, sessao.tenantId, gamResumo.xpTotal) : null
     const posicaoPercentil = posGeral && totalEst ? Math.max(1, Math.round((posGeral / totalEst) * 100)) : null
     const analytics = await montarPerfilAnalytics(svc, sessao.estudanteId, sessao.tenantId, {

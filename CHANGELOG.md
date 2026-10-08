@@ -12,6 +12,20 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.4.1 — 2026-10-08 (hotfix de estabilidade)
+
+Corrige a instabilidade que apareceu após a v3.4.0 (áreas abrindo mas sem carregar, logout travando,
+admin lento) — causada pelo **perfil novo pesando demais no backend**.
+
+- **Perfil · Estatísticas (dado real) agora leve:** o cálculo (`montarPerfilAnalytics`) passou a ser
+  **cacheado** (TTL do relatório) e **limitado aos últimos ~6 meses** — antes carregava TODA a história
+  de respostas do aluno + metadados de TODAS as questões a cada abertura (dezenas de round-trips ao
+  Supabase, sem cache), o que no VPS único + pico da Curseduca martelava o banco e deixava **todas** as
+  áreas lentas/travadas. A média da turma também passou a ser **cacheada por plataforma** (era até 3000
+  linhas por view). Segue a regra "área nova já nasce otimizada" (sem fetchAll em caminho quente).
+- **Logout resiliente (admin):** `logoutAction` nunca mais trava se o backend estiver lento — limpa a
+  sessão localmente (`signOut({ scope: 'local' })`) e faz a auditoria em best-effort, sem esperar a rede.
+
 ## 3.4.0 — 2026-10-08
 
 Foco: **adaptação dinâmica de tela** (Curseduca/tablet/iframe), **perfil do aluno reconstruído com dado

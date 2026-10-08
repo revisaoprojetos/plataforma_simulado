@@ -1,6 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { remember, chaveRelatorio, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
 import type {
   PerfilResumoSemana, PerfilAtividade, PerfilEstatKpi, PerfilVoceMedia,
   PerfilBancaResumo, PerfilForteFraco, PerfilRendimentoHora, PerfilTempoQuestao, PerfilDisciplina,
@@ -44,28 +45,50 @@ function slotBrt(iso: string): number { const h = brt(iso).getUTCHours(); if (h 
 function hojeBrtMeiaNoiteUtcMs(): number { const d = brt(new Date().toISOString()); return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()) + 3 * 3600_000 }
 function fmtSeg(s: number): string { const m = Math.floor(s / 60), r = Math.round(s % 60); return m > 0 ? `${m}min ${String(r).padStart(2, '0')}s` : `${r}s` }
 
+export interface PerfilAnalyticsCtx {
+  porDisciplina: PerfilDisciplina[]
+  notaMedia: number | null
+  acertoMedio: number | null
+  turmaNota: number | null
+  posicaoPercentil: number | null
+}
+
+// Janela de 6 meses: os blocos ricos são "recentes" (heatmap/semana/mês/estatísticas). Limitar o
+// período corta drasticamente as linhas e os round-trips ao Supabase (era TODA a história do aluno →
+// dezenas de queries por abertura de perfil, martelando o banco em produção). Regra [[otimizacao]].
+const JANELA_DIAS = 182
+
 /**
- * Monta os blocos ricos do perfil. `porDisciplina`/`notaMedia`/`acertoMedio` vêm do relatório (não
- * refetch); `turmaNota`/`posicaoPercentil` são passados pela página (já calculados).
+ * Monta os blocos ricos do perfil — CACHEADO (TTL do relatório) p/ não recomputar a cada view.
+ * `porDisciplina`/`notaMedia`/`acertoMedio` vêm do relatório; `turmaNota`/`posicaoPercentil` da página.
  */
 export async function montarPerfilAnalytics(
   svc: SupabaseClient,
   estudanteId: string,
   tenantId: string | null,
-  ctx: {
-    porDisciplina: PerfilDisciplina[]
-    notaMedia: number | null
-    acertoMedio: number | null
-    turmaNota: number | null
-    posicaoPercentil: number | null
-  },
+  ctx: PerfilAnalyticsCtx,
+): Promise<PerfilAnalytics> {
+  return remember(
+    chaveRelatorio(tenantId, 'perfil-analytics', estudanteId),
+    TTL_RELATORIO,
+    () => _montarPerfilAnalytics(svc, estudanteId, tenantId, ctx),
+  )
+}
+
+async function _montarPerfilAnalytics(
+  svc: SupabaseClient,
+  estudanteId: string,
+  tenantId: string | null,
+  ctx: PerfilAnalyticsCtx,
 ): Promise<PerfilAnalytics> {
   try {
+    const isoLimite = new Date(Date.now() - JANELA_DIAS * DIA_MS).toISOString()
     const { data: sessRows } = await svc
       .from('simulado_sessoes_prova')
       .select('id, simulado_id, iniciado_em, finalizado_em, nota, is_teste, deletado')
       .eq('estudante_id', estudanteId)
       .eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000')
+      .gte('iniciado_em', isoLimite)
       .order('iniciado_em', { ascending: true })
     const sessoes: Sess[] = (sessRows ?? [])
       .filter((s: any) => s.finalizado_em && !s.is_teste && !s.deletado)
