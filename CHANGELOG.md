@@ -12,6 +12,19 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.4.6 — 2026-10-08
+
+- **Link do admin para o simulado (`/aluno/login?token=`) agora usa a entrada BRANDED da marca.** Esse
+  link (gerado pelo admin) caía SEMPRE no `EmbedLoginForm` genérico (roxo/Revisão), ignorando a marca —
+  por isso o simulado do VND abria com o visual do Revisão. Agora segue a mesma regra de `/simulado/
+  <token>`: MEQ sempre, Revisão/VND com `internoAtivo` → `EntradaReal` (verde VND etc.).
+- **Título da aba correto:** `/aluno/login` passou a ter `generateMetadata` com o nome do tenant **do
+  token** (não do host) — antes, em localhost/sem subdomínio, a aba mostrava "Revisão" num simulado VND.
+- **Loader neutro:** a tela de "Carregando…" de `/aluno/login` pegava a logo pelo HOST (em
+  localhost/sem subdomínio → mostrava a logo do Revisão num simulado do VND). Agora é **neutra** (anel
+  + ponto, sem logo de marca); o visual branded aparece na própria página.
+- Fetches da rota memoizados (`cache()`) + paralelizados — menos queries por acesso.
+
 ## 3.4.5 — 2026-10-08
 
 - **VND · entrada do simulado — "Voltar" no canto superior esquerdo + responsivo:** saiu de dentro do

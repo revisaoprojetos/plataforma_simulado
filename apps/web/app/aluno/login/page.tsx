@@ -3,9 +3,26 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { EmbedLoginForm } from '@/components/embed/embed-login-form'
 import { BookOpen } from 'lucide-react'
 import { resolverHudConfig } from '@/lib/hud/resolve-hud'
+import { lerAparenciaAuth } from '@/lib/brand/aparencia-auth'
+import { EntradaReal } from '@/components/brand/simulado/meq/entrada-real'
+import { FontScaleInit } from '@/components/font-scale-init'
+import type { SimTheme, TipoResposta } from '@/components/brand/simulado/types'
+import type { Metadata } from 'next'
+import { cache } from 'react'
 
 interface PageProps {
   searchParams: Promise<{ token?: string }>
+}
+
+// Título da aba = nome do tenant DO TOKEN (não do host). Antes, em localhost/sem subdomínio, caía no
+// tenant padrão (Revisão) → a aba mostrava "Revisão" mesmo num simulado do VND.
+export async function generateMetadata({ searchParams }: PageProps): Promise<Metadata> {
+  const { token } = await searchParams
+  if (!token) return { title: 'Simulado' }
+  const sim = await fetchSimulado(token)
+  if (!sim) return { title: 'Simulado' }
+  const b = await fetchBranding(sim.tenant_id)
+  return { title: b?.nome ? `${b.nome} · Simulado` : 'Simulado' }
 }
 
 /** Aviso simples (sem token / simulado inexistente). */
@@ -21,7 +38,8 @@ function Aviso({ titulo, msg, erro }: { titulo: string; msg: string; erro?: bool
   )
 }
 
-async function fetchSimulado(token: string) {
+// cache(): dedupe por request — generateMetadata e a página compartilham o mesmo resultado.
+const fetchSimulado = cache(async (token: string) => {
   try {
     const svc = createAdminClient()
     const { data } = await svc
@@ -33,22 +51,52 @@ async function fetchSimulado(token: string) {
   } catch {
     return null
   }
-}
+})
 
-async function fetchBranding(tenantId: string) {
+const fetchBranding = cache(async (tenantId: string) => {
   try {
     const svc = createAdminClient()
-    const { data: t } = await svc.from('simulado_tenants').select('nome, tema').eq('id', tenantId).maybeSingle()
-    const tema = (t?.tema ?? {}) as Record<string, string>
+    const { data: t } = await svc.from('simulado_tenants').select('nome, slug, tema').eq('id', tenantId).maybeSingle()
+    const tema = (t?.tema ?? {}) as any
+    // Marca + tema default do tenant (mesma resolução do portal / de /simulado/[token]).
+    const ap = lerAparenciaAuth(tema, { slug: (t as any)?.slug ?? null, nome: t?.nome ?? null })
+    const temaInicial: SimTheme = ap.defaultTheme === 'escuro' ? 'escuro' : ap.defaultTheme === 'azul' ? 'azul' : 'claro'
     return {
       nome: tema.nome_site ?? t?.nome ?? 'Simulado',
-      logoUrl: tema.logo_url ?? null,
-      logoGrandeUrl: tema.logo_grande_url ?? null,
-      logoBg: tema.logo_png_bg ?? '#ffffff',
-      logoEstilo: tema.logo_estilo ?? 'arredondado',
+      brand: ap.brand,
+      internoAtivo: ap.internoAtivo,
+      temaInicial,
+      logoUrl: (tema.logo_url ?? null) as string | null,
+      logoGrandeUrl: (tema.logo_grande_url ?? null) as string | null,
+      logoBg: (tema.logo_png_bg ?? '#ffffff') as string,
+      logoEstilo: (tema.logo_estilo ?? 'arredondado') as string,
     }
   } catch {
     return null
+  }
+})
+
+// Info da prova p/ a entrada branded (nº de questões, tipo A–E/CE, permite folha). Espelha /simulado/[token].
+async function fetchInfoProva(simuladoId: string, tenantId: string): Promise<{ nQuestoes: number | null; tipo: TipoResposta; permiteFolha: boolean }> {
+  try {
+    const svc = createAdminClient()
+    const [{ count }, amostra, simRow] = await Promise.all([
+      svc.from('simulado_prova_questoes').select('questao_id', { count: 'exact', head: true }).eq('simulado_id', simuladoId).eq('tenant_id', tenantId),
+      svc.from('simulado_prova_questoes').select('questao_id').eq('simulado_id', simuladoId).eq('tenant_id', tenantId).limit(30),
+      svc.from('simulado_simulados').select('regras, embed_ativo').eq('id', simuladoId).maybeSingle(),
+    ])
+    let tipo: TipoResposta = 'ABCDE'
+    const ids = ((amostra.data ?? []) as any[]).map((r) => r.questao_id)
+    if (ids.length) {
+      const { data: qs } = await svc.from('simulado_questoes').select('tipo').in('id', ids)
+      const ce = ((qs ?? []) as any[]).filter((q) => String(q.tipo ?? '').toLowerCase().includes('ce') || String(q.tipo ?? '').toLowerCase().includes('certo')).length
+      if (ce > ids.length / 2) tipo = 'CE'
+    }
+    const regras = ((simRow.data as any)?.regras ?? {}) as Record<string, unknown>
+    const permiteFolha = regras.permite_folha !== false && regras.folha_ativa !== false
+    return { nQuestoes: count ?? null, tipo, permiteFolha }
+  } catch {
+    return { nQuestoes: null, tipo: 'ABCDE', permiteFolha: true }
   }
 }
 
@@ -70,10 +118,47 @@ export default async function AlunoLoginPage({ searchParams }: PageProps) {
   }
 
   const metodo = (simulado.metodo_identificacao ?? 'email_cpf') as 'email' | 'email_cpf' | 'email_telefone'
-  const hud = await resolverHudConfig(simulado.id, simulado.tenant_id)
-  const branding = await fetchBranding(simulado.tenant_id)
-  const dark = await resolveTemaDark()
+  const [branding, dark] = await Promise.all([
+    fetchBranding(simulado.tenant_id),
+    resolveTemaDark(),
+  ])
 
+  // Entrada BRANDED da marca (mesma regra de /simulado/[token]): MEQ sempre; Revisão/VND com internoAtivo.
+  // Antes o link do admin (/aluno/login) caía SEMPRE no EmbedLoginForm genérico (roxo), ignorando a marca
+  // — por isso o simulado do VND abria com o visual do Revisão (e título da aba do Revisão).
+  const usaEntradaNova = branding?.brand === 'meq' || ((branding?.brand === 'revisao' || branding?.brand === 'vnd') && !!branding.internoAtivo)
+  if (usaEntradaNova && branding) {
+    const info = await fetchInfoProva(simulado.id, simulado.tenant_id)
+    return (
+      <>
+        <FontScaleInit scope={`aluno:${token}`} />
+        <EntradaReal
+          token={token}
+          brand={branding.brand}
+          metodo={metodo}
+          temaInicial={dark ? 'escuro' : branding.temaInicial}
+          plataforma={branding.nome}
+          agoraISO={new Date().toISOString()}
+          prova={{
+            titulo: simulado.titulo,
+            status: simulado.status,
+            dataInicio: simulado.data_inicio,
+            dataFim: simulado.data_fim,
+            tempoLimiteMin: simulado.tempo_limite_min,
+            nQuestoes: info.nQuestoes,
+            tipo: info.tipo,
+            banca: info.tipo === 'CE' ? 'Padrão Cebraspe · Certo ou Errado' : 'Objetiva A–E',
+            subtitulo: '',
+            curto: 'CADERNO DE PROVA · SIMULADO',
+            permiteFolha: info.permiteFolha,
+          }}
+        />
+      </>
+    )
+  }
+
+  // Fallback (demais marcas / sem internoAtivo): EmbedLoginForm genérico.
+  const hud = await resolverHudConfig(simulado.id, simulado.tenant_id)
   return (
     <EmbedLoginForm
       token={token}
