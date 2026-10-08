@@ -126,7 +126,9 @@ export default async function AlunoLoginPage({ searchParams }: PageProps) {
   // Entrada BRANDED da marca (mesma regra de /simulado/[token]): MEQ sempre; Revisão/VND com internoAtivo.
   // Antes o link do admin (/aluno/login) caía SEMPRE no EmbedLoginForm genérico (roxo), ignorando a marca
   // — por isso o simulado do VND abria com o visual do Revisão (e título da aba do Revisão).
-  const usaEntradaNova = branding?.brand === 'meq' || ((branding?.brand === 'revisao' || branding?.brand === 'vnd') && !!branding.internoAtivo)
+  // POR ENQUANTO: só os modelos NOVOS (entrada branded) como padrão em TODOS os tenants — HUD/
+  // EmbedLoginForm desativada no login. (Reversível.) Fallback: sem branding → genérico.
+  const usaEntradaNova = !!branding
   if (usaEntradaNova && branding) {
     const info = await fetchInfoProva(simulado.id, simulado.tenant_id)
     return (

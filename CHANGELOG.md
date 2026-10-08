@@ -12,6 +12,17 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.4.8 — 2026-10-08
+
+- **HUD do simulado substituída pelos modelos novos (designer novo) como PADRÃO.** Por enquanto, o
+  login e o carregamento do simulado usam SÓ as telas novas, em TODOS os tenants:
+  - **Login:** `/simulado/<token>` e `/aluno/login` sempre usam a **entrada branded** da marca
+    (`EntradaReal`) — a HUD/`EmbedLoginForm` fica desativada no login (fallback só se o branding não
+    resolver). (Reversível: era por marca/`internoAtivo`.)
+  - **Carregamento:** o `loading.tsx` dessas rotas passou a usar o **`PlatformLoader`** (loader do
+    designer novo, resolvido pela plataforma) no lugar do loader da HUD.
+  - A HUD continua no RUNNER da prova (motor real) — só o login/carregamento foram trocados.
+
 ## 3.4.7 — 2026-10-08
 
 - **Entrada do simulado do VND agora é FUNCIONAL (não mais mock).** O "ticket verde" do VND era só
