@@ -74,6 +74,8 @@ const SECOES: { chave: Bucket; titulo: string; dot: string; chipBg: string }[] =
 function Capa({ brand, item }: { brand: Brand; item: ItemSimuladoCat }) {
   const img = item.vis?.capa ?? item.vis?.capaBanner ?? null
   const grad = item.vis?.cor || FALLBACK_GRAD[brand]
+  // Capa full-bleed (object-cover), no MESMO formato dos cards de pasta. Na altura menor (112px) a arte
+  // enquadra bem sem cortar demais (igual às pastas da home).
   if (brand === 'vnd') return <CoverVnd titulo={item.titulo} sub="" grad={grad} img={img} />
   if (brand === 'meq') return <CoverMeq titulo={item.titulo} grad={grad} img={img} />
   return <CoverRev titulo={item.titulo} sub="" grad={grad} img={img} />
@@ -83,7 +85,7 @@ function Capa({ brand, item }: { brand: Brand; item: ItemSimuladoCat }) {
 // "Fazer agora" — gradiente da marca (como o .hrv-cta dos recentes), texto branco, ocupa a largura.
 function BtnPrimario({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <Link href={href} className="ip-btn-primary" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7, height: 38, borderRadius: 11, padding: '0 14px', background: 'linear-gradient(180deg, var(--brand), color-mix(in srgb, var(--brand) 72%, #000 28%))', color: '#FFF', fontSize: 13.5, fontWeight: 800, textDecoration: 'none', border: 0, flex: 1, minWidth: 0, boxShadow: '0 10px 20px -12px color-mix(in srgb, var(--brand) 80%, transparent), inset 0 1px 0 rgba(255,255,255,.2)' }}>
+    <Link href={href} className="ip-btn-primary" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7, height: 38, borderRadius: 11, padding: '0 12px', background: 'linear-gradient(180deg, var(--brand), color-mix(in srgb, var(--brand) 72%, #000 28%))', color: '#FFF', fontSize: 13, fontWeight: 800, whiteSpace: 'nowrap', textDecoration: 'none', border: 0, flex: 1, minWidth: 0, boxShadow: '0 10px 20px -12px color-mix(in srgb, var(--brand) 80%, transparent), inset 0 1px 0 rgba(255,255,255,.2)' }}>
       {children}
     </Link>
   )
@@ -99,8 +101,8 @@ function BtnSecundario({ href, children }: { href: string; children: React.React
 function BtnCaderno({ url }: { url: string }) {
   return (
     <button type="button" onClick={() => baixarCaderno(url)} title="Baixar caderno de questões" aria-label="Baixar caderno de questões"
-      className="ip-btn-sec" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 38, padding: '0 14px', borderRadius: 11, background: 'var(--surface)', color: 'var(--ink)', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', border: '1px solid var(--line)', flexShrink: 0 }}>
-      <FileDown size={15} />Baixar
+      className="ip-btn-sec" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5, height: 38, padding: '0 11px', borderRadius: 11, background: 'var(--surface)', color: 'var(--ink)', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', cursor: 'pointer', border: '1px solid var(--line)', flexShrink: 0 }}>
+      <FileDown size={14} />Baixar
     </button>
   )
 }
@@ -169,20 +171,20 @@ function CardSim({ brand, item }: { brand: Brand; item: ItemSimuladoCat }) {
   const fazerHref = item.embed_token ? `/simulado/${item.embed_token}` : null
   const statusTxt = item.tom === 'sky' ? item.quando : item.statusLabel
   return (
-    <div className="ip-card" style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', overflow: 'hidden', minHeight: 168 }}>
+    <div className="ip-card" style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', overflow: 'hidden', minHeight: 112 }}>
       {/* capa à esquerda (altura cheia) */}
-      <div style={{ position: 'relative', width: 210, flexShrink: 0, overflow: 'hidden' }}>
+      <div style={{ position: 'relative', width: '36%', maxWidth: 160, flexShrink: 0, overflow: 'hidden' }}>
         <Capa brand={brand} item={item} />
         {item.novo && (
           <span style={{ position: 'absolute', left: 10, top: 10, height: 22, padding: '0 9px', borderRadius: 99, background: '#E5484D', color: '#FFF', fontSize: 10, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center' }}>Novo</span>
         )}
         {item.emAndamento && (
-          <span style={{ position: 'absolute', left: 10, bottom: 10, height: 22, padding: '0 9px', borderRadius: 99, background: '#F1C232', color: '#2A1A55', fontSize: 10, fontWeight: 800, letterSpacing: '.03em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center' }}>Em andamento</span>
+          <span style={{ position: 'absolute', left: 8, bottom: 8, maxWidth: 'calc(100% - 16px)', height: 20, padding: '0 8px', borderRadius: 99, background: '#F1C232', color: '#2A1A55', fontSize: 9.5, fontWeight: 800, letterSpacing: '.02em', textTransform: 'uppercase', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center' }}>Em andamento</span>
         )}
       </div>
       {/* corpo à direita */}
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 16px 16px' }}>
-        <b style={{ fontSize: 14.5, lineHeight: 1.3, color: 'var(--ink)', fontWeight: 800, letterSpacing: '-0.01em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.titulo}</b>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 7, padding: '12px 14px' }}>
+        <b style={{ fontSize: 14, lineHeight: 1.25, color: 'var(--ink)', fontWeight: 800, letterSpacing: '-0.01em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.titulo}</b>
         {statusTxt ? (
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>
             <Clock size={13} style={{ flexShrink: 0 }} /> <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{statusTxt}</span>
@@ -218,21 +220,21 @@ function CardAndamento({ brand, item, prog }: { brand: Brand; item: ItemSimulado
   const fazerHref = item.embed_token ? `/simulado/${item.embed_token}` : null
   const pct = prog?.pct ?? 0
   return (
-    <div className="ip-card" style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', overflow: 'hidden', minHeight: 168 }}>
-      <div style={{ position: 'relative', width: 210, flexShrink: 0, overflow: 'hidden' }}>
+    <div className="ip-card" style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', overflow: 'hidden', minHeight: 112 }}>
+      <div style={{ position: 'relative', width: '36%', maxWidth: 160, flexShrink: 0, overflow: 'hidden' }}>
         <Capa brand={brand} item={item} />
-        <span style={{ position: 'absolute', left: 10, top: 10, height: 22, padding: '0 9px', borderRadius: 99, background: '#F1C232', color: '#2A1A55', fontSize: 10, fontWeight: 800, letterSpacing: '.03em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#2A1A55' }} />Em andamento
+        <span style={{ position: 'absolute', left: 8, top: 8, maxWidth: 'calc(100% - 16px)', height: 20, padding: '0 8px', borderRadius: 99, background: '#F1C232', color: '#2A1A55', fontSize: 9.5, fontWeight: 800, letterSpacing: '.02em', textTransform: 'uppercase', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#2A1A55', flexShrink: 0 }} />Em andamento
         </span>
       </div>
-      <div style={{ flex: 1, minWidth: 0, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <b style={{ fontSize: 14.5, lineHeight: 1.3, color: 'var(--ink)', fontWeight: 800, letterSpacing: '-0.01em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.titulo}</b>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 11.5, color: 'var(--muted)', fontWeight: 600 }}>
-            <span>Questão {(prog?.questaoAtual ?? 0).toLocaleString('pt-BR')} de {(prog?.total ?? 0).toLocaleString('pt-BR')}</span>
-            <b style={{ color: 'var(--ink)' }}>{pct}%</b>
+      <div style={{ flex: 1, minWidth: 0, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <b style={{ fontSize: 14, lineHeight: 1.25, color: 'var(--ink)', fontWeight: 800, letterSpacing: '-0.01em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.titulo}</b>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Questão {(prog?.questaoAtual ?? 0).toLocaleString('pt-BR')} de {(prog?.total ?? 0).toLocaleString('pt-BR')}</span>
+            <b style={{ color: 'var(--ink)', flexShrink: 0 }}>{pct}%</b>
           </div>
-          <div style={{ height: 6, borderRadius: 3, background: 'var(--surface2)', overflow: 'hidden' }}>
+          <div style={{ height: 5, borderRadius: 3, background: 'var(--surface2)', overflow: 'hidden' }}>
             <div style={{ height: '100%', width: `${Math.max(0, Math.min(100, pct))}%`, borderRadius: 3, background: 'var(--brand)' }} />
           </div>
         </div>
@@ -250,11 +252,11 @@ function CardAndamento({ brand, item, prog }: { brand: Brand; item: ItemSimulado
 function CardFeito({ brand, item, nota }: { brand: Brand; item: ItemSimuladoCat; nota?: { nota: number | null; notaLiberada: boolean; data: string } }) {
   const n = nota?.notaLiberada && nota?.nota != null ? nota.nota : null
   return (
-    <Link href={`/aluno/simulados/${item.id}`} className="ip-card" style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', overflow: 'hidden', minHeight: 168, color: 'inherit', textDecoration: 'none' }}>
-      <div style={{ position: 'relative', width: 210, flexShrink: 0, overflow: 'hidden' }}>
+    <Link href={`/aluno/simulados/${item.id}`} className="ip-card" style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', overflow: 'hidden', minHeight: 112, color: 'inherit', textDecoration: 'none' }}>
+      <div style={{ position: 'relative', width: '36%', maxWidth: 160, flexShrink: 0, overflow: 'hidden' }}>
         <Capa brand={brand} item={item} />
       </div>
-      <div style={{ flex: 1, minWidth: 0, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ flex: 1, minWidth: 0, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 700, color: '#1FA868' }}><CircleCheck size={13} />Concluído</span>
           {nota?.data ? <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{nota.data}</span> : null}
@@ -292,9 +294,8 @@ function CardSubpasta({ sp }: { sp: PastaCat }) {
 }
 
 const CSS = `
-.ip-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:stretch}
-@media (max-width:1100px){.ip-grid{grid-template-columns:repeat(2,1fr)}}
-@media (max-width:720px){.ip-grid{grid-template-columns:1fr}}
+/* adaptativo ao CONTAINER (nao ao viewport) — nao corta em tablet/iframe; min(100%,300px) = 1 coluna quando estreito. */
+.ip-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:16px;align-items:stretch}
 .ip-card{height:100%;transition:transform .4s cubic-bezier(.22,1,.36,1),box-shadow .4s cubic-bezier(.22,1,.36,1),border-color .25s}
 .ip-card:hover{transform:translateY(-3px);border-color:var(--brandLine,var(--line));box-shadow:0 22px 40px -28px rgba(0,0,0,.45)}
 .ip-card .rlz-cov{transition:transform .6s cubic-bezier(.22,1,.36,1)}.ip-card:hover .rlz-cov{transform:scale(1.05)}

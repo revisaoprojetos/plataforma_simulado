@@ -30,7 +30,7 @@ import Link from 'next/link'
 import {
   Flag, BookOpen, BarChart3, Trophy, Play, RotateCcw, Lock, Check, Mountain,
   Plus, Minus, Maximize2, Crosshair, Download, ExternalLink,
-  Flame, Zap, Crown, Target, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronUp, ChevronDown, Scale, FileText, TrendingUp, List, Loader2,
+  Flame, Zap, Crown, Target, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronUp, ChevronDown, Scale, FileText, TrendingUp, List, Loader2, FlaskConical,
 } from 'lucide-react'
 import type { Trilha, TrilhaNode } from '@/components/aluno/trilha-simulados'
 import type { AulaDesempenho } from '@/lib/leitura/trilha'
@@ -114,7 +114,7 @@ function FlameSeq({ size = 18 }: { size?: number }) {
 }
 
 export function DesafioLSRevisao({
-  theme, trilha, desempenho, ranking, minhaLinha, meuId, meuNome, regulamento, pontuacao, gam, carimbos = [], diasLeitura = [], moduloNome,
+  theme, trilha, desempenho, ranking, minhaLinha, meuId, meuNome, regulamento, pontuacao, gam, carimbos = [], diasLeitura = [], moduloNome, testador = false,
 }: DesafioLSMeqProps) {
   useTemaInterno(theme) // reage ao toggle claro/escuro/azul ao vivo
   const [tab, setTab] = useState<Tab>('trilha')
@@ -168,10 +168,19 @@ export function DesafioLSRevisao({
 
       {/* ═══════════ CONTEÚDO (banner full-bleed acima; aqui o conteúdo recebe respiro lateral) ═══════════ */}
       <div style={{ padding: '22px 24px 24px' }}>
+        {testador && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, padding: '11px 14px', borderRadius: 14, background: 'color-mix(in srgb, var(--brand) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--brand) 35%, transparent)', color: 'var(--ink)' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 9, background: 'color-mix(in srgb, var(--brand) 18%, transparent)', color: 'var(--brand)', flexShrink: 0 }}><FlaskConical size={16} /></span>
+            <div style={{ minWidth: 0, lineHeight: 1.3 }}>
+              <b style={{ display: 'block', fontSize: 13 }}>Modo teste</b>
+              <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Todas as aulas liberadas e livres para refazer — nada é contabilizado (sem XP, sequência ou ranking).</span>
+            </div>
+          </div>
+        )}
         {/* `key={tab}` remonta o painel ao trocar de aba → a animação lsrTabIn (fade + leve subida) re-roda. */}
         <div key={tab} className="lsr-tabpane">
           {tab === 'trilha' && (
-            <AbaTrilha nodes={nodes} dy={dy} setDy={setDy} idxAtual={idxAtual} diasConcluidos={diasConcluidos} totalDias={totalDias} progressoPct={progressoPct} desempenho={desempenho} gam={gam} diasLeitura={diasLeitura} />
+            <AbaTrilha nodes={nodes} dy={dy} setDy={setDy} idxAtual={idxAtual} diasConcluidos={diasConcluidos} totalDias={totalDias} progressoPct={progressoPct} desempenho={desempenho} gam={gam} diasLeitura={diasLeitura} testador={testador} />
           )}
           {tab === 'reg' && <AbaRegulamento regulamento={regulamento} pontuacao={pontuacao} gam={gam} moduloNome={moduloNome} />}
           {tab === 'des' && <AbaDesempenho desempenho={desempenho} totalDias={totalDias} diasConcluidos={diasConcluidos} pontos={pontos} progressoPct={progressoPct} carimbos={carimbos} />}
@@ -202,7 +211,7 @@ export function DesafioLSRevisao({
         @keyframes lsrBob{ 0%,100%{ transform:translateY(0);} 50%{ transform:translateY(-4px);} }
         /* Bob do balão "Libera amanhã" PRESERVANDO a centralização (translate -50% + deslocamento). Sem isto
            a animação sobrescreve o transform inline e o balão desgruda do nó. */
-        @keyframes lsrBobLib{ 0%,100%{ transform:translate(-50%, calc(-50% - 46px)); } 50%{ transform:translate(-50%, calc(-50% - 52px)); } }
+        @keyframes lsrBobLib{ 0%,100%{ transform:translate(-50%, calc(-100% - 24px * var(--z,1))) scale(var(--z,1)); } 50%{ transform:translate(-50%, calc(-100% - 30px * var(--z,1))) scale(var(--z,1)); } }
         [data-ls-rev] .lsr-tab{ transition:color .25s; }
         /* Transição do CONTEÚDO ao trocar de aba — DESLIZAMENTO (entra da direita) + fade. */
         [data-ls-rev] .lsr-tabpane{ animation:lsrTabIn .34s cubic-bezier(.22,1,.36,1) both; }
@@ -213,8 +222,8 @@ export function DesafioLSRevisao({
         @keyframes lsrBalaoIn{ 0%{ opacity:0; transform:scale(.55) translateY(14px); } 60%{ opacity:1; } 100%{ opacity:1; transform:none; } }
         @keyframes lsrBalaoOut{ 0%{ opacity:1; transform:none; } 100%{ opacity:0; transform:scale(.7) translateY(8px); } }
         /* Pulo contínuo do balão (sobe/desce) — só depois do "pop" de entrada. */
-        .lsr-balao-wrap{ animation:lsrBalaoBob 1.7s ease-in-out .28s infinite; }
-        @keyframes lsrBalaoBob{ 0%,100%{ transform:translate(-50%, calc(-100% - 48px)); } 50%{ transform:translate(-50%, calc(-100% - 58px)); } }
+        .lsr-balao-wrap{ animation:lsrBalaoBob 1.7s ease-in-out .28s infinite; transform-origin:50% 100%; }
+        @keyframes lsrBalaoBob{ 0%,100%{ transform:translate(-50%, calc(-100% - 48px * var(--z,1))) scale(var(--z,1)); } 50%{ transform:translate(-50%, calc(-100% - 58px * var(--z,1))) scale(var(--z,1)); } }
         /* Botão de ação do balão: realce no HOVER e "pressionar" no CLIQUE. */
         .lsr-balao-cta{ transition:transform .12s ease, filter .12s ease, box-shadow .12s ease; }
         .lsr-balao-cta:hover{ filter:brightness(1.06); transform:translateY(-1px); box-shadow:0 10px 20px -10px rgba(0,0,0,.55); }
@@ -321,10 +330,10 @@ function HeaderHero({
 // ABA TRILHA — palco da montanha (flex 1) + coluna lateral à DIREITA (336px).
 // ─────────────────────────────────────────────────────────────────────────────
 function AbaTrilha({
-  nodes, dy, setDy, idxAtual, diasConcluidos, totalDias, progressoPct, desempenho, gam, diasLeitura = [],
+  nodes, dy, setDy, idxAtual, diasConcluidos, totalDias, progressoPct, desempenho, gam, diasLeitura = [], testador = false,
 }: {
   nodes: TrilhaNode[]; dy: number; setDy: (i: number) => void; idxAtual: number
-  diasConcluidos: number; totalDias: number; progressoPct: number; desempenho: AulaDesempenho[]; gam?: GamRail | null; diasLeitura?: string[]
+  diasConcluidos: number; totalDias: number; progressoPct: number; desempenho: AulaDesempenho[]; gam?: GamRail | null; diasLeitura?: string[]; testador?: boolean
 }) {
   const sel = nodes[dy]
   const selDesemp = sel ? desempenho.find((d) => d.id === sel.id) : undefined
@@ -332,11 +341,11 @@ function AbaTrilha({
   return (
     <div className="lsr-trilha-wrap" style={{ display: 'flex', gap: 18, alignItems: 'stretch' }}>
       {/* ── Palco da montanha (com barra de início acoplada) ── */}
-      <PalcoMontanha nodes={nodes} dy={dy} setDy={setDy} idxAtual={idxAtual} diasConcluidos={diasConcluidos} totalDias={totalDias} progressoPct={progressoPct} sel={sel} selDesemp={selDesemp} desempenho={desempenho} />
+      <PalcoMontanha nodes={nodes} dy={dy} setDy={setDy} idxAtual={idxAtual} diasConcluidos={diasConcluidos} totalDias={totalDias} progressoPct={progressoPct} sel={sel} selDesemp={selDesemp} desempenho={desempenho} testador={testador} />
 
       {/* ── Coluna lateral DIREITA ── */}
       <aside className="lsr-side" style={{ flex: '0 0 336px', width: 336, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 14, position: 'sticky', top: 90 }}>
-        <AulaDoDiaCard sel={sel} selDesemp={selDesemp} dy={dy} idxAtual={idxAtual} />
+        <AulaDoDiaCard sel={sel} selDesemp={selDesemp} dy={dy} idxAtual={idxAtual} testador={testador} />
         <ProximasParadas nodes={nodes} idxAtual={idxAtual} />
         <SuaEnergia desempenho={desempenho} gam={gam} diasLeitura={diasLeitura} />
       </aside>
@@ -345,7 +354,7 @@ function AbaTrilha({
 }
 
 // ── Card roxo "Aula do dia" (lateral) ──
-function AulaDoDiaCard({ sel, selDesemp, dy, idxAtual }: { sel?: TrilhaNode; selDesemp?: AulaDesempenho; dy: number; idxAtual: number }) {
+function AulaDoDiaCard({ sel, selDesemp, dy, idxAtual, testador = false }: { sel?: TrilhaNode; selDesemp?: AulaDesempenho; dy: number; idxAtual: number; testador?: boolean }) {
   if (!sel) return null
   const bloqueada = sel.estado === 'disponivel' && !!sel.naoLiberada
   const concluida = sel.estado === 'concluido'
@@ -397,6 +406,12 @@ function AulaDoDiaCard({ sel, selDesemp, dy, idxAtual }: { sel?: TrilhaNode; sel
           <Link href={href} style={{ width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 10, height: 50, padding: '0 22px', borderRadius: 13, background: GOLD, color: '#2A1A55', fontSize: 15, fontWeight: 800 }}>
             <span style={{ display: 'inline-flex', width: 26, height: 26, borderRadius: '50%', background: 'rgba(0,0,0,.12)', alignItems: 'center', justifyContent: 'center' }}><Play size={13} /></span>
             {ctaLab}
+          </Link>
+        )}
+        {/* MODO TESTE: botão "Testar" sempre disponível — abre a aula p/ conferir a visualização do aluno. */}
+        {testador && (
+          <Link href={sel.hrefLeitura ?? sel.href ?? `/aluno/leitura/${sel.id}`} style={{ marginTop: 10, width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 42, borderRadius: 12, background: 'rgba(255,255,255,.12)', border: '1px solid rgba(255,255,255,.3)', color: '#fff', fontSize: 13.5, fontWeight: 800 }}>
+            <FlaskConical size={14} /> Testar
           </Link>
         )}
       </div>
@@ -512,10 +527,10 @@ function SuaEnergia({ desempenho, gam, diasLeitura = [] }: { desempenho: AulaDes
 // (Motor de zoom/pan e mapeamento de nós = REUSO do MEQ.)
 // ─────────────────────────────────────────────────────────────────────────────
 function PalcoMontanha({
-  nodes, dy, setDy, idxAtual, diasConcluidos, totalDias, progressoPct, sel, selDesemp, desempenho = [],
+  nodes, dy, setDy, idxAtual, diasConcluidos, totalDias, progressoPct, sel, selDesemp, desempenho = [], testador = false,
 }: {
   nodes: TrilhaNode[]; dy: number; setDy: (i: number) => void; idxAtual: number
-  diasConcluidos: number; totalDias: number; progressoPct: number; sel?: TrilhaNode; selDesemp?: AulaDesempenho; desempenho?: AulaDesempenho[]
+  diasConcluidos: number; totalDias: number; progressoPct: number; sel?: TrilhaNode; selDesemp?: AulaDesempenho; desempenho?: AulaDesempenho[]; testador?: boolean
 }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
@@ -707,7 +722,7 @@ function PalcoMontanha({
         {/* Conteúdo (stageRef) preenche a LARGURA e mantém a proporção da imagem (aspect 1024/1536) →
             fica MAIS ALTO que a janela de 720px: o aluno arrasta pra cima pra ver o topo. img `cover`
             numa caixa com a MESMA proporção = sem distorção; nós por % linear = idêntico ao mockup. */}
-        <div ref={stageRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', aspectRatio: `${IMG_W} / ${IMG_H}`, transformOrigin: '0 0', willChange: 'transform' }}>
+        <div ref={stageRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', aspectRatio: `${IMG_W} / ${IMG_H}`, transformOrigin: '0 0', willChange: 'transform', ['--z' as string]: (1 / zoom).toFixed(3) } as React.CSSProperties}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/leiseca/trilha_m.jpg" alt="" aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
 
@@ -726,7 +741,7 @@ function PalcoMontanha({
             const concl = node.estado === 'concluido'
             const atualNode = i === idxAtual
             const bloq = node.estado === 'disponivel' && !!node.naoLiberada
-            const sz = atualNode ? 46 : 32
+            const sz = atualNode ? 42 : 28
             const selN = i === dy
             const ehCume = i === nodes.length - 1
             return (
@@ -739,7 +754,10 @@ function PalcoMontanha({
                   position: 'absolute',
                   left: `${(x / IMG_W) * 100}%`,
                   top: `${(y / IMG_H) * 100}%`,
-                  transform: 'translate(-50%,-50%)',
+                  // CONTRA-ESCALA 1/zoom: o nó mantém tamanho CONSTANTE na tela enquanto o palco amplia →
+                  // dar zoom AFASTA os dias (posições escalam) sem inchar os círculos → fica limpo/proporcional.
+                  transform: `translate(-50%,-50%) scale(${(1 / zoom).toFixed(3)})`,
+                  transition: 'transform .3s cubic-bezier(.22,1,.36,1)',
                   width: sz, height: sz, borderRadius: '50%',
                   border: atualNode ? '3px solid #fff' : concl ? '2px solid rgba(255,255,255,.85)' : bloq ? '1.5px solid rgba(255,255,255,.55)' : 0,
                   cursor: 'pointer', padding: 0,
@@ -763,14 +781,14 @@ function PalcoMontanha({
                   : atualNode ? <Play size={sz * 0.42} />
                     : ehCume ? <Flag size={14} color="var(--brand)" />
                       : bloq ? String(i + 1).padStart(2, '0')
-                        : <Play size={12} color="#2E1F7A" />}
+                        : <span style={{ color: '#2E1F7A' }}>{String(i + 1).padStart(2, '0')}</span>}
               </button>
             )
           })}
 
           {/* Rótulo "Você está aqui" — logo acima do nó atual (some quando um balão de aula está aberto). */}
           {!balaoVis && nodePts[idxAtual] && (
-            <span aria-hidden style={{ position: 'absolute', left: `${(nodePts[idxAtual].x / IMG_W) * 100}%`, top: `${(nodePts[idxAtual].y / IMG_H) * 100}%`, transform: 'translate(-50%, calc(-50% - 50px))', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', height: 22, padding: '0 9px', borderRadius: 99, background: 'var(--brand)', color: '#fff', fontSize: 11, fontWeight: 800, boxShadow: '0 6px 14px -6px rgba(0,0,0,.6)', zIndex: 7 }}>
+            <span aria-hidden style={{ position: 'absolute', left: `${(nodePts[idxAtual].x / IMG_W) * 100}%`, top: `${(nodePts[idxAtual].y / IMG_H) * 100}%`, transform: 'translate(-50%, calc(-100% - 26px * var(--z,1))) scale(var(--z,1))', transformOrigin: '50% 100%', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', height: 22, padding: '0 9px', borderRadius: 99, background: 'var(--brand)', color: '#fff', fontSize: 11, fontWeight: 800, boxShadow: '0 6px 14px -6px rgba(0,0,0,.6)', zIndex: 7 }}>
               Você está aqui
               {/* Ponta (triângulo) logo ABAIXO do balão → aponta p/ o círculo do nó atual (sem invadir o texto). */}
               <span aria-hidden style={{ position: 'absolute', left: '50%', top: '100%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '7px solid var(--brand)' }} />
@@ -778,7 +796,7 @@ function PalcoMontanha({
           )}
           {/* Balão "Libera amanhã" — some SÓ quando o balão da aula aberto está NO PRÓPRIO nó bloqueado. */}
           {libIdx >= 0 && nodePts[libIdx] && !(balaoVis && balaoVis.i === libIdx) && (
-            <span aria-hidden style={{ position: 'absolute', left: `${(nodePts[libIdx].x / IMG_W) * 100}%`, top: `${(nodePts[libIdx].y / IMG_H) * 100}%`, transform: 'translate(-50%, calc(-50% - 46px))', display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', height: 26, padding: '0 11px 0 6px', borderRadius: 99, background: '#fff', color: '#1A1530', fontSize: 11.5, fontWeight: 800, boxShadow: '0 10px 22px -10px rgba(0,0,0,.6)', zIndex: 9, animation: 'lsrBobLib 2.6s ease-in-out infinite' }}>
+            <span aria-hidden style={{ position: 'absolute', left: `${(nodePts[libIdx].x / IMG_W) * 100}%`, top: `${(nodePts[libIdx].y / IMG_H) * 100}%`, transform: 'translate(-50%, calc(-100% - 24px * var(--z,1))) scale(var(--z,1))', transformOrigin: '50% 100%', display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', height: 26, padding: '0 11px 0 6px', borderRadius: 99, background: '#fff', color: '#1A1530', fontSize: 11.5, fontWeight: 800, boxShadow: '0 10px 22px -10px rgba(0,0,0,.6)', zIndex: 9, animation: 'lsrBobLib 2.6s ease-in-out infinite' }}>
               <span style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--brand)', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Lock size={11} /></span>
               {libLabel}
               {/* Ponta (triângulo) logo ABAIXO do balão → aponta p/ o círculo da aula (sem invadir o texto). */}
@@ -797,7 +815,7 @@ function PalcoMontanha({
             const lab = concl ? 'Revisar aula' : lp > 0 ? 'Continuar' : 'Iniciar aula'
             const href = nd.hrefLeitura ?? nd.href ?? '#'
             return (
-              <div className={balaoVis.saindo ? undefined : 'lsr-balao-wrap'} onPointerDown={(e) => e.stopPropagation()} style={{ position: 'absolute', left: `${(np.x / IMG_W) * 100}%`, top: `${(np.y / IMG_H) * 100}%`, transform: 'translate(-50%, calc(-100% - 48px))', zIndex: 14, width: 216 }}>
+              <div className={balaoVis.saindo ? undefined : 'lsr-balao-wrap'} onPointerDown={(e) => e.stopPropagation()} style={{ position: 'absolute', left: `${(np.x / IMG_W) * 100}%`, top: `${(np.y / IMG_H) * 100}%`, transform: 'translate(-50%, calc(-100% - 48px * var(--z,1))) scale(var(--z,1))', transformOrigin: '50% 100%', zIndex: 14, width: 216, maxWidth: '82vw' }}>
                 <div className={balaoVis.saindo ? 'lsr-balao-out' : 'lsr-balao-in'} style={{ position: 'relative', borderRadius: 14, padding: '11px 12px', background: '#fff', color: '#1A1530', boxShadow: '0 16px 34px -14px rgba(0,0,0,.72)' }}>
                   <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.12em', color: 'var(--brand)' }}>DIA {String(balaoVis.i + 1).padStart(2, '0')}</span>
                   <b style={{ display: 'block', margin: '2px 0 9px', fontSize: 13, lineHeight: 1.25, letterSpacing: '-0.01em' }}>{nd.titulo}</b>
@@ -806,6 +824,12 @@ function PalcoMontanha({
                   ) : (
                     <Link href={href} onClick={() => setBalaoNode(null)} className="lsr-balao-cta" style={{ display: 'inline-flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 8, height: 40, borderRadius: 10, background: concl ? 'var(--brand)' : GOLD, color: concl ? '#fff' : '#2A1A55', fontSize: 13.5, fontWeight: 800 }}>
                       {concl ? <RotateCcw size={14} /> : <Play size={13} />} {lab}
+                    </Link>
+                  )}
+                  {/* MODO TESTE: botão "Testar" abaixo da ação — abre a aula mesmo que apareça bloqueada. */}
+                  {testador && (
+                    <Link href={nd.hrefLeitura ?? nd.href ?? `/aluno/leitura/${nd.id}`} onClick={() => setBalaoNode(null)} className="lsr-balao-cta" style={{ display: 'inline-flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 6, height: 34, marginTop: 8, borderRadius: 10, background: 'color-mix(in srgb, var(--brand) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--brand) 32%, transparent)', color: 'var(--brand)', fontSize: 12.5, fontWeight: 800 }}>
+                      <FlaskConical size={13} /> Testar
                     </Link>
                   )}
                   <span aria-hidden style={{ position: 'absolute', left: '50%', top: '100%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '7px solid transparent', borderRight: '7px solid transparent', borderTop: '8px solid #fff' }} />

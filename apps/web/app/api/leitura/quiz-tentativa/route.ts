@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { docAcessivelAluno } from '@/lib/leitura/acesso'
+import { ehTestadorLeituraDoc } from '@/lib/leitura/testadores'
 import { onQuizConcluido } from '@/lib/gamificacao'
 import { invalidarRankingPorDocumento } from '@/lib/leitura/ranking'
 import { avaliarMedalhasPorDocumento } from '@/lib/leitura/carimbos'
@@ -39,14 +40,19 @@ export async function POST(request: NextRequest) {
       tentativa_num: tentativaNum, acertos, total, nota, respostas: b.respostas ?? null,
     })
     if (error) return NextResponse.json({ ok: false, message: error.message })
-    // Gamificação: atividade + bônus de COMBO por gabaritar a aula (uma vez por documento; per-acerto já
-    // é creditado nas respostas inline). Fire-and-forget: nunca quebra o registro da tentativa.
-    void onQuizConcluido(svc, { tenantId: sessao.tenantId, estudanteId: sessao.estudanteId, documentoId: documento_id, acertos, total })
-    // Medalhas colecionáveis do módulo (carimbos + conquistas): avalia/concede na conclusão do quiz.
-    void avaliarMedalhasPorDocumento(svc, sessao.tenantId, documento_id, sessao.estudanteId)
-    // Concluir o quiz muda aulas/sequência/pontos no ranking → invalida o cache do módulo na hora
-    // (o ranking é por respostas; sem isto só atualizava após o TTL de 5 min). Best-effort.
-    void invalidarRankingPorDocumento(svc, sessao.tenantId, documento_id)
+    // MODO TESTE (acesso exclusivo): registra a tentativa (p/ o testador ver o resultado), mas NÃO
+    // contabiliza nada — sem XP/combo, sem medalhas e sem mexer no ranking.
+    const testador = await ehTestadorLeituraDoc(svc, sessao.tenantId, sessao.estudanteId, documento_id)
+    if (!testador) {
+      // Gamificação: atividade + bônus de COMBO por gabaritar a aula (uma vez por documento; per-acerto já
+      // é creditado nas respostas inline). Fire-and-forget: nunca quebra o registro da tentativa.
+      void onQuizConcluido(svc, { tenantId: sessao.tenantId, estudanteId: sessao.estudanteId, documentoId: documento_id, acertos, total })
+      // Medalhas colecionáveis do módulo (carimbos + conquistas): avalia/concede na conclusão do quiz.
+      void avaliarMedalhasPorDocumento(svc, sessao.tenantId, documento_id, sessao.estudanteId)
+      // Concluir o quiz muda aulas/sequência/pontos no ranking → invalida o cache do módulo na hora
+      // (o ranking é por respostas; sem isto só atualizava após o TTL de 5 min). Best-effort.
+      void invalidarRankingPorDocumento(svc, sessao.tenantId, documento_id)
+    }
     return NextResponse.json({ ok: true, tentativa_num: tentativaNum, acertos, total, nota })
   } catch (e: any) {
     // Migração ausente → não quebra o quiz.

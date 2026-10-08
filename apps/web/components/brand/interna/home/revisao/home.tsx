@@ -23,7 +23,7 @@
  * `prefers-reduced-motion: reduce` desliga loops e fixa o estado final.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   Award,
   BookOpen,
@@ -564,12 +564,40 @@ function RecentesMobile({ cards }: { cards: HomeSimuladoCard[] }) {
   return (
     <section className="hrv-up hrv-only-m">
       <div className="hrv-sec-head"><h3><Play size={16} className="hrv-ic-brand" />Simulados recentes</h3></div>
-      <div className="hrv-hscroll hs">
+      <HScrollArrows>
         {cards.map((c, i) => (
           <div className="hrv-hscroll-item" key={c.id}><RecenteCard c={c} i={i} /></div>
         ))}
-      </div>
+      </HScrollArrows>
     </section>
+  )
+}
+
+/** Scroll horizontal com SETAS LATERAIS que aparecem só quando há card pro lado (overflow). As setas
+ *  aparecem/somem conforme a posição do scroll e navegam ~85% da largura visível. Reutilizável. */
+function HScrollArrows({ children }: { children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [canL, setCanL] = useState(false)
+  const [canR, setCanR] = useState(false)
+  const update = useCallback(() => {
+    const el = ref.current; if (!el) return
+    setCanL(el.scrollLeft > 4)
+    setCanR(el.scrollLeft + el.clientWidth < el.scrollWidth - 4)
+  }, [])
+  useEffect(() => {
+    const el = ref.current; if (!el) return
+    update()
+    el.addEventListener('scroll', update, { passive: true })
+    window.addEventListener('resize', update)
+    return () => { el.removeEventListener('scroll', update); window.removeEventListener('resize', update) }
+  }, [update])
+  const go = (dir: number) => { const el = ref.current; if (el) el.scrollBy({ left: dir * Math.round(el.clientWidth * 0.85), behavior: 'smooth' }) }
+  return (
+    <div style={{ position: 'relative' }}>
+      <div ref={ref} className="hrv-hscroll hs">{children}</div>
+      {canL && <button type="button" aria-label="Anterior" className="hrv-hscroll-arrow" style={{ left: 2 }} onClick={() => go(-1)}><ChevronLeft size={18} /></button>}
+      {canR && <button type="button" aria-label="Próximo" className="hrv-hscroll-arrow" style={{ right: 2 }} onClick={() => go(1)}><ChevronRight size={18} /></button>}
+    </div>
   )
 }
 
@@ -1052,7 +1080,7 @@ const CSS = `
 .hrv-cont-info>b{display:block;font-size:15.5px;color:var(--ink);letter-spacing:-.02em}
 .hrv-cont-info>span{font-size:12.5px;color:var(--muted)}
 .hrv-cont-actions{display:flex;gap:10px;margin-top:16px}
-.hrv-cta{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;border-radius:13px;color:#fff;font-weight:800;font-size:14px;border:0;background:linear-gradient(180deg,#6449E0,#4B30BE);box-shadow:0 10px 20px -12px rgba(75,48,190,.8),inset 0 1px 0 rgba(255,255,255,.2);transition:filter .15s,transform .15s;flex:1}
+.hrv-cta{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;border-radius:13px;color:#fff;font-weight:800;font-size:14px;border:0;background:linear-gradient(180deg,#6449E0,#4B30BE);box-shadow:0 10px 20px -12px rgba(75,48,190,.8),inset 0 1px 0 rgba(255,255,255,.2);transition:filter .15s,transform .15s;flex:1;white-space:nowrap}
 .hrv-cta:hover{filter:brightness(1.08);transform:translateY(-1px)}
 .hrv-cta-sm{height:38px;border-radius:11px;font-size:13px;gap:7px}
 .hrv-btn-outline{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:44px;padding:0 14px;border-radius:13px;border:1px solid var(--line);color:var(--ink);font-weight:700;font-size:13px}
@@ -1066,7 +1094,7 @@ const CSS = `
 .hrv-sec-arrows button{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);background:var(--surface);color:var(--ink);display:inline-flex;align-items:center;justify-content:center}
 
 /* --- recentes (pôster — MODELO SALVO, ainda usado por "Outros simulados") --- */
-.hrv-recentes-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.hrv-recentes-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr));gap:14px}
 .hrv-recente{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden}
 .hrv-recente-cover{height:118px}
 .hrv-recente-body{padding:14px;display:flex;flex-direction:column;gap:10px}
@@ -1082,7 +1110,7 @@ const CSS = `
 
 /* --- recentes (TICKET vivo): capa à esquerda (fixa, altura cheia ~168) + corpo à direita --- */
 .hrv-rtk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px}
-.hrv-rtk{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden;min-height:168px}
+.hrv-rtk{display:flex;background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden;min-height:136px}
 .hrv-rtk-cover{width:150px;flex-shrink:0;overflow:hidden}
 .hrv-rtk-body{flex:1;min-width:0;padding:14px 16px;display:flex;flex-direction:column;justify-content:space-between;gap:12px}
 
@@ -1140,7 +1168,10 @@ const CSS = `
 .hrv-filtros{display:flex;gap:6px}
 .hrv-filtro{height:30px;padding:0 12px;border-radius:99px;font-size:12.5px;font-weight:700;display:inline-flex;align-items:center;border:1px solid var(--line);background:transparent;color:var(--muted)}
 .hrv-filtro-on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-.hrv-pastas-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+/* ADAPTATIVO AO CONTAINER (nao ao viewport) — nao corta em tablet/iframe (Curseduca). O card tem cover
+   fixo de 150px, entao repeat(N,1fr) estourava (min-content maior que a track). min(100%,260px) = 1 coluna
+   quando estreito; acima, quantas de 260px+ couberem. */
+.hrv-pastas-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,260px),1fr));gap:14px}
 .hrv-pc{display:flex;height:112px;background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden}
 .hrv-pc-cover{width:150px;flex-shrink:0}
 .hrv-pc-body{flex:1;min-width:0;padding:14px 16px;display:flex;flex-direction:column;justify-content:center;gap:6px}
@@ -1186,6 +1217,9 @@ const CSS = `
 .hrv-hscroll::-webkit-scrollbar{display:none}
 .hrv-hscroll-item{flex:0 0 380px}
 .hs::-webkit-scrollbar{display:none}
+/* Setas laterais do scroll horizontal (aparecem só quando ha card pro lado). */
+.hrv-hscroll-arrow{position:absolute;top:50%;transform:translateY(-50%);z-index:6;width:34px;height:34px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--surface);border:1px solid var(--line);color:var(--ink);box-shadow:0 6px 18px -6px rgba(0,0,0,.45);cursor:pointer}
+.hrv-hscroll-arrow:active{transform:translateY(-50%) scale(.92)}
 
 /* --- responsivo --- */
 @media (max-width:980px){
@@ -1201,8 +1235,7 @@ const CSS = `
   .hrv-h1{font-size:28px}
   .hrv-greet-sub{font-size:14px}
   .hrv-two{grid-template-columns:1fr}
-  .hrv-pastas-grid{grid-template-columns:repeat(2,1fr)}
-  .hrv-recentes-grid{grid-template-columns:1fr}
+  /* pastas/recentes já se ajustam ao container (auto-fill) — sem override por viewport. */
   .hrv-rtk-grid{grid-template-columns:1fr}
   .hrv-slide-txt-m{padding:0 22px;gap:12px}
   .hrv-slide-h2-m{font-size:26px}

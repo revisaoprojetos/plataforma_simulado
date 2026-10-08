@@ -27,7 +27,7 @@ import Link from 'next/link'
 import {
   Flag, BookOpen, BarChart3, Trophy, Play, RotateCcw, Lock, Check, Mountain,
   ChevronRight, Plus, Minus, Maximize2, Crosshair, Download, ExternalLink,
-  Flame, Zap, Crown, Target,
+  Flame, Zap, Crown, Target, FlaskConical,
 } from 'lucide-react'
 import type { Trilha, TrilhaNode } from '@/components/aluno/trilha-simulados'
 import type { AulaDesempenho } from '@/lib/leitura/trilha'
@@ -122,10 +122,13 @@ export interface DesafioLSMeqProps {
   degradeTrilha?: TrilhaDegrade
   /** Nome do módulo p/ breadcrumb ("Constituição Federal"). */
   moduloNome: string
+  /** MODO TESTE (acesso exclusivo): todas as aulas liberadas, refaz à vontade e nada contabiliza.
+   *  Só muda a UI aqui (mostra o selo) — o gating e o "não contabilizar" já são server-side. */
+  testador?: boolean
 }
 
 export function DesafioLSMeq({
-  trilha, desempenho, ranking, minhaLinha, meuId, meuNome, regulamento, pontuacao, gam, carimbos = [], moduloNome,
+  trilha, desempenho, ranking, minhaLinha, meuId, meuNome, regulamento, pontuacao, gam, carimbos = [], moduloNome, testador = false,
 }: DesafioLSMeqProps) {
   const [tab, setTab] = useState<Tab>('trilha')
 
@@ -173,6 +176,16 @@ export function DesafioLSMeq({
       {/* ═══════════ HEADER HERO ═══════════ */}
       <HeaderHero moduloNome={moduloNome} heroSub={heroSub} stats={headerStats} />
 
+      {testador && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 14px', borderRadius: 14, background: 'color-mix(in srgb, var(--brand) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--brand) 35%, transparent)', color: 'var(--ink)' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 9, background: 'color-mix(in srgb, var(--brand) 18%, transparent)', color: 'var(--brand)', flexShrink: 0 }}><FlaskConical size={16} /></span>
+          <div style={{ minWidth: 0, lineHeight: 1.3 }}>
+            <b style={{ display: 'block', fontSize: 13 }}>Modo teste</b>
+            <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Todas as aulas liberadas e livres para refazer — nada é contabilizado (sem XP, sequência ou ranking).</span>
+          </div>
+        </div>
+      )}
+
       {/* ═══════════ ABAS SEGMENTADAS ═══════════ */}
       {/* Container em var(--track) (= --tBg do mockup: #E4EAF5 claro), ativo = var(--surface) (--tOn #fff)
           com ink var(--ink) (--tOnInk), inativo = var(--muted) (--sub). Altura 40, radius 11/8, fonte 13.5. */}
@@ -205,7 +218,7 @@ export function DesafioLSMeq({
 
       {/* ═══════════ CONTEÚDO ═══════════ */}
       {tab === 'trilha' && (
-        <AbaTrilha nodes={nodes} dy={dy} setDy={setDy} idxAtual={idxAtual} diasConcluidos={diasConcluidos} totalDias={totalDias} progressoPct={progressoPct} desempenho={desempenho} />
+        <AbaTrilha nodes={nodes} dy={dy} setDy={setDy} idxAtual={idxAtual} diasConcluidos={diasConcluidos} totalDias={totalDias} progressoPct={progressoPct} desempenho={desempenho} testador={testador} />
       )}
       {tab === 'reg' && <AbaRegulamento regulamento={regulamento} pontuacao={pontuacao} gam={gam} />}
       {tab === 'des' && <AbaDesempenho desempenho={desempenho} totalDias={totalDias} diasConcluidos={diasConcluidos} pontos={pontos} carimbos={carimbos} />}
@@ -232,8 +245,8 @@ export function DesafioLSMeq({
         @keyframes lsmBalaoIn{ 0%{ opacity:0; transform:scale(.55) translateY(14px); } 60%{ opacity:1; } 100%{ opacity:1; transform:none; } }
         @keyframes lsmBalaoOut{ 0%{ opacity:1; transform:none; } 100%{ opacity:0; transform:scale(.7) translateY(8px); } }
         /* Pulo contínuo do balão (sobe/desce) — só depois do "pop" de entrada. */
-        .lsm-balao-wrap{ animation:lsmBalaoBob 1.7s ease-in-out .28s infinite; }
-        @keyframes lsmBalaoBob{ 0%,100%{ transform:translate(-50%, calc(-100% - 48px)); } 50%{ transform:translate(-50%, calc(-100% - 58px)); } }
+        .lsm-balao-wrap{ animation:lsmBalaoBob 1.7s ease-in-out .28s infinite; transform-origin:50% 100%; }
+        @keyframes lsmBalaoBob{ 0%,100%{ transform:translate(-50%, calc(-100% - 48px * var(--z,1))) scale(var(--z,1)); } 50%{ transform:translate(-50%, calc(-100% - 58px * var(--z,1))) scale(var(--z,1)); } }
         /* Botão de ação do balão: realce no HOVER e "pressionar" no CLIQUE. */
         .lsm-balao-cta{ transition:transform .12s ease, filter .12s ease, box-shadow .12s ease; }
         .lsm-balao-cta:hover{ filter:brightness(1.06); transform:translateY(-1px); box-shadow:0 10px 20px -10px rgba(0,0,0,.55); }
@@ -296,10 +309,10 @@ function HeaderHero({ moduloNome, heroSub, stats }: { moduloNome: string; heroSu
 // ABA TRILHA — coluna lateral (ESQUERDA no MEQ) + palco da montanha.
 // ─────────────────────────────────────────────────────────────────────────────
 function AbaTrilha({
-  nodes, dy, setDy, idxAtual, diasConcluidos, totalDias, progressoPct, desempenho,
+  nodes, dy, setDy, idxAtual, diasConcluidos, totalDias, progressoPct, desempenho, testador = false,
 }: {
   nodes: TrilhaNode[]; dy: number; setDy: (i: number) => void; idxAtual: number
-  diasConcluidos: number; totalDias: number; progressoPct: number; desempenho: AulaDesempenho[]
+  diasConcluidos: number; totalDias: number; progressoPct: number; desempenho: AulaDesempenho[]; testador?: boolean
 }) {
   const sel = nodes[dy]
   const selDesemp = sel ? desempenho.find((d) => d.id === sel.id) : undefined
@@ -309,7 +322,7 @@ function AbaTrilha({
     <div className="ls-grid-side" style={{ display: 'grid', gridTemplateColumns: '336px minmax(0,1fr)', gap: 18, alignItems: 'start' }}>
       {/* ── Coluna lateral (ficha técnica + previsão) ── */}
       <aside style={{ display: 'flex', flexDirection: 'column', gap: 14, position: 'sticky', top: 12 }}>
-        <FichaTecnica sel={sel} selDesemp={selDesemp} dy={dy} idxAtual={idxAtual} totalDias={totalDias} />
+        <FichaTecnica sel={sel} selDesemp={selDesemp} dy={dy} idxAtual={idxAtual} totalDias={totalDias} testador={testador} />
         <AcertoQuizzes desempenho={desempenho} />
         <ChecklistHoje sel={sel} selDesemp={selDesemp} />
         <RitmoPrevisao desempenho={desempenho} totalDias={totalDias} diasConcluidos={diasConcluidos} />
@@ -317,15 +330,15 @@ function AbaTrilha({
 
       {/* ── Palco da montanha ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-        <PalcoMontanha nodes={nodes} dy={dy} setDy={setDy} idxAtual={idxAtual} diasConcluidos={diasConcluidos} totalDias={totalDias} progressoPct={progressoPct} desempenho={desempenho} />
-        <BarraInicio sel={sel} selDesemp={selDesemp} dy={dy} idxAtual={idxAtual} />
+        <PalcoMontanha nodes={nodes} dy={dy} setDy={setDy} idxAtual={idxAtual} diasConcluidos={diasConcluidos} totalDias={totalDias} progressoPct={progressoPct} desempenho={desempenho} testador={testador} />
+        <BarraInicio sel={sel} selDesemp={selDesemp} dy={dy} idxAtual={idxAtual} testador={testador} />
       </div>
     </div>
   )
 }
 
 // ── Ficha técnica (card lateral) ──
-function FichaTecnica({ sel, selDesemp, dy, idxAtual, totalDias }: { sel?: TrilhaNode; selDesemp?: AulaDesempenho; dy: number; idxAtual: number; totalDias: number }) {
+function FichaTecnica({ sel, selDesemp, dy, idxAtual, totalDias, testador = false }: { sel?: TrilhaNode; selDesemp?: AulaDesempenho; dy: number; idxAtual: number; totalDias: number; testador?: boolean }) {
   if (!sel) return null
   const bloqueada = sel.estado === 'disponivel' && !!sel.naoLiberada
   const concluida = sel.estado === 'concluido'
@@ -374,6 +387,12 @@ function FichaTecnica({ sel, selDesemp, dy, idxAtual, totalDias }: { sel?: Trilh
       ) : (
         <Link href={href} style={{ marginTop: 14, display: 'inline-flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 8, height: 44, borderRadius: 11, background: concluida ? 'var(--surface2)' : 'var(--brand)', color: concluida ? 'var(--ink)' : '#fff', border: concluida ? '1px solid var(--line)' : 0, fontSize: 13.5, fontWeight: 800 }}>
           {concluida ? <RotateCcw size={15} /> : <Play size={15} />} {ctaLab}
+        </Link>
+      )}
+      {/* MODO TESTE: botão "Testar" — abre a aula p/ conferir a visualização do aluno. */}
+      {testador && (
+        <Link href={sel.hrefLeitura ?? sel.href ?? `/aluno/leitura/${sel.id}`} style={{ marginTop: 8, display: 'inline-flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 7, height: 40, borderRadius: 11, background: 'color-mix(in srgb, var(--brand) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--brand) 32%, transparent)', color: 'var(--brand)', fontSize: 13, fontWeight: 800 }}>
+          <FlaskConical size={14} /> Testar
         </Link>
       )}
     </div>
@@ -489,10 +508,10 @@ function RitmoPrevisao({ desempenho, totalDias, diasConcluidos }: { desempenho: 
 // PALCO DA MONTANHA — imagem de fundo + spline SVG + 30 nós + zoom/pan + overlays.
 // ─────────────────────────────────────────────────────────────────────────────
 function PalcoMontanha({
-  nodes, dy, setDy, idxAtual, diasConcluidos, totalDias, progressoPct, desempenho = [],
+  nodes, dy, setDy, idxAtual, diasConcluidos, totalDias, progressoPct, desempenho = [], testador = false,
 }: {
   nodes: TrilhaNode[]; dy: number; setDy: (i: number) => void; idxAtual: number
-  diasConcluidos: number; totalDias: number; progressoPct: number; desempenho?: AulaDesempenho[]
+  diasConcluidos: number; totalDias: number; progressoPct: number; desempenho?: AulaDesempenho[]; testador?: boolean
 }) {
   const wrapRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
@@ -599,7 +618,7 @@ function PalcoMontanha({
         className="ls-stage"
         style={{ position: 'relative', width: '100%', height: 720, overflow: 'hidden', touchAction: 'pan-y', cursor: zoom > 1 ? 'grab' : 'default', background: '#0B0820' }}
       >
-        <div ref={stageRef} style={{ position: 'absolute', inset: 0, transformOrigin: '0 0', willChange: 'transform' }}>
+        <div ref={stageRef} style={{ position: 'absolute', inset: 0, transformOrigin: '0 0', willChange: 'transform', ['--z' as string]: (1 / zoom).toFixed(3) } as React.CSSProperties}>
           {/* Fundo da montanha */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/leiseca/trilha_m.jpg" alt="" aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center bottom' }} />
@@ -636,7 +655,9 @@ function PalcoMontanha({
                   position: 'absolute',
                   left: `${(x / IMG_W) * 100}%`,
                   top: `${(y / IMG_H) * 100}%`,
-                  transform: 'translate(-50%,-50%)',
+                  // Contra-escala 1/zoom: nó com tamanho CONSTANTE na tela → o zoom afasta os dias sem inchar.
+                  transform: `translate(-50%,-50%) scale(${(1 / zoom).toFixed(3)})`,
+                  transition: 'transform .3s cubic-bezier(.22,1,.36,1)',
                   width: sz, height: sz, borderRadius: node.estado === 'concluido' || atualNode ? '50%' : 8,
                   border: '2px solid rgba(255,255,255,.9)', cursor: 'pointer', padding: 0,
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -670,7 +691,7 @@ function PalcoMontanha({
                 position: 'absolute',
                 left: `${(nodePts[idxAtual].x / IMG_W) * 100}%`,
                 top: `${(nodePts[idxAtual].y / IMG_H) * 100}%`,
-                transform: 'translate(-50%,-250%)',
+                transform: 'translate(-50%, calc(-100% - 28px * var(--z,1))) scale(var(--z,1))', transformOrigin: '50% 100%',
                 display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap',
                 height: 24, padding: '0 10px', borderRadius: 99, background: '#5ECEF0', color: '#0b1020',
                 fontSize: 11, fontWeight: 800, boxShadow: '0 4px 12px rgba(0,0,0,.35)', zIndex: 6,
@@ -709,7 +730,7 @@ function PalcoMontanha({
             const lab = concl ? 'Revisar aula' : lp > 0 ? 'Continuar' : 'Iniciar aula'
             const href = nd.hrefLeitura ?? nd.href ?? '#'
             return (
-              <div className={balaoVis.saindo ? undefined : 'lsm-balao-wrap'} onPointerDown={(e) => e.stopPropagation()} style={{ position: 'absolute', left: `${(np.x / IMG_W) * 100}%`, top: `${(np.y / IMG_H) * 100}%`, transform: 'translate(-50%, calc(-100% - 48px))', zIndex: 14, width: 216 }}>
+              <div className={balaoVis.saindo ? undefined : 'lsm-balao-wrap'} onPointerDown={(e) => e.stopPropagation()} style={{ position: 'absolute', left: `${(np.x / IMG_W) * 100}%`, top: `${(np.y / IMG_H) * 100}%`, transform: 'translate(-50%, calc(-100% - 48px * var(--z,1))) scale(var(--z,1))', transformOrigin: '50% 100%', zIndex: 14, width: 216, maxWidth: '82vw' }}>
                 <div className={balaoVis.saindo ? 'lsm-balao-out' : 'lsm-balao-in'} style={{ position: 'relative', borderRadius: 14, padding: '11px 12px', background: '#fff', color: '#171E3B', boxShadow: '0 16px 34px -14px rgba(0,0,0,.72)' }}>
                   <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.12em', color: 'var(--brand)' }}>DIA {String(balaoVis.i + 1).padStart(2, '0')}</span>
                   <b style={{ display: 'block', margin: '2px 0 9px', fontSize: 13, lineHeight: 1.25, letterSpacing: '-0.01em' }}>{nd.titulo}</b>
@@ -718,6 +739,12 @@ function PalcoMontanha({
                   ) : (
                     <Link href={href} onClick={() => setBalaoNode(null)} className="lsm-balao-cta" style={{ display: 'inline-flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 8, height: 40, borderRadius: 10, background: 'var(--brand)', color: '#fff', fontSize: 13.5, fontWeight: 800 }}>
                       {concl ? <RotateCcw size={14} /> : <Play size={13} />} {lab}
+                    </Link>
+                  )}
+                  {/* MODO TESTE: botão "Testar" abaixo da ação — abre a aula mesmo que apareça bloqueada. */}
+                  {testador && (
+                    <Link href={nd.hrefLeitura ?? nd.href ?? `/aluno/leitura/${nd.id}`} onClick={() => setBalaoNode(null)} className="lsm-balao-cta" style={{ display: 'inline-flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 6, height: 34, marginTop: 8, borderRadius: 10, background: 'color-mix(in srgb, var(--brand) 12%, transparent)', border: '1px solid color-mix(in srgb, var(--brand) 32%, transparent)', color: 'var(--brand)', fontSize: 12.5, fontWeight: 800 }}>
+                      <FlaskConical size={13} /> Testar
                     </Link>
                   )}
                   <span aria-hidden style={{ position: 'absolute', left: '50%', top: '100%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '7px solid transparent', borderRight: '7px solid transparent', borderTop: '8px solid #fff' }} />
@@ -788,7 +815,7 @@ function ToolPill({ onClick, title, children }: { onClick: () => void; title?: s
 }
 
 // ── Barra de início acoplada abaixo do palco ──
-function BarraInicio({ sel, selDesemp, dy, idxAtual }: { sel?: TrilhaNode; selDesemp?: AulaDesempenho; dy: number; idxAtual: number }) {
+function BarraInicio({ sel, selDesemp, dy, idxAtual, testador = false }: { sel?: TrilhaNode; selDesemp?: AulaDesempenho; dy: number; idxAtual: number; testador?: boolean }) {
   if (!sel) return null
   const bloqueada = sel.estado === 'disponivel' && !!sel.naoLiberada
   const concluida = sel.estado === 'concluido'
@@ -821,6 +848,12 @@ function BarraInicio({ sel, selDesemp, dy, idxAtual }: { sel?: TrilhaNode; selDe
       ) : (
         <Link href={href} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 44, padding: '0 22px', borderRadius: 11, background: concluida ? 'var(--surface2)' : 'var(--brand)', color: concluida ? 'var(--ink)' : '#fff', border: concluida ? '1px solid var(--line)' : 0, fontSize: 13.5, fontWeight: 800, whiteSpace: 'nowrap' }}>
           {concluida ? <RotateCcw size={15} /> : <Play size={15} />} {ctaLab}
+        </Link>
+      )}
+      {/* MODO TESTE: botão "Testar" ao lado da ação da trilha. */}
+      {testador && (
+        <Link href={sel.hrefLeitura ?? sel.href ?? `/aluno/leitura/${sel.id}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 44, padding: '0 18px', borderRadius: 11, background: 'color-mix(in srgb, var(--brand) 10%, transparent)', border: '1px solid color-mix(in srgb, var(--brand) 32%, transparent)', color: 'var(--brand)', fontSize: 13, fontWeight: 800, whiteSpace: 'nowrap' }}>
+          <FlaskConical size={14} /> Testar
         </Link>
       )}
     </div>

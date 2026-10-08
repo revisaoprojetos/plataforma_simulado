@@ -55,13 +55,15 @@ const TIPOS_ATUALIZACAO = [
   { v: 'correcao_editorial', label: 'Correção editorial', Icon: SpellCheck },
 ] as const
 
-export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar = false, publicadaVersao = 1, temRascunhoPendente = false, versaoEdicao, abaInicial, indiceTipos: indiceTiposProp = [], espInicial = null, grifoCoresInicial = null, blocosInicial = null }: {
+export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar = false, publicadaVersao = 1, temRascunhoPendente = false, versaoEdicao, abaInicial, indiceTipos: indiceTiposProp = [], espInicial = null, grifoCoresInicial = null, blocosInicial = null, voltarHref }: {
   documento: Documento; htmlAtual: string; podeEditar: boolean; podePublicar?: boolean; publicadaVersao?: number; temRascunhoPendente?: boolean; versaoEdicao?: number
   abaInicial?: 'conteudo' | 'config' | 'questoes'
   indiceTipos?: string[]
   espInicial?: EspacamentoDoc | null
   grifoCoresInicial?: GrifoCores | null
   blocosInicial?: BlocoDef[] | null
+  /** "Voltar" customizado (ex.: vindo da Jurisprudência) — default = banco de aulas da Lei Seca. */
+  voltarHref?: string
 }) {
   const versaoAutoria = versaoEdicao ?? documento.versao
   const router = useRouter()
@@ -302,7 +304,7 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
       {/* Cabeçalho */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <Link href={documento.pasta_id ? `/admin/leitura?pasta=${documento.pasta_id}` : '/admin/leitura'} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+          <Link href={voltarHref ?? (documento.pasta_id ? `/admin/leitura?pasta=${documento.pasta_id}` : '/admin/leitura')} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
             <ArrowLeft className="h-4 w-4" /> Voltar
           </Link>
           <h1 className="text-xl font-bold tracking-tight">{titulo || 'Documento'}</h1>

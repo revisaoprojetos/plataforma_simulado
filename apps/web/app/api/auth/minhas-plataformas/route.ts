@@ -40,12 +40,14 @@ export async function GET() {
   //      no `tenantIds` para não-super) e super-admins.
   //   - "Só super-admin" (tema.somente_super): APENAS super-admin global.
   //   - "Oculta": ninguém.
+  // ORDEM IMPORTA: a restrição de visibilidade vem ANTES do "ativo". Antes, `ativo===true` liberava
+  // para QUALQUER admin e ignorava o `somente_super` — então uma plataforma só-super aparecia no seletor
+  // mas o /admin bloqueava (redirect /login) → LOOP "carrega e volta" (bug do MEQ, somente_super+ativo).
   const tenants = (todas ?? []).filter((t: any) => {
-    if (t.ativo === true) return true
     const tema = (t.tema as any) ?? {}
-    if (tema.somente_super === true) return superAdmin
-    if (tema.somente_admin === true) return true
-    return false
+    if (tema.somente_super === true) return superAdmin // reservada a super-admin → fora do seletor p/ não-super
+    if (tema.somente_admin === true) return true       // só-admin: admins (já recortados por tenantIds) + super
+    return t.ativo === true                             // "Todos": precisa estar ativo
   })
 
   const plataformas = (tenants ?? []).map((t: any) => ({

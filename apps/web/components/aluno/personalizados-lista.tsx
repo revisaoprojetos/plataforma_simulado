@@ -7,6 +7,7 @@ import { Wand2, Plus, Loader2, FileQuestion, Play, Pencil, CheckCircle2 } from '
 import { cn } from '@/lib/utils'
 import { iconePersonalizado } from '@/lib/personalizado-visual'
 import { type CardView } from '@/lib/card-view'
+import { cardGrid, POSTER_MIN, TICKET_MIN } from '@/components/aluno/card-grid'
 import { listarMeusSimulados, type MeuSimuladoResumo } from '@/app/aluno/(portal)/simulados/builder-actions'
 
 // Nota (0–100) → tom (mesma régua dos cards oficiais). `notaTone` = sobre a capa escura (pôster);
@@ -140,7 +141,7 @@ export function PersonalizadosLista({ view = 'poster' }: { view?: CardView }) {
         </div>
       ) : (
         // Mesma grade dos cards oficiais (pôster ou ticket, conforme o console).
-        <div className={view === 'ticket' ? 'grid gap-3 md:grid-cols-2 xl:grid-cols-3' : 'grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'}>
+        <div style={view === 'ticket' ? cardGrid(TICKET_MIN, 12) : cardGrid(POSTER_MIN, 14)}>
           {itens.map((s) => <CardPersonalizado key={s.id} s={s} variant={view} />)}
         </div>
       )}

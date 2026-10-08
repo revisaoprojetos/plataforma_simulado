@@ -140,7 +140,9 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
         // plataforma = bloqueado. Em dev (sem tenant resolvido) mantém a lista como fallback.
         if (!sup && tenantAtualId) {
           if (!plats.some((p) => p.id === tenantAtualId)) setSemAcesso(true)
-          else if (!forcarSelecao) router.replace('/admin') // ao TROCAR de plataforma, mostra a lista
+          // Auto-entra SÓ quem tem 1 plataforma. Com acesso a VÁRIAS (mesmo e-mail em múltiplos tenants),
+          // mostra o SELETOR para escolher (antes auto-entrava direto e o seletor nunca aparecia).
+          else if (!forcarSelecao && plats.length <= 1) router.replace('/admin')
         }
       })
       .catch(() => { if (vivo) { setErroCarregar(true); toast.error('Não foi possível carregar suas plataformas.') } })
@@ -223,9 +225,9 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
       )
     }
 
-    // Super-admin escolhe (console + plataformas); admin comum vê a lista ao TROCAR de plataforma.
-    // Em dev sem tenant, mostra a lista como fallback.
-    const mostrarLista = superAdmin || !tenantAtualId || forcarSelecao
+    // Super-admin escolhe (console + plataformas); admin comum vê a lista ao TROCAR de plataforma OU
+    // quando tem acesso a VÁRIAS plataformas (seletor pós-login). Em dev sem tenant, lista como fallback.
+    const mostrarLista = superAdmin || !tenantAtualId || forcarSelecao || (minhasPlats?.length ?? 0) > 1
     return (
       <Shell wide>
         <div className="mb-7 flex flex-col items-center gap-3 text-center">

@@ -49,14 +49,14 @@ export function PaneTabs({ marca, pt, onPane, nMain, nPers, radius = 12 }: { mar
   const cell = (key: Pane, icon: string, label: string, count: number) => {
     const on = pt === key
     return (
-      <button type="button" role="tab" aria-selected={on} onClick={() => onPane(key)} className="rlz-tab" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, whiteSpace: 'nowrap', height: 42, padding: '0 16px', border: 0, borderRadius: radius, background: on ? 'var(--tOn)' : 'transparent', color: on ? 'var(--tOnInk)' : 'var(--muted)', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
+      <button type="button" role="tab" aria-selected={on} onClick={() => onPane(key)} className="rlz-tab" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, whiteSpace: 'nowrap', flexShrink: 0, height: 42, padding: '0 14px', border: 0, borderRadius: radius, background: on ? 'var(--tOn)' : 'transparent', color: on ? 'var(--tOnInk)' : 'var(--muted)', fontSize: 13.5, fontWeight: 700, cursor: 'pointer' }}>
         <Ic n={icon} s={16} />{label}
         <span style={{ fontSize: 11.5, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: 'var(--cnt)', color: 'var(--cntInk)' }}>{count}</span>
       </button>
     )
   }
   return (
-    <div role="tablist" style={{ display: 'inline-flex', gap: 4, padding: 4, borderRadius: 15, background: 'var(--tBg)' }}>
+    <div role="tablist" className="hs" style={{ display: 'flex', maxWidth: '100%', overflowX: 'auto', gap: 4, padding: 4, borderRadius: 15, background: 'var(--tBg)', scrollbarWidth: 'none' }}>
       {cell('main', 'clip', `Simulados ${marca}`, nMain)}
       {cell('pers', 'plus', 'Personalizados', nPers)}
     </div>
@@ -148,14 +148,14 @@ export function NotaRing({ v, size = 54 }: { v: number; size?: number }) {
 
 // ---------------------------------------------------------------- CAPAS por marca (decorativas, aria-hidden)
 // Revisão: marca R em contorno + grade (porte do mockup).
-export function CoverRev({ titulo, sub, grad, big = 24, monteItalic = true, img }: { titulo: string; sub: string; grad: string; big?: number; monteItalic?: boolean; img?: string | null }) {
+export function CoverRev({ titulo, sub, grad, big = 24, monteItalic = true, img, fit = 'cover' }: { titulo: string; sub: string; grad: string; big?: number; monteItalic?: boolean; img?: string | null; fit?: 'cover' | 'contain' }) {
   // Com IMAGEM real (capa/ticket do simulado): a foto preenche a capa (object-cover) e NÃO há texto nem
   // degradê sobreposto — a arte da imagem já traz o título. Sem imagem: gradiente + textura + glifo + texto.
   return (
     <div className="rlz-cov" style={{ position: 'relative', overflow: 'hidden', width: '100%', height: '100%', background: grad, color: '#FFF', display: 'flex', flexDirection: 'column', justifyContent: img ? 'flex-end' : 'center', padding: img ? 0 : '12px 14px' }}>
       {img ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={img} alt="" aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        <img src={img} alt="" aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: fit }} />
       ) : (
         <>
           <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.07) 1px,transparent 1px)', backgroundSize: '18px 18px', pointerEvents: 'none' }} />
@@ -170,13 +170,13 @@ export function CoverRev({ titulo, sub, grad, big = 24, monteItalic = true, img 
 }
 
 // VND: capa verde + folha (leaf) decorativa + traço dourado.
-export function CoverVnd({ titulo, sub, grad, big = 22, showKicker = false, img }: { titulo: string; sub: string; grad: string; big?: number; showKicker?: boolean; img?: string | null }) {
+export function CoverVnd({ titulo, sub, grad, big = 22, showKicker = false, img, fit = 'cover' }: { titulo: string; sub: string; grad: string; big?: number; showKicker?: boolean; img?: string | null; fit?: 'cover' | 'contain' }) {
   return (
     <div className="rlz-cov" style={{ position: 'relative', overflow: 'hidden', width: '100%', height: '100%', background: grad, color: '#FFF', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: img ? 0 : '12px 14px' }}>
       {img ? (
         // COM IMAGEM: só a foto, sem texto nem degradê (a arte já tem o título).
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={img} alt="" aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        <img src={img} alt="" aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: fit }} />
       ) : (
         <>
           <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle,rgba(185,245,212,.22) 1px,transparent 1.6px)', backgroundSize: '14px 14px', pointerEvents: 'none' }} />
@@ -192,13 +192,13 @@ export function CoverVnd({ titulo, sub, grad, big = 22, showKicker = false, img 
 }
 
 // MEQ: capa navy + "circuito" simplificado (3 traços) + 3 barrinhas ciano (porte de perfil-meq Cover).
-export function CoverMeq({ titulo, grad, big = 12, img }: { titulo: string; grad: string; big?: number; img?: string | null }) {
+export function CoverMeq({ titulo, grad, big = 12, img, fit = 'cover' }: { titulo: string; grad: string; big?: number; img?: string | null; fit?: 'cover' | 'contain' }) {
   return (
     <div className="rlz-cov" style={{ position: 'relative', overflow: 'hidden', width: '100%', height: '100%', background: grad, color: '#FFF', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: img ? 0 : '10px 12px' }}>
       {img ? (
         // COM IMAGEM: só a foto, sem texto nem degradê (a arte já tem o título).
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={img} alt="" aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        <img src={img} alt="" aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: fit }} />
       ) : (
         <>
           <svg viewBox="0 0 160 100" aria-hidden preserveAspectRatio="xMidYMid slice" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>

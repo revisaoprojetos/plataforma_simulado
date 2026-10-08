@@ -28,7 +28,7 @@ import { useTemaInterno } from '@/components/brand/interna/use-tema-interno'
 
 /** Visão de um módulo do LegProc Digital: banner colapsável (igual ao admin) com tabs Trilha | Desempenho
  * e busca, + aviso de questões pendentes. */
-export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulasPendentes, ranking, minhaLinha = null, meuId, meuNome, formato = DEFAULT_TRILHA_FORMATO, simbolos = DEFAULT_TRILHA_SIMBOLOS, livre, inverter = false, degrade, degradeTrilha, descricao, regulamento, pontuacao, desafios, desempenhoDesafios, gam = null, diasLeitura = [], carimbos = [], conquistasModulo = [], progAulas = {}, interno = null }: {
+export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulasPendentes, ranking, minhaLinha = null, meuId, meuNome, formato = DEFAULT_TRILHA_FORMATO, simbolos = DEFAULT_TRILHA_SIMBOLOS, livre, inverter = false, degrade, degradeTrilha, descricao, regulamento, pontuacao, desafios, desempenhoDesafios, gam = null, diasLeitura = [], carimbos = [], conquistasModulo = [], progAulas = {}, testador = false, interno = null }: {
   modulo: string
   trilha: Trilha
   desempenho: AulaDesempenho[]
@@ -56,6 +56,8 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
   conquistasModulo?: ConquistaModuloView[]
   /** Progresso por aula (concluida/gabaritada) — para estampar o carimbo só nas aulas realmente feitas. */
   progAulas?: Record<string, { concluida: boolean; gabaritada: boolean }>
+  /** MODO TESTE (acesso exclusivo): todas as aulas liberadas, refaz à vontade e nada contabiliza. */
+  testador?: boolean
   /** Quando ligado (visual novo por tenant), renderiza o interior NOVO (montanha) na marca/tema do
    *  tenant — para TODAS as marcas, não só MEQ. Vem de resolverInterno() na página. */
   interno?: { brand: Brand; theme: InternaTheme } | null
@@ -166,6 +168,7 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
           degrade={degrade}
           degradeTrilha={degradeTrilha}
           moduloNome={trilha.nome}
+          testador={testador}
         />
       </div>
     )

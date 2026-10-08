@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { onPraticaRespondida } from '@/lib/gamificacao'
 import { docAcessivelAluno } from '@/lib/leitura/acesso'
+import { ehTestadorLeituraDoc } from '@/lib/leitura/testadores'
 
 // POST /api/leitura/resposta — responde uma questão inline da leitura (validação server-side).
 export const dynamic = 'force-dynamic'
@@ -24,11 +25,14 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ message: 'Sem acesso a este documento.' }, { status: 403 })
   }
 
+  // MODO TESTE (acesso exclusivo): ignora gates e grava sem contabilizar (refaz à vontade).
+  const testador = await ehTestadorLeituraDoc(svc, sessao.tenantId, sessao.estudanteId, documento_id)
+
   // Regras do módulo (opcionais, default OFF): SEQUENCIAL (só responde um dia com os anteriores
   // concluídos) e BLOQUEAR REFAZER (questão já respondida não pode ser re-respondida — trava o quiz
-  // após concluir). A flag de refazer é usada logo abaixo, na hora de gravar.
+  // após concluir). A flag de refazer é usada logo abaixo, na hora de gravar. Testador pula tudo.
   let bloquearRefazer = false
-  try {
+  if (!testador) try {
     const { data: docAtual } = await svc.from('simulado_documentos').select('pasta_id, ordem').eq('id', documento_id).eq('tenant_id', sessao.tenantId).maybeSingle()
     const pastaId = (docAtual as any)?.pasta_id
     if (pastaId) {
@@ -81,18 +85,20 @@ export async function POST(request: NextRequest) {
   if (bloquearRefazer && jaResp) return NextResponse.json({ message: 'Este quiz já foi concluído e não pode ser refeito.', bloqueado: 'refazer' }, { status: 403 })
 
   // ON CONFLICT DO NOTHING (ignoreDuplicates): insere só na 1ª vez; refazer é IGNORADO (principal intacto).
+  // TESTADOR: sobrescreve (ignoreDuplicates=false) p/ poder refazer sempre; e nunca credita XP.
   const { data: up, error } = await svc.from('simulado_leitura_respostas').upsert(
     {
       tenant_id: sessao.tenantId, estudante_id: sessao.estudanteId, documento_id, questao_id,
       alternativa_id, correta, snapshot_gabarito: { alternativa_id, correta, letra: LETRA[idx] ?? '?', correta_id: corretaId },
       respondido_em: new Date().toISOString(),
     },
-    { onConflict: 'estudante_id,documento_id,questao_id', ignoreDuplicates: true },
+    { onConflict: 'estudante_id,documento_id,questao_id', ignoreDuplicates: !testador },
   ).select('id').maybeSingle()
   if (error) return NextResponse.json({ message: error.message }, { status: 500 })
 
   // XP por acerto SÓ quando realmente gravou a 1ª resposta (up != null); refazer (ignorado) não re-credita.
-  if (up) void onPraticaRespondida(svc, { tenantId: sessao.tenantId, estudanteId: sessao.estudanteId, respostaId: (up as any).id, correta, disciplinaId: (disc as any)?.disciplina_id ?? null })
+  // Testador nunca contabiliza (sem XP/streak).
+  if (up && !testador) void onPraticaRespondida(svc, { tenantId: sessao.tenantId, estudanteId: sessao.estudanteId, respostaId: (up as any).id, correta, disciplinaId: (disc as any)?.disciplina_id ?? null })
 
   return NextResponse.json({ ok: true, correta, correta_id: corretaId, letra: LETRA[idx] ?? '?', jaRespondida: !!jaResp })
 }

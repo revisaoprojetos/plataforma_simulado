@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { Loader2, Search, UserCheck, Info, Check, Trash2, Globe, Lock, Link2, Users2, X, EyeOff, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { Loader2, Search, UserCheck, Info, Check, Trash2, Globe, Lock, Link2, Users2, X, EyeOff, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FlaskConical } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CopyLink } from '@/components/admin/copy-link'
 import { AvatarEstudante } from '@/components/aluno/avatar-estudante'
@@ -15,6 +15,7 @@ import {
   carregarAtribuicaoPasta, definirGruposPasta, contarMembrosGrupos,
   carregarControleAcesso, definirEstudantesPasta,
   carregarRankingOcultos, salvarRankingOcultos,
+  carregarTestadoresExclusivos, salvarTestadoresExclusivos,
   type EstudanteAcessoLinha, type ControleAcessoLinha,
 } from '@/app/admin/leitura/actions'
 
@@ -51,6 +52,13 @@ export function ModuloAcesso({ pastaId }: { pastaId: string }) {
     if (!r.ok) toast.error(r.error ?? 'Erro ao salvar.')
   }
 
+  // Acessos exclusivos (modo teste) — contas de admin com e-mail de estudante.
+  const [testEst, setTestEst] = useState<EstudanteAcessoLinha[]>([])
+  async function salvarTestadores(est: EstudanteAcessoLinha[]) {
+    const r = await salvarTestadoresExclusivos(pastaId, est.map((e) => e.id))
+    if (!r.ok) toast.error(r.error ?? 'Erro ao salvar.')
+  }
+
   // Carrega (mount + após mutações) — grupos vinculados + controle completo.
   async function carregar() {
     const [a, c] = await Promise.all([carregarAtribuicaoPasta(pastaId), carregarControleAcesso(pastaId)])
@@ -68,8 +76,9 @@ export function ModuloAcesso({ pastaId }: { pastaId: string }) {
     ;(async () => {
       try {
         await carregar()
-        const oc = await carregarRankingOcultos(pastaId)
+        const [oc, tx] = await Promise.all([carregarRankingOcultos(pastaId), carregarTestadoresExclusivos(pastaId)])
         if (oc.ok) { setOcEst(oc.estudantes ?? []); setOcGrp(oc.grupos ?? []); setOcTotal(oc.total ?? false) }
+        if (tx.ok) setTestEst(tx.estudantes ?? [])
       } catch (e) {
         console.error('[acessos] falha ao carregar:', e)
         toast.error('Não foi possível carregar os acessos. Tente recarregar.')
@@ -286,6 +295,9 @@ export function ModuloAcesso({ pastaId }: { pastaId: string }) {
         </div>
       </div>
 
+      {/* ACESSOS EXCLUSIVOS (MODO TESTE) — card próprio, abaixo do acesso. Independente do "liberar p/ todos". */}
+      <TestadoresExclusivosCard testEst={testEst} setTestEst={setTestEst} salvar={salvarTestadores} />
+
     </div>
   )
 }
@@ -378,5 +390,67 @@ function OcultarRankingDialog({ todosGrupos, ocEst, setOcEst, ocGrp, setOcGrp, o
         document.body,
       )}
     </>
+  )
+}
+
+/** Card "Acessos exclusivos (modo teste)" — abaixo do card de acesso, mesma organização (header +
+ *  Adicionar estudantes + tabela com remover). Contas de admin que usam e-mail de estudante: veem todas
+ *  as aulas liberadas todo dia, refazem à vontade e NÃO contabilizam (sem XP/streak, fora do ranking). */
+function TestadoresExclusivosCard({ testEst, setTestEst, salvar }: {
+  testEst: EstudanteAcessoLinha[]; setTestEst: (v: EstudanteAcessoLinha[]) => void
+  salvar: (est: EstudanteAcessoLinha[]) => void
+}) {
+  function adicionar(novos: AlunoSel[]) {
+    const map = new Map(testEst.map((e) => [e.id, e]))
+    for (const nv of novos) if (!map.has(nv.id)) map.set(nv.id, { id: nv.id, nome: nv.nome, email: nv.email, cpf: nv.cpf, classificacao: nv.classificacao, avatar: nv.avatar, perfil_avatar_cor: nv.perfil_avatar_cor })
+    const arr = [...map.values()]; setTestEst(arr); salvar(arr)
+  }
+  function remover(id: string) { const arr = testEst.filter((x) => x.id !== id); setTestEst(arr); salvar(arr) }
+  return (
+    <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+      <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3">
+        <p className="flex items-center gap-1.5 text-sm font-semibold"><FlaskConical className="h-4 w-4 text-violet-500" /> Acessos exclusivos <span className="rounded-full bg-violet-500/10 px-2 py-0.5 text-[11px] font-medium text-violet-600 dark:text-violet-400">modo teste</span> <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">{testEst.length}</span></p>
+        <div className="ml-auto"><AdicionarEstudantesDialog jaIds={new Set(testEst.map((e) => e.id))} onSelecionar={adicionar} /></div>
+      </div>
+      <div className="border-b bg-violet-500/5 px-4 py-2.5 text-xs text-violet-700 dark:text-violet-300">
+        Para admins que acessam com e-mail de estudante. As contas aqui veem <strong>todas as aulas liberadas
+        todo dia</strong>, podem <strong>refazer o desafio à vontade</strong> e <strong>não contabilizam nada</strong>
+        (sem XP, sequência ou ranking). Na área do aluno elas veem um selo <strong>“Modo teste”</strong>.
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-background">
+            <tr className="border-b text-left text-muted-foreground">
+              <th className="px-3 py-2 font-medium">Nome</th>
+              <th className="hidden px-3 py-2 font-medium sm:table-cell">E-mail</th>
+              <th className="hidden px-3 py-2 font-medium md:table-cell">Documento</th>
+              <th className="w-12 px-3 py-2" />
+            </tr>
+          </thead>
+          <tbody>
+            {testEst.length === 0 ? (
+              <tr><td colSpan={4} className="py-10 text-center text-muted-foreground">Nenhuma conta de teste. Use “Adicionar estudantes” (e-mail do admin) para habilitar o modo teste deste desafio.</td></tr>
+            ) : testEst.map((a) => (
+              <tr key={a.id} className="border-b transition-colors hover:bg-muted/40">
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-2.5">
+                    <AvatarEstudante nome={a.nome} avatar={a.avatar} cor={a.perfil_avatar_cor} className="h-8 w-8 shrink-0 text-[11px] text-white" />
+                    <div className="flex min-w-0 items-center gap-1.5">
+                      <Link href={`/admin/estudantes/${a.id}`} className="truncate font-medium hover:text-primary hover:underline">{a.nome}</Link>
+                      <ClassificacaoBadge classificacao={a.classificacao} />
+                    </div>
+                  </div>
+                </td>
+                <td className="hidden px-3 py-2 text-muted-foreground sm:table-cell"><span className="block truncate">{a.email ?? '—'}</span></td>
+                <td className="hidden px-3 py-2 font-mono text-xs text-muted-foreground md:table-cell">{a.cpf ?? '—'}</td>
+                <td className="px-3 py-2 text-right">
+                  <button type="button" onClick={() => remover(a.id)} title="Remover do modo teste" aria-label="Remover do modo teste" className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"><Trash2 className="h-4 w-4" /></button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   )
 }

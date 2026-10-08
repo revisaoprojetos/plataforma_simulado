@@ -219,6 +219,8 @@ export async function carregarRankingModulo(moduloId: string, tenantId: string):
         const grps = Array.isArray(cfg.grupos) ? cfg.grupos : []
         if (grps.length) { const mem = await fetchAllByIn<{ estudante_id: string }>(grps, (chunk) => svc.from('simulado_grupo_membros').select('estudante_id').in('grupo_id', chunk)); for (const m of mem) ocultosSet.add(m.estudante_id) }
       } catch { /* coluna ranking_ocultos ausente */ }
+      // Acessos exclusivos / modo teste: nunca competem no ranking (tolerante à coluna ausente).
+      try { const { testadoresDoModulo } = await import('@/lib/leitura/testadores'); for (const id of await testadoresDoModulo(svc, tenantId, moduloId)) ocultosSet.add(id) } catch { /* ausente */ }
     }
 
     // Nome + e-mail + foto/cor do avatar.

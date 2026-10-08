@@ -4,13 +4,18 @@
 // abas Visão geral/Conquistas/Histórico/Desempenho. Prefixo CSS `pvn-`.
 // DADOS REAIS (PerfilData): renderiza só seções com fonte real; nada de botão/toggle inerte.
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { internaTokensStyle, INTERNA_RADIUS, type InternaTheme } from '../interna-tokens'
 import { useTemaInterno } from '../use-tema-interno'
 import { BK, Ic, Tabs, type TabDef, notec, fnum, LineSvg } from './shared'
 import { useIsMobile } from './use-is-mobile'
-import type { PerfilData } from './data'
+import type { PerfilData, PerfilPreferencias } from './data'
+import { salvarPerfilPrefs } from '@/app/aluno/(portal)/perfil/actions'
+import {
+  MetaDiariaCard, PreferenciasCard, ResumoSemanaCard, AtividadeHeatmap, EstatKpiStrip,
+  VoceMediaCard, BancaCard, FortesFracosCard, RendimentoHoraCard, TempoQuestaoCard, HistoricoTabela, PERFIL_BLOCOS_CSS,
+} from './blocos'
 
 const VP = 'M1.00 5.90L11.51 5.77Q12.20 5.76 12.53 6.13L21.21 15.98Q21.47 16.25 21.57 15.86L21.60 8.10C21.60 7.05 20.81 6.30 19.76 5.88L30.57 5.90Q31.00 5.91 30.74 6.33L23.18 14.49C22.26 15.55 21.80 16.65 21.73 18.23L21.67 25.45Q21.60 26.24 20.95 25.96L6.03 8.31C4.78 6.96 3.14 6.19 1.00 5.90Z'
 
@@ -128,9 +133,8 @@ function Kpis({ mobile, data }: { mobile: boolean; data: PerfilData }) {
     items.push({ p: ringP, color: '#7C6CF0', inner: <b style={{ fontSize: 15, color: 'var(--ink)' }}>Nv {h.nivel}</b>, t: 'Próximo nível', s: `${Math.max(0, h.xpNivelMax - h.xpNivelAtual)} XP p/ o ${h.nivel + 1}` })
     items.push({ p: 0, color: '#F0773A', inner: <Ic n="flame" s={24} c="#F0773A" />, t: 'Sequência', s: `${h.streak} dias · recorde ${h.recorde}` })
   }
-  const cols = mobile ? 1 : items.length
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols},1fr)`, gap: 12 }}>
+    <div className="pvn-kpis">
       {items.map((it, idx) => (
         <div key={idx} className="pvn-lift" style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderRadius: 22, background: 'var(--surface)', border: '1px solid var(--line)' }}>
           <Ring p={it.p} color={it.color} size={mobile ? 60 : 70} sw={7} inner={it.inner} />
@@ -144,6 +148,13 @@ function Kpis({ mobile, data }: { mobile: boolean; data: PerfilData }) {
 // ---------------------------------------------------------------- Visão geral (perfil de estudos + Lei Seca)
 function TabGeral({ mobile, data }: { mobile: boolean; data: PerfilData }) {
   const h = data.header
+  const [prefs, setPrefs] = useState<PerfilPreferencias | null>(data.preferencias ?? null)
+  const [meta, setMeta] = useState<number>(data.metaDiaria?.meta ?? 20)
+  const [saving, startSave] = useTransition()
+  const persistir = (patch: Record<string, unknown>) => startSave(async () => { try { await salvarPerfilPrefs(patch as any) } catch { /* best-effort */ } })
+  const onMeta = (m: number) => { setMeta(m); persistir({ metaDiaria: m }) }
+  const onToggle = (k: keyof PerfilPreferencias) => { if (!prefs) return; const nv = { ...prefs, [k]: !prefs[k] }; setPrefs(nv); persistir({ [k]: nv[k] }) }
+
   const rows: [string, string, string | null][] = [
     ['trend', 'Matéria mais forte', data.matForte],
     ['flag', 'Matéria a reforçar', data.matReforcar],
@@ -177,9 +188,18 @@ function TabGeral({ mobile, data }: { mobile: boolean; data: PerfilData }) {
     </div>
   </>) : null
 
-  if (mobile) return <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>{dados}{lei}</div>
+  const metaCard = data.metaDiaria ? <MetaDiariaCard bk={bk} meta={meta} feitas={data.metaDiaria.feitas} onMeta={onMeta} saving={saving} /> : null
+  const resumo = data.resumoSemana ? <ResumoSemanaCard bk={bk} r={data.resumoSemana} /> : null
+  const prefsCard = prefs ? <PreferenciasCard bk={bk} prefs={prefs} onToggle={onToggle} saving={saving} /> : null
+
+  if (mobile) return <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>{dados}{metaCard}{lei}{resumo}{prefsCard}</div>
+  const colStyle = { display: 'flex', flexDirection: 'column' as const, gap: 16 }
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: lei ? 'minmax(0,1fr) minmax(0,1fr)' : '1fr', gap: 16, alignItems: 'start' }}>{dados}{lei}</div>
+    <div className="pvn-info3">
+      <div style={colStyle}>{dados}</div>
+      <div style={colStyle}>{metaCard}{lei}</div>
+      <div style={colStyle}>{resumo}{prefsCard}</div>
+    </div>
   )
 }
 
@@ -220,56 +240,13 @@ function TabConq({ mobile, data }: { mobile: boolean; data: PerfilData }) {
   )
 }
 
-// ---------------------------------------------------------------- Histórico (timeline)
-function VRing({ v, size = 46 }: { v: number; size?: number }) {
-  const r = (size - 6) / 2 - 1, C = 2 * Math.PI * r
-  const [col] = notec(v)
-  return (
-    <span style={{ position: 'relative', width: size, height: size, flexShrink: 0, display: 'inline-block', borderRadius: '50%', background: 'rgba(4,26,16,.75)', boxShadow: '0 6px 16px -6px rgba(0,0,0,.6)' }}>
-      <svg viewBox={`0 0 ${size} ${size}`} style={{ width: size, height: size, transform: 'rotate(-90deg)' }}>
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,.18)" strokeWidth={4} />
-        <circle className="pvn-ring" cx={size / 2} cy={size / 2} r={r} fill="none" stroke={col} strokeWidth={4} strokeLinecap="round" strokeDasharray={C.toFixed(1)} strokeDashoffset={(C * (1 - v / 100)).toFixed(1)} style={{ ['--c' as any]: C.toFixed(1) }} />
-      </svg>
-      <b style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11.5, color: '#FFF' }}>{v}</b>
-    </span>
-  )
-}
-
-function TabHist({ mobile, data }: { mobile: boolean; data: PerfilData }) {
+// ---------------------------------------------------------------- Histórico (tabela ordenável + rolagem)
+function TabHist({ data }: { mobile: boolean; data: PerfilData }) {
   const hist = data.historico
-  if (hist.length === 0) {
-    return bk.card(<>{bk.head('clock', 'Histórico de simulados')}<span style={{ fontSize: 13, color: 'var(--muted)' }}>Nenhum simulado realizado ainda.</span></>)
-  }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 12, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--goldInk)' }}><Ic n="clock" s={13} />{hist.length} simulados</span>
-      {hist.map((item, k) => {
-        const last = k === hist.length - 1
-        const [rc] = notec(item.acerto)
-        const card = (
-          <div className="pvn-rowh" style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 14, padding: '12px 14px', marginBottom: 10, borderRadius: 18, background: 'var(--surface)', border: '1px solid var(--line)' }}>
-            <VRing v={item.acerto} />
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <b style={{ display: 'block', fontSize: 14, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.simulado}</b>
-              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 5 }}>
-                {([['cal', item.quando], ['star', item.nota == null ? 'sem nota' : 'nota ' + fnum(item.nota)], ['clock', item.tempo]] as [string, string][]).map(([i, v]) => (
-                  <span key={v} style={{ height: 22, padding: '0 8px', borderRadius: 99, background: 'var(--surface2)', fontSize: 11, fontWeight: 700, color: 'var(--muted)', display: 'inline-flex', alignItems: 'center', gap: 4 }}><Ic n={i} s={11} />{v}</span>
-                ))}
-              </div>
-            </div>
-            {item.href ? <Ic n="cr" s={16} c="var(--muted)" /> : null}
-          </div>
-        )
-        return (
-          <div key={k} style={{ display: 'flex', gap: 14 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: 16, flexShrink: 0 }}>
-              <span style={{ width: 14, height: 14, borderRadius: '50%', background: 'var(--surface)', border: `3px solid ${rc}`, marginTop: 22 }} />
-              {last ? null : <span style={{ flex: 1, width: 2, background: 'var(--line2)', marginTop: 4 }} />}
-            </div>
-            {item.href ? <Link href={item.href} style={{ textDecoration: 'none', color: 'inherit', flex: 1, minWidth: 0, display: 'flex' }}>{card}</Link> : card}
-          </div>
-        )
-      })}
+      {data.atividade ? <AtividadeHeatmap bk={bk} a={data.atividade} /> : null}
+      <HistoricoTabela bk={bk} hist={hist} />
     </div>
   )
 }
@@ -300,26 +277,58 @@ function DiscCard({ data }: { data: PerfilData }) {
 function EvoCard({ mobile, data }: { mobile: boolean; data: PerfilData }) {
   const w = mobile ? 360 : 600, h = mobile ? 150 : 180
   const vals = data.evolucao.map((e) => e.nota)
-  const labels = data.evolucao.map((e) => e.rotulo)
+  const labels = data.evolucao.map((e) => (e.rotulo.includes('/') ? e.rotulo.split('/').slice(0, 2).join('/') : e.rotulo)) // "DD/MM"
+  const chartMin = Math.max(260, vals.length * 46) // rolamento horizontal quando há muitos pontos
   return bk.card(<>
     {bk.head('trend', 'Evolução da nota', undefined, 'Nota média por período')}
     {vals.length === 0 ? <span style={{ fontSize: 13, color: 'var(--muted)' }}>Sem dados de evolução ainda.</span> : (
-      <div className="pvn-pv">
+      <div className="pvn-pv" style={{ overflowX: 'auto', maxWidth: '100%' }}>
+        <div style={{ minWidth: chartMin }}>
         <LineSvg vals={vals} w={w} h={h} color="var(--brand)" fill="var(--chip)" />
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>{labels.map((m) => <span key={m} style={{ fontSize: 10, color: 'var(--muted)' }}>{m}</span>)}</div>
+        <div style={{ display: 'flex', marginTop: 6 }}>{labels.map((m, i) => <span key={i} style={{ flex: 1, minWidth: 0, textAlign: 'center', fontSize: 10, color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m}</span>)}</div>
+        </div>
       </div>
     )}
   </>)
 }
 
 function TabEst({ mobile, data }: { mobile: boolean; data: PerfilData }) {
-  if (mobile) return <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}><EvoCard mobile data={data} /><DiscCard data={data} /></div>
+  const kpis = data.estatKpis && data.estatKpis.length ? <EstatKpiStrip bk={bk} kpis={data.estatKpis} /> : null
+  const voce = data.voceXmedia && data.voceXmedia.length ? <VoceMediaCard bk={bk} rows={data.voceXmedia} /> : null
+  const banca = data.porBanca ? <BancaCard bk={bk} b={data.porBanca} /> : null
+  const ff = data.fortesFracos ? <FortesFracosCard bk={bk} ff={data.fortesFracos} /> : null
+  const rend = data.rendimentoHora ? <RendimentoHoraCard bk={bk} r={data.rendimentoHora} /> : null
+  const tempo = data.tempoPorQuestao ? <TempoQuestaoCard bk={bk} t={data.tempoPorQuestao} /> : null
+  if (mobile) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {kpis}<EvoCard mobile data={data} />{voce}<DiscCard data={data} />{banca}{ff}{rend}{tempo}
+      </div>
+    )
+  }
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,1fr)', gap: 16, alignItems: 'start' }}><EvoCard mobile={false} data={data} /><DiscCard data={data} /></div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {kpis}
+      {voce ? <div className="pvn-est"><EvoCard mobile={false} data={data} />{voce}</div> : <EvoCard mobile={false} data={data} />}
+      <div className="pvn-est3"><DiscCard data={data} />{banca}{ff}</div>
+      {(rend || tempo) ? <div className="pvn-est">{rend}{tempo}</div> : null}
+    </div>
   )
 }
 
 const CSS = `
+/* Adapta ao CONTAINER real (Curseduca/sidebar/tablet), não ao viewport. */
+.pvn-wrap{container-type:inline-size;overflow-x:clip;max-width:100%}
+.pvn-wrap .card{min-width:0;max-width:100%}
+.pvn-est>*,.pvn-est3>*,.pvn-info3>*{min-width:0}
+.pvn-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,200px),1fr));gap:12px}
+.pvn-2col{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+.pvn-est{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px;align-items:start}
+.pvn-info3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;align-items:start}
+.pvn-est3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;align-items:start}
+@container (max-width:720px){.pvn-2col,.pvn-est{grid-template-columns:1fr}}
+@container (max-width:980px){.pvn-info3,.pvn-est3{grid-template-columns:1fr 1fr}}
+@container (max-width:640px){.pvn-info3,.pvn-est3{grid-template-columns:1fr}}
 .pvn-pv{animation:pvnpv .45s cubic-bezier(.22,1,.36,1) both}
 @keyframes pvnpv{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .ptab{transition:background .25s,color .25s}
@@ -363,9 +372,9 @@ export function PerfilVnd({ theme: themeProp, data }: { theme: InternaTheme; dat
   )
   return (
     <div style={{ ...internaTokensStyle('vnd', theme), ['--r' as any]: `${INTERNA_RADIUS.vnd}px`, minHeight: '100%', background: 'var(--bg)' }}>
-      <style>{CSS}</style>
+      <style>{CSS + PERFIL_BLOCOS_CSS}</style>
       <Header mobile={mobile} data={data} />
-      <div style={{ padding: mobile ? '18px 18px 28px' : '24px 32px 56px', display: 'flex', flexDirection: 'column', gap: 20 }}>{body}</div>
+      <div className="pvn-wrap" style={{ padding: mobile ? '18px 18px 28px' : '24px 32px 56px', display: 'flex', flexDirection: 'column', gap: 20 }}>{body}</div>
     </div>
   )
 }

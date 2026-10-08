@@ -14,10 +14,12 @@ export const dynamic = 'force-dynamic'
 
 const ABAS = ['conteudo', 'config', 'questoes'] as const
 
-export default async function LeituraEditorPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string }> }) {
+export default async function LeituraEditorPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; voltar?: string }> }) {
   const { id } = await params
-  const { tab } = await searchParams
+  const { tab, voltar } = await searchParams
   const abaInicial = (ABAS as readonly string[]).includes(tab ?? '') ? (tab as (typeof ABAS)[number]) : undefined
+  // Voltar customizado (ex.: vindo da Jurisprudência) — só rotas internas do admin (evita open redirect).
+  const voltarHref = typeof voltar === 'string' && voltar.startsWith('/admin/') ? voltar : undefined
   if (!(await checkPermission('leitura:view'))) redirect('/admin')
   const access = await getCurrentAccess()
   if (!access.tenantId) redirect('/admin')
@@ -53,6 +55,7 @@ export default async function LeituraEditorPage({ params, searchParams }: { para
       {/* O antes/depois (Alterações) agora fica no sidebar do editor, como aba ao lado do Índice. */}
       <LeituraEditor
         documento={documento}
+        voltarHref={voltarHref}
         htmlAtual={limparCabecalhoHtml((cont as any)?.html ?? '')}
         podeEditar={await checkPermission('leitura:update')}
         podePublicar={await checkPermission('leitura:publicar')}

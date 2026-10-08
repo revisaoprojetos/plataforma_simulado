@@ -4,6 +4,7 @@ import { Library } from 'lucide-react'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { LEITURA_ATIVA } from '@/lib/flags'
 import { carregarTrilhaLeituraAluno, carregarModuloCompleto } from '@/lib/leitura/trilha'
+import { ehTestadorModulo } from '@/lib/leitura/testadores'
 import { carregarRankingModulo, calcularMinhaLinhaLeitura, anonimizarRankingParaAluno } from '@/lib/leitura/ranking'
 import { LeituraModulos } from '@/components/aluno/leitura-modulos'
 import { LeituraModuloView } from '@/components/aluno/leitura-modulo-view'
@@ -72,12 +73,13 @@ export default async function LeituraAlunoPage({ searchParams }: { searchParams:
       const bgTrilha = mod.trilhaAparencia.livre.fundo?.url ?? mod.trilha.capa ?? mod.trilha.capaCard ?? null
       if (bgTrilha) ReactDOM.preload(bgTrilha, { as: 'image', fetchPriority: 'high' })
       // 2ª leva (depende das medalhas já concedidas acima): carimbos/conquistas/progresso em paralelo.
-      const [carimbos, conquistasModulo, prog] = await Promise.all([
+      const [carimbos, conquistasModulo, prog, testador] = await Promise.all([
         carimbosDoAluno(svc, sessao.tenantId, modulo, sessao.estudanteId),
         conquistasModuloDoAluno(svc, sessao.tenantId, modulo, sessao.estudanteId),
         progressoModuloAluno(svc, sessao.tenantId, modulo, sessao.estudanteId),
+        ehTestadorModulo(svc, sessao.tenantId, sessao.estudanteId, modulo),
       ])
-      const view = <LeituraModuloView modulo={modulo} trilha={mod.trilha} desempenho={mod.desempenho} pendentes={mod.pendentes} aulasPendentes={mod.aulasPendentes} ranking={ranking} minhaLinha={minhaLinha} meuId={sessao.estudanteId} meuNome={sessao.nome} formato={mod.trilhaAparencia.formato} simbolos={mod.trilhaAparencia.simbolos} livre={mod.trilhaAparencia.livre} inverter={mod.trilhaAparencia.inverter} degrade={mod.trilhaAparencia.degrade} degradeTrilha={mod.trilhaAparencia.degradeTrilha} descricao={mod.trilhaAparencia.descricao} regulamento={mod.regulamento} pontuacao={mod.pontuacao} desafios={mod.desafios} desempenhoDesafios={mod.desempenhoDesafios} gam={gam} diasLeitura={diasLeitura} carimbos={carimbos} conquistasModulo={conquistasModulo} progAulas={prog.porAula} interno={_it.ativo ? { brand: _it.brand, theme: _it.theme } : null} />
+      const view = <LeituraModuloView modulo={modulo} trilha={mod.trilha} desempenho={mod.desempenho} pendentes={mod.pendentes} aulasPendentes={mod.aulasPendentes} ranking={ranking} minhaLinha={minhaLinha} meuId={sessao.estudanteId} meuNome={sessao.nome} formato={mod.trilhaAparencia.formato} simbolos={mod.trilhaAparencia.simbolos} livre={mod.trilhaAparencia.livre} inverter={mod.trilhaAparencia.inverter} degrade={mod.trilhaAparencia.degrade} degradeTrilha={mod.trilhaAparencia.degradeTrilha} descricao={mod.trilhaAparencia.descricao} regulamento={mod.regulamento} pontuacao={mod.pontuacao} desafios={mod.desafios} desempenhoDesafios={mod.desempenhoDesafios} gam={gam} diasLeitura={diasLeitura} carimbos={carimbos} conquistasModulo={conquistasModulo} progAulas={prog.porAula} testador={testador} interno={_it.ativo ? { brand: _it.brand, theme: _it.theme } : null} />
       // No visual novo o interior (DesafioLS) gerencia o próprio layout e o BANNER é FULL-BLEED (cobre
       // toda a área interna, como a home) — então NÃO embrulhamos em padding. O legado mantém o padding.
       return view

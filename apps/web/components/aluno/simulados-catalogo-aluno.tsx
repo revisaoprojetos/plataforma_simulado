@@ -3,6 +3,7 @@ import { ArrowLeft, FolderOpen, Play, CheckCircle2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { iconeBanco } from '@/lib/banco-visual'
 import { CardSimulado } from '@/components/aluno/card-simulado'
+import { cardGrid, POSTER_MIN, TICKET_MIN } from '@/components/aluno/card-grid'
 import { FileiraHorizontal } from '@/components/fileira-horizontal'
 import { type CardView } from '@/lib/card-view'
 import type { ItemSimulado } from '@/lib/aluno/simulado-item'
@@ -36,10 +37,11 @@ function SecoesGrid({ itens, cols5, view = 'poster' }: { itens: ItemSimuladoCat[
   const buckets: Record<string, ItemSimuladoCat[]> = { agendados: [], disponiveis: [], refazer: [] }
   for (const i of itens) buckets[bucketDe(i)].push(i)
   if (itens.length === 0) return <p className="rounded-2xl border border-dashed py-10 text-center text-sm text-muted-foreground">Nenhum simulado nesta pasta ainda.</p>
-  // Ticket ocupa a largura toda → grade de 1–2 colunas; pôster mantém a grade 4:5.
-  const gridCls = view === 'ticket'
-    ? 'grid gap-3 md:grid-cols-2 xl:grid-cols-3'
-    : cn('grid gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4', cols5 && 'xl:grid-cols-5')
+  // Grade ADAPTATIVA ao container (não ao viewport) — não corta em tablet/iframe. cols5 → pôster um pouco
+  // menor (cabe + colunas em telas largas, como era o xl:grid-cols-5).
+  const gridStyle = view === 'ticket'
+    ? cardGrid(TICKET_MIN, 12)
+    : cardGrid(cols5 ? 188 : POSTER_MIN, 16)
   return (
     <div className="space-y-6">
       {SECOES.map((sec) => {
@@ -52,7 +54,7 @@ function SecoesGrid({ itens, cols5, view = 'poster' }: { itens: ItemSimuladoCat[
               <h2 className="font-semibold">{sec.titulo}</h2>
               <span className="text-sm text-muted-foreground">({arr.length})</span>
             </div>
-            <div className={gridCls}>
+            <div style={gridStyle}>
               {arr.map((s) => <CardSimulado key={s.id} s={s} variant={view} />)}
             </div>
           </section>

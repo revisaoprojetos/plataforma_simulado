@@ -277,5 +277,49 @@ export function perfilMock(): PerfilData {
     matForte: 'Processual Civil · 100%',
     matReforcar: 'Agrário · 0%',
     trilhaHref: '/aluno/leitura',
+    resumoSemana: {
+      questoes: 155, questoesDeltaPct: 22, simulados: 2, simuladosDelta: 1,
+      tempoMin: 400, tempoDeltaMin: 70, acerto: 41, acertoDeltaPp: 5,
+      dias: WD.map((label, i) => ({ label, valor: [70, 42, 0, 0, 0, 0, 0][i] })),
+    },
+    atividade: mockAtividade(),
+    estatKpis: EST_KPIS.map(([label, valor, delta, good, serie]) => ({ label, valor, delta, good, serie })),
+    voceXmedia: [
+      { label: 'Nota média', voce: 18.9, media: 17.4, melhor: true },
+      { label: 'Acerto médio', voce: 36, media: 41, sufixo: '%', melhor: false },
+      { label: 'Questões por semana', voce: 155, media: 120, melhor: true },
+    ],
+    porBanca: { bancas: BANCAS.map(([nome, acerto, total]) => ({ nome, acerto, total })), acertos: 1231, erros: 1778, brancos: 411 },
+    fortesFracos: {
+      fortes: [{ nome: 'Processual Civil', pct: 100, trend: 'up' }, { nome: 'Civil', pct: 50, trend: 'up' }, { nome: 'Ambiental', pct: 50, trend: 'up' }],
+      fracos: [{ nome: 'Agrário', pct: 0, trend: 'down' }, { nome: 'Proc. do Trabalho', pct: 17, trend: 'down' }, { nome: 'Língua Portuguesa', pct: 19, trend: 'down' }],
+    },
+    rendimentoHora: { matriz: mockMatriz(), slots: SLOTS, dias: WD, insight: 'Você acerta 14 pp a mais estudando entre 18h e 21h nos dias úteis.' },
+    tempoPorQuestao: { geralSeg: 151, acertaSeg: 125, erraSeg: 178, lenta: { nome: 'Tributário', seg: 220 }, rapida: { nome: 'Civil', seg: 112 } },
+    metaDiaria: { meta: 20, feitas: 14 },
+    preferencias: { lembrete: true, resumoSemanal: true, aparecerRanking: true, modoFoco: false },
   }
+}
+
+// Heatmap de atividade do preview (determinístico): ~142 dias ativos nos últimos 182.
+function mockAtividade() {
+  const dias: { data: string; nivel: number }[] = []
+  const hoje = new Date()
+  let s = 7
+  const rnd = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff }
+  for (let i = 0; i < 182; i++) {
+    const d = new Date(hoje.getTime() - i * 86400000)
+    const r = rnd()
+    if (r < 0.22) continue // dia sem estudo
+    const nivel = r < 0.5 ? 1 : r < 0.75 ? 2 : r < 0.92 ? 3 : 4
+    dias.push({ data: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`, nivel })
+  }
+  return { dias, totalDias: dias.length }
+}
+
+// Matriz dia×faixa de acerto (preview): -1 = sem dado.
+function mockMatriz(): number[][] {
+  let s = 13
+  const rnd = () => { s = (s * 1103515245 + 12345) & 0x7fffffff; return s / 0x7fffffff }
+  return WD.map(() => SLOTS.map(() => { const r = rnd(); return r < 0.25 ? -1 : Math.round(20 + r * 70) }))
 }

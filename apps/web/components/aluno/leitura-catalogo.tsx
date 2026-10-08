@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { BookOpenText, CheckCircle2, Search, Scale } from 'lucide-react'
 import type { DocumentoAluno } from '@/lib/leitura/acesso'
 import { capaComPos } from '@/lib/leitura/capa-pos'
+import { cardGrid, POSTER_MIN } from '@/components/aluno/card-grid'
 
 const SEM_MATERIA = '__sem__'
 
@@ -79,7 +80,7 @@ export function LeituraCatalogo({ docs }: { docs: DocumentoAluno[] }) {
               <span className="text-xs font-normal normal-case">({g.itens.length})</span>
             </h2>
           )}
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4 xl:grid-cols-5">
+          <div style={cardGrid(POSTER_MIN, 16)}>
             {g.itens.map((d) => <CardLei key={d.id} d={d} />)}
           </div>
         </section>

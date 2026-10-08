@@ -84,6 +84,9 @@ export async function GET(request: NextRequest) {
   const minha = estudanteId ? linhas.find((l) => l.estudanteId === estudanteId) : undefined
   const selecionadas = euIncluido || !minha ? top : [...top, minha]
 
+  // Posição absoluta de cada aluno no ranking completo (p/ pódio/"Você" mesmo fora do top 10).
+  const posPorId = new Map(linhas.map((l, i) => [l.estudanteId, i + 1]))
+
   // Perfil (iniciais/cargo/nível/avatar) — PRIVACIDADE: não expõe o nome completo dos outros, só iniciais.
   const ids = [...new Set(selecionadas.map((l) => l.estudanteId))]
   const perfis = await perfilAlunos(svc, tenantId, ids)
@@ -92,9 +95,10 @@ export async function GET(request: NextRequest) {
     return {
       ini: p?.iniciais ?? '?', cargo: p?.cargo ?? '', cargoIcone: p?.cargoIcone ?? '', nivel: p?.nivel ?? 1,
       avatar: p?.avatar ?? null, avatarCor: p?.avatarCor ?? null,
+      pos: posPorId.get(l.estudanteId) ?? 0,
       pts: l.pts, selos: l.selos, you: estudanteId ? l.estudanteId === estudanteId : false,
     }
   })
   const meu = estudanteId ? perfis.get(estudanteId) : null
-  return NextResponse.json({ rows, me: meu ?? null })
+  return NextResponse.json({ rows, me: meu ?? null, total: linhas.length })
 }

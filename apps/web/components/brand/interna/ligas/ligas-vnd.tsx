@@ -21,6 +21,12 @@ const CSS = LIGA_BASE_CSS + `
 .lgvn-hero .dots{position:absolute;inset:0;background-image:radial-gradient(rgba(185,245,212,.18) 1.2px,transparent 1.2px);background-size:22px 22px;pointer-events:none}
 .lgvn-xray{position:relative;overflow:hidden}
 .lgvn-xray .dots{position:absolute;inset:0;background-image:radial-gradient(rgba(185,245,212,.14) 1.2px,transparent 1.2px);background-size:20px 20px;pointer-events:none}
+/* Adapta ao CONTAINER real (Curseduca/sidebar), não ao viewport: colapsa a grade 3 colunas e
+   solta o sticky quando aperta — sem cards cortados em tablet/iframe. */
+.lgvn-wrap{container-type:inline-size}
+.lgvn-liga{display:grid;grid-template-columns:300px 1fr 330px;gap:18px;align-items:start}
+.lgvn-side-sticky{position:sticky;top:90px}
+@container (max-width:1080px){.lgvn-liga{grid-template-columns:1fr}.lgvn-side-sticky{position:static}}
 `
 
 const RECOMPENSAS: { pos: string; premio: string }[] = [
@@ -60,7 +66,7 @@ export function LigasVnd({ theme: themeProp, data, ranking }: { theme: InternaTh
 
   // Painel verde escuro "RAIO-X DO ALUNO" (Sua semana)
   const Xray = (
-    <div className="lgvn-xray" style={{ position: mobile ? undefined : 'sticky', top: mobile ? undefined : 90, borderRadius: 'var(--r)', background: 'linear-gradient(150deg,#06301E,#0B4A2E)', color: '#FFF', padding: 18, display: 'flex', flexDirection: 'column', gap: 14, border: `1px solid ${GOLD}33` }}>
+    <div className="lgvn-xray lgvn-side-sticky" style={{ borderRadius: 'var(--r)', background: 'linear-gradient(150deg,#06301E,#0B4A2E)', color: '#FFF', padding: 18, display: 'flex', flexDirection: 'column', gap: 14, border: `1px solid ${GOLD}33` }}>
       <span aria-hidden className="dots" />
       <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 2 }}>
         <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.16em', color: GOLD }}>RAIO-X DO ALUNO</span>
@@ -79,7 +85,7 @@ export function LigasVnd({ theme: themeProp, data, ranking }: { theme: InternaTh
   return (
     <div className="min-h-full" style={{ ...internaTokensStyle('vnd', theme), minHeight: '100%' }}>
       <style>{CSS}</style>
-      <div style={{ padding: mobile ? '14px' : '24px', display: 'flex', flexDirection: 'column', gap: 22, background: 'var(--bg)', minHeight: '100%' }}>
+      <div className="lgvn-wrap" style={{ padding: mobile ? '14px' : '24px', display: 'flex', flexDirection: 'column', gap: 22, background: 'var(--bg)', minHeight: '100%' }}>
         {/* HERO VERDE com KPIs em vidro */}
         <div className="lgvn-hero" style={{ borderRadius: 'var(--r)', background: heroGrad, color: '#FFF', padding: mobile ? '18px 16px' : '26px 28px', display: 'flex', flexDirection: 'column', gap: 18 }}>
           <span aria-hidden className="dots" />
@@ -107,7 +113,7 @@ export function LigasVnd({ theme: themeProp, data, ranking }: { theme: InternaTh
         <LigaTabs tab={tab} onTab={setTab} onCell="#12643D" onInk="#FFF" bg="var(--surface2)" />
 
         {tab === 'liga' ? (
-          <div className="lg-pv" key="liga" style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : '300px 1fr 330px', gap: 18, alignItems: 'start' }}>
+          <div className="lg-pv lgvn-liga" key="liga">
             {Left}
             <Painel title={`${data.ligaNome} · ${data.membros} alunos`} sub="A sua posição está destacada.">
               <RankingSlot ranking={ranking} />

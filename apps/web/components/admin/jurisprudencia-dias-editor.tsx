@@ -5,8 +5,8 @@ import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
-  ChevronDown, ChevronRight, ChevronUp, Plus, Trash2, Loader2, Save, CheckCircle2, Scale,
-  Eye, EyeOff, Clock, CalendarClock, X, FilePlus2, Pencil,
+  ChevronDown, ChevronRight, ChevronUp, Trash2, Loader2,
+  Eye, EyeOff, Clock, CalendarClock, X, FilePlus2, Pencil, BookOpen, HelpCircle, FileText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
@@ -15,18 +15,16 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import {
-  salvarDiaDesafio, criarDiaDesafio, excluirDiaDesafio, reordenarDiasDesafio, definirPublicacaoDiasDesafio,
-  type DiaEstado,
+  criarDiaDesafio, excluirDiaDesafio, reordenarDiasDesafio, definirPublicacaoDiasDesafio,
+  editarLeituraDia, type DiaEstado,
 } from '@/app/admin/jurisprudencia/actions'
 
 // Shape de uma tese (casa com dados.js: ref, tema, q, o[3], a=índice correto, tese).
 type Tese = { ref: string; tema: string; q: string; o: string[]; a: number; tese: string }
 type Pub = { estado?: DiaEstado; publicarEm?: string | null }
-type Dia = { titulo?: string; teses?: Tese[] | null; materia?: string | null; ordem?: number; pub?: Pub }
+type Dia = { titulo?: string; teses?: Tese[] | null; materia?: string | null; ordem?: number; pub?: Pub; documento_id?: string | null }
 type Materia = { id: string; nome: string; curto: string; icon?: string; cor?: string; dias?: number[] }
 type Final = { id: string; nome: string; curto: string; icon?: string; cor?: string; dias?: number[] } | null
-
-const teseVazia = (): Tese => ({ ref: '', tema: '', q: '', o: ['', '', ''], a: 0, tese: '' })
 
 // Estado efetivo de um dia (publicada / visualizável / agendada / rascunho) a partir do `pub`.
 function estadoDoDia(pub?: Pub): 'publicada' | 'visualizavel' | 'agendada' | 'rascunho' {
@@ -42,11 +40,13 @@ function fmtAgendada(iso: string): string {
 
 // Editor dos dias no modelo "Desafio de Lei Seca": tabela de dias (só questões), publicar/agendar,
 // reordenar, multi-seleção; cada dia expande para o editor de teses.
-export function JurisDiasEditor({ desafioId, dias, materias, final }: {
+export function JurisDiasEditor({ desafioId, dias, materias, final, quizPorDia }: {
   desafioId: string
   dias: Record<string, Dia>
   materias: Materia[]
   final: Final
+  /** Contagem de "Questões do conteúdo" por chave de dia (do documento vinculado). */
+  quizPorDia?: Record<string, number>
 }) {
   const router = useRouter()
   const [pending, start] = useTransition()
@@ -143,7 +143,7 @@ export function JurisDiasEditor({ desafioId, dias, materias, final }: {
               total={entradas.length}
               dia={e.dia}
               materiaInfo={matInfo(e.dia.materia)}
-              matOpts={matOpts}
+              quizCount={quizPorDia?.[e.key] ?? 0}
               pending={pending}
               aberto={aberto === e.key}
               selecionado={sel.has(e.key)}
@@ -153,7 +153,6 @@ export function JurisDiasEditor({ desafioId, dias, materias, final }: {
               onExcluir={() => excluirDia(e.key)}
               onEstado={(estado) => aplicarEstado([e.key], estado, null, estado === 'publicada' ? 'Dia publicado' : estado === 'visualizavel' ? 'Dia visualizável' : 'Dia em rascunho')}
               onAgendar={() => setAgendarKeys([e.key])}
-              onSaved={() => router.refresh()}
             />
           ))}
         </div>
@@ -167,14 +166,14 @@ export function JurisDiasEditor({ desafioId, dias, materias, final }: {
   )
 }
 
-function DiaLinha({ desafioId, chave, posicao, total, dia, materiaInfo, matOpts, pending, aberto, selecionado, onToggleSel, onToggle, onMover, onExcluir, onEstado, onAgendar, onSaved }: {
+function DiaLinha({ desafioId, chave, posicao, total, dia, materiaInfo, quizCount = 0, pending, aberto, selecionado, onToggleSel, onToggle, onMover, onExcluir, onEstado, onAgendar }: {
   desafioId: string
   chave: string
   posicao: number
   total: number
   dia: Dia
   materiaInfo: Materia | null
-  matOpts: Materia[]
+  quizCount?: number
   pending: boolean
   aberto: boolean
   selecionado: boolean
@@ -184,34 +183,30 @@ function DiaLinha({ desafioId, chave, posicao, total, dia, materiaInfo, matOpts,
   onExcluir: () => void
   onEstado: (estado: DiaEstado) => void
   onAgendar: () => void
-  onSaved: () => void
 }) {
-  const [titulo, setTitulo] = useState(dia.titulo ?? '')
-  const [materia, setMateria] = useState<string | null>(dia.materia ?? null)
-  const [teses, setTeses] = useState<Tese[]>(() => (dia.teses ?? []).map((t) => ({ ...t, o: [...(t.o ?? ['', '', ''])] })))
-  const [sujo, setSujo] = useState(false)
-  const [salvando, start] = useTransition()
+  const router = useRouter()
+  const [abrindoLeitura, startLeitura] = useTransition()
+  const [abrindoQuestoes, startQuestoes] = useTransition()
+  const voltarJuris = () => encodeURIComponent(`/admin/jurisprudencia?desafio=${desafioId}&aba=dias`)
 
-  const marcar = () => setSujo(true)
-  const patchTese = (idx: number, patch: Partial<Tese>) => { setTeses((ts) => ts.map((t, k) => (k === idx ? { ...t, ...patch } : t))); marcar() }
-  const patchOpcao = (idx: number, oi: number, v: string) => { setTeses((ts) => ts.map((t, k) => (k === idx ? { ...t, o: t.o.map((o, j) => (j === oi ? v : o)) } : t))); marcar() }
-  const addTese = () => { setTeses((ts) => [...ts, teseVazia()]); marcar() }
-  async function removerTese(idx: number) {
-    if (!(await confirmar({ mensagem: 'Remover esta tese?', destrutivo: true, confirmar: 'Remover' }))) return
-    setTeses((ts) => ts.filter((_, k) => k !== idx)); marcar()
+  // Abre (criando se preciso) o documento do dia no editor de CONTEÚDO (leitura), com "voltar" p/ a juris.
+  function abrirLeitura() {
+    startLeitura(async () => {
+      const r = await editarLeituraDia(desafioId, chave)
+      if (r.ok && r.documentoId) router.push(`/admin/leitura/${r.documentoId}?tab=conteudo&voltar=${voltarJuris()}`)
+      else toast.error(r.error ?? 'Erro ao abrir a leitura.')
+    })
   }
-  const moverTese = (idx: number, dir: -1 | 1) => {
-    setTeses((ts) => { const j = idx + dir; if (j < 0 || j >= ts.length) return ts; const n = [...ts]; ;[n[idx], n[j]] = [n[j], n[idx]]; return n })
-    marcar()
-  }
-  function salvar() {
-    start(async () => {
-      const r = await salvarDiaDesafio(desafioId, chave, { titulo: titulo.trim(), teses, materia })
-      if (!r.ok) { toast.error(r.error ?? 'Erro ao salvar o dia.'); return }
-      toast.success(`Dia ${posicao} salvo.`); setSujo(false); onSaved()
+  // Abre a área "Questões do conteúdo" do dia — EXATAMENTE a mesma da Lei Seca (QuizConteudoAdmin).
+  function abrirQuestoes() {
+    startQuestoes(async () => {
+      const r = await editarLeituraDia(desafioId, chave)
+      if (r.ok && r.documentoId) router.push(`/admin/leitura/${r.documentoId}/questoes?voltar=${voltarJuris()}`)
+      else toast.error(r.error ?? 'Erro ao abrir as questões.')
     })
   }
 
+  const titulo = dia.titulo ?? ''
   const estado = estadoDoDia(dia.pub)
   const cor = materiaInfo?.cor ?? '#6d28d9'
 
@@ -227,7 +222,7 @@ function DiaLinha({ desafioId, chave, posicao, total, dia, materiaInfo, matOpts,
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white" style={{ background: cor }}>{materiaInfo?.curto?.slice(0, 3) || posicao}</span>
         <button onClick={onToggle} className="min-w-0 flex-1 text-left" title="Abrir editor de questões">
           <p className="truncate text-sm font-semibold text-foreground">{titulo || <span className="text-muted-foreground">Dia {posicao} — sem título</span>}</p>
-          <p className="truncate text-[11px] text-muted-foreground">{materiaInfo ? `${materiaInfo.nome} · ` : ''}{teses.length} tese(s){sujo ? ' · não salvo' : ''}</p>
+          <p className="truncate text-[11px] text-muted-foreground">{materiaInfo?.nome ?? 'Aula do dia'}</p>
         </button>
 
         {/* Estado de publicação (dropdown) */}
@@ -254,6 +249,7 @@ function DiaLinha({ desafioId, chave, posicao, total, dia, materiaInfo, matOpts,
         </DropdownMenu>
 
         <div className="flex shrink-0 items-center gap-0.5">
+          {dia.documento_id && <span title="Leitura configurada" className="mr-0.5 inline-flex h-4 w-4 items-center justify-center text-emerald-600 dark:text-emerald-400"><BookOpen className="h-3.5 w-3.5" /></span>}
           <button onClick={() => onMover(-1)} disabled={posicao === 1 || pending} title="Subir" className="rounded-md p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"><ChevronUp className="h-4 w-4" /></button>
           <button onClick={() => onMover(1)} disabled={posicao === total || pending} title="Descer" className="rounded-md p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"><ChevronDown className="h-4 w-4" /></button>
           <button onClick={onToggle} title="Editar questões" className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><Pencil className="h-4 w-4" /></button>
@@ -261,48 +257,25 @@ function DiaLinha({ desafioId, chave, posicao, total, dia, materiaInfo, matOpts,
         </div>
       </div>
 
-      {/* Painel que ABRE PARA BAIXO com animação (grid-rows 0fr -> 1fr) */}
-      <div className={cn('grid transition-[grid-template-rows] duration-300 ease-out', aberto ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}>
-        <div className="overflow-hidden">
-          <div className="space-y-4 border-t bg-background/40 p-4">
-            <div className="grid gap-3 sm:grid-cols-[1fr_200px]">
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium text-muted-foreground">Título do dia</span>
-                <input value={titulo} onChange={(e) => { setTitulo(e.target.value); marcar() }}
-                  placeholder="Ex.: Administrativo 2026" className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40" />
-              </label>
-              <label className="block">
-                <span className="mb-1 block text-xs font-medium text-muted-foreground">Matéria (cartucho)</span>
-                <select value={materia ?? ''} onChange={(e) => { setMateria(e.target.value || null); marcar() }}
-                  className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
-                  <option value="">— sem matéria —</option>
-                  {matOpts.map((m) => <option key={m.id} value={m.id}>{m.nome}</option>)}
-                </select>
-              </label>
-            </div>
-
-            <div className="space-y-3">
-              {teses.length === 0 && (
-                <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">Nenhuma tese neste dia. Adicione a primeira.</p>
-              )}
-              {teses.map((t, idx) => (
-                <TeseCard key={idx} indice={idx} total={teses.length} tese={t}
-                  onPatch={(p) => patchTese(idx, p)} onPatchOpcao={(oi, v) => patchOpcao(idx, oi, v)}
-                  onRemover={() => removerTese(idx)} onMover={(dir) => moverTese(idx, dir)} />
-              ))}
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3">
-              <button type="button" onClick={addTese} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-medium transition hover:border-primary/40 hover:bg-primary/5">
-                <Plus className="h-4 w-4" /> Adicionar tese
-              </button>
-              <button type="button" onClick={salvar} disabled={salvando || !sujo} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50">
-                {salvando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar dia {posicao}
-              </button>
-            </div>
-          </div>
+      {/* Expansão IDÊNTICA à Lei Seca: Conteúdo + Questões do conteúdo — mesmas áreas/configurações. */}
+      {aberto && (
+        <div className="border-t bg-muted/20">
+          <button type="button" onClick={abrirLeitura} disabled={abrindoLeitura}
+            className="group flex w-full items-center gap-2.5 py-2.5 pl-16 pr-3 text-sm transition-colors hover:bg-muted/50 disabled:opacity-60">
+            <FileText className={cn('h-4 w-4 shrink-0', dia.documento_id ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground')} />
+            <span className="flex-1 text-left font-medium text-foreground">Conteúdo</span>
+            <span className="text-[11px] text-muted-foreground">{dia.documento_id ? 'editar conteúdo' : 'inserir conteúdo'}</span>
+            {abrindoLeitura ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />}
+          </button>
+          <button type="button" onClick={abrirQuestoes} disabled={abrindoQuestoes}
+            className="group flex w-full items-center gap-2.5 border-t py-2.5 pl-16 pr-3 text-sm transition-colors hover:bg-muted/50 disabled:opacity-60">
+            <HelpCircle className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <span className="flex-1 text-left font-medium text-foreground">Questões do conteúdo</span>
+            <span className="text-[11px] text-muted-foreground">{quizCount > 0 ? `${quizCount} questão(ões)` : 'adicionar questões'}</span>
+            {abrindoQuestoes ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />}
+          </button>
         </div>
-      </div>
+      )}
     </div>
   )
 }
@@ -366,67 +339,3 @@ function CaixaSelecao({ checked, indeterminate, onChange, label }: { checked: bo
   )
 }
 
-function TeseCard({ indice, total, tese, onPatch, onPatchOpcao, onRemover, onMover }: {
-  indice: number
-  total: number
-  tese: Tese
-  onPatch: (p: Partial<Tese>) => void
-  onPatchOpcao: (oi: number, v: string) => void
-  onRemover: () => void
-  onMover: (dir: -1 | 1) => void
-}) {
-  return (
-    <div className="rounded-xl border bg-background p-3 shadow-sm">
-      <div className="mb-2 flex items-center gap-2">
-        <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-bold tabular-nums text-muted-foreground">{indice + 1}</span>
-        <Scale className="h-4 w-4 shrink-0 text-primary/70" />
-        <span className="flex-1 text-xs font-medium text-muted-foreground">Tese</span>
-        <div className="flex items-center gap-0.5">
-          <button type="button" onClick={() => onMover(-1)} disabled={indice === 0} title="Subir" className="rounded-md p-1 text-muted-foreground transition hover:bg-muted disabled:opacity-30"><ChevronUp className="h-4 w-4" /></button>
-          <button type="button" onClick={() => onMover(1)} disabled={indice === total - 1} title="Descer" className="rounded-md p-1 text-muted-foreground transition hover:bg-muted disabled:opacity-30"><ChevronDown className="h-4 w-4" /></button>
-          <button type="button" onClick={onRemover} title="Remover" className="rounded-md p-1 text-destructive transition hover:bg-destructive/10"><Trash2 className="h-4 w-4" /></button>
-        </div>
-      </div>
-
-      <div className="grid gap-2 sm:grid-cols-2">
-        <label className="block">
-          <span className="mb-1 block text-xs font-medium text-muted-foreground">Referência</span>
-          <input value={tese.ref} onChange={(e) => onPatch({ ref: e.target.value })} placeholder="Súmula Vinculante 13 · STF"
-            className="w-full rounded-lg border bg-card px-2.5 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40" />
-        </label>
-        <label className="block">
-          <span className="mb-1 block text-xs font-medium text-muted-foreground">Tema (curto)</span>
-          <input value={tese.tema} onChange={(e) => onPatch({ tema: e.target.value })} placeholder="Nepotismo"
-            className="w-full rounded-lg border bg-card px-2.5 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40" />
-        </label>
-      </div>
-
-      <label className="mt-2 block">
-        <span className="mb-1 block text-xs font-medium text-muted-foreground">Enunciado da pergunta</span>
-        <textarea value={tese.q} onChange={(e) => onPatch({ q: e.target.value })} rows={2} placeholder="Situação-problema apresentada ao aluno…"
-          className="w-full resize-y rounded-lg border bg-card px-2.5 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40" />
-      </label>
-
-      <div className="mt-2 space-y-1.5">
-        <span className="block text-xs font-medium text-muted-foreground">Alternativas (marque a correta)</span>
-        {[0, 1, 2].map((oi) => (
-          <div key={oi} className="flex items-center gap-2">
-            <button type="button" onClick={() => onPatch({ a: oi })} title="Marcar como correta"
-              className={cn('flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-bold transition',
-                tese.a === oi ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-muted-foreground/30 text-muted-foreground hover:border-emerald-500/50')}>
-              {tese.a === oi ? <CheckCircle2 className="h-4 w-4" /> : String.fromCharCode(65 + oi)}
-            </button>
-            <input value={tese.o[oi] ?? ''} onChange={(e) => onPatchOpcao(oi, e.target.value)} placeholder={`Alternativa ${String.fromCharCode(65 + oi)}`}
-              className={cn('w-full rounded-lg border bg-card px-2.5 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40', tese.a === oi && 'border-emerald-500/40')} />
-          </div>
-        ))}
-      </div>
-
-      <label className="mt-2 block">
-        <span className="mb-1 block text-xs font-medium text-muted-foreground">Texto da tese (revisão)</span>
-        <textarea value={tese.tese} onChange={(e) => onPatch({ tese: e.target.value })} rows={3} placeholder="Texto integral da súmula/tese exibido na revisão…"
-          className="w-full resize-y rounded-lg border bg-card px-2.5 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40" />
-      </label>
-    </div>
-  )
-}

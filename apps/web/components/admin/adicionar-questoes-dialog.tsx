@@ -7,7 +7,7 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger,
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Plus, Search, Check, Loader2, Upload, ListChecks, ChevronRight, Copy } from 'lucide-react'
+import { Plus, Search, Check, Loader2, Upload, ListChecks, ChevronRight, Copy, ArrowLeftRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { copiarTexto } from '@/lib/clipboard'
@@ -17,6 +17,8 @@ import { useRouter } from 'next/navigation'
 import { adicionarQuestoes, buscarQuestoesForaBanco, detalheQuestaoBanco, type QuestaoBancoBuscaItem, type QuestaoDetalheBanco } from '@/app/admin/banco-questoes/actions'
 import type { QuestaoImport } from '@/app/admin/banco-questoes/import-types'
 import { ImportarQuestoesTab } from '@/components/admin/importar-questoes-tab'
+import { ImportarDePlataformaTab } from '@/components/admin/importar-de-plataforma-tab'
+import { listarPlataformasOrigem } from '@/app/admin/questoes/importar-plataforma-actions'
 
 const difCfg: Record<string, { label: string; cls: string }> = {
   facil: { label: 'Fácil', cls: 'text-green-600' },
@@ -52,7 +54,12 @@ export function AdicionarQuestoesDialog({
   trigger?: ReactElement
 }) {
   const [open, setOpen] = useState(false)
-  const [modo, setModo] = useState<'existentes' | 'importar'>('existentes')
+  const [modo, setModo] = useState<'existentes' | 'importar' | 'plataformas'>('existentes')
+  // Aba "Plataformas" (importar de outro tenant) só aparece p/ super-admin. Em vez de threadar um prop
+  // por todos os callers, o próprio pop-up sonda `listarPlataformasOrigem()` (que já gateia no servidor)
+  // na 1ª abertura: se houver ≥1 plataforma de origem, o usuário é super-admin e a aba é liberada.
+  const [podePlataforma, setPodePlataforma] = useState(false)
+  const sondouPlataforma = useRef(false)
   const [busca, setBusca] = useState('')
   const [disc, setDisc] = useState('all')
   const [dif, setDif] = useState('all')
@@ -89,6 +96,13 @@ export function AdicionarQuestoesDialog({
     return () => { vivo = false; clearTimeout(t) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, modo, busca, disc, dif, tipoF, bancoId])
+
+  // Sonda UMA vez (na 1ª abertura) se o usuário pode importar de outras plataformas (super-admin).
+  useEffect(() => {
+    if (!open || sondouPlataforma.current) return
+    sondouPlataforma.current = true
+    listarPlataformasOrigem().then((r) => { if (r.ok && (r.plataformas?.length ?? 0) > 0) setPodePlataforma(true) }).catch(() => {})
+  }, [open])
 
   function toggle(id: string) {
     setSel((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n })
@@ -141,18 +155,21 @@ export function AdicionarQuestoesDialog({
       {trigger
         ? <DialogTrigger render={trigger} />
         : <DialogTrigger render={<Button />}><Plus className="mr-2 h-4 w-4" /> Adicionar questões</DialogTrigger>}
-      <DialogContent className="flex h-[85vh] max-h-[85vh] w-full flex-col gap-0 p-0 sm:max-w-3xl">
+      <DialogContent className={cn('flex h-[85vh] max-h-[85vh] w-full flex-col gap-0 p-0', modo === 'plataformas' ? 'sm:max-w-5xl' : 'sm:max-w-3xl')}>
         <DialogHeader className="px-6 pt-6">
           <DialogTitle className="flex items-center gap-2"><Plus className="h-5 w-5" /> Adicionar questões ao banco</DialogTitle>
-          <DialogDescription>Importe questões de um arquivo ou selecione questões já existentes no sistema.</DialogDescription>
+          <DialogDescription>Importe questões de um arquivo, de outra plataforma ou selecione questões já existentes no sistema.</DialogDescription>
         </DialogHeader>
 
         {/* Abas */}
         <div className="flex gap-1 px-6 pt-4">
           {([
             { k: 'importar', label: 'Importar questões', icon: Upload },
+            { k: 'plataformas', label: 'Plataformas', icon: ArrowLeftRight },
             { k: 'existentes', label: 'Questões do sistema', icon: ListChecks },
-          ] as const).filter((t) => t.k !== 'importar' || bancoId || onImportar).map((t) => (
+          ] as const)
+            .filter((t) => (t.k !== 'importar' || bancoId || onImportar) && (t.k !== 'plataformas' || podePlataforma))
+            .map((t) => (
             <button key={t.k} type="button" onClick={() => setModo(t.k)}
               className={cn('inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
                 modo === t.k ? 'border-primary bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-muted')}>
@@ -163,6 +180,10 @@ export function AdicionarQuestoesDialog({
 
         {modo === 'importar' ? (
           <ImportarQuestoesTab bancoId={bancoId ?? null} onDone={() => setOpen(false)} onParsed={onImportar} />
+        ) : modo === 'plataformas' ? (
+          // Importa as questões escolhidas da outra plataforma PARA o tenant atual; ao concluir, volta p/
+          // "Questões do sistema" (cache limpo) — elas já aparecem lá p/ serem adicionadas ao banco/quiz.
+          <ImportarDePlataformaTab onDone={() => { cacheRef.current.clear(); setSel(new Set()); setModo('existentes') }} />
         ) : (
         <>
         {/* Filtros */}

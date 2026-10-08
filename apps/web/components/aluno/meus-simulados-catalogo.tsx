@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { iconeBanco } from '@/lib/banco-visual'
 import { FileiraHorizontal } from '@/components/fileira-horizontal'
 import { PersonalizadosLista } from '@/components/aluno/personalizados-lista'
+import { cardGrid, POSTER_MIN, TICKET_MIN, FOLDER_MIN } from '@/components/aluno/card-grid'
 import { type CardView } from '@/lib/card-view'
 import type { VisualSim } from '@/lib/aluno/simulado-visual'
 import type { PastaCatalogo } from '@/lib/aluno/grupos-catalogo'
@@ -27,7 +28,7 @@ const modoLabel = (m: string) => (m === 'janela_fixa' ? 'Agendado' : m === 'praz
 
 // Cards um pouco mais estreitos para espiar um pedaço do próximo na fileira do Catálogo.
 const BASIS = 'shrink-0 basis-[calc((100%-1rem)/2.25)] sm:basis-[calc((100%-2rem)/3.3)] lg:basis-[calc((100%-3rem)/4.3)] xl:basis-[calc((100%-4rem)/5.3)]'
-const GRID_TILES = 'grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3'
+const GRID_TILES_STYLE = cardGrid(FOLDER_MIN, 12) // pastas (tiles horizontais) — adaptativo ao container
 // Vista "Status": seções por DESEMPENHO (nota da melhor tentativa) — diferencia de verdade do Quadro.
 const STATUS_SECOES = [
   { chave: 'aprovado', label: 'Aprovado (nota ≥ 70)', cor: 'bg-emerald-500' },
@@ -197,9 +198,7 @@ export function MeusSimuladosCatalogo({ itens, pastas, view = 'poster' }: { iten
   }
   const trilhaAte = (id: string): PastaCatalogo[] => { const arr: PastaCatalogo[] = []; let cur = pastaById.get(id); while (cur) { arr.unshift(cur); cur = cur.paiId && folderIds.has(cur.paiId) ? pastaById.get(cur.paiId) : undefined } return arr }
 
-  const gridSims = view === 'ticket'
-    ? 'grid gap-3 md:grid-cols-2 xl:grid-cols-3'
-    : 'grid grid-cols-2 gap-3 sm:grid-cols-2 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
+  const gridSims = view === 'ticket' ? cardGrid(TICKET_MIN, 12) : cardGrid(POSTER_MIN, 14)
 
   // Tile de PASTA (visão Pasta) — igual ao admin: capa à esquerda, PASTA + nome + contagem + "Abrir pasta".
   function FolderTile({ f }: { f: PastaCatalogo }) {
@@ -302,12 +301,12 @@ export function MeusSimuladosCatalogo({ itens, pastas, view = 'poster' }: { iten
               {/* key por pasta → a cascata roda de novo ao entrar/sair de uma pasta. */}
               <div key={`pasta:${pastaAtual ?? 'raiz'}`} className="space-y-2">
                 {subpastasAqui.length > 0 && (
-                  <div className={GRID_TILES}>{subpastasAqui.map((f, i) => <Entrada key={f.id} i={i}><FolderTile f={f} /></Entrada>)}</div>
+                  <div style={GRID_TILES_STYLE}>{subpastasAqui.map((f, i) => <Entrada key={f.id} i={i}><FolderTile f={f} /></Entrada>)}</div>
                 )}
                 {simsAqui.length > 0 && (
                   <>
                     {subpastasAqui.length > 0 && <h3 className="pt-1 text-sm font-semibold text-muted-foreground">{atual ? 'Simulados desta pasta' : 'Outros simulados'}</h3>}
-                    <div className={gridSims}>{simsAqui.map((s, i) => <Entrada key={s.id} i={subpastasAqui.length + i}><CardConcluido s={s} variant={view} /></Entrada>)}</div>
+                    <div style={gridSims}>{simsAqui.map((s, i) => <Entrada key={s.id} i={subpastasAqui.length + i}><CardConcluido s={s} variant={view} /></Entrada>)}</div>
                   </>
                 )}
                 {subpastasAqui.length === 0 && simsAqui.length === 0 && (
@@ -325,7 +324,7 @@ export function MeusSimuladosCatalogo({ itens, pastas, view = 'poster' }: { iten
                   const inner = view === 'ticket' ? (
                     <section className="space-y-2">
                       <h3 className="text-sm font-semibold text-muted-foreground">{p.nome} <span className="opacity-60">({its.length})</span></h3>
-                      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">{its.map((s) => <CardConcluido key={s.id} s={s} variant="ticket" />)}</div>
+                      <div style={cardGrid(TICKET_MIN, 12)}>{its.map((s) => <CardConcluido key={s.id} s={s} variant="ticket" />)}</div>
                     </section>
                   ) : (
                     <FileiraHorizontal titulo={p.nome} count={its.length}>
@@ -339,7 +338,7 @@ export function MeusSimuladosCatalogo({ itens, pastas, view = 'poster' }: { iten
                   <Entrada i={folhasComSims.length}>
                     <div className="space-y-2">
                       {folhasComSims.length > 0 && <h3 className="pt-1 text-sm font-semibold text-muted-foreground">Outros simulados</h3>}
-                      <div className={gridSims}>{avulsos.map((s) => <CardConcluido key={s.id} s={s} variant={view} />)}</div>
+                      <div style={gridSims}>{avulsos.map((s) => <CardConcluido key={s.id} s={s} variant={view} />)}</div>
                     </div>
                   </Entrada>
                 )}
@@ -350,7 +349,7 @@ export function MeusSimuladosCatalogo({ itens, pastas, view = 'poster' }: { iten
             // key=vista → a cascata roda ao alternar Quadro↔Status; as imagens têm fade próprio (CapaImg). ──
             <>
               <h2 className="flex items-center gap-2 text-sm font-semibold"><CheckCircle2 className="h-4 w-4 text-emerald-500" /> Concluídos ({itens.length})</h2>
-              <div key={vista} className={gridSims}>
+              <div key={vista} style={gridSims}>
                 {vista === 'status'
                   ? (() => { let k = 0; return STATUS_SECOES.flatMap((sec) => {
                       const arr = itens.filter((s) => bucketDesemp(s) === sec.chave)

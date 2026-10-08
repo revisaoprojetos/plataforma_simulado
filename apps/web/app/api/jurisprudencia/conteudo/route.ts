@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { checkPermission } from '@/lib/auth/permissions'
-import { lerDesafioJogo, mapearParaDESAFIO, temAcessoDesafio } from '@/lib/jurisprudencia/conteudo'
+import { lerDesafioJogo, mapearParaDESAFIO, preencherTesesPorQuiz, temAcessoDesafio } from '@/lib/jurisprudencia/conteudo'
 
 // GET /api/jurisprudencia/conteudo?desafio=<pastaId>
 // Devolve { CONFIG, MATERIAS, FINAL, DIAS } (mapeado de desafio_jogo). Gate por sessão + acesso à pasta.
@@ -25,6 +25,9 @@ export async function GET(request: NextRequest) {
   if (sessao && !(await temAcessoDesafio(sessao.estudanteId, sessao.tenantId, desafioId))) {
     return NextResponse.json({ error: 'Sem acesso a este desafio.' }, { status: 403 })
   }
+
+  // As teses do arcade vêm das "Questões do conteúdo" (QuizConteudoAdmin) de cada dia — mesma fonte da Lei Seca.
+  dj.dias = await preencherTesesPorQuiz(svc, dj.dias ?? {})
 
   return NextResponse.json(mapearParaDESAFIO(dj))
 }

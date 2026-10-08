@@ -7,11 +7,16 @@
 // id do desafio (pasta) vindo da URL: ?desafio=<pastaId>
 const ID = new URLSearchParams(location.search).get('desafio');
 
-// injeta um <script> e resolve quando carregar
+// Cache-busting: versão vinda do ?v= do próprio bootstrap (definida no index.html) — propagada aos
+// scripts injetados (jogo.js/dados.js) para o navegador NÃO servir uma versão antiga em cache.
+const ASSET_V = (() => { try { return new URL(document.currentScript.src).searchParams.get('v') || ''; } catch (e) { return ''; } })();
+const VQ = ASSET_V ? ('?v=' + encodeURIComponent(ASSET_V)) : '';
+
+// injeta um <script> e resolve quando carregar (com a versão de cache-busting)
 function injetar(src){
   return new Promise((resolve, reject) => {
     const s = document.createElement('script');
-    s.src = src; s.onload = resolve; s.onerror = reject;
+    s.src = src + (src.indexOf('?') >= 0 ? '' : VQ); s.onload = resolve; s.onerror = reject;
     document.body.appendChild(s);
   });
 }
@@ -33,20 +38,26 @@ async function carregarConteudo(){
 
 // pré-semeia o localStorage com o progresso do aluno (o que jogo.js lê no load())
 async function semearProgresso(){
-  const key = window.DESAFIO && window.DESAFIO.CONFIG && window.DESAFIO.CONFIG.storageKey;
-  if(!key) return;
-  if(!ID) return; // sem id não há progresso remoto; jogo usa o localStorage local como está
+  if(!ID) return; // sem id não há progresso/leitura remota; jogo usa o localStorage local como está
   try{
     const r = await fetch(`/api/jurisprudencia/progresso?desafio=${encodeURIComponent(ID)}`, { credentials:'same-origin' });
     if(!r.ok) return;
     const p = await r.json();
-    if(p && p.perfil && window.DESAFIO) window.DESAFIO.PERFIL = p.perfil; // card do jogador (nome/cargo/nível/foto)
-    const atual = JSON.parse(localStorage.getItem(key) || '{}');
-    // servidor é a fonte de verdade de dom/best/recorde; mantém campos locais (muted, sel…)
-    const semeado = Object.assign({}, atual, {
-      dom: p.dom || {}, best: p.best || {}, recorde: p.recorde || 0,
-    });
-    localStorage.setItem(key, JSON.stringify(semeado));
+    if(window.DESAFIO){
+      if(p && p.perfil) window.DESAFIO.PERFIL = p.perfil; // card do jogador (nome/cargo/nível/foto)
+      // Gate de LEITURA por dia: mapa { "<dia>": concluída? } + documento de cada dia (p/ o link do leitor).
+      // Setado SEMPRE (independe do storageKey) — senão a tela do dia/botão de leitura nunca aparecem.
+      window.DESAFIO.LEITURAS = (p && p.leituras) || {};
+      window.DESAFIO.LEITURA_DOCS = (p && p.leituraDocs) || {};
+    }
+    // Semeia o progresso local (dom/best/recorde) quando houver chave de storage.
+    const key = window.DESAFIO && window.DESAFIO.CONFIG && window.DESAFIO.CONFIG.storageKey;
+    if(key){
+      const atual = JSON.parse(localStorage.getItem(key) || '{}');
+      // servidor é a fonte de verdade de dom/best/recorde; mantém campos locais (muted, sel…)
+      const semeado = Object.assign({}, atual, { dom: p.dom || {}, best: p.best || {}, recorde: p.recorde || 0 });
+      localStorage.setItem(key, JSON.stringify(semeado));
+    }
   }catch(e){ /* mantém o que houver localmente */ }
 }
 
@@ -102,6 +113,14 @@ async function carregarRanking(){
 (async () => {
   await carregarConteudo();     // window.DESAFIO pronto
   if(!window.DESAFIO){ await injetar('js/dados.js'); } // garantia extra
+  if(window.DESAFIO){
+    window.DESAFIO.ID = ID; // id do desafio (p/ o link do leitor por dia)
+    // Desafios do backend não trazem storageKey → o jogo caía numa chave "undefined" compartilhada e o
+    // semearProgresso abortava. Garante uma chave isolada por desafio (progresso + gate funcionam).
+    if(window.DESAFIO.CONFIG && !window.DESAFIO.CONFIG.storageKey){
+      window.DESAFIO.CONFIG.storageKey = ID ? ('jurisclub-'+ID) : 'jurisclub-desafio-v1';
+    }
+  }
   aplicarAparencia();           // overrides de cor do admin (antes do motor pintar)
   await semearProgresso();      // localStorage pré-semeado + window.DESAFIO.PERFIL
   await carregarRanking();      // window.__JURIS_RANK (ranking real)

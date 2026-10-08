@@ -17,6 +17,13 @@ import { PRIVACY } from './mock'
 const CSS = LIGA_BASE_CSS + `
 .lgrv-hero{position:relative;overflow:hidden}
 .lgrv-hero .grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px);background-size:24px 24px;-webkit-mask-image:linear-gradient(180deg,#000,transparent 85%);mask-image:linear-gradient(180deg,#000,transparent 85%);pointer-events:none}
+/* Adaptação ao CONTAINER (não ao viewport): dentro da Curseduca/sidebar a largura real é menor
+   que a janela, então media-query falha. Container query colapsa a grade Classificação|Pódio
+   e solta o sticky quando o espaço aperta — nada de card cortado em tablet/iframe. */
+.lgrv-wrap{container-type:inline-size}
+.lgrv-liga{display:grid;grid-template-columns:1fr 340px;gap:18px;align-items:start}
+.lgrv-side{position:sticky;top:90px}
+@container (max-width:820px){.lgrv-liga{grid-template-columns:1fr}.lgrv-side{position:static}}
 `
 
 export function LigasRevisao({ theme: themeProp, data, ranking }: { theme: InternaTheme; data: LigaData; ranking?: ReactNode }) {
@@ -28,7 +35,7 @@ export function LigasRevisao({ theme: themeProp, data, ranking }: { theme: Inter
   const heroGrad = 'linear-gradient(140deg,#24166A,#4B30BE 55%,#6449E0)'
 
   const Side = (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, position: mobile ? undefined : 'sticky', top: mobile ? undefined : 90 }}>
+    <div className="lgrv-side" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <Painel title="Pódio da semana" sub="Os três primeiros da sua liga.">
         <Podio podio={data.podio} dark={dark} />
       </Painel>
@@ -41,7 +48,7 @@ export function LigasRevisao({ theme: themeProp, data, ranking }: { theme: Inter
   return (
     <div className="min-h-full" style={{ ...internaTokensStyle('revisao', theme), minHeight: '100%' }}>
       <style>{CSS}</style>
-      <div style={{ padding: mobile ? '14px' : '24px', display: 'flex', flexDirection: 'column', gap: 22, background: 'var(--bg)', minHeight: '100%' }}>
+      <div className="lgrv-wrap" style={{ padding: mobile ? '14px' : '24px', display: 'flex', flexDirection: 'column', gap: 22, background: 'var(--bg)', minHeight: '100%' }}>
         {/* HERO ROXO full-bleed */}
         <div className="lgrv-hero" style={{ borderRadius: 'var(--r)', background: heroGrad, color: '#FFF', padding: mobile ? '18px 16px' : '26px 28px', display: 'flex', flexDirection: 'column', gap: 20 }}>
           <span aria-hidden className="grid" />
@@ -68,12 +75,11 @@ export function LigasRevisao({ theme: themeProp, data, ranking }: { theme: Inter
         <LigaTabs tab={tab} onTab={setTab} onCell="#2E1F7A" onInk="#FFF" bg={dark ? '#2C2C34' : '#ECE8F6'} />
 
         {tab === 'liga' ? (
-          <div className="lg-pv" key="liga" style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : '1fr 340px', gap: 18, alignItems: 'start' }}>
-            {mobile ? Side : null}
+          <div className="lg-pv lgrv-liga" key="liga">
             <Painel title={`Classificação da ${data.ligaNome}`} sub="A sua posição está destacada.">
               <RankingSlot ranking={ranking} />
             </Painel>
-            {!mobile ? Side : null}
+            {Side}
           </div>
         ) : (
           <div className="lg-pv" key="geral">

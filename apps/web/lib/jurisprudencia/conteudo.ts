@@ -65,6 +65,69 @@ export function mapearParaDESAFIO(desafioJogo: DesafioJogo | null): DesafioMapea
 }
 
 /**
+ * Preenche `dias[chave].teses` a partir das "Questões do conteúdo" (simulado_documento_quiz_questoes)
+ * do documento vinculado ao dia — assim o arcade usa EXATAMENTE as mesmas questões editadas na área
+ * de Lei Seca (QuizConteudoAdmin), em vez de teses editadas à parte. Dias sem documento/sem questões
+ * mantêm as teses legadas que já estiverem no jsonb. Service role → sem filtro de tenant (documento_id
+ * já é único e escopado). Discursivas/sem alternativas ficam de fora do arcade.
+ */
+export async function preencherTesesPorQuiz(svc: Svc, dias: Record<string, any>): Promise<Record<string, any>> {
+  const comDoc = Object.entries(dias ?? {}).filter(([, d]) => d && typeof d === 'object' && d.documento_id)
+  if (!comDoc.length) return dias
+  const docIds = [...new Set(comDoc.map(([, d]) => d.documento_id as string))]
+
+  // 1) Questões do quiz por documento (ordem única .order('id') p/ paginar; reordena por `ordem` depois).
+  const dq = await fetchAllByIn<{ documento_id: string; questao_id: string; ordem: number }>(docIds, (chunk) =>
+    svc.from('simulado_documento_quiz_questoes').select('documento_id, questao_id, ordem').eq('deletado', false).in('documento_id', chunk).order('id')).catch(() => [] as any[])
+  if (!dq.length) return dias
+
+  const questaoIds = [...new Set(dq.map((r) => r.questao_id))]
+  // 2) Metadados das questões + alternativas (texto/ordem/correta). Tolerante a `assunto_detalhe`.
+  const SEL = 'id, enunciado, comentario_professor, assunto_detalhe, ano, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome), bancas:simulado_bancas(nome), orgaos:simulado_orgaos(nome)'
+  const [qs, alts] = await Promise.all([
+    fetchAllByIn<any>(questaoIds, (chunk) => svc.from('simulado_questoes').select(SEL).in('id', chunk).order('id'))
+      .catch(() => fetchAllByIn<any>(questaoIds, (chunk) => svc.from('simulado_questoes').select(SEL.replace(', assunto_detalhe', '')).in('id', chunk).order('id')).catch(() => [] as any[])),
+    fetchAllByIn<{ questao_id: string; texto: string | null; ordem: number | null; correta: boolean | null }>(questaoIds, (chunk) =>
+      svc.from('simulado_alternativas').select('questao_id, texto, ordem, correta').in('questao_id', chunk).order('id')).catch(() => [] as any[]),
+  ])
+  const qById = new Map((qs as any[]).map((q) => [q.id, q]))
+  const altsPorQ = new Map<string, { texto: string; ordem: number; correta: boolean }[]>()
+  for (const a of alts as any[]) {
+    const arr = altsPorQ.get(a.questao_id) ?? []
+    arr.push({ texto: a.texto ?? '', ordem: Number(a.ordem ?? 0), correta: !!a.correta })
+    altsPorQ.set(a.questao_id, arr)
+  }
+
+  const refDe = (banca?: string | null, orgao?: string | null, ano?: number | null) => [banca, orgao, ano].filter(Boolean).join(' · ')
+  const teseDaQuestao = (questaoId: string): any | null => {
+    const q = qById.get(questaoId); if (!q) return null
+    const opts = (altsPorQ.get(questaoId) ?? []).slice().sort((a, b) => a.ordem - b.ordem)
+    if (opts.length < 2) return null // discursiva / sem alternativas → fora do arcade
+    return {
+      ref: refDe(q.bancas?.nome, q.orgaos?.nome, q.ano),
+      tema: q.assuntos?.nome || q.assunto_detalhe || q.disciplinas?.nome || '',
+      q: q.enunciado ?? '',
+      o: opts.map((o) => o.texto),
+      a: Math.max(0, opts.findIndex((o) => o.correta)),
+      tese: q.comentario_professor ?? '',
+    }
+  }
+
+  // 3) Agrupa o quiz por documento (respeitando `ordem`) e sobrescreve as teses do dia.
+  const quizPorDoc = new Map<string, { questao_id: string; ordem: number }[]>()
+  for (const r of dq) { const arr = quizPorDoc.get(r.documento_id) ?? []; arr.push(r); quizPorDoc.set(r.documento_id, arr) }
+  for (const arr of quizPorDoc.values()) arr.sort((a, b) => (a.ordem ?? 0) - (b.ordem ?? 0))
+
+  for (const [chave, d] of comDoc) {
+    const quiz = quizPorDoc.get(d.documento_id as string)
+    if (!quiz || !quiz.length) continue // sem questões → mantém teses legadas
+    const teses = quiz.map((r) => teseDaQuestao(r.questao_id)).filter(Boolean)
+    if (teses.length) dias[chave] = { ...d, teses }
+  }
+  return dias
+}
+
+/**
  * Regra de acesso por PASTA (mesmo padrão da Leitura por pasta):
  * SEM nenhuma atribuição = liberado a todos; COM atribuição = só estudantes atribuídos
  * (simulado_pasta_estudantes) OU membros de grupos atribuídos (simulado_pasta_grupos +

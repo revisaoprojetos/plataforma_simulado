@@ -2,10 +2,10 @@
 
 import { useState, useTransition, useRef, useEffect } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Save, Heart, Timer, Coins, Image as ImageIcon, BookMarked, X, Plus, Trash2, Award, Music, Upload, Crop, ImagePlus } from 'lucide-react'
+import { Loader2, Save, Heart, Timer, Coins, Image as ImageIcon, BookMarked, X, Plus, Trash2, Award, Music, Upload, Crop, ImagePlus, Gamepad2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { TrilhaFundoCropper } from '@/components/admin/trilha-fundo-cropper'
-import { salvarConfigDesafio, salvarImagensDesafio, salvarMateriasDesafio } from '@/app/admin/jurisprudencia/actions'
+import { salvarConfigDesafio, salvarImagensDesafio, salvarMateriasDesafio, renomearDesafio } from '@/app/admin/jurisprudencia/actions'
 
 // Slots de imagem anexada: formato travado (igual ao enquadramento do fundo da trilha) + tamanho final.
 const SLOTS = [
@@ -71,14 +71,27 @@ function IconePreview({ icon, cor, img }: { icon?: string; cor?: string; img?: s
   )
 }
 
-// Aba Configurações: regras do jogo (config) + matérias/final + imagens anexadas.
-export function JurisConfigForm({ desafioId, config, materias, final, imagens }: {
+// Aba Configurações: nome do desafio + regras do jogo (config) + matérias/final + imagens anexadas.
+export function JurisConfigForm({ desafioId, nome, config, materias, final, imagens }: {
   desafioId: string
+  nome: string
   config: Config
   materias: Materia[]
   final: { id: string; nome: string; curto: string; icon?: string; dias: number[] } | null
   imagens: Record<string, any>
 }) {
+  // --- Nome do desafio (nome da pasta) ---
+  const [nomeDesafio, setNomeDesafio] = useState(nome ?? '')
+  const [pendNome, startNome] = useTransition()
+  function salvarNome() {
+    const n = nomeDesafio.trim()
+    if (!n) { toast.error('Informe um nome.'); return }
+    startNome(async () => {
+      const r = await renomearDesafio(desafioId, n)
+      if (!r.ok) { toast.error(r.error ?? 'Erro ao renomear.'); return }
+      toast.success('Nome do desafio salvo.')
+    })
+  }
   // --- Config --- (a LIBERAÇÃO dos dias foi movida p/ a aba "Dias & Teses"; preservamos as chaves no merge)
   const [vidas, setVidas] = useState(config?.vidas ?? 3)
   const [tempoResposta, setTempoResposta] = useState(config?.tempoResposta ?? 25)
@@ -160,6 +173,23 @@ export function JurisConfigForm({ desafioId, config, materias, final, imagens }:
 
   return (
     <div className="space-y-5">
+      {/* Nome do desafio */}
+      <section className="space-y-3 rounded-2xl border bg-card p-4 shadow-sm">
+        <h3 className="flex items-center gap-2 text-sm font-semibold"><Gamepad2 className="h-4 w-4 text-primary" /> Nome do desafio</h3>
+        <p className="text-xs text-muted-foreground">Aparece na lista de desafios, no cabeçalho do admin e para o aluno.</p>
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="min-w-[220px] flex-1 block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">Nome</span>
+            <input value={nomeDesafio} onChange={(e) => setNomeDesafio(e.target.value)} placeholder="Ex.: Desafio de Jurisprudência 2026"
+              className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40" />
+          </label>
+          <button type="button" onClick={salvarNome} disabled={pendNome || !nomeDesafio.trim() || nomeDesafio.trim() === (nome ?? '').trim()}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-60">
+            {pendNome ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar nome
+          </button>
+        </div>
+      </section>
+
       {/* Regras do jogo */}
       <section className="space-y-4 rounded-2xl border bg-card p-4 shadow-sm">
         <h3 className="flex items-center gap-2 text-sm font-semibold"><Timer className="h-4 w-4 text-primary" /> Regras do jogo</h3>

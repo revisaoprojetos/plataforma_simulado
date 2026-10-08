@@ -128,7 +128,8 @@ export default async function MeusSimuladosPage() {
       stats: {
         feitos,
         concluidos: concluidos.length,
-        mediaGeral: notasOk.length ? notasOk.reduce((a, b) => a + b, 0) / notasOk.length : null,
+        // 1 casa decimal (evita dízima tipo 21.3333…% na exibição).
+        mediaGeral: notasOk.length ? Math.round((notasOk.reduce((a, b) => a + b, 0) / notasOk.length) * 10) / 10 : null,
         melhorNota: melhorNotaVal,
         novosNoMes: novosNoMes || null,
         pctConcluidos: feitos > 0 ? Math.round((concluidos.length / feitos) * 100) : null,

@@ -46,26 +46,26 @@ function Stat({ icon, v, l }: { icon: string; v: string; l: string }) {
 // título, barra de % e botão Continuar. O card inteiro leva ao runner (continuarHref).
 function CardAndamento({ it }: { it: RlzEmAndamento }) {
   return (
-    <Link href={it.continuarHref} className="rlzrv-card" style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 18, overflow: 'hidden', minHeight: 168, color: 'inherit', textDecoration: 'none' }}>
-      <div style={{ position: 'relative', width: 210, flexShrink: 0, overflow: 'hidden' }}>
+    <Link href={it.continuarHref} className="rlzrv-card" style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 18, overflow: 'hidden', minHeight: 112, color: 'inherit', textDecoration: 'none' }}>
+      <div style={{ position: 'relative', width: '36%', maxWidth: 160, flexShrink: 0, overflow: 'hidden' }}>
         <CoverRev titulo={it.capa.rotulo} sub={it.capa.sub} grad={gradOf(it.capa)} img={it.capa.capa} big={13} />
-        <span style={{ position: 'absolute', right: 10, top: 10, height: 24, padding: '0 10px', borderRadius: 99, background: 'rgba(241,194,50,.95)', color: '#2A1A55', fontSize: 11, fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 5 }}>
-          <span className="rlzrv-live" style={{ width: 6, height: 6, borderRadius: '50%', background: '#2A1A55' }} />EM ANDAMENTO
+        <span style={{ position: 'absolute', left: 8, top: 8, maxWidth: 'calc(100% - 16px)', height: 20, padding: '0 8px', borderRadius: 99, background: 'rgba(241,194,50,.95)', color: '#2A1A55', fontSize: 9.5, fontWeight: 800, letterSpacing: '.02em', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <span className="rlzrv-live" style={{ width: 5, height: 5, borderRadius: '50%', background: '#2A1A55', flexShrink: 0 }} />EM ANDAMENTO
         </span>
       </div>
-      <div style={{ flex: 1, minWidth: 0, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ flex: 1, minWidth: 0, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div>
-          <b style={{ fontSize: 14.5, lineHeight: 1.3, color: 'var(--ink)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.titulo}</b>
+          <b style={{ fontSize: 14, lineHeight: 1.25, color: 'var(--ink)', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.titulo}</b>
           {it.banca ? <span style={{ display: 'block', marginTop: 2, fontSize: 12, color: 'var(--muted)' }}>{it.banca}</span> : null}
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 11.5, color: 'var(--muted)', fontWeight: 600 }}>
-            <span>Questão {it.questaoAtual} de {it.total}</span>
-            <b style={{ color: 'var(--ink)' }}>{it.pct}%</b>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Questão {it.questaoAtual} de {it.total}</span>
+            <b style={{ color: 'var(--ink)', flexShrink: 0 }}>{it.pct}%</b>
           </div>
           <BarRev pct={it.pct} />
         </div>
-        <span className="rlzrv-cta" style={{ marginTop: 'auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 40, borderRadius: 12, color: '#FFF', fontSize: 13.5, fontWeight: 800, background: 'linear-gradient(180deg,#6449E0,#4B30BE)', boxShadow: '0 10px 20px -12px rgba(75,48,190,.8), inset 0 1px 0 rgba(255,255,255,.2)' }}><Ic n="play" s={13} />Continuar</span>
+        <span className="rlzrv-cta" style={{ marginTop: 'auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7, height: 36, borderRadius: 11, color: '#FFF', fontSize: 13, fontWeight: 800, whiteSpace: 'nowrap', background: 'linear-gradient(180deg,#6449E0,#4B30BE)', boxShadow: '0 10px 20px -12px rgba(75,48,190,.8), inset 0 1px 0 rgba(255,255,255,.2)' }}><Ic n="play" s={13} />Continuar</span>
       </div>
     </Link>
   )
@@ -73,14 +73,14 @@ function CardAndamento({ it }: { it: RlzEmAndamento }) {
 
 function CardConcluido({ it }: { it: RlzConcluido }) {
   return (
-    <Link href={it.href} className="rlzrv-card" style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 18, overflow: 'hidden', minHeight: 168, color: 'inherit', textDecoration: 'none' }}>
-      <div style={{ width: 210, flexShrink: 0, overflow: 'hidden' }}><CoverRev titulo={it.capa.rotulo} sub={it.capa.sub} grad={gradOf(it.capa)} img={it.capa.capa} big={13} /></div>
-      <div style={{ flex: 1, minWidth: 0, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+    <Link href={it.href} className="rlzrv-card" style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 18, overflow: 'hidden', minHeight: 112, color: 'inherit', textDecoration: 'none' }}>
+      <div style={{ width: '36%', maxWidth: 160, flexShrink: 0, overflow: 'hidden' }}><CoverRev titulo={it.capa.rotulo} sub={it.capa.sub} grad={gradOf(it.capa)} img={it.capa.capa} big={13} /></div>
+      <div style={{ flex: 1, minWidth: 0, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 700, color: '#1FA868' }}><Ic n="check" s={13} />Concluído</span>
           <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{it.data}</span>
         </div>
-        <span style={{ fontSize: 14.5, lineHeight: 1.3, color: 'var(--ink)', fontWeight: 700, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.titulo}</span>
+        <span style={{ fontSize: 14, lineHeight: 1.25, color: 'var(--ink)', fontWeight: 700, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.titulo}</span>
         <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           {it.notaLiberada && it.nota != null
             ? <NotaPill v={it.nota} />
@@ -94,19 +94,19 @@ function CardConcluido({ it }: { it: RlzConcluido }) {
 function CardPersonalizado({ it }: { it: RlzPersonalizado }) {
   const rascunho = it.status === 'rascunho'
   return (
-    <Link href={it.href} className="rlzrv-card" style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 18, overflow: 'hidden', minHeight: 124, color: 'inherit', textDecoration: 'none' }}>
+    <Link href={it.href} className="rlzrv-card" style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 18, overflow: 'hidden', minHeight: 112, color: 'inherit', textDecoration: 'none' }}>
       <div style={{ position: 'relative', width: 116, flexShrink: 0, background: 'linear-gradient(140deg,#3C4458,#5B6478)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,.9)', overflow: 'hidden' }}>
         <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.08) 1px,transparent 1px)', backgroundSize: '16px 16px' }} />
         <span style={{ position: 'relative', width: 48, height: 48, borderRadius: 15, background: 'rgba(255,255,255,.16)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Ic n={rascunho ? 'edit' : 'star'} s={22} /></span>
       </div>
-      <div style={{ flex: 1, minWidth: 0, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 6 }}>
+      <div style={{ flex: 1, minWidth: 0, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           {rascunho
             ? <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--muted)' }}>Rascunho</span>
             : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 700, color: '#1FA868' }}><Ic n="check" s={13} />Concluído</span>}
           {it.nQuestoes != null ? <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{it.nQuestoes} questões</span> : null}
         </div>
-        <b style={{ fontSize: 14.5, lineHeight: 1.3, color: 'var(--ink)' }}>{it.nome}</b>
+        <b style={{ fontSize: 14, lineHeight: 1.25, color: 'var(--ink)' }}>{it.nome}</b>
         <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           {rascunho
             ? <span className="rlzrv-ibtn" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 30, padding: '0 12px', borderRadius: 10, border: '1px solid var(--line)', color: 'var(--ink)', fontSize: 12.5, fontWeight: 700 }}><Ic n="edit" s={13} />Continuar editando</span>
@@ -144,7 +144,9 @@ export function RealizadosRevisao({ theme: themeProp, data }: { theme: InternaTh
   const nAnd = data.emAndamento.length
   const nDone = data.concluidos.length
   const pers = data.personalizados
-  const gridCols = mobile ? '1fr' : 'repeat(3,1fr)'
+  // ADAPTATIVO ao container (não fixo em N colunas) — não fica amontoado em tablet/iframe. min(100%,320px)
+  // = 1 coluna quando estreito; acima, encaixa quantos tickets de ≥320px couberem.
+  const gridCols = 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))'
   const doneList = mobile ? data.concluidos.slice(0, 6) : data.concluidos
 
   return (

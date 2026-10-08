@@ -19,7 +19,7 @@ import { construirEspinha, rangeParaAncora, ancoraParaRange, rectsDoRange, type 
 import { QuestaoLeitura } from '@/components/aluno/questao-leitura'
 import { LeituraAtualizacaoAviso } from '@/components/aluno/leitura-atualizacao-aviso'
 import { GRIFOS, corDoGrifo, ehEstrutural } from '@/lib/leitura/grifos'
-import { prepararCaixasTabela, prepararCaixasCobrado } from '@/lib/leitura/caixas'
+import { prepararCaixasTabela, prepararCaixasCobrado, prepararTabelasColapsaveis } from '@/lib/leitura/caixas'
 import { prepararArtigosCobrados } from '@/lib/leitura/artigos-cobrados'
 import { montarArvoreToc, type NoToc } from '@/lib/leitura/indice'
 import { IndiceArvore, type NoIndiceView } from '@/components/leitura/indice-arvore'
@@ -1240,6 +1240,9 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
       limpezasTab.push(prepararCaixasCobrado(cont, doc.blocos, onTabToggle))
       // Artigos já cobrados em prova (com questão ancorada): selo + recolher/expandir (default aberto).
       limpezasTab.push(prepararArtigosCobrados(cont, artigosCobrados, onTabToggle))
+      // Tabelas "soltas" (não viraram caixa) ganham recolher/expandir (default ABERTO). Depois das caixas,
+      // p/ não embrulhar as tabelas que já viraram ENTENDIMENTO/etc.
+      limpezasTab.push(prepararTabelasColapsaveis(cont))
     }
     // Envelope: desconecta o observer enquanto muta (senão as PRÓPRIAS mutações dos transforms re-disparam
     // o observer → reprocessa/reinicia as caixas, o que quebrava o expandir). Guard re-entrante também.

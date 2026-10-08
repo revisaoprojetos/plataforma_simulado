@@ -82,6 +82,9 @@ const CSS = `
 export function RecomendadoRevisao({ theme: themeProp, data, questoes }: { theme: InternaTheme; data: RecoData; questoes: QuestaoAluno[] }) {
   const theme = useTemaInterno(themeProp)
   const mobile = useIsMobile()
+  // Empilha o grid "Diagnóstico | Reforço" já em TABLET (≤980px): no 2-col o painel de reforço (1fr) ficava
+  // estreito demais (~285px) e o conteúdo saía cortado. Em iframe estreito também empilha.
+  const compact = useIsMobile(980)
   const pad = mobile ? 14 : 24
   const s = data.stats
   const ins = data.insight
@@ -129,8 +132,8 @@ export function RecomendadoRevisao({ theme: themeProp, data, questoes }: { theme
       )}
 
       {/* grid 380px | 1fr (mobile: reforço primeiro, depois diagnóstico) */}
-      <div className="rcm-up" style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : '380px minmax(0,1fr)', gap: 18, alignItems: 'start' }}>
-        {mobile ? (
+      <div className="rcm-up" style={{ display: 'grid', gridTemplateColumns: compact ? '1fr' : '380px minmax(0,1fr)', gap: 18, alignItems: 'start' }}>
+        {compact ? (
           <>
             <Caderno brand="revisao" total={s.questoesHoje} questoes={questoes} />
             <Diagnostico data={data} />

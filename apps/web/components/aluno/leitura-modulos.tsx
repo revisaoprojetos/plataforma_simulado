@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { Library, ChevronRight, AlertTriangle } from 'lucide-react'
 import { type CardView } from '@/lib/card-view'
+import { cardGrid, POSTER_MIN, TICKET_MIN } from '@/components/aluno/card-grid'
 
 export type ModuloAlunoCard = { id: string; nome: string; cor: string | null; capa: string | null; capaCard: string | null; total: number; done: number; pendentes?: number }
 
@@ -18,11 +19,9 @@ function SeloPendentes({ n, claro }: { n: number; claro?: boolean }) {
 /** Seleção de MÓDULOS do aluno (grid de cards) — antes de abrir a trilha. Segue o card_view do tenant
  * (pôster × ticket). Cada card leva a `/aluno/leitura?modulo=<id>` (infos + trilha serpenteada). */
 export function LeituraModulos({ modulos, cardView = 'poster' }: { modulos: ModuloAlunoCard[]; cardView?: CardView }) {
-  const grid = cardView === 'ticket'
-    ? 'grid gap-3 md:grid-cols-2 xl:grid-cols-3'
-    : 'grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'
+  const gridStyle = cardView === 'ticket' ? cardGrid(TICKET_MIN, 12) : cardGrid(POSTER_MIN, 14)
   return (
-    <div className={grid}>
+    <div style={gridStyle}>
       {modulos.map((m) => <ModuloCardAluno key={m.id} m={m} variant={cardView} />)}
     </div>
   )

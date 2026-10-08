@@ -45,7 +45,7 @@ const GRUPOS: GrupoDef[] = [
     label: 'Simulados',
     Icon: ClipboardList,
     itens: [
-      { href: '/aluno/realizados', Icon: ClipboardList, titulo: 'Simulados realizados', sub: 'Histórico, notas e relatórios', short: 'Realizados' },
+      { href: '/aluno/simulados', Icon: ClipboardList, titulo: 'Simulados realizados', sub: 'Histórico, notas e relatórios', short: 'Realizados' },
       { href: '/aluno/recomendado', Icon: Lightbulb, titulo: 'Recomendados para você', sub: 'Escolhidos pelo seu desempenho', short: 'Para você' },
       { href: '/aluno/questoes', Icon: BookOpen, titulo: 'Banco de questões', sub: 'Treine por matéria, banca e ano', short: 'Questões' },
     ],
@@ -84,7 +84,9 @@ export interface DownBarProps {
 export function DownBar({ theme, nav, usuario, pathname, onAccount }: DownBarProps) {
   const [aberto, setAberto] = useState<Grupo | null>(null)
 
-  const inicioAtivo = pathname === '/aluno' || pathname === '/aluno/' || nav.find((n) => n.ativo)?.href === '/aluno'
+  // Início ativo SÓ na home exata. (O item '/aluno' do nav casa por startsWith → ficava "ativo" em
+  // TODAS as rotas /aluno/*; por isso não dá p/ usar nav.find(ativo) aqui.)
+  const inicioAtivo = pathname === '/aluno' || pathname === '/aluno/'
   const ligasAtivo = pathname.startsWith('/aluno/ligas')
 
   // Qual grupo contém a rota atual + o item ativo (para a pílula).
@@ -104,7 +106,11 @@ export function DownBar({ theme, nav, usuario, pathname, onAccount }: DownBarPro
     <nav
       aria-label="Navegação"
       style={{
-        position: 'sticky',
+        // FIXA no viewport (não rola com o conteúdo): o shell é minHeight:100vh e o body rola, então
+        // 'sticky' deixava a barra no fim do conteúdo. O .shr-main já tem padding-bottom p/ compensar.
+        position: 'fixed',
+        left: 0,
+        right: 0,
         bottom: 14,
         zIndex: 60,
         margin: '0 14px',

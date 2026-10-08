@@ -75,12 +75,19 @@ export default async function IntegracaoProviderPage({ params }: { params: Promi
   const cred = ((cfg as any)?.credenciais ?? {}) as Record<string, string>
   const mapaInicial = { mapa: ((cfg as any)?.mapa_json && typeof (cfg as any).mapa_json === 'object') ? (cfg as any).mapa_json as Record<string, string> : {}, ultimoPayload: (ultimoInbox as any)?.data?.body_json ?? null }
 
+  // URL base do webhook = DOMÍNIO DO PRÓPRIO TENANT (cada plataforma tem o seu; a Guru precisa de uma
+  // URL pública que resolva o tenant certo). A rota resolve o tenant pelo TOKEN, mas a URL exibida tem
+  // que ser a do tenant p/ o admin colar na Guru. Sem domínio próprio → cai no env global.
+  const { data: tRow } = await svc.from('simulado_tenants').select('dominio').eq('id', tid).maybeSingle()
+  const dom = String((tRow as any)?.dominio ?? '').replace(/^https?:\/\//, '').replace(/\/+$/, '')
+  const appUrl = dom ? `https://${dom}` : (process.env.NEXT_PUBLIC_APP_URL ?? '')
+
   return (
     <div className="animate-page space-y-6">
       {header}
       <IntegracaoProviderClient
         provider={prov}
-        appUrl={process.env.NEXT_PUBLIC_APP_URL ?? ''}
+        appUrl={appUrl}
         config={{
           ativo: (cfg as any)?.ativo ?? false,
           baseUrl: (cfg as any)?.base_url ?? '',

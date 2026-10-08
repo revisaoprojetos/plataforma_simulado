@@ -12,6 +12,41 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.4.0 — 2026-10-08
+
+Foco: **adaptação dinâmica de tela** (Curseduca/tablet/iframe), **perfil do aluno reconstruído com dado
+real** e **correção de configuração da Curseduca por plataforma**.
+
+- **Perfil do aluno (visual novo) reconstruído ao design completo, 100% com dado real** — voltaram os
+  blocos que tinham sido cortados: **Meta diária** e **Preferências** (funcionais, salvam em
+  `simulado_estudantes.perfil_prefs`), **Resumo da semana**, **Atividade de estudo** (heatmap),
+  **5 KPIs** com sparkline, **Você × média**, **Acerto por banca**, **Fortes e fracos**, **Quando você
+  rende mais** (dia×hora) e **Tempo por questão**. Motor `lib/aluno/perfil-analytics.ts` (sessões +
+  respostas reais, BRT). Blocos compartilhados pelas 3 marcas (`perfil/blocos.tsx`).
+- **Histórico de simulados** — tabela com **ordenação por coluna** (padrão por Data) e **rolagem** com
+  altura de 10 linhas, padronizada nas 3 marcas.
+- **Gráfico de Evolução da nota** — rolamento horizontal + dimensionamento dinâmico, barras alinhadas
+  aos rótulos, datas "DD/MM" e espaço no topo para a nota das barras mais altas não ser cortada.
+- **Adaptação dinâmica ao container (não ao viewport)** via container queries / grids `auto-fill` —
+  corrige cards cortados em tablet e dentro da Curseduca em: **Ligas**, **Perfil**, **Realizados**,
+  **Recomendados**, **Pastas/Início** e nos cards de simulado.
+- **Cards de Jurisprudência** no mesmo formato pôster da área de **Lei Seca**.
+- **Desafios · Acessos exclusivos / modo teste (testadores)** — contas de admin com e-mail de estudante
+  veem tudo liberado, refazem à vontade e **não contam** (sem XP/streak/ranking), por desafio.
+- **Trilha (mapa) · zoom** — nós e balões ("Você está aqui"/"Libera amanhã"/ação) com escala e
+  distância compensadas para ficarem proporcionais e legíveis em qualquer zoom.
+- **Leitura** — tabelas colapsáveis (cabeçalho com toggle, sem card em volta) e correção das caixas de
+  entendimento/divergência; texto não vaza mais da folha.
+- **Login admin multi-plataforma** — seletor de plataforma aparece para quem tem o mesmo e-mail em
+  vários tenants; filtro `somente_admin` libera quem está no RBAC daquela plataforma (corrige o loop
+  de carregamento no MEQ).
+- **Integrações · Curseduca/Guru por plataforma** — a URL do webhook exibida passa a usar o **domínio
+  próprio do tenant** (quando configurado), em vez do `NEXT_PUBLIC_APP_URL` global, para o webhook
+  resolver o tenant correto nas outras plataformas.
+
+**Migrações** (aplicar + `NOTIFY pgrst, 'reload schema'`): `20261007000000_pasta_testadores_exclusivos`,
+`20261008000000_perfil_prefs`.
+
 ## 3.3.1 — 2026-10-07
 
 - **Aluno · Desafio de Lei Seca — streak (sequência) consistente entre as áreas:** o número de "dias"

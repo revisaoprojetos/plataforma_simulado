@@ -771,7 +771,7 @@ export function AttRows({
                 <span><b style={{ color: 'var(--ink)' }}>{a.tempo}</b></span>
                 <span><b style={{ color: 'var(--ink)' }}>{pos}</b> lugar</span>
               </div>
-              {a.downloads?.length ? <div style={{ marginTop: 10 }}><CadernosInline downloads={a.downloads} brand={brand} /></div> : null}
+              {a.downloads?.length ? <div style={{ marginTop: 10 }}><CadernosInline downloads={a.downloads} brand={brand} mobile /></div> : null}
             </>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
@@ -826,7 +826,7 @@ export function AttRows({
 
 // Cadernos de UMA realização — ícones de download na mesma linha (à direita). Cada tipo de caderno
 // (sem gabarito + com gabarito quando liberado) vira um botão-ícone com o nome no tooltip.
-function CadernosInline({ downloads, brand }: { downloads: { nome: string; href: string; comGab: boolean }[]; brand: Brand }) {
+function CadernosInline({ downloads, brand, mobile }: { downloads: { nome: string; href: string; comGab: boolean }[]; brand: Brand; mobile?: boolean }) {
   if (!downloads.length) return null
   const semGab = downloads.filter((d) => !d.comGab)
   const comGab = downloads.filter((d) => d.comGab)
@@ -842,8 +842,9 @@ function CadernosInline({ downloads, brand }: { downloads: { nome: string; href:
     </a>
   )
   return (
-    // Tudo na MESMA linha (sem quebrar); divisória leve separa "sem gabarito" × "com gabarito".
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, justifyContent: 'flex-end' }}>
+    // Desktop: tudo na MESMA linha, à direita. MOBILE: QUEBRA em várias linhas (flex-wrap) e alinha à
+    // esquerda — senão os botões (flexShrink:0 + nowrap) estouravam a tela e saíam cortados.
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, flexWrap: mobile ? 'wrap' : 'nowrap', justifyContent: mobile ? 'flex-start' : 'flex-end' }}>
       {semGab.map(Btn)}
       {semGab.length && comGab.length ? <span aria-hidden style={{ width: 1, height: 20, background: 'var(--line)', margin: '0 3px', flexShrink: 0 }} /> : null}
       {comGab.map(Btn)}

@@ -750,7 +750,8 @@ const CSS = `
 .hmq-tabs{display:flex;gap:4px;padding:3px;border-radius:11px;background:var(--surface2);border:1px solid var(--line)}
 .hmq-tab{height:30px;padding:0 12px;border:0;border-radius:8px;font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;background:transparent;color:var(--muted);cursor:pointer;font-family:inherit}
 .hmq-tab-on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(10,20,60,.12)}
-.hmq-pastas{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+/* adaptativo ao container (não ao viewport) — não corta em tablet/iframe. */
+.hmq-pastas{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr));gap:12px}
 .hmq-tile{display:flex;align-items:center;gap:12px;padding:10px;border-radius:14px;background:var(--surface);border:1px solid var(--line);text-decoration:none}
 .hmq-outro{display:flex;align-items:center;gap:14px;padding:10px;border-radius:14px;background:var(--surface);border:1px solid var(--line)}
 
@@ -805,7 +806,6 @@ const CSS = `
   .hmq-hero{border-radius:14px}
   .hmq-hero-body{padding:0 20px 34px}
   .hmq-hero-body h2{font-size:26px}
-  .hmq-pastas{grid-template-columns:1fr}
   .hmq-perf{grid-template-columns:110px 1fr 36px}
   /* recentes: tabela -> lista (capa 50, banca·%, segmentos, play) */
   .hmq-thead{display:none}

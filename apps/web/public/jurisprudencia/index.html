@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,500;0,600;0,700;0,800;0,900;1,800;1,900&family=Press+Start+2P&family=VT323&display=swap">
-<link rel="stylesheet" href="css/estilos.css">
+<link rel="stylesheet" href="css/estilos.css?v=20261007g">
 <!-- Produção: esconde as ferramentas de demonstração (o elemento fica no DOM p/ o jogo.js não quebrar). -->
 <style>.demo{display:none!important}</style>
 </head>
@@ -53,6 +53,9 @@
   <button class="in-skip" id="inSkip">PULAR ▸</button>
   <div class="in-flash"></div>
 </div>
+<!-- Retorno da leitura (?skipIntro=1): esconde a tela de carregamento NA HORA (antes de pintar) para
+     cair direto no console, sem flash da abertura. -->
+<script>if(new URLSearchParams(location.search).get('skipIntro')==='1'){var _i=document.getElementById('intro');if(_i)_i.style.display='none';}</script>
 
 <div class="page">
   <header class="top">
@@ -104,8 +107,11 @@
             <div class="big glitch" id="atTitle" data-t="DIA 01">DIA 01</div>
             <div class="sub" id="atSub">ADMINISTRATIVO 2026</div>
             <p id="atDesc">Pegue os pontos dourados e responda para dominar as teses. Fuja das armadilhas.</p>
-            <button class="btn-w" id="btnStart">COMEÇAR</button>
-            <span class="hint">PRESSIONE ENTER</span>
+            <div class="row">
+              <button class="btn-w ler" id="btnLeitura" hidden>LEITURA DO DIA</button>
+              <button class="btn-w" id="btnStart">COMEÇAR</button>
+            </div>
+            <span class="hint" id="atHint">PRESSIONE ENTER</span>
           </div>
           <div class="ov clear" id="ovReady" hidden><div class="big gold" id="readyTxt">PRONTO?</div></div>
           <div class="ov" id="ovPause" hidden><div class="big">PAUSA</div><span class="hint">P PARA VOLTAR</span></div>
@@ -158,7 +164,8 @@
         <div class="ptabs" role="tablist" aria-label="Painel do desafio">
           <button class="ptab" role="tab" data-pt="rank" aria-selected="true"><span class="key">1</span>RANKING</button>
           <button class="ptab" role="tab" data-pt="selos" aria-selected="false"><span class="key">2</span>SELOS</button>
-          <button class="ptab" role="tab" data-pt="arm" aria-selected="false"><span class="key">3</span>ARMADILHAS</button>
+          <button class="ptab" role="tab" data-pt="arm" aria-selected="false"><span class="key">3</span>DESAFIOS</button>
+          <button class="ptab" role="tab" data-pt="fases" aria-selected="false"><span class="key">4</span>FASES</button>
         </div>
         <div class="pt-body">
           <div class="pane" data-pane="rank" role="tabpanel">
@@ -176,25 +183,20 @@
             <div class="pane-head"><span>BESTIÁRIO</span><span class="px">CONHEÇA O INIMIGO</span></div>
             <div id="trapsList"></div>
           </div>
+          <!-- SELECT STAGE movido para a coluna lateral (aba FASES) — otimiza a área, sem rolagem na página. -->
+          <div class="pane pane-fases" data-pane="fases" role="tabpanel" hidden>
+            <div class="pane-head"><span>SELECIONAR FASE</span><span class="px" id="stHintMini">15 FASES</span></div>
+            <div class="st-preview" id="stPreview" aria-live="polite"></div>
+            <div class="st-railwrap">
+              <button class="st-nav" id="stPrev" aria-label="Fase anterior">◀</button>
+              <div class="st-rail" id="stages"></div>
+              <button class="st-nav" id="stNext" aria-label="Próxima fase">▶</button>
+            </div>
+          </div>
         </div>
       </div>
     </aside>
   </main>
-
-  <section class="stages" aria-label="Seleção de fase">
-    <div class="st-head">
-      <h2 class="ptitle"><span class="pt-ico">▶</span> SELECT STAGE <span class="st-sub">ESCOLHA O CARTUCHO E A FASE</span></h2>
-      <span class="st-hint">CRÉDITOS 03 · 15 FASES · 7 MATÉRIAS</span>
-    </div>
-    <div class="st-body">
-      <div class="st-preview" id="stPreview" aria-live="polite"></div>
-      <div class="st-railwrap">
-        <button class="st-nav" id="stPrev" aria-label="Fase anterior">◀</button>
-        <div class="st-rail" id="stages"></div>
-        <button class="st-nav" id="stNext" aria-label="Próxima fase">▶</button>
-      </div>
-    </div>
-  </section>
 
   <footer class="demo">
     <span class="demo-t">FERRAMENTAS DE DEMONSTRAÇÃO</span>
@@ -267,6 +269,6 @@
 
 <div class="toast" id="toast" hidden></div>
 
-<script src="js/bootstrap.js"></script>
+<script src="js/bootstrap.js?v=20261007g"></script>
 </body>
 </html>

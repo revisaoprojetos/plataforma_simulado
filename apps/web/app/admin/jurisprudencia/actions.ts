@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { criarPastaFolder } from '@/app/admin/banco-questoes/actions'
+import { criarDocumento } from '@/app/admin/leitura/actions'
 import { hospedarAudioBase64 } from '@/lib/storage/hospedar-base64'
 import type { DesafioJogo } from '@/lib/jurisprudencia/conteudo'
 
@@ -91,6 +92,17 @@ export async function criarDesafio(nome: string): Promise<{ ok: boolean; id?: st
   return r
 }
 
+/** Renomeia o desafio (nome da pasta jurisprudencia). */
+export async function renomearDesafio(id: string, nome: string): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const n = (nome ?? '').trim(); if (!n) return { ok: false, error: 'Informe um nome.' }
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_pastas').update({ nome: n }).eq('id', id).eq('tenant_id', g.tenantId).eq('folder_area', 'jurisprudencia')
+  if (error) return { ok: false, error: error.message }
+  revalidatePath('/admin/jurisprudencia')
+  return { ok: true }
+}
+
 /** Lê o conteúdo completo do desafio p/ o editor admin. */
 export async function lerDesafio(id: string): Promise<{ ok: boolean; desafio?: Required<DesafioJogo>; error?: string }> {
   const g = await guard('leitura:view'); if (!g.ok) return { ok: false, error: g.error }
@@ -132,7 +144,8 @@ export async function salvarMateriasDesafio(id: string, materias: any[], final: 
 // Estados de publicação de um dia (espelha o modelo da Leitura/Lei Seca).
 export type DiaEstado = 'publicada' | 'visualizavel' | 'rascunho'
 type DiaPub = { estado?: DiaEstado; publicarEm?: string | null }
-type DiaJogo = { titulo?: string; teses?: any[]; materia?: string | null; ordem?: number; pub?: DiaPub }
+// `documento_id` liga o dia ao documento de LEITURA (simulado_documentos) que complementa o quiz do arcade.
+type DiaJogo = { titulo?: string; teses?: any[]; materia?: string | null; ordem?: number; pub?: DiaPub; documento_id?: string | null }
 
 const diasObj = (atual: DesafioJogo): Record<string, DiaJogo> => ({ ...(atual.dias && typeof atual.dias === 'object' ? atual.dias : {}) }) as any
 // Ordena as chaves de dias por .ordem (fallback: chave numérica) — a ordem de exibição.
@@ -216,6 +229,46 @@ export async function definirPublicacaoDiasDesafio(
   const pub: DiaPub = { estado: patch.estado, publicarEm: patch.publicarEm ?? null }
   for (const n of numerosDia.map(String)) if (dias[n]) dias[n] = { ...dias[n], pub }
   return salvarMerge(g.tenantId, g.atorId, id, { dias })
+}
+
+/**
+ * Garante o documento de LEITURA do dia (cria vinculado à pasta do desafio se ainda não existir) e
+ * devolve o id para abrir o editor de conteúdo da Lei Seca (`/admin/leitura/<id>`). A leitura
+ * COMPLEMENTA o quiz (teses) do arcade; o aluno lê e só então libera o quiz daquele dia.
+ */
+export async function editarLeituraDia(id: string, numeroDia: number | string): Promise<{ ok: boolean; documentoId?: string; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const atual = await lerJogoParaMerge(svc, g.tenantId, id)
+  if (atual === null) return { ok: false, error: 'Desafio não encontrado.' }
+  const chave = String(Number(numeroDia))
+  const dias = diasObj(atual)
+  const dia = dias[chave]
+  if (!dia) return { ok: false, error: 'Dia não encontrado.' }
+  // Dois flags OBRIGATÓRIOS p/ o fluxo do ALUNO funcionar:
+  //  • `desafio_ativo=true`: /api/leitura/progresso só marca a leitura como concluída (gate do quiz) com ele.
+  //  • `publicado=true`: o leitor do aluno (carregarDocumentoAluno), a rota de progresso e a gravação da
+  //    conclusão EXIGEM doc publicado — sem isso o botão de Leitura não aparece e a leitura não abre.
+  //  A leitura do dia é parte do desafio e fica sempre "viva" (a visibilidade é gateada pelo PUB do dia).
+  // Já existe e não foi apagado? reaproveita (garantindo os flags).
+  if (dia.documento_id) {
+    const { data } = await svc.from('simulado_documentos').select('id, desafio_ativo, publicado').eq('id', dia.documento_id).eq('tenant_id', g.tenantId).eq('deletado', false).maybeSingle()
+    if (data) {
+      const patch: Record<string, unknown> = {}
+      if (!(data as any).desafio_ativo) patch.desafio_ativo = true
+      if (!(data as any).publicado) patch.publicado = true
+      if (Object.keys(patch).length) await svc.from('simulado_documentos').update(patch).eq('id', dia.documento_id).eq('tenant_id', g.tenantId)
+      return { ok: true, documentoId: dia.documento_id }
+    }
+  }
+  // Cria o documento de leitura vinculado à pasta do desafio (folder_area jurisprudencia).
+  const titulo = `${dia.titulo?.trim() || `Dia ${chave}`} — Leitura`
+  const r = await criarDocumento(titulo, id)
+  if (!r.ok || !r.id) return { ok: false, error: r.error ?? 'Falha ao criar a leitura.' }
+  await svc.from('simulado_documentos').update({ desafio_ativo: true, publicado: true }).eq('id', r.id).eq('tenant_id', g.tenantId)
+  dias[chave] = { ...dia, documento_id: r.id }
+  const s = await salvarMerge(g.tenantId, g.atorId, id, { dias })
+  return s.ok ? { ok: true, documentoId: r.id } : { ok: false, error: s.error }
 }
 
 /** Salva as imagens anexadas (ticket, capa…) — base64/URL por chave. */

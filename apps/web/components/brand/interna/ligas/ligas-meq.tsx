@@ -17,6 +17,12 @@ import { PRIVACY } from './mock'
 const CSS = LIGA_BASE_CSS + `
 .lgmq-kpi{transition:border-color .2s,transform .2s}.lgmq-kpi:hover{border-color:var(--brand2);transform:translateY(-2px)}
 .lgmq-reg{transition:background .15s,border-color .15s}.lgmq-reg:hover{background:var(--chip);border-color:var(--brand2)}
+/* Adapta ao CONTAINER real (Curseduca/sidebar), não ao viewport: colapsa a grade Classificação|Pódio
+   e solta o sticky quando aperta — sem cards cortados em tablet/iframe. */
+.lgmq-wrap{container-type:inline-size}
+.lgmq-liga{display:grid;grid-template-columns:1fr 340px;gap:18px;align-items:start}
+.lgmq-side{position:sticky;top:90px}
+@container (max-width:820px){.lgmq-liga{grid-template-columns:1fr}.lgmq-side{position:static}}
 `
 
 function Kpi({ rotulo, valor, icon }: { rotulo: string; valor: string; icon: string }) {
@@ -58,7 +64,7 @@ export function LigasMeq({ theme: themeProp, data, ranking }: { theme: InternaTh
   const [tab, setTab] = useState<LigaTab>('liga')
 
   const Side = (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, position: mobile ? undefined : 'sticky', top: mobile ? undefined : 90 }}>
+    <div className="lgmq-side" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       <Painel title="Comparar aluno" sub="Top 3 da liga (anônimo).">
         <Podio podio={data.podio} dark={dark} />
       </Painel>
@@ -71,7 +77,7 @@ export function LigasMeq({ theme: themeProp, data, ranking }: { theme: InternaTh
   return (
     <div className="min-h-full" style={{ ...internaTokensStyle('meq', theme), minHeight: '100%' }}>
       <style>{CSS}</style>
-      <div style={{ padding: mobile ? '14px' : '24px', display: 'flex', flexDirection: 'column', gap: 20, background: 'var(--bg)', minHeight: '100%' }}>
+      <div className="lgmq-wrap" style={{ padding: mobile ? '14px' : '24px', display: 'flex', flexDirection: 'column', gap: 20, background: 'var(--bg)', minHeight: '100%' }}>
         {mobile ? <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--ink)' }}>Ligas</h1> : null}
 
         {/* KPIs */}
@@ -101,7 +107,7 @@ export function LigasMeq({ theme: themeProp, data, ranking }: { theme: InternaTh
         <LigaTabs tab={tab} onTab={setTab} onCell="var(--brand2)" onInk="#0B1020" bg="var(--surface2)" radius={8} />
 
         {tab === 'liga' ? (
-          <div className="lg-pv" key="liga" style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr' : '1fr 340px', gap: 18, alignItems: 'start' }}>
+          <div className="lg-pv lgmq-liga" key="liga">
             <Painel title={`${data.ligaNome}`} sub="A sua posição está destacada.">
               <RankingSlot ranking={ranking} />
             </Painel>

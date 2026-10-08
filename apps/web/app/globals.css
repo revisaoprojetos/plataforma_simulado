@@ -860,6 +860,18 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 /* ABERTA: libera o overflow para o conteúdo aparecer INTEIRO (senão parte do texto "falta"/fica cortada). */
 .leitura-prosa .caixa-colapsavel[data-aberto] > .caixa-corpo > .caixa-corpo-in { overflow:visible; }
 
+/* TABELAS colapsáveis: SEM card em volta — só um cabeçalho "Tabela" (+ prévia dos cabeçalhos quando
+   recolhida) com a seta de expandir, e a tabela normal embaixo. Começa ABERTA; clicar no cabeçalho recolhe. */
+.leitura-prosa .tabela-colapsavel { margin:calc(8px * var(--lp-bloco-texto-top,2.2) * var(--esc-blocos,1)) 0; }
+.leitura-prosa .tabela-colapsavel > .caixa-cab { color:#6b6b73; font-weight:700; font-size:.85em; padding:0 26px 0 2px !important; }
+.leitura-prosa .tabela-colapsavel > .caixa-cab > :first-child { color:inherit; white-space:nowrap; }
+/* Rótulo "Tabela" via CSS (span vazio no DOM → não mexe nas âncoras dos grifos). */
+.leitura-prosa .tabela-colapsavel > .caixa-cab > :first-child::before { content:"Tabela"; }
+/* Respiro entre o cabeçalho e a tabela quando aberta. */
+.leitura-prosa .tabela-colapsavel[data-aberto] > .caixa-corpo > .caixa-corpo-in { padding-top:6px; }
+/* A tabela ocupa a largura toda, sem margem herdada. */
+.leitura-prosa .tabela-colapsavel > .caixa-corpo .caixa-corpo-in > table { margin:0; width:100% !important; }
+
 /* "Já cobrado em prova" (só esta caixa): ABRE também ao passar o mouse (além do clique, que continua
    valendo via [data-aberto]). Ao sair do hover recolhe de novo. Espelha o estado aberto. */
 .leitura-prosa [data-caixa="cobrado"]:hover > .caixa-corpo { grid-template-rows:1fr; }

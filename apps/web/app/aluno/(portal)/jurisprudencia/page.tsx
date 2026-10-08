@@ -2,9 +2,11 @@ import { Gavel } from 'lucide-react'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { getCurrentTenant } from '@/lib/tenant'
 import { resolverSidebarRotulos, rotuloDe, IconeMenu } from '@/lib/sidebar-rotulos'
-import { desafiosDoAluno, temAcessoDesafio } from '@/lib/jurisprudencia/conteudo'
+import { desafiosDoAluno, temAcessoDesafio, lerDesafioJogo } from '@/lib/jurisprudencia/conteudo'
+import { createAdminClient } from '@/lib/supabase/server'
 import { JurisprudenciaJogo } from '@/components/aluno/jurisprudencia-jogo'
 import { JurisprudenciaTickets } from '@/components/aluno/jurisprudencia-ticket'
+import { DesafioJurisInterno } from '@/components/aluno/jurisprudencia/desafio-juris-interno'
 import { resolverInterno } from '@/lib/aluno/interno-gate'
 import { InternaPageRoot } from '@/components/brand/interna/page-shell'
 import { PlatformJuris } from '@/components/brand/interna/juris'
@@ -36,6 +38,33 @@ export default async function JurisprudenciaAlunoPage({
             Você não tem acesso a este desafio ou ele não existe mais.
           </p>
         </div>
+      )
+    }
+    // Visual novo (interno): o desafio vira uma ÁREA INTERNA com abas (como a Lei Seca) — a aba
+    // "Desafio" traz o arcade inteiro encaixado; + Regulamento / Desempenho / Ranking.
+    const _itDesafio = await resolverInterno()
+    if (_itDesafio.ativo) {
+      const svc = createAdminClient()
+      const [dj, pastaRow] = await Promise.all([
+        lerDesafioJogo(svc, desafio),
+        svc.from('simulado_pastas').select('nome').eq('id', desafio).maybeSingle(),
+      ])
+      const nomeDesafio = ((pastaRow.data as any)?.nome ?? 'Desafio de Jurisprudência') as string
+      const diasObj = dj?.dias && typeof dj.dias === 'object' ? (dj.dias as Record<string, any>) : {}
+      const diasArr = Object.entries(diasObj)
+        .map(([chave, d]) => ({ chave, titulo: ((d as any)?.titulo ?? '').trim() || `Dia ${chave}`, ordem: (d as any)?.ordem ?? Number(chave) }))
+        .sort((a, b) => (a.ordem - b.ordem) || (Number(a.chave) - Number(b.chave)))
+        .map(({ chave, titulo }) => ({ chave, titulo }))
+      const totalDias = diasArr.length
+      const materiasCount = Array.isArray(dj?.materias) ? dj.materias.length : 0
+      const imagens = dj?.imagens && typeof dj.imagens === 'object' ? (dj.imagens as any) : {}
+      // Hero usa SÓ a imagem larga (ticket 4:3) — nunca a capa (4:5 retrato), que fica esticada no banner.
+      const bannerUrl = (imagens.ticket || null) as string | null
+      const config = dj?.config && typeof dj.config === 'object' ? (dj.config as any) : null
+      return (
+        <InternaPageRoot brand={_itDesafio.brand} theme={_itDesafio.theme}>
+          <DesafioJurisInterno desafioId={desafio} titulo={nomeDesafio} theme={_itDesafio.theme} totalDias={totalDias} materiasCount={materiasCount} config={config} bannerUrl={bannerUrl} dias={diasArr} />
+        </InternaPageRoot>
       )
     }
     return <JurisprudenciaJogo desafioId={desafio} />

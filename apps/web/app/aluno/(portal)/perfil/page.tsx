@@ -13,7 +13,9 @@ import { BarChart3, ArrowRight, Flame, Zap, Trophy, ClipboardList, Target, Clock
 import { getGamConfig, gamAtivaParaAluno } from '@/lib/gamificacao'
 import { carregarTrilhaLeituraAluno } from '@/lib/leitura/trilha'
 import { LEITURA_ATIVA } from '@/lib/flags'
-import { resumoGamificacao, conquistasDoAluno, posicaoNaLiga } from '@/lib/gamificacao/leitura'
+import { resumoGamificacao, conquistasDoAluno, posicaoNaLiga, posicaoGeral } from '@/lib/gamificacao/leitura'
+import { montarPerfilAnalytics } from '@/lib/aluno/perfil-analytics'
+import { lerPerfilPrefs } from '@/lib/aluno/perfil-prefs'
 import { ConquistasGrid } from '@/components/aluno/conquistas-grid'
 import { CarimbosPerfil } from '@/components/aluno/carimbos-perfil'
 import { PerfilAdesivosLayer } from '@/components/aluno/perfil-adesivos-layer'
@@ -81,10 +83,29 @@ export default async function PerfilAlunoPage() {
   // ── NOVO VISUAL INTERNO (ligado aos dados reais): Perfil redesenhado. ──
   const _it = await resolverInterno()
   if (_it.ativo) {
-    const rel = (dados && (dados as any).dados) ? (dados as any).dados : null
+    // montarRelatorioEstudante JÁ retorna o relatório PLANO (DadosRelatorioEstudante: .simulados,
+    // .evolucao, .porDisciplina, .historico). O unwrap antigo `dados.dados` não existia nesse nível
+    // → rel ficava null e a aba Estatísticas/KPIs/Histórico vinham vazios. Usa `dados` direto.
+    const rel = (dados ?? null) as any
     const ps = (nome || 'Aluno').trim().split(/\s+/).filter(Boolean)
     const iniciais = (ps[0]?.[0] ?? 'A').toUpperCase() + (ps.length > 1 ? (ps[ps.length - 1][0] ?? '').toUpperCase() : '')
     const porDisc = (rel?.porDisciplina ?? []) as { nome: string; aluno: number; turma: number }[]
+
+    // ── Blocos ricos (dado real): turma (nota média amostrada), posição percentil, prefs, analytics. ──
+    const [turmaNotaRes, totalEstRes, perfilPrefs] = await Promise.all([
+      svc.from('simulado_sessoes_prova').select('nota').eq('tenant_id', sessao.tenantId).not('nota', 'is', null).eq('is_teste', false).eq('deletado', false).limit(3000),
+      svc.from('simulado_estudantes').select('id', { count: 'exact', head: true }).eq('tenant_id', sessao.tenantId),
+      lerPerfilPrefs(svc, sessao.estudanteId),
+    ])
+    const notasTurma = (turmaNotaRes.data ?? []).map((r: any) => Number(r.nota)).filter((n: number) => !Number.isNaN(n))
+    const turmaNota = notasTurma.length ? notasTurma.reduce((a, b) => a + b, 0) / notasTurma.length : null
+    const totalEst = totalEstRes.count ?? 0
+    const posGeral = gamResumo ? await posicaoGeral(svc, sessao.tenantId, gamResumo.xpTotal) : null
+    const posicaoPercentil = posGeral && totalEst ? Math.max(1, Math.round((posGeral / totalEst) * 100)) : null
+    const analytics = await montarPerfilAnalytics(svc, sessao.estudanteId, sessao.tenantId, {
+      porDisciplina: porDisc, notaMedia: rel?.notaMedia ?? null, acertoMedio: rel?.acertoMedio ?? null, turmaNota, posicaoPercentil,
+    })
+
     const perfilData: PerfilData = {
       header: {
         nome, iniciais,
@@ -117,11 +138,23 @@ export default async function PerfilAlunoPage() {
         simulado: h.simulado, quando: h.quando, nota: h.nota, acerto: h.acerto, tempo: h.tempo,
         href: h.simuladoId ? `/aluno/simulados/${h.simuladoId}` : null,
       })),
-      conquistas: (gamConquistas ?? []).map((c: any) => ({ titulo: c.def?.titulo ?? 'Conquista', desbloqueada: !!c.desbloqueada, cor: c.def?.cor ?? null, criterio: c.def?.criterio ?? null })),
+      // A descrição da conquista vive em def.descricao (não "criterio") — era por isso que a legenda
+      // do badge aparecia vazia. Mapeia descricao → criterio (campo que o badge lê).
+      conquistas: (gamConquistas ?? []).map((c: any) => ({ titulo: c.def?.titulo ?? 'Conquista', desbloqueada: !!c.desbloqueada, cor: c.def?.cor ?? null, criterio: c.def?.descricao ?? c.def?.criterio ?? null })),
       leiSeca: (trilhasLeitura as any[]).map((t) => ({ lei: t.titulo ?? t.nome ?? 'Lei', feitas: t.feitas ?? t.concluidas ?? t.done ?? 0, total: t.total ?? 0, href: '/aluno/leitura' })),
       matForte: porDisc.length ? porDisc[0].nome : null,
       matReforcar: porDisc.length ? porDisc[porDisc.length - 1].nome : null,
       trilhaHref: '/aluno/leitura',
+      resumoSemana: analytics.resumoSemana,
+      atividade: analytics.atividade,
+      estatKpis: analytics.estatKpis,
+      voceXmedia: analytics.voceXmedia,
+      porBanca: analytics.porBanca,
+      fortesFracos: analytics.fortesFracos,
+      rendimentoHora: analytics.rendimentoHora,
+      tempoPorQuestao: analytics.tempoPorQuestao,
+      metaDiaria: { meta: perfilPrefs.metaDiaria, feitas: analytics.questoesHoje },
+      preferencias: perfilPrefs,
     }
     return <PlatformPerfil brand={_it.brand} theme={_it.theme} data={perfilData} />
   }

@@ -127,7 +127,9 @@ export function PlatformJuris({ brand, theme: themeProp, titulo, desafios, stats
               Nenhum desafio disponível para você no momento.
             </div>
           ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 14 }}>
+            // Grade igual à Lei Seca (pôster 4:5): adaptável ao container (iframe/tablet) via auto-fill
+            // + min(100%, 200px) — nunca estoura a largura, empilha sozinho quando aperta.
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 200px), 1fr))', gap: 14 }}>
               {desafios.map((d) => (
                 <CardDesafio key={d.id} d={d} />
               ))}
@@ -138,6 +140,9 @@ export function PlatformJuris({ brand, theme: themeProp, titulo, desafios, stats
   )
 }
 
+// Card de desafio em formato PÔSTER (4:5) — idêntico ao card de módulo da Lei Seca
+// (ModuloCardAluno): capa preenchendo, degradê inferior e título/kicker sobrepostos em branco,
+// badge de ação no canto superior direito. O card inteiro é o link que abre o jogo.
 function CardDesafio({ d }: { d: JurisDesafio }) {
   const href = `/aluno/jurisprudencia?desafio=${d.id}`
   const capa = d.imagemTicket || null
@@ -145,69 +150,55 @@ function CardDesafio({ d }: { d: JurisDesafio }) {
     <Link
       href={href}
       aria-label={`Abrir desafio ${d.nome}`}
-      className="group block overflow-hidden transition duration-500 hover:-translate-y-1"
-      style={{
-        borderRadius: 'var(--r)',
-        border: '1px solid var(--line)',
-        background: 'var(--surface)',
-        boxShadow: '0 1px 2px rgba(0,0,0,.04)',
-      }}
+      className="group relative block aspect-[4/5] overflow-hidden transition-all duration-500 hover:-translate-y-1 hover:shadow-lg"
+      style={{ borderRadius: 'var(--r)', border: '1px solid var(--line)', boxShadow: '0 1px 2px rgba(0,0,0,.04)' }}
     >
-      {/* Capa (~4/3): imagem do ticket ou gradiente da marca com textura + marca-d'água. */}
-      <div className="relative overflow-hidden" style={{ aspectRatio: '4 / 3' }}>
-        {capa ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={capa}
-            alt=""
-            className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
-          />
-        ) : (
-          <div className="absolute inset-0" style={{ background: CAPA_GRAD }}>
-            <span aria-hidden="true" className="absolute inset-0" style={{ backgroundImage: CAPA_GRID, backgroundSize: '22px 22px' }} />
-            <span
-              aria-hidden="true"
-              className="absolute transition-transform duration-700 group-hover:scale-110"
-              style={{ right: -14, bottom: -14, color: 'rgba(255,255,255,.16)' }}
-            >
-              <Scale size={120} strokeWidth={1.4} />
-            </span>
-            <span className="absolute left-4 top-4 inline-flex items-center justify-center rounded-xl" style={{ width: 40, height: 40, background: 'rgba(255,255,255,.14)', color: '#FFFFFF' }}>
-              <Gavel size={20} />
-            </span>
-          </div>
-        )}
+      {capa ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={capa}
+          alt=""
+          className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
+        />
+      ) : (
+        <div className="absolute inset-0" style={{ background: CAPA_GRAD }}>
+          <span aria-hidden="true" className="absolute inset-0" style={{ backgroundImage: CAPA_GRID, backgroundSize: '22px 22px' }} />
+          <span
+            aria-hidden="true"
+            className="absolute transition-transform duration-700 group-hover:scale-110"
+            style={{ right: -14, bottom: -14, color: 'rgba(255,255,255,.16)' }}
+          >
+            <Scale size={120} strokeWidth={1.4} />
+          </span>
+          <span className="absolute left-4 top-4 inline-flex items-center justify-center rounded-xl" style={{ width: 40, height: 40, background: 'rgba(255,255,255,.14)', color: '#FFFFFF' }}>
+            <Gavel size={20} />
+          </span>
+        </div>
+      )}
+
+      {/* degradê inferior p/ legibilidade do título sobre a capa */}
+      <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,.9) 0%, rgba(0,0,0,.32) 45%, rgba(0,0,0,.08) 100%)' }} />
+
+      {/* kicker + título sobrepostos no rodapé */}
+      <div className="absolute inset-x-0 bottom-0 z-10" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <p style={{ margin: 0, fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.72)' }}>
+          Desafio
+        </p>
+        <h3
+          className="line-clamp-2"
+          style={{ margin: 0, fontSize: 14, fontWeight: 800, lineHeight: 1.25, letterSpacing: '-0.02em', color: '#FFFFFF', textShadow: '0 1px 2px rgba(0,0,0,.4)' }}
+        >
+          {d.nome}
+        </h3>
       </div>
 
-      {/* Corpo */}
-      <div style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div>
-          <p style={{ margin: 0, fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--goldInk)' }}>
-            Desafio
-          </p>
-          <h3
-            className="line-clamp-2"
-            style={{ margin: '4px 0 0', fontSize: 15, fontWeight: 800, lineHeight: 1.3, letterSpacing: '-0.02em', color: 'var(--ink)' }}
-          >
-            {d.nome}
-          </h3>
-        </div>
-        <span
-          className="inline-flex items-center justify-center gap-2 transition group-hover:brightness-110"
-          style={{
-            height: 38,
-            borderRadius: 12,
-            background: 'var(--brand)',
-            color: '#FFFFFF',
-            fontSize: 13,
-            fontWeight: 800,
-            boxShadow: '0 10px 20px -12px color-mix(in oklab, var(--brand) 70%, transparent)',
-          }}
-        >
-          <Play size={14} />
-          Jogar
-        </span>
-      </div>
+      {/* badge de ação (Jogar) no canto superior direito */}
+      <span
+        className="absolute right-2 top-2 z-10 inline-flex items-center justify-center rounded-full transition-colors group-hover:bg-white/30"
+        style={{ height: 28, width: 28, background: 'rgba(255,255,255,.18)', color: '#FFFFFF', backdropFilter: 'blur(4px)' }}
+      >
+        <Play size={14} />
+      </span>
     </Link>
   )
 }

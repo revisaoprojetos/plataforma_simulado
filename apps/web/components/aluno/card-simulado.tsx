@@ -38,6 +38,9 @@ export function CardSimulado({ s, dica = false, variant = 'poster' }: { s: ItemS
   })()
   const feito = s.finalizadas > 0                    // já realizou → oferece "Ver resultados"
   const resultadoHref = `/aluno/simulados/${s.id}`   // área do simulado realizado (todas as tentativas)
+  // Clicar na CAPA já dispara a ação principal: disponível/aguardando → abre o simulado ("Fazer agora");
+  // senão, se já feito → "Ver resultados". Indisponível (agendado/manutenção) → sem ação.
+  const capaHref = (s.podeFazer || s.podeAguardar) ? `/simulado/${s.embed_token}` : feito ? resultadoHref : null
 
   // ===== Variante TICKET: card baixo e retangular — metade esquerda com a imagem, direita com infos. =====
   if (variant === 'ticket') {
@@ -48,7 +51,7 @@ export function CardSimulado({ s, dica = false, variant = 'poster' }: { s: ItemS
         <div className="group/card relative h-full aspect-[4/3] shrink-0 overflow-hidden">
           <CapaCard capa={capa ?? s.vis?.capaBanner} cor={cor} icone={s.vis?.icone} orig={s.vis?.capaMeta?.orig} cfg={s.vis?.capaMeta?.ticket} />
         </div>
-        {(s.podeFazer || s.podeAguardar) && <Link href={`/simulado/${s.embed_token}`} className="absolute inset-0 z-10" aria-label={s.titulo} />}
+        {capaHref && <Link href={capaHref} className="absolute inset-0 z-10" aria-label={s.titulo} />}
         {/* direita: infos */}
         <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 p-2.5">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -96,7 +99,7 @@ export function CardSimulado({ s, dica = false, variant = 'poster' }: { s: ItemS
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/5" />
 
       {s.novo && <FitaNovo />}
-      {(s.podeFazer || s.podeAguardar) && <Link href={`/simulado/${s.embed_token}`} className="absolute inset-0 z-10" aria-label={s.titulo} />}
+      {capaHref && <Link href={capaHref} className="absolute inset-0 z-10" aria-label={s.titulo} />}
 
       {/* Selo de status no topo-direito. Aberto → "Sempre disponível" (relógio); demais → status (Ao vivo/Agendado/Em manutenção…). */}
       {(() => {

@@ -575,7 +575,7 @@ function normPublicacao(v: any): PublicacaoModulo {
   return { status: v.status === 'publicado' ? 'publicado' : 'rascunho', publicarEm: v.publicarEm ?? null, encerrarEm: v.encerrarEm ?? null }
 }
 export type ModuloLeitura = { id: string; nome: string; pai_id: string | null; cor: string | null; icone: string | null; capa_url: string | null; capa_card_url: string | null; adesivo_url: string | null; pontuacao: PontuacaoLeitura; desafios: DesafioModulo[]; intro: IntroConfig; regulamento: RegulamentoConfig; trilhaAparencia: TrilhaAparencia; regraSequencial: boolean; quizBloquearRefazer: boolean; ordem: number; subpastas: number; aulas: number; publicacao: PublicacaoModulo }
-export type BancoAulas = { ok: boolean; error?: string; pastas?: ModuloLeitura[]; aulas?: (Documento & { questoes?: number })[]; breadcrumb?: { id: string; nome: string }[]; modulos?: { id: string; nome: string }[]; moduloAtual?: ModuloLeitura }
+export type BancoAulas = { ok: boolean; error?: string; pastas?: ModuloLeitura[]; aulas?: (Documento & { questoes?: number; quizQuestoes?: number })[]; breadcrumb?: { id: string; nome: string }[]; modulos?: { id: string; nome: string }[]; moduloAtual?: ModuloLeitura }
 
 /** `.order('ordem')` tolerante: se a coluna `ordem` ainda não existir, refaz ordenando por nome. */
 async function pastasLeitura(svc: any, tenantId: string, area: string = AREA_LEITURA): Promise<any[]> {
@@ -632,14 +632,20 @@ export async function listarBancoAulas(pastaId?: string | null, detalhes: boolea
   const ids = aulasNivel.map((d) => d.id)
   const artigosPorDoc = new Map<string, number>()
   const questoesPorDoc = new Map<string, number>()
+  const quizPorDoc = new Map<string, number>()
   if (ids.length) {
     const cont = await fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_documento_conteudos').select('documento_id, versao, artigos').eq('tenant_id', g.tenantId).in('documento_id', chunk).order('documento_id'))
     const versaoDoc = new Map(aulasNivel.map((d) => [d.id, d.versao]))
     for (const c of cont) if (c.versao === versaoDoc.get(c.documento_id)) artigosPorDoc.set(c.documento_id, c.artigos ?? 0)
     const qs = await fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_documento_questoes').select('documento_id').eq('tenant_id', g.tenantId).eq('deletado', false).in('documento_id', chunk))
     for (const q of qs) questoesPorDoc.set(q.documento_id, (questoesPorDoc.get(q.documento_id) ?? 0) + 1)
+    // Contagem do QUIZ ("Questões do conteúdo", simulado_documento_quiz_questoes) — tolerante se a migração não rodou.
+    try {
+      const quiz = await fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_documento_quiz_questoes').select('documento_id').eq('tenant_id', g.tenantId).eq('deletado', false).in('documento_id', chunk).order('documento_id'))
+      for (const q of quiz) quizPorDoc.set(q.documento_id, (quizPorDoc.get(q.documento_id) ?? 0) + 1)
+    } catch { /* tabela de quiz ausente (migração 20260910000001 pendente) */ }
   }
-  const aulas = aulasNivel.map((d) => ({ ...d, artigos: artigosPorDoc.get(d.id) ?? 0, questoes: questoesPorDoc.get(d.id) ?? 0, publicacao: normDocPublicacao(d.publicacao, !!d.publicado) }))
+  const aulas = aulasNivel.map((d) => ({ ...d, artigos: artigosPorDoc.get(d.id) ?? 0, questoes: questoesPorDoc.get(d.id) ?? 0, quizQuestoes: quizPorDoc.get(d.id) ?? 0, publicacao: normDocPublicacao(d.publicacao, !!d.publicado) }))
 
   // Breadcrumb subindo por pai_id.
   const mapa = new Map(todasPastas.map((p) => [p.id, p]))
@@ -1494,6 +1500,35 @@ export async function salvarRankingOcultos(pastaId: string, cfg: RankingOcultosC
   const { error } = await svc.from('simulado_pastas').update({ ranking_ocultos: val }).eq('id', pastaId).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS)
   if (error) return { ok: false, error: /ranking_ocultos|column|schema cache/i.test(error.message) ? 'Migração pendente (coluna ranking_ocultos jsonb em simulado_pastas).' : error.message }
   await invalidarRankingLeitura(g.tenantId, pastaId) // reflete na hora (sem esperar o TTL do cache)
+  revalidatePath('/admin/leitura'); return { ok: true }
+}
+
+// ─────────── Acessos exclusivos / MODO TESTE (contas de admin com e-mail de estudante) ───────────
+// Testadores exclusivos: veem TODAS as aulas liberadas todo dia, podem refazer o desafio à vontade e
+// NÃO contabilizam (sem XP/streak, fora do ranking). Guardado em simulado_pastas.testadores_exclusivos
+// (uuid[] jsonb). Tolerante à coluna ausente. Também já ficam fora do ranking (ver lib/leitura/ranking.ts).
+
+/** Lê os estudantes marcados como testador exclusivo do módulo (com nomes p/ exibir). */
+export async function carregarTestadoresExclusivos(pastaId: string): Promise<{ ok: boolean; estudantes?: EstudanteAcessoLinha[]; error?: string }> {
+  const g = await guard('leitura:view'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  let raw: unknown = []
+  try { const { data } = await svc.from('simulado_pastas').select('testadores_exclusivos').eq('id', pastaId).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS).maybeSingle(); raw = (data as any)?.testadores_exclusivos ?? [] } catch { raw = [] }
+  const ids = Array.isArray(raw) ? raw.filter((x: unknown): x is string => typeof x === 'string') : []
+  const estudantes = ids.length
+    ? await fetchAllByIn<EstudanteAcessoLinha>(ids, (chunk) => svc.from('simulado_estudantes').select('id, nome, email, cpf, classificacao, avatar, perfil_avatar_cor').in('id', chunk).eq('tenant_id', g.tenantId))
+    : []
+  return { ok: true, estudantes }
+}
+
+/** Salva os testadores exclusivos do módulo (lista de estudante_id). Tolerante à coluna ausente. */
+export async function salvarTestadoresExclusivos(pastaId: string, estudanteIds: string[]): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const val = [...new Set((estudanteIds ?? []).filter(Boolean))]
+  const { error } = await svc.from('simulado_pastas').update({ testadores_exclusivos: val }).eq('id', pastaId).eq('tenant_id', g.tenantId).in('folder_area', AREAS_DESAFIO_FOLDERS)
+  if (error) return { ok: false, error: /testadores_exclusivos|column|schema cache/i.test(error.message) ? 'Migração pendente (coluna testadores_exclusivos jsonb em simulado_pastas).' : error.message }
+  await invalidarRankingLeitura(g.tenantId, pastaId) // saem do ranking na hora
   revalidatePath('/admin/leitura'); return { ok: true }
 }
 

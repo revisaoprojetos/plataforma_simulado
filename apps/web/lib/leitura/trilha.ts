@@ -8,6 +8,7 @@ import { normalizarPontuacaoLeitura, type PontuacaoLeitura, type DesempenhoLeitu
 import { normalizarDesafios, type DesafioModulo } from '@/lib/leitura/desafios'
 import { desempenhoLeituraAluno } from '@/lib/leitura/desafios-eval'
 import { resolverTrilhaAparencia, DEFAULT_TRILHA_APARENCIA, type TrilhaAparencia } from '@/lib/leitura/trilha-aparencia'
+import { testadorModulosDoAluno } from '@/lib/leitura/testadores'
 import type { Trilha, TrilhaNode } from '@/components/aluno/trilha-simulados'
 
 type EstadoAula = 'concluido' | 'atual' | 'bloqueado'
@@ -147,23 +148,31 @@ async function sequenciaLeitura(estId: string, tenantId: string) {
   const modulos = todosModulos.filter((m) => acessiveis.has(m.id))
   if (byModulo.has('__geral__')) modulos.push({ id: '__geral__', nome: 'Geral', cor: null, capa: null, capaCard: null, adesivo: null, intro: normalizarIntro(null), regulamento: normalizarRegulamento(null), pontuacao: normalizarPontuacaoLeitura(null), trilhaAparencia: DEFAULT_TRILHA_APARENCIA, regraSequencial: false })
 
+  // MODO TESTE (acessos exclusivos): nos módulos em que o aluno é testador, TODAS as aulas ficam
+  // liberadas todo dia (ignora "libera amanhã" e a regra sequencial) — só p/ conferir a visualização.
+  let testadorMods = new Set<string>()
+  try { testadorMods = await testadorModulosDoAluno(svc, tenantId, estId) } catch { /* coluna ausente */ }
+
   const seqByModulo = new Map<string, AulaSeq[]>()
   let jaProxima = false // já achou a PRÓXIMA a liberar (1ª aula ainda não liberada de toda a sequência)
   for (const m of modulos) {
+    const ehTeste = testadorMods.has(m.id)
     // Regra SEQUENCIAL é POR MÓDULO (config). Default OFF = LIVRE: toda aula liberada e não-concluída
     // é acessível (o aluno faz em qualquer ordem). ON = desbloqueio rígido: só 1 aula aberta por vez
     // (a 1ª não-concluída = 'atual', as seguintes = 'bloqueado' com "conclua a anterior").
-    const seq = (m as { regraSequencial?: boolean }).regraSequencial === true
+    // Testador: nunca sequencial (tudo aberto).
+    const seq = !ehTeste && (m as { regraSequencial?: boolean }).regraSequencial === true
     let jaAbriu = false
     const arr: AulaSeq[] = []
     for (const d of byModulo.get(m.id) ?? []) {
       const s = st.get(d.id)!
       // Aula VISUALIZÁVEL: aparece bloqueada ("ainda não liberada") e NÃO entra na sequência (não vira "atual").
       // A 1ª delas é a PRÓXIMA a liberar → recebe destaque ("aula de amanhã/hoje") na trilha.
-      if (d.visualizavel) { const proxima = !jaProxima; jaProxima = true; arr.push({ ...s, estado: 'bloqueado', naoLiberada: true, proxima, moduloId: m.id }); continue }
+      // Testador ignora esse gate (vê tudo liberado).
+      if (!ehTeste && d.visualizavel) { const proxima = !jaProxima; jaProxima = true; arr.push({ ...s, estado: 'bloqueado', naoLiberada: true, proxima, moduloId: m.id }); continue }
       let estado: EstadoAula
       if (s.aulaConcluida) estado = 'concluido'
-      else if (!seq) estado = 'atual'                       // LIVRE: disponível
+      else if (!seq) estado = 'atual'                       // LIVRE / TESTE: disponível
       else if (!jaAbriu) { estado = 'atual'; jaAbriu = true } // SEQUENCIAL: só a 1ª não-concluída abre
       else estado = 'bloqueado'
       arr.push({ ...s, estado, moduloId: m.id })

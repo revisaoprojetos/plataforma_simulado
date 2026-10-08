@@ -38,7 +38,16 @@ export function prepararCaixasTabela(cont: HTMLElement, blocos: BlocoDef[] = DEF
     div.classList.add('caixa-colapsavel')
     pintar(div, bloco)
     const cab = document.createElement('div'); cab.className = 'caixa-cab'
-    while (headCell.firstChild) cab.appendChild(headCell.firstChild) // título
+    // Título = 1º BLOCO do cabeçalho. Blocos EXTRAS na MESMA célula (ex.: subtítulo "Crime cometido…"
+    // abaixo do título) vão pro CORPO — senão o flex do cabeçalho alinha os dois lado a lado (o bug do
+    // "ATENÇÃO - DIVERGÊNCIA JURISPRUDENCIAL"). Cabeçalho de 1 bloco (NÃO ESQUEÇA etc.) não muda.
+    const extrasHead: ChildNode[] = []
+    let viuTitulo = false
+    for (const k of Array.from(headCell.childNodes)) {
+      if (viuTitulo) { extrasHead.push(k); continue }
+      cab.appendChild(k)
+      if (k.nodeType === 1) viuTitulo = true
+    }
     pintarTitulo(cab, bloco.corTitulo)
     div.appendChild(cab)
     const corpo = document.createElement('div'); corpo.className = 'caixa-corpo'
@@ -46,6 +55,7 @@ export function prepararCaixasTabela(cont: HTMLElement, blocos: BlocoDef[] = DEF
 
     const bodyRows = rows.slice(1)
     const multiCol = bodyRows.some((r) => r.cells.length > 1)
+    for (const ex of extrasHead) inner.appendChild(ex) // subtítulos do cabeçalho entram no topo do corpo
     if (multiCol) {
       rows[0].remove()
       tab.replaceWith(div)
@@ -77,6 +87,10 @@ export function prepararCaixasParagrafo(cont: HTMLElement, blocos: BlocoDef[] = 
   for (const el of els) {
     try {
       if (!el.isConnected || el.closest('.caixa-colapsavel')) continue
+      // DENTRO DE TABELA não vira caixa: uma célula com "STJ:", "STF:" etc. é DADO da tabela (coluna
+      // "Competência"), não um bloco de destaque. Converter quebrava a tabela. A conversão de tabela
+      // inteira (cabeçalho de 1 célula → caixa) continua por prepararCaixasTabela.
+      if (el.closest('td') || el.closest('th')) continue
       if (Array.from(el.children).some((c) => /^(P|DIV|LI|TABLE|UL|OL|BLOCKQUOTE)$/.test(c.tagName))) continue
       const full = el.textContent || ''
       const hit = acharBlocoPorInicio(full, blocos)
@@ -133,3 +147,45 @@ export function prepararCaixasParagrafo(cont: HTMLElement, blocos: BlocoDef[] = 
 
 /** Alias de compat: nome antigo. */
 export const prepararCaixasCobrado = prepararCaixasParagrafo
+
+/**
+ * Torna TABELAS "soltas" (que não viraram caixa de destaque) recolhíveis: envolve cada `<table>` num
+ * `.caixa-colapsavel` com cabeçalho "Tabela" + seta — reusando o MESMO acordeão das caixas (clique
+ * delegado + animação CSS). Começam ABERTAS; quando recolhidas, a prévia mostra os cabeçalhos da 1ª
+ * linha. Só MOVE a tabela pra dentro do corpo (posição e ordem preservadas → espinha dos grifos intacta).
+ * Idempotente (pula tabelas já dentro de uma caixa). Recolhido por clique no cabeçalho.
+ */
+export function prepararTabelasColapsaveis(cont: HTMLElement): () => void {
+  for (const tab of Array.from(cont.querySelectorAll<HTMLTableElement>('table'))) {
+    try {
+      // Já dentro de uma caixa (ENTENDIMENTO multi-col) ou já embrulhada → não mexe.
+      if (tab.closest('.caixa-colapsavel')) continue
+
+      const box = document.createElement('div')
+      box.classList.add('caixa-colapsavel', 'tabela-colapsavel')
+      // SEM data-caixa → sem card em volta; só o cabeçalho "Tabela" + seta e a tabela normal embaixo.
+      box.setAttribute('data-aberto', '1') // tabela começa ABERTA (conteúdo principal); clicar recolhe
+
+      const cab = document.createElement('div'); cab.className = 'caixa-cab'
+      cab.setAttribute('role', 'button'); cab.setAttribute('tabindex', '0'); cab.setAttribute('aria-expanded', 'true')
+      // Rótulo "Tabela" via CSS (::before do span VAZIO) — sem nó de texto, p/ NÃO entrar na espinha das
+      // âncoras dos grifos (mesma razão de a prévia/seta serem ::before/::after nas caixas).
+      const titulo = document.createElement('span'); cab.appendChild(titulo)
+      // Prévia (cabeçalhos da 1ª linha) — aparece quando recolhida (via CSS ::before, sem nó de texto).
+      const headRow = tab.rows[0]
+      if (headRow) {
+        const heads = Array.from(headRow.cells).map((c) => (c.textContent || '').replace(/\s+/g, ' ').trim()).filter(Boolean)
+        const previa = heads.join(' · ').slice(0, 160)
+        if (previa) cab.setAttribute('data-previa', previa)
+      }
+
+      const corpo = document.createElement('div'); corpo.className = 'caixa-corpo'
+      const inner = document.createElement('div'); inner.className = 'caixa-corpo-in'
+      tab.replaceWith(box)      // box ocupa o lugar da tabela (tabela fica destacada)
+      inner.appendChild(tab)    // move a tabela pra dentro do corpo
+      corpo.appendChild(inner)
+      box.appendChild(cab); box.appendChild(corpo)
+    } catch { /* não deixa 1 tabela quebrar as demais */ }
+  }
+  return () => {}
+}

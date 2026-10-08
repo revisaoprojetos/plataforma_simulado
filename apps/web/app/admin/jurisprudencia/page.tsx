@@ -11,6 +11,7 @@ import { JurisDesigner } from '@/components/admin/jurisprudencia-designer'
 import { JurisMedalhas } from '@/components/admin/jurisprudencia-medalhas'
 import { getCurrentTenant } from '@/lib/tenant'
 import { resolverCardView } from '@/lib/card-view'
+import { createAdminClient } from '@/lib/supabase/server'
 import { cn } from '@/lib/utils'
 
 export const dynamic = 'force-dynamic'
@@ -54,6 +55,24 @@ export default async function JurisprudenciaAdminPage({ searchParams }: { search
   const jogo = res.desafio
   const nome = lista.find((d) => d.id === desafio)?.nome ?? 'Desafio'
 
+  // Contagem de "Questões do conteúdo" por dia (do documento vinculado) — só a aba de dias usa.
+  const quizPorDia: Record<string, number> = {}
+  if (abaAtual === 'dias') {
+    const diasObj = (jogo.dias ?? {}) as Record<string, any>
+    const docPorDia: Record<string, string> = {}
+    for (const [k, d] of Object.entries(diasObj)) { const did = d?.documento_id; if (typeof did === 'string' && did) docPorDia[k] = did }
+    const docIds = [...new Set(Object.values(docPorDia))]
+    if (docIds.length) {
+      const svc = createAdminClient()
+      try {
+        const { data } = await svc.from('simulado_documento_quiz_questoes').select('documento_id').eq('deletado', false).in('documento_id', docIds)
+        const cnt = new Map<string, number>()
+        for (const r of (data ?? []) as any[]) cnt.set(r.documento_id, (cnt.get(r.documento_id) ?? 0) + 1)
+        for (const [k, did] of Object.entries(docPorDia)) quizPorDia[k] = cnt.get(did) ?? 0
+      } catch { /* tabela de quiz ausente (migração 20260910000001 pendente) */ }
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-start gap-2">
@@ -69,8 +88,8 @@ export default async function JurisprudenciaAdminPage({ searchParams }: { search
       <JurisTabsBar desafioId={desafio} abaAtual={abaAtual} />
 
       <div className={cn('pt-1')}>
-        {abaAtual === 'dias' && <JurisDiasEditor desafioId={desafio} dias={jogo.dias ?? {}} materias={jogo.materias ?? []} final={jogo.final ?? null} />}
-        {abaAtual === 'config' && <JurisConfigForm desafioId={desafio} config={jogo.config ?? null} materias={jogo.materias ?? []} final={jogo.final ?? null} imagens={jogo.imagens ?? {}} />}
+        {abaAtual === 'dias' && <JurisDiasEditor desafioId={desafio} dias={jogo.dias ?? {}} materias={jogo.materias ?? []} final={jogo.final ?? null} quizPorDia={quizPorDia} />}
+        {abaAtual === 'config' && <JurisConfigForm desafioId={desafio} nome={nome} config={jogo.config ?? null} materias={jogo.materias ?? []} final={jogo.final ?? null} imagens={jogo.imagens ?? {}} />}
         {abaAtual === 'designer' && <JurisDesigner desafioId={desafio} aparencia={jogo.aparencia ?? {}} />}
         {abaAtual === 'acessos' && <ModuloAcesso pastaId={desafio} />}
         {abaAtual === 'medalhas' && <JurisMedalhas desafioId={desafio} materias={jogo.materias ?? []} final={jogo.final ?? null} imagens={jogo.imagens ?? {}} />}

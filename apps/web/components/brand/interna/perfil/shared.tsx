@@ -223,24 +223,32 @@ export function Spark({ vals, color, w = 110, h = 34 }: { vals: number[]; color:
 
 // barras SVG com grow (kit.bars_svg)
 export function BarsSvg({ vals, labels, w = 900, h = 200, color = 'var(--brand)', rad = 6, showVals = true }: { vals: number[]; labels: string[]; w?: number; h?: number; color?: string; rad?: number; showVals?: boolean }) {
-  const n = vals.length, gap = 6, bw = (w - gap * (n - 1)) / n, mx = Math.max(...vals, 1)
+  const n = vals.length, mx = Math.max(...vals, 1)
+  // Modelo de CÉLULAS IGUAIS (w/n), barra centrada na célula — IDÊNTICO aos rótulos HTML (flex:1),
+  // então barra, valor e dia ficam SEMPRE alinhados (independente do stretch do preserveAspectRatio).
+  const cell = w / n
+  const bw = Math.max(4, Math.min(cell * 0.6, 46))
+  // Headroom no topo: a barra mais alta vai só até HEAD, deixando espaço p/ o VALOR (nota) acima
+  // dela sempre aparecer — antes o número da barra mais alta era cortado pelo topo do container.
+  const HEAD = 22
+  const plotH = Math.max(10, h - HEAD)
   // Só as BARRAS ficam no SVG escalado (preserveAspectRatio:none). Os RÓTULOS/valores vão em HTML —
   // texto dentro de SVG com escala não-uniforme fica ESTICADO (bug da aba Estatísticas).
-  const centerPct = (i: number) => (((i * (bw + gap)) + bw / 2) / w) * 100
+  const centerPct = (i: number) => (((i + 0.5) * cell) / w) * 100
   return (
     <div style={{ width: '100%' }}>
       <div style={{ position: 'relative', width: '100%', height: h }}>
         <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" style={{ width: '100%', height: h, display: 'block', overflow: 'visible' }}>
-          {[0, 1, 2, 3, 4].map((k) => { const y = h - h * k / 4; return <line key={k} x1={0} x2={w} y1={y.toFixed(1)} y2={y.toFixed(1)} stroke="var(--line)" strokeWidth={1} vectorEffect="non-scaling-stroke" /> })}
+          {[0, 1, 2, 3, 4].map((k) => { const y = h - plotH * k / 4; return <line key={k} x1={0} x2={w} y1={y.toFixed(1)} y2={y.toFixed(1)} stroke="var(--line)" strokeWidth={1} vectorEffect="non-scaling-stroke" /> })}
           {vals.map((v, i) => {
-            const x = i * (bw + gap), bh = Math.max(3, h * v / mx), y = h - bh
+            const x = i * cell + (cell - bw) / 2, bh = Math.max(3, plotH * v / mx), y = h - bh
             return <rect key={i} className="pgrow" x={x.toFixed(1)} y={y.toFixed(1)} width={bw.toFixed(1)} height={bh.toFixed(1)} rx={rad} fill={color} style={{ animationDelay: `${(i * 0.02).toFixed(2)}s`, transformOrigin: `${(x + bw / 2).toFixed(1)}px ${h}px` }} />
           })}
         </svg>
         {showVals && (
           <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
             {vals.map((v, i) => {
-              const bh = Math.max(3, h * v / mx), topPct = ((h - bh) / h) * 100
+              const bh = Math.max(3, plotH * v / mx), topPct = ((h - bh) / h) * 100
               return <span key={i} style={{ position: 'absolute', left: `${centerPct(i)}%`, top: `${topPct}%`, transform: 'translate(-50%,-118%)', fontSize: 10, fontWeight: 700, color: 'var(--ink)', whiteSpace: 'nowrap' }}>{String(v).replace('.', ',')}</span>
             })}
           </div>
@@ -248,7 +256,7 @@ export function BarsSvg({ vals, labels, w = 900, h = 200, color = 'var(--brand)'
       </div>
       {labels.length > 0 && (
         <div style={{ display: 'flex', marginTop: 4 }}>
-          {labels.map((l, i) => <span key={i} style={{ flex: 1, textAlign: 'center', fontSize: 10, color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden' }}>{l}</span>)}
+          {labels.map((l, i) => <span key={i} style={{ flex: 1, minWidth: 0, textAlign: 'center', fontSize: 10, color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{l}</span>)}
         </div>
       )}
     </div>

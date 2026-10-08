@@ -14,7 +14,7 @@ import { listarVersoesDocumento, carregarDiffDocumento, reverterAlteracao } from
 import { listarQuestoesDocumento, type QuestaoDoc } from '@/app/admin/leitura/actions'
 import { DEFAULT_GRIFO_CORES, type GrifoCores } from '@/lib/leitura/trilha-aparencia'
 import { aplicarGrifos } from '@/lib/leitura/recolorir-grifos'
-import { prepararCaixasTabela, prepararCaixasCobrado } from '@/lib/leitura/caixas'
+import { prepararCaixasTabela, prepararCaixasCobrado, prepararTabelasColapsaveis } from '@/lib/leitura/caixas'
 import { DEFAULT_BLOCOS, type BlocoDef } from '@/lib/leitura/blocos'
 import { DEFAULT_ESPACAMENTO, estiloEspacamento, type EspacamentoDoc } from '@/lib/leitura/espacamento'
 import { NIVEL_TIPO, montarArvoreToc, type NoToc } from '@/lib/leitura/indice'
@@ -216,6 +216,8 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
       limpezasTab.push(prepararCaixasTabela(cont, blocosRef.current, () => window.dispatchEvent(new Event('resize'))))
       // "📌 Já cobrado em prova:" (parágrafos) → caixa colapsável, igual ao aluno.
       limpezasTab.push(prepararCaixasCobrado(cont, blocosRef.current, () => window.dispatchEvent(new Event('resize'))))
+      // Tabelas "soltas" ganham recolher/expandir (default aberto) — igual ao aluno.
+      limpezasTab.push(prepararTabelasColapsaveis(cont))
       // Pega data-caixa (novo) E as classes legadas box-stj/box-stf (conteúdo antigo).
       const caixas = Array.from(cont.querySelectorAll<HTMLElement>('[data-caixa="stj"], [data-caixa="stf"], .box-stj, .box-stf'))
       for (const box of caixas) {

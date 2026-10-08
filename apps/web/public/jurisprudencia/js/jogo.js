@@ -10,8 +10,9 @@ const { CONFIG, MATERIAS, FINAL, DIAS } = window.DESAFIO;
    ========================================================= */
 const DEF = {dom:{}, best:{}, recorde:0, demoAll:false, final:null, muted:false, volSfx:1, volMus:.5, sel:null};
 let S = load();
-// Regra: a cada entrada no desafio o som começa ATIVADO — EFEITOS no MÁXIMO e MÚSICA na METADE.
-S.muted = false; S.volSfx = 1; S.volMus = .5;
+// Preferência de ÁUDIO persiste entre entradas: o que o aluno deixar (mudo/volumes) fica salvo em
+// localStorage (save() grava muted/volSfx/volMus) e é relido no load(). 1ª vez (sem dado salvo) usa o
+// DEF = som ligado (efeitos no máximo, música na metade).
 function load(){ try{ const r = localStorage.getItem(CONFIG.storageKey); if(r) return Object.assign({}, DEF, JSON.parse(r)); }catch(e){} return JSON.parse(JSON.stringify(DEF)); }
 function save(){ try{ localStorage.setItem(CONFIG.storageKey, JSON.stringify(S)); }catch(e){} }
 
@@ -369,6 +370,59 @@ function bfs(sx,sy){
   return d;
 }
 
+// ─── Gate de LEITURA por dia (complementa o quiz do arcade) ──────────────────────────────────────
+// Cada dia pode ter um documento de LEITURA vinculado (DIAS[n].documento_id). O quiz (labirinto) do
+// dia só libera depois que o aluno concluir a leitura. Replays (dia já concluído) pulam o gate.
+function leituraConcluidaDia(n){ const m=(window.DESAFIO&&window.DESAFIO.LEITURAS)||{}; return !!m[String(n)]; }
+// Fonte de verdade = LEITURA_DOCS (só dias com leitura PUBLICADA, vindo da API). Assim leitura em
+// rascunho (ou API indisponível) NÃO trava o quiz — gate só quando há conteúdo real pra ler.
+function docDoDia(n){ const m=(window.DESAFIO&&window.DESAFIO.LEITURA_DOCS)||{}; return m[String(n)]||null; }
+// Prévia do Designer (iframe com ?preview=1): não trava o quiz nem sequestra a aba do admin.
+const PREVIEW = new URLSearchParams(location.search).get('preview')==='1';
+// Leitura obrigatória ainda pendente? (dia com leitura publicada, não lida, não é replay/demo).
+// No preview do Designer não trava (admin visualiza as 2 opções E consegue jogar p/ ver o labirinto).
+function leituraBloqueada(n){ return !PREVIEW && !!docDoDia(n) && !leituraConcluidaDia(n) && !dayComplete(n) && !S.demoAll; }
+// Abre a LEITURA do dia SEM recarregar o arcade: pede ao PORTAL (pai) p/ abrir um overlay por cima — o
+// iframe do arcade fica montado/congelado atrás (estado/progresso preservados, sem flash de abertura).
+// No designer (preview): nova aba. Fallback (sem pai ouvindo): navega a página inteira (como a Lei Seca).
+function irParaLeitura(n){
+  const did=(window.DESAFIO&&window.DESAFIO.ID)||new URLSearchParams(location.search).get('desafio')||'';
+  const docId=docDoDia(n); if(!docId) return;
+  const url='/aluno/jurisprudencia/leitura/'+encodeURIComponent(docId)+'?desafio='+encodeURIComponent(did);
+  if(PREVIEW){ window.open(url, '_blank', 'noopener'); return; }
+  try{ if(window.parent && window.parent!==window){ window.parent.postMessage({ type:'juris-abrir-leitura', docId:docId, desafio:did }, '*'); return; } }catch(e){}
+  try{ window.top.location.href=url; }catch(e){ window.location.href=url; }
+}
+// Configura a TELA DO DIA (attract) com as 2 opções: Leitura (1ª) + Desafio (COMEÇAR, travado até ler).
+function aplicarGateAtract(n){
+  const bLer=$('#btnLeitura'), bStart=$('#btnStart'), hint=$('#atHint');
+  const temLeitura=!!docDoDia(n), bloqueada=leituraBloqueada(n);
+  if(bLer) bLer.hidden=!temLeitura;
+  if(bStart){
+    bStart.classList.toggle('lock', bloqueada);
+    // Cadeado = o ícone de pixel art do próprio arcade (ICON.lock), não um emoji.
+    const lockIco = pxSvg('lock','currentColor').replace('<svg ', '<svg width="15" height="15" style="vertical-align:-.15em;margin-right:.4em" ');
+    bStart.innerHTML = bloqueada ? lockIco+'CONCLUA A LEITURA' : 'COMEÇAR';
+  }
+  if(hint) hint.textContent = bloqueada ? 'FAÇA A LEITURA DO DIA PARA LIBERAR' : 'PRESSIONE ENTER';
+}
+// Chama atenção pro botão de leitura quando o aluno tenta começar sem ter lido.
+function flashLeitura(){ const b=$('#btnLeitura'); if(!b||b.hidden) return; b.classList.remove('pulse'); void b.offsetWidth; b.classList.add('pulse'); }
+// Re-busca o estado de LEITURA no servidor e reaplica o gate — chamado quando o aluno VOLTA da leitura
+// (concluindo ou não). Cobre bfcache / navegação que não recarrega o iframe / conclusão ainda em voo.
+let __recarregando=false;
+async function recarregarLeituras(){
+  if(PREVIEW || __recarregando) return;
+  const did=(window.DESAFIO&&window.DESAFIO.ID)||new URLSearchParams(location.search).get('desafio'); if(!did) return;
+  __recarregando=true;
+  try{
+    const r=await fetch('/api/jurisprudencia/progresso?desafio='+encodeURIComponent(did),{credentials:'same-origin',cache:'no-store'});
+    if(r.ok){ const p=await r.json(); if(window.DESAFIO){ window.DESAFIO.LEITURAS=(p&&p.leituras)||{}; window.DESAFIO.LEITURA_DOCS=(p&&p.leituraDocs)||{}; }
+      if(G.mode==='attract'){ aplicarGateAtract(G.day); } }
+  }catch(e){ /* mantém o estado atual */ }
+  finally{ __recarregando=false; }
+}
+
 function loadDay(n){
   n=Number(n); if(!DIAS[n]){ n=hoje(); if(n==null) return; } // dia removido/ausente: cai no dia atual
   G.day=n; S.sel=n; save(); stageSel=n;
@@ -380,9 +434,13 @@ function loadDay(n){
   $('#atTitle').textContent=`DIA ${dd(pos(n))}`; $('#atTitle').dataset.t=`DIA ${dd(pos(n))}`;
   $('#atSub').textContent=((DIAS[n]&&DIAS[n].titulo)||'').toUpperCase();
   const left = getTeses(n).length - (G.replay?0:domOf(n).length);
-  $('#atDesc').textContent = G.replay
+  // Tela do dia: a leitura é a 1ª etapa e libera o desafio. Reaparece a cada troca de dia (todo loadDay).
+  $('#atDesc').textContent = leituraBloqueada(n)
+    ? 'Faça a leitura do dia para liberar o desafio. Depois, pegue os pontos dourados e responda cada questão.'
+    : G.replay
     ? `Dia concluído. Jogue de novo para revisar as ${getTeses(n).length} teses e melhorar sua pontuação.`
     : `${left} ${left===1?'tese':'teses'} para dominar: pegue os pontos dourados e responda. Fuja das armadilhas.`;
+  aplicarGateAtract(n);
   renderAll();
 }
 function resetBoard(full){
@@ -392,9 +450,10 @@ function resetBoard(full){
     for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++) if(open(x,y)){ G.dots[x+y*COLS]=1; G.dotsLeft++; }
     const P=[[13,1],[13,ROWS-2]]; P.forEach(([x,y])=>{ if(open(x,y)){ if(G.dots[x+y*COLS]===1) G.dotsLeft--; G.dots[x+y*COLS]=2; } });
     G.dots[1+(ROWS-2)*COLS]=0; G.dotsLeft--;
-    // teses
+    // teses — TODAS as questões pendentes do dia, em ordem e posições ALEATÓRIAS no labirinto.
     const all=getTeses(G.day), dom=domOf(G.day);
     const pend = all.map((_,i)=>i).filter(i=>G.replay || !dom.includes(i));
+    for(let i=pend.length-1;i>0;i--){ const j=Math.floor(R()*(i+1)); [pend[i],pend[j]]=[pend[j],pend[i]]; } // ordem aleatória das questões
     G.teses=[]; const d0=bfs(1,ROWS-2);
     const cand=[]; for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++) if(open(x,y) && d0[x+y*COLS]>=8 && G.dots[x+y*COLS]!==2) cand.push([x,y]);
     for(let i=cand.length-1;i>0;i--){ const j=Math.floor(R()*(i+1)); [cand[i],cand[j]]=[cand[j],cand[i]]; }
@@ -403,6 +462,13 @@ function resetBoard(full){
       for(const [x,y] of cand){ if(G.teses.length>=pend.length) break;
         if(G.teses.every(t=>Math.abs(t.x-x)+Math.abs(t.y-y)>=minD)) G.teses.push({x,y,idx:pend[G.teses.length]}); }
       minD-=2;
+    }
+    // Garante que TODAS as questões apareçam, mesmo que faltem células bem espaçadas (fallback por célula livre).
+    if(G.teses.length<pend.length){
+      const usado=new Set(G.teses.map(t=>t.x+'_'+t.y));
+      for(let y=0;y<ROWS && G.teses.length<pend.length;y++) for(let x=0;x<COLS && G.teses.length<pend.length;x++){
+        if(open(x,y) && G.dots[x+y*COLS]!==2 && !usado.has(x+'_'+y)){ G.teses.push({x,y,idx:pend[G.teses.length]}); usado.add(x+'_'+y); }
+      }
     }
   }
   G.player=mkEnt(1,ROWS-2,6.4); G.want=null;
@@ -441,6 +507,8 @@ function setMode(m){
 }
 function startRun(){
   SFX.init(); if(G.mode!=='attract') return;
+  // A leitura do dia é a 1ª etapa: sem ela, o desafio fica travado.
+  if(leituraBloqueada(G.day)){ SFX.locked(); flashLeitura(); return; }
   G.lives=CONFIG.vidas; G.score=0; G.parts={lab:0,tese:0,vida:0};
   resetBoard(true); SFX.start(); ready(1.6);
 }
@@ -568,7 +636,7 @@ function openQuestion(ti){
   Q={ti, q, idx:t.idx, time:CONFIG.tempoResposta, done:false};
   $('#qTag').textContent=`TESE ${t.idx+1} · DIA ${dd(pos(G.day))} · ${matOf(G.day).curto}`;
   $('#qText').textContent=q.q;
-  $('#qOpts').innerHTML=q.o.map((o,i)=>`<button class="opt" data-i="${i}"><span class="k">${'ABC'[i]}</span><span>${o}</span></button>`).join('');
+  $('#qOpts').innerHTML=q.o.map((o,i)=>`<button class="opt" data-i="${i}"><span class="k">${String.fromCharCode(65+i)}</span><span>${o}</span></button>`).join('');
   $('#qRes').hidden=true; $('#qBar').classList.remove('hot');
   $('#qModal').hidden=false;
   setTimeout(()=>$('#qOpts .opt')?.focus(),50);
@@ -750,6 +818,7 @@ function renderStages(){
       <div class="cart-label"><span class="cart-ic">${iconHtml(m)}</span><span class="cart-name">${((m.curto||m.nome)||({adm:'ADMINIST.',civ:'CIVIL',con:'CONSTITUC.',pre:'PREVIDENC.',pc:'PROC. CIVIL',tra:'TRABALHO',tri:'TRIBUTÁRIO',rg:'SELO FINAL'})[m.id]||'').toUpperCase()}</span></div>
       <div class="cart-stages">${btns}</div><div class="cart-pins"></div></div></div>`;
   }).join('');
+  const hm=$('#stHintMini'); if(hm) hm.textContent=`${NDAYS} ${NDAYS===1?'FASE':'FASES'}`;
   renderPreview();
 }
 function renderPreview(flick){
@@ -1153,6 +1222,13 @@ document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{ i
 document.querySelector('.tabs').addEventListener('click',e=>{ const b=e.target.closest('.tab'); if(b){ RT.tab=b.dataset.tab; SFX.click(); renderRank(); } });
 $('#rChips').addEventListener('click',e=>{ const b=e.target.closest('.chip'); if(b){ RT.mat=b.dataset.mat; SFX.click(); renderRank(); } });
 $('#btnStart').onclick=startRun;
+$('#btnLeitura').onclick=()=>{ SFX.click(); irParaLeitura(G.day); };
+// Ao VOLTAR da leitura (aba/foco/visibilidade ou restauração de bfcache), reatualiza o gate do dia.
+window.addEventListener('pageshow', recarregarLeituras);
+window.addEventListener('focus', recarregarLeituras);
+document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) recarregarLeituras(); });
+// O portal avisa quando o overlay de leitura fechou → reatualiza só o gate (sem recarregar o arcade).
+window.addEventListener('message', (e)=>{ if(e && e.data && e.data.type==='juris-leitura-fechada') recarregarLeituras(); });
 $('#btnContinue').onclick=continueRun;
 $('#btnReplay').onclick=()=>{ SFX.click(); loadDay(G.day); };
 $('#btnNext').onclick=()=>{ const _ci=VORD.indexOf(G.day); const nx=_ci>=0&&_ci<VORD.length-1?VORD[_ci+1]:null; if(nx!=null) pickDay(nx); };
@@ -1218,7 +1294,7 @@ addEventListener('keydown',e=>{
   if(e.target.closest('input,textarea')) return;
   if(KEYMAP[e.key] && ['play','ready','paused'].includes(G.mode)){ e.preventDefault(); setWant(KEYMAP[e.key]); return; }
   if(e.key==='Enter'){ if(G.mode==='attract'){ e.preventDefault(); startRun(); } else if(G.mode==='gameover'){ e.preventDefault(); continueRun(); } else if(G.mode==='clear' && !$('#btnNext').hidden && document.activeElement?.tagName!=='BUTTON'){ e.preventDefault(); $('#btnNext').click(); } }
-  if(['1','2','3'].includes(e.key) && G.mode!=='play'){ showPane(['rank','selos','arm'][+e.key-1]); SFX.click(); }
+  if(['1','2','3','4'].includes(e.key) && G.mode!=='play'){ showPane(['rank','selos','arm','fases'][+e.key-1]); SFX.click(); }
   const flashBtn={p:'abPause',P:'abPause',m:'abSound',M:'abSound',f:'btnExpand',F:'btnExpand'}[e.key]; if(flashBtn){ const fb=$('#'+flashBtn); fb.classList.add('pressed'); setTimeout(()=>fb.classList.remove('pressed'),140); }
   if(e.key==='p'||e.key==='P'){ if(G.mode==='play') pause(true); else if(G.mode==='paused') pause(false); }
   if(e.key==='m'||e.key==='M'){ snd.click(); }
@@ -1239,6 +1315,9 @@ document.addEventListener('visibilitychange',()=>{ if(document.hidden) pause(tru
 const INTRO = { on:true, p:0, seg:-1, done:false };
 (function intro(){
   const el=$('#intro'); if(!el){ INTRO.on=false; return; }
+  // Pula a abertura SOMENTE quando o retorno vem da leitura (?skipIntro=1 na URL). Na 1ª entrada (sem
+  // esse parâmetro) a animação toca por completo. Sinal explícito por URL = nada de estado persistente.
+  if(new URLSearchParams(location.search).get('skipIntro')==='1'){ INTRO.on=false; INTRO.done=true; try{BGM.arm();}catch(e){} el.remove(); return; }
   // mascote
   const mc=$('#inMascotCv').getContext('2d'); const mt0=performance.now(); let mHappy=false, mJump=0;
   (function mloop(now){

@@ -4,13 +4,18 @@
 // KPI strip 6, abas Informações/Histórico/Conquistas/Estatísticas. Prefixo CSS `prv-`.
 // DADOS REAIS (PerfilData): renderiza só seções com fonte real; nada de botão/toggle inerte.
 
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { internaTokensStyle, INTERNA_RADIUS, type InternaTheme } from '../interna-tokens'
 import { useTemaInterno } from '../use-tema-interno'
 import { BK, Ic, Tabs, type TabDef, notec, fnum, Donut, BarsSvg, LineSvg } from './shared'
 import { useIsMobile } from './use-is-mobile'
-import type { PerfilData } from './data'
+import type { PerfilData, PerfilPreferencias } from './data'
+import { salvarPerfilPrefs } from '@/app/aluno/(portal)/perfil/actions'
+import {
+  MetaDiariaCard, PreferenciasCard, ResumoSemanaCard, AtividadeHeatmap, EstatKpiStrip,
+  VoceMediaCard, BancaCard, FortesFracosCard, RendimentoHoraCard, TempoQuestaoCard, HistoricoTabela, PERFIL_BLOCOS_CSS,
+} from './blocos'
 
 const REV_R = 'M6 5.5H32C43.5 5.5 49 13 49 23C49 31 45 37 39.5 40.5L62 61H6Z M9.2 9.2H19.2V57.6H9.2Z'
 const REV_RO = 'M6 5.5H32C43.5 5.5 49 13 49 23C49 31 45 37 39.5 40.5L62 61H6Z'
@@ -131,7 +136,7 @@ function Header({ mobile, data }: { mobile: boolean; data: PerfilData }) {
 
 // ---------------------------------------------------------------- KPI strip (6)
 const DASH = '—'
-function Kpis({ mobile, data }: { mobile: boolean; data: PerfilData }) {
+function Kpis({ data }: { data: PerfilData }) {
   const k = data.kpis
   const items: [string, string, string][] = [
     ['clip', String(k.simuladosFeitos), 'Simulados feitos'],
@@ -141,9 +146,8 @@ function Kpis({ mobile, data }: { mobile: boolean; data: PerfilData }) {
     ['trophy', k.melhorNota == null ? DASH : fnum(k.melhorNota), 'Melhor nota'],
     ['bolt', k.xpMes == null ? DASH : String(k.xpMes), 'XP este mês'],
   ]
-  const cols = mobile ? 2 : 6
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols},1fr)`, gap: 10 }}>
+    <div className="prv-kpis">
       {items.map(([i, v, l], idx) => (
         <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 16, background: 'var(--surface)', border: '1px solid var(--line)' }}>
           <span style={{ width: 36, height: 36, borderRadius: 11, background: 'var(--chip)', color: 'var(--brand)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Ic n={i} s={17} /></span>
@@ -157,9 +161,18 @@ function Kpis({ mobile, data }: { mobile: boolean; data: PerfilData }) {
   )
 }
 
+
 // ---------------------------------------------------------------- tab: Informações (perfil de estudos + Lei Seca)
 function TabInfo({ mobile, data }: { mobile: boolean; data: PerfilData }) {
   const h = data.header
+  // Config (Meta diária + Preferências) — estado local otimista + persistência via action.
+  const [prefs, setPrefs] = useState<PerfilPreferencias | null>(data.preferencias ?? null)
+  const [meta, setMeta] = useState<number>(data.metaDiaria?.meta ?? 20)
+  const [saving, startSave] = useTransition()
+  const persistir = (patch: Record<string, unknown>) => startSave(async () => { try { await salvarPerfilPrefs(patch as any) } catch { /* best-effort */ } })
+  const onMeta = (m: number) => { setMeta(m); persistir({ metaDiaria: m }) }
+  const onToggle = (k: keyof PerfilPreferencias) => { if (!prefs) return; const nv = { ...prefs, [k]: !prefs[k] }; setPrefs(nv); persistir({ [k]: nv[k] }) }
+
   const rows: [string, string, string | null][] = [
     ['trend', 'Matéria mais forte', data.matForte],
     ['flag', 'Matéria a reforçar', data.matReforcar],
@@ -193,54 +206,30 @@ function TabInfo({ mobile, data }: { mobile: boolean; data: PerfilData }) {
     </div>
   </>) : null
 
-  if (mobile) return <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>{dados}{lei}</div>
+  const metaCard = data.metaDiaria ? <MetaDiariaCard bk={bk} meta={meta} feitas={data.metaDiaria.feitas} onMeta={onMeta} saving={saving} /> : null
+  const resumo = data.resumoSemana ? <ResumoSemanaCard bk={bk} r={data.resumoSemana} /> : null
+  const prefsCard = prefs ? <PreferenciasCard bk={bk} prefs={prefs} onToggle={onToggle} saving={saving} /> : null
+
+  if (mobile) return <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>{dados}{metaCard}{lei}{resumo}{prefsCard}</div>
+  // 3 colunas (spec): [Perfil de estudos] · [Meta diária + Lei Seca] · [Resumo da semana + Preferências].
+  const colStyle = { display: 'flex', flexDirection: 'column' as const, gap: 16 }
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: lei ? '1fr 1fr' : '1fr', gap: 16, alignItems: 'start' }}>
-      {dados}{lei}
+    <div className="prv-info3">
+      <div style={colStyle}>{dados}</div>
+      <div style={colStyle}>{metaCard}{lei}</div>
+      <div style={colStyle}>{resumo}{prefsCard}</div>
     </div>
   )
 }
 
 // ---------------------------------------------------------------- tab: Histórico
-function TabHist({ mobile, data }: { mobile: boolean; data: PerfilData }) {
-  const hist = data.historico
-  const Row = ({ item, k, border }: { item: PerfilData['historico'][number]; k: number; border: boolean }) => {
-    const n = item.nota
-    const [fg, bg] = n == null ? ['var(--muted)', 'var(--surface2)'] : notec(n)
-    const [af] = notec(item.acerto)
-    if (mobile) {
-      const inner = (
-        <div className="prv-rowh" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 4px', borderTop: border ? '1px solid var(--line)' : undefined }}>
-          <span style={{ width: 44, height: 44, borderRadius: 13, background: bg, color: fg, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, flexShrink: 0 }}>{n == null ? DASH : fnum(n)}</span>
-          <div style={{ flex: 1, minWidth: 0 }}><b style={{ display: 'block', fontSize: 13, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.simulado}</b><span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{item.quando} · {item.acerto}% acerto · {item.tempo}</span></div>
-          {item.href ? <Ic n="cr" s={16} c="var(--muted)" /> : null}
-        </div>
-      )
-      return item.href ? <Link key={k} href={item.href} style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>{inner}</Link> : <div key={k}>{inner}</div>
-    }
-    const cols = 'minmax(0,2.4fr) 1fr 0.9fr 1.3fr 0.9fr'
-    const inner = (
-      <div className="prv-rowh" style={{ display: 'grid', gridTemplateColumns: cols, alignItems: 'center', gap: 16, padding: '11px 10px', borderTop: '1px solid var(--line)' }}>
-        <b style={{ fontSize: 13.5, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.simulado}</b>
-        <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>{item.quando}</span>
-        <span style={{ justifySelf: 'start', height: 26, padding: '0 10px', borderRadius: 8, background: bg, color: fg, fontSize: 12.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center' }}>{n == null ? DASH : fnum(n)}</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><div style={{ flex: 1 }}>{bk.bar(item.acerto, af, 6)}</div><span style={{ width: 34, fontSize: 12, fontWeight: 700, color: 'var(--ink)' }}>{item.acerto}%</span></div>
-        <span style={{ fontSize: 12.5, color: 'var(--ink)' }}>{item.tempo}</span>
-      </div>
-    )
-    return item.href ? <Link key={k} href={item.href} style={{ textDecoration: 'none', color: 'inherit', display: 'block' }}>{inner}</Link> : <div key={k}>{inner}</div>
-  }
-  const header = !mobile ? (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,2.4fr) 1fr 0.9fr 1.3fr 0.9fr', gap: 16, padding: '0 10px 10px', fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--muted)' }}>
-      {['Simulado', 'Data', 'Nota', 'Acerto', 'Tempo'].map((hh) => <span key={hh}>{hh}</span>)}
+function TabHist({ data }: { mobile: boolean; data: PerfilData }) {
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {data.atividade ? <AtividadeHeatmap bk={bk} a={data.atividade} /> : null}
+      <HistoricoTabela bk={bk} hist={data.historico} />
     </div>
-  ) : null
-  return bk.card(<>
-    {bk.head('clock', 'Histórico de simulados', <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>{hist.length} registros</span>)}
-    {hist.length === 0
-      ? <span style={{ fontSize: 13, color: 'var(--muted)' }}>Nenhum simulado realizado ainda.</span>
-      : <div style={{ marginTop: 4 }}>{header}{hist.map((item, k) => <Row key={k} item={item} k={k} border={k > 0} />)}</div>}
-  </>)
+  )
 }
 
 // ---------------------------------------------------------------- tab: Conquistas
@@ -274,7 +263,7 @@ function TabConq({ mobile, data }: { mobile: boolean; data: PerfilData }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {head}
       {total ? (
-        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${mobile ? 3 : 6},1fr)`, gap: mobile ? 8 : 12 }}>
+        <div className="prv-conq">
           {data.conquistas.map((a, k) => <Badge key={k} a={a} mobile={mobile} />)}
         </div>
       ) : null}
@@ -308,8 +297,12 @@ function DiscCard({ data }: { data: PerfilData }) {
 function EvoCard({ mobile, data }: { mobile: boolean; data: PerfilData }) {
   const [ev, setEv] = useState<'bar' | 'line'>('bar')
   const w = mobile ? 360 : 640, h = mobile ? 150 : 200
+  // Evolução é por sessão (pode ter dezenas) → mostra TODOS os pontos com rolamento horizontal:
+  // largura mínima por ponto garante leitura; quando cabe, preenche o container (dinâmico).
   const vals = data.evolucao.map((e) => e.nota)
-  const labels = data.evolucao.map((e) => e.rotulo)
+  // Rótulo curto "DD/MM" (sem o ano) — pedido do usuário; rótulos sem barra (mock mensal) ficam iguais.
+  const labels = data.evolucao.map((e) => (e.rotulo.includes('/') ? e.rotulo.split('/').slice(0, 2).join('/') : e.rotulo))
+  const chartMin = Math.max(260, vals.length * 46)
   const tog = (
     <div style={{ display: 'inline-flex', gap: 3, padding: 3, borderRadius: 10, background: 'var(--surface2)', border: '1px solid var(--line)' }}>
       {(['bar', 'line'] as const).map((o) => (
@@ -319,27 +312,65 @@ function EvoCard({ mobile, data }: { mobile: boolean; data: PerfilData }) {
   )
   return bk.card(<>
     {bk.head('trend', 'Evolução da nota', tog, 'Nota média por período')}
-    {vals.length === 0 ? <span style={{ fontSize: 13, color: 'var(--muted)' }}>Sem dados de evolução ainda.</span> : ev === 'bar' ? (
-      <div className="prv-pv"><BarsSvg vals={vals} labels={labels} w={w} h={h} color="var(--brand)" rad={6} /></div>
-    ) : (
-      <div className="prv-pv">
-        <LineSvg vals={vals} w={w} h={h} color="var(--brand)" fill="var(--chip)" />
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 6 }}>{labels.map((m) => <span key={m} style={{ fontSize: 10, color: 'var(--muted)' }}>{m}</span>)}</div>
+    {vals.length === 0 ? <span style={{ fontSize: 13, color: 'var(--muted)' }}>Sem dados de evolução ainda.</span> : (
+      <div className="prv-pv" style={{ overflowX: 'auto', maxWidth: '100%' }}>
+        <div style={{ minWidth: chartMin }}>
+          {ev === 'bar' ? (
+            <BarsSvg vals={vals} labels={labels} w={w} h={h} color="var(--brand)" rad={6} />
+          ) : (<>
+            <LineSvg vals={vals} w={w} h={h} color="var(--brand)" fill="var(--chip)" />
+            <div style={{ display: 'flex', marginTop: 6 }}>{labels.map((m, i) => <span key={i} style={{ flex: 1, minWidth: 0, textAlign: 'center', fontSize: 10, color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m}</span>)}</div>
+          </>)}
+        </div>
       </div>
     )}
   </>)
 }
 
 function TabEst({ mobile, data }: { mobile: boolean; data: PerfilData }) {
-  if (mobile) return <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}><EvoCard mobile data={data} /><DiscCard data={data} /></div>
+  const kpis = data.estatKpis && data.estatKpis.length ? <EstatKpiStrip bk={bk} kpis={data.estatKpis} /> : null
+  const voce = data.voceXmedia && data.voceXmedia.length ? <VoceMediaCard bk={bk} rows={data.voceXmedia} /> : null
+  const banca = data.porBanca ? <BancaCard bk={bk} b={data.porBanca} /> : null
+  const ff = data.fortesFracos ? <FortesFracosCard bk={bk} ff={data.fortesFracos} /> : null
+  const rend = data.rendimentoHora ? <RendimentoHoraCard bk={bk} r={data.rendimentoHora} /> : null
+  const tempo = data.tempoPorQuestao ? <TempoQuestaoCard bk={bk} t={data.tempoPorQuestao} /> : null
+  if (mobile) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {kpis}<EvoCard mobile data={data} />{voce}<DiscCard data={data} />{banca}{ff}{rend}{tempo}
+      </div>
+    )
+  }
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.25fr) minmax(0,1fr)', gap: 16, alignItems: 'start' }}>
-      <EvoCard mobile={false} data={data} /><DiscCard data={data} />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {kpis}
+      {voce
+        ? <div className="prv-est"><EvoCard mobile={false} data={data} />{voce}</div>
+        : <EvoCard mobile={false} data={data} />}
+      <div className="prv-est3"><DiscCard data={data} />{banca}{ff}</div>
+      {(rend || tempo) ? <div className="prv-est">{rend}{tempo}</div> : null}
     </div>
   )
 }
 
 const CSS = `
+/* Adapta ao CONTAINER real (Curseduca/sidebar/tablet), não ao viewport: KPIs e conquistas em
+   auto-fill (nunca estouram) e os painéis 2-col colapsam quando aperta. Sem cards cortados. */
+.prv-wrap{container-type:inline-size;overflow-x:clip;max-width:100%}
+/* Cards encolhíveis: sem isso o min-width:auto do card cresce até o conteúdo mais largo (gráfico
+   com rolagem) e estica a coluna p/ fora da tela. Com min-width:0 o scroll do gráfico fica interno. */
+.prv-wrap .card{min-width:0;max-width:100%}
+.prv-est>*,.prv-est3>*,.prv-info3>*{min-width:0}
+.prv-kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,150px),1fr));gap:10px}
+.prv-conq{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,108px),1fr));gap:12px}
+.prv-2col{display:grid;grid-template-columns:1fr 1fr;gap:16px;align-items:start}
+.prv-est{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);gap:16px;align-items:start}
+.prv-info3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;align-items:start}
+.prv-est3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;align-items:start}
+.prv-estk{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,170px),1fr));gap:10px}
+@container (max-width:720px){.prv-2col,.prv-est{grid-template-columns:1fr}}
+@container (max-width:980px){.prv-info3,.prv-est3{grid-template-columns:1fr 1fr}}
+@container (max-width:640px){.prv-info3,.prv-est3{grid-template-columns:1fr}}
 .prv-pv{animation:prvpv .45s cubic-bezier(.22,1,.36,1) both}
 @keyframes prvpv{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .ptab{transition:background .25s,color .25s}
@@ -373,7 +404,7 @@ export function PerfilRevisao({ theme: themeProp, data }: { theme: InternaTheme;
   const mobile = useIsMobile()
   const body = (
     <>
-      <Kpis mobile={mobile} data={data} />
+      <Kpis data={data} />
       <div><Tabs bk={bk} tabs={mobile ? TABS_MOB : TABS} active={pf} onPick={setPf} mobile={mobile} /></div>
       <div className="prv-pv" key={pf}>
         {pf === 'info' && <TabInfo mobile={mobile} data={data} />}
@@ -385,11 +416,11 @@ export function PerfilRevisao({ theme: themeProp, data }: { theme: InternaTheme;
   )
   return (
     <div style={{ ...internaTokensStyle('revisao', theme), ['--r' as any]: `${INTERNA_RADIUS.revisao}px`, minHeight: '100%', background: 'var(--bg)' }}>
-      <style>{CSS}</style>
+      <style>{CSS + PERFIL_BLOCOS_CSS}</style>
       {mobile ? (
-        <div style={{ padding: '20px 18px 28px', display: 'flex', flexDirection: 'column', gap: 20 }}><Header mobile data={data} />{body}</div>
+        <div className="prv-wrap" style={{ padding: '20px 18px 28px', display: 'flex', flexDirection: 'column', gap: 20 }}><Header mobile data={data} />{body}</div>
       ) : (
-        <div><Header mobile={false} data={data} /><div style={{ padding: '24px 32px 48px', display: 'flex', flexDirection: 'column', gap: 20 }}>{body}</div></div>
+        <div><Header mobile={false} data={data} /><div className="prv-wrap" style={{ padding: '24px 32px 48px', display: 'flex', flexDirection: 'column', gap: 20 }}>{body}</div></div>
       )}
     </div>
   )

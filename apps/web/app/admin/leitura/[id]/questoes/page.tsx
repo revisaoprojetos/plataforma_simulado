@@ -10,8 +10,10 @@ import { listarDisciplinasFiltro } from '@/app/admin/banco-questoes/actions'
 
 export const dynamic = 'force-dynamic'
 
-export default async function QuizConteudoPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function QuizConteudoPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ voltar?: string }> }) {
   const { id } = await params
+  const { voltar } = await searchParams
+  const voltarHref = typeof voltar === 'string' && voltar.startsWith('/admin/') ? voltar : null
   if (!(await checkPermission('leitura:view'))) redirect('/admin')
   const access = await getCurrentAccess()
   if (!access.tenantId) redirect('/admin')
@@ -31,7 +33,7 @@ export default async function QuizConteudoPage({ params }: { params: Promise<{ i
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <Link href={d.pasta_id ? `/admin/leitura?pasta=${d.pasta_id}` : '/admin/leitura'} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+        <Link href={voltarHref ?? (d.pasta_id ? `/admin/leitura?pasta=${d.pasta_id}` : '/admin/leitura')} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
           <ArrowLeft className="h-4 w-4" /> Voltar
         </Link>
         <div>

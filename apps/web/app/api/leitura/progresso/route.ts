@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { onLeituraConcluida } from '@/lib/gamificacao'
 import { docAcessivelAluno } from '@/lib/leitura/acesso'
+import { ehTestadorLeituraDoc } from '@/lib/leitura/testadores'
 import { invalidarRankingPorDocumento } from '@/lib/leitura/ranking'
 import { avaliarMedalhasPorDocumento } from '@/lib/leitura/carimbos'
 
@@ -53,8 +54,12 @@ export async function POST(request: NextRequest) {
   )
   if (error) return NextResponse.json({ message: error.message }, { status: 500 })
 
+  // MODO TESTE (acesso exclusivo): conclui a leitura normalmente (p/ liberar o quiz), mas NÃO contabiliza
+  // (sem XP/streak/medalhas/ranking) — só confere a visualização.
+  const testador = await ehTestadorLeituraDoc(svc, sessao.tenantId, sessao.estudanteId, documento_id)
+
   // Gamificação só na PRIMEIRA conclusão (idempotente por documento no ledger de qualquer forma).
-  if (concluiuAgora) {
+  if (concluiuAgora && !testador) {
     void onLeituraConcluida(svc, { tenantId: sessao.tenantId, estudanteId: sessao.estudanteId, documentoId: documento_id })
     // Concluir a leitura muda o desempenho no ranking/pop-up → invalida o cache do módulo na hora.
     void invalidarRankingPorDocumento(svc, sessao.tenantId, documento_id)
