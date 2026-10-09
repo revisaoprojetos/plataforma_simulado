@@ -22,7 +22,10 @@ import { FolhaResposta } from '@/components/prova/folha-resposta'
 import { useAppearance } from '@/lib/brand/use-appearance'
 import { ProvaMeqLive, type ModalProva as ModalProvaMeq } from '@/components/brand/simulado/meq/prova-live'
 import { ProvaRevisaoLive } from '@/components/brand/simulado/revisao/prova-live'
+import { ProvaVndLive } from '@/components/brand/simulado/vnd/prova-live'
 import { RevisaoFinalNova } from '@/components/aluno/revisao-final-nova'
+import { ResultadoVndNova } from '@/components/aluno/resultado-vnd-nova'
+import { ResultadoMeqNova } from '@/components/aluno/resultado-meq-nova'
 import type { SimTheme } from '@/components/brand/simulado/types'
 
 // --- Types ---
@@ -120,8 +123,10 @@ export function ProvaClient({ token, hudInicial, darkInicial = false, internoAti
   const appearance = useAppearance()
   const brand = appearance.brand
   const isMeq = brand === 'meq'
+  // VND usa o SimProva branded (ProvaVndLive) sobre o mesmo motor — como MEQ, SEM gate de internoAtivo.
+  const isVnd = brand === 'vnd'
   // Revisão com o visual interno novo (gate estrito): só então usamos as telas branded de prova/resultado.
-  const isRevisaoNova = !isMeq && brand === 'revisao' && !!internoAtivo
+  const isRevisaoNova = !isMeq && !isVnd && brand === 'revisao' && !!internoAtivo
   // Tema do SimProva: escuro quando dark; senão o tema padrão da marca (MEQ tem claro/azul).
   const simTheme: SimTheme = dark ? 'escuro' : (appearance.defaultTheme === 'azul' ? 'azul' : 'claro')
 
@@ -423,7 +428,7 @@ export function ProvaClient({ token, hudInicial, darkInicial = false, internoAti
   // Tela de carregamento da PLATAFORMA (loader padrão) — usada nas transições do simulado
   // (entrar/gerar prova e enviar/finalizar). Resolve marca/estilo sozinho via /api/public/appearance.
   const telaCarregamento = (mensagem: string) => (
-    <PlatformLoader brand={brand} message={mensagem} theme={dark ? 'dark' : 'light'} />
+    <PlatformLoader brand={brand} style={appearance.loadingStyle} message={mensagem} theme={dark ? 'dark' : 'light'} />
   )
 
   if (status === 'loading') return telaCarregamento('Preparando seu simulado...')
@@ -452,6 +457,31 @@ export function ProvaClient({ token, hudInicial, darkInicial = false, internoAti
     if (isRevisaoNova) {
       return (
         <RevisaoFinalNova
+          sessionToken={sessionToken ?? ''}
+          token={token}
+          inicioUrl="/aluno"
+          theme={simTheme}
+          dark={dark}
+          onToggleDark={toggleDark}
+        />
+      )
+    }
+    // VND / MEQ: resultado branded da marca (mesma fonte de dados do RevisaoFinal).
+    if (isVnd) {
+      return (
+        <ResultadoVndNova
+          sessionToken={sessionToken ?? ''}
+          token={token}
+          inicioUrl="/aluno"
+          theme={simTheme}
+          dark={dark}
+          onToggleDark={toggleDark}
+        />
+      )
+    }
+    if (isMeq) {
+      return (
+        <ResultadoMeqNova
           sessionToken={sessionToken ?? ''}
           token={token}
           inicioUrl="/aluno"
@@ -541,7 +571,7 @@ export function ProvaClient({ token, hudInicial, darkInicial = false, internoAti
   // MEQ não usa este overlay legado (HUD do caderno-designer): o SimProva da marca é
   // renderizado direto abaixo, com sua própria composição. A entrada branded (SimEntrada)
   // é tratada antes, na tela de identificação.
-  if (!iniciado && !isMeq && !isRevisaoNova) {
+  if (!iniciado && !isMeq && !isVnd && !isRevisaoNova) {
     return (
       <div className="relative" style={hudCssVars(efetivarHud(sessao.hudCores, sessao.hudPorPagina, 'prova'), dark) as React.CSSProperties}>
         <div aria-hidden className="pointer-events-none select-none blur-[3px]">{provaHudEl}</div>
@@ -573,6 +603,56 @@ export function ProvaClient({ token, hudInicial, darkInicial = false, internoAti
     const tempoRegressivo = sessao.tempo_limite_min != null
     return (
       <ProvaMeqLive
+        theme={simTheme}
+        titulo={sessao.simuladoTitulo ?? 'Simulado'}
+        logoUrl={sessao.branding?.logoUrl ?? null}
+        banca={questaoAtual.disciplina ?? undefined}
+        questoes={sessao.questoes}
+        qi={questaoIndex + 1}
+        respostas={respostas}
+        marcadas={marcadas}
+        eliminadas={eliminadas}
+        discPaginas={discPaginas}
+        modo={modoFolha ? 'folha' : 'cad'}
+        fz={fzMeq}
+        md={mdMeq}
+        ck={ckMeq}
+        ns={nsMeq}
+        tempoLabel={tempoLabel}
+        timerWarning={timerWarning}
+        tempoRegressivo={tempoRegressivo}
+        isFinalizando={isFinalizando}
+        dark={dark}
+        onSetModo={(m) => setModoFolha(m === 'folha')}
+        onCycleFz={() => setFzMeq((v) => (v + 1) % 3)}
+        onToggleDark={toggleDark}
+        onGoto={(n) => setQuestaoIndex(Math.max(0, Math.min(totalQuestoes - 1, n - 1)))}
+        onResponder={handleResponder}
+        onToggleFlag={(qid) => toggleMarcar(qid)}
+        onToggleEliminar={(qid, altId) => toggleEliminar(qid, altId)}
+        onSetMd={setMdMeq}
+        onSetCk={setCkMeq}
+        onSetNs={setNsMeq}
+        onFinalizar={handleFinalizar}
+        slotDiscursiva={questaoAtual.tipo === 'discursiva' ? (
+          <QuestaoDiscursivaEnvio
+            key={questaoAtual.id}
+            sessaoId={sessao.id}
+            questaoId={questaoAtual.id}
+            bloqueada={!!questaoAtual.bloqueada}
+            onCount={(n) => setDiscPaginas((prev) => ({ ...prev, [questaoAtual.id]: n }))}
+          />
+        ) : undefined}
+      />
+    )
+  }
+
+  // ── VND: ProvaVndLive sobre o mesmo motor (drop-in do ProvaMeqLive, só muda o visual) ──
+  if (isVnd) {
+    const tempoLabel = segundosRestantes !== null ? formatTime(segundosRestantes) : null
+    const tempoRegressivo = sessao.tempo_limite_min != null
+    return (
+      <ProvaVndLive
         theme={simTheme}
         titulo={sessao.simuladoTitulo ?? 'Simulado'}
         banca={questaoAtual.disciplina ?? undefined}

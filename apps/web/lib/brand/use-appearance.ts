@@ -65,6 +65,19 @@ export function primeAppearance(parcial: Partial<Appearance>): Appearance {
 }
 
 /**
+ * Semeia o cache SOBRESCREVENDO (ao contrário de `primeAppearance`, que respeita um cache existente).
+ * Usado no fluxo do simulado, onde a marca vem do TOKEN (não do host): garante que os carregamentos
+ * (fallback de rota, transições do runner, resultado) sigam a marca/estilo do simulado mesmo quando o
+ * host (ex.: admin Revisão) já populou o cache com outra marca. Client-only — no servidor o cache é
+ * global entre requests e não deve ser mutado por render.
+ */
+export function primeAppearanceForce(parcial: Partial<Appearance>): void {
+  if (typeof window === 'undefined') return
+  cache = normalizar(parcial)
+  window.__APPEARANCE__ = cache
+}
+
+/**
  * Lê a aparência JÁ conhecida de forma SÍNCRONA (cache de módulo OU semente global do SSR),
  * sem disparar fetch. `null` quando nada foi semeado ainda. Usada pelo PlatformLoader para
  * resolver a marca no 1º paint e não piscar a marca de outro tenant.

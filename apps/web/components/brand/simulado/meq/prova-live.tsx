@@ -42,6 +42,8 @@ export interface ProvaMeqLiveProps {
   theme: SimTheme
   titulo: string
   banca?: string
+  /** Logo do tenant (white-label) — quando presente substitui a marca genérica no header. */
+  logoUrl?: string | null
   questoes: ProvaLiveQuestao[]
   qi: number // índice 1..N (questão atual)
   respostas: Record<string, string> // questao_id -> alternativa_id
@@ -104,7 +106,8 @@ export function ProvaMeqLive(p: ProvaMeqLiveProps) {
 
       {/* Header sticky */}
       <div className={`${P}-head`} style={{ position: 'sticky', top: 0, zIndex: 20, display: 'flex', alignItems: 'center', gap: 14, height: 72, padding: '0 28px', background: 'var(--surface)', borderBottom: '1px solid var(--line)' }}>
-        <MarcaMeq size={30} />
+        {/* Logo REAL do tenant (white-label); sem logo cai na marca genérica MEQ. */}
+        {p.logoUrl ? <img src={p.logoUrl} alt="" style={{ height: 32, maxWidth: 132, objectFit: 'contain', borderRadius: 6 }} /> : <MarcaMeq size={30} />}
         <div className={`${P}-htit`} style={{ lineHeight: 1.2, minWidth: 0 }}>
           <b style={{ display: 'block', fontSize: 15, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.titulo}</b>
           {p.banca ? <span style={{ fontSize: 12, color: 'var(--muted)' }}>{p.banca}</span> : null}
@@ -374,7 +377,9 @@ function Navegador({ questoes, qi, respostas, discPaginas, marcadas, cAns, cBl, 
         <b style={{ fontSize: 15, color: 'var(--ink)' }}>Navegador</b>
         <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--brand)' }}>{cPct}% feito</span>
       </div>
-      <div className={`${P}-nscroll`} style={{ maxHeight: 420, overflowY: 'auto', paddingRight: 2 }}>
+      {/* margin -6 + padding 6: expande a caixa de recorte do overflow (que corta o anel do "Atual" nas
+          questões das bordas) sem deslocar a grade — o anel de seleção cabe nos 6px e não é mais cortado. */}
+      <div className={`${P}-nscroll`} style={{ maxHeight: 432, overflowY: 'auto', margin: -6, padding: 6 }}>
         <NavGrid questoes={questoes} qi={qi} respostas={respostas} discPaginas={discPaginas} marcadas={marcadas} cols={5} onGo={onGo} />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginTop: 12, fontSize: 11, color: 'var(--muted)' }}>
@@ -414,7 +419,7 @@ function NavGrid({ questoes, qi, respostas, discPaginas, marcadas, cols, onGo }:
         if (answered) { bg = 'var(--nAns)'; color = 'var(--nAnsInk)' }
         if (atual) { bg = 'var(--selDot)'; color = '#fff' }
         return (
-          <button key={q.id} type="button" onClick={() => onGo(n)} style={{ position: 'relative', height: 38, border: 0, borderRadius: 7, background: bg, color, font: 'inherit', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', boxShadow: atual ? '0 0 0 3px var(--surface),0 0 0 5px var(--selDot)' : flagged ? 'inset 0 0 0 2px var(--flag)' : undefined, transition: 'background .2s' }}>
+          <button key={q.id} type="button" onClick={() => onGo(n)} style={{ position: 'relative', zIndex: atual ? 1 : undefined, height: 38, border: 0, borderRadius: 7, background: bg, color, font: 'inherit', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', boxShadow: atual ? '0 0 0 3px var(--surface),0 0 0 5px var(--selDot)' : flagged ? 'inset 0 0 0 2px var(--flag)' : undefined, transition: 'background .2s' }}>
             {n}
             {flagged && !atual ? <span style={{ position: 'absolute', right: 3, top: 3, width: 6, height: 6, borderRadius: '50%', background: 'var(--flag)' }} /> : null}
           </button>

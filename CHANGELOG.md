@@ -12,6 +12,33 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.5.0 — 2026-10-09
+
+- **Fluxo do simulado 100% no designer novo nas 3 marcas (runner + resultado):**
+  - **Runner do VND** novo (`ProvaVndLive`, drop-in do contrato do MEQ) — antes a prova do VND caía no
+    HUD legado roxo do Revisão. Fiação em `prova-client` (`isVnd`, sem gate de `internoAtivo`).
+  - **Resultado** branded ligado aos **dados reais** para **VND** (`resultado-vnd-nova`) e **MEQ**
+    (`resultado-meq-nova`) — antes ambos usavam o `RevisaoFinal` legado (cores roxas). Omissão graciosa
+    de blocos sem fonte real (ranking/turma/histograma) — nada fabricado.
+- **Carregamentos do simulado consistentes** (sem flash do Revisão; sem 2 loaders diferentes ao finalizar):
+  novo `AppearanceSeed` + `primeAppearanceForce` semeiam a marca/estilo do **TOKEN** (não do host);
+  `telaCarregamento` e o loader pós-identificação passam o mesmo `loadingStyle`.
+- **Rota do simulado mais rápida (dev):** `EntradaReal`/`ProvaClient`/`EmbedLoginForm` via `next/dynamic`
+  — a entrada deixa de compilar a árvore inteira do runner (tela "Esperando…" longa no 1º acesso).
+- **MEQ — card da entrada:** "Sempre aberto · sem prazo" quando o simulado não tem janela; **Banca**
+  ocultada; **Itens** com o tipo REAL (múltipla escolha × Certo/Errado, detecção por nº de alternativas =
+  mesma regra do runner `ehCE`); grade responsiva (`auto-fit`). Valores antes eram chumbados.
+- **MEQ — navegador de questões:** o anel da questão selecionada (ex.: a 1) não é mais cortado — `z-index`
+  no botão atual + expansão da caixa de recorte do container de overflow (`margin -6` + `padding 6`).
+- **MEQ — logo real do tenant** (white-label) no header do runner e no lockup da entrada; sem logo cai na
+  marca genérica MEQ. `logoUrl` threaded por `ProvaMeqLiveProps`/`ProvaClient` e `SimEntradaReal`/entrada.
+- **VND — faixa cinza** abaixo do conteúdo das áreas internas (Início/Realizados/Desafios/…): o `<main>`
+  do shell passou a pintar o fundo temático (o `min-height:100%` do conteúdo não resolvia sob `min-h-dvh`).
+- **Home VND:** card **"Sua semana"** some quando o Cronograma está desativado (flag `OCULTAR_CRONOGRAMA`,
+  via `HomeData.cronogramaAtivo`); links **"Relatório"** (→ /aluno/perfil) e **"Ver todos"** (→ /aluno/simulados)
+  agora funcionam (eram links mortos).
+- **Sequência (streak):** anel do dia de **hoje** agora é `ring-inset` — não é mais cortado por containers.
+
 ## 3.4.10 — 2026-10-08
 
 - **Entrada do simulado VND — ajustes de conteúdo:**

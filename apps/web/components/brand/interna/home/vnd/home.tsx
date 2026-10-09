@@ -93,9 +93,9 @@ function CardHead({ icon, title, color, right }: { icon: React.ReactNode; title:
   )
 }
 
-function SecHeaderLink({ label }: { label: string }) {
+function SecHeaderLink({ label, href = '#', onClick }: { label: string; href?: string; onClick?: (e: React.MouseEvent) => void }) {
   return (
-    <a href="#" onClick={(e) => e.preventDefault()} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12.5, fontWeight: 800, color: 'var(--brand)' }}>
+    <a href={href} onClick={onClick ?? ((e) => e.preventDefault())} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12.5, fontWeight: 800, color: 'var(--brand)' }}>
       {label}<ChevronRight size={13} />
     </a>
   )
@@ -115,6 +115,8 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
   const { usuario, sequenciaMeta, missoes, continuar, resumo, desempenho, agenda, destaques, recentes, pastas, outros, outrosDisponiveis } = data
   // Gamificação (config do tenant p/ este aluno). off → esconde nível/XP/sequência/missões/liga.
   const gamOn = data.gamAtivo !== false
+  // Cronograma desativado no tenant (flag) → esconde o card "Sua semana".
+  const cronoOn = data.cronogramaAtivo !== false
   // Texto rotativo "Rumo a …": só cargos REAIS (sem fabricar). O keyframe era fixo p/ 3 itens e
   // quebrava com 1 (no portal real `data.rotativo` não vem → caía no título do nível/vazio). Agora:
   // filtra vazios, gera o keyframe p/ a quantidade EXATA e só anima com ≥2 (senão fica estático).
@@ -415,8 +417,8 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
             )}
           </div>
 
-          {/* Missões · Desempenho · Sua semana */}
-          <div className="up hvn-u3" style={{ display: 'grid', gridTemplateColumns: gamOn ? 'repeat(3,1fr)' : 'repeat(2,1fr)', gap: 18 }}>
+          {/* Missões · Desempenho · Sua semana (colunas = nº de cards visíveis). */}
+          <div className="up hvn-u3" style={{ display: 'grid', gridTemplateColumns: `repeat(${(gamOn ? 1 : 0) + 1 + (cronoOn ? 1 : 0)},1fr)`, gap: 18 }}>
             {gamOn && (
             <div style={CARD}>
               <CardHead icon={<Zap size={16} />} title="Missões de hoje" right={<span style={{ fontSize: 11.5, color: 'var(--muted)' }}>renova à {data.renovaEm}</span>} />
@@ -439,7 +441,7 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
             )}
 
             <div style={CARD}>
-              <CardHead icon={<BarChart3 size={16} />} title="Desempenho por matéria" right={<SecHeaderLink label="Relatório" />} />
+              <CardHead icon={<BarChart3 size={16} />} title="Desempenho por matéria" right={<SecHeaderLink label="Relatório" {...linkReal('/aluno/perfil')} />} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 13 }}>
                 {desempenho.slice(0, 5).map((d, i) => {
                   const baixo = d.pctAcerto < 60
@@ -458,8 +460,9 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
               </div>
             </div>
 
+            {cronoOn && (
             <div style={CARD}>
-              <CardHead icon={<Calendar size={16} />} title="Sua semana" right={<SecHeaderLink label="Cronograma" />} />
+              <CardHead icon={<Calendar size={16} />} title="Sua semana" right={<SecHeaderLink label="Cronograma" {...linkReal('/aluno/cronograma')} />} />
               <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 14, paddingLeft: 18 }}>
                 <span style={{ position: 'absolute', left: 5, top: 6, bottom: 6, width: 2, background: 'var(--line2)', borderRadius: 2 }} />
                 {agenda.map((a, i) => (
@@ -472,13 +475,14 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
                 ))}
               </div>
             </div>
+            )}
           </div>
 
           {/* Simulados recentes */}
           <section className="up hvn-u4">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
               <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, letterSpacing: '-0.03em' }}>Simulados recentes</h3>
-              <SecHeaderLink label="Ver todos" />
+              <SecHeaderLink label="Ver todos" {...linkReal('/aluno/simulados')} />
             </div>
             <div className="hvn-grid4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
               {recentes.map((s, i) => <RecenteCard key={s.id} s={s} grad={COVER_BG[i % COVER_BG.length]} />)}
@@ -711,7 +715,7 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
         <section>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, letterSpacing: '-0.03em' }}>Simulados recentes</h3>
-            <SecHeaderLink label="Ver todos" />
+            <SecHeaderLink label="Ver todos" {...linkReal('/aluno/simulados')} />
           </div>
           <div className="hvn-hs" style={{ display: 'flex', gap: 14, overflowX: 'auto', margin: '0 -18px', padding: '0 18px' }}>
             {recentes.map((s, i) => (

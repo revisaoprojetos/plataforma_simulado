@@ -1,14 +1,20 @@
+import dynamic from 'next/dynamic'
 import { resolveTemaDark } from '@/lib/hud/resolve-dark'
 import { createAdminClient } from '@/lib/supabase/server'
 import { resolverHudConfig } from '@/lib/hud/resolve-hud'
 import { HUD_CORES_PADRAO, type HudCores, type HudPorPagina } from '@/lib/caderno-designer/types'
-import { EmbedLoginForm } from '@/components/embed/embed-login-form'
 import { AlertCircle } from 'lucide-react'
-import { ProvaClient } from './prova-client'
 import { FontScaleInit } from '@/components/font-scale-init'
 import { lerAparenciaAuth } from '@/lib/brand/aparencia-auth'
-import { EntradaReal } from '@/components/brand/simulado/meq/entrada-real'
+import { AppearanceSeed } from '@/components/brand/appearance-seed'
 import type { SimTheme, TipoResposta } from '@/components/brand/simulado/types'
+
+// Code-split por ROTA de uso: a entrada (sem ?st=) não precisa compilar/baixar o runner (ProvaClient
+// puxa os 3 runners + resultados + folha + HUD), e o runner (com ?st=) não precisa da entrada. Em dev
+// isso evita compilar a árvore inteira só para mostrar o login do simulado (tela "Esperando…" longa).
+const EntradaReal = dynamic(() => import('@/components/brand/simulado/meq/entrada-real').then((m) => m.EntradaReal))
+const ProvaClient = dynamic(() => import('./prova-client').then((m) => m.ProvaClient))
+const EmbedLoginForm = dynamic(() => import('@/components/embed/embed-login-form').then((m) => m.EmbedLoginForm))
 
 // Página cheia da prova (acesso pelo portal do aluno ou por link direto).
 // - Sem `?st=`: mostra a tela de identificação (branded) que, ao validar, redireciona
@@ -47,10 +53,13 @@ export default async function ProvaPage({ params, searchParams }: { params: Prom
       const info = await fetchInfoProva(sim.id, sim.tenant_id)
       return (
         <>
+          <AppearanceSeed appearance={branding!.aparencia} />
           <FontScaleInit scope={`aluno:${token}`} />
           <EntradaReal
             token={token}
             brand={branding!.brand}
+            loadingStyle={branding!.aparencia.loadingStyle}
+            logoUrl={branding!.logoUrl}
             metodo={metodo}
             temaInicial={dark ? 'escuro' : branding!.temaInicial}
             plataforma={branding!.nome}
@@ -93,6 +102,9 @@ export default async function ProvaPage({ params, searchParams }: { params: Prom
     : null
   return (
     <>
+      {/* Semeia a marca/estilo do TOKEN p/ os loaders (fallback de rota, transições, resultado) não
+          piscarem a marca do host. */}
+      {branding ? <AppearanceSeed appearance={branding.aparencia} /> : null}
       {/* Anti-flash: aplica a escala de fonte salva (por token do simulado) antes do 1º paint. */}
       <FontScaleInit scope={`aluno:${token}`} />
       <ProvaClient token={token} hudInicial={{ base, porPagina, branding: brandingSimples }} darkInicial={dark} internoAtivo={branding?.brand === 'revisao' && !!branding?.internoAtivo} />
@@ -149,6 +161,8 @@ async function fetchBranding(tenantId: string) {
       brand: ap.brand,
       internoAtivo: ap.internoAtivo,
       temaInicial,
+      // Aparência COMPLETA (marca + estilos de login/carregamento) p/ semear os loaders pela marca do TOKEN.
+      aparencia: ap,
       logoUrl: (tema.logo_url ?? null) as string | null,
       logoGrandeUrl: (tema.logo_grande_url ?? null) as string | null,
       logoBg: (tema.logo_png_bg ?? '#ffffff') as string,
@@ -168,13 +182,20 @@ async function fetchInfoProva(simuladoId: string, tenantId: string): Promise<{ n
       svc.from('simulado_prova_questoes').select('questao_id').eq('simulado_id', simuladoId).eq('tenant_id', tenantId).limit(30),
       svc.from('simulado_simulados').select('regras, embed_ativo').eq('id', simuladoId).maybeSingle(),
     ])
-    // Tipo: amostra os tipos das questões vinculadas; se a maioria é 'ce', trata como Certo/Errado.
+    // Tipo: CE = questão objetiva com EXATAMENTE 2 alternativas (Certo/Errado) — MESMA regra do runner
+    // (ehCE). O tipo-string das questões não distingue CE de A–E, então contamos as alternativas.
     let tipo: TipoResposta = 'ABCDE'
     const ids = ((amostra.data ?? []) as any[]).map((r) => r.questao_id)
     if (ids.length) {
-      const { data: qs } = await svc.from('simulado_questoes').select('tipo').in('id', ids)
-      const ce = ((qs ?? []) as any[]).filter((q) => String(q.tipo ?? '').toLowerCase().includes('ce') || String(q.tipo ?? '').toLowerCase().includes('certo')).length
-      if (ce > ids.length / 2) tipo = 'CE'
+      const { data: qs } = await svc.from('simulado_questoes').select('id, tipo').in('id', ids)
+      const objIds = ((qs ?? []) as any[]).filter((q) => q.tipo !== 'discursiva').map((q) => q.id)
+      if (objIds.length) {
+        const { data: alts } = await svc.from('simulado_alternativas').select('questao_id').in('questao_id', objIds)
+        const nAlt = new Map<string, number>()
+        for (const a of ((alts ?? []) as any[])) nAlt.set(a.questao_id, (nAlt.get(a.questao_id) ?? 0) + 1)
+        const ce = objIds.filter((id) => (nAlt.get(id) ?? 0) === 2).length
+        if (ce > objIds.length / 2) tipo = 'CE'
+      }
     }
     const regras = ((simRow.data as any)?.regras ?? {}) as Record<string, unknown>
     // Folha de respostas: por padrão permitida; desligada por regra explícita.

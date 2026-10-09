@@ -49,7 +49,7 @@ export function StreakCalendario({ dias, streak, feitoHoje = false, chestXp = 0,
           return (
             <div key={d.dia} className="flex flex-1 flex-col items-center gap-1.5">
               <span className={`text-[10px] font-medium uppercase ${d.hoje ? 'text-foreground' : 'text-muted-foreground'}`}>{d.label}</span>
-              <span className={`flex h-9 w-9 items-center justify-center rounded-full border ${aceso ? 'border-orange-500 bg-gradient-to-b from-amber-400 to-orange-500 text-white shadow-[0_0_10px_rgba(249,115,22,0.45)]' : 'bg-muted text-muted-foreground/40'} ${d.hoje ? 'ring-2 ring-primary/40' : ''}`}>
+              <span className={`flex h-9 w-9 items-center justify-center rounded-full border ${aceso ? 'border-orange-500 bg-gradient-to-b from-amber-400 to-orange-500 text-white shadow-[0_0_10px_rgba(249,115,22,0.45)]' : 'bg-muted text-muted-foreground/40'} ${d.hoje ? 'ring-2 ring-inset ring-primary/60' : ''}`}>
                 <Flame className="h-4 w-4" fill={aceso ? 'currentColor' : 'none'} style={aceso ? { animation: `streak-flame 1.8s ease-in-out ${i * 0.15}s infinite` } : undefined} />
               </span>
             </div>

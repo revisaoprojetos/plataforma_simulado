@@ -34,8 +34,10 @@ export function montarHomeData(args: {
   brand?: string
   /** Gamificação ligada p/ este aluno (false → home esconde XP/nível/sequência/missões/liga). */
   gamAtivo?: boolean
+  /** Cronograma ativo no tenant (false → home esconde o card "Sua semana"). */
+  cronogramaAtivo?: boolean
 }): HomeData {
-  const { nomeCompleto, gamResumo, gamMissoes, gamSemana, recentes, grupos, progresso, destaquesReais, feitos, questoesResolvidas, taxaAcerto, chest, posicaoLiga, rotativo, gamAtivo, brand } = args
+  const { nomeCompleto, gamResumo, gamMissoes, gamSemana, recentes, grupos, progresso, destaquesReais, feitos, questoesResolvidas, taxaAcerto, chest, posicaoLiga, rotativo, gamAtivo, cronogramaAtivo, brand } = args
   const rotativoLimpo = (rotativo ?? []).map((r) => (r ?? '').trim()).filter(Boolean)
   const primeiro = (nomeCompleto || 'Aluno').split(' ')[0]
   const prog = gamResumo?.progresso ?? null
@@ -105,6 +107,7 @@ export function montarHomeData(args: {
   return {
     ...(rotativoLimpo.length ? { rotativo: rotativoLimpo } : {}),
     gamAtivo: gamAtivo !== false,
+    cronogramaAtivo: cronogramaAtivo !== false,
     usuario: {
       nome: primeiro,
       iniciais: iniciaisDe(nomeCompleto),

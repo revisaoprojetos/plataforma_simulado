@@ -5,6 +5,7 @@ import { BookOpen } from 'lucide-react'
 import { resolverHudConfig } from '@/lib/hud/resolve-hud'
 import { lerAparenciaAuth } from '@/lib/brand/aparencia-auth'
 import { EntradaReal } from '@/components/brand/simulado/meq/entrada-real'
+import { AppearanceSeed } from '@/components/brand/appearance-seed'
 import { FontScaleInit } from '@/components/font-scale-init'
 import type { SimTheme, TipoResposta } from '@/components/brand/simulado/types'
 import type { Metadata } from 'next'
@@ -66,6 +67,8 @@ const fetchBranding = cache(async (tenantId: string) => {
       brand: ap.brand,
       internoAtivo: ap.internoAtivo,
       temaInicial,
+      // Aparência COMPLETA p/ semear os loaders pela marca do TOKEN (não a do host).
+      aparencia: ap,
       logoUrl: (tema.logo_url ?? null) as string | null,
       logoGrandeUrl: (tema.logo_grande_url ?? null) as string | null,
       logoBg: (tema.logo_png_bg ?? '#ffffff') as string,
@@ -85,12 +88,19 @@ async function fetchInfoProva(simuladoId: string, tenantId: string): Promise<{ n
       svc.from('simulado_prova_questoes').select('questao_id').eq('simulado_id', simuladoId).eq('tenant_id', tenantId).limit(30),
       svc.from('simulado_simulados').select('regras, embed_ativo').eq('id', simuladoId).maybeSingle(),
     ])
+    // CE = questão objetiva com EXATAMENTE 2 alternativas (Certo/Errado) — mesma regra do runner (ehCE).
     let tipo: TipoResposta = 'ABCDE'
     const ids = ((amostra.data ?? []) as any[]).map((r) => r.questao_id)
     if (ids.length) {
-      const { data: qs } = await svc.from('simulado_questoes').select('tipo').in('id', ids)
-      const ce = ((qs ?? []) as any[]).filter((q) => String(q.tipo ?? '').toLowerCase().includes('ce') || String(q.tipo ?? '').toLowerCase().includes('certo')).length
-      if (ce > ids.length / 2) tipo = 'CE'
+      const { data: qs } = await svc.from('simulado_questoes').select('id, tipo').in('id', ids)
+      const objIds = ((qs ?? []) as any[]).filter((q) => q.tipo !== 'discursiva').map((q) => q.id)
+      if (objIds.length) {
+        const { data: alts } = await svc.from('simulado_alternativas').select('questao_id').in('questao_id', objIds)
+        const nAlt = new Map<string, number>()
+        for (const a of ((alts ?? []) as any[])) nAlt.set(a.questao_id, (nAlt.get(a.questao_id) ?? 0) + 1)
+        const ce = objIds.filter((id) => (nAlt.get(id) ?? 0) === 2).length
+        if (ce > objIds.length / 2) tipo = 'CE'
+      }
     }
     const regras = ((simRow.data as any)?.regras ?? {}) as Record<string, unknown>
     const permiteFolha = regras.permite_folha !== false && regras.folha_ativa !== false
@@ -133,10 +143,13 @@ export default async function AlunoLoginPage({ searchParams }: PageProps) {
     const info = await fetchInfoProva(simulado.id, simulado.tenant_id)
     return (
       <>
+        <AppearanceSeed appearance={branding.aparencia} />
         <FontScaleInit scope={`aluno:${token}`} />
         <EntradaReal
           token={token}
           brand={branding.brand}
+          loadingStyle={branding.aparencia.loadingStyle}
+          logoUrl={branding.logoUrl}
           metodo={metodo}
           temaInicial={dark ? 'escuro' : branding.temaInicial}
           plataforma={branding.nome}

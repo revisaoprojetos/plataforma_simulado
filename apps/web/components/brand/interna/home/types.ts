@@ -151,6 +151,8 @@ export interface HomeData {
   rotativo?: string[]
   /** Gamificação ligada p/ este aluno? false = esconde XP/nível/sequência/missões/liga na home. Default: true. */
   gamAtivo?: boolean
+  /** Cronograma ativo no tenant? false = esconde o card "Sua semana" (flag OCULTAR_CRONOGRAMA). Default: true. */
+  cronogramaAtivo?: boolean
 }
 
 export interface HomeScreenProps {

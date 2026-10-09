@@ -73,9 +73,9 @@ export function Entrada({ theme, data, es = 'aberto', mo = 'cad', real }: { them
           </button>
         </div>
 
-        {/* Lockup central */}
+        {/* Lockup central — logo REAL do tenant (white-label); sem logo cai na marca genérica MEQ. */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, marginBottom: 18 }}>
-          <MarcaMeq size={46} />
+          {real?.logoUrl ? <img src={real.logoUrl} alt="" style={{ height: 52, maxWidth: 200, objectFit: 'contain' }} /> : <MarcaMeq size={46} />}
         </div>
 
         {/* Cabeçalho navy (caderno de prova) */}
@@ -90,11 +90,19 @@ export function Entrada({ theme, data, es = 'aberto', mo = 'cad', real }: { them
 
           {/* Tabela de 5 células */}
           <div className={`${P}-tbl`} style={{ marginTop: 18, display: 'grid', borderTop: '1px solid rgba(255,255,255,.14)', borderLeft: '1px solid rgba(255,255,255,.14)', borderRadius: 8, overflow: 'hidden' }}>
-            <Cell label="Data" value={`${iniLabel.data} · ${iniLabel.hora}`} />
-            <Cell label="Encerra" value={`${fimLabel.data} · ${fimLabel.hora}`} />
+            {info.semJanela ? (
+              // Sem janela (sem data de início/fim) → não mostra Data/Encerra; indica "sempre aberto".
+              <Cell label="Disponibilidade" value="Sempre aberto · sem prazo" />
+            ) : (
+              <>
+                <Cell label="Data" value={`${iniLabel.data} · ${iniLabel.hora}`} />
+                <Cell label="Encerra" value={`${fimLabel.data} · ${fimLabel.hora}`} />
+              </>
+            )}
             <Cell label="Duração" value={dur} />
-            <Cell label="Itens" value={`${info.n} · Certo/Errado`} />
-            <Cell label="Banca" value="Padrão Cebraspe" cls={`${P}-tbl-banca`} />
+            {/* Tipo REAL das questões (não chumbado): múltipla escolha (A–E) ou Certo/Errado (Cebraspe). */}
+            <Cell label="Itens" value={`${info.n} · ${info.tipo === 'CE' ? 'Certo/Errado' : 'Múltipla escolha'}`} />
+            {/* Banca: ocultada por enquanto (a pedido) — era um valor chumbado "Padrão Cebraspe". */}
           </div>
         </div>
 
@@ -488,10 +496,8 @@ function css() {
 ${baseKeyframes(P)}
 @keyframes ${P}spin{to{transform:rotate(360deg)}}
 @media (prefers-reduced-motion:reduce){svg[style*="${P}spin"]{animation-duration:1.4s!important}}
-.${P}-tbl{grid-template-columns:repeat(5,minmax(0,1fr))}
+.${P}-tbl{grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}
 @media (max-width:640px){
-  .${P}-tbl{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .${P}-tbl-banca{grid-column:1 / -1}
   .${P}-modal{left:12px!important;right:12px!important;bottom:12px!important;top:auto!important;width:auto!important;max-width:none!important;transform:none!important;border-radius:22px}
   .${P}-modal.${P}-mpop{animation-name:${P}msh}
 }`

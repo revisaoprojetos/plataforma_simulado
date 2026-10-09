@@ -25,6 +25,10 @@ export interface EntradaRealProps {
   metodo: MetodoIdentificacao
   /** tema inicial resolvido no servidor (claro/azul = default do tenant; escuro = dark). */
   temaInicial: SimTheme
+  /** slug do estilo de carregamento do tenant (p/ o loader pós-identificação casar com os demais). */
+  loadingStyle?: string
+  /** logo REAL do tenant (white-label) — exibida no cabeçalho da entrada no lugar da marca genérica. */
+  logoUrl?: string | null
   /** nome da plataforma (ex.: "MEQ Concursos") para a linha de identificação. */
   plataforma: string
   /** e-mail já logado no portal (read-only/pré-preenchido). */
@@ -197,6 +201,7 @@ export function EntradaReal(props: EntradaRealProps) {
     return (
       <PlatformLoader
         brand={brand}
+        style={props.loadingStyle}
         theme={theme}
         message={ultimoModo.current === 'resultado' ? 'Abrindo seus resultados…' : 'Preparando seu simulado…'}
       />
@@ -237,7 +242,7 @@ export function EntradaReal(props: EntradaRealProps) {
   const real: SimEntradaReal = {
     metodo, email, setEmail, cpf, setCpf, telefone, setTelefone,
     onIdentificar, onValidar, carregando, erro, voltarHref: '/aluno', onToggleTheme: toggleDark,
-    plataforma, permiteFolha: prova.permiteFolha,
+    plataforma, logoUrl: props.logoUrl ?? null, permiteFolha: prova.permiteFolha,
   }
 
   return <PlatformSimulado brand={brand} tela="entrada" theme={theme} data={data} es={es} real={real} />

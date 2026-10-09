@@ -157,6 +157,8 @@ export interface SimEntradaReal {
   onToggleTheme?: () => void
   /** Nome da plataforma para a linha "cadastrado na plataforma do …". */
   plataforma: string
+  /** Logo REAL do tenant (white-label) — quando presente substitui a marca genérica no cabeçalho. */
+  logoUrl?: string | null
   /** Simulado permite abrir só a folha de respostas? */
   permiteFolha: boolean
 }

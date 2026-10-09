@@ -675,7 +675,11 @@ export function ShellVND({ nav, usuario, children }: AlunoShellProps) {
       </header>
 
       {/* ───── Conteúdo ───── */}
-      <main className={cn('flex-1', ehAreaNova ? 'pb-[90px] lg:pb-0' : 'px-4 pb-[100px] pt-4 lg:px-6 lg:pb-8 lg:pt-6')}>{children}</main>
+      {/* O <main> (flex-1) já preenche a viewport; o conteúdo interno fica top-aligned e, como o root usa
+          min-h-dvh (min-height, não height), o `min-height:100%` do conteúdo NÃO resolve → sobraria a faixa
+          cinza do fundo do shell (var(--bg)) abaixo dele. Solução: pintar o <main> com o MESMO fundo das
+          telas internas (simVars vnd claro/escuro) via dark: — assim não há emenda/faixa em área nenhuma. */}
+      <main className={cn('flex-1', ehAreaNova ? 'bg-[#F5F8F6] pb-[90px] dark:bg-[#061009] lg:pb-0' : 'px-4 pb-[100px] pt-4 lg:px-6 lg:pb-8 lg:pt-6')}>{children}</main>
 
       {/* ───── Tab bar + folha Menu (mobile) ───── */}
       <TabBar nav={nav} onAbrirMenu={() => setFolhaMenu(true)} />

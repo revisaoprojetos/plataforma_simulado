@@ -34,6 +34,7 @@ import { PlatformHome } from '@/components/brand/interna/home'
 import { PlatformPasta } from '@/components/brand/interna/pasta'
 import { resolverInterno } from '@/lib/aluno/interno-gate'
 import { montarHomeData } from '@/lib/aluno/home-nova'
+import { OCULTAR_CRONOGRAMA } from '@/lib/flags'
 import type { InternaTheme } from '@/components/brand/interna/interna-tokens'
 import type { HomeDestaque } from '@/components/brand/interna/home/types'
 
@@ -457,6 +458,8 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
       chest,
       posicaoLiga,
       gamAtivo,
+      // Cronograma desativado globalmente (flag) → esconde o card "Sua semana" na home.
+      cronogramaAtivo: !OCULTAR_CRONOGRAMA,
       // Cargos/áreas do "Rumo a …" (rotativo): configurável por tenant. Sem config = estático.
       rotativo: Array.isArray((tenantRow?.tema as any)?.hero_rotativo) ? (tenantRow?.tema as any).hero_rotativo : undefined,
       // Marca → slide de boas-vindas (Revisão=redesign; VND/MEQ=plataforma nova).
