@@ -125,7 +125,16 @@ export function Gota({ ativo }: { ativo?: boolean }) {
 }
 
 /** Capa MEQ: gradiente azul + circuito no canto + 3 barrinhas ciano + rótulo. */
-export function Capa({ rotulo, grad = 'linear-gradient(150deg,#1F2A55,#306AB5)', radius = 10, fs = 13 }: { rotulo: string; grad?: string; radius?: number; fs?: number }) {
+export function Capa({ rotulo, grad = 'linear-gradient(150deg,#1F2A55,#306AB5)', radius = 10, fs = 13, src }: { rotulo: string; grad?: string; radius?: number; fs?: number; src?: string | null }) {
+  // Com imagem REAL do simulado/pasta: a capa preenche o tile (object-cover) + leve escurecimento no
+  // rodapé p/ legibilidade do rótulo. Sem imagem: mantém o visual "circuito" com gradiente.
+  if (src) {
+    return (
+      <div className="hmq-cov" style={{ position: 'relative', overflow: 'hidden', width: '100%', height: '100%', borderRadius: radius, background: grad }}>
+        <img src={src} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+    )
+  }
   return (
     <div
       className="hmq-cov"

@@ -55,7 +55,15 @@ function dotsOverlay(size = 14, op = 0.22) {
 }
 
 /** Capa de simulado/pasta reutilizável (gradiente verde + marca V + rótulo). */
-function Cover({ rotulo, sub, grad, big = 28 }: { rotulo: string; sub: string; grad: string; big?: number }) {
+function Cover({ rotulo, sub, grad, big = 28, src }: { rotulo: string; sub: string; grad: string; big?: number; src?: string | null }) {
+  // Com imagem REAL do simulado/pasta: preenche o tile (object-cover). Sem imagem: visual VND com gradiente.
+  if (src) {
+    return (
+      <div className="hvn-cov" style={{ position: 'relative', overflow: 'hidden', width: '100%', height: '100%', background: `linear-gradient(140deg,${grad})` }}>
+        <img src={src} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+      </div>
+    )
+  }
   return (
     <div
       className="hvn-cov"
@@ -331,7 +339,7 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
               <div style={CARD}>
                 <div style={{ display: 'flex', gap: 18, alignItems: 'stretch' }}>
                   <div style={{ width: 150, borderRadius: 18, overflow: 'hidden', flexShrink: 0 }}>
-                    <Cover rotulo={continuar.capa.rotulo} sub={continuar.capa.sub} grad="#0B3340,#1C7A8C" big={26} />
+                    <Cover rotulo={continuar.capa.rotulo} sub={continuar.capa.sub} grad="#0B3340,#1C7A8C" big={26} src={continuar.capa.capa} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
@@ -505,7 +513,7 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
             <div className="hvn-grid4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
               {pastasFilt.map((p, i) => (
                 <a key={p.id} {...(preview ? { href: '#', onClick: onClickSafe } : { href: `/aluno?pasta=${encodeURIComponent(p.id)}` })} className="hvn-lift" style={{ display: 'flex', flexDirection: 'column', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 22, overflow: 'hidden' }}>
-                  <div style={{ height: 120 }}><Cover rotulo={p.rotuloCapa} sub={p.subCapa} grad={COVER_BG[i % COVER_BG.length]} big={26} /></div>
+                  <div style={{ height: 120 }}><Cover rotulo={p.rotuloCapa} sub={p.subCapa} grad={COVER_BG[i % COVER_BG.length]} big={26} src={p.capa} /></div>
                   <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                     <div style={{ minWidth: 0 }}>
                       <b style={{ display: 'block', fontSize: 13.5, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.nome}</b>
@@ -730,7 +738,7 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 12 }}>
             {pastas.map((p, i) => (
               <a key={p.id} href="#" onClick={onClickSafe} className="hvn-lift" style={{ display: 'flex', flexDirection: 'column', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 20, overflow: 'hidden' }}>
-                <div style={{ height: 96 }}><Cover rotulo={p.rotuloCapa} sub={p.subCapa} grad={COVER_BG[i % COVER_BG.length]} big={22} /></div>
+                <div style={{ height: 96 }}><Cover rotulo={p.rotuloCapa} sub={p.subCapa} grad={COVER_BG[i % COVER_BG.length]} big={22} src={p.capa} /></div>
                 <div style={{ padding: '10px 12px' }}>
                   <b style={{ display: 'block', fontSize: 12.5, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.nome}</b>
                   <span style={{ fontSize: 11, color: 'var(--muted)' }}>{p.qtdSimulados} simulados</span>
@@ -749,7 +757,7 @@ function RecenteCard({ s, grad }: { s: HomeData['recentes'][number]; grad: strin
   const emAndamento = s.status === 'Em andamento'
   return (
     <div className="hvn-lift" style={{ display: 'flex', flexDirection: 'column', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 22, overflow: 'hidden', height: '100%' }}>
-      <div style={{ height: 120 }}><Cover rotulo={s.capa.rotulo} sub={s.capa.sub || 'SIMULADO'} grad={grad} /></div>
+      <div style={{ height: 120 }}><Cover rotulo={s.capa.rotulo} sub={s.capa.sub || 'SIMULADO'} grad={grad} src={s.capa.capa} /></div>
       <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
         <div>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--muted)' }}><Clock size={12} />{s.status} · {s.tipo}</span>

@@ -82,7 +82,7 @@ function CardAndamento({ it }: { it: RlzEmAndamento }) {
   return (
     <Link href={it.continuarHref} className="rlzmq-card" style={{ display: 'block', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 16, padding: 16, boxShadow: 'var(--shadow)', color: 'inherit', textDecoration: 'none' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <div style={{ width: 52, height: 52, borderRadius: 10, overflow: 'hidden', flexShrink: 0 }}><CoverMeq titulo={it.capa.rotulo} grad={gradOf(it.capa)} img={it.capa.capa} /></div>
+        <div style={{ width: 104, height: 76, borderRadius: 12, overflow: 'hidden', flexShrink: 0 }}><CoverMeq titulo={it.capa.rotulo} grad={gradOf(it.capa)} img={it.capa.capa} /></div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <b style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.titulo}</b>
           {it.banca ? <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{it.banca}</span> : null}
@@ -110,7 +110,7 @@ function TabelaConcluidos({ mobile, itens }: { mobile: boolean; itens: RlzConclu
           const [c] = nota != null ? notec(nota) : ['var(--muted)']
           return (
             <Link key={it.id} href={it.href} className="rlzmq-row" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderTop: k ? '1px solid var(--line)' : undefined, color: 'inherit', textDecoration: 'none' }}>
-              <div style={{ width: 46, height: 46, borderRadius: 10, overflow: 'hidden', flexShrink: 0 }}><CoverMeq titulo={it.capa.rotulo} grad={gradOf(it.capa)} img={it.capa.capa} big={11} /></div>
+              <div style={{ width: 104, height: 72, borderRadius: 12, overflow: 'hidden', flexShrink: 0 }}><CoverMeq titulo={it.capa.rotulo} grad={gradOf(it.capa)} img={it.capa.capa} big={12} /></div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <b style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.titulo}</b>
                 <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{it.banca ? `${it.banca} · ` : ''}{it.data}</span>
@@ -138,7 +138,7 @@ function TabelaConcluidos({ mobile, itens }: { mobile: boolean; itens: RlzConclu
         return (
           <div key={it.id} className="rlzmq-row" style={{ display: 'grid', gridTemplateColumns: cols, gap: 16, alignItems: 'center', padding: '12px 10px', borderTop: '1px solid var(--line)' }}>
             <Link href={it.href} style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, color: 'inherit', textDecoration: 'none' }}>
-              <div style={{ width: 44, height: 44, borderRadius: 10, overflow: 'hidden', flexShrink: 0 }}><CoverMeq titulo={it.capa.rotulo} grad={gradOf(it.capa)} img={it.capa.capa} big={11} /></div>
+              <div style={{ width: 104, height: 72, borderRadius: 12, overflow: 'hidden', flexShrink: 0 }}><CoverMeq titulo={it.capa.rotulo} grad={gradOf(it.capa)} img={it.capa.capa} big={12} /></div>
               <div style={{ minWidth: 0 }}>
                 <b style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.titulo}</b>
                 {it.area ? <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{it.area}</span> : null}
@@ -150,7 +150,7 @@ function TabelaConcluidos({ mobile, itens }: { mobile: boolean; itens: RlzConclu
               ? <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}><div style={{ flex: 1 }}><Segs n={10} lit={Math.round(nota / 10)} h={6} on={c} gap={2} rad={2} /></div><b style={{ width: 38, textAlign: 'right', fontSize: 13, color: c }}>{fnum(nota)}</b></div>
               : <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>Nota em breve</span>}
             <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-              <ActCta href={it.correcaoHref} icon="chart" label="Correção" />
+              <ActCta href={it.correcaoHref} icon="chart" label="Resultado" />
               <ActIcon href={it.refazerHref} icon="play" label="Refazer" />
               <ActIcon href={it.baixarHref ?? it.href} icon="dl" label="Baixar caderno" />
             </div>

@@ -4,6 +4,7 @@ import { getSessaoAluno } from '@/lib/aluno-session'
 import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
 import { resolverPastasArvore } from '@/lib/aluno/grupos-catalogo'
+import { resolverBancasSimulados } from '@/lib/aluno/banca-simulado'
 import { resolverCardView } from '@/lib/card-view'
 import { MeusSimuladosCatalogo } from '@/components/aluno/meus-simulados-catalogo'
 import { resolverInterno } from '@/lib/aluno/interno-gate'
@@ -124,6 +125,8 @@ export default async function MeusSimuladosPage() {
       .select('id, titulo, status')
       .eq('owner_estudante_id', estId).eq('tenant_id', sessao.tenantId).eq('deletado', false)
       .order('created_at', { ascending: false })
+    // Banca PREDOMINANTE (via questões) — coluna "Banca" da tabela de realizados.
+    const bancaPorSim = await resolverBancasSimulados(svc, sessao.tenantId, [...concluidos, ...emAndamentoItens].map((s: any) => s.id))
     const data: RealizadosData = {
       stats: {
         feitos,
@@ -135,8 +138,8 @@ export default async function MeusSimuladosPage() {
         pctConcluidos: feitos > 0 ? Math.round((concluidos.length / feitos) * 100) : null,
         melhorNotaOrigem,
       },
-      emAndamento: emAndamentoItens.map((s: any) => ({ id: s.id, titulo: s.titulo, capa: svis(s), area: areaDe(s), ...progDe(s), continuarHref: `/aluno/simulados/${s.id}` })),
-      concluidos: concluidos.map((s: any) => ({ id: s.id, titulo: s.titulo, capa: svis(s), area: areaDe(s), data: dm(s.ultimo ?? s.created_at), nota: s.melhor, notaLiberada: s.notaLiberada, href: `/aluno/simulados/${s.id}`, correcaoHref: `/aluno/simulados/${s.id}`, refazerHref: `/aluno/simulados/${s.id}`, baixarHref: `/aluno/simulados/${s.id}` })),
+      emAndamento: emAndamentoItens.map((s: any) => ({ id: s.id, titulo: s.titulo, capa: svis(s), area: areaDe(s), banca: bancaPorSim.get(s.id), ...progDe(s), continuarHref: `/aluno/simulados/${s.id}` })),
+      concluidos: concluidos.map((s: any) => ({ id: s.id, titulo: s.titulo, capa: svis(s), area: areaDe(s), banca: bancaPorSim.get(s.id), data: dm(s.ultimo ?? s.created_at), nota: s.melhor, notaLiberada: s.notaLiberada, href: `/aluno/simulados/${s.id}`, correcaoHref: `/aluno/simulados/${s.id}`, refazerHref: `/aluno/simulados/${s.id}`, baixarHref: `/aluno/simulados/${s.id}` })),
       personalizados: {
         criarHref: '/aluno/simulados/personalizados/novo',
         itens: ((persRows ?? []) as any[]).map((p) => ({ id: p.id, nome: p.titulo, status: p.status === 'rascunho' ? 'rascunho' as const : 'concluido' as const, href: `/aluno/simulados/personalizados/${p.id}`, refazerHref: `/aluno/simulados/personalizados/${p.id}`, editarHref: `/aluno/simulados/personalizados/${p.id}`, baixarHref: `/aluno/simulados/personalizados/${p.id}` })),

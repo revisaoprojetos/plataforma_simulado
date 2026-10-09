@@ -12,6 +12,31 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.7.2 — 2026-10-09
+
+Refinamentos da área do aluno (visual interno), foco MEQ.
+
+- **Capa real dos simulados:** o componente de capa da home MEQ (`Capa`) e do VND (`Cover`) não tinham
+  suporte a imagem — só gradiente+texto. Agora renderizam a imagem real do banco (`vis.capa`) em
+  recentes, pastas, continuar e "outros"; sem imagem, caem no gradiente.
+- **Recentes sem os já feitos:** simulados concluídos saem de "Simulados recentes" (vão p/ Realizados);
+  mantém os em andamento. Antes um feito recém-publicado poluía os recentes por 7 dias.
+- **Pastas do admin na Início:** quando os simulados estão organizados por PASTA DE SIMULADO (pasta_id) e
+  não por banco→pasta-pai, a Início agora lista essas pastas (antes a seção ficava vazia). Clicar abre a
+  pasta (casa por `pasta_id`). Removida a aba "todas" duplicada.
+- **Banca nos cards:** nova resolução da banca PREDOMINANTE via questões (`lib/aluno/banca-simulado.ts`,
+  cacheada/tenant-wide) ligada na Início e em Realizados.
+- **Disponibilidade real:** a linha dos recentes mostrava "Sempre disponível" fixo; agora mostra o texto
+  real (`quando` — ex.: "Início 10/10 · Encerra 10/10").
+- **UI dos recentes:** imagem maior/landscape; nome do simulado clicável (inicia); "Fazer agora" com ícone
+  e botões maiores; download com texto "Baixar".
+- **Pastas e Realizados:** cards de pasta mais largos (visão de pasta e home) + capa em paisagem (mesmo
+  formato da imagem); imagens maiores em Realizados; botão "Correção" → **"Resultado"**.
+- **Banner no mobile:** o hero MEQ usava `aspect-ratio 1920/500` sem override → ~90px no celular, com o
+  circuito decorativo "preenchendo" tudo e o slide de texto sem caber. Mobile agora tem altura fixa
+  (188px), circuito/glow decorativos escondidos e texto ajustado. Setas e botão de pausar do banner
+  **sem caixa/borda** (só o ícone, com sombra p/ contraste).
+
 ## 3.7.1 — 2026-10-09
 
 - **Diagnóstico — corte de página nos cards de pilar (com rodapé):** a linha de pilares (LEI SECA /

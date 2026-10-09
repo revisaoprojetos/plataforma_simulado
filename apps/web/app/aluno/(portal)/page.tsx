@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
+import { resolverBancasSimulados } from '@/lib/aluno/banca-simulado'
 import { montarItensSimulado } from '@/lib/aluno/simulado-item'
 import { resolverGruposCatalogo } from '@/lib/aluno/grupos-catalogo'
 import { resolverEnunciadoUrls } from '@/lib/aluno/enunciado'
@@ -165,16 +166,37 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
     progresso[g.id] = { total: inGrp.length, done: inGrp.filter((s) => feitosSet.has(s.id)).length }
   }
 
-  // Recentes: disponíveis/agendados, mais novos primeiro. Mostra os NÃO feitos E TAMBÉM os
-  // RECÉM-PUBLICADOS (últimos 7 dias) mesmo já feitos — senão um simulado novo somia do bloco no
-  // instante em que o aluno o concluísse (era o caso do ENAP: publicado e já feito no mesmo dia).
+  // Pastas do ADMIN (folder_area='simulado'): quando os simulados estão organizados por PASTA DE SIMULADO
+  // (pasta_id) e não por banco→pasta-pai, o catálogo (grupos, via banco→pai) fica vazio e a Início não
+  // mostrava nenhuma pasta. Completamos a lista com essas pastas do admin — a visão de pasta já casa por
+  // `i.pastaId === pasta` (link /aluno?pasta=<id>), então clicar funciona.
+  let pastasHome = grupos
+  const semGrupo = itensCat.filter((s) => !s.grupoId && s.pastaId)
+  const adminPastaIds = [...new Set(semGrupo.map((s) => s.pastaId).filter(Boolean))] as string[]
+  if (adminPastaIds.length) {
+    const { data: apRows } = await svc.from('simulado_pastas')
+      .select('id, nome, cor, capa_url, capa_card_url, is_folder')
+      .in('id', adminPastaIds)
+    for (const p of (apRows ?? []) as any[]) {
+      if (p.is_folder === false || pastasHome.some((g) => g.id === p.id)) continue
+      pastasHome = [...pastasHome, { id: p.id, nome: p.nome, cor: p.cor ?? null, icone: null, capa: p.capa_url ?? null, capaCard: p.capa_card_url ?? null }]
+      const inGrp = itensCat.filter((s) => s.pastaId === p.id && !s.grupoId)
+      progresso[p.id] = { total: inGrp.length, done: inGrp.filter((s) => feitosSet.has(s.id)).length }
+    }
+  }
+
+  // Recentes: disponíveis/agendados que o aluno AINDA NÃO concluiu — os concluídos saem daqui e ficam
+  // em "Realizados" (antes um simulado já feito ficava poluindo os recentes por ser recém-publicado).
+  // Mantém os EM ANDAMENTO (p/ continuar). Mais novos primeiro.
   const lancamento = (i: any) => new Date(i.regras?.publicado_em ?? i.created_at ?? 0).getTime()
-  const SETE_DIAS = 7 * 24 * 60 * 60 * 1000
-  const recemPublicado = (i: any) => { const t = lancamento(i); return t > 0 && Date.now() - t < SETE_DIAS }
   const recentes = itensCat
-    .filter((i) => (i.podeFazer || i.emAndamento || i.statusLabel === 'Agendado') && (!feitosSet.has(i.id) || recemPublicado(i)))
+    .filter((i) => (i.podeFazer || i.emAndamento || i.statusLabel === 'Agendado') && (!feitosSet.has(i.id) || i.emAndamento))
     .sort((a, b) => lancamento(b) - lancamento(a))
     .slice(0, 5)
+
+  // Banca PREDOMINANTE dos recentes (via questões → banca) — p/ a coluna "Banca" dos cards da Início.
+  const bancaPorSim = await resolverBancasSimulados(svc, sessao!.tenantId, recentes.map((i) => i.id))
+  const recentesEnriquecidos = recentes.map((i) => ({ ...i, banca: bancaPorSim.get(i.id) ?? '' }))
   // Banners de simulado (VITRINE): aparecem para TODOS os alunos com a QUANTIDADE de simulados da
   // pasta e a descrição — pra mostrar que há mais conteúdo. O bloqueio real acontece ao clicar
   // (destino sem acesso → pop-up "sem acesso"). Contagem é tenant-wide (não depende do acesso do aluno).
@@ -452,7 +474,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
     const homeData = montarHomeData({
       nomeCompleto: sessao!.nome,
       gamResumo, gamMissoes, gamSemana,
-      recentes, grupos, progresso, destaquesReais,
+      recentes: recentesEnriquecidos, grupos: pastasHome, progresso, destaquesReais,
       feitos: feitosSet.size,
       questoesResolvidas, taxaAcerto,
       chest,

@@ -101,6 +101,8 @@ export interface HomeSimuladoCard {
   capa: HomeCapa
   tipo: string // "Inédito" | "Prova real"
   banca: string
+  /** Texto de disponibilidade real (ex.: "Sempre disponível", "Início 10/10 · Encerra 10/10"). */
+  quando?: string
   status: string // "Em andamento" | "Não iniciado" | "Concluído"
   progresso: number // 0–100
   cadernoUrl?: string

@@ -180,7 +180,8 @@ export function HomeMeq({ theme, data, preview }: { theme: InternaTheme; data: H
   // ── Abas das pastas (filtro local por categoria) ─────────────────────────
   const categorias = useMemo(() => {
     const set: string[] = []
-    for (const p of data.pastas) if (p.categoria && !set.includes(p.categoria)) set.push(p.categoria)
+    // 'todas' é o placeholder de "sem categoria" → não vira aba (senão duplica a aba "Todas").
+    for (const p of data.pastas) if (p.categoria && p.categoria.toLowerCase() !== 'todas' && !set.includes(p.categoria)) set.push(p.categoria)
     return set
   }, [data.pastas])
   const [aba, setAba] = useState<string>('Todas')
@@ -538,8 +539,8 @@ export function HomeMeq({ theme, data, preview }: { theme: InternaTheme; data: H
                 const done = p.concluidos ?? 0
                 return (
                   <a key={p.id} {...(preview ? { href: '#', onClick: (e: React.MouseEvent) => e.preventDefault() } : { href: `/aluno?pasta=${encodeURIComponent(p.id)}` })} className="hmq-tile hmq-lift">
-                    <div style={{ width: 70, height: 70, borderRadius: 11, overflow: 'hidden', flexShrink: 0 }}>
-                      <Capa rotulo={p.rotuloCapa} grad={CAPA_GRADS[i % CAPA_GRADS.length]} radius={11} fs={14} />
+                    <div style={{ width: 150, height: 112, borderRadius: 13, overflow: 'hidden', flexShrink: 0 }}>
+                      <Capa rotulo={p.rotuloCapa} grad={CAPA_GRADS[i % CAPA_GRADS.length]} radius={13} fs={18} src={p.capa} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--brand2)' }}>{p.categoria}</span>
@@ -575,7 +576,7 @@ export function HomeMeq({ theme, data, preview }: { theme: InternaTheme; data: H
                 {data.outros.map((o, i) => (
                   <div key={o.id} className="hmq-outro hmq-lift">
                     <div style={{ width: 64, height: 64, borderRadius: 11, overflow: 'hidden', flexShrink: 0 }}>
-                      <Capa rotulo={o.capa.rotulo} grad={CAPA_GRADS[(i + 1) % CAPA_GRADS.length]} radius={11} />
+                      <Capa rotulo={o.capa.rotulo} grad={CAPA_GRADS[(i + 1) % CAPA_GRADS.length]} radius={11} src={o.capa.capa} />
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, color: 'var(--muted)' }}>
@@ -663,14 +664,17 @@ function LinhaRecente({ r, grad }: { r: HomeSimuladoCard; grad: string }) {
     <div className="hmq-trow hmq-row">
       {/* Simulado (capa + título) */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
-        <div style={{ width: 54, height: 54, borderRadius: 10, overflow: 'hidden', flexShrink: 0 }}>
-          <Capa rotulo={r.capa.rotulo} grad={grad} />
+        <div style={{ width: 112, height: 84, borderRadius: 12, overflow: 'hidden', flexShrink: 0 }}>
+          <Capa rotulo={r.capa.rotulo} grad={grad} src={r.capa.capa} />
         </div>
         <div style={{ minWidth: 0 }}>
-          <b style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.titulo}</b>
+          {/* Clicar no NOME inicia o simulado (mesmo destino do "Fazer agora"). */}
+          {r.fazerUrl
+            ? <a href={r.fazerUrl} className="hmq-rlink" style={{ textDecoration: 'none' }}><b style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'pointer' }}>{r.titulo}</b></a>
+            : <b style={{ display: 'block', fontSize: 13.5, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.titulo}</b>}
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 11.5, color: 'var(--muted)' }}>
             <Clock className="hmq-i" style={{ width: 12, height: 12 }} />
-            Sempre disponível
+            {r.quando || 'Sempre disponível'}
           </span>
         </div>
       </div>
@@ -687,13 +691,13 @@ function LinhaRecente({ r, grad }: { r: HomeSimuladoCard; grad: string }) {
         <span style={{ fontSize: 11, color: 'var(--muted)' }}>{r.progresso}%</span>
       </div>
       {/* Ações — links REAIS do runner/caderno quando houver (fazerUrl/cadernoUrl); sem url = inerte. */}
-      <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
         {r.fazerUrl
-          ? <a className="hmq-cta" href={r.fazerUrl} style={{ height: 34, borderRadius: 10, fontSize: 12.5, padding: '0 12px', textDecoration: 'none' }}>{label}</a>
-          : <span className="hmq-cta" style={{ height: 34, borderRadius: 10, fontSize: 12.5, padding: '0 12px' }}>{label}</span>}
+          ? <a className="hmq-cta" href={r.fazerUrl} style={{ height: 40, borderRadius: 11, fontSize: 13.5, padding: '0 16px', textDecoration: 'none' }}><Play className="hmq-i" style={{ width: 14, height: 14, fill: 'currentColor', stroke: 'none' }} />{label}</a>
+          : <span className="hmq-cta" style={{ height: 40, borderRadius: 11, fontSize: 13.5, padding: '0 16px' }}><Play className="hmq-i" style={{ width: 14, height: 14, fill: 'currentColor', stroke: 'none' }} />{label}</span>}
         {r.cadernoUrl
-          ? <a className="hmq-icobtn" href={r.cadernoUrl} target="_blank" rel="noopener noreferrer" aria-label="Baixar caderno" title="Baixar caderno"><Download className="hmq-i" style={{ width: 15, height: 15 }} /></a>
-          : <span className="hmq-icobtn" aria-label="Baixar caderno" title="Baixar caderno"><Download className="hmq-i" style={{ width: 15, height: 15 }} /></span>}
+          ? <a className="hmq-dl" href={r.cadernoUrl} target="_blank" rel="noopener noreferrer" title="Baixar caderno"><Download className="hmq-i" style={{ width: 16, height: 16 }} /> Baixar</a>
+          : <span className="hmq-dl" style={{ opacity: 0.5 }} title="Baixar caderno"><Download className="hmq-i" style={{ width: 16, height: 16 }} /> Baixar</span>}
       </div>
     </div>
   )
@@ -723,6 +727,10 @@ const CSS = `
 .hmq-ctaw:hover{filter:brightness(1.06);transform:translateY(-1px)}
 .hmq-ghost{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 12px;border-radius:10px;border:1px solid var(--line);color:var(--muted);font-size:12.5px;font-weight:600;cursor:pointer}
 .hmq-icobtn{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);color:var(--muted);display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.hmq-dl{height:40px;padding:0 15px;border-radius:11px;border:1px solid var(--line);color:var(--muted);display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:700;cursor:pointer;text-decoration:none;white-space:nowrap;background:var(--surface);transition:background .2s,color .2s,border-color .2s}
+.hmq-dl:hover{background:var(--surface2);color:var(--ink);border-color:var(--brand2)}
+.hmq-rlink b{transition:color .2s}
+.hmq-rlink:hover b{color:var(--brand)}
 .hmq-seghov .sgm{transition:transform .25s cubic-bezier(.2,.8,.2,1)}
 .hmq-seghov:hover .sgm:nth-child(1){transform:translateY(-4px)}.hmq-seghov:hover .sgm:nth-child(2){transform:translateY(-2px)}
 
@@ -731,15 +739,17 @@ const CSS = `
    molde aparece EXATO no aluno (WYSIWYG): largura cheia, sem recorte e sem distorção (cover casando a proporção). */
 .hmq-hero{position:relative;overflow:hidden;width:100%;aspect-ratio:1920/500;border-radius:18px}
 .hmq-hero-body{position:relative;height:100%;display:flex;flex-direction:column;justify-content:center;gap:12px;padding:0 84px 34px;max-width:720px}
-.hmq-arr{position:absolute;top:50%;transform:translateY(-50%);z-index:4;display:inline-flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);width:40px;height:40px;border-radius:8px;border:0;background:#FFFFFF;color:#171E3B;box-shadow:0 6px 16px -8px rgba(10,20,60,.6);cursor:pointer;transition:background .15s,color .15s}
-.hmq-arr:hover{background:#5ECEF0;color:#171E3B}
+/* Setas SEM caixa: só o ícone (branco + sombra p/ contraste sobre a imagem). */
+.hmq-arr{position:absolute;top:50%;transform:translateY(-50%);z-index:4;display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border:0;background:transparent;color:#FFFFFF;cursor:pointer;filter:drop-shadow(0 2px 5px rgba(0,0,0,.55));transition:transform .15s,color .15s}
+.hmq-arr:hover{color:#5ECEF0;transform:translateY(-50%) scale(1.14)}
 .hmq-cctrl{position:absolute;left:84px;bottom:14px;z-index:3;display:flex;align-items:center;gap:7px}
 .hmq-cdot{transition:width .3s,background .3s;cursor:pointer}
-.hmq-cpause{display:inline-flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:8px;border:1.5px solid #5ECEF0;background:rgba(23,30,59,.55);color:#5ECEF0;cursor:pointer;transition:background .15s,color .15s}
-.hmq-cpause:hover{background:#5ECEF0;color:#171E3B}
+/* Pausar SEM caixa/borda: só o ícone (ciano + sombra p/ contraste). */
+.hmq-cpause{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border:0;background:transparent;color:#5ECEF0;cursor:pointer;filter:drop-shadow(0 2px 5px rgba(0,0,0,.55));transition:transform .15s,color .15s}
+.hmq-cpause:hover{color:#FFFFFF;transform:scale(1.14)}
 
 /* tabela recentes */
-.hmq-trow{display:grid;grid-template-columns:minmax(0,2.2fr) 0.8fr 1fr 1.1fr 168px;align-items:center;gap:14px;padding:12px 8px}
+.hmq-trow{display:grid;grid-template-columns:minmax(0,2.2fr) 0.8fr 1fr 1.1fr 260px;align-items:center;gap:14px;padding:12px 8px}
 .hmq-thead{padding:0 8px 10px;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .hmq-row{border-top:1px solid var(--line);transition:background .35s ease,box-shadow .35s ease}
 .hmq-row:hover{background:var(--surface2);box-shadow:inset 3px 0 0 var(--brand2)}
@@ -753,8 +763,8 @@ const CSS = `
 .hmq-tab{height:30px;padding:0 12px;border:0;border-radius:8px;font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;background:transparent;color:var(--muted);cursor:pointer;font-family:inherit}
 .hmq-tab-on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(10,20,60,.12)}
 /* adaptativo ao container (não ao viewport) — não corta em tablet/iframe. */
-.hmq-pastas{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,240px),1fr));gap:12px}
-.hmq-tile{display:flex;align-items:center;gap:12px;padding:10px;border-radius:14px;background:var(--surface);border:1px solid var(--line);text-decoration:none}
+.hmq-pastas{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,420px),1fr));gap:14px}
+.hmq-tile{display:flex;align-items:center;gap:14px;padding:14px;border-radius:16px;background:var(--surface);border:1px solid var(--line);text-decoration:none}
 .hmq-outro{display:flex;align-items:center;gap:14px;padding:10px;border-radius:14px;background:var(--surface);border:1px solid var(--line)}
 
 /* lift / cover shine */
@@ -805,9 +815,16 @@ const CSS = `
   .hmq-grid-mid{grid-template-columns:1fr}
   .hmq-kpis{grid-template-columns:repeat(2,1fr)}
   .hmq-h1{font-size:24px}
-  .hmq-hero{border-radius:14px}
-  .hmq-hero-body{padding:0 20px 34px}
-  .hmq-hero-body h2{font-size:26px}
+  /* Mobile: o aspect 1920/500 deixava o hero com ~90px → tudo espremido e o circuito decorativo
+     "preenchia" o banner; o slide de texto (Plataforma nova) não cabia. Fixa uma ALTURA usável e
+     esconde o circuito/glow decorativos (poluíam o banner curto). */
+  .hmq-hero{border-radius:14px;aspect-ratio:auto;height:188px}
+  .hmq-circ{display:none}
+  .hmq-glow{display:none}
+  .hmq-hero-body{padding:0 18px 18px;gap:7px;max-width:none}
+  .hmq-hero-body h2{font-size:22px;line-height:1.1}
+  .hmq-hero-body p{font-size:12.5px}
+  .hmq-arr{width:32px;height:32px}
   .hmq-perf{grid-template-columns:110px 1fr 36px}
   /* recentes: tabela -> lista (capa 50, banca·%, segmentos, play) */
   .hmq-thead{display:none}

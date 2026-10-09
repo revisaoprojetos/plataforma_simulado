@@ -49,6 +49,9 @@ export function montarHomeData(args: {
     capa: { rotulo: (i.titulo ?? 'Simulado').slice(0, 18), sub: i.banca ?? '', cores: i.vis?.cor ?? undefined, capa: i.vis?.capa ?? i.vis?.capaBanner ?? null },
     tipo: i.refazer ? 'Prova real' : 'Inédito',
     banca: i.banca ?? '',
+    // Texto REAL de disponibilidade (ex.: "Sempre disponível", "Início 10/10 · Encerra 10/10") — antes
+    // a linha mostrava "Sempre disponível" fixo mesmo em simulado agendado.
+    quando: i.quando ?? '',
     status: i.statusLabel ?? (i.emAndamento ? 'Em andamento' : i.refazer ? 'Concluído' : 'Não iniciado'),
     progresso: typeof i.progresso === 'number' ? i.progresso : 0,
     cadernoUrl: i.enunciadoUrl ?? undefined,

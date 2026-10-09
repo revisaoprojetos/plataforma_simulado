@@ -294,8 +294,9 @@ function CardSubpasta({ sp }: { sp: PastaCat }) {
 }
 
 const CSS = `
-/* adaptativo ao CONTAINER (nao ao viewport) — nao corta em tablet/iframe; min(100%,300px) = 1 coluna quando estreito. */
-.ip-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:16px;align-items:stretch}
+/* adaptativo ao CONTAINER (nao ao viewport) — nao corta em tablet/iframe; min(100%,440px) = 1 coluna quando estreito.
+   Cards mais LARGOS: min 440px → menos colunas (ticket capa+infos com mais respiro). */
+.ip-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,440px),1fr));gap:16px;align-items:stretch}
 .ip-card{height:100%;transition:transform .4s cubic-bezier(.22,1,.36,1),box-shadow .4s cubic-bezier(.22,1,.36,1),border-color .25s}
 .ip-card:hover{transform:translateY(-3px);border-color:var(--brandLine,var(--line));box-shadow:0 22px 40px -28px rgba(0,0,0,.45)}
 .ip-card .rlz-cov{transition:transform .6s cubic-bezier(.22,1,.36,1)}.ip-card:hover .rlz-cov{transform:scale(1.05)}
