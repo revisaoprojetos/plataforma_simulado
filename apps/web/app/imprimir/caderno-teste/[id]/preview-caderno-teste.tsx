@@ -82,6 +82,9 @@ export function PreviewCadernoTeste({ item, questoes, vars, discBanco, standalon
         .caderno-pronto{gap:0!important}
         .caderno-pronto>[aria-hidden]{display:none!important}
         .caderno-pronto>div{box-shadow:none!important;break-after:page;page-break-after:always}
+        /* Rede de segurança: nunca cortar um bloco no meio na quebra de página (ex.: linha de pilares com
+           rodapé). Se um bloco encostaria no limite, ele vai INTEIRO p/ a próxima página em vez de ser fatiado. */
+        .caderno-pronto .cad-bloco{break-inside:avoid;page-break-inside:avoid}
         /* a ÚLTIMA folha (contracapa) começa SEMPRE numa página nova e não deixa página em branco depois */
         .caderno-pronto>div:last-child{break-after:avoid;page-break-after:avoid;break-before:page;page-break-before:always;overflow:hidden}
       }`}</style>

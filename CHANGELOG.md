@@ -12,6 +12,15 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.7.1 — 2026-10-09
+
+- **Diagnóstico — corte de página nos cards de pilar (com rodapé):** a linha de pilares (LEI SECA /
+  JURISPRUDÊNCIA / DOUTRINA) é um bloco atômico; **com rodapé** a área útil encolhe e o bloco encostava no
+  limite da folha e era **fatiado** na quebra de página (sem rodapé cabia). Fix em `previa.tsx`: `BUF` maior
+  quando há rodapé/margem de base (30→48) → o bloco desce **inteiro** p/ a próxima folha antes de encostar;
+  e `break-inside: avoid` na impressão (classe `cad-bloco`) como rede de segurança — nenhum bloco é cortado
+  no meio. Vale p/ impressão de caderno-teste **e** modelos (componente compartilhado) e p/ o PDF do worker.
+
 ## 3.7.0 — 2026-10-09
 
 - **Caderno-teste / Diagnóstico — cores de texto e fundo que faltavam:** o editor já tinha os controles de

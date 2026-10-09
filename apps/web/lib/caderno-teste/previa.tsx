@@ -570,7 +570,11 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
       // idêntico à renderização. Assim nada é empurrado com espaço sobrando nem cortado.
       const tops = kids.map((el) => el.getBoundingClientRect().top)
       const hs = kids.map((el, i) => (i < kids.length - 1 ? tops[i + 1] : el.getBoundingClientRect().bottom) - tops[i])
-      const BUF = 26 // folga p/ sub-pixel/diferenças de render — evita card cortado/sliver colorido no fim da folha
+      // folga p/ sub-pixel/diferenças de render — evita card cortado/sliver colorido no fim da folha.
+      // Com RODAPÉ a área útil fica mais apertada e um bloco atômico (ex.: linha de pilares) encosta no
+      // limite e vaza → cortado. Mais folga quando há rodapé/imagem de rodapé empurra o bloco p/ a próxima
+      // folha antes de encostar. (`break-inside: avoid` na impressão é a rede de segurança final.)
+      const BUF = (a.rodapeUrl || a.margemBase) ? 48 : 30
       // Quanto o bloco ÂNCORA em `idx` precisa caber p/ ficar na página: o CARD INTEIRO (âncora + todas as
       // continuações coladas) quando ele cabe numa página em branco; senão (card gigante) só a âncora + a
       // 1ª continuação (evita cabeçalho órfão do próprio card e deixa o resto quebrar).
@@ -635,7 +639,7 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
       {temCapa && <Folha item={item} num={1} total={total} pad={pad} Ht={Ht} Hf={Hf} ehCapa capaCfg={item.capa ?? CAPA_PADRAO} onPickCapa={onPickCapa} selCapa={selCapa} />}
       {pages.map((idxs, pi) => (
         <Folha key={pi} item={item} num={(temCapa ? 1 : 0) + pi + 1} total={total} pad={pad} Ht={Ht} Hf={Hf}>
-          {idxs.map((i, gi) => <div key={i} style={{ marginTop: gi === 0 ? 0 : (blocos[i].juntar ? 0 : GAP) }}>{blocos[i].node}</div>)}
+          {idxs.map((i, gi) => <div key={i} className="cad-bloco" style={{ marginTop: gi === 0 ? 0 : (blocos[i].juntar ? 0 : GAP) }}>{blocos[i].node}</div>)}
         </Folha>
       ))}
       {temUltima && <Folha item={item} num={total} total={total} pad={pad} Ht={Ht} Hf={Hf} ehUltima />}
