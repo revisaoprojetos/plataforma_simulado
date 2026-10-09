@@ -7,6 +7,7 @@
 
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
+import { estiloCapaView } from '@/lib/capa-visual'
 import { simTokensStyle } from '../sim-tokens'
 import type { AcaoEntrada, EstadoEntrada, SimEntradaReal, SimMock, SimTheme } from '../types'
 import {
@@ -48,6 +49,24 @@ export function Entrada({ theme, data, es = 'aberto', mo = 'cad', real }: { them
   const fimLabel = fmtDate(info.fimISO)
   const iniLabel = fmtDate(info.inicioISO)
   const dur = info.duracaoMin == null ? 'Sem limite' : minToDur(info.duracaoMin)
+  // Logo por TEMA (decisão do usuário): tema CLARO usa a logo ESCURA (campo "Logo grande — entrada do aluno" /
+  // logo_grande_url, p/ contraste no fundo claro); tema ESCURO usa a logo clara (logo_url). Fallback cruzado.
+  const logoClaro = real?.logoGrandeUrl ?? real?.logoDarkUrl ?? real?.logoUrl // fundo claro → logo escura
+  const logoEscuro = real?.logoUrl ?? real?.logoDarkUrl ?? real?.logoGrandeUrl // fundo escuro → logo clara
+  const logoSrc = theme === 'escuro' ? logoEscuro : logoClaro
+  // Sem logo dedicada p/ fundo claro (logo_grande_url/logo_dark_url vazios), a única logo é a BRANCA
+  // (feita p/ fundo escuro). No tema claro, mostramos ela num "selo" navy p/ não sumir no fundo claro.
+  // Assim que uma logo escura/clara dedicada for cadastrada, ela é usada direto (sem selo).
+  const temLogoClaraDedicada = !!(real?.logoGrandeUrl || real?.logoDarkUrl)
+  const usarChipLogo = theme !== 'escuro' && !temLogoClaraDedicada && !!logoSrc
+  // Informações (disponibilidade/duração/itens) — com capa viram um card limpo abaixo do banner.
+  const infoItems: { label: string; value: string }[] = [
+    info.semJanela ? { label: 'Disponibilidade', value: 'Sempre aberto · sem prazo' } : { label: 'Data', value: `${iniLabel.data} · ${iniLabel.hora}` },
+    ...(info.semJanela ? [] : [{ label: 'Encerra', value: `${fimLabel.data} · ${fimLabel.hora}` }]),
+    { label: 'Duração', value: dur },
+    { label: 'Itens', value: `${info.n} · ${info.tipo === 'CE' ? 'Certo/Errado' : 'Múltipla escolha'}` },
+  ]
+  const badgeStyle = { display: 'inline-flex', alignItems: 'center', height: 24, padding: '0 10px', borderRadius: 6, background: MEQ_CYAN, color: '#0B1124', fontSize: 11.5, fontWeight: 700 } as const
 
   return (
     <div className={`${P}-app`} style={{ ...simTokensStyle('meq', theme), position: 'relative', minHeight: '100vh', overflowX: 'hidden' }}>
@@ -73,38 +92,72 @@ export function Entrada({ theme, data, es = 'aberto', mo = 'cad', real }: { them
           </button>
         </div>
 
-        {/* Lockup central — logo REAL do tenant (white-label); sem logo cai na marca genérica MEQ. */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, marginBottom: 18 }}>
-          {real?.logoUrl ? <img src={real.logoUrl} alt="" style={{ height: 52, maxWidth: 200, objectFit: 'contain' }} /> : <MarcaMeq size={46} />}
-        </div>
-
-        {/* Cabeçalho navy (caderno de prova) */}
-        <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 'var(--r)', background: MEQ_NAVY_GRAD, color: '#fff', padding: '24px 28px' }}>
-          <div className={`${P}-headcirc`} aria-hidden style={{ position: 'absolute', right: -60, top: -80, width: 360, opacity: 0.5 }} />
-          <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.2em', color: '#8BEAEA' }}>{info.curto}</span>
-            <span style={{ display: 'inline-flex', alignItems: 'center', height: 24, padding: '0 10px', borderRadius: 6, background: MEQ_CYAN, color: '#0B1124', fontSize: 11.5, fontWeight: 700 }}>{badge[es]}</span>
-          </div>
-          <h1 style={{ position: 'relative', margin: '10px 0 2px', fontSize: 30, fontWeight: 700, letterSpacing: '-0.04em' }}>{info.titulo}</h1>
-          <span style={{ position: 'relative', fontSize: 13, color: '#A9C6F0' }}>{info.subtitulo}</span>
-
-          {/* Tabela de 5 células */}
-          <div className={`${P}-tbl`} style={{ marginTop: 18, display: 'grid', borderTop: '1px solid rgba(255,255,255,.14)', borderLeft: '1px solid rgba(255,255,255,.14)', borderRadius: 8, overflow: 'hidden' }}>
-            {info.semJanela ? (
-              // Sem janela (sem data de início/fim) → não mostra Data/Encerra; indica "sempre aberto".
-              <Cell label="Disponibilidade" value="Sempre aberto · sem prazo" />
+        {/* Lockup central — logo por tema; com capa, o status "Em andamento" sobe pra ESTA linha (fora do card). */}
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, marginBottom: 18, minHeight: 40 }}>
+          {logoSrc ? (
+            usarChipLogo ? (
+              // Logo branca no tema claro → num "selo" navy p/ contraste (até subirem uma logo escura dedicada).
+              <span style={{ display: 'inline-flex', alignItems: 'center', padding: '9px 16px', borderRadius: 14, background: MEQ_NAVY_GRAD }}>
+                <img src={logoSrc} alt="" style={{ height: 38, maxWidth: 180, objectFit: 'contain' }} />
+              </span>
             ) : (
-              <>
-                <Cell label="Data" value={`${iniLabel.data} · ${iniLabel.hora}`} />
-                <Cell label="Encerra" value={`${fimLabel.data} · ${fimLabel.hora}`} />
-              </>
-            )}
-            <Cell label="Duração" value={dur} />
-            {/* Tipo REAL das questões (não chumbado): múltipla escolha (A–E) ou Certo/Errado (Cebraspe). */}
-            <Cell label="Itens" value={`${info.n} · ${info.tipo === 'CE' ? 'Certo/Errado' : 'Múltipla escolha'}`} />
-            {/* Banca: ocultada por enquanto (a pedido) — era um valor chumbado "Padrão Cebraspe". */}
+              <img src={logoSrc} alt="" style={{ height: 52, maxWidth: 200, objectFit: 'contain' }} />
+            )
+          ) : <MarcaMeq size={46} />}
+          {info.capaUrl ? <span style={{ ...badgeStyle, position: 'absolute', right: 0, top: '50%', transform: 'translateY(-50%)' }}>{badge[es]}</span> : null}
+        </div>
+
+        {/* Cabeçalho (caderno de prova) — capa do simulado ao fundo com o MESMO enquadramento do admin */}
+        <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 'var(--r)', background: MEQ_NAVY_GRAD, color: '#fff' }}>
+          {info.capaUrl ? (
+            // recorte/zoom/efeitos salvos (formato paisagem) → render fiel ao que foi ajustado no admin.
+            // Sem véu/fade (a pedido) — a legibilidade do título vem de uma sombra leve no texto.
+            <div aria-hidden style={{ position: 'absolute', inset: 0, ...estiloCapaView(info.capaUrl, info.capaCfg) }} />
+          ) : null}
+          <div className={`${P}-headcirc`} aria-hidden style={{ position: 'absolute', right: -60, top: -80, width: 360, opacity: info.capaUrl ? 0.2 : 0.5 }} />
+          {/* conteúdo acima da capa/véu — com capa, o banner fica mais ALTO (menos corte na imagem) e o
+              texto ancora embaixo (estilo hero) */}
+          <div style={{ position: 'relative', zIndex: 1, padding: '24px 28px', ...(info.capaUrl ? { minHeight: 300, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' } : {}) }}>
+            {/* Com capa: esconde o kicker "CADERNO DE PROVA · SIMULADO" + o badge (a imagem já é o visual;
+                o status sobe pra linha da logo). Sem capa: mostra kicker + badge aqui dentro. */}
+            {!info.capaUrl ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.2em', color: '#8BEAEA' }}>{info.curto}</span>
+                <span style={badgeStyle}>{badge[es]}</span>
+              </div>
+            ) : null}
+            <h1 style={{ margin: '10px 0 2px', fontSize: 30, fontWeight: 700, letterSpacing: '-0.04em', ...(info.capaUrl ? { textShadow: '0 1px 12px rgba(0,0,0,.6)' } : {}) }}>{info.titulo}</h1>
+            <span style={{ fontSize: 13, color: '#A9C6F0', ...(info.capaUrl ? { textShadow: '0 1px 8px rgba(0,0,0,.55)' } : {}) }}>{info.subtitulo}</span>
+
+            {/* Sem capa: tabela de células aqui dentro. Com capa: viram um card limpo abaixo do banner. */}
+            {!info.capaUrl ? (
+              <div className={`${P}-tbl`} style={{ marginTop: 18, display: 'grid', borderTop: '1px solid rgba(255,255,255,.14)', borderLeft: '1px solid rgba(255,255,255,.14)', borderRadius: 8, overflow: 'hidden' }}>
+                {info.semJanela ? (
+                  <Cell label="Disponibilidade" value="Sempre aberto · sem prazo" />
+                ) : (
+                  <>
+                    <Cell label="Data" value={`${iniLabel.data} · ${iniLabel.hora}`} />
+                    <Cell label="Encerra" value={`${fimLabel.data} · ${fimLabel.hora}`} />
+                  </>
+                )}
+                <Cell label="Duração" value={dur} />
+                <Cell label="Itens" value={`${info.n} · ${info.tipo === 'CE' ? 'Certo/Errado' : 'Múltipla escolha'}`} />
+              </div>
+            ) : null}
           </div>
         </div>
+
+        {/* Com capa: informações num card limpo abaixo do banner, acima da identificação */}
+        {info.capaUrl ? (
+          <div style={{ marginTop: 14, display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 1, background: 'var(--line)', border: '1px solid var(--line)', borderRadius: 'var(--r)', overflow: 'hidden' }}>
+            {infoItems.map((it) => (
+              <div key={it.label} style={{ background: 'var(--surface)', padding: '14px 18px' }}>
+                <span style={{ display: 'block', fontSize: 10.5, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--muted)' }}>{it.label}</span>
+                <b style={{ display: 'block', marginTop: 4, fontSize: 14, color: 'var(--ink)' }}>{it.value}</b>
+              </div>
+            ))}
+          </div>
+        ) : null}
 
         {/* Seção 01 · Identificação */}
         <div style={{ marginTop: 20, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: '24px 28px', boxShadow: '0 1px 2px rgba(16,30,70,.04)' }}>

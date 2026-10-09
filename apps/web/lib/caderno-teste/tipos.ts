@@ -3,7 +3,7 @@
 // própria (como as "modalidades" do editor antigo). Config isolado em
 // simulado_cadernos_teste.config.builderV3.
 
-import { DIAG_PADRAO, DIAG_AGU_2023, DIAG_PGE_RS, DIAG_BASE_4, DIAG_SEMANA_6EM7, DIAG_VAZIO, type DiagConteudo } from './diagnostico'
+import { DIAG_PADRAO, DIAG_AGU_2023, DIAG_PGE_RS, DIAG_BASE_4, DIAG_SEMANA_6EM7, DIAG_VAZIO, DIAG_MEQ, type DiagConteudo } from './diagnostico'
 import type { CadernoDoc } from '@/lib/caderno-designer/types'
 import { FOLHA_RESPOSTAS_DOC, CADERNO_PERGUNTAS_DOC } from '@/lib/caderno-designer/preset-cadernos-doc'
 
@@ -256,6 +256,7 @@ export const MODALIDADES: ModalidadeMeta[] = [
       { id: 'semana_6em7', nome: 'Diagnóstico - 1 disciplina', descricao: 'Diagnóstico enxuto por disciplina (lei seca/jurisprudência/doutrina) + bloco de jurisprudência prioritária — base dos cadernos "Semana de atualização (6 meses em 7 dias)". Ajuste a disciplina e os temas.', ajustes: { corPrimaria: '#2d254f', corSecundaria: '#f6b420', colunas: 2, coresPilar: { doutrina: '#e8850c', lei_seca: '#c9a227', jurisprudencia: '#3b5bdb', lingua_portuguesa: '#1a7a4a' } }, conteudo: DIAG_SEMANA_6EM7 },
       { id: 'agu_2023', nome: 'Diagnóstico - Padrão', descricao: 'Pré-preenchido com o diagnóstico da AGU 2023.', ajustes: { corPrimaria: '#2d254f', corSecundaria: '#f6b420' }, conteudo: DIAG_AGU_2023 },
       { id: 'pge_rs', nome: 'Completo (PGE/RS)', descricao: 'Estrutura base para o diagnóstico da PGE/RS — ajuste os textos/disciplinas.', ajustes: { corPrimaria: '#2d254f', corSecundaria: '#f6b420' }, conteudo: DIAG_PGE_RS },
+      { id: 'meq', nome: 'MEQ (blocos + contagem)', descricao: 'Modelo do MEQ (padrão TRT): bloco Conhecimentos Gerais × Específicos, faixas por contagem de acertos, pilares, disciplinas e sugestões de estudo. Ajuste os textos/disciplinas.', ajustes: { corPrimaria: '#0a1a3f', corSecundaria: '#f6b420' }, conteudo: DIAG_MEQ },
       // 'agu_diagnostico' (v1 doc-backed, blocos antigos) REMOVIDO — usava o render legado (PreviaBlocos)
       // em vez do atual (conteudo/Previa com os fixes). 0 cadernos usavam. Use 'agu_2023' (mesmo AGU, atual).
     ],

@@ -16,7 +16,7 @@ import type { SimTheme } from '../types'
 import {
   AMBER, baseKeyframes, BgfxMeq, btnGhost, btnPrimary, CERTO_GRAD, ERR_RED, ERRADO_GRAD,
   IconCheck, IconChevL, IconChevR, IconClock, IconFlag, IconGrid, IconInfo, IconList,
-  IconMoon, MarcaMeq, MEQ_BRAND_GRAD, ModalHead, ModalShell, OK_GREEN,
+  IconMoon, MarcaMeq, MEQ_BRAND_GRAD, MEQ_NAVY_GRAD, ModalHead, ModalShell, OK_GREEN,
 } from './shared'
 
 const P = 'smpl'
@@ -42,8 +42,13 @@ export interface ProvaMeqLiveProps {
   theme: SimTheme
   titulo: string
   banca?: string
-  /** Logo do tenant (white-label) — quando presente substitui a marca genérica no header. */
+  /** Logo do tenant (white-label) — quando presente substitui a marca genérica no header.
+   *  Convenção (igual à entrada): `logoUrl` = logo CLARA (p/ fundo escuro); `logoGrandeUrl`/`logoDarkUrl`
+   *  = logo ESCURA (p/ fundo claro). A logo exibida segue o TEMA — senão a logo branca aparecia no
+   *  header claro (bug reportado). */
   logoUrl?: string | null
+  logoGrandeUrl?: string | null
+  logoDarkUrl?: string | null
   questoes: ProvaLiveQuestao[]
   qi: number // índice 1..N (questão atual)
   respostas: Record<string, string> // questao_id -> alternativa_id
@@ -106,8 +111,9 @@ export function ProvaMeqLive(p: ProvaMeqLiveProps) {
 
       {/* Header sticky */}
       <div className={`${P}-head`} style={{ position: 'sticky', top: 0, zIndex: 20, display: 'flex', alignItems: 'center', gap: 14, height: 72, padding: '0 28px', background: 'var(--surface)', borderBottom: '1px solid var(--line)' }}>
-        {/* Logo REAL do tenant (white-label); sem logo cai na marca genérica MEQ. */}
-        {p.logoUrl ? <img src={p.logoUrl} alt="" style={{ height: 32, maxWidth: 132, objectFit: 'contain', borderRadius: 6 }} /> : <MarcaMeq size={30} />}
+        {/* Logo REAL do tenant por TEMA (igual à entrada): fundo CLARO → logo escura (logoGrande/dark);
+            fundo ESCURO → logo clara (logoUrl). Sem logo cai na marca genérica MEQ. */}
+        <HeaderLogo p={p} />
         <div className={`${P}-htit`} style={{ lineHeight: 1.2, minWidth: 0 }}>
           <b style={{ display: 'block', fontSize: 15, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.titulo}</b>
           {p.banca ? <span style={{ fontSize: 12, color: 'var(--muted)' }}>{p.banca}</span> : null}
@@ -192,6 +198,27 @@ export function ProvaMeqLive(p: ProvaMeqLiveProps) {
       {p.md === 'conf' && <ModalConf N={N} cAns={cAns} cBl={cBl} ck={p.ck} isFinalizando={p.isFinalizando} setCk={p.onSetCk} onClose={() => p.onSetMd('rev')} onOk={p.onFinalizar} />}
     </div>
   )
+}
+
+// Logo do header por TEMA (igual à entrada do simulado): fundo CLARO (temas claro/azul) → logo ESCURA
+// (logoGrande/dark, p/ contraste); fundo ESCURO → logo CLARA (logoUrl, feita p/ fundo escuro). Antes o
+// header usava sempre `logoUrl` (a logo branca), que sumia/ficava errada no header claro.
+function HeaderLogo({ p }: { p: ProvaMeqLiveProps }) {
+  const escuro = p.dark
+  const logoClaro = p.logoGrandeUrl ?? p.logoDarkUrl ?? p.logoUrl // fundo claro → logo escura
+  const logoEscuro = p.logoUrl ?? p.logoDarkUrl ?? p.logoGrandeUrl // fundo escuro → logo clara
+  const logoSrc = escuro ? logoEscuro : logoClaro
+  if (!logoSrc) return <MarcaMeq size={30} />
+  // Sem logo escura dedicada (só a branca) + tema claro → "selo" navy p/ a logo branca não sumir.
+  const temLogoClaraDedicada = !!(p.logoGrandeUrl || p.logoDarkUrl)
+  if (!escuro && !temLogoClaraDedicada) {
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 11px', borderRadius: 10, background: MEQ_NAVY_GRAD }}>
+        <img src={logoSrc} alt="" style={{ height: 24, maxWidth: 120, objectFit: 'contain' }} />
+      </span>
+    )
+  }
+  return <img src={logoSrc} alt="" style={{ height: 32, maxWidth: 132, objectFit: 'contain', borderRadius: 6 }} />
 }
 
 function SegBtn({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: ReactNode; label: string }) {

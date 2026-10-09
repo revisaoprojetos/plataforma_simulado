@@ -6,7 +6,7 @@
 
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import type { ItemCaderno, PreviewQuestao, CapaConfig } from './tipos'
-import { DIAG_PADRAO, slugDiag, topicosParaTexto, prefFonte, type DiagPilar, type DiagSugestao } from './diagnostico'
+import { DIAG_PADRAO, slugDiag, topicosParaTexto, prefFonte, escolherBanda, type DiagPilar, type DiagSugestao } from './diagnostico'
 import { CORES_PILAR_PADRAO, CAPA_PADRAO } from './tipos'
 import { formatarInline, formatarMarcadores } from './formato'
 import { cssDaFonte, resolveTheme } from '@/lib/caderno-designer/theme'
@@ -61,14 +61,18 @@ function preencher(t: string, vars: Record<string, string>): string {
     return m
   })
 }
-/** Banda de texto que casa com o % do pilar (0-49/50-80/81-100). null quando não há dado (mostra todas). */
+/** Banda de texto que casa com o desempenho do pilar — por % (0-49/50-80/81-100) OU por CONTAGEM de
+ *  acertos (0-14/15-29/30-37, 02…). null quando não há dado (mostra todas as faixas). */
 function bandaAdaptativa(pilar: DiagPilar, vars: Record<string, string>): { faixa: string; texto: string } | null {
-  const raw = pilar.chave ? vars[`pct_${prefFonte(pilar.tipoFonte)}${pilar.chave}`] : undefined
+  if (!pilar.chave) return null
+  const pref = prefFonte(pilar.tipoFonte)
+  const raw = vars[`pct_${pref}${pilar.chave}`]
   if (raw == null) return null
-  const n = parseFloat(String(raw).replace('%', '').replace(',', '.'))
-  if (isNaN(n)) return null
-  const faixa = n <= 49 ? '0-49' : n <= 80 ? '50-80' : '81-100'
-  return pilar.bandas.find((b) => b.faixa === faixa) ?? pilar.bandas[0] ?? null
+  const pct = parseFloat(String(raw).replace('%', '').replace(',', '.'))
+  if (isNaN(pct)) return null
+  const acerto = parseFloat(String(vars[`acerto_${pref}${pilar.chave}`] ?? '0').replace(',', '.')) || 0
+  const total = parseFloat(String(vars[`total_${pref}${pilar.chave}`] ?? '0').replace(',', '.')) || 0
+  return escolherBanda(pilar.bandas, acerto, total, pct)
 }
 
 const QUESTOES_EXEMPLO: PreviewQuestao[] = [
@@ -370,6 +374,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
     ), 'Desempenho por pilar', 'desempenho', '', true, blockKey)
   }
   if (c.pilares.length && !ocultasP.has('sec_pilares')) add('sec_pilares', <Sec parte="sec_pilares" t={c.tituloPilares ?? 'Desempenho por pilar'} />, `Faixa de seção · ${c.tituloPilares ?? 'Desempenho por pilar'}`, 'secao', 'sec_pilares', true, 'sec_pilares')
+  if (c.pilaresIntro && c.pilares.length && !ocultasP.has('pilares')) { const cor = corP('pilares_intro', '#5a5570'); add('pilares_intro', <p key="pilintro" {...atr('pilares_intro', 'Introdução (pilares)', cor, { fontSize: corpo, color: cor, margin: '0 0 5px', lineHeight: 1.4 })}>{V(c.pilaresIntro)}</p>, 'Introdução (pilares)', 'texto', 'pilares_intro', true) }
   if (c.pilares.length && !ocultasP.has('pilares')) emitirPilares(c.pilares, 'pilar', 'pilares')
   // Grupos de pilar SEPARADOS: cada "Desempenho por pilar" adicionado vira um bloco próprio (não junta no mesmo).
   ;(c.pilaresGrupos ?? []).forEach((grupo, gi) => { if (grupo.length) emitirPilares(grupo, `pilarG:${gi}`, `pilaresG:${gi}`) })

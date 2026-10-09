@@ -488,6 +488,8 @@ export function ProvaClient({ token, hudInicial, darkInicial = false, internoAti
           theme={simTheme}
           dark={dark}
           onToggleDark={toggleDark}
+          logoUrl={sessao?.branding?.logoUrl ?? null}
+          logoGrandeUrl={sessao?.branding?.logoGrandeUrl ?? null}
         />
       )
     }
@@ -606,6 +608,7 @@ export function ProvaClient({ token, hudInicial, darkInicial = false, internoAti
         theme={simTheme}
         titulo={sessao.simuladoTitulo ?? 'Simulado'}
         logoUrl={sessao.branding?.logoUrl ?? null}
+        logoGrandeUrl={sessao.branding?.logoGrandeUrl ?? null}
         banca={questaoAtual.disciplina ?? undefined}
         questoes={sessao.questoes}
         qi={questaoIndex + 1}

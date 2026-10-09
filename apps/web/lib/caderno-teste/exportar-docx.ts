@@ -123,6 +123,7 @@ export async function gerarDocxDiagnostico(item: ItemCaderno, disc: DiscBanco[],
   // Desempenho por pilar (linha de cards).
   if (c.pilares.length) {
     banner(c.tituloPilares ?? 'Desempenho por pilar', corParte('sec_pilares', a.corPrimaria || '#2d254f'))
+    if (c.pilaresIntro) nodes.push(P(runs(c.pilaresIntro, vars, { color: '5A5570', size: sz(11), font: 'Arial' }), { align: AlignmentType.JUSTIFIED }))
     const w = Math.floor(100 / c.pilares.length)
     nodes.push(tabela([new TableRow({ children: c.pilares.map((pl, i) => {
       const cor = corParte(`pilar:${i}`, a.corPrimaria || '#2d254f')

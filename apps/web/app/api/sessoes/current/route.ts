@@ -4,66 +4,57 @@ import { type HudCores } from '@/lib/caderno-designer/types'
 import { resolverHudConfig } from '@/lib/hud/resolve-hud'
 import { funcaoEtiquetaPorQuestao, funcaoBloqueia } from '@/lib/simulado/etiqueta-funcao'
 import { etiquetasPorQuestao } from '@/lib/aluno/etiquetas-questao'
+import { memoEstatico } from '@/lib/cache/memo-estatico'
 
 // GET /api/sessoes/current?token={embed_token}&st={sessao_id}
 // Carrega o estado da sessão para o runner do aluno.
 // Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
+//
+// ESCALA (1000+ alunos no mesmo simulado): o CONTEÚDO (questões + alternativas + metadados + branding)
+// é IGUAL pra todos → cacheado com `remember` (Redis em prod, memória no dev) p/ 1500 alunos não lerem
+// as 60 questões do banco 1500×. Só o PER-ALUNO (respostas/discursivas da sessão) é lido ao vivo.
+// Invalida por TTL curto (anulação/alteração durante a prova reflete em ≤ alguns min; a re-correção
+// server-side cuida da PONTUAÇÃO de qualquer jeito). Degrada com elegância (Redis fora → computa direto).
 export const dynamic = 'force-dynamic'
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url)
-  const st = searchParams.get('st') // sessao_id (UUID)
-  if (!st) {
-    return NextResponse.json({ message: 'Sessão ausente.' }, { status: 400 })
-  }
+/** Bundle COMPARTILHADO por simulado (igual p/ todos os alunos) — o que é caro de ler e repetido. */
+interface Compartilhado {
+  questoes: any[]
+  simuladoTitulo: string
+  tempo_limite_min: number | null
+  hudCores: HudCores
+  hudPorPagina: any
+  branding: { nome: string; logoUrl: string | null; logoGrandeUrl: string | null; logoBg: string; logoEstilo: string } | null
+}
 
+async function carregarCompartilhado(simuladoId: string, tenantId: string): Promise<Compartilhado> {
   const supabase = createAdminClient()
-
-  const { data: sessao } = await supabase
-    .from('simulado_sessoes_prova')
-    .select('id, simulado_id, estudante_id, status, iniciado_em, tenant_id')
-    .eq('id', st)
-    .maybeSingle()
-
-  if (!sessao) {
-    return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
-  }
+  const admin = createAdminClient()
 
   // Tolerante à coluna imagem_url (pode não ter sido migrada): tenta com ela, cai sem.
   const selQ = (cols: string) => supabase
     .from('simulado_prova_questoes')
     .select(`ordem, anulada, questoes:simulado_questoes(${cols})`)
-    .eq('simulado_id', sessao.simulado_id)
+    .eq('simulado_id', simuladoId)
     // Defesa em profundidade: só serve questões DO tenant da sessão (service role bypassa RLS;
     // impede que uma linha cross-tenant eventualmente injetada na prova apareça na prova do aluno).
-    .eq('tenant_id', (sessao as { tenant_id?: string }).tenant_id ?? '00000000-0000-0000-0000-000000000000')
+    .eq('tenant_id', tenantId)
     // Anuladas NÃO são escondidas: aparecem no runner com as assertivas, porém bloqueadas
     // para resposta (ponto garantido a todos). A flag `anulada` vai no payload.
     .order('ordem')
 
-  const admin = createAdminClient()
-  // Estado da sessão em PARALELO (caminho quente: abrir/retomar a prova). Antes ~6 em série.
-  const [
-    { data: simulado },
-    sq,
-    { data: respostas },
-    { data: disc },
-    hud,
-    branding,
-  ] = await Promise.all([
-    supabase.from('simulado_simulados').select('tempo_limite_min, titulo').eq('id', sessao.simulado_id).single(),
+  const [{ data: simulado }, sq, hud, branding] = await Promise.all([
+    supabase.from('simulado_simulados').select('tempo_limite_min, titulo').eq('id', simuladoId).single(),
     (async () => {
       let sqr = await selQ('id, tipo, enunciado, imagem_url, disciplinas:simulado_disciplinas(nome), alternativas:simulado_alternativas(id, texto, ordem)')
       if (sqr.error && /imagem_url|column/i.test(sqr.error.message)) sqr = await selQ('id, tipo, enunciado, disciplinas:simulado_disciplinas(nome), alternativas:simulado_alternativas(id, texto, ordem)')
       if (sqr.error) sqr = await selQ('id, tipo, enunciado, alternativas:simulado_alternativas(id, texto, ordem)')
       return sqr.data
     })(),
-    supabase.from('simulado_respostas_objetivas').select('questao_id, alternativa_id').eq('sessao_id', sessao.id),
-    supabase.from('simulado_respostas_discursivas').select('id, questao_id, texto').eq('sessao_id', sessao.id),
-    resolverHudConfig(sessao.simulado_id, sessao.tenant_id),
-    (async (): Promise<{ nome: string; logoUrl: string | null; logoGrandeUrl: string | null; logoBg: string; logoEstilo: string } | null> => {
+    resolverHudConfig(simuladoId, tenantId),
+    (async (): Promise<Compartilhado['branding']> => {
       try {
-        const { data: t } = await admin.from('simulado_tenants').select('nome, tema').eq('id', sessao.tenant_id).maybeSingle()
+        const { data: t } = await admin.from('simulado_tenants').select('nome, tema').eq('id', tenantId).maybeSingle()
         const tema = (t?.tema ?? {}) as any
         return {
           nome: tema.nome_site ?? t?.nome ?? 'Simulado',
@@ -119,9 +110,52 @@ export async function GET(request: NextRequest) {
   // Etiquetas de EXIBIÇÃO (badges nome + cor) por questão — mostradas no pop-up de expandir.
   try {
     const qids = questoes.map((q) => q.id).filter(Boolean)
-    const map = await etiquetasPorQuestao(admin, sessao.tenant_id, qids)
+    const map = await etiquetasPorQuestao(admin, tenantId, qids)
     for (const q of questoes) q.etiquetas = map.get(q.id) ?? []
   } catch { /* etiquetas ausentes */ }
+
+  return {
+    questoes,
+    simuladoTitulo: simulado?.titulo ?? 'Simulado',
+    tempo_limite_min: simulado?.tempo_limite_min ?? null,
+    hudCores: hud.base,
+    hudPorPagina: hud.porPagina,
+    branding,
+  }
+}
+
+export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url)
+  const st = searchParams.get('st') // sessao_id (UUID)
+  if (!st) {
+    return NextResponse.json({ message: 'Sessão ausente.' }, { status: 400 })
+  }
+
+  const supabase = createAdminClient()
+
+  const { data: sessao } = await supabase
+    .from('simulado_sessoes_prova')
+    .select('id, simulado_id, estudante_id, status, iniciado_em, tenant_id')
+    .eq('id', st)
+    .maybeSingle()
+
+  if (!sessao) {
+    return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
+  }
+
+  const tenantId = (sessao as { tenant_id?: string }).tenant_id ?? '00000000-0000-0000-0000-000000000000'
+
+  // CONTEÚDO compartilhado (questões + metadados) — cacheado por simulado (TTL curto). Em escala,
+  // 1500 alunos reutilizam o mesmo bundle em vez de recarregar as questões do banco.
+  const admin = createAdminClient()
+  const [compartilhado, { data: respostas }, { data: disc }] = await Promise.all([
+    // Conteúdo estático da prova (questões/alternativas/enunciados) — cache de vida longa POR RÉPLICA
+    // (protege o banco mesmo sem Redis) + Redis entre réplicas. 1500 alunos reutilizam o mesmo bundle.
+    memoEstatico(`sim-prova:questoes:${sessao.simulado_id}`, 600, () => carregarCompartilhado(sessao.simulado_id, tenantId)),
+    // PER-ALUNO (ao vivo): respostas objetivas e discursivas DESTA sessão.
+    supabase.from('simulado_respostas_objetivas').select('questao_id, alternativa_id').eq('sessao_id', sessao.id),
+    supabase.from('simulado_respostas_discursivas').select('id, questao_id, texto').eq('sessao_id', sessao.id),
+  ])
 
   const respMap: Record<string, string> = {}
   for (const r of respostas ?? []) {
@@ -144,22 +178,18 @@ export async function GET(request: NextRequest) {
     } catch { /* tabela ainda não migrada */ }
   }
 
-  // Cores do HUD do caderno vinculado ao simulado — recolore a prova com o tema do caderno.
-  const hudCores: HudCores = hud.base
-  const hudPorPagina = hud.porPagina
-
   return NextResponse.json({
     id: sessao.id,
-    questoes,
-    simuladoTitulo: simulado?.titulo ?? 'Simulado',
-    tempo_limite_min: simulado?.tempo_limite_min ?? null,
+    questoes: compartilhado.questoes,
+    simuladoTitulo: compartilhado.simuladoTitulo,
+    tempo_limite_min: compartilhado.tempo_limite_min,
     iniciado_em: sessao.iniciado_em,
     status: sessao.status,
     respostas: respMap,
     respostas_discursivas: respDisc,
     paginas_discursivas: respDiscPaginas,
-    hudCores,
-    hudPorPagina,
-    branding,
+    hudCores: compartilhado.hudCores,
+    hudPorPagina: compartilhado.hudPorPagina,
+    branding: compartilhado.branding,
   })
 }

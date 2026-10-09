@@ -32,6 +32,25 @@ const OK = OK_GREEN
 const ERR = ERR_RED
 const WARN = AMBER
 
+// Logo do header por TEMA (igual ao runner do simulado): fundo CLARO (temas claro/azul) → logo ESCURA
+// (logoGrande/dark, p/ contraste); fundo ESCURO → logo CLARA (logoUrl, feita p/ fundo escuro). Sem logo
+// cai na marca genérica MEQ. Antes o "Simulado finalizado" usava sempre a marca genérica.
+function HeaderLogo({ dark, logoUrl, logoGrandeUrl, logoDarkUrl }: { dark?: boolean; logoUrl?: string | null; logoGrandeUrl?: string | null; logoDarkUrl?: string | null }) {
+  const logoClaro = logoGrandeUrl ?? logoDarkUrl ?? logoUrl // fundo claro → logo escura
+  const logoEscuro = logoUrl ?? logoDarkUrl ?? logoGrandeUrl // fundo escuro → logo clara
+  const logoSrc = dark ? logoEscuro : logoClaro
+  if (!logoSrc) return <MarcaMeq size={26} />
+  const temLogoClaraDedicada = !!(logoGrandeUrl || logoDarkUrl)
+  if (!dark && !temLogoClaraDedicada) {
+    return (
+      <span style={{ display: 'inline-flex', alignItems: 'center', padding: '5px 11px', borderRadius: 10, background: MEQ_NAVY_GRAD }}>
+        <img src={logoSrc} alt="" style={{ height: 22, maxWidth: 110, objectFit: 'contain' }} />
+      </span>
+    )
+  }
+  return <img src={logoSrc} alt="" style={{ height: 28, maxWidth: 120, objectFit: 'contain', borderRadius: 6 }} />
+}
+
 // ── Shape do resultado (idêntico ao do RevisaoFinal) ────────────────────────────
 interface AltRev { id: string; texto: string; correta?: boolean }
 interface QuestaoRev {
@@ -85,6 +104,9 @@ export function ResultadoMeqNova({
   theme = 'claro',
   dark,
   onToggleDark,
+  logoUrl = null,
+  logoGrandeUrl = null,
+  logoDarkUrl = null,
 }: {
   sessionToken: string
   /** Token do simulado — "Refazer" aponta p/ /simulado/{token} (novo login). */
@@ -94,6 +116,11 @@ export function ResultadoMeqNova({
   theme?: SimTheme
   dark?: boolean
   onToggleDark?: () => void
+  /** Logo do tenant (white-label) por TEMA — igual ao runner: `logoUrl` = logo clara (fundo escuro);
+   *  `logoGrandeUrl`/`logoDarkUrl` = logo escura (fundo claro). Sem logo cai na marca genérica MEQ. */
+  logoUrl?: string | null
+  logoGrandeUrl?: string | null
+  logoDarkUrl?: string | null
 }) {
   const router = useRouter()
   const [data, setData] = useState<Resultado | null>(null)
@@ -278,7 +305,7 @@ export function ResultadoMeqNova({
       <div style={{ position: 'relative', zIndex: 1 }}>
         {/* HEADER */}
         <div className={`${PFX}-top`} style={{ position: 'sticky', top: 0, zIndex: 20, display: 'flex', alignItems: 'center', gap: 20, height: 70, padding: '0 32px', background: 'var(--surface)', borderBottom: '1px solid var(--line)' }}>
-          <MarcaMeq size={26} />
+          <HeaderLogo dark={dark} logoUrl={logoUrl} logoGrandeUrl={logoGrandeUrl} logoDarkUrl={logoDarkUrl} />
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 14, fontWeight: 700, color: OK }}><IconCheck size={15} sw={2.8} /> Simulado finalizado</span>
           <span style={{ flex: 1 }} />
           {onToggleDark && (

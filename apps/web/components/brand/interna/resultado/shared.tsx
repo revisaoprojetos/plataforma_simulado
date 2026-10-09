@@ -25,6 +25,7 @@ import {
   Info,
   Layers,
   Lightbulb,
+  Loader2,
   Lock,
   type LucideIcon,
   Medal,
@@ -39,6 +40,7 @@ import {
   Users,
   Zap,
 } from 'lucide-react'
+import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import type { Brand } from '../interna-tokens'
 import type {
@@ -577,14 +579,67 @@ export function RingStats({ data }: { data: ResultadoInternoData }) {
 
 // ───────────────────────────── downloads reais ──────────────────────────────
 
+/**
+ * Baixa o caderno (PDF) MOSTRANDO feedback — igual ao portal Revisão (`meu-simulado-view`):
+ * `toast.loading('Gerando PDF…')` + spinner no botão enquanto o servidor renderiza o PDF no Chromium
+ * (pode levar segundos), com re-tentativa em 503 (servidor ocupado). PDFs importados (arquivo direto,
+ * href fora de `/api/`) abrem na hora, sem geração. Antes era um `<a download>` cru, sem aviso nenhum
+ * — por isso o MEQ "não mostrava a notificação" que o Revisão mostra.
+ */
+function useBaixarPdf() {
+  const [baixando, setBaixando] = useState(false)
+  async function baixar(href: string, nome: string) {
+    if (baixando) return
+    // Arquivo direto (PDF importado) → abre sem gerar no servidor.
+    if (!/\/api\//.test(href)) { window.open(href, '_blank', 'noopener,noreferrer'); return }
+    setBaixando(true)
+    toast.loading('Gerando PDF com o fundo e os cards…', { id: 'cadpdf' })
+    try {
+      let res: Response | null = null
+      for (let tentativa = 0; tentativa < 3; tentativa++) {
+        res = await fetch(href)
+        if (res.status !== 503) break
+        toast.loading('Servidor ocupado gerando PDFs… tentando de novo', { id: 'cadpdf' })
+        await new Promise((r) => setTimeout(r, 2000 * (tentativa + 1)))
+      }
+      if (!res || !res.ok) {
+        let msg = 'Não foi possível gerar o PDF agora. Tente novamente em instantes.'
+        try { const j = await res?.json(); if (j?.message) msg = j.message } catch { /* corpo não-JSON */ }
+        throw new Error(msg)
+      }
+      const blob = await res.blob()
+      if (!blob.size || !/pdf/i.test(blob.type)) throw new Error('O PDF gerado veio vazio. Tente novamente em instantes.')
+      const url = URL.createObjectURL(blob)
+      const fnome = new URLSearchParams(href.split('?')[1] ?? '').get('nome') || nome.replace(/[\\/:*?"<>|]+/g, '').replace(/\s+/g, '_') || 'caderno'
+      const a = document.createElement('a')
+      a.href = url; a.download = `${fnome}.pdf`
+      document.body.appendChild(a); a.click(); a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 10_000)
+      toast.success('Download concluído', { id: 'cadpdf', description: nome })
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'Não foi possível gerar o PDF agora. Tente novamente em instantes.', { id: 'cadpdf' })
+    } finally {
+      setBaixando(false)
+    }
+  }
+  return { baixando, baixar }
+}
+
 function DlTile({ brand, dl, compact }: { brand: Brand; dl: ResDownload; compact?: boolean }) {
   const r = brand === 'revisao' ? 14 : brand === 'vnd' ? 12 : 8
   const Icon = /comentad/i.test(dl.nome) ? MessageSquare : /diagn/i.test(dl.nome) ? BarChart3 : /caderno/i.test(dl.nome) ? BookOpen : Download
+  const { baixando, baixar } = useBaixarPdf()
+  const [hover, setHover] = useState(false)
+  const on = hover && !baixando
   return (
-    <a
-      href={dl.href}
+    <button
+      type="button"
+      onClick={() => baixar(dl.href, dl.nome)}
+      disabled={baixando}
       className="rrz-dlc"
       title={`Baixar ${dl.nome}`}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
       style={{
         display: 'inline-flex',
         alignItems: 'center',
@@ -592,21 +647,26 @@ function DlTile({ brand, dl, compact }: { brand: Brand; dl: ResDownload; compact
         height: compact ? 36 : 42,
         padding: compact ? '0 12px' : '0 14px',
         borderRadius: r,
-        border: '1px solid var(--line)',
-        background: 'var(--surface)',
+        border: `1px solid ${on ? acc(brand) : 'var(--line)'}`,
+        background: on ? 'var(--chip)' : 'var(--surface)',
         color: 'var(--ink)',
+        font: 'inherit',
         fontSize: compact ? 12 : 12.5,
         fontWeight: 700,
         whiteSpace: 'nowrap',
         textDecoration: 'none',
+        cursor: baixando ? 'default' : 'pointer',
+        transform: on ? 'translateY(-1px)' : 'none',
+        boxShadow: on ? `0 8px 18px -10px ${acc(brand)}` : 'none',
+        transition: 'transform .16s ease, box-shadow .16s ease, border-color .16s ease, background .16s ease',
       }}
     >
-      <span style={{ width: compact ? 22 : 26, height: compact ? 22 : 26, borderRadius: 7, background: 'var(--chip)', color: acc(brand), display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-        <Icon size={compact ? 13 : 14} />
+      <span style={{ width: compact ? 22 : 26, height: compact ? 22 : 26, borderRadius: 7, background: on ? acc(brand) : 'var(--chip)', color: on ? '#fff' : acc(brand), display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background .16s ease, color .16s ease' }}>
+        {baixando ? <Loader2 size={compact ? 13 : 14} className="animate-spin" /> : <Icon size={compact ? 13 : 14} />}
       </span>
-      {dl.nome}
-      <ArrowRight size={13} style={{ opacity: 0.6, marginLeft: 2 }} />
-    </a>
+      {baixando ? 'Gerando PDF…' : dl.nome}
+      {baixando ? null : <ArrowRight size={13} style={{ opacity: 0.6, marginLeft: 2, transform: on ? 'translateX(2px)' : 'none', transition: 'transform .16s ease' }} />}
+    </button>
   )
 }
 
@@ -826,28 +886,47 @@ export function AttRows({
 
 // Cadernos de UMA realização — ícones de download na mesma linha (à direita). Cada tipo de caderno
 // (sem gabarito + com gabarito quando liberado) vira um botão-ícone com o nome no tooltip.
+function CadernoInlineBtn({ d, brand }: { d: { nome: string; href: string; comGab: boolean }; brand: Brand }) {
+  const { baixando, baixar } = useBaixarPdf()
+  const [hover, setHover] = useState(false)
+  const on = hover && !baixando
+  const accent = d.comGab ? acc(brand) : 'var(--ink)'
+  return (
+    <button
+      type="button"
+      onClick={() => baixar(d.href, d.nome)}
+      disabled={baixando}
+      title={`Baixar ${d.nome}${d.comGab ? ' (com gabarito)' : ''}`}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6, height: 30, padding: '0 11px', borderRadius: 9,
+        border: `1px solid ${on ? acc(brand) : d.comGab ? 'color-mix(in srgb, ' + acc(brand) + ' 45%, var(--line))' : 'var(--line)'}`,
+        background: on ? 'var(--chip)' : d.comGab ? 'var(--chip)' : 'var(--surface2)',
+        color: accent, font: 'inherit', fontSize: 11.5, fontWeight: 700, whiteSpace: 'nowrap', textDecoration: 'none', flexShrink: 0,
+        cursor: baixando ? 'default' : 'pointer',
+        transform: on ? 'translateY(-1px)' : 'none',
+        boxShadow: on ? `0 6px 14px -8px ${acc(brand)}` : 'none',
+        transition: 'transform .16s ease, box-shadow .16s ease, border-color .16s ease, background .16s ease',
+      }}
+    >
+      {baixando ? <Loader2 size={13} className="animate-spin" style={{ flexShrink: 0 }} /> : <Download size={13} style={{ flexShrink: 0 }} />}
+      {baixando ? 'Gerando PDF…' : d.nome}
+    </button>
+  )
+}
+
 function CadernosInline({ downloads, brand, mobile }: { downloads: { nome: string; href: string; comGab: boolean }[]; brand: Brand; mobile?: boolean }) {
   if (!downloads.length) return null
   const semGab = downloads.filter((d) => !d.comGab)
   const comGab = downloads.filter((d) => d.comGab)
-  const Btn = (d: { nome: string; href: string; comGab: boolean }, i: number) => (
-    <a
-      key={(d.comGab ? 'g' : 's') + i}
-      href={d.href}
-      download
-      title={`Baixar ${d.nome}${d.comGab ? ' (com gabarito)' : ''}`}
-      style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 30, padding: '0 11px', borderRadius: 9, border: `1px solid ${d.comGab ? 'color-mix(in srgb, ' + acc(brand) + ' 45%, var(--line))' : 'var(--line)'}`, background: d.comGab ? 'var(--chip)' : 'var(--surface2)', color: d.comGab ? acc(brand) : 'var(--ink)', fontSize: 11.5, fontWeight: 700, whiteSpace: 'nowrap', textDecoration: 'none', flexShrink: 0 }}
-    >
-      <Download size={13} style={{ flexShrink: 0 }} />{d.nome}
-    </a>
-  )
   return (
     // Desktop: tudo na MESMA linha, à direita. MOBILE: QUEBRA em várias linhas (flex-wrap) e alinha à
     // esquerda — senão os botões (flexShrink:0 + nowrap) estouravam a tela e saíam cortados.
     <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, flexWrap: mobile ? 'wrap' : 'nowrap', justifyContent: mobile ? 'flex-start' : 'flex-end' }}>
-      {semGab.map(Btn)}
+      {semGab.map((d, i) => <CadernoInlineBtn key={'s' + i} d={d} brand={brand} />)}
       {semGab.length && comGab.length ? <span aria-hidden style={{ width: 1, height: 20, background: 'var(--line)', margin: '0 3px', flexShrink: 0 }} /> : null}
-      {comGab.map(Btn)}
+      {comGab.map((d, i) => <CadernoInlineBtn key={'g' + i} d={d} brand={brand} />)}
     </div>
   )
 }

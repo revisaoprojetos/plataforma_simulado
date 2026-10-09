@@ -2,17 +2,38 @@
 // importação (Word/HTML). Um item de diagnóstico guarda este objeto em `item.conteudo`.
 
 export type DiagBanda = { faixa: string; texto: string }
-/** Fonte dos dados de um card: pilar canônico (`{pct_pilar_<chave>}`) ou disciplina (`{pct_<chave>}`). */
-export type TipoFonte = 'pilar' | 'disciplina'
-/** `chave` = slug do pilar/disciplina. `tipoFonte` decide o prefixo da variável (pilar_ ou nada). */
+/** Fonte dos dados de um card: pilar canônico (`{pct_pilar_<chave>}`), disciplina (`{pct_<chave>}`) ou
+ *  BLOCO agregado (`{pct_bloco_<chave>}`, ex.: conhecimentos gerais × específicos). */
+export type TipoFonte = 'pilar' | 'disciplina' | 'bloco'
+/** `chave` = slug do pilar/disciplina/bloco. `tipoFonte` decide o prefixo da variável. */
 export type DiagPilar = { nome: string; chave?: string; tipoFonte?: TipoFonte; totalTxt: string; bandas: DiagBanda[] }
 /** `chave` = slug da disciplina → casa com {pct_<chave>}/{acerto_<chave>}/{total_<chave>}/{assuntos_<chave>}. */
 export type DiagDisciplina = { nome: string; chave?: string; total: string; categoria: string }
 
-/** Prefixo da variável conforme a fonte: pilar canônico usa `pilar_`; disciplina, sem prefixo. */
-export function prefFonte(tipo?: TipoFonte): string { return tipo === 'disciplina' ? '' : 'pilar_' }
+/** Prefixo da variável conforme a fonte: pilar canônico usa `pilar_`; disciplina, sem prefixo; bloco, `bloco_`. */
+export function prefFonte(tipo?: TipoFonte): string { return tipo === 'disciplina' ? '' : tipo === 'bloco' ? 'bloco_' : 'pilar_' }
 /** Legenda "x de N questões" com as variáveis certas para a chave/fonte. */
 export function totalTxtDe(chave: string, tipo?: TipoFonte): string { const p = prefFonte(tipo); return `{acerto_${p}${chave}} de {total_${p}${chave}} questões` }
+
+/** Parseia uma faixa ("0-49", "18-20", "02", "0-01") em [min,max] numérico. null se não for numérica. */
+export function parseFaixaRange(f: string): [number, number] | null {
+  const m = String(f ?? '').replace(/\s+/g, '').match(/^(\d+)(?:[-–](\d+))?$/)
+  if (!m) return null
+  const lo = Number(m[1]); const hi = m[2] != null ? Number(m[2]) : lo
+  return [Math.min(lo, hi), Math.max(lo, hi)]
+}
+/** Escolhe a banda que casa com o desempenho. Suporta faixas por PORCENTAGEM (0-49/50-80/81-100) E por
+ *  CONTAGEM de acertos (ex.: 0-14/15-29/30-37, 0-01, 02, 18-20) — detecta contagem quando o TETO das
+ *  faixas ≤ total de questões (ex.: 37 ≤ 37). Sem dado (acerto/total 0 e sem match), devolve a 1ª banda. */
+export function escolherBanda(bandas: DiagBanda[] | undefined, acerto: number, total: number, pct: number): DiagBanda | null {
+  if (!bandas || !bandas.length) return null
+  const ranges = bandas.map((b) => ({ b, r: parseFaixaRange(b.faixa) }))
+  const maxHi = Math.max(0, ...ranges.map((x) => (x.r ? x.r[1] : 0)))
+  const porContagem = total > 0 && maxHi <= total
+  const valor = porContagem ? acerto : pct
+  const hit = ranges.find((x) => x.r && valor >= x.r[0] && valor <= x.r[1])
+  return hit?.b ?? bandas[0] ?? null
+}
 
 /** Slug igual ao de merge.ts (para as variáveis casarem com os dados do banco/aluno). */
 export function slugDiag(s: string): string {
@@ -53,6 +74,9 @@ export type DiagConteudo = {
   tituloPilares?: string
   tituloDisciplinas?: string
   tituloSugestoes?: string
+  /** Parágrafo introdutório da seção de pilares (ex.: "Este simulado inclui 40 questões de Conhecimentos
+   *  Específicos…"), renderizado entre a faixa de seção e os cards de pilar. */
+  pilaresIntro?: string
   pilares: DiagPilar[]
   /** Seção SEPARADA (ex.: Língua Portuguesa na PGE/RS) — card de pilar/disciplina próprio, fora dos jurídicos.
    * `chave`/`tipoFonte` tornam adaptável a qualquer matéria (ex.: história) conforme os dados do simulado. */
@@ -354,6 +378,88 @@ export const DIAG_PGE_RS: DiagConteudo = {
     'Importante: caso este simulado reproduza uma prova aplicada, algumas questões — especialmente as de legislação e jurisprudência — podem estar desatualizadas por alterações legislativas e evolução do entendimento dos tribunais.',
     'Abaixo, as questões que sofreram atualização (edite conforme o recorte da PGE/RS):',
   ],
+  gabaritoObs: [],
+}
+
+/** Preset pronto: Diagnóstico de Desempenho — MEQ. Montado a partir do modelo DOCX do MEQ (padrão TRT).
+ *  Usa BLOCO agregado "Conhecimentos Gerais" ({pct_bloco_gerais}) separado dos pilares de Específicos, e
+ *  FAIXAS POR CONTAGEM de acertos (0-10/11-17/18-20; 0-14/15-29/30-37; 0-01/02/03). */
+export const DIAG_MEQ: DiagConteudo = {
+  tituloCabecalho: 'Diagnóstico de Desempenho',
+  // Só o nome do simulado (variável {simulado}); se quiser acrescentar concurso/cargo, é editável no item.
+  subtitulo: '{simulado}',
+  notaTotal: '{total_questoes}',
+  notaTexto: '{acertos} acertos de {total_questoes} questões — {percentual} de aproveitamento',
+  intro: [
+    'Este é o 2º Concurso Simulado do MEQ, elaborado para reproduzir, o mais próximo possível, as características da prova que você está se preparando para enfrentar. E sim: lembra da onda de TRTs que o professor Breno tanto fala? Pois é. Ela está chegando!',
+    'E, desta vez, o nosso simulado vai um pouco além. Como os concursos para os Tribunais Regionais do Trabalho envolvem diferentes etapas, este relatório foi pensado para ser uma ferramenta que você poderá consultar também posteriormente, ao longo da sua preparação.',
+    'Neste estágio, o objetivo vai além de identificar conteúdos que você ainda não domina. O simulado deve funcionar como uma ferramenta de diagnóstico, ajudando você a localizar gargalos de desempenho e transformar seus erros em decisões mais estratégicas de estudo.',
+    'O número de acertos é apenas uma parte desse diagnóstico. O dado realmente relevante está na leitura do seu desempenho por bloco (Conhecimentos Gerais e Conhecimentos Específicos), por pilar (Lei Seca, Jurisprudência e Doutrina) e por disciplina.',
+    'Essa análise permite compreender não apenas o que você errou, mas, principalmente, qual é a natureza de cada erro e qual intervenção de estudo ele exige. Um erro por desconhecimento do conteúdo demanda uma abordagem diferente daquele causado por uma leitura incompleta da lei, pela desatualização jurisprudencial, pela dificuldade de aplicação de um conceito doutrinário ou, ainda, por uma falha de atenção e interpretação no momento da prova.',
+    'Por isso, ao finalizar o simulado, não olhe apenas para o resultado final. Guarde este relatório. Ele poderá ser consultado posteriormente para orientar suas decisões de estudo e ajudar você a entender quais conhecimentos precisam ser reforçados e quais pontos merecem maior atenção em cada etapa da preparação.',
+    'E a preparação para as próximas etapas já começou: a prova discursiva está disponível na área de Membros do aluno. Acesse a plataforma para conferir as orientações e realizar essa etapa.',
+  ],
+  // Bloco "Conhecimentos Gerais" (agregado): usa a seção separada (mesmo render do "Língua Portuguesa").
+  linguaPortuguesa: {
+    chave: 'gerais', tipoFonte: 'bloco',
+    secTitulo: 'DESEMPENHO EM CONHECIMENTOS GERAIS',
+    secIntro: 'Este simulado inclui 20 questões de Conhecimentos Gerais, no mesmo padrão da prova real. Esse bloco não pode ser subestimado: além do peso que tem na nota final, costuma ser o mais "domável" da prova, pois se constrói com treino de leitura, revisão de regras pontuais e prática constante de questões.',
+    titulo: 'CONHECIMENTOS GERAIS',
+    totalTxt: '{acerto_bloco_gerais} de {total_bloco_gerais} questões',
+    bandas: [
+      { faixa: '0-10', texto: 'Seu desempenho em Conhecimentos Gerais ficou abaixo do esperado, e isso merece atenção. Esse bloco reúne disciplinas que estão presentes em praticamente todos os concursos e que pesam diretamente na sua classificação. Como as bancas costumam combinar regras gramaticais e interpretação de texto em uma mesma questão, e cobrar raciocínio lógico de forma aplicada, a melhor estratégia é fortalecer essas frentes simultaneamente. Retome a leitura ativa de textos, revise temas como concordância, regência, crase e pontuação e reserve um tempo fixo da semana para resolver questões de raciocínio lógico e matemático.' },
+      { faixa: '11-17', texto: 'Seu desempenho em Conhecimentos Gerais ficou na faixa intermediária, mostrando que você já possui uma boa base, mas ainda há espaço para evoluir. É comum que uma única questão exija, ao mesmo tempo, domínio das regras gramaticais (como concordância, regência, crase e pontuação) e uma boa capacidade de interpretação de texto. Por isso, nem sempre é fácil identificar se o erro aconteceu por falta de conhecimento da regra ou por uma leitura imprecisa. Vale reforçar a leitura ativa de textos, combinando esse hábito com a revisão dos principais tópicos gramaticais cobrados pelas bancas e com a prática regular de questões de raciocínio lógico. É um investimento importante, especialmente porque esse bloco é decisivo para a classificação.' },
+      { faixa: '18-20', texto: 'Seu desempenho em Conhecimentos Gerais foi excelente. Ter um bom domínio desse bloco é um diferencial importante e ajuda a manter estabilidade em uma parte relevante da prova. Para manter esse excelente desempenho, continue cultivando o hábito da leitura ativa de textos variados, faça revisões periódicas de temas como concordância, regência, crase e pontuação e mantenha a prática de questões de raciocínio lógico. Assim, você preserva um dos seus principais pontos fortes até o dia da prova.' },
+    ],
+  },
+  tituloPilares: 'DESEMPENHO POR PILAR — CONHECIMENTOS ESPECÍFICOS',
+  pilaresIntro: 'Este simulado inclui 40 questões de Conhecimentos Específicos, no mesmo padrão da prova real. É nesse bloco que se concentra a maior parte da pontuação e onde, normalmente, se define a classificação final. Por isso, o seu resultado aqui deve ser lido em conjunto com o desempenho por pilar e por disciplina, apresentados a seguir.',
+  pilares: [
+    { nome: 'LEI SECA', chave: 'lei_seca', totalTxt: '{acerto_pilar_lei_seca} de {total_pilar_lei_seca} questões', bandas: [
+      { faixa: '0-14', texto: 'Seu desempenho em Lei Seca ficou abaixo do esperado, e esse é o principal sinal de atenção deste diagnóstico. As bancas cobram de forma recorrente o texto literal da lei, e esse tipo de questão costuma ser um dos maiores responsáveis pela reprovação. A boa notícia é que, diferente da jurisprudência, essa é uma lacuna que pode ser superada principalmente com leitura, repetição e revisão. Antes de priorizar outras frentes, reorganize seu cronograma para dar destaque à leitura da legislação das disciplinas de maior peso na prova. Faça grifos, utilize revisões espaçadas e fortaleça primeiro esse pilar, que costuma oferecer o retorno mais rápido.' },
+      { faixa: '15-29', texto: 'Seu desempenho em Lei Seca ficou em uma faixa intermediária, o que mostra que você já conhece boa parte dos institutos, mas ainda perde pontos em detalhes como redação do dispositivo, prazos ou exceções. Esses detalhes fazem toda a diferença. As bancas costumam cobrar exatamente o texto da lei e, por isso, esse é um tipo de questão que pode ser recuperado com um bom plano de revisão. Priorize a releitura ativa da legislação das disciplinas em que você mais errou, destacando os dispositivos e revisando de forma consistente. Esse costuma ser um dos pilares que responde mais rapidamente a um estudo bem organizado.' },
+      { faixa: '30-37', texto: 'Seu desempenho em Lei Seca foi excelente, e isso representa uma vantagem importante. As bancas cobram com frequência o texto literal da lei e exigem atenção aos detalhes dos dispositivos, não apenas o entendimento geral dos institutos. Ter essa base bem consolidada faz diferença porque tanto a jurisprudência quanto a doutrina se apoiam no conhecimento da letra da lei. Continue revisando os dispositivos mais cobrados e aproveite essa vantagem para dedicar mais tempo aos pilares em que seu desempenho ainda pode evoluir.' },
+    ] },
+    { nome: 'JURISPRUDÊNCIA', chave: 'jurisprudencia', totalTxt: '{acerto_pilar_jurisprudencia} de {total_pilar_jurisprudencia} questões', bandas: [
+      { faixa: '0-01', texto: 'Seu desempenho em Jurisprudência ficou abaixo do esperado e merece atenção. As bancas mantêm um padrão consistente de cobrança de súmulas, orientações jurisprudenciais e teses fixadas pelos tribunais superiores. Um resultado como esse normalmente indica que o acompanhamento da jurisprudência não está acontecendo com a frequência ou a profundidade que a prova exige. É comum deixar esse estudo para depois enquanto se prioriza lei e doutrina, mas esse momento chegou. Reserve um bloco fixo da sua semana para acompanhar os informativos e as súmulas dos tribunais superiores de forma contínua.' },
+      { faixa: '02', texto: 'Seu desempenho em Jurisprudência ficou na faixa intermediária, o que mostra que ainda existe um bom espaço para crescimento. Se a Lei Seca costuma garantir muitos pontos, a jurisprudência é o que frequentemente diferencia quem conquista as primeiras colocações de quem fica na linha entre aprovação e reprovação. Como seu resultado já demonstra uma boa base, vale a pena investir nesse pilar agora. Continue acompanhando os informativos e as súmulas dos tribunais superiores para fortalecer esse diferencial.' },
+      { faixa: '03', texto: 'Seu desempenho em Jurisprudência foi excelente, e isso é um diferencial importante neste momento da preparação. Embora a Lei Seca tenha um peso grande na prova, é a jurisprudência que costuma separar os candidatos mais bem preparados dos demais. Para manter esse nível, continue acompanhando semanalmente os informativos e as súmulas dos tribunais superiores.' },
+    ] },
+    { nome: 'DOUTRINA', chave: 'doutrina', totalTxt: '{acerto_pilar_doutrina} de {total_pilar_doutrina} questões', bandas: [
+      { faixa: '0-49', texto: 'O desempenho em doutrina ficou abaixo do esperado. Doutrina é a base do raciocínio jurídico — quem não domina classificações, distinções conceituais e princípios tende a errar também em questões de lei e jurisprudência. O investimento em doutrina tem retorno duplo.' },
+      { faixa: '50-80', texto: 'O desempenho em doutrina foi intermediário. Você acerta nas questões mais diretas, mas perde quando a banca explora distinções mais finas ou classificações menos óbvias. Dominar doutrina ajuda a ganhar pontos também em questões de lei e jurisprudência com elemento conceitual de fundo.' },
+      { faixa: '81-100', texto: 'O desempenho em doutrina foi excelente. Você demonstra domínio das classificações, distinções conceituais e fundamentos teóricos que a banca costuma explorar, e isso tende a se refletir também em questões de lei e jurisprudência com fundo conceitual. Mantenha a solidez.' },
+    ] },
+  ],
+  disciplinasIntro: 'A análise a seguir tem foco nos seus pontos de erro e está dividida em Conhecimentos Gerais e Conhecimentos Específicos. Para cada disciplina de Conhecimentos Específicos, você encontra o desempenho por categoria (lei seca, jurisprudência e doutrina) e uma leitura personalizada do que os erros revelam sobre as lacunas a priorizar. Nas disciplinas de Conhecimentos Gerais, também trazemos um apontamento do assunto errado.',
+  disciplinas: [
+    { nome: 'Língua Portuguesa', chave: 'lingua_portuguesa', total: 'x/10', categoria: 'Assunto Principal' },
+    { nome: 'Raciocínio Lógico e Matemático', chave: 'raciocinio_logico_e_matematico', total: 'x/5', categoria: 'Assunto Principal' },
+    { nome: 'Direito Administrativo', chave: 'direito_administrativo', total: 'x/7', categoria: 'Assunto Principal' },
+    { nome: 'Direito Constitucional', chave: 'direito_constitucional', total: 'x/7', categoria: 'Assunto Principal' },
+    { nome: 'Direito do Trabalho', chave: 'direito_do_trabalho', total: 'x/7', categoria: 'Assunto Principal' },
+    { nome: 'Direito Processual do Trabalho', chave: 'direito_processual_do_trabalho', total: 'x/7', categoria: 'Assunto Principal' },
+    { nome: 'Direito Civil', chave: 'direito_civil', total: 'x/6', categoria: 'Assunto Principal' },
+    { nome: 'Direito Processual Civil', chave: 'direito_processual_civil', total: 'x/6', categoria: 'Assunto Principal' },
+    { nome: 'Direitos Humanos', chave: 'direitos_humanos', total: 'x/5', categoria: 'Assunto Principal' },
+  ],
+  tituloSugestoes: 'SUGESTÕES DE ESTUDO',
+  sugestoes: [
+    { titulo: 'LEI SECA', prioridade: 'Prioridade Alta', corTitulo: '#d17a00', intro: 'As bancas cobram lei seca de forma direta e literal — saber o dispositivo exato faz diferença entre acertar e errar. Combinando o último concurso com o padrão geral das bancas, os dispositivos de maior recorrência são:', itens: [
+      { forte: true, texto: '[Dispositivo / tema prioritário]' },
+      { forte: true, texto: '[Dispositivo / tema prioritário]' },
+      { forte: true, texto: '[Dispositivo / tema prioritário]' },
+    ] },
+    { titulo: 'JURISPRUDÊNCIA', prioridade: 'Prioridade Alta', corTitulo: '#d17a00', intro: 'Jurisprudência é o ponto sensível que não pode ser negligenciado. As bancas cobram súmulas, orientações jurisprudenciais e teses fixadas de forma sistemática — quem não acompanha jurisprudência perde questões que dava para acertar. Cruzando o último concurso com o padrão geral das bancas, a prioridade é:', itens: [
+      { forte: true, texto: '[Dispositivo / tema prioritário]' },
+      { forte: true, texto: '[Dispositivo / tema prioritário]' },
+      { forte: true, texto: '[Dispositivo / tema prioritário]' },
+    ] },
+  ],
+  fechamento: [],
+  partesOcultas: ['gabarito'],
+  gabaritoTitulo: '',
+  gabaritoIntro: [],
   gabaritoObs: [],
 }
 

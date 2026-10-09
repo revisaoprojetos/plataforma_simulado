@@ -234,6 +234,19 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
         vars[`pct_pilar_${chave}`] = '0%'
       }
     }
+    // BLOCOS agregados (ex.: diagnóstico MEQ): Conhecimentos GERAIS (Português, Raciocínio Lógico/Matemática,
+    // Informática, Atualidades, Ética…) × ESPECÍFICOS (o restante — tipicamente as disciplinas jurídicas).
+    // Classificação pelo NOME da disciplina → {pct_bloco_gerais}/{acerto_bloco_gerais}/{total_bloco_gerais} e _especificos.
+    const ehGerais = (d: string) => /(portugu|l[ií]ngua|racioc|l[óo]gic|matem|inform[áa]tic|atualidad|[ée]tic|reda[çc][ãa]o|ingl[êe]s|espanhol|conhecimentos\s+gerais)/i.test(d)
+    let gAc = 0, gTot = 0, eAc = 0, eTot = 0
+    for (const [d, tot] of discTotais) {
+      const ac = porDisc.get(d) ?? 0
+      if (ehGerais(d)) { gAc += ac; gTot += tot } else { eAc += ac; eTot += tot }
+    }
+    vars['acerto_bloco_gerais'] = String(gAc); vars['total_bloco_gerais'] = String(gTot)
+    vars['pct_bloco_gerais'] = gTot ? `${Math.round((gAc / gTot) * 100)}%` : '0%'
+    vars['acerto_bloco_especificos'] = String(eAc); vars['total_bloco_especificos'] = String(eTot)
+    vars['pct_bloco_especificos'] = eTot ? `${Math.round((eAc / eTot) * 100)}%` : '0%'
     return { id: a.id, nome: a.nome ?? a.email ?? 'Aluno', vars, respostas: Object.fromEntries(marcadaPorAluno.get(a.id) ?? []) }
   })
 }

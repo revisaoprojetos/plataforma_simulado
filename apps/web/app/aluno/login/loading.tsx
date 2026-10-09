@@ -1,8 +1,18 @@
-import { PlatformLoader } from '@/components/brand/platform-loader'
-
-// Tela de carregamento do DESIGNER NOVO (PlatformLoader) — substitui a HUD (ProvaLoading). Sem `brand`/
-// `style`, o PlatformLoader resolve a marca/estilo do loading pela plataforma (host) via
-// /api/public/appearance. A entrada (login) branded fica em page.tsx (EntradaReal).
+// Fallback de carregamento NEUTRO (sem marca). No 1º load/refresh ainda não dá pra saber a marca do
+// TOKEN, então NÃO resolvemos marca pelo host — em localhost/subdomínio (ex.: meq.localhost) o host
+// caía no padrão e PISCAVA o visual do Revisão (R roxo) num simulado do MEQ. A entrada branded correta
+// (EntradaReal) aparece logo em seguida, já com a marca certa do token.
 export default function Loading() {
-  return <PlatformLoader message="Carregando…" />
+  return (
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center"
+      style={{ background: 'linear-gradient(150deg,#12141c,#181b26,#1e2230)' }}
+      role="status"
+      aria-busy="true"
+      aria-live="polite"
+    >
+      <span style={{ width: 36, height: 36, borderRadius: '50%', border: '3px solid rgba(255,255,255,.16)', borderTopColor: 'rgba(255,255,255,.72)', animation: 'simloadspin .8s linear infinite' }} />
+      <style>{`@keyframes simloadspin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  )
 }

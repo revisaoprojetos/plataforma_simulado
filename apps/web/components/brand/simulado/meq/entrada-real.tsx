@@ -29,6 +29,14 @@ export interface EntradaRealProps {
   loadingStyle?: string
   /** logo REAL do tenant (white-label) — exibida no cabeçalho da entrada no lugar da marca genérica. */
   logoUrl?: string | null
+  /** logo do tenant p/ fundo ESCURO (tema escuro). No tema claro usa `logoUrl`. */
+  logoDarkUrl?: string | null
+  /** logo GRANDE (campo da entrada do aluno) — vira a logo ESCURA no tema claro. */
+  logoGrandeUrl?: string | null
+  /** capa do simulado (imagem ORIGINAL) p/ o fundo do cabeçalho do card. */
+  capaUrl?: string | null
+  /** enquadramento salvo da capa (formato paisagem) — render fiel ao ajuste do admin. */
+  capaCfg?: import('@/lib/capa-meta').CapaViewCfg | null
   /** nome da plataforma (ex.: "MEQ Concursos") para a linha de identificação. */
   plataforma: string
   /** e-mail já logado no portal (read-only/pré-preenchido). */
@@ -222,6 +230,8 @@ export function EntradaReal(props: EntradaRealProps) {
       inicioISO: prova.dataInicio ?? agoraISO,
       fimISO: prova.dataFim ?? agoraISO,
       semJanela: !prova.dataInicio && !prova.dataFim, // sem data de início/fim → "Sempre aberto"
+      capaUrl: props.capaUrl ?? null,
+      capaCfg: props.capaCfg ?? null,
       inscritos: 0,
       regras: [],
       recompensa: '',
@@ -242,7 +252,7 @@ export function EntradaReal(props: EntradaRealProps) {
   const real: SimEntradaReal = {
     metodo, email, setEmail, cpf, setCpf, telefone, setTelefone,
     onIdentificar, onValidar, carregando, erro, voltarHref: '/aluno', onToggleTheme: toggleDark,
-    plataforma, logoUrl: props.logoUrl ?? null, permiteFolha: prova.permiteFolha,
+    plataforma, logoUrl: props.logoUrl ?? null, logoDarkUrl: props.logoDarkUrl ?? null, logoGrandeUrl: props.logoGrandeUrl ?? null, permiteFolha: prova.permiteFolha,
   }
 
   return <PlatformSimulado brand={brand} tela="entrada" theme={theme} data={data} es={es} real={real} />

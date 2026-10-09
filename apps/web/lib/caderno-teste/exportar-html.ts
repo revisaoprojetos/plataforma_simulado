@@ -1,5 +1,5 @@
 import 'server-only'
-import { DIAG_PADRAO, slugDiag, topicosParaTexto, prefFonte, type DiagPilar } from './diagnostico'
+import { DIAG_PADRAO, slugDiag, topicosParaTexto, prefFonte, escolherBanda, type DiagPilar } from './diagnostico'
 import { CORES_PILAR_PADRAO, type ItemCaderno, type PreviewQuestao } from './tipos'
 import { formatarInline, formatarMarcadores } from './formato'
 import { cssDaFonte } from '@/lib/caderno-designer/theme'
@@ -32,12 +32,15 @@ function preencher(t: string, vars: Record<string, string>): string {
   })
 }
 function bandaAdaptativa(pilar: DiagPilar, vars: Record<string, string>): { faixa: string; texto: string } | null {
-  const raw = pilar.chave ? vars[`pct_${prefFonte(pilar.tipoFonte)}${pilar.chave}`] : undefined
+  if (!pilar.chave) return null
+  const pref = prefFonte(pilar.tipoFonte)
+  const raw = vars[`pct_${pref}${pilar.chave}`]
   if (raw == null) return null
-  const n = parseFloat(String(raw).replace('%', '').replace(',', '.'))
-  if (isNaN(n)) return null
-  const f = n <= 49 ? '0-49' : n <= 80 ? '50-80' : '81-100'
-  return pilar.bandas.find((b) => b.faixa === f) ?? pilar.bandas[0] ?? null
+  const pct = parseFloat(String(raw).replace('%', '').replace(',', '.'))
+  if (isNaN(pct)) return null
+  const acerto = parseFloat(String(vars[`acerto_${pref}${pilar.chave}`] ?? '0').replace(',', '.')) || 0
+  const total = parseFloat(String(vars[`total_${pref}${pilar.chave}`] ?? '0').replace(',', '.')) || 0
+  return escolherBanda(pilar.bandas, acerto, total, pct)
 }
 
 function htmlDiagnostico(item: ItemCaderno, vars: Record<string, string>, disc: DiscBanco[]): string {
@@ -73,7 +76,8 @@ function htmlDiagnostico(item: ItemCaderno, vars: Record<string, string>, disc: 
     h += `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:10px"><tr><td style="background:#fff2cc;border:1px solid ${cor}22;padding:10px">${card}</td></tr></table>`
   }
   if (c.pilares.length) {
-    h += sec('Desempenho por pilar')
+    h += sec(c.tituloPilares ?? 'Desempenho por pilar')
+    if (c.pilaresIntro) h += `<p style="font-size:${fsz('pilares_intro', corpo)};color:${corP('pilares_intro', '#5a5570')};margin:0 0 8px;line-height:1.4;${fonteCss('pilares_intro')}">${V(c.pilaresIntro)}</p>`
     h += '<table style="width:100%;border-collapse:separate;border-spacing:10px 0"><tr style="vertical-align:top">'
     c.pilares.forEach((pl, i) => {
       const banda = bandaAdaptativa(pl, vars)

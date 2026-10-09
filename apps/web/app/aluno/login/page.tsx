@@ -6,6 +6,8 @@ import { resolverHudConfig } from '@/lib/hud/resolve-hud'
 import { lerAparenciaAuth } from '@/lib/brand/aparencia-auth'
 import { EntradaReal } from '@/components/brand/simulado/meq/entrada-real'
 import { AppearanceSeed } from '@/components/brand/appearance-seed'
+import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
+import { remember } from '@/lib/cache/relatorio-cache'
 import { FontScaleInit } from '@/components/font-scale-init'
 import type { SimTheme, TipoResposta } from '@/components/brand/simulado/types'
 import type { Metadata } from 'next'
@@ -45,7 +47,7 @@ const fetchSimulado = cache(async (token: string) => {
     const svc = createAdminClient()
     const { data } = await svc
       .from('simulado_simulados')
-      .select('id, titulo, metodo_identificacao, tenant_id, status, data_inicio, data_fim, tempo_limite_min')
+      .select('id, titulo, metodo_identificacao, tenant_id, status, data_inicio, data_fim, tempo_limite_min, regras')
       .eq('embed_token', token)
       .single()
     return data ?? null
@@ -54,7 +56,8 @@ const fetchSimulado = cache(async (token: string) => {
   }
 })
 
-const fetchBranding = cache(async (tenantId: string) => {
+// Branding é IGUAL pra todos os alunos do tenant → cacheado (remember) p/ reduzir egress no pico.
+const fetchBranding = cache((tenantId: string) => remember(`sim-entrada:branding:${tenantId}`, 300, async () => {
   try {
     const svc = createAdminClient()
     const { data: t } = await svc.from('simulado_tenants').select('nome, slug, tema').eq('id', tenantId).maybeSingle()
@@ -70,6 +73,7 @@ const fetchBranding = cache(async (tenantId: string) => {
       // Aparência COMPLETA p/ semear os loaders pela marca do TOKEN (não a do host).
       aparencia: ap,
       logoUrl: (tema.logo_url ?? null) as string | null,
+      logoDarkUrl: (tema.logo_dark_url ?? null) as string | null,
       logoGrandeUrl: (tema.logo_grande_url ?? null) as string | null,
       logoBg: (tema.logo_png_bg ?? '#ffffff') as string,
       logoEstilo: (tema.logo_estilo ?? 'arredondado') as string,
@@ -77,7 +81,7 @@ const fetchBranding = cache(async (tenantId: string) => {
   } catch {
     return null
   }
-})
+}))
 
 // Info da prova p/ a entrada branded (nº de questões, tipo A–E/CE, permite folha). Espelha /simulado/[token].
 async function fetchInfoProva(simuladoId: string, tenantId: string): Promise<{ nQuestoes: number | null; tipo: TipoResposta; permiteFolha: boolean }> {
@@ -140,7 +144,19 @@ export default async function AlunoLoginPage({ searchParams }: PageProps) {
   // EmbedLoginForm desativada no login. (Reversível.) Fallback: sem branding → genérico.
   const usaEntradaNova = !!branding
   if (usaEntradaNova && branding) {
-    const info = await fetchInfoProva(simulado.id, simulado.tenant_id)
+    // Info da prova + capa — IGUAIS pra todos os alunos → CACHEADAS (remember) p/ reduzir egress no pico.
+    const [info, capa] = await Promise.all([
+      remember(`sim-entrada:info:${simulado.id}`, 1800, () => fetchInfoProva(simulado.id, simulado.tenant_id)),
+      remember(`sim-entrada:capa:${simulado.id}`, 600, async () => {
+        const vis = (await resolverVisualSimulados(createAdminClient(), [{ id: simulado.id, regras: (simulado as any).regras }])).get(simulado.id)
+        return {
+          capaUrl: vis?.capaMeta?.orig ?? vis?.capaBanner ?? vis?.capa ?? null,
+          capaCfg: vis?.capaMeta?.ticket ?? null,
+        }
+      }),
+    ])
+    const capaUrl = capa.capaUrl
+    const capaCfg = capa.capaCfg
     return (
       <>
         <AppearanceSeed appearance={branding.aparencia} />
@@ -150,6 +166,10 @@ export default async function AlunoLoginPage({ searchParams }: PageProps) {
           brand={branding.brand}
           loadingStyle={branding.aparencia.loadingStyle}
           logoUrl={branding.logoUrl}
+          logoDarkUrl={branding.logoDarkUrl}
+          logoGrandeUrl={branding.logoGrandeUrl}
+          capaUrl={capaUrl}
+          capaCfg={capaCfg}
           metodo={metodo}
           temaInicial={dark ? 'escuro' : branding.temaInicial}
           plataforma={branding.nome}

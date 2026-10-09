@@ -7,6 +7,8 @@
 // renderizadas apenas em /simulado/preview (produção/motor de prova intactos).
 // O wiring ao backend real vem em rodada dedicada.
 
+import type { CapaViewCfg } from '@/lib/capa-meta'
+
 export type Brand = 'revisao' | 'vnd' | 'meq'
 export type SimTheme = 'claro' | 'escuro' | 'azul' // 'azul' só MEQ
 export type Tela = 'entrada' | 'prova' | 'resultado'
@@ -29,6 +31,10 @@ export interface SimInfo {
   fimISO: string
   /** Simulado SEM janela (sem data de início/fim) → UI mostra "Sempre aberto · sem prazo". */
   semJanela?: boolean
+  /** Capa do simulado (imagem) — usada como fundo do cabeçalho do card da entrada, quando houver. */
+  capaUrl?: string | null
+  /** Enquadramento (recorte/efeitos) da capa p/ formato paisagem — render fiel ao que o admin ajustou. */
+  capaCfg?: CapaViewCfg | null
   inscritos: number
   regras: string[]
   recompensa: string
@@ -159,6 +165,10 @@ export interface SimEntradaReal {
   plataforma: string
   /** Logo REAL do tenant (white-label) — quando presente substitui a marca genérica no cabeçalho. */
   logoUrl?: string | null
+  /** Logo do tenant para FUNDO ESCURO (tema escuro). No tema claro usa-se `logoUrl`; no escuro, esta. */
+  logoDarkUrl?: string | null
+  /** Logo GRANDE (campo "prova/embed/entrada do aluno") — usada como a logo ESCURA no tema claro da entrada. */
+  logoGrandeUrl?: string | null
   /** Simulado permite abrir só a folha de respostas? */
   permiteFolha: boolean
 }

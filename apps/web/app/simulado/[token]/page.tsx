@@ -1,4 +1,5 @@
 import dynamic from 'next/dynamic'
+import { cache } from 'react'
 import { resolveTemaDark } from '@/lib/hud/resolve-dark'
 import { createAdminClient } from '@/lib/supabase/server'
 import { resolverHudConfig } from '@/lib/hud/resolve-hud'
@@ -7,7 +8,20 @@ import { AlertCircle } from 'lucide-react'
 import { FontScaleInit } from '@/components/font-scale-init'
 import { lerAparenciaAuth } from '@/lib/brand/aparencia-auth'
 import { AppearanceSeed } from '@/components/brand/appearance-seed'
+import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
+import { remember } from '@/lib/cache/relatorio-cache'
 import type { SimTheme, TipoResposta } from '@/components/brand/simulado/types'
+import type { Metadata } from 'next'
+
+// Título da aba = nome do tenant DO TOKEN (não do host). Sem isto, em localhost/subdomínio caía no
+// tenant padrão (Revisão) → a aba mostrava "Revisão" mesmo num simulado do MEQ.
+export async function generateMetadata({ params }: { params: Promise<{ token: string }> }): Promise<Metadata> {
+  const { token } = await params
+  const sim = await fetchSimulado(token)
+  if (!sim) return { title: 'Simulado' }
+  const b = await fetchBranding(sim.tenant_id)
+  return { title: b?.nome ? `${b.nome} · Simulado` : 'Simulado' }
+}
 
 // Code-split por ROTA de uso: a entrada (sem ?st=) não precisa compilar/baixar o runner (ProvaClient
 // puxa os 3 runners + resultados + folha + HUD), e o runner (com ?st=) não precisa da entrada. Em dev
@@ -24,8 +38,7 @@ export default async function ProvaPage({ params, searchParams }: { params: Prom
   const { token } = await params
   const { st } = await searchParams
 
-  const sim = await fetchSimulado(token)
-  const dark = await resolveTemaDark()
+  const [sim, dark] = await Promise.all([fetchSimulado(token), resolveTemaDark()])
 
   // HUD (cores/estilo por página) do caderno vinculado — login e prova seguem o designer.
   let base: HudCores = HUD_CORES_PADRAO
@@ -50,7 +63,20 @@ export default async function ProvaPage({ params, searchParams }: { params: Prom
     // Fallback: se o branding não resolver, cai no EmbedLoginForm (segurança).
     const usaEntradaNova = !!branding
     if (usaEntradaNova) {
-      const info = await fetchInfoProva(sim.id, sim.tenant_id)
+      // Info da prova + capa — IGUAIS pra todos os alunos → CACHEADAS (remember) p/ reduzir egress no pico
+      // (1000 alunos no mesmo simulado não recomputam as mesmas queries). Expira por TTL.
+      const [info, capa] = await Promise.all([
+        remember(`sim-entrada:info:${sim.id}`, 1800, () => fetchInfoProva(sim.id, sim.tenant_id)),
+        remember(`sim-entrada:capa:${sim.id}`, 600, async () => {
+          const vis = (await resolverVisualSimulados(createAdminClient(), [{ id: sim.id, regras: sim.regras }])).get(sim.id)
+          return {
+            capaUrl: vis?.capaMeta?.orig ?? vis?.capaBanner ?? vis?.capa ?? null,
+            capaCfg: vis?.capaMeta?.ticket ?? null,
+          }
+        }),
+      ])
+      const capaUrl = capa.capaUrl
+      const capaCfg = capa.capaCfg
       return (
         <>
           <AppearanceSeed appearance={branding!.aparencia} />
@@ -60,6 +86,10 @@ export default async function ProvaPage({ params, searchParams }: { params: Prom
             brand={branding!.brand}
             loadingStyle={branding!.aparencia.loadingStyle}
             logoUrl={branding!.logoUrl}
+            logoDarkUrl={branding!.logoDarkUrl}
+            logoGrandeUrl={branding!.logoGrandeUrl}
+            capaUrl={capaUrl}
+            capaCfg={capaCfg}
             metodo={metodo}
             temaInicial={dark ? 'escuro' : branding!.temaInicial}
             plataforma={branding!.nome}
@@ -124,7 +154,8 @@ function SimuladoNaoEncontrado() {
   )
 }
 
-async function fetchSimulado(embedToken: string): Promise<{
+// cache(): dedupe por request — generateMetadata e a página compartilham o mesmo resultado (sem dobrar queries).
+const fetchSimulado = cache(async (embedToken: string): Promise<{
   id: string
   titulo: string
   metodo_identificacao: string | null
@@ -133,22 +164,24 @@ async function fetchSimulado(embedToken: string): Promise<{
   data_inicio: string | null
   data_fim: string | null
   tempo_limite_min: number | null
-} | null> {
+  regras: any
+} | null> => {
   try {
     const svc = createAdminClient()
     const { data } = await svc
       .from('simulado_simulados')
-      .select('id, titulo, metodo_identificacao, tenant_id, status, data_inicio, data_fim, tempo_limite_min')
+      .select('id, titulo, metodo_identificacao, tenant_id, status, data_inicio, data_fim, tempo_limite_min, regras')
       .eq('embed_token', embedToken)
       .maybeSingle()
     return (data as any) ?? null
   } catch {
     return null
   }
-}
+})
 
-/** Marca do tenant (logo + nome + brand/tema) para login/prova seguirem a configuração. */
-async function fetchBranding(tenantId: string) {
+/** Marca do tenant (logo + nome + brand/tema) para login/prova seguirem a configuração.
+ *  É IGUAL pra todos os alunos do tenant → cacheado (remember) p/ 1000 alunos não gerarem 1000 queries. */
+const fetchBranding = cache((tenantId: string) => remember(`sim-entrada:branding:${tenantId}`, 300, async () => {
   try {
     const svc = createAdminClient()
     const { data: t } = await svc.from('simulado_tenants').select('nome, slug, tema').eq('id', tenantId).maybeSingle()
@@ -164,6 +197,7 @@ async function fetchBranding(tenantId: string) {
       // Aparência COMPLETA (marca + estilos de login/carregamento) p/ semear os loaders pela marca do TOKEN.
       aparencia: ap,
       logoUrl: (tema.logo_url ?? null) as string | null,
+      logoDarkUrl: (tema.logo_dark_url ?? null) as string | null,
       logoGrandeUrl: (tema.logo_grande_url ?? null) as string | null,
       logoBg: (tema.logo_png_bg ?? '#ffffff') as string,
       logoEstilo: (tema.logo_estilo ?? 'arredondado') as string,
@@ -171,7 +205,7 @@ async function fetchBranding(tenantId: string) {
   } catch {
     return null
   }
-}
+}))
 
 /** Nº de questões, tipo (CE/A–E) e se o simulado permite abrir só a folha de respostas. */
 async function fetchInfoProva(simuladoId: string, tenantId: string): Promise<{ nQuestoes: number | null; tipo: TipoResposta; permiteFolha: boolean }> {

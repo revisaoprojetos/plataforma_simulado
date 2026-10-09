@@ -12,6 +12,30 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.6.0 — 2026-10-09
+
+- **Escala / egress (preparação p/ 1500+ alunos ao vivo):** o CONTEÚDO estático da prova (questões +
+  alternativas + enunciados), IGUAL p/ todos os alunos, deixou de ser lido do banco **por aluno**:
+  - `GET /api/sessoes/current` agora separa o **compartilhado (cacheado por simulado)** do **per-aluno
+    (ao vivo)**. Cache em **processo de vida longa por réplica** (`lib/cache/memo-estatico.ts`, 10 min)
+    **+ Redis** (`remember`) → protege o banco **mesmo sem Redis** (1500 alunos reutilizam o bundle).
+  - Entrada do simulado (`/simulado/[token]` e `/aluno/login`): `info/tipo`, **capa** e **branding**
+    cacheados (`remember`) — iguais p/ todos → não geram 1000× as mesmas queries. Queries paralelizadas.
+  - `GET /api/sessoes/tempo` (poll do timer) cacheia `tempo_limite_min`/regras (TTL 60s).
+  - Detecção de tipo CE×múltipla por **nº de alternativas** (regra do runner) incluída no cache de info.
+- **Entrada do MEQ — capa + layout:** capa do simulado ao **fundo do banner** com o **enquadramento salvo**
+  no editor (formato ticket/paisagem), banner mais alto, **sem fade**; `CADERNO DE PROVA · SIMULADO`
+  ocultado quando há capa; **Disponibilidade/Duração/Itens** movidos p/ um card limpo abaixo do banner;
+  **"Em andamento"** sobe p/ a linha da logo (fora do card).
+- **Logo por tema (white-label):** tema claro usa a logo ESCURA (`logo_grande_url`), tema escuro a clara
+  (`logo_url`); selo navy de fallback quando só há a logo branca. Threaded na entrada e no runner MEQ.
+- **Loader de carregamento NEUTRO** no fallback de rota (`loading.tsx` de `/simulado/[token]` e
+  `/aluno/login`) — não pisca mais a marca do Revisão num simulado de outra plataforma no 1º load.
+- **Título da aba** de `/simulado/[token]` passa a usar o nome do tenant do **TOKEN** (não do host).
+- **Rota do simulado mais leve no dev:** `generateMetadata` + `fetchSimulado`/`fetchBranding` com `cache()`
+  (dedupe por request); `next/dynamic` já separava entrada × runner.
+- Refinamentos em andamento de **caderno-teste/diagnóstico** e **resultado interno** entram no mesmo lote.
+
 ## 3.5.0 — 2026-10-09
 
 - **Fluxo do simulado 100% no designer novo nas 3 marcas (runner + resultado):**
