@@ -73,6 +73,8 @@ export async function gerarDocxDiagnostico(item: ItemCaderno, disc: DiscBanco[],
   const a = item.ajustes
   const prim = hx(a.corPrimaria || '#2d254f'), amar = hx(a.corSecundaria || '#f6b420')
   const corParte = (parte: string, def: string) => hx((a.coresParte ?? {})[parte] || def)
+  const corFundoParte = (parte: string, def: string) => hx((a.coresFundoParte ?? {})[parte] || def) // cor de FUNDO por bloco (pilar/card)
+  const corTextoParte = (parte: string, def: string) => hx((a.coresTextoParte ?? {})[parte] || def) // cor do TEXTO por bloco (nome/nota/faixas)
   const corPilar = (slug?: string) => hx((slug && ((a.coresPilar ?? {})[slug] || CORES_PILAR_PADRAO[slug])) || a.corPrimaria || '#2d254f')
   const P = (children: TextRun[], opts: { align?: any; after?: number } = {}) => new Paragraph({ children, alignment: opts.align, spacing: { after: opts.after ?? 80 } })
   const nodes: (Paragraph | Table)[] = []
@@ -91,15 +93,15 @@ export async function gerarDocxDiagnostico(item: ItemCaderno, disc: DiscBanco[],
   // Nome do aluno.
   if (a.mostrarDadosAluno) {
     nodes.push(tabela([new TableRow({ children: [
-      celula([P(runs(c.rotuloNome ?? 'NOME:', vars, { color: 'FFFFFF', size: sz(13), bold: true, font: 'Arial' }), { after: 0 })], { bg: corParte('diag_nome_rot', a.corPrimaria || '#2d254f'), widthPct: 18 }),
-      celula([P(runs(c.nomeTexto ?? '{nome}', vars, { color: '3B2F00', size: sz(11), bold: true, font: 'Arial' }), { after: 0 })], { bg: corParte('diag_nome_val', amar), widthPct: 82 }),
+      celula([P(runs(c.rotuloNome ?? 'NOME:', vars, { color: corTextoParte('diag_nome_rot', '#ffffff'), size: sz(13), bold: true, font: 'Arial' }), { after: 0 })], { bg: corParte('diag_nome_rot', a.corPrimaria || '#2d254f'), widthPct: 18 }),
+      celula([P(runs(c.nomeTexto ?? '{nome}', vars, { color: corTextoParte('diag_nome_val', '#3b2f00'), size: sz(11), bold: true, font: 'Arial' }), { after: 0 })], { bg: corParte('diag_nome_val', amar), widthPct: 82 }),
     ] })]))
   }
 
   // Nota.
   nodes.push(tabela([new TableRow({ children: [
-    celula([new Paragraph({ children: [...runs('{acertos}', vars, { color: 'FFFFFF', size: sz(30), bold: true, font: 'Arial' }), new TextRun({ text: `/${preencher(c.notaTotal, vars)}`, color: 'FFFFFF', size: sz(16), bold: true, font: 'Arial' })], spacing: { after: 0 } })], { bg: corParte('diag_nota_num', '#9b6800'), widthPct: 22 }),
-    celula([P(runs(c.notaTexto, vars, { color: '3B2F00', size: sz(11), bold: true, font: 'Arial' }), { after: 0 })], { bg: corParte('diag_nota_faixa', amar), widthPct: 78 }),
+    celula([new Paragraph({ children: [...runs('{acertos}', vars, { color: corTextoParte('diag_nota_num', '#ffffff'), size: sz(30), bold: true, font: 'Arial' }), new TextRun({ text: `/${preencher(c.notaTotal, vars)}`, color: corTextoParte('diag_nota_num', '#ffffff'), size: sz(16), bold: true, font: 'Arial' })], spacing: { after: 0 } })], { bg: corParte('diag_nota_num', '#9b6800'), widthPct: 22 }),
+    celula([P(runs(c.notaTexto, vars, { color: corTextoParte('diag_nota_faixa', '#3b2f00'), size: sz(11), bold: true, font: 'Arial' }), { after: 0 })], { bg: corParte('diag_nota_faixa', amar), widthPct: 78 }),
   ] })]))
 
   // Introdução.
@@ -116,8 +118,8 @@ export async function gerarDocxDiagnostico(item: ItemCaderno, disc: DiscBanco[],
       new Paragraph({ children: runs(`{pct_${prefFonte(lp.tipoFonte)}${lp.chave}}`, vars, { color: cor, size: sz(22), bold: true, font: 'Arial' }), spacing: { after: 20 } }),
       new Paragraph({ children: runs(lp.totalTxt, vars, { color: '5A5570', size: sz(10), font: 'Arial' }), spacing: { after: 40 } }),
     ]
-    for (const b of lp.bandas) { if (b.texto) kids.push(P(runs(b.texto, vars, { color: '243B53', size: sz(10), font: 'Arial' }), { align: AlignmentType.JUSTIFIED, after: 40 })) }
-    nodes.push(tabela([new TableRow({ children: [celula(kids, { bg: 'FFF2CC' })] })]))
+    for (const b of lp.bandas) { if (b.texto) kids.push(P(runs(b.texto, vars, { color: corTextoParte('lingua_card', '#243b53'), size: sz(10), font: 'Arial' }), { align: AlignmentType.JUSTIFIED, after: 40 })) }
+    nodes.push(tabela([new TableRow({ children: [celula(kids, { bg: corFundoParte('lingua_card', '#fff2cc') })] })]))
   }
 
   // Desempenho por pilar (linha de cards).
@@ -132,8 +134,8 @@ export async function gerarDocxDiagnostico(item: ItemCaderno, disc: DiscBanco[],
         new Paragraph({ children: runs(pl.chave ? `{pct_${prefFonte(pl.tipoFonte)}${pl.chave}}` : 'X%', vars, { color: cor, size: sz(22), bold: true, font: 'Arial' }), spacing: { after: 20 } }),
         new Paragraph({ children: runs(pl.totalTxt, vars, { color: '5A5570', size: sz(10), font: 'Arial' }), spacing: { after: 40 } }),
       ]
-      for (const b of pl.bandas) { if (b.texto) kids.push(P(runs(b.texto, vars, { color: '243B53', size: sz(9), font: 'Arial' }), { align: AlignmentType.JUSTIFIED, after: 40 })) }
-      return celula(kids, { bg: 'FFF2CC', widthPct: w })
+      for (const b of pl.bandas) { if (b.texto) kids.push(P(runs(b.texto, vars, { color: corTextoParte(`pilar:${i}`, '#243b53'), size: sz(9), font: 'Arial' }), { align: AlignmentType.JUSTIFIED, after: 40 })) }
+      return celula(kids, { bg: corFundoParte(`pilar:${i}`, '#fff2cc'), widthPct: w })
     }) })]))
   }
 

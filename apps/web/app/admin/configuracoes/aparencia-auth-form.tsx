@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { Save, Loader2, Check, Sun, Moon, Droplet, LogIn, MonitorPlay, Building2, ExternalLink } from 'lucide-react'
+import { Save, Loader2, Check, Sun, Moon, Droplet, LogIn, MonitorPlay, Building2, ExternalLink, Type, Plus, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Switch } from '@/components/ui/switch'
 import {
@@ -50,16 +50,33 @@ export function AparenciaAuthForm({ tema, salvarTema }: { tema: any; salvarTema:
     setTrocarAberto(false)
   }
 
+  // Ticker (título animado do login MEQ) — só editável quando o novo login da marca MEQ está ativo;
+  // em qualquer outra variação o editor some, mas a config permanece salva (reaparece ao reativar).
+  const mostrarTicker = cfg.loginAtivo && cfg.brand === 'meq'
+  const ticker = cfg.loginTicker
+  const setTicker = (patch: Partial<typeof ticker>) => setCfg((c) => ({ ...c, loginTicker: { ...c.loginTicker, ...patch } }))
+  const setPalavra = (i: number, v: string) => setTicker({ palavras: ticker.palavras.map((w, j) => (j === i ? v : w)) })
+  const addPalavra = () => setTicker({ palavras: [...ticker.palavras, ''] })
+  const removePalavra = (i: number) => setTicker({ palavras: ticker.palavras.filter((_, j) => j !== i) })
+
   function salvar() {
+    // Limpa palavras vazias antes de gravar; sem nenhuma válida, cai no padrão "Tribunais.".
+    const palavras = cfg.loginTicker.palavras.map((w) => w.trim()).filter(Boolean)
+    const toSave = { ...cfg, loginTicker: { animar: cfg.loginTicker.animar, palavras: palavras.length ? palavras : ['Tribunais.'] } }
     start(async () => {
       try {
-        await salvarTema({ aparencia_auth: cfg })
+        await salvarTema({ aparencia_auth: toSave })
         toast.success('Aparência de login e carregamento salva!')
       } catch (err) {
         toast.error(err instanceof Error ? err.message : 'Erro ao salvar')
       }
     })
   }
+
+  // Query p/ o "Pré-ver login" refletir as palavras/animação sem salvar (MEQ).
+  const tickerQS = cfg.brand === 'meq'
+    ? `&words=${encodeURIComponent(ticker.palavras.map((w) => w.trim()).filter(Boolean).join('|'))}&animar=${ticker.animar ? 1 : 0}`
+    : ''
 
   return (
     <div className="space-y-6">
@@ -122,6 +139,64 @@ export function AparenciaAuthForm({ tema, salvarTema }: { tema: any; salvarTema:
         onPick={(slug) => setCfg((c) => ({ ...c, loginStyle: slug }))}
         desativado={!cfg.loginAtivo}
       />
+
+      {/* Título do login (ticker) — só MEQ com o novo login ativo. Fora disso o editor some, mas a
+          config fica salva (reaparece ao reativar). */}
+      {mostrarTicker && (
+        <section className="space-y-3 rounded-xl border bg-muted/20 p-4 sm:max-w-xl">
+          <div className="flex items-center gap-2">
+            <span className="rounded-lg bg-primary/10 p-1.5 text-primary"><Type className="h-4 w-4" /></span>
+            <div>
+              <p className="text-sm font-medium">Título do login — palavras</p>
+              <p className="text-xs text-muted-foreground">“Treino de verdade para <b>…</b>”. Edite as palavras; ligue a animação para alterná-las.</p>
+            </div>
+          </div>
+
+          <label className="flex cursor-pointer items-center justify-between gap-3 rounded-lg border bg-background px-3 py-2.5">
+            <span className="min-w-0">
+              <span className="block text-sm font-medium">Animar (alternar as palavras)</span>
+              <span className="block text-[11px] text-muted-foreground">Desligado, mostra só a 1ª palavra (estático).</span>
+            </span>
+            <Switch checked={ticker.animar} onCheckedChange={(v) => setTicker({ animar: v })} />
+          </label>
+
+          <div className="space-y-2">
+            {ticker.palavras.map((p, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <span className="w-5 text-center text-xs font-semibold text-muted-foreground">{i + 1}</span>
+                <input
+                  value={p}
+                  onChange={(e) => setPalavra(i, e.target.value)}
+                  placeholder="Ex.: Tribunais."
+                  className="h-9 flex-1 rounded-lg border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+                />
+                <button
+                  type="button"
+                  onClick={() => removePalavra(i)}
+                  disabled={ticker.palavras.length <= 1}
+                  aria-label="Remover palavra"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border text-muted-foreground transition-colors hover:text-foreground disabled:opacity-40"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+            {ticker.palavras.length < 8 && (
+              <button
+                type="button"
+                onClick={addPalavra}
+                className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <Plus className="h-3.5 w-3.5" /> Adicionar palavra
+              </button>
+            )}
+          </div>
+
+          {ticker.animar && ticker.palavras.filter((w) => w.trim()).length < 2 && (
+            <p className="text-[11px] text-amber-600 dark:text-amber-400">Adicione 2+ palavras para a animação alternar — com 1 só, fica estático.</p>
+          )}
+        </section>
+      )}
 
       {/* Ativador do carregamento branded */}
       <label className="flex items-start gap-3 rounded-xl border bg-muted/20 p-4 cursor-pointer sm:max-w-xl">
@@ -196,7 +271,7 @@ export function AparenciaAuthForm({ tema, salvarTema }: { tema: any; salvarTema:
         </button>
         {/* Abre login/carregamento em nova aba com os estilos atuais (sem precisar salvar). */}
         <a
-          href={`/login/preview?view=login&brand=${cfg.brand}&login=${encodeURIComponent(cfg.loginStyle)}&loading=${encodeURIComponent(cfg.loadingStyle)}&theme=${cfg.defaultTheme}`}
+          href={`/login/preview?view=login&brand=${cfg.brand}&login=${encodeURIComponent(cfg.loginStyle)}&loading=${encodeURIComponent(cfg.loadingStyle)}&theme=${cfg.defaultTheme}${tickerQS}`}
           target="_blank" rel="noreferrer"
           className="inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-muted">
           <ExternalLink className="h-4 w-4" /> Pré-ver login

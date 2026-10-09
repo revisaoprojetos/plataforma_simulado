@@ -7,12 +7,14 @@ import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { softDelete } from '@/lib/soft-delete'
 import { hospedarBase64 } from '@/lib/storage/hospedar-base64'
-import { novoItemVazio, type Modalidade } from '@/lib/caderno-teste/tipos'
+import { novoItemVazio, novoItem, type Modalidade, type PaletaCores } from '@/lib/caderno-teste/tipos'
 import { remember, chaveRelatorio, esquecer, TTL_RELATORIO } from '@/lib/cache/relatorio-cache'
 
 const TABELA = 'simulado_caderno_modelos'
 const AREA = 'caderno_modelo'
 const NADA = '00000000-0000-0000-0000-000000000000'
+/** origem reservada: a "paleta de cores dos modelos padrão" da plataforma (1 linha por tenant, oculta do grid). */
+const PALETA_ORIGEM = 'paleta_padroes'
 
 /** Chave de cache da área (a lista inteira do tenant) + invalidação em toda mutação. */
 const chaveModelos = (tenantId: string) => chaveRelatorio(tenantId, 'modelos-caderno')
@@ -45,10 +47,12 @@ export async function carregarModelosArea(): Promise<{ ok: boolean; modelos: Mod
     // remember NÃO cacheia (o catch abaixo devolve ok:false sem gravar 30min de falha).
     const dados = await remember(chaveModelos(g.tenantId), TTL_RELATORIO, async () => {
       const svc = createAdminClient()
-      const modelos = await fetchAll<ModeloRow>(() => svc
+      const modelosRaw = await fetchAll<ModeloRow>(() => svc
         .from(TABELA)
         .select('id, nome, modalidade, origem, pasta_id, cor, capa_url, capa_card_url, atualizado_em, config')
         .eq('tenant_id', g.tenantId).eq('deletado', false).order('atualizado_em', { ascending: false }))
+      // A "paleta dos padrões" é uma linha interna (origem=paleta_padroes) — não aparece em "Meus modelos".
+      const modelos = modelosRaw.filter((m) => m.origem !== PALETA_ORIGEM)
       const pastasAll = await fetchAll<PastaModeloRow & { is_folder?: boolean; folder_area?: string }>(() => svc
         .from('simulado_pastas')
         .select('id, nome, pai_id, cor, capa_url, capa_card_url, is_folder, folder_area')
@@ -248,6 +252,57 @@ export async function excluirPastaModelo(id: string): Promise<{ ok: boolean; err
   await invalidarModelosCache(g.tenantId)
   revalidatePath('/admin/modelos-caderno')
   return { ok: true }
+}
+
+// ── Paleta de cores dos MODELOS PADRÃO (por plataforma) ──────────────────────
+// Uma linha interna por tenant (origem=paleta_padroes) guarda um modelo de diagnóstico cujas CORES
+// (ajustes) são aplicadas a TODOS os modelos padrão da plataforma. Editada no mesmo editor de modelos.
+
+/** Extrai o subconjunto de cores (PaletaCores) do config de um modelo. */
+function paletaDoConfig(config: unknown): PaletaCores {
+  const aj = (config as { item?: { ajustes?: Record<string, unknown> } } | null)?.item?.ajustes ?? {}
+  return {
+    corPrimaria: aj.corPrimaria as string | undefined,
+    corSecundaria: aj.corSecundaria as string | undefined,
+    coresPilar: (aj.coresPilar as Record<string, string>) ?? undefined,
+    coresDisc: (aj.coresDisc as Record<string, string>) ?? undefined,
+    coresParte: (aj.coresParte as Record<string, string>) ?? undefined,
+    coresTextoParte: (aj.coresTextoParte as Record<string, string>) ?? undefined,
+    coresFundoParte: (aj.coresFundoParte as Record<string, string>) ?? undefined,
+  }
+}
+
+/** Cores da paleta da plataforma (aplicadas aos modelos padrão). null se ainda não configurada. */
+export async function obterPaletaPadroes(): Promise<PaletaCores | null> {
+  const g = await guard()
+  if (!g.ok) return null
+  try {
+    const svc = createAdminClient()
+    const { data } = await svc.from(TABELA).select('config').eq('tenant_id', g.tenantId)
+      .eq('origem', PALETA_ORIGEM).eq('deletado', false).order('atualizado_em', { ascending: false }).limit(1).maybeSingle()
+    if (!data?.config) return null
+    return paletaDoConfig(data.config)
+  } catch { return null }
+}
+
+/** Abre (ou cria, a partir do modelo MEQ) a linha de paleta da plataforma e devolve o id p/ o editor. */
+export async function abrirOuCriarPaletaPadroes(): Promise<{ ok: boolean; id?: string; error?: string }> {
+  const g = await guard()
+  if (!g.ok) return g
+  const svc = createAdminClient()
+  const { data: existe } = await svc.from(TABELA).select('id').eq('tenant_id', g.tenantId)
+    .eq('origem', PALETA_ORIGEM).eq('deletado', false).order('atualizado_em', { ascending: false }).limit(1).maybeSingle()
+  if (existe?.id) return { ok: true, id: existe.id }
+  // Base rica com todos os blocos de diagnóstico (cabeçalho, nome, nota, pilares, disciplinas, sugestões).
+  const item = novoItem('diagnostico', 'meq')
+  const config = { v: 1, item, origem: PALETA_ORIGEM }
+  const { data, error } = await svc.from(TABELA).insert({
+    tenant_id: g.tenantId, nome: 'Cores dos modelos padrão', config, modalidade: 'diagnostico', origem: PALETA_ORIGEM, criado_por: g.atorId,
+  }).select('id').single()
+  if (error || !data) return { ok: false, error: error?.message ?? 'Erro ao criar paleta.' }
+  await registrarAudit({ operacao: 'INSERT', entidade: TABELA, entidadeId: data.id, depois: { paleta: true } })
+  await invalidarModelosCache(g.tenantId)
+  return { ok: true, id: data.id }
 }
 
 /** Fase 2 (consumo): modelos publicáveis para o construtor de caderno do simulado. */

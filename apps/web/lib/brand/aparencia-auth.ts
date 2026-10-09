@@ -19,6 +19,28 @@ import {
 
 export type { Brand, Theme }
 
+/** Título animado (ticker) do login MEQ — palavras configuráveis + liga/desliga a animação. */
+export interface LoginTicker {
+  /** `true` = alterna as palavras (animação de entrada); `false` = mostra só a primeira, estática. */
+  animar: boolean
+  /** Palavras exibidas no título do login (ex.: ["Tribunais.", "Polícias.", "Fiscais."]). */
+  palavras: string[]
+}
+
+export const TICKER_PADRAO: LoginTicker = { animar: false, palavras: ['Tribunais.'] }
+
+/** Sanea o ticker vindo do tema/console: strings não-vazias (máx. 8), fallback "Tribunais.". */
+export function sanearTicker(raw: unknown): LoginTicker {
+  const r = (raw ?? {}) as Partial<LoginTicker>
+  const palavras = Array.isArray(r.palavras)
+    ? r.palavras.map((p) => (typeof p === 'string' ? p.trim() : '')).filter(Boolean).slice(0, 8)
+    : []
+  return {
+    animar: r.animar === true,
+    palavras: palavras.length ? palavras : [...TICKER_PADRAO.palavras],
+  }
+}
+
 export interface AuthAppearance {
   brand: Brand
   /**
@@ -43,6 +65,8 @@ export interface AuthAppearance {
   defaultTheme: Theme // tema da tela de login/loading antes do usuário logar
   followSystemTheme: boolean // se true, usa prefers-color-scheme quando o usuário não escolheu
   loadingMinMs?: number | null // override opcional; null = padrão do estilo (§3.4)
+  /** Título animado (ticker) do login MEQ — editável no console. */
+  loginTicker: LoginTicker
 }
 
 /** Shape público devolvido pelo endpoint pré-login (sem metadados). */
@@ -95,8 +119,9 @@ export function lerAparenciaAuth(
   const loginAtivo = raw.loginAtivo === true
   const loadingAtivo = raw.loadingAtivo !== false
   const internoAtivo = raw.internoAtivo === true
+  const loginTicker = sanearTicker(raw.loginTicker)
 
-  return { brand, loginAtivo, loadingAtivo, internoAtivo, loginStyle, loadingStyle, defaultTheme, followSystemTheme, loadingMinMs }
+  return { brand, loginAtivo, loadingAtivo, internoAtivo, loginStyle, loadingStyle, defaultTheme, followSystemTheme, loadingMinMs, loginTicker }
 }
 
 /** Projeção pública (lida ANTES do login, sem dados sensíveis). */
@@ -111,6 +136,7 @@ export function aparenciaAuthPublica(a: AuthAppearance): AuthAppearancePublic {
     defaultTheme: a.defaultTheme,
     followSystemTheme: a.followSystemTheme,
     loadingMinMs: a.loadingMinMs ?? null,
+    loginTicker: a.loginTicker,
   }
 }
 
@@ -131,5 +157,6 @@ export function sanearAparenciaAuth(input: Partial<AuthAppearance>): AuthAppeara
     defaultTheme: temaValido(brand, input.defaultTheme as Theme) ? (input.defaultTheme as Theme) : cat.fallback.theme,
     followSystemTheme: input.followSystemTheme === true,
     loadingMinMs: typeof input.loadingMinMs === 'number' && input.loadingMinMs >= 0 ? input.loadingMinMs : null,
+    loginTicker: sanearTicker(input.loginTicker),
   }
 }

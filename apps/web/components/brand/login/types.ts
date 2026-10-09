@@ -65,4 +65,6 @@ export interface LoginVariantProps {
   plataforma: string
   /** Logo do tenant (quando houver); as variantes usam sobretudo os SVGs de marca. */
   logo?: string | null
+  /** Título animado (ticker) do login MEQ — palavras + liga/desliga a animação (editável no console). */
+  ticker?: { animar: boolean; palavras: string[] } | null
 }

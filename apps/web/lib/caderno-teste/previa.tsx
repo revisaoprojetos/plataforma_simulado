@@ -266,8 +266,8 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   ), 'Cabeçalho', 'cabecalho', 'diag_cab', true) }
   if (a.mostrarDadosAluno && !ocultasP.has('nome')) { const corN = corP('diag_nome_rot', prim), corV = corP('diag_nome_val', amar); add('diag_nome', (
     <div style={{ display: 'flex', overflow: 'hidden' }}>
-      <div {...atr('diag_nome_rot', 'Rótulo NOME', corN, { background: corN, color: '#fff', fontWeight: 800, fontSize: 14, padding: '8px 14px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' })}>{V(c.rotuloNome ?? 'NOME:')}</div>
-      <div {...atr('diag_nome_val', 'Faixa do nome', corV, { background: corV, color: '#3b2f00', flex: 1, display: 'flex', alignItems: 'center', padding: '8px 14px', fontSize: corpo, fontWeight: 600 })}>{V(c.nomeTexto ?? '{nome}')}</div>
+      <div {...atr('diag_nome_rot', 'Rótulo NOME', corN, { background: corN, color: corTextoP('diag_nome_rot', '#fff'), fontWeight: 800, fontSize: 14, padding: '8px 14px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' })}>{V(c.rotuloNome ?? 'NOME:')}</div>
+      <div {...atr('diag_nome_val', 'Faixa do nome', corV, { background: corV, color: corTextoP('diag_nome_val', '#3b2f00'), flex: 1, display: 'flex', alignItems: 'center', padding: '8px 14px', fontSize: corpo, fontWeight: 600 })}>{V(c.nomeTexto ?? '{nome}')}</div>
     </div>
   ), 'Nome do aluno', 'nome', 'diag_nome_rot', true) }
   // Card "Dados do estudante" — o MESMO bloco `identificacao` da folha (extraído do preset, sem cópia).
@@ -289,8 +289,8 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   }
   if (!ocultasP.has('nota')) { const corNum = corP('diag_nota_num', '#9b6800'), corFx = corP('diag_nota_faixa', amar); add('diag_nota', (
     <div style={{ display: 'flex', border: `1px solid ${prim}33`, overflow: 'hidden' }}>
-      <div {...atr('diag_nota_num', 'Bloco da nota', corNum, { background: corNum, color: '#fff', padding: '10px 20px', display: 'flex', alignItems: 'baseline' })}><span style={{ fontSize: fs('diag_nota_num', 32), fontWeight: 800 }}>{V('{acertos}')}</span><span style={{ fontSize: fs('diag_nota_num', 16), fontWeight: 700 }}>/{V(c.notaTotal)}</span></div>
-      <div {...atr('diag_nota_faixa', 'Faixa da nota', corFx, { background: corFx, color: '#3b2f00', flex: 1, display: 'flex', alignItems: 'center', padding: '10px 16px', fontSize: corpo, fontWeight: 600 })}>{V(c.notaTexto)}</div>
+      <div {...atr('diag_nota_num', 'Bloco da nota', corNum, { background: corNum, color: corTextoP('diag_nota_num', '#fff'), padding: '10px 20px', display: 'flex', alignItems: 'baseline' })}><span style={{ fontSize: fs('diag_nota_num', 32), fontWeight: 800 }}>{V('{acertos}')}</span><span style={{ fontSize: fs('diag_nota_num', 16), fontWeight: 700 }}>/{V(c.notaTotal)}</span></div>
+      <div {...atr('diag_nota_faixa', 'Faixa da nota', corFx, { background: corFx, color: corTextoP('diag_nota_faixa', '#3b2f00'), flex: 1, display: 'flex', alignItems: 'center', padding: '10px 16px', fontSize: corpo, fontWeight: 600 })}>{V(c.notaTexto)}</div>
     </div>
   ), 'Nota', 'nota', 'diag_nota_num', true) }
   c.intro.forEach((p, i) => { const cor = corP(`intro:${i}`, '#1a202c'); add(`intro:${i}`, <p key={`intro${i}`} {...atr(`intro:${i}`, `Parágrafo de abertura ${i + 1}`, cor, { fontSize: corpo, lineHeight: 1.4, textAlign: 'justify', margin: '0 0 3px', color: cor })}>{V(p)}</p>, `Introdução ${i + 1}`, 'texto', `intro:${i}`, true) })
@@ -318,7 +318,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
     const bandas = banda ? [banda] : lp.bandas
     const cor = corP('lingua_card', corDoPilar(lp.chave, a.coresPilar ?? {}, prim))
     add('lingua_card', (
-      <div key="lpcard" {...atr('lingua_card', lp.titulo, cor, { background: '#fff2cc', border: `1px solid ${cor}22`, padding: 8, marginBottom: 4 })}>
+      <div key="lpcard" {...atr('lingua_card', lp.titulo, cor, { background: corFundoP('lingua_card', '#fff2cc'), border: `1px solid ${cor}22`, padding: 8, marginBottom: 4 })}>
         <div style={{ fontSize: fs('lingua_card', 9), fontWeight: 700, color: cor, letterSpacing: 0.5 }}>{V(lp.titulo)}</div>
         <div style={{ fontSize: fs('lingua_card', 22), fontWeight: 800, color: cor, lineHeight: 1.1 }}>{V(`{pct_${prefFonte(lp.tipoFonte)}${lp.chave}}`)}</div>
         <div style={{ fontSize: fs('lingua_card', corpo), color: '#5a5570', marginBottom: 6 }}>{V(lp.totalTxt)}</div>
@@ -347,7 +347,7 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
           const vazio = algumComQuestoes && !!pl.chave && (t === undefined || t === '0')
           if (vazio) {
             return (
-              <div key={i} {...atr(parte, pl.nome, cor, { flex: 1, minWidth: 0, background: '#fff2cc', border: `1px solid ${cor}22`, padding: 8 })}>
+              <div key={i} {...atr(parte, pl.nome, cor, { flex: 1, minWidth: 0, background: corFundoP(parte, '#fff2cc'), border: `1px solid ${cor}22`, padding: 8 })}>
                 <div style={{ fontSize: fs(parte, 9), fontWeight: 700, color: cor, letterSpacing: 0.5 }}>{V(pl.nome)}</div>
                 <div style={{ fontSize: fs(parte, 22), fontWeight: 800, color: `${cor}88`, lineHeight: 1.1 }}>—</div>
                 <div style={{ fontSize: fs(parte, corpo), color: '#8a8397', fontStyle: 'italic', lineHeight: 1.4, marginTop: 2 }}>Sem questões deste pilar neste simulado.</div>
@@ -357,14 +357,14 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
           const banda = bandaAdaptativa(pl, vars)
           const bandas = banda ? [banda] : pl.bandas // com dado do aluno mostra só a faixa; sem dado, todas (modelo)
           return (
-            <div key={i} {...atr(parte, pl.nome, cor, { flex: 1, minWidth: 0, background: '#fff2cc', border: `1px solid ${cor}22`, padding: 8 })}>
+            <div key={i} {...atr(parte, pl.nome, cor, { flex: 1, minWidth: 0, background: corFundoP(parte, '#fff2cc'), border: `1px solid ${cor}22`, padding: 8 })}>
               <div style={{ fontSize: fs(parte, 9), fontWeight: 700, color: cor, letterSpacing: 0.5 }}>{V(pl.nome)}</div>
               <div style={{ fontSize: fs(parte, 22), fontWeight: 800, color: cor, lineHeight: 1.1 }}>{pl.chave ? V(`{pct_${prefFonte(pl.tipoFonte)}${pl.chave}}`) : 'X%'}</div>
               <div style={{ fontSize: fs(parte, corpo), color: '#5a5570', marginBottom: 6 }}>{V(pl.totalTxt)}</div>
               {bandas.map((b, j) => (
                 <div key={j} style={{ marginBottom: 6 }}>
                   {!banda && <div style={{ fontSize: fs(parte, corpo), fontWeight: 700, color: cor }}>{b.faixa}</div>}
-                  {b.texto && <div style={{ fontSize: fs(parte, corpo), color: '#243b53', lineHeight: 1.4, textAlign: alignP(parte, 'justify') }}>{V(b.texto)}</div>}
+                  {b.texto && <div style={{ fontSize: fs(parte, corpo), color: corTextoP(parte, '#243b53'), lineHeight: 1.4, textAlign: alignP(parte, 'justify') }}>{V(b.texto)}</div>}
                 </div>
               ))}
             </div>

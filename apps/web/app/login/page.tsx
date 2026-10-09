@@ -34,6 +34,7 @@ export default async function LoginPage() {
           plataforma={tema.nome_site ?? tenant.nome ?? 'Plataforma'}
           logo={tema.logo_url ?? null}
           modoInicial="aluno"
+          ticker={aparencia.loginTicker}
         />
       )
     }

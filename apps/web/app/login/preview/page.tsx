@@ -29,6 +29,11 @@ export default async function LoginPreviewPage({
   const loadingStyle = loadingSlugValido(brand, str('loading') ?? '') ? (str('loading') as string) : cat.fallback.loading
   const view = str('view') === 'loading' ? 'loading' : 'login'
 
+  // Ticker do título (MEQ) — palavras vêm por query (`words=a|b|c`) p/ o preview refletir as edições
+  // do console sem precisar salvar. `animar=1` liga a animação.
+  const palavras = (str('words') ?? '').split('|').map((s) => s.trim()).filter(Boolean)
+  const ticker = palavras.length ? { animar: str('animar') === '1', palavras } : null
+
   if (view === 'loading') {
     return <PlatformLoader brand={brand} theme={theme} style={loadingStyle} message="Pré-visualização do carregamento" />
   }
@@ -42,6 +47,7 @@ export default async function LoginPreviewPage({
       preview
       plataforma={cat.nome}
       modoInicial="aluno"
+      ticker={ticker}
     />
   )
 }

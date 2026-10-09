@@ -295,19 +295,23 @@ export function HeaderLockup({ chrome, scale = 1 }: { chrome: MeqChrome; scale?:
   )
 }
 
-// ── Ticker vertical "Tribunais./Polícias./Fiscais." (tickA 4s) ────────────────
-// A classe de animação (.{prefix}-tick) vem do <style> da variante.
-// `gradient` (opcional) pinta o texto com gradiente; senão usa `color`.
+// ── Palavra(s) do título — configurável no console (tema.aparencia_auth.loginTicker) ──────────────
+// `palavras` + `animar` vêm do tenant: sem animação OU 1 palavra → estático; com animação e 2+ palavras
+// → ciclo vertical com keyframes GERADOS p/ N palavras (não mais 4 fixas). Fallback "Tribunais.".
 export function Ticker({
   prefix,
   color,
   gradient,
   lineHeightEm = 1.1,
+  palavras,
+  animar = false,
 }: {
   prefix: string
   color: string
   gradient?: string
   lineHeightEm?: number
+  palavras?: string[] | null
+  animar?: boolean
 }) {
   const inner: CSSProperties = gradient
     ? {
@@ -317,19 +321,50 @@ export function Ticker({
         color: 'transparent',
       }
     : { color }
+  const lista = (palavras ?? []).map((p) => (p ?? '').trim()).filter(Boolean)
+  const words = lista.length ? lista : ['Tribunais.']
+
+  // Estático: animação desligada ou só 1 palavra → mostra a primeira, sem ciclo.
+  if (!animar || words.length < 2) {
+    return (
+      <span style={{ display: 'inline-block', lineHeight: `${lineHeightEm}em`, verticalAlign: 'top', ...inner }}>
+        {words[0]}
+      </span>
+    )
+  }
+
+  // Animado: ciclo vertical com keyframes para N palavras (dwell + slide); repete a 1ª no fim p/ o
+  // loop ser imperceptível. Cada variante tem prefix único (mlc/mld/mlt) → sem colisão de @keyframes.
+  const n = words.length
+  const anim = `${prefix}TickDyn`
+  const cls = `${prefix}-tickdyn`
+  const dur = Math.max(3, +(n * 1.9).toFixed(2))
   return (
     <span style={{ display: 'inline-block', height: `${lineHeightEm}em`, overflow: 'hidden', verticalAlign: 'top' }}>
-      <span
-        className={`${prefix}-tick`}
-        style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: `${lineHeightEm}em`, ...inner }}
-      >
-        <span>Tribunais.</span>
-        <span>Polícias.</span>
-        <span>Fiscais.</span>
-        <span>Tribunais.</span>
+      <style>{`${tickerKeyframes(anim, n, lineHeightEm)}.${cls}{animation:${anim} ${dur}s cubic-bezier(.6,.1,.2,1) infinite}`}</style>
+      <span className={cls} style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: `${lineHeightEm}em`, ...inner }}>
+        {words.map((w, i) => <span key={i}>{w}</span>)}
+        <span aria-hidden="true">{words[0]}</span>
       </span>
     </span>
   )
+}
+
+// Keyframes do ciclo vertical p/ N palavras: cada palavra fica parada ~68% da sua fatia e desliza no
+// resto; ao fim (100%) chega em -N*linha (= repetição da 1ª) p/ o loop emendar sem salto.
+function tickerKeyframes(name: string, n: number, lh: number): string {
+  const slice = 100 / n
+  const hold = 0.68
+  const frames: string[] = []
+  for (let i = 0; i < n; i++) {
+    const y = (i * lh).toFixed(3)
+    const start = (i * slice).toFixed(2)
+    const end = (i * slice + slice * hold).toFixed(2)
+    frames.push(`${start}%{transform:translateY(-${y}em)}`)
+    frames.push(`${end}%{transform:translateY(-${y}em)}`)
+  }
+  frames.push(`100%{transform:translateY(-${(n * lh).toFixed(3)}em)}`)
+  return `@keyframes ${name}{${frames.join('')}}`
 }
 
 // ── CSS base compartilhado (entradas up/pop, circuito, glow, ticker) ──────────

@@ -3,7 +3,7 @@
 // própria (como as "modalidades" do editor antigo). Config isolado em
 // simulado_cadernos_teste.config.builderV3.
 
-import { DIAG_PADRAO, DIAG_AGU_2023, DIAG_PGE_RS, DIAG_BASE_4, DIAG_SEMANA_6EM7, DIAG_VAZIO, DIAG_MEQ, type DiagConteudo } from './diagnostico'
+import { DIAG_PADRAO, DIAG_AGU_2023, DIAG_PGE_RS, DIAG_BASE_4, DIAG_SEMANA_6EM7, DIAG_VAZIO, DIAG_MEQ, DIAG_MEQ_TESTE, type DiagConteudo } from './diagnostico'
 import type { CadernoDoc } from '@/lib/caderno-designer/types'
 import { FOLHA_RESPOSTAS_DOC, CADERNO_PERGUNTAS_DOC } from '@/lib/caderno-designer/preset-cadernos-doc'
 
@@ -257,6 +257,7 @@ export const MODALIDADES: ModalidadeMeta[] = [
       { id: 'agu_2023', nome: 'Diagnóstico - Padrão', descricao: 'Pré-preenchido com o diagnóstico da AGU 2023.', ajustes: { corPrimaria: '#2d254f', corSecundaria: '#f6b420' }, conteudo: DIAG_AGU_2023 },
       { id: 'pge_rs', nome: 'Completo (PGE/RS)', descricao: 'Estrutura base para o diagnóstico da PGE/RS — ajuste os textos/disciplinas.', ajustes: { corPrimaria: '#2d254f', corSecundaria: '#f6b420' }, conteudo: DIAG_PGE_RS },
       { id: 'meq', nome: 'MEQ (blocos + contagem)', descricao: 'Modelo do MEQ (padrão TRT): bloco Conhecimentos Gerais × Específicos, faixas por contagem de acertos, pilares, disciplinas e sugestões de estudo. Ajuste os textos/disciplinas.', ajustes: { corPrimaria: '#0a1a3f', corSecundaria: '#f6b420' }, conteudo: DIAG_MEQ },
+      { id: 'meq_teste', nome: 'MEQ · teste (cópia)', descricao: 'Cópia de teste do modelo MEQ (mesmos blocos + contagem e base de cores navy+amarelo). Use para variar/experimentar sem afetar o MEQ original.', ajustes: { corPrimaria: '#0a1a3f', corSecundaria: '#f6b420' }, conteudo: DIAG_MEQ_TESTE },
       // 'agu_diagnostico' (v1 doc-backed, blocos antigos) REMOVIDO — usava o render legado (PreviaBlocos)
       // em vez do atual (conteudo/Previa com os fixes). 0 cadernos usavam. Use 'agu_2023' (mesmo AGU, atual).
     ],
@@ -296,20 +297,40 @@ export function aplicarModelo(atual: BuilderAjustes, modelo: Modelo): BuilderAju
   return { ...atual, ...modelo.ajustes }
 }
 
-/** Ajustes de uma modalidade+modelo (base + overrides do modelo). */
-export function ajustesDeModelo(modalidade: Modalidade, modeloId: string): BuilderAjustes {
+/** Paleta de cores por plataforma (tenant): subset de BuilderAjustes aplicado aos MODELOS PADRÃO.
+ *  Editada num só lugar e aplicada a todos os padrões → cada plataforma com seus modelos nas suas cores. */
+export type PaletaCores = Partial<Pick<BuilderAjustes,
+  'corPrimaria' | 'corSecundaria' | 'coresPilar' | 'coresDisc' | 'coresParte' | 'coresTextoParte' | 'coresFundoParte'>>
+
+/** Mescla a paleta da plataforma sobre os ajustes (escalares sobrescrevem; mapas de cor fazem merge raso). */
+export function aplicarPaleta(ajustes: BuilderAjustes, paleta?: PaletaCores | null): BuilderAjustes {
+  if (!paleta) return ajustes
+  return {
+    ...ajustes,
+    ...(paleta.corPrimaria ? { corPrimaria: paleta.corPrimaria } : {}),
+    ...(paleta.corSecundaria ? { corSecundaria: paleta.corSecundaria } : {}),
+    coresPilar: { ...ajustes.coresPilar, ...(paleta.coresPilar ?? {}) },
+    coresDisc: { ...ajustes.coresDisc, ...(paleta.coresDisc ?? {}) },
+    coresParte: { ...ajustes.coresParte, ...(paleta.coresParte ?? {}) },
+    coresTextoParte: { ...ajustes.coresTextoParte, ...(paleta.coresTextoParte ?? {}) },
+    coresFundoParte: { ...ajustes.coresFundoParte, ...(paleta.coresFundoParte ?? {}) },
+  }
+}
+
+/** Ajustes de uma modalidade+modelo (base + overrides do modelo + paleta da plataforma). */
+export function ajustesDeModelo(modalidade: Modalidade, modeloId: string, paleta?: PaletaCores | null): BuilderAjustes {
   const meta = metaDaModalidade(modalidade)
   const modelo = meta.modelos.find((m) => m.id === modeloId) ?? meta.modelos[0]
-  return { ...AJUSTES_BASE, ...modelo.ajustes }
+  return aplicarPaleta({ ...AJUSTES_BASE, ...modelo.ajustes }, paleta)
 }
 
 function clonar<T>(v: T): T { try { return structuredClone(v) } catch { return JSON.parse(JSON.stringify(v)) } }
 
-/** Cria um item (grupo) de modalidade+modelo. */
-export function novoItem(modalidade: Modalidade, modeloId: string): ItemCaderno {
+/** Cria um item (grupo) de modalidade+modelo. A paleta da plataforma (quando dada) tinge os ajustes. */
+export function novoItem(modalidade: Modalidade, modeloId: string, paleta?: PaletaCores | null): ItemCaderno {
   const meta = metaDaModalidade(modalidade)
   const modelo = meta.modelos.find((m) => m.id === modeloId) ?? meta.modelos[0]
-  const item: ItemCaderno = { id: novoId(), modalidade, modelo: modelo.id, ajustes: ajustesDeModelo(modalidade, modelo.id) }
+  const item: ItemCaderno = { id: novoId(), modalidade, modelo: modelo.id, ajustes: ajustesDeModelo(modalidade, modelo.id, paleta) }
   if (modalidade === 'diagnostico') item.conteudo = clonar(modelo.conteudo ?? DIAG_PADRAO)
   if (modelo.doc) item.docEdit = clonar(modelo.doc) // variante pronta (ex.: folha AGU só com um gabarito)
   return item

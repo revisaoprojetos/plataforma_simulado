@@ -336,17 +336,66 @@ function ModeloEditorBase({ id, nomeInicial, configInicial }: { id: string; nome
         const TAMS = [6, 7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36]
         return (
           <InspectorAside titulo={pickerCor.label} onClose={fecharPickerCor} voltar={origemEstrutura ? () => { setPickerCor(null); setOrigemEstrutura(false); setEstruturaAberta(true) } : undefined}>
-            {temCorTexto ? (
+            {pickerCor.parte.startsWith('sug:') ? (() => {
+              const i = Number(pickerCor.parte.slice('sug:'.length))
+              const cf = (item.conteudo ?? {}) as DiagConteudo
+              const s = cf.sugestoes?.[i]
+              return (
+                <div className="space-y-2.5">
+                  <div className="grid grid-cols-2 gap-2">
+                    <div><div className="mb-1 text-[11px] text-muted-foreground">Cor</div><HexColorField value={a.coresParte?.[pickerCor.parte] ?? pickerCor.cor} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), [pickerCor.parte]: v } })} /></div>
+                    <div><div className="mb-1 text-[11px] text-muted-foreground">Cor do título</div><HexColorField value={s?.corTitulo || '#9a6e00'} onChange={(v) => setConteudo({ ...cf, sugestoes: (cf.sugestoes ?? []).map((x, j) => j === i ? { ...x, corTitulo: v } : x) })} /></div>
+                    <div><div className="mb-1 text-[11px] text-muted-foreground">Cor de <b>&gt;</b></div><HexColorField value={cf.corMarcador || '#3b5bdb'} onChange={(v) => setConteudo({ ...cf, corMarcador: v })} /></div>
+                    <div><div className="mb-1 text-[11px] text-muted-foreground">Cor de <b>&gt;&gt;</b></div><HexColorField value={cf.corMarcadorForte || '#e8850c'} onChange={(v) => setConteudo({ ...cf, corMarcadorForte: v })} /></div>
+                  </div>
+                  <p className="text-[10px] leading-snug text-muted-foreground">Nos Tópicos, comece a linha com <code>&gt;</code> ou <code>&gt;&gt;</code> para o marcador pegar a cor.</p>
+                </div>
+              )
+            })() : temCorTexto ? (
               <div className="grid grid-cols-2 gap-2">
                 <div><div className="mb-1 text-[11px] text-muted-foreground">Cor</div><HexColorField value={a.coresParte?.[pickerCor.parte] ?? pickerCor.cor} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), [pickerCor.parte]: v } })} /></div>
                 <div><div className="mb-1 text-[11px] text-muted-foreground">Cor do texto</div><HexColorField value={a.coresTextoParte?.[pickerCor.parte] || '#ffffff'} onChange={(v) => setAjuste({ coresTextoParte: { ...(a.coresTextoParte ?? {}), [pickerCor.parte]: v } })} /></div>
               </div>
-            ) : (
+            ) : (pickerCor.parte.startsWith('fita:') || pickerCor.parte.startsWith('sugInd:') || pickerCor.parte.startsWith('pilar:') || pickerCor.parte.startsWith('pilarG:') || pickerCor.parte === 'lingua_card' || pickerCor.parte === 'dados_card' || ['diag_nota_num', 'diag_nota_faixa', 'diag_nome_rot', 'diag_nome_val'].includes(pickerCor.parte)) ? null : (
               <>
                 <div className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Cor</div>
                 <HexColorField value={a.coresParte?.[pickerCor.parte] ?? pickerCor.cor} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), [pickerCor.parte]: v } })} />
                 {a.coresParte?.[pickerCor.parte] && <button onClick={() => { const cp = { ...(a.coresParte ?? {}) }; delete cp[pickerCor.parte]; setAjuste({ coresParte: cp }) }} className="mt-2 text-[11px] text-muted-foreground hover:underline">Restaurar cor padrão</button>}
               </>
+            )}
+            {(pickerCor.parte === 'diag_nota_num' || pickerCor.parte === 'diag_nota_faixa') && (
+              <div className="grid grid-cols-2 gap-2">
+                <div><div className="mb-1 text-[11px] text-muted-foreground">Esquerda (fundo)</div><HexColorField value={a.coresParte?.['diag_nota_num'] ?? '#9b6800'} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), ['diag_nota_num']: v } })} /></div>
+                <div><div className="mb-1 text-[11px] text-muted-foreground">Direita (fundo)</div><HexColorField value={a.coresParte?.['diag_nota_faixa'] ?? a.corSecundaria} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), ['diag_nota_faixa']: v } })} /></div>
+                <div><div className="mb-1 text-[11px] text-muted-foreground">Esquerda (texto)</div><HexColorField value={a.coresTextoParte?.['diag_nota_num'] ?? '#ffffff'} onChange={(v) => setAjuste({ coresTextoParte: { ...(a.coresTextoParte ?? {}), ['diag_nota_num']: v } })} /></div>
+                <div><div className="mb-1 text-[11px] text-muted-foreground">Direita (texto)</div><HexColorField value={a.coresTextoParte?.['diag_nota_faixa'] ?? '#3b2f00'} onChange={(v) => setAjuste({ coresTextoParte: { ...(a.coresTextoParte ?? {}), ['diag_nota_faixa']: v } })} /></div>
+              </div>
+            )}
+            {(pickerCor.parte === 'diag_nome_rot' || pickerCor.parte === 'diag_nome_val') && (
+              <div className="grid grid-cols-2 gap-2">
+                <div><div className="mb-1 text-[11px] text-muted-foreground">Esquerda (NOME)</div><HexColorField value={a.coresParte?.['diag_nome_rot'] ?? a.corPrimaria} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), ['diag_nome_rot']: v } })} /></div>
+                <div><div className="mb-1 text-[11px] text-muted-foreground">Direita (faixa)</div><HexColorField value={a.coresParte?.['diag_nome_val'] ?? a.corSecundaria} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), ['diag_nome_val']: v } })} /></div>
+                <div><div className="mb-1 text-[11px] text-muted-foreground">Esquerda (texto)</div><HexColorField value={a.coresTextoParte?.['diag_nome_rot'] ?? '#ffffff'} onChange={(v) => setAjuste({ coresTextoParte: { ...(a.coresTextoParte ?? {}), ['diag_nome_rot']: v } })} /></div>
+                <div><div className="mb-1 text-[11px] text-muted-foreground">Direita (texto)</div><HexColorField value={a.coresTextoParte?.['diag_nome_val'] ?? '#3b2f00'} onChange={(v) => setAjuste({ coresTextoParte: { ...(a.coresTextoParte ?? {}), ['diag_nome_val']: v } })} /></div>
+              </div>
+            )}
+            {pickerCor.parte.startsWith('sugInd:') && (() => {
+              const sk = pickerCor.parte
+              return (
+                <div className="grid grid-cols-2 gap-2">
+                  <div><div className="mb-1 text-[11px] text-muted-foreground">Topo (fundo)</div><HexColorField value={a.coresParte?.[sk] ?? '#fdf3d0'} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), [sk]: v } })} /></div>
+                  <div><div className="mb-1 text-[11px] text-muted-foreground">Topo (texto)</div><HexColorField value={a.coresTextoParte?.[`${sk}:topo`] ?? '#9a6e00'} onChange={(v) => setAjuste({ coresTextoParte: { ...(a.coresTextoParte ?? {}), [`${sk}:topo`]: v } })} /></div>
+                  <div><div className="mb-1 text-[11px] text-muted-foreground">Informações (fundo)</div><HexColorField value={a.coresFundoParte?.[sk] ?? '#f0eeff'} onChange={(v) => setAjuste({ coresFundoParte: { ...(a.coresFundoParte ?? {}), [sk]: v } })} /></div>
+                  <div><div className="mb-1 text-[11px] text-muted-foreground">Informações (texto)</div><HexColorField value={a.coresTextoParte?.[`${sk}:info`] ?? '#243b53'} onChange={(v) => setAjuste({ coresTextoParte: { ...(a.coresTextoParte ?? {}), [`${sk}:info`]: v } })} /></div>
+                </div>
+              )
+            })()}
+            {(pickerCor.parte.startsWith('pilar:') || pickerCor.parte.startsWith('pilarG:') || pickerCor.parte === 'lingua_card') && (
+              <div className="grid grid-cols-2 gap-2">
+                <div><div className="mb-1 text-[11px] text-muted-foreground">Cor do destaque</div><HexColorField value={a.coresParte?.[pickerCor.parte] ?? a.corPrimaria} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), [pickerCor.parte]: v } })} /></div>
+                <div><div className="mb-1 text-[11px] text-muted-foreground">Cor de fundo</div><HexColorField value={a.coresFundoParte?.[pickerCor.parte] ?? '#fff2cc'} onChange={(v) => setAjuste({ coresFundoParte: { ...(a.coresFundoParte ?? {}), [pickerCor.parte]: v } })} /></div>
+                <div className="col-span-2"><div className="mb-1 text-[11px] text-muted-foreground">Cor do texto (faixas)</div><HexColorField value={a.coresTextoParte?.[pickerCor.parte] ?? '#243b53'} onChange={(v) => setAjuste({ coresTextoParte: { ...(a.coresTextoParte ?? {}), [pickerCor.parte]: v } })} /></div>
+              </div>
             )}
             <div className="mt-3">
               <div className="mb-1 text-[11px] text-muted-foreground">Alinhamento</div>

@@ -699,7 +699,7 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
                     <HexColorField value={a.coresTextoParte?.[pickerCor.parte] || '#ffffff'} onChange={(v) => setAjuste({ coresTextoParte: { ...(a.coresTextoParte ?? {}), [pickerCor.parte]: v } })} />
                   </div>
                 </div>
-              ) : (pickerCor.parte.startsWith('fita:') || pickerCor.parte.startsWith('sugInd:') || pickerCor.parte === 'dados_card' || ['diag_nota_num', 'diag_nota_faixa', 'diag_nome_rot', 'diag_nome_val'].includes(pickerCor.parte)) ? null : (
+              ) : (pickerCor.parte.startsWith('fita:') || pickerCor.parte.startsWith('sugInd:') || pickerCor.parte.startsWith('pilar:') || pickerCor.parte.startsWith('pilarG:') || pickerCor.parte === 'lingua_card' || pickerCor.parte === 'dados_card' || ['diag_nota_num', 'diag_nota_faixa', 'diag_nome_rot', 'diag_nome_val'].includes(pickerCor.parte)) ? null : (
                 <>
                   <div className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Cor</div>
                   <HexColorField value={a.coresParte?.[pickerCor.parte] ?? pickerCor.cor} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), [pickerCor.parte]: v } })} />
@@ -752,7 +752,13 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
                 }
                 const existe = fontesDisponiveis.some((f) => (f.tipo === 'disciplina' ? 'd' : 'p') + ':' + f.chave === val)
                 return (
-                  <div className="mt-3">
+                  <>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div><div className="mb-1 text-[11px] text-muted-foreground">Cor do destaque</div><HexColorField value={a.coresParte?.[pickerCor.parte] ?? a.corPrimaria} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), [pickerCor.parte]: v } })} /></div>
+                      <div><div className="mb-1 text-[11px] text-muted-foreground">Cor de fundo</div><HexColorField value={a.coresFundoParte?.[pickerCor.parte] ?? '#fff2cc'} onChange={(v) => setAjuste({ coresFundoParte: { ...(a.coresFundoParte ?? {}), [pickerCor.parte]: v } })} /></div>
+                      <div className="col-span-2"><div className="mb-1 text-[11px] text-muted-foreground">Cor do texto (faixas)</div><HexColorField value={a.coresTextoParte?.[pickerCor.parte] ?? '#243b53'} onChange={(v) => setAjuste({ coresTextoParte: { ...(a.coresTextoParte ?? {}), [pickerCor.parte]: v } })} /></div>
+                    </div>
+                    <div className="mt-3">
                     <div className="mb-1 text-[11px] text-muted-foreground">Fonte dos dados (pilar/disciplina do simulado)</div>
                     <select value={val} onChange={(e) => { const v = e.target.value; const t = v.slice(0, 1); sel(v.slice(2), t === 'd' ? 'disciplina' : 'pilar') }} className="w-full rounded border bg-background px-2 py-1.5 text-xs outline-none focus:border-primary">
                       {!existe && <option value={val}>{chave || '(escolher)'}</option>}
@@ -760,7 +766,8 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
                       <optgroup label="Disciplinas">{fontesDisponiveis.filter((f) => f.tipo === 'disciplina').map((f) => <option key={'d:' + f.chave} value={'d:' + f.chave}>{f.nome}</option>)}</optgroup>
                     </select>
                     <p className="mt-1 text-[10px] leading-snug text-muted-foreground">De qual pilar/disciplina do simulado vêm o % e a contagem deste card.</p>
-                  </div>
+                    </div>
+                  </>
                 )
               })()}
               {pickerCor.parte === 'sec_pilares' && (() => {

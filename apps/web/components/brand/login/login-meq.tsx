@@ -45,9 +45,9 @@ const TOKENS: Record<MeqTheme, LoginFormTokens> = {
   },
 }
 
-export function LoginMEQ({ style, theme, core, preview, plataforma, logo }: LoginVariantProps & { style: string }) {
+export function LoginMEQ({ style, theme, core, preview, plataforma, logo, ticker }: LoginVariantProps & { style: string }) {
   const t = asMeqTheme(theme)
-  const common = { t, theme, core, preview, plataforma }
+  const common = { t, theme, core, preview, plataforma, ticker }
   void logo // as variantes usam os SVGs de marca MEQ
   if (style === 'meq-login-dividido') return <Dividido {...common} />
   if (style === 'meq-login-trilha') return <Trilha {...common} />
@@ -60,6 +60,7 @@ type VProps = {
   core: LoginVariantProps['core']
   preview?: boolean
   plataforma: string
+  ticker?: { animar: boolean; palavras: string[] } | null
 }
 
 // Fonte Sora (não carregada globalmente — só Plus Jakarta + Montserrat).
@@ -70,7 +71,7 @@ function SoraFont() {
 // ═════════════════════════════════════════════════════════════════════════════
 // VARIANTE 1 — CIRCUITO (centralizado). prefix mlc-
 // ═════════════════════════════════════════════════════════════════════════════
-function Circuito({ t, theme, core, preview }: VProps) {
+function Circuito({ t, theme, core, preview, ticker }: VProps) {
   const c = CHROME[t]
   return (
     <div className="mlc-root" style={{ background: c.bg, color: c.cardFg }}>
@@ -88,7 +89,7 @@ function Circuito({ t, theme, core, preview }: VProps) {
       <main className="mlc-main">
         <div className="mlc-head">
           <h1 className="mlc-h1 mlc-up mlc-d2" style={{ color: c.h1 }}>
-            Treino de verdade<br />para <Ticker prefix="mlc" color={c.tickerColor} gradient={c.tickerGradient} lineHeightEm={1.1} />
+            Treino de verdade<br />para <Ticker prefix="mlc" color={c.tickerColor} gradient={c.tickerGradient} lineHeightEm={1.1} palavras={ticker?.palavras} animar={ticker?.animar} />
           </h1>
           <p className="mlc-para mlc-up mlc-d3" style={{ color: c.para }}>
             Entre e continue a sua preparação de onde parou.
@@ -163,7 +164,7 @@ const PASSOS = [
   { n: '3', t: 'Acompanhe sua evolução', d: 'Veja onde acertar mais e onde revisar.', delay: '5.7s' },
 ]
 
-function Dividido({ t, theme, core, preview }: VProps) {
+function Dividido({ t, theme, core, preview, ticker }: VProps) {
   const c = CHROME[t]
   return (
     <div className="mld-root" style={{ background: c.bg, color: c.cardFg }}>
@@ -178,7 +179,7 @@ function Dividido({ t, theme, core, preview }: VProps) {
         <section className="mld-left">
           <div className="mld-up mld-d1"><HeaderLockup chrome={c} scale={1.22} /></div>
           <h1 className="mld-h1 mld-up mld-d2" style={{ color: c.h1 }}>
-            Treino de verdade<br />para <Ticker prefix="mld" color={c.tickerDividido} lineHeightEm={1.25} />
+            Treino de verdade<br />para <Ticker prefix="mld" color={c.tickerDividido} lineHeightEm={1.25} palavras={ticker?.palavras} animar={ticker?.animar} />
           </h1>
           <p className="mld-para mld-up mld-d3" style={{ color: c.para }}>
             Questões comentadas, simulados por banca e um raio-x do seu desempenho em cada matéria.
@@ -258,7 +259,7 @@ const NODES: { cx: number; cy: number; ndDelay: string; coreDelay: string; num: 
 ]
 const ROUTE_D = 'M24 40 L180 40 L220 80 L420 80 L460 40 L616 40'
 
-function Trilha({ t, theme, core, preview }: VProps) {
+function Trilha({ t, theme, core, preview, ticker }: VProps) {
   const c = CHROME[t]
   return (
     <div className="mlt-root" style={{ background: c.bg, color: c.cardFg }}>
@@ -283,7 +284,7 @@ function Trilha({ t, theme, core, preview }: VProps) {
           </span>
           <h1 className="mlt-h1 mlt-up mlt-d3" style={{ color: c.h1 }}>
             Do edital<br />à posse em{' '}
-            <Ticker prefix="mlt" color={c.tickerTrilhaColor} gradient={c.tickerTrilhaGradient} lineHeightEm={1.1} />
+            <Ticker prefix="mlt" color={c.tickerTrilhaColor} gradient={c.tickerTrilhaGradient} lineHeightEm={1.1} palavras={ticker?.palavras} animar={ticker?.animar} />
           </h1>
           <p className="mlt-para mlt-up mlt-d4" style={{ color: c.para }}>
             Cada etapa da sua preparação conectada: do que cai na prova ao simulado que mostra se você está pronto.

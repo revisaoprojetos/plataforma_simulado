@@ -12,10 +12,11 @@ import { EditarPastaModeloDialog } from '@/components/admin/modelos-caderno/edit
 import { NovoModeloDialog } from '@/components/admin/modelos-caderno/novo-modelo-dialog'
 import { ModelosPadrao } from '@/components/admin/modelos-caderno/modelos-padrao'
 import { moverModelo, excluirPastaModelo, type ModeloRow, type PastaModeloRow } from '@/app/admin/modelos-caderno/actions'
+import type { PaletaCores } from '@/lib/caderno-teste/tipos'
 
 const MODALIDADES_FILTRO = ['folha_respostas', 'caderno_questoes', 'caderno_completo', 'diagnostico'] as const
 
-export function ModelosGrid({ modelos, pastas, pastaAtual: pastaAtualInicial }: { modelos: ModeloRow[]; pastas: PastaModeloRow[]; pastaAtual: string | null }) {
+export function ModelosGrid({ modelos, pastas, pastaAtual: pastaAtualInicial, paleta }: { modelos: ModeloRow[]; pastas: PastaModeloRow[]; pastaAtual: string | null; paleta?: PaletaCores | null }) {
   const router = useRouter()
   // Pasta atual = estado no CLIENTE (dados já vêm todos e filtramos aqui) → abrir pasta é instantâneo,
   // sem re-executar o server component. A URL é sincronizada via History API (compartilhável/refresh).
@@ -101,7 +102,7 @@ export function ModelosGrid({ modelos, pastas, pastaAtual: pastaAtualInicial }: 
       </div>
 
       {aba === 'padrao' ? (
-        <ModelosPadrao pastaAtual={pastaAtual} />
+        <ModelosPadrao pastaAtual={pastaAtual} paleta={paleta} />
       ) : (
         <>
       {/* Barra: trilha + busca + filtros + ações */}

@@ -42,6 +42,7 @@ export default async function AlunoEntrarPage({ searchParams }: { searchParams: 
           plataforma={tema.nome_site ?? tenant.nome ?? 'Área do Aluno'}
           logo={tema.logo_url ?? null}
           modoInicial="aluno"
+          ticker={aparencia.loginTicker}
         />
       )
     }

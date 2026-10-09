@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import { LayoutTemplate, Loader2 } from 'lucide-react'
-import { carregarModelosArea } from './actions'
+import { carregarModelosArea, obterPaletaPadroes } from './actions'
 import { ModelosGrid } from '@/components/admin/modelos-caderno/modelos-grid'
 
 export default async function ModelosCadernoPage({ searchParams }: { searchParams: Promise<{ pasta?: string }> }) {
@@ -25,7 +25,7 @@ export default async function ModelosCadernoPage({ searchParams }: { searchParam
 }
 
 async function GridStream({ pasta }: { pasta: string | null }) {
-  const { ok, modelos, pastas } = await carregarModelosArea()
+  const [{ ok, modelos, pastas }, paleta] = await Promise.all([carregarModelosArea(), obterPaletaPadroes()])
   if (!ok) {
     return (
       <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 text-sm text-destructive">
@@ -33,7 +33,7 @@ async function GridStream({ pasta }: { pasta: string | null }) {
       </div>
     )
   }
-  return <ModelosGrid modelos={modelos} pastas={pastas} pastaAtual={pasta} />
+  return <ModelosGrid modelos={modelos} pastas={pastas} pastaAtual={pasta} paleta={paleta} />
 }
 
 /** Fallback do Suspense: só aparece se o carregamento demorar (fade-in atrasado).

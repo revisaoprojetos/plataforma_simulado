@@ -4,21 +4,23 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
-import { LayoutTemplate, X, Pencil, Loader2 } from 'lucide-react'
+import { LayoutTemplate, X, Pencil, Loader2, Palette } from 'lucide-react'
 import { docDoPreset, idsDeterministicos } from '@/lib/caderno-teste/previa-blocos'
-import { MODALIDADES, MODELOS_PADRAO_OCULTOS, novoItem, presetDoModelo, type Modalidade } from '@/lib/caderno-teste/tipos'
-import { criarModeloComConfig } from '@/app/admin/modelos-caderno/actions'
+import { MODALIDADES, MODELOS_PADRAO_OCULTOS, novoItem, presetDoModelo, type Modalidade, type PaletaCores } from '@/lib/caderno-teste/tipos'
+import { criarModeloComConfig, abrirOuCriarPaletaPadroes } from '@/app/admin/modelos-caderno/actions'
 import { MODALIDADE_META, ModeloMiniPrevia, VisualizadorModelo } from './modelo-card'
 
-/** Seção somente-leitura com os MODELOS PADRÃO (hardcoded em MODALIDADES). Clique → prévia; editar = cópia → editor. */
-export function ModelosPadrao({ pastaAtual }: { pastaAtual: string | null }) {
+/** Seção somente-leitura com os MODELOS PADRÃO (hardcoded em MODALIDADES). Clique → prévia; editar = cópia → editor.
+ *  `paleta` = cores da plataforma aplicadas a TODOS os padrões (editável no botão "Editar cores dos padrões"). */
+export function ModelosPadrao({ pastaAtual, paleta }: { pastaAtual: string | null; paleta?: PaletaCores | null }) {
   const router = useRouter()
   const [pending, start] = useTransition()
+  const [abrindoPaleta, startPaleta] = useTransition()
 
   // Editar um modelo padrão = criar a CÓPIA editável na hora e abrir DIRETO no editor (sem pop-up).
   function editar(modalidade: Modalidade, modeloId: string, nomeSel: string) {
     start(async () => {
-      const it = novoItem(modalidade, modeloId)
+      const it = novoItem(modalidade, modeloId, paleta)
       const preset = presetDoModelo(modalidade, modeloId)
       if (preset && !it.docEdit) it.docEdit = idsDeterministicos(docDoPreset(preset)!)
       else if (it.docEdit) it.docEdit = idsDeterministicos(it.docEdit)
@@ -29,9 +31,24 @@ export function ModelosPadrao({ pastaAtual }: { pastaAtual: string | null }) {
     })
   }
 
+  // Editar a PALETA da plataforma: abre (ou cria) o modelo interno de cores e vai pro editor.
+  function editarPaleta() {
+    startPaleta(async () => {
+      const r = await abrirOuCriarPaletaPadroes()
+      if (r.ok && r.id) router.push(`/admin/modelos-caderno/${r.id}`)
+      else toast.error(r.error ?? 'Erro ao abrir a paleta')
+    })
+  }
+
   return (
     <div className="space-y-6">
-      <p className="text-xs text-muted-foreground">Modelos prontos do sistema (não editáveis). Clique num modelo para <strong>pré-visualizar</strong>; editar cria uma <strong>cópia editável</strong> e abre no editor.</p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <p className="max-w-2xl text-xs text-muted-foreground">Modelos prontos do sistema. Clique num modelo para <strong>pré-visualizar</strong>; editar cria uma <strong>cópia editável</strong>. Use <strong>Editar cores dos padrões</strong> para definir, num só lugar, as cores de todos os blocos — aplicadas a todos os modelos padrão desta plataforma.</p>
+        <button type="button" onClick={editarPaleta} disabled={abrindoPaleta}
+          className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/5 px-3 text-sm font-semibold text-primary transition-colors hover:bg-primary/10 disabled:opacity-60">
+          {abrindoPaleta ? <Loader2 className="h-4 w-4 animate-spin" /> : <Palette className="h-4 w-4" />} Editar cores dos padrões
+        </button>
+      </div>
       {MODALIDADES.map((mod) => {
         const modelos = mod.modelos.filter((m) => !MODELOS_PADRAO_OCULTOS.has(m.id))
         if (!modelos.length) return null
@@ -44,7 +61,7 @@ export function ModelosPadrao({ pastaAtual }: { pastaAtual: string | null }) {
               <span className="hidden text-xs text-muted-foreground sm:inline">· {mod.descricao}</span>
             </div>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-5">
-              {modelos.map((m) => <PadraoCard key={m.id} modalidade={mod.id} modeloId={m.id} nome={m.nome} descricao={m.descricao} editando={pending} onEditar={() => editar(mod.id, m.id, m.nome)} />)}
+              {modelos.map((m) => <PadraoCard key={m.id} modalidade={mod.id} modeloId={m.id} nome={m.nome} descricao={m.descricao} paleta={paleta} editando={pending} onEditar={() => editar(mod.id, m.id, m.nome)} />)}
             </div>
           </section>
         )
@@ -88,9 +105,9 @@ function PreviaPadraoDialog({ item, nome, modalidade, editando, onFechar, onEdit
   )
 }
 
-function PadraoCard({ modalidade, modeloId, nome, descricao, editando, onEditar }: { modalidade: Modalidade; modeloId: string; nome: string; descricao: string; editando?: boolean; onEditar: () => void }) {
+function PadraoCard({ modalidade, modeloId, nome, descricao, paleta, editando, onEditar }: { modalidade: Modalidade; modeloId: string; nome: string; descricao: string; paleta?: PaletaCores | null; editando?: boolean; onEditar: () => void }) {
   // Mesmo item/prévia do card de "Meus modelos" (ModeloMiniPrevia): preset + docEdit determinístico.
-  const item = novoItem(modalidade, modeloId)
+  const item = novoItem(modalidade, modeloId, paleta)
   const preset = presetDoModelo(modalidade, modeloId)
   if (preset && !item.docEdit) item.docEdit = idsDeterministicos(docDoPreset(preset)!)
   const meta = MODALIDADE_META[modalidade] ?? { label: 'Modelo', icon: LayoutTemplate }

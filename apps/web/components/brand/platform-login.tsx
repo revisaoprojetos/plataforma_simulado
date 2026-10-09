@@ -31,6 +31,8 @@ export interface PlatformLoginProps {
   plataforma: string
   logo?: string | null
   modoInicial?: 'aluno' | 'admin'
+  /** Título animado (ticker) do login MEQ — palavras + animar (editável no console). */
+  ticker?: { animar: boolean; palavras: string[] } | null
 }
 
 export function PlatformLogin({
@@ -43,9 +45,10 @@ export function PlatformLogin({
   plataforma,
   logo = null,
   modoInicial = 'aluno',
+  ticker = null,
 }: PlatformLoginProps) {
   const core = useLoginCore({ metodo, preview, modoInicial })
-  const common = { theme, core, preview, plataforma, logo, style }
+  const common = { theme, core, preview, plataforma, logo, style, ticker }
 
   const tela =
     brand === 'vnd' ? <LoginVND {...common} /> :

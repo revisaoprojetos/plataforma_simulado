@@ -463,6 +463,10 @@ export const DIAG_MEQ: DiagConteudo = {
   gabaritoObs: [],
 }
 
+/** Cópia de teste do MEQ: clone profundo e independente do DIAG_MEQ (mesmos blocos + contagem).
+ * Serve para variar/experimentar (cores, textos) sem afetar o modelo MEQ original. */
+export const DIAG_MEQ_TESTE: DiagConteudo = JSON.parse(JSON.stringify(DIAG_MEQ)) as DiagConteudo
+
 /** Preset BASE reutilizável: estrutura completa com 4 disciplinas e textos genéricos (sem citar banca/concurso).
  * Serve de ponto de partida para qualquer simulado — edite textos, pilares e disciplinas conforme necessário. */
 export const DIAG_BASE_4: DiagConteudo = {

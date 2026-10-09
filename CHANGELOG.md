@@ -12,6 +12,29 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.7.0 — 2026-10-09
+
+- **Caderno-teste / Diagnóstico — cores de texto e fundo que faltavam:** o editor já tinha os controles de
+  cor de texto do **Nome** e da **Nota**, mas a prévia e a exportação **Word** ignoravam (cor chumbada).
+  Agora `previa.tsx`, `exportar-docx.ts` e `exportar-html.ts` leem `coresTextoParte`/`coresFundoParte` para
+  Nome, Nota, faixas dos **pilares/Língua** e cabeçalho das **sugestões** (`>`/`>>` e título juntos).
+- **Editor de MODELOS (`modelo-editor.tsx`) ganhou as grades de cor completas:** o editor de modelos usava só
+  um "Cor" genérico; portei as grades dedicadas (Nome/Nota com fundo+texto esq/dir, pilares com
+  destaque+fundo+texto, sugestões com título+`>`+`>>`, sugestão individual). Removida a duplicação do "Cor"
+  genérico no pilar/Língua no builder.
+- **Cópia de teste do MEQ:** novo preset `DIAG_MEQ_TESTE` (clone do `DIAG_MEQ`) + entrada
+  "MEQ · teste (cópia)" no catálogo — mesmos blocos+contagem, para variar sem afetar o original.
+- **Paleta de cores dos modelos padrão (por plataforma):** novo botão **"Editar cores dos padrões"** na aba
+  *Modelos padrão* abre o editor sobre uma linha interna (`origem=paleta_padroes`, oculta em "Meus modelos");
+  as cores definidas ali (`PaletaCores` — primária/secundária + mapas de cor por bloco) são aplicadas a
+  **todos os modelos padrão** da plataforma (prévias e cópias). `novoItem`/`ajustesDeModelo` aceitam a paleta;
+  `obterPaletaPadroes`/`abrirOuCriarPaletaPadroes` em `modelos-caderno/actions.ts`. Sem migração (reusa
+  `simulado_caderno_modelos`). Script `scripts/_meq-paleta-semear.mjs` semeia a paleta MEQ a partir da
+  cópia de teste já colorida (rodar com `--apply`).
+- **Login MEQ — ticker animado (em andamento):** título do login com palavras alternáveis configuráveis
+  (`LoginTicker`/`sanearTicker`, `tema.loginTicker`), liga/desliga a animação, editável na aba de aparência
+  de autenticação do admin.
+
 ## 3.6.0 — 2026-10-09
 
 - **Escala / egress (preparação p/ 1500+ alunos ao vivo):** o CONTEÚDO estático da prova (questões +

@@ -52,6 +52,7 @@ function htmlDiagnostico(item: ItemCaderno, vars: Record<string, string>, disc: 
   const corP = (parte: string, def: string) => (a.coresParte ?? {})[parte] || def // cor individual por bloco (clique na prévia)
   const alignP = (parte: string, def: string) => (a.alinhamentoParte ?? {})[parte] || def // alinhamento por bloco
   const corTextoP = (parte: string, def: string) => (a.coresTextoParte ?? {})[parte] || def // cor do texto por bloco
+  const corFundoP = (parte: string, def: string) => (a.coresFundoParte ?? {})[parte] || def // cor de FUNDO por bloco (pilar/card)
   const estCss = (parte: string) => { const e = (a.estiloParte ?? {})[parte]; return `${e?.b ? 'font-weight:700;' : ''}${e?.i ? 'font-style:italic;' : ''}${e?.u ? 'text-decoration:underline;' : ''}` } // negrito/itálico/sublinhado por bloco
   const fonteCss = (parte: string) => { const f = cssDaFonte((a.fonteParte ?? {})[parte]); return f ? `font-family:${f};` : '' } // fonte por bloco
   const escl = (parte: string) => (a.tamanhoParte ?? {})[parte] ?? 1 // multiplicador de tamanho por bloco
@@ -72,8 +73,8 @@ function htmlDiagnostico(item: ItemCaderno, vars: Record<string, string>, disc: 
     const bandas = banda ? [banda] : lp.bandas
     const cor = corP('lingua_card', corDoPilar(lp.chave, a.coresPilar ?? {}, prim))
     let card = `<div style="font-size:${fsz('lingua_card', 10)};font-weight:700;color:${cor};letter-spacing:.5px">${esc(lp.titulo)}</div><div style="font-size:${fsz('lingua_card', 24)};font-weight:800;color:${cor}">${V(`{pct_${prefFonte(lp.tipoFonte)}${lp.chave}}`)}</div><div style="font-size:${fsz('lingua_card', corpo)};color:#5a5570;margin-bottom:6px">${V(lp.totalTxt)}</div>`
-    for (const b of bandas) card += `${!banda ? `<div style="font-size:${fsz('lingua_card', corpo)};font-weight:700;color:${cor}">${esc(b.faixa)}</div>` : ''}${b.texto ? `<div style="font-size:${fsz('lingua_card', corpo)};color:#243b53;line-height:1.4;text-align:${alignP('lingua_card', 'justify')};margin-bottom:6px">${V(b.texto)}</div>` : ''}`
-    h += `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:10px"><tr><td style="background:#fff2cc;border:1px solid ${cor}22;padding:10px">${card}</td></tr></table>`
+    for (const b of bandas) card += `${!banda ? `<div style="font-size:${fsz('lingua_card', corpo)};font-weight:700;color:${cor}">${esc(b.faixa)}</div>` : ''}${b.texto ? `<div style="font-size:${fsz('lingua_card', corpo)};color:${corTextoP('lingua_card', '#243b53')};line-height:1.4;text-align:${alignP('lingua_card', 'justify')};margin-bottom:6px">${V(b.texto)}</div>` : ''}`
+    h += `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:10px"><tr><td style="background:${corFundoP('lingua_card', '#fff2cc')};border:1px solid ${cor}22;padding:10px">${card}</td></tr></table>`
   }
   if (c.pilares.length) {
     h += sec(c.tituloPilares ?? 'Desempenho por pilar')
@@ -85,8 +86,8 @@ function htmlDiagnostico(item: ItemCaderno, vars: Record<string, string>, disc: 
       const pk = `pilar:${i}`
       const cor = corP(pk, prim)
       let card = `<div style="font-size:${fsz(pk, 10)};font-weight:700;color:${cor};letter-spacing:.5px">${esc(pl.nome)}</div><div style="font-size:${fsz(pk, 24)};font-weight:800;color:${cor}">${pl.chave ? V(`{pct_${prefFonte(pl.tipoFonte)}${pl.chave}}`) : 'X%'}</div><div style="font-size:${fsz(pk, corpo)};color:#5a5570;margin-bottom:6px">${V(pl.totalTxt)}</div>`
-      for (const b of bandas) card += `${!banda ? `<div style="font-size:${fsz(pk, corpo)};font-weight:700;color:${cor}">${esc(b.faixa)}</div>` : ''}${b.texto ? `<div style="font-size:${fsz(pk, corpo)};color:#243b53;line-height:1.4;text-align:${alignP(pk, 'justify')};margin-bottom:6px">${V(b.texto)}</div>` : ''}`
-      h += `<td style="width:33%;background:#fff2cc;border:1px solid ${cor}22;padding:10px">${card}</td>`
+      for (const b of bandas) card += `${!banda ? `<div style="font-size:${fsz(pk, corpo)};font-weight:700;color:${cor}">${esc(b.faixa)}</div>` : ''}${b.texto ? `<div style="font-size:${fsz(pk, corpo)};color:${corTextoP(pk, '#243b53')};line-height:1.4;text-align:${alignP(pk, 'justify')};margin-bottom:6px">${V(b.texto)}</div>` : ''}`
+      h += `<td style="width:33%;background:${corFundoP(pk, '#fff2cc')};border:1px solid ${cor}22;padding:10px">${card}</td>`
     })
     h += '</tr></table>'
   }
@@ -110,7 +111,7 @@ function htmlDiagnostico(item: ItemCaderno, vars: Record<string, string>, disc: 
       // Todos os tópicos num só bloco (introdução separada); marcadores `>`/`>>` coloridos.
       const it = s.itens.length ? `<div style="font-size:${fsz(`sug:${si}`, corpo)};line-height:1.5;text-align:${alignP(`sug:${si}`, 'justify')}">${formatarMarcadores(preencher(topicosParaTexto(s.itens), vars), c.corMarcador, c.corMarcadorForte)}</div>` : ''
       const cor = corP(`sug:${si}`, '#fdf3d0')
-      h += `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:10px"><tr><td style="background:${cor};padding:5px 12px;font-weight:800;font-size:${fsz(`sug:${si}`, 11)};color:${s.corTitulo || '#9a6e00'}">${V(s.titulo)}</td><td style="background:${cor};padding:5px 12px;text-align:right;font-weight:700;font-size:${fsz(`sug:${si}`, 10)};color:#9a6e00">${s.prioridade ? '[!] ' + V(s.prioridade) : ''}</td></tr><tr><td colspan="2" style="background:#f0eeff;padding:8px 12px">${s.intro ? `<p style="font-size:${fsz(`sug:${si}`, corpo)};margin:0 0 6px;line-height:1.4;text-align:${alignP(`sug:${si}`, 'justify')}">${V(s.intro)}</p>` : ''}${it}</td></tr></table>`
+      h += `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin-bottom:10px"><tr><td style="background:${cor};padding:5px 12px;font-weight:800;font-size:${fsz(`sug:${si}`, 11)};color:${s.corTitulo || '#9a6e00'}">${V(s.titulo)}</td><td style="background:${cor};padding:5px 12px;text-align:right;font-weight:700;font-size:${fsz(`sug:${si}`, 10)};color:${s.corTitulo || '#9a6e00'}">${s.prioridade ? '[!] ' + V(s.prioridade) : ''}</td></tr><tr><td colspan="2" style="background:#f0eeff;padding:8px 12px">${s.intro ? `<p style="font-size:${fsz(`sug:${si}`, corpo)};margin:0 0 6px;line-height:1.4;text-align:${alignP(`sug:${si}`, 'justify')}">${V(s.intro)}</p>` : ''}${it}</td></tr></table>`
     })
   }
   if ((c.fechamento?.length ?? 0) > 0) {
