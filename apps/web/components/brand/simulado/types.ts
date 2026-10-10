@@ -153,6 +153,10 @@ export interface SimEntradaReal {
   /** Valida identidade/acesso SEM criar sessão. Resolve `true` se o aluno pode começar (→ abre o
    *  modal "Tudo pronto"); `false` quando há erro/bloqueio (a UI mostra o erro direto, sem modal). */
   onValidar?: () => Promise<boolean>
+  /** Preenchido após `onValidar` quando o aluno JÁ TEM uma sessão em andamento (não finalizada).
+   *  A entrada usa p/ mostrar "Continuar de onde parou · Questão X de Y" no lugar de "Começar agora".
+   *  Clicar continua RETOMA a mesma sessão (o servidor reabre a não-finalizada). */
+  emAndamento?: { questaoAtual: number; total: number } | null
   /** Ação em curso (para spinner/disable dos botões). */
   carregando: AcaoEntrada | null
   /** Mensagem de erro de bloqueio/identidade (do backend, já personalizada). */

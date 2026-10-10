@@ -360,8 +360,8 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
                       )}
                     </div>
                     <div style={{ display: 'flex', gap: 10, marginTop: 'auto' }}>
-                      <a className="hvn-cta" href="#" onClick={onClickSafe} style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 46, borderRadius: 14, color: '#FFFFFF', fontWeight: 800, fontSize: 14 }}><Play size={14} fill="currentColor" stroke="none" />Retomar simulado</a>
-                      <a href="#" onClick={onClickSafe} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 46, padding: '0 16px', borderRadius: 14, border: '1px solid var(--line)', color: 'var(--ink)', fontWeight: 700, fontSize: 13 }}><FileDown size={15} />Caderno</a>
+                      <a className="hvn-cta" {...linkReal(continuar.fazerUrl ?? undefined)} style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 46, borderRadius: 14, color: '#FFFFFF', fontWeight: 800, fontSize: 14 }}><Play size={14} fill="currentColor" stroke="none" />Retomar simulado</a>
+                      {continuar.cadernoUrl ? <a {...linkReal(continuar.cadernoUrl)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 46, padding: '0 16px', borderRadius: 14, border: '1px solid var(--line)', color: 'var(--ink)', fontWeight: 700, fontSize: 13 }}><FileDown size={15} />Caderno</a> : null}
                     </div>
                   </div>
                 </div>
@@ -670,7 +670,7 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
               ))}
             </div>
             <div style={{ fontSize: 12, color: 'var(--muted)', marginBottom: 12 }}>Questão {continuar.questaoAtual} de {continuar.totalQuestoes} · {continuar.tempoRestante} restantes</div>
-            <a className="hvn-cta" href="#" onClick={onClickSafe} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 44, borderRadius: 14, color: '#FFFFFF', fontWeight: 800, fontSize: 14, width: '100%' }}><Play size={14} fill="currentColor" stroke="none" />Retomar simulado</a>
+            <a className="hvn-cta" {...linkReal(continuar?.fazerUrl ?? undefined)} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 44, borderRadius: 14, color: '#FFFFFF', fontWeight: 800, fontSize: 14, width: '100%' }}><Play size={14} fill="currentColor" stroke="none" />Retomar simulado</a>
           </div>
         )}
 

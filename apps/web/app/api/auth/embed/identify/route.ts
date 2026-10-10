@@ -249,7 +249,27 @@ export async function POST(request: NextRequest) {
   //     então abrir o modal "Tudo pronto"; e-mail errado/sem acesso já caiu nos bloqueios acima,
   //     exibindo o erro DIRETO (sem modal).
   if (body.modo === 'validar') {
-    return NextResponse.json({ ok: true, estudante_nome: estudante.nome })
+    // Sessão JÁ EM ANDAMENTO? A entrada usa isto p/ mostrar "Continuar de onde parou" (questão X de Y)
+    // em vez de "Começar agora" — clicar continua RETOMA a mesma sessão (abaixo). 1 lookup indexado;
+    // os counts só rodam para quem tem sessão aberta (raro no 1º acesso).
+    let emAndamento = false, questaoAtual = 0, total = 0
+    if (!ehTeste) {
+      const { data: aberta } = await supabase
+        .from('simulado_sessoes_prova')
+        .select('id').eq('simulado_id', simulado.id).eq('estudante_id', estudante.id)
+        .eq('is_teste', false).neq('status', 'finalizada')
+        .order('iniciado_em', { ascending: false }).limit(1).maybeSingle()
+      if (aberta) {
+        const [{ count: resp }, { count: tot }] = await Promise.all([
+          supabase.from('simulado_respostas_objetivas').select('*', { count: 'exact', head: true }).eq('sessao_id', aberta.id),
+          supabase.from('simulado_prova_questoes').select('*', { count: 'exact', head: true }).eq('simulado_id', simulado.id),
+        ])
+        total = tot ?? 0
+        questaoAtual = Math.min((resp ?? 0) + 1, total || (resp ?? 0) + 1)
+        emAndamento = true
+      }
+    }
+    return NextResponse.json({ ok: true, estudante_nome: estudante.nome, emAndamento, questaoAtual, total })
   }
 
   // 4. Abrir ou retomar sessao_prova (is_teste = ehTeste — teste e prova real não se misturam).

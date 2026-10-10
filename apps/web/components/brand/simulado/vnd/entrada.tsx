@@ -260,6 +260,11 @@ export function EntradaVND({ theme, data, es = 'aberto', preview, real }: SimScr
               onToggle={() => setAg((v) => !v)}
               text="Li as regras e estou pronto. Sei que o tempo não para depois de iniciar."
             />
+            {real?.emAndamento ? (
+              <span style={{ display: 'block', fontSize: 12.5, lineHeight: 1.5, color: 'var(--muted)', textAlign: 'center' }}>
+                Você já começou este simulado — vamos continuar da <b style={{ color: 'var(--ink)' }}>questão {real.emAndamento.questaoAtual} de {real.emAndamento.total}</b>. Suas respostas foram salvas.
+              </span>
+            ) : null}
             <button
               type="button"
               disabled={!ag || !!real?.carregando}
@@ -273,7 +278,7 @@ export function EntradaVND({ theme, data, es = 'aberto', preview, real }: SimScr
               }}
             >
               <Play size={16} />
-              {real?.carregando ? 'Entrando…' : 'Começar agora'}
+              {real?.carregando ? 'Entrando…' : real?.emAndamento ? 'Continuar de onde parei' : 'Começar agora'}
             </button>
           </div>
         </ModalShell>

@@ -104,6 +104,8 @@ export function montarHomeData(args: {
         tempoRestante: emAndamento.quando ?? '',
         ultimaAtividade: '',
         cadernoUrl: emAndamento.enunciadoUrl ?? undefined,
+        // RETOMAR no runner (antes o card do "Continuar" ia p/ '#' e não navegava).
+        fazerUrl: emAndamento.embed_token ? `/simulado/${emAndamento.embed_token}` : null,
       }
     : null
 

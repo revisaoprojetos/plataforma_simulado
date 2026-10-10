@@ -12,6 +12,23 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.7.3 — 2026-10-10
+
+Correções URGENTES do fluxo de "continuar" simulado em andamento (pré-lançamento).
+
+- **"Continuar" ia para resultado vazio:** o botão de simulado EM ANDAMENTO (em Realizados e no card
+  "Continuar"/"Retomar" da Home) apontava para `/aluno/simulados/<id>` — a tela de RESULTADO, que só lê
+  sessões finalizadas → mostrava "Você ainda não concluiu este simulado" em vez de retomar. Agora aponta
+  para o runner `/simulado/<token>` (o identify reabre a sessão não-finalizada). Vale p/ todos os brands.
+  Home: `HomeContinuar.fazerUrl` (novo) + botões do Revisão/VND ligados (antes iam p/ `'#'`).
+- **"Aparece para começar de novo":** a entrada mostrava "Começar agora" mesmo com uma prova em andamento
+  (o progresso NUNCA se perdia — clicar sempre retomava a sessão; era só o rótulo). Agora o `identify`
+  (modo `validar`) devolve `emAndamento` + a questão atual; a entrada (Revisão/VND) mostra **"Continuar de
+  onde você parou · Questão X de Y"** e o botão vira **"Continuar de onde parei"**. MEQ já ia direto p/ a
+  prova retomada (sem modal). `SimEntradaReal.emAndamento` + captura em `entrada-real`.
+- **Admin (em andamento):** relatórios de simulados + gestão de tentativas + painel de janela de testes
+  (arquivos de admin incluídos no push a pedido).
+
 ## 3.7.2 — 2026-10-09
 
 Refinamentos da área do aluno (visual interno), foco MEQ.

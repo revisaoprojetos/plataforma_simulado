@@ -17,7 +17,7 @@ export async function montarRelatorioSimulado(svc: SupabaseClient, simId: string
 }
 
 async function _montarRelatorioSimulado(svc: SupabaseClient, simId: string, tenantId: string | null): Promise<DadosRelatorioSimulado | null> {
-  const { data: alvo } = await svc.from('simulado_simulados').select('id, titulo, modo_aplicacao, regras').eq('id', simId).eq('deletado', false).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
+  const { data: alvo } = await svc.from('simulado_simulados').select('id, titulo, modo_aplicacao, regras, data_inicio, data_fim').eq('id', simId).eq('deletado', false).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').maybeSingle()
   if (!alvo) return null
 
   // Questões do simulado (ordem, tipo, disciplina, enunciado).
@@ -76,6 +76,26 @@ async function _montarRelatorioSimulado(svc: SupabaseClient, simId: string, tena
   const retentativas = Number.isFinite(retentRaw) && retentRaw > 0 ? retentRaw : 1
   const permiteVarias = modo === 'aberto' || retentativas > 1
   const politica = (regras.politica_nota ?? 'ultima') as 'ultima' | 'melhor' | 'media'
+
+  // ── JANELA DE APLICAÇÃO (só p/ janela_fixa com datas): quantos finalizaram DENTRO do horário
+  // previsto vs ANTES (prováveis testes) vs DEPOIS. Distinct por aluno; usa TODAS as finalizadas. ──
+  const diIni = (alvo as any)?.data_inicio ? new Date((alvo as any).data_inicio) : null
+  const diFim = (alvo as any)?.data_fim ? new Date((alvo as any).data_fim) : null
+  const temJanela = modo === 'janela_fixa' && !!diIni && !!diFim
+  let janela: { inicio: string; fim: string } | null = null
+  let janelaStats: { dentro: number; antes: number; depois: number } | null = null
+  if (temJanela && diIni && diFim) {
+    janela = { inicio: diIni.toISOString(), fim: diFim.toISOString() }
+    const inW = new Set<string>(), antesW = new Set<string>(), depoisW = new Set<string>()
+    for (const s of finalizadasAll) {
+      if (!s.finalizado_em || !s.estudante_id) continue
+      const t = new Date(s.finalizado_em).getTime()
+      if (t < diIni.getTime()) antesW.add(s.estudante_id)
+      else if (t > diFim.getTime()) depoisW.add(s.estudante_id)
+      else inW.add(s.estudante_id)
+    }
+    janelaStats = { dentro: inW.size, antes: antesW.size, depois: depoisW.size }
+  }
 
   const totalQuestoes = (pq ?? []).length
   const discOrdem = new Map<string, number>()
@@ -155,6 +175,22 @@ async function _montarRelatorioSimulado(svc: SupabaseClient, simId: string, tena
     const ests = await fetchAllByIn<any>(estIds, (chunk) => svc.from('simulado_estudantes').select('id, nome, email, telefone, classificacao').in('id', chunk))
     for (const e of ests) infoEst.set(e.id, { nome: e.nome ?? 'Estudante', email: e.email ?? null, telefone: e.telefone ?? null, classificacao: e.classificacao ?? null })
   }
+
+  // Sessões finalizadas FORA da janela (antes/depois) — os prováveis "testes de antes". Lista por
+  // sessão p/ o admin marcar como teste / excluir / marcar o aluno como testador.
+  const foraJanela = (temJanela && diIni && diFim)
+    ? finalizadasAll
+      .filter((s) => s.finalizado_em && s.estudante_id && (new Date(s.finalizado_em).getTime() < diIni.getTime() || new Date(s.finalizado_em).getTime() > diFim.getTime()))
+      .map((s) => ({
+        sessId: s.id as string,
+        estId: s.estudante_id as string,
+        nome: infoEst.get(s.estudante_id)?.nome ?? 'Estudante',
+        fimISO: s.finalizado_em as string,
+        quando: (new Date(s.finalizado_em).getTime() < diIni.getTime() ? 'antes' : 'depois') as 'antes' | 'depois',
+        nota: s.nota != null ? Number(s.nota) : null,
+      }))
+      .sort((a, b) => new Date(a.fimISO).getTime() - new Date(b.fimISO).getTime())
+    : []
 
   // Config + levantamento de tentativas (para simulados que permitem várias).
   const politicaLabel = politica === 'melhor' ? 'Melhor nota' : politica === 'media' ? 'Média das tentativas' : 'Última tentativa'
@@ -343,5 +379,6 @@ async function _montarRelatorioSimulado(svc: SupabaseClient, simId: string, tena
     totalSessoes: atribuidosSet.size, finalizadas: finalizadas.length, notaMedia, melhorNota, acertoMedio, tempoMedioMin,
     porDisciplina, porQuestao, distribuicao, ranking, disciplinas, linhas, questoes, engajamento,
     porClassificacao, dispersao, histogramaAcertos, config, tentativasResumo, porAlunoTentativas,
+    janela, janelaStats, foraJanela, simId,
   }
 }

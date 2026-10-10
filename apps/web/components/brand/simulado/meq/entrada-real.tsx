@@ -102,6 +102,8 @@ export function EntradaReal(props: EntradaRealProps) {
 
   // Espera (identidade OK antes do início): o backend devolve {aguardando, data_inicio}.
   const [aguardando, setAguardando] = useState<string | null>(null)
+  // Sessão em andamento detectada no validar → a entrada mostra "Continuar de onde parou".
+  const [emAnd, setEmAnd] = useState<{ questaoAtual: number; total: number } | null>(null)
   const ultimoModo = useRef<AcaoEntrada>('iniciar')
 
   // Tick de 1s para o countdown (relógio = base do servidor + tempo decorrido local).
@@ -182,6 +184,8 @@ export function EntradaReal(props: EntradaRealProps) {
       }
       const json = await res.json()
       setCarregando(null)
+      // Sessão em andamento? → a entrada mostra "Continuar de onde parou" (clicar RETOMA a mesma sessão).
+      setEmAnd(json.emAndamento ? { questaoAtual: Number(json.questaoAtual) || 0, total: Number(json.total) || 0 } : null)
       // Identidade OK mas ainda antes do início (entrada antecipada) → não abre o modal; mostra a espera.
       if (json.aguardando && json.data_inicio) { setAguardando(json.data_inicio as string); return false }
       return true
@@ -251,7 +255,7 @@ export function EntradaReal(props: EntradaRealProps) {
 
   const real: SimEntradaReal = {
     metodo, email, setEmail, cpf, setCpf, telefone, setTelefone,
-    onIdentificar, onValidar, carregando, erro, voltarHref: '/aluno', onToggleTheme: toggleDark,
+    onIdentificar, onValidar, emAndamento: emAnd, carregando, erro, voltarHref: '/aluno', onToggleTheme: toggleDark,
     plataforma, logoUrl: props.logoUrl ?? null, logoDarkUrl: props.logoDarkUrl ?? null, logoGrandeUrl: props.logoGrandeUrl ?? null, permiteFolha: prova.permiteFolha,
   }
 

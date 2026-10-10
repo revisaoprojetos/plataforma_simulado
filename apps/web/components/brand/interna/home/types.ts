@@ -60,6 +60,8 @@ export interface HomeContinuar {
   acertos?: number
   ultimaAtividade: string
   cadernoUrl?: string
+  /** Link do runner p/ RETOMAR a prova (/simulado/<token>). Null = sem token. */
+  fazerUrl?: string | null
 }
 
 export interface HomeResumo {

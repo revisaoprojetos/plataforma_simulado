@@ -138,7 +138,10 @@ export default async function MeusSimuladosPage() {
         pctConcluidos: feitos > 0 ? Math.round((concluidos.length / feitos) * 100) : null,
         melhorNotaOrigem,
       },
-      emAndamento: emAndamentoItens.map((s: any) => ({ id: s.id, titulo: s.titulo, capa: svis(s), area: areaDe(s), banca: bancaPorSim.get(s.id), ...progDe(s), continuarHref: `/aluno/simulados/${s.id}` })),
+      // "Continuar" RETOMA a prova no runner (/simulado/<token> → o identify reabre a sessão em andamento).
+      // Antes apontava p/ /aluno/simulados/<id> (tela de RESULTADO, que só lê sessões finalizadas) → mostrava
+      // "Você ainda não concluiu este simulado" em vez de retomar. Fallback p/ o detalhe se faltar token.
+      emAndamento: emAndamentoItens.map((s: any) => ({ id: s.id, titulo: s.titulo, capa: svis(s), area: areaDe(s), banca: bancaPorSim.get(s.id), ...progDe(s), continuarHref: s.embed_token ? `/simulado/${s.embed_token}` : `/aluno/simulados/${s.id}` })),
       concluidos: concluidos.map((s: any) => ({ id: s.id, titulo: s.titulo, capa: svis(s), area: areaDe(s), banca: bancaPorSim.get(s.id), data: dm(s.ultimo ?? s.created_at), nota: s.melhor, notaLiberada: s.notaLiberada, href: `/aluno/simulados/${s.id}`, correcaoHref: `/aluno/simulados/${s.id}`, refazerHref: `/aluno/simulados/${s.id}`, baixarHref: `/aluno/simulados/${s.id}` })),
       personalizados: {
         criarHref: '/aluno/simulados/personalizados/novo',

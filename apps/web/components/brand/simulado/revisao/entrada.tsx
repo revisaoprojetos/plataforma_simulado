@@ -251,11 +251,16 @@ export function EntradaRevisao({ theme, data, es: esInit = 'aberto', real }: Sim
       {/* Modal INI */}
       {md === 'ini' && (
         <Modal onClose={closeMd} width={500} prefix={PFX}
-          icon={P.play} titulo="Tudo pronto para começar" sub={info.titulo}>
+          icon={P.play} titulo={real?.emAndamento ? 'Continuar de onde você parou' : 'Tudo pronto para começar'} sub={info.titulo}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
             <KpiBox label="Tempo" valor="Sem limite" nota="pause quando quiser" brand />
             <KpiBox label="Questões" valor={String(info.n)} nota="objetiva A–E" />
           </div>
+          {real?.emAndamento ? (
+            <span style={{ display: 'block', fontSize: 12.5, lineHeight: 1.5, color: 'var(--muted)', textAlign: 'center' }}>
+              Você já começou este simulado — vamos continuar da <b style={{ color: 'var(--ink)' }}>questão {real.emAndamento.questaoAtual} de {real.emAndamento.total}</b>. Suas respostas foram salvas.
+            </span>
+          ) : null}
           <span style={{ display: 'block', fontSize: 10.5, fontWeight: 800, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--muted)' }}>Como você quer responder?</span>
           <RadioMode selected={mo === 'cad'} onClick={() => setMo('cad')} icon={P.book} titulo="Caderno completo" sub="Enunciados, alternativas e ferramentas de estudo" />
           <RadioMode selected={mo === 'folha'} onClick={() => setMo('folha')} icon={P.list} titulo="Só a folha de respostas" sub="Para quem fez no papel e quer apenas marcar" />
@@ -269,7 +274,7 @@ export function EntradaRevisao({ theme, data, es: esInit = 'aberto', real }: Sim
             className={`${PFX}-sbtn`}
             style={{ ...primaryBtnStyle(52), opacity: ag && !busy ? 1 : 0.45, pointerEvents: ag && !busy ? 'auto' : 'none', transition: 'opacity .2s' }}
           >
-            <Ic d={P.play} size={16} />{busy ? 'Entrando…' : 'Começar agora'}
+            <Ic d={P.play} size={16} />{busy ? 'Entrando…' : real?.emAndamento ? 'Continuar de onde parei' : 'Começar agora'}
           </button>
         </Modal>
       )}

@@ -11,6 +11,7 @@ import { ArrowLeft, ShieldCheck } from 'lucide-react'
 import { montarComparativo } from '@/lib/simulado/comparativo'
 import { montarResultadoAluno, type SessaoInput } from '@/lib/simulado/resultado-aluno'
 import { MeuSimuladoView } from '@/components/aluno/meu-simulado-view'
+import { GestaoTentativas } from './gestao-tentativas'
 
 export const dynamic = 'force-dynamic'
 
@@ -96,6 +97,8 @@ export default async function EstudanteSimuladoPage({ params }: { params: Promis
         <ShieldCheck className="h-4 w-4 shrink-0 text-primary" />
         <span>Visão de administrador: nota, gabarito e todos os cadernos aparecem liberados aqui — inclusive os que ainda não foram liberados para o aluno.</span>
       </div>
+
+      <GestaoTentativas simuladoId={simuladoId} estId={id} sessoes={finalizadas.map((s) => ({ id: s.id, tentativa_num: s.tentativa_num, nota: s.nota, finalizado_em: s.finalizado_em }))} />
 
       <MeuSimuladoView
         tentativas={tentativas}

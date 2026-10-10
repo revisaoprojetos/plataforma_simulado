@@ -7,6 +7,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { TipoSimuladoBadge } from '@/components/admin/tipo-simulado-badge'
 import type { TipoSimulado } from '@/lib/simulado/tipo'
 import { cn } from '@/lib/utils'
+import { JanelaTestesPanel } from './janela-testes-panel'
 import { Users, CheckCircle2, Target, Trophy, Clock, Crown, Medal, ClipboardList, BookOpen, BarChart3, ListChecks, FileSpreadsheet, FileText, Loader2, LayoutDashboard, Search, ChevronDown, Check, X, LogIn, Eye, Download, Activity, AlertTriangle, Timer, Gauge, Repeat, Lock, TrendingUp, TrendingDown, Minus, Shield } from 'lucide-react'
 
 // ── Helpers de gráfico p/ o Excel: renderiza em canvas e devolve PNG base64 (sem prefixo) p/ addImage ──
@@ -134,6 +135,14 @@ export type DadosRelatorioSimulado = {
   config: { modo: string; modoLabel: string; permiteVarias: boolean; tentativasPermitidas: string; politica: string; politicaLabel: string }
   tentativasResumo: { totalTentativas: number; mediaPorAluno: number; alunosComMaisDeUma: number }
   porAlunoTentativas: { nome: string; tentativas: number; primeiraNota: number | null; notaConsiderada: number | null; delta: number | null }[]
+  /** Janela de aplicação (só modo janela_fixa com datas). */
+  janela: { inicio: string; fim: string } | null
+  /** Alunos distintos que finalizaram dentro / antes / depois da janela. */
+  janelaStats: { dentro: number; antes: number; depois: number } | null
+  /** Sessões finalizadas FORA da janela (prováveis testes) — para marcar como teste / excluir. */
+  foraJanela: { sessId: string; estId: string; nome: string; fimISO: string; quando: 'antes' | 'depois'; nota: number | null }[]
+  /** ID do simulado (para as ações de gestão de tentativas). */
+  simId: string
 }
 
 // Cabeçalho na ordem pedida + uma coluna por disciplina.
@@ -403,6 +412,11 @@ export function RelatorioSimuladoView({ d, print }: { d: DadosRelatorioSimulado;
           <FunilItem icon={<CheckCircle2 className="h-4 w-4" />} tom="emerald" label="Finalizaram" valor={d.finalizadas} base={d.totalSessoes} baseLabel="dos matriculados" />
         </div>
       </div>
+
+      {/* Janela de aplicação & tentativas-teste (só janela_fixa; some no modo print/PDF). */}
+      {!print && d.janela && (
+        <JanelaTestesPanel simuladoId={d.simId} janela={d.janela} janelaStats={d.janelaStats} foraJanela={d.foraJanela} />
+      )}
 
       {/* Engajamento e relatórios */}
       <Painel titulo="Engajamento e relatórios" sub={`Base: ${d.engajamento.atribuidos} estudante(s) atribuído(s) ao simulado`} tom="primary" icon={<Activity className="h-4 w-4" />}>
