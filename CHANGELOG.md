@@ -12,6 +12,21 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.8.0 — 2026-10-10
+
+Integrações (webhook por domínio do tenant) + relatório de simulado com janela e gestão de testes.
+
+- **Webhook de integração (Guru/Curseduca) usa o domínio do PRÓPRIO tenant:** a URL dedicada agora
+  é montada com `tenants.dominio` (ex.: `https://simulado.vocenadefensoria.com.br/...`) em vez do
+  `NEXT_PUBLIC_APP_URL` global — cada plataforma gera a URL correta para colar na Guru.
+  ([admin/integracoes/[provider]/page.tsx](apps/web/app/admin/integracoes/[provider]/page.tsx))
+- **Relatório de simulado — janela de aplicação:** para simulados de *janela fixa*, mostra quantos
+  **finalizaram no horário previsto** vs **antes** (prováveis testes) vs **depois**.
+- **Gestão de tentativas-teste:** no relatório e na página do aluno-no-simulado, dá para **marcar a
+  sessão como teste** (reversível), **marcar o aluno como testador** deste simulado (cascateia e vale
+  p/ futuras sessões, via `simulado_testadores`) ou **excluir** a tentativa — com permissão, auditoria
+  e invalidação de cache do relatório.
+
 ## 3.7.3 — 2026-10-10
 
 Correções URGENTES do fluxo de "continuar" simulado em andamento (pré-lançamento).
