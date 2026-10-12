@@ -3,7 +3,8 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { checkPermission, getCurrentAccess } from '@/lib/auth/permissions'
 import { fetchAll } from '@/lib/supabase/fetch-all'
-import { lerDesafioJogo, temAcessoDesafio, perfilAlunos } from '@/lib/jurisprudencia/conteudo'
+import { lerDesafioJogo, temAcessoDesafio, perfilAlunos, preencherTesesPorQuiz } from '@/lib/jurisprudencia/conteudo'
+import { diasAtivosPorAluno, streakDe } from '@/lib/jurisprudencia/sequencia'
 
 // GET /api/jurisprudencia/ranking?desafio=<id>&tab=geral|dia|materia&ref=<n|materiaId>
 //   -> { rows:[ { nome, ini, pts, selos, you } ] } top 10 + a linha do aluno (you:true).
@@ -51,8 +52,8 @@ export async function GET(request: NextRequest) {
   }
 
   // Progresso de TODOS os alunos do desafio (1 linha por aluno) — paginado (nunca trunca em 1000).
-  const progresso = await fetchAll<{ estudante_id: string; dom: any; best: any }>(() =>
-    svc.from('simulado_jurisprudencia_progresso').select('estudante_id, dom, best').eq('desafio_id', desafioId).order('estudante_id', { ascending: true }),
+  const progresso = await fetchAll<{ estudante_id: string; dom: any; best: any; atualizado_em: string | null }>(() =>
+    svc.from('simulado_jurisprudencia_progresso').select('estudante_id, dom, best, atualizado_em').eq('desafio_id', desafioId).order('estudante_id', { ascending: true }),
   )
 
   const pontosDe = (best: any): number => {
@@ -62,12 +63,36 @@ export async function GET(request: NextRequest) {
     for (const d of chaves) soma += Math.max(0, Number(best[d]) || 0)
     return soma
   }
+
+  // SELO = MATÉRIA CONCLUÍDA (todas as teses de todos os dias da matéria dominadas) — igual ao jogo
+  // (matDone/selosCount). O bug anterior contava "dias com qualquer tese", inflando o número.
+  const diasComTeses = await preencherTesesPorQuiz(svc, dj.dias && typeof dj.dias === 'object' ? (dj.dias as Record<string, any>) : {}).catch(() => (dj.dias as Record<string, any>) ?? {})
+  const materias: any[] = Array.isArray(dj.materias) ? dj.materias : []
+  const final = dj.final
+  const matIdOfDay = (dayKey: string): string | null => {
+    const d = diasComTeses[dayKey]
+    if (d?.materia) return String(d.materia)
+    const m = materias.find((x) => (x?.dias ?? []).includes(Number(dayKey)))
+    if (m) return String(m.id)
+    if (final && (final?.dias ?? []).includes(Number(dayKey))) return String(final.id)
+    return null
+  }
+  const diasDaMateria = (mId: string): string[] => Object.keys(diasComTeses).filter((k) => matIdOfDay(k) === mId)
+  const tesesDoDia = (dayKey: string): number => { const t = diasComTeses[dayKey]?.teses; return Array.isArray(t) ? t.length : 0 }
+  const diaCompleto = (dom: any, dayKey: string): boolean => {
+    const arr = dom?.[dayKey]; const n = tesesDoDia(dayKey)
+    return n > 0 && Array.isArray(arr) && arr.length >= n
+  }
+  const materiaCompleta = (dom: any, m: any): boolean => {
+    const ds = diasDaMateria(String(m?.id))
+    return ds.length > 0 && ds.every((d) => diaCompleto(dom, d))
+  }
+  const totalSelos = materias.length
   const selosDe = (dom: any): number => {
     if (!dom || typeof dom !== 'object') return 0
-    const chaves = diasEscopo ?? Object.keys(dom)
-    let n = 0
-    for (const d of chaves) { const arr = dom[d]; if (Array.isArray(arr) && arr.length) n++ }
-    return n
+    // Por aba: 'geral' = matérias completas; 'dia'/'materia' = dias completos no escopo.
+    if (!diasEscopo) return materias.filter((m) => materiaCompleta(dom, m)).length
+    return diasEscopo.filter((d) => diaCompleto(dom, d)).length
   }
 
   const linhas: Linha[] = progresso.map((p) => ({
@@ -89,6 +114,13 @@ export async function GET(request: NextRequest) {
 
   // Perfil (iniciais/cargo/nível/avatar) — PRIVACIDADE: não expõe o nome completo dos outros, só iniciais.
   const ids = [...new Set(selecionadas.map((l) => l.estudanteId))]
+  // Sequência (streak) — dias de atividade do ledger (+ backfill por atualizado_em). Só p/ as linhas
+  // exibidas (top 10 + você); não varia por aba. Reduz a varredura do ledger.
+  const atualizadoPorAluno = new Map<string, string | null>(
+    progresso.filter((p) => ids.includes(p.estudante_id)).map((p) => [p.estudante_id, p.atualizado_em ?? null]),
+  )
+  const diasPorAluno = await diasAtivosPorAluno(svc, tenantId, desafioId, atualizadoPorAluno, ids).catch(() => new Map())
+  const streakDeId = (id: string) => streakDe(diasPorAluno.get(id) ?? new Set<string>())
   const perfis = await perfilAlunos(svc, tenantId, ids)
   const rows = selecionadas.map((l) => {
     const p = perfis.get(l.estudanteId)
@@ -96,9 +128,9 @@ export async function GET(request: NextRequest) {
       ini: p?.iniciais ?? '?', cargo: p?.cargo ?? '', cargoIcone: p?.cargoIcone ?? '', nivel: p?.nivel ?? 1,
       avatar: p?.avatar ?? null, avatarCor: p?.avatarCor ?? null,
       pos: posPorId.get(l.estudanteId) ?? 0,
-      pts: l.pts, selos: l.selos, you: estudanteId ? l.estudanteId === estudanteId : false,
+      pts: l.pts, selos: l.selos, streak: streakDeId(l.estudanteId), you: estudanteId ? l.estudanteId === estudanteId : false,
     }
   })
   const meu = estudanteId ? perfis.get(estudanteId) : null
-  return NextResponse.json({ rows, me: meu ?? null, total: linhas.length })
+  return NextResponse.json({ rows, me: meu ?? null, total: linhas.length, totalSelos })
 }

@@ -112,7 +112,7 @@ function LegendaBar({ cores, escuro, noTopo, semGrifos, onToggleGrifos, mostrarM
   )
 }
 
-export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAULT_GRIFO_CORES, interno = false }: {
+export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAULT_GRIFO_CORES, interno = false, embed = false }: {
   doc: DocumentoCarregado
   // Modo trilha (2 etapas): 'leitura' = leitura pura (SEM questões inline; ao concluir → CTA questões);
   // 'questoes' = painel read-only de consulta (documento + grifos, sem inline, sem concluir).
@@ -124,6 +124,9 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
   // Visual novo: o <main> é full-bleed (sem padding) → o leitor preenche a área cheia (sem margens
   // negativas) e fica centralizado/limitado p/ não ficar um vão enorme nas telas largas.
   interno?: boolean
+  // Embed (dentro do arcade da jurisprudência): leitor em TELA CHEIA (sem o top bar do portal) e o
+  // botão de voltar vira "Voltar" (fecha o overlay via #fechar-leitura em vez de ir pra "Trilha").
+  embed?: boolean
 }) {
   const [modo, setModo] = useState<Modo>((doc.prefs?.modo as Modo) || 'scroll')
   // Tema da leitura sincronizado com o claro/escuro do sistema (next-themes). Café (sepia) é override
@@ -1268,7 +1271,8 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
       ? (interno
         // Visual novo: altura FIXA = viewport − top bar (72px) → o leitor se auto-limita, então a
         // barra lateral (sumário) fica ESTÁTICA com rolagem própria e só a leitura rola. w-full = sem faixas.
-        ? 'h-[calc(100dvh-72px)] w-full'
+        // No EMBED (overlay do arcade) não há top bar → ocupa a viewport cheia.
+        ? (embed ? 'h-[100dvh] w-full' : 'h-[calc(100dvh-72px)] w-full')
         // LegProc (shell antigo): cancela o padding do <main> (p-4/md:p-6) com margens negativas.
         : '-m-4 h-[100dvh] md:-m-6')
       : 'h-[calc(100dvh-7rem)] min-h-[420px] rounded-2xl border shadow-sm')}
@@ -1281,7 +1285,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
         <aside className="flex w-64 shrink-0 flex-col border-r" style={{ borderColor: '#0000001a', background: cores.bg }}>
           <div className="flex items-center justify-between border-b px-3 py-2.5" style={{ borderColor: '#0000001a' }}>
             <Link href={trilha?.voltarHref ?? '/aluno/leitura'} className="inline-flex items-center gap-1 text-sm font-medium" style={{ color: cores.muted }}>
-              <ArrowLeft className="h-4 w-4" /> {trilha?.voltarHref && trilha.voltarHref !== '/aluno/leitura' ? 'Trilha' : 'Biblioteca'}
+              <ArrowLeft className="h-4 w-4" /> {embed ? 'Voltar' : (trilha?.voltarHref && trilha.voltarHref !== '/aluno/leitura' ? 'Trilha' : 'Biblioteca')}
             </Link>
             <button onClick={() => setMenuAberto(false)} className="rounded p-1" style={{ color: cores.muted }} aria-label="Fechar menu"><X className="h-4 w-4" /></button>
           </div>
@@ -1390,7 +1394,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
             </div>
             {trilha?.modo === 'questoes' ? null : concluido ? (
               trilha?.modo === 'leitura' && trilha.questoesHref ? (
-                <Link href={trilha.questoesHref} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-primary-foreground transition hover:opacity-90">
+                <Link href={trilha.questoesHref} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold transition hover:opacity-90" style={{ color: '#fff' }}>
                   <CheckCircle2 className="h-4 w-4" /> Ir para as questões
                 </Link>
               ) : (

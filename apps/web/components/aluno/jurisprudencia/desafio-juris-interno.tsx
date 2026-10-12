@@ -40,10 +40,14 @@ export interface DesafioJurisInternoProps {
   materiasCount: number
   config: Config
   bannerUrl: string | null
+  /** Cabeçalho compacto (retrai banner + abas → mais tela para o arcade). */
+  compacto?: boolean
+  /** Cor de fundo do cabeçalho (usada quando NÃO há imagem). Vazio/null = gradiente padrão. */
+  corFundo?: string | null
   dias: DiaInfo[]
 }
 
-export function DesafioJurisInterno({ desafioId, titulo, theme, totalDias, materiasCount, config, bannerUrl, dias }: DesafioJurisInternoProps) {
+export function DesafioJurisInterno({ desafioId, titulo, theme, totalDias, materiasCount, config, bannerUrl, compacto, corFundo, dias }: DesafioJurisInternoProps) {
   useTemaInterno(theme) // reage ao toggle claro/escuro/azul ao vivo
   const [tab, setTab] = useState<Tab>('desafio')
 
@@ -53,11 +57,14 @@ export function DesafioJurisInterno({ desafioId, titulo, theme, totalDias, mater
   const arcadeRef = useRef<HTMLIFrameElement>(null)
   const leituraRef = useRef<HTMLIFrameElement>(null)
   const [leitura, setLeitura] = useState<string | null>(null)
-  const fecharLeitura = () => { setLeitura(null); try { arcadeRef.current?.contentWindow?.postMessage({ type: 'juris-leitura-fechada' }, '*') } catch { /* ignora */ } }
+  // Enquanto o iframe da leitura carrega, mostramos um loader ESCURO por cima (em vez da tela branca).
+  const [leituraLoad, setLeituraLoad] = useState(false)
+  const fecharLeitura = () => { setLeitura(null); setLeituraLoad(false); try { arcadeRef.current?.contentWindow?.postMessage({ type: 'juris-leitura-fechada' }, '*') } catch { /* ignora */ } }
   useEffect(() => {
     function onMsg(e: MessageEvent) {
       const d = e.data as { type?: string; docId?: string; desafio?: string }
       if (d && d.type === 'juris-abrir-leitura' && d.docId) {
+        setLeituraLoad(true)
         setLeitura(`/aluno/jurisprudencia/leitura/${encodeURIComponent(d.docId)}?desafio=${encodeURIComponent(d.desafio || desafioId)}&embed=1`)
       }
     }
@@ -86,7 +93,7 @@ export function DesafioJurisInterno({ desafioId, titulo, theme, totalDias, mater
     // margin:-24 cancela o padding do InternaPageRoot (full-bleed). height capada à viewport (menos o
     // topbar de 72px do shell) + overflow:hidden → SEM scroll externo e sem faixa/linha sobrando.
     <div data-juris-int style={{ display: 'flex', flexDirection: 'column', margin: -24, height: 'calc(100dvh - 72px)', overflow: 'hidden' }}>
-      <HeaderHero titulo={titulo} totalDias={totalDias} materiasCount={materiasCount} tab={tab} setTab={setTab} tabs={TABS} banner={bannerUrl} />
+      <HeaderHero titulo={titulo} totalDias={totalDias} materiasCount={materiasCount} tab={tab} setTab={setTab} tabs={TABS} banner={bannerUrl} compacto={compacto} corFundo={corFundo} />
 
       {/* ARCADE: SEMPRE montado — nunca recarrega (nem ao trocar de aba, nem ao abrir a leitura), então
           nada de painéis vazios, perda de progresso ou flash da abertura ao voltar. */}
@@ -100,14 +107,19 @@ export function DesafioJurisInterno({ desafioId, titulo, theme, totalDias, mater
         />
       </div>
 
-      {/* Overlay da LEITURA (por cima de tudo, via portal) — o arcade continua montado/congelado atrás. */}
+      {/* Overlay da LEITURA (por cima de tudo, via portal) — o arcade continua montado/congelado atrás.
+          SEM barra própria: a leitura abre em TELA CHEIA (embed cobre o shell) e tem o seu botão "Voltar"
+          (fecha via #fechar-leitura). Só o loader escuro enquanto o iframe carrega. */}
       {leitura && typeof document !== 'undefined' && createPortal(
-        <div style={{ position: 'fixed', inset: 0, zIndex: 120, display: 'flex', flexDirection: 'column', background: '#05060f' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 14px', background: 'var(--surface)', borderBottom: '1px solid var(--line)', flex: '0 0 auto' }}>
-            <button type="button" onClick={fecharLeitura} style={{ cursor: 'pointer', border: 0, borderRadius: 8, padding: '8px 14px', fontWeight: 800, fontSize: 12, letterSpacing: '.04em', background: GOLD, color: '#2A1A55' }}>◀ VOLTAR AO DESAFIO</button>
-            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.1em', color: 'var(--muted)' }}>LEITURA DO DIA</span>
-          </div>
-          <iframe ref={leituraRef} src={leitura} title="Leitura do dia" style={{ flex: 1, width: '100%', border: 0, background: '#fff' }} />
+        <div style={{ position: 'fixed', inset: 0, zIndex: 120, background: '#05060f' }}>
+          <iframe ref={leituraRef} src={leitura} title="Leitura do dia" onLoad={() => setLeituraLoad(false)} style={{ display: 'block', width: '100%', height: '100%', border: 0, background: '#fff' }} />
+          {leituraLoad && (
+            // Loader ESCURO por cima do iframe branco → sem a tela branca "em branco" antes da leitura.
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, background: '#05060f', color: 'rgba(255,255,255,.75)' }}>
+              <Loader2 size={30} className="animate-spin" style={{ color: GOLD }} />
+              <span style={{ fontSize: 12.5, fontWeight: 700, letterSpacing: '.08em' }}>Carregando a leitura…</span>
+            </div>
+          )}
         </div>,
         document.body,
       )}
@@ -144,14 +156,66 @@ export function DesafioJurisInterno({ desafioId, titulo, theme, totalDias, mater
 
 // ── HERO: banner roxo radial + breadcrumb + abas sublinhadas (ouro). ──
 function HeaderHero({
-  titulo, totalDias, materiasCount, tab, setTab, tabs, banner,
+  titulo, totalDias, materiasCount, tab, setTab, tabs, banner, compacto, corFundo,
 }: {
   titulo: string; totalDias: number; materiasCount: number
   tab: Tab; setTab: (t: Tab) => void; tabs: { k: Tab; label: string; icon: React.ReactNode }[]
-  banner?: string | null
+  banner?: string | null; compacto?: boolean; corFundo?: string | null
 }) {
+  // Fundo do cabeçalho: imagem > cor custom > gradiente padrão. No compacto desemboca no preto do arcade.
+  const bgCompacto = corFundo
+    ? `linear-gradient(180deg,${corFundo} 0%,${corFundo} 45%,#05060f 100%)`
+    : 'linear-gradient(180deg,#3B1E8F 0%,#1E1150 48%,#05060f 100%)'
+  const bgNormal = corFundo || 'radial-gradient(120% 140% at 50% 0%,#3B1E8F 0%,#1E1150 55%,#120A33 100%)'
+  // Botões de aba (reusados nos dois modos). `h` = altura da linha (encaixa o sublinhado embaixo).
+  const abaBtns = (h: number) => tabs.map((t) => {
+    const ativo = tab === t.k
+    return (
+      <button
+        key={t.k} type="button" role="tab" aria-selected={ativo} onClick={() => setTab(t.k)} className="ji-tab"
+        style={{
+          position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 7, height: h, padding: '0 4px',
+          border: 0, background: 'none', font: 'inherit', fontSize: 14, fontWeight: 700,
+          color: ativo ? '#fff' : 'rgba(255,255,255,.62)', cursor: 'pointer', whiteSpace: 'nowrap',
+        }}
+      >
+        {t.icon}{t.label}
+        <span aria-hidden style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 3, borderRadius: '3px 3px 0 0', background: ativo ? GOLD : 'transparent', opacity: ativo ? 1 : 0, transition: 'opacity .25s ease, background .25s' }} />
+      </button>
+    )
+  })
+
+  // MODO COMPACTO: barra retraída SEM o espaçamento do banner — título em cima e abas logo ABAIXO
+  // (empilhado, como no normal, só que coladinho) → sobra bem mais tela para o arcade.
+  if (compacto) {
+    return (
+      // Fundo desemboca no preto do arcade (#05060f) no rodapé → sem linha/aresta entre a barra e o jogo.
+      <div style={{ position: 'relative', overflow: 'hidden', flex: '0 0 auto', background: bgCompacto }}>
+        {banner && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={banner} alt="" aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        )}
+        <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', padding: '0 20px' }}>
+          {/* Linha 1 — voltar + título + chip */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, height: 44, flexShrink: 0 }}>
+            <Link href="/aluno/jurisprudencia" aria-label="Voltar aos desafios" style={{ width: 28, height: 28, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,.12)', color: '#fff' }}>
+              <ChevronLeft size={15} />
+            </Link>
+            <span style={{ display: 'inline-flex', color: '#CFC4FF' }}><Scale size={16} /></span>
+            <b style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.02em', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{titulo}</b>
+            <span className="ji-hero-chip" style={{ height: 22, padding: '0 9px', borderRadius: 99, background: GOLD, color: '#2A1A55', fontSize: 11.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+              {totalDias} {totalDias === 1 ? 'fase' : 'fases'}{materiasCount ? ` · ${materiasCount} ${materiasCount === 1 ? 'matéria' : 'matérias'}` : ''}
+            </span>
+          </div>
+          {/* Linha 2 — abas, logo abaixo do título (sem linha divisória). */}
+          <div role="tablist" style={{ display: 'flex', gap: 24, overflowX: 'auto' }}>{abaBtns(42)}</div>
+        </div>
+      </div>
+    )
+  }
+
   return (
-    <div style={{ position: 'relative', overflow: 'hidden', height: 160, flex: '0 0 auto', borderRadius: 0, background: 'radial-gradient(120% 140% at 50% 0%,#3B1E8F 0%,#1E1150 55%,#120A33 100%)' }}>
+    <div style={{ position: 'relative', overflow: 'hidden', height: 160, flex: '0 0 auto', borderRadius: 0, background: bgNormal }}>
       {banner && (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={banner} alt="" aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -457,17 +521,18 @@ function PillR({ cor, icon, children }: { cor: string; icon: React.ReactNode; ch
 // ABA RANKING — pódio + card "Você" + progresso + classificação.
 // (Mesma estrutura da Lei Seca; dados reais de /api/jurisprudencia/ranking.)
 // ─────────────────────────────────────────────────────────────────────────────
-type RankRow = { ini: string; cargo: string; cargoIcone: string; nivel: number; avatar: string | null; avatarCor: string | null; pos: number; pts: number; selos: number; you: boolean }
+type RankRow = { ini: string; cargo: string; cargoIcone: string; nivel: number; avatar: string | null; avatarCor: string | null; pos: number; pts: number; selos: number; streak: number; you: boolean }
 function AbaRanking({ desafioId, totalDias }: { desafioId: string; totalDias: number }) {
   const [rows, setRows] = useState<RankRow[] | null>(null)
   const [total, setTotal] = useState(0)
+  const [totalSelos, setTotalSelos] = useState(0)
   const [loading, setLoading] = useState(true)
   useEffect(() => {
     let vivo = true
     setLoading(true)
     fetch(`/api/jurisprudencia/ranking?desafio=${encodeURIComponent(desafioId)}&tab=geral`, { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (vivo && d && Array.isArray(d.rows)) { setRows(d.rows); setTotal(Number(d.total) || d.rows.length) } })
+      .then((d) => { if (vivo && d && Array.isArray(d.rows)) { setRows(d.rows); setTotal(Number(d.total) || d.rows.length); setTotalSelos(Number(d.totalSelos) || 0) } })
       .catch(() => {})
       .finally(() => { if (vivo) setLoading(false) })
     return () => { vivo = false }
@@ -476,7 +541,8 @@ function AbaRanking({ desafioId, totalDias }: { desafioId: string; totalDias: nu
   const itens = useMemo(() => (rows ? [...rows].sort((a, b) => a.pos - b.pos) : []), [rows])
   const top3 = itens.filter((r) => r.pos >= 1 && r.pos <= 3).sort((a, b) => a.pos - b.pos)
   const eu = itens.find((r) => r.you) ?? null
-  const progressoPct = totalDias > 0 && eu ? Math.round((eu.selos / totalDias) * 100) : 0
+  const totSelos = totalSelos || totalDias // selo = matéria concluída
+  const progressoPct = totSelos > 0 && eu ? Math.round((eu.selos / totSelos) * 100) : 0
 
   if (loading && !itens.length) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '64px 20px', color: 'var(--muted)', fontSize: 14 }}><Loader2 size={20} className="animate-spin" style={{ color: 'var(--brand)' }} /> Carregando ranking…</div>
   if (!itens.length) return <div className="ji-card" style={{ padding: 40, textAlign: 'center', color: 'var(--muted)', fontSize: 14 }}>Ainda não há pontuações neste desafio.</div>
@@ -525,7 +591,7 @@ function AbaRanking({ desafioId, totalDias }: { desafioId: string; totalDias: nu
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <b style={{ fontSize: 14, color: 'var(--ink)' }}>Você</b>{' '}
                   <span style={{ height: 18, padding: '0 6px', borderRadius: 99, background: 'var(--chip)', color: 'var(--brand)', fontSize: 10, fontWeight: 800, display: 'inline-flex', alignItems: 'center' }}>VOCÊ</span>
-                  <span style={{ display: 'block', fontSize: 11.5, color: 'var(--muted)' }}>{eu.selos} {eu.selos === 1 ? 'selo' : 'selos'}</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--muted)' }}>{eu.selos} {eu.selos === 1 ? 'selo' : 'selos'} · <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, color: eu.streak > 0 ? '#E8763A' : 'var(--muted)', fontWeight: 700 }}><Flame size={12} />{eu.streak || 0} {eu.streak === 1 ? 'dia' : 'dias'}</span></span>
                 </div>
                 <div style={{ textAlign: 'center', paddingLeft: 10, borderLeft: '1px solid var(--line)' }}>
                   <b style={{ display: 'block', fontSize: 16, color: 'var(--brand)' }}>{fmt(eu.pts)}</b>
@@ -548,7 +614,7 @@ function AbaRanking({ desafioId, totalDias }: { desafioId: string; totalDias: nu
                 <span style={{ display: 'block', width: `${progressoPct}%`, height: '100%', borderRadius: 99, background: `linear-gradient(90deg,var(--brand),${GOLD})` }} />
               </div>
             </div>
-            <span style={{ fontSize: 12, color: 'var(--muted)' }}>{eu.selos} de {totalDias} fases com selo</span>
+            <span style={{ fontSize: 12, color: 'var(--muted)' }}>{eu.selos} de {totSelos} {totSelos === 1 ? 'selo' : 'selos'} (matérias concluídas)</span>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line)', fontSize: 12, color: 'var(--muted)' }}>
               <TrendingUp size={14} color="#1FA868" /> Domine as teses de hoje para subir no ranking.
             </div>
@@ -565,8 +631,8 @@ function AbaRanking({ desafioId, totalDias }: { desafioId: string; totalDias: nu
           </div>
           <span style={{ fontSize: 12, color: 'var(--muted)' }}>{fmt(total)} {total === 1 ? 'aluno' : 'alunos'}</span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '40px minmax(0,1fr) 80px 90px', gap: 12, padding: '0 12px 10px', borderBottom: '1px solid var(--line)' }}>
-          {[['#', 'left'], ['Aluno', 'left'], ['Selos', 'right'], ['Pontos', 'right']].map(([h, al]) => (
+        <div style={{ display: 'grid', gridTemplateColumns: '40px minmax(0,1fr) 68px 60px 84px', gap: 12, padding: '0 12px 10px', borderBottom: '1px solid var(--line)' }}>
+          {[['#', 'left'], ['Aluno', 'left'], ['Sequência', 'right'], ['Selos', 'right'], ['Pontos', 'right']].map(([h, al]) => (
             <span key={h} style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', textAlign: al as any }}>{h}</span>
           ))}
         </div>
@@ -574,7 +640,7 @@ function AbaRanking({ desafioId, totalDias }: { desafioId: string; totalDias: nu
           {itens.map((r) => {
             const top = r.pos <= 3
             return (
-              <div key={r.pos} style={{ display: 'grid', gridTemplateColumns: '40px minmax(0,1fr) 80px 90px', gap: 12, alignItems: 'center', padding: '10px 12px', borderBottom: '1px solid var(--line)', background: r.you ? 'color-mix(in srgb,var(--brand) 7%,transparent)' : 'transparent' }}>
+              <div key={r.pos} style={{ display: 'grid', gridTemplateColumns: '40px minmax(0,1fr) 68px 60px 84px', gap: 12, alignItems: 'center', padding: '10px 12px', borderBottom: '1px solid var(--line)', background: r.you ? 'color-mix(in srgb,var(--brand) 7%,transparent)' : 'transparent' }}>
                 <span style={{ width: 28, height: 28, borderRadius: 8, background: top ? 'var(--chip)' : 'transparent', color: top ? 'var(--brand)' : 'var(--muted)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800 }}>{r.pos}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                   <AvatarR row={r} size={34} />
@@ -589,6 +655,7 @@ function AbaRanking({ desafioId, totalDias }: { desafioId: string; totalDias: nu
                     </span>
                   </div>
                 </div>
+                <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 3, fontSize: 13, fontWeight: 700, color: r.streak > 0 ? '#E8763A' : 'var(--muted)' }}><Flame size={13} color={r.streak > 0 ? '#E8763A' : 'var(--muted)'} />{r.streak || 0}</span>
                 <span style={{ textAlign: 'right', fontSize: 13, color: 'var(--muted)' }}>{r.selos}</span>
                 <b style={{ textAlign: 'right', fontSize: 14, color: 'var(--ink)' }}>{fmt(r.pts)}</b>
               </div>

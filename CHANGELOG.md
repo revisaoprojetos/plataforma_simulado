@@ -12,6 +12,28 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.8.1 — 2026-10-12
+
+Desafio de Jurisprudência: sequência (streak) server-side, placar reorganizado, rework do score e vários ajustes de UI/contagem.
+
+- **Sequência (streak) server-side, no padrão do Lei Seca:** atividade diária gravada no ledger imutável
+  `simulado_xp_eventos` (`origem='jurisprudencia'`, `meta.dia` em BRT, idempotente — **sem migração**);
+  cálculo reusa `calcularSequencia` (`lib/jurisprudencia/sequencia.ts`). **Coluna 🔥 Sequência** na aba
+  Ranking (React), no mini-ranking lateral e no Hall da Fama do jogo; card do jogador ganhou card
+  **SEQUÊNCIA + semana** (dom→sáb). Backfill por `atualizado_em` p/ quem já tinha jogado.
+- **Contagem de selos corrigida:** o ranking contava "dias com qualquer tese" como selo; agora
+  **SELO = MATÉRIA CONCLUÍDA** (igual ao jogo — `matDone`), via `preencherTesesPorQuiz`; API devolve `totalSelos`.
+- **Score por fase = teses + bolinhas, com teto fixo:** removidos os bônus variáveis (vade mecum, armadilha,
+  labirinto limpo, vidas) da pontuação contada; **200 bolinhas em todas as fases** (labirinto determinístico
+  por alvo); `best` com teto por fase (corrige inflação ao refazer). **2 placares no HUD** (SCORE atual + MELHOR).
+- **Placar do aluno reorganizado:** PONTOS TOTAIS + POSIÇÃO lado a lado; SELOS + TESES; barra de progresso
+  com o dia atual como marcador (contorno), só dourado = concluído. **TESES DO DIA** com 2 visíveis + rolagem
+  e botão **EXPANDIR** (popup estilo pergunta com todas as teses).
+- **Vidas configuráveis** (quantidade ou ilimitada) no admin; **toggle ⚡ ANIM** (reduz as animações ao redor
+  da tela sem perder fluidez); abas da coluna reordenadas (Aulas/Selos/Ranking/Desafios) + card "Próximas aulas".
+- **Ajustes de UI:** Recorde/avatar fora da barra superior; setas do seletor de aula reencaixadas;
+  posição/brilho do item Vade Mecum; leitura em embed cobre o shell (botão "Voltar").
+
 ## 3.8.0 — 2026-10-10
 
 Integrações (webhook por domínio do tenant) + relatório de simulado com janela e gestão de testes.

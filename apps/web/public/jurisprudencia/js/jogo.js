@@ -5,10 +5,17 @@ const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const { CONFIG, MATERIAS, FINAL, DIAS } = window.DESAFIO;
 
+// Vidas: quantidade fixa OU ilimitada (sem game over), configurável no admin.
+const VIDAS_ILIM = CONFIG.vidasIlimitada === true;
+const VIDAS_INI = VIDAS_ILIM ? Infinity : (Number(CONFIG.vidas) || 3);
+
+// Bolinhas coletáveis por fase — FIXO em todas (teto de pontos uniforme).
+const BOLINHAS_ALVO = 200;
+
 /* =========================================================
    ESTADO
    ========================================================= */
-const DEF = {dom:{}, best:{}, recorde:0, demoAll:false, final:null, muted:false, volSfx:1, volMus:.5, sel:null};
+const DEF = {dom:{}, best:{}, recorde:0, demoAll:false, final:null, muted:false, volSfx:1, volMus:.5, sel:null, calm:false, dias:[]};
 let S = load();
 // Preferência de ÁUDIO persiste entre entradas: o que o aluno deixar (mudo/volumes) fica salvo em
 // localStorage (save() grava muted/volSfx/volMus) e é relido no load(). 1ª vez (sem dado salvo) usa o
@@ -75,6 +82,23 @@ const totalPts = () => Object.values(S.best).reduce((a,b)=>a+b,0);
 const selosCount = () => (MATERIAS||[]).filter(matDone).length;
 const pad = (n,l=6) => String(Math.max(0,Math.floor(n))).padStart(l,'0');
 const dd = n => String(n).padStart(2,'0');
+
+// ----- Sequência (streak): dias com atividade. S.dias é semeado do SERVIDOR (ledger) no bootstrap;
+// marcarDiaAtivo adiciona HOJE ao jogar (sincroniza no POST). Datas em BRT p/ bater com o servidor. -----
+const ymd = dt => (dt instanceof Date ? dt : new Date(dt)).toLocaleDateString('en-CA', { timeZone:'America/Sao_Paulo' });
+function marcarDiaAtivo(){ if(!Array.isArray(S.dias)) S.dias=[]; const h=ymd(new Date()); if(!S.dias.includes(h)){ S.dias.push(h); if(S.dias.length>400) S.dias=S.dias.slice(-400); save(); } }
+function calcStreak(){
+  const set=new Set(Array.isArray(S.dias)?S.dias:[]); let n=0; const d=new Date();
+  if(!set.has(ymd(d))) d.setDate(d.getDate()-1);   // ainda não jogou HOJE não quebra a sequência
+  while(set.has(ymd(d))){ n++; d.setDate(d.getDate()-1); }
+  return n;
+}
+function semanaAtiva(){
+  const set=new Set(Array.isArray(S.dias)?S.dias:[]); const now=new Date();
+  const ini=new Date(now); ini.setDate(now.getDate()-now.getDay());   // domingo da semana atual
+  const LB=['D','S','T','Q','Q','S','S']; const hk=ymd(now);
+  return LB.map((lb,i)=>{ const dt=new Date(ini); dt.setDate(ini.getDate()+i); const k=ymd(dt); return {lb, on:set.has(k), hoje:k===hk, futuro:dt>now}; });
+}
 
 /* =========================================================
    SOM 8-bit
@@ -313,7 +337,7 @@ function finalMedal(won){
    ========================================================= */
 function rng(seed){ let a=seed>>>0; return ()=>{ a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a); t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
 const D4 = [[1,0],[-1,0],[0,1],[0,-1]];
-function genMaze(cols, rows, seed, extra=.07){
+function genMaze(cols, rows, seed, extra=.07, target=0){
   const R=rng(seed), g=Array.from({length:rows},()=>Array(cols).fill(1));
   const cw=(cols-1)/2, ch=(rows-1)/2, vis=Array.from({length:ch},()=>Array(cw).fill(false));
   const st=[[0,ch-1]]; vis[ch-1][0]=true; g[2*(ch-1)+1][1]=0;
@@ -331,7 +355,17 @@ function genMaze(cols, rows, seed, extra=.07){
       if(c.length){ const [dx,dy]=c[Math.floor(R()*c.length)]; g[y+dy][x+dx]=0; }
     }
   }
-  for(let y=1;y<rows-1;y++) for(let x=1;x<cols-1;x++) if(g[y][x]===1 && ((x%2===0)!==(y%2===0)) && R()<extra) g[y][x]=0;
+  if(target){
+    // Abre paredes internas (entre corredores), em ordem determinística, até atingir
+    // EXATAMENTE `target` células abertas — garante o mesmo nº de bolinhas em toda fase.
+    let open=0; for(let y=0;y<rows;y++) for(let x=0;x<cols;x++) if(g[y][x]===0) open++;
+    const cand=[];
+    for(let y=1;y<rows-1;y++) for(let x=1;x<cols-1;x++) if(g[y][x]===1 && ((x%2===0)!==(y%2===0))) cand.push([x,y]);
+    for(let i=cand.length-1;i>0;i--){ const j=Math.floor(R()*(i+1)); [cand[i],cand[j]]=[cand[j],cand[i]]; }
+    for(const [x,y] of cand){ if(open>=target) break; g[y][x]=0; open++; }
+  } else {
+    for(let y=1;y<rows-1;y++) for(let x=1;x<cols-1;x++) if(g[y][x]===1 && ((x%2===0)!==(y%2===0)) && R()<extra) g[y][x]=0;
+  }
   return g;
 }
 function drawWalls(ctx, g, T, {neon='#6d3cff', inner='#060a33', glow='#8b5cf6', w=.36}={}){
@@ -358,7 +392,7 @@ const wallLayer=document.createElement('canvas');
 let TS=24;
 const DIRS={up:{dx:0,dy:-1},down:{dx:0,dy:1},left:{dx:-1,dy:0},right:{dx:1,dy:0}};
 const G = {mode:'attract', day:1, t:0, maze:null, dots:null, dotsLeft:0, teses:[], player:null, traps:[], want:null,
-  lives:CONFIG.vidas, score:0, parts:{lab:0,tese:0,vida:0}, fright:0, shake:0, readyT:0, dieT:0, overT:0, particles:[], floats:[], replay:false, distCache:null, distKey:''};
+  lives:VIDAS_INI, score:0, parts:{lab:0,tese:0,vida:0}, fright:0, shake:0, readyT:0, dieT:0, overT:0, particles:[], floats:[], replay:false, distCache:null, distKey:''};
 
 const open = (x,y) => x>=0&&y>=0&&x<COLS&&y<ROWS&&G.maze[y][x]===0;
 function mkEnt(x,y,speed){ return {x,y,nx:x,ny:y,p:0,moving:false,dir:null,speed,face:1}; }
@@ -426,7 +460,7 @@ async function recarregarLeituras(){
 function loadDay(n){
   n=Number(n); if(!DIAS[n]){ n=hoje(); if(n==null) return; } // dia removido/ausente: cai no dia atual
   G.day=n; S.sel=n; save(); stageSel=n;
-  G.maze=genMaze(COLS,ROWS,1000+n*7919);
+  G.maze=genMaze(COLS,ROWS,1000+n*7919,.07,BOLINHAS_ALVO+3);  // +3 = 2 power + 1 spawn → 200 bolinhas
   G.replay=dayComplete(n);
   buildWallLayer();
   resetBoard(true);
@@ -450,9 +484,11 @@ function resetBoard(full){
     for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++) if(open(x,y)){ G.dots[x+y*COLS]=1; G.dotsLeft++; }
     const P=[[13,1],[13,ROWS-2]]; P.forEach(([x,y])=>{ if(open(x,y)){ if(G.dots[x+y*COLS]===1) G.dotsLeft--; G.dots[x+y*COLS]=2; } });
     G.dots[1+(ROWS-2)*COLS]=0; G.dotsLeft--;
-    // teses — TODAS as questões pendentes do dia, em ordem e posições ALEATÓRIAS no labirinto.
+    G.dotsTotal=G.dotsLeft;   // bolinhas coletáveis da fase (fixo por dia; base do teto de pontos)
+    // teses — TODAS as questões do dia, em ordem e posições ALEATÓRIAS no labirinto.
     const all=getTeses(G.day), dom=domOf(G.day);
-    const pend = all.map((_,i)=>i).filter(i=>G.replay || !dom.includes(i));
+    // SEMPRE todas as teses do dia no labirinto.
+    const pend = all.map((_,i)=>i);
     for(let i=pend.length-1;i>0;i--){ const j=Math.floor(R()*(i+1)); [pend[i],pend[j]]=[pend[j],pend[i]]; } // ordem aleatória das questões
     G.teses=[]; const d0=bfs(1,ROWS-2);
     const cand=[]; for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++) if(open(x,y) && d0[x+y*COLS]>=8 && G.dots[x+y*COLS]!==2) cand.push([x,y]);
@@ -509,7 +545,8 @@ function startRun(){
   SFX.init(); if(G.mode!=='attract') return;
   // A leitura do dia é a 1ª etapa: sem ela, o desafio fica travado.
   if(leituraBloqueada(G.day)){ SFX.locked(); flashLeitura(); return; }
-  G.lives=CONFIG.vidas; G.score=0; G.parts={lab:0,tese:0,vida:0};
+  marcarDiaAtivo();   // jogou hoje → conta na sequência
+  G.lives=VIDAS_INI; G.score=0; G.parts={lab:0,tese:0,vida:0};
   resetBoard(true); SFX.start(); ready(1.6);
 }
 function ready(t){ G.readyT=t; $('#readyTxt').textContent='PRONTO?'; setMode('ready'); renderHud(); }
@@ -536,8 +573,8 @@ function updPlayer(dt){
 function arrive(){
   const p=G.player, i=p.x+p.y*COLS;
   if(G.dots[i]===1){ G.dots[i]=0; G.dotsLeft--; addPts(CONFIG.pontos.ponto,'lab'); SFX.waka(); G.chompT=.12;
-    if(G.dotsLeft<=0){ addPts(CONFIG.pontos.labirintoLimpo,'lab'); float(p.x,p.y,'LABIRINTO LIMPO +500','#3fd5ff'); SFX.power(); } }
-  else if(G.dots[i]===2){ G.dots[i]=0; addPts(CONFIG.pontos.vadeMecum,'lab'); G.fright=7; SFX.power();
+    if(G.dotsLeft<=0){ float(p.x,p.y,'LABIRINTO LIMPO!','#3fd5ff'); SFX.power(); } }
+  else if(G.dots[i]===2){ G.dots[i]=0; G.fright=7; SFX.power();
     float(p.x,p.y,'VADE MECUM!','#3fd5ff'); burst(p.x,p.y,'#3fd5ff',18);
     G.traps.forEach(t=>{ if(t.moving){ [t.x,t.nx]=[t.nx,t.x]; [t.y,t.ny]=[t.ny,t.y]; t.p=1-t.p; t.dir={dx:-t.dir.dx,dy:-t.dir.dy}; } t.eaten=false; }); }
   const ti=G.teses.findIndex(t=>t.x===p.x&&t.y===p.y);
@@ -582,13 +619,14 @@ function collide(){
   for(const t of G.traps){
     if(t.wait>0||t.out>0) continue;
     const b=posE(t); if(Math.hypot(a.x-b.x,a.y-b.y)<.62){
-      if(G.fright>0 && !t.eaten){ t.eaten=true; t.out=3.5; addPts(CONFIG.pontos.armadilha,'lab'); SFX.eat(); burst(b.x,b.y,TRAP_DEF[t.k].cor,20); float(b.x,b.y,`${TRAP_DEF[t.k].nome.toUpperCase()} SUPERADA +200`,'#fff'); }
+      if(G.fright>0 && !t.eaten){ t.eaten=true; t.out=3.5; SFX.eat(); burst(b.x,b.y,TRAP_DEF[t.k].cor,20); float(b.x,b.y,`${TRAP_DEF[t.k].nome.toUpperCase()} SUPERADA!`,'#fff'); }
       else { die(); return; }
     }
   }
 }
 function die(){ setMode('dying'); G.dieT=1.4; SFX.die(); shake(); const p=posE(G.player); burst(p.x,p.y,'#ffc83d',30); }
 function loseLife(){
+  if(VIDAS_ILIM) return false;       // vidas ilimitadas: só respawn, nunca game over
   G.lives--; renderHud();
   if(G.lives<=0){ gameOver(); return true; }
   return false;
@@ -596,26 +634,38 @@ function loseLife(){
 function gameOver(){
   G.best_save(); setMode('gameover'); G.overT=9.99; SFX.over(); renderAll();
 }
+// Teto de pontos da fase (determinístico): nº de teses × pts da tese + bolinhas × pts da bolinha.
+function capDia(day){
+  const nTeses = getTeses(day).length;
+  const nDots = (day===G.day && G.dotsTotal) ? G.dotsTotal : 0;
+  return nTeses*CONFIG.pontos.tese + nDots*CONFIG.pontos.ponto;
+}
 G.best_save = function(){
-  if(G.score > (S.best[G.day]||0)) S.best[G.day]=G.score;
-  if(G.score > S.recorde) S.recorde=G.score;
+  const cap=capDia(G.day);
+  const run=cap>0 ? Math.min(G.score, cap) : G.score;   // a partida nunca vale mais que o teto da fase
+  let best=Math.max(run, Number(S.best[G.day])||0);
+  if(cap>0) best=Math.min(best, cap);                    // corrige valores antigos acima do teto
+  S.best[G.day]=best;
+  // recorde = maior fase (recalculado p/ absorver correções de teto em dados antigos)
+  S.recorde=Math.max(0, ...Object.values(S.best).map(v=>Number(v)||0));
   save();
 };
 function continueRun(){
   SFX.init(); SFX.start();
-  G.lives=CONFIG.vidas; G.replay=dayComplete(G.day) && G.replay;
+  G.lives=VIDAS_INI; G.replay=dayComplete(G.day) && G.replay;
   resetBoard(true); ready(1.4);
 }
 function dayClear(){
-  const bonus=G.lives*CONFIG.pontos.vida; G.parts.vida=bonus; G.score+=bonus;
+  G.parts.vida=0;   // pontuação = só teses + bolinhas (sem bônus de vidas)
   const before=new Set(MATERIAS.filter(matDone).map(m=>m.id));
   G.best_save();
   setMode('clear'); SFX.clear(); shake(.4);
   for(let i=0;i<5;i++) setTimeout(()=>burst(Math.random()*COLS,Math.random()*ROWS*.6,['#ffc83d','#c08cff','#3fd5ff'][i%3],26),i*220);
   const isFinal = isFinalDay(G.day);
   $('#clTitle').textContent = isFinal ? 'DESAFIO CONCLUÍDO!' : `DIA ${dd(pos(G.day))} CONCLUÍDO`;
-  const rows=[['Pontos no labirinto',G.parts.lab],[`Teses dominadas ×${CONFIG.pontos.tese}`,G.parts.tese],[`Vidas restantes ×${CONFIG.pontos.vida}`,bonus],['TOTAL',G.score]];
-  const tl=$('#clTally'); tl.innerHTML=rows.map(([l],i)=>`<span class="${i===3?'tot':''}">${l}</span><b class="${i===3?'tot':''}" data-v="${rows[i][1]}">000000</b>`).join('');
+  const rows=[['Bolinhas coletadas',G.parts.lab],[`Teses dominadas ×${CONFIG.pontos.tese}`,G.parts.tese],['TOTAL',G.score]];
+  const tot=rows.length-1;
+  const tl=$('#clTally'); tl.innerHTML=rows.map(([l],i)=>`<span class="${i===tot?'tot':''}">${l}</span><b class="${i===tot?'tot':''}" data-v="${rows[i][1]}">000000</b>`).join('');
   tl.querySelectorAll('b').forEach((b,i)=>{ const v=+b.dataset.v; let k=0; const st=Math.max(1,Math.ceil(v/24));
     setTimeout(()=>{ const iv=setInterval(()=>{ k=Math.min(v,k+st); b.textContent=pad(k); SFX.tick(); if(k>=v) clearInterval(iv); },30); }, i*450); });
   const won = MATERIAS.find(m=>matDone(m) && !before.has(m.id));
@@ -647,14 +697,19 @@ function answer(i){
   document.querySelectorAll('#qOpts .opt').forEach((b,k)=>{ b.disabled=true; if(k===Q.q.a) b.classList.add('right'); if(k===i && !ok) b.classList.add('wrong'); });
   const h=$('#qResT');
   if(ok){
+    const d=S.dom[G.day]||(S.dom[G.day]=[]);
+    // Sempre pontua ao acertar (cada tese vale 1x por partida — já sai do labirinto).
+    // O farm é impedido pelo TETO por fase no best_save (best = melhor partida, limitada ao máximo da fase).
     h.textContent=`TESE DOMINADA! +${CONFIG.pontos.tese}`; h.className='ok'; SFX.ok(); addPts(CONFIG.pontos.tese,'tese');
-    const d=S.dom[G.day]||(S.dom[G.day]=[]); if(!d.includes(Q.idx)){ d.push(Q.idx); save(); }
+    if(!d.includes(Q.idx)){ d.push(Q.idx); save(); }
   } else {
     h.textContent = i<0 ? 'TEMPO ESGOTADO! −1 VIDA' : 'A PEGADINHA TE PEGOU! −1 VIDA'; h.className='bad'; SFX.bad(); shake();
   }
   Q.ok=ok;
   $('#qRef').textContent=Q.q.ref+' · '+Q.q.tema;
   $('#qTese').textContent=Q.q.tese;
+  // Explicação SEMPRE recolhida ao mostrar o resultado (o aluno expande se quiser).
+  { const e=$('#qExp'), b=$('#qExpBtn'); if(e) e.hidden=true; if(b){ b.setAttribute('aria-expanded','false'); b.textContent='Ver explicação ▾'; } }
   $('#qRes').hidden=false; $('#qNext').focus();
   renderAll();
 }
@@ -662,7 +717,7 @@ function closeQuestion(){
   if(!Q||!Q.done) return;
   $('#qModal').hidden=true;
   const t=G.teses[Q.ti];
-  if(Q.ok){ G.happyT=1.4; G.teses.splice(Q.ti,1); float(t.x,t.y,'+100','#ffc83d'); }
+  if(Q.ok){ G.happyT=1.4; G.teses.splice(Q.ti,1); float(t.x,t.y,'+'+CONFIG.pontos.tese,'#ffc83d'); }
   else {
     const d=bfs(G.player.x,G.player.y), c=[];
     for(let y=0;y<ROWS;y++) for(let x=0;x<COLS;x++) if(open(x,y)&&d[x+y*COLS]>=7&&!G.teses.some(o=>o.x===x&&o.y===y)) c.push([x,y]);
@@ -785,12 +840,15 @@ const heart = (lost) => `<svg viewBox="0 0 7 6" shape-rendering="crispEdges" cla
 let hudLast='';
 function renderHudLive(){
   const all=getTeses(G.day).length, got = G.replay ? all-G.teses.length : domOf(G.day).length;
-  const k=G.score+'|'+got+'|'+G.lives+'|'+G.day;
+  // MELHOR = recorde da fase (persiste ao perder); sobe ao vivo quando a partida supera o recorde.
+  const best=Math.max(Number(S.best[G.day])||0, G.score);
+  const k=G.score+'|'+best+'|'+got+'|'+G.lives+'|'+G.day;
   if(k===hudLast) return; hudLast=k;
   $('#hudScore').textContent=pad(G.score);
+  if($('#hudBest')) $('#hudBest').textContent=pad(best);
   $('#hudDay').textContent=G.day;
   $('#hudTeses').textContent=`${got}/${all}`;
-  $('#hudLives').innerHTML=Array.from({length:CONFIG.vidas},(_,i)=>heart(i>=G.lives)).join('');
+  $('#hudLives').innerHTML=VIDAS_ILIM ? '<span style="font-size:18px;line-height:1;color:#ff5f6d;font-weight:900">∞</span>' : Array.from({length:VIDAS_INI},(_,i)=>heart(i>=G.lives)).join('');
 }
 function renderHud(){ hudLast=''; renderHudLive(); }
 
@@ -818,8 +876,33 @@ function renderStages(){
       <div class="cart-label"><span class="cart-ic">${iconHtml(m)}</span><span class="cart-name">${((m.curto||m.nome)||({adm:'ADMINIST.',civ:'CIVIL',con:'CONSTITUC.',pre:'PREVIDENC.',pc:'PROC. CIVIL',tra:'TRABALHO',tri:'TRIBUTÁRIO',rg:'SELO FINAL'})[m.id]||'').toUpperCase()}</span></div>
       <div class="cart-stages">${btns}</div><div class="cart-pins"></div></div></div>`;
   }).join('');
-  const hm=$('#stHintMini'); if(hm) hm.textContent=`${NDAYS} ${NDAYS===1?'FASE':'FASES'}`;
+  const hm=$('#stHintMini'); if(hm) hm.textContent=`${NDAYS} ${NDAYS===1?'AULA':'AULAS'}`;
   renderPreview();
+  renderProxAulas();
+}
+// Card "Próximas aulas": referência rápida da aula de hoje + as próximas (otimiza o espaço da coluna).
+const PN_IC={
+  play:'<svg viewBox="0 0 10 10"><path d="M2.2 1.2 L8.6 5 L2.2 8.8 Z" fill="currentColor"/></svg>',
+  flag:'<svg viewBox="0 0 10 10"><path d="M2.4 1 V9" fill="none" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/><path d="M2.4 1.4 H8 L6.4 3.2 L8 5 H2.4 Z" fill="currentColor"/></svg>',
+  check:'<svg viewBox="0 0 10 10"><path d="M1.8 5.2 L4 7.4 L8.2 2.4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  lock:'<svg viewBox="0 0 10 10"><rect x="2.4" y="4.4" width="5.2" height="4.1" rx=".6" fill="currentColor"/><path d="M3.6 4.4 V3.4 a1.4 1.4 0 0 1 2.8 0 V4.4" fill="none" stroke="currentColor" stroke-width="1"/></svg>'
+};
+function renderProxAulas(){
+  const box=$('#pvNext'); if(!box) return;
+  const cur=hoje(); let i=VORD.indexOf(Number(cur)); if(i<0) i=0;
+  const win=VORD.slice(i, i+4);                 // aula de hoje + próximas 3
+  const items=win.map(n=>{
+    const st=stateOf(n), titulo=(DIAS[n]&&DIAS[n].titulo)||('Aula '+pos(n));
+    let sub,cls,ic;
+    if(st==='current'){ sub='Hoje'; cls='cur'; ic='play'; }
+    else if(st==='done'){ sub='Concluída'; cls='done'; ic='check'; }
+    else if(st==='avail'){ sub='Disponível'; cls='avail'; ic='flag'; }
+    else { const d=dataLiberacao(n); sub=d?('Abre em '+d):'Em breve'; cls='locked'; ic='lock'; }
+    return `<button class="pn-item ${cls}" data-day="${n}" title="${titulo}">
+      <span class="pn-ic">${PN_IC[ic]}</span>
+      <span class="pn-txt"><b>Aula ${dd(pos(n))} · ${titulo}</b><span class="pn-sub">${sub}</span></span></button>`;
+  }).join('');
+  box.innerHTML=`<div class="pn-head">PRÓXIMAS AULAS</div><div class="pn-list">${items}</div>`;
 }
 function renderPreview(flick){
   const n=stageSel, m=matOf(n), st=stateOf(n), all=getTeses(n).length, dom=Math.min(all,domOf(n).length);
@@ -866,14 +949,24 @@ function avImg(r, cls){
 function renderPlayer(){
   const sc=selosCount(), lvl = matDone(FINAL) ? 'LENDA JURISCLUB' : NIVEIS[Math.min(sc, NIVEIS.length-1)];
   const pf = perfilJog(); const nomeJ = (pf && pf.nome) || 'Você'; const cargoJ = (pf && pf.cargo) || lvl; const cargoIc = (pf && pf.cargoIcone) || '';
-  let totT=0, domT=0; for(const n of VORD){ const t=getTeses(n).length; totT+=t; domT+=Math.min(t,domOf(n).length); }
+  // TESES = só as teses de conteúdo (dias normais). Dias finais (selo) reusam teses dos outros
+  // dias — contá-las aqui DUPLICARIA o total. domT limitado ao nº real de teses do dia.
+  let totT=0, domT=0; for(const n of VORD){ if(isFinalDay(n)) continue; const t=getTeses(n).length; totT+=t; domT+=Math.min(t,domOf(n).length); }
   const rows=rankRows('geral'), me=rows.find(r=>r.you)||{pos:99,pts:0,selos:0,you:true}, cur=hoje();
   const cells=VORD.map(n=>`<i class="${dayComplete(n)?'done':n===cur?'cur':''}" title="Dia ${pos(n)}"></i>`).join('');
+  const streak=calcStreak(), semana=semanaAtiva();
+  const week=semana.map(d=>`<span class="p1-wk ${d.on?'on':''} ${d.hoje?'hoje':''} ${d.futuro?'fut':''}" title="${d.lb}">${d.lb}</span>`).join('');
   $('#p1').innerHTML=`
     <div class="p1-top"><span class="up">1UP</span>${avImg(pf,'avatar')}<div><b>${nomeJ}</b><small class="p1-cargo">${cargoIc}<span>${cargoJ}</span></small></div></div>
-    <div class="p1-score"><small>PONTOS TOTAIS</small><span class="px">${pad(totalPts())}</span></div>
+    <div class="p1-row2">
+      <div class="p1-score"><small>PONTOS TOTAIS</small><span class="px">${pad(totalPts())}</span></div>
+      <div class="p1-pos"><small>POSIÇÃO</small><span class="px">${me.pts?dd(me.pos)+'º':'--'}</span></div>
+    </div>
+    <div class="p1-streak">
+      <div class="p1-streak-h"><small>SEQUÊNCIA</small><span class="px"><svg viewBox="0 0 10 12" class="fire"><path d="M5 0 C7 3 9 4 8 7.5 A3.2 3.2 0 1 1 2 7.5 C1.6 5.6 2.6 5 3 5.6 C3 3.5 4 2 5 0 Z" fill="currentColor"/></svg>${streak} <i>${streak===1?'dia':'dias'}</i></span></div>
+      <div class="p1-week">${week}</div>
+    </div>
     <div class="p1-stats">
-      <div><small>POSIÇÃO</small><span class="px">${me.pts?dd(me.pos)+'º':'--'}</span></div>
       <div><small>SELOS</small><span class="px">${sc}/${(MATERIAS||[]).length}</span></div>
       <div><small>TESES</small><span class="px">${domT}/${totT}</span></div>
     </div>
@@ -908,12 +1001,16 @@ function renderTeses(){
   const all=getTeses(G.day), dom=domOf(G.day), key=G.day+':'+dom.join(',');
   const fresh = lastDom.startsWith(G.day+':') ? dom.filter(i=>!lastDom.split(':')[1].split(',').includes(String(i))) : [];
   lastDom=key;
-  $('#tesesCount').textContent=`${Math.min(all.length,dom.length)}/${all.length}`;
-  $('#tesesList').innerHTML = all.map((q,i)=>{
+  const cont=`${Math.min(all.length,dom.length)}/${all.length}`;
+  $('#tesesCount').textContent=cont;
+  const html = all.map((q,i)=>{
     const d=dom.includes(i);
     return d ? `<div class="tese dom ${fresh.includes(i)?'new':''}">${pxSvg('star','#ffc83d')}<div><div class="lb">DOMINADA</div><div class="nm">${q.tema}</div><div class="rf">${q.ref}</div></div><span class="no">${dd(i+1)}</span></div>`
              : `<div class="tese">${pxSvg('lock','#7f84d6')}<div><div class="lb">A DOMINAR</div><div class="nm">Pegue o ponto dourado</div></div><span class="no">${dd(i+1)}</span></div>`;
   }).join('');
+  $('#tesesList').innerHTML = html;
+  const full=$('#tesesListFull'); if(full) full.innerHTML = html;          // popup "expandir"
+  const fc=$('#tesesModalCount'); if(fc) fc.textContent = cont;
 }
 function renderTraps(){
   const pips=n=>`<span class="pips">${[0,1,2,3,4].map(i=>`<i class="${i<n?'on':''}"></i>`).join('')}</span>`;
@@ -930,7 +1027,7 @@ function renderTraps(){
     `<div class="bx-sec">INIMIGOS</div>`+enemies.map(card).join('')+
     `<div class="bx-sec">ITENS</div>`+
     item('gold',spriteURL(makeSprite(['XXX','XXX','XXX'],{X:'#ffc83d'}),9),'#ffc83d','Ponto dourado','TESE','Uma tese escondida no labirinto. Pegue e responda para dominar.',`+${CONFIG.pontos.tese} AO ACERTAR · ERRO CUSTA 1 VIDA`,3)+
-    item('vm',spriteURL(makeSprite(ICON.book,{X:'#3fd5ff'}),4),'#3fd5ff','Vade Mecum','PODER','Por 7 segundos as armadilhas ficam azuis e fogem: encoste nelas para superá-las.',`2 POR LABIRINTO · +${CONFIG.pontos.armadilha} POR ARMADILHA`,4);
+    item('vm',spriteURL(makeSprite(ICON.book,{X:'#3fd5ff'}),4),'#3fd5ff','Vade Mecum','PODER','Por 7 segundos as armadilhas ficam azuis e fogem: encoste nelas para superá-las.',`2 POR LABIRINTO · SUPERE AS ARMADILHAS`,4);
 }
 
 const SAMPLE=[['Lucas P.',1720,0],['Beatriz L.',1560,0],['Pedro H.',1530,0],['Fernanda V.',1470,0],['Camila R.',1460,0],['Rafael T.',1330,0],['Isabela D.',1290,0],['Larissa C.',1280,0],['Paula E.',1280,0],['Marina A.',1210,0]];
@@ -944,22 +1041,24 @@ const SAMPLE_CAPIS=['feliz','satisfeita','joinha','ideia','pensando','concluido'
 function sampleAvatar(i){ return SAMPLE_CAPIS[i%SAMPLE_CAPIS.length]; }
 function hashN(s){ let h=2166136261; for(const c of s){ h^=c.charCodeAt(0); h=Math.imul(h,16777619);} return h>>>0; }
 let RT={tab:'geral', mat:'adm'};
+// Ícone de fogo (sequência) reusado no ranking/hall da fama.
+const FIRE_SVG='<svg viewBox="0 0 10 12" class="fire-ic" aria-hidden="true"><path d="M5 0 C7 3 9 4 8 7.5 A3.2 3.2 0 1 1 2 7.5 C1.6 5.6 2.6 5 3 5.6 C3 3.5 4 2 5 0 Z" fill="currentColor"/></svg>';
 function rankRows(tab, mat){
   // Dados REAIS do backend (privacidade: só iniciais; + cargo/nível/foto). Fallback = SAMPLE de exemplo.
   const R = (typeof window!=='undefined' && window.__JURIS_RANK) || null;
   if(R && Array.isArray(R.rows) && R.rows.length){
-    const rr=R.rows.map((r,i)=>({ ini:r.ini||'?', iniciais:r.ini||'?', cargo:r.cargo||'', cargoIcone:r.cargoIcone||'', nivel:r.nivel||1, avatar:r.avatar||null, avatarCor:r.avatarCor||null, nome:r.you?'Você':(r.ini||'?'), pts:+r.pts||0, selos:+r.selos||0, you:!!r.you, ord:i }));
+    const rr=R.rows.map((r,i)=>({ ini:r.ini||'?', iniciais:r.ini||'?', cargo:r.cargo||'', cargoIcone:r.cargoIcone||'', nivel:r.nivel||1, avatar:r.avatar||null, avatarCor:r.avatarCor||null, nome:r.you?'Você':(r.ini||'?'), pts:+r.pts||0, selos:+r.selos||0, streak:+r.streak||0, you:!!r.you, ord:i }));
     rr.sort((a,b)=>b.pts-a.pts || a.ord-b.ord); rr.forEach((r,i)=>r.pos=i+1); return rr;
   }
   const rows=SAMPLE.map(([n,p,s],i)=>{
     let pts=p; if(tab==='dia') pts=Math.round(p*.58/10)*10; else if(tab==='mat') pts=Math.round((300+hashN(n+mat)%900)/10)*10;
-    return {nome:n, ini:ini(n), iniciais:ini(n), pts, selos:s, ord:i,
+    return {nome:n, ini:ini(n), iniciais:ini(n), pts, selos:s, streak:hashN(n+'seq')%14, ord:i,
       avatar:sampleAvatar(i), avatarCor:SAMPLE_GRAD[i%SAMPLE_GRAD.length][0],
       cargo:SAMPLE_CARGOS[i%SAMPLE_CARGOS.length], cargoIcone:'', nivel:2+(hashN(n)%9)};
   });
   const m=MATERIAS.find(x=>x.id===mat);
   const my = tab==='geral' ? totalPts() : tab==='dia' ? (S.best[hoje()]||0) : diasDaMateria(m).reduce((a,d)=>a+(S.best[d]||0),0);
-  const _pf=perfilJog(); rows.push({nome:'Você', ini:(_pf&&_pf.iniciais)||'VC', iniciais:(_pf&&_pf.iniciais)||'VC', cargo:(_pf&&_pf.cargo)||'', cargoIcone:(_pf&&_pf.cargoIcone)||'', nivel:(_pf&&_pf.nivel)||1, avatar:(_pf&&_pf.avatar)||null, avatarCor:(_pf&&_pf.avatarCor)||null, pts:my, selos:selosCount(), you:true, ord:99});
+  const _pf=perfilJog(); rows.push({nome:'Você', ini:(_pf&&_pf.iniciais)||'VC', iniciais:(_pf&&_pf.iniciais)||'VC', cargo:(_pf&&_pf.cargo)||'', cargoIcone:(_pf&&_pf.cargoIcone)||'', nivel:(_pf&&_pf.nivel)||1, avatar:(_pf&&_pf.avatar)||null, avatarCor:(_pf&&_pf.avatarCor)||null, pts:my, selos:selosCount(), streak:calcStreak(), you:true, ord:99});
   rows.sort((a,b)=>b.pts-a.pts || a.ord-b.ord);
   rows.forEach((r,i)=>r.pos=i+1);
   return rows;
@@ -967,8 +1066,8 @@ function rankRows(tab, mat){
 function renderRankMini(){
   const rows=rankRows('geral'), me=rows.find(r=>r.you)||{pos:99,pts:0,selos:0,you:true};
   $('#rankDay').textContent=`ATÉ O DIA ${dd(pos(hoje()))}`;
-  const li=r=>`<li class="${r.you?'you':''}"><span class="p">${r.you&&r.pts===0?'–':r.pos}</span>${avImg(r,'a')}<span>${r.you?'Você':r.ini}</span><span class="s">${pad(r.pts)}</span></li>`;
-  const list = me.pos<=7 ? rows.slice(0,8).map(li) : [...rows.filter(r=>!r.you).slice(0,7).map(li), '<li class="sep">· · ·</li>', li(me)];
+  const li=r=>`<li class="${r.you?'you':''}"><span class="p">${r.you&&r.pts===0?'–':r.pos}</span>${avImg(r,'a')}<span>${r.you?'Você':r.ini}</span><span class="st" title="Sequência">${FIRE_SVG}${r.streak||0}</span><span class="s">${pad(r.pts)}</span></li>`;
+  const list = me.pos<=10 ? rows.slice(0,10).map(li) : [...rows.filter(r=>!r.you).slice(0,9).map(li), '<li class="sep">· · ·</li>', li(me)];
   $('#rankMini').innerHTML=list.join('');
 }
 const PODPAL={1:{X:'#ffc83d',A:'#fff3c4',D:'#2a1800',W:'#ffffff',P:'#2a1800'},2:{X:'#d3d9ff',A:'#ffffff',D:'#161a4a',W:'#ffffff',P:'#161a4a'},3:{X:'#f0965a',A:'#ffe0c8',D:'#2a1206',W:'#ffffff',P:'#2a1206'}};
@@ -1001,12 +1100,13 @@ function renderRank(){
   // lista 4º ao 10º
   const rest=rows.slice(3,10), show = me.pos<=10 ? rest : [...rows.filter(r=>!r.you).slice(3,10),'gap',me];
   $('#rTable').innerHTML=show.map((r,i)=>{ if(r==='gap') return `<div class="hl-gap">· · ·</div>`;
-    return `<div class="hl-row ${r.you?'you':''}" style="--d:${(1.1+i*.07).toFixed(2)}s"><span class="pos">${r.you&&r.pts===0?'–':r.pos+'º'}</span>${avImg(r,'av')}<span class="nm">${r.you?'Você':r.ini}${r.you?'<span class="yt">VOCÊ</span>':''}${(r.cargo||r.nivel)?`<small class="hl-cargo" style="display:flex;align-items:center;gap:3px;opacity:.72;font-size:10px;letter-spacing:.02em">${r.cargo?(r.cargoIcone||''):''}<span>${r.cargo||''}${r.nivel?`${r.cargo?' · ':''}Nv ${r.nivel}`:''}</span></small>`:''}</span><span class="sl">${Array.from({length:7},(_,k)=>`<i class="${k<r.selos?'on':''}"></i>`).join('')}</span><span class="pt" data-v="${r.pts}" data-delay="${(1.2+i*.07)*1000}">000000</span></div>`; }).join('');
+    return `<div class="hl-row ${r.you?'you':''}" style="--d:${(1.1+i*.07).toFixed(2)}s"><span class="pos">${r.you&&r.pts===0?'–':r.pos+'º'}</span>${avImg(r,'av')}<span class="nm">${r.you?'Você':r.ini}${r.you?'<span class="yt">VOCÊ</span>':''}${(r.cargo||r.nivel)?`<small class="hl-cargo" style="display:flex;align-items:center;gap:3px;opacity:.72;font-size:10px;letter-spacing:.02em">${r.cargo?(r.cargoIcone||''):''}<span>${r.cargo||''}${r.nivel?`${r.cargo?' · ':''}Nv ${r.nivel}`:''}</span></small>`:''}</span><span class="sl">${Array.from({length:7},(_,k)=>`<i class="${k<r.selos?'on':''}"></i>`).join('')}</span><span class="hl-streak" title="Sequência">${FIRE_SVG}${r.streak||0}</span><span class="pt" data-v="${r.pts}" data-delay="${(1.2+i*.07)*1000}">000000</span></div>`; }).join('');
   countUp($('#rankModal'));
   SFX.seq([523,659,784,1047,784,1047,1319],.07,'square',.04);
 }
 function renderHeader(){
-  const el=$('#recorde'), target=S.recorde, from=+el.textContent||0;
+  const el=$('#recorde'); if(!el) return;   // recorde removido do header
+  const target=S.recorde, from=+el.textContent||0;
   if(from===target){ el.textContent=pad(target); return; }
   let k=from; const st=Math.max(1,Math.ceil((target-from)/20));
   const iv=setInterval(()=>{ k=Math.min(target,k+st); el.textContent=pad(k); if(k>=target) clearInterval(iv); },35);
@@ -1170,7 +1270,7 @@ function openBest(k){
       <div class="id-stats" style="--c:${d.cor}"><span>VELOCIDADE</span>${pips(b.vel)}<span>PERIGO</span>${pips(b.per)}</div>
       <div class="id-box"><h4>COMPORTAMENTO</h4><p>${b.comp}</p></div>
       <div class="id-box"><h4>COMO ESCAPAR</h4><p>${b.dica}</p></div>
-      <div class="id-box"><h4>APARECE</h4><p>${b.quando.charAt(0)+b.quando.slice(1).toLowerCase()}. Superar com o Vade Mecum vale +${CONFIG.pontos.armadilha}.</p></div>`, d.cor);
+      <div class="id-box"><h4>APARECE</h4><p>${b.quando.charAt(0)+b.quando.slice(1).toLowerCase()}. Com o Vade Mecum você pode superá-la.</p></div>`, d.cor);
     return;
   }
   const gold=k==='gold';
@@ -1180,7 +1280,7 @@ function openBest(k){
     <div class="id-head"><div><small>ITEM · ${gold?'TESE':'PODER'}</small><h3 id="infoTitle">${gold?'Ponto dourado':'Vade Mecum'}</h3></div><span class="id-state on" style="color:${cc}">${gold?'+'+CONFIG.pontos.tese:'7 SEG'}</span></div>
     <div class="id-compare"><figure class="on" style="grid-column:1/-1"><div class="id-sprite bx-sprite ${k}" style="--c:${cc}"><img alt="" src="${img}" style="width:${gold?'34%':'62%'}"></div><figcaption>${gold?'NO LABIRINTO':'NO LABIRINTO'}<span>${gold?'pulsando e brilhando':'piscando em azul'}</span></figcaption></figure></div>
     <div class="id-box"><h4>O QUE FAZ</h4><p>${gold?'Cada ponto dourado guarda uma tese do dia. Ao pegar, abre uma pergunta com '+CONFIG.tempoResposta+' segundos para responder.':'Por 7 segundos as armadilhas ficam azuis, mais lentas e fogem de você. Encoste nelas para superá-las.'}</p></div>
-    <div class="id-box"><h4>${gold?'ACERTOU OU ERROU':'FIQUE DE OLHO'}</h4><p>${gold?'Acertou: tese dominada e +'+CONFIG.pontos.tese+' pontos. Errou ou o tempo acabou: −1 vida e a tese muda de lugar no labirinto.':'Quando as armadilhas começam a piscar em branco, o efeito está acabando. Cada armadilha superada vale +'+CONFIG.pontos.armadilha+' e volta ao ponto de partida.'}</p></div>
+    <div class="id-box"><h4>${gold?'ACERTOU OU ERROU':'FIQUE DE OLHO'}</h4><p>${gold?'Acertou: tese dominada e +'+CONFIG.pontos.tese+' pontos. Errou ou o tempo acabou: −1 vida e a tese muda de lugar no labirinto.':'Quando as armadilhas começam a piscar em branco, o efeito está acabando. Cada armadilha superada volta ao ponto de partida.'}</p></div>
     <div class="id-box"><h4>QUANTIDADE</h4><p>${gold?'Um por tese ainda não dominada no dia.':'Dois por labirinto, em lados opostos.'}</p></div>`, cc);
 }
 const onCard=(sel,fn)=>e=>{ const c=e.target.closest(sel); if(!c) return; if(e.type==='keydown' && !['Enter',' '].includes(e.key)) return; e.preventDefault(); e.stopPropagation(); SFX.init(); fn(c); };
@@ -1209,6 +1309,7 @@ $('#abSound').onclick=()=>snd.click();
 document.addEventListener('fullscreenchange',()=>{ if(!document.fullscreenElement && document.body.classList.contains('theater')) theater(false); });
 
 $('#stages').addEventListener('click',e=>{ const b=e.target.closest('.cs'); if(b){ selectStage(+b.dataset.day); return; } const c=e.target.closest('.cart'); if(c){ const m=[...MATERIAS,FINAL][+c.dataset.cart]; const ds=diasDaMateria(m); const n=ds.find(d=>!dayComplete(d)&&dayUnlocked(d))||ds[0]; if(n!=null) selectStage(n); } });
+$('#pvNext').addEventListener('click',e=>{ const b=e.target.closest('.pn-item'); if(b) selectStage(+b.dataset.day); });
 $('#stPrev').onclick=()=>{ const p=pos(stageSel||keyAt(1)); const k=keyAt(Math.max(1,p-1)); if(k!=null) selectStage(k); };
 $('#stNext').onclick=()=>{ const p=pos(stageSel||keyAt(1)); const k=keyAt(Math.min(NDAYS,p+1)); if(k!=null) selectStage(k); };
 $('#stages').addEventListener('mouseover',e=>{ const c=e.target.closest('.cart'); if(c && c!==window.__hc){ window.__hc=c; SFX.tone(1400,.02,'square',.015); } });
@@ -1216,7 +1317,10 @@ function showPane(k){ document.querySelectorAll('.ptab').forEach(t=>t.setAttribu
 document.querySelector('.ptabs').addEventListener('click',e=>{ const t=e.target.closest('.ptab'); if(t){ SFX.init(); SFX.click(); showPane(t.dataset.pt); } });
 $('#map').addEventListener('click',e=>{ const b=e.target.closest('.node'); if(b && pickDay(+b.dataset.day)) closeModal('mapModal'); });
 $('#btnMap').onclick=()=>openModal('mapModal');
+$('#btnTesesExpand') && ($('#btnTesesExpand').onclick=()=>{ renderTeses(); openModal('tesesModal'); });
 $('#btnRank').onclick=$('#btnRank2').onclick=()=>openModal('rankModal');
+// Toggle da explicação (recolher/expandir) no resultado da questão.
+if($('#qExpBtn')) $('#qExpBtn').onclick=()=>{ const e=$('#qExp'), b=$('#qExpBtn'); if(!e) return; const abrir=e.hidden; e.hidden=!abrir; b.setAttribute('aria-expanded',String(abrir)); b.textContent= abrir ? 'Recolher explicação ▴' : 'Ver explicação ▾'; if(abrir) e.scrollTop=0; };
 document.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>closeModal(b.dataset.close));
 document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m && m.id!=='qModal') closeModal(m.id); }));
 document.querySelector('.tabs').addEventListener('click',e=>{ const b=e.target.closest('.tab'); if(b){ RT.tab=b.dataset.tab; SFX.click(); renderRank(); } });
@@ -1250,6 +1354,12 @@ function syncSound(){
   setBar(volMus, S.volMus, musOff());
   BGM.apply();
 }
+// Header ⚡ ANIM = reduz animações ao redor da tela (piscadas/pulsos/glow). Canvas do jogo e
+// transições seguem fluidos — só desliga as animações decorativas (modo mais estático).
+const btnAnim=$('#btnAnim');
+function syncAnim(){ document.body.classList.toggle('calm', !!S.calm); if(btnAnim) btnAnim.setAttribute('aria-pressed', String(!S.calm)); }
+if(btnAnim) btnAnim.onclick=()=>{ S.calm=!S.calm; save(); syncAnim(); SFX.init(); if(!S.calm) SFX.click(); };
+syncAnim();
 // Header ♪ SOM = mudo GERAL (efeitos + música). Ao reativar totalmente mudo, volta na metade.
 snd.onclick=()=>{
   if(S.muted){ S.muted=false; if(!((S.volSfx||0)>0) && !((S.volMus||0)>0)){ S.volSfx=1; S.volMus=.5; } }
@@ -1274,8 +1384,8 @@ $('#demoAll').onchange=e=>{ S.demoAll=e.target.checked; save(); renderAll(); toa
 $('#btnReset').onclick=e=>{
   const b=e.currentTarget;
   if(!b.classList.contains('armed')){ b.classList.add('armed'); b.textContent='CLIQUE DE NOVO PARA CONFIRMAR'; setTimeout(()=>{ b.classList.remove('armed'); b.textContent='ZERAR PROGRESSO'; },3000); return; }
-  const muted=S.muted; S=JSON.parse(JSON.stringify(DEF)); S.muted=muted; save(); $('#demoAll').checked=false;
-  b.classList.remove('armed'); b.textContent='ZERAR PROGRESSO'; $('#recorde').textContent='000000'; loadDay(1); toast('Progresso zerado.');
+  const muted=S.muted, calm=S.calm; S=JSON.parse(JSON.stringify(DEF)); S.muted=muted; S.calm=calm; save(); $('#demoAll').checked=false;
+  b.classList.remove('armed'); b.textContent='ZERAR PROGRESSO'; { const rc=$('#recorde'); if(rc) rc.textContent='000000'; } syncAnim(); loadDay(1); toast('Progresso zerado.');
 };
 
 // teclado
@@ -1294,7 +1404,7 @@ addEventListener('keydown',e=>{
   if(e.target.closest('input,textarea')) return;
   if(KEYMAP[e.key] && ['play','ready','paused'].includes(G.mode)){ e.preventDefault(); setWant(KEYMAP[e.key]); return; }
   if(e.key==='Enter'){ if(G.mode==='attract'){ e.preventDefault(); startRun(); } else if(G.mode==='gameover'){ e.preventDefault(); continueRun(); } else if(G.mode==='clear' && !$('#btnNext').hidden && document.activeElement?.tagName!=='BUTTON'){ e.preventDefault(); $('#btnNext').click(); } }
-  if(['1','2','3','4'].includes(e.key) && G.mode!=='play'){ showPane(['rank','selos','arm','fases'][+e.key-1]); SFX.click(); }
+  if(['1','2','3','4'].includes(e.key) && G.mode!=='play'){ showPane(['fases','selos','rank','arm'][+e.key-1]); SFX.click(); }
   const flashBtn={p:'abPause',P:'abPause',m:'abSound',M:'abSound',f:'btnExpand',F:'btnExpand'}[e.key]; if(flashBtn){ const fb=$('#'+flashBtn); fb.classList.add('pressed'); setTimeout(()=>fb.classList.remove('pressed'),140); }
   if(e.key==='p'||e.key==='P'){ if(G.mode==='play') pause(true); else if(G.mode==='paused') pause(false); }
   if(e.key==='m'||e.key==='M'){ snd.click(); }

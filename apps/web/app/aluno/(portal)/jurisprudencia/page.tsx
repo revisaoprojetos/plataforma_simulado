@@ -58,12 +58,14 @@ export default async function JurisprudenciaAlunoPage({
       const totalDias = diasArr.length
       const materiasCount = Array.isArray(dj?.materias) ? dj.materias.length : 0
       const imagens = dj?.imagens && typeof dj.imagens === 'object' ? (dj.imagens as any) : {}
-      // Hero usa SÓ a imagem larga (ticket 4:3) — nunca a capa (4:5 retrato), que fica esticada no banner.
-      const bannerUrl = (imagens.ticket || null) as string | null
+      // Fundo DEDICADO do cabeçalho (imagens.fundo) — NÃO herda do ticket/capa; vazio = só o gradiente.
+      const bannerUrl = (imagens.fundo || null) as string | null
       const config = dj?.config && typeof dj.config === 'object' ? (dj.config as any) : null
+      const compacto = config?.compacto === true
+      const corFundo = (config?.corFundo as string) || null
       return (
         <InternaPageRoot brand={_itDesafio.brand} theme={_itDesafio.theme}>
-          <DesafioJurisInterno desafioId={desafio} titulo={nomeDesafio} theme={_itDesafio.theme} totalDias={totalDias} materiasCount={materiasCount} config={config} bannerUrl={bannerUrl} dias={diasArr} />
+          <DesafioJurisInterno desafioId={desafio} titulo={nomeDesafio} theme={_itDesafio.theme} totalDias={totalDias} materiasCount={materiasCount} config={config} bannerUrl={bannerUrl} compacto={compacto} corFundo={corFundo} dias={diasArr} />
         </InternaPageRoot>
       )
     }

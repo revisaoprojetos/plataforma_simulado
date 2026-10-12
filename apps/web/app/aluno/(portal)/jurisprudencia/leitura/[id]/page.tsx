@@ -31,5 +31,10 @@ export default async function JurisLeitorPage({ params, searchParams }: { params
     ? '#fechar-leitura'
     : (desafio ? `/aluno/jurisprudencia?desafio=${encodeURIComponent(desafio)}` : '/aluno/jurisprudencia')
   const _it = await resolverInterno()
-  return <LeitorDocumento doc={doc} buscaInicial={busca ?? undefined} grifoCores={doc.grifoCores} interno={_it.ativo} trilha={{ modo: 'leitura', questoesHref: voltar, voltarHref: voltar }} />
+  const ehEmbed = embed === '1'
+  const leitor = <LeitorDocumento doc={doc} buscaInicial={busca ?? undefined} grifoCores={doc.grifoCores} interno={_it.ativo} embed={ehEmbed} trilha={{ modo: 'leitura', questoesHref: voltar, voltarHref: voltar }} />
+  // EMBED (overlay do arcade): a página fica dentro do grupo (portal) → o layout renderiza o shell
+  // (sidebar + top bar). Um container FIXO em tela cheia cobre o shell → o iframe mostra só a leitura.
+  if (ehEmbed) return <div style={{ position: 'fixed', inset: 0, zIndex: 200 }}>{leitor}</div>
+  return leitor
 }

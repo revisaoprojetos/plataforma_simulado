@@ -203,9 +203,14 @@ button{font-family:inherit;color:inherit}
 
 /* coluna esquerda */
 .col-left{position:relative;min-width:0;min-height:560px}
-.col-left-in{position:absolute;inset:0;display:flex;flex-direction:column;gap:20px}
-.teses-panel{flex:1;min-height:0;display:flex;flex-direction:column}
-#tesesList{flex:1;min-height:0;overflow:auto;scrollbar-width:thin;scrollbar-color:var(--neon) transparent;padding-right:2px}
+.col-left-in{position:absolute;inset:0;display:flex;flex-direction:column;gap:20px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--neon) transparent}
+.teses-panel{flex:none;min-height:0;display:flex;flex-direction:column}
+/* TESES DO DIA na coluna: só ~2 visíveis + rolagem (o resto abre no popup "EXPANDIR"). */
+#tesesList{flex:none;max-height:128px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--neon) transparent;padding-right:2px}
+.teses-expand{width:100%;margin-top:8px;font-size:11px;letter-spacing:.12em;padding:8px}
+.tesescard{max-width:560px;border:2px solid var(--gold);background:linear-gradient(180deg,#0e1760,#070d42);padding:20px;box-shadow:0 0 40px rgba(255,200,61,.22),inset 0 0 30px rgba(0,0,0,.4)}
+.tesescard .ptitle{margin:0 0 12px}
+.teses-full{max-height:min(60vh,520px);overflow-y:auto;scrollbar-width:thin;scrollbar-color:var(--neon) transparent;padding-right:3px}
 .pv-title{min-height:2.5em;display:flex;align-items:center}
 .p1{position:relative;padding:16px}
 .p1-top{display:flex;align-items:center;gap:10px}
@@ -213,10 +218,26 @@ button{font-family:inherit;color:inherit}
 .p1-top .avatar{width:38px;height:38px;font-size:13px}
 .p1-top b{display:block;font-size:15px}
 .p1-top small{display:block;font-weight:800;font-size:9.5px;letter-spacing:.16em;color:var(--neon-hi);margin-top:2px}
-.p1-score{margin:14px 0 12px;padding:10px 12px;background:#050a35;border:1px solid #232b86;box-shadow:inset 0 0 18px rgba(0,0,0,.6)}
-.p1-score small{display:block;font-weight:800;font-size:9.5px;letter-spacing:.2em;color:var(--lav)}
-.p1-score .px{display:block;font-size:44px;line-height:1;letter-spacing:.06em;color:var(--gold);text-shadow:0 0 12px rgba(255,200,61,.5)}
-.p1-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+/* Linha 1: PONTOS TOTAIS (esq) + POSIÇÃO (dir) lado a lado */
+.p1-row2{display:grid;grid-template-columns:1.6fr 1fr;gap:8px;margin:14px 0 10px}
+.p1-score,.p1-pos{padding:9px 11px;background:#050a35;border:1px solid #232b86;box-shadow:inset 0 0 18px rgba(0,0,0,.6);min-width:0}
+.p1-pos{display:flex;flex-direction:column;justify-content:center}
+.p1-score small,.p1-pos small{display:block;font-weight:800;font-size:9px;letter-spacing:.16em;color:var(--lav)}
+.p1-score .px{display:block;font-size:30px;line-height:1;letter-spacing:.03em;color:var(--gold);text-shadow:0 0 12px rgba(255,200,61,.5);overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.p1-pos .px{display:block;font-size:30px;line-height:1;color:#fff;margin-top:2px}
+/* Card SEQUÊNCIA (streak) + semana */
+.p1-streak{margin-bottom:10px;padding:9px 11px;border:1px solid #39306f;background:linear-gradient(180deg,rgba(255,120,40,.07),rgba(255,255,255,.012));box-shadow:inset 0 0 18px rgba(0,0,0,.4)}
+.p1-streak-h{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.p1-streak-h small{font-weight:800;font-size:9px;letter-spacing:.16em;color:var(--lav)}
+.p1-streak-h .px{display:flex;align-items:center;gap:6px;font-size:26px;line-height:1;color:#ff8a3d;text-shadow:0 0 10px rgba(255,120,40,.5)}
+.p1-streak-h .px i{font-style:normal;font-size:12px;color:var(--lav)}
+.p1-streak-h .fire{width:17px;height:21px;color:#ff8a3d;filter:drop-shadow(0 0 5px rgba(255,120,40,.7))}
+.p1-week{display:grid;grid-template-columns:repeat(7,1fr);gap:5px;margin-top:9px}
+.p1-wk{display:flex;align-items:center;justify-content:center;height:26px;border:1px solid var(--line);background:#0e1452;font:800 10px/1 var(--f-ui);color:var(--muted);border-radius:4px}
+.p1-wk.on{background:#ff8a3d;border-color:#ff8a3d;color:#1a1030;box-shadow:0 0 8px rgba(255,120,40,.5)}
+.p1-wk.hoje{outline:2px solid var(--neon-hi);outline-offset:1px}
+.p1-wk.fut{opacity:.38}
+.p1-stats{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
 .p1-stats div{border:1px solid var(--line);padding:7px 6px;text-align:center;background:rgba(255,255,255,.015)}
 .p1-stats small{display:block;font-weight:800;font-size:8.5px;letter-spacing:.14em;color:var(--muted)}
 .p1-stats .px{display:block;font-size:22px;line-height:1.1;color:#fff}
@@ -225,7 +246,8 @@ button{font-family:inherit;color:inherit}
 .p1-cells{display:grid;grid-template-columns:repeat(15,1fr);gap:3px}
 .p1-cells i{height:10px;background:#1a2070}
 .p1-cells i.done{background:var(--gold);box-shadow:0 0 6px rgba(255,200,61,.6)}
-.p1-cells i.cur{background:var(--neon);animation:pulse 1.2s infinite}
+/* Dia atual = marcador "você está aqui" (contorno neon), NÃO preenchido — só 'done' (dourado) conta no X/15. */
+.p1-cells i.cur{background:#1a2070;box-shadow:inset 0 0 0 2px var(--neon),0 0 6px color-mix(in srgb,var(--neon) 55%,transparent);animation:pulse 1.2s infinite}
 
 /* coluna direita com abas */
 .col-right{position:relative;min-width:0}
@@ -249,10 +271,29 @@ button{font-family:inherit;color:inherit}
 /* SELECT STAGE movido p/ a aba FASES (coluna direita estreita): prévia em cima + trilho horizontal
    (prev/next navegam). Sobrescreve o layout largo padrão de .st-* dentro desta pane. */
 .pane-fases{display:flex;flex-direction:column;gap:12px}
+/* Card "Próximas aulas" — referência rápida da aula na coluna */
+.pv-next{border:1px solid var(--line);border-radius:12px;background:rgba(8,13,55,.5);padding:9px 11px}
+.pn-head{font-family:var(--f-arc);font-size:9px;letter-spacing:.09em;color:#8f93d6;margin-bottom:6px}
+.pn-list{display:flex;flex-direction:column}
+.pn-item{display:grid;grid-template-columns:26px minmax(0,1fr);gap:9px;align-items:center;width:100%;text-align:left;background:none;border:none;border-bottom:1px solid #141c66;border-radius:8px;padding:7px 5px;cursor:pointer;color:inherit;font:inherit}
+.pn-item:last-child{border-bottom:none}
+.pn-item:hover{background:rgba(124,92,255,.10)}
+.pn-ic{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;background:#0e1556;border:1px solid #2a3390;color:#9aa0e6}
+.pn-ic svg{width:12px;height:12px}
+.pn-item.cur .pn-ic{background:var(--neon);border-color:var(--neon);color:#fff;box-shadow:0 0 10px color-mix(in srgb,var(--neon) 60%,transparent)}
+.pn-item.done .pn-ic{color:var(--gold);border-color:#4a3f1a}
+.pn-item.locked .pn-ic{color:#6b70aa;opacity:.8}
+.pn-txt{min-width:0;display:flex;flex-direction:column;gap:1px}
+.pn-txt b{font-size:12.5px;font-weight:700;color:#e7e8ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pn-sub{font-size:11px;color:#8186c8}
+.pn-item.cur .pn-sub{color:var(--neon-hi)}
+.pn-item.done .pn-sub{color:var(--gold)}
 .pane-fases .st-preview{gap:8px}
 .pane-fases .pv-screen{flex:none}
 .pane-fases .st-railwrap{display:grid;grid-template-columns:26px minmax(0,1fr) 26px;gap:6px;align-items:stretch}
-.pane-fases .st-nav{height:auto;max-height:none}
+/* Setas ◀▶: centralizam o glifo e se encaixam no strip dos cards (compensa o padding 24/8 do rail,
+   que existe p/ o cursor "▼ P1" e o badge "NEW!" absolutos acima dos cards). */
+.pane-fases .st-nav{height:auto;max-height:none;display:grid;place-items:center;margin:24px 0 8px}
 .pane-fases .st-rail{display:flex;grid-template-columns:none;overflow-x:auto;overflow-y:visible;gap:10px;padding:24px 2px 8px;scroll-snap-type:x proximity}
 .pane-fases .cart-wrap{flex:none;width:112px}
 .pane-fases .cart{width:112px}
@@ -274,6 +315,8 @@ button{font-family:inherit;color:inherit}
 @keyframes scrshake{10%{transform:translate(-6px,3px)}30%{transform:translate(5px,-4px)}50%{transform:translate(-4px,2px)}70%{transform:translate(3px,-2px)}90%{transform:translate(-1px,1px)}}
 .hud{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:1.6cqw 2.6cqw .8cqw;font:clamp(15px,3cqw,28px)/1 var(--f-px);color:#5f63b8;letter-spacing:.06em}
 .hud b{color:#d4d5ff;font-weight:400}
+.hud .hud-best{color:#8a7a3a}
+.hud .hud-best b{color:#ffc83d}
 .hud .lives{display:flex;gap:.6cqw}
 .hud .lives svg{width:clamp(12px,2.4cqw,22px);height:auto}
 .hud .lives svg.lost{opacity:.18}
@@ -385,7 +428,7 @@ kbd{font:16px/1 var(--f-px);border:1px solid #3a42a0;background:#0a1150;color:#f
 .bx:hover{border-color:var(--c);box-shadow:0 0 14px color-mix(in srgb,var(--c) 45%,transparent)}
 .bx-sprite{position:relative;width:58px;height:58px;display:grid;place-items:center;background:radial-gradient(circle,#10165a,#03061f 75%);border:2px solid color-mix(in srgb,var(--c) 55%,#0a0f45);overflow:hidden}
 .bx-sprite::after{content:"";position:absolute;inset:0;background:repeating-linear-gradient(to bottom,rgba(255,255,255,.05) 0 1px,transparent 1px 3px)}
-.bx-sprite img{width:40px;height:40px;image-rendering:pixelated;filter:drop-shadow(0 0 6px var(--c))}
+.bx-sprite img{width:40px;height:40px;object-fit:contain;image-rendering:pixelated;filter:drop-shadow(0 0 6px var(--c))}
 .bx-sprite.peg img{animation:aHunt .5s steps(2) infinite}
 @keyframes aHunt{0%{transform:translate(-2px,0)}50%{transform:translate(2px,-3px)}}
 .bx-sprite.sum img{animation:aDrift 2.6s ease-in-out infinite}
@@ -394,8 +437,8 @@ kbd{font:16px/1 var(--f-px);border:1px solid #3a42a0;background:#0a1150;color:#f
 @keyframes aVanish{0%,55%{opacity:1}58%{opacity:.1}62%{opacity:.8}66%,88%{opacity:.06}92%{opacity:.7}100%{opacity:1}}
 .bx-sprite.gold img{width:22px;height:22px;animation:aGold 1.2s ease-in-out infinite}
 @keyframes aGold{50%{transform:scale(1.3) rotate(45deg);filter:drop-shadow(0 0 12px var(--c))}}
-.bx-sprite.vm img{width:34px;height:34px;animation:aVm 1s steps(2) infinite}
-@keyframes aVm{50%{transform:translateY(-3px);filter:drop-shadow(0 0 14px var(--c)) brightness(1.3)}}
+.bx-sprite.vm img{width:30px;height:30px;animation:aVm 1s steps(2) infinite}
+@keyframes aVm{50%{transform:translateY(-3px);filter:drop-shadow(0 0 7px var(--c)) brightness(1.2)}}
 .bx:hover .bx-sprite img{animation-duration:.25s}
 .bx-name{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .bx-name b{font-size:13.5px}
@@ -425,7 +468,11 @@ kbd{font:16px/1 var(--f-px);border:1px solid #3a42a0;background:#0a1150;color:#f
 .traps span{font-size:12px;color:var(--lav);line-height:1.35}
 .rmini{list-style:none;margin:0;padding:0}
 .rmini{margin-bottom:14px!important}
-.rmini li{display:grid;grid-template-columns:24px 24px 1fr auto;gap:8px;align-items:center;padding:8px 4px;border-bottom:1px solid #141c66;font-size:13px;font-weight:600}
+.rmini li{display:grid;grid-template-columns:24px 24px 1fr auto auto;gap:8px;align-items:center;padding:8px 4px;border-bottom:1px solid #141c66;font-size:13px;font-weight:600}
+/* Ícone de fogo (sequência) reusado no ranking/hall da fama */
+.fire-ic{width:11px;height:13px;vertical-align:-1px}
+.rmini .st{display:inline-flex;align-items:center;gap:2px;font:16px/1 var(--f-px);color:#ff8a3d}
+.rmini li.you .st{color:#ffb27a}
 .rmini .a{width:24px;height:24px;border:1.5px solid var(--neon);display:grid;place-items:center;font-weight:900;font-size:8.5px;background:#0b1150}
 .rmini li:nth-child(-n+3):not(.you){background:linear-gradient(90deg,rgba(139,92,246,.22),transparent)}
 .rmini li.sep{display:block;text-align:center;letter-spacing:.4em;color:var(--lav);padding:4px;border:0}
@@ -543,6 +590,14 @@ body.theater .abtn.big small{color:#fff;border-color:var(--gold)}
 .qres .ref{font:18px/1 var(--f-px);color:var(--gold);letter-spacing:.06em}
 .qres p{font-size:13.5px;line-height:1.55;color:#dcdcff;margin:6px 0 14px}
 .qres .row{display:flex;justify-content:flex-end}
+/* Explicação recolhível: botão toggle + caixa com rolagem interna quando o texto é grande. */
+.qexp-toggle{margin:10px 0 0;font:700 10.5px/1 var(--f-ui);letter-spacing:.09em;text-transform:uppercase;color:var(--gold);background:color-mix(in srgb,var(--gold) 12%,transparent);border:1px solid color-mix(in srgb,var(--gold) 42%,transparent);border-radius:8px;padding:8px 13px;cursor:pointer;transition:background .15s}
+.qexp-toggle:hover{background:color-mix(in srgb,var(--gold) 22%,transparent)}
+.qexp{max-height:200px;overflow-y:auto;overscroll-behavior:contain;margin-top:8px;padding-right:8px;border-top:1px solid #ffffff14}
+.qexp p{margin:10px 0 4px}
+.qexp::-webkit-scrollbar{width:8px}
+.qexp::-webkit-scrollbar-thumb{background:#ffffff26;border-radius:4px}
+.qexp::-webkit-scrollbar-track{background:transparent}
 
 /* mapa */
 .mapcard{max-width:1320px;border:1px solid var(--line);background:var(--panel);padding:24px clamp(16px,4vw,48px)}
@@ -640,7 +695,9 @@ body.theater .abtn.big small{color:#fff;border-color:var(--gold)}
 .pod-empty{opacity:.35}
 /* lista 4º+ */
 .hof-list{padding:10px 16px 4px}
-.hl-row{display:grid;grid-template-columns:46px 28px minmax(0,1fr) auto 92px;gap:10px;align-items:center;padding:7px 10px;border-bottom:1px dashed #241e7a;animation:rowIn .45s cubic-bezier(.3,1.3,.5,1) both;animation-delay:var(--d)}
+.hl-row{display:grid;grid-template-columns:46px 28px minmax(0,1fr) auto auto 92px;gap:10px;align-items:center;padding:7px 10px;border-bottom:1px dashed #241e7a;animation:rowIn .45s cubic-bezier(.3,1.3,.5,1) both;animation-delay:var(--d)}
+.hl-row .hl-streak{display:inline-flex;align-items:center;gap:3px;font:18px/1 var(--f-px);color:#ff8a3d;text-shadow:0 0 8px rgba(255,120,40,.45)}
+.hl-row.you .hl-streak{color:#ffb27a}
 @keyframes rowIn{from{opacity:0;transform:translateX(40px)}}
 .hl-row .pos{font:24px/1 var(--f-px);color:#cfd0ff}
 .hl-row .av{width:26px;height:26px;border:1.5px solid var(--neon);display:grid;place-items:center;font-weight:900;font-size:9px;background:#0b1150}
@@ -655,7 +712,7 @@ body.theater .abtn.big small{color:#fff;border-color:var(--gold)}
 .hl-row .yt{font:14px/1 var(--f-px);color:#0a0f45;background:var(--cyan);padding:1px 4px;animation:blink 1s steps(2,start) infinite}
 .hl-gap{text-align:center;color:var(--lav);letter-spacing:.4em;padding:4px}
 .rfoot{font-size:11px;color:var(--lav);line-height:1.55;padding:6px 16px 16px;margin:0}
-@media (max-width:560px){ .podium{padding:56px 8px 0;gap:6px;min-height:280px} .pod-masc{width:54px;height:54px} .pod.p1 .pod-masc{width:72px;height:72px} .pod-name{font-size:12px} .pod-score{font-size:20px} .hl-row{grid-template-columns:38px 26px minmax(0,1fr) 76px} .hl-row .sl{display:none} }
+@media (max-width:560px){ .podium{padding:56px 8px 0;gap:6px;min-height:280px} .pod-masc{width:54px;height:54px} .pod.p1 .pod-masc{width:72px;height:72px} .pod-name{font-size:12px} .pod-score{font-size:20px} .hl-row{grid-template-columns:38px 26px minmax(0,1fr) auto 76px} .hl-row .sl{display:none} }
 
 .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:180;background:#0b1150;border:2px solid var(--neon);padding:10px 16px;
   font:20px/1.2 var(--f-px);letter-spacing:.06em;color:#fff;box-shadow:0 0 20px rgba(139,92,246,.6);max-width:calc(100% - 32px);text-align:center}
@@ -744,3 +801,7 @@ body.theater .abtn.big small{color:#fff;border-color:var(--gold)}
   *,*::before,*::after{animation:none!important;transition:none!important}
   .in-brand,.in-ring,.in-sub,.in-title,.in-bar,.in-status,.in-mascot,.in-tag{opacity:1}
 }
+/* Modo "menos animações" (toggle ⚡ ANIM do topo): remove piscadas/pulsos/glow em volta da
+   tela do arcade, mas MANTÉM as transições e o canvas do jogo fluidos (nada de travar). */
+body.calm *,body.calm *::before,body.calm *::after{animation:none!important}
+body.calm .in-brand,body.calm .in-ring,body.calm .in-sub,body.calm .in-title,body.calm .in-bar,body.calm .in-status,body.calm .in-mascot,body.calm .in-tag{opacity:1}

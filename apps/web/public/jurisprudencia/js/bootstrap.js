@@ -54,8 +54,14 @@ async function semearProgresso(){
     const key = window.DESAFIO && window.DESAFIO.CONFIG && window.DESAFIO.CONFIG.storageKey;
     if(key){
       const atual = JSON.parse(localStorage.getItem(key) || '{}');
-      // servidor é a fonte de verdade de dom/best/recorde; mantém campos locais (muted, sel…)
-      const semeado = Object.assign({}, atual, { dom: p.dom || {}, best: p.best || {}, recorde: p.recorde || 0 });
+      // Sequência: o SERVIDOR é a fonte da verdade dos dias de atividade (ledger). Mescla com o local
+      // (preserva um "hoje" marcado agora que ainda não sincronizou). Dedupe + só datas YYYY-MM-DD.
+      const diasSrv = Array.isArray(p && p.dias) ? p.dias : [];
+      const diasLoc = Array.isArray(atual.dias) ? atual.dias : [];
+      const dias = Array.from(new Set(diasSrv.concat(diasLoc)))
+        .filter(function(d){ return typeof d==='string' && /^\d{4}-\d{2}-\d{2}$/.test(d); }).sort();
+      // servidor = fonte de dom/best/recorde/dias; mantém campos locais (muted, sel…)
+      const semeado = Object.assign({}, atual, { dom: p.dom || {}, best: p.best || {}, recorde: p.recorde || 0, dias });
       localStorage.setItem(key, JSON.stringify(semeado));
     }
   }catch(e){ /* mantém o que houver localmente */ }
@@ -75,7 +81,7 @@ function interceptarSalvar(){
         fetch('/api/jurisprudencia/progresso', {
           method:'POST', credentials:'same-origin',
           headers:{ 'Content-Type':'application/json' },
-          body: JSON.stringify({ desafio:ID, dom:o.dom || {}, best:o.best || {}, recorde:o.recorde || 0 }),
+          body: JSON.stringify({ desafio:ID, dom:o.dom || {}, best:o.best || {}, recorde:o.recorde || 0, dias:o.dias || [] }),
           keepalive:true,
         }).catch(()=>{});
       }catch(e){ /* v não-JSON: ignora */ }

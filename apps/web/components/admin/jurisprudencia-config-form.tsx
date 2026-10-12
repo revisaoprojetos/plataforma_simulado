@@ -11,7 +11,10 @@ import { salvarConfigDesafio, salvarImagensDesafio, salvarMateriasDesafio, renom
 const SLOTS = [
   { k: 'ticket' as const, label: 'Ticket', aspect: 4 / 3, box: 'aspect-[4/3]', fmt: '4:3', maxW: 800, maxH: 600 },
   { k: 'capa' as const, label: 'Capa', aspect: 4 / 5, box: 'aspect-[4/5]', fmt: '4:5', maxW: 600, maxH: 750 },
+  // Fundo do CABEÇALHO/abas da área do aluno (dedicado — NÃO herda do ticket/capa). Vazio = só o gradiente.
+  { k: 'fundo' as const, label: 'Fundo do cabeçalho', aspect: 16 / 5, box: 'aspect-[16/5]', fmt: '16:5', maxW: 1600, maxH: 500 },
 ]
+type SlotKey = (typeof SLOTS)[number]['k']
 function carregarImg(src: string): Promise<HTMLImageElement> {
   return new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error('load')); im.src = src })
 }
@@ -33,6 +36,7 @@ type Config = {
   liberacao: 'progresso' | 'calendario'
   inicioCalendario: string
   vidas: number
+  vidasIlimitada?: boolean
   tempoResposta: number
   pontos: Pontos
   storageKey?: string
@@ -56,6 +60,7 @@ const ICONES = ['building', 'briefcase', 'doc', 'umbrella', 'folder', 'hardhat',
 const DICAS_IMG: Record<string, string> = {
   ticket: '800×600 px (4:3) — card de acesso do aluno',
   capa: '600×750 px (4:5) — capa do desafio',
+  fundo: '1600×500 px (16:5) — fundo do cabeçalho/abas (vazio = só o gradiente; não herda da capa)',
 }
 
 // Cores padrão por matéria no jogo (MCOL) — usadas como default do seletor de cor.
@@ -94,10 +99,15 @@ export function JurisConfigForm({ desafioId, nome, config, materias, final, imag
   }
   // --- Config --- (a LIBERAÇÃO dos dias foi movida p/ a aba "Dias & Teses"; preservamos as chaves no merge)
   const [vidas, setVidas] = useState(config?.vidas ?? 3)
+  const [vidasIlimitada, setVidasIlimitada] = useState((config as any)?.vidasIlimitada === true)
   const [tempoResposta, setTempoResposta] = useState(config?.tempoResposta ?? 25)
   const [pontos, setPontos] = useState<Pontos>({ ...PONTOS_DEFAULT, ...(config?.pontos ?? {}) })
   const [musicaFundo, setMusicaFundo] = useState(config?.musicaFundo ?? '')
   const [musicaLoop, setMusicaLoop] = useState(config?.musicaLoop !== false) // padrão: em loop
+  // Cabeçalho compacto da área do aluno (retrai banner + abas → mais tela do arcade).
+  const [compacto, setCompacto] = useState((config as any)?.compacto === true)
+  // Cor de fundo do cabeçalho (usada quando NÃO há imagem de fundo). Vazio = gradiente roxo padrão.
+  const [corFundo, setCorFundo] = useState<string>(((config as any)?.corFundo as string) || '')
   const musicaRef = useRef<HTMLAudioElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   // Para o áudio da prévia ao SAIR da aba/página (sem vazar som entre as páginas).
@@ -115,7 +125,7 @@ export function JurisConfigForm({ desafioId, nome, config, materias, final, imag
 
   function salvarConfig() {
     startCfg(async () => {
-      const novo = { ...(config ?? {}), vidas: Number(vidas) || 0, tempoResposta: Number(tempoResposta) || 0, pontos, musicaFundo: musicaFundo.trim(), musicaLoop }
+      const novo = { ...(config ?? {}), vidas: Number(vidas) || 0, vidasIlimitada, tempoResposta: Number(tempoResposta) || 0, pontos, musicaFundo: musicaFundo.trim(), musicaLoop, compacto, corFundo: corFundo.trim() || null }
       const r = await salvarConfigDesafio(desafioId, novo)
       if (!r.ok) { toast.error(r.error ?? 'Erro ao salvar configuração.'); return }
       // Reflete a URL final hospedada (data:audio importado vira URL do storage) — feedback + evita re-subir.
@@ -140,13 +150,14 @@ export function JurisConfigForm({ desafioId, nome, config, materias, final, imag
   }
 
   // --- Imagens ---
-  const [imgs, setImgs] = useState<Record<string, string>>({ ticket: imagens?.ticket ?? '', capa: imagens?.capa ?? '' })
+  const [imgs, setImgs] = useState<Record<string, string>>({ ticket: imagens?.ticket ?? '', capa: imagens?.capa ?? '', fundo: imagens?.fundo ?? '' })
   const [pendImg, startImg] = useTransition()
-  const [cropSlot, setCropSlot] = useState<'ticket' | 'capa' | null>(null)
+  const [cropSlot, setCropSlot] = useState<SlotKey | null>(null)
   const ticketRef = useRef<HTMLInputElement>(null)
   const capaRef = useRef<HTMLInputElement>(null)
-  const refDe = (k: 'ticket' | 'capa') => (k === 'ticket' ? ticketRef : capaRef)
-  function enviarImagem(k: 'ticket' | 'capa', file: File | null | undefined) {
+  const fundoRef = useRef<HTMLInputElement>(null)
+  const refDe = (k: SlotKey) => (k === 'ticket' ? ticketRef : k === 'capa' ? capaRef : fundoRef)
+  function enviarImagem(k: SlotKey, file: File | null | undefined) {
     if (!file) return
     if (!file.type.startsWith('image/')) { toast.error('Selecione uma imagem.'); return }
     const r = new FileReader(); r.onload = () => setImgs((s) => ({ ...s, [k]: String(r.result) })); r.readAsDataURL(file)
@@ -198,7 +209,11 @@ export function JurisConfigForm({ desafioId, nome, config, materias, final, imag
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block">
             <span className="mb-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Heart className="h-3.5 w-3.5" /> Vidas</span>
-            <input type="number" min={1} value={vidas} onChange={(e) => setVidas(Number(e.target.value))} className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40" />
+            <input type="number" min={1} value={vidas} disabled={vidasIlimitada} onChange={(e) => setVidas(Number(e.target.value))} className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40 disabled:cursor-not-allowed disabled:opacity-50" />
+            <span className="mt-2 flex cursor-pointer items-center gap-2 text-xs font-medium text-muted-foreground">
+              <input type="checkbox" checked={vidasIlimitada} onChange={(e) => setVidasIlimitada(e.target.checked)} className="h-4 w-4 accent-[var(--primary)]" />
+              Vidas ilimitadas (sem game over)
+            </span>
           </label>
           <label className="block">
             <span className="mb-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Timer className="h-3.5 w-3.5" /> Tempo por pergunta (segundos)</span>
@@ -247,6 +262,26 @@ export function JurisConfigForm({ desafioId, nome, config, materias, final, imag
             <input type="checkbox" checked={musicaLoop} onChange={(e) => setMusicaLoop(e.target.checked)} className="h-4 w-4 accent-[var(--primary)]" />
             Repetir em loop infinito (recomendado p/ trechos curtos)
           </label>
+        </div>
+
+        <div>
+          <h4 className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><Gamepad2 className="h-3.5 w-3.5" /> Layout da área do aluno</h4>
+          <label className="flex w-fit cursor-pointer items-center gap-2 text-sm font-medium">
+            <input type="checkbox" checked={compacto} onChange={(e) => setCompacto(e.target.checked)} className="h-4 w-4 accent-[var(--primary)]" />
+            Cabeçalho compacto
+          </label>
+          <p className="mt-1 text-[11px] text-muted-foreground">Retrai o banner e as abas (sem o espaçamento do topo) → sobra mais tela para o arcade.</p>
+
+          <div className="mt-3">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">Cor do cabeçalho</span>
+            <div className="flex items-center gap-2">
+              <input type="color" value={/^#[0-9a-fA-F]{6}$/.test(corFundo) ? corFundo : '#2a1466'} onChange={(e) => setCorFundo(e.target.value)} className="h-9 w-12 shrink-0 cursor-pointer rounded-lg border bg-background p-1" />
+              <input value={corFundo} onChange={(e) => setCorFundo(e.target.value)} placeholder="#2a1466 (vazio = gradiente padrão)"
+                className="w-56 rounded-lg border bg-background px-2.5 py-1.5 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring/40" />
+              {corFundo && <button type="button" onClick={() => setCorFundo('')} className="text-[11px] text-muted-foreground hover:underline">Limpar</button>}
+            </div>
+            <p className="mt-1 text-[11px] text-muted-foreground">Usada quando <strong>não há imagem de fundo</strong>. Vazio = gradiente roxo padrão. A imagem de fundo (aba Imagens) tem prioridade sobre a cor.</p>
+          </div>
         </div>
 
         <div className="flex justify-end">

@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { checkPermission } from '@/lib/auth/permissions'
 import { temAcessoDesafio, perfilAlunos, lerDesafioJogo } from '@/lib/jurisprudencia/conteudo'
+import { diaBRT, streakDe } from '@/lib/jurisprudencia/sequencia'
 
 // Progresso do aluno no Desafio de Jurisprudência (tabela simulado_jurisprudencia_progresso).
 //   dom  = {"<dia>": [índices de teses dominadas]}
@@ -46,7 +47,7 @@ export async function GET(request: NextRequest) {
   }
 
   const [{ data }, perfis, jogo] = await Promise.all([
-    svc.from('simulado_jurisprudencia_progresso').select('dom, best, recorde').eq('desafio_id', desafioId).eq('estudante_id', sessao.estudanteId).maybeSingle(),
+    svc.from('simulado_jurisprudencia_progresso').select('dom, best, recorde, atualizado_em').eq('desafio_id', desafioId).eq('estudante_id', sessao.estudanteId).maybeSingle(),
     perfilAlunos(svc, sessao.tenantId, [sessao.estudanteId]),
     lerDesafioJogo(svc, desafioId),
   ])
@@ -80,10 +81,30 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // Sequência (streak): dias de atividade do aluno NO DESAFIO, lidos do LEDGER (fonte da verdade).
+  // Backfill: se não houver evento (atividade anterior à feature), usa o dia do `atualizado_em`.
+  const diasSet = new Set<string>()
+  try {
+    const { data: evs } = await svc
+      .from('simulado_xp_eventos')
+      .select('meta')
+      .eq('tenant_id', sessao.tenantId)
+      .eq('estudante_id', sessao.estudanteId)
+      .eq('origem', 'jurisprudencia')
+      .eq('meta->>desafio', desafioId)
+      .limit(500)
+    for (const e of (evs ?? []) as any[]) { const d = e?.meta?.dia; if (typeof d === 'string') diasSet.add(d) }
+  } catch { /* ledger indisponível → cai no backfill */ }
+  if (!diasSet.size && (data as any)?.atualizado_em) diasSet.add(diaBRT((data as any).atualizado_em))
+  const dias = [...diasSet].sort()
+
   return NextResponse.json({
     dom: (data as any)?.dom ?? {},
     best: (data as any)?.best ?? {},
     recorde: (data as any)?.recorde ?? 0,
+    atualizadoEm: (data as any)?.atualizado_em ?? null,
+    dias,                       // ['YYYY-MM-DD'] — dias de atividade (ledger + backfill) p/ a sequência
+    streak: streakDe(diasSet),  // streak atual já computado no servidor (BRT)
     perfil, // { nome, iniciais, cargo, nivel, avatar, avatarCor } — card do jogador
     leituras,              // { "<dia>": bool } — leitura concluída (gate do quiz)
     leituraDocs: docPorDia, // { "<dia>": documentoId } — p/ o link do leitor
@@ -95,7 +116,7 @@ export async function POST(request: NextRequest) {
   const sessao = await getSessaoAluno()
   if (!sessao) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
 
-  let b: { desafio?: string; dom?: unknown; best?: unknown; recorde?: unknown }
+  let b: { desafio?: string; dom?: unknown; best?: unknown; recorde?: unknown; dias?: unknown }
   try { b = await request.json() } catch { return NextResponse.json({ error: 'Requisição inválida.' }, { status: 400 }) }
   const desafioId = typeof b.desafio === 'string' ? b.desafio : ''
   if (!desafioId) return NextResponse.json({ error: 'Desafio não informado.' }, { status: 400 })
@@ -123,6 +144,28 @@ export async function POST(request: NextRequest) {
     { onConflict: 'desafio_id,estudante_id' },
   )
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Sequência (streak): grava os dias de atividade no LEDGER imutável (simulado_xp_eventos,
+  // origem='jurisprudencia'). Idempotente por (tenant,aluno,origem,ref_id='<desafio>:<dia>').
+  // xp=0 (marcador puro — não afeta XP/ranking de gamificação). Mesmo padrão do Lei Seca (meta.dia).
+  const diasRaw = Array.isArray(b.dias) ? (b.dias as unknown[]) : []
+  const dias = Array.from(
+    new Set(diasRaw.filter((d): d is string => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d))),
+  ).slice(-180)
+  if (dias.length) {
+    const linhas = dias.map((dia) => ({
+      tenant_id: sessao.tenantId,
+      estudante_id: sessao.estudanteId,
+      origem: 'jurisprudencia',
+      ref_id: `${desafioId}:${dia}`,
+      xp: 0,
+      meta: { dia, desafio: desafioId },
+    }))
+    await svc
+      .from('simulado_xp_eventos')
+      .upsert(linhas, { onConflict: 'tenant_id,estudante_id,origem,ref_id', ignoreDuplicates: true })
+      .then(() => {}, () => {}) // best-effort: não bloqueia o salvamento do progresso
+  }
 
   return NextResponse.json({ ok: true })
 }

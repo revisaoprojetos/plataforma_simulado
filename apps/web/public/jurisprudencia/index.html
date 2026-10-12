@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,500;0,600;0,700;0,800;0,900;1,800;1,900&family=Press+Start+2P&family=VT323&display=swap">
-<link rel="stylesheet" href="css/estilos.css?v=20261007g">
+<link rel="stylesheet" href="css/estilos.css?v=20261012d">
 <!-- Produção: esconde as ferramentas de demonstração (o elemento fica no DOM p/ o jogo.js não quebrar). -->
 <style>.demo{display:none!important}</style>
 </head>
@@ -71,10 +71,10 @@
     <div class="rec">
       <div class="snd-wrap">
         <button class="snd" id="btnSound" aria-pressed="true" title="Ligar/desligar som (M)">♪ SOM</button>
+        <button class="snd" id="btnAnim" aria-pressed="true" title="Reduzir animações ao redor da tela (modo mais estático)">⚡ ANIM</button>
         <span class="vol-grp" title="Volume dos efeitos sonoros"><b class="vol-lb">EFX</b><input type="range" class="vol" id="volSfx" min="0" max="100" value="100" aria-label="Volume dos efeitos"></span>
         <span class="vol-grp" title="Volume da música de fundo"><b class="vol-lb">MÚS</b><input type="range" class="vol" id="volMus" min="0" max="100" value="50" aria-label="Volume da música"></span>
       </div>
-      <span>Recorde</span><span class="px gold" id="recorde">000000</span><span class="avatar">VC</span>
     </div>
   </header>
   <!-- Música de fundo (opcional): coloque o arquivo em assets/audio/musica-fundo.mp3 — o volume é o controle acima. -->
@@ -86,7 +86,8 @@
       <section class="panel p1" id="p1" aria-label="Seu placar"></section>
       <section class="panel teses-panel">
         <h2 class="ptitle"><span class="pt-ico">★</span> TESES DO DIA <span class="pt-count" id="tesesCount">0/4</span></h2>
-        <div id="tesesList"></div>
+        <div id="tesesList" class="teses-mini"></div>
+        <button class="btn-o teses-expand" id="btnTesesExpand" type="button">EXPANDIR ▾</button>
       </section>
     </div></aside>
 
@@ -95,6 +96,7 @@
         <div class="screen" id="screen">
           <div class="hud">
             <span>SCORE <b id="hudScore">000000</b></span>
+            <span class="hud-best">MELHOR <b id="hudBest">000000</b></span>
             <span>DIA <b id="hudDay">1</b>/15</span>
             <span>TESES <b id="hudTeses">0/4</b></span>
             <span class="lives" id="hudLives" aria-label="Vidas"></span>
@@ -162,13 +164,13 @@
     <aside class="col-right">
       <div class="panel tabs-panel">
         <div class="ptabs" role="tablist" aria-label="Painel do desafio">
-          <button class="ptab" role="tab" data-pt="rank" aria-selected="true"><span class="key">1</span>RANKING</button>
+          <button class="ptab" role="tab" data-pt="fases" aria-selected="true"><span class="key">1</span>AULAS</button>
           <button class="ptab" role="tab" data-pt="selos" aria-selected="false"><span class="key">2</span>SELOS</button>
-          <button class="ptab" role="tab" data-pt="arm" aria-selected="false"><span class="key">3</span>DESAFIOS</button>
-          <button class="ptab" role="tab" data-pt="fases" aria-selected="false"><span class="key">4</span>FASES</button>
+          <button class="ptab" role="tab" data-pt="rank" aria-selected="false"><span class="key">3</span>RANKING</button>
+          <button class="ptab" role="tab" data-pt="arm" aria-selected="false"><span class="key">4</span>DESAFIOS</button>
         </div>
         <div class="pt-body">
-          <div class="pane" data-pane="rank" role="tabpanel">
+          <div class="pane" data-pane="rank" role="tabpanel" hidden>
             <div class="pane-head"><span>HIGH SCORES</span><span class="px" id="rankDay">ATÉ O DIA 01</span></div>
             <ol class="rmini" id="rankMini"></ol>
             <button class="btn-o wide" id="btnRank2">VER RANKING COMPLETO</button>
@@ -183,15 +185,16 @@
             <div class="pane-head"><span>BESTIÁRIO</span><span class="px">CONHEÇA O INIMIGO</span></div>
             <div id="trapsList"></div>
           </div>
-          <!-- SELECT STAGE movido para a coluna lateral (aba FASES) — otimiza a área, sem rolagem na página. -->
-          <div class="pane pane-fases" data-pane="fases" role="tabpanel" hidden>
-            <div class="pane-head"><span>SELECIONAR FASE</span><span class="px" id="stHintMini">15 FASES</span></div>
+          <!-- SELECT STAGE movido para a coluna lateral (aba AULAS) — otimiza a área, sem rolagem na página. -->
+          <div class="pane pane-fases" data-pane="fases" role="tabpanel">
+            <div class="pane-head"><span>SELECIONAR AULA</span><span class="px" id="stHintMini">15 AULAS</span></div>
             <div class="st-preview" id="stPreview" aria-live="polite"></div>
             <div class="st-railwrap">
-              <button class="st-nav" id="stPrev" aria-label="Fase anterior">◀</button>
+              <button class="st-nav" id="stPrev" aria-label="Aula anterior">◀</button>
               <div class="st-rail" id="stages"></div>
-              <button class="st-nav" id="stNext" aria-label="Próxima fase">▶</button>
+              <button class="st-nav" id="stNext" aria-label="Próxima aula">▶</button>
             </div>
+            <div class="pv-next" id="pvNext"></div>
           </div>
         </div>
       </div>
@@ -215,9 +218,19 @@
     <div class="qres" id="qRes" hidden>
       <h4 id="qResT"></h4>
       <div class="ref" id="qRef"></div>
-      <p id="qTese"></p>
+      <button class="qexp-toggle" id="qExpBtn" type="button" aria-expanded="false">Ver explicação ▾</button>
+      <div class="qexp" id="qExp" hidden><p id="qTese"></p></div>
       <div class="row"><button class="btn-w" id="qNext">CONTINUAR</button></div>
     </div>
+  </div>
+</div>
+
+<!-- todas as teses do dia (estilo pergunta) -->
+<div class="modal" id="tesesModal" hidden>
+  <div class="mcard tesescard" role="dialog" aria-modal="true" aria-label="Teses do dia">
+    <h2 class="ptitle"><span class="pt-ico">★</span> TESES DO DIA <span class="pt-count" id="tesesModalCount">0/4</span></h2>
+    <div id="tesesListFull" class="teses-full"></div>
+    <div class="mclose"><button class="btn-w" data-close="tesesModal">FECHAR</button></div>
   </div>
 </div>
 
@@ -269,6 +282,6 @@
 
 <div class="toast" id="toast" hidden></div>
 
-<script src="js/bootstrap.js?v=20261007g"></script>
+<script src="js/bootstrap.js?v=20261012d"></script>
 </body>
 </html>
