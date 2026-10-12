@@ -12,6 +12,19 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.9.1 — 2026-10-12
+
+Correções de layout do aluno (VND/Revisão).
+
+- **Sino de notificações (VND):** o painel do sino era desenhado para a sidebar **escura** da Revisão
+  (fundo `--sidebar` + texto branco + bordas brancas). No VND o sino fica no **top bar claro**, então o
+  painel saía branco com texto branco (invisível) — "toda bugada". Passou a usar tokens de
+  **popover/card** (fundo/foreground/bordas que se adaptam ao claro/escuro), legível em qualquer marca.
+- **Realizações e cadernos (resultado do simulado):** com muitos downloads (Caderno + Folha + Folha +
+  Diagnóstico + Gabarito) a linha da realização espremia a grade de estatísticas abaixo do conteúdo e as
+  colunas ficavam "uma dentro da outra". A linha agora **quebra** (os cadernos descem pra 2ª linha), a
+  grade ganhou largura mínima e o nome da realização trunca. Vale pros 3 brands (`resultado/shared.tsx`).
+
 ## 3.9.0 — 2026-10-12
 
 Desafio/Leitura: Biblioteca do Desafio, selos oficiais do JurisClub, "Temas do dia", editor do conteúdo

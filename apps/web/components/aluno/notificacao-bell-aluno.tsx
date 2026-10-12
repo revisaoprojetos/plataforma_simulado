@@ -185,29 +185,29 @@ export function NotificacaoBellAluno({ diagonal = false, colapsada = false }: { 
       {montado && pos && typeof document !== 'undefined' && createPortal(
         <div
           ref={panelRef}
-          style={{ left: pos.left, top: pos.top, bottom: pos.bottom, background: 'var(--sidebar)', color: 'var(--sidebar-foreground)' }}
+          style={{ left: pos.left, top: pos.top, bottom: pos.bottom, background: 'var(--popover, var(--card))', color: 'var(--popover-foreground, var(--card-foreground))' }}
           className={cn(
-            'fixed z-[120] flex max-h-[75vh] w-[340px] flex-col overflow-hidden rounded-2xl border border-white/10 shadow-2xl transition-all duration-200 ease-out',
+            'fixed z-[120] flex max-h-[75vh] w-[340px] flex-col overflow-hidden rounded-2xl border border-border shadow-2xl transition-all duration-200 ease-out',
             pos.dir === 'down' ? 'origin-top-left' : 'origin-bottom-left',
             visivel ? 'translate-y-0 scale-100 opacity-100' : cn('pointer-events-none scale-95 opacity-0', pos.dir === 'down' ? '-translate-y-3' : 'translate-y-3'),
           )}
         >
-          <header className="flex items-center justify-between border-b border-white/10 px-5 py-4">
-            <span className="text-base font-bold text-white">Notificações</span>
-            <button onClick={fechar} aria-label="Fechar" className="rounded-md p-1 text-sidebar-foreground/60 transition-colors hover:bg-white/10 hover:text-white"><X className="h-4 w-4" /></button>
+          <header className="flex items-center justify-between border-b border-border px-5 py-4">
+            <span className="text-base font-bold text-foreground">Notificações</span>
+            <button onClick={fechar} aria-label="Fechar" className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
           </header>
 
           <div className="min-h-0 flex-1 overflow-auto">
             {items.length === 0 ? (
-              <p className="px-5 py-12 text-center text-sm text-sidebar-foreground/50">Nenhuma notificação por aqui. ✨</p>
+              <p className="px-5 py-12 text-center text-sm text-muted-foreground">Nenhuma notificação por aqui. ✨</p>
             ) : (
               items.map((i) => (
-                <button key={i.id} onClick={() => irPara(i)} className={cn('flex w-full gap-3 border-b border-white/[0.06] px-5 py-4 text-left transition-colors last:border-0 hover:bg-white/5', i.link && 'cursor-pointer')}>
-                  <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: i.lida ? 'rgba(255,255,255,.18)' : 'var(--brand-accent)', boxShadow: i.lida ? undefined : '0 0 8px color-mix(in oklab, var(--brand-accent) 60%, transparent)' }} />
+                <button key={i.id} onClick={() => irPara(i)} className={cn('flex w-full gap-3 border-b border-border/60 px-5 py-4 text-left transition-colors last:border-0 hover:bg-muted/50', i.link && 'cursor-pointer')}>
+                  <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full" style={{ background: i.lida ? 'color-mix(in oklab, var(--muted-foreground) 45%, transparent)' : 'var(--brand-accent, var(--primary))', boxShadow: i.lida ? undefined : '0 0 8px color-mix(in oklab, var(--brand-accent, var(--primary)) 60%, transparent)' }} />
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-semibold leading-snug text-white">{i.titulo}</p>
-                    {i.mensagem && <p className="mt-0.5 text-[13px] leading-snug text-sidebar-foreground/60">{i.mensagem}</p>}
-                    <p className="mt-1.5 text-[11px] font-medium uppercase tracking-wide text-sidebar-foreground/40">{tempoRelativoLongo(i.criado_em)}</p>
+                    <p className="text-sm font-semibold leading-snug text-foreground">{i.titulo}</p>
+                    {i.mensagem && <p className="mt-0.5 text-[13px] leading-snug text-muted-foreground">{i.mensagem}</p>}
+                    <p className="mt-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground/70">{tempoRelativoLongo(i.criado_em)}</p>
                   </div>
                 </button>
               ))
@@ -215,7 +215,7 @@ export function NotificacaoBellAluno({ diagonal = false, colapsada = false }: { 
           </div>
 
           {items.length > 0 && (
-            <button onClick={marcarTodasLidas} className="shrink-0 border-t border-white/10 px-5 py-3.5 text-center text-sm font-medium text-sidebar-foreground/80 transition-colors hover:bg-white/5 hover:text-white">
+            <button onClick={marcarTodasLidas} className="shrink-0 border-t border-border px-5 py-3.5 text-center text-sm font-medium text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground">
               Marcar todas como lidas
             </button>
           )}

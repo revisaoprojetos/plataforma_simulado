@@ -809,7 +809,7 @@ export function AttRows({
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
               {badge}
               <div style={{ minWidth: 0 }}>
-                <b style={{ display: 'block', fontSize: 13.5, color: 'var(--ink)', whiteSpace: 'nowrap' }}>Realização {a.n}</b>
+                <b style={{ display: 'block', fontSize: 13.5, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Realização {a.n}</b>
                 {tags}
               </div>
             </div>
@@ -834,8 +834,8 @@ export function AttRows({
               {a.downloads?.length ? <div style={{ marginTop: 10 }}><CadernosInline downloads={a.downloads} brand={brand} mobile /></div> : null}
             </>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-              <div style={{ flex: 1, minWidth: 0, display: 'grid', gridTemplateColumns: '20px 34px minmax(0,1fr) 72px 86px 78px 56px', gap: 14, alignItems: 'center' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', rowGap: 12 }}>
+              <div style={{ flex: 1, minWidth: 'min(100%, 550px)', display: 'grid', gridTemplateColumns: '20px 34px minmax(0,1fr) 72px 86px 78px 56px', gap: 14, alignItems: 'center' }}>
                 {check}
                 <span style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--muted)' }}>{k + 1}</span>
                 {name}
@@ -923,7 +923,7 @@ function CadernosInline({ downloads, brand, mobile }: { downloads: { nome: strin
   return (
     // Desktop: tudo na MESMA linha, à direita. MOBILE: QUEBRA em várias linhas (flex-wrap) e alinha à
     // esquerda — senão os botões (flexShrink:0 + nowrap) estouravam a tela e saíam cortados.
-    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, flexWrap: mobile ? 'wrap' : 'nowrap', justifyContent: mobile ? 'flex-start' : 'flex-end' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, flexWrap: 'wrap', justifyContent: mobile ? 'flex-start' : 'flex-end' }}>
       {semGab.map((d, i) => <CadernoInlineBtn key={'s' + i} d={d} brand={brand} />)}
       {semGab.length && comGab.length ? <span aria-hidden style={{ width: 1, height: 20, background: 'var(--line)', margin: '0 3px', flexShrink: 0 }} /> : null}
       {comGab.map((d, i) => <CadernoInlineBtn key={'g' + i} d={d} brand={brand} />)}
