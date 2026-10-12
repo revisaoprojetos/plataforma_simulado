@@ -12,6 +12,14 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.8.3 — 2026-10-12
+
+Ajuste do modal "Mapa do labirinto" (Desafio de Jurisprudência): estava encostado à esquerda e grande.
+
+- **Centralizado:** o `.mapcard` tinha `max-width` sem `margin:auto` (ficava à esquerda dentro do `.mcard`
+  de largura total) — adicionado `margin-inline:auto`.
+- **Menor:** `max-width` 1320→960px e o labirinto `min-width` 820→680px, com padding reduzido.
+
 ## 3.8.2 — 2026-10-12
 
 Hotfix de **persistência** do Desafio de Jurisprudência (progresso sumia ao recarregar) + teto do score.

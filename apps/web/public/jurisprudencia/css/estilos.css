@@ -600,11 +600,11 @@ body.theater .abtn.big small{color:#fff;border-color:var(--gold)}
 .qexp::-webkit-scrollbar-track{background:transparent}
 
 /* mapa */
-.mapcard{max-width:1320px;border:1px solid var(--line);background:var(--panel);padding:24px clamp(16px,4vw,48px)}
+.mapcard{max-width:960px;margin-inline:auto;border:1px solid var(--line);background:var(--panel);padding:20px clamp(14px,3vw,32px)}
 .mapcard h2{font-family:var(--f-arc);font-size:clamp(16px,2.4vw,26px);margin:0 0 10px;letter-spacing:.04em}
 .mapcard .msub{color:var(--neon-hi);font-weight:800;font-style:italic;font-size:14px;margin:0 0 18px}
 .mapscroll{overflow-x:auto}
-.map{position:relative;min-width:820px;aspect-ratio:43/25;border:3px solid var(--neon);box-shadow:0 0 18px rgba(139,92,246,.7), inset 0 0 18px rgba(139,92,246,.4);background:#050a33}
+.map{position:relative;min-width:680px;aspect-ratio:43/25;border:3px solid var(--neon);box-shadow:0 0 18px rgba(139,92,246,.7), inset 0 0 18px rgba(139,92,246,.4);background:#050a33}
 .map canvas{position:absolute;inset:0;width:100%;height:100%}
 .map svg.trail{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
 .node{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:2px;background:none;border:0;padding:0;cursor:pointer}
