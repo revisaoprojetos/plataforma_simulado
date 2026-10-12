@@ -30,7 +30,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { FontScaleControl } from '@/components/font-scale-control'
-import { NotificacaoBellAluno } from '@/components/aluno/notificacao-bell-aluno'
+import { CentralNotificacoes } from '@/components/aluno/central-notificacoes'
 import type { AlunoShellProps, AlunoNavItem } from './types'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -644,11 +644,10 @@ export function ShellVND({ nav, usuario, children }: AlunoShellProps) {
         <div className="ml-auto flex items-center gap-1">
           <BuscaExpansivel />
           <TemaTextoMenu scope={scope} />
-          {/* Central de notificações: reusa o sino existente (abre PARA BAIXO não é
-              suportado por ele; abre p/ cima a partir do botão — aceitável no header).
-              TODO: central de notificações VND (abas/preferências/silenciar, spec §2.7). */}
+          {/* Central de notificações RICA do VND (abas Todas/Não lidas/Estudos/Simulados/Ranking,
+              grupos Hoje/Anteriores) — ligada à API real. Abre para baixo-esquerda a partir do sino. */}
           <span className="flex h-10 w-10 items-center justify-center text-[color:var(--topmuted)]">
-            <NotificacaoBellAluno />
+            <CentralNotificacoes brand="vnd" />
           </span>
           <BotaoPerfil usuario={usuario} scope={scope} />
         </div>
@@ -669,7 +668,7 @@ export function ShellVND({ nav, usuario, children }: AlunoShellProps) {
           </span>
         </Link>
         <div className="ml-auto flex items-center gap-1 text-white [&_svg]:text-white">
-          <span className="flex h-10 w-10 items-center justify-center"><NotificacaoBellAluno /></span>
+          <span className="flex h-10 w-10 items-center justify-center"><CentralNotificacoes brand="vnd" /></span>
           <BotaoPerfil usuario={usuario} scope={scope} compacto />
         </div>
       </header>

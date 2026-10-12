@@ -12,6 +12,20 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.10.0 — 2026-10-12
+
+Central de notificações rica no VND (abas/grupos), ligada a dados reais.
+
+- **Central de notificações do VND (nova):** o VND mostrava o **sino simples** (que saía bugado no top bar
+  claro); agora usa a **central rica** no padrão do design — cabeçalho com "N novas", abas
+  **Todas / Não lidas / Estudos / Simulados / Ranking**, grupos **Hoje / Anteriores**, cards com ícone por
+  categoria + botão de ação, marcar como lida (uma/todas) e "Ver todas as notificações". Componente novo
+  `components/aluno/central-notificacoes.tsx`, **branded** (tokens via `internaTokensStyle`) e portalizado.
+- **Dados reais:** ligada à API `/api/aluno/notificacoes` (não é mais mock). Categoria/ícone/ação são
+  derivados do `tipo`/`link`/texto da notificação enquanto o backend não tem coluna de categoria.
+- Desktop e mobile do `shell-vnd` passam a usar a central (removido o `NotificacaoBellAluno` do VND; ele
+  segue na sidebar antiga da Revisão). O MEQ mantém a sua central própria.
+
 ## 3.9.1 — 2026-10-12
 
 Correções de layout do aluno (VND/Revisão).
