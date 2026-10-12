@@ -1,5 +1,6 @@
 import 'server-only'
 import { parse, NodeType } from 'node-html-parser'
+import { selosParaSpans } from './selos'
 
 // Sanitizador de HTML para a AREA DE LEITURA (server-only).
 //
@@ -30,7 +31,7 @@ const REMOVE_TAGS = new Set([
 const VOID_TAGS = new Set(['br', 'hr', 'img', 'col'])
 // Atributos permitidos por tag (o resto e descartado - inclusive todo on*).
 const ALLOW_ATTR: Record<string, Set<string>> = {
-  '*': new Set(['class', 'id', 'data-art', 'data-secao', 'data-disp', 'data-disp-tipo', 'data-grifo', 'data-grifo-label', 'data-grifo-estrutural', 'data-caixa', 'data-align', 'data-cobranca']),
+  '*': new Set(['class', 'id', 'data-art', 'data-secao', 'data-disp', 'data-disp-tipo', 'data-grifo', 'data-grifo-label', 'data-grifo-estrutural', 'data-caixa', 'data-align', 'data-cobranca', 'data-selo', 'data-selo-sm', 'data-selo-ic', 'data-selo-h']),
   a: new Set(['href', 'title']),
   img: new Set(['src', 'alt', 'width', 'height']),
   td: new Set(['colspan', 'rowspan']),
@@ -73,6 +74,8 @@ function styleSeguro(raw: string): string | null {
     if (i < 0) continue
     const prop = decl.slice(0, i).trim().toLowerCase()
     const val = decl.slice(i + 1).trim()
+    // Cor da marcação canetão (custom property). Só aceita valor de cor seguro.
+    if (prop === '--marca-cor') { if (/^#[0-9a-f]{3,8}$/i.test(val) || /^rgba?\([\d.,%\s]+\)$/i.test(val) || /^[a-z]{3,20}$/i.test(val)) out.push(prop + ':' + val); continue }
     if (PROPS_STYLE.has(prop) && valorStyleSeguro(prop, val)) out.push(prop + ':' + val)
   }
   return out.length ? out.join(';') : null
@@ -242,9 +245,11 @@ export function sanitizarDocumento(htmlBruto: string): HtmlSanitizado {
   // O DOCTYPE / declaração XML não é elemento — o parser o deixa como TEXTO e ele sairia
   // escapado no fim (aparecia "<!DOCTYPE html>" literal na leitura). Removemos antes do parse.
   // <html>/<head>/<body> já somem (REMOVE_TAGS / unwrap); aqui é só o cabeçalho do arquivo.
-  const limpo = (htmlBruto ?? '')
-    .replace(/<\?xml[^>]*\?>/gi, '')
-    .replace(/<!DOCTYPE[^>]*>/gi, '')
+  const limpo = selosParaSpans(
+    (htmlBruto ?? '')
+      .replace(/<\?xml[^>]*\?>/gi, '')
+      .replace(/<!DOCTYPE[^>]*>/gi, ''),
+  ) // tags de selo (<rg>…) → <span data-selo> ANTES do allowlist (senão a tag desconhecida some)
   const root = parse(limpo, { comment: false })
   mapearMontagem(root)
   const artigos = ancorarArtigos(root)

@@ -146,6 +146,7 @@ const navGroups: NavGroup[] = [
       { label: 'Lei Seca', href: '/admin/leitura', icon: Library, perm: 'leitura:view', oculto: !LEITURA_ATIVA },
       { label: 'Lei Seca · Análise', href: '/admin/leitura/analise', icon: BarChart3, perm: 'relatorios:view', oculto: !LEITURA_ATIVA },
       { label: 'Jurisprudência', href: '/admin/jurisprudencia', icon: Scale, perm: 'leitura:view', oculto: !JURISPRUDENCIA_ATIVA },
+      { label: 'Biblioteca', href: '/admin/leitura/biblioteca', icon: LayoutTemplate, perm: 'leitura:view', oculto: !LEITURA_ATIVA },
       // 'Análise' da Jurisprudência volta na F4 (rota /admin/jurisprudencia/analise ainda não existe).
     ],
   },

@@ -15,10 +15,13 @@ import { listarQuestoesDocumento, type QuestaoDoc } from '@/app/admin/leitura/ac
 import { DEFAULT_GRIFO_CORES, type GrifoCores } from '@/lib/leitura/trilha-aparencia'
 import { aplicarGrifos } from '@/lib/leitura/recolorir-grifos'
 import { prepararCaixasTabela, prepararCaixasCobrado, prepararTabelasColapsaveis } from '@/lib/leitura/caixas'
+import { prepararSelosLeitura } from '@/lib/leitura/selos'
 import { DEFAULT_BLOCOS, type BlocoDef } from '@/lib/leitura/blocos'
 import { DEFAULT_ESPACAMENTO, estiloEspacamento, type EspacamentoDoc } from '@/lib/leitura/espacamento'
 import { NIVEL_TIPO, montarArvoreToc, type NoToc } from '@/lib/leitura/indice'
 import { IndiceArvore, type NoIndiceView } from '@/components/leitura/indice-arvore'
+import { TemasDoDia } from '@/components/leitura/temas-do-dia'
+import { extrairTopicos, ancorarTopicos, type TopicoBase, type TopicosConfig } from '@/lib/leitura/topicos'
 import type { BlocoDiff, DiffDoc, VersaoInfo } from '@/lib/leitura/diff-tipos'
 
 /** Card read-only "Questão no contexto" — injetado na prévia do admin no ponto do artigo. */
@@ -107,7 +110,7 @@ const RESUMO_ZERO = { mod: 0, add: 0, rem: 0, igual: 0 }
 /** Controles do editor de grifos expostos p/ a barra de topo do editor (desfazer/refazer). */
 export type GrifoCtl = { dirty: boolean; podeDesfazer: boolean; podeRefazer: boolean; desfazer: () => void; refazer: () => void }
 
-export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 0, podeComparar = false, onGrifoCtl, versaoQuestoes, indiceTipos = [], esp = DEFAULT_ESPACAMENTO, grifoCores = DEFAULT_GRIFO_CORES, blocos = DEFAULT_BLOCOS }: {
+export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 0, podeComparar = false, onGrifoCtl, versaoQuestoes, indiceTipos = [], esp = DEFAULT_ESPACAMENTO, grifoCores = DEFAULT_GRIFO_CORES, blocos = DEFAULT_BLOCOS, topicos = {} }: {
   documentoId: string; html: string; podeEditar: boolean; artigos?: number; podeComparar?: boolean
   onGrifoCtl?: (c: GrifoCtl | null) => void
   /** Quando definido, carrega as questões inseridas dessa versão e as mostra inline (read-only) na prévia. */
@@ -120,6 +123,8 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
   grifoCores?: GrifoCores
   /** Blocos de destaque configuráveis (detecção por palavras-chave + cor + prévia por bloco). */
   blocos?: BlocoDef[]
+  /** "Temas do dia" — ajuste do admin por tópico (tags/questões/incluir). */
+  topicos?: TopicosConfig
 }) {
   const router = useRouter()
   const [qDoc, setQDoc] = useState<QuestaoDoc[]>([])
@@ -132,6 +137,21 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
   const [maxH, setMaxH] = useState<number>()
   const scrollRef = useRef<HTMLDivElement>(null)
   const viewRef = useRef<HTMLDivElement>(null)
+  // "Temas do dia" na barra da prévia (mesma do aluno).
+  const [temas, setTemas] = useState<TopicoBase[]>([])
+  useEffect(() => {
+    const cont = viewRef.current; if (!cont) return
+    const run = () => { ancorarTopicos(cont); setTemas(extrairTopicos(cont)) }
+    run(); const t = setTimeout(run, 240)
+    return () => clearTimeout(t)
+  }, [html])
+  const irTema = (key: string) => {
+    const el = viewRef.current?.querySelector<HTMLElement>(`[data-tema="${CSS.escape(key)}"]`)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el.classList.remove('leitura-alvo'); void el.offsetWidth; el.classList.add('leitura-alvo')
+    window.setTimeout(() => el.classList.remove('leitura-alvo'), 1700)
+  }
   // Prévia dos toggles do aluno: ocultar grifos do Revisão (spans com fundo inline) e "meus grifos"
   // (não há grifos pessoais no admin → o toggle existe por paridade, sem efeito visível).
   const [semGrifos, setSemGrifos] = useState(false)
@@ -205,9 +225,11 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
     }
     const limpezasTab: (() => void)[] = []
     const aplicar = () => {
+      // TAGS de selo (<rg>, <essencial>…) viram a IMAGEM do selo — igual ao leitor do aluno.
+      prepararSelosLeitura(cont)
       // Recolhe os VÃOS grandes: parágrafos vazios (só espaço/br) somem do layout (display:none) — igual
       // ao leitor do aluno. Sem isto, a prévia do admin fica com espaços enormes entre os blocos.
-      for (const p of Array.from(cont.querySelectorAll<HTMLElement>('p'))) {
+      if (!esp?.preservarHtml) for (const p of Array.from(cont.querySelectorAll<HTMLElement>('p'))) {
         if (p.hasAttribute('data-vazio') || p.closest('.caixa-colapsavel')) continue
         if (p.querySelector('img, table, iframe')) continue
         if ((p.textContent || '').replace(/ /g, ' ').trim() === '') { p.setAttribute('data-vazio', '1'); p.style.display = 'none' }
@@ -646,16 +668,17 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
               </p>
             )}
 
-            {/* Painel ÍNDICE — árvore recolhível (mesma do aluno), conforme os tipos configurados. */}
+            {/* Painel ÍNDICE — "Temas do dia" + árvore recolhível (mesma do aluno). */}
             {(!podeComparar || aba === 'indice') && (
-              tocView.length > 0 ? (
-                <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+              <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+                <TemasDoDia topicos={temas} config={topicos} onIr={irTema} className="mb-3" />
+                {tocView.length > 0 ? (
                   <IndiceArvore nodes={tocView} estaAberto={(id) => !recolhidos.has(id)} onToggle={toggleToc}
                     onPular={(id) => { const s = secaoPorId.get(id); if (s) pular(s) }} />
-                </div>
-              ) : (
-                <p className="px-1 py-2 text-xs text-muted-foreground">Sem seções detectadas neste conteúdo.</p>
-              )
+                ) : (
+                  <p className="px-1 py-2 text-xs text-muted-foreground">Sem seções detectadas neste conteúdo.</p>
+                )}
+              </div>
             )}
 
             {/* Painel ALTERAÇÕES (antes/depois) — carregado sob demanda ao abrir a aba */}
@@ -763,7 +786,7 @@ export function LeituraPreviewGrifos({ documentoId, html, podeEditar, artigos = 
           </div>
         ) : html ? (
           <div className="mx-auto max-w-3xl overflow-hidden rounded-lg border bg-card shadow-sm">
-            <div ref={viewRef} className={cn(CONTENT_CLASS, semGrifos && 'sem-grifos')} style={estiloEspacamento(esp) as any} dangerouslySetInnerHTML={{ __html: html }} />
+            <div ref={viewRef} className={cn(CONTENT_CLASS, semGrifos && 'sem-grifos', esp?.preservarHtml && 'leitura-fiel')} style={estiloEspacamento(esp) as any} dangerouslySetInnerHTML={{ __html: html }} />
           </div>
         ) : (
           <div className="flex h-full items-center justify-center">

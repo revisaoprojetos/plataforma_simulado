@@ -51,6 +51,24 @@ export function DesafioJurisInterno({ desafioId, titulo, theme, totalDias, mater
   useTemaInterno(theme) // reage ao toggle claro/escuro/azul ao vivo
   const [tab, setTab] = useState<Tab>('desafio')
 
+  // FAIXA BRANCA em volta da down bar: o scroll do portal (.shr-main) tem fundo CLARO no interno e aparecia
+  // atrás/abaixo do arcade. Na aba DESAFIO pintamos SÓ o fundo do .shr-main com o MESMO fundo do desafio
+  // (o do body do arcade: navy + pontilhado) → mesmo se rolar, o que aparece é o fundo do desafio, não
+  // branco, e a down bar fica ENCAIXADA. NÃO mexemos no overflow (senão a rolagem das outras abas buga).
+  // Reverte ao trocar de aba/sair; as outras abas ficam iguais.
+  useEffect(() => {
+    if (tab !== 'desafio') return
+    const main = document.querySelector('.shr-main') as HTMLElement | null
+    if (!main) return
+    const prev = main.style.background
+    main.style.background =
+      'radial-gradient(circle at 1px 1px, #131b63 1px, transparent 1.5px) 0 0 / 18px 18px,' +
+      'radial-gradient(1200px 600px at 50% -10%, #0d1670 0%, transparent 60%),' +
+      '#040830'
+    return () => { main.style.background = prev }
+  }, [tab])
+
+
   // LEITURA sem recarregar o arcade: o iframe do jogo fica SEMPRE montado (congelado, estado preservado);
   // a leitura abre num overlay POR CIMA (irmão, via portal). O arcade pede via postMessage; ao fechar,
   // avisamos o arcade p/ reatualizar só o gate — nada recarrega, sem painéis vazios nem flash da abertura.
@@ -92,7 +110,7 @@ export function DesafioJurisInterno({ desafioId, titulo, theme, totalDias, mater
   return (
     // margin:-24 cancela o padding do InternaPageRoot (full-bleed). height capada à viewport (menos o
     // topbar de 72px do shell) + overflow:hidden → SEM scroll externo e sem faixa/linha sobrando.
-    <div data-juris-int style={{ display: 'flex', flexDirection: 'column', margin: -24, height: 'calc(100dvh - 72px)', overflow: 'hidden' }}>
+    <div data-juris-int data-tab={tab} style={{ display: 'flex', flexDirection: 'column', margin: -24, height: 'calc(100dvh - 72px)', overflow: 'hidden' }}>
       <HeaderHero titulo={titulo} totalDias={totalDias} materiasCount={materiasCount} tab={tab} setTab={setTab} tabs={TABS} banner={bannerUrl} compacto={compacto} corFundo={corFundo} />
 
       {/* ARCADE: SEMPRE montado — nunca recarrega (nem ao trocar de aba, nem ao abrir a leitura), então
@@ -145,8 +163,24 @@ export function DesafioJurisInterno({ desafioId, titulo, theme, totalDias, mater
         [data-juris-int] .ji-rank-grid{ display:grid; grid-template-columns:420px minmax(0,1fr); gap:18px; align-items:start; }
         @media (max-width: 1023px){
           [data-juris-int] .ji-kpis{ grid-template-columns:repeat(2,1fr); }
-          [data-juris-int] .ji-reg-grid, [data-juris-int] .ji-des-grid, [data-juris-int] .ji-rank-grid{ grid-template-columns:1fr; }
+          /* minmax(0,1fr) (não 1fr=minmax(auto,1fr)): a coluna pode encolher abaixo do min-content, então
+             a tabela (min-width:560) rola DENTRO do ji-table-scroll em vez de esticar o grid e estourar a
+             tela (pódio/cards do Ranking ficavam maiores que o viewport). */
+          [data-juris-int] .ji-reg-grid, [data-juris-int] .ji-des-grid, [data-juris-int] .ji-rank-grid{ grid-template-columns:minmax(0,1fr); }
           [data-juris-int] .ji-hero-chip{ display:none !important; }
+          /* Empilhado: o card "Ganhos e metas" não pode mais ser sticky (grudava e sobrepunha o texto). */
+          [data-juris-int] .ji-reg-sticky{ position: static !important; }
+        }
+        /* Tabelas (Desempenho/Ranking) rolam na HORIZONTAL quando não cabem (mobile) — sem colunas
+           espremidas/sobrepostas nem conteúdo saindo do card. */
+        [data-juris-int] .ji-table-scroll{ overflow-x:auto; -webkit-overflow-scrolling:touch; }
+        [data-juris-int] .ji-table-min{ min-width:560px; }
+        /* ≤640px: o shell usa o topbar MOBILE (64px) → preenche a altura disponível. A faixa branca
+           abaixo some porque o ARCADE (iframe) agora tem folga própria no rodapé (padding no .page,
+           ver estilos.css): ao rolar até o fim, o conteúdo sobe acima da down bar e o fundo pontilhado
+           do próprio arcade preenche a área. */
+        @media (max-width: 640px){
+          [data-juris-int]{ height: calc(100dvh - 64px); }
         }
         @media (prefers-reduced-motion: reduce){ [data-juris-int] *{ animation:none !important; } }
       `}</style>
@@ -280,8 +314,9 @@ function AbaRegulamento({ config, totalDias, materiasCount }: { config: Config; 
 
   return (
     <div className="ji-reg-grid">
-      {/* Ganhos e metas — coluna esquerda sticky. */}
-      <div className="ji-card" style={{ padding: 18, position: 'sticky', top: 0 }}>
+      {/* Ganhos e metas — coluna esquerda sticky (só no desktop; no mobile empilhado vira static p/ não
+          grudar e sobrepor o "Como funciona"). */}
+      <div className="ji-card ji-reg-sticky" style={{ padding: 18, position: 'sticky', top: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
           <Zap size={18} color="var(--brand)" />
           <h3 style={{ margin: 0, fontSize: 15.5, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--ink)' }}>Ganhos e metas</h3>
@@ -403,7 +438,7 @@ function AbaDesempenho({ desafioId, totalDias, dias }: { desafioId: string; tota
 
   const CHART_W = 640, CHART_H = 150
   const barW = CHART_W / Math.max(1, totalDias) - 4
-  const COLS = '48px minmax(0,1fr) 90px 120px 130px'
+  const COLS = '48px minmax(130px,1fr) 90px 120px 130px'
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -473,8 +508,9 @@ function AbaDesempenho({ desafioId, totalDias, dias }: { desafioId: string; tota
         </div>
       </div>
 
-      {/* Tabela por fase */}
+      {/* Tabela por fase — rola na horizontal no mobile (não cabe: COLS ~436px). */}
       <div className="ji-card" style={{ padding: 18 }}>
+        <div className="ji-table-scroll"><div className="ji-table-min">
         <div style={{ display: 'grid', gridTemplateColumns: COLS, gap: 12, padding: '0 10px 10px', borderBottom: '1px solid var(--line)' }}>
           {['Fase', 'Matéria / dia', 'Teses', 'Melhor pontuação', 'Situação'].map((h) => (
             <span key={h} style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>{h}</span>
@@ -501,6 +537,7 @@ function AbaDesempenho({ desafioId, totalDias, dias }: { desafioId: string; tota
             </div>
           ))}
         </div>
+        </div></div>
       </div>
     </div>
   )
@@ -631,7 +668,8 @@ function AbaRanking({ desafioId, totalDias }: { desafioId: string; totalDias: nu
           </div>
           <span style={{ fontSize: 12, color: 'var(--muted)' }}>{fmt(total)} {total === 1 ? 'aluno' : 'alunos'}</span>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: '40px minmax(0,1fr) 68px 60px 84px', gap: 12, padding: '0 12px 10px', borderBottom: '1px solid var(--line)' }}>
+        <div className="ji-table-scroll"><div className="ji-table-min">
+        <div style={{ display: 'grid', gridTemplateColumns: '40px minmax(120px,1fr) 68px 60px 84px', gap: 12, padding: '0 12px 10px', borderBottom: '1px solid var(--line)' }}>
           {[['#', 'left'], ['Aluno', 'left'], ['Sequência', 'right'], ['Selos', 'right'], ['Pontos', 'right']].map(([h, al]) => (
             <span key={h} style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', textAlign: al as any }}>{h}</span>
           ))}
@@ -640,7 +678,7 @@ function AbaRanking({ desafioId, totalDias }: { desafioId: string; totalDias: nu
           {itens.map((r) => {
             const top = r.pos <= 3
             return (
-              <div key={r.pos} style={{ display: 'grid', gridTemplateColumns: '40px minmax(0,1fr) 68px 60px 84px', gap: 12, alignItems: 'center', padding: '10px 12px', borderBottom: '1px solid var(--line)', background: r.you ? 'color-mix(in srgb,var(--brand) 7%,transparent)' : 'transparent' }}>
+              <div key={r.pos} style={{ display: 'grid', gridTemplateColumns: '40px minmax(120px,1fr) 68px 60px 84px', gap: 12, alignItems: 'center', padding: '10px 12px', borderBottom: '1px solid var(--line)', background: r.you ? 'color-mix(in srgb,var(--brand) 7%,transparent)' : 'transparent' }}>
                 <span style={{ width: 28, height: 28, borderRadius: 8, background: top ? 'var(--chip)' : 'transparent', color: top ? 'var(--brand)' : 'var(--muted)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800 }}>{r.pos}</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
                   <AvatarR row={r} size={34} />
@@ -662,6 +700,7 @@ function AbaRanking({ desafioId, totalDias }: { desafioId: string; totalDias: nu
             )
           })}
         </div>
+        </div></div>
       </div>
     </div>
   )

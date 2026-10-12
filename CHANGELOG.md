@@ -12,6 +12,28 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.9.0 — 2026-10-12
+
+Desafio/Leitura: Biblioteca do Desafio, selos oficiais do JurisClub, "Temas do dia", editor do conteúdo
+(marcação canetão, corte de página, espaçamento fiel) e fidelidade dos blocos importados.
+
+- **Biblioteca do Desafio (nova área):** em Desafios → Biblioteca. Blocos de HTML prontos + **Tags (selos)**
+  em **pastas/subpastas** (modelo dos simulados), global por tenant. Importar selos padrão, upload de
+  imagem, código da tag padronizado com `<>`. Migração `20261012000000_biblioteca_desafio.sql`.
+- **Selos = imagens oficiais (JurisClub):** as tags `<rg>`, `<essencial>`… passam a renderizar os **PNGs
+  oficiais** (3 variantes: completo/compacto/ícone) em `/public/leitura/selos`, no leitor e na prévia.
+  Inserção de selo no editor (botão "Selo") com tamanho (Normal/Compacto/Ícone), posição e redimensionar.
+- **Temas do dia (tópicos):** na barra de índice da leitura (aluno + prévia), acima do sumário —
+  numeração + nome + **tags (selos)** + nº de questões; clicar rola/centraliza/destaca (igual ao índice).
+  Híbrido: tópicos automáticos dos títulos (h1–h3 **e** parágrafos negrito/centralizado/CAIXA ALTA); admin
+  ajusta tags/questões/incluir na aba "Temas do dia" (quiz_config.topicos). Título mantém o tamanho no leitor.
+- **Editor de conteúdo:** **marcação canetão/pincel** (traço atrás do texto, cor/estilo editáveis, adapta a
+  2+ linhas), **corte de página** (divisor + quebra no PDF), "Salvar conteúdo" na barra sticky, Enter cria
+  `<p>` e o editor reflete o espaçamento da leitura (WYSIWYG).
+- **Fidelidade ao HTML importado:** blocos de 1 coluna (citações/artigos) deixam de receber o verde das
+  tabelas comparativas e respeitam a cor da fonte (ou transparente); controle manual de cor por bloco.
+  Toggle **"Preservar espaçamento do HTML"** por documento (não colapsa parágrafos vazios / linhas do Enter).
+
 ## 3.8.4 — 2026-10-12
 
 Leitura (compartilhada Lei Seca + Jurisprudência): tabelas colapsáveis viram um bloco de cor única.

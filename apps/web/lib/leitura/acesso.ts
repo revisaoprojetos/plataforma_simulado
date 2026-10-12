@@ -8,6 +8,7 @@ import { normalizarTiposIndice } from './indice'
 import { resolverGrifoCores, type GrifoCores } from './trilha-aparencia'
 import { resolverBlocos, type BlocoDef } from './blocos'
 import { normalizarEspacamento, type EspacamentoDoc } from './espacamento'
+import { resolverTopicos, type TopicosConfig } from './topicos'
 import type { DiffDoc } from './diff-tipos'
 
 /**
@@ -194,6 +195,7 @@ export interface DocumentoCarregado {
   esp: EspacamentoDoc              // espaçamento GRANULAR do ADMIN (quiz_config.esp; deriva dos legados se ausente)
   grifoCores: GrifoCores           // cores dos grifos definidas pelo ADMIN (quiz_config.grifoCores)
   blocos: BlocoDef[]               // blocos de destaque configuráveis (quiz_config.blocos); prévia é por bloco
+  topicos: TopicosConfig           // "Temas do dia": ajuste do admin por tópico (quiz_config.topicos)
 }
 
 export interface GrifoLei { id: string; inicio: number; fim: number; exact: string; prefix: string; suffix: string; tipo: string; nota: string | null }
@@ -391,6 +393,7 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
     esp: normalizarEspacamento((doc as any).quiz_config),
     grifoCores: resolverGrifoCores((doc as any).quiz_config?.grifoCores),
     blocos: resolverBlocos((doc as any).quiz_config?.blocos),
+    topicos: resolverTopicos((doc as any).quiz_config?.topicos),
   }
 }
 

@@ -161,9 +161,18 @@ export function prepararTabelasColapsaveis(cont: HTMLElement): () => void {
       // Já dentro de uma caixa (ENTENDIMENTO multi-col) ou já embrulhada → não mexe.
       if (tab.closest('.caixa-colapsavel')) continue
 
+      // Tabela de 1 COLUNA (box/citação de artigo) NÃO é tabela comparativa → marca p/ o CSS não
+      // aplicar o verde das comparativas e renderizar fiel ao HTML (transparente + cor inline da fonte).
+      const unicaColuna = Array.from(tab.rows).every((r) => r.cells.length <= 1)
+      if (unicaColuna) tab.classList.add('col-unica')
+
       const box = document.createElement('div')
       box.classList.add('caixa-colapsavel', 'tabela-colapsavel')
-      // SEM data-caixa → sem card em volta; só o cabeçalho "Tabela" + seta e a tabela normal embaixo.
+      // Borda do quadro vai no WRAPPER (não na tabela interna) p/ CONTINUAR visível quando recolhido.
+      if (unicaColuna) box.classList.add('box-unica')
+      // FIEL AO HTML: NÃO recolore nem reformata a tabela — ela mantém exatamente o fundo/borda/cor que
+      // vieram na importação. O wrapper só adiciona o recolher (seta). Se o box do Word é transparente
+      // com borda, continua assim; se tem uma cor de verdade, idem. (Cor é editável no editor, por bloco.)
       box.setAttribute('data-aberto', '1') // tabela começa ABERTA (conteúdo principal); clicar recolhe
 
       const cab = document.createElement('div'); cab.className = 'caixa-cab'
@@ -185,13 +194,6 @@ export function prepararTabelasColapsaveis(cont: HTMLElement): () => void {
       inner.appendChild(tab)    // move a tabela pra dentro do corpo
       corpo.appendChild(inner)
       box.appendChild(cab); box.appendChild(corpo)
-      // Bloco com a COR ÚNICA do card: remove o FUNDO dos grifos/marca-texto do Word DENTRO da tabela.
-      // Eles são pintados por JS com `!important` inline (recolorir-grifos) → o CSS não vence; aqui
-      // zeramos via JS (também inline !important, e rodamos DEPOIS dos grifos). Texto/cores preservados.
-      inner.querySelectorAll<HTMLElement>('*').forEach((el) => {
-        el.style.setProperty('background', 'transparent', 'important')
-        el.style.setProperty('background-color', 'transparent', 'important')
-      })
     } catch { /* não deixa 1 tabela quebrar as demais */ }
   }
   return () => {}

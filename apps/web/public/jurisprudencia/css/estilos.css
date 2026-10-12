@@ -389,7 +389,15 @@ button{font-family:inherit;color:inherit}
 .cg small{font-weight:800;font-size:8.5px;letter-spacing:.16em;color:var(--lav);white-space:nowrap}
 .controls kbd{display:inline-grid;place-items:center;min-width:24px;height:24px;padding:0 6px;font:17px/1 var(--f-px);color:#fff;background:linear-gradient(180deg,#1b2272,#10165a);border:1px solid #3a42a8;border-radius:3px;box-shadow:0 3px 0 #04072a, inset 0 1px 0 rgba(255,255,255,.12);margin:0}
 kbd{font:16px/1 var(--f-px);border:1px solid #3a42a0;background:#0a1150;color:#fff;padding:1px 6px;margin:0 1px}
-.dpad{display:none;grid-template-columns:repeat(3,58px);grid-template-rows:repeat(3,58px);gap:6px;justify-content:center;margin:14px auto 0;user-select:none;-webkit-user-select:none}
+.dpad{display:none;grid-template-columns:repeat(3,58px);grid-template-rows:repeat(2,58px);gap:6px;justify-content:center;margin:14px auto 0;user-select:none;-webkit-user-select:none}
+/* Layout em 2 linhas: START à DIREITA da seta de cima; a seta de BAIXO ocupa o centro
+   (lugar antigo do START). Posicionado por grid-area — o HTML/jogo.js não muda. */
+.dpad span{display:none}
+.dpad [data-d="up"]{grid-area:1/2}
+.dpad #dpadStart{grid-area:1/3}
+.dpad [data-d="left"]{grid-area:2/1}
+.dpad [data-d="down"]{grid-area:2/2}
+.dpad [data-d="right"]{grid-area:2/3}
 .dpad button{border:2px solid var(--neon);background:rgba(139,92,246,.12);color:#fff;font:26px/1 var(--f-px);touch-action:none;cursor:pointer}
 .dpad button:active{background:rgba(139,92,246,.45)}
 .dpad .c{border-color:var(--gold);color:var(--gold);font-size:16px}
@@ -561,8 +569,13 @@ body.theater .abtn.big small{color:#fff;border-color:var(--gold)}
 @media (max-width:520px){ .id-teses{grid-template-columns:1fr} .id-compare{grid-template-columns:1fr 1fr} .id-arrow{display:none} }
 
 /* ---------- modais ---------- */
-.modal{position:fixed;inset:0;z-index:170;background:rgba(2,4,24,.84);backdrop-filter:blur(6px);display:grid;place-items:center;padding:16px;overflow:auto}
-.mcard{width:100%;animation:crton .35s ease-out}
+/* grid-template-columns:minmax(0,1fr) LIMITA a trilha à viewport — sem isso, um filho com
+   min-content largo (ex.: o Mapa, .map{min-width:680px}) estourava o card e jogava o botão
+   FECHAR pra fora da tela no mobile. Agora o conteúdo largo rola dentro do próprio card. */
+/* overscroll-behavior:contain = trava a rolagem DENTRO do modal; sem isso, ao chegar no fim do quiz
+   o scroll "vazava" (scroll chaining) para o arcade/portal atrás e o aluno saía da área. */
+.modal{position:fixed;inset:0;z-index:170;background:rgba(2,4,24,.84);backdrop-filter:blur(6px);display:grid;place-items:center;grid-template-columns:minmax(0,1fr);padding:16px;overflow:auto;overscroll-behavior:contain}
+.mcard{width:100%;min-width:0;animation:crton .35s ease-out}
 @keyframes crton{0%{transform:scaleY(.01) scaleX(.6);filter:brightness(3)}60%{transform:scaleY(1.02) scaleX(1)}100%{transform:none;filter:none}}
 .mclose{display:flex;justify-content:center;margin-top:16px}
 
@@ -721,6 +734,9 @@ body.theater .abtn.big small{color:#fff;border-color:var(--gold)}
 @media (max-width:1180px){
   .layout{grid-template-columns:1fr 1fr}
   .center{grid-column:1/-1;order:-1}
+  /* Centro vira full-width: sem limite o gabinete esticava de ponta a ponta no tablet (labirinto
+     gigante). Limita e centraliza; no celular (≤720) o max não constrange e ele fica 100%. */
+  .cabinet{max-width:700px;margin-inline:auto}
   .tabs-panel{position:static;height:100%}
   .col-left{min-height:0}
   .col-left-in{position:static}
@@ -729,14 +745,69 @@ body.theater .abtn.big small{color:#fff;border-color:var(--gold)}
 }
 @media (max-width:720px){
   .layout{grid-template-columns:minmax(0,1fr)}
-  .top{justify-content:center}
-  .dj{order:-1;width:100%;justify-content:center}
+  /* Topo em 3 faixas: (1) as DUAS logos lado a lado, (2) os botões MAPA+RANKING lado a lado,
+     (3) som/volume. Logos reduzidas p/ caberem juntas; botões com flex:1 (mesma largura). */
+  /* Folga grande no RODAPÉ: cria um espaço preenchido com o fundo (pontilhado) abaixo do conteúdo
+     (ex.: "Próximas aulas"). Assim, ao rolar até o fim no portal, o conteúdo sobe acima da down bar e
+     o fundo do arcade preenche o lugar — sem a faixa branca. +safe-area do iPhone. */
+  .page{padding-block:18px calc(120px + env(safe-area-inset-bottom,0px))}
+  .top{justify-content:center;gap:9px 12px;padding:11px 13px}
+  .dj{order:0;width:auto;justify-content:center;gap:7px}
+  .dj svg{width:26px;height:26px}
+  .dj small{font-size:8.5px;letter-spacing:.2em}
+  .dj b{font-size:13px}
+  .brand{order:1;gap:7px}
+  .brand .pill{font-size:9.5px;padding:4px 8px}
+  .brand .jc{font-size:16px}
+  .actions{order:2;width:100%;flex-wrap:nowrap;gap:8px}
+  .actions .btn-o{flex:1;padding:9px 8px;font-size:10.5px;line-height:1.15;text-align:center}
+  .rec{order:3;width:100%;justify-content:center;border-top:1px solid var(--line);padding-top:10px;margin-top:2px}
+  .snd-wrap{flex-wrap:wrap;justify-content:center;gap:8px 10px}
   .cabinet{padding:10px 10px 8px;border-radius:16px}
   .controls{display:none}
   .grille{display:none}
   .cab-foot{gap:8px}
   .leds i{width:16px}
   .abtns{gap:10px}
+  /* TELA (botão "big" dourado) do MESMO tamanho dos demais (PAUSA/SOM/MÚSICA) no mobile. */
+  .abtn.big{gap:5px}
+  .abtn.big .cap{width:26px;height:26px}
+}
+@media (max-width:420px){
+  /* Mais estreito (iframe da Curseduca): encolhe mais as logos p/ manterem-se na MESMA linha. */
+  .dj svg{width:21px;height:21px}
+  .dj{gap:6px}
+  .dj small{font-size:7px;letter-spacing:.14em}
+  .dj b{font-size:11px}
+  .brand{gap:6px}
+  .brand .pill{font-size:8px;padding:3px 6px;letter-spacing:.08em}
+  .brand .jc{font-size:13px}
+  .top{gap:6px 8px;padding:9px}
+  .actions .btn-o{padding:9px 6px;font-size:10px;letter-spacing:.04em}
+  .actions{gap:8px}
+}
+/* ---------- pergunta em TELA CHEIA no mobile ---------- */
+@media (max-width:720px){
+  /* Folga inferior nos modais p/ o botão (FECHAR/CONTINUAR) não ficar atrás da barra inferior do
+     portal (down bar ~64px @ bottom:14) que sobrepõe o iframe. #qModal sobrescreve abaixo (tela cheia). */
+  .modal{padding-bottom:calc(16px + 90px + env(safe-area-inset-bottom,0px))}
+  /* O card da pergunta ocupa a TELA INTEIRA e ROLA por dentro (enunciado longo + 5 alternativas +
+     explicação). Cabeçalho (tese/tempo + barra de tempo) fica FIXO no topo ao rolar. O padding-bottom
+     grande reserva espaço para CONTINUAR / VER EXPLICAÇÃO não ficarem ESCONDIDOS atrás da down bar. */
+  #qModal{padding:0}
+  #qModal .qcard{max-width:none;width:100%;height:100vh;height:100dvh;border-radius:0;border-width:0;
+    padding:0 15px calc(96px + env(safe-area-inset-bottom,0px));
+    overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+  #qModal .qtop{position:sticky;top:0;z-index:3;margin:0 -15px;padding:13px 15px 7px;
+    background:linear-gradient(180deg,#0e1760 82%,rgba(14,23,96,0))}
+  #qModal .qbar{position:sticky;top:43px;z-index:2;margin:0 0 15px}
+  #qModal .qq{font-size:16px;line-height:1.5;margin:2px 0 16px}
+  #qModal .opt{font-size:14.5px}
+  /* Explicação FLUI na rolagem única do card (sem scroll aninhado de 200px) — evita o texto sumir e o
+     CONTINUAR encostar nele. Botão separado e em bloco próprio abaixo de tudo. */
+  #qModal .qexp{max-height:none;overflow:visible;padding-right:0}
+  #qModal .qres .row{margin-top:20px}
+  #qModal .qres .btn-w{width:100%}
 }
 /* ---------- abertura (carregamento) ---------- */
 #intro{position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:clamp(14px,3.2vh,30px);padding:16px;overflow:hidden;

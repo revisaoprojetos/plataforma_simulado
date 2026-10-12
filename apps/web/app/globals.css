@@ -731,7 +731,7 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
    controle de tamanho do leitor — o texto não crescia (só o line-height). Forçamos o conteúdo a HERDAR o
    tamanho do container (.leitura-conteudo, que recebe `fontSize: fonte`). Títulos/caixas via classe/`em`
    seguem escalando normalmente. Só no leitor (não na prévia do editor). */
-.leitura-conteudo [style*="font-size"] { font-size: inherit !important; }
+.leitura-conteudo [style*="font-size"]:not(.leitura-titulo):not(.leitura-titulo *) { font-size: inherit !important; }
 
 /* Fix (2026-10-07): o HTML do Word usa TABELAS (<table>) sem largura de coluna e com células cujo
    texto não quebra — ex.: o box "NÃO ESQUEÇA" (<table><td><p>…</p></td></table>). Com `table-layout:auto`
@@ -803,6 +803,13 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 /* Word deixa parágrafos VAZIOS (só espaço/<br>) entre as caixas → vão GIGANTE. Zera a altura deles. */
 .leitura-prosa p:empty,
 .leitura-prosa p:has(> br:only-child) { margin:0 !important; height:0 !important; min-height:0 !important; line-height:0 !important; }
+/* Documento FIEL AO HTML (.leitura-fiel): NÃO colapsa vazios → linhas em branco do Word e do Enter do
+   editor VALEM (cada parágrafo vazio = 1 linha NATURAL). E zera os multiplicadores de margem de bloco. */
+.leitura-prosa.leitura-fiel p:empty,
+.leitura-prosa.leitura-fiel p:has(> br:only-child) { height:auto !important; min-height:0 !important; line-height:inherit !important; margin:0 !important; }
+.leitura-prosa.leitura-fiel p:empty::before { content:"\00a0"; } /* parágrafo totalmente vazio ocupa 1 linha */
+.leitura-prosa.leitura-fiel [data-vazio] { display:revert !important; }
+.leitura-prosa.leitura-fiel { --lp-bloco-bloco:1; --lp-bloco-texto-top:1; --lp-bloco-texto-bot:1; }
 /* Bloco↔bloco: quando um bloco vem logo após outro, o gap vem do "entre blocos" (o de cima zera o
    margin-bottom p/ não colapsar/duplicar com o texto). Cobre todas as variações de caixa via :is(). */
 .leitura-prosa :is([data-caixa],.box-stj,.box-stf,.box-cinza,.box-cinza-esc,.box-atencao):has(+ :is([data-caixa],.box-stj,.box-stf,.box-cinza,.box-cinza-esc,.box-atencao)) { margin-bottom: 0 !important; }
@@ -860,23 +867,26 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 /* ABERTA: libera o overflow para o conteúdo aparecer INTEIRO (senão parte do texto "falta"/fica cortada). */
 .leitura-prosa .caixa-colapsavel[data-aberto] > .caixa-corpo > .caixa-corpo-in { overflow:visible; }
 
-/* TABELAS colapsáveis = card VERDE (mesma cor do conteúdo interno) — bloco verde único, SEM "Tabela".
-   Seta no canto superior direito. Começa ABERTA; clicar recolhe. (O verde do texto é aplicado por JS
-   com !important inline, então o CSS não o remove; em vez disso o card fica verde p/ ficar uniforme.) */
+/* TABELAS colapsáveis: RESPEITAM a cor que veio na importação. Sem cor na fonte → card neutro
+   (transparente); com cor (.cor-fonte) → o card usa a cor inline da fonte. Seta no canto sup. direito. */
 .leitura-prosa .tabela-colapsavel {
-  position:relative; color:#111; font-size:.95em; background:#e3f0db; border:1px solid #bcd9a6; border-radius:8px; padding:10px 14px;
+  position:relative; color:inherit; font-size:.95em; background:transparent; border:0; border-radius:8px; padding:0;
   margin:calc(5px * var(--lp-bloco-texto-top,2.2) * var(--esc-blocos,1)) 0 calc(6px * var(--lp-bloco-texto-bot,2.2) * var(--esc-blocos,1));
 }
-.leitura-prosa .tabela-colapsavel > .caixa-cab { color:#4e7a3c; font-weight:700; font-size:.9em; padding:0 24px 0 0 !important; }
+/* Veio COR na importação → card colorido (cor/borda inline), com respiro interno. */
+.leitura-prosa .tabela-colapsavel.cor-fonte { border:1px solid; padding:10px 14px; }
+.leitura-prosa .tabela-colapsavel > .caixa-cab { color:inherit; font-weight:700; font-size:.9em; padding:0 24px 0 0 !important; }
 .leitura-prosa .tabela-colapsavel > .caixa-cab > :first-child { color:inherit; white-space:nowrap; }
+/* Prévia (recolhida): mesma cor do texto interno (não apagada/verde). */
+.leitura-prosa .tabela-colapsavel > .caixa-cab::before { opacity:.9; color:inherit; }
 /* SEM rótulo "Tabela" (o card já é o bloco). */
 .leitura-prosa .tabela-colapsavel > .caixa-cab > :first-child::before { content:none; }
 /* ABERTA: a seta fica no canto superior direito do card. */
 .leitura-prosa .tabela-colapsavel[data-aberto] > .caixa-cab { position:absolute; top:8px; right:10px; z-index:3; min-height:0; width:16px; height:16px; padding:0 !important; }
 .leitura-prosa .tabela-colapsavel[data-aberto] > .caixa-cab::after { right:2px; opacity:.6; }
 .leitura-prosa .tabela-colapsavel[data-aberto] > .caixa-corpo > .caixa-corpo-in { padding-top:0; }
-/* Remove só as BORDAS internas da tabela (do Word / da prévia do admin) p/ o verde ficar liso. */
-.leitura-prosa .tabela-colapsavel .caixa-corpo-in :is(table,tr,td,th,thead,tbody) { border:0 !important; box-shadow:none !important; }
+/* No card COLORIDO (cor da fonte) remove as bordas internas p/ ficar liso; tabela neutra MANTÉM suas bordas. */
+.leitura-prosa .tabela-colapsavel.cor-fonte .caixa-corpo-in :is(table,tr,td,th,thead,tbody) { border:0 !important; box-shadow:none !important; }
 .leitura-prosa .tabela-colapsavel > .caixa-corpo .caixa-corpo-in > table { margin:0; width:100% !important; }
 
 /* "Já cobrado em prova" (só esta caixa): ABRE também ao passar o mouse (além do clique, que continua
@@ -885,6 +895,60 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 .leitura-prosa [data-caixa="cobrado"]:hover > .caixa-corpo > .caixa-corpo-in { overflow:visible; }
 .leitura-prosa [data-caixa="cobrado"]:hover > .caixa-cab::before { content:none; }
 .leitura-prosa [data-caixa="cobrado"]:hover > .caixa-cab::after { transform:rotate(-135deg); }
+
+/* Selos da leitura (tags <rg>, <essencial>… → IMAGEM oficial do JurisClub em /leitura/selos).
+   Variantes por sufixo de arquivo: padrão (badge completo), .sm (compacto), .ic (ícone redondo). */
+.leitura-prosa .sl-img, .ce-leitura .sl-img { display:inline-block; height:1.7em; width:auto; margin:0 .14em; vertical-align:-0.42em; user-select:none; }
+.leitura-prosa .sl-img.sm, .ce-leitura .sl-img.sm { height:1.5em; }
+.leitura-prosa .sl-img.ic, .ce-leitura .sl-img.ic { height:1.7em; width:1.7em; vertical-align:-0.45em; }
+.leitura-prosa .sl-img.ic.sm, .ce-leitura .sl-img.ic.sm { height:1.4em; width:1.4em; }
+/* Bloco de alinhamento do selo (text-align vem inline: left/center/right). */
+.leitura-prosa .sl-bloco, .ce-leitura .sl-bloco { margin:.45em 0; }
+
+/* MARCAÇÃO CANETÃO/PINCEL: traço orgânico ATRÁS do texto (prioridade: tópicos/títulos). Fundo aplicado
+   DIRETO no <span> (sempre fica atrás do próprio texto — à prova de falhas), com borda irregular p/
+   parecer tinta de marca-texto. Cor via --marca-cor (default âmbar como na imagem). */
+/* O traço é um background-image (SVG) ATRÁS do texto → o texto NUNCA é cortado. display:inline-block faz
+   o traço virar UM bloco que, em 2+ linhas, se ESTENDE VERTICALMENTE cobrindo todas as linhas (uma só
+   área, com sobra nas pontas — ok). Pincel "gordo" cobre a altura do texto. */
+.leitura-prosa .marca-pincel, .ce-leitura .marca-pincel {
+  display:inline-block; vertical-align:baseline; color:inherit; padding:.28em .55em;
+  background-repeat:no-repeat; background-position:center; background-size:100% 100%;
+}
+/* PINCEL (padrão): traço orgânico âmbar (igual à imagem). Cor fixa (âmbar). */
+.leitura-prosa .marca-pincel, .ce-leitura .marca-pincel,
+.leitura-prosa .marca-pincel.est-pincel, .ce-leitura .marca-pincel.est-pincel {
+  background-image:url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20300%2050'%20preserveAspectRatio='none'%3E%3Cpath%20fill='%23edc14a'%20d='M22%209C9%2010%203%2018%204%2027C5%2036%2013%2043%2026%2043C100%2045%20200%2040%20272%2042C287%2042%20297%2034%20296%2024C295%2014%20287%207%20275%208C200%2010%20100%205%2022%209Z'/%3E%3C/svg%3E");
+  background-color:transparent;
+}
+.leitura-prosa :is(h1,h2,h3) .marca-pincel, .ce-leitura :is(h1,h2,h3) .marca-pincel { padding:.38em .7em; }
+/* MARCADOR: pílula arredondada — COR LIVRE (--marca-cor). */
+.leitura-prosa .marca-pincel.est-marcador, .ce-leitura .marca-pincel.est-marcador {
+  background-image:none; background-color:var(--marca-cor,#edc14a); border-radius:1em;
+}
+/* RETO: faixa reta (cantos leves) — COR LIVRE (--marca-cor). */
+.leitura-prosa .marca-pincel.est-reto, .ce-leitura .marca-pincel.est-reto {
+  background-image:none; background-color:var(--marca-cor,#edc14a); border-radius:.14em; padding:.12em .3em;
+}
+
+/* CORTE DE PÁGINA: divisor pontilhado entre tópicos (e quebra de página no PDF/impressão). */
+.leitura-prosa hr.corte-pagina, .ce-leitura hr.corte-pagina {
+  border:0; border-top:1px dashed color-mix(in srgb, currentColor 32%, transparent);
+  height:0; margin:1.5em 0; break-after:page; page-break-after:always;
+}
+/* Editor de conteúdo (contentEditable) = WYSIWYG do espaçamento da leitura: parágrafos com a MESMA
+   margem e linhas em branco VISÍVEIS (1 linha cada), p/ bater com a aba Conteúdo. */
+.ce-leitura p { margin:0 0 .5rem; }
+.ce-leitura p:empty, .ce-leitura p:has(> br:only-child) { margin:0; min-height:0; line-height:inherit; }
+.ce-leitura p:empty::before { content:"\00a0"; }
+
+/* No editor, um rótulo discreto "corte de página" ajuda a ver onde cai o corte. */
+.ce-leitura hr.corte-pagina { position:relative; margin:1.9em 0; }
+.ce-leitura hr.corte-pagina::after {
+  content:"corte de página"; position:absolute; left:50%; top:-0.72em; transform:translateX(-50%);
+  background:var(--card,#fff); padding:0 .5em; font-size:10px; letter-spacing:.04em; text-transform:uppercase;
+  color:color-mix(in srgb, currentColor 55%, transparent); white-space:nowrap;
+}
 
 /* "Artigos já cobrados em prova" (LegProc): selo + chevron de recolher no cabeçalho do artigo.
    O rótulo vem de CSS content (::before) → SEM nó de texto, não entra na espinha das âncoras. */
@@ -943,17 +1007,27 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 
 /* Tabelas comparativas (RESERVA LEGAL × LEGALIDADE etc.): cantos ARREDONDADOS + borda + fundo DIFERENTE
    do cinza das caixas de recolher. Preserva .mac-tbl (que tem estilo próprio). */
-.leitura-prosa table:not(.mac-tbl) {
+.leitura-prosa table:not(.mac-tbl):not(.col-unica) {
   border-collapse:separate !important; border-spacing:0; width:100%; margin:10px 0;
   border:1px solid #bfe0d3; border-radius:12px; overflow:hidden;
 }
-.leitura-prosa table:not(.mac-tbl) td, .leitura-prosa table:not(.mac-tbl) th {
+.leitura-prosa table:not(.mac-tbl):not(.col-unica) td, .leitura-prosa table:not(.mac-tbl):not(.col-unica) th {
   border:1px solid #d8eee2 !important; background:#f0faf5 !important; padding:8px 11px !important; vertical-align:top;
 }
-.leitura-prosa table:not(.mac-tbl) tr:first-child > * { background:#dcf2e8 !important; font-weight:600; }
-.dark .leitura-prosa table:not(.mac-tbl) { border-color:#3b3a4d; }
-.dark .leitura-prosa table:not(.mac-tbl) td, .dark .leitura-prosa table:not(.mac-tbl) th { background:rgba(255,255,255,.04) !important; border-color:#3a3948 !important; }
-.dark .leitura-prosa table:not(.mac-tbl) tr:first-child > * { background:rgba(255,255,255,.08) !important; }
+.leitura-prosa table:not(.mac-tbl):not(.col-unica) tr:first-child > * { background:#dcf2e8 !important; font-weight:600; }
+.dark .leitura-prosa table:not(.mac-tbl):not(.col-unica) { border-color:#3b3a4d; }
+.dark .leitura-prosa table:not(.mac-tbl):not(.col-unica) td, .dark .leitura-prosa table:not(.mac-tbl):not(.col-unica) th { background:rgba(255,255,255,.04) !important; border-color:#3a3948 !important; }
+.dark .leitura-prosa table:not(.mac-tbl):not(.col-unica) tr:first-child > * { background:rgba(255,255,255,.08) !important; }
+
+/* Tabela de 1 COLUNA (box/citação de artigo) = FIEL AO HTML: fundo transparente; a cor inline que veio
+   na importação (ex.: peach) VENCE, pois aqui NÃO há !important. A BORDA do quadro vai no WRAPPER
+   (.box-unica) p/ continuar visível quando RECOLHIDO (a tabela interna some ao recolher). */
+.leitura-prosa table.col-unica { width:100%; margin:0; border:0; border-collapse:separate; border-spacing:0; }
+.leitura-prosa table.col-unica td, .leitura-prosa table.col-unica th { border:0; padding:8px 11px; vertical-align:top; }
+.leitura-prosa .tabela-colapsavel.box-unica { border:1px solid color-mix(in srgb, currentColor 24%, transparent); border-radius:4px; overflow:hidden; }
+/* Recolhido: a prévia fica DENTRO do quadro, com respiro (e espaço p/ a seta à direita). */
+.leitura-prosa .tabela-colapsavel.box-unica:not([data-aberto]) > .caixa-cab { padding:8px 30px 8px 11px !important; }
+.leitura-prosa .tabela-colapsavel.box-unica:not([data-aberto]) > .caixa-cab::after { right:10px; }
 
 /* Tabelas do padrão MAC (cabeçalho marinho + zebra) */
 .leitura-prosa .mac-tbl { width:100%; border-collapse:collapse; font-size:.9em; margin:6px 0; }

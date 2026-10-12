@@ -16,9 +16,12 @@ export interface EspacamentoDoc {
   blocoTextoTop: number
   /** Distância do bloco com o texto/parágrafo ABAIXO dele (mult; 2.2 = 100%). */
   blocoTextoBot: number
+  /** FIEL AO HTML: preserva o espaçamento do HTML importado (não colapsa parágrafos vazios e não
+   *  aplica as margens custom de bloco). Quando ligado, os sliders acima não valem. */
+  preservarHtml: boolean
 }
 
-export const DEFAULT_ESPACAMENTO: EspacamentoDoc = { linha: 1, parTop: 0, parBot: 1, blocoBloco: 2.2, blocoTextoTop: 2.2, blocoTextoBot: 2.2 }
+export const DEFAULT_ESPACAMENTO: EspacamentoDoc = { linha: 1, parTop: 0, parBot: 1, blocoBloco: 2.2, blocoTextoTop: 2.2, blocoTextoBot: 2.2, preservarHtml: false }
 
 const num = (v: unknown, lo: number, hi: number, def: number): number =>
   typeof v === 'number' && Number.isFinite(v) ? Math.max(lo, Math.min(hi, Math.round(v * 100) / 100)) : def
@@ -43,6 +46,7 @@ export function resolverEspacamento(raw: unknown): EspacamentoDoc {
     blocoBloco: num(r.blocoBloco, ESP_LIMITES.blocoBloco.min, ESP_LIMITES.blocoBloco.max, 2.2),
     blocoTextoTop: num(r.blocoTextoTop, ESP_LIMITES.blocoTextoTop.min, ESP_LIMITES.blocoTextoTop.max, 2.2),
     blocoTextoBot: num(r.blocoTextoBot, ESP_LIMITES.blocoTextoBot.min, ESP_LIMITES.blocoTextoBot.max, 2.2),
+    preservarHtml: r.preservarHtml === true,
   }
 }
 
@@ -52,7 +56,7 @@ export function normalizarEspacamento(quizConfig: unknown): EspacamentoDoc {
   if (qc.esp && typeof qc.esp === 'object') return resolverEspacamento(qc.esp)
   const blocos = num(qc.espacamento, ESP_LIMITES.blocoBloco.min, ESP_LIMITES.blocoBloco.max, 2.2)
   const texto = num(qc.espacamento_texto, ESP_LIMITES.parBot.min, 3, 1)
-  return { linha: 1, parTop: 0, parBot: texto, blocoBloco: blocos, blocoTextoTop: blocos, blocoTextoBot: blocos }
+  return { linha: 1, parTop: 0, parBot: texto, blocoBloco: blocos, blocoTextoTop: blocos, blocoTextoBot: blocos, preservarHtml: false }
 }
 
 /** CSS vars (--lp-*) para aplicar num container (leitor/prévia). Espalhar no `style`. */

@@ -20,9 +20,12 @@ import { QuestaoLeitura } from '@/components/aluno/questao-leitura'
 import { LeituraAtualizacaoAviso } from '@/components/aluno/leitura-atualizacao-aviso'
 import { GRIFOS, corDoGrifo, ehEstrutural } from '@/lib/leitura/grifos'
 import { prepararCaixasTabela, prepararCaixasCobrado, prepararTabelasColapsaveis } from '@/lib/leitura/caixas'
+import { prepararSelosLeitura } from '@/lib/leitura/selos'
 import { prepararArtigosCobrados } from '@/lib/leitura/artigos-cobrados'
 import { montarArvoreToc, type NoToc } from '@/lib/leitura/indice'
 import { IndiceArvore, type NoIndiceView } from '@/components/leitura/indice-arvore'
+import { TemasDoDia } from '@/components/leitura/temas-do-dia'
+import { extrairTopicos, ancorarTopicos, type TopicoBase } from '@/lib/leitura/topicos'
 import { confirmar } from '@/components/ui/confirm-dialog'
 
 type Modo = 'scroll' | 'flip' | 'capitulo'
@@ -245,6 +248,31 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
   const viewportRef = useRef<HTMLDivElement>(null)
   const wrapperRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
+  // "Temas do dia": tópicos extraídos dos títulos + o tema atual (scroll-spy).
+  const [topicos, setTopicos] = useState<TopicoBase[]>([])
+  const [temaAtivo, setTemaAtivo] = useState<string | null>(null)
+  // Extrai os tópicos + marca os títulos com data-tema (após o conteúdo montar).
+  useEffect(() => {
+    const cont = contentRef.current; if (!cont) return
+    const run = () => { ancorarTopicos(cont); setTopicos(extrairTopicos(cont)) }
+    run(); const t = setTimeout(run, 220)
+    return () => clearTimeout(t)
+  }, [doc.html])
+  // Scroll-spy: destaca o tema cujo título está no topo da viewport.
+  useEffect(() => {
+    const vp = viewportRef.current, ct = contentRef.current
+    if (!vp || !ct || !topicos.length) return
+    const onScroll = () => {
+      const temas = Array.from(ct.querySelectorAll<HTMLElement>('[data-tema]'))
+      const top = vp.getBoundingClientRect().top + 90
+      let atual: string | null = temas[0]?.getAttribute('data-tema') ?? null
+      for (const el of temas) { if (el.getBoundingClientRect().top <= top) atual = el.getAttribute('data-tema'); else break }
+      setTemaAtivo(atual)
+    }
+    onScroll()
+    vp.addEventListener('scroll', onScroll, { passive: true })
+    return () => vp.removeEventListener('scroll', onScroll)
+  }, [topicos])
   // Expandir/recolher TODAS as caixas colapsáveis de uma vez (STJ/STF, tabela, "já cobrado", etc.).
   const alternarTodasCaixas = (abrir: boolean) => {
     const cont = contentRef.current; if (!cont) return
@@ -497,14 +525,15 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
       aplicarGrifos(ct, { ocultar: semGrifos, cores: grifoCores })
       // Colapsa parágrafos SÓ-ESPAÇO (&nbsp;, espaços, <br>) que o Word deixa entre as caixas (ATENÇÃO /
       // ENTENDIMENTO / NÃO ESQUEÇA / Já cobrado) → eram a causa do vão extra. `trim()` remove o nbsp.
-      if (ct) ct.querySelectorAll('p').forEach((p) => {
+      // Pulado quando o documento preserva o espaçamento do HTML (fiel ao Word / Enter do editor).
+      if (ct && !doc.esp?.preservarHtml) ct.querySelectorAll('p').forEach((p) => {
         const vazio = !(p.textContent || '').trim() && !p.querySelector('img,table,hr,svg')
         if (vazio) { const s = (p as HTMLElement).style; s.margin = '0'; s.height = '0'; s.minHeight = '0'; s.lineHeight = '0'; s.overflow = 'hidden' }
       })
     }
     run(); const r = requestAnimationFrame(run); const t = setTimeout(run, 180)
     return () => { cancelAnimationFrame(r); clearTimeout(t) }
-  }, [semGrifos, grifoCores, doc.html, slots])
+  }, [semGrifos, grifoCores, doc.html, slots, doc.esp?.preservarHtml])
 
   // ── Busca dentro da lei: acha ocorrências na espinha, gera rects p/ realçar + navegar. ──
   // Debounce: não reconstrói a espinha/varre a cada tecla (custo alto em leis grandes).
@@ -666,6 +695,26 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
     const el = root?.querySelector<HTMLElement>(`[data-disp="${CSS.escape(s.id)}"]`) ?? root?.querySelector<HTMLElement>(`#${CSS.escape(s.id)}`) ?? root?.querySelector<HTMLElement>(`[data-art="${s.art}"]`)
     if (!el) return
     if (modo !== 'flip') { el.scrollIntoView({ behavior: 'smooth', block: 'center' }) }
+    else { const alvo = Math.floor(el.offsetLeft / (colW + GAP)); irPara(alvo) }
+    flashAlvo(el)
+  }
+
+  // ── Pular para um TEMA (tópico) — mesma mecânica do sumário (centraliza + flash + modos). ──
+  function irTema(key: string) {
+    setTemaAtivo(key)
+    const sel = `[data-tema="${CSS.escape(key)}"]`
+    if (modo === 'capitulo') {
+      const alvo0 = contentRef.current?.querySelector<HTMLElement>(sel)
+      if (alvo0) setCapAtual(capituloDoEl(alvo0))
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const el = contentRef.current?.querySelector<HTMLElement>(sel)
+        if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); flashAlvo(el) }
+      }))
+      return
+    }
+    const el = contentRef.current?.querySelector<HTMLElement>(sel)
+    if (!el) return
+    if (modo !== 'flip') el.scrollIntoView({ behavior: 'smooth', block: 'center' })
     else { const alvo = Math.floor(el.offsetLeft / (colW + GAP)); irPara(alvo) }
     flashAlvo(el)
   }
@@ -1005,7 +1054,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
     <div
       ref={contentRef}
       data-leitura-tema={tema}
-      className={cn('leitura-conteudo leitura-prosa px-6 py-6 [&_a]:underline [&_h1]:mb-3 [&_h1]:mt-4 [&_h1]:text-2xl [&_h1]:font-bold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-xl [&_h2]:font-bold [&_h3]:mb-1 [&_h3]:mt-3 [&_h3]:text-lg [&_h3]:font-semibold [&_li]:ml-6 [&_li]:list-disc [&_p]:mb-3 [&_table]:my-3 [&_table]:w-full [&_td]:border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:px-2 [&_th]:py-1', semGrifos && 'sem-grifos')}
+      className={cn('leitura-conteudo leitura-prosa px-6 py-6 [&_a]:underline [&_h1]:mb-3 [&_h1]:mt-4 [&_h1]:text-2xl [&_h1]:font-bold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-xl [&_h2]:font-bold [&_h3]:mb-1 [&_h3]:mt-3 [&_h3]:text-lg [&_h3]:font-semibold [&_li]:ml-6 [&_li]:list-disc [&_p]:mb-3 [&_table]:my-3 [&_table]:w-full [&_td]:border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:px-2 [&_th]:py-1', semGrifos && 'sem-grifos', doc.esp?.preservarHtml && 'leitura-fiel')}
       style={modo === 'flip'
         ? { ...proseStyle, columnWidth: colW || undefined, columnGap: GAP, columnFill: 'auto', height: '100%' }
         : proseStyle}
@@ -1204,9 +1253,11 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
     let mo: MutationObserver | null = null
     let rodando = false
     const aplicarCore = () => {
+      // TAGS de selo (<rg>, <essencial>…) viram a IMAGEM do selo — ANTES do resto (p/ contar como <img>).
+      prepararSelosLeitura(cont)
       // Recolhe os VÃOS grandes entre blocos: parágrafos vazios (só espaço/br, sem imagem/tabela) somem do
       // layout (display:none) — NÃO removidos do DOM, então a "espinha" das âncoras dos grifos fica intacta.
-      for (const p of Array.from(cont.querySelectorAll<HTMLElement>('p'))) {
+      if (!doc.esp?.preservarHtml) for (const p of Array.from(cont.querySelectorAll<HTMLElement>('p'))) {
         if (p.hasAttribute('data-vazio') || p.closest('.caixa-colapsavel')) continue
         if (p.querySelector('img, table, iframe')) continue
         if ((p.textContent || '').replace(/ /g, ' ').trim() === '') { p.setAttribute('data-vazio', '1'); p.style.display = 'none' }
@@ -1347,8 +1398,9 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
             </div>
           </div>
 
-          {/* Sumário — árvore recolhível (capítulos/artigos/§/incisos conforme a config do índice). */}
+          {/* Sumário — "Temas do dia" (tópicos) + árvore recolhível (capítulos/artigos/§/incisos). */}
           <div className="leitura-scroll min-h-0 flex-1 overflow-y-auto px-2 py-2">
+            <TemasDoDia topicos={topicos} config={doc.topicos ?? {}} ativo={temaAtivo} onIr={irTema} className="mb-3" />
             <p className="px-1 pb-1 text-[11px] font-semibold uppercase tracking-wide" style={{ color: cores.muted }}>Sumário</p>
             {tocView.length === 0 ? (
               <p className="px-1 text-xs" style={{ color: cores.muted }}>Sem seções detectadas.</p>

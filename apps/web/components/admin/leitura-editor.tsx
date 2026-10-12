@@ -11,7 +11,9 @@ import {
   ImagePlus, Trash2, RefreshCw, Settings2, HelpCircle, X, Layers, Replace, Check, Bell, BellOff, PencilLine, Plus, Minus,
   FilePlus2, Ban, SpellCheck,
   Strikethrough, ListOrdered, AlignLeft, AlignCenter, AlignRight, Palette, Eraser, Undo2, Redo2, RotateCcw, Captions, CaptionsOff,
+  Stamp, Scissors, Highlighter,
 } from 'lucide-react'
+import { SELOS, criarSeloEl, codigoTag, prepararSelosLeitura, selosImgParaSpan, alturaBaseSelo } from '@/lib/leitura/selos'
 import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { atualizarDocumento, publicarVersao, salvarIndiceTipos, salvarEspacamentoDocumento, type Documento, type SituacaoEditorial } from '@/app/admin/leitura/actions'
@@ -25,6 +27,8 @@ import { carregarDiffDocumento, renomearVersao } from '@/app/admin/leitura/alter
 import { salvarConteudoHtml, importarDocx } from '@/app/admin/leitura/upload-actions'
 import { LeituraPreviewGrifos, type GrifoCtl } from '@/components/admin/leitura-preview-grifos'
 import { LeituraQuestoesAdmin } from '@/components/admin/leitura-questoes-admin'
+import { TopicosEditor } from '@/components/admin/topicos-editor'
+import { type TopicosConfig } from '@/lib/leitura/topicos'
 
 // Redimensiona a imagem no cliente → data URL leve (WebP/JPEG). Mesmo padrão do banco.
 async function redimensionarImagem(file: File, max = 1600): Promise<string> {
@@ -55,13 +59,14 @@ const TIPOS_ATUALIZACAO = [
   { v: 'correcao_editorial', label: 'Correção editorial', Icon: SpellCheck },
 ] as const
 
-export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar = false, publicadaVersao = 1, temRascunhoPendente = false, versaoEdicao, abaInicial, indiceTipos: indiceTiposProp = [], espInicial = null, grifoCoresInicial = null, blocosInicial = null, voltarHref }: {
+export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar = false, publicadaVersao = 1, temRascunhoPendente = false, versaoEdicao, abaInicial, indiceTipos: indiceTiposProp = [], espInicial = null, grifoCoresInicial = null, blocosInicial = null, topicosInicial = {}, voltarHref }: {
   documento: Documento; htmlAtual: string; podeEditar: boolean; podePublicar?: boolean; publicadaVersao?: number; temRascunhoPendente?: boolean; versaoEdicao?: number
   abaInicial?: 'conteudo' | 'config' | 'questoes'
   indiceTipos?: string[]
   espInicial?: EspacamentoDoc | null
   grifoCoresInicial?: GrifoCores | null
   blocosInicial?: BlocoDef[] | null
+  topicosInicial?: TopicosConfig
   /** "Voltar" customizado (ex.: vindo da Jurisprudência) — default = banco de aulas da Lei Seca. */
   voltarHref?: string
 }) {
@@ -110,7 +115,7 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
   const [indiceTipos, setIndiceTipos] = useState<string[]>(indiceTiposProp)
   // Espaçamento GRANULAR (entrelinha + parágrafo/bloco sup/inf) — padrão do leitor; o aluno ainda escala.
   const [esp, setEsp] = useState<EspacamentoDoc>(espInicial ?? DEFAULT_ESPACAMENTO)
-  const ajustarEsp = (k: keyof EspacamentoDoc, delta: number) => {
+  const ajustarEsp = (k: Exclude<keyof EspacamentoDoc, 'preservarHtml'>, delta: number) => {
     const lim = ESP_LIMITES[k]
     const v = Math.max(lim.min, Math.min(lim.max, Math.round((esp[k] + delta) * 100) / 100))
     if (v === esp[k]) return
@@ -119,6 +124,11 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
     startEspaco(async () => { const r = await salvarEspacamentoDocumento(documento.id, { esp: next }); if (!r.ok) toast.error(r.error ?? 'Erro ao salvar espaçamento') })
   }
   const resetarEsp = () => { setEsp(DEFAULT_ESPACAMENTO); startEspaco(async () => { const r = await salvarEspacamentoDocumento(documento.id, { esp: DEFAULT_ESPACAMENTO }); if (!r.ok) toast.error(r.error ?? 'Erro ao salvar espaçamento') }) }
+  const togglePreservarHtml = () => {
+    const next = { ...esp, preservarHtml: !esp.preservarHtml }
+    setEsp(next)
+    startEspaco(async () => { const r = await salvarEspacamentoDocumento(documento.id, { esp: next }); if (!r.ok) toast.error(r.error ?? 'Erro ao salvar espaçamento') })
+  }
   // Cores dos grifos (realces + textos) — recolore os grifos inline do HTML; prévia na aba Conteúdo.
   const [grifoCores, setGrifoCores] = useState<GrifoCores>(grifoCoresInicial ?? DEFAULT_GRIFO_CORES)
   const setCorGrifo = (k: keyof GrifoCores, v: string) => {
@@ -158,6 +168,12 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
   }
 
   const [modo, setModo] = useState<Modo>('colar')
+  const [seloMenu, setSeloMenu] = useState(false)
+  const [seloVar, setSeloVar] = useState<'' | 'sm' | 'ic'>('') // tamanho do selo: ''=normal, sm=compacto, ic=ícone
+  const [marcaCor, setMarcaCor] = useState('#edc14a') // cor da marcação canetão
+  const [marcaEstilo, setMarcaEstilo] = useState<'pincel' | 'marcador' | 'reto'>('pincel') // estilo do traço
+  const [seloSel, setSeloSel] = useState<{ el: HTMLElement; x: number; y: number } | null>(null) // selo clicado no editor → menu de edição
+  const [blocoSel, setBlocoSel] = useState<{ el: HTMLTableElement; x: number; y: number } | null>(null) // tabela/box clicado → cor do bloco
   const [htmlColar, setHtmlColar] = useState('')
   const [savingConteudo, setSavingConteudo] = useState(false)
   const editorRef = useRef<HTMLDivElement>(null)
@@ -290,12 +306,183 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
     cont?.focus()
   }
 
+  // Insere o SELO (imagem oficial) na posição do cursor do editor de conteúdo. Round-trip: o <img>
+  // carrega data-selo → sobrevive ao save (sanitizador) e é re-renderizado como imagem na leitura.
+  const inserirSelo = (slug: string) => {
+    setSeloMenu(false)
+    const cont = editorRef.current
+    if (!cont) return
+    cont.focus()
+    const el = criarSeloEl(slug, seloVar ? [seloVar] : [])
+    if (!el) return
+    const sel = window.getSelection()
+    let range = sel && sel.rangeCount ? sel.getRangeAt(0) : null
+    // Só insere dentro do editor; se o cursor estiver fora, joga no fim do conteúdo.
+    if (!range || !cont.contains(range.commonAncestorContainer)) { range = document.createRange(); range.selectNodeContents(cont); range.collapse(false) }
+    range.deleteContents()
+    range.insertNode(el)
+    const espaco = document.createTextNode(' ')
+    el.after(espaco)
+    range.setStartAfter(espaco); range.collapse(true)
+    sel?.removeAllRanges(); sel?.addRange(range)
+  }
+
+  // Marcação "canetão/pincel": traço orgânico ATRÁS do texto selecionado (prioridade: tópicos/títulos).
+  // Toggle: se a seleção já está marcada, desmarca. Reusa <span class="marca-pincel"> (sobrevive ao save).
+  const marcarPincel = () => {
+    const cont = editorRef.current
+    const sel = window.getSelection()
+    if (!cont || !sel || sel.rangeCount === 0) return
+    const range = sel.getRangeAt(0)
+    // DESMARCAR: remove QUALQUER marcação que a seleção/cursor tocar (robusto: intersecta OU contém o cursor).
+    const base = range.commonAncestorContainer
+    const elBase = (base.nodeType === 1 ? base as HTMLElement : base.parentElement) as HTMLElement | null
+    const alvo = Array.from(cont.querySelectorAll<HTMLElement>('.marca-pincel')).filter((m) => {
+      try { if (range.intersectsNode(m)) return true } catch { /* ignore */ }
+      return !!elBase && (m === elBase || m.contains(elBase) || elBase.closest?.('.marca-pincel') === m)
+    })
+    if (alvo.length) {
+      for (const m of alvo) { const pai = m.parentNode; while (m.firstChild) pai?.insertBefore(m.firstChild, m); pai?.removeChild(m) }
+      cont.normalize?.(); cont.focus(); return
+    }
+    if (sel.isCollapsed) { toast.message('Selecione o trecho para marcar — ou clique dentro de uma marcação para remover.'); return }
+    const span = document.createElement('span'); span.className = marcaEstilo === 'pincel' ? 'marca-pincel' : `marca-pincel est-${marcaEstilo}`
+    if (marcaCor && marcaCor.toLowerCase() !== '#edc14a') span.style.setProperty('--marca-cor', marcaCor)
+    try { span.appendChild(range.extractContents()); range.insertNode(span); sel.removeAllRanges() }
+    catch { toast.error('Selecione um trecho dentro de um mesmo parágrafo.') }
+    editorRef.current?.focus()
+  }
+  // Troca a cor: aplica à marcação sob o cursor (se houver) e vira a cor padrão das próximas.
+  const aplicarCorMarca = (cor: string) => {
+    setMarcaCor(cor)
+    const sel = window.getSelection()
+    const base = sel?.rangeCount ? sel.getRangeAt(0).commonAncestorContainer : null
+    const host = base ? ((base.nodeType === 1 ? base as HTMLElement : base.parentElement)?.closest?.('.marca-pincel') as HTMLElement | null) : null
+    if (host && editorRef.current?.contains(host)) { host.style.setProperty('--marca-cor', cor); editorRef.current?.focus() }
+  }
+  // Troca o estilo (pincel/marcador/reto) da marcação sob o cursor e define o padrão das próximas.
+  const aplicarEstiloMarca = (est: 'pincel' | 'marcador' | 'reto') => {
+    setMarcaEstilo(est)
+    const sel = window.getSelection()
+    const base = sel?.rangeCount ? sel.getRangeAt(0).commonAncestorContainer : null
+    const host = base ? ((base.nodeType === 1 ? base as HTMLElement : base.parentElement)?.closest?.('.marca-pincel') as HTMLElement | null) : null
+    if (host && editorRef.current?.contains(host)) { host.classList.remove('est-marcador', 'est-reto'); if (est !== 'pincel') host.classList.add(`est-${est}`); editorRef.current?.focus() }
+  }
+
+  // Insere um CORTE DE PÁGINA (divisor pontilhado entre tópicos; vira quebra de página no PDF) no cursor.
+  const inserirCorte = () => {
+    const cont = editorRef.current
+    if (!cont) return
+    cont.focus()
+    const hr = document.createElement('hr'); hr.className = 'corte-pagina'
+    const sel = window.getSelection()
+    let range = sel && sel.rangeCount ? sel.getRangeAt(0) : null
+    if (!range || !cont.contains(range.commonAncestorContainer)) { range = document.createRange(); range.selectNodeContents(cont); range.collapse(false) }
+    range.deleteContents()
+    range.insertNode(hr)
+    const p = document.createElement('p'); p.appendChild(document.createElement('br'))
+    hr.after(p)
+    const r2 = document.createRange(); r2.setStart(p, 0); r2.collapse(true)
+    sel?.removeAllRanges(); sel?.addRange(r2)
+  }
+
+  // HTML do editor pronto p/ salvar: converte os <img> de selo em <span data-selo> (o src relativo não
+  // sobrevive ao sanitizador; o span sim, e o leitor re-renderiza a imagem).
+  const htmlDoEditorParaSalvar = (): string => {
+    const cont = editorRef.current
+    if (!cont) return ''
+    const clone = cont.cloneNode(true) as HTMLElement
+    try { selosImgParaSpan(clone) } catch { /* ignore */ }
+    return clone.innerHTML
+  }
+
+  // Clique num selo dentro do editor → abre o MENU de edição (forma, posição, remover) ancorado nele.
+  const abrirMenuSelo = (img: HTMLElement) => {
+    const r = img.getBoundingClientRect()
+    setSeloSel({ el: img, x: Math.round(r.left), y: Math.round(r.bottom) })
+  }
+  const reancorar = (el: HTMLElement) => { const r = el.getBoundingClientRect(); setSeloSel({ el, x: Math.round(r.left), y: Math.round(r.bottom) }) }
+  const seloFormaAtual = (): '' | 'sm' | 'ic' => !seloSel ? '' : seloSel.el.classList.contains('ic') ? 'ic' : seloSel.el.classList.contains('sm') ? 'sm' : ''
+  const seloAlturaAtual = (): number => {
+    if (!seloSel) return 1.7
+    const vs = [seloSel.el.classList.contains('sm') && 'sm', seloSel.el.classList.contains('ic') && 'ic'].filter(Boolean) as string[]
+    return parseFloat(seloSel.el.getAttribute('data-selo-h') || '') || alturaBaseSelo(vs)
+  }
+  // Troca a forma do selo mantendo o tamanho custom (se houver) e o alinhamento.
+  const aplicarFormaSelo = (v: '' | 'sm' | 'ic') => {
+    if (!seloSel) return
+    const slug = seloSel.el.getAttribute('data-selo'); if (!slug) return
+    const alturaEm = parseFloat(seloSel.el.getAttribute('data-selo-h') || '') || undefined
+    const novo = criarSeloEl(slug, v ? [v] : [], alturaEm)
+    if (!novo) return
+    seloSel.el.replaceWith(novo)
+    editorRef.current?.focus(); reancorar(novo)
+  }
+  // Aumenta/diminui o tamanho do selo livremente (passo 0.2em; mín 0.8em, máx 6em). Persiste em data-selo-h.
+  const escalarSelo = (delta: number) => {
+    if (!seloSel) return
+    const img = seloSel.el as HTMLImageElement
+    const nova = Math.min(6, Math.max(0.8, Math.round((seloAlturaAtual() + delta) * 100) / 100))
+    const ic = img.classList.contains('ic')
+    img.style.setProperty('height', `${nova}em`)
+    img.style.setProperty('width', ic ? `${nova}em` : 'auto')
+    img.setAttribute('data-selo-h', String(nova))
+    editorRef.current?.focus(); reancorar(img)
+  }
+  // Posição: 'inline' (no meio do texto) ou alinhado num bloco próprio (esquerda/centro/direita).
+  const posicionarSelo = (pos: 'inline' | 'left' | 'center' | 'right') => {
+    if (!seloSel) return
+    const el = seloSel.el
+    const wrap = el.parentElement && el.parentElement.classList.contains('sl-bloco') ? el.parentElement : null
+    if (pos === 'inline') {
+      if (wrap) wrap.replaceWith(el)
+    } else {
+      let w = wrap
+      if (!w) { w = document.createElement('div'); w.className = 'sl-bloco'; el.replaceWith(w); w.appendChild(el) }
+      w.style.setProperty('text-align', pos)
+    }
+    editorRef.current?.focus(); reancorar(el)
+  }
+  const removerSelo = () => { if (!seloSel) return; const w = seloSel.el.parentElement?.classList.contains('sl-bloco') ? seloSel.el.parentElement : null; (w ?? seloSel.el).remove(); setSeloSel(null); editorRef.current?.focus() }
+
+  // ── Cor do BLOCO (tabela/box importado) ─────────────────────────────────────────────────────
+  // Lê a cor atual (1ª célula com fundo) — p/ o color input abrir na cor certa.
+  const corDoBloco = (tb: HTMLTableElement): string => {
+    for (const row of Array.from(tb.rows)) for (const cell of Array.from(row.cells)) {
+      const m = /background(?:-color)?\s*:\s*(#[0-9a-f]{3,8})/i.exec((cell as HTMLElement).getAttribute('style') || '')
+      if (m) return m[1]
+    }
+    return '#ffffff'
+  }
+  // Pinta o bloco: aplica a cor de fundo na tabela e em TODAS as células (fica uniforme).
+  const pintarBloco = (cor: string) => {
+    if (!blocoSel) return
+    const tb = blocoSel.el
+    tb.style.setProperty('background-color', cor)
+    tb.querySelectorAll<HTMLElement>('td, th').forEach((c) => c.style.setProperty('background-color', cor))
+    editorRef.current?.focus()
+  }
+  // "Sem cor": remove o fundo da tabela e de todas as células → vira box branco/neutro na leitura.
+  const limparCorBloco = () => {
+    if (!blocoSel) return
+    const tb = blocoSel.el
+    const limpa = (el: HTMLElement) => { el.style.removeProperty('background'); el.style.removeProperty('background-color'); if (!el.getAttribute('style')?.trim()) el.removeAttribute('style') }
+    limpa(tb); tb.querySelectorAll<HTMLElement>('td, th, tr, thead, tbody').forEach(limpa)
+    setBlocoSel(null); editorRef.current?.focus()
+  }
+
   // Ao abrir a aba "Editor", carrega o conteúdo salvo (permite editar em vez de recomeçar do zero).
   useEffect(() => {
     if (modo === 'editor' && editorRef.current) {
       // styleWithCSS: alinhamento/cor via execCommand saem como `style` (que agora sobrevive à sanitização).
       try { document.execCommand('styleWithCSS', false, 'true') } catch { /* browser antigo */ }
-      if (!editorRef.current.innerHTML.trim() && htmlAtual) editorRef.current.innerHTML = htmlAtual
+      // Enter cria <p> (não <div>) → espaçamento igual ao da leitura e linhas em branco preservadas.
+      try { document.execCommand('defaultParagraphSeparator', false, 'p') } catch { /* browser antigo */ }
+      if (!editorRef.current.innerHTML.trim() && htmlAtual) {
+        editorRef.current.innerHTML = htmlAtual
+        // Converte selos (<span data-selo>/<rg>) na IMAGEM já no editor, p/ o admin ver o que inseriu.
+        try { prepararSelosLeitura(editorRef.current) } catch { /* ignore */ }
+      }
     }
   }, [modo, htmlAtual])
 
@@ -470,7 +657,7 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
 
       {/* CONTEÚDO: prévia grande + painel de edição de grifos ao lado */}
       {aba === 'conteudo' && (
-        <LeituraPreviewGrifos documentoId={documento.id} html={htmlAtual} podeEditar={podeEditar} artigos={documento.artigos ?? 0} podeComparar={temRascunhoPendente || publicadaVersao > 1} onGrifoCtl={setGrifoCtl} versaoQuestoes={versaoAutoria} indiceTipos={indiceTipos} esp={esp} grifoCores={grifoCores} blocos={blocos} />
+        <LeituraPreviewGrifos documentoId={documento.id} html={htmlAtual} podeEditar={podeEditar} artigos={documento.artigos ?? 0} podeComparar={temRascunhoPendente || publicadaVersao > 1} onGrifoCtl={setGrifoCtl} versaoQuestoes={versaoAutoria} indiceTipos={indiceTipos} esp={esp} grifoCores={grifoCores} blocos={blocos} topicos={topicosInicial} />
       )}
 
       {/* CONFIGURAÇÃO: importação de conteúdo + metadados + desafio. Personalização (capa/título/
@@ -482,12 +669,20 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
           {podeEditar && (
             <section className="space-y-2">
               <p className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><FileText className="h-3.5 w-3.5" /> Conteúdo da lei</p>
-              <div className="mb-3 flex gap-1 rounded-lg border bg-muted/40 p-1 text-sm">
-                {([['colar', 'HTML', ClipboardPaste], ['word', 'Word', Upload], ['editor', 'Editor', PenLine]] as const).map(([m, label, Icon]) => (
-                  <button key={m} onClick={() => setModo(m)} className={cn('flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 transition-colors', modo === m ? 'bg-card font-medium shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
-                    <Icon className="h-3.5 w-3.5" /> {label}
+              {/* Linha de modos (HTML/Word/Editor) + Salvar — STICKY: segue o rolamento no topo. */}
+              <div className="sticky top-0 z-30 mb-2 flex items-center gap-2 bg-background py-1">
+                <div className="flex flex-1 gap-1 rounded-lg border bg-muted/40 p-1 text-sm">
+                  {([['colar', 'HTML', ClipboardPaste], ['word', 'Word', Upload], ['editor', 'Editor', PenLine]] as const).map(([m, label, Icon]) => (
+                    <button key={m} onClick={() => setModo(m)} className={cn('flex flex-1 items-center justify-center gap-1.5 rounded-md px-2 py-1.5 transition-colors', modo === m ? 'bg-card font-medium shadow-sm' : 'text-muted-foreground hover:text-foreground')}>
+                      <Icon className="h-3.5 w-3.5" /> {label}
+                    </button>
+                  ))}
+                </div>
+                {modo === 'editor' && (
+                  <button onClick={() => processarConteudo(htmlDoEditorParaSalvar())} disabled={savingConteudo} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50">
+                    {savingConteudo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar conteúdo
                   </button>
-                ))}
+                )}
               </div>
 
               {modo === 'colar' && (
@@ -523,8 +718,8 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
 
               {modo === 'editor' && (
                 <div className="space-y-2">
-                  {/* Barra de ferramentas FIXA: cola no topo da área de rolagem ao editar textos longos. */}
-                  <div className="sticky top-0 z-20 flex flex-wrap items-center gap-1 rounded-lg border bg-card p-1 shadow-sm">
+                  {/* Barra de ferramentas: cola logo ABAIXO da linha de modos (offset) ao rolar. */}
+                  <div className="sticky top-11 z-10 flex flex-wrap items-center gap-1 rounded-lg border bg-card p-1 shadow-sm">
                     <button onClick={() => exec('undo')} title="Desfazer" className="rounded-md p-1.5 text-muted-foreground hover:bg-card hover:text-foreground"><Undo2 className="h-4 w-4" /></button>
                     <button onClick={() => exec('redo')} title="Refazer" className="rounded-md p-1.5 text-muted-foreground hover:bg-card hover:text-foreground"><Redo2 className="h-4 w-4" /></button>
                     <span className="mx-0.5 h-5 w-px bg-border" />
@@ -557,11 +752,106 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
                     </select>
                     <span className="mx-0.5 h-5 w-px bg-border" />
                     <button onClick={limparFormatacao} title="Limpar formatação" className="rounded-md p-1.5 text-muted-foreground hover:bg-card hover:text-foreground"><Eraser className="h-4 w-4" /></button>
+                    <span className="mx-0.5 h-5 w-px bg-border" />
+                    {/* Inserir SELO (Biblioteca) no cursor */}
+                    <div className="relative">
+                      <button onMouseDown={(e) => e.preventDefault()} onClick={() => setSeloMenu((v) => !v)} title="Inserir selo" className={cn('inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs font-medium text-muted-foreground hover:bg-card hover:text-foreground', seloMenu && 'bg-muted text-foreground')}>
+                        <Stamp className="h-4 w-4" /> Selo <ChevronDown className="h-3 w-3" />
+                      </button>
+                      {seloMenu && (
+                        <>
+                          <div className="fixed inset-0 z-30" onClick={() => setSeloMenu(false)} />
+                          <div className="absolute right-0 top-full z-40 mt-1 max-h-80 w-72 overflow-auto rounded-xl border bg-card p-1.5 shadow-xl">
+                            {/* Tamanho do selo — aplica a variante da imagem (Normal/Compacto/Ícone). */}
+                            <div className="flex items-center gap-1 px-1 pb-1.5">
+                              {([['', 'Normal'], ['sm', 'Compacto'], ['ic', 'Ícone']] as const).map(([v, label]) => (
+                                <button key={v || 'n'} onMouseDown={(e) => e.preventDefault()} onClick={() => setSeloVar(v)} className={cn('flex-1 rounded-md border px-1.5 py-1 text-[11px] font-medium transition-colors', seloVar === v ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted')}>{label}</button>
+                              ))}
+                            </div>
+                            <p className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Selos</p>
+                            {Object.entries(SELOS).map(([slug, def]) => (
+                              <button key={slug} onMouseDown={(e) => e.preventDefault()} onClick={() => inserirSelo(slug)} className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left hover:bg-muted">
+                                <img src={`/leitura/selos/${slug}-ic.png`} alt="" className="h-6 w-6 shrink-0" draggable={false} />
+                                <span className="min-w-0 flex-1">
+                                  <span className="block truncate text-sm font-medium">{def.nome}</span>
+                                  <code className="block truncate font-mono text-[11px] text-muted-foreground">{codigoTag(slug)}</code>
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={inserirCorte} title="Corte de página (divisor / quebra de página)" className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs font-medium text-muted-foreground hover:bg-card hover:text-foreground"><Scissors className="h-4 w-4" /> Corte</button>
+                    <button type="button" onMouseDown={(e) => e.preventDefault()} onClick={marcarPincel} title="Marcação canetão (traço atrás do texto — ótimo p/ tópicos)" className="inline-flex items-center gap-1 rounded-md border px-2 py-1.5 text-xs font-medium text-muted-foreground hover:bg-card hover:text-foreground"><Highlighter className="h-4 w-4" /> Marcar</button>
+                    <label onMouseDown={(e) => e.preventDefault()} title="Cor da marcação" className="relative inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border" style={{ background: marcaCor }}>
+                      <input type="color" value={marcaCor} onChange={(e) => aplicarCorMarca(e.target.value)} className="absolute inset-0 cursor-pointer opacity-0" aria-label="Cor da marcação" />
+                    </label>
+                    <select value={marcaEstilo} onChange={(e) => aplicarEstiloMarca(e.target.value as 'pincel' | 'marcador' | 'reto')} onMouseDown={(e) => e.stopPropagation()} title="Estilo da marcação" className="h-7 rounded-md border bg-card px-1 text-xs text-muted-foreground">
+                      <option value="pincel">Pincel</option>
+                      <option value="marcador">Marcador</option>
+                      <option value="reto">Reto</option>
+                    </select>
                   </div>
-                  <div ref={editorRef} contentEditable suppressContentEditableWarning className="min-h-[220px] rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm leading-relaxed outline-none focus:ring-1 focus:ring-ring [&_h2]:mb-1 [&_h2]:mt-2 [&_h2]:text-base [&_h2]:font-bold [&_ul]:ml-5 [&_ul]:list-disc" />
-                  <button onClick={() => processarConteudo(editorRef.current?.innerHTML ?? '')} disabled={savingConteudo} className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-sm font-semibold text-primary-foreground transition hover:opacity-90 disabled:opacity-50">
-                    {savingConteudo ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar conteúdo
-                  </button>
+                  <div ref={editorRef} contentEditable suppressContentEditableWarning
+                    onClick={(e) => {
+                      const t = e.target as HTMLElement
+                      if (t?.tagName === 'IMG' && t.classList.contains('sl-img')) { abrirMenuSelo(t); setBlocoSel(null); return }
+                      setSeloSel(null)
+                      const tb = t?.closest?.('table') as HTMLTableElement | null
+                      if (tb && editorRef.current?.contains(tb)) setBlocoSel({ el: tb, x: e.clientX, y: e.clientY }); else setBlocoSel(null)
+                    }}
+                    className="ce-leitura min-h-[220px] rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm leading-relaxed outline-none focus:ring-1 focus:ring-ring [&_.sl-img]:cursor-pointer [&_h2]:mb-1 [&_h2]:mt-2 [&_h2]:text-base [&_h2]:font-bold [&_ul]:ml-5 [&_ul]:list-disc" />
+
+                  {/* Menu de edição do selo (abre ao clicar num selo no editor) */}
+                  {seloSel && createPortal(
+                    <>
+                      <div className="fixed inset-0 z-[95]" onMouseDown={() => setSeloSel(null)} />
+                      <div className="fixed z-[96] w-56 rounded-xl border bg-card p-2 shadow-xl" style={{ left: Math.min(seloSel.x, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 240), top: seloSel.y + 6 }} onMouseDown={(e) => e.preventDefault()}>
+                        <div className="flex items-center gap-2 border-b px-1 pb-1.5">
+                          <img src={`/leitura/selos/${seloSel.el.getAttribute('data-selo')}-ic.png`} alt="" className="h-5 w-5" draggable={false} />
+                          <span className="truncate text-xs font-semibold">{SELOS[seloSel.el.getAttribute('data-selo') || '']?.nome ?? 'Selo'}</span>
+                          <button onClick={removerSelo} title="Remover selo" className="ml-auto rounded p-1 text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /></button>
+                        </div>
+                        <p className="px-1 pt-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Tamanho</p>
+                        <div className="flex items-center gap-1 p-1">
+                          <button onClick={() => escalarSelo(-0.2)} title="Diminuir" className="flex h-7 w-7 items-center justify-center rounded-md border text-muted-foreground hover:bg-muted"><Minus className="h-3.5 w-3.5" /></button>
+                          <span className="flex-1 text-center text-[11px] font-medium tabular-nums">{seloAlturaAtual().toFixed(1)}em</span>
+                          <button onClick={() => escalarSelo(0.2)} title="Aumentar" className="flex h-7 w-7 items-center justify-center rounded-md border text-muted-foreground hover:bg-muted"><Plus className="h-3.5 w-3.5" /></button>
+                        </div>
+                        <p className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Forma</p>
+                        <div className="flex gap-1 p-1">
+                          {([['', 'Normal'], ['sm', 'Compacto'], ['ic', 'Ícone']] as const).map(([v, label]) => (
+                            <button key={v || 'n'} onClick={() => aplicarFormaSelo(v)} className={cn('flex-1 rounded-md border px-1.5 py-1 text-[11px] font-medium transition-colors', seloFormaAtual() === v ? 'border-primary bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-muted')}>{label}</button>
+                          ))}
+                        </div>
+                        <p className="px-1 pt-1 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Posição</p>
+                        <div className="grid grid-cols-4 gap-1 p-1">
+                          {([['inline', 'Linha', PenLine], ['left', 'Esq.', AlignLeft], ['center', 'Centro', AlignCenter], ['right', 'Dir.', AlignRight]] as const).map(([p, label, Icon]) => (
+                            <button key={p} onClick={() => posicionarSelo(p)} title={label} className="flex flex-col items-center gap-0.5 rounded-md border px-1 py-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted"><Icon className="h-3.5 w-3.5" /> {label}</button>
+                          ))}
+                        </div>
+                      </div>
+                    </>,
+                    document.body,
+                  )}
+
+                  {/* Cor do BLOCO (box/tabela importado) — clicar no box abre isto */}
+                  {blocoSel && createPortal(
+                    <>
+                      <div className="fixed inset-0 z-[95]" onMouseDown={() => setBlocoSel(null)} />
+                      <div className="fixed z-[96] w-56 rounded-xl border bg-card p-2 shadow-xl" style={{ left: Math.min(blocoSel.x, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 240), top: blocoSel.y + 6 }} onMouseDown={(e) => e.preventDefault()}>
+                        <p className="px-1 pb-1.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Cor do bloco</p>
+                        <label className="relative flex h-9 cursor-pointer items-center justify-center gap-1.5 rounded-md border text-xs font-medium hover:bg-muted">
+                          <Palette className="h-3.5 w-3.5" /> Escolher cor
+                          <input type="color" defaultValue={corDoBloco(blocoSel.el)} onChange={(e) => pintarBloco(e.target.value)} className="absolute inset-0 cursor-pointer opacity-0" aria-label="Cor do bloco" />
+                        </label>
+                        <button onClick={limparCorBloco} className="mt-1.5 flex w-full items-center justify-center gap-1.5 rounded-md border px-2 py-2 text-xs font-medium text-muted-foreground hover:bg-muted"><Ban className="h-3.5 w-3.5" /> Sem cor (transparente)</button>
+                        <p className="mt-1.5 px-1 text-[10px] leading-snug text-muted-foreground">Deixa o box com fundo transparente (só borda + texto), como no Word.</p>
+                      </div>
+                    </>,
+                    document.body,
+                  )}
                 </div>
               )}
             </section>
@@ -665,6 +955,17 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
             </div>
           </details>
 
+          {/* Temas do dia (tópicos) — recolhível. Tópicos automáticos dos títulos; admin ajusta tags + questões. */}
+          <details className="group border-t pt-4">
+            <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground [&::-webkit-details-marker]:hidden">
+              <ListTree className="h-3.5 w-3.5 text-primary" /> Temas do dia
+              <ChevronDown className="ml-auto h-4 w-4 transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="pt-3">
+              <TopicosEditor documentoId={documento.id} htmlAtual={htmlAtual} topicosInicial={topicosInicial} />
+            </div>
+          </details>
+
           {/* Espaçamento — BLOCOS (caixas) e TEXTO (parágrafos), separados. Padrão que o aluno vê. */}
           <details className="group border-t pt-4">
             <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground [&::-webkit-details-marker]:hidden">
@@ -674,6 +975,18 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
             </summary>
             <div className="space-y-3 pt-3">
               <p className="text-xs text-muted-foreground">Controle total — entrelinha, e espaço <strong>acima/abaixo</strong> de parágrafos e blocos. Padrão para o aluno (ele ainda escala no leitor). Prévia na aba <span className="font-medium text-foreground">Conteúdo</span>.</p>
+              {/* Preservar espaçamento do HTML (fiel ao Word / Enter do editor) — quando ligado, os sliders não valem. */}
+              <button type="button" onClick={togglePreservarHtml} className={cn('flex w-full items-center gap-2.5 rounded-lg border p-2.5 text-left transition', esp.preservarHtml ? 'border-primary/40 bg-primary/[0.05]' : 'hover:bg-muted')}>
+                <FileText className={cn('h-4 w-4 shrink-0', esp.preservarHtml ? 'text-primary' : 'text-muted-foreground')} />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium">Preservar espaçamento do HTML</span>
+                  <span className="block text-[11px] leading-snug text-muted-foreground">Mantém as linhas em branco do Word e do <strong>Enter</strong> no editor (não colapsa parágrafos vazios). Ligado, os sliders abaixo não valem.</span>
+                </span>
+                <span className={cn('relative h-5 w-9 shrink-0 rounded-full transition-colors', esp.preservarHtml ? 'bg-primary' : 'bg-muted-foreground/30')}>
+                  <span className={cn('absolute top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all', esp.preservarHtml ? 'left-[18px]' : 'left-0.5')} />
+                </span>
+              </button>
+              <div className={cn(esp.preservarHtml && 'pointer-events-none opacity-40')}>
               {([
                 { k: 'linha', label: 'Entrelinha do texto', step: 0.1, base: 1 },
                 { k: 'parTop', label: 'Parágrafo — espaço acima', step: 0.25, base: 1 },
@@ -681,7 +994,7 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
                 { k: 'blocoBloco', label: 'Distância entre blocos', step: 0.22, base: 2.2 },
                 { k: 'blocoTextoTop', label: 'Bloco e texto — acima', step: 0.22, base: 2.2 },
                 { k: 'blocoTextoBot', label: 'Bloco e texto — abaixo', step: 0.22, base: 2.2 },
-              ] as { k: keyof EspacamentoDoc; label: string; step: number; base: number }[]).map(({ k, label, step, base }) => {
+              ] as { k: Exclude<keyof EspacamentoDoc, 'preservarHtml'>; label: string; step: number; base: number }[]).map(({ k, label, step, base }) => {
                 const lim = ESP_LIMITES[k]
                 const barra = Math.max(0, Math.min(100, Math.round(((esp[k] - lim.min) / (lim.max - lim.min)) * 100)))
                 return (
@@ -696,6 +1009,7 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
                   </div>
                 )
               })}
+              </div>
               <div className="flex flex-wrap gap-2 pt-1">
                 <button type="button" onClick={() => aplicarTodasAulas({ espacamento: true }, 'o espaçamento')} disabled={aplicandoTodas} className="inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50">
                   {aplicandoTodas ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Layers className="h-3.5 w-3.5" />} Aplicar a todas as aulas

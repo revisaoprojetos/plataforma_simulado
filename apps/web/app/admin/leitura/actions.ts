@@ -18,6 +18,7 @@ import { normalizarCarimbos, normalizarConquistasModulo, type CarimboDef, type M
 import { resolverEspacamento, type EspacamentoDoc } from '@/lib/leitura/espacamento'
 import { resolverTrilhaAparencia, resolverGrifoCores, type TrilhaAparencia, type TrilhaFundoConfig, type TrilhaDegrade, type GrifoCores } from '@/lib/leitura/trilha-aparencia'
 import { resolverBlocos, type BlocoDef } from '@/lib/leitura/blocos'
+import { resolverTopicos, type TopicosConfig } from '@/lib/leitura/topicos'
 import { esquecer } from '@/lib/cache/relatorio-cache'
 import { invalidarRankingLeitura, carregarRankingModulo, type RankingLeituraItem } from '@/lib/leitura/ranking'
 import { classificarFormato } from '@/lib/simulado/formato'
@@ -1426,6 +1427,19 @@ export async function salvarBlocosDocumento(documentoId: string, patch: { blocos
   const merged: any = { ...((doc as any)?.quiz_config ?? {}) }
   if (patch.blocos != null) merged.blocos = resolverBlocos(patch.blocos)
   if (patch.previa != null) merged.blocosPrevia = !!patch.previa
+  const { error } = await svc.from('simulado_documentos').update({ quiz_config: merged, atualizado_em: new Date().toISOString() }).eq('id', documentoId).eq('tenant_id', g.tenantId)
+  if (error) return { ok: false, error: QUIZ_SEM_TABELA(error.message) ? 'Rode a migração 20260910000001.' : error.message }
+  revalidatePath(`/admin/leitura/${documentoId}`)
+  return { ok: true }
+}
+
+/** Salva a config de "Temas do dia" (tags/nº de questões/incluir por tópico) em quiz_config.topicos. */
+export async function salvarTopicos(documentoId: string, topicos: TopicosConfig): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { data: doc } = await svc.from('simulado_documentos').select('quiz_config').eq('id', documentoId).eq('tenant_id', g.tenantId).maybeSingle()
+  const merged: any = { ...((doc as any)?.quiz_config ?? {}) }
+  merged.topicos = resolverTopicos(topicos)
   const { error } = await svc.from('simulado_documentos').update({ quiz_config: merged, atualizado_em: new Date().toISOString() }).eq('id', documentoId).eq('tenant_id', g.tenantId)
   if (error) return { ok: false, error: QUIZ_SEM_TABELA(error.message) ? 'Rode a migração 20260910000001.' : error.message }
   revalidatePath(`/admin/leitura/${documentoId}`)

@@ -8,6 +8,7 @@ import { normalizarTiposIndice } from '@/lib/leitura/indice'
 import { resolverGrifoCores } from '@/lib/leitura/trilha-aparencia'
 import { resolverBlocos } from '@/lib/leitura/blocos'
 import { normalizarEspacamento } from '@/lib/leitura/espacamento'
+import { resolverTopicos } from '@/lib/leitura/topicos'
 import { type Documento } from '../actions'
 
 export const dynamic = 'force-dynamic'
@@ -67,6 +68,7 @@ export default async function LeituraEditorPage({ params, searchParams }: { para
         espInicial={normalizarEspacamento(d.quiz_config)}
         grifoCoresInicial={grifoCores}
         blocosInicial={resolverBlocos(d.quiz_config?.blocos)}
+        topicosInicial={resolverTopicos(d.quiz_config?.topicos)}
       />
       {/* Ao abrir o LegProc, aquece as áreas irmãs (Questões do conteúdo · Alterações) em 2º plano. */}
       <PrefetchRotas rotas={[`/admin/leitura/${id}/questoes`, `/admin/leitura/${id}/alteracoes`]} />
