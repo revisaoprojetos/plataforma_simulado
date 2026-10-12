@@ -12,6 +12,19 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.8.2 — 2026-10-12
+
+Hotfix de **persistência** do Desafio de Jurisprudência (progresso sumia ao recarregar) + teto do score.
+
+- **Persistência não-destrutiva (causa raiz do "reverte no reload"):** o `bootstrap` sobrescrevia o
+  localStorage com o servidor no load — se o POST fire-and-forget não chegava, o reload APAGAVA o
+  progresso local. Agora o seed é um **merge monotônico** (dom = união das teses/dia, best = maior/dia,
+  dias = união), **nunca** apaga o local. + **sync-up** no load (reenvia o que o local tiver a mais) e
+  **`sendBeacon`** ao fechar/ocultar a aba (o último estado chega ao servidor mesmo com reload imediato).
+- **Teto do score:** correção dos valores de `best` **anteriores ao teto** (resíduo da era com bônus /
+  merge com valor inflado): no load, cada fase é clampada ao máximo atingível (`teses×100 + 200×10`).
+  O labirinto segue com **200 bolinhas** por fase (teto 3.000 p/ 10 teses).
+
 ## 3.8.1 — 2026-10-12
 
 Desafio de Jurisprudência: sequência (streak) server-side, placar reorganizado, rework do score e vários ajustes de UI/contagem.

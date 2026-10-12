@@ -1504,6 +1504,23 @@ const INTRO = { on:true, p:0, seg:-1, done:false };
   requestAnimationFrame(tick);
 })();
 
+// Corrige valores de `best` ANTERIORES ao teto por fase (resíduo da era com bônus, ou merge do
+// servidor com valor antigo inflado): clampa cada fase ao máximo atingível (teses×100 + 200 bolinhas×10).
+(function corrigirBestTeto(){
+  try{
+    if(!S.best || typeof S.best!=='object') return;
+    let mudou=false;
+    for(const k in S.best){
+      if(isFinalDay(k)) continue;                 // dia final tem teto próprio; evita criar S.final no load
+      const nT=(getTeses(k)||[]).length;
+      if(!nT) continue;                            // teses não carregadas p/ esse dia: não clampa
+      const cap=nT*CONFIG.pontos.tese + BOLINHAS_ALVO*CONFIG.pontos.ponto;
+      if((Number(S.best[k])||0) > cap){ S.best[k]=cap; mudou=true; }
+    }
+    if(mudou){ S.recorde=Math.max(0, ...Object.values(S.best).map(v=>Number(v)||0)); save(); }
+  }catch(e){}
+})();
+
 // início
 new ResizeObserver(()=>{ resize(); if(!$('#mapModal').hidden) renderMap(); }).observe(canvas);
 syncSound(); renderTraps();

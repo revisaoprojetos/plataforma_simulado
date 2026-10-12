@@ -50,19 +50,30 @@ async function semearProgresso(){
       window.DESAFIO.LEITURAS = (p && p.leituras) || {};
       window.DESAFIO.LEITURA_DOCS = (p && p.leituraDocs) || {};
     }
-    // Semeia o progresso local (dom/best/recorde) quando houver chave de storage.
+    // Semeia o progresso local MESCLANDO servidor + local — NUNCA sobrescreve (senão um POST
+    // fire-and-forget que não chegou faria o reload APAGAR o progresso local). Progresso é monotônico:
+    // dom = UNIÃO das teses dominadas por dia; best = MAIOR pontuação por dia; dias = união.
     const key = window.DESAFIO && window.DESAFIO.CONFIG && window.DESAFIO.CONFIG.storageKey;
     if(key){
       const atual = JSON.parse(localStorage.getItem(key) || '{}');
-      // Sequência: o SERVIDOR é a fonte da verdade dos dias de atividade (ledger). Mescla com o local
-      // (preserva um "hoje" marcado agora que ainda não sincronizou). Dedupe + só datas YYYY-MM-DD.
+      const obj = x => (x && typeof x==='object' && !Array.isArray(x)) ? x : {};
+      const mergeDom = (a,b) => { const o = Object.assign({}, obj(a)); for(const k in obj(b)){ const s=new Set(Array.isArray(o[k])?o[k]:[]); (Array.isArray(b[k])?b[k]:[]).forEach(i=>s.add(i)); o[k]=[...s]; } return o; };
+      const mergeBest = (a,b) => { const o = Object.assign({}, obj(a)); for(const k in obj(b)){ o[k]=Math.max(Number(o[k])||0, Number(b[k])||0); } return o; };
+      const dom = mergeDom(p.dom, atual.dom);
+      const best = mergeBest(p.best, atual.best);
+      const recorde = Math.max(Number(p.recorde)||0, Number(atual.recorde)||0, 0, ...Object.values(best).map(v=>Number(v)||0));
       const diasSrv = Array.isArray(p && p.dias) ? p.dias : [];
       const diasLoc = Array.isArray(atual.dias) ? atual.dias : [];
       const dias = Array.from(new Set(diasSrv.concat(diasLoc)))
         .filter(function(d){ return typeof d==='string' && /^\d{4}-\d{2}-\d{2}$/.test(d); }).sort();
-      // servidor = fonte de dom/best/recorde/dias; mantém campos locais (muted, sel…)
-      const semeado = Object.assign({}, atual, { dom: p.dom || {}, best: p.best || {}, recorde: p.recorde || 0, dias });
+      const semeado = Object.assign({}, atual, { dom, best, recorde, dias });
       localStorage.setItem(key, JSON.stringify(semeado));
+      // Sync-up: se o local tinha progresso ALÉM do servidor (POST perdido), re-envia agora.
+      try{
+        if(JSON.stringify({ d:obj(p.dom), b:obj(p.best) }) !== JSON.stringify({ d:dom, b:best })){
+          fetch('/api/jurisprudencia/progresso', { method:'POST', credentials:'same-origin', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ desafio:ID, dom, best, recorde, dias }), keepalive:true }).catch(()=>{});
+        }
+      }catch(e){}
     }
   }catch(e){ /* mantém o que houver localmente */ }
 }
@@ -87,6 +98,17 @@ function interceptarSalvar(){
       }catch(e){ /* v não-JSON: ignora */ }
     }
   };
+  // Flush CONFIÁVEL ao fechar/ocultar a aba: sendBeacon sobrevive ao unload e leva o cookie de sessão —
+  // garante que o ÚLTIMO estado (ex.: dia recém-concluído) chega ao servidor mesmo com reload imediato.
+  const flush = () => {
+    try{
+      const o = JSON.parse(localStorage.getItem(key) || '{}');
+      const body = JSON.stringify({ desafio:ID, dom:o.dom || {}, best:o.best || {}, recorde:o.recorde || 0, dias:o.dias || [] });
+      if(navigator.sendBeacon){ navigator.sendBeacon('/api/jurisprudencia/progresso', new Blob([body], { type:'application/json' })); }
+    }catch(e){}
+  };
+  addEventListener('pagehide', flush);
+  addEventListener('visibilitychange', () => { if(document.visibilityState === 'hidden') flush(); });
 }
 
 // aplica overrides de cor (CSS vars) definidos no admin — recolorir o chrome do jogo SEM tocar no
