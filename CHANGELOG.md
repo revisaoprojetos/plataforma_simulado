@@ -12,6 +12,17 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.8.4 — 2026-10-12
+
+Leitura (compartilhada Lei Seca + Jurisprudência): tabelas colapsáveis viram um bloco de cor única.
+
+- **Tabela colapsável = card verde único, sem "Tabela":** removido o rótulo "Tabela" e o card passou a ter
+  a cor do conteúdo (verde-claro), com a seta de recolher/expandir no canto superior direito.
+- **Verde "mais forte" das palavras removido:** os grifos/marca-texto do Word pintam o fundo por JS com
+  `!important` inline (CSS não vence), então agora o `prepararTabelasColapsaveis` zera o fundo de dentro da
+  tabela por JS (depois dos grifos), mantendo texto/cores. Resultado: bloco de **cor única**.
+- Vale para os **dois** leitores (é o mesmo componente/processamento) + a prévia do admin.
+
 ## 3.8.3 — 2026-10-12
 
 Ajuste do modal "Mapa do labirinto" (Desafio de Jurisprudência): estava encostado à esquerda e grande.

@@ -185,6 +185,13 @@ export function prepararTabelasColapsaveis(cont: HTMLElement): () => void {
       inner.appendChild(tab)    // move a tabela pra dentro do corpo
       corpo.appendChild(inner)
       box.appendChild(cab); box.appendChild(corpo)
+      // Bloco com a COR ÚNICA do card: remove o FUNDO dos grifos/marca-texto do Word DENTRO da tabela.
+      // Eles são pintados por JS com `!important` inline (recolorir-grifos) → o CSS não vence; aqui
+      // zeramos via JS (também inline !important, e rodamos DEPOIS dos grifos). Texto/cores preservados.
+      inner.querySelectorAll<HTMLElement>('*').forEach((el) => {
+        el.style.setProperty('background', 'transparent', 'important')
+        el.style.setProperty('background-color', 'transparent', 'important')
+      })
     } catch { /* não deixa 1 tabela quebrar as demais */ }
   }
   return () => {}
