@@ -4,8 +4,9 @@ import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
-import { Plus, Gamepad2, Loader2, Gavel } from 'lucide-react'
+import { Plus, Gamepad2, Loader2, Gavel, Copy } from 'lucide-react'
 import { type CardView } from '@/lib/card-view'
+import { copiarTexto } from '@/lib/clipboard'
 import { criarDesafio } from '@/app/admin/jurisprudencia/actions'
 
 type DesafioItem = { id: string; nome: string; imagens?: Record<string, any> | null }
@@ -77,6 +78,14 @@ export function JurisDesafioLista({ desafios, cardView = 'poster' }: { desafios:
 function DesafioCard({ d, variant }: { d: DesafioItem; variant: CardView }) {
   const href = `/admin/jurisprudencia?desafio=${d.id}`
   const c = 'var(--primary)'
+  // Copiar o link do aluno p/ este desafio (igual ao "Copiar link da trilha" do Lei Seca). preventDefault
+  // + stopPropagation p/ não navegar (o card é um <Link>).
+  async function copiarLink(e: React.MouseEvent) {
+    e.preventDefault(); e.stopPropagation()
+    const base = typeof window !== 'undefined' ? window.location.origin : ''
+    if (await copiarTexto(`${base}/aluno/jurisprudencia?desafio=${d.id}`)) toast.success('Link do desafio copiado')
+    else toast.error('Não foi possível copiar o link.')
+  }
   // Pôster prefere a CAPA (4:5); ticket prefere o TICKET (4:3). Um cai no outro se faltar.
   const capaPoster = (d.imagens?.capa as string | undefined) || (d.imagens?.ticket as string | undefined) || null
   const capaTicket = (d.imagens?.ticket as string | undefined) || (d.imagens?.capa as string | undefined) || null
@@ -101,6 +110,11 @@ function DesafioCard({ d, variant }: { d: DesafioItem; variant: CardView }) {
           <h3 className="line-clamp-2 text-sm font-bold leading-tight text-foreground sm:text-[15px]">{d.nome}</h3>
           <Badge />
         </div>
+        {/* Copiar link do desafio (aluno) — canto inferior direito, igual ao Lei Seca. */}
+        <button type="button" onClick={copiarLink} title="Copiar link do desafio (aluno)"
+          className="pointer-events-auto absolute bottom-2 right-2 z-30 flex h-7 w-7 items-center justify-center rounded-lg border bg-card text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground">
+          <Copy className="h-3.5 w-3.5" />
+        </button>
       </Link>
     )
   }
@@ -119,6 +133,11 @@ function DesafioCard({ d, variant }: { d: DesafioItem; variant: CardView }) {
         <h3 className="mt-0.5 line-clamp-2 text-sm font-bold leading-tight text-white drop-shadow-sm">{d.nome}</h3>
         <span className="mt-1.5 inline-flex items-center gap-1 rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-medium text-white backdrop-blur"><Gavel className="h-3 w-3" /> Jurisprudência</span>
       </div>
+      {/* Copiar link do desafio (aluno) — canto inferior direito, igual ao Lei Seca. */}
+      <button type="button" onClick={copiarLink} title="Copiar link do desafio (aluno)"
+        className="pointer-events-auto absolute bottom-2 right-2 z-30 flex h-8 w-8 items-center justify-center rounded-lg bg-white/15 text-white backdrop-blur transition-colors hover:bg-white hover:text-neutral-900">
+        <Copy className="h-4 w-4" />
+      </button>
     </Link>
   )
 }

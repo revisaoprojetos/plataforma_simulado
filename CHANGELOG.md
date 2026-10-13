@@ -12,6 +12,18 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.11.1 — 2026-10-13
+
+Copiar link do Desafio de Jurisprudência + correção da sequência da leitura.
+
+- **Copiar link (Jurisprudência):** o card do desafio (lista do admin) ganhou o botão **Copiar** (ticket e
+  pôster), igual ao "Copiar link da trilha" do Lei Seca — copia o link do aluno `…/aluno/jurisprudencia?
+  desafio=<id>`. E o "**Link direto**" da aba **Acessos** passou a apontar pro **Juris** (abre o jogo do
+  desafio) em vez da trilha de Lei Seca — `ModuloAcesso` agora detecta a área pela rota (`usePathname`).
+- **Correção da sequência (leitura):** ao responder a última questão do quiz, grava o marcador de conclusão
+  (`onQuizConcluido`) na hora — antes dependia só da finalização em `/quiz-tentativa`, que nem sempre
+  disparava, deixando dias SEM evento e **quebrando a sequência**. Idempotente.
+
 ## 3.11.0 — 2026-10-13
 
 Leitura rápida, novo leitor de jurisprudência (pré-visualização), ticket do desafio padronizado e correções.

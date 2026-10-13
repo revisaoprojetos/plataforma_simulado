@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { toast } from 'sonner'
 import { Loader2, Search, UserCheck, Info, Check, Trash2, Globe, Lock, Link2, Users2, X, EyeOff, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FlaskConical } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -26,7 +27,11 @@ const POR_PAGINA = 10
 // Aba "Acessos" do MÓDULO. GRUPOS ficam VINCULADOS (conexão viva): novos alunos no grupo — manual ou
 // via sync (Curseduca/Guru) — passam a ter acesso automaticamente. A tabela de CONTROLE mostra TODOS os
 // alunos com acesso (membros dos grupos + adicionados individualmente) e de qual grupo cada um veio.
-export function ModuloAcesso({ pastaId }: { pastaId: string }) {
+export function ModuloAcesso({ pastaId, area }: { pastaId: string; area?: 'leitura' | 'jurisprudencia' }) {
+  // Área: prop explícita OU detecta pela rota (admin de jurisprudência vs leitura/Lei Seca) — assim o
+  // link direto abre o jogo do Juris (/aluno/jurisprudencia?desafio=) em vez da trilha de leitura.
+  const pathname = usePathname()
+  const ehJuris = area === 'jurisprudencia' || (!area && !!pathname?.includes('/jurisprudencia'))
   const [carregando, setCarregando] = useState(true)
   const [salvando, setSalvando] = useState(false)
   const [todosGrupos, setTodosGrupos] = useState<Grupo[]>([])
@@ -41,7 +46,8 @@ export function ModuloAcesso({ pastaId }: { pastaId: string }) {
   const [liberarTodos, setLiberarTodos] = useState(false)
   const [origem, setOrigem] = useState('')
   useEffect(() => { setOrigem(process.env.NEXT_PUBLIC_APP_URL || window.location.origin) }, [])
-  const linkTrilha = origem ? `${origem}/aluno/leitura?modulo=${pastaId}` : ''
+  // Juris abre o JOGO do desafio (/aluno/jurisprudencia?desafio=); leitura/Lei Seca abre a trilha.
+  const linkTrilha = origem ? (ehJuris ? `${origem}/aluno/jurisprudencia?desafio=${pastaId}` : `${origem}/aluno/leitura?modulo=${pastaId}`) : ''
 
   // Ocultos do ranking (contas de teste).
   const [ocEst, setOcEst] = useState<EstudanteAcessoLinha[]>([])
@@ -152,8 +158,8 @@ export function ModuloAcesso({ pastaId }: { pastaId: string }) {
     <div className="space-y-4">
       {/* Link direto para a trilha interna do módulo */}
       <div className="space-y-1.5 rounded-xl border bg-card px-4 py-3 shadow-sm">
-        <p className="flex items-center gap-1.5 text-sm font-semibold"><Link2 className="h-4 w-4 text-primary" /> Link direto para a trilha</p>
-        <p className="text-xs text-muted-foreground">Envie este link aos alunos com acesso — abre direto a trilha deste módulo (pede login se o aluno ainda não estiver logado).</p>
+        <p className="flex items-center gap-1.5 text-sm font-semibold"><Link2 className="h-4 w-4 text-primary" /> {ehJuris ? 'Link direto para o desafio' : 'Link direto para a trilha'}</p>
+        <p className="text-xs text-muted-foreground">Envie este link aos alunos com acesso — {ehJuris ? 'abre direto este desafio de jurisprudência' : 'abre direto a trilha deste módulo'} (pede login se o aluno ainda não estiver logado).</p>
         {linkTrilha ? <CopyLink url={linkTrilha} /> : <div className="h-9 animate-pulse rounded bg-muted" />}
       </div>
 

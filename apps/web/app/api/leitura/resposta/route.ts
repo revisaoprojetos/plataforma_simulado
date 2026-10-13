@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
-import { onPraticaRespondida } from '@/lib/gamificacao'
+import { onPraticaRespondida, onQuizConcluido } from '@/lib/gamificacao'
 import { docAcessivelAluno } from '@/lib/leitura/acesso'
 import { ehTestadorLeituraDoc } from '@/lib/leitura/testadores'
 
@@ -99,6 +99,26 @@ export async function POST(request: NextRequest) {
   // XP por acerto SÓ quando realmente gravou a 1ª resposta (up != null); refazer (ignorado) não re-credita.
   // Testador nunca contabiliza (sem XP/streak).
   if (up && !testador) void onPraticaRespondida(svc, { tenantId: sessao.tenantId, estudanteId: sessao.estudanteId, respostaId: (up as any).id, correta, disciplinaId: (disc as any)?.disciplina_id ?? null })
+
+  // SEQUÊNCIA confiável: se ESTA resposta COMPLETOU o quiz da aula (todas as "Questões do conteúdo"
+  // respondidas), grava o marcador de conclusão AGORA (awaited). Antes o marcador (evento quiz:<doc>,
+  // dia imutável do ledger) só vinha da finalização em /quiz-tentativa — que nem sempre dispara, deixando
+  // dias SEM evento e QUEBRANDO a sequência (bug da contabilização). onQuizConcluido é idempotente
+  // (quiz:<doc> 1×), então a finalização posterior não duplica. Só p/ questão de quiz, resposta NOVA, não-testador.
+  if (up && !testador && vincQuiz.data) {
+    try {
+      const [qz, rp] = await Promise.all([
+        svc.from('simulado_documento_quiz_questoes').select('questao_id').eq('tenant_id', sessao.tenantId).eq('documento_id', documento_id).eq('deletado', false),
+        svc.from('simulado_leitura_respostas').select('questao_id, correta').eq('tenant_id', sessao.tenantId).eq('estudante_id', sessao.estudanteId).eq('documento_id', documento_id),
+      ])
+      const qset = new Set(((qz.data ?? []) as any[]).map((q) => q.questao_id))
+      const feitas = ((rp.data ?? []) as any[]).filter((r) => qset.has(r.questao_id))
+      if (qset.size > 0 && feitas.length >= qset.size) {
+        const acertos = feitas.filter((r) => r.correta).length
+        await onQuizConcluido(svc, { tenantId: sessao.tenantId, estudanteId: sessao.estudanteId, documentoId: documento_id, acertos, total: qset.size })
+      }
+    } catch { /* nunca bloqueia a resposta */ }
+  }
 
   return NextResponse.json({ ok: true, correta, correta_id: corretaId, letra: LETRA[idx] ?? '?', jaRespondida: !!jaResp })
 }
