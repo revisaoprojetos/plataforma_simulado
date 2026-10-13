@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import { headers } from 'next/headers'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentTenantId, getCurrentTenant } from '@/lib/tenant'
 import { fetchAll } from '@/lib/supabase/fetch-all'
@@ -217,7 +218,13 @@ async function BoardData({ pastaParam }: { pastaParam?: string }) {
     .filter((b) => b.is_folder && contGrupo.has(b.id))
     .map((b) => ({ id: b.id, nome: b.nome, cor: b.cor ?? null, icone: b.icone ?? null, capa: (b.capa_card_url ?? b.capa_url) ?? null, count: contGrupo.get(b.id) ?? 0 }))
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  // Base do LINK DE CÓPIA do simulado: usa o HOST ATUAL (o admin de cada tenant acessa pelo SEU domínio,
+  // ex.: VND em simulado.vocenadefensoria.com.br) — NÃO o NEXT_PUBLIC_APP_URL global (que era o revisaopge
+  // para todos). Fallback: env e localhost. x-forwarded-host = host público real atrás do proxy/Traefik.
+  const hh = await headers()
+  const hostHdr = hh.get('x-forwarded-host') || hh.get('host') || ''
+  const protoHdr = hh.get('x-forwarded-proto') || (hostHdr.includes('localhost') || hostHdr.includes('127.0.0.1') ? 'http' : 'https')
+  const appUrl = hostHdr ? `${protoHdr}://${hostHdr}` : (process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000')
   // Estilo dos cards definido no console: o admin usa `card_view_admin` (com fallback para o valor
   // compartilhado `card_view`, retrocompatível). O portal do aluno segue `card_view`.
   // Lê a tema do getCurrentTenant (createAdminClient, memoizado, mesma fonte do tema visual) — NÃO

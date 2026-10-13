@@ -1,3 +1,4 @@
+import { headers } from 'next/headers'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { notFound } from 'next/navigation'
@@ -29,7 +30,11 @@ export default async function SimuladoEmbedPage({ params }: PageProps) {
     notFound()
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://seu-dominio.com'
+  // Host ATUAL do tenant (ex.: VND em vocenadefensoria) — NÃO o NEXT_PUBLIC_APP_URL global (revisaopge).
+  const hh = await headers()
+  const hostHdr = hh.get('x-forwarded-host') || hh.get('host') || ''
+  const protoHdr = hh.get('x-forwarded-proto') || (hostHdr.includes('localhost') || hostHdr.includes('127.0.0.1') ? 'http' : 'https')
+  const baseUrl = hostHdr ? `${protoHdr}://${hostHdr}` : (process.env.NEXT_PUBLIC_APP_URL ?? 'https://seu-dominio.com')
   const embedToken = simulado.embed_token as string | null
   const embedAtivo = simulado.embed_ativo as boolean ?? false
 

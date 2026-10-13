@@ -316,7 +316,8 @@ function ModuloCard({ m, variant, onExcluir, basePath = '/admin/leitura', basePa
   const href = `${basePath}?pasta=${m.id}`
   const contagem = `${m.aulas} aula(s)`
   async function copiarLinkTrilha() {
-    const base = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+    // Host ATUAL do tenant (ex.: VND em vocenadefensoria) — NÃO o NEXT_PUBLIC_APP_URL global (revisaopge).
+    const base = window.location.origin || process.env.NEXT_PUBLIC_APP_URL
     if (await copiarTexto(`${base}${basePathAluno}?modulo=${m.id}`)) toast.success('Link da trilha copiado')
     else toast.error('Não foi possível copiar o link.')
   }

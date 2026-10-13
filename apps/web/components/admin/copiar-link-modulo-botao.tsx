@@ -11,7 +11,8 @@ import { copiarTexto } from '@/lib/clipboard'
 export function CopiarLinkModuloBotao({ pastaId, claro = false }: { pastaId: string; claro?: boolean }) {
   const [copiado, setCopiado] = useState(false)
   async function copiar() {
-    const base = process.env.NEXT_PUBLIC_APP_URL || window.location.origin
+    // Host ATUAL do tenant (ex.: VND em vocenadefensoria) — NÃO o NEXT_PUBLIC_APP_URL global (revisaopge).
+    const base = window.location.origin || process.env.NEXT_PUBLIC_APP_URL
     if (await copiarTexto(`${base}/aluno/leitura?modulo=${pastaId}`)) { setCopiado(true); setTimeout(() => setCopiado(false), 2000) }
     else toast.error('Não foi possível copiar o link.')
   }

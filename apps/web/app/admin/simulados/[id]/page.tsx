@@ -1,4 +1,5 @@
 import { Suspense } from 'react'
+import { headers } from 'next/headers'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId, getCurrentTenant } from '@/lib/tenant'
 import { fetchAll } from '@/lib/supabase/fetch-all'
@@ -86,7 +87,11 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
     )
   }
 
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000'
+  // Host ATUAL do tenant (ex.: VND em vocenadefensoria) — NÃO o NEXT_PUBLIC_APP_URL global (revisaopge).
+  const hh = await headers()
+  const hostHdr = hh.get('x-forwarded-host') || hh.get('host') || ''
+  const protoHdr = hh.get('x-forwarded-proto') || (hostHdr.includes('localhost') || hostHdr.includes('127.0.0.1') ? 'http' : 'https')
+  const appUrl = hostHdr ? `${protoHdr}://${hostHdr}` : (process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000')
   // Loader configurado no tenant (mesma "linha que passa" do carregamento de rota) — usado nos
   // fallbacks de Suspense das abas, para a animação de carregamento ser consistente.
   const loaderEstilo = (((await getTenantTheme()).tema as Record<string, unknown> | null)?.loading_estilo as EstiloLoader) ?? 'skeleton'
