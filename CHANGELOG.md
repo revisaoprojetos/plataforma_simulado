@@ -12,6 +12,19 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.13.1 — 2026-10-13
+
+**fix(simulados): link de cópia usa o domínio do tenant atual (não o global)**
+
+- Os links copiados no admin (acesso ao simulado, snippet de embed e trilha da leitura)
+  usavam `NEXT_PUBLIC_APP_URL` (global = `revisaopge`), fazendo o **VND** copiar link com
+  `revisaopge.com.br` em vez de `vocenadefensoria` (e o MEQ idem).
+- Agora o domínio deriva do **host atual da request** (`x-forwarded-host`) nas páginas server
+  (`/admin/simulados`, `/admin/simulados/[id]`, `/admin/simulados/[id]/embed`) e de
+  `window.location.origin` nos botões client (copiar link do módulo/trilha).
+
+---
+
 ## 3.13.0 — 2026-10-13
 
 Desafio de Jurisprudência (arcade) + Leitura rápida + Leitor novo (mobile): correções de sequência e
