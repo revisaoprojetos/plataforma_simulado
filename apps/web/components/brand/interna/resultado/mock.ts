@@ -571,9 +571,12 @@ export function deriveSamples(brand: Brand, data: ResultadoInternoData): Resulta
       .slice(0, 5)
   }
 
-  // ranking (iniciais de exemplo; nunca nome real)
-  if (!out.ranking) {
-    out.ranking = buildRankingSample(brand, out, rng)
+  // ranking: o REAL (data.ranking, vindo do servidor) VENCE; o sample só preenche os campos que o real
+  // não traz (ex.: "questões mais difíceis", sem fonte real no resultado do aluno). Assim posição,
+  // percentil e classificação ficam consistentes (mesma fonte) e os blocos sem dado ainda renderizam.
+  {
+    const sampleRank = buildRankingSample(brand, out, rng)
+    out.ranking = out.ranking ? { ...sampleRank, ...out.ranking } : sampleRank
   }
 
   if (brand === 'meq' && out.corteEstimado == null) out.corteEstimado = 60

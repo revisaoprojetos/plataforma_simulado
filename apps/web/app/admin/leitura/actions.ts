@@ -21,6 +21,7 @@ import { resolverBlocos, type BlocoDef } from '@/lib/leitura/blocos'
 import { resolverTopicos, type TopicosConfig } from '@/lib/leitura/topicos'
 import { esquecer } from '@/lib/cache/relatorio-cache'
 import { invalidarRankingLeitura, carregarRankingModulo, type RankingLeituraItem } from '@/lib/leitura/ranking'
+import { carregarRelatorioModulo, type RelatorioModulo } from '@/lib/leitura/relatorio'
 import { classificarFormato } from '@/lib/simulado/formato'
 import { confirmarImportQuestoes } from '@/app/admin/banco-questoes/actions'
 import type { QuestaoImport } from '@/app/admin/banco-questoes/import-types'
@@ -913,6 +914,8 @@ export interface DetalheAulaRanking {
   leituraInicio: string | null; leituraFim: string | null; leituraTempoSeg: number | null
   quizInicio: string | null; quizFim: string | null
   tentativas: number // nº de tentativas do quiz registradas (>1 = o aluno refez)
+  /** Linha alternativa (áreas sem leitura/quiz com horário — ex.: juris: "N teses dominadas"). */
+  subtitulo?: string
 }
 export interface DetalheRankingAluno {
   nome: string; email: string | null
@@ -1586,4 +1589,20 @@ export async function obterRankingModulo(moduloId: string, fresco = false): Prom
     const r = await carregarRankingModulo(moduloId || '__geral__', g.tenantId)
     return { ok: true, itens: r.itens }
   } catch (e: any) { return { ok: false, error: e?.message ?? 'Falha ao carregar o ranking.' } }
+}
+
+/**
+ * Relatório do módulo — carregado SOB DEMANDA pelo cliente (não bloqueia o render da página, que
+ * pendurava quando o loader pesado demorava → "não abre"). Timeout de segurança (45s) para nunca
+ * ficar num spinner infinito; o resultado fica em cache no 1º sucesso.
+ */
+export async function obterRelatorioModulo(moduloId: string): Promise<{ ok: boolean; rel?: RelatorioModulo; error?: string }> {
+  const g = await guard('leitura:view'); if (!g.ok) return { ok: false, error: g.error }
+  try {
+    const rel = await Promise.race([
+      carregarRelatorioModulo(moduloId || '__geral__', g.tenantId),
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error('O relatório demorou demais para calcular.')), 45_000)),
+    ])
+    return { ok: true, rel }
+  } catch (e: any) { return { ok: false, error: e?.message ?? 'Falha ao carregar o relatório.' } }
 }

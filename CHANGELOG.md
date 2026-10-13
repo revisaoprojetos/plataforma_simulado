@@ -12,6 +12,30 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.12.0 — 2026-10-13
+
+Admin do Desafio de Jurisprudência: Ranking + Relatório ricos (reuso do Lei Seca) + modal do aluno;
+Relatório do Lei Seca destravado e otimizado (RPC); correção da leitura rápida (concluir + sequência).
+
+- **Ranking rico no juris (reuso, não cópia):** a aba Ranking passou a usar o `RankingAdmin` do Lei Seca
+  parametrizado de forma ADITIVA (pódio, chips, abas Pontos/Sequência/Dias, busca, filtros, export
+  CSV/Excel/Word/PDF, paginação, atualizando ao vivo, ocultar contas de teste) com **nome completo**.
+  Loader otimizado `carregarRankingJuris` (mesmo shape `RankingLeitura`).
+- **Relatório no juris (nova aba):** reusa o mesmo `LeituraRelatorio` (KPIs + adesão por dia + tops),
+  carregado sob demanda no cliente.
+- **Modal do aluno (3 pontinhos) no juris:** Visão geral + **Sequência editável** (calendário do suporte:
+  marcar/desconsiderar/salvar), reusando o `DetalheAlunoModal` com loaders injetáveis. O ajuste da
+  sequência passa a valer (mesmo `calcularSequencia`). Migração `20261013000003_juris_sequencia_ajuste`.
+- **Relatório do Lei Seca destravado + otimizado:** carregava pesado e **não abria** (puxava ~12k+
+  respostas/XP e pendurava o render). Agora carrega **no cliente** (spinner + timeout) e usa uma **RPC
+  agregada** (`rpc_leitura_relatorio_json`); o juris tem a sua (`rpc_juris_relatorio_json`) p/ escala.
+  Fallback para o caminho antigo se a RPC não estiver aplicada.
+- **Leitura rápida — concluir + sequência (correção):** o HTML do JurisClub é um slide isolado que NÃO
+  reportava as respostas → nada salvava e o desafio não liberava. Agora há o botão **"Concluir leitura"**
+  no player (grava o gate que libera o dia, independente da tabela da leitura rápida) e, no juris, a
+  conclusão **conta na sequência** (ledger `origem='jurisprudencia'`, dia de hoje BRT).
+- **Build:** `obterRankingJuris` "ao vivo" sempre fresco; invalidação de cache ao salvar sequência.
+
 ## 3.11.1 — 2026-10-13
 
 Copiar link do Desafio de Jurisprudência + correção da sequência da leitura.

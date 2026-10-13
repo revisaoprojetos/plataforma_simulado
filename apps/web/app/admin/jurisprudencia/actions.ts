@@ -8,6 +8,14 @@ import { criarPastaFolder } from '@/app/admin/banco-questoes/actions'
 import { criarDocumento } from '@/app/admin/leitura/actions'
 import { hospedarAudioBase64 } from '@/lib/storage/hospedar-base64'
 import type { DesafioJogo } from '@/lib/jurisprudencia/conteudo'
+import { carregarRankingJuris, invalidarRankingJuris } from '@/lib/jurisprudencia/ranking'
+import { carregarRelatorioJuris } from '@/lib/jurisprudencia/relatorio'
+import { lerDesafioJogo, preencherTesesPorQuiz } from '@/lib/jurisprudencia/conteudo'
+import { diasAtivosPorAluno } from '@/lib/jurisprudencia/sequencia'
+import { calcularSequencia } from '@/lib/leitura/sequencia'
+import type { RankingLeituraItem } from '@/lib/leitura/ranking'
+import type { RelatorioModulo } from '@/lib/leitura/relatorio'
+import type { DetalheRankingAluno, DetalheAulaRanking } from '@/app/admin/leitura/actions'
 
 /**
  * Admin do Desafio de Jurisprudência (JurisClub). O desafio é uma PASTA
@@ -21,6 +29,109 @@ async function guard(perm: string) {
   const access = await getCurrentAccess()
   if (!access.tenantId) return { ok: false as const, error: 'Tenant não resolvido.' }
   return { ok: true as const, tenantId: access.tenantId, atorId: access.userId ?? null }
+}
+
+/** Ranking do admin do desafio (polling "ao vivo" do RankingAdmin). `fresco` invalida o cache antes.
+ *  Default fresco=TRUE: o poll "ao vivo" do admin SEMPRE recalcula (instantâneo), sem esperar o TTL. */
+export async function obterRankingJuris(desafioId: string, fresco = true): Promise<{ ok: boolean; itens?: RankingLeituraItem[]; error?: string }> {
+  const g = await guard('leitura:view')
+  if (!g.ok) return { ok: false, error: g.error }
+  try {
+    if (fresco) await invalidarRankingJuris(g.tenantId, desafioId)
+    const r = await carregarRankingJuris(desafioId, g.tenantId)
+    return { ok: true, itens: r.itens }
+  } catch (e: any) { return { ok: false, error: e?.message ?? 'Falha ao carregar o ranking.' } }
+}
+
+/** Relatório do desafio — carregado SOB DEMANDA pelo cliente (não pendura o render). Timeout 45s. */
+export async function obterRelatorioJuris(desafioId: string): Promise<{ ok: boolean; rel?: RelatorioModulo; error?: string }> {
+  const g = await guard('leitura:view'); if (!g.ok) return { ok: false, error: g.error }
+  try {
+    const rel = await Promise.race([
+      carregarRelatorioJuris(desafioId, g.tenantId),
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error('O relatório demorou demais para calcular.')), 45_000)),
+    ])
+    return { ok: true, rel }
+  } catch (e: any) { return { ok: false, error: e?.message ?? 'Falha ao carregar o relatório.' } }
+}
+
+/**
+ * Detalhe do aluno no ranking do desafio (modal dos 3 pontinhos — Visão geral + Sequência). Mesmo
+ * shape do Lei Seca (`DetalheRankingAluno`) para reusar o `DetalheAlunoModal`. "Aulas feitas" = DIAS
+ * DOMINADOS (sem horários de leitura/quiz — o arcade não registra duração); `diasAuto` = dias de
+ * atividade do ledger (p/ o calendário da sequência); overrides = ajuste manual do suporte.
+ */
+export async function detalheRankingAlunoJuris(desafioId: string, estudanteId: string): Promise<{ ok: boolean; detalhe?: DetalheRankingAluno; error?: string }> {
+  const g = await guard('leitura:view'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const dj = await lerDesafioJogo(svc, desafioId)
+  const diasObj = dj?.dias && typeof dj.dias === 'object' ? (dj.dias as Record<string, any>) : {}
+  const diasComTeses = await preencherTesesPorQuiz(svc, diasObj).catch(() => diasObj)
+  const diasChaves = Object.keys(diasComTeses)
+  const tesesDoDia = (k: string): number => { const t = diasComTeses[k]?.teses; return Array.isArray(t) ? t.length : 0 }
+  const diaCompleto = (dom: any, k: string): boolean => { const arr = dom?.[k]; const n = tesesDoDia(k); return n > 0 && Array.isArray(arr) && arr.length >= n }
+  const tituloDia = (k: string): string => (diasComTeses[k]?.titulo || '').toString().trim() || `Dia ${k}`
+
+  const { data: prog } = await svc.from('simulado_jurisprudencia_progresso').select('dom, best, atualizado_em').eq('desafio_id', desafioId).eq('estudante_id', estudanteId).maybeSingle()
+  const dom = (prog as any)?.dom ?? {}
+  const best = (prog as any)?.best ?? {}
+
+  const aulas: DetalheAulaRanking[] = []
+  let pontosTotal = 0
+  for (const k of diasChaves) {
+    const pts = Math.max(0, Number(best[k]) || 0)
+    pontosTotal += pts
+    if (diaCompleto(dom, k)) {
+      const n = tesesDoDia(k)
+      aulas.push({ titulo: tituloDia(k), data: null, pontos: pts, leituraInicio: null, leituraFim: null, leituraTempoSeg: null, quizInicio: null, quizFim: null, tentativas: 0, subtitulo: `${n} tese${n > 1 ? 's' : ''} dominada${n > 1 ? 's' : ''}` })
+    }
+  }
+
+  const diasMap = await diasAtivosPorAluno(svc, g.tenantId, desafioId, new Map([[estudanteId, (prog as any)?.atualizado_em ?? null]]), [estudanteId]).catch(() => new Map<string, Set<string>>())
+  const diasAuto = [...(diasMap.get(estudanteId) ?? new Set<string>())].sort()
+
+  let overrides: Record<string, boolean> = {}
+  try {
+    const { data: aj } = await svc.from('simulado_jurisprudencia_sequencia_ajuste').select('overrides').eq('tenant_id', g.tenantId).eq('estudante_id', estudanteId).eq('desafio_id', desafioId).maybeSingle()
+    if (aj && (aj as any).overrides && typeof (aj as any).overrides === 'object') overrides = (aj as any).overrides as Record<string, boolean>
+  } catch { /* migração pendente → sem ajuste */ }
+
+  const tz = 'America/Sao_Paulo'
+  const hoje = new Date().toLocaleDateString('en-CA', { timeZone: tz })
+  const ontem = new Date(Date.parse(hoje + 'T00:00:00Z') - 86_400_000).toISOString().slice(0, 10)
+  const seq = calcularSequencia(diasAuto, overrides, hoje, ontem)
+
+  const { data: est } = await svc.from('simulado_estudantes').select('nome, email').eq('id', estudanteId).eq('tenant_id', g.tenantId).maybeSingle()
+
+  return {
+    ok: true,
+    detalhe: {
+      nome: (est as any)?.nome ?? 'Aluno', email: (est as any)?.email ?? null,
+      streakAtual: seq.streakAtual, streakMaior: seq.streakMaior, ultimoDiaAtivo: diasAuto[diasAuto.length - 1] ?? null,
+      totalAulas: diasChaves.length, aulasConcluidas: aulas.length, pontosTotal, aulas,
+      tz, hoje, diasAuto, overrides, diaAulas: {},
+    },
+  }
+}
+
+/** Salva o ajuste manual da sequência do aluno no desafio (calendário do suporte). Upsert por
+ *  (tenant, aluno, desafio) + invalida o cache do ranking. Tolerante à migração ausente. */
+export async function salvarSequenciaAjusteJuris(desafioId: string, estudanteId: string, overrides: Record<string, boolean>): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const limpo: Record<string, boolean> = {}
+  for (const [k, v] of Object.entries(overrides ?? {})) if (/^\d{4}-\d{2}-\d{2}$/.test(k)) limpo[k] = !!v
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_jurisprudencia_sequencia_ajuste').upsert(
+    { tenant_id: g.tenantId, estudante_id: estudanteId, desafio_id: desafioId, overrides: limpo, atualizado_por: g.atorId, atualizado_em: new Date().toISOString() },
+    { onConflict: 'tenant_id,estudante_id,desafio_id' },
+  )
+  if (error) {
+    if (/does not exist|schema cache|42P01/i.test(error.message)) return { ok: false, error: 'Aplique a migração 20261013000003_juris_sequencia_ajuste.' }
+    return { ok: false, error: error.message }
+  }
+  await invalidarRankingJuris(g.tenantId, desafioId).catch(() => {})
+  revalidatePath('/admin/jurisprudencia')
+  return { ok: true }
 }
 
 /** Lê o desafio_jogo atual da pasta (p/ merge). Retorna {} se vazio; null se a pasta não é válida. */

@@ -8,8 +8,7 @@ import { PublicarModuloBotao } from '@/components/admin/publicar-modulo-botao'
 import { CopiarLinkModuloBotao } from '@/components/admin/copiar-link-modulo-botao'
 import { RankingAdmin } from '@/components/admin/ranking-admin'
 import { carregarRankingModulo } from '@/lib/leitura/ranking'
-import { LeituraRelatorio } from '@/components/admin/leitura-relatorio'
-import { carregarRelatorioModulo } from '@/lib/leitura/relatorio'
+import { RelatorioAsync } from '@/components/admin/relatorio-async'
 import { ModuloMedalhasForm } from '@/components/admin/modulo-medalhas-form'
 import { carregarCarimbosModulo, carregarConquistasModulo, listarAulasDoModulo } from './actions'
 import { getCurrentTenant, getCurrentTenantId } from '@/lib/tenant'
@@ -89,7 +88,7 @@ export default async function LeituraAdminPage({ searchParams }: { searchParams:
           )}
           {/* Relatório completo do módulo (adesão, sequências, pontuação, tempos + export Excel). */}
           {moduloTab === 'relatorio' && pasta && (
-            <LeituraRelatorio rel={await carregarRelatorioModulo(pasta, (await getCurrentTenantId()) ?? '')} moduloId={pasta} />
+            <RelatorioAsync moduloId={pasta} area="leitura" />
           )}
           {/* Medalhas: conquistas próprias do módulo (ícone + condição) + carimbos (imagem na trilha). */}
           {moduloTab === 'medalhas' && pasta && await (async () => {

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { checkPermission, getCurrentAccess } from '@/lib/auth/permissions'
-import { fetchAll } from '@/lib/supabase/fetch-all'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { lerDesafioJogo, temAcessoDesafio, perfilAlunos, preencherTesesPorQuiz } from '@/lib/jurisprudencia/conteudo'
 import { diasAtivosPorAluno, streakDe } from '@/lib/jurisprudencia/sequencia'
 
@@ -51,10 +51,24 @@ export async function GET(request: NextRequest) {
     diasEscopo = (alvo?.dias ?? []).map((n: number) => String(n))
   }
 
+  // Contas OCULTAS do ranking: ranking_ocultos da pasta (estudantes + membros dos grupos) + testadores
+  // (modo teste / acesso exclusivo). Mesma regra do ranking ADMIN (lib/jurisprudencia/ranking.ts) — o
+  // aviso no admin diz que essas contas "não contabilizam nada (sem XP, sequência ou ranking)".
+  const ocultosSet = new Set<string>()
+  try {
+    const { data: ro } = await svc.from('simulado_pastas').select('ranking_ocultos').eq('id', desafioId).eq('tenant_id', tenantId).maybeSingle()
+    const cfg = (ro as any)?.ranking_ocultos ?? {}
+    for (const id of (Array.isArray(cfg.estudantes) ? cfg.estudantes : [])) ocultosSet.add(id)
+    const grps = Array.isArray(cfg.grupos) ? cfg.grupos : []
+    if (grps.length) { const mem = await fetchAllByIn<{ estudante_id: string }>(grps, (chunk) => svc.from('simulado_grupo_membros').select('estudante_id').in('grupo_id', chunk)); for (const m of mem) ocultosSet.add(m.estudante_id) }
+  } catch { /* coluna ranking_ocultos ausente */ }
+  try { const { testadoresDoModulo } = await import('@/lib/leitura/testadores'); for (const id of await testadoresDoModulo(svc, tenantId, desafioId)) ocultosSet.add(id) } catch { /* ausente */ }
+
   // Progresso de TODOS os alunos do desafio (1 linha por aluno) — paginado (nunca trunca em 1000).
-  const progresso = await fetchAll<{ estudante_id: string; dom: any; best: any; atualizado_em: string | null }>(() =>
+  // Remove as contas ocultas/teste para não contaminarem pontos/selos/posições/total.
+  const progresso = (await fetchAll<{ estudante_id: string; dom: any; best: any; atualizado_em: string | null }>(() =>
     svc.from('simulado_jurisprudencia_progresso').select('estudante_id, dom, best, atualizado_em').eq('desafio_id', desafioId).order('estudante_id', { ascending: true }),
-  )
+  )).filter((p) => !ocultosSet.has(p.estudante_id))
 
   const pontosDe = (best: any): number => {
     if (!best || typeof best !== 'object') return 0
@@ -122,9 +136,13 @@ export async function GET(request: NextRequest) {
   const diasPorAluno = await diasAtivosPorAluno(svc, tenantId, desafioId, atualizadoPorAluno, ids).catch(() => new Map())
   const streakDeId = (id: string) => streakDe(diasPorAluno.get(id) ?? new Set<string>())
   const perfis = await perfilAlunos(svc, tenantId, ids)
+  // ADMIN (sem sessão de aluno) vê o NOME COMPLETO, igual ao ranking do Lei Seca. O ALUNO continua
+  // só com iniciais (privacidade — não expor nome dos outros no jogo).
+  const ehAdmin = !estudanteId
   const rows = selecionadas.map((l) => {
     const p = perfis.get(l.estudanteId)
     return {
+      ...(ehAdmin ? { nome: p?.nome ?? '?' } : {}),
       ini: p?.iniciais ?? '?', cargo: p?.cargo ?? '', cargoIcone: p?.cargoIcone ?? '', nivel: p?.nivel ?? 1,
       avatar: p?.avatar ?? null, avatarCor: p?.avatarCor ?? null,
       pos: posPorId.get(l.estudanteId) ?? 0,

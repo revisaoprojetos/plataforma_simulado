@@ -188,6 +188,8 @@ export function Btn({
   kind = 'ghost',
   h = 36,
   href,
+  onClick,
+  ativo,
 }: {
   brand: Brand
   icon?: LucideIcon
@@ -195,6 +197,10 @@ export function Btn({
   kind?: 'ghost' | 'accent' | 'primary'
   h?: number
   href?: string | null
+  /** Com `onClick` o botão fica INTERATIVO (vira <button>); sem href/onClick, é um rótulo inerte. */
+  onClick?: () => void
+  /** Estado "ligado" (ex.: favoritado) — preenche com a cor da marca. */
+  ativo?: boolean
 }) {
   const r = brand === 'meq' ? 10 : brand === 'vnd' ? 12 : 11
   const base: CSSProperties = {
@@ -235,10 +241,78 @@ export function Btn({
       </a>
     )
   }
+  if (onClick) {
+    const st: CSSProperties = ativo ? { ...base, background: acc(brand), color: '#FFFFFF', border: '0' } : base
+    return (
+      <button type="button" onClick={onClick} style={{ ...st, cursor: 'pointer' }}>
+        {inner}
+      </button>
+    )
+  }
   return (
     <span aria-hidden style={{ ...base, opacity: 0.55, cursor: 'default' }}>
       {inner}
     </span>
+  )
+}
+
+const REPORT_TIPOS = [
+  { value: 'erro_gabarito', label: 'Gabarito' },
+  { value: 'enunciado_confuso', label: 'Enunciado' },
+  { value: 'desatualizada', label: 'Desatualizada' },
+  { value: 'outro', label: 'Outro' },
+]
+
+/** Ações da questão no resultado (Simulados realizados): SALVAR (favoritar) + REPORTAR erro. NÃO existe
+ *  "Refazer" aqui — a questão já foi respondida no simulado e a resposta é imutável. */
+function AcoesCorrecao({ brand, sessaoId, questaoId }: { brand: Brand; sessaoId?: string | null; questaoId?: string }) {
+  const [salvo, setSalvo] = useState(false)
+  const [salvando, setSalvando] = useState(false)
+  const [rep, setRep] = useState<'fechado' | 'aberto' | 'enviado'>('fechado')
+  const [tipo, setTipo] = useState('erro_gabarito')
+  const [msg, setMsg] = useState('')
+  const [enviando, setEnviando] = useState(false)
+
+  async function salvar() {
+    if (!questaoId || salvando) return
+    setSalvando(true)
+    try {
+      const r = await fetch('/api/aluno/favoritos', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ questao_id: questaoId }) })
+      if (r.ok) { const d = await r.json().catch(() => ({})); setSalvo(!!d.favorito) }
+    } finally { setSalvando(false) }
+  }
+  async function enviarReport() {
+    if (!sessaoId || !questaoId || enviando) return
+    setEnviando(true)
+    try {
+      const r = await fetch('/api/sessoes/reportar-erro', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessao_id: sessaoId, questao_id: questaoId, tipo, mensagem: msg }) })
+      if (r.ok) setRep('enviado')
+    } finally { setEnviando(false) }
+  }
+  if (!questaoId) return null
+  const podeReport = !!sessaoId
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <Btn brand={brand} icon={salvando ? Loader2 : Bookmark} onClick={salvar} ativo={salvo}>{salvo ? 'Salva' : 'Salvar'}</Btn>
+        {podeReport && rep !== 'enviado' && <Btn brand={brand} icon={Flag} onClick={() => setRep((s) => (s === 'aberto' ? 'fechado' : 'aberto'))}>Reportar</Btn>}
+        {rep === 'enviado' && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 700, color: OK }}><Check size={14} /> Reportado, obrigado!</span>}
+      </div>
+      {rep === 'aberto' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 12, borderRadius: 12, background: 'var(--surface2)', border: '1px solid var(--line)' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {REPORT_TIPOS.map((t) => (
+              <button key={t.value} type="button" onClick={() => setTipo(t.value)} style={{ height: 26, padding: '0 10px', borderRadius: 99, border: '1px solid var(--line)', background: tipo === t.value ? acc(brand) : 'transparent', color: tipo === t.value ? '#FFFFFF' : 'var(--muted)', fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }}>{t.label}</button>
+            ))}
+          </div>
+          <textarea value={msg} onChange={(e) => setMsg(e.target.value)} placeholder="Descreva o problema (opcional)" rows={2} maxLength={1000} style={{ width: '100%', resize: 'none', borderRadius: 10, border: '1px solid var(--line)', background: 'transparent', color: 'var(--ink)', padding: '8px 10px', fontSize: 13, outline: 'none' }} />
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <Btn brand={brand} icon={enviando ? Loader2 : Flag} onClick={enviarReport}>Enviar</Btn>
+            <button type="button" onClick={() => setRep('fechado')} style={{ background: 'none', border: 0, color: 'var(--muted)', fontSize: 12, cursor: 'pointer' }}>Cancelar</button>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -1195,7 +1269,7 @@ function Hdots({ hist }: { hist?: QStatus[] }) {
   )
 }
 
-function Qrow({ brand, item, mobile, open, onToggle, gabaritoLiberado }: { brand: Brand; item: ResCorrecao; mobile: boolean; open: boolean; onToggle: () => void; gabaritoLiberado: boolean }) {
+function Qrow({ brand, item, mobile, open, onToggle, gabaritoLiberado, sessaoId }: { brand: Brand; item: ResCorrecao; mobile: boolean; open: boolean; onToggle: () => void; gabaritoLiberado: boolean; sessaoId?: string | null }) {
   const { c, bg, lab } = stc(item.status)
   const r = brand === 'revisao' ? 14 : brand === 'vnd' ? 16 : 8
   const numR = brand === 'meq' ? 8 : brand === 'vnd' ? '50%' : 10
@@ -1249,11 +1323,7 @@ function Qrow({ brand, item, mobile, open, onToggle, gabaritoLiberado }: { brand
           </div>
         </div>
       ) : null}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <Btn brand={brand} icon={Bookmark}>Salvar</Btn>
-        <Btn brand={brand} icon={RefreshCw}>Refazer questão</Btn>
-        <Btn brand={brand} icon={Flag}>Reportar</Btn>
-      </div>
+      <AcoesCorrecao brand={brand} sessaoId={sessaoId} questaoId={item.questaoId} />
     </div>
   ) : null
   return (
@@ -1287,13 +1357,16 @@ export function QFilters({ brand, data, qf, setQf, showGerar }: { brand: Brand; 
           )
         })}
       </div>
-      {showGerar ? <Btn brand={brand} icon={Target} kind="accent" href={data.treinarErrosHref}>Gerar simulado com meus erros</Btn> : null}
+      {/* "Gerar simulado com meus erros": OCULTO por ora (feature ainda será construída). Reativar = flip. */}
+      {MOSTRAR_GERAR_ERROS && showGerar ? <Btn brand={brand} icon={Target} kind="accent" href={data.treinarErrosHref}>Gerar simulado com meus erros</Btn> : null}
     </div>
   )
 }
+// Flag temporária: esconde o CTA "Gerar simulado com meus erros" no tab de Questões até a feature existir.
+const MOSTRAR_GERAR_ERROS = false
 
 /** Correção questão-a-questão (de `data.correcao`): filtro por status + paginação local (20). */
-export function QList({ brand, data, mobile, qf, pg, setPg, openMap, toggleOpen }: { brand: Brand; data: ResultadoInternoData; mobile: boolean; qf: string; pg: number; setPg: (p: number) => void; openMap: Record<number, boolean>; toggleOpen: (ordem: number) => void }) {
+export function QList({ brand, data, mobile, qf, pg, setPg, openMap, toggleOpen, sessaoId }: { brand: Brand; data: ResultadoInternoData; mobile: boolean; qf: string; pg: number; setPg: (p: number) => void; openMap: Record<number, boolean>; toggleOpen: (ordem: number) => void; sessaoId?: string | null }) {
   const list = useMemo(() => data.correcao.filter((q) => matchFilter(q, qf)), [data.correcao, qf])
   const total = list.length
   const maxpg = Math.max(1, Math.ceil(total / PAGE))
@@ -1333,7 +1406,7 @@ export function QList({ brand, data, mobile, qf, pg, setPg, openMap, toggleOpen 
         <div style={{ padding: 30, textAlign: 'center', fontSize: 13, color: 'var(--muted)' }}>Nenhuma questão neste filtro.</div>
       ) : (
         slice.map((item) => (
-          <Qrow key={item.ordem} brand={brand} item={item} mobile={mobile} open={openMap[item.ordem] ?? item.ordem === firstOrdem} onToggle={() => toggleOpen(item.ordem)} gabaritoLiberado={data.gabaritoLiberado} />
+          <Qrow key={item.ordem} brand={brand} item={item} mobile={mobile} open={openMap[item.ordem] ?? item.ordem === firstOrdem} onToggle={() => toggleOpen(item.ordem)} gabaritoLiberado={data.gabaritoLiberado} sessaoId={sessaoId} />
         ))
       )}
       {maxpg > 1 ? <div style={{ marginTop: 4 }}>{pager}</div> : null}
@@ -1419,8 +1492,11 @@ function PeerRow({ peer, brand, highlight }: { peer: ResRankPeer; brand: Brand; 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: brand === 'meq' ? 8 : 12, background: highlight ? 'var(--chip)' : 'transparent', border: highlight ? `1px solid color-mix(in srgb,${acc(brand)} 35%,transparent)` : '1px solid transparent' }}>
       <span style={{ width: 26, fontSize: 12, fontWeight: 800, color: 'var(--muted)', textAlign: 'center' }}>{peer.posicao}º</span>
-      <span style={{ width: 30, height: 30, borderRadius: '50%', background: 'var(--surface2)', color: highlight ? acc(brand) : 'var(--muted)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-        {peer.voce ? <User size={15} /> : <span style={{ fontSize: 10, fontWeight: 800 }}>{peer.iniciais.replace(/\s/g, '')}</span>}
+      <span style={{ width: 30, height: 30, borderRadius: '50%', overflow: 'hidden', background: peer.avatarCor ?? 'var(--surface2)', color: highlight ? acc(brand) : 'var(--muted)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: peer.voce ? `2px solid ${acc(brand)}` : '1px solid var(--line)' }}>
+        {peer.avatar
+          // eslint-disable-next-line @next/next/no-img-element
+          ? <img src={peer.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: peer.avatar.includes('/mascote/') ? 'contain' : 'cover' }} />
+          : peer.voce ? <User size={15} /> : <span style={{ fontSize: 10, fontWeight: 800 }}>{peer.iniciais.replace(/\s/g, '')}</span>}
       </span>
       <b style={{ flex: 1, fontSize: 13, color: highlight ? acc(brand) : 'var(--ink)' }}>{peer.voce ? 'Você' : peer.iniciais}</b>
       <span style={{ fontSize: 12, color: 'var(--muted)' }}>{peer.acertos} ac.</span>
@@ -1461,7 +1537,7 @@ function DificeisBlock({ brand, data }: { brand: Brand; data: ResultadoInternoDa
     <Card brand={brand}>
       <Head brand={brand} icon={Flag} title="Questões mais difíceis para a turma" />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-        {r.dificeis.map((q) => (
+        {(r.dificeis ?? []).map((q) => (
           <div key={q.ordem} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderTop: '1px solid var(--line)' }}>
             <span style={{ width: 30, height: 30, borderRadius: 8, background: stc(q.seuStatus).bg, color: stc(q.seuStatus).c, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, flexShrink: 0 }}>{q.ordem}</span>
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -1492,8 +1568,11 @@ function PodioBlock({ data }: { data: ResultadoInternoData }) {
             const rank = i === 0 ? 2 : i === 1 ? 1 : 3
             return (
               <div key={p.posicao} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-                <span style={{ width: i === 1 ? 44 : 36, height: i === 1 ? 44 : 36, borderRadius: '50%', background: 'rgba(255,255,255,.12)', color: medals[rank - 1], display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Medal size={i === 1 ? 24 : 18} />
+                <span style={{ width: i === 1 ? 44 : 36, height: i === 1 ? 44 : 36, borderRadius: '50%', overflow: 'hidden', background: p.avatarCor ?? 'rgba(255,255,255,.12)', color: medals[rank - 1], display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, border: `2px solid ${medals[rank - 1]}` }}>
+                  {p.avatar
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={p.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: p.avatar.includes('/mascote/') ? 'contain' : 'cover' }} />
+                    : <Medal size={i === 1 ? 24 : 18} />}
                 </span>
                 <b style={{ fontSize: 11.5 }}>{p.iniciais}</b>
                 <span style={{ fontSize: 10.5, color: '#CFE3D7' }}>{fnum(p.nota)}</span>

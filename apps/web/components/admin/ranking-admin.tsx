@@ -11,6 +11,7 @@ import { AvatarEstudante } from '@/components/aluno/avatar-estudante'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { DetalheAlunoModal } from '@/components/aluno/leitura-ranking'
 import type { RankingLeitura, RankingLeituraItem, RankingStatus } from '@/lib/leitura/ranking'
+import type { DetalheRankingAluno } from '@/app/admin/leitura/actions'
 import { obterRankingModulo, carregarRankingOcultos, salvarRankingOcultos } from '@/app/admin/leitura/actions'
 import { baixarTabelaCsv, baixarTabelaExcel, baixarTabelaWord, baixarTabelaPdf } from '@/lib/relatorios/exportar-tabela'
 
@@ -76,7 +77,29 @@ function CountUp({ value, className }: { value: number; className?: string }) {
  * e ANIMA as mudanças — linhas deslizam para a nova posição (FLIP) e pontos/sequência fazem count-up +
  * destaque quando um aluno passa o outro. Ordenação PRINCIPAL = sequência; desempate = pontos.
  */
-export function RankingAdmin({ inicial, moduloId, moduloNome }: { inicial: RankingLeitura; moduloId: string; moduloNome?: string }) {
+export function RankingAdmin({
+  inicial, moduloId, moduloNome,
+  loader = obterRankingModulo,
+  rotulos,
+  detalheAluno = true,
+  detalheActions,
+}: {
+  inicial: RankingLeitura
+  moduloId: string
+  moduloNome?: string
+  /** Fonte do polling "ao vivo" + refetch (default = ranking do Lei Seca). A Jurisprudência injeta o seu. */
+  loader?: (moduloId: string, fresco?: boolean) => Promise<{ ok: boolean; itens?: RankingLeituraItem[]; error?: string }>
+  /** Rótulos customizáveis por área (ex.: "Aulas" → "Dias" no juris). */
+  rotulos?: { aulas?: string }
+  /** Liga o modal de detalhe do aluno (3 pontinhos: Visão geral + Sequência editável). */
+  detalheAluno?: boolean
+  /** Loaders do modal de detalhe por área (default = Lei Seca). Juris injeta os seus. */
+  detalheActions?: {
+    carregar: (moduloId: string, estudanteId: string) => Promise<{ ok: boolean; detalhe?: DetalheRankingAluno; error?: string }>
+    salvar: (moduloId: string, estudanteId: string, overrides: Record<string, boolean>) => Promise<{ ok: boolean; error?: string }>
+  }
+}) {
+  const rotAulas = rotulos?.aulas ?? 'Aulas'
   const [itens, setItens] = useState<RankingLeituraItem[]>(inicial.itens)
   const [busca, setBusca] = useState('')
   const [nivelMin, setNivelMin] = useState<number | ''>('')
@@ -120,12 +143,12 @@ export function RankingAdmin({ inicial, moduloId, moduloNome }: { inicial: Ranki
     let vivo = true
     const puxar = async () => {
       if (document.hidden) return
-      const r = await obterRankingModulo(moduloId).catch(() => null)
+      const r = await loader(moduloId).catch(() => null)
       if (vivo && r?.ok && r.itens) aplicar(r.itens)
     }
     const id = setInterval(puxar, POLL_MS)
     return () => { vivo = false; clearInterval(id) }
-  }, [aoVivo, moduloId, aplicar])
+  }, [aoVivo, moduloId, aplicar, loader])
 
   // Limpa flashes expirados.
   useEffect(() => {
@@ -238,7 +261,7 @@ export function RankingAdmin({ inicial, moduloId, moduloNome }: { inicial: Ranki
   const nomeArqExport = `ranking_${(moduloNome ?? 'modulo').replace(/\s+/g, '-').toLowerCase()}`
   const tituloExport = `Ranking — ${moduloNome ?? 'Módulo'}`
   const dadosExport = () => {
-    const head = ['#', 'Aluno', 'E-mail', 'Nível', 'Aulas', 'Total aulas', 'Progresso %', 'Sequência', 'Pontos', 'Último acesso', 'Status']
+    const head = ['#', 'Aluno', 'E-mail', 'Nível', rotAulas, `Total ${rotAulas.toLowerCase()}`, 'Progresso %', 'Sequência', 'Pontos', 'Último acesso', 'Status']
     const rows = lista.map((i) => [i.oculto ? '—' : (rankById.get(i.estudanteId) ?? ''), i.nome, i.email ?? '', i.nivel, i.aulasConcluidas, i.totalAulas, i.totalAulas > 0 ? Math.round((i.aulasConcluidas / i.totalAulas) * 100) : 0, i.streakAtual, i.score, ultAcesso(i.ultimoDiaAtivo), STATUS[i.status].rotulo])
     return { head, rows }
   }
@@ -258,7 +281,7 @@ export function RankingAdmin({ inicial, moduloId, moduloNome }: { inicial: Ranki
       const grupos = (atual.ok && Array.isArray((atual as any).grupos)) ? ((atual as any).grupos as any[]).map((g) => g.id ?? g) : []
       const r = await salvarRankingOcultos(moduloId, { estudantes: [...ids], grupos, total: false } as any)
       if (!r.ok) { toast.error(r.error ?? 'Falha ao salvar.'); return }
-      const fresh = await obterRankingModulo(moduloId, true)
+      const fresh = await loader(moduloId, true)
       if (fresh.ok && fresh.itens) aplicar(fresh.itens)
       setSel(new Set())
       toast.success(ocultar ? 'Ocultados do ranking.' : 'Reexibidos no ranking.')
@@ -337,7 +360,7 @@ export function RankingAdmin({ inicial, moduloId, moduloNome }: { inicial: Ranki
                 const alt = it.posicao === 1 ? 'h-24' : it.posicao === 2 ? 'h-16' : 'h-12'
                 const cor = it.posicao === 1 ? '#f5c518' : it.posicao === 2 ? '#c7cdd6' : '#cd8d4e'
                 return (
-                  <button key={it.estudanteId} type="button" onClick={() => setDetalhe(it)} className="group flex flex-col items-center text-center">
+                  <button key={it.estudanteId} type="button" onClick={() => { if (detalheAluno) setDetalhe(it) }} className="group flex flex-col items-center text-center">
                     <span className="relative mb-2 inline-flex rounded-full ring-2 ring-offset-2 ring-offset-background transition-transform group-hover:scale-105"
                       style={{ '--tw-ring-color': cor } as React.CSSProperties}>
                       {it.posicao === 1 && <Crown className="absolute -top-5 left-1/2 z-10 h-5 w-5 -translate-x-1/2 text-[#f5c518]" />}
@@ -375,7 +398,7 @@ export function RankingAdmin({ inicial, moduloId, moduloNome }: { inicial: Ranki
           <div className="inline-flex rounded-xl border bg-muted/40 p-1">
             <TabOrdem v="pontos" rotulo="Pontos" />
             <TabOrdem v="sequencia" rotulo="Sequência" />
-            <TabOrdem v="aulas" rotulo="Aulas" />
+            <TabOrdem v="aulas" rotulo={rotAulas} />
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -478,7 +501,7 @@ export function RankingAdmin({ inicial, moduloId, moduloNome }: { inicial: Ranki
                     <CountUp value={it.score} className={cn('text-base font-extrabold tabular-nums', flashOn ? 'text-primary' : 'text-foreground')} />
                   </td>
                   <td className="px-2 py-2.5 text-center">
-                    <button type="button" onClick={() => setDetalhe(it)} aria-label="Detalhes" className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><MoreVertical className="h-4 w-4" /></button>
+                    {detalheAluno && <button type="button" onClick={() => setDetalhe(it)} aria-label="Detalhes" className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><MoreVertical className="h-4 w-4" /></button>}
                   </td>
                 </tr>
               )
@@ -504,7 +527,7 @@ export function RankingAdmin({ inicial, moduloId, moduloNome }: { inicial: Ranki
         </div>
       </div>
 
-      {detalhe && <DetalheAlunoModal moduloId={moduloId} it={detalhe} onClose={() => setDetalhe(null)} />}
+      {detalheAluno && detalhe && <DetalheAlunoModal moduloId={moduloId} it={detalhe} onClose={() => setDetalhe(null)} carregarDetalhe={detalheActions?.carregar} salvarSequencia={detalheActions?.salvar} rotulos={rotulos} />}
     </div>
   )
 }

@@ -6,6 +6,7 @@ import { ehTestadorLeituraDoc } from '@/lib/leitura/testadores'
 import { onLeituraConcluida, onQuizConcluido } from '@/lib/gamificacao'
 import { invalidarRankingPorDocumento } from '@/lib/leitura/ranking'
 import { avaliarMedalhasPorDocumento } from '@/lib/leitura/carimbos'
+import { diaBRT } from '@/lib/jurisprudencia/sequencia'
 import type { RespostaRapida } from '@/lib/leitura/leitura-rapida'
 
 // "Leitura rápida" — progresso PERSISTIDO do caminho alternativo (leitura + questões num HTML isolado).
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const sessao = await getSessaoAluno()
   if (!sessao) return NextResponse.json({ message: 'Não autenticado.' }, { status: 401 })
-  let b: { documento_id?: string; versao?: number; respostas?: Record<string, { alternativa?: string; correta?: boolean }>; total?: number }
+  let b: { documento_id?: string; versao?: number; respostas?: Record<string, { alternativa?: string; correta?: boolean }>; total?: number; concluir?: boolean; desafio?: string }
   try { b = await request.json() } catch { return NextResponse.json({ message: 'Requisição inválida.' }, { status: 400 }) }
   const documentoId = b.documento_id
   if (!documentoId) return NextResponse.json({ message: 'Dados obrigatórios ausentes.' }, { status: 400 })
@@ -69,38 +70,52 @@ export async function POST(request: NextRequest) {
   if (!doc) return NextResponse.json({ message: 'Sem acesso a este documento.' }, { status: 403 })
 
   try {
-    // Estado atual (p/ saber se já concluiu → gamificação só UMA vez).
-    const { data: atual } = await svc.from('simulado_leitura_rapida_progresso')
-      .select('concluido_em').eq('tenant_id', sessao.tenantId).eq('estudante_id', sessao.estudanteId).eq('documento_id', documentoId).maybeSingle()
-    const jaConcluido = !!(atual as any)?.concluido_em
-    const concluirAgora = !jaConcluido && total > 0 && respondidas >= total
-    const concluidoEm = jaConcluido ? (atual as any).concluido_em : (concluirAgora ? new Date().toISOString() : null)
+    // Já concluiu? Checa o GATE (simulado_leitura_progresso), tabela que SEMPRE existe → a conclusão
+    // (e os créditos) NÃO dependem da migração da leitura rápida. Créditos disparam UMA vez.
+    const { data: gate } = await svc.from('simulado_leitura_progresso')
+      .select('concluido_em').eq('estudante_id', sessao.estudanteId).eq('documento_id', documentoId).eq('documento_versao', versao).maybeSingle()
+    const jaConcluido = !!(gate as any)?.concluido_em
+    // Conclui quando TODAS as questões foram feitas OU quando o aluno clica "Concluir leitura" no player
+    // (`concluir`) — o HTML do JurisClub é um slide isolado que não reporta as respostas.
+    const concluirAgora = !jaConcluido && (b.concluir === true || (total > 0 && respondidas >= total))
+    const concluidoEm = jaConcluido ? (gate as any).concluido_em : (concluirAgora ? new Date().toISOString() : null)
 
-    const { error } = await svc.from('simulado_leitura_rapida_progresso').upsert({
-      tenant_id: sessao.tenantId, estudante_id: sessao.estudanteId, documento_id: documentoId,
-      respostas, respondidas, total, acertos, concluido_em: concluidoEm, atualizado_em: new Date().toISOString(),
-    }, { onConflict: 'estudante_id,documento_id' })
-    if (error) return NextResponse.json({ ok: false, message: error.message })
+    // Marcações da leitura rápida (retomar) — BEST-EFFORT: se a migração não rodou, NÃO bloqueia a conclusão.
+    try {
+      await svc.from('simulado_leitura_rapida_progresso').upsert({
+        tenant_id: sessao.tenantId, estudante_id: sessao.estudanteId, documento_id: documentoId,
+        respostas, respondidas, total, acertos, concluido_em: concluidoEm, atualizado_em: new Date().toISOString(),
+      }, { onConflict: 'estudante_id,documento_id' })
+    } catch { /* tabela da leitura rápida ausente → segue (o gate abaixo é o que libera o desafio) */ }
 
     if (concluirAgora) {
       // MODO TESTE (acesso exclusivo): conclui p/ o testador ver, mas NÃO contabiliza nada.
       const testador = await ehTestadorLeituraDoc(svc, sessao.tenantId, sessao.estudanteId, documentoId)
       if (!testador) {
-        // Marca a LEITURA concluída (caminho rápido ignora o tempo mínimo) — alimenta o check "aula concluída".
+        // Marca a LEITURA concluída (caminho rápido ignora o tempo mínimo) — LIBERA o desafio do dia.
         await svc.from('simulado_leitura_progresso').upsert({
           tenant_id: sessao.tenantId, estudante_id: sessao.estudanteId, documento_id: documentoId, documento_versao: versao,
           pct: 100, concluido_em: concluidoEm, atualizado_em: new Date().toISOString(),
         }, { onConflict: 'estudante_id,documento_id,documento_versao' })
         // Gamificação do desafio: leitura (XP) + quiz (combo/sequência). Idempotente por documento no ledger.
         void onLeituraConcluida(svc, { tenantId: sessao.tenantId, estudanteId: sessao.estudanteId, documentoId })
-        void onQuizConcluido(svc, { tenantId: sessao.tenantId, estudanteId: sessao.estudanteId, documentoId, acertos, total })
+        void onQuizConcluido(svc, { tenantId: sessao.tenantId, estudanteId: sessao.estudanteId, documentoId, acertos, total: Math.max(total, respondidas) })
         void avaliarMedalhasPorDocumento(svc, sessao.tenantId, documentoId, sessao.estudanteId)
         void invalidarRankingPorDocumento(svc, sessao.tenantId, documentoId)
+        // SEQUÊNCIA DO DESAFIO DE JURISPRUDÊNCIA: grava o DIA DE HOJE (BRT) no ledger imutável
+        // (origem='jurisprudencia', meta.dia/meta.desafio) — MESMO marcador do arcade → a conclusão da
+        // leitura rápida passa a CONTAR na sequência do juris. Idempotente por ref_id='<desafio>:<hoje>'.
+        if (b.desafio) {
+          const hoje = diaBRT()
+          void svc.from('simulado_xp_eventos').upsert(
+            [{ tenant_id: sessao.tenantId, estudante_id: sessao.estudanteId, origem: 'jurisprudencia', ref_id: `${b.desafio}:${hoje}`, xp: 0, meta: { dia: hoje, desafio: b.desafio } }],
+            { onConflict: 'tenant_id,estudante_id,origem,ref_id', ignoreDuplicates: true },
+          ).then(() => {}, () => {})
+        }
       }
     }
     return NextResponse.json({ ok: true, respondidas, total, acertos, concluido: !!concluidoEm, concluiuAgora: concluirAgora })
   } catch (e: any) {
-    // Migração ausente → não quebra o player (só não persiste/retoma).
     return NextResponse.json({ ok: false, message: e?.message ?? 'Leitura rápida indisponível.' })
   }
 }

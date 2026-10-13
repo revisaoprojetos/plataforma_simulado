@@ -6,7 +6,7 @@ import type { RelatorioModulo } from '@/lib/leitura/relatorio'
 
 const fmt = (n: number) => n.toLocaleString('pt-BR')
 const fmtSeg = (s: number) => (!s ? '—' : s >= 3600 ? `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m` : s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`)
-const diaCurto = (d: string) => { const [, m, dd] = d.split('-'); return `${dd}/${m}` }
+const diaCurto = (d: string) => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(d); return m ? `${m[3]}/${m[2]}` : d }
 
 function Kpi({ icon: Icon, label, valor, sub, tom = 'text-primary' }: { icon: typeof Users; label: string; valor: string | number; sub?: string; tom?: string }) {
   return (
@@ -40,7 +40,24 @@ function TopLista({ titulo, itens, unidade, icon: Icon }: { titulo: string; iten
   )
 }
 
-export function LeituraRelatorio({ rel, moduloId }: { rel: RelatorioModulo; moduloId: string }) {
+export function LeituraRelatorio({ rel, moduloId, rotulos }: { rel: RelatorioModulo | null; moduloId: string; rotulos?: { aulas?: string; aulaSingular?: string; excelHref?: string | null } }) {
+  // GUARD: o loader é pesado (varre respostas/XP do módulo). Se falhar/estourar o tempo, NÃO deixamos a
+  // exceção subir e quebrar a página inteira do admin — mostramos um estado de erro gracioso.
+  if (!rel) {
+    return (
+      <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-8 text-center">
+        <p className="text-sm font-medium text-destructive">Não foi possível carregar o relatório agora.</p>
+        <p className="mx-auto mt-1 max-w-md text-xs text-muted-foreground">O cálculo pode ter excedido o tempo (base grande). Recarregue a página em instantes — o resultado fica em cache depois do primeiro carregamento.</p>
+      </div>
+    )
+  }
+  // Rótulos de unidade (reuso: "Aulas/aula" no Lei Seca, "Dias/dia" no juris).
+  const uniPlural = rotulos?.aulas ?? 'Aulas'           // "Aulas" | "Dias"
+  const uniPluralL = uniPlural.toLowerCase()             // "aulas" | "dias"
+  const uniSing = rotulos?.aulaSingular ?? 'aula'        // "aula" | "dia"
+  const uniSingCap = uniSing.charAt(0).toUpperCase() + uniSing.slice(1)
+  // Excel: default = endpoint da leitura; `null` esconde o botão (juris não tem export Excel).
+  const excelHref = rotulos?.excelHref === undefined ? `/api/admin/leitura/relatorio-excel?modulo=${moduloId}` : rotulos.excelHref
   const maxDia = Math.max(1, ...rel.porDia.map((d) => d.alunos))
   return (
     <div className="space-y-4">
@@ -48,18 +65,20 @@ export function LeituraRelatorio({ rel, moduloId }: { rel: RelatorioModulo; modu
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-lg font-bold tracking-tight">Relatório do módulo</h2>
-          <p className="text-xs text-muted-foreground">Adesão, sequências, pontuação e tempos por aula. Exporte tudo em Excel (várias abas + resumo).</p>
+          <p className="text-xs text-muted-foreground">Adesão, sequências, pontuação e tempos por {uniSing}.{excelHref ? ' Exporte tudo em Excel (várias abas + resumo).' : ''}</p>
         </div>
-        <a href={`/api/admin/leitura/relatorio-excel?modulo=${moduloId}`}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90">
-          <Download className="h-4 w-4" /> Baixar Excel
-        </a>
+        {excelHref && (
+          <a href={excelHref}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90">
+            <Download className="h-4 w-4" /> Baixar Excel
+          </a>
+        )}
       </div>
 
       {/* KPIs */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi icon={Users} label="Alunos participantes" valor={fmt(rel.totalAlunos)} sub={`${rel.mediaAulasPorAluno} aulas/aluno em média`} />
-        <Kpi icon={BookCheck} label="Aulas concluídas" valor={fmt(rel.aulasConcluidasTotal)} sub={`de ${rel.totalAulas} aulas no módulo`} />
+        <Kpi icon={Users} label="Alunos participantes" valor={fmt(rel.totalAlunos)} sub={`${rel.mediaAulasPorAluno} ${uniPluralL}/aluno em média`} />
+        <Kpi icon={BookCheck} label={`${uniPlural} concluídas`} valor={fmt(rel.aulasConcluidasTotal)} sub={`de ${rel.totalAulas} ${uniPluralL}`} />
         <Kpi icon={Flame} label="Sequência" valor={rel.seqMedia} sub={`maior: ${rel.seqMaior} dias`} tom="text-amber-500" />
         <Kpi icon={Zap} label="Pontos (média)" valor={fmt(rel.pontosMedia)} sub={`maior: ${fmt(rel.pontosMaior)} · total ${fmt(rel.pontosTotal)}`} />
       </div>
@@ -67,10 +86,10 @@ export function LeituraRelatorio({ rel, moduloId }: { rel: RelatorioModulo; modu
       {/* Adesão por dia */}
       <div className="rounded-2xl border bg-card p-4 shadow-sm">
         <h3 className="mb-3 flex items-center gap-1.5 text-sm font-semibold"><TrendingUp className="h-4 w-4 text-primary" /> Adesão por dia</h3>
-        {rel.porDia.length === 0 ? <p className="py-6 text-center text-sm text-muted-foreground">Nenhuma aula concluída ainda.</p> : (
+        {rel.porDia.length === 0 ? <p className="py-6 text-center text-sm text-muted-foreground">Nenhum registro ainda.</p> : (
           <div className="flex items-end gap-1.5 overflow-x-auto pb-1" style={{ minHeight: 140 }}>
             {rel.porDia.map((d) => (
-              <div key={d.dia} className="flex min-w-[34px] flex-1 flex-col items-center gap-1" title={`${d.dia}: ${d.alunos} alunos · ${d.aulas} aulas`}>
+              <div key={d.dia} className="flex min-w-[34px] flex-1 flex-col items-center gap-1" title={`${d.dia}: ${d.alunos} alunos · ${d.aulas} ${uniPluralL}`}>
                 <span className="text-[10px] font-semibold tabular-nums text-muted-foreground">{d.alunos}</span>
                 <div className="flex w-full items-end justify-center" style={{ height: 96 }}>
                   <div className="w-full max-w-[26px] rounded-t bg-primary/80" style={{ height: `${Math.round((d.alunos / maxDia) * 96)}px` }} />
@@ -90,13 +109,13 @@ export function LeituraRelatorio({ rel, moduloId }: { rel: RelatorioModulo; modu
 
       {/* Por aula */}
       <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-        <div className="border-b p-4"><h3 className="flex items-center gap-1.5 text-sm font-semibold"><Clock className="h-4 w-4 text-primary" /> Por aula</h3></div>
+        <div className="border-b p-4"><h3 className="flex items-center gap-1.5 text-sm font-semibold"><Clock className="h-4 w-4 text-primary" /> Por {uniSing}</h3></div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="border-b bg-muted text-left text-muted-foreground">
               <tr>
                 <th className="w-14 px-4 py-2.5 text-center font-medium">Dia</th>
-                <th className="px-4 py-2.5 font-medium">Aula</th>
+                <th className="px-4 py-2.5 font-medium">{uniSingCap}</th>
                 <th className="px-4 py-2.5 text-center font-medium">Concluíram</th>
                 <th className="px-4 py-2.5 text-center font-medium">Leitura (méd.)</th>
                 <th className="px-4 py-2.5 text-center font-medium">Quiz (méd.)</th>

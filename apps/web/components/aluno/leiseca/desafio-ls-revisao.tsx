@@ -151,7 +151,8 @@ export function DesafioLSRevisao({
   useEffect(() => { setDy(idxAtual >= 0 ? idxAtual : 0) }, [idxAtual])
 
   const progressoPct = totalDias > 0 ? Math.round((diasConcluidos / totalDias) * 100) : 0
-  const pontos = useMemo(() => desempenho.reduce((s, a) => s + (a.pontos || 0), 0), [desempenho])
+  // Total = pontos BASE das aulas + pontos EXTRAS (bônus de sequência/conclusão) — igual ao ranking.
+  const pontos = useMemo(() => desempenho.reduce((s, a) => s + (a.pontos || 0) + (a.pontosExtra || 0), 0), [desempenho])
   const posicao = minhaLinha?.posicao ?? rankingAtivo.itens.find((r) => r.estudanteId === meuId)?.posicao ?? null
 
   const TABS: { k: Tab; label: string; icon: React.ReactNode }[] = [
@@ -363,7 +364,7 @@ function AulaDoDiaCard({ sel, selDesemp, dy, idxAtual, testador = false }: { sel
   const ringOff = ringLen * (1 - (concluida ? 100 : leituraPct) / 100)
   const statusTxt = concluida ? 'Concluída' : bloqueada ? 'Bloqueada' : 'Em andamento'
   const qTxt = selDesemp && selDesemp.questoesTotal > 0 ? `${selDesemp.questoesRespondidas}/${selDesemp.questoesTotal}` : '0/10'
-  const ptsTxt = selDesemp && selDesemp.pontos > 0 ? `+${selDesemp.pontos}` : '—'
+  const ptsTxt = selDesemp && (selDesemp.pontos > 0 || selDesemp.pontosExtra > 0) ? `+${selDesemp.pontos + (selDesemp.pontosExtra || 0)}` : '—'
   const ctaLab = concluida ? 'Revisar aula' : leituraPct > 0 ? 'Continuar leitura' : 'Começar aula'
   const href = sel.hrefLeitura ?? sel.href ?? '#'
 
@@ -1156,8 +1157,13 @@ function AbaDesempenho({
                 {a.sequencia > 0 ? (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12.5, fontWeight: 700, color: '#F0773A' }}><Flame size={13} /> {a.sequencia}</span>
                 ) : <span style={{ color: 'var(--muted)' }}>—</span>}
-                {/* Pontos */}
-                {a.pontos > 0 ? <b style={{ fontSize: 12.5, color: 'var(--brand)' }}>+{a.pontos}</b> : <b style={{ fontSize: 12.5, color: 'var(--muted)' }}>—</b>}
+                {/* Pontos (base + bônus de sequência/conclusão) */}
+                {a.pontos > 0 || a.pontosExtra > 0 ? (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                    <b style={{ fontSize: 12.5, color: 'var(--brand)' }}>+{a.pontos}</b>
+                    {a.pontosExtra > 0 ? <span title="Bônus (sequência/conclusão)" style={{ fontSize: 10, fontWeight: 800, color: '#C98A12', background: 'rgba(232,169,58,.18)', borderRadius: 99, padding: '1px 6px', whiteSpace: 'nowrap' }}>+{a.pontosExtra} bônus</span> : null}
+                  </span>
+                ) : <b style={{ fontSize: 12.5, color: 'var(--muted)' }}>—</b>}
                 {/* Situação */}
                 {concl ? (
                   <PillR cor="#1FA868" icon={<Check size={11} strokeWidth={3} />}>Concluída</PillR>

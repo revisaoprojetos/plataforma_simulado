@@ -14,8 +14,11 @@ import { toast } from 'sonner'
 import { ChevronLeft, Loader2, CheckCircle2, Zap } from 'lucide-react'
 import { parseEventoLeituraRapida, montarRestauracaoLeituraRapida, type RespostaRapida } from '@/lib/leitura/leitura-rapida'
 
-export function LeituraRapidaPlayer({ documentoId, versao, html, titulo, voltarHref }: {
+export function LeituraRapidaPlayer({ documentoId, versao, html, titulo, voltarHref, desafio }: {
   documentoId: string; versao: number; html: string; titulo?: string; voltarHref?: string
+  /** Id do Desafio de Jurisprudência (quando a leitura rápida é a leitura do dia do juris): ao concluir,
+   *  grava o dia no ledger da sequência do juris (origem='jurisprudencia'). Vazio no Lei Seca. */
+  desafio?: string
 }) {
   // Repara placeholders MAL-FORMADOS do HTML colado: o gerador às vezes emite "{{a.l})" (só um "}") →
   // o framework de template não substitui a LETRA da alternativa e ela aparece literal ("{{a.l})") para
@@ -45,7 +48,7 @@ export function LeituraRapidaPlayer({ documentoId, versao, html, titulo, voltarH
     setSalvando(true)
     fetch('/api/leitura/rapida', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ documento_id: documentoId, versao, respostas: respostasRef.current, total: totalRef.current }),
+      body: JSON.stringify({ documento_id: documentoId, versao, respostas: respostasRef.current, total: totalRef.current, desafio }),
     })
       .then((r) => r.json().catch(() => ({})))
       .then((r) => {
@@ -57,7 +60,31 @@ export function LeituraRapidaPlayer({ documentoId, versao, html, titulo, voltarH
         salvandoRef.current = false; setSalvando(false)
         if (pendenteRef.current) { pendenteRef.current = false; persistir() } // coalescência: salva o último estado
       })
-  }, [documentoId, versao])
+  }, [documentoId, versao, desafio])
+
+  // CONCLUIR (nível plataforma): o HTML do JurisClub é um slide isolado que NÃO reporta as respostas,
+  // então o aluno conclui aqui. Grava o GATE (libera o desafio do dia) e volta ao desafio.
+  const [concluindo, setConcluindo] = useState(false)
+  const concluir = useCallback(() => {
+    if (concluindo || concluidoRef.current) return
+    setConcluindo(true)
+    fetch('/api/leitura/rapida', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ documento_id: documentoId, versao, respostas: respostasRef.current, total: totalRef.current, concluir: true, desafio }),
+    })
+      .then((r) => r.json().catch(() => ({})))
+      .then((r) => {
+        if (r?.ok && (r.concluiuAgora || r.concluido)) {
+          concluidoRef.current = true; setConcluido(true)
+          toast.success('Leitura concluída! Liberando o desafio…')
+          setTimeout(() => { if (voltarHref) window.location.href = voltarHref }, 700)
+        } else {
+          toast.error(r?.message ?? 'Não foi possível concluir. Tente de novo.')
+        }
+      })
+      .catch(() => toast.error('Não foi possível concluir. Tente de novo.'))
+      .finally(() => setConcluindo(false))
+  }, [documentoId, versao, voltarHref, concluindo, desafio])
 
   // 1) Carrega o estado salvo ao montar (p/ restaurar as marcações no iframe quando ele avisar 'pronto').
   useEffect(() => {
@@ -119,14 +146,24 @@ export function LeituraRapidaPlayer({ documentoId, versao, html, titulo, voltarH
         <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground"><Zap className="h-4 w-4 text-primary" /> {titulo || 'Leitura rápida'}</span>
         <div className="ml-auto flex items-center gap-3 text-xs">
           {salvando && <span className="inline-flex items-center gap-1 text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" /> salvando…</span>}
-          {concluido ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-1 font-semibold text-emerald-600 dark:text-emerald-400"><CheckCircle2 className="h-3.5 w-3.5" /> Concluído{prog && prog.total > 0 ? ` · ${prog.acertos}/${prog.total}` : ''}</span>
-          ) : prog && prog.total > 0 ? (
-            <span className="inline-flex items-center gap-2 text-muted-foreground">
+          {!concluido && prog && prog.total > 0 && (
+            <span className="hidden items-center gap-2 text-muted-foreground sm:inline-flex">
               <span className="font-medium text-foreground">{prog.respondidas}/{prog.total}</span> respondidas
               <span className="h-1.5 w-24 overflow-hidden rounded-full bg-muted"><span className="block h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} /></span>
             </span>
-          ) : null}
+          )}
+          {concluido ? (
+            voltarHref ? (
+              <Link href={voltarHref} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"><CheckCircle2 className="h-3.5 w-3.5" /> Voltar ao desafio</Link>
+            ) : (
+              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2.5 py-1 font-semibold text-emerald-600 dark:text-emerald-400"><CheckCircle2 className="h-3.5 w-3.5" /> Concluído{prog && prog.total > 0 ? ` · ${prog.acertos}/${prog.total}` : ''}</span>
+            )
+          ) : (
+            <button type="button" onClick={concluir} disabled={concluindo}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 disabled:opacity-60">
+              {concluindo ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CheckCircle2 className="h-3.5 w-3.5" />} Concluir leitura
+            </button>
+          )}
         </div>
       </header>
       {/* IFRAME sandbox allow-scripts (sem same-origin): roda o JS da página isolado; comunica só por postMessage. */}

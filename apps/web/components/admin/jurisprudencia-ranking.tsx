@@ -24,7 +24,11 @@ export function JurisRanking({ desafioId, materias }: { desafioId: string; mater
       const qs = new URLSearchParams({ desafio: desafioId, tab })
       if (tab !== 'geral') qs.set('ref', ref)
       const r = await fetch(`/api/jurisprudencia/ranking?${qs.toString()}`, { cache: 'no-store' })
-      if (!r.ok) throw new Error('Falha ao carregar o ranking.')
+      if (!r.ok) {
+        let detalhe = ''
+        try { const j = await r.json(); if (j?.error) detalhe = `: ${j.error}` } catch { /* corpo não-JSON */ }
+        throw new Error(`Falha ao carregar o ranking (HTTP ${r.status})${detalhe}`)
+      }
       const data = await r.json()
       setRows(Array.isArray(data?.rows) ? data.rows : [])
     } catch (e: any) {

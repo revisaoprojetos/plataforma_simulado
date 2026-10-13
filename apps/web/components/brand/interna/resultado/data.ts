@@ -27,6 +27,7 @@ export interface ResTentativa {
 
 export interface ResCorrecao {
   ordem: number
+  questaoId?: string // id da questão (p/ Salvar/Favoritar e Reportar no resultado)
   enunciado: string
   disciplina: string | null
   dificuldade?: 'facil' | 'media' | 'dificil' | null
@@ -55,7 +56,7 @@ export interface ResPadrao {
   dica: string
 }
 export interface ResHistBin { faixa: string; qtd: number; voce?: boolean }
-export interface ResRankPeer { iniciais: string; nota: number; acertos: number; posicao: number; voce?: boolean }
+export interface ResRankPeer { iniciais: string; nota: number; acertos: number; posicao: number; voce?: boolean; avatar?: string | null; avatarCor?: string | null }
 export interface ResDificil { ordem: number; disciplina: string; turmaPct: number; seuStatus: ResStatus }
 export interface ResRanking {
   participantes: number
@@ -66,7 +67,7 @@ export interface ResRanking {
   mediaMarcador: number // posição (0..100) da linha "média"
   top: ResRankPeer[] // top 5 (iniciais only)
   voce: ResRankPeer
-  dificeis: ResDificil[]
+  dificeis?: ResDificil[] // "questões mais difíceis p/ a turma" — sem fonte real no resultado do aluno (amostra)
   podio?: ResRankPeer[] // VND (3)
   corteEstimado?: { valor: number; diff: number; faltam: number } // MEQ
 }

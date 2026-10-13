@@ -1,15 +1,17 @@
 import Link from 'next/link'
 import { Gamepad2, ArrowLeft } from 'lucide-react'
-import { listarDesafios, lerDesafio } from '@/app/admin/jurisprudencia/actions'
+import { listarDesafios, lerDesafio, obterRankingJuris, detalheRankingAlunoJuris, salvarSequenciaAjusteJuris } from '@/app/admin/jurisprudencia/actions'
+import { RankingAdmin } from '@/components/admin/ranking-admin'
+import { RelatorioAsync } from '@/components/admin/relatorio-async'
+import { carregarRankingJuris } from '@/lib/jurisprudencia/ranking'
 import { ModuloAcesso } from '@/components/admin/modulo-acesso'
 import { JurisDesafioLista } from '@/components/admin/jurisprudencia-lista'
 import { JurisTabsBar, type JurisTab } from '@/components/admin/jurisprudencia-tabs'
 import { JurisDiasEditor } from '@/components/admin/jurisprudencia-dias-editor'
 import { JurisConfigForm } from '@/components/admin/jurisprudencia-config-form'
-import { JurisRanking } from '@/components/admin/jurisprudencia-ranking'
 import { JurisDesigner } from '@/components/admin/jurisprudencia-designer'
 import { JurisMedalhas } from '@/components/admin/jurisprudencia-medalhas'
-import { getCurrentTenant } from '@/lib/tenant'
+import { getCurrentTenant, getCurrentTenantId } from '@/lib/tenant'
 import { resolverCardView } from '@/lib/card-view'
 import { createAdminClient } from '@/lib/supabase/server'
 import { cn } from '@/lib/utils'
@@ -40,7 +42,7 @@ export default async function JurisprudenciaAdminPage({ searchParams }: { search
   }
 
   // Com desafio: carrega o jogo e abre as abas de edição.
-  const abaAtual: JurisTab = aba === 'config' || aba === 'designer' || aba === 'acessos' || aba === 'medalhas' || aba === 'ranking' ? aba : 'dias'
+  const abaAtual: JurisTab = aba === 'config' || aba === 'designer' || aba === 'acessos' || aba === 'medalhas' || aba === 'ranking' || aba === 'relatorio' ? aba : 'dias'
   const [res, lista] = await Promise.all([lerDesafio(desafio), listarDesafios()])
 
   if (!res.ok || !res.desafio) {
@@ -93,7 +95,8 @@ export default async function JurisprudenciaAdminPage({ searchParams }: { search
         {abaAtual === 'designer' && <JurisDesigner desafioId={desafio} aparencia={jogo.aparencia ?? {}} />}
         {abaAtual === 'acessos' && <ModuloAcesso pastaId={desafio} />}
         {abaAtual === 'medalhas' && <JurisMedalhas desafioId={desafio} materias={jogo.materias ?? []} final={jogo.final ?? null} imagens={jogo.imagens ?? {}} />}
-        {abaAtual === 'ranking' && <JurisRanking desafioId={desafio} materias={jogo.materias ?? []} />}
+        {abaAtual === 'ranking' && <RankingAdmin inicial={await carregarRankingJuris(desafio, (await getCurrentTenantId()) ?? '')} moduloId={desafio} moduloNome={nome} loader={obterRankingJuris} rotulos={{ aulas: 'Dias' }} detalheAluno detalheActions={{ carregar: detalheRankingAlunoJuris, salvar: salvarSequenciaAjusteJuris }} />}
+        {abaAtual === 'relatorio' && <RelatorioAsync moduloId={desafio} area="jurisprudencia" rotulos={{ aulas: 'Dias', aulaSingular: 'dia', excelHref: null }} />}
       </div>
     </div>
   )

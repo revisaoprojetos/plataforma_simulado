@@ -93,13 +93,19 @@ export async function GET(request: NextRequest) {
   try {
     const { data: evs } = await svc
       .from('simulado_xp_eventos')
-      .select('meta')
+      .select('meta, criado_em')
       .eq('tenant_id', sessao.tenantId)
       .eq('estudante_id', sessao.estudanteId)
       .eq('origem', 'jurisprudencia')
       .eq('meta->>desafio', desafioId)
       .limit(500)
-    for (const e of (evs ?? []) as any[]) { const d = e?.meta?.dia; if (typeof d === 'string') diasSet.add(d) }
+    for (const e of (evs ?? []) as any[]) {
+      const d = e?.meta?.dia
+      if (typeof d !== 'string') continue
+      // Ignora data fabricada pelo cliente (meta.dia != dia de criação BRT); legítimo é gravado no dia.
+      if (e.criado_em && d !== diaBRT(e.criado_em)) continue
+      diasSet.add(d)
+    }
   } catch { /* ledger indisponível → cai no backfill */ }
   if (!diasSet.size && (data as any)?.atualizado_em) diasSet.add(diaBRT((data as any).atualizado_em))
   const dias = [...diasSet].sort()
@@ -152,27 +158,19 @@ export async function POST(request: NextRequest) {
   )
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Sequência (streak): grava os dias de atividade no LEDGER imutável (simulado_xp_eventos,
-  // origem='jurisprudencia'). Idempotente por (tenant,aluno,origem,ref_id='<desafio>:<dia>').
-  // xp=0 (marcador puro — não afeta XP/ranking de gamificação). Mesmo padrão do Lei Seca (meta.dia).
-  const diasRaw = Array.isArray(b.dias) ? (b.dias as unknown[]) : []
-  const dias = Array.from(
-    new Set(diasRaw.filter((d): d is string => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d))),
-  ).slice(-180)
-  if (dias.length) {
-    const linhas = dias.map((dia) => ({
-      tenant_id: sessao.tenantId,
-      estudante_id: sessao.estudanteId,
-      origem: 'jurisprudencia',
-      ref_id: `${desafioId}:${dia}`,
-      xp: 0,
-      meta: { dia, desafio: desafioId },
-    }))
-    await svc
-      .from('simulado_xp_eventos')
-      .upsert(linhas, { onConflict: 'tenant_id,estudante_id,origem,ref_id', ignoreDuplicates: true })
-      .then(() => {}, () => {}) // best-effort: não bloqueia o salvamento do progresso
-  }
+  // Sequência (streak): grava o DIA DE HOJE (servidor, fuso BRT) no LEDGER imutável (simulado_xp_eventos,
+  // origem='jurisprudencia'). A atividade acontece AGORA (neste POST), então o dia é o de hoje — NÃO
+  // confiar em datas enviadas pelo cliente (localStorage acumulado/arbitrário inflava a sequência: o jogo
+  // mandava datas antigas e cada uma virava um "dia ativo" falso). Idempotente por
+  // (tenant,aluno,origem,ref_id='<desafio>:<dia-de-hoje>'); xp=0 (marcador, não afeta XP/gamificação).
+  const hoje = diaBRT()
+  await svc
+    .from('simulado_xp_eventos')
+    .upsert(
+      [{ tenant_id: sessao.tenantId, estudante_id: sessao.estudanteId, origem: 'jurisprudencia', ref_id: `${desafioId}:${hoje}`, xp: 0, meta: { dia: hoje, desafio: desafioId } }],
+      { onConflict: 'tenant_id,estudante_id,origem,ref_id', ignoreDuplicates: true },
+    )
+    .then(() => {}, () => {}) // best-effort: não bloqueia o salvamento do progresso
 
   return NextResponse.json({ ok: true })
 }

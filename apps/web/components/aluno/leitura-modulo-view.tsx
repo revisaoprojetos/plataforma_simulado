@@ -478,7 +478,12 @@ function DesempenhoModulo({ desempenho }: { desempenho: AulaDesempenho[] }) {
                     ) : <span className="text-muted-foreground">—</span>}
                   </td>
                   <td className="px-4 py-3 text-center tabular-nums">
-                    {a.pontos > 0 ? <span className="font-semibold text-primary">+{a.pontos}</span> : <span className="text-muted-foreground">—</span>}
+                    {a.pontos > 0 || a.pontosExtra > 0 ? (
+                      <span className="inline-flex items-center justify-center gap-1.5">
+                        <span className="font-semibold text-primary">+{a.pontos}</span>
+                        {a.pontosExtra > 0 ? <span title="Bônus (sequência/conclusão)" className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-400">+{a.pontosExtra} bônus</span> : null}
+                      </span>
+                    ) : <span className="text-muted-foreground">—</span>}
                   </td>
                   <td className="px-4 py-3 text-right">
                     {a.estado === 'concluido' ? (

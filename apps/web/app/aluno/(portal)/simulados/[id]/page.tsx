@@ -14,6 +14,7 @@ import { AvaliacaoSimulado } from '@/components/aluno/avaliacao-simulado'
 import { resolverInterno } from '@/lib/aluno/interno-gate'
 import { PlatformResultadoInterno } from '@/components/brand/interna/resultado'
 import type { ResultadoInternoData } from '@/components/brand/interna/resultado/data'
+import { montarRankingResultado } from '@/lib/simulado/ranking-resultado'
 
 const notaTone = (n: number) => (n >= 70 ? 'text-emerald-600 dark:text-emerald-400' : n >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400')
 const nota = (n: number | null) => (n == null ? '—' : Number(n).toFixed(1).replace('.', ','))
@@ -111,6 +112,9 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
       return out
     }
     const downloads = downloadsDe(melhor.id)
+    // Ranking REAL (classificação + posição + percentil) — mesma fonte p/ a aba Ranking e os tiles da
+    // Visão geral, para não divergirem. Só com a nota liberada; tolerante a falha (cai no sample).
+    const rankReal = notaLiberada ? await montarRankingResultado(svc, id, estId, sessao.tenantId, _it.brand, { minhaNota: melhorT?.nota ?? null, meusAcertos: melhorT?.acertos }).catch(() => null) : null
     const resultadoData: ResultadoInternoData = {
       titulo: sim.titulo,
       notaLiberada, gabaritoLiberado,
@@ -123,8 +127,12 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
         total: melhorT?.total ?? 0,
         pct: melhorT?.pct ?? 0,
         tempo: melhorT ? fmtDur(melhorT.tempoMs) : '—',
-        posicao: melhorT?.posicao ?? null,
+        posicao: rankReal?.posicao ?? melhorT?.posicao ?? null,
+        participantes: rankReal?.participantes,
+        percentil: rankReal?.percentil,
+        mediaTurma: rankReal?.mediaTurma,
       },
+      ranking: rankReal ?? undefined,
       tentativas: tentativas.map((t) => ({
         n: t.n, nota: t.nota, acertos: t.acertos, erros: Math.max(0, t.total - t.acertos), branco: 0, total: t.total, pct: t.pct,
         tempo: fmtDur(t.tempoMs), posicao: t.posicao, data: fmtDm(t.finalizado),
@@ -134,7 +142,7 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
       porDisciplina: (melhorT?.porDisc ?? []).map((d) => ({ nome: d.nome, pct: d.pct, ac: d.ac, tt: d.tt })),
       mapa: questoes.map((q) => ({ ordem: q.ordem, status: statusQ(q) })),
       correcao: questoes.map((q) => ({
-        ordem: q.ordem, enunciado: q.enunciado, disciplina: q.disciplina, comentario: q.comentario,
+        ordem: q.ordem, questaoId: q.questaoId, enunciado: q.enunciado, disciplina: q.disciplina, comentario: q.comentario,
         status: statusQ(q), gabarito: q.alternativas.find((a) => a.correta)?.letra ?? null,
         alternativas: q.alternativas.map((a) => ({ letra: a.letra, texto: a.texto, correta: a.correta })),
       })),

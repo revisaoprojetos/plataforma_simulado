@@ -145,9 +145,85 @@ export async function invalidarRelatorioLeitura(tenantId: string, moduloId: stri
   await esquecer(chaveRelatorioLeitura(tenantId, moduloId)); await esquecer(chaveRelatorioLeitura(tenantId, '__geral__'))
 }
 
-/** Dashboard (agregados) do módulo — sem o detalhe por aluno×aula (esse vai no Excel). CACHEADO (TTL 300s). */
+/** Maior corrida de dias consecutivos (YYYY-MM-DD) — mesma métrica de `seqMaiorPorAluno` da agregação. */
+function maiorCorrida(dias: string[]): number {
+  const ord = [...new Set(dias)].sort(); let run = 0, melhor = 0, prev = ''
+  for (const d of ord) { run = prev && Date.parse(d + 'T00:00:00Z') - Date.parse(prev + 'T00:00:00Z') === 86_400_000 ? run + 1 : 1; if (run > melhor) melhor = run; prev = d }
+  return melhor
+}
+
+/**
+ * CAMINHO RÁPIDO: agrega TUDO no banco via `rpc_leitura_relatorio_json` (1 query, resposta compacta) —
+ * elimina o pull de ~12k respostas + ~10k XP. Retorna null se a RPC não estiver aplicada (→ fallback).
+ */
+async function construirRelatorioViaRpc(moduloId: string, tenantId: string): Promise<RelatorioModulo | null> {
+  const svc = createAdminClient()
+  const geral = moduloId === '__geral__'
+  let dq = svc.from('simulado_documentos').select('id, titulo, ordem').eq('tenant_id', tenantId).eq('deletado', false).eq('publicado', true)
+  dq = geral ? dq.is('pasta_id', null) : dq.eq('pasta_id', moduloId)
+  const { data: docs } = await dq.order('ordem', { ascending: true })
+  const docList = (docs ?? []) as { id: string; titulo: string; ordem: number }[]
+  const docIds = docList.map((d) => d.id)
+  let moduloNome = 'Módulo'
+  if (!geral) { try { const { data } = await svc.from('simulado_pastas').select('nome').eq('id', moduloId).eq('tenant_id', tenantId).maybeSingle(); moduloNome = (data as any)?.nome ?? 'Módulo' } catch { /* ignore */ } }
+  const vazio: RelatorioModulo = { moduloNome, totalAlunos: 0, totalAulas: docList.length, aulasConcluidasTotal: 0, mediaAulasPorAluno: 0, porDia: [], seqMedia: 0, seqMaior: 0, seqDistribuicao: [], topSequencia: [], pontosMedia: 0, pontosMaior: 0, pontosTotal: 0, topPontos: [], porAula: docList.map((d) => ({ docId: d.id, titulo: d.titulo, ordem: d.ordem, concluiram: 0, leituraMediaSeg: 0, quizMediaSeg: 0 })) }
+  if (!docIds.length) return vazio
+
+  let tz = 'America/Sao_Paulo'
+  try { const cfg = await getGamConfig(svc, tenantId); tz = cfg?.timezone || tz } catch { /* ignore */ }
+
+  const rpc = await svc.rpc('rpc_leitura_relatorio_json', { p_tenant: tenantId, p_docs: docIds, p_tz: tz })
+  if (rpc.error || !rpc.data) return null // RPC não aplicada → fallback no caminho antigo
+  const d = rpc.data as { por_aluno?: any[]; por_dia?: any[]; por_aula?: any[] }
+  const porAluno = Array.isArray(d.por_aluno) ? d.por_aluno : []
+  if (!porAluno.length) return vazio
+
+  const seqPorAluno = new Map<string, number>(porAluno.map((a) => [a.estudante_id, maiorCorrida((a.dias ?? []) as string[])]))
+  const pontosPorAluno = new Map<string, number>(porAluno.map((a) => [a.estudante_id, Number(a.pontos) || 0]))
+  const aulasPorAluno = new Map<string, number>(porAluno.map((a) => [a.estudante_id, Number(a.aulas_concluidas) || 0]))
+
+  // Nomes/e-mails só dos alunos que aparecem nos TOPs (dashboard mostra 10 de cada).
+  const topSeqIds = [...seqPorAluno.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([id]) => id)
+  const topPtsIds = [...pontosPorAluno.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([id]) => id)
+  const idsNomes = [...new Set([...topSeqIds, ...topPtsIds])]
+  const nomes = idsNomes.length
+    ? new Map((await fetchAllByIn<{ id: string; nome: string; email: string | null }>(idsNomes, (chunk) => svc.from('simulado_estudantes').select('id, nome, email').in('id', chunk).eq('tenant_id', tenantId))).map((e) => [e.id, e]))
+    : new Map<string, { id: string; nome: string; email: string | null }>()
+  const nomeDe = (id: string) => nomes.get(id)?.nome ?? 'Aluno'
+  const emailDe = (id: string) => nomes.get(id)?.email ?? null
+
+  const totalAlunos = porAluno.length
+  const aulasConcluidasTotal = [...aulasPorAluno.values()].reduce((s, x) => s + x, 0)
+  const seqs = [...seqPorAluno.values()]
+  const seqMedia = seqs.length ? Math.round((seqs.reduce((s, x) => s + x, 0) / seqs.length) * 10) / 10 : 0
+  const seqMaior = seqs.length ? Math.max(...seqs) : 0
+  const distMap = new Map<number, number>(); for (const s of seqs) distMap.set(s, (distMap.get(s) ?? 0) + 1)
+  const seqDistribuicao = [...distMap.entries()].sort((a, b) => a[0] - b[0]).map(([s, n]) => ({ seq: s, alunos: n }))
+  const topSequencia: RelatorioTop[] = topSeqIds.map((id) => ({ estudanteId: id, nome: nomeDe(id), email: emailDe(id), valor: seqPorAluno.get(id) ?? 0 }))
+  const pts = [...pontosPorAluno.values()]
+  const pontosTotal = pts.reduce((s, x) => s + x, 0)
+  const pontosMedia = pts.length ? Math.round(pontosTotal / pts.length) : 0
+  const pontosMaior = pts.length ? Math.max(...pts) : 0
+  const topPontos: RelatorioTop[] = topPtsIds.map((id) => ({ estudanteId: id, nome: nomeDe(id), email: emailDe(id), valor: pontosPorAluno.get(id) ?? 0 }))
+
+  const porDia: RelatorioPorDia[] = (Array.isArray(d.por_dia) ? d.por_dia : []).map((x) => ({ dia: String(x.dia), alunos: Number(x.alunos) || 0, aulas: Number(x.aulas) || 0 }))
+  const paMap = new Map<string, any>((Array.isArray(d.por_aula) ? d.por_aula : []).map((x) => [x.documento_id, x]))
+  const porAula: RelatorioPorAula[] = docList.map((doc) => { const pa = paMap.get(doc.id); return { docId: doc.id, titulo: doc.titulo, ordem: doc.ordem, concluiram: Number(pa?.concluiram) || 0, leituraMediaSeg: Number(pa?.leitura_med) || 0, quizMediaSeg: Number(pa?.quiz_med) || 0 } })
+
+  return {
+    moduloNome, totalAlunos, totalAulas: docList.length, aulasConcluidasTotal,
+    mediaAulasPorAluno: totalAlunos ? Math.round((aulasConcluidasTotal / totalAlunos) * 10) / 10 : 0,
+    porDia, seqMedia, seqMaior, seqDistribuicao, topSequencia,
+    pontosMedia, pontosMaior, pontosTotal, topPontos, porAula,
+  }
+}
+
+/** Dashboard (agregados) do módulo — sem o detalhe por aluno×aula (esse vai no Excel). CACHEADO (TTL 1800s).
+ *  Caminho RÁPIDO via RPC (agrega no banco); cai no caminho antigo (pull + agregação no app) se a RPC não existir. */
 export async function carregarRelatorioModulo(moduloId: string, tenantId: string): Promise<RelatorioModulo> {
-  return remember<RelatorioModulo>(chaveRelatorioLeitura(tenantId, moduloId), 300, async () => {
+  return remember<RelatorioModulo>(chaveRelatorioLeitura(tenantId, moduloId), 1800, async () => {
+  const viaRpc = await construirRelatorioViaRpc(moduloId, tenantId).catch(() => null)
+  if (viaRpc) return viaRpc
   const base = await carregarBase(moduloId, tenantId)
   const ag = agregar(base)
   const alunosIds = [...ag.aulasPorAluno.keys()]

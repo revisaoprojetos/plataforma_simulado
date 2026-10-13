@@ -21,10 +21,12 @@ function OrigemBadge({ origem }: { origem?: 'guru' | 'curseduca' | null }) {
 
 /** "Adicionar grupo" — picker com a MESMA organização da área de Grupos (pastas mestres → subgrupos),
  * origem/contagem e etiqueta "vinculado" nos já com acesso. Devolve os grupos escolhidos ao pai. */
-export function AdicionarGrupoModuloDialog({ grupos, jaMarcados, onSelecionar }: {
+export function AdicionarGrupoModuloDialog({ grupos, jaMarcados, onSelecionar, elevado }: {
   grupos: GrupoOpc[]
   jaMarcados: Set<string>
   onSelecionar: (ids: string[]) => void
+  /** Abre DENTRO de outro pop-up (z-[100]) → sobe o z-index p/ não ficar atrás. */
+  elevado?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [busca, setBusca] = useState('')
@@ -81,7 +83,7 @@ export function AdicionarGrupoModuloDialog({ grupos, jaMarcados, onSelecionar }:
       <DialogTrigger render={<Button variant="outline" />}>
         <UsersRound className="mr-2 h-4 w-4" /> Adicionar grupo
       </DialogTrigger>
-      <DialogContent className="flex max-h-[85vh] w-full flex-col gap-0 p-0 sm:max-w-2xl">
+      <DialogContent className={cn('flex max-h-[85vh] w-full flex-col gap-0 p-0 sm:max-w-2xl', elevado && 'z-[130]')} overlayClassName={elevado ? 'z-[125]' : undefined}>
         <DialogHeader className="px-6 pt-6">
           <DialogTitle>Adicionar grupo com acesso</DialogTitle>
           <DialogDescription>Marque as turmas que participam — organizadas em pastas, como na área de Grupos. Novos membros do grupo entram automaticamente.</DialogDescription>

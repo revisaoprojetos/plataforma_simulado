@@ -148,7 +148,7 @@ export function DesafioLSMeq({
   useEffect(() => { setDy(idxAtual >= 0 ? idxAtual : 0) }, [idxAtual])
 
   const progressoPct = totalDias > 0 ? Math.round((diasConcluidos / totalDias) * 100) : 0
-  const pontos = useMemo(() => desempenho.reduce((s, a) => s + (a.pontos || 0), 0), [desempenho])
+  const pontos = useMemo(() => desempenho.reduce((s, a) => s + (a.pontos || 0) + (a.pontosExtra || 0), 0), [desempenho])
   const posicao = minhaLinha?.posicao ?? ranking.itens.find((r) => r.estudanteId === meuId)?.posicao ?? null
 
   // Stats do header (4 blocos).
@@ -1022,7 +1022,12 @@ function AbaDesempenho({ desempenho, totalDias, diasConcluidos, pontos, carimbos
                     </td>
                     <td style={tdSt}>{a.questoesTotal > 0 ? `${a.questoesRespondidas}/${a.questoesTotal}` : '—'}</td>
                     <td style={{ ...tdSt, textAlign: 'center' }}>{a.sequencia > 0 ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: '#F0773A', fontWeight: 700 }}><Flame size={12} /> {a.sequencia}</span> : <span style={{ color: 'var(--muted)' }}>—</span>}</td>
-                    <td style={{ ...tdSt, textAlign: 'center' }}>{a.pontos > 0 ? <b style={{ color: 'var(--brand)' }}>+{a.pontos}</b> : <span style={{ color: 'var(--muted)' }}>—</span>}</td>
+                    <td style={{ ...tdSt, textAlign: 'center' }}>{a.pontos > 0 || a.pontosExtra > 0 ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, justifyContent: 'center' }}>
+                        <b style={{ color: 'var(--brand)' }}>+{a.pontos}</b>
+                        {a.pontosExtra > 0 ? <span title="Bônus (sequência/conclusão)" style={{ fontSize: 10, fontWeight: 800, color: '#C98A12', background: 'rgba(232,169,58,.18)', borderRadius: 99, padding: '1px 6px', whiteSpace: 'nowrap' }}>+{a.pontosExtra} bônus</span> : null}
+                      </span>
+                    ) : <span style={{ color: 'var(--muted)' }}>—</span>}</td>
                     <td style={{ ...tdSt, textAlign: 'right' }}>
                       {a.estado === 'concluido' ? <Pill cor="#1FA868" icon={<Check size={11} />}>Concluída</Pill>
                         : bloqueada ? <Pill cor="var(--muted)" icon={<Lock size={11} />}>Bloqueada</Pill>

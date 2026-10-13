@@ -43,7 +43,7 @@ function parseCsv(text: string): Record<string, string>[] {
 
 const MODELO = 'email,nome,telefone,documento,classificacao\njoao@exemplo.com,João Silva,11999990000,12345678900,normal\n'
 
-export function AdicionarEstudantesDialog({ bancoId, onSelecionar, jaIds, onVinculado }: {
+export function AdicionarEstudantesDialog({ bancoId, onSelecionar, jaIds, onVinculado, elevado }: {
   bancoId?: string
   /** Modo REUTILIZÁVEL (criação de simulado): em vez de vincular no banco, devolve os alunos escolhidos. */
   onSelecionar?: (alunos: AlunoSel[]) => void
@@ -51,6 +51,9 @@ export function AdicionarEstudantesDialog({ bancoId, onSelecionar, jaIds, onVinc
   jaIds?: Set<string>
   /** Chamado após vincular/importar no banco (ex.: recarregar a lista da aba Estudantes do simulado). */
   onVinculado?: () => void
+  /** Quando o dialog abre DENTRO de outro pop-up (ex.: "Ocultar do ranking", z-[100]), sobe o z-index
+   *  do overlay+conteúdo acima dele — senão abre ATRÁS e não dá pra selecionar. */
+  elevado?: boolean
 }) {
   const [open, setOpen] = useState(false)
   const [busca, setBusca] = useState('')
@@ -131,7 +134,7 @@ export function AdicionarEstudantesDialog({ bancoId, onSelecionar, jaIds, onVinc
       <DialogTrigger render={<Button />}>
         <UserPlus className="mr-2 h-4 w-4" /> Adicionar estudantes
       </DialogTrigger>
-      <DialogContent className="flex max-h-[85vh] w-full flex-col gap-0 p-0 sm:max-w-3xl">
+      <DialogContent className={cn('flex max-h-[85vh] w-full flex-col gap-0 p-0 sm:max-w-3xl', elevado && 'z-[130]')} overlayClassName={elevado ? 'z-[125]' : undefined}>
         <DialogHeader className="px-6 pt-6">
           <DialogTitle>Adicionar estudantes</DialogTitle>
           <DialogDescription>Importe um arquivo CSV ou selecione estudantes já cadastrados na plataforma.</DialogDescription>

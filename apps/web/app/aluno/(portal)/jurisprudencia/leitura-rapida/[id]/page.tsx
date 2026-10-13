@@ -26,7 +26,7 @@ export default async function JurisLeituraRapidaPage({ params, searchParams }: {
   const voltar = ehEmbed
     ? '#fechar-leitura'
     : (desafio ? `/aluno/jurisprudencia?desafio=${encodeURIComponent(desafio)}` : '/aluno/jurisprudencia')
-  const player = <LeituraRapidaPlayer documentoId={id} versao={doc.versao} html={doc.leituraRapida} titulo={doc.titulo} voltarHref={voltar} />
+  const player = <LeituraRapidaPlayer documentoId={id} versao={doc.versao} html={doc.leituraRapida} titulo={doc.titulo} voltarHref={voltar} desafio={desafio} />
   // EMBED (overlay do arcade): a página está no grupo (portal) → o layout renderiza o shell. Um container
   // FIXO em tela cheia cobre o shell → o iframe mostra só a leitura rápida.
   if (ehEmbed) return <div style={{ position: 'fixed', inset: 0, zIndex: 200 }}>{player}</div>

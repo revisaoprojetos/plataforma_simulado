@@ -57,7 +57,7 @@ export async function diasAtivosPorAluno(
   for (let from = 0; ; from += PAGE) {
     let q = svc
       .from('simulado_xp_eventos')
-      .select('estudante_id, meta')
+      .select('estudante_id, meta, criado_em')
       .eq('tenant_id', tenantId)
       .eq('origem', 'jurisprudencia')
       .eq('meta->>desafio', desafioId)
@@ -67,6 +67,10 @@ export async function diasAtivosPorAluno(
     for (const r of data as any[]) {
       const dia = r?.meta?.dia
       if (!dia) continue
+      // Ignora datas FABRICADAS pelo cliente (eventos antigos em que o jogo mandava datas arbitrárias):
+      // um evento legítimo é gravado no DIA em que acontece, então meta.dia == dia de criação (BRT).
+      // meta.dia != dia de criação → data inventada → não conta (sem apagar nada; só não soma à sequência).
+      if (r.criado_em && dia !== diaBRT(r.criado_em)) continue
       let s = map.get(r.estudante_id)
       if (!s) map.set(r.estudante_id, (s = new Set()))
       s.add(dia)

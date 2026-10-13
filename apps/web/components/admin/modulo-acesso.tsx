@@ -356,7 +356,7 @@ function OcultarRankingDialog({ todosGrupos, ocEst, setOcEst, ocGrp, setOcGrp, o
               <div>
                 <div className="mb-1.5 flex items-center justify-between">
                   <span className="text-xs font-medium text-muted-foreground">Grupos ocultos</span>
-                  <AdicionarGrupoModuloDialog grupos={todosGrupos} jaMarcados={new Set(ocGrp.map((g) => g.id))} onSelecionar={(ids) => { const novos = [...new Map([...ocGrp, ...ids.map((id) => { const g = todosGrupos.find((x) => x.id === id); return { id, nome: g?.nome ?? 'Grupo', cor: g?.cor ?? null } })].map((g) => [g.id, g])).values()]; setOcGrp(novos); salvar(ocEst, novos, ocTotal) }} />
+                  <AdicionarGrupoModuloDialog elevado grupos={todosGrupos} jaMarcados={new Set(ocGrp.map((g) => g.id))} onSelecionar={(ids) => { const novos = [...new Map([...ocGrp, ...ids.map((id) => { const g = todosGrupos.find((x) => x.id === id); return { id, nome: g?.nome ?? 'Grupo', cor: g?.cor ?? null } })].map((g) => [g.id, g])).values()]; setOcGrp(novos); salvar(ocEst, novos, ocTotal) }} />
                 </div>
                 {ocGrp.length === 0 ? <p className="text-[11px] text-muted-foreground">Nenhum grupo oculto.</p> : (
                   <div className="flex flex-wrap gap-2">
@@ -373,7 +373,7 @@ function OcultarRankingDialog({ todosGrupos, ocEst, setOcEst, ocGrp, setOcGrp, o
               <div>
                 <div className="mb-1.5 flex items-center justify-between">
                   <span className="text-xs font-medium text-muted-foreground">Alunos ocultos</span>
-                  <AdicionarEstudantesDialog jaIds={new Set(ocEst.map((e) => e.id))} onSelecionar={(novos) => { const map = new Map(ocEst.map((e) => [e.id, e])); for (const nv of novos) if (!map.has(nv.id)) map.set(nv.id, { id: nv.id, nome: nv.nome, email: nv.email, cpf: nv.cpf, classificacao: nv.classificacao, avatar: nv.avatar, perfil_avatar_cor: nv.perfil_avatar_cor }); const arr = [...map.values()]; setOcEst(arr); salvar(arr, ocGrp, ocTotal) }} />
+                  <AdicionarEstudantesDialog elevado jaIds={new Set(ocEst.map((e) => e.id))} onSelecionar={(novos) => { const map = new Map(ocEst.map((e) => [e.id, e])); for (const nv of novos) if (!map.has(nv.id)) map.set(nv.id, { id: nv.id, nome: nv.nome, email: nv.email, cpf: nv.cpf, classificacao: nv.classificacao, avatar: nv.avatar, perfil_avatar_cor: nv.perfil_avatar_cor }); const arr = [...map.values()]; setOcEst(arr); salvar(arr, ocGrp, ocTotal) }} />
                 </div>
                 {ocEst.length === 0 ? <p className="text-[11px] text-muted-foreground">Nenhum aluno oculto.</p> : (
                   <div className="flex flex-wrap gap-2">

@@ -2,10 +2,10 @@
 
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { CalendarDays, Settings2, Users, Medal, Trophy, Palette } from 'lucide-react'
+import { CalendarDays, Settings2, Users, Medal, Trophy, Palette, BarChart3 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
-export type JurisTab = 'dias' | 'config' | 'designer' | 'acessos' | 'medalhas' | 'ranking'
+export type JurisTab = 'dias' | 'config' | 'designer' | 'acessos' | 'medalhas' | 'ranking' | 'relatorio'
 
 const TABS: { id: JurisTab; label: string; Icon: typeof CalendarDays }[] = [
   { id: 'dias', label: 'Dias & Teses', Icon: CalendarDays },
@@ -14,6 +14,7 @@ const TABS: { id: JurisTab; label: string; Icon: typeof CalendarDays }[] = [
   { id: 'acessos', label: 'Acessos', Icon: Users },
   { id: 'medalhas', label: 'Medalhas', Icon: Medal },
   { id: 'ranking', label: 'Ranking', Icon: Trophy },
+  { id: 'relatorio', label: 'Relatório', Icon: BarChart3 },
 ]
 
 // Barra de abas do desafio (underline deslizante), navega por ?aba=.

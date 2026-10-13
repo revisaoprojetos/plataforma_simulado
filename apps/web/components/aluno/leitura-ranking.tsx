@@ -377,7 +377,17 @@ export function LeituraRanking({ ranking, minhaLinha = null, meuId, meuNome, mod
 
 /** Pop-up com o detalhe do aluno. Abas: "Visão geral" (sequência/progresso/aulas) e "Sequência"
  *  (calendário do suporte: marcar/desconsiderar dias que contam no streak). */
-export function DetalheAlunoModal({ moduloId, it, onClose }: { moduloId: string; it: RankingLeituraItem; onClose: () => void }) {
+type CarregarDetalhe = (moduloId: string, estudanteId: string) => Promise<{ ok: boolean; detalhe?: DetalheRankingAluno; error?: string }>
+type SalvarSequencia = (moduloId: string, estudanteId: string, overrides: Record<string, boolean>) => Promise<{ ok: boolean; error?: string }>
+
+export function DetalheAlunoModal({ moduloId, it, onClose, carregarDetalhe = detalheRankingAluno, salvarSequencia = salvarSequenciaAjuste, rotulos }: {
+  moduloId: string; it: RankingLeituraItem; onClose: () => void
+  /** Loaders injetáveis por área (default = Lei Seca). A Jurisprudência passa os seus. */
+  carregarDetalhe?: CarregarDetalhe
+  salvarSequencia?: SalvarSequencia
+  rotulos?: { aulas?: string }
+}) {
+  const rotAulas = rotulos?.aulas ?? 'Aulas'
   const [d, setD] = useState<DetalheRankingAluno | null>(null)
   const [erro, setErro] = useState<string | null>(null)
   const [aba, setAba] = useState<'geral' | 'sequencia'>('geral')
@@ -385,9 +395,9 @@ export function DetalheAlunoModal({ moduloId, it, onClose }: { moduloId: string;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     document.addEventListener('keydown', onKey)
-    detalheRankingAluno(moduloId, it.estudanteId).then((r) => { if (r.ok && r.detalhe) { setD(r.detalhe); setOvr(r.detalhe.overrides ?? {}) } else setErro(r.error ?? 'Erro ao carregar.') }).catch(() => setErro('Erro ao carregar.'))
+    carregarDetalhe(moduloId, it.estudanteId).then((r) => { if (r.ok && r.detalhe) { setD(r.detalhe); setOvr(r.detalhe.overrides ?? {}) } else setErro(r.error ?? 'Erro ao carregar.') }).catch(() => setErro('Erro ao carregar.'))
     return () => document.removeEventListener('keydown', onKey)
-  }, [moduloId, it.estudanteId, onClose])
+  }, [moduloId, it.estudanteId, onClose, carregarDetalhe])
 
   // Sequência AO VIVO (reflete as edições do calendário antes de salvar).
   const seqLive = useMemo(() => (d ? calcularSequencia(d.diasAuto, ovr, d.hoje) : null), [d, ovr])
@@ -439,24 +449,25 @@ export function DetalheAlunoModal({ moduloId, it, onClose }: { moduloId: string;
                 <Stat icon={Zap} label="pontos" valor={d.pontosTotal.toLocaleString('pt-BR')} />
                 <Stat icon={Flame} label="sequência atual" valor={`${streakAtual}d`} />
                 <Stat icon={Award} label="maior sequência" valor={`${streakMaior}d`} />
-                <Stat icon={BookCheck} label="aulas" valor={`${d.aulasConcluidas}/${d.totalAulas}`} />
+                <Stat icon={BookCheck} label={rotAulas.toLowerCase()} valor={`${d.aulasConcluidas}/${d.totalAulas}`} />
               </div>
               <div>
                 <div className="mb-1 flex items-center justify-between text-xs text-muted-foreground"><span>Progresso</span><span className="tabular-nums">{pctProg}%</span></div>
                 <div className="h-2 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary transition-[width]" style={{ width: `${pctProg}%` }} /></div>
               </div>
               <div>
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Aulas feitas ({d.aulas.length})</p>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{rotAulas} feitas ({d.aulas.length})</p>
                 {d.aulas.length === 0 ? (
-                  <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">Ainda não fez nenhuma aula.</p>
+                  <p className="rounded-lg border border-dashed p-4 text-center text-sm text-muted-foreground">Sem registros ainda.</p>
                 ) : (
                   <ul className="divide-y rounded-xl border">
                     {d.aulas.map((a, i) => (
                       <li key={i} className="flex items-center gap-3 px-3 py-2.5">
                         <span className="min-w-0 flex-1">
                           <span className="flex items-center gap-1.5 text-sm font-medium"><span className="truncate">{a.titulo}</span>{a.tentativas > 1 && <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-semibold text-amber-600 dark:text-amber-400">{a.tentativas} tentativas</span>}</span>
-                          <span className="block text-[11px] text-muted-foreground"><b className="font-semibold text-foreground/70">Leitura:</b> {fmtMomento(a.leituraInicio, a.leituraFim)}{fmtDur(a.leituraTempoSeg) ? ` · ${fmtDur(a.leituraTempoSeg)}` : ''}</span>
-                          <span className="block text-[11px] text-muted-foreground"><b className="font-semibold text-foreground/70">Quiz:</b> {fmtMomento(a.quizInicio, a.quizFim)}{durEntre(a.quizInicio, a.quizFim) ? ` · ${durEntre(a.quizInicio, a.quizFim)}` : ''}</span>
+                          {(a.leituraInicio || a.leituraFim || a.leituraTempoSeg != null) && <span className="block text-[11px] text-muted-foreground"><b className="font-semibold text-foreground/70">Leitura:</b> {fmtMomento(a.leituraInicio, a.leituraFim)}{fmtDur(a.leituraTempoSeg) ? ` · ${fmtDur(a.leituraTempoSeg)}` : ''}</span>}
+                          {(a.quizInicio || a.quizFim) && <span className="block text-[11px] text-muted-foreground"><b className="font-semibold text-foreground/70">Quiz:</b> {fmtMomento(a.quizInicio, a.quizFim)}{durEntre(a.quizInicio, a.quizFim) ? ` · ${durEntre(a.quizInicio, a.quizFim)}` : ''}</span>}
+                          {a.subtitulo && <span className="block text-[11px] text-muted-foreground">{a.subtitulo}</span>}
                         </span>
                         <span className="shrink-0 rounded-md bg-primary/10 px-2 py-0.5 text-xs font-bold text-primary tabular-nums">+{a.pontos}</span>
                       </li>
@@ -468,7 +479,7 @@ export function DetalheAlunoModal({ moduloId, it, onClose }: { moduloId: string;
           ) : (
             <CalendarioSequencia
               d={d} ovr={ovr} setOvr={setOvr} moduloId={moduloId} estudanteId={it.estudanteId}
-              streakAtual={streakAtual} streakMaior={streakMaior}
+              streakAtual={streakAtual} streakMaior={streakMaior} salvarSequencia={salvarSequencia}
               onSaved={(novo) => setD({ ...d, overrides: novo })}
             />
           )}
@@ -482,9 +493,10 @@ export function DetalheAlunoModal({ moduloId, it, onClose }: { moduloId: string;
 /** Calendário de reconfiguração da sequência (suporte). Cada dia: verde = conta (o aluno fez);
  *  tracejado = marcado manualmente (preenche buraco/reativa); acinzentado/riscado = desconsiderado
  *  (ele fez mas você tirou → quebra a sequência ali). Clique alterna; salva por (aluno, módulo). */
-function CalendarioSequencia({ d, ovr, setOvr, moduloId, estudanteId, streakAtual, streakMaior, onSaved }: {
+function CalendarioSequencia({ d, ovr, setOvr, moduloId, estudanteId, streakAtual, streakMaior, onSaved, salvarSequencia }: {
   d: DetalheRankingAluno; ovr: Record<string, boolean>; setOvr: (o: Record<string, boolean>) => void
   moduloId: string; estudanteId: string; streakAtual: number; streakMaior: number; onSaved: (o: Record<string, boolean>) => void
+  salvarSequencia: SalvarSequencia
 }) {
   const autoSet = useMemo(() => new Set(d.diasAuto), [d.diasAuto])
   const baseDia = d.diasAuto[d.diasAuto.length - 1] || d.hoje
@@ -518,7 +530,7 @@ function CalendarioSequencia({ d, ovr, setOvr, moduloId, estudanteId, streakAtua
   const mudarMes = (delta: number) => { const dt = new Date(Date.UTC(ano, mesN - 1 + delta, 1)); setMes(`${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}`) }
   async function salvar() {
     setSalvando(true)
-    const r = await salvarSequenciaAjuste(moduloId, estudanteId, ovr)
+    const r = await salvarSequencia(moduloId, estudanteId, ovr)
     setSalvando(false)
     if (r.ok) { toast.success('Sequência atualizada.'); onSaved(ovr) }
     else toast.error(r.error ?? 'Não foi possível salvar.')

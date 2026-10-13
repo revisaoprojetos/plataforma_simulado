@@ -31,6 +31,7 @@ export type TentativaResumo = {
 export type AltAgregada = { letra: string; texto: string; correta: boolean; escolhas: number }
 export type QuestaoAgregada = {
   ordem: number
+  questaoId: string
   enunciado: string
   disciplina: string | null
   comentario: string | null
@@ -146,6 +147,7 @@ export async function montarResultadoAluno(
     // desconsiderada: fica 0/0/0 (fora do total) — badge de anulada só sinaliza que está fora de jogo.
     return {
       ordem: (r.ordem ?? 0) + 1,
+      questaoId: r.questao_id,
       enunciado: strip(q.enunciado) || '(sem enunciado)',
       disciplina: q.disciplinas?.nome ?? null,
       comentario: revelarGabarito ? (q.comentario_professor ? strip(q.comentario_professor) : null) : null,

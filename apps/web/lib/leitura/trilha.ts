@@ -264,8 +264,10 @@ export interface AulaDesempenho {
   questoesTotal: number
   questoesRespondidas: number
   questoesPendentes: number
-  /** Pontos (XP) ganhos nesta aula (leitura + quiz). */
+  /** Pontos (XP) BASE da aula (leitura + quiz). */
   pontos: number
+  /** Pontos EXTRAS (bônus) ganhos NESTE dia: marco de sequência e/ou bônus de conclusão. 0 se nenhum. */
+  pontosExtra: number
   /** Sequência (dias consecutivos de atividade) no dia em que fez esta aula; 0 se não fez. */
   sequencia: number
   /** Quando concluiu a aula (ISO) — base da sequência + exibição. */
@@ -341,12 +343,58 @@ export async function carregarModuloCompleto(estId: string, tenantId: string, mo
     } catch { /* coluna/migração ausente → sem botão */ }
   }
 
+  // Pontos DEVIDOS pela conclusão (config): leitura concluída = pontos_aula; quiz completo = pontos_quiz.
+  // A coluna PONTOS usa o MAIOR entre o XP realmente creditado e o devido — assim uma aula concluída
+  // SEMPRE mostra pontos_aula+pontos_quiz (ex.: +10), mesmo quando o evento de quiz não foi gravado
+  // (bug que deixava "+5"); e dias com multiplicador preservam o valor maior já creditado.
+  const pontosDevidos = (a: typeof arr[number]) =>
+    (a.leituraConcluida ? (m.pontuacao.pontos_aula || 0) : 0) +
+    (a.questoesTotal > 0 && a.questoesRespondidas >= a.questoesTotal ? (m.pontuacao.pontos_quiz || 0) : 0)
+
+  // ── Pontos EXTRAS (bônus) por DIA — mesma regra do ranking (bonusSequenciaLeitura / bonusConclusaoLeitura),
+  // mas DISTRIBUÍDOS no dia em que foram ganhos, para somar certo e aparecer na tabela. Robusto p/ todos:
+  //  • CONCLUSÃO = total de aulas feitas (em ordem): a cada `conclusao_cada` (auto) ou marcos_conclusao (custom).
+  //  • SEQUÊNCIA = run ATUAL de dias CONSECUTIVOS (= streak do ranking; usa o dia IMUTÁVEL do ledger, sem bug):
+  //    marcos "ao atingir N" (custom) ou a cada `semana_dias` (auto). Só vale se a sequência está VIVA (hoje/ontem).
+  const cfg = m.pontuacao
+  const extraDoc = new Map<string, number>()
+  const addExtra = (id: string, v: number) => { if (v > 0) extraDoc.set(id, (extraDoc.get(id) ?? 0) + v) }
+  {
+    const diaDoc = (id: string): string | null => diaFeitoDoc.get(id) ?? (dataDoc.has(id) ? diaDe(dataDoc.get(id)!) : null)
+    const concl = arr.filter((a) => a.estado === 'concluido').map((a) => ({ id: a.doc.id, dia: diaDoc(a.doc.id) }))
+      .filter((a): a is { id: string; dia: string } => !!a.dia)
+      .sort((x, y) => (x.dia < y.dia ? -1 : x.dia > y.dia ? 1 : 0))
+    // CONCLUSÃO (ordem de conclusão)
+    if ((cfg.conclusao_modo ?? 'custom') === 'auto') {
+      if ((cfg.conclusao_bonus || 0) > 0 && (cfg.conclusao_cada || 0) > 0) concl.forEach((a, i) => { if ((i + 1) % cfg.conclusao_cada === 0) addExtra(a.id, cfg.conclusao_bonus) })
+    } else {
+      for (const mc of (cfg.marcos_conclusao ?? [])) { const a = concl[(mc.dias || 0) - 1]; if (a) addExtra(a.id, mc.bonus || 0) }
+    }
+    // SEQUÊNCIA (run atual, só se viva em hoje/ontem — igual ao streakAtual do ranking)
+    const hojeBRT = diaDe(new Date().toISOString())
+    const ontemBRT = new Date(Date.parse(hojeBRT + 'T00:00:00Z') - 86_400_000).toISOString().slice(0, 10)
+    const diasRun = [...new Set(concl.map((a) => a.dia))].sort()
+    let runStart = diasRun.length ? diasRun.length - 1 : 0
+    for (let i = diasRun.length - 1; i > 0; i--) { const consec = Date.parse(diasRun[i] + 'T00:00:00Z') - Date.parse(diasRun[i - 1] + 'T00:00:00Z') === 86_400_000; if (consec) runStart = i - 1; else break }
+    const run = diasRun.slice(runStart) // sequência 1..run.length
+    const viva = run.length > 0 && (run[run.length - 1] === hojeBRT || run[run.length - 1] === ontemBRT)
+    if (viva) {
+      const diaParaId = new Map(concl.map((a) => [a.dia, a.id]))
+      if ((cfg.sequencia_modo ?? 'auto') === 'custom') {
+        for (const ms of (cfg.marcos_sequencia ?? [])) { if ((ms.dias || 0) >= 1 && ms.dias <= run.length) { const id = diaParaId.get(run[ms.dias - 1]); if (id) addExtra(id, ms.bonus || 0) } }
+      } else if ((cfg.bonus_semana || 0) > 0 && (cfg.semana_dias || 0) > 0) {
+        for (let k = cfg.semana_dias; k <= run.length; k += cfg.semana_dias) { const id = diaParaId.get(run[k - 1]); if (id) addExtra(id, cfg.bonus_semana) }
+      }
+    }
+  }
+
   const desempenho: AulaDesempenho[] = arr.map((a) => ({
     id: a.doc.id, titulo: a.doc.titulo, estado: a.estado,
     leituraPct: a.doc.pct, leituraConcluida: a.leituraConcluida,
     questoesTotal: a.questoesTotal, questoesRespondidas: a.questoesRespondidas,
     questoesPendentes: Math.max(0, a.questoesTotal - a.questoesRespondidas),
-    pontos: pontosDoc.get(a.doc.id) ?? 0,
+    pontos: Math.max(pontosDoc.get(a.doc.id) ?? 0, pontosDevidos(a)),
+    pontosExtra: extraDoc.get(a.doc.id) ?? 0,
     data: dataDoc.get(a.doc.id) ?? null,
     diaFeito: diaFeitoDoc.get(a.doc.id) ?? (dataDoc.has(a.doc.id) ? diaDe(dataDoc.get(a.doc.id)!) : null),
     sequencia: dataDoc.has(a.doc.id) ? (streakDoDia.get(diaDe(dataDoc.get(a.doc.id)!)) ?? 0) : 0,

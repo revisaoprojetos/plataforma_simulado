@@ -71,7 +71,7 @@ export function ResultadoRevisao({ theme, data, sessaoId }: { theme: InternaThem
         <Tabs rt={rt} setRt={setRt} mobile={mobile} />
         <div key={rt} className="rrz-pv">
           {rt === 'geral' && <Geral d={d} mobile={mobile} sel={sel} toggleSel={toggleSel} allSel={allSel} noneSel={noneSel} />}
-          {rt === 'quest' && <TabQuest d={d} mobile={mobile} qf={qf} setFilter={setFilter} pg={pg} setPg={setPg} openMap={openMap} toggleOpen={toggleOpen} />}
+          {rt === 'quest' && <TabQuest d={d} mobile={mobile} qf={qf} setFilter={setFilter} pg={pg} setPg={setPg} openMap={openMap} toggleOpen={toggleOpen} sessaoId={sessaoId} />}
           {rt === 'rank' && <RankTab brand="revisao" data={d} mobile={mobile} />}
           {rt === 'aval' && <TabAval brand="revisao" mobile={mobile} sessaoId={sessaoId} />}
         </div>
@@ -186,7 +186,7 @@ function Geral({ d, mobile, sel, toggleSel, allSel, noneSel }: { d: ResultadoInt
   )
 }
 
-function TabQuest({ d, mobile, qf, setFilter, pg, setPg, openMap, toggleOpen }: { d: ResultadoInternoData; mobile: boolean; qf: string; setFilter: (f: string) => void; pg: number; setPg: (p: number) => void; openMap: Record<number, boolean>; toggleOpen: (ordem: number) => void }) {
+function TabQuest({ d, mobile, qf, setFilter, pg, setPg, openMap, toggleOpen, sessaoId }: { d: ResultadoInternoData; mobile: boolean; qf: string; setFilter: (f: string) => void; pg: number; setPg: (p: number) => void; openMap: Record<number, boolean>; toggleOpen: (ordem: number) => void; sessaoId?: string | null }) {
   const side = (
     <Card brand="revisao" style={mobile ? undefined : { position: 'sticky', top: 90 }}>
       <Head brand="revisao" icon={LayoutGrid} title="Mapa de questões" />
@@ -208,7 +208,7 @@ function TabQuest({ d, mobile, qf, setFilter, pg, setPg, openMap, toggleOpen }: 
   const lst = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
       <QFilters brand="revisao" data={d} qf={qf} setQf={setFilter} showGerar={!mobile} />
-      <QList brand="revisao" data={d} mobile={mobile} qf={qf} pg={pg} setPg={setPg} openMap={openMap} toggleOpen={toggleOpen} />
+      <QList brand="revisao" data={d} mobile={mobile} qf={qf} pg={pg} setPg={setPg} openMap={openMap} toggleOpen={toggleOpen} sessaoId={sessaoId} />
     </div>
   )
   if (mobile) return <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>{lst}{side}</div>
