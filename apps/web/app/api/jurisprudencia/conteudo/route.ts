@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { checkPermission } from '@/lib/auth/permissions'
 import { lerDesafioJogo, mapearParaDESAFIO, preencherTesesPorQuiz, temAcessoDesafio } from '@/lib/jurisprudencia/conteudo'
+import { ehTestadorModulo } from '@/lib/leitura/testadores'
 
 // GET /api/jurisprudencia/conteudo?desafio=<pastaId>
 // Devolve { CONFIG, MATERIAS, FINAL, DIAS } (mapeado de desafio_jogo). Gate por sessão + acesso à pasta.
@@ -29,5 +30,11 @@ export async function GET(request: NextRequest) {
   // As teses do arcade vêm das "Questões do conteúdo" (QuizConteudoAdmin) de cada dia — mesma fonte da Lei Seca.
   dj.dias = await preencherTesesPorQuiz(svc, dj.dias ?? {})
 
-  return NextResponse.json(mapearParaDESAFIO(dj))
+  const resp = mapearParaDESAFIO(dj)
+  // MODO TESTE (acesso exclusivo): o testador do desafio joga com TODOS os dias liberados (ignora o
+  // agendamento/bloqueio por dia) — e já fica fora do ranking. Admin na prévia (sem sessão) também vê tudo.
+  const testador = admin || (sessao ? await ehTestadorModulo(svc, sessao.tenantId, sessao.estudanteId, desafioId) : false)
+  if (testador) resp.CONFIG = { ...resp.CONFIG, testador: true }
+
+  return NextResponse.json(resp)
 }

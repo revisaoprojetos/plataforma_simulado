@@ -59,21 +59,26 @@ export async function carregarRankingJuris(desafioId: string, tenantId: string):
     const totalDias = diasChaves.length
     const tesesDoDia = (k: string): number => { const t = diasComTeses[k]?.teses; return Array.isArray(t) ? t.length : 0 }
     const diaCompleto = (dom: any, k: string): boolean => { const arr = dom?.[k]; const n = tesesDoDia(k); return n > 0 && Array.isArray(arr) && arr.length >= n }
+    // Dias que SOMAM pontos = só os que têm teses REAIS. O dia FINAL/selo tem 0 teses próprias (reusa um
+    // POOL de teses de outros dias), então pontuar nele DUPLICARIA pontos já contados → ficava 3340 em vez
+    // de 3000. `dominados` já ignora (diaCompleto exige teses>0); aqui alinhamos o `pontos`.
+    const diasPontuaveis = diasChaves.filter((k) => tesesDoDia(k) > 0)
 
     const pontosDe = (best: any): number => {
       if (!best || typeof best !== 'object') return 0
-      let soma = 0; for (const d of diasChaves) soma += Math.max(0, Number(best[d]) || 0); return soma
+      let soma = 0; for (const d of diasPontuaveis) soma += Math.max(0, Number(best[d]) || 0); return soma
     }
-    const dominadosDe = (dom: any): number => diasChaves.filter((k) => diaCompleto(dom, k)).length
+    const dominadosDe = (dom: any): number => diasPontuaveis.filter((k) => diaCompleto(dom, k)).length
     const hoje = new Date().toLocaleDateString('en-CA', { timeZone: TZ })
     const diaDe = (iso: string) => new Date(iso).toLocaleDateString('en-CA', { timeZone: TZ })
 
     // Registros por aluno: CAMINHO RÁPIDO via RPC (agrega no banco — blinda a escala) ou FALLBACK
     // (puxa o progresso + varre o ledger no app, se a RPC não estiver aplicada).
     type Reg = { estudanteId: string; pontos: number; dominados: number; dias: Set<string>; atualizadoEm: string | null }
-    const tesesMap: Record<string, number> = {}; for (const k of diasChaves) tesesMap[k] = tesesDoDia(k)
+    const tesesMap: Record<string, number> = {}; for (const k of diasPontuaveis) tesesMap[k] = tesesDoDia(k)
     let regs: Reg[]
-    const rpc = await rpcJurisRelatorio(svc, tenantId, desafioId, diasChaves, tesesMap)
+    // Passa SÓ os dias pontuáveis (com teses reais) → a RPC soma pontos/dominados sem o dia final/selo.
+    const rpc = await rpcJurisRelatorio(svc, tenantId, desafioId, diasPontuaveis, tesesMap)
     if (rpc) {
       regs = rpc.por_aluno.map((a) => ({ estudanteId: a.estudante_id, pontos: Number(a.pontos) || 0, dominados: Number(a.dominados) || 0, dias: new Set<string>(), atualizadoEm: a.atualizado_em ?? null }))
     } else {

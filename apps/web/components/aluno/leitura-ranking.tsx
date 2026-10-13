@@ -194,7 +194,7 @@ export function LeituraRanking({ ranking, minhaLinha = null, meuId, meuNome, mod
                 <div key={it.estudanteId} className="flex min-w-0 flex-col items-center text-center">
                   <span className="relative mb-2 inline-flex rounded-full ring-2 ring-offset-2 ring-offset-card" style={{ '--tw-ring-color': cor } as CSSProperties}>
                     {lugar === 1 && <Crown className="absolute -top-4 left-1/2 z-10 h-4 w-4 -translate-x-1/2 sm:-top-5 sm:h-5 sm:w-5" style={{ color: cor }} />}
-                    <AvatarEstudante nome={it.nome} avatar={it.avatar} cor={it.avatarCor ?? '#6d28d9'} className={cn('text-white shadow-md', lugar === 1 ? 'h-12 w-12 text-sm sm:h-16 sm:w-16 sm:text-lg' : 'h-10 w-10 text-xs sm:h-12 sm:w-12 sm:text-sm')} />
+                    <AvatarEstudante nome={it.nome} avatar={it.avatar} cor={it.avatarCor ?? (it.avatar ? undefined : '#6d28d9')} className={cn('text-white shadow-md', lugar === 1 ? 'h-12 w-12 text-sm sm:h-16 sm:w-16 sm:text-lg' : 'h-10 w-10 text-xs sm:h-12 sm:w-12 sm:text-sm')} />
                   </span>
                   <span className={cn('line-clamp-1 max-w-full text-xs font-semibold sm:text-sm', eu && 'text-primary')}>{eu ? 'Você' : it.nome}</span>
                   <span className="flex flex-wrap items-center justify-center gap-x-1 text-[10px] font-bold tabular-nums sm:gap-x-1.5 sm:text-xs">
@@ -225,7 +225,7 @@ export function LeituraRanking({ ranking, minhaLinha = null, meuId, meuNome, mod
               <div className="hidden h-11 w-px shrink-0 bg-border sm:block" />
               {/* identidade */}
               <span className="relative shrink-0">
-                <AvatarEstudante nome={meuNome ?? meuIt.nome} avatar={meuIt.avatar} cor={meuIt.avatarCor ?? '#6d28d9'} className="h-11 w-11 text-sm text-white" />
+                <AvatarEstudante nome={meuNome ?? meuIt.nome} avatar={meuIt.avatar} cor={meuIt.avatarCor ?? (meuIt.avatar ? undefined : '#6d28d9')} className="h-11 w-11 text-sm text-white" />
                 {gamAtivo && meuIt.nivel > 0 && <span className="absolute -bottom-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-0.5 text-[9px] font-bold text-primary-foreground ring-2 ring-card">{meuIt.nivel}</span>}
               </span>
               <div className="min-w-0 flex-1">
@@ -324,7 +324,7 @@ export function LeituraRanking({ ranking, minhaLinha = null, meuId, meuNome, mod
                     <td className="px-3 py-2.5">
                       <div className="flex min-w-0 items-center gap-2.5">
                         <span className="relative shrink-0">
-                          <AvatarEstudante nome={it.nome} avatar={it.avatar} cor={it.avatarCor ?? '#6d28d9'} className="h-9 w-9 text-[11px] text-white" />
+                          <AvatarEstudante nome={it.nome} avatar={it.avatar} cor={it.avatarCor ?? (it.avatar ? undefined : '#6d28d9')} className="h-9 w-9 text-[11px] text-white" />
                           {gamAtivo && it.nivel > 0 && <span className="absolute -bottom-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-0.5 text-[9px] font-bold text-primary-foreground ring-2 ring-card">{it.nivel}</span>}
                         </span>
                         <div className="min-w-0">
@@ -418,7 +418,7 @@ export function DetalheAlunoModal({ moduloId, it, onClose, carregarDetalhe = det
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={onClose} />
       <div className="relative flex max-h-[88vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-3 border-b p-4">
-          <AvatarEstudante nome={it.nome} avatar={it.avatar} cor={it.avatarCor ?? '#6d28d9'} className="h-10 w-10 shrink-0 text-sm text-white" />
+          <AvatarEstudante nome={it.nome} avatar={it.avatar} cor={it.avatarCor ?? (it.avatar ? undefined : '#6d28d9')} className="h-10 w-10 shrink-0 text-sm text-white" />
           <div className="min-w-0 flex-1">
             <h3 className="truncate font-semibold">{it.nome}</h3>
             {it.email && <p className="truncate text-xs text-muted-foreground">{it.email}</p>}

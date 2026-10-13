@@ -14,14 +14,14 @@ import { HexColorField } from '@/components/admin/hex-color-field'
 import { FONTES_CADERNO } from '@/lib/caderno-designer/theme'
 import { PreviaBlocos, capaPadraoDoPreset, docDoPreset, idsDeterministicos } from '@/lib/caderno-teste/previa-blocos'
 import { Previa, outlineDoItem, type DiagEntrada, type TipoBloco } from '@/lib/caderno-teste/previa'
-import { presetDoItem, metaDaModalidade, CAPA_PADRAO, type ItemCaderno, type BuilderAjustes, type CapaConfig, type PreviewQuestao, type DiagConteudo } from '@/lib/caderno-teste/tipos'
+import { presetDoItem, metaDaModalidade, faixaDeAjustes, CAPA_PADRAO, type ItemCaderno, type BuilderAjustes, type CapaConfig, type PreviewQuestao, type DiagConteudo } from '@/lib/caderno-teste/tipos'
 import { DIAG_PADRAO } from '@/lib/caderno-teste/diagnostico'
 import { camposDoBloco, aplicarCampoBloco, podeRemoverParte, removerParteDiag } from '@/lib/caderno-teste/edicao'
 import { acharBloco, atualizarBlocoAttrs, removerBloco, adicionarBlocoDoc, adicionarBlocoEmContainer, moverBlocoDoc, NOME_BLOCO, camposDoBlocoDoc } from '@/lib/caderno-teste/edicao-doc'
 import { createBlock } from '@/lib/caderno-designer/blocks'
 import type { CadernoDoc } from '@/lib/caderno-designer/types'
 import { salvarModelo, criarModeloComConfig } from '@/app/admin/modelos-caderno/actions'
-import { useZoomAjustado, EditorBoundary, Tog, Segment, CampoAltura, CampoImagem, CampoBlocoEditor, CampoFormatavel, DocEstruturaPanel, BLOCOS_ADD, ICONE_TIPO } from './_campos'
+import { useZoomAjustado, EditorBoundary, Tog, Segment, CampoAltura, CampoImagem, FaixaControles, CampoBlocoEditor, CampoFormatavel, DocEstruturaPanel, BLOCOS_ADD, ICONE_TIPO } from './_campos'
 
 /** Questões de EXEMPLO — um modelo é sobre layout/estilo, não sobre questões reais. */
 const SAMPLE: PreviewQuestao[] = Array.from({ length: 6 }, (_, i) => ({
@@ -299,6 +299,9 @@ function ModeloEditorBase({ id, nomeInicial, configInicial }: { id: string; nome
           <div className="col-span-2 mt-1"><p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><MoveVertical className="h-3.5 w-3.5" /> Espaçamento (topo e base)</p></div>
           <div className="col-span-1"><CampoAltura label="Topo" valor={a.margemTopo} onChange={(n) => setAjuste({ margemTopo: n })} /></div>
           <div className="col-span-1"><CampoAltura label="Base" valor={a.margemBase} onChange={(n) => setAjuste({ margemBase: n })} /></div>
+
+          <div className="col-span-2 mt-1"><p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><MoveVertical className="h-3.5 w-3.5" /> Ajustes das faixas (cabeçalho e rodapé)</p></div>
+          <FaixaControles a={a} set={setAjuste} />
         </div>
 
         {/* Prévia */}
@@ -313,7 +316,7 @@ function ModeloEditorBase({ id, nomeInicial, configInicial }: { id: string; nome
           )}
           <div key={`${item.modalidade}:${item.modelo}`} className="mx-auto" style={{ zoom } as Record<string, unknown>}>
             {preset ? (
-              <PreviaBlocos presetId={preset} questoes={SAMPLE} vars={SEM_VARS} titulo={a.titulo} capaUrl={a.capaUrl} ultimaUrl={a.ultimaUrl} folhaUrl={a.folhaUrl} cabecalhoUrl={a.cabecalhoUrl} rodapeUrl={a.rodapeUrl} margemTopo={a.margemTopo} margemBase={a.margemBase}
+              <PreviaBlocos presetId={preset} questoes={SAMPLE} vars={SEM_VARS} titulo={a.titulo} capaUrl={a.capaUrl} ultimaUrl={a.ultimaUrl} folhaUrl={a.folhaUrl} cabecalhoUrl={a.cabecalhoUrl} rodapeUrl={a.rodapeUrl} faixa={faixaDeAjustes(a)} margemTopo={a.margemTopo} margemBase={a.margemBase}
                 capa={item.capa} onPickCapa={() => { setEstruturaAberta(false); setPickerCapa(true); setPickerCor(null); setPickerBloco(null) }} selCapa={pickerCapa}
                 docOverride={item.docEdit} onPickBloco={(bid) => { setEstruturaAberta(false); setOrigemEstrutura(false); setPickerBloco(bid); setPickerCapa(false); setPickerCor(null) }} selBlocoId={pickerBloco} />
             ) : (
@@ -356,7 +359,7 @@ function ModeloEditorBase({ id, nomeInicial, configInicial }: { id: string; nome
                 <div><div className="mb-1 text-[11px] text-muted-foreground">Cor</div><HexColorField value={a.coresParte?.[pickerCor.parte] ?? pickerCor.cor} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), [pickerCor.parte]: v } })} /></div>
                 <div><div className="mb-1 text-[11px] text-muted-foreground">Cor do texto</div><HexColorField value={a.coresTextoParte?.[pickerCor.parte] || '#ffffff'} onChange={(v) => setAjuste({ coresTextoParte: { ...(a.coresTextoParte ?? {}), [pickerCor.parte]: v } })} /></div>
               </div>
-            ) : (pickerCor.parte.startsWith('fita:') || pickerCor.parte.startsWith('sugInd:') || pickerCor.parte.startsWith('pilar:') || pickerCor.parte.startsWith('pilarG:') || pickerCor.parte === 'lingua_card' || pickerCor.parte === 'dados_card' || ['diag_nota_num', 'diag_nota_faixa', 'diag_nome_rot', 'diag_nome_val'].includes(pickerCor.parte)) ? null : (
+            ) : (pickerCor.parte.startsWith('fita:') || pickerCor.parte.startsWith('sugInd:') || pickerCor.parte.startsWith('pilar:') || pickerCor.parte.startsWith('pilarG:') || pickerCor.parte.startsWith('disc:') || pickerCor.parte.startsWith('discInd:') || pickerCor.parte === 'lingua_card' || pickerCor.parte === 'dados_card' || ['diag_nota_num', 'diag_nota_faixa', 'diag_nome_rot', 'diag_nome_val'].includes(pickerCor.parte)) ? null : (
               <>
                 <div className="mb-1.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Cor</div>
                 <HexColorField value={a.coresParte?.[pickerCor.parte] ?? pickerCor.cor} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), [pickerCor.parte]: v } })} />
@@ -395,6 +398,19 @@ function ModeloEditorBase({ id, nomeInicial, configInicial }: { id: string; nome
                 <div><div className="mb-1 text-[11px] text-muted-foreground">Cor do destaque</div><HexColorField value={a.coresParte?.[pickerCor.parte] ?? a.corPrimaria} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), [pickerCor.parte]: v } })} /></div>
                 <div><div className="mb-1 text-[11px] text-muted-foreground">Cor de fundo</div><HexColorField value={a.coresFundoParte?.[pickerCor.parte] ?? '#fff2cc'} onChange={(v) => setAjuste({ coresFundoParte: { ...(a.coresFundoParte ?? {}), [pickerCor.parte]: v } })} /></div>
                 <div className="col-span-2"><div className="mb-1 text-[11px] text-muted-foreground">Cor do texto (faixas)</div><HexColorField value={a.coresTextoParte?.[pickerCor.parte] ?? '#243b53'} onChange={(v) => setAjuste({ coresTextoParte: { ...(a.coresTextoParte ?? {}), [pickerCor.parte]: v } })} /></div>
+              </div>
+            )}
+            {(pickerCor.parte.startsWith('disc:') || pickerCor.parte.startsWith('discInd:')) && (
+              <div className="grid grid-cols-2 gap-2">
+                <div className="col-span-2"><div className="mb-1 text-[11px] text-muted-foreground">Cor da fita</div><HexColorField value={a.coresParte?.[pickerCor.parte] ?? pickerCor.cor} onChange={(v) => setAjuste({ coresParte: { ...(a.coresParte ?? {}), [pickerCor.parte]: v } })} />{a.coresParte?.[pickerCor.parte] && <button onClick={() => { const cp = { ...(a.coresParte ?? {}) }; delete cp[pickerCor.parte]; setAjuste({ coresParte: cp }) }} className="mt-1 text-[11px] text-muted-foreground hover:underline">Restaurar cor padrão</button>}</div>
+                <div><div className="mb-1 text-[11px] text-muted-foreground">Cor de fundo</div><HexColorField value={a.coresFundoParte?.[pickerCor.parte] ?? '#f5f3ff'} onChange={(v) => setAjuste({ coresFundoParte: { ...(a.coresFundoParte ?? {}), [pickerCor.parte]: v } })} />{a.coresFundoParte?.[pickerCor.parte] && <button onClick={() => { const cp = { ...(a.coresFundoParte ?? {}) }; delete cp[pickerCor.parte]; setAjuste({ coresFundoParte: cp }) }} className="mt-1 text-[11px] text-muted-foreground hover:underline">Restaurar</button>}</div>
+                <div><div className="mb-1 text-[11px] text-muted-foreground">Cor do texto</div><HexColorField value={a.coresTextoParte?.[pickerCor.parte] ?? a.corPrimaria} onChange={(v) => setAjuste({ coresTextoParte: { ...(a.coresTextoParte ?? {}), [pickerCor.parte]: v } })} />{a.coresTextoParte?.[pickerCor.parte] && <button onClick={() => { const cp = { ...(a.coresTextoParte ?? {}) }; delete cp[pickerCor.parte]; setAjuste({ coresTextoParte: cp }) }} className="mt-1 text-[11px] text-muted-foreground hover:underline">Restaurar</button>}</div>
+                {(() => { const kPct = `${pickerCor.parte}:pct`; return (
+                  <div><div className="mb-1 text-[11px] text-muted-foreground">Cor do %</div><HexColorField value={a.coresTextoParte?.[kPct] ?? (a.coresParte?.[pickerCor.parte] ?? pickerCor.cor)} onChange={(v) => setAjuste({ coresTextoParte: { ...(a.coresTextoParte ?? {}), [kPct]: v } })} />{a.coresTextoParte?.[kPct] && <button onClick={() => { const cp = { ...(a.coresTextoParte ?? {}) }; delete cp[kPct]; setAjuste({ coresTextoParte: cp }) }} className="mt-1 text-[11px] text-muted-foreground hover:underline">Restaurar</button>}</div>
+                ) })()}
+                {(() => { const kAc = `${pickerCor.parte}:acerto`; return (
+                  <div><div className="mb-1 text-[11px] text-muted-foreground">Cor do X/N</div><HexColorField value={a.coresTextoParte?.[kAc] ?? '#9590b0'} onChange={(v) => setAjuste({ coresTextoParte: { ...(a.coresTextoParte ?? {}), [kAc]: v } })} />{a.coresTextoParte?.[kAc] && <button onClick={() => { const cp = { ...(a.coresTextoParte ?? {}) }; delete cp[kAc]; setAjuste({ coresTextoParte: cp }) }} className="mt-1 text-[11px] text-muted-foreground hover:underline">Restaurar</button>}</div>
+                ) })()}
               </div>
             )}
             <div className="mt-3">

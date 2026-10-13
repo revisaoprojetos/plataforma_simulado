@@ -12,6 +12,24 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.14.0 — 2026-10-13
+
+**feat(caderno): ajustes de cabeçalho/rodapé, cores do card de disciplina e herança do modelo p/ o simulado**
+
+- **Imagem de fundo da folha**: passa a preencher 100% da folha (`backgroundSize: 100% 100%`) —
+  idêntico em todas as páginas A4 e sem **faixa branca** no rodapé quando a folha cresce além do A4.
+- **Novos ajustes de cabeçalho/rodapé** (prévia, PDF e export Word/HTML): **encaixe** da imagem
+  (preencher/inteira/esticar), **alinhamento**, **altura da faixa** independente da reserva e
+  **em quais folhas** aparece (todas/só a 1ª/exceto a 1ª). Novos campos em `tipos.ts` +
+  `FaixaControles` reusado no modelo-editor e no builder.
+- **Card de disciplina**: cor da **fita**, do **fundo**, do **texto**, do **%** e do **X/N** agora
+  são **editáveis separadamente** (antes o % acompanhava a fita e não dava p/ mudar o fundo).
+- **Herança do modelo → simulado**: as edições por-card feitas no MODELO (disciplinas genéricas
+  `disciplina_1..N`) são transferidas **por posição** p/ as disciplinas reais do banco
+  (`herdarEdicoesDiscReais` em `previa.tsx`) — cor + alinhamento + fonte + tamanho + estilo. Edição
+  feita direto no banco real tem prioridade. Corrige as cores "sumindo"/mudando ao abrir o simulado.
+- Bundle também inclui trabalho em andamento de **jurisprudência** (área de questões) e **leitura**.
+
 ## 3.13.1 — 2026-10-13
 
 **fix(simulados): link de cópia usa o domínio do tenant atual (não o global)**

@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { Printer } from 'lucide-react'
 import { Previa, type DiscBanco } from '@/lib/caderno-teste/previa'
 import { PreviaBlocos } from '@/lib/caderno-teste/previa-blocos'
-import { presetDoItem, type ItemCaderno, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
+import { presetDoItem, faixaDeAjustes, type ItemCaderno, type PreviewQuestao } from '@/lib/caderno-teste/tipos'
 
 /** Renderiza um grupo do caderno de teste com os MESMOS componentes de prévia do editor (paginado em A4). */
 export function PreviewCadernoTeste({ item, questoes, vars, discBanco, standalone, respostas, gabaritoLiberado, auto, baixarWord, nomeArq }: {
@@ -97,7 +97,7 @@ export function PreviewCadernoTeste({ item, questoes, vars, discBanco, standalon
         </div>
       )}
       {preset
-        ? <PreviaBlocos presetId={preset} questoes={questoes} vars={vars} titulo={item.ajustes.titulo} capaUrl={item.ajustes.capaUrl} ultimaUrl={item.ajustes.ultimaUrl} folhaUrl={item.ajustes.folhaUrl} cabecalhoUrl={item.ajustes.cabecalhoUrl} rodapeUrl={item.ajustes.rodapeUrl} margemTopo={item.ajustes.margemTopo} margemBase={item.ajustes.margemBase} capa={item.capa} docOverride={item.docEdit} respostas={respostas} gabaritoLiberado={gabaritoLiberado} />
+        ? <PreviaBlocos presetId={preset} questoes={questoes} vars={vars} titulo={item.ajustes.titulo} capaUrl={item.ajustes.capaUrl} ultimaUrl={item.ajustes.ultimaUrl} folhaUrl={item.ajustes.folhaUrl} cabecalhoUrl={item.ajustes.cabecalhoUrl} rodapeUrl={item.ajustes.rodapeUrl} faixa={faixaDeAjustes(item.ajustes)} margemTopo={item.ajustes.margemTopo} margemBase={item.ajustes.margemBase} capa={item.capa} docOverride={item.docEdit} respostas={respostas} gabaritoLiberado={gabaritoLiberado} />
         : <Previa item={item} questoes={questoes} vars={vars} discBanco={discBanco} />}
     </div>
   )

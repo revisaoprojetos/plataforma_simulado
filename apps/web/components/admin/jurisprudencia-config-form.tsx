@@ -108,6 +108,9 @@ export function JurisConfigForm({ desafioId, nome, config, materias, final, imag
   const [compacto, setCompacto] = useState((config as any)?.compacto === true)
   // Cor de fundo do cabeçalho (usada quando NÃO há imagem de fundo). Vazio = gradiente roxo padrão.
   const [corFundo, setCorFundo] = useState<string>(((config as any)?.corFundo as string) || '')
+  // MODO das QUESTÕES: 'questoes' = tela de responder do Lei Seca (as teses viram quiz, mais robusto) |
+  // 'leitura_rapida' (default) = o quiz HTML enxuto atual. Vale para o desafio inteiro.
+  const [modoQuestoes, setModoQuestoes] = useState<'leitura_rapida' | 'questoes'>((config as any)?.modoQuestoes === 'questoes' ? 'questoes' : 'leitura_rapida')
   const musicaRef = useRef<HTMLAudioElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   // Para o áudio da prévia ao SAIR da aba/página (sem vazar som entre as páginas).
@@ -125,7 +128,7 @@ export function JurisConfigForm({ desafioId, nome, config, materias, final, imag
 
   function salvarConfig() {
     startCfg(async () => {
-      const novo = { ...(config ?? {}), vidas: Number(vidas) || 0, vidasIlimitada, tempoResposta: Number(tempoResposta) || 0, pontos, musicaFundo: musicaFundo.trim(), musicaLoop, compacto, corFundo: corFundo.trim() || null }
+      const novo = { ...(config ?? {}), vidas: Number(vidas) || 0, vidasIlimitada, tempoResposta: Number(tempoResposta) || 0, pontos, musicaFundo: musicaFundo.trim(), musicaLoop, compacto, corFundo: corFundo.trim() || null, modoQuestoes }
       const r = await salvarConfigDesafio(desafioId, novo)
       if (!r.ok) { toast.error(r.error ?? 'Erro ao salvar configuração.'); return }
       // Reflete a URL final hospedada (data:audio importado vira URL do storage) — feedback + evita re-subir.
@@ -206,6 +209,29 @@ export function JurisConfigForm({ desafioId, nome, config, materias, final, imag
         <h3 className="flex items-center gap-2 text-sm font-semibold"><Timer className="h-4 w-4 text-primary" /> Regras do jogo</h3>
 
         <p className="text-xs text-muted-foreground">A <b>liberação dos dias</b> (progresso/calendário) agora fica na aba <b>Dias &amp; Teses</b>.</p>
+
+        {/* Modo das QUESTÕES: reaproveita a tela de responder do Lei Seca OU o quiz HTML (leitura rápida). */}
+        <div className="rounded-xl border bg-background/50 p-3">
+          <span className="mb-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><BookMarked className="h-3.5 w-3.5" /> Modo das questões</span>
+          <p className="mb-2 text-[11px] text-muted-foreground">Como o aluno responde as questões do dia (botão <b>QUESTÕES</b> na tela do dia). Vale para o desafio inteiro.</p>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {([
+              { v: 'questoes' as const, t: 'Questões (tela padrão)', d: 'Mesma tela de responder do Lei Seca: uma a uma, navegador, finalizar e nota. Mais robusta.' },
+              { v: 'leitura_rapida' as const, t: 'Leitura rápida (HTML)', d: 'O quiz HTML enxuto atual (slide). Mantém o comportamento antigo.' },
+            ]).map((o) => (
+              <button key={o.v} type="button" onClick={() => setModoQuestoes(o.v)}
+                className={cn('rounded-lg border p-2.5 text-left transition-colors', modoQuestoes === o.v ? 'border-primary bg-primary/10 ring-1 ring-primary/40' : 'bg-card hover:bg-muted')}>
+                <span className="flex items-center gap-1.5 text-sm font-semibold">
+                  <span className={cn('flex h-3.5 w-3.5 items-center justify-center rounded-full border', modoQuestoes === o.v ? 'border-primary' : 'border-muted-foreground/40')}>
+                    {modoQuestoes === o.v && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                  </span>
+                  {o.t}
+                </span>
+                <span className="mt-1 block text-[11px] text-muted-foreground">{o.d}</span>
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="block">
             <span className="mb-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Heart className="h-3.5 w-3.5" /> Vidas</span>

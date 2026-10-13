@@ -155,17 +155,21 @@ async function sequenciaLeitura(estId: string, tenantId: string) {
   for (const d of docs) { const k = d.pastaId ?? '__geral__'; (byModulo.get(k) ?? byModulo.set(k, []).get(k)!).push(d) }
   for (const arr of byModulo.values()) arr.sort((a, b) => (a.ordem - b.ordem) || a.titulo.localeCompare(b.titulo))
 
-  // Gate de PUBLICAÇÃO do módulo: rascunho / agendado p/ futuro / encerrado não aparecem (dados ficam salvos).
-  const todosModulos = pastas.filter((p) => byModulo.has(p.id) && moduloPublicadoAgora(p.publicacao)).map((p) => ({ id: p.id as string, nome: p.nome as string, cor: (p.cor ?? null) as string | null, capa: (p.capa_url ?? null) as string | null, capaCard: (p.capa_card_url ?? null) as string | null, adesivo: (p.adesivo_url ?? null) as string | null, intro: normalizarIntro(p.intro_config), regulamento: normalizarRegulamento(p.regulamento), pontuacao: normalizarPontuacaoLeitura(p.pontuacao), trilhaAparencia: resolverTrilhaAparencia(p.trilha_aparencia), regraSequencial: !!p.regra_sequencial }))
-  // Gate de acesso do módulo (pula os que o aluno não pode ver).
-  const acessiveis = await modulosAcessiveis(svc, tenantId, estId, todosModulos.map((m) => m.id))
-  const modulos = todosModulos.filter((m) => acessiveis.has(m.id))
-  if (byModulo.has('__geral__')) modulos.push({ id: '__geral__', nome: 'Geral', cor: null, capa: null, capaCard: null, adesivo: null, intro: normalizarIntro(null), regulamento: normalizarRegulamento(null), pontuacao: normalizarPontuacaoLeitura(null), trilhaAparencia: DEFAULT_TRILHA_APARENCIA, regraSequencial: false })
-
   // MODO TESTE (acessos exclusivos): nos módulos em que o aluno é testador, TODAS as aulas ficam
   // liberadas todo dia (ignora "libera amanhã" e a regra sequencial) — só p/ conferir a visualização.
+  // Calculado ANTES dos gates de publicação/acesso porque o testador os ignora (ver abaixo).
   let testadorMods = new Set<string>()
   try { testadorMods = await testadorModulosDoAluno(svc, tenantId, estId) } catch { /* coluna ausente */ }
+
+  // Gate de PUBLICAÇÃO do módulo: rascunho / agendado p/ futuro / encerrado não aparecem (dados ficam salvos).
+  // EXCEÇÃO: testador exclusivo enxerga o desafio mesmo AGENDADO p/ futuro ou encerrado (contanto que já
+  // esteja em status 'publicado'), para conferir a visualização antes de abrir ao aluno.
+  const visivelAgora = (p: any) => moduloPublicadoAgora(p.publicacao) || (testadorMods.has(p.id) && (p.publicacao as any)?.status === 'publicado')
+  const todosModulos = pastas.filter((p) => byModulo.has(p.id) && visivelAgora(p)).map((p) => ({ id: p.id as string, nome: p.nome as string, cor: (p.cor ?? null) as string | null, capa: (p.capa_url ?? null) as string | null, capaCard: (p.capa_card_url ?? null) as string | null, adesivo: (p.adesivo_url ?? null) as string | null, intro: normalizarIntro(p.intro_config), regulamento: normalizarRegulamento(p.regulamento), pontuacao: normalizarPontuacaoLeitura(p.pontuacao), trilhaAparencia: resolverTrilhaAparencia(p.trilha_aparencia), regraSequencial: !!p.regra_sequencial }))
+  // Gate de acesso do módulo (pula os que o aluno não pode ver) — testador exclusivo passa direto.
+  const acessiveis = await modulosAcessiveis(svc, tenantId, estId, todosModulos.map((m) => m.id))
+  const modulos = todosModulos.filter((m) => acessiveis.has(m.id) || testadorMods.has(m.id))
+  if (byModulo.has('__geral__')) modulos.push({ id: '__geral__', nome: 'Geral', cor: null, capa: null, capaCard: null, adesivo: null, intro: normalizarIntro(null), regulamento: normalizarRegulamento(null), pontuacao: normalizarPontuacaoLeitura(null), trilhaAparencia: DEFAULT_TRILHA_APARENCIA, regraSequencial: false })
 
   const seqByModulo = new Map<string, AulaSeq[]>()
   let jaProxima = false // já achou a PRÓXIMA a liberar (1ª aula ainda não liberada de toda a sequência)

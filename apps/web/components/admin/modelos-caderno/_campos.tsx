@@ -14,6 +14,7 @@ import { hospedarImagemCadernoAction } from '@/app/admin/cadernos/actions'
 import { BLOCKS, getBlockMeta } from '@/lib/caderno-designer/blocks'
 import { listarBlocosDoc, camposDoBlocoDoc, type CampoBlocoDoc } from '@/lib/caderno-teste/edicao-doc'
 import type { CampoTexto } from '@/lib/caderno-teste/edicao'
+import type { BuilderAjustes } from '@/lib/caderno-teste/tipos'
 import type { CadernoDoc } from '@/lib/caderno-designer/types'
 import {
   Loader2, FileUp, X, Plus, ArrowUp, ArrowDown, Pencil, Trash2, Type,
@@ -107,6 +108,71 @@ export function CampoAltura({ label, valor, onChange }: { label: string; valor: 
       <input type="range" min={0} max={400} step={4} value={v} onChange={(e) => onChange(clamp(Number(e.target.value)))} className="w-full accent-primary" />
       <div className="mt-0.5 text-[10px] text-muted-foreground">{v === 0 ? 'Automático' : `${v}px de reserva`}</div>
     </div>
+  )
+}
+
+type FitFaixa = 'cover' | 'contain' | 'fill'
+type AlinhaFaixa = 'left' | 'center' | 'right'
+type ModoFaixa = 'todas' | 'primeira' | 'exceto-primeira'
+
+/** Controles de UMA faixa (cabeçalho ou rodapé): encaixe, alinhamento, páginas e altura própria. */
+function FaixaBanda({ titulo, fit, alinhar, altura, modo, onFit, onAlinhar, onAltura, onModo }: {
+  titulo: string; fit?: FitFaixa; alinhar?: AlinhaFaixa; altura?: number; modo?: ModoFaixa
+  onFit: (v: FitFaixa) => void; onAlinhar: (v: AlinhaFaixa) => void; onAltura: (v: number) => void; onModo: (v: ModoFaixa) => void
+}) {
+  const selCls = 'w-full rounded-md border bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:border-primary'
+  const clampH = (n: number) => Math.max(0, Math.min(400, Math.round(n) || 0))
+  return (
+    <div className="col-span-1 space-y-1.5 rounded-md border bg-background p-2">
+      <div className="text-[11px] font-semibold text-muted-foreground">{titulo}</div>
+      <div>
+        <div className="mb-0.5 text-[10px] text-muted-foreground">Encaixe da imagem</div>
+        <select value={fit ?? 'cover'} onChange={(e) => onFit(e.target.value as FitFaixa)} className={selCls}>
+          <option value="cover">Preencher (corta)</option>
+          <option value="contain">Imagem inteira</option>
+          <option value="fill">Esticar</option>
+        </select>
+      </div>
+      <div>
+        <div className="mb-0.5 text-[10px] text-muted-foreground">Alinhamento</div>
+        <div className="flex overflow-hidden rounded-md border">
+          {([['left', AlignLeft], ['center', AlignCenter], ['right', AlignRight]] as const).map(([v, Ic]) => (
+            <button key={v} type="button" onClick={() => onAlinhar(v)} className={cn('flex flex-1 items-center justify-center py-1', (alinhar ?? 'center') === v ? 'bg-primary text-primary-foreground' : 'hover:bg-muted')}><Ic className="h-3.5 w-3.5" /></button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <div className="mb-0.5 text-[10px] text-muted-foreground">Em quais folhas</div>
+        <select value={modo ?? 'todas'} onChange={(e) => onModo(e.target.value as ModoFaixa)} className={selCls}>
+          <option value="todas">Todas as folhas</option>
+          <option value="primeira">Só a 1ª folha</option>
+          <option value="exceto-primeira">Exceto a 1ª folha</option>
+        </select>
+      </div>
+      <div className="rounded-md border px-2 py-1.5">
+        <div className="mb-0.5 flex items-center justify-between">
+          <span className="text-[10px] text-muted-foreground">Altura da faixa</span>
+          <div className="flex items-center gap-1">
+            <input type="number" min={0} max={400} value={altura ?? 0} onChange={(e) => onAltura(clampH(Number(e.target.value)))} className="w-14 rounded border bg-background px-1.5 py-0.5 text-right text-xs text-foreground" />
+            <span className="text-[10px] text-muted-foreground">px</span>
+          </div>
+        </div>
+        <input type="range" min={0} max={400} step={4} value={altura ?? 0} onChange={(e) => onAltura(clampH(Number(e.target.value)))} className="w-full accent-primary" />
+        <div className="mt-0.5 text-[10px] text-muted-foreground">{(altura ?? 0) === 0 ? 'Automático (usa a reserva)' : `${altura}px de faixa`}</div>
+      </div>
+    </div>
+  )
+}
+
+/** Bloco de ajustes de cabeçalho + rodapé (encaixe/alinhamento/páginas/altura) para os dois editores. */
+export function FaixaControles({ a, set }: { a: BuilderAjustes; set: (patch: Partial<BuilderAjustes>) => void }) {
+  return (
+    <>
+      <FaixaBanda titulo="Cabeçalho (faixa)" fit={a.cabecalhoFit} alinhar={a.cabecalhoAlinhar} altura={a.cabecalhoAltura} modo={a.cabecalhoModo}
+        onFit={(v) => set({ cabecalhoFit: v })} onAlinhar={(v) => set({ cabecalhoAlinhar: v })} onAltura={(v) => set({ cabecalhoAltura: v })} onModo={(v) => set({ cabecalhoModo: v })} />
+      <FaixaBanda titulo="Rodapé (faixa)" fit={a.rodapeFit} alinhar={a.rodapeAlinhar} altura={a.rodapeAltura} modo={a.rodapeModo}
+        onFit={(v) => set({ rodapeFit: v })} onAlinhar={(v) => set({ rodapeAlinhar: v })} onAltura={(v) => set({ rodapeAltura: v })} onModo={(v) => set({ rodapeModo: v })} />
+    </>
   )
 }
 

@@ -18,12 +18,15 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import {
-  Gamepad2, Trophy, BookOpen, BarChart3, ChevronLeft, Loader2, Heart, Timer, Coins, Medal, Flame, Target, Scale,
-  Zap, Check, List, TrendingUp, Flag, Lock, Crown, FileText, HelpCircle,
+  Gamepad2, Trophy, BookOpen, BarChart3, ChevronLeft, Loader2, Heart, Timer, Coins, Medal, Target, Scale,
+  Zap, Check, List, Flag, Lock, FileText, HelpCircle, TrendingUp,
 } from 'lucide-react'
 import { useTemaInterno } from '@/components/brand/interna/use-tema-interno'
 import type { InternaTheme } from '@/components/brand/interna/interna-tokens'
 import { iniciarTourGuia } from '@/components/aluno/guia-tour-runner'
+import { LeituraRanking } from '@/components/aluno/leitura-ranking'
+import type { RankingLeitura } from '@/lib/leitura/ranking'
+import type { TituloNivel } from '@/lib/gamificacao/config'
 
 const GOLD = '#F1C232'
 const fmt = (n: number) => (Number(n) || 0).toLocaleString('pt-BR')
@@ -111,14 +114,18 @@ export function DesafioJurisInterno({ desafioId, titulo, theme, totalDias, mater
   const [leitura, setLeitura] = useState<string | null>(null)
   // Enquanto o iframe da leitura carrega, mostramos um loader ESCURO por cima (em vez da tela branca).
   const [leituraLoad, setLeituraLoad] = useState(false)
+  // Rótulo do overlay conforme o que está abrindo: "a leitura…" (leitor do dia) ou "as questões…" (quiz).
+  const [overlayLabel, setOverlayLabel] = useState('a leitura…')
   const fecharLeitura = () => { setLeitura(null); setLeituraLoad(false); try { arcadeRef.current?.contentWindow?.postMessage({ type: 'juris-leitura-fechada' }, '*') } catch { /* ignora */ } }
   useEffect(() => {
     function onMsg(e: MessageEvent) {
       const d = e.data as { type?: string; docId?: string; desafio?: string }
-      if (d && (d.type === 'juris-abrir-leitura' || d.type === 'juris-abrir-leitura-rapida') && d.docId) {
-        const base = d.type === 'juris-abrir-leitura-rapida' ? 'leitura-rapida' : 'leitura'
-        // Leitor NOVO (redesign) na leitura do dia (v2=1); a leitura rápida segue como está.
+      if (d && (d.type === 'juris-abrir-leitura' || d.type === 'juris-abrir-leitura-rapida' || d.type === 'juris-abrir-questoes') && d.docId) {
+        // leitura = leitor do dia · leitura-rapida = quiz HTML · questoes = tela de responder do Lei Seca.
+        const base = d.type === 'juris-abrir-leitura-rapida' ? 'leitura-rapida' : d.type === 'juris-abrir-questoes' ? 'questoes' : 'leitura'
+        // Leitor NOVO (redesign) na leitura do dia (v2=1); rápida/questões seguem como estão.
         const extra = base === 'leitura' ? '&v2=1' : ''
+        setOverlayLabel(base === 'leitura' ? 'a leitura…' : 'as questões…')
         setLeituraLoad(true)
         setLeitura(`/aluno/jurisprudencia/${base}/${encodeURIComponent(d.docId)}?desafio=${encodeURIComponent(d.desafio || desafioId)}&embed=1${extra}`)
       }
@@ -167,12 +174,12 @@ export function DesafioJurisInterno({ desafioId, titulo, theme, totalDias, mater
           (fecha via #fechar-leitura). Só o loader escuro enquanto o iframe carrega. */}
       {leitura && typeof document !== 'undefined' && createPortal(
         <div style={{ position: 'fixed', inset: 0, zIndex: 120, background: '#05060f' }}>
-          <iframe ref={leituraRef} src={leitura} title="Leitura do dia" onLoad={() => setLeituraLoad(false)} style={{ display: 'block', width: '100%', height: '100%', border: 0, background: '#fff' }} />
+          <iframe ref={leituraRef} src={leitura} title={overlayLabel === 'a leitura…' ? 'Leitura do dia' : 'Questões do dia'} onLoad={() => setLeituraLoad(false)} style={{ display: 'block', width: '100%', height: '100%', border: 0, background: '#fff' }} />
           {leituraLoad && (
             // Loader ESCURO por cima do iframe branco → sem a tela branca "em branco" antes da leitura.
             <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, background: '#05060f', color: 'rgba(255,255,255,.75)' }}>
               <Loader2 size={30} className="animate-spin" style={{ color: GOLD }} />
-              <span style={{ fontSize: 12.5, fontWeight: 700, letterSpacing: '.08em' }}>Carregando a leitura…</span>
+              <span style={{ fontSize: 12.5, fontWeight: 700, letterSpacing: '.08em' }}>Carregando {overlayLabel}</span>
             </div>
           )}
         </div>,
@@ -184,7 +191,7 @@ export function DesafioJurisInterno({ desafioId, titulo, theme, totalDias, mater
           <div key={tab} className="ji-pane">
             {tab === 'reg' && <AbaRegulamento config={config} totalDias={totalDias} materiasCount={materiasCount} />}
             {tab === 'des' && <AbaDesempenho desafioId={desafioId} totalDias={totalDias} dias={dias} />}
-            {tab === 'rank' && <AbaRanking desafioId={desafioId} totalDias={totalDias} />}
+            {tab === 'rank' && <AbaRanking desafioId={desafioId} totalDias={totalDias} titulo={titulo} />}
           </div>
         </div>
       )}
@@ -598,164 +605,36 @@ function PillR({ cor, icon, children }: { cor: string; icon: React.ReactNode; ch
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// ABA RANKING — pódio + card "Você" + progresso + classificação.
-// (Mesma estrutura da Lei Seca; dados reais de /api/jurisprudencia/ranking.)
+// ABA RANKING — REUSA o ranking rico do Lei Seca (LeituraRanking): pódio + cards "Sua posição" +
+// classificação com PAGINAÇÃO. Dados de /api/jurisprudencia/ranking?rico=1 (RankingLeitura anonimizado).
+// (Antes era uma versão simplificada, sem os cards e sem os botões de paginar.)
 // ─────────────────────────────────────────────────────────────────────────────
-type RankRow = { ini: string; cargo: string; cargoIcone: string; nivel: number; avatar: string | null; avatarCor: string | null; pos: number; pts: number; selos: number; streak: number; you: boolean }
-function AbaRanking({ desafioId, totalDias }: { desafioId: string; totalDias: number }) {
-  const [rows, setRows] = useState<RankRow[] | null>(null)
-  const [total, setTotal] = useState(0)
-  const [totalSelos, setTotalSelos] = useState(0)
+function AbaRanking({ desafioId, totalDias, titulo }: { desafioId: string; totalDias: number; titulo?: string }) {
+  const [data, setData] = useState<{ ranking: RankingLeitura; meuId: string | null; titulos: TituloNivel[]; totalDesafio: number } | null>(null)
   const [loading, setLoading] = useState(true)
   useEffect(() => {
     let vivo = true
     setLoading(true)
-    fetch(`/api/jurisprudencia/ranking?desafio=${encodeURIComponent(desafioId)}&tab=geral`, { cache: 'no-store' })
+    fetch(`/api/jurisprudencia/ranking?desafio=${encodeURIComponent(desafioId)}&rico=1`, { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (vivo && d && Array.isArray(d.rows)) { setRows(d.rows); setTotal(Number(d.total) || d.rows.length); setTotalSelos(Number(d.totalSelos) || 0) } })
+      .then((d) => { if (vivo && d && d.ranking) setData(d) })
       .catch(() => {})
       .finally(() => { if (vivo) setLoading(false) })
     return () => { vivo = false }
   }, [desafioId])
 
-  const itens = useMemo(() => (rows ? [...rows].sort((a, b) => a.pos - b.pos) : []), [rows])
-  const top3 = itens.filter((r) => r.pos >= 1 && r.pos <= 3).sort((a, b) => a.pos - b.pos)
-  const eu = itens.find((r) => r.you) ?? null
-  const totSelos = totalSelos || totalDias // selo = matéria concluída
-  const progressoPct = totSelos > 0 && eu ? Math.round((eu.selos / totSelos) * 100) : 0
+  if (loading && !data) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '64px 20px', color: 'var(--muted)', fontSize: 14 }}><Loader2 size={20} className="animate-spin" style={{ color: 'var(--brand)' }} /> Carregando ranking…</div>
+  if (!data || !data.ranking?.itens?.length) return <div className="ji-card" style={{ padding: 40, textAlign: 'center', color: 'var(--muted)', fontSize: 14 }}>Ainda não há pontuações neste desafio.</div>
 
-  if (loading && !itens.length) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '64px 20px', color: 'var(--muted)', fontSize: 14 }}><Loader2 size={20} className="animate-spin" style={{ color: 'var(--brand)' }} /> Carregando ranking…</div>
-  if (!itens.length) return <div className="ji-card" style={{ padding: 40, textAlign: 'center', color: 'var(--muted)', fontSize: 14 }}>Ainda não há pontuações neste desafio.</div>
-
+  // O tema interno do juris redefine `--muted` com OUTRO significado (cor de TEXTO cinza), mas o
+  // LeituraRanking (shadcn) usa `bg-muted` como FUNDO (cabeçalho da tabela, nº de posição, hover do botão
+  // de paginação) → ficavam cinza-escuros. Remapeamos SÓ `--muted`/`--muted-foreground` a partir dos tokens
+  // certos da área interna (surface2 = fundo sutil; sub = texto secundário) — herda marca e claro/escuro.
   return (
-    <div className="ji-rank-grid">
-      {/* Esquerda: pódio + você + progresso */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div className="ji-card" style={{ padding: 20 }}>
-          <b style={{ display: 'block', margin: '0 0 2px', fontSize: 22, letterSpacing: '-0.03em', color: 'var(--ink)' }}>Ranking geral</b>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--muted)' }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#1FA868' }} /> Ao vivo · <b style={{ color: 'var(--ink)' }}>{fmt(total)}</b> {total === 1 ? 'aluno' : 'alunos'}
-          </span>
-
-          {/* Pódio */}
-          {top3.length > 0 && (
-            <div style={{ marginTop: 22, display: 'flex', alignItems: 'flex-end', gap: 8 }}>
-              {[top3[1], top3[0], top3[2]].map((r, idx) => {
-                if (!r) return <div key={idx} style={{ flex: 1 }} />
-                const alt = r.pos === 1 ? 120 : r.pos === 2 ? 90 : 70
-                const cor = r.pos === 1 ? '#E8C877' : r.pos === 2 ? '#C0C7CF' : '#D3955E'
-                return (
-                  <div key={r.pos} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, minWidth: 0 }}>
-                    {r.pos === 1 && <Crown size={18} color="#E8B83A" />}
-                    <AvatarR row={r} size={r.pos === 1 ? 48 : 40} />
-                    <b style={{ fontSize: 12.5, color: 'var(--ink)' }}>{r.you ? 'Você' : r.ini}</b>
-                    <span style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{fmt(r.pts)} pts</span>
-                    <div style={{ width: '100%', height: alt, borderRadius: '14px 14px 4px 4px', background: `linear-gradient(180deg,${cor}66,${cor}11)`, border: `1px solid ${cor}88`, display: 'flex', justifyContent: 'center', paddingTop: 10, fontSize: 20, fontWeight: 800, color: cor }}>
-                      {r.pos}º
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          {/* Você */}
-          {eu && (
-            <div style={{ marginTop: 14 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, background: 'var(--surface)', border: '1.5px solid var(--brand)', boxShadow: '0 12px 24px -18px rgba(0,0,0,.5)' }}>
-                <div style={{ paddingRight: 12, borderRight: '1px solid var(--line)' }}>
-                  <b style={{ display: 'block', fontSize: 24, letterSpacing: '-0.03em', color: 'var(--ink)' }}>{eu.pos}º</b>
-                  <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>Posição</span>
-                </div>
-                <AvatarR row={eu} size={40} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <b style={{ fontSize: 14, color: 'var(--ink)' }}>Você</b>{' '}
-                  <span style={{ height: 18, padding: '0 6px', borderRadius: 99, background: 'var(--chip)', color: 'var(--brand)', fontSize: 10, fontWeight: 800, display: 'inline-flex', alignItems: 'center' }}>VOCÊ</span>
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--muted)' }}>{eu.selos} {eu.selos === 1 ? 'selo' : 'selos'} · <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, color: eu.streak > 0 ? '#E8763A' : 'var(--muted)', fontWeight: 700 }}><Flame size={12} />{eu.streak || 0} {eu.streak === 1 ? 'dia' : 'dias'}</span></span>
-                </div>
-                <div style={{ textAlign: 'center', paddingLeft: 10, borderLeft: '1px solid var(--line)' }}>
-                  <b style={{ display: 'block', fontSize: 16, color: 'var(--brand)' }}>{fmt(eu.pts)}</b>
-                  <span style={{ fontSize: 10.5, color: 'var(--muted)' }}>pts</span>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Progresso do desafio */}
-        {eu && (
-          <div className="ji-card" style={{ padding: 18 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <b style={{ fontSize: 14, color: 'var(--ink)' }}>Progresso do desafio</b>
-              <b style={{ fontSize: 13, color: 'var(--brand)' }}>{progressoPct}%</b>
-            </div>
-            <div style={{ margin: '10px 0 6px' }}>
-              <div style={{ height: 8, borderRadius: 99, background: 'var(--track)', overflow: 'hidden' }}>
-                <span style={{ display: 'block', width: `${progressoPct}%`, height: '100%', borderRadius: 99, background: `linear-gradient(90deg,var(--brand),${GOLD})` }} />
-              </div>
-            </div>
-            <span style={{ fontSize: 12, color: 'var(--muted)' }}>{eu.selos} de {totSelos} {totSelos === 1 ? 'selo' : 'selos'} (matérias concluídas)</span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line)', fontSize: 12, color: 'var(--muted)' }}>
-              <TrendingUp size={14} color="#1FA868" /> Domine as teses de hoje para subir no ranking.
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Direita: classificação */}
-      <div className="ji-card" style={{ padding: 18 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <Trophy size={18} color="var(--brand)" />
-            <h3 style={{ margin: 0, fontSize: 15.5, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--ink)' }}>Classificação</h3>
-          </div>
-          <span style={{ fontSize: 12, color: 'var(--muted)' }}>{fmt(total)} {total === 1 ? 'aluno' : 'alunos'}</span>
-        </div>
-        <div className="ji-table-scroll"><div className="ji-table-min">
-        <div style={{ display: 'grid', gridTemplateColumns: '40px minmax(120px,1fr) 68px 60px 84px', gap: 12, padding: '0 12px 10px', borderBottom: '1px solid var(--line)' }}>
-          {[['#', 'left'], ['Aluno', 'left'], ['Sequência', 'right'], ['Selos', 'right'], ['Pontos', 'right']].map(([h, al]) => (
-            <span key={h} style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', textAlign: al as any }}>{h}</span>
-          ))}
-        </div>
-        <div>
-          {itens.map((r) => {
-            const top = r.pos <= 3
-            return (
-              <div key={r.pos} style={{ display: 'grid', gridTemplateColumns: '40px minmax(120px,1fr) 68px 60px 84px', gap: 12, alignItems: 'center', padding: '10px 12px', borderBottom: '1px solid var(--line)', background: r.you ? 'color-mix(in srgb,var(--brand) 7%,transparent)' : 'transparent' }}>
-                <span style={{ width: 28, height: 28, borderRadius: 8, background: top ? 'var(--chip)' : 'transparent', color: top ? 'var(--brand)' : 'var(--muted)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800 }}>{r.pos}</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                  <AvatarR row={r} size={34} />
-                  <div style={{ minWidth: 0 }}>
-                    <b style={{ display: 'block', fontSize: 13.5, color: 'var(--ink)', fontWeight: r.you ? 800 : 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {r.you ? 'Você' : r.ini}
-                      {r.you && <span style={{ marginLeft: 6, height: 16, padding: '0 5px', borderRadius: 99, background: 'var(--brand)', color: '#fff', fontSize: 9, fontWeight: 800, display: 'inline-flex', alignItems: 'center', verticalAlign: '1px' }}>VOCÊ</span>}
-                    </b>
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--muted)' }}>
-                      {r.cargoIcone ? <span style={{ display: 'inline-flex', width: 11, height: 11 }} dangerouslySetInnerHTML={{ __html: r.cargoIcone }} /> : null}
-                      {r.cargo || `Nível ${r.nivel}`}
-                    </span>
-                  </div>
-                </div>
-                <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'flex-end', gap: 3, fontSize: 13, fontWeight: 700, color: r.streak > 0 ? '#E8763A' : 'var(--muted)' }}><Flame size={13} color={r.streak > 0 ? '#E8763A' : 'var(--muted)'} />{r.streak || 0}</span>
-                <span style={{ textAlign: 'right', fontSize: 13, color: 'var(--muted)' }}>{r.selos}</span>
-                <b style={{ textAlign: 'right', fontSize: 14, color: 'var(--ink)' }}>{fmt(r.pts)}</b>
-              </div>
-            )
-          })}
-        </div>
-        </div></div>
-      </div>
+    <div style={{ ['--muted' as any]: 'var(--surface2)', ['--muted-foreground' as any]: 'var(--sub)' }}>
+      <LeituraRanking ranking={data.ranking} meuId={data.meuId} moduloId={desafioId} moduloNome={titulo ?? 'Desafio'}
+        titulos={data.titulos ?? []} totalDesafio={data.totalDesafio || totalDias} />
     </div>
   )
 }
 
-function AvatarR({ row, size }: { row: RankRow; size: number }) {
-  return (
-    <span style={{ width: size, height: size, borderRadius: '50%', flexShrink: 0, overflow: 'hidden', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: row.avatarCor || 'var(--chip)', color: 'var(--brand)', fontSize: size * 0.34, fontWeight: 800, border: row.you ? '2px solid var(--brand)' : '1px solid var(--line)' }}>
-      {row.avatar
-        // eslint-disable-next-line @next/next/no-img-element
-        ? <img src={row.avatar} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-        : row.ini}
-    </span>
-  )
-}

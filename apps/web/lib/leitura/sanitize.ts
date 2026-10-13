@@ -1,6 +1,7 @@
 import 'server-only'
 import { parse, NodeType } from 'node-html-parser'
 import { selosParaSpans } from './selos'
+import { normalizarTermoTag, mapaTagsBiblioteca, type TagBiblioteca } from './biblioteca-tags'
 
 // Sanitizador de HTML para a AREA DE LEITURA (server-only).
 //
@@ -111,6 +112,31 @@ function serialize(node: any): string {
   if (!ALLOW_TAGS.has(tag)) return filhos // unwrap: mantem o conteudo, descarta a tag
   if (VOID_TAGS.has(tag)) return '<' + tag + attrsSeguros(tag, el) + '>'
   return '<' + tag + attrsSeguros(tag, el) + '>' + filhos + '</' + tag + '>'
+}
+
+// Converte MARCADORES DE TEXTO de tag no HTML da tag CADASTRADA NA BIBLIOTECA (pelo tenant). Complementa
+// o selosParaSpans (que só pega as tags cruas <rg>). Casos cobertos: um parágrafo/célula cujo texto é SÓ
+// "<nome da tag>" — inclusive com os <> escapados (&lt;…&gt;) e o nome quebrado em vários <span> do Word
+// (colar do Word). O nome é casado pelo TEXTO EXATO que o admin cadastrou na Biblioteca (acento/caixa-
+// insensível) e substituído pelo HTML daquela tag. SEM lista fixa no código: se não houver tag com esse
+// nome na Biblioteca, o bloco fica intacto. Só converte blocos "folha" cujo texto é 100% marcador(es).
+function tagsDeTextoParaHtml(root: any, mapaTags: Record<string, string>): void {
+  if (!mapaTags || !Object.keys(mapaTags).length) return
+  let blocos: any[]
+  try { blocos = root.querySelectorAll('p, li, td, th, h1, h2, h3, h4, h5, h6, div') } catch { return }
+  for (const el of blocos) {
+    try {
+      if (!el.tagName) continue
+      if (el.querySelector('p, div, li, table, ul, ol, h1, h2, h3, h4, h5, h6')) continue // só blocos folha
+      const txt = (el.text || '').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&amp;/gi, '&').replace(/\s+/g, ' ').trim()
+      if (!txt || txt.length > 120 || txt[0] !== '<') continue
+      if (!/^(<[^<>]+>\s*)+$/.test(txt)) continue // o bloco é SÓ marcador(es) <...>?
+      const marcadores: string[] = txt.match(/<[^<>]+>/g) || []
+      const htmls = marcadores.map((mk: string) => mapaTags[normalizarTermoTag(mk.slice(1, -1))])
+      if (!htmls.length || htmls.some((h: string | undefined) => !h)) continue // algum não é tag da Biblioteca → não mexe
+      el.set_content(htmls.join(' '))
+    } catch { /* um bloco não quebra os demais */ }
+  }
 }
 
 // ── Montagem editorial (padrao MAC/Revisao) ─────────────────────────────────
@@ -241,7 +267,10 @@ export interface HtmlSanitizado {
 }
 
 // Sanitiza + ancora (data-art) + indexa dispositivos (data-disp) + extrai a espinha.
-export function sanitizarDocumento(htmlBruto: string): HtmlSanitizado {
+// `tagsBiblioteca`: tags do tenant (nome/slug → html) p/ converter marcadores "<nome>" em texto no selo
+// cadastrado. Omitido/vazio → não converte (não há lista fixa de fallback).
+export function sanitizarDocumento(htmlBruto: string, tagsBiblioteca: TagBiblioteca[] = []): HtmlSanitizado {
+  const mapaTags = mapaTagsBiblioteca(tagsBiblioteca)
   // O DOCTYPE / declaração XML não é elemento — o parser o deixa como TEXTO e ele sairia
   // escapado no fim (aparecia "<!DOCTYPE html>" literal na leitura). Removemos antes do parse.
   // <html>/<head>/<body> já somem (REMOVE_TAGS / unwrap); aqui é só o cabeçalho do arquivo.
@@ -251,6 +280,7 @@ export function sanitizarDocumento(htmlBruto: string): HtmlSanitizado {
       .replace(/<!DOCTYPE[^>]*>/gi, ''),
   ) // tags de selo (<rg>…) → <span data-selo> ANTES do allowlist (senão a tag desconhecida some)
   const root = parse(limpo, { comment: false })
+  tagsDeTextoParaHtml(root, mapaTags) // <nome da tag> em texto (import/Word) → HTML da tag da Biblioteca
   mapearMontagem(root)
   const artigos = ancorarArtigos(root)
   const dispositivos = indexarDispositivos(root)

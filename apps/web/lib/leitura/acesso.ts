@@ -9,6 +9,7 @@ import { resolverGrifoCores, type GrifoCores } from './trilha-aparencia'
 import { resolverBlocos, type BlocoDef } from './blocos'
 import { normalizarEspacamento, type EspacamentoDoc } from './espacamento'
 import { resolverTopicos, type TopicosConfig } from './topicos'
+import { ehTestadorModulo } from './testadores'
 import type { DiffDoc } from './diff-tipos'
 
 /**
@@ -232,28 +233,34 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
   const svc = createAdminClient()
   // Tolerante: `versao_publicada` só existe após a migração A2.
   let dsel = await svc.from('simulado_documentos')
-    .select('id, titulo, descricao, versao, versao_publicada, publicado, deletado, desafio_ativo, desafio_exige_fim, desafio_tempo_min, quiz_config')
+    .select('id, titulo, descricao, versao, versao_publicada, publicado, deletado, desafio_ativo, desafio_exige_fim, desafio_tempo_min, quiz_config, pasta_id')
     .eq('id', documentoId).eq('tenant_id', tenantId).maybeSingle()
   if (dsel.error && /versao_publicada|quiz_config|column/i.test(String(dsel.error.message))) {
-    dsel = await svc.from('simulado_documentos').select('id, titulo, descricao, versao, publicado, deletado, desafio_ativo, desafio_exige_fim, desafio_tempo_min').eq('id', documentoId).eq('tenant_id', tenantId).maybeSingle() as any
+    dsel = await svc.from('simulado_documentos').select('id, titulo, descricao, versao, publicado, deletado, desafio_ativo, desafio_exige_fim, desafio_tempo_min, pasta_id').eq('id', documentoId).eq('tenant_id', tenantId).maybeSingle() as any
   }
   const doc = dsel.data
-  if (!doc || (doc as any).deletado || !(doc as any).publicado) return null
+  if (!doc || (doc as any).deletado) return null
+  // MODO TESTE (acesso exclusivo): testador do módulo abre o leitor mesmo com a aula AGENDADA (não
+  // publicada) e ignora o gate de grupo — p/ conferir o desafio antes de abrir ao aluno.
+  const ehTeste = (doc as any).pasta_id ? await ehTestadorModulo(svc, tenantId, estudanteId, (doc as any).pasta_id) : false
+  if (!ehTeste && !(doc as any).publicado) return null
 
-  // Visibilidade (mesma regra do catálogo)
-  const [{ data: dg }, { data: de }] = await Promise.all([
-    svc.from('simulado_documento_grupos').select('grupo_id').eq('documento_id', documentoId),
-    svc.from('simulado_documento_estudantes').select('estudante_id').eq('documento_id', documentoId),
-  ])
-  const grupos = (dg ?? []).map((r: any) => r.grupo_id)
-  const estuds = (de ?? []).map((r: any) => r.estudante_id)
-  if (grupos.length || estuds.length) {
-    let ok = estuds.includes(estudanteId)
-    if (!ok && grupos.length) {
-      const { data: gm } = await svc.from('simulado_grupo_membros').select('grupo_id').eq('estudante_id', estudanteId).in('grupo_id', grupos)
-      ok = !!(gm ?? []).length
+  // Visibilidade (mesma regra do catálogo) — testador passa direto.
+  if (!ehTeste) {
+    const [{ data: dg }, { data: de }] = await Promise.all([
+      svc.from('simulado_documento_grupos').select('grupo_id').eq('documento_id', documentoId),
+      svc.from('simulado_documento_estudantes').select('estudante_id').eq('documento_id', documentoId),
+    ])
+    const grupos = (dg ?? []).map((r: any) => r.grupo_id)
+    const estuds = (de ?? []).map((r: any) => r.estudante_id)
+    if (grupos.length || estuds.length) {
+      let ok = estuds.includes(estudanteId)
+      if (!ok && grupos.length) {
+        const { data: gm } = await svc.from('simulado_grupo_membros').select('grupo_id').eq('estudante_id', estudanteId).in('grupo_id', grupos)
+        ok = !!(gm ?? []).length
+      }
+      if (!ok) return null
     }
-    if (!ok) return null
   }
 
   // Aluno lê a versão PUBLICADA vigente (A2); genéricos usam a versão única.
@@ -444,9 +451,14 @@ export async function docAcessivelAluno(
   estudanteId: string,
   campos = 'id',
 ): Promise<Record<string, any> | null> {
-  const sel = `${campos}, deletado, publicado`
+  const sel = `${campos}, deletado, publicado, pasta_id`
   const { data: doc } = await svc.from('simulado_documentos').select(sel).eq('id', documentoId).eq('tenant_id', tenantId).maybeSingle()
-  if (!doc || (doc as any).deletado || !(doc as any).publicado) return null
+  if (!doc || (doc as any).deletado) return null
+  // MODO TESTE (acesso exclusivo): o testador do módulo acessa a aula mesmo AGENDADA (não publicada) e
+  // ignora o gate de grupo — p/ conferir/fazer o desafio antes de abrir ao aluno (nada contabiliza).
+  const pastaId = (doc as any).pasta_id as string | null
+  if (pastaId && (await ehTestadorModulo(svc, tenantId, estudanteId, pastaId))) return doc as Record<string, any>
+  if (!(doc as any).publicado) return null
   if (!(await alunoPodeVer(svc, documentoId, estudanteId))) return null
   return doc as Record<string, any>
 }
@@ -464,8 +476,14 @@ export async function gateQuizAluno(documentoId: string, estudanteId: string, te
     dsel = await svc.from('simulado_documentos').select('id, titulo, pasta_id, versao, publicado, deletado').eq('id', documentoId).eq('tenant_id', tenantId).maybeSingle() as any
   }
   const doc: any = dsel.data
-  if (!doc || doc.deletado || !doc.publicado) return null
-  if (!(await alunoPodeVer(svc, documentoId, estudanteId))) return null
+  if (!doc || doc.deletado) return null
+  // MODO TESTE (acesso exclusivo): testador do módulo abre o quiz mesmo com a aula AGENDADA (não publicada)
+  // e ignora o gate de grupo. Senão exige publicado + visível ao aluno.
+  const ehTeste = doc.pasta_id ? await ehTestadorModulo(svc, tenantId, estudanteId, doc.pasta_id) : false
+  if (!ehTeste) {
+    if (!doc.publicado) return null
+    if (!(await alunoPodeVer(svc, documentoId, estudanteId))) return null
+  }
   const versao = doc.versao_publicada ?? doc.versao ?? 1
   const { data: prog } = await svc.from('simulado_leitura_progresso').select('concluido_em').eq('estudante_id', estudanteId).eq('documento_id', documentoId).eq('documento_versao', versao).maybeSingle()
   return { titulo: doc.titulo, pastaId: doc.pasta_id ?? null, leituraConcluida: !!(prog as any)?.concluido_em }

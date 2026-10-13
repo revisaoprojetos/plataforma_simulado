@@ -237,8 +237,14 @@ export function gerarHtmlItem(item: ItemCaderno, opts: { vars?: Record<string, s
   const titulo = esc(a.titulo || 'Caderno')
   const capa = a.capaUrl ? `<div style="margin-bottom:16px"><img src="${esc(a.capaUrl)}" style="width:100%;display:block" /></div>` : ''
   const ultima = a.ultimaUrl ? `<div style="page-break-before:always"><img src="${esc(a.ultimaUrl)}" style="width:100%;display:block" /></div>` : ''
-  const cab = a.cabecalhoUrl ? `<img src="${esc(a.cabecalhoUrl)}" style="width:100%;display:block;margin-bottom:12px" />` : ''
-  const rod = a.rodapeUrl ? `<img src="${esc(a.rodapeUrl)}" style="width:100%;display:block;margin-top:16px" />` : ''
+  // Faixas: honra encaixe (fit), alinhamento e altura própria. O export é fluxo contínuo (sem páginas
+  // físicas), então o "modo de página" (só 1ª / exceto 1ª) não se aplica — a faixa entra uma vez.
+  const fitOf = (f?: string) => f === 'contain' ? 'contain' : f === 'fill' ? 'fill' : 'cover'
+  const posOf = (al?: string) => `${al ?? 'center'} center`
+  const cabH = a.cabecalhoAltura && a.cabecalhoAltura > 0 ? a.cabecalhoAltura : 0
+  const rodH = a.rodapeAltura && a.rodapeAltura > 0 ? a.rodapeAltura : 0
+  const cab = a.cabecalhoUrl ? `<img src="${esc(a.cabecalhoUrl)}" style="width:100%;display:block;margin-bottom:12px${cabH ? `;height:${cabH}px;object-fit:${fitOf(a.cabecalhoFit)};object-position:${posOf(a.cabecalhoAlinhar)}` : ''}" />` : ''
+  const rod = a.rodapeUrl ? `<img src="${esc(a.rodapeUrl)}" style="width:100%;display:block;margin-top:16px${rodH ? `;height:${rodH}px;object-fit:${fitOf(a.rodapeFit)};object-position:${posOf(a.rodapeAlinhar)}` : ''}" />` : ''
   const bg = a.folhaUrl ? `background-image:url('${esc(a.folhaUrl)}');background-size:cover;` : ''
   // Conteúdo numa TABELA centralizada de largura fixa (o Word ignora max-width/margin:auto de div, mas
   // respeita largura de tabela) + página A4 com margens via @page/mso → download fiel à prévia.

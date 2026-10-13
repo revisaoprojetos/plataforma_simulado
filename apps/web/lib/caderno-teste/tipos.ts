@@ -105,6 +105,21 @@ export type BuilderAjustes = {
   /** Reserva de espaço na BASE de cada página (px) — até onde o conteúdo sobe, p/ não invadir o
    *  rodapé/imagem de fundo. 0 = automático (deduz do rodapé/folha). Mantém A4. */
   margemBase: number
+  /** Encaixe da imagem do cabeçalho/rodapé na faixa: 'cover' (preenche, pode cortar) ·
+   *  'contain' (imagem inteira, sem cortar) · 'fill' (estica). Default 'cover'. */
+  cabecalhoFit?: 'cover' | 'contain' | 'fill'
+  rodapeFit?: 'cover' | 'contain' | 'fill'
+  /** Alinhamento horizontal da imagem do cabeçalho/rodapé dentro da faixa. Default 'center'. */
+  cabecalhoAlinhar?: 'left' | 'center' | 'right'
+  rodapeAlinhar?: 'left' | 'center' | 'right'
+  /** Altura da FAIXA do cabeçalho/rodapé (px), INDEPENDENTE da reserva de conteúdo (margemTopo/Base).
+   *  0 = usa a reserva (comportamento antigo). Permite faixa fina com mais respiro de conteúdo. */
+  cabecalhoAltura?: number
+  rodapeAltura?: number
+  /** Em quais páginas o cabeçalho/rodapé aparece: 'todas' · 'primeira' (só a 1ª folha de conteúdo) ·
+   *  'exceto-primeira' (demais folhas). Default 'todas'. */
+  cabecalhoModo?: 'todas' | 'primeira' | 'exceto-primeira'
+  rodapeModo?: 'todas' | 'primeira' | 'exceto-primeira'
   /** Cor por pilar (slug → hex) — cor PADRÃO da linha das disciplinas daquele pilar. */
   coresPilar: Record<string, string>
   /** Cor individual por disciplina (chave/slug → hex) — sobrepõe a cor do pilar quando definida. */
@@ -123,6 +138,24 @@ export type BuilderAjustes = {
   fonteParte: Record<string, string>
   /** Tamanho do texto por PARTE (parte → multiplicador, ex.: 1.15). Aplica ao bloco inteiro (texto e filhos). */
   tamanhoParte: Record<string, number>
+}
+
+/** Ajustes das FAIXAS (cabeçalho/rodapé) passados ao render doc-backed (PreviaBlocos). */
+export type FaixaCfg = {
+  cabFit?: 'cover' | 'contain' | 'fill'; rodFit?: 'cover' | 'contain' | 'fill'
+  cabAlinhar?: 'left' | 'center' | 'right'; rodAlinhar?: 'left' | 'center' | 'right'
+  cabAltura?: number; rodAltura?: number
+  cabModo?: 'todas' | 'primeira' | 'exceto-primeira'; rodModo?: 'todas' | 'primeira' | 'exceto-primeira'
+}
+
+/** Extrai a config das faixas a partir dos ajustes do item (para o render doc-backed). */
+export function faixaDeAjustes(a: BuilderAjustes): FaixaCfg {
+  return {
+    cabFit: a.cabecalhoFit, rodFit: a.rodapeFit,
+    cabAlinhar: a.cabecalhoAlinhar, rodAlinhar: a.rodapeAlinhar,
+    cabAltura: a.cabecalhoAltura, rodAltura: a.rodapeAltura,
+    cabModo: a.cabecalhoModo, rodModo: a.rodapeModo,
+  }
 }
 
 /** Cores padrão por pilar (adaptável: pilares novos herdam a cor secundária até serem configurados). */
@@ -200,6 +233,14 @@ export const AJUSTES_BASE: BuilderAjustes = {
   rodapeUrl: '',
   margemTopo: 0,
   margemBase: 0,
+  cabecalhoFit: 'cover',
+  rodapeFit: 'cover',
+  cabecalhoAlinhar: 'center',
+  rodapeAlinhar: 'center',
+  cabecalhoAltura: 0,
+  rodapeAltura: 0,
+  cabecalhoModo: 'todas',
+  rodapeModo: 'todas',
   coresPilar: { ...CORES_PILAR_PADRAO },
   coresDisc: {},
   coresParte: {},

@@ -8,6 +8,7 @@ import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { esquecer } from '@/lib/cache/relatorio-cache'
 import { sanitizarDocumento } from '@/lib/leitura/sanitize'
+import { carregarTagsBiblioteca } from '@/lib/leitura/biblioteca-tags'
 import { validateFile, PRESETS } from '@/lib/storage/validate'
 
 async function guard() {
@@ -24,7 +25,9 @@ async function guard() {
  * comportamento antigo (upsert na versão vigente).
  */
 async function salvarConteudo(tenantId: string, atorId: string | null, documentoId: string, htmlBruto: string) {
-  const { html, texto, artigos, dispositivos } = sanitizarDocumento(htmlBruto)
+  // Tags do tenant (Biblioteca) → converte marcadores "<nome da tag>" em texto no selo cadastrado.
+  const tagsBiblioteca = await carregarTagsBiblioteca(tenantId)
+  const { html, texto, artigos, dispositivos } = sanitizarDocumento(htmlBruto, tagsBiblioteca)
   if (!html.replace(/<[^>]+>/g, '').trim()) return { ok: false as const, error: 'O conteúdo ficou vazio após a limpeza. Verifique o HTML.' }
 
   const svc = createAdminClient()

@@ -10,7 +10,7 @@ import { BlockRender, dataComQuestao } from '@/lib/caderno-designer/blocks'
 import { resolveTheme, cssDaFonte, type CadernoTheme } from '@/lib/caderno-designer/theme'
 import { PRESETS_CADERNO } from '@/lib/caderno-designer/presets'
 import { PAD_H, PAD_V, RUNNING_PADRAO, type CadernoData, type CadernoDoc, type QuestaoData } from '@/lib/caderno-designer/types'
-import { CAPA_PADRAO, type CapaConfig, type PreviewQuestao } from './tipos'
+import { CAPA_PADRAO, type CapaConfig, type PreviewQuestao, type FaixaCfg } from './tipos'
 import { formatarInline } from './formato'
 
 const A4_W = 794
@@ -100,13 +100,23 @@ function itensDaPagina(page: CadernoDoc['pages'][number], data: CadernoData, the
 
 /** Uma folha A4 de CONTEÚDO: fundo de página (letterhead) + faixas de cabeçalho/rodapé (imagens dos
  *  ajustes) + área segura (o conteúdo fica ENTRE as faixas, via paddingTop=cabH / paddingBottom=rodH). */
-function FolhaConteudo({ theme, folhaUrl, cabecalhoUrl, rodapeUrl, cabH, rodH, children }: { theme: CadernoTheme; folhaUrl?: string; cabecalhoUrl?: string; rodapeUrl?: string; cabH: number; rodH: number; children: ReactNode }) {
+function FolhaConteudo({ theme, folhaUrl, cabecalhoUrl, rodapeUrl, cabH, rodH, faixa, pageIdx = 0, children }: { theme: CadernoTheme; folhaUrl?: string; cabecalhoUrl?: string; rodapeUrl?: string; cabH: number; rodH: number; faixa?: FaixaCfg; pageIdx?: number; children: ReactNode }) {
+  // Ajustes da faixa: encaixe (fit), alinhamento horizontal, altura própria (independente da reserva)
+  // e em quais páginas de conteúdo aparece (todas / só a 1ª / exceto a 1ª).
+  const mostra = (modo?: string) => modo === 'primeira' ? pageIdx === 0 : modo === 'exceto-primeira' ? pageIdx > 0 : true
+  const objPos = (al?: string) => `${al ?? 'center'} center`
+  const bandaTopoH = faixa?.cabAltura && faixa.cabAltura > 0 ? Math.min(faixa.cabAltura, cabH) : cabH
+  const bandaBaseH = faixa?.rodAltura && faixa.rodAltura > 0 ? Math.min(faixa.rodAltura, rodH) : rodH
+  const verCab = cabecalhoUrl && mostra(faixa?.cabModo)
+  const verRod = rodapeUrl && mostra(faixa?.rodModo)
   return (
     <div style={{ width: A4_W, minHeight: A4_H, position: 'relative', overflow: 'hidden', background: theme.cores.fundo, color: theme.cores.texto, boxShadow: '0 2px 20px rgba(0,0,0,.16)', fontFamily: theme.tipografia.familia }}>
-      {folhaUrl && <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${folhaUrl})`, backgroundSize: '210mm 297mm', backgroundRepeat: 'no-repeat', backgroundPosition: 'top center' }} />}
-      {/* Faixa de CABEÇALHO (topo) e RODAPÉ (base): ocupam exatamente a área reservada (cabH/rodH). */}
-      {cabecalhoUrl && <img src={cabecalhoUrl} alt="" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: cabH, objectFit: 'cover', zIndex: 1 }} />}
-      {rodapeUrl && <img src={rodapeUrl} alt="" style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: rodH, objectFit: 'cover', zIndex: 1 }} />}
+      {/* Fundo preenchendo 100% da folha: idêntico em todas as páginas A4 e sem faixa branca no rodapé
+          quando a folha cresce além do A4 (ver nota em previa.tsx). */}
+      {folhaUrl && <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${folhaUrl})`, backgroundSize: '100% 100%', backgroundRepeat: 'no-repeat', backgroundPosition: 'center' }} />}
+      {/* Faixa de CABEÇALHO (topo) e RODAPÉ (base): altura própria (bandaTopoH/bandaBaseH), ancoradas no topo/base. */}
+      {verCab && <img src={cabecalhoUrl} alt="" style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: bandaTopoH, objectFit: faixa?.cabFit ?? 'cover', objectPosition: objPos(faixa?.cabAlinhar), zIndex: 1 }} />}
+      {verRod && <img src={rodapeUrl} alt="" style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', height: bandaBaseH, objectFit: faixa?.rodFit ?? 'cover', objectPosition: objPos(faixa?.rodAlinhar), zIndex: 1 }} />}
       <div style={{ position: 'relative', zIndex: 2, paddingTop: cabH, paddingBottom: rodH, paddingLeft: PAD_H, paddingRight: PAD_H }}>
         {children}
       </div>
@@ -141,7 +151,7 @@ function FolhaCapa({ capaUrl, capa, theme, onPick, sel }: { capaUrl: string; cap
 }
 
 /** Prévia A4 de um modelo pronto (doc v1) com as questões do banco + variáveis do aluno. */
-export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, capaUrl, ultimaUrl, folhaUrl, cabecalhoUrl, rodapeUrl, capa, onPickCapa, selCapa, docOverride, onPickBloco, selBlocoId, respostas, gabaritoLiberado, margemTopo, margemBase, estatico }: {
+export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, capaUrl, ultimaUrl, folhaUrl, cabecalhoUrl, rodapeUrl, faixa, capa, onPickCapa, selCapa, docOverride, onPickBloco, selBlocoId, respostas, gabaritoLiberado, margemTopo, margemBase, estatico }: {
   presetId: string
   questoes: PreviewQuestao[]
   vars?: Record<string, string>
@@ -165,6 +175,8 @@ export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, cap
   cabecalhoUrl?: string
   /** Faixa de rodapé (imagem na base de cada folha de conteúdo). */
   rodapeUrl?: string
+  /** Ajustes das faixas (encaixe/alinhamento/altura/modo de página) de cabeçalho e rodapé. */
+  faixa?: FaixaCfg
   /** Config do título da capa (sobrepõe o default do preset). */
   capa?: CapaConfig
   /** Clique no título da capa → abre o editor lateral. */
@@ -254,7 +266,7 @@ export function PreviaBlocos({ presetId, questoes, vars = {}, titulo, cores, cap
       )}
       {capaPage && <FolhaCapa key="capa" capaUrl={capaUrl!} capa={capaEfetiva} theme={theme} onPick={onPickCapa} sel={selCapa} />}
       {pages.map((idxs, pi) => (
-        <FolhaConteudo key={pi} theme={theme} folhaUrl={folhaUrl} cabecalhoUrl={cabecalhoUrl} rodapeUrl={rodapeUrl} cabH={cabH} rodH={rodH}>
+        <FolhaConteudo key={pi} theme={theme} folhaUrl={folhaUrl} cabecalhoUrl={cabecalhoUrl} rodapeUrl={rodapeUrl} cabH={cabH} rodH={rodH} faixa={faixa} pageIdx={pi}>
           {idxs.map((i, gi) => itens[i] && <div key={itens[i].key} style={{ marginTop: gi === 0 ? 0 : (itens[i].gapTop || 0) }}>{itens[i].node}</div>)}
         </FolhaConteudo>
       ))}

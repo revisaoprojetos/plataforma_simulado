@@ -302,6 +302,8 @@ export async function perfilAlunos(svc: Svc, tenantId: string, ids: string[]): P
       id: e.id, nome: e.nome ?? 'Aluno', iniciais: iniciaisDe(e.nome ?? ''),
       cargo: cargoObj?.titulo ?? '', cargoIcone: cargoIconeSvg(cargoObj?.icone), nivel,
       // Foto = CAPIVARA: a escolhida pelo aluno, OU uma capi padrão determinística (igual AvatarEstudante).
+      // Cor de fundo = EXATAMENTE a que o aluno escolheu no perfil (perfil_avatar_cor); null quando não
+      // escolheu (aí a capi fica sobre fundo neutro, igual no perfil — sem roxo fixo nem cor aleatória).
       avatar: e.avatar ?? avatarPadraoDe(e.id), avatarCor: e.perfil_avatar_cor ?? null,
     })
   }

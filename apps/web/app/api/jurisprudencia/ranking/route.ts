@@ -39,6 +39,20 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Sem acesso a este desafio.' }, { status: 403 })
   }
 
+  // MODO RICO (rico=1): devolve o ranking COMPLETO no formato do Lei Seca (RankingLeitura) para reusar o
+  // componente LeituraRanking do aluno (pódio + cards "Sua posição" + classificação PAGINADA). Anonimiza
+  // p/ o aluno (iniciais; "Você" por extenso). Cacheado via carregarRankingJuris (mesmo do admin).
+  if (sp.get('rico') === '1') {
+    const { carregarRankingJuris } = await import('@/lib/jurisprudencia/ranking')
+    const { anonimizarRankingParaAluno } = await import('@/lib/leitura/ranking')
+    const rk = await carregarRankingJuris(desafioId, tenantId)
+    const ranking = estudanteId ? anonimizarRankingParaAluno(rk, estudanteId) : rk
+    let titulos: unknown[] = []
+    try { const { getGamConfig } = await import('@/lib/gamificacao'); const gc = (await getGamConfig(svc, tenantId)) as any; titulos = gc?.nivel_curva?.titulos ?? gc?.config?.nivel_curva?.titulos ?? [] } catch { /* sem títulos → [] */ }
+    const totalDesafio = Object.keys(dj.dias && typeof dj.dias === 'object' ? (dj.dias as Record<string, any>) : {}).length
+    return NextResponse.json({ ranking, meuId: estudanteId, titulos, totalDesafio })
+  }
+
   // Dias que entram no cálculo conforme a aba. 'geral' = todos; 'dia' = [ref]; 'materia' = os dias da matéria.
   let diasEscopo: string[] | null = null // null = todos (geral)
   if (tab === 'dia') {
@@ -72,7 +86,9 @@ export async function GET(request: NextRequest) {
 
   const pontosDe = (best: any): number => {
     if (!best || typeof best !== 'object') return 0
-    const chaves = diasEscopo ?? Object.keys(best)
+    // 'geral' (diasEscopo null) soma só os dias com TESES REAIS — o dia final/selo (0 teses próprias,
+    // reusa um pool) não pode somar pontos, senão duplicaria (ficava 3340 em vez de 3000).
+    const chaves = diasEscopo ?? Object.keys(best).filter((d) => tesesDoDia(d) > 0)
     let soma = 0
     for (const d of chaves) soma += Math.max(0, Number(best[d]) || 0)
     return soma

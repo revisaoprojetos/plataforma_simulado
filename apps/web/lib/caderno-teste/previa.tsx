@@ -94,9 +94,44 @@ const QUESTOES_EXEMPLO: PreviewQuestao[] = [
 
 type Interativo = { selParte?: string; onPick?: (parte: string, label: string, cor: string, anchor: DOMRect) => void }
 
+// Mapas de edição POR PARTE chaveados por `disc:<chave>` — herdados do modelo p/ as disciplinas reais.
+const MAPS_PARTE_DISC = ['coresParte', 'coresFundoParte', 'coresTextoParte', 'alinhamentoParte', 'fonteParte', 'tamanhoParte', 'estiloParte'] as const
+
+/** Quando o banco REAL substitui as disciplinas GENÉRICAS do modelo (ex.: `disciplina_1` → `criminologia`),
+ *  as edições por-card feitas no MODELO (cor da fita/fundo/texto/%/X-N + alinhamento/fonte/tamanho/estilo),
+ *  que ficam chaveadas por `disc:<chave-genérica>`, deixariam de casar e o card voltaria ao padrão. Aqui
+ *  transferimos essas edições POR POSIÇÃO (i-ésima genérica → i-ésima real, na MESMA ordem em que os cards
+ *  renderizam), backfillando a chave real SÓ quando ela ainda não tem valor próprio — ou seja, uma edição
+ *  feita direto no banco real sempre tem prioridade. Idempotente e sem efeito quando não há banco. */
+function herdarEdicoesDiscReais(a: ItemCaderno['ajustes'], conteudo: ItemCaderno['conteudo'], discBanco: DiscBanco[]): ItemCaderno['ajustes'] {
+  const gen = conteudo?.disciplinas ?? []
+  const ocultas = new Set(conteudo?.discOcultas ?? [])
+  const reais = discBanco.filter((d) => !ocultas.has(d.chave)) // mesma lista/ordem renderizada (ver `discs`)
+  if (!reais.length || !gen.length) return a
+  const pares: [string, string][] = []
+  const n = Math.min(reais.length, gen.length)
+  for (let i = 0; i < n; i++) { const gk = gen[i]?.chave, rk = reais[i]?.chave; if (gk && rk && gk !== rk) pares.push([gk, rk]) }
+  if (!pares.length) return a
+  const out: Record<string, unknown> = { ...a }
+  for (const nome of MAPS_PARTE_DISC) {
+    const src = (a as Record<string, unknown>)[nome] as Record<string, unknown> | undefined
+    if (!src) continue
+    let mudou = false; const next = { ...src }
+    for (const [gk, rk] of pares) for (const suf of ['', ':pct', ':acerto']) {
+      const gKey = `disc:${gk}${suf}`, rKey = `disc:${rk}${suf}`
+      if (src[gKey] !== undefined && next[rKey] === undefined) { next[rKey] = src[gKey]; mudou = true }
+    }
+    if (mudou) out[nome] = next
+  }
+  // coresDisc (cor legada por chave) também herda por posição.
+  const cd = a.coresDisc as Record<string, string> | undefined
+  if (cd) { let mudou = false; const next = { ...cd }; for (const [gk, rk] of pares) if (cd[gk] !== undefined && next[rk] === undefined) { next[rk] = cd[gk]; mudou = true } ; if (mudou) out.coresDisc = next }
+  return out as ItemCaderno['ajustes']
+}
+
 /** Monta os blocos (nós) do conteúdo do grupo, em ordem — a paginação distribui isso em folhas. */
 function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<string, string>, discBanco: DiscBanco[], inter?: Interativo, sink?: { entradas?: DiagEntrada[] }): ReactNode[] {
-  const a = item.ajustes
+  const a = herdarEdicoesDiscReais(item.ajustes, item.conteudo, discBanco)
   const base = a.compacto ? 10 : 12
   const corpo = a.compacto ? 9 : 10 // tamanho ÚNICO do CORPO do texto (todos os blocos/cards); título/% seguem em destaque
   // Texto com formatação inline (**negrito**, *itálico*, <u>sublinhado</u>) já com variáveis aplicadas.
@@ -395,10 +430,14 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
     const fita = pos === 'left' ? { borderLeft: `3px solid ${corDisc}` } : { borderTop: `3px solid ${corDisc}` }
     const bg = corFundoP(dk, '#f5f3ff') // fundo editável do card
     const corNome = corTextoP(dk, corTxt) // cor do texto (nome/assuntos) editável
+    // Cor do % (porcentagem) DESVINCULADA da fita: default = cor da fita (mantém o visual atual), mas
+    // editável à parte via coresTextoParte['<dk>:pct']. A fração X/N tem cor própria ['<dk>:acerto'].
+    const corPct = corTextoP(`${dk}:pct`, corDisc)
+    const corAcerto = corTextoP(`${dk}:acerto`, '#9590b0')
     add(dk, (
       <div {...atr(dk, d.nome, corDisc, { background: bg, ...fita, padding: lista.length ? '6px 10px 2px' : '6px 10px 6px', display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 })}>
         <div style={{ fontSize: fs(dk, 11), fontWeight: 700, color: corNome }}>{V(c.discNomes?.[d.chave] ?? d.nome)}</div>
-        <div style={{ fontSize: fs(dk, 11), whiteSpace: 'nowrap' }}><span style={{ color: '#9590b0' }}>{V(`{acerto_${fonte}}`)}/{V(`{total_${fonte}}`)}</span> <span style={{ fontWeight: 800, color: corDisc }}>{V(`{pct_${fonte}}`)}</span></div>
+        <div style={{ fontSize: fs(dk, 11), whiteSpace: 'nowrap' }}><span style={{ color: corAcerto }}>{V(`{acerto_${fonte}}`)}/{V(`{total_${fonte}}`)}</span> <span style={{ fontWeight: 800, color: corPct }}>{V(`{pct_${fonte}}`)}</span></div>
       </div>
     ), c.discNomes?.[d.chave] ?? d.nome, 'card', dk, true)
     lista.forEach((as, k) => addCont(`${dk}:a${k}`, (
@@ -482,12 +521,16 @@ export function outlineDoItem(item: ItemCaderno, questoes: PreviewQuestao[], var
 }
 
 /** Uma folha A4 (fundo + cabeçalho + conteúdo + rodapé) ou a capa (página inteira). */
-function Folha({ item, num, total, pad, Ht, Hf, ehCapa, ehUltima, capaCfg, onPickCapa, selCapa, children }: { item: ItemCaderno; num: number; total: number; pad: number; Ht: number; Hf: number; ehCapa?: boolean; ehUltima?: boolean; capaCfg?: CapaConfig; onPickCapa?: () => void; selCapa?: boolean; children?: ReactNode }) {
+function Folha({ item, num, total, pad, Ht, Hf, ehCapa, ehUltima, capaCfg, onPickCapa, selCapa, pageConteudoIdx, children }: { item: ItemCaderno; num: number; total: number; pad: number; Ht: number; Hf: number; ehCapa?: boolean; ehUltima?: boolean; capaCfg?: CapaConfig; onPickCapa?: () => void; selCapa?: boolean; pageConteudoIdx?: number; children?: ReactNode }) {
   const a = item.ajustes
   const cfg = capaCfg ?? CAPA_PADRAO
   return (
     <div style={{ width: A4_W, minHeight: A4_H, position: 'relative', overflow: 'visible', background: '#fff', color: '#1a202c', boxShadow: '0 2px 20px rgba(0,0,0,.16)', fontFamily: 'var(--font-inter), system-ui, sans-serif' }}>
-      {a.folhaUrl && <img src={a.folhaUrl} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />}
+      {/* Fundo da folha PREENCHENDO 100% da folha (sem recorte): em páginas A4 (tamanho igual) o papel
+          timbrado fica IDÊNTICO em todas; e se a folha crescer além do A4 (rede de segurança anti-corte),
+          o fundo acompanha até a base — nunca sobra faixa branca no rodapé (ao contrário do A4 fixo
+          com no-repeat) nem "desliza" verticalmente (ao contrário do objectFit:cover centralizado). */}
+      {a.folhaUrl && <div style={{ position: 'absolute', inset: 0, backgroundImage: `url(${a.folhaUrl})`, backgroundSize: '100% 100%', backgroundRepeat: 'no-repeat', backgroundPosition: 'center' }} />}
       {ehCapa ? (
         a.capaUrl && (
           <>
@@ -512,19 +555,32 @@ function Folha({ item, num, total, pad, Ht, Hf, ehCapa, ehUltima, capaCfg, onPic
         )
       ) : ehUltima ? (
         a.ultimaUrl && <img src={a.ultimaUrl} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 1 }} />
-      ) : (
+      ) : (() => {
+        // Ajustes de faixa: encaixe (fit), alinhamento horizontal, altura própria (independente da
+        // reserva) e em quais páginas de conteúdo a faixa aparece (todas / só a 1ª / exceto a 1ª).
+        const idxC = pageConteudoIdx ?? 0
+        const mostra = (modo?: string) => modo === 'primeira' ? idxC === 0 : modo === 'exceto-primeira' ? idxC > 0 : true
+        const objPos = (al?: string) => `${al ?? 'center'} center`
+        const bandaTopoH = a.cabecalhoAltura && a.cabecalhoAltura > 0 ? Math.min(a.cabecalhoAltura, Ht) : Ht
+        const bandaBaseH = a.rodapeAltura && a.rodapeAltura > 0 ? Math.min(a.rodapeAltura, Hf) : Hf
+        const verCab = a.cabecalhoUrl && mostra(a.cabecalhoModo)
+        const verRod = a.rodapeUrl && mostra(a.rodapeModo)
+        return (
         <div style={{ position: 'relative', zIndex: 1, minHeight: A4_H, display: 'flex', flexDirection: 'column' }}>
-          <div style={{ height: Ht, flexShrink: 0, overflow: 'hidden' }}>
-            {a.cabecalhoUrl && <img src={a.cabecalhoUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+          {/* Faixa do TOPO: altura própria (bandaTopoH) ancorada no topo da reserva (Ht). */}
+          <div style={{ height: Ht, flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'flex-start' }}>
+            {verCab && <img src={a.cabecalhoUrl} alt="" style={{ width: '100%', height: bandaTopoH, objectFit: a.cabecalhoFit ?? 'cover', objectPosition: objPos(a.cabecalhoAlinhar) }} />}
           </div>
           {/* flex "1 0 auto" = preenche a folha (páginas curtas) mas NÃO encolhe (páginas cheias):
               se um bloco passar do limite, a folha CRESCE em vez de cortar/esconder — nada some. */}
           <div style={{ flex: '1 0 auto', padding: `8px ${pad}px`, overflow: 'visible' }}>{children}</div>
-          <div style={{ height: Hf, flexShrink: 0, position: 'relative', overflow: 'hidden' }}>
-            {a.rodapeUrl && <img src={a.rodapeUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+          {/* Faixa da BASE: altura própria (bandaBaseH) ancorada na base da reserva (Hf). */}
+          <div style={{ height: Hf, flexShrink: 0, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'flex-end' }}>
+            {verRod && <img src={a.rodapeUrl} alt="" style={{ width: '100%', height: bandaBaseH, objectFit: a.rodapeFit ?? 'cover', objectPosition: objPos(a.rodapeAlinhar) }} />}
           </div>
         </div>
-      )}
+        )
+      })()}
     </div>
   )
 }
@@ -638,7 +694,7 @@ export function Previa({ item, questoes, vars = {}, discBanco = [], onPick, selP
       )}
       {temCapa && <Folha item={item} num={1} total={total} pad={pad} Ht={Ht} Hf={Hf} ehCapa capaCfg={item.capa ?? CAPA_PADRAO} onPickCapa={onPickCapa} selCapa={selCapa} />}
       {pages.map((idxs, pi) => (
-        <Folha key={pi} item={item} num={(temCapa ? 1 : 0) + pi + 1} total={total} pad={pad} Ht={Ht} Hf={Hf}>
+        <Folha key={pi} item={item} num={(temCapa ? 1 : 0) + pi + 1} total={total} pad={pad} Ht={Ht} Hf={Hf} pageConteudoIdx={pi}>
           {idxs.map((i, gi) => <div key={i} className="cad-bloco" style={{ marginTop: gi === 0 ? 0 : (blocos[i].juntar ? 0 : GAP) }}>{blocos[i].node}</div>)}
         </Folha>
       ))}

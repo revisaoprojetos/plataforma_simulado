@@ -15,7 +15,7 @@ import { ModeloPicker } from '@/components/admin/caderno-teste/modelo-picker'
 import { abrirModelo, carregarModelosArea, type ModeloRow, type PastaModeloRow } from '@/app/admin/modelos-caderno/actions'
 import { MODELOS_CADERNO_ATIVO } from '@/lib/flags'
 import { BancoPicker, type BancoOpcao } from '@/components/admin/caderno-teste/banco-picker'
-import { metaDaModalidade, itemAtivo, novoItem, novoItemVazio, presetDoItem, CAPA_PADRAO, CORES_PILAR_PADRAO, type BuilderV3, type BuilderAjustes, type CapaConfig, type Modalidade, type PreviewQuestao, type ItemCaderno } from '@/lib/caderno-teste/tipos'
+import { metaDaModalidade, itemAtivo, novoItem, novoItemVazio, presetDoItem, faixaDeAjustes, CAPA_PADRAO, CORES_PILAR_PADRAO, type BuilderV3, type BuilderAjustes, type CapaConfig, type Modalidade, type PreviewQuestao, type ItemCaderno } from '@/lib/caderno-teste/tipos'
 import { camposDoBloco, aplicarCampoBloco, podeRemoverParte, removerParteDiag, type CampoTexto } from '@/lib/caderno-teste/edicao'
 import { acharBloco, atualizarBlocoAttrs, removerBloco, adicionarBlocoDoc, adicionarBlocoEmContainer, moverBlocoDoc, listarBlocosDoc, camposDoBlocoDoc, NOME_BLOCO, type CampoBlocoDoc } from '@/lib/caderno-teste/edicao-doc'
 import { BLOCKS, createBlock, getBlockMeta } from '@/lib/caderno-designer/blocks'
@@ -602,6 +602,12 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
           <div className="col-span-2 rounded-md border border-dashed px-2.5 py-2 text-[10px] leading-relaxed text-muted-foreground">
             ↕️ Define até onde os blocos descem/sobem na página (A4 mantido). <strong>0 = automático</strong>. Aumente o valor até o conteúdo ficar <strong>entre</strong> o cabeçalho e o rodapé, sem cobrir a faixa/imagem de fundo.
           </div>
+
+          <div className="col-span-2 mt-2"><p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><MoveVertical className="h-3.5 w-3.5" /> Ajustes das faixas (cabeçalho e rodapé)</p></div>
+          <FaixaControles a={a} set={setAjuste} />
+          <div className="col-span-2 rounded-md border border-dashed px-2.5 py-2 text-[10px] leading-relaxed text-muted-foreground">
+            🎚️ <strong>Encaixe</strong>: “Preencher” corta a imagem p/ caber · “Imagem inteira” mostra tudo sem cortar · “Esticar” distorce p/ preencher. <strong>Altura da faixa</strong> = espessura da imagem (0 = usa a reserva). <strong>Em quais folhas</strong> controla repetir em todas ou só na 1ª.
+          </div>
           {ativo.modalidade === 'diagnostico' && (
             <div className="col-span-2 rounded-md border border-dashed px-2.5 py-2 text-[11px] leading-snug text-muted-foreground">
               💡 Cor das disciplinas por pilar: <strong>clique no card de uma disciplina na prévia</strong> (à direita) e escolha a cor ao lado.
@@ -625,7 +631,7 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
             // evitando nós velhos (header do modelo anterior) presos por ids determinísticos.
             <div key={`${ativo.id}:${ativo.modalidade}:${ativo.modelo}`} className="mx-auto" style={{ zoom } as any}>
               {presetAtivo ? (
-                <PreviaBlocos presetId={presetAtivo} questoes={questoes} vars={varsPrevia} titulo={a.titulo} capaUrl={a.capaUrl} ultimaUrl={a.ultimaUrl} folhaUrl={a.folhaUrl} cabecalhoUrl={a.cabecalhoUrl} rodapeUrl={a.rodapeUrl} margemTopo={a.margemTopo} margemBase={a.margemBase}
+                <PreviaBlocos presetId={presetAtivo} questoes={questoes} vars={varsPrevia} titulo={a.titulo} capaUrl={a.capaUrl} ultimaUrl={a.ultimaUrl} folhaUrl={a.folhaUrl} cabecalhoUrl={a.cabecalhoUrl} rodapeUrl={a.rodapeUrl} faixa={faixaDeAjustes(a)} margemTopo={a.margemTopo} margemBase={a.margemBase}
                   capa={ativo.capa} onPickCapa={() => { setEstruturaAberta(false); setPickerCapa(true); setPickerCor(null); setPickerBloco(null) }} selCapa={pickerCapa}
                   docOverride={ativo.docEdit} onPickBloco={(id) => { setEstruturaAberta(false); setOrigemEstrutura(false); setPickerBloco(id); setPickerCapa(false); setPickerCor(null) }} selBlocoId={pickerBloco} />
               ) : (
@@ -1442,6 +1448,71 @@ function CampoAltura({ label, valor, onChange }: { label: string; valor: number;
       <input type="range" min={0} max={400} step={4} value={v} onChange={(e) => onChange(clamp(Number(e.target.value)))} className="w-full accent-primary" />
       <div className="mt-0.5 text-[10px] text-muted-foreground">{v === 0 ? 'Automático' : `${v}px de reserva`}</div>
     </div>
+  )
+}
+
+type FitFaixa = 'cover' | 'contain' | 'fill'
+type AlinhaFaixa = 'left' | 'center' | 'right'
+type ModoFaixa = 'todas' | 'primeira' | 'exceto-primeira'
+
+/** Controles de UMA faixa (cabeçalho/rodapé): encaixe, alinhamento, páginas e altura própria. */
+function FaixaBanda({ titulo, fit, alinhar, altura, modo, onFit, onAlinhar, onAltura, onModo }: {
+  titulo: string; fit?: FitFaixa; alinhar?: AlinhaFaixa; altura?: number; modo?: ModoFaixa
+  onFit: (v: FitFaixa) => void; onAlinhar: (v: AlinhaFaixa) => void; onAltura: (v: number) => void; onModo: (v: ModoFaixa) => void
+}) {
+  const selCls = 'w-full rounded-md border bg-background px-2 py-1.5 text-xs text-foreground outline-none focus:border-primary'
+  const clampH = (n: number) => Math.max(0, Math.min(400, Math.round(n) || 0))
+  return (
+    <div className="col-span-1 space-y-1.5 rounded-md border bg-background p-2">
+      <div className="text-[11px] font-semibold text-muted-foreground">{titulo}</div>
+      <div>
+        <div className="mb-0.5 text-[10px] text-muted-foreground">Encaixe da imagem</div>
+        <select value={fit ?? 'cover'} onChange={(e) => onFit(e.target.value as FitFaixa)} className={selCls}>
+          <option value="cover">Preencher (corta)</option>
+          <option value="contain">Imagem inteira</option>
+          <option value="fill">Esticar</option>
+        </select>
+      </div>
+      <div>
+        <div className="mb-0.5 text-[10px] text-muted-foreground">Alinhamento</div>
+        <div className="flex overflow-hidden rounded-md border">
+          {([['left', 'Esq.'], ['center', 'Centro'], ['right', 'Dir.']] as const).map(([v, lbl]) => (
+            <button key={v} type="button" onClick={() => onAlinhar(v)} className={cn('flex-1 py-1 text-[11px]', (alinhar ?? 'center') === v ? 'bg-primary font-semibold text-primary-foreground' : 'hover:bg-muted')}>{lbl}</button>
+          ))}
+        </div>
+      </div>
+      <div>
+        <div className="mb-0.5 text-[10px] text-muted-foreground">Em quais folhas</div>
+        <select value={modo ?? 'todas'} onChange={(e) => onModo(e.target.value as ModoFaixa)} className={selCls}>
+          <option value="todas">Todas as folhas</option>
+          <option value="primeira">Só a 1ª folha</option>
+          <option value="exceto-primeira">Exceto a 1ª folha</option>
+        </select>
+      </div>
+      <div className="rounded-md border px-2 py-1.5">
+        <div className="mb-0.5 flex items-center justify-between">
+          <span className="text-[10px] text-muted-foreground">Altura da faixa</span>
+          <div className="flex items-center gap-1">
+            <input type="number" min={0} max={400} value={altura ?? 0} onChange={(e) => onAltura(clampH(Number(e.target.value)))} className="w-14 rounded border bg-background px-1.5 py-0.5 text-right text-xs text-foreground" />
+            <span className="text-[10px] text-muted-foreground">px</span>
+          </div>
+        </div>
+        <input type="range" min={0} max={400} step={4} value={altura ?? 0} onChange={(e) => onAltura(clampH(Number(e.target.value)))} className="w-full accent-primary" />
+        <div className="mt-0.5 text-[10px] text-muted-foreground">{(altura ?? 0) === 0 ? 'Automático (usa a reserva)' : `${altura}px de faixa`}</div>
+      </div>
+    </div>
+  )
+}
+
+/** Bloco de ajustes de cabeçalho + rodapé (encaixe/alinhamento/páginas/altura). */
+function FaixaControles({ a, set }: { a: BuilderAjustes; set: (patch: Partial<BuilderAjustes>) => void }) {
+  return (
+    <>
+      <FaixaBanda titulo="Cabeçalho (faixa)" fit={a.cabecalhoFit} alinhar={a.cabecalhoAlinhar} altura={a.cabecalhoAltura} modo={a.cabecalhoModo}
+        onFit={(v) => set({ cabecalhoFit: v })} onAlinhar={(v) => set({ cabecalhoAlinhar: v })} onAltura={(v) => set({ cabecalhoAltura: v })} onModo={(v) => set({ cabecalhoModo: v })} />
+      <FaixaBanda titulo="Rodapé (faixa)" fit={a.rodapeFit} alinhar={a.rodapeAlinhar} altura={a.rodapeAltura} modo={a.rodapeModo}
+        onFit={(v) => set({ rodapeFit: v })} onAlinhar={(v) => set({ rodapeAlinhar: v })} onAltura={(v) => set({ rodapeAltura: v })} onModo={(v) => set({ rodapeModo: v })} />
+    </>
   )
 }
 

@@ -5,6 +5,11 @@ const RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 const { CONFIG, MATERIAS, FINAL, DIAS } = window.DESAFIO;
 
+// MODO TESTE (acesso exclusivo): o backend marca CONFIG.testador=true p/ contas de teste do desafio.
+// Igual ao "demoAll": TODOS os dias ficam liberados (ignora o agendamento/bloqueio por dia). O testador
+// já é excluído do ranking server-side; aqui é só a liberação de jogo.
+const TESTADOR = !!(CONFIG && CONFIG.testador);
+
 // Vidas: quantidade fixa OU ilimitada (sem game over), configurável no admin.
 const VIDAS_ILIM = CONFIG.vidasIlimitada === true;
 const VIDAS_INI = VIDAS_ILIM ? Infinity : (Number(CONFIG.vidas) || 3);
@@ -41,7 +46,7 @@ function pubEstado(n){
   if(est==='rascunho') return 'rascunho';
   return est==='visualizavel' ? 'visualizavel' : 'publicada';
 }
-function dayVisible(n){ if(S.demoAll) return true; return pubEstado(n)!=='rascunho'; }
+function dayVisible(n){ if(S.demoAll||TESTADOR) return true; return pubEstado(n)!=='rascunho'; }
 const VORD = ORD_ALL.filter(dayVisible);          // dias visíveis, na ordem (o que o aluno enxerga)
 const NDAYS = VORD.length;
 const pos = n => VORD.indexOf(Number(n))+1;        // número exibido (1..N) a partir da chave estável
@@ -69,7 +74,7 @@ function getTeses(n){
 const domOf = n => S.dom[n] || [];
 const dayComplete = n => domOf(n).length >= getTeses(n).length;
 // Jogável = publicada (demo/preview liberam tudo). Agendada/visualizável/rascunho = bloqueado.
-function dayUnlocked(n){ if(S.demoAll) return true; return pubEstado(n)==='publicada'; }
+function dayUnlocked(n){ if(S.demoAll||TESTADOR) return true; return pubEstado(n)==='publicada'; }
 // Data de liberação do dia AGENDADO (p/ exibir "BLOQUEADO - DD/MM/AAAA"). null se não agendado.
 function dataLiberacao(n){
   const p = DIAS[n] && DIAS[n].pub; if(!(p && p.publicarEm)) return null;
@@ -415,7 +420,7 @@ function docDoDia(n){ const m=(window.DESAFIO&&window.DESAFIO.LEITURA_DOCS)||{};
 const PREVIEW = new URLSearchParams(location.search).get('preview')==='1';
 // Leitura obrigatória ainda pendente? (dia com leitura publicada, não lida, não é replay/demo).
 // No preview do Designer não trava (admin visualiza as 2 opções E consegue jogar p/ ver o labirinto).
-function leituraBloqueada(n){ return !PREVIEW && !!docDoDia(n) && !leituraConcluidaDia(n) && !dayComplete(n) && !S.demoAll; }
+function leituraBloqueada(n){ return !PREVIEW && !TESTADOR && !!docDoDia(n) && !leituraConcluidaDia(n) && !dayComplete(n) && !S.demoAll; }
 // Abre a LEITURA do dia SEM recarregar o arcade: pede ao PORTAL (pai) p/ abrir um overlay por cima — o
 // iframe do arcade fica montado/congelado atrás (estado/progresso preservados, sem flash de abertura).
 // No designer (preview): nova aba. Fallback (sem pai ouvindo): navega a página inteira (como a Lei Seca).
@@ -439,14 +444,33 @@ function irParaLeituraRapida(n){
   try{ if(window.parent && window.parent!==window){ window.parent.postMessage({ type:'juris-abrir-leitura-rapida', docId:docId, desafio:did }, '*'); return; } }catch(e){}
   try{ window.top.location.href=url; }catch(e){ window.location.href=url; }
 }
+// MODO das QUESTÕES (config do desafio): 'questoes' = tela de responder do Lei Seca (as teses viram quiz)
+// | 'leitura_rapida' (default) = o quiz HTML enxuto. Lido de CONFIG.modoQuestoes (desafio_jogo.config).
+function modoQuestoes(){ return (CONFIG && CONFIG.modoQuestoes==='questoes') ? 'questoes' : 'leitura_rapida'; }
+// Em modo 'questoes', o botão QUESTÕES usa o DOCUMENTO do dia (mesmo da leitura) e só aparece quando o dia
+// TEM teses (as teses = questões do quiz). Sem backend novo: as teses já vêm do conteúdo.
+function docQuestoesDoDia(n){ const doc=docDoDia(n); return (doc && getTeses(n).length>0) ? doc : null; }
+// Dia tem QUESTÕES para mostrar o botão? (depende do modo configurado).
+function temQuestoesDoDia(n){ return modoQuestoes()==='questoes' ? !!docQuestoesDoDia(n) : !!docRapidaDoDia(n); }
+// Abre a tela de QUESTÕES (Lei Seca) do dia — overlay no portal, igual à leitura (só muda a rota/tipo).
+function irParaQuestoes(n){
+  const did=(window.DESAFIO&&window.DESAFIO.ID)||new URLSearchParams(location.search).get('desafio')||'';
+  const docId=docQuestoesDoDia(n); if(!docId) return;
+  const url='/aluno/jurisprudencia/questoes/'+encodeURIComponent(docId)+'?desafio='+encodeURIComponent(did);
+  if(PREVIEW){ window.open(url, '_blank', 'noopener'); return; }
+  try{ if(window.parent && window.parent!==window){ window.parent.postMessage({ type:'juris-abrir-questoes', docId:docId, desafio:did }, '*'); return; } }catch(e){}
+  try{ window.top.location.href=url; }catch(e){ window.location.href=url; }
+}
+// Dispatcher do botão QUESTÕES: abre a tela do Lei Seca (modo questoes) ou a leitura rápida HTML.
+function abrirQuestoes(n){ if(modoQuestoes()==='questoes') irParaQuestoes(n); else irParaLeituraRapida(n); }
 // Configura a TELA DO DIA (attract) com as opções: Leitura do dia + Leitura rápida (se houver) + COMEÇAR.
 function aplicarGateAtract(n){
   const bLer=$('#btnLeitura'), bStart=$('#btnStart'), hint=$('#atHint'), bRap=$('#btnLeituraRapida');
   const temLeitura=!!docDoDia(n), bloqueada=leituraBloqueada(n);
   if(bLer) bLer.hidden=!temLeitura;
-  const temRapida=!!docRapidaDoDia(n);
-  if(bRap) bRap.hidden=!temRapida;                 // botão QUESTÕES só aparece quando houver leitura rápida
-  if(bStart) bStart.classList.toggle('solo', !temRapida); // sem Questões → JOGAR ocupa a linha inteira
+  const temQuestoes=temQuestoesDoDia(n);
+  if(bRap) bRap.hidden=!temQuestoes;                 // botão QUESTÕES só aparece quando o dia tiver questões/leitura rápida
+  if(bStart) bStart.classList.toggle('solo', !temQuestoes); // sem Questões → JOGAR ocupa a linha inteira
   if(bStart){
     bStart.classList.toggle('lock', bloqueada);
     // Cadeado = o ícone de pixel art do próprio arcade (ICON.lock), não um emoji.
@@ -1355,7 +1379,7 @@ document.querySelector('.tabs').addEventListener('click',e=>{ const b=e.target.c
 $('#rChips').addEventListener('click',e=>{ const b=e.target.closest('.chip'); if(b){ RT.mat=b.dataset.mat; SFX.click(); renderRank(); } });
 $('#btnStart').onclick=startRun;
 $('#btnLeitura').onclick=()=>{ SFX.click(); irParaLeitura(G.day); };
-{ const bRap=$('#btnLeituraRapida'); if(bRap) bRap.onclick=()=>{ SFX.click(); irParaLeituraRapida(G.day); }; }
+{ const bRap=$('#btnLeituraRapida'); if(bRap) bRap.onclick=()=>{ SFX.click(); abrirQuestoes(G.day); }; }
 // Ao VOLTAR da leitura (aba/foco/visibilidade ou restauração de bfcache), reatualiza o gate do dia.
 window.addEventListener('pageshow', recarregarLeituras);
 window.addEventListener('focus', recarregarLeituras);

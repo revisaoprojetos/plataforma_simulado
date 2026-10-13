@@ -1304,10 +1304,12 @@ function parseDay(raw){
   const size=el=>{let m=0;el.querySelectorAll('[style]').forEach(s=>{const x=/font-size:\s*([\d.]+)pt/.exec(s.getAttribute('style'));if(x)m=Math.max(m,+x[1])});return m};
   const day={title:'',temas:[]};let cur=null;
   [...d.body.children].forEach(el=>{
+    // Selos REAIS da Biblioteca que o editor colocou no conteúdo (<span data-selo>) → tags do tema.
+    if(cur&&el.querySelectorAll){try{el.querySelectorAll('[data-selo]').forEach(s=>{const sl=s.getAttribute('data-selo');if(sl&&!cur.selos.includes(sl))cur.selos.push(sl)})}catch(e){}}
     const t=(el.textContent||'').replace(/ /g,' ').trim();if(!t)return;
     if(el.tagName==='P'||/^H[1-6]$/.test(el.tagName)){const sz=size(el);
       if(sz>=24&&!day.title){day.title=t;return}
-      if(sz>=14){cur={title:sentenceCase(t),tese:null,blocks:[]};day.temas.push(cur);return}
+      if(sz>=14){cur={title:sentenceCase(t),tese:null,blocks:[],selos:[]};day.temas.push(cur);return}
       if(!cur)return;
       const rs=trimRuns(runs(el));
       if(rs.filter(r=>r.t.trim()).every(r=>r.b)&&t.length<160){cur.blocks.push({type:'h3',text:t});return}
@@ -1352,11 +1354,14 @@ function renderDay(){
   $('#dhCourts').textContent=[...new Set(DAY.temas.map(t=>t.tese&&t.tese.court).filter(Boolean))].join(' · ')||'Jurisprudência';
   document.title='Leitor · '+(dayNum?'Dia '+dayNum+' · ':'')+subject;
   $('#article').innerHTML=DAY.temas.map((tm,i)=>{const id='t'+(i+1),P=pad(i+1),te=tm.tese;
-    const court=te?`<span class="tag court ${te.court.toLowerCase()}"><svg class="i"><use href="#i-scale"/></svg>${te.court}</span>`:'';
+    // Tag de tribunal (STF/STJ) era AUTO-derivada da cor da tabela da tese — NÃO vem do editor, então
+    // não deve virar tag. A tese segue com sua cor (usa data-court, não a pílula).
     const selos=(()=>{const tt=tagsDoTema(tm.title);
-      if(tt===null)return ((META.tags||[])[i]||[]).map(k=>{const d=TAGDEF[k];return d?`<span class="tag ${d[0]}"><svg class="i"><use href="#${d[1]}"/></svg>${d[2]}</span>`:''}).join('');
-      return tt.map(seloImg).join('')})();
-    const tags=court+selos;
+      // SEM fallback de modelo/demo: tags do tema = config do editor (CFG.topicos) OU, na falta dela, os
+      // selos REAIS da Biblioteca que estão no conteúdo (data-selo). Nunca os DAY_META hardcoded.
+      const slugs=(tt&&tt.length)?tt:(tm.selos||[]);
+      return slugs.map(seloImg).join('')})();
+    const tags=selos;
     const tese=te?`<div class="tese" data-court="${te.court}"><button class="tese-copy" data-copy-tese title="Copiar tese com a citação"><svg class="i"><use href="#i-copy"/></svg></button><blockquote>${te.items.map((x,j)=>{const L=te.items.length-1;return `<p>${j===0?'“':''}${esc(x)}${j===L?(/[.!?;]$/.test(x)?'':'.')+'”'+(te.cite?` <b>(${esc(te.cite)}).</b>`:''):''}</p>`}).join('')}</blockquote></div>`:'';
     let body='',k=0,inConcl=false;
     tm.blocks.forEach(b=>{

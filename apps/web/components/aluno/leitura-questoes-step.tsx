@@ -16,7 +16,13 @@ type Resultado = { correta: boolean; corretaId: string | null }
  * FINALIZAR no topo (só habilita com todas respondidas; senão mostra um balão). Estado das respostas vive
  * aqui (no pai) → não some ao navegar. Ao finalizar: registra a tentativa e abre o pop-up com a nota.
  */
-export function LeituraQuestoesStep({ doc, questoes, trilhaHref, bloquearRefazer = false }: { doc: { id: string; titulo: string }; questoes: QuestaoLeituraDados[]; trilhaHref: string; bloquearRefazer?: boolean }) {
+export function LeituraQuestoesStep({ doc, questoes, trilhaHref, bloquearRefazer = false, desafio, voltarLabel = 'Trilha', voltarCta = 'Voltar à trilha', avisoConclusao = 'A próxima aula foi liberada na trilha.' }: {
+  doc: { id: string; titulo: string }; questoes: QuestaoLeituraDados[]; trilhaHref: string; bloquearRefazer?: boolean
+  /** Id do Desafio de Jurisprudência (modo "questões"): ao finalizar, credita o dia (libera o JOGAR + sequência + teses). Vazio no Lei Seca. */
+  desafio?: string
+  /** Rótulos do "voltar" (reuso fora do Lei Seca). Default = trilha. No juris: "Desafio" / "Voltar ao desafio". */
+  voltarLabel?: string; voltarCta?: string; avisoConclusao?: string
+}) {
   const total = questoes.length
   const jaCompletoInicial = total > 0 && questoes.filter((q) => q.resposta).length >= total
 
@@ -57,7 +63,7 @@ export function LeituraQuestoesStep({ doc, questoes, trilhaHref, bloquearRefazer
       const respostasMap = Object.fromEntries(questoes.map((q) => [q.questaoId, !!resultados[q.docQuestaoId]?.correta]))
       fetch('/api/leitura/quiz-tentativa', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ documento_id: doc.id, acertos: acertosTotal, total, respostas: respostasMap }),
+        body: JSON.stringify({ documento_id: doc.id, acertos: acertosTotal, total, respostas: respostasMap, desafio }),
       }).catch(() => { /* tolerante: migração de tentativas pode não ter rodado */ })
     }
     setMostrarPopup(true)
@@ -156,7 +162,7 @@ export function LeituraQuestoesStep({ doc, questoes, trilhaHref, bloquearRefazer
       <div className="flex items-center gap-2 border-b bg-card px-3 py-2.5 sm:px-5">
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <Link href={trilhaHref} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border bg-card px-2.5 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
-            <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">Trilha</span>
+            <ArrowLeft className="h-4 w-4" /> <span className="hidden sm:inline">{voltarLabel}</span>
           </Link>
         </div>
         <div className="min-w-0 text-center">
@@ -202,9 +208,14 @@ export function LeituraQuestoesStep({ doc, questoes, trilhaHref, bloquearRefazer
                 <p className="text-lg font-bold">Você já respondeu este quiz</p>
                 <p className="text-sm text-muted-foreground">Acertos: <span className="font-semibold text-foreground">{acertosTotal}/{total}</span> ({pct}%)</p>
               </div>
-              <div className="mt-1 flex flex-wrap items-center justify-center gap-2">
-                <button type="button" onClick={verResultados} className="inline-flex items-center gap-1.5 rounded-xl border bg-card px-4 py-2.5 text-sm font-semibold shadow-sm transition-colors hover:bg-muted"><Eye className="h-4 w-4" /> Ver resultados</button>
-                {!bloquearRefazer && <button type="button" onClick={refazer} className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90"><RotateCcw className="h-4 w-4" /> Refazer</button>}
+              {/* Ações agrupadas: 2 botões em cima (grid) + Voltar embaixo na largura dos dois (gap menor). */}
+              <div className="mt-1 flex w-full max-w-[22rem] flex-col gap-2">
+                <div className={cn('grid gap-2', bloquearRefazer ? 'grid-cols-1' : 'grid-cols-2')}>
+                  <button type="button" onClick={verResultados} className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border bg-card px-4 py-2.5 text-sm font-semibold shadow-sm transition-colors hover:bg-muted"><Eye className="h-4 w-4" /> Ver resultados</button>
+                  {!bloquearRefazer && <button type="button" onClick={refazer} className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90"><RotateCcw className="h-4 w-4" /> Refazer</button>}
+                </div>
+                {/* Voltar CENTRALIZADO (além do botão do canto) — largura dos 2 de cima — fecha o overlay / volta ao desafio. */}
+                <Link href={trilhaHref} className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border bg-card px-4 py-2.5 text-sm font-semibold text-muted-foreground shadow-sm transition-colors hover:bg-muted hover:text-foreground"><ArrowLeft className="h-4 w-4" /> {voltarCta}</Link>
               </div>
             </div>
           ) : (
@@ -249,10 +260,10 @@ export function LeituraQuestoesStep({ doc, questoes, trilhaHref, bloquearRefazer
             <p className="mt-1 text-sm text-muted-foreground">Você acertou</p>
             <p className="my-1 text-3xl font-extrabold tabular-nums text-primary">{acertosTotal}<span className="text-lg font-bold text-muted-foreground">/{total}</span></p>
             <p className="text-sm font-semibold text-muted-foreground">{pct}% de acerto</p>
-            <p className="mt-2 text-xs text-muted-foreground">A próxima aula foi liberada na trilha.</p>
+            <p className="mt-2 text-xs text-muted-foreground">{avisoConclusao}</p>
             <div className="mt-4 flex flex-col gap-2">
               <button type="button" onClick={refazer} className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl border bg-card px-4 py-2.5 text-sm font-semibold shadow-sm transition-colors hover:bg-muted"><RotateCcw className="h-4 w-4" /> Refazer quiz</button>
-              <Link href={trilhaHref} className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90"><Flag className="h-4 w-4" /> Voltar à trilha</Link>
+              <Link href={trilhaHref} className="inline-flex w-full items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90"><Flag className="h-4 w-4" /> {voltarCta}</Link>
             </div>
           </div>
         </div>,
