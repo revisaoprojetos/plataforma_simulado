@@ -8,11 +8,14 @@
 // que abrem o jogo em /aluno/jurisprudencia?desafio=<id>.
 
 import Link from 'next/link'
-import { Gavel, Scale, Play, BookOpen } from 'lucide-react'
+import { Gavel, Scale, Play, BookOpen, Check, Zap, Clock, RotateCcw } from 'lucide-react'
 import { type Brand, type InternaTheme } from '../interna-tokens'
 import { useTemaInterno } from '../use-tema-interno'
 
-type JurisDesafio = { id: string; nome: string; imagemTicket?: string | null }
+type JurisDesafio = { id: string; nome: string; imagemTicket?: string | null; diasFeitos?: number; totalDias?: number }
+
+const OK = '#1FA868'
+const GOLD = '#F1C232'
 
 type PlatformJurisProps = {
   brand: Brand
@@ -127,9 +130,8 @@ export function PlatformJuris({ brand, theme: themeProp, titulo, desafios, stats
               Nenhum desafio disponível para você no momento.
             </div>
           ) : (
-            // Grade igual à Lei Seca (pôster 4:5): adaptável ao container (iframe/tablet) via auto-fill
-            // + min(100%, 200px) — nunca estoura a largura, empilha sozinho quando aperta.
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 200px), 1fr))', gap: 14 }}>
+            // Grade de TICKETS igual à Lei Seca (mesmas dimensões): 1 col → 2 (md) → 3 (xl).
+            <div className="grid grid-cols-1 gap-[14px] md:grid-cols-2 xl:grid-cols-3">
               {desafios.map((d) => (
                 <CardDesafio key={d.id} d={d} />
               ))}
@@ -140,65 +142,85 @@ export function PlatformJuris({ brand, theme: themeProp, titulo, desafios, stats
   )
 }
 
-// Card de desafio em formato PÔSTER (4:5) — idêntico ao card de módulo da Lei Seca
-// (ModuloCardAluno): capa preenchendo, degradê inferior e título/kicker sobrepostos em branco,
-// badge de ação no canto superior direito. O card inteiro é o link que abre o jogo.
+// Card de desafio em formato TICKET — IDÊNTICO ao módulo da Lei Seca (mesmas dimensões): capa 150px
+// à esquerda + corpo à direita com status, título, barra de progresso (dias dominados/total · %) e
+// botão (Jogar / Continuar / Revisar conforme o estado). O card inteiro é o link que abre o jogo.
 function CardDesafio({ d }: { d: JurisDesafio }) {
   const href = `/aluno/jurisprudencia?desafio=${d.id}`
   const capa = d.imagemTicket || null
+  const total = d.totalDias ?? 0
+  const feitos = Math.min(d.diasFeitos ?? 0, total || (d.diasFeitos ?? 0))
+  const pct = total > 0 ? Math.round((feitos / total) * 100) : 0
+  const s: 'done' | 'and' | 'new' = total > 0 && feitos >= total ? 'done' : feitos > 0 ? 'and' : 'new'
+  const statusCfg =
+    s === 'done'
+      ? { cor: OK, icon: <Check size={13} />, rotulo: 'Concluído' }
+      : s === 'and'
+        ? { cor: 'var(--goldInk)', icon: <Zap size={13} />, rotulo: 'Em andamento' }
+        : { cor: 'var(--muted)', icon: <Clock size={13} />, rotulo: 'Não iniciado' }
+  const botao =
+    s === 'done'
+      ? { rotulo: 'Revisar', icon: <RotateCcw size={14} /> }
+      : s === 'and'
+        ? { rotulo: 'Continuar', icon: <Play size={14} /> }
+        : { rotulo: 'Jogar', icon: <Play size={14} /> }
   return (
     <Link
       href={href}
       aria-label={`Abrir desafio ${d.nome}`}
-      className="group relative block aspect-[4/5] overflow-hidden transition-all duration-500 hover:-translate-y-1 hover:shadow-lg"
-      style={{ borderRadius: 'var(--r)', border: '1px solid var(--line)', boxShadow: '0 1px 2px rgba(0,0,0,.04)' }}
+      className="group block transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_40px_-24px_rgba(0,0,0,.5)]"
+      style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 18, overflow: 'hidden', minHeight: 164, color: 'inherit' }}
     >
-      {capa ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={capa}
-          alt=""
-          className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-700 group-hover:scale-105"
-        />
-      ) : (
-        <div className="absolute inset-0" style={{ background: CAPA_GRAD }}>
-          <span aria-hidden="true" className="absolute inset-0" style={{ backgroundImage: CAPA_GRID, backgroundSize: '22px 22px' }} />
+      {/* capa (esquerda, 150px) */}
+      <div style={{ width: 150, flexShrink: 0, overflow: 'hidden' }}>
+        {capa ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={capa} alt="" className="transition-transform duration-500 group-hover:scale-105" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : (
+          <div className="transition-transform duration-500 group-hover:scale-105" style={{ position: 'relative', overflow: 'hidden', width: '100%', height: '100%', background: CAPA_GRAD, color: '#FFFFFF', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '14px 16px' }}>
+            <span aria-hidden="true" className="absolute inset-0" style={{ backgroundImage: CAPA_GRID, backgroundSize: '22px 22px' }} />
+            <span aria-hidden="true" style={{ position: 'absolute', right: -14, bottom: -16, color: 'rgba(255,255,255,.16)' }}>
+              <Scale size={104} strokeWidth={1.4} />
+            </span>
+            <span style={{ position: 'relative', fontSize: 9, fontWeight: 800, letterSpacing: '.14em', opacity: 0.85 }}>JURISPRUDÊNCIA</span>
+            <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginTop: 8, width: 38, height: 38, borderRadius: 11, background: 'rgba(255,255,255,.16)' }}>
+              <Gavel size={20} />
+            </span>
+          </div>
+        )}
+      </div>
+      {/* corpo (direita) */}
+      <div style={{ flex: 1, minWidth: 0, padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 700, color: statusCfg.cor }}>
+          {statusCfg.icon}
+          {statusCfg.rotulo}
+        </span>
+        <b className="line-clamp-2" style={{ fontSize: 14.5, lineHeight: 1.3, color: 'var(--ink)' }}>{d.nome}</b>
+        {total > 0 ? (
+          <div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--muted)', marginBottom: 5 }}>
+              <span>{fmt(feitos)} de {fmt(total)} dias</span>
+              <b style={{ color: 'var(--ink)' }}>{pct}%</b>
+            </div>
+            <div style={{ height: 6, borderRadius: 99, background: 'var(--track)', overflow: 'hidden' }}>
+              <span style={{ display: 'block', width: `${pct}%`, height: '100%', borderRadius: 99, background: `linear-gradient(90deg,var(--brand),var(--brand2) 70%,${GOLD})` }} />
+            </div>
+          </div>
+        ) : (
+          <p className="line-clamp-2" style={{ margin: 0, fontSize: 12, color: 'var(--muted)', lineHeight: 1.4 }}>
+            Decore a jurisprudência dos tribunais superiores jogando.
+          </p>
+        )}
+        <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
           <span
-            aria-hidden="true"
-            className="absolute transition-transform duration-700 group-hover:scale-110"
-            style={{ right: -14, bottom: -14, color: 'rgba(255,255,255,.16)' }}
+            className="transition group-hover:brightness-110"
+            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 32, padding: '0 16px', borderRadius: 12, background: 'var(--brand)', color: '#FFFFFF', fontSize: 12.5, fontWeight: 800, whiteSpace: 'nowrap' }}
           >
-            <Scale size={120} strokeWidth={1.4} />
-          </span>
-          <span className="absolute left-4 top-4 inline-flex items-center justify-center rounded-xl" style={{ width: 40, height: 40, background: 'rgba(255,255,255,.14)', color: '#FFFFFF' }}>
-            <Gavel size={20} />
+            {botao.icon}
+            {botao.rotulo}
           </span>
         </div>
-      )}
-
-      {/* degradê inferior p/ legibilidade do título sobre a capa */}
-      <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(0,0,0,.9) 0%, rgba(0,0,0,.32) 45%, rgba(0,0,0,.08) 100%)' }} />
-
-      {/* kicker + título sobrepostos no rodapé */}
-      <div className="absolute inset-x-0 bottom-0 z-10" style={{ padding: 12, display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <p style={{ margin: 0, fontSize: 10, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: 'rgba(255,255,255,.72)' }}>
-          Desafio
-        </p>
-        <h3
-          className="line-clamp-2"
-          style={{ margin: 0, fontSize: 14, fontWeight: 800, lineHeight: 1.25, letterSpacing: '-0.02em', color: '#FFFFFF', textShadow: '0 1px 2px rgba(0,0,0,.4)' }}
-        >
-          {d.nome}
-        </h3>
       </div>
-
-      {/* badge de ação (Jogar) no canto superior direito */}
-      <span
-        className="absolute right-2 top-2 z-10 inline-flex items-center justify-center rounded-full transition-colors group-hover:bg-white/30"
-        style={{ height: 28, width: 28, background: 'rgba(255,255,255,.18)', color: '#FFFFFF', backdropFilter: 'blur(4px)' }}
-      >
-        <Play size={14} />
-      </span>
     </Link>
   )
 }

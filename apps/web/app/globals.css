@@ -775,6 +775,26 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 .leitura-prosa strong[style*="background"],
 .leitura-prosa mark { color:#111 !important; }
 
+/* Mesma lógica para BLOCOS/CÉLULAS/TÍTULOS com FUNDO claro vindos da importação (caixas tipo "Modulação
+   de efeitos" = <td background-color>, pills de título, parágrafos realçados): no escuro o fg claro da
+   folha sumia sobre o fundo claro → força texto ESCURO. Seletores SIMPLES (sem :is()/:not() longos, que
+   alguns processadores de CSS descartam). `background-color` cobre o Word; exclui `transparent`. O bloco
+   e TODO o texto dentro (menos grifos/exceção, que têm cor própria). */
+.leitura-prosa td[style*="background-color"]:not([style*="transparent"]),
+.leitura-prosa th[style*="background-color"]:not([style*="transparent"]),
+.leitura-prosa p[style*="background-color"]:not([style*="transparent"]),
+.leitura-prosa div[style*="background-color"]:not([style*="transparent"]),
+.leitura-prosa li[style*="background-color"]:not([style*="transparent"]),
+.leitura-prosa h1[style*="background-color"]:not([style*="transparent"]),
+.leitura-prosa h2[style*="background-color"]:not([style*="transparent"]),
+.leitura-prosa h3[style*="background-color"]:not([style*="transparent"]),
+.leitura-prosa h4[style*="background-color"]:not([style*="transparent"]) { color:#111 !important; }
+.leitura-prosa td[style*="background-color"]:not([style*="transparent"]) *:not([data-grifo]):not(.exc),
+.leitura-prosa th[style*="background-color"]:not([style*="transparent"]) *:not([data-grifo]):not(.exc),
+.leitura-prosa p[style*="background-color"]:not([style*="transparent"]) *:not([data-grifo]):not(.exc),
+.leitura-prosa div[style*="background-color"]:not([style*="transparent"]) *:not([data-grifo]):not(.exc),
+.leitura-prosa li[style*="background-color"]:not([style*="transparent"]) *:not([data-grifo]):not(.exc) { color:#111 !important; }
+
 /* Espaçamento GRANULAR (controle total do admin, quiz_config.esp → lib/leitura/espacamento.ts):
    entrelinha (--lp-linha) + parágrafo superior/inferior (--lp-par-top/-bot) + bloco superior/inferior
    (--lp-bloco-top/-bot). O aluno ainda ESCALA por cima via --esc-texto/--esc-blocos (default 1).
@@ -788,6 +808,12 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
   --lp-bloco-texto-top: var(--leitura-espaco, 2.2); --lp-bloco-texto-bot: var(--leitura-espaco, 2.2);
   --esc-texto: 1; --esc-blocos: 1;
 }
+/* Cor base do texto POR TEMA (dirigida pelo data-leitura-tema do leitor do aluno). Fica no CSS, e não
+   no inline do proseStyle, para o container do conteúdo NÃO ser recriado a cada troca de tema — evita a
+   re-rasterização dos overlays mix-blend (pisca/reflow que fazia o texto "mudar de tamanho e voltar"). */
+.leitura-prosa[data-leitura-tema="claro"] { color: #1f2937; }
+.leitura-prosa[data-leitura-tema="sepia"] { color: #4b3f2f; }
+.leitura-prosa[data-leitura-tema="escuro"] { color: #d8d8dc; }
 .leitura-prosa p {
   line-height: calc(1.6 * var(--lp-linha, 1));
   margin-top: calc(0.72rem * var(--lp-par-top, 0) * var(--esc-texto, 1)) !important;
@@ -863,9 +889,11 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 .leitura-prosa .caixa-colapsavel[data-aberto] > .caixa-cab::after { transform:rotate(-135deg); }
 .leitura-prosa .caixa-colapsavel > .caixa-corpo { display:grid; grid-template-rows:0fr; transition:grid-template-rows .3s ease; }
 .leitura-prosa .caixa-colapsavel[data-aberto] > .caixa-corpo { grid-template-rows:1fr; }
-.leitura-prosa .caixa-colapsavel > .caixa-corpo > .caixa-corpo-in { overflow:hidden; min-height:0; }
-/* ABERTA: libera o overflow para o conteúdo aparecer INTEIRO (senão parte do texto "falta"/fica cortada). */
-.leitura-prosa .caixa-colapsavel[data-aberto] > .caixa-corpo > .caixa-corpo-in { overflow:visible; }
+.leitura-prosa .caixa-colapsavel > .caixa-corpo > .caixa-corpo-in { overflow:hidden; min-height:0; transition:overflow 0s; }
+/* ABERTA: libera o overflow para o conteúdo aparecer INTEIRO (senão grifo/selo "falta"/fica cortado),
+   mas SÓ ao FIM da animação (delay .3s) — se liberar na hora, o conteúdo aparece inteiro de uma vez
+   enquanto a linha do grid cresce e a animação "pula". Ao recolher, volta a hidden na hora (clipa suave). */
+.leitura-prosa .caixa-colapsavel[data-aberto] > .caixa-corpo > .caixa-corpo-in { overflow:visible; transition:overflow 0s .3s; }
 
 /* TABELAS colapsáveis: RESPEITAM a cor que veio na importação. Sem cor na fonte → card neutro
    (transparente); com cor (.cor-fonte) → o card usa a cor inline da fonte. Seta no canto sup. direito. */
@@ -882,9 +910,15 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 /* SEM rótulo "Tabela" (o card já é o bloco). */
 .leitura-prosa .tabela-colapsavel > .caixa-cab > :first-child::before { content:none; }
 /* ABERTA: a seta fica no canto superior direito do card. */
-.leitura-prosa .tabela-colapsavel[data-aberto] > .caixa-cab { position:absolute; top:8px; right:10px; z-index:3; min-height:0; width:16px; height:16px; padding:0 !important; }
+.leitura-prosa .tabela-colapsavel[data-aberto] > .caixa-cab { position:absolute; top:12px; right:14px; z-index:3; min-height:0; width:16px; height:16px; padding:0 !important; }
 .leitura-prosa .tabela-colapsavel[data-aberto] > .caixa-cab::after { right:2px; opacity:.6; }
 .leitura-prosa .tabela-colapsavel[data-aberto] > .caixa-corpo > .caixa-corpo-in { padding-top:0; }
+/* ABERTA: respiro no TOPO (cabeçalho com folga da seta) via padding do WRAPPER — NUNCA no .caixa-corpo-in,
+   que é o elemento animado (grid 0fr↔1fr): padding nele deixa um filete no recolhido e TRAVA a animação.
+   A transição no wrapper acompanha o corpo p/ abrir/fechar fluido. */
+.leitura-prosa .tabela-colapsavel { transition:padding-top .3s ease; }
+.leitura-prosa .tabela-colapsavel.cor-fonte[data-aberto]  { padding-top:28px; }
+.leitura-prosa .tabela-colapsavel.box-unica[data-aberto]  { padding-top:30px; }
 /* No card COLORIDO (cor da fonte) remove as bordas internas p/ ficar liso; tabela neutra MANTÉM suas bordas. */
 .leitura-prosa .tabela-colapsavel.cor-fonte .caixa-corpo-in :is(table,tr,td,th,thead,tbody) { border:0 !important; box-shadow:none !important; }
 .leitura-prosa .tabela-colapsavel > .caixa-corpo .caixa-corpo-in > table { margin:0; width:100% !important; }
@@ -1019,6 +1053,50 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 .dark .leitura-prosa table:not(.mac-tbl):not(.col-unica) td, .dark .leitura-prosa table:not(.mac-tbl):not(.col-unica) th { background:rgba(255,255,255,.04) !important; border-color:#3a3948 !important; }
 .dark .leitura-prosa table:not(.mac-tbl):not(.col-unica) tr:first-child > * { background:rgba(255,255,255,.08) !important; }
 
+/* ── MODO ESCURO da leitura ───────────────────────────────────────────────────────────────────────
+   O HTML importado traz cores de texto INLINE escuras (pensadas p/ fundo claro). No escuro elas somem.
+   (1) FORA de blocos coloridos (títulos/art/texto): o texto segue o fg do tema (claro) → legível.
+   (2) DENTRO de blocos de cor CLARA (peach/caixas/marcação): texto ESCURO p/ contrastar com o fundo.
+   Vale no leitor (data-leitura-tema="escuro") e na prévia do admin (.dark). */
+.leitura-prosa[data-leitura-tema="escuro"] [style*="color"]:not([style*="background"]):not([data-grifo]):not(.sl-img),
+.dark .leitura-prosa:not([data-leitura-tema]) [style*="color"]:not([style*="background"]):not([data-grifo]):not(.sl-img) { color: inherit !important; }
+/* Títulos/tópicos no escuro: claros (mesmo sem cor inline). */
+.leitura-prosa[data-leitura-tema="escuro"] .leitura-titulo,
+.leitura-prosa[data-leitura-tema="escuro"] .leitura-titulo *:not(.marca-pincel):not(.marca-pincel *):not(.sl-img),
+.dark .leitura-prosa:not([data-leitura-tema]) .leitura-titulo,
+.dark .leitura-prosa:not([data-leitura-tema]) .leitura-titulo *:not(.marca-pincel):not(.marca-pincel *):not(.sl-img) { color: inherit !important; }
+/* Blocos de cor CLARA → texto escuro (automático a partir do fundo do bloco). */
+.leitura-prosa[data-leitura-tema="escuro"] :is(.tabela-colapsavel.cor-fonte, table.col-unica.cor-fonte, [data-caixa], .box-stj, .box-stf, .box-atencao, .box-cinza, .box-cinza-esc, .marca-pincel),
+.leitura-prosa[data-leitura-tema="escuro"] :is(.tabela-colapsavel.cor-fonte, table.col-unica.cor-fonte, [data-caixa], .box-stj, .box-stf, .box-atencao, .box-cinza, .box-cinza-esc, .marca-pincel) [style*="color"]:not(.sl-img),
+.dark .leitura-prosa:not([data-leitura-tema]) :is(.tabela-colapsavel.cor-fonte, table.col-unica.cor-fonte, [data-caixa], .box-stj, .box-stf, .box-atencao, .box-cinza, .box-cinza-esc, .marca-pincel),
+.dark .leitura-prosa:not([data-leitura-tema]) :is(.tabela-colapsavel.cor-fonte, table.col-unica.cor-fonte, [data-caixa], .box-stj, .box-stf, .box-atencao, .box-cinza, .box-cinza-esc, .marca-pincel) [style*="color"]:not(.sl-img) { color:#1a1a1a !important; }
+
+/* ─── EDITOR do admin (.ce-leitura) no ESCURO: mesma adaptação de legibilidade da leitura ───
+   O editor é contentEditable e usa .ce-leitura (sem data-leitura-tema), seguindo o .dark do app. Como
+   NÃO podemos mutar o HTML (seria salvo), a adaptação aqui é CSS-only: blocos/realces de cor CLARA →
+   texto ESCURO; texto colorido/títulos FORA de blocos → claros (legíveis no escuro). */
+.dark .ce-leitura td[style*="background-color"]:not([style*="transparent"]),
+.dark .ce-leitura th[style*="background-color"]:not([style*="transparent"]),
+.dark .ce-leitura p[style*="background-color"]:not([style*="transparent"]),
+.dark .ce-leitura div[style*="background-color"]:not([style*="transparent"]),
+.dark .ce-leitura li[style*="background-color"]:not([style*="transparent"]),
+.dark .ce-leitura h1[style*="background-color"]:not([style*="transparent"]),
+.dark .ce-leitura h2[style*="background-color"]:not([style*="transparent"]),
+.dark .ce-leitura h3[style*="background-color"]:not([style*="transparent"]),
+.dark .ce-leitura h4[style*="background-color"]:not([style*="transparent"]) { color:#111 !important; }
+.dark .ce-leitura td[style*="background-color"]:not([style*="transparent"]) *:not([data-grifo]):not(.exc),
+.dark .ce-leitura th[style*="background-color"]:not([style*="transparent"]) *:not([data-grifo]):not(.exc),
+.dark .ce-leitura p[style*="background-color"]:not([style*="transparent"]) *:not([data-grifo]):not(.exc),
+.dark .ce-leitura div[style*="background-color"]:not([style*="transparent"]) *:not([data-grifo]):not(.exc),
+.dark .ce-leitura li[style*="background-color"]:not([style*="transparent"]) *:not([data-grifo]):not(.exc) { color:#111 !important; }
+/* Realces/caixas/marcações por classe → texto escuro (preto sobre a marcação amarela). */
+.dark .ce-leitura :is([data-caixa], .box-stj, .box-stf, .box-atencao, .box-cinza, .box-cinza-esc, .tabela-colapsavel.cor-fonte, table.col-unica.cor-fonte, .marca-pincel),
+.dark .ce-leitura :is([data-caixa], .box-stj, .box-stf, .box-atencao, .box-cinza, .box-cinza-esc, .tabela-colapsavel.cor-fonte, table.col-unica.cor-fonte, .marca-pincel) [style*="color"]:not(.sl-img) { color:#1a1a1a !important; }
+/* Texto colorido/títulos FORA de blocos → claros. */
+.dark .ce-leitura [style*="color"]:not([style*="background"]):not([data-grifo]):not(.sl-img),
+.dark .ce-leitura .leitura-titulo,
+.dark .ce-leitura .leitura-titulo *:not(.marca-pincel):not(.marca-pincel *):not(.sl-img) { color: inherit !important; }
+
 /* Tabela de 1 COLUNA (box/citação de artigo) = FIEL AO HTML: fundo transparente; a cor inline que veio
    na importação (ex.: peach) VENCE, pois aqui NÃO há !important. A BORDA do quadro vai no WRAPPER
    (.box-unica) p/ continuar visível quando RECOLHIDO (a tabela interna some ao recolher). */
@@ -1061,3 +1139,4 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 .leitura-prosa.sem-grifos [data-grifo="excecao"], .leitura-prosa.sem-grifos .exc {
   font-weight:inherit !important;
 }
+

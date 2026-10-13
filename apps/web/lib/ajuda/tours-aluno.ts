@@ -110,4 +110,25 @@ export const TOURS_ALUNO: Record<string, PassoTour[]> = {
     { pose: 'ideia', titulo: 'Descreva o problema', texto: 'Escolha o tipo (gabarito, enunciado…) e conte o que houve. Na tela de resultado, a aba "Avaliação" também reporta um problema geral.' },
     { pose: 'joinha', titulo: 'Obrigada! 💜', texto: 'Seu report ajuda a melhorar o banco para todo mundo. Valeu demais!' },
   ],
+
+  // Tour do DESAFIO DE JURISPRUDÊNCIA (roda DENTRO de um desafio; os passos ficam na própria página —
+  // sem `rota`, pois as abas são estado, não rotas). Os `alvo` apontam para [data-tour]: os do interno
+  // (desafio-juris-interno: arena, abas Regulamento/Desempenho/Ranking, Ajuda) E os do ARCADE no iframe
+  // (index.html: placar, teses, teclas, MAPA, SOM, abas do painel, próximas aulas) — o runner resolve
+  // alvos dentro de iframes same-origin.
+  jurisprudencia: [
+    { pose: 'balanca', titulo: 'Desafio de Jurisprudência ⚖️', texto: 'Oi, eu sou a Capi! Bora conhecer esse desafio? Aqui você aprende as teses dos tribunais jogando um labirinto. Vou te mostrar tudo! 🎮' },
+    { pose: 'estudante', titulo: 'A arena do jogo', texto: 'Esta é a arena! Você guia o personagem pelo labirinto, pega os pontos dourados e enfrenta as teses — sem deixar as armadilhas te alcançarem. A leitura do dia libera a fase.', alvo: 'juris-desafio' },
+    { pose: 'satisfeita', titulo: 'Seu placar', texto: 'Aqui fica o seu placar da partida: pontos, melhor pontuação, o dia atual e as suas vidas ❤️. Fique de olho nelas!', alvo: 'juris-placar' },
+    { pose: 'ideia', titulo: 'Teses do dia', texto: 'Estas são as teses da fase. Cada ponto do labirinto abre uma pergunta — acerte para dominar a tese. Dá pra expandir e ver todas aqui.', alvo: 'juris-teses' },
+    { pose: 'pensando', titulo: 'As teclas de jogar', texto: 'Mova com as setas ou WASD; responda as teses com A, B e C. P pausa, M liga/desliga o som e F deixa em tela cheia. No celular, use os controles na tela.', alvo: 'juris-teclas' },
+    { pose: 'procurando', titulo: 'Mapa do labirinto', texto: 'Perdido? Toque em "Ver mapa do labirinto" para enxergar o caminho, os pontos e onde está o selo final.', alvo: 'juris-mapa' },
+    { pose: 'cafe', titulo: 'Som e animações', texto: 'Aqui você liga/desliga o som e a música, ajusta o volume e pode reduzir as animações ao redor da tela.', alvo: 'juris-som' },
+    { pose: 'ideia', titulo: 'Abas do painel', texto: 'Neste painel você alterna entre Aulas, Selos (sua coleção), Ranking e Desafios — o bestiário com os inimigos que vai encontrar.', alvo: 'juris-paineis' },
+    { pose: 'estudante', titulo: 'Próximas aulas', texto: 'Escolha por qual aula começar e veja as próximas que vêm por aí. Vá avançando dia após dia para colecionar os selos!', alvo: 'juris-aulas' },
+    { pose: 'procurando', titulo: 'Regulamento', texto: 'Nesta aba ficam as regras, quanto vale cada ação e as metas do desafio.', alvo: 'juris-reg' },
+    { pose: 'satisfeita', titulo: 'Desempenho', texto: 'Aqui você acompanha sua evolução: pontos por fase, teses dominadas, recorde e as etapas concluídas. 📊', alvo: 'juris-des' },
+    { pose: 'balanca', titulo: 'Ranking', texto: 'Dispute com a galera! O ranking mostra sua posição, seus pontos e a sua sequência de dias. 🏆', alvo: 'juris-rank' },
+    { pose: 'joinha', titulo: 'Quer rever? É só me chamar 💜', texto: 'Toque aqui na Ajuda quando quiser refazer este tour. Agora é com você — bom jogo!', alvo: 'juris-ajuda' },
+  ],
 }

@@ -48,8 +48,11 @@ export function PaginadorCaderno({
       // Altura REAL de cada bloco (getBoundingClientRect = border-box; margem/gap fica de fora
       // e é somada separadamente na hora de empacotar). Cada filho envolve exatamente um item.
       const alturas = filhos.map((f) => f.getBoundingClientRect().height)
-      // Folga contra arredondamento sub-pixel (evita que um bloco "quase cabe" seja cortado).
-      const BUF = 4
+      // Folga anti-transbordo: a medição é feita em TELA, mas o page.pdf() renderiza em PRINT —
+      // pequenas diferenças de métrica podem deixar um bloco que "quase cabia" crescer e cruzar a
+      // quebra física (sem respeitar cabeçalho/rodapé). Uma folga maior empurra esse bloco pra
+      // próxima página em vez de transbordar. 24px ≈ margem de 1 linha de segurança.
+      const BUF = 24
       const grupos: number[][] = []
       let atual: number[] = []
       let h = 0

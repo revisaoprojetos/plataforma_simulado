@@ -33,6 +33,8 @@ export interface RlzConcluido {
   data: string // dd/mm
   nota: number | null
   notaLiberada: boolean
+  /** Nº de tentativas finalizadas que o aluno fez neste simulado. */
+  tentativas?: number
   /** Página interna do resultado (clique no card). */
   href: string
   correcaoHref: string

@@ -442,6 +442,11 @@ function DesempenhoModulo({ desempenho }: { desempenho: AulaDesempenho[] }) {
                     ) : (
                       <Link href={`/aluno/leitura/${a.id}`} className="block truncate font-medium hover:text-primary hover:underline">{a.titulo}</Link>
                     )}
+                    {!bloqueada && a.temLeituraRapida && (
+                      <Link href={`/aluno/leitura-rapida/${a.id}`} className="mt-1 inline-flex items-center gap-1 rounded-md bg-primary/10 px-1.5 py-0.5 text-[11px] font-medium text-primary transition-colors hover:bg-primary/20">
+                        <Zap className="h-3 w-3" /> Leitura rápida
+                      </Link>
+                    )}
                   </td>
                   <td className="px-4 py-3">
                     {a.leituraConcluida ? (

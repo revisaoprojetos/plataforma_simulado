@@ -337,8 +337,8 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
           <div className="up hvn-u2" style={{ display: 'grid', gridTemplateColumns: gamOn ? '2fr 1fr' : '1fr', gap: 18 }}>
             {continuar ? (
               <div style={CARD}>
-                <div style={{ display: 'flex', gap: 18, alignItems: 'stretch' }}>
-                  <div style={{ width: 150, borderRadius: 18, overflow: 'hidden', flexShrink: 0 }}>
+                <div style={{ display: 'flex', gap: 16, alignItems: 'stretch' }}>
+                  <div style={{ width: 150, borderRadius: 14, overflow: 'hidden', flexShrink: 0 }}>
                     <Cover rotulo={continuar.capa.rotulo} sub={continuar.capa.sub} grad="#0B3340,#1C7A8C" big={26} src={continuar.capa.capa} />
                   </div>
                   <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -492,7 +492,7 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
               <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, letterSpacing: '-0.03em' }}>Simulados recentes</h3>
               <SecHeaderLink label="Ver todos" {...linkReal('/aluno/simulados')} />
             </div>
-            <div className="hvn-grid4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(100%,400px),1fr))', gap: 16 }}>
               {recentes.map((s, i) => <RecenteCard key={s.id} s={s} grad={COVER_BG[i % COVER_BG.length]} />)}
             </div>
           </section>
@@ -510,16 +510,17 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
                 })}
               </div>
             </div>
-            <div className="hvn-grid4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(100%,360px),1fr))', gap: 16 }}>
               {pastasFilt.map((p, i) => (
-                <a key={p.id} {...(preview ? { href: '#', onClick: onClickSafe } : { href: `/aluno?pasta=${encodeURIComponent(p.id)}` })} className="hvn-lift" style={{ display: 'flex', flexDirection: 'column', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 22, overflow: 'hidden' }}>
-                  <div style={{ height: 120 }}><Cover rotulo={p.rotuloCapa} sub={p.subCapa} grad={COVER_BG[i % COVER_BG.length]} big={26} src={p.capa} /></div>
-                  <div style={{ padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                <a key={p.id} {...(preview ? { href: '#', onClick: onClickSafe } : { href: `/aluno?pasta=${encodeURIComponent(p.id)}` })} className="hvn-lift hvn-tk" style={{ position: 'relative', display: 'flex', background: 'var(--surface)', borderRadius: 22, overflow: 'hidden', minHeight: 150 }}>
+                  <div style={{ width: 150, flexShrink: 0, overflow: 'hidden' }}><Cover rotulo={p.rotuloCapa} sub={p.subCapa} grad={COVER_BG[i % COVER_BG.length]} big={24} src={p.capa} /></div>
+                  <span aria-hidden className="hvn-tk-perf" />
+                  <div style={{ flex: 1, minWidth: 0, padding: '12px 14px 12px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
                     <div style={{ minWidth: 0 }}>
-                      <b style={{ display: 'block', fontSize: 13.5, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.nome}</b>
-                      <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{p.qtdSimulados} simulados</span>
+                      <b style={{ display: 'block', fontSize: 14.5, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.nome}</b>
+                      <span style={{ fontSize: 12, color: 'var(--muted)' }}>{p.qtdSimulados} simulados</span>
                     </div>
-                    <span style={{ width: 30, height: 30, borderRadius: 10, background: 'var(--chip)', color: 'var(--brand)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><ArrowRight size={14} /></span>
+                    <span style={{ width: 32, height: 32, borderRadius: 10, background: 'var(--chip)', color: 'var(--brand)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><ArrowRight size={15} /></span>
                   </div>
                 </a>
               ))}
@@ -532,7 +533,7 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--ink)' }}>Outros simulados</h3>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 24, padding: '0 10px', borderRadius: 99, background: 'var(--chip)', color: 'var(--brand)', fontSize: 12, fontWeight: 800 }}><span className="hvn-live" style={{ width: 6, height: 6, borderRadius: '50%', background: '#2EC77A' }} />Disponíveis · {outrosDisponiveis}</span>
             </div>
-            <div className="hvn-grid4" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(100%,400px),1fr))', gap: 14 }}>
               {outros.map((s, i) => <RecenteCard key={s.id} s={s} grad={COVER_BG[(i + 2) % COVER_BG.length]} />)}
             </div>
           </section>
@@ -725,9 +726,9 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
             <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, letterSpacing: '-0.03em' }}>Simulados recentes</h3>
             <SecHeaderLink label="Ver todos" {...linkReal('/aluno/simulados')} />
           </div>
-          <div className="hvn-hs" style={{ display: 'flex', gap: 14, overflowX: 'auto', margin: '0 -18px', padding: '0 18px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {recentes.map((s, i) => (
-              <div key={s.id} style={{ flex: '0 0 228px' }}><RecenteCard s={s} grad={COVER_BG[i % COVER_BG.length]} /></div>
+              <RecenteCard key={s.id} s={s} grad={COVER_BG[i % COVER_BG.length]} />
             ))}
           </div>
         </section>
@@ -735,13 +736,14 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
         {/* Pastas (2 col) */}
         <section>
           <h3 style={{ margin: '0 0 12px', fontSize: 17, fontWeight: 800, letterSpacing: '-0.03em' }}>Pastas de simulados</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {pastas.map((p, i) => (
-              <a key={p.id} href="#" onClick={onClickSafe} className="hvn-lift" style={{ display: 'flex', flexDirection: 'column', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 20, overflow: 'hidden' }}>
-                <div style={{ height: 96 }}><Cover rotulo={p.rotuloCapa} sub={p.subCapa} grad={COVER_BG[i % COVER_BG.length]} big={22} src={p.capa} /></div>
-                <div style={{ padding: '10px 12px' }}>
-                  <b style={{ display: 'block', fontSize: 12.5, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.nome}</b>
-                  <span style={{ fontSize: 11, color: 'var(--muted)' }}>{p.qtdSimulados} simulados</span>
+              <a key={p.id} href="#" onClick={onClickSafe} className="hvn-lift hvn-tk" style={{ position: 'relative', display: 'flex', background: 'var(--surface)', borderRadius: 20, overflow: 'hidden', minHeight: 132 }}>
+                <div style={{ width: 150, flexShrink: 0, overflow: 'hidden' }}><Cover rotulo={p.rotuloCapa} sub={p.subCapa} grad={COVER_BG[i % COVER_BG.length]} big={22} src={p.capa} /></div>
+                <span aria-hidden className="hvn-tk-perf" />
+                <div style={{ flex: 1, minWidth: 0, padding: '10px 12px 10px 16px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2 }}>
+                  <b style={{ display: 'block', fontSize: 13.5, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.nome}</b>
+                  <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{p.qtdSimulados} simulados</span>
                 </div>
               </a>
             ))}
@@ -753,23 +755,28 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
 }
 
 /** Card de simulado (recentes/outros) — card VND 3D. */
+// TICKET (capa à ESQUERDA, altura cheia ~150px + corpo à direita), no estilo do Revisão mas com a
+// personalização VND: Cover verde/dourado (marca V), picote tracejado no encontro capa/corpo (detalhe
+// de "bilhete") e CTA verde. Mantém status/tipo, título e o botão "Baixar" do caderno.
 function RecenteCard({ s, grad }: { s: HomeData['recentes'][number]; grad: string }) {
   const emAndamento = s.status === 'Em andamento'
   return (
-    <div className="hvn-lift" style={{ display: 'flex', flexDirection: 'column', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 22, overflow: 'hidden', height: '100%' }}>
-      <div style={{ height: 120 }}><Cover rotulo={s.capa.rotulo} sub={s.capa.sub || 'SIMULADO'} grad={grad} src={s.capa.capa} /></div>
-      <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
+    <div className="hvn-lift hvn-tk" style={{ position: 'relative', display: 'flex', background: 'var(--surface)', borderRadius: 22, overflow: 'hidden', minHeight: 168, height: '100%' }}>
+      <div style={{ width: 150, flexShrink: 0, overflow: 'hidden' }}><Cover rotulo={s.capa.rotulo} sub={s.capa.sub || 'SIMULADO'} grad={grad} src={s.capa.capa} /></div>
+      {/* picote (perfuração) do ticket, no encontro capa/corpo */}
+      <span aria-hidden className="hvn-tk-perf" />
+      <div style={{ flex: 1, minWidth: 0, padding: '14px 16px 14px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 12 }}>
         <div>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: 'var(--muted)' }}><Clock size={12} />{s.status} · {s.tipo}</span>
-          <b style={{ display: 'block', marginTop: 4, fontSize: 14.5, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.titulo}</b>
+          <b style={{ display: 'block', marginTop: 5, fontSize: 15, color: 'var(--ink)', lineHeight: 1.25, letterSpacing: '-0.01em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.titulo}</b>
         </div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 'auto' }}>
+        <div style={{ display: 'flex', gap: 8 }}>
           {/* Link REAL do runner quando houver token (fazerUrl); sem url (ex.: preview/mock) = no-op. */}
           <a className="hvn-cta" {...(s.fazerUrl ? { href: s.fazerUrl } : { href: '#', onClick: (e: React.MouseEvent) => e.preventDefault() })} style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7, height: 40, borderRadius: 12, color: '#FFFFFF', fontSize: 13, fontWeight: 800 }}>
             <Play size={12} fill="currentColor" stroke="none" />{emAndamento ? 'Continuar' : s.status === 'Concluído' ? 'Refazer' : 'Fazer agora'}
           </a>
           {s.cadernoUrl && (
-            <a href={s.cadernoUrl} target="_blank" rel="noopener noreferrer" aria-label="Baixar caderno" title="Baixar caderno" style={{ width: 40, height: 40, borderRadius: 12, border: '1px solid var(--line)', color: 'var(--muted)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><FileDown size={16} /></a>
+            <a href={s.cadernoUrl} target="_blank" rel="noopener noreferrer" aria-label="Baixar caderno" title="Baixar caderno" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 40, padding: '0 13px', borderRadius: 12, border: '1px solid var(--line)', color: 'var(--ink)', background: 'var(--surface)', fontSize: 12.5, fontWeight: 700, flexShrink: 0 }}><FileDown size={15} />Baixar</a>
           )}
         </div>
       </div>
@@ -818,6 +825,16 @@ const CSS = `
 .hvn-root .hvn-arr:hover{transform:translateY(-50%) scale(1.06)}
 .hvn-root .hvn-hs::-webkit-scrollbar{display:none}
 .hvn-root .hvn-hs{scrollbar-width:none}
+/* Contorno via ::after (z-index 2): ACIMA da capa → dourado do hover nos DOIS lados; ABAIXO do picote
+   (z-3) → o furo da meia-lua cobre a linha. */
+.hvn-root .hvn-tk::after{content:'';position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 1px var(--line);pointer-events:none;z-index:2;transition:box-shadow .3s}
+.hvn-root .hvn-tk:hover::after{box-shadow:inset 0 0 0 1px var(--hoverLine,rgba(232,200,119,.7))}
+/* Perfuração = dots pequenos (furinhos da cor do fundo) ao longo do corte (x=150) + FUROS maiores
+   (meia-lua) no topo e na base. Como o contorno é inset, o furo cobre a linha → meia-lua limpa. */
+.hvn-root .hvn-tk-perf{position:absolute;left:150px;top:6px;bottom:6px;width:6px;transform:translateX(-50%);pointer-events:none;z-index:3;background-image:radial-gradient(circle at center,var(--bg) 1.7px,transparent 2.1px);background-size:6px 9px;background-position:center;background-repeat:repeat-y}
+.hvn-root .hvn-tk-perf::before,.hvn-root .hvn-tk-perf::after{content:'';position:absolute;left:50%;width:17px;height:17px;border-radius:50%;background:var(--bg)}
+.hvn-root .hvn-tk-perf::before{top:-6px;transform:translate(-50%,-50%)}
+.hvn-root .hvn-tk-perf::after{bottom:-6px;transform:translate(-50%,50%)}
 .hvn-mob{display:none}
 @media (max-width:900px){.hvn-desk{display:none}.hvn-mob{display:flex}}
 @media (max-width:1180px) and (min-width:901px){.hvn-root .hvn-grid4{grid-template-columns:repeat(2,1fr)!important}.hvn-root .hvn-u2{grid-template-columns:1fr!important}.hvn-root .hvn-u3{grid-template-columns:1fr!important}}

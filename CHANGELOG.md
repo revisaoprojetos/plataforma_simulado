@@ -12,6 +12,30 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.11.0 — 2026-10-13
+
+Leitura rápida, novo leitor de jurisprudência (pré-visualização), ticket do desafio padronizado e correções.
+
+- **Leitura rápida (nova):** caminho alternativo em que o aluno lê + responde num fluxo único; persiste
+  o progresso (`simulado_leitura_rapida_progresso`) p/ sair e voltar, conta streak/XP ao concluir e NÃO
+  perde a sequência. Rota `/api/leitura/rapida` (GET restaura, POST salva/conclui) + player sandbox
+  (iframe) com restauração via postMessage; gate na trilha (`trilha.ts`). Migração
+  `20261013000000_leitura_rapida_progresso.sql` (aplicar antes de promover).
+- **Novo leitor de jurisprudência (redesign — pré-visualização via `?v2=1`):** PORTE FIEL do protótipo
+  rodando em iframe isolado (`public/leitura/leitor-jus.html` + host `leitor-jus.tsx` com handshake
+  postMessage que injeta o HTML real do dia). Traz todo o app desenhado: barra de marcação (7 ferramentas
+  × 5 cores), legenda, sumário/mini-rail, modo foco, folha espelho, caderno (Marcações/Notas), busca e voz.
+  Ajustes: tags por tema vêm dos **selos reais da biblioteca** (`quiz_config.topicos`), modo foco acende a
+  tese ativa, botões "Concluir leitura", rótulo "Modo de leitura", aba Revisão removida do caderno, fix da
+  gaveta lateral no mobile, e leitura **sempre limpa** (seeds demo removidos; só o que o aluno faz é salvo).
+- **Ticket do Desafio de Jurisprudência:** padronizado ao estilo do Lei Seca/simulados (mesmas dimensões,
+  status, **barra de progresso real** dias dominados/total · %, botão Jogar/Continuar/Revisar).
+- **Jogo (JurisClub):** botão "⚡ ANIMAÇÃO" por extenso (era "ANIM").
+- **Editor da Leitura:** correções (aba Editor vazia ao trocar de aba, botão Justificar), blocos
+  colapsáveis (cor/cabeçalho/animação), tamanho de fonte preservado ao trocar o modo de leitura.
+- **Build:** `lib/pdf/browser.ts` usa `browser.connected` (propriedade) em vez de `isConnected()`
+  (removido no puppeteer atual) — destravava o `next build` da imagem.
+
 ## 3.10.0 — 2026-10-12
 
 Central de notificações rica no VND (abas/grupos), ligada a dados reais.

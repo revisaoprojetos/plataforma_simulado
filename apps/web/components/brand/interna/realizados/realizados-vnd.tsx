@@ -73,9 +73,10 @@ function Hero({ mobile, S }: { mobile: boolean; S: RealizadosData['stats'] }) {
 
 function CardAndamento({ it }: { it: RlzEmAndamento }) {
   return (
-    <Link href={it.continuarHref} className="rlzvn-card" style={{ display: 'flex', gap: 14, alignItems: 'center', padding: 12, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 22, color: 'inherit', textDecoration: 'none' }}>
-      <div style={{ width: 96, height: 96, borderRadius: 16, overflow: 'hidden', flexShrink: 0 }}><CoverVnd titulo={it.capa.rotulo} sub={it.capa.sub} grad={gradOf(it.capa)} img={it.capa.capa} big={18} /></div>
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 10 }}>
+    <Link href={it.continuarHref} className="rlzvn-card" style={{ position: 'relative', display: 'flex', background: 'var(--surface)', borderRadius: 22, overflow: 'hidden', color: 'inherit', textDecoration: 'none', minHeight: 168 }}>
+      <div style={{ width: 150, flexShrink: 0, overflow: 'hidden' }}><CoverVnd titulo={it.capa.rotulo} sub={it.capa.sub} grad={gradOf(it.capa)} img={it.capa.capa} big={22} /></div>
+      <span aria-hidden className="rlzvn-perf" />
+      <div style={{ flex: 1, minWidth: 0, padding: '14px 16px 14px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 10 }}>
         <div style={{ minWidth: 0 }}>
           <b style={{ display: 'block', fontSize: 14.5, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.titulo}</b>
           {it.banca ? <span style={{ fontSize: 12, color: 'var(--muted)' }}>{it.banca}</span> : null}
@@ -98,18 +99,26 @@ function CardAndamento({ it }: { it: RlzEmAndamento }) {
 function CardConcluido({ it }: { it: RlzConcluido }) {
   const nota = it.notaLiberada && it.nota != null ? it.nota : null
   return (
-    <Link href={it.href} className="rlzvn-card" style={{ display: 'flex', flexDirection: 'column', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 22, overflow: 'hidden', color: 'inherit', textDecoration: 'none' }}>
-      <div style={{ position: 'relative', height: 168, overflow: 'hidden' }}>
-        <CoverVnd titulo={it.capa.rotulo} sub={it.capa.sub} grad={gradOf(it.capa)} img={it.capa.capa} big={26} showKicker />
-        {nota != null ? <span style={{ position: 'absolute', right: 10, bottom: 10 }}><NotaRing v={nota} /></span> : null}
+    <Link href={it.href} className="rlzvn-card" style={{ position: 'relative', display: 'flex', background: 'var(--surface)', borderRadius: 22, overflow: 'hidden', color: 'inherit', textDecoration: 'none', minHeight: 168 }}>
+      <div style={{ width: 150, flexShrink: 0, overflow: 'hidden' }}>
+        <CoverVnd titulo={it.capa.rotulo} sub={it.capa.sub} grad={gradOf(it.capa)} img={it.capa.capa} big={22} showKicker />
       </div>
-      <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 700, color: '#1FA868' }}><Ic n="check" s={13} />Concluído</span>
-          <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{it.data}</span>
+      <span aria-hidden className="rlzvn-perf" />
+      <div style={{ position: 'relative', flex: 1, minWidth: 0, padding: '13px 16px 13px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', gap: 8 }}>
+        {/* topo: Concluído + data; o TÍTULO logo abaixo (quebra em 2 linhas se não couber) */}
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 700, color: '#1FA868' }}><Ic n="check" s={13} />Concluído</span>
+            <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{it.data}</span>
+          </div>
+          <b className="rlzvn-clamp2" style={{ marginTop: 5, fontSize: 14.5, lineHeight: 1.3, color: 'var(--ink)', fontWeight: 700 }}>{it.titulo}</b>
         </div>
-        <span style={{ fontSize: 14, lineHeight: 1.3, color: 'var(--ink)', fontWeight: 700 }}>{it.titulo}</span>
-        {nota == null ? <span style={{ fontSize: 11.5, color: 'var(--muted)', fontWeight: 700 }}>Nota em breve</span> : null}
+        {/* parte de baixo, separado: nº de tentativas que o aluno fez */}
+        <span style={{ fontSize: 11.5, color: 'var(--muted)', fontWeight: 600, paddingRight: nota != null ? 54 : 0 }}>{(it.tentativas ?? 1)} {(it.tentativas ?? 1) === 1 ? 'tentativa' : 'tentativas'}</span>
+        {/* nota: canto INFERIOR DIREITO */}
+        {nota != null
+          ? <span style={{ position: 'absolute', right: 14, bottom: 12 }}><NotaRing v={nota} /></span>
+          : <span style={{ position: 'absolute', right: 14, bottom: 12, fontSize: 11.5, color: 'var(--muted)', fontWeight: 700 }}>Nota em breve</span>}
       </div>
     </Link>
   )
@@ -118,20 +127,21 @@ function CardConcluido({ it }: { it: RlzConcluido }) {
 function CardPersonalizado({ it }: { it: RlzPersonalizado }) {
   const rascunho = it.status === 'rascunho'
   return (
-    <div className="rlzvn-card" style={{ display: 'flex', flexDirection: 'column', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 22, overflow: 'hidden' }}>
-      <Link href={it.href} style={{ position: 'relative', height: 108, background: 'linear-gradient(140deg,#0B3A24,#16804F)', color: '#FFF', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '12px 14px', textDecoration: 'none' }}>
+    <div className="rlzvn-card" style={{ position: 'relative', display: 'flex', background: 'var(--surface)', borderRadius: 22, overflow: 'hidden', minHeight: 168 }}>
+      <Link href={it.href} style={{ position: 'relative', width: 150, flexShrink: 0, background: 'linear-gradient(140deg,#0B3A24,#16804F)', color: '#FFF', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '12px 12px', textDecoration: 'none' }}>
         <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle,rgba(185,245,212,.22) 1px,transparent 1.6px)', backgroundSize: '14px 14px' }} />
         <span style={{ position: 'relative', fontSize: 8.5, fontWeight: 800, letterSpacing: '.2em', color: '#F1D48A' }}>PERSONALIZADO</span>
-        <b style={{ position: 'relative', fontSize: 16, letterSpacing: '-0.03em' }}>{it.nome}</b>
+        <b style={{ position: 'relative', fontSize: 15, letterSpacing: '-0.03em', lineHeight: 1.1 }}>{it.nome}</b>
         {rascunho
           ? <span style={{ position: 'absolute', right: 10, top: 10, height: 22, padding: '0 9px', borderRadius: 99, background: 'rgba(0,0,0,.35)', color: '#F1D48A', fontSize: 10.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center' }}>Rascunho</span>
-          : (it.nota != null ? <span style={{ position: 'absolute', right: 10, top: 10 }}><NotaRing v={it.nota} size={44} /></span> : null)}
+          : (it.nota != null ? <span style={{ position: 'absolute', right: 8, top: 8 }}><NotaRing v={it.nota} size={44} /></span> : null)}
       </Link>
-      <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {it.nQuestoes != null ? <span style={{ fontSize: 12, color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.nQuestoes} questões</span> : null}
+      <span aria-hidden className="rlzvn-perf" />
+      <div style={{ flex: 1, minWidth: 0, padding: '14px 16px 14px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 10 }}>
+        {it.nQuestoes != null ? <span style={{ fontSize: 12.5, color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.nQuestoes} questões</span> : null}
         {rascunho
-          ? <GoldLink href={it.href} h={34}><Ic n="edit" s={13} />Continuar editando</GoldLink>
-          : <Link href={it.href} className="rlzvn-ibtn" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 34, borderRadius: 11, border: '1px solid var(--line)', color: 'var(--ink)', fontSize: 12.5, fontWeight: 700, textDecoration: 'none' }}><Ic n="play" s={13} />Refazer</Link>}
+          ? <GoldLink href={it.href} h={36}><Ic n="edit" s={13} />Continuar editando</GoldLink>
+          : <Link href={it.href} className="rlzvn-ibtn" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, height: 36, borderRadius: 11, border: '1px solid var(--line)', color: 'var(--ink)', fontSize: 12.5, fontWeight: 700, textDecoration: 'none' }}><Ic n="play" s={13} />Refazer</Link>}
       </div>
     </div>
   )
@@ -141,8 +151,21 @@ const CSS = `
 .rlzvn-pv{animation:rlzvnpv .45s cubic-bezier(.22,1,.36,1) both}
 @keyframes rlzvnpv{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
 .rlzvn-tab{transition:background .25s,color .25s}.rlzvn-fbtn{transition:background .2s,color .2s,border-color .2s}
-.rlzvn-card{transition:transform .55s cubic-bezier(.22,1,.36,1),box-shadow .55s cubic-bezier(.22,1,.36,1),border-color .3s}
-.rlzvn-card:hover{transform:translateY(-8px) scale(1.012);border-color:var(--hoverLine);box-shadow:0 26px 44px -28px rgba(10,40,25,.6)}
+/* Contorno via ::after (z-index 2): ACIMA da capa → o dourado do hover aparece nos DOIS lados; mas
+   ABAIXO do picote (z-3) → o furo da meia-lua cobre a linha. Sombra de elevação fica no card no hover. */
+.rlzvn-card{transition:transform .55s cubic-bezier(.22,1,.36,1),box-shadow .55s cubic-bezier(.22,1,.36,1)}
+.rlzvn-card::after{content:'';position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 1px var(--line);pointer-events:none;z-index:2;transition:box-shadow .3s}
+.rlzvn-card:hover{transform:translateY(-8px) scale(1.012);box-shadow:0 26px 44px -28px rgba(10,40,25,.6)}
+.rlzvn-card:hover::after{box-shadow:inset 0 0 0 1px var(--hoverLine)}
+/* Ticket VND: perfuração = dots pequenos (furinhos da cor do fundo) ao longo do corte capa/corpo
+   (x=150) + FUROS maiores (meia-lua) no topo e na base. Como o contorno do card é box-shadow INSET,
+   o furo cobre a linha na área da meia-lua → fica limpo, sem a linha do card cortando. */
+.rlzvn-perf{position:absolute;left:150px;top:6px;bottom:6px;width:6px;transform:translateX(-50%);pointer-events:none;z-index:3;background-image:radial-gradient(circle at center,var(--bg) 1.7px,transparent 2.1px);background-size:6px 9px;background-position:center;background-repeat:repeat-y}
+.rlzvn-perf::before,.rlzvn-perf::after{content:'';position:absolute;left:50%;width:17px;height:17px;border-radius:50%;background:var(--bg)}
+.rlzvn-perf::before{top:-6px;transform:translate(-50%,-50%)}
+.rlzvn-perf::after{bottom:-6px;transform:translate(-50%,50%)}
+/* Título em até 2 linhas (quebra se não couber em uma). */
+.rlzvn-clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .rlzvn-card .rlz-cov{transition:transform .7s cubic-bezier(.22,1,.36,1)}.rlzvn-card:hover .rlz-cov{transform:scale(1.06)}
 .rlzvn-ibtn{transition:background .15s,color .15s,border-color .15s}.rlz-ibtn:hover,.rlzvn-ibtn:hover{background:var(--chip);color:var(--brand);border-color:var(--brand)}
 .rlzvn-gold{transition:filter .2s,transform .2s}.rlzvn-gold:hover{filter:brightness(1.06);transform:translateY(-1px)}
@@ -166,8 +189,10 @@ export function RealizadosVnd({ theme: themeProp, data }: { theme: InternaTheme;
   const nAnd = data.emAndamento.length
   const nDone = data.concluidos.length
   const pers = data.personalizados
-  const doneCols = mobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)'
-  const andCols = mobile ? '1fr' : 'repeat(3,1fr)'
+  // Tickets (capa à esquerda) pedem colunas mais largas e adaptativas ao CONTAINER (não ao viewport) —
+  // não cortam no iframe da Curseduca. Mobile = 1 por linha (ticket full-width empilhado).
+  const doneCols = mobile ? '1fr' : 'repeat(auto-fill,minmax(min(100%,400px),1fr))'
+  const andCols = mobile ? '1fr' : 'repeat(auto-fill,minmax(min(100%,400px),1fr))'
   const doneList = mobile ? data.concluidos.slice(0, 6) : data.concluidos
 
   return (

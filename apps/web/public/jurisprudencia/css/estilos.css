@@ -78,6 +78,14 @@ button{font-family:inherit;color:inherit}
 /* Botão de LEITURA (ação primária do dia) em dourado. */
 .btn-w.ler{background:var(--gold);color:#1a1200;box-shadow:0 0 0 3px #0a0f45, 0 0 0 5px var(--gold), 0 0 calc(26px*var(--glow)) color-mix(in srgb,var(--gold) 80%,transparent)}
 .btn-w.ler:hover{box-shadow:0 0 0 3px #0a0f45, 0 0 0 5px #fff, 0 0 calc(30px*var(--glow)) color-mix(in srgb,var(--gold) 80%,transparent)}
+/* Leitura RÁPIDA: MESMO porte da leitura do dia (btn-w), mas DOURADO VAZADO → irmã secundária. */
+.btn-w.ler-rapida{background:transparent;color:var(--gold);box-shadow:0 0 0 3px #0a0f45, 0 0 0 5px var(--gold)}
+.btn-w.ler-rapida:hover{background:color-mix(in srgb,var(--gold) 16%,transparent);box-shadow:0 0 0 3px #0a0f45, 0 0 0 5px #fff, 0 0 calc(28px*var(--glow)) color-mix(in srgb,var(--gold) 80%,transparent)}
+/* Tela do dia (attract): menos ÁREA INTERNA dos botões (padding nos 2 eixos; mantém o espaço ENTRE eles). */
+#ovAttract .row .btn-w{padding:10px 16px}
+/* Espaço entre a linha de cima (do dia + começar) e a de baixo (leitura rápida). */
+#ovAttract #rowRapida{margin-top:8px}
+@media (max-width:560px){ #ovAttract .row .btn-w{font-size:12px;padding:9px 12px} }
 /* COMEÇAR travado enquanto a leitura não foi concluída. */
 .btn-w.lock{background:#2a2f52;color:#6b73a0;cursor:not-allowed;box-shadow:0 0 0 3px #0a0f45, 0 0 0 5px #3a3f66}
 .btn-w.lock:hover{box-shadow:0 0 0 3px #0a0f45, 0 0 0 5px #3a3f66}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -10,7 +10,7 @@ import {
   Bold, Italic, Underline, Heading, List, Trophy, Scale, Send, ChevronDown,
   ImagePlus, Trash2, RefreshCw, Settings2, HelpCircle, X, Layers, Replace, Check, Bell, BellOff, PencilLine, Plus, Minus,
   FilePlus2, Ban, SpellCheck,
-  Strikethrough, ListOrdered, AlignLeft, AlignCenter, AlignRight, Palette, Eraser, Undo2, Redo2, RotateCcw, Captions, CaptionsOff,
+  Strikethrough, ListOrdered, AlignLeft, AlignCenter, AlignRight, AlignJustify, Palette, Eraser, Undo2, Redo2, RotateCcw, Captions, CaptionsOff,
   Stamp, Scissors, Highlighter,
 } from 'lucide-react'
 import { SELOS, criarSeloEl, codigoTag, prepararSelosLeitura, selosImgParaSpan, alturaBaseSelo } from '@/lib/leitura/selos'
@@ -28,7 +28,9 @@ import { salvarConteudoHtml, importarDocx } from '@/app/admin/leitura/upload-act
 import { LeituraPreviewGrifos, type GrifoCtl } from '@/components/admin/leitura-preview-grifos'
 import { LeituraQuestoesAdmin } from '@/components/admin/leitura-questoes-admin'
 import { TopicosEditor } from '@/components/admin/topicos-editor'
+import { LeituraRapidaEditor } from '@/components/admin/leitura-rapida-editor'
 import { type TopicosConfig } from '@/lib/leitura/topicos'
+import { Zap } from 'lucide-react'
 
 // Redimensiona a imagem no cliente → data URL leve (WebP/JPEG). Mesmo padrão do banco.
 async function redimensionarImagem(file: File, max = 1600): Promise<string> {
@@ -59,14 +61,15 @@ const TIPOS_ATUALIZACAO = [
   { v: 'correcao_editorial', label: 'Correção editorial', Icon: SpellCheck },
 ] as const
 
-export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar = false, publicadaVersao = 1, temRascunhoPendente = false, versaoEdicao, abaInicial, indiceTipos: indiceTiposProp = [], espInicial = null, grifoCoresInicial = null, blocosInicial = null, topicosInicial = {}, voltarHref }: {
+export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar = false, publicadaVersao = 1, temRascunhoPendente = false, versaoEdicao, abaInicial, indiceTipos: indiceTiposProp = [], espInicial = null, grifoCoresInicial = null, blocosInicial = null, topicosInicial = {}, leituraRapidaInicial = '', voltarHref }: {
   documento: Documento; htmlAtual: string; podeEditar: boolean; podePublicar?: boolean; publicadaVersao?: number; temRascunhoPendente?: boolean; versaoEdicao?: number
-  abaInicial?: 'conteudo' | 'config' | 'questoes'
+  abaInicial?: 'conteudo' | 'config' | 'questoes' | 'leitura-rapida'
   indiceTipos?: string[]
   espInicial?: EspacamentoDoc | null
   grifoCoresInicial?: GrifoCores | null
   blocosInicial?: BlocoDef[] | null
   topicosInicial?: TopicosConfig
+  leituraRapidaInicial?: string
   /** "Voltar" customizado (ex.: vindo da Jurisprudência) — default = banco de aulas da Lei Seca. */
   voltarHref?: string
 }) {
@@ -75,7 +78,7 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
   // Ao criar/entrar num documento, abre já na CONFIGURAÇÃO (parte técnica): dados do card,
   // conteúdo da lei e metadados. A aba "Conteúdo" (leitura/grifos) fica a um clique.
   // A trilha (banco de aulas) faz deep-link direto p/ Conteúdo/Questões via `abaInicial`.
-  const [aba, setAba] = useState<'conteudo' | 'config' | 'questoes'>(abaInicial ?? 'config')
+  const [aba, setAba] = useState<'conteudo' | 'config' | 'questoes' | 'leitura-rapida'>(abaInicial ?? 'config')
   const [capa, setCapa] = useState<string | null>(documento.capa_url ?? null)
   const [processandoCapa, setProcessandoCapa] = useState(false)
   const capaRef = useRef<HTMLInputElement>(null)
@@ -471,20 +474,34 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
     setBlocoSel(null); editorRef.current?.focus()
   }
 
-  // Ao abrir a aba "Editor", carrega o conteúdo salvo (permite editar em vez de recomeçar do zero).
-  useEffect(() => {
-    if (modo === 'editor' && editorRef.current) {
-      // styleWithCSS: alinhamento/cor via execCommand saem como `style` (que agora sobrevive à sanitização).
-      try { document.execCommand('styleWithCSS', false, 'true') } catch { /* browser antigo */ }
-      // Enter cria <p> (não <div>) → espaçamento igual ao da leitura e linhas em branco preservadas.
-      try { document.execCommand('defaultParagraphSeparator', false, 'p') } catch { /* browser antigo */ }
-      if (!editorRef.current.innerHTML.trim() && htmlAtual) {
-        editorRef.current.innerHTML = htmlAtual
-        // Converte selos (<span data-selo>/<rg>) na IMAGEM já no editor, p/ o admin ver o que inseriu.
-        try { prepararSelosLeitura(editorRef.current) } catch { /* ignore */ }
-      }
+  // htmlAtual sempre fresco p/ o callback ref estável (sem recriar o ref e re-montar o editor).
+  const htmlAtualRef = useRef(htmlAtual)
+  htmlAtualRef.current = htmlAtual
+
+  // Carrega o conteúdo salvo no <div> do editor (permite editar em vez de recomeçar do zero).
+  const popularEditor = useCallback((node: HTMLDivElement) => {
+    // styleWithCSS: alinhamento/cor via execCommand saem como `style` (que agora sobrevive à sanitização).
+    try { document.execCommand('styleWithCSS', false, 'true') } catch { /* browser antigo */ }
+    // Enter cria <p> (não <div>) → espaçamento igual ao da leitura e linhas em branco preservadas.
+    try { document.execCommand('defaultParagraphSeparator', false, 'p') } catch { /* browser antigo */ }
+    if (!node.innerHTML.trim() && htmlAtualRef.current) {
+      node.innerHTML = htmlAtualRef.current
+      // Converte selos (<span data-selo>/<rg>) na IMAGEM já no editor, p/ o admin ver o que inseriu.
+      try { prepararSelosLeitura(node) } catch { /* ignore */ }
     }
-  }, [modo, htmlAtual])
+  }, [])
+
+  // Callback ref: popula assim que o <div> MONTA (ao abrir a aba "Editor" OU ao voltar p/ a aba/tab —
+  // o efeito [modo,htmlAtual] não re-rodava no remount com o mesmo `modo`, deixando o editor vazio).
+  const setEditorEl = useCallback((node: HTMLDivElement | null) => {
+    editorRef.current = node
+    if (node) popularEditor(node)
+  }, [popularEditor])
+
+  // htmlAtual pode chegar/atualizar DEPOIS do mount → repopula (guarda não sobrescreve edição em curso).
+  useEffect(() => {
+    if (modo === 'editor' && editorRef.current) popularEditor(editorRef.current)
+  }, [modo, htmlAtual, popularEditor])
 
   return (
     <div className="space-y-5">
@@ -643,17 +660,30 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
 
       {/* Abas: Configuração · Conteúdo · Questões — sublinhado animado (Configuração à esquerda).
           O "Acesso dos alunos" saiu daqui: o controle de acesso é feito na área do MÓDULO. */}
-      <div className="relative flex border-b text-sm">
-        {([['config', 'Configuração', Settings2], ['conteudo', 'Conteúdo', FileText], ['questoes', 'Questões', HelpCircle]] as const).map(([a, label, Icon]) => (
-          <button key={a} onClick={() => setAba(a)} className={cn('flex flex-1 items-center justify-center gap-1.5 px-3 py-2.5 font-medium transition-colors', aba === a ? 'text-primary' : 'text-muted-foreground hover:text-foreground')}>
-            <Icon className="h-4 w-4" /> {label}
-          </button>
-        ))}
-        <span className="absolute bottom-[-1px] h-0.5 rounded-full bg-primary transition-all duration-300 ease-out" style={{ width: '33.333%', left: `${(aba === 'config' ? 0 : aba === 'conteudo' ? 1 : 2) * 33.333}%` }} />
-      </div>
+      {(() => {
+        const ABAS = [['config', 'Configuração', Settings2], ['conteudo', 'Conteúdo', FileText], ['questoes', 'Questões', HelpCircle], ['leitura-rapida', 'Leitura rápida', Zap]] as const
+        const idx = ABAS.findIndex(([a]) => a === aba)
+        return (
+          <div className="relative flex border-b text-sm">
+            {ABAS.map(([a, label, Icon]) => (
+              <button key={a} onClick={() => setAba(a)} className={cn('flex flex-1 items-center justify-center gap-1.5 px-3 py-2.5 font-medium transition-colors', aba === a ? 'text-primary' : 'text-muted-foreground hover:text-foreground')}>
+                <Icon className="h-4 w-4" /> {label}
+              </button>
+            ))}
+            <span className="absolute bottom-[-1px] h-0.5 rounded-full bg-primary transition-all duration-300 ease-out" style={{ width: `${100 / ABAS.length}%`, left: `${idx * (100 / ABAS.length)}%` }} />
+          </div>
+        )
+      })()}
 
       {/* QUESTÕES: índice em blocos com inserção de questões do banco entre os artigos (Fase 2). */}
       {aba === 'questoes' && <LeituraQuestoesAdmin documentoId={documento.id} versao={versaoAutoria} html={htmlAtual} />}
+
+      {/* LEITURA RÁPIDA: HTML de uma página enxuta (reading + questões) para ler rápido. */}
+      {aba === 'leitura-rapida' && (
+        <div className="pt-4">
+          <LeituraRapidaEditor documentoId={documento.id} inicial={leituraRapidaInicial} />
+        </div>
+      )}
 
       {/* CONTEÚDO: prévia grande + painel de edição de grifos ao lado */}
       {aba === 'conteudo' && (
@@ -737,6 +767,7 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
                     <button onClick={() => exec('justifyLeft')} title="Alinhar à esquerda" className="rounded-md p-1.5 text-muted-foreground hover:bg-card hover:text-foreground"><AlignLeft className="h-4 w-4" /></button>
                     <button onClick={() => exec('justifyCenter')} title="Centralizar" className="rounded-md p-1.5 text-muted-foreground hover:bg-card hover:text-foreground"><AlignCenter className="h-4 w-4" /></button>
                     <button onClick={() => exec('justifyRight')} title="Alinhar à direita" className="rounded-md p-1.5 text-muted-foreground hover:bg-card hover:text-foreground"><AlignRight className="h-4 w-4" /></button>
+                    <button onClick={() => exec('justifyFull')} title="Justificar" className="rounded-md p-1.5 text-muted-foreground hover:bg-card hover:text-foreground"><AlignJustify className="h-4 w-4" /></button>
                     <span className="mx-0.5 h-5 w-px bg-border" />
                     <label title="Cor do texto" className="relative flex cursor-pointer items-center rounded-md p-1.5 text-muted-foreground hover:bg-card hover:text-foreground">
                       <Palette className="h-4 w-4" />
@@ -793,7 +824,7 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
                       <option value="reto">Reto</option>
                     </select>
                   </div>
-                  <div ref={editorRef} contentEditable suppressContentEditableWarning
+                  <div ref={setEditorEl} contentEditable suppressContentEditableWarning
                     onClick={(e) => {
                       const t = e.target as HTMLElement
                       if (t?.tagName === 'IMG' && t.classList.contains('sl-img')) { abrirMenuSelo(t); setBlocoSel(null); return }

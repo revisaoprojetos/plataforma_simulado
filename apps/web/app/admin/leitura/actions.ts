@@ -1433,6 +1433,22 @@ export async function salvarBlocosDocumento(documentoId: string, patch: { blocos
   return { ok: true }
 }
 
+/** Salva o HTML da "Leitura rápida" (página completa, inclusive com scripts). É SEMPRE exibida num
+ * IFRAME sandbox COM `allow-scripts` mas SEM `allow-same-origin` → o JS roda isolado (origem opaca),
+ * não acessa a plataforma nem escapa do sandbox. Por isso guardamos a página INTEIRA, como está. */
+export async function salvarLeituraRapida(documentoId: string, html: string): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  if ((html ?? '').length > 4 * 1024 * 1024) return { ok: false, error: 'HTML muito grande (máx. ~4 MB).' }
+  const svc = createAdminClient()
+  const { data: doc } = await svc.from('simulado_documentos').select('quiz_config').eq('id', documentoId).eq('tenant_id', g.tenantId).maybeSingle()
+  const merged: any = { ...((doc as any)?.quiz_config ?? {}) }
+  merged.leitura_rapida = (html ?? '').trim()
+  const { error } = await svc.from('simulado_documentos').update({ quiz_config: merged, atualizado_em: new Date().toISOString() }).eq('id', documentoId).eq('tenant_id', g.tenantId)
+  if (error) return { ok: false, error: QUIZ_SEM_TABELA(error.message) ? 'Rode a migração 20260910000001.' : error.message }
+  revalidatePath(`/admin/leitura/${documentoId}`)
+  return { ok: true }
+}
+
 /** Salva a config de "Temas do dia" (tags/nº de questões/incluir por tópico) em quiz_config.topicos. */
 export async function salvarTopicos(documentoId: string, topicos: TopicosConfig): Promise<{ ok: boolean; error?: string }> {
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }

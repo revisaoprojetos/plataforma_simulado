@@ -82,15 +82,29 @@ async function statusAulas(svc: any, tenantId: string, estId: string, docs: Docu
       if (r.correta) { const a = acertoPorDoc.get(r.documento_id) ?? new Set<string>(); a.add(r.questao_id); acertoPorDoc.set(r.documento_id, a) }
     }
   }
+  // "Leitura rápida" CONCLUÍDA (caminho alternativo): as questões são do HTML (sem questao_id), então
+  // conta como "questões feitas" pelo registro de conclusão. Query barata; tolerante à migração ausente.
+  const rapidaDone = new Map<string, { acertos: number; total: number }>()
+  if (ids.length) {
+    try {
+      const { data } = await svc.from('simulado_leitura_rapida_progresso').select('documento_id, acertos, total, concluido_em')
+        .eq('tenant_id', tenantId).eq('estudante_id', estId).in('documento_id', ids).not('concluido_em', 'is', null)
+      for (const r of (((data ?? []) as any[]))) rapidaDone.set(r.documento_id, { acertos: Number(r.acertos) || 0, total: Number(r.total) || 0 })
+    } catch { /* migração ausente → sem efeito */ }
+  }
   for (const d of docs) {
     const obrig = obrigPorDoc.get(d.id) ?? new Set<string>()
     const resp = respPorDoc.get(d.id) ?? new Set<string>()
     const acer = acertoPorDoc.get(d.id) ?? new Set<string>()
-    const questoesFeitas = [...obrig].every((qid) => resp.has(qid))
-    const questoesRespondidas = [...obrig].filter((qid) => resp.has(qid)).length
+    const rapida = rapidaDone.get(d.id)
     const questoesTotal = totalPorDoc.get(d.id) ?? 0
-    // Gabaritou = tem quiz, todas respondidas E todas corretas (máximo de pontos da aula).
-    const gabaritou = questoesTotal > 0 && questoesFeitas && [...obrig].every((qid) => acer.has(qid))
+    // Questões feitas = todas as do quiz respondidas OU a leitura rápida concluída (caminho alternativo).
+    const questoesFeitas = ([...obrig].every((qid) => resp.has(qid)) && (questoesTotal > 0 || !rapida)) || !!rapida
+    const respPorQuiz = [...obrig].filter((qid) => resp.has(qid)).length
+    const questoesRespondidas = rapida ? Math.max(respPorQuiz, questoesTotal) : respPorQuiz
+    // Gabaritou = tem quiz todo correto OU gabaritou na leitura rápida (acertos === total).
+    const gabaritou = (questoesTotal > 0 && [...obrig].every((qid) => resp.has(qid)) && [...obrig].every((qid) => acer.has(qid)))
+      || (!!rapida && rapida.total > 0 && rapida.acertos >= rapida.total)
     map.set(d.id, { doc: d, leituraConcluida: d.concluido, questoesFeitas, aulaConcluida: d.concluido && questoesFeitas, questoesTotal, questoesRespondidas, gabaritou })
   }
   return map
@@ -259,6 +273,8 @@ export interface AulaDesempenho {
   /** Dia em que a aula CONTA como feita ('YYYY-MM-DD', fuso do tenant) — dia IMUTÁVEL do ledger
    *  (meta.dia do quiz), igual ao streak; fallback p/ o dia do `data`. Coluna "Feito em" da tabela. */
   diaFeito: string | null
+  /** Tem "Leitura rápida" (HTML enxuto) configurada → mostra o botão no card. */
+  temLeituraRapida: boolean
 }
 export interface ModuloCompleto {
   trilha: Trilha | null
@@ -314,6 +330,17 @@ export async function carregarModuloCompleto(estId: string, tenantId: string, mo
     run = consecutivo ? run + 1 : 1; streakDoDia.set(d, run); prevDia = d
   }
 
+  // Quais aulas têm "Leitura rápida" (HTML) — query BARATA (só `id`, filtro no JSON; NÃO puxa o HTML).
+  const idsRapida = arr.map((a) => a.doc.id)
+  let comRapida = new Set<string>()
+  if (idsRapida.length) {
+    try {
+      const { data } = await svc.from('simulado_documentos').select('id').eq('tenant_id', tenantId).in('id', idsRapida)
+        .not('quiz_config->>leitura_rapida', 'is', null).neq('quiz_config->>leitura_rapida', '')
+      comRapida = new Set((((data ?? []) as any[]).map((d) => d.id)))
+    } catch { /* coluna/migração ausente → sem botão */ }
+  }
+
   const desempenho: AulaDesempenho[] = arr.map((a) => ({
     id: a.doc.id, titulo: a.doc.titulo, estado: a.estado,
     leituraPct: a.doc.pct, leituraConcluida: a.leituraConcluida,
@@ -323,6 +350,7 @@ export async function carregarModuloCompleto(estId: string, tenantId: string, mo
     data: dataDoc.get(a.doc.id) ?? null,
     diaFeito: diaFeitoDoc.get(a.doc.id) ?? (dataDoc.has(a.doc.id) ? diaDe(dataDoc.get(a.doc.id)!) : null),
     sequencia: dataDoc.has(a.doc.id) ? (streakDoDia.get(diaDe(dataDoc.get(a.doc.id)!)) ?? 0) : 0,
+    temLeituraRapida: comRapida.has(a.doc.id),
   }))
   // Pendência ACIONÁVEL = leitura concluída (questões liberadas) mas ainda faltam responder.
   const comPend = arr.filter((a) => a.leituraConcluida && a.questoesTotal - a.questoesRespondidas > 0)

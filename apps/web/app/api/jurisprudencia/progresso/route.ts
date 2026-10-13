@@ -21,6 +21,7 @@ export async function GET(request: NextRequest) {
     if (!(await checkPermission('leitura:view'))) return NextResponse.json({ error: 'Não autenticado.' }, { status: 401 })
     const desafioId = request.nextUrl.searchParams.get('desafio')
     const leituraDocs: Record<string, string> = {}
+    const leituraRapidaDocs: Record<string, string> = {}
     if (desafioId) {
       const svc = createAdminClient()
       const jogo = await lerDesafioJogo(svc, desafioId)
@@ -30,12 +31,13 @@ export async function GET(request: NextRequest) {
       const docIds = [...new Set(Object.values(docPorDia))]
       if (docIds.length) {
         // No designer, mostra o botão de leitura mesmo p/ rascunho (só exclui deletado) — é visualização.
-        const { data: docs } = await svc.from('simulado_documentos').select('id, deletado').in('id', docIds)
+        const { data: docs } = await svc.from('simulado_documentos').select('id, deletado, quiz_config').in('id', docIds)
         const vivos = new Set(((docs ?? []) as any[]).filter((d) => !d.deletado).map((d) => d.id))
-        for (const [dia, did] of Object.entries(docPorDia)) if (vivos.has(did)) leituraDocs[dia] = did
+        const comRapida = new Set(((docs ?? []) as any[]).filter((d) => !d.deletado && typeof d.quiz_config?.leitura_rapida === 'string' && d.quiz_config.leitura_rapida.trim()).map((d) => d.id))
+        for (const [dia, did] of Object.entries(docPorDia)) { if (vivos.has(did)) leituraDocs[dia] = did; if (comRapida.has(did)) leituraRapidaDocs[dia] = did }
       }
     }
-    return NextResponse.json({ dom: {}, best: {}, recorde: 0, perfil: null, leituras: {}, leituraDocs })
+    return NextResponse.json({ dom: {}, best: {}, recorde: 0, perfil: null, leituras: {}, leituraDocs, leituraRapidaDocs })
   }
 
   const desafioId = request.nextUrl.searchParams.get('desafio')
@@ -60,9 +62,10 @@ export async function GET(request: NextRequest) {
   for (const [k, d] of Object.entries(diasObj)) { const did = (d as any)?.documento_id; if (typeof did === 'string' && did) docPorDiaBruto[k] = did }
   const docPorDia: Record<string, string> = {}
   const leituras: Record<string, boolean> = {}
+  const leituraRapidaDocs: Record<string, string> = {} // { "<dia>": documentoId } só p/ dias com leitura RÁPIDA
   const idsBrutos = [...new Set(Object.values(docPorDiaBruto))]
   if (idsBrutos.length) {
-    const { data: docs } = await svc.from('simulado_documentos').select('id, publicado, deletado, desafio_ativo').eq('tenant_id', sessao.tenantId).in('id', idsBrutos)
+    const { data: docs } = await svc.from('simulado_documentos').select('id, publicado, deletado, desafio_ativo, quiz_config').eq('tenant_id', sessao.tenantId).in('id', idsBrutos)
     // Auto-cura: a leitura de um dia do desafio nasce p/ ser consumida pelo aluno. Docs vinculados
     // (desafio_ativo=true) que ficaram em rascunho são publicados aqui — senão o botão de Leitura
     // nunca apareceria e o leitor não abriria. A visibilidade real continua gateada pelo PUB do dia.
@@ -73,6 +76,9 @@ export async function GET(request: NextRequest) {
     }
     const pub = new Set(((docs ?? []) as any[]).filter((d) => d.publicado && !d.deletado).map((d) => d.id))
     for (const [dia, did] of Object.entries(docPorDiaBruto)) if (pub.has(did)) docPorDia[dia] = did
+    // Dias cujo documento tem LEITURA RÁPIDA configurada (quiz_config.leitura_rapida não-vazio).
+    const comRapida = new Set(((docs ?? []) as any[]).filter((d) => pub.has(d.id) && typeof d.quiz_config?.leitura_rapida === 'string' && d.quiz_config.leitura_rapida.trim()).map((d) => d.id))
+    for (const [dia, did] of Object.entries(docPorDia)) if (comRapida.has(did)) leituraRapidaDocs[dia] = did
     const docIds = [...new Set(Object.values(docPorDia))]
     if (docIds.length) {
       const { data: progs } = await svc.from('simulado_leitura_progresso').select('documento_id, concluido_em').eq('estudante_id', sessao.estudanteId).in('documento_id', docIds)
@@ -108,6 +114,7 @@ export async function GET(request: NextRequest) {
     perfil, // { nome, iniciais, cargo, nivel, avatar, avatarCor } — card do jogador
     leituras,              // { "<dia>": bool } — leitura concluída (gate do quiz)
     leituraDocs: docPorDia, // { "<dia>": documentoId } — p/ o link do leitor
+    leituraRapidaDocs,      // { "<dia>": documentoId } — dias que TÊM leitura rápida (botão no arcade)
   })
 }
 

@@ -190,6 +190,29 @@ export function prepararTabelasColapsaveis(cont: HTMLElement): () => void {
 
       const corpo = document.createElement('div'); corpo.className = 'caixa-corpo'
       const inner = document.createElement('div'); inner.className = 'caixa-corpo-in'
+
+      // COR FIEL no WRAPPER (só col-unica = quote/artigo): a cor vive na tabela interna, que fica DENTRO
+      // do corpo e SOME ao recolher → o card virava branco. Copiando fundo/texto pro wrapper, o card
+      // mantém a cor base e a cor do texto mesmo RECOLHIDO (e o topo aberto vira um "cabeçalho" colorido).
+      if (unicaColuna) {
+        const lerCor = (el: Element | null) => {
+          const st = el?.getAttribute('style') || ''
+          return {
+            bg: /background(?:-color)?\s*:\s*([^;]+)/i.exec(st)?.[1]?.trim(),
+            fg: /(?:^|;)\s*color\s*:\s*([^;]+)/i.exec(st)?.[1]?.trim(),
+          }
+        }
+        const cel = tab.querySelector('td,th'), tr0 = tab.querySelector('tr')
+        const bg = lerCor(cel).bg || lerCor(tr0).bg || lerCor(tab).bg
+        const fg = lerCor(cel).fg || lerCor(tr0).fg || lerCor(tab).fg
+        if (bg) {
+          box.style.setProperty('background', bg)
+          // Borda sutil derivada do fundo p/ o card ficar definido (fiel ao look das caixas coloridas).
+          box.style.setProperty('border-color', `color-mix(in srgb, ${bg} 78%, #000)`)
+        }
+        if (fg) box.style.setProperty('color', fg)
+      }
+
       tab.replaceWith(box)      // box ocupa o lugar da tabela (tabela fica destacada)
       inner.appendChild(tab)    // move a tabela pra dentro do corpo
       corpo.appendChild(inner)

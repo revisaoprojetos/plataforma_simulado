@@ -171,9 +171,9 @@ function CardSim({ brand, item }: { brand: Brand; item: ItemSimuladoCat }) {
   const fazerHref = item.embed_token ? `/simulado/${item.embed_token}` : null
   const statusTxt = item.tom === 'sky' ? item.quando : item.statusLabel
   return (
-    <div className="ip-card" style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', overflow: 'hidden', minHeight: 112 }}>
+    <div className={brand === 'vnd' ? 'ip-card ip-vnd' : 'ip-card'} style={{ display: 'flex', background: 'var(--surface)', ...(brand === 'vnd' ? {} : { border: '1px solid var(--line)' }), borderRadius: 'var(--r)', overflow: 'hidden', minHeight: brand === 'vnd' ? 150 : 112 }}>
       {/* capa à esquerda (altura cheia) */}
-      <div style={{ position: 'relative', width: '36%', maxWidth: 160, flexShrink: 0, overflow: 'hidden' }}>
+      <div style={{ position: 'relative', width: brand === 'vnd' ? 150 : '36%', maxWidth: brand === 'vnd' ? 150 : 160, flexShrink: 0, overflow: 'hidden' }}>
         <Capa brand={brand} item={item} />
         {item.novo && (
           <span style={{ position: 'absolute', left: 10, top: 10, height: 22, padding: '0 9px', borderRadius: 99, background: '#E5484D', color: '#FFF', fontSize: 10, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center' }}>Novo</span>
@@ -182,6 +182,7 @@ function CardSim({ brand, item }: { brand: Brand; item: ItemSimuladoCat }) {
           <span style={{ position: 'absolute', left: 8, bottom: 8, maxWidth: 'calc(100% - 16px)', height: 20, padding: '0 8px', borderRadius: 99, background: '#F1C232', color: '#2A1A55', fontSize: 9.5, fontWeight: 800, letterSpacing: '.02em', textTransform: 'uppercase', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center' }}>Em andamento</span>
         )}
       </div>
+      {brand === 'vnd' && <span aria-hidden className="ip-perf" />}
       {/* corpo à direita */}
       <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 7, padding: '12px 14px' }}>
         <b style={{ fontSize: 14, lineHeight: 1.25, color: 'var(--ink)', fontWeight: 800, letterSpacing: '-0.01em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.titulo}</b>
@@ -220,13 +221,14 @@ function CardAndamento({ brand, item, prog }: { brand: Brand; item: ItemSimulado
   const fazerHref = item.embed_token ? `/simulado/${item.embed_token}` : null
   const pct = prog?.pct ?? 0
   return (
-    <div className="ip-card" style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', overflow: 'hidden', minHeight: 112 }}>
-      <div style={{ position: 'relative', width: '36%', maxWidth: 160, flexShrink: 0, overflow: 'hidden' }}>
+    <div className={brand === 'vnd' ? 'ip-card ip-vnd' : 'ip-card'} style={{ display: 'flex', background: 'var(--surface)', ...(brand === 'vnd' ? {} : { border: '1px solid var(--line)' }), borderRadius: 'var(--r)', overflow: 'hidden', minHeight: brand === 'vnd' ? 150 : 112 }}>
+      <div style={{ position: 'relative', width: brand === 'vnd' ? 150 : '36%', maxWidth: brand === 'vnd' ? 150 : 160, flexShrink: 0, overflow: 'hidden' }}>
         <Capa brand={brand} item={item} />
         <span style={{ position: 'absolute', left: 8, top: 8, maxWidth: 'calc(100% - 16px)', height: 20, padding: '0 8px', borderRadius: 99, background: '#F1C232', color: '#2A1A55', fontSize: 9.5, fontWeight: 800, letterSpacing: '.02em', textTransform: 'uppercase', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
           <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#2A1A55', flexShrink: 0 }} />Em andamento
         </span>
       </div>
+      {brand === 'vnd' && <span aria-hidden className="ip-perf" />}
       <div style={{ flex: 1, minWidth: 0, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
         <b style={{ fontSize: 14, lineHeight: 1.25, color: 'var(--ink)', fontWeight: 800, letterSpacing: '-0.01em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.titulo}</b>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -252,10 +254,11 @@ function CardAndamento({ brand, item, prog }: { brand: Brand; item: ItemSimulado
 function CardFeito({ brand, item, nota }: { brand: Brand; item: ItemSimuladoCat; nota?: { nota: number | null; notaLiberada: boolean; data: string } }) {
   const n = nota?.notaLiberada && nota?.nota != null ? nota.nota : null
   return (
-    <Link href={`/aluno/simulados/${item.id}`} className="ip-card" style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', overflow: 'hidden', minHeight: 112, color: 'inherit', textDecoration: 'none' }}>
-      <div style={{ position: 'relative', width: '36%', maxWidth: 160, flexShrink: 0, overflow: 'hidden' }}>
+    <Link href={`/aluno/simulados/${item.id}`} className={brand === 'vnd' ? 'ip-card ip-vnd' : 'ip-card'} style={{ display: 'flex', background: 'var(--surface)', ...(brand === 'vnd' ? {} : { border: '1px solid var(--line)' }), borderRadius: 'var(--r)', overflow: 'hidden', minHeight: brand === 'vnd' ? 150 : 112, color: 'inherit', textDecoration: 'none' }}>
+      <div style={{ position: 'relative', width: brand === 'vnd' ? 150 : '36%', maxWidth: brand === 'vnd' ? 150 : 160, flexShrink: 0, overflow: 'hidden' }}>
         <Capa brand={brand} item={item} />
       </div>
+      {brand === 'vnd' && <span aria-hidden className="ip-perf" />}
       <div style={{ flex: 1, minWidth: 0, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 700, color: '#1FA868' }}><CircleCheck size={13} />Concluído</span>
@@ -297,8 +300,16 @@ const CSS = `
 /* adaptativo ao CONTAINER (nao ao viewport) — nao corta em tablet/iframe; min(100%,440px) = 1 coluna quando estreito.
    Cards mais LARGOS: min 440px → menos colunas (ticket capa+infos com mais respiro). */
 .ip-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,440px),1fr));gap:16px;align-items:stretch}
-.ip-card{height:100%;transition:transform .4s cubic-bezier(.22,1,.36,1),box-shadow .4s cubic-bezier(.22,1,.36,1),border-color .25s}
+.ip-card{height:100%;position:relative;transition:transform .4s cubic-bezier(.22,1,.36,1),box-shadow .4s cubic-bezier(.22,1,.36,1),border-color .25s}
 .ip-card:hover{transform:translateY(-3px);border-color:var(--brandLine,var(--line));box-shadow:0 22px 40px -28px rgba(0,0,0,.45)}
+/* Ticket VND dentro das pastas: contorno via ::after (z-2, acima da capa p/ o dourado do hover nos 2
+   lados; abaixo do picote z-3) + picote = dots pequenos + furos (meia-lua) no corte capa/corpo (x=150). */
+.ip-vnd::after{content:'';position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 1px var(--line);pointer-events:none;z-index:2;transition:box-shadow .3s}
+.ip-vnd:hover::after{box-shadow:inset 0 0 0 1px var(--hoverLine,rgba(232,200,119,.7))}
+.ip-perf{position:absolute;left:150px;top:6px;bottom:6px;width:6px;transform:translateX(-50%);pointer-events:none;z-index:3;background-image:radial-gradient(circle at center,var(--bg) 1.7px,transparent 2.1px);background-size:6px 9px;background-position:center;background-repeat:repeat-y}
+.ip-perf::before,.ip-perf::after{content:'';position:absolute;left:50%;width:17px;height:17px;border-radius:50%;background:var(--bg)}
+.ip-perf::before{top:-6px;transform:translate(-50%,-50%)}
+.ip-perf::after{bottom:-6px;transform:translate(-50%,50%)}
 .ip-card .rlz-cov{transition:transform .6s cubic-bezier(.22,1,.36,1)}.ip-card:hover .rlz-cov{transform:scale(1.05)}
 .ip-btn-primary{transition:filter .25s,transform .25s}.ip-btn-primary:hover{filter:brightness(1.08);transform:translateY(-1px)}
 .ip-btn-sec{transition:background .2s,color .2s,border-color .2s}.ip-btn-sec:hover{background:var(--chip);color:var(--brand);border-color:var(--brandLine,var(--line))}

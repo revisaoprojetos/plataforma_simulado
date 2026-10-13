@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   ChevronDown, ChevronRight, ChevronUp, Trash2, Loader2,
-  Eye, EyeOff, Clock, CalendarClock, X, FilePlus2, Pencil, BookOpen, HelpCircle, FileText,
+  Eye, EyeOff, Clock, CalendarClock, X, FilePlus2, Pencil, BookOpen, HelpCircle, FileText, Zap,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
@@ -187,6 +187,7 @@ function DiaLinha({ desafioId, chave, posicao, total, dia, materiaInfo, quizCoun
   const router = useRouter()
   const [abrindoLeitura, startLeitura] = useTransition()
   const [abrindoQuestoes, startQuestoes] = useTransition()
+  const [abrindoRapida, startRapida] = useTransition()
   const voltarJuris = () => encodeURIComponent(`/admin/jurisprudencia?desafio=${desafioId}&aba=dias`)
 
   // Abre (criando se preciso) o documento do dia no editor de CONTEÚDO (leitura), com "voltar" p/ a juris.
@@ -203,6 +204,14 @@ function DiaLinha({ desafioId, chave, posicao, total, dia, materiaInfo, quizCoun
       const r = await editarLeituraDia(desafioId, chave)
       if (r.ok && r.documentoId) router.push(`/admin/leitura/${r.documentoId}/questoes?voltar=${voltarJuris()}`)
       else toast.error(r.error ?? 'Erro ao abrir as questões.')
+    })
+  }
+  // Abre a aba "Leitura rápida" do dia (HTML enxuto com leitura + questões).
+  function abrirLeituraRapida() {
+    startRapida(async () => {
+      const r = await editarLeituraDia(desafioId, chave)
+      if (r.ok && r.documentoId) router.push(`/admin/leitura/${r.documentoId}?tab=leitura-rapida&voltar=${voltarJuris()}`)
+      else toast.error(r.error ?? 'Erro ao abrir a leitura rápida.')
     })
   }
 
@@ -273,6 +282,13 @@ function DiaLinha({ desafioId, chave, posicao, total, dia, materiaInfo, quizCoun
             <span className="flex-1 text-left font-medium text-foreground">Questões do conteúdo</span>
             <span className="text-[11px] text-muted-foreground">{quizCount > 0 ? `${quizCount} questão(ões)` : 'adicionar questões'}</span>
             {abrindoQuestoes ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />}
+          </button>
+          <button type="button" onClick={abrirLeituraRapida} disabled={abrindoRapida}
+            className="group flex w-full items-center gap-2.5 border-t py-2.5 pl-16 pr-3 text-sm transition-colors hover:bg-muted/50 disabled:opacity-60">
+            <Zap className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <span className="flex-1 text-left font-medium text-foreground">Leitura rápida</span>
+            <span className="text-[11px] text-muted-foreground">página enxuta (leitura + questões)</span>
+            {abrindoRapida ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />}
           </button>
         </div>
       )}

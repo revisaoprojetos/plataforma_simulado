@@ -3,7 +3,8 @@ import { existsSync } from 'node:fs'
 import { createAdminClient } from '@/lib/supabase/server'
 import { registrarRelatorioEvento } from '@/lib/relatorio-eventos'
 import { adquirirSlotPdf, liberarSlotPdf } from '@/lib/pdf/chromium-guard'
-import puppeteer from 'puppeteer-core'
+import type { Page } from 'puppeteer-core'
+import { obterBrowserPdf, agendarFecharBrowserPdf } from '@/lib/pdf/browser'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -12,7 +13,10 @@ export const fetchCache = 'force-no-store'
 
 // Base que o navegador headless (mesmo host do web) usa p/ buscar a página. NÃO usar WEB_INTERNAL_URL
 // (endereço do host visto de dentro do Docker, p/ o Gotenberg).
-const WEB_INTERNAL = process.env.CADERNO_PDF_WEB_URL ?? 'http://localhost:3000'
+// IPv4 explícito (127.0.0.1) e NÃO `localhost`: no container o Next escuta em 0.0.0.0 (IPv4), mas
+// `localhost` resolve primeiro p/ IPv6 ::1 → o Chromium leva ECONNREFUSED e o PDF falha (500). Ver
+// override por env CADERNO_PDF_WEB_URL se o web rodar noutra porta/host.
+const WEB_INTERNAL = process.env.CADERNO_PDF_WEB_URL ?? 'http://127.0.0.1:3000'
 
 /** Acha um Chromium/Edge instalado (sem baixar nada). */
 function acharNavegador(): string | null {
@@ -72,13 +76,13 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ message: 'Servidor ocupado gerando outros PDFs. Tente novamente em instantes.' }, { status: 503 })
   }
 
-  let browser: Awaited<ReturnType<typeof puppeteer.launch>> | null = null
+  let page: Page | null = null
   try {
-    // --disable-dev-shm-usage é ESSENCIAL em container: o /dev/shm padrão do Docker é minúsculo (64MB)
-    // e o Chromium crasha ao renderizar a página em alta resolução (deviceScaleFactor 2 + timbre),
-    // devolvendo 500 "Falha ao gerar o PDF". Escreve a memória compartilhada em /tmp. +GPU off (headless).
-    browser = await puppeteer.launch({ executablePath: exec, headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu'] })
-    const page = await browser.newPage()
+    // Browser Chromium REUSADO entre requests (sobe 1x, fecha ocioso) — ver lib/pdf/browser.ts. Evita o
+    // custo de subir um Chromium a cada PDF (os args essenciais, incl. --disable-dev-shm-usage p/ container,
+    // ficam lá). Só a PÁGINA é criada/fechada por request.
+    const browser = await obterBrowserPdf(exec)
+    page = await browser.newPage()
     await page.setCacheEnabled(false)
     await page.setViewport({ width: 794, height: 1123, deviceScaleFactor: 2 })
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 })
@@ -118,12 +122,10 @@ export async function GET(request: NextRequest) {
       if (!root) return true // cadernos sem paginador (ex.: folha simples) não têm .caderno-pronto
       const folhas = Array.from(root.children).filter((c) => c.getAttribute('aria-hidden') === null)
       return folhas.length > 0 && folhas.every((f) => (f as HTMLElement).getBoundingClientRect().height <= 1130)
-    }, { timeout: 8000 }).catch(() => {})
-    await new Promise((r) => setTimeout(r, 250))
+    }, { timeout: 12_000 }).catch(() => {})
+    await new Promise((r) => setTimeout(r, 300))
     await page.emulateMediaType('print')
     const pdf = await page.pdf({ printBackground: true, preferCSSPageSize: true })
-    await browser.close()
-    browser = null
     return new NextResponse(pdf as any, {
       headers: {
         'Content-Type': 'application/pdf',
@@ -132,9 +134,12 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (e) {
-    try { await browser?.close() } catch { /* noop */ }
+    // Loga o motivo real no container (Portainer) — a UI só mostra a mensagem genérica.
+    console.error('[caderno-teste-pdf] falha ao gerar:', url, '→', (e as Error).message)
     return NextResponse.json({ message: 'Falha ao gerar o PDF.', detalhe: (e as Error).message }, { status: 500 })
   } finally {
+    try { await page?.close() } catch { /* noop */ }
     liberarSlotPdf()
+    agendarFecharBrowserPdf()
   }
 }

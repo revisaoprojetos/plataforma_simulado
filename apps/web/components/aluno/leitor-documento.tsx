@@ -15,6 +15,7 @@ import type { DocumentoCarregado, AnotacaoAluno } from '@/lib/leitura/acesso'
 import { DEFAULT_GRIFO_CORES, type GrifoCores } from '@/lib/leitura/trilha-aparencia'
 import { estiloEspacamento, DEFAULT_ESPACAMENTO } from '@/lib/leitura/espacamento'
 import { aplicarGrifos } from '@/lib/leitura/recolorir-grifos'
+import { adaptarLeituraEscuro } from '@/lib/leitura/adaptar-escuro'
 import { construirEspinha, rangeParaAncora, ancoraParaRange, rectsDoRange, type Espinha, type RectRel } from '@/lib/leitura/anotacoes-engine'
 import { QuestaoLeitura } from '@/components/aluno/questao-leitura'
 import { LeituraAtualizacaoAviso } from '@/components/aluno/leitura-atualizacao-aviso'
@@ -535,6 +536,20 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
     return () => { cancelAnimationFrame(r); clearTimeout(t) }
   }, [semGrifos, grifoCores, doc.html, slots, doc.esp?.preservarHtml])
 
+  // Tema do conteúdo via ATRIBUTO imperativo (não no JSX do memo) → trocar o tema não recria o container
+  // do conteúdo (que só depende de doc.html/espaço/modo), evitando o pisca/reflow. Antes do paint.
+  useIsoLayout(() => { contentRef.current?.setAttribute('data-leitura-tema', tema) }, [tema])
+
+  // ── Adaptação automática de cores no MODO ESCURO (todo tipo de texto) ──
+  // Reconhece por luminância a cor de cada elemento e, no escuro, clareia o texto escuro (mantendo o
+  // matiz dos tópicos/títulos) ou escurece texto claro sobre fundo claro. Roda DEPOIS dos grifos e do
+  // box-prep (que reprocessam o conteúdo), por isso rAF + timeout, igual ao efeito acima.
+  useEffect(() => {
+    const run = () => adaptarLeituraEscuro(contentRef.current, tema === 'escuro')
+    run(); const r = requestAnimationFrame(run); const t = setTimeout(run, 200)
+    return () => { cancelAnimationFrame(r); clearTimeout(t) }
+  }, [tema, semGrifos, grifoCores, doc.html, slots, doc.esp?.preservarHtml])
+
   // ── Busca dentro da lei: acha ocorrências na espinha, gera rects p/ realçar + navegar. ──
   // Debounce: não reconstrói a espinha/varre a cada tecla (custo alto em leis grandes).
   useIsoLayout(() => {
@@ -1029,7 +1044,20 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
     } finally { setConcluindo(false) }
   }
 
-  const proseStyle = useMemo<React.CSSProperties>(() => ({ fontSize: fonte, lineHeight: 1.7, color: cores.fg, ...estiloEspacamento(doc.esp ?? DEFAULT_ESPACAMENTO), ['--esc-blocos' as string]: espaco / 2.2, ['--esc-texto' as string]: espacoTexto } as React.CSSProperties), [fonte, cores.fg, espaco, espacoTexto, doc.esp])
+  // A COR do texto vem do CSS (.leitura-prosa[data-leitura-tema=…]) — NÃO do inline — para o container do
+  // conteúdo não ser recriado na troca de tema (o que re-rasterizava os overlays mix-blend = pisca/reflow).
+  const proseStyle = useMemo<React.CSSProperties>(() => ({ fontSize: fonte, lineHeight: 1.7, ...estiloEspacamento(doc.esp ?? DEFAULT_ESPACAMENTO), ['--esc-blocos' as string]: espaco / 2.2, ['--esc-texto' as string]: espacoTexto } as React.CSSProperties), [fonte, espaco, espacoTexto, doc.esp])
+  // GARANTIA do tamanho da fonte/escala no container: o div de conteúdo é memoizado por [modo,colW,…] e
+  // sofre mutação imperativa (caixas, adaptar-escuro). Em alguns refluxos de troca de modo (rolar↔capítulo↔
+  // virar) o React não reassenta o fontSize inline no nó mutado → o texto "perdia o tamanho". Reaplicamos
+  // o tamanho e as escalas direto no DOM após cada troca de modo/medição.
+  useIsoLayout(() => {
+    const el = contentRef.current
+    if (!el) return
+    el.style.fontSize = `${fonte}px`
+    el.style.setProperty('--esc-blocos', String(espaco / 2.2))
+    el.style.setProperty('--esc-texto', String(espacoTexto))
+  }, [fonte, espaco, espacoTexto, modo, colW, doc.html, slots])
   // Blend do overlay de grifos. O overlay fica ATRÁS do texto (conteúdo é `relative z-[1]`), então o
   // texto NUNCA é lavado pelo blend — ele pinta opaco por cima e permanece legível nos dois temas.
   //  - claro: 'multiply' → realce saturado (highlighter) sobre a folha branca, texto escuro por cima.
@@ -1053,7 +1081,6 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
   const conteudoEl = useMemo(() => (
     <div
       ref={contentRef}
-      data-leitura-tema={tema}
       className={cn('leitura-conteudo leitura-prosa px-6 py-6 [&_a]:underline [&_h1]:mb-3 [&_h1]:mt-4 [&_h1]:text-2xl [&_h1]:font-bold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-xl [&_h2]:font-bold [&_h3]:mb-1 [&_h3]:mt-3 [&_h3]:text-lg [&_h3]:font-semibold [&_li]:ml-6 [&_li]:list-disc [&_p]:mb-3 [&_table]:my-3 [&_table]:w-full [&_td]:border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:px-2 [&_th]:py-1', semGrifos && 'sem-grifos', doc.esp?.preservarHtml && 'leitura-fiel')}
       style={modo === 'flip'
         ? { ...proseStyle, columnWidth: colW || undefined, columnGap: GAP, columnFill: 'auto', height: '100%' }

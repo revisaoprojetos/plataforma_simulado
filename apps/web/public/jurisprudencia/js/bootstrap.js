@@ -49,6 +49,7 @@ async function semearProgresso(){
       // Setado SEMPRE (independe do storageKey) — senão a tela do dia/botão de leitura nunca aparecem.
       window.DESAFIO.LEITURAS = (p && p.leituras) || {};
       window.DESAFIO.LEITURA_DOCS = (p && p.leituraDocs) || {};
+      window.DESAFIO.LEITURA_RAPIDA_DOCS = (p && p.leituraRapidaDocs) || {}; // dias com leitura rápida
     }
     // Semeia o progresso local MESCLANDO servidor + local — NUNCA sobrescreve (senão um POST
     // fire-and-forget que não chegou faria o reload APAGAR o progresso local). Progresso é monotônico:

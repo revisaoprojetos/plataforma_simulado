@@ -23,7 +23,7 @@ import { ConfigModuloSalvarProvider } from '@/components/admin/config-modulo-sal
 import { BlocoColapsavel } from '@/components/admin/bloco-colapsavel'
 import { ModuloAcesso } from '@/components/admin/modulo-acesso'
 import {
-  ChevronRight, ChevronUp, ChevronDown, Home, Library, FolderPlus, FilePlus2, Pencil, Trash2, FolderInput, Eye, EyeOff, BookOpenText, MoreVertical, FolderOpen, FileText, HelpCircle, Settings2, Users, X, Clock, CalendarClock, Link2, Copy,
+  ChevronRight, ChevronUp, ChevronDown, Home, Library, FolderPlus, FilePlus2, Pencil, Trash2, FolderInput, Eye, EyeOff, BookOpenText, MoreVertical, FolderOpen, FileText, HelpCircle, Settings2, Users, X, Clock, CalendarClock, Link2, Copy, Zap,
 } from 'lucide-react'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/utils'
@@ -622,6 +622,12 @@ function AulaLinha({ a, i, total, modulos, pending, onOrdem, onExcluir, onPerson
             <HelpCircle className="h-4 w-4 shrink-0 text-muted-foreground" />
             <span className="flex-1 font-medium text-foreground">Questões do conteúdo</span>
             <span className="text-[11px] text-muted-foreground">{(a.quizQuestoes ?? 0) > 0 ? `${a.quizQuestoes} questão(ões)` : 'adicionar questões'}</span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
+          </Link>
+          <Link href={`${basePath}/${a.id}?tab=leitura-rapida`} className="group flex items-center gap-2.5 border-t py-2.5 pl-16 pr-3 text-sm transition-colors hover:bg-muted/50">
+            <Zap className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <span className="flex-1 font-medium text-foreground">Leitura rápida</span>
+            <span className="text-[11px] text-muted-foreground">página enxuta (leitura + questões)</span>
             <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
           </Link>
         </div>

@@ -88,7 +88,38 @@ export default async function JurisprudenciaAlunoPage({
   // ── NOVO VISUAL INTERNO: lista no design novo (PlatformJuris), fiel ao mockup, com dados reais. ──
   const _it = await resolverInterno()
   if (_it.ativo) {
-    const desafiosData = desafios.map((d) => ({ id: d.id, nome: d.nome, imagemTicket: d.imagemTicket ?? null }))
+    // Progresso REAL por desafio (dias dominados / total) p/ a barra do ticket — 2 queries em lote,
+    // calculado em memória. Tolerante: se a tabela/coluna não existir, cai p/ 0 (card sem barra).
+    const progDesafio = new Map<string, { feitos: number; total: number }>()
+    try {
+      const ids = desafios.map((d) => d.id)
+      if (ids.length) {
+        const svcP = createAdminClient()
+        const [pastasRes, progRes] = await Promise.all([
+          svcP.from('simulado_pastas').select('id, desafio_jogo').in('id', ids),
+          svcP.from('simulado_jurisprudencia_progresso').select('desafio_id, dom').eq('estudante_id', sessao.estudanteId).in('desafio_id', ids),
+        ])
+        const jogoMap = new Map((pastasRes.data ?? []).map((p: any) => [p.id, p.desafio_jogo ?? {}]))
+        const domMap = new Map((progRes.data ?? []).map((p: any) => [p.desafio_id, p.dom ?? {}]))
+        for (const id of ids) {
+          const dj: any = jogoMap.get(id) ?? {}
+          const dias = dj?.dias && typeof dj.dias === 'object' ? dj.dias : {}
+          const total = Object.keys(dias).length
+          const dom: any = domMap.get(id) ?? {}
+          const feitos = Object.keys(dias).filter((k) => {
+            const teses = dias[k]?.teses
+            const n = Array.isArray(teses) ? teses.length : 0
+            const arr = dom[k]
+            return n > 0 && Array.isArray(arr) && arr.length >= n
+          }).length
+          progDesafio.set(id, { feitos, total })
+        }
+      }
+    } catch { /* progresso é best-effort — card renderiza sem barra */ }
+    const desafiosData = desafios.map((d) => {
+      const p = progDesafio.get(d.id)
+      return { id: d.id, nome: d.nome, imagemTicket: d.imagemTicket ?? null, diasFeitos: p?.feitos ?? 0, totalDias: p?.total ?? 0 }
+    })
     const stats = { desafios: desafiosData.length, disponiveis: desafiosData.length }
     // MEQ tem composição própria (spec 04 §2): o shell da marca (shell-meq) já traz rail + top bar,
     // então renderizamos só a região de conteúdo (sem o cabeçalho duplicado do InternaPageRoot).

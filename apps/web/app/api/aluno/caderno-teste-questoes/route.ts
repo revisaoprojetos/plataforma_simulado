@@ -11,7 +11,9 @@ export const maxDuration = 60
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
 
-const WEB_INTERNAL = process.env.CADERNO_PDF_WEB_URL ?? 'http://localhost:3000'
+// IPv4 explícito (não `localhost`): no container o Next escuta em 0.0.0.0 (IPv4) e `localhost` resolve
+// p/ IPv6 ::1 → o Chromium leva ECONNREFUSED e o PDF falha (500).
+const WEB_INTERNAL = process.env.CADERNO_PDF_WEB_URL ?? 'http://127.0.0.1:3000'
 
 /** Acha um Chromium/Edge instalado (sem baixar nada). */
 function acharNavegador(): string | null {

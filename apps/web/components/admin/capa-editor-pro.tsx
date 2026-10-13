@@ -11,8 +11,11 @@ import { DEFAULT_CAPA_VIEW, type CapaViewCfg, type CapaRect } from '@/lib/capa-m
 
 export type CapaEditorValue = { orig: string | null; poster: CapaViewCfg; ticket: CapaViewCfg }
 type Formato = 'poster' | 'ticket'
-const ASPECTO: Record<Formato, number> = { poster: 4 / 5, ticket: 4 / 3 }
-const ROTULO: Record<Formato, string> = { poster: 'Pôster (vertical 4:5)', ticket: 'Ticket (paisagem 4:3)' }
+// Proporção da capa do ticket do card do aluno (capa à esquerda, 150px × 168px de altura = 25:28).
+// O editor enquadra NESSA proporção p/ a prévia bater com o que o aluno vê. (Pôster segue 4:5 vertical.)
+const TICKET_W = 150, TICKET_H = 168
+const ASPECTO: Record<Formato, number> = { poster: 4 / 5, ticket: TICKET_W / TICKET_H }
+const ROTULO: Record<Formato, string> = { poster: 'Pôster (vertical 4:5)', ticket: 'Ticket (vertical 25:28)' }
 
 /**
  * Editor PROFISSIONAL da capa do card do simulado — reusa o cropper da trilha (TrilhaFundoCropper) e os
@@ -89,7 +92,7 @@ export function CapaEditorPro({ value, onChange, cor, icone, prepararImagem }: {
       {crop && value.orig && (
         <TrilhaFundoCropper
           src={value.orig}
-          titulo={`Ajustar ${crop === 'poster' ? 'pôster (4:5)' : 'ticket (4:3)'}`}
+          titulo={`Ajustar ${crop === 'poster' ? 'pôster (4:5)' : 'ticket (25:28)'}`}
           aspectInicial={ASPECTO[crop]}
           aspectTravado={ASPECTO[crop]}
           cropInicial={(value[crop].crop as CapaRect | null) ?? null}
@@ -112,7 +115,7 @@ function FormatoSecao({ formato, cfg, orig, cor, icone, onAjustar, setCfg, setDe
   setDeg: (patch: Partial<TrilhaDegrade>) => void
 }) {
   const deg = cfg.degrade ?? DEFAULT_TRILHA_DEGRADE_IMAGEM
-  const aspectCls = formato === 'poster' ? 'aspect-[4/5]' : 'aspect-[4/3]'
+  const aspectCls = formato === 'poster' ? 'aspect-[4/5]' : 'aspect-[150/168]'
   return (
     <div className="space-y-3 rounded-xl border bg-muted/20 p-3">
       <p className="text-xs font-semibold">{ROTULO[formato]}</p>

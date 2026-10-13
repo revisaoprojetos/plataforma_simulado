@@ -427,11 +427,24 @@ function irParaLeitura(n){
   try{ if(window.parent && window.parent!==window){ window.parent.postMessage({ type:'juris-abrir-leitura', docId:docId, desafio:did }, '*'); return; } }catch(e){}
   try{ window.top.location.href=url; }catch(e){ window.location.href=url; }
 }
-// Configura a TELA DO DIA (attract) com as 2 opções: Leitura (1ª) + Desafio (COMEÇAR, travado até ler).
+// Dia tem LEITURA RÁPIDA? (versão enxuta do conteúdo; vem da API em LEITURA_RAPIDA_DOCS). Concluí-la
+// grava a MESMA conclusão da leitura do dia → também LIBERA o desafio (gate satisfeito).
+function docRapidaDoDia(n){ const m=(window.DESAFIO&&window.DESAFIO.LEITURA_RAPIDA_DOCS)||{}; return m[String(n)]||null; }
+// Abre a LEITURA RÁPIDA do dia (overlay no portal, igual à leitura do dia — só muda a rota/tipo).
+function irParaLeituraRapida(n){
+  const did=(window.DESAFIO&&window.DESAFIO.ID)||new URLSearchParams(location.search).get('desafio')||'';
+  const docId=docRapidaDoDia(n); if(!docId) return;
+  const url='/aluno/jurisprudencia/leitura-rapida/'+encodeURIComponent(docId)+'?desafio='+encodeURIComponent(did);
+  if(PREVIEW){ window.open(url, '_blank', 'noopener'); return; }
+  try{ if(window.parent && window.parent!==window){ window.parent.postMessage({ type:'juris-abrir-leitura-rapida', docId:docId, desafio:did }, '*'); return; } }catch(e){}
+  try{ window.top.location.href=url; }catch(e){ window.location.href=url; }
+}
+// Configura a TELA DO DIA (attract) com as opções: Leitura do dia + Leitura rápida (se houver) + COMEÇAR.
 function aplicarGateAtract(n){
-  const bLer=$('#btnLeitura'), bStart=$('#btnStart'), hint=$('#atHint');
+  const bLer=$('#btnLeitura'), bStart=$('#btnStart'), hint=$('#atHint'), rowRap=$('#rowRapida');
   const temLeitura=!!docDoDia(n), bloqueada=leituraBloqueada(n);
   if(bLer) bLer.hidden=!temLeitura;
+  if(rowRap) rowRap.hidden=!docRapidaDoDia(n); // a LINHA da rápida (embaixo) só aparece quando houver
   if(bStart){
     bStart.classList.toggle('lock', bloqueada);
     // Cadeado = o ícone de pixel art do próprio arcade (ICON.lock), não um emoji.
@@ -451,7 +464,7 @@ async function recarregarLeituras(){
   __recarregando=true;
   try{
     const r=await fetch('/api/jurisprudencia/progresso?desafio='+encodeURIComponent(did),{credentials:'same-origin',cache:'no-store'});
-    if(r.ok){ const p=await r.json(); if(window.DESAFIO){ window.DESAFIO.LEITURAS=(p&&p.leituras)||{}; window.DESAFIO.LEITURA_DOCS=(p&&p.leituraDocs)||{}; }
+    if(r.ok){ const p=await r.json(); if(window.DESAFIO){ window.DESAFIO.LEITURAS=(p&&p.leituras)||{}; window.DESAFIO.LEITURA_DOCS=(p&&p.leituraDocs)||{}; window.DESAFIO.LEITURA_RAPIDA_DOCS=(p&&p.leituraRapidaDocs)||{}; }
       if(G.mode==='attract'){ aplicarGateAtract(G.day); } }
   }catch(e){ /* mantém o estado atual */ }
   finally{ __recarregando=false; }
@@ -1327,6 +1340,7 @@ document.querySelector('.tabs').addEventListener('click',e=>{ const b=e.target.c
 $('#rChips').addEventListener('click',e=>{ const b=e.target.closest('.chip'); if(b){ RT.mat=b.dataset.mat; SFX.click(); renderRank(); } });
 $('#btnStart').onclick=startRun;
 $('#btnLeitura').onclick=()=>{ SFX.click(); irParaLeitura(G.day); };
+{ const bRap=$('#btnLeituraRapida'); if(bRap) bRap.onclick=()=>{ SFX.click(); irParaLeituraRapida(G.day); }; }
 // Ao VOLTAR da leitura (aba/foco/visibilidade ou restauração de bfcache), reatualiza o gate do dia.
 window.addEventListener('pageshow', recarregarLeituras);
 window.addEventListener('focus', recarregarLeituras);

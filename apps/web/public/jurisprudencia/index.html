@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,500;0,600;0,700;0,800;0,900;1,800;1,900&family=Press+Start+2P&family=VT323&display=swap">
-<link rel="stylesheet" href="css/estilos.css?v=20261012q">
+<link rel="stylesheet" href="css/estilos.css?v=20261013d">
 <!-- Produção: esconde as ferramentas de demonstração (o elemento fica no DOM p/ o jogo.js não quebrar). -->
 <style>.demo{display:none!important}</style>
 </head>
@@ -65,13 +65,13 @@
       <div><small>DESAFIO DE</small><b>JURISPRUDÊNCIA</b></div>
     </div>
     <nav class="actions">
-      <button class="btn-o" id="btnMap">VER MAPA DO LABIRINTO</button>
+      <button class="btn-o" id="btnMap" data-tour="juris-mapa">VER MAPA DO LABIRINTO</button>
       <button class="btn-o" id="btnRank">RANKING</button>
     </nav>
     <div class="rec">
-      <div class="snd-wrap">
+      <div class="snd-wrap" data-tour="juris-som">
         <button class="snd" id="btnSound" aria-pressed="true" title="Ligar/desligar som (M)">♪ SOM</button>
-        <button class="snd" id="btnAnim" aria-pressed="true" title="Reduzir animações ao redor da tela (modo mais estático)">⚡ ANIM</button>
+        <button class="snd" id="btnAnim" aria-pressed="true" title="Reduzir animações ao redor da tela (modo mais estático)">⚡ ANIMAÇÃO</button>
         <span class="vol-grp" title="Volume dos efeitos sonoros"><b class="vol-lb">EFX</b><input type="range" class="vol" id="volSfx" min="0" max="100" value="100" aria-label="Volume dos efeitos"></span>
         <span class="vol-grp" title="Volume da música de fundo"><b class="vol-lb">MÚS</b><input type="range" class="vol" id="volMus" min="0" max="100" value="50" aria-label="Volume da música"></span>
       </div>
@@ -83,8 +83,8 @@
 
   <main class="layout">
     <aside class="col-left"><div class="col-left-in">
-      <section class="panel p1" id="p1" aria-label="Seu placar"></section>
-      <section class="panel teses-panel">
+      <section class="panel p1" id="p1" aria-label="Seu placar" data-tour="juris-placar"></section>
+      <section class="panel teses-panel" data-tour="juris-teses">
         <h2 class="ptitle"><span class="pt-ico">★</span> TESES DO DIA <span class="pt-count" id="tesesCount">0/4</span></h2>
         <div id="tesesList" class="teses-mini"></div>
         <button class="btn-o teses-expand" id="btnTesesExpand" type="button">EXPANDIR ▾</button>
@@ -112,6 +112,9 @@
             <div class="row">
               <button class="btn-w ler" id="btnLeitura" hidden>LEITURA DO DIA</button>
               <button class="btn-w" id="btnStart">COMEÇAR</button>
+            </div>
+            <div class="row" id="rowRapida" hidden>
+              <button class="btn-w ler-rapida" id="btnLeituraRapida">LEITURA RÁPIDA</button>
             </div>
             <span class="hint" id="atHint">PRESSIONE ENTER</span>
           </div>
@@ -146,7 +149,7 @@
       <div class="stand"></div>
       <div class="tv-base"></div>
       <button class="theater-exit" id="btnExitTheater">✕ SAIR DA TELA CHEIA <kbd>ESC</kbd></button>
-      <div class="controls" aria-label="Controles">
+      <div class="controls" aria-label="Controles" data-tour="juris-teclas">
         <div class="cg"><span class="kk"><kbd>←</kbd><kbd>↑</kbd><kbd>↓</kbd><kbd>→</kbd></span><small>MOVER · WASD</small></div>
         <div class="cg"><kbd>ENTER</kbd><small>COMEÇAR</small></div>
         <div class="cg"><span class="kk"><kbd>A</kbd><kbd>B</kbd><kbd>C</kbd></span><small>RESPONDER</small></div>
@@ -154,7 +157,7 @@
         <div class="cg"><kbd>M</kbd><small>SOM</small></div>
         <div class="cg"><kbd>F</kbd><small>TELA CHEIA</small></div>
       </div>
-      <div class="dpad" id="dpad">
+      <div class="dpad" id="dpad" data-tour="juris-teclas">
         <span></span><button data-d="up" aria-label="Cima">▲</button><span></span>
         <button data-d="left" aria-label="Esquerda">◀</button><button class="c" id="dpadStart" aria-label="Começar ou pausar">START</button><button data-d="right" aria-label="Direita">▶</button>
         <span></span><button data-d="down" aria-label="Baixo">▼</button><span></span>
@@ -163,7 +166,7 @@
 
     <aside class="col-right">
       <div class="panel tabs-panel">
-        <div class="ptabs" role="tablist" aria-label="Painel do desafio">
+        <div class="ptabs" role="tablist" aria-label="Painel do desafio" data-tour="juris-paineis">
           <button class="ptab" role="tab" data-pt="fases" aria-selected="true"><span class="key">1</span>AULAS</button>
           <button class="ptab" role="tab" data-pt="selos" aria-selected="false"><span class="key">2</span>SELOS</button>
           <button class="ptab" role="tab" data-pt="rank" aria-selected="false"><span class="key">3</span>RANKING</button>
@@ -186,7 +189,7 @@
             <div id="trapsList"></div>
           </div>
           <!-- SELECT STAGE movido para a coluna lateral (aba AULAS) — otimiza a área, sem rolagem na página. -->
-          <div class="pane pane-fases" data-pane="fases" role="tabpanel">
+          <div class="pane pane-fases" data-pane="fases" role="tabpanel" data-tour="juris-aulas">
             <div class="pane-head"><span>SELECIONAR AULA</span><span class="px" id="stHintMini">15 AULAS</span></div>
             <div class="st-preview" id="stPreview" aria-live="polite"></div>
             <div class="st-railwrap">
@@ -282,6 +285,6 @@
 
 <div class="toast" id="toast" hidden></div>
 
-<script src="js/bootstrap.js?v=20261012q"></script>
+<script src="js/bootstrap.js?v=20261013d"></script>
 </body>
 </html>

@@ -13,7 +13,7 @@ import { type Documento } from '../actions'
 
 export const dynamic = 'force-dynamic'
 
-const ABAS = ['conteudo', 'config', 'questoes'] as const
+const ABAS = ['conteudo', 'config', 'questoes', 'leitura-rapida'] as const
 
 export default async function LeituraEditorPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tab?: string; voltar?: string }> }) {
   const { id } = await params
@@ -69,6 +69,7 @@ export default async function LeituraEditorPage({ params, searchParams }: { para
         grifoCoresInicial={grifoCores}
         blocosInicial={resolverBlocos(d.quiz_config?.blocos)}
         topicosInicial={resolverTopicos(d.quiz_config?.topicos)}
+        leituraRapidaInicial={typeof d.quiz_config?.leitura_rapida === 'string' ? d.quiz_config.leitura_rapida : ''}
       />
       {/* Ao abrir o LegProc, aquece as áreas irmãs (Questões do conteúdo · Alterações) em 2º plano. */}
       <PrefetchRotas rotas={[`/admin/leitura/${id}/questoes`, `/admin/leitura/${id}/alteracoes`]} />

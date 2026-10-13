@@ -196,6 +196,7 @@ export interface DocumentoCarregado {
   grifoCores: GrifoCores           // cores dos grifos definidas pelo ADMIN (quiz_config.grifoCores)
   blocos: BlocoDef[]               // blocos de destaque configuráveis (quiz_config.blocos); prévia é por bloco
   topicos: TopicosConfig           // "Temas do dia": ajuste do admin por tópico (quiz_config.topicos)
+  leituraRapida: string            // HTML da "Leitura rápida" (quiz_config.leitura_rapida); '' se não houver
 }
 
 export interface GrifoLei { id: string; inicio: number; fim: number; exact: string; prefix: string; suffix: string; tipo: string; nota: string | null }
@@ -394,6 +395,7 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
     grifoCores: resolverGrifoCores((doc as any).quiz_config?.grifoCores),
     blocos: resolverBlocos((doc as any).quiz_config?.blocos),
     topicos: resolverTopicos((doc as any).quiz_config?.topicos),
+    leituraRapida: typeof (doc as any).quiz_config?.leitura_rapida === 'string' ? (doc as any).quiz_config.leitura_rapida : '',
   }
 }
 

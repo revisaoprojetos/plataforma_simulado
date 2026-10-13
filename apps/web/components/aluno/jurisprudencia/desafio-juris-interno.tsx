@@ -19,15 +19,36 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import {
   Gamepad2, Trophy, BookOpen, BarChart3, ChevronLeft, Loader2, Heart, Timer, Coins, Medal, Flame, Target, Scale,
-  Zap, Check, List, TrendingUp, Flag, Lock, Crown, FileText,
+  Zap, Check, List, TrendingUp, Flag, Lock, Crown, FileText, HelpCircle,
 } from 'lucide-react'
 import { useTemaInterno } from '@/components/brand/interna/use-tema-interno'
 import type { InternaTheme } from '@/components/brand/interna/interna-tokens'
+import { iniciarTourGuia } from '@/components/aluno/guia-tour-runner'
 
 const GOLD = '#F1C232'
 const fmt = (n: number) => (Number(n) || 0).toLocaleString('pt-BR')
 
 type Tab = 'desafio' | 'reg' | 'des' | 'rank'
+// Alvos do tour da Capi (ver TOURS_ALUNO.jurisprudencia). O arcade usa 'juris-desafio' (área grande);
+// as abas Regulamento/Desempenho/Ranking recebem o próprio alvo nos botões.
+const TOUR_ATTR: Partial<Record<Tab, string>> = { reg: 'juris-reg', des: 'juris-des', rank: 'juris-rank' }
+/** Botão de Ajuda do desafio: reinicia o tour guiado da Capi (também alvo do último passo). `onStart`
+ *  garante a aba Desafio ativa antes (os blocos do arcade ficam ocultos nas outras abas). */
+function AjudaTourBtn({ style, onStart }: { style?: React.CSSProperties; onStart?: () => void }) {
+  return (
+    <button
+      type="button" data-tour="juris-ajuda" onClick={() => { onStart?.(); iniciarTourGuia('jurisprudencia') }}
+      title="Rever o tour do desafio com a Capi" aria-label="Ajuda — rever o tour do desafio"
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 11px', borderRadius: 99,
+        background: 'rgba(255,255,255,.14)', color: '#fff', border: '1px solid rgba(255,255,255,.22)',
+        fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', ...style,
+      }}
+    >
+      <HelpCircle size={14} /> Ajuda
+    </button>
+  )
+}
 type Pontos = { ponto?: number; tese?: number; vadeMecum?: number; vida?: number; armadilha?: number; labirintoLimpo?: number }
 type Config = { vidas?: number; tempoResposta?: number; pontos?: Pontos } | null
 type DiaInfo = { chave: string; titulo: string }
@@ -50,6 +71,19 @@ export interface DesafioJurisInternoProps {
 export function DesafioJurisInterno({ desafioId, titulo, theme, totalDias, materiasCount, config, bannerUrl, compacto, corFundo, dias }: DesafioJurisInternoProps) {
   useTemaInterno(theme) // reage ao toggle claro/escuro/azul ao vivo
   const [tab, setTab] = useState<Tab>('desafio')
+
+  // Tour da Capi na PRIMEIRA vez que o aluno entra num desafio (apresenta o jogo e as abas). Depois,
+  // é só o botão "Ajuda" no cabeçalho para refazer. Flag global por aluno (não repete a cada desafio).
+  useEffect(() => {
+    let t: ReturnType<typeof setTimeout> | undefined
+    try {
+      if (localStorage.getItem('juris:tour-visto') !== '1') {
+        localStorage.setItem('juris:tour-visto', '1')
+        t = setTimeout(() => iniciarTourGuia('jurisprudencia'), 950) // deixa o cabeçalho/arena montarem
+      }
+    } catch { /* sem storage → sem auto-tour */ }
+    return () => { if (t) clearTimeout(t) }
+  }, [])
 
   // FAIXA BRANCA em volta da down bar: o scroll do portal (.shr-main) tem fundo CLARO no interno e aparecia
   // atrás/abaixo do arcade. Na aba DESAFIO pintamos SÓ o fundo do .shr-main com o MESMO fundo do desafio
@@ -81,9 +115,12 @@ export function DesafioJurisInterno({ desafioId, titulo, theme, totalDias, mater
   useEffect(() => {
     function onMsg(e: MessageEvent) {
       const d = e.data as { type?: string; docId?: string; desafio?: string }
-      if (d && d.type === 'juris-abrir-leitura' && d.docId) {
+      if (d && (d.type === 'juris-abrir-leitura' || d.type === 'juris-abrir-leitura-rapida') && d.docId) {
+        const base = d.type === 'juris-abrir-leitura-rapida' ? 'leitura-rapida' : 'leitura'
+        // Leitor NOVO (redesign) na leitura do dia (v2=1); a leitura rápida segue como está.
+        const extra = base === 'leitura' ? '&v2=1' : ''
         setLeituraLoad(true)
-        setLeitura(`/aluno/jurisprudencia/leitura/${encodeURIComponent(d.docId)}?desafio=${encodeURIComponent(d.desafio || desafioId)}&embed=1`)
+        setLeitura(`/aluno/jurisprudencia/${base}/${encodeURIComponent(d.docId)}?desafio=${encodeURIComponent(d.desafio || desafioId)}&embed=1${extra}`)
       }
     }
     window.addEventListener('message', onMsg)
@@ -115,7 +152,7 @@ export function DesafioJurisInterno({ desafioId, titulo, theme, totalDias, mater
 
       {/* ARCADE: SEMPRE montado — nunca recarrega (nem ao trocar de aba, nem ao abrir a leitura), então
           nada de painéis vazios, perda de progresso ou flash da abertura ao voltar. */}
-      <div style={{ display: tab === 'desafio' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0, background: '#05060f' }}>
+      <div data-tour="juris-desafio" style={{ display: tab === 'desafio' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0, background: '#05060f' }}>
         <iframe
           ref={arcadeRef}
           src={`/jurisprudencia/index.html?desafio=${encodeURIComponent(desafioId)}`}
@@ -207,6 +244,7 @@ function HeaderHero({
     return (
       <button
         key={t.k} type="button" role="tab" aria-selected={ativo} onClick={() => setTab(t.k)} className="ji-tab"
+        data-tour={TOUR_ATTR[t.k]}
         style={{
           position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 7, height: h, padding: '0 4px',
           border: 0, background: 'none', font: 'inherit', fontSize: 14, fontWeight: 700,
@@ -236,10 +274,11 @@ function HeaderHero({
               <ChevronLeft size={15} />
             </Link>
             <span style={{ display: 'inline-flex', color: '#CFC4FF' }}><Scale size={16} /></span>
-            <b style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.02em', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{titulo}</b>
+            <b style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.02em', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{titulo}</b>
             <span className="ji-hero-chip" style={{ height: 22, padding: '0 9px', borderRadius: 99, background: GOLD, color: '#2A1A55', fontSize: 11.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
               {totalDias} {totalDias === 1 ? 'fase' : 'fases'}{materiasCount ? ` · ${materiasCount} ${materiasCount === 1 ? 'matéria' : 'matérias'}` : ''}
             </span>
+            <AjudaTourBtn style={{ marginLeft: 'auto', flexShrink: 0 }} onStart={() => setTab('desafio')} />
           </div>
           {/* Linha 2 — abas, logo abaixo do título (sem linha divisória). */}
           <div role="tablist" style={{ display: 'flex', gap: 24, overflowX: 'auto' }}>{abaBtns(42)}</div>
@@ -272,6 +311,9 @@ function HeaderHero({
         </div>
       </div>
 
+      {/* Ajuda (rever o tour) — topo-direito */}
+      <AjudaTourBtn style={{ position: 'absolute', right: 28, top: 22 }} onStart={() => setTab('desafio')} />
+
       {/* Abas sublinhadas */}
       <div style={{ position: 'absolute', left: 28, right: 28, bottom: 0, borderTop: banner ? 'none' : '1px solid rgba(255,255,255,.1)' }}>
         <div role="tablist" style={{ display: 'flex', gap: 26, overflowX: 'auto' }}>
@@ -280,6 +322,7 @@ function HeaderHero({
             return (
               <button
                 key={t.k} type="button" role="tab" aria-selected={ativo} onClick={() => setTab(t.k)} className="ji-tab"
+                data-tour={TOUR_ATTR[t.k]}
                 style={{
                   position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 7, height: 44, padding: '0 4px',
                   border: 0, background: 'none', font: 'inherit', fontSize: 14, fontWeight: 700,

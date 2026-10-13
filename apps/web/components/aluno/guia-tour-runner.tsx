@@ -67,27 +67,55 @@ export function GuiaTourRunner({ gamAtivo = false }: { gamAtivo?: boolean }) {
 
   // Entra num passo: pula gamOnly, navega se preciso, senão acha o alvo + mede (com retries).
   useEffect(() => {
-    if (!passo || saindo || !est) { setRect(null); return }
+    // Durante a saída (fechar/Pular/Entendi) NÃO mexe no rect: zerá-lo faria `centrado` virar true e o
+    // card pular do rodapé para o modo central (Capi grande no meio) no meio da animação de saída.
+    if (saindo) return
+    if (!passo || !est) { setRect(null); return }
     if (passo.gamOnly && !gamAtivo) { const n = valido(est.i + 1, 1); n === -1 ? fechar() : salvar(n); return }
     const rotaPath = passo.rota?.split('?')[0]
     if (rotaPath && rotaPath !== pathname) { router.push(passo.rota!); return }
     if (!passo.alvo) { setRect(null); return }
 
     let cancel = false, tent = 0
-    const medir = (el: HTMLElement) => {
+    // Resolve o alvo no documento principal OU dentro de um iframe same-origin (ex.: o arcade do Desafio
+    // de Jurisprudência, cujos blocos — MAPA, SOM, teclas, teses, abas, próximas aulas — ficam no iframe).
+    // Retorna o 1º elemento VISÍVEL + o deslocamento (posição do iframe no viewport do pai) para o
+    // spotlight cair no lugar certo. Com data-tour duplicado (ex.: teclas no .controls E no .dpad), pega
+    // o que está visível no viewport atual (desktop → legenda; mobile → d-pad).
+    const vis = (el: HTMLElement) => { const r = el.getBoundingClientRect(); return r.width > 1 && r.height > 1 }
+    const pick = (root: Document | HTMLElement, ox: number, oy: number) => {
+      for (const el of Array.from(root.querySelectorAll<HTMLElement>(`[data-tour="${passo.alvo}"]`))) if (vis(el)) return { el, ox, oy }
+      return null
+    }
+    const acharAlvo = (): { el: HTMLElement; ox: number; oy: number } | null => {
+      const main = pick(document, 0, 0)
+      if (main) return main
+      for (const ifr of Array.from(document.querySelectorAll('iframe'))) {
+        try {
+          const doc = ifr.contentDocument
+          if (!doc) continue
+          const r = ifr.getBoundingClientRect()
+          const hit = pick(doc, r.left, r.top)
+          if (hit) return hit
+        } catch { /* cross-origin → ignora */ }
+      }
+      return null
+    }
+    const medir = (el: HTMLElement, ox: number, oy: number) => {
       const r = el.getBoundingClientRect()
-      if (passo.topo) { const h = Math.min(r.height, Math.round(window.innerHeight * 0.5)); setRect(new DOMRect(r.left, Math.max(8, r.top), r.width, h)) }
-      else setRect(r)
+      const left = r.left + ox, top = r.top + oy
+      if (passo.topo) { const h = Math.min(r.height, Math.round(window.innerHeight * 0.5)); setRect(new DOMRect(left, Math.max(8, top), r.width, h)) }
+      else setRect(new DOMRect(left, top, r.width, r.height))
     }
     const buscar = () => {
       if (cancel) return
-      const el = document.querySelector(`[data-tour="${passo.alvo}"]`) as HTMLElement | null
-      if (el) { el.scrollIntoView({ behavior: 'smooth', block: passo.topo ? 'start' : 'center' }); setTimeout(() => !cancel && medir(el), 360); return }
+      const hit = acharAlvo()
+      if (hit) { hit.el.scrollIntoView({ behavior: 'smooth', block: passo.topo ? 'start' : 'center' }); setTimeout(() => !cancel && medir(hit.el, hit.ox, hit.oy), 360); return }
       if (tent++ < 15) setTimeout(buscar, 200)
-      else setRect(null) // alvo ausente (ex.: gam off) → cai no card central
+      else setRect(null) // alvo ausente (ex.: oculto/gam off) → cai no card central
     }
     buscar()
-    const onMove = () => { const el = document.querySelector(`[data-tour="${passo.alvo}"]`) as HTMLElement | null; if (el && !cancel) medir(el) }
+    const onMove = () => { const hit = acharAlvo(); if (hit && !cancel) medir(hit.el, hit.ox, hit.oy) }
     window.addEventListener('resize', onMove); window.addEventListener('scroll', onMove, true)
     return () => { cancel = true; window.removeEventListener('resize', onMove); window.removeEventListener('scroll', onMove, true) }
   }, [passo, pathname, saindo, est, gamAtivo, valido, fechar, router])
@@ -108,6 +136,9 @@ export function GuiaTourRunner({ gamAtivo = false }: { gamAtivo?: boolean }) {
   const proximo = () => (ehUltimo ? fechar() : salvar(idxProx))
   const anterior = () => idxAnt !== -1 && salvar(idxAnt)
   const centrado = !passo.alvo || !rect
+  // O card (rodapé por padrão) COBRIA o alvo quando ele ficava embaixo (ex.: as teclas/controles na base
+  // do gabinete). Flipa para o TOPO quando o centro do alvo está na metade de baixo da tela.
+  const cardNoTopo = !centrado && !!rect && (rect.top + rect.height / 2) > window.innerHeight * 0.5
 
   // Progresso considerando só os passos visíveis (sem os gamOnly ocultos).
   const visiveis = passos!.map((p, k) => k).filter((k) => !(passos![k].gamOnly && !gamAtivo))
@@ -115,10 +146,21 @@ export function GuiaTourRunner({ gamAtivo = false }: { gamAtivo?: boolean }) {
 
   const controles = (
     <div className="mt-3 flex items-center justify-between gap-3">
-      <div className="flex items-center gap-1">
-        {visiveis.map((k, n) => <span key={k} className={cn('h-1.5 rounded-full transition-all', n === posAtual ? 'w-4 bg-primary' : 'w-1.5 bg-muted-foreground/30')} />)}
+      {/* Progresso: bolinhas em tours curtos; barra compacta + "n/total" em tours longos (ex.: o do
+          Desafio de Jurisprudência tem 13 passos → 13 bolinhas estouravam o card e empurravam os botões). */}
+      <div className="flex min-w-0 flex-1 items-center gap-1.5">
+        {visiveis.length <= 8 ? (
+          visiveis.map((k, n) => <span key={k} className={cn('h-1.5 rounded-full transition-all', n === posAtual ? 'w-4 bg-primary' : 'w-1.5 bg-muted-foreground/30')} />)
+        ) : (
+          <>
+            <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-muted-foreground/20">
+              <span className="block h-full rounded-full bg-primary transition-all" style={{ width: `${Math.round(((posAtual + 1) / visiveis.length) * 100)}%` }} />
+            </span>
+            <span className="shrink-0 text-[11px] font-medium tabular-nums text-muted-foreground">{posAtual + 1}/{visiveis.length}</span>
+          </>
+        )}
       </div>
-      <div className="flex items-center gap-1.5">
+      <div className="flex shrink-0 items-center gap-1.5">
         <button type="button" onClick={fechar} className="px-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">Pular</button>
         {idxAnt !== -1 && (
           <button type="button" onClick={anterior} aria-label="Anterior" className="rounded-lg border p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><ArrowLeft className="h-4 w-4" /></button>
@@ -150,10 +192,12 @@ export function GuiaTourRunner({ gamAtivo = false }: { gamAtivo?: boolean }) {
           </div>
         </div>
       ) : (
-        // Etapa com alvo: Capi + card no rodapé.
-        <div className={cn('absolute inset-x-0 bottom-5 z-[1] flex justify-center px-4', saindo ? 'motion-safe:animate-[tour-out_.38s_ease-in_both]' : 'motion-safe:animate-[tour-in_.4s_cubic-bezier(.34,1.56,.64,1)_both]')}>
-          <div className="flex w-full max-w-md items-end gap-2">
-            <Mascote key={`m${est.i}`} reacao={passo.pose} tamanho={92} entra flutua className="shrink-0" />
+        // Etapa com alvo: Capi + card no rodapé (ou no topo, quando o alvo fica embaixo — não o cobre).
+        // No MOBILE (≤640px) o shell mostra a top-bar (~64px) e a down-bar (~78px); por isso o card ganha
+        // folga maior (top-20/bottom-24) p/ não ficar atrás das barras — inclusive dentro da Curseduca.
+        <div className={cn('absolute inset-x-0 z-[1] flex justify-center px-4', cardNoTopo ? 'top-20 sm:top-5' : 'bottom-24 sm:bottom-5', saindo ? 'motion-safe:animate-[tour-out_.38s_ease-in_both]' : 'motion-safe:animate-[tour-in_.4s_cubic-bezier(.34,1.56,.64,1)_both]')}>
+          <div className={cn('flex w-full max-w-md gap-2', cardNoTopo ? 'items-start' : 'items-end')}>
+            <Mascote key={`m${est.i}`} reacao={passo.pose} tamanho={92} entra flutua className="shrink-0 [&_img]:!h-[68px] sm:[&_img]:!h-[92px]" />
             <div className="min-w-0 flex-1 rounded-2xl border bg-card p-4 shadow-2xl">
               <div className="text-sm font-bold text-primary">{passo.titulo}</div>
               <p className="mt-1 min-h-[2.5rem] text-sm leading-snug text-foreground"><Maquina key={est.i} texto={passo.texto} /></p>
