@@ -7,6 +7,8 @@ import { onLeituraConcluida, onQuizConcluido } from '@/lib/gamificacao'
 import { invalidarRankingPorDocumento } from '@/lib/leitura/ranking'
 import { avaliarMedalhasPorDocumento } from '@/lib/leitura/carimbos'
 import { diaBRT } from '@/lib/jurisprudencia/sequencia'
+import { creditarTesesLeituraRapida } from '@/lib/jurisprudencia/conteudo'
+import { invalidarRankingJuris } from '@/lib/jurisprudencia/ranking'
 import type { RespostaRapida } from '@/lib/leitura/leitura-rapida'
 
 // "Leitura rápida" — progresso PERSISTIDO do caminho alternativo (leitura + questões num HTML isolado).
@@ -111,6 +113,12 @@ export async function POST(request: NextRequest) {
             [{ tenant_id: sessao.tenantId, estudante_id: sessao.estudanteId, origem: 'jurisprudencia', ref_id: `${b.desafio}:${hoje}`, xp: 0, meta: { dia: hoje, desafio: b.desafio } }],
             { onConflict: 'tenant_id,estudante_id,origem,ref_id', ignoreDuplicates: true },
           ).then(() => {}, () => {})
+          // PLACAR do arcade: credita SÓ os pontos das teses/perguntas do dia (sem as bolinhas do
+          // labirinto) — ex.: 10×100 = 1000. Quem jogar o labirinto depois pode superar (best = max).
+          const desafioRapida = b.desafio
+          void creditarTesesLeituraRapida(svc, { tenantId: sessao.tenantId, estudanteId: sessao.estudanteId, desafioId: desafioRapida, documentoId })
+            .then(() => invalidarRankingJuris(sessao.tenantId, desafioRapida))
+            .catch(() => {})
         }
       }
     }

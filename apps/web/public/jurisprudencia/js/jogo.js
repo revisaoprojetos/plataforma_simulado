@@ -441,15 +441,17 @@ function irParaLeituraRapida(n){
 }
 // Configura a TELA DO DIA (attract) com as opções: Leitura do dia + Leitura rápida (se houver) + COMEÇAR.
 function aplicarGateAtract(n){
-  const bLer=$('#btnLeitura'), bStart=$('#btnStart'), hint=$('#atHint'), rowRap=$('#rowRapida');
+  const bLer=$('#btnLeitura'), bStart=$('#btnStart'), hint=$('#atHint'), bRap=$('#btnLeituraRapida');
   const temLeitura=!!docDoDia(n), bloqueada=leituraBloqueada(n);
   if(bLer) bLer.hidden=!temLeitura;
-  if(rowRap) rowRap.hidden=!docRapidaDoDia(n); // a LINHA da rápida (embaixo) só aparece quando houver
+  const temRapida=!!docRapidaDoDia(n);
+  if(bRap) bRap.hidden=!temRapida;                 // botão QUESTÕES só aparece quando houver leitura rápida
+  if(bStart) bStart.classList.toggle('solo', !temRapida); // sem Questões → JOGAR ocupa a linha inteira
   if(bStart){
     bStart.classList.toggle('lock', bloqueada);
     // Cadeado = o ícone de pixel art do próprio arcade (ICON.lock), não um emoji.
     const lockIco = pxSvg('lock','currentColor').replace('<svg ', '<svg width="15" height="15" style="vertical-align:-.15em;margin-right:.4em" ');
-    bStart.innerHTML = bloqueada ? lockIco+'CONCLUA A LEITURA' : 'COMEÇAR';
+    bStart.innerHTML = bloqueada ? lockIco+'CONCLUA A LEITURA' : 'JOGAR';
   }
   if(hint) hint.textContent = bloqueada ? 'FAÇA A LEITURA DO DIA PARA LIBERAR' : 'PRESSIONE ENTER';
 }
@@ -553,6 +555,19 @@ function setMode(m){
   document.querySelectorAll('#leds i').forEach((l,i)=>l.classList.toggle('on', m==='play' ? true : i===0));
   // Botão PAUSA mostra ▶ (play) quando o jogo está pausado; senão as 2 barrinhas de pause.
   const cp=$('#capPause'); if(cp) cp.innerHTML = (m==='paused') ? IC_PLAY : IC_PAUSE;
+  // Botão "sair do desafio" (X): aparece DENTRO da partida; some na tela do dia (attract) e no resultado
+  // (clear), que já têm seus próprios botões (Leitura/Começar · Jogar de novo/Próximo).
+  const se=$('#btnSair'); if(se) se.hidden = (m==='attract' || m==='clear');
+}
+// Sai da partida/overlays e volta à TELA DO DIA (attract) do dia atual, PRESERVANDO o progresso: as teses
+// já dominadas ficam salvas (dom é gravado por tese) e `best_save` guarda o melhor score da partida. Usado
+// pelo "X" (desktop, no HUD) e pelo "EXIT" (mobile, à esquerda do ▲ no d-pad).
+function sairParaDia(){
+  if(G.mode==='attract') return;                              // já está na tela do dia
+  if(!$('#qModal').hidden){ $('#qModal').hidden=true; Q=null; } // abandona a questão aberta (sem pontuar)
+  if(['play','ready','paused','dying','question'].includes(G.mode)) G.best_save(); // preserva o score da partida
+  SFX.click();
+  loadDay(G.day);                                             // reseta o tabuleiro e mostra a tela do dia
 }
 function startRun(){
   SFX.init(); if(G.mode!=='attract') return;
@@ -1425,8 +1440,14 @@ addEventListener('keydown',e=>{
 });
 // d-pad e toques
 $('#dpad').addEventListener('pointerdown',e=>{ const b=e.target.closest('button'); if(!b) return; e.preventDefault(); SFX.init();
+  if(b.dataset.exit){ sairParaDia(); return; }  // EXIT (mobile): sai do desafio → tela do dia
   if(b.dataset.d){ if(G.mode==='attract') startRun(); setWant(b.dataset.d); }
   else { if(G.mode==='attract') startRun(); else if(G.mode==='gameover') continueRun(); else if(G.mode==='play') pause(true); else if(G.mode==='paused') pause(false); } });
+// Botão "X" (desktop): sai do desafio e volta à tela do dia.
+$('#btnSair') && ($('#btnSair').onclick=()=>sairParaDia());
+// Overlay de PAUSA: "Continuar" (retoma) e "Voltar ao dia" (sai do desafio → tela do dia c/ Leitura/Começar).
+$('#btnResume') && ($('#btnResume').onclick=()=>{ SFX.click(); pause(false); });
+$('#btnPauseSair') && ($('#btnPauseSair').onclick=()=>sairParaDia());
 let tStart=null;
 canvas.addEventListener('touchstart',e=>{ const t=e.touches[0]; tStart=[t.clientX,t.clientY]; },{passive:true});
 canvas.addEventListener('touchend',e=>{ if(!tStart) return; const t=e.changedTouches[0], dx=t.clientX-tStart[0], dy=t.clientY-tStart[1]; tStart=null;

@@ -515,6 +515,23 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:0}
 .seltool .tbtn svg{width:15px;height:15px}
 .seltool .tbtn.del:hover{color:var(--bad)}
 .seltool [data-g][hidden]{display:none}
+/* MOBILE/touch: a barra tem ~17 botões numa linha só (~510px) e estourava a largura do celular — os
+   botões da direita ficavam fora da tela e impossíveis de tocar. No ponteiro grosso ela QUEBRA em linhas,
+   cabe na viewport e os alvos ficam ≥40px (fáceis de acertar com o dedo). */
+@media (pointer:coarse){
+  .seltool{flex-wrap:wrap;justify-content:center;max-width:calc(100vw - 20px);gap:4px;padding:6px;row-gap:4px}
+  .seltool .vs{display:none}                 /* separadores só gastam largura ao quebrar linha */
+  .seltool .tl{width:42px;height:42px}
+  .seltool .tl svg{width:20px;height:20px}
+  .seltool .tbtn{height:42px;padding:0 13px;font-size:14px}
+  .seltool .tbtn svg{width:18px;height:18px}
+  .seltool .cd{width:38px;height:38px}
+  .seltool .cd i{width:20px;height:20px}
+  /* Seleção no TOUCH: garante que o texto é selecionável (handles nativos aparecem) e SUPRIME o menu
+     nativo (callout) do iOS/Android, que competia com a nossa barra e deixava a experiência confusa
+     ("parecia que não era texto"). A nossa barra passa a ser a ÚNICA ao marcar. */
+  .flow,.tese,.doc-head,.sec-head h2{-webkit-user-select:text;user-select:text;-webkit-touch-callout:none}
+}
 
 .pop{position:fixed;z-index:70;width:min(400px,calc(100vw - 32px));background:var(--raise);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow-2);display:none;overflow:hidden}
 .pop.show{display:block}
@@ -1552,6 +1569,12 @@ $('#anClear').onclick=()=>{const n=S.an.filter(a=>a.sec===S.cur).length;if(!n)re
 
 /* Seleção */
 const tool=$('#seltool');let pendingSel=null,activeAn=null;
+// Acionar ferramenta = SELECIONA o texto → CLICA no botão (mobile e PC). O trecho é CAPTURADO em
+// `pendingSel` quando a barra aparece (onSelectEnd), então o apply funciona MESMO que a seleção colapse ao
+// clicar. DESKTOP: preventDefault no mousedown preserva a seleção visível ao clicar (fica mais claro) e o
+// click dispara normal. TOUCH: NÃO interceptamos o toque (senão poderia engolir o click do botão em alguns
+// navegadores) — confiamos no pendingSel capturado + click normal. Assim a ferramenta aciona de 1ª nos dois.
+tool.addEventListener('mousedown',e=>{if(!matchMedia('(pointer:coarse)').matches)e.preventDefault()});
 function selInfo(){const sel=getSelection();if(!sel.rangeCount||sel.isCollapsed)return null;const r=sel.getRangeAt(0);
   const sc=r.startContainer.nodeType===1?r.startContainer:r.startContainer.parentElement;const b=sc&&sc.closest('[data-pid]');if(!b||!article.contains(b))return null;
   let end=r.endContainer,endOff=r.endOffset;if(!b.contains(end)){end=b;endOff=b.childNodes.length}
@@ -1562,7 +1585,7 @@ function selInfo(){const sel=getSelection();if(!sel.rangeCount||sel.isCollapsed)
 let lastReaderSel=null;
 function showTool(rect,existing){tool.classList.add('show');$('[data-a="del"]',tool).hidden=!existing;$$('[data-g="tools"]',tool).forEach(g=>g.hidden=!!existing);
   $$('.cd',tool).forEach(d=>d.classList.toggle('on',existing?activeAn&&activeAn.c===d.dataset.c:false));
-  const w=tool.offsetWidth,h=tool.offsetHeight;const x=Math.max(10,Math.min(innerWidth-w-10,rect.left+rect.width/2-w/2));let y=rect.top-h-10;if(y<64)y=rect.bottom+10;tool.style.left=x+'px';tool.style.top=y+'px'}
+  const w=tool.offsetWidth,h=tool.offsetHeight;const x=Math.max(10,Math.min(innerWidth-w-10,rect.left+rect.width/2-w/2));let y=rect.top-h-10;if(y<64)y=rect.bottom+10;y=Math.max(64,Math.min(y,innerHeight-h-10));tool.style.left=x+'px';tool.style.top=y+'px'}
 function hideTool(){tool.classList.remove('show');pendingSel=null;activeAn=null}
 function onSelectEnd(){const i=selInfo();if(!i){if(!activeAn)hideTool();return}
   lastReaderSel=i;const t=S.set.tool;
@@ -1572,12 +1595,17 @@ function onSelectEnd(){const i=selInfo();if(!i){if(!activeAn)hideTool();return}
 document.addEventListener('mouseup',e=>{if(e.target.closest&&e.target.closest('#seltool,.pop,#mirror,#anbar'))return;setTimeout(onSelectEnd,10)});
 document.addEventListener('keyup',e=>{if(e.shiftKey&&!(e.target.closest&&e.target.closest('[contenteditable]')))setTimeout(onSelectEnd,10)});
 document.addEventListener('selectionchange',()=>{if(matchMedia('(pointer:coarse)').matches){clearTimeout(window._st);window._st=setTimeout(onSelectEnd,400)}});
+// TOUCH: ao LEVANTAR o dedo com um trecho já selecionado, mostra a barra NA HORA (sem esperar o debounce
+// de 400ms da seleção) — resolve a sensação de "não acionou". Tap simples (seleção vazia) é inofensivo.
+document.addEventListener('pointerup',e=>{if(!matchMedia('(pointer:coarse)').matches)return;if(e.target.closest&&e.target.closest('#seltool,.pop,#mirror,#anbar'))return;clearTimeout(window._st);window._st=setTimeout(onSelectEnd,120)});
 scroller.addEventListener('scroll',()=>{if(tool.classList.contains('show'))hideTool();if(pop.dataset.kind!=='note')closePop()},{passive:true});
 article.addEventListener('click',e=>{const m=e.target.closest('mark.an');if(!m||!getSelection().isCollapsed||doc.classList.contains('hide-mine'))return;
   const a=S.an.find(x=>x.id===m.dataset.aid);if(!a)return;e.stopPropagation();
   if(S.set.tool==='eraser'){commit();removeAn(a.id,true);toast('Marcação apagada',{label:'Desfazer',fn:undo});return}
   activeAn=a;pendingSel=null;showTool(m.getBoundingClientRect(),true)});
-document.addEventListener('mousedown',e=>{if(!e.target.closest('#seltool,mark.an,.pop')&&!e.target.closest('#scroller'))hideTool()});
+// Fecha o balão ao clicar/tocar em OUTRO LUGAR (qualquer coisa que não seja o próprio balão, uma marcação
+// ou um popover). Clicar em outro texto fecha e, se virar seleção, o onSelectEnd reabre no novo trecho.
+document.addEventListener('mousedown',e=>{if(!e.target.closest('#seltool,mark.an,.pop'))hideTool()});
 
 function apply(t,c,silent){const i=pendingSel;if(!i)return null;commit();
   S.an.filter(a=>a.pid===i.pid&&a.t===t&&a.s<i.e&&a.e>i.s).forEach(a=>removeAn(a.id,false,true));
@@ -1587,8 +1615,15 @@ function removeAn(id,render=true,quiet){unwrap(anMarks(id));S.an=S.an.filter(a=>
 function erase(i){const hit=S.an.filter(a=>a.pid===i.pid&&a.s<i.e&&a.e>i.s);if(!hit.length)return;commit();const b=blockOf(i.pid);const txt=b.textContent;
   hit.forEach(a=>{const parts=[];if(a.s<i.s)parts.push({...a,id:uid(),e:i.s,text:txt.slice(a.s,i.s)});if(a.e>i.e)parts.push({...a,id:uid(),s:i.e,text:txt.slice(i.e,a.e),note:parts.length?'':a.note});
     removeAn(a.id,false);parts.forEach(p=>{S.an.push(p);paint(p)})});save('an');renderPanels();$('#anHint').textContent='Trecho limpo · Ctrl Z desfaz'}
-$$('.cd',tool).forEach(d=>d.onclick=()=>{const c=d.dataset.c;if(activeAn){commit();activeAn.c=c;anMarks(activeAn.id).forEach(m=>m.dataset.c=c);save('an');renderPanels();hideTool()}else{setColor(c);apply('hl',c)}});
-$$('[data-st]',tool).forEach(b=>b.onclick=()=>apply(b.dataset.st,S.set.color));
+// Reabre o balão JÁ na marcação criada/clicada (modo "existe"): some os estilos, mostra cor ativa + lixeira
+// + Nota/Cartão/Folha. Assim ao MODIFICAR (trocar cor etc.) o balão PERMANECE ABERTO; fecha só no clique
+// fora / rolagem / Esc / lixeira. `activeAn` setado também evita o auto-hide do selectionchange no touch.
+function manterBalaoNa(a){if(!a)return;activeAn=a;pendingSel=null;const m=anMarks(a.id)[0];if(m)showTool(m.getBoundingClientRect(),true)}
+$$('.cd',tool).forEach(d=>d.onclick=()=>{const c=d.dataset.c;
+  if(activeAn){commit();activeAn.c=c;anMarks(activeAn.id).forEach(m=>m.dataset.c=c);save('an');renderPanels();
+    $$('.cd',tool).forEach(x=>x.classList.toggle('on',x.dataset.c===c))}        // troca a cor e MANTÉM aberto
+  else{setColor(c);manterBalaoNa(apply('hl',c,true))}});                        // aplica num trecho novo e CONTINUA aberto
+$$('[data-st]',tool).forEach(b=>b.onclick=()=>{if(activeAn)return;manterBalaoNa(apply(b.dataset.st,S.set.color,true))});
 tool.addEventListener('click',e=>{const b=e.target.closest('.tbtn');if(!b)return;const a=b.dataset.a;const info=activeAn||pendingSel;if(!info)return;
   if(a==='note'){if(activeAn){const x=activeAn;hideTool();openNote(x)}else{const x=apply('hl',S.set.color,true);if(x)openNote(x)}}
   if(a==='card'){openCardFrom(info);hideTool()}

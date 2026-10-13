@@ -63,9 +63,12 @@ async function semearProgresso(){
       const dom = mergeDom(p.dom, atual.dom);
       const best = mergeBest(p.best, atual.best);
       const recorde = Math.max(Number(p.recorde)||0, Number(atual.recorde)||0, 0, ...Object.values(best).map(v=>Number(v)||0));
+      // SEQUÊNCIA: `dias` vem SÓ do SERVIDOR (ledger já FILTRADO: descarta datas fabricadas pelo cliente
+      // antigo). NÃO unir com o localStorage — ele pode conter datas antigas/arbitrárias (ex.: "ontem" que
+      // não existiu) que inflavam a sequência no arcade (mostrava 2 quando o relatório mostra 1). O POST
+      // ignora `dias`; quem registra o dia é o servidor (dia de HOJE). marcarDiaAtivo re-adiciona HOJE ao jogar.
       const diasSrv = Array.isArray(p && p.dias) ? p.dias : [];
-      const diasLoc = Array.isArray(atual.dias) ? atual.dias : [];
-      const dias = Array.from(new Set(diasSrv.concat(diasLoc)))
+      const dias = diasSrv
         .filter(function(d){ return typeof d==='string' && /^\d{4}-\d{2}-\d{2}$/.test(d); }).sort();
       const semeado = Object.assign({}, atual, { dom, best, recorde, dias });
       localStorage.setItem(key, JSON.stringify(semeado));

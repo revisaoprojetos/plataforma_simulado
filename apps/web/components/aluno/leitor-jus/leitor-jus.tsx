@@ -13,8 +13,11 @@
 import { useCallback, useEffect, useRef } from 'react'
 import type { TopicosConfig } from '@/lib/leitura/topicos'
 import { SELOS } from '@/lib/leitura/selos'
+import { APP_VERSION } from '@/lib/version'
 
-const PROTOTIPO = '/leitura/leitor-jus.html'
+// Cache-bust atrelado à versão do app: como é um asset estático (public/), sem o ?v= o navegador/CDN
+// poderia servir o HTML antigo após o deploy. APP_VERSION muda a cada release → sempre busca o novo.
+const PROTOTIPO = `/leitura/leitor-jus.html?v=${APP_VERSION}`
 // slug → rótulo do selo (p/ alt/title dos PNGs no leitor). O catálogo é a fonte da biblioteca.
 const SELO_LABELS: Record<string, string> = Object.fromEntries(Object.entries(SELOS).map(([k, v]) => [k, v.nome]))
 

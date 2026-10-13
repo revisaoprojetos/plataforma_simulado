@@ -128,6 +128,52 @@ export async function preencherTesesPorQuiz(svc: Svc, dias: Record<string, any>)
 }
 
 /**
+ * CRÉDITO da LEITURA RÁPIDA no placar do arcade (decisão do usuário 2026-10-13): concluir a leitura
+ * rápida de um dia credita SÓ os pontos das TESES/perguntas do dia (nº de teses × CONFIG.pontos.tese,
+ * ex.: 10×100 = 1000) — SEM as bolinhas do labirinto (que só vêm ao JOGAR). O dia passa a contar como
+ * dominado (dom = todas as teses) e `best[dia] = max(atual, pontos das teses)`; quem depois jogar o
+ * labirinto pode superar (best é monotônico: max). Idempotente: reaplicar não baixa best nem duplica.
+ * Usa service role (sem filtro de tenant) — o chamador já validou acesso. Tolerante a erros (best-effort).
+ */
+export async function creditarTesesLeituraRapida(
+  svc: Svc,
+  { tenantId, estudanteId, desafioId, documentoId }: { tenantId: string; estudanteId: string; desafioId: string; documentoId: string },
+): Promise<void> {
+  const jogo = await lerDesafioJogo(svc, desafioId)
+  if (!jogo) return
+  const diasObj = jogo.dias && typeof jogo.dias === 'object' ? (jogo.dias as Record<string, any>) : {}
+  // Dia cujo documento_id bate com o da leitura concluída.
+  const diaKey = Object.keys(diasObj).find((k) => diasObj[k]?.documento_id === documentoId)
+  if (!diaKey) return
+  // Nº REAL de teses do dia = questões do quiz do conteúdo (mesma fonte do ranking/arcade).
+  const diasComTeses = await preencherTesesPorQuiz(svc, { [diaKey]: diasObj[diaKey] }).catch(() => ({ [diaKey]: diasObj[diaKey] }))
+  const teses = diasComTeses[diaKey]?.teses
+  const nTeses = Array.isArray(teses) ? teses.length : 0
+  if (nTeses <= 0) return // dia sem perguntas → nada a creditar (leitura rápida só gateia)
+  const tesePts = Math.max(0, Number(jogo.config?.pontos?.tese) || 100)
+  const scoreTeses = nTeses * tesePts
+
+  // Lê o progresso atual (merge por dia — não sobrescreve outros dias nem baixa best).
+  const { data: atual } = await svc
+    .from('simulado_jurisprudencia_progresso')
+    .select('dom, best, recorde')
+    .eq('desafio_id', desafioId).eq('estudante_id', estudanteId).maybeSingle()
+  const dom: Record<string, any> = (atual as any)?.dom && typeof (atual as any).dom === 'object' ? { ...(atual as any).dom } : {}
+  const best: Record<string, any> = (atual as any)?.best && typeof (atual as any).best === 'object' ? { ...(atual as any).best } : {}
+  // Dia dominado: todas as teses (0..n-1). best[dia] monotônico (nunca baixa).
+  const domDia = new Set<number>(Array.isArray(dom[diaKey]) ? dom[diaKey].map((x: any) => Number(x)).filter((x: number) => Number.isInteger(x)) : [])
+  for (let i = 0; i < nTeses; i++) domDia.add(i)
+  dom[diaKey] = [...domDia]
+  best[diaKey] = Math.max(Number(best[diaKey]) || 0, scoreTeses)
+  const recorde = Math.max(Number((atual as any)?.recorde) || 0, ...Object.values(best).map((v) => Number(v) || 0), 0)
+
+  await svc.from('simulado_jurisprudencia_progresso').upsert(
+    { tenant_id: tenantId, desafio_id: desafioId, estudante_id: estudanteId, dom, best, recorde, atualizado_em: new Date().toISOString() },
+    { onConflict: 'desafio_id,estudante_id' },
+  )
+}
+
+/**
  * Regra de acesso por PASTA (mesmo padrão da Leitura por pasta):
  * SEM nenhuma atribuição = liberado a todos; COM atribuição = só estudantes atribuídos
  * (simulado_pasta_estudantes) OU membros de grupos atribuídos (simulado_pasta_grupos +

@@ -12,6 +12,36 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.13.0 — 2026-10-13
+
+Desafio de Jurisprudência (arcade) + Leitura rápida + Leitor novo (mobile): correções de sequência e
+pontuação, botão de sair do desafio, renomes, reorganização da tela do dia e ferramentas de marcação
+funcionando no celular.
+
+- **Sequência do juris (arcade) corrigida:** o card de sequência mostrava **2** (ex.: "ontem" que não
+  existiu) enquanto o relatório mostrava **1**. Causa: o arcade semeava os dias da **união servidor +
+  localStorage** (datas antigas/fabricadas do cliente). Agora os dias vêm **só do ledger do servidor**
+  (já filtrado); `marcarDiaAtivo` ainda conta HOJE ao jogar. Nenhum dado alterado.
+- **Leitura rápida credita só as teses (decisão do usuário):** concluir a leitura rápida de um dia do
+  juris passa a creditar **só os pontos das perguntas/teses** (nº teses × `pontos.tese`, ex.: 10×100 =
+  **1000**) — **sem as bolinhas** do labirinto. `best = max(atual, teses)`, então quem jogar o labirinto
+  ainda chega aos 3000. Novo `creditarTesesLeituraRapida`; invalida o ranking. Quem já tinha 3000 (jogou)
+  não é mexido.
+- **Sair do desafio (arcade):** botão **"✕"** no HUD (desktop) e **"EXIT"** no d-pad (mobile, à esquerda
+  do ▲) + menu na **PAUSA** (CONTINUAR / VOLTAR PARA LEITURA) → voltam à tela do dia preservando o
+  progresso (teses + melhor score).
+- **Renomes + tela do dia:** "COMEÇAR" → **JOGAR**, "LEITURA RÁPIDA" → **QUESTÕES**. Botões reorganizados:
+  **LEITURA DO DIA** larga em cima; **QUESTÕES** (esq.) + **JOGAR** (dir.) embaixo (grid 2 colunas, com
+  espaçamento e largura ajustados; JOGAR ocupa a linha toda quando não há Questões).
+- **Leitor novo (mobile) — marcação funcionando:** a barra flutuante de marcação tinha ~17 botões numa
+  linha só (~510px) e **estourava a tela**; agora **quebra em linhas**, cabe na viewport e os alvos ficam
+  **≥42px**. Seleção no touch garantida (`user-select:text` + supressão do menu nativo que competia) e a
+  barra aparece ao **soltar o dedo**. O botão da ferramenta aciona de 1ª (trecho capturado em `pendingSel`).
+  O **balão de uma marcação permanece aberto** ao modificar (trocar cor/estilo), fechando só no clique
+  fora/rolagem/lixeira. Iframe do leitor com cache-bust por `APP_VERSION`.
+
+---
+
 ## 3.12.0 — 2026-10-13
 
 Admin do Desafio de Jurisprudência: Ranking + Relatório ricos (reuso do Lei Seca) + modal do aluno;

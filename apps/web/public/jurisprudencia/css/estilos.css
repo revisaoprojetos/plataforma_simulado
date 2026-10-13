@@ -83,9 +83,14 @@ button{font-family:inherit;color:inherit}
 .btn-w.ler-rapida:hover{background:color-mix(in srgb,var(--gold) 16%,transparent);box-shadow:0 0 0 3px #0a0f45, 0 0 0 5px #fff, 0 0 calc(28px*var(--glow)) color-mix(in srgb,var(--gold) 80%,transparent)}
 /* Tela do dia (attract): menos ÁREA INTERNA dos botões (padding nos 2 eixos; mantém o espaço ENTRE eles). */
 #ovAttract .row .btn-w{padding:10px 16px}
-/* Espaço entre a linha de cima (do dia + começar) e a de baixo (leitura rápida). */
-#ovAttract #rowRapida{margin-top:8px}
-@media (max-width:560px){ #ovAttract .row .btn-w{font-size:12px;padding:9px 12px} }
+/* Tela do dia: LEITURA larga em CIMA (fora a fora) e, embaixo, QUESTÕES (esq.) + JOGAR (dir.). Grid de 2
+   colunas → a leitura ocupa as duas (largura total dos de baixo). Casos: sem Leitura → só a linha de baixo;
+   sem Questões → JOGAR (.solo) ocupa a linha toda. */
+#ovAttract .atbtns{display:grid;grid-template-columns:1fr 1fr;row-gap:14px;column-gap:14px;width:min(290px,44cqw);margin:2px auto 0}
+#ovAttract .atbtns .btn-w{width:100%;padding:11px 14px;margin:0}
+#ovAttract .atbtns #btnLeitura{grid-column:1 / -1}
+#ovAttract .atbtns #btnStart.solo{grid-column:1 / -1}
+@media (max-width:560px){ #ovAttract .atbtns{width:min(260px,74cqw);row-gap:11px;column-gap:11px} #ovAttract .atbtns .btn-w{font-size:12px;padding:10px 12px} }
 /* COMEÇAR travado enquanto a leitura não foi concluída. */
 .btn-w.lock{background:#2a2f52;color:#6b73a0;cursor:not-allowed;box-shadow:0 0 0 3px #0a0f45, 0 0 0 5px #3a3f66}
 .btn-w.lock:hover{box-shadow:0 0 0 3px #0a0f45, 0 0 0 5px #3a3f66}
@@ -403,12 +408,21 @@ kbd{font:16px/1 var(--f-px);border:1px solid #3a42a0;background:#0a1150;color:#f
 .dpad span{display:none}
 .dpad [data-d="up"]{grid-area:1/2}
 .dpad #dpadStart{grid-area:1/3}
+.dpad #dpadExit{grid-area:1/1}            /* EXIT à ESQUERDA do ▲ (canto superior esquerdo do d-pad) */
 .dpad [data-d="left"]{grid-area:2/1}
 .dpad [data-d="down"]{grid-area:2/2}
 .dpad [data-d="right"]{grid-area:2/3}
 .dpad button{border:2px solid var(--neon);background:rgba(139,92,246,.12);color:#fff;font:26px/1 var(--f-px);touch-action:none;cursor:pointer}
 .dpad button:active{background:rgba(139,92,246,.45)}
 .dpad .c{border-color:var(--gold);color:var(--gold);font-size:16px}
+.dpad #dpadExit{border-color:#ff6b7a;color:#ffd0d5;background:rgba(255,80,96,.14);font-size:14px;letter-spacing:.06em}
+.dpad #dpadExit:active{background:rgba(255,80,96,.42)}
+/* "X" de sair do desafio no HUD (desktop): some na tela do dia/resultado (toggle no setMode). Fica num
+   stacking acima dos overlays (.ov z4) para continuar clicável também em PAUSA/GAME OVER. */
+.scr-exit{position:relative;z-index:6;flex:0 0 auto;display:grid;place-items:center;width:clamp(22px,4.2cqw,34px);height:clamp(22px,4.2cqw,34px);padding:0;border:2px solid #ff6b7a;border-radius:7px;background:rgba(255,80,96,.14);color:#ffd0d5;font:clamp(13px,2.6cqw,20px)/1 var(--f-px);cursor:pointer}
+.scr-exit:hover{background:rgba(255,80,96,.32)}
+.scr-exit:active{transform:scale(.94)}
+.scr-exit[hidden]{display:none}
 @media (pointer:coarse), (max-width:900px){.dpad{display:grid}}
 
 /* ---------- direita ---------- */
