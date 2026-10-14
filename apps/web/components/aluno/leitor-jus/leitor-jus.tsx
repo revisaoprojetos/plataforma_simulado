@@ -22,7 +22,7 @@ const PROTOTIPO = `/leitura/leitor-jus.html?v=${APP_VERSION}`
 const SELO_LABELS: Record<string, string> = Object.fromEntries(Object.entries(SELOS).map(([k, v]) => [k, v.nome]))
 
 export function LeitorJus({
-  html, titulo, sobretitulo = '', topicos, caminho, voltarHref, questoesHref,
+  html, titulo, sobretitulo = '', topicos, caminho, voltarHref, questoesHref, documentoId, versao,
 }: {
   html: string
   titulo: string
@@ -31,11 +31,31 @@ export function LeitorJus({
   caminho: string[]
   voltarHref?: string
   questoesHref?: string
+  /** Documento + versão p/ gravar progresso/conclusão da leitura (gate que libera o quiz no arcade). */
+  documentoId?: string
+  versao?: number
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   // Mantém os dados num ref para o listener de mensagem sempre ver o valor atual sem re-registrar.
-  const dadosRef = useRef({ html, titulo, sobretitulo, topicos, caminho, voltarHref, questoesHref })
-  dadosRef.current = { html, titulo, sobretitulo, topicos, caminho, voltarHref, questoesHref }
+  const dadosRef = useRef({ html, titulo, sobretitulo, topicos, caminho, voltarHref, questoesHref, documentoId, versao })
+  dadosRef.current = { html, titulo, sobretitulo, topicos, caminho, voltarHref, questoesHref, documentoId, versao }
+
+  // O leitor é um iframe isolado → quem fala com a API é o host. Grava progresso/conclusão da leitura.
+  const postProgresso = useCallback((body: Record<string, unknown>) => {
+    const d = dadosRef.current
+    if (!d.documentoId || !d.versao) return Promise.resolve()
+    return fetch('/api/leitura/progresso', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin',
+      body: JSON.stringify({ documento_id: d.documentoId, versao: d.versao, ...body }),
+    }).then(() => undefined).catch(() => undefined)
+  }, [])
+
+  // Acumula tempo de leitura enquanto o overlay está aberto (p/ desafios com tempo mínimo).
+  useEffect(() => {
+    if (!documentoId || !versao) return
+    const iv = setInterval(() => { void postProgresso({ tempo_inc: 20 }) }, 20000)
+    return () => clearInterval(iv)
+  }, [documentoId, versao, postProgresso])
 
   const enviarDia = useCallback(() => {
     const win = iframeRef.current?.contentWindow
@@ -66,12 +86,15 @@ export function LeitorJus({
       if (m.type === 'leitor-jus-nav') {
         const d = dadosRef.current
         const href = m.to === 'questoes' ? d.questoesHref : d.voltarHref
-        if (href) window.location.href = href
+        const ir = () => { if (href) window.location.href = href }
+        // "Concluir leitura" → grava a conclusão (pct 100) ANTES de fechar, p/ o arcade liberar o quiz do dia.
+        if (m.to === 'questoes') { void postProgresso({ pct: 100, concluir: true }).then(ir) }
+        else ir()
       }
     }
     window.addEventListener('message', onMsg)
     return () => window.removeEventListener('message', onMsg)
-  }, [enviarDia])
+  }, [enviarDia, postProgresso])
 
   return (
     <iframe

@@ -12,6 +12,21 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.15.1 — 2026-10-14
+
+**fix(juris): vazamento de progresso entre contas + conclusão da leitura liberar o jogo**
+
+- **BUG GRAVE — progresso do arcade vazava entre contas:** o `storageKey` do localStorage era FIXO
+  (`jurisclub-desafio-v1`) para todas as contas. Ao trocar de conta no mesmo navegador, o bootstrap
+  mesclava o progresso (dom/best) da conta anterior e **re-sincronizava pro servidor** da nova conta —
+  o aluno "ganhava" pontos sem jogar. Agora o `storageKey` é **por aluno** (`...:<estudante_id>`),
+  isolando cada conta. (Fix em `/api/jurisprudencia/conteudo`.)
+- **Conclusão da leitura não liberava o jogo:** o leitor novo (`LeitorJus`) ao "Concluir leitura" só
+  fechava o overlay, sem gravar `simulado_leitura_progresso` → o gate do arcade seguia bloqueado. Agora o
+  host grava a conclusão (pct 100 + `concluir`) antes de fechar, e acumula tempo de leitura (heartbeat).
+
+---
+
 ## 3.15.0 — 2026-10-14
 
 **feat(juris): dificuldade configurável + correções do leitor/arcade**

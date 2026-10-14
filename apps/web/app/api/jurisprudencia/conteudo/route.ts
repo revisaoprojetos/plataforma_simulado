@@ -31,10 +31,16 @@ export async function GET(request: NextRequest) {
   dj.dias = await preencherTesesPorQuiz(svc, dj.dias ?? {})
 
   const resp = mapearParaDESAFIO(dj)
+  const extra: Record<string, unknown> = {}
   // MODO TESTE (acesso exclusivo): o testador do desafio joga com TODOS os dias liberados (ignora o
   // agendamento/bloqueio por dia) — e já fica fora do ranking. Admin na prévia (sem sessão) também vê tudo.
   const testador = admin || (sessao ? await ehTestadorModulo(svc, sessao.tenantId, sessao.estudanteId, desafioId) : false)
-  if (testador) resp.CONFIG = { ...resp.CONFIG, testador: true }
+  if (testador) extra.testador = true
+  // storageKey POR ALUNO: o progresso do arcade (dom/best) vive no localStorage. Com uma chave FIXA p/ todos,
+  // ao trocar de conta no mesmo navegador o progresso VAZAVA entre contas e o bootstrap re-sincronizava pro
+  // servidor (aluno "ganhava" pontos sem jogar). Namespacing por estudante isola cada conta.
+  if (sessao) extra.storageKey = `${(resp.CONFIG as any)?.storageKey || 'jurisclub-desafio'}:${sessao.estudanteId}`
+  if (Object.keys(extra).length) resp.CONFIG = { ...resp.CONFIG, ...extra }
 
   return NextResponse.json(resp)
 }
