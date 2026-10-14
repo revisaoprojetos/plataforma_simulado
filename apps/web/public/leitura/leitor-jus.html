@@ -1956,11 +1956,15 @@ if(document.fonts)document.fonts.ready.then(()=>{layoutDoc();onScroll()});
 }; /* fim __boot */
 let __started=false;
 const __kick=(html,cfg)=>{if(__started)return;__started=true;try{__boot(html,cfg)}catch(err){console.error('[leitor-jus] boot',err)}};
-if(window.parent===window){ __kick('', {}); }
+if(window.parent===window){ __kick('', {}); } /* standalone (preview direto) → modelo embutido */
 else {
+  // EMBED (dentro do arcade): SEMPRE espera o dia REAL do host. NÃO abre o modelo embutido por timeout —
+  // senão qualquer dia cairia no DEMO "Dia 01". Handshake robusto: re-anuncia 'ready' até o dia chegar
+  // (cobre a corrida de montagem em que a 1ª msg é perdida).
   window.addEventListener('message',(e)=>{const m=e&&e.data;if(m&&m.type==='leitor-jus-day')__kick(m.html||'', m.cfg||{})});
-  try{window.parent.postMessage({type:'leitor-jus-ready'},'*')}catch(_){}
-  setTimeout(()=>__kick('', {}), 2000); /* se o host não responder, abre o modelo embutido */
+  const __ping=()=>{try{window.parent.postMessage({type:'leitor-jus-ready'},'*')}catch(_){}};
+  __ping();
+  let __tries=0; const __iv=setInterval(()=>{ if(__started||++__tries>40){clearInterval(__iv);return;} __ping(); }, 300);
 }
 })();
 </script>

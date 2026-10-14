@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useRef, useEffect } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Save, Heart, Timer, Coins, Image as ImageIcon, BookMarked, X, Plus, Trash2, Award, Music, Upload, Crop, ImagePlus, Gamepad2 } from 'lucide-react'
+import { Loader2, Save, Heart, Timer, Coins, Image as ImageIcon, BookMarked, X, Plus, Trash2, Award, Music, Upload, Crop, ImagePlus, Gamepad2, Gauge } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { TrilhaFundoCropper } from '@/components/admin/trilha-fundo-cropper'
 import { salvarConfigDesafio, salvarImagensDesafio, salvarMateriasDesafio, renomearDesafio } from '@/app/admin/jurisprudencia/actions'
@@ -38,6 +38,8 @@ type Config = {
   vidas: number
   vidasIlimitada?: boolean
   tempoResposta: number
+  dificuldade?: 'muito_facil' | 'facil' | 'normal' | 'dificil'
+  dificuldadeAluno?: boolean
   pontos: Pontos
   storageKey?: string
   musicaFundo?: string
@@ -101,6 +103,12 @@ export function JurisConfigForm({ desafioId, nome, config, materias, final, imag
   const [vidas, setVidas] = useState(config?.vidas ?? 3)
   const [vidasIlimitada, setVidasIlimitada] = useState((config as any)?.vidasIlimitada === true)
   const [tempoResposta, setTempoResposta] = useState(config?.tempoResposta ?? 25)
+  // DIFICULDADE: escala a velocidade das armadilhas (e reduz a quantidade no "Muito fácil"). Vidas e tempo
+  // de resposta continuam nos campos próprios. Default 'normal' (comportamento atual).
+  const [dificuldade, setDificuldade] = useState<'muito_facil' | 'facil' | 'normal' | 'dificil'>(
+    (['muito_facil', 'facil', 'normal', 'dificil'] as const).includes((config as any)?.dificuldade) ? (config as any).dificuldade : 'normal')
+  // Permitir que o ALUNO escolha a própria dificuldade no arcade. Off = travado na padrão acima.
+  const [dificuldadeAluno, setDificuldadeAluno] = useState((config as any)?.dificuldadeAluno === true)
   const [pontos, setPontos] = useState<Pontos>({ ...PONTOS_DEFAULT, ...(config?.pontos ?? {}) })
   const [musicaFundo, setMusicaFundo] = useState(config?.musicaFundo ?? '')
   const [musicaLoop, setMusicaLoop] = useState(config?.musicaLoop !== false) // padrão: em loop
@@ -128,7 +136,7 @@ export function JurisConfigForm({ desafioId, nome, config, materias, final, imag
 
   function salvarConfig() {
     startCfg(async () => {
-      const novo = { ...(config ?? {}), vidas: Number(vidas) || 0, vidasIlimitada, tempoResposta: Number(tempoResposta) || 0, pontos, musicaFundo: musicaFundo.trim(), musicaLoop, compacto, corFundo: corFundo.trim() || null, modoQuestoes }
+      const novo = { ...(config ?? {}), vidas: Number(vidas) || 0, vidasIlimitada, tempoResposta: Number(tempoResposta) || 0, dificuldade, dificuldadeAluno, pontos, musicaFundo: musicaFundo.trim(), musicaLoop, compacto, corFundo: corFundo.trim() || null, modoQuestoes }
       const r = await salvarConfigDesafio(desafioId, novo)
       if (!r.ok) { toast.error(r.error ?? 'Erro ao salvar configuração.'); return }
       // Reflete a URL final hospedada (data:audio importado vira URL do storage) — feedback + evita re-subir.
@@ -244,6 +252,37 @@ export function JurisConfigForm({ desafioId, nome, config, materias, final, imag
           <label className="block">
             <span className="mb-1 flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Timer className="h-3.5 w-3.5" /> Tempo por pergunta (segundos)</span>
             <input type="number" min={1} value={tempoResposta} onChange={(e) => setTempoResposta(Number(e.target.value))} className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40" />
+          </label>
+        </div>
+
+        <div>
+          <span className="mb-1.5 flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Gauge className="h-3.5 w-3.5" /> Dificuldade (velocidade das armadilhas)</span>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {([
+              { v: 'muito_facil', label: 'Muito fácil', desc: 'Bem lentas' },
+              { v: 'facil', label: 'Fácil', desc: 'Mais lentas' },
+              { v: 'normal', label: 'Normal', desc: 'Padrão' },
+              { v: 'dificil', label: 'Difícil', desc: 'Mais rápidas' },
+            ] as const).map((o) => (
+              <button key={o.v} type="button" onClick={() => setDificuldade(o.v)}
+                className={cn('rounded-lg border p-2.5 text-left transition-colors', dificuldade === o.v ? 'border-primary bg-primary/10 ring-1 ring-primary/40' : 'bg-card hover:bg-muted')}>
+                <span className="flex items-center gap-1.5">
+                  <span className={cn('flex h-3.5 w-3.5 items-center justify-center rounded-full border', dificuldade === o.v ? 'border-primary' : 'border-muted-foreground/40')}>
+                    {dificuldade === o.v && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                  </span>
+                  <span className="text-sm font-medium">{o.label}</span>
+                </span>
+                <span className="mt-1 block text-[11px] text-muted-foreground">{o.desc}</span>
+              </button>
+            ))}
+          </div>
+          <p className="mt-1.5 text-[11px] text-muted-foreground">Afeta só a velocidade (e a quantidade, no “Muito fácil”) das armadilhas. Vidas e tempo por pergunta ficam nos campos acima.</p>
+          <label className="mt-2 flex cursor-pointer items-start gap-2 rounded-lg border bg-background px-3 py-2">
+            <input type="checkbox" checked={dificuldadeAluno} onChange={(e) => setDificuldadeAluno(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--primary)]" />
+            <span>
+              <span className="block text-sm font-medium">Deixar o aluno escolher a dificuldade</span>
+              <span className="block text-[11px] text-muted-foreground">Ligado: aparece um botão de dificuldade no arcade e o aluno ajusta à vontade (começa na padrão acima). Desligado: fica travado na padrão.</span>
+            </span>
           </label>
         </div>
 

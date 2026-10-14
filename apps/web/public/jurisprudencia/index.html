@@ -7,7 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,500;0,600;0,700;0,800;0,900;1,800;1,900&family=Press+Start+2P&family=VT323&display=swap">
-<link rel="stylesheet" href="css/estilos.css?v=20261013g">
+<link rel="stylesheet" href="css/estilos.css?v=20261013n">
 <!-- Produção: esconde as ferramentas de demonstração (o elemento fica no DOM p/ o jogo.js não quebrar). -->
 <style>.demo{display:none!important}</style>
 </head>
@@ -143,7 +143,7 @@
         </div>
         <div class="cab-foot">
           <span class="leds" id="leds"><i></i><i></i><i></i></span>
-          <span class="grille" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span>
+          <button class="snd cab-dific" id="btnDific" title="Ajustar a dificuldade (velocidade das armadilhas)" hidden>🎚 DIFIC: <b id="dificLb">NORMAL</b></button>
           <div class="abtns">
             <button class="abtn pink" id="abPause" title="Pausa (P)"><span class="cap" id="capPause"><svg viewBox="0 0 10 10" aria-hidden="true"><path fill="currentColor" d="M2 1h2.2v8H2zM5.8 1h2.2v8H5.8z"/></svg></span><small>PAUSA</small></button>
             <button class="abtn cyan" id="abSound" title="Ligar/desligar efeitos sonoros"><span class="cap">♪</span><small>SOM</small></button>
@@ -291,6 +291,6 @@
 
 <div class="toast" id="toast" hidden></div>
 
-<script src="js/bootstrap.js?v=20261013g"></script>
+<script src="js/bootstrap.js?v=20261013n"></script>
 </body>
 </html>

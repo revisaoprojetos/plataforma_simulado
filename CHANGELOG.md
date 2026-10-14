@@ -12,6 +12,25 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.15.0 — 2026-10-14
+
+**feat(juris): dificuldade configurável + correções do leitor/arcade**
+
+- **Leitor do dia (jurisprudência) abria sempre o "Dia 01":** o protótipo (`leitor-jus.html`) caía no
+  documento DEMO embutido quando o handshake do host atrasava (timeout de 2s) e ignorava o dia real.
+  Agora, no embed, ele **sempre espera o conteúdo real** e re-anuncia "ready" até recebê-lo (sem fallback
+  de demo). Todos os dias passam a abrir o conteúdo certo.
+- **Tags do sumário do leitor:** removido o STF/STJ auto-derivado (não vem do editor) e o fallback de tags
+  de modelo/demo. Agora o tema mostra só os selos REAIS da Biblioteca presentes no conteúdo (`data-selo`).
+- **Testador exclusivo** passa a enxergar a **leitura de qualquer dia** do desafio (mesmo agendado/rascunho).
+- **Dificuldade (velocidade das armadilhas):**
+  - Admin define a **padrão** (Muito fácil / Fácil / Normal / Difícil) na config do desafio e pode **permitir
+    o aluno escolher** (toggle). Desligado = travado na padrão.
+  - Aluno, quando permitido, ajusta pelo botão **🎚 DIFIC** na barra do monitor do arcade (cicla os níveis,
+    salva na conta e re-aplica na hora). "Muito fácil" também reduz a quantidade de armadilhas.
+
+---
+
 ## 3.14.0 — 2026-10-13
 
 **feat(caderno): ajustes de cabeçalho/rodapé, cores do card de disciplina e herança do modelo p/ o simulado**

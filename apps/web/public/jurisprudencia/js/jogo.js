@@ -10,6 +10,17 @@ const { CONFIG, MATERIAS, FINAL, DIAS } = window.DESAFIO;
 // já é excluído do ranking server-side; aqui é só a liberação de jogo.
 const TESTADOR = !!(CONFIG && CONFIG.testador);
 
+// DIFICULDADE: escala a velocidade das armadilhas. Menor = mais fácil; 'muito_facil' tira 1 armadilha.
+// O admin define a PADRÃO (CONFIG.dificuldade) e pode PERMITIR o aluno escolher (CONFIG.dificuldadeAluno).
+// Quando permitido, a escolha do aluno (S.dific) vence; senão fica travado na padrão do admin.
+const DIFIC_TAB = { muito_facil: 0.55, facil: 0.78, normal: 1, dificil: 1.2 };
+const DIFIC_ORDEM = ['muito_facil', 'facil', 'normal', 'dificil'];
+const DIFIC_ROTULO = { muito_facil: 'MUITO FÁCIL', facil: 'FÁCIL', normal: 'NORMAL', dificil: 'DIFÍCIL' };
+const ALUNO_ESCOLHE_DIFIC = !!(CONFIG && CONFIG.dificuldadeAluno);
+const DIFIC_PADRAO = (CONFIG && DIFIC_TAB[CONFIG.dificuldade] != null) ? CONFIG.dificuldade : 'normal';
+function dificKey(){ return (ALUNO_ESCOLHE_DIFIC && S.dific && DIFIC_TAB[S.dific] != null) ? S.dific : DIFIC_PADRAO; }
+function dificMult(){ return DIFIC_TAB[dificKey()] ?? 1; }
+
 // Vidas: quantidade fixa OU ilimitada (sem game over), configurável no admin.
 const VIDAS_ILIM = CONFIG.vidasIlimitada === true;
 const VIDAS_INI = VIDAS_ILIM ? Infinity : (Number(CONFIG.vidas) || 3);
@@ -20,7 +31,7 @@ const BOLINHAS_ALVO = 200;
 /* =========================================================
    ESTADO
    ========================================================= */
-const DEF = {dom:{}, best:{}, recorde:0, demoAll:false, final:null, muted:false, volSfx:1, volMus:.5, sel:null, calm:false, dias:[]};
+const DEF = {dom:{}, best:{}, recorde:0, demoAll:false, final:null, muted:false, volSfx:1, volMus:.5, sel:null, calm:false, dias:[], dific:null};
 let S = load();
 // Preferência de ÁUDIO persiste entre entradas: o que o aluno deixar (mudo/volumes) fica salvo em
 // localStorage (save() grava muted/volSfx/volMus) e é relido no load(). 1ª vez (sem dado salvo) usa o
@@ -549,9 +560,10 @@ function resetBoard(full){
   G.player=mkEnt(1,ROWS-2,6.4); G.want=null;
   const lvl=1+(G.day-1)*.025;
   const spawns=[[COLS-2,1,'peg',0],[COLS-2,ROWS-2,'sum',2.5],[1,1,'inf',5],[13,7,'peg',8]];
-  const count = G.day<=2?2 : G.day<=8?3 : 4;
+  let count = G.day<=2?2 : G.day<=8?3 : 4;
+  if(dificKey()==='muito_facil') count=Math.max(1,count-1);   // "Muito fácil": uma armadilha a menos
   G.traps=spawns.slice(0,count).map(([x,y,k,w])=>{
-    const sp = {peg:5.6,sum:4.1,inf:5.0}[k]*lvl;
+    const sp = {peg:5.6,sum:4.1,inf:5.0}[k]*lvl*dificMult();
     const e=mkEnt(x,y,sp); e.k=k; e.sx=x; e.sy=y; e.wait=w; e.out=0; return e;
   });
   G.fright=0; G.distKey='';
@@ -1378,8 +1390,10 @@ document.querySelectorAll('.modal').forEach(m=>m.addEventListener('click',e=>{ i
 document.querySelector('.tabs').addEventListener('click',e=>{ const b=e.target.closest('.tab'); if(b){ RT.tab=b.dataset.tab; SFX.click(); renderRank(); } });
 $('#rChips').addEventListener('click',e=>{ const b=e.target.closest('.chip'); if(b){ RT.mat=b.dataset.mat; SFX.click(); renderRank(); } });
 $('#btnStart').onclick=startRun;
-$('#btnLeitura').onclick=()=>{ SFX.click(); irParaLeitura(G.day); };
-{ const bRap=$('#btnLeituraRapida'); if(bRap) bRap.onclick=()=>{ SFX.click(); abrirQuestoes(G.day); }; }
+// Leitura/Questões seguem a AULA SELECIONADA no painel (stageSel) — não o dia do tabuleiro carregado —
+// p/ clicar numa aula e abrir a leitura DELA (antes caía no dia atual/dia 1). JOGAR segue usando G.day.
+$('#btnLeitura').onclick=()=>{ SFX.click(); irParaLeitura(stageSel||G.day); };
+{ const bRap=$('#btnLeituraRapida'); if(bRap) bRap.onclick=()=>{ SFX.click(); abrirQuestoes(stageSel||G.day); }; }
 // Ao VOLTAR da leitura (aba/foco/visibilidade ou restauração de bfcache), reatualiza o gate do dia.
 window.addEventListener('pageshow', recarregarLeituras);
 window.addEventListener('focus', recarregarLeituras);
@@ -1413,6 +1427,19 @@ const btnAnim=$('#btnAnim');
 function syncAnim(){ document.body.classList.toggle('calm', !!S.calm); if(btnAnim) btnAnim.setAttribute('aria-pressed', String(!S.calm)); }
 if(btnAnim) btnAnim.onclick=()=>{ S.calm=!S.calm; save(); syncAnim(); SFX.init(); if(!S.calm) SFX.click(); };
 syncAnim();
+
+// Dificuldade escolhida pelo ALUNO (só quando o admin permite): botão cíclico MUITO FÁCIL→FÁCIL→NORMAL→DIFÍCIL.
+const btnDific=$('#btnDific');
+// Atualiza SÓ o rótulo do nível (<b id="dificLb">) — o resto do botão fica fixo (não "pula" ao trocar).
+function syncDific(){ const lb=$('#dificLb'); if(lb) lb.textContent=(DIFIC_ROTULO[dificKey()]||'NORMAL'); else if(btnDific) btnDific.textContent='🎚 DIFIC: '+(DIFIC_ROTULO[dificKey()]||'NORMAL'); }
+if(btnDific){
+  if(ALUNO_ESCOLHE_DIFIC){
+    btnDific.hidden=false; syncDific();
+    btnDific.onclick=()=>{ const i=DIFIC_ORDEM.indexOf(dificKey()); S.dific=DIFIC_ORDEM[(i+1)%DIFIC_ORDEM.length]; save(); syncDific(); SFX.click();
+      // Re-aplica na hora (velocidade/quantidade das armadilhas é montada no loadDay) — só fora de jogo.
+      if(['attract','gameover','clear'].includes(G.mode)) loadDay(G.day); };
+  } else { btnDific.hidden=true; }
+}
 // Header ♪ SOM = mudo GERAL (efeitos + música). Ao reativar totalmente mudo, volta na metade.
 snd.onclick=()=>{
   if(S.muted){ S.muted=false; if(!((S.volSfx||0)>0) && !((S.volMus||0)>0)){ S.volSfx=1; S.volMus=.5; } }

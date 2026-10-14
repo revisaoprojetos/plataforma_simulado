@@ -366,6 +366,19 @@ button{font-family:inherit;color:inherit}
 .ov .selo-won{width:clamp(70px,16cqw,140px);animation:pop .6s cubic-bezier(.2,1.6,.4,1)}
 @keyframes pop{from{transform:scale(0) rotate(-30deg)}}
 .cab-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 6px 2px}
+/* Dificuldade (aluno): no lugar da antiga grille, deslocada p/ a esquerda. Ancorada à esquerda
+   (margin-right:auto) e o VALOR com largura fixa → trocar o nível NÃO move o card, só o texto muda. */
+.cab-dific{margin-left:56px;margin-right:auto;align-self:center;font-size:16px;line-height:1;letter-spacing:1.6px;padding:7px 12px;border-radius:8px;white-space:nowrap;background:rgba(10,14,53,.6);box-shadow:0 0 0 1px rgba(0,0,0,.4) inset}
+.cab-dific:hover{color:#fff;border-color:var(--lav)}
+.cab-dific #dificLb{display:inline-block;min-width:7.2em;text-align:left;color:#ffc83d}
+/* MOBILE: a dificuldade ganha uma LINHA PRÓPRIA no topo da barra (centralizada); some os LEDs
+   decorativos p/ os botões PAUSA/SOM/MÚSICA/TELA caberem na linha de baixo. */
+@media (max-width:720px){
+  .cab-foot{flex-wrap:wrap;gap:8px;justify-content:center}
+  .leds{display:none}
+  .cab-dific{order:-1;flex:0 0 100%;margin:0;text-align:center;font-size:14px;padding:7px 10px}
+  .cab-dific #dificLb{min-width:6em}
+}
 .grille{display:flex;gap:4px;flex:1;justify-content:center}
 .grille i{width:28px;height:3px;background:#070b35;box-shadow:inset 0 1px 0 rgba(0,0,0,.6),0 1px 0 rgba(255,255,255,.05)}
 .abtns{display:flex;gap:14px;align-items:flex-end}

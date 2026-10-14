@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { checkPermission } from '@/lib/auth/permissions'
 import { temAcessoDesafio, perfilAlunos, lerDesafioJogo } from '@/lib/jurisprudencia/conteudo'
+import { ehTestadorModulo } from '@/lib/leitura/testadores'
 import { diaBRT, streakDe } from '@/lib/jurisprudencia/sequencia'
 
 // Progresso do aluno no Desafio de Jurisprudência (tabela simulado_jurisprudencia_progresso).
@@ -48,10 +49,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Sem acesso a este desafio.' }, { status: 403 })
   }
 
-  const [{ data }, perfis, jogo] = await Promise.all([
+  const [{ data }, perfis, jogo, testador] = await Promise.all([
     svc.from('simulado_jurisprudencia_progresso').select('dom, best, recorde, atualizado_em').eq('desafio_id', desafioId).eq('estudante_id', sessao.estudanteId).maybeSingle(),
     perfilAlunos(svc, sessao.tenantId, [sessao.estudanteId]),
     lerDesafioJogo(svc, desafioId),
+    ehTestadorModulo(svc, sessao.tenantId, sessao.estudanteId, desafioId),
   ])
   const perfil = perfis.get(sessao.estudanteId) ?? null
 
@@ -74,7 +76,9 @@ export async function GET(request: NextRequest) {
       try { await svc.from('simulado_documentos').update({ publicado: true }).eq('tenant_id', sessao.tenantId).in('id', curar) } catch { /* ignora */ }
       for (const d of (docs as any[])) if (curar.includes(d.id)) d.publicado = true
     }
-    const pub = new Set(((docs ?? []) as any[]).filter((d) => d.publicado && !d.deletado).map((d) => d.id))
+    // Testador exclusivo enxerga a leitura de QUALQUER dia (mesmo agendado/rascunho) — p/ conferir antes
+    // de abrir ao aluno. Aluno normal: só docs publicados.
+    const pub = new Set(((docs ?? []) as any[]).filter((d) => (testador || d.publicado) && !d.deletado).map((d) => d.id))
     for (const [dia, did] of Object.entries(docPorDiaBruto)) if (pub.has(did)) docPorDia[dia] = did
     // Dias cujo documento tem LEITURA RÁPIDA configurada (quiz_config.leitura_rapida não-vazio).
     const comRapida = new Set(((docs ?? []) as any[]).filter((d) => pub.has(d.id) && typeof d.quiz_config?.leitura_rapida === 'string' && d.quiz_config.leitura_rapida.trim()).map((d) => d.id))
