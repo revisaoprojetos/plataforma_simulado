@@ -12,6 +12,15 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.17.2 — 2026-10-14
+
+**fix(build): shim `modelos-caderno/_campos.tsx` faltando — CI do v3.17.1 falhou (`Can't resolve './_campos'`)**
+
+- O rename `modelos-caderno/_campos.tsx → caderno-shared/campos.tsx` entrou no commit do v3.16.0, mas o
+  **shim** de compatibilidade (re-export que mantém o `import './_campos'` do `modelo-editor.tsx` funcionando)
+  estava **untracked** e não foi commitado. No Windows o build passava (o arquivo existia local + FS
+  case-insensitive); no CI (Linux) o módulo não resolvia e o `next build` quebrava. Commitado o shim.
+
 ## 3.17.1 — 2026-10-14
 
 **fix(simulado): link da plataforma volta na entrada do simulado (3 marcas)**
