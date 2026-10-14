@@ -25,8 +25,9 @@ function dificMult(){ return DIFIC_TAB[dificKey()] ?? 1; }
 const VIDAS_ILIM = CONFIG.vidasIlimitada === true;
 const VIDAS_INI = VIDAS_ILIM ? Infinity : (Number(CONFIG.vidas) || 3);
 
-// Bolinhas coletáveis por fase — FIXO em todas (teto de pontos uniforme).
-const BOLINHAS_ALVO = 200;
+// Bolinhas coletáveis por fase — configurável no admin (CONFIG.bolinhasQtd); padrão 200. Mesma qtd em
+// todas as fases (teto de pontos uniforme). Clamp defensivo p/ não gerar labirinto inviável.
+const BOLINHAS_ALVO = Math.max(10, Math.min(400, Math.round(Number(CONFIG && CONFIG.bolinhasQtd) || 200)));
 
 /* =========================================================
    ESTADO
@@ -83,9 +84,20 @@ function getTeses(n){
   return S.final.map(([d,i])=>DIAS[d].teses[i]);
 }
 const domOf = n => S.dom[n] || [];
-const dayComplete = n => domOf(n).length >= getTeses(n).length;
+const dayComplete = n => { const t=getTeses(n).length; return t>0 && domOf(n).length>=t; };
 // Jogável = publicada (demo/preview liberam tudo). Agendada/visualizável/rascunho = bloqueado.
-function dayUnlocked(n){ if(S.demoAll||TESTADOR) return true; return pubEstado(n)==='publicada'; }
+// SELO FINAL (dia agregado): NÃO basta estar "publicado" — ele é a culminância, então só libera quando
+// TODOS os dias normais estiverem publicados E concluídos. Antes caía no default 'publicada' (sem pub) e
+// ficava jogável cedo demais (e pontuava um "dia 15" que não devia existir ainda).
+function dayUnlocked(n){
+  if(S.demoAll||TESTADOR) return true;
+  if(isFinalDay(n)){
+    if(pubEstado(n)==='rascunho') return false;
+    const normais = VORD.filter(k=>!isFinalDay(k));
+    return normais.length>0 && normais.every(k=>pubEstado(k)==='publicada' && dayComplete(k));
+  }
+  return pubEstado(n)==='publicada';
+}
 // Data de liberação do dia AGENDADO (p/ exibir "BLOQUEADO - DD/MM/AAAA"). null se não agendado.
 function dataLiberacao(n){
   const p = DIAS[n] && DIAS[n].pub; if(!(p && p.publicarEm)) return null;
@@ -94,7 +106,9 @@ function dataLiberacao(n){
 }
 function hoje(){ for(const n of VORD){ if(dayUnlocked(n) && !dayComplete(n)) return n; } return VORD[VORD.length-1] ?? keyAt(1); }
 const matDone = m => { const ds=diasDaMateria(m); return ds.length>0 && ds.every(dayComplete); };
-const totalPts = () => Object.values(S.best).reduce((a,b)=>a+b,0);
+// PONTOS TOTAIS = só dos dias com TESES PRÓPRIAS (exclui o SELO FINAL, que reusa um POOL de teses de outros
+// dias → pontuar nele DUPLICARIA; e exclui dias sem conteúdo). Mesma regra do ranking (diasPontuaveis).
+const totalPts = () => Object.keys(S.best).reduce((a,k)=>{ const n=Number(k); const ownT=isFinalDay(n)?0:(((DIAS[n]&&DIAS[n].teses)||[]).length); return a + (ownT>0 ? (Number(S.best[k])||0) : 0); },0);
 const selosCount = () => (MATERIAS||[]).filter(matDone).length;
 const pad = (n,l=6) => String(Math.max(0,Math.floor(n))).padStart(l,'0');
 const dd = n => String(n).padStart(2,'0');

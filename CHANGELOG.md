@@ -12,6 +12,23 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.17.0 — 2026-10-14
+
+**feat(juris): Regulamento configurável, bolinhas editáveis + fix do selo final e da sequência no ranking**
+
+- **Regulamento (admin + aluno):** "Como funciona" agora puxa direto do config (`comoFunciona`); "Ganhos"
+  tem editor de **toda** a pontuação — inclusive os itens que não pontuam mais — e botões 👁 para **ocultar**
+  cada item e cada card (fases/matérias/vidas/tempo) via `regulamentoOcultos`.
+- **Bolinhas do labirinto configuráveis:** novo bloco no admin com **pontos por bolinha** + **quantidade por
+  fase** (`bolinhasQtd`, padrão 200) e **total calculado**. A quantidade também define quantas bolinhas o jogo
+  gera (`BOLINHAS_ALVO` lê `CONFIG.bolinhasQtd`, com clamp 10–400). Card do aluno mostra por-bolinha e o total.
+- **fix(selo final):** o dia agregado (selo) só libera quando TODOS os dias normais estiverem **publicados e
+  concluídos** — antes caía no default 'publicada' e abria cedo demais (e chegou a pontuar um "dia 15" inexistente).
+  `dayComplete` agora exige teses > 0.
+- **fix(sequência no ranking):** `diasAtivosPorAluno` não filtra mais por `.in(estudanteIds)` (≈443 ids →
+  URI too long → query falhava → todos ficavam com sequência 1); varre os marcadores do desafio e o chamador usa `.get(id)`.
+- Cache-bust do arcade `?v=20261014a`.
+
 ## 3.16.0 — 2026-10-14
 
 **feat(perfil): editor de perfil do aluno — foto, banner, cor de fundo e adesivos**

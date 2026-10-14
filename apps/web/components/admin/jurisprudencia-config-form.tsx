@@ -2,7 +2,7 @@
 
 import { useState, useTransition, useRef, useEffect } from 'react'
 import { toast } from 'sonner'
-import { Loader2, Save, Heart, Timer, Coins, Image as ImageIcon, BookMarked, X, Plus, Trash2, Award, Music, Upload, Crop, ImagePlus, Gamepad2, Gauge } from 'lucide-react'
+import { Loader2, Save, Heart, Timer, Coins, Image as ImageIcon, BookMarked, X, Plus, Trash2, Award, Music, Upload, Crop, ImagePlus, Gamepad2, Gauge, Eye, EyeOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { TrilhaFundoCropper } from '@/components/admin/trilha-fundo-cropper'
 import { salvarConfigDesafio, salvarImagensDesafio, salvarMateriasDesafio, renomearDesafio } from '@/app/admin/jurisprudencia/actions'
@@ -40,6 +40,9 @@ type Config = {
   tempoResposta: number
   dificuldade?: 'muito_facil' | 'facil' | 'normal' | 'dificil'
   dificuldadeAluno?: boolean
+  comoFunciona?: string
+  regulamentoOcultos?: string[]
+  bolinhasQtd?: number
   pontos: Pontos
   storageKey?: string
   musicaFundo?: string
@@ -49,7 +52,6 @@ type Materia = { id: string; nome: string; curto: string; icon?: string; dias: n
 
 const PONTOS_DEFAULT: Pontos = { ponto: 10, vadeMecum: 50, armadilha: 200, tese: 100, vida: 200, labirintoLimpo: 500 }
 const PONTOS_CAMPOS: { k: keyof Pontos; label: string; desc: string }[] = [
-  { k: 'ponto', label: 'Acerto (ponto)', desc: 'Por resposta certa' },
   { k: 'tese', label: 'Tese dominada', desc: 'Ao dominar uma tese' },
   { k: 'vadeMecum', label: 'Vade Mécum', desc: 'Bônus de coleta' },
   { k: 'vida', label: 'Vida extra', desc: 'Item de vida' },
@@ -109,7 +111,14 @@ export function JurisConfigForm({ desafioId, nome, config, materias, final, imag
     (['muito_facil', 'facil', 'normal', 'dificil'] as const).includes((config as any)?.dificuldade) ? (config as any).dificuldade : 'normal')
   // Permitir que o ALUNO escolha a própria dificuldade no arcade. Off = travado na padrão acima.
   const [dificuldadeAluno, setDificuldadeAluno] = useState((config as any)?.dificuldadeAluno === true)
+  // Texto do "Como funciona" (Regulamento) — editável; vazio usa o texto padrão.
+  const [comoFunciona, setComoFunciona] = useState<string>(((config as any)?.comoFunciona as string) || '')
+  // Itens OCULTOS no Regulamento (chaves dos ganhos: tese/ponto/vadeMecum/vida/armadilha/labirintoLimpo +
+  // cards: fases/materias/vidas/tempo). Aparecem no aluno só os que NÃO estão aqui.
+  const [regOcultos, setRegOcultos] = useState<string[]>(Array.isArray((config as any)?.regulamentoOcultos) ? (config as any).regulamentoOcultos : [])
+  const toggleOc = (k: string) => setRegOcultos((a) => (a.includes(k) ? a.filter((x) => x !== k) : [...a, k]))
   const [pontos, setPontos] = useState<Pontos>({ ...PONTOS_DEFAULT, ...(config?.pontos ?? {}) })
+  const [bolinhasQtd, setBolinhasQtd] = useState<number>(Number((config as any)?.bolinhasQtd) || 200)
   const [musicaFundo, setMusicaFundo] = useState(config?.musicaFundo ?? '')
   const [musicaLoop, setMusicaLoop] = useState(config?.musicaLoop !== false) // padrão: em loop
   // Cabeçalho compacto da área do aluno (retrai banner + abas → mais tela do arcade).
@@ -136,7 +145,7 @@ export function JurisConfigForm({ desafioId, nome, config, materias, final, imag
 
   function salvarConfig() {
     startCfg(async () => {
-      const novo = { ...(config ?? {}), vidas: Number(vidas) || 0, vidasIlimitada, tempoResposta: Number(tempoResposta) || 0, dificuldade, dificuldadeAluno, pontos, musicaFundo: musicaFundo.trim(), musicaLoop, compacto, corFundo: corFundo.trim() || null, modoQuestoes }
+      const novo = { ...(config ?? {}), vidas: Number(vidas) || 0, vidasIlimitada, tempoResposta: Number(tempoResposta) || 0, dificuldade, dificuldadeAluno, comoFunciona: comoFunciona.trim() || null, regulamentoOcultos: regOcultos, bolinhasQtd: Math.max(0, Number(bolinhasQtd) || 200), pontos, musicaFundo: musicaFundo.trim(), musicaLoop, compacto, corFundo: corFundo.trim() || null, modoQuestoes }
       const r = await salvarConfigDesafio(desafioId, novo)
       if (!r.ok) { toast.error(r.error ?? 'Erro ao salvar configuração.'); return }
       // Reflete a URL final hospedada (data:audio importado vira URL do storage) — feedback + evita re-subir.
@@ -290,16 +299,78 @@ export function JurisConfigForm({ desafioId, nome, config, materias, final, imag
           <h4 className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><Coins className="h-3.5 w-3.5" /> Tabela de pontos</h4>
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {PONTOS_CAMPOS.map(({ k, label, desc }) => (
-              <label key={k} className="flex items-center justify-between gap-2 rounded-lg border bg-background px-3 py-2">
+              <div key={k} className={cn('flex items-center justify-between gap-2 rounded-lg border bg-background px-3 py-2', regOcultos.includes(k) && 'opacity-60')}>
                 <span className="min-w-0">
                   <span className="block truncate text-sm font-medium">{label}</span>
                   <span className="block truncate text-[11px] text-muted-foreground">{desc}</span>
                 </span>
-                <input type="number" value={pontos[k]} onChange={(e) => setPontos((p) => ({ ...p, [k]: Number(e.target.value) }))}
-                  className="w-20 shrink-0 rounded-md border bg-card px-2 py-1 text-right text-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring/40" />
-              </label>
+                <span className="flex shrink-0 items-center gap-1.5">
+                  <button type="button" onClick={() => toggleOc(k)} title={regOcultos.includes(k) ? 'Mostrar no Regulamento' : 'Ocultar no Regulamento'}
+                    className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted">
+                    {regOcultos.includes(k) ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                  </button>
+                  <input type="number" value={pontos[k]} onChange={(e) => setPontos((p) => ({ ...p, [k]: Number(e.target.value) }))}
+                    className="w-20 rounded-md border bg-card px-2 py-1 text-right text-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring/40" />
+                </span>
+              </div>
             ))}
           </div>
+          <div className="mt-2 rounded-lg border bg-background px-3 py-2.5">
+            <div className="flex items-center justify-between gap-2">
+              <span className="flex items-center gap-1.5 text-sm font-medium"><Coins className="h-3.5 w-3.5 text-muted-foreground" /> Bolinhas do labirinto</span>
+              <span className="rounded-md bg-muted px-2 py-0.5 text-xs font-semibold tabular-nums">Total +{(Math.max(0, Number(bolinhasQtd) || 0) * (Number(pontos.ponto) || 0)).toLocaleString('pt-BR')}</span>
+            </div>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              <div className={cn('flex items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2', regOcultos.includes('ponto') && 'opacity-60')}>
+                <span className="min-w-0">
+                  <span className="block truncate text-xs font-medium">Pontos por bolinha</span>
+                  <span className="block truncate text-[11px] text-muted-foreground">Cada bolinha coletada</span>
+                </span>
+                <span className="flex shrink-0 items-center gap-1.5">
+                  <button type="button" onClick={() => toggleOc('ponto')} title={regOcultos.includes('ponto') ? 'Mostrar no Regulamento' : 'Ocultar no Regulamento'}
+                    className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted">
+                    {regOcultos.includes('ponto') ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                  </button>
+                  <input type="number" min={0} value={pontos.ponto} onChange={(e) => setPontos((p) => ({ ...p, ponto: Number(e.target.value) }))}
+                    className="w-16 rounded-md border bg-background px-2 py-1 text-right text-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring/40" />
+                </span>
+              </div>
+              <div className={cn('flex items-center justify-between gap-2 rounded-lg border bg-card px-3 py-2', regOcultos.includes('bolinhasTotal') && 'opacity-60')}>
+                <span className="min-w-0">
+                  <span className="block truncate text-xs font-medium">Bolinhas por fase</span>
+                  <span className="block truncate text-[11px] text-muted-foreground">Quantas há no labirinto</span>
+                </span>
+                <span className="flex shrink-0 items-center gap-1.5">
+                  <button type="button" onClick={() => toggleOc('bolinhasTotal')} title={regOcultos.includes('bolinhasTotal') ? 'Mostrar total no Regulamento' : 'Ocultar total no Regulamento'}
+                    className="rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted">
+                    {regOcultos.includes('bolinhasTotal') ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                  </button>
+                  <input type="number" min={0} value={bolinhasQtd} onChange={(e) => setBolinhasQtd(Number(e.target.value))}
+                    className="w-16 rounded-md border bg-background px-2 py-1 text-right text-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring/40" />
+                </span>
+              </div>
+            </div>
+          </div>
+          <p className="mt-1.5 text-[11px] text-muted-foreground">Esses valores alimentam direto o card "Ganhos e metas" do Regulamento. O 👁 oculta o item no Regulamento (ex.: o que não vale mais pontos). Pode também zerar o valor. A quantidade de bolinhas também define quantas aparecem no labirinto do jogo.</p>
+          <div className="mt-3">
+            <span className="mb-1.5 block text-[11px] font-semibold text-muted-foreground">Cards do Regulamento (mostrar/ocultar)</span>
+            <div className="flex flex-wrap gap-2">
+              {([['fases', 'Fases'], ['materias', 'Matérias'], ['vidas', 'Vidas'], ['tempo', 'Tempo']] as const).map(([k, lb]) => (
+                <button key={k} type="button" onClick={() => toggleOc(k)}
+                  className={cn('inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors', regOcultos.includes(k) ? 'bg-muted text-muted-foreground line-through' : 'bg-card hover:bg-muted')}>
+                  {regOcultos.includes(k) ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />} {lb}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h4 className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-muted-foreground"><BookMarked className="h-3.5 w-3.5" /> “Como funciona” (Regulamento)</h4>
+          <textarea value={comoFunciona} onChange={(e) => setComoFunciona(e.target.value)} rows={4}
+            placeholder="Texto que o aluno vê no Regulamento. Vazio = texto padrão (a leitura libera o desafio, labirinto, dominar as teses…)."
+            className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40" />
+          <p className="mt-1 text-[11px] text-muted-foreground">Os números do Regulamento (fases, matérias, vidas, tempo) já vêm automaticamente da config — só o texto é livre aqui.</p>
         </div>
 
         <div>

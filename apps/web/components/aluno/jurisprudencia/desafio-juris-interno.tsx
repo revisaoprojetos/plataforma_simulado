@@ -53,7 +53,7 @@ function AjudaTourBtn({ style, onStart }: { style?: React.CSSProperties; onStart
   )
 }
 type Pontos = { ponto?: number; tese?: number; vadeMecum?: number; vida?: number; armadilha?: number; labirintoLimpo?: number }
-type Config = { vidas?: number; tempoResposta?: number; pontos?: Pontos } | null
+type Config = { vidas?: number; tempoResposta?: number; pontos?: Pontos; comoFunciona?: string; regulamentoOcultos?: string[]; bolinhasQtd?: number } | null
 type DiaInfo = { chave: string; titulo: string }
 
 export interface DesafioJurisInternoProps {
@@ -355,42 +355,59 @@ function AbaRegulamento({ config, totalDias, materiasCount }: { config: Config; 
   const vidas = config?.vidas ?? 3
   const tempo = config?.tempoResposta ?? 25
   const p = config?.pontos ?? {}
-  const regras = [
-    { icon: <Gamepad2 size={16} />, label: 'Fases', valor: `${totalDias}` },
-    { icon: <BookOpen size={16} />, label: 'Matérias', valor: `${materiasCount}` },
-    { icon: <Heart size={16} />, label: 'Vidas', valor: `${vidas}` },
-    { icon: <Timer size={16} />, label: 'Tempo por pergunta', valor: `${tempo}s` },
-  ]
+  // Itens que o admin OCULTOU no Regulamento (chaves dos ganhos + dos cards).
+  const oc = new Set<string>(Array.isArray(config?.regulamentoOcultos) ? config!.regulamentoOcultos! : [])
+  const regras = ([
+    { key: 'fases', icon: <Gamepad2 size={16} />, label: 'Fases', valor: `${totalDias}` },
+    { key: 'materias', icon: <BookOpen size={16} />, label: 'Matérias', valor: `${materiasCount}` },
+    { key: 'vidas', icon: <Heart size={16} />, label: 'Vidas', valor: `${vidas}` },
+    { key: 'tempo', icon: <Timer size={16} />, label: 'Tempo por pergunta', valor: `${tempo}s` },
+  ]).filter((r) => !oc.has(r.key))
+  const nBolinhas = Math.max(0, Number(config?.bolinhasQtd) || 200)
+  const noLab = ([
+    { key: 'tese', gold: true, valor: p.tese ?? 100, txt: 'por tese dominada' },
+    { key: 'ponto', gold: false, valor: p.ponto ?? 10, txt: 'por bolinha coletada no labirinto' },
+    { key: 'bolinhasTotal', gold: false, valor: nBolinhas * (p.ponto ?? 10), txt: `juntando todas as ${fmt(nBolinhas)} bolinhas da fase` },
+    { key: 'vadeMecum', gold: false, valor: p.vadeMecum ?? 50, txt: 'por Vade Mécum coletado' },
+  ]).filter((g) => !oc.has(g.key))
+  const bonus = ([
+    { key: 'labirintoLimpo', gold: true, valor: p.labirintoLimpo ?? 500, txt: 'ao limpar o labirinto' },
+    { key: 'vida', gold: false, valor: p.vida ?? 200, txt: 'por vida restante no fim' },
+    { key: 'armadilha', gold: false, valor: p.armadilha ?? 200, txt: 'por armadilha superada' },
+  ]).filter((g) => !oc.has(g.key))
+  const temGanhos = noLab.length > 0 || bonus.length > 0
 
   return (
     <div className="ji-reg-grid">
       {/* Ganhos e metas — coluna esquerda sticky (só no desktop; no mobile empilhado vira static p/ não
           grudar e sobrepor o "Como funciona"). */}
+      {temGanhos && (
       <div className="ji-card ji-reg-sticky" style={{ padding: 18, position: 'sticky', top: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
           <Zap size={18} color="var(--brand)" />
           <h3 style={{ margin: 0, fontSize: 15.5, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--ink)' }}>Ganhos e metas</h3>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ padding: 14, borderRadius: 14, border: '1px solid var(--line)', background: 'var(--surface2)' }}>
-            <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>No labirinto</span>
-            <div style={{ marginTop: 6 }}>
-              <GanhoItem gold valor={`+${fmt(p.tese ?? 100)}`} txt="por tese dominada" />
-              <GanhoItem valor={`+${fmt(p.ponto ?? 10)}`} txt="por ponto do labirinto" />
-              <GanhoItem valor={`+${fmt(p.vadeMecum ?? 50)}`} txt="por Vade Mécum coletado" />
+          {noLab.length > 0 && (
+            <div style={{ padding: 14, borderRadius: 14, border: '1px solid var(--line)', background: 'var(--surface2)' }}>
+              <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>No labirinto</span>
+              <div style={{ marginTop: 6 }}>
+                {noLab.map((g) => <GanhoItem key={g.key} gold={g.gold} valor={`+${fmt(g.valor)}`} txt={g.txt} />)}
+              </div>
             </div>
-          </div>
-          <div style={{ padding: 14, borderRadius: 14, border: '1px solid var(--line)', background: 'var(--surface2)' }}>
-            <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>Bônus</span>
-            <div style={{ marginTop: 6 }}>
-              <GanhoItem gold valor={`+${fmt(p.labirintoLimpo ?? 500)}`} txt="ao limpar o labirinto" />
-              <GanhoItem valor={`+${fmt(p.vida ?? 200)}`} txt="por vida restante no fim" />
-              <GanhoItem valor={`+${fmt(p.armadilha ?? 200)}`} txt="por armadilha superada" />
+          )}
+          {bonus.length > 0 && (
+            <div style={{ padding: 14, borderRadius: 14, border: '1px solid var(--line)', background: 'var(--surface2)' }}>
+              <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>Bônus</span>
+              <div style={{ marginTop: 6 }}>
+                {bonus.map((g) => <GanhoItem key={g.key} gold={g.gold} valor={`+${fmt(g.valor)}`} txt={g.txt} />)}
+              </div>
             </div>
-          </div>
+          )}
           <span style={{ display: 'block', fontSize: 12, color: 'var(--muted)' }}>A leitura do dia libera o desafio; domine todas as teses da fase para concluí-la.</span>
         </div>
       </div>
+      )}
 
       {/* Como funciona */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -402,10 +419,10 @@ function AbaRegulamento({ config, totalDias, materiasCount }: { config: Config; 
               <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>Regras do desafio</span>
             </div>
           </div>
-          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.75, color: 'var(--ink)', opacity: .9 }}>
-            Cada fase (dia) tem uma <b>leitura</b> e um <b>desafio no labirinto</b>. Faça a leitura do dia para liberar o
-            desafio; depois, percorra o labirinto pegando os pontos dourados e respondendo cada questão (tese), sem
-            deixar as armadilhas te alcançarem. Domine todas as teses da fase para concluí-la e subir no ranking.
+          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.75, color: 'var(--ink)', opacity: .9, whiteSpace: 'pre-line' }}>
+            {(config?.comoFunciona && config.comoFunciona.trim())
+              ? config.comoFunciona
+              : 'Cada fase (dia) tem uma leitura e um desafio no labirinto. Faça a leitura do dia para liberar o desafio; depois, percorra o labirinto pegando os pontos dourados e respondendo cada questão (tese), sem deixar as armadilhas te alcançarem. Domine todas as teses da fase para concluí-la e subir no ranking.'}
           </p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 10, marginTop: 16 }}>
             {regras.map((r) => (

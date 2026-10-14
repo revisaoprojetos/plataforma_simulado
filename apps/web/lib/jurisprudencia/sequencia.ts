@@ -52,16 +52,19 @@ export async function diasAtivosPorAluno(
   estudanteIds?: string[],
 ): Promise<Map<string, Set<string>>> {
   const map = new Map<string, Set<string>>()
-  // Ledger do desafio. `estudanteIds` (ex.: linhas exibidas no ranking) limita a varredura. Pagina p/ não perder linhas.
+  // Ledger do desafio (filtrado por meta->>desafio), paginado. NÃO filtramos por `estudanteIds` no `.in()`:
+  // o ranking passava ~443 ids → URL gigante (URI too long no PostgREST) → a query FALHAVA → mapa vazio →
+  // caía no backfill (1 dia) e TODO MUNDO ficava com sequência 1. Varremos todos os marcadores do desafio
+  // (bounded por alunos×dias) e o chamador usa `.get(id)` de quem precisa. (ver [[in-sem-chunk-hang-proxy]])
+  void estudanteIds
   const PAGE = 1000
   for (let from = 0; ; from += PAGE) {
-    let q = svc
+    const q = svc
       .from('simulado_xp_eventos')
       .select('estudante_id, meta, criado_em')
       .eq('tenant_id', tenantId)
       .eq('origem', 'jurisprudencia')
       .eq('meta->>desafio', desafioId)
-    if (estudanteIds && estudanteIds.length) q = q.in('estudante_id', estudanteIds)
     const { data, error } = await q.order('id', { ascending: true }).range(from, from + PAGE - 1)
     if (error || !data || !data.length) break
     for (const r of data as any[]) {
