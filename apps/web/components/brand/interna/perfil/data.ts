@@ -19,6 +19,8 @@ export interface PerfilHeader {
   avatarUrl: string | null
   avatarCor: string | null
   gamAtivo: boolean
+  /** Fundo do banner escolhido pelo aluno: null = fundo ANIMADO padrão; '#hex' = cor; URL = imagem. */
+  perfilCapa?: string | null
 }
 
 export interface PerfilKpis {
@@ -67,6 +69,20 @@ export interface PerfilTempoQuestao {
 export interface PerfilMetaDiaria { meta: number; feitas: number }
 /** Toggles de preferências do aluno. */
 export interface PerfilPreferencias { lembrete: boolean; resumoSemanal: boolean; aparecerRanking: boolean; modoFoco: boolean }
+/** Edição de perfil (SÓ Revisão): opções + estado atual p/ o editor rico (avatar/banner/adesivos). Quando
+ * null/ausente, o perfil não mostra o botão "Editar perfil" (ex.: MEQ/VND ficam sem editor por ora). */
+export interface PerfilEdicaoAdesivo { carimboId: string; url: string; x: number; y: number; tamanho: number; rotacao: number }
+export interface PerfilEdicao {
+  avatar: string | null
+  perfilCapa: string | null
+  avatarCor: string | null
+  adesivos: PerfilEdicaoAdesivo[]
+  avatares: string[]
+  fundos: string[]
+  cores: string[]
+  colecionados: { carimboId: string; url: string; titulo: string }[]
+}
+
 export interface PerfilHistorico { simulado: string; quando: string; nota: number | null; acerto: number; tempo: string; href: string | null }
 export interface PerfilConquista { titulo: string; desbloqueada: boolean; cor?: string | null; criterio?: string | null }
 export interface PerfilLeiSeca { lei: string; feitas: number; total: number; href?: string | null }
@@ -94,4 +110,6 @@ export interface PerfilData {
   tempoPorQuestao?: PerfilTempoQuestao | null
   metaDiaria?: PerfilMetaDiaria | null
   preferencias?: PerfilPreferencias | null
+  /** SÓ Revisão: dados do editor de perfil (avatar/banner/adesivos). null → sem botão de editar. */
+  edicao?: PerfilEdicao | null
 }

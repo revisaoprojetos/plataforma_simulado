@@ -12,6 +12,21 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.16.0 — 2026-10-14
+
+**feat(perfil): editor de perfil do aluno — foto, banner, cor de fundo e adesivos**
+
+- Nova área **"Decorar perfil" / "Editar perfil"** no perfil do aluno (`perfil-editor-pro.tsx`) com prévia ao
+  vivo e abas **Foto / Banner / Adesivos**, usando os dados que já existem no sistema (avatares Capi, fundos,
+  cores e carimbos colecionados).
+- **Banner** respeita o `perfilCapa` escolhido: imagem (fundo salvo), cor sólida (`#…`) ou o **fundo animado**
+  (grid + "RUMO À PROCURADORIA") — este último agora é uma opção selecionável.
+- **Adesivos** posicionáveis (arrastar/redimensionar) renderizados no banner real; tamanho em % da altura
+  para ficar consistente entre a prévia e o banner.
+- **Cor de fundo do avatar** (`avatarCor`) aplicada em TODAS as imagens de perfil da plataforma: card do
+  perfil, top bar e barra inferior do shell.
+- Editor exibido **só na Revisão** (que tem as fotos Capi); oculto em MEQ/VND.
+
 ## 3.15.4 — 2026-10-14
 
 **fix(juris): bootstrap AUTORITATIVO do servidor — fim do vazamento/re-sync do progresso do arcade**

@@ -10,6 +10,7 @@ import { internaTokensStyle, INTERNA_RADIUS, type InternaTheme } from '../intern
 import { useTemaInterno } from '../use-tema-interno'
 import { BK, Ic, Tabs, type TabDef, notec, fnum, Donut, BarsSvg, LineSvg } from './shared'
 import { useIsMobile } from './use-is-mobile'
+import { PerfilEditorPro } from '@/components/aluno/perfil-editor-pro'
 import type { PerfilData, PerfilPreferencias } from './data'
 import { salvarPerfilPrefs } from '@/app/aluno/(portal)/perfil/actions'
 import {
@@ -67,8 +68,14 @@ function LvlRing({ size, p, color, inner }: { size: number; p: number; color: st
 
 function Avatar({ size, data }: { size: number; data: PerfilData }) {
   const h = data.header
-  if (h.avatarUrl) return <img src={h.avatarUrl} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-  return <span style={{ width: '100%', height: '100%', borderRadius: '50%', background: h.avatarCor || 'linear-gradient(160deg,#F7C25A,#E8952A)', color: '#FFF', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.round(size * 0.36), fontWeight: 800 }}>{h.iniciais}</span>
+  // Cor ATRÁS da foto (as capis são PNG transparente) + contain (não corta a capi, igual top bar/sidebar).
+  return (
+    <span style={{ width: '100%', height: '100%', borderRadius: '50%', overflow: 'hidden', background: h.avatarCor || 'linear-gradient(160deg,#F7C25A,#E8952A)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+      {h.avatarUrl
+        ? <img src={h.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center 82%' }} />
+        : <span style={{ color: '#FFF', fontSize: Math.round(size * 0.36), fontWeight: 800 }}>{h.iniciais}</span>}
+    </span>
+  )
 }
 
 function WhoRow({ mobile, data }: { mobile: boolean; data: PerfilData }) {
@@ -103,9 +110,26 @@ function WhoRow({ mobile, data }: { mobile: boolean; data: PerfilData }) {
           </div>
         ) : null}
       </div>
-      {h.memberSince ? (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: mobile ? 'flex-start' : 'flex-end', gap: 12, paddingTop: mobile ? 0 : 16 }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--muted)' }}><Ic n="crown" s={14} />Aluno desde {h.memberSince}</span>
+      {(h.memberSince || data.edicao) ? (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: mobile ? 'flex-start' : 'flex-end', gap: 10, paddingTop: mobile ? 0 : 16 }}>
+          {h.memberSince ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: 'var(--muted)' }}><Ic n="crown" s={14} />Aluno desde {h.memberSince}</span> : null}
+          {/* Etiquetas (adesivos liberados): mostra os primeiros e "+N" quando há muitos. */}
+          {data.edicao && data.edicao.colecionados.length > 0 ? (
+            <div style={{ display: 'flex', alignItems: 'center' }}>
+              {data.edicao.colecionados.slice(0, 6).map((c, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={c.carimboId} src={c.url} alt="" title={c.titulo} style={{ width: 26, height: 26, borderRadius: '50%', border: '2px solid var(--bg)', background: 'var(--surface)', objectFit: 'contain', marginLeft: i ? -8 : 0, position: 'relative', zIndex: 20 - i }} />
+              ))}
+              {data.edicao.colecionados.length > 6 ? (
+                <span style={{ marginLeft: -8, height: 26, minWidth: 26, padding: '0 7px', borderRadius: 99, background: 'var(--surface)', border: '2px solid var(--bg)', fontSize: 11, fontWeight: 800, color: 'var(--ink)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>+{data.edicao.colecionados.length - 6}</span>
+              ) : null}
+            </div>
+          ) : null}
+          {data.edicao ? (
+            <PerfilEditorPro nome={h.nome} iniciais={h.iniciais} nivel={h.nivel} tituloNivel={h.tituloNivel}
+              avatar={data.edicao.avatar} perfilCapa={data.edicao.perfilCapa} avatarCor={data.edicao.avatarCor}
+              adesivos={data.edicao.adesivos} avatares={data.edicao.avatares} fundos={data.edicao.fundos} cores={data.edicao.cores} colecionados={data.edicao.colecionados} />
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -115,17 +139,34 @@ function WhoRow({ mobile, data }: { mobile: boolean; data: PerfilData }) {
 function Header({ mobile, data }: { mobile: boolean; data: PerfilData }) {
   const Hb = mobile ? 120 : 210
   const g = mobile ? 32 : 44
+  // Fundo do aluno: null/'anim' = grade ANIMADA padrão; '#hex' = cor sólida; URL = imagem.
+  const capa = data.header.perfilCapa ?? null
+  const ehCorCapa = !!capa && capa.startsWith('#')
+  const ehAnimado = capa == null || capa === 'anim'
   const banner = (
-    <div style={{ position: 'relative', height: Hb, background: 'linear-gradient(120deg,#24166A,#4B30BE 55%,#6449E0)', overflow: 'hidden' }}>
-      <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px)', backgroundSize: `${g}px ${g}px`, pointerEvents: 'none' }} />
-      <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>{squares(mobile ? 350 : 1180, Hb, g, mobile ? 6 : 12, mobile ? 11 : 17)}</div>
-      {mobile ? null : (
-        <svg className="prv-emb" viewBox="0 0 68 66" aria-hidden style={{ position: 'absolute', right: 60, top: '50%', marginTop: -88, width: 180, height: 175, pointerEvents: 'none' }}>
-          <path fillRule="evenodd" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.12)" strokeWidth={0.25} d={REV_R} />
-          <path className="prv-run" fill="none" stroke="#F1C232" strokeWidth={0.45} strokeLinecap="round" d={REV_RO} />
-        </svg>
-      )}
-      {mobile ? null : <span style={{ position: 'absolute', left: 32, top: 56, fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: '#F1C232' }}>RUMO À PROCURADORIA</span>}
+    <div style={{ position: 'relative', height: Hb, overflow: 'hidden', background: ehAnimado ? 'linear-gradient(120deg,#24166A,#4B30BE 55%,#6449E0)' : (ehCorCapa ? capa! : '#1a1240') }}>
+      {capa && !ehCorCapa && capa !== 'anim' ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={capa} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+      ) : null}
+      {ehAnimado ? (
+        <>
+          <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px)', backgroundSize: `${g}px ${g}px`, pointerEvents: 'none' }} />
+          <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>{squares(mobile ? 350 : 1180, Hb, g, mobile ? 6 : 12, mobile ? 11 : 17)}</div>
+          {mobile ? null : (
+            <svg className="prv-emb" viewBox="0 0 68 66" aria-hidden style={{ position: 'absolute', right: 60, top: '50%', marginTop: -88, width: 180, height: 175, pointerEvents: 'none' }}>
+              <path fillRule="evenodd" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.12)" strokeWidth={0.25} d={REV_R} />
+              <path className="prv-run" fill="none" stroke="#F1C232" strokeWidth={0.45} strokeLinecap="round" d={REV_RO} />
+            </svg>
+          )}
+          {mobile ? null : <span style={{ position: 'absolute', left: 32, top: 56, fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: '#F1C232' }}>RUMO À PROCURADORIA</span>}
+        </>
+      ) : null}
+      {/* Adesivos-decoração salvos pelo aluno (posição/tamanho em % do banner). */}
+      {(data.edicao?.adesivos ?? []).map((a, i) => (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img key={i} src={a.url} alt="" style={{ position: 'absolute', left: `${a.x}%`, top: `${a.y}%`, height: `${a.tamanho}%`, width: 'auto', transform: `translate(-50%,-50%) rotate(${a.rotacao || 0}deg)`, pointerEvents: 'none', objectFit: 'contain', filter: 'drop-shadow(0 2px 4px rgba(0,0,0,.35))' }} />
+      ))}
     </div>
   )
   if (mobile) {

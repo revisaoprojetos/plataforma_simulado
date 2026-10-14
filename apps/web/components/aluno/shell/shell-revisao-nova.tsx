@@ -321,12 +321,11 @@ export function ShellRevisaoNova({
             >
               <span style={{ position: 'relative', display: 'inline-flex' }}>
                 {usuario.avatarUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={usuario.avatarUrl}
-                    alt=""
-                    style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', boxShadow: '0 0 0 2px rgba(241,194,50,.55)' }}
-                  />
+                  // Cor ATRÁS da foto (capi é PNG transparente) + contain, igual perfil/sidebar.
+                  <span style={{ width: 44, height: 44, borderRadius: '50%', overflow: 'hidden', background: avatarCor, display: 'inline-flex', boxShadow: '0 0 0 2px rgba(241,194,50,.55)' }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={usuario.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center 82%' }} />
+                  </span>
                 ) : (
                   <span
                     aria-hidden="true"
@@ -620,7 +619,7 @@ export function ShellRevisaoNova({
             >
               {usuario.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={usuario.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img src={usuario.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center 82%' }} />
               ) : (
                 usuario.iniciais
               )}
@@ -717,7 +716,7 @@ export function ShellRevisaoNova({
             >
               {usuario.avatarUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={usuario.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img src={usuario.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center 82%' }} />
               ) : (
                 usuario.iniciais
               )}

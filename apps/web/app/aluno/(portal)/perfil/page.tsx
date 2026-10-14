@@ -130,6 +130,7 @@ export default async function PerfilAlunoPage() {
         avatarUrl: pers.avatar ?? null,
         avatarCor: pers.avatarCor ?? null,
         gamAtivo,
+        perfilCapa: pers.perfilCapa ?? null,
       },
       kpis: {
         simuladosFeitos: rel?.simulados ?? 0,
@@ -162,6 +163,13 @@ export default async function PerfilAlunoPage() {
       tempoPorQuestao: analytics.tempoPorQuestao,
       metaDiaria: { meta: perfilPrefs.metaDiaria, feitas: analytics.questoesHoje },
       preferencias: perfilPrefs,
+      // Editor de perfil SÓ no Revisão (fotos da Capi). MEQ/VND → null = sem botão de editar por ora.
+      edicao: _it.brand === 'revisao' ? {
+        avatar: pers.avatar ?? null, perfilCapa: pers.perfilCapa ?? null, avatarCor: pers.avatarCor ?? null,
+        adesivos: (pers.adesivos ?? []).map((a: any) => ({ carimboId: a.carimboId, url: a.url, x: a.x ?? 50, y: a.y ?? 30, tamanho: a.tamanho ?? 14, rotacao: a.rotacao ?? 0 })),
+        avatares: opcoes.avatares ?? [], fundos: opcoes.fundos ?? [], cores: opcoes.cores ?? [],
+        colecionados: colecionadosAdesivos,
+      } : null,
     }
     return <PlatformPerfil brand={_it.brand} theme={_it.theme} data={perfilData} />
   }
