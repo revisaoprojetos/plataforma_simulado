@@ -143,10 +143,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Sem acesso a este desafio.' }, { status: 403 })
   }
 
-  // Sanitiza: dom/best objetos, recorde inteiro >= 0.
-  const dom = b.dom && typeof b.dom === 'object' && !Array.isArray(b.dom) ? b.dom : {}
-  const best = b.best && typeof b.best === 'object' && !Array.isArray(b.best) ? b.best : {}
-  const recorde = Math.max(0, Math.trunc(Number(b.recorde) || 0))
+  // Sanitiza: dom/best objetos; recorde = maior best (recomputado — não confia no recorde do cliente).
+  // NB: o SELO FINAL (dia agregado) é MANTIDO — quem ganhar de verdade salva normalmente. O "dia 15
+  // fantasma" era o VAZAMENTO do localStorage (storageKey fixo), já corrigido por conta (v3.15.1) + limpeza
+  // dos dados; não dá pra bloquear aqui sem quebrar o selo legítimo.
+  const dom = b.dom && typeof b.dom === 'object' && !Array.isArray(b.dom) ? (b.dom as Record<string, unknown>) : {}
+  const best = b.best && typeof b.best === 'object' && !Array.isArray(b.best) ? (b.best as Record<string, unknown>) : {}
+  const recorde = Math.max(0, ...Object.values(best).map((v) => Math.trunc(Number(v) || 0)))
 
   const { error } = await svc.from('simulado_jurisprudencia_progresso').upsert(
     {
@@ -162,19 +165,10 @@ export async function POST(request: NextRequest) {
   )
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Sequência (streak): grava o DIA DE HOJE (servidor, fuso BRT) no LEDGER imutável (simulado_xp_eventos,
-  // origem='jurisprudencia'). A atividade acontece AGORA (neste POST), então o dia é o de hoje — NÃO
-  // confiar em datas enviadas pelo cliente (localStorage acumulado/arbitrário inflava a sequência: o jogo
-  // mandava datas antigas e cada uma virava um "dia ativo" falso). Idempotente por
-  // (tenant,aluno,origem,ref_id='<desafio>:<dia-de-hoje>'); xp=0 (marcador, não afeta XP/gamificação).
-  const hoje = diaBRT()
-  await svc
-    .from('simulado_xp_eventos')
-    .upsert(
-      [{ tenant_id: sessao.tenantId, estudante_id: sessao.estudanteId, origem: 'jurisprudencia', ref_id: `${desafioId}:${hoje}`, xp: 0, meta: { dia: hoje, desafio: desafioId } }],
-      { onConflict: 'tenant_id,estudante_id,origem,ref_id', ignoreDuplicates: true },
-    )
-    .then(() => {}, () => {}) // best-effort: não bloqueia o salvamento do progresso
+  // NB: a SEQUÊNCIA do juris NÃO é mais marcada aqui. Antes, cada save/re-sync do arcade gravava um marcador
+  // de "dia ativo" — então só interagir com o arcade (ou um re-sync do localStorage) já contava como
+  // sequência, mesmo sem fazer a aula. Agora o marcador vem só da conclusão da LEITURA (ou das questões),
+  // que é a regra: fazer a leitura conta como sequência. (ver /api/leitura/progresso e quiz-tentativa.)
 
   return NextResponse.json({ ok: true })
 }

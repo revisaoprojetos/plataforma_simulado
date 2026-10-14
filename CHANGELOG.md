@@ -12,6 +12,20 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.15.3 — 2026-10-14
+
+**fix(juris): arcade salvar não conta mais como sequência (só a leitura conta) + recorde recomputado**
+
+- O POST `/api/jurisprudencia/progresso` gravava um marcador de sequência a CADA save/re-sync do arcade →
+  só interagir com o jogo (ou um re-sync do localStorage) já contava como "dia da sequência", mesmo sem fazer
+  a aula. Removido: agora a sequência vem só da conclusão da LEITURA (ou das questões). Corrige "quem não fez
+  a aula estava contabilizando".
+- `recorde` recomputado do maior `best` no servidor (não confia no recorde enviado pelo cliente).
+- Selo final PRESERVADO (não é bloqueado no servidor) — o "dia 15 fantasma" era o vazamento do localStorage,
+  corrigido por `storageKey` por conta (v3.15.1) + limpeza dos dados.
+
+---
+
 ## 3.15.2 — 2026-10-14
 
 **fix(gamificação/juris): sequência da top bar conta qualquer atividade + leitura conta na sequência do juris**
