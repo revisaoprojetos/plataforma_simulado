@@ -51,33 +51,25 @@ async function semearProgresso(){
       window.DESAFIO.LEITURA_DOCS = (p && p.leituraDocs) || {};
       window.DESAFIO.LEITURA_RAPIDA_DOCS = (p && p.leituraRapidaDocs) || {}; // dias com leitura rápida
     }
-    // Semeia o progresso local MESCLANDO servidor + local — NUNCA sobrescreve (senão um POST
-    // fire-and-forget que não chegou faria o reload APAGAR o progresso local). Progresso é monotônico:
-    // dom = UNIÃO das teses dominadas por dia; best = MAIOR pontuação por dia; dias = união.
+    // Semeia o progresso local a partir do SERVIDOR (AUTORITATIVO). ANTES mesclava servidor+local e
+    // re-sincronizava o que o local tinha "a mais" — mas isso fazia o localStorage VAZAR dado: progresso de
+    // outra conta/sessão (storageKey antigo era fixo) OU um dia removido no admin VOLTAVA sozinho (o merge
+    // ressuscitava e o sync-up re-gravava no servidor). Agora o SERVIDOR manda: o localStorage espelha o
+    // servidor (preservando só as PREFERÊNCIAS do aluno — som/volume/dificuldade/dia selecionado). Sem merge,
+    // sem re-sync. O arcade continua POSTando a cada jogada (setItem → POST), então jogada real persiste.
     const key = window.DESAFIO && window.DESAFIO.CONFIG && window.DESAFIO.CONFIG.storageKey;
     if(key){
       const atual = JSON.parse(localStorage.getItem(key) || '{}');
       const obj = x => (x && typeof x==='object' && !Array.isArray(x)) ? x : {};
-      const mergeDom = (a,b) => { const o = Object.assign({}, obj(a)); for(const k in obj(b)){ const s=new Set(Array.isArray(o[k])?o[k]:[]); (Array.isArray(b[k])?b[k]:[]).forEach(i=>s.add(i)); o[k]=[...s]; } return o; };
-      const mergeBest = (a,b) => { const o = Object.assign({}, obj(a)); for(const k in obj(b)){ o[k]=Math.max(Number(o[k])||0, Number(b[k])||0); } return o; };
-      const dom = mergeDom(p.dom, atual.dom);
-      const best = mergeBest(p.best, atual.best);
-      const recorde = Math.max(Number(p.recorde)||0, Number(atual.recorde)||0, 0, ...Object.values(best).map(v=>Number(v)||0));
-      // SEQUÊNCIA: `dias` vem SÓ do SERVIDOR (ledger já FILTRADO: descarta datas fabricadas pelo cliente
-      // antigo). NÃO unir com o localStorage — ele pode conter datas antigas/arbitrárias (ex.: "ontem" que
-      // não existiu) que inflavam a sequência no arcade (mostrava 2 quando o relatório mostra 1). O POST
-      // ignora `dias`; quem registra o dia é o servidor (dia de HOJE). marcarDiaAtivo re-adiciona HOJE ao jogar.
+      const dom = obj(p.dom);
+      const best = obj(p.best);
+      const recorde = Math.max(Number(p.recorde)||0, 0, ...Object.values(best).map(v=>Number(v)||0));
       const diasSrv = Array.isArray(p && p.dias) ? p.dias : [];
-      const dias = diasSrv
-        .filter(function(d){ return typeof d==='string' && /^\d{4}-\d{2}-\d{2}$/.test(d); }).sort();
+      const dias = diasSrv.filter(function(d){ return typeof d==='string' && /^\d{4}-\d{2}-\d{2}$/.test(d); }).sort();
+      // Mantém as preferências locais (muted, volSfx, volMus, calm, sel, dific, demoAll, final) e SOBRESCREVE
+      // só o progresso (dom/best/recorde/dias) com o do servidor.
       const semeado = Object.assign({}, atual, { dom, best, recorde, dias });
       localStorage.setItem(key, JSON.stringify(semeado));
-      // Sync-up: se o local tinha progresso ALÉM do servidor (POST perdido), re-envia agora.
-      try{
-        if(JSON.stringify({ d:obj(p.dom), b:obj(p.best) }) !== JSON.stringify({ d:dom, b:best })){
-          fetch('/api/jurisprudencia/progresso', { method:'POST', credentials:'same-origin', headers:{ 'Content-Type':'application/json' }, body: JSON.stringify({ desafio:ID, dom, best, recorde, dias }), keepalive:true }).catch(()=>{});
-        }
-      }catch(e){}
     }
   }catch(e){ /* mantém o que houver localmente */ }
 }

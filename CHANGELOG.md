@@ -12,6 +12,19 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.15.4 — 2026-10-14
+
+**fix(juris): bootstrap AUTORITATIVO do servidor — fim do vazamento/re-sync do progresso do arcade**
+
+- O `bootstrap.js` mesclava o progresso do servidor com o localStorage e **re-sincronizava o que o local
+  tinha "a mais"** → progresso de outra conta/sessão, ou um dia removido no admin, **voltava sozinho** (e era
+  re-gravado no servidor). Era por isso que apagar o "dia 15"/pontos não segurava.
+- Agora o **servidor é autoritativo**: o localStorage espelha o progresso do servidor (dom/best/recorde/dias),
+  preservando só as preferências do aluno (som/volume/dificuldade/dia selecionado). Sem merge, sem re-sync.
+  A jogada real continua persistindo (o arcade POSTa a cada save). Zerar no banco agora **segura**.
+
+---
+
 ## 3.15.3 — 2026-10-14
 
 **fix(juris): arcade salvar não conta mais como sequência (só a leitura conta) + recorde recomputado**
