@@ -6,6 +6,8 @@ import { docAcessivelAluno } from '@/lib/leitura/acesso'
 import { ehTestadorLeituraDoc } from '@/lib/leitura/testadores'
 import { invalidarRankingPorDocumento } from '@/lib/leitura/ranking'
 import { avaliarMedalhasPorDocumento } from '@/lib/leitura/carimbos'
+import { diaBRT } from '@/lib/jurisprudencia/sequencia'
+import { invalidarRankingJuris } from '@/lib/jurisprudencia/ranking'
 
 // POST /api/leitura/progresso — auto-save idempotente do progresso de leitura.
 export const dynamic = 'force-dynamic'
@@ -14,7 +16,7 @@ export async function POST(request: NextRequest) {
   const sessao = await getSessaoAluno()
   if (!sessao) return NextResponse.json({ message: 'Não autenticado.' }, { status: 401 })
 
-  let body: { documento_id?: string; versao?: number; pct?: number; artigo_max?: number; tempo_inc?: number; concluir?: boolean }
+  let body: { documento_id?: string; versao?: number; pct?: number; artigo_max?: number; tempo_inc?: number; concluir?: boolean; desafio?: string }
   try { body = await request.json() } catch { return NextResponse.json({ message: 'Requisição inválida.' }, { status: 400 }) }
   const { documento_id, versao } = body
   if (!documento_id || !versao) return NextResponse.json({ message: 'Dados obrigatórios ausentes.' }, { status: 400 })
@@ -65,6 +67,17 @@ export async function POST(request: NextRequest) {
     void invalidarRankingPorDocumento(svc, sessao.tenantId, documento_id)
     // Medalhas do módulo (carimbos + conquistas colecionáveis): avalia/concede na conclusão da aula.
     void avaliarMedalhasPorDocumento(svc, sessao.tenantId, documento_id, sessao.estudanteId)
+    // SEQUÊNCIA DO DESAFIO DE JURISPRUDÊNCIA: a regra é a LEITURA contar como sequência (sem precisar fazer
+    // as questões). Grava o DIA DE HOJE (BRT) no ledger imutável (origem='jurisprudencia'), mesmo marcador
+    // do arcade. Idempotente por ref_id='<desafio>:<hoje>'. Só quando a conclusão vem do arcade da juris.
+    if (body.desafio) {
+      const desafioId = body.desafio
+      const hoje = diaBRT()
+      void svc.from('simulado_xp_eventos').upsert(
+        [{ tenant_id: sessao.tenantId, estudante_id: sessao.estudanteId, origem: 'jurisprudencia', ref_id: `${desafioId}:${hoje}`, xp: 0, meta: { dia: hoje, desafio: desafioId } }],
+        { onConflict: 'tenant_id,estudante_id,origem,ref_id', ignoreDuplicates: true },
+      ).then(() => invalidarRankingJuris(sessao.tenantId, desafioId), () => {})
+    }
   }
 
   return NextResponse.json({ ok: true, pct: pctNovo, concluido: !!concluidoEm })

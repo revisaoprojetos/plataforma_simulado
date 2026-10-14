@@ -46,12 +46,19 @@ async function streakLedgerGlobal(
   const ontem = new Date(Date.parse(hoje + 'T00:00:00Z') - 86_400_000).toISOString().slice(0, 10)
   const dias = new Set<string>()
   try {
+    // Streak da TOP BAR = QUALQUER atividade do aluno, 1 vez por dia (regra do usuário): varre TODO o ledger
+    // de XP (leitura, jurisprudência, prática, lei seca…) e conta o DIA de cada evento — meta.dia (imutável,
+    // quando houver) ou o dia BRT do criado_em. Dedup por dia → mais de uma atividade no mesmo dia = 1.
     const { data: ev } = await svc
       .from('simulado_xp_eventos')
-      .select('meta')
+      .select('meta, criado_em')
       .eq('tenant_id', tenantId).eq('estudante_id', estudanteId)
-      .eq('origem', 'leitura').like('ref_id', 'quiz:%')
-    for (const e of (ev ?? []) as any[]) { const d = e?.meta?.dia; if (d) dias.add(d) }
+      .limit(5000)
+    for (const e of (ev ?? []) as any[]) {
+      const md = e?.meta?.dia
+      const d = (typeof md === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(md)) ? md : (e?.criado_em ? diaLocal(tz, new Date(e.criado_em)) : null)
+      if (d) dias.add(d)
+    }
   } catch { return { streakAtual: 0, streakMaior: 0, vazio: true } }
   // Overrides manuais (calendário do suporte) de TODOS os módulos deste aluno; true vence false.
   let overrides: Record<string, boolean> | undefined

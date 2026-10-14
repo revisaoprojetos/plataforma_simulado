@@ -22,7 +22,7 @@ const PROTOTIPO = `/leitura/leitor-jus.html?v=${APP_VERSION}`
 const SELO_LABELS: Record<string, string> = Object.fromEntries(Object.entries(SELOS).map(([k, v]) => [k, v.nome]))
 
 export function LeitorJus({
-  html, titulo, sobretitulo = '', topicos, caminho, voltarHref, questoesHref, documentoId, versao,
+  html, titulo, sobretitulo = '', topicos, caminho, voltarHref, questoesHref, documentoId, versao, desafio,
 }: {
   html: string
   titulo: string
@@ -34,11 +34,13 @@ export function LeitorJus({
   /** Documento + versão p/ gravar progresso/conclusão da leitura (gate que libera o quiz no arcade). */
   documentoId?: string
   versao?: number
+  /** Desafio (pasta) — p/ a conclusão da leitura contar na SEQUÊNCIA do juris (regra: leitura = sequência). */
+  desafio?: string
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   // Mantém os dados num ref para o listener de mensagem sempre ver o valor atual sem re-registrar.
-  const dadosRef = useRef({ html, titulo, sobretitulo, topicos, caminho, voltarHref, questoesHref, documentoId, versao })
-  dadosRef.current = { html, titulo, sobretitulo, topicos, caminho, voltarHref, questoesHref, documentoId, versao }
+  const dadosRef = useRef({ html, titulo, sobretitulo, topicos, caminho, voltarHref, questoesHref, documentoId, versao, desafio })
+  dadosRef.current = { html, titulo, sobretitulo, topicos, caminho, voltarHref, questoesHref, documentoId, versao, desafio }
 
   // O leitor é um iframe isolado → quem fala com a API é o host. Grava progresso/conclusão da leitura.
   const postProgresso = useCallback((body: Record<string, unknown>) => {
@@ -88,7 +90,7 @@ export function LeitorJus({
         const href = m.to === 'questoes' ? d.questoesHref : d.voltarHref
         const ir = () => { if (href) window.location.href = href }
         // "Concluir leitura" → grava a conclusão (pct 100) ANTES de fechar, p/ o arcade liberar o quiz do dia.
-        if (m.to === 'questoes') { void postProgresso({ pct: 100, concluir: true }).then(ir) }
+        if (m.to === 'questoes') { void postProgresso({ pct: 100, concluir: true, desafio: d.desafio }).then(ir) }
         else ir()
       }
     }

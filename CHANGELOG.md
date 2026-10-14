@@ -12,6 +12,21 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.15.2 — 2026-10-14
+
+**fix(gamificação/juris): sequência da top bar conta qualquer atividade + leitura conta na sequência do juris**
+
+- **Sequência da TOP BAR agora conta QUALQUER atividade (1×/dia):** antes só contava quiz de leitura
+  (`origem='leitura'`, `ref_id='quiz:%'`) — a atividade do juris (e outras) não bumpava o streak global.
+  Agora varre todo o ledger de XP e conta o dia de cada evento (dedup por dia). Quem fez juris ontem+hoje
+  passa a mostrar 2 na top bar.
+- **Leitura conta na SEQUÊNCIA do juris:** concluir a LEITURA do dia (sem precisar fazer as questões) agora
+  grava o marcador de sequência do juris (`/api/leitura/progresso` com `desafio`).
+- **Dia 15 (selo final) zerado:** removido o progresso de arcade do dia 15 (dom/best) de todas as contas
+  desse desafio (dado vazado do bug anterior do storageKey). Fica "não iniciada" até ser desbloqueado.
+
+---
+
 ## 3.15.1 — 2026-10-14
 
 **fix(juris): vazamento de progresso entre contas + conclusão da leitura liberar o jogo**
