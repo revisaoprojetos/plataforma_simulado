@@ -167,6 +167,10 @@ export interface SimEntradaReal {
   onToggleTheme?: () => void
   /** Nome da plataforma para a linha "cadastrado na plataforma do …". */
   plataforma: string
+  /** Rótulo curto da plataforma usado no LINK de identificação (ex.: "Plataforma Revisão"). */
+  plataformaRotulo?: string
+  /** Link da plataforma (Curseduca) onde o aluno faz/confirma o cadastro — o "e-mail cadastrado na …" vira âncora. */
+  plataformaLoginUrl?: string | null
   /** Logo REAL do tenant (white-label) — quando presente substitui a marca genérica no cabeçalho. */
   logoUrl?: string | null
   /** Logo do tenant para FUNDO ESCURO (tema escuro). No tema claro usa-se `logoUrl`; no escuro, esta. */

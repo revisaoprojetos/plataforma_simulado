@@ -110,7 +110,10 @@ export function EntradaRevisao({ theme, data, es: esInit = 'aberto', real }: Sim
         {/* Cartão Identificação */}
         <RBox titulo="Identifique-se para iniciar" icon={P.chart} iconPath2>
           <span style={{ display: 'block', margin: '-6px 0 16px', fontSize: 13, color: 'var(--muted)' }}>
-            Use o e-mail cadastrado na <b style={{ color: 'var(--brand)' }}>plataforma do Simulado Revisão</b>.
+            Use o e-mail cadastrado na{' '}
+            {real?.plataformaLoginUrl
+              ? <a href={real.plataformaLoginUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--brand)', fontWeight: 700, textDecoration: 'underline', textUnderlineOffset: 2 }}>{real.plataformaRotulo ?? 'plataforma'}</a>
+              : <b style={{ color: 'var(--brand)' }}>{real?.plataformaRotulo ?? 'plataforma'}</b>}.
           </span>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

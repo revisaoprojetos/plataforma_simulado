@@ -12,6 +12,18 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.17.1 — 2026-10-14
+
+**fix(simulado): link da plataforma volta na entrada do simulado (3 marcas)**
+
+- No designer novo da entrada o nome da plataforma deixou de ser um **link**. Voltou como âncora, no formato
+  **"Plataforma Revisão / MEQ / VND"**, apontando para o login da Curseduca de cada tenant:
+  - Revisão → `https://revisaopge.curseduca.pro/login`
+  - VND → `https://vocenadefensoria.curseduca.pro/login`
+  - MEQ → `https://meqconcursos.curseduca.pro/login`
+- Mapa por marca em `EntradaReal`; novos campos `plataformaRotulo` + `plataformaLoginUrl` em `SimEntradaReal`.
+- Revisão (subtítulo), MEQ e VND (label do campo de e-mail) renderizam o rótulo como link (nova aba).
+
 ## 3.17.0 — 2026-10-14
 
 **feat(juris): Regulamento configurável, bolinhas editáveis + fix do selo final e da sequência no ranking**

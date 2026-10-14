@@ -59,6 +59,14 @@ export interface EntradaRealProps {
   agoraISO: string
 }
 
+/** Rótulo + link da plataforma (Curseduca) por marca — o aluno usa o MESMO e-mail cadastrado lá.
+ *  O link some do novo designer da entrada; aqui ele volta como âncora na linha de identificação. */
+const PLATAFORMA_LOGIN: Record<Brand, { rotulo: string; url: string }> = {
+  revisao: { rotulo: 'Plataforma Revisão', url: 'https://revisaopge.curseduca.pro/login' },
+  vnd: { rotulo: 'Plataforma VND', url: 'https://vocenadefensoria.curseduca.pro/login' },
+  meq: { rotulo: 'Plataforma MEQ', url: 'https://meqconcursos.curseduca.pro/login' },
+}
+
 /** Calcula o estado inicial da Entrada a partir da janela/status (sem conhecer o aluno ainda). */
 function calcularEs(p: EntradaRealProps['prova'], agora: number): EstadoEntrada {
   const ini = p.dataInicio ? new Date(p.dataInicio).getTime() : null
@@ -256,7 +264,8 @@ export function EntradaReal(props: EntradaRealProps) {
   const real: SimEntradaReal = {
     metodo, email, setEmail, cpf, setCpf, telefone, setTelefone,
     onIdentificar, onValidar, emAndamento: emAnd, carregando, erro, voltarHref: '/aluno', onToggleTheme: toggleDark,
-    plataforma, logoUrl: props.logoUrl ?? null, logoDarkUrl: props.logoDarkUrl ?? null, logoGrandeUrl: props.logoGrandeUrl ?? null, permiteFolha: prova.permiteFolha,
+    plataforma, plataformaRotulo: PLATAFORMA_LOGIN[brand].rotulo, plataformaLoginUrl: PLATAFORMA_LOGIN[brand].url,
+    logoUrl: props.logoUrl ?? null, logoDarkUrl: props.logoDarkUrl ?? null, logoGrandeUrl: props.logoGrandeUrl ?? null, permiteFolha: prova.permiteFolha,
   }
 
   return <PlatformSimulado brand={brand} tela="entrada" theme={theme} data={data} es={es} real={real} />

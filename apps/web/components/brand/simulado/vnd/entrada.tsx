@@ -391,7 +391,7 @@ function EmailField({ value = '', error = false }: { value?: string; error?: boo
 }
 
 // Campo controlado real (reaproveita o visual do EmailField mock).
-function CampoReal({ label, icon, type, value, onChange, placeholder, inputMode }: { label: string; icon: React.ReactNode; type?: string; value: string; onChange: (v: string) => void; placeholder: string; inputMode?: 'numeric' | 'tel' }) {
+function CampoReal({ label, icon, type, value, onChange, placeholder, inputMode }: { label: React.ReactNode; icon: React.ReactNode; type?: string; value: string; onChange: (v: string) => void; placeholder: string; inputMode?: 'numeric' | 'tel' }) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
       <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>{label} <b style={{ color: '#E5484D' }}>*</b></span>
@@ -406,7 +406,9 @@ function CampoReal({ label, icon, type, value, onChange, placeholder, inputMode 
 function CamposReais({ real }: { real: SimEntradaReal }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <CampoReal label={`E-mail cadastrado${real.plataforma ? ` em ${real.plataforma}` : ''}`} icon={<Mail size={17} />} type="email" value={real.email} onChange={real.setEmail} placeholder="seu@email.com" />
+      <CampoReal label={<>E-mail cadastrado na{' '}{real.plataformaLoginUrl
+        ? <a href={real.plataformaLoginUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--brand)', fontWeight: 700, textDecoration: 'underline', textUnderlineOffset: 2 }}>{real.plataformaRotulo ?? 'plataforma'}</a>
+        : <b style={{ color: 'var(--brand)' }}>{real.plataformaRotulo ?? 'plataforma'}</b>}</>} icon={<Mail size={17} />} type="email" value={real.email} onChange={real.setEmail} placeholder="seu@email.com" />
       {real.metodo === 'email_cpf' && <CampoReal label="CPF" icon={<User size={17} />} value={real.cpf} onChange={real.setCpf} placeholder="000.000.000-00" inputMode="numeric" />}
       {real.metodo === 'email_telefone' && <CampoReal label="Telefone" icon={<User size={17} />} value={real.telefone} onChange={real.setTelefone} placeholder="(00) 00000-0000" inputMode="tel" />}
     </div>

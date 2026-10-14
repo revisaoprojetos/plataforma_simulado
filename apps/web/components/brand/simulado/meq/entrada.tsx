@@ -230,12 +230,16 @@ function Cell({ label, value, cls }: { label: string; value: string; cls?: strin
 // Quando `real` está presente: e-mail controlado + (CPF/telefone conforme método).
 // Sem `real` (preview): campo decorativo com `valor` default.
 function CampoEmail({ erro, valor, real }: { erro?: boolean; valor?: string; real?: SimEntradaReal }) {
-  const plataforma = real?.plataforma
+  const rotulo = real?.plataformaRotulo ?? (real?.plataforma ? `plataforma do ${real.plataforma}` : 'plataforma')
+  const linkUrl = real?.plataformaLoginUrl
   return (
     <>
       <label style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
         <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>
-          E-mail cadastrado {plataforma ? <>na plataforma do <b style={{ color: 'var(--brand)' }}>{plataforma}</b></> : 'na plataforma'} <b style={{ color: ERR_RED }}>*</b>
+          E-mail cadastrado na{' '}
+          {linkUrl
+            ? <a href={linkUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--brand)', fontWeight: 700, textDecoration: 'underline', textUnderlineOffset: 2 }}>{rotulo}</a>
+            : <b style={{ color: 'var(--brand)' }}>{rotulo}</b>} <b style={{ color: ERR_RED }}>*</b>
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 10, height: 50, padding: '0 14px', borderRadius: 8, background: 'var(--surface)', color: erro ? ERR_RED : 'var(--muted)', border: `1.5px solid ${erro ? ERR_RED : 'var(--line2)'}`, boxShadow: erro ? `0 0 0 4px rgba(229,72,77,.12)` : undefined }}>
           <IconMail />
