@@ -12,6 +12,19 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.17.6 — 2026-10-15
+
+**fix(juris) CRÍTICO: POST do progresso mescla best/dom por `max` (anti-regressão) — correções param de reverter**
+
+- O `best` do arcade é um **recorde (máximo)**; nunca deveria diminuir. Mas o `POST /progresso` sobrescrevia
+  cego, então um `localStorage` velho (pontuação rebaixada pelo clamp `tese=0`, ou anterior a uma recorreção
+  do servidor) **REGREDIA** o valor a cada flush do bootstrap — desfazendo correções e reintroduzindo valores
+  antigos.
+- Agora o POST **mescla monotonicamente**: `best[dia] = max(servidor, cliente)` e `dom[dia] = união das
+  teses`. Correções do servidor **persistem**; nenhuma aba antiga consegue baixar a pontuação.
+- Com isso a recorreção retroativa das teses (tese ficou 0 o desafio todo até hoje → dominar teses dava 0;
+  restaurado p/ 100 e os pontos de teses re-somados aos dias já completos, respeitando o teto) fica estável.
+
 ## 3.17.5 — 2026-10-15
 
 **fix(juris): detalhe do aluno (admin) não soma mais o dia 15/selo — consistência de pontuação entre áreas**

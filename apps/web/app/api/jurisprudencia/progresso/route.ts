@@ -147,24 +147,41 @@ export async function POST(request: NextRequest) {
   // NB: o SELO FINAL (dia agregado) é MANTIDO — quem ganhar de verdade salva normalmente. O "dia 15
   // fantasma" era o VAZAMENTO do localStorage (storageKey fixo), já corrigido por conta (v3.15.1) + limpeza
   // dos dados; não dá pra bloquear aqui sem quebrar o selo legítimo.
-  const dom = b.dom && typeof b.dom === 'object' && !Array.isArray(b.dom) ? (b.dom as Record<string, unknown>) : {}
-  const best = b.best && typeof b.best === 'object' && !Array.isArray(b.best) ? (b.best as Record<string, unknown>) : {}
-  const recorde = Math.max(0, ...Object.values(best).map((v) => Math.trunc(Number(v) || 0)))
+  const domIn = b.dom && typeof b.dom === 'object' && !Array.isArray(b.dom) ? (b.dom as Record<string, unknown>) : {}
+  const bestIn = b.best && typeof b.best === 'object' && !Array.isArray(b.best) ? (b.best as Record<string, unknown>) : {}
 
-  // GUARDA ANTI-ZERAMENTO (causa da perda de progresso): o cliente NUNCA manda dom/best vazios de forma
-  // legítima — jogar só ACRESCENTA. Mas o bootstrap tem um flush (pagehide/visibilitychange → sendBeacon)
-  // que POSTa o localStorage; se o seed do servidor falhar (GET 500/timeout/rede), o localStorage fica
-  // vazio e o flush grava `{}` POR CIMA do progresso real, zerando o aluno. Se o payload é totalmente
-  // vazio E já existe progresso no servidor, NÃO sobrescreve (reset de verdade é via SQL do admin).
-  if (Object.keys(dom).length === 0 && Object.keys(best).length === 0) {
-    const { data: atual } = await svc
-      .from('simulado_jurisprudencia_progresso')
-      .select('dom, best')
-      .eq('desafio_id', desafioId).eq('estudante_id', sessao.estudanteId)
-      .maybeSingle()
-    const temDados = atual && ((atual.dom && Object.keys(atual.dom).length) || (atual.best && Object.keys(atual.best).length))
+  // Estado atual no servidor (fonte p/ a guarda anti-vazio + a MESCLA monotônica abaixo).
+  const { data: atual } = await svc
+    .from('simulado_jurisprudencia_progresso')
+    .select('dom, best')
+    .eq('desafio_id', desafioId).eq('estudante_id', sessao.estudanteId)
+    .maybeSingle()
+  const domAtual = (atual?.dom && typeof atual.dom === 'object') ? atual.dom as Record<string, unknown> : {}
+  const bestAtual = (atual?.best && typeof atual.best === 'object') ? atual.best as Record<string, unknown> : {}
+
+  // GUARDA ANTI-ZERAMENTO: o cliente NUNCA manda dom/best vazios legítimos — jogar só ACRESCENTA. O flush do
+  // bootstrap (pagehide → sendBeacon) POSTa o localStorage; se o seed falhar, grava `{}` por cima → zera.
+  // Vazio total + já há dados no servidor → não sobrescreve (reset real é via SQL do admin).
+  if (Object.keys(domIn).length === 0 && Object.keys(bestIn).length === 0) {
+    const temDados = Object.keys(domAtual).length || Object.keys(bestAtual).length
     if (temDados) return NextResponse.json({ ok: true, protegido: true })
   }
+
+  // MESCLA MONOTÔNICA (best é um RECORDE → só sobe; dom só ganha teses). Antes o POST sobrescrevia cego: um
+  // localStorage velho (ex.: pontuação rebaixada pelo clamp, ou anterior a uma recorreção do servidor)
+  // REGREDIA o valor do servidor a cada flush. Agora best[dia]=max(servidor,cliente) e dom[dia]=união das
+  // teses — assim correções do servidor PERSISTEM e nenhuma aba velha consegue baixar a pontuação.
+  const best: Record<string, number> = {}
+  for (const k of new Set([...Object.keys(bestAtual), ...Object.keys(bestIn)])) {
+    best[k] = Math.max(Math.trunc(Number(bestAtual[k]) || 0), Math.trunc(Number(bestIn[k]) || 0))
+  }
+  const dom: Record<string, number[]> = {}
+  for (const k of new Set([...Object.keys(domAtual), ...Object.keys(domIn)])) {
+    const a = Array.isArray(domAtual[k]) ? (domAtual[k] as any[]).map((x) => Number(x)) : []
+    const i = Array.isArray(domIn[k]) ? (domIn[k] as any[]).map((x) => Number(x)) : []
+    dom[k] = [...new Set([...a, ...i].filter((x) => Number.isFinite(x)))]
+  }
+  const recorde = Math.max(0, ...Object.values(best).map((v) => Math.trunc(Number(v) || 0)))
 
   const { error } = await svc.from('simulado_jurisprudencia_progresso').upsert(
     {
