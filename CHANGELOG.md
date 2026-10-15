@@ -12,6 +12,22 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.17.3 — 2026-10-15
+
+**fix(juris) CRÍTICO: anti-zeramento do progresso do arcade + recuperação pelo navegador**
+
+- **Causa da perda:** a rota `POST /api/jurisprudencia/progresso` fazia upsert cego (gravava o que o cliente
+  mandasse, inclusive `{}`), e o `bootstrap.js` tem um flush (`pagehide`/`visibilitychange` → `sendBeacon`)
+  que POSTa o localStorage. Quando o seed do servidor falhava (GET 500/timeout/rede), o localStorage ficava
+  vazio e o flush gravava `{}` **por cima do progresso real**, zerando `dom`/`best` do aluno (intermitente).
+- **Guarda no servidor:** payload totalmente vazio **nunca** sobrescreve um progresso não-vazio (reset real
+  continua via SQL do admin). Protege inclusive clientes antigos em cache.
+- **Guarda no cliente:** `bootstrap.js` não envia POST/flush com `dom`+`best` vazios.
+- **Recuperação:** se o servidor vier vazio, o arcade tenta restaurar do localStorage da CHAVE ANTIGA
+  (pré-v3.15.1, `jurisclub-<idDoDesafio>`, sem o id do aluno) — intacta porque o seed novo grava noutra chave —
+  e re-envia ao servidor. Recupera quem abrir no mesmo navegador.
+- Cache-bust do arcade `?v=20261015a`.
+
 ## 3.17.2 — 2026-10-14
 
 **fix(build): shim `modelos-caderno/_campos.tsx` faltando — CI do v3.17.1 falhou (`Can't resolve './_campos'`)**

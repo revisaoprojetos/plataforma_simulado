@@ -151,6 +151,21 @@ export async function POST(request: NextRequest) {
   const best = b.best && typeof b.best === 'object' && !Array.isArray(b.best) ? (b.best as Record<string, unknown>) : {}
   const recorde = Math.max(0, ...Object.values(best).map((v) => Math.trunc(Number(v) || 0)))
 
+  // GUARDA ANTI-ZERAMENTO (causa da perda de progresso): o cliente NUNCA manda dom/best vazios de forma
+  // legítima — jogar só ACRESCENTA. Mas o bootstrap tem um flush (pagehide/visibilitychange → sendBeacon)
+  // que POSTa o localStorage; se o seed do servidor falhar (GET 500/timeout/rede), o localStorage fica
+  // vazio e o flush grava `{}` POR CIMA do progresso real, zerando o aluno. Se o payload é totalmente
+  // vazio E já existe progresso no servidor, NÃO sobrescreve (reset de verdade é via SQL do admin).
+  if (Object.keys(dom).length === 0 && Object.keys(best).length === 0) {
+    const { data: atual } = await svc
+      .from('simulado_jurisprudencia_progresso')
+      .select('dom, best')
+      .eq('desafio_id', desafioId).eq('estudante_id', sessao.estudanteId)
+      .maybeSingle()
+    const temDados = atual && ((atual.dom && Object.keys(atual.dom).length) || (atual.best && Object.keys(atual.best).length))
+    if (temDados) return NextResponse.json({ ok: true, protegido: true })
+  }
+
   const { error } = await svc.from('simulado_jurisprudencia_progresso').upsert(
     {
       tenant_id: sessao.tenantId,

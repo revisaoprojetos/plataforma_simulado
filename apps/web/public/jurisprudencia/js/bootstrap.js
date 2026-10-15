@@ -61,13 +61,38 @@ async function semearProgresso(){
     if(key){
       const atual = JSON.parse(localStorage.getItem(key) || '{}');
       const obj = x => (x && typeof x==='object' && !Array.isArray(x)) ? x : {};
-      const dom = obj(p.dom);
-      const best = obj(p.best);
-      const recorde = Math.max(Number(p.recorde)||0, 0, ...Object.values(best).map(v=>Number(v)||0));
+      let dom = obj(p.dom);
+      let best = obj(p.best);
+      let recorde = Math.max(Number(p.recorde)||0, 0, ...Object.values(best).map(v=>Number(v)||0));
       const diasSrv = Array.isArray(p && p.dias) ? p.dias : [];
       const dias = diasSrv.filter(function(d){ return typeof d==='string' && /^\d{4}-\d{2}-\d{2}$/.test(d); }).sort();
+      // RECUPERAÇÃO (progresso zerado no servidor): até o fix, um seed que falhava fazia o flush gravar `{}`
+      // por cima do progresso real. Se o SERVIDOR veio vazio, tentamos restaurar do localStorage da CHAVE
+      // ANTIGA (pré-v3.15.1: 'jurisclub-<idDoDesafio>', sem o id do aluno) — intacta porque o seed novo grava
+      // noutra chave. Se achar progresso lá, usa e RE-ENVIA ao servidor (passa pelo guard anti-vazio).
+      if(Object.keys(dom).length===0 && Object.keys(best).length===0){
+        const legados = ['jurisclub-'+ID, 'jurisclub-desafio-v1', 'jurisclub-desafio'];
+        for(const lk of legados){
+          if(lk===key) continue;
+          try{
+            const leg = JSON.parse(localStorage.getItem(lk) || '{}');
+            const ld = obj(leg.dom), lb = obj(leg.best);
+            if(Object.keys(ld).length || Object.keys(lb).length){
+              dom = ld; best = lb;
+              recorde = Math.max(Number(leg.recorde)||0, 0, ...Object.values(lb).map(v=>Number(v)||0));
+              try{
+                fetch('/api/jurisprudencia/progresso', {
+                  method:'POST', credentials:'same-origin', headers:{ 'Content-Type':'application/json' },
+                  body: JSON.stringify({ desafio:ID, dom, best, recorde, dias }), keepalive:true,
+                }).catch(()=>{});
+              }catch(e){}
+              break;
+            }
+          }catch(e){ /* chave legada inválida: ignora */ }
+        }
+      }
       // Mantém as preferências locais (muted, volSfx, volMus, calm, sel, dific, demoAll, final) e SOBRESCREVE
-      // só o progresso (dom/best/recorde/dias) com o do servidor.
+      // só o progresso (dom/best/recorde/dias) com o do servidor (ou o recuperado da chave antiga).
       const semeado = Object.assign({}, atual, { dom, best, recorde, dias });
       localStorage.setItem(key, JSON.stringify(semeado));
     }
@@ -84,6 +109,11 @@ function interceptarSalvar(){
     if(k === key){
       try{
         const o = JSON.parse(v) || {};
+        // ANTI-ZERAMENTO: nunca envia progresso vazio ao servidor. Jogar só ACRESCENTA, então
+        // dom/best vazios aqui = estado não-semeado (seed falhou) → gravar isso zeraria o aluno.
+        const domN = (o.dom && typeof o.dom==='object') ? Object.keys(o.dom).length : 0;
+        const bestN = (o.best && typeof o.best==='object') ? Object.keys(o.best).length : 0;
+        if(domN===0 && bestN===0) return;
         // fire-and-forget: não bloqueia o jogo
         fetch('/api/jurisprudencia/progresso', {
           method:'POST', credentials:'same-origin',
@@ -99,6 +129,11 @@ function interceptarSalvar(){
   const flush = () => {
     try{
       const o = JSON.parse(localStorage.getItem(key) || '{}');
+      // ANTI-ZERAMENTO (igual ao interceptor): não faz flush de progresso vazio — era a origem da perda
+      // (seed falhava → localStorage vazio → sendBeacon no pagehide gravava `{}` por cima do servidor).
+      const domN = (o.dom && typeof o.dom==='object') ? Object.keys(o.dom).length : 0;
+      const bestN = (o.best && typeof o.best==='object') ? Object.keys(o.best).length : 0;
+      if(domN===0 && bestN===0) return;
       const body = JSON.stringify({ desafio:ID, dom:o.dom || {}, best:o.best || {}, recorde:o.recorde || 0, dias:o.dias || [] });
       if(navigator.sendBeacon){ navigator.sendBeacon('/api/jurisprudencia/progresso', new Blob([body], { type:'application/json' })); }
     }catch(e){}
