@@ -79,6 +79,8 @@ export async function detalheRankingAlunoJuris(desafioId: string, estudanteId: s
   const aulas: DetalheAulaRanking[] = []
   let pontosTotal = 0
   for (const k of diasChaves) {
+    // Dia final/selo (0 teses próprias) NÃO soma pontos — senão duplica (alinha ao ranking/arcade).
+    if (tesesDoDia(k) <= 0) continue
     const pts = Math.max(0, Number(best[k]) || 0)
     pontosTotal += pts
     if (diaCompleto(dom, k)) {

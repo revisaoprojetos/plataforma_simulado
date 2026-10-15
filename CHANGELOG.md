@@ -12,6 +12,18 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.17.5 — 2026-10-15
+
+**fix(juris): detalhe do aluno (admin) não soma mais o dia 15/selo — consistência de pontuação entre áreas**
+
+- O "pontosTotal" do modal **Detalhe do aluno** somava `best` de TODOS os dias, incluindo o **dia 15 (selo
+  final)** — que tem 0 teses próprias e reusa um pool, então duplicava pontos. Agora pula dias com `teses<=0`,
+  igual ao **ranking**, à **API /ranking** e ao **arcade** (`totalPts`/`pontosDe`). Fim do "cada área com um
+  número diferente".
+- NB (config, feito no banco): o campo `pontos.tese` do desafio estava em **0** (concluir não pontuava e o teto
+  por dia caía p/ 2.000 → 6.000 em 3 dias); restaurado para **100** (3.000/dia → 9.000). Dia-15 fantasma
+  (restaurado pela recuperação) limpo das contas afetadas, com backup.
+
 ## 3.17.4 — 2026-10-15
 
 **fix(home): check-in de hoje credita XP de verdade + dia correto no card de Sequência (homes branded)**
