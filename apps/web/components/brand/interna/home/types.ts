@@ -23,6 +23,7 @@ export interface HomeUsuario {
 export interface HomeSemanaDia {
   dia: string // "SEG"
   estudou: boolean
+  hoje?: boolean // o dia de HOJE (último dos 7 dias cronológicos) — destaque do check-in
 }
 
 export interface HomeSequenciaMeta {

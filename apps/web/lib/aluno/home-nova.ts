@@ -130,7 +130,7 @@ export function montarHomeData(args: {
     sequenciaMeta: {
       diasSeguidos: gamResumo?.streakAtual ?? 0,
       recordeDias: gamResumo?.streakMaior ?? 0,
-      semana: (gamSemana ?? []).map((d: any) => ({ dia: d.label ?? '', estudou: !!d.ativo })),
+      semana: (gamSemana ?? []).map((d: any) => ({ dia: d.label ?? '', estudou: !!d.ativo, hoje: !!d.hoje })),
       checkinHoje: !!gamResumo?.feitoHoje,
       metaDiariaXp: gamResumo?.metaDiaXp ?? 0,
       xpHoje: gamResumo?.xpHoje ?? 0,

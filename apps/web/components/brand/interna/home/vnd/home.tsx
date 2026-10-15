@@ -14,6 +14,7 @@ import {
   ChevronRight, ChevronLeft, ArrowRight, Scale, BookText, Lightbulb, Trophy,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useCheckin } from '../use-checkin'
 import type { HomeData, InternaTheme } from '../types'
 import { internaTokensStyle } from '../../interna-tokens'
 import { useTemaInterno } from '../../use-tema-interno'
@@ -155,7 +156,7 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
   const nSlides = 1 + slideDest.length
   const [slide, setSlide] = useState(0)
   const [paused, setPaused] = useState(false)
-  const [checked, setChecked] = useState(sequenciaMeta.checkinHoje)
+  const { checked, busy, fazer } = useCheckin(sequenciaMeta.checkinHoje)
   const [cat, setCat] = useState<string>('Todas')
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -415,7 +416,7 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
               {checked ? (
                 <div style={{ marginTop: 16, height: 46, borderRadius: 14, background: 'var(--chip)', color: 'var(--brand)', fontWeight: 800, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><Check size={16} />Check-in feito · +{sequenciaMeta.bauXp} XP</div>
               ) : (
-                <button className="hvn-gold" type="button" onClick={() => setChecked(true)} style={{ marginTop: 16, width: '100%', height: 46, border: 0, borderRadius: 14, color: '#2A1F02', fontWeight: 800, fontSize: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><Calendar size={16} />Fazer check-in de hoje</button>
+                <button className="hvn-gold" type="button" onClick={(e) => fazer({ clientX: e.clientX, clientY: e.clientY })} disabled={busy} style={{ marginTop: 16, width: '100%', height: 46, border: 0, borderRadius: 14, color: '#2A1F02', fontWeight: 800, fontSize: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><Calendar size={16} />{busy ? 'Registrando…' : 'Fazer check-in de hoje'}</button>
               )}
               <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: 'var(--muted)' }}>
                 <Gift size={18} style={{ color: 'var(--goldInk)' }} />
@@ -693,7 +694,7 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
           {checked ? (
             <div style={{ height: 44, borderRadius: 14, background: 'var(--chip)', color: 'var(--brand)', fontWeight: 800, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><Check size={16} />Check-in feito · +{sequenciaMeta.bauXp} XP</div>
           ) : (
-            <button className="hvn-gold" type="button" onClick={() => setChecked(true)} style={{ width: '100%', height: 44, border: 0, borderRadius: 14, color: '#2A1F02', fontWeight: 800, fontSize: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><Calendar size={16} />Fazer check-in de hoje</button>
+            <button className="hvn-gold" type="button" onClick={(e) => fazer({ clientX: e.clientX, clientY: e.clientY })} disabled={busy} style={{ width: '100%', height: 44, border: 0, borderRadius: 14, color: '#2A1F02', fontWeight: 800, fontSize: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><Calendar size={16} />{busy ? 'Registrando…' : 'Fazer check-in de hoje'}</button>
           )}
         </div>
         )}

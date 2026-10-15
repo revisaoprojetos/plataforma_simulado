@@ -12,6 +12,19 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.17.4 — 2026-10-15
+
+**fix(home): check-in de hoje credita XP de verdade + dia correto no card de Sequência (homes branded)**
+
+- Nos homes do visual novo (Revisão/MEQ/VND) o botão "Fazer check-in" era **mock** (`setChecked(true)` local):
+  não chamava o servidor, então **não creditava XP** nem persistia. Agora usa `useCheckin` → `POST
+  /api/aluno/gamificacao/ping` (mesmo fluxo do card antigo): persiste o streak, credita o XP, dispara a
+  celebração e revalida (top bar/sidebar/level atualizam).
+- **Dia "hoje" errado (Revisão):** o card marcava o "hoje" pelo primeiro dia não-estudado (`primeiroPendente`)
+  — com o dia já feito, o anel pulava pro próximo dia. Agora usa a flag real `hoje` do servidor (último dia
+  da janela), carregada de ponta a ponta (`atividadeSemana` → `home-nova` → `HomeSemanaDia.hoje`).
+- NB: o valor do XP por check-in vem da config `streak.por_dia` do tenant (setada p/ 10 em Revisão/MEQ/VND).
+
 ## 3.17.3 — 2026-10-15
 
 **fix(juris) CRÍTICO: anti-zeramento do progresso do arcade + recuperação pelo navegador**

@@ -48,6 +48,7 @@ import {
 import { cn } from '@/lib/utils'
 import { internaTokensStyle } from '../../interna-tokens'
 import { useTemaInterno } from '../../use-tema-interno'
+import { useCheckin } from '../use-checkin'
 import type { HomeContinuar, HomeData, HomeDestaque, HomePasta, HomeSimuladoCard, InternaTheme } from '../types'
 
 // Amarelo fixo da marca (spec §1.1 constantes) + texto legível sobre ele.
@@ -702,13 +703,13 @@ function MetaDiaria({ xpHoje, meta }: { xpHoje: number; meta: number }) {
 
 function Sequencia({ data }: { data: HomeData }) {
   const s = data.sequenciaMeta
-  const [checked, setChecked] = useState(s.checkinHoje)
+  const { checked, busy, fazer } = useCheckin(s.checkinHoje)
   const streakTxt = s.diasSeguidos === 1 ? '1 dia' : `${s.diasSeguidos} dias`
-  // Normaliza semana para 7 dias DOM..SÁB.
+  // Semana = últimos 7 dias cronológicos (termina HOJE no último slot).
   const semana = DIAS_PT.map((d, i) => s.semana[i] ?? { dia: d, estudou: false })
-  // "Hoje" = último dia ainda não estudado (destacado com borda da marca); senão o último slot.
-  const primeiroPendente = semana.findIndex((d) => !d.estudou)
-  const hojeIdx = primeiroPendente === -1 ? semana.length - 1 : primeiroPendente
+  // "Hoje" = o dia marcado pelo servidor (flag `hoje`); fallback = último slot (hoje é sempre o fim da janela).
+  const idxHoje = semana.findIndex((d) => d.hoje)
+  const hojeIdx = idxHoje === -1 ? semana.length - 1 : idxHoje
   const faltamBau = Math.max(0, s.bauDias - s.diasSeguidos)
 
   return (
@@ -720,10 +721,11 @@ function Sequencia({ data }: { data: HomeData }) {
       <div className="hrv-week">
         {semana.map((d, i) => {
           const estudou = d.estudou
-          const hoje = i === hojeIdx && !estudou
+          const ehHoje = i === hojeIdx
+          const hoje = ehHoje && !estudou
           return (
             <div className="hrv-week-day" key={i}>
-              <span className="hrv-week-lbl" style={{ color: hoje ? 'var(--ink)' : 'var(--muted)' }}>{d.dia}</span>
+              <span className="hrv-week-lbl" style={{ color: ehHoje ? 'var(--ink)' : 'var(--muted)' }}>{d.dia}</span>
               <span
                 className={cn('hrv-week-cell', estudou && 'hrv-fire')}
                 style={
@@ -748,10 +750,10 @@ function Sequencia({ data }: { data: HomeData }) {
       </div>
 
       {checked ? (
-        <div className="hrv-checked"><Check size={16} />Check-in feito · +10 XP</div>
+        <div className="hrv-checked"><Check size={16} />Check-in de hoje feito</div>
       ) : (
-        <button type="button" className="hrv-cta hrv-checkin" onClick={() => setChecked(true)}>
-          <CalendarDays size={16} />Fazer check-in de hoje
+        <button type="button" className="hrv-cta hrv-checkin" onClick={(e) => fazer({ clientX: e.clientX, clientY: e.clientY })} disabled={busy}>
+          <CalendarDays size={16} />{busy ? 'Registrando…' : 'Fazer check-in de hoje'}
         </button>
       )}
 

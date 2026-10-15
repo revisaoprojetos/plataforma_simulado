@@ -2,7 +2,7 @@
 
 import type { Brand, HomeData } from './types'
 
-const SEMANA = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'].map((dia, i) => ({ dia, estudou: i >= 1 && i <= 4 }))
+const SEMANA = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'].map((dia, i) => ({ dia, estudou: i >= 1 && i <= 4, hoje: i === 4 }))
 
 const MISSOES = [
   { titulo: 'Complete 1 simulado', xp: 30, progresso: 1, total: 1 },

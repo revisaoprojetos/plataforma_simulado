@@ -17,6 +17,7 @@ import { Calendar, ChevronLeft, ChevronRight, Clock, Download, Gift, Pause, Play
 import { cn } from '@/lib/utils'
 import { internaTokensStyle } from '../../interna-tokens'
 import { useTemaInterno } from '../../use-tema-interno'
+import { useCheckin } from '../use-checkin'
 import type { HomeData, HomeSimuladoCard, InternaTheme } from '../types'
 import { Capa, CircuitHero, Fogo, Gota, MarcaBarras, Segs } from './circuit'
 
@@ -174,7 +175,7 @@ export function HomeMeq({ theme, data, preview }: { theme: InternaTheme; data: H
   const irPara = (i: number) => { setAnim(true); setSlide(((i % total) + total) % total) }
 
   // ── Check-in local ────────────────────────────────────────────────────────
-  const [checked, setChecked] = useState(data.sequenciaMeta.checkinHoje)
+  const { checked, busy, fazer } = useCheckin(data.sequenciaMeta.checkinHoje)
   const streakTxt = checked ? (data.sequenciaMeta.diasSeguidos <= 1 ? '1 dia' : `${data.sequenciaMeta.diasSeguidos} dias`) : '0 dias'
 
   // ── Abas das pastas (filtro local por categoria) ─────────────────────────
@@ -444,7 +445,8 @@ export function HomeMeq({ theme, data, preview }: { theme: InternaTheme; data: H
                   const dia = meta.semana[i]
                   const label = dia?.dia || SEMANA_LABELS[i]
                   const estudou = !!dia?.estudou
-                  const hoje = i === 6 // SÁB no mock = hoje (borda)
+                  // "Hoje" = dia marcado pelo servidor (flag) ou o último slot (fim da janela de 7 dias).
+                  const hoje = dia?.hoje ?? (i === 6)
                   return (
                     <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
                       <span
@@ -472,9 +474,9 @@ export function HomeMeq({ theme, data, preview }: { theme: InternaTheme; data: H
                   Check-in feito · +{meta.bauXp} XP
                 </div>
               ) : (
-                <button className="hmq-cta" type="button" onClick={() => setChecked(true)} style={{ marginTop: 14, width: '100%', height: 42, border: 0, borderRadius: 11, fontSize: 13.5 }}>
+                <button className="hmq-cta" type="button" onClick={(e) => fazer({ clientX: e.clientX, clientY: e.clientY })} disabled={busy} style={{ marginTop: 14, width: '100%', height: 42, border: 0, borderRadius: 11, fontSize: 13.5 }}>
                   <Calendar className="hmq-i" style={{ width: 15, height: 15 }} />
-                  Fazer check-in de hoje
+                  {busy ? 'Registrando…' : 'Fazer check-in de hoje'}
                 </button>
               )}
               <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--muted)' }}>
