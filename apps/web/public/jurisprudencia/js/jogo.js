@@ -418,6 +418,13 @@ function drawWalls(ctx, g, T, {neon='#6d3cff', inner='#060a33', glow='#8b5cf6', 
    ========================================================= */
 const COLS=27, ROWS=15;
 const canvas=$('#game'), ctx=canvas.getContext('2d');
+// FOCO DO IFRAME: o arcade roda dentro de um <iframe> (portal → Curseduca). Se o foco do teclado estiver na
+// PÁGINA PAI (ex.: acabou de trocar p/ a aba Desafio, ou fechou a leitura), as SETAS rolam a página pai e o
+// keydown NUNCA chega aqui → o personagem fica parado e o aluno "perde sem conseguir jogar". Trazemos o foco
+// para o canvas (focável) + window.focus() sempre que o aluno toca/clica no jogo e ao iniciar a partida.
+canvas.tabIndex=-1; canvas.style.outline='none';
+function grabFocus(){ try{ canvas.focus({preventScroll:true}); }catch(e){} try{ window.focus(); }catch(e){} }
+['pointerdown','touchstart','mousedown'].forEach(ev=>{ try{ $('#screen').addEventListener(ev, grabFocus, {passive:true}); }catch(e){} });
 const wallLayer=document.createElement('canvas');
 let TS=24;
 const DIRS={up:{dx:0,dy:-1},down:{dx:0,dy:1},left:{dx:-1,dy:0},right:{dx:1,dy:0}};
@@ -620,7 +627,7 @@ function sairParaDia(){
   loadDay(G.day);                                             // reseta o tabuleiro e mostra a tela do dia
 }
 function startRun(){
-  SFX.init(); if(G.mode!=='attract') return;
+  SFX.init(); grabFocus(); if(G.mode!=='attract') return;
   // A leitura do dia é a 1ª etapa: sem ela, o desafio fica travado.
   if(leituraBloqueada(G.day)){ SFX.locked(); flashLeitura(); return; }
   marcarDiaAtivo();   // jogou hoje → conta na sequência

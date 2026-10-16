@@ -12,6 +12,19 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.18.1 — 2026-10-16
+
+**fix(juris): arcade "travado" — foco do teclado no iframe (personagem não andava e perdia)**
+
+- O arcade roda num `<iframe>`; se o foco do teclado estava na PÁGINA PAI (ex.: trocou p/ a aba Desafio — o
+  iframe fica sempre montado e não ganha foco sozinho — ou fechou a leitura), as SETAS/WASD rolavam a página
+  e o `keydown` nunca chegava ao jogo → o personagem ficava parado e o aluno "perdia sem conseguir jogar".
+- **Arcade (jogo.js):** canvas focável (`tabindex=-1`) + `grabFocus()` (canvas.focus + window.focus) em todo
+  `pointerdown`/`touchstart` no jogo e ao iniciar a partida (`startRun`).
+- **Host (desafio-juris-interno.tsx):** foca o iframe do arcade ao abrir a aba Desafio, ao fechar a leitura e
+  quando a aba/janela volta a ficar visível.
+- Cache-bust `?v=20261015b`.
+
 ## 3.18.0 — 2026-10-16
 
 **feat: cadernos, leitor da juris, tema escuro da Maratona, config de legendas e correções**

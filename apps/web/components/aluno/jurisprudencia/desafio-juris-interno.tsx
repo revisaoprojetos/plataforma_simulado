@@ -116,7 +116,10 @@ export function DesafioJurisInterno({ desafioId, titulo, theme, totalDias, mater
   const [leituraLoad, setLeituraLoad] = useState(false)
   // Rótulo do overlay conforme o que está abrindo: "a leitura…" (leitor do dia) ou "as questões…" (quiz).
   const [overlayLabel, setOverlayLabel] = useState('a leitura…')
-  const fecharLeitura = () => { setLeitura(null); setLeituraLoad(false); try { arcadeRef.current?.contentWindow?.postMessage({ type: 'juris-leitura-fechada' }, '*') } catch { /* ignora */ } }
+  // Devolve o FOCO ao iframe do arcade — sem isto o teclado (setas/WASD) fica na página pai e o personagem
+  // não anda (aluno "trava e perde sem conseguir jogar"). Usado ao abrir a aba Desafio e ao fechar a leitura.
+  const focarArcade = () => { setTimeout(() => { try { arcadeRef.current?.focus() } catch { /* ignora */ } }, 60) }
+  const fecharLeitura = () => { setLeitura(null); setLeituraLoad(false); try { arcadeRef.current?.contentWindow?.postMessage({ type: 'juris-leitura-fechada' }, '*') } catch { /* ignora */ } focarArcade() }
   useEffect(() => {
     function onMsg(e: MessageEvent) {
       const d = e.data as { type?: string; docId?: string; desafio?: string }
@@ -143,6 +146,18 @@ export function DesafioJurisInterno({ desafioId, titulo, theme, totalDias, mater
     return () => clearInterval(iv)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [leitura])
+
+  // Ao entrar na aba Desafio, foca o iframe do arcade p/ o teclado funcionar de cara (iframe sempre montado
+  // → trocar de aba não dá foco sozinho). Também re-foca quando a aba/janela volta a ficar visível.
+  useEffect(() => {
+    if (tab !== 'desafio') return
+    focarArcade()
+    const onVis = () => { if (!document.hidden) focarArcade() }
+    window.addEventListener('focus', focarArcade)
+    document.addEventListener('visibilitychange', onVis)
+    return () => { window.removeEventListener('focus', focarArcade); document.removeEventListener('visibilitychange', onVis) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab])
 
   const TABS: { k: Tab; label: string; icon: React.ReactNode }[] = [
     { k: 'desafio', label: 'Desafio', icon: <Gamepad2 size={15} /> },
