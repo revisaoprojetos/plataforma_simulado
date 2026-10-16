@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { atualizarDocumento, publicarVersao, salvarIndiceTipos, salvarEspacamentoDocumento, type Documento, type SituacaoEditorial } from '@/app/admin/leitura/actions'
 import { DEFAULT_ESPACAMENTO, ESP_LIMITES, type EspacamentoDoc } from '@/lib/leitura/espacamento'
-import { salvarGrifoCoresDocumento, salvarBlocosDocumento, aplicarConfigTodasAulas } from '@/app/admin/leitura/actions'
+import { salvarGrifoCoresDocumento, salvarBlocosDocumento, salvarLegendasDocumento, aplicarConfigTodasAulas } from '@/app/admin/leitura/actions'
 import { DEFAULT_GRIFO_CORES, type GrifoCores } from '@/lib/leitura/trilha-aparencia'
 import { DEFAULT_BLOCOS, type BlocoDef } from '@/lib/leitura/blocos'
 import { TIPOS_INDICE, contarTiposNoHtml } from '@/lib/leitura/indice'
@@ -61,7 +61,7 @@ const TIPOS_ATUALIZACAO = [
   { v: 'correcao_editorial', label: 'Correção editorial', Icon: SpellCheck },
 ] as const
 
-export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar = false, publicadaVersao = 1, temRascunhoPendente = false, versaoEdicao, abaInicial, indiceTipos: indiceTiposProp = [], espInicial = null, grifoCoresInicial = null, blocosInicial = null, topicosInicial = {}, leituraRapidaInicial = '', voltarHref }: {
+export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar = false, publicadaVersao = 1, temRascunhoPendente = false, versaoEdicao, abaInicial, indiceTipos: indiceTiposProp = [], espInicial = null, grifoCoresInicial = null, blocosInicial = null, topicosInicial = {}, leituraRapidaInicial = '', legendasOffInicial = [], grifoRevisaoOffInicial = false, voltarHref }: {
   documento: Documento; htmlAtual: string; podeEditar: boolean; podePublicar?: boolean; publicadaVersao?: number; temRascunhoPendente?: boolean; versaoEdicao?: number
   abaInicial?: 'conteudo' | 'config' | 'questoes' | 'leitura-rapida'
   indiceTipos?: string[]
@@ -70,6 +70,8 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
   blocosInicial?: BlocoDef[] | null
   topicosInicial?: TopicosConfig
   leituraRapidaInicial?: string
+  legendasOffInicial?: string[]
+  grifoRevisaoOffInicial?: boolean
   /** "Voltar" customizado (ex.: vindo da Jurisprudência) — default = banco de aulas da Lei Seca. */
   voltarHref?: string
 }) {
@@ -144,6 +146,21 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
     { key: 'nucleo', label: 'Núcleo', fundo: true }, { key: 'complemento', label: 'Complemento', fundo: true }, { key: 'prazo', label: 'Prazos', fundo: true },
     { key: 'excecao', label: 'Exceção', fundo: false }, { key: 'stf', label: 'STF', fundo: false }, { key: 'stj', label: 'STJ', fundo: false },
   ]
+  // Legendas visíveis na barra do leitor + "Grifo do Revisão" (grifos editoriais). Desligar oculta o item.
+  const LEGENDAS: { key: string; label: string }[] = [
+    { key: 'nucleo', label: 'Núcleo' }, { key: 'complemento', label: 'Complemento' }, { key: 'prazo', label: 'Prazos' },
+    { key: 'crucial', label: 'crucial' }, { key: 'excecao', label: 'exceção' },
+    { key: 'stf', label: 'STF' }, { key: 'stj', label: 'STJ' }, { key: 'equipe', label: 'Equipe' },
+  ]
+  const [savingLeg, startLeg] = useTransition()
+  const [legOff, setLegOff] = useState<string[]>(legendasOffInicial ?? [])
+  const [grifoRevOff, setGrifoRevOff] = useState<boolean>(!!grifoRevisaoOffInicial)
+  const salvarLeg = (nextOff: string[], nextRev: boolean) => { startLeg(async () => { const r = await salvarLegendasDocumento(documento.id, { legendasOff: nextOff, grifoRevisaoOff: nextRev }); if (!r.ok) toast.error(r.error ?? 'Erro ao salvar legendas') }) }
+  const toggleLeg = (k: string) => { const next = legOff.includes(k) ? legOff.filter((x) => x !== k) : [...legOff, k]; setLegOff(next); salvarLeg(next, grifoRevOff) }
+  const toggleGrifoRev = () => { const next = !grifoRevOff; setGrifoRevOff(next); salvarLeg(legOff, next) }
+  const TODAS_LEGENDAS = LEGENDAS.map((l) => l.key)
+  const marcarTodasLeg = () => { setLegOff([]); setGrifoRevOff(false); salvarLeg([], false) }       // tudo LIGADO
+  const desmarcarTodasLeg = () => { setLegOff(TODAS_LEGENDAS); setGrifoRevOff(true); salvarLeg(TODAS_LEGENDAS, true) } // tudo DESLIGADO
   // Blocos configuráveis (rótulo + palavras-chave + cor). Detecção data-driven em caixas.ts.
   const [savingBlocos, startBlocos] = useTransition()
   const [blocos, setBlocos] = useState<BlocoDef[]>(blocosInicial ?? DEFAULT_BLOCOS)
@@ -1074,6 +1091,36 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
                   </div>
                 ))}
               </div>
+            </div>
+          </details>
+
+          {/* Legendas & Grifo do Revisão — liga/desliga itens da barra de legenda do leitor + os grifos editoriais. */}
+          <details className="group border-t pt-4">
+            <summary className="flex cursor-pointer list-none items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground [&::-webkit-details-marker]:hidden">
+              <Captions className="h-3.5 w-3.5 text-primary" /> Legendas &amp; Grifo do Revisão
+              {savingLeg && <Loader2 className="h-3 w-3 animate-spin" />}
+              <ChevronDown className="ml-auto h-4 w-4 transition-transform group-open:rotate-180" />
+            </summary>
+            <div className="space-y-3 pt-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="min-w-0 flex-1 text-xs text-muted-foreground">Desmarque para <span className="font-medium text-foreground">ocultar</span> o item da barra de legenda no topo da leitura do aluno (Lei Seca e Jurisprudência).</p>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  <button type="button" onClick={marcarTodasLeg} className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground">Marcar todas</button>
+                  <button type="button" onClick={desmarcarTodasLeg} className="inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground">Desmarcar todas</button>
+                </div>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {LEGENDAS.map((l) => { const on = !legOff.includes(l.key); return (
+                  <label key={l.key} className="flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-1.5 text-sm">
+                    <span className="min-w-0 truncate">{l.label}</span>
+                    <input type="checkbox" checked={on} onChange={() => toggleLeg(l.key)} className="h-4 w-4 shrink-0 accent-primary" />
+                  </label>
+                )})}
+              </div>
+              <label className="flex cursor-pointer items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-sm">
+                <span className="min-w-0"><span className="font-medium">Grifo do Revisão</span> <span className="text-[11px] text-muted-foreground">— mostra os grifos editoriais e o botão de ocultar/mostrar</span></span>
+                <input type="checkbox" checked={!grifoRevOff} onChange={toggleGrifoRev} className="h-4 w-4 shrink-0 accent-primary" />
+              </label>
             </div>
           </details>
 

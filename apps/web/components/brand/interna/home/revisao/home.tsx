@@ -50,6 +50,8 @@ import { internaTokensStyle } from '../../interna-tokens'
 import { useTemaInterno } from '../../use-tema-interno'
 import { useCheckin } from '../use-checkin'
 import type { HomeContinuar, HomeData, HomeDestaque, HomePasta, HomeSimuladoCard, InternaTheme } from '../types'
+import { MaratonaCardDestaque } from '@/components/aluno/maratona/maratona-card-destaque'
+import { MARATONA } from '@/lib/maratona/config'
 
 // Amarelo fixo da marca (spec §1.1 constantes) + texto legível sobre ele.
 const AMARELO = '#F1C232'
@@ -145,6 +147,7 @@ export function HomeRevisao({
               <NivelCard data={data} />
               {data.continuar ? <ContinuarCard c={data.continuar} /> : null}
             </div>
+            {data.maratona ? <MaratonaCardDestaque config={data.maratona.config ?? MARATONA} estado={data.maratona.estado} recolhidoInicial={data.maratona.recolhido} /> : null}
             <Recentes cards={data.recentes} />
             <Desempenho data={data} />
           </div>
@@ -165,6 +168,7 @@ export function HomeRevisao({
           <Atalhos />
           {data.continuar ? <ContinuarCard c={data.continuar} /> : null}
           <Sequencia data={data} />
+          {data.maratona ? <MaratonaCardDestaque config={data.maratona.config ?? MARATONA} estado={data.maratona.estado} recolhidoInicial={data.maratona.recolhido} /> : null}
           <RecentesMobile cards={data.recentes} />
           <NivelCard data={data} />
           <Missoes data={data} />

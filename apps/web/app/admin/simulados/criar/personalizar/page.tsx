@@ -1,6 +1,7 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { Loader2, ImagePlus, RefreshCw, Trash2, Check, Crop } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -28,6 +29,14 @@ async function redimensionar(file: File, max = 2400): Promise<string> {
 export default function PersonalizarPage() {
   useGuardStep(0)
   const { draft, patch } = useCriar()
+  // Criado a partir de um DESAFIO (?destino=<pastaId>): já fixa a pasta destino do simulado p/ cair lá.
+  const sp = useSearchParams()
+  const destino = sp.get('destino')
+  const seeded = useRef(false)
+  useEffect(() => {
+    if (destino && !seeded.current) { seeded.current = true; patch({ simuladoFolder: { mode: 'existente', id: destino } }) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [destino])
   const bannerRef = useRef<HTMLInputElement>(null)
   const [subBanner, setSubBanner] = useState(false)
   const [cropper, setCropper] = useState<{ file?: File; src?: string; aspect: number; titulo: string } | null>(null)

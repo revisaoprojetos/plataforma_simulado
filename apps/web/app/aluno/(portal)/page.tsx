@@ -487,6 +487,19 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
       // Marca → slide de boas-vindas (Revisão=redesign; VND/MEQ=plataforma nova).
       brand: aparencia.brand,
     })
+    // MARATONA (desafio de simulados) — só no Revisão, só p/ quem tem acesso (Guru/Curseduca) e lançada.
+    // A config vem do admin (desafio_jogo.config) com as contagens reais vinculadas → card fiel ao real.
+    if (aparencia.brand === 'revisao') {
+      try {
+        const { estadoMaratonaAluno } = await import('@/lib/maratona/participacao')
+        const { carregarDesafioMaratona } = await import('@/lib/maratona/carregar')
+        const [est, des] = await Promise.all([
+          estadoMaratonaAluno(svc, sessao!.tenantId, estId),
+          carregarDesafioMaratona(svc, sessao!.tenantId),
+        ])
+        if (est.visivel && des.lancada) homeData.maratona = { estado: est.iniciado ? 'continuar' : 'aceitar', recolhido: est.recolhido, config: des.config }
+      } catch { /* gating indisponível → não mostra o card */ }
+    }
     return <PlatformHome brand={aparencia.brand} theme={theme} data={homeData} />
   }
 

@@ -70,6 +70,8 @@ export default async function LeituraEditorPage({ params, searchParams }: { para
         blocosInicial={resolverBlocos(d.quiz_config?.blocos)}
         topicosInicial={resolverTopicos(d.quiz_config?.topicos)}
         leituraRapidaInicial={typeof d.quiz_config?.leitura_rapida === 'string' ? d.quiz_config.leitura_rapida : ''}
+        legendasOffInicial={Array.isArray(d.quiz_config?.legendasOff) ? d.quiz_config.legendasOff : []}
+        grifoRevisaoOffInicial={!!d.quiz_config?.grifoRevisaoOff}
       />
       {/* Ao abrir o LegProc, aquece as áreas irmãs (Questões do conteúdo · Alterações) em 2º plano. */}
       <PrefetchRotas rotas={[`/admin/leitura/${id}/questoes`, `/admin/leitura/${id}/alteracoes`]} />

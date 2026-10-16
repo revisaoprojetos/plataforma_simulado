@@ -1421,6 +1421,21 @@ export async function salvarGrifoCoresDocumento(documentoId: string, cores: Grif
   return { ok: true }
 }
 
+/** Legendas visíveis + "Grifo do Revisão" por DOCUMENTO — em quiz_config (migration-free).
+ *  `legendasOff` = chaves de legenda OCULTADAS na barra do leitor (nucleo/complemento/prazo/crucial/
+ *  excecao/stf/stj/equipe). `grifoRevisaoOff` = desativa os grifos editoriais (do Revisão) e o toggle. */
+export async function salvarLegendasDocumento(documentoId: string, cfg: { legendasOff?: string[]; grifoRevisaoOff?: boolean }): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { data: doc } = await svc.from('simulado_documentos').select('quiz_config').eq('id', documentoId).eq('tenant_id', g.tenantId).maybeSingle()
+  const legendasOff = Array.isArray(cfg.legendasOff) ? [...new Set(cfg.legendasOff.filter((s) => typeof s === 'string'))] : []
+  const merged = { ...((doc as any)?.quiz_config ?? {}), legendasOff, grifoRevisaoOff: !!cfg.grifoRevisaoOff }
+  const { error } = await svc.from('simulado_documentos').update({ quiz_config: merged, atualizado_em: new Date().toISOString() }).eq('id', documentoId).eq('tenant_id', g.tenantId)
+  if (error) return { ok: false, error: QUIZ_SEM_TABELA(error.message) ? 'Rode a migração 20260910000001.' : error.message }
+  revalidatePath(`/admin/leitura/${documentoId}`)
+  return { ok: true }
+}
+
 /** Blocos de destaque configuráveis (rótulo + palavras-chave + cor) por DOCUMENTO — em
  *  quiz_config.blocos (migration-free). Detecção e cor aplicadas no admin e no aluno. */
 export async function salvarBlocosDocumento(documentoId: string, patch: { blocos?: BlocoDef[]; previa?: boolean }): Promise<{ ok: boolean; error?: string }> {

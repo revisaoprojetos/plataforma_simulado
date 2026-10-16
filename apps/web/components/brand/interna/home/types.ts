@@ -2,6 +2,7 @@
 // Modelado para espelhar os dados reais do portal — facilita o wiring futuro (/aluno) ao backend.
 
 import type { Brand, InternaTheme } from '../interna-tokens'
+import type { MaratonaConfig } from '@/lib/maratona/config'
 
 export type { Brand, InternaTheme }
 
@@ -158,6 +159,9 @@ export interface HomeData {
   gamAtivo?: boolean
   /** Cronograma ativo no tenant? false = esconde o card "Sua semana" (flag OCULTAR_CRONOGRAMA). Default: true. */
   cronogramaAtivo?: boolean
+  /** Só Revisão + quem tem acesso (Guru/Curseduca) + maratona lançada. Null/ausente = não mostra o card.
+   *  `config` = config efetiva do admin (com contagens reais vinculadas); ausente = usa defaults. */
+  maratona?: { estado: 'aceitar' | 'continuar'; recolhido: boolean; config?: MaratonaConfig } | null
 }
 
 export interface HomeScreenProps {

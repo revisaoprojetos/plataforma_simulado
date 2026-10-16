@@ -82,30 +82,33 @@ function elNoRange(el: HTMLElement, range: Range): boolean {
 
 // Barra de LEGENDA dos grifos — FIXA no topo da leitura (sticky). Ao rolar, fica colada no topo;
 // no topo do documento, aparece "separada" (respiro + sombra leve). Substitui a caixa LEGENDA inline.
-function LegendaBar({ cores, escuro, noTopo, semGrifos, onToggleGrifos, mostrarMeus, onToggleMeus, grifoCores }: { cores: { fg: string; muted: string; sheet: string }; escuro: boolean; noTopo: boolean; semGrifos: boolean; onToggleGrifos: () => void; mostrarMeus: boolean; onToggleMeus: () => void; grifoCores: GrifoCores }) {
+function LegendaBar({ cores, escuro, noTopo, semGrifos, onToggleGrifos, mostrarMeus, onToggleMeus, grifoCores, legendasOff = [], grifoRevisaoOff = false }: { cores: { fg: string; muted: string; sheet: string }; escuro: boolean; noTopo: boolean; semGrifos: boolean; onToggleGrifos: () => void; mostrarMeus: boolean; onToggleMeus: () => void; grifoCores: GrifoCores; legendasOff?: string[]; grifoRevisaoOff?: boolean }) {
   const chip = 'rounded px-1.5 py-[3px] text-[11px] font-semibold leading-none'
   const tag = 'px-0.5 text-[11px] font-bold leading-none'
+  const vis = (k: string) => !legendasOff.includes(k)
+  const temDir = vis('stf') || vis('stj') || vis('equipe')
+  const todasOff = ['nucleo', 'complemento', 'prazo', 'crucial', 'excecao', 'stf', 'stj', 'equipe'].every((k) => legendasOff.includes(k))
   return (
     <div className={cn('pointer-events-none sticky top-0 z-20 flex justify-center transition-[padding] duration-200', noTopo ? 'pt-3' : 'pt-2')}>
       <div className={cn('pointer-events-auto flex max-w-full flex-wrap items-center justify-center gap-x-1.5 gap-y-1 rounded-full border px-3 py-1.5 backdrop-blur transition-shadow duration-200', noTopo ? 'shadow-sm' : 'shadow-md')}
         style={{ background: `${cores.sheet}${escuro ? 'e6' : 'f2'}`, borderColor: escuro ? 'rgba(255,255,255,.10)' : 'rgba(0,0,0,.08)' }}>
-        <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: cores.muted }}>Legenda</span>
-        <span className={chip} style={{ background: grifoCores.nucleo, color: '#111' }}>Núcleo</span>
-        <span className={chip} style={{ background: grifoCores.complemento, color: '#111' }}>Complemento</span>
-        <span className={chip} style={{ background: grifoCores.prazo, color: '#111' }}>Prazos</span>
-        <span className={tag} style={{ color: cores.fg }}>crucial</span>
-        <span className={tag} style={{ color: grifoCores.excecao }}>exceção</span>
-        <span className="px-0.5 leading-none" style={{ color: cores.muted }}>·</span>
-        <span className={tag} style={{ color: grifoCores.stf }}>STF</span>
-        <span className={tag} style={{ color: grifoCores.stj }}>STJ</span>
-        <span className="px-0.5 text-[11px] font-medium leading-none" style={{ color: cores.muted }}>Equipe</span>
+        {!todasOff && <span className="text-[10px] font-bold uppercase tracking-wide" style={{ color: cores.muted }}>Legenda</span>}
+        {vis('nucleo') && <span className={chip} style={{ background: grifoCores.nucleo, color: '#111' }}>Núcleo</span>}
+        {vis('complemento') && <span className={chip} style={{ background: grifoCores.complemento, color: '#111' }}>Complemento</span>}
+        {vis('prazo') && <span className={chip} style={{ background: grifoCores.prazo, color: '#111' }}>Prazos</span>}
+        {vis('crucial') && <span className={tag} style={{ color: cores.fg }}>crucial</span>}
+        {vis('excecao') && <span className={tag} style={{ color: grifoCores.excecao }}>exceção</span>}
+        {temDir && <span className="px-0.5 leading-none" style={{ color: cores.muted }}>·</span>}
+        {vis('stf') && <span className={tag} style={{ color: grifoCores.stf }}>STF</span>}
+        {vis('stj') && <span className={tag} style={{ color: grifoCores.stj }}>STJ</span>}
+        {vis('equipe') && <span className="px-0.5 text-[11px] font-medium leading-none" style={{ color: cores.muted }}>Equipe</span>}
         {/* Exibir/ocultar grifos — à direita da legenda (mesmos controles da barra de anotações). */}
-        <span className="mx-0.5 h-3.5 w-px shrink-0" style={{ background: escuro ? 'rgba(255,255,255,.15)' : 'rgba(0,0,0,.12)' }} />
-        <button type="button" onClick={onToggleGrifos} title={semGrifos ? 'Mostrar grifos do Revisão' : 'Ocultar grifos do Revisão'} aria-pressed={!semGrifos}
+        {!grifoRevisaoOff && <span className="mx-0.5 h-3.5 w-px shrink-0" style={{ background: escuro ? 'rgba(255,255,255,.15)' : 'rgba(0,0,0,.12)' }} />}
+        {!grifoRevisaoOff && <button type="button" onClick={onToggleGrifos} title={semGrifos ? 'Mostrar grifos do Revisão' : 'Ocultar grifos do Revisão'} aria-pressed={!semGrifos}
           className="inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-medium leading-none transition hover:opacity-80"
           style={{ color: semGrifos ? cores.muted : cores.fg }}>
           {semGrifos ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />} Grifos do Revisão
-        </button>
+        </button>}
         <button type="button" onClick={onToggleMeus} title={mostrarMeus ? 'Ocultar meus grifos' : 'Mostrar meus grifos'} aria-pressed={mostrarMeus}
           className="inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[11px] font-medium leading-none transition hover:opacity-80"
           style={{ color: mostrarMeus ? cores.fg : cores.muted }}>
@@ -216,6 +219,9 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
   // "Cobrado em prova" = artigos com QUESTÃO ancorada (aposArtigo). Alimenta o recolher/expandir.
   const artigosCobrados = useMemo(() => new Set((doc.questoes ?? []).map((q) => q.aposArtigo).filter((n) => n > 0)), [doc.questoes])
   const [semGrifos, setSemGrifos] = useState(!!doc.prefs?.semGrifos)
+  // Admin desativou o "Grifo do Revisão" p/ este documento → força ocultar os grifos editoriais e some os
+  // toggles (o aluno não liga de volta). Mantém a preferência do aluno limpa (não polui sem_grifos).
+  const grifoRevOff = !!doc.grifoRevisaoOff
   const [mostrarMeus, setMostrarMeus] = useState(true) // "Meus grifos": ligado por padrão; desligar oculta os grifos do aluno
   // Legenda das cores do aluno (renomeável): padrão + o que o aluno já salvou. Salva debounced.
   const [rotulos, setRotulos] = useState<Record<string, string>>(() => ({ ...ROTULOS_GRIFO_PADRAO, ...((doc.prefs?.grifoRotulos as Record<string, string> | null) ?? {}) }))
@@ -523,7 +529,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
   useEffect(() => {
     const run = () => {
       const ct = contentRef.current
-      aplicarGrifos(ct, { ocultar: semGrifos, cores: grifoCores })
+      aplicarGrifos(ct, { ocultar: semGrifos || grifoRevOff, cores: grifoCores })
       // Colapsa parágrafos SÓ-ESPAÇO (&nbsp;, espaços, <br>) que o Word deixa entre as caixas (ATENÇÃO /
       // ENTENDIMENTO / NÃO ESQUEÇA / Já cobrado) → eram a causa do vão extra. `trim()` remove o nbsp.
       // Pulado quando o documento preserva o espaçamento do HTML (fiel ao Word / Enter do editor).
@@ -1081,7 +1087,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
   const conteudoEl = useMemo(() => (
     <div
       ref={contentRef}
-      className={cn('leitura-conteudo leitura-prosa px-6 py-6 [&_a]:underline [&_h1]:mb-3 [&_h1]:mt-4 [&_h1]:text-2xl [&_h1]:font-bold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-xl [&_h2]:font-bold [&_h3]:mb-1 [&_h3]:mt-3 [&_h3]:text-lg [&_h3]:font-semibold [&_li]:ml-6 [&_li]:list-disc [&_p]:mb-3 [&_table]:my-3 [&_table]:w-full [&_td]:border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:px-2 [&_th]:py-1', semGrifos && 'sem-grifos', doc.esp?.preservarHtml && 'leitura-fiel')}
+      className={cn('leitura-conteudo leitura-prosa px-6 py-6 [&_a]:underline [&_h1]:mb-3 [&_h1]:mt-4 [&_h1]:text-2xl [&_h1]:font-bold [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-xl [&_h2]:font-bold [&_h3]:mb-1 [&_h3]:mt-3 [&_h3]:text-lg [&_h3]:font-semibold [&_li]:ml-6 [&_li]:list-disc [&_p]:mb-3 [&_table]:my-3 [&_table]:w-full [&_td]:border [&_td]:px-2 [&_td]:py-1 [&_th]:border [&_th]:px-2 [&_th]:py-1', (semGrifos || grifoRevOff) && 'sem-grifos', doc.esp?.preservarHtml && 'leitura-fiel')}
       style={modo === 'flip'
         ? { ...proseStyle, columnWidth: colW || undefined, columnGap: GAP, columnFill: 'auto', height: '100%' }
         : proseStyle}
@@ -1093,7 +1099,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
     <div className="pointer-events-none absolute inset-0" aria-hidden>
       {grifos.map((g) => {
         if (grifosOcultos.has(g.id)) return null // ocultado pela borracha
-        if (semGrifos && !ehEstrutural(g.tipo)) return null
+        if ((semGrifos || grifoRevOff) && !ehEstrutural(g.tipo)) return null
         const gr = grifosRects[g.id]; if (!gr) return null
         const info = (GRIFOS as any)[g.tipo]
         const label = info?.label ?? 'Grifo'
@@ -1516,7 +1522,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
             style={modo !== 'flip' ? { background: cores.desk } : undefined}
           >
             {/* Barra de LEGENDA fixa (sticky) — some no modo virar (sem rolagem vertical). */}
-            {modo !== 'flip' && <LegendaBar cores={cores} escuro={tema === 'escuro'} noTopo={noTopo} semGrifos={semGrifos} onToggleGrifos={() => setSemGrifos((v) => !v)} mostrarMeus={mostrarMeus} onToggleMeus={() => setMostrarMeus((v) => !v)} grifoCores={grifoCores} />}
+            {modo !== 'flip' && <LegendaBar cores={cores} escuro={tema === 'escuro'} noTopo={noTopo} semGrifos={semGrifos} onToggleGrifos={() => setSemGrifos((v) => !v)} mostrarMeus={mostrarMeus} onToggleMeus={() => setMostrarMeus((v) => !v)} grifoCores={grifoCores} legendasOff={doc.legendasOff} grifoRevisaoOff={grifoRevOff} />}
             {/* wrapper posicionado: no modo virar leva o transform; nos demais é a FOLHA (papel) flutuante. */}
             <div
               ref={wrapperRef}
@@ -1635,6 +1641,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
           <div className="space-y-3 border-b px-3 py-3" style={{ borderColor: '#0000001a' }}>
             {/* SEMPRE visível (acima de "Meus grifos"): ocultar/mostrar os grifos do Revisão. Antes ficava
                 escondido por uma detecção que falhava em alguns docs. */}
+            {!grifoRevOff && (
             <div className="flex items-center justify-between text-xs" style={{ color: cores.muted }}>
               <span className="inline-flex items-center gap-1"><Highlighter className="h-3.5 w-3.5" /> Grifos do Revisão</span>
               <div className="flex items-center gap-2">
@@ -1643,6 +1650,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
                 <input type="checkbox" checked={!semGrifos} onChange={(e) => setSemGrifos(!e.target.checked)} className="h-4 w-4 rounded border" aria-label="Mostrar grifos do Revisão" />
               </div>
             </div>
+            )}
             {/* Meus grifos: ligado por padrão; desligar OCULTA (bloqueia) os grifos do próprio aluno. */}
             <div className="flex items-center justify-between text-xs" style={{ color: cores.muted }}>
               <span className="inline-flex items-center gap-1"><StickyNote className="h-3.5 w-3.5" /> Meus grifos</span>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState, useTransition } from 'react'
+import { useMemo, useRef, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import {
   criarDiaDesafio, excluirDiaDesafio, reordenarDiasDesafio, definirPublicacaoDiasDesafio,
-  editarLeituraDia, type DiaEstado,
+  editarLeituraDia, renomearDiaDesafio, type DiaEstado,
 } from '@/app/admin/jurisprudencia/actions'
 
 // Shape de uma tese (casa com dados.js: ref, tema, q, o[3], a=índice correto, tese).
@@ -151,6 +151,7 @@ export function JurisDiasEditor({ desafioId, dias, materias, final, quizPorDia }
               onToggle={() => setAberto((a) => (a === e.key ? null : e.key))}
               onMover={(delta) => mover(i, delta)}
               onExcluir={() => excluirDia(e.key)}
+              onRenomear={(titulo) => run(() => renomearDiaDesafio(desafioId, e.key, titulo), 'Nome do dia atualizado')}
               onEstado={(estado) => aplicarEstado([e.key], estado, null, estado === 'publicada' ? 'Dia publicado' : estado === 'visualizavel' ? 'Dia visualizável' : 'Dia em rascunho')}
               onAgendar={() => setAgendarKeys([e.key])}
             />
@@ -166,7 +167,7 @@ export function JurisDiasEditor({ desafioId, dias, materias, final, quizPorDia }
   )
 }
 
-function DiaLinha({ desafioId, chave, posicao, total, dia, materiaInfo, quizCount = 0, pending, aberto, selecionado, onToggleSel, onToggle, onMover, onExcluir, onEstado, onAgendar }: {
+function DiaLinha({ desafioId, chave, posicao, total, dia, materiaInfo, quizCount = 0, pending, aberto, selecionado, onToggleSel, onToggle, onMover, onExcluir, onRenomear, onEstado, onAgendar }: {
   desafioId: string
   chave: string
   posicao: number
@@ -181,10 +182,14 @@ function DiaLinha({ desafioId, chave, posicao, total, dia, materiaInfo, quizCoun
   onToggle: () => void
   onMover: (delta: -1 | 1) => void
   onExcluir: () => void
+  onRenomear: (titulo: string) => void
   onEstado: (estado: DiaEstado) => void
   onAgendar: () => void
 }) {
   const router = useRouter()
+  const [editandoNome, setEditandoNome] = useState(false)
+  const [rascunhoNome, setRascunhoNome] = useState('')
+  const cancelarNome = useRef(false)
   const [abrindoLeitura, startLeitura] = useTransition()
   const [abrindoQuestoes, startQuestoes] = useTransition()
   const [abrindoRapida, startRapida] = useTransition()
@@ -219,6 +224,15 @@ function DiaLinha({ desafioId, chave, posicao, total, dia, materiaInfo, quizCoun
   const estado = estadoDoDia(dia.pub)
   const cor = materiaInfo?.cor ?? '#6d28d9'
 
+  // Renomear o dia (inline) — mesmo espírito do "Personalizar aula" do Lei Seca, focado no nome.
+  function iniciarRename() { setRascunhoNome(titulo); cancelarNome.current = false; setEditandoNome(true) }
+  function salvarRename() {
+    if (cancelarNome.current) { cancelarNome.current = false; setEditandoNome(false); return }
+    setEditandoNome(false)
+    const t = rascunhoNome.trim()
+    if (t !== titulo.trim()) onRenomear(t)
+  }
+
   return (
     <div className={cn('border-b last:border-0 transition-colors', selecionado && 'bg-primary/5', aberto && 'bg-muted/20')}>
       {/* Linha da tabela */}
@@ -229,10 +243,28 @@ function DiaLinha({ desafioId, chave, posicao, total, dia, materiaInfo, quizCoun
           {aberto ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
         </button>
         <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-bold text-white" style={{ background: cor }}>{materiaInfo?.curto?.slice(0, 3) || posicao}</span>
-        <button onClick={onToggle} className="min-w-0 flex-1 text-left" title="Abrir editor de questões">
-          <p className="truncate text-sm font-semibold text-foreground">{titulo || <span className="text-muted-foreground">Dia {posicao} — sem título</span>}</p>
-          <p className="truncate text-[11px] text-muted-foreground">{materiaInfo?.nome ?? 'Aula do dia'}</p>
-        </button>
+        {editandoNome ? (
+          <div className="min-w-0 flex-1">
+            <input
+              autoFocus
+              value={rascunhoNome}
+              onChange={(e) => setRascunhoNome(e.target.value)}
+              onBlur={salvarRename}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur() }
+                else if (e.key === 'Escape') { e.preventDefault(); cancelarNome.current = true; e.currentTarget.blur() }
+              }}
+              placeholder={`Dia ${posicao} — sem título`}
+              className="w-full rounded-md border border-primary bg-background px-2 py-1 text-sm font-semibold text-foreground outline-none"
+            />
+            <p className="truncate text-[11px] text-muted-foreground">{materiaInfo?.nome ?? 'Aula do dia'}</p>
+          </div>
+        ) : (
+          <button onClick={onToggle} className="min-w-0 flex-1 text-left" title="Abrir editor de questões">
+            <p className="truncate text-sm font-semibold text-foreground">{titulo || <span className="text-muted-foreground">Dia {posicao} — sem título</span>}</p>
+            <p className="truncate text-[11px] text-muted-foreground">{materiaInfo?.nome ?? 'Aula do dia'}</p>
+          </button>
+        )}
 
         {/* Estado de publicação (dropdown) */}
         <DropdownMenu>
@@ -261,7 +293,7 @@ function DiaLinha({ desafioId, chave, posicao, total, dia, materiaInfo, quizCoun
           {dia.documento_id && <span title="Leitura configurada" className="mr-0.5 inline-flex h-4 w-4 items-center justify-center text-emerald-600 dark:text-emerald-400"><BookOpen className="h-3.5 w-3.5" /></span>}
           <button onClick={() => onMover(-1)} disabled={posicao === 1 || pending} title="Subir" className="rounded-md p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"><ChevronUp className="h-4 w-4" /></button>
           <button onClick={() => onMover(1)} disabled={posicao === total || pending} title="Descer" className="rounded-md p-1 text-muted-foreground hover:bg-muted disabled:opacity-30"><ChevronDown className="h-4 w-4" /></button>
-          <button onClick={onToggle} title="Editar questões" className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><Pencil className="h-4 w-4" /></button>
+          <button onClick={iniciarRename} disabled={pending} title="Renomear dia" className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-40"><Pencil className="h-4 w-4" /></button>
           <button onClick={onExcluir} title="Excluir dia" className="rounded-md p-1 text-muted-foreground hover:bg-rose-500/10 hover:text-rose-600"><Trash2 className="h-4 w-4" /></button>
         </div>
       </div>

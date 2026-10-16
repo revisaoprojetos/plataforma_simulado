@@ -4,7 +4,8 @@ import { useState } from 'react'
 import { Trophy, Stamp } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ModuloConquistasForm } from '@/components/admin/modulo-conquistas-form'
-import { ModuloCarimbosForm } from '@/components/admin/modulo-carimbos-form'
+import { ModuloCarimbosForm, type CondicaoLabels, type AulasTextos, type MedalhaVariante } from '@/components/admin/modulo-carimbos-form'
+import type { salvarConquistasModulo, salvarCarimbosModulo } from '@/app/admin/leitura/actions'
 import type { ModuloConquistaDef, CarimboDef } from '@/lib/leitura/carimbos-tipos'
 
 type Sub = 'conquistas' | 'carimbos'
@@ -13,8 +14,10 @@ export type AulaOpcao = { id: string; titulo: string }
 /**
  * Aba "Medalhas" do módulo: agrupa as duas coleções — Conquistas (ícone + condição) e Carimbos
  * (imagem estampada na trilha). Sub-abas internas para gerenciar cada uma.
+ * `salvarConquistas`/`salvarCarimbos` permitem reusar a aba em OUTROS desafios (ex.: Maratona de
+ * Simulados) gravando nas actions daquele contexto; `rotuloAula` troca "dias" por "simulados" etc.
  */
-export function ModuloMedalhasForm({ pastaId, conquistas, carimbos, aulas = [] }: { pastaId: string; conquistas: ModuloConquistaDef[]; carimbos: CarimboDef[]; aulas?: AulaOpcao[] }) {
+export function ModuloMedalhasForm({ pastaId, conquistas, carimbos, aulas = [], salvarConquistas, salvarCarimbos, rotuloAula, condicaoLabels, aulasTextos, variante }: { pastaId: string; conquistas: ModuloConquistaDef[]; carimbos: CarimboDef[]; aulas?: AulaOpcao[]; salvarConquistas?: typeof salvarConquistasModulo; salvarCarimbos?: typeof salvarCarimbosModulo; rotuloAula?: { todas: string; especificas: string }; condicaoLabels?: CondicaoLabels; aulasTextos?: AulasTextos; variante?: MedalhaVariante }) {
   const [sub, setSub] = useState<Sub>('conquistas')
   const abas: { id: Sub; label: string; Icon: typeof Trophy; contagem: number }[] = [
     { id: 'conquistas', label: 'Conquistas', Icon: Trophy, contagem: conquistas.length },
@@ -34,8 +37,8 @@ export function ModuloMedalhasForm({ pastaId, conquistas, carimbos, aulas = [] }
         ))}
       </div>
 
-      {sub === 'conquistas' && <ModuloConquistasForm pastaId={pastaId} inicial={conquistas} aulas={aulas} />}
-      {sub === 'carimbos' && <ModuloCarimbosForm pastaId={pastaId} inicial={carimbos} aulas={aulas} />}
+      {sub === 'conquistas' && <ModuloConquistasForm pastaId={pastaId} inicial={conquistas} aulas={aulas} salvarAction={salvarConquistas} rotuloAula={rotuloAula} condicaoLabels={condicaoLabels} aulasTextos={aulasTextos} />}
+      {sub === 'carimbos' && <ModuloCarimbosForm pastaId={pastaId} inicial={carimbos} aulas={aulas} salvarAction={salvarCarimbos} rotuloAula={rotuloAula} condicaoLabels={condicaoLabels} aulasTextos={aulasTextos} variante={variante} />}
     </div>
   )
 }

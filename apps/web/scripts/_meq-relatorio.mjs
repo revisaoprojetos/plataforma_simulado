@@ -167,6 +167,20 @@ function addSheet(aba, titulo, sub, rows) {
   ws.views = [{ state: 'frozen', ySplit: 4 }]
   ws.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4, column: 5 } }
 }
+// Aba 0: IDENTIFICAÇÃO dos simulados (qual é qual) — o registro em `simulados` foi apagado.
+;(function addIdent() {
+  const ws = wb.addWorksheet('Identificação')
+  ws.mergeCells('A1:G1'); ws.getCell('A1').value = 'MEQ — Identificação dos 2 simulados (10/10/2026)'; ws.getCell('A1').font = { bold: true, size: 13 }
+  ws.mergeCells('A2:G2'); ws.getCell('A2').value = 'O registro na tabela "simulados" foi removido (sem título). Cada simulado é identificado por TURNO/HORÁRIO e pelas DISCIPLINAS das questões.'; ws.getCell('A2').font = { italic: true, size: 9, color: { argb: 'FF666666' } }; ws.getRow(2).height = 26; ws.getCell('A2').alignment = { wrapText: true, vertical: 'top' }
+  const hr = ws.getRow(4); hr.values = ['Simulado', 'Turno', 'Data', 'Horário', 'Alunos', 'Q1–20 (base)', 'Q21–60 (específicas = o que distingue)']; hr.font = { bold: true }
+  hr.eachCell((c) => { c.fill = HEADER_FILL; c.alignment = { horizontal: 'center', wrapText: true, vertical: 'middle' }; c.border = { bottom: { style: 'thin', color: { argb: 'FFBBBBBB' } } } }); hr.height = 30
+  SIMS.forEach((s, i) => {
+    const n = linhas.filter((l) => l.sims[s.id]).length
+    const r = ws.addRow([`Simulado ${i + 1}`, s.turno, s.periodo, s.janela, n, s.discA, s.discB])
+    r.alignment = { vertical: 'top', wrapText: true }; r.getCell(1).font = { bold: true }; r.height = 56
+  })
+  ws.columns[0].width = 12; ws.columns[1].width = 8; ws.columns[2].width = 12; ws.columns[3].width = 14; ws.columns[4].width = 8; ws.columns[5].width = 40; ws.columns[6].width = 64
+})()
 // Aba 1: total dos 2 simulados
 addSheet('Total (2 simulados)', 'MEQ — Total dos 2 simulados (por aluno)',
   `Acertos somando os 2 simulados de 10/10/2026. Q1–20 e Q21–60 separados. Melhor tentativa por aluno/simulado. ${linhas.length} alunos.`,

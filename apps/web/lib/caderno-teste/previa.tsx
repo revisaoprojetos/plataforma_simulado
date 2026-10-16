@@ -104,13 +104,29 @@ const MAPS_PARTE_DISC = ['coresParte', 'coresFundoParte', 'coresTextoParte', 'al
  *  renderizam), backfillando a chave real SÓ quando ela ainda não tem valor próprio — ou seja, uma edição
  *  feita direto no banco real sempre tem prioridade. Idempotente e sem efeito quando não há banco. */
 function herdarEdicoesDiscReais(a: ItemCaderno['ajustes'], conteudo: ItemCaderno['conteudo'], discBanco: DiscBanco[]): ItemCaderno['ajustes'] {
-  const gen = conteudo?.disciplinas ?? []
   const ocultas = new Set(conteudo?.discOcultas ?? [])
   const reais = discBanco.filter((d) => !ocultas.has(d.chave)) // mesma lista/ordem renderizada (ver `discs`)
-  if (!reais.length || !gen.length) return a
+  if (!reais.length) return a
+  // Fontes GENÉRICAS por posição. 1ª opção: as disciplinas do MODELO em `conteudo.disciplinas` (quando
+  // ainda são os placeholders `disciplina_N`). Fallback robusto: se essa lista já virou real (ou sumiu),
+  // deduzimos as chaves genéricas `disciplina_N` que ficaram ÓRFÃS nos próprios mapas de edição — assim a
+  // herança funciona mesmo quando o modelo foi "achatado" para o banco. Ordenadas pelo número (1,2,3…).
+  const ehGen = (s?: string) => !!s && /^disciplina_\d+$/.test(s)
+  let genChaves = (conteudo?.disciplinas ?? []).map((d) => d?.chave).filter((s): s is string => !!s)
+  if (!genChaves.some(ehGen)) {
+    const set = new Set<string>()
+    for (const nome of MAPS_PARTE_DISC) {
+      const m = (a as Record<string, unknown>)[nome] as Record<string, unknown> | undefined
+      if (!m) continue
+      for (const k of Object.keys(m)) { const mt = k.match(/^disc:(disciplina_\d+)(?::|$)/); if (mt) set.add(mt[1]) }
+    }
+    for (const k of Object.keys(a.coresDisc ?? {})) if (ehGen(k)) set.add(k)
+    genChaves = [...set].sort((x, y) => Number(x.slice('disciplina_'.length)) - Number(y.slice('disciplina_'.length)))
+  }
+  if (!genChaves.length) return a
   const pares: [string, string][] = []
-  const n = Math.min(reais.length, gen.length)
-  for (let i = 0; i < n; i++) { const gk = gen[i]?.chave, rk = reais[i]?.chave; if (gk && rk && gk !== rk) pares.push([gk, rk]) }
+  const n = Math.min(reais.length, genChaves.length)
+  for (let i = 0; i < n; i++) { const gk = genChaves[i], rk = reais[i]?.chave; if (gk && rk && gk !== rk) pares.push([gk, rk]) }
   if (!pares.length) return a
   const out: Record<string, unknown> = { ...a }
   for (const nome of MAPS_PARTE_DISC) {

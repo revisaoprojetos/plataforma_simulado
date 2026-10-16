@@ -113,7 +113,7 @@ export function ShellRevisaoNova({
   // Áreas com CONTEÚDO REDESENHADO (trazem o próprio layout/padding/fundo) ficam FULL-BLEED, como a
   // home — senão o shell aplicaria padding em cima do padding do componente ("encaixe"/caixa dupla).
   // As demais (conteúdo atual) recebem padding para não ficar cortadas. Nova área → adicionar aqui.
-  const AREAS_NOVAS = ['/aluno/perfil', '/aluno/cronograma', '/aluno/recomendado', '/aluno/simulados', '/aluno/questoes', '/aluno/ligas', '/aluno/leitura', '/aluno/jurisprudencia']
+  const AREAS_NOVAS = ['/aluno/perfil', '/aluno/cronograma', '/aluno/recomendado', '/aluno/simulados', '/aluno/questoes', '/aluno/ligas', '/aluno/leitura', '/aluno/jurisprudencia', '/aluno/maratona']
   const ehAreaNova = rota === '/aluno' || AREAS_NOVAS.some((a) => rota.startsWith(a))
   const [collapsed, toggleCollapsed] = useSidebarCollapsed()
   const [fontIdx, applyFont] = useFontScale()

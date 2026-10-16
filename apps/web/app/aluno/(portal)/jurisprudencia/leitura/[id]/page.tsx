@@ -36,7 +36,7 @@ export default async function JurisLeitorPage({ params, searchParams }: { params
       : (desafio ? `/aluno/jurisprudencia?desafio=${encodeURIComponent(desafio)}` : '/aluno/jurisprudencia')
     return (
       <div style={{ position: 'fixed', inset: 0, zIndex: 200 }}>
-        <LeitorJus html={doc.html} titulo={doc.titulo} topicos={doc.topicos} caminho={['Jurisprudência', doc.titulo || 'Leitura']} voltarHref={voltarHref} questoesHref={voltarHref} documentoId={doc.id} versao={doc.versao} desafio={desafio} />
+        <LeitorJus html={doc.html} titulo={doc.titulo} topicos={doc.topicos} caminho={['Jurisprudência', doc.titulo || 'Leitura']} voltarHref={voltarHref} questoesHref={voltarHref} documentoId={doc.id} versao={doc.versao} desafio={desafio} legendasOff={doc.legendasOff} grifoRevisaoOff={doc.grifoRevisaoOff} />
       </div>
     )
   }

@@ -288,6 +288,19 @@ export async function salvarDiaDesafio(
   return salvarMerge(g.tenantId, g.atorId, id, { dias })
 }
 
+/** Renomeia APENAS o título de um dia — preserva teses/matéria/ordem/pub/documento. numeroDia = chave em `dias`. */
+export async function renomearDiaDesafio(id: string, numeroDia: number | string, titulo: string): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const atual = await lerJogoParaMerge(svc, g.tenantId, id)
+  if (atual === null) return { ok: false, error: 'Desafio não encontrado.' }
+  const chave = String(Number(numeroDia))
+  const dias = diasObj(atual)
+  if (!(chave in dias)) return { ok: false, error: 'Dia não encontrado.' }
+  dias[chave] = { ...dias[chave], titulo: (titulo ?? '').toString().slice(0, 200) }
+  return salvarMerge(g.tenantId, g.atorId, id, { dias })
+}
+
 /** Cria um novo dia (próximo slot livre; cap de 15 por causa do mapa do labirinto). Começa em rascunho. */
 export async function criarDiaDesafio(id: string): Promise<{ ok: boolean; error?: string; chave?: string }> {
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }

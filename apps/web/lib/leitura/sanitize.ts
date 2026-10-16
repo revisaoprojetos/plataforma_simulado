@@ -148,7 +148,7 @@ function tagsDeTextoParaHtml(root: any, mapaTags: Record<string, string>): void 
 // estiliza e que o "modo sem grifos" entende:
 //   hl-y -> data-grifo="nucleo"  | hl-g -> complemento | hl-r -> prazo | exc -> excecao
 //   box-stj -> data-caixa="stj"  | box-stf -> stf | box-atencao -> alerta | box-cinza(-esc) -> comentario
-//   style:text-align:center      -> data-align="center"
+//   style:text-align:center|right|justify -> data-align="center|right|justify"
 //   paragrafo iniciado por 📌     -> data-cobranca="1" (marcador "ja cobrado em prova")
 const MAP_HL: Record<string, string> = { 'hl-y': 'nucleo', 'hl-g': 'complemento', 'hl-r': 'prazo', 'exc': 'excecao' }
 const MAP_BOX: Record<string, string> = { 'box-stj': 'stj', 'box-stf': 'stf', 'box-atencao': 'alerta', 'box-cinza': 'comentario', 'box-cinza-esc': 'comentario' }
@@ -156,9 +156,12 @@ const MAP_BOX: Record<string, string> = { 'box-stj': 'stj', 'box-stf': 'stf', 'b
 function mapearMontagem(root: any): void {
   for (const el of root.querySelectorAll('*')) {
     if (!el.tagName) continue
-    // alinhamento central: o style inline sera descartado -> preserva como data-align
+    // alinhamento (center/right/justify): preserva como data-align canônico — sobrevive a reprocessamento
+    // (ex.: o leitor da juris reconstrói os <p> e perderia o style inline). 'left' = default, não marca.
     const style = (el.getAttribute('style') || '').toLowerCase()
-    if (/text-align\s*:\s*center/.test(style)) el.setAttribute('data-align', 'center')
+    let al = (/text-align\s*:\s*(center|right|justify)/.exec(style) || [])[1]
+    if (!al) { const a = (el.getAttribute('align') || '').toLowerCase(); if (/^(center|right|justify)$/.test(a)) al = a } // atributo align="..." (Word) seria descartado
+    if (al) el.setAttribute('data-align', al)
     // classes editoriais -> atributos canonicos (mantem classes desconhecidas, ex.: mac-tbl/ind1)
     const classe = el.getAttribute('class')
     if (classe) {

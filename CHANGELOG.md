@@ -12,6 +12,27 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.18.0 — 2026-10-16
+
+**feat: cadernos, leitor da juris, tema escuro da Maratona, config de legendas e correções**
+
+- **Cadernos (editor)**: fundo da folha preenche 100% (fim das faixas brancas); novos ajustes de
+  cabeçalho/rodapé (encaixe/alinhamento/altura/em-quais-folhas); card de disciplina com cor de
+  fita/fundo/texto/%/X-N separadas; herança por posição das edições do MODELO → disciplinas reais do
+  banco; início da unificação dos dois editores (helpers em `components/admin/caderno-shared/`).
+- **Jurisprudência (admin)**: renomear o nome do dia/aula (inline) na aba Dias & Teses.
+- **Leitor (Lei Seca + Juris)**: justificação do texto corrige (inline/`data-align` canônico no sanitize
+  + CSS); caixas de Art./lei justificadas e deslocadas (~2/3, à direita) no leitor da juris; fix do
+  parse do dia 1 (título de tema embrulhado em `marca-pincel` não virava tema → tese colava no anterior).
+- **Leitor da Juris (iframe)**: remove cabeçalho do documento; espaço do topo menor; tag das leituras
+  maior (só na leitura, não na lateral); "LEGENDA"/botão da lateral/recolher somem quando não há legenda;
+  botão "Concluir leitura" no fim (contínuo e por-tema), com ícone e ~1/3 da coluna à direita.
+- **Config de legendas por documento**: no editor, ligar/desligar cada legenda + "Grifo do Revisão"
+  (com Marcar/Desmarcar todas); aplicado nos dois leitores. Todas as aulas de Jurisprudência ficaram
+  com as legendas e o Grifo do Revisão desativados.
+- **Maratona de Simulados**: suporte a TEMA ESCURO (tokens `--mxi-*` reativos ao `.dark`), mantendo a
+  identidade navy+dourado.
+
 ## 3.17.6 — 2026-10-15
 
 **fix(juris) CRÍTICO: POST do progresso mescla best/dom por `max` (anti-regressão) — correções param de reverter**

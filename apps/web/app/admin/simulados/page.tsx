@@ -1,5 +1,8 @@
 import { Suspense } from 'react'
+import Link from 'next/link'
 import { headers } from 'next/headers'
+import { cn } from '@/lib/utils'
+import { DesafiosSimuladoAdmin } from '@/components/admin/desafios-simulado-admin'
 import { createServiceClient } from '@/lib/supabase/server'
 import { getCurrentTenantId, getCurrentTenant } from '@/lib/tenant'
 import { fetchAll } from '@/lib/supabase/fetch-all'
@@ -19,6 +22,13 @@ import { simuladosTiposSql } from '@/lib/data/simulados.repo'
 
 // Hash estável (djb2) do CONJUNTO de simulados → chave de cache. Muda ao criar/excluir/publicar
 // simulado (recomputa), e é invalidada por import/re-correção (invalidarRelatorios).
+/** Aba "de linha" (sublinhado) — padrão do admin. */
+function SimTabLink({ href, ativa, label }: { href: string; ativa: boolean; label: string }) {
+  return (
+    <Link href={href} className={cn('relative -mb-px border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors', ativa ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground')}>{label}</Link>
+  )
+}
+
 function hashIds(ids: string[]): string {
   let h = 5381
   const s = [...ids].sort().join(',')
@@ -26,8 +36,26 @@ function hashIds(ids: string[]): string {
   return (h >>> 0).toString(36) + '.' + ids.length
 }
 
-export default async function SimuladosPage({ searchParams }: { searchParams: Promise<{ pasta?: string }> }) {
-  const { pasta: pastaParam } = await searchParams
+export default async function SimuladosPage({ searchParams }: { searchParams: Promise<{ pasta?: string; tab?: string; desafio?: string }> }) {
+  const { pasta: pastaParam, tab, desafio: desafioParam } = await searchParams
+  const abaDesafios = tab === 'desafios'
+  // DENTRO de um desafio: a área interna TOMA a tela (sem o título "Aplicação" nem as abas de cima),
+  // igual ao admin dos desafios (JurisClub). O `desafio` é uma PASTA real → reusamos ModuloAcesso/RankingAdmin.
+  if (abaDesafios && desafioParam) {
+    const { normalizarPontuacaoLeitura } = await import('@/lib/leitura/pontuacao')
+    const rankingInicial = { itens: [], gamAtivo: false, pontuacao: normalizarPontuacaoLeitura(null) }
+    const { lerConfigMaratona, contarDesafio, listarSimuladosDesafio, listarSimuladosForaDesafio, carregarSelosDesafio } = await import('./desafios-actions')
+    const [config, contagem, simuladosDesafio, simuladosFora, selos] = await Promise.all([
+      lerConfigMaratona(desafioParam), contarDesafio(desafioParam),
+      listarSimuladosDesafio(desafioParam), listarSimuladosForaDesafio(desafioParam),
+      carregarSelosDesafio(desafioParam),
+    ])
+    const hhD = await headers()
+    const hostD = hhD.get('x-forwarded-host') || hhD.get('host') || ''
+    const protoD = hhD.get('x-forwarded-proto') || (hostD.includes('localhost') || hostD.includes('127.0.0.1') ? 'http' : 'https')
+    const appUrlD = hostD ? `${protoD}://${hostD}` : (process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000')
+    return <div className="space-y-4"><DesafiosSimuladoAdmin desafioId={desafioParam} maratonaId={desafioParam} rankingInicial={rankingInicial} config={config} contagem={contagem} simuladosDesafio={simuladosDesafio} simuladosFora={simuladosFora} appUrl={appUrlD} selos={selos} /></div>
+  }
   // Href do "voltar" (seta <) do header: SOBE um nível de verdade — pasta pai da atual, ou raiz. Assim não
   // depende do histórico (que voltaria pro simulado de onde o admin veio). Consulta única e barata por PK.
   let voltarHref = '/admin/simulados'
@@ -40,35 +68,56 @@ export default async function SimuladosPage({ searchParams }: { searchParams: Pr
       voltarHref = pai ? `/admin/simulados?pasta=${pai}` : '/admin/simulados'
     } catch { /* pai_id pode não existir em algum ambiente → cai na raiz */ }
   }
+  // Aba DESAFIOS (lista): resolve a pasta real do desafio (p/ o card linkar com o id real) + ranking vazio.
+  let maratonaId = ''
+  let rankingVazioDesafio: any = null
+  if (abaDesafios) {
+    const { normalizarPontuacaoLeitura } = await import('@/lib/leitura/pontuacao')
+    rankingVazioDesafio = { itens: [], gamAtivo: false, pontuacao: normalizarPontuacaoLeitura(null) }
+    const { garantirDesafioMaratona } = await import('./desafios-actions')
+    maratonaId = (await garantirDesafioMaratona()).id ?? ''
+  }
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-start gap-2">
           <VoltarSimulados pastaId={pastaParam ?? null} voltarHref={voltarHref} />
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Simulados</h1>
-            <p className="text-muted-foreground">Gerencie provas, agendamentos e publicações.</p>
+            <h1 className="text-2xl font-bold tracking-tight">Aplicação de simulados</h1>
+            <p className="text-muted-foreground">{abaDesafios ? 'Agrupe simulados em desafios, com configurações e acessos próprios.' : 'Gerencie provas, agendamentos e publicações.'}</p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <NovaPastaBtn pastaId={pastaParam ?? null} />
-          <NovoSimuladoDialog
-            trigger={
-              <button type="button"
-                className="inline-flex items-center justify-center gap-2 rounded-lg px-8 py-2.5 text-sm font-semibold text-white shadow-md ring-1 ring-white/15 transition-all hover:brightness-110 hover:shadow-lg active:scale-[0.98]"
-                style={{ background: 'linear-gradient(135deg, var(--primary), color-mix(in oklab, var(--primary) 72%, #000))' }}>
-                <Plus className="h-4 w-4" />
-                Novo simulado
-              </button>
-            }
-          />
-        </div>
+        {!abaDesafios && (
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <NovaPastaBtn pastaId={pastaParam ?? null} />
+            <NovoSimuladoDialog
+              trigger={
+                <button type="button"
+                  className="inline-flex items-center justify-center gap-2 rounded-lg px-8 py-2.5 text-sm font-semibold text-white shadow-md ring-1 ring-white/15 transition-all hover:brightness-110 hover:shadow-lg active:scale-[0.98]"
+                  style={{ background: 'linear-gradient(135deg, var(--primary), color-mix(in oklab, var(--primary) 72%, #000))' }}>
+                  <Plus className="h-4 w-4" />
+                  Novo simulado
+                </button>
+              }
+            />
+          </div>
+        )}
       </div>
 
-      {/* O shell (título + botão) aparece na hora; o board (leituras pesadas) entra por streaming. */}
-      <Suspense key={pastaParam ?? 'raiz'} fallback={<BoardSkeleton />}>
-        <BoardData pastaParam={pastaParam} />
-      </Suspense>
+      {/* Abas: SIMULADOS (aplicação normal) · DESAFIOS (agrupamentos tipo maratona) — tab de linha. */}
+      <div className="flex items-center gap-1 border-b">
+        <SimTabLink href={`/admin/simulados${pastaParam ? `?pasta=${pastaParam}` : ''}`} ativa={!abaDesafios} label="Simulados" />
+        <SimTabLink href="/admin/simulados?tab=desafios" ativa={abaDesafios} label="Desafios" />
+      </div>
+
+      {abaDesafios ? (
+        <DesafiosSimuladoAdmin desafioId={null} maratonaId={maratonaId} rankingInicial={rankingVazioDesafio} />
+      ) : (
+        /* O shell (título + botão) aparece na hora; o board (leituras pesadas) entra por streaming. */
+        <Suspense key={pastaParam ?? 'raiz'} fallback={<BoardSkeleton />}>
+          <BoardData pastaParam={pastaParam} />
+        </Suspense>
+      )}
     </div>
   )
 }

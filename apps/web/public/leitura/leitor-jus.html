@@ -172,11 +172,14 @@ kbd{font-family:var(--f-mono);font-size:11px;line-height:1;border:1px solid var(
 
 .scroller{flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;scroll-behavior:smooth;padding-inline:24px;padding-block:32px 120px;background:var(--desk)}
 @media (prefers-reduced-motion:reduce){.scroller{scroll-behavior:auto}}
-.doc{max-width:calc(var(--read-w) + 176px);margin:0 auto;position:relative;background:var(--raise);border:1px solid var(--line);border-radius:6px;box-shadow:0 1px 1px rgba(0,0,0,.03),0 2px 4px rgba(0,0,0,.03),0 18px 40px -18px rgba(23,22,29,.18);padding:64px 88px 72px}
+.doc{max-width:calc(var(--read-w) + 176px);margin:0 auto;position:relative;background:var(--raise);border:1px solid var(--line);border-radius:6px;box-shadow:0 1px 1px rgba(0,0,0,.03),0 2px 4px rgba(0,0,0,.03),0 18px 40px -18px rgba(23,22,29,.18);padding:32px 88px 72px}
 .doc::before{content:"";position:absolute;inset:6px;border:1px solid var(--line);border-radius:3px;pointer-events:none;opacity:.6}
 .margin{position:absolute;top:0;width:236px;height:100%;pointer-events:none}
 
 .doc-head{margin-bottom:56px}
+/* Cabeçalho do documento (nome do arquivo + dia/ano/contagem/tribunais/"como ler") REMOVIDO da leitura
+   do aluno — o conteúdo começa direto no 1º tema. ID + !important vence os combos .show/.app.paged. */
+#docHead{display:none!important}
 .kicker{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--accent);display:flex;gap:8px;align-items:center}
 .kicker .dot{width:3px;height:3px;border-radius:50%;background:var(--ink-3)}
 .kicker .muted{color:var(--ink-3)}
@@ -244,7 +247,8 @@ kbd{font-family:var(--f-mono);font-size:11px;line-height:1;border:1px solid var(
 .flow ul{padding-left:1.1em;margin:0 0 1.1em}
 .flow li{margin-bottom:.5em;padding-left:.2em}
 .flow li::marker{color:var(--ink-3)}
-.law{margin:.4em 0 1.5em;padding:9px 12px;background:transparent;border:1px solid var(--tese-bd);border-radius:0;font-family:"Carlito",Calibri,"Segoe UI",Arial,sans-serif;font-size:calc(var(--read-size) * .84);line-height:1.8;color:var(--tese-ink)}
+.law{margin:.4em 0 1.5em;padding:9px 12px;background:transparent;border:1px solid var(--tese-bd);border-radius:0;font-family:"Carlito",Calibri,"Segoe UI",Arial,sans-serif;font-size:calc(var(--read-size) * .84);line-height:1.8;color:var(--tese-ink);text-align:justify;hyphens:auto;-webkit-hyphens:auto;width:66%;margin-left:auto}
+@media(max-width:720px){.law{width:auto;margin-left:0}}
 .law-h{display:flex;justify-content:space-between;align-items:center;gap:10px;font-family:var(--f-mono);font-size:11.5px;color:var(--ink-3);margin-bottom:8px}
 .law-h button{font-family:var(--f-ui);font-size:12px;font-weight:500;color:var(--accent);display:inline-flex;align-items:center;gap:4px}
 .law-h button svg{width:13px;height:13px}
@@ -324,7 +328,14 @@ mark.sr.cur{box-shadow:inset 0 -1.25em var(--hl-y),0 0 0 2px var(--c-y);border-r
 .secnav .next,.secnav .done{grid-column:2;text-align:right;align-items:flex-end}
 .secnav .done{background:var(--accent);border-color:var(--accent)}
 .secnav .done small,.secnav .done span{color:var(--accent-ink)}
-.app:not(.paged) .secnav .prev{visibility:hidden}
+/* Navegação prev/próximo tema SÓ no modo "um tema por vez" (paged). No modo CONTÍNUO a navegação some
+   (é redundante — basta rolar), mas o "Concluir leitura" do FIM (último tema) PERMANECE, centralizado
+   embaixo. Puro CSS reativo à classe .paged → trocar de modo não deixa resíduo. */
+.app:not(.paged) .secnav:not(.secnav-fim){display:none}
+.app:not(.paged) .secnav-fim{display:block}
+.app:not(.paged) .secnav-fim .prev,.app:not(.paged) .secnav-fim>span{display:none}
+/* ~1/3 da coluna, encostado à direita (como eram os botões de "próximo tema"). */
+.app:not(.paged) .secnav-fim .done{width:34%;min-width:220px;margin-left:auto;text-align:center;align-items:center}
 .app.paged .sec{display:none;padding-top:0;margin-top:0}
 .app.paged .sec.current{display:block}
 .app.paged .sec.current::before{display:none}
@@ -658,8 +669,8 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:0}
 
 /* ===== Ajustes de composição ===== */
 .numeral{display:none!important}
-.sec-head{text-align:center;margin-bottom:34px}
-.sec-kick{justify-content:center;position:relative;min-height:28px;margin-bottom:14px}
+.sec-head{text-align:center;margin-bottom:22px}
+.sec-kick{justify-content:center;position:relative;min-height:0;margin-bottom:4px}
 .sec-kick .act{position:absolute;right:0;top:0;margin:0}
 .sec h2{margin:0 auto 6px;max-width:92%}
 .flow h3{font-size:17px;font-weight:600;letter-spacing:-.005em;margin:2.1em 0 .75em;padding-left:12px;border-left:3px solid #E3B54A;line-height:1.35}
@@ -678,7 +689,10 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:0}
 @media (max-width:1400px){.top .tb .lbl{display:none}.searchbtn{width:160px}}
 @container (max-width:1020px){.doc{padding:44px 44px 56px}}
 @container (max-width:760px){.doc{padding:30px 22px 44px}}
-.blk-tags{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 10px}
+.blk-tags{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+/* Tag (selo) MAIOR só na LEITURA. O sumário lateral (.t-tags) reusa o mesmo HTML, então o tamanho
+   base (1.55em inline) continua lá — só aqui aumentamos (sobrepõe o inline com !important). */
+.blk-tags .selo-tag{height:2.3em!important}
 .blk-tags + .tese{margin-top:0}
 
 /* ===== Barra de legenda fixa ===== */
@@ -1299,11 +1313,26 @@ function trimRuns(rs){rs=rs.filter(r=>r.t!=='');while(rs.length&&!rs[0].t.trim()
 function runsHTML(rs){let out='',cur=null,buf='';const flush=()=>{if(!buf)return;const tw=(/\s*$/.exec(buf)||[''])[0];if(buf.trim())buf=buf.slice(0,buf.length-tw.length);let h=esc(buf);if(buf.trim()){if(cur.b)h='<b>'+h+'</b>';if(cur.i)h='<i>'+h+'</i>';if(cur.e)h=`<span class="ed ${cur.e}">${h}</span>`}out+=h+(buf.trim()?esc(tw):'');buf=''};
   rs.forEach(r=>{r.e=r.e||'';if(cur&&(r.b!==cur.b||r.i!==cur.i||r.e!==cur.e)&&r.t.trim()){flush();cur=r}else if(!cur)cur=r;buf+=r.t});flush();return out.replace(/<\/b>(\s*)<b>/g,'$1')}
 function parseCite(c){const parts=c.split(/,\s*/);const rel=(/Rel\.\s*Min\.\s*([^,]+)/.exec(c)||[])[1];return {julgado:parts[0]||'',orgao:parts.find(x=>/Turma|Plenário|Seção|Corte Especial|Pleno/i.test(x))||'',relator:rel?titleCase(rel.trim()):'',data:(/j\.\s*([\d\/.]+\d)/.exec(c)||[])[1]||''}}
+// Alinhamento do parágrafo do EDITOR: data-align (canônico) ou style:text-align inline. Preserva o
+// justificado/centralizado que o admin aplicou (o rebuild recria o <p>, então precisa ser reemitido).
+function alignDe(el){try{const a=(el.getAttribute('data-align')||'').toLowerCase();if(/^(center|right|justify|left)$/.test(a))return a;const m=/text-align\s*:\s*(center|right|justify|left)/.exec((el.getAttribute('style')||'').toLowerCase());return m?m[1]:''}catch(e){return ''}}
 function parseDay(raw){
   const d=new DOMParser().parseFromString(raw,'text/html');
   const size=el=>{let m=0;el.querySelectorAll('[style]').forEach(s=>{const x=/font-size:\s*([\d.]+)pt/.exec(s.getAttribute('style'));if(x)m=Math.max(m,+x[1])});return m};
   const day={title:'',temas:[]};let cur=null;
-  [...d.body.children].forEach(el=>{
+  // Achata wrappers INLINE (ex.: <span class="marca-pincel"> que o editor põe em volta de um TÍTULO de
+  // tema): sem isso o <p> do título fica "escondido" dentro do span, o tema NÃO é detectado e a tese/
+  // conteúdo seguinte acaba colado no tema ANTERIOR. Desembrulha só os blocos DIRETOS do wrapper.
+  const topo=[];
+  for(const el of [...d.body.children]){
+    const tg=el.tagName;
+    if(tg==='P'||/^H[1-6]$/.test(tg)||tg==='TABLE'){topo.push(el);continue}
+    if(/^(SPAN|B|I|U|EM|STRONG|FONT|A|MARK)$/.test(tg)){
+      try{const inner=[...el.querySelectorAll(':scope > p, :scope > h1, :scope > h2, :scope > h3, :scope > h4, :scope > h5, :scope > h6, :scope > table')];if(inner.length){topo.push(...inner);continue}}catch(e){}
+    }
+    topo.push(el); // demais (div/hr/etc.) seguem como antes (ignorados pelos branches abaixo)
+  }
+  topo.forEach(el=>{
     // Selos REAIS da Biblioteca que o editor colocou no conteúdo (<span data-selo>) → tags do tema.
     if(cur&&el.querySelectorAll){try{el.querySelectorAll('[data-selo]').forEach(s=>{const sl=s.getAttribute('data-selo');if(sl&&!cur.selos.includes(sl))cur.selos.push(sl)})}catch(e){}}
     const t=(el.textContent||'').replace(/ /g,' ').trim();if(!t)return;
@@ -1313,7 +1342,7 @@ function parseDay(raw){
       if(!cur)return;
       const rs=trimRuns(runs(el));
       if(rs.filter(r=>r.t.trim()).every(r=>r.b)&&t.length<160){cur.blocks.push({type:'h3',text:t});return}
-      cur.blocks.push({type:'p',html:runsHTML(rs)});return}
+      cur.blocks.push({type:'p',html:runsHTML(rs),align:alignDe(el)});return}
     if(el.tagName==='TABLE'&&cur){const st=el.outerHTML;const court=/DEEAF6/i.test(st)?'STF':/FBE4D5/i.test(st)?'STJ':null;
       const ps=[...el.querySelectorAll('p')].map(p=>({t:p.textContent.replace(/ /g,' ').trim(),rs:trimRuns(runs(p))})).filter(x=>x.t);
       if(court&&!cur.tese){const items=ps.map(x=>x.t);let last=items[items.length-1];let cite='';
@@ -1366,14 +1395,14 @@ function renderDay(){
     let body='',k=0,inConcl=false;
     tm.blocks.forEach(b=>{
       if(b.type==='h3'){if(inConcl){body+='</div>';inConcl=false}k++;body+=`<h3 id="${id}-${k}">${esc(b.text)}</h3>`;if(/^conclus/i.test(b.text)){body+='<div class="concl">';inConcl=true}}
-      else if(b.type==='p')body+=`<p>${b.html}</p>`;
+      else if(b.type==='p')body+=`<p${b.align?` style="text-align:${b.align}"`:''}>${b.html}</p>`;
       else if(b.type==='law'){if(inConcl){body+='</div>';inConcl=false}
         const ps=b.paras.length?b.paras.slice():[''];const L=ps.length-1;
         body+=`<div class="law" data-label="${esc(b.label)}">${ps.map((x,j)=>{let h=x==='(…)'?'(…)':x;if(j===0)h='“'+(b.label?`<b>${esc(b.label)}.</b> `:'')+h;if(j===L)h+='”';return `<p${x==='(…)'&&j>0?' class="omit"':''}>${h}</p>`}).join('')}</div>`}});
     if(inConcl)body+='</div>';
     const check=false?`<div class="check" data-quiz="${id}"><div class="check-h"><b><svg class="i"><use href="#i-quiz"/></svg>Checkpoint · Certo ou errado?</b><span data-score></span></div>${ch.map(q=>`<div class="q" data-ans="${q.a}"><p>${esc(q.q)}</p><div class="ops"><button data-v="C">Certo</button><button data-v="E">Errado</button></div><div class="why">${esc(q.why)}</div></div>`).join('')}</div>`:'';
     const cite=te&&te.cite?te.court+', '+te.cite:tm.title;
-    return `<section class="sec" id="${id}" data-title="${esc(tm.title)}" data-cite="${esc(cite)}"><header class="sec-head"><span class="numeral" aria-hidden="true">${P}</span><div class="sec-kick"><b>Tema ${P}</b><span class="act"><button class="icb" data-listen title="Ouvir este tema"><svg class="i"><use href="#i-vol"/></svg></button></span></div><h2><span>${esc(tm.title)}</span></h2></header>${tags?`<div class="blk-tags">${tags}</div>`:''}${tese}<div class="flow">${body}</div></section>`}).join('');
+    return `<section class="sec" id="${id}" data-title="${esc(tm.title)}" data-cite="${esc(cite)}"><header class="sec-head"><span class="numeral" aria-hidden="true">${P}</span><div class="sec-kick"><span class="act"><button class="icb" data-listen title="Ouvir este tema"><svg class="i"><use href="#i-vol"/></svg></button></span></div><h2><span>${esc(tm.title)}</span></h2></header>${tags?`<div class="blk-tags">${tags}</div>`:''}${tese}<div class="flow">${body}</div></section>`}).join('');
   linkArticles();
 }
 
@@ -1438,10 +1467,10 @@ const secWords={};secs.forEach(s=>{secWords[s.id]=words(s);const dm=$('[data-min
 const totalWords=Object.values(secWords).reduce((a,b)=>a+b,0);
 ($('#totalMin')||{}).textContent=Math.max(1,Math.round(totalWords/WPM))+' min de leitura';
 
-secs.forEach((s,i)=>{const n=document.createElement('nav');n.className='secnav';n.setAttribute('aria-label','Navegar entre temas');const prev=secs[i-1],next=secs[i+1];
+secs.forEach((s,i)=>{const n=document.createElement('nav');n.setAttribute('aria-label','Navegar entre temas');const prev=secs[i-1],next=secs[i+1];n.className=next?'secnav':'secnav secnav-fim';
   n.innerHTML=(prev?`<button class="prev" data-goto="${prev.id}"><small><svg class="i"><use href="#i-left"/></svg>Tema ${pad(i)}</small><span>${esc(prev.dataset.title)}</span></button>`:'<span></span>')+
    (next?`<button class="next" data-goto="${next.id}"><small>Próximo · Tema ${pad(i+2)}<svg class="i"><use href="#i-right"/></svg></small><span>${esc(next.dataset.title)}</span></button>`
-        :`<button class="done" data-quest><small>Você chegou ao fim</small><span>Concluir leitura</span></button>`);
+        :`<button class="done" data-quest><small>final da leitura</small><span style="display:inline-flex;align-items:center;gap:7px"><svg class="i" style="width:16px;height:16px"><use href="#i-quiz"/></svg>Concluir leitura</span></button>`);
   s.appendChild(n)});
 
 /* ================= SUMÁRIO E PROGRESSO ================= */
@@ -1529,6 +1558,18 @@ function applyVis(){const st=S.set;article.classList.toggle('eds',st.showEd!==fa
 $('#tgEd').onclick=()=>{S.set.showEd=S.set.showEd===false;saveSet();applyVis()};
 $('#tgMine').onclick=()=>{S.set.showMine=S.set.showMine===false;saveSet();applyVis();renderNotes()};
 $('#legMin').onclick=()=>{S.set.legMin=!S.set.legMin;saveSet();applyVis()};
+// Config do editor (quiz_config): oculta as legendas desligadas e desativa o "Grifo do Revisão"
+// (esconde o toggle + força os grifos editoriais ocultos). Vem no CFG via postMessage do host.
+;(function aplicarCfgLegendas(){
+  const offs=Array.isArray(CFG.legendasOff)?CFG.legendasOff:[];
+  const MAP={nucleo:'lg-n',complemento:'lg-c',prazo:'lg-p',crucial:'lg-f',excecao:'lg-x',stf:'lg-stf',stj:'lg-stj',equipe:'lg-eq'};
+  offs.forEach(k=>{const cls=MAP[k];const el=cls&&$('.'+cls);if(el)el.style.display='none'});
+  if(['stf','stj','equipe'].every(k=>offs.includes(k))){const d=$('.lg-dot');if(d)d.style.display='none'}
+  // Todas as legendas off → some o rótulo "LEGENDA" (topo) E o botão "Legenda" do rodapé da lateral.
+  const TODAS=['nucleo','complemento','prazo','crucial','excecao','stf','stj','equipe'];
+  if(TODAS.every(k=>offs.includes(k))){const lab=$('.leg-lab');if(lab)lab.style.display='none';const bl=$('#btnLegend');if(bl)bl.style.display='none';const lm=$('#legMin');if(lm)lm.style.display='none'}
+  if(CFG.grifoRevisaoOff){const tg=$('#tgEd');if(tg)tg.style.display='none';const sep=$('#legSep');if(sep)sep.style.display='none';S.set.showEd=false;applyVis()}
+})();
 function openMenu(m,btn){const was=m.classList.contains('show');closeMenus();if(!was){m.classList.add('show');btn.classList.add('on')}}
 function closeMenus(){$$('.menu.show,.tplmenu.show').forEach(x=>x.classList.remove('show'));$('#btnType').classList.remove('on');$('#btnFocus').classList.toggle('on',app.classList.contains('focus'))}
 $('#btnType').onclick=e=>{e.stopPropagation();openMenu($('#mnType'),$('#btnType'))};

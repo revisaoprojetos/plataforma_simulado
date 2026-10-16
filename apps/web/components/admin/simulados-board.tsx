@@ -184,7 +184,7 @@ function LiberacaoChip({ label, on, pending, onClick }: { label: string; on: boo
 }
 
 /** Cartão de simulado (admin): capa em cima, corpo com chips, LIBERAÇÕES clicáveis e ações inline. */
-function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecionar, variant = 'poster' }: {
+export function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecionar, variant = 'poster' }: {
   s: SimuladoCard; appUrl: string; online: number
   onMover?: () => void; selecionado: boolean; onSelecionar: (v: boolean) => void; variant?: CardView
 }) {
@@ -499,7 +499,7 @@ function NovoTile({ pastaNome, variant = 'poster' }: { pastaNome?: string; varia
 }
 
 type PastaSim = { id: string; nome: string; cor?: string | null; icone?: string | null; capa?: string | null; capaLarga?: string | null; count: number; cardFade?: { ativo?: boolean; cor?: string | null } | null }
-type DestinoSim = { id: string; nome: string }
+export type DestinoSim = { id: string; nome: string }
 export type SimuladoCatalogo = SimuladoCard & { grupoId: string | null }
 
 export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders = [], destinos = [], atual = null, catalogo, cardView = 'poster', vistaInicial, breadcrumb = [] }: {
@@ -1078,7 +1078,7 @@ function MoverEmMassaDialog({ ids, destinos, onClose, onDone }: { ids: string[];
   )
 }
 
-function MoverSimuladoDialog({ simulado, destinos, atualId, onClose }: { simulado: SimuladoCard; destinos: DestinoSim[]; atualId: string | null; onClose: () => void }) {
+export function MoverSimuladoDialog({ simulado, destinos, atualId, onClose }: { simulado: SimuladoCard; destinos: DestinoSim[]; atualId: string | null; onClose: () => void }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   const [sel, setSel] = useState<string | null>(simulado.pasta_id ?? atualId)

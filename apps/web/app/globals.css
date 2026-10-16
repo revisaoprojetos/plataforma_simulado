@@ -1115,6 +1115,9 @@ select option { background-color: var(--popover); color: var(--popover-foregroun
 
 /* Alinhamento e recuos preservados do original */
 .leitura-prosa [data-align="center"] { text-align:center; }
+.leitura-prosa [data-align="justify"] { text-align:justify; }
+.leitura-prosa [data-align="right"] { text-align:right; }
+.leitura-prosa [data-align="left"] { text-align:left; }
 .leitura-prosa .ind1 { margin-left:32px; }
 .leitura-prosa .ind2 { margin-left:64px; }
 

@@ -8,14 +8,14 @@ import { ConquistaIconeFx } from '@/components/gamificacao/conquista-icone'
 import { salvarConquistasModulo } from '@/app/admin/leitura/actions'
 import { conquistaModuloNova, CONDICAO_LABEL, CONDICAO_TIPOS, usaMeta, usaAula, type ModuloConquistaDef, type CarimboCondicaoTipo } from '@/lib/leitura/carimbos-tipos'
 import type { AulaOpcao } from '@/components/admin/modulo-medalhas-form'
-import { AulasAlvo } from '@/components/admin/modulo-carimbos-form'
+import { AulasAlvo, type CondicaoLabels, type AulasTextos } from '@/components/admin/modulo-carimbos-form'
 
 /**
  * Sub-aba "Conquistas" do módulo: conquistas PRÓPRIAS do módulo (ícone + condição de progresso).
  * O aluno ganha ao cumprir a condição; entram na coleção de conquistas dele e aparecem na área de
  * gamificação com etiqueta da origem. Salva tudo de uma vez.
  */
-export function ModuloConquistasForm({ pastaId, inicial, aulas = [] }: { pastaId: string; inicial: ModuloConquistaDef[]; aulas?: AulaOpcao[] }) {
+export function ModuloConquistasForm({ pastaId, inicial, aulas = [], salvarAction = salvarConquistasModulo, rotuloAula, condicaoLabels = CONDICAO_LABEL, aulasTextos }: { pastaId: string; inicial: ModuloConquistaDef[]; aulas?: AulaOpcao[]; salvarAction?: typeof salvarConquistasModulo; rotuloAula?: { todas: string; especificas: string }; condicaoLabels?: CondicaoLabels; aulasTextos?: AulasTextos }) {
   const [lista, setLista] = useState<ModuloConquistaDef[]>(inicial)
   const [salvando, setSalvando] = useState(false)
 
@@ -25,7 +25,7 @@ export function ModuloConquistasForm({ pastaId, inicial, aulas = [] }: { pastaId
 
   async function salvar() {
     setSalvando(true)
-    const r = await salvarConquistasModulo(pastaId, lista)
+    const r = await salvarAction(pastaId, lista)
     setSalvando(false)
     if (r.ok) { if (r.conquistas) setLista(r.conquistas); toast.success('Conquistas salvas') }
     else toast.error(r.error ?? 'Erro ao salvar')
@@ -56,14 +56,14 @@ export function ModuloConquistasForm({ pastaId, inicial, aulas = [] }: { pastaId
         </div>
       ) : (
         <div className="grid gap-3 lg:grid-cols-2">
-          {lista.map((c) => <ConquistaCard key={c.id} c={c} aulas={aulas} onPatch={(p) => patch(c.id, p)} onRemover={() => remover(c.id)} />)}
+          {lista.map((c) => <ConquistaCard key={c.id} c={c} aulas={aulas} rotuloAula={rotuloAula} condicaoLabels={condicaoLabels} aulasTextos={aulasTextos} onPatch={(p) => patch(c.id, p)} onRemover={() => remover(c.id)} />)}
         </div>
       )}
     </div>
   )
 }
 
-function ConquistaCard({ c, aulas, onPatch, onRemover }: { c: ModuloConquistaDef; aulas: AulaOpcao[]; onPatch: (p: Partial<ModuloConquistaDef>) => void; onRemover: () => void }) {
+function ConquistaCard({ c, aulas, rotuloAula, condicaoLabels = CONDICAO_LABEL, aulasTextos, onPatch, onRemover }: { c: ModuloConquistaDef; aulas: AulaOpcao[]; rotuloAula?: { todas: string; especificas: string }; condicaoLabels?: CondicaoLabels; aulasTextos?: AulasTextos; onPatch: (p: Partial<ModuloConquistaDef>) => void; onRemover: () => void }) {
   const cor = c.cor || corConquista(c.id)
   const selectCls = 'h-9 w-full rounded-lg border bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40'
   return (
@@ -103,7 +103,7 @@ function ConquistaCard({ c, aulas, onPatch, onRemover }: { c: ModuloConquistaDef
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs font-medium text-muted-foreground">Ganha quando:</span>
           <select value={c.condicao.tipo} onChange={(e) => onPatch({ condicao: { ...c.condicao, tipo: e.target.value as CarimboCondicaoTipo } })} className="h-9 min-w-[220px] flex-1 rounded-lg border bg-background px-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
-            {CONDICAO_TIPOS.map((t) => <option key={t} value={t}>{CONDICAO_LABEL[t]}</option>)}
+            {CONDICAO_TIPOS.map((t) => <option key={t} value={t}>{condicaoLabels[t]}</option>)}
           </select>
           {usaMeta(c.condicao.tipo) && (
             <input type="number" min={1} value={c.condicao.meta} onChange={(e) => onPatch({ condicao: { ...c.condicao, meta: Math.max(1, Number(e.target.value) || 1) } })} className="h-9 w-16 rounded-lg border bg-background px-2 text-right text-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-primary/40" />
@@ -112,7 +112,8 @@ function ConquistaCard({ c, aulas, onPatch, onRemover }: { c: ModuloConquistaDef
         {usaAula(c.condicao.tipo) && (
           <AulasAlvo modo={c.condicao.aulaModo ?? 'todas'} ids={c.condicao.aulaIds ?? []} aulas={aulas}
             onChange={(modo, ids) => onPatch({ condicao: { ...c.condicao, aulaModo: modo, aulaIds: ids } })}
-            rotulos={{ todas: 'Não exigir nestes dias:', especificas: 'Exigir estes dias:' }} />
+            textos={aulasTextos}
+            rotulos={rotuloAula ?? { todas: 'Não exigir nestes dias:', especificas: 'Exigir estes dias:' }} />
         )}
       </div>
     </div>

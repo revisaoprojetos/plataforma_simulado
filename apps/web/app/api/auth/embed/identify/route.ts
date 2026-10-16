@@ -7,6 +7,7 @@ import { dispararWebhook } from '@/lib/webhooks/dispatch'
 import { contatoEstudante } from '@/lib/webhooks/payload'
 import { publicarAoVivo } from '@/lib/realtime/pubsub'
 import { ehSimuladoGratuito } from '@/lib/simulado/gratuito'
+import { temAcessoPorDesafio } from '@/lib/simulado/desafio-acesso'
 
 interface RequestBody {
   embed_token?: string
@@ -231,8 +232,11 @@ export async function POST(request: NextRequest) {
       }
       acessoAvulso = acesso
     } else {
-      // "Acesso gratuito" (classificação própria) libera para TODOS, sem matrícula.
-      const temAcesso = ehSimuladoGratuito(regrasSim) || await verificarAcesso(supabase, estudante.id, simulado.id)
+      // "Acesso gratuito" (classificação própria) libera para TODOS, sem matrícula. Também libera quem
+      // tem acesso pelo DESAFIO ao qual o simulado pertence (base de acesso = acesso do desafio).
+      const temAcesso = ehSimuladoGratuito(regrasSim)
+        || await verificarAcesso(supabase, estudante.id, simulado.id)
+        || await temAcessoPorDesafio(supabase, estudante.id, simulado.id)
       if (!temAcesso) {
         return bloqueio(tenantId, 'bloqueio_sem_matricula', { nome: estudante.nome ?? '', simulado: tituloSimulado })
       }

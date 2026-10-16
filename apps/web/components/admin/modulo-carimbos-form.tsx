@@ -8,12 +8,21 @@ import { salvarCarimbosModulo } from '@/app/admin/leitura/actions'
 import { carimboNovo, CONDICAO_LABEL, CONDICAO_TIPOS, usaMeta, usaAula, type CarimboDef, type CarimboCondicaoTipo, type CarimboAlvo } from '@/lib/leitura/carimbos-tipos'
 import type { AulaOpcao } from '@/components/admin/modulo-medalhas-form'
 
+// Textos/labels contextuais (default = leitura; o desafio de simulados troca por "simulados").
+export type CondicaoLabels = Record<CarimboCondicaoTipo, string>
+// Variante da prévia/placement: 'leitura' = trilha (nó/balão); 'simulado' = ticket/pôster do simulado.
+export type MedalhaVariante = 'leitura' | 'simulado'
+const PLACEMENT_LABELS: Record<MedalhaVariante, [CarimboAlvo, string][]> = {
+  leitura: [['no', 'No dia (nó)'], ['card', 'No balão do conteúdo'], ['livre', 'Ponto livre']],
+  simulado: [['no', 'No ticket'], ['card', 'No card (pôster)'], ['livre', 'Área livre']],
+}
+
 /**
  * Sub-aba "Carimbos" do módulo: gerencia os adesivos colecionáveis. Cada carimbo tem imagem, título,
  * texto (o que mostra no perfil do aluno), condição de ganho e ONDE aparece — no balão de uma aula
  * (com deslocamento/rotação) ou num ponto livre da trilha — com prévia no formato do alvo escolhido.
  */
-export function ModuloCarimbosForm({ pastaId, inicial, aulas = [] }: { pastaId: string; inicial: CarimboDef[]; aulas?: AulaOpcao[] }) {
+export function ModuloCarimbosForm({ pastaId, inicial, aulas = [], salvarAction = salvarCarimbosModulo, condicaoLabels = CONDICAO_LABEL, aulasTextos, rotuloAula, variante = 'leitura' }: { pastaId: string; inicial: CarimboDef[]; aulas?: AulaOpcao[]; salvarAction?: typeof salvarCarimbosModulo; condicaoLabels?: CondicaoLabels; aulasTextos?: AulasTextos; rotuloAula?: { todas: string; especificas: string }; variante?: MedalhaVariante }) {
   const [lista, setLista] = useState<CarimboDef[]>(inicial)
   const [salvando, setSalvando] = useState(false)
 
@@ -23,7 +32,7 @@ export function ModuloCarimbosForm({ pastaId, inicial, aulas = [] }: { pastaId: 
 
   async function salvar() {
     setSalvando(true)
-    const r = await salvarCarimbosModulo(pastaId, lista)
+    const r = await salvarAction(pastaId, lista)
     setSalvando(false)
     if (r.ok) { if (r.carimbos) setLista(r.carimbos); toast.success('Carimbos salvos') }
     else toast.error(r.error ?? 'Erro ao salvar')
@@ -54,14 +63,14 @@ export function ModuloCarimbosForm({ pastaId, inicial, aulas = [] }: { pastaId: 
         </div>
       ) : (
         <div className="grid gap-3 lg:grid-cols-2">
-          {lista.map((c) => <CarimboCard key={c.id} c={c} aulas={aulas} onPatch={(p) => patch(c.id, p)} onRemover={() => remover(c.id)} />)}
+          {lista.map((c) => <CarimboCard key={c.id} c={c} aulas={aulas} condicaoLabels={condicaoLabels} aulasTextos={aulasTextos} rotuloAula={rotuloAula} variante={variante} onPatch={(p) => patch(c.id, p)} onRemover={() => remover(c.id)} />)}
         </div>
       )}
     </div>
   )
 }
 
-function CarimboCard({ c, aulas, onPatch, onRemover }: { c: CarimboDef; aulas: AulaOpcao[]; onPatch: (p: Partial<CarimboDef>) => void; onRemover: () => void }) {
+function CarimboCard({ c, aulas, condicaoLabels = CONDICAO_LABEL, aulasTextos, rotuloAula, variante = 'leitura', onPatch, onRemover }: { c: CarimboDef; aulas: AulaOpcao[]; condicaoLabels?: CondicaoLabels; aulasTextos?: AulasTextos; rotuloAula?: { todas: string; especificas: string }; variante?: MedalhaVariante; onPatch: (p: Partial<CarimboDef>) => void; onRemover: () => void }) {
   const inputRef = useRef<HTMLInputElement>(null)
   function escolher(file: File | null) {
     if (!file) return
@@ -100,10 +109,10 @@ function CarimboCard({ c, aulas, onPatch, onRemover }: { c: CarimboDef; aulas: A
         <input value={c.texto} onChange={(e) => onPatch({ texto: e.target.value })} placeholder="Texto no perfil (ex.: Participou do Desafio de Lei Seca)" className="h-9 w-full rounded-lg border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40" />
       </div>
 
-      {/* Prévia em TAMANHO REAL — bate 1:1 com o que o aluno vê (nó/card) */}
+      {/* Prévia em TAMANHO REAL — bate 1:1 com o que o aluno vê (ticket/pôster no simulado; nó/balão na leitura) */}
       <Secao titulo="Prévia (tamanho real)" icon={Eye}>
         <div style={XADREZ} className="flex justify-center overflow-auto rounded-xl px-4 py-8 ring-1 ring-border">
-          <Previa c={c} />
+          {variante === 'simulado' ? <PreviaSimulado c={c} /> : <Previa c={c} />}
         </div>
       </Secao>
 
@@ -111,7 +120,7 @@ function CarimboCard({ c, aulas, onPatch, onRemover }: { c: CarimboDef; aulas: A
       <Secao titulo="Condição para ganhar" icon={Trophy}>
         <div className="flex flex-wrap items-center gap-2">
           <select value={c.condicao.tipo} onChange={(e) => onPatch({ condicao: { ...c.condicao, tipo: e.target.value as CarimboCondicaoTipo } })} className={cn(selectCls, 'min-w-[240px] flex-1')}>
-            {CONDICAO_TIPOS.map((t) => <option key={t} value={t}>{CONDICAO_LABEL[t]}</option>)}
+            {CONDICAO_TIPOS.map((t) => <option key={t} value={t}>{condicaoLabels[t]}</option>)}
           </select>
           {usaMeta(c.condicao.tipo) && (
             <label className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">Quantidade
@@ -122,14 +131,15 @@ function CarimboCard({ c, aulas, onPatch, onRemover }: { c: CarimboDef; aulas: A
         {condPorAula && (
           <AulasAlvo modo={c.condicao.aulaModo ?? 'todas'} ids={c.condicao.aulaIds ?? []} aulas={aulas}
             onChange={(modo, ids) => onPatch({ condicao: { ...c.condicao, aulaModo: modo, aulaIds: ids } })}
-            rotulos={{ todas: 'Não exigir nestes dias:', especificas: 'Exigir estes dias:' }} />
+            textos={aulasTextos}
+            rotulos={rotuloAula ?? { todas: 'Não exigir nestes dias:', especificas: 'Exigir estes dias:' }} />
         )}
       </Secao>
 
       {/* ── Onde aparece ── */}
       <Secao titulo="Onde aparece" icon={MapPin}>
         <div className="inline-flex flex-wrap rounded-lg border bg-background p-0.5">
-          {([['no', 'No dia (nó)'], ['card', 'No balão do conteúdo'], ['livre', 'Ponto livre']] as [CarimboAlvo, string][]).map(([v, label]) => (
+          {PLACEMENT_LABELS[variante].map(([v, label]) => (
             <button key={v} type="button" onClick={() => setAlvo(v)} className={cn('rounded-md px-2.5 py-1 text-xs font-medium transition-colors', c.alvo === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>{label}</button>
           ))}
         </div>
@@ -141,6 +151,7 @@ function CarimboCard({ c, aulas, onPatch, onRemover }: { c: CarimboDef; aulas: A
         ) : (
           <AulasAlvo modo={c.alvoModo} ids={c.alvoAulaIds} aulas={aulas}
             onChange={(modo, ids) => onPatch({ alvoModo: modo, alvoAulaIds: ids })}
+            textos={aulasTextos}
             rotulos={{ todas: 'Ocultar nestes dias:', especificas: 'Aparecer nestes dias:' }} />
         ))}
         {/* Sobreposição (frente/atrás do texto) + recorte na área — só faz sentido no nó/card. */}
@@ -251,35 +262,100 @@ function Previa({ c }: { c: CarimboDef }) {
   )
 }
 
+/** Prévia do carimbo/selo no contexto de SIMULADO: no TICKET (alvo 'no') ou no CARD pôster (alvo 'card'),
+ *  usando a mesma lógica de ancoragem/recorte/sobreposição. Bate com o formato que o aluno vê no simulado. */
+function PreviaSimulado({ c }: { c: CarimboDef }) {
+  const z = c.sobreposicao === 'atras' ? 1 : 20
+  const fundo = 'linear-gradient(155deg, var(--primary) 0%, #0f172a 135%)'
+  const Badge = ({ anchor, clip }: { anchor: CSSProperties; clip: string }) => {
+    if (!c.url) return null
+    // eslint-disable-next-line @next/next/no-img-element
+    const img = <img src={c.url} alt="" style={{ ...anchor, width: c.tamanho, height: c.tamanho }} className="pointer-events-none absolute object-contain" />
+    if (c.recortar) return <div className={cn('pointer-events-none absolute inset-0 overflow-hidden', clip)} style={{ zIndex: z }}>{img}</div>
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={c.url} alt="" style={{ ...anchor, width: c.tamanho, height: c.tamanho, zIndex: z }} className="pointer-events-none absolute object-contain" />
+  }
+  // Canto superior direito + deslocamento (px) — igual ao card/ticket do aluno.
+  const anchorTR: CSSProperties = { right: 0, top: 0, transform: `translate(calc(50% + ${c.x}px), calc(-50% + ${c.y}px)) rotate(${c.rotacao}deg)` }
+
+  if (c.alvo === 'card') {
+    // Card PÔSTER do simulado (4:5), como no catálogo/home do aluno.
+    return (
+      <div className="relative overflow-hidden rounded-2xl border shadow-xl" style={{ width: 196, aspectRatio: '4 / 5' }}>
+        <div className="absolute inset-0" style={{ background: fundo }} />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
+        <Badge clip="rounded-2xl" anchor={anchorTR} />
+        <div className="absolute inset-x-0 bottom-0 z-[15] p-3">
+          <span className="mb-1 inline-flex rounded-md bg-amber-500/90 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">Em andamento</span>
+          <h3 className="text-sm font-bold leading-tight text-white drop-shadow-sm">Simulado 1 · AGU</h3>
+        </div>
+      </div>
+    )
+  }
+  if (c.alvo === 'no') {
+    // TICKET do simulado (imagem à esquerda + infos à direita), mesmo formato do board.
+    return (
+      <div className="relative flex overflow-hidden rounded-2xl border bg-card shadow-sm" style={{ width: 320, height: 112 }}>
+        <div className="relative aspect-[4/3] h-full shrink-0 overflow-hidden">
+          <div className="absolute inset-0" style={{ background: fundo }} />
+          <Badge clip="rounded-none" anchor={anchorTR} />
+        </div>
+        <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 px-3">
+          <span className="inline-flex w-fit rounded-full bg-amber-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">Em andamento</span>
+          <b className="truncate text-sm text-foreground">Simulado 1 · AGU</b>
+          <span className="truncate text-[11px] text-muted-foreground">Objetiva · Janela fixa</span>
+        </div>
+      </div>
+    )
+  }
+  // Área livre: posição em % de uma área do desafio (tamanho variável) → prévia representativa.
+  return (
+    <div className="relative h-44 w-72 overflow-hidden rounded-xl ring-1 ring-inset ring-border/70">
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-muted-foreground/50">
+        <Stamp className="h-6 w-6" /><span className="text-[10px] font-medium">Área do desafio (posição em %)</span>
+      </div>
+      {c.url && (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={c.url} alt="" style={{ left: `${c.x}%`, top: `${c.y}%`, width: c.tamanho, height: c.tamanho, transform: `translate(-50%,-50%) rotate(${c.rotacao}deg)` }} className="pointer-events-none absolute object-contain" />
+      )}
+    </div>
+  )
+}
+
 /** Multi-seleção de dias reutilizável: "Todas as aulas" (com filtro do que excluir) ou "Aulas específicas".
  *  Usada tanto na CONDIÇÃO (quais aulas concluir/gabaritar) quanto no placement (onde aparece). */
-export function AulasAlvo({ modo, ids, aulas, onChange, rotulos }: {
+/** Textos do multi-seletor — default = "aulas/dias" (leitura); o desafio de simulados passa "simulados". */
+export type AulasTextos = { emQuais: string; todas: string; especificas: string; conta: string; selecione: string; filtrar: string; escolher: string; vazio: string }
+const AULAS_TEXTOS_PADRAO: AulasTextos = { emQuais: 'Em quais dias:', todas: 'Todas as aulas', especificas: 'Aulas específicas', conta: 'dia(s)', selecione: 'Selecione os dias', filtrar: 'Filtrar dias', escolher: 'Escolher dias', vazio: 'Nenhuma aula no módulo ainda.' }
+
+export function AulasAlvo({ modo, ids, aulas, onChange, rotulos, textos = AULAS_TEXTOS_PADRAO }: {
   modo: 'todas' | 'especificas'; ids: string[]; aulas: AulaOpcao[]
   onChange: (modo: 'todas' | 'especificas', ids: string[]) => void
   rotulos: { todas: string; especificas: string }
+  textos?: AulasTextos
 }) {
-  // A lista de dias fica RECOLHIDA por padrão em "Todas" (filtro opcional); abre em "Específicas".
+  // A lista de itens fica RECOLHIDA por padrão em "Todas" (filtro opcional); abre em "Específicas".
   const [aberto, setAberto] = useState(modo === 'especificas')
   const set = new Set(ids)
   const toggle = (id: string) => { const s = new Set(ids); s.has(id) ? s.delete(id) : s.add(id); onChange(modo, [...s]) }
   const setModo = (m: 'todas' | 'especificas') => { onChange(m, []); setAberto(m === 'especificas') }
   const resumo = modo === 'todas'
-    ? (set.size ? `Todas, exceto ${set.size} dia(s)` : 'Todas as aulas')
-    : (set.size ? `${set.size} dia(s)` : 'Selecione os dias')
+    ? (set.size ? `Todas, exceto ${set.size} ${textos.conta}` : textos.todas)
+    : (set.size ? `${set.size} ${textos.conta}` : textos.selecione)
   const mostrarLista = aberto && aulas.length > 0
   return (
     <div className="space-y-2 rounded-lg border bg-background/60 p-2.5">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium text-muted-foreground">Em quais dias:</span>
+        <span className="text-xs font-medium text-muted-foreground">{textos.emQuais}</span>
         <div className="inline-flex rounded-lg border bg-background p-0.5">
-          {([['todas', 'Todas as aulas'], ['especificas', 'Aulas específicas']] as ['todas' | 'especificas', string][]).map(([v, label]) => (
+          {([['todas', textos.todas], ['especificas', textos.especificas]] as ['todas' | 'especificas', string][]).map(([v, label]) => (
             <button key={v} type="button" onClick={() => setModo(v)} className={cn('rounded-md px-2.5 py-1 text-xs font-medium transition-colors', modo === v ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground')}>{label}</button>
           ))}
         </div>
         <span className="text-[11px] font-medium text-foreground/70">{resumo}</span>
         {aulas.length > 0 && (
           <button type="button" onClick={() => setAberto((v) => !v)} className="ml-auto inline-flex items-center gap-1 rounded-md px-2 py-1 text-[11px] font-medium text-primary hover:bg-primary/10">
-            {modo === 'todas' ? (set.size ? 'Editar filtro' : 'Filtrar dias') : 'Escolher dias'}
+            {modo === 'todas' ? (set.size ? 'Editar filtro' : textos.filtrar) : textos.escolher}
             <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', aberto && 'rotate-180')} />
           </button>
         )}
@@ -297,7 +373,7 @@ export function AulasAlvo({ modo, ids, aulas, onChange, rotulos }: {
           </div>
         </div>
       )}
-      {aulas.length === 0 && <p className="text-[11px] text-muted-foreground">Nenhuma aula no módulo ainda.</p>}
+      {aulas.length === 0 && <p className="text-[11px] text-muted-foreground">{textos.vazio}</p>}
     </div>
   )
 }

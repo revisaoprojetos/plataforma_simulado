@@ -198,6 +198,8 @@ export interface DocumentoCarregado {
   blocos: BlocoDef[]               // blocos de destaque configuráveis (quiz_config.blocos); prévia é por bloco
   topicos: TopicosConfig           // "Temas do dia": ajuste do admin por tópico (quiz_config.topicos)
   leituraRapida: string            // HTML da "Leitura rápida" (quiz_config.leitura_rapida); '' se não houver
+  legendasOff: string[]            // legendas OCULTADAS na barra do leitor (quiz_config.legendasOff)
+  grifoRevisaoOff: boolean         // desativa grifos editoriais (do Revisão) + o toggle (quiz_config.grifoRevisaoOff)
 }
 
 export interface GrifoLei { id: string; inicio: number; fim: number; exact: string; prefix: string; suffix: string; tipo: string; nota: string | null }
@@ -403,6 +405,8 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
     blocos: resolverBlocos((doc as any).quiz_config?.blocos),
     topicos: resolverTopicos((doc as any).quiz_config?.topicos),
     leituraRapida: typeof (doc as any).quiz_config?.leitura_rapida === 'string' ? (doc as any).quiz_config.leitura_rapida : '',
+    legendasOff: Array.isArray((doc as any).quiz_config?.legendasOff) ? (doc as any).quiz_config.legendasOff.filter((s: unknown) => typeof s === 'string') : [],
+    grifoRevisaoOff: !!(doc as any).quiz_config?.grifoRevisaoOff,
   }
 }
 

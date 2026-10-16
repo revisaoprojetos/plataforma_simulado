@@ -22,7 +22,7 @@ const PROTOTIPO = `/leitura/leitor-jus.html?v=${APP_VERSION}`
 const SELO_LABELS: Record<string, string> = Object.fromEntries(Object.entries(SELOS).map(([k, v]) => [k, v.nome]))
 
 export function LeitorJus({
-  html, titulo, sobretitulo = '', topicos, caminho, voltarHref, questoesHref, documentoId, versao, desafio,
+  html, titulo, sobretitulo = '', topicos, caminho, voltarHref, questoesHref, documentoId, versao, desafio, legendasOff = [], grifoRevisaoOff = false,
 }: {
   html: string
   titulo: string
@@ -36,11 +36,14 @@ export function LeitorJus({
   versao?: number
   /** Desafio (pasta) — p/ a conclusão da leitura contar na SEQUÊNCIA do juris (regra: leitura = sequência). */
   desafio?: string
+  /** Config do editor: legendas ocultadas e "Grifo do Revisão" desativado (quiz_config do documento). */
+  legendasOff?: string[]
+  grifoRevisaoOff?: boolean
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   // Mantém os dados num ref para o listener de mensagem sempre ver o valor atual sem re-registrar.
-  const dadosRef = useRef({ html, titulo, sobretitulo, topicos, caminho, voltarHref, questoesHref, documentoId, versao, desafio })
-  dadosRef.current = { html, titulo, sobretitulo, topicos, caminho, voltarHref, questoesHref, documentoId, versao, desafio }
+  const dadosRef = useRef({ html, titulo, sobretitulo, topicos, caminho, voltarHref, questoesHref, documentoId, versao, desafio, legendasOff, grifoRevisaoOff })
+  dadosRef.current = { html, titulo, sobretitulo, topicos, caminho, voltarHref, questoesHref, documentoId, versao, desafio, legendasOff, grifoRevisaoOff }
 
   // O leitor é um iframe isolado → quem fala com a API é o host. Grava progresso/conclusão da leitura.
   const postProgresso = useCallback((body: Record<string, unknown>) => {
@@ -74,6 +77,8 @@ export function LeitorJus({
         caminho: d.caminho,
         topicos: d.topicos ?? null,
         selos: SELO_LABELS,
+        legendasOff: d.legendasOff ?? [],
+        grifoRevisaoOff: !!d.grifoRevisaoOff,
       },
     }, '*')
   }, [])
