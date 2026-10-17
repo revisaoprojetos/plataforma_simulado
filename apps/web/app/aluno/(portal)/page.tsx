@@ -492,12 +492,16 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
     if (aparencia.brand === 'revisao') {
       try {
         const { estadoMaratonaAluno } = await import('@/lib/maratona/participacao')
-        const { carregarDesafioMaratona } = await import('@/lib/maratona/carregar')
+        const { carregarDesafioMaratona, carregarProgressoMaratona } = await import('@/lib/maratona/carregar')
         const [est, des] = await Promise.all([
           estadoMaratonaAluno(svc, sessao!.tenantId, estId),
           carregarDesafioMaratona(svc, sessao!.tenantId),
         ])
-        if (est.visivel && des.lancada) homeData.maratona = { estado: est.iniciado ? 'continuar' : 'aceitar', recolhido: est.recolhido, config: des.config }
+        if (est.visivel && des.lancada) {
+          // Progressão REAL do aluno (simulados concluídos) p/ o card da Home mostrar "{feitos}/N" + barra.
+          const progresso = des.pastaId ? await carregarProgressoMaratona(svc, sessao!.tenantId, estId, des.pastaId) : 0
+          homeData.maratona = { estado: est.iniciado ? 'continuar' : 'aceitar', recolhido: est.recolhido, config: des.config, progresso }
+        }
       } catch { /* gating indisponível → não mostra o card */ }
     }
     return <PlatformHome brand={aparencia.brand} theme={theme} data={homeData} />

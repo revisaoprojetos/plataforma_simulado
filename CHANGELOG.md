@@ -12,6 +12,17 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.19.4 — 2026-10-17
+
+**fix(maratona): acesso por GRUPO não liberava o desafio + card da Home mostra a progressão real**
+
+- **Acesso (crítico):** o gate da maratona checava **assinatura Guru**, ignorando os grupos/alunos adicionados
+  na aba **Acessos** — por isso só quem tinha Guru via o desafio. Agora `alunoTemAcessoMaratona` (card/área) e
+  `temAcessoPorDesafio` (simulados) seguem o modelo da aba Acessos: **individual + grupo** (`simulado_pasta_estudantes`
+  / `simulado_pasta_grupos` + `simulado_grupo_membros`); sem atribuição = liberado para todos. Igual ao juris.
+- **Card da Home:** "{feitos}/N" e a barra eram fixos em 0 — agora refletem a **progressão real** (simulados
+  concluídos) do aluno.
+
 ## 3.19.3 — 2026-10-17
 
 **fix(maratona): aba Medalhas reflete o estado REAL (conquistada×bloqueada) + remove texto fixo do ranking**

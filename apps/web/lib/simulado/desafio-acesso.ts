@@ -13,8 +13,22 @@ export async function temAcessoPorDesafio(svc: any, estudanteId: string, simulad
     if (!pastaId) return false
     const { data: pasta } = await svc.from('simulado_pastas').select('folder_area').eq('id', pastaId).maybeSingle()
     if ((pasta as any)?.folder_area !== 'maratona') return false
-    const { data } = await svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', pastaId).eq('estudante_id', estudanteId).limit(1)
-    return !!(data && data.length)
+    // Acesso = individual (simulado_pasta_estudantes) OU grupo (simulado_pasta_grupos + simulado_grupo_membros);
+    // sem atribuição = liberado para todos. Mesmo modelo da aba Acessos (ModuloAcesso) e do juris — antes só
+    // checava o individual, então membros de GRUPO adicionados ficavam de fora.
+    const [{ data: pe }, { data: pg }] = await Promise.all([
+      svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', pastaId),
+      svc.from('simulado_pasta_grupos').select('grupo_id').eq('pasta_id', pastaId),
+    ])
+    const estuds = new Set((pe ?? []).map((r: any) => r.estudante_id as string))
+    const grupos = (pg ?? []).map((r: any) => r.grupo_id as string)
+    if (!estuds.size && !grupos.length) return true
+    if (estuds.has(estudanteId)) return true
+    if (grupos.length) {
+      const { data: gm } = await svc.from('simulado_grupo_membros').select('grupo_id').eq('estudante_id', estudanteId).in('grupo_id', grupos)
+      if ((gm ?? []).length) return true
+    }
+    return false
   } catch {
     return false
   }

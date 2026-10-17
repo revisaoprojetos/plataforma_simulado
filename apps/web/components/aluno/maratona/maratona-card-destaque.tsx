@@ -15,10 +15,12 @@ import type { MaratonaConfig } from '@/lib/maratona/config'
 const DMa = (iso: string) => { const [, m, d] = (iso || '').split('-'); return d && m ? `${d}/${m}` : iso }
 const diasEntre = (a: string, b: string) => { const x = Date.parse(a + 'T00:00:00Z'), y = Date.parse(b + 'T00:00:00Z'); return Number.isFinite(x) && Number.isFinite(y) ? Math.round((y - x) / 86400000) + 1 : 0 }
 
-export function MaratonaCardDestaque({ config, estado, recolhidoInicial }: {
+export function MaratonaCardDestaque({ config, estado, recolhidoInicial, feitos: feitosProp = 0 }: {
   config: MaratonaConfig
   estado: 'aceitar' | 'continuar'
   recolhidoInicial: boolean
+  /** Simulados concluídos pelo aluno (0..qtdSimulados) — progressão real no card. */
+  feitos?: number
 }) {
   const router = useRouter()
   const [recolhido, setRecolhido] = useState(recolhidoInicial)
@@ -30,7 +32,7 @@ export function MaratonaCardDestaque({ config, estado, recolhidoInicial }: {
   const toggle = () => { const n = !recolhido; setRecolhido(n); persistir({ recolhido: n }) }
   const abrirDesafio = () => { if (estado === 'aceitar') persistir({ iniciado: true }); start(() => router.push('/aluno/maratona')) }
 
-  const feitos = 0
+  const feitos = Math.max(0, Math.min(feitosProp, config.qtdSimulados))
   const segs = Array.from({ length: config.qtdSimulados })
   const dias = diasEntre(config.inicio, config.fim)
   const chip = 'display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 11px;border-radius:99px'

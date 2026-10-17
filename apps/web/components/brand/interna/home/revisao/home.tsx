@@ -147,7 +147,7 @@ export function HomeRevisao({
               <NivelCard data={data} />
               {data.continuar ? <ContinuarCard c={data.continuar} /> : null}
             </div>
-            {data.maratona ? <MaratonaCardDestaque config={data.maratona.config ?? MARATONA} estado={data.maratona.estado} recolhidoInicial={data.maratona.recolhido} /> : null}
+            {data.maratona ? <MaratonaCardDestaque config={data.maratona.config ?? MARATONA} estado={data.maratona.estado} recolhidoInicial={data.maratona.recolhido} feitos={data.maratona.progresso ?? 0} /> : null}
             <Recentes cards={data.recentes} />
             <Desempenho data={data} />
           </div>
@@ -168,7 +168,7 @@ export function HomeRevisao({
           <Atalhos />
           {data.continuar ? <ContinuarCard c={data.continuar} /> : null}
           <Sequencia data={data} />
-          {data.maratona ? <MaratonaCardDestaque config={data.maratona.config ?? MARATONA} estado={data.maratona.estado} recolhidoInicial={data.maratona.recolhido} /> : null}
+          {data.maratona ? <MaratonaCardDestaque config={data.maratona.config ?? MARATONA} estado={data.maratona.estado} recolhidoInicial={data.maratona.recolhido} feitos={data.maratona.progresso ?? 0} /> : null}
           <RecentesMobile cards={data.recentes} />
           <NivelCard data={data} />
           <Missoes data={data} />

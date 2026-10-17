@@ -15,21 +15,30 @@ export interface EstadoMaratona {
 }
 
 /**
- * ACESSO: o card só aparece para quem tem **assinatura Guru ativa** (o produto entra pela Curseduca,
- * então a assinatura `provider='guru'` é o acesso real/pago). `confirmado_curseduca` liga Guru×Curseduca.
- * Regra conservadora: Guru `status='ativo'` e não expirada. (Fase 2: ajustável no admin.)
+ * ACESSO: segue o que o admin configurou na aba **Acessos** do desafio (ModuloAcesso) — individual
+ * (`simulado_pasta_estudantes`) OU grupo (`simulado_pasta_grupos` + `simulado_grupo_membros`). SEM atribuição
+ * nenhuma = liberado para todos. (Mesmo modelo do desafio de Jurisprudência — `pastaAcessivel`.) Antes isso
+ * era gateado por assinatura Guru, o que ignorava os grupos adicionados e só liberava quem tinha Guru.
  */
 export async function alunoTemAcessoMaratona(svc: Svc, tenantId: string, estudanteId: string): Promise<boolean> {
   try {
-    const { data } = await svc
-      .from('simulado_assinaturas')
-      .select('status, expira_em')
-      .eq('tenant_id', tenantId).eq('estudante_id', estudanteId).eq('provider', 'guru').eq('status', 'ativo')
-      .limit(1)
-    const a = (data ?? [])[0] as { status?: string; expira_em?: string | null } | undefined
-    if (!a) return false
-    if (a.expira_em && new Date(a.expira_em).getTime() < Date.now()) return false
-    return true
+    const { data: ps } = await svc.from('simulado_pastas').select('id')
+      .eq('tenant_id', tenantId).eq('folder_area', 'maratona').order('created_at', { ascending: true }).limit(1)
+    const pastaId = (ps ?? [])[0]?.id as string | undefined
+    if (!pastaId) return false
+    const [{ data: pe }, { data: pg }] = await Promise.all([
+      svc.from('simulado_pasta_estudantes').select('estudante_id').eq('pasta_id', pastaId),
+      svc.from('simulado_pasta_grupos').select('grupo_id').eq('pasta_id', pastaId),
+    ])
+    const estuds = new Set((pe ?? []).map((r: any) => r.estudante_id as string))
+    const grupos = (pg ?? []).map((r: any) => r.grupo_id as string)
+    if (!estuds.size && !grupos.length) return true // sem atribuição = todos
+    if (estuds.has(estudanteId)) return true
+    if (grupos.length) {
+      const { data: gm } = await svc.from('simulado_grupo_membros').select('grupo_id').eq('estudante_id', estudanteId).in('grupo_id', grupos)
+      if ((gm ?? []).length) return true
+    }
+    return false
   } catch { return false }
 }
 

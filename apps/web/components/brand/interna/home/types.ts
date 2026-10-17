@@ -161,7 +161,7 @@ export interface HomeData {
   cronogramaAtivo?: boolean
   /** Só Revisão + quem tem acesso (Guru/Curseduca) + maratona lançada. Null/ausente = não mostra o card.
    *  `config` = config efetiva do admin (com contagens reais vinculadas); ausente = usa defaults. */
-  maratona?: { estado: 'aceitar' | 'continuar'; recolhido: boolean; config?: MaratonaConfig } | null
+  maratona?: { estado: 'aceitar' | 'continuar'; recolhido: boolean; config?: MaratonaConfig; progresso?: number } | null
 }
 
 export interface HomeScreenProps {
