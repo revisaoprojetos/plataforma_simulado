@@ -141,32 +141,44 @@ async function BoardData({ pastaParam }: { pastaParam?: string }) {
   const tenantId = await getCurrentTenantId()
   const tid = tenantId ?? '00000000-0000-0000-0000-000000000000'
 
-  // Simulados + pastas (Aplicação) + bancos + flag ocultar-discursiva + desafios em PARALELO (independentes).
-  const [simulados, folders, bancos, ocultarDiscursiva, desafios] = await Promise.all([
+  // Pastas da Aplicação PRIMEIRO: precisamos da árvore p/ escopar os simulados à SUBÁRVORE da pasta atual
+  // (a pasta + TODAS as descendentes). Sem isso, ao navegar dentro de uma pasta buscávamos só os simulados
+  // DIRETOS dela e as contagens recursivas das SUBPASTAS davam 0 (bug: "0 simulado(s)" com conteúdo).
+  const folders = await (async (): Promise<any[]> => {
+    const selP = (cols: string) => supabase.from('simulado_pastas').select(cols).eq('deletado', false).eq('tenant_id', tid).order('nome')
+    let r: { data: any[] | null; error: { message: string } | null } = await selP('id, nome, cor, icone, capa_url, capa_card_url, capa_meta, is_folder, folder_area, pai_id')
+    if (r.error) r = await selP('id, nome, cor, icone, capa_url, capa_card_url, is_folder, folder_area, pai_id')
+    if (r.error) r = await selP('id, nome, cor, icone, capa_url, is_folder, folder_area, pai_id')
+    if (r.error) r = await selP('id, nome, cor, icone, capa_url, is_folder, folder_area')
+    return r.error ? [] : (r.data ?? []).filter((p: any) => p.is_folder && p.folder_area === 'simulado')
+  })()
+  // Subárvore da pasta atual (ela + descendentes) → ids p/ escopar os simulados (contagem recursiva correta).
+  const escopoPastas: string[] | null = (() => {
+    if (!pastaParam) return null
+    const filhos = new Map<string, string[]>()
+    for (const f of folders) if (f.pai_id) (filhos.get(f.pai_id) ?? filhos.set(f.pai_id, []).get(f.pai_id)!).push(f.id)
+    const out: string[] = []; const stack = [pastaParam]; const seen = new Set<string>()
+    while (stack.length) { const id = stack.pop()!; if (seen.has(id)) continue; seen.add(id); out.push(id); for (const c of (filhos.get(id) ?? [])) stack.push(c) }
+    return out
+  })()
+
+  // Simulados + bancos + flag ocultar-discursiva + desafios em PARALELO (independentes).
+  const [simulados, bancos, ocultarDiscursiva, desafios] = await Promise.all([
     // Simulados (tolerante à coluna pasta_id ausente). owner_estudante_id IS NULL: só OFICIAIS
     // (os do construtor pessoal do aluno ficam de fora). fetchAll: tenant com >1000 não trunca.
     (async (): Promise<any[]> => {
       const base = 'id, titulo, status, data_inicio, data_fim, modo_aplicacao, tempo_limite_min, embed_token, created_at, regras'
-      // Dentro de uma pasta (?pasta=id) buscamos SÓ os simulados dela — bem mais leve que puxar TODOS
-      // (com regras jsonb) a cada navegação. Na raiz (sem pastaParam) traz todos, como antes.
-      const buscar = (cols: string, comPasta: boolean) => fetchAll<any>(() => {
+      // Dentro de uma pasta: busca a SUBÁRVORE (pasta + subpastas) — leve (só o ramo) e com contagem certa.
+      // Na raiz (sem pastaParam) traz todos, como antes.
+      const buscar = (cols: string, escopo: string[] | null) => fetchAll<any>(() => {
         let q = supabase.from('simulado_simulados').select(cols).eq('deletado', false).eq('tenant_id', tid).is('owner_estudante_id', null)
-        if (comPasta && pastaParam) q = q.eq('pasta_id', pastaParam)
+        if (escopo) q = q.in('pasta_id', escopo)
         return q.order('created_at', { ascending: false }).order('id', { ascending: true })
       })
       let sims: any[]
-      try { sims = await buscar(`${base}, pasta_id`, true) }
-      catch (e: any) { if (/pasta_id|column/i.test(e?.message ?? '')) sims = await buscar(base, false); else throw e }
+      try { sims = await buscar(`${base}, pasta_id`, escopoPastas) }
+      catch (e: any) { if (/pasta_id|column/i.test(e?.message ?? '')) sims = await buscar(base, null); else throw e }
       return sims.map((s: any) => ({ ...s, pasta_id: s.pasta_id ?? null }))
-    })(),
-    // Pastas da Aplicação de Simulado (is_folder + folder_area='simulado'), tolerante a colunas ausentes.
-    (async (): Promise<any[]> => {
-      const selP = (cols: string) => supabase.from('simulado_pastas').select(cols).eq('deletado', false).eq('tenant_id', tid).order('nome')
-      let r: { data: any[] | null; error: { message: string } | null } = await selP('id, nome, cor, icone, capa_url, capa_card_url, capa_meta, is_folder, folder_area, pai_id')
-      if (r.error) r = await selP('id, nome, cor, icone, capa_url, capa_card_url, is_folder, folder_area, pai_id')
-      if (r.error) r = await selP('id, nome, cor, icone, capa_url, is_folder, folder_area, pai_id')
-      if (r.error) r = await selP('id, nome, cor, icone, capa_url, is_folder, folder_area')
-      return r.error ? [] : (r.data ?? []).filter((p: any) => p.is_folder && p.folder_area === 'simulado')
     })(),
     // Bancos (Banco de Simulado) p/ agrupar o CATÁLOGO — a pasta-pai (is_folder) é a fileira.
     (async (): Promise<any[]> => {

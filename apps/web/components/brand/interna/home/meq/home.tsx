@@ -19,6 +19,7 @@ import { internaTokensStyle } from '../../interna-tokens'
 import { useTemaInterno } from '../../use-tema-interno'
 import { useCheckin } from '../use-checkin'
 import type { HomeData, HomeSimuladoCard, InternaTheme } from '../types'
+import { BaixarCadernoBtn } from '../../baixar-caderno-btn'
 import { Capa, CircuitHero, Fogo, Gota, MarcaBarras, Segs } from './circuit'
 
 // ── Overrides de tokens por tema (spec §1.3). interna-tokens não expõe --head/--sub/
@@ -698,7 +699,7 @@ function LinhaRecente({ r, grad }: { r: HomeSimuladoCard; grad: string }) {
           ? <a className="hmq-cta" href={r.fazerUrl} style={{ height: 40, borderRadius: 11, fontSize: 13.5, padding: '0 16px', textDecoration: 'none' }}><Play className="hmq-i" style={{ width: 14, height: 14, fill: 'currentColor', stroke: 'none' }} />{label}</a>
           : <span className="hmq-cta" style={{ height: 40, borderRadius: 11, fontSize: 13.5, padding: '0 16px' }}><Play className="hmq-i" style={{ width: 14, height: 14, fill: 'currentColor', stroke: 'none' }} />{label}</span>}
         {r.cadernoUrl
-          ? <a className="hmq-dl" href={r.cadernoUrl} target="_blank" rel="noopener noreferrer" title="Baixar caderno"><Download className="hmq-i" style={{ width: 16, height: 16 }} /> Baixar</a>
+          ? <BaixarCadernoBtn simuladoId={r.id} titulo={r.titulo} brand="meq" className="hmq-dl"><Download className="hmq-i" style={{ width: 16, height: 16 }} /> Baixar</BaixarCadernoBtn>
           : <span className="hmq-dl" style={{ opacity: 0.5 }} title="Baixar caderno"><Download className="hmq-i" style={{ width: 16, height: 16 }} /> Baixar</span>}
       </div>
     </div>

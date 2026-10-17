@@ -443,6 +443,9 @@ function AbaConfig({ pastaId, inicial, contagem }: { pastaId: string; inicial: C
   const [inscritosAuto, setInscritosAuto] = useState(inicial.inscritosAuto !== false)
   const [regulamentoUrl, setRegulamentoUrl] = useState(inicial.regulamentoUrl ?? '#')
   const [lancada, setLancada] = useState(inicial.lancada)
+  // Visibilidade na home do aluno (default OCULTO — o desafio vive na própria área).
+  const [mostrarNasPastas, setMostrarNasPastas] = useState(inicial.mostrarNasPastas === true)
+  const [mostrarNosRecentes, setMostrarNosRecentes] = useState(inicial.mostrarNosRecentes === true)
   // Capa (1:1): a imagem exibida (capaUrl) + ORIGINAL p/ reajustar + estado do recorte (zoom/centro).
   const [capaUrl, setCapaUrl] = useState<string>(inicial.capaUrl ?? '')
   const [capaOrig, setCapaOrig] = useState<string | null>(inicial.capaOrig ?? null)
@@ -476,7 +479,7 @@ function AbaConfig({ pastaId, inicial, contagem }: { pastaId: string; inicial: C
         titulo: titulo.trim(), destaque: destaque.trim(), descricao: descricao.trim(),
         inscricoesAte, inicio, fim, qtdSimulados: Number(qtd) || 0, qtdSimuladosAuto: qtdAuto, padrao: padrao.trim(),
         recompensa: { xp: Number(xp) || 0, extra: extra.trim() || undefined }, inscritos: Number(inscritos) || 0, inscritosAuto,
-        regulamentoUrl: regulamentoUrl.trim() || '#', lancada,
+        regulamentoUrl: regulamentoUrl.trim() || '#', lancada, mostrarNasPastas, mostrarNosRecentes,
         capaUrl: capaUrl || inicial.capaUrl, capaOrig, capaCrop,
       })
       if (!r.ok) { toast.error(r.error ?? 'Erro ao salvar.'); return }
@@ -553,6 +556,21 @@ function AbaConfig({ pastaId, inicial, contagem }: { pastaId: string; inicial: C
           <input type="checkbox" checked={lancada} onChange={(e) => setLancada(e.target.checked)} className="h-4 w-4 accent-[var(--primary)]" />
           Lançado <span className="font-normal text-muted-foreground">— quando ligado, o card aparece para quem tem acesso (Curseduca + Guru).</span>
         </label>
+      </Secao>
+
+      {/* Visibilidade na HOME do aluno — por padrão o desafio fica SÓ na própria área (não polui a home). */}
+      <Secao icon={<Info className="h-4 w-4 text-primary" />} titulo="Visibilidade na home do aluno">
+        <p className="-mt-1 mb-3 text-xs text-muted-foreground">Por padrão o desafio vive só na própria área. Ligue abaixo para também mostrá-lo na home do aluno.</p>
+        <div className="space-y-2.5">
+          <label className="flex cursor-pointer items-start gap-2.5 text-sm font-medium">
+            <input type="checkbox" checked={mostrarNasPastas} onChange={(e) => setMostrarNasPastas(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--primary)]" />
+            <span>Mostrar a pasta do desafio na área de <b>Pastas</b> <span className="block font-normal text-muted-foreground">Quando desligado, a pasta do desafio não aparece na lista de pastas da home.</span></span>
+          </label>
+          <label className="flex cursor-pointer items-start gap-2.5 text-sm font-medium">
+            <input type="checkbox" checked={mostrarNosRecentes} onChange={(e) => setMostrarNosRecentes(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--primary)]" />
+            <span>Mostrar os simulados nos <b>Recentes</b> <span className="block font-normal text-muted-foreground">Quando desligado, os simulados do desafio não aparecem na fileira de recentes da home.</span></span>
+          </label>
+        </div>
       </Secao>
 
       <div className="flex items-center justify-end">

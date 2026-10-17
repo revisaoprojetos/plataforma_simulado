@@ -4,6 +4,7 @@ import { MARATONA, MARATONA_LANCADA, type MaratonaConfig } from './config'
 import { normalizarRegulamento } from '@/lib/leitura/regulamento'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { remember, chaveRelatorio } from '@/lib/cache/relatorio-cache'
+import { resolverEnunciadoUrls } from '@/lib/aluno/enunciado'
 
 type Svc = ReturnType<typeof createAdminClient>
 
@@ -206,6 +207,10 @@ export interface MaratonaSimuladoLink {
   // finalizadas ≥ segMin). segMin=0 → qualquer encerramento já dá o check. false enquanto não cumpriu.
   segMin: number          // tempo mínimo de permanência da etapa, em segundos (0 = sem mínimo)
   checkin: boolean        // selo conquistado (dourado); false = ainda cinza/bloqueado
+  dur: number             // MAIOR duração (seg) que o aluno permaneceu numa sessão finalizada (0 = não concluiu)
+  // CADERNO (download): "Caderno de questões (sem respostas)" do simulado, igual à plataforma.
+  // null = sem caderno a baixar / enunciado não liberado. PDF direto ou endpoint de gerar.
+  cadernoUrl: string | null
 }
 /**
  * Para cada simulado vinculado (na ordem de data = semana/checkpoint), devolve o link de FAZER
@@ -215,13 +220,13 @@ export interface MaratonaSimuladoLink {
 export async function carregarSimuladosLinksMaratona(svc: Svc, tenantId: string, pastaId: string | null, estudanteId: string): Promise<(MaratonaSimuladoLink | null)[]> {
   if (!pastaId) return []
   try {
-    const { data: sims } = await svc.from('simulado_simulados').select('id, titulo, embed_token, data_inicio, data_fim, modo_aplicacao, status, created_at')
+    const { data: sims } = await svc.from('simulado_simulados').select('id, titulo, embed_token, regras, data_inicio, data_fim, modo_aplicacao, status, created_at')
       .eq('tenant_id', tenantId).eq('pasta_id', pastaId).eq('deletado', false).is('owner_estudante_id', null)
       .order('data_inicio', { ascending: true, nullsFirst: false }).order('created_at', { ascending: true })
     const etapas = await lerEtapasMaratona(svc, tenantId, pastaId)
     const rotuloPor = new Map(etapas.map((e) => [e.simuladoId, rotuloAplicado(e)]))
     const segMinPor = new Map(etapas.map((e) => [e.simuladoId, Math.max(0, Math.round(Number(e.segMin) || 0))]))
-    type Row = { id: string; titulo: string | null; embed_token: string | null; data_inicio: string | null; data_fim: string | null; modo_aplicacao: string | null; status: string | null }
+    type Row = { id: string; titulo: string | null; embed_token: string | null; regras: any; data_inicio: string | null; data_fim: string | null; modo_aplicacao: string | null; status: string | null }
     const simById = new Map((sims ?? []).map((s: any) => [s.id as string, s as Row]))
     // COLOCAÇÃO POR ÁREA: cada área (1..N) recebe o simulado com aquele `slot`. Sem slots definidos →
     // fallback para a ordem (comportamento antigo). Áreas vazias ficam `null` (checkpoint sem simulado).
@@ -249,6 +254,9 @@ export async function carregarSimuladosLinksMaratona(svc: Svc, tenantId: string,
         }
       }
     }
+    // CADERNO (download): mesma resolução da plataforma (PDF importado ou caderno gerado), gateado por
+    // regras.enunciado_liberado. Endpoint idêntico ao da trilha (/api/aluno/caderno-teste-questoes).
+    const enunUrls = await resolverEnunciadoUrls(svc, rows.filter(Boolean).map((r) => ({ id: (r as Row).id, regras: (r as Row).regras })))
     const hoje = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
     return rows.map((r) => {
       if (!r) return null
@@ -265,12 +273,17 @@ export async function carregarSimuladosLinksMaratona(svc: Svc, tenantId: string,
       const dur = durPor.get(r.id) ?? 0
       // CHECK-IN = encerrou E permaneceu ao menos o mínimo (ou etapa sem mínimo). Selo dourado.
       const checkin = concluido && (segMin <= 0 || dur >= segMin)
+      const info = enunUrls.get(r.id)
+      const liberadoEnun = (r.regras as any)?.enunciado_liberado !== false
+      const cadernoUrl = !liberadoEnun ? null
+        : info?.pdf ? info.pdf
+        : (info?.temCaderno && r.embed_token) ? `/api/aluno/caderno-teste-questoes?token=${encodeURIComponent(r.embed_token)}` : null
       return {
         simuladoId: r.id, titulo: r.titulo ?? 'Simulado', rotulo: rotuloPor.get(r.id) || '',
-        data, liberacao, liberada, segMin, checkin,
+        data, liberacao, liberada, segMin, checkin, dur: Math.round(dur),
         fazerUrl: r.embed_token ? `/simulado/${r.embed_token}` : '',
         resultadoUrl: `/aluno/simulados/${r.id}`,
-        concluido,
+        concluido, cadernoUrl,
       }
     })
   } catch { return [] }
@@ -294,12 +307,24 @@ export async function carregarProgressoMaratona(svc: Svc, tenantId: string, estu
     }
     const reais = ids.filter(Boolean) as string[]
     if (!reais.length) return 0
-    const { data: ses } = await svc.from('simulado_sessoes_prova').select('simulado_id')
+    // CHECK-IN por etapa = conclusão (sessão finalizada) + PERMANÊNCIA ≥ segMin (requisito de tempo). O
+    // progresso/medalhas avança só nas etapas com check-in — igual ao SELO (não basta concluir correndo).
+    const segMinPor = new Map(etapas.map((e) => [e.simuladoId, Math.max(0, Math.round(Number(e.segMin) || 0))]))
+    const { data: ses } = await svc.from('simulado_sessoes_prova').select('simulado_id, iniciado_em, finalizado_em')
       .eq('estudante_id', estudanteId).eq('is_teste', false).eq('deletado', false).eq('status', 'finalizada')
       .in('simulado_id', reais)
-    const done = new Set((ses ?? []).map((s: any) => s.simulado_id as string))
+    const done = new Set<string>()
+    const durPor = new Map<string, number>() // maior duração (seg) entre as sessões finalizadas
+    for (const s of (ses ?? []) as any[]) {
+      done.add(s.simulado_id as string)
+      if (s.iniciado_em && s.finalizado_em) {
+        const d = (new Date(s.finalizado_em).getTime() - new Date(s.iniciado_em).getTime()) / 1000
+        if (d > 0) durPor.set(s.simulado_id, Math.max(durPor.get(s.simulado_id) ?? 0, d))
+      }
+    }
+    const temCheckin = (id: string) => { const seg = segMinPor.get(id) ?? 0; return done.has(id) && (seg <= 0 || (durPor.get(id) ?? 0) >= seg) }
     let cur = 0
-    for (const id of ids) { if (id && done.has(id)) cur++; else break } // prefixo sequencial por área
+    for (const id of ids) { if (id && temCheckin(id)) cur++; else break } // prefixo sequencial por área
     return Math.min(cur, AREAS_MARATONA)
   } catch { return 0 }
 }

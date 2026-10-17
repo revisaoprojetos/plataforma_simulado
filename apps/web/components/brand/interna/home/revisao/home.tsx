@@ -50,6 +50,7 @@ import { internaTokensStyle } from '../../interna-tokens'
 import { useTemaInterno } from '../../use-tema-interno'
 import { useCheckin } from '../use-checkin'
 import type { HomeContinuar, HomeData, HomeDestaque, HomePasta, HomeSimuladoCard, InternaTheme } from '../types'
+import { BaixarCadernoBtn } from '../../baixar-caderno-btn'
 import { MaratonaCardDestaque } from '@/components/aluno/maratona/maratona-card-destaque'
 import { MARATONA } from '@/lib/maratona/config'
 
@@ -537,7 +538,7 @@ function ContinuarCard({ c }: { c: HomeContinuar }) {
       </div>
       <div className="hrv-cont-actions">
         <a className="hrv-cta" href="#"><Play size={14} fill="currentColor" />Retomar simulado</a>
-        <a className="hrv-btn-outline" href={c.cadernoUrl || '#'}><Download size={15} />Caderno</a>
+        {c.cadernoUrl ? <BaixarCadernoBtn simuladoId={c.simuladoId} titulo={c.titulo} brand="revisao" className="hrv-btn-outline"><Download size={15} />Caderno</BaixarCadernoBtn> : null}
       </div>
     </div>
   )
@@ -623,7 +624,7 @@ function RecenteCard({ c, i }: { c: HomeSimuladoCard; i: number }) {
           </div>
           <div className="hrv-recente-actions">
             <a className="hrv-cta hrv-cta-sm" href={c.fazerUrl || '#'} style={{ color: '#fff' }}><Play size={12} fill="currentColor" /><span style={{ color: '#fff' }}>{c.status === 'Em andamento' ? 'Continuar' : 'Fazer agora'}</span></a>
-            {c.cadernoUrl ? <a className="hrv-dl-btn" href={c.cadernoUrl} download aria-label="Baixar caderno" title="Baixar caderno"><Download size={14} />Baixar</a> : null}
+            {c.cadernoUrl ? <BaixarCadernoBtn simuladoId={c.id} titulo={c.titulo} brand="revisao" className="hrv-dl-btn"><Download size={14} />Baixar</BaixarCadernoBtn> : null}
           </div>
         </div>
       </div>
@@ -915,7 +916,7 @@ function Outros({ cards, disponiveis }: { cards: HomeSimuladoCard[]; disponiveis
               <b className="hrv-recente-title">{c.titulo}</b>
               <div className="hrv-recente-actions">
                 <a className="hrv-cta hrv-cta-sm" href={c.fazerUrl || '#'} style={{ color: '#fff' }}><Play size={12} fill="currentColor" /><span style={{ color: '#fff' }}>Fazer agora</span></a>
-                {c.cadernoUrl ? <a className="hrv-dl-btn" href={c.cadernoUrl} download aria-label="Baixar caderno" title="Baixar caderno"><Download size={14} />Baixar</a> : null}
+                {c.cadernoUrl ? <BaixarCadernoBtn simuladoId={c.id} titulo={c.titulo} brand="revisao" className="hrv-dl-btn"><Download size={14} />Baixar</BaixarCadernoBtn> : null}
               </div>
             </div>
           </div>

@@ -259,25 +259,29 @@ export async function GET(request: NextRequest) {
 
   // MARATONA: se o simulado pertence a um desafio (pasta folder_area='maratona'), expõe o NÚMERO do
   // corredor do aluno + se a maratona foi CONCLUÍDA (todos os simulados feitos → selo Finisher).
-  let maratona: { numero: number | null; concluido: boolean } | null = null
+  // `checkin`/`segMin`/`dur` = status do CHECK-IN (permanência mínima) desta etapa → a tela de resultado
+  // avisa quando o aluno concluiu correndo e NÃO validou o selo/medalha (queixa "nada mostrando isso").
+  let maratona: { numero: number | null; concluido: boolean; checkin: boolean; segMin: number; dur: number } | null = null
   const pastaIdSim = (simulado as any)?.pasta_id as string | null
   if (pastaIdSim && sessao.estudante_id && sessao.tenant_id) {
     try {
       const { data: pastaRow } = await admin.from('simulado_pastas').select('folder_area').eq('id', pastaIdSim).eq('tenant_id', sessao.tenant_id).maybeSingle()
       if ((pastaRow as any)?.folder_area === 'maratona') {
-        const [{ lerNumeroCorredor, garantirNumeroCorredor }, { carregarProgressoMaratona }] = await Promise.all([
+        const [{ lerNumeroCorredor, garantirNumeroCorredor }, { carregarProgressoMaratona, carregarSimuladosLinksMaratona }] = await Promise.all([
           import('@/lib/maratona/participacao'), import('@/lib/maratona/carregar'),
         ])
         const { count: totalSim } = await admin.from('simulado_simulados').select('*', { count: 'exact', head: true })
           .eq('tenant_id', sessao.tenant_id).eq('pasta_id', pastaIdSim).eq('deletado', false).is('owner_estudante_id', null)
         // Sessão finalizada = concluiu este simulado → GARANTE o número (idempotente, ordem de chegada).
         const pegarNumero = sessao.status === 'finalizada' ? garantirNumeroCorredor : lerNumeroCorredor
-        const [numero, progresso] = await Promise.all([
+        const [numero, progresso, links] = await Promise.all([
           pegarNumero(admin, sessao.tenant_id, pastaIdSim, sessao.estudante_id),
           carregarProgressoMaratona(admin, sessao.tenant_id, sessao.estudante_id, pastaIdSim),
+          carregarSimuladosLinksMaratona(admin, sessao.tenant_id, pastaIdSim, sessao.estudante_id),
         ])
         const total = Math.min(totalSim ?? 0, 3)
-        maratona = { numero, concluido: total > 0 && progresso >= total }
+        const etapa = links.find((l) => l && l.simuladoId === (simulado as any)?.id) ?? null
+        maratona = { numero, concluido: total > 0 && progresso >= total, checkin: !!etapa?.checkin, segMin: etapa?.segMin ?? 0, dur: etapa?.dur ?? 0 }
       }
     } catch { /* best-effort: sem maratona */ }
   }

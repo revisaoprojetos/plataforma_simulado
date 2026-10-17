@@ -131,4 +131,30 @@ export const TOURS_ALUNO: Record<string, PassoTour[]> = {
     { pose: 'balanca', titulo: 'Ranking', texto: 'Dispute com a galera! O ranking mostra sua posição, seus pontos e a sua sequência de dias. 🏆', alvo: 'juris-rank' },
     { pose: 'joinha', titulo: 'Quer rever? É só me chamar 💜', texto: 'Toque aqui na Ajuda quando quiser refazer este tour. Agora é com você — bom jogo!', alvo: 'juris-ajuda' },
   ],
+
+  // Tour da MARATONA DE SIMULADOS (roda DENTRO do desafio; abas são estado, sem `rota`). Os `alvo`
+  // apontam para os botões de aba [data-tour="maratona-*"] no topo (sempre visíveis) + o botão Ajuda.
+  // O passo do REGULAMENTO é o principal (o aluno precisa ler as regras + o check-in antes de começar).
+  maratona: [
+    { pose: 'feliz', titulo: 'Maratona de Simulados 🏁', texto: 'Oi, eu sou a Capi! Bora conhecer a maratona? São 3 simulados que te levam do Aeroporto até a chegada — 42 km de percurso. Vou te mostrar cada parte, vem comigo!' },
+    // ── PERCURSO ──
+    { pose: 'procurando', titulo: 'O mapa do percurso 🗺️', texto: 'Este é o mapa em Brasília. Cada marcador é um ponto de controle (um simulado). Toque num marcador para ver os detalhes daquela parada: endereço, KM e a medalha do trecho.', alvo: 'maratona-percurso-mapa' },
+    { pose: 'satisfeita', titulo: 'Suas medalhas de KM', texto: 'Logo abaixo ficam as medalhas de cada parada — cinza enquanto bloqueadas, douradas quando você conquista. Vai colecionando até a chegada! 🥇', alvo: 'maratona-percurso-medalhas' },
+    // ── PAINEL ──
+    { pose: 'estudante', titulo: 'Tempo e número de corredor', texto: 'No Painel: aqui fica o seu tempo de prova acumulado e o seu número de corredor — entregue por ordem de chegada quando você encerra o 1º simulado.', alvo: 'maratona-painel-corredor' },
+    { pose: 'ideia', titulo: 'Sua posição no percurso', texto: 'Esta linha mostra onde você está no percurso. Você só AVANÇA quando conclui a etapa com o check-in válido (o tempo mínimo) — não basta terminar correndo.', alvo: 'maratona-painel-timeline' },
+    { pose: 'concluido', titulo: 'A medalha da parada', texto: 'A medalha da sua parada atual. Fica bloqueada (cinza, com cadeado) até você validar o check-in daquela etapa.', alvo: 'maratona-painel-medalha' },
+    { pose: 'procurando', titulo: 'Próximo simulado e parciais', texto: 'Aqui você vê qual é o próximo simulado a fazer e as suas parciais — um resumo rápido de cada etapa.', alvo: 'maratona-painel-proximo' },
+    // ── SIMULADOS ──
+    { pose: 'estudante', titulo: 'Fazer o simulado da etapa', texto: 'Na aba Simulados você escolhe a etapa e inicia o simulado, vê o resultado quando já fez, e baixa o caderno de questões.', alvo: 'maratona-simulados-acesso' },
+    { pose: 'atencao', titulo: 'O check-in ⏱️ — muito importante!', texto: 'ATENÇÃO: para validar a etapa e ganhar o selo e a medalha, você precisa PERMANECER o tempo mínimo no simulado. Só marcar as questões correndo NÃO conta — é preciso fazer o simulado de verdade!', alvo: 'maratona-simulados-checkin' },
+    // ── RANKING ──
+    { pose: 'balanca', titulo: 'Ranking 🏆', texto: 'Dispute com a galera! O ranking mostra o pódio, sua posição, o número de corredor e quem validou o check-in — classificado por menor tempo de prova.', alvo: 'maratona-ranking', topo: true },
+    // ── MEDALHAS ──
+    { pose: 'satisfeita', titulo: 'Sua coleção de medalhas 🥇', texto: 'São quatro medalhas de KM, uma a cada parada. Elas liberam conforme você valida o check-in de cada etapa.', alvo: 'maratona-medalhas-grid' },
+    { pose: 'feliz', titulo: 'Selo da Maratona e Finisher', texto: 'E tem os selos especiais: o Selo da Maratona (já seu, pela inscrição) e o Selo Finisher 🏅 — que você ganha ao cruzar a linha de chegada!', alvo: 'maratona-medalhas-selos' },
+    // ── REGULAMENTO (principal) ──
+    { pose: 'ideia', titulo: 'O Regulamento 📜 — leia primeiro!', texto: 'O MAIS IMPORTANTE: leia o Regulamento aqui ANTES de começar! Todas as regras, o tempo mínimo de check-in, as datas e as premiações estão no documento abaixo. Não deixe de ler. 💜', alvo: 'maratona-regulamento-topo' },
+    { pose: 'joinha', titulo: 'Quer rever? É só me chamar 💜', texto: 'Toque aqui na Ajuda sempre que quiser refazer este tour. Agora é com você — boa corrida! 🏃', alvo: 'maratona-ajuda' },
+  ],
 }

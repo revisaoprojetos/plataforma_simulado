@@ -7,8 +7,11 @@
 import { useState, useRef, useEffect, type CSSProperties, type ReactNode } from 'react'
 import Link from 'next/link'
 import type { InternaTheme } from '@/components/brand/interna/interna-tokens'
-import { ChevronLeft, ChevronDown, Map, User, Trophy, Medal, Plane, Check, MapPin, Lock, Flag, ScrollText, FileText, Download, ExternalLink, Play } from 'lucide-react'
+import { ChevronLeft, ChevronDown, Map, User, Trophy, Medal, Plane, Check, MapPin, Lock, Flag, ScrollText, FileText, Download, ExternalLink, Play, Clock, AlertTriangle, RotateCcw, Info, HelpCircle } from 'lucide-react'
+import { iniciarTourGuia } from '@/components/aluno/guia-tour-runner'
 import { type RegulamentoConfig, embedVideoUrl } from '@/lib/leitura/regulamento'
+import { CadernosDownloadDialog } from '@/components/brand/interna/cadernos-download-dialog'
+import { useTemaInterno } from '@/components/brand/interna/use-tema-interno'
 import type { RankingMaratona, MaratonaRankLinha, MaratonaSimuladoLink } from '@/lib/maratona/carregar'
 import { ChevronsLeft, ChevronRight, ChevronsRight } from 'lucide-react'
 
@@ -36,6 +39,28 @@ function acaoSim(simulados: (MaratonaSimuladoLink | null)[] | undefined, idx: nu
   if (s.concluido) return { href: s.resultadoUrl, label: 'Ver resultados' }
   if (!s.liberada) return null // ainda não disponível (data/janela/não publicado)
   return s.fazerUrl ? { href: s.fazerUrl, label: 'Iniciar simulado' } : null
+}
+// Botão "Baixar caderno" — abre o MESMO pop-up de cadernos da plataforma (Caderno de Questões / Gabarito),
+// respeitando a liberação (a lista vem de /api/aluno/simulado-downloads). Estilizado para a maratona:
+// tone 'escuro' = sobre painel escuro (contorno branco → dourado no hover); 'claro' = sobre card branco.
+function BaixarCaderno({ simuladoId, titulo, tone = 'escuro', full = false }: { simuladoId: string; titulo?: string; tone?: 'escuro' | 'claro'; full?: boolean }) {
+  const [hover, setHover] = useState(false)
+  const [aberto, setAberto] = useState(false)
+  const theme = useTemaInterno('claro')
+  const claro = tone === 'claro'
+  const borda = claro ? INK : (hover ? GOLD : 'rgba(255,255,255,.7)')
+  const bg = hover ? (claro ? INK : GOLD) : 'transparent'
+  const cor = hover ? (claro ? '#fff' : NAVY) : (claro ? INK : '#fff')
+  return (
+    <>
+      <button type="button" onClick={() => setAberto(true)} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+        title="Baixar caderno de questões" aria-label="Baixar caderno de questões"
+        style={{ alignSelf: full ? 'stretch' : 'flex-start', width: full ? '100%' : undefined, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 42, padding: '0 16px', borderRadius: 10, border: `1.5px solid ${borda}`, background: bg, color: cor, cursor: 'pointer', fontWeight: 800, fontSize: 13.5, transition: 'all .2s' }}>
+        <Download size={16} /> Baixar caderno
+      </button>
+      {aberto && <CadernosDownloadDialog simuladoId={simuladoId} titulo={titulo} brand="revisao" theme={theme} onClose={() => setAberto(false)} />}
+    </>
+  )
 }
 // DD/MM a partir de 'YYYY-MM-DD'.
 const fmtDMa = (iso?: string | null) => { if (!iso) return ''; const p = iso.split('-'); return p[2] && p[1] ? `${p[2]}/${p[1]}` : iso }
@@ -74,6 +99,29 @@ export function MaratonaInterno({ capaUrl, regulamento, progresso = 0, ranking, 
     setSimMenu((v) => !v)
   }
   const escolherSim = (cur: number) => { setSimSel(cur); setAba('simulados'); setSimMenu(false) }
+  // AUTO-TOUR da Capi na 1ª visita (flag por aluno; depois é só o botão "Ajuda" para refazer).
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('maratona:tour-visto') !== '1') {
+        localStorage.setItem('maratona:tour-visto', '1')
+        iniciarTourGuia('maratona')
+      }
+    } catch { /* sem storage → sem auto-tour */ }
+  }, [])
+  // TOUR: quando um passo com alvo 'maratona-<aba>' entra, TROCA para aquela aba — assim a Capi mostra o
+  // conteúdo DENTRO da página (não só o botão da top bar). O runner então acha o [data-tour] já visível.
+  useEffect(() => {
+    const abas: Aba[] = ['percurso', 'painel', 'simulados', 'ranking', 'medalhas', 'regulamento']
+    const h = (e: Event) => {
+      const alvo = (e as CustomEvent).detail?.alvo as string | undefined
+      if (!alvo?.startsWith('maratona-')) return
+      // Aba = 1º segmento após "maratona-" (ex.: 'maratona-painel-corredor' → painel). Vários passos por área.
+      const k = alvo.slice('maratona-'.length).split('-')[0]
+      if ((abas as string[]).includes(k)) { setSimMenu(false); setAba(k as Aba) }
+    }
+    window.addEventListener('guia-tour:passo', h)
+    return () => window.removeEventListener('guia-tour:passo', h)
+  }, [])
   // REGRA: ao trocar de área/aba da maratona, volta pro TOPO (senão a nova tela abre no meio/fim onde estava).
   const rootRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -124,7 +172,9 @@ export function MaratonaInterno({ capaUrl, regulamento, progresso = 0, ranking, 
               <b style={{ fontSize: 15, fontStyle: 'italic' }}>ENAP + AGU</b>
             </div>
           </div>
-          <nav style={{ display: 'flex', gap: 4, marginLeft: 'auto', overflowX: 'auto' }} aria-label="Telas da maratona">
+          {/* Grupo abas + Ajuda: fica à direita no desktop; no mobile quebra junto e as abas rolam na horizontal. */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 'auto', minWidth: 0 }}>
+          <nav style={{ display: 'flex', gap: 4, overflowX: 'auto', minWidth: 0 }} aria-label="Telas da maratona">
             {TABS.map((t) => (
               t.k === 'simulados' ? (
                 // "Simulados" é um botão-dropdown: ao clicar, abre o select dos 3 simulados.
@@ -141,6 +191,13 @@ export function MaratonaInterno({ capaUrl, regulamento, progresso = 0, ranking, 
               )
             ))}
           </nav>
+          {/* AJUDA — reinicia o tour guiado da Capi (e é o alvo do último passo). */}
+          <button type="button" data-tour="maratona-ajuda" onClick={() => iniciarTourGuia('maratona')}
+            title="Rever o tour da maratona com a Capi" aria-label="Ajuda — rever o tour da maratona"
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 12px', borderRadius: 9, background: 'rgba(247,181,0,.15)', color: GOLD, border: '1px solid rgba(247,181,0,.4)', cursor: 'pointer', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
+            <HelpCircle size={15} /> Ajuda
+          </button>
+          </div>
 
           {/* Dropdown do botão "Simulados" — absoluto ao container (abaixo do botão). Hover realça a opção. */}
           {simMenu && simRect && (
@@ -168,22 +225,24 @@ export function MaratonaInterno({ capaUrl, regulamento, progresso = 0, ranking, 
         </div>
       </header>
 
-      {/* main SEM padding lateral → o banner do Painel fica fora a fora; as demais abas usam wrapper com px. */}
+      {/* main SEM padding lateral → o banner do Painel fica fora a fora; as demais abas usam wrapper com px.
+          `data-tour` no CONTEÚDO de cada aba: o tour da Capi troca para a aba e dá spotlight AQUI (dentro
+          da página), não só no botão da top bar. */}
       <main style={{ flex: 1, width: '100%' }}>
-        {aba === 'percurso' && <Percurso cur={progresso} simulados={simulados} />}
-        {aba === 'painel' && <Painel onVerMapa={() => setAba('percurso')} onVerRanking={() => setAba('ranking')} onIrSimulado={escolherSim} cur={progresso} simulados={simulados} tempoDecorrido={tempoDecorrido} numero={numeroCorredor} />}
+        {aba === 'percurso' && <div data-tour="maratona-percurso" style={{ scrollMarginTop: 76 }}><Percurso cur={progresso} simulados={simulados} /></div>}
+        {aba === 'painel' && <div data-tour="maratona-painel" style={{ scrollMarginTop: 76 }}><Painel onVerMapa={() => setAba('percurso')} onVerRanking={() => setAba('ranking')} onIrSimulado={escolherSim} cur={progresso} simulados={simulados} tempoDecorrido={tempoDecorrido} numero={numeroCorredor} /></div>}
         {/* Aba Simulados: conteúdo = simulado de referência selecionado; PERCURSO = conclusão REAL (progresso). */}
-        {aba === 'simulados' && <Painel onVerMapa={() => setAba('percurso')} onVerRanking={() => setAba('ranking')} onIrSimulado={escolherSim} cur={simSel} percursoCur={progresso} simulados={simulados} tempoDecorrido={tempoDecorrido} numero={numeroCorredor} abaSimulado />}
-        {aba === 'ranking' && <Ranking ranking={ranking} meuId={meuId} simulados={simulados} />}
-        {aba === 'medalhas' && <div style={{ padding: '20px 24px 32px' }}><Medalhas simulados={simulados} progresso={progresso} /></div>}
-        {aba === 'regulamento' && <div style={{ padding: '20px 24px 32px' }}><Regulamento regulamento={regulamento} /></div>}
+        {aba === 'simulados' && <div data-tour="maratona-simulados" style={{ scrollMarginTop: 76 }}><Painel onVerMapa={() => setAba('percurso')} onVerRanking={() => setAba('ranking')} onIrSimulado={escolherSim} cur={simSel} percursoCur={progresso} simulados={simulados} tempoDecorrido={tempoDecorrido} numero={numeroCorredor} abaSimulado /></div>}
+        {aba === 'ranking' && <div data-tour="maratona-ranking" style={{ scrollMarginTop: 76 }}><Ranking ranking={ranking} meuId={meuId} simulados={simulados} /></div>}
+        {aba === 'medalhas' && <div data-tour="maratona-medalhas" style={{ scrollMarginTop: 76, padding: '20px 24px 32px' }}><Medalhas simulados={simulados} progresso={progresso} /></div>}
+        {aba === 'regulamento' && <div data-tour="maratona-regulamento" style={{ scrollMarginTop: 76, padding: '20px 24px 32px' }}><Regulamento regulamento={regulamento} /></div>}
       </main>
     </div>
   )
 }
 
-function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
-  return <div style={{ background: CARD, borderRadius: 16, boxShadow: '0 1px 3px rgba(7,26,63,.08)', ...style }}>{children}</div>
+function Card({ children, style, ...rest }: { children: React.ReactNode; style?: React.CSSProperties } & React.HTMLAttributes<HTMLDivElement>) {
+  return <div {...rest} style={{ background: CARD, borderRadius: 16, boxShadow: '0 1px 3px rgba(7,26,63,.08)', ...style }}>{children}</div>
 }
 function Kicker({ children }: { children: React.ReactNode }) {
   return <div style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase', color: INK_TX }}>{children}</div>
@@ -204,7 +263,7 @@ function Regulamento({ regulamento }: { regulamento?: RegulamentoConfig }) {
   return (
     <Card style={{ padding: 18 }}>
       {/* Cabeçalho + ações do PDF */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingBottom: 14, marginBottom: 18, borderBottom: `1px solid ${LINE}` }}>
+      <div data-tour="maratona-regulamento-topo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingBottom: 14, marginBottom: 18, borderBottom: `1px solid ${LINE}`, scrollMarginTop: 90 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ color: GOLD, display: 'inline-flex' }}><FileText size={18} /></span>
           <div>
@@ -386,7 +445,7 @@ function Percurso({ cur = 0, simulados }: { cur?: number; simulados?: (MaratonaS
       </section>
 
       {/* Mapa + parada selecionada */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-start' }}>
+      <div data-tour="maratona-percurso-mapa" style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-start', scrollMarginTop: 90 }}>
         <Card style={{ flex: '999 1 520px', minWidth: 0, padding: 14 }}>
           <div style={{ position: 'relative', width: '100%', aspectRatio: '1000 / 620', borderRadius: 10, overflow: 'hidden', background: '#E9EDF3' }}>
             <svg viewBox="0 0 1000 620" preserveAspectRatio="none" aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
@@ -441,9 +500,14 @@ function Percurso({ cur = 0, simulados }: { cur?: number; simulados?: (MaratonaS
             <h2 style={{ margin: 0, fontStretch: '125%', fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', fontSize: 28 }}>{sel.name}</h2>
             {(() => {
               const acao = acaoSim(simulados, PC_SIM_IDX[selIdx])
-              return acao ? (
-                <Link href={acao.href} style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 8, minHeight: 44, padding: '0 20px', borderRadius: 10, background: INK, color: '#fff', textDecoration: 'none', fontStretch: '125%', fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', fontSize: 14, letterSpacing: '.5px' }}>{acao.label} →</Link>
-              ) : null
+              const simPc = PC_SIM_IDX[selIdx] != null ? simulados?.[PC_SIM_IDX[selIdx]!] : null
+              if (!acao && !simPc?.cadernoUrl) return null
+              return (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+                  {acao && <Link href={acao.href} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, minHeight: 44, padding: '0 20px', borderRadius: 10, background: INK, color: '#fff', textDecoration: 'none', fontStretch: '125%', fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', fontSize: 14, letterSpacing: '.5px' }}>{acao.label} →</Link>}
+                  {simPc?.cadernoUrl && <BaixarCaderno simuladoId={simPc.simuladoId} titulo={simPc.rotulo || simPc.titulo} tone="claro" />}
+                </div>
+              )
             })()}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, fontSize: 14 }}>
               {[['Simulado', sel.sim], ['Endereço', sel.local], ['Km acumulado', `KM ${sel.km}`]].map(([k, v], j) => (
@@ -467,7 +531,7 @@ function Percurso({ cur = 0, simulados }: { cur?: number; simulados?: (MaratonaS
       </div>
 
       {/* Suas medalhas de km */}
-      <Card style={{ padding: 20 }}>
+      <Card style={{ padding: 20, scrollMarginTop: 90 }} data-tour="maratona-percurso-medalhas">
         <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, marginBottom: 14 }}>
           <Kicker>Suas medalhas de km</Kicker>
           <span style={{ fontFamily: MONO, fontSize: 12, color: MUT }}>{PERCURSO_PCS.filter((d) => d.medal != null && st(d.n) !== 'locked').length} de 4 conquistadas</span>
@@ -516,19 +580,57 @@ const kickerDk: CSSProperties = { fontStretch: '125%', fontWeight: 800, fontStyl
 const chipBase: CSSProperties = { alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 999, fontStretch: '125%', fontWeight: 800, fontSize: 11, letterSpacing: '1.5px', textTransform: 'uppercase' }
 const panelCard: CSSProperties = { background: CARD, borderRadius: 16, boxShadow: '0 10px 30px rgba(7,26,63,.12)' }
 
-/** SELO (check-in) da etapa: CINZA/bloqueado até o aluno PERMANECER o tempo mínimo no simulado; vira
- *  DOURADO + tag "OBTIDO" quando cumpre (s.checkin). Desenhado p/ fundo navy (texto claro). */
-function SeloEtapa({ s }: { s?: MaratonaSimuladoLink | null }) {
+/** CARD de CHECK-IN da etapa (fundo navy, texto claro): explica o REQUISITO (permanência ≥ tempo mínimo),
+ *  mostra o STATUS real e o MOTIVO quando bloqueado — e oferece REFAZER quando o aluno concluiu correndo
+ *  (sem cumprir o tempo). Resolve a queixa "não tem informação de check-in válido ou não / como funciona". */
+function SeloEtapa({ s, tone = 'navy' }: { s?: MaratonaSimuladoLink | null; tone?: 'navy' | 'claro' }) {
   if (!s) return null
-  const ok = s.checkin
-  const circulo: CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'center', width: 42, height: 42, borderRadius: '50%', flexShrink: 0, background: ok ? GOLD : 'rgba(255,255,255,.08)', border: ok ? `2px solid ${GOLD}` : '2px dashed rgba(255,255,255,.3)', filter: ok ? 'none' : 'grayscale(1)' }
+  const claro = tone === 'claro'
+  const temMin = s.segMin > 0
+  const minTxt = fmtDurCurto(s.segMin)
+  const durTxt = fmtDurCurto(s.dur)
+  // 3 estados: validado (checkin) · concluiu mas NÃO cumpriu o tempo (falhou) · ainda não concluiu.
+  const falhou = s.concluido && !s.checkin && temMin
+  const estado: 'ok' | 'falhou' | 'pendente' = s.checkin ? 'ok' : falhou ? 'falhou' : 'pendente'
+  // Cor de destaque (accent) + chrome do card por estado.
+  const accent = estado === 'ok' ? '#F2A800' : estado === 'falhou' ? '#E0860A' : (claro ? '#8A93A6' : 'rgba(255,255,255,.4)')
+  const bgGrad = estado === 'ok'
+    ? (claro ? 'linear-gradient(135deg, rgba(247,181,0,.18), rgba(247,181,0,.05))' : 'linear-gradient(135deg, rgba(247,181,0,.2), rgba(247,181,0,.05))')
+    : estado === 'falhou'
+      ? (claro ? 'linear-gradient(135deg, rgba(224,134,10,.16), rgba(224,134,10,.03))' : 'linear-gradient(135deg, rgba(246,166,9,.2), rgba(246,166,9,.04))')
+      : (claro ? 'rgba(7,26,63,.035)' : 'rgba(255,255,255,.05)')
+  const txtTit = claro ? INK_TX : '#fff'
+  const txtBody = claro ? MUT : '#CBD4E4'
+  const strong = claro ? INK_TX : '#fff'
+  const Icone = estado === 'ok' ? Medal : estado === 'falhou' ? AlertTriangle : Lock
+  const badge = estado === 'ok' ? 'OBTIDO' : estado === 'falhou' ? 'NÃO VALIDADO' : 'BLOQUEADO'
+  const titulo = estado === 'ok' ? 'Check-in validado' : estado === 'falhou' ? 'Check-in não validado' : 'Check-in da etapa'
+  const B = (txt: string) => <b style={{ color: strong, fontWeight: 800 }}>{txt}</b>
+  const corpo = estado === 'ok'
+    ? (temMin ? <>Você permaneceu {B(durTxt)} no simulado <span style={{ opacity: .85 }}>(mínimo {minTxt})</span>. Selo e medalha {B('garantidos')}.</> : <>Simulado concluído. Selo e medalha {B('garantidos')}.</>)
+    : estado === 'falhou'
+      ? <>Você concluiu em {B(durTxt)}, mas o mínimo é {B(minTxt)}. Só marcar as questões rápido não conta — refaça permanecendo pelo menos {B(minTxt)} para ganhar o selo e a medalha.</>
+      : (temMin ? <>Para ganhar o selo e a medalha, permaneça pelo menos {B(minTxt)} no simulado. Só marcar as questões rápido não conta — é preciso realmente fazer o simulado.</> : <>Conclua o simulado para ganhar o selo e a medalha desta etapa.</>)
+  const badgeBg = estado === 'ok' ? 'linear-gradient(135deg,#FFD24A,#F2A800)' : estado === 'falhou' ? 'linear-gradient(135deg,#F6B24A,#E0860A)' : (claro ? 'rgba(7,26,63,.06)' : 'rgba(255,255,255,.08)')
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 12, background: ok ? 'rgba(247,181,0,.12)' : 'rgba(255,255,255,.05)', border: `1px solid ${ok ? 'rgba(247,181,0,.5)' : 'rgba(255,255,255,.12)'}` }}>
-      <span style={circulo}>{ok ? <Medal size={22} color={NAVY} /> : <Lock size={16} color="#CBD4E4" />}</span>
-      <span style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-        <span style={{ fontWeight: 800, fontSize: 13.5, color: '#fff' }}>{ok ? 'Selo da etapa' : 'Selo bloqueado'}</span>
-        {ok && <span style={{ padding: '1px 8px', borderRadius: 999, background: GOLD, color: NAVY, fontSize: 10, fontWeight: 800, letterSpacing: '.5px' }}>OBTIDO</span>}
-      </span>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 16px', borderRadius: 16, background: bgGrad, border: `1px solid ${estado === 'pendente' ? (claro ? 'rgba(7,26,63,.1)' : 'rgba(255,255,255,.12)') : `color-mix(in srgb, ${accent} 45%, transparent)`}`, boxShadow: estado === 'pendente' ? 'none' : `0 12px 28px -18px ${accent}` }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: 14, flexShrink: 0, background: badgeBg, boxShadow: estado === 'pendente' ? 'none' : `0 8px 18px -6px color-mix(in srgb, ${accent} 70%, transparent)`, border: estado === 'pendente' ? `2px dashed ${accent}` : 'none' }}>
+          <Icone size={20} color={estado === 'pendente' ? (claro ? '#3B4866' : '#CBD4E4') : estado === 'ok' ? NAVY : '#fff'} />
+        </span>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
+          <span style={{ fontWeight: 800, fontSize: 15, color: txtTit, letterSpacing: '-.01em' }}>{titulo}</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 9px', borderRadius: 999, background: estado === 'ok' ? 'linear-gradient(135deg,#FFD24A,#F2A800)' : (claro ? 'rgba(7,26,63,.07)' : 'rgba(255,255,255,.14)'), color: estado === 'ok' ? NAVY : accent, fontSize: 10, fontWeight: 900, letterSpacing: '.6px', boxShadow: estado === 'ok' ? '0 3px 8px -2px rgba(247,181,0,.5)' : 'none' }}>
+            {estado === 'ok' ? <Check size={11} strokeWidth={3.5} /> : estado === 'falhou' ? <AlertTriangle size={10} /> : <Lock size={10} />}{badge}
+          </span>
+        </span>
+      </div>
+      <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.55, color: txtBody }}>{corpo}</p>
+      {estado === 'falhou' && s.fazerUrl ? (
+        <Link href={s.fazerUrl} style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 7, minHeight: 38, padding: '0 16px', borderRadius: 10, background: claro ? INK : GOLD, color: claro ? '#fff' : NAVY, textDecoration: 'none', fontWeight: 800, fontSize: 12.5, boxShadow: `0 8px 18px -10px ${claro ? INK : GOLD}` }}>
+          <RotateCcw size={15} /> Refazer para validar o check-in
+        </Link>
+      ) : null}
     </div>
   )
 }
@@ -625,7 +727,7 @@ function Painel({ onVerMapa, onVerRanking, onIrSimulado, cur = 0, percursoCur, s
               <span style={kickerLt}>{h.rotulo}</span>
               <h1 style={{ margin: 0, fontStretch: '125%', fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', fontSize: 52, lineHeight: 0.98 }}>{h.titulo}</h1>
               <p style={{ margin: 0, maxWidth: 560, fontSize: 15.5, lineHeight: 1.55, color: '#BCC8E0' }}>{h.resumo}</p>
-              <div style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 18 }}>
+              <div data-tour="maratona-painel-corredor" style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 18, scrollMarginTop: 90 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                   <span style={{ fontFamily: MONO, fontSize: 13, color: '#BCC8E0' }}>Tempo de prova acumulado</span>
                   <span style={{ fontFamily: MONO, fontSize: 34, lineHeight: 1 }}>{fmtTempo(tempoDecorrido)}</span>
@@ -646,15 +748,15 @@ function Painel({ onVerMapa, onVerRanking, onIrSimulado, cur = 0, percursoCur, s
                 iniciar/ver resultado do simulado selecionado + a data real ("já disponível"/"disponível em …").
                 Na aba "Painel" (overview) NÃO aparece botão de iniciar. O Aeroporto nunca tem simulado. */}
             {abaSimulado && alvo && (
-              <div style={{ flex: '0 1 300px', minWidth: 240, display: 'flex', flexDirection: 'column', gap: 10, background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.14)', borderRadius: 16, padding: 18 }}>
+              <div data-tour="maratona-simulados-acesso" style={{ flex: '0 1 300px', minWidth: 240, display: 'flex', flexDirection: 'column', gap: 10, background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.14)', borderRadius: 16, padding: 18, scrollMarginTop: 90 }}>
                 <span style={{ ...kickerLt, color: GOLD }}>Simulado desta etapa</span>
                 <span style={{ fontStretch: '125%', fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', fontSize: 20, lineHeight: 1.08 }}>{alvo.rotulo || alvo.titulo}</span>
                 <span style={{ fontFamily: MONO, fontSize: 13, color: alvo.liberada ? GOLD : '#BCC8E0' }}>{dispoSim(alvo)}</span>
-                {/* SELO da etapa: cinza/bloqueado → dourado "OBTIDO" quando o aluno cumpre o tempo mínimo. */}
-                <SeloEtapa s={alvo} />
                 {alvoAcao
                   ? <Link href={alvoAcao.href} style={{ marginTop: 4, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, borderRadius: 10, background: GOLD, color: NAVY, textDecoration: 'none', fontStretch: '125%', fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', fontSize: 15 }}>{alvoAcao.label} →</Link>
                   : <span style={{ marginTop: 4, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, borderRadius: 10, background: 'rgba(255,255,255,.12)', color: '#CBD4E4', fontWeight: 700, fontSize: 13.5 }}><Lock size={15} /> {dispoSim(alvo)}</span>}
+                {/* BAIXAR CADERNO — pop-up de cadernos (caderno/gabarito) igual à plataforma, respeitando liberação. */}
+                {alvo.cadernoUrl && <BaixarCaderno simuladoId={alvo.simuladoId} titulo={alvo.rotulo || alvo.titulo} full />}
               </div>
             )}
           </div>
@@ -664,7 +766,7 @@ function Painel({ onVerMapa, onVerRanking, onIrSimulado, cur = 0, percursoCur, s
       {/* conteúdo sobreposto ao header (como no protótipo: margin-top negativo) + padding lateral próprio */}
       <div style={{ position: 'relative', marginTop: -48, padding: '0 24px 32px', display: 'flex', flexDirection: 'column', gap: 20 }}>
         {/* Percurso em etapas */}
-        <section style={{ ...panelCard, padding: '22px 26px' }}>
+        <section data-tour="maratona-painel-timeline" style={{ ...panelCard, padding: '22px 26px', scrollMarginTop: 90 }}>
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, marginBottom: 18 }}>
             <span style={kickerDk}>Percurso</span>
             <button type="button" onClick={onVerMapa} style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', fontSize: 14, fontWeight: 600, color: INK_TX }}>Ver mapa completo</button>
@@ -685,7 +787,7 @@ function Painel({ onVerMapa, onVerRanking, onIrSimulado, cur = 0, percursoCur, s
         </section>
 
         {/* Parada atual: foto + medalha */}
-        <section style={{ ...panelCard, overflow: 'hidden', display: 'flex', flexWrap: 'wrap' }}>
+        <section data-tour="maratona-painel-medalha" style={{ ...panelCard, overflow: 'hidden', display: 'flex', flexWrap: 'wrap', scrollMarginTop: 90 }}>
           <div style={{ flex: '1 1 380px', minHeight: 260, position: 'relative', background: NAVY }}>
             <img src={p.img} alt={'Foto ilustrativa · ' + c.name} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
             <span style={{ position: 'absolute', left: 14, top: 14, padding: '5px 10px', borderRadius: 8, background: NAVY, color: '#fff', fontFamily: MONO, fontSize: 12 }}>{p.codeLabel} · {p.local}</span>
@@ -705,12 +807,15 @@ function Painel({ onVerMapa, onVerRanking, onIrSimulado, cur = 0, percursoCur, s
               <span style={p.chipStyle}>{p.chip}</span>
               <h2 style={{ margin: 0, fontStretch: '125%', fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', fontSize: 26, lineHeight: 1.05 }}>{p.medalTitle}</h2>
               <p style={{ margin: 0, fontSize: 15.5, lineHeight: 1.55, color: MUT }}>{p.medalText}</p>
+              {/* CHECK-IN da etapa logo abaixo do texto da medalha (requisito + status + refazer). Só na aba
+                  SIMULADOS, onde `alvo` casa com a medalha mostrada (no overview a medalha é do checkpoint atual). */}
+              {abaSimulado && alvo && alvo.segMin > 0 ? <div data-tour="maratona-simulados-checkin" style={{ scrollMarginTop: 90 }}><SeloEtapa s={alvo} tone="claro" /></div> : null}
             </div>
           </div>
         </section>
 
         {/* Próximo simulado + Parciais */}
-        <section style={{ display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'stretch' }}>
+        <section data-tour="maratona-painel-proximo" style={{ display: 'flex', flexWrap: 'wrap', gap: 20, alignItems: 'stretch', scrollMarginTop: 90 }}>
           <div style={{ ...panelCard, flex: '999 1 480px', minWidth: 0, padding: 26, display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <span style={{ fontFamily: MONO, fontSize: 13, color: MUT }}>{n.trecho}</span>
@@ -862,7 +967,7 @@ function Ranking({ ranking, meuId, simulados }: { ranking?: RankingMaratona; meu
       ) : (
         <>
           {/* Pódio (top 3 reais) */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 14 }}>
+          <div data-tour="maratona-ranking-podio" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 14, scrollMarginTop: 90 }}>
             {podium.map((r, i) => {
               const first = i === 0
               const cardBg: CSSProperties = first ? { background: GOLD, color: NAVY, border: `2px solid ${GOLD}` } : { background: CARD, color: TEXT, border: `2px solid ${i === 1 ? INK : LINE}` }
@@ -885,7 +990,7 @@ function Ranking({ ranking, meuId, simulados }: { ranking?: RankingMaratona; meu
           </div>
 
           {/* Classificação (real) — paginada 10/pág, com "Você" fixo embaixo e controles início/voltar/avançar/pular. */}
-          <Card style={{ padding: 0, overflow: 'hidden' }}>
+          <Card style={{ padding: 0, overflow: 'hidden', scrollMarginTop: 90 }} data-tour="maratona-ranking-tabela">
             <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: 12, padding: '20px 22px 12px' }}>
               <Kicker>Classificação</Kicker>
               <span style={{ fontFamily: MONO, fontSize: 12, color: MUT }}>{view.length} {view.length === 1 ? 'corredor' : 'corredores'}</span>
@@ -959,9 +1064,10 @@ const MEDALHAS_PC: { n: number; txt: string }[] = [
 // Medalha (índice em MEDALHAS_PC) → ÁREA de simulado (0..2). A 3ª e a 4ª (passagem/chegada) vêm do 3º simulado.
 const MEDAL_AREA = [0, 1, 2, 2]
 function Medalhas({ simulados, progresso = 0 }: { simulados?: (MaratonaSimuladoLink | null)[]; progresso?: number }) {
-  // Medalha de KM CONQUISTADA = o aluno CONCLUIU o simulado daquela parada. Finisher = concluiu os 3 (chegada).
-  const onMedalha = (i: number) => !!simulados?.[MEDAL_AREA[i] ?? 0]?.concluido
-  const finisher = progresso >= 3 || !!simulados?.[2]?.concluido
+  // Medalha de KM CONQUISTADA = o aluno CONCLUIU o simulado daquela parada E cumpriu o tempo mínimo
+  // (check-in), igual ao selo da etapa — não basta concluir correndo. Finisher = check-in nos 3.
+  const onMedalha = (i: number) => !!simulados?.[MEDAL_AREA[i] ?? 0]?.checkin
+  const finisher = progresso >= 3 || !!simulados?.[2]?.checkin
   const qtd = MEDALHAS_PC.filter((_, i) => onMedalha(i)).length
   return (
     <div style={{ display: 'grid', gap: 24 }}>
@@ -979,7 +1085,7 @@ function Medalhas({ simulados, progresso = 0 }: { simulados?: (MaratonaSimuladoL
       </div>
 
       {/* Medalhas — estado REAL por parada: dourada (conquistada) ou cinza/bloqueada (até concluir o simulado). */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
+      <div data-tour="maratona-medalhas-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, scrollMarginTop: 90 }}>
         {MEDALHAS_PC.map((m, i) => {
           const on = onMedalha(i)
           const dark = i === 3
@@ -1002,7 +1108,7 @@ function Medalhas({ simulados, progresso = 0 }: { simulados?: (MaratonaSimuladoL
       <span style={{ fontSize: 13, color: MUT }}>As medalhas cinza liberam assim que você <b style={{ color: INK_TX }}>concluir o simulado</b> daquela parada.</span>
 
       {/* Selos próprios da maratona: Maratona (na inscrição — já liberado p/ quem tem acesso) + Finisher (na chegada). */}
-      <div style={{ display: 'grid', gap: 12 }}>
+      <div data-tour="maratona-medalhas-selos" style={{ display: 'grid', gap: 12, scrollMarginTop: 90 }}>
         <Kicker>Selo da maratona e selo finisher</Kicker>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
           {([

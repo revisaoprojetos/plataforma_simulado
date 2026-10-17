@@ -21,7 +21,7 @@ function comCacheBuster(url: string): string {
 }
 
 /** Baixa o "Enunciado de Questões" (PDF, já com ?download=<nome>.pdf) sem navegar/abrir inline. */
-function baixarEnunciado(url: string) {
+export function baixarEnunciado(url: string) {
   const a = document.createElement('a')
   a.href = comCacheBuster(url)
   a.rel = 'noopener'

@@ -75,6 +75,10 @@ export function GuiaTourRunner({ gamAtivo = false }: { gamAtivo?: boolean }) {
     const rotaPath = passo.rota?.split('?')[0]
     if (rotaPath && rotaPath !== pathname) { router.push(passo.rota!); return }
     if (!passo.alvo) { setRect(null); return }
+    // Avisa a PÁGINA que um passo com alvo entrou. Telas com ABAS (ex.: maratona) escutam e trocam para a
+    // aba do alvo ANTES do spotlight — o alvo só existe no DOM quando a aba certa está ativa. Additivo:
+    // sem listener (tours normais) = no-op. O runner então acha o alvo (com retries) já na aba certa.
+    try { window.dispatchEvent(new CustomEvent('guia-tour:passo', { detail: { id: est.id, alvo: passo.alvo } })) } catch { /* ignore */ }
 
     let cancel = false, tent = 0
     // Resolve o alvo no documento principal OU dentro de um iframe same-origin (ex.: o arcade do Desafio

@@ -133,12 +133,13 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   // levar o aluno à MESMA pasta que o admin vê (o grupo do catálogo é por banco→pai, um id diferente).
   const pastaBySim = new Map<string, string | null>(sims.map((s: any) => [s.id, s.pasta_id ?? null]))
 
-  // Visual dos simulados + mapa pasta→simulado de TODOS os sims (usado nos banners de vitrine):
-  // ambos só dependem de `sims`, então rodam em paralelo.
-  const [visual, { grupoPorSim: grupoPorSimAll }] = await Promise.all([
+  // Visual dos simulados + mapa grupo→simulado de TODOS os sims. `grupoPorSimAll` só alimenta os BANNERS
+  // de vitrine (home) → na visão de pasta (?pasta) NÃO resolvemos (economiza ~2 idas ao banco).
+  const [visual, grupoAll] = await Promise.all([
     resolverVisualSimulados(svc, sims.map((s: any) => ({ id: s.id, regras: s.regras }))),
-    resolverGruposCatalogo(svc, sims.map((s: any) => ({ id: s.id, regras: s.regras }))),
+    pasta ? Promise.resolve({ grupoPorSim: new Map<string, string | null>() }) : resolverGruposCatalogo(svc, sims.map((s: any) => ({ id: s.id, regras: s.regras }))),
   ])
+  const grupoPorSimAll = grupoAll.grupoPorSim
   const itensAll = montarItensSimulado(sims, sessoesPorSim, expiraPorSim, visual)
     .filter((i) => i.podeFazer || i.emAndamento || i.refazer || i.statusLabel === 'Agendado')
 
@@ -166,23 +167,60 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
     progresso[g.id] = { total: inGrp.length, done: inGrp.filter((s) => feitosSet.has(s.id)).length }
   }
 
-  // Pastas do ADMIN (folder_area='simulado'): quando os simulados estão organizados por PASTA DE SIMULADO
-  // (pasta_id) e não por banco→pasta-pai, o catálogo (grupos, via banco→pai) fica vazio e a Início não
-  // mostrava nenhuma pasta. Completamos a lista com essas pastas do admin — a visão de pasta já casa por
-  // `i.pastaId === pasta` (link /aluno?pasta=<id>), então clicar funciona.
-  let pastasHome = grupos
-  const semGrupo = itensCat.filter((s) => !s.grupoId && s.pastaId)
-  const adminPastaIds = [...new Set(semGrupo.map((s) => s.pastaId).filter(Boolean))] as string[]
-  if (adminPastaIds.length) {
-    const { data: apRows } = await svc.from('simulado_pastas')
-      .select('id, nome, cor, capa_url, capa_card_url, is_folder')
-      .in('id', adminPastaIds)
-    for (const p of (apRows ?? []) as any[]) {
-      if (p.is_folder === false || pastasHome.some((g) => g.id === p.id)) continue
-      pastasHome = [...pastasHome, { id: p.id, nome: p.nome, cor: p.cor ?? null, icone: null, capa: p.capa_url ?? null, capaCard: p.capa_card_url ?? null }]
-      const inGrp = itensCat.filter((s) => s.pastaId === p.id && !s.grupoId)
-      progresso[p.id] = { total: inGrp.length, done: inGrp.filter((s) => feitosSet.has(s.id)).length }
+  // DESAFIO (maratona): por padrão a PASTA do desafio NÃO aparece na área de Pastas, nem seus simulados
+  // nos Recentes — o desafio vive na própria área. O admin liga cada um no desafio (desafio_jogo.config).
+  const ocultarPastaDesafio = new Set<string>()
+  const ocultarRecenteDesafio = new Set<string>()
+  try {
+    const { data: desRows } = await svc.from('simulado_pastas')
+      .select('id, desafio_jogo').eq('tenant_id', sessao!.tenantId).eq('folder_area', 'maratona').eq('deletado', false)
+    for (const d of (desRows ?? []) as any[]) {
+      const cfg = d.desafio_jogo?.config ?? {}
+      if (cfg.mostrarNasPastas !== true) ocultarPastaDesafio.add(d.id)
+      if (cfg.mostrarNosRecentes !== true) ocultarRecenteDesafio.add(d.id)
     }
+  } catch { /* sem desafios → nada a ocultar */ }
+  // itensCat da HOME: sem os simulados de desafio cuja pasta está oculta (não vazam como avulsos/pasta).
+  const itensHome = itensCat.filter((i) => !(i.pastaId && ocultarPastaDesafio.has(i.pastaId)))
+
+  // Pastas do ALUNO espelham a "Aplicação de Simulados" do admin (árvore de pasta_id): cada simulado com
+  // pasta_id entra na sua PASTA-RAIZ (sobe pai_id até o topo). O catálogo por banco→pai (grupos) vira
+  // FALLBACK só p/ simulados SEM pasta_id. Assim uma pasta como "Minissimulados de Procuradoria" (cujos
+  // simulados têm o banco em OUTRA árvore) aparece para o aluno, com subpastas — igual ao admin. Só na HOME.
+  let pastasHome: typeof grupos = grupos
+  if (!pasta) {
+    const appFolders = await (async (): Promise<any[]> => {
+      try {
+        const r = await svc.from('simulado_pastas')
+          .select('id, nome, cor, icone, capa_url, capa_card_url, pai_id, is_folder, folder_area')
+          .eq('tenant_id', sessao!.tenantId).eq('is_folder', true).eq('deletado', false)
+        return ((r.data ?? []) as any[]).filter((f) => f.folder_area === 'simulado')
+      } catch { return [] }
+    })()
+    const appById = new Map<string, any>(appFolders.map((f) => [f.id, f]))
+    // Pasta-RAIZ da Aplicação a partir de uma pasta-folha (sobe pai_id até o topo; guarda contra ciclos).
+    const topApp = (pid: string | null): string | null => {
+      let cur = pid ? appById.get(pid) : null
+      const seen = new Set<string>()
+      while (cur && cur.pai_id && appById.has(cur.pai_id) && !seen.has(cur.id)) { seen.add(cur.id); cur = appById.get(cur.pai_id) }
+      return cur?.id ?? null
+    }
+    // Grupo da HOME por simulado: raiz da Aplicação (preferida) OU grupo do catálogo (banco) como fallback.
+    const grupoHomeDe = (s: ItemSimuladoCat): string | null => (s.pastaId ? topApp(s.pastaId) : null) ?? s.grupoId ?? null
+    const visualById = new Map<string, typeof grupos[number]>()
+    for (const g of grupos) visualById.set(g.id, g)
+    for (const f of appFolders) if (!visualById.has(f.id)) visualById.set(f.id, { id: f.id, nome: f.nome, cor: f.cor ?? null, icone: f.icone ?? null, capa: f.capa_url ?? null, capaCard: f.capa_card_url ?? null })
+    const progHome: Record<string, { total: number; done: number }> = {}
+    for (const s of itensHome) {
+      const gid = grupoHomeDe(s)
+      if (!gid || ocultarPastaDesafio.has(gid)) continue
+      const p = progHome[gid] ?? { total: 0, done: 0 }
+      p.total++; if (feitosSet.has(s.id)) p.done++
+      progHome[gid] = p
+    }
+    for (const [k, v] of Object.entries(progHome)) progresso[k] = v
+    pastasHome = (Object.keys(progHome).map((id) => visualById.get(id)).filter(Boolean) as typeof grupos)
+      .filter((g) => !ocultarPastaDesafio.has(g.id))
   }
 
   // Recentes: disponíveis/agendados que o aluno AINDA NÃO concluiu — os concluídos saem daqui e ficam
@@ -191,11 +229,13 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   const lancamento = (i: any) => new Date(i.regras?.publicado_em ?? i.created_at ?? 0).getTime()
   const recentes = itensCat
     .filter((i) => (i.podeFazer || i.emAndamento || i.statusLabel === 'Agendado') && (!feitosSet.has(i.id) || i.emAndamento))
+    .filter((i) => !(i.pastaId && ocultarRecenteDesafio.has(i.pastaId))) // desafio: só nos recentes se o admin ligar
     .sort((a, b) => lancamento(b) - lancamento(a))
     .slice(0, 5)
 
   // Banca PREDOMINANTE dos recentes (via questões → banca) — p/ a coluna "Banca" dos cards da Início.
-  const bancaPorSim = await resolverBancasSimulados(svc, sessao!.tenantId, recentes.map((i) => i.id))
+  // Banca predominante só alimenta a coluna "Banca" dos recentes (home) → pulada na visão de pasta.
+  const bancaPorSim = pasta ? new Map<string, string>() : await resolverBancasSimulados(svc, sessao!.tenantId, recentes.map((i) => i.id))
   const recentesEnriquecidos = recentes.map((i) => ({ ...i, banca: bancaPorSim.get(i.id) ?? '' }))
   // Banners de simulado (VITRINE): aparecem para TODOS os alunos com a QUANTIDADE de simulados da
   // pasta e a descrição — pra mostrar que há mais conteúdo. O bloqueio real acontece ao clicar
@@ -238,22 +278,29 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
       for (const s of rows) simByToken.set(s.embed_token, { ...s, vis: visB.get(s.id) ?? null, item: itemById.get(s.id) })
     }
 
-    // Pastas: capa/nome + CONTAGEM TENANT-WIDE de simulados (banco_base_id → banco → pasta-pai, ou a própria pasta).
+    // Pastas: capa/nome + CONTAGEM TENANT-WIDE de simulados (banco_base_id → banco → pasta-pai, ou a própria
+    // pasta). Tudo aqui é IGUAL p/ todos os alunos (config de banner + sims do tenant) → CACHE por tenant
+    // (120s). Sem isso, cada carregamento da Início fazia um fetchAll de TODOS os sims do tenant só p/ contar.
     const pastaIds = [...new Set(simBanners.map((b) => pastaDe(b.link as string)).filter(Boolean))] as string[]
-    const pastaRow = new Map<string, any>(); const pastaCount = new Map<string, number>()
-    if (pastaIds.length) {
-      // Pasta-alvo (id) + bancos-filhos (pai_id): 2 leituras independentes em simulado_pastas → paralelo.
-      const [pr, bancos] = await Promise.all([
-        svc.from('simulado_pastas').select('id, nome, cor, capa_url').in('id', pastaIds),
-        svc.from('simulado_pastas').select('id, pai_id').in('pai_id', pastaIds).then((r: any) => r.data ?? [], () => []),
-      ])
-      for (const p of (pr.data ?? []) as any[]) pastaRow.set(p.id, p)
-      const bancoToFolder = new Map<string, string>()
-      for (const f of pastaIds) bancoToFolder.set(f, f)
-      for (const bc of bancos as any[]) if (bc.pai_id) bancoToFolder.set(bc.id, bc.pai_id)
-      const simsT = await fetchAll<{ regras: any }>(() => svc.from('simulado_simulados').select('regras').eq('tenant_id', sessao!.tenantId).eq('deletado', false).eq('status', 'publicado').is('owner_estudante_id', null).order('id', { ascending: true }))
-      for (const s of simsT as any[]) { const bb = (s.regras as any)?.banco_base_id; const f = bb ? bancoToFolder.get(bb) : null; if (f) pastaCount.set(f, (pastaCount.get(f) ?? 0) + 1) }
-    }
+    const heroPastas = pastaIds.length
+      ? await remember(`aluno-home-hero-pastas:${sessao!.tenantId}:${[...pastaIds].sort().join(',')}`, 120, async (): Promise<{ rows: Record<string, any>; counts: Record<string, number> }> => {
+          const [pr, bancos] = await Promise.all([
+            svc.from('simulado_pastas').select('id, nome, cor, capa_url').in('id', pastaIds),
+            svc.from('simulado_pastas').select('id, pai_id').in('pai_id', pastaIds).then((r: any) => r.data ?? [], () => []),
+          ])
+          const rows: Record<string, any> = {}
+          for (const p of (pr.data ?? []) as any[]) rows[p.id] = p
+          const bancoToFolder = new Map<string, string>()
+          for (const f of pastaIds) bancoToFolder.set(f, f)
+          for (const bc of bancos as any[]) if (bc.pai_id) bancoToFolder.set(bc.id, bc.pai_id)
+          const simsT = await fetchAll<{ regras: any }>(() => svc.from('simulado_simulados').select('regras').eq('tenant_id', sessao!.tenantId).eq('deletado', false).eq('status', 'publicado').is('owner_estudante_id', null).order('id', { ascending: true }))
+          const counts: Record<string, number> = {}
+          for (const s of simsT as any[]) { const bb = (s.regras as any)?.banco_base_id; const f = bb ? bancoToFolder.get(bb) : null; if (f) counts[f] = (counts[f] ?? 0) + 1 }
+          return { rows, counts }
+        })
+      : { rows: {}, counts: {} }
+    const pastaRow = new Map<string, any>(Object.entries(heroPastas.rows))
+    const pastaCount = new Map<string, number>(Object.entries(heroPastas.counts))
 
     heroSims = simBanners.map((b): HeroSimSlide => {
       const tok = tokenDe(b.link as string)
@@ -396,21 +443,22 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
     )
   }
 
-  // Assistente/mascote (config do tenant) — usada no tour de novidades da gamificação.
-  const tenant = await getCurrentTenant()
+  // Assistente/mascote + config da gamificação (independentes) em paralelo.
+  const [tenant, gamConfig] = await Promise.all([getCurrentTenant(), getGamConfig(svc, sessao!.tenantId)])
   const assistente = ((tenant?.tema as any)?.assistente ?? {}) as { ativo?: boolean; nome?: string }
 
-  // Gamificação (hero + missões + calendário de sequência) — só quando o tenant ativou.
-  const gamConfig = await getGamConfig(svc, sessao!.tenantId)
   // gamAtivo é POR ALUNO (respeita o público 'selecionados' — grupos/alunos vinculados).
   const gamAtivo = await gamAtivaParaAluno(svc, sessao!.tenantId, estId, gamConfig)
+  // Gamificação (hero + missões + sequência + conquistas) = ~10 idas ao banco por carregamento da Início.
+  // CACHE por aluno com TTL CURTO (15s): deixa o ir-e-voltar entre pastas/Início instantâneo sem puxar o
+  // ledger de XP toda vez. Ação que dá XP leva > 15s (prova/quiz) → a Início volta a mostrar o valor fresco.
   const [gamResumo, gamMissoes, gamSemana, gamConquistas] = gamConfig && gamAtivo
-    ? await Promise.all([
+    ? await remember(`aluno-home-gam:${estId}`, 15, () => Promise.all([
         resumoGamificacao(svc, sessao!.tenantId, estId, gamConfig),
         missoesHoje(svc, sessao!.tenantId, estId, gamConfig),
         atividadeSemana(svc, sessao!.tenantId, estId, gamConfig.timezone),
         conquistasProgresso(svc, sessao!.tenantId, estId, gamConfig),
-      ])
+      ]))
     : [null, [], [], []]
 
   const chest = gamConfig?.xp_regras.chest
@@ -533,7 +581,7 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
             </div>
           )}
 
-          <SimuladosCatalogoAluno itens={itensCat} grupos={grupos} progresso={progresso} recentes={recentes} full={!gamResumo} recentesConcluidos={recentes.length === 0 && feitosSet.size > 0} view={cardView} />
+          <SimuladosCatalogoAluno itens={itensHome} grupos={grupos} progresso={progresso} recentes={recentes} full={!gamResumo} recentesConcluidos={recentes.length === 0 && feitosSet.size > 0} view={cardView} />
         </div>
 
         {/* ── Coluna direita: meta, sequência, missões, liga, conquistas ── */}

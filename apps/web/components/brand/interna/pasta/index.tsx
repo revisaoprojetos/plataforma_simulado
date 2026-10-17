@@ -18,6 +18,7 @@ import { ArrowLeft, Folder, FolderOpen, Play, RotateCcw, Clock, CalendarClock, C
 import { internaTokensStyle, INTERNA_FONT, type Brand, type InternaTheme } from '../interna-tokens'
 import { useTemaInterno } from '../use-tema-interno'
 import { CoverRev, CoverVnd, CoverMeq } from '../realizados/shared'
+import { BaixarCadernoBtn } from '../baixar-caderno-btn'
 import type { ItemSimuladoCat } from '@/components/aluno/simulados-catalogo-aluno'
 
 type PastaCat = { id: string; nome: string; cor: string | null; capa: string | null; count: number }
@@ -42,17 +43,6 @@ const FALLBACK_GRAD: Record<Brand, string> = {
   revisao: 'linear-gradient(135deg,#2A1E4A,#4A31B8)',
   vnd: 'linear-gradient(140deg,#062A1B,#16804F)',
   meq: 'linear-gradient(150deg,#121A3A,#2B4A8F)',
-}
-
-// Baixa o caderno de questões (PDF) direto, com cache-buster — sem navegar (idêntico ao card antigo).
-function baixarCaderno(url: string) {
-  const sep = url.includes('?') ? '&' : '?'
-  const a = document.createElement('a')
-  a.href = `${url}${sep}v=${Date.now()}`
-  a.rel = 'noopener'
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
 }
 
 // ---- bucket (MESMA lógica do catálogo antigo: agendados/disponiveis/refazer) ----
@@ -97,13 +87,13 @@ function BtnSecundario({ href, children }: { href: string; children: React.React
     </Link>
   )
 }
-// Download do caderno = botão COM TEXTO "Baixar" (igual ao dos recentes), ao lado da ação principal.
-function BtnCaderno({ url }: { url: string }) {
+// Download do caderno = botão COM TEXTO "Baixar" (igual ao dos recentes) → abre o pop-up de cadernos.
+function BtnCaderno({ item, brand }: { item: ItemSimuladoCat; brand: Brand }) {
   return (
-    <button type="button" onClick={() => baixarCaderno(url)} title="Baixar caderno de questões" aria-label="Baixar caderno de questões"
+    <BaixarCadernoBtn simuladoId={item.id} titulo={item.titulo} brand={brand}
       className="ip-btn-sec" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5, height: 38, padding: '0 11px', borderRadius: 11, background: 'var(--surface)', color: 'var(--ink)', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', cursor: 'pointer', border: '1px solid var(--line)', flexShrink: 0 }}>
       <FileDown size={14} />Baixar
-    </button>
+    </BaixarCadernoBtn>
   )
 }
 
@@ -150,7 +140,7 @@ function CardSimPoster({ brand, item }: { brand: Brand; item: ItemSimuladoCat })
           )}
           {(item.enunciadoUrl || feito) ? (
             <div style={{ display: 'flex', gap: 8 }}>
-              {item.enunciadoUrl ? <BtnCaderno url={item.enunciadoUrl} /> : null}
+              {item.enunciadoUrl ? <BtnCaderno item={item} brand={brand} /> : null}
               {feito ? (
                 <BtnSecundario href={`/aluno/simulados/${item.id}`}><CircleCheck size={15} /> Ver resultados</BtnSecundario>
               ) : null}
@@ -208,7 +198,7 @@ function CardSim({ brand, item }: { brand: Brand; item: ItemSimuladoCat }) {
               {item.statusLabel === 'Agendado' ? 'Ainda não abriu' : item.statusLabel === 'Em manutenção' ? 'Em manutenção' : 'Indisponível'}
             </span>
           )}
-          {item.enunciadoUrl ? <BtnCaderno url={item.enunciadoUrl} /> : null}
+          {item.enunciadoUrl ? <BtnCaderno item={item} brand={brand} /> : null}
         </div>
       </div>
     </div>
@@ -242,7 +232,7 @@ function CardAndamento({ brand, item, prog }: { brand: Brand; item: ItemSimulado
         </div>
         <div style={{ marginTop: 'auto', display: 'flex', gap: 8 }}>
           {fazerHref ? <BtnPrimario href={fazerHref}><RotateCcw size={15} /> Continuar</BtnPrimario> : <span style={{ flex: 1, minWidth: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: 38, borderRadius: 11, background: 'var(--surface2)', color: 'var(--muted)', fontSize: 12.5, fontWeight: 700 }}>Indisponível</span>}
-          {item.enunciadoUrl ? <BtnCaderno url={item.enunciadoUrl} /> : null}
+          {item.enunciadoUrl ? <BtnCaderno item={item} brand={brand} /> : null}
         </div>
       </div>
     </div>
@@ -275,22 +265,27 @@ function CardFeito({ brand, item, nota }: { brand: Brand; item: ItemSimuladoCat;
   )
 }
 
-function CardSubpasta({ sp }: { sp: PastaCat }) {
-  const grad = sp.cor || 'linear-gradient(150deg,#3C4458,#5B6478)'
+// Card de SUBPASTA — MESMA dimensão/organização do ticket de simulado (CardSim): capa à esquerda em
+// altura cheia (36%/150 no VND) + corpo à direita. Só o conteúdo muda (chip "Pasta" + nome + contagem).
+function CardSubpasta({ brand, sp }: { brand: Brand; sp: PastaCat }) {
+  const grad = sp.cor || FALLBACK_GRAD[brand]
   return (
-    <Link href={`/aluno?pasta=${sp.id}`} className="ip-card" style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', overflow: 'hidden', minHeight: 96, color: 'inherit', textDecoration: 'none' }}>
-      <div style={{ position: 'relative', width: 96, flexShrink: 0, overflow: 'hidden', background: sp.capa ? undefined : grad }}>
+    <Link href={`/aluno?pasta=${sp.id}`} className={brand === 'vnd' ? 'ip-card ip-vnd' : 'ip-card'} style={{ display: 'flex', background: 'var(--surface)', ...(brand === 'vnd' ? {} : { border: '1px solid var(--line)' }), borderRadius: 'var(--r)', overflow: 'hidden', minHeight: brand === 'vnd' ? 150 : 132, color: 'inherit', textDecoration: 'none' }}>
+      <div style={{ position: 'relative', width: brand === 'vnd' ? 150 : '36%', maxWidth: brand === 'vnd' ? 150 : 160, flexShrink: 0, overflow: 'hidden', background: sp.capa ? undefined : grad }}>
         {sp.capa ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={sp.capa} alt="" aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
-          <FolderOpen size={30} style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', color: 'rgba(255,255,255,.85)' }} />
+          <FolderOpen size={34} style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%,-50%)', color: 'rgba(255,255,255,.85)' }} />
         )}
       </div>
-      <div style={{ flex: 1, minWidth: 0, padding: '12px 14px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4 }}>
+      {brand === 'vnd' && <span aria-hidden className="ip-perf" />}
+      <div style={{ flex: 1, minWidth: 0, padding: '14px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 7 }}>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, width: 'fit-content', padding: '2px 8px', borderRadius: 7, background: 'var(--chip)', color: 'var(--brand)', fontSize: 9.5, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase' }}><Folder size={11} /> Pasta</span>
-        <b style={{ fontSize: 14, lineHeight: 1.25, color: 'var(--ink)', fontWeight: 800, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{sp.nome}</b>
-        <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{sp.count.toLocaleString('pt-BR')} simulado{sp.count !== 1 ? 's' : ''}</span>
+        <b style={{ fontSize: 14, lineHeight: 1.25, color: 'var(--ink)', fontWeight: 800, letterSpacing: '-0.01em', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{sp.nome}</b>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: 'var(--muted)' }}>
+          <FolderOpen size={13} style={{ flexShrink: 0 }} /> {sp.count.toLocaleString('pt-BR')} simulado{sp.count !== 1 ? 's' : ''}
+        </span>
       </div>
     </Link>
   )
@@ -377,11 +372,11 @@ export function PlatformPasta({ brand, theme, pastaInfo, subpastas, breadcrumb, 
           </div>
         </header>
 
-        {/* Subpastas (estilo Drive) */}
+        {/* Subpastas — MESMO grid/dimensão dos tickets de simulado (.ip-grid: 3 colunas, cards largos). */}
         {subpastas.length > 0 ? (
           <section style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 12 }}>
-              {subpastas.map((sp) => <CardSubpasta key={sp.id} sp={sp} />)}
+            <div className="ip-grid">
+              {subpastas.map((sp) => <CardSubpasta key={sp.id} brand={brand} sp={sp} />)}
             </div>
           </section>
         ) : null}

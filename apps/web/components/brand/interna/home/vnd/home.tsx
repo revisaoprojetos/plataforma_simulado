@@ -18,6 +18,7 @@ import { useCheckin } from '../use-checkin'
 import type { HomeData, InternaTheme } from '../types'
 import { internaTokensStyle } from '../../interna-tokens'
 import { useTemaInterno } from '../../use-tema-interno'
+import { BaixarCadernoBtn } from '../../baixar-caderno-btn'
 
 const VND_SVG =
   'M1.00 5.90L11.51 5.77Q12.20 5.76 12.53 6.13L21.21 15.98Q21.47 16.25 21.57 15.86L21.60 8.10C21.60 7.05 20.81 6.30 19.76 5.88L30.57 5.90Q31.00 5.91 30.74 6.33L23.18 14.49C22.26 15.55 21.80 16.65 21.73 18.23L21.67 25.45Q21.60 26.24 20.95 25.96L6.03 8.31C4.78 6.96 3.14 6.19 1.00 5.90Z'
@@ -777,7 +778,7 @@ function RecenteCard({ s, grad }: { s: HomeData['recentes'][number]; grad: strin
             <Play size={12} fill="currentColor" stroke="none" />{emAndamento ? 'Continuar' : s.status === 'Concluído' ? 'Refazer' : 'Fazer agora'}
           </a>
           {s.cadernoUrl && (
-            <a href={s.cadernoUrl} target="_blank" rel="noopener noreferrer" aria-label="Baixar caderno" title="Baixar caderno" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 40, padding: '0 13px', borderRadius: 12, border: '1px solid var(--line)', color: 'var(--ink)', background: 'var(--surface)', fontSize: 12.5, fontWeight: 700, flexShrink: 0 }}><FileDown size={15} />Baixar</a>
+            <BaixarCadernoBtn simuladoId={s.id} titulo={s.titulo} brand="vnd" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 40, padding: '0 13px', borderRadius: 12, border: '1px solid var(--line)', color: 'var(--ink)', background: 'var(--surface)', fontSize: 12.5, fontWeight: 700, flexShrink: 0 }}><FileDown size={15} />Baixar</BaixarCadernoBtn>
           )}
         </div>
       </div>

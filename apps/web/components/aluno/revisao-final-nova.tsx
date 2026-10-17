@@ -21,7 +21,7 @@ import {
   Bgfx, MarcaR, Ic, P as RIC, cardStyle, primaryBtnStyle, ghostBtnStyle, baseKeyframes,
   REV_GOLD, RAINBOW, OK, ERR, WARN,
 } from '@/components/brand/simulado/revisao/shared'
-import { Loader2 } from 'lucide-react'
+import { Loader2, CircleCheck, AlertTriangle } from 'lucide-react'
 
 const PFX = 'srfn'
 const LETRA = ['A', 'B', 'C', 'D', 'E', 'F']
@@ -67,8 +67,9 @@ interface Resultado {
   nota_liberada?: boolean
   caderno_liberado?: boolean
   aviso_gabarito?: { total: number; anuladas: number; trocas: number; ultima: string | null } | null
-  /** Maratona: número do corredor do aluno + se o desafio foi concluído (selo Finisher). Só em simulado de maratona. */
-  maratona?: { numero: number | null; concluido: boolean } | null
+  /** Maratona: número do corredor + se o desafio foi concluído (selo Finisher) + CHECK-IN desta etapa
+   *  (permanência mínima): `checkin` validado, `segMin` exigido e `dur` que o aluno ficou. Só em maratona. */
+  maratona?: { numero: number | null; concluido: boolean; checkin?: boolean; segMin?: number; dur?: number } | null
   questoes: QuestaoRev[]
 }
 
@@ -360,6 +361,30 @@ export function RevisaoFinalNova({
               )}
             </div>
           </div>
+
+          {/* MARATONA — CHECK-IN desta etapa: avisa se validou o tempo mínimo (selo/medalha) ou não. */}
+          {data.maratona && (data.maratona.segMin ?? 0) > 0 && (() => {
+            const seg = data.maratona.segMin ?? 0, dur = data.maratona.dur ?? 0, ok = !!data.maratona.checkin
+            const fmt = (s: number) => { const m = Math.round(s / 60); return m >= 60 ? `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}` : `${m}min` }
+            const cor = ok ? '#1FA868' : '#E0860A'
+            return (
+              <div style={cardStyle({ padding: 16 })}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: '50%', flexShrink: 0, background: `color-mix(in srgb, ${cor} 15%, transparent)`, color: cor }}>
+                    {ok ? <CircleCheck size={20} /> : <AlertTriangle size={20} />}
+                  </span>
+                  <div style={{ minWidth: 0 }}>
+                    <b style={{ display: 'block', fontSize: 14, color: 'var(--ink)' }}>{ok ? 'Check-in validado' : 'Check-in não validado'}</b>
+                    <span style={{ fontSize: 12.5, lineHeight: 1.5, color: 'var(--muted)' }}>
+                      {ok
+                        ? `Você permaneceu ${fmt(dur)} no simulado (mínimo ${fmt(seg)}). O selo e a medalha desta etapa estão garantidos.`
+                        : `Você concluiu em ${fmt(dur)}, mas o mínimo é ${fmt(seg)}. Só marcar as questões rápido não conta — refaça o simulado permanecendo pelo menos ${fmt(seg)} para ganhar o selo e a medalha desta etapa.`}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )
+          })()}
 
           {/* MARATONA — SELO do desafio (Finisher) quando TODOS os simulados foram concluídos. */}
           {data.maratona?.concluido && (

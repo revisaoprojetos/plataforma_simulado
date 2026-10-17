@@ -49,6 +49,10 @@ export type ConfigDesafioSim = MaratonaConfig & {
   inscritosAuto?: boolean
   /** Ordem + organização das etapas da maratona (ordem do array = sequência). */
   etapas?: EtapaMaratona[]
+  /** Visibilidade na HOME do aluno (default = OCULTO; o desafio vive na própria área). Quando ligado,
+   *  a PASTA do desafio aparece na área de Pastas e/ou os simulados dele aparecem nos Recentes. */
+  mostrarNasPastas?: boolean
+  mostrarNosRecentes?: boolean
 }
 
 export type ContagemDesafio = { simulados: number; inscritos: number }
