@@ -31,6 +31,8 @@ export function MaratonaCardDestaque({ config, estado, recolhidoInicial, feitos:
   }
   const toggle = () => { const n = !recolhido; setRecolhido(n); persistir({ recolhido: n }) }
   const abrirDesafio = () => { if (estado === 'aceitar') persistir({ iniciado: true }); start(() => router.push('/aluno/maratona')) }
+  // "Ver regulamento" abre a área da maratona já na aba REGULAMENTO (interna), não um link externo.
+  const abrirRegulamento = () => { if (estado === 'aceitar') persistir({ iniciado: true }); start(() => router.push('/aluno/maratona?aba=regulamento')) }
 
   const feitos = Math.max(0, Math.min(feitosProp, config.qtdSimulados))
   const segs = Array.from({ length: config.qtdSimulados })
@@ -89,7 +91,7 @@ export function MaratonaCardDestaque({ config, estado, recolhidoInicial, feitos:
                     {estado === 'continuar' ? 'Continuar desafio' : 'Aceitar desafio'}
                     <svg className="i" viewBox="0 0 24 24" aria-hidden="true" style={{ width: 15, height: 15 }}><path d="m9 18 6-6-6-6" /></svg>
                   </button>
-                  <a href={config.regulamentoUrl} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 46, padding: '0 18px', borderRadius: 13, border: '1px solid rgba(255,255,255,.28)', background: 'rgba(255,255,255,.06)', color: '#FFFFFF', fontSize: 13.5, fontWeight: 700, textDecoration: 'none' }}>Ver regulamento</a>
+                  <button type="button" onClick={abrirRegulamento} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 46, padding: '0 18px', borderRadius: 13, border: '1px solid rgba(255,255,255,.28)', background: 'rgba(255,255,255,.06)', color: '#FFFFFF', fontSize: 13.5, fontWeight: 700, cursor: 'pointer' }}>Ver regulamento</button>
                   <button type="button" onClick={toggle} className="mx-hide" aria-label="Ocultar desafio" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7, height: 46, padding: '0 16px', borderRadius: 13, border: 0, background: 'transparent', color: '#CFC4FF', font: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
                     <svg className="i" viewBox="0 0 24 24" aria-hidden="true" style={{ width: 15, height: 15 }}><path d="m6 15 6-6 6 6" /></svg>Ocultar
                   </button>

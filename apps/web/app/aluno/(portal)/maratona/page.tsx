@@ -14,7 +14,9 @@ export const dynamic = 'force-dynamic'
  * Gate: só Revisão, maratona lançada e aluno com acesso (Guru/Curseduca). Visitar = "iniciou" (o card
  * na Home passa a mostrar "Continuar"). As telas (Percurso/Painel/Ranking/Medalhas) são o porte do design.
  */
-export default async function MaratonaPage() {
+export default async function MaratonaPage({ searchParams }: { searchParams?: Promise<{ aba?: string }> }) {
+  const sp = (await searchParams) ?? {}
+  const abaInicial = sp.aba === 'regulamento' || sp.aba === 'percurso' || sp.aba === 'simulados' || sp.aba === 'ranking' || sp.aba === 'medalhas' ? sp.aba : undefined
   const sessao = await getSessaoAluno()
   if (!sessao) redirect('/aluno/entrar')
   const it = await resolverInterno()
@@ -37,5 +39,5 @@ export default async function MaratonaPage() {
     ? (jaCorreu ? await garantirNumeroCorredor(svc, sessao.tenantId, pastaId, sessao.estudanteId)
                 : await lerNumeroCorredor(svc, sessao.tenantId, pastaId, sessao.estudanteId))
     : null
-  return <MaratonaInterno theme={it.theme} capaUrl={config.capaUrl} regulamento={config.regulamento} progresso={progresso} ranking={ranking} meuId={sessao.estudanteId} simulados={simulados} tempoDecorrido={tempoDecorrido} numeroCorredor={numeroCorredor} />
+  return <MaratonaInterno theme={it.theme} capaUrl={config.capaUrl} regulamento={config.regulamento} progresso={progresso} ranking={ranking} meuId={sessao.estudanteId} simulados={simulados} tempoDecorrido={tempoDecorrido} numeroCorredor={numeroCorredor} abaInicial={abaInicial} />
 }

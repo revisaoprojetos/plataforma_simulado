@@ -53,8 +53,8 @@ const fmtNum = (n?: number | null) => (n && n > 0 ? String(n).padStart(4, '0') :
 // Segundos → duração curta "20min" / "1h 05min" (para o tempo mínimo da etapa).
 const fmtDurCurto = (seg?: number) => { const s = Math.max(0, Math.round(Number(seg) || 0)); const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), ss = s % 60; return [h ? `${h}h` : '', m ? `${m}min` : '', ss ? `${ss}s` : ''].filter(Boolean).join(' ') || '0s' }
 
-export function MaratonaInterno({ capaUrl, regulamento, progresso = 0, ranking, meuId, simulados, tempoDecorrido = 0, numeroCorredor = null }: { theme: InternaTheme; capaUrl?: string; regulamento?: RegulamentoConfig; progresso?: number; ranking?: RankingMaratona; meuId?: string; simulados?: (MaratonaSimuladoLink | null)[]; tempoDecorrido?: number; numeroCorredor?: number | null }) {
-  const [aba, setAba] = useState<Aba>('painel')
+export function MaratonaInterno({ capaUrl, regulamento, progresso = 0, ranking, meuId, simulados, tempoDecorrido = 0, numeroCorredor = null, abaInicial }: { theme: InternaTheme; capaUrl?: string; regulamento?: RegulamentoConfig; progresso?: number; ranking?: RankingMaratona; meuId?: string; simulados?: (MaratonaSimuladoLink | null)[]; tempoDecorrido?: number; numeroCorredor?: number | null; abaInicial?: Aba }) {
+  const [aba, setAba] = useState<Aba>(abaInicial ?? 'painel')
   const [simSel, setSimSel] = useState<number>(1) // simulado selecionado na aba "Simulados" (cur 1/2/3)
   const [simMenu, setSimMenu] = useState(false)   // dropdown do botão "Simulados" aberto?
   const [hoverSim, setHoverSim] = useState<number | null>(null)

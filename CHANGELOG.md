@@ -12,6 +12,13 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.19.5 — 2026-10-17
+
+**fix(maratona): "Ver regulamento" do card da Home abre a aba Regulamento interna (não um link externo)**
+
+- O botão era `<a href={config.regulamentoUrl}>` (vazio/externo). Agora navega para `/aluno/maratona?aba=regulamento`;
+  a página lê `?aba=` e abre o `MaratonaInterno` já na aba correta (`abaInicial`).
+
 ## 3.19.4 — 2026-10-17
 
 **fix(maratona): acesso por GRUPO não liberava o desafio + card da Home mostra a progressão real**
