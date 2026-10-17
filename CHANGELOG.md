@@ -12,6 +12,13 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.19.2 — 2026-10-17
+
+**fix(maratona): "Link direto" do admin (aba Acessos) levava à trilha de leitura — agora abre a maratona**
+
+- O `ModuloAcesso` (reusado da leitura) gerava `/aluno/leitura?modulo=<id>` também para a maratona. Nova área
+  `area="maratona"` → link vira **`/aluno/maratona`** (percurso/painel), rótulo "Link direto para a maratona".
+
 ## 3.19.1 — 2026-10-17
 
 **fix(maratona): ranking expunha o NOME COMPLETO do corredor — volta a mostrar só INICIAIS (privacidade)**

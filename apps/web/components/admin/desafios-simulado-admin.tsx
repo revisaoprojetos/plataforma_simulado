@@ -112,7 +112,7 @@ function DesafioInterno({ desafio, pastaId, rankingInicial, contagem, simulados,
         {aba === 'selos' && <AbaSelos pastaId={pastaId} selos={selos} simulados={simulados} />}
         {/* RANKING e ACESSOS: componentes REAIS da plataforma (mesmos do JurisClub), por pasta/módulo. */}
         {aba === 'ranking' && <RankingAdmin inicial={rankingInicial} moduloId={pastaId} moduloNome={`${desafio.titulo} ${desafio.destaque}`} loader={obterRankingMaratona} rotulos={{ aulas: 'Simulados' }} detalheAluno={false} />}
-        {aba === 'acessos' && <ModuloAcesso pastaId={pastaId} />}
+        {aba === 'acessos' && <ModuloAcesso pastaId={pastaId} area="maratona" />}
         {/* REGULAMENTO: mesma tela do Lei Seca (ModuloRegulamentoForm), gravando em desafio_jogo.config.regulamento. */}
         {aba === 'regulamento' && <ModuloRegulamentoForm key={pastaId} pastaId={pastaId} atual={desafio.regulamento ?? REGULAMENTO_PADRAO} salvar={salvarRegulamentoDesafio} />}
         {aba === 'config' && <AbaConfig pastaId={pastaId} inicial={desafio} contagem={contagem} />}
