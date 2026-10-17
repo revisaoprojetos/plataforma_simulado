@@ -12,6 +12,15 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.19.3 — 2026-10-17
+
+**fix(maratona): aba Medalhas reflete o estado REAL (conquistada×bloqueada) + remove texto fixo do ranking**
+
+- **Medalhas:** era 100% mock (todas douradas + fileira "bloqueado" fixa). Agora cada medalha de KM fica
+  **dourada (CONQUISTADA)** quando o aluno concluiu o simulado daquela parada, ou **cinza + cadeado
+  (BLOQUEADA)** caso contrário; contador "X de 4"; selo **Finisher** libera ao concluir os 3 simulados.
+- **Ranking:** removido o placeholder "Próxima atualização [segunda-feira, 10h]".
+
 ## 3.19.2 — 2026-10-17
 
 **fix(maratona): "Link direto" do admin (aba Acessos) levava à trilha de leitura — agora abre a maratona**

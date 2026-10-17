@@ -175,7 +175,7 @@ export function MaratonaInterno({ capaUrl, regulamento, progresso = 0, ranking, 
         {/* Aba Simulados: conteúdo = simulado de referência selecionado; PERCURSO = conclusão REAL (progresso). */}
         {aba === 'simulados' && <Painel onVerMapa={() => setAba('percurso')} onVerRanking={() => setAba('ranking')} onIrSimulado={escolherSim} cur={simSel} percursoCur={progresso} simulados={simulados} tempoDecorrido={tempoDecorrido} numero={numeroCorredor} abaSimulado />}
         {aba === 'ranking' && <Ranking ranking={ranking} meuId={meuId} simulados={simulados} />}
-        {aba === 'medalhas' && <div style={{ padding: '20px 24px 32px' }}><Medalhas /></div>}
+        {aba === 'medalhas' && <div style={{ padding: '20px 24px 32px' }}><Medalhas simulados={simulados} progresso={progresso} /></div>}
         {aba === 'regulamento' && <div style={{ padding: '20px 24px 32px' }}><Regulamento regulamento={regulamento} /></div>}
       </main>
     </div>
@@ -839,10 +839,6 @@ function Ranking({ ranking, meuId, simulados }: { ranking?: RankingMaratona; meu
               <h1 style={{ margin: 0, fontStretch: '125%', fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', fontSize: 52, lineHeight: 0.98 }}>{head.titulo}</h1>
               <p style={{ margin: 0, maxWidth: 560, fontSize: 15.5, lineHeight: 1.55, color: '#BCC8E0' }}>{head.resumo}</p>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <span style={{ fontFamily: MONO, fontSize: 13, color: '#BCC8E0' }}>Próxima atualização</span>
-              <span style={{ fontFamily: MONO, fontSize: 28, lineHeight: 1 }}>[segunda-feira, 10h]</span>
-            </div>
           </div>
         </div>
       </header>
@@ -960,7 +956,13 @@ const MEDALHAS_PC: { n: number; txt: string }[] = [
   { n: 4, txt: 'Simulado 3 · 31/10 · passagem PGFN' },
   { n: 5, txt: 'Simulado 3 · 31/10 · chegada' },
 ]
-function Medalhas() {
+// Medalha (índice em MEDALHAS_PC) → ÁREA de simulado (0..2). A 3ª e a 4ª (passagem/chegada) vêm do 3º simulado.
+const MEDAL_AREA = [0, 1, 2, 2]
+function Medalhas({ simulados, progresso = 0 }: { simulados?: (MaratonaSimuladoLink | null)[]; progresso?: number }) {
+  // Medalha de KM CONQUISTADA = o aluno CONCLUIU o simulado daquela parada. Finisher = concluiu os 3 (chegada).
+  const onMedalha = (i: number) => !!simulados?.[MEDAL_AREA[i] ?? 0]?.concluido
+  const finisher = progresso >= 3 || !!simulados?.[2]?.concluido
+  const qtd = MEDALHAS_PC.filter((_, i) => onMedalha(i)).length
   return (
     <div style={{ display: 'grid', gap: 24 }}>
       {/* Hero (texto sobre o fundo, como no protótipo) */}
@@ -969,50 +971,49 @@ function Medalhas() {
           <Kicker>Gamificação · medalhas de km</Kicker>
           <h1 style={{ margin: '10px 0 10px', fontStretch: '125%', fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', fontSize: 40, lineHeight: 1, color: INK_TX }}>Uma medalha a cada parada</h1>
           <p style={{ margin: 0, maxWidth: 820, fontSize: 14.5, lineHeight: 1.5, color: MUT }}>Três simulados, quatro medalhas. Partindo do Aeroporto: 17/10 chega à AGU (KM 21), 24/10 à PGF (KM 28) e 31/10 passa pela PGFN (KM 35) até a chegada no Ed. II da AGU (KM 42,195).</p>
+          <p style={{ margin: '8px 0 0', fontSize: 13, fontWeight: 700, color: INK_TX }}>{qtd} de {MEDALHAS_PC.length} medalhas conquistadas.</p>
         </div>
         <span style={{ display: 'inline-flex', alignItems: 'center', padding: '10px 18px', borderRadius: 999, background: NAVY, border: `2px solid ${GOLD}` }}>
           <img src="/maratona/logo-revisao.png" alt="Revisão Ensino Jurídico" style={{ height: 24, width: 'auto' }} />
         </span>
       </div>
 
-      {/* Medalhas conquistadas (showcase) — a 4ª (chegada) com fundo escuro */}
+      {/* Medalhas — estado REAL por parada: dourada (conquistada) ou cinza/bloqueada (até concluir o simulado). */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
         {MEDALHAS_PC.map((m, i) => {
+          const on = onMedalha(i)
           const dark = i === 3
           return (
-            <div key={m.n} style={{ background: dark ? NAVY : CARD, borderRadius: 16, padding: '24px 12px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, border: dark ? `1px solid ${NAVY}` : `1px solid ${LINE}` }}>
-              <img src={medalSrc(m.n, true)} alt="" style={{ width: '100%', maxWidth: 170, height: 'auto', objectFit: 'contain' }} />
+            <div key={m.n} style={{ position: 'relative', background: dark ? NAVY : CARD, borderRadius: 16, padding: '24px 12px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, border: `1px solid ${on ? (dark ? NAVY : LINE) : 'var(--mxi-line)'}`, ...(on ? {} : { opacity: 0.96 }) }}>
+              <div style={{ position: 'relative', width: '100%', maxWidth: 170 }}>
+                <img src={medalSrc(m.n, on)} alt="" style={{ width: '100%', height: 'auto', objectFit: 'contain', ...(on ? {} : { filter: 'grayscale(1) opacity(.7)' }) }} />
+                {!on && (
+                  <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: '50%', background: 'rgba(7,26,63,.72)', border: '2px solid rgba(255,255,255,.5)' }}><Lock size={18} color="#fff" /></span>
+                  </span>
+                )}
+              </div>
               <span style={{ fontFamily: MONO, fontSize: 13, textAlign: 'center', color: dark ? '#CBB8FF' : MUT }}>{m.txt}</span>
+              <span style={{ padding: '2px 10px', borderRadius: 999, fontSize: 10.5, fontWeight: 800, letterSpacing: '.5px', ...(on ? { background: GOLD, color: NAVY } : { background: 'var(--mxi-bg)', color: MUT, border: `1px solid ${LINE}` }) }}>{on ? 'CONQUISTADA' : 'BLOQUEADA'}</span>
             </div>
           )
         })}
       </div>
+      <span style={{ fontSize: 13, color: MUT }}>As medalhas cinza liberam assim que você <b style={{ color: INK_TX }}>concluir o simulado</b> daquela parada.</span>
 
-      {/* Estado bloqueado */}
-      <Card style={{ padding: '22px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'baseline', gap: 16 }}>
-          <Kicker>Estado bloqueado</Kicker>
-          <span style={{ fontSize: 14, color: MUT }}>Aparece até o corredor concluir o simulado do ponto.</span>
-        </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 16, justifyItems: 'center' }}>
-          {MEDALHAS_PC.map((m) => (
-            <img key={m.n} src={medalSrc(m.n, false)} alt="" style={{ width: '100%', maxWidth: 110, height: 'auto', objectFit: 'contain', opacity: 0.85 }} />
-          ))}
-        </div>
-      </Card>
-
-      {/* Selos (feature própria da maratona) — showcase dos dois selos em círculo, igual ao mockup:
-          Maratona (card claro) + Finisher (card escuro navy). */}
+      {/* Selos próprios da maratona: Maratona (na inscrição — já liberado p/ quem tem acesso) + Finisher (na chegada). */}
       <div style={{ display: 'grid', gap: 12 }}>
         <Kicker>Selo da maratona e selo finisher</Kicker>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
           {([
-            { img: 'selo-maratona.png', cap: 'Selo da Maratona · na inscrição', dark: false },
-            { img: 'selo-finisher-42k.png', cap: 'Selo Finisher · na chegada', dark: true },
+            { img: 'selo-maratona.png', cap: 'Selo da Maratona · na inscrição', dark: false, on: true },
+            { img: 'selo-finisher-42k.png', cap: 'Selo Finisher · na chegada', dark: true, on: finisher },
           ] as const).map((s) => (
-            <div key={s.img} style={{ background: s.dark ? NAVY : CARD, border: `1px solid ${s.dark ? NAVY : LINE}`, borderRadius: 16, padding: '30px 24px 22px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
-              <img src={`/maratona/${s.img}`} alt="" style={{ width: '100%', maxWidth: 300, aspectRatio: '1', objectFit: 'contain', filter: 'grayscale(1)', opacity: 0.45 }} />
-              <span style={{ fontFamily: MONO, fontSize: 13, letterSpacing: '.02em', textAlign: 'center', color: s.dark ? '#CBB8FF' : MUT }}>{s.cap}</span>
+            <div key={s.img} style={{ position: 'relative', background: s.dark ? NAVY : CARD, border: `1px solid ${s.dark ? NAVY : LINE}`, borderRadius: 16, padding: '30px 24px 22px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
+              <img src={`/maratona/${s.img}`} alt="" style={{ width: '100%', maxWidth: 300, aspectRatio: '1', objectFit: 'contain', ...(s.on ? {} : { filter: 'grayscale(1)', opacity: 0.45 }) }} />
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: MONO, fontSize: 13, letterSpacing: '.02em', textAlign: 'center', color: s.dark ? '#CBB8FF' : MUT }}>
+                {s.on ? <Medal size={15} color={GOLD} /> : <Lock size={14} />}{s.cap}
+              </span>
             </div>
           ))}
         </div>
