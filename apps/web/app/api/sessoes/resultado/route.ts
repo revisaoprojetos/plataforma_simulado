@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
     alunoInfo,
   ] = await Promise.all([
     supabase.from('simulado_sessoes_prova').select('estudante_id').eq('simulado_id', sessao.simulado_id).eq('is_teste', false).eq('status', 'finalizada').eq('deletado', false),
-    supabase.from('simulado_simulados').select('titulo, status, data_fim, regras, owner_estudante_id').eq('id', sessao.simulado_id).single(),
+    supabase.from('simulado_simulados').select('titulo, status, data_fim, regras, owner_estudante_id, pasta_id').eq('id', sessao.simulado_id).single(),
     (async (): Promise<string | null> => {
       if (!sessao.estudante_id) return null
       const { data } = await supabase.from('simulado_estudantes').select('classificacao').eq('id', sessao.estudante_id).maybeSingle()
@@ -257,7 +257,33 @@ export async function GET(request: NextRequest) {
     tempo = h > 0 ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}` : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
   }
 
+  // MARATONA: se o simulado pertence a um desafio (pasta folder_area='maratona'), expõe o NÚMERO do
+  // corredor do aluno + se a maratona foi CONCLUÍDA (todos os simulados feitos → selo Finisher).
+  let maratona: { numero: number | null; concluido: boolean } | null = null
+  const pastaIdSim = (simulado as any)?.pasta_id as string | null
+  if (pastaIdSim && sessao.estudante_id && sessao.tenant_id) {
+    try {
+      const { data: pastaRow } = await admin.from('simulado_pastas').select('folder_area').eq('id', pastaIdSim).eq('tenant_id', sessao.tenant_id).maybeSingle()
+      if ((pastaRow as any)?.folder_area === 'maratona') {
+        const [{ lerNumeroCorredor, garantirNumeroCorredor }, { carregarProgressoMaratona }] = await Promise.all([
+          import('@/lib/maratona/participacao'), import('@/lib/maratona/carregar'),
+        ])
+        const { count: totalSim } = await admin.from('simulado_simulados').select('*', { count: 'exact', head: true })
+          .eq('tenant_id', sessao.tenant_id).eq('pasta_id', pastaIdSim).eq('deletado', false).is('owner_estudante_id', null)
+        // Sessão finalizada = concluiu este simulado → GARANTE o número (idempotente, ordem de chegada).
+        const pegarNumero = sessao.status === 'finalizada' ? garantirNumeroCorredor : lerNumeroCorredor
+        const [numero, progresso] = await Promise.all([
+          pegarNumero(admin, sessao.tenant_id, pastaIdSim, sessao.estudante_id),
+          carregarProgressoMaratona(admin, sessao.tenant_id, sessao.estudante_id, pastaIdSim),
+        ])
+        const total = Math.min(totalSim ?? 0, 3)
+        maratona = { numero, concluido: total > 0 && progresso >= total }
+      }
+    } catch { /* best-effort: sem maratona */ }
+  }
+
   return NextResponse.json({
+    maratona,
     titulo: simulado?.titulo ?? 'Simulado',
     nota: sessao.nota ?? null,
     acertos,

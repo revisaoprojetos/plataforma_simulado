@@ -28,7 +28,7 @@ function isoParaInput(iso?: string | null): string {
 
 /** Pop-up de configuração TOTAL de um banner já criado (tipo, título, mensagem, imagem+recorte,
  *  link/destino, cor, ativo). Salva via atualizarBannerAction. */
-export function BannerEditModal({ banner, tenantId, destinos, desempenho, onToggleDesempenho, destaqueAtivoInicial = true, destaqueTextoInicial = '', fadeAtivoInicial = true, fadeNivelInicial = 100, popupEstiloInicial = 'classico', popupPontasInicial = 'arredondado', bannerTextoPosInicial = 'center', bannerTextoCorInicial = 'claro', bannerTextoTamInicial = 'medio', bannerTextoXInicial = null, bannerTextoYInicial = null, bannerOcultarTituloInicial = false, bannerOcultarMensagemInicial = false, agendaInicioInicial = '', agendaFimInicial = '', freqInicial = 'login', bannerAspect = { w: 1920, h: 500 }, onClose }: { banner: Banner; tenantId?: string; destinos?: DestinoBanner[]; desempenho?: boolean; onToggleDesempenho?: (v: boolean) => void; destaqueAtivoInicial?: boolean; destaqueTextoInicial?: string; fadeAtivoInicial?: boolean; fadeNivelInicial?: number; popupEstiloInicial?: PopupEstilo; popupPontasInicial?: PopupPontas; bannerTextoPosInicial?: BannerTextoPos; bannerTextoCorInicial?: BannerTextoCor; bannerTextoTamInicial?: BannerTextoTam; bannerTextoXInicial?: number | null; bannerTextoYInicial?: number | null; bannerOcultarTituloInicial?: boolean; bannerOcultarMensagemInicial?: boolean; agendaInicioInicial?: string; agendaFimInicial?: string; freqInicial?: 'login' | 'sempre' | 'uma_vez'; bannerAspect?: { w: number; h: number }; onClose: () => void }) {
+export function BannerEditModal({ banner, imagemOrigInicial = null, tenantId, destinos, desempenho, onToggleDesempenho, destaqueAtivoInicial = true, destaqueTextoInicial = '', fadeAtivoInicial = true, fadeNivelInicial = 100, popupEstiloInicial = 'classico', popupPontasInicial = 'arredondado', bannerTextoPosInicial = 'center', bannerTextoCorInicial = 'claro', bannerTextoTamInicial = 'medio', bannerTextoXInicial = null, bannerTextoYInicial = null, bannerOcultarTituloInicial = false, bannerOcultarMensagemInicial = false, agendaInicioInicial = '', agendaFimInicial = '', freqInicial = 'login', bannerAspect = { w: 1920, h: 500 }, onClose }: { banner: Banner; imagemOrigInicial?: string | null; tenantId?: string; destinos?: DestinoBanner[]; desempenho?: boolean; onToggleDesempenho?: (v: boolean) => void; destaqueAtivoInicial?: boolean; destaqueTextoInicial?: string; fadeAtivoInicial?: boolean; fadeNivelInicial?: number; popupEstiloInicial?: PopupEstilo; popupPontasInicial?: PopupPontas; bannerTextoPosInicial?: BannerTextoPos; bannerTextoCorInicial?: BannerTextoCor; bannerTextoTamInicial?: BannerTextoTam; bannerTextoXInicial?: number | null; bannerTextoYInicial?: number | null; bannerOcultarTituloInicial?: boolean; bannerOcultarMensagemInicial?: boolean; agendaInicioInicial?: string; agendaFimInicial?: string; freqInicial?: 'login' | 'sempre' | 'uma_vez'; bannerAspect?: { w: number; h: number }; onClose: () => void }) {
   const router = useRouter()
   const [pending, start] = useTransition()
   // Modo da UI: "simulado" é um destaque (hero) que aponta p/ um simulado/pasta. Detecta pelo banner.
@@ -40,6 +40,8 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
   const [titulo, setTitulo] = useState(banner.titulo ?? '')
   const [mensagem, setMensagem] = useState(banner.mensagem ?? '')
   const [imagem, setImagem] = useState(banner.imagem_url ?? '')
+  // Imagem ORIGINAL (inteira) p/ reabrir o recorte sem perda — persistida em tema.banner_destaques[id].imagemOrig.
+  const [imagemOrig, setImagemOrig] = useState<string>(imagemOrigInicial ?? '')
   const [link, setLink] = useState(banner.link ?? '')
   const [cor, setCor] = useState(banner.cor ?? '#6366f1')
   const [ativo, setAtivo] = useState(banner.ativo)
@@ -81,14 +83,14 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
       return
     }
     setEnviando(true)
-    try { const url = await fileToDataUrl(f); setCropSrc(url); setCropOpen(true) }
+    try { const url = await fileToDataUrl(f); setCropSrc(url); setImagemOrig(url); setCropOpen(true) }
     catch { toast.error('Falha ao ler a imagem.') }
     finally { setEnviando(false); if (fileRef.current) fileRef.current.value = '' }
   }
 
   function salvar() {
     start(async () => {
-      const r = await atualizarBannerAction(banner.id, { tipo, titulo, mensagem, imagem_url: imagem, link, cor, ativo, ordem: banner.ordem, destaqueAtivo, destaqueTexto, fadeAtivo, fadeNivel, ...(uiTipo === 'popup' ? { popupEstilo: estilo, popupPontas: pontas } : {}), ...(ehBanner ? { bannerTextoPos: bannerPos, bannerTextoCor: bannerCor, bannerTextoTam: bannerTam, bannerTextoX: Math.round(bannerX), bannerTextoY: Math.round(bannerY), bannerOcultarTitulo: ocultarTitulo, bannerOcultarMensagem: ocultarMensagem } : {}), agendaInicio: agendaIni ? new Date(agendaIni).toISOString() : '', agendaFim: agendaFim ? new Date(agendaFim).toISOString() : '', ...(uiTipo === 'popup' ? { freq } : {}) }, tenantId)
+      const r = await atualizarBannerAction(banner.id, { tipo, titulo, mensagem, imagem_url: imagem, imagemOrig: imagem ? (imagemOrig || imagem) : '', link, cor, ativo, ordem: banner.ordem, destaqueAtivo, destaqueTexto, fadeAtivo, fadeNivel, ...(uiTipo === 'popup' ? { popupEstilo: estilo, popupPontas: pontas } : {}), ...(ehBanner ? { bannerTextoPos: bannerPos, bannerTextoCor: bannerCor, bannerTextoTam: bannerTam, bannerTextoX: Math.round(bannerX), bannerTextoY: Math.round(bannerY), bannerOcultarTitulo: ocultarTitulo, bannerOcultarMensagem: ocultarMensagem } : {}), agendaInicio: agendaIni ? new Date(agendaIni).toISOString() : '', agendaFim: agendaFim ? new Date(agendaFim).toISOString() : '', ...(uiTipo === 'popup' ? { freq } : {}) }, tenantId)
       if (r.ok) { toast.success('Banner atualizado.'); router.refresh(); onClose() }
       else toast.error(r.error ?? 'Falha ao salvar.')
     })
@@ -207,8 +209,8 @@ export function BannerEditModal({ banner, tenantId, destinos, desempenho, onTogg
               </div>
               {imagem && (
                 <div className="flex items-center gap-3 text-xs">
-                  {tipo !== 'popup' && <button type="button" onClick={() => { setCropSrc(cropSrc || imagem); setCropOpen(true) }} className="inline-flex items-center gap-1 font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"><Crop className="h-3.5 w-3.5" /> Ajustar recorte</button>}
-                  <button type="button" onClick={() => setImagem('')} className="inline-flex items-center gap-1 font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"><X className="h-3.5 w-3.5" /> Remover imagem</button>
+                  {tipo !== 'popup' && <button type="button" onClick={() => { setCropSrc(imagemOrig || cropSrc || imagem); setCropOpen(true) }} className="inline-flex items-center gap-1 font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"><Crop className="h-3.5 w-3.5" /> Ajustar recorte</button>}
+                  <button type="button" onClick={() => { setImagem(''); setImagemOrig('') }} className="inline-flex items-center gap-1 font-medium text-muted-foreground underline-offset-2 hover:text-foreground hover:underline"><X className="h-3.5 w-3.5" /> Remover imagem</button>
                 </div>
               )}
               {cropOpen && cropSrc && <BannerCropper src={cropSrc} outW={bannerAspect.w} outH={bannerAspect.h} onApply={(d) => { setImagem(d); setCropOpen(false) }} onCancel={() => setCropOpen(false)} />}

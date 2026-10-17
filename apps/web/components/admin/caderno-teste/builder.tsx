@@ -209,6 +209,7 @@ function CadernoTesteBuilderBase({ cadernoId, builderInicial, bancos, questoesIn
         switch (tipo) {
           case 'cabecalho': return { ...it, ajustes: { ...it.ajustes, mostrarCabecalho: true } }
           case 'nome': return { ...it, ajustes: { ...it.ajustes, mostrarDadosAluno: true }, conteudo: { ...c, partesOcultas: most('nome') } }
+          case 'peito': return { ...it, ajustes: { ...it.ajustes, mostrarPeito: true }, conteudo: { ...c, partesOcultas: most('peito') } }
           case 'dados_card': return { ...it, conteudo: { ...c, dadosCard: true } }
           case 'nota': return { ...it, conteudo: { ...c, partesOcultas: most('nota') } }
           case 'texto': return { ...it, conteudo: { ...c, intro: [...c.intro, 'Novo parágrafo — clique na prévia para editar.'] } }

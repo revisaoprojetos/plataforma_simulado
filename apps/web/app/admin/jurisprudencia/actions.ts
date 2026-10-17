@@ -6,7 +6,7 @@ import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { criarPastaFolder } from '@/app/admin/banco-questoes/actions'
 import { criarDocumento } from '@/app/admin/leitura/actions'
-import { hospedarAudioBase64 } from '@/lib/storage/hospedar-base64'
+import { hospedarAudioBase64, hospedarBase64 } from '@/lib/storage/hospedar-base64'
 import type { DesafioJogo } from '@/lib/jurisprudencia/conteudo'
 import { carregarRankingJuris, invalidarRankingJuris } from '@/lib/jurisprudencia/ranking'
 import { carregarRelatorioJuris } from '@/lib/jurisprudencia/relatorio'
@@ -403,10 +403,16 @@ export async function salvarImagensDesafio(id: string, imagens: Record<string, a
   // MESCLA com as imagens já salvas (ticket/capa vêm da aba Config; selos/personagens da aba Medalhas)
   // para que uma aba não apague as chaves da outra.
   const svc = createAdminClient()
+  // base64 (data:image) → storage, para TODAS as chaves (inclui os *_orig não-destrutivos) — evita
+  // inflar o jsonb com imagens inteiras. '' limpa; URL passa direto.
+  const hosteadas: Record<string, any> = {}
+  for (const [k, v] of Object.entries(imagens && typeof imagens === 'object' ? imagens : {})) {
+    hosteadas[k] = (typeof v === 'string' && v.startsWith('data:image')) ? ((await hospedarBase64(v, svc)) ?? v) : v
+  }
   const atual = await lerJogoParaMerge(svc, g.tenantId, id)
   if (atual === null) return { ok: false, error: 'Desafio não encontrado.' }
   const base = atual.imagens && typeof atual.imagens === 'object' ? atual.imagens : {}
-  const mescladas = { ...base, ...(imagens && typeof imagens === 'object' ? imagens : {}) }
+  const mescladas = { ...base, ...hosteadas }
   return salvarMerge(g.tenantId, g.atorId, id, { imagens: mescladas })
 }
 

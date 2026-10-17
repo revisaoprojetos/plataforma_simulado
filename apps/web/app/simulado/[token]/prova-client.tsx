@@ -96,6 +96,19 @@ function useTimer(iniciado_em: string, tempo_limite_min: number | null) {
   return segundosRestantes
 }
 
+/** Cronômetro CRESCENTE (tempo decorrido desde o início da sessão), em segundos. Usado quando NÃO há
+ *  tempo limite — aí mostramos o tempo correndo pra cima em vez de uma contagem regressiva. */
+function useElapsed(iniciado_em: string) {
+  const [seg, setSeg] = useState(0)
+  useEffect(() => {
+    const calc = () => Math.max(0, Math.floor((Date.now() - new Date(iniciado_em).getTime()) / 1000))
+    setSeg(calc())
+    const interval = setInterval(() => setSeg(calc()), 1000)
+    return () => clearInterval(interval)
+  }, [iniciado_em])
+  return seg
+}
+
 function formatTime(segundos: number) {
   const h = Math.floor(segundos / 3600)
   const m = Math.floor((segundos % 3600) / 60)
@@ -257,6 +270,8 @@ export function ProvaClient({ token, hudInicial, darkInicial = false, internoAti
     sessao?.iniciado_em ?? new Date().toISOString(),
     sessao?.tempo_limite_min ?? null
   )
+  // Tempo DECORRIDO (crescente) — usado quando não há tempo limite, p/ mostrar o cronômetro correndo.
+  const segundosDecorridos = useElapsed(sessao?.iniciado_em ?? new Date().toISOString())
 
   // Pega mudanças no TEMPO LIMITE feitas durante a prova (ex.: admin muda 3h→5h) SEM recarregar:
   // consulta um endpoint leve ao trocar de questão e a cada 30s; atualiza o cronômetro se mudou.
@@ -703,8 +718,11 @@ export function ProvaClient({ token, hudInicial, darkInicial = false, internoAti
   // Drop-in do ProvaMeqLive (contrato idêntico ProvaMeqLiveProps); só o visual muda.
   // Todo o estado/handlers continuam neste ProvaClient; o componente é controlado.
   if (isRevisaoNova) {
-    const tempoLabel = segundosRestantes !== null ? formatTime(segundosRestantes) : null
+    // Com limite = contagem regressiva; SEM limite = cronômetro crescente (tempo decorrido).
     const tempoRegressivo = sessao.tempo_limite_min != null
+    const tempoLabel = tempoRegressivo
+      ? (segundosRestantes !== null ? formatTime(segundosRestantes) : null)
+      : formatTime(segundosDecorridos)
     return (
       <ProvaRevisaoLive
         theme={simTheme}

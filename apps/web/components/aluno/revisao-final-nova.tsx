@@ -67,6 +67,8 @@ interface Resultado {
   nota_liberada?: boolean
   caderno_liberado?: boolean
   aviso_gabarito?: { total: number; anuladas: number; trocas: number; ultima: string | null } | null
+  /** Maratona: número do corredor do aluno + se o desafio foi concluído (selo Finisher). Só em simulado de maratona. */
+  maratona?: { numero: number | null; concluido: boolean } | null
   questoes: QuestaoRev[]
 }
 
@@ -345,8 +347,34 @@ export function RevisaoFinalNova({
                   <PosTile label="Nota final" valor={cebraspe ? String(notaFinal) : `${media}%`} color="var(--brand)" />
                 </div>
               )}
+
+              {/* MARATONA — número de corredor do aluno (numeração que ele pegou na maratona). */}
+              {data.maratona && data.maratona.numero != null && (
+                <div style={{ marginTop: 14, display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 16, background: 'var(--surface2)', border: '1px solid var(--line)' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 60, height: 44, padding: '0 10px', borderRadius: 12, background: 'var(--chip)', color: 'var(--brand)', fontFamily: 'ui-monospace, monospace', fontWeight: 800, fontSize: 16, letterSpacing: '.02em' }}>Nº {String(data.maratona.numero).padStart(4, '0')}</span>
+                  <div style={{ minWidth: 0 }}>
+                    <b style={{ display: 'block', fontSize: 13.5, color: 'var(--ink)' }}>Maratona de Simulados</b>
+                    <span style={{ fontSize: 12, color: 'var(--muted)' }}>Seu número de corredor no desafio.</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
+
+          {/* MARATONA — SELO do desafio (Finisher) quando TODOS os simulados foram concluídos. */}
+          {data.maratona?.concluido && (
+            <div style={cardStyle({ padding: 20 })}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/maratona/selo-finisher-42k.png" alt="Selo Finisher da Maratona" style={{ width: 92, height: 92, objectFit: 'contain', flexShrink: 0 }} />
+                <div style={{ minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 10.5, fontWeight: 800, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--brand)' }}>Desafio concluído</span>
+                  <b style={{ display: 'block', fontSize: 18, color: 'var(--ink)', lineHeight: 1.2 }}>Selo Finisher · Maratona de Simulados</b>
+                  <span style={{ fontSize: 13, color: 'var(--muted)' }}>Você completou todos os simulados da maratona. O selo está no seu perfil.</span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* DOWNLOADS — "Como você fez" (sempre) + "Com gabarito" (quando liberado) */}
           <div style={cardStyle({ padding: 20 })}>

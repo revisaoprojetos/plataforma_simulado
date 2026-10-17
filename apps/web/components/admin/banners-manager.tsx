@@ -62,6 +62,7 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
   const [titulo, setTitulo] = useState('')
   const [mensagem, setMensagem] = useState('')
   const [imagem, setImagem] = useState('')
+  const [imagemOrig, setImagemOrig] = useState('') // original (inteira) p/ reabrir recorte sem perda
   const [link, setLink] = useState('')
   const [cor, setCor] = useState('#6366f1')
   const [destaqueAtivoN, setDestaqueAtivoN] = useState(true)
@@ -131,7 +132,7 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
       return
     }
     setEnviando(true)
-    try { const url = await fileToDataUrl(f); setCropSrc(url); setCropOpen(true) }
+    try { const url = await fileToDataUrl(f); setCropSrc(url); setImagemOrig(url); setCropOpen(true) }
     catch { toast.error('Falha ao ler a imagem.') }
     finally { setEnviando(false); if (fileRef.current) fileRef.current.value = '' }
   }
@@ -157,10 +158,10 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
     if (uiTipo !== 'simulado' && !titulo.trim() && !mensagem.trim() && !imagem.trim()) { toast.error('Preencha ao menos um título, mensagem ou imagem.'); return }
     setAlvo('novo')
     start(async () => {
-      const r = await criarBannerAction({ tipo, titulo, mensagem, imagem_url: imagem, link, cor, ativo: true, destaqueAtivo: destaqueAtivoN, destaqueTexto: destaqueTextoN, fadeAtivo: fadeAtivoN, fadeNivel: fadeNivelN }, tenantId)
+      const r = await criarBannerAction({ tipo, titulo, mensagem, imagem_url: imagem, imagemOrig: imagem ? (imagemOrig || imagem) : '', link, cor, ativo: true, destaqueAtivo: destaqueAtivoN, destaqueTexto: destaqueTextoN, fadeAtivo: fadeAtivoN, fadeNivel: fadeNivelN }, tenantId)
       setAlvo(null)
       if (!r.ok) { toast.error(r.error ?? 'Falha ao criar.'); return }
-      toast.success('Criado!'); setTitulo(''); setMensagem(''); setImagem(''); setLink(''); setDestaqueTextoN(''); setDestaqueAtivoN(true); setFadeAtivoN(true); setFadeNivelN(100); setCriando(false)
+      toast.success('Criado!'); setTitulo(''); setMensagem(''); setImagem(''); setImagemOrig(''); setLink(''); setDestaqueTextoN(''); setDestaqueAtivoN(true); setFadeAtivoN(true); setFadeNivelN(100); setCriando(false)
       router.refresh()
     })
   }
@@ -306,10 +307,10 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
               <img src={imagem} alt="" className={cn('w-full object-cover', tipo === 'popup' && 'h-20')} style={tipo === 'popup' ? undefined : { aspectRatio: `${bannerAspect.w}/${bannerAspect.h}` }} />
               <div className="absolute right-1.5 top-1.5 flex gap-1.5">
                 {tipo !== 'popup' && (
-                  <button type="button" onClick={() => { setCropSrc(cropSrc || imagem); setCropOpen(true) }} title="Ajustar área (recorte)"
+                  <button type="button" onClick={() => { setCropSrc(imagemOrig || cropSrc || imagem); setCropOpen(true) }} title="Ajustar área (recorte)"
                     className="flex h-6 w-6 items-center justify-center rounded-md bg-black/50 text-white transition hover:bg-black/70"><Crop className="h-3.5 w-3.5" /></button>
                 )}
-                <button type="button" onClick={() => setImagem('')} title="Remover imagem"
+                <button type="button" onClick={() => { setImagem(''); setImagemOrig('') }} title="Remover imagem"
                   className="flex h-6 w-6 items-center justify-center rounded-md bg-black/50 text-white transition hover:bg-black/70"><X className="h-3.5 w-3.5" /></button>
               </div>
             </div>
@@ -404,7 +405,7 @@ export function BannersManager({ banners, tenantId, destinos, desempenhoAtivo = 
         })}
       </div>
 
-      {editando && <BannerEditModal banner={editando} tenantId={tenantId} destinos={destinos} desempenho={desempenho} onToggleDesempenho={alternarDesempenho} destaqueAtivoInicial={destaques[editando.id]?.ativo !== false} destaqueTextoInicial={destaques[editando.id]?.texto ?? ''} fadeAtivoInicial={destaques[editando.id]?.fadeAtivo !== false} fadeNivelInicial={destaques[editando.id]?.fadeNivel ?? 100} popupEstiloInicial={destaques[editando.id]?.popupEstilo ?? 'classico'} popupPontasInicial={destaques[editando.id]?.popupPontas ?? 'arredondado'} bannerTextoPosInicial={destaques[editando.id]?.bannerTextoPos ?? 'center'} bannerTextoCorInicial={destaques[editando.id]?.bannerTextoCor ?? 'claro'} bannerTextoTamInicial={destaques[editando.id]?.bannerTextoTam ?? 'medio'} bannerTextoXInicial={(destaques[editando.id] as any)?.bannerTextoX ?? null} bannerTextoYInicial={(destaques[editando.id] as any)?.bannerTextoY ?? null} bannerOcultarTituloInicial={(destaques[editando.id] as any)?.bannerOcultarTitulo ?? false} bannerOcultarMensagemInicial={(destaques[editando.id] as any)?.bannerOcultarMensagem ?? false} agendaInicioInicial={(destaques[editando.id] as any)?.agendaInicio ?? ''} agendaFimInicial={(destaques[editando.id] as any)?.agendaFim ?? ''} freqInicial={(destaques[editando.id] as any)?.freq ?? 'login'} bannerAspect={bannerAspect} onClose={() => setEditando(null)} />}
+      {editando && <BannerEditModal banner={editando} imagemOrigInicial={(destaques[editando.id] as any)?.imagemOrig ?? null} tenantId={tenantId} destinos={destinos} desempenho={desempenho} onToggleDesempenho={alternarDesempenho} destaqueAtivoInicial={destaques[editando.id]?.ativo !== false} destaqueTextoInicial={destaques[editando.id]?.texto ?? ''} fadeAtivoInicial={destaques[editando.id]?.fadeAtivo !== false} fadeNivelInicial={destaques[editando.id]?.fadeNivel ?? 100} popupEstiloInicial={destaques[editando.id]?.popupEstilo ?? 'classico'} popupPontasInicial={destaques[editando.id]?.popupPontas ?? 'arredondado'} bannerTextoPosInicial={destaques[editando.id]?.bannerTextoPos ?? 'center'} bannerTextoCorInicial={destaques[editando.id]?.bannerTextoCor ?? 'claro'} bannerTextoTamInicial={destaques[editando.id]?.bannerTextoTam ?? 'medio'} bannerTextoXInicial={(destaques[editando.id] as any)?.bannerTextoX ?? null} bannerTextoYInicial={(destaques[editando.id] as any)?.bannerTextoY ?? null} bannerOcultarTituloInicial={(destaques[editando.id] as any)?.bannerOcultarTitulo ?? false} bannerOcultarMensagemInicial={(destaques[editando.id] as any)?.bannerOcultarMensagem ?? false} agendaInicioInicial={(destaques[editando.id] as any)?.agendaInicio ?? ''} agendaFimInicial={(destaques[editando.id] as any)?.agendaFim ?? ''} freqInicial={(destaques[editando.id] as any)?.freq ?? 'login'} bannerAspect={bannerAspect} onClose={() => setEditando(null)} />}
     </div>
   )
 }

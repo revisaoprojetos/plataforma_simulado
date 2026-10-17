@@ -325,16 +325,18 @@ function revisarMiniStyle(on: boolean): React.CSSProperties {
 
 function Navegador({ N, qi, respostas, flags, onGo, cols, cell }: { N: number; qi: number; respostas: Record<number, string | null>; flags: Record<number, boolean>; onGo: (n: number) => void; cols: number; cell: number }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols},1fr)`, gap: 6 }}>
+    // padding dá folga p/ o halo da célula ATIVA não ser cortado pela borda do card nas laterais.
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols},1fr)`, gap: 7, padding: 4 }}>
       {Array.from({ length: N }, (_, i) => i + 1).map((n) => {
         const cur = n === qi
         const ans = !!respostas[n]
         const fl = !!flags[n]
         const bg = cur ? 'var(--selDot)' : ans ? 'var(--nAns)' : 'var(--surface2)'
         const col = cur ? '#fff' : ans ? 'var(--nAnsInk)' : 'var(--muted)'
-        const ring = cur ? '0 0 0 3px var(--surface), 0 0 0 5px var(--selDot)' : fl ? 'inset 0 0 0 2px var(--flag)' : 'none'
+        const ring = cur ? '0 0 0 2px var(--surface), 0 0 0 4px var(--selDot)' : fl ? 'inset 0 0 0 2px var(--flag)' : 'none'
         return (
-          <button key={n} type="button" onClick={() => onGo(n)} style={{ position: 'relative', height: cell, border: 0, borderRadius: 9, background: bg, color: col, boxShadow: ring, font: 'inherit', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', transition: 'background .2s' }}>
+          // zIndex no ATIVO: o halo (box-shadow) pinta POR CIMA das vizinhas → não fica recortado nos lados.
+          <button key={n} type="button" onClick={() => onGo(n)} style={{ position: 'relative', zIndex: cur ? 1 : undefined, height: cell, border: 0, borderRadius: 9, background: bg, color: col, boxShadow: ring, font: 'inherit', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', transition: 'background .2s' }}>
             {n}
             {fl && <span style={{ position: 'absolute', right: 3, top: 3, width: 6, height: 6, borderRadius: '50%', background: 'var(--flag)' }} />}
           </button>

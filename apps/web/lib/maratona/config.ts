@@ -2,6 +2,8 @@
 // FASE 1 (interface): dados MOCK fiéis ao design. FASE 2 (depois): virá do admin/cadastro.
 // O card de entrada (Home do Revisão) e a área interna (percurso/painel/ranking/medalhas) consomem isto.
 
+import type { RegulamentoConfig } from '@/lib/leitura/regulamento'
+
 export interface MaratonaConfig {
   id: string
   titulo: string
@@ -18,6 +20,8 @@ export interface MaratonaConfig {
   recompensa: { xp: number; extra?: string }
   inscritos: number
   regulamentoUrl: string
+  /** Aba "Regulamento" do desafio (igual ao Lei Seca): PDF + vídeo + descrição. Opcional (default = inativo). */
+  regulamento?: RegulamentoConfig
 }
 
 /** Dados do desafio em destaque (mock do design `desafio-maratona`). */

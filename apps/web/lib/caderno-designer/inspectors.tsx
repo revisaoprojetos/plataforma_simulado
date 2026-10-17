@@ -852,6 +852,18 @@ export function BlockInspector({ block, onChange, varsExtra, gruposBanco, assunt
           <Faixa label="Largura da linha (px)" min={100} max={400} value={a.larguraLinha ?? 220} onChange={(v) => set('larguraLinha', v)} />
         </div>
       )
+    case 'peito':
+      return (
+        <div className="space-y-3">
+          <Row label="Rótulo"><input value={a.rotulo ?? ''} onChange={(e) => set('rotulo', e.target.value)} placeholder="Nº DE PEITO:" className={inputCls} /></Row>
+          <Cor label="Fundo do rótulo" value={a.corRotulo} onChange={(v) => set('corRotulo', v)} />
+          <Cor label="Texto do rótulo" value={a.corTextoRotulo} onChange={(v) => set('corTextoRotulo', v)} />
+          <Cor label="Fundo do número" value={a.corValor} onChange={(v) => set('corValor', v)} />
+          <Cor label="Cor do número" value={a.corTextoValor} onChange={(v) => set('corTextoValor', v)} />
+          <Faixa label="Arredondar bordas (px)" min={0} max={20} value={a.bordaRaio ?? 0} onChange={(v) => set('bordaRaio', v)} />
+          <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">O número vem do <b>Nº de peito do aluno</b> (variável <code>{'{{numero_peito}}'}</code>), definido ao finalizar o simulado. No editor aparece <code>[0000]</code>.</p>
+        </div>
+      )
     case 'quebra-pagina':
       return <p className="rounded-md border border-primary/20 bg-primary/5 px-2 py-1.5 text-xs text-muted-foreground">Força o conteúdo seguinte a começar numa nova página na impressão/PDF. O marcador tracejado não aparece no PDF.</p>
     default:

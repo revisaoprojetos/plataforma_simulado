@@ -23,8 +23,10 @@ export function camposDoBloco(item: ItemCaderno, parte: string, nomeFallback?: s
   if (parte === 'diag_cab_sub') return [{ id: 'subtitulo', label: 'Texto', valor: c.subtitulo, multiline: true }]
   if (parte === 'diag_nome_rot') return [{ id: 'rotuloNome', label: 'Texto', valor: c.rotuloNome ?? 'NOME:' }]
   if (parte === 'diag_nome_val') return [{ id: 'nomeTexto', label: 'Texto', valor: c.nomeTexto ?? '{nome}', placeholder: '{nome}' }]
+  if (parte === 'diag_peito_rot') return [{ id: 'rotuloPeito', label: 'Texto', valor: c.rotuloPeito ?? 'Nº DE PEITO:' }]
+  if (parte === 'diag_peito_val') return [{ id: 'peitoTexto', label: 'Texto', valor: c.peitoTexto ?? '{numero_peito}', placeholder: '{numero_peito}' }]
   if (parte === 'diag_nota_num') return [{ id: 'notaTotal', label: 'Total (denominador)', valor: c.notaTotal }]
-  if (parte === 'diag_nota_faixa') return [{ id: 'notaTexto', label: 'Texto da nota', valor: c.notaTexto, multiline: true }]
+  if (parte === 'diag_nota_faixa') return [{ id: 'notaTexto', label: 'Texto da nota', valor: c.notaTexto, multiline: true }, { id: 'notaDescricao', label: 'Descrição (2ª linha)', valor: c.notaDescricao ?? '', multiline: true, placeholder: 'ex.: Medalha conquistada: KM 21 · AGU' }]
   if (parte.startsWith('intro:')) { const i = Number(parte.slice('intro:'.length)); if (c.intro[i] == null) return []; return [{ id: 'intro', label: 'Parágrafo', valor: c.intro[i], multiline: true }] }
   if (parte.startsWith('fechamento:')) { const i = Number(parte.slice('fechamento:'.length)); if (c.fechamento?.[i] == null) return []; return [{ id: 'fechamento', label: 'Parágrafo', valor: c.fechamento[i], multiline: true }] }
   if (parte.startsWith('gabIntro:')) { const i = Number(parte.slice('gabIntro:'.length)); if (c.gabaritoIntro[i] == null) return []; return [{ id: 'texto', label: 'Parágrafo', valor: c.gabaritoIntro[i], multiline: true }] }
@@ -130,8 +132,10 @@ export function aplicarCampoBloco(conteudo: DiagConteudo | undefined, parte: str
   else if (parte === 'diag_cab_sub') { if (campoId === 'subtitulo') c.subtitulo = valor }
   else if (parte === 'diag_nome_rot') { if (campoId === 'rotuloNome') c.rotuloNome = valor }
   else if (parte === 'diag_nome_val') { if (campoId === 'nomeTexto') c.nomeTexto = valor }
+  else if (parte === 'diag_peito_rot') { if (campoId === 'rotuloPeito') c.rotuloPeito = valor }
+  else if (parte === 'diag_peito_val') { if (campoId === 'peitoTexto') c.peitoTexto = valor }
   else if (parte === 'diag_nota_num') { if (campoId === 'notaTotal') c.notaTotal = valor }
-  else if (parte === 'diag_nota_faixa') { if (campoId === 'notaTexto') c.notaTexto = valor }
+  else if (parte === 'diag_nota_faixa') { if (campoId === 'notaTexto') c.notaTexto = valor; else if (campoId === 'notaDescricao') c.notaDescricao = valor }
   else if (parte.startsWith('intro:')) { const i = Number(parte.slice('intro:'.length)); if (c.intro[i] != null) c.intro[i] = valor }
   else if (parte.startsWith('fechamento:')) { const i = Number(parte.slice('fechamento:'.length)); if (c.fechamento?.[i] != null) c.fechamento[i] = valor }
   else if (parte.startsWith('gabIntro:')) { const i = Number(parte.slice('gabIntro:'.length)); if (c.gabaritoIntro[i] != null) c.gabaritoIntro[i] = valor }

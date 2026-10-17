@@ -45,16 +45,17 @@ export default async function SimuladosPage({ searchParams }: { searchParams: Pr
     const { normalizarPontuacaoLeitura } = await import('@/lib/leitura/pontuacao')
     const rankingInicial = { itens: [], gamAtivo: false, pontuacao: normalizarPontuacaoLeitura(null) }
     const { lerConfigMaratona, contarDesafio, listarSimuladosDesafio, listarSimuladosForaDesafio, carregarSelosDesafio } = await import('./desafios-actions')
-    const [config, contagem, simuladosDesafio, simuladosFora, selos] = await Promise.all([
+    const { carregarDestinosSimulados } = await import('./actions')
+    const [config, contagem, simuladosDesafio, simuladosFora, selos, destinosDesafio] = await Promise.all([
       lerConfigMaratona(desafioParam), contarDesafio(desafioParam),
       listarSimuladosDesafio(desafioParam), listarSimuladosForaDesafio(desafioParam),
-      carregarSelosDesafio(desafioParam),
+      carregarSelosDesafio(desafioParam), carregarDestinosSimulados(),
     ])
     const hhD = await headers()
     const hostD = hhD.get('x-forwarded-host') || hhD.get('host') || ''
     const protoD = hhD.get('x-forwarded-proto') || (hostD.includes('localhost') || hostD.includes('127.0.0.1') ? 'http' : 'https')
     const appUrlD = hostD ? `${protoD}://${hostD}` : (process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000')
-    return <div className="space-y-4"><DesafiosSimuladoAdmin desafioId={desafioParam} maratonaId={desafioParam} rankingInicial={rankingInicial} config={config} contagem={contagem} simuladosDesafio={simuladosDesafio} simuladosFora={simuladosFora} appUrl={appUrlD} selos={selos} /></div>
+    return <div className="space-y-4"><DesafiosSimuladoAdmin desafioId={desafioParam} maratonaId={desafioParam} rankingInicial={rankingInicial} config={config} contagem={contagem} simuladosDesafio={simuladosDesafio} simuladosFora={simuladosFora} appUrl={appUrlD} selos={selos} destinos={destinosDesafio} /></div>
   }
   // Href do "voltar" (seta <) do header: SOBE um nível de verdade — pasta pai da atual, ou raiz. Assim não
   // depende do histórico (que voltaria pro simulado de onde o admin veio). Consulta única e barata por PK.
@@ -71,11 +72,13 @@ export default async function SimuladosPage({ searchParams }: { searchParams: Pr
   // Aba DESAFIOS (lista): resolve a pasta real do desafio (p/ o card linkar com o id real) + ranking vazio.
   let maratonaId = ''
   let rankingVazioDesafio: any = null
+  let listaDesafioConfig: any = undefined
   if (abaDesafios) {
     const { normalizarPontuacaoLeitura } = await import('@/lib/leitura/pontuacao')
     rankingVazioDesafio = { itens: [], gamAtivo: false, pontuacao: normalizarPontuacaoLeitura(null) }
-    const { garantirDesafioMaratona } = await import('./desafios-actions')
+    const { garantirDesafioMaratona, lerConfigMaratona } = await import('./desafios-actions')
     maratonaId = (await garantirDesafioMaratona()).id ?? ''
+    if (maratonaId) listaDesafioConfig = await lerConfigMaratona(maratonaId) // capa/título REAIS no card da lista
   }
   return (
     <div className="space-y-5">
@@ -111,7 +114,7 @@ export default async function SimuladosPage({ searchParams }: { searchParams: Pr
       </div>
 
       {abaDesafios ? (
-        <DesafiosSimuladoAdmin desafioId={null} maratonaId={maratonaId} rankingInicial={rankingVazioDesafio} />
+        <DesafiosSimuladoAdmin desafioId={null} maratonaId={maratonaId} rankingInicial={rankingVazioDesafio} config={listaDesafioConfig} />
       ) : (
         /* O shell (título + botão) aparece na hora; o board (leituras pesadas) entra por streaming. */
         <Suspense key={pastaParam ?? 'raiz'} fallback={<BoardSkeleton />}>
@@ -138,8 +141,8 @@ async function BoardData({ pastaParam }: { pastaParam?: string }) {
   const tenantId = await getCurrentTenantId()
   const tid = tenantId ?? '00000000-0000-0000-0000-000000000000'
 
-  // Simulados + pastas (Aplicação) + bancos + flag ocultar-discursiva em PARALELO (independentes).
-  const [simulados, folders, bancos, ocultarDiscursiva] = await Promise.all([
+  // Simulados + pastas (Aplicação) + bancos + flag ocultar-discursiva + desafios em PARALELO (independentes).
+  const [simulados, folders, bancos, ocultarDiscursiva, desafios] = await Promise.all([
     // Simulados (tolerante à coluna pasta_id ausente). owner_estudante_id IS NULL: só OFICIAIS
     // (os do construtor pessoal do aluno ficam de fora). fetchAll: tenant com >1000 não trunca.
     (async (): Promise<any[]> => {
@@ -159,7 +162,8 @@ async function BoardData({ pastaParam }: { pastaParam?: string }) {
     // Pastas da Aplicação de Simulado (is_folder + folder_area='simulado'), tolerante a colunas ausentes.
     (async (): Promise<any[]> => {
       const selP = (cols: string) => supabase.from('simulado_pastas').select(cols).eq('deletado', false).eq('tenant_id', tid).order('nome')
-      let r: { data: any[] | null; error: { message: string } | null } = await selP('id, nome, cor, icone, capa_url, capa_card_url, is_folder, folder_area, pai_id')
+      let r: { data: any[] | null; error: { message: string } | null } = await selP('id, nome, cor, icone, capa_url, capa_card_url, capa_meta, is_folder, folder_area, pai_id')
+      if (r.error) r = await selP('id, nome, cor, icone, capa_url, capa_card_url, is_folder, folder_area, pai_id')
       if (r.error) r = await selP('id, nome, cor, icone, capa_url, is_folder, folder_area, pai_id')
       if (r.error) r = await selP('id, nome, cor, icone, capa_url, is_folder, folder_area')
       return r.error ? [] : (r.data ?? []).filter((p: any) => p.is_folder && p.folder_area === 'simulado')
@@ -172,6 +176,16 @@ async function BoardData({ pastaParam }: { pastaParam?: string }) {
       return (r.data ?? []).filter((p: any) => ehPastaBanco(p.folder_area))
     })(),
     getOcultarDiscursiva(),
+    // Desafios (pastas folder_area='maratona') — destino de mover/copiar simulados. Tolerante.
+    (async (): Promise<any[]> => {
+      const selD = (cols: string) => supabase.from('simulado_pastas').select(cols).eq('deletado', false).eq('tenant_id', tid).eq('folder_area', 'maratona').order('nome')
+      // IMPORTANTE: a capa do desafio vive em desafio_jogo.config.capaUrl → o fallback SEMPRE mantém desafio_jogo.
+      let r: { data: any[] | null; error: { message: string } | null } = await selD('id, nome, cor, icone, capa_url, capa_card_url, desafio_jogo')
+      if (r.error) r = await selD('id, nome, cor, icone, capa_url, desafio_jogo')
+      if (r.error) r = await selD('id, nome, desafio_jogo')
+      if (r.error) r = await selD('id, nome')
+      return r.error ? [] : (r.data ?? [])
+    })(),
   ])
   const bancoById = new Map<string, any>(bancos.map((b) => [b.id, b]))
   // Pasta (is_folder) que contém o banco do simulado — é a fileira do catálogo (null = avulso).
@@ -254,8 +268,13 @@ async function BoardData({ pastaParam }: { pastaParam?: string }) {
   // Fade lateral POR PASTA (tema.card_fade_pastas[id]) — getCurrentTenant é memoizado (sem 2ª query).
   const cardFadePastas = (((await getCurrentTenant())?.tema as any)?.card_fade_pastas ?? {}) as Record<string, { ativo?: boolean; cor?: string | null }>
   // `capa` = pôster (card 4:5, prefere capa_card_url); `capaLarga` = banner (capa_url) usado no card ticket.
-  const foldersOut = foldersNivel.map((f) => ({ id: f.id, nome: f.nome, cor: f.cor ?? null, icone: f.icone ?? null, capa: capa(f), capaLarga: f.capa_url ?? null, count: contRec(f.id), cardFade: cardFadePastas[f.id] ?? null }))
-  const destinos = folders.map((f) => ({ id: f.id, nome: f.nome }))
+  // Enquadramento não-destrutivo do card da pasta (capa_meta.card = orig + poster/ticket) → CapaCard.
+  const foldersOut = foldersNivel.map((f) => ({ id: f.id, nome: f.nome, cor: f.cor ?? null, icone: f.icone ?? null, capa: capa(f), capaLarga: f.capa_url ?? null, count: contRec(f.id), cardFade: cardFadePastas[f.id] ?? null, orig: (f.capa_meta?.card?.orig ?? capa(f)) ?? null, cfgPoster: f.capa_meta?.card?.poster ?? null, cfgTicket: f.capa_meta?.card?.ticket ?? null }))
+  // A capa da pasta é SÓ a dela (capa_card_url/capa_url); sem capa → placeholder (não empresta de simulado).
+  const destinos = [
+    ...folders.map((f) => ({ id: f.id, nome: f.nome, tipo: 'pasta' as const, capa: f.capa_card_url ?? f.capa_url ?? null, cor: f.cor ?? null, icone: f.icone ?? null, paiId: f.pai_id ?? null })),
+    ...desafios.map((d) => ({ id: d.id, nome: d.nome, tipo: 'desafio' as const, capa: d.desafio_jogo?.config?.capaUrl ?? d.capa_card_url ?? d.capa_url ?? null, cor: d.cor ?? null, icone: d.icone ?? null, paiId: null })),
+  ]
 
   // Catálogo (view horizontal estilo Netflix): simulados agrupados pela PASTA DO BANCO de simulado
   // (o "grupo" no Banco de Simulado). Só entram no catálogo os que têm grupo; os avulsos ficam à parte.

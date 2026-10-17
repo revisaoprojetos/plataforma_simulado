@@ -171,6 +171,8 @@ export function JurisConfigForm({ desafioId, nome, config, materias, final, imag
 
   // --- Imagens ---
   const [imgs, setImgs] = useState<Record<string, string>>({ ticket: imagens?.ticket ?? '', capa: imagens?.capa ?? '', fundo: imagens?.fundo ?? '' })
+  // Imagem ORIGINAL (inteira) por slot — p/ reenquadrar sem perda (reabre o cropper do original).
+  const [imgsOrig, setImgsOrig] = useState<Record<string, string>>({ ticket: imagens?.ticket_orig ?? '', capa: imagens?.capa_orig ?? '', fundo: imagens?.fundo_orig ?? '' })
   const [pendImg, startImg] = useTransition()
   const [cropSlot, setCropSlot] = useState<SlotKey | null>(null)
   const ticketRef = useRef<HTMLInputElement>(null)
@@ -180,13 +182,15 @@ export function JurisConfigForm({ desafioId, nome, config, materias, final, imag
   function enviarImagem(k: SlotKey, file: File | null | undefined) {
     if (!file) return
     if (!file.type.startsWith('image/')) { toast.error('Selecione uma imagem.'); return }
-    const r = new FileReader(); r.onload = () => setImgs((s) => ({ ...s, [k]: String(r.result) })); r.readAsDataURL(file)
+    // Guarda o ORIGINAL (inteiro) + mostra ele até enquadrar — reenquadrar depois usa o original.
+    const r = new FileReader(); r.onload = () => { const full = String(r.result); setImgs((s) => ({ ...s, [k]: full })); setImgsOrig((s) => ({ ...s, [k]: full })) }; r.readAsDataURL(file)
   }
   async function aplicarEnquadramento(crop: { x: number; y: number; w: number; h: number }) {
     const slot = cropSlot; if (!slot) return
     const cfg = SLOTS.find((s) => s.k === slot)!
     try {
-      const out = await rasterizarCrop(imgs[slot], crop, cfg.maxW, cfg.maxH)
+      // Recorta SEMPRE do original (não do recorte anterior) → não-destrutivo.
+      const out = await rasterizarCrop(imgsOrig[slot] || imgs[slot], crop, cfg.maxW, cfg.maxH)
       setImgs((s) => ({ ...s, [slot]: out }))
       toast.success('Enquadramento aplicado — clique em "Salvar imagens".')
     } catch { toast.error('Não foi possível reenquadrar esta imagem (hospedada sem permissão). Reenvie a imagem e ajuste.') }
@@ -196,6 +200,8 @@ export function JurisConfigForm({ desafioId, nome, config, materias, final, imag
     startImg(async () => {
       const limpo: Record<string, string> = {}
       Object.entries(imgs).forEach(([k, v]) => { if (v && v.trim()) limpo[k] = v.trim() })
+      // Guarda também o ORIGINAL por slot (chave *_orig) p/ reenquadrar depois sem perda.
+      Object.entries(imgsOrig).forEach(([k, v]) => { if (v && v.trim()) limpo[`${k}_orig`] = v.trim() })
       const r = await salvarImagensDesafio(desafioId, limpo)
       if (!r.ok) { toast.error(r.error ?? 'Erro ao salvar imagens.'); return }
       toast.success('Imagens salvas.')
@@ -511,7 +517,7 @@ export function JurisConfigForm({ desafioId, nome, config, materias, final, imag
                   <div className={cn('relative overflow-hidden rounded-lg border bg-muted/30', cfg.box)}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={val} alt={cfg.label} className="absolute inset-0 h-full w-full object-cover" />
-                    <button type="button" onClick={() => setImgs((s) => ({ ...s, [cfg.k]: '' }))} title="Remover" className="absolute right-1.5 top-1.5 rounded-md bg-background/80 p-1 text-destructive shadow transition hover:bg-background"><X className="h-4 w-4" /></button>
+                    <button type="button" onClick={() => { setImgs((s) => ({ ...s, [cfg.k]: '' })); setImgsOrig((s) => ({ ...s, [cfg.k]: '' })) }} title="Remover" className="absolute right-1.5 top-1.5 rounded-md bg-background/80 p-1 text-destructive shadow transition hover:bg-background"><X className="h-4 w-4" /></button>
                   </div>
                 ) : (
                   <div className={cn('flex items-center justify-center rounded-lg border border-dashed bg-muted/20 text-muted-foreground', cfg.box)}><ImageIcon className="h-6 w-6" /></div>
@@ -542,11 +548,11 @@ export function JurisConfigForm({ desafioId, nome, config, materias, final, imag
       </section>
 
       {/* Cropper de enquadramento (formato travado por slot) — mesmo editor do fundo da trilha. */}
-      {cropSlot && imgs[cropSlot] && (() => {
+      {cropSlot && (imgsOrig[cropSlot] || imgs[cropSlot]) && (() => {
         const cfg = SLOTS.find((s) => s.k === cropSlot)!
         return (
           <TrilhaFundoCropper
-            src={imgs[cropSlot]}
+            src={imgsOrig[cropSlot] || imgs[cropSlot]}
             aspectInicial={cfg.aspect}
             aspectTravado={cfg.aspect}
             titulo={`Enquadrar ${cfg.label.toLowerCase()} (${cfg.fmt})`}

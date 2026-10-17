@@ -7,21 +7,23 @@
 //      Acessos · Configurações (regras + personalização = toda a edição do bloco).
 // FASE 1: estrutura + desafio "Maratona" (mock da config). FASE 2: CRUD real no banco.
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Trophy, Plus, ArrowLeft, FileText, Medal, BarChart3, Users, Settings, Flag, Calendar, Award, Info, Palette, Loader2, ImagePlus, Crop, RefreshCw, Trash2, Search, X } from 'lucide-react'
+import { Trophy, Plus, ArrowLeft, FileText, Medal, BarChart3, Users, Settings, Flag, Calendar, Award, Info, Palette, Loader2, ImagePlus, Crop, RefreshCw, Trash2, Search, X, ScrollText, ChevronRight, GripVertical, Save } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { MARATONA, type MaratonaConfig } from '@/lib/maratona/config'
+import { REGULAMENTO_PADRAO } from '@/lib/leitura/regulamento'
 import { MaratonaCardDestaque } from '@/components/aluno/maratona/maratona-card-destaque'
 import { ModuloAcesso } from '@/components/admin/modulo-acesso'
 import { RankingAdmin } from '@/components/admin/ranking-admin'
 import { ModuloMedalhasForm } from '@/components/admin/modulo-medalhas-form'
-import { CardSimuladoAdmin, MoverSimuladoDialog, type SimuladoCard } from '@/components/admin/simulados-board'
+import { ModuloRegulamentoForm } from '@/components/admin/modulo-regulamento-form'
+import { CardSimuladoAdmin, MoverSimuladoDialog, CopiarSimuladoDialog, type SimuladoCard, type DestinoSim } from '@/components/admin/simulados-board'
 import { NovoSimuladoDialog } from '@/components/admin/novo-simulado-dialog'
 import { ImageCropper, type CropState } from '@/app/admin/simulados/criar/image-cropper'
-import { obterRankingMaratona, salvarConfigMaratona, salvarConquistasDesafio, salvarCarimbosDesafio, type ConfigDesafioSim, type ContagemDesafio } from '@/app/admin/simulados/desafios-actions'
+import { obterRankingMaratona, salvarConfigMaratona, salvarConquistasDesafio, salvarCarimbosDesafio, salvarRegulamentoDesafio, type ConfigDesafioSim, type ContagemDesafio, type EtapaMaratona } from '@/app/admin/simulados/desafios-actions'
 import type { ModuloConquistaDef, CarimboDef, CarimboCondicaoTipo } from '@/lib/leitura/carimbos-tipos'
 import { moverSimuladoParaPasta } from '@/app/admin/simulados/actions'
 import type { RankingLeitura } from '@/lib/leitura/ranking'
@@ -32,14 +34,14 @@ const DMa = (iso: string) => { const [, m, d] = (iso || '').split('-'); return d
 // Visual do desafio (um por enquanto) vem da config; o ID REAL (pasta) vem do servidor p/ wirar os componentes.
 const DESAFIO = { ...MARATONA, lancada: true, capa: MARATONA.capaUrl }
 
-export function DesafiosSimuladoAdmin({ desafioId, maratonaId, rankingInicial, config, contagem, simuladosDesafio = [], simuladosFora = [], appUrl = '', selos }: { desafioId: string | null; maratonaId: string; rankingInicial: RankingLeitura; config?: ConfigDesafioSim; contagem?: ContagemDesafio; simuladosDesafio?: SimuladoCard[]; simuladosFora?: { id: string; titulo: string; status: string }[]; appUrl?: string; selos?: { conquistas: ModuloConquistaDef[]; carimbos: CarimboDef[] } }) {
-  if (desafioId) return <DesafioInterno desafio={config ?? { ...DESAFIO }} pastaId={desafioId} rankingInicial={rankingInicial} contagem={contagem ?? { simulados: 0, inscritos: 0 }} simulados={simuladosDesafio} fora={simuladosFora} appUrl={appUrl} selos={selos ?? { conquistas: [], carimbos: [] }} />
-  return <DesafiosLista maratonaId={maratonaId} />
+export function DesafiosSimuladoAdmin({ desafioId, maratonaId, rankingInicial, config, contagem, simuladosDesafio = [], simuladosFora = [], appUrl = '', selos, destinos = [] }: { desafioId: string | null; maratonaId: string; rankingInicial: RankingLeitura; config?: ConfigDesafioSim; contagem?: ContagemDesafio; simuladosDesafio?: SimuladoCard[]; simuladosFora?: { id: string; titulo: string; status: string }[]; appUrl?: string; selos?: { conquistas: ModuloConquistaDef[]; carimbos: CarimboDef[] }; destinos?: DestinoSim[] }) {
+  if (desafioId) return <DesafioInterno desafio={config ?? { ...DESAFIO }} pastaId={desafioId} rankingInicial={rankingInicial} contagem={contagem ?? { simulados: 0, inscritos: 0 }} simulados={simuladosDesafio} fora={simuladosFora} appUrl={appUrl} selos={selos ?? { conquistas: [], carimbos: [] }} destinos={destinos} />
+  return <DesafiosLista maratonaId={maratonaId} desafio={config ? { ...config, capa: config.capaUrl } : DESAFIO} />
 }
 
 /* ─────────── BLOCO DE INÍCIO: cards dos desafios ─────────── */
-function DesafiosLista({ maratonaId }: { maratonaId: string }) {
-  const d = DESAFIO
+function DesafiosLista({ maratonaId, desafio }: { maratonaId: string; desafio?: typeof DESAFIO }) {
+  const d = desafio ?? DESAFIO
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3">
@@ -49,17 +51,23 @@ function DesafiosLista({ maratonaId }: { maratonaId: string }) {
           <Plus className="h-4 w-4" /> Novo desafio
         </button>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Card em estilo TICKET (igual aos simulados): imagem 4:3 à esquerda, infos à direita. */}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <Link href={`/admin/simulados?tab=desafios&desafio=${maratonaId}`}
-          className="group overflow-hidden rounded-2xl border bg-card shadow-sm transition-all hover:-translate-y-0.5 hover:shadow-md">
-          <div className="relative aspect-[16/7] overflow-hidden">
-            <img src={d.capa} alt="" className="h-full w-full object-cover transition-transform group-hover:scale-[1.03]" />
-            <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-full bg-black/55 px-2 py-0.5 text-[11px] font-semibold text-white backdrop-blur"><Trophy className="h-3 w-3 text-amber-300" /> Desafio</span>
-            <span className={cn('absolute right-2 top-2 rounded-full px-2 py-0.5 text-[11px] font-semibold backdrop-blur', d.lancada ? 'bg-emerald-500/85 text-white' : 'bg-black/55 text-white')}>{d.lancada ? 'Lançado' : 'Rascunho'}</span>
+          className="group/card relative flex h-32 overflow-hidden rounded-2xl border bg-card shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg sm:h-36">
+          <div className="relative aspect-[4/3] h-full shrink-0 overflow-hidden bg-muted">
+            <img src={d.capa} alt="" className="h-full w-full object-cover transition-transform group-hover/card:scale-[1.03]" />
+            <span className="absolute left-2 top-2 inline-flex items-center gap-1 rounded-md bg-black/55 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white backdrop-blur"><Trophy className="h-3 w-3 text-amber-300" /> Desafio</span>
           </div>
-          <div className="p-3.5">
-            <b className="block truncate text-sm">{d.titulo} <span className="text-primary">{d.destaque}</span></b>
-            <p className="mt-0.5 text-xs text-muted-foreground">{d.qtdSimulados} simulados · {DMa(d.inicio)} a {DMa(d.fim)}</p>
+          <div className="flex min-w-0 flex-1 flex-col justify-between px-3 pb-2 pt-2">
+            <div className="flex min-h-6 items-center">
+              <span className={cn('inline-flex w-fit items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide', d.lancada ? 'bg-emerald-500 text-white' : 'bg-muted text-muted-foreground')}>{d.lancada ? 'Lançado' : 'Rascunho'}</span>
+            </div>
+            <div className="min-w-0">
+              <h3 className="line-clamp-2 text-sm font-bold leading-tight text-foreground sm:text-[15px]">{d.titulo} <span className="text-primary">{d.destaque}</span></h3>
+              <p className="line-clamp-1 text-[11px] text-muted-foreground">{d.qtdSimulados} simulados · {DMa(d.inicio)} a {DMa(d.fim)}</p>
+            </div>
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary">Abrir desafio <ChevronRight className="h-3.5 w-3.5" /></span>
           </div>
         </Link>
       </div>
@@ -68,16 +76,17 @@ function DesafiosLista({ maratonaId }: { maratonaId: string }) {
 }
 
 /* ─────────── ÁREA INTERNA do desafio (igual ao admin dos desafios: back + h1 + abas underline) ─────────── */
-type Aba = 'simulados' | 'selos' | 'ranking' | 'acessos' | 'config'
+type Aba = 'simulados' | 'selos' | 'ranking' | 'acessos' | 'regulamento' | 'config'
 const ABAS: { k: Aba; label: string; icon: React.ReactNode }[] = [
   { k: 'simulados', label: 'Simulados', icon: <FileText className="h-4 w-4" /> },
   { k: 'selos', label: 'Selos', icon: <Medal className="h-4 w-4" /> },
   { k: 'ranking', label: 'Ranking', icon: <BarChart3 className="h-4 w-4" /> },
   { k: 'acessos', label: 'Acessos', icon: <Users className="h-4 w-4" /> },
+  { k: 'regulamento', label: 'Regulamento', icon: <ScrollText className="h-4 w-4" /> },
   { k: 'config', label: 'Configurações', icon: <Settings className="h-4 w-4" /> },
 ]
 
-function DesafioInterno({ desafio, pastaId, rankingInicial, contagem, simulados, fora, appUrl, selos }: { desafio: ConfigDesafioSim; pastaId: string; rankingInicial: RankingLeitura; contagem: ContagemDesafio; simulados: SimuladoCard[]; fora: { id: string; titulo: string; status: string }[]; appUrl: string; selos: { conquistas: ModuloConquistaDef[]; carimbos: CarimboDef[] } }) {
+function DesafioInterno({ desafio, pastaId, rankingInicial, contagem, simulados, fora, appUrl, selos, destinos }: { desafio: ConfigDesafioSim; pastaId: string; rankingInicial: RankingLeitura; contagem: ContagemDesafio; simulados: SimuladoCard[]; fora: { id: string; titulo: string; status: string }[]; appUrl: string; selos: { conquistas: ModuloConquistaDef[]; carimbos: CarimboDef[] }; destinos: DestinoSim[] }) {
   const [aba, setAba] = useState<Aba>('simulados')
   return (
     <div className="space-y-4">
@@ -99,11 +108,13 @@ function DesafioInterno({ desafio, pastaId, rankingInicial, contagem, simulados,
       <TabsBar aba={aba} setAba={setAba} />
 
       <div className="pt-1">
-        {aba === 'simulados' && <AbaSimulados pastaId={pastaId} simulados={simulados} fora={fora} appUrl={appUrl} />}
+        {aba === 'simulados' && <AbaSimulados pastaId={pastaId} simulados={simulados} fora={fora} appUrl={appUrl} destinos={destinos} etapas={desafio.etapas} />}
         {aba === 'selos' && <AbaSelos pastaId={pastaId} selos={selos} simulados={simulados} />}
         {/* RANKING e ACESSOS: componentes REAIS da plataforma (mesmos do JurisClub), por pasta/módulo. */}
         {aba === 'ranking' && <RankingAdmin inicial={rankingInicial} moduloId={pastaId} moduloNome={`${desafio.titulo} ${desafio.destaque}`} loader={obterRankingMaratona} rotulos={{ aulas: 'Simulados' }} detalheAluno={false} />}
         {aba === 'acessos' && <ModuloAcesso pastaId={pastaId} />}
+        {/* REGULAMENTO: mesma tela do Lei Seca (ModuloRegulamentoForm), gravando em desafio_jogo.config.regulamento. */}
+        {aba === 'regulamento' && <ModuloRegulamentoForm key={pastaId} pastaId={pastaId} atual={desafio.regulamento ?? REGULAMENTO_PADRAO} salvar={salvarRegulamentoDesafio} />}
         {aba === 'config' && <AbaConfig pastaId={pastaId} inicial={desafio} contagem={contagem} />}
       </div>
     </div>
@@ -131,17 +142,67 @@ function TabsBar({ aba, setAba }: { aba: Aba; setAba: (a: Aba) => void }) {
   )
 }
 
-/* ── Simulados: lista REAL (ticket) vinculada à pasta do desafio + adicionar/criar/remover. ── */
-function AbaSimulados({ pastaId, simulados, fora, appUrl }: { pastaId: string; simulados: SimuladoCard[]; fora: { id: string; titulo: string; status: string }[]; appUrl: string }) {
+/* ── Simulados do desafio: cada simulado é COLOCADO numa das 3 ÁREAS do percurso (onde o link/acesso dele
+ *  aparece). A data/liberação/regras vêm do PRÓPRIO simulado (editadas na área interna dele). ── */
+const AREAS_MARATONA = 3 // o percurso tem 3 áreas de simulado (checkpoints)
+/** Formata segundos em "1h 20min 30s" (omite as partes zeradas). */
+function fmtDur(seg: number): string {
+  const h = Math.floor(seg / 3600), m = Math.floor((seg % 3600) / 60), s = seg % 60
+  return [h ? `${h}h` : '', m ? `${m}min` : '', s ? `${s}s` : ''].filter(Boolean).join(' ') || '0s'
+}
+type EtapaItem = { id: string; slot: number; rotulo: string; custom: boolean; segMin: number } // slot 0=não incluído; rotulo=texto do nome (sempre preservado); custom=aplica o nome personalizado; segMin=tempo mín. no simulado p/ o check-in, em seg (0=sem mínimo)
+
+function AbaSimulados({ pastaId, simulados, fora, appUrl, destinos, etapas }: { pastaId: string; simulados: SimuladoCard[]; fora: { id: string; titulo: string; status: string }[]; appUrl: string; destinos: DestinoSim[]; etapas?: EtapaMaratona[] }) {
   const router = useRouter()
   const [movendo, setMovendo] = useState<SimuladoCard | null>(null)
+  const [copiando, setCopiando] = useState<SimuladoCard | null>(null)
   const [addOpen, setAddOpen] = useState(false)
-  const [sel, setSel] = useState<Set<string>>(new Set())
-  const toggleSel = (id: string, v: boolean) => setSel((p) => { const n = new Set(p); if (v) n.add(id); else n.delete(id); return n })
+  const [pend, start] = useTransition()
+
+  const porId = useMemo(() => new Map(simulados.map((s) => [s.id, s])), [simulados])
+  const inicial = useMemo<EtapaItem[]>(() => {
+    const et = Array.isArray(etapas) ? etapas : []
+    const vistos = new Set<string>()
+    const base: EtapaItem[] = []
+    const norm = (v: any) => { const n = Number(v) || 0; return n >= 1 && n <= AREAS_MARATONA ? n : 0 }
+    for (const e of et) if (porId.has(e.simuladoId) && !vistos.has(e.simuladoId)) {
+      vistos.add(e.simuladoId)
+      const rotulo = (e.rotulo ?? '').toString()
+      // custom ligado: explícito (rotuloOn) ou, p/ dados antigos sem a flag, quando há texto salvo.
+      const custom = e.rotuloOn === true || (e.rotuloOn === undefined && !!rotulo.trim())
+      base.push({ id: e.simuladoId, slot: norm(e.slot), rotulo, custom, segMin: Math.max(0, Math.round(Number(e.segMin) || 0)) })
+    }
+    for (const s of simulados) if (!vistos.has(s.id)) base.push({ id: s.id, slot: 0, rotulo: '', custom: false, segMin: 0 })
+    return base
+  }, [etapas, simulados, porId])
+
+  const [itens, setItens] = useState<EtapaItem[]>(inicial)
+  useEffect(() => { setItens(inicial) }, [inicial]) // ressincroniza ao adicionar/remover simulado
+  const [drag, setDrag] = useState<number | null>(null)
+  const dirty = JSON.stringify(itens) !== JSON.stringify(inicial)
+
+  const reorder = (from: number, to: number) => { if (from === to) return; setItens((p) => { const a = [...p]; const [m] = a.splice(from, 1); a.splice(to, 0, m); return a }) }
+  // Atribui a área; se outro simulado já está nessa área, libera o outro (uma área = um simulado).
+  const setSlot = (id: string, slot: number) => setItens((p) => p.map((it) => it.id === id ? { ...it, slot } : (slot !== 0 && it.slot === slot ? { ...it, slot: 0 } : it)))
+  const setRotulo = (id: string, rotulo: string) => setItens((p) => p.map((it) => it.id === id ? { ...it, rotulo } : it))
+  const setSegMin = (id: string, segMin: number) => setItens((p) => p.map((it) => it.id === id ? { ...it, segMin: Math.max(0, Math.round(segMin) || 0) } : it))
+  // Liga/desliga o nome personalizado SEM apagar o texto digitado (fica salvo p/ quando religar).
+  const toggleCustom = (id: string, on: boolean) => setItens((p) => p.map((it) => it.id === id ? { ...it, custom: on } : it))
+
+  function salvar() {
+    start(async () => {
+      const novas: EtapaMaratona[] = itens.map((it) => ({ simuladoId: it.id, ...(it.slot ? { slot: it.slot } : {}), ...(it.rotulo.trim() ? { rotulo: it.rotulo.trim() } : {}), rotuloOn: it.custom, ...(it.segMin ? { segMin: it.segMin } : {}) }))
+      const r = await salvarConfigMaratona(pastaId, { etapas: novas })
+      if (!r.ok) { toast.error(r.error ?? 'Erro ao salvar.'); return }
+      toast.success('Maratona salva.')
+      router.refresh()
+    })
+  }
+
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-muted-foreground">Os simulados da jornada. <b>Criar</b> um novo (mesmo fluxo dos simulados, já caindo aqui) ou <b>adicionar</b> um existente. No menu de cada card, <b>Mover</b> → Raiz remove do desafio.</p>
+        <p className="max-w-2xl text-sm text-muted-foreground">A maratona tem <b>3 áreas</b> no percurso. Escolha <b>em qual área</b> cada simulado aparece (onde o link/acesso dele entra) — <b>uma área por simulado</b>. A <b>data</b>, a <b>liberação</b> e as demais regras vêm de <b>dentro do próprio simulado</b> (nada a repetir aqui).</p>
         <div className="flex shrink-0 gap-2">
           <button type="button" onClick={() => setAddOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-sm font-medium shadow-sm transition hover:bg-muted"><Plus className="h-4 w-4" /> Adicionar existente</button>
           <NovoSimuladoDialog destino={pastaId} trigger={
@@ -149,23 +210,108 @@ function AbaSimulados({ pastaId, simulados, fora, appUrl }: { pastaId: string; s
           } />
         </div>
       </div>
-      {simulados.length === 0 ? (
+
+      {itens.length === 0 ? (
         <div className="rounded-xl border border-dashed bg-muted/30 p-8 text-center text-sm text-muted-foreground">
           Nenhum simulado neste desafio ainda. Use <b>Criar simulado</b> ou <b>Adicionar existente</b>.
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {simulados.map((s) => (
-            <CardSimuladoAdmin key={s.id} s={s} appUrl={appUrl} online={0} variant="ticket"
-              selecionado={sel.has(s.id)} onSelecionar={(v) => toggleSel(s.id, v)} onMover={() => setMovendo(s)} />
-          ))}
+        <div className="space-y-3">
+          {itens.map((it, i) => {
+            const s = porId.get(it.id)
+            if (!s) return null
+            return (
+              <div key={it.id}
+                onDragEnter={() => { if (drag !== null && drag !== i) { reorder(drag, i); setDrag(i) } }}
+                onDragOver={(e) => { if (drag !== null) e.preventDefault() }}
+                onDrop={() => setDrag(null)}
+                className={cn('rounded-2xl border bg-muted/20 p-2 transition', drag === i && 'opacity-60 ring-2 ring-primary/50')}>
+                <div className="flex flex-wrap items-stretch gap-2 lg:flex-nowrap">
+                  {/* ALÇA de arrastar (só ela é draggable → os links/menu do card continuam clicáveis). */}
+                  <span draggable onDragStart={() => setDrag(i)} onDragEnd={() => setDrag(null)} title="Arraste para reordenar"
+                    className="flex cursor-grab touch-none select-none flex-col items-center justify-center rounded-xl px-1 text-muted-foreground transition-colors hover:bg-muted active:cursor-grabbing">
+                    <GripVertical className="h-4 w-4" />
+                  </span>
+                  {/* CARD COMPLETO do simulado — editar, personalizar, mover, copiar, ao-vivo (intacto).
+                      Data/liberação/regras vêm daqui (editadas na área interna do simulado). */}
+                  <div className="min-w-0 flex-1">
+                    <CardSimuladoAdmin s={s} appUrl={appUrl} online={0} variant="ticket" selecionado={false} onSelecionar={() => {}} onMover={() => setMovendo(s)} onCopiar={() => setCopiando(s)} />
+                  </div>
+                  {/* CONFIGURADOR — área do percurso + nome exibido (mesma linha) + tempo mínimo. Largura ~ a do card. */}
+                  <div className="flex w-full flex-col justify-center gap-3 rounded-xl border bg-card p-3 lg:min-w-0 lg:flex-1">
+                    {/* LINHA 1: "Onde aparece" e "Nome exibido" lado a lado. */}
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4">
+                      <label className="flex flex-1 flex-col gap-1 text-xs font-semibold">Onde aparece na maratona
+                        <select value={it.slot} onChange={(e) => setSlot(it.id, Number(e.target.value))}
+                          className="h-9 w-full rounded-lg border bg-background px-2 text-sm font-normal text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/40">
+                          <option value={0}>Não incluir no percurso</option>
+                          {Array.from({ length: AREAS_MARATONA }, (_, k) => k + 1).map((n) => (
+                            <option key={n} value={n}>Área {n} do percurso</option>
+                          ))}
+                        </select>
+                      </label>
+                      {/* NOME EXIBIDO: título em cima (alinhado ao "Onde aparece") + o campo/texto do nome.
+                          A opção "Usar nome personalizado" ficou LÁ EMBAIXO, após a caixa de tempo. */}
+                      <div className="flex flex-1 flex-col gap-1.5">
+                        <span className="text-xs font-semibold">Nome exibido na maratona</span>
+                        {it.custom
+                          ? <input value={it.rotulo} onChange={(e) => setRotulo(it.id, e.target.value)} placeholder="ex.: AGU"
+                              className="h-9 w-full rounded-lg border bg-background px-2.5 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring/40" />
+                          : <span className="flex h-9 items-center truncate text-[12px] text-muted-foreground" title={s.titulo}>Usa o nome real: <b className="ml-1 font-medium text-foreground">{s.titulo}</b></span>}
+                      </div>
+                    </div>
+                    {/* LINHA 2: TEMPO MÍNIMO + opção de nome personalizado + "aparece na área" — tudo na MESMA linha. */}
+                    <div className="flex flex-col gap-1.5 border-t pt-3">
+                      <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                        {/* Tempo mínimo (h/min/seg) */}
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs font-semibold">Tempo mínimo no simulado</span>
+                          <div className="flex items-center gap-1.5">
+                            <input type="number" min={0} value={Math.floor(it.segMin / 3600)} onChange={(e) => setSegMin(it.id, (Number(e.target.value) || 0) * 3600 + (it.segMin % 3600))}
+                              className="h-8 w-16 rounded-lg border bg-background px-2.5 text-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring/40" />
+                            <span className="text-[11px] text-muted-foreground">h</span>
+                            <input type="number" min={0} max={59} value={Math.floor((it.segMin % 3600) / 60)} onChange={(e) => setSegMin(it.id, Math.floor(it.segMin / 3600) * 3600 + Math.min(59, Number(e.target.value) || 0) * 60 + (it.segMin % 60))}
+                              className="h-8 w-16 rounded-lg border bg-background px-2.5 text-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring/40" />
+                            <span className="text-[11px] text-muted-foreground">min</span>
+                            <input type="number" min={0} max={59} value={it.segMin % 60} onChange={(e) => setSegMin(it.id, Math.floor(it.segMin / 60) * 60 + Math.min(59, Number(e.target.value) || 0))}
+                              className="h-8 w-16 rounded-lg border bg-background px-2.5 text-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring/40" />
+                            <span className="text-[11px] text-muted-foreground">seg</span>
+                          </div>
+                        </div>
+                        {/* Opção de nome personalizado (desmarcar NÃO apaga o texto) + "aparece na área" */}
+                        <label className="flex items-center gap-2 text-[12px] text-muted-foreground">
+                          <input type="checkbox" checked={it.custom} onChange={(e) => toggleCustom(it.id, e.target.checked)} className="h-3.5 w-3.5 accent-[var(--primary)]" />
+                          Usar nome personalizado
+                        </label>
+                        <span className="text-[11px] text-muted-foreground">{it.slot ? `Aparece na Área ${it.slot}.` : 'Não aparece no percurso.'}</span>
+                      </div>
+                      <span className="text-[11px] text-muted-foreground">{it.segMin ? `≥ ${fmtDur(it.segMin)} no simulado = ganha o selo da etapa.` : 'Sem mínimo (0 = selo ao encerrar).'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
-      {movendo && <MoverSimuladoDialog simulado={movendo} destinos={[]} atualId={pastaId} onClose={() => setMovendo(null)} />}
+
+      {itens.length > 0 && (
+        <div className="flex items-center justify-end gap-2 pt-1">
+          {dirty && <button type="button" onClick={() => setItens(inicial)} className="rounded-lg border bg-card px-3 py-1.5 text-sm font-medium text-muted-foreground shadow-sm transition hover:bg-muted">Descartar</button>}
+          <button type="button" onClick={salvar} disabled={!dirty || pend}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-4 py-1.5 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90 disabled:opacity-50">
+            {pend ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Salvar áreas
+          </button>
+        </div>
+      )}
+
+      {movendo && <MoverSimuladoDialog simulado={movendo} destinos={destinos} atualId={pastaId} onClose={() => setMovendo(null)} />}
+      {copiando && <CopiarSimuladoDialog simulado={copiando} destinos={destinos} atualId={pastaId} onClose={() => setCopiando(null)} />}
       {addOpen && <AdicionarSimuladoDialog pastaId={pastaId} fora={fora} onClose={() => setAddOpen(false)} onAdded={() => { setAddOpen(false); router.refresh() }} />}
     </div>
   )
 }
+
 
 /* Dialog "Adicionar existente": busca + vincula o simulado à pasta do desafio (moverSimuladoParaPasta). */
 function AdicionarSimuladoDialog({ pastaId, fora, onClose, onAdded }: { pastaId: string; fora: { id: string; titulo: string; status: string }[]; onClose: () => void; onAdded: () => void }) {

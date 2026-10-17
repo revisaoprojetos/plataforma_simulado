@@ -66,9 +66,15 @@ export type DiagConteudo = {
   rotuloNome?: string
   /** Texto da FAIXA do nome (valor à direita) — default a variável {nome}; editável como os demais blocos. */
   nomeTexto?: string
+  /** Rótulo do campo do Nº de peito (ex.: "Nº DE PEITO:"). */
+  rotuloPeito?: string
+  /** Texto da FAIXA do nº de peito — default a variável {numero_peito} (número do corredor salvo). */
+  peitoTexto?: string
   subtitulo: string
   notaTotal: string
   notaTexto: string
+  /** 2ª linha (descrição) da faixa da nota, abaixo do texto principal (ex.: "Medalha conquistada: KM 21 · AGU"). */
+  notaDescricao?: string
   intro: string[]
   /** Títulos das seções (editáveis). Opcionais — usam o texto padrão quando ausentes. */
   tituloPilares?: string

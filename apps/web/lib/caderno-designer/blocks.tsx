@@ -59,6 +59,9 @@ export const BLOCKS: BlockMeta[] = [
     defaults: { titulo: 'Título do Cabeçalho', subtitulo: '', corFundo: '', corTexto: '#ffffff', tamTitulo: 20, tamSub: 11, align: 'left', fonte: '', padding: 14, bordaRaio: 0, largura: 100, alinhamentoBloco: 'left' } },
   { type: 'nome-aluno', title: 'Nome do aluno', icon: IdCard, category: 'identificacao', dynamic: true, supportsVars: true,
     defaults: { rotulo: 'NOME:', corRotulo: '', corValor: '', corTextoRotulo: '#ffffff', corTextoValor: '#3b2f00', fonte: '', bordaRaio: 0 } },
+  // Nº DE PEITO: número do corredor que o aluno recebe ao finalizar (fixo/salvo) — valor vem de {{numero_peito}}.
+  { type: 'peito', title: 'Nº de peito (corredor)', icon: IdCard, category: 'identificacao', dynamic: true, supportsVars: true,
+    defaults: { rotulo: 'Nº DE PEITO:', corRotulo: '', corValor: '', corTextoRotulo: '#ffffff', corTextoValor: '#1a3a6b', fonte: '', bordaRaio: 0 } },
   // Estrutura
   { type: 'card', title: 'Card', icon: Square, category: 'estrutura', container: true, supportsVars: true,
     defaults: { corFundo: '#f8fafc', bordaCor: '', bordaLargura: 1, bordaRaio: 0, padding: 8, largura: 100, alinhamento: 'center', fitaCor: '', fitaAltura: 0 } },
@@ -650,6 +653,17 @@ function BlockRenderBody({ block, theme, data, full, editor, selectable, selecte
         <div style={{ display: 'flex', overflow: 'hidden', borderRadius: a.bordaRaio ?? 0, fontFamily: cssDaFonte(a.fonte) || theme.tipografia.familia }}>
           <div style={{ background: a.corRotulo || c.primaria, color: a.corTextoRotulo || '#ffffff', fontWeight: 800, fontSize: 14, padding: '8px 14px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' }}>{applyVars(a.rotulo ?? 'NOME:', data.vars)}</div>
           <div style={{ background: a.corValor || c.acento, color: a.corTextoValor || '#3b2f00', flex: 1, display: 'flex', alignItems: 'center', padding: '8px 14px', fontSize: 13, fontWeight: 600 }}>{nomeVal && !/\{/.test(nomeVal) ? nomeVal : ' '}</div>
+        </div>
+      )
+    }
+    case 'peito': {
+      // Valor = número do corredor salvo ({{numero_peito}}); no editor/sem dado mostra o placeholder [0000].
+      const val = applyVars('{{numero_peito}}', data.vars)
+      const mostra = val && !/\{/.test(val) ? val : '[0000]'
+      return (
+        <div style={{ display: 'flex', overflow: 'hidden', borderRadius: a.bordaRaio ?? 0, fontFamily: cssDaFonte(a.fonte) || theme.tipografia.familia }}>
+          <div style={{ background: a.corRotulo || c.primaria, color: a.corTextoRotulo || '#ffffff', fontWeight: 800, fontSize: 14, padding: '8px 14px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' }}>{applyVars(a.rotulo ?? 'Nº DE PEITO:', data.vars)}</div>
+          <div style={{ background: a.corValor || c.acento, color: a.corTextoValor || '#1a3a6b', flex: 1, display: 'flex', alignItems: 'center', padding: '8px 14px', fontSize: 14, fontWeight: 700, letterSpacing: '.06em' }}>{mostra}</div>
         </div>
       )
     }

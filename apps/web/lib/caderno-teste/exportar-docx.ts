@@ -87,7 +87,7 @@ export async function gerarDocxDiagnostico(item: ItemCaderno, disc: DiscBanco[],
     const bg = corParte('diag_cab', a.corPrimaria || '#2d254f')
     const kids: Paragraph[] = [new Paragraph({ children: runs(c.tituloCabecalho ?? 'Diagnóstico de Desempenho', vars, { color: 'FFFFFF', size: sz(20), bold: true, font: 'Arial' }), spacing: { after: 40 } })]
     if (c.subtitulo) kids.push(new Paragraph({ children: runs(c.subtitulo, vars, { color: 'FFFFFF', size: sz(11), font: 'Arial' }) }))
-    nodes.push(tabela([new TableRow({ children: [celula(kids, { bg })] })]))
+    nodes.push(tabela([new TableRow({ children: [celula(kids, { bg, topBorda: corParte('diag_cab_fita', amar) })] })]))
   }
 
   // Nome do aluno.
@@ -98,10 +98,18 @@ export async function gerarDocxDiagnostico(item: ItemCaderno, disc: DiscBanco[],
     ] })]))
   }
 
+  // Nº de peito (corredor).
+  if (a.mostrarPeito) {
+    nodes.push(tabela([new TableRow({ children: [
+      celula([P(runs(c.rotuloPeito ?? 'Nº DE PEITO:', vars, { color: corTextoParte('diag_peito_rot', '#ffffff'), size: sz(13), bold: true, font: 'Arial' }), { after: 0 })], { bg: corParte('diag_peito_rot', a.corPrimaria || '#2d254f'), widthPct: 22 }),
+      celula([P(runs(c.peitoTexto ?? '{numero_peito}', vars, { color: corTextoParte('diag_peito_val', '#1a3a6b'), size: sz(11), bold: true, font: 'Arial' }), { after: 0 })], { bg: corParte('diag_peito_val', amar), widthPct: 78 }),
+    ] })]))
+  }
+
   // Nota.
   nodes.push(tabela([new TableRow({ children: [
     celula([new Paragraph({ children: [...runs('{acertos}', vars, { color: corTextoParte('diag_nota_num', '#ffffff'), size: sz(30), bold: true, font: 'Arial' }), new TextRun({ text: `/${preencher(c.notaTotal, vars)}`, color: corTextoParte('diag_nota_num', '#ffffff'), size: sz(16), bold: true, font: 'Arial' })], spacing: { after: 0 } })], { bg: corParte('diag_nota_num', '#9b6800'), widthPct: 22 }),
-    celula([P(runs(c.notaTexto, vars, { color: corTextoParte('diag_nota_faixa', '#3b2f00'), size: sz(11), bold: true, font: 'Arial' }), { after: 0 })], { bg: corParte('diag_nota_faixa', amar), widthPct: 78 }),
+    celula([P(runs(c.notaTexto, vars, { color: corTextoParte('diag_nota_faixa', '#3b2f00'), size: sz(11), bold: true, font: 'Arial' }), { after: c.notaDescricao ? 20 : 0 }), ...(c.notaDescricao ? [P(runs(c.notaDescricao, vars, { color: corTextoParte('diag_nota_faixa', '#3b2f00'), size: sz(10), font: 'Arial' }), { after: 0 })] : [])], { bg: corParte('diag_nota_faixa', amar), widthPct: 78 }),
   ] })]))
 
   // Introdução.

@@ -32,8 +32,12 @@ const INPUT = 'h-9 w-full rounded-lg border bg-[var(--input-bg,transparent)] px-
 /**
  * Regulamento do módulo (LegProc) — repaginado em seções: título/descrição, vídeo, PDF (lido dentro da
  * plataforma), tabela nativa (sem PDF) e a prévia de ganhos/metas (da pontuação do módulo).
+ *
+ * Reutilizável por outros desafios (ex.: Maratona de Simulados): `pontuacao` é opcional (quando ausente,
+ * a seção "Ganhos & metas" não aparece) e `salvar` pode ser injetado p/ persistir em outro lugar
+ * (ex.: desafio_jogo.config.regulamento) — por padrão grava no módulo de leitura (salvarRegulamentoModulo).
  */
-export function ModuloRegulamentoForm({ pastaId, atual, pontuacao }: { pastaId: string; atual: RegulamentoConfig; pontuacao: PontuacaoLeitura }) {
+export function ModuloRegulamentoForm({ pastaId, atual, pontuacao, salvar: salvarProp }: { pastaId: string; atual: RegulamentoConfig; pontuacao?: PontuacaoLeitura | null; salvar?: (pastaId: string, cfg: RegulamentoConfig) => Promise<{ ok: boolean; error?: string }> }) {
   const [cfg, setCfg] = useState<RegulamentoConfig>(atual)
   const [salvando, setSalvando] = useState(false)
   const [enviando, setEnviando] = useState(false)
@@ -68,7 +72,7 @@ export function ModuloRegulamentoForm({ pastaId, atual, pontuacao }: { pastaId: 
 
   async function salvar() {
     setSalvando(true)
-    const r = await salvarRegulamentoModulo(pastaId, cfg)
+    const r = await (salvarProp ?? salvarRegulamentoModulo)(pastaId, cfg)
     setSalvando(false)
     if (r.ok) toast.success('Regulamento salvo'); else toast.error(r.error ?? 'Erro ao salvar')
   }
@@ -172,15 +176,17 @@ export function ModuloRegulamentoForm({ pastaId, atual, pontuacao }: { pastaId: 
             )}
           </Secao>
 
-          {/* Ganhos & metas (read-only, da pontuação) */}
-          <Secao icon={Zap} titulo="Ganhos & metas" desc='Puxados da aba "Configurações" → Pontuação.'>
-            <ul className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
-              <li>• <strong className="text-foreground">+{pontuacao.pontos_aula}</strong> pts por leitura</li>
-              <li>• <strong className="text-foreground">+{pontuacao.pontos_quiz}</strong> pts por concluir o quiz</li>
-              {pontuacao.pontos_acerto > 0 && <li>• <strong className="text-foreground">+{pontuacao.pontos_acerto}</strong> pts por acerto no quiz</li>}
-              {pontuacao.combo_ativo && <li>• <strong className="text-foreground">+{pontuacao.combo_bonus}</strong> pts de bônus ao gabaritar</li>}
-            </ul>
-          </Secao>
+          {/* Ganhos & metas (read-only, da pontuação) — só quando o módulo tem pontuação. */}
+          {pontuacao && (
+            <Secao icon={Zap} titulo="Ganhos & metas" desc='Puxados da aba "Configurações" → Pontuação.'>
+              <ul className="grid gap-1 text-xs text-muted-foreground sm:grid-cols-2">
+                <li>• <strong className="text-foreground">+{pontuacao.pontos_aula}</strong> pts por leitura</li>
+                <li>• <strong className="text-foreground">+{pontuacao.pontos_quiz}</strong> pts por concluir o quiz</li>
+                {pontuacao.pontos_acerto > 0 && <li>• <strong className="text-foreground">+{pontuacao.pontos_acerto}</strong> pts por acerto no quiz</li>}
+                {pontuacao.combo_ativo && <li>• <strong className="text-foreground">+{pontuacao.combo_bonus}</strong> pts de bônus ao gabaritar</li>}
+              </ul>
+            </Secao>
+          )}
         </div>
       )}
 

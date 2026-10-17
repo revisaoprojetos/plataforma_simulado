@@ -8,7 +8,7 @@
 // só muda o VISUAL (marca Revisão via simTokensStyle('revisao', theme) + look de
 // revisao/prova.tsx/shared.tsx). Prefixo de CSS: srpl- (p/ não colidir com smpl- do MEQ).
 
-import { useMemo, type ReactNode, type CSSProperties } from 'react'
+import { useMemo, useState, type ReactNode, type CSSProperties } from 'react'
 import { MarkdownContent } from '@/components/markdown-content'
 import { simTokensStyle } from '../sim-tokens'
 import {
@@ -48,6 +48,31 @@ export function ProvaRevisaoLive(p: ProvaMeqLiveProps) {
   const cPct = N > 0 ? Math.round((cAns / N) * 100) : 0
 
   const timerColor = p.timerWarning ? ERR : 'var(--brand)'
+  // Ocultar o cronômetro crescente (preferência local do aluno durante a prova).
+  const [cronoOculto, setCronoOculto] = useState(false)
+  // REGRESSIVO (tempo limite ligado): bloco à DIREITA do Caderno, com rótulo "restantes".
+  const timerEl = p.tempoLabel !== null ? (
+    <div className={`${P}-timer ${p.timerWarning ? `${P}-pulse` : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 8, height: 40, padding: '0 12px', borderRadius: 11, background: p.timerWarning ? 'color-mix(in srgb,var(--flag) 14%,var(--surface2))' : 'var(--surface2)', color: timerColor }}>
+      <Ic size={16}><circle cx="12" cy="12" r="9" /><path d={RIC.clock} /></Ic>
+      <span style={{ lineHeight: 1.1 }}>
+        <b style={{ display: 'block', fontSize: 14, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{p.tempoLabel}</b>
+        <span className={`${P}-timersub`} style={{ fontSize: 10.5, color: 'var(--muted)' }}>restantes</span>
+      </span>
+    </div>
+  ) : null
+  // CRESCENTE (sem limite): bloco à ESQUERDA do Caderno — só o número (maior), SEM rótulo, com botão de ocultar.
+  const cronoEl = p.tempoLabel !== null ? (
+    <div className={`${P}-timer`} style={{ display: 'flex', alignItems: 'center', gap: 8, height: 40, padding: '0 10px 0 12px', borderRadius: 11, background: 'var(--surface2)', color: 'var(--brand)' }}>
+      <Ic size={17}><circle cx="12" cy="12" r="9" /><path d={RIC.clock} /></Ic>
+      <b style={{ fontSize: 19, fontWeight: 800, fontVariantNumeric: 'tabular-nums', letterSpacing: '.02em', whiteSpace: 'nowrap' }}>{cronoOculto ? '--:--:--' : p.tempoLabel}</b>
+      <button type="button" onClick={() => setCronoOculto((v) => !v)} aria-label={cronoOculto ? 'Mostrar tempo' : 'Ocultar tempo'} title={cronoOculto ? 'Mostrar tempo' : 'Ocultar tempo'}
+        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, border: 0, borderRadius: 8, background: 'transparent', color: 'var(--muted)', cursor: 'pointer', padding: 0 }}>
+        {cronoOculto
+          ? <Ic size={15}><path d="M9.9 4.2A10.9 10.9 0 0 1 12 4c6.5 0 10 7 10 7a18.4 18.4 0 0 1-2.2 3.2M6.6 6.6A18.5 18.5 0 0 0 2 11s3.5 7 10 7a10.9 10.9 0 0 0 4.1-.8" /><path d="M3 3l18 18" /></Ic>
+          : <Ic size={15}><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" /><circle cx="12" cy="12" r="3" /></Ic>}
+      </button>
+    </div>
+  ) : null
 
   return (
     <div className={`${P}-root`} style={{ ...simTokensStyle('revisao', p.theme), position: 'relative', minHeight: '100vh', overflowX: 'hidden' }}>
@@ -66,22 +91,17 @@ export function ProvaRevisaoLive(p: ProvaMeqLiveProps) {
           <b className={`${P}-hcount`} style={{ fontSize: 14, color: 'var(--ink)' }}>Questão {qi} de {N}</b>
           <span style={{ flex: 1 }} />
 
+          {/* Cronômetro CRESCENTE (sem tempo limite) — à ESQUERDA do Caderno (só número + ocultar). */}
+          {!p.tempoRegressivo && cronoEl}
+
           {/* Segmentado Caderno/Folha */}
           <div style={{ display: 'inline-flex', gap: 3, padding: 3, borderRadius: 12, background: 'var(--tBg)' }}>
             <Seg active={p.modo === 'cad'} onClick={() => p.onSetModo('cad')} icon={RIC.book} label="Caderno" />
             <Seg active={p.modo === 'folha'} onClick={() => p.onSetModo('folha')} icon={RIC.list} label="Folha" />
           </div>
 
-          {/* Timer (servidor) */}
-          {p.tempoLabel !== null ? (
-            <div className={`${P}-timer ${p.timerWarning ? `${P}-pulse` : ''}`} style={{ display: 'flex', alignItems: 'center', gap: 8, height: 40, padding: '0 12px', borderRadius: 11, background: p.timerWarning ? 'color-mix(in srgb,var(--flag) 14%,var(--surface2))' : 'var(--surface2)', color: timerColor }}>
-              <Ic size={16}><circle cx="12" cy="12" r="9" /><path d={RIC.clock} /></Ic>
-              <span style={{ lineHeight: 1.1 }}>
-                <b style={{ display: 'block', fontSize: 14, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{p.tempoLabel}</b>
-                <span className={`${P}-timersub`} style={{ fontSize: 10.5, color: 'var(--muted)' }}>{p.tempoRegressivo ? 'restantes' : 'decorridos'}</span>
-              </span>
-            </div>
-          ) : null}
+          {/* Contagem REGRESSIVA (tempo limite ligado) — à DIREITA do Caderno, como antes. */}
+          {p.tempoRegressivo && timerEl}
 
           <button type="button" onClick={p.onToggleDark} aria-label="Tema" className={`${P}-hbtn`} style={hbtn()}><Ic d={RIC.moon} size={16} /></button>
           <button type="button" onClick={p.onCycleFz} aria-label="Tamanho da letra" className={`${P}-hbtn`} style={hbtn()}><span style={{ fontSize: 13 }}>{FZ_LAB[p.fz]}</span></button>
@@ -192,12 +212,6 @@ function CardQuestao({ q, qi, N, resp, fz, flagged, elim, slotDiscursiva, onMark
           </div>
         ) : null}
 
-        {ce ? (
-          <div style={{ padding: '14px 16px', borderLeft: '3px solid var(--selDot)', background: 'var(--surface2)', borderRadius: '0 10px 10px 0', fontSize: 12.5, color: 'var(--muted)' }}>
-            Julgue o item a seguir.
-          </div>
-        ) : null}
-
         <div style={{ margin: 0, fontSize: FZ[fz], lineHeight: 1.7, color: 'var(--ink)' }}>
           <MarkdownContent>{q.enunciado}</MarkdownContent>
           {q.imagem_url ? (
@@ -218,14 +232,12 @@ function CardQuestao({ q, qi, N, resp, fz, flagged, elim, slotDiscursiva, onMark
           <>
             <div className={`${P}-ce`} style={{ display: 'flex', gap: 12 }}>
               {alts.map((a) => {
-                const isCerto = /certo|verdad/i.test(a.texto)
+                // MESMO estilo das alternativas de múltipla escolha: normal quando inativo; ativo = selBg +
+                // borda/anel selDot (sem verde/vermelho).
                 const sel = resp === a.id
-                const dim = !!resp && resp !== a.id
-                const cor = isCerto ? OK : ERR
-                const grad = isCerto ? 'linear-gradient(180deg,#27C07E,#1FA868)' : 'linear-gradient(180deg,#F0565B,#E5484D)'
                 return (
-                  <button key={a.id} type="button" onClick={() => onMark(a.id)} className={`${P}-cebtn`} style={{ flex: 1, height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 12, border: 0, background: grad, boxShadow: sel ? `0 0 0 3px var(--surface),0 0 0 6px ${cor},0 10px 24px -8px ${cor}` : `0 4px 12px -6px ${cor}`, opacity: dim ? 0.4 : 1, cursor: 'pointer', transition: 'opacity .2s,box-shadow .2s' }}>
-                    <b style={{ fontSize: 17, fontWeight: 800, letterSpacing: '.02em', color: '#fff' }}>{a.texto}</b>
+                  <button key={a.id} type="button" onClick={() => onMark(a.id)} className={`${P}-cebtn`} style={{ flex: 1, height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 12, border: `1.5px solid ${sel ? 'var(--selLine)' : 'var(--line)'}`, background: sel ? 'var(--selBg)' : 'var(--surface)', boxShadow: sel ? '0 0 0 3px color-mix(in srgb,var(--selDot) 18%,transparent)' : 'none', cursor: 'pointer', transition: 'border-color .2s, background .2s, box-shadow .2s' }}>
+                    <b style={{ fontSize: 17, fontWeight: 800, letterSpacing: '.02em', color: sel ? 'var(--selDot)' : 'var(--ink)' }}>{a.texto}</b>
                   </button>
                 )
               })}
@@ -352,10 +364,19 @@ function Navegador({ questoes, qi, respostas, discPaginas, marcadas, cAns, cBl, 
           <Leg color="var(--flag)" label={<>Para revisar · <b style={{ color: 'var(--ink)' }}>{cFl}</b></>} />
         </div>
       </div>
-      <div style={{ display: 'flex', gap: 10, padding: 12, borderRadius: 12, background: 'var(--peachBg)', fontSize: 12, lineHeight: 1.45, color: 'var(--ink)' }}>
-        <span style={{ color: '#E5A800' }}><Ic size={16}><path d={RIC.bulb} /><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2V17h6v-.3c0-.8.4-1.5 1-2A7 7 0 0 0 12 2z" /></Ic></span>
-        <span>Use a tesoura para eliminar alternativas e o marcador para voltar depois.</span>
-      </div>
+      {/* Dica da tesoura SÓ quando a questão atual é múltipla escolha (onde a tesoura existe). Em Certo/Errado
+          e discursiva não há tesoura → não mostra a dica. */}
+      {(() => {
+        const atual = questoes[qi - 1]
+        const temTesoura = !!atual && !ehCE(atual) && atual.tipo !== 'discursiva' && !atual.bloqueada
+        if (!temTesoura) return null
+        return (
+          <div style={{ display: 'flex', gap: 10, padding: 12, borderRadius: 12, background: 'var(--peachBg)', fontSize: 12, lineHeight: 1.45, color: 'var(--ink)' }}>
+            <span style={{ color: '#E5A800' }}><Ic size={16}><path d={RIC.bulb} /><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2V17h6v-.3c0-.8.4-1.5 1-2A7 7 0 0 0 12 2z" /></Ic></span>
+            <span>Use a tesoura para eliminar alternativas e o marcador para voltar depois.</span>
+          </div>
+        )
+      })()}
     </div>
   )
 }
@@ -364,7 +385,8 @@ function NavGrid({ questoes, qi, respostas, discPaginas, marcadas, cols, onGo }:
   questoes: ProvaLiveQuestao[]; qi: number; respostas: Record<string, string>; discPaginas: Record<string, number>; marcadas: Set<string>; cols: number; onGo: (n: number) => void
 }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols},1fr)`, gap: 6 }}>
+    // padding dá folga p/ o halo da célula ATIVA não ser cortado pela borda do card nas laterais.
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols},1fr)`, gap: 7, padding: 4 }}>
       {questoes.map((q, i) => {
         const n = i + 1
         const cur = n === qi
@@ -372,9 +394,10 @@ function NavGrid({ questoes, qi, respostas, discPaginas, marcadas, cols, onGo }:
         const fl = marcadas.has(q.id)
         const bg = cur ? 'var(--selDot)' : ans ? 'var(--nAns)' : 'var(--surface2)'
         const col = cur ? '#fff' : ans ? 'var(--nAnsInk)' : 'var(--muted)'
-        const ring = cur ? '0 0 0 3px var(--surface), 0 0 0 5px var(--selDot)' : fl ? 'inset 0 0 0 2px var(--flag)' : 'none'
+        const ring = cur ? '0 0 0 2px var(--surface), 0 0 0 4px var(--selDot)' : fl ? 'inset 0 0 0 2px var(--flag)' : 'none'
         return (
-          <button key={q.id} type="button" onClick={() => onGo(n)} style={{ position: 'relative', height: 38, border: 0, borderRadius: 9, background: bg, color: col, boxShadow: ring, font: 'inherit', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', transition: 'background .2s' }}>
+          // zIndex no ATIVO: o halo (box-shadow) pinta POR CIMA das vizinhas → não fica recortado nos lados.
+          <button key={q.id} type="button" onClick={() => onGo(n)} style={{ position: 'relative', zIndex: cur ? 1 : undefined, height: 38, border: 0, borderRadius: 9, background: bg, color: col, boxShadow: ring, font: 'inherit', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', transition: 'background .2s' }}>
             {n}
             {fl && !cur && <span style={{ position: 'absolute', right: 3, top: 3, width: 6, height: 6, borderRadius: '50%', background: 'var(--flag)' }} />}
           </button>

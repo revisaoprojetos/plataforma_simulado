@@ -19,7 +19,7 @@ import type { CadernoDoc } from '@/lib/caderno-designer/types'
 import {
   Loader2, FileUp, X, Plus, ArrowUp, ArrowDown, Pencil, Trash2, Type,
   AlignLeft, AlignCenter, AlignRight, AlignJustify,
-  LayoutTemplate, FileText, Users, BarChart3, Heading, LayoutGrid, StickyNote, ClipboardList,
+  LayoutTemplate, FileText, Users, BarChart3, Heading, LayoutGrid, StickyNote, ClipboardList, Hash,
 } from 'lucide-react'
 
 /** Zoom da prévia para caber na largura do painel. */
@@ -59,6 +59,7 @@ export const ICONE_TIPO: Record<string, typeof Type> = { cabecalho: LayoutTempla
 export const BLOCOS_ADD: { tipo: string; label: string; icon: typeof Type; contavel?: boolean; grupo?: 'composto' }[] = [
   { tipo: 'cabecalho', label: 'Cabeçalho', icon: LayoutTemplate },
   { tipo: 'nome', label: 'Nome do aluno', icon: FileText },
+  { tipo: 'peito', label: 'Nº de peito', icon: Hash },
   { tipo: 'dados_card', label: 'Dados do estudante', icon: Users },
   { tipo: 'nota', label: 'Nota', icon: BarChart3 },
   { tipo: 'texto', label: 'Texto / parágrafo', icon: Type },
@@ -288,7 +289,7 @@ export function CampoBlocoEditor({ campo, onChange }: { campo: CampoBlocoDoc; on
 }
 
 const CAT_LABEL: Record<string, string> = { conteudo: 'Conteúdo', avaliacao: 'Avaliação', identificacao: 'Identificação', estrutura: 'Estrutura' }
-const BLOCOS_NOVOS = new Set<string>(['cabecalho', 'nome-aluno', 'titulo-secao', 'texto-livre', 'card', 'diag-nota', 'diag-disciplina', 'diag-sugestoes'])
+const BLOCOS_NOVOS = new Set<string>(['cabecalho', 'nome-aluno', 'peito', 'titulo-secao', 'texto-livre', 'card', 'diag-nota', 'diag-disciplina', 'diag-sugestoes'])
 
 /** Painel Estrutura dos modelos doc-backed: listar/reordenar/editar/remover + adicionar da paleta. */
 export function DocEstruturaPanel({ doc, onAdd, onMover, onRemover, onEditar }: {

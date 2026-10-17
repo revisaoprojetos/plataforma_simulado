@@ -310,9 +310,13 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   // cards grandes (muitos assuntos/itens) QUEBREM entre páginas em vez de vazarem atrás do rodapé.
   const addCont = (key: string, node: ReactNode, parte: string) => entradas.push({ key, node, label: '', tipo: 'card', parte, removivel: false, apagar: parte, juntar: true, outlineOculto: true })
   if (a.mostrarCabecalho) { const cor = corP('diag_cab', prim); add('diag_cab', (
-    <div {...atr('diag_cab', 'Cabeçalho (fundo)', cor, { background: cor, color: '#fff', padding: '12px 16px' })}>
-      <div {...atr('diag_cab_titulo', 'Título do cabeçalho', corP('diag_cab_titulo', '#fff'), { fontSize: fs('diag_cab_titulo', 20), fontWeight: 800, color: corP('diag_cab_titulo', '#fff') })}>{V(c.tituloCabecalho ?? 'Diagnóstico de Desempenho')}</div>
-      {c.subtitulo && <div {...atr('diag_cab_sub', 'Subtítulo do cabeçalho', corP('diag_cab_sub', '#fff'), { fontSize: fs('diag_cab_sub', 11), opacity: 0.85, marginTop: 2, color: corP('diag_cab_sub', '#fff') })}>{V(c.subtitulo)}</div>}
+    <div style={{ overflow: 'hidden' }}>
+      {/* FITA no topo do cabeçalho (cor editável clicando na faixa). */}
+      <div {...atr('diag_cab_fita', 'Fita do cabeçalho', corP('diag_cab_fita', amar), { background: corP('diag_cab_fita', amar), height: 6 })} />
+      <div {...atr('diag_cab', 'Cabeçalho (fundo)', cor, { background: cor, color: '#fff', padding: '12px 16px' })}>
+        <div {...atr('diag_cab_titulo', 'Título do cabeçalho', corP('diag_cab_titulo', '#fff'), { fontSize: fs('diag_cab_titulo', 20), fontWeight: 800, color: corP('diag_cab_titulo', '#fff') })}>{V(c.tituloCabecalho ?? 'Diagnóstico de Desempenho')}</div>
+        {c.subtitulo && <div {...atr('diag_cab_sub', 'Subtítulo do cabeçalho', corP('diag_cab_sub', '#fff'), { fontSize: fs('diag_cab_sub', 11), opacity: 0.85, marginTop: 2, color: corP('diag_cab_sub', '#fff') })}>{V(c.subtitulo)}</div>}
+      </div>
     </div>
   ), 'Cabeçalho', 'cabecalho', 'diag_cab', true) }
   if (a.mostrarDadosAluno && !ocultasP.has('nome')) { const corN = corP('diag_nome_rot', prim), corV = corP('diag_nome_val', amar); add('diag_nome', (
@@ -321,6 +325,13 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
       <div {...atr('diag_nome_val', 'Faixa do nome', corV, { background: corV, color: corTextoP('diag_nome_val', '#3b2f00'), flex: 1, display: 'flex', alignItems: 'center', padding: '8px 14px', fontSize: corpo, fontWeight: 600 })}>{V(c.nomeTexto ?? '{nome}')}</div>
     </div>
   ), 'Nome do aluno', 'nome', 'diag_nome_rot', true) }
+  // Nº DE PEITO (corredor) — mesmo visual do NOME; valor = {numero_peito} (número salvo ao finalizar).
+  if (a.mostrarPeito && !ocultasP.has('peito')) { const corR = corP('diag_peito_rot', prim), corV = corP('diag_peito_val', amar); add('diag_peito', (
+    <div style={{ display: 'flex', overflow: 'hidden' }}>
+      <div {...atr('diag_peito_rot', 'Rótulo Nº DE PEITO', corR, { background: corR, color: corTextoP('diag_peito_rot', '#fff'), fontWeight: 800, fontSize: 14, padding: '8px 14px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center' })}>{V(c.rotuloPeito ?? 'Nº DE PEITO:')}</div>
+      <div {...atr('diag_peito_val', 'Faixa do nº de peito', corV, { background: corV, color: corTextoP('diag_peito_val', '#1a3a6b'), flex: 1, display: 'flex', alignItems: 'center', padding: '8px 14px', fontSize: corpo, fontWeight: 700, letterSpacing: '.06em' })}>{V(c.peitoTexto ?? '{numero_peito}')}</div>
+    </div>
+  ), 'Nº de peito', 'nome', 'diag_peito_rot', true) }
   // Card "Dados do estudante" — o MESMO bloco `identificacao` da folha (extraído do preset, sem cópia).
   if (c.dadosCard) {
     const identData = montarCadernoData([], vars, a.titulo || 'Simulado', { gabaritoLiberado: true })
@@ -341,7 +352,10 @@ function blocosDoItem(item: ItemCaderno, qs: PreviewQuestao[], vars: Record<stri
   if (!ocultasP.has('nota')) { const corNum = corP('diag_nota_num', '#9b6800'), corFx = corP('diag_nota_faixa', amar); add('diag_nota', (
     <div style={{ display: 'flex', border: `1px solid ${prim}33`, overflow: 'hidden' }}>
       <div {...atr('diag_nota_num', 'Bloco da nota', corNum, { background: corNum, color: corTextoP('diag_nota_num', '#fff'), padding: '10px 20px', display: 'flex', alignItems: 'baseline' })}><span style={{ fontSize: fs('diag_nota_num', 32), fontWeight: 800 }}>{V('{acertos}')}</span><span style={{ fontSize: fs('diag_nota_num', 16), fontWeight: 700 }}>/{V(c.notaTotal)}</span></div>
-      <div {...atr('diag_nota_faixa', 'Faixa da nota', corFx, { background: corFx, color: corTextoP('diag_nota_faixa', '#3b2f00'), flex: 1, display: 'flex', alignItems: 'center', padding: '10px 16px', fontSize: corpo, fontWeight: 600 })}>{V(c.notaTexto)}</div>
+      <div {...atr('diag_nota_faixa', 'Faixa da nota', corFx, { background: corFx, color: corTextoP('diag_nota_faixa', '#3b2f00'), flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2, padding: '10px 16px', fontSize: corpo, fontWeight: 600 })}>
+        <span>{V(c.notaTexto)}</span>
+        {c.notaDescricao && <span style={{ fontSize: Math.max(8, corpo - 1), fontWeight: 500, opacity: 0.85 }}>{V(c.notaDescricao)}</span>}
+      </div>
     </div>
   ), 'Nota', 'nota', 'diag_nota_num', true) }
   c.intro.forEach((p, i) => { const cor = corP(`intro:${i}`, '#1a202c'); add(`intro:${i}`, <p key={`intro${i}`} {...atr(`intro:${i}`, `Parágrafo de abertura ${i + 1}`, cor, { fontSize: corpo, lineHeight: 1.4, textAlign: 'justify', margin: '0 0 3px', color: cor })}>{V(p)}</p>, `Introdução ${i + 1}`, 'texto', `intro:${i}`, true) })

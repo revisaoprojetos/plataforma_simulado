@@ -43,7 +43,7 @@ export function removerBloco(doc: CadernoDoc, id: string): CadernoDoc {
 /** Rótulo amigável do tipo de bloco (cabeçalho do editor lateral). */
 export const NOME_BLOCO: Record<string, string> = {
   'texto-livre': 'Texto', 'titulo-secao': 'Título de seção', instrucoes: 'Instruções', card: 'Card',
-  cabecalho: 'Cabeçalho', 'nome-aluno': 'Nome do aluno',
+  cabecalho: 'Cabeçalho', 'nome-aluno': 'Nome do aluno', peito: 'Nº de peito',
   identificacao: 'Dados do estudante', 'gabarito-grid': 'Grade de gabarito', 'gabarito-correcao': 'Correção',
   'q-comentario': 'Comentário', separador: 'Separador', repeticao: 'Questões', colunas: 'Colunas',
   coluna: 'Coluna', espacador: 'Espaçador', 'plano-fundo': 'Fundo', imagem: 'Imagem', assinatura: 'Assinatura',
@@ -58,6 +58,7 @@ export function camposDoBlocoDoc(block: Block): CampoBlocoDoc[] {
     case 'titulo-secao': return [C('texto', 'Texto', 'texto'), C('subtitulo', 'Subtítulo', 'texto'), C('cor', 'Cor do texto', 'cor'), C('corFundo', 'Cor de fundo', 'cor'), C('fonte', 'Fonte', 'fonte')]
     case 'cabecalho': return [C('titulo', 'Título', 'texto'), C('subtitulo', 'Subtítulo', 'texto'), C('corFundo', 'Cor de fundo', 'cor'), C('corTexto', 'Cor do texto', 'cor'), C('tamTitulo', 'Tamanho do título', 'num'), C('fonte', 'Fonte', 'fonte')]
     case 'nome-aluno': return [C('rotulo', 'Rótulo', 'texto'), C('corRotulo', 'Cor do rótulo', 'cor'), C('corTextoRotulo', 'Texto do rótulo', 'cor'), C('corValor', 'Cor da faixa', 'cor'), C('corTextoValor', 'Cor do nome', 'cor'), C('fonte', 'Fonte', 'fonte')]
+    case 'peito': return [C('rotulo', 'Rótulo', 'texto'), C('corRotulo', 'Cor do rótulo', 'cor'), C('corTextoRotulo', 'Texto do rótulo', 'cor'), C('corValor', 'Cor da faixa', 'cor'), C('corTextoValor', 'Cor do número', 'cor'), C('fonte', 'Fonte', 'fonte')]
     case 'instrucoes': return [C('titulo', 'Título', 'texto'), C('texto', 'Texto', 'texto'), C('corFundo', 'Cor de fundo', 'cor'), C('corBorda', 'Cor da borda', 'cor')]
     case 'card': return [C('corFundo', 'Cor de fundo', 'cor'), C('bordaCor', 'Cor da borda', 'cor')]
     case 'identificacao': return [{ id: 'titulo', label: 'Título', tipo: 'texto', valor: a.titulo ?? '', placeholder: 'Dados do Candidato' }, C('corHeader', 'Cor do cabeçalho', 'cor'), C('corHeaderTexto', 'Texto do cabeçalho', 'cor'), C('corAcento', 'Cor de acento', 'cor'), C('fonte', 'Fonte', 'fonte')]

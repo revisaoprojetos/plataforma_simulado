@@ -11,11 +11,10 @@ import { DEFAULT_CAPA_VIEW, type CapaViewCfg, type CapaRect } from '@/lib/capa-m
 
 export type CapaEditorValue = { orig: string | null; poster: CapaViewCfg; ticket: CapaViewCfg }
 type Formato = 'poster' | 'ticket'
-// Proporção da capa do ticket do card do aluno (capa à esquerda, 150px × 168px de altura = 25:28).
-// O editor enquadra NESSA proporção p/ a prévia bater com o que o aluno vê. (Pôster segue 4:5 vertical.)
-const TICKET_W = 150, TICKET_H = 168
-const ASPECTO: Record<Formato, number> = { poster: 4 / 5, ticket: TICKET_W / TICKET_H }
-const ROTULO: Record<Formato, string> = { poster: 'Pôster (vertical 4:5)', ticket: 'Ticket (vertical 25:28)' }
+// A capa do TICKET é exibida em PAISAGEM 4:3 (metade esquerda do card ticket, aluno e admin — ver
+// card-simulado.tsx). O editor enquadra NESSA proporção p/ a prévia bater com o que o aluno vê.
+const ASPECTO: Record<Formato, number> = { poster: 4 / 5, ticket: 4 / 3 }
+const ROTULO: Record<Formato, string> = { poster: 'Pôster (vertical 4:5)', ticket: 'Ticket (horizontal 4:3)' }
 
 /**
  * Editor PROFISSIONAL da capa do card do simulado — reusa o cropper da trilha (TrilhaFundoCropper) e os
@@ -115,14 +114,14 @@ function FormatoSecao({ formato, cfg, orig, cor, icone, onAjustar, setCfg, setDe
   setDeg: (patch: Partial<TrilhaDegrade>) => void
 }) {
   const deg = cfg.degrade ?? DEFAULT_TRILHA_DEGRADE_IMAGEM
-  const aspectCls = formato === 'poster' ? 'aspect-[4/5]' : 'aspect-[150/168]'
+  const aspectCls = formato === 'poster' ? 'aspect-[4/5]' : 'aspect-[4/3]'
   return (
     <div className="space-y-3 rounded-xl border bg-muted/20 p-3">
       <p className="text-xs font-semibold">{ROTULO[formato]}</p>
-      {/* Prévia WYSIWYG (mesmo CapaCard do aluno). Altura FIXA igual nos dois formatos → os controles
-          abaixo alinham linha a linha (pôster e ticket ficam lado a lado, não um mais baixo). */}
+      {/* Prévia WYSIWYG (mesmo CapaCard do aluno): pôster 4:5 e ticket 4:3 — a MESMA proporção em que a
+          capa aparece no card do aluno/admin. Altura fixa p/ os controles alinharem lado a lado. */}
       <div className="flex h-48 items-center justify-center">
-        <div className={cn('group/card relative h-full overflow-hidden rounded-xl border', aspectCls)}>
+        <div className={cn('group/card relative max-h-full overflow-hidden rounded-xl border', formato === 'ticket' ? 'h-auto w-full' : 'h-full', aspectCls)}>
           <CapaCard capa={orig} cor={cor} icone={icone} orig={orig} cfg={cfg} />
         </div>
       </div>
@@ -154,16 +153,17 @@ function FormatoSecao({ formato, cfg, orig, cor, icone, onAjustar, setCfg, setDe
             <span className="mb-1 flex items-center justify-between text-[11px] font-medium text-muted-foreground"><span>Comprimento</span><span className="tabular-nums">{deg.comprimento}%</span></span>
             <input type="range" min={5} max={100} step={1} value={deg.comprimento} disabled={!deg.ativo} onChange={(e) => setDeg({ comprimento: Number(e.target.value) })} className="w-full accent-[var(--primary)]" />
           </label>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <label className="inline-flex min-w-[150px] flex-1 items-center gap-2">
-              <span className="text-[11px] font-medium text-muted-foreground">Direção</span>
+          {/* Direção (linha cheia) + Cor (linha abaixo) — empilhados p/ não sobrepor em colunas estreitas. */}
+          <div className="space-y-2">
+            <label className="flex items-center gap-2">
+              <span className="w-14 shrink-0 text-[11px] font-medium text-muted-foreground">Direção</span>
               <select value={deg.direcao} disabled={!deg.ativo} onChange={(e) => setDeg({ direcao: e.target.value as TrilhaDegrade['direcao'] })}
-                className="h-8 flex-1 rounded-lg border bg-[var(--input-bg,transparent)] px-2 text-xs outline-none focus:ring-1 focus:ring-ring">
+                className="h-8 min-w-0 flex-1 rounded-lg border bg-[var(--input-bg,transparent)] px-2 text-xs outline-none focus:ring-1 focus:ring-ring">
                 {DEGRADE_DIRS.map((o) => <option key={o.id} value={o.id}>{o.label}</option>)}
               </select>
             </label>
-            <label className="inline-flex items-center gap-2">
-              <span className="text-[11px] font-medium text-muted-foreground">Cor</span>
+            <label className="flex items-center gap-2">
+              <span className="w-14 shrink-0 text-[11px] font-medium text-muted-foreground">Cor</span>
               <input type="color" value={deg.cor} disabled={!deg.ativo} onChange={(e) => setDeg({ cor: e.target.value })} className="h-7 w-10 cursor-pointer rounded border bg-transparent p-0.5" />
             </label>
           </div>

@@ -11,7 +11,7 @@ import { softDelete } from '@/lib/soft-delete'
 import { brtLocalParaIso } from '@/lib/brt'
 import { computarResumoAoVivo, computarOnlinePorSimulado, JANELA_ATIVO_MIN, type ResumoAoVivo } from '@/lib/simulado/ao-vivo'
 import { garantirBancoDoSimulado, bancoDoSimulado } from '@/lib/simulado/banco-do-simulado'
-import { confirmarImportQuestoes } from '@/app/admin/banco-questoes/actions'
+import { confirmarImportQuestoes, duplicarBanco } from '@/app/admin/banco-questoes/actions'
 import type { QuestaoImport } from '@/app/admin/banco-questoes/import-types'
 import { reordenarProvaViaApi, estudantesLinkadosViaApi } from '@/lib/data/simulados-api'
 import { estudantesLinkadosSql } from '@/lib/data/relatorios.repo'
@@ -453,6 +453,86 @@ export async function moverSimuladoParaPasta(simuladoId: string, pastaId: string
   }
   revalidatePath('/admin/simulados')
   return { ok: true }
+}
+
+/**
+ * Lista os DESTINOS de mover/copiar (pastas de simulado + desafios), com capa/cor/ícone e pai p/ as
+ * subpastas — mesmo shape que o board. Usado quando o diálogo roda FORA do board (ex.: dentro do desafio).
+ */
+export async function carregarDestinosSimulados(): Promise<import('@/components/admin/simulados-board').DestinoSim[]> {
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return []
+  const svc = createAdminClient()
+  const out: import('@/components/admin/simulados-board').DestinoSim[] = []
+  try {
+    const selP = (cols: string) => svc.from('simulado_pastas').select(cols).eq('deletado', false).eq('tenant_id', tenantId).order('nome')
+    let rp: any = await selP('id, nome, cor, icone, capa_url, capa_card_url, is_folder, folder_area, pai_id')
+    if (rp.error) rp = await selP('id, nome, is_folder, folder_area, pai_id')
+    const pastas = ((rp.data ?? []) as any[]).filter((p) => p.is_folder && p.folder_area === 'simulado')
+    // Capa SÓ da pasta (sem emprestar de simulado): sem capa própria → placeholder no card.
+    for (const p of pastas) out.push({ id: p.id, nome: p.nome, tipo: 'pasta', capa: p.capa_card_url ?? p.capa_url ?? null, cor: p.cor ?? null, icone: p.icone ?? null, paiId: p.pai_id ?? null })
+
+    let rd: any = await svc.from('simulado_pastas').select('id, nome, cor, icone, capa_url, capa_card_url, desafio_jogo').eq('deletado', false).eq('tenant_id', tenantId).eq('folder_area', 'maratona').order('nome')
+    if (rd.error) rd = await svc.from('simulado_pastas').select('id, nome, desafio_jogo').eq('deletado', false).eq('tenant_id', tenantId).eq('folder_area', 'maratona').order('nome')
+    for (const d of ((rd.data ?? []) as any[])) out.push({ id: d.id, nome: d.nome, tipo: 'desafio', capa: d.desafio_jogo?.config?.capaUrl ?? d.capa_card_url ?? d.capa_url ?? null, cor: d.cor ?? null, icone: d.icone ?? null, paiId: null })
+  } catch { /* best-effort */ }
+  return out
+}
+
+/**
+ * COPIA (duplica) um simulado para uma pasta/desafio (ou raiz). Cria um novo simulado em RASCUNHO,
+ * com novo embed_token, título "(cópia)", duplicando o banco de conteúdo (independente) quando houver
+ * e a composição da prova (as questões em si são da biblioteca, só referenciadas). Mantém o original.
+ */
+export async function copiarSimuladoParaPasta(simuladoId: string, pastaId: string | null): Promise<{ ok: boolean; id?: string; error?: string }> {
+  if (!(await checkPermission('simulados:create'))) return { ok: false, error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  const svc = createAdminClient()
+  const { data: orig } = await svc.from('simulado_simulados').select('*').eq('id', simuladoId).eq('tenant_id', tenantId).maybeSingle()
+  if (!orig) return { ok: false, error: 'Simulado não encontrado.' }
+  const o = orig as any
+
+  // Banco de conteúdo (regras.banco_base_id): duplica para ficar INDEPENDENTE. Falhou → compartilha o original.
+  const bancoBaseId = o.regras?.banco_base_id as string | undefined
+  let novoBanco: string | undefined
+  if (bancoBaseId) { try { const d = await duplicarBanco(bancoBaseId); if (d.ok && d.id) novoBanco = d.id } catch { /* best-effort */ } }
+  const regras = { ...(o.regras ?? {}), ...(novoBanco ? { banco_base_id: novoBanco } : {}) }
+
+  const insert: Record<string, unknown> = {
+    tenant_id: tenantId, titulo: `${o.titulo} (cópia)`, descricao: o.descricao ?? null,
+    modo_aplicacao: o.modo_aplicacao, data_inicio: o.data_inicio ?? null, data_fim: o.data_fim ?? null,
+    tempo_limite_min: o.tempo_limite_min ?? null, metodo_identificacao: o.metodo_identificacao ?? null,
+    embed_ativo: false, embed_token: crypto.randomUUID(), regras, status: 'rascunho',
+    pasta_id: pastaId, created_at: new Date().toISOString(),
+  }
+  let novoId: string | null = null
+  const r1 = await svc.from('simulado_simulados').insert(insert).select('id').single()
+  if (!r1.error && r1.data) novoId = (r1.data as any).id
+  else if (r1.error && /pasta_id|column/i.test(r1.error.message)) {
+    const insert2 = { ...insert }; delete insert2.pasta_id
+    const r2 = await svc.from('simulado_simulados').insert(insert2).select('id').single()
+    if (r2.error || !r2.data) return { ok: false, error: r2.error?.message ?? 'Erro ao copiar.' }
+    novoId = (r2.data as any).id
+  } else return { ok: false, error: r1.error?.message ?? 'Erro ao copiar.' }
+  if (!novoId) return { ok: false, error: 'Erro ao copiar.' }
+
+  // Composição da prova (as questões são da biblioteca → só copiamos os vínculos/ordem).
+  try {
+    const qs = await fetchAll<any>(() => svc.from('simulado_prova_questoes').select('questao_id, ordem, anulada, peso')
+      .eq('simulado_id', simuladoId).eq('tenant_id', tenantId).order('ordem', { ascending: true }))
+    for (let i = 0; i < qs.length; i += 500) {
+      const lote = qs.slice(i, i + 500).map((q) => ({ tenant_id: tenantId, simulado_id: novoId, questao_id: q.questao_id, ordem: q.ordem, ...(q.anulada ? { anulada: true } : {}), ...(q.peso != null ? { peso: q.peso } : {}) }))
+      const ins = await svc.from('simulado_prova_questoes').insert(lote)
+      if (ins.error && /anulada|peso|column/i.test(ins.error.message)) {
+        await svc.from('simulado_prova_questoes').insert(qs.slice(i, i + 500).map((q) => ({ tenant_id: tenantId, simulado_id: novoId, questao_id: q.questao_id, ordem: q.ordem })))
+      }
+    }
+  } catch { /* best-effort */ }
+
+  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_simulados', entidadeId: novoId, depois: { copia_de: simuladoId, pasta_id: pastaId } })
+  revalidatePath('/admin/simulados')
+  return { ok: true, id: novoId }
 }
 
 /**

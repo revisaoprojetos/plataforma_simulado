@@ -86,6 +86,16 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
   if (!estIds.length) return []
   const alunos = await fetchAllByIn<any>(estIds, (chunk) => svc.from('simulado_estudantes').select('id, nome, email, telefone, cpf, classificacao').in('id', chunk).order('nome'))
 
+  // Nº DE PEITO (corredor da maratona): número FIXO que o aluno recebe ao finalizar, salvo em
+  // desafio_jogo.config.corredores da pasta da maratona do tenant. Mapeia estudanteId → número (4 dígitos).
+  const peitoPorAluno = new Map<string, string>()
+  try {
+    const { data: mar } = await svc.from('simulado_pastas').select('desafio_jogo')
+      .eq('tenant_id', tenantId).eq('folder_area', 'maratona').order('created_at', { ascending: true }).limit(1)
+    const cor = (mar ?? [])[0]?.desafio_jogo?.config?.corredores
+    if (cor && typeof cor === 'object') for (const [eid, v] of Object.entries(cor)) { const n = Number(v); if (Number.isFinite(n) && n > 0) peitoPorAluno.set(eid, String(n).padStart(4, '0')) }
+  } catch { /* sem maratona/coluna → nº de peito fica vazio */ }
+
   // Letra de cada alternativa (por ordem) → fallback p/ respostas antigas sem a letra.
   const altLetra = new Map<string, string>() // alternativaId → "A"/"B"…
   const corretaLetra = new Map<string, string>() // questaoId → letra da alternativa correta
@@ -207,6 +217,7 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
       nome: a.nome ?? '', email: a.email ?? '', telefone: a.telefone ?? '', cpf: a.cpf ?? '', classificacao: a.classificacao ?? '',
       simulado: bancoNome, acertos: String(acertos), erros: String(erros), total_questoes: String(totalPontuavel),
       nota: nota.toFixed(1).replace('.', ','), percentual: totalPontuavel ? `${Math.round((acertos / totalPontuavel) * 100)}%` : '0%',
+      numero_peito: peitoPorAluno.get(a.id) ?? '', // Nº de peito (corredor) — fixo, salvo na maratona
       ...info,
     }
     for (const [d, tot] of discTotais) {

@@ -89,6 +89,7 @@ export type BuilderAjustes = {
   corSecundaria: string
   mostrarCabecalho: boolean
   mostrarDadosAluno: boolean
+  mostrarPeito?: boolean // Nº de peito (corredor) — opt-in
   mostrarComentarios: boolean
   mostrarGabarito: boolean
   numAlternativas: number // 4 ou 5

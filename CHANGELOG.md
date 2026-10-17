@@ -12,6 +12,25 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.19.0 — 2026-10-17
+
+**feat: Maratona (check-in/selo/nº de corredor), runner (Certo×Errado + navegador + cronômetro) e bloco "Nº de peito" nos cadernos**
+
+- **Maratona — regra de check-in + selo:** por etapa, um "Tempo mínimo no simulado" (h/min/seg) no admin; o
+  aluno que **permanece ≥ esse tempo** ao encerrar ganha o **check-in** da etapa. Selo por área: **cinza
+  (bloqueado) → dourado + tag "OBTIDO"** quando cumpre; a medalha da parada também só doura com o check.
+- **Nº do corredor:** entregue na **ordem de chegada ao 1º simulado encerrado**, fixo. Atribuição **atômica**
+  (`SELECT … FOR UPDATE` na pasta, sem duplicar no pico; fallback sem `DATABASE_URL`). Exibido destacado no
+  Painel (à direita do tempo) e usado no PDF via `{{numero_peito}}`.
+- **Ranking da maratona:** passa a mostrar **nº do corredor · check · tempo** (sem pontos); ordena por check-in
+  e menor tempo. "Ir para o simulado" no Painel abre a aba Simulados (não vai direto).
+- **Runner (Revisão):** navegador sem recorte na célula ativa; **Certo/Errado** no mesmo estilo das múltiplas
+  (sem verde/vermelho; ativo = cor de seleção); removido "Julgue o item a seguir"; dica da tesoura só em
+  múltipla escolha; **cronômetro crescente** (sem rótulo, com ocultar) à esquerda do Caderno quando **não há
+  tempo limite**.
+- **Cadernos/diagnóstico:** novo bloco **"Nº de peito"** (designer e diagnóstico), com valor vindo do número do
+  corredor salvo; **fita no topo do cabeçalho** (cor editável) e **descrição (2ª linha) na nota**.
+
 ## 3.18.1 — 2026-10-16
 
 **fix(juris): arcade "travado" — foco do teclado no iframe (personagem não andava e perdia)**

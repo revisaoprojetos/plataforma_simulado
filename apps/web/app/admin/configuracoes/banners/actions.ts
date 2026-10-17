@@ -12,6 +12,8 @@ export interface BannerInput {
   titulo?: string | null
   mensagem?: string | null
   imagem_url?: string | null
+  /** Imagem ORIGINAL (inteira, não recortada) — guardada p/ reabrir o recorte sem perda. */
+  imagemOrig?: string | null
   link?: string | null
   cor?: string | null
   ativo?: boolean
@@ -38,7 +40,7 @@ export interface BannerInput {
   freq?: 'login' | 'sempre' | 'uma_vez'
 }
 
-type DestaqueEntry = { ativo?: boolean; texto?: string; fadeAtivo?: boolean; fadeNivel?: number; popupEstilo?: string; popupPontas?: string; bannerTextoPos?: string; bannerTextoCor?: string; bannerTextoTam?: string; bannerTextoX?: number; bannerTextoY?: number; bannerOcultarTitulo?: boolean; bannerOcultarMensagem?: boolean; agendaInicio?: string; agendaFim?: string; freq?: string }
+type DestaqueEntry = { ativo?: boolean; texto?: string; fadeAtivo?: boolean; fadeNivel?: number; popupEstilo?: string; popupPontas?: string; bannerTextoPos?: string; bannerTextoCor?: string; bannerTextoTam?: string; bannerTextoX?: number; bannerTextoY?: number; bannerOcultarTitulo?: boolean; bannerOcultarMensagem?: boolean; agendaInicio?: string; agendaFim?: string; freq?: string; imagemOrig?: string }
 
 /** Salva a config por-banner (rótulo "Em destaque" + degradê + estilo do pop-up) em
  *  tema.banner_destaques[bannerId], mesclando com o que já existir. */
@@ -46,7 +48,7 @@ async function salvarDestaque(
   svc: ReturnType<typeof createAdminClient>,
   tenantId: string,
   bannerId: string,
-  data: Pick<BannerInput, 'destaqueAtivo' | 'destaqueTexto' | 'fadeAtivo' | 'fadeNivel' | 'popupEstilo' | 'popupPontas' | 'bannerTextoPos' | 'bannerTextoCor' | 'bannerTextoTam' | 'bannerTextoX' | 'bannerTextoY' | 'bannerOcultarTitulo' | 'bannerOcultarMensagem' | 'agendaInicio' | 'agendaFim' | 'freq'>,
+  data: Pick<BannerInput, 'destaqueAtivo' | 'destaqueTexto' | 'fadeAtivo' | 'fadeNivel' | 'popupEstilo' | 'popupPontas' | 'bannerTextoPos' | 'bannerTextoCor' | 'bannerTextoTam' | 'bannerTextoX' | 'bannerTextoY' | 'bannerOcultarTitulo' | 'bannerOcultarMensagem' | 'agendaInicio' | 'agendaFim' | 'freq' | 'imagemOrig'>,
 ) {
   const nada = data.destaqueAtivo === undefined && data.destaqueTexto === undefined && data.fadeAtivo === undefined
     && data.fadeNivel === undefined && data.popupEstilo === undefined && data.popupPontas === undefined
@@ -54,13 +56,18 @@ async function salvarDestaque(
     && data.bannerTextoX === undefined && data.bannerTextoY === undefined
     && data.bannerOcultarTitulo === undefined && data.bannerOcultarMensagem === undefined
     && data.agendaInicio === undefined && data.agendaFim === undefined && data.freq === undefined
+    && data.imagemOrig === undefined
   if (nada) return
+  // Imagem ORIGINAL (não-destrutivo): base64 → storage; '' limpa; undefined mantém.
+  let imagemOrigOut: string | null | undefined = data.imagemOrig
+  if (typeof data.imagemOrig === 'string' && data.imagemOrig.startsWith('data:')) imagemOrigOut = await hospedarBase64(data.imagemOrig, svc)
   const { data: t } = await svc.from('simulado_tenants').select('tema').eq('id', tenantId).maybeSingle()
   const tema = { ...(((t?.tema as Record<string, unknown>) ?? {})) }
   const mapa = { ...(((tema.banner_destaques as Record<string, unknown>) ?? {})) } as Record<string, DestaqueEntry>
   const atual = mapa[bannerId] ?? {}
   mapa[bannerId] = {
     ...atual,
+    ...(data.imagemOrig !== undefined ? { imagemOrig: imagemOrigOut || undefined } : {}),
     ...(data.destaqueAtivo !== undefined || data.destaqueTexto !== undefined || data.fadeAtivo !== undefined || data.fadeNivel !== undefined
       ? {
           ativo: data.destaqueAtivo !== false,

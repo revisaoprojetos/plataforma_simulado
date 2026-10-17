@@ -9,6 +9,9 @@ import { BANCO_CORES } from '@/lib/banco-visual'
 import { Loader2, X, Check, Palette, ImagePlus, Trash2, RefreshCw, Crop } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ImageCropper, type CropState } from '@/app/admin/simulados/criar/image-cropper'
+import { CapaEditorPro, type CapaEditorValue } from '@/components/admin/capa-editor-pro'
+import { CapaCard } from '@/components/aluno/capa-card'
+import { DEFAULT_CAPA_VIEW, type CapaViewCfg } from '@/lib/capa-meta'
 import { type CardView } from '@/lib/card-view'
 import { useRegistrarSalvavel } from '@/components/admin/config-modulo-salvar'
 
@@ -58,11 +61,12 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
   const rot = rotulo ?? 'pasta'
   const Rot = rot.charAt(0).toUpperCase() + rot.slice(1)
   const gp = (m: string, f: string) => (generoM ? m : f) // concordância de gênero
-  const cardRef = useRef<HTMLInputElement>(null)
   const largaRef = useRef<HTMLInputElement>(null)
   const [nome, setNome] = useState(pasta?.nome ?? '')
   const [cor, setCor] = useState<string | null>(pasta?.cor ?? null)
-  const [capaCard, setCapaCard] = useState<string | null>(pasta?.capa ?? null)
+  // Capa do CARD — editor não-destrutivo (igual ao simulado): guarda a imagem ORIGINAL + enquadramento
+  // por formato (pôster/ticket); o card do aluno renderiza por CSS (CapaCard), sem recortar a imagem.
+  const [capaCardPro, setCapaCardPro] = useState<CapaEditorValue>({ orig: pasta?.capa ?? null, poster: { ...DEFAULT_CAPA_VIEW }, ticket: { ...DEFAULT_CAPA_VIEW } })
   const [capaLarga, setCapaLarga] = useState<string | null>(pasta?.capaLarga ?? null)
   const [salvando, setSalvando] = useState(false)
   // Fade lateral do card DESTA pasta (por-pasta, tema.card_fade_pastas[id]). Só p/ simulados/bancos.
@@ -71,14 +75,12 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
   const [fadeCor, setFadeCor] = useState<string>(typeof (cardFade as any)?.cor === 'string' ? (cardFade as any).cor : '')
   // Editor de recorte (posição + zoom) na proporção certa, aberto ao escolher OU ao "Ajustar".
   const [cropper, setCropper] = useState<{ file?: File; src?: string; alvo: 'card' | 'banner'; aspect: number; titulo: string; zoom?: number; center?: { x: number; y: number } } | null>(null)
-  // Fonte ORIGINAL + estado do recorte por imagem — p/ REEDITAR de onde parou (re-recorta do original).
-  const origCard = useRef<File | string | null>(pasta?.capa ?? null)
+  // Fonte ORIGINAL + estado do recorte do BANNER — p/ REEDITAR de onde parou (re-recorta do original).
   const origBanner = useRef<File | string | null>(pasta?.capaLarga ?? null)
-  const cropCard = useRef<CropState | null>(null)
   const cropBanner = useRef<CropState | null>(null)
   // Salvar único (aba Config do módulo): compara com o snapshot inicial p/ saber se há pendência.
-  const snap = () => JSON.stringify({ nome: nome.trim(), cor, capaCard, capaLarga, fadeAtivo, fadeCor })
-  const baseRef = useRef(JSON.stringify({ nome: (pasta?.nome ?? '').trim(), cor: pasta?.cor ?? null, capaCard: pasta?.capa ?? null, capaLarga: pasta?.capaLarga ?? null, fadeAtivo: (cardFade as any)?.ativo === true, fadeCor: typeof (cardFade as any)?.cor === 'string' ? (cardFade as any).cor : '' }))
+  const snap = () => JSON.stringify({ nome: nome.trim(), cor, capaCard: capaCardPro, capaLarga, fadeAtivo, fadeCor })
+  const baseRef = useRef(JSON.stringify({ nome: (pasta?.nome ?? '').trim(), cor: pasta?.cor ?? null, capaCard: { orig: pasta?.capa ?? null, poster: { ...DEFAULT_CAPA_VIEW }, ticket: { ...DEFAULT_CAPA_VIEW } }, capaLarga: pasta?.capaLarga ?? null, fadeAtivo: (cardFade as any)?.ativo === true, fadeCor: typeof (cardFade as any)?.cor === 'string' ? (cardFade as any).cor : '' }))
   const dirty = !criar && snap() !== baseRef.current
 
   useEffect(() => {
@@ -91,48 +93,41 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
   useEffect(() => {
     if (!pasta?.id) return
     lerCapaMeta(pasta.id).then((meta) => {
-      if (meta?.card) { if (meta.card.orig) origCard.current = meta.card.orig; if (meta.card.crop) cropCard.current = meta.card.crop as CropState }
+      if (meta?.card) setCapaCardPro((prev) => ({
+        orig: meta.card?.orig ?? prev.orig,
+        poster: (meta.card?.poster as CapaViewCfg | undefined) ?? prev.poster,
+        ticket: (meta.card?.ticket as CapaViewCfg | undefined) ?? prev.ticket,
+      }))
       if (meta?.banner) { if (meta.banner.orig) origBanner.current = meta.banner.orig; if (meta.banner.crop) cropBanner.current = meta.banner.crop as CropState }
     }).catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pasta?.id])
 
   const c = cor ?? '#6d28d9'
-  const tituloCrop = (alvo: 'card' | 'banner') => (alvo === 'banner' ? 'Ajustar imagem larga' : 'Ajustar capa do card')
-  // O recorte segue o CARD VIEW ATIVO: em TICKET tudo é PAISAGEM (4:3, como o card ticket exibe a
-  // imagem deitada); em PÔSTER a imagem larga fica 16:4 e a capa do card 4:5. Assim o "Ajustar" bate
-  // com o formato realmente exibido.
-  // O BANNER (capa larga) é SEMPRE largo (~2740×400) — usado na trilha/banners, nunca no card/ticket,
-  // então NÃO segue o toggle. Só a imagem do CARD adapta: ticket = paisagem (4:3), pôster = 4:5.
-  const aspectDe = (alvo: 'card' | 'banner') => (alvo === 'banner' ? 2740 / 400 : cardView === 'ticket' ? 4 / 3 : 4 / 5)
-
-  // Escolher um arquivo novo → vira o original desta imagem, zera o estado e abre o recorte.
-  function abrirCropper(f: File | null, alvo: 'card' | 'banner') {
+  const aspectBanner = 2740 / 400
+  // Banner (capa larga) — editor de recorte (pan&zoom). O CARD usa o CapaEditorPro (não-destrutivo).
+  function abrirCropperBanner(f: File | null) {
     if (!f) return
     if (!f.type.startsWith('image/')) { toast.error('Selecione um arquivo de imagem.'); return }
-    if (alvo === 'card') { origCard.current = f; cropCard.current = null } else { origBanner.current = f; cropBanner.current = null }
-    setCropper({ file: f, alvo, aspect: aspectDe(alvo), titulo: tituloCrop(alvo) })
+    origBanner.current = f; cropBanner.current = null
+    setCropper({ file: f, alvo: 'banner', aspect: aspectBanner, titulo: 'Ajustar imagem larga' })
   }
-  // "Ajustar": reabre a partir do ORIGINAL + o zoom/posição salvos → continua de onde parou (sem perda).
-  function ajustarAtual(alvo: 'card' | 'banner') {
-    const base = (alvo === 'card' ? origCard.current : origBanner.current) ?? (alvo === 'card' ? capaCard : capaLarga)
+  function ajustarBanner() {
+    const base = origBanner.current ?? capaLarga
     if (!base) return
-    const est = alvo === 'card' ? cropCard.current : cropBanner.current
-    const comum = { alvo, aspect: aspectDe(alvo), titulo: tituloCrop(alvo), zoom: est?.zoom, center: est ? { x: est.cx, y: est.cy } : undefined }
+    const est = cropBanner.current
+    const comum = { alvo: 'banner' as const, aspect: aspectBanner, titulo: 'Ajustar imagem larga', zoom: est?.zoom, center: est ? { x: est.cx, y: est.cy } : undefined }
     if (base instanceof File) setCropper({ file: base, ...comum })
     else setCropper({ src: base, ...comum })
   }
-  // Recorte (base64) + estado voltam do editor → guarda o recorte e o estado; NÃO mexe no original.
-  function aplicarCrop(base64: string, state: CropState) {
-    const alvo = cropper?.alvo
-    setCropper(null)
-    if (alvo === 'card') { setCapaCard(base64); cropCard.current = state }
-    else if (alvo === 'banner') { setCapaLarga(base64); cropBanner.current = state }
+  function aplicarCropBanner(base64: string, state: CropState) {
+    setCropper(null); setCapaLarga(base64); cropBanner.current = state
   }
 
-  // Monta o capa_meta (ORIGINAL + params de recorte) p/ reeditar depois. Só inclui a imagem que existe.
+  // capa_meta: CARD = ORIGINAL + enquadramento por formato (pôster/ticket, por CSS) → nunca recorta a
+  // imagem. BANNER = original + recorte (pan&zoom). Só inclui a imagem que existe.
   async function montarMeta(): Promise<CapaMetaIn> {
-    const card = capaCard ? { orig: await origParaMeta(origCard.current), crop: cropCard.current } : null
+    const card = capaCardPro.orig ? { orig: await origParaMeta(capaCardPro.orig), poster: capaCardPro.poster, ticket: capaCardPro.ticket } : null
     const banner = capaLarga ? { orig: await origParaMeta(origBanner.current), crop: cropBanner.current } : null
     return { card, banner }
   }
@@ -146,15 +141,15 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
     if (criar) {
       const r = await criarPastaFolder(nome.trim(), paiId, area)
       if (!r.ok || !r.id) { setSalvando(false); toast.error(r.error ?? 'Erro ao criar'); return }
-      await atualizarBanco(r.id, nome.trim(), cor, null, capaLarga, capaCard, meta)
+      await atualizarBanco(r.id, nome.trim(), cor, null, capaLarga, capaCardPro.orig, meta)
       if (mostrarFade) await salvarPastaCardFade(r.id, cf) // fade só desta pasta
       setSalvando(false)
       toast.success(paiId ? `Sub${rot} ${gp('criado', 'criada')}` : `${Rot} ${gp('criado', 'criada')}`); onSaved(); onClose()
     } else {
-      const r = await atualizarBanco(pasta!.id!, nome.trim(), cor, null, capaLarga, capaCard, meta)
+      const r = await atualizarBanco(pasta!.id!, nome.trim(), cor, null, capaLarga, capaCardPro.orig, meta)
       if (mostrarFade && r.ok) await salvarPastaCardFade(pasta!.id!, cf) // fade só desta pasta
       setSalvando(false)
-      if (r.ok) { toast.success(`${Rot} ${gp('atualizado', 'atualizada')}`); onSaved({ nome: nome.trim(), cor, capa: capaCard, capaLarga }); onClose() }
+      if (r.ok) { toast.success(`${Rot} ${gp('atualizado', 'atualizada')}`); onSaved({ nome: nome.trim(), cor, capa: capaCardPro.orig, capaLarga }); onClose() }
       else toast.error(r.error ?? 'Erro ao salvar')
     }
   }
@@ -166,7 +161,7 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
     setSalvando(true)
     const meta = await montarMeta()
     const cf = { ativo: fadeAtivo, cor: fadeCor.trim() || null }
-    const r = await atualizarBanco(pasta.id, nome.trim(), cor, null, capaLarga, capaCard, meta)
+    const r = await atualizarBanco(pasta.id, nome.trim(), cor, null, capaLarga, capaCardPro.orig, meta)
     if (mostrarFade && r.ok) await salvarPastaCardFade(pasta.id, cf)
     setSalvando(false)
     // NÃO chama onSaved aqui: ele faz router.refresh() e remontaria os demais forms no meio do salvar
@@ -180,9 +175,9 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
   const btnOverlay = 'inline-flex items-center gap-1 rounded-md bg-black/60 px-2 py-1 text-xs font-medium text-white backdrop-blur hover:bg-black/70'
 
   const dialogo = (
-      <div role="dialog" aria-modal={!inline} className={cn('relative grid grid-cols-1 overflow-hidden rounded-2xl border bg-card md:grid-cols-[1fr_260px]', inline ? '' : 'animate-pop max-h-[88vh] w-full max-w-3xl shadow-2xl')}>
-        {/* Form */}
-        <div className="min-w-0 overflow-auto">
+      <div role="dialog" aria-modal={!inline} className={cn('relative grid grid-cols-1 overflow-hidden rounded-2xl border bg-card md:grid-cols-[1fr_340px]', inline ? '' : 'animate-pop max-h-[90vh] w-full max-w-5xl shadow-2xl grid-rows-1')}>
+        {/* Form (rola internamente — min-h-0 deixa a coluna encolher dentro do max-h do diálogo). */}
+        <div className="flex min-h-0 min-w-0 flex-col overflow-y-auto">
           <div className="flex items-center justify-between border-b px-5 py-3">
             <h3 className="flex items-center gap-2 text-sm font-semibold"><Palette className="h-4 w-4" /> {criar ? (paiId ? `${gp('Novo', 'Nova')} sub${rot}` : `${gp('Novo', 'Nova')} ${rot}`) : `Personalizar ${rot}`}</h3>
             {!inline && <button type="button" onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground md:hidden"><X className="h-4 w-4" /></button>}
@@ -194,45 +189,24 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
                 className="w-full rounded-lg border bg-[var(--input-bg,transparent)] px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-ring" />
             </div>
 
-            {/* Capa do card (imagem inteira, 4:5) */}
+            {/* Capa do card — editor NÃO-DESTRUTIVO (igual ao simulado): guarda a imagem inteira e enquadra
+                por formato (pôster/ticket) via CSS. A imagem fora do enquadramento NUNCA é perdida. */}
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">Capa (imagem inteira — usada no card)</label>
-              <p className="text-[11px] text-muted-foreground/70">
-                {cardView === 'ticket' ? 'Proporção 4:3 (horizontal) · ex.: 1200×900px' : 'Proporção 4:5 (vertical) · ex.: 1000×1250px'} · JPG, PNG ou WebP
-              </p>
-              <input ref={cardRef} type="file" accept="image/*" className="hidden" onChange={(e) => { abrirCropper(e.target.files?.[0] ?? null, 'card'); e.target.value = '' }} />
-              {capaCard ? (
-                // Miniatura na PROPORÇÃO do card do modo ativo (pôster 4:5 / ticket 4:3), altura fixa
-                // (um pouco maior p/ os botões do topo não cobrirem a imagem).
-                <div className="relative mx-auto max-w-full overflow-hidden rounded-xl border" style={{ aspectRatio: String(aspectDe('card')), height: 210 }}>
-                  <img src={capaCard} alt="Capa" className="absolute inset-0 h-full w-full object-cover" />
-                  <div className="absolute right-2 top-2 flex gap-1.5">
-                    <button type="button" onClick={() => ajustarAtual('card')} className={btnOverlay}><Crop className="h-3.5 w-3.5" /> Ajustar</button>
-                    <button type="button" onClick={() => cardRef.current?.click()} className={btnOverlay}><RefreshCw className="h-3.5 w-3.5" /> Trocar</button>
-                    <button type="button" onClick={() => setCapaCard(null)} className={cn(btnOverlay, 'hover:bg-rose-600')}><Trash2 className="h-3.5 w-3.5" /> Remover</button>
-                  </div>
-                </div>
-              ) : (
-                <button type="button" onClick={() => cardRef.current?.click()}
-                  className="flex h-32 w-full flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed text-muted-foreground transition-colors hover:border-primary hover:text-foreground">
-                  <ImagePlus className="h-6 w-6" />
-                  <span className="text-sm font-medium">Adicionar capa do card</span>
-                  <span className="text-[11px] text-muted-foreground/70">{cardView === 'ticket' ? '4:3 · ex.: 1200×900px' : '4:5 · ex.: 1000×1250px'}</span>
-                </button>
-              )}
+              <label className="text-xs font-medium text-muted-foreground">Capa (imagem do card)</label>
+              <CapaEditorPro value={capaCardPro} onChange={setCapaCardPro} cor={c} icone={null} prepararImagem={(f) => redimensionar(f)} />
             </div>
 
             {/* Imagem larga (banner 16:4 — trilha e card ticket) */}
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">Imagem larga (banner — usada na trilha e no card ticket)</label>
               <p className="text-[11px] text-muted-foreground/70">Bem larga (~7:1, horizontal) · ex.: 2740×400px · JPG, PNG ou WebP</p>
-              <input ref={largaRef} type="file" accept="image/*" className="hidden" onChange={(e) => { abrirCropper(e.target.files?.[0] ?? null, 'banner'); e.target.value = '' }} />
+              <input ref={largaRef} type="file" accept="image/*" className="hidden" onChange={(e) => { abrirCropperBanner(e.target.files?.[0] ?? null); e.target.value = '' }} />
               {capaLarga ? (
                 // Banner largo: tira de largura total na proporção real (~2740×400) — fica baixa, nunca gigante.
-                <div className="relative w-full overflow-hidden rounded-xl border" style={{ aspectRatio: String(aspectDe('banner')) }}>
+                <div className="relative w-full overflow-hidden rounded-xl border" style={{ aspectRatio: String(aspectBanner) }}>
                   <img src={capaLarga} alt="Imagem larga" className="absolute inset-0 h-full w-full object-cover" />
                   <div className="absolute right-2 top-2 flex gap-1.5">
-                    <button type="button" onClick={() => ajustarAtual('banner')} className={btnOverlay}><Crop className="h-3.5 w-3.5" /> Ajustar</button>
+                    <button type="button" onClick={ajustarBanner} className={btnOverlay}><Crop className="h-3.5 w-3.5" /> Ajustar</button>
                     <button type="button" onClick={() => largaRef.current?.click()} className={btnOverlay}><RefreshCw className="h-3.5 w-3.5" /> Trocar</button>
                     <button type="button" onClick={() => setCapaLarga(null)} className={cn(btnOverlay, 'hover:bg-rose-600')}><Trash2 className="h-3.5 w-3.5" /> Remover</button>
                   </div>
@@ -300,19 +274,29 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
           </div>
         </div>
 
-        {/* Prévia do card da pasta — espelha o estilo do console (pôster × ticket). */}
-        <div className="hidden flex-col gap-2 border-l bg-muted/20 p-4 md:flex">
-          <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Prévia{cardView === 'ticket' ? ' · ticket' : ''}</p>
-          {cardView === 'ticket' ? (
-            // Ticket: imagem deitada à esquerda + nome à direita. Usa a CAPA (capa_card_url) primeiro,
-            // igual ao card ticket do admin (que exibe a capa deitada), caindo p/ a imagem larga.
+        {/* Prévia — como o ALUNO vê: pôster + ticket (+ banner, se houver). Preenche a coluna direita. */}
+        <div className="hidden min-h-0 flex-col gap-4 overflow-y-auto border-l bg-muted/20 p-4 md:flex">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Prévia · como o aluno vê</p>
+
+          {/* Card PÔSTER (4:5) */}
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Card pôster</p>
+            <div className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl border shadow-sm">
+              <CapaCard capa={capaCardPro.orig ?? capaLarga} cor={c} orig={capaCardPro.orig} cfg={capaCardPro.poster} />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
+              <div className="absolute inset-x-0 bottom-0 z-20 p-3">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-white/70">{Rot}</p>
+                <h3 className="mt-0.5 line-clamp-2 text-sm font-bold leading-tight text-white drop-shadow-sm">{nome || `Nome ${gp('do', 'da')} ${rot}`}</h3>
+              </div>
+            </div>
+          </div>
+
+          {/* Card TICKET — IGUAL ao ticket do aluno/admin: capa 4:3 à esquerda + nome à direita. */}
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Card ticket</p>
             <div className="relative flex h-28 w-full overflow-hidden rounded-2xl border bg-card shadow-sm">
               <div className="relative h-full aspect-[4/3] shrink-0 overflow-hidden">
-                {(capaCard ?? capaLarga) ? (
-                  <img src={(capaCard ?? capaLarga)!} alt="" className="absolute inset-0 h-full w-full object-cover" />
-                ) : (
-                  <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }} />
-                )}
+                <CapaCard capa={capaCardPro.orig ?? capaLarga} cor={c} orig={capaCardPro.orig} cfg={capaCardPro.ticket} />
                 {fadeAtivo && <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `linear-gradient(110deg, transparent 45%, ${fadeCor || c})` }} />}
               </div>
               <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 p-3">
@@ -320,26 +304,25 @@ export function EditarPastaDialog({ pasta, area, paiId = null, cardView = 'poste
                 <h3 className="line-clamp-2 text-sm font-bold leading-tight text-foreground">{nome || `Nome ${gp('do', 'da')} ${rot}`}</h3>
               </div>
             </div>
-          ) : (
-            // Pôster (4:5): a imagem do card (capa inteira) preenche tudo, com o nome sobreposto.
-            <div className="relative aspect-[4/5] w-full overflow-hidden rounded-2xl border shadow-sm">
-              {(capaCard ?? capaLarga) ? (
-                <img src={(capaCard ?? capaLarga)!} alt="" className="absolute inset-0 h-full w-full object-cover" />
-              ) : (
-                <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }} />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
-              <div className="absolute inset-x-0 bottom-0 z-20 p-3">
-                <p className="text-[10px] font-medium uppercase tracking-wide text-white/70">{Rot}</p>
-                <h3 className="mt-0.5 line-clamp-2 text-sm font-bold leading-tight text-white drop-shadow-sm">{nome || `Nome ${gp('do', 'da')} ${rot}`}</h3>
+          </div>
+
+          {/* Banner (trilha) — só quando há imagem larga. */}
+          {capaLarga && (
+            <div className="space-y-1.5">
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground/70">Banner (trilha)</p>
+              <div className="relative w-full overflow-hidden rounded-lg border" style={{ aspectRatio: String(aspectBanner) }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={capaLarga} alt="" className="absolute inset-0 h-full w-full object-cover" />
               </div>
             </div>
           )}
+
+          <p className="mt-auto text-[10px] leading-relaxed text-muted-foreground/70">O card do aluno fica idêntico a estas prévias — o enquadramento é por CSS, a imagem inteira fica guardada.</p>
         </div>
       </div>
   )
 
-  const cropperEl = cropper && <ImageCropper file={cropper.file} src={cropper.src} aspect={cropper.aspect} titulo={cropper.titulo} initialZoom={cropper.zoom} initialCenter={cropper.center} onCancel={() => setCropper(null)} onConfirm={aplicarCrop} />
+  const cropperEl = cropper && <ImageCropper file={cropper.file} src={cropper.src} aspect={cropper.aspect} titulo={cropper.titulo} initialZoom={cropper.zoom} initialCenter={cropper.center} onCancel={() => setCropper(null)} onConfirm={aplicarCropBanner} />
 
   if (inline) return <>{dialogo}{cropperEl}</>
 

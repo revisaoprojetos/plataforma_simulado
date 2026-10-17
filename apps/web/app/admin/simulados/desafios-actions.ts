@@ -4,6 +4,7 @@
 // (simulado_pastas, folder_area='maratona') — assim reusamos os componentes da plataforma
 // (ModuloAcesso por pastaId, RankingAdmin por moduloId) exatamente como no JurisClub.
 
+import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { checkPermission } from '@/lib/auth/permissions'
@@ -13,10 +14,31 @@ import { normalizarCarimbos, normalizarConquistasModulo, type CarimboDef, type M
 import type { SimuladoCard } from '@/components/admin/simulados-board'
 import { criarPastaFolder } from '@/app/admin/banco-questoes/actions'
 import { MARATONA, type MaratonaConfig } from '@/lib/maratona/config'
+import { normalizarRegulamento, type RegulamentoConfig } from '@/lib/leitura/regulamento'
 import type { RankingLeituraItem } from '@/lib/leitura/ranking'
 
 // Config do desafio (persistida em desafio_jogo.config). Além da MaratonaConfig que alimenta o card do
 // aluno, guarda o estado do editor de capa (original + recorte) p/ reajustar de onde parou (não-destrutivo).
+/** Uma ETAPA da maratona = um simulado colocado numa ÁREA do percurso. A maratona tem 3 áreas de simulado
+ *  (os 3 checkpoints); `slot` (1,2,3) define EM QUAL área o link/acesso do simulado aparece. `slot` ausente
+ *  = não incluído no percurso (fica só na ordem como fallback). Data/liberação/regras vêm do PRÓPRIO
+ *  simulado. Persistida em `config.etapas` (jsonb, sem migração). */
+export type EtapaMaratona = {
+  simuladoId: string
+  /** Área do percurso (1, 2 ou 3) onde este simulado aparece. Ausente = não incluído. */
+  slot?: number
+  /** Nome EXIBIDO na maratona (dropdown/percurso). Texto é SEMPRE preservado (mesmo com a opção desligada),
+   *  pra não perder o que foi digitado; `rotuloOn` diz se ele deve ser APLICADO. Vazio = usa o nome real. */
+  rotulo?: string
+  /** Aplica o `rotulo` (nome personalizado) na maratona? false = usa o nome real, mas mantém o texto salvo.
+   *  Ausente (dados antigos) = aplica se houver texto (retrocompat). */
+  rotuloOn?: boolean
+  /** Tempo MÍNIMO de permanência NO SIMULADO, em SEGUNDOS, para o aluno ganhar o CHECK-IN (selo) desta etapa.
+   *  O aluno precisa ficar ao menos este tempo (ex.: 1200 = 20min). 0/ausente = sem mínimo (qualquer
+   *  encerramento já dá o check). O tempo real do aluno é o que conta no "tempo decorrido". */
+  segMin?: number
+}
+
 export type ConfigDesafioSim = MaratonaConfig & {
   lancada: boolean
   capaOrig?: string | null
@@ -25,6 +47,8 @@ export type ConfigDesafioSim = MaratonaConfig & {
   // alunos com acesso) em vez do número fixo. Default = automático (reflete o que existe de verdade).
   qtdSimuladosAuto?: boolean
   inscritosAuto?: boolean
+  /** Ordem + organização das etapas da maratona (ordem do array = sequência). */
+  etapas?: EtapaMaratona[]
 }
 
 export type ContagemDesafio = { simulados: number; inscritos: number }
@@ -72,7 +96,15 @@ export async function salvarConfigMaratona(pastaId: string, patch: Partial<Confi
   const dj = ((data as any)?.desafio_jogo && typeof (data as any).desafio_jogo === 'object') ? { ...(data as any).desafio_jogo } : {}
   dj.config = { ...(dj.config && typeof dj.config === 'object' ? dj.config : {}), ...p }
   const { error } = await svc.from('simulado_pastas').update({ desafio_jogo: dj }).eq('id', pastaId).eq('tenant_id', tenantId)
-  return error ? { ok: false, error: error.message } : { ok: true }
+  if (error) return { ok: false, error: error.message }
+  revalidatePath('/admin/simulados') // reflete capa/título novos no board e nos diálogos de mover/copiar
+  return { ok: true }
+}
+
+/** Salva o REGULAMENTO do desafio (merge em desafio_jogo.config.regulamento). Mesma assinatura do
+ *  salvarRegulamentoModulo (Lei Seca) p/ injetar no ModuloRegulamentoForm. PDF/vídeo/descrição. */
+export async function salvarRegulamentoDesafio(pastaId: string, cfg: RegulamentoConfig): Promise<{ ok: boolean; error?: string }> {
+  return await salvarConfigMaratona(pastaId, { regulamento: normalizarRegulamento(cfg) })
 }
 
 /** Garante a pasta real do desafio Maratona (cria na 1ª vez). Retorna o id p/ wirar os componentes reais. */

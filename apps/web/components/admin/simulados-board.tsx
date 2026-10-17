@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { EditarPastaDialog } from '@/components/admin/editar-pasta-dialog'
 import { CapaCard } from '@/components/aluno/capa-card'
 import type { CapaViewCfg } from '@/lib/capa-meta'
+// (CapaViewCfg usado também no enquadramento não-destrutivo das capas de pasta)
 import { FileiraHorizontal } from '@/components/fileira-horizontal'
 import { excluirPastaFolder } from '@/app/admin/banco-questoes/actions'
 import type { TipoSimulado } from '@/lib/simulado/tipo'
@@ -53,6 +54,8 @@ import {
   Rows3,
   GalleryHorizontalEnd,
   Users,
+  Search,
+  FolderSymlink,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { iconeBanco } from '@/lib/banco-visual'
@@ -71,6 +74,7 @@ import {
   liberarItemAction,
   onlinePorSimulado,
   moverSimuladoParaPasta,
+  copiarSimuladoParaPasta,
 } from '@/app/admin/simulados/actions'
 
 export interface SimuladoCard {
@@ -184,9 +188,9 @@ function LiberacaoChip({ label, on, pending, onClick }: { label: string; on: boo
 }
 
 /** Cartão de simulado (admin): capa em cima, corpo com chips, LIBERAÇÕES clicáveis e ações inline. */
-export function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onSelecionar, variant = 'poster' }: {
+export function CardSimuladoAdmin({ s, appUrl, online, onMover, onCopiar, selecionado, onSelecionar, variant = 'poster' }: {
   s: SimuladoCard; appUrl: string; online: number
-  onMover?: () => void; selecionado: boolean; onSelecionar: (v: boolean) => void; variant?: CardView
+  onMover?: () => void; onCopiar?: () => void; selecionado: boolean; onSelecionar: (v: boolean) => void; variant?: CardView
 }) {
   const router = useRouter()
   const sp = useSearchParams()
@@ -266,7 +270,8 @@ export function CardSimuladoAdmin({ s, appUrl, online, onMover, selecionado, onS
       <DropdownMenuSeparator />
       <DropdownMenuItem onClick={copiarLink}><Copy className="mr-2 h-4 w-4" /> Copiar link</DropdownMenuItem>
       <DropdownMenuItem onClick={abrirSimulado}><ExternalLink className="mr-2 h-4 w-4" /> Abrir aplicação</DropdownMenuItem>
-      {onMover && <DropdownMenuItem onClick={onMover}><FolderInput className="mr-2 h-4 w-4" /> Mover para pasta</DropdownMenuItem>}
+      {onMover && <DropdownMenuItem onClick={onMover}><FolderInput className="mr-2 h-4 w-4" /> Mover para…</DropdownMenuItem>}
+      {onCopiar && <DropdownMenuItem onClick={onCopiar}><FolderSymlink className="mr-2 h-4 w-4" /> Copiar para…</DropdownMenuItem>}
       <DropdownMenuSeparator />
       {s.status === 'publicado' && <DropdownMenuItem onClick={() => acao(encerrarSimuladoAction, 'Simulado encerrado')}><Square className="mr-2 h-4 w-4" /> Encerrar</DropdownMenuItem>}
       {s.status === 'encerrado' && <DropdownMenuItem onClick={() => acao(reabrirSimuladoAction, 'Simulado reaberto')}><Play className="mr-2 h-4 w-4" /> Reabrir</DropdownMenuItem>}
@@ -498,8 +503,8 @@ function NovoTile({ pastaNome, variant = 'poster' }: { pastaNome?: string; varia
   )
 }
 
-type PastaSim = { id: string; nome: string; cor?: string | null; icone?: string | null; capa?: string | null; capaLarga?: string | null; count: number; cardFade?: { ativo?: boolean; cor?: string | null } | null }
-export type DestinoSim = { id: string; nome: string }
+type PastaSim = { id: string; nome: string; cor?: string | null; icone?: string | null; capa?: string | null; capaLarga?: string | null; count: number; cardFade?: { ativo?: boolean; cor?: string | null } | null; orig?: string | null; cfgPoster?: CapaViewCfg | null; cfgTicket?: CapaViewCfg | null }
+export type DestinoSim = { id: string; nome: string; tipo?: 'pasta' | 'desafio'; capa?: string | null; cor?: string | null; icone?: string | null; paiId?: string | null }
 export type SimuladoCatalogo = SimuladoCard & { grupoId: string | null }
 
 export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders = [], destinos = [], atual = null, catalogo, cardView = 'poster', vistaInicial, breadcrumb = [] }: {
@@ -518,6 +523,7 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
   const [busca, setBusca] = useState('')
   const [modo, setModo] = useState<string>('todos')
   const [movendo, setMovendo] = useState<SimuladoCard | null>(null)
+  const [copiando, setCopiando] = useState<SimuladoCard | null>(null)
   const [editandoPasta, setEditandoPasta] = useState<PastaSim | null>(null)
   const [selecao, setSelecao] = useState<Set<string>>(new Set())
 
@@ -600,9 +606,8 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
   // Grade de tiles das pastas/subpastas deste nível — reusada pelas 3 vistas (raiz e dentro de pasta).
   const tilesGrid = secoesPasta.pastas.length > 0 ? (
     <div className={gradeCls(cardView)}>
-      {secoesPasta.pastas.map(({ folder, sims }) => folder && (
+      {secoesPasta.pastas.map(({ folder }) => folder && (
         <FolderTile key={folder.id} folder={folder} count={folder.count} appUrl={appUrl}
-          capaFallback={sims.map((s) => s.vis?.capa ?? s.vis?.capaBanner ?? null).find(Boolean) ?? null}
           onPersonalizar={() => setEditandoPasta(folder)} onExcluir={() => excluirPasta(folder)} variant={cardView} />
       ))}
     </div>
@@ -660,7 +665,7 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
       {vista === 'status' ? (
         <div className="space-y-6">
           {atual && tilesGrid}
-          <SecoesStatus sims={filtrados} online={online} appUrl={appUrl} onMover={podeMover ? (s) => setMovendo(s) : undefined}
+          <SecoesStatus sims={filtrados} online={online} appUrl={appUrl} onMover={podeMover ? (s) => setMovendo(s) : undefined} onCopiar={(s) => setCopiando(s)}
             recolhidas={recolhidas} toggleSecao={toggleSecao} selecao={selecao} onSelecionar={setSel} variant={cardView} />
         </div>
       ) : vista === 'pastas' ? (
@@ -670,11 +675,11 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
           {atual ? (
             <SecaoSimples titulo={atual.nome} icone={FolderOpen} sims={secoesPasta.semPasta} online={online} appUrl={appUrl}
               aberto={!recolhidas.has('sem-pasta')} toggle={() => toggleSecao('sem-pasta')}
-              onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel} mostrarNovo layout="grade" variant={cardView} />
+              onMover={podeMover ? (s) => setMovendo(s) : undefined} onCopiar={(s) => setCopiando(s)} selecao={selecao} onSelecionar={setSel} mostrarNovo layout="grade" variant={cardView} />
           ) : secoesPasta.semPasta.length > 0 ? (
             <SecaoSimples titulo="Sem pasta" icone={FolderInput} sims={secoesPasta.semPasta} online={online} appUrl={appUrl}
               aberto={!recolhidas.has('sem-pasta')} toggle={() => toggleSecao('sem-pasta')}
-              onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel} layout="grade" variant={cardView} />
+              onMover={podeMover ? (s) => setMovendo(s) : undefined} onCopiar={(s) => setCopiando(s)} selecao={selecao} onSelecionar={setSel} layout="grade" variant={cardView} />
           ) : null}
           {secoesPasta.pastas.length === 0 && secoesPasta.semPasta.length === 0 && (
             <p className="rounded-2xl border border-dashed py-14 text-center text-sm text-muted-foreground">{atual ? 'Pasta vazia.' : 'Nenhuma pasta ainda. Crie a primeira em “Nova pasta”.'}</p>
@@ -686,7 +691,7 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
           {tilesGrid}
           <SecaoSimples titulo={atual.nome} icone={FolderOpen} sims={secoesPasta.semPasta} online={online} appUrl={appUrl}
             aberto={!recolhidas.has('sem-pasta')} toggle={() => toggleSecao('sem-pasta')}
-            onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel}
+            onMover={podeMover ? (s) => setMovendo(s) : undefined} onCopiar={(s) => setCopiando(s)} selecao={selecao} onSelecionar={setSel}
             mostrarNovo layout="fileira" variant={cardView} />
         </div>
       ) : (
@@ -696,14 +701,14 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
             folder && <PastaSection key={folder.id} folder={folder} sims={sims} online={online} appUrl={appUrl}
               aberto={!recolhidas.has(`p:${folder.id}`)} toggle={() => toggleSecao(`p:${folder.id}`)}
               onGerenciar={() => setEditandoPasta(folder)} onExcluir={() => excluirPasta(folder)}
-              onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel} variant={cardView} />
+              onMover={podeMover ? (s) => setMovendo(s) : undefined} onCopiar={(s) => setCopiando(s)} selecao={selecao} onSelecionar={setSel} variant={cardView} />
           ))}
 
           {secoesPasta.semPasta.length > 0 && (
             <SecaoSimples titulo="Sem pasta" icone={FolderInput}
               sims={secoesPasta.semPasta} online={online} appUrl={appUrl}
               aberto={!recolhidas.has('sem-pasta')} toggle={() => toggleSecao('sem-pasta')}
-              onMover={podeMover ? (s) => setMovendo(s) : undefined} selecao={selecao} onSelecionar={setSel} variant={cardView} />
+              onMover={podeMover ? (s) => setMovendo(s) : undefined} onCopiar={(s) => setCopiando(s)} selecao={selecao} onSelecionar={setSel} variant={cardView} />
           )}
 
           {folders.length === 0 && secoesPasta.semPasta.length === 0 && (
@@ -720,6 +725,7 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
       )}
 
       {movendo && <MoverSimuladoDialog simulado={movendo} destinos={destinos} atualId={atual?.id ?? null} onClose={() => setMovendo(null)} />}
+      {copiando && <CopiarSimuladoDialog simulado={copiando} destinos={destinos} atualId={atual?.id ?? null} onClose={() => setCopiando(null)} />}
       {editandoPasta && (
         <EditarPastaDialog
           pasta={{ id: editandoPasta.id, nome: editandoPasta.nome, cor: editandoPasta.cor ?? null, capa: editandoPasta.capa ?? null, capaLarga: (editandoPasta as any).capaLarga ?? null }}
@@ -735,14 +741,14 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
 /** Uma seção de PASTA: cabeçalho (nome + contagem + status + ações em massa) e grade de cards. */
 /** Tile de PASTA (view "Pastas"): pôster que leva para dentro da pasta (?pasta=id) → simulados de lá.
  *  Menu de 3 pontos: personalizar, copiar link e excluir. */
-function FolderTile({ folder, count, appUrl, onPersonalizar, onExcluir, variant = 'poster', capaFallback = null }: {
-  folder: PastaSim; count: number; appUrl: string; onPersonalizar: () => void; onExcluir: () => void; variant?: CardView; capaFallback?: string | null
+function FolderTile({ folder, count, appUrl, onPersonalizar, onExcluir, variant = 'poster' }: {
+  folder: PastaSim; count: number; appUrl: string; onPersonalizar: () => void; onExcluir: () => void; variant?: CardView
 }) {
   const cor = folder.cor ?? '#6d28d9'
   const Icon = iconeBanco(folder.icone)
-  // Capa efetiva: a da PASTA (card→banner); se não tiver, cai na capa de um SIMULADO de dentro (fallback)
-  // → pastas sem capa própria não ficam com o gradiente "vazio".
-  const capaEff = folder.capa ?? folder.capaLarga ?? capaFallback ?? null
+  // Capa efetiva: SOMENTE a da PASTA (card→banner). Sem capa própria → placeholder (cor/ícone);
+  // NÃO empresta a capa de um simulado de dentro (evita a pasta "roubar" a imagem de um simulado).
+  const capaEff = folder.capa ?? folder.capaLarga ?? null
   // Fade lateral POR PASTA (tema.card_fade_pastas[id]) — DESLIGADO por padrão; liga só quem marcar.
   const fadeOn = folder.cardFade?.ativo === true
   const fadeCor = folder.cardFade?.cor || cor
@@ -767,10 +773,8 @@ function FolderTile({ folder, count, appUrl, onPersonalizar, onExcluir, variant 
     return (
       <div className="group relative flex h-32 overflow-hidden rounded-2xl border bg-card shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg sm:h-36">
         <div className="relative w-[38%] max-w-[12rem] shrink-0 overflow-hidden">
-          {capaT
-            ? <img src={capaT} alt="" className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105" />
-            : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
-          {!capaT && <Icon className="absolute -right-4 -top-4 h-28 w-28 text-white/10" />}
+          {/* Enquadramento não-destrutivo (CapaCard): mostra a imagem INTEIRA posicionada por CSS. */}
+          <CapaCard capa={folder.orig ?? capaT} cor={cor} icone={folder.icone} orig={folder.orig ?? undefined} cfg={folder.cfgTicket ?? undefined} />
           {fadeOn && <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `linear-gradient(110deg, transparent 45%, ${fadeCor})` }} />}
         </div>
         <Link href={href} className="absolute inset-0 z-10" aria-label={folder.nome} />
@@ -805,13 +809,8 @@ function FolderTile({ folder, count, appUrl, onPersonalizar, onExcluir, variant 
     <div className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
       {/* Pôster clicável (entra na pasta). */}
       <Link href={href} className="absolute inset-0 flex flex-col justify-end outline-none focus-visible:ring-2 focus-visible:ring-primary/50">
-        {capaEff ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={capaEff} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-        ) : (
-          <div className="absolute inset-0" style={{ background: `linear-gradient(150deg, ${cor} 0%, #0f172a 150%)` }} />
-        )}
-        {!capaEff && <Icon className="pointer-events-none absolute -right-4 -top-4 h-24 w-24 text-white/10" />}
+        {/* Enquadramento não-destrutivo (CapaCard): imagem INTEIRA posicionada por CSS (pôster). */}
+        <CapaCard capa={folder.orig ?? capaEff} cor={cor} icone={folder.icone} orig={folder.orig ?? undefined} cfg={folder.cfgPoster ?? undefined} />
         <div className="relative bg-gradient-to-t from-black/85 via-black/45 to-transparent p-3 pt-8">
           <p className="line-clamp-2 text-[13px] font-bold leading-tight text-white">{folder.nome}</p>
           <p className="mt-0.5 text-[11px] font-medium text-white/80">{count} simulado(s)</p>
@@ -833,10 +832,10 @@ function FolderTile({ folder, count, appUrl, onPersonalizar, onExcluir, variant 
   )
 }
 
-function PastaSection({ folder, sims, online, appUrl, aberto, toggle, onGerenciar, onExcluir, onMover, selecao, onSelecionar, variant = 'poster', layout = 'fileira' }: {
+function PastaSection({ folder, sims, online, appUrl, aberto, toggle, onGerenciar, onExcluir, onMover, onCopiar, selecao, onSelecionar, variant = 'poster', layout = 'fileira' }: {
   folder: PastaSim; sims: SimuladoCard[]; online: Record<string, number>; appUrl: string
   aberto: boolean; toggle: () => void; onGerenciar: () => void; onExcluir: () => void
-  onMover?: (s: SimuladoCard) => void; selecao: Set<string>; onSelecionar: (id: string, v: boolean) => void; variant?: CardView; layout?: 'fileira' | 'grade'
+  onMover?: (s: SimuladoCard) => void; onCopiar?: (s: SimuladoCard) => void; selecao: Set<string>; onSelecionar: (id: string, v: boolean) => void; variant?: CardView; layout?: 'fileira' | 'grade'
 }) {
   const st = statusPasta(sims)
   // Link da PASTA para o aluno: abre a home filtrada nesta pasta. Sem login, o proxy manda para
@@ -879,7 +878,7 @@ function PastaSection({ folder, sims, online, appUrl, aberto, toggle, onGerencia
         <div className={gradeCls(variant)}>
           {sims.map((s) => (
             <CardSimuladoAdmin key={s.id} s={s} appUrl={appUrl} online={online[s.id] ?? 0} variant={variant}
-              onMover={onMover ? () => onMover(s) : undefined} selecionado={selecao.has(s.id)} onSelecionar={(v) => onSelecionar(s.id, v)} />
+              onMover={onMover ? () => onMover(s) : undefined} onCopiar={onCopiar ? () => onCopiar(s) : undefined} selecionado={selecao.has(s.id)} onSelecionar={(v) => onSelecionar(s.id, v)} />
           ))}
           <NovoTile pastaNome={folder.nome} variant={variant} />
         </div>
@@ -888,7 +887,7 @@ function PastaSection({ folder, sims, online, appUrl, aberto, toggle, onGerencia
           {sims.map((s) => (
             <div key={s.id} className={variant === 'ticket' ? CARD_BASIS_TICKET : CARD_BASIS}>
               <CardSimuladoAdmin s={s} appUrl={appUrl} online={online[s.id] ?? 0} variant={variant}
-                onMover={onMover ? () => onMover(s) : undefined} selecionado={selecao.has(s.id)} onSelecionar={(v) => onSelecionar(s.id, v)} />
+                onMover={onMover ? () => onMover(s) : undefined} onCopiar={onCopiar ? () => onCopiar(s) : undefined} selecionado={selecao.has(s.id)} onSelecionar={(v) => onSelecionar(s.id, v)} />
             </div>
           ))}
           <div className={variant === 'ticket' ? CARD_BASIS_TICKET : CARD_BASIS}><NovoTile pastaNome={folder.nome} variant={variant} /></div>
@@ -899,9 +898,9 @@ function PastaSection({ folder, sims, online, appUrl, aberto, toggle, onGerencia
 }
 
 /** Seção simples (sem ações de pasta) — usada para "Sem pasta" e para o nível de dentro de uma pasta. */
-function SecaoSimples({ titulo, icone: Icone, sims, online, appUrl, aberto, toggle, onMover, selecao, onSelecionar, mostrarNovo, variant = 'poster', layout = 'fileira' }: {
+function SecaoSimples({ titulo, icone: Icone, sims, online, appUrl, aberto, toggle, onMover, onCopiar, selecao, onSelecionar, mostrarNovo, variant = 'poster', layout = 'fileira' }: {
   titulo: string; icone: any; sims: SimuladoCard[]; online: Record<string, number>; appUrl: string
-  aberto: boolean; toggle: () => void; onMover?: (s: SimuladoCard) => void
+  aberto: boolean; toggle: () => void; onMover?: (s: SimuladoCard) => void; onCopiar?: (s: SimuladoCard) => void
   selecao: Set<string>; onSelecionar: (id: string, v: boolean) => void; mostrarNovo?: boolean; variant?: CardView; layout?: 'fileira' | 'grade'
 }) {
   return (
@@ -919,7 +918,7 @@ function SecaoSimples({ titulo, icone: Icone, sims, online, appUrl, aberto, togg
           <div className={gradeCls(variant)}>
             {sims.map((s) => (
               <CardSimuladoAdmin key={s.id} s={s} appUrl={appUrl} online={online[s.id] ?? 0} variant={variant}
-                onMover={onMover ? () => onMover(s) : undefined} selecionado={selecao.has(s.id)} onSelecionar={(v) => onSelecionar(s.id, v)} />
+                onMover={onMover ? () => onMover(s) : undefined} onCopiar={onCopiar ? () => onCopiar(s) : undefined} selecionado={selecao.has(s.id)} onSelecionar={(v) => onSelecionar(s.id, v)} />
             ))}
             {mostrarNovo && <NovoTile pastaNome={titulo} variant={variant} />}
           </div>
@@ -928,7 +927,7 @@ function SecaoSimples({ titulo, icone: Icone, sims, online, appUrl, aberto, togg
             {sims.map((s) => (
               <div key={s.id} className={variant === 'ticket' ? CARD_BASIS_TICKET : CARD_BASIS}>
                 <CardSimuladoAdmin s={s} appUrl={appUrl} online={online[s.id] ?? 0} variant={variant}
-                  onMover={onMover ? () => onMover(s) : undefined} selecionado={selecao.has(s.id)} onSelecionar={(v) => onSelecionar(s.id, v)} />
+                  onMover={onMover ? () => onMover(s) : undefined} onCopiar={onCopiar ? () => onCopiar(s) : undefined} selecionado={selecao.has(s.id)} onSelecionar={(v) => onSelecionar(s.id, v)} />
               </div>
             ))}
             {mostrarNovo && <div className={variant === 'ticket' ? CARD_BASIS_TICKET : CARD_BASIS}><NovoTile pastaNome={titulo} variant={variant} /></div>}
@@ -940,9 +939,9 @@ function SecaoSimples({ titulo, icone: Icone, sims, online, appUrl, aberto, togg
 }
 
 /** Seções por status (Em andamento / A iniciar / Encerrado) em grade — vista "Status". */
-function SecoesStatus({ sims, online, appUrl, onMover, recolhidas, toggleSecao, selecao, onSelecionar, variant = 'poster' }: {
+function SecoesStatus({ sims, online, appUrl, onMover, onCopiar, recolhidas, toggleSecao, selecao, onSelecionar, variant = 'poster' }: {
   sims: SimuladoCard[]; online: Record<string, number>; appUrl: string
-  onMover?: (s: SimuladoCard) => void; recolhidas: Set<string>; toggleSecao: (chave: string) => void
+  onMover?: (s: SimuladoCard) => void; onCopiar?: (s: SimuladoCard) => void; recolhidas: Set<string>; toggleSecao: (chave: string) => void
   selecao: Set<string>; onSelecionar: (id: string, v: boolean) => void; variant?: CardView
 }) {
   return (
@@ -969,7 +968,7 @@ function SecoesStatus({ sims, online, appUrl, onMover, recolhidas, toggleSecao, 
               <div className={variant === 'ticket' ? 'grid gap-3 md:grid-cols-2 xl:grid-cols-3' : 'grid items-stretch gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5'}>
                 {itens.map((s) => (
                   <CardSimuladoAdmin key={s.id} s={s} appUrl={appUrl} online={online[s.id] ?? 0} variant={variant}
-                    onMover={onMover ? () => onMover(s) : undefined} selecionado={selecao.has(s.id)} onSelecionar={(v) => onSelecionar(s.id, v)} />
+                    onMover={onMover ? () => onMover(s) : undefined} onCopiar={onCopiar ? () => onCopiar(s) : undefined} selecionado={selecao.has(s.id)} onSelecionar={(v) => onSelecionar(s.id, v)} />
                 ))}
               </div>
             ))}
@@ -1038,78 +1037,157 @@ function BarraSelecao({ ids, simById, destinos, totalVisiveis, onSelecionarTodos
   )
 }
 
-/** Move vários simulados de uma vez para uma pasta (ou raiz). */
-function MoverEmMassaDialog({ ids, destinos, onClose, onDone }: { ids: string[]; destinos: DestinoSim[]; onClose: () => void; onDone: () => void }) {
-  const [pending, start] = useTransition()
-  const [sel, setSel] = useState<string | null>(null)
-  function salvar() {
-    start(async () => {
-      const res = await Promise.all(ids.map((id) => moverSimuladoParaPasta(id, sel)))
-      const err = res.find((r) => !r.ok)
-      if (err) toast.error(err.error ?? 'Erro ao mover')
-      else toast.success(`${ids.length} simulado(s) ${sel ? 'movido(s) para a pasta' : 'movido(s) para a raiz'}`)
-      onDone(); onClose()
-    })
-  }
+/** Card de destino em estilo "ticket": capa da pasta/desafio (ou bloco com cor+ícone) + nome.
+ *  `onAbrir` (quando a pasta tem subpastas) mostra um botão p/ entrar nelas; `subCount` = nº de subpastas. */
+function DestinoTicket({ d, raiz, ativo, onClick, onAbrir, subCount = 0 }: { d?: DestinoSim; raiz?: boolean; ativo: boolean; onClick: () => void; onAbrir?: () => void; subCount?: number }) {
+  const desafio = d?.tipo === 'desafio'
+  const Icon = raiz ? Home : desafio ? Trophy : Folder
+  const temCapa = !raiz && !!d?.capa
   return (
-    <div className="fixed inset-0 z-[210] flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onClose} />
-      <div role="dialog" aria-modal="true" className="relative flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl">
-        <div className="flex items-center justify-between border-b px-5 py-3">
-          <h3 className="flex items-center gap-2 text-sm font-semibold"><FolderInput className="h-4 w-4" /> Mover {ids.length} simulado(s)</h3>
-          <button type="button" onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
+    <div className={cn('group relative overflow-hidden rounded-xl border transition-all', ativo ? 'border-primary ring-2 ring-primary' : 'hover:border-primary/50 hover:shadow-sm')}>
+      {/* Imagem = selecionar */}
+      <button type="button" onClick={onClick} className="block w-full text-left">
+        <div className="relative aspect-[16/9] bg-muted" style={!raiz && d?.cor ? { backgroundColor: d.cor } : undefined}>
+          {temCapa
+            ? <img src={d!.capa!} alt="" className="absolute inset-0 h-full w-full object-cover" />
+            : <div className="flex h-full items-center justify-center"><Icon className={cn('h-8 w-8', (!raiz && d?.cor) ? 'text-white/90' : desafio ? 'text-amber-500' : 'text-muted-foreground')} /></div>}
+          {ativo && <span className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow"><Check className="h-3.5 w-3.5" /></span>}
         </div>
-        <div className="min-h-0 flex-1 space-y-1.5 overflow-auto p-4">
-          <OpcaoSim ativo={sel === null} onClick={() => setSel(null)} icon={<Radio className="h-4 w-4 text-muted-foreground" />} label="Raiz (sem pasta)" />
-          {destinos.length === 0 && <p className="px-1 py-2 text-center text-xs text-muted-foreground">Nenhuma pasta criada ainda.</p>}
-          {destinos.map((d) => (
-            <OpcaoSim key={d.id} ativo={sel === d.id} onClick={() => setSel(d.id)} icon={<Folder className="h-4 w-4 text-muted-foreground" />} label={d.nome} />
-          ))}
-        </div>
-        <div className="flex items-center justify-end gap-2 border-t px-5 py-3">
-          <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted">Cancelar</button>
-          <button type="button" onClick={salvar} disabled={pending}
-            className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
-            {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Mover
+      </button>
+      {/* Rodapé: nome (seleciona) + botão de subpastas (navega) SEM sobrepor o texto. */}
+      <div className="flex items-center gap-2 px-3 py-2.5">
+        <button type="button" onClick={onClick} className="flex min-w-0 flex-1 items-center gap-2 text-left">
+          <Icon className={cn('h-4 w-4 shrink-0', desafio ? 'text-amber-500' : 'text-muted-foreground')} />
+          <span className="truncate text-sm font-medium">{raiz ? 'Raiz (sem pasta)' : d?.nome}</span>
+        </button>
+        {onAbrir && subCount > 0 && (
+          <button type="button" onClick={onAbrir} title={`Abrir ${subCount} subpasta(s)`}
+            className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-primary px-2 py-1 text-[11px] font-bold text-primary-foreground transition-opacity hover:opacity-90">
+            {subCount} <ChevronRight className="h-3.5 w-3.5" />
           </button>
-        </div>
+        )}
       </div>
     </div>
   )
 }
 
-export function MoverSimuladoDialog({ simulado, destinos, atualId, onClose }: { simulado: SimuladoCard; destinos: DestinoSim[]; atualId: string | null; onClose: () => void }) {
-  const router = useRouter()
+/**
+ * Diálogo genérico de seleção de DESTINO — base do mover e do copiar. Largo, com abas Simulado/Desafio
+ * e cards de ticket (capa da pasta). `onConfirm(sel)` recebe o id do destino (null = raiz).
+ */
+function SelecionarDestinoDialog({ titulo, subtitulo, icone, destinos, atualId, incluirRaiz = true, bloquearAtual = false, confirmLabel, confirmIcone, onConfirm, onClose, z = 200 }: {
+  titulo: string; subtitulo?: string; icone: React.ReactNode; destinos: DestinoSim[]; atualId: string | null
+  incluirRaiz?: boolean; bloquearAtual?: boolean; confirmLabel: string; confirmIcone?: React.ReactNode
+  onConfirm: (sel: string | null) => Promise<void> | void; onClose: () => void; z?: number
+}) {
+  const [sel, setSel] = useState<string | null>(atualId)
+  const [busca, setBusca] = useState('')
+  const [navPai, setNavPai] = useState<string | null>(null) // pasta-pai aberta (navegação de subpastas)
   const [pending, start] = useTransition()
-  const [sel, setSel] = useState<string | null>(simulado.pasta_id ?? atualId)
-
-  function salvar() {
-    start(async () => {
-      const r = await moverSimuladoParaPasta(simulado.id, sel)
-      if (r.ok) { toast.success(sel ? 'Movido para a pasta' : 'Movido para a raiz'); router.refresh(); onClose() } else toast.error(r.error ?? 'Erro ao mover')
-    })
-  }
-
+  const atualEhDesafio = destinos.some((d) => d.id === atualId && d.tipo === 'desafio')
+  const [tab, setTab] = useState<'pasta' | 'desafio'>(atualEhDesafio ? 'desafio' : 'pasta')
+  const q = busca.trim().toLowerCase()
+  const match = (n: string) => !q || n.toLowerCase().includes(q)
+  const todasPastas = destinos.filter((d) => d.tipo !== 'desafio')
+  const pastaById = new Map(todasPastas.map((d) => [d.id, d]))
+  const filhosDe = (pid: string | null) => todasPastas.filter((d) => (d.paiId ?? null) === pid)
+  const nSub = (id: string) => todasPastas.filter((d) => (d.paiId ?? null) === id).length
+  const desafios = destinos.filter((d) => d.tipo === 'desafio' && match(d.nome))
+  const totalDesafios = destinos.filter((d) => d.tipo === 'desafio').length
+  // Busca: lista PLANA (todos os níveis). Sem busca: filhos do nível atual, com as pastas QUE TÊM
+  // subpastas no topo (contêineres primeiro) → melhor organização.
+  const pastasVisiveis = q
+    ? todasPastas.filter((d) => match(d.nome))
+    : [...filhosDe(navPai)].sort((a, b) => (nSub(b.id) > 0 ? 1 : 0) - (nSub(a.id) > 0 ? 1 : 0) || a.nome.localeCompare(b.nome, 'pt-BR'))
+  const raizVisivel = incluirRaiz && tab === 'pasta' && (q ? match('raiz') : navPai === null)
+  // Caminho (breadcrumb) do nível atual até a raiz.
+  const caminho: DestinoSim[] = []
+  { let cur: string | null = navPai; const seen = new Set<string>(); while (cur && pastaById.has(cur) && !seen.has(cur)) { seen.add(cur); const p = pastaById.get(cur)!; caminho.unshift(p); cur = p.paiId ?? null } }
+  const lista = tab === 'desafio' ? desafios : pastasVisiveis
+  // Separação de organização (aba Simulado, sem busca): pastas COM subpastas × pastas simples.
+  const seccionar = tab === 'pasta' && !q
+  const comSub = seccionar ? pastasVisiveis.filter((d) => nSub(d.id) > 0) : []
+  const semSub = seccionar ? pastasVisiveis.filter((d) => nSub(d.id) === 0) : []
+  const vazio = lista.length === 0 && !(tab === 'pasta' && raizVisivel)
+  function confirmar() { start(async () => { await onConfirm(sel) }) }
+  const abas = [['pasta', 'Simulado', Folder], ['desafio', 'Desafio', Trophy]] as const
+  const gridCls = 'grid grid-cols-2 gap-3 sm:grid-cols-3'
+  const tkt = (d: DestinoSim) => <DestinoTicket key={d.id} d={d} ativo={sel === d.id} onClick={() => setSel(d.id)} onAbrir={seccionar ? () => setNavPai(d.id) : undefined} subCount={seccionar ? nSub(d.id) : 0} />
   return createPortal(
-    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
+    <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: z }}>
       <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onClose} />
-      <div role="dialog" aria-modal="true" className="relative flex max-h-[85vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl">
-        <div className="flex items-center justify-between border-b px-5 py-3">
-          <h3 className="flex items-center gap-2 text-sm font-semibold"><FolderInput className="h-4 w-4" /> Mover “{simulado.titulo}”</h3>
+      <div role="dialog" aria-modal="true" className="relative flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl">
+        <div className="flex items-start justify-between gap-3 border-b px-5 py-3.5">
+          <div className="flex min-w-0 items-start gap-2.5">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">{icone}</span>
+            <div className="min-w-0">
+              <h3 className="truncate text-sm font-semibold">{titulo}</h3>
+              {subtitulo && <p className="truncate text-xs text-muted-foreground">{subtitulo}</p>}
+            </div>
+          </div>
           <button type="button" onClick={onClose} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
         </div>
-        <div className="min-h-0 flex-1 space-y-1.5 overflow-auto p-4">
-          <OpcaoSim ativo={sel === null} onClick={() => setSel(null)} icon={<Radio className="h-4 w-4 text-muted-foreground" />} label="Raiz (sem pasta)" />
-          {destinos.length === 0 && <p className="px-1 py-2 text-center text-xs text-muted-foreground">Nenhuma pasta criada ainda.</p>}
-          {destinos.map((d) => (
-            <OpcaoSim key={d.id} ativo={sel === d.id} onClick={() => setSel(d.id)} icon={<Folder className="h-4 w-4 text-muted-foreground" />} label={d.nome} />
+        {/* Abas Simulado / Desafio (padrão sublinhado) */}
+        <div className="flex gap-6 border-b px-5">
+          {abas.map(([k, label, Icon]) => (
+            <button key={k} type="button" onClick={() => setTab(k)}
+              className={cn('relative -mb-px inline-flex items-center gap-1.5 border-b-2 py-2.5 text-sm font-medium transition-colors',
+                tab === k ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')}>
+              <Icon className="h-4 w-4" /> {label}
+              <span className="rounded-full bg-muted px-1.5 text-[11px] font-semibold text-muted-foreground">{k === 'desafio' ? totalDesafios : todasPastas.length + (incluirRaiz ? 1 : 0)}</span>
+            </button>
           ))}
+        </div>
+        <div className="border-b p-3">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input autoFocus value={busca} onChange={(e) => setBusca(e.target.value)} placeholder={tab === 'desafio' ? 'Buscar desafio…' : 'Buscar pasta (todas as subpastas)…'}
+              className="w-full rounded-lg border bg-background py-2 pl-8 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40" />
+          </div>
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto p-4">
+          {/* Breadcrumb de subpastas (só na aba Simulado, sem busca). */}
+          {tab === 'pasta' && !q && caminho.length > 0 && (
+            <div className="mb-3 flex flex-wrap items-center gap-0.5 text-xs text-muted-foreground">
+              <button type="button" onClick={() => setNavPai(null)} className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-medium hover:text-foreground"><Home className="h-3.5 w-3.5" /> Pastas</button>
+              {caminho.map((c, i) => (
+                <span key={c.id} className="inline-flex items-center gap-0.5">
+                  <ChevronRight className="h-3.5 w-3.5" />
+                  <button type="button" onClick={() => setNavPai(c.id)} className={cn('rounded px-1.5 py-0.5 font-medium hover:text-foreground', i === caminho.length - 1 && 'text-foreground')}>{c.nome}</button>
+                </span>
+              ))}
+            </div>
+          )}
+          {seccionar ? (
+            // Aba Simulado, sem busca → separado: Raiz, depois "Com subpastas" e "Pastas".
+            <div className="space-y-4">
+              {raizVisivel && <div className={gridCls}><DestinoTicket raiz ativo={sel === null} onClick={() => setSel(null)} /></div>}
+              {comSub.length > 0 && (
+                <div>
+                  <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><FolderTree className="h-3.5 w-3.5" /> Com subpastas</p>
+                  <div className={gridCls}>{comSub.map(tkt)}</div>
+                </div>
+              )}
+              {semSub.length > 0 && (
+                <div>
+                  <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><Folder className="h-3.5 w-3.5" /> Pastas</p>
+                  <div className={gridCls}>{semSub.map(tkt)}</div>
+                </div>
+              )}
+            </div>
+          ) : (
+            // Busca (plana) ou aba Desafio → grid único.
+            <div className={gridCls}>
+              {lista.map((d) => <DestinoTicket key={d.id} d={d} ativo={sel === d.id} onClick={() => setSel(d.id)} />)}
+            </div>
+          )}
+          {vazio && <p className="py-10 text-center text-xs text-muted-foreground">Nenhum {tab === 'desafio' ? 'desafio' : 'pasta'} {q ? 'encontrado' : 'aqui'}.</p>}
         </div>
         <div className="flex items-center justify-end gap-2 border-t px-5 py-3">
           <button type="button" onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted">Cancelar</button>
-          <button type="button" onClick={salvar} disabled={pending || sel === (simulado.pasta_id ?? atualId)}
+          <button type="button" onClick={confirmar} disabled={pending || (bloquearAtual && sel === atualId)}
             className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">
-            {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : null} Mover
+            {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : confirmIcone} {confirmLabel}
           </button>
         </div>
       </div>
@@ -1118,15 +1196,45 @@ export function MoverSimuladoDialog({ simulado, destinos, atualId, onClose }: { 
   )
 }
 
-function OpcaoSim({ ativo, onClick, icon, label }: { ativo: boolean; onClick: () => void; icon: React.ReactNode; label: string }) {
+/** Move vários simulados de uma vez para uma pasta/desafio (ou raiz). */
+function MoverEmMassaDialog({ ids, destinos, onClose, onDone }: { ids: string[]; destinos: DestinoSim[]; onClose: () => void; onDone: () => void }) {
   return (
-    <button type="button" onClick={onClick}
-      className={cn('flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors', ativo ? 'border-primary bg-primary/5' : 'hover:border-primary/40')}>
-      <span className={cn('flex h-4 w-4 shrink-0 items-center justify-center rounded-full border', ativo ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground/40')}>
-        {ativo && <Check className="h-3 w-3" />}
-      </span>
-      {icon}
-      <span className="min-w-0 flex-1 truncate text-sm font-medium">{label}</span>
-    </button>
+    <SelecionarDestinoDialog z={210} titulo={`Mover ${ids.length} simulado(s)`} subtitulo="Escolha a pasta ou desafio de destino"
+      icone={<FolderInput className="h-5 w-5" />} destinos={destinos} atualId={null} incluirRaiz confirmLabel="Mover" confirmIcone={<FolderInput className="h-4 w-4" />}
+      onClose={onClose}
+      onConfirm={async (sel) => {
+        const res = await Promise.all(ids.map((id) => moverSimuladoParaPasta(id, sel)))
+        const err = res.find((r) => !r.ok)
+        if (err) { toast.error(err.error ?? 'Erro ao mover'); return }
+        toast.success(`${ids.length} simulado(s) ${sel ? 'movido(s) para o destino' : 'movido(s) para a raiz'}`)
+        onDone(); onClose()
+      }} />
+  )
+}
+
+export function MoverSimuladoDialog({ simulado, destinos, atualId, onClose }: { simulado: SimuladoCard; destinos: DestinoSim[]; atualId: string | null; onClose: () => void }) {
+  const router = useRouter()
+  return (
+    <SelecionarDestinoDialog titulo={`Mover “${simulado.titulo}”`} subtitulo="Escolha a pasta ou desafio de destino"
+      icone={<FolderInput className="h-5 w-5" />} destinos={destinos} atualId={simulado.pasta_id ?? atualId} incluirRaiz bloquearAtual
+      confirmLabel="Mover" confirmIcone={<FolderInput className="h-4 w-4" />} onClose={onClose}
+      onConfirm={async (sel) => {
+        const r = await moverSimuladoParaPasta(simulado.id, sel)
+        if (r.ok) { toast.success(sel ? 'Movido para o destino' : 'Movido para a raiz'); router.refresh(); onClose() } else toast.error(r.error ?? 'Erro ao mover')
+      }} />
+  )
+}
+
+/** Copia (duplica) um simulado para uma pasta/desafio (ou raiz). O original permanece. */
+export function CopiarSimuladoDialog({ simulado, destinos, atualId, onClose }: { simulado: SimuladoCard; destinos: DestinoSim[]; atualId: string | null; onClose: () => void }) {
+  const router = useRouter()
+  return (
+    <SelecionarDestinoDialog titulo={`Copiar “${simulado.titulo}”`} subtitulo="Cria uma cópia no destino — o original permanece"
+      icone={<Copy className="h-5 w-5" />} destinos={destinos} atualId={simulado.pasta_id ?? atualId} incluirRaiz
+      confirmLabel="Copiar" confirmIcone={<Copy className="h-4 w-4" />} onClose={onClose}
+      onConfirm={async (sel) => {
+        const r = await copiarSimuladoParaPasta(simulado.id, sel)
+        if (r.ok) { toast.success('Cópia criada'); router.refresh(); onClose() } else toast.error(r.error ?? 'Erro ao copiar')
+      }} />
   )
 }
