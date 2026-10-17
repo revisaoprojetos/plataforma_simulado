@@ -12,6 +12,26 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.20.0 — 2026-10-17
+
+**feat: área de Teste (editores Office) atrás da manutenção + downloads de caderno no card + ajustes de maratona**
+
+- **Spike dos editores Office (`/admin/teste`):** nova área para avaliar a migração do construtor de caderno
+  (blocos HTML) para **docx nativo**, com **Collabora Online (CODE)** e **OnlyOffice (Community)** rodando em
+  Docker (`docker-compose.teste.yml`). Criar/importar/editar `.docx`, prova de **merge** (docxtemplater:
+  `{tags}` + laços) com dados reais de 1 aluno, e geração de **modelos** prontos.
+- **Plugin do OnlyOffice "Blocos & Variáveis"** (painel lateral docado, servido pelo próprio app via config
+  dinâmica): blocos **fiéis ao Diagnóstico real** (paleta navy/dourado, tamanhos e posição dos valores lidos
+  do `.docx` de referência), inserção 1-clique de blocos (`PasteHtml`) e variáveis (`PasteText`), e **modo
+  "Prévia de valores"** reversível — liga/desliga no documento via `Undo` exato, contando os campos presentes
+  pelo backend (`/api/teste/doc-tags`).
+- **Teste gated pela manutenção por área:** a área **nasce bloqueada** (`padraoBloqueado`) e a visibilidade/
+  acesso é filtrada pelo **allowlist** em *Sistema → Páginas em manutenção → Admin* (quem pode visualizar).
+- **Downloads de caderno a partir do card do simulado:** pop-up "Baixar" na home/pasta com Caderno de Questões
+  (enunciado/pré-prova), Gabarito Comentado e Diagnóstico quando liberados e importados como PDF; reusa a mesma
+  fonte do resultado (`caderno_entrega` + `resolverLiberacoes`).
+- **Maratona:** melhorias no interno (progressão/abas) e no carregamento; tours do aluno atualizados.
+
 ## 3.19.5 — 2026-10-17
 
 **fix(maratona): "Ver regulamento" do card da Home abre a aba Regulamento interna (não um link externo)**

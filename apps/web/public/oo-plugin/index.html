@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Blocos & Variáveis</title>
+<style>
+  :root { --navy:#071a3f; --blue:#1a367c; --gold:#f7b500; --grey:#3b4866; --lgrey:#e9edf3; --line:#e6ebf4; --soft:#f6f8fc; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; font-family: Arial, Helvetica, sans-serif; color:#1b2440; background:#fff; -webkit-font-smoothing:antialiased; }
+  body { display:flex; flex-direction:column; }
+
+  /* abas segmentadas */
+  .tabs { display:flex; gap:4px; padding:10px 10px 0; }
+  .tab { flex:1; display:flex; align-items:center; justify-content:center; gap:5px; padding:8px; font-size:12px; font-weight:700; border:1px solid var(--line); border-bottom:0; border-radius:10px 10px 0 0; background:var(--soft); color:#64719a; cursor:pointer; transition:.12s; }
+  .tab:hover { color:var(--navy); }
+  .tab.on { background:var(--navy); border-color:var(--navy); color:#fff; }
+
+  /* barra do modo prévia com switch pill */
+  .pvbar { display:flex; align-items:center; gap:10px; padding:9px 10px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); background:var(--soft); }
+  .sw { display:inline-flex; align-items:center; gap:8px; font-size:11.5px; font-weight:700; color:#33415c; cursor:pointer; user-select:none; }
+  .sw input { display:none; }
+  .track { width:34px; height:19px; border-radius:999px; background:#cfd8ea; position:relative; transition:.18s; flex:none; }
+  .track::after { content:''; position:absolute; top:2px; left:2px; width:15px; height:15px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.25); transition:.18s; }
+  .sw input:checked + .track { background:var(--gold); }
+  .sw input:checked + .track::after { transform:translateX(15px); }
+  .pvtag { margin-left:auto; font-size:10px; font-weight:800; letter-spacing:.03em; padding:3px 8px; border-radius:999px; background:#eef1f8; color:#8591ad; }
+  .pvtag.on { background:var(--gold); color:#4a3500; }
+
+  .wrap { flex:1; overflow-y:auto; padding:12px 10px 16px; }
+  .hint { font-size:11px; line-height:1.45; color:#5f6c8c; background:var(--soft); border:1px solid var(--line); border-radius:9px; padding:9px 11px; margin-bottom:12px; }
+  .hint b { color:var(--navy); }
+
+  /* grupos de variáveis */
+  .grp { margin-bottom:14px; }
+  .grp h4 { margin:0 0 7px; font-size:9.5px; letter-spacing:.07em; text-transform:uppercase; color:#95a0bd; display:flex; align-items:center; gap:6px; }
+  .grp h4::after { content:''; flex:1; height:1px; background:var(--line); }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; }
+  .chip { display:inline-flex; align-items:baseline; gap:5px; border:1px solid var(--line); background:#fff; color:#2a3550; border-radius:8px; padding:6px 10px; font-size:11.5px; font-weight:700; cursor:pointer; transition:.12s; }
+  .chip:hover { border-color:var(--navy); background:#eef3ff; box-shadow:0 1px 3px rgba(7,26,63,.08); }
+  .chip:active { transform:translateY(1px); }
+  .chip .val { font-weight:600; font-size:10.5px; color:#8591ad; }
+  .chip.pv .val { color:var(--blue); }
+
+  /* cards de bloco */
+  .card { border:1px solid var(--line); border-radius:14px; padding:11px; margin-bottom:12px; background:#fff; box-shadow:0 1px 2px rgba(7,26,63,.04); }
+  .card .top { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:3px; }
+  .card .ttl { font-size:12.5px; font-weight:800; color:var(--navy); }
+  .card .tag { font-size:9px; font-weight:800; letter-spacing:.03em; text-transform:uppercase; padding:2px 7px; border-radius:999px; background:#eef1f8; color:#7b88a8; }
+  .card .tag.loop { background:#fff6e0; color:#9a6a00; }
+  .card .ds { font-size:10.5px; color:#6b7897; margin:0 0 9px; line-height:1.4; }
+  .prev { border:1px solid var(--line); border-radius:10px; overflow:hidden; background:#fff; height:132px; position:relative; }
+  .prev > .inner { position:absolute; top:0; left:0; width:222%; transform:scale(.45); transform-origin:top left; padding:11px; }
+  .add { margin-top:9px; width:100%; display:flex; align-items:center; justify-content:center; gap:6px; border:0; border-radius:9px; background:var(--navy); color:#fff; font-size:12px; font-weight:800; padding:9px; cursor:pointer; transition:.12s; }
+  .add:hover { background:#0b3a7a; }
+  .add:active { transform:translateY(1px); }
+
+  .ok { position:fixed; left:10px; right:10px; bottom:10px; background:#0f8a4d; color:#fff; font-size:11.5px; font-weight:700; padding:9px 11px; border-radius:9px; opacity:0; transform:translateY(8px); transition:.2s; pointer-events:none; text-align:center; box-shadow:0 4px 12px rgba(0,0,0,.2); }
+  .ok.show { opacity:1; transform:translateY(0); }
+</style>
+</head>
+<body>
+  <div class="tabs">
+    <button class="tab on" id="t-var" onclick="aba('var')">⬡ Variáveis</button>
+    <button class="tab" id="t-mod" onclick="aba('mod')">▦ Blocos</button>
+  </div>
+  <div class="pvbar">
+    <label class="sw"><input type="checkbox" id="pv" onchange="togglePv()"><span class="track"></span> Prévia de valores</label>
+    <span class="pvtag" id="pvtag">CAMPOS</span>
+  </div>
+  <div class="wrap">
+    <div id="pane-var">
+      <div class="hint">Clique numa variável → é inserida no cursor. Com a <b>prévia</b> ligada, mostra o valor de exemplo e preenche o documento.</div>
+      <div id="vars"></div>
+    </div>
+    <div id="pane-mod" style="display:none">
+      <div class="hint">Blocos no padrão do <b>Diagnóstico real</b> (cores, tamanhos e posição dos valores). <b>Adicionar</b> insere no cursor.</div>
+      <div id="blocos"></div>
+    </div>
+  </div>
+  <div class="ok" id="ok"></div>
+
+<script>
+/* carrega o plugins.js do MESMO servidor do editor (origem do referrer), síncrono via document.write. */
+(function(){
+  var o='http://localhost:8082';
+  try{ if(document.referrer) o=new URL(document.referrer).origin; }catch(e){}
+  document.write('<scr'+'ipt src="'+o+'/sdkjs-plugins/v1/plugins.js"></scr'+'ipt>');
+})();
+</script>
+<script>
+/* ===== catálogos — fiéis ao Diagnóstico real (3d8c721d). Estilo 100% INLINE (classes não sobrevivem ao PasteHtml).
+   Paleta: navy #071a3f · azul #1a367c · cinza #3b4866 · dourado #f7b500 · cinza-claro #e9edf3.
+   Tamanhos em pt: título 20 · nº grande 32 (+13) · faixa 10 · disciplina 10.5 · % 11 · secundário 9/9.5. ===== */
+// [rótulo, tag, valor de exemplo]
+var VARS = [
+  { g:'Dados do aluno', tags:[['Nº de peito','{numero_peito}','0042'],['Nome','{nome}','Ana Beatriz Souza'],['CPF','{cpf}','123.456.789-00'],['E-mail','{email}','ana.souza@email.com'],['Simulado','{simulado}','MARATONA ENAP + AGU · SIMULADO 01']] },
+  { g:'Desempenho geral', tags:[['Acertos','{acertos}','24'],['Total','{total_questoes}','30'],['%','{percentual}','80%'],['Erros','{erros}','6'],['Em branco','{em_branco}','0']] },
+  { g:'Por disciplina / pilar', tags:[['Acerto disc.','{acerto_<disc>}','4'],['Total disc.','{total_<disc>}','5'],['% disc.','{pct_<disc>}','80%'],['Acerto pilar','{acerto_pilar_<p>}','24'],['% pilar','{pct_pilar_<p>}','80%']] },
+];
+// Amostras usadas nos BLOCOS e no "Aplicar no documento". Dentro dos laços, {nome} = nome da disciplina/pilar.
+var SAMPLE = {
+  '{simulado}':'MARATONA DE SIMULADOS ENAP + AGU · SIMULADO 01 · 17/10/2026',
+  '{numero_peito}':'0042', '{total_questoes}':'30', '{percentual}':'80%', '{em_branco}':'0',
+  '{acertos}':'24', '{erros}':'6', '{nota}':'8,0', '{cpf}':'123.456.789-00', '{email}':'ana.souza@email.com',
+  '{nome}':'Direito Constitucional', '{assuntos}':'- Constitucional: art. 37 (acumulação de cargos)',
+  '{acerto}':'4', '{total}':'5', '{pct}':'80%',
+  '{numero}':'1', '{disciplina}':'Direito Constitucional',
+  '{enunciado}':'Julgue o item a seguir conforme a CF/1988: a vedação à acumulação remunerada de cargos públicos…',
+  '{alternativas}':'( ) Certo        ( ) Errado', '{gabarito}':'Certo',
+};
+var LOOPS = ['{#disciplinas}','{/disciplinas}','{#pilares}','{/pilares}','{#questoes}','{/questoes}'];
+// Troca tags por exemplos num trecho HTML/texto (maiores primeiro p/ não cortar tag dentro de outra).
+function amostra(s){
+  var out = s;
+  LOOPS.forEach(function(m){ out = out.split(m).join(''); });
+  Object.keys(SAMPLE).sort(function(a,b){return b.length-a.length;}).forEach(function(k){ out = out.split(k).join(SAMPLE[k]); });
+  return out;
+}
+
+var AR='font-family:Arial,sans-serif';
+function tb(inner){ return '<table width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse">'+inner+'</table>'; }
+// Espaçador: o PasteHtml ignora margin de tabela, então separo os blocos com um parágrafo vazio.
+var SP='<p style="margin:0;'+AR+';font-size:9pt;line-height:9pt">&nbsp;</p>';
+
+// Faixa de seção: navy com texto DOURADO (DESEMPENHO POR DISCIPLINA, SUGESTÕES DE ESTUDO…)
+function band(t){ return tb('<tr><td bgcolor="#071a3f" style="background-color:#071a3f;padding:7px 12px"><p style="margin:0;'+AR+';font-size:10pt;font-weight:bold;color:#f7b500">'+t+'</p></td></tr>'); }
+
+// Cabeçalho: fita dourada (#ffc000) no topo + faixa cinza-clara + título 20pt + subtítulo
+var CAB = tb('<tr><td bgcolor="#e9edf3" style="background-color:#e9edf3;border-top:3px solid #ffc000;padding:12px 16px">'
+  + '<p style="margin:0 0 2px;'+AR+';font-size:8.5pt;font-weight:bold;color:#1a367c">{simulado}</p>'
+  + '<p style="margin:0;'+AR+';font-size:20pt;font-weight:bold;color:#071a3f">Diagnóstico de Desempenho</p>'
+  + '<p style="margin:2px 0 0;'+AR+';font-size:9.5pt;color:#3b4866">Lei seca · {total_questoes} itens de Certo ou Errado</p>'
+  + '</td></tr>');
+
+// Nº de peito: rótulo navy + valor em célula branca
+var PEITO = tb('<tr>'
+  + '<td bgcolor="#071a3f" width="24%" valign="middle" style="background-color:#071a3f;width:24%;padding:8px 12px;'+AR+';font-size:11pt;font-weight:bold;color:#ffffff">Nº DE PEITO:</td>'
+  + '<td bgcolor="#ffffff" valign="middle" style="background-color:#ffffff;border:1px solid #d8dfea;padding:8px 12px;'+AR+';font-size:10.5pt;color:#071a3f">{numero_peito}</td>'
+  + '</tr>','8px');
+
+// Nota: célula dourada (nº 32pt + /total 13pt) + célula cinza com resumo e medalha
+var NOTA = tb('<tr>'
+  + '<td bgcolor="#f7b500" width="25%" align="center" valign="middle" style="background-color:#f7b500;width:25%;text-align:center;vertical-align:middle;padding:10px 6px;'+AR+';color:#071a3f">'
+  +   '<span style="font-size:32pt;font-weight:bold">{acertos}</span><span style="font-size:13pt;font-weight:bold">/{total_questoes}</span></td>'
+  + '<td bgcolor="#e9edf3" valign="middle" style="background-color:#e9edf3;vertical-align:middle;padding:10px 14px;'+AR+'">'
+  +   '<p style="margin:0;'+AR+';font-size:10.5pt;color:#071a3f">{acertos} acertos de {total_questoes} itens — <b>{percentual}</b> de aproveitamento</p>'
+  +   '<p style="margin:3px 0 0;'+AR+';font-size:9pt;color:#3b4866">Medalha conquistada: KM 21 · AGU</p>'
+  + '</td></tr>','8px');
+
+// Desempenho por disciplina: faixa + linha por disciplina (nome + assuntos | x/y  z%). Laço repete a <tr>.
+var DISC = band('DESEMPENHO POR DISCIPLINA') + SP
+  + tb('<tr>'
+    + '<td valign="top" style="padding:6px 0 6px 2px;'+AR+'">{#disciplinas}<span style="font-size:10.5pt;font-weight:bold;color:#071a3f">{nome}</span><br/><span style="font-size:9pt;color:#3b4866">{assuntos}</span></td>'
+    + '<td width="22%" align="right" valign="top" style="width:22%;text-align:right;padding:6px 2px 6px 0;'+AR+'"><span style="font-size:9pt;color:#3b4866">{acertos}/{total}&nbsp;&nbsp;</span><span style="font-size:11pt;font-weight:bold;color:#1a367c">{pct}</span>{/disciplinas}</td>'
+    + '</tr>');
+
+// Caixa de análise de pilar (estilo LEI SECA): título + prioridade + texto
+var PILARBOX = band('ANÁLISE POR PILAR') + SP
+  + tb('<tr>'
+    + '<td valign="top" style="padding:4px 0;'+AR+';font-size:10pt;font-weight:bold;color:#1a367c">LEI SECA</td>'
+    + '<td width="36%" align="right" valign="top" style="width:36%;text-align:right;padding:4px 0;'+AR+';font-size:9pt;font-weight:bold;color:#53308f">[!] Prioridade Alta</td>'
+    + '</tr><tr><td colspan="2" style="padding:2px 0 8px;'+AR+';font-size:9.5pt;color:#071a3f">Neste simulado, a lei seca respondeu por {acertos} dos {total_questoes} itens. Escreva aqui os dispositivos cobrados e o que revisar.</td></tr>');
+
+// Faixa de seção genérica (reaproveitável)
+var FAIXA = band('TÍTULO DA SEÇÃO');
+
+// ===== Folha de respostas (mesma paleta) =====
+function gradeHtml(linhas){
+  var L=['A','B','C','D','E'];
+  var h='<table width="72%" border="1" bordercolor="#cdd9ea" cellspacing="0" cellpadding="4" style="width:72%;border-collapse:collapse;'+AR+';font-size:10.5pt">';
+  h+='<tr><td bgcolor="#071a3f" style="background-color:#071a3f;color:#ffffff;text-align:center;font-weight:bold">Q</td>';
+  L.forEach(function(x){ h+='<td bgcolor="#071a3f" style="background-color:#071a3f;color:#ffffff;text-align:center;font-weight:bold">'+x+'</td>'; });
+  h+='</tr>';
+  for(var i=1;i<=linhas;i++){ var bg=(i%2)?'#ffffff':'#e9edf3';
+    h+='<tr><td bgcolor="'+bg+'" style="background-color:'+bg+';text-align:center;font-weight:bold;color:#071a3f">'+i+'</td>';
+    L.forEach(function(){ h+='<td bgcolor="'+bg+'" style="background-color:'+bg+';text-align:center;color:#9aa8c6">◯</td>'; });
+    h+='</tr>';
+  }
+  return h+'</table>';
+}
+var FOLHA = tb('<tr><td bgcolor="#071a3f" style="background-color:#071a3f;border-top:3px solid #ffc000;padding:9px 14px"><p style="margin:0;'+AR+';font-size:13pt;font-weight:bold;color:#ffffff">FOLHA DE RESPOSTAS — {simulado}</p></td></tr>') + SP
+  + tb('<tr>'
+    + '<td bgcolor="#e9edf3" style="background-color:#e9edf3;padding:8px 12px;'+AR+';font-size:10.5pt;color:#071a3f"><b>Nome:</b> {nome}</td>'
+    + '<td bgcolor="#e9edf3" width="30%" style="background-color:#e9edf3;width:30%;padding:8px 12px;'+AR+';font-size:10.5pt;color:#071a3f"><b>Nº de peito:</b> {numero_peito}</td>'
+    + '</tr>')
+  + '<p style="margin:8px 0 6px;'+AR+';font-size:9pt;color:#3b4866">Preencha ◯ a alternativa de cada questão.</p>'
+  + gradeHtml(10);
+
+// ===== Questão do caderno (laço) =====
+var QUESTAO = tb('<tr><td bgcolor="#071a3f" style="background-color:#071a3f;padding:6px 10px"><p style="margin:0;'+AR+';font-size:11pt;font-weight:bold;color:#ffffff">QUESTÃO {numero} · {disciplina}</p></td></tr>','8px')
+  + '<p style="margin:5px 0;'+AR+';font-size:10.5pt;text-align:justify;color:#071a3f">{enunciado}</p>'
+  + '<p style="margin:0;'+AR+';font-size:10.5pt;color:#071a3f">{alternativas}</p>'
+  + '<p style="margin:2px 0 0;'+AR+';font-size:9pt;color:#3b4866">Gabarito oficial: {gabarito}</p>';
+var CADERNO = tb('<tr><td bgcolor="#071a3f" style="background-color:#071a3f;border-top:3px solid #ffc000;padding:9px 14px"><p style="margin:0;'+AR+';font-size:13pt;font-weight:bold;color:#ffffff">CADERNO DE QUESTÕES — {simulado}</p></td></tr>') + SP
+  + '<p style="margin:0;'+AR+';font-size:10.5pt">{#questoes}</p>' + QUESTAO + '<p style="margin:0;'+AR+';font-size:10.5pt">{/questoes}</p>';
+
+var BLOCOS = [
+  { nome:'Diagnóstico completo', ds:'Cabeçalho + nº de peito + nota + desempenho por disciplina, no padrão real.', html: CAB+SP+PEITO+SP+NOTA+SP+DISC },
+  { nome:'Cabeçalho', ds:'Faixa cinza-clara: {simulado}, “Diagnóstico de Desempenho” (20pt) e subtítulo.', html: CAB },
+  { nome:'Nº de peito', ds:'Rótulo navy + valor {numero_peito} em célula branca.', html: PEITO },
+  { nome:'Bloco de nota', ds:'Célula dourada {acertos}/{total_questoes} (32pt) + resumo {percentual} + medalha.', html: NOTA },
+  { nome:'Desempenho por disciplina', ds:'Faixa navy/dourada + linha por disciplina (laço {#disciplinas}): nome, assuntos e x/y + %.', html: DISC },
+  { nome:'Análise por pilar', ds:'Caixa estilo “LEI SECA”: título + prioridade + texto editável.', html: PILARBOX },
+  { nome:'Faixa de seção', ds:'Barra navy com texto dourado — reaproveitável (edite o título).', html: FAIXA },
+  { nome:'Folha de respostas', ds:'Cabeçalho + dados do aluno + grade A–E (10 linhas de amostra).', html: FOLHA },
+  { nome:'Questão (caderno)', ds:'Laço {#questoes}: número, disciplina, enunciado, alternativas e gabarito.', html: CADERNO },
+];
+
+/* ===== UI ===== */
+function el(tag,cls,html){var e=document.createElement(tag);if(cls)e.className=cls;if(html!=null)e.innerHTML=html;return e;}
+function aba(w){
+  document.getElementById('t-var').classList.toggle('on', w==='var');
+  document.getElementById('t-mod').classList.toggle('on', w==='mod');
+  document.getElementById('pane-var').style.display = w==='var'?'':'none';
+  document.getElementById('pane-mod').style.display = w==='mod'?'':'none';
+}
+var okTimer;
+function flash(msg){ var o=document.getElementById('ok'); o.textContent='✓ '+msg; o.classList.add('show'); clearTimeout(okTimer); okTimer=setTimeout(function(){o.classList.remove('show')},2200); }
+var preview=false, undoSteps=0, docBusy=false, sessionTags={};
+function docId(){ try{ return new URLSearchParams(location.search).get('id')||''; }catch(e){ return ''; } }
+function tagsDe(s){ var m=s.match(/\{[#\/]?[^{}]+\}/g)||[], o={}; m.forEach(function(t){o[t]=1;}); return Object.keys(o); }
+function regKeys(arr){ arr.forEach(function(t){ if(LOOPS.indexOf(t)>=0 || SAMPLE.hasOwnProperty(t)) sessionTags[t]=1; }); }
+
+// Insere SEMPRE o template ({campos}); nunca os valores "assados". Se a prévia estiver ligada, reverte
+// antes (p/ as trocas ficarem contíguas no Undo), insere o template e re-preenche o documento.
+function inserir(kind, payload, label){
+  if(!(window.Asc&&window.Asc.plugin)) return;
+  function go(){
+    window.Asc.plugin.executeMethod(kind,[payload],function(){
+      regKeys(kind==='PasteHtml'?tagsDe(payload):[payload]);
+      flash((kind==='PasteHtml'?'Bloco inserido: ':'Inserido: ')+label);
+      if(preview) aplicarDoc();
+    });
+  }
+  if(preview) reverterDoc(go); else go();
+}
+function inserirTexto(tag, label){ inserir('PasteText', tag, label); }
+function inserirHtml(html, label){ inserir('PasteHtml', html, label); }
+
+function togglePv(){
+  preview = document.getElementById('pv').checked;
+  var tag=document.getElementById('pvtag');
+  tag.textContent = preview ? 'PRÉVIA' : 'CAMPOS'; tag.classList.toggle('on', preview);
+  render();
+  if(preview) aplicarDoc(); else reverterDoc();
+}
+// Liga a prévia no doc: campos a preencher = (presentes no .docx salvo, via backend) ∪ (inseridos nesta
+// sessão, ao vivo). Troca cada distinto 1x e conta → o desligar desfaz exatamente esse nº.
+function aplicarDoc(cb){
+  if(!(window.Asc&&window.Asc.plugin)){ if(cb)cb(); return; }
+  if(docBusy){ if(cb)cb(); return; }
+  docBusy=true; undoSteps=0;
+  var cand = LOOPS.concat(Object.keys(SAMPLE));
+  fetch('/api/teste/doc-tags',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:docId(), candidatos:cand})})
+    .then(function(r){return r.json();}).catch(function(){ return {presentes:[]}; })
+    .then(function(d){
+      var set={};
+      ((d&&d.presentes)||[]).forEach(function(k){ set[k]=1; });
+      Object.keys(sessionTags).forEach(function(k){ set[k]=1; });
+      var pres=Object.keys(set).sort(function(a,b){ var la=LOOPS.indexOf(a)>=0,lb=LOOPS.indexOf(b)>=0; if(la!==lb) return la?-1:1; return b.length-a.length; });
+      var i=0;
+      (function next(){
+        if(i>=pres.length){ docBusy=false; flash(undoSteps?('Prévia ligada — '+undoSteps+' campo(s)'):'Nenhum campo pra preencher — insira um bloco primeiro'); if(cb)cb(); return; }
+        var k=pres[i++], rep=(LOOPS.indexOf(k)>=0)?'':SAMPLE[k];
+        window.Asc.plugin.executeMethod('SearchAndReplace',[{searchString:k, replaceString:rep, matchCase:true}],function(){ undoSteps++; next(); });
+      })();
+    });
+}
+// Desliga a prévia: desfaz (Undo) exatamente o nº de trocas feitas; para se não houver mais o que desfazer.
+function reverterDoc(cb){
+  if(!(window.Asc&&window.Asc.plugin)){ if(cb)cb(); return; }
+  var n=undoSteps; undoSteps=0;
+  if(n<=0){ if(cb)cb(); return; }
+  docBusy=true;
+  (function undo(){
+    if(n<=0){ docBusy=false; flash('Prévia desligada — campos restaurados'); if(cb)cb(); return; }
+    window.Asc.plugin.executeMethod('CanUndo',[],function(can){
+      if(!can){ docBusy=false; if(cb)cb(); return; }
+      window.Asc.plugin.executeMethod('Undo',[],function(){ n--; undo(); });
+    });
+  })();
+}
+
+function render(){
+  var vc=document.getElementById('vars'); vc.innerHTML='';
+  VARS.forEach(function(gr){
+    var g=el('div','grp'); g.appendChild(el('h4',null,gr.g));
+    var chips=el('div','chips');
+    gr.tags.forEach(function(t){
+      var txt = preview ? (t[2]||t[1]) : t[1];
+      var b=el('button', 'chip'+(preview?' pv':'')); b.title=t[1];
+      b.innerHTML = t[0] + (preview ? ' <span class="val">'+t[2]+'</span>' : '');
+      b.onclick=function(){ inserirTexto(t[1], t[0]); }; // insere SEMPRE a tag (o valor é só visual)
+      chips.appendChild(b);
+    });
+    g.appendChild(chips); vc.appendChild(g);
+  });
+  var bc=document.getElementById('blocos'); bc.innerHTML='';
+  BLOCOS.forEach(function(bl){
+    var isLoop = bl.html.indexOf('{#')>=0;
+    var html = preview ? amostra(bl.html) : bl.html;
+    var c=el('div','card');
+    var top=el('div','top'); top.appendChild(el('div','ttl',bl.nome));
+    top.appendChild(el('span','tag'+(isLoop?' loop':''), isLoop?'laço':'bloco')); c.appendChild(top);
+    c.appendChild(el('div','ds',bl.ds));
+    var p=el('div','prev'); p.appendChild(el('div','inner',html)); c.appendChild(p);
+    var add=el('button','add','＋ Adicionar'); add.onclick=function(){inserirHtml(bl.html,bl.nome)}; c.appendChild(add); // insere SEMPRE o template
+    bc.appendChild(c);
+  });
+}
+
+if(window.Asc&&window.Asc.plugin){
+  window.Asc.plugin.init = function(){ render(); };
+  window.Asc.plugin.button = function(id){ this.executeCommand('close',''); };
+} else {
+  window.addEventListener('DOMContentLoaded', render);
+}
+</script>
+</body>
+</html>

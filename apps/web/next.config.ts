@@ -19,6 +19,16 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async headers() {
+    // SPIKE Office: o editor OnlyOffice (origem :8082) busca o config.json do nosso plugin
+    // (origem :3000) por XHR — precisa de CORS liberado nesses arquivos estáticos.
+    return [
+      {
+        source: "/oo-plugin/:path*",
+        headers: [{ key: "Access-Control-Allow-Origin", value: "*" }],
+      },
+    ];
+  },
   experimental: {
     // Turbopack no Windows: a escrita/compactação do cache PERSISTENTE de disco em dev estoura a RAM
     // (chega a ~20GB e trava o PC). Com TURBOPACK_FS_CACHE=off o dev roda SEM esse cache — cold start

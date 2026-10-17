@@ -223,6 +223,17 @@ const navGroups: NavGroup[] = [
       { label: 'Ajuda', href: '/admin/ajuda', icon: HelpCircle },
     ],
   },
+  {
+    // SPIKE: teste dos editores Office reais (Collabora / OnlyOffice) — avaliar migração do construtor
+    // de caderno de blocos HTML para docx nativo. Área isolada, não afeta o resto. Visibilidade/acesso
+    // é controlada pela MANUTENÇÃO POR ÁREA (nasce bloqueada; libere por allowlist em Sistema → Páginas
+    // em manutenção → Admin). Por isso NÃO usa `superOnly` — o allowlist (por pessoa) é quem rege.
+    label: 'Teste',
+    icon: FlaskConical,
+    items: [
+      { label: 'Editores Office', href: '/admin/teste', icon: FlaskConical, perm: 'configuracoes:view' },
+    ],
+  },
 ]
 
 /** O item casa com a rota atual? (pode casar mais de um — ver `itemAtivo`) */

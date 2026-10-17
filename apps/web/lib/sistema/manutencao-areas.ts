@@ -15,9 +15,11 @@ export type AreaManutencao = {
   key: string
   label: string
   descricao: string
-  href: string          // rota base da área — usada p/ esconder do menu e bloquear o acesso
-  hrefs?: string[]      // rotas EXTRA da mesma área (ex.: Gamificação = trilha + ligas + recomendado)
-  discursiva?: boolean  // área especial: além da rota, esconde as opções de discursiva espalhadas
+  href: string              // rota base da área — usada p/ esconder do menu e bloquear o acesso
+  hrefs?: string[]          // rotas EXTRA da mesma área (ex.: Gamificação = trilha + ligas + recomendado)
+  discursiva?: boolean      // área especial: além da rota, esconde as opções de discursiva espalhadas
+  padraoBloqueado?: boolean // nasce BLOQUEADA (ON) quando não há config salva — p/ áreas restritas (ex.: Teste).
+                            // O toggle continua significando "em manutenção"; só muda o default. Libere por allowlist.
 }
 
 /** Áreas que podem ser colocadas em manutenção. (Não inclui configs sensíveis p/ não trancar o admin.) */
@@ -33,6 +35,9 @@ export const AREAS_MANUTENCAO: AreaManutencao[] = [
   { key: 'grupos', label: 'Grupos', descricao: 'Turmas e grupos de alunos.', href: '/admin/grupos' },
   { key: 'integracoes', label: 'Integrações', descricao: 'Curseduca, Guru e webhooks.', href: '/admin/integracoes' },
   { key: 'estudantes', label: 'Estudantes', descricao: 'Cadastro e gestão de alunos.', href: '/admin/estudantes' },
+  // Área de TESTE (spike dos editores Office). Nasce BLOQUEADA — só quem estiver no allowlist vê o
+  // item no menu e acessa /admin/teste. Cobre também as sub-rotas (/admin/teste/onlyoffice|collabora/...).
+  { key: 'teste', label: 'Teste — Editores Office', descricao: 'Área de avaliação dos editores Office (Collabora/OnlyOffice). Fica bloqueada por padrão; libere só quem precisa testar.', href: '/admin/teste', padraoBloqueado: true },
 ]
 
 /**
@@ -58,7 +63,8 @@ export type ManutencaoLiberados = Record<string, string[]>
 export function normalizarMapaAreas(raw: unknown, areas: AreaManutencao[]): Record<string, boolean> {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   const out: Record<string, boolean> = {}
-  for (const a of areas) out[a.key] = !!r[a.key]
+  // Sem config salva: usa o default da área (`padraoBloqueado`). Com config, respeita o valor salvo.
+  for (const a of areas) out[a.key] = a.key in r ? !!r[a.key] : !!a.padraoBloqueado
   return out
 }
 

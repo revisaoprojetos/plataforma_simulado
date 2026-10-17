@@ -1,0 +1,44 @@
+# SPIKE — editores Office reais para avaliar a migração do caderno (docx nativo).
+# Sobe as edições GRÁTIS: Collabora CODE (LibreOffice, licença MPL) e OnlyOffice Docs Community (AGPL).
+# Uso:  docker compose -f docker-compose.teste.yml up -d
+# Os serviços precisam alcançar o app Next (host) em host.docker.internal:3000 (WOPI / document.url / callback).
+#
+# .env.local (apps/web) — adicione:
+#   NEXT_PUBLIC_COLLABORA_URL=http://localhost:9980
+#   NEXT_PUBLIC_ONLYOFFICE_URL=http://localhost:8082
+#   TESTE_WOPI_HOST=http://host.docker.internal:3000
+services:
+  # Collabora Online Development Edition (LibreOffice no navegador). Edita/salva via WOPI do app.
+  collabora:
+    image: collabora/code:latest
+    container_name: teste-collabora
+    ports:
+      - '9980:9980'
+    environment:
+      # Permite o HOST WOPI do app (o Collabora só aceita hosts listados aqui — regex de URL).
+      - aliasgroup1=http://host\.docker\.internal:3000
+      # HTTP puro no local (sem TLS) + não gerar cert.
+      - extra_params=--o:ssl.enable=false --o:ssl.termination=false --o:net.frame_ancestors=http://localhost:3000
+      - DONT_GEN_SSL_CERT=true
+      - username=admin
+      - password=admin
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    cap_add:
+      - MKNOD
+    restart: unless-stopped
+
+  # OnlyOffice Document Server (Community). Baixa o .docx por document.url e salva via callback.
+  # IMPORTANTE: o OnlyOffice BLOQUEIA IP privado (host.docker.internal) por padrão (SSRF guard) → dá
+  # "erro ao baixar" / "não pode ser gravado". Após subir/recriar, rode:  bash scripts/teste-onlyoffice-fix.sh
+  onlyoffice:
+    image: onlyoffice/documentserver:latest
+    container_name: teste-onlyoffice
+    ports:
+      - '8082:80'
+    environment:
+      # Sem JWT no spike (simplifica a integração). Em produção isso seria ligado com segredo.
+      - JWT_ENABLED=false
+    extra_hosts:
+      - 'host.docker.internal:host-gateway'
+    restart: unless-stopped

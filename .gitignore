@@ -92,3 +92,7 @@ docs/env*
 
 # Artefatos temporários de teste/medição (tmp-cronograma.pdf, tmp-*.mjs)
 tmp-*
+
+# Spike dos editores Office (área de Teste): .docx de teste gravados em disco + scripts helper locais
+apps/web/.teste-docs/
+apps/web/scripts/_*
