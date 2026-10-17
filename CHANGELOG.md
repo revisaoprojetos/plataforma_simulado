@@ -12,6 +12,15 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.19.1 — 2026-10-17
+
+**fix(maratona): ranking expunha o NOME COMPLETO do corredor — volta a mostrar só INICIAIS (privacidade)**
+
+- O ranking da maratona estava mostrando o nome completo de terceiros (ex.: "Joao") em vez da abreviação.
+- Agora o loader (`carregarRankingMaratona`) anonimiza: nome de terceiros vira **iniciais** ("João Silva" →
+  "J. S."; nome único → "J."); a própria linha do aluno continua como **"Você"** (componente). Cache por
+  tenant passa a guardar só iniciais (sem PII).
+
 ## 3.19.0 — 2026-10-17
 
 **feat: Maratona (check-in/selo/nº de corredor), runner (Certo×Errado + navegador + cronômetro) e bloco "Nº de peito" nos cadernos**

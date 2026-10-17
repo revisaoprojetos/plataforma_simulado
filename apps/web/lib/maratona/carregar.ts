@@ -58,6 +58,15 @@ export async function carregarDesafioMaratona(svc: Svc, tenantId: string): Promi
  * ter terminado o simulado correspondente. Retorna 0..3 (3 = cruzou a chegada). Sem pasta/erro → 0.
  */
 // ─── RANKING REAL da maratona ─────────────────────────────────────────────────
+/** PRIVACIDADE (obrigatória nos rankings): o nome de TERCEIROS vira só INICIAIS — "João Silva" → "J. S."
+ *  (primeiro + último nome); nome único → "J.". A própria linha do aluno aparece como "Você" (no componente). */
+function iniciaisDe(nome: string | null | undefined): string {
+  const ps = (nome || '').trim().split(/\s+/).filter(Boolean)
+  if (!ps.length) return '—'
+  const a = ps[0][0]?.toUpperCase() ?? ''
+  const b = ps.length > 1 ? (ps[ps.length - 1][0]?.toUpperCase() ?? '') : ''
+  return b ? `${a}. ${b}.` : `${a}.`
+}
 export interface MaratonaRankLinha { estudanteId: string; nome: string; pontos: number; tempo: string; tentativas: number; posicao: number
   numero: number | null   // número do corredor (0001…); null = ainda não encerrou o 1º simulado
   checkin: boolean         // check-in ok (permaneceu ≥ mínimo): na semana = daquela etapa; no geral = todas as etapas
@@ -171,7 +180,7 @@ export async function carregarRankingMaratona(svc: Svc, tenantId: string, pastaI
     if (ids.length) {
       // .in() chunkado (lista grande pendura o proxy) + paginado.
       const ests = await fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_estudantes').select('id, nome').in('id', chunk).order('id', { ascending: true }), { rotulo: 'maratona-ranking-nomes' })
-      for (const e of ests) nomes.set(e.id, e.nome ?? 'Aluno')
+      for (const e of ests) nomes.set(e.id, iniciaisDe(e.nome)) // privacidade: só iniciais no ranking
     }
     // Corrida: quem tem check-in na frente, depois menor tempo, depois nome. (Sem pontos no ranking.)
     const ordenar = (arr: Linha[]) => [...arr]
