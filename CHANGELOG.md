@@ -12,6 +12,22 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.21.0 — 2026-10-19
+
+**feat/fix(maratona): ranking conta só a tentativa válida · "Simulado encerrado" · ranking admin com nomes reais**
+
+- **Ranking — tentativa válida:** o check-in sai da maior permanência (≥ `segMin`), mas o tempo/nota exibidos
+  vinham da última tentativa — então quem fazia em 23min e **refazia em 7min** aparecia com "7min + check".
+  Agora nota e tempo do ranking saem **só das tentativas válidas** (permanência ≥ mínimo); sem válida → cai pro
+  fim. Um aluno com check nunca mais aparece abaixo do mínimo. (`carregarRankingMaratona`.)
+- **"Simulado encerrado":** quando a janela do simulado passa (ou status `encerrado`), a UI do check-in deixa de
+  oferecer **"Refazer"** e mostra **"Simulado encerrado"** (`MaratonaSimuladoLink.encerrado` + `SeloEtapa`/`dispoSim`).
+- **Ranking ADMIN (novo):** a aba Ranking da maratona estava vazia (stub). Agora tem tabela própria
+  ([`maratona-ranking-admin.tsx`](apps/web/components/admin/maratona-ranking-admin.tsx)) com **nomes/e-mails reais**
+  (aluno segue anônimo/iniciais), nº de peito e, **por etapa**, check-in ✓/⚠ + tempo que conta + nº de tentativas +
+  flag "abaixo do mínimo"; busca + filtros (com/sem check-in, refez, abaixo do mínimo). Loader
+  `carregarRankingMaratonaAdmin` + action `obterRankingMaratonaAdmin` (gated por `simulados:view`).
+
 ## 3.20.0 — 2026-10-17
 
 **feat: área de Teste (editores Office) atrás da manutenção + downloads de caderno no card + ajustes de maratona**

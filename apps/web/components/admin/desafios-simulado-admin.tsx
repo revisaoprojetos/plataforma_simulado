@@ -17,13 +17,13 @@ import { MARATONA, type MaratonaConfig } from '@/lib/maratona/config'
 import { REGULAMENTO_PADRAO } from '@/lib/leitura/regulamento'
 import { MaratonaCardDestaque } from '@/components/aluno/maratona/maratona-card-destaque'
 import { ModuloAcesso } from '@/components/admin/modulo-acesso'
-import { RankingAdmin } from '@/components/admin/ranking-admin'
+import { MaratonaRankingAdmin } from '@/components/admin/maratona-ranking-admin'
 import { ModuloMedalhasForm } from '@/components/admin/modulo-medalhas-form'
 import { ModuloRegulamentoForm } from '@/components/admin/modulo-regulamento-form'
 import { CardSimuladoAdmin, MoverSimuladoDialog, CopiarSimuladoDialog, type SimuladoCard, type DestinoSim } from '@/components/admin/simulados-board'
 import { NovoSimuladoDialog } from '@/components/admin/novo-simulado-dialog'
 import { ImageCropper, type CropState } from '@/app/admin/simulados/criar/image-cropper'
-import { obterRankingMaratona, salvarConfigMaratona, salvarConquistasDesafio, salvarCarimbosDesafio, salvarRegulamentoDesafio, type ConfigDesafioSim, type ContagemDesafio, type EtapaMaratona } from '@/app/admin/simulados/desafios-actions'
+import { salvarConfigMaratona, salvarConquistasDesafio, salvarCarimbosDesafio, salvarRegulamentoDesafio, type ConfigDesafioSim, type ContagemDesafio, type EtapaMaratona } from '@/app/admin/simulados/desafios-actions'
 import type { ModuloConquistaDef, CarimboDef, CarimboCondicaoTipo } from '@/lib/leitura/carimbos-tipos'
 import { moverSimuladoParaPasta } from '@/app/admin/simulados/actions'
 import type { RankingLeitura } from '@/lib/leitura/ranking'
@@ -86,7 +86,7 @@ const ABAS: { k: Aba; label: string; icon: React.ReactNode }[] = [
   { k: 'config', label: 'Configurações', icon: <Settings className="h-4 w-4" /> },
 ]
 
-function DesafioInterno({ desafio, pastaId, rankingInicial, contagem, simulados, fora, appUrl, selos, destinos }: { desafio: ConfigDesafioSim; pastaId: string; rankingInicial: RankingLeitura; contagem: ContagemDesafio; simulados: SimuladoCard[]; fora: { id: string; titulo: string; status: string }[]; appUrl: string; selos: { conquistas: ModuloConquistaDef[]; carimbos: CarimboDef[] }; destinos: DestinoSim[] }) {
+function DesafioInterno({ desafio, pastaId, contagem, simulados, fora, appUrl, selos, destinos }: { desafio: ConfigDesafioSim; pastaId: string; rankingInicial?: RankingLeitura; contagem: ContagemDesafio; simulados: SimuladoCard[]; fora: { id: string; titulo: string; status: string }[]; appUrl: string; selos: { conquistas: ModuloConquistaDef[]; carimbos: CarimboDef[] }; destinos: DestinoSim[] }) {
   const [aba, setAba] = useState<Aba>('simulados')
   return (
     <div className="space-y-4">
@@ -111,7 +111,7 @@ function DesafioInterno({ desafio, pastaId, rankingInicial, contagem, simulados,
         {aba === 'simulados' && <AbaSimulados pastaId={pastaId} simulados={simulados} fora={fora} appUrl={appUrl} destinos={destinos} etapas={desafio.etapas} />}
         {aba === 'selos' && <AbaSelos pastaId={pastaId} selos={selos} simulados={simulados} />}
         {/* RANKING e ACESSOS: componentes REAIS da plataforma (mesmos do JurisClub), por pasta/módulo. */}
-        {aba === 'ranking' && <RankingAdmin inicial={rankingInicial} moduloId={pastaId} moduloNome={`${desafio.titulo} ${desafio.destaque}`} loader={obterRankingMaratona} rotulos={{ aulas: 'Simulados' }} detalheAluno={false} />}
+        {aba === 'ranking' && <MaratonaRankingAdmin pastaId={pastaId} />}
         {aba === 'acessos' && <ModuloAcesso pastaId={pastaId} area="maratona" />}
         {/* REGULAMENTO: mesma tela do Lei Seca (ModuloRegulamentoForm), gravando em desafio_jogo.config.regulamento. */}
         {aba === 'regulamento' && <ModuloRegulamentoForm key={pastaId} pastaId={pastaId} atual={desafio.regulamento ?? REGULAMENTO_PADRAO} salvar={salvarRegulamentoDesafio} />}

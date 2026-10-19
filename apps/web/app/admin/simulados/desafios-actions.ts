@@ -16,6 +16,7 @@ import { criarPastaFolder } from '@/app/admin/banco-questoes/actions'
 import { MARATONA, type MaratonaConfig } from '@/lib/maratona/config'
 import { normalizarRegulamento, type RegulamentoConfig } from '@/lib/leitura/regulamento'
 import type { RankingLeituraItem } from '@/lib/leitura/ranking'
+import { carregarRankingMaratonaAdmin, type MaratonaRankingAdminData } from '@/lib/maratona/carregar'
 
 // Config do desafio (persistida em desafio_jogo.config). Além da MaratonaConfig que alimenta o card do
 // aluno, guarda o estado do editor de capa (original + recorte) p/ reajustar de onde parou (não-destrutivo).
@@ -200,4 +201,19 @@ export async function listarSimuladosForaDesafio(pastaId: string): Promise<{ id:
  */
 export async function obterRankingMaratona(_moduloId: string, _fresco = false): Promise<{ ok: boolean; itens?: RankingLeituraItem[]; error?: string }> {
   return { ok: true, itens: [] }
+}
+
+/** RANKING ADMIN da maratona (nomes reais + detalhe por etapa: check-in, tempo, tentativas). Para o painel
+ *  de suporte ver QUEM são os alunos, quem validou o check-in, quem fez < mínimo e quem refez. */
+export async function obterRankingMaratonaAdmin(pastaId: string): Promise<{ ok: boolean; data?: MaratonaRankingAdminData; error?: string }> {
+  if (!(await checkPermission('simulados:view'))) return { ok: false, error: 'Sem permissão.' }
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId) return { ok: false, error: 'Tenant não resolvido.' }
+  try {
+    const svc = createAdminClient()
+    const data = await carregarRankingMaratonaAdmin(svc, tenantId, pastaId)
+    return { ok: true, data }
+  } catch (e) {
+    return { ok: false, error: (e as Error).message }
+  }
 }

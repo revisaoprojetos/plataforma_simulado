@@ -159,14 +159,19 @@ export async function carregarRankingMaratona(svc: Svc, tenantId: string, pastaI
         porAluno.set(s.estudante_id, arr)
       }
       const linhas: Linha[] = [...porAluno.entries()].map(([eid, sess]) => {
-        let conta = sess[sess.length - 1] // 'ultima' (default)
-        if (politica === 'melhor') conta = sess.reduce((b, s) => (s.nota > b.nota ? s : b), sess[0])
-        const pontos = politica === 'media' ? sess.reduce((a, s) => a + s.nota, 0) / sess.length : conta.nota
-        const t = politica === 'media' ? { s: '—', ms: Number.POSITIVE_INFINITY } : fmtTempoRank(conta.ini, conta.fim)
-        // CHECK-IN desta etapa = permaneceu ao menos o mínimo em ALGUMA sessão (maior duração ≥ segMin).
-        let maxDur = 0
-        for (const s of sess) if (s.ini && s.fim) { const d = (new Date(s.fim).getTime() - new Date(s.ini).getTime()) / 1000; if (d > maxDur) maxDur = d }
+        // Permanência (duração) de cada sessão; maxDur = base do CHECK-IN (≥ segMin em ALGUMA sessão).
+        const durDe = (s: { ini: string | null; fim: string | null }) => (s.ini && s.fim) ? Math.max(0, (new Date(s.fim).getTime() - new Date(s.ini).getTime()) / 1000) : 0
+        const maxDur = sess.reduce((m, s) => Math.max(m, durDe(s)), 0)
         const checkinSim = segMinSim <= 0 ? true : maxDur >= segMinSim
+        // RANKING: nota e TEMPO saem só das tentativas VÁLIDAS (permanência ≥ segMin). Assim um aluno com
+        // check NUNCA aparece com tempo < mínimo (ex.: fez em 23min e refez em 7min → conta os 23min, não os 7).
+        // Sem tentativa válida → usa todas (mas aí checkinSim=false e ele cai pro fim do ranking).
+        const validas = segMinSim <= 0 ? sess : sess.filter((s) => durDe(s) >= segMinSim)
+        const bs = validas.length ? validas : sess
+        let conta = bs[bs.length - 1] // 'ultima' (default)
+        if (politica === 'melhor') conta = bs.reduce((b, s) => (s.nota > b.nota ? s : b), bs[0])
+        const pontos = politica === 'media' ? bs.reduce((a, s) => a + s.nota, 0) / bs.length : conta.nota
+        const t = politica === 'media' ? { s: '—', ms: Number.POSITIVE_INFINITY } : fmtTempoRank(conta.ini, conta.fim)
         idsSet.add(eid)
         const g = geral.get(eid) ?? { pontos: 0, tent: 0, ms: 0, checks: 0 }
         g.pontos += pontos; g.tent += sess.length; g.ms += Number.isFinite(t.ms) ? t.ms : 0; g.checks += checkinSim ? 1 : 0
@@ -203,6 +208,7 @@ export interface MaratonaSimuladoLink {
   data: string | null     // YYYY-MM-DD (data_inicio do simulado); null = sem data
   liberacao: string       // modo_aplicacao do simulado ('aberto' | 'janela_fixa' | 'prazo_relativo')
   liberada: boolean       // simulado disponível agora (modo + janela + status publicado)
+  encerrado: boolean      // janela já passou (data_fim < hoje) ou status 'encerrado' — não dá mais pra fazer/refazer
   // CHECK-IN (selo): o aluno PERMANECEU ao menos `segMin` no simulado (maior duração entre as sessões
   // finalizadas ≥ segMin). segMin=0 → qualquer encerramento já dá o check. false enquanto não cumpriu.
   segMin: number          // tempo mínimo de permanência da etapa, em segundos (0 = sem mínimo)
@@ -268,6 +274,9 @@ export async function carregarSimuladosLinksMaratona(svc: Svc, tenantId: string,
       const publicado = (r.status || '') === 'publicado'
       let liberada = publicado
       if (publicado && liberacao === 'janela_fixa') liberada = (!data || hoje >= data) && (!fim || hoje <= fim)
+      // ENCERRADO = janela fixa cuja data_fim já passou, ou simulado marcado como encerrado. Não dá mais
+      // pra fazer nem refazer → a UI troca "Refazer/Disponível em …" por "Simulado encerrado".
+      const encerrado = (r.status || '') === 'encerrado' || (liberacao === 'janela_fixa' && !!fim && hoje > fim)
       const concluido = done.has(r.id)
       const segMin = segMinPor.get(r.id) ?? 0
       const dur = durPor.get(r.id) ?? 0
@@ -280,7 +289,7 @@ export async function carregarSimuladosLinksMaratona(svc: Svc, tenantId: string,
         : (info?.temCaderno && r.embed_token) ? `/api/aluno/caderno-teste-questoes?token=${encodeURIComponent(r.embed_token)}` : null
       return {
         simuladoId: r.id, titulo: r.titulo ?? 'Simulado', rotulo: rotuloPor.get(r.id) || '',
-        data, liberacao, liberada, segMin, checkin, dur: Math.round(dur),
+        data, liberacao, liberada, encerrado, segMin, checkin, dur: Math.round(dur),
         fazerUrl: r.embed_token ? `/simulado/${r.embed_token}` : '',
         resultadoUrl: `/aluno/simulados/${r.id}`,
         concluido, cadernoUrl,
@@ -350,4 +359,86 @@ export async function carregarTempoDecorridoMaratona(svc: Svc, tenantId: string,
     }
     return Math.round(seg)
   } catch { return 0 }
+}
+
+// ─── RANKING ADMIN (nomes/e-mails REAIS + detalhe por etapa p/ suporte investigar) ────────────
+export interface MaratonaAdminEtapa { simuladoId: string; nome: string; segMin: number }
+export interface MaratonaAdminCelula { tentativas: number; maxDur: number; tempoConta: number; checkin: boolean; refez: boolean; teveRapida: boolean; nota: number | null }
+export interface MaratonaAdminLinha { estudanteId: string; nome: string; email: string | null; numero: number | null; checkins: number; etapas: (MaratonaAdminCelula | null)[] }
+export interface MaratonaRankingAdminData { etapas: MaratonaAdminEtapa[]; linhas: MaratonaAdminLinha[] }
+
+/**
+ * RANKING ADMIN da maratona: nomes/e-mails REAIS (NÃO anonimiza) + detalhe por etapa — tentativas,
+ * permanência (maxDur), tempo que CONTA (tentativa válida ≥ segMin pela política 'ultima'), check-in e
+ * flags "refez" (>1 tentativa) / "teveRapida" (alguma tentativa < segMin). Para o suporte ver quem são,
+ * quem validou o check-in, quem fez < mínimo e quem refez. NÃO cacheado (sempre fresco p/ investigação).
+ */
+export async function carregarRankingMaratonaAdmin(svc: Svc, tenantId: string, pastaId: string | null): Promise<MaratonaRankingAdminData> {
+  if (!pastaId) return { etapas: [], linhas: [] }
+  try {
+    const { data: sims } = await svc.from('simulado_simulados').select('id, titulo, data_inicio, created_at')
+      .eq('tenant_id', tenantId).eq('pasta_id', pastaId).eq('deletado', false).is('owner_estudante_id', null)
+      .order('data_inicio', { ascending: true, nullsFirst: false }).order('created_at', { ascending: true })
+    const simById = new Map((sims ?? []).map((s: any) => [s.id as string, s]))
+    const et = await lerEtapasMaratona(svc, tenantId, pastaId)
+    // Colunas = etapas por slot (1..3); fallback = ordem por data.
+    let etapaIds: string[]
+    if (et.some((e) => Number(e.slot) >= 1)) {
+      const arr: (string | null)[] = Array.from({ length: AREAS_MARATONA }, () => null)
+      for (const e of et) { const n = Number(e.slot) || 0; if (n >= 1 && n <= AREAS_MARATONA && !arr[n - 1]) arr[n - 1] = e.simuladoId }
+      etapaIds = arr.filter((x): x is string => !!x)
+    } else {
+      etapaIds = et.map((e) => e.simuladoId).filter((id) => simById.has(id)).slice(0, AREAS_MARATONA)
+      if (!etapaIds.length) etapaIds = (sims ?? []).slice(0, AREAS_MARATONA).map((s: any) => s.id)
+    }
+    const segMinPor = new Map(et.map((e) => [e.simuladoId, Math.max(0, Math.round(Number(e.segMin) || 0))]))
+    const rotuloPor = new Map(et.map((e) => [e.simuladoId, rotuloAplicado(e)]))
+    const etapas: MaratonaAdminEtapa[] = etapaIds.map((id) => ({ simuladoId: id, nome: rotuloPor.get(id) || (simById.get(id)?.titulo ?? 'Simulado'), segMin: segMinPor.get(id) ?? 0 }))
+    // nº de peito (corredores) da config da pasta
+    const corredores = new Map<string, number>()
+    try {
+      const { data: pr } = await svc.from('simulado_pastas').select('desafio_jogo').eq('id', pastaId).eq('tenant_id', tenantId).maybeSingle()
+      const cor = (pr as any)?.desafio_jogo?.config?.corredores
+      if (cor && typeof cor === 'object') for (const [k, v] of Object.entries(cor)) { const n = Number(v); if (Number.isFinite(n) && n > 0) corredores.set(k, n) }
+    } catch { /* sem números ainda */ }
+    // Sessões finalizadas (não-teste) por etapa → por aluno
+    const porEtapaAluno = new Map<string, Map<string, { nota: number; dur: number }[]>>()
+    const idsSet = new Set<string>()
+    for (const sid of etapaIds) {
+      const ses = await fetchAll<any>(() => svc.from('simulado_sessoes_prova').select('estudante_id, nota, iniciado_em, finalizado_em')
+        .eq('simulado_id', sid).eq('is_teste', false).eq('status', 'finalizada').eq('deletado', false)
+        .order('id', { ascending: true }), 1000, 'maratona-admin-sessoes')
+      const m = new Map<string, { nota: number; dur: number }[]>()
+      for (const s of ses) {
+        const dur = (s.iniciado_em && s.finalizado_em) ? Math.max(0, (new Date(s.finalizado_em).getTime() - new Date(s.iniciado_em).getTime()) / 1000) : 0
+        const arr = m.get(s.estudante_id) ?? []; arr.push({ nota: Number(s.nota ?? 0), dur }); m.set(s.estudante_id, arr); idsSet.add(s.estudante_id)
+      }
+      porEtapaAluno.set(sid, m)
+    }
+    // Nomes/e-mails REAIS (admin)
+    const nomes = new Map<string, { nome: string; email: string | null }>()
+    const ids = [...idsSet]
+    if (ids.length) {
+      const ests = await fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_estudantes').select('id, nome, email').in('id', chunk).order('id', { ascending: true }), { rotulo: 'maratona-admin-nomes' })
+      for (const e of ests) nomes.set(e.id, { nome: e.nome ?? 'Aluno', email: e.email ?? null })
+    }
+    const linhas: MaratonaAdminLinha[] = ids.map((eid) => {
+      const cels = etapaIds.map((sid): MaratonaAdminCelula | null => {
+        const sess = porEtapaAluno.get(sid)?.get(eid)
+        if (!sess || !sess.length) return null
+        const segMin = segMinPor.get(sid) ?? 0
+        const durs = sess.map((s) => s.dur)
+        const maxDur = Math.max(...durs)
+        const checkin = segMin <= 0 || maxDur >= segMin
+        const validas = segMin <= 0 ? sess : sess.filter((s) => s.dur >= segMin)
+        const conta = (validas.length ? validas : sess).slice(-1)[0] // política 'ultima' entre as válidas
+        return { tentativas: sess.length, maxDur: Math.round(maxDur), tempoConta: Math.round(conta.dur), checkin, refez: sess.length > 1, teveRapida: segMin > 0 && durs.some((d) => d < segMin), nota: conta.nota }
+      })
+      const info = nomes.get(eid) ?? { nome: 'Aluno', email: null }
+      return { estudanteId: eid, nome: info.nome, email: info.email, numero: corredores.get(eid) ?? null, checkins: cels.filter((c) => c?.checkin).length, etapas: cels }
+    })
+    const tTotal = (l: MaratonaAdminLinha) => l.etapas.reduce((a, c) => a + (c?.checkin ? c.tempoConta : 0), 0)
+    linhas.sort((a, b) => (b.checkins - a.checkins) || (tTotal(a) - tTotal(b)) || a.nome.localeCompare(b.nome, 'pt-BR'))
+    return { etapas, linhas }
+  } catch { return { etapas: [], linhas: [] } }
 }

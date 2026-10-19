@@ -69,6 +69,7 @@ function dispoSim(s?: MaratonaSimuladoLink | null): string {
   if (!s) return ''
   if (s.concluido) return 'Simulado concluído'
   if (s.liberada) return 'Já disponível'
+  if (s.encerrado) return 'Simulado encerrado'
   return s.data ? `Disponível em ${fmtDMa(s.data)}` : 'Disponível em breve'
 }
 // Segundos → HH:MM:SS (tempo decorrido real do desafio = soma dos tempos dos simulados).
@@ -589,6 +590,7 @@ function SeloEtapa({ s, tone = 'navy' }: { s?: MaratonaSimuladoLink | null; tone
   const temMin = s.segMin > 0
   const minTxt = fmtDurCurto(s.segMin)
   const durTxt = fmtDurCurto(s.dur)
+  const encerrado = !!s.encerrado && !s.checkin // janela passou e o check-in não foi validado → não dá pra refazer
   // 3 estados: validado (checkin) · concluiu mas NÃO cumpriu o tempo (falhou) · ainda não concluiu.
   const falhou = s.concluido && !s.checkin && temMin
   const estado: 'ok' | 'falhou' | 'pendente' = s.checkin ? 'ok' : falhou ? 'falhou' : 'pendente'
@@ -609,8 +611,12 @@ function SeloEtapa({ s, tone = 'navy' }: { s?: MaratonaSimuladoLink | null; tone
   const corpo = estado === 'ok'
     ? (temMin ? <>Você permaneceu {B(durTxt)} no simulado <span style={{ opacity: .85 }}>(mínimo {minTxt})</span>. Selo e medalha {B('garantidos')}.</> : <>Simulado concluído. Selo e medalha {B('garantidos')}.</>)
     : estado === 'falhou'
-      ? <>Você concluiu em {B(durTxt)}, mas o mínimo é {B(minTxt)}. Só marcar as questões rápido não conta — refaça permanecendo pelo menos {B(minTxt)} para ganhar o selo e a medalha.</>
-      : (temMin ? <>Para ganhar o selo e a medalha, permaneça pelo menos {B(minTxt)} no simulado. Só marcar as questões rápido não conta — é preciso realmente fazer o simulado.</> : <>Conclua o simulado para ganhar o selo e a medalha desta etapa.</>)
+      ? (encerrado
+          ? <>Você concluiu em {B(durTxt)}, mas o mínimo era {B(minTxt)}. O simulado foi {B('encerrado')} — o check-in não pôde ser validado.</>
+          : <>Você concluiu em {B(durTxt)}, mas o mínimo é {B(minTxt)}. Só marcar as questões rápido não conta — refaça permanecendo pelo menos {B(minTxt)} para ganhar o selo e a medalha.</>)
+      : (encerrado
+          ? <>O simulado foi {B('encerrado')} e o check-in desta etapa não foi validado.</>
+          : (temMin ? <>Para ganhar o selo e a medalha, permaneça pelo menos {B(minTxt)} no simulado. Só marcar as questões rápido não conta — é preciso realmente fazer o simulado.</> : <>Conclua o simulado para ganhar o selo e a medalha desta etapa.</>))
   const badgeBg = estado === 'ok' ? 'linear-gradient(135deg,#FFD24A,#F2A800)' : estado === 'falhou' ? 'linear-gradient(135deg,#F6B24A,#E0860A)' : (claro ? 'rgba(7,26,63,.06)' : 'rgba(255,255,255,.08)')
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 16px', borderRadius: 16, background: bgGrad, border: `1px solid ${estado === 'pendente' ? (claro ? 'rgba(7,26,63,.1)' : 'rgba(255,255,255,.12)') : `color-mix(in srgb, ${accent} 45%, transparent)`}`, boxShadow: estado === 'pendente' ? 'none' : `0 12px 28px -18px ${accent}` }}>
@@ -626,7 +632,11 @@ function SeloEtapa({ s, tone = 'navy' }: { s?: MaratonaSimuladoLink | null; tone
         </span>
       </div>
       <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.55, color: txtBody }}>{corpo}</p>
-      {estado === 'falhou' && s.fazerUrl ? (
+      {encerrado ? (
+        <span style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 7, minHeight: 38, padding: '0 16px', borderRadius: 10, background: claro ? 'rgba(7,26,63,.06)' : 'rgba(255,255,255,.12)', color: claro ? MUT : '#CBD4E4', fontWeight: 800, fontSize: 12.5 }}>
+          <Lock size={14} /> Simulado encerrado
+        </span>
+      ) : estado === 'falhou' && s.fazerUrl ? (
         <Link href={s.fazerUrl} style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 7, minHeight: 38, padding: '0 16px', borderRadius: 10, background: claro ? INK : GOLD, color: claro ? '#fff' : NAVY, textDecoration: 'none', fontWeight: 800, fontSize: 12.5, boxShadow: `0 8px 18px -10px ${claro ? INK : GOLD}` }}>
           <RotateCcw size={15} /> Refazer para validar o check-in
         </Link>
