@@ -12,6 +12,15 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.21.1 — 2026-10-19
+
+**fix(estudantes): bloqueia e-mail duplicado ao criar/editar aluno**
+
+- `createEstudanteAction` criava o perfil sem checar duplicidade → dava pra ter 2 alunos com o mesmo e-mail
+  no tenant (double-submit). Agora **criar** e **editar** bloqueiam e-mail já usado por outro aluno ativo da
+  mesma plataforma (case-insensitive, por tenant) com mensagem clara no form. O fluxo de **admin** já era
+  idempotente (reusa a conta + upsert em `tenant_acessos`), não mudou.
+
 ## 3.21.0 — 2026-10-19
 
 **feat/fix(maratona): ranking conta só a tentativa válida · "Simulado encerrado" · ranking admin com nomes reais**

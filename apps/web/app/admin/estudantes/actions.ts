@@ -170,9 +170,22 @@ export async function createEstudanteAction(data: NovoEstudanteData) {
 
   const supabase = await createServiceClient()
 
+  const email = data.email?.trim()
+  if (!email) return { error: 'Informe o e-mail.' }
+  // BLOQUEIO de duplicidade: não deixa criar 2 alunos com o MESMO e-mail no tenant (case-insensitive).
+  // (o `ilike` restringe os candidatos; a confirmação exata em JS evita o `_` curinga do LIKE.)
+  {
+    const alvo = email.toLowerCase()
+    const { data: dupes } = await supabase.from('simulado_estudantes').select('id, email')
+      .eq('tenant_id', tenantId).eq('deletado', false).ilike('email', email)
+    if ((dupes ?? []).some((r: any) => (r.email ?? '').trim().toLowerCase() === alvo)) {
+      return { error: 'Já existe um aluno cadastrado com esse e-mail nesta plataforma.' }
+    }
+  }
+
   // Cria conta global (auth.users). Se o e-mail já existe, segue sem recriar.
   const { data: authUser, error: authError } = await supabase.auth.admin.createUser({
-    email: data.email,
+    email,
     email_confirm: true,
     user_metadata: { full_name: data.nome },
   })
@@ -187,7 +200,7 @@ export async function createEstudanteAction(data: NovoEstudanteData) {
     tenant_id: tenantId,
     user_id: userId,
     nome: data.nome,
-    email: data.email,
+    email,
     cpf: data.cpf || null,
     telefone: data.telefone || null,
     classificacao: data.classificacao ?? 'normal',
@@ -231,6 +244,15 @@ export async function editarEstudanteAction(id: string, data: EditarEstudanteDat
   if (!email) return { error: 'Informe o e-mail.' }
 
   const svc = createAdminClient()
+  // BLOQUEIO de duplicidade: nenhum OUTRO aluno ativo do tenant pode ter esse e-mail.
+  {
+    const alvo = email.toLowerCase()
+    const { data: dupes } = await svc.from('simulado_estudantes').select('id, email')
+      .eq('tenant_id', tenantId).eq('deletado', false).neq('id', id).ilike('email', email)
+    if ((dupes ?? []).some((r: any) => (r.email ?? '').trim().toLowerCase() === alvo)) {
+      return { error: 'Já existe outro aluno com esse e-mail nesta plataforma.' }
+    }
+  }
   const { data: antes } = await svc
     .from('simulado_estudantes')
     .select('nome, email, cpf, telefone, data_nascimento, classificacao, matricula_externa, created_at')
