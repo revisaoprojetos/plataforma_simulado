@@ -12,6 +12,17 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.22.2 — 2026-10-20
+
+**fix(gamificação): rede de segurança do marcador de dia (streak da Leitura) — fim dos buracos sob carga**
+
+- O marcador do dia (`quiz:<doc>`) dependia de TODA a cadeia de queries do `onQuizConcluido`; sob o pico do
+  último dia do desafio ~15% das conclusões falhavam (erro transitório engolido) e o dia sumia do streak.
+- [`/api/leitura/resposta`](apps/web/app/api/leitura/resposta/route.ts): ao completar o quiz, o `onQuizConcluido`
+  virou best-effort e ganhou uma **rede de segurança** — se o marcador não existe, grava um mínimo idempotente
+  (`xp=0`, ancorado ao dia da leitura) direto, com 1 insert. O streak deixa de depender da cadeia rica ter sucedido.
+  Quando o `onQuizConcluido` já gravou (com XP), o insert é no-op.
+
 ## 3.22.1 — 2026-10-20
 
 **fix(gamificação): streak da Leitura e missão de simulado — eventos ao vivo perdidos sob carga**

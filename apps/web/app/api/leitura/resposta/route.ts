@@ -117,7 +117,31 @@ export async function POST(request: NextRequest) {
       const feitas = ((rp.data ?? []) as any[]).filter((r) => qset.has(r.questao_id))
       if (qset.size > 0 && feitas.length >= qset.size) {
         const acertos = feitas.filter((r) => r.correta).length
-        await onQuizConcluido(svc, { tenantId: sessao.tenantId, estudanteId: sessao.estudanteId, documentoId: documento_id, acertos, total: qset.size })
+        // XP + bônus + marcador (cadeia rica; best-effort — pode falhar sob carga e engolir o erro).
+        try {
+          await onQuizConcluido(svc, { tenantId: sessao.tenantId, estudanteId: sessao.estudanteId, documentoId: documento_id, acertos, total: qset.size })
+        } catch { /* cai na rede de segurança abaixo */ }
+        // REDE DE SEGURANÇA do streak: o marcador do dia (quiz:<doc>) NÃO pode depender de o
+        // onQuizConcluido (várias queries) ter sucedido — sob o pico do último dia ~15% falhavam e o
+        // dia sumia do streak apesar de "Concluída 100%". Se o marcador não existe, grava um mínimo
+        // (xp=0, idempotente) direto. Se o onQuizConcluido já gravou (com XP), este insert é no-op.
+        try {
+          const { data: temMarc } = await svc.from('simulado_xp_eventos').select('id')
+            .eq('tenant_id', sessao.tenantId).eq('estudante_id', sessao.estudanteId).eq('origem', 'leitura').eq('ref_id', `quiz:${documento_id}`).maybeSingle()
+          if (!temMarc) {
+            let dia = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date())
+            try {
+              const { data: lev } = await svc.from('simulado_xp_eventos').select('meta')
+                .eq('tenant_id', sessao.tenantId).eq('estudante_id', sessao.estudanteId).eq('origem', 'leitura').eq('ref_id', documento_id).maybeSingle()
+              const dl = (lev?.meta as { dia?: string } | null)?.dia
+              if (dl && dl < dia) dia = dl // ancora ao dia da LEITURA se anterior (cross-meia-noite), igual onQuizConcluido
+            } catch { /* mantém hoje */ }
+            await svc.from('simulado_xp_eventos').upsert(
+              [{ tenant_id: sessao.tenantId, estudante_id: sessao.estudanteId, origem: 'leitura', ref_id: `quiz:${documento_id}`, xp: 0, meta: { documentoId: documento_id, quiz: true, dia, reconciliado: true } }],
+              { onConflict: 'tenant_id,estudante_id,origem,ref_id', ignoreDuplicates: true },
+            )
+          }
+        } catch { /* rede de segurança é best-effort */ }
       }
     } catch { /* nunca bloqueia a resposta */ }
   }
