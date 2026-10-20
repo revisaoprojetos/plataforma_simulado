@@ -12,6 +12,22 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.22.1 — 2026-10-20
+
+**fix(gamificação): streak da Leitura e missão de simulado — eventos ao vivo perdidos sob carga**
+
+- **Streak da Leitura/Lei Seca perdendo o dia da conclusão:** o marcador do dia (`quiz:<doc>` no ledger, fonte das
+  colunas "Feito em"/"Sequência" e do streak) só era gravado pelo `onQuizConcluido` disparado ao completar o quiz;
+  sob o pico do último dia do desafio ~15% das conclusões falhavam (erro transitório engolido pelo try/catch) e o
+  dia sumia do streak, apesar de "Concluída 100%". Agora [`/api/leitura/resposta`](apps/web/app/api/leitura/resposta/route.ts)
+  re-avalia a conclusão **a cada resposta** (sem gate `up`, idempotente) → re-carimba se o evento ao vivo se perder.
+- **Missão "Complete 1 simulado" ficando 0/1 mesmo após concluir:** o crédito dependia só do evento ao vivo no
+  finalize e nada reconciliava depois. [`missoesHoje`](apps/web/lib/gamificacao/leitura.ts) agora reconcilia a missão
+  `finalizar_simulado` contando as sessões realmente finalizadas do dia (não-teste), robusto a falha transitória
+  (+ helper `janelaDiaUtc` em [`datas.ts`](apps/web/lib/gamificacao/datas.ts)).
+- **Backfill (produção):** restaurados os marcadores de dia perdidos de ~71 alunos na Leitura (Lei Seca) — "Feito em",
+  "Sequência" e XP restaurados, sem duplicar bônus; reversível. (Teto de XP NÃO era a causa — estava desligado.)
+
 ## 3.22.0 — 2026-10-20
 
 **feat(biblioteca): Biblioteca de Conteúdos — Drive jurídico com capa fiel, visualizador e versões**

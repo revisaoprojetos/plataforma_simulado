@@ -1,7 +1,7 @@
 import { getGamConfig, type GamConfig, type LigaDef, type MissaoDef, type ConquistaDef } from './config'
 import { progressoNivel, ligaParaXp, proximaLiga, type ProgressoNivel } from './niveis'
 import { missoesDoDia } from './rodizio'
-import { diaLocal, inicioDaSemanaISO, inicioDoMesISO } from './datas'
+import { diaLocal, inicioDaSemanaISO, inicioDoMesISO, janelaDiaUtc } from './datas'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { listarConquistasModuloTenant } from '@/lib/leitura/carimbos'
 import { calcularSequencia } from '@/lib/leitura/sequencia'
@@ -129,9 +129,36 @@ export async function missoesHoje(svc: any, tenantId: string, estudanteId: strin
     .select('missao_id, progresso, completa')
     .eq('tenant_id', tenantId).eq('estudante_id', estudanteId).eq('dia', hoje)
   const porId = new Map<string, any>((data ?? []).map((r: any) => [r.missao_id, r]))
-  return missoesDoDia(config.missoes_def ?? [], config.missoes_config, hoje).map((def) => {
+  const missoes = missoesDoDia(config.missoes_def ?? [], config.missoes_config, hoje)
+
+  // RECONCILIAÇÃO da missão "Complete N simulado(s)": o crédito normal é feito pelo evento ao vivo
+  // no finalize (onSimuladoFinalizado → progredirMissoes). Se esse evento falhar pontualmente
+  // (race/erro transitório, auto-encerramento num dia diferente, finalize cross-meia-noite), a linha
+  // de progresso nunca é criada e o aluno vê 0/1 mesmo tendo concluído um simulado hoje — e nada
+  // reconcilia depois (o backfill não refaz missões). Aqui o DISPLAY passa a refletir a realidade:
+  // conta os simulados realmente finalizados hoje (não-teste) como piso do progresso.
+  const missaoSim = missoes.find((m) => m.tipo === 'finalizar_simulado')
+  let finalizadosHoje = 0
+  if (missaoSim && !(porId.get(missaoSim.id)?.completa)) {
+    const { ini, fim } = janelaDiaUtc(config.timezone, hoje)
+    const { count } = await svc
+      .from('simulado_sessoes_prova')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId).eq('estudante_id', estudanteId)
+      .eq('status', 'finalizada').eq('is_teste', false).eq('deletado', false)
+      .gte('finalizado_em', ini).lt('finalizado_em', fim)
+    finalizadosHoje = count ?? 0
+  }
+
+  return missoes.map((def) => {
     const p = porId.get(def.id)
-    return { def, progresso: Math.min(p?.progresso ?? 0, def.meta), completa: p?.completa ?? false }
+    let progresso = p?.progresso ?? 0
+    let completa = p?.completa ?? false
+    if (def.tipo === 'finalizar_simulado' && !completa && finalizadosHoje > progresso) {
+      progresso = finalizadosHoje
+      completa = finalizadosHoje >= def.meta
+    }
+    return { def, progresso: Math.min(progresso, def.meta), completa }
   })
 }
 

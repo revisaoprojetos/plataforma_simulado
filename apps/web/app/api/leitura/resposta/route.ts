@@ -105,7 +105,9 @@ export async function POST(request: NextRequest) {
   // dia imutável do ledger) só vinha da finalização em /quiz-tentativa — que nem sempre dispara, deixando
   // dias SEM evento e QUEBRANDO a sequência (bug da contabilização). onQuizConcluido é idempotente
   // (quiz:<doc> 1×), então a finalização posterior não duplica. Só p/ questão de quiz, resposta NOVA, não-testador.
-  if (up && !testador && vincQuiz.data) {
+  // NÃO gated por `up`: se o evento ao vivo se perdeu (falha transitória na requisição que completou o
+  // quiz), qualquer resposta/revisão posterior do quiz re-avalia a conclusão e carimba o dia (idempotente).
+  if (!testador && vincQuiz.data) {
     try {
       const [qz, rp] = await Promise.all([
         svc.from('simulado_documento_quiz_questoes').select('questao_id').eq('tenant_id', sessao.tenantId).eq('documento_id', documento_id).eq('deletado', false),
