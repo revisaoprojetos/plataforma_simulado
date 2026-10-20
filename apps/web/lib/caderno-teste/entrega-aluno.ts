@@ -14,7 +14,9 @@ export interface ModalidadeAluno {
 
 // Entrega V2: espelha os tipos de app/admin/cadernos-teste/actions.ts (definidos aqui p/ NÃO importar de
 // um arquivo 'use server' — evita acoplar a lib ao bundle de server actions). `simulado_pastas.caderno_entrega`.
-export type EntregaRef = { cadernoId?: string; itemId?: string; pdfUrl?: string; pdfNome?: string } | null
+// `docId`/`versaoId` = diagnóstico do EDITOR BETA (OnlyOffice). Hoje INERTE para o aluno (usavel() abaixo
+// o ignora de propósito — é teste de usabilidade no admin). Em sincronia com app/admin/cadernos-teste/actions.ts.
+export type EntregaRef = { cadernoId?: string; itemId?: string; pdfUrl?: string; pdfNome?: string; docId?: string; versaoId?: string } | null
 export type EntregaSlots = { diagnostico?: EntregaRef; folha?: EntregaRef; enunciado?: EntregaRef; gabarito?: EntregaRef }
 
 /** Adiciona ?download=<nome>.pdf p/ o arquivo baixar com nome amigável (mesmo padrão do v1). */

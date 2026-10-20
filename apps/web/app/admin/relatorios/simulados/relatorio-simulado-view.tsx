@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { formatBrt } from '@/lib/brt'
 import { toast } from 'sonner'
 import { Painel, Hero, BarrasH, Colunas, ListaBusca, Vazio, baixarCsv, heatBar } from '@/components/admin/relatorios/viz'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -143,6 +144,8 @@ export type DadosRelatorioSimulado = {
   foraJanela: { sessId: string; estId: string; nome: string; fimISO: string; quando: 'antes' | 'depois'; nota: number | null }[]
   /** ID do simulado (para as ações de gestão de tentativas). */
   simId: string
+  /** REGISTROS de uso do relatório (quem visualizou/baixou + horário), mais recentes primeiro. */
+  relatorioEventos: { estudanteId: string | null; nome: string; email: string | null; tipo: 'visualizou' | 'baixou'; criadoEm: string | null }[]
 }
 
 // Cabeçalho na ordem pedida + uma coluna por disciplina.
@@ -427,6 +430,13 @@ export function RelatorioSimuladoView({ d, print }: { d: DadosRelatorioSimulado;
           <EngajItem icon={<Download className="h-4 w-4" />} tom="amber" label="Baixaram relatório" valor={d.engajamento.baixaramRelatorio} base={d.engajamento.finalizaram} baseLabel="dos que finalizaram" />
         </div>
       </Painel>
+
+      {/* Registros de uso do relatório — quem visualizou/baixou, com nome, e-mail e horário (só na tela). */}
+      {!print && (
+        <Painel titulo="Registros de uso do relatório" sub="Quem visualizou ou baixou o relatório — com nome, e-mail e horário (Brasília)" tom="primary" icon={<ListChecks className="h-4 w-4" />}>
+          <RegistrosRelatorio eventos={d.relatorioEventos} />
+        </Painel>
+      )}
 
       {/* Levantamento de tentativas (só quando permite várias) */}
       {d.config.permiteVarias && (
@@ -953,6 +963,74 @@ function EngajItem({ icon, tom, label, valor, base, baseLabel }: { icon: React.R
         <div className={cn('h-full rounded-full transition-all', t.bar)} style={{ width: `${pct}%` }} />
       </div>
       <p className="text-[11px] text-muted-foreground">{pct}% {baseLabel}</p>
+    </div>
+  )
+}
+
+// Tabela de REGISTROS de uso do relatório (quem viu/baixou + horário) — busca + filtro por ação.
+function RegistrosRelatorio({ eventos }: { eventos: DadosRelatorioSimulado['relatorioEventos'] }) {
+  const [q, setQ] = useState('')
+  const [tipo, setTipo] = useState<'todos' | 'baixou' | 'visualizou'>('todos')
+  const filtrados = useMemo(() => {
+    const t = q.trim().toLowerCase()
+    return eventos.filter((e) => {
+      if (tipo !== 'todos' && e.tipo !== tipo) return false
+      if (t && !`${e.nome} ${e.email ?? ''}`.toLowerCase().includes(t)) return false
+      return true
+    })
+  }, [eventos, q, tipo])
+  const nBaixou = useMemo(() => eventos.filter((e) => e.tipo === 'baixou').length, [eventos])
+  const nViu = eventos.length - nBaixou
+
+  if (!eventos.length) return <p className="py-6 text-center text-sm text-muted-foreground">Ainda não há registros de visualização ou download deste relatório.</p>
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar por nome ou e-mail…"
+            className="h-9 w-64 rounded-lg border bg-background pl-8 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/40" />
+        </div>
+        <div className="flex gap-1.5">
+          {([['todos', `Todos (${eventos.length})`], ['baixou', `Baixaram (${nBaixou})`], ['visualizou', `Visualizaram (${nViu})`]] as const).map(([v, label]) => (
+            <button key={v} type="button" onClick={() => setTipo(v)}
+              className={cn('rounded-full border px-2.5 py-1 text-xs font-medium transition', tipo === v ? 'border-primary bg-primary/10 text-primary' : 'hover:bg-muted')}>{label}</button>
+          ))}
+        </div>
+        <span className="ml-auto text-xs text-muted-foreground">{filtrados.length} registro(s)</span>
+      </div>
+      <div className="overflow-x-auto rounded-xl border">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+              <th className="px-3 py-2.5 font-semibold">#</th>
+              <th className="px-3 py-2.5 font-semibold">Aluno</th>
+              <th className="px-3 py-2.5 font-semibold">Ação</th>
+              <th className="px-3 py-2.5 font-semibold">Data e horário</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y">
+            {filtrados.length === 0 ? (
+              <tr><td colSpan={4} className="px-3 py-8 text-center text-muted-foreground">Nenhum registro encontrado.</td></tr>
+            ) : filtrados.map((e, i) => (
+              <tr key={i} className="hover:bg-muted/30">
+                <td className="px-3 py-2.5 text-muted-foreground tabular-nums">{i + 1}</td>
+                <td className="px-3 py-2.5">
+                  <div className="font-medium leading-tight">{e.nome}</div>
+                  {e.email && <div className="text-xs text-muted-foreground">{e.email}</div>}
+                </td>
+                <td className="px-3 py-2.5">
+                  {e.tipo === 'baixou'
+                    ? <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-700 dark:text-amber-400"><Download className="h-3 w-3" /> Baixou</span>
+                    : <span className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium text-muted-foreground"><Eye className="h-3 w-3" /> Visualizou</span>}
+                </td>
+                <td className="px-3 py-2.5 tabular-nums">{formatBrt(e.criadoEm) ?? '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

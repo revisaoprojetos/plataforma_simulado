@@ -5,80 +5,166 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Blocos & Variáveis</title>
 <style>
-  :root { --navy:#071a3f; --blue:#1a367c; --gold:#f7b500; --grey:#3b4866; --lgrey:#e9edf3; --line:#e6ebf4; --soft:#f6f8fc; }
+  /* Paleta no padrão OnlyOffice: usa as variáveis de tema do editor (claro/escuro) com fallback claro.
+     Accent = azul do Document Editor (#446995). Nada de navy/dourado da marca aqui — só a UI do editor. */
+  :root {
+    --oo-accent:#446995;
+    --oo-bg: var(--background-normal, #ffffff);
+    --oo-bar: var(--background-toolbar, #f7f7f7);
+    --oo-txt: var(--text-normal, #363636);
+    --oo-txt2: var(--text-tertiary, #90949a);
+    --oo-line: var(--border-regular-control, #cfcfcf);
+    --oo-line2: var(--border-toolbar, #e0e0e0);
+    --oo-hover: var(--highlight-button-hover, #e8eef5);
+  }
+  /* Tema ESCURO: prefere as variáveis injetadas pelo editor; se não vierem, cai em cinzas escuros
+     (nunca branco) — assim o fundo acompanha o cinza do OnlyOffice como os demais painéis. */
+  body.oo-dark {
+    --oo-accent:#4a8ac1;
+    --oo-bg: var(--background-normal, #2b2b2b);
+    --oo-bar: var(--background-toolbar, #333333);
+    --oo-txt: var(--text-normal, #e0e0e0);
+    --oo-txt2: var(--text-tertiary, #9a9a9a);
+    --oo-line: var(--border-regular-control, #4a4a4a);
+    --oo-line2: var(--border-toolbar, #3d3d3d);
+    --oo-hover: var(--highlight-button-hover, #3a4557);
+  }
   * { box-sizing: border-box; }
-  html, body { margin:0; height:100%; font-family: Arial, Helvetica, sans-serif; color:#1b2440; background:#fff; -webkit-font-smoothing:antialiased; }
+  html, body { margin:0; height:100%; font-family:'Open Sans', 'Segoe UI', Arial, sans-serif; font-size:12px; color:var(--oo-txt); background:var(--oo-bg); -webkit-font-smoothing:antialiased; }
   body { display:flex; flex-direction:column; }
 
-  /* abas segmentadas */
-  .tabs { display:flex; gap:4px; padding:10px 10px 0; }
-  .tab { flex:1; display:flex; align-items:center; justify-content:center; gap:5px; padding:8px; font-size:12px; font-weight:700; border:1px solid var(--line); border-bottom:0; border-radius:10px 10px 0 0; background:var(--soft); color:#64719a; cursor:pointer; transition:.12s; }
-  .tab:hover { color:var(--navy); }
-  .tab.on { background:var(--navy); border-color:var(--navy); color:#fff; }
+  /* abas de LINHA (sublinhado), padrão dos painéis do OnlyOffice */
+  .tabs { display:flex; background:var(--oo-bar); border-bottom:1px solid var(--oo-line2); padding:0 6px; }
+  .tab { flex:1; padding:9px 10px; font-size:12px; font-weight:600; border:0; border-bottom:2px solid transparent; background:transparent; color:var(--oo-txt2); cursor:pointer; transition:color .12s, border-color .12s; }
+  .tab:hover { color:var(--oo-txt); }
+  .tab.on { color:var(--oo-accent); border-bottom-color:var(--oo-accent); }
 
-  /* barra do modo prévia com switch pill */
-  .pvbar { display:flex; align-items:center; gap:10px; padding:9px 10px; border-top:1px solid var(--line); border-bottom:1px solid var(--line); background:var(--soft); }
-  .sw { display:inline-flex; align-items:center; gap:8px; font-size:11.5px; font-weight:700; color:#33415c; cursor:pointer; user-select:none; }
+  /* barra do modo prévia */
+  .pvbar { display:flex; align-items:center; gap:8px; padding:7px 10px; border-bottom:1px solid var(--oo-line2); background:var(--oo-bar); }
+  .sw { display:inline-flex; align-items:center; gap:7px; font-size:12px; color:var(--oo-txt); cursor:pointer; user-select:none; }
   .sw input { display:none; }
-  .track { width:34px; height:19px; border-radius:999px; background:#cfd8ea; position:relative; transition:.18s; flex:none; }
-  .track::after { content:''; position:absolute; top:2px; left:2px; width:15px; height:15px; border-radius:50%; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.25); transition:.18s; }
-  .sw input:checked + .track { background:var(--gold); }
-  .sw input:checked + .track::after { transform:translateX(15px); }
-  .pvtag { margin-left:auto; font-size:10px; font-weight:800; letter-spacing:.03em; padding:3px 8px; border-radius:999px; background:#eef1f8; color:#8591ad; }
-  .pvtag.on { background:var(--gold); color:#4a3500; }
+  .track { width:30px; height:16px; border-radius:999px; background:var(--oo-line); position:relative; transition:.16s; flex:none; }
+  .track::after { content:''; position:absolute; top:2px; left:2px; width:12px; height:12px; border-radius:50%; background:#fff; box-shadow:0 1px 1px rgba(0,0,0,.3); transition:.16s; }
+  .sw input:checked + .track { background:var(--oo-accent); }
+  .sw input:checked + .track::after { transform:translateX(14px); }
+  .pvtag { margin-left:auto; font-size:10px; font-weight:700; letter-spacing:.02em; padding:2px 7px; border-radius:3px; background:var(--oo-line2); color:var(--oo-txt2); }
+  .pvtag.on { background:var(--oo-accent); color:#fff; }
 
-  .wrap { flex:1; overflow-y:auto; padding:12px 10px 16px; }
-  .hint { font-size:11px; line-height:1.45; color:#5f6c8c; background:var(--soft); border:1px solid var(--line); border-radius:9px; padding:9px 11px; margin-bottom:12px; }
-  .hint b { color:var(--navy); }
+  .scroll { flex:1; overflow-y:auto; }
+  .wrap { padding:10px 10px 16px; }
+  .hint { font-size:11px; line-height:1.45; color:var(--oo-txt2); background:var(--oo-bar); border:1px solid var(--oo-line2); border-radius:3px; padding:8px 10px; margin-bottom:12px; }
+  .hint b { color:var(--oo-txt); font-weight:600; }
 
   /* grupos de variáveis */
   .grp { margin-bottom:14px; }
-  .grp h4 { margin:0 0 7px; font-size:9.5px; letter-spacing:.07em; text-transform:uppercase; color:#95a0bd; display:flex; align-items:center; gap:6px; }
-  .grp h4::after { content:''; flex:1; height:1px; background:var(--line); }
-  .chips { display:flex; flex-wrap:wrap; gap:6px; }
-  .chip { display:inline-flex; align-items:baseline; gap:5px; border:1px solid var(--line); background:#fff; color:#2a3550; border-radius:8px; padding:6px 10px; font-size:11.5px; font-weight:700; cursor:pointer; transition:.12s; }
-  .chip:hover { border-color:var(--navy); background:#eef3ff; box-shadow:0 1px 3px rgba(7,26,63,.08); }
-  .chip:active { transform:translateY(1px); }
-  .chip .val { font-weight:600; font-size:10.5px; color:#8591ad; }
-  .chip.pv .val { color:var(--blue); }
+  .grp h4 { margin:0 0 7px; font-size:10px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--oo-txt2); display:flex; align-items:center; gap:8px; }
+  .grp h4::after { content:''; flex:1; height:1px; background:var(--oo-line2); }
+  .chips { display:flex; flex-wrap:wrap; gap:5px; }
+  .chip { display:inline-flex; align-items:center; border:1px solid var(--oo-line); background:var(--oo-bg); color:var(--oo-txt); border-radius:9px; padding:5px 11px; font-size:12px; font-weight:400; cursor:pointer; transition:background .12s, border-color .12s; }
+  .chip:hover { border-color:var(--oo-accent); background:var(--oo-hover); }
+  .chip:active { background:var(--oo-line2); }
+  /* Reguladores de variáveis (seletor de simulado + modal) */
+  .simsel { margin-bottom:0; }
+  .divisoria { height:1px; background:var(--oo-line2); margin:13px 24px; }
+  .simsel-hd { font-size:11px; font-weight:600; color:var(--oo-txt2,#888); margin-bottom:5px; }
+  .simsel-btn { display:flex; align-items:center; gap:7px; width:100%; border:1px solid var(--oo-line); background:var(--oo-bg); color:var(--oo-txt); border-radius:9px; padding:8px 10px; font-size:12px; cursor:pointer; text-align:left; }
+  .simsel-btn:hover { border-color:var(--oo-accent); }
+  #simsel-lbl { flex:1 1 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  #simvars { margin-top:9px; }
+  .svgrp { margin-top:9px; }
+  .svgrp h5 { margin:0 0 5px; font-size:11px; font-weight:600; color:var(--oo-txt); }
+  .modal { position:fixed; inset:0; z-index:9999; display:flex; align-items:center; justify-content:center; padding:14px; }
+  .modal-bg { position:absolute; inset:0; background:rgba(0,0,0,.5); }
+  .modal-panel { position:relative; width:100%; max-width:430px; max-height:82vh; display:flex; flex-direction:column; background:var(--oo-bg); border:1px solid var(--oo-line); border-radius:12px; overflow:hidden; box-shadow:0 14px 44px rgba(0,0,0,.45); }
+  .modal-head { display:flex; align-items:center; justify-content:space-between; padding:11px 14px; border-bottom:1px solid var(--oo-line2); font-size:13px; font-weight:600; color:var(--oo-txt); }
+  .modal-x { border:none; background:none; color:var(--oo-txt2,#888); cursor:pointer; font-size:15px; line-height:1; }
+  .modal-search { margin:11px 14px 0; padding:8px 10px; border:1px solid var(--oo-line); border-radius:8px; background:var(--oo-bg); color:var(--oo-txt); font-size:12px; outline:none; }
+  .modal-search:focus { border-color:var(--oo-accent); }
+  .crumb { display:flex; flex-wrap:wrap; align-items:center; gap:5px; padding:8px 14px 0; font-size:11px; }
+  .crumb-b { border:none; background:none; color:var(--oo-txt2,#888); cursor:pointer; font-size:11px; padding:0; }
+  .crumb-b:hover { color:var(--oo-txt); }
+  .crumb-sep { color:var(--oo-line2); }
+  .simlista { padding:10px 14px 14px; overflow-y:auto; display:flex; flex-direction:column; gap:5px; }
+  .simitem { display:flex; align-items:center; gap:8px; width:100%; border:1px solid var(--oo-line); background:var(--oo-bg); color:var(--oo-txt); border-radius:9px; padding:8px 10px; font-size:12px; cursor:pointer; text-align:left; }
+  .simitem:hover { border-color:var(--oo-accent); background:var(--oo-hover); }
+  .simitem .si-tt { flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .simitem .si-ct, .simitem .si-st { flex:0 0 auto; font-size:10px; color:var(--oo-txt2,#888); }
+  .simempty { padding:20px 0; text-align:center; font-size:12px; color:var(--oo-txt2,#888); }
+  .simloading { font-size:11px; color:var(--oo-txt2,#888); padding:6px 0; }
+  /* Tickets (mesmo estilo do picker da prévia) */
+  .crumb-back { border:1px solid var(--oo-line); background:var(--oo-bg); color:var(--oo-txt2,#888); cursor:pointer; font-size:15px; line-height:1; border-radius:7px; width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; margin-right:2px; }
+  .crumb-back:hover:not(:disabled) { border-color:var(--oo-accent); color:var(--oo-accent); }
+  .crumb-back:disabled { opacity:.4; cursor:default; }
+  .simgrid { display:flex; flex-direction:column; gap:8px; }
+  .simcard { display:flex; align-items:stretch; width:100%; height:82px; border:1px solid var(--oo-line); background:var(--oo-bg); border-radius:12px; overflow:hidden; cursor:pointer; text-align:left; transition:border-color .12s, transform .12s, box-shadow .12s; }
+  .simcard:hover { border-color:var(--oo-accent); transform:translateY(-1px); box-shadow:0 4px 14px rgba(0,0,0,.25); }
+  .simcard .cc { position:relative; flex:0 0 auto; width:108px; background-color:#1a367c; background-size:cover; background-position:center; }
+  .cc-badge { position:absolute; left:5px; top:5px; background:rgba(0,0,0,.5); color:#fff; font-size:9px; padding:2px 6px; border-radius:5px; }
+  .simcard .cc-body { flex:1 1 auto; min-width:0; display:flex; flex-direction:column; justify-content:space-between; padding:8px 10px; }
+  .cc-ttl { font-size:12px; font-weight:600; color:var(--oo-txt); line-height:1.25; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+  .cc-sub { font-size:10px; color:var(--oo-txt2,#888); }
+  .cc-chip { align-self:flex-start; font-size:9px; font-weight:600; padding:2px 7px; border-radius:20px; }
+  .cc-chip.publicado { background:rgba(16,185,129,.16); color:#10b981; }
+  .cc-chip.rascunho { background:rgba(245,158,11,.16); color:#f59e0b; }
+  .cc-chip.encerrado { background:var(--oo-line2); color:var(--oo-txt2,#888); }
 
   /* cards de bloco */
-  .card { border:1px solid var(--line); border-radius:14px; padding:11px; margin-bottom:12px; background:#fff; box-shadow:0 1px 2px rgba(7,26,63,.04); }
+  .card { border:1px solid var(--oo-line2); border-radius:12px; padding:10px; margin-bottom:10px; background:var(--oo-bg); }
   .card .top { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:3px; }
-  .card .ttl { font-size:12.5px; font-weight:800; color:var(--navy); }
-  .card .tag { font-size:9px; font-weight:800; letter-spacing:.03em; text-transform:uppercase; padding:2px 7px; border-radius:999px; background:#eef1f8; color:#7b88a8; }
-  .card .tag.loop { background:#fff6e0; color:#9a6a00; }
-  .card .ds { font-size:10.5px; color:#6b7897; margin:0 0 9px; line-height:1.4; }
-  .prev { border:1px solid var(--line); border-radius:10px; overflow:hidden; background:#fff; height:132px; position:relative; }
+  .card .ttl { font-size:12.5px; font-weight:600; color:var(--oo-txt); }
+  .card .tag { font-size:9px; font-weight:700; letter-spacing:.02em; text-transform:uppercase; padding:2px 6px; border-radius:3px; background:var(--oo-line2); color:var(--oo-txt2); }
+  .card .tag.loop { background:var(--oo-hover); color:var(--oo-accent); }
+  .card .ds { font-size:11px; color:var(--oo-txt2); margin:0 0 9px; line-height:1.4; }
+  .prev { border:1px solid var(--oo-line2); border-radius:8px; overflow:hidden; background:#fff; min-height:40px; position:relative; }
   .prev > .inner { position:absolute; top:0; left:0; width:222%; transform:scale(.45); transform-origin:top left; padding:11px; }
-  .add { margin-top:9px; width:100%; display:flex; align-items:center; justify-content:center; gap:6px; border:0; border-radius:9px; background:var(--navy); color:#fff; font-size:12px; font-weight:800; padding:9px; cursor:pointer; transition:.12s; }
-  .add:hover { background:#0b3a7a; }
-  .add:active { transform:translateY(1px); }
+  /* Tema escuro: sem a "folha" branca — a prévia fica transparente e os blocos aparecem direto no card. */
+  body.oo-dark .prev { background:transparent; border-color:transparent; }
+  .add { margin-top:9px; width:100%; display:flex; align-items:center; justify-content:center; gap:6px; border:1px solid var(--oo-accent); border-radius:9px; background:var(--oo-accent); color:#fff; font-size:12px; font-weight:600; padding:8px; cursor:pointer; transition:filter .12s; }
+  .add:hover { filter:brightness(1.08); }
+  .add:active { filter:brightness(.94); }
 
-  .ok { position:fixed; left:10px; right:10px; bottom:10px; background:#0f8a4d; color:#fff; font-size:11.5px; font-weight:700; padding:9px 11px; border-radius:9px; opacity:0; transform:translateY(8px); transition:.2s; pointer-events:none; text-align:center; box-shadow:0 4px 12px rgba(0,0,0,.2); }
+  .ok { position:fixed; left:10px; right:10px; bottom:10px; background:#447f3b; color:#fff; font-size:11.5px; font-weight:600; padding:8px 11px; border-radius:3px; opacity:0; transform:translateY(8px); transition:.2s; pointer-events:none; text-align:center; box-shadow:0 3px 10px rgba(0,0,0,.25); }
   .ok.show { opacity:1; transform:translateY(0); }
 </style>
 </head>
 <body>
   <div class="tabs">
-    <button class="tab on" id="t-var" onclick="aba('var')">⬡ Variáveis</button>
-    <button class="tab" id="t-mod" onclick="aba('mod')">▦ Blocos</button>
+    <button class="tab on" id="t-var" onclick="aba('var')">Variáveis</button>
+    <button class="tab" id="t-mod" onclick="aba('mod')">Blocos</button>
   </div>
-  <div class="pvbar">
-    <label class="sw"><input type="checkbox" id="pv" onchange="togglePv()"><span class="track"></span> Prévia de valores</label>
-    <span class="pvtag" id="pvtag">CAMPOS</span>
+  <div class="scroll">
+  <div class="pvbar" style="justify-content:flex-start">
+    <span style="font-size:11px;line-height:1.4;color:var(--oo-txt2)"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:4px"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>Para ver com valores, use <b style="color:var(--oo-txt)">“Ver com valores”</b> no topo do editor — abre uma prévia preenchida <b style="color:var(--oo-txt)">sem alterar</b> o template.</span>
   </div>
+  <div id="st" style="padding:5px 10px;font-size:11px;color:#c9821f;background:rgba(208,131,36,.14);border-bottom:1px solid var(--oo-line2)">conectando ao editor…</div>
   <div class="wrap">
     <div id="pane-var">
-      <div class="hint">Clique numa variável → é inserida no cursor. Com a <b>prévia</b> ligada, mostra o valor de exemplo e preenche o documento.</div>
+      <div class="simsel">
+        <div class="simsel-hd">Variáveis deste simulado</div>
+        <button class="simsel-btn" onclick="abrirSeletorSim()"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex:0 0 auto;color:var(--oo-accent)"><path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/></svg><span id="simsel-lbl">Selecionar simulado…</span></button>
+        <div id="simvars"></div>
+      </div>
+      <div class="divisoria"></div>
+      <div class="hint">Clique numa variável → insere o campo <b>{campo}</b> no cursor. A <b>Prévia de valores</b> troca os campos por valores <b>no documento</b> — esta barra não muda.</div>
       <div id="vars"></div>
     </div>
     <div id="pane-mod" style="display:none">
-      <div class="hint">Blocos no padrão do <b>Diagnóstico real</b> (cores, tamanhos e posição dos valores). <b>Adicionar</b> insere no cursor.</div>
+      <div class="hint"><b>Adicionar</b> insere o bloco no cursor.</div>
       <div id="blocos"></div>
     </div>
   </div>
+  </div>
   <div class="ok" id="ok"></div>
+
+  <div id="simmodal" class="modal" style="display:none">
+    <div class="modal-bg" onclick="fecharSeletorSim()"></div>
+    <div class="modal-panel">
+      <div class="modal-head"><span>Selecionar simulado</span><button class="modal-x" onclick="fecharSeletorSim()">✕</button></div>
+      <input id="simbusca" class="modal-search" placeholder="Buscar simulado…" oninput="SIMBUSCA=this.value;renderSimLista()">
+      <div id="simcrumb" class="crumb"></div>
+      <div id="simlista" class="simlista"></div>
+    </div>
+  </div>
 
 <script>
 /* carrega o plugins.js do MESMO servidor do editor (origem do referrer), síncrono via document.write. */
@@ -95,13 +181,13 @@
 // [rótulo, tag, valor de exemplo]
 var VARS = [
   { g:'Dados do aluno', tags:[['Nº de peito','{numero_peito}','0042'],['Nome','{nome}','Ana Beatriz Souza'],['CPF','{cpf}','123.456.789-00'],['E-mail','{email}','ana.souza@email.com'],['Simulado','{simulado}','MARATONA ENAP + AGU · SIMULADO 01']] },
-  { g:'Desempenho geral', tags:[['Acertos','{acertos}','24'],['Total','{total_questoes}','30'],['%','{percentual}','80%'],['Erros','{erros}','6'],['Em branco','{em_branco}','0']] },
+  { g:'Desempenho geral', tags:[['Acertos','{acertos}','24'],['Total','{total_questoes}','30'],['%','{percentual}','80%'],['Erros','{erros}','6'],['Em branco','{em_branco}','0'],['Tempo usado','{tempo_usado}','3 h 42 min']] },
   { g:'Por disciplina / pilar', tags:[['Acerto disc.','{acerto_<disc>}','4'],['Total disc.','{total_<disc>}','5'],['% disc.','{pct_<disc>}','80%'],['Acerto pilar','{acerto_pilar_<p>}','24'],['% pilar','{pct_pilar_<p>}','80%']] },
 ];
 // Amostras usadas nos BLOCOS e no "Aplicar no documento". Dentro dos laços, {nome} = nome da disciplina/pilar.
 var SAMPLE = {
   '{simulado}':'MARATONA DE SIMULADOS ENAP + AGU · SIMULADO 01 · 17/10/2026',
-  '{numero_peito}':'0042', '{total_questoes}':'30', '{percentual}':'80%', '{em_branco}':'0',
+  '{numero_peito}':'0042', '{total_questoes}':'30', '{percentual}':'80%', '{em_branco}':'0', '{tempo_usado}':'3 h 42 min',
   '{acertos}':'24', '{erros}':'6', '{nota}':'8,0', '{cpf}':'123.456.789-00', '{email}':'ana.souza@email.com',
   '{nome}':'Direito Constitucional', '{assuntos}':'- Constitucional: art. 37 (acumulação de cargos)',
   '{acerto}':'4', '{total}':'5', '{pct}':'80%',
@@ -119,7 +205,31 @@ function amostra(s){
 }
 
 var AR='font-family:Arial,sans-serif';
-function tb(inner){ return '<table width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse">'+inner+'</table>'; }
+var CR='font-family:Courier New,Courier,monospace'; // fonte do bloco "Nome do aluno"
+// ===== Paleta dos blocos por MARCA do tenant (injetada pelo host em localStorage.oo_blocos_palette).
+// Fonte fica Arial (AR). As cores dos blocos continuam DEFAULT (navy+dourado) quando não há paleta —
+// zero regressão. Com paleta, um recolor() mapeia os hexes default → cores da marca ANTES de inserir.
+var PB = (function(){ try { return JSON.parse(localStorage.getItem('oo_blocos_palette')||'null') || {}; } catch(e){ return {}; } })();
+var C_FAIXA = PB.faixa || '#071a3f', C_HILITE = PB.faixaTexto || '#f7b500', C_PRIM = PB.destaque || '#1a367c';
+var C_CREAM = PB.cream || '#f8f1d4', C_FITA = PB.fita || '#ffc000';
+// Mapa default→marca. NÃO mexe em #ffffff (fundos brancos), #e9edf3/#d8dfea (neutros claros),
+// #3b4866 (texto secundário) nem #53308f (prioridade, semântico).
+function recolor(html){
+  if(!PB || !PB.destaque) return html; // sem marca → design original
+  // Verde da marca: faixa escura (navy→faixa), azul→destaque, dourado→destaque (faixa/nota/fita).
+  // MANTÉM o CREAM (#f8f1d4) NEUTRO — recolorir o cream fazia texto verde em fundo verde (ilegível).
+  // Também não mexe em branco/neutros/prioridade.
+  return String(html)
+    .split('#071a3f').join(C_FAIXA)       // faixas escuras
+    .split('#1a367c').join(C_PRIM).split('#446995').join(C_PRIM) // azul/pct → médio da marca
+    .split('#f7b500').join(C_HILITE)      // claro (texto da faixa + fundo da nota)
+    .split('#ffc000').join(C_FITA)        // fita do cabeçalho
+    .split('#e9edf3').join(C_CREAM).split('#f8f1d4').join(C_CREAM) // cabeçalho + nota direita + pilar cards → cream da marca
+    .split('#53308f').join('#b45309');    // "Prioridade Alta": roxo → âmbar
+}
+// page-break-inside:avoid → a tabela não parte no meio da página (evita a "fita"/borda se repetir na
+// quebra); se não couber, o bloco inteiro desce para a próxima página.
+function tb(inner){ return '<table width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;table-layout:fixed;page-break-inside:avoid">'+inner+'</table>'; }
 // Espaçador: o PasteHtml ignora margin de tabela, então separo os blocos com um parágrafo vazio.
 var SP='<p style="margin:0;'+AR+';font-size:9pt;line-height:9pt">&nbsp;</p>';
 
@@ -129,41 +239,155 @@ function band(t){ return tb('<tr><td bgcolor="#071a3f" style="background-color:#
 // Cabeçalho: fita dourada (#ffc000) no topo + faixa cinza-clara + título 20pt + subtítulo
 var CAB = tb('<tr><td bgcolor="#e9edf3" style="background-color:#e9edf3;border-top:3px solid #ffc000;padding:12px 16px">'
   + '<p style="margin:0 0 2px;'+AR+';font-size:8.5pt;font-weight:bold;color:#1a367c">{simulado}</p>'
-  + '<p style="margin:0;'+AR+';font-size:20pt;font-weight:bold;color:#071a3f">Diagnóstico de Desempenho</p>'
-  + '<p style="margin:2px 0 0;'+AR+';font-size:9.5pt;color:#3b4866">Lei seca · {total_questoes} itens de Certo ou Errado</p>'
+  + '<p style="margin:0;'+AR+';font-size:20pt;font-weight:bold;color:#000000">Diagnóstico de Desempenho</p>'
   + '</td></tr>');
 
 // Nº de peito: rótulo navy + valor em célula branca
 var PEITO = tb('<tr>'
   + '<td bgcolor="#071a3f" width="24%" valign="middle" style="background-color:#071a3f;width:24%;padding:8px 12px;'+AR+';font-size:11pt;font-weight:bold;color:#ffffff">Nº DE PEITO:</td>'
-  + '<td bgcolor="#ffffff" valign="middle" style="background-color:#ffffff;border:1px solid #d8dfea;padding:8px 12px;'+AR+';font-size:10.5pt;color:#071a3f">{numero_peito}</td>'
+  + '<td bgcolor="#ffffff" valign="middle" style="background-color:#ffffff;border:1px solid #d8dfea;padding:8px 12px;'+AR+';font-size:10.5pt;color:#000000">{numero_peito}</td>'
+  + '</tr>','8px');
+
+// Nome do aluno: rótulo "NOME :" na cor ESCURA da marca (#071a3f→faixa) + campo branco com {nome}. Fonte Courier New.
+var NOME = tb('<tr>'
+  + '<td bgcolor="#071a3f" width="18%" valign="middle" style="background-color:#071a3f;width:18%;padding:8px 14px;'+CR+';font-size:10.5pt;font-weight:bold;color:#ffffff">NOME :</td>'
+  + '<td bgcolor="#ffffff" valign="middle" style="background-color:#ffffff;border:1px solid #d8dfea;padding:8px 14px;'+CR+';font-size:10.5pt;color:#000000">{nome}</td>'
   + '</tr>','8px');
 
 // Nota: célula dourada (nº 32pt + /total 13pt) + célula cinza com resumo e medalha
 var NOTA = tb('<tr>'
-  + '<td bgcolor="#f7b500" width="25%" align="center" valign="middle" style="background-color:#f7b500;width:25%;text-align:center;vertical-align:middle;padding:10px 6px;'+AR+';color:#071a3f">'
+  + '<td bgcolor="#f7b500" width="25%" align="center" valign="middle" style="background-color:#f7b500;width:25%;text-align:center;vertical-align:middle;padding:10px 6px;'+AR+';color:#000000">'
   +   '<span style="font-size:32pt;font-weight:bold">{acertos}</span><span style="font-size:13pt;font-weight:bold">/{total_questoes}</span></td>'
   + '<td bgcolor="#e9edf3" valign="middle" style="background-color:#e9edf3;vertical-align:middle;padding:10px 14px;'+AR+'">'
-  +   '<p style="margin:0;'+AR+';font-size:10.5pt;color:#071a3f">{acertos} acertos de {total_questoes} itens — <b>{percentual}</b> de aproveitamento</p>'
-  +   '<p style="margin:3px 0 0;'+AR+';font-size:9pt;color:#3b4866">Medalha conquistada: KM 21 · AGU</p>'
+  +   '<p style="margin:0;'+AR+';font-size:10.5pt;color:#000000">{acertos} acertos de {total_questoes} itens — <b>{percentual}</b> de aproveitamento</p>'
+  +   '<p style="margin:3px 0 0;'+AR+';font-size:9pt;color:#000000">Tempo usado: {tempo_usado}</p>'
   + '</td></tr>','8px');
 
-// Desempenho por disciplina: faixa + linha por disciplina (nome + assuntos | x/y  z%). Laço repete a <tr>.
-var DISC = band('DESEMPENHO POR DISCIPLINA') + SP
-  + tb('<tr>'
-    + '<td valign="top" style="padding:6px 0 6px 2px;'+AR+'">{#disciplinas}<span style="font-size:10.5pt;font-weight:bold;color:#071a3f">{nome}</span><br/><span style="font-size:9pt;color:#3b4866">{assuntos}</span></td>'
-    + '<td width="22%" align="right" valign="top" style="width:22%;text-align:right;padding:6px 2px 6px 0;'+AR+'"><span style="font-size:9pt;color:#3b4866">{acertos}/{total}&nbsp;&nbsp;</span><span style="font-size:11pt;font-weight:bold;color:#1a367c">{pct}</span>{/disciplinas}</td>'
-    + '</tr>');
+// Desempenho por disciplina — DESENHO DO USUÁRIO, fiel: tabela de 2 linhas com os marcadores DENTRO.
+// LINHA 1 = conteúdo (abre o laço: {#disciplinas} inline com {nome}); LINHA 2 = espaçador cuja altura
+// define a distância entre as disciplinas, e fecha o laço ({/disciplinas} na última célula). O
+// docxtemplater repete AS DUAS <tr> por item (laço de linha). VALIDADO numa tabela 2-linhas REAL do
+// OnlyOffice: 3 disciplinas → 6 linhas, sem vazar o escopo raiz.
+// LIÇÃO: marcador de ABERTURA no MESMO parágrafo do {nome} (<span>, nunca <p> em volta) — com <p> o
+// paragraphLoop joga o render pro escopo raiz (saía o nome do aluno). O "não gerava" das versões
+// anteriores era SEMPRE marcador órfão de bloco inserido 2x+ (a prévia agora auto-corrige isso).
+//  - Fundo BRANCO puro o OnlyOffice DESCARTA → uso o cream da marca (#f8f1d4) na linha de conteúdo.
+//  - LINHA 2 (espaçador) é transparente (cor da página) → respiro branco entre os cards; arraste a
+//    altura dessa linha no editor pra mudar a distância (ou eu calibro o line-height aqui).
+// 3 COLUNAS (como o modelo do usuário): [1] nome+assuntos (larga) | [2] acertos/total | [3] pct.
+// As 2 da direita são estreitas e right-aligned, com nowrap pra NÃO quebrar em 2 linhas.
+// DISC_CARD = só o card (laço das 3 colunas, SEM a faixa de título). DISC = faixa + card.
+var DCEL = 'background-color:#fdfdfd;border:none;';
+var DGAP = 'border:none;padding:0;font-size:8pt;line-height:12pt';
+var DISC_CARD = '<table width="100%" border="0" cellspacing="0" cellpadding="0" style="width:100%;border:none;border-collapse:collapse;table-layout:fixed">'
+    + '<tr>'
+      + '<td bgcolor="#fdfdfd" width="71%" valign="middle" style="'+DCEL+'width:71%;padding:9px 12px;'+AR+'">{#disciplinas}<span style="font-size:10.5pt;font-weight:bold;color:#000000">{nome}</span><br/><span style="font-size:9pt;color:#000000">{assuntos}</span></td>'
+      + '<td bgcolor="#fdfdfd" width="19%" align="right" valign="middle" nowrap style="'+DCEL+'width:19%;text-align:right;white-space:nowrap;padding:9px 4px;'+AR+'"><span style="font-size:9pt;color:#000000">{acertos}/{total}</span></td>'
+      + '<td bgcolor="#fdfdfd" width="10%" align="right" valign="middle" nowrap style="'+DCEL+'width:10%;text-align:right;white-space:nowrap;padding:9px 12px 9px 4px;'+AR+'"><span style="font-size:13pt;font-weight:bold;color:#1a367c">{pct}</span></td>'
+    + '</tr>'
+    + '<tr><td style="'+DGAP+'">&nbsp;</td><td width="19%" style="'+DGAP+';width:19%">&nbsp;</td><td width="10%" style="'+DGAP+';width:10%">{/disciplinas}</td></tr>'
+  + '</table>';
+var DISC = band('DESEMPENHO POR DISCIPLINA') + SP + DISC_CARD;
 
-// Caixa de análise de pilar (estilo LEI SECA): título + prioridade + texto
+// Caixa de análise de pilar (estilo LEI SECA): título + prioridade + texto — COM FUNDO (fita dourada +
+// card cream), igual ao "Sugestões de estudo".
 var PILARBOX = band('ANÁLISE POR PILAR') + SP
-  + tb('<tr>'
-    + '<td valign="top" style="padding:4px 0;'+AR+';font-size:10pt;font-weight:bold;color:#1a367c">LEI SECA</td>'
-    + '<td width="36%" align="right" valign="top" style="width:36%;text-align:right;padding:4px 0;'+AR+';font-size:9pt;font-weight:bold;color:#53308f">[!] Prioridade Alta</td>'
-    + '</tr><tr><td colspan="2" style="padding:2px 0 8px;'+AR+';font-size:9.5pt;color:#071a3f">Neste simulado, a lei seca respondeu por {acertos} dos {total_questoes} itens. Escreva aqui os dispositivos cobrados e o que revisar.</td></tr>');
+  + '<table width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;table-layout:fixed">'
+    + '<tr><td bgcolor="#f7b500" style="background-color:#f7b500;font-size:2pt;line-height:4pt;padding:0">&nbsp;</td></tr>'
+    + '<tr><td bgcolor="#f8f1d4" valign="top" style="background-color:#f8f1d4;padding:12px 18px;'+AR+'">'
+    + '<table width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;table-layout:fixed;'+AR+'"><tr>'
+    +   '<td valign="top" style="'+AR+';font-size:10pt;font-weight:bold;color:#1a367c">LEI SECA</td>'
+    +   '<td width="40%" align="right" valign="top" style="width:40%;text-align:right;'+AR+';font-size:9pt;font-weight:bold;color:#53308f">[!] Prioridade Alta</td>'
+    + '</tr></table>'
+    + '<p style="margin:10px 0 0;'+AR+';font-size:9.5pt;color:#071a3f;text-align:justify;line-height:1.5">Neste simulado, a lei seca respondeu por {acertos} dos {total_questoes} itens. Escreva aqui os dispositivos cobrados e o que revisar.</p>'
+    + '</td></tr></table>';
 
 // Faixa de seção genérica (reaproveitável)
 var FAIXA = band('TÍTULO DA SEÇÃO');
+
+// ===== Desempenho por PILAR (Lei seca · Jurisprudência · Doutrina) + versão em seção separada =====
+// Faixa navy com texto BRANCO (como nas imagens de referência).
+function bandW(t){ return tb('<tr><td bgcolor="#071a3f" style="background-color:#071a3f;padding:7px 14px"><p style="margin:0;'+AR+';font-size:10pt;font-weight:bold;letter-spacing:.03em;color:#ffffff">'+t+'</p></td></tr>'); }
+// Faixa de nota (0-49 / 50-80 / 81-100): rótulo em negrito + texto justificado.
+function pfaixa(lbl, txt){ return '<p style="margin:11px 0 2px;'+CR+';font-size:9.5pt;font-weight:bold;color:#1a367c">'+lbl+'</p><p style="margin:0;'+AR+';font-size:8.5pt;color:#000000;text-align:justify;line-height:1.45">'+txt+'</p>'; }
+// Faixa CONDICIONAL (igual ao caderno real): só aparece se {cond} for verdadeiro. Marcadores em
+// parágrafos minúsculos PRÓPRIOS (block-condition) → o docxtemplater remove os marcadores E esconde a
+// faixa inteira quando a condição é falsa (validado: sem linha em branco). cond = ls_f1/ls_f2/ls_f3…
+function pfaixaCond(cond, lbl, txt){
+  var MK = 'margin:0;'+AR+';font-size:1pt;line-height:2pt;color:#c7bc94';
+  return '<p style="'+MK+'">{#'+cond+'}</p>' + pfaixa(lbl, txt) + '<p style="'+MK+'">{/'+cond+'}</p>';
+}
+// Card de pilar: fundo cream + nome + {chave_pct} + "{chave_acertos} de {chave_total} questões" + as
+// faixas. COM `chave` (ls/jur/dout/sec): % e questões viram variáveis E só aparece a FAIXA do intervalo
+// do % ({chave_f1}=0-49, _f2=50-80, _f3=81-100). Sem chave: placeholder literal + as 3 faixas.
+function pcard(nome, corTopo, corPct, t0, t5, t8, w, chave){
+  var pct = chave ? '{'+chave+'_pct}' : 'X%';
+  var quest = chave ? '{'+chave+'_acertos} de {'+chave+'_total} questões' : 'X de N questões';
+  var faixas = chave
+    ? pfaixaCond(chave+'_f1', '0-49', t0) + pfaixaCond(chave+'_f2', '50-80', t5) + pfaixaCond(chave+'_f3', '81-100', t8)
+    : pfaixa('0-49', t0) + pfaixa('50-80', t5) + pfaixa('81-100', t8);
+  return '<td width="'+w+'" valign="top" bgcolor="#f8f1d4" style="background-color:#f8f1d4;width:'+w+';border-top:3px solid '+corTopo+';padding:12px 14px;page-break-inside:avoid;'+AR+'">'
+    + '<p style="margin:0;'+CR+';font-size:10pt;font-weight:bold;letter-spacing:.03em;color:#1a367c">'+nome+'</p>'
+    + '<p style="margin:4px 0 0;'+AR+';font-size:24pt;font-weight:bold;line-height:1;color:'+corPct+'">'+pct+'</p>'
+    + '<p style="margin:1px 0 0;'+AR+';font-size:9pt;color:#000000">'+quest+'</p>'
+    + faixas
+    + '</td>';
+}
+var PGAP='<td width="2%" style="width:2%">&nbsp;</td>';
+var PILAR3 = bandW('DESEMPENHO POR PILAR') + SP + '<table width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;table-layout:fixed;page-break-inside:avoid"><tr valign="top" style="page-break-inside:avoid">'
+  + pcard('LEI SECA','#f7b500','#071a3f',
+      'Seu desempenho em lei seca ficou abaixo de 50%, um resultado que merece atenção. A cobrança do texto literal da lei costuma ser um dos principais fatores de reprovação. O estudo precisa ir além do contato superficial e chegar ao nível do detalhe.',
+      'Seu desempenho em lei seca foi intermediário: você tem base, mas ainda deixa pontos na mesa. Questões que parecem simples viram armadilhas sem o domínio preciso do dispositivo. Foque nos diplomas de maior incidência.',
+      'Seu desempenho em lei seca foi excelente — esse costuma ser o diferencial da aprovação. Mantenha o resultado com revisões periódicas e atenção às especificidades do seu concurso.','32%','ls')
+  + PGAP
+  + pcard('JURISPRUDÊNCIA','#f7b500','#071a3f',
+      'Seu desempenho em jurisprudência ficou abaixo de 50%. Reforce urgentemente o estudo de informativos e das principais teses dos tribunais superiores (STF e STJ).',
+      'Seu desempenho em jurisprudência foi médio — há espaço relevante para crescer. As questões de jurisprudência costumam diferenciar os primeiros colocados. Vale reforçar com informativos recentes.',
+      'Seu desempenho em jurisprudência foi ótimo! Você acompanha os informativos e aplica os entendimentos com segurança. Mantenha o hábito, com atenção à jurisprudência mais recente.','32%','jur')
+  + PGAP
+  + pcard('DOUTRINA','#f7b500','#071a3f',
+      'Seu desempenho em doutrina ficou abaixo de 50%. Doutrina é a base do raciocínio jurídico — quem não domina classificações, distinções e princípios erra também em lei e jurisprudência. O investimento tem retorno duplo.',
+      'Seu desempenho em doutrina foi intermediário: você acerta as questões diretas, mas perde nas distinções mais finas. Dominar doutrina ajuda a ganhar pontos também em lei e jurisprudência com fundo conceitual.',
+      'Seu desempenho em doutrina foi excelente. Você domina classificações, distinções conceituais e fundamentos teóricos — o que se reflete também nas demais frentes. Mantenha a solidez.','32%','dout')
+  + '</tr></table>';
+var PILARSEP = bandW('DESEMPENHO EM SEÇÃO SEPARADA') + SP
+  + '<p style="margin:0 0 8px;'+AR+';font-size:9.5pt;color:#3b4866;line-height:1.5">Use esta seção para uma frente que tem lógica própria e não se encaixa na lente de "lei seca x jurisprudência x doutrina" (ex.: Língua Portuguesa, Raciocínio Lógico, uma disciplina específica). Ajuste o título, o texto e a fonte de dados conforme o simulado — ou remova o bloco se não precisar.</p>'
+  + tb('<tr>' + pcard('SEÇÃO SEPARADA','#f7b500','#071a3f',
+      'Seu desempenho nesta frente ficou abaixo do esperado e merece atenção. Retome os fundamentos e pratique com questões no mesmo padrão da prova para consolidar a base.',
+      'Seu desempenho nesta frente foi intermediário: há base, mas ainda há espaço relevante para crescer. Reforce os pontos de maior incidência e mantenha a prática constante.',
+      'Excelente desempenho nesta frente! Mantenha o ritmo com revisões periódicas para não perder o rendimento até a prova.','100%','sec') + '</tr>');
+
+// ===== Sugestões de estudo — MONTAGEM DO USUÁRIO: cabeçalho DOURADO em 2 colunas (LEI SECA | [!]
+// Prioridade Alta) + linha cream (colspan) com os tópicos > / >> em negrito. Espaço menor acima. =====
+var SP_PQ = '<p style="margin:0;'+AR+';font-size:5pt;line-height:6pt">&nbsp;</p>';
+var SUGESTOES = bandW('SUGESTÕES DE ESTUDO') + SP_PQ
+  + '<table width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;table-layout:fixed">'
+    + '<tr>'
+    +   '<td bgcolor="#f7b500" width="72%" valign="middle" style="background-color:#f7b500;width:72%;padding:6px 14px;'+AR+'"><span style="font-size:10pt;font-weight:bold;color:#1a367c">LEI SECA</span></td>'
+    +   '<td bgcolor="#f7b500" width="28%" align="right" valign="middle" style="background-color:#f7b500;width:28%;text-align:right;padding:6px 14px;'+AR+'"><span style="font-size:9pt;font-weight:bold;color:#53308f">[!] Prioridade Alta</span></td>'
+    + '</tr>'
+    + '<tr><td colspan="2" bgcolor="#f8f1d4" valign="top" style="background-color:#f8f1d4;padding:12px 14px;'+AR+'">'
+    + '<p style="margin:0;'+AR+';font-size:9.5pt;color:#071a3f;text-align:justify;line-height:1.5">Priorize a legislação de maior incidência na prova, tendo em vista a quantidade de questões de Direito Administrativo, Constitucional, Tributário e Processo Civil.</p>'
+    + '<p style="margin:6px 0 0;'+AR+';font-size:9.5pt;color:#071a3f;text-align:justify;line-height:1.5"><b>&gt; Nesse sentido,</b> a leitura da CF/88 — em especial do Art. 1.º ao Art. 36 e do Art. 44 ao 62 — é fundamental.</p>'
+    + '<p style="margin:6px 0 0;'+AR+';font-size:9.5pt;color:#071a3f;text-align:justify;line-height:1.5"><b>&gt; Administrativo:</b> recomenda-se a leitura da Lei 14.133 de 2021, fazendo um link entre a Lei de Licitações e Contratos e a legislação local.</p>'
+    + '<p style="margin:6px 0 0;'+AR+';font-size:9.5pt;color:#071a3f;text-align:justify;line-height:1.5"><b>&gt; Tributário:</b> leitura atenta dos dispositivos modificados pela Lei Complementar 236 de 2026 — as bancas tendem a explorar atualizações legislativas recentes.</p>'
+    + '<p style="margin:6px 0 0;'+AR+';font-size:9.5pt;color:#071a3f;text-align:justify;line-height:1.5"><b>&gt; Processo Civil:</b> o foco são as normas relacionadas à Fazenda Pública em juízo.</p>'
+    + '<p style="margin:6px 0 0;'+AR+';font-size:9.5pt;color:#071a3f;text-align:justify;line-height:1.5"><b>&gt; Legislação local:</b> neste momento dê ênfase à Lei Orgânica do Município de Curitiba, correlacionando com a Constituição Federal de 88 e buscando as diferenças entre as legislações.</p>'
+    + '<p style="margin:8px 0 0;'+AR+';font-size:9.5pt;color:#071a3f;text-align:justify;line-height:1.5">Ademais, as leis previdenciárias locais já estão disponíveis e têm grande chance de serem cobradas. Por isso recomendamos a leitura das seguintes leis locais:</p>'
+    + '<p style="margin:4px 0 0;'+AR+';font-size:9.5pt;color:#071a3f;line-height:1.7"><b>&gt;&gt;</b> Lei nº 9.626 de 1999<br/><b>&gt;&gt;</b> Lei nº 10.817 de 2003<br/><b>&gt;&gt;</b> Lei nº 12.072 de 2006<br/><b>&gt;&gt;</b> Lei nº 15.072 de 2027.</p>'
+    + '</td></tr></table>';
+
+// ===== Gabarito oficial desatualizado (faixa + aviso + lista de questões atualizadas) =====
+var GABDESAT = bandW('GABARITO OFICIAL DESATUALIZADO') + SP
+  + '<p style="margin:0;'+AR+';font-size:9.5pt;color:#071a3f;text-align:justify;line-height:1.5"><b>Importante:</b> este simulado reproduz integralmente a prova da AGU aplicada em 2023. Por esse motivo, algumas questões — especialmente as que envolvem legislação e jurisprudência — podem estar desatualizadas em razão de alterações legislativas e da evolução do entendimento dos tribunais.</p>'
+  + '<p style="margin:8px 0 10px;'+AR+';font-size:9.5pt;color:#071a3f;text-align:justify;line-height:1.5">Para preservar a fidelidade da prova original e, ao mesmo tempo, garantir um estudo alinhado ao cenário atual, apresentamos abaixo as questões que sofreram atualização:</p>'
+  + '<table width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;table-layout:fixed">'
+    + '<tr><td bgcolor="#c0392b" style="background-color:#c0392b;font-size:2pt;line-height:4pt;padding:0">&nbsp;</td></tr>'
+    + '<tr><td bgcolor="#f8f1d4" valign="top" style="background-color:#f8f1d4;padding:12px 14px;'+AR+';font-size:9.5pt;color:#071a3f;line-height:1.7">'
+    + '<b>Questão 39</b> — alteração da redação da LRF<br/>'
+    + '<b>Questão 42</b> — lei antiga de licitações (permanece relevante)<br/>'
+    + '<b>Questão 63</b> — mudança da jurisprudência sobre estabilização da tutela antecipada (permanece relevante)'
+    + '</td></tr></table>';
 
 // ===== Folha de respostas (mesma paleta) =====
 function gradeHtml(linhas){
@@ -198,10 +422,16 @@ var CADERNO = tb('<tr><td bgcolor="#071a3f" style="background-color:#071a3f;bord
 var BLOCOS = [
   { nome:'Diagnóstico completo', ds:'Cabeçalho + nº de peito + nota + desempenho por disciplina, no padrão real.', html: CAB+SP+PEITO+SP+NOTA+SP+DISC },
   { nome:'Cabeçalho', ds:'Faixa cinza-clara: {simulado}, “Diagnóstico de Desempenho” (20pt) e subtítulo.', html: CAB },
+  { nome:'Nome do aluno', ds:'Rótulo “NOME :” na cor da marca + campo branco com {nome}.', html: NOME },
   { nome:'Nº de peito', ds:'Rótulo navy + valor {numero_peito} em célula branca.', html: PEITO },
   { nome:'Bloco de nota', ds:'Célula dourada {acertos}/{total_questoes} (32pt) + resumo {percentual} + medalha.', html: NOTA },
-  { nome:'Desempenho por disciplina', ds:'Faixa navy/dourada + linha por disciplina (laço {#disciplinas}): nome, assuntos e x/y + %.', html: DISC },
+  { nome:'Desempenho por disciplina', ds:'Faixa navy/dourada + card por disciplina (laço {#disciplinas}): nome, assuntos | x/y | %.', html: DISC },
+  { nome:'Disciplina (só o card)', ds:'Só o card em 3 colunas por disciplina (laço {#disciplinas}), SEM a faixa de título — use quando já tiver o título em cima.', html: DISC_CARD },
   { nome:'Análise por pilar', ds:'Caixa estilo “LEI SECA”: título + prioridade + texto editável.', html: PILARBOX },
+  { nome:'Desempenho por pilar (3 colunas)', ds:'Faixa + 3 pilares (Lei seca · Jurisprudência · Doutrina) lado a lado: %, nº de questões e faixas 0-49 / 50-80 / 81-100.', html: PILAR3 },
+  { nome:'Desempenho — seção separada', ds:'Faixa + descrição + 1 card para uma frente própria (ex.: Língua Portuguesa): % e faixas 0-49 / 50-80 / 81-100.', html: PILARSEP },
+  { nome:'Sugestões de estudo', ds:'Faixa + card de prioridade (LEI SECA) com texto editável de recomendações e lista de leis locais.', html: SUGESTOES },
+  { nome:'Gabarito oficial desatualizado', ds:'Faixa + aviso sobre a prova original + lista das questões que sofreram atualização (edite os itens).', html: GABDESAT },
   { nome:'Faixa de seção', ds:'Barra navy com texto dourado — reaproveitável (edite o título).', html: FAIXA },
   { nome:'Folha de respostas', ds:'Cabeçalho + dados do aluno + grade A–E (10 linhas de amostra).', html: FOLHA },
   { nome:'Questão (caderno)', ds:'Laço {#questoes}: número, disciplina, enunciado, alternativas e gabarito.', html: CADERNO },
@@ -214,84 +444,102 @@ function aba(w){
   document.getElementById('t-mod').classList.toggle('on', w==='mod');
   document.getElementById('pane-var').style.display = w==='var'?'':'none';
   document.getElementById('pane-mod').style.display = w==='mod'?'':'none';
+  // A prévia só tem altura real quando a aba está VISÍVEL (oculta = offsetHeight 0). Re-mede ao abrir Blocos.
+  if(w==='mod') setTimeout(ajustarPrevias, 0);
 }
 var okTimer;
 function flash(msg){ var o=document.getElementById('ok'); o.textContent='✓ '+msg; o.classList.add('show'); clearTimeout(okTimer); okTimer=setTimeout(function(){o.classList.remove('show')},2200); }
-var preview=false, undoSteps=0, docBusy=false, sessionTags={};
-function docId(){ try{ return new URLSearchParams(location.search).get('id')||''; }catch(e){ return ''; } }
-function tagsDe(s){ var m=s.match(/\{[#\/]?[^{}]+\}/g)||[], o={}; m.forEach(function(t){o[t]=1;}); return Object.keys(o); }
-function regKeys(arr){ arr.forEach(function(t){ if(LOOPS.indexOf(t)>=0 || SAMPLE.hasOwnProperty(t)) sessionTags[t]=1; }); }
-
-// Insere SEMPRE o template ({campos}); nunca os valores "assados". Se a prévia estiver ligada, reverte
-// antes (p/ as trocas ficarem contíguas no Undo), insere o template e re-preenche o documento.
+// Adicionar: insere SEMPRE o template ({campos}) no cursor — NÃO altera mais nada no documento. A prévia
+// com valores é NÃO-DESTRUTIVA (botão "Ver com valores" no editor → gera uma cópia preenchida, só leitura).
 function inserir(kind, payload, label){
-  if(!(window.Asc&&window.Asc.plugin)) return;
-  function go(){
-    window.Asc.plugin.executeMethod(kind,[payload],function(){
-      regKeys(kind==='PasteHtml'?tagsDe(payload):[payload]);
-      flash((kind==='PasteHtml'?'Bloco inserido: ':'Inserido: ')+label);
-      if(preview) aplicarDoc();
-    });
-  }
-  if(preview) reverterDoc(go); else go();
+  if(!(window.Asc&&window.Asc.plugin) || !conectado){ flash('⚠ Editor não conectado — recarregue (Ctrl+F5)'); return; }
+  window.Asc.plugin.executeMethod(kind,[payload]);
+  flash((kind==='PasteHtml'?'Bloco inserido: ':'Inserido: ')+label);
 }
 function inserirTexto(tag, label){ inserir('PasteText', tag, label); }
-function inserirHtml(html, label){ inserir('PasteHtml', html, label); }
+function inserirHtml(html, label){ inserir('PasteHtml', recolor(html), label); }
 
-function togglePv(){
-  preview = document.getElementById('pv').checked;
-  var tag=document.getElementById('pvtag');
-  tag.textContent = preview ? 'PRÉVIA' : 'CAMPOS'; tag.classList.toggle('on', preview);
-  render();
-  if(preview) aplicarDoc(); else reverterDoc();
+// ===== Reguladores de variáveis: seleciona um simulado real (pop-up com pastas/busca) e mostra as
+// variáveis DELE (por disciplina + pilares, já com o slug do relatório) pra inserir e montar o template.
+var SIMDATA=null, SIMPASTA=null, SIMBUSCA='';
+function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];}); }
+function abrirSeletorSim(){ document.getElementById('simmodal').style.display='flex'; if(!SIMDATA) carregarSimData(); else renderSimLista(); setTimeout(function(){var i=document.getElementById('simbusca'); if(i){i.value=SIMBUSCA;i.focus();}},40); }
+function fecharSeletorSim(){ document.getElementById('simmodal').style.display='none'; }
+function carregarSimData(){ var l=document.getElementById('simlista'); l.innerHTML='<div class="simempty">Carregando…</div>'; fetch('/api/teste/simulados-picker').then(function(r){return r.json();}).then(function(d){ SIMDATA={pastas:(d&&d.pastas)||[],simulados:(d&&d.simulados)||[]}; SIMPASTA=null; renderSimLista(); }).catch(function(e){ l.innerHTML='<div class="simempty">Falha ao carregar: '+esc(e)+'</div>'; }); }
+function capaBg(item){ var cor=item.cor||'#1a367c'; var s='background-color:'+cor+';'; if(item.capa){ s+="background-image:url('"+String(item.capa).replace(/['\\]/g,'')+"');"; } return s; }
+function renderSimLista(){
+  if(!SIMDATA) return;
+  var l=document.getElementById('simlista'), cr=document.getElementById('simcrumb'); l.innerHTML=''; cr.innerHTML='';
+  var byId={}; SIMDATA.pastas.forEach(function(p){byId[p.id]=p;});
+  var path=[], cur=SIMPASTA; while(cur&&byId[cur]){ path.unshift(byId[cur]); cur=byId[cur].paiId; }
+  var back=el('button','crumb-back','‹'); back.disabled=!SIMPASTA; back.title='Voltar'; back.onclick=function(){ if(SIMPASTA){ SIMPASTA=(byId[SIMPASTA]?byId[SIMPASTA].paiId:null)||null; renderSimLista(); } }; cr.appendChild(back);
+  var ini=el('button','crumb-b','Início'); ini.onclick=function(){SIMPASTA=null;renderSimLista();}; cr.appendChild(ini);
+  path.forEach(function(p){ cr.appendChild(el('span','crumb-sep','›')); var b=el('button','crumb-b',esc(p.nome)); b.onclick=function(){SIMPASTA=p.id;renderSimLista();}; cr.appendChild(b); });
+  var q=SIMBUSCA.trim().toLowerCase(), buscando=q.length>0;
+  var subp=buscando?[]:SIMDATA.pastas.filter(function(p){return (p.paiId||null)===SIMPASTA;});
+  var sims=buscando?SIMDATA.simulados.filter(function(s){return (s.titulo||'').toLowerCase().indexOf(q)>=0;}):SIMDATA.simulados.filter(function(s){return (s.pastaId||null)===SIMPASTA;});
+  if(!subp.length && !sims.length){ l.innerHTML='<div class="simempty">'+(buscando?'Nada encontrado.':'Pasta vazia.')+'</div>'; return; }
+  var grid=el('div','simgrid');
+  subp.forEach(function(p){
+    var b=el('button','simcard');
+    b.innerHTML='<div class="cc" style="'+capaBg(p)+'"><span class="cc-badge">📁 Pasta</span></div><div class="cc-body"><div class="cc-ttl">'+esc(p.nome)+'</div><div class="cc-sub">'+p.count+' simulado'+(p.count===1?'':'s')+' ›</div></div>';
+    b.onclick=function(){SIMPASTA=p.id;SIMBUSCA='';var i=document.getElementById('simbusca');if(i)i.value='';renderSimLista();};
+    grid.appendChild(b);
+  });
+  sims.forEach(function(s){
+    var st=(s.status||'rascunho').toLowerCase();
+    var b=el('button','simcard');
+    b.innerHTML='<div class="cc" style="'+capaBg(s)+'"></div><div class="cc-body"><div class="cc-ttl">'+esc(s.titulo)+'</div><span class="cc-chip '+st+'">'+esc(s.status)+'</span></div>';
+    b.onclick=function(){selSimulado(s.id,s.titulo);};
+    grid.appendChild(b);
+  });
+  l.appendChild(grid);
 }
-// Liga a prévia no doc: campos a preencher = (presentes no .docx salvo, via backend) ∪ (inseridos nesta
-// sessão, ao vivo). Troca cada distinto 1x e conta → o desligar desfaz exatamente esse nº.
-function aplicarDoc(cb){
-  if(!(window.Asc&&window.Asc.plugin)){ if(cb)cb(); return; }
-  if(docBusy){ if(cb)cb(); return; }
-  docBusy=true; undoSteps=0;
-  var cand = LOOPS.concat(Object.keys(SAMPLE));
-  fetch('/api/teste/doc-tags',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({id:docId(), candidatos:cand})})
-    .then(function(r){return r.json();}).catch(function(){ return {presentes:[]}; })
-    .then(function(d){
-      var set={};
-      ((d&&d.presentes)||[]).forEach(function(k){ set[k]=1; });
-      Object.keys(sessionTags).forEach(function(k){ set[k]=1; });
-      var pres=Object.keys(set).sort(function(a,b){ var la=LOOPS.indexOf(a)>=0,lb=LOOPS.indexOf(b)>=0; if(la!==lb) return la?-1:1; return b.length-a.length; });
-      var i=0;
-      (function next(){
-        if(i>=pres.length){ docBusy=false; flash(undoSteps?('Prévia ligada — '+undoSteps+' campo(s)'):'Nenhum campo pra preencher — insira um bloco primeiro'); if(cb)cb(); return; }
-        var k=pres[i++], rep=(LOOPS.indexOf(k)>=0)?'':SAMPLE[k];
-        window.Asc.plugin.executeMethod('SearchAndReplace',[{searchString:k, replaceString:rep, matchCase:true}],function(){ undoSteps++; next(); });
-      })();
-    });
-}
-// Desliga a prévia: desfaz (Undo) exatamente o nº de trocas feitas; para se não houver mais o que desfazer.
-function reverterDoc(cb){
-  if(!(window.Asc&&window.Asc.plugin)){ if(cb)cb(); return; }
-  var n=undoSteps; undoSteps=0;
-  if(n<=0){ if(cb)cb(); return; }
-  docBusy=true;
-  (function undo(){
-    if(n<=0){ docBusy=false; flash('Prévia desligada — campos restaurados'); if(cb)cb(); return; }
-    window.Asc.plugin.executeMethod('CanUndo',[],function(can){
-      if(!can){ docBusy=false; if(cb)cb(); return; }
-      window.Asc.plugin.executeMethod('Undo',[],function(){ n--; undo(); });
-    });
-  })();
+function selSimulado(id,nome){ fecharSeletorSim(); document.getElementById('simsel-lbl').textContent=nome; carregarSimVars(id,nome); }
+function carregarSimVars(id,nome){ var c=document.getElementById('simvars'); c.innerHTML='<div class="simloading">Carregando variáveis…</div>'; fetch('/api/teste/simulado-vars/'+encodeURIComponent(id)).then(function(r){return r.json();}).then(function(d){ renderSimVars(d); }).catch(function(e){ c.innerHTML='<div class="simloading">Falha: '+esc(e)+'</div>'; }); }
+function renderSimVars(d){
+  var c=document.getElementById('simvars'); c.innerHTML='';
+  if(d&&d.erro){ c.innerHTML='<div class="simloading">'+esc(d.erro)+'</div>'; return; }
+  var discs=(d&&d.disciplinas)||[], pilares=(d&&d.pilares)||[];
+  function chip(label,tag,parent){ var b=el('button','chip',esc(label)); b.title=tag; b.onclick=function(){inserirTexto(tag,label);}; parent.appendChild(b); }
+  discs.forEach(function(dd){
+    var g=el('div','svgrp'); g.appendChild(el('h5',null,esc(dd.nome)+' · '+dd.total+' q'));
+    var ch=el('div','chips');
+    chip('Acerto','{acerto_'+dd.slug+'}',ch); chip('Total','{total_'+dd.slug+'}',ch); chip('%','{pct_'+dd.slug+'}',ch); chip('Assuntos','{assuntos_'+dd.slug+'}',ch);
+    g.appendChild(ch); c.appendChild(g);
+  });
+  if(pilares.length){
+    var g=el('div','svgrp'); g.appendChild(el('h5',null,'Pilares'));
+    var ch=el('div','chips');
+    pilares.forEach(function(p){ chip('% '+p.nome,'{pct_pilar_'+p.slug+'}',ch); chip('Acerto '+p.nome,'{acerto_pilar_'+p.slug+'}',ch); chip('Total '+p.nome,'{total_pilar_'+p.slug+'}',ch); });
+    g.appendChild(ch); c.appendChild(g);
+  }
+  if(!discs.length && !pilares.length) c.innerHTML='<div class="simloading">Esse simulado não tem disciplinas/pilares mapeados.</div>';
 }
 
+// Busca a paleta da MARCA no servidor (resolve pelo host do tenant) e recolore os blocos. Canal
+// confiável (mesmo do picker de simulados), independente de localStorage.
+function carregarPaleta(){
+  try {
+    fetch('/api/teste/blocos-palette').then(function(r){return r.json();}).then(function(p){
+      if(!p || !p.faixa) return;
+      PB = p;
+      C_FAIXA = p.faixa; C_HILITE = p.faixaTexto; C_PRIM = p.destaque; C_CREAM = p.cream; C_FITA = p.fita;
+      // UI do plugin na cor da marca: botão "+ Adicionar", abas, chips, toggles (tudo usa --oo-accent).
+      try { var a = p.destaque || p.faixaTexto; document.documentElement.style.setProperty('--oo-accent', a); document.body.style.setProperty('--oo-accent', a); } catch(e){}
+      try { render(); } catch(e){}
+    }).catch(function(){});
+  } catch(e){}
+}
 function render(){
   var vc=document.getElementById('vars'); vc.innerHTML='';
   VARS.forEach(function(gr){
     var g=el('div','grp'); g.appendChild(el('h4',null,gr.g));
     var chips=el('div','chips');
     gr.tags.forEach(function(t){
-      var txt = preview ? (t[2]||t[1]) : t[1];
-      var b=el('button', 'chip'+(preview?' pv':'')); b.title=t[1];
-      b.innerHTML = t[0] + (preview ? ' <span class="val">'+t[2]+'</span>' : '');
-      b.onclick=function(){ inserirTexto(t[1], t[0]); }; // insere SEMPRE a tag (o valor é só visual)
+      var b=el('button','chip'); b.title=t[1];       // a barra é SEMPRE igual (não depende da prévia)
+      b.innerHTML = t[0];
+      b.onclick=function(){ inserirTexto(t[1], t[0]); }; // insere a tag {campo} no cursor
       chips.appendChild(b);
     });
     g.appendChild(chips); vc.appendChild(g);
@@ -299,23 +547,56 @@ function render(){
   var bc=document.getElementById('blocos'); bc.innerHTML='';
   BLOCOS.forEach(function(bl){
     var isLoop = bl.html.indexOf('{#')>=0;
-    var html = preview ? amostra(bl.html) : bl.html;
     var c=el('div','card');
     var top=el('div','top'); top.appendChild(el('div','ttl',bl.nome));
     top.appendChild(el('span','tag'+(isLoop?' loop':''), isLoop?'laço':'bloco')); c.appendChild(top);
     c.appendChild(el('div','ds',bl.ds));
-    var p=el('div','prev'); p.appendChild(el('div','inner',html)); c.appendChild(p);
+    // A prévia mostra VALORES de exemplo (amostra) — assim {acertos} etc. viram números curtos e não
+    // estouram as células (ex.: a célula dourada 32pt). O "+ Adicionar" continua inserindo o template.
+    var p=el('div','prev'); p.appendChild(el('div','inner', recolor(amostra(bl.html)))); c.appendChild(p); // prévia já na cor da marca
     var add=el('button','add','＋ Adicionar'); add.onclick=function(){inserirHtml(bl.html,bl.nome)}; c.appendChild(add); // insere SEMPRE o template
     bc.appendChild(c);
   });
+  ajustarPrevias(); setTimeout(ajustarPrevias, 200);
 }
+// A prévia é um .inner escalado (scale .45) e posicionado absoluto → o pai não "cresce" sozinho. Mede o
+// conteúdo e fixa a altura do .prev = altura escalada, pra encaixar no tamanho do bloco (sem sobra embaixo).
+function ajustarPrevias(){
+  document.querySelectorAll('#blocos .prev').forEach(function(p){
+    var inner=p.querySelector('.inner'); if(!inner) return;
+    var h=inner.offsetHeight*0.45; if(h>0) p.style.height=Math.round(h+2)+'px';
+  });
+}
+// Largura do painel muda → a prévia reflui; re-mede se a aba Blocos estiver visível.
+try { window.addEventListener('resize', function(){ var pm=document.getElementById('pane-mod'); if(pm && pm.style.display!=='none') ajustarPrevias(); }); } catch(e){}
 
+var conectado=false;
+// Cores translúcidas → funcionam no claro E no escuro (não ficam faixa branca no tema escuro).
+function setSt(t, ok){ var e=document.getElementById('st'); if(!e) return; e.textContent=t; e.style.color=ok?'#2ea25f':'#c9821f'; e.style.background=ok?'rgba(46,162,95,.15)':'rgba(208,131,36,.14)'; }
+function plog(o){ try{ fetch('/api/teste/plugin-log',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(o)}); }catch(e){} }
+// Diagnóstico p/ o backend: plugins.js carregou? API presente? de onde veio? (não vejo o console do navegador)
+plog({ev:'load', asc:!!window.Asc, plugin:!!(window.Asc&&window.Asc.plugin), ref:(document.referrer||''), href:location.href});
 if(window.Asc&&window.Asc.plugin){
-  window.Asc.plugin.init = function(){ render(); };
+  window.Asc.plugin.init = function(){ conectado=true; plog({ev:'init'}); setSt('✓ Editor conectado — pode adicionar', true); render(); carregarPaleta(); };
   window.Asc.plugin.button = function(id){ this.executeCommand('close',''); };
-} else {
-  window.addEventListener('DOMContentLoaded', render);
+  // Tema do editor → injeta as variáveis (--background-normal, --text-normal, …) no plugin, para o
+  // fundo/cores acompanharem o OnlyOffice (claro OU escuro) em vez de ficar branco fixo.
+  window.Asc.plugin.onThemeChanged = function(theme){
+    try { if(window.Asc.plugin.onThemeChangedBase) window.Asc.plugin.onThemeChangedBase(theme); } catch(e){}
+    // Detecta escuro pelo BRILHO do fundo realmente aplicado (robusto: independe do formato do `theme`).
+    try {
+      var m=/(\d+)[,\s]+(\d+)[,\s]+(\d+)/.exec(getComputedStyle(document.body).backgroundColor||'');
+      var dark = m && (0.299*+m[1]+0.587*+m[2]+0.114*+m[3]) < 128;
+      document.body.classList.toggle('oo-dark', !!dark);
+    } catch(e){}
+  };
 }
+// Monta a barra JÁ — ela não depende do editor (os cliques só usam a API depois). Isso evita a corrida
+// em que o editor chama o init do plugin ANTES deste script atribuir window.Asc.plugin.init (barra vazia).
+try { render(); } catch (e) {}
+try { carregarPaleta(); } catch (e) {}
+// Diagnóstico: se o editor não chamar o init em 3s, o bridge está morto. Mostra Asc/plugin na faixa E loga.
+try { setTimeout(function(){ if(!conectado){ plog({ev:'timeout3s', asc:!!window.Asc, plugin:!!(window.Asc&&window.Asc.plugin)}); setSt('⚠ init não disparou (Asc='+(!!window.Asc)+' plugin='+(!!(window.Asc&&window.Asc.plugin))+') — recarregue', false); } }, 3000); } catch(e){}
 </script>
 </body>
 </html>

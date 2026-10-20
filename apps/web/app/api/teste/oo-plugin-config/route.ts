@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     name: 'Blocos & Variáveis',
     nameLocale: { 'pt-BR': 'Blocos & Variáveis' },
     guid: 'asc.{C7A3F1E0-9B2D-4E6A-8F14-5D2B7C0A1E33}',
-    version: '1.0.0',
+    version: '1.0.5',
     variations: [
       {
         description: 'Blocos prontos e variáveis — clique para inserir no documento.',

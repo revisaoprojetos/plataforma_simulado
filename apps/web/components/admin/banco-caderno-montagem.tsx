@@ -5,9 +5,10 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { BarChart3, ClipboardList, FileText, BookOpenCheck, ExternalLink, Loader2, FileUp, Trash2, Plus, Pencil, FolderOpen, X } from 'lucide-react'
+import { BarChart3, ClipboardList, FileText, BookOpenCheck, ExternalLink, Loader2, FileUp, Trash2, Plus, Pencil, FolderOpen, X, FileType2, Search } from 'lucide-react'
 import { PdfPreview } from '@/components/admin/pdf-preview'
-import { salvarMontagem, criarCadernoParaSlot, type EntregaSlots, type EntregaRef, type MontagemGrupo } from '@/app/admin/cadernos-teste/actions'
+import { salvarMontagem, criarCadernoParaSlot, listarDocsOnlyOffice, previaOnlyOffice, type EntregaSlots, type EntregaRef, type MontagemGrupo, type DocOffice, type TrechoPrevia } from '@/app/admin/cadernos-teste/actions'
+import { abrirEdicaoDocx } from '@/app/admin/biblioteca/actions'
 
 type SlotKey = 'diagnostico' | 'folha' | 'enunciado' | 'gabarito'
 type SlotDef = { chave: SlotKey; titulo: string; icon: typeof FileText; pdf: boolean }
@@ -74,6 +75,27 @@ function SlotCard({ slot, cor, bancoId, valor, prontos, onSet }: {
   const [pickerAberto, setPickerAberto] = useState(false)
   const ehCaderno = !!valor?.itemId
   const ehPdf = !!valor?.pdfUrl
+  const ehOffice = !!valor?.docId
+  const diag = slot.chave === 'diagnostico' // seletor de origem (Modelos × Editor beta) só no Diagnóstico
+  const [fonte, setFonte] = useState<'modelos' | 'office'>(ehOffice ? 'office' : 'modelos')
+  const [pickerOffice, setPickerOffice] = useState(false)
+  const [docsOffice, setDocsOffice] = useState<DocOffice[]>([])
+  const [carregandoDocs, setCarregandoDocs] = useState(false)
+  const [buscaDoc, setBuscaDoc] = useState('')
+  const [abrindoEditor, setAbrindoEditor] = useState(false)
+
+  async function abrirPickerOffice() {
+    setPickerOffice(true); setCarregandoDocs(true)
+    try { const r = await listarDocsOnlyOffice(); setDocsOffice(r.docs) } finally { setCarregandoDocs(false) }
+  }
+  async function editarOffice() {
+    if (!valor?.docId) return
+    setAbrindoEditor(true)
+    const r = await abrirEdicaoDocx(valor.docId)
+    setAbrindoEditor(false)
+    if (!r.ok || !r.versaoId) { toast.error(r.error || 'Falha ao abrir o editor.'); return }
+    window.location.href = `/admin/biblioteca/editar/${r.versaoId}`
+  }
 
   // Escala da prévia do caderno: mostra a folha A4 ajustada à largura do card (rola pelas folhas).
   const BASE_W = 794, BASE_H = 1123
@@ -148,41 +170,70 @@ function SlotCard({ slot, cor, bancoId, valor, prontos, onSet }: {
             </div>
           ) : ehPdf ? (
             <PdfPreview url={valor!.pdfUrl!} titulo={slot.titulo} className="absolute inset-0" />
+          ) : ehOffice ? (
+            <div className="absolute inset-0 overflow-y-auto overflow-x-hidden bg-white dark:bg-neutral-950">
+              <FolhaPrevia docId={valor!.docId!} baseW={BASE_W} escala={escala} />
+            </div>
           ) : (
             /* VAZIO: criar (editor), importar PDF (enunciado/gabarito) ou selecionar um caderno já pronto. */
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 text-center">
               <Icon className="h-9 w-9 text-muted-foreground/30" />
-              <p className="text-xs text-muted-foreground">Nada aqui ainda.</p>
-              <div className="flex flex-wrap items-center justify-center gap-2">
-                <button type="button" onClick={criar} disabled={criando}
-                  className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-60" style={{ background: cor }}>
-                  {criando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Criar
-                </button>
-                {slot.pdf && (
-                  <button type="button" onClick={() => fileRef.current?.click()} disabled={enviando}
-                    className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted disabled:opacity-60">
-                    {enviando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileUp className="h-3.5 w-3.5" />} Importar PDF
+              {/* Diagnóstico: escolher de onde vem — Modelos (construtor) ou Editor beta (OnlyOffice). */}
+              {diag && (
+                <div className="flex items-center rounded-lg border p-0.5 text-[11px] font-medium">
+                  <button type="button" onClick={() => setFonte('modelos')} className={`rounded-md px-2.5 py-1 ${fonte === 'modelos' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>Modelos</button>
+                  <button type="button" onClick={() => setFonte('office')} className={`rounded-md px-2.5 py-1 ${fonte === 'office' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>Editor beta</button>
+                </div>
+              )}
+              {diag && fonte === 'office' ? (
+                <>
+                  <p className="text-xs text-muted-foreground">Puxar um documento .docx da Biblioteca (OnlyOffice).</p>
+                  <button type="button" onClick={abrirPickerOffice}
+                    className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-opacity hover:opacity-90" style={{ background: cor }}>
+                    <FileType2 className="h-3.5 w-3.5" /> Selecionar documento
                   </button>
-                )}
-              </div>
-              {prontos.length > 0 && (
-                <button type="button" onClick={() => setPickerAberto(true)}
-                  className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted">
-                  <FolderOpen className="h-3.5 w-3.5" /> Selecionar pronto
-                </button>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs text-muted-foreground">Nada aqui ainda.</p>
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <button type="button" onClick={criar} disabled={criando}
+                      className="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-60" style={{ background: cor }}>
+                      {criando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />} Criar
+                    </button>
+                    {slot.pdf && (
+                      <button type="button" onClick={() => fileRef.current?.click()} disabled={enviando}
+                        className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted disabled:opacity-60">
+                        {enviando ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileUp className="h-3.5 w-3.5" />} Importar PDF
+                      </button>
+                    )}
+                  </div>
+                  {prontos.length > 0 && (
+                    <button type="button" onClick={() => setPickerAberto(true)}
+                      className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-muted">
+                      <FolderOpen className="h-3.5 w-3.5" /> Selecionar pronto
+                    </button>
+                  )}
+                </>
               )}
             </div>
           )}
         </div>
 
         {/* Ações do que já está no slot */}
-        {(ehCaderno || ehPdf) && (
+        {(ehCaderno || ehPdf || ehOffice) && (
           <div className="flex items-center gap-1.5">
             {ehCaderno && (
               <Link href={`/admin/cadernos-teste/${valor!.cadernoId}?grupo=${valor!.itemId}`}
                 className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-white shadow-sm transition-opacity hover:opacity-90" style={{ background: cor }}>
                 <Pencil className="h-3.5 w-3.5" /> Editar
               </Link>
+            )}
+            {ehOffice && (
+              <button type="button" onClick={editarOffice} disabled={abrindoEditor}
+                className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-60" style={{ background: cor }}>
+                {abrindoEditor ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Pencil className="h-3.5 w-3.5" />} Editar no OnlyOffice
+              </button>
             )}
             {ehPdf && (
               <button type="button" onClick={() => fileRef.current?.click()} disabled={enviando}
@@ -231,6 +282,68 @@ function SlotCard({ slot, cor, bancoId, valor, prontos, onSet }: {
         </div>,
         document.body,
       )}
+
+      {/* Pop-up: selecionar um documento .docx da Biblioteca (editor beta / OnlyOffice) como diagnóstico. */}
+      {pickerOffice && createPortal(
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={() => setPickerOffice(false)}>
+          <div className="flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border bg-card shadow-xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white" style={{ background: cor }}><FileType2 className="h-3.5 w-3.5" /></span>
+                <h3 className="truncate text-sm font-semibold">Diagnóstico do editor beta (OnlyOffice)</h3>
+              </div>
+              <button type="button" onClick={() => setPickerOffice(false)} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
+            </div>
+            <div className="border-b px-3 py-2">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <input value={buscaDoc} onChange={(e) => setBuscaDoc(e.target.value)} placeholder="Buscar documento…" className="h-8 w-full rounded-lg border bg-background pl-8 pr-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-primary/40" />
+              </div>
+            </div>
+            <div className="scroll-claro max-h-[56vh] space-y-1.5 overflow-y-auto p-3">
+              {carregandoDocs ? (
+                <div className="flex items-center justify-center gap-2 py-8 text-xs text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando…</div>
+              ) : docsOffice.filter((d) => d.titulo.toLowerCase().includes(buscaDoc.trim().toLowerCase())).length === 0 ? (
+                <div className="px-2 py-8 text-center text-xs text-muted-foreground">Nenhum documento .docx publicado na Biblioteca. Importe/publique um em <span className="font-medium text-foreground">Biblioteca → Conteúdos</span>.</div>
+              ) : docsOffice.filter((d) => d.titulo.toLowerCase().includes(buscaDoc.trim().toLowerCase())).map((d) => {
+                const on = valor?.docId === d.id
+                return (
+                  <button key={d.id} type="button" onClick={() => { onSet({ docId: d.id, versaoId: d.versaoAtualId }); setPickerOffice(false) }}
+                    className={`flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors ${on ? 'border-primary ring-1 ring-primary' : 'hover:border-primary/50 hover:bg-muted/40'}`}>
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary"><FileType2 className="h-4 w-4" /></span>
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium leading-tight">{d.titulo}</span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
+    </div>
+  )
+}
+
+/** Prévia da "folha" de um documento da Biblioteca (trechos da versão atual), escalada à largura do card. */
+function FolhaPrevia({ docId, baseW, escala }: { docId: string; baseW: number; escala: number }) {
+  const [trechos, setTrechos] = useState<TrechoPrevia[] | null>(null)
+  const [erro, setErro] = useState(false)
+  useEffect(() => {
+    let vivo = true
+    previaOnlyOffice(docId).then((r) => { if (!vivo) return; if (r.ok) setTrechos(r.trechos); else setErro(true) }).catch(() => vivo && setErro(true))
+    return () => { vivo = false }
+  }, [docId])
+  if (erro) return <div className="flex h-full items-center justify-center p-4 text-xs text-muted-foreground">Não foi possível carregar a prévia.</div>
+  if (!trechos) return <div className="flex h-full items-center justify-center gap-2 p-4 text-xs text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando folha…</div>
+  return (
+    <div style={{ width: baseW, transform: `scale(${escala})`, transformOrigin: 'top left' }}>
+      <div className="mx-auto bg-white px-16 py-14 text-[15px] leading-relaxed text-neutral-900" style={{ width: baseW, minHeight: 1123 }}>
+        {trechos.length === 0 ? <p className="text-neutral-400">Documento sem conteúdo estruturado.</p> : trechos.map((t, i) => {
+          if (t.tipo === 'titulo') return <h2 key={i} className="mb-2 mt-4 text-xl font-bold">{t.texto}</h2>
+          if (t.tipo === 'capitulo') return <h3 key={i} className="mb-1 mt-3 text-base font-semibold text-neutral-600">{t.texto}</h3>
+          return <p key={i} className="mb-2">{t.texto}</p>
+        })}
+      </div>
     </div>
   )
 }

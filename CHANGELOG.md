@@ -12,6 +12,23 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.22.0 — 2026-10-20
+
+**feat(biblioteca): Biblioteca de Conteúdos — Drive jurídico com capa fiel, visualizador e versões**
+
+- **Nova área Biblioteca de Conteúdos** (`/admin/biblioteca`): Drive com pastas, importação de `.docx/.pdf/.html`,
+  versionamento e reconciliação de uids (grifos/anotações sobrevivem às edições). Coleções **Conteúdos** e
+  **Modelos de Caderno** (editados 100% no OnlyOffice).
+- **Capa fiel do card (print da 1ª folha):** ao importar/publicar/editar (editor OnlyOffice), o sistema gera um PNG
+  nítido (1000×1414) da 1ª página via **OnlyOffice ConvertService** e usa como capa do card — a ideia dos simulados,
+  mas gerada automaticamente. Cache no storage por versão+hash (bucket `pdfs`), URL já entregue pelo `listarArvore`
+  (sem flash de placeholder), com geração sob demanda no `onError` e backfill das capas existentes.
+- **Visualizador em tela cheia:** a folha renderizada FIEL (OnlyOffice modo leitura) no centro + lateral direita com
+  abas **Versões** (linha do tempo das edições: upload/editor/restauração + data BRT) e **Detalhes** (infos +
+  "Onde é usado"/vínculos). Cards estilo Drive (folha A4 borda-a-borda) e kebab animado.
+- **Acesso do aluno** (`/aluno/biblioteca`) e **editores Office** na área de **Teste** (plugin Blocos & Variáveis,
+  prévia "Ver com valores" com seleção de simulado), tudo atrás da manutenção por área.
+
 ## 3.21.1 — 2026-10-19
 
 **fix(estudantes): bloqueia e-mail duplicado ao criar/editar aluno**

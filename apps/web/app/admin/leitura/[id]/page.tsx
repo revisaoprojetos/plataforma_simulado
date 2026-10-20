@@ -1,6 +1,8 @@
 import { notFound, redirect } from 'next/navigation'
+import Link from 'next/link'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
+import { getCurrentTenant } from '@/lib/tenant'
 import { limparCabecalhoHtml } from '@/lib/leitura/limpar-cabecalho'
 import { LeituraEditor } from '@/components/admin/leitura-editor'
 import { PrefetchRotas } from '@/components/admin/prefetch-rotas'
@@ -50,9 +52,17 @@ export default async function LeituraEditorPage({ params, searchParams }: { para
     situacao_editorial: d.situacao_editorial ?? 'em_preparacao',
   }
   const temRascunhoPendente = rascunhoVersao > publicadaVersao
+  // BETA opcional (por tenant): edição em OnlyOffice. Default off → link não aparece; nada muda no editor.
+  const tenant = await getCurrentTenant()
+  const officeBeta = !!(tenant?.tema as any)?.leitura_onlyoffice
 
   return (
     <div className="space-y-3">
+      {officeBeta && (
+        <Link href={`/admin/leitura/${id}/office`} className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-500/10 dark:text-amber-400">
+          Editar no OnlyOffice (beta · importação lossy para o rascunho)
+        </Link>
+      )}
       {/* O antes/depois (Alterações) agora fica no sidebar do editor, como aba ao lado do Índice. */}
       <LeituraEditor
         documento={documento}

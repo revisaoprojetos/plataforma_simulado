@@ -45,6 +45,7 @@ const NAV: ItemNav[] = [
   { href: '/aluno', label: 'Início', icon: Home, exact: true, tour: 'nav-inicio' },
   { href: '/aluno/simulados', label: 'Simulados Realizados', icon: ClipboardList, tour: 'nav-simulados' },
   { href: '/aluno/leitura', label: 'Desafio de Lei Seca', icon: Library, tour: 'nav-leitura' },
+  { href: '/aluno/biblioteca', label: 'Biblioteca', icon: BookOpen },
   { href: '/aluno/jurisprudencia', label: 'Desafio de Jurisprudência', icon: Gavel, tour: 'nav-jurisprudencia' },
   {
     href: '/aluno/cronograma',

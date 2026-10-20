@@ -224,6 +224,17 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
+    // Biblioteca de Conteúdos (Drive jurídico + Modelos de caderno). Área REAL por tenant, mas nasce
+    // BLOQUEADA via MANUTENÇÃO POR ÁREA (key 'biblioteca', padraoBloqueado) — libere por allowlist em
+    // Sistema → Páginas em manutenção → Admin. Multi-tenant: cada plataforma vê só o seu conteúdo.
+    label: 'Biblioteca',
+    icon: BookOpen,
+    items: [
+      { label: 'Conteúdos', href: '/admin/biblioteca', icon: BookOpen, perm: 'configuracoes:view' },
+      { label: 'Modelos de Caderno (OnlyOffice)', href: '/admin/biblioteca?tab=modelos', icon: LayoutTemplate, perm: 'configuracoes:view' },
+    ],
+  },
+  {
     // SPIKE: teste dos editores Office reais (Collabora / OnlyOffice) — avaliar migração do construtor
     // de caderno de blocos HTML para docx nativo. Área isolada, não afeta o resto. Visibilidade/acesso
     // é controlada pela MANUTENÇÃO POR ÁREA (nasce bloqueada; libere por allowlist em Sistema → Páginas

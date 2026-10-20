@@ -169,7 +169,10 @@ export async function criarCadernoParaSlot(bancoId: string, slot: 'diagnostico' 
 
 // ===== Montagem / entrega do Caderno (teste) por banco (slots) =====
 export type MontagemGrupo = { cadernoId: string; cadernoNome: string; itemId: string; modalidade: string; modelo: string; label: string }
-export type EntregaRef = { cadernoId?: string; itemId?: string; pdfUrl?: string; pdfNome?: string } | null
+// `docId`/`versaoId` = diagnóstico vindo do EDITOR BETA (OnlyOffice / Biblioteca de Conteúdos). Inerte
+// para o aluno hoje (entrega-aluno.usavel() ignora) — é teste de usabilidade no admin. Manter em sincronia
+// com o mesmo tipo em lib/caderno-teste/entrega-aluno.ts.
+export type EntregaRef = { cadernoId?: string; itemId?: string; pdfUrl?: string; pdfNome?: string; docId?: string; versaoId?: string } | null
 export type EntregaSlots = { diagnostico?: EntregaRef; folha?: EntregaRef; enunciado?: EntregaRef; gabarito?: EntregaRef }
 
 export type MontagemPdf = { url: string; nome: string; origem: string }
@@ -228,4 +231,32 @@ export async function salvarMontagem(bancoId: string, entrega: EntregaSlots): Pr
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_pastas', entidadeId: bancoId, depois: { caderno_entrega: entrega } })
   revalidatePath(`/admin/banco-questoes/${bancoId}`)
   return { ok: true }
+}
+
+// ===== Diagnóstico via EDITOR BETA (OnlyOffice / Biblioteca de Conteúdos) =====
+export type DocOffice = { id: string; titulo: string; versaoAtualId: string }
+export type TrechoPrevia = { tipo: string; rotulo: string | null; texto: string }
+
+/** Documentos .docx PUBLICADOS da Biblioteca — opções de diagnóstico vindas do editor beta. */
+export async function listarDocsOnlyOffice(): Promise<{ ok: boolean; docs: DocOffice[] }> {
+  const access = await getCurrentAccess()
+  if (!access.tenantId || !(await checkPermission('questoes:view'))) return { ok: true, docs: [] }
+  const svc = createAdminClient()
+  const rows = await fetchAll<any>(() => svc.from('simulado_conteudo_documentos')
+    .select('id, titulo, tipo_origem, status, versao_atual_id, deletado')
+    .eq('tenant_id', access.tenantId!).eq('status', 'publicado').eq('tipo_origem', 'docx').eq('deletado', false)
+    .not('versao_atual_id', 'is', null).order('atualizado_em', { ascending: false }).order('id', { ascending: true }))
+  return { ok: true, docs: (rows ?? []).map((d) => ({ id: d.id, titulo: d.titulo, versaoAtualId: d.versao_atual_id })) }
+}
+
+/** Trechos da versão atual de um documento da Biblioteca — para a PRÉVIA DA FOLHA do diagnóstico beta. */
+export async function previaOnlyOffice(docId: string): Promise<{ ok: boolean; titulo?: string; versaoId?: string; trechos: TrechoPrevia[] }> {
+  const access = await getCurrentAccess()
+  if (!access.tenantId || !(await checkPermission('questoes:view')) || !docId) return { ok: false, trechos: [] }
+  const svc = createAdminClient()
+  const { data: doc } = await svc.from('simulado_conteudo_documentos').select('titulo, versao_atual_id, status, deletado').eq('tenant_id', access.tenantId).eq('id', docId).maybeSingle()
+  if (!doc || (doc as any).deletado || !(doc as any).versao_atual_id) return { ok: false, trechos: [] }
+  const trechos = await fetchAll<any>(() => svc.from('simulado_conteudo_trechos')
+    .select('tipo, rotulo, texto, ordem').eq('tenant_id', access.tenantId!).eq('versao_id', (doc as any).versao_atual_id).order('ordem', { ascending: true }))
+  return { ok: true, titulo: (doc as any).titulo, versaoId: (doc as any).versao_atual_id, trechos: (trechos ?? []).map((t) => ({ tipo: t.tipo, rotulo: t.rotulo, texto: t.texto })) }
 }

@@ -38,6 +38,9 @@ export const AREAS_MANUTENCAO: AreaManutencao[] = [
   // Área de TESTE (spike dos editores Office). Nasce BLOQUEADA — só quem estiver no allowlist vê o
   // item no menu e acessa /admin/teste. Cobre também as sub-rotas (/admin/teste/onlyoffice|collabora/...).
   { key: 'teste', label: 'Teste — Editores Office', descricao: 'Área de avaliação dos editores Office (Collabora/OnlyOffice). Fica bloqueada por padrão; libere só quem precisa testar.', href: '/admin/teste', padraoBloqueado: true },
+  // Biblioteca de Conteúdos (Drive jurídico + Modelos de caderno + editores OnlyOffice). Nasce BLOQUEADA
+  // em TODOS os tenants — libere por allowlist. Cobre sub-rotas (/admin/biblioteca/editar/...).
+  { key: 'biblioteca', label: 'Biblioteca de Conteúdos', descricao: 'Drive de documentos jurídicos versionados + Modelos de caderno, com edição no OnlyOffice. Bloqueada por padrão; libere só quem for operar.', href: '/admin/biblioteca', padraoBloqueado: true },
 ]
 
 /**
@@ -53,6 +56,8 @@ export const AREAS_MANUTENCAO_ALUNO: AreaManutencao[] = [
   { key: 'trilha', label: 'Trilha', descricao: 'Trilha de simulados/gamificação do aluno (/aluno/trilha).', href: '/aluno/trilha' },
   { key: 'ligas', label: 'Ligas', descricao: 'Ranking por ligas (/aluno/ligas).', href: '/aluno/ligas' },
   { key: 'recomendado', label: 'Recomendado', descricao: 'Questões recomendadas pelo desempenho do aluno (/aluno/recomendado).', href: '/aluno/recomendado' },
+  // Biblioteca do aluno (ler conteúdos liberados + grifar). Nasce BLOQUEADA — libere por allowlist.
+  { key: 'biblioteca', label: 'Biblioteca', descricao: 'Leitura dos materiais liberados, com grifos salvos (/aluno/biblioteca).', href: '/aluno/biblioteca', padraoBloqueado: true },
 ]
 
 export type ManutencaoAreas = Record<string, boolean>

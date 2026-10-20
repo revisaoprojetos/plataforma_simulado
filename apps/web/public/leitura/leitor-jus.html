@@ -1316,6 +1316,14 @@ function parseCite(c){const parts=c.split(/,\s*/);const rel=(/Rel\.\s*Min\.\s*([
 // Alinhamento do parágrafo do EDITOR: data-align (canônico) ou style:text-align inline. Preserva o
 // justificado/centralizado que o admin aplicou (o rebuild recria o <p>, então precisa ser reemitido).
 function alignDe(el){try{const a=(el.getAttribute('data-align')||'').toLowerCase();if(/^(center|right|justify|left)$/.test(a))return a;const m=/text-align\s*:\s*(center|right|justify|left)/.exec((el.getAttribute('style')||'').toLowerCase());return m?m[1]:''}catch(e){return ''}}
+// Court da TESE pelo FUNDO da caixa — tolerante ao TOM (o autor nem sempre usa o hex exato #FBE4D5/#DEEAF6;
+// ex.: #FDE9D9). Pêssego/quente (R>B) = STJ; azul/frio (B>R) = STF; neutro/branco/cinza = null (não é tese).
+function courtDeFundo(st){
+  const m=/background(?:-color)?\s*:\s*#?([0-9a-fA-F]{6})/.exec(st||'');if(!m)return null;
+  const h=m[1],r=parseInt(h.slice(0,2),16),g=parseInt(h.slice(2,4),16),b=parseInt(h.slice(4,6),16);
+  if(Math.max(r,g,b)-Math.min(r,g,b)<10)return null; // sem cor (branco/cinza) → não é caixa de tese
+  if(b>=r+10)return 'STF';if(r>=b+10)return 'STJ';return null;
+}
 function parseDay(raw){
   const d=new DOMParser().parseFromString(raw,'text/html');
   const size=el=>{let m=0;el.querySelectorAll('[style]').forEach(s=>{const x=/font-size:\s*([\d.]+)pt/.exec(s.getAttribute('style'));if(x)m=Math.max(m,+x[1])});return m};
@@ -1343,7 +1351,9 @@ function parseDay(raw){
       const rs=trimRuns(runs(el));
       if(rs.filter(r=>r.t.trim()).every(r=>r.b)&&t.length<160){cur.blocks.push({type:'h3',text:t});return}
       cur.blocks.push({type:'p',html:runsHTML(rs),align:alignDe(el)});return}
-    if(el.tagName==='TABLE'&&cur){const st=el.outerHTML;const court=/DEEAF6/i.test(st)?'STF':/FBE4D5/i.test(st)?'STJ':null;
+    if(el.tagName==='TABLE'&&cur){const st=el.outerHTML;
+      const umaColuna=[...el.rows].every(r=>r.cells.length<=1); // caixa de destaque (tese) = 1 coluna
+      const court=(/DEEAF6/i.test(st)?'STF':/FBE4D5/i.test(st)?'STJ':null)||(umaColuna?courtDeFundo(st):null);
       const ps=[...el.querySelectorAll('p')].map(p=>({t:p.textContent.replace(/ /g,' ').trim(),rs:trimRuns(runs(p))})).filter(x=>x.t);
       if(court&&!cur.tese){const items=ps.map(x=>x.t);let last=items[items.length-1];let cite='';
         const m=/\(([^()]*(?:\([^()]*\)[^()]*)*)\)\.?\s*$/.exec(last);if(m){cite=m[1].trim();items[items.length-1]=last.slice(0,m.index).trim()}

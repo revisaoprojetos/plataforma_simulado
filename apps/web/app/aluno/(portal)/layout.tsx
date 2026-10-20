@@ -149,6 +149,7 @@ export default async function AlunoPortalLayout({ children }: { children: React.
       { href: '/aluno', label: 'Início', short: 'Início', icon: 'Home', exact: true },
       { href: '/aluno/simulados', label: 'Simulados Realizados', short: 'Realizados', icon: 'ClipboardList' },
       { href: '/aluno/leitura', label: 'Desafio de Lei Seca', short: 'Lei Seca', icon: 'Library', gate: LEITURA_ATIVA },
+      { href: '/aluno/biblioteca', label: 'Biblioteca', short: 'Biblioteca', icon: 'BookOpen' },
       { href: '/aluno/jurisprudencia', label: 'Desafio de Jurisprudência', short: 'Juris', icon: 'Gavel', gate: JURISPRUDENCIA_ATIVA },
       { href: '/aluno/cronograma', label: 'Cronograma', short: 'Cronograma', icon: 'CalendarDays', gate: !OCULTAR_CRONOGRAMA },
       { href: '/aluno/recomendado', label: 'Recomendado', short: 'Recomendado', icon: 'Lightbulb' },

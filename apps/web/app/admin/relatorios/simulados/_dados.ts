@@ -224,10 +224,10 @@ async function _montarRelatorioSimulado(svc: SupabaseClient, simId: string, tena
   // Total de estudantes matriculados no simulado: toda matrícula (liberada ou bloqueada) + acesso avulso + quem já tem sessão.
   const atribuidosSet = new Set<string>(sess.map((s) => s.estudante_id).filter(Boolean))
   // Matrículas, acessos avulsos e eventos de relatório são leituras independentes — em paralelo.
-  const [mats, acs, evRes] = await Promise.all([
+  const [mats, acs, eventos] = await Promise.all([
     fetchAll<any>(() => svc.from('simulado_matriculas').select('estudante_id').eq('simulado_id', simId).order('estudante_id')),
     fetchAll<any>(() => svc.from('simulado_acessos').select('estudante_id').eq('simulado_id', simId).order('estudante_id')),
-    svc.from('simulado_relatorio_eventos').select('estudante_id, tipo').eq('simulado_id', simId).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000'),
+    fetchAll<any>(() => svc.from('simulado_relatorio_eventos').select('estudante_id, tipo, criado_em').eq('simulado_id', simId).eq('tenant_id', tenantId ?? '00000000-0000-0000-0000-000000000000').order('id', { ascending: true })),
   ])
   for (const m of mats) if (m.estudante_id) atribuidosSet.add(m.estudante_id)
   for (const a of acs) if (a.estudante_id) atribuidosSet.add(a.estudante_id)
@@ -236,12 +236,22 @@ async function _montarRelatorioSimulado(svc: SupabaseClient, simId: string, tena
   const acessaramSet = new Set(sess.filter((s) => s.iniciado_em).map((s) => s.estudante_id).filter(Boolean))
   const finalizaramSet = new Set(finalizadas.map((s) => s.estudante_id).filter(Boolean))
   const visSet = new Set<string>(), baixSet = new Set<string>()
-  const eventos = evRes.data
   for (const ev of (eventos ?? []) as any[]) {
     if (!ev.estudante_id) continue
     if (ev.tipo === 'visualizou') visSet.add(ev.estudante_id)
     else if (ev.tipo === 'baixou') baixSet.add(ev.estudante_id)
   }
+  // REGISTROS detalhados (quem visualizou/baixou + horário) p/ a tabela de auditoria no relatório.
+  // Resolve o nome/e-mail de alunos que não entraram em `infoEst` (sem sessão nas listas acima).
+  const faltamIds = [...new Set((eventos ?? []).map((e: any) => e.estudante_id).filter((id: any): id is string => !!id && !infoEst.has(id)))]
+  if (faltamIds.length) {
+    const ests = await fetchAllByIn<any>(faltamIds, (chunk) => svc.from('simulado_estudantes').select('id, nome, email').in('id', chunk))
+    for (const e of ests) if (!infoEst.has(e.id)) infoEst.set(e.id, { nome: e.nome ?? 'Estudante', email: e.email ?? null, telefone: null, classificacao: null })
+  }
+  const relatorioEventos = (eventos ?? [])
+    .filter((ev: any) => ev.estudante_id && (ev.tipo === 'baixou' || ev.tipo === 'visualizou'))
+    .map((ev: any) => ({ estudanteId: ev.estudante_id as string, nome: infoEst.get(ev.estudante_id)?.nome ?? 'Estudante', email: infoEst.get(ev.estudante_id)?.email ?? null, tipo: ev.tipo as 'baixou' | 'visualizou', criadoEm: (ev.criado_em as string) ?? null }))
+    .sort((a: any, b: any) => (b.criadoEm ?? '').localeCompare(a.criadoEm ?? ''))
   const engajamento = {
     atribuidos: atribuidosSet.size,
     acessaram: acessaramSet.size,
@@ -379,6 +389,6 @@ async function _montarRelatorioSimulado(svc: SupabaseClient, simId: string, tena
     totalSessoes: atribuidosSet.size, finalizadas: finalizadas.length, notaMedia, melhorNota, acertoMedio, tempoMedioMin,
     porDisciplina, porQuestao, distribuicao, ranking, disciplinas, linhas, questoes, engajamento,
     porClassificacao, dispersao, histogramaAcertos, config, tentativasResumo, porAlunoTentativas,
-    janela, janelaStats, foraJanela, simId,
+    janela, janelaStats, foraJanela, simId, relatorioEventos,
   }
 }
