@@ -174,10 +174,10 @@ export async function dadosVisualizacao(documentoId: string): Promise<{
 
 /** Miniatura FIEL do card: PNG da 1ª página do .docx (render do OnlyOffice), cacheado no storage por
  *  versão (hash). Devolve a URL assinada da imagem. Gera 1x e reusa; falhou → null (card usa fallback). */
-export async function thumbDocumento(documentoId: string): Promise<{ url: string | null }> {
+export async function thumbDocumento(documentoId: string, opts?: { latest?: boolean }): Promise<{ url: string | null }> {
   const g = await guard('view')
   if (!g.ok) return { url: null }
-  return { url: await gerarThumbDocumento(g.tenantId, documentoId) }
+  return { url: await gerarThumbDocumento(g.tenantId, documentoId, { latest: opts?.latest }) }
 }
 
 export async function criarPasta(nome: string, paiId?: string | null, categoria: Categoria = 'conteudo'): Promise<{ ok: boolean; error?: string; id?: string }> {

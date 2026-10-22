@@ -331,7 +331,7 @@ function CapaFielOffice({ docId, baseW, escala }: { docId: string; baseW: number
   const [falhou, setFalhou] = useState(false)
   useEffect(() => {
     let vivo = true
-    thumbDocumento(docId).then((r) => { if (vivo) { if (r.url) setUrl(r.url); else setFalhou(true) } }).catch(() => vivo && setFalhou(true))
+    thumbDocumento(docId, { latest: true }).then((r) => { if (vivo) { if (r.url) setUrl(r.url); else setFalhou(true) } }).catch(() => vivo && setFalhou(true))
     return () => { vivo = false }
   }, [docId])
   // eslint-disable-next-line @next/next/no-img-element

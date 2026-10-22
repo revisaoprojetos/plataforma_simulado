@@ -34,8 +34,9 @@ function slot(id: string, nome: string, flags: { semGab: boolean; comGab: boolea
   const base: ModalidadeAluno = { id, nome, semGab: flags.semGab, comGab: flags.comGab }
   // PDF importado → baixa direto.
   if (r.pdfUrl) return { ...base, pdfUrl: comDownload(r.pdfUrl, r.pdfNome || nome) }
-  // Diagnóstico do EDITOR BETA (OnlyOffice): PDF gerado on-the-fly do .docx preenchido c/ os valores do aluno.
-  if (ehOffice(r) && sessaoId) return { ...base, pdfUrl: comDownload(`/api/aluno/diagnostico-docx-pdf?versaoId=${encodeURIComponent(r.versaoId!)}&sessao=${encodeURIComponent(sessaoId)}`, nome) }
+  // Diagnóstico do EDITOR BETA (OnlyOffice): PDF do .docx preenchido c/ os valores do aluno. Passa o docId
+  // (não o versaoId congelado na seleção) → a rota resolve a VERSÃO ATUAL, pegando o template JÁ EDITADO.
+  if (ehOffice(r) && sessaoId) return { ...base, pdfUrl: comDownload(`/api/aluno/diagnostico-docx-pdf?docId=${encodeURIComponent(r.docId!)}&sessao=${encodeURIComponent(sessaoId)}`, nome) }
   // Item gerado (caderno de teste) → download pela rota do caderno.
   if (r.cadernoId && r.itemId) return { ...base, cadernoTeste: { cadernoId: r.cadernoId, itemId: r.itemId } }
   return base // office sem sessaoId: sem link (não ocorre no fluxo do aluno, que sempre tem sessão)

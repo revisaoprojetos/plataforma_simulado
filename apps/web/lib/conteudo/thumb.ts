@@ -56,7 +56,7 @@ function thumbPath(tenantId: string, versaoId: string, hash: string) {
 /** Resolve a versão atual/mais nova do documento (.docx), gera a thumb FIEL via OnlyOffice e guarda no
  *  storage (cache por versão/hash). Reutilizável pela leitura (card) E pela pré-geração (publicar/editar).
  *  `forcar` pula a verificação de cache (usado logo após uma edição). Best-effort → null em qualquer falha. */
-export async function gerarThumbDocumento(tenantId: string, documentoId: string, opts?: { forcar?: boolean }): Promise<string | null> {
+export async function gerarThumbDocumento(tenantId: string, documentoId: string, opts?: { forcar?: boolean; latest?: boolean }): Promise<string | null> {
   try {
     const svc = createAdminClient()
     const { data: doc } = await svc.from('simulado_conteudo_documentos')
@@ -64,7 +64,9 @@ export async function gerarThumbDocumento(tenantId: string, documentoId: string,
     if (!doc || (doc as any).tipo_origem !== 'docx') return null
     const campos = 'id, arquivo_key, hash_arquivo'
     let ver: any = null
-    if ((doc as any).versao_atual_id) ver = (await svc.from('simulado_conteudo_versoes').select(campos).eq('tenant_id', tenantId).eq('id', (doc as any).versao_atual_id).maybeSingle()).data
+    // `latest`: ignora versao_atual_id e usa a última por numero (o template EDITADO vive num rascunho mais
+    // novo que a versão publicada/importada). Default: versao_atual_id → fallback na mais nova.
+    if (!opts?.latest && (doc as any).versao_atual_id) ver = (await svc.from('simulado_conteudo_versoes').select(campos).eq('tenant_id', tenantId).eq('id', (doc as any).versao_atual_id).maybeSingle()).data
     if (!ver) ver = (await svc.from('simulado_conteudo_versoes').select(campos).eq('tenant_id', tenantId).eq('documento_id', documentoId).order('numero', { ascending: false }).limit(1).maybeSingle()).data
     if (!ver?.arquivo_key) return null
     const path = thumbPath(tenantId, ver.id, ver.hash_arquivo)

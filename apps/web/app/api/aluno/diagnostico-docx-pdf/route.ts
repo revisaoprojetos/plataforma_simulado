@@ -26,10 +26,11 @@ function pdfResp(bytes: Uint8Array, nome: string) {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
-  const versaoId = searchParams.get('versaoId')
+  const docId = searchParams.get('docId')
+  const versaoIdParam = searchParams.get('versaoId') // compat: links antigos
   const sessaoId = searchParams.get('sessao')
   const nome = (searchParams.get('download') || 'diagnostico').replace(/[\\/:*?"<>|]+/g, '').replace(/\.pdf$/i, '').slice(0, 120) || 'diagnostico'
-  if (!versaoId || !sessaoId) return NextResponse.json({ message: 'Parâmetros ausentes.' }, { status: 400 })
+  if ((!docId && !versaoIdParam) || !sessaoId) return NextResponse.json({ message: 'Parâmetros ausentes.' }, { status: 400 })
 
   const svc = createAdminClient()
   // Sessão = credencial do aluno + escopo do tenant.
@@ -37,12 +38,21 @@ export async function GET(request: Request) {
   if (!sess) return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
   const tenantId = (sess as any).tenant_id as string
 
-  // Versão do .docx (diagnóstico do editor), escopada ao tenant da sessão.
-  const { data: ver } = await svc.from('simulado_conteudo_versoes').select('id, arquivo_key, hash_arquivo').eq('id', versaoId).eq('tenant_id', tenantId).maybeSingle()
+  // Resolve a versão MAIS NOVA do documento (o template JÁ EDITADO fica num rascunho mais novo que a
+  // versão publicada/importada). Editar um publicado cria nova versão → `versao_atual_id` fica na antiga,
+  // por isso NÃO uso ele aqui: pego a última por `numero`. Fallback: versaoId direto (links antigos).
+  const campos = 'id, arquivo_key, hash_arquivo'
+  let ver: any = null
+  if (docId) {
+    const { data: doc } = await svc.from('simulado_conteudo_documentos').select('id').eq('id', docId).eq('tenant_id', tenantId).eq('deletado', false).maybeSingle()
+    if (doc) ver = (await svc.from('simulado_conteudo_versoes').select(campos).eq('tenant_id', tenantId).eq('documento_id', docId).order('numero', { ascending: false }).limit(1).maybeSingle()).data
+  }
+  if (!ver && versaoIdParam) ver = (await svc.from('simulado_conteudo_versoes').select(campos).eq('id', versaoIdParam).eq('tenant_id', tenantId).maybeSingle()).data
   if (!ver?.arquivo_key) return NextResponse.json({ message: 'Documento não encontrado.' }, { status: 404 })
+  const versaoId = ver.id as string
   const h8 = String((ver as any).hash_arquivo || '').slice(0, 8)
 
-  // Cache do PDF por sessão + versão/hash.
+  // Cache do PDF por sessão + versão/hash (muda quando o template é re-editado → hash novo).
   const bucket = await resolverBucketConteudo()
   const pdfPath = `conteudo-diag-aluno/${tenantId}/${sessaoId}_${versaoId}_${h8}.pdf`
   const cachedUrl = await urlAssinadaOriginal(pdfPath, 600)

@@ -12,6 +12,18 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.24.1 — 2026-10-22
+
+**fix(diagnóstico OnlyOffice): usar a versão EDITADA (não a importada) no PDF do aluno e na capa**
+
+- O PDF do diagnóstico do aluno saía no formato **importado** (placeholders `[NOME COMPLETO...]`, `X/100`) em
+  vez do template **editado** (com as variáveis). Causa: a rota usava o `versaoId` congelado na seleção, mas
+  editar um documento publicado cria um **rascunho mais novo** (e `versao_atual_id` fica na versão antiga).
+  Agora a rota resolve pelo `docId` → **última versão por `numero`** (o rascunho editado). `entrega-aluno.ts`
+  passa o `docId` (não o versaoId).
+- `gerarThumbDocumento`/`thumbDocumento` ganharam a opção `latest` (ignora `versao_atual_id`, usa a mais nova);
+  a **capa fiel** do card do diagnóstico (`banco-caderno-montagem.tsx`) pede `latest: true` → mostra o editado.
+
 ## 3.24.0 — 2026-10-22
 
 **feat(diagnóstico OnlyOffice): prévia fiel no card + download do diagnóstico do aluno; OnlyOffice em produção**
