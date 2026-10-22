@@ -12,6 +12,18 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.24.2 — 2026-10-22
+
+**fix(diagnóstico OnlyOffice): dados REAIS do aluno no PDF (aluno certo, acertos, pilares, tempo)**
+
+- **Aluno errado:** a rota chamava `carregarDadosBancoCore` só com `{sessao}` e usava `registros[0]` → sem
+  `aluno`, o merge carrega todos os alunos ordenados por nome e `registros[0]` virava o 1º alfabético ("Alice"),
+  não o dono da sessão → nome errado e 0 acertos. Agora passa `aluno: estudante_id` e usa `.find(r.id===)`.
+- **Pilares de exemplo:** o template usa `ls_pct/jur_pct/dout_pct` (schema do `computarPreviaDados`), mas o
+  merge dá `pct_pilar_<slug>` → caíam nos valores de exemplo (45/70/100%). Agora faz o **alias** com os valores
+  reais por questão do merge (+ faixas 0-49/50-80/81-100).
+- **Tempo:** `tempo_usado` mapeado do `tempo_total` do merge.
+
 ## 3.24.1 — 2026-10-22
 
 **fix(diagnóstico OnlyOffice): usar a versão EDITADA (não a importada) no PDF do aluno e na capa**

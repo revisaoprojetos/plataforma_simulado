@@ -63,13 +63,28 @@ export async function GET(request: Request) {
   const bancoId = (((sim as any)?.regras as any)?.banco_base_id as string | undefined) || null
   if (!bancoId) return NextResponse.json({ message: 'Banco não configurado para este simulado.' }, { status: 404 })
 
-  const { registros, disciplinas } = await carregarDadosBancoCore(svc, tenantId, bancoId, { sessao: sessaoId })
-  const vars = (registros[0]?.vars ?? {}) as Record<string, string>
-  // Dict docxtemplater: base de exemplo (campos estáticos) + vars REAIS do aluno + laço {#disciplinas}.
+  // IMPORTANTE: passar o ALUNO (estudante_id da sessão) + achar o registro certo. Sem `aluno`, o merge
+  // carrega TODOS os alunos ordenados por nome e registros[0] vira o primeiro alfabético ("Alice…"), não o
+  // dono da sessão → vinha nome errado e 0 acertos.
+  const estudanteId = (sess as any).estudante_id as string
+  const { registros, disciplinas } = await carregarDadosBancoCore(svc, tenantId, bancoId, { sessao: sessaoId, aluno: estudanteId })
+  const reg = registros.find((r) => r.id === estudanteId) ?? registros[0]
+  const vars = (reg?.vars ?? {}) as Record<string, string>
+  // PILAR: o template usa ls_/jur_/dout_ (schema do computarPreviaDados); o merge dá pct_pilar_<slug>. Faz o
+  // alias com os valores REAIS por questão do merge (+ faixas f1/f2/f3 = 0-49/50-80/81-100).
+  const pil = (slug: string, pref: string): Record<string, unknown> => {
+    const a = Number(vars[`acerto_pilar_${slug}`] || 0)
+    const t = Number(vars[`total_pilar_${slug}`] || 0)
+    const n = t ? Math.round((a / t) * 100) : 0
+    return { [`${pref}_pct`]: `${n}%`, [`${pref}_acertos`]: String(a), [`${pref}_total`]: String(t), [`${pref}_f1`]: n <= 49, [`${pref}_f2`]: n >= 50 && n <= 80, [`${pref}_f3`]: n >= 81 }
+  }
+  // Dict docxtemplater: base de exemplo + vars REAIS do aluno + aliases de pilar + tempo + laço {#disciplinas}.
   const dados: Record<string, unknown> = {
     ...DADOS_PREVIA,
     ...vars,
     simulado: (sim as any)?.titulo || vars.simulado || (DADOS_PREVIA as any).simulado,
+    tempo_usado: vars.tempo_total || (DADOS_PREVIA as any).tempo_usado, // merge dá tempo_total; template usa tempo_usado
+    ...pil('lei_seca', 'ls'), ...pil('jurisprudencia', 'jur'), ...pil('doutrina', 'dout'),
     disciplinas: disciplinas.map((d) => ({
       nome: d.nome,
       acertos: vars[`acerto_${d.chave}`] ?? '0',
