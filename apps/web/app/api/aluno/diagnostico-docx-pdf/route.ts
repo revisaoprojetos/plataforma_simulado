@@ -52,9 +52,10 @@ export async function GET(request: Request) {
   const versaoId = ver.id as string
   const h8 = String((ver as any).hash_arquivo || '').slice(0, 8)
 
-  // Cache do PDF por sessão + versão/hash (muda quando o template é re-editado → hash novo).
+  // Cache do PDF por sessão + versão/hash. `_v2` = marca da LÓGICA de dados (muda aqui p/ invalidar PDFs
+  // gerados com o mapeamento antigo/errado; bump este sufixo sempre que o dict de dados mudar).
   const bucket = await resolverBucketConteudo()
-  const pdfPath = `conteudo-diag-aluno/${tenantId}/${sessaoId}_${versaoId}_${h8}.pdf`
+  const pdfPath = `conteudo-diag-aluno/${tenantId}/${sessaoId}_${versaoId}_${h8}_v2.pdf`
   const cachedUrl = await urlAssinadaOriginal(pdfPath, 600)
   if (cachedUrl) { try { const r = await fetch(cachedUrl); if (r.ok) return pdfResp(new Uint8Array(await r.arrayBuffer()), nome) } catch { /* gera abaixo */ } }
 

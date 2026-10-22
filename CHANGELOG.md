@@ -12,6 +12,14 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.24.3 — 2026-10-22
+
+**fix(diagnóstico OnlyOffice): invalida o cache do PDF (marca `_v2`)**
+
+- O PDF do diagnóstico é cacheado por sessão+versão+hash; como o template não mudou, os PDFs gerados com o
+  mapeamento de dados ANTIGO (errado) continuariam a ser servidos. Adicionado sufixo `_v2` no caminho do cache
+  → regenera com os dados corretos (v3.24.2).
+
 ## 3.24.2 — 2026-10-22
 
 **fix(diagnóstico OnlyOffice): dados REAIS do aluno no PDF (aluno certo, acertos, pilares, tempo)**
