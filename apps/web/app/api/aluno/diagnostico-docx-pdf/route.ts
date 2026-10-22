@@ -52,10 +52,11 @@ export async function GET(request: Request) {
   const versaoId = ver.id as string
   const h8 = String((ver as any).hash_arquivo || '').slice(0, 8)
 
-  // Cache do PDF por sessão + versão/hash. `_v2` = marca da LÓGICA de dados (muda aqui p/ invalidar PDFs
-  // gerados com o mapeamento antigo/errado; bump este sufixo sempre que o dict de dados mudar).
+  // Cache do PDF por sessão + versão/hash. Sufixo `_vN` = marca da LÓGICA (dados + render); bump p/ invalidar
+  // PDFs antigos. `_v4` = auto-heal que FECHA laço órfão no limite da célula (antes removia a abertura e a
+  // faixa condicional aparecia sempre → "desempenho" com 2 faixas).
   const bucket = await resolverBucketConteudo()
-  const pdfPath = `conteudo-diag-aluno/${tenantId}/${sessaoId}_${versaoId}_${h8}_v2.pdf`
+  const pdfPath = `conteudo-diag-aluno/${tenantId}/${sessaoId}_${versaoId}_${h8}_v4.pdf`
   const cachedUrl = await urlAssinadaOriginal(pdfPath, 600)
   if (cachedUrl) { try { const r = await fetch(cachedUrl); if (r.ok) return pdfResp(new Uint8Array(await r.arrayBuffer()), nome) } catch { /* gera abaixo */ } }
 
@@ -99,12 +100,14 @@ export async function GET(request: Request) {
   const buf = await baixarOriginal((ver as any).arquivo_key)
   if (!buf) return NextResponse.json({ message: 'Falha ao abrir o documento.' }, { status: 502 })
   const filled = await renderPreviaDocx(buf, dados)
-  const tmpPath = `conteudo-diag-tmp/${tenantId}/${sessaoId}_${versaoId}_${h8}.docx`
-  try { await uploadArquivo({ tenantId, bucket, path: tmpPath, data: Buffer.from(filled), contentType: DOCX, nome: 'diag.docx', publico: false, criadoPor: null }) } catch { return NextResponse.json({ message: 'Falha ao preparar o documento.' }, { status: 502 }) }
+  // Hash do CONTEÚDO PREENCHIDO = identidade do PDF p/ este aluno/dados. Entra no path do tmp E no `key` do
+  // ConvertService — senão o OnlyOffice cacheia por key constante e devolve o PDF da 1ª conversão (bug Alice).
+  const contentHash = createHash('sha1').update(filled).digest('hex').slice(0, 16)
+  const tmpPath = `conteudo-diag-tmp/${tenantId}/${sessaoId}_${contentHash}.docx`
+  try { await uploadArquivo({ tenantId, bucket, path: tmpPath, data: Buffer.from(filled), contentType: DOCX, nome: 'diag.docx', publico: false, criadoPor: null }) } catch { /* mesmo conteúdo já existe → segue p/ a URL assinada */ }
   const tmpUrl = await urlAssinadaOriginal(tmpPath, 600)
   if (!tmpUrl) return NextResponse.json({ message: 'Falha ao preparar o documento.' }, { status: 502 })
-  const key = createHash('sha1').update(`${sessaoId}:${versaoId}:${h8}`).digest('hex').slice(0, 16)
-  const pdf = await converterDocxParaPdf(tmpUrl, `diag_${key}`)
+  const pdf = await converterDocxParaPdf(tmpUrl, `diag_${contentHash}`)
   if (!pdf) return NextResponse.json({ message: 'OnlyOffice indisponível para gerar o PDF.' }, { status: 502 })
   try { await uploadArquivo({ tenantId, bucket, path: pdfPath, data: pdf, contentType: PDF, nome: 'diagnostico.pdf', publico: false, criadoPor: null }) } catch { /* cache best-effort */ }
   return pdfResp(new Uint8Array(pdf), nome)

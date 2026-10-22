@@ -155,7 +155,9 @@ export async function carregarRankingModulo(moduloId: string, tenantId: string):
       const base = pontuarLegProc(pontuacao, { acertos, aulasConcluidas, aulasGabaritadas }, gamAtivo)
       // Bônus — só com a gamificação ativa. Ambos pelos dias CONSECUTIVOS (streak): conclusão e
       // sequência são duas faixas independentes de bônus sobre a mesma sequência de dias.
-      const score = base + (gamAtivo ? bonusSequenciaLeitura(seq.streakAtual, pontuacao) + bonusConclusaoLeitura(seq.streakAtual, pontuacao) : 0)
+      // Bônus de MARCO (pontos extras do desafio) = PERMANENTE: baseado no MAIOR streak atingido (streakMaior),
+      // não no streakAtual (que zera quando o desafio acaba/quebra a sequência → o aluno perdia os extras).
+      const score = base + (gamAtivo ? bonusSequenciaLeitura(seq.streakMaior, pontuacao) + bonusConclusaoLeitura(seq.streakMaior, pontuacao) : 0)
       return { estudanteId: id, acertos, aulasConcluidas, aulasGabaritadas, streakAtual: seq.streakAtual, ultimoDia: seq.diasEfetivos[seq.diasEfetivos.length - 1] ?? '', score }
     }
 
@@ -240,7 +242,9 @@ export async function carregarRankingModulo(moduloId: string, tenantId: string):
       nivel: nivelDe.get(b.estudanteId) ?? 1, totalAulas, ultimoDiaAtivo: b.ultimoDia || null, status: statusRanking(b.ultimoDia, hoje),
     } })
     // Ordena por SEQUÊNCIA (streak) primeiro — pedido do produto — depois pontos, aulas e nome.
-    const ordena = (arr: typeof comNome) => [...arr].sort((a, b) => b.streakAtual - a.streakAtual || b.score - a.score || b.aulasConcluidas - a.aulasConcluidas || a.nome.localeCompare(b.nome, 'pt-BR'))
+    // ORDENAÇÃO: PONTUAÇÃO (score) primeiro, sequência só como desempate — quem tem mais pontos fica acima,
+    // mesmo com sequência menor (antes ordenava por streak primeiro → aluno com menos pontos subia no pódio).
+    const ordena = (arr: typeof comNome) => [...arr].sort((a, b) => b.score - a.score || b.streakAtual - a.streakAtual || b.aulasConcluidas - a.aulasConcluidas || a.nome.localeCompare(b.nome, 'pt-BR'))
     // Reais competem por posição (1..N); ocultos vêm depois marcados (ou somem se "ocultar totalmente").
     const reais = ordena(comNome.filter((b) => !ocultosSet.has(b.estudanteId))).map((b, i) => ({ ...b, posicao: i + 1, oculto: false }))
     const ocultos = ocultarTotal ? [] : ordena(comNome.filter((b) => ocultosSet.has(b.estudanteId))).map((b) => ({ ...b, posicao: 0, oculto: true }))
@@ -320,8 +324,9 @@ export async function calcularMinhaLinhaLeitura(moduloId: string, tenantId: stri
   } catch { /* ledger indisponível → usa dias das respostas */ }
   const { calcularSequencia } = await import('@/lib/leitura/sequencia')
   const seq = calcularSequencia(diasLedger ?? dias, overrides, hoje, ontem)
+  // marco PERMANENTE: usa streakMaior (pico atingido, do ledger imutável), não streakAtual (zera pós-desafio)
   const base = pontuarLegProc(pontuacao, { acertos, aulasConcluidas, aulasGabaritadas }, gamAtivo)
-  const score = base + (gamAtivo ? bonusSequenciaLeitura(seq.streakAtual, pontuacao) + bonusConclusaoLeitura(seq.streakAtual, pontuacao) : 0)
+  const score = base + (gamAtivo ? bonusSequenciaLeitura(seq.streakMaior, pontuacao) + bonusConclusaoLeitura(seq.streakMaior, pontuacao) : 0)
   const ultimoDia = seq.diasEfetivos[seq.diasEfetivos.length - 1] ?? ''
 
   const { data: e } = await svc.from('simulado_estudantes').select('nome, email, avatar, perfil_avatar_cor').eq('id', estudanteId).eq('tenant_id', tenantId).maybeSingle()

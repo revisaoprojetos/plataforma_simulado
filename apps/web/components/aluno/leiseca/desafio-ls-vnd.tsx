@@ -1457,7 +1457,7 @@ function AbaRanking({
     if (!euBase) return 0
     const exato = itens.find((r) => r.estudanteId === meuId)?.posicao
     if (exato) return exato
-    return itens.filter((r) => r.estudanteId !== meuId && (r.streakAtual > euBase.streakAtual || (r.streakAtual === euBase.streakAtual && r.score > euBase.score))).length + 1
+    return itens.filter((r) => r.estudanteId !== meuId && (r.score > euBase.score || (r.score === euBase.score && r.streakAtual > euBase.streakAtual))).length + 1
   }, [itens, euBase, meuId])
   const eu = euBase ? { ...euBase, posicao: euBase.posicao || minhaPosicao } : null
   const top3 = itens.slice(0, 3)

@@ -10,6 +10,9 @@ export interface ModalidadeAluno {
   pdfUrl?: string
   /** Item gerado da entrega V2 → download pela rota /api/aluno/caderno-teste-pdf. */
   cadernoTeste?: { cadernoId: string; itemId: string }
+  /** Diagnóstico do EDITOR BETA (OnlyOffice) → PDF por sessão em /api/aluno/diagnostico-docx-pdf?docId=..&sessao=..
+   *  O consumidor monta a URL com o sessaoId da realização (o pdfUrl acima pode vir pronto quando já há sessão). */
+  office?: { docId: string }
 }
 
 // Entrega V2: espelha os tipos de app/admin/cadernos-teste/actions.ts (definidos aqui p/ NÃO importar de
@@ -34,9 +37,12 @@ function slot(id: string, nome: string, flags: { semGab: boolean; comGab: boolea
   const base: ModalidadeAluno = { id, nome, semGab: flags.semGab, comGab: flags.comGab }
   // PDF importado → baixa direto.
   if (r.pdfUrl) return { ...base, pdfUrl: comDownload(r.pdfUrl, r.pdfNome || nome) }
-  // Diagnóstico do EDITOR BETA (OnlyOffice): PDF do .docx preenchido c/ os valores do aluno. Passa o docId
-  // (não o versaoId congelado na seleção) → a rota resolve a VERSÃO ATUAL, pegando o template JÁ EDITADO.
-  if (ehOffice(r) && sessaoId) return { ...base, pdfUrl: comDownload(`/api/aluno/diagnostico-docx-pdf?docId=${encodeURIComponent(r.docId!)}&sessao=${encodeURIComponent(sessaoId)}`, nome) }
+  // Diagnóstico do EDITOR BETA (OnlyOffice): vira o tipo `office` (com docId). Se já há sessão, também já
+  // monta o pdfUrl pronto (consumidor que abre direto); senão o consumidor monta por realização (dlHref).
+  if (ehOffice(r)) {
+    const b: ModalidadeAluno = { ...base, office: { docId: r.docId! } }
+    return sessaoId ? { ...b, pdfUrl: comDownload(`/api/aluno/diagnostico-docx-pdf?docId=${encodeURIComponent(r.docId!)}&sessao=${encodeURIComponent(sessaoId)}`, nome) } : b
+  }
   // Item gerado (caderno de teste) → download pela rota do caderno.
   if (r.cadernoId && r.itemId) return { ...base, cadernoTeste: { cadernoId: r.cadernoId, itemId: r.itemId } }
   return base // office sem sessaoId: sem link (não ocorre no fluxo do aluno, que sempre tem sessão)
@@ -57,8 +63,9 @@ export function modalidadesDoAlunoV2(entrega: EntregaSlots | null | undefined, s
   const out: ModalidadeAluno[] = []
   if (usavel(e.enunciado)) out.push(slot('enunciado', 'Caderno de Questões', { semGab: true, comGab: false }, e.enunciado))
   if (usavel(e.folha)) out.push(slot('folha', 'Folha de Respostas', { semGab: true, comGab: true }, e.folha))
-  // Diagnóstico OnlyOffice só entra se há sessão (precisa dela p/ preencher os valores do aluno no PDF).
-  if (usavel(e.diagnostico) && (!ehOffice(e.diagnostico) || sessaoId)) out.push(slot('diagnostico', 'Diagnóstico', { semGab: false, comGab: true }, e.diagnostico, sessaoId))
+  // Diagnóstico: entra sempre (o variant office vira `office:{docId}`; o consumidor monta a URL com o sessaoId
+  // da realização — ou já vem pronto no pdfUrl quando o sessaoId foi passado aqui).
+  if (usavel(e.diagnostico)) out.push(slot('diagnostico', 'Diagnóstico', { semGab: false, comGab: true }, e.diagnostico, sessaoId))
   if (usavel(e.gabarito)) out.push(slot('gabarito', 'Gabarito Comentado', { semGab: false, comGab: true }, e.gabarito))
   return out
 }

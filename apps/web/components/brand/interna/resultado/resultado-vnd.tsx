@@ -67,7 +67,7 @@ export function ResultadoVnd({ theme, data, sessaoId }: { theme: InternaTheme; d
       <style>{resultadoCss(P)}</style>
       <div style={{ minHeight: '100%', background: 'var(--bg)' }}>
         <Header d={d} mobile={mobile} />
-        <div className="rrz-pv" style={{ maxWidth: 1376, margin: '0 auto', padding: mobile ? '18px 18px 28px' : '24px clamp(16px,4vw,32px) 56px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <div className="rrz-pv" style={{ padding: mobile ? '18px 18px 28px' : '24px clamp(16px,4vw,32px) 56px', display: 'flex', flexDirection: 'column', gap: 18 }}>
           <Tabs rt={rt} setRt={setRt} mobile={mobile} />
           <div key={rt} className="rrz-pv">
             {rt === 'geral' && <Geral d={d} mobile={mobile} sel={sel} toggleSel={toggleSel} allSel={allSel} noneSel={noneSel} />}
@@ -101,7 +101,7 @@ function Header({ d, mobile }: { d: ResultadoInternoData; mobile: boolean }) {
   return (
     <section style={{ position: 'relative', overflow: 'hidden', background: 'linear-gradient(120deg,#041A10 0%,#0B4A2E 55%,#12643D 100%)', color: '#FFFFFF', padding: mobile ? '18px 18px 22px' : '22px 0 30px' }}>
       <span aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: 'radial-gradient(circle,rgba(185,245,212,.18) 1.2px,transparent 1.8px)', backgroundSize: '22px 22px' }} />
-      <div style={{ position: 'relative', maxWidth: 1376, margin: '0 auto', padding: mobile ? 0 : '0 clamp(16px,4vw,32px)' }}>
+      <div style={{ position: 'relative', padding: mobile ? 0 : '0 clamp(16px,4vw,32px)' }}>
         {!mobile ? <a href="#" style={{ fontSize: 12, fontWeight: 700, color: '#86CFA6' }}>‹ Simulados realizados</a> : null}
         <div style={{ display: 'flex', flexDirection: mobile ? 'column' : 'row', alignItems: mobile ? 'stretch' : 'center', gap: mobile ? 16 : 26, flexWrap: 'wrap', marginTop: mobile ? 0 : 10 }}>
           <div style={{ flex: 1, minWidth: 240 }}>

@@ -358,8 +358,8 @@ export async function carregarModuloCompleto(estId: string, tenantId: string, mo
   // ── Pontos EXTRAS (bônus) por DIA — mesma regra do ranking (bonusSequenciaLeitura / bonusConclusaoLeitura),
   // mas DISTRIBUÍDOS no dia em que foram ganhos, para somar certo e aparecer na tabela. Robusto p/ todos:
   //  • CONCLUSÃO = total de aulas feitas (em ordem): a cada `conclusao_cada` (auto) ou marcos_conclusao (custom).
-  //  • SEQUÊNCIA = run ATUAL de dias CONSECUTIVOS (= streak do ranking; usa o dia IMUTÁVEL do ledger, sem bug):
-  //    marcos "ao atingir N" (custom) ou a cada `semana_dias` (auto). Só vale se a sequência está VIVA (hoje/ontem).
+  //  • SEQUÊNCIA = MAIOR run de dias CONSECUTIVOS já atingido (= streakMaior do ranking; dia IMUTÁVEL do ledger):
+  //    marcos "ao atingir N" (custom) ou a cada `semana_dias` (auto). PERMANENTE — não exige sequência viva.
   const cfg = m.pontuacao
   const extraDoc = new Map<string, number>()
   const addExtra = (id: string, v: number) => { if (v > 0) extraDoc.set(id, (extraDoc.get(id) ?? 0) + v) }
@@ -374,15 +374,20 @@ export async function carregarModuloCompleto(estId: string, tenantId: string, mo
     } else {
       for (const mc of (cfg.marcos_conclusao ?? [])) { const a = concl[(mc.dias || 0) - 1]; if (a) addExtra(a.id, mc.bonus || 0) }
     }
-    // SEQUÊNCIA (run atual, só se viva em hoje/ontem — igual ao streakAtual do ranking)
-    const hojeBRT = diaDe(new Date().toISOString())
-    const ontemBRT = new Date(Date.parse(hojeBRT + 'T00:00:00Z') - 86_400_000).toISOString().slice(0, 10)
+    // SEQUÊNCIA = bônus de MARCO (pontos extras do desafio) PERMANENTE: baseado no MAIOR run de dias
+    // CONSECUTIVOS já atingido (= streakMaior do ranking), NÃO no run atual/vivo. Uma vez conquistado o
+    // marco (14/21/30 dias…), ele fica — não some quando o desafio termina ou a sequência quebra.
+    // Distribuído no dia em que foi ganho (o N-ésimo dia do maior run) para somar certo e aparecer na tabela.
     const diasRun = [...new Set(concl.map((a) => a.dia))].sort()
-    let runStart = diasRun.length ? diasRun.length - 1 : 0
-    for (let i = diasRun.length - 1; i > 0; i--) { const consec = Date.parse(diasRun[i] + 'T00:00:00Z') - Date.parse(diasRun[i - 1] + 'T00:00:00Z') === 86_400_000; if (consec) runStart = i - 1; else break }
-    const run = diasRun.slice(runStart) // sequência 1..run.length
-    const viva = run.length > 0 && (run[run.length - 1] === hojeBRT || run[run.length - 1] === ontemBRT)
-    if (viva) {
+    let bestStart = 0, bestLen = diasRun.length ? 1 : 0, curStart = 0
+    for (let i = 1; i < diasRun.length; i++) {
+      const consec = Date.parse(diasRun[i] + 'T00:00:00Z') - Date.parse(diasRun[i - 1] + 'T00:00:00Z') === 86_400_000
+      if (!consec) curStart = i
+      const curLen = i - curStart + 1
+      if (curLen > bestLen) { bestLen = curLen; bestStart = curStart }
+    }
+    const run = diasRun.slice(bestStart, bestStart + bestLen) // o MAIOR run (sequência 1..run.length)
+    {
       const diaParaId = new Map(concl.map((a) => [a.dia, a.id]))
       if ((cfg.sequencia_modo ?? 'auto') === 'custom') {
         for (const ms of (cfg.marcos_sequencia ?? [])) { if ((ms.dias || 0) >= 1 && ms.dias <= run.length) { const id = diaParaId.get(run[ms.dias - 1]); if (id) addExtra(id, ms.bonus || 0) } }

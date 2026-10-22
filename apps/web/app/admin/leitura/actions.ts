@@ -1040,7 +1040,8 @@ export async function detalheRankingAluno(moduloId: string, estudanteId: string)
     detalhe: {
       nome: (est as any)?.nome ?? 'Aluno', email: (est as any)?.email ?? null,
       streakAtual: seq.streakAtual, streakMaior: seq.streakMaior, ultimoDiaAtivo: (gamRow as any)?.ultimo_dia_ativo ?? null,
-      totalAulas: docList.length, aulasConcluidas: aulas.length, pontosTotal: pontosTotal + (gamAtivo ? bonusSequenciaLeitura(seq.streakAtual, pontuacao) : 0), aulas,
+      // marco PERMANENTE: streakMaior (pico atingido) — o bônus do desafio não some quando a sequência acaba
+      totalAulas: docList.length, aulasConcluidas: aulas.length, pontosTotal: pontosTotal + (gamAtivo ? bonusSequenciaLeitura(seq.streakMaior, pontuacao) : 0), aulas,
       tz, hoje, diasAuto: [...diasConcluidos].sort(), overrides, diaAulas,
     },
   }

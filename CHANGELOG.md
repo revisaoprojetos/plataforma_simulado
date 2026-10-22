@@ -12,6 +12,28 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.25.0 — 2026-10-22
+
+**fix(diagnóstico OnlyOffice): "desempenho por pilar" com faixa duplicada + download do aluno + ajustes de ranking/trilha**
+
+- **Desempenho por pilar mostrava 2 faixas (ex.: Jurisprudência 0-49 E 81-100):** o template tinha um laço
+  órfão `{#jur_f3}` **sem** `{/jur_f3}` (bloco "81-100" não fechado). O auto-corretor de marcadores
+  (`removerMarcadoresOrfaos` em [`previa-docx.ts`](apps/web/lib/conteudo/previa-docx.ts)) **removia a abertura
+  órfã** → o texto da faixa alta virava incondicional e aparecia sempre. Agora, num `{#x}` órfão, ele **insere
+  o fechamento no 1º limite estrutural** (`</w:tc>`/`</w:tr>`/`</w:body>`) → o conteúdo volta a ser condicional.
+  Vale para **qualquer** template e **sobrevive a re-edições** (fix de código, não de dado). Cache do PDF do
+  aluno invalidado (`_v3` → `_v4`).
+- **Download do diagnóstico pelo aluno (editor OnlyOffice):** nova modalidade `office` na entrega V2
+  ([`entrega-aluno.ts`](apps/web/lib/caderno-teste/entrega-aluno.ts)) + botão em "Simulados realizados"
+  ([página do simulado](apps/web/app/aluno/(portal)/simulados/[id]/page.tsx)); o PDF é gerado por sessão com os
+  dados reais do aluno.
+- **Resultado (VND) sem faixas laterais:** removido o `max-w`/`margin:auto` → largura cheia.
+- **Bônus de MARCO (leitura/desafio) agora é PERMANENTE:** ranking, "minha linha", detalhe do admin e trilha
+  passam a usar o **maior** streak atingido (`streakMaior`, do ledger imutável) no lugar do `streakAtual` — os
+  pontos extras conquistados (14/21/30 dias…) **não somem** quando a sequência quebra ou o desafio termina.
+- **Ranking de leitura ordenado por PONTOS:** pódio e lista ordenam por pontuação primeiro, usando a sequência
+  só como desempate (antes ordenava por streak primeiro → aluno com menos pontos subia no pódio).
+
 ## 3.24.3 — 2026-10-22
 
 **fix(diagnóstico OnlyOffice): invalida o cache do PDF (marca `_v2`)**

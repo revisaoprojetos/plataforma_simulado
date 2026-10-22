@@ -109,7 +109,7 @@ export function RankingAdmin({
   const [seqMin, setSeqMin] = useState<number | ''>('')
   const [seqMax, setSeqMax] = useState<number | ''>('')
   const [acesso, setAcesso] = useState<AcessoFiltro>('todos')
-  const [ordem, setOrdem] = useState<Ordem>('sequencia')
+  const [ordem, setOrdem] = useState<Ordem>('pontos') // ranking por PONTUAÇÃO (sequência é só desempate)
   const [dir, setDir] = useState<'asc' | 'desc'>('desc')
   const [filtro, setFiltro] = useState<'todos' | RankingStatus>('todos')
   const [pagina, setPagina] = useState(1)
@@ -224,9 +224,9 @@ export function RankingAdmin({
   const pag = Math.min(pagina, totalPag)
   const visiveis = lista.slice((pag - 1) * POR_PAG, pag * POR_PAG)
 
-  // Pódio (top 3 por sequência→pontos entre os reais), independente de filtro/busca.
+  // Pódio (top 3 por PONTOS→sequência entre os reais), independente de filtro/busca.
   const podio = useMemo(() => {
-    const top = [...reais].sort((a, b) => b.streakAtual - a.streakAtual || b.score - a.score).slice(0, 3)
+    const top = [...reais].sort((a, b) => b.score - a.score || b.streakAtual - a.streakAtual).slice(0, 3)
     return [top[1], top[0], top[2]] as (RankingLeituraItem | undefined)[] // 2º · 1º · 3º
   }, [reais])
 

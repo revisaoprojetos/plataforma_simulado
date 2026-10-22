@@ -11,7 +11,18 @@ function removerMarcadoresOrfaos(xml: string): { xml: string; removidos: number 
   const nomes = new Set<string>()
   for (const m of xml.matchAll(/\{#([a-zA-Z0-9_]+)\}/g)) nomes.add(m[1])
   for (const m of xml.matchAll(/\{\/([a-zA-Z0-9_]+)\}/g)) nomes.add(m[1])
-  const remover: { start: number; end: number }[] = []
+  // ops: trechos a REMOVER (text:'') e trechos a INSERIR (start===end). Aplicados do fim p/ o início.
+  const ops: { start: number; end: number; text: string }[] = []
+  // Fecha um `{#nome}` órfão no 1º limite estrutural após ele (fim da célula/linha/corpo) → o conteúdo volta
+  // a ser CONDICIONAL (em vez de aparecer sempre). Parágrafo só-marcador é consumido pelo paragraphLoop.
+  const fecharNoLimite = (nome: string, apos: number) => {
+    const cands = ['</w:tc>', '</w:tr>', '</w:body>'].map((t) => xml.indexOf(t, apos)).filter((i) => i >= 0)
+    if (!cands.length) { ops.push({ start: apos, end: apos, text: '' }); return false } // sem limite → não dá p/ fechar
+    const pos = Math.min(...cands)
+    ops.push({ start: pos, end: pos, text: `<w:p><w:r><w:t xml:space="preserve">{/${nome}}</w:t></w:r></w:p>` })
+    return true
+  }
+  let orfaos = 0
   for (const nome of nomes) {
     const re = new RegExp(`\\{(#|/)${nome}\\}`, 'g')
     const ocorr: { start: number; end: number; abre: boolean }[] = []
@@ -19,16 +30,19 @@ function removerMarcadoresOrfaos(xml: string): { xml: string; removidos: number 
     while ((m = re.exec(xml))) ocorr.push({ start: m.index, end: m.index + m[0].length, abre: m[1] === '#' })
     let aberto: { start: number; end: number } | null = null
     for (const o of ocorr) {
-      if (o.abre) { if (aberto) remover.push(aberto); aberto = { start: o.start, end: o.end } }
-      else { if (!aberto) remover.push({ start: o.start, end: o.end }); else aberto = null }
+      // Novo `{#}` com um anterior ainda aberto = DUPLICATA → remove o anterior (abertura duplicada).
+      if (o.abre) { if (aberto) { ops.push({ start: aberto.start, end: aberto.end, text: '' }); orfaos++ }; aberto = { start: o.start, end: o.end } }
+      // `{/}` sem abertura = fechamento órfão → remove.
+      else { if (!aberto) { ops.push({ start: o.start, end: o.end, text: '' }); orfaos++ } else aberto = null }
     }
-    if (aberto) remover.push(aberto)
+    // Abertura órfã final (sem fechamento) → FECHA no limite da célula (não remove) p/ preservar a condição.
+    if (aberto) { orfaos++; fecharNoLimite(nome, aberto.end) }
   }
-  if (!remover.length) return { xml, removidos: 0 }
-  remover.sort((a, b) => b.start - a.start)
+  if (!orfaos) return { xml, removidos: 0 }
+  ops.sort((a, b) => b.start - a.start)
   let out = xml
-  for (const r of remover) out = out.slice(0, r.start) + out.slice(r.end)
-  return { xml: out, removidos: remover.length }
+  for (const op of ops) out = out.slice(0, op.start) + op.text + out.slice(op.end)
+  return { xml: out, removidos: orfaos }
 }
 
 function lacosDesbalanceados(xml: string): { nome: string; abre: number; fecha: number }[] {

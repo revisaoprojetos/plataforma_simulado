@@ -96,6 +96,11 @@ export default async function ResultadoAlunoPage({ params }: { params: Promise<{
     // Link do caderno de UMA tentativa específica (cada realização gera os PDFs da SUA sessão).
     const dlHref = (m: typeof modalidades[number], gab: boolean, ssid: string): string | null => {
       if (m.pdfUrl) return m.pdfUrl
+      // Diagnóstico do editor OnlyOffice: PDF preenchido com os valores DESTA sessão (por realização).
+      if (m.office) {
+        const nomeD = [sim.titulo, m.nome].map(limpar).filter(Boolean).join('_') || 'diagnostico'
+        return `/api/aluno/diagnostico-docx-pdf?docId=${encodeURIComponent(m.office.docId)}&sessao=${encodeURIComponent(ssid)}&download=${encodeURIComponent(nomeD)}`
+      }
       if (!m.cadernoTeste) return null
       const nome = [sim.titulo, m.nome].map(limpar).filter(Boolean).join('_') || 'caderno'
       const qs = new URLSearchParams({ caderno: m.cadernoTeste.cadernoId, grupo: m.cadernoTeste.itemId, sessao: ssid, nome })
