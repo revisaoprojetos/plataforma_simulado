@@ -27,12 +27,13 @@ const POR_PAGINA = 10
 // Aba "Acessos" do MÓDULO. GRUPOS ficam VINCULADOS (conexão viva): novos alunos no grupo — manual ou
 // via sync (Curseduca/Guru) — passam a ter acesso automaticamente. A tabela de CONTROLE mostra TODOS os
 // alunos com acesso (membros dos grupos + adicionados individualmente) e de qual grupo cada um veio.
-export function ModuloAcesso({ pastaId, area }: { pastaId: string; area?: 'leitura' | 'jurisprudencia' | 'maratona' }) {
+export function ModuloAcesso({ pastaId, area }: { pastaId: string; area?: 'leitura' | 'jurisprudencia' | 'maratona' | 'biblioteca' }) {
   // Área: prop explícita OU detecta pela rota (admin de jurisprudência vs leitura/Lei Seca) — assim o
   // link direto abre o jogo do Juris (/aluno/jurisprudencia?desafio=) em vez da trilha de leitura.
   const pathname = usePathname()
   const ehJuris = area === 'jurisprudencia' || (!area && !!pathname?.includes('/jurisprudencia'))
   const ehMaratona = area === 'maratona'
+  const ehBiblioteca = area === 'biblioteca' // Biblioteca não tem ranking/modo-teste → esconde essas seções
   const [carregando, setCarregando] = useState(true)
   const [salvando, setSalvando] = useState(false)
   const [todosGrupos, setTodosGrupos] = useState<Grupo[]>([])
@@ -49,7 +50,7 @@ export function ModuloAcesso({ pastaId, area }: { pastaId: string; area?: 'leitu
   useEffect(() => { setOrigem(process.env.NEXT_PUBLIC_APP_URL || window.location.origin) }, [])
   // Maratona abre a área da maratona (/aluno/maratona — resolve a pasta única do tenant, sem param);
   // Juris abre o JOGO do desafio (/aluno/jurisprudencia?desafio=); leitura/Lei Seca abre a trilha.
-  const linkTrilha = origem ? (ehMaratona ? `${origem}/aluno/maratona` : ehJuris ? `${origem}/aluno/jurisprudencia?desafio=${pastaId}` : `${origem}/aluno/leitura?modulo=${pastaId}`) : ''
+  const linkTrilha = origem ? (ehBiblioteca ? `${origem}/aluno/biblioteca` : ehMaratona ? `${origem}/aluno/maratona` : ehJuris ? `${origem}/aluno/jurisprudencia?desafio=${pastaId}` : `${origem}/aluno/leitura?modulo=${pastaId}`) : ''
 
   // Ocultos do ranking (contas de teste).
   const [ocEst, setOcEst] = useState<EstudanteAcessoLinha[]>([])
@@ -219,8 +220,8 @@ export function ModuloAcesso({ pastaId, area }: { pastaId: string; area?: 'leitu
                 <option value="individuais">Adicionados à parte</option>
               </select>
             </div>
-            {/* Ocultar do ranking (pop-up, estilo filtro) */}
-            <OcultarRankingDialog todosGrupos={todosGrupos} ocEst={ocEst} setOcEst={setOcEst} ocGrp={ocGrp} setOcGrp={setOcGrp} ocTotal={ocTotal} setOcTotal={setOcTotal} salvar={salvarOcultos} />
+            {/* Ocultar do ranking (pop-up, estilo filtro) — Biblioteca não tem ranking */}
+            {!ehBiblioteca && <OcultarRankingDialog todosGrupos={todosGrupos} ocEst={ocEst} setOcEst={setOcEst} ocGrp={ocGrp} setOcGrp={setOcGrp} ocTotal={ocTotal} setOcTotal={setOcTotal} salvar={salvarOcultos} />}
             <div className="relative ml-auto min-w-44 flex-1 sm:max-w-xs">
               <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar nome, e-mail ou CPF…" className="w-full rounded-lg border bg-[var(--input-bg,transparent)] py-2 pl-9 pr-3 text-sm outline-none focus:ring-1 focus:ring-ring" />
@@ -303,8 +304,9 @@ export function ModuloAcesso({ pastaId, area }: { pastaId: string; area?: 'leitu
         </div>
       </div>
 
-      {/* ACESSOS EXCLUSIVOS (MODO TESTE) — card próprio, abaixo do acesso. Independente do "liberar p/ todos". */}
-      <TestadoresExclusivosCard testEst={testEst} setTestEst={setTestEst} salvar={salvarTestadores} />
+      {/* ACESSOS EXCLUSIVOS (MODO TESTE) — card próprio, abaixo do acesso. Independente do "liberar p/ todos".
+          Biblioteca não tem XP/ranking/modo-teste → não mostra. */}
+      {!ehBiblioteca && <TestadoresExclusivosCard testEst={testEst} setTestEst={setTestEst} salvar={salvarTestadores} />}
 
     </div>
   )

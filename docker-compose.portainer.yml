@@ -63,6 +63,16 @@ services:
       # fetchAll do PostgREST nos relatórios quando a API estiver fora. Sem ela, cai no PostgREST.
       - DATABASE_URL=${DATABASE_URL}
       - REPORT_SQL=${REPORT_SQL:-on}
+      # OnlyOffice (Biblioteca de Conteúdos: editor docx + prévia fiel + CAPA do card via ConvertService).
+      #  - NEXT_PUBLIC_ONLYOFFICE_URL: URL PÚBLICA do Document Server (o NAVEGADOR carrega o api.js daqui) —
+      #    lida no servidor em runtime, então basta setar aqui (sem rebuild da imagem).
+      #  - CONTEUDO_WOPI_HOST: URL por onde o Document Server alcança ESTE app (callback de save). Use a
+      #    PÚBLICA (https) p/ evitar o bloqueio de IP privado do OnlyOffice (SSRF guard). O callback resolve
+      #    o tenant pela versão, então qualquer host que roteie pro app serve.
+      #  - ONLYOFFICE_INTERNAL_URL: URL INTERNA (web→DS) usada só p/ gerar a capa (ConvertService), na rede do swarm.
+      - NEXT_PUBLIC_ONLYOFFICE_URL=${NEXT_PUBLIC_ONLYOFFICE_URL:-https://onlyoffice.${APP_BASE_DOMAIN:-revisaopge.com.br}}
+      - CONTEUDO_WOPI_HOST=${CONTEUDO_WOPI_HOST:-https://simulado.${APP_BASE_DOMAIN:-revisaopge.com.br}}
+      - ONLYOFFICE_INTERNAL_URL=${ONLYOFFICE_INTERNAL_URL:-http://onlyoffice}
     networks:
       - default
       - traefik
@@ -204,6 +214,50 @@ services:
         constraints:
           - node.role == worker
 
+  # =====================================================================
+  # OnlyOffice Document Server — editor .docx + prévia fiel + CAPA do card da Biblioteca de Conteúdos.
+  # ANTES DE SUBIR / APÓS SUBIR:
+  #  1) DNS: `onlyoffice.${APP_BASE_DOMAIN}` → IP da VPS (o cert WILDCARD `*.${APP_BASE_DOMAIN}` já cobre).
+  #  2) Pesado: ~2 GB RAM + volumes persistentes. Confira a folga da VPS.
+  #  3) ⚠️ SEGURANÇA: está com JWT_ENABLED=false porque o editor da Biblioteca ainda NÃO assina a config.
+  #     Um Document Server público SEM JWT é um proxy de conversão aberto. Ligue o JWT assim que o editor
+  #     assinar a config (peça a implementação). Enquanto isso, considere restringir por IP no Traefik.
+  #  4) SSRF guard do OnlyOffice: bloqueia IP privado. Por isso CONTEUDO_WOPI_HOST é a URL PÚBLICA do app
+  #     (o callback sai pela internet e volta via Traefik) — assim NÃO precisa editar o local.json.
+  #  5) document.url das edições/capa = URL ASSINADA do Supabase (pública) → o DS baixa sem problema.
+  onlyoffice:
+    image: onlyoffice/documentserver:${ONLYOFFICE_VERSION:-latest}
+    environment:
+      - JWT_ENABLED=false
+    volumes:
+      - onlyoffice_data:/var/www/onlyoffice/Data
+      - onlyoffice_log:/var/log/onlyoffice
+      - onlyoffice_lib:/var/lib/onlyoffice
+      - onlyoffice_db:/var/lib/postgresql
+    networks:
+      - default
+      - traefik
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+      placement:
+        constraints:
+          - node.role == worker
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=${TRAEFIK_NETWORK:-network_swarm_public}"
+        - "traefik.http.routers.onlyoffice.rule=Host(`onlyoffice.${APP_BASE_DOMAIN:-revisaopge.com.br}`)"
+        # Prioridade > catch-all (1) da app, p/ este Host() explícito vencer o roteamento.
+        - "traefik.http.routers.onlyoffice.priority=20"
+        - "traefik.http.routers.onlyoffice.entrypoints=websecure"
+        - "traefik.http.routers.onlyoffice.tls=true"
+        - "traefik.http.routers.onlyoffice.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencryptresolver}"
+        # Reaproveita o cert WILDCARD `*.${APP_BASE_DOMAIN}` (DNS-01) já emitido pela app.
+        - "traefik.http.routers.onlyoffice.tls.domains[0].main=${APP_BASE_DOMAIN:-revisaopge.com.br}"
+        - "traefik.http.routers.onlyoffice.tls.domains[0].sans=*.${APP_BASE_DOMAIN:-revisaopge.com.br}"
+        - "traefik.http.services.onlyoffice.loadbalancer.server.port=80"
+
 networks:
   default:
   traefik:
@@ -212,3 +266,7 @@ networks:
 
 volumes:
   redis_data:
+  onlyoffice_data:
+  onlyoffice_log:
+  onlyoffice_lib:
+  onlyoffice_db:

@@ -12,6 +12,30 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.23.0 — 2026-10-22
+
+**feat(biblioteca): área do aluno + leitor fiel de PDF com grifos, controle de acesso e navegação Drive**
+
+Biblioteca de Conteúdos liberada para o aluno, reutilizando a área de leitura do Jurisprudência.
+
+- **Leitor do aluno = o mesmo `leitor-jus.html`** (top bar, barra de grifos, caderno, sumário, foco), com o
+  **conteúdo = PDF fiel** (OnlyOffice) renderizado dentro (`components/aluno/leitor-biblioteca.tsx`).
+  - Grifos **geométricos** sobre o PDF (marca-texto/sublinhado/ondulado/tachado/contorno + cores + borracha +
+    desfazer + nota), salvos **no perfil do aluno** (`simulado_conteudo_grifos_pdf`, API `/api/conteudo/grifo-pdf`).
+  - Seleção de texto **estável** portando o mecanismo do pdfjs (`endOfContent` + `.selecting`); camada de texto
+    com as variáveis corretas do pdfjs 6.x (`--total-scale-factor`, `--scale-round-x/y`).
+- **Controle de acesso** no gate do aluno (`lib/conteudo/leitor.ts`): por grupo/para todos + herança de pasta
+  (`acesso_geral`/`herda_acesso`); a biblioteca do aluno mostra **só a área de conteúdo** (exclui modelos de caderno).
+- **Navegação Drive do aluno** (`components/aluno/biblioteca-drive.tsx`): pastas/subpastas, capas fiéis, menu de
+  3 pontos (Abrir/Baixar) reutilizando o menu animado do admin (`components/conteudo/menu-drive.tsx`); largura cheia.
+- **Admin**: diálogos de acesso (grupos+alunos+herança), botão "Novo" e cards estilo Drive; **auto-publicar** o
+  documento na importação (subir = já disponível); download do aluno gated (`/api/conteudo/baixar`).
+- **Migrações**: `20261021000000` (acesso de documento), `20261022000000` (papéis+link), `20261022100000`
+  (`html_rico`), `20261022110000` (`simulado_conteudo_grifos_pdf`). ⚠️ Aplicar em produção + `NOTIFY pgrst`.
+- ℹ️ Limitação conhecida: o OnlyOffice converte cores de **tema** do docx errado (pincel amarelo de título vira
+  roxo) em qualquer saída (PDF/PNG) — não é do renderizador; corrige-se no docx (cor fixa).
+- Inclui ajustes em andamento de Curseduca (reconciliação) e Lei Seca (VND) feitos em paralelo.
+
 ## 3.22.2 — 2026-10-20
 
 **fix(gamificação): rede de segurança do marcador de dia (streak da Leitura) — fim dos buracos sob carga**

@@ -25,6 +25,7 @@
     "data": "workspace:*",
     "date-fns": "^4.1.0",
     "docx": "^9.7.1",
+    "docx-preview": "^0.4.1",
     "docxtemplater": "^3.71.1",
     "exceljs": "^4.4.0",
     "html-to-docx": "^1.8.0",

@@ -291,6 +291,33 @@ mark.an.flash{outline:2px solid var(--accent-2);outline-offset:2px;border-radius
 mark.an[data-tail]::after{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);vertical-align:super;margin-left:3px}
 .hide-mine mark.an{background:none!important;text-decoration:none!important;box-shadow:none!important;font-weight:inherit!important;color:inherit!important;cursor:text}
 .hide-mine mark.an[data-tail]::after,.hide-mine .margin{display:none}
+/* CONTEÚDO PDF (Biblioteca): cada página = canvas + camada de texto (seleção) + overlays de grifo geométricos */
+.pdf-sec{padding:0;margin:0 0 22px;display:flex;justify-content:center;background:none;border:none}
+.pdf-sec:last-child{margin-bottom:0}
+.pdfpage{position:relative;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,.16);border-radius:2px}
+.pdfpage canvas{position:absolute;inset:0;z-index:1;border-radius:2px}
+/* camada de texto do PDF.js 6.x — CSS OFICIAL (font-size dos spans vem daqui; precisa --total-scale-factor) */
+.pdftl{position:absolute;text-align:initial;inset:0;overflow:clip;opacity:1;line-height:1;letter-spacing:normal;word-spacing:normal;text-size-adjust:none;forced-color-adjust:none;transform-origin:0 0;caret-color:CanvasText;z-index:2;--min-font-size:1;--text-scale-factor:calc(var(--total-scale-factor) * var(--min-font-size));--min-font-size-inv:calc(1 / var(--min-font-size))}
+.pdftl :is(span,br){color:transparent;position:absolute;white-space:pre;cursor:text;transform-origin:0% 0%;user-select:text}
+.pdftl > :not(.markedContent),.pdftl .markedContent span:not(.markedContent){z-index:1;--font-height:0;font-size:calc(var(--text-scale-factor) * var(--font-height));--scale-x:1;--rotate:0deg;transform:rotate(var(--rotate)) scaleX(var(--scale-x)) scale(var(--min-font-size-inv))}
+.pdftl .markedContent{display:contents}
+.pdftl ::selection{background:rgba(120,90,255,.35)}
+/* mecanismo oficial do pdfjs p/ seleção estável: o endOfContent "ancora" o fim da seleção */
+.pdftl{user-select:text}
+.pdftl .endOfContent{display:block;position:absolute;inset:100% 0 0;z-index:0;cursor:default;user-select:none}
+.pdftl.selecting .endOfContent{top:0}
+/* overlays de grifo: por cima do canvas (z3), SEM bloquear a seleção (pointer-events:none) */
+.pdfov{position:absolute;z-index:3;pointer-events:none;border-radius:2px}
+.pdfov[data-t="hl"],.pdfov[data-t="bd"],.pdfov[data-t="tc"]{background:color-mix(in srgb, var(--k) 42%, transparent);mix-blend-mode:multiply}
+.pdfov[data-t="ul"]{background:linear-gradient(to top,var(--k) 2.5px,transparent 2.5px)}
+.pdfov[data-t="wv"]{background:linear-gradient(to top,var(--k) 2.5px,transparent 2.5px);border-radius:0}
+.pdfov[data-t="st"]{background:linear-gradient(transparent 43%,var(--k) 43%,var(--k) 57%,transparent 57%)}
+.pdfov[data-t="bx"]{box-shadow:inset 0 0 0 2px var(--k)}
+.hide-mine .pdfov{display:none}
+/* modo PDF: sem a "folha"/moldura do leitor em volta (o próprio PDF já é a folha) */
+body.pdf-reading .doc{background:none!important;border:none!important;box-shadow:none!important;padding:14px 0 28px!important;max-width:none!important}
+body.pdf-reading .doc::before{display:none!important}
+body.pdf-reading .sec{padding-top:0!important;margin-top:0!important}
 mark.sr{background:none;color:inherit;box-shadow:inset 0 -.42em var(--hl-y)}
 mark.sr.cur{box-shadow:inset 0 -1.25em var(--hl-y),0 0 0 2px var(--c-y);border-radius:2px}
 .flash-block{animation:fb 1.4s ease}
@@ -1376,6 +1403,7 @@ let DAY=parseDay(RAW);if(!DAY.temas.length&&!(RAW_INJECTED&&RAW_INJECTED.trim())
 const dm=/DIA\s*(\d+)\s*[-–]\s*(.+?)\s*(?:\((\d{4})\))?$/i.exec(DAY.title)||[];
 const dayNum=dm[1]||'', subject=dm[2]?titleCase(dm[2]):DAY.title, year=dm[3]||'';
 dayKey=slug(DAY.title||'dia');
+if(CFG.modo==='biblioteca')dayKey='bib-'+slug(CFG.docKey||'doc'); // chave estável por documento (folhas/cartões locais)
 const META=DAY_META[dayKey]||{tags:[],checks:[]};
 /* Tags/selos REAIS vêm da biblioteca (editor): CFG.topicos[slug(titulo)].tags = slugs do catálogo de
    selos; renderizados como os PNGs oficiais (/leitura/selos). CFG.selos = {slug: rótulo}. */
@@ -1384,7 +1412,97 @@ const SELO_LABELS=(CFG&&CFG.selos)||{};
 const seloImg=(sl)=>`<img class="sl-img selo-tag" src="/leitura/selos/${sl}-sm.png" alt="${esc(SELO_LABELS[sl]||sl)}" title="${esc(SELO_LABELS[sl]||sl)}" draggable="false" loading="lazy" style="height:1.55em;width:auto;vertical-align:-.36em">`;
 const tagsDoTema=(titulo)=>{if(!TOPICOS)return null;let k=slug(titulo).slice(0,60)||'tema';const c=TOPICOS[k];return c&&Array.isArray(c.tags)?c.tags:[]};
 
+/* MODO BIBLIOTECA: renderiza o HTML RICO do documento (já com data-uid por bloco) diretamente, como UMA
+   seção. Mesmo motor de marcação/grifo do Jurisprudência — só a fonte do conteúdo e a persistência mudam.
+   Não usa parseDay/temas (o conteúdo não é estruturado por tamanho de fonte como o export do Juris). */
+function renderBiblioteca(){
+  const titulo=(CFG.titulo||'Documento');
+  $('#crSubj').textContent=titulo;$('#crDay').textContent='Leitura';
+  $('#dhSubj').textContent=titulo;$('#dhDay').textContent='';
+  $('#dhTitle').textContent=titulo;
+  $('#dhLede').textContent='Leia o documento e grife os trechos importantes — seus grifos ficam salvos no seu perfil.';
+  $('#dhCount').textContent='';$('#dhCourts').textContent='Biblioteca';
+  document.title='Leitor · '+titulo;
+  // CONTEÚDO = PDF FIEL (o mesmo do editor). Cada página vira uma .sec com canvas + camada de texto;
+  // o motor de grifos opera sobre a camada de texto (marca sobre o canvas). Casca 100% do Juris.
+  if(CFG.pdf && Array.isArray(CFG.pdf.pages) && CFG.pdf.pages.length){
+    $('#article').classList.add('pdf-mode');document.body.classList.add('pdf-reading');
+    $('#article').innerHTML=CFG.pdf.pages.map((pg,i)=>`<section class="sec pdf-sec" id="p${i+1}" data-title="Página ${i+1}" data-cite="${esc(titulo)}"><div class="pdfpage" style="width:${pg.w}px;height:${pg.h}px"><canvas></canvas><div class="pdftl textLayer"></div></div></section>`).join('');
+    setTimeout(()=>{renderPdfPages().catch(err=>console.error('[leitor-jus][pdf]',err))},0);
+    return;
+  }
+  const safe=(CFG.html||'').trim()||'<p>(documento sem conteúdo)</p>';
+  $('#article').innerHTML=`<section class="sec" id="t1" data-title="${esc(titulo)}" data-cite="${esc(titulo)}"><header class="sec-head"><h2><span>${esc(titulo)}</span></h2></header><div class="flow bib-flow">${safe}</div></section>`;
+}
+
+/* Renderiza o PDF página a página dentro das .sec já criadas (canvas + camada de texto). Cada span da
+   camada de texto ganha data-pid estável (p<pág>-s<i>) → o motor de grifos marca o texto (transparente)
+   sobre o canvas = marca-texto fiel. Ao terminar, repinta os grifos e recalcula sumário/tempo. */
+async function renderPdfPages(){
+  const pdfjs=await import('/pdf/pdf.min.mjs');
+  pdfjs.GlobalWorkerOptions.workerSrc='/pdf/pdf.worker.min.mjs';
+  const pdf=await pdfjs.getDocument({url:CFG.pdf.url}).promise;
+  const scale=CFG.pdf.scale||1.4;
+  for(let n=1;n<=pdf.numPages;n++){
+    const sec=$('#p'+n); if(!sec)continue;
+    const wrap=$('.pdfpage',sec), canvas=$('canvas',wrap), tl=$('.pdftl',wrap);
+    try{
+      const page=await pdf.getPage(n);
+      const viewport=page.getViewport({scale});
+      const dpr=Math.min((window.devicePixelRatio||1)*1.6,3); // oversample p/ nitidez
+      canvas.width=Math.floor(viewport.width*dpr);canvas.height=Math.floor(viewport.height*dpr);
+      canvas.style.width=viewport.width+'px';canvas.style.height=viewport.height+'px';
+      const ctx=canvas.getContext('2d');ctx.scale(dpr,dpr);
+      await page.render({canvasContext:ctx,viewport}).promise;
+      // variáveis que o pdfjs 6.x usa p/ dimensionar a camada de texto + escalar os spans (sem elas, altura/escala quebram)
+      tl.style.setProperty('--scale-factor',String(scale));tl.style.setProperty('--total-scale-factor',String(scale));
+      tl.style.setProperty('--user-unit','1');tl.style.setProperty('--scale-round-x','1px');tl.style.setProperty('--scale-round-y','1px');
+      try{const t=new pdfjs.TextLayer({textContentSource:page.streamTextContent(),container:tl,viewport});await t.render()}catch(_){}
+      // seleção estável (mecanismo pdfjs): endOfContent + classe .selecting no mousedown
+      const end=document.createElement('div');end.className='endOfContent';tl.appendChild(end);tl.__eoc=end;
+      tl.addEventListener('mousedown',()=>tl.classList.add('selecting'));
+      initPdfSelection();
+      S.an.filter(a=>a.sec===('p'+n)).forEach(paint); // repinta os grifos (geométricos) desta página
+    }catch(err){console.error('[leitor-jus][pdf] página '+n,err)}
+  }
+  if(typeof __afterPdf==='function')__afterPdf();
+}
+// Pós-render do PDF: recalcula palavras/tempo por página, re-render do sumário e re-layout.
+function __afterPdf(){
+  try{secs.forEach(s=>{secWords[s.id]=words(s)});totalWords=Object.values(secWords).reduce((a,b)=>a+b,0)||1}catch(_){}
+  try{renderToc()}catch(_){}
+  try{if(typeof layoutDoc==='function')layoutDoc()}catch(_){}
+  try{if(typeof onScroll==='function')onScroll()}catch(_){}
+}
+// Seleção ESTÁVEL na camada de texto do PDF — porte do mecanismo do pdfjs (TextLayerBuilder): o endOfContent
+// "ancora" o fim da seleção p/ ela não vazar e grudar tudo. Sem isto, arrastar o mouse seleciona demais.
+let __pdfSelInit=false;
+function initPdfSelection(){
+  if(__pdfSelInit)return;__pdfSelInit=true;
+  const layers=()=>$$('#article .pdftl');
+  const reset=tl=>{const end=tl.__eoc;if(end){tl.appendChild(end);end.style.width='';end.style.height=''}tl.classList.remove('selecting')};
+  const resetAll=()=>layers().forEach(reset);
+  document.addEventListener('pointerup',resetAll);
+  window.addEventListener('blur',resetAll);
+  let modern;
+  document.addEventListener('selectionchange',()=>{
+    const sel=getSelection();if(!sel||sel.rangeCount===0){resetAll();return}
+    const active=new Set();
+    for(let i=0;i<sel.rangeCount;i++){const r=sel.getRangeAt(i);for(const tl of layers())if(!active.has(tl)&&r.intersectsNode(tl))active.add(tl)}
+    for(const tl of layers()){if(active.has(tl))tl.classList.add('selecting');else reset(tl)}
+    if(modern===undefined){const l0=layers()[0];modern=l0?getComputedStyle(l0).webkitUserSelect==='none':false;
+      if(!modern){const v=navigator.userAgentData?(navigator.userAgentData.brands.find(b=>b.brand==='Chromium')||{}).version:(/\bChrome\/(\d+)\b/.exec(navigator.userAgent)||[])[1];modern=!!v&&parseInt(v,10)>=128}}
+    if(modern)return; // Chrome moderno/Firefox tratam nativamente → não mexer no DOM (evita interferir)
+    try{const range=sel.getRangeAt(0);let anchor=range.endContainer;if(anchor.nodeType===3)anchor=anchor.parentNode;
+      if(!modern&&range.endOffset===0){do{while(!anchor.previousSibling)anchor=anchor.parentNode;anchor=anchor.previousSibling}while(!anchor.childNodes.length)}
+      const tl=anchor&&anchor.parentElement&&anchor.parentElement.closest&&anchor.parentElement.closest('.pdftl');const end=tl&&tl.__eoc;
+      if(end&&tl){end.style.width=tl.style.width;end.style.height=tl.style.height;end.style.userSelect='text';anchor.parentElement.insertBefore(end,anchor.nextSibling)}
+    }catch(_){}
+  });
+}
+
 function renderDay(){
+  if(CFG.modo==='biblioteca'){renderBiblioteca();return}
   $('#crSubj').textContent=subject+(year?' '+year:'');$('#crDay').textContent=dayNum?'Dia '+dayNum:'Leitura';
   $('#dhSubj').textContent=subject;$('#dhDay').textContent=[dayNum&&'Dia '+dayNum,year].filter(Boolean).join(' · ');
   $('#dhTitle').textContent=dayNum?`Jurisprudência do Dia ${dayNum}`:subject;
@@ -1462,11 +1580,27 @@ const S={
   time:store.get('time',{}), cur:store.get('cur','t1')
 };
 if(!['680px','800px','960px'].includes(S.set.w))S.set.w='800px';
-const save=k=>store.set(k,S[k]);
+// MODO BIBLIOTECA: os grifos vêm do SERVIDOR (perfil do aluno), não do localStorage; e cada save('an')
+// é espelhado de volta ao host (debounce) → o host reconcilia com /api/conteudo/anotacao (persistência
+// por aluno, reconciliável por uid). Demais chaves (folhas/cartões) seguem locais.
+if(CFG.modo==='biblioteca'){S.an=Array.isArray(CFG.grifos)?CFG.grifos.slice():[]}
+let _bibT=null;
+function bibSync(){try{window.parent.postMessage({type:'leitor-jus-grifos',grifos:(S.an||[]).map(a=>({id:a.id,sec:a.sec||'',rects:a.rects||null,t:a.t,c:a.c,note:a.note||'',text:a.text||''}))},'*')}catch(_){}}
+function bibSyncSoon(){clearTimeout(_bibT);_bibT=setTimeout(bibSync,500)}
+const save=k=>{store.set(k,S[k]);if(k==='an'&&CFG.modo==='biblioteca')bibSyncSoon()};
 const saveSet=()=>save('set');
 
 renderDay();
-$$('#article .flow p, #article .flow li, #article .tese p, #article .law p').forEach((el,i)=>el.dataset.pid='b'+i);
+if(CFG.modo==='biblioteca'){
+  if(!CFG.pdf){
+    // HTML rico: o grifo ancora no data-uid (âncora estável) → pid = uid
+    $$('#article [data-uid]').forEach(el=>{el.dataset.pid=el.dataset.uid});
+    $$('#article .flow p, #article .flow li, #article .flow h1, #article .flow h2, #article .flow h3, #article .flow h4, #article .flow td, #article .flow th, #article .flow blockquote').forEach((el,i)=>{if(!el.dataset.pid)el.dataset.pid='x'+i});
+  }
+  // PDF: os pids são atribuídos por SPAN da camada de texto em renderPdfPages (assíncrono).
+} else {
+  $$('#article .flow p, #article .flow li, #article .tese p, #article .law p').forEach((el,i)=>el.dataset.pid='b'+i);
+}
 const secs=$$('#article .sec');
 const secOf=el=>el.closest('.sec');
 const secIdx=id=>secs.findIndex(s=>s.id===id);
@@ -1474,7 +1608,7 @@ const secIdx=id=>secs.findIndex(s=>s.id===id);
 /* Tempo de leitura */
 const WPM=200, words=el=>(el.textContent.trim().match(/\S+/g)||[]).length;
 const secWords={};secs.forEach(s=>{secWords[s.id]=words(s);const dm=$('[data-min]',s);if(dm)dm.textContent=Math.max(1,Math.round(secWords[s.id]/WPM))+' min de leitura'});
-const totalWords=Object.values(secWords).reduce((a,b)=>a+b,0);
+let totalWords=Object.values(secWords).reduce((a,b)=>a+b,0)||1;
 ($('#totalMin')||{}).textContent=Math.max(1,Math.round(totalWords/WPM))+' min de leitura';
 
 secs.forEach((s,i)=>{const n=document.createElement('nav');n.setAttribute('aria-label','Navegar entre temas');const prev=secs[i-1],next=secs[i+1];n.className=next?'secnav':'secnav secnav-fim';
@@ -1594,11 +1728,11 @@ function wrap(block,s,e,attrs){let pos=0;const segs=[];textNodes(block).forEach(
   const marks=[];segs.forEach(([n,p])=>{const a=Math.max(0,s-p),b=Math.min(n.nodeValue.length,e-p);if(b<=a)return;let node=n;if(b<node.nodeValue.length)node.splitText(b);if(a>0)node=node.splitText(a);
     const m=document.createElement('mark');Object.entries(attrs).forEach(([k,v])=>m.setAttribute(k,v));node.parentNode.insertBefore(m,node);m.appendChild(node);marks.push(m)});return marks}
 function unwrap(ms){const ps=new Set();ms.forEach(m=>{ps.add(m.parentNode);m.replaceWith(...m.childNodes)});ps.forEach(p=>p&&p.normalize())}
-const anMarks=id=>$$(`mark.an[data-aid="${id}"]`,article);
+const anMarks=id=>(CFG.modo==='biblioteca'&&CFG.pdf)?$$(`.pdfov[data-aid="${id}"]`,article):$$(`mark.an[data-aid="${id}"]`,article);
 const blockOf=pid=>$(`[data-pid="${pid}"]`);
-function paint(a){const b=blockOf(a.pid);if(!b)return;wrap(b,a.s,a.e,{class:'an','data-aid':a.id,'data-t':a.t,'data-c':a.c});refreshTail(a)}
+function paint(a){if(CFG.modo==='biblioteca'&&CFG.pdf){return paintPdf(a)}const b=blockOf(a.pid);if(!b)return;wrap(b,a.s,a.e,{class:'an','data-aid':a.id,'data-t':a.t,'data-c':a.c});refreshTail(a)}
 function refreshTail(a){const ms=anMarks(a.id);ms.forEach(m=>m.removeAttribute('data-tail'));if(a.note&&ms.length)ms[ms.length-1].setAttribute('data-tail','')}
-function repaintAll(){unwrap($$('mark.an',article));S.an.forEach(paint)}
+function repaintAll(){if(CFG.modo==='biblioteca'&&CFG.pdf){$$('.pdfov',article).forEach(e=>e.remove());S.an.forEach(paint);return}unwrap($$('mark.an',article));S.an.forEach(paint)}
 function seed(phrase,t,c,note){const b=$$('[data-pid]').find(x=>x.textContent.includes(phrase));if(!b)return null;const s=b.textContent.indexOf(phrase);return {id:uid(),pid:b.dataset.pid,s,e:s+phrase.length,t,c,note,sec:secOf(b).id,text:phrase,ex:true}}
 /* Tudo começa LIMPO: nenhuma marcação/nota/cartão/folha pré-fabricada. Só o que o ALUNO fizer é
    salvo (localStorage por dia) e restaurado ao reabrir. Os seeds demo do protótipo foram removidos. */
@@ -1638,12 +1772,57 @@ function selInfo(){const sel=getSelection();if(!sel.rangeCount||sel.isCollapsed)
   const p2=document.createRange();p2.selectNodeContents(b);p2.setEnd(end,endOff);let e=p2.toString().length;
   const t=b.textContent;let s2=s;while(s2<e&&/\s/.test(t[s2]))s2++;while(e>s2&&/\s/.test(t[e-1]))e--;if(e-s2<1)return null;
   return {pid:b.dataset.pid,s:s2,e,text:t.slice(s2,e),rect:r.getBoundingClientRect(),sec:secOf(b).id}}
+
+// ── MODO PDF: o grifo é GEOMÉTRICO (retângulos por cima do canvas), não embrulha o texto da camada do
+// PDF (que é posicionada de forma absoluta e quebraria). A seleção vira rects normalizados (0..1) por
+// página → 1 grifo por página com vários rects (linhas). Alinha perfeito e não bugga entre linhas.
+const ehPdf=()=>CFG.modo==='biblioteca'&&!!CFG.pdf;
+function selInfoPdf(){
+  const sel=getSelection();if(!sel.rangeCount||sel.isCollapsed)return null;const r=sel.getRangeAt(0);
+  const texto=r.toString().replace(/\s+/g,' ').trim();if(!texto)return null;
+  const pageEls=$$('#article .pdf-sec');const porPag=new Map();let first=null;
+  for(const rc of r.getClientRects()){
+    if(rc.width<1||rc.height<1)continue;const cx=rc.left+rc.width/2,cy=rc.top+rc.height/2;
+    const el=pageEls.find(p=>{const b=p.getBoundingClientRect();return cx>=b.left&&cx<=b.right&&cy>=b.top&&cy<=b.bottom});
+    if(!el)continue;const pp=$('.pdfpage',el);const b=pp.getBoundingClientRect();
+    const rect={x0:(rc.left-b.left)/b.width,y0:(rc.top-b.top)/b.height,x1:(rc.right-b.left)/b.width,y1:(rc.bottom-b.top)/b.height};
+    (porPag.get(el.id)??porPag.set(el.id,[]).get(el.id)).push(rect);if(!first)first=rc;
+  }
+  if(!porPag.size||!first)return null;
+  // mescla os retângulos da MESMA linha (cada palavra é um span → sem isso o grifo fica com buracos brancos)
+  const all=[...porPag.entries()].map(([sec,rs])=>[sec,mergeRects(rs)]);
+  return {sec:all[0][0],rects:all[0][1],text:texto,rect:first,_all:all};
+}
+function mergeRects(rects){
+  const srt=rects.slice().sort((a,b)=>a.y0-b.y0||a.x0-b.x0);const lines=[];
+  for(const r of srt){const h=r.y1-r.y0;const ln=lines.find(l=>Math.abs((l.y0+l.y1)/2-(r.y0+r.y1)/2)<h*0.6);
+    if(ln){ln.x0=Math.min(ln.x0,r.x0);ln.x1=Math.max(ln.x1,r.x1);ln.y0=Math.min(ln.y0,r.y0);ln.y1=Math.max(ln.y1,r.y1)}else lines.push({...r})}
+  return lines;
+}
+function paintPdf(a){const sec=$('#'+a.sec);if(!sec)return;const pp=$('.pdfpage',sec);if(!pp)return;
+  (a.rects||[]).forEach(r=>{const d=document.createElement('div');d.className='pdfov';d.dataset.aid=a.id;d.dataset.t=a.t;d.dataset.c=a.c;
+    d.style.cssText=`left:${r.x0*100}%;top:${r.y0*100}%;width:${(r.x1-r.x0)*100}%;height:${(r.y1-r.y0)*100}%`;pp.appendChild(d)})}
+function applyPdf(t,c){const i=pendingSel;if(!i||!i._all)return null;commit();let last=null;
+  for(const [sec,rects] of i._all){const a={id:uid(),sec,rects,t,c:t==='bd'?'k':c,note:'',text:i.text};S.an.push(a);paintPdf(a);last=a}
+  save('an');getSelection().removeAllRanges();hideTool();renderPanels();return last}
+function erasePdf(i){if(!i||!i._all)return;const rem=new Set();
+  for(const [sec,rects] of i._all)S.an.filter(a=>a.sec===sec&&(a.rects||[]).some(gr=>rects.some(sr=>gr.x0<sr.x1&&gr.x1>sr.x0&&gr.y0<sr.y1&&gr.y1>sr.y0))).forEach(a=>rem.add(a.id));
+  if(!rem.size)return;commit();rem.forEach(id=>removeAn(id,false));save('an');renderPanels()}
 let lastReaderSel=null;
 function showTool(rect,existing){tool.classList.add('show');$('[data-a="del"]',tool).hidden=!existing;$$('[data-g="tools"]',tool).forEach(g=>g.hidden=!!existing);
   $$('.cd',tool).forEach(d=>d.classList.toggle('on',existing?activeAn&&activeAn.c===d.dataset.c:false));
   const w=tool.offsetWidth,h=tool.offsetHeight;const x=Math.max(10,Math.min(innerWidth-w-10,rect.left+rect.width/2-w/2));let y=rect.top-h-10;if(y<64)y=rect.bottom+10;y=Math.max(64,Math.min(y,innerHeight-h-10));tool.style.left=x+'px';tool.style.top=y+'px'}
 function hideTool(){tool.classList.remove('show');pendingSel=null;activeAn=null}
-function onSelectEnd(){const i=selInfo();if(!i){if(!activeAn)hideTool();return}
+function onSelectEnd(){
+  if(ehPdf()){
+    const i=selInfoPdf();if(!i){if(!activeAn)hideTool();return}
+    pendingSel=i;lastReaderSel=i;const t=S.set.tool;
+    if(t==='select'){activeAn=null;showTool(i.rect,false)}
+    else if(t==='eraser'){erasePdf(i);getSelection().removeAllRanges()}
+    else{applyPdf(t,S.set.color)}
+    return;
+  }
+  const i=selInfo();if(!i){if(!activeAn)hideTool();return}
   lastReaderSel=i;const t=S.set.tool;
   if(t==='select'){pendingSel=i;activeAn=null;showTool(i.rect,false)}
   else if(t==='eraser'){erase(i);getSelection().removeAllRanges()}
@@ -1655,7 +1834,21 @@ document.addEventListener('selectionchange',()=>{if(matchMedia('(pointer:coarse)
 // de 400ms da seleção) — resolve a sensação de "não acionou". Tap simples (seleção vazia) é inofensivo.
 document.addEventListener('pointerup',e=>{if(!matchMedia('(pointer:coarse)').matches)return;if(e.target.closest&&e.target.closest('#seltool,.pop,#mirror,#anbar'))return;clearTimeout(window._st);window._st=setTimeout(onSelectEnd,120)});
 scroller.addEventListener('scroll',()=>{if(tool.classList.contains('show'))hideTool();if(pop.dataset.kind!=='note')closePop()},{passive:true});
-article.addEventListener('click',e=>{const m=e.target.closest('mark.an');if(!m||!getSelection().isCollapsed||doc.classList.contains('hide-mine'))return;
+article.addEventListener('click',e=>{
+  if(CFG.modo==='biblioteca'&&CFG.pdf){
+    if(!getSelection().isCollapsed||doc.classList.contains('hide-mine'))return;
+    // clique num grifo (overlay é pointer-events:none) → hit-test por coordenada na página
+    for(const el of $$('#article .pdf-sec')){const pp=$('.pdfpage',el);if(!pp)continue;const b=pp.getBoundingClientRect();
+      if(e.clientX<b.left||e.clientX>b.right||e.clientY<b.top||e.clientY>b.bottom)continue;
+      const x=(e.clientX-b.left)/b.width,y=(e.clientY-b.top)/b.height;
+      const hit=S.an.find(a=>a.sec===el.id&&(a.rects||[]).some(r=>x>=r.x0&&x<=r.x1&&y>=r.y0&&y<=r.y1));
+      if(hit){e.stopPropagation();
+        if(S.set.tool==='eraser'){commit();removeAn(hit.id);toast('Marcação apagada',{label:'Desfazer',fn:undo});return}
+        activeAn=hit;pendingSel=null;showTool({left:e.clientX,right:e.clientX,top:e.clientY-4,bottom:e.clientY+4,width:0,height:8},true);return}
+      break}
+    return;
+  }
+  const m=e.target.closest('mark.an');if(!m||!getSelection().isCollapsed||doc.classList.contains('hide-mine'))return;
   const a=S.an.find(x=>x.id===m.dataset.aid);if(!a)return;e.stopPropagation();
   if(S.set.tool==='eraser'){commit();removeAn(a.id,true);toast('Marcação apagada',{label:'Desfazer',fn:undo});return}
   activeAn=a;pendingSel=null;showTool(m.getBoundingClientRect(),true)});
@@ -1663,11 +1856,11 @@ article.addEventListener('click',e=>{const m=e.target.closest('mark.an');if(!m||
 // ou um popover). Clicar em outro texto fecha e, se virar seleção, o onSelectEnd reabre no novo trecho.
 document.addEventListener('mousedown',e=>{if(!e.target.closest('#seltool,mark.an,.pop'))hideTool()});
 
-function apply(t,c,silent){const i=pendingSel;if(!i)return null;commit();
+function apply(t,c,silent){if(ehPdf())return applyPdf(t,c);const i=pendingSel;if(!i)return null;commit();
   S.an.filter(a=>a.pid===i.pid&&a.t===t&&a.s<i.e&&a.e>i.s).forEach(a=>removeAn(a.id,false,true));
   const a={id:uid(),pid:i.pid,s:i.s,e:i.e,t,c:t==='bd'?'k':c,note:'',sec:i.sec,text:i.text};S.an.push(a);save('an');getSelection().removeAllRanges();paint(a);hideTool();renderPanels();
   if(!silent)toast(TOOLS[t]+' aplicado',{label:'Desfazer',fn:undo});return a}
-function removeAn(id,render=true,quiet){unwrap(anMarks(id));S.an=S.an.filter(a=>a.id!==id);save('an');if(render)renderPanels()}
+function removeAn(id,render=true,quiet){if(CFG.modo==='biblioteca'&&CFG.pdf){anMarks(id).forEach(m=>m.remove())}else{unwrap(anMarks(id))}S.an=S.an.filter(a=>a.id!==id);save('an');if(render)renderPanels()}
 function erase(i){const hit=S.an.filter(a=>a.pid===i.pid&&a.s<i.e&&a.e>i.s);if(!hit.length)return;commit();const b=blockOf(i.pid);const txt=b.textContent;
   hit.forEach(a=>{const parts=[];if(a.s<i.s)parts.push({...a,id:uid(),e:i.s,text:txt.slice(a.s,i.s)});if(a.e>i.e)parts.push({...a,id:uid(),s:i.e,text:txt.slice(i.e,a.e),note:parts.length?'':a.note});
     removeAn(a.id,false);parts.forEach(p=>{S.an.push(p);paint(p)})});save('an');renderPanels();$('#anHint').textContent='Trecho limpo · Ctrl Z desfaz'}
@@ -1729,10 +1922,16 @@ function renderNotes(){const M=$('#margin');M.innerHTML='';if(!notesOn)return;
 
 /* ================= CADERNO ================= */
 let anFilter='all';
-const ord=pid=>+pid.slice(1);
+const ord=pid=>pid?(+pid.slice(1)||0):0;
+// Ordena por SEÇÃO (página/tema) e depois pela posição: no PDF (grifo geométrico) usa o y do 1º retângulo;
+// no texto usa pid/offset. Robusto p/ grifos sem pid (PDF).
+function sorted(list){return list.slice().sort((a,b)=>{
+  const sa=secIdx(a.sec),sb=secIdx(b.sec);if(sa!==sb)return sa-sb;
+  if(a.rects||b.rects){const ya=(a.rects&&a.rects[0])?a.rects[0].y0:0,yb=(b.rects&&b.rects[0])?b.rects[0].y0:0;return ya-yb}
+  return ord(a.pid)-ord(b.pid)||(a.s||0)-(b.s||0);
+})}
 function item(a){return `<div class="item" data-aid="${a.id}" data-c="${a.c}"><q>${esc(a.text)}</q>${a.note?`<div class="nt">${esc(a.note)}</div>`:''}
   <div class="meta"><span>${TOOLS[a.t]}${a.t!=='bd'?' · '+COLORS[a.c]:''}${a.ex?' · exemplo':''}</span><span class="sp"></span><span class="acts"><button data-act="note" title="Nota"><svg class="i"><use href="#i-note"/></svg></button><button data-act="card" title="Criar cartão"><svg class="i"><use href="#i-cards"/></svg></button><button data-act="sheet" title="Levar para a folha"><svg class="i"><use href="#t-send"/></svg></button><button data-act="del" title="Remover"><svg class="i"><use href="#i-trash"/></svg></button></span></div></div>`}
-function sorted(list){return list.slice().sort((a,b)=>ord(a.pid)-ord(b.pid)||a.s-b.s)}
 function grouped(list){return secs.map((s,i)=>{const hs=sorted(list.filter(a=>a.sec===s.id));return hs.length?`<div class="group-h">Tema ${pad(i+1)}</div>`+hs.map(item).join(''):''}).join('')}
 function renderPanels(){const counts={};S.an.forEach(a=>counts[a.t]=(counts[a.t]||0)+1);
   $('#hlFilter').innerHTML=`<button class="chip ${anFilter==='all'?'on':''}" data-f="all">Todas <small>${S.an.length}</small></button>`+Object.keys(TOOLS).filter(t=>counts[t]).map(t=>`<button class="chip ${anFilter===t?'on':''}" data-f="${t}">${TOOLS[t]} <small>${counts[t]}</small></button>`).join('');

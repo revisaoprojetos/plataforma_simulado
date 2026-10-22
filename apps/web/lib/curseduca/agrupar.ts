@@ -8,14 +8,18 @@ export function normNome(s?: string | null): string {
   return (s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim().replace(/\s+/g, ' ')
 }
 
-/** Quantos pares canal→grupo processar por tick do cron (mantém cada tick curto). */
-const LOTE = 8
+/** Orçamento de TEMPO por tick do cron (ms): processa o MÁXIMO de pares que couber, retomando no
+ *  próximo tick de onde parou. Deixa folga pro corte (~5min) do proxy do cron. */
+const ORCAMENTO_MS = 210_000
 
 /**
  * Um "tick" do agrupamento automático por nome: vincula cada canal da Curseduca ao grupo do sistema
  * de MESMO NOME (cria os que faltam + entra no grupo + propaga acesso, via executarImport com
- * destino='existente'). Processa só um LOTE por chamada, começando em `cursor` (round-robin), para
- * que cada tick do cron seja curto. Devolve um resumo + o próximo cursor.
+ * destino='existente'). COBERTURA DETERMINÍSTICA: ordena os pares por id do canal e usa `cursor` =
+ * ÚLTIMO id processado (não índice de array), processando o máximo que couber no orçamento de tempo e
+ * retomando no próximo tick a partir do próximo id. Assim nenhum canal fica de fora, mesmo que a lista
+ * de canais mude de tamanho/ordem entre ticks (era a causa de alunos ficarem sem acesso por dias).
+ * Devolve um resumo + o próximo cursor (0 = completou a volta → recomeça).
  *
  * `sincronizar=false`: só ADICIONA ao grupo, nunca remove (não tira aluno que saiu do canal).
  */
@@ -61,15 +65,19 @@ export async function agruparPorNomeTick(
     return { resultado: { ok: true, modo: 'agrupar', pares: 0, sem_grupo: semGrupo.length, obs: 'nenhum canal casou com grupo do sistema' }, proximoCursor: 0 }
   }
 
-  // 4) Fatia deste tick (round-robin a partir do cursor).
-  const ini = ((cursor % pares.length) + pares.length) % pares.length
-  const fatia = pares.slice(ini, ini + LOTE)
-  if (fatia.length < LOTE) fatia.push(...pares.slice(0, LOTE - fatia.length)) // wrap
+  // 4) ORDEM ESTÁVEL por id do canal + cursor = ÚLTIMO id processado (não índice). Começa no 1º par com
+  //    canal > cursor; se não houver (passou do fim), reinicia do começo. Cobertura determinística.
+  pares.sort((a, b) => a.canal - b.canal)
+  let start = pares.findIndex((p) => p.canal > cursor)
+  if (start < 0) start = 0
 
-  // 5) Re-sincroniza cada par (tolerante: um grupo que falhe não derruba os outros).
-  let vinculadosTot = 0, novosTot = 0, falhas = 0, curados = 0
+  // 5) Processa o MÁXIMO de pares que couber no orçamento de tempo (não um lote fixo), dando a volta
+  //    (wrap) se sobrar. Cada executarImport é tolerante a falha (um grupo que falhe não derruba os outros).
+  const t0 = Date.now()
+  let vinculadosTot = 0, novosTot = 0, falhas = 0, curados = 0, processados = 0, ultimoCanal = cursor
   const detalhe: { nome: string; via: 'id' | 'nome'; vinculados: number; novos: number; erro?: string }[] = []
-  for (const p of fatia) {
+  for (let k = 0; k < pares.length; k++) {
+    const p = pares[(start + k) % pares.length]
     try {
       const r = await executarImport({ tenantId, cfg }, [p.canal], { tipo: 'existente', grupoId: p.grupo }, false, Number.MAX_SAFE_INTEGER)
       vinculadosTot += r.vinculados ?? 0
@@ -87,14 +95,16 @@ export async function agruparPorNomeTick(
       falhas++
       detalhe.push({ nome: p.nome, via: p.via, vinculados: 0, novos: 0, erro: String(e?.message ?? e).slice(0, 120) })
     }
+    ultimoCanal = p.canal; processados++
+    if (Date.now() - t0 > ORCAMENTO_MS) break // acabou o tempo do tick → retoma do próximo id no próximo
   }
 
-  const proximoCursor = (ini + fatia.length) % pares.length
+  // Deu a volta completa → recomeça (cursor 0). Senão, retoma do último id processado.
+  const proximoCursor = processados >= pares.length ? 0 : ultimoCanal
   return {
     resultado: {
-      ok: falhas === 0, modo: 'agrupar', descobrir, candidatos: alvo.length, total_pares: pares.length, processados_neste_tick: fatia.length,
+      ok: falhas === 0, modo: 'agrupar', descobrir, candidatos: alvo.length, total_pares: pares.length, processados_neste_tick: processados,
       match: { por_id: porId, por_nome: porNome }, curados,
-      faixa: `${ini + 1}..${ini + fatia.length} de ${pares.length}`,
       vinculados: vinculadosTot, novos: novosTot, falhas, sem_grupo: semGrupo.length, detalhe: detalhe.slice(0, 12),
       atualizado_em: new Date().toISOString(),
     },

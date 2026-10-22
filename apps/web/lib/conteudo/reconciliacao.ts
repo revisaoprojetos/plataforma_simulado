@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { fetchAll } from '@/lib/supabase/fetch-all'
 import { alinhar, type TrechoVersao } from './alinhamento'
-import { extrairTrechosHtml } from './trechos'
+import { extrairTrechosHtml, injetarUidsNoHtml } from './trechos'
 import { emitirEvento } from './outbox'
 
 // RECONCILIAÇÃO (Fase 2/6) — o coração do "grifo sobrevive à edição". Ao publicar uma nova versão:
@@ -158,6 +158,14 @@ export async function reconciliarVersao(input: {
 
   // marca a conversão e emite evento
   await svc.from(T_VER).update({ status_conversao: baixaConfianca ? 'revisao_necessaria' : 'ok' }).eq('tenant_id', tenantId).eq('id', input.versaoNovaId)
+
+  // HTML RICO: formatação original preservada + data-uid por bloco (âncora do grifo), alinhado aos
+  // mesmos uids dos trechos (ordem i). É o que a área de leitura do aluno renderiza fielmente. Gravado
+  // à parte (update próprio): se a coluna ainda não existir (migração pendente), não derruba o acima.
+  try {
+    const htmlRico = injetarUidsNoHtml(input.html, linhas.map((l) => l.uid))
+    await svc.from(T_VER).update({ html_rico: htmlRico }).eq('tenant_id', tenantId).eq('id', input.versaoNovaId)
+  } catch { /* coluna html_rico ausente → o leitor regenera sob demanda */ }
   await emitirEvento(svc, tenantId, 'anotacao.reconciliar', { documento_id: input.documentoId, versao_id: input.versaoNovaId, revisao: baixaConfianca })
   return res
 }

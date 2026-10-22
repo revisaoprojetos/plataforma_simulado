@@ -165,6 +165,9 @@ export async function listarTodosGrupos(cfg: CurseducaCfg): Promise<GrupoCursedu
     if (!j.metadata?.hasMore || data.length === 0) break
     offset += limit
   }
+  // ORDEM ESTÁVEL por id: a API não garante ordenação, e o sync "agrupar por nome" usa um cursor por id
+  // de canal — sem ordem estável a cobertura virava amostragem aleatória (canais ficavam de fora por dias).
+  out.sort((a, b) => Number(a.id) - Number(b.id))
   return out
 }
 

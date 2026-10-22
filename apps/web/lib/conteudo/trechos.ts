@@ -56,6 +56,28 @@ function classificar(tag: string, texto: string): { tipo: TrechoExtraido['tipo']
   return { tipo: 'paragrafo', rotulo: null }
 }
 
+/**
+ * HTML RICO para a leitura: mantém a formatação original (negrito, itálico, cores, imagens, links) e
+ * envolve CADA bloco não-vazio com `data-uid="<uid>"` — a âncora estável do grifo. Usa a MESMA sequência
+ * e filtro de `extrairTrechosHtml` (blocos com texto < 2 são pulados), então os uids casam 1:1 com os
+ * trechos. NÃO remove containers/spans (ao contrário de extrairTrechosHtml) para preservar a fidelidade.
+ */
+export function injetarUidsNoHtml(html: string, uids: string[]): string {
+  const limpo = String(html || '')
+    .replace(/<!--[\s\S]*?-->/g, '')
+    .replace(/<(script|style|head)\b[\s\S]*?<\/\1>/gi, '')
+  let i = 0
+  BLOCOS.lastIndex = 0
+  return limpo.replace(BLOCOS, (full: string, _tag: string, inner: string) => {
+    const texto = textoDoBloco(inner)
+    if (!texto || texto.length < 2) return full // pulado (igual a extrairTrechosHtml) → fica sem uid
+    const uid = uids[i++]
+    if (!uid) return full
+    // injeta data-uid na tag de abertura do bloco (preserva atributos existentes)
+    return full.replace(/^<([a-z0-9]+)\b/i, (_m: string, t: string) => `<${t} data-uid="${uid}"`)
+  })
+}
+
 /** Extrai os trechos do HTML na ordem do documento. Ignora blocos vazios e <div> que só embrulham. */
 export function extrairTrechosHtml(html: string): TrechoExtraido[] {
   const limpo = String(html || '')

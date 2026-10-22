@@ -40,6 +40,8 @@ import type { PontuacaoLeitura } from '@/lib/leitura/pontuacao'
 import type { GamRail } from '@/lib/aluno/trilhas'
 import type { CarimboAlunoView } from '@/components/aluno/carimbos-colecao'
 import { avatarPadraoDe } from '@/lib/aluno/avatar-padrao'
+import type { TrilhaFundoConfig, TrilhaLivreConfig } from '@/lib/leitura/trilha-aparencia'
+import type { TrilhaFormato } from '@/lib/gamificacao/trilha-formato'
 import type { DesafioLSMeqProps } from './desafio-ls-meq'
 import { useTemaInterno } from '@/components/brand/interna/use-tema-interno'
 
@@ -78,6 +80,39 @@ const NODES: [number, number][] = [
   [649.8, 1028.1], [564, 1008.3], [513.4, 973.2], [596.3, 950.7], [678.9, 920.4], [616.3, 886.6], [533.6, 859], [590.8, 838.4], [644, 829.3], [694.8, 813.4],
   [610.8, 788.7], [604.9, 746.9], [680, 715.1], [598.5, 681.9], [525.3, 634.5], [522.8, 582.7], [607.9, 561.1], [551.6, 525.6], [534.2, 446], [515, 360],
 ]
+const clampPct = (n: number) => Math.max(0, Math.min(100, n))
+/** Posição-padrão (serpentina) p/ um nó do modo LIVRE que o admin ainda não posicionou à mão. */
+function posSerp(i: number, total: number): { x: number; y: number } {
+  const cols = total <= 4 ? 2 : 3
+  const rows = Math.max(1, Math.ceil(total / cols))
+  const row = Math.floor(i / cols)
+  const inRow = i % cols
+  const col = row % 2 === 0 ? inRow : cols - 1 - inRow
+  return { x: clampPct(((col + 0.5) / cols) * 100), y: clampPct(rows === 1 ? 50 : 8 + (row / (rows - 1)) * 84) }
+}
+
+/** Fundo da trilha PERSONALIZADA (formato 'livre') — imagem do admin com recorte/encaixe/opacidade/zoom.
+ *  Mesma fórmula do renderizador canônico `TrilhaLivre` (variante desktop; o palco já tem pan/zoom próprio). */
+function FundoLivre({ fundo }: { fundo: TrilhaFundoConfig }) {
+  const url = fundo.url
+  if (!url) return null
+  const desfoque = fundo.desfoque ?? 0
+  const opacity = (fundo.opacidade ?? 100) / 100
+  const filter = desfoque > 0 ? `blur(${desfoque}px)` : undefined
+  const crop = fundo.crop
+  if (crop && crop.w > 0 && crop.h > 0) {
+    const sizeW = 100 / crop.w, sizeH = 100 / crop.h
+    const posBgX = crop.w < 1 ? (crop.x / (1 - crop.w)) * 100 : 0
+    const posBgY = crop.h < 1 ? (crop.y / (1 - crop.h)) * 100 : 0
+    const blurScale = desfoque > 0 ? 1.06 : 1
+    return <div aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: `url("${url}")`, backgroundSize: `${sizeW}% ${sizeH}%`, backgroundPosition: `${posBgX}% ${posBgY}%`, backgroundRepeat: 'no-repeat', opacity, filter, transform: blurScale !== 1 ? `scale(${blurScale})` : undefined }} />
+  }
+  const posX = fundo.posX ?? 50, posY = fundo.posY ?? 50
+  const zoom = Math.max(1, fundo.zoom ?? 1) + (desfoque > 0 ? 0.06 : 0)
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={url} alt="" aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: fundo.ajuste ?? 'cover', objectPosition: `${posX}% ${posY}%`, opacity, filter, transform: `scale(${zoom})`, transformOrigin: `${posX}% ${posY}%` }} />
+}
+
 /** Caminho SVG suave (Catmull-Rom → Bézier) pelos pontos. */
 function splinePath(pts: [number, number][]): string {
   if (pts.length < 2) return ''
@@ -115,6 +150,7 @@ function FlameSeq({ size = 18 }: { size?: number }) {
 
 export function DesafioLSRevisao({
   theme, trilha, desempenho, ranking, minhaLinha, meuId, meuNome, regulamento, pontuacao, gam, carimbos = [], diasLeitura = [], moduloNome, testador = false,
+  formato, livre,
 }: DesafioLSMeqProps) {
   useTemaInterno(theme) // reage ao toggle claro/escuro/azul ao vivo
   const [tab, setTab] = useState<Tab>('trilha')
@@ -181,7 +217,7 @@ export function DesafioLSRevisao({
         {/* `key={tab}` remonta o painel ao trocar de aba → a animação lsrTabIn (fade + leve subida) re-roda. */}
         <div key={tab} className="lsr-tabpane">
           {tab === 'trilha' && (
-            <AbaTrilha nodes={nodes} dy={dy} setDy={setDy} idxAtual={idxAtual} diasConcluidos={diasConcluidos} totalDias={totalDias} progressoPct={progressoPct} desempenho={desempenho} gam={gam} diasLeitura={diasLeitura} testador={testador} />
+            <AbaTrilha nodes={nodes} dy={dy} setDy={setDy} idxAtual={idxAtual} diasConcluidos={diasConcluidos} totalDias={totalDias} progressoPct={progressoPct} desempenho={desempenho} gam={gam} diasLeitura={diasLeitura} testador={testador} formato={formato} livre={livre} />
           )}
           {tab === 'reg' && <AbaRegulamento regulamento={regulamento} pontuacao={pontuacao} gam={gam} moduloNome={moduloNome} />}
           {tab === 'des' && <AbaDesempenho desempenho={desempenho} totalDias={totalDias} diasConcluidos={diasConcluidos} pontos={pontos} progressoPct={progressoPct} carimbos={carimbos} />}
@@ -331,10 +367,11 @@ function HeaderHero({
 // ABA TRILHA — palco da montanha (flex 1) + coluna lateral à DIREITA (336px).
 // ─────────────────────────────────────────────────────────────────────────────
 function AbaTrilha({
-  nodes, dy, setDy, idxAtual, diasConcluidos, totalDias, progressoPct, desempenho, gam, diasLeitura = [], testador = false,
+  nodes, dy, setDy, idxAtual, diasConcluidos, totalDias, progressoPct, desempenho, gam, diasLeitura = [], testador = false, formato, livre,
 }: {
   nodes: TrilhaNode[]; dy: number; setDy: (i: number) => void; idxAtual: number
   diasConcluidos: number; totalDias: number; progressoPct: number; desempenho: AulaDesempenho[]; gam?: GamRail | null; diasLeitura?: string[]; testador?: boolean
+  formato?: TrilhaFormato; livre?: TrilhaLivreConfig
 }) {
   const sel = nodes[dy]
   const selDesemp = sel ? desempenho.find((d) => d.id === sel.id) : undefined
@@ -342,7 +379,7 @@ function AbaTrilha({
   return (
     <div className="lsr-trilha-wrap" style={{ display: 'flex', gap: 18, alignItems: 'stretch' }}>
       {/* ── Palco da montanha (com barra de início acoplada) ── */}
-      <PalcoMontanha nodes={nodes} dy={dy} setDy={setDy} idxAtual={idxAtual} diasConcluidos={diasConcluidos} totalDias={totalDias} progressoPct={progressoPct} sel={sel} selDesemp={selDesemp} desempenho={desempenho} testador={testador} />
+      <PalcoMontanha nodes={nodes} dy={dy} setDy={setDy} idxAtual={idxAtual} diasConcluidos={diasConcluidos} totalDias={totalDias} progressoPct={progressoPct} sel={sel} selDesemp={selDesemp} desempenho={desempenho} testador={testador} formato={formato} livre={livre} />
 
       {/* ── Coluna lateral DIREITA ── */}
       <aside className="lsr-side" style={{ flex: '0 0 336px', width: 336, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 14, position: 'sticky', top: 90 }}>
@@ -528,11 +565,20 @@ function SuaEnergia({ desempenho, gam, diasLeitura = [] }: { desempenho: AulaDes
 // (Motor de zoom/pan e mapeamento de nós = REUSO do MEQ.)
 // ─────────────────────────────────────────────────────────────────────────────
 function PalcoMontanha({
-  nodes, dy, setDy, idxAtual, diasConcluidos, totalDias, progressoPct, sel, selDesemp, desempenho = [], testador = false,
+  nodes, dy, setDy, idxAtual, diasConcluidos, totalDias, progressoPct, sel, selDesemp, desempenho = [], testador = false, formato, livre,
 }: {
   nodes: TrilhaNode[]; dy: number; setDy: (i: number) => void; idxAtual: number
   diasConcluidos: number; totalDias: number; progressoPct: number; sel?: TrilhaNode; selDesemp?: AulaDesempenho; desempenho?: AulaDesempenho[]; testador?: boolean
+  formato?: TrilhaFormato; livre?: TrilhaLivreConfig
 }) {
+  // ── Geometria: usa a CONFIG DO ADMIN quando o módulo está em formato 'livre' (fundo próprio + posições
+  //    em %). Senão, cai no desenho FIXO da montanha (NODES / 1024×1536). CW/CH = espaço de coordenadas dos
+  //    pontos; AR = proporção (largura/altura) do palco. No caso fixo CW/CH = IMG_W/IMG_H → comportamento
+  //    IDÊNTICO ao anterior. (Corrige o VND, que mostrava a montanha e as posições fixas do Revisão.) ──
+  const livreAtivo = formato === 'livre' && (!!livre?.fundo?.url || Object.keys(livre?.nos ?? {}).length > 0)
+  const AR = livreAtivo ? (livre?.aspecto && livre.aspecto > 0 ? livre.aspecto : 0.8) : IMG_W / IMG_H
+  const CW = livreAtivo ? 1000 : IMG_W
+  const CH = livreAtivo ? Math.max(1, Math.round(1000 / AR)) : IMG_H
   const wrapRef = useRef<HTMLDivElement>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const [zoom, setZoom] = useState(1)
@@ -553,17 +599,41 @@ function PalcoMontanha({
   const wheelTargetRef = useRef<number | null>(null) // alvo de rolagem suave (y) da roda do mouse
   const rafRef = useRef<number | null>(null)
 
-  const pts = NODES
-  const spline = useMemo(() => splinePath(pts), [pts])
+  // Pontos da trilha: no modo LIVRE, posições do admin (nos em %) → espaço CW×CH; senão, NODES fixos.
+  const pts = useMemo<[number, number][]>(() => {
+    if (livreAtivo) {
+      return nodes.map((n, i) => {
+        const p = livre?.nos?.[n.id] ?? posSerp(i, nodes.length)
+        return [(p.x / 100) * CW, (p.y / 100) * CH] as [number, number]
+      })
+    }
+    return NODES
+  }, [livreAtivo, nodes, livre, CW, CH])
+  // Caminho: no modo LIVRE honra as CURVAS do admin (bézier quadrática por trecho); senão, spline fixo.
+  const spline = useMemo(() => {
+    if (!livreAtivo) return splinePath(pts)
+    if (pts.length < 2) return ''
+    let d = `M ${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`
+    for (let i = 0; i < pts.length - 1; i++) {
+      const b = pts[i + 1]
+      const cc = livre?.curvas?.[nodes[i].id]
+      const cx = cc ? (cc.x / 100) * CW : (pts[i][0] + b[0]) / 2
+      const cy = cc ? (cc.y / 100) * CH : (pts[i][1] + b[1]) / 2
+      d += ` Q ${cx.toFixed(1)} ${cy.toFixed(1)} ${b[0].toFixed(1)} ${b[1].toFixed(1)}`
+    }
+    return d
+  }, [livreAtivo, pts, livre, nodes, CW, CH])
   const doneFrac = totalDias > 0 ? Math.min(1, diasConcluidos / (totalDias - 1 || 1)) : 0
 
   const nodePts = useMemo(() => {
+    // Modo LIVRE: 1 nó real por ponto (posição do admin). Fixo: distribui os nós reais sobre os 30 pontos.
+    if (livreAtivo) return nodes.map((node, i) => ({ node, i, x: pts[i]?.[0] ?? 0, y: pts[i]?.[1] ?? 0 }))
     return nodes.slice(0, 30).map((node, i) => {
       const t = nodes.length > 1 ? i / (nodes.length - 1) : 0
       const p = pts[Math.round(t * (pts.length - 1))]
       return { node, i, x: p[0], y: p[1] }
     })
-  }, [nodes, pts])
+  }, [livreAtivo, nodes, pts])
 
   // "Libera amanhã" = PRÓXIMA aula realmente BLOQUEADA (agendada), não o nó vizinho ao aluno. Com a aula
   // atrasada (várias disponíveis), o balão vai p/ o 1º nó bloqueado — nunca ao lado do "Você está aqui".
@@ -606,7 +676,7 @@ function PalcoMontanha({
   function contentSize() {
     const wrap = wrapRef.current
     const w = wrap ? wrap.clientWidth : 0
-    return { w: w * zoomRef.current, h: w * (IMG_H / IMG_W) * zoomRef.current }
+    return { w: w * zoomRef.current, h: w * (CH / CW) * zoomRef.current }
   }
   function clampPan() {
     const wrap = wrapRef.current
@@ -621,7 +691,7 @@ function PalcoMontanha({
   useEffect(() => {
     const wrap = wrapRef.current
     if (!wrap) return
-    const ch = wrap.clientWidth * (IMG_H / IMG_W)
+    const ch = wrap.clientWidth * (CH / CW)
     panRef.current = { x: 0, y: Math.min(0, wrap.clientHeight - ch) }
     applyTransform()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -690,10 +760,10 @@ function PalcoMontanha({
     const target = 1.8
     zoomRef.current = target
     setZoom(target)
-    const relX = p.x / IMG_W
-    const relY = p.y / IMG_H
+    const relX = p.x / CW
+    const relY = p.y / CH
     panRef.current.x = wrap.clientWidth / 2 - relX * wrap.clientWidth * target
-    panRef.current.y = wrap.clientHeight / 2 - relY * (wrap.clientWidth * (IMG_H / IMG_W)) * target
+    panRef.current.y = wrap.clientHeight / 2 - relY * (wrap.clientWidth * (CH / CW)) * target
     setAnim(true)
     clampPan(); applyTransform()
   }
@@ -702,7 +772,7 @@ function PalcoMontanha({
     zoomRef.current = 1
     setZoom(1)
     // "Ver trilha inteira" = zoom 1 mostrando a base (dia atual); o aluno sobe arrastando.
-    const ch = wrap ? wrap.clientWidth * (IMG_H / IMG_W) : 0
+    const ch = wrap ? wrap.clientWidth * (CH / CW) : 0
     panRef.current = { x: 0, y: wrap ? Math.min(0, wrap.clientHeight - ch) : 0 }
     setAnim(true)
     applyTransform()
@@ -723,17 +793,23 @@ function PalcoMontanha({
         {/* Conteúdo (stageRef) preenche a LARGURA e mantém a proporção da imagem (aspect 1024/1536) →
             fica MAIS ALTO que a janela de 720px: o aluno arrasta pra cima pra ver o topo. img `cover`
             numa caixa com a MESMA proporção = sem distorção; nós por % linear = idêntico ao mockup. */}
-        <div ref={stageRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', aspectRatio: `${IMG_W} / ${IMG_H}`, transformOrigin: '0 0', willChange: 'transform', ['--z' as string]: (1 / zoom).toFixed(3) } as React.CSSProperties}>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/leiseca/trilha_m.jpg" alt="" aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+        <div ref={stageRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', aspectRatio: `${CW} / ${CH}`, transformOrigin: '0 0', willChange: 'transform', ['--z' as string]: (1 / zoom).toFixed(3) } as React.CSSProperties}>
+          {/* Fundo: imagem configurada no admin (modo livre) ou a montanha fixa do mockup. */}
+          {livreAtivo && livre?.fundo?.url ? (
+            <FundoLivre fundo={livre.fundo} />
+          ) : (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src="/leiseca/trilha_m.jpg" alt="" aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+          )}
 
-          {/* Spline (traço pontilhado + traço aceso em OURO) */}
-          <svg viewBox={`0 0 ${IMG_W} ${IMG_H}`} preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }} aria-hidden>
+          {/* Spline (traço pontilhado + traço aceso em OURO). pathLength=1000 → o trecho aceso funciona em
+              qualquer comprimento de caminho (montanha fixa OU trilha livre do admin). */}
+          <svg viewBox={`0 0 ${CW} ${CH}`} preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }} aria-hidden>
             <path d={spline} fill="none" stroke="rgba(255,255,255,.85)" strokeWidth={3.5} strokeLinecap="round" strokeDasharray="0.5 10" vectorEffect="non-scaling-stroke" />
             <path
               d={spline} fill="none" stroke={GOLD} strokeWidth={6} strokeLinecap="round"
-              vectorEffect="non-scaling-stroke"
-              style={{ strokeDasharray: 3000, strokeDashoffset: 3000 * (1 - doneFrac), filter: 'drop-shadow(0 0 6px rgba(241,194,50,.6))' }}
+              vectorEffect="non-scaling-stroke" pathLength={1000}
+              style={{ strokeDasharray: 1000, strokeDashoffset: 1000 * (1 - doneFrac), filter: 'drop-shadow(0 0 6px rgba(241,194,50,.6))' }}
             />
           </svg>
 
@@ -753,8 +829,8 @@ function PalcoMontanha({
                 title={`Dia ${String(i + 1).padStart(2, '0')} · ${node.titulo}`}
                 style={{
                   position: 'absolute',
-                  left: `${(x / IMG_W) * 100}%`,
-                  top: `${(y / IMG_H) * 100}%`,
+                  left: `${(x / CW) * 100}%`,
+                  top: `${(y / CH) * 100}%`,
                   // CONTRA-ESCALA 1/zoom: o nó mantém tamanho CONSTANTE na tela enquanto o palco amplia →
                   // dar zoom AFASTA os dias (posições escalam) sem inchar os círculos → fica limpo/proporcional.
                   transform: `translate(-50%,-50%) scale(${(1 / zoom).toFixed(3)})`,
@@ -789,7 +865,7 @@ function PalcoMontanha({
 
           {/* Rótulo "Você está aqui" — logo acima do nó atual (some quando um balão de aula está aberto). */}
           {!balaoVis && nodePts[idxAtual] && (
-            <span aria-hidden style={{ position: 'absolute', left: `${(nodePts[idxAtual].x / IMG_W) * 100}%`, top: `${(nodePts[idxAtual].y / IMG_H) * 100}%`, transform: 'translate(-50%, calc(-100% - 26px * var(--z,1))) scale(var(--z,1))', transformOrigin: '50% 100%', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', height: 22, padding: '0 9px', borderRadius: 99, background: 'var(--brand)', color: '#fff', fontSize: 11, fontWeight: 800, boxShadow: '0 6px 14px -6px rgba(0,0,0,.6)', zIndex: 7 }}>
+            <span aria-hidden style={{ position: 'absolute', left: `${(nodePts[idxAtual].x / CW) * 100}%`, top: `${(nodePts[idxAtual].y / CH) * 100}%`, transform: 'translate(-50%, calc(-100% - 26px * var(--z,1))) scale(var(--z,1))', transformOrigin: '50% 100%', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', height: 22, padding: '0 9px', borderRadius: 99, background: 'var(--brand)', color: '#fff', fontSize: 11, fontWeight: 800, boxShadow: '0 6px 14px -6px rgba(0,0,0,.6)', zIndex: 7 }}>
               Você está aqui
               {/* Ponta (triângulo) logo ABAIXO do balão → aponta p/ o círculo do nó atual (sem invadir o texto). */}
               <span aria-hidden style={{ position: 'absolute', left: '50%', top: '100%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '7px solid var(--brand)' }} />
@@ -797,7 +873,7 @@ function PalcoMontanha({
           )}
           {/* Balão "Libera amanhã" — some SÓ quando o balão da aula aberto está NO PRÓPRIO nó bloqueado. */}
           {libIdx >= 0 && nodePts[libIdx] && !(balaoVis && balaoVis.i === libIdx) && (
-            <span aria-hidden style={{ position: 'absolute', left: `${(nodePts[libIdx].x / IMG_W) * 100}%`, top: `${(nodePts[libIdx].y / IMG_H) * 100}%`, transform: 'translate(-50%, calc(-100% - 24px * var(--z,1))) scale(var(--z,1))', transformOrigin: '50% 100%', display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', height: 26, padding: '0 11px 0 6px', borderRadius: 99, background: '#fff', color: '#1A1530', fontSize: 11.5, fontWeight: 800, boxShadow: '0 10px 22px -10px rgba(0,0,0,.6)', zIndex: 9, animation: 'lsrBobLib 2.6s ease-in-out infinite' }}>
+            <span aria-hidden style={{ position: 'absolute', left: `${(nodePts[libIdx].x / CW) * 100}%`, top: `${(nodePts[libIdx].y / CH) * 100}%`, transform: 'translate(-50%, calc(-100% - 24px * var(--z,1))) scale(var(--z,1))', transformOrigin: '50% 100%', display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', height: 26, padding: '0 11px 0 6px', borderRadius: 99, background: '#fff', color: '#1A1530', fontSize: 11.5, fontWeight: 800, boxShadow: '0 10px 22px -10px rgba(0,0,0,.6)', zIndex: 9, animation: 'lsrBobLib 2.6s ease-in-out infinite' }}>
               <span style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--brand)', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Lock size={11} /></span>
               {libLabel}
               {/* Ponta (triângulo) logo ABAIXO do balão → aponta p/ o círculo da aula (sem invadir o texto). */}
@@ -816,7 +892,7 @@ function PalcoMontanha({
             const lab = concl ? 'Revisar aula' : lp > 0 ? 'Continuar' : 'Iniciar aula'
             const href = nd.hrefLeitura ?? nd.href ?? '#'
             return (
-              <div className={balaoVis.saindo ? undefined : 'lsr-balao-wrap'} onPointerDown={(e) => e.stopPropagation()} style={{ position: 'absolute', left: `${(np.x / IMG_W) * 100}%`, top: `${(np.y / IMG_H) * 100}%`, transform: 'translate(-50%, calc(-100% - 48px * var(--z,1))) scale(var(--z,1))', transformOrigin: '50% 100%', zIndex: 14, width: 216, maxWidth: '82vw' }}>
+              <div className={balaoVis.saindo ? undefined : 'lsr-balao-wrap'} onPointerDown={(e) => e.stopPropagation()} style={{ position: 'absolute', left: `${(np.x / CW) * 100}%`, top: `${(np.y / CH) * 100}%`, transform: 'translate(-50%, calc(-100% - 48px * var(--z,1))) scale(var(--z,1))', transformOrigin: '50% 100%', zIndex: 14, width: 216, maxWidth: '82vw' }}>
                 <div className={balaoVis.saindo ? 'lsr-balao-out' : 'lsr-balao-in'} style={{ position: 'relative', borderRadius: 14, padding: '11px 12px', background: '#fff', color: '#1A1530', boxShadow: '0 16px 34px -14px rgba(0,0,0,.72)' }}>
                   <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.12em', color: 'var(--brand)' }}>DIA {String(balaoVis.i + 1).padStart(2, '0')}</span>
                   <b style={{ display: 'block', margin: '2px 0 9px', fontSize: 13, lineHeight: 1.25, letterSpacing: '-0.01em' }}>{nd.titulo}</b>

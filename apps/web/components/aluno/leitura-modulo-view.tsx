@@ -23,6 +23,7 @@ import type { AulaDesempenho } from '@/lib/leitura/trilha'
 import type { RankingLeitura, RankingLeituraItem } from '@/lib/leitura/ranking'
 import { DesafioLSMeq } from '@/components/aluno/leiseca/desafio-ls-meq'
 import { DesafioLSRevisao } from '@/components/aluno/leiseca/desafio-ls-revisao'
+import { DesafioLSVND } from '@/components/aluno/leiseca/desafio-ls-vnd'
 import { internaTokensStyle, INTERNA_FONT, type Brand, type InternaTheme } from '@/components/brand/interna/interna-tokens'
 import { useTemaInterno } from '@/components/brand/interna/use-tema-interno'
 
@@ -132,10 +133,10 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
   // Interior NOVO (montanha): quando o tenant está no visual novo. A prop `interno` (vinda da página,
   // p/ qualquer marca) tem precedência; o auto-detect do shell MEQ é fallback. CADA MARCA tem seu
   // PRÓPRIO design de interior (os mockups DesafioLS{Revisao,VND,MEQ} são bem diferentes), então
-  // roteamos por marca: MEQ → DesafioLSMeq; Revisão/VND → DesafioLSRevisao (compartilham a linguagem).
+  // roteamos por marca: MEQ → DesafioLSMeq; VND → DesafioLSVND (verde+dourado); Revisão → DesafioLSRevisao.
   const internoNovo: { brand: Brand; theme: InternaTheme } | null = interno ?? (meq ? { brand: 'meq', theme: meq.theme } : null)
   if (internoNovo) {
-    const Interior = internoNovo.brand === 'meq' ? DesafioLSMeq : DesafioLSRevisao
+    const Interior = internoNovo.brand === 'meq' ? DesafioLSMeq : internoNovo.brand === 'vnd' ? DesafioLSVND : DesafioLSRevisao
     // MEQ já reage via seu próprio data-tema; p/ as demais marcas usamos o tema VIVO (dark toggle).
     const th: InternaTheme = internoNovo.brand === 'meq' ? internoNovo.theme : liveTemaInterno
     return (

@@ -38,8 +38,9 @@ const nextConfig: NextConfig = {
     serverActions: {
       allowedOrigins: ["localhost:3000"],
       // Cadernos do designer podem chegar grandes no PRIMEIRO save (fundos em base64, antes de
-      // hospedar). Margem folgada; depois de salvar as imagens viram URL e o doc fica leve.
-      bodySizeLimit: "30mb",
+      // hospedar). Importação da Biblioteca envia o arquivo em base64 (1 por chamada) — a base64
+      // infla ~37%, então 120mb cobre arquivos de até ~85MB (PDFs/.docx grandes de material).
+      bodySizeLimit: "120mb",
     },
   },
 };
