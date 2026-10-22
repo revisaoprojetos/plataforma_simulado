@@ -12,6 +12,16 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.25.1 — 2026-10-22
+
+**chore(sidebar): "Modelos de Caderno (OnlyOffice)" movido para o grupo Simulado**
+
+- O item **Modelos de Caderno (OnlyOffice)** (`/admin/biblioteca?tab=modelos`) saiu do grupo *Biblioteca* e passou
+  a ficar **logo abaixo de "Modelos de Caderno"** no grupo **Simulado** — os dois tipos de modelo de caderno
+  juntos. Vale para **todos os tenants** (código global). A `href` não mudou, então permissão
+  (`configuracoes:view`), o gate de manutenção por área (`biblioteca`) e os rótulos/ícones personalizados por
+  tenant continuam valendo. Grupo *Biblioteca* ficou só com "Conteúdos".
+
 ## 3.25.0 — 2026-10-22
 
 **fix(diagnóstico OnlyOffice): "desempenho por pilar" com faixa duplicada + download do aluno + ajustes de ranking/trilha**

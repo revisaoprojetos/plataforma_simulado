@@ -124,6 +124,10 @@ const navGroups: NavGroup[] = [
       // "Banco de Simulado" foi consolidado DENTRO da Aplicação de Simulado (abas do detalhe do
       // simulado). A área deixou de ser um item de menu; /admin/banco-questoes redireciona p/ lá.
       { label: 'Modelos de Caderno', href: '/admin/modelos-caderno', icon: LayoutTemplate, perm: 'questoes:view', oculto: !MODELOS_CADERNO_ATIVO },
+      // "Modelos de Caderno (OnlyOffice)" fica logo abaixo do item acima (pedido do produto): os dois tipos de
+      // modelo de caderno juntos na área do Simulado. A rota é a mesma da Biblioteca (?tab=modelos), então
+      // permissão e gate de manutenção por área ('biblioteca') seguem valendo (filtro por href, não por grupo).
+      { label: 'Modelos de Caderno (OnlyOffice)', href: '/admin/biblioteca?tab=modelos', icon: LayoutTemplate, perm: 'configuracoes:view' },
     ],
   },
   {
@@ -231,7 +235,7 @@ const navGroups: NavGroup[] = [
     icon: BookOpen,
     items: [
       { label: 'Conteúdos', href: '/admin/biblioteca', icon: BookOpen, perm: 'configuracoes:view' },
-      { label: 'Modelos de Caderno (OnlyOffice)', href: '/admin/biblioteca?tab=modelos', icon: LayoutTemplate, perm: 'configuracoes:view' },
+      // "Modelos de Caderno (OnlyOffice)" foi movido para o grupo Simulado (logo abaixo de "Modelos de Caderno").
     ],
   },
   {
