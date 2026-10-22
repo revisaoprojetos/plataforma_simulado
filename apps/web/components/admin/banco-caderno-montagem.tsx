@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import { BarChart3, ClipboardList, FileText, BookOpenCheck, ExternalLink, Loader2, FileUp, Trash2, Plus, Pencil, FolderOpen, X, FileType2, Search } from 'lucide-react'
 import { PdfPreview } from '@/components/admin/pdf-preview'
 import { salvarMontagem, criarCadernoParaSlot, listarDocsOnlyOffice, previaOnlyOffice, type EntregaSlots, type EntregaRef, type MontagemGrupo, type DocOffice, type TrechoPrevia } from '@/app/admin/cadernos-teste/actions'
-import { abrirEdicaoDocx } from '@/app/admin/biblioteca/actions'
+import { abrirEdicaoDocx, thumbDocumento } from '@/app/admin/biblioteca/actions'
 
 type SlotKey = 'diagnostico' | 'folha' | 'enunciado' | 'gabarito'
 type SlotDef = { chave: SlotKey; titulo: string; icon: typeof FileText; pdf: boolean }
@@ -171,8 +171,8 @@ function SlotCard({ slot, cor, bancoId, valor, prontos, onSet }: {
           ) : ehPdf ? (
             <PdfPreview url={valor!.pdfUrl!} titulo={slot.titulo} className="absolute inset-0" />
           ) : ehOffice ? (
-            <div className="absolute inset-0 overflow-y-auto overflow-x-hidden bg-white dark:bg-neutral-950">
-              <FolhaPrevia docId={valor!.docId!} baseW={BASE_W} escala={escala} />
+            <div className="absolute inset-0 overflow-hidden bg-white dark:bg-neutral-950">
+              <CapaFielOffice docId={valor!.docId!} baseW={BASE_W} escala={escala} />
             </div>
           ) : (
             /* VAZIO: criar (editor), importar PDF (enunciado/gabarito) ou selecionar um caderno já pronto. */
@@ -322,6 +322,22 @@ function SlotCard({ slot, cor, bancoId, valor, prontos, onSet }: {
       )}
     </div>
   )
+}
+
+/** Prévia FIEL (igual à capa do card da Biblioteca): imagem da 1ª página renderizada do .docx (OnlyOffice).
+ *  Enquanto gera, mostra um loader; se falhar, cai na FolhaPrevia (trechos). */
+function CapaFielOffice({ docId, baseW, escala }: { docId: string; baseW: number; escala: number }) {
+  const [url, setUrl] = useState<string | null>(null)
+  const [falhou, setFalhou] = useState(false)
+  useEffect(() => {
+    let vivo = true
+    thumbDocumento(docId).then((r) => { if (vivo) { if (r.url) setUrl(r.url); else setFalhou(true) } }).catch(() => vivo && setFalhou(true))
+    return () => { vivo = false }
+  }, [docId])
+  // eslint-disable-next-line @next/next/no-img-element
+  if (url) return <img src={url} alt="" className="absolute inset-0 h-full w-full bg-white object-contain" />
+  if (falhou) return <FolhaPrevia docId={docId} baseW={baseW} escala={escala} />
+  return <div className="absolute inset-0 flex items-center justify-center bg-white dark:bg-neutral-950"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
 }
 
 /** Prévia da "folha" de um documento da Biblioteca (trechos da versão atual), escalada à largura do card. */

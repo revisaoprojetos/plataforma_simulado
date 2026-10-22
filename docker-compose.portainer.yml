@@ -70,8 +70,10 @@ services:
       #    PÚBLICA (https) p/ evitar o bloqueio de IP privado do OnlyOffice (SSRF guard). O callback resolve
       #    o tenant pela versão, então qualquer host que roteie pro app serve.
       #  - ONLYOFFICE_INTERNAL_URL: URL INTERNA (web→DS) usada só p/ gerar a capa (ConvertService), na rede do swarm.
-      - NEXT_PUBLIC_ONLYOFFICE_URL=${NEXT_PUBLIC_ONLYOFFICE_URL:-https://onlyoffice.${APP_BASE_DOMAIN:-revisaopge.com.br}}
-      - CONTEUDO_WOPI_HOST=${CONTEUDO_WOPI_HOST:-https://simulado.${APP_BASE_DOMAIN:-revisaopge.com.br}}
+      # NEXT_PUBLIC_ONLYOFFICE_URL é DERIVADO do ONLYOFFICE_HOST (uma fonte só de verdade) → basta setar
+      # ONLYOFFICE_HOST. `https://${VAR:-default}` é substituição simples (sem ${} aninhado = sem bug).
+      - NEXT_PUBLIC_ONLYOFFICE_URL=https://${ONLYOFFICE_HOST:-onlyoffice.revisaopge.com.br}
+      - CONTEUDO_WOPI_HOST=${CONTEUDO_WOPI_HOST:-https://simulado.revisaopge.com.br}
       - ONLYOFFICE_INTERNAL_URL=${ONLYOFFICE_INTERNAL_URL:-http://onlyoffice}
     networks:
       - default
@@ -247,15 +249,18 @@ services:
       labels:
         - "traefik.enable=true"
         - "traefik.docker.network=${TRAEFIK_NETWORK:-network_swarm_public}"
-        - "traefik.http.routers.onlyoffice.rule=Host(`onlyoffice.${APP_BASE_DOMAIN:-revisaopge.com.br}`)"
+        # ONLYOFFICE_HOST = hostname público do Document Server. Default usa o subdomínio do domínio base
+        # (exige registro DNS). SEM acesso ao DNS? Use sslip.io (sem cadastro): defina no Portainer
+        #   ONLYOFFICE_HOST=onlyoffice.46-224-161-181.sslip.io  (troque pelos octetos do IP da VPS com "-")
+        # e NEXT_PUBLIC_ONLYOFFICE_URL=https://onlyoffice.46-224-161-181.sslip.io
+        - "traefik.http.routers.onlyoffice.rule=Host(`${ONLYOFFICE_HOST:-onlyoffice.revisaopge.com.br}`)"
         # Prioridade > catch-all (1) da app, p/ este Host() explícito vencer o roteamento.
         - "traefik.http.routers.onlyoffice.priority=20"
         - "traefik.http.routers.onlyoffice.entrypoints=websecure"
         - "traefik.http.routers.onlyoffice.tls=true"
-        - "traefik.http.routers.onlyoffice.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencryptresolver}"
-        # Reaproveita o cert WILDCARD `*.${APP_BASE_DOMAIN}` (DNS-01) já emitido pela app.
-        - "traefik.http.routers.onlyoffice.tls.domains[0].main=${APP_BASE_DOMAIN:-revisaopge.com.br}"
-        - "traefik.http.routers.onlyoffice.tls.domains[0].sans=*.${APP_BASE_DOMAIN:-revisaopge.com.br}"
+        # Cert por HOST (não wildcard) → funciona tanto p/ subdomínio real quanto p/ sslip.io. Exige que o
+        # certresolver consiga desafio HTTP-01 (porta 80 do Traefik aberta). Se o resolver for só DNS-01,
+        # o cert do sslip.io falha → aí o caminho é o DNS mesmo (registro A na conta Cloudflare do domínio).
         - "traefik.http.services.onlyoffice.loadbalancer.server.port=80"
 
 networks:

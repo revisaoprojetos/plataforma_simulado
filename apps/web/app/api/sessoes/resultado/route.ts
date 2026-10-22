@@ -162,7 +162,7 @@ export async function GET(request: NextRequest) {
     (async (): Promise<ModalidadeAluno[]> => {
       if (!bancoBaseIdV2) return []
       const entrega = await carregarEntregaBanco(admin, sessao.tenant_id, bancoBaseIdV2)
-      return temEntregaV2(entrega) ? modalidadesDoAlunoV2(entrega) : []
+      return temEntregaV2(entrega) ? modalidadesDoAlunoV2(entrega, sessao.id) : []
     })(),
   ])
   const cadernoId: string | null = null

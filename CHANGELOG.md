@@ -12,6 +12,24 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.24.0 — 2026-10-22
+
+**feat(diagnóstico OnlyOffice): prévia fiel no card + download do diagnóstico do aluno; OnlyOffice em produção**
+
+- **Prévia fiel do card do Diagnóstico (admin):** quando a fonte do diagnóstico é o **editor OnlyOffice**, o card
+  da montagem do caderno (`banco-caderno-montagem.tsx`) agora mostra a **imagem da 1ª página renderizada** (mesma
+  capa fiel da Biblioteca, via `thumbDocumento`) em vez do HTML/trechos. Loader enquanto gera; fallback pra prévia
+  de trechos se o OnlyOffice estiver fora.
+- **Download do Diagnóstico pro aluno (editor OnlyOffice):** antes o diagnóstico vindo do editor era **inerte**
+  pro aluno. Agora o slot `{docId, versaoId}` vira um `pdfUrl` e aparece em "Materiais e downloads" (quando o
+  gabarito/nota é liberado). Nova rota `/api/aluno/diagnostico-docx-pdf` valida a sessão, pega os **valores reais
+  do aluno** (`carregarDadosBancoCore`), **preenche o `.docx`** (`renderPreviaDocx`) e **converte em PDF no
+  OnlyOffice** (`converterDocxParaPdf`), cacheado por sessão+versão. (`entrega-aluno.ts` reconhece o variant;
+  `sessoes/resultado` passa o `sessao.id` — sem mexer nos componentes de resultado.)
+- **Infra — OnlyOffice em produção:** serviço `onlyoffice` adicionado ao `docker-compose.portainer.yml` (atrás do
+  Traefik, host via `${ONLYOFFICE_HOST}` — sslip.io quando não há DNS próprio, cert HTTP-01). Envs do `web`:
+  `NEXT_PUBLIC_ONLYOFFICE_URL` (derivada do host), `CONTEUDO_WOPI_HOST` (pública, evita SSRF), `ONLYOFFICE_INTERNAL_URL`.
+
 ## 3.23.0 — 2026-10-22
 
 **feat(biblioteca): área do aluno + leitor fiel de PDF com grifos, controle de acesso e navegação Drive**
