@@ -22,7 +22,6 @@ export interface Leitura {
   html: string
   anotacoes: Anotacao[]
 }
-export interface ItemBiblioteca { id: string; titulo: string; tipo_origem: string; versaoAtualId: string; atualizado_em: string }
 
 // ─────────── CONTROLE DE ACESSO (modelo Drive: liberar p/ todos + grupos/alunos + herança) ───────────
 // Regra por NÍVEL (pasta ou documento):
@@ -150,30 +149,6 @@ async function atribuicoesDocs(svc: any, tenantId: string, docIds: string[]) {
   return { grupos, estud }
 }
 
-/** Documentos PUBLICADOS visíveis ao aluno (respeita acesso por grupo/todos + herança de pasta). */
-export async function listarBibliotecaAluno(alunoId: string): Promise<ItemBiblioteca[]> {
-  const tenantId = await getCurrentTenantId()
-  if (!tenantId) return []
-  // Cache por (tenant, aluno) com TTL curto — o aluno acessa via iframe Curseduca (muitos reloads); sem
-  // cache, cada visita re-puxa docs + atribuições (vetor do estouro de egress). Staleness limitado a 120s.
-  return remember<ItemBiblioteca[]>(`conteudo:biblioteca-aluno:${tenantId}:${alunoId}`, 120, async () => {
-    const svc = createAdminClient()
-    const rows = await fetchAll<any>(() => svc.from(T_DOC)
-      .select('id, titulo, tipo_origem, versao_atual_id, atualizado_em, pasta_id, herda_acesso, acesso_geral')
-      .eq('tenant_id', tenantId).eq('status', 'publicado').eq('deletado', false).eq('categoria', 'conteudo')
-      .not('versao_atual_id', 'is', null)
-      .order('atualizado_em', { ascending: false }).order('id', { ascending: true }))
-    const docs = rows ?? []
-    if (!docs.length) return []
-    const { meusGrupos, pastaAcessivel } = await contextoAcessoAluno(svc, tenantId, alunoId)
-    const { grupos: dGrupos, estud: dEstud } = await atribuicoesDocs(svc, tenantId, docs.map((d: any) => d.id))
-    return docs
-      .filter((d: any) => nivelLibera(d.acesso_geral ?? null, dGrupos.get(d.id), dEstud.get(d.id), meusGrupos, alunoId)
-        && (d.herda_acesso === false || pastaAcessivel(d.pasta_id ?? null)))
-      .map((d: any) => ({ id: d.id, titulo: d.titulo, tipo_origem: d.tipo_origem, versaoAtualId: d.versao_atual_id, atualizado_em: d.atualizado_em }))
-  })
-}
-
 export interface PastaAluno { id: string; nome: string; cor: string | null; totalDocs: number }
 export interface DocAluno { id: string; titulo: string; tipo_origem: string; versaoAtualId: string }
 export interface ArvoreAluno {
@@ -190,6 +165,11 @@ export async function arvoreBibliotecaAluno(alunoId: string, pastaId?: string | 
   const vazio: ArvoreAluno = { pastas: [], documentos: [], breadcrumb: [], thumbs: {}, previas: {}, pastaAtual: pastaId ?? null }
   const tenantId = await getCurrentTenantId()
   if (!tenantId) return vazio
+  // Cache por (tenant, ALUNO, pasta) — TTL 90s. A chave DEVE incluir o alunoId: a árvore já vem FILTRADA
+  // por acesso (grupos/alunos + herança da pasta); sem o escopo por aluno, um aluno veria docs de outro.
+  // O aluno acessa via iframe Curseduca (muitos reloads) → sem cache cada visita re-puxa docs + atribuições
+  // + prévias (vetor do estouro de egress). As URLs assinadas (thumbs) valem 1h, então 90s não as expira.
+  return remember<ArvoreAluno>(`conteudo:arvore-aluno:${tenantId}:${alunoId}:${pastaId ?? 'root'}`, 90, async () => {
   const svc = createAdminClient()
 
   const [pastasRaw, docsRaw] = await Promise.all([
@@ -255,6 +235,7 @@ export async function arvoreBibliotecaAluno(alunoId: string, pastaId?: string | 
   } catch { /* capa/prévia best-effort */ }
 
   return { pastas: subpastas, documentos, breadcrumb, thumbs, previas, pastaAtual: alvo }
+  })
 }
 
 /** Carrega a leitura (trechos da versão atual + grifos do aluno). null se não publicado OU sem acesso. */

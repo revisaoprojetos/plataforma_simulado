@@ -58,41 +58,6 @@ function CardThumb({ doc, thumbUrl, trechos }: { doc: Doc; thumbUrl?: string; tr
   return <div className="flex h-full items-center justify-center"><Icone className="h-10 w-10 text-neutral-300" /></div>
 }
 
-/** Miniatura FIEL da 1ª página do .docx no card (docx-preview escalado), carregada só quando visível. */
-function DocxThumb({ url, trechos }: { url: string; trechos?: { tipo: string; texto: string }[] }) {
-  const hostRef = useRef<HTMLDivElement>(null)
-  const pageRef = useRef<HTMLDivElement>(null)
-  const [scale, setScale] = useState(0.26)
-  const [estado, setEstado] = useState<'load' | 'ok' | 'erro'>('load')
-  useEffect(() => {
-    const host = hostRef.current; if (!host) return
-    let vivo = true, iniciou = false
-    const start = async () => {
-      if (iniciou) return; iniciou = true
-      try {
-        const resp = await fetch(url); if (!resp.ok) throw new Error('fetch')
-        const buf = await resp.arrayBuffer()
-        if (!vivo || !pageRef.current) return
-        pageRef.current.innerHTML = ''
-        const { renderAsync } = await import('docx-preview')
-        await renderAsync(buf, pageRef.current, undefined, { inWrapper: false, breakPages: true, ignoreLastRenderedPageBreak: false })
-        if (vivo) setEstado('ok')
-      } catch { if (vivo) setEstado('erro') }
-    }
-    const io = new IntersectionObserver((es) => { if (es.some((e) => e.isIntersecting)) { start(); io.disconnect() } }, { rootMargin: '300px' })
-    io.observe(host)
-    const medir = () => { const w = host.clientWidth; if (w > 10) setScale(w / 794) }
-    medir(); const ro = new ResizeObserver(medir); ro.observe(host)
-    return () => { vivo = false; io.disconnect(); ro.disconnect() }
-  }, [url])
-  if (estado === 'erro') return trechos?.length ? <CardFolhaPrevia trechos={trechos} /> : <div className="h-full bg-white" />
-  return (
-    <div ref={hostRef} className="absolute inset-0 overflow-hidden bg-white">
-      <div ref={pageRef} style={{ width: 794, transform: `scale(${scale})`, transformOrigin: 'top left' }} className={`pointer-events-none transition-opacity ${estado === 'ok' ? 'opacity-100' : 'opacity-0'}`} />
-    </div>
-  )
-}
-
 /** Fallback da miniatura: folha A4 (794px) escalada à largura do card, borda-a-borda. */
 function CardFolhaPrevia({ trechos }: { trechos: { tipo: string; texto: string }[] }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -136,8 +101,6 @@ export function BibliotecaClient() {
   const [docs, setDocs] = useState<Doc[]>([])
   const [previas, setPrevias] = useState<Record<string, { tipo: string; texto: string }[]>>({})
   const [thumbs, setThumbs] = useState<Record<string, string>>({})
-  const [arquivos, setArquivos] = useState<Record<string, { url: string; tipo: string }>>({})
-  const [pdfs, setPdfs] = useState<Record<string, string>>({})
   const [breadcrumb, setBreadcrumb] = useState<PastaConteudo[]>([])
   const [carregando, setCarregando] = useState(true)
   const [view, setView] = useState<'grid' | 'lista'>('grid')
@@ -157,7 +120,7 @@ export function BibliotecaClient() {
     try {
       const r = await listarArvore(pastaId, cat)
       if (!r.ok) { toast.error(r.error || 'Falha ao carregar.'); return }
-      setPastas(r.pastas); setDocs(r.documentos); setPrevias(r.previas || {}); setThumbs(r.thumbs || {}); setArquivos(r.arquivos || {}); setPdfs(r.pdfs || {}); setBreadcrumb(r.breadcrumb); setPastaAtual(pastaId)
+      setPastas(r.pastas); setDocs(r.documentos); setPrevias(r.previas || {}); setThumbs(r.thumbs || {}); setBreadcrumb(r.breadcrumb); setPastaAtual(pastaId)
       // Histórico: cada navegação de pasta vira uma entrada (URL inalterada, preservando o estado do Next)
       // → o "Voltar" do navegador sobe de pasta em vez de sair da Biblioteca. push=false quando a
       // própria navegação já veio de um popstate (voltar/avançar do navegador).
@@ -496,7 +459,7 @@ export function BibliotecaClient() {
       {acessoDrive && <DriveAcessoWrapper pastaId={acessoDrive.id} categoria={categoria} onFechar={() => setAcessoDrive(null)} />}
       {uploads && uploads.length > 0 && <DriveUploadPanel itens={uploads} onClose={() => setUploads(null)} />}
       {importAberto && <ImportDialog pastaId={pastaAtual} categoria={categoria} onFechar={() => setImportAberto(false)} onPronto={() => { setImportAberto(false); carregar(pastaAtual) }} />}
-      {detalheId && <DetalheDialog documentoId={detalheId} pdfUrlInicial={pdfs[detalheId]} capaInicial={thumbs[detalheId]} onFechar={() => setDetalheId(null)} onMudou={() => carregar(pastaAtual)} />}
+      {detalheId && <DetalheDialog documentoId={detalheId} capaInicial={thumbs[detalheId]} onFechar={() => setDetalheId(null)} onMudou={() => carregar(pastaAtual)} />}
       {acessoPasta && (
         <Overlay onFechar={() => setAcessoPasta(null)} largura="max-w-3xl">
           <div className="mb-4 flex items-center justify-between">

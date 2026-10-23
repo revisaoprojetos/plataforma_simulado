@@ -151,11 +151,16 @@ export async function POST(request: NextRequest) {
   const bestIn = b.best && typeof b.best === 'object' && !Array.isArray(b.best) ? (b.best as Record<string, unknown>) : {}
 
   // Estado atual no servidor (fonte p/ a guarda anti-vazio + a MESCLA monotônica abaixo).
-  const { data: atual } = await svc
+  const { data: atual, error: errAtual } = await svc
     .from('simulado_jurisprudencia_progresso')
     .select('dom, best')
     .eq('desafio_id', desafioId).eq('estudante_id', sessao.estudanteId)
     .maybeSingle()
+  // FAIL-CLOSED: se a leitura do estado atual FALHAR (erro transitório do banco), NÃO grava. Sem o `atual`,
+  // a mescla usaria só as chaves que ESTE cliente enviou (o que estiver no localStorage dele agora) e
+  // derrubaria dias que só existem no servidor — ex.: uma matéria apaga a outra. O cliente mantém o
+  // localStorage e re-tenta no próximo flush; nada é perdido, só adiado. (Antes o erro era ignorado.)
+  if (errAtual) return NextResponse.json({ ok: true, adiado: true })
   const domAtual = (atual?.dom && typeof atual.dom === 'object') ? atual.dom as Record<string, unknown> : {}
   const bestAtual = (atual?.best && typeof atual.best === 'object') ? atual.best as Record<string, unknown> : {}
 

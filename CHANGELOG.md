@@ -12,6 +12,29 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.26.0 — 2026-10-23
+
+**perf(biblioteca): otimização backend-first (admin + aluno) — corta egress e carregamento**
+
+- **`html_rico` eliminado (−3,1 GB no banco + fim do write-amplification):** a coluna `html_rico` das versões
+  guardava o HTML com **imagens base64 inline** (~10 MB por documento, ~3,1 GB no total), **reescrito a cada
+  edição** do OnlyOffice. O leitor do aluno usa 100% o **PDF fiel** (`carregarLeituraPdf`); o caminho HTML
+  (`carregarLeitura`) está morto e, se reativado, `regenerarHtmlRico` recria sob demanda. Removida a escrita em
+  `reconciliacao.ts` e **zerado** o `html_rico` existente (regenerável). Sem perda para o aluno.
+- **Navegação da Biblioteca do aluno cacheada:** `arvoreBibliotecaAluno` agora passa por `remember(90s)` com
+  chave **por tenant+aluno+pasta** — corta o recomputo de acesso sobre todos os documentos a cada recarga
+  (ex.: iframe Curseduca com muitos reloads). Acesso por-aluno intacto (a chave inclui o aluno).
+- **Admin `listarArvore` enxuto:** deixou de gerar a URL assinada do original (que o cliente descartava) e a
+  **pré-geração de PDF** de todo docx; a URL do PDF virou **sob demanda** (ao abrir o detalhe). Card carrega só
+  a capa (thumb) — de **3 idas ao storage por documento para 1**.
+- **Prévia do admin** (`conteudoPreviewAdmin`) deixou de puxar **todos** os trechos (até ~7.766 por versão) —
+  limitada a 400.
+- **Código morto removido:** `listarBibliotecaAluno`, `DocxThumb` e estados `arquivos`/`pdfs` do cliente.
+- **fix(ranking leitura):** o detalhe do aluno (`detalheRankingAluno`) agora soma o **bônus de conclusão** além
+  do de sequência — antes mostrava menos pontos que a lista do ranking.
+- **fix(jurisprudência progresso):** gravação **fail-closed** — se a leitura do estado atual falhar, não grava
+  (evita apagar dias que só existem no servidor); o cliente mantém o localStorage e re-tenta.
+
 ## 3.25.1 — 2026-10-22
 
 **chore(sidebar): "Modelos de Caderno (OnlyOffice)" movido para o grupo Simulado**

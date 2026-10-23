@@ -38,11 +38,9 @@ export async function listarArvore(pastaId?: string | null, categoria: Categoria
   pastas: PastaConteudo[]; documentos: Awaited<ReturnType<typeof listarDocumentos>>; breadcrumb: PastaConteudo[]
   previas: Record<string, { tipo: string; texto: string }[]>
   thumbs: Record<string, string>
-  arquivos: Record<string, { url: string; tipo: string }>
-  pdfs: Record<string, string>
 }> {
   const g = await guard('view')
-  if (!g.ok) return { ok: false, error: g.error, pastas: [], documentos: [], breadcrumb: [], previas: {}, thumbs: {}, arquivos: {}, pdfs: {} }
+  if (!g.ok) return { ok: false, error: g.error, pastas: [], documentos: [], breadcrumb: [], previas: {}, thumbs: {} }
   const svc = createAdminClient()
   const area = folderArea(categoria)
   // Filtra NO BANCO por área (não varre todas as pastas do tenant) + order por coluna única (paginação segura).
@@ -63,10 +61,6 @@ export async function listarArvore(pastaId?: string | null, categoria: Categoria
   // PRÉVIA dos cards: primeiros trechos ESTRUTURADOS (tipo+texto) p/ montar uma mini-página (título + linhas),
   // em vez de um blocão de texto. Versão = atual (publicada) ou a mais nova. Batched.
   const previas: Record<string, { tipo: string; texto: string }[]> = {}
-  // URL assinada do ORIGINAL por doc → miniatura FIEL no card (docx-preview / PDF nativo), sem OnlyOffice.
-  const arquivos: Record<string, { url: string; tipo: string }> = {}
-  // URL do PDF (doc inteiro, cacheado) por doc → a prévia grande abre DIRETO no viewer (sem telas de loading).
-  const pdfs: Record<string, string> = {}
   // CAPA (thumb fiel): URL assinada JÁ PRONTA do PNG cacheado → o card renderiza a imagem direto, sem piscar
   // a folha de trechos. Caminho determinístico (versão+hash); se o objeto não existir, o card regenera onError.
   const thumbs: Record<string, string> = {}
@@ -87,32 +81,27 @@ export async function listarArvore(pastaId?: string | null, categoria: Categoria
       for (const t of trechos) { const a = porVersao.get(t.versao_id) ?? []; if (a.length < 24) a.push({ tipo: String(t.tipo || 'paragrafo'), texto: String(t.texto || '').replace(/\s+/g, ' ').trim().slice(0, 320) }); porVersao.set(t.versao_id, a) }
       for (const [docId, verId] of verPorDoc) { const arr = porVersao.get(verId); if (arr && arr.length) previas[docId] = arr }
 
-      // Por doc: (a) URL do ORIGINAL (p/ docx-preview, fallback local) e (b) URL da CAPA fiel do OnlyOffice
-      // (PNG cacheado por versão/hash) — PREFERIDA quando existe (produção). O card tenta a capa e, se o
-      // objeto não existir (ex.: dev sem OnlyOffice → 404), cai no docx-preview.
-      const vks = (await fetchAll<any>(() => svc.from('simulado_conteudo_versoes').select('id, arquivo_key, hash_arquivo').eq('tenant_id', g.tenantId).in('id', verIds))) ?? []
-      const keyPorVer = new Map<string, string>(); const hashPorVer = new Map<string, string>()
-      for (const v of vks) { if (v.arquivo_key) keyPorVer.set(v.id, v.arquivo_key); hashPorVer.set(v.id, String(v.hash_arquivo || '')) }
+      // CAPA fiel do OnlyOffice (PNG cacheado por versão/hash) p/ o card. O card tenta a capa e, se o
+      // objeto não existir (ex.: dev sem OnlyOffice → 404), cai no docx-preview/trechos.
+      const vks = (await fetchAll<any>(() => svc.from('simulado_conteudo_versoes').select('id, hash_arquivo').eq('tenant_id', g.tenantId).in('id', verIds))) ?? []
+      const hashPorVer = new Map<string, string>()
+      for (const v of vks) hashPorVer.set(v.id, String(v.hash_arquivo || ''))
       await Promise.all(documentos.map(async (d) => {
         const verId = verPorDoc.get(d.id); if (!verId) return
-        const key = keyPorVer.get(verId)
-        if (key) { const url = await urlAssinadaOriginal(key, 3600); if (url) arquivos[d.id] = { url, tipo: String((d as any).tipo_origem || 'docx') } }
         if ((d as any).tipo_origem === 'docx') {
           const h8 = hashPorVer.get(verId)?.slice(0, 8) || ''
-          // Capa (1ª página). Cacheada → usa; senão pré-gera em background.
+          // SÓ a CAPA (1ª página) do card. Cacheada → usa; senão pré-gera em background. O PDF do doc
+          // inteiro e a URL assinada do original NÃO são gerados aqui (egress/trabalho desperdiçado): o
+          // detalhe (PreviaFiel) busca o PDF on-demand via pdfPreviewDocumento quando o aluno abre o doc.
           const turl = await urlAssinadaOriginal(`conteudo-thumbs/${g.tenantId}/${verId}_${h8}_r1k.png`, 3600)
           if (turl) thumbs[d.id] = turl
           else void gerarThumbDocumento(g.tenantId, d.id).catch(() => {})
-          // PDF (doc inteiro). Cacheado → devolve a URL (prévia grande abre DIRETO); senão pré-gera.
-          const purl = await urlAssinadaOriginal(`conteudo-pdfs/${g.tenantId}/${verId}_${h8}.pdf`, 3600)
-          if (purl) pdfs[d.id] = purl
-          else void gerarPdfDocumento(g.tenantId, d.id).catch(() => {})
         }
       }))
     }
   } catch { /* prévia/capa best-effort */ }
 
-  return { ok: true, pastas, documentos, breadcrumb, previas, thumbs, arquivos, pdfs }
+  return { ok: true, pastas, documentos, breadcrumb, previas, thumbs }
 }
 
 /** Trechos da versão atual (ou mais nova) de um documento — para a aba "Prévia" do drawer de detalhe. */
@@ -487,7 +476,11 @@ export async function conteudoPreviewAdmin(documentoId: string): Promise<{ ok: b
   let versaoId: string | null = (doc as any).versao_atual_id ?? null
   if (!versaoId) { const uv = await ultimaVersao(documentoId); versaoId = uv?.id ?? null }
   if (!versaoId) return { ok: false, error: 'Sem versão para visualizar ainda.' }
-  const trechos = await fetchAll<any>(() => svc.from('simulado_conteudo_trechos').select('uid, ordem, tipo, rotulo, texto').eq('tenant_id', g.tenantId).eq('versao_id', versaoId).order('ordem', { ascending: true }))
+  // Prévia = guardrail de egress: no máx. 400 trechos (cobre a prévia de praticamente qualquer doc), em
+  // vez do fetchAll ILIMITADO que paginava o documento inteiro só para a aba "Prévia".
+  const { data: trechos } = await svc.from('simulado_conteudo_trechos')
+    .select('uid, ordem, tipo, rotulo, texto').eq('tenant_id', g.tenantId).eq('versao_id', versaoId)
+    .order('ordem', { ascending: true }).limit(400)
   return { ok: true, trechos: ((trechos as any[]) ?? []).map((t) => ({ uid: t.uid, tipo: t.tipo, rotulo: t.rotulo ?? null, texto: t.texto ?? '' })) }
 }
 
