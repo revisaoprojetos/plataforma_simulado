@@ -12,6 +12,39 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.28.2 — 2026-10-24
+
+**fix(maratona/banco): duplicar banco não herda mais o `caderno_entrega` (downloads do dia errado)**
+
+- Montar uma maratona **duplicando** um simulado fazia `copiarBanco` copiar a coluna `caderno_entrega`
+  inteira → os PDFs de **Enunciado e Gabarito do dia 1** eram herdados pelos outros dias, e todos os
+  downloads puxavam o caderno do dia 1 (a prova online, que usa o banco próprio, não era afetada).
+- Agora [`copiarBanco`](apps/web/app/admin/banco-questoes/actions.ts) **não herda `caderno_entrega`** — cada
+  cópia começa sem cadernos e o admin define os seus (enunciado/gabarito/diagnóstico/folha por dia). Vale para
+  duplicar banco, duplicar pasta e copiar simulado para pasta.
+
+## 3.28.1 — 2026-10-24
+
+**fix(plugin): reorganização do painel de variáveis do simulado (OnlyOffice)**
+
+Na v3.28.0 os chips novos (Nível/Faixa/Card) espremeram tudo numa lista única — em "Pilares"
+todas as variáveis de todos os pilares caíam no mesmo bloco, sem separação. Agora:
+
+- **Seções** "Disciplinas" e "Pilares" com cabeçalho/divisória.
+- **Um bloco por item** (card com borda): título (nome · nº de questões) + botão **"＋ Card deste item"**
+  em destaque (largura total) + chips de valor com **rótulos curtos** (`%`, `Acerto`, `Total`, `Assuntos`,
+  `Nível`, `Faixa`) — o nome do pilar/disciplina não se repete mais em cada chip.
+- **"＋ Inserir TODOS os pilares (cards)"** em destaque no topo da seção Pilares.
+
+**fix(caderno): título cortado no seletor "Modelos de caderno — Diagnóstico"**
+
+- No popup de modelos, o título (um `<span>` com `line-clamp-2`) não recebia largura dentro do card
+  `inline-block`, então o clamp não aplicava e o `overflow-hidden` cortava o texto; títulos com underscore
+  (`SP-Diagnostico_de_...`) ainda estouravam sem ponto de quebra. Fix: `block w-full` + `break-words` no
+  título → 2 linhas com reticências, sem corte.
+
+---
+
 ## 3.28.0 — 2026-10-24
 
 **feat(prévia): contrato de variáveis 100% adaptativo + card de pilar já cabeado (1 clique)**

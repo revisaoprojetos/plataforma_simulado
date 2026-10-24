@@ -250,6 +250,10 @@ async function copiarBanco(svc: ReturnType<typeof createAdminClient>, tenantId: 
   // Exclui id, timestamps, flags de exclusão e auditoria (caso existam) e caderno_id (tratado à parte).
   const { id: _i, created_at: _c, criado_em: _cc, atualizado_em: _a, updated_at: _u, deletado: _d, deletado_em: _de, deletado_por: _dp, criado_por: _cp, atualizado_por: _ap, caderno_id: origCadernoId, ...rest } = o
   const insBase: Record<string, unknown> = { ...rest }
+  // caderno_entrega (PDFs de enunciado/gabarito/diagnóstico/folha) é CONTEÚDO ESPECÍFICO do banco original.
+  // NÃO herdar na cópia: senão a cópia serve o download do ORIGINAL (bug "todos os dias da maratona puxavam
+  // o caderno do dia 1" — montada duplicando o simulado). Cada cópia define os seus cadernos.
+  delete insBase.caderno_entrega
   if (opts.nome !== undefined) insBase.nome = opts.nome
   if (opts.paiId !== undefined) insBase.pai_id = opts.paiId
   // Insere a cópia; se alguma coluna ainda não existir no banco, remove SÓ ela e tenta de novo.
