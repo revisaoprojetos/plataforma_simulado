@@ -63,6 +63,9 @@
   .chip { display:inline-flex; align-items:center; border:1px solid var(--oo-line); background:var(--oo-bg); color:var(--oo-txt); border-radius:9px; padding:5px 11px; font-size:12px; font-weight:400; cursor:pointer; transition:background .12s, border-color .12s; }
   .chip:hover { border-color:var(--oo-accent); background:var(--oo-hover); }
   .chip:active { background:var(--oo-line2); }
+  /* Botão que INSERE um card já cabeado (%, nº e faixas) — destaque na cor da marca. */
+  .chip-card { border-color:var(--oo-accent); background:color-mix(in srgb, var(--oo-accent) 13%, transparent); color:var(--oo-accent); font-weight:600; }
+  .chip-card:hover { border-color:var(--oo-accent); background:color-mix(in srgb, var(--oo-accent) 24%, transparent); }
   /* Reguladores de variáveis (seletor de simulado + modal) */
   .simsel { margin-bottom:0; }
   .divisoria { height:1px; background:var(--oo-line2); margin:13px 24px; }
@@ -497,21 +500,54 @@ function renderSimLista(){
 }
 function selSimulado(id,nome){ fecharSeletorSim(); document.getElementById('simsel-lbl').textContent=nome; carregarSimVars(id,nome); }
 function carregarSimVars(id,nome){ var c=document.getElementById('simvars'); c.innerHTML='<div class="simloading">Carregando variáveis…</div>'; fetch('/api/teste/simulado-vars/'+encodeURIComponent(id)).then(function(r){return r.json();}).then(function(d){ renderSimVars(d); }).catch(function(e){ c.innerHTML='<div class="simloading">Falha: '+esc(e)+'</div>'; }); }
+// Texto genérico por faixa (0-49 / 50-80 / 81-100) com o NOME do pilar/disciplina interpolado. É SEMPRE
+// coerente com a faixa porque o card é cabeado a {slug_f1}/{slug_f2}/{slug_f3}: só aparece a faixa do % real.
+// O autor refina o texto livremente; nunca precisa mexer em marcador de laço.
+function textosPilarAuto(nome){
+  return [
+    'Seu desempenho em '+nome+' ficou abaixo de 50% e merece atenção. Retome os fundamentos e pratique com questões no mesmo padrão da prova para consolidar a base.',
+    'Seu desempenho em '+nome+' foi intermediário: há base, mas ainda há espaço relevante para crescer. Reforce os pontos de maior incidência e mantenha a prática constante.',
+    'Excelente desempenho em '+nome+'! Você domina esta frente — mantenha o ritmo com revisões periódicas até a prova.'
+  ];
+}
+// 1 card JÁ CABEADO ao slug (%, "x de y questões" e as 3 faixas condicionais). Self-consistent por
+// construção: impossível a faixa apontar pro pilar errado, porque tudo usa a MESMA `chave`=slug.
+function umCardSlugHtml(nome, slug){
+  var t=textosPilarAuto(nome);
+  return tb('<tr>'+pcard(String(nome).toUpperCase(),'#f7b500','#071a3f',t[0],t[1],t[2],'100%',slug)+'</tr>');
+}
+// Linha "DESEMPENHO POR PILAR" com UM card por pilar PRESENTE no simulado (cada um cabeado ao seu slug).
+// Adapta-se sozinho: 3 pilares da jurisprudência (STF/STJ/SI), ou Lei seca/Jurisprudência/Doutrina, etc.
+function cardsPilaresHtml(pilares){
+  if(!pilares.length) return '';
+  var w=Math.max(10, Math.floor((100-(pilares.length-1)*2)/pilares.length))+'%';
+  var cells=pilares.map(function(p){ var t=textosPilarAuto(p.nome); return pcard(String(p.nome).toUpperCase(),'#f7b500','#071a3f',t[0],t[1],t[2],w,p.slug); });
+  return bandW('DESEMPENHO POR PILAR') + SP + '<table width="100%" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;table-layout:fixed;page-break-inside:avoid"><tr valign="top" style="page-break-inside:avoid">'+cells.join(PGAP)+'</tr></table>';
+}
 function renderSimVars(d){
   var c=document.getElementById('simvars'); c.innerHTML='';
   if(d&&d.erro){ c.innerHTML='<div class="simloading">'+esc(d.erro)+'</div>'; return; }
   var discs=(d&&d.disciplinas)||[], pilares=(d&&d.pilares)||[];
   function chip(label,tag,parent){ var b=el('button','chip',esc(label)); b.title=tag; b.onclick=function(){inserirTexto(tag,label);}; parent.appendChild(b); }
+  // Botão de CARD: insere o card inteiro já cabeado — um clique, sem casar variável/faixa na mão.
+  function cardBtn(label,html,parent){ var b=el('button','chip chip-card','＋ '+esc(label)); b.title='Insere o card já cabeado (%, nº de questões e faixa) — pronto, sem mexer em marcador'; b.onclick=function(){inserirHtml(html,label);}; parent.appendChild(b); }
   discs.forEach(function(dd){
     var g=el('div','svgrp'); g.appendChild(el('h5',null,esc(dd.nome)+' · '+dd.total+' q'));
     var ch=el('div','chips');
     chip('Acerto','{acerto_'+dd.slug+'}',ch); chip('Total','{total_'+dd.slug+'}',ch); chip('%','{pct_'+dd.slug+'}',ch); chip('Assuntos','{assuntos_'+dd.slug+'}',ch);
+    chip('Nível','{'+dd.slug+'_nivel}',ch); chip('Faixa','{'+dd.slug+'_faixa}',ch);
+    cardBtn('Card '+dd.nome, umCardSlugHtml(dd.nome, dd.slug), ch);
     g.appendChild(ch); c.appendChild(g);
   });
   if(pilares.length){
     var g=el('div','svgrp'); g.appendChild(el('h5',null,'Pilares'));
+    var top=el('div','chips'); cardBtn('Inserir TODOS os pilares (cards)', cardsPilaresHtml(pilares), top); g.appendChild(top);
     var ch=el('div','chips');
-    pilares.forEach(function(p){ chip('% '+p.nome,'{pct_pilar_'+p.slug+'}',ch); chip('Acerto '+p.nome,'{acerto_pilar_'+p.slug+'}',ch); chip('Total '+p.nome,'{total_pilar_'+p.slug+'}',ch); });
+    pilares.forEach(function(p){
+      chip('% '+p.nome,'{pct_pilar_'+p.slug+'}',ch); chip('Acerto '+p.nome,'{acerto_pilar_'+p.slug+'}',ch); chip('Total '+p.nome,'{total_pilar_'+p.slug+'}',ch);
+      chip('Nível '+p.nome,'{'+p.slug+'_nivel}',ch); chip('Faixa '+p.nome,'{'+p.slug+'_faixa}',ch);
+      cardBtn('Card '+p.nome, umCardSlugHtml(p.nome, p.slug), ch);
+    });
     g.appendChild(ch); c.appendChild(g);
   }
   if(!discs.length && !pilares.length) c.innerHTML='<div class="simloading">Esse simulado não tem disciplinas/pilares mapeados.</div>';

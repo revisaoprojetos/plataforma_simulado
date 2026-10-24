@@ -12,6 +12,34 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.28.0 — 2026-10-24
+
+**feat(prévia): contrato de variáveis 100% adaptativo + card de pilar já cabeado (1 clique)**
+
+Para a prévia/diagnóstico nunca mais ter "variável que não conecta" ou "faixa apontando pro pilar errado",
+e priorizar a facilidade de edição:
+
+- **Dados (fonte única e universal) — `computarPreviaDados`:** toda agrupação (geral, cada disciplina, cada
+  pilar/sub-pilar) agora emite o MESMO conjunto — `<slug>_pct` / `<slug>_acertos` / `<slug>_total` + as
+  faixas `<slug>_f1/f2/f3` **sempre casadas com o %** — nas duas convenções de nome (`<slug>_*` e os aliases
+  `pct_pilar_*`/`pct_*`). Resultado: qualquer `{X_pct}` tem automaticamente `{#X_f1/f2/f3}` certos, e um tipo
+  de agrupação novo entra "de graça" (sem tocar em template nem em deploy). Flags de faixa também dentro do
+  laço `{#disciplinas}`.
+- **Fim da divergência entre os dois labs:** o lab do Teste (`/admin/teste/onlyoffice`) e o da Biblioteca
+  (`/admin/biblioteca/editar`) passam a usar a MESMA função de cálculo. Era essa duplicação que fazia o fix
+  pegar só num lab (saga v3.27.1 → v3.27.2).
+- **Plugin do OnlyOffice — card já cabeado:** na aba de variáveis do simulado, cada pilar/disciplina ganha um
+  botão **"＋ Card"** que insere o card inteiro (%, nº de questões e as 3 faixas) **já ligado ao slug certo** —
+  impossível a faixa cair no pilar errado. Botão **"Inserir TODOS os pilares (cards)"** monta a seção
+  "Desempenho por pilar" com um card por pilar presente no simulado (ex.: STF/STJ/Sistemas Internacionais),
+  cada um correto. Um clique, sem casar marcador na mão.
+- **Variáveis-ÚNICAS de faixa (frase sem condicional):** além dos 3 blocos condicionais, cada agrupação expõe
+  `{<slug>_nivel}` (crítico / intermediário / excelente) e `{<slug>_faixa}` (0-49 / 50-80 / 81-100), medidos
+  pela nota real daquele pilar. Assim dá pra escrever uma linha só — ex.: `Desempenho {stf_nivel} ({stf_pct}).`
+  → "Desempenho excelente (86%)." — sem precisar de marcador de laço. Chips "Nível"/"Faixa" no plugin.
+
+---
+
 ## 3.27.2 — 2026-10-24
 
 **fix(prévia): sub-pilares (STF/STJ/SI) continuavam em branco no Lab da BIBLIOTECA**
