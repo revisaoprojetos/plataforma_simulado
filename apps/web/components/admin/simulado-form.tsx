@@ -40,6 +40,9 @@ const simuladoSchema = z.object({
       embaralhar_questoes: z.boolean().optional(),
       embaralhar_alternativas: z.boolean().optional(),
       revisao_antes_enviar: z.boolean().optional(),
+      // Prazo relativo (acesso avulso): guardado dentro de `regras` (sem colunas dedicadas no banco).
+      prazo_valor: z.coerce.number().optional(),
+      prazo_unidade: z.enum(['horas', 'dias', 'meses']).optional(),
       exibir_nota: z.boolean().optional(),
       mostrar_comentario: z.boolean().optional(),
       retentativas: z.coerce.number().optional(),
@@ -60,6 +63,9 @@ const simuladoSchema = z.object({
 })
 
 export type SimuladoFormData = z.infer<typeof simuladoSchema>
+
+// Rótulos amigáveis do modo (o trigger do base-ui mostraria o valor cru, ex.: "prazo_relativo", sem isto).
+const MODO_LABEL: Record<string, string> = { janela_fixa: 'Agendado', prazo_relativo: 'Prazo relativo', aberto: 'Aberto' }
 
 interface SimuladoFormProps {
   initialData?: Partial<SimuladoFormData>
@@ -110,6 +116,9 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
   const minIniciais = Number(initialData?.tempo_limite_min ?? 0) || 0
   const pad = (n: number) => String(n).padStart(2, '0')
   const [tempoProva, setTempoProva] = useState(minIniciais ? `${pad(Math.floor(minIniciais / 60))}:${pad(minIniciais % 60)}` : '')
+  // "Sem data de fim": janela fixa SEM término — abre na data de início e fica aberto até encerrar à mão.
+  // Começa marcado quando já não há data de fim (vazio = sem término, regra do negócio).
+  const [semDataFim, setSemDataFim] = useState(!initialData?.data_fim)
 
   // Aplica as transformações de negócio (tempo em minutos, retentativas ilimitadas, etc.) sobre os
   // valores do form. Usado tanto pelo auto-save quanto pelo submit por Enter.
@@ -117,6 +126,9 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
     const [h, m] = tempoProva.split(':')
     const totalMin = (Number(h) || 0) * 60 + (Number(m) || 0)
     data.tempo_limite_min = totalMin > 0 ? totalMin : undefined
+    // Fim vazio (ex.: "Sem data de fim" marcado, que zera o campo) → não envia fim: fica aberto até
+    // encerrar à mão. Baseado no VALOR (não no state do checkbox) p/ não depender de closure do auto-save.
+    if (!data.data_fim) data.data_fim = undefined
     if (data.regras) {
       // Ilimitadas = sem teto (o motor trata retentativas<=0 como ilimitado).
       if (data.regras.retentativas_ilimitadas) data.regras.retentativas = 0
@@ -212,20 +224,20 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
               value={modo ?? 'janela_fixa'}
               onValueChange={(v) => setValue('modo_aplicacao', v as SimuladoFormData['modo_aplicacao'])}
             >
-              <SelectTrigger>
-                <SelectValue />
+              <SelectTrigger className="w-full">
+                <SelectValue>{(v: string) => MODO_LABEL[v] ?? 'Agendado'}</SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="janela_fixa">Janela Fixa (ex.: 8h–13h com 1000+ simultâneos)</SelectItem>
-                <SelectItem value="prazo_relativo">Prazo Relativo (acesso avulso com prazo)</SelectItem>
-                <SelectItem value="aberto">Aberto (sempre disponível)</SelectItem>
+                <SelectItem value="janela_fixa">Agendado — data e horário definidos (ex.: 8h–13h)</SelectItem>
+                <SelectItem value="prazo_relativo">Prazo relativo — acesso avulso com prazo</SelectItem>
+                <SelectItem value="aberto">Aberto — sempre disponível</SelectItem>
               </SelectContent>
             </Select>
-            {modo !== 'janela_fixa' && (
+            {modo === 'aberto' && (
               <p className="text-xs text-muted-foreground">
                 Para agendar data e horário,{' '}
                 <button type="button" onClick={() => setValue('modo_aplicacao', 'janela_fixa')} className="font-medium text-primary underline underline-offset-2 hover:opacity-80">
-                  mudar para Janela Fixa
+                  mudar para Agendado
                 </button>{' '}— os campos de data/hora aparecem logo abaixo.
               </p>
             )}
@@ -245,16 +257,50 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
                     {...register('data_inicio')}
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="data_fim">Data/Hora de Fim</Label>
-                  <Input
-                    id="data_fim"
-                    type="datetime-local"
-                    {...register('data_fim')}
-                  />
-                </div>
+                {!semDataFim && (
+                  <div className="space-y-2">
+                    <Label htmlFor="data_fim">Data/Hora de Fim</Label>
+                    <Input
+                      id="data_fim"
+                      type="datetime-local"
+                      {...register('data_fim')}
+                    />
+                  </div>
+                )}
               </div>
+              <label className="flex cursor-pointer items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--primary)]"
+                  checked={semDataFim}
+                  onChange={(e) => { setSemDataFim(e.target.checked); if (e.target.checked) setValue('data_fim', '') }}
+                />
+                <span>
+                  <span className="font-medium">Sem data de fim</span>
+                  <span className="block text-xs text-muted-foreground">Abre na data de início e fica aberto para sempre, até você encerrar manualmente.</span>
+                </span>
+              </label>
               <p className="text-xs text-muted-foreground">{BRT_LABEL} — informe e confira sempre no horário de Brasília.</p>
+            </div>
+          )}
+
+          {modo === 'prazo_relativo' && (
+            <div className="space-y-2">
+              <Label htmlFor="prazo_valor">Prazo para concluir</Label>
+              <div className="flex flex-wrap items-center gap-2">
+                <Input id="prazo_valor" type="number" min={1} className="w-28" placeholder="ex.: 7" {...register('regras.prazo_valor')} />
+                <Select value={watch('regras.prazo_unidade') ?? 'dias'} onValueChange={(v) => setValue('regras.prazo_unidade', v as 'horas' | 'dias' | 'meses')}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue>{(v: string) => ({ horas: 'Horas', dias: 'Dias', meses: 'Meses' } as Record<string, string>)[v] ?? 'Dias'}</SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="horas">Horas</SelectItem>
+                    <SelectItem value="dias">Dias</SelectItem>
+                    <SelectItem value="meses">Meses</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-xs text-muted-foreground">Começa a contar quando você libera o acesso de cada aluno. Cada tentativa vale dentro desse prazo.</p>
             </div>
           )}
 
@@ -311,7 +357,7 @@ export function SimuladoForm({ initialData, onSubmit }: SimuladoFormProps) {
                   />
                   <div>
                     <Label htmlFor="entrada_antecipada">Permitir entrada antecipada (aguardar o início)</Label>
-                    <p className="text-xs text-muted-foreground">O aluno pode fazer login antes do horário e fica numa tela de espera com contagem regressiva; o simulado abre sozinho ao chegar a hora — sem gastar tempo de prova. (Só faz efeito no modo Janela Fixa, com data/hora de início.)</p>
+                    <p className="text-xs text-muted-foreground">O aluno pode fazer login antes do horário e fica numa tela de espera com contagem regressiva; o simulado abre sozinho ao chegar a hora — sem gastar tempo de prova. (Só faz efeito no modo Agendado, com data/hora de início.)</p>
                   </div>
                 </div>
 

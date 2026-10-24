@@ -4,6 +4,7 @@
 
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { estadoAnulacaoPorQuestao } from '@/lib/simulado/questoes-anuladas'
+import { subPilarJurisprudencia } from '@/lib/simulado/pilar-jurisprudencia'
 
 export type Registro = { id: string; nome: string; vars: Record<string, string>; respostas: Record<string, string> }
 
@@ -43,7 +44,7 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
   if (qids.length) {
     // O PILAR vem da coluna `categoria` da questão (Lei seca / Jurisprudência / Doutrina).
     // `pilar_1/pilar_2` é opcional (fallback) para bases que usem esse formato.
-    const qs = await fetchAllByIn<any>(qids, (chunk) => svc.from('simulado_questoes').select('id, categoria, pilar_1, pilar_2, assunto_detalhe, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome)').in('id', chunk).order('id'))
+    const qs = await fetchAllByIn<any>(qids, (chunk) => svc.from('simulado_questoes').select('id, categoria, pilar_1, pilar_2, grupo, comentario_professor, enunciado, assunto_detalhe, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome)').in('id', chunk).order('id'))
     for (const q of qs) {
       if (desconsideraSet.has(q.id)) continue // fora do total — não conta em nada
       const d = (q as any).disciplinas?.nome ?? 'Geral'
@@ -66,6 +67,13 @@ export async function carregarRegistros(svc: any, tenantId: string, bancoId: str
       else if (catTxt.includes('jurisprud')) pilar = 'Jurisprudência'
       else if (catTxt.includes('doutrina')) pilar = 'Doutrina'
       const unicos = pilar ? [pilar] : []
+      // JURISPRUDÊNCIA → abre em SUB-PILAR por tribunal (STF/STJ/Sistemas Internacionais/Outros),
+      // detectado do campo pilar_1 (se explícito) ou do texto (comentário do professor + enunciado).
+      // Aditivo: a questão fica no pilar "Jurisprudência" E no seu tribunal (que somam o total da juris).
+      if (pilar === 'Jurisprudência') {
+        const trib = subPilarJurisprudencia((q as any).pilar_1, (q as any).comentario_professor, (q as any).enunciado)
+        if (trib && !unicos.includes(trib)) unicos.push(trib)
+      }
       pilaresDaQuestao.set(q.id, unicos)
       for (const p of unicos) pilarTotais.set(p, (pilarTotais.get(p) ?? 0) + 1)
     }

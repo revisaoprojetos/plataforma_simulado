@@ -12,6 +12,27 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.27.0 — 2026-10-24
+
+**feat/fix: sub-pilar da jurisprudência (STF/STJ) no diagnóstico + seletores do Lab de prévia + dev webpack**
+
+- **Sub-pilar da jurisprudência (STF · STJ · Sistemas Internacionais):** os minissimulados de jurisprudência
+  não trazem o tribunal num campo estruturado — ele só aparece no texto (comentário/enunciado). Novo
+  `lib/simulado/pilar-jurisprudencia.ts` detecta o tribunal por texto e **abre a Jurisprudência em
+  sub-pilares** (aditivo: a questão continua no pilar "Jurisprudência"). A API `simulado-vars` e os cálculos
+  passam a expor `pct_pilar_stf`, `acerto_pilar_stj`, etc. Ex.: DPE/SP-Minissimulado → **STF 7 · STJ 20 ·
+  Sistemas Internacionais 3** (antes colapsava tudo em "Jurisprudência", por isso o diagnóstico mostrava os
+  pilares errados).
+- **Seletor de Diagnóstico (editor beta):** só lista os **Modelos de Caderno** (`categoria=modelo_caderno`,
+  não mais a Biblioteca/Conteúdos), com **capa/thumb** e **navegação em pastas/subpastas** (cards no visual da
+  Biblioteca, até 5 por linha).
+- **Seletor "Selecionar simulado" (Laboratório de prévia):** abas **Simulados × Desafios** — os desafios
+  (ex.: Maratona) aparecem como pastas com os **simulados internos** (capa + mesmo visual).
+- **Dev (`scripts/dev.ps1`):** força `next dev --webpack` — no Next 16 o Turbopack virou padrão e era instável
+  aqui (OOM + `ChunkLoadError` do HMR que travava o editor no localhost).
+- **Ajustes acumulados** em simulados (form/wizard/tabela de questões/regras/board), leitor de jurisprudência,
+  caderno-designer (merge), ingestão de conteúdo e callback do OnlyOffice.
+
 ## 3.26.1 — 2026-10-24
 
 **fix(integração Curseduca): a integração "sumia depois de um tempo" em todos os tenants (chave de criptografia)**

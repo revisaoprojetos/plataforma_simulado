@@ -54,6 +54,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ ver
       .select('id, numero').eq('tenant_id', v.tenant_id).eq('documento_id', v.documento_id).lt('numero', v.numero)
       .order('numero', { ascending: false }).limit(1).maybeSingle()
     if (html.trim()) await reconciliarVersao({ documentoId: v.documento_id, versaoNovaId: v.id, versaoAnteriorId: anterior?.id ?? null, html, forcar: true, tenantId: v.tenant_id })
+    // REGRA: salvar no editor PUBLICA a versão editada como a ATUAL — o documento NÃO pode ficar preso
+    // numa versão anterior. (callback é server-to-server, sem sessão → atualiza direto com o tenant da versão.)
+    await svc.from('simulado_conteudo_documentos')
+      .update({ versao_atual_id: v.id, status: 'publicado', atualizado_em: new Date().toISOString() })
+      .eq('tenant_id', v.tenant_id).eq('id', v.documento_id)
     // Edição salva → regenera a miniatura FIEL do card (conteúdo/hash mudaram).
     await gerarThumbDocumento(v.tenant_id, v.documento_id, { forcar: true }).catch(() => {})
   } catch (e) {

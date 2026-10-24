@@ -10,6 +10,8 @@ import { materialDoConfig, materialEnunciadoDoConfig, type MaterialCaderno } fro
 import { metaDaModalidade, novoItem } from '@/lib/caderno-teste/tipos'
 import type { BuilderV3, Modalidade, PreviewQuestao } from '@/lib/caderno-teste/tipos'
 import { carregarQuestoesBancoCore, carregarDadosBancoCore } from '@/lib/caderno-teste/dados-banco'
+import { urlAssinadaOriginal } from '@/lib/conteudo/ingestao'
+import { gerarThumbDocumento } from '@/lib/conteudo/thumb'
 
 // Tipos declarados aqui (não re-exportados de uma lib) — em arquivo 'use server' o Next trata todo
 // export como server action; re-export de `type` quebra o build. São estruturalmente = aos da lib.
@@ -237,16 +239,69 @@ export async function salvarMontagem(bancoId: string, entrega: EntregaSlots): Pr
 export type DocOffice = { id: string; titulo: string; versaoAtualId: string }
 export type TrechoPrevia = { tipo: string; rotulo: string | null; texto: string }
 
-/** Documentos .docx PUBLICADOS da Biblioteca — opções de diagnóstico vindas do editor beta. */
+export type PastaModelo = { id: string; nome: string; pai_id: string | null; cor: string | null }
+
+/** Documentos .docx PUBLICADOS do novo modelo de cadernos — opções de diagnóstico do editor beta.
+ *  FILTRA por `categoria='modelo_caderno'` (antes vinha SEM filtro → misturava a Biblioteca/Conteúdos). */
 export async function listarDocsOnlyOffice(): Promise<{ ok: boolean; docs: DocOffice[] }> {
   const access = await getCurrentAccess()
   if (!access.tenantId || !(await checkPermission('questoes:view'))) return { ok: true, docs: [] }
   const svc = createAdminClient()
   const rows = await fetchAll<any>(() => svc.from('simulado_conteudo_documentos')
-    .select('id, titulo, tipo_origem, status, versao_atual_id, deletado')
-    .eq('tenant_id', access.tenantId!).eq('status', 'publicado').eq('tipo_origem', 'docx').eq('deletado', false)
+    .select('id, titulo, tipo_origem, status, versao_atual_id, deletado, categoria')
+    .eq('tenant_id', access.tenantId!).eq('categoria', 'modelo_caderno').eq('status', 'publicado').eq('tipo_origem', 'docx').eq('deletado', false)
     .not('versao_atual_id', 'is', null).order('atualizado_em', { ascending: false }).order('id', { ascending: true }))
   return { ok: true, docs: (rows ?? []).map((d) => ({ id: d.id, titulo: d.titulo, versaoAtualId: d.versao_atual_id })) }
+}
+
+/** Árvore (pastas/subpastas + docs + thumbs) do NOVO MODELO DE CADERNOS (categoria 'modelo_caderno',
+ *  folder_area 'conteudo_modelo') — para o seletor do Diagnóstico navegar em pastas com prévia de imagem.
+ *  NÃO traz a Biblioteca/Conteúdos. Permissão `questoes:view` (igual ao seletor). */
+export async function listarArvoreModelosOffice(pastaId?: string | null): Promise<{
+  ok: boolean; pastas: PastaModelo[]; docs: DocOffice[]; breadcrumb: PastaModelo[]; thumbs: Record<string, string>
+}> {
+  const access = await getCurrentAccess()
+  if (!access.tenantId || !(await checkPermission('questoes:view'))) return { ok: false, pastas: [], docs: [], breadcrumb: [], thumbs: {} }
+  const tenantId = access.tenantId
+  const svc = createAdminClient()
+  const AREA = 'conteudo_modelo'
+  const todas = (await fetchAll<any>(() => svc.from('simulado_pastas')
+    .select('id, nome, pai_id, cor, deletado').eq('tenant_id', tenantId).eq('folder_area', AREA).eq('is_folder', true)
+    .order('id', { ascending: true }))) ?? []
+  const doArea = todas.filter((p) => !p.deletado).sort((a, b) => String(a.nome).localeCompare(String(b.nome)))
+  const alvo = pastaId ?? null
+  const pastas: PastaModelo[] = doArea.filter((p) => (p.pai_id ?? null) === alvo).map((p) => ({ id: p.id, nome: p.nome, pai_id: p.pai_id ?? null, cor: p.cor ?? null }))
+  // breadcrumb (raiz → pasta atual)
+  const porId = new Map<string, any>(doArea.map((p) => [p.id, p]))
+  const breadcrumb: PastaModelo[] = []
+  let cur: string | null = alvo
+  while (cur && porId.has(cur)) { const p = porId.get(cur)!; breadcrumb.unshift({ id: p.id, nome: p.nome, pai_id: p.pai_id ?? null, cor: p.cor ?? null }); cur = p.pai_id ?? null }
+  // docs publicados (docx) da pasta atual
+  const rows = (await fetchAll<any>(() => {
+    const base = svc.from('simulado_conteudo_documentos')
+      .select('id, titulo, versao_atual_id, tipo_origem, status, deletado, pasta_id, categoria')
+      .eq('tenant_id', tenantId).eq('categoria', 'modelo_caderno').eq('status', 'publicado').eq('tipo_origem', 'docx').eq('deletado', false)
+      .not('versao_atual_id', 'is', null).order('titulo', { ascending: true })
+    return alvo === null ? base.is('pasta_id', null) : base.eq('pasta_id', alvo)
+  })) ?? []
+  const docs: DocOffice[] = rows.map((d) => ({ id: d.id, titulo: d.titulo, versaoAtualId: d.versao_atual_id }))
+  // thumbs (capa fiel PNG cacheada); se faltar, pré-gera em background
+  const thumbs: Record<string, string> = {}
+  try {
+    const verIds = [...new Set(rows.map((d) => d.versao_atual_id).filter(Boolean))] as string[]
+    if (verIds.length) {
+      const vks = (await fetchAll<any>(() => svc.from('simulado_conteudo_versoes').select('id, hash_arquivo').eq('tenant_id', tenantId).in('id', verIds))) ?? []
+      const hashPorVer = new Map<string, string>(vks.map((v: any) => [v.id, String(v.hash_arquivo || '')]))
+      await Promise.all(rows.map(async (d) => {
+        const verId = d.versao_atual_id as string | null; if (!verId) return
+        const h8 = hashPorVer.get(verId)?.slice(0, 8) || ''
+        const turl = await urlAssinadaOriginal(`conteudo-thumbs/${tenantId}/${verId}_${h8}_r1k.png`, 3600)
+        if (turl) thumbs[d.id] = turl
+        else void gerarThumbDocumento(tenantId, d.id).catch(() => {})
+      }))
+    }
+  } catch { /* thumbs best-effort */ }
+  return { ok: true, pastas, docs, breadcrumb, thumbs }
 }
 
 /** Trechos da versão atual de um documento da Biblioteca — para a PRÉVIA DA FOLHA do diagnóstico beta. */

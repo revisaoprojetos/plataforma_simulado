@@ -5,10 +5,11 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { BarChart3, ClipboardList, FileText, BookOpenCheck, ExternalLink, Loader2, FileUp, Trash2, Plus, Pencil, FolderOpen, X, FileType2, Search } from 'lucide-react'
+import { BarChart3, ClipboardList, FileText, BookOpenCheck, ExternalLink, Loader2, FileUp, Trash2, Plus, Pencil, FolderOpen, X, FileType2, Search, ChevronRight } from 'lucide-react'
 import { PdfPreview } from '@/components/admin/pdf-preview'
-import { salvarMontagem, criarCadernoParaSlot, listarDocsOnlyOffice, previaOnlyOffice, type EntregaSlots, type EntregaRef, type MontagemGrupo, type DocOffice, type TrechoPrevia } from '@/app/admin/cadernos-teste/actions'
+import { salvarMontagem, criarCadernoParaSlot, listarArvoreModelosOffice, previaOnlyOffice, type EntregaSlots, type EntregaRef, type MontagemGrupo, type DocOffice, type PastaModelo, type TrechoPrevia } from '@/app/admin/cadernos-teste/actions'
 import { abrirEdicaoDocx, thumbDocumento } from '@/app/admin/biblioteca/actions'
+import { DrivePastaStyles } from '@/components/admin/pasta-card-drive'
 
 type SlotKey = 'diagnostico' | 'folha' | 'enunciado' | 'gabarito'
 type SlotDef = { chave: SlotKey; titulo: string; icon: typeof FileText; pdf: boolean }
@@ -80,14 +81,21 @@ function SlotCard({ slot, cor, bancoId, valor, prontos, onSet }: {
   const [fonte, setFonte] = useState<'modelos' | 'office'>(ehOffice ? 'office' : 'modelos')
   const [pickerOffice, setPickerOffice] = useState(false)
   const [docsOffice, setDocsOffice] = useState<DocOffice[]>([])
+  const [pastasOffice, setPastasOffice] = useState<PastaModelo[]>([])
+  const [breadcrumbOffice, setBreadcrumbOffice] = useState<PastaModelo[]>([])
+  const [thumbsOffice, setThumbsOffice] = useState<Record<string, string>>({})
   const [carregandoDocs, setCarregandoDocs] = useState(false)
   const [buscaDoc, setBuscaDoc] = useState('')
   const [abrindoEditor, setAbrindoEditor] = useState(false)
 
-  async function abrirPickerOffice() {
-    setPickerOffice(true); setCarregandoDocs(true)
-    try { const r = await listarDocsOnlyOffice(); setDocsOffice(r.docs) } finally { setCarregandoDocs(false) }
+  async function carregarModelos(pastaId: string | null) {
+    setCarregandoDocs(true)
+    try {
+      const r = await listarArvoreModelosOffice(pastaId)
+      setDocsOffice(r.docs); setPastasOffice(r.pastas); setBreadcrumbOffice(r.breadcrumb); setThumbsOffice(r.thumbs)
+    } finally { setCarregandoDocs(false) }
   }
+  async function abrirPickerOffice() { setPickerOffice(true); setBuscaDoc(''); await carregarModelos(null) }
   async function editarOffice() {
     if (!valor?.docId) return
     setAbrindoEditor(true)
@@ -286,11 +294,11 @@ function SlotCard({ slot, cor, bancoId, valor, prontos, onSet }: {
       {/* Pop-up: selecionar um documento .docx da Biblioteca (editor beta / OnlyOffice) como diagnóstico. */}
       {pickerOffice && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm" onClick={() => setPickerOffice(false)}>
-          <div className="flex max-h-[80vh] w-full max-w-md flex-col overflow-hidden rounded-2xl border bg-card shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <div className="flex max-h-[85vh] w-full max-w-4xl flex-col overflow-hidden rounded-2xl border bg-card shadow-xl" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between gap-2 border-b px-4 py-3">
               <div className="flex min-w-0 items-center gap-2">
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-white" style={{ background: cor }}><FileType2 className="h-3.5 w-3.5" /></span>
-                <h3 className="truncate text-sm font-semibold">Diagnóstico do editor beta (OnlyOffice)</h3>
+                <h3 className="truncate text-sm font-semibold">Modelos de caderno — Diagnóstico (editor beta)</h3>
               </div>
               <button type="button" onClick={() => setPickerOffice(false)} className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
             </div>
@@ -300,21 +308,81 @@ function SlotCard({ slot, cor, bancoId, valor, prontos, onSet }: {
                 <input value={buscaDoc} onChange={(e) => setBuscaDoc(e.target.value)} placeholder="Buscar documento…" className="h-8 w-full rounded-lg border bg-background pl-8 pr-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-primary/40" />
               </div>
             </div>
-            <div className="scroll-claro max-h-[56vh] space-y-1.5 overflow-y-auto p-3">
+            {/* Breadcrumb (Modelos > pasta > subpasta) */}
+            <div className="flex flex-wrap items-center gap-0.5 border-b px-3 py-1.5 text-[11px] text-muted-foreground">
+              <button type="button" onClick={() => { setBuscaDoc(''); carregarModelos(null) }} className="rounded px-1 py-0.5 font-medium hover:bg-muted hover:text-foreground">Modelos</button>
+              {breadcrumbOffice.map((b) => (
+                <span key={b.id} className="flex min-w-0 items-center gap-0.5">
+                  <ChevronRight className="h-3 w-3 shrink-0 opacity-50" />
+                  <button type="button" onClick={() => { setBuscaDoc(''); carregarModelos(b.id) }} className="max-w-[9rem] truncate rounded px-1 py-0.5 hover:bg-muted hover:text-foreground">{b.nome}</button>
+                </span>
+              ))}
+            </div>
+            <div className="scroll-claro max-h-[58vh] overflow-y-auto p-3">
+              <DrivePastaStyles />
               {carregandoDocs ? (
-                <div className="flex items-center justify-center gap-2 py-8 text-xs text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando…</div>
-              ) : docsOffice.filter((d) => d.titulo.toLowerCase().includes(buscaDoc.trim().toLowerCase())).length === 0 ? (
-                <div className="px-2 py-8 text-center text-xs text-muted-foreground">Nenhum documento .docx publicado na Biblioteca. Importe/publique um em <span className="font-medium text-foreground">Biblioteca → Conteúdos</span>.</div>
-              ) : docsOffice.filter((d) => d.titulo.toLowerCase().includes(buscaDoc.trim().toLowerCase())).map((d) => {
-                const on = valor?.docId === d.id
+                <div className="flex items-center justify-center gap-2 py-12 text-xs text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando…</div>
+              ) : (() => {
+                const busca = buscaDoc.trim().toLowerCase()
+                const pastasF = pastasOffice.filter((p) => p.nome.toLowerCase().includes(busca))
+                const docsF = docsOffice.filter((d) => d.titulo.toLowerCase().includes(busca))
+                if (pastasF.length === 0 && docsF.length === 0) {
+                  return <div className="px-2 py-12 text-center text-xs text-muted-foreground">{busca ? 'Nada encontrado nesta pasta.' : <>Nenhum modelo de caderno aqui. Crie/publique em <span className="font-medium text-foreground">Biblioteca → Modelos de Caderno</span>.</>}</div>
+                }
                 return (
-                  <button key={d.id} type="button" onClick={() => { onSet({ docId: d.id, versaoId: d.versaoAtualId }); setPickerOffice(false) }}
-                    className={`flex w-full items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors ${on ? 'border-primary ring-1 ring-primary' : 'hover:border-primary/50 hover:bg-muted/40'}`}>
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary"><FileType2 className="h-4 w-4" /></span>
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium leading-tight">{d.titulo}</span>
-                  </button>
+                  <div className="space-y-4">
+                    {/* Pastas — MESMO card da Biblioteca (estilo Google Drive), sem o menu de gestão. */}
+                    {pastasF.length > 0 && (
+                      <div>
+                        <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Pastas</div>
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                          {pastasF.map((p) => (
+                            <div key={p.id} className="gd-folder-card" role="button" tabIndex={0} title={p.nome}
+                              onClick={() => { setBuscaDoc(''); carregarModelos(p.id) }}
+                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setBuscaDoc(''); carregarModelos(p.id) } }}>
+                              <span className="gd-ico-wrap">
+                                <svg className="gd-ico" viewBox="0 0 24 24" style={{ fill: p.cor || 'var(--gd-folder)' }}>
+                                  <path d="M10 4H4c-1.1 0-2 .9-2 2v2h20c0-1.1-.9-2-2-2h-8l-2-2z" />
+                                  <path className="gd-flap" d="M2 8v10c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8H2z" />
+                                </svg>
+                              </span>
+                              <span className="gd-name" title={p.nome}>{p.nome}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    {/* Modelos (documentos) — card A4 3:4 igual à Biblioteca, título embaixo em até 2 linhas. */}
+                    {docsF.length > 0 && (
+                      <div>
+                        <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Modelos</div>
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                          {docsF.map((d) => {
+                            const on = valor?.docId === d.id
+                            return (
+                              <button key={d.id} type="button" title={d.titulo}
+                                onClick={() => { onSet({ docId: d.id, versaoId: d.versaoAtualId }); setPickerOffice(false) }}
+                                className={`group relative overflow-hidden rounded-2xl border bg-card text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md ${on ? 'border-primary ring-1 ring-primary' : 'hover:border-primary/40'}`}>
+                                <div className="relative aspect-[3/4] overflow-hidden border-b bg-neutral-100 dark:bg-neutral-800">
+                                  {thumbsOffice[d.id] ? (
+                                    // eslint-disable-next-line @next/next/no-img-element
+                                    <img src={thumbsOffice[d.id]} alt="" className="h-full w-full object-cover object-top transition-transform duration-300 group-hover:scale-[1.03]" />
+                                  ) : (
+                                    <span className="flex h-full w-full items-center justify-center"><FileType2 className="h-8 w-8 text-muted-foreground/40" /></span>
+                                  )}
+                                  <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/[0.04] to-transparent" />
+                                  {on && <span className="absolute right-1.5 top-1.5 rounded-full bg-primary px-1.5 py-0.5 text-[9px] font-bold text-primary-foreground shadow">Atual</span>}
+                                </div>
+                                <span className="line-clamp-2 min-h-[2.4rem] px-2 py-1.5 text-[11.5px] font-medium leading-tight text-foreground">{d.titulo}</span>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 )
-              })}
+              })()}
             </div>
           </div>
         </div>,

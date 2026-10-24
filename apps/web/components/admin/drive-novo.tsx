@@ -213,8 +213,11 @@ function NovaPastaDialog({ onFechar, onCriar }: { rotuloBranco: string; onFechar
 // ───────── Painel de progresso de UPLOAD (estilo Drive) — total + por arquivo com % ─────────
 export type DriveUploadStatus = 'enviando' | 'processando' | 'ok' | 'erro'
 export type DriveUploadItem = { id: string; nome: string; cor: string; pct: number; status: DriveUploadStatus }
+// Rótulos do título (reutilizável p/ outros contextos além de documentos — ex.: questões do simulado).
+export type DriveUploadLabels = { gerundio: string; subSing: string; subPlur: string; verbSing: string; verbPlur: string }
+const LABELS_PADRAO: DriveUploadLabels = { gerundio: 'Importando', subSing: 'documento', subPlur: 'documentos', verbSing: 'importado', verbPlur: 'importados' }
 
-export function DriveUploadPanel({ itens, onClose }: { itens: DriveUploadItem[]; onClose: () => void }) {
+export function DriveUploadPanel({ itens, onClose, labels = LABELS_PADRAO }: { itens: DriveUploadItem[]; onClose: () => void; labels?: DriveUploadLabels }) {
   const [colapsado, setColapsado] = useState(false)
   const total = itens.length
   const okCount = itens.filter((x) => x.status === 'ok').length
@@ -224,8 +227,8 @@ export function DriveUploadPanel({ itens, onClose }: { itens: DriveUploadItem[];
   const overall = Math.round((100 * itens.reduce((s, x) => s + fracao(x), 0)) / Math.max(1, total))
   const terminou = concluidos === total
   const titulo = terminou
-    ? (erroCount ? `${okCount} importado${okCount === 1 ? '' : 's'} · ${erroCount} com erro` : `${okCount} documento${okCount === 1 ? '' : 's'} importado${okCount === 1 ? '' : 's'}`)
-    : `Importando ${concluidos} de ${total}…`
+    ? (erroCount ? `${okCount} ${okCount === 1 ? labels.verbSing : labels.verbPlur} · ${erroCount} com erro` : `${okCount} ${okCount === 1 ? labels.subSing : labels.subPlur} ${okCount === 1 ? labels.verbSing : labels.verbPlur}`)
+    : `${labels.gerundio} ${concluidos} de ${total}…`
   return createPortal(
     <div className={`gd-up gd-show${colapsado ? ' gd-collapsed' : ''}`} role="status" aria-live="polite">
       <div className="gd-up-top">

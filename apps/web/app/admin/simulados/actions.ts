@@ -948,8 +948,9 @@ export async function publishSimuladoAction(id: string) {
     .eq('tenant_id', tenantId ?? SEM_TENANT)
   if (!nQuestoes || nQuestoes < 1) return { error: 'Adicione ao menos 1 questão antes de publicar.' }
   if (sim?.modo_aplicacao === 'janela_fixa') {
-    if (!sim.data_inicio || !sim.data_fim) return { error: 'Para janela fixa, defina data de início e de fim.' }
-    if (new Date(sim.data_fim).getTime() <= new Date(sim.data_inicio).getTime()) {
+    // Início é obrigatório; FIM é OPCIONAL (vazio = sem data de término → fica aberto até encerrar à mão).
+    if (!sim.data_inicio) return { error: 'Para janela fixa, defina a data de início.' }
+    if (sim.data_fim && new Date(sim.data_fim).getTime() <= new Date(sim.data_inicio).getTime()) {
       return { error: 'A data de fim deve ser depois da data de início.' }
     }
   }

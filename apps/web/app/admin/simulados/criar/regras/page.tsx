@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { FileText, CalendarClock, ShieldCheck, Settings2, Trophy, Clock, Info, ListChecks, List, AlertTriangle, Timer, Infinity as Infinito, UserCheck } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
@@ -24,6 +25,8 @@ export default function RegrasPage() {
   const r = draft.regras as Record<string, any>
   const tipoCorrecao = (r.tipo_correcao ?? 'pontuacao') as 'pontuacao' | 'cebraspe'
   const ehCebraspe = tipoCorrecao === 'cebraspe'
+  // "Sem data de fim": começa marcado quando ainda não há data de fim (vazio = sem término).
+  const [semDataFim, setSemDataFim] = useState(!info.data_fim)
 
   // Campo "Tempo de prova" reutilizado nos 3 modos (fica ao lado do fim, no prazo e no aberto).
   const campoTempo = (
@@ -147,16 +150,23 @@ export default function RegrasPage() {
           {/* Configuração do modo escolhido + tempo de prova (agrupados num bloco destacado). */}
           <div className="space-y-4 rounded-xl border bg-muted/20 p-4">
             {info.modo_aplicacao === 'janela_fixa' && (
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 <div className="grid gap-4 sm:grid-cols-3">
                   <Campo label="Abre em" obrigatorio hint="Data e hora em que o aluno pode começar."><Input type="datetime-local" value={info.data_inicio} onChange={(e) => patchInfo({ data_inicio: e.target.value })} /></Campo>
-                  <Campo label="Fecha em" hint="Opcional. Com data, encerra e corrige tudo automaticamente."><Input type="datetime-local" value={info.data_fim} onChange={(e) => patchInfo({ data_fim: e.target.value })} /></Campo>
+                  {!semDataFim && (
+                    <Campo label="Fecha em" hint="Com data, encerra e corrige tudo automaticamente."><Input type="datetime-local" value={info.data_fim} onChange={(e) => patchInfo({ data_fim: e.target.value })} /></Campo>
+                  )}
                   {campoTempo}
                 </div>
-                {info.data_fim ? (
+                <label className="flex cursor-pointer items-start gap-2 text-sm">
+                  <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--primary)]" checked={semDataFim} onChange={(e) => { setSemDataFim(e.target.checked); if (e.target.checked) patchInfo({ data_fim: '' }) }} />
+                  <span>
+                    <span className="font-medium">Sem data de fim</span>
+                    <span className="block text-xs text-muted-foreground">Abre na data acima e fica <strong className="font-semibold text-foreground">aberto para sempre</strong>, até você encerrar manualmente.</span>
+                  </span>
+                </label>
+                {!semDataFim && (
                   <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Clock className="h-3.5 w-3.5 shrink-0" /> {BRT_LABEL} — informe e confira sempre no horário de Brasília.</p>
-                ) : (
-                  <p className="flex items-start gap-1.5 text-xs text-muted-foreground"><Infinito className="mt-0.5 h-3.5 w-3.5 shrink-0" /> Sem "Fecha em": abre na data acima e fica <strong className="font-semibold text-foreground">aberto para sempre</strong>, até você encerrar manualmente.</p>
                 )}
               </div>
             )}

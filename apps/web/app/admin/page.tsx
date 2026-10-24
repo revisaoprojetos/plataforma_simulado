@@ -61,7 +61,7 @@ async function getDados(tenantId: string) {
   }
 }
 
-const modeLabels: Record<string, string> = { janela_fixa: 'Janela fixa', prazo_relativo: 'Prazo relativo', aberto: 'Aberto' }
+const modeLabels: Record<string, string> = { janela_fixa: 'Agendado', prazo_relativo: 'Prazo relativo', aberto: 'Aberto' }
 const statusLabels: Record<string, { label: string; class: string }> = {
   rascunho: { label: 'Rascunho', class: 'bg-muted text-muted-foreground' },
   publicado: { label: 'Publicado', class: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400' },

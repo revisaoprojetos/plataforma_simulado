@@ -98,7 +98,7 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
   const fallbackAba = <Loader estilo={loaderEstilo} className="py-2" />
 
   const modoLabelMap: Record<string, string> = {
-    janela_fixa: 'Janela fixa',
+    janela_fixa: 'Agendado',
     prazo_relativo: 'Prazo relativo',
     aberto: 'Aberto',
   }
@@ -366,7 +366,7 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
                       ? 'Liberado por aluno após a matrícula'
                       : simulado.data_inicio || simulado.data_fim
                       ? `${formatDate(simulado.data_inicio)} → ${formatDate(simulado.data_fim)}`
-                      : 'Janela fixa — defina as datas'}
+                      : 'Agendado — defina as datas'}
                   </div>
                 </div>
                 <div className="rounded-lg border p-3">

@@ -37,6 +37,8 @@ if ($Turbo) {
   Write-Host "==> Iniciando (Turbopack)..." -ForegroundColor Green
   npx next dev --turbopack
 } else {
+  # Next 16 usa Turbopack POR PADRÃO (instável nesta máquina: OOM + ChunkLoadError do HMR,
+  # que quebra a navegação do editor). `--webpack` força o bundler estável.
   Write-Host "==> Iniciando (webpack, estável)..." -ForegroundColor Green
-  npx next dev
+  npx next dev --webpack
 }

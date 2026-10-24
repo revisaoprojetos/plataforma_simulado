@@ -29,7 +29,7 @@ export function computarPreviaDados(payload: PreviaPayload): Record<string, unkn
     const nAc = acertosDe.get(disc) ?? 0
     qs.forEach((q, i) => {
       const certa = i < nAc
-      if (q.pilar) { pilarTot.set(q.pilar, (pilarTot.get(q.pilar) ?? 0) + 1); if (certa) pilarAc.set(q.pilar, (pilarAc.get(q.pilar) ?? 0) + 1) }
+      for (const p of (q.pilares?.length ? q.pilares : (q.pilar ? [q.pilar] : []))) { pilarTot.set(p, (pilarTot.get(p) ?? 0) + 1); if (certa) pilarAc.set(p, (pilarAc.get(p) ?? 0) + 1) }
       if (!certa && q.assunto) { const s = assuntosErr.get(disc) ?? new Set<string>(); s.add(q.assunto); assuntosErr.set(disc, s) }
     })
   }

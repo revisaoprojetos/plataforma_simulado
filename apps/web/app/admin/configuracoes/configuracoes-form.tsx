@@ -685,7 +685,7 @@ function TelaDashboard({ c, fgBtn }: PrevScreen) {
     [Activity, 'Sessões hoje', '0', '0 nos últimos 7 dias'],
   ]
   const sims: [string, string, string, string][] = [
-    ['Concurso TJ Rascunho', 'Janela fixa', '#94a3b8', 'Rascunho'],
+    ['Concurso TJ Rascunho', 'Agendado', '#94a3b8', 'Rascunho'],
     ['Simulado OAB 2026', 'Prazo relativo', '#f59e0b', 'Encerrado'],
     ['Simulado Teste THEME', 'Aberto', '#22c55e', 'Publicado'],
   ]
@@ -837,7 +837,7 @@ function TelaSimulados({ c, fgBtn }: PrevScreen) {
         <div className="flex items-center gap-1 rounded-lg p-0.5" style={{ background: c.tabBg }}>
           {['Linhas', 'Pastas', 'Status'].map((t, i) => <span key={t} className="rounded-md px-2 py-1 text-[9px] font-medium" style={i === 0 ? { background: c.tabAtivo, color: c.tabTexto } : { opacity: 0.6 }}>{t}</span>)}
         </div>
-        <Chips c={c} fgBtn={fgBtn} itens={['Todos', 'Janela fixa', 'Prazo relativo', 'Aberto']} />
+        <Chips c={c} fgBtn={fgBtn} itens={['Todos', 'Agendado', 'Prazo relativo', 'Aberto']} />
       </div>
       <div className="flex h-40 items-center justify-center rounded-2xl border border-dashed text-[11px] opacity-55" style={{ borderColor: c.cborder }}>Nenhum simulado ainda. Crie o primeiro em “Novo simulado”.</div>
     </div>

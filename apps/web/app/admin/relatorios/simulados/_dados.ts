@@ -194,7 +194,7 @@ async function _montarRelatorioSimulado(svc: SupabaseClient, simId: string, tena
 
   // Config + levantamento de tentativas (para simulados que permitem várias).
   const politicaLabel = politica === 'melhor' ? 'Melhor nota' : politica === 'media' ? 'Média das tentativas' : 'Última tentativa'
-  const modoLabel = modo === 'aberto' ? 'Aberto — liberado, várias tentativas' : modo === 'janela_fixa' ? 'Janela fixa' : 'Prazo relativo'
+  const modoLabel = modo === 'aberto' ? 'Aberto — liberado, várias tentativas' : modo === 'janela_fixa' ? 'Agendado' : 'Prazo relativo'
   const config = {
     modo, modoLabel, permiteVarias,
     tentativasPermitidas: modo === 'aberto' ? 'Ilimitado' : String(retentativas),

@@ -483,7 +483,9 @@ function modoQuestoes(){ return (CONFIG && CONFIG.modoQuestoes==='questoes') ? '
 // TEM teses (as teses = questões do quiz). Sem backend novo: as teses já vêm do conteúdo.
 function docQuestoesDoDia(n){ const doc=docDoDia(n); return (doc && getTeses(n).length>0) ? doc : null; }
 // Dia tem QUESTÕES para mostrar o botão? (depende do modo configurado).
-function temQuestoesDoDia(n){ return modoQuestoes()==='questoes' ? !!docQuestoesDoDia(n) : !!docRapidaDoDia(n); }
+// SELO FINAL: NÃO tem questões próprias (só reusa um POOL de teses de outros dias p/ o labirinto) — é
+// "apenas leitura + minigame". Então o botão QUESTÕES some nele (e o JOGAR vira .solo, largura total).
+function temQuestoesDoDia(n){ if(isFinalDay(n)) return false; return modoQuestoes()==='questoes' ? !!docQuestoesDoDia(n) : !!docRapidaDoDia(n); }
 // Abre a tela de QUESTÕES (Lei Seca) do dia — overlay no portal, igual à leitura (só muda a rota/tipo).
 function irParaQuestoes(n){
   const did=(window.DESAFIO&&window.DESAFIO.ID)||new URLSearchParams(location.search).get('desafio')||'';

@@ -17,7 +17,12 @@ export async function obterDisciplinasDoSimulado(simuladoId: string) {
 
 /** Dados do PICKER (pop-up): árvore de pastas + simulados com capa/visual. */
 export async function carregarPickerSimulados() {
-  return carregarPicker()
+  return carregarPicker('simulado')
+}
+
+/** Dados do PICKER — aba DESAFIOS: pastas de desafio (maratona…) + simulados INTERNOS delas. */
+export async function carregarPickerDesafios() {
+  return carregarPicker('desafio')
 }
 
 const pct = (a: number, t: number) => (t > 0 ? `${Math.round((a / t) * 100)}%` : '0%')
@@ -45,7 +50,7 @@ export async function aplicarPreviaSimulado(
       const nAc = acertosDe.get(disc) ?? 0
       qs.forEach((q, i) => {
         const certa = i < nAc
-        if (q.pilar) { pilarTot.set(q.pilar, (pilarTot.get(q.pilar) ?? 0) + 1); if (certa) pilarAc.set(q.pilar, (pilarAc.get(q.pilar) ?? 0) + 1) }
+        for (const p of (q.pilares?.length ? q.pilares : (q.pilar ? [q.pilar] : []))) { pilarTot.set(p, (pilarTot.get(p) ?? 0) + 1); if (certa) pilarAc.set(p, (pilarAc.get(p) ?? 0) + 1) }
         if (!certa && q.assunto) { const s = assuntosErr.get(disc) ?? new Set<string>(); s.add(q.assunto); assuntosErr.set(disc, s) }
       })
     }

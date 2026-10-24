@@ -55,7 +55,19 @@ function escaparHtml(s: string): string {
 export async function converterParaHtml(data: Buffer, tipo: TipoOrigem): Promise<{ html: string; erro?: string }> {
   try {
     if (tipo === 'docx') {
-      const r = await mammoth.convertToHtml({ buffer: data }, { styleMap: ['u => u', 'strike => s'] } as any)
+      // Mapeia os estilos de TÍTULO em português ("Título 1/2/3") para h1/h2/h3 — o mammoth já mapeia os
+      // ingleses ("Heading N") por padrão, mas não os PT. Assim o html_rico/trechos ganham hierarquia real
+      // (e o sumário por títulos do leitor fica melhor). styleMap custom é ADITIVO ao default do mammoth.
+      const r = await mammoth.convertToHtml({ buffer: data }, {
+        styleMap: [
+          'u => u', 'strike => s',
+          "p[style-name='Título 1'] => h1:fresh", "p[style-name='Titulo 1'] => h1:fresh",
+          "p[style-name='Título 2'] => h2:fresh", "p[style-name='Titulo 2'] => h2:fresh",
+          "p[style-name='Título 3'] => h3:fresh", "p[style-name='Titulo 3'] => h3:fresh",
+          "p[style-name='Título 4'] => h4:fresh", "p[style-name='Titulo 4'] => h4:fresh",
+          "p[style-name='Título'] => h1:fresh", "p[style-name='Titulo'] => h1:fresh",
+        ],
+      } as any)
       return { html: r.value || '' }
     }
     if (tipo === 'pdf') {

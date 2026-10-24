@@ -3,7 +3,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400..700;1,8..60,400..600&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Atkinson+Hyperlegible:wght@400;700&family=Carlito:ital,wght@0,400;0,700;1,400&display=swap">
 <style>
-/* Layout: sumário | texto com barra de marcação + folha espelho lado a lado | caderno em gaveta. */
+/* Layout: sumário | texto com barra de marcação + anotações lado a lado | meus grifos em gaveta. */
 :root{
   --bg:#fbfbfc; --side:#f5f5f8; --raise:#ffffff; --ink:#17161d; --ink-2:#4a4955; --ink-3:#6c6b78; --line:#e8e7ed; --line-2:#d8d7df; --hover:#efeff4;
   --accent:#3d2e8a; --accent-ink:#ffffff; --accent-soft:#efedf8; --accent-2:#5b4bb3; --accent-line:#d3cbf3;
@@ -110,7 +110,7 @@ kbd{font-family:var(--f-mono);font-size:11px;line-height:1;border:1px solid var(
 .bar i{display:block;height:100%;width:0;background:var(--accent);border-radius:99px;transition:width .25s}
 .toc{list-style:none;margin:0;padding:0}
 .toc > li{margin-bottom:2px}
-.t-item{width:100%;display:grid;grid-template-columns:26px minmax(0,1fr) auto;gap:6px;align-items:start;text-align:left;padding:9px 8px;border-radius:8px}
+.t-item{width:100%;display:grid;grid-template-columns:26px minmax(0,1fr) auto;gap:6px;align-items:start;text-align:left;padding:9px 8px;border-radius:8px;transition:background .18s ease,box-shadow .24s cubic-bezier(.2,0,0,1)}
 .t-item:hover{background:var(--hover)}
 .t-n{font-family:var(--f-mono);font-size:11.5px;color:var(--ink-3);padding-top:2px}
 .t-t{display:block;font-size:13.5px;line-height:1.38;font-weight:500;color:var(--ink-2);text-wrap:pretty}
@@ -120,12 +120,20 @@ kbd{font-family:var(--f-mono);font-size:11px;line-height:1;border:1px solid var(
 .toc > li + li{border-top:1px solid var(--line);padding-top:2px}
 .toc li.cur .t-t{color:var(--ink);font-weight:600}
 .toc li.cur .t-n{color:var(--accent)}
-.subs{list-style:none;margin:2px 0 8px 32px;padding:0 0 0 10px;border-left:1px solid var(--line-2);display:none}
-.toc li.cur .subs{display:block}
+/* subitens: expandem/colapsam com animação (max-height + opacity), sem reconstruir o DOM */
+.subs{list-style:none;margin:0 0 0 32px;padding:0 0 0 10px;border-left:1px solid var(--line-2);display:block;overflow:hidden;max-height:0;opacity:0;transition:max-height .34s cubic-bezier(.2,0,0,1),opacity .26s ease,margin .3s ease,padding .3s ease}
+.toc li.cur .subs{max-height:1400px;opacity:1;margin:3px 0 8px 32px;padding:4px 0 2px 10px}
+.subs button{transition:color .15s,background .15s}
 .subs button{width:100%;text-align:left;padding:5px 8px;border-radius:6px;font-size:12.5px;color:var(--ink-3);display:flex;align-items:center;gap:6px;line-height:1.35}
 .subs button:hover{color:var(--ink);background:var(--hover)}
 .subs button.cur{color:var(--accent);font-weight:600}
 .subs svg{width:12px;height:12px;color:var(--accent);fill:currentColor;flex:none}
+/* abas do sumário (Índices | Páginas) — só no modo biblioteca/PDF */
+.toc-tabs{display:flex;gap:4px;margin:4px 2px 10px;padding:3px;background:var(--hover);border-radius:9px}
+.toc-tabs[hidden]{display:none}
+.toc-tab{flex:1;padding:6px 8px;border:0;background:none;border-radius:7px;font:inherit;font-size:12.5px;font-weight:600;color:var(--ink-3);text-align:center;cursor:pointer;transition:background .15s,color .15s}
+.toc-tab:hover{color:var(--ink)}
+.toc-tab.on{background:var(--raise);color:var(--ink);box-shadow:var(--shadow-1)}
 .side-foot{border-top:1px solid var(--line);padding:14px 22px calc(14px + env(safe-area-inset-bottom,0px));width:272px;display:flex;flex-direction:column;gap:10px}
 .goal-row{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;color:var(--ink-2)}
 .goal-row b{font-weight:600;color:var(--ink);font-variant-numeric:tabular-nums}
@@ -979,8 +987,8 @@ html,body,.scroller,.side-in,.pane,.mr-scroll,.menu,.palette .res,.law-pop,.rail
       </div>
     </div>
     <button class="tb focusbar on" id="btnExitFocus" title="Sair do foco (Esc)"><svg class="i"><use href="#i-x"/></svg><span class="lbl">Sair do foco</span></button>
-    <button class="tb hide-in-focus" id="btnMirror" title="Folha espelho (M)" aria-label="Folha espelho"><svg class="i"><use href="#i-mirror"/></svg><span class="lbl">Folha espelho</span></button>
-    <button class="tb hide-in-focus" id="btnNb" title="Caderno (B)" aria-label="Caderno de estudo"><svg class="i"><use href="#i-nb"/></svg><span class="lbl">Caderno</span><span class="badge" id="nbBadge" hidden>0</span></button>
+    <button class="tb hide-in-focus" id="btnMirror" title="Anotações (M)" aria-label="Anotações"><svg class="i"><use href="#i-mirror"/></svg><span class="lbl">Anotações</span></button>
+    <button class="tb hide-in-focus" id="btnNb" title="Meus Grifos (B)" aria-label="Meus Grifos"><svg class="i"><use href="#i-nb"/></svg><span class="lbl">Meus Grifos</span><span class="badge" id="nbBadge" hidden>0</span></button>
     <span class="vsep hide-in-focus"></span>
     <button class="cta hide-in-focus" id="btnQuest"><svg class="i"><use href="#i-quiz"/></svg><span class="lbl">Concluir leitura</span></button>
     <div class="hairline"><i id="hair"></i></div>
@@ -994,6 +1002,10 @@ html,body,.scroller,.side-in,.pane,.mr-scroll,.menu,.palette .res,.law-pop,.rail
     </div>
     <div class="side-in">
       <div class="overall"><div class="bar"><i id="ovBar"></i></div><span id="ovTxt">0%</span></div>
+      <div class="toc-tabs" id="tocTabs" role="tablist" hidden>
+        <button class="toc-tab on" data-toc="indices" role="tab">Índices</button>
+        <button class="toc-tab" data-toc="paginas" role="tab">Páginas</button>
+      </div>
       <ol class="toc" id="toc"></ol>
     </div>
     <div class="side-foot">
@@ -1076,18 +1088,18 @@ html,body,.scroller,.side-in,.pane,.mr-scroll,.menu,.palette .res,.law-pop,.rail
       </div>
     </div>
 
-    <div class="resizer" id="resizer" role="separator" aria-orientation="vertical" aria-label="Ajustar largura da folha espelho" tabindex="0"><i></i></div>
+    <div class="resizer" id="resizer" role="separator" aria-orientation="vertical" aria-label="Ajustar largura das anotações" tabindex="0"><i></i></div>
 
     <!-- ============ FOLHA ESPELHO ============ -->
-    <section class="mrp" id="mirror" aria-label="Folha espelho">
+    <section class="mrp" id="mirror" aria-label="Anotações">
       <div class="mr-head">
         <button class="tb mv-switch" id="mvToText" title="Ver o texto"><svg class="i"><use href="#i-left"/></svg>Texto</button>
-        <span class="mr-title">Folha espelho</span>
+        <span class="mr-title">Anotações</span>
         <label for="mrSec" class="sr-only">Tema da folha</label>
         <select class="mr-sel" id="mrSec"></select>
         <span class="sp"></span>
         <span class="mr-follow"><span>Acompanhar leitura</span><button class="switch" id="mrFollow" role="switch" aria-checked="true" aria-label="Acompanhar o tema que estou lendo"></button></span>
-        <button class="icb" id="mrClose" aria-label="Fechar folha espelho"><svg class="i"><use href="#i-x"/></svg></button>
+        <button class="icb" id="mrClose" aria-label="Fechar anotações"><svg class="i"><use href="#i-x"/></svg></button>
       </div>
       <div class="mr-tabs">
         <div class="seg" id="mrMode"><button data-v="text" class="on">Texto</button><button data-v="sketch">Esquema</button></div>
@@ -1151,8 +1163,8 @@ html,body,.scroller,.side-in,.pane,.mr-scroll,.menu,.palette .res,.law-pop,.rail
     </section>
   </main>
 
-  <aside class="nb" id="nb" aria-label="Caderno de estudo">
-    <div class="nb-h"><h2>Caderno</h2><button class="icb" id="nbClose" aria-label="Fechar caderno"><svg class="i"><use href="#i-x"/></svg></button></div>
+  <aside class="nb" id="nb" aria-label="Meus Grifos">
+    <div class="nb-h"><h2>Meus Grifos</h2><button class="icb" id="nbClose" aria-label="Fechar Meus Grifos"><svg class="i"><use href="#i-x"/></svg></button></div>
     <div class="tabs" role="tablist">
       <button data-tab="hl" class="on">Marcações <span class="n" id="nHl">0</span></button>
       <button data-tab="nt">Notas <span class="n" id="nNt">0</span></button>
@@ -1190,7 +1202,7 @@ html,body,.scroller,.side-in,.pane,.mr-scroll,.menu,.palette .res,.law-pop,.rail
   <span class="vs"></span>
   <button class="tbtn" data-a="note" title="Nota · N"><svg class="i"><use href="#i-note"/></svg>Nota</button>
   <button class="tbtn" data-a="card" title="Cartão de revisão · C"><svg class="i"><use href="#i-cards"/></svg>Cartão</button>
-  <button class="tbtn" data-a="mirror" title="Enviar para a folha espelho"><svg class="i"><use href="#t-send"/></svg>Folha</button>
+  <button class="tbtn" data-a="mirror" title="Enviar para as anotações"><svg class="i"><use href="#t-send"/></svg>Anotar</button>
   <button class="tbtn" data-a="copy" title="Copiar com citação"><svg class="i"><use href="#i-copy"/></svg></button>
   <button class="tbtn" data-a="speak" title="Ouvir"><svg class="i"><use href="#i-vol"/></svg></button>
   <button class="tbtn del" data-a="del" title="Remover marcação" hidden><svg class="i"><use href="#i-trash"/></svg></button>
@@ -1234,11 +1246,11 @@ html,body,.scroller,.side-in,.pane,.mr-scroll,.menu,.palette .res,.law-pop,.rail
     <span>Nota · Cartão na seleção</span><kbd>N · C</kbd>
     <span class="kh">Leitura</span>
     <span>Buscar</span><kbd>/</kbd>
-    <span>Folha espelho</span><kbd>M</kbd>
+    <span>Anotações</span><kbd>M</kbd>
     <span>Modo foco</span><kbd>F</kbd>
     <span>Iniciar ou pausar sessão</span><kbd>P</kbd>
     <span>Aparência</span><kbd>T</kbd>
-    <span>Caderno · Revisar cartões</span><kbd>B · R</kbd>
+    <span>Meus Grifos · Revisar cartões</span><kbd>B · R</kbd>
     <span>Tema anterior ou próximo</span><kbd>← →</kbd>
     <span>Fechar ou sair do foco</span><kbd>Esc</kbd>
   </div></div>
@@ -1435,6 +1447,89 @@ function renderBiblioteca(){
   $('#article').innerHTML=`<section class="sec" id="t1" data-title="${esc(titulo)}" data-cite="${esc(titulo)}"><header class="sec-head"><h2><span>${esc(titulo)}</span></h2></header><div class="flow bib-flow">${safe}</div></section>`;
 }
 
+// Sumário por TÍTULOS do PDF: cada item { title, level, page, y } → o #toc vira uma árvore clicável.
+let pdfOutline=[];
+let tocModo='indices'; // aba ativa do sumário no modo biblioteca/PDF: 'indices' (títulos) | 'paginas'
+let tocLidasAnt=-1;    // nº de páginas lidas no último build do #toc (p/ só reconstruir quando muda)
+// Agrupa os fragmentos de texto da camada do pdf.js em LINHAS (por y), guardando texto + maior tamanho de fonte.
+function agruparLinhasPdf(items){
+  const porLinha=new Map();
+  for(const it of (items||[])){const s=(it.str||'');if(!s.trim())continue;const tr=it.transform||[1,0,0,1,0,0];const y=Math.round(tr[5]);const h=Math.round(it.height||Math.hypot(tr[2],tr[3])||0);const x=tr[4]||0;
+    let key=null;for(const k of porLinha.keys()){if(Math.abs(k-y)<=3){key=k;break}}if(key==null)key=y;
+    const L=porLinha.get(key)||{frag:[],h:0,y:key,x:1e9};L.frag.push({x,s});L.h=Math.max(L.h,h);L.x=Math.min(L.x,x);porLinha.set(key,L)}
+  return [...porLinha.values()].map(L=>({text:L.frag.sort((a,b)=>a.x-b.x).map(f=>f.s).join('').replace(/\s+/g,' ').trim(),h:L.h,y:L.y,x:L.x})).filter(L=>L.text)
+}
+// Normaliza texto p/ casar o título do índice com o do corpo (sem acento/pontuação, minúsculo).
+function normTxt(s){return (s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()}
+// Acha a 1ª ocorrência de um título no CORPO (fora das páginas de índice) → {page,line} p/ navegar certo.
+// Prefere uma linha com fonte maior que o corpo (é um cabeçalho de verdade), senão cai na 1ª aproximada.
+function acharTituloNoCorpo(titulo,pageLines,pulaPaginas,corpoH){
+  const alvo=normTxt(titulo);if(alvo.length<4)return null;
+  const nums=Object.keys(pageLines).map(Number).sort((a,b)=>a-b);let aprox=null;
+  for(const n of nums){if(pulaPaginas.has(n))continue;
+    for(const L of (pageLines[n]||[])){const t=normTxt(L.text);if(!t)continue;
+      const casa=(t===alvo)||(alvo.length>=8&&t.startsWith(alvo))||(alvo.length>=16&&t.includes(alvo));
+      if(casa){if(!corpoH||L.h>=corpoH*1.04)return {page:n,line:L};if(!aprox)aprox={page:n,line:L}}}}
+  return aprox;
+}
+// Monta o sumário por TÍTULOS. Ordem de preferência:
+//   1) ÍNDICE EMBUTIDO do PDF (getOutline / marcadores) — quando existir.
+//   2) ÍNDICE do próprio documento (página "Sumário/Índice": linhas "Título ..... Nº") → navegação achando o título no corpo.
+//   3) HEURÍSTICA por tamanho de fonte (reflete o PDF renderizado) — fallback.
+async function construirSumarioPdf(pdf,pageLines){
+  const pgs=(CFG.pdf&&CFG.pdf.pages)||[];const scale=CFG.pdf.scale||1.4;
+  // corpo = tamanho de fonte MAIS FREQUENTE (p/ distinguir título de texto/rodapé)
+  const todas=[];for(const n in pageLines)for(const L of pageLines[n])todas.push({text:L.text,h:L.h,y:L.y,x:L.x,page:+n});
+  const freq=new Map();todas.forEach(L=>{if(L.h)freq.set(L.h,(freq.get(L.h)||0)+1)});
+  let corpoH=12,mx=0;freq.forEach((c,h)=>{if(c>mx){mx=c;corpoH=h}});
+  // 1) ÍNDICE do próprio documento (página "Sumário/Índice": linhas "Título ..... Nº") — normalmente o MAIS
+  //    completo e fiel; navegação achando o título no corpo (nº impresso + offset consensual).
+  let viaIndice=[];
+  try{
+    const reIdx=/^(.{3,}?)[\s.]*\.{2,}[\s.]*(\d{1,4})\s*$/;
+    const idx=[];const pagsIdx=new Set();
+    for(const n in pageLines){let hits=0;for(const L of (pageLines[n]||[])){const m=L.text.match(reIdx);if(m){const tt=m[1].replace(/[.\s]+$/,'').trim();if(tt.length>=3&&!/^\d+$/.test(tt)){idx.push({titulo:tt,pag:+m[2],x:L.x,h:L.h,page:+n});hits++}}}if(hits>=3)pagsIdx.add(+n)}
+    const noIdx=idx.filter(e=>pagsIdx.has(e.page));
+    if(noIdx.length>=5){
+      // nível por TAMANHO DE FONTE no índice (seções em negrito/MAIÚSCULAS são maiores que os subitens)
+      const hsIdx=[...new Set(noIdx.map(e=>e.h))].sort((a,b)=>b-a);
+      const nivelIdx=h=>Math.min(3,Math.max(0,hsIdx.indexOf(h)));
+      // Acha cada título no corpo só p/ DESCOBRIR o offset (página renderizada − página impressa do índice).
+      const matches=noIdx.map(e=>({e,a:acharTituloNoCorpo(e.titulo,pageLines,pagsIdx,corpoH)}));
+      const offs=matches.filter(m=>m.a).map(m=>m.a.page-m.e.pag);
+      const offCount=new Map();offs.forEach(o=>offCount.set(o,(offCount.get(o)||0)+1));
+      let offBest=0,offMax=0;offCount.forEach((c,o)=>{if(c>offMax){offMax=c;offBest=o}});
+      const consistente=offs.length>=3&&offMax/offs.length>=0.6; // offset bem definido → nº impresso é autoritativo
+      const med=offs.length?offs.slice().sort((a,b)=>a-b)[Math.floor(offs.length/2)]:0;
+      const offset=consistente?offBest:med;const nP=pgs.length||1;
+      viaIndice=matches.map(({e,a})=>{let page=Math.max(1,Math.min(nP,(e.pag||1)+offset));if(a&&!consistente)page=a.page;let y=0;if(a&&a.page===page){const ph=(pgs[page-1]&&pgs[page-1].h)||0;y=ph?Math.max(0,ph-a.line.y*scale-40):0}return {title:e.titulo,level:nivelIdx(e.h),page,y:Math.round(y)}});
+    }
+  }catch(_){}
+  // 2) marcadores embutidos (getOutline) — usados se o índice do documento não existir OU for mais pobre.
+  let viaOutline=[];
+  try{const ol=await pdf.getOutline();
+    if(ol&&ol.length){const out=[];
+      const destPag=async(dest)=>{try{const d=typeof dest==='string'?await pdf.getDestination(dest):dest;if(Array.isArray(d)&&d[0]!=null)return (await pdf.getPageIndex(d[0]))+1}catch(_){}return null};
+      const flat=async(items,lvl)=>{for(const it of (items||[])){const t=(it.title||'').trim();const p=await destPag(it.dest);if(t)out.push({title:t,level:lvl,page:p||1,y:0});if(it.items&&it.items.length)await flat(it.items,lvl+1)}};
+      await flat(ol,0);viaOutline=out;}
+  }catch(_){}
+  // escolhe o MAIS RICO — o índice do documento tem prioridade (é a TOC do autor; marcadores podem ser grossos)
+  if(viaIndice.length>=Math.max(5,viaOutline.length))return viaIndice.slice(0,400);
+  if(viaOutline.length)return viaOutline.slice(0,400);
+  if(viaIndice.length>=5)return viaIndice.slice(0,400);
+  // 3) HEURÍSTICA por tamanho de fonte
+  if(!todas.length)return [];
+  const limiar=corpoH*1.18;
+  const cand=todas.filter(L=>L.h>=limiar&&L.text.length>=2&&L.text.length<=90&&!/^[\d.\s]+$/.test(L.text)&&!/^(p[áa]gina|p\.)\s*\d/i.test(L.text));
+  if(!cand.length)return [];
+  const alturas=[...new Set(cand.map(L=>L.h))].sort((a,b)=>b-a);
+  const nivelH=h=>Math.min(3,Math.max(0,alturas.indexOf(h)));
+  cand.sort((a,b)=>a.page-b.page||b.y-a.y);
+  let out=cand.map(L=>{const ph=(pgs[L.page-1]&&pgs[L.page-1].h)||0;const y=ph?Math.max(0,ph-L.y*scale-40):0;return {title:L.text,level:nivelH(L.h),page:L.page,y:Math.round(y)}});
+  if(out.length>180)out=out.filter(o=>o.level===0);
+  return out.slice(0,400)
+}
+
 /* Renderiza o PDF página a página dentro das .sec já criadas (canvas + camada de texto). Cada span da
    camada de texto ganha data-pid estável (p<pág>-s<i>) → o motor de grifos marca o texto (transparente)
    sobre o canvas = marca-texto fiel. Ao terminar, repinta os grifos e recalcula sumário/tempo. */
@@ -1443,6 +1538,7 @@ async function renderPdfPages(){
   pdfjs.GlobalWorkerOptions.workerSrc='/pdf/pdf.worker.min.mjs';
   const pdf=await pdfjs.getDocument({url:CFG.pdf.url}).promise;
   const scale=CFG.pdf.scale||1.4;
+  const pageLines={};
   for(let n=1;n<=pdf.numPages;n++){
     const sec=$('#p'+n); if(!sec)continue;
     const wrap=$('.pdfpage',sec), canvas=$('canvas',wrap), tl=$('.pdftl',wrap);
@@ -1458,6 +1554,8 @@ async function renderPdfPages(){
       tl.style.setProperty('--scale-factor',String(scale));tl.style.setProperty('--total-scale-factor',String(scale));
       tl.style.setProperty('--user-unit','1');tl.style.setProperty('--scale-round-x','1px');tl.style.setProperty('--scale-round-y','1px');
       try{const t=new pdfjs.TextLayer({textContentSource:page.streamTextContent(),container:tl,viewport});await t.render()}catch(_){}
+      // Coleta as linhas (texto + tamanho de fonte + posição) desta página p/ montar o sumário por TÍTULOS.
+      try{const tc=await page.getTextContent();pageLines[n]=agruparLinhasPdf(tc.items)}catch(_){pageLines[n]=[]}
       // seleção estável (mecanismo pdfjs): endOfContent + classe .selecting no mousedown
       const end=document.createElement('div');end.className='endOfContent';tl.appendChild(end);tl.__eoc=end;
       tl.addEventListener('mousedown',()=>tl.classList.add('selecting'));
@@ -1465,6 +1563,8 @@ async function renderPdfPages(){
       S.an.filter(a=>a.sec===('p'+n)).forEach(paint); // repinta os grifos (geométricos) desta página
     }catch(err){console.error('[leitor-jus][pdf] página '+n,err)}
   }
+  // Sumário por TÍTULOS: índice embutido do PDF (getOutline) ou detecção por tamanho de fonte.
+  try{pdfOutline=await construirSumarioPdf(pdf,pageLines)}catch(_){pdfOutline=[]}
   if(typeof __afterPdf==='function')__afterPdf();
 }
 // Pós-render do PDF: recalcula palavras/tempo por página, re-render do sumário e re-layout.
@@ -1619,14 +1719,67 @@ secs.forEach((s,i)=>{const n=document.createElement('nav');n.setAttribute('aria-
 
 /* ================= SUMÁRIO E PROGRESSO ================= */
 let currentSub=null,activeBlock=null;
-function renderToc(){let done=0;
+function renderToc(){
+  // MODO PDF/BIBLIOTECA: abas "Índices" (títulos, caixas aninhadas estilo juris) e "Páginas" (lista de
+  // páginas). Mostra o progresso (check/%) por página lida e destaca a seção/página atual.
+  if(CFG&&CFG.pdf&&pdfOutline.length){
+    const tabs=$('#tocTabs');if(tabs)tabs.hidden=false;
+    const lido=p=>Math.min(1,S.seen['p'+p]||0);
+    const prog=p=>{const v=lido(p);return v>.97?'<svg class="i"><use href="#i-check"/></svg>':v>.02?Math.round(v*100)+'%':''};
+    const curPg=(S.cur&&S.cur[0]==='p')?+S.cur.slice(1):0;
+    if(tocModo==='paginas'){
+      // SUMÁRIO POR PÁGINAS: uma linha por página, com o progresso de leitura.
+      $('#toc').innerHTML=secs.map((s,i)=>`<li class="${s.id===S.cur?'cur':''}"><button class="t-item" data-goto="${s.id}"><span class="t-n">${i+1}</span><span><span class="t-t"><span class="t-tx">Página ${i+1}</span></span></span><span class="t-p">${prog(i+1)}</span></button></li>`).join('');
+    }else{
+      // SUMÁRIO POR ÍNDICES: cada SEÇÃO (nível 0) é uma CAIXA e os subitens ficam ANINHADOS (.subs).
+      const grupos=[];let atual=null;
+      for(const o of pdfOutline){if(o.level===0||!atual){atual={top:o,subs:[]};grupos.push(atual)}else atual.subs.push(o)}
+      $('#toc').innerHTML=grupos.map(g=>{
+        const cur=g.top.page===curPg||g.subs.some(s=>s.page===curPg);
+        const subs=g.subs.map(s=>`<li><button data-pdfpage="${s.page}" data-pdfy="${s.y||0}" class="${s.page===curPg?'cur':''}" title="${esc(s.title)}">${lido(s.page)>.97?'<svg class="i sub-chk"><use href="#i-check"/></svg>':''}${esc(s.title)}</button></li>`).join('');
+        return `<li class="${cur?'cur':''}"><button class="t-item" data-pdfpage="${g.top.page}" data-pdfy="${g.top.y||0}" title="${esc(g.top.title)}"><span class="t-n">${g.top.page}</span><span><span class="t-t"><span class="t-tx">${esc(g.top.title)}</span></span></span><span class="t-p">${prog(g.top.page)}</span></button>${subs?`<ul class="subs">${subs}</ul>`:''}</li>`;
+      }).join('');
+    }
+    let done=0;secs.forEach(s=>{if(Math.min(1,S.seen[s.id]||0)>.97)done++});
+    $('#sideCount').textContent=done+' de '+secs.length+' lidas';
+    $('#railList').innerHTML=secs.map((s,i)=>`<button data-goto="${s.id}" class="${s.id===S.cur?'cur':''} ${Math.min(1,S.seen[s.id]||0)>.97?'done':''}" title="Página ${i+1}">${pad(i+1)}</button>`).join('');
+    $('#toc').dataset.built='pdf';tocLidasAnt=done; // marca p/ o scroll só MOVER o destaque (anima via CSS)
+    return;
+  }
+  $('#toc').dataset.built='html';
+  let done=0;
   $('#toc').innerHTML=secs.map((s,i)=>{const p=Math.min(1,S.seen[s.id]||0);if(p>.97)done++;
     const subs=$$('.flow h3',s).map(h=>`<li><button data-sub="${h.id}">${S.bm.includes(h.id)?'<svg class="i"><use href="#i-bm"/></svg>':''}${esc(h.firstChild.textContent)}</button></li>`).join('');
     const pr=p>.97?'<svg class="i"><use href="#i-check"/></svg>':p>.02?Math.round(p*100)+'%':'';
     return `<li class="${s.id===S.cur?'cur':''}"><button class="t-item" data-goto="${s.id}"><span class="t-n">${pad(i+1)}</span><span><span class="t-t"><span class="t-tx">${esc(s.dataset.title)}</span></span><span class="t-tags">${($('.blk-tags',s)?.innerHTML)||''}</span></span><span class="t-p">${pr}</span></button><ul class="subs">${subs}</ul></li>`}).join('');
   $('#sideCount').textContent=done+' de '+secs.length+' lidos';$('#railList').innerHTML=secs.map((s,i)=>`<button data-goto="${s.id}" class="${s.id===S.cur?'cur':''} ${Math.min(1,S.seen[s.id]||0)>.97?'done':''}" title="${esc(s.dataset.title)}">${pad(i+1)}</button>`).join('');markSub()}
 function markSub(){$$('.subs button').forEach(b=>b.classList.toggle('cur',b.dataset.sub===currentSub))}
+// Atualização LEVE do sumário no scroll (modo biblioteca/PDF): só move as classes .cur em cima do DOM
+// existente → o CSS anima o destaque e o expandir/colapsar dos subitens. Rebuild só quando muda o nº de lidas.
+function atualizarToc(){
+  if(!(CFG&&CFG.pdf&&pdfOutline.length)||$('#toc').dataset.built!=='pdf'){renderToc();return}
+  const lido=p=>Math.min(1,S.seen['p'+p]||0);
+  const progHtml=p=>{const v=lido(p);return v>.97?'<svg class="i"><use href="#i-check"/></svg>':v>.02?Math.round(v*100)+'%':''};
+  const curPg=(S.cur&&S.cur[0]==='p')?+S.cur.slice(1):0;
+  $$('#toc > li').forEach(li=>{
+    const top=$('.t-item',li);if(!top)return;
+    const pg=+(top.dataset.pdfpage||(top.dataset.goto||'').replace(/^p/,'')||0);
+    const subsBtns=$$('.subs [data-pdfpage]',li);
+    li.classList.toggle('cur',[pg,...subsBtns.map(b=>+b.dataset.pdfpage)].includes(curPg));
+    const tp=$('.t-p',top);if(tp){const nv=progHtml(pg);if(tp.innerHTML!==nv)tp.innerHTML=nv}
+    subsBtns.forEach(b=>{b.classList.toggle('cur',+b.dataset.pdfpage===curPg);
+      const feito=lido(+b.dataset.pdfpage)>.97,ic=b.querySelector('.sub-chk');
+      if(feito&&!ic)b.insertAdjacentHTML('afterbegin','<svg class="i sub-chk"><use href="#i-check"/></svg>');else if(!feito&&ic)ic.remove()});
+  });
+  let done=0;secs.forEach(s=>{if(Math.min(1,S.seen[s.id]||0)>.97)done++});
+  $('#sideCount').textContent=done+' de '+secs.length+' lidas';
+  $$('#railList button').forEach((b,i)=>{b.classList.toggle('cur',('p'+(i+1))===S.cur);b.classList.toggle('done',lido(i+1)>.97)});
+}
 $('#toc').addEventListener('click',e=>{const b=e.target.closest('[data-sub]');if(!b)return;const h=$('#'+b.dataset.sub);goto(secOf(h).id,{el:h})});
+// Clique num título do sumário do PDF → rola até a página e a posição (y) do título.
+$('#toc').addEventListener('click',e=>{const b=e.target.closest('[data-pdfpage]');if(!b)return;e.preventDefault();const sec=$('#p'+b.dataset.pdfpage);if(!sec)return;const st=scroller.getBoundingClientRect().top;scroller.scrollTo({top:sec.getBoundingClientRect().top-st+scroller.scrollTop-120+(+b.dataset.pdfy||0),behavior:'smooth'});if(isSmall())app.classList.remove('sb-open')});
+// Abas do sumário: alterna entre Índices (títulos) e Páginas.
+$$('#tocTabs .toc-tab').forEach(b=>b.onclick=()=>{tocModo=b.dataset.toc;$$('#tocTabs .toc-tab').forEach(x=>x.classList.toggle('on',x===b));renderToc()});
 function onScroll(){const vh=scroller.clientHeight,top=scroller.getBoundingClientRect().top;let changed=false;
   secs.forEach(s=>{if(s.offsetParent===null)return;const r=s.getBoundingClientRect();if(r.bottom<top||r.top>top+vh)return;const v=Math.max(0,Math.min(1,(top+vh-r.top)/r.height));if(v>(S.seen[s.id]||0)+.004){S.seen[s.id]=v;changed=true}});
   if(!app.classList.contains('paged')){let cur=secs[0].id;secs.forEach(s=>{if(s.getBoundingClientRect().top<top+vh*.35)cur=s.id});if(cur!==S.cur){S.cur=cur;save('cur');changed=true;onSecChange()}}
@@ -1636,7 +1789,7 @@ function onScroll(){const vh=scroller.clientHeight,top=scroller.getBoundingClien
   if(!best)$$('.flow > *, .tese',article).forEach(el=>{if(el.offsetParent===null)return;const d=Math.abs(el.getBoundingClientRect().top-line);if(d<md){md=d;best=el}});
   if(best!==activeBlock){activeBlock&&activeBlock.classList.remove('is-active');activeBlock=best;best&&best.classList.add('is-active')}
   store.set('pos',{sec:S.cur,top:scroller.scrollTop});
-  if(changed){save('seen');renderToc()}renderProgress()}
+  if(changed){save('seen');atualizarToc()}renderProgress()}
 function renderProgress(){let read=0;secs.forEach(s=>read+=secWords[s.id]*Math.min(1,S.seen[s.id]||0));const pct=Math.round(read/totalWords*100);const left=Math.max(0,Math.ceil((totalWords-read)/WPM));
   $('#hair').style.width=pct+'%';$('#ovBar').style.width=pct+'%';$('#ovTxt').textContent=pct+'%'}
 let tick=false;scroller.addEventListener('scroll',()=>{if(!tick){tick=true;requestAnimationFrame(()=>{onScroll();tick=false})}},{passive:true});
@@ -1667,7 +1820,7 @@ function openTab(t){setNb(true);setTab(t)}
 function setTab(t){$$('.tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===t));$$('.pane').forEach(p=>p.classList.toggle('on',p.id==='p-'+t));renderFoot(t)}
 $$('.tabs button').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
 function renderFoot(t){const f=$('#nbFoot');
-  if(t==='hl'||t==='nt'){f.hidden=false;f.innerHTML='<button class="btn full" id="copyAll"><svg class="i"><use href="#i-copy"/></svg>Copiar como resumo</button><button class="btn" id="allToSheet" title="Levar para a folha espelho do tema atual"><svg class="i"><use href="#t-send"/></svg>Folha</button>';$('#copyAll').onclick=copyAll;$('#allToSheet').onclick=allToSheet}
+  if(t==='hl'||t==='nt'){f.hidden=false;f.innerHTML='<button class="btn full" id="copyAll"><svg class="i"><use href="#i-copy"/></svg>Copiar como resumo</button><button class="btn" id="allToSheet" title="Levar para as anotações do tema atual"><svg class="i"><use href="#t-send"/></svg>Anotar</button>';$('#copyAll').onclick=copyAll;$('#allToSheet').onclick=allToSheet}
   else if(t==='rv'){const n=due().length;f.hidden=false;f.innerHTML=`<button class="btn pri full" id="rvStart" ${n?'':'disabled'}><svg class="i"><use href="#i-cards"/></svg>${n?'Revisar '+n+(n>1?' cartões':' cartão'):'Nada para revisar hoje'}</button>`;$('#rvStart').onclick=startReview}
   else f.hidden=true}
 
@@ -1896,7 +2049,7 @@ function openNote(a){const m=anMarks(a.id)[0];if(!m)return;pop.dataset.kind='not
 function showLei(el){const l=$('#'+el.dataset.law);if(!l)return;pop.dataset.kind='lei';const lab=l.dataset.label||'';const a=null;const par=(el.dataset.par||'').replace(/\s+/g,' ').toLowerCase();
   const body=$$('p',l).map(p=>{const t=p.textContent.replace(/^“/,'').trim().toLowerCase().replace(/\s+/g,' ');const hit=par&&t.startsWith(par);return `<p${hit?' class="hlp"':''}>${p.innerHTML}</p>`}).join('');
   pop.innerHTML=`<div class="pop-h"><span>${esc(lab)}</span><button class="icb" id="plX" aria-label="Fechar"><svg class="i"><use href="#i-x"/></svg></button></div><div class="pop-b law-pop">${body}</div>
-   <div class="pop-f"><span style="display:flex;gap:6px"><button class="btn" id="plGo" title="Ir ao quadro no texto">Ver no texto</button><button class="btn" id="plSheet"><svg class="i"><use href="#t-send"/></svg>Folha</button><button class="btn" id="plCopy" title="Copiar"><svg class="i"><use href="#i-copy"/></svg></button></span>${a?`<a href="${a.href}" target="_blank" rel="noopener">Planalto<svg class="i"><use href="#i-ext"/></svg></a>`:''}</div>`;
+   <div class="pop-f"><span style="display:flex;gap:6px"><button class="btn" id="plGo" title="Ir ao quadro no texto">Ver no texto</button><button class="btn" id="plSheet"><svg class="i"><use href="#t-send"/></svg>Anotar</button><button class="btn" id="plCopy" title="Copiar"><svg class="i"><use href="#i-copy"/></svg></button></span>${a?`<a href="${a.href}" target="_blank" rel="noopener">Planalto<svg class="i"><use href="#i-ext"/></svg></a>`:''}</div>`;
   placePop(el.getBoundingClientRect());const hp=$('.hlp',pop);if(hp){const lp=$('.law-pop',pop);lp.scrollTop=hp.offsetTop-lp.offsetTop-12}
   $('#plX').onclick=closePop;$('#plCopy').onclick=()=>copy(lab+'\n'+$('.pop-b',pop).innerText,'Dispositivo copiado');
   $('#plGo').onclick=()=>{closePop();goto(secOf(l).id,{el:l});setTimeout(()=>{l.classList.remove('flash-block');void l.offsetWidth;l.classList.add('flash-block')},250)};
@@ -2048,7 +2201,7 @@ function mdShortcuts(){const s=getSelection();if(!s.rangeCount)return;const n=s.
   for(const [re,cmd] of rules){if(re.test(t)&&n===blk.firstChild){n.nodeValue=t.replace(re,'');if(['h2','h3','blockquote'].includes(cmd))document.execCommand('formatBlock',false,cmd);else if(cmd==='todo'){document.execCommand('insertHTML',false,'<ul class="todo"><li><br></li></ul>');blk.textContent.trim()===''&&blk.remove()}else document.execCommand(cmd);break}}}
 /* inserir conteúdo na folha */
 function citeHTML(a){const i=secIdx(a.sec)+1;return `<blockquote class="cite" data-c="${a.c||'y'}">“${esc(a.text)}”<span class="cite-src" contenteditable="false" data-pid="${a.pid}">Tema ${pad(i)} · ir ao texto</span></blockquote>${a.note?`<p>${esc(a.note)}</p>`:''}`}
-function sendToSheet(a){insertIntoSheet(citeHTML(a)+'<p><br></p>',a.sec);toast('Trecho levado para a folha espelho')}
+function sendToSheet(a){insertIntoSheet(citeHTML(a)+'<p><br></p>',a.sec);toast('Trecho levado para as anotações')}
 function insertIntoSheet(html,secId,atCaret){if(!app.classList.contains('mirror'))setMirror(true);else if(isNarrow())app.classList.remove('mv-text');
   if(secId&&secId!==sheetSec){if(S.set.follow&&secId!==S.cur){S.set.follow=false;saveSet();$('#mrFollow').setAttribute('aria-checked','false')}loadSheet(secId)}
   if(mrMode!=='text')$('#mrMode button[data-v="text"]').click();

@@ -96,7 +96,7 @@ export interface SimuladoCard {
 const tipoLabel = (t?: TipoSimulado | null) => (t === 'discursiva' ? 'Discursiva' : t === 'mista' ? 'Mista' : 'Objetiva')
 
 const modoLabel: Record<string, string> = {
-  janela_fixa: 'Janela fixa',
+  janela_fixa: 'Agendado',
   prazo_relativo: 'Prazo relativo',
   aberto: 'Aberto',
 }
@@ -587,7 +587,7 @@ export function SimuladosBoard({ simulados, appUrl, onlineInicial = {}, folders 
 
   const filtros = [
     { v: 'todos', label: 'Todos' },
-    { v: 'janela_fixa', label: 'Janela fixa' },
+    { v: 'janela_fixa', label: 'Agendado' },
     { v: 'prazo_relativo', label: 'Prazo relativo' },
     { v: 'aberto', label: 'Aberto' },
   ]

@@ -3,11 +3,15 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { resolverVisualSimulados } from '@/lib/aluno/simulado-visual'
+import { subPilarJurisprudencia } from '@/lib/simulado/pilar-jurisprudencia'
 
 // Camada de dados da Área de Teste (prévia + variáveis). Reutilizada pela server action (laboratório),
 // pelas rotas de API (plugin do OnlyOffice) e pelo cálculo da prévia.
 
-export type QuestaoSim = { disciplina: string; assunto: string; pilar: string; ordem: number }
+// `pilar` = pilar canônico primário (Lei seca/Jurisprudência/Doutrina/…). `pilares` = TODOS os pilares
+// da questão: o canônico + o SUB-PILAR por tribunal quando é jurisprudência (STF/STJ/Sistemas
+// Internacionais/Outros). Os consumidores de variáveis por pilar devem iterar `pilares`.
+export type QuestaoSim = { disciplina: string; assunto: string; pilar: string; pilares?: string[]; ordem: number }
 export type DisciplinaOpt = { nome: string; total: number; assuntos: string }
 export type PickerPasta = { id: string; nome: string; cor: string | null; icone: string | null; capa: string | null; orig: string | null; cfg: any | null; paiId: string | null; count: number }
 export type PickerSim = { id: string; titulo: string; status: string; pastaId: string | null; cor: string | null; icone: string | null; capa: string | null; orig: string | null; cfg: any | null }
@@ -36,7 +40,7 @@ export async function carregarQuestoesSimulado(simuladoId: string): Promise<{ di
   try {
     const pq = await fetchAllByIn<any>([simuladoId], (chunk) =>
       svc.from('simulado_prova_questoes')
-        .select('questao_id, ordem, anulada, questoes:simulado_questoes(categoria, pilar_1, pilar_2, assunto_detalhe, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome))')
+        .select('questao_id, ordem, anulada, questoes:simulado_questoes(categoria, pilar_1, pilar_2, grupo, comentario_professor, enunciado, assunto_detalhe, disciplinas:simulado_disciplinas(nome), assuntos:simulado_assuntos(nome))')
         .in('simulado_id', chunk).order('ordem', { ascending: true }))
     const questoes: QuestaoSim[] = []
     const totPorDisc = new Map<string, number>()
@@ -46,7 +50,13 @@ export async function carregarQuestoesSimulado(simuladoId: string): Promise<{ di
       const disciplina = q?.disciplinas?.nome || 'Sem disciplina'
       const assunto = ((q?.assuntos?.nome ?? q?.assunto_detalhe ?? '') as string).toString().trim()
       const pilar = pilarDe(q?.categoria, q?.pilar_1, q?.pilar_2, disciplina)
-      questoes.push({ disciplina, assunto, pilar, ordem: Number(r.ordem ?? questoes.length) })
+      const pilares = pilar ? [pilar] : []
+      // Jurisprudência → abre em sub-pilar por tribunal (aditivo), detectado do pilar_1 ou do texto.
+      if (pilar === 'Jurisprudência') {
+        const trib = subPilarJurisprudencia(q?.pilar_1, q?.comentario_professor, q?.enunciado)
+        if (trib && !pilares.includes(trib)) pilares.push(trib)
+      }
+      questoes.push({ disciplina, assunto, pilar, pilares, ordem: Number(r.ordem ?? questoes.length) })
       totPorDisc.set(disciplina, (totPorDisc.get(disciplina) ?? 0) + 1)
     }
     const disciplinas = [...totPorDisc.entries()].map(([nome, total]) => ({ nome, total, assuntos: '' })).sort((a, b) => b.total - a.total)
@@ -56,19 +66,27 @@ export async function carregarQuestoesSimulado(simuladoId: string): Promise<{ di
   }
 }
 
-/** Árvore de pastas (folder_area='simulado') + simulados com capa/visual resolvidos (pro picker). */
-export async function carregarPicker(): Promise<{ pastas: PickerPasta[]; simulados: PickerSim[] }> {
+/** Áreas de pasta que são DESAFIOS (agrupam simulados numa jornada; hoje só a Maratona). */
+export const DESAFIO_AREAS: readonly string[] = ['maratona']
+
+/** Árvore de pastas + simulados com capa/visual resolvidos (pro picker).
+ *  modo='simulado' (padrão): pastas folder_area='simulado' + TODOS os simulados (inclui os da raiz).
+ *  modo='desafio': pastas das áreas de DESAFIO (maratona…) + SÓ os simulados INTERNOS dessas pastas. */
+export async function carregarPicker(modo: 'simulado' | 'desafio' = 'simulado'): Promise<{ pastas: PickerPasta[]; simulados: PickerSim[] }> {
   const tenantId = await getCurrentTenantId()
   if (!tenantId) return { pastas: [], simulados: [] }
   const svc = createAdminClient()
   const pastasRaw = ((await fetchAll<any>(() => svc.from('simulado_pastas')
     .select('id, nome, cor, icone, capa_url, capa_card_url, capa_meta, is_folder, folder_area, pai_id, deletado, tenant_id')
     .eq('tenant_id', tenantId).order('nome', { ascending: true }))) ?? [])
-    .filter((p: any) => !p.deletado && p.is_folder && p.folder_area === 'simulado')
-  const simsRaw = (await fetchAll<any>(() => svc.from('simulado_simulados')
+    .filter((p: any) => !p.deletado && p.is_folder && (modo === 'desafio' ? DESAFIO_AREAS.includes(p.folder_area) : p.folder_area === 'simulado'))
+  const simsRawAll = (await fetchAll<any>(() => svc.from('simulado_simulados')
     .select('id, titulo, status, pasta_id, regras, created_at')
     .eq('tenant_id', tenantId).eq('deletado', false).is('owner_estudante_id', null)
     .order('created_at', { ascending: false }).order('id', { ascending: true }))) ?? []
+  // No modo DESAFIO só entram os simulados que estão DENTRO de uma pasta de desafio (sem os soltos na raiz).
+  const idsPastasVisiveis = new Set(pastasRaw.map((p: any) => String(p.id)))
+  const simsRaw = modo === 'desafio' ? simsRawAll.filter((s) => s.pasta_id && idsPastasVisiveis.has(String(s.pasta_id))) : simsRawAll
   const vis = await resolverVisualSimulados(svc, simsRaw.map((s) => ({ id: s.id, regras: s.regras })))
 
   const simulados: PickerSim[] = simsRaw.map((s) => {

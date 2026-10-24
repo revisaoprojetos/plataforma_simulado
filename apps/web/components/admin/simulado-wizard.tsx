@@ -118,6 +118,8 @@ export function SimuladoWizard({
     titulo: '', descricao: '', instrucoes: '', modo_aplicacao: 'janela_fixa', data_inicio: '', data_fim: '',
     prazo_valor: '', prazo_unidade: 'dias', tempo_limite_min: '', metodo_identificacao: 'email', embed_ativo: false,
   })
+  // "Sem data de fim": janela fixa sem término (vazio = aberto até encerrar à mão). Marcado quando não há fim.
+  const [semDataFim, setSemDataFim] = useState(!info.data_fim)
   const [regras, setRegras] = useState<Record<string, any>>({
     embaralhar_questoes: false, embaralhar_alternativas: false, revisao_antes_enviar: true,
     retentativas: 1, retentativas_ilimitadas: false, politica_nota: 'ultima',
@@ -543,12 +545,23 @@ export function SimuladoWizard({
                     </Campo>
                   </div>
                   {info.modo_aplicacao === 'janela_fixa' && (
-                    <div className="space-y-1.5">
+                    <div className="space-y-2">
                       <div className="grid gap-4 sm:grid-cols-2">
                         <Campo label="Início"><Input type="datetime-local" value={info.data_inicio} onChange={(e) => set('data_inicio', e.target.value)} /></Campo>
-                        <Campo label="Fim" hint="Fecha o acesso automaticamente."><Input type="datetime-local" value={info.data_fim} onChange={(e) => set('data_fim', e.target.value)} /></Campo>
+                        {!semDataFim && (
+                          <Campo label="Fim" hint="Fecha o acesso automaticamente."><Input type="datetime-local" value={info.data_fim} onChange={(e) => set('data_fim', e.target.value)} /></Campo>
+                        )}
                       </div>
-                      <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Clock className="h-3.5 w-3.5" /> {BRT_LABEL} — informe e confira sempre no horário de Brasília.</p>
+                      <label className="flex cursor-pointer items-start gap-2 text-sm">
+                        <input type="checkbox" className="mt-0.5 h-4 w-4 shrink-0 accent-[var(--primary)]" checked={semDataFim} onChange={(e) => { setSemDataFim(e.target.checked); if (e.target.checked) set('data_fim', '') }} />
+                        <span>
+                          <span className="font-medium">Sem data de fim</span>
+                          <span className="block text-xs text-muted-foreground">Abre na data de início e fica aberto para sempre, até você encerrar manualmente.</span>
+                        </span>
+                      </label>
+                      {!semDataFim && (
+                        <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><Clock className="h-3.5 w-3.5" /> {BRT_LABEL} — informe e confira sempre no horário de Brasília.</p>
+                      )}
                     </div>
                   )}
                   {info.modo_aplicacao === 'prazo_relativo' && (

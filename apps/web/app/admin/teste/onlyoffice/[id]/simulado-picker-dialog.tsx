@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Search, Folder, ChevronRight, ChevronLeft, Loader2, X, FileText } from 'lucide-react'
 import { CapaCard } from '@/components/aluno/capa-card'
-import { carregarPickerSimulados, type PickerPasta, type PickerSim } from './previa-actions'
+import { carregarPickerSimulados, carregarPickerDesafios, type PickerPasta, type PickerSim } from './previa-actions'
 
 const STATUS: Record<string, { label: string; cls: string }> = {
   publicado: { label: 'Publicado', cls: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' },
@@ -14,6 +14,7 @@ const STATUS: Record<string, { label: string; cls: string }> = {
 
 export function SimuladoPickerDialog({ onSelect, onClose }: { onSelect: (id: string, titulo: string) => void; onClose: () => void }) {
   const [carregando, setCarregando] = useState(true)
+  const [aba, setAba] = useState<'simulado' | 'desafio'>('simulado')
   const [pastas, setPastas] = useState<PickerPasta[]>([])
   const [simulados, setSimulados] = useState<PickerSim[]>([])
   const [pastaAtual, setPastaAtual] = useState<string | null>(null)
@@ -21,7 +22,16 @@ export function SimuladoPickerDialog({ onSelect, onClose }: { onSelect: (id: str
   const [montado, setMontado] = useState(false)
 
   useEffect(() => { setMontado(true) }, [])
-  useEffect(() => { (async () => { try { const r = await carregarPickerSimulados(); setPastas(r.pastas); setSimulados(r.simulados) } finally { setCarregando(false) } })() }, [])
+  // Recarrega ao trocar de aba (Simulados × Desafios) e reseta a navegação/busca.
+  useEffect(() => {
+    let vivo = true
+    setCarregando(true); setPastaAtual(null); setBusca('')
+    ;(async () => {
+      try { const r = aba === 'desafio' ? await carregarPickerDesafios() : await carregarPickerSimulados(); if (vivo) { setPastas(r.pastas); setSimulados(r.simulados) } }
+      finally { if (vivo) setCarregando(false) }
+    })()
+    return () => { vivo = false }
+  }, [aba])
   useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }; window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h) }, [onClose])
 
   const porId = useMemo(() => new Map(pastas.map((p) => [p.id, p])), [pastas])
@@ -44,6 +54,17 @@ export function SimuladoPickerDialog({ onSelect, onClose }: { onSelect: (id: str
             <p className="text-xs text-muted-foreground">Navegue pelas pastas ou busque pelo nome.</p>
           </div>
           <button onClick={onClose} aria-label="Fechar" className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted"><X className="h-4 w-4" /></button>
+        </div>
+
+        {/* Abas: Simulados × Desafios (os desafios se comportam como pastas com simulados internos) */}
+        <div className="flex items-center gap-1 border-b px-4">
+          {([['simulado', 'Simulados'], ['desafio', 'Desafios']] as const).map(([k, label]) => (
+            <button key={k} type="button" onClick={() => setAba(k)}
+              className={`relative px-3 py-2 text-sm font-medium transition-colors ${aba === k ? 'text-foreground' : 'text-muted-foreground hover:text-foreground'}`}>
+              {label}
+              {aba === k && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-primary" />}
+            </button>
+          ))}
         </div>
 
         <div className="border-b px-4 py-3">
@@ -89,7 +110,7 @@ export function SimuladoPickerDialog({ onSelect, onClose }: { onSelect: (id: str
                   {sims.map((s) => <SimTicket key={s.id} s={s} onClick={() => onSelect(s.id, s.titulo)} />)}
                 </div>
               ) : (!subpastas.length && (
-                <div className="py-12 text-center text-sm text-muted-foreground">{buscando ? 'Nenhum simulado encontrado.' : 'Pasta vazia.'}</div>
+                <div className="py-12 text-center text-sm text-muted-foreground">{buscando ? 'Nenhum simulado encontrado.' : (aba === 'desafio' && !pastaAtual ? 'Nenhum desafio ainda.' : 'Pasta vazia.')}</div>
               ))}
             </>
           )}

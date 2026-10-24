@@ -303,7 +303,7 @@ function PreviaSimulado({ c }: { c: CarimboDef }) {
         <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 px-3">
           <span className="inline-flex w-fit rounded-full bg-amber-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">Em andamento</span>
           <b className="truncate text-sm text-foreground">Simulado 1 · AGU</b>
-          <span className="truncate text-[11px] text-muted-foreground">Objetiva · Janela fixa</span>
+          <span className="truncate text-[11px] text-muted-foreground">Objetiva · Agendado</span>
         </div>
       </div>
     )
