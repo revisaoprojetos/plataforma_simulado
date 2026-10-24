@@ -12,6 +12,17 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.27.1 — 2026-10-24
+
+**fix(prévia): valores dos SUB-PILARES (STF/STJ/SI) ficavam em branco no diagnóstico**
+
+- A listagem de variáveis (`simulado-vars`) já abria os sub-pilares, mas o **cálculo da prévia**
+  (`aplicarPreviaSimulado`) só gerava as variáveis de pilar para a lista fixa `Lei seca / Jurisprudência /
+  Doutrina` — então `pct_pilar_stf`, `acerto_pilar_stj`, etc. **nunca eram preenchidos** e os cards STF/STJ/SI
+  saíam em branco (caindo na amostra). Agora as variáveis de pilar (`pct_pilar_<slug>`, `acerto_pilar_<slug>`,
+  `total_pilar_<slug>`) + os flags de faixa (`<slug>_f1/f2/f3`) são gerados para **TODOS os pilares
+  presentes**, incluindo os sub-pilares da jurisprudência.
+
 ## 3.27.0 — 2026-10-24
 
 **feat/fix: sub-pilar da jurisprudência (STF/STJ) no diagnóstico + seletores do Lab de prévia + dev webpack**

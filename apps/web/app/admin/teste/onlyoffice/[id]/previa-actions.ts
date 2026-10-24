@@ -76,7 +76,11 @@ export async function aplicarPreviaSimulado(
       const s = slugVar(d.nome), a = acertosDe.get(d.nome) ?? 0
       slugVars[`acerto_${s}`] = String(a); slugVars[`total_${s}`] = String(d.total || 0); slugVars[`pct_${s}`] = pct(a, d.total || 0); slugVars[`assuntos_${s}`] = assuntosDe(d.nome)
     }
-    for (const nome of ['Lei seca', 'Jurisprudência', 'Doutrina']) {
+    // Pilares: os 3 canônicos SEMPRE (mesmo 0, p/ templates genéricos) + TODOS os presentes — inclui os
+    // SUB-PILARES da jurisprudência (STF/STJ/Sistemas Internacionais). Antes era só a lista fixa, então
+    // pct_pilar_stf/acerto_pilar_stj etc. nunca eram gerados → a prévia ficava em branco nesses cards.
+    const pilaresParaVar = new Set<string>(['Lei seca', 'Jurisprudência', 'Doutrina', ...pilarTot.keys()])
+    for (const nome of pilaresParaVar) {
       const s = slugVar(nome), t = pilarTot.get(nome) ?? 0, a = pilarAc.get(nome) ?? 0
       slugVars[`acerto_pilar_${s}`] = String(a); slugVars[`total_pilar_${s}`] = String(t); slugVars[`pct_pilar_${s}`] = pct(a, t)
     }
@@ -87,6 +91,9 @@ export async function aplicarPreviaSimulado(
       acertos: String(acertos), total_questoes: String(total), percentual: pct(acertos, total), erros: String(Math.max(0, total - acertos)),
       disciplinas,
       ...pv('Lei seca', 'ls'), ...pv('Jurisprudência', 'jur'), ...pv('Doutrina', 'dout'),
+      // pv() TAMBÉM por SLUG p/ TODOS os pilares presentes (STF/STJ/Sistemas Internacionais…): gera
+      // {slug_pct}/{slug_acertos}/{slug_total} + os flags de faixa {slug_f1/f2/f3} (condicionais do card).
+      ...Object.assign({}, ...[...pilarTot.keys()].map((nome) => pv(nome, slugVar(nome)))),
       ...slugVars,
     }
     await escreverPrevia(id, data)
