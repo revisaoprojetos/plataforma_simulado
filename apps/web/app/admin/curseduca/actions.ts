@@ -8,7 +8,7 @@ import { configDoEnv, testarCredenciais, listarTodosGrupos, contarMembros, lista
 import { resolverCfg, executarImport, envAplicaAoTenant } from '@/lib/curseduca/import-core'
 import { executarAutoVinculo } from '@/lib/curseduca/auto-vinculo'
 import type { DestinoImport, ResultadoImportCurseduca } from '@/lib/curseduca/tipos'
-import { criptografar, descriptografar, estaCriptografado, criptografiaAtiva } from '@/lib/crypto'
+import { criptografar, descriptografar, estaCriptografado, criptografiaAtiva, ilegivelPorChave } from '@/lib/crypto'
 import { resolverCfgCurseduca } from '@/lib/curseduca/cfg'
 import { selecionarGrupos } from '@/lib/simulado/grupos'
 import { fetchAll } from '@/lib/supabase/fetch-all'
@@ -90,7 +90,7 @@ export async function contarTodosGrupos(ids: number[]): Promise<{ ok: boolean; c
 }
 
 // ── Credenciais por tenant ──────────────────────────────────────────────────
-export type CurseducaConfigDTO = { base_url: string; usuario: string; ativo: boolean; temApiKey: boolean; temSenha: boolean; usandoEnv: boolean; existe: boolean; criptografado: boolean; criptografiaAtiva: boolean }
+export type CurseducaConfigDTO = { base_url: string; usuario: string; ativo: boolean; temApiKey: boolean; temSenha: boolean; usandoEnv: boolean; existe: boolean; criptografado: boolean; criptografiaAtiva: boolean; ilegivel: boolean }
 
 /** Estado da config Curseduca do tenant (nunca devolve api_key/senha — só se estão preenchidas). */
 export async function getCurseducaConfig(): Promise<{ ok: boolean; error?: string; config?: CurseducaConfigDTO }> {
@@ -100,7 +100,7 @@ export async function getCurseducaConfig(): Promise<{ ok: boolean; error?: strin
   // O .env global só vale para o tenant designado (evita uma empresa usar a conta de outra).
   const env = envAplicaAoTenant(access.tenantId) ? configDoEnv() : null
   const cripAtiva = criptografiaAtiva()
-  const doEnv = (): CurseducaConfigDTO => ({ base_url: env?.base || 'https://prof.curseduca.pro', usuario: env?.user || '', ativo: !!env, temApiKey: !!env?.apiKey, temSenha: !!env?.pass, usandoEnv: !!env, existe: false, criptografado: false, criptografiaAtiva: cripAtiva })
+  const doEnv = (): CurseducaConfigDTO => ({ base_url: env?.base || 'https://prof.curseduca.pro', usuario: env?.user || '', ativo: !!env, temApiKey: !!env?.apiKey, temSenha: !!env?.pass, usandoEnv: !!env, existe: false, criptografado: false, criptografiaAtiva: cripAtiva, ilegivel: false })
   try {
     const svc = createAdminClient()
     // FONTE CANÔNICA: simulado_integracao_config (provider=curseduca). O painel legado passou a ler/gravar
@@ -108,12 +108,15 @@ export async function getCurseducaConfig(): Promise<{ ok: boolean; error?: strin
     const { data: novo } = await svc.from('simulado_integracao_config').select('base_url, credenciais, ativo').eq('tenant_id', access.tenantId).eq('provider', 'curseduca').maybeSingle()
     const cred = ((novo as any)?.credenciais ?? {}) as Record<string, string>
     if (novo && (cred.api_key || cred.usuario || cred.senha)) {
-      return { ok: true, config: { base_url: (novo as any).base_url || 'https://prof.curseduca.pro', usuario: descriptografar(cred.usuario) || '', ativo: !!(novo as any).ativo, temApiKey: !!cred.api_key, temSenha: !!cred.senha, usandoEnv: false, existe: true, criptografado: estaCriptografado(cred.api_key) || estaCriptografado(cred.senha), criptografiaAtiva: cripAtiva } }
+      // `ilegivel`: existe credencial criptografada que NENHUMA chave disponível lê (APP_ENCRYPTION_KEY mudou)
+      // → a UI mostra "regrave/ajuste a chave" em vez de parecer que foi apagada.
+      const ilegivel = ilegivelPorChave(cred.api_key) || ilegivelPorChave(cred.senha) || ilegivelPorChave(cred.usuario)
+      return { ok: true, config: { base_url: (novo as any).base_url || 'https://prof.curseduca.pro', usuario: (ilegivel ? '' : descriptografar(cred.usuario)) || '', ativo: !!(novo as any).ativo, temApiKey: !!cred.api_key, temSenha: !!cred.senha, usandoEnv: false, existe: true, criptografado: estaCriptografado(cred.api_key) || estaCriptografado(cred.senha), criptografiaAtiva: cripAtiva, ilegivel } }
     }
     // Fallback: config legada.
     const { data } = await svc.from('simulado_curseduca_config').select('base_url, api_key, usuario, senha, ativo').eq('tenant_id', access.tenantId).maybeSingle()
     const d = data as any
-    if (d) return { ok: true, config: { base_url: d.base_url || 'https://prof.curseduca.pro', usuario: d.usuario || '', ativo: !!d.ativo, temApiKey: !!d.api_key, temSenha: !!d.senha, usandoEnv: false, existe: true, criptografado: estaCriptografado(d.api_key) || estaCriptografado(d.senha), criptografiaAtiva: cripAtiva } }
+    if (d) { const ilegivel = ilegivelPorChave(d.api_key) || ilegivelPorChave(d.senha); return { ok: true, config: { base_url: d.base_url || 'https://prof.curseduca.pro', usuario: d.usuario || '', ativo: !!d.ativo, temApiKey: !!d.api_key, temSenha: !!d.senha, usandoEnv: false, existe: true, criptografado: estaCriptografado(d.api_key) || estaCriptografado(d.senha), criptografiaAtiva: cripAtiva, ilegivel } } }
     return { ok: true, config: doEnv() }
   } catch {
     return { ok: true, config: doEnv() } // tabela ainda não existe → usa env

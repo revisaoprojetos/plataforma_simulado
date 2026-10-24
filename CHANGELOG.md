@@ -12,6 +12,25 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.26.1 — 2026-10-24
+
+**fix(integração Curseduca): a integração "sumia depois de um tempo" em todos os tenants (chave de criptografia)**
+
+- **Causa-raiz (confirmada com dado real):** as credenciais ficam criptografadas (AES-256-GCM) com a
+  `APP_ENCRYPTION_KEY`; esse valor **mudou ao longo do tempo** em produção, então credenciais salvas com a
+  chave anterior ficavam **ilegíveis** e o código as tratava como **"não configurado" silenciosamente** → o
+  admin tinha que readicionar tudo, e a regra de sync parava.
+- **Rotação de chave** (`lib/crypto.ts`): novo `APP_ENCRYPTION_KEY_OLD` (lista por vírgula); a descriptografia
+  tenta a chave atual e depois as antigas → trocar a chave **não órfã mais** as credenciais. A criptografia
+  usa sempre a atual.
+- **Para de mascarar** (`lib/integracoes/config.ts`): falha de descriptografia agora é **logada** (não vira
+  "não configurado" silencioso).
+- **Aviso na UI** (`curseduca-config.tsx`): credencial ilegível mostra banner *"a chave mudou — regrave"* e
+  abre o painel, em vez de parecer apagada.
+- **Chave propagada** a `worker` e `api` no compose (antes só o `web`).
+- **AÇÃO DE INFRA necessária:** fixar `APP_ENCRYPTION_KEY` no env do stack (valor permanente) e nunca trocar;
+  readicionar as credenciais do tenant órfão 1x.
+
 ## 3.26.0 — 2026-10-23
 
 **perf(biblioteca): otimização backend-first (admin + aluno) — corta egress e carregamento**

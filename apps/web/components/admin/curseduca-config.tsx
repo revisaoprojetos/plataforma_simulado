@@ -29,6 +29,7 @@ export function CurseducaConfig({ inicialAberto = false, semColapso = false }: {
         setBaseUrl(r.config.base_url)
         setUsuario(r.config.usuario)
         setAtivo(r.config.ativo)
+        if (r.config.ilegivel) setAberto(true) // abre o painel p/ o admin regravar
       }
     })
     return () => { vivo = false }
@@ -53,6 +54,7 @@ export function CurseducaConfig({ inicialAberto = false, semColapso = false }: {
           <p className="text-sm font-semibold">Credenciais da Curseduca</p>
           <p className="truncate text-xs text-muted-foreground">
             {carregando ? 'carregando…'
+              : cfg?.ilegivel ? '⚠ Credenciais salvas, mas ILEGÍVEIS (a chave de criptografia do servidor mudou). Regrave abaixo.'
               : cfg?.usandoEnv ? 'Usando as credenciais globais do servidor (.env). Configure aqui para este cliente.'
               : cfg?.existe ? `Configurado para este tenant · usuário ${cfg.usuario || '—'} · ${cfg.ativo ? 'ativo' : 'inativo'}`
               : 'Não configurado — informe as credenciais desta plataforma.'}
@@ -69,8 +71,15 @@ export function CurseducaConfig({ inicialAberto = false, semColapso = false }: {
 
       {aberto && (
         <div className="space-y-3 border-t p-4">
+          {/* Credenciais ilegíveis: a chave mudou → a credencial salva não é mais lida. */}
+          {!carregando && cfg?.ilegivel && (
+            <div className="flex items-start gap-2 rounded-lg border border-rose-500/30 bg-rose-500/5 px-3 py-2 text-xs text-rose-700 dark:text-rose-400">
+              <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>As credenciais existem no banco mas <b>não podem ser descriptografadas</b> — a <b>APP_ENCRYPTION_KEY</b> do servidor mudou desde que foram salvas. Informe API key e senha de novo abaixo e salve. (Para não perder de novo, o suporte deve <b>fixar a APP_ENCRYPTION_KEY</b> e nunca trocá-la.)</span>
+            </div>
+          )}
           {/* Status de criptografia em repouso */}
-          {!carregando && cfg && (
+          {!carregando && cfg && !cfg.ilegivel && (
             cfg.criptografiaAtiva
               ? <div className="flex items-center gap-2 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-3 py-2 text-xs text-emerald-700 dark:text-emerald-400"><Lock className="h-3.5 w-3.5" /> Segredos {cfg.criptografado ? 'guardados criptografados' : 'serão criptografados'} no banco (AES-256).</div>
               : <div className="flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-700 dark:text-amber-400"><ShieldAlert className="h-3.5 w-3.5" /> <b>APP_ENCRYPTION_KEY</b> ausente no servidor — os segredos ficam em texto puro. Defina a chave para criptografar.</div>

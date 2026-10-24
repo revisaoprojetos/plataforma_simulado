@@ -1,6 +1,6 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
-import { descriptografar, criptografar } from '@/lib/crypto'
+import { descriptografar, criptografar, tentarDescriptografar, estaCriptografado } from '@/lib/crypto'
 import type { Provider, ProviderCfg } from '@/lib/integracoes/tipos'
 
 /**
@@ -52,7 +52,19 @@ export async function resolverProviderCfg(tenantId: string, provider: Provider, 
     // ignorarAtivo: permite TESTAR a conexão com a credencial salva antes de ativar a integração.
     if (d && (opts?.ignorarAtivo || d.ativo) && d.credenciais && typeof d.credenciais === 'object') {
       const cred: Record<string, string> = {}
-      for (const [k, v] of Object.entries(d.credenciais as Record<string, string>)) cred[k] = descriptografar(v) ?? ''
+      let ilegivel = false // havia credencial criptografada que NENHUMA chave leu (a chave mudou?)
+      for (const [k, v] of Object.entries(d.credenciais as Record<string, string>)) {
+        // tentarDescriptografar NÃO lança: um campo ilegível não derruba a função inteira pro
+        // fallback silencioso (antes um throw virava "não configurado" → integração "sumia").
+        const dec = tentarDescriptografar(v)
+        if (dec === null && estaCriptografado(v)) ilegivel = true
+        cred[k] = dec ?? ''
+      }
+      if (ilegivel) {
+        // NÃO mascarar: logar alto (a credencial existe, mas a APP_ENCRYPTION_KEY atual não a lê).
+        // Fixar a chave no stack e/ou pôr a antiga em APP_ENCRYPTION_KEY_OLD recupera; senão, regravar.
+        console.error(`[integracoes] credenciais ILEGÍVEIS p/ tenant=${tenantId} provider=${provider}: APP_ENCRYPTION_KEY mudou? (defina APP_ENCRYPTION_KEY_OLD com a chave anterior ou regrave as credenciais)`)
+      }
       const mapa = (d.mapa_json && typeof d.mapa_json === 'object') ? (d.mapa_json as Record<string, string>) : undefined
       // considera configurado só se tiver ao menos uma credencial não vazia
       if (Object.values(cred).some((v) => v)) return { provider, baseUrl: d.base_url || BASE_PADRAO[provider], credenciais: cred, mapa }

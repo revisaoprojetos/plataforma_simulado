@@ -48,8 +48,12 @@ services:
       - PDF_RENDER_SECRET=${PDF_RENDER_SECRET}
       - WEB_INTERNAL_URL=http://web:3000
       - CRON_SECRET=${CRON_SECRET}
-      # Criptografa em repouso os segredos no banco (credenciais Curseduca por tenant)
+      # Criptografa em repouso os segredos no banco (credenciais Curseduca por tenant).
+      # FIXE este valor e NUNCA troque: se mudar, as credenciais salvas ficam ilegíveis e a integração
+      # "some". Ao precisar rotacionar, mova a chave antiga para APP_ENCRYPTION_KEY_OLD (lista separada por
+      # vírgula) — a descriptografia tenta a atual e depois as antigas, sem órfãs.
       - APP_ENCRYPTION_KEY=${APP_ENCRYPTION_KEY}
+      - APP_ENCRYPTION_KEY_OLD=${APP_ENCRYPTION_KEY_OLD}
       # Assina/verifica os JWTs de sessão do portal do aluno (evita acoplar a validade
       # da sessão à SUPABASE_SERVICE_ROLE_KEY, usada como fallback se ausente)
       - ALUNO_SESSION_SECRET=${ALUNO_SESSION_SECRET}
@@ -150,6 +154,9 @@ services:
       - DATABASE_URL_REPLICA=${DATABASE_URL_REPLICA}
       - DATABASE_POOL_MAX=${DATABASE_POOL_MAX:-5}
       - REPORT_SQL=${REPORT_SQL:-on}
+      # Mesma chave do web (caso a API venha a ler segredos criptografados). Fixe e nunca troque.
+      - APP_ENCRYPTION_KEY=${APP_ENCRYPTION_KEY}
+      - APP_ENCRYPTION_KEY_OLD=${APP_ENCRYPTION_KEY_OLD}
     networks:
       - default
     deploy:
@@ -172,6 +179,9 @@ services:
       - WEB_INTERNAL_URL=http://web:3000
       # Auto-encerramento: mesmo valor do CRON_SECRET do web (worker chama /api/cron/encerrar-expirados a cada 60s)
       - CRON_SECRET=${CRON_SECRET}
+      # Mesma chave do web (o worker pode decriptar segredos ao rodar jobs/sync). Fixe e nunca troque.
+      - APP_ENCRYPTION_KEY=${APP_ENCRYPTION_KEY}
+      - APP_ENCRYPTION_KEY_OLD=${APP_ENCRYPTION_KEY_OLD}
       # PDF_PUBLIC_BASE é opcional: sem ela, o worker usa o getPublicUrl do Supabase.
     networks:
       - default
