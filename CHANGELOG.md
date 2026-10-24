@@ -12,6 +12,22 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.27.2 — 2026-10-24
+
+**fix(prévia): sub-pilares (STF/STJ/SI) continuavam em branco no Lab da BIBLIOTECA**
+
+- A v3.27.1 corrigiu só o cálculo inline do Lab do **Teste** (`/admin/teste/onlyoffice/[id]`). O Lab da
+  **Biblioteca** (`/admin/biblioteca/editar/[versaoId]`) — que é o usado no diagnóstico — calcula por
+  `computarPreviaDados` (`lib/conteudo/previa-compute.ts`), que **ainda** emitia variáveis de pilar só
+  para a lista fixa `Lei seca / Jurisprudência / Doutrina`. Resultado: `pct_pilar_stf`, `stf_acertos`,
+  `stf_total` (e STJ/SI) nunca eram gerados → cards de sub-pilar em branco.
+- Agora `computarPreviaDados` gera `pct_pilar_<slug>` / `acerto_pilar_<slug>` / `total_pilar_<slug>` +
+  os flags de faixa `<slug>_f1/f2/f3` para **todos** os pilares presentes (inclui os sub-pilares da
+  jurisprudência). Verificado no simulado "DPE/SP-Minissimulado de Jurisprudência" (VND): STF 7 · STJ 20
+  · Sistemas Internacionais 3.
+
+---
+
 ## 3.27.1 — 2026-10-24
 
 **fix(prévia): valores dos SUB-PILARES (STF/STJ/SI) ficavam em branco no diagnóstico**
