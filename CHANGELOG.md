@@ -12,6 +12,27 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.29.1 — 2026-10-25
+
+**fix(diagnóstico): card volta a ter as 3 faixas separadas, mas o texto de cada uma é variável**
+
+A v3.29.0 colapsou o card numa única área (`{slug_texto}`). Agora o card do botão "＋ Card" mantém as
+**três faixas separadas** (0-49 / 50-80 / 81-100), porém o texto de cada uma é a **variável**
+`{<slug>_texto_f1/f2/f3}` — editada na aba "Textos de desempenho" (não digitada no .docx), então editar nunca
+quebra; o condicional `{#<slug>_f1}…` faz aparecer só a faixa do % real. `{<slug>_texto}` (1 linha) continua
+disponível. nullGetter cobre `_texto_f1/f2/f3` (nunca vazio).
+
+**feat(diagnóstico): CONDIÇÃO INLINE na variável — `{<slug>_pct=LO-HI texto}`**
+
+Modelo pedido: escrever a condição dentro da própria variável, medindo o % entre valores. Ex.:
+`{ls_pct=80-100 Excelente desempenho em lei seca.}` mostra o texto só quando `{ls_pct}` ∈ [80,100];
+`{jur_pct=0-49 Abaixo de 50%…}` idem. Aspas opcionais; funciona com qualquer `{<algo>_pct}`. Implementado via
+parser próprio do docxtemplater (sem dependência nova) que delega as tags normais ao parser padrão — validado
+que laços/seções/variáveis continuam intactos. LIMITE DO WORD: o texto da condição tem de ficar num ÚNICO
+parágrafo (sem Enter dentro da chave) e sem `{` `}`.
+
+---
+
 ## 3.29.0 — 2026-10-25
 
 **feat(diagnóstico): narrativa como VARIÁVEL + blocos nunca vazios + relatório real sem divergir**

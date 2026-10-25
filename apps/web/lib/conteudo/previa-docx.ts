@@ -4,6 +4,39 @@ import Docxtemplater from 'docxtemplater'
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx'
 import { DEFAULT_TEXTOS, nomeDoSlug } from '@/lib/conteudo/previa-compute'
 
+// ── CONDIÇÃO INLINE na variável (modelo pedido): `{<slug>_pct=LO-HI texto}` → mostra o texto só quando o
+// % (ex.: {ls_pct}) está ENTRE LO e HI. Ex.: `{ls_pct=80-100 Excelente desempenho…}`, `{jur_pct=0-49 Abaixo…}`.
+// Aspas opcionais. Mede qualquer `{<algo>_pct}`. As tags normais passam pelo parser PADRÃO (replicado inline,
+// sem depender do angular-expressions, que não está instalado): o docxtemplater anda no scopeList sozinho
+// (devolvemos undefined p/ ele subir de escopo → cai no nullGetter). LIMITE DO WORD: o texto da condição tem
+// de ficar num ÚNICO parágrafo (sem Enter dentro da tag) e sem `{` `}`.
+const RE_COND = /^([A-Za-z0-9_]+?_pct)\s*=\s*(\d{1,3})\s*-\s*(\d{1,3})\s+([\s\S]+)$/
+function parserPrevia(tag: string): { get: (scope: any, context?: any) => unknown } {
+  const t = String(tag)
+  const m = RE_COND.exec(t.trim())
+  if (m) {
+    const key = m[1], lo = Math.min(+m[2], +m[3]), hi = Math.max(+m[2], +m[3])
+    const txt = m[4].trim().replace(/^[“”"'«»\s]+|[“”"'«»\s]+$/g, '')
+    return {
+      get(scope: any, context: any) {
+        const list: any[] = (context && context.scopeList) || [scope]
+        let raw: any
+        for (let i = list.length - 1; i >= 0; i--) { const s = list[i]; if (s != null && s[key] != null) { raw = s[key]; break } }
+        const v = parseInt(String(raw ?? '').replace(/[^\d-]/g, ''), 10)
+        return Number.isFinite(v) && v >= lo && v <= hi ? txt : ''
+      },
+    }
+  }
+  // Parser PADRÃO do docxtemplater (doc-utils.js): só olha o escopo dado; undefined faz o doc subir no scopeList.
+  return {
+    get(scope: any) {
+      if (t === '.') return scope
+      if (scope && Object.prototype.hasOwnProperty.call(scope, t)) return scope[t]
+      return undefined
+    },
+  }
+}
+
 // nullGetter INTELIGENTE: garante que NENHUM bloco/variável do contrato apareça vazio no PDF, mesmo que a
 // variável não tenha sido gerada (slug não presente no simulado, erro de digitação, pilar sem questões).
 // Qualquer `{<slug>_pct|_acertos|_total|_faixa|_nivel|_texto|_f1|_f2|_f3}` cai num PADRÃO coerente em vez de
@@ -16,6 +49,8 @@ function valorPadraoVar(tag: string): unknown {
   if (/_(acertos|total)$/.test(tag)) return '0'
   if (/_faixa$/.test(tag)) return '0-49'
   if (/_nivel$/.test(tag)) return 'crítico'
+  const mb = /_texto_f([123])$/.exec(tag)
+  if (mb) { const banda = (`f${mb[1]}`) as 'f1' | 'f2' | 'f3'; return DEFAULT_TEXTOS[banda].replace(/\{nome\}/g, nomeDoSlug(tag.replace(/_texto_f[123]$/, ''))).replace(/\{pct\}/g, '0%') }
   if (/_texto$/.test(tag)) return DEFAULT_TEXTOS.f1.replace(/\{nome\}/g, nomeDoSlug(tag.replace(/_texto$/, ''))).replace(/\{pct\}/g, '0%')
   return '' // demais variáveis/laços desconhecidos → vazio/oculto (comportamento antigo)
 }
@@ -92,7 +127,7 @@ export async function renderPreviaDocx(buf: Buffer, dados: Record<string, unknow
       const f = zip.file('word/document.xml')
       if (f) { const { xml, removidos } = removerMarcadoresOrfaos(f.asText()); if (removidos) zip.file('word/document.xml', xml) }
     } catch { /* segue; o catch externo trata */ }
-    const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true, nullGetter: (part: any) => valorPadraoVar(String(part?.value ?? '')) })
+    const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true, parser: parserPrevia, nullGetter: (part: any) => valorPadraoVar(String(part?.value ?? '')) })
     doc.render(dados)
     return doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' })
   } catch (e) {

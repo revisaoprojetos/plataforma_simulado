@@ -326,21 +326,22 @@ function pfaixaCond(cond, lbl, txt){
   var MK = 'margin:0;'+AR+';font-size:1pt;line-height:2pt;color:#c7bc94';
   return '<p style="'+MK+'">{#'+cond+'}</p>' + pfaixa(lbl, txt) + '<p style="'+MK+'">{/'+cond+'}</p>';
 }
-// Card de pilar: fundo cream + nome + {chave_pct} + "{chave_acertos} de {chave_total} questões" + a NARRATIVA.
-// COM `chave` (ls/jur/dout/sec/<slug>): a narrativa é UMA variável {chave_texto}, resolvida por faixa no
-// servidor (0-49/50-80/81-100) e editada em "Textos de desempenho" — SEM marcador de laço, então editar o
-// template NUNCA quebra. (t0/t5/t8 só são usados no fallback sem chave.) O nullGetter garante que nunca fica vazio.
+// Card de pilar: fundo cream + nome + {chave_pct} + "{chave_acertos} de {chave_total} questões" + as 3 FAIXAS.
+// COM `chave` (ls/jur/dout/sec/<slug>): mantém as TRÊS faixas separadas (0-49/50-80/81-100), mas o texto de
+// cada uma é uma VARIÁVEL {chave_texto_f1/f2/f3} (editada em "Textos de desempenho", NÃO digitada no .docx) —
+// então editar nunca quebra. O condicional {#chave_f1}… faz aparecer só a faixa do % real; o nullGetter
+// garante que nunca fica vazio. (t0/t5/t8 só são usados no fallback sem chave.)
 function pcard(nome, corTopo, corPct, t0, t5, t8, w, chave){
   var pct = chave ? '{'+chave+'_pct}' : 'X%';
   var quest = chave ? '{'+chave+'_acertos} de {'+chave+'_total} questões' : 'X de N questões';
-  var narr = chave
-    ? '<p style="margin:11px 0 0;'+AR+';font-size:8.5pt;color:#000000;text-align:justify;line-height:1.45">{'+chave+'_texto}</p>'
+  var faixas = chave
+    ? pfaixaCond(chave+'_f1', '0-49', '{'+chave+'_texto_f1}') + pfaixaCond(chave+'_f2', '50-80', '{'+chave+'_texto_f2}') + pfaixaCond(chave+'_f3', '81-100', '{'+chave+'_texto_f3}')
     : pfaixa('0-49', t0) + pfaixa('50-80', t5) + pfaixa('81-100', t8);
   return '<td width="'+w+'" valign="top" bgcolor="#f8f1d4" style="background-color:#f8f1d4;width:'+w+';border-top:3px solid '+corTopo+';padding:12px 14px;page-break-inside:avoid;'+AR+'">'
     + '<p style="margin:0;'+CR+';font-size:10pt;font-weight:bold;letter-spacing:.03em;color:#1a367c">'+nome+'</p>'
     + '<p style="margin:4px 0 0;'+AR+';font-size:24pt;font-weight:bold;line-height:1;color:'+corPct+'">'+pct+'</p>'
     + '<p style="margin:1px 0 0;'+AR+';font-size:9pt;color:#000000">'+quest+'</p>'
-    + narr
+    + faixas
     + '</td>';
 }
 var PGAP='<td width="2%" style="width:2%">&nbsp;</td>';

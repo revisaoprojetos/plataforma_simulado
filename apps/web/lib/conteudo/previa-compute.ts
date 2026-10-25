@@ -34,11 +34,15 @@ export function nomeDoSlug(slug: string): string {
   if (NOMES_SLUG[slug]) return NOMES_SLUG[slug]
   return (slug || '').split('_').filter(Boolean).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || slug
 }
-/** Texto da faixa (0-49/50-80/81-100) daquele agrupamento: override por slug > default do tenant > default do app. */
-export function textoDesempenho(bank: TextosDesempenho | null | undefined, slug: string, nome: string, n: number): string {
-  const banda: 'f1' | 'f2' | 'f3' = n <= 49 ? 'f1' : n <= 80 ? 'f2' : 'f3'
+/** Texto de UMA faixa específica (f1/f2/f3) daquele agrupamento: override por slug > default do tenant >
+ *  default do app, com {nome}/{pct} interpolados. */
+export function textoDaFaixa(bank: TextosDesempenho | null | undefined, slug: string, nome: string, banda: 'f1' | 'f2' | 'f3', n: number): string {
   const tpl = bank?.por_pilar?.[slug]?.[banda] || bank?.default?.[banda] || DEFAULT_TEXTOS[banda]
   return String(tpl).replace(/\{nome\}/g, nome).replace(/\{pct\}/g, `${n}%`)
+}
+/** Texto da faixa ATUAL (pela nota n) — p/ o card de UMA linha ({slug_texto}). */
+export function textoDesempenho(bank: TextosDesempenho | null | undefined, slug: string, nome: string, n: number): string {
+  return textoDaFaixa(bank, slug, nome, n <= 49 ? 'f1' : n <= 80 ? 'f2' : 'f3', n)
 }
 
 /** Emissor ÚNICO do contrato de variáveis de UMA agrupação (pilar/sub-pilar/disciplina/geral), a partir de
@@ -52,7 +56,13 @@ export function emitirVarsAgrupamento(out: Record<string, unknown>, slug: string
   out[`${slug}_f1`] = n <= 49; out[`${slug}_f2`] = n >= 50 && n <= 80; out[`${slug}_f3`] = n >= 81
   out[`${slug}_faixa`] = n <= 49 ? '0-49' : n <= 80 ? '50-80' : '81-100'
   out[`${slug}_nivel`] = n <= 49 ? 'crítico' : n <= 80 ? 'intermediário' : 'excelente'
-  out[`${slug}_texto`] = textoDesempenho(ctx?.textos ?? null, slug, ctx?.nome ?? nomeDoSlug(slug), n)
+  // Narrativa: `{slug_texto}` = texto da faixa ATUAL (card de 1 linha) + `{slug_texto_f1/f2/f3}` = texto de
+  // CADA faixa (card de 3 seções, dentro do condicional {#slug_f1}…). Ambos editados em "Textos de desempenho".
+  const bk = ctx?.textos ?? null, nm = ctx?.nome ?? nomeDoSlug(slug)
+  out[`${slug}_texto`] = textoDaFaixa(bk, slug, nm, n <= 49 ? 'f1' : n <= 80 ? 'f2' : 'f3', n)
+  out[`${slug}_texto_f1`] = textoDaFaixa(bk, slug, nm, 'f1', n)
+  out[`${slug}_texto_f2`] = textoDaFaixa(bk, slug, nm, 'f2', n)
+  out[`${slug}_texto_f3`] = textoDaFaixa(bk, slug, nm, 'f3', n)
 }
 
 export interface PreviaPayload {
