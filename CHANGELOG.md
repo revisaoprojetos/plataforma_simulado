@@ -12,6 +12,25 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.29.2 — 2026-10-25
+
+**feat(diagnóstico): fórmula de condição estilo Excel, só nas chaves — `{cond; valor; cond; valor; padrão}`**
+
+Fórmula definitiva (modelo do Excel `SE()` aninhado, mas SÓ nas chaves, sem "SE"), validada em .docx: lê a
+variável de %/nota e mapeia o texto de cada pontuação. Ex.:
+`{ls_pct>=80; "Excelente…"; ls_pct>=50; "Intermediário…"; "Abaixo de 50%…"}`.
+- Lida de cima pra baixo: a 1ª condição verdadeira define o texto; o **último item solto (ímpar) é o padrão**.
+- Condições: `>=` `<=` `>` `<` `=` `<>` ou faixa `LO-HI` sobre qualquer `{<slug>_pct}` (pilar/sub-pilar/disciplina).
+- O texto de cada pontuação pode ser **inline, entre aspas** (dentro da própria fórmula — testado com texto longo,
+  acentos, pontuação e `;` dentro das aspas) OU uma **variável** (`ls_texto_alto/_medio/_baixo`, escrita na aba
+  "Textos de desempenho"). Split respeita aspas e parênteses; `<`/`>` tolerados mesmo escapados (`&lt;`/`&gt;`).
+- Compat: `SE(...)`/`IF(...)` aninhado e a forma `{<pct>=LO-HI texto}` também funcionam. Variáveis de texto por
+  faixa com nomes legíveis `{<slug>_texto_baixo/_medio/_alto}`; `ls/jur/dout` puxam o override do pilar canônico.
+- LIMITE DO WORD (texto inline): a fórmula inteira num ÚNICO parágrafo (sem Enter dentro das `{ }`) e sem `{`/`}`.
+- Validado que tags normais, laços e seções continuam intactos.
+
+---
+
 ## 3.29.1 — 2026-10-25
 
 **fix(diagnóstico): card volta a ter as 3 faixas separadas, mas o texto de cada uma é variável**

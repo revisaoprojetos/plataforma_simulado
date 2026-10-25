@@ -34,10 +34,13 @@ export function nomeDoSlug(slug: string): string {
   if (NOMES_SLUG[slug]) return NOMES_SLUG[slug]
   return (slug || '').split('_').filter(Boolean).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || slug
 }
-/** Texto de UMA faixa específica (f1/f2/f3) daquele agrupamento: override por slug > default do tenant >
- *  default do app, com {nome}/{pct} interpolados. */
+// Slug curto (usado em {ls_texto_alto}) → slug canônico do override na aba (editado como "Lei seca" etc.).
+const ALIAS_SLUG: Record<string, string> = { ls: 'lei_seca', jur: 'jurisprudencia', dout: 'doutrina' }
+/** Texto de UMA faixa específica (f1/f2/f3) daquele agrupamento: override por slug (ou seu alias canônico) >
+ *  default do tenant > default do app, com {nome}/{pct} interpolados. */
 export function textoDaFaixa(bank: TextosDesempenho | null | undefined, slug: string, nome: string, banda: 'f1' | 'f2' | 'f3', n: number): string {
-  const tpl = bank?.por_pilar?.[slug]?.[banda] || bank?.default?.[banda] || DEFAULT_TEXTOS[banda]
+  const ov = bank?.por_pilar?.[slug]?.[banda] || bank?.por_pilar?.[ALIAS_SLUG[slug] ?? '\u0000']?.[banda]
+  const tpl = ov || bank?.default?.[banda] || DEFAULT_TEXTOS[banda]
   return String(tpl).replace(/\{nome\}/g, nome).replace(/\{pct\}/g, `${n}%`)
 }
 /** Texto da faixa ATUAL (pela nota n) — p/ o card de UMA linha ({slug_texto}). */
@@ -59,10 +62,14 @@ export function emitirVarsAgrupamento(out: Record<string, unknown>, slug: string
   // Narrativa: `{slug_texto}` = texto da faixa ATUAL (card de 1 linha) + `{slug_texto_f1/f2/f3}` = texto de
   // CADA faixa (card de 3 seções, dentro do condicional {#slug_f1}…). Ambos editados em "Textos de desempenho".
   const bk = ctx?.textos ?? null, nm = ctx?.nome ?? nomeDoSlug(slug)
-  out[`${slug}_texto`] = textoDaFaixa(bk, slug, nm, n <= 49 ? 'f1' : n <= 80 ? 'f2' : 'f3', n)
-  out[`${slug}_texto_f1`] = textoDaFaixa(bk, slug, nm, 'f1', n)
-  out[`${slug}_texto_f2`] = textoDaFaixa(bk, slug, nm, 'f2', n)
-  out[`${slug}_texto_f3`] = textoDaFaixa(bk, slug, nm, 'f3', n)
+  const banda: 'f1' | 'f2' | 'f3' = n <= 49 ? 'f1' : n <= 80 ? 'f2' : 'f3'
+  const t1 = textoDaFaixa(bk, slug, nm, 'f1', n), t2 = textoDaFaixa(bk, slug, nm, 'f2', n), t3 = textoDaFaixa(bk, slug, nm, 'f3', n)
+  // Texto de CADA faixa, sempre preenchido (o SE()/condição é que escolhe qual usar). Nomes técnicos
+  // (_f1/f2/f3) E legíveis (_baixo/_medio/_alto). `{ls_texto}` = texto da faixa ATUAL (já escolhido).
+  out[`${slug}_texto`] = banda === 'f1' ? t1 : banda === 'f2' ? t2 : t3
+  out[`${slug}_texto_f1`] = out[`${slug}_texto_baixo`] = t1
+  out[`${slug}_texto_f2`] = out[`${slug}_texto_medio`] = t2
+  out[`${slug}_texto_f3`] = out[`${slug}_texto_alto`] = t3
 }
 
 export interface PreviaPayload {
