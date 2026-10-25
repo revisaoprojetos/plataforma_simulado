@@ -12,6 +12,17 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.29.3 — 2026-10-25
+
+**fix(plugin): card "Desempenho por pilar" passa a inserir a FÓRMULA UNIFICADA**
+
+O bloco/card de pilar (botão "＋ Card" e "Desempenho por pilar") ainda vinha com as 3 faixas separadas
+(`{ls_texto_f1/f2/f3}` sob rótulos 0-49/50-80/81-100). Agora insere UMA fórmula por pilar que escolhe o texto
+pela pontuação: `{ls_pct>=81; ls_texto_alto; ls_pct>=50; ls_texto_medio; ls_texto_baixo}` (variáveis da aba
+"Textos de desempenho", trocáveis por texto "entre aspas" inline). Vale pra ls/jur/dout e qualquer sub-pilar.
+
+---
+
 ## 3.29.2 — 2026-10-25
 
 **feat(diagnóstico): fórmula de condição estilo Excel, só nas chaves — `{cond; valor; cond; valor; padrão}`**

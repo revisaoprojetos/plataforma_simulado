@@ -334,14 +334,16 @@ function pfaixaCond(cond, lbl, txt){
 function pcard(nome, corTopo, corPct, t0, t5, t8, w, chave){
   var pct = chave ? '{'+chave+'_pct}' : 'X%';
   var quest = chave ? '{'+chave+'_acertos} de {'+chave+'_total} questões' : 'X de N questões';
-  var faixas = chave
-    ? pfaixaCond(chave+'_f1', '0-49', '{'+chave+'_texto_f1}') + pfaixaCond(chave+'_f2', '50-80', '{'+chave+'_texto_f2}') + pfaixaCond(chave+'_f3', '81-100', '{'+chave+'_texto_f3}')
+  // NARRATIVA UNIFICADA: UMA fórmula só (estilo Excel, nas chaves) que lê o % e escolhe o texto da pontuação.
+  // Usa as variáveis de texto da aba (chave_texto_alto/medio/baixo) — o autor pode trocar por texto "entre aspas".
+  var narr = chave
+    ? '<p style="margin:11px 0 0;'+AR+';font-size:8.5pt;color:#000000;text-align:justify;line-height:1.45">{'+chave+'_pct>=81; '+chave+'_texto_alto; '+chave+'_pct>=50; '+chave+'_texto_medio; '+chave+'_texto_baixo}</p>'
     : pfaixa('0-49', t0) + pfaixa('50-80', t5) + pfaixa('81-100', t8);
   return '<td width="'+w+'" valign="top" bgcolor="#f8f1d4" style="background-color:#f8f1d4;width:'+w+';border-top:3px solid '+corTopo+';padding:12px 14px;page-break-inside:avoid;'+AR+'">'
     + '<p style="margin:0;'+CR+';font-size:10pt;font-weight:bold;letter-spacing:.03em;color:#1a367c">'+nome+'</p>'
     + '<p style="margin:4px 0 0;'+AR+';font-size:24pt;font-weight:bold;line-height:1;color:'+corPct+'">'+pct+'</p>'
     + '<p style="margin:1px 0 0;'+AR+';font-size:9pt;color:#000000">'+quest+'</p>'
-    + faixas
+    + narr
     + '</td>';
 }
 var PGAP='<td width="2%" style="width:2%">&nbsp;</td>';
@@ -439,8 +441,8 @@ var BLOCOS = [
   { nome:'Desempenho por disciplina', ds:'Faixa navy/dourada + card por disciplina (laço {#disciplinas}): nome, assuntos | x/y | %.', html: DISC },
   { nome:'Disciplina (só o card)', ds:'Só o card em 3 colunas por disciplina (laço {#disciplinas}), SEM a faixa de título — use quando já tiver o título em cima.', html: DISC_CARD },
   { nome:'Análise por pilar', ds:'Caixa estilo “LEI SECA”: título + prioridade + texto editável.', html: PILARBOX },
-  { nome:'Desempenho por pilar (3 colunas)', ds:'Faixa + 3 pilares (Lei seca · Jurisprudência · Doutrina) lado a lado: %, nº de questões e faixas 0-49 / 50-80 / 81-100.', html: PILAR3 },
-  { nome:'Desempenho — seção separada', ds:'Faixa + descrição + 1 card para uma frente própria (ex.: Língua Portuguesa): % e faixas 0-49 / 50-80 / 81-100.', html: PILARSEP },
+  { nome:'Desempenho por pilar (3 colunas)', ds:'Faixa + 3 pilares (Lei seca · Jurisprudência · Doutrina) lado a lado: %, nº de questões e a FÓRMULA unificada que escolhe o texto pela pontuação.', html: PILAR3 },
+  { nome:'Desempenho — seção separada', ds:'Faixa + descrição + 1 card para uma frente própria (ex.: Língua Portuguesa): % e a fórmula unificada por pontuação.', html: PILARSEP },
   { nome:'Sugestões de estudo', ds:'Faixa + card de prioridade (LEI SECA) com texto editável de recomendações e lista de leis locais.', html: SUGESTOES },
   { nome:'Gabarito oficial desatualizado', ds:'Faixa + aviso sobre a prova original + lista das questões que sofreram atualização (edite os itens).', html: GABDESAT },
   { nome:'Faixa de seção', ds:'Barra navy com texto dourado — reaproveitável (edite o título).', html: FAIXA },
