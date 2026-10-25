@@ -12,6 +12,29 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.29.0 — 2026-10-25
+
+**feat(diagnóstico): narrativa como VARIÁVEL + blocos nunca vazios + relatório real sem divergir**
+
+Resolve de vez os cards do diagnóstico saindo em branco e a fragilidade de editar os textos:
+
+- **Narrativa = variável `{<slug>_texto}`** (ls_texto, jur_texto, lingua_portuguesa_texto, stf_texto…): o
+  card não usa mais os 3 blocos condicionais `{#ls_f1}…{/ls_f1}` (que quebravam ao editar — marcador órfão).
+  O sistema resolve o parágrafo da faixa REAL do aluno; a redação fica fora do .docx, então editar nunca
+  quebra o documento. O botão "＋ Card" insere `{chave_texto}` + chip "Texto".
+- **Aba "Textos de desempenho" no Laboratório** (genérico + override por pilar): texto padrão por faixa com
+  `{nome}`/`{pct}` que se adaptam + overrides por pilar/disciplina. Guardado no tema do tenant (sem migração).
+- **Blocos NUNCA vazios**: `nullGetter` inteligente — qualquer variável do contrato
+  (`_pct/_acertos/_total/_faixa/_nivel/_texto/_f1-3`) que falte resolve para um padrão coerente (0% / 0 /
+  texto genérico / faixa 0-49) em vez de branco.
+- **Relatório REAL do aluno** (`/api/aluno/diagnostico-docx-pdf`) passa a usar a MESMA fonte de variáveis da
+  prévia (`emitirVarsAgrupamento`): emite o contrato por slug p/ todo pilar/sub-pilar/disciplina presente, a
+  partir dos valores reais. Fim do "prévia certa × PDF do aluno em branco". Cache do PDF `_v4 → _v5`.
+- **Plugin**: painel de variáveis reorganizado (seções + card por item). **Seletor de modelos**: título não
+  corta mais (block/break-words).
+
+---
+
 ## 3.28.2 — 2026-10-24
 
 **fix(maratona/banco): duplicar banco não herda mais o `caderno_entrega` (downloads do dia errado)**

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ArrowLeft, Eye, Loader2, SlidersHorizontal, RotateCcw, FolderOpen, X, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { obterDisciplinasDoSimulado, aplicarPreviaSimulado, resetarPrevia } from './previa-actions'
 import { SimuladoPickerDialog } from '@/app/admin/teste/onlyoffice/[id]/simulado-picker-dialog'
+import { TextosDesempenhoEditor } from '@/components/admin/textos-desempenho-editor'
 
 declare global { interface Window { DocsAPI?: any } }
 
@@ -23,6 +24,7 @@ export function PreviaLab({ versaoId, titulo: tituloDoc, onlyofficeUrl, wopiHost
   const [version, setVersion] = useState(docVersao)
   const [recarregando, setRecarregando] = useState(false)
   const [recolhida, setRecolhida] = useState(false)
+  const [abaPanel, setAbaPanel] = useState<'reguladores' | 'textos'>('reguladores')
 
   const editorRef = useRef<any>(null)
   const debRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -126,14 +128,19 @@ export function PreviaLab({ versaoId, titulo: tituloDoc, onlyofficeUrl, wopiHost
             </button>
           ) : (
           <>
-          <div className="flex items-center gap-2 border-b px-4 py-3">
-            <SlidersHorizontal className="h-4 w-4 shrink-0 text-primary" />
-            <span className="truncate text-sm font-semibold">Reguladores da prévia</span>
+          <div className="flex items-center gap-1 border-b px-2">
+            {([['reguladores', 'Reguladores'], ['textos', 'Textos']] as const).map(([k, label]) => (
+              <button key={k} onClick={() => setAbaPanel(k)} className={`relative border-b-2 px-3 py-2.5 text-sm font-semibold transition ${abaPanel === k ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}>{label}</button>
+            ))}
             <button onClick={() => setRecolhida(true)} aria-label="Recolher reguladores" title="Recolher" className="ml-auto shrink-0 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground">
               <PanelLeftClose className="h-4 w-4" />
             </button>
           </div>
-          <div className="min-h-0 flex-1 overflow-y-auto"><div className="space-y-4 p-4">
+          <div className="min-h-0 flex-1 overflow-y-auto">
+          {abaPanel === 'textos' ? (
+            <TextosDesempenhoEditor disciplinas={discs} />
+          ) : (
+          <div className="space-y-4 p-4">
             <div>
               <label className="mb-1.5 block text-xs font-medium text-muted-foreground">Simulado da plataforma</label>
               <button onClick={() => setPickerAberto(true)} className="flex w-full items-center gap-2 rounded-lg border bg-background px-3 py-2 text-left text-sm transition-colors hover:border-primary">
@@ -174,7 +181,9 @@ export function PreviaLab({ versaoId, titulo: tituloDoc, onlyofficeUrl, wopiHost
                 </button>
               </>
             )}
-          </div></div>
+          </div>
+          )}
+          </div>
           </>
           )}
         </aside>

@@ -4,6 +4,7 @@ import { escreverPrevia, limparPrevia, versaoPrevia } from '@/lib/teste/store'
 import { carregarQuestoesSimulado, carregarPicker } from '@/lib/teste/simulado-dados'
 import type { QuestaoSim, PickerPasta as LPP, PickerSim as LPS } from '@/lib/teste/simulado-dados'
 import { computarPreviaDados } from '@/lib/conteudo/previa-compute'
+import { carregarTextosDesempenho } from '@/lib/conteudo/textos-desempenho'
 
 // Server actions do laboratório da PRÉVIA (chamadas pelos componentes React). A lógica de dados mora em
 // lib/teste/simulado-dados.ts (seleção/questões) e o CÁLCULO em lib/conteudo/previa-compute.ts — a MESMA
@@ -33,7 +34,7 @@ export async function aplicarPreviaSimulado(
   payload: { simuladoTitulo?: string; disciplinas: { nome: string; acertos: number; total: number }[]; questoes?: QuestaoSim[] },
 ): Promise<{ version: string; erro?: string }> {
   try {
-    const data = computarPreviaDados(payload)
+    const data = computarPreviaDados({ ...payload, textos: await carregarTextosDesempenho() })
     await escreverPrevia(id, data)
     return { version: await versaoPrevia(id) }
   } catch (e) {

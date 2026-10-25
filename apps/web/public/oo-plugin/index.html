@@ -63,9 +63,6 @@
   .chip { display:inline-flex; align-items:center; border:1px solid var(--oo-line); background:var(--oo-bg); color:var(--oo-txt); border-radius:9px; padding:5px 11px; font-size:12px; font-weight:400; cursor:pointer; transition:background .12s, border-color .12s; }
   .chip:hover { border-color:var(--oo-accent); background:var(--oo-hover); }
   .chip:active { background:var(--oo-line2); }
-  /* Botão que INSERE um card já cabeado (%, nº e faixas) — destaque na cor da marca. */
-  .chip-card { border-color:var(--oo-accent); background:color-mix(in srgb, var(--oo-accent) 13%, transparent); color:var(--oo-accent); font-weight:600; }
-  .chip-card:hover { border-color:var(--oo-accent); background:color-mix(in srgb, var(--oo-accent) 24%, transparent); }
   /* Reguladores de variáveis (seletor de simulado + modal) */
   .simsel { margin-bottom:0; }
   .divisoria { height:1px; background:var(--oo-line2); margin:13px 24px; }
@@ -74,8 +71,17 @@
   .simsel-btn:hover { border-color:var(--oo-accent); }
   #simsel-lbl { flex:1 1 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   #simvars { margin-top:9px; }
-  .svgrp { margin-top:9px; }
-  .svgrp h5 { margin:0 0 5px; font-size:11px; font-weight:600; color:var(--oo-txt); }
+  /* Cabeçalho de seção (DISCIPLINAS / PILARES): separador claro entre os grupos. */
+  .svsec { margin:15px 0 7px; font-size:10px; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--oo-txt2,#888); border-bottom:1px solid var(--oo-line); padding-bottom:4px; }
+  .svsec:first-child { margin-top:2px; }
+  /* Bloco de UM item (disciplina/pilar): título + ação de card + chips de valor (rótulos curtos). */
+  .svgrp { margin:0 0 8px; padding:9px 10px; border:1px solid var(--oo-line); border-radius:10px; background:var(--oo-bg); }
+  .svgrp h5 { margin:0 0 7px; font-size:11.5px; font-weight:700; color:var(--oo-txt); }
+  /* Botão de CARD (ação primária do bloco) — cheio, largura total, na cor da marca. */
+  .svcard { display:block; width:100%; text-align:center; margin:0 0 7px; border:1px solid var(--oo-accent); border-radius:8px; background:var(--oo-accent); color:#fff; font-size:11.5px; font-weight:600; padding:7px 8px; cursor:pointer; transition:filter .12s; }
+  .svcard:hover { filter:brightness(1.08); }
+  .svcard-wide { margin-bottom:11px; }
+  .svhint { margin:0 0 7px; font-size:10px; color:var(--oo-txt2,#888); line-height:1.4; }
   .modal { position:fixed; inset:0; z-index:9999; display:flex; align-items:center; justify-content:center; padding:14px; }
   .modal-bg { position:absolute; inset:0; background:rgba(0,0,0,.5); }
   .modal-panel { position:relative; width:100%; max-width:430px; max-height:82vh; display:flex; flex-direction:column; background:var(--oo-bg); border:1px solid var(--oo-line); border-radius:12px; overflow:hidden; box-shadow:0 14px 44px rgba(0,0,0,.45); }
@@ -320,20 +326,21 @@ function pfaixaCond(cond, lbl, txt){
   var MK = 'margin:0;'+AR+';font-size:1pt;line-height:2pt;color:#c7bc94';
   return '<p style="'+MK+'">{#'+cond+'}</p>' + pfaixa(lbl, txt) + '<p style="'+MK+'">{/'+cond+'}</p>';
 }
-// Card de pilar: fundo cream + nome + {chave_pct} + "{chave_acertos} de {chave_total} questões" + as
-// faixas. COM `chave` (ls/jur/dout/sec): % e questões viram variáveis E só aparece a FAIXA do intervalo
-// do % ({chave_f1}=0-49, _f2=50-80, _f3=81-100). Sem chave: placeholder literal + as 3 faixas.
+// Card de pilar: fundo cream + nome + {chave_pct} + "{chave_acertos} de {chave_total} questões" + a NARRATIVA.
+// COM `chave` (ls/jur/dout/sec/<slug>): a narrativa é UMA variável {chave_texto}, resolvida por faixa no
+// servidor (0-49/50-80/81-100) e editada em "Textos de desempenho" — SEM marcador de laço, então editar o
+// template NUNCA quebra. (t0/t5/t8 só são usados no fallback sem chave.) O nullGetter garante que nunca fica vazio.
 function pcard(nome, corTopo, corPct, t0, t5, t8, w, chave){
   var pct = chave ? '{'+chave+'_pct}' : 'X%';
   var quest = chave ? '{'+chave+'_acertos} de {'+chave+'_total} questões' : 'X de N questões';
-  var faixas = chave
-    ? pfaixaCond(chave+'_f1', '0-49', t0) + pfaixaCond(chave+'_f2', '50-80', t5) + pfaixaCond(chave+'_f3', '81-100', t8)
+  var narr = chave
+    ? '<p style="margin:11px 0 0;'+AR+';font-size:8.5pt;color:#000000;text-align:justify;line-height:1.45">{'+chave+'_texto}</p>'
     : pfaixa('0-49', t0) + pfaixa('50-80', t5) + pfaixa('81-100', t8);
   return '<td width="'+w+'" valign="top" bgcolor="#f8f1d4" style="background-color:#f8f1d4;width:'+w+';border-top:3px solid '+corTopo+';padding:12px 14px;page-break-inside:avoid;'+AR+'">'
     + '<p style="margin:0;'+CR+';font-size:10pt;font-weight:bold;letter-spacing:.03em;color:#1a367c">'+nome+'</p>'
     + '<p style="margin:4px 0 0;'+AR+';font-size:24pt;font-weight:bold;line-height:1;color:'+corPct+'">'+pct+'</p>'
     + '<p style="margin:1px 0 0;'+AR+';font-size:9pt;color:#000000">'+quest+'</p>'
-    + faixas
+    + narr
     + '</td>';
 }
 var PGAP='<td width="2%" style="width:2%">&nbsp;</td>';
@@ -529,26 +536,34 @@ function renderSimVars(d){
   if(d&&d.erro){ c.innerHTML='<div class="simloading">'+esc(d.erro)+'</div>'; return; }
   var discs=(d&&d.disciplinas)||[], pilares=(d&&d.pilares)||[];
   function chip(label,tag,parent){ var b=el('button','chip',esc(label)); b.title=tag; b.onclick=function(){inserirTexto(tag,label);}; parent.appendChild(b); }
-  // Botão de CARD: insere o card inteiro já cabeado — um clique, sem casar variável/faixa na mão.
-  function cardBtn(label,html,parent){ var b=el('button','chip chip-card','＋ '+esc(label)); b.title='Insere o card já cabeado (%, nº de questões e faixa) — pronto, sem mexer em marcador'; b.onclick=function(){inserirHtml(html,label);}; parent.appendChild(b); }
-  discs.forEach(function(dd){
-    var g=el('div','svgrp'); g.appendChild(el('h5',null,esc(dd.nome)+' · '+dd.total+' q'));
-    var ch=el('div','chips');
-    chip('Acerto','{acerto_'+dd.slug+'}',ch); chip('Total','{total_'+dd.slug+'}',ch); chip('%','{pct_'+dd.slug+'}',ch); chip('Assuntos','{assuntos_'+dd.slug+'}',ch);
-    chip('Nível','{'+dd.slug+'_nivel}',ch); chip('Faixa','{'+dd.slug+'_faixa}',ch);
-    cardBtn('Card '+dd.nome, umCardSlugHtml(dd.nome, dd.slug), ch);
-    g.appendChild(ch); c.appendChild(g);
-  });
-  if(pilares.length){
-    var g=el('div','svgrp'); g.appendChild(el('h5',null,'Pilares'));
-    var top=el('div','chips'); cardBtn('Inserir TODOS os pilares (cards)', cardsPilaresHtml(pilares), top); g.appendChild(top);
-    var ch=el('div','chips');
-    pilares.forEach(function(p){
-      chip('% '+p.nome,'{pct_pilar_'+p.slug+'}',ch); chip('Acerto '+p.nome,'{acerto_pilar_'+p.slug+'}',ch); chip('Total '+p.nome,'{total_pilar_'+p.slug+'}',ch);
-      chip('Nível '+p.nome,'{'+p.slug+'_nivel}',ch); chip('Faixa '+p.nome,'{'+p.slug+'_faixa}',ch);
-      cardBtn('Card '+p.nome, umCardSlugHtml(p.nome, p.slug), ch);
+  function sec(txt){ c.appendChild(el('div','svsec',esc(txt))); }
+  // Bloco de UM item (disciplina/pilar): título + card em destaque + chips de valor com RÓTULOS CURTOS
+  // (o nome do item já está no título, não precisa repetir em cada chip). `pref` = prefixo das variáveis.
+  function blocoItem(nome, qtd, cardHtml, defs){
+    var g=el('div','svgrp');
+    g.appendChild(el('h5',null,esc(nome)+(qtd!=null?' · '+qtd+' questões':'')));
+    var card=el('button','svcard','＋ Card deste item'); card.title='Insere o card inteiro já cabeado (%, nº e as 3 faixas) — pronto, sem mexer em marcador'; card.onclick=function(){inserirHtml(cardHtml,'Card '+nome);}; g.appendChild(card);
+    var ch=el('div','chips'); defs.forEach(function(x){ chip(x[0], x[1], ch); }); g.appendChild(ch);
+    c.appendChild(g);
+  }
+  if(discs.length){
+    sec('Disciplinas');
+    discs.forEach(function(dd){
+      blocoItem(dd.nome, dd.total, umCardSlugHtml(dd.nome, dd.slug), [
+        ['%','{pct_'+dd.slug+'}'],['Acerto','{acerto_'+dd.slug+'}'],['Total','{total_'+dd.slug+'}'],
+        ['Assuntos','{assuntos_'+dd.slug+'}'],['Texto','{'+dd.slug+'_texto}'],['Nível','{'+dd.slug+'_nivel}'],['Faixa','{'+dd.slug+'_faixa}'],
+      ]);
     });
-    g.appendChild(ch); c.appendChild(g);
+  }
+  if(pilares.length){
+    sec('Pilares');
+    var todos=el('button','svcard svcard-wide','＋ Inserir TODOS os pilares (cards)'); todos.title='Monta a seção "Desempenho por pilar" com um card por pilar presente neste simulado'; todos.onclick=function(){inserirHtml(cardsPilaresHtml(pilares),'Todos os pilares');}; c.appendChild(todos);
+    pilares.forEach(function(p){
+      blocoItem(p.nome, null, umCardSlugHtml(p.nome, p.slug), [
+        ['%','{pct_pilar_'+p.slug+'}'],['Acerto','{acerto_pilar_'+p.slug+'}'],['Total','{total_pilar_'+p.slug+'}'],
+        ['Texto','{'+p.slug+'_texto}'],['Nível','{'+p.slug+'_nivel}'],['Faixa','{'+p.slug+'_faixa}'],
+      ]);
+    });
   }
   if(!discs.length && !pilares.length) c.innerHTML='<div class="simloading">Esse simulado não tem disciplinas/pilares mapeados.</div>';
 }

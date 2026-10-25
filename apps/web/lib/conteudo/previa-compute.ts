@@ -15,10 +15,51 @@ import { slugVar, type QuestaoSim } from '@/lib/teste/simulado-dados'
 
 const pct = (a: number, t: number) => (t > 0 ? `${Math.round((a / t) * 100)}%` : '0%')
 
+// ── Banco de TEXTOS de desempenho (narrativa por faixa) — editado em "Textos de desempenho" (tema jsonb). ──
+// O template usa só `{<slug>_texto}` (variável limpa, sem marcador de laço); a redação fica AQUI/no banco, então
+// editar o texto nunca quebra o .docx. `{nome}` e `{pct}` são interpolados. Genérico (default) + override por slug.
+export type TextosDesempenho = { default?: { f1?: string; f2?: string; f3?: string }; por_pilar?: Record<string, { f1?: string; f2?: string; f3?: string }> }
+export const DEFAULT_TEXTOS: { f1: string; f2: string; f3: string } = {
+  f1: 'Seu desempenho em {nome} ficou abaixo de 50% ({pct}) e merece atenção. Retome os fundamentos e pratique com questões no mesmo padrão da prova para consolidar a base.',
+  f2: 'Seu desempenho em {nome} foi intermediário ({pct}): há base, mas ainda há espaço relevante para crescer. Reforce os pontos de maior incidência e mantenha a prática constante.',
+  f3: 'Excelente desempenho em {nome} ({pct})! Você domina esta frente — mantenha o ritmo com revisões periódicas até a prova.',
+}
+const NOMES_SLUG: Record<string, string> = {
+  ls: 'Lei seca', jur: 'Jurisprudência', dout: 'Doutrina', lei_seca: 'Lei seca', jurisprudencia: 'Jurisprudência',
+  doutrina: 'Doutrina', stf: 'STF', stj: 'STJ', sistemas_internacionais: 'Sistemas Internacionais',
+  lingua_portuguesa: 'Língua Portuguesa', outros: 'Outros', geral: 'desempenho geral',
+}
+/** Nome de exibição a partir do slug (p/ interpolar {nome} quando o chamador não tem o nome). */
+export function nomeDoSlug(slug: string): string {
+  if (NOMES_SLUG[slug]) return NOMES_SLUG[slug]
+  return (slug || '').split('_').filter(Boolean).map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') || slug
+}
+/** Texto da faixa (0-49/50-80/81-100) daquele agrupamento: override por slug > default do tenant > default do app. */
+export function textoDesempenho(bank: TextosDesempenho | null | undefined, slug: string, nome: string, n: number): string {
+  const banda: 'f1' | 'f2' | 'f3' = n <= 49 ? 'f1' : n <= 80 ? 'f2' : 'f3'
+  const tpl = bank?.por_pilar?.[slug]?.[banda] || bank?.default?.[banda] || DEFAULT_TEXTOS[banda]
+  return String(tpl).replace(/\{nome\}/g, nome).replace(/\{pct\}/g, `${n}%`)
+}
+
+/** Emissor ÚNICO do contrato de variáveis de UMA agrupação (pilar/sub-pilar/disciplina/geral), a partir de
+ *  acertos/total REAIS. Gera `<slug>_pct/_acertos/_total`, as faixas `<slug>_f1/_f2/_f3` (casadas com o %),
+ *  `<slug>_faixa`/`<slug>_nivel` e **`<slug>_texto`** (narrativa da faixa, pronta pra usar sem condicional).
+ *  USADO TANTO na prévia (computarPreviaDados) QUANTO no relatório REAL do aluno — fonte única, sem divergir. */
+export function emitirVarsAgrupamento(out: Record<string, unknown>, slug: string, a: number, t: number, ctx?: { nome?: string; textos?: TextosDesempenho | null }): void {
+  if (!slug) return
+  const n = t ? Math.round((a / t) * 100) : 0
+  out[`${slug}_pct`] = `${n}%`; out[`${slug}_acertos`] = String(a); out[`${slug}_total`] = String(t)
+  out[`${slug}_f1`] = n <= 49; out[`${slug}_f2`] = n >= 50 && n <= 80; out[`${slug}_f3`] = n >= 81
+  out[`${slug}_faixa`] = n <= 49 ? '0-49' : n <= 80 ? '50-80' : '81-100'
+  out[`${slug}_nivel`] = n <= 49 ? 'crítico' : n <= 80 ? 'intermediário' : 'excelente'
+  out[`${slug}_texto`] = textoDesempenho(ctx?.textos ?? null, slug, ctx?.nome ?? nomeDoSlug(slug), n)
+}
+
 export interface PreviaPayload {
   simuladoTitulo?: string
   disciplinas: { nome: string; acertos: number; total: number }[]
   questoes?: QuestaoSim[]
+  textos?: TextosDesempenho | null
 }
 
 export function computarPreviaDados(payload: PreviaPayload): Record<string, unknown> {
@@ -51,26 +92,18 @@ export function computarPreviaDados(payload: PreviaPayload): Record<string, unkn
   })
 
   // ===== Emissão universal: <slug>_pct/_acertos/_total + faixas <slug>_f1/_f2/_f3 (casadas com o %). =====
-  // Rótulo e nível da faixa (p/ usar numa frase ÚNICA, sem condicional): ex. "Desempenho {slug_nivel}".
-  const faixaRotulo = (n: number) => (n <= 49 ? '0-49' : n <= 80 ? '50-80' : '81-100')
-  const faixaNivel = (n: number) => (n <= 49 ? 'crítico' : n <= 80 ? 'intermediário' : 'excelente')
+  // Contrato de variáveis via o emissor ÚNICO (mesmo usado no relatório REAL do aluno).
   const out: Record<string, unknown> = {}
-  const emitir = (slug: string, a: number, t: number) => {
-    if (!slug) return
-    const n = t ? Math.round((a / t) * 100) : 0
-    out[`${slug}_pct`] = `${n}%`; out[`${slug}_acertos`] = String(a); out[`${slug}_total`] = String(t)
-    const f = faixa(n); out[`${slug}_f1`] = f.f1; out[`${slug}_f2`] = f.f2; out[`${slug}_f3`] = f.f3
-    // Variáveis-ÚNICAS da medição da faixa (sem condicional): rótulo numérico + nível textual.
-    out[`${slug}_faixa`] = faixaRotulo(n); out[`${slug}_nivel`] = faixaNivel(n)
-  }
+  const textos = payload.textos ?? null
+  const emitir = (slug: string, a: number, t: number, nome?: string) => emitirVarsAgrupamento(out, slug, a, t, { nome, textos })
 
   // GERAL (nota do simulado) — permite {geral_pct} + faixa {#geral_f1}… no cabeçalho.
-  emitir('geral', acertos, total)
+  emitir('geral', acertos, total, 'desempenho geral')
 
   // DISCIPLINAS — sufixo <slug>_* (com faixa) + aliases de PREFIXO (pct_/acerto_/total_/assuntos_) p/ compat.
   for (const d of discs) {
     const s = slugVar(d.nome), a = acertosDe.get(d.nome) ?? 0, t = d.total || 0
-    emitir(s, a, t)
+    emitir(s, a, t, d.nome)
     out[`acerto_${s}`] = String(a); out[`total_${s}`] = String(t); out[`pct_${s}`] = pct(a, t); out[`assuntos_${s}`] = assuntosDe(d.nome)
   }
 
@@ -80,8 +113,8 @@ export function computarPreviaDados(payload: PreviaPayload): Record<string, unkn
   const CURTAS: Record<string, string> = { 'Lei seca': 'ls', 'Jurisprudência': 'jur', 'Doutrina': 'dout' }
   for (const nome of new Set<string>(['Lei seca', 'Jurisprudência', 'Doutrina', ...pilarTot.keys()])) {
     const s = slugVar(nome), a = pilarAc.get(nome) ?? 0, t = pilarTot.get(nome) ?? 0
-    emitir(s, a, t)
-    if (CURTAS[nome]) emitir(CURTAS[nome], a, t)
+    emitir(s, a, t, nome)
+    if (CURTAS[nome]) emitir(CURTAS[nome], a, t, nome)
     out[`acerto_pilar_${s}`] = String(a); out[`total_pilar_${s}`] = String(t); out[`pct_pilar_${s}`] = pct(a, t)
   }
 

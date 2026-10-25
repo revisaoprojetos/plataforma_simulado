@@ -3,6 +3,9 @@ import { createHash } from 'node:crypto'
 import { createAdminClient } from '@/lib/supabase/server'
 import { baixarOriginal, urlAssinadaOriginal, resolverBucketConteudo } from '@/lib/conteudo/ingestao'
 import { renderPreviaDocx } from '@/lib/conteudo/previa-docx'
+import { emitirVarsAgrupamento, nomeDoSlug } from '@/lib/conteudo/previa-compute'
+import { carregarTextosDesempenho } from '@/lib/conteudo/textos-desempenho'
+import { slugVar } from '@/lib/teste/simulado-dados'
 import { converterDocxParaPdf } from '@/lib/conteudo/thumb'
 import { carregarDadosBancoCore } from '@/lib/caderno-teste/dados-banco'
 import { uploadArquivo } from '@/lib/storage'
@@ -53,10 +56,10 @@ export async function GET(request: Request) {
   const h8 = String((ver as any).hash_arquivo || '').slice(0, 8)
 
   // Cache do PDF por sessão + versão/hash. Sufixo `_vN` = marca da LÓGICA (dados + render); bump p/ invalidar
-  // PDFs antigos. `_v4` = auto-heal que FECHA laço órfão no limite da célula (antes removia a abertura e a
-  // faixa condicional aparecia sempre → "desempenho" com 2 faixas).
+  // PDFs antigos. `_v4` = auto-heal que FECHA laço órfão no limite da célula. `_v5` = contrato ÚNICO de
+  // variáveis por slug (pilares/sub-pilares/disciplinas) p/ cards do botão "＋ Card" não saírem em branco.
   const bucket = await resolverBucketConteudo()
-  const pdfPath = `conteudo-diag-aluno/${tenantId}/${sessaoId}_${versaoId}_${h8}_v4.pdf`
+  const pdfPath = `conteudo-diag-aluno/${tenantId}/${sessaoId}_${versaoId}_${h8}_v5.pdf`
   const cachedUrl = await urlAssinadaOriginal(pdfPath, 600)
   if (cachedUrl) { try { const r = await fetch(cachedUrl); if (r.ok) return pdfResp(new Uint8Array(await r.arrayBuffer()), nome) } catch { /* gera abaixo */ } }
 
@@ -72,21 +75,12 @@ export async function GET(request: Request) {
   const { registros, disciplinas } = await carregarDadosBancoCore(svc, tenantId, bancoId, { sessao: sessaoId, aluno: estudanteId })
   const reg = registros.find((r) => r.id === estudanteId) ?? registros[0]
   const vars = (reg?.vars ?? {}) as Record<string, string>
-  // PILAR: o template usa ls_/jur_/dout_ (schema do computarPreviaDados); o merge dá pct_pilar_<slug>. Faz o
-  // alias com os valores REAIS por questão do merge (+ faixas f1/f2/f3 = 0-49/50-80/81-100).
-  const pil = (slug: string, pref: string): Record<string, unknown> => {
-    const a = Number(vars[`acerto_pilar_${slug}`] || 0)
-    const t = Number(vars[`total_pilar_${slug}`] || 0)
-    const n = t ? Math.round((a / t) * 100) : 0
-    return { [`${pref}_pct`]: `${n}%`, [`${pref}_acertos`]: String(a), [`${pref}_total`]: String(t), [`${pref}_f1`]: n <= 49, [`${pref}_f2`]: n >= 50 && n <= 80, [`${pref}_f3`]: n >= 81 }
-  }
-  // Dict docxtemplater: base de exemplo + vars REAIS do aluno + aliases de pilar + tempo + laço {#disciplinas}.
+  // Dict docxtemplater: base de exemplo + vars REAIS do aluno + laço {#disciplinas}.
   const dados: Record<string, unknown> = {
     ...DADOS_PREVIA,
     ...vars,
     simulado: (sim as any)?.titulo || vars.simulado || (DADOS_PREVIA as any).simulado,
     tempo_usado: vars.tempo_total || (DADOS_PREVIA as any).tempo_usado, // merge dá tempo_total; template usa tempo_usado
-    ...pil('lei_seca', 'ls'), ...pil('jurisprudencia', 'jur'), ...pil('doutrina', 'dout'),
     disciplinas: disciplinas.map((d) => ({
       nome: d.nome,
       acertos: vars[`acerto_${d.chave}`] ?? '0',
@@ -95,6 +89,25 @@ export async function GET(request: Request) {
       assuntos: vars[`assuntos_${d.chave}`] ?? '',
     })),
   }
+  // CONTRATO ÚNICO de variáveis (MESMO emissor da prévia — fim da divergência "prévia certa × relatório real
+  // em branco"): p/ TODO pilar/sub-pilar presente em `vars` + TODA disciplina + geral, gera por SLUG
+  // <slug>_pct/_acertos/_total + faixas <slug>_f1/_f2/_f3 + <slug>_faixa/_nivel, a partir dos valores REAIS do
+  // aluno. Gerado DEPOIS do spread de `vars` (essas chaves por-sufixo não existem em vars). ls/jur/dout = compat.
+  const textos = await carregarTextosDesempenho(tenantId)
+  const CURTAS_PILAR: Record<string, string> = { lei_seca: 'ls', jurisprudencia: 'jur', doutrina: 'dout' }
+  for (const k of Object.keys(vars)) {
+    const m = /^acerto_pilar_(.+)$/.exec(k); if (!m) continue
+    const slug = m[1]
+    const a = Number(vars[`acerto_pilar_${slug}`] || 0), t = Number(vars[`total_pilar_${slug}`] || 0)
+    emitirVarsAgrupamento(dados, slug, a, t, { nome: nomeDoSlug(slug), textos })
+    if (CURTAS_PILAR[slug]) emitirVarsAgrupamento(dados, CURTAS_PILAR[slug], a, t, { nome: nomeDoSlug(slug), textos })
+  }
+  for (const d of disciplinas) {
+    const a = Number(vars[`acerto_${d.chave}`] || 0), t = Number(vars[`total_${d.chave}`] || 0)
+    emitirVarsAgrupamento(dados, d.chave, a, t, { nome: d.nome, textos })
+    const s = slugVar(d.nome); if (s && s !== d.chave) emitirVarsAgrupamento(dados, s, a, t, { nome: d.nome, textos })
+  }
+  { const gA = Number(vars.acertos || 0), gT = Number(vars.total_questoes || 0); if (gT) emitirVarsAgrupamento(dados, 'geral', gA, gT, { nome: 'desempenho geral', textos }) }
 
   // .docx original → preenchido → PDF via OnlyOffice (ConvertService precisa de URL pública/assinada).
   const buf = await baixarOriginal((ver as any).arquivo_key)

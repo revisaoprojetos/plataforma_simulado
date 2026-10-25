@@ -2,6 +2,23 @@ import 'server-only'
 import PizZip from 'pizzip'
 import Docxtemplater from 'docxtemplater'
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx'
+import { DEFAULT_TEXTOS, nomeDoSlug } from '@/lib/conteudo/previa-compute'
+
+// nullGetter INTELIGENTE: garante que NENHUM bloco/variável do contrato apareça vazio no PDF, mesmo que a
+// variável não tenha sido gerada (slug não presente no simulado, erro de digitação, pilar sem questões).
+// Qualquer `{<slug>_pct|_acertos|_total|_faixa|_nivel|_texto|_f1|_f2|_f3}` cai num PADRÃO coerente em vez de
+// branco; variáveis fora do padrão mantêm o comportamento antigo (vazio). Faixa: _f1 verdadeiro por padrão
+// (0% → 0-49) e _f2/_f3 falsos → a faixa 0-49 aparece (nunca some o parágrafo).
+function valorPadraoVar(tag: string): unknown {
+  if (/_f1$/.test(tag)) return true
+  if (/_f2$/.test(tag) || /_f3$/.test(tag)) return false
+  if (/_pct$/.test(tag)) return '0%'
+  if (/_(acertos|total)$/.test(tag)) return '0'
+  if (/_faixa$/.test(tag)) return '0-49'
+  if (/_nivel$/.test(tag)) return 'crítico'
+  if (/_texto$/.test(tag)) return DEFAULT_TEXTOS.f1.replace(/\{nome\}/g, nomeDoSlug(tag.replace(/_texto$/, ''))).replace(/\{pct\}/g, '0%')
+  return '' // demais variáveis/laços desconhecidos → vazio/oculto (comportamento antigo)
+}
 
 // Merge NÃO-DESTRUTIVO de um .docx template com dados (docxtemplater) + auto-correção de marcadores de
 // laço órfãos (mesma lógica da prévia do Teste — extraída para reusar na Biblioteca sem duplicar).
@@ -75,7 +92,7 @@ export async function renderPreviaDocx(buf: Buffer, dados: Record<string, unknow
       const f = zip.file('word/document.xml')
       if (f) { const { xml, removidos } = removerMarcadoresOrfaos(f.asText()); if (removidos) zip.file('word/document.xml', xml) }
     } catch { /* segue; o catch externo trata */ }
-    const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true, nullGetter: () => '' })
+    const doc = new Docxtemplater(zip, { paragraphLoop: true, linebreaks: true, nullGetter: (part: any) => valorPadraoVar(String(part?.value ?? '')) })
     doc.render(dados)
     return doc.getZip().generate({ type: 'nodebuffer', compression: 'DEFLATE' })
   } catch (e) {

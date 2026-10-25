@@ -3,7 +3,8 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { carregarQuestoesSimulado, carregarPicker, type QuestaoSim } from '@/lib/teste/simulado-dados'
-import { computarPreviaDados } from '@/lib/conteudo/previa-compute'
+import { computarPreviaDados, type TextosDesempenho } from '@/lib/conteudo/previa-compute'
+import { carregarTextosDesempenho, salvarTextosDesempenho } from '@/lib/conteudo/textos-desempenho'
 
 // Lab da PRÉVIA da Biblioteca — MESMAS funções do Teste (seleção de simulado + sliders), mas guardando os
 // dados por VERSÃO (simulado_conteudo_versoes.previa_dados) em vez do store de disco do Teste. A /preview
@@ -33,7 +34,8 @@ export async function aplicarPreviaSimulado(
   try {
     const tenantId = await tenantOk()
     if (!tenantId) return { version: String(Date.now()), erro: 'Sem permissão.' }
-    const data = computarPreviaDados(payload)
+    const textos = await carregarTextosDesempenho(tenantId)
+    const data = computarPreviaDados({ ...payload, textos })
     const svc = createAdminClient()
     const { error } = await svc.from('simulado_conteudo_versoes').update({ previa_dados: data }).eq('tenant_id', tenantId).eq('id', versaoId)
     if (error) return { version: String(Date.now()), erro: error.message }
@@ -50,4 +52,15 @@ export async function resetarPrevia(versaoId: string): Promise<{ ok: boolean }> 
   const svc = createAdminClient()
   await svc.from('simulado_conteudo_versoes').update({ previa_dados: null }).eq('tenant_id', tenantId).eq('id', versaoId)
   return { ok: true }
+}
+
+// ── Textos de desempenho (narrativa por faixa) — editados na aba do Lab, guardados no tema do tenant. ──
+export type { TextosDesempenho }
+export async function obterTextosDesempenho(): Promise<{ ok: boolean; textos?: TextosDesempenho | null; error?: string }> {
+  const tenantId = await tenantOk(); if (!tenantId) return { ok: false, error: 'Sem permissão.' }
+  return { ok: true, textos: await carregarTextosDesempenho(tenantId) }
+}
+export async function gravarTextosDesempenho(textos: TextosDesempenho): Promise<{ ok: boolean; error?: string }> {
+  const tenantId = await tenantOk(); if (!tenantId) return { ok: false, error: 'Sem permissão.' }
+  return salvarTextosDesempenho(tenantId, textos)
 }

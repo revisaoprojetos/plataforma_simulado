@@ -373,7 +373,7 @@ function SlotCard({ slot, cor, bancoId, valor, prontos, onSet }: {
                                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/[0.04] to-transparent" />
                                   {on && <span className="absolute right-1.5 top-1.5 rounded-full bg-primary px-1.5 py-0.5 text-[9px] font-bold text-primary-foreground shadow">Atual</span>}
                                 </div>
-                                <span className="line-clamp-2 min-h-[2.4rem] px-2 py-1.5 text-[11.5px] font-medium leading-tight text-foreground">{d.titulo}</span>
+                                <span className="line-clamp-2 block w-full min-h-[2.4rem] break-words px-2 py-1.5 text-[11.5px] font-medium leading-tight text-foreground">{d.titulo}</span>
                               </button>
                             )
                           })}
