@@ -12,6 +12,20 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.29.4 — 2026-10-25
+
+**fix(plugin): card com o RÓTULO da faixa separado (em cima) da fórmula do texto (embaixo)**
+
+Tentar juntar rótulo + texto com Enter DENTRO da fórmula quebra (Enter dentro das `{ }` parte a tag → saía
+"30-40C" grudado). Agora o card insere o rótulo numa linha (`{<slug>_faixa}` = faixa do % do aluno, em negrito)
+e a fórmula unificada do texto na linha de baixo — mantendo o formato antigo (rótulo em cima, texto embaixo),
+sem Enter dentro da fórmula. Troque `{<slug>_faixa}` por um rótulo fixo/fórmula se quiser rótulos customizados.
+- **Quebra de linha dentro do valor** (`//` ou `\n`): como não dá pra apertar Enter dentro das `{ }`, use `//`
+  (ou `\n`) para pular linha — permite "rótulo // texto" numa fórmula só. Ex.:
+  `{ls_pct>=81; "81-100 // Excelente…"; ls_pct>=50; "50-80 // Intermediário…"; "0-49 // Abaixo…"}`.
+
+---
+
 ## 3.29.3 — 2026-10-25
 
 **fix(plugin): card "Desempenho por pilar" passa a inserir a FÓRMULA UNIFICADA**

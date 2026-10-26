@@ -63,13 +63,16 @@ function condVerdadeira(cond: string, scope: any, context: any): boolean {
   if (rg) { const v = lerNumero(rg[1], scope, context), lo = Math.min(+rg[2], +rg[3]), hi = Math.max(+rg[2], +rg[3]); return v >= lo && v <= hi }
   return false
 }
+// Marcador de QUEBRA DE LINHA dentro do texto (não dá pra apertar Enter dentro da fórmula): `//` ou `\n`
+// viram quebra real (com linebreaks:true o docxtemplater renderiza <w:br/>). Permite "rótulo // texto".
+function quebras(s: string): string { return s.replace(/\s*(?:\\n|\/\/)\s*/g, '\n') }
 function avaliarValor(expr: string, scope: any, context: any): string {
   const e = expr.trim()
   const se = /^=?\s*(SE|IF)\s*\(([\s\S]*)\)$/i.exec(e)
   if (se) return avaliarSE(se[2], scope, context)
-  if (/^["'“«][\s\S]*["'”»]$/.test(e)) return e.replace(/^["'“«]|["'”»]$/g, '')
+  if (/^["'“«][\s\S]*["'”»]$/.test(e)) return quebras(e.replace(/^["'“«]|["'”»]$/g, ''))
   if (/^[A-Za-z0-9_]+$/.test(e)) { const v = resolveVar(e, scope, context); return v == null ? '' : String(v) }
-  return e
+  return quebras(e)
 }
 function avaliarSE(args: string, scope: any, context: any): string {
   const p = dividirArgs(args)
