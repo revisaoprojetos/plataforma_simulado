@@ -12,7 +12,6 @@ import {
 import { ModuloAcesso } from '@/components/admin/modulo-acesso'
 import { DocumentoAcesso } from '@/components/admin/documento-acesso'
 import { PastaCardDrive, DrivePastaStyles } from '@/components/admin/pasta-card-drive'
-import { BibliotecaDocSidebar } from '@/components/admin/biblioteca-doc-sidebar'
 import { DriveAcessoDialog, DriveAcessoStyles, type DriveNode, type DrivePapel } from '@/components/admin/drive-acesso'
 import { DriveNovoButton, DriveNovoStyles, DriveUploadPanel, type DriveUploadItem } from '@/components/admin/drive-novo'
 import { MenuPortal, ItemMenu } from '@/components/conteudo/menu-drive'
@@ -93,29 +92,6 @@ function BadgeStatus({ s }: { s: string }) {
   return <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${v.cor}`}><v.Icone className="h-3 w-3" />{v.txt}</span>
 }
 
-/** Badge do TIPO do arquivo (canto da miniatura), estilo mockup: DOCX (marca), PDF (vermelho), HTML. */
-function BadgeTipo({ t }: { t: string }) {
-  const map: Record<string, { txt: string; cls: string }> = {
-    docx: { txt: 'DOCX', cls: 'bg-primary text-primary-foreground' },
-    pdf: { txt: 'PDF', cls: 'bg-rose-600 text-white' },
-    html: { txt: 'HTML', cls: 'bg-amber-600 text-white' },
-  }
-  const v = map[t] ?? { txt: (t || '—').toUpperCase(), cls: 'bg-muted text-foreground' }
-  return <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold tracking-wider shadow-sm ${v.cls}`}>{v.txt}</span>
-}
-
-/** Rótulo de acesso do card: "Todos" (sem restrição) ou "Restrito" (acesso_geral = restrito). */
-function AccessLabel({ restrito }: { restrito?: boolean }) {
-  return (
-    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground" title={restrito ? 'Acesso restrito' : 'Liberado a todos'}>
-      <Users2 className="h-3 w-3" />{restrito ? 'Restrito' : 'Todos'}
-    </span>
-  )
-}
-
-type TipoFiltro = 'todos' | 'docx' | 'pdf'
-type Ordenar = 'atualizados' | 'nome' | 'criados'
-
 export function BibliotecaClient() {
   const searchParams = useSearchParams()
   const [categoria, setCategoria] = useState<Categoria>(searchParams.get('tab') === 'modelos' ? 'modelo_caderno' : 'conteudo')
@@ -126,17 +102,10 @@ export function BibliotecaClient() {
   const [previas, setPrevias] = useState<Record<string, { tipo: string; texto: string }[]>>({})
   const [thumbs, setThumbs] = useState<Record<string, string>>({})
   const [breadcrumb, setBreadcrumb] = useState<PastaConteudo[]>([])
-  const [contagens, setContagens] = useState<Record<string, number>>({})
-  const [restritasPasta, setRestritasPasta] = useState<Record<string, boolean>>({})
-  const [restritoDoc, setRestritoDoc] = useState<Record<string, boolean>>({})
-  const [resumo, setResumo] = useState<{ nGrupos: number; nAlunos: number }>({ nGrupos: 0, nAlunos: 0 })
   const [carregando, setCarregando] = useState(true)
   const [view, setView] = useState<'grid' | 'lista'>('grid')
   const [busca, setBusca] = useState('')
   const [filtro, setFiltro] = useState<StatusFiltro>('todos')
-  const [tipo, setTipo] = useState<TipoFiltro>('todos')
-  const [ordenar, setOrdenar] = useState<Ordenar>('atualizados')
-  const buscaRef = useRef<HTMLInputElement>(null)
   const [importAberto, setImportAberto] = useState(false)
   const [detalheId, setDetalheId] = useState<string | null>(null)
   const [acessoPasta, setAcessoPasta] = useState<PastaConteudo | null>(null) // pasta cujo acesso se gerencia
@@ -152,7 +121,6 @@ export function BibliotecaClient() {
       const r = await listarArvore(pastaId, cat)
       if (!r.ok) { toast.error(r.error || 'Falha ao carregar.'); return }
       setPastas(r.pastas); setDocs(r.documentos); setPrevias(r.previas || {}); setThumbs(r.thumbs || {}); setBreadcrumb(r.breadcrumb); setPastaAtual(pastaId)
-      setContagens(r.contagens || {}); setRestritasPasta(r.restritasPasta || {}); setRestritoDoc(r.restritoDoc || {}); setResumo(r.resumo || { nGrupos: 0, nAlunos: 0 })
       // Histórico: cada navegação de pasta vira uma entrada (URL inalterada, preservando o estado do Next)
       // → o "Voltar" do navegador sobe de pasta em vez de sair da Biblioteca. push=false quando a
       // própria navegação já veio de um popstate (voltar/avançar do navegador).
@@ -192,22 +160,10 @@ export function BibliotecaClient() {
 
   const docsFiltrados = useMemo(() => {
     const q = busca.trim().toLowerCase()
-    const arr = docs
+    return docs
       .filter((d) => filtro === 'todos' || d.status === filtro)
-      .filter((d) => tipo === 'todos' || d.tipo_origem === tipo)
       .filter((d) => !q || d.titulo.toLowerCase().includes(q))
-    const ord = [...arr]
-    if (ordenar === 'nome') ord.sort((a, b) => a.titulo.localeCompare(b.titulo, 'pt-BR'))
-    else if (ordenar === 'criados') ord.sort((a, b) => String(b.criado_em).localeCompare(String(a.criado_em)))
-    else ord.sort((a, b) => String(b.atualizado_em).localeCompare(String(a.atualizado_em)))
-    return ord
-  }, [docs, busca, filtro, tipo, ordenar])
-
-  // Ctrl/⌘+K foca a busca (atalho real, igual ao hint do campo).
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); buscaRef.current?.focus() } }
-    window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  }, [docs, busca, filtro])
 
   async function novaPasta() {
     const nome = await pedirTexto({ titulo: 'Nova pasta', placeholder: 'Nome da pasta', confirmar: 'Criar' })
@@ -273,10 +229,10 @@ export function BibliotecaClient() {
       try {
         const destino = comoPasta ? await garantirPasta(String((f as any).webkitRelativePath || f.name).split('/').slice(0, -1)) : pastaAtual
         const prep = await prepararUploadConteudo(f.name)
-        if (!prep.ok || !prep.path || !prep.uploadUrl) { patch(i, { status: 'erro', pct: 100 }); continue }
-        // PUT direto ao storage (Supabase signed URL ou S3 presigned PUT) — mesma mecânica XHR com progresso.
-        let subiu = await subirComProgresso(prep.uploadUrl, f, (frac) => patch(i, { pct: Math.min(99, Math.round(frac * 100)) }))
-        if (!subiu && prep.kind === 'supabase' && prep.token && prep.bucket) { // fallback Supabase (sem progresso de bytes)
+        if (!prep.ok || !prep.path) { patch(i, { status: 'erro', pct: 100 }); continue }
+        let subiu = false
+        if (prep.signedUrl) subiu = await subirComProgresso(prep.signedUrl, f, (frac) => patch(i, { pct: Math.min(99, Math.round(frac * 100)) }))
+        if (!subiu && prep.token && prep.bucket) { // fallback (sem progresso de bytes)
           const up = await createClient().storage.from(prep.bucket).uploadToSignedUrl(prep.path, prep.token, f, { contentType: f.type || undefined })
           subiu = !up.error
         }
@@ -348,20 +304,8 @@ export function BibliotecaClient() {
       <DriveAcessoStyles />
       <DriveNovoStyles />
       <div>
-        <h1 className="text-2xl font-bold tracking-tight text-primary">
-          {ehModelo
-            ? 'Modelos de Caderno (OnlyOffice)'
-            : pastaAtual && breadcrumb.length
-              ? breadcrumb.map((b) => b.nome).join(' · ')
-              : 'Biblioteca de Conteúdos'}
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          {ehModelo
-            ? 'Modelos de caderno em .docx, editados 100% no OnlyOffice — organização em Drive (pastas).'
-            : pastaAtual
-              ? `${pastas.length} ${pastas.length === 1 ? 'pasta' : 'pastas'} · ${docs.length} ${docs.length === 1 ? 'material' : 'materiais'} · entrega a ${resumo.nGrupos} ${resumo.nGrupos === 1 ? 'grupo' : 'grupos'} e ${resumo.nAlunos} ${resumo.nAlunos === 1 ? 'aluno' : 'alunos'}`
-              : `${pastas.length} ${pastas.length === 1 ? 'pasta' : 'pastas'} · documentos versionados — os grifos sobrevivem às edições`}
-        </p>
+        <h1 className="text-2xl font-bold tracking-tight">{ehModelo ? 'Modelos de Caderno (OnlyOffice)' : 'Biblioteca de Conteúdos'}</h1>
+        <p className="text-sm text-muted-foreground">{ehModelo ? 'Modelos de caderno em .docx, editados 100% no OnlyOffice — organização em Drive (pastas).' : 'Documentos jurídicos versionados — os grifos e anotações sobrevivem às edições.'}</p>
       </div>
 
       {/* Barra: breadcrumb + ações */}
@@ -400,42 +344,20 @@ export function BibliotecaClient() {
         </div>
       </div>
 
-      {/* Busca destacada (atalho Ctrl/⌘+K foca o campo) */}
-      <div className="relative">
-        <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-        <input
-          ref={buscaRef}
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-          placeholder="Buscar documentos pelo título…"
-          className="h-12 w-full rounded-xl border bg-muted/40 pl-11 pr-24 text-sm outline-none transition focus-visible:bg-background focus-visible:ring-2 focus-visible:ring-primary/40"
-        />
-        <kbd className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 rounded-md border bg-background px-2 py-0.5 text-[11px] font-medium text-muted-foreground">Ctrl K</kbd>
-      </div>
-
-      {/* Filtros por tipo (esq.) + ordenar/status/view (dir.) */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5">
-          {([['todos', 'Todos'], ['docx', 'Documentos'], ['pdf', 'PDF']] as [TipoFiltro, string][]).map(([k, label]) => (
-            <button key={k} onClick={() => setTipo(k)} className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${tipo === k ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-muted text-muted-foreground hover:text-foreground'}`}>{label}</button>
+      {/* Busca + filtros + view */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative min-w-[220px] flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar documentos…" className="h-9 w-full rounded-lg border bg-background pl-9 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40" />
+        </div>
+        <div className="flex items-center gap-1">
+          {(['todos', 'publicado', 'rascunho', 'arquivado'] as StatusFiltro[]).map((f) => (
+            <button key={f} onClick={() => setFiltro(f)} className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${filtro === f ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}>{f}</button>
           ))}
         </div>
-        <div className="flex items-center gap-2">
-          <select value={filtro} onChange={(e) => setFiltro(e.target.value as StatusFiltro)} aria-label="Filtrar por status" className="h-9 rounded-lg border bg-background px-2.5 text-xs font-medium text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
-            <option value="todos">Status: todos</option>
-            <option value="publicado">Publicado</option>
-            <option value="rascunho">Rascunho</option>
-            <option value="arquivado">Arquivado</option>
-          </select>
-          <select value={ordenar} onChange={(e) => setOrdenar(e.target.value as Ordenar)} aria-label="Ordenar" className="h-9 rounded-lg border bg-background px-2.5 text-xs font-medium text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
-            <option value="atualizados">Ordenar: Atualizados</option>
-            <option value="criados">Ordenar: Criados</option>
-            <option value="nome">Ordenar: Nome</option>
-          </select>
-          <div className="flex items-center rounded-lg border p-0.5">
-            <button onClick={() => setView('grid')} aria-label="Grade" className={`rounded-md p-1.5 ${view === 'grid' ? 'bg-muted text-foreground' : 'text-muted-foreground'}`}><LayoutGrid className="h-4 w-4" /></button>
-            <button onClick={() => setView('lista')} aria-label="Lista" className={`rounded-md p-1.5 ${view === 'lista' ? 'bg-muted text-foreground' : 'text-muted-foreground'}`}><ListIcon className="h-4 w-4" /></button>
-          </div>
+        <div className="flex items-center rounded-lg border p-0.5">
+          <button onClick={() => setView('grid')} aria-label="Grade" className={`rounded-md p-1.5 ${view === 'grid' ? 'bg-muted text-foreground' : 'text-muted-foreground'}`}><LayoutGrid className="h-4 w-4" /></button>
+          <button onClick={() => setView('lista')} aria-label="Lista" className={`rounded-md p-1.5 ${view === 'lista' ? 'bg-muted text-foreground' : 'text-muted-foreground'}`}><ListIcon className="h-4 w-4" /></button>
         </div>
       </div>
 
@@ -446,13 +368,7 @@ export function BibliotecaClient() {
           {/* Pastas */}
           {pastas.length > 0 && (
             <div>
-              <div className="mb-2 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  <span className="inline-flex items-center gap-1"><Folder className="h-3.5 w-3.5" />Pastas</span>
-                  <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-bold text-foreground/70">{pastas.length}</span>
-                </div>
-                <button onClick={novaPasta} className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"><FolderPlus className="h-3.5 w-3.5" />Nova pasta</button>
-              </div>
+              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pastas</div>
               <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                 {pastas.map((p) => (
                   <PastaCardDrive
@@ -461,8 +377,6 @@ export function BibliotecaClient() {
                     nome={p.nome}
                     cor={p.cor ?? null}
                     categoria={categoria}
-                    itens={contagens[p.id]}
-                    restrito={restritasPasta[p.id]}
                     onAbrir={() => carregar(p.id)}
                     onAcesso={() => setAcessoDrive({ id: p.id, nome: p.nome })}
                     onRenomear={(novo) => renomearPastaInline(p, novo)}
@@ -480,39 +394,39 @@ export function BibliotecaClient() {
 
           {/* Documentos */}
           <div>
-            <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              <span className="inline-flex items-center gap-1"><FileText className="h-3.5 w-3.5" />{ehModelo ? 'Modelos' : 'Documentos'}</span>
-              <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-bold text-foreground/70">{docsFiltrados.length}</span>
-            </div>
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{ehModelo ? 'Modelos' : 'Documentos'}</div>
             {docsFiltrados.length === 0 ? (
               <div className="rounded-2xl border border-dashed bg-muted/30 px-6 py-14 text-center text-sm text-muted-foreground">
                 {ehModelo ? 'Nenhum modelo aqui. Crie um a partir de um .docx — você edita no OnlyOffice.' : 'Nenhum documento aqui. Clique em Importar documento para começar.'}
               </div>
             ) : view === 'grid' ? (
               <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-                {docsFiltrados.map((d) => (
-                  <div key={d.id} className="group relative overflow-hidden rounded-2xl border bg-card shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md">
-                    <button onClick={() => setDetalheId(d.id)} className="block w-full text-left">
-                      {/* Miniatura: folha A4 inteira, borda-a-borda — igual aos Modelos de Caderno. */}
-                      <div className="relative aspect-[3/4] overflow-hidden border-b bg-neutral-100 dark:bg-neutral-800">
-                        <CardThumb doc={d} thumbUrl={thumbs[d.id]} trechos={previas[d.id]} />
-                        <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/[0.04] to-transparent" />
-                        <div className="absolute left-2 top-2"><BadgeTipo t={d.tipo_origem} /></div>
-                      </div>
-                      {/* Rodapé: título (2 linhas) + status e acesso */}
-                      <div className="p-3">
-                        <div className="line-clamp-2 min-h-[2.4rem] text-sm font-semibold leading-tight" title={d.titulo}>{d.titulo}</div>
-                        <div className="mt-2 flex items-center justify-between gap-2">
-                          <BadgeStatus s={d.status} />
-                          <AccessLabel restrito={restritoDoc[d.id]} />
+                {docsFiltrados.map((d) => {
+                  const Icone = ICONE_TIPO[d.tipo_origem] ?? FileText
+                  return (
+                    <div key={d.id} className="group relative overflow-hidden rounded-2xl border bg-card shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md">
+                      <button onClick={() => setDetalheId(d.id)} className="block w-full text-left">
+                        {/* Miniatura: folha A4 inteira, borda-a-borda — igual aos Modelos de Caderno. */}
+                        <div className="relative aspect-[3/4] overflow-hidden border-b bg-neutral-100 dark:bg-neutral-800">
+                          <CardThumb doc={d} thumbUrl={thumbs[d.id]} trechos={previas[d.id]} />
+                          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/[0.04] to-transparent" />
+                          <div className="absolute left-2 top-2"><BadgeStatus s={d.status} /></div>
                         </div>
+                        {/* Rodapé: ícone + título + tipo */}
+                        <div className="flex items-center gap-2.5 p-3">
+                          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><Icone className="h-4 w-4" /></span>
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-semibold leading-tight" title={d.titulo}>{d.titulo}</div>
+                            <div className="mt-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">{d.tipo_origem}</div>
+                          </div>
+                        </div>
+                      </button>
+                      <div className="absolute right-2 top-2">
+                        <MenuDoc d={d} categoria={categoria} onAbrir={() => setDetalheId(d.id)} onAcesso={() => setAcessoDoc(d)} onEditarOffice={() => editarDocOffice(d)} onBaixar={() => baixarDoc(d)} onRenomear={() => renomearDoc(d)} onMover={(p) => moverDoc(d, p)} onArquivar={() => arquivarDoc(d)} />
                       </div>
-                    </button>
-                    <div className="absolute right-2 top-2">
-                      <MenuDoc d={d} categoria={categoria} onAbrir={() => setDetalheId(d.id)} onAcesso={() => setAcessoDoc(d)} onEditarOffice={() => editarDocOffice(d)} onBaixar={() => baixarDoc(d)} onRenomear={() => renomearDoc(d)} onMover={(p) => moverDoc(d, p)} onArquivar={() => arquivarDoc(d)} />
                     </div>
-                  </div>
-                ))}
+                  )
+                })}
               </div>
             ) : (
               <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
@@ -545,17 +459,7 @@ export function BibliotecaClient() {
       {acessoDrive && <DriveAcessoWrapper pastaId={acessoDrive.id} categoria={categoria} onFechar={() => setAcessoDrive(null)} />}
       {uploads && uploads.length > 0 && <DriveUploadPanel itens={uploads} onClose={() => setUploads(null)} />}
       {importAberto && <ImportDialog pastaId={pastaAtual} categoria={categoria} onFechar={() => setImportAberto(false)} onPronto={() => { setImportAberto(false); carregar(pastaAtual) }} />}
-      {detalheId && (
-        <BibliotecaDocSidebar
-          documentoId={detalheId}
-          pastaLabel={breadcrumb.map((b) => b.nome).join(' · ') || 'Início'}
-          onFechar={() => setDetalheId(null)}
-          onMudou={() => carregar(pastaAtual)}
-          onGerenciarAcesso={() => { const dd = docs.find((x) => x.id === detalheId); if (dd) setAcessoDoc(dd) }}
-          onEditarOffice={() => { const dd = docs.find((x) => x.id === detalheId); if (dd) editarDocOffice(dd) }}
-          onBaixar={() => { const dd = docs.find((x) => x.id === detalheId); if (dd) baixarDoc(dd) }}
-        />
-      )}
+      {detalheId && <DetalheDialog documentoId={detalheId} capaInicial={thumbs[detalheId]} onFechar={() => setDetalheId(null)} onMudou={() => carregar(pastaAtual)} />}
       {acessoPasta && (
         <Overlay onFechar={() => setAcessoPasta(null)} largura="max-w-3xl">
           <div className="mb-4 flex items-center justify-between">
