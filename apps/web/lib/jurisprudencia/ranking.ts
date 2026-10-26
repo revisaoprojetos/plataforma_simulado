@@ -88,36 +88,45 @@ export async function carregarRankingJuris(desafioId: string, tenantId: string):
     }
     if (!regs.length) return vazio
     const ids = [...new Set(regs.map((r) => r.estudanteId))]
-    // Sequência: SEMPRE do ledger FILTRADO (ignora datas fabricadas pelo cliente — meta.dia != dia de
-    // criação). O RPC agrega pontos/dominados no banco mas NÃO filtra as datas, então recomputamos `dias`
-    // aqui p/ a sequência bater (diasAtivosPorAluno já descarta os eventos fabricados).
     const atualizadoSeq = new Map<string, string | null>(regs.map((r) => [r.estudanteId, r.atualizadoEm]))
-    const diasSeq = await diasAtivosPorAluno(svc, tenantId, desafioId, atualizadoSeq, ids).catch(() => new Map<string, Set<string>>())
-    for (const r of regs) r.dias = diasSeq.get(r.estudanteId) ?? new Set<string>()
     const ontem = new Date(Date.parse(hoje + 'T00:00:00Z') - 86_400_000).toISOString().slice(0, 10)
 
-    // Ajustes MANUAIS da sequência (calendário do suporte) por aluno — sobrepõem o automático. Tolerante.
-    const overridesPorAluno = new Map<string, Record<string, boolean>>()
-    try {
-      const ajs = await fetchAllByIn<{ estudante_id: string; overrides: any }>(ids, (chunk) => svc.from('simulado_jurisprudencia_sequencia_ajuste').select('estudante_id, overrides').eq('tenant_id', tenantId).eq('desafio_id', desafioId).in('estudante_id', chunk))
-      for (const a of ajs) if (a.overrides && typeof a.overrides === 'object') overridesPorAluno.set(a.estudante_id, a.overrides as Record<string, boolean>)
-    } catch { /* migração de ajuste pendente → sem override */ }
-
-    // Contas ocultas do ranking: ranking_ocultos da pasta (estudantes + grupos) + testadores (modo teste).
-    const ocultosSet = new Set<string>(); let ocultarTotal = false
-    try {
-      const { data: ro } = await svc.from('simulado_pastas').select('ranking_ocultos').eq('id', desafioId).eq('tenant_id', tenantId).maybeSingle()
-      const cfg = (ro as any)?.ranking_ocultos ?? {}
-      ocultarTotal = cfg.total === true
-      for (const id of (Array.isArray(cfg.estudantes) ? cfg.estudantes : [])) ocultosSet.add(id)
-      const grps = Array.isArray(cfg.grupos) ? cfg.grupos : []
-      if (grps.length) { const mem = await fetchAllByIn<{ estudante_id: string }>(grps, (chunk) => svc.from('simulado_grupo_membros').select('estudante_id').in('grupo_id', chunk)); for (const m of mem) ocultosSet.add(m.estudante_id) }
-    } catch { /* coluna ranking_ocultos ausente */ }
-    try { const { testadoresDoModulo } = await import('@/lib/leitura/testadores'); for (const id of await testadoresDoModulo(svc, tenantId, desafioId)) ocultosSet.add(id) } catch { /* ausente */ }
-
-    // Perfil (nome/avatar/nível) + e-mail (em lote — o perfilAlunos não traz e-mail).
-    const perfis = await perfilAlunos(svc, tenantId, ids)
-    const ests = await fetchAllByIn<{ id: string; email: string | null }>(ids, (chunk) => svc.from('simulado_estudantes').select('id, email').in('id', chunk))
+    // PARALELO: as 5 leituras abaixo dependem só de `ids`/tenant/desafio — eram sequenciais (cada
+    // round-trip ~1-2s neste ambiente → ~9s). Rodando juntas, o custo cai ao de UMA leitura. Cada uma
+    // é tolerante a falha (fallback vazio), preservando o comportamento best-effort anterior.
+    const [diasSeq, overridesPorAluno, ocultosInfo, perfis, ests] = await Promise.all([
+      // Sequência: SEMPRE do ledger FILTRADO (ignora datas fabricadas — meta.dia != dia de criação).
+      diasAtivosPorAluno(svc, tenantId, desafioId, atualizadoSeq, ids).catch(() => new Map<string, Set<string>>()),
+      // Ajustes MANUAIS da sequência (calendário do suporte) por aluno — sobrepõem o automático.
+      (async (): Promise<Map<string, Record<string, boolean>>> => {
+        const m = new Map<string, Record<string, boolean>>()
+        try {
+          const ajs = await fetchAllByIn<{ estudante_id: string; overrides: any }>(ids, (chunk) => svc.from('simulado_jurisprudencia_sequencia_ajuste').select('estudante_id, overrides').eq('tenant_id', tenantId).eq('desafio_id', desafioId).in('estudante_id', chunk))
+          for (const a of ajs) if (a.overrides && typeof a.overrides === 'object') m.set(a.estudante_id, a.overrides as Record<string, boolean>)
+        } catch { /* migração de ajuste pendente → sem override */ }
+        return m
+      })(),
+      // Contas ocultas: ranking_ocultos da pasta (estudantes + grupos) + testadores (modo teste).
+      (async (): Promise<{ ocultosSet: Set<string>; ocultarTotal: boolean }> => {
+        const ocultosSet = new Set<string>(); let ocultarTotal = false
+        try {
+          const { data: ro } = await svc.from('simulado_pastas').select('ranking_ocultos').eq('id', desafioId).eq('tenant_id', tenantId).maybeSingle()
+          const cfg = (ro as any)?.ranking_ocultos ?? {}
+          ocultarTotal = cfg.total === true
+          for (const id of (Array.isArray(cfg.estudantes) ? cfg.estudantes : [])) ocultosSet.add(id)
+          const grps = Array.isArray(cfg.grupos) ? cfg.grupos : []
+          if (grps.length) { const mem = await fetchAllByIn<{ estudante_id: string }>(grps, (chunk) => svc.from('simulado_grupo_membros').select('estudante_id').in('grupo_id', chunk)); for (const m of mem) ocultosSet.add(m.estudante_id) }
+        } catch { /* coluna ranking_ocultos ausente */ }
+        try { const { testadoresDoModulo } = await import('@/lib/leitura/testadores'); for (const id of await testadoresDoModulo(svc, tenantId, desafioId)) ocultosSet.add(id) } catch { /* ausente */ }
+        return { ocultosSet, ocultarTotal }
+      })(),
+      // Perfil (nome/avatar/nível).
+      perfilAlunos(svc, tenantId, ids),
+      // E-mail em lote (o perfilAlunos não traz e-mail).
+      fetchAllByIn<{ id: string; email: string | null }>(ids, (chunk) => svc.from('simulado_estudantes').select('id, email').in('id', chunk)),
+    ])
+    for (const r of regs) r.dias = diasSeq.get(r.estudanteId) ?? new Set<string>()
+    const { ocultosSet, ocultarTotal } = ocultosInfo
     const emailDe = new Map(ests.map((e) => [e.id, e.email ?? null]))
 
     type Bruto = Omit<RankingLeituraItem, 'posicao' | 'oculto'> & { ultimoDia: string }
@@ -131,7 +140,10 @@ export async function carregarRankingJuris(desafioId: string, tenantId: string):
         nome: perfil?.nome ?? 'Aluno', email: emailDe.get(r.estudanteId) ?? null,
         avatar: perfil?.avatar ?? null, avatarCor: perfil?.avatarCor ?? null,
         acertos: dom, aulasConcluidas: dom, aulasGabaritadas: dom,
-        score: r.pontos, streakAtual: calcularSequencia(dias, overridesPorAluno.get(r.estudanteId), hoje, ontem).streakAtual,
+        // GUARDA (anti-dispersão streak × aulas): o "dia de sequência" vem da LEITURA; se o aluno leu o dia
+        // mas NÃO dominou as teses no arcade, não deve exibir streak MAIOR que as aulas concluídas (dias
+        // dominados). Teto = nº de aulas concluídas. Ex.: lia 14 dias mas dominou 10 → mostra 10, não 14.
+        score: r.pontos, streakAtual: Math.min(calcularSequencia(dias, overridesPorAluno.get(r.estudanteId), hoje, ontem).streakAtual, dom),
         nivel: perfil?.nivel ?? 1, totalAulas: totalDias,
         ultimoDiaAtivo: ultimoDia || null, status: statusRanking(ultimoDia || null, hoje),
         ultimoDia,

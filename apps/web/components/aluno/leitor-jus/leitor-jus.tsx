@@ -58,7 +58,8 @@ export function LeitorJus({
   // Acumula tempo de leitura enquanto o overlay está aberto (p/ desafios com tempo mínimo).
   useEffect(() => {
     if (!documentoId || !versao) return
-    const iv = setInterval(() => { void postProgresso({ tempo_inc: 20 }) }, 20000)
+    // Pausa quando a aba está oculta: não conta tempo de leitura nem gera egress com o usuário fora.
+    const iv = setInterval(() => { if (document.hidden) return; void postProgresso({ tempo_inc: 20 }) }, 20000)
     return () => clearInterval(iv)
   }, [documentoId, versao, postProgresso])
 

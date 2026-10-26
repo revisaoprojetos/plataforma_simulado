@@ -1,7 +1,7 @@
 import 'server-only'
 import { SignJWT } from 'jose'
 import { createAdminClient } from '@/lib/supabase/server'
-import { uploadArquivo } from '@/lib/storage'
+import { uploadArquivo, getStorage } from '@/lib/storage'
 import { resolverBucketConteudo, urlAssinadaOriginal } from './ingestao'
 
 // Miniatura FIEL do card: converte o .docx na imagem PNG da 1ª página via ConvertService do OnlyOffice
@@ -70,10 +70,10 @@ export async function gerarThumbDocumento(tenantId: string, documentoId: string,
     if (!ver) ver = (await svc.from('simulado_conteudo_versoes').select(campos).eq('tenant_id', tenantId).eq('documento_id', documentoId).order('numero', { ascending: false }).limit(1).maybeSingle()).data
     if (!ver?.arquivo_key) return null
     const path = thumbPath(tenantId, ver.id, ver.hash_arquivo)
-    // Cache: a thumb já existe no storage? `urlAssinadaOriginal` só devolve URL se o OBJETO EXISTE
-    // (createSignedUrl erra em "Object not found"). Não usar HEAD aqui: a URL assinada do Supabase não
-    // responde bem a HEAD → o cache falhava sempre e REGERAVA toda vez (lento).
-    if (!opts?.forcar) {
+    const bucket = await resolverBucketConteudo()
+    // Cache: a thumb já existe no storage? Checa EXISTÊNCIA (HeadObject no S3 / list no Supabase) — NÃO
+    // confiar no erro da URL assinada: no S3 o getSignedUrl NUNCA erra → serviria URL quebrada e nunca regeraria.
+    if (!opts?.forcar && await getStorage().exists(bucket, path)) {
       const cached = await urlAssinadaOriginal(path, 3600)
       if (cached) return cached
     }
@@ -84,7 +84,7 @@ export async function gerarThumbDocumento(tenantId: string, documentoId: string,
     // Guarda no storage e devolve a URL ASSINADA (evita trafegar o PNG em base64 — centenas de KB — na
     // resposta da action; a próxima leitura também usa a URL cacheada). Só cai no data URL se o storage hesitar.
     try {
-      await uploadArquivo({ tenantId, bucket: await resolverBucketConteudo(), path, data: png, contentType: 'image/png', nome: 'thumb.png', publico: false, criadoPor: null })
+      await uploadArquivo({ tenantId, bucket, path, data: png, contentType: 'image/png', nome: 'thumb.png', publico: false, criadoPor: null })
       const url = await urlAssinadaOriginal(path, 3600)
       if (url) return url
     } catch { /* cache best-effort → cai no data URL abaixo */ }
@@ -140,14 +140,17 @@ export async function gerarPdfDocumento(tenantId: string, documentoId: string): 
     if ((doc as any).tipo_origem === 'pdf') return await urlAssinadaOriginal(ver.arquivo_key, 3600) // já é PDF
     if ((doc as any).tipo_origem !== 'docx') return null
     const path = pdfPath(tenantId, ver.id, ver.hash_arquivo)
-    const cached = await urlAssinadaOriginal(path, 3600)
-    if (cached) return cached
+    const bucket = await resolverBucketConteudo()
+    if (await getStorage().exists(bucket, path)) {
+      const cached = await urlAssinadaOriginal(path, 3600)
+      if (cached) return cached
+    }
     const src = await urlAssinadaOriginal(ver.arquivo_key, 600)
     if (!src) return null
     const pdf = await converterDocxParaPdf(src, `pdf_${ver.id}_${String(ver.hash_arquivo || '').slice(0, 8)}`)
     if (!pdf) return null
     try {
-      await uploadArquivo({ tenantId, bucket: await resolverBucketConteudo(), path, data: pdf, contentType: 'application/pdf', nome: 'doc.pdf', publico: false, criadoPor: null })
+      await uploadArquivo({ tenantId, bucket, path, data: pdf, contentType: 'application/pdf', nome: 'doc.pdf', publico: false, criadoPor: null })
       const url = await urlAssinadaOriginal(path, 3600)
       if (url) return url
     } catch { /* cache best-effort */ }

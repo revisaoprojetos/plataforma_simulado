@@ -10,6 +10,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import { AvatarEstudante } from '@/components/aluno/avatar-estudante'
+import { acessoEfetivo, type ItemAcesso, type Atribuicao } from '@/lib/conteudo/acesso-efetivo'
+import { PilulaModo, PilulaEstado, type ModoAcesso } from '@/components/biblioteca/pilulas'
+import { PermissaoQuadros, type Permissoes } from '@/components/biblioteca/permissao-quadros'
 
 const sv = (o: Record<string, string | number>): CSSProperties => o as CSSProperties
 
@@ -23,17 +26,23 @@ export type DrivePessoa = {
   papel: DrivePapel
   avatar?: string | null // foto de perfil (estudante)
   corAvatar?: string | null // cor de fundo do avatar
+  origem?: 'avulsa' | 'individual' // proveniência da entrega (spec 01 §5); via_pacote é resolvido fora
+  perms?: Permissoes // permissões ler/baixar/grifar desta entrega
 }
+export type { ModoAcesso }
 export type DriveNode = {
   id: string
   nome: string
   tipo: 'folder' | 'doc'
   cor?: string | null
   herda: boolean
+  modo?: ModoAcesso // modo de acesso de 1ª classe (principal/herdar/propria/bloquear)
+  oculto?: boolean // visibilidade: escondido do aluno
   pessoas: DrivePessoa[]
   geral: DriveGeral
   filhos: DriveNode[]
 }
+const PERMS_FULL: Permissoes = { ler: true, baixar: true, grifar: true }
 export type DriveAcessoEvento =
   | { tipo: 'herdar'; node: DriveNode; herda: boolean }
   | { tipo: 'add'; node: DriveNode; pessoa: DrivePessoa }
@@ -123,6 +132,42 @@ function caminhoDe(root: DriveNode, id: string): string[] {
 function clone(n: DriveNode): DriveNode { return { ...n, pessoas: n.pessoas.map((p) => ({ ...p })), geral: n.geral ? { ...n.geral } : null, filhos: n.filhos.map(clone) } }
 function acharNo(root: DriveNode, id: string): DriveNode | null { if (root.id === id) return root; for (const c of root.filhos) { const r = acharNo(c, id); if (r) return r } return null }
 
+/** Modo exibido quando o nó ainda não tem `modo` explícito (dados antigos): deriva de raiz/herança. */
+function modoDisplay(node: DriveNode, isRoot: boolean): ModoAcesso {
+  if (node.modo) return node.modo
+  if (isRoot) return 'principal'
+  if (node.herda === false) return 'propria'
+  return 'herdar'
+}
+/** Ancestrais (pai imediato → raiz) de um nó na árvore local. */
+function ancestraisDe(root: DriveNode, id: string): DriveNode[] {
+  const path: DriveNode[] = []
+  const go = (n: DriveNode, acc: DriveNode[]): boolean => {
+    if (n.id === id) { path.push(...acc.slice().reverse()); return true }
+    return n.filhos.some((c) => go(c, [...acc, n]))
+  }
+  go(root, [])
+  return path
+}
+/** DriveNode local → ItemAcesso (sem ancestrais) p/ o acessoEfetivo (motor ÚNICO, igual ao gate do aluno). */
+function nodeParaItem(node: DriveNode, isRoot: boolean): ItemAcesso {
+  return {
+    id: node.id,
+    modo: modoDisplay(node, isRoot),
+    oculto: node.oculto === true,
+    acessoGeral: node.geral ? node.geral.modo : null,
+    atribuicoes: node.pessoas.map((p): Atribuicao => ({
+      tipo: p.tipo === 'grupo' ? 'grupo' : 'aluno',
+      grupoId: p.tipo === 'grupo' ? p.id : null,
+      estudanteId: p.tipo === 'estudante' ? p.id : null,
+      origem: p.origem ?? 'avulsa',
+      podeLer: p.perms ? p.perms.ler : null,
+      podeBaixar: p.perms ? p.perms.baixar : null,
+      podeGrifar: p.perms ? p.perms.grifar : null,
+    })),
+  }
+}
+
 const BADGE: Record<EstadoNo, { cls: string; label: string; lock?: boolean }> = {
   root: { cls: 'gd-b-root', label: 'Pasta principal' },
   inh: { cls: 'gd-b-inh', label: 'Herdado' },
@@ -142,7 +187,7 @@ function PessoaAvatar({ p, cls }: { p: { tipo: 'estudante' | 'grupo'; id: string
 }
 
 export function DriveAcessoDialog({
-  root: rootProp, me, onClose, onSalvar, resolverEmail, onCopiarLink, onToast, focoId, listarGrupos, buscarAlunos,
+  root: rootProp, me, onClose, onSalvar, resolverEmail, onCopiarLink, onToast, focoId, listarGrupos, buscarAlunos, buscarGruposAluno,
 }: {
   root: DriveNode
   me: { id: string; nome: string }
@@ -155,6 +200,8 @@ export function DriveAcessoDialog({
   focoId?: string
   listarGrupos?: () => Promise<DriveGrupo[]>
   buscarAlunos?: (q: string, offset: number) => Promise<{ items: DriveAluno[]; total: number }>
+  /** Grupos (ids) de um aluno — habilita o "Simular aluno" (acessoEfetivo roda localmente). */
+  buscarGruposAluno?: (estudanteId: string) => Promise<string[]>
 }) {
   const [root, setRoot] = useState<DriveNode>(() => clone(rootProp))
   const [shown, setShown] = useState(false)
@@ -168,7 +215,8 @@ export function DriveAcessoDialog({
   const [bulkEmail, setBulkEmail] = useState('')
   const [bulkPapel, setBulkPapel] = useState<DrivePapel>('reader')
   const [bulkRm, setBulkRm] = useState('')
-  const [picker, setPicker] = useState<null | 'single' | 'bulk'>(null)
+  const [picker, setPicker] = useState<null | 'single' | 'bulk' | 'sim'>(null)
+  const [sim, setSim] = useState<{ aluno: DriveAluno; grupos: string[] } | null>(null)
   const treeRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { const r = requestAnimationFrame(() => requestAnimationFrame(() => setShown(true))); return () => cancelAnimationFrame(r) }, [])
@@ -192,7 +240,7 @@ export function DriveAcessoDialog({
     const ini = new Map<string, DriveNode>()
     const idx = (n: DriveNode) => { ini.set(n.id, n); n.filhos.forEach(idx) }
     idx(rootProp)
-    const chave = (n: DriveNode) => JSON.stringify([n.herda, n.geral, [...n.pessoas].map((p) => [p.tipo, p.id, p.papel]).sort()])
+    const chave = (n: DriveNode) => JSON.stringify([n.herda, n.modo ?? null, n.oculto ?? false, n.geral, [...n.pessoas].map((p) => [p.tipo, p.id, p.papel, p.origem ?? 'avulsa', p.perms?.ler !== false, p.perms?.baixar !== false, p.perms?.grifar !== false]).sort()])
     const mud: DriveNode[] = []
     const cmp = (n: DriveNode) => { const o = ini.get(n.id); if (o && chave(n) !== chave(o)) mud.push(n); n.filhos.forEach(cmp) }
     cmp(atual)
@@ -244,7 +292,30 @@ export function DriveAcessoDialog({
   const itensMassa = useMemo(() => nodes.filter((n) => checked.has(n.id)), [nodes, checked])
 
   // ---- ações sobre um nó ----
-  const addPessoaLocal = (node: DriveNode, p: DrivePessoa) => mutar((r) => { const n = acharNo(r, node.id); if (!n) return; const ex = n.pessoas.find((x) => x.id === p.id && x.tipo === p.tipo); if (ex) ex.papel = p.papel; else n.pessoas.push({ ...p }) })
+  const addPessoaLocal = (node: DriveNode, p: DrivePessoa) => mutar((r) => { const n = acharNo(r, node.id); if (!n) return; const ex = n.pessoas.find((x) => x.id === p.id && x.tipo === p.tipo); if (ex) ex.papel = p.papel; else n.pessoas.push({ origem: 'avulsa', perms: { ...PERMS_FULL }, ...p }) })
+
+  // Modo de acesso (1ª classe). Sincroniza `herda` p/ manter o estado coerente (herdar=herda; demais=não herda).
+  function definirModo(node: DriveNode, modo: ModoAcesso) {
+    mutar((r) => { const n = acharNo(r, node.id); if (n) { n.modo = modo; n.herda = modo === 'herdar' } })
+    toast(modo === 'bloquear' ? `"${node.nome}" bloqueado (só equipe)` : modo === 'herdar' ? `"${node.nome}" herda da pasta acima` : modo === 'principal' ? `"${node.nome}" é a pasta principal` : `"${node.nome}" com regra própria`)
+  }
+  function alternarOculto(node: DriveNode) {
+    const oculto = !node.oculto
+    mutar((r) => { const n = acharNo(r, node.id); if (n) n.oculto = oculto })
+    toast(oculto ? `"${node.nome}" oculto do aluno` : `"${node.nome}" visível novamente`)
+  }
+  function alterarOrigem(node: DriveNode, pessoaId: string, origem: 'avulsa' | 'individual') {
+    mutar((r) => { const n = acharNo(r, node.id); const p = n?.pessoas.find((x) => x.id === pessoaId); if (p) p.origem = origem })
+  }
+  function alterarPerm(node: DriveNode, pessoaId: string, chave: keyof Permissoes, ativo: boolean) {
+    mutar((r) => { const n = acharNo(r, node.id); const p = n?.pessoas.find((x) => x.id === pessoaId); if (p) p.perms = { ...(p.perms ?? PERMS_FULL), [chave]: ativo } })
+  }
+  // Simulação de acesso de um aluno: busca os grupos do aluno e guarda — o cálculo (acessoEfetivo) é no render.
+  async function simularAluno(al: DriveAluno) {
+    const grupos = buscarGruposAluno ? await buscarGruposAluno(al.id).catch(() => []) : []
+    setSim({ aluno: al, grupos })
+    toast(`Simulando acesso de ${al.nome}`)
+  }
 
   async function adicionarPessoa(node: DriveNode, email: string, papel: DrivePapel) {
     const v = email.trim().toLowerCase()
@@ -299,8 +370,8 @@ export function DriveAcessoDialog({
   function adicionarSelecionados(alvo: 'single' | 'bulk', sel: SelecaoAcesso) {
     const destinos = alvo === 'bulk' ? itensMassa : [selected]
     const pessoas: DrivePessoa[] = [
-      ...sel.grupos.map((gr): DrivePessoa => ({ id: gr.id, tipo: 'grupo', email: '', nome: gr.nome, papel: sel.papel })),
-      ...sel.estudantes.map((al): DrivePessoa => ({ id: al.id, tipo: 'estudante', email: al.email ?? '', nome: al.nome, papel: sel.papel, avatar: al.avatar ?? null, corAvatar: al.cor ?? null })),
+      ...sel.grupos.map((gr): DrivePessoa => ({ id: gr.id, tipo: 'grupo', email: '', nome: gr.nome, papel: sel.papel, origem: 'avulsa', perms: { ...PERMS_FULL } })),
+      ...sel.estudantes.map((al): DrivePessoa => ({ id: al.id, tipo: 'estudante', email: al.email ?? '', nome: al.nome, papel: sel.papel, avatar: al.avatar ?? null, corAvatar: al.cor ?? null, origem: 'individual', perms: { ...PERMS_FULL } })),
     ]
     if (!pessoas.length) { setPicker(null); return }
     mutar((r) => {
@@ -402,6 +473,7 @@ export function DriveAcessoDialog({
   function PainelItem({ n }: { n: DriveNode }) {
     const e = eff.get(n.id)!
     const isRoot = n.id === root.id
+    const modoAtual = modoDisplay(n, isRoot)
     const desc = descendentes(n)
     const nf = desc.filter((x) => x.tipo === 'folder').length
     const nfi = desc.length - nf
@@ -415,9 +487,35 @@ export function DriveAcessoDialog({
           <span className="gd-big"><FileIcon n={n} cor={n.cor} /></span>
           <div style={{ minWidth: 0 }}><h3>{n.nome}</h3><div className="gd-crumb">{caminhoDe(root, n.id).join(' › ')}</div></div>
         </div>
-        <div className="gd-switch-row">
-          <div><b>Herdar acesso</b><small>{isRoot ? 'Pasta principal — define o acesso padrão de tudo que está dentro' : 'Recebe as permissões da pasta acima'}</small></div>
-          <button className={`gd-switch${n.herda ? ' gd-on' : ''}`} role="switch" aria-checked={n.herda} disabled={isRoot} onClick={() => !isRoot && alternarHeranca(n)} />
+        <div className="gd-switch-row" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ flex: 1 }}><b>Modo de acesso</b><small>{isRoot ? 'Pasta principal — define o padrão de tudo que está dentro' : 'Como este item decide quem vê'}</small></div>
+            <button
+              type="button"
+              onClick={() => alternarOculto(n)}
+              title={n.oculto ? 'Mostrar ao aluno' : 'Ocultar do aluno'}
+              aria-pressed={!!n.oculto}
+              style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0, opacity: n.oculto ? 1 : 0.6 }}
+            >
+              {n.oculto ? <PilulaEstado estado="oculto" /> : <span className="gd-tag">Visível</span>}
+            </button>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {(isRoot ? (['principal', 'propria', 'bloquear'] as ModoAcesso[]) : (['herdar', 'propria', 'principal', 'bloquear'] as ModoAcesso[])).map((m) => {
+              const ativo = modoAtual === m
+              return (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => definirModo(n, m)}
+                  aria-pressed={ativo}
+                  style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0, borderRadius: 999, opacity: ativo ? 1 : 0.5, boxShadow: ativo ? '0 0 0 2px var(--gd-accent)' : 'none', transition: 'opacity .15s, box-shadow .15s' }}
+                >
+                  <PilulaModo modo={m} curto />
+                </button>
+              )
+            })}
+          </div>
         </div>
         <div className={`gd-status ${liberadoTodos ? 'gd-st-ok' : 'gd-st-restr'}`}>
           <span className="gd-st-ic">{liberadoTodos ? <Svg d={P.globe} /> : <Svg d={P.lock} />}</span>
@@ -436,8 +534,9 @@ export function DriveAcessoDialog({
             <ul className="gd-people">
               {pessoasVis.map((p, i) => {
                 const own = p.sourceId === n.id
+                const perms = p.perms ?? PERMS_FULL
                 return (
-                  <li className="gd-person" key={p.tipo + p.id} style={{ animationDelay: `${i * 40}ms` }}>
+                  <li className="gd-person" key={p.tipo + p.id} style={{ animationDelay: `${i * 40}ms`, flexWrap: 'wrap' }}>
                     <PessoaAvatar p={p} cls="gd-av-lg" />
                     <div className="gd-who">
                       <b>{p.nome}</b>
@@ -446,6 +545,15 @@ export function DriveAcessoDialog({
                     {own
                       ? <button className="gd-icon-btn" title="Remover acesso" onClick={() => removerPessoa(n, p.id, p.nome)}><Svg d={P.close} /></button>
                       : <span className="gd-tag" style={{ marginRight: 4 }}>da pasta acima</span>}
+                    {own && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', width: '100%', paddingLeft: 48 }}>
+                        <select className="gd-field gd-ghost" style={{ width: 'auto' }} value={p.origem ?? 'avulsa'} onChange={(ev) => alterarOrigem(n, p.id, ev.target.value as 'avulsa' | 'individual')} title="Origem da entrega">
+                          <option value="avulsa">Entrega avulsa</option>
+                          <option value="individual">Individual</option>
+                        </select>
+                        <PermissaoQuadros kind="docx" valor={perms} onChange={(chave, ativo) => alterarPerm(n, p.id, chave, ativo)} />
+                      </div>
+                    )}
                   </li>
                 )
               })}
@@ -465,6 +573,32 @@ export function DriveAcessoDialog({
               <button className="gd-btn gd-outline gd-sm" disabled={!ncus} onClick={() => resetFilhos(n)}>Fazer todos herdarem desta pasta</button>
               <button className="gd-btn gd-outline gd-sm" disabled={!desc.length} onClick={() => restringirFilhos(n)}>Restringir todos os internos</button>
             </div>
+          </>
+        )}
+        {buscarAlunos && (
+          <>
+            <div className="gd-sec-title">Simular aluno</div>
+            <div className="gd-actions-wrap" style={{ marginTop: 0 }}>
+              <button className="gd-btn gd-outline gd-sm" onClick={() => setPicker('sim')}><Svg d={P.people} />Escolher aluno</button>
+              {sim && <button className="gd-btn gd-text gd-sm" onClick={() => setSim(null)}>Limpar</button>}
+            </div>
+            {sim && (() => {
+              const item = nodeParaItem(n, isRoot)
+              item.ancestrais = ancestraisDe(root, n.id).map((a) => nodeParaItem(a, a.id === root.id))
+              const res = acessoEfetivo(item, { estudanteId: sim.aluno.id, grupos: sim.grupos })
+              const podeTxt = [res.permissoes.ler && 'ler', res.permissoes.baixar && 'baixar', res.permissoes.grifar && 'grifar'].filter(Boolean).join(' / ') || '—'
+              return (
+                <div className={`gd-status ${res.permitido ? 'gd-st-ok' : 'gd-st-restr'}`} style={{ marginTop: 10 }}>
+                  <span className="gd-st-ic">{res.permitido ? <Svg d={P.globe} /> : <Svg d={P.lock} />}</span>
+                  <div>
+                    <b>{sim.aluno.nome}: {res.permitido ? 'vê este item' : 'não vê este item'}</b>
+                    <small>{res.permitido
+                      ? `Origem: ${res.origens.join(', ') || '—'} · pode ${podeTxt}`
+                      : `Motivo: ${res.motivo === 'bloqueado' ? 'bloqueado (só equipe)' : res.motivo === 'oculto' ? 'oculto' : 'não atribuído'}`}</small>
+                  </div>
+                </div>
+              )
+            })()}
           </>
         )}
         <div className="gd-actions-wrap" style={{ marginTop: 18 }}>
@@ -551,8 +685,12 @@ export function DriveAcessoDialog({
       </div>
       {picker && (
         <DriveAddPicker
+          modo={picker === 'sim' ? 'sim' : 'add'}
           onClose={() => setPicker(null)}
-          onConfirm={(sel) => adicionarSelecionados(picker, sel)}
+          onConfirm={(sel) => {
+            if (picker === 'sim') { const al = sel.estudantes[0]; setPicker(null); if (al) void simularAluno(al); return }
+            adicionarSelecionados(picker, sel)
+          }}
           listarGrupos={listarGrupos}
           buscarAlunos={buscarAlunos}
         />
@@ -574,14 +712,17 @@ function GrupoPickRow({ gr, sel, onToggle, indent }: { gr: DriveGrupo; sel: bool
 
 // Seletor de GRUPOS + ALUNOS (abas, busca paginada server-side) p/ o "Liberar acesso". Mesmo espírito das
 // outras áreas (grupos + alunos + liberar p/ todos), mas organizado no visual do Drive (pastas mestres → subgrupos).
-function DriveAddPicker({ onClose, onConfirm, listarGrupos, buscarAlunos }: {
+function DriveAddPicker({ onClose, onConfirm, listarGrupos, buscarAlunos, modo = 'add' }: {
   onClose: () => void
   onConfirm: (sel: SelecaoAcesso) => void
   listarGrupos?: () => Promise<DriveGrupo[]>
   buscarAlunos?: (q: string, offset: number) => Promise<{ items: DriveAluno[]; total: number }>
+  /** 'sim' = escolher UM aluno p/ simular acesso (só a aba Alunos). */
+  modo?: 'add' | 'sim'
 }) {
+  const ehSim = modo === 'sim'
   const [shown, setShown] = useState(false)
-  const [tab, setTab] = useState<'grupos' | 'alunos'>('grupos')
+  const [tab, setTab] = useState<'grupos' | 'alunos'>(ehSim ? 'alunos' : 'grupos')
   const [papel, setPapel] = useState<DrivePapel>('reader')
   const [grupos, setGrupos] = useState<DriveGrupo[] | null>(null)
   const [qG, setQG] = useState('')
@@ -622,11 +763,11 @@ function DriveAddPicker({ onClose, onConfirm, listarGrupos, buscarAlunos }: {
       <div className={`gd-scrim gd-s2${shown ? ' gd-show' : ''}`} onClick={fechar} />
       <div className={`gd-dialog gd-picker${shown ? ' gd-show' : ''}`} role="dialog" aria-modal="true">
         <header>
-          <h2>Adicionar grupos e alunos</h2>
+          <h2>{ehSim ? 'Escolher aluno para simular' : 'Adicionar grupos e alunos'}</h2>
           <button className="gd-icon-btn" aria-label="Fechar" onClick={fechar}><Svg d={P.close} /></button>
         </header>
         <div className="gd-ptabs">
-          <button className={tab === 'grupos' ? 'gd-on' : ''} onClick={() => setTab('grupos')}>Grupos {selG.size > 0 && <span className="gd-cnt">{selG.size}</span>}</button>
+          {!ehSim && <button className={tab === 'grupos' ? 'gd-on' : ''} onClick={() => setTab('grupos')}>Grupos {selG.size > 0 && <span className="gd-cnt">{selG.size}</span>}</button>}
           <button className={tab === 'alunos' ? 'gd-on' : ''} onClick={() => setTab('alunos')}>Alunos {selA.size > 0 && <span className="gd-cnt">{selA.size}</span>}</button>
         </div>
         <div className="gd-dlg-body" style={{ paddingTop: 12 }}>
@@ -691,11 +832,11 @@ function DriveAddPicker({ onClose, onConfirm, listarGrupos, buscarAlunos }: {
           )}
         </div>
         <footer className="gd-lined">
-          <span className="gd-footer-sum">{totalSel > 0 ? `${totalSel} selecionado${totalSel === 1 ? '' : 's'}` : 'Selecione grupos ou alunos'}</span>
+          <span className="gd-footer-sum">{totalSel > 0 ? `${totalSel} selecionado${totalSel === 1 ? '' : 's'}` : ehSim ? 'Escolha um aluno' : 'Selecione grupos ou alunos'}</span>
           <span className="gd-spacer" />
           <button className="gd-btn gd-text" onClick={fechar}>Cancelar</button>
           <button className="gd-btn gd-filled" disabled={totalSel === 0} onClick={() => onConfirm({ grupos: [...selG.values()], estudantes: [...selA.values()], papel })}>
-            Adicionar{totalSel > 0 ? ` (${totalSel})` : ''}
+            {ehSim ? 'Simular' : `Adicionar${totalSel > 0 ? ` (${totalSel})` : ''}`}
           </button>
         </footer>
       </div>

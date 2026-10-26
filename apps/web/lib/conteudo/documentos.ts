@@ -8,7 +8,10 @@ import { emitirEvento } from './outbox'
 // service role (createAdminClient) + filtro por tenant_id na app (RLS ligado sem políticas). As
 // decisões de PRODUTO (coexistência/migração, legal, vigência) são da Fase D — aqui é só a base.
 
-export type TipoOrigem = 'docx' | 'pdf' | 'html'
+// Fase 1: além de docx/pdf/html, aceita mídia/office (pptx/xlsx/video/audio) — só ingestão (guardar o
+// original + registrar o tipo). ATENÇÃO: a coluna `tipo_origem` tem CHECK que precisa ser ampliado (ver
+// relatório/migração aditiva); sem isso o INSERT desses tipos é rejeitado pelo Postgres.
+export type TipoOrigem = 'docx' | 'pdf' | 'html' | 'pptx' | 'xlsx' | 'video' | 'audio'
 export type StatusDoc = 'rascunho' | 'publicado' | 'arquivado'
 export type StatusConversao = 'pendente' | 'processando' | 'ok' | 'revisao_necessaria' | 'erro'
 export type CategoriaConteudo = 'conteudo' | 'modelo_caderno'

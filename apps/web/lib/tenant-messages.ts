@@ -97,7 +97,7 @@ export async function getAllTenantMensagens(tenantId?: string): Promise<TenantMe
     const supabase = createAdminClient()
     const { data, error } = await supabase
       .from('simulado_tenant_mensagens')
-      .select('*')
+      .select('id, chave, titulo, corpo, canal, ativo')
       .eq('tenant_id', tid ?? '')
       .order('chave')
 

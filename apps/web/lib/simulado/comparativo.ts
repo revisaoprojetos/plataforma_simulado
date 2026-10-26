@@ -104,11 +104,21 @@ export async function montarComparativo(
   opts: { minhaNota: number | null; minhaSessaoId: string | null },
   tenantId: string | null,
 ): Promise<Comparativo> {
-  const turma = await remember(
-    chaveRelatorio(tenantId, 'comparativo-turma', simuladoId),
-    TTL_RELATORIO,
-    () => computarTurma(svc, simuladoId, tenantId),
-  )
+  // A parte da TURMA (cacheada/pesada) e as respostas da PRÓPRIA sessão (só dependem de
+  // `opts.minhaSessaoId`) são INDEPENDENTES → rodam em paralelo. O processamento do recorte do aluno
+  // (que usa turma.fora/turma.discDeQ) fica abaixo, após ambas resolverem.
+  const [turma, mr] = await Promise.all([
+    remember(
+      chaveRelatorio(tenantId, 'comparativo-turma', simuladoId),
+      TTL_RELATORIO,
+      () => computarTurma(svc, simuladoId, tenantId),
+    ),
+    (async (): Promise<any[]> => {
+      if (!opts.minhaSessaoId) return []
+      const { data } = await svc.from('simulado_respostas_objetivas').select('questao_id, correta').eq('sessao_id', opts.minhaSessaoId)
+      return (data ?? []) as any[]
+    })(),
+  ])
 
   const notas = turma.notas
   let minhaPosicao: number | null = null, percentil: number | null = null
@@ -120,10 +130,7 @@ export async function montarComparativo(
   const foraSet = new Set(turma.fora)
   const discDeQ = new Map(turma.discDeQ)
   const minhaDisc = new Map<string, { ac: number; tt: number }>()
-  if (opts.minhaSessaoId) {
-    const { data: mr } = await svc.from('simulado_respostas_objetivas').select('questao_id, correta').eq('sessao_id', opts.minhaSessaoId)
-    for (const r of (mr ?? []) as any[]) { if (foraSet.has(r.questao_id)) continue; const d = discDeQ.get(r.questao_id) ?? 'Sem disciplina'; const v = minhaDisc.get(d) ?? { ac: 0, tt: 0 }; v.tt++; if (r.correta) v.ac++; minhaDisc.set(d, v) }
-  }
+  for (const r of mr) { if (foraSet.has(r.questao_id)) continue; const d = discDeQ.get(r.questao_id) ?? 'Sem disciplina'; const v = minhaDisc.get(d) ?? { ac: 0, tt: 0 }; v.tt++; if (r.correta) v.ac++; minhaDisc.set(d, v) }
 
   const porDisciplina = turma.porDiscTurma.map(({ nome, turmaPct }) => {
     const minha = minhaDisc.get(nome)

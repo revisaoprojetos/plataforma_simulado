@@ -23,6 +23,7 @@ import { EstudantePerfilTabs } from '@/components/admin/estudante-perfil-tabs'
 import { DesafiosFeitosCards, type DesafioVisual } from '@/components/admin/desafios-feitos-cards'
 import { desafiosAlunoSql, assinaturasAlunoSql, desafiosPendentesAlunoSql, simuladosVinculadosAlunoSql, gruposVinculadosAlunoSql, pagamentosAlunoSql } from 'data'
 import { VinculosAluno } from '@/components/admin/vinculos-aluno'
+import { gruposVinculadosFallback, simuladosVinculadosFallback } from '@/lib/admin/vinculos-fallback'
 import { EstudanteAssinaturas } from '@/components/admin/estudante-assinaturas'
 import type { GrupoBanco } from '@/app/admin/banco-questoes/actions'
 import { modalidadesDoAlunoV2, temEntregaV2, type EntregaSlots, type ModalidadeAluno } from '@/lib/caderno-teste/entrega-aluno'
@@ -262,8 +263,14 @@ export default async function EstudantePerfilPage({ params, searchParams }: { pa
   const assAtivas = assinaturas.filter((a) => a.status === 'ativo').length
 
   // Vínculos (aba): simulados que o aluno acessa + grupos (com nº de alunos).
-  const simuladosVinc = (simVincRaw ?? []).map((s) => ({ id: s.id, titulo: s.titulo || 'Simulado', status: s.status || '' }))
-  const gruposVinc = (grpVincRaw ?? []).map((g) => ({ id: g.id, nome: g.nome || 'Grupo', cor: g.cor ?? null, membros: Number(g.membros) || 0 }))
+  // FALLBACK: o SQL agregado devolve `null` quando está OFF (DATABASE_URL ausente / REPORT_SQL=off) —
+  // sem isto a aba mostrava "0 grupos" mesmo com o aluno vinculado. Cai no PostgREST (mesmas regras).
+  const [simVinc2, grpVinc2] = await Promise.all([
+    simVincRaw ?? simuladosVinculadosFallback(svc, TID, id).catch(() => []),
+    grpVincRaw ?? gruposVinculadosFallback(svc, TID, id).catch(() => []),
+  ])
+  const simuladosVinc = (simVinc2 ?? []).map((s) => ({ id: s.id, titulo: s.titulo || 'Simulado', status: s.status || '' }))
+  const gruposVinc = (grpVinc2 ?? []).map((g) => ({ id: g.id, nome: g.nome || 'Grupo', cor: g.cor ?? null, membros: Number(g.membros) || 0 }))
 
   // Assinaturas + pagamentos (aba). Datas absurdas (início corrompido) viram null.
   const isoSane = (d: string | Date | null) => { if (!d) return null; const t = new Date(d as any); const y = t.getFullYear(); return y >= 2000 && y <= 2100 ? t.toISOString() : null }

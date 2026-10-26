@@ -10,6 +10,7 @@ import { registrarAudit } from '@/lib/audit'
 import { matricularEmSimuladosDoBanco } from '@/lib/simulado/matricular-banco'
 import { selecionarGrupos, contarMembrosGrupos } from '@/lib/simulado/grupos'
 import { pdfStoragePath } from '@/lib/caderno-designer/material'
+import { getStorage } from '@/lib/storage'
 
 async function guard() {
   if (!(await checkPermission('questoes:view'))) return { ok: false as const, error: 'Sem permissão.' }
@@ -425,21 +426,20 @@ export async function subirMaterialPdf(cadernoId: string, bancoId: string, dataU
   if (buf.subarray(0, 4).toString('latin1') !== '%PDF') return { ok: false, error: 'O arquivo não é um PDF válido.' }
 
   const svc = createAdminClient()
+  const st = getStorage()
   const { config, existe } = await lerConfigCaderno(svc, cadernoId, g.tenantId)
   if (!existe) return { ok: false, error: 'Caderno não encontrado.' }
 
   // Nome do arquivo com hash do conteúdo → cada versão é uma URL nova (evita cache velho).
   const hash = createHash('sha1').update(buf).digest('hex').slice(0, 10)
   const path = `materiais/${g.tenantId}/${cadernoId}-${hash}.pdf`
-  // Garante o bucket 'pdfs' (público) — em projetos novos ele pode não existir ("Bucket not found").
-  try { await svc.storage.createBucket('pdfs', { public: true }) } catch { /* já existe */ }
-  let { error: upErr } = await svc.storage.from('pdfs').upload(path, buf, { contentType: 'application/pdf', upsert: true })
-  if (upErr && /bucket.*not.*found/i.test(upErr.message)) {
-    await svc.storage.createBucket('pdfs', { public: true }).catch(() => {})
-    ;({ error: upErr } = await svc.storage.from('pdfs').upload(path, buf, { contentType: 'application/pdf', upsert: true }))
+  let url: string
+  try {
+    const r = await st.upload({ bucket: 'pdfs', path, data: buf, contentType: 'application/pdf', upsert: true, publico: true })
+    url = r.url ?? st.getPublicUrl('pdfs', path)
+  } catch (e: any) {
+    return { ok: false, error: e?.message ?? 'Falha ao enviar o PDF.' }
   }
-  if (upErr) return { ok: false, error: upErr.message }
-  const url = svc.storage.from('pdfs').getPublicUrl(path).data.publicUrl as string
 
   const nome = (nomeArquivo || 'Material completo').replace(/\.pdf$/i, '').trim() || 'Material completo'
   const urlAntiga = (config.material as any)?.pdfUrl as string | undefined
@@ -447,12 +447,12 @@ export async function subirMaterialPdf(cadernoId: string, bancoId: string, dataU
   const { error } = await svc.from('simulado_cadernos_designer').update({ config: { ...config, material } }).eq('id', cadernoId).eq('tenant_id', g.tenantId)
   if (error) {
     // Rollback: config não persistiu → remove o objeto recém-subido (evita órfão no storage).
-    try { await svc.storage.from('pdfs').remove([path]) } catch { /* ignora */ }
+    await st.remove('pdfs', path).catch(() => {})
     return { ok: false, error: error.message }
   }
   // Substituição: apaga o PDF anterior (hash/path diferente) para não acumular órfãos.
   const pathAntigo = pdfStoragePath(urlAntiga)
-  if (pathAntigo && pathAntigo !== path) { try { await svc.storage.from('pdfs').remove([pathAntigo]) } catch { /* ignora */ } }
+  if (pathAntigo && pathAntigo !== path) { await st.remove('pdfs', pathAntigo).catch(() => {}) }
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_cadernos_designer', entidadeId: cadernoId, depois: { material_pdf: nome } })
   revalidatePath(`/admin/banco-questoes/${bancoId}`)
   return { ok: true, url, nome }
@@ -463,12 +463,13 @@ export async function removerMaterialPdf(cadernoId: string, bancoId: string, slo
   const g = await guard()
   if (!g.ok) return g
   const svc = createAdminClient()
+  const st = getStorage()
   const { config, existe } = await lerConfigCaderno(svc, cadernoId, g.tenantId, tabela)
   if (!existe) return { ok: false, error: 'Caderno não encontrado.' }
   const configKey = slot === 'enunciado' ? 'material_enunciado' : 'material'
   // Apaga o arquivo do storage (evita órfão) antes de zerar a referência no config.
   const pathAntigo = pdfStoragePath((config[configKey] as any)?.pdfUrl as string | undefined)
-  if (pathAntigo) { try { await svc.storage.from('pdfs').remove([pathAntigo]) } catch { /* ignora */ } }
+  if (pathAntigo) { await st.remove('pdfs', pathAntigo).catch(() => {}) }
   const material = { fonte: 'sistema', pdfUrl: '', pdfNome: '' }
   const { error } = await svc.from(tabela).update({ config: { ...config, [configKey]: material } }).eq('id', cadernoId).eq('tenant_id', g.tenantId)
   if (error) return { ok: false, error: error.message }

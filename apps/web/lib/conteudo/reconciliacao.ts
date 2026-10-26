@@ -61,7 +61,13 @@ export async function reconciliarVersao(input: {
 
   // 1. trechos da nova versão (do HTML)
   const extraidos = extrairTrechosHtml(input.html)
-  if (extraidos.length === 0) return { ...vazio, erro: 'documento sem trechos extraíveis' }
+  if (extraidos.length === 0) {
+    // Fase 1 (mídia/office): documento SEM trechos textuais (vídeo/áudio, ou pptx/xlsx sem índice). Não
+    // é erro — guardamos o original e a versão fica 'ok' sem trechos/anotações. Antes isto abortava a
+    // ingestão; agora toleramos (o importador publica a versão normalmente).
+    await svc.from(T_VER).update({ status_conversao: 'ok' }).eq('tenant_id', tenantId).eq('id', input.versaoNovaId)
+    return { ...vazio }
+  }
 
   // 2. trechos da versão anterior (com uid), se houver
   let velhosDB: TrechoDB[] = []

@@ -2,28 +2,40 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { createPortal } from 'react-dom'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
-  FolderPlus, FilePlus, Upload, Folder, FileText, FileType2, FileCode2, Search, LayoutGrid, List as ListIcon,
+  FolderPlus, Upload, Folder, FileText, FileType2, FileCode2, LayoutGrid, List as ListIcon,
   ChevronRight, ChevronLeft, MoreVertical, Loader2, X, CircleCheck, CircleDashed, Archive,
   Download, Pencil, Info, Trash2, FolderInput, Layers, Link2, RotateCcw, Clock, ExternalLink, Users2,
+  Lock, Palette, Check, Settings2, Copy, Files, Search, Home, FolderTree,
 } from 'lucide-react'
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
+  DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent,
+} from '@/components/ui/dropdown-menu'
 import { ModuloAcesso } from '@/components/admin/modulo-acesso'
 import { DocumentoAcesso } from '@/components/admin/documento-acesso'
-import { PastaCardDrive, DrivePastaStyles } from '@/components/admin/pasta-card-drive'
+import { DrivePastaStyles } from '@/components/admin/pasta-card-drive'
+import { BibliotecaDocSidebar } from '@/components/admin/biblioteca-doc-sidebar'
 import { DriveAcessoDialog, DriveAcessoStyles, type DriveNode, type DrivePapel } from '@/components/admin/drive-acesso'
 import { DriveNovoButton, DriveNovoStyles, DriveUploadPanel, type DriveUploadItem } from '@/components/admin/drive-novo'
 import { MenuPortal, ItemMenu } from '@/components/conteudo/menu-drive'
+import { CardPasta } from '@/components/biblioteca/card-pasta'
+import { CardConteudo } from '@/components/biblioteca/card-conteudo'
+import { SeloTipo } from '@/components/biblioteca/selo-tipo'
+import { BuscaDrive, ResultadosBusca, type OpcaoChip, type SugestaoBusca, type ResultadoBusca } from '@/components/biblioteca/busca-drive'
+import { cardGrid, FOLDER_MIN, POSTER_MIN } from '@/components/aluno/card-grid'
+import { TIPOS_CONTEUDO, kindPorArquivo, type KindConteudo } from '@/lib/biblioteca/tipos-conteudo'
 import { confirmar, pedirTexto } from '@/components/ui/confirm-dialog'
 import { createClient } from '@/lib/supabase/client'
 import { formatBrt } from '@/lib/brt'
 import {
   listarArvore, criarPasta, removerPasta, renomearPasta, moverPasta, definirCorPasta, moverDocumento,
   importarDocumento, prepararUploadConteudo, importarDeStorage, criarDocumentoBranco, publicarDocumento, publicarNovaVersao, removerDocumento, detalheDocumento, abrirEdicaoDocx,
-  renomearDocumento, urlDownloadDocumento, listarPastasConteudo, dadosVisualizacao, thumbDocumento, pdfPreviewDocumento, conteudoPreviewAdmin,
+  renomearDocumento, urlDownloadDocumento, listarPastasConteudo, dadosVisualizacao, thumbDocumento, pdfPreviewDocumento, conteudoPreviewAdmin, duplicarDocumento,
   carregarArvoreAcesso, montarArvoreAcessoDrive, salvarAcessoNo, resolverEstudantePorEmail,
-  listarGruposBiblioteca, buscarAlunosBiblioteca,
+  listarGruposBiblioteca, buscarAlunosBiblioteca, gruposDoEstudante,
   type PastaConteudo, type Categoria, type NoAcesso,
 } from './actions'
 
@@ -34,20 +46,21 @@ type StatusFiltro = 'todos' | 'rascunho' | 'publicado' | 'arquivado'
 
 const ICONE_TIPO: Record<string, typeof FileText> = { docx: FileType2, pdf: FileText, html: FileCode2 }
 
+// Mapeia o tipo_origem armazenado (docx|pdf|html) para o KindConteudo dos selos/cards. html = documento.
+function docKind(tipoOrigem: string): KindConteudo {
+  return tipoOrigem === 'pdf' ? 'pdf' : 'docx'
+}
+// Paleta curta para o menu "Mudar cor" da pasta (mesmas cores do protótipo Drive).
+const CORES_PASTA = ['#444746', '#d06b64', '#f83a22', '#ff7537', '#ffad46', '#fad165', '#b3dc6c', '#16a765', '#42d692', '#9fc6e7', '#4986e7', '#9a9cff', '#b99aff', '#cd74e6', '#f691b2']
+
 /** Miniatura do card: tenta a IMAGEM FIEL do .docx (1ª página, render do OnlyOffice) — igual aos Modelos
  *  de Caderno. Se falhar (não-docx, OnlyOffice indisponível), cai na folha de trechos ou no ícone. */
 function CardThumb({ doc, thumbUrl, trechos }: { doc: Doc; thumbUrl?: string; trechos?: { tipo: string; texto: string }[] }) {
-  const [url, setUrl] = useState<string | null>(thumbUrl ?? null)
+  // CAPA = 1ª página (PNG cacheado), carregada LAZY pela rota (só cache; nunca gera OnlyOffice no render).
+  // Se faltar (404), o onError cai na folha de trechos (instantânea) — nunca renderiza o doc inteiro.
+  const [url, setUrl] = useState<string | null>(thumbUrl ?? (doc.tipo_origem === 'docx' && doc.versao_atual_id ? `/api/admin/biblioteca/capa/${doc.versao_atual_id}` : null))
   const [imgRuim, setImgRuim] = useState(false)
   const Icone = ICONE_TIPO[doc.tipo_origem] ?? FileText
-  // CAPA = só a 1ª página (PNG do OnlyOffice), cacheada. Se faltar, gera 1x em background (fica cacheada
-  // p/ sempre). Enquanto não há capa, mostra o CONTEÚDO (instantâneo) — nunca renderiza o doc inteiro.
-  useEffect(() => {
-    if (url || imgRuim || doc.tipo_origem !== 'docx') return
-    let vivo = true
-    thumbDocumento(doc.id).then((r) => { if (vivo && r.url) setUrl(r.url) }).catch(() => {})
-    return () => { vivo = false }
-  }, [doc.id, doc.tipo_origem, url, imgRuim])
   if (url && !imgRuim) return (
     <div className="absolute inset-0 bg-white">
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -92,6 +105,29 @@ function BadgeStatus({ s }: { s: string }) {
   return <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${v.cor}`}><v.Icone className="h-3 w-3" />{v.txt}</span>
 }
 
+/** Badge do TIPO do arquivo (canto da miniatura), estilo mockup: DOCX (marca), PDF (vermelho), HTML. */
+function BadgeTipo({ t }: { t: string }) {
+  const map: Record<string, { txt: string; cls: string }> = {
+    docx: { txt: 'DOCX', cls: 'bg-primary text-primary-foreground' },
+    pdf: { txt: 'PDF', cls: 'bg-rose-600 text-white' },
+    html: { txt: 'HTML', cls: 'bg-amber-600 text-white' },
+  }
+  const v = map[t] ?? { txt: (t || '—').toUpperCase(), cls: 'bg-muted text-foreground' }
+  return <span className={`rounded-md px-1.5 py-0.5 text-[10px] font-bold tracking-wider shadow-sm ${v.cls}`}>{v.txt}</span>
+}
+
+/** Rótulo de acesso do card: "Todos" (sem restrição) ou "Restrito" (acesso_geral = restrito). */
+function AccessLabel({ restrito }: { restrito?: boolean }) {
+  return (
+    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground" title={restrito ? 'Acesso restrito' : 'Liberado a todos'}>
+      <Users2 className="h-3 w-3" />{restrito ? 'Restrito' : 'Todos'}
+    </span>
+  )
+}
+
+type TipoFiltro = 'todos' | 'docx' | 'pdf'
+type Ordenar = 'atualizados' | 'nome' | 'criados'
+
 export function BibliotecaClient() {
   const searchParams = useSearchParams()
   const [categoria, setCategoria] = useState<Categoria>(searchParams.get('tab') === 'modelos' ? 'modelo_caderno' : 'conteudo')
@@ -102,10 +138,17 @@ export function BibliotecaClient() {
   const [previas, setPrevias] = useState<Record<string, { tipo: string; texto: string }[]>>({})
   const [thumbs, setThumbs] = useState<Record<string, string>>({})
   const [breadcrumb, setBreadcrumb] = useState<PastaConteudo[]>([])
+  const [contagens, setContagens] = useState<Record<string, number>>({})
+  const [restritasPasta, setRestritasPasta] = useState<Record<string, boolean>>({})
+  const [restritoDoc, setRestritoDoc] = useState<Record<string, boolean>>({})
+  const [resumo, setResumo] = useState<{ nGrupos: number; nAlunos: number }>({ nGrupos: 0, nAlunos: 0 })
   const [carregando, setCarregando] = useState(true)
   const [view, setView] = useState<'grid' | 'lista'>('grid')
   const [busca, setBusca] = useState('')
+  const [buscaAtiva, setBuscaAtiva] = useState<string | null>(null) // termo submetido (Enter) → tela de resultados
   const [filtro, setFiltro] = useState<StatusFiltro>('todos')
+  const [tipo, setTipo] = useState<TipoFiltro>('todos')
+  const [ordenar, setOrdenar] = useState<Ordenar>('atualizados')
   const [importAberto, setImportAberto] = useState(false)
   const [detalheId, setDetalheId] = useState<string | null>(null)
   const [acessoPasta, setAcessoPasta] = useState<PastaConteudo | null>(null) // pasta cujo acesso se gerencia
@@ -121,6 +164,7 @@ export function BibliotecaClient() {
       const r = await listarArvore(pastaId, cat)
       if (!r.ok) { toast.error(r.error || 'Falha ao carregar.'); return }
       setPastas(r.pastas); setDocs(r.documentos); setPrevias(r.previas || {}); setThumbs(r.thumbs || {}); setBreadcrumb(r.breadcrumb); setPastaAtual(pastaId)
+      setContagens(r.contagens || {}); setRestritasPasta(r.restritasPasta || {}); setRestritoDoc(r.restritoDoc || {}); setResumo(r.resumo || { nGrupos: 0, nAlunos: 0 })
       // Histórico: cada navegação de pasta vira uma entrada (URL inalterada, preservando o estado do Next)
       // → o "Voltar" do navegador sobe de pasta em vez de sair da Biblioteca. push=false quando a
       // própria navegação já veio de um popstate (voltar/avançar do navegador).
@@ -137,7 +181,7 @@ export function BibliotecaClient() {
   useEffect(() => {
     const cat: Categoria = searchParams.get('tab') === 'modelos' ? 'modelo_caderno' : 'conteudo'
     setCategoria((prev) => (prev === cat ? prev : cat))
-    setBusca(''); setFiltro('todos')
+    setBusca(''); setBuscaAtiva(null); setFiltro('todos')
   }, [searchParams])
 
   useEffect(() => {
@@ -160,10 +204,16 @@ export function BibliotecaClient() {
 
   const docsFiltrados = useMemo(() => {
     const q = busca.trim().toLowerCase()
-    return docs
+    const arr = docs
       .filter((d) => filtro === 'todos' || d.status === filtro)
+      .filter((d) => tipo === 'todos' || d.tipo_origem === tipo)
       .filter((d) => !q || d.titulo.toLowerCase().includes(q))
-  }, [docs, busca, filtro])
+    const ord = [...arr]
+    if (ordenar === 'nome') ord.sort((a, b) => a.titulo.localeCompare(b.titulo, 'pt-BR'))
+    else if (ordenar === 'criados') ord.sort((a, b) => String(b.criado_em).localeCompare(String(a.criado_em)))
+    else ord.sort((a, b) => String(b.atualizado_em).localeCompare(String(a.atualizado_em)))
+    return ord
+  }, [docs, busca, filtro, tipo, ordenar])
 
   async function novaPasta() {
     const nome = await pedirTexto({ titulo: 'Nova pasta', placeholder: 'Nome da pasta', confirmar: 'Criar' })
@@ -200,13 +250,19 @@ export function BibliotecaClient() {
       } catch { resolve(false) }
     })
   }
-  const corTipo = (nome: string) => /\.pdf$/i.test(nome) ? '#ea4335' : /\.html?$/i.test(nome) ? '#e8710a' : 'var(--brand-primary, var(--primary))'
+  // Cor do ícone no painel de progresso: selo do tipo detectado (token fixo por tipo), com fallback à marca.
+  const corTipo = (nome: string) => {
+    const k = kindPorArquivo(nome)
+    return k ? `var(--sel-${TIPOS_CONTEUDO[k].seloSlug})` : 'var(--brand-primary, var(--primary))'
+  }
 
   // Upload direto (sem pop-up) com painel de progresso (total + por arquivo). comoPasta=true recria a
   // árvore de subpastas pelo webkitRelativePath. Sobe DIRETO ao storage e ingere a partir de lá.
   async function importarArquivos(files: File[], comoPasta: boolean) {
-    const suportados = files.filter((f) => /\.(docx|pdf|html?)$/i.test(f.name))
-    if (!suportados.length) { toast.error('Nenhum arquivo suportado (.docx, .pdf, .html) encontrado.'); return }
+    // Aceita todas as extensões dos TIPOS_CONTEUDO (docx/pdf/html + pptx/xlsx/vídeo/áudio). A ingestão
+    // dos tipos novos está sendo habilitada no backend; aqui só não bloqueamos o upload por extensão.
+    const suportados = files.filter((f) => kindPorArquivo(f.name, f.type) !== null)
+    if (!suportados.length) { toast.error('Nenhum arquivo suportado encontrado.'); return }
     const itens: DriveUploadItem[] = suportados.map((f, i) => ({ id: `${Date.now()}-${i}-${f.name}`, nome: f.name, cor: corTipo(f.name), pct: 0, status: 'enviando' }))
     setUploads(itens)
     const patch = (i: number, p: Partial<DriveUploadItem>) => setUploads((prev) => (prev ? prev.map((x, k) => (k === i ? { ...x, ...p } : x)) : prev))
@@ -229,10 +285,10 @@ export function BibliotecaClient() {
       try {
         const destino = comoPasta ? await garantirPasta(String((f as any).webkitRelativePath || f.name).split('/').slice(0, -1)) : pastaAtual
         const prep = await prepararUploadConteudo(f.name)
-        if (!prep.ok || !prep.path) { patch(i, { status: 'erro', pct: 100 }); continue }
-        let subiu = false
-        if (prep.signedUrl) subiu = await subirComProgresso(prep.signedUrl, f, (frac) => patch(i, { pct: Math.min(99, Math.round(frac * 100)) }))
-        if (!subiu && prep.token && prep.bucket) { // fallback (sem progresso de bytes)
+        if (!prep.ok || !prep.path || !prep.uploadUrl) { patch(i, { status: 'erro', pct: 100 }); continue }
+        // PUT direto ao storage (Supabase signed URL ou S3 presigned PUT) — mesma mecânica XHR com progresso.
+        let subiu = await subirComProgresso(prep.uploadUrl, f, (frac) => patch(i, { pct: Math.min(99, Math.round(frac * 100)) }))
+        if (!subiu && prep.kind === 'supabase' && prep.token && prep.bucket) { // fallback Supabase (sem progresso de bytes)
           const up = await createClient().storage.from(prep.bucket).uploadToSignedUrl(prep.path, prep.token, f, { contentType: f.type || undefined })
           subiu = !up.error
         }
@@ -269,11 +325,14 @@ export function BibliotecaClient() {
   }
   // ── Ações do documento (menu de 3 pontos) ──
   async function editarDocOffice(d: Doc) {
+    const t = toast.loading('Abrindo o editor…')
     try {
       const r = await abrirEdicaoDocx(d.id)
+      toast.dismiss(t)
       if (!r.ok || !r.versaoId) return toast.error(r.error || 'Edição no editor disponível só para .docx.')
       window.location.href = `/admin/biblioteca/editar/${r.versaoId}?origem=${encodeURIComponent(window.location.pathname + window.location.search)}`
     } catch (e: any) {
+      toast.dismiss(t)
       toast.error('Falha ao abrir o editor: ' + (e?.message || 'erro desconhecido'))
     }
   }
@@ -297,37 +356,80 @@ export function BibliotecaClient() {
     const r = await removerDocumento(d.id); if (!r.ok) return toast.error(r.error || 'Falha.')
     toast.success('Documento arquivado.'); carregar(pastaAtual)
   }
+  async function duplicarDoc(d: Doc) {
+    const t = toast.loading('Criando cópia…')
+    const r = await duplicarDocumento(d.id)
+    toast.dismiss(t)
+    if (!r.ok) return toast.error(r.error || 'Falha ao copiar.')
+    toast.success('Cópia criada.'); carregar(pastaAtual)
+  }
+
+  // ── Dados derivados para a busca estilo Drive ──
+  const caminhoAtual = breadcrumb.map((b) => b.nome).join(' › ') || 'Início'
+  const tiposChip: OpcaoChip[] = [
+    { k: 'todos', label: 'Todos', ativo: tipo === 'todos' },
+    { k: 'docx', label: 'Documentos', ativo: tipo === 'docx' },
+    { k: 'pdf', label: 'PDF', ativo: tipo === 'pdf' },
+  ]
+  const statusChip: OpcaoChip[] = [
+    { k: 'todos', label: 'Qualquer status', ativo: filtro === 'todos' },
+    { k: 'publicado', label: 'Publicado', ativo: filtro === 'publicado' },
+    { k: 'rascunho', label: 'Rascunho', ativo: filtro === 'rascunho' },
+    { k: 'arquivado', label: 'Arquivado', ativo: filtro === 'arquivado' },
+  ]
+  const sugestoesBusca: SugestaoBusca[] = busca.trim()
+    ? docsFiltrados.slice(0, 5).map((d) => ({ id: d.id, kind: docKind(d.tipo_origem), titulo: d.titulo, caminho: caminhoAtual }))
+    : []
+  const resultadosBusca: ResultadoBusca[] = docsFiltrados.map((d) => ({
+    id: d.id, kind: docKind(d.tipo_origem), titulo: d.titulo, caminho: caminhoAtual, status: <BadgeStatus s={d.status} />,
+  }))
 
   return (
-    <div className="space-y-5">
+    <div className="w-full space-y-5">
       <DrivePastaStyles />
       <DriveAcessoStyles />
       <DriveNovoStyles />
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">{ehModelo ? 'Modelos de Caderno (OnlyOffice)' : 'Biblioteca de Conteúdos'}</h1>
-        <p className="text-sm text-muted-foreground">{ehModelo ? 'Modelos de caderno em .docx, editados 100% no OnlyOffice — organização em Drive (pastas).' : 'Documentos jurídicos versionados — os grifos e anotações sobrevivem às edições.'}</p>
-      </div>
 
-      {/* Barra: breadcrumb + ações */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <nav className="flex items-center gap-1 text-sm">
-          {/* Voltar = sobe para a pasta PAI (penúltimo item do breadcrumb; raiz se já estiver no 1º nível). */}
-          <button
-            onClick={() => carregar(breadcrumb.length >= 2 ? breadcrumb[breadcrumb.length - 2].id : null)}
-            disabled={pastaAtual === null}
-            title="Voltar para a pasta anterior"
-            className="mr-1 inline-flex items-center gap-1 rounded-md border px-2 py-1 text-muted-foreground transition hover:bg-muted disabled:cursor-not-allowed disabled:opacity-40"
-          ><ChevronLeft className="h-4 w-4" />Voltar</button>
-          <button onClick={() => carregar(null)} className={`rounded-md px-2 py-1 hover:bg-muted ${pastaAtual === null ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>Início</button>
-          {breadcrumb.map((b) => (
-            <span key={b.id} className="flex items-center gap-1">
-              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
-              <button onClick={() => carregar(b.id)} className={`rounded-md px-2 py-1 hover:bg-muted ${pastaAtual === b.id ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>{b.nome}</button>
-            </span>
-          ))}
-        </nav>
-        <div className="flex items-center gap-2">
-          <button onClick={abrirGerenciarAcessos} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-muted"><Users2 className="h-4 w-4" />Gerenciar acessos</button>
+      {/* Cabeçalho: voltar redondo (só dentro de pasta) + breadcrumb + título + resumo + ações */}
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-2">
+          {pastaAtual !== null && (
+            <button
+              onClick={() => carregar(breadcrumb.length >= 2 ? breadcrumb[breadcrumb.length - 2].id : null)}
+              title="Voltar para a pasta anterior" aria-label="Voltar"
+              className="mt-1 grid h-9 w-9 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:-translate-x-0.5 hover:bg-muted hover:text-foreground"
+            ><ChevronLeft className="h-5 w-5" /></button>
+          )}
+          <div className="min-w-0">
+            <nav className="mb-0.5 flex flex-wrap items-center gap-1 text-xs">
+              <button onClick={() => carregar(null)} className={`rounded px-1.5 py-0.5 hover:bg-muted ${pastaAtual === null ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>{ehModelo ? 'Modelos' : 'Biblioteca'}</button>
+              {breadcrumb.map((b) => (
+                <span key={b.id} className="flex items-center gap-1">
+                  <ChevronRight className="h-3 w-3 text-muted-foreground" />
+                  <button onClick={() => carregar(b.id)} className={`rounded px-1.5 py-0.5 hover:bg-muted ${pastaAtual === b.id ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>{b.nome}</button>
+                </span>
+              ))}
+            </nav>
+            <h1 className="truncate text-2xl font-bold tracking-tight text-primary">
+              {ehModelo
+                ? 'Modelos de Caderno (OnlyOffice)'
+                : pastaAtual && breadcrumb.length
+                  ? breadcrumb[breadcrumb.length - 1].nome
+                  : 'Biblioteca de Conteúdos'}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {ehModelo
+                ? 'Modelos de caderno em .docx, editados 100% no OnlyOffice — organização em Drive (pastas).'
+                : pastaAtual
+                  ? `${pastas.length} ${pastas.length === 1 ? 'pasta' : 'pastas'} · ${docs.length} ${docs.length === 1 ? 'material' : 'materiais'} · entrega a ${resumo.nGrupos} ${resumo.nGrupos === 1 ? 'grupo' : 'grupos'} e ${resumo.nAlunos} ${resumo.nAlunos === 1 ? 'aluno' : 'alunos'}`
+                  : `${pastas.length} ${pastas.length === 1 ? 'pasta' : 'pastas'} · documentos versionados — os grifos sobrevivem às edições`}
+            </p>
+          </div>
+        </div>
+        {/* Menu "Novo" ACIMA da busca (z-index do menu fica acima da barra) */}
+        <div className="flex shrink-0 items-center gap-2">
+          {/* Modelos de caderno não têm aluno (só admin): sem "Gerenciar acessos". */}
+          {!ehModelo && <button onClick={abrirGerenciarAcessos} className="inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium hover:bg-muted"><Users2 className="h-4 w-4" />Gerenciar acessos</button>}
           <DriveNovoButton
             rotuloBranco={ehModelo ? 'Modelo em branco' : 'Documento em branco'}
             onNovaPasta={async (nome, cor) => {
@@ -344,95 +446,138 @@ export function BibliotecaClient() {
         </div>
       </div>
 
-      {/* Busca + filtros + view */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative min-w-[220px] flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar documentos…" className="h-9 w-full rounded-lg border bg-background pl-9 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40" />
+      {/* Busca estilo Drive (Ctrl/⌘+K) */}
+      <BuscaDrive
+        valor={busca}
+        onValor={setBusca}
+        onSubmit={(t) => setBuscaAtiva(t)}
+        onLimpar={() => { setBusca(''); setBuscaAtiva(null) }}
+        tipos={tiposChip}
+        onTipo={(k) => setTipo(k as TipoFiltro)}
+        status={statusChip}
+        onStatus={(k) => setFiltro(k as StatusFiltro)}
+        sugestoes={sugestoesBusca}
+        onAbrirSugestao={(s) => setDetalheId(s.id)}
+        escopoLabel={ehModelo ? 'Modelos' : 'Toda a biblioteca'}
+        placeholder={ehModelo ? 'Buscar modelos pelo título…' : 'Buscar na biblioteca — títulos, pastas…'}
+      />
+
+      {/* Filtros por tipo (esq.) + ordenar/view (dir.) — ocultos na tela de resultados */}
+      {buscaAtiva === null && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            {([['todos', 'Todos'], ['docx', 'Documentos'], ['pdf', 'PDF']] as [TipoFiltro, string][]).map(([k, label]) => (
+              <button key={k} onClick={() => setTipo(k)} className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${tipo === k ? 'bg-primary text-primary-foreground shadow-sm' : 'bg-muted text-muted-foreground hover:text-foreground'}`}>{label}</button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <select value={filtro} onChange={(e) => setFiltro(e.target.value as StatusFiltro)} aria-label="Filtrar por status" className="h-9 rounded-lg border bg-background px-2.5 text-xs font-medium text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+              <option value="todos">Status: todos</option>
+              <option value="publicado">Publicado</option>
+              <option value="rascunho">Rascunho</option>
+              <option value="arquivado">Arquivado</option>
+            </select>
+            <select value={ordenar} onChange={(e) => setOrdenar(e.target.value as Ordenar)} aria-label="Ordenar" className="h-9 rounded-lg border bg-background px-2.5 text-xs font-medium text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+              <option value="atualizados">Ordenar: Atualizados</option>
+              <option value="criados">Ordenar: Criados</option>
+              <option value="nome">Ordenar: Nome</option>
+            </select>
+            <div className="flex items-center rounded-lg border p-0.5">
+              <button onClick={() => setView('grid')} aria-label="Grade" className={`rounded-md p-1.5 ${view === 'grid' ? 'bg-muted text-foreground' : 'text-muted-foreground'}`}><LayoutGrid className="h-4 w-4" /></button>
+              <button onClick={() => setView('lista')} aria-label="Lista" className={`rounded-md p-1.5 ${view === 'lista' ? 'bg-muted text-foreground' : 'text-muted-foreground'}`}><ListIcon className="h-4 w-4" /></button>
+            </div>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          {(['todos', 'publicado', 'rascunho', 'arquivado'] as StatusFiltro[]).map((f) => (
-            <button key={f} onClick={() => setFiltro(f)} className={`rounded-full px-3 py-1 text-xs font-medium capitalize ${filtro === f ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground'}`}>{f}</button>
-          ))}
-        </div>
-        <div className="flex items-center rounded-lg border p-0.5">
-          <button onClick={() => setView('grid')} aria-label="Grade" className={`rounded-md p-1.5 ${view === 'grid' ? 'bg-muted text-foreground' : 'text-muted-foreground'}`}><LayoutGrid className="h-4 w-4" /></button>
-          <button onClick={() => setView('lista')} aria-label="Lista" className={`rounded-md p-1.5 ${view === 'lista' ? 'bg-muted text-foreground' : 'text-muted-foreground'}`}><ListIcon className="h-4 w-4" /></button>
-        </div>
-      </div>
+      )}
 
       {carregando ? (
         <div className="flex items-center justify-center gap-2 py-20 text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" />Carregando…</div>
+      ) : buscaAtiva !== null ? (
+        <ResultadosBusca
+          termo={buscaAtiva}
+          resultados={resultadosBusca}
+          onAbrir={(r) => setDetalheId(r.id)}
+          onLimpar={() => { setBusca(''); setBuscaAtiva(null) }}
+          voltarLabel={pastaAtual ? (breadcrumb[breadcrumb.length - 1]?.nome ?? undefined) : undefined}
+        />
       ) : (
         <div className="space-y-5">
           {/* Pastas */}
           {pastas.length > 0 && (
-            <div>
-              <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pastas</div>
-              <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+            <section>
+              <div className="mb-3 flex items-center justify-between">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <span className="inline-flex items-center gap-1.5"><Folder className="h-4 w-4" />Pastas</span>
+                  <span className="rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-400">{pastas.length}</span>
+                </div>
+                <button onClick={novaPasta} className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"><FolderPlus className="h-3.5 w-3.5" />Nova pasta</button>
+              </div>
+              <div style={cardGrid(FOLDER_MIN, 12)}>
                 {pastas.map((p) => (
-                  <PastaCardDrive
+                  <CardPasta
                     key={p.id}
-                    id={p.id}
                     nome={p.nome}
                     cor={p.cor ?? null}
-                    categoria={categoria}
-                    onAbrir={() => carregar(p.id)}
-                    onAcesso={() => setAcessoDrive({ id: p.id, nome: p.nome })}
-                    onRenomear={(novo) => renomearPastaInline(p, novo)}
-                    onMudarCor={(c) => mudarCorPasta(p, c)}
-                    onMover={(dest) => moverPastaFn(p, dest)}
-                    onExcluir={() => excluirPasta(p)}
-                    carregarPastas={() => listarPastasConteudo(categoria)}
-                    onCopiarLink={() => { navigator.clipboard?.writeText(window.location.href).catch(() => {}); toast.success(`Link de "${p.nome}" copiado.`) }}
-                    onToast={(m) => toast.message(m)}
+                    contagem={contagens[p.id] != null ? `${contagens[p.id]} ${contagens[p.id] === 1 ? 'item' : 'itens'}` : undefined}
+                    pilulas={restritasPasta[p.id] ? <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-400"><Lock className="h-3 w-3" />Restrito</span> : undefined}
+                    onClick={() => carregar(p.id)}
+                    acoes={
+                      <MenuPasta
+                        p={p}
+                        categoria={categoria}
+                        onAbrir={() => carregar(p.id)}
+                        onAcesso={() => setAcessoDrive({ id: p.id, nome: p.nome })}
+                        onRenomear={() => renomear(p)}
+                        onMudarCor={(c) => mudarCorPasta(p, c)}
+                        onMover={(dest) => moverPastaFn(p, dest)}
+                        onCopiarLink={() => { navigator.clipboard?.writeText(window.location.href).catch(() => {}); toast.success(`Link de "${p.nome}" copiado.`) }}
+                        onExcluir={() => excluirPasta(p)}
+                      />
+                    }
                   />
                 ))}
               </div>
-            </div>
+            </section>
           )}
 
+          {/* Divisória Pastas / Documentos (também dentro de pastas) */}
+          {pastas.length > 0 && docsFiltrados.length > 0 && <div className="border-t" />}
+
           {/* Documentos */}
-          <div>
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{ehModelo ? 'Modelos' : 'Documentos'}</div>
+          <section>
+            <div className="mb-3 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5"><FileText className="h-4 w-4" />{ehModelo ? 'Modelos' : 'Documentos'}</span>
+              <span className="rounded-full bg-primary/12 px-1.5 py-0.5 text-[10px] font-bold text-primary">{docsFiltrados.length}</span>
+            </div>
             {docsFiltrados.length === 0 ? (
               <div className="rounded-2xl border border-dashed bg-muted/30 px-6 py-14 text-center text-sm text-muted-foreground">
-                {ehModelo ? 'Nenhum modelo aqui. Crie um a partir de um .docx — você edita no OnlyOffice.' : 'Nenhum documento aqui. Clique em Importar documento para começar.'}
+                {ehModelo ? 'Nenhum modelo aqui. Crie um a partir de um .docx — você edita no OnlyOffice.' : 'Nenhum documento aqui. Use o botão “Novo” para enviar um arquivo.'}
               </div>
             ) : view === 'grid' ? (
-              <div className="grid gap-3 grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-                {docsFiltrados.map((d) => {
-                  const Icone = ICONE_TIPO[d.tipo_origem] ?? FileText
-                  return (
-                    <div key={d.id} className="group relative overflow-hidden rounded-2xl border bg-card shadow-sm transition hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-md">
-                      <button onClick={() => setDetalheId(d.id)} className="block w-full text-left">
-                        {/* Miniatura: folha A4 inteira, borda-a-borda — igual aos Modelos de Caderno. */}
-                        <div className="relative aspect-[3/4] overflow-hidden border-b bg-neutral-100 dark:bg-neutral-800">
-                          <CardThumb doc={d} thumbUrl={thumbs[d.id]} trechos={previas[d.id]} />
-                          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/[0.04] to-transparent" />
-                          <div className="absolute left-2 top-2"><BadgeStatus s={d.status} /></div>
-                        </div>
-                        {/* Rodapé: ícone + título + tipo */}
-                        <div className="flex items-center gap-2.5 p-3">
-                          <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><Icone className="h-4 w-4" /></span>
-                          <div className="min-w-0 flex-1">
-                            <div className="truncate text-sm font-semibold leading-tight" title={d.titulo}>{d.titulo}</div>
-                            <div className="mt-0.5 text-[11px] uppercase tracking-wide text-muted-foreground">{d.tipo_origem}</div>
-                          </div>
-                        </div>
-                      </button>
-                      <div className="absolute right-2 top-2">
-                        <MenuDoc d={d} categoria={categoria} onAbrir={() => setDetalheId(d.id)} onAcesso={() => setAcessoDoc(d)} onEditarOffice={() => editarDocOffice(d)} onBaixar={() => baixarDoc(d)} onRenomear={() => renomearDoc(d)} onMover={(p) => moverDoc(d, p)} onArquivar={() => arquivarDoc(d)} />
-                      </div>
-                    </div>
-                  )
-                })}
+              <div style={cardGrid(POSTER_MIN, 12)}>
+                {docsFiltrados.map((d) => (
+                  <DocCard
+                    key={d.id}
+                    d={d}
+                    categoria={categoria}
+                    thumbInicial={thumbs[d.id]}
+                    restrito={restritoDoc[d.id]}
+                    onAbrir={() => setDetalheId(d.id)}
+                    onAcesso={() => setAcessoDoc(d)}
+                    onEditarOffice={() => editarDocOffice(d)}
+                    onBaixar={() => baixarDoc(d)}
+                    onRenomear={() => renomearDoc(d)}
+                    onMover={(p) => moverDoc(d, p)}
+                    onArquivar={() => arquivarDoc(d)}
+                    onDuplicar={() => duplicarDoc(d)}
+                  />
+                ))}
               </div>
             ) : (
               <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
                 <table className="w-full text-sm">
                   <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                    <tr><th className="px-4 py-2.5 font-semibold">Documento</th><th className="px-4 py-2.5 text-center font-semibold">Tipo</th><th className="px-4 py-2.5 text-center font-semibold">Status</th><th className="w-10" /></tr>
+                    <tr><th className="px-4 py-2.5 font-semibold">Documento</th><th className="px-4 py-2.5 text-center font-semibold">Tipo</th>{!ehModelo && <th className="px-4 py-2.5 text-center font-semibold">Status</th>}<th className="w-10" /></tr>
                   </thead>
                   <tbody>
                     {docsFiltrados.map((d) => {
@@ -440,10 +585,10 @@ export function BibliotecaClient() {
                       return (
                         <tr key={d.id} onClick={() => setDetalheId(d.id)} className="group cursor-pointer border-b last:border-0 hover:bg-muted/40">
                           <td className="px-4 py-2.5"><span className="flex items-center gap-2"><Icone className="h-4 w-4 text-muted-foreground" /><span className="truncate font-medium" title={d.titulo}>{d.titulo}</span></span></td>
-                          <td className="px-4 py-2.5 text-center text-xs uppercase text-muted-foreground">{d.tipo_origem}</td>
-                          <td className="px-4 py-2.5 text-center"><BadgeStatus s={d.status} /></td>
+                          <td className="px-4 py-2.5 text-center"><SeloTipo kind={docKind(d.tipo_origem)} tamanho="sm" /></td>
+                          {!ehModelo && <td className="px-4 py-2.5 text-center"><BadgeStatus s={d.status} /></td>}
                           <td className="px-2 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
-                            <MenuDoc d={d} categoria={categoria} onAbrir={() => setDetalheId(d.id)} onAcesso={() => setAcessoDoc(d)} onEditarOffice={() => editarDocOffice(d)} onBaixar={() => baixarDoc(d)} onRenomear={() => renomearDoc(d)} onMover={(p) => moverDoc(d, p)} onArquivar={() => arquivarDoc(d)} />
+                            <MenuDoc d={d} categoria={categoria} onAbrir={() => setDetalheId(d.id)} onAcesso={() => setAcessoDoc(d)} onEditarOffice={() => editarDocOffice(d)} onBaixar={() => baixarDoc(d)} onRenomear={() => renomearDoc(d)} onMover={(p) => moverDoc(d, p)} onArquivar={() => arquivarDoc(d)} onDuplicar={() => duplicarDoc(d)} />
                           </td>
                         </tr>
                       )
@@ -452,14 +597,25 @@ export function BibliotecaClient() {
                 </table>
               </div>
             )}
-          </div>
+          </section>
         </div>
       )}
 
       {acessoDrive && <DriveAcessoWrapper pastaId={acessoDrive.id} categoria={categoria} onFechar={() => setAcessoDrive(null)} />}
       {uploads && uploads.length > 0 && <DriveUploadPanel itens={uploads} onClose={() => setUploads(null)} />}
       {importAberto && <ImportDialog pastaId={pastaAtual} categoria={categoria} onFechar={() => setImportAberto(false)} onPronto={() => { setImportAberto(false); carregar(pastaAtual) }} />}
-      {detalheId && <DetalheDialog documentoId={detalheId} capaInicial={thumbs[detalheId]} onFechar={() => setDetalheId(null)} onMudou={() => carregar(pastaAtual)} />}
+      {detalheId && (
+        <BibliotecaDocSidebar
+          documentoId={detalheId}
+          pastaLabel={breadcrumb.map((b) => b.nome).join(' · ') || 'Início'}
+          onFechar={() => setDetalheId(null)}
+          onMudou={() => carregar(pastaAtual)}
+          onGerenciarAcesso={() => { const dd = docs.find((x) => x.id === detalheId); if (dd) setAcessoDoc(dd) }}
+          onEditarOffice={() => { const dd = docs.find((x) => x.id === detalheId); if (dd) editarDocOffice(dd) }}
+          onBaixar={() => { const dd = docs.find((x) => x.id === detalheId); if (dd) baixarDoc(dd) }}
+          semAcesso={ehModelo}
+        />
+      )}
       {acessoPasta && (
         <Overlay onFechar={() => setAcessoPasta(null)} largura="max-w-3xl">
           <div className="mb-4 flex items-center justify-between">
@@ -494,13 +650,15 @@ export function BibliotecaClient() {
 
 /** Dropdown em PORTAL (document.body, posição fixed ancorada no botão) — fica ACIMA de qualquer card/seção,
  *  sem ser preso por contexto de empilhamento/overflow de ancestrais (o bug do clique cair no card de baixo). */
-function MenuPasta({ p, categoria, onAcesso, onRenomear, onMover, onExcluir }: { p: PastaConteudo; categoria: Categoria; onAcesso: () => void; onRenomear: () => void; onMover: (destinoId: string | null) => void; onExcluir: () => void }) {
-  const [aberto, setAberto] = useState(false)
-  const [tela, setTela] = useState<'raiz' | 'mover'>('raiz')
+function MenuPasta({ p, categoria, onAbrir, onAcesso, onRenomear, onMudarCor, onMover, onCopiarLink, onExcluir }: {
+  p: PastaConteudo; categoria: Categoria
+  onAbrir: () => void; onAcesso: () => void; onRenomear: () => void; onMudarCor: (cor: string | null) => void
+  onMover: (destinoId: string | null) => void; onCopiarLink: () => void; onExcluir: () => void
+}) {
+  const [open, setOpen] = useState(false)
   const [pastas, setPastas] = useState<{ id: string; nome: string; pai_id: string | null }[] | null>(null)
-  const btnRef = useRef<HTMLButtonElement>(null)
-  const fecha = (fn: () => void) => () => { setAberto(false); setTela('raiz'); fn() }
-  async function abrirMover() { setTela('mover'); if (!pastas) setPastas(await listarPastasConteudo(categoria)) }
+  async function carregarPastas() { if (!pastas) setPastas(await listarPastasConteudo(categoria)) }
+  const pick = (fn: () => void) => () => { setOpen(false); fn() }
   // Não pode mover a pasta para DENTRO de si mesma nem de um descendente (evita ciclo).
   const bloqueadas = useMemo(() => {
     const set = new Set<string>([p.id])
@@ -510,90 +668,220 @@ function MenuPasta({ p, categoria, onAcesso, onRenomear, onMover, onExcluir }: {
     while (stack.length) { const cur = stack.pop()!; for (const f of filhos.get(cur) ?? []) if (!set.has(f)) { set.add(f); stack.push(f) } }
     return set
   }, [pastas, p.id])
-  const prof = (id: string | null, ps: typeof pastas): number => { let n = 0, cur = id; const byId = new Map((ps ?? []).map((x) => [x.id, x])); while (cur && byId.get(cur)) { n++; cur = byId.get(cur)!.pai_id } return n }
+  const [moverAberto, setMoverAberto] = useState(false)
+  // Mesmo design do menu dos simulados (DropdownMenu base-ui), abrindo para a DIREITA. "Mover para…"
+  // abre o POP-UP MoverConteudoDialog (navegação de pastas) — a própria pasta e descendentes ficam de fora.
   return (
     <>
-      <button ref={btnRef} onClick={(e) => { e.stopPropagation(); setAberto((v) => !v); setTela('raiz') }} aria-label="Ações da pasta" className={`cursor-pointer rounded-md p-1 text-muted-foreground transition hover:bg-muted ${aberto ? 'opacity-100 bg-muted' : 'opacity-0 group-hover:opacity-100'}`}><MoreVertical className="h-4 w-4" /></button>
-      {aberto && (
-        <MenuPortal anchor={btnRef.current} onClose={() => { setAberto(false); setTela('raiz') }}>
-          {tela === 'raiz' ? (
-            <>
-              <ItemMenu onClick={fecha(onAcesso)} icon={Users2}>Acesso dos alunos</ItemMenu>
-              <ItemMenu onClick={fecha(onRenomear)} icon={Pencil}>Renomear</ItemMenu>
-              <ItemMenu onClick={abrirMover} icon={FolderInput} submenu>Mover para…</ItemMenu>
-              <div className="mx-2 my-1.5 h-px bg-border" />
-              <ItemMenu onClick={fecha(onExcluir)} icon={Trash2} destrutivo>Excluir</ItemMenu>
-            </>
-          ) : (
-            <>
-              <button onClick={() => setTela('raiz')} className="flex w-full items-center gap-2 px-4 py-2 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-accent"><ChevronLeft className="h-4 w-4" />Mover para…</button>
-              <div className="mx-2 my-1.5 h-px bg-border" />
-              <div className="max-h-72 overflow-auto">
-                <ItemMenu onClick={fecha(() => onMover(null))} icon={Folder}>Raiz (Início)</ItemMenu>
-                {(pastas ?? []).filter((x) => !bloqueadas.has(x.id)).map((x) => (
-                  <button key={x.id} onClick={fecha(() => onMover(x.id))} style={{ paddingLeft: 16 + prof(x.pai_id, pastas) * 14 }} className="flex w-full items-center gap-3 py-2.5 pr-4 text-left text-[13.5px] transition-colors hover:bg-accent"><Folder className="h-[18px] w-[18px] shrink-0 text-muted-foreground" /><span className="min-w-0 truncate">{x.nome}</span></button>
+      <DropdownMenu open={open} onOpenChange={setOpen}>
+        <DropdownMenuTrigger
+          aria-label="Ações da pasta"
+          title="Mais ações"
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground data-popup-open:bg-accent data-popup-open:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <MoreVertical className="h-4 w-4" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-56">
+          <DropdownMenuItem onClick={onAbrir}><FolderInput className="mr-2 h-4 w-4" /> Abrir</DropdownMenuItem>
+          {categoria !== 'modelo_caderno' && <DropdownMenuItem onClick={onAcesso}><Users2 className="mr-2 h-4 w-4" /> Acesso dos alunos</DropdownMenuItem>}
+          <DropdownMenuItem onClick={onRenomear}><Pencil className="mr-2 h-4 w-4" /> Renomear</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={onCopiarLink}><Link2 className="mr-2 h-4 w-4" /> Copiar link</DropdownMenuItem>
+          <DropdownMenuSub>
+            <DropdownMenuSubTrigger><Palette className="mr-2 h-4 w-4" /> Mudar cor</DropdownMenuSubTrigger>
+            <DropdownMenuSubContent className="w-auto">
+              <div className="grid grid-cols-5 gap-2 p-2">
+                <button onClick={pick(() => onMudarCor(null))} title="Cor padrão" className="grid h-8 w-8 place-items-center rounded-full border bg-muted text-muted-foreground transition hover:ring-2 hover:ring-primary/40">{!p.cor && <Check className="h-4 w-4" />}</button>
+                {CORES_PASTA.map((c) => (
+                  <button key={c} onClick={pick(() => onMudarCor(c))} title={c} style={{ background: c }} className="grid h-8 w-8 place-items-center rounded-full transition hover:scale-110 hover:ring-2 hover:ring-primary/50">{p.cor === c && <Check className="h-4 w-4 text-white" />}</button>
                 ))}
-                {pastas && pastas.filter((x) => !bloqueadas.has(x.id)).length === 0 && <p className="px-4 py-2 text-xs text-muted-foreground">Sem outra pasta de destino.</p>}
               </div>
-            </>
-          )}
-        </MenuPortal>
+            </DropdownMenuSubContent>
+          </DropdownMenuSub>
+          <DropdownMenuItem onClick={() => { setOpen(false); carregarPastas(); setMoverAberto(true) }}><FolderInput className="mr-2 h-4 w-4" /> Mover para…</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={onExcluir} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {moverAberto && (
+        <MoverConteudoDialog
+          titulo={`Mover “${p.nome}”`}
+          subtitulo="Escolha a pasta de destino — entre nas pastas ou clique para selecionar"
+          pastas={pastas}
+          atualId={null}
+          bloquear={bloqueadas}
+          onConfirm={async (sel) => { setMoverAberto(false); await onMover(sel) }}
+          onClose={() => setMoverAberto(false)}
+        />
       )}
     </>
   )
 }
 
-/** Menu de 3 pontos do documento (estilo Drive): abrir/editar/baixar/renomear/mover/arquivar. */
-function MenuDoc({ d, categoria, onAbrir, onAcesso, onEditarOffice, onBaixar, onRenomear, onMover, onArquivar }: {
-  d: Doc; categoria: Categoria
-  onAbrir: () => void; onAcesso: () => void; onEditarOffice: () => void; onBaixar: () => void; onRenomear: () => void; onMover: (pastaId: string | null) => void; onArquivar: () => void
+/** Card de documento (grid) — CardConteudo + selo por tipo + capa lazy (thumb docx) + menu "…". */
+function DocCard({ d, categoria, thumbInicial, restrito, onAbrir, onAcesso, onEditarOffice, onBaixar, onRenomear, onMover, onArquivar, onDuplicar }: {
+  d: Doc; categoria: Categoria; thumbInicial?: string; restrito?: boolean
+  onAbrir: () => void; onAcesso: () => void; onEditarOffice: () => void; onBaixar: () => void
+  onRenomear: () => void; onMover: (pastaId: string | null) => void; onArquivar: () => void; onDuplicar: () => void
 }) {
-  const [aberto, setAberto] = useState(false)
-  const [tela, setTela] = useState<'raiz' | 'mover'>('raiz')
-  const [pastas, setPastas] = useState<{ id: string; nome: string; pai_id: string | null }[] | null>(null)
-  const btnRef = useRef<HTMLButtonElement>(null)
-  const fecha = (fn: () => void) => () => { setAberto(false); setTela('raiz'); fn() }
-  async function abrirMover() { setTela('mover'); if (!pastas) setPastas(await listarPastasConteudo(categoria)) }
-  // profundidade p/ indentar a árvore de pastas
-  const prof = (id: string | null, ps: typeof pastas): number => { let n = 0, cur = id; const byId = new Map((ps ?? []).map((p) => [p.id, p])); while (cur && byId.get(cur)) { n++; cur = byId.get(cur)!.pai_id } return n }
+  const kind = docKind(d.tipo_origem)
+  // Capa fiel (1ª página docx) carregada LAZY pela rota (só cache; NUNCA gera OnlyOffice no render → acaba
+  // com o "thundering herd" de conversões ao abrir a pasta). Uncached → 404 → placeholder do tipo.
+  const capaUrl = thumbInicial ?? (d.tipo_origem === 'docx' && d.versao_atual_id ? `/api/admin/biblioteca/capa/${d.versao_atual_id}` : undefined)
+  return (
+    <CardConteudo
+      kind={kind}
+      titulo={d.titulo}
+      capaUrl={capaUrl}
+      onClick={onAbrir}
+      pilulas={categoria === 'modelo_caderno' ? undefined : <><BadgeStatus s={d.status} /><AccessLabel restrito={restrito} /></>}
+      acoes={<MenuDoc d={d} categoria={categoria} onAbrir={onAbrir} onAcesso={onAcesso} onEditarOffice={onEditarOffice} onBaixar={onBaixar} onRenomear={onRenomear} onMover={onMover} onArquivar={onArquivar} onDuplicar={onDuplicar} />}
+    />
+  )
+}
 
+/** Menu de 3 pontos do documento (estilo Drive): abrir/editar/baixar/renomear/mover/arquivar. */
+function MenuDoc({ d, categoria, onAbrir, onAcesso, onEditarOffice, onBaixar, onRenomear, onMover, onArquivar, onDuplicar }: {
+  d: Doc; categoria: Categoria
+  onAbrir: () => void; onAcesso: () => void; onEditarOffice: () => void; onBaixar: () => void; onRenomear: () => void; onMover: (pastaId: string | null) => void; onArquivar: () => void; onDuplicar: () => void
+}) {
+  const router = useRouter()
+  const [pastas, setPastas] = useState<{ id: string; nome: string; pai_id: string | null }[] | null>(null)
+  const [moverAberto, setMoverAberto] = useState(false)
+  async function carregarPastas() { if (!pastas) setPastas(await listarPastasConteudo(categoria)) }
+  function copiarLink() {
+    const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/biblioteca/${d.id}`
+    navigator.clipboard?.writeText(url).then(() => toast.success('Link copiado.')).catch(() => toast.error('Não foi possível copiar.'))
+  }
+  // Mesmo design do menu dos simulados (DropdownMenu base-ui), abrindo para a DIREITA. "Mover para…"
+  // abre o POP-UP MoverConteudoDialog (navegação de pastas), não um submenu lateral.
   return (
     <>
-      <button ref={btnRef} onClick={(e) => { e.stopPropagation(); setAberto((v) => !v); setTela('raiz') }} aria-label="Ações do documento" className={`cursor-pointer rounded-md p-1 backdrop-blur-sm transition hover:bg-muted focus-visible:opacity-100 ${aberto ? 'bg-muted text-foreground opacity-100' : 'bg-card/70 text-muted-foreground opacity-0 group-hover:opacity-100'}`}><MoreVertical className="h-4 w-4" /></button>
-      {aberto && (
-        <MenuPortal anchor={btnRef.current} onClose={() => { setAberto(false); setTela('raiz') }}>
-          {tela === 'raiz' ? (
-            <>
-              <ItemMenu icon={Info} onClick={fecha(onAbrir)}>Informações / versões</ItemMenu>
-              <ItemMenu icon={Users2} onClick={fecha(onAcesso)}>Acesso dos alunos</ItemMenu>
-              {d.tipo_origem === 'docx' && <ItemMenu icon={Pencil} onClick={fecha(onEditarOffice)}>Editar no OnlyOffice</ItemMenu>}
-              <ItemMenu icon={Download} onClick={fecha(onBaixar)}>Baixar</ItemMenu>
-              <ItemMenu icon={FileText} onClick={fecha(onRenomear)}>Renomear</ItemMenu>
-              <ItemMenu icon={FolderInput} onClick={abrirMover} submenu>Mover para…</ItemMenu>
-              <div className="mx-2 my-1.5 h-px bg-border" />
-              <ItemMenu icon={Trash2} onClick={fecha(onArquivar)} destrutivo>Arquivar</ItemMenu>
-            </>
-          ) : (
-            <>
-              <button onClick={() => setTela('raiz')} className="flex w-full items-center gap-2 px-4 py-2 text-[13px] font-medium text-muted-foreground transition-colors hover:bg-accent"><ChevronLeft className="h-4 w-4" />Mover para…</button>
-              <div className="mx-2 my-1.5 h-px bg-border" />
-              <div className="max-h-56 overflow-y-auto">
-                <ItemMenu icon={Folder} onClick={fecha(() => onMover(null))}>Raiz</ItemMenu>
-                {pastas === null ? (
-                  <div className="flex items-center gap-2 px-4 py-2 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />Carregando…</div>
-                ) : pastas.length === 0 ? (
-                  <div className="px-4 py-2 text-xs text-muted-foreground">Sem pastas.</div>
-                ) : pastas.map((p) => (
-                  <button key={p.id} onClick={fecha(() => onMover(p.id))} className="flex w-full cursor-pointer items-center gap-3 py-2.5 pr-4 text-left text-[13.5px] transition-colors hover:bg-accent" style={{ paddingLeft: 16 + prof(p.pai_id, pastas) * 14 }}>
-                    <Folder className="h-[18px] w-[18px] shrink-0 text-muted-foreground" /><span className="min-w-0 truncate">{p.nome}</span>
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-        </MenuPortal>
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          aria-label="Ações do documento"
+          title="Mais ações"
+          className="flex h-7 w-7 items-center justify-center rounded-lg text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-accent-foreground data-popup-open:bg-accent data-popup-open:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <MoreVertical className="h-4 w-4" />
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start" className="w-56">
+          <DropdownMenuItem onClick={() => router.push(`/admin/biblioteca/conteudo/${d.id}/gerenciar`)}><Settings2 className="mr-2 h-4 w-4" /> Gerenciar</DropdownMenuItem>
+          <DropdownMenuItem onClick={onAbrir}><Info className="mr-2 h-4 w-4" /> Detalhes / versões</DropdownMenuItem>
+          {categoria !== 'modelo_caderno' && <DropdownMenuItem onClick={onAcesso}><Users2 className="mr-2 h-4 w-4" /> Acesso dos alunos</DropdownMenuItem>}
+          {d.tipo_origem === 'docx' && <DropdownMenuItem onClick={onEditarOffice}><Pencil className="mr-2 h-4 w-4" /> Editar no OnlyOffice</DropdownMenuItem>}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={copiarLink}><Link2 className="mr-2 h-4 w-4" /> Copiar link</DropdownMenuItem>
+          <DropdownMenuItem onClick={onDuplicar}><Files className="mr-2 h-4 w-4" /> Criar uma cópia</DropdownMenuItem>
+          <DropdownMenuItem onClick={onBaixar}><Download className="mr-2 h-4 w-4" /> Baixar</DropdownMenuItem>
+          <DropdownMenuItem onClick={onRenomear}><Pencil className="mr-2 h-4 w-4" /> Renomear</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => { carregarPastas(); setMoverAberto(true) }}><FolderInput className="mr-2 h-4 w-4" /> Mover para…</DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={onArquivar} className="text-destructive focus:text-destructive"><Archive className="mr-2 h-4 w-4" /> Arquivar</DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {moverAberto && (
+        <MoverConteudoDialog
+          titulo={`Mover “${d.titulo}”`}
+          subtitulo="Escolha a pasta de destino — entre nas pastas ou clique para selecionar"
+          pastas={pastas}
+          atualId={null}
+          onConfirm={async (sel) => { setMoverAberto(false); await onMover(sel) }}
+          onClose={() => setMoverAberto(false)}
+        />
       )}
     </>
+  )
+}
+
+/** Pop-up de "Mover para…" (padrão do board dos simulados): busca, breadcrumb para ENTRAR nas subpastas,
+ *  seções "Com subpastas"/"Pastas", seleção por clique e confirmação. `bloquear` = ids a esconder (a
+ *  própria pasta + descendentes, p/ evitar ciclo). `onConfirm(sel)` recebe o id do destino (null = raiz). */
+function MoverConteudoDialog({ titulo, subtitulo, pastas, atualId, bloquear, onConfirm, onClose }: {
+  titulo: string; subtitulo?: string
+  pastas: { id: string; nome: string; pai_id: string | null }[] | null
+  atualId: string | null; bloquear?: Set<string>
+  onConfirm: (sel: string | null) => void | Promise<void>; onClose: () => void
+}) {
+  const [sel, setSel] = useState<string | null>(atualId)
+  const [busca, setBusca] = useState('')
+  const [navPai, setNavPai] = useState<string | null>(null)
+  const [pending, setPending] = useState(false)
+  useEffect(() => { const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose(); document.addEventListener('keydown', esc); return () => document.removeEventListener('keydown', esc) }, [onClose])
+  const bloq = bloquear ?? new Set<string>()
+  const todas = (pastas ?? []).filter((p) => !bloq.has(p.id))
+  const byId = useMemo(() => new Map(todas.map((p) => [p.id, p])), [todas])
+  const q = busca.trim().toLowerCase()
+  const nSub = (id: string) => todas.filter((p) => (p.pai_id ?? null) === id).length
+  const visiveis = q ? todas.filter((p) => p.nome.toLowerCase().includes(q)) : todas.filter((p) => (p.pai_id ?? null) === navPai)
+  const comSub = q ? [] : visiveis.filter((p) => nSub(p.id) > 0).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+  const semSub = q ? visiveis : visiveis.filter((p) => nSub(p.id) === 0).sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+  const caminho: { id: string; nome: string; pai_id: string | null }[] = []
+  { let cur = navPai; const seen = new Set<string>(); while (cur && byId.has(cur) && !seen.has(cur)) { seen.add(cur); const p = byId.get(cur)!; caminho.unshift(p); cur = p.pai_id ?? null } }
+  async function confirmar() { setPending(true); try { await onConfirm(sel) } finally { setPending(false) } }
+  const gridCls = 'grid grid-cols-2 gap-3 sm:grid-cols-3'
+  const Tile = (p: { id: string; nome: string; pai_id: string | null }) => {
+    const n = nSub(p.id); const ativo = sel === p.id
+    return (
+      <div key={p.id} role="button" tabIndex={0} onClick={() => setSel(p.id)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); setSel(p.id) } }}
+        className={`relative flex cursor-pointer flex-col gap-2 rounded-xl border p-3 transition-colors ${ativo ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:border-primary/40 hover:bg-muted/40'}`}>
+        <span className="flex items-center gap-2"><Folder className="h-5 w-5 shrink-0 text-primary" /><span className="min-w-0 truncate text-sm font-medium" title={p.nome}>{p.nome}</span></span>
+        <span className="flex items-center justify-between text-[11px] text-muted-foreground">
+          <span>{n > 0 ? `${n} subpasta${n > 1 ? 's' : ''}` : 'pasta'}</span>
+          {n > 0 && !q && <span role="button" tabIndex={0} onClick={(e) => { e.stopPropagation(); setNavPai(p.id); setSel(p.id) }} className="inline-flex cursor-pointer items-center gap-0.5 rounded px-1 font-medium text-primary hover:underline">Entrar <ChevronRight className="h-3 w-3" /></span>}
+        </span>
+      </div>
+    )
+  }
+  return createPortal(
+    <div className="fixed inset-0 z-[130] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" onClick={onClose} />
+      <div role="dialog" aria-modal="true" className="relative flex max-h-[88vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl">
+        <div className="flex items-start justify-between gap-3 border-b px-5 py-3.5">
+          <div className="flex min-w-0 items-start gap-2.5">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><FolderInput className="h-5 w-5" /></span>
+            <div className="min-w-0"><h3 className="truncate text-sm font-semibold" title={titulo}>{titulo}</h3>{subtitulo && <p className="truncate text-xs text-muted-foreground">{subtitulo}</p>}</div>
+          </div>
+          <button onClick={onClose} aria-label="Fechar" className="rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground"><X className="h-4 w-4" /></button>
+        </div>
+        <div className="border-b p-3">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <input autoFocus value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar pasta (todas as subpastas)…" className="w-full rounded-lg border bg-background py-2 pl-8 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40" />
+          </div>
+        </div>
+        <div className="min-h-0 flex-1 overflow-auto p-4">
+          {!q && caminho.length > 0 && (
+            <div className="mb-3 flex flex-wrap items-center gap-0.5 text-xs text-muted-foreground">
+              <button onClick={() => setNavPai(null)} className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 font-medium hover:text-foreground"><Home className="h-3.5 w-3.5" /> Pastas</button>
+              {caminho.map((c, i) => (<span key={c.id} className="inline-flex items-center gap-0.5"><ChevronRight className="h-3.5 w-3.5" /><button onClick={() => setNavPai(c.id)} className={`rounded px-1.5 py-0.5 font-medium hover:text-foreground ${i === caminho.length - 1 ? 'text-foreground' : ''}`}>{c.nome}</button></span>))}
+            </div>
+          )}
+          {pastas === null ? (
+            <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando pastas…</div>
+          ) : (
+            <div className="space-y-4">
+              {!q && (
+                <div className={gridCls}>
+                  <div role="button" tabIndex={0} onClick={() => setSel(null)} onKeyDown={(e) => { if (e.key === 'Enter') setSel(null) }} className={`flex cursor-pointer flex-col gap-2 rounded-xl border p-3 transition-colors ${sel === null ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:border-primary/40 hover:bg-muted/40'}`}>
+                    <span className="flex items-center gap-2"><Home className="h-5 w-5 text-primary" /><span className="text-sm font-medium">Raiz (Início)</span></span>
+                    <span className="text-[11px] text-muted-foreground">Fora de qualquer pasta</span>
+                  </div>
+                </div>
+              )}
+              {comSub.length > 0 && <div><p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><FolderTree className="h-3.5 w-3.5" /> Com subpastas</p><div className={gridCls}>{comSub.map(Tile)}</div></div>}
+              {semSub.length > 0 && <div>{!q && <p className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"><Folder className="h-3.5 w-3.5" /> Pastas</p>}<div className={gridCls}>{semSub.map(Tile)}</div></div>}
+              {visiveis.length === 0 && <p className="py-10 text-center text-xs text-muted-foreground">Nenhuma pasta {q ? 'encontrada' : 'aqui'}.</p>}
+            </div>
+          )}
+        </div>
+        <div className="flex items-center justify-end gap-2 border-t px-5 py-3">
+          <button onClick={onClose} className="rounded-lg border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted">Cancelar</button>
+          <button onClick={confirmar} disabled={pending} className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground transition-opacity hover:opacity-90 disabled:opacity-50">{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderInput className="h-4 w-4" />} Mover</button>
+        </div>
+      </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -1109,9 +1397,9 @@ function DriveAcessoWrapper({ pastaId, categoria, onFechar }: { pastaId: string;
       onClose={onFechar}
       onSalvar={async (mudados) => {
         const r = await Promise.all(mudados.map((n) => salvarAcessoNo({
-          id: n.id, tipo: n.tipo, herda: n.herda, geral: n.geral,
-          grupos: n.pessoas.filter((p) => p.tipo === 'grupo').map((p) => ({ id: p.id, papel: p.papel })),
-          estudantes: n.pessoas.filter((p) => p.tipo === 'estudante').map((p) => ({ id: p.id, papel: p.papel })),
+          id: n.id, tipo: n.tipo, herda: n.herda, geral: n.geral, modo: n.modo, oculto: n.oculto,
+          grupos: n.pessoas.filter((p) => p.tipo === 'grupo').map((p) => ({ id: p.id, papel: p.papel, origem: p.origem, perms: p.perms })),
+          estudantes: n.pessoas.filter((p) => p.tipo === 'estudante').map((p) => ({ id: p.id, papel: p.papel, origem: p.origem, perms: p.perms })),
         })))
         const falha = r.find((x) => !x.ok)
         if (falha) toast.error(falha.error || 'Falha ao salvar alguns acessos.')
@@ -1122,6 +1410,7 @@ function DriveAcessoWrapper({ pastaId, categoria, onFechar }: { pastaId: string;
       }}
       listarGrupos={async () => { const r = await listarGruposBiblioteca(); return r.ok && r.grupos ? r.grupos : [] }}
       buscarAlunos={async (q, offset) => { const r = await buscarAlunosBiblioteca(q, offset); return r.ok ? { items: r.items ?? [], total: r.total ?? 0 } : { items: [], total: 0 } }}
+      buscarGruposAluno={async (estudanteId) => { const r = await gruposDoEstudante(estudanteId); return r.ok && r.grupos ? r.grupos : [] }}
       onCopiarLink={() => { navigator.clipboard?.writeText(window.location.href).catch(() => {}) }}
       onToast={(m) => toast.message(m)}
     />

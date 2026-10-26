@@ -87,6 +87,16 @@ export async function computarOnlinePorSimulado(svc: SupabaseClient, tenantId: s
   if (!ids.length) return {}
   const cutoffMs = Date.now() - JANELA_ATIVO_MS
   const cutoffIso = new Date(cutoffMs).toISOString()
+
+  // CAMINHO RÁPIDO (escala): agrega "fazendo agora" NO BANCO numa query (conta alunos distintos ativos
+  // por simulado), em vez de puxar todas as sessões + respostas + matrículas e cruzar no app. Cai no
+  // caminho PostgREST abaixo se o SQL direto não estiver disponível.
+  try {
+    const { onlinePorSimuladoSql } = await import('@/lib/simulado/ao-vivo-sql')
+    const rapido = await onlinePorSimuladoSql(tenantId, ids, cutoffIso)
+    if (rapido !== null) return rapido
+  } catch { /* fallback PostgREST */ }
+
   const sess = await fetchAllByIn<any>(ids, (chunk) =>
     svc.from('simulado_sessoes_prova')
       .select('id, simulado_id, estudante_id, status, iniciado_em')

@@ -18,7 +18,17 @@ const chave = (tenantId: string, desafioId: string) => `jurisprudencia:relatorio
 export async function carregarRelatorioJuris(desafioId: string, tenantId: string): Promise<RelatorioModulo> {
   return remember<RelatorioModulo>(chave(tenantId, desafioId), 1800, async () => {
     const svc = createAdminClient()
-    const dj = await lerDesafioJogo(svc, desafioId)
+    // Reads independentes → em paralelo: config do desafio (jogo/dias), nome do módulo e ranking (JÁ cacheado,
+    // per-aluno). `preencherTesesPorQuiz` fica depois por depender de `dj.dias`.
+    const [dj, moduloNome, rank] = await Promise.all([
+      lerDesafioJogo(svc, desafioId),
+      (async (): Promise<string> => {
+        let n = 'Desafio'
+        try { const { data } = await svc.from('simulado_pastas').select('nome').eq('id', desafioId).eq('tenant_id', tenantId).maybeSingle(); n = (data as any)?.nome ?? n } catch { /* ignore */ }
+        return n
+      })(),
+      carregarRankingJuris(desafioId, tenantId),
+    ])
     const diasObj = dj?.dias && typeof dj.dias === 'object' ? (dj.dias as Record<string, any>) : {}
     const diasComTeses = await preencherTesesPorQuiz(svc, diasObj).catch(() => diasObj)
     const diasChaves = Object.keys(diasComTeses)
@@ -27,11 +37,7 @@ export async function carregarRelatorioJuris(desafioId: string, tenantId: string
     const diaCompleto = (dom: any, k: string): boolean => { const arr = dom?.[k]; const n = tesesDoDia(k); return n > 0 && Array.isArray(arr) && arr.length >= n }
     const tituloDia = (k: string): string => (diasComTeses[k]?.titulo || '').toString().trim() || `Dia ${k}`
 
-    let moduloNome = 'Desafio'
-    try { const { data } = await svc.from('simulado_pastas').select('nome').eq('id', desafioId).eq('tenant_id', tenantId).maybeSingle(); moduloNome = (data as any)?.nome ?? moduloNome } catch { /* ignore */ }
-
-    // Per-aluno (ranking JÁ cacheado): nome/email/dias dominados/pontos/sequência.
-    const rank = await carregarRankingJuris(desafioId, tenantId)
+    // Per-aluno (ranking JÁ cacheado, resolvido acima): nome/email/dias dominados/pontos/sequência.
     const reais = rank.itens.filter((i) => !i.oculto)
     const totalAlunos = reais.length
     const aulasConcluidasTotal = reais.reduce((s, i) => s + i.aulasConcluidas, 0)

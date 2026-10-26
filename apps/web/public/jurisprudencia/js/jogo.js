@@ -425,6 +425,13 @@ const canvas=$('#game'), ctx=canvas.getContext('2d');
 canvas.tabIndex=-1; canvas.style.outline='none';
 function grabFocus(){ try{ canvas.focus({preventScroll:true}); }catch(e){} try{ window.focus(); }catch(e){} }
 ['pointerdown','touchstart','mousedown'].forEach(ev=>{ try{ $('#screen').addEventListener(ev, grabFocus, {passive:true}); }catch(e){} });
+// EMBUTIDO (iframe — inclusive aninhado na Curseduca): num iframe aninhado CROSS-ORIGIN o foco de teclado é
+// NÃO-confiável — canvas.focus()/window.focus() não capturam o teclado, as setas rolam a página PAI e o
+// personagem fica parado (aluno "não consegue fazer nenhuma ação", tela andando ao redor). Fix: mostrar o
+// D-PAD (controle por clique/toque, INDEPENDENTE de foco) sempre que rodando embutido — não só em toque/mobile.
+// Detecção: self!==top; acesso cross-origin a window.top LANÇA → também = embutido.
+let EMBUTIDO = false; try { EMBUTIDO = window.self !== window.top; } catch (e) { EMBUTIDO = true; }
+if (EMBUTIDO) { try { document.body.classList.add('emb'); } catch (e) {} }
 const wallLayer=document.createElement('canvas');
 let TS=24;
 const DIRS={up:{dx:0,dy:-1},down:{dx:0,dy:1},left:{dx:-1,dy:0},right:{dx:1,dy:0}};
@@ -1517,6 +1524,21 @@ $('#dpad').addEventListener('pointerdown',e=>{ const b=e.target.closest('button'
   if(b.dataset.exit){ sairParaDia(); return; }  // EXIT (mobile): sai do desafio → tela do dia
   if(b.dataset.d){ if(G.mode==='attract') startRun(); setWant(b.dataset.d); }
   else { if(G.mode==='attract') startRun(); else if(G.mode==='gameover') continueRun(); else if(G.mode==='play') pause(true); else if(G.mode==='paused') pause(false); } });
+// COMANDOS DEMONSTRATIVOS clicáveis (fallback no PC): clicar na legenda de teclas (← ↑ ↓ → / ENTER / A B C /
+// P / M / F) executa a MESMA ação da tecla — para o aluno controlar o jogo com o MOUSE quando o teclado não
+// pega foco (iframe Curseduca) e caso o d-pad não funcione. Reusa as funções do jogo (sem duplicar lógica).
+$('.controls') && $('.controls').addEventListener('pointerdown', e => {
+  const k = e.target.closest('kbd'); if (!k) return;
+  e.preventDefault(); try { SFX.init(); } catch (_) {}
+  const t = (k.textContent || '').trim(), T = t.toUpperCase();
+  const dir = { '←': 'left', '↑': 'up', '↓': 'down', '→': 'right' }[t];
+  if (dir) { if (G.mode === 'attract') startRun(); setWant(dir); return; }
+  if (T === 'ENTER') { if (G.mode === 'attract') startRun(); else if (G.mode === 'gameover') continueRun(); else if (G.mode === 'clear' && !$('#btnNext').hidden) $('#btnNext').click(); return; }
+  if (T === 'A' || T === 'B' || T === 'C') { const i = { A: 0, B: 1, C: 2 }[T]; const qOpen = !$('#qModal').hidden; if (qOpen && Q && !Q.done && i < Q.q.o.length) answer(i); else if (qOpen && Q && Q.done) closeQuestion(); return; }
+  if (T === 'P') { if (G.mode === 'play') pause(true); else if (G.mode === 'paused') pause(false); return; }
+  if (T === 'M') { snd.click(); return; }
+  if (T === 'F') { theater(!document.body.classList.contains('theater')); return; }
+});
 // Botão "X" (desktop): sai do desafio e volta à tela do dia.
 $('#btnSair') && ($('#btnSair').onclick=()=>sairParaDia());
 // Overlay de PAUSA: "Continuar" (retoma) e "Voltar ao dia" (sai do desafio → tela do dia c/ Leitura/Começar).

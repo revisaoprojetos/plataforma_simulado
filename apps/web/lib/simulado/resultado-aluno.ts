@@ -55,15 +55,30 @@ export async function montarResultadoAluno(
 ): Promise<{ tentativas: TentativaResumo[]; questoes: QuestaoAgregada[]; totalQuestoes: number }> {
   const sessaoIds = sessoes.map((s) => s.id)
 
-  const { data: pq } = await svc
-    .from('simulado_prova_questoes')
-    .select('ordem, anulada, questao_id, questoes:simulado_questoes(id, enunciado, comentario_professor, disciplinas:simulado_disciplinas(nome), alternativas:simulado_alternativas(id, texto, ordem, correta))')
-    .eq('simulado_id', simuladoId).order('ordem')
-  const questoesRaw = (pq ?? []) as any[]
-  // Anulação: boolean per-simulado OU etiqueta funcional (anular/desconsiderar).
-  //  - anular → ponto garantido a todos (continua no total).
-  //  - desconsiderar → sai do total (não conta pra ninguém).
-  const funcMap = await funcaoEtiquetaPorQuestao(svc, questoesRaw.map((r) => r.questao_id))
+  // As questões da prova (+ funções de etiqueta, que dependem delas) são INDEPENDENTES das respostas
+  // do aluno (estas só dependem de `sessaoIds`, vindo do parâmetro). Rodam em paralelo.
+  const [{ questoesRaw, funcMap }, respostas] = await Promise.all([
+    (async () => {
+      const { data: pq } = await svc
+        .from('simulado_prova_questoes')
+        .select('ordem, anulada, questao_id, questoes:simulado_questoes(id, enunciado, comentario_professor, disciplinas:simulado_disciplinas(nome), alternativas:simulado_alternativas(id, texto, ordem, correta))')
+        .eq('simulado_id', simuladoId).order('ordem')
+      const questoesRaw = (pq ?? []) as any[]
+      // Anulação: boolean per-simulado OU etiqueta funcional (anular/desconsiderar).
+      //  - anular → ponto garantido a todos (continua no total).
+      //  - desconsiderar → sai do total (não conta pra ninguém).
+      const funcMap = await funcaoEtiquetaPorQuestao(svc, questoesRaw.map((r) => r.questao_id))
+      return { questoesRaw, funcMap }
+    })(),
+    (async (): Promise<any[]> => {
+      if (!sessaoIds.length) return []
+      const { data } = await svc
+        .from('simulado_respostas_objetivas')
+        .select('sessao_id, questao_id, alternativa_id, correta, snapshot_gabarito')
+        .in('sessao_id', sessaoIds)
+      return data ?? []
+    })(),
+  ])
   const anuladaSet = new Set<string>()      // ponto garantido (anular OU boolean)
   const desconsideraSet = new Set<string>() // fora do total
   for (const r of questoesRaw) {
@@ -75,14 +90,6 @@ export async function montarResultadoAluno(
   const discDeQ = new Map<string, string>()
   for (const r of questoesRaw) discDeQ.set(r.questao_id, r.questoes?.disciplinas?.nome ?? 'Sem disciplina')
 
-  let respostas: any[] = []
-  if (sessaoIds.length) {
-    const { data } = await svc
-      .from('simulado_respostas_objetivas')
-      .select('sessao_id, questao_id, alternativa_id, correta, snapshot_gabarito')
-      .in('sessao_id', sessaoIds)
-    respostas = data ?? []
-  }
   const bySessao = new Map<string, Map<string, any>>()
   for (const r of respostas) {
     if (!bySessao.has(r.sessao_id)) bySessao.set(r.sessao_id, new Map())

@@ -90,12 +90,15 @@ export async function montarRankingResultado(
   brand?: string | null,
   opts?: { minhaNota?: number | null; meusAcertos?: number },
 ): Promise<RankingResultado | null> {
-  const turma = await montarRankingTurma(svc, simuladoId, tenantId, brand)
+  // A parte da TURMA (cacheada) e o avatar do PRÓPRIO aluno são INDEPENDENTES → rodam em paralelo.
+  // Avatar do PRÓPRIO aluno (foto real, se tiver; senão a capivara pelo nome) — só o "Você" mostra o real.
+  const [turma, meRow] = await Promise.all([
+    montarRankingTurma(svc, simuladoId, tenantId, brand),
+    (async () => (await svc.from('simulado_estudantes').select('nome, avatar, perfil_avatar_cor').eq('id', meuEstudanteId).maybeSingle()).data)(),
+  ])
   if (!turma) return null
   const { participantes, mediaTurma, notas, binsQtd } = turma
 
-  // Avatar do PRÓPRIO aluno (foto real, se tiver; senão a capivara pelo nome) — só o "Você" mostra o real.
-  const { data: meRow } = await svc.from('simulado_estudantes').select('nome, avatar, perfil_avatar_cor').eq('id', meuEstudanteId).maybeSingle()
   const meuNome = (meRow as any)?.nome ?? ''
   const meuAvatar: string = ((meRow as any)?.avatar as string) || avatarPadraoDe(meuNome, brand)
   const meuAvatarCor: string | null = ((meRow as any)?.perfil_avatar_cor as string) || corAvatarPadrao(meuNome)

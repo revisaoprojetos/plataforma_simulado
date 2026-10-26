@@ -1,4 +1,4 @@
-import type { StorageProvider, UploadParams, UploadResult } from '@/lib/storage/types'
+import type { StorageProvider, UploadParams, UploadResult, UploadTicket } from '@/lib/storage/types'
 import { StorageError } from '@/lib/storage/types'
 
 // Provider Google Cloud Storage.
@@ -54,6 +54,30 @@ export function createGcsProvider(): StorageProvider {
     async remove(bucket, path) {
       const b = await getBucket(bucket)
       await b.file(path).delete({ ignoreNotFound: true })
+    },
+
+    async exists(bucket, path) {
+      const b = await getBucket(bucket)
+      const [ok] = await b.file(path).exists()
+      return !!ok
+    },
+
+    async download(bucket, path) {
+      const b = await getBucket(bucket)
+      try {
+        const [buf] = await b.file(path).download()
+        return new Uint8Array(buf)
+      } catch {
+        return null
+      }
+    },
+
+    async criarUploadTicket(bucket, path, contentType): Promise<UploadTicket> {
+      const b = await getBucket(bucket)
+      const [url] = await b.file(path).getSignedUrl({
+        action: 'write', version: 'v4', expires: Date.now() + 3600 * 1000, contentType,
+      })
+      return { kind: 's3-put', bucket, path, url, headers: contentType ? { 'content-type': contentType } : undefined }
     },
   }
 }

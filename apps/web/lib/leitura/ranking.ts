@@ -102,19 +102,22 @@ export async function carregarRankingModulo(moduloId: string, tenantId: string):
     const svc = createAdminClient()
     const geral = moduloId === '__geral__'
 
-    // Config de pontuação do módulo (tolerante) + gamificação ativa do tenant.
-    let pontuacaoRaw: unknown = null
-    if (!geral) {
-      try { const { data } = await svc.from('simulado_pastas').select('pontuacao').eq('id', moduloId).eq('tenant_id', tenantId).maybeSingle(); pontuacaoRaw = (data as { pontuacao?: unknown } | null)?.pontuacao ?? null } catch { /* coluna ausente */ }
-    }
-    const pontuacao = normalizarPontuacaoLeitura(pontuacaoRaw)
-    let gamAtivo = false; let tz = 'America/Sao_Paulo'
-    try { const cfg = await getGamConfig(svc, tenantId); gamAtivo = !!cfg?.ativo; tz = cfg?.timezone || tz } catch { /* gamificação ausente */ }
-
-    // Aulas do módulo.
+    // Config de pontuação do módulo (tolerante) + gamificação ativa do tenant + aulas do módulo.
+    // Reads independentes → em paralelo (corta ~2 round-trips do caminho crítico; cada uma mantém seu fallback).
     let dq = svc.from('simulado_documentos').select('id').eq('tenant_id', tenantId).eq('deletado', false).eq('publicado', true)
     dq = geral ? dq.is('pasta_id', null) : dq.eq('pasta_id', moduloId)
-    const { data: docs } = await dq
+    const [pontuacaoRaw, gamCfg, docsRes] = await Promise.all([
+      (async (): Promise<unknown> => {
+        if (geral) return null
+        try { const { data } = await svc.from('simulado_pastas').select('pontuacao').eq('id', moduloId).eq('tenant_id', tenantId).maybeSingle(); return (data as { pontuacao?: unknown } | null)?.pontuacao ?? null } catch { /* coluna ausente */ return null }
+      })(),
+      getGamConfig(svc, tenantId).catch(() => null),
+      dq,
+    ])
+    const pontuacao = normalizarPontuacaoLeitura(pontuacaoRaw)
+    const gamAtivo = !!gamCfg?.ativo
+    const tz = gamCfg?.timezone || 'America/Sao_Paulo'
+    const docs = (docsRes as { data?: { id: string }[] | null }).data
     const aulaIds = (docs ?? []).map((d: { id: string }) => d.id)
     if (!aulaIds.length) return { itens: [], gamAtivo, pontuacao }
 
@@ -124,29 +127,37 @@ export async function carregarRankingModulo(moduloId: string, tenantId: string):
     const hoje = new Date().toLocaleDateString('en-CA', { timeZone: tz })
     const ontem = new Date(Date.parse(hoje + 'T00:00:00Z') - 86_400_000).toISOString().slice(0, 10)
 
-    // Ajustes MANUAIS da sequência (calendário do suporte) por aluno — sobrepõem o automático. Tolerante.
-    const { calcularSequencia } = await import('@/lib/leitura/sequencia')
-    const overridesPorAluno = new Map<string, Record<string, boolean>>()
-    try {
-      const { data: ajs } = await svc.from('simulado_leitura_sequencia_ajuste').select('estudante_id, overrides').eq('tenant_id', tenantId).eq('modulo_id', moduloId)
-      for (const a of ajs ?? []) if ((a as any).overrides && typeof (a as any).overrides === 'object') overridesPorAluno.set((a as any).estudante_id, (a as any).overrides)
-    } catch { /* migração pendente → sem ajuste */ }
-
-    // Dia de CONCLUSÃO da aula IMUTÁVEL (ledger de XP, `meta.dia` do evento de quiz) — REFAZER não move
-    // esse dia, ao contrário do `respondido_em` (que o refazimento sobrescrevia, quebrando o streak de
-    // quem refez). Fonte correta da sequência; fallback p/ os dias das respostas quando não há evento.
-    const diasLedger = new Map<string, Set<string>>()
-    try {
-      const { diasConclusaoLedgerSql } = await import('data')
-      const rows = await diasConclusaoLedgerSql(tenantId, aulaIds).catch(() => null)
-      if (rows) {
-        for (const r of rows) diasLedger.set(r.estudante_id, new Set((r.dias ?? []).filter(Boolean)))
-      } else {
-        const ev = await fetchAllByIn<{ estudante_id: string; meta: any }>(aulaIds, (chunk) =>
-          svc.from('simulado_xp_eventos').select('estudante_id, meta').eq('tenant_id', tenantId).eq('origem', 'leitura').like('ref_id', 'quiz:%').filter('meta->>documentoId', 'in', `(${chunk.join(',')})`).order('id'))
-        for (const e of ev) { const d = (e as any).meta?.dia; if (!d) continue; const s = diasLedger.get(e.estudante_id) ?? diasLedger.set(e.estudante_id, new Set()).get(e.estudante_id)!; s.add(d) }
-      }
-    } catch { /* ledger indisponível → usa os dias das respostas */ }
+    // Ajustes MANUAIS da sequência (overrides por aluno) + Dia de CONCLUSÃO IMUTÁVEL (ledger de XP) +
+    // import do cálculo de sequência. Nenhum depende do outro → em paralelo (cada um com seu fallback).
+    // - overrides: calendário do suporte que sobrepõe o automático (tolerante à migração pendente).
+    // - diasLedger: `meta.dia` do evento de quiz — REFAZER não move esse dia (ao contrário do `respondido_em`,
+    //   que o refazimento sobrescrevia, quebrando o streak de quem refez); fallback p/ os dias das respostas.
+    const [{ calcularSequencia }, overridesPorAluno, diasLedger] = await Promise.all([
+      import('@/lib/leitura/sequencia'),
+      (async (): Promise<Map<string, Record<string, boolean>>> => {
+        const m = new Map<string, Record<string, boolean>>()
+        try {
+          const { data: ajs } = await svc.from('simulado_leitura_sequencia_ajuste').select('estudante_id, overrides').eq('tenant_id', tenantId).eq('modulo_id', moduloId)
+          for (const a of ajs ?? []) if ((a as any).overrides && typeof (a as any).overrides === 'object') m.set((a as any).estudante_id, (a as any).overrides)
+        } catch { /* migração pendente → sem ajuste */ }
+        return m
+      })(),
+      (async (): Promise<Map<string, Set<string>>> => {
+        const m = new Map<string, Set<string>>()
+        try {
+          const { diasConclusaoLedgerSql } = await import('data')
+          const rows = await diasConclusaoLedgerSql(tenantId, aulaIds).catch(() => null)
+          if (rows) {
+            for (const r of rows) m.set(r.estudante_id, new Set((r.dias ?? []).filter(Boolean)))
+          } else {
+            const ev = await fetchAllByIn<{ estudante_id: string; meta: any }>(aulaIds, (chunk) =>
+              svc.from('simulado_xp_eventos').select('estudante_id, meta').eq('tenant_id', tenantId).eq('origem', 'leitura').like('ref_id', 'quiz:%').filter('meta->>documentoId', 'in', `(${chunk.join(',')})`).order('id'))
+            for (const e of ev) { const d = (e as any).meta?.dia; if (!d) continue; const s = m.get(e.estudante_id) ?? m.set(e.estudante_id, new Set()).get(e.estudante_id)!; s.add(d) }
+          }
+        } catch { /* ledger indisponível → usa os dias das respostas */ }
+        return m
+      })(),
+    ])
 
     type Bruto = { estudanteId: string; acertos: number; aulasConcluidas: number; aulasGabaritadas: number; streakAtual: number; ultimoDia: string; score: number }
     const montarBruto = (id: string, acertos: number, aulasConcluidas: number, aulasGabaritadas: number, diasResp: Iterable<string>): Bruto => {
@@ -210,32 +221,40 @@ export async function carregarRankingModulo(moduloId: string, tenantId: string):
     }
     if (!brutos.length) return { itens: [], gamAtivo, pontuacao }
 
-    // Contas de teste ocultas do ranking (marcadas em Acessos): não competem por posição.
-    const ocultosSet = new Set<string>(); let ocultarTotal = false
-    if (!geral) {
-      try {
-        const { data: ro } = await svc.from('simulado_pastas').select('ranking_ocultos').eq('id', moduloId).eq('tenant_id', tenantId).maybeSingle()
-        const cfg = (ro as any)?.ranking_ocultos ?? {}
-        ocultarTotal = cfg.total === true
-        for (const id of (Array.isArray(cfg.estudantes) ? cfg.estudantes : [])) ocultosSet.add(id)
-        const grps = Array.isArray(cfg.grupos) ? cfg.grupos : []
-        if (grps.length) { const mem = await fetchAllByIn<{ estudante_id: string }>(grps, (chunk) => svc.from('simulado_grupo_membros').select('estudante_id').in('grupo_id', chunk)); for (const m of mem) ocultosSet.add(m.estudante_id) }
-      } catch { /* coluna ranking_ocultos ausente */ }
-      // Acessos exclusivos / modo teste: nunca competem no ranking (tolerante à coluna ausente).
-      try { const { testadoresDoModulo } = await import('@/lib/leitura/testadores'); for (const id of await testadoresDoModulo(svc, tenantId, moduloId)) ocultosSet.add(id) } catch { /* ausente */ }
-    }
-
-    // Nome + e-mail + foto/cor do avatar.
-    const ests = await fetchAllByIn<{ id: string; nome: string; email: string | null; avatar: string | null; perfil_avatar_cor: string | null }>(brutos.map((b) => b.estudanteId), (chunk) =>
-      svc.from('simulado_estudantes').select('id, nome, email, avatar, perfil_avatar_cor').in('id', chunk))
+    // Reads pós-agregação independentes → em paralelo:
+    // - ocultosSet/ocultarTotal: contas de teste ocultas do ranking (marcadas em Acessos) — não competem por posição.
+    // - ests: nome + e-mail + foto/cor do avatar.
+    // - nivelDe: nível de gamificação por aluno (tolerante — tabela pode não existir).
+    const [{ ocultosSet, ocultarTotal }, ests, nivelDe] = await Promise.all([
+      (async (): Promise<{ ocultosSet: Set<string>; ocultarTotal: boolean }> => {
+        const ocultosSet = new Set<string>(); let ocultarTotal = false
+        if (!geral) {
+          try {
+            const { data: ro } = await svc.from('simulado_pastas').select('ranking_ocultos').eq('id', moduloId).eq('tenant_id', tenantId).maybeSingle()
+            const cfg = (ro as any)?.ranking_ocultos ?? {}
+            ocultarTotal = cfg.total === true
+            for (const id of (Array.isArray(cfg.estudantes) ? cfg.estudantes : [])) ocultosSet.add(id)
+            const grps = Array.isArray(cfg.grupos) ? cfg.grupos : []
+            if (grps.length) { const mem = await fetchAllByIn<{ estudante_id: string }>(grps, (chunk) => svc.from('simulado_grupo_membros').select('estudante_id').in('grupo_id', chunk)); for (const m of mem) ocultosSet.add(m.estudante_id) }
+          } catch { /* coluna ranking_ocultos ausente */ }
+          // Acessos exclusivos / modo teste: nunca competem no ranking (tolerante à coluna ausente).
+          try { const { testadoresDoModulo } = await import('@/lib/leitura/testadores'); for (const id of await testadoresDoModulo(svc, tenantId, moduloId)) ocultosSet.add(id) } catch { /* ausente */ }
+        }
+        return { ocultosSet, ocultarTotal }
+      })(),
+      fetchAllByIn<{ id: string; nome: string; email: string | null; avatar: string | null; perfil_avatar_cor: string | null }>(brutos.map((b) => b.estudanteId), (chunk) =>
+        svc.from('simulado_estudantes').select('id, nome, email, avatar, perfil_avatar_cor').in('id', chunk)),
+      (async (): Promise<Map<string, number>> => {
+        const nivelDe = new Map<string, number>()
+        try {
+          const gam = await fetchAllByIn<{ estudante_id: string; nivel: number | null }>(brutos.map((b) => b.estudanteId), (chunk) =>
+            svc.from('simulado_gamificacao_estudante').select('estudante_id, nivel').eq('tenant_id', tenantId).in('estudante_id', chunk))
+          for (const g of gam) nivelDe.set(g.estudante_id, Math.max(1, Number(g.nivel ?? 1)))
+        } catch { /* gamificação ausente */ }
+        return nivelDe
+      })(),
+    ])
     const estDe = new Map(ests.map((e) => [e.id, e]))
-    // Nível de gamificação por aluno (tolerante — tabela pode não existir).
-    const nivelDe = new Map<string, number>()
-    try {
-      const gam = await fetchAllByIn<{ estudante_id: string; nivel: number | null }>(brutos.map((b) => b.estudanteId), (chunk) =>
-        svc.from('simulado_gamificacao_estudante').select('estudante_id, nivel').eq('tenant_id', tenantId).in('estudante_id', chunk))
-      for (const g of gam) nivelDe.set(g.estudante_id, Math.max(1, Number(g.nivel ?? 1)))
-    } catch { /* gamificação ausente */ }
     const totalAulas = aulaIds.length
     const comNome = brutos.map((b) => { const e = estDe.get(b.estudanteId); return {
       ...b, nome: e?.nome ?? 'Aluno', email: e?.email ?? null, avatar: e?.avatar ?? null, avatarCor: e?.perfil_avatar_cor ?? null,

@@ -1,6 +1,7 @@
 import 'server-only'
 import { createHash } from 'crypto'
 import { BUCKET_IMAGENS } from '@/lib/storage/bucket-imagens'
+import { getStorage } from '@/lib/storage'
 
 /** Registra metadados no catálogo central `simulado_arquivos` (best-effort, idempotente por path). */
 async function registrarArquivo(svc: any, meta: { tenantId: string; nome: string; tipo: string; bucket: string; path: string; tamanho: number; criadoPor?: string | null }) {
@@ -34,12 +35,12 @@ export async function hospedarBase64(valor: string | null | undefined, svc: any,
   const nome = `${createHash('sha1').update(buf).digest('hex').slice(0, 24)}.${ext}`
   const path = `assets/${nome}`
   try {
-    const { data: lista } = await svc.storage.from(BUCKET_IMAGENS).list('assets', { search: nome, limit: 1 })
-    if (!lista?.some((f: any) => f.name === nome)) {
-      await svc.storage.from(BUCKET_IMAGENS).upload(path, buf, { contentType: `image/${tipo}`, upsert: true, cacheControl: '31536000' })
+    const st = getStorage()
+    if (!(await st.exists(BUCKET_IMAGENS, path))) {
+      await st.upload({ bucket: BUCKET_IMAGENS, path, data: buf, contentType: `image/${tipo}`, upsert: true, publico: true, cacheControl: '31536000' })
     }
     if (opts?.tenantId) await registrarArquivo(svc, { tenantId: opts.tenantId, nome, tipo: `image/${tipo}`, bucket: BUCKET_IMAGENS, path, tamanho: buf.length, criadoPor: opts.criadoPor })
-    return (svc.storage.from(BUCKET_IMAGENS).getPublicUrl(path).data.publicUrl as string) || v
+    return st.getPublicUrl(BUCKET_IMAGENS, path) || v
   } catch {
     return v // storage indisponível → mantém base64 (não bloqueia o save)
   }
@@ -62,14 +63,14 @@ export async function hospedarAudioBase64(valor: string | null | undefined, svc:
   const nome = `${createHash('sha1').update(buf).digest('hex').slice(0, 24)}.${ext}`
   const path = `audio/${nome}`
   const contentType = `audio/${tipo}`
-  // Checa o ERRO do upload (supabase-js não lança) — se o bucket restringe MIME (só imagens), tenta o
-  // bucket de pdfs; se nenhum aceitar, MANTÉM o base64 (toca embutido) em vez de devolver URL inválida.
+  // Se o bucket restringe MIME (só imagens), o upload FALHA (o provider lança) → tenta o bucket de
+  // pdfs; se nenhum aceitar, MANTÉM o base64 (toca embutido) em vez de devolver URL inválida.
+  const st = getStorage()
   for (const bucket of [BUCKET_IMAGENS, 'pdfs']) {
     try {
-      const { error } = await svc.storage.from(bucket).upload(path, buf, { contentType, upsert: true, cacheControl: '31536000' })
-      if (error) continue
+      const r = await st.upload({ bucket, path, data: buf, contentType, upsert: true, publico: true, cacheControl: '31536000' })
       if (opts?.tenantId) await registrarArquivo(svc, { tenantId: opts.tenantId, nome, tipo: contentType, bucket, path, tamanho: buf.length, criadoPor: opts.criadoPor })
-      const url = svc.storage.from(bucket).getPublicUrl(path).data.publicUrl as string
+      const url = r.url ?? st.getPublicUrl(bucket, path)
       if (url) return url
     } catch { /* tenta o próximo bucket */ }
   }

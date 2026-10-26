@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { pdfStoragePath } from '@/lib/caderno-designer/material'
+import { getStorage } from '@/lib/storage'
 
 // Endpoint dinamico (sessao/dados/mutacao) — nunca cachear estaticamente.
 export const dynamic = 'force-dynamic'
@@ -54,11 +55,14 @@ export async function POST(req: NextRequest) {
     const chave = slot === 'enunciado' ? 'enunciado' : 'gabarito'
     const hash = createHash('sha1').update(buf).digest('hex').slice(0, 10)
     const path = `materiais/${access.tenantId}/draft-${chave}-${hash}.pdf`
-    try { await svc.storage.createBucket('pdfs', { public: true }) } catch { /* já existe */ }
-    let up = await svc.storage.from('pdfs').upload(path, buf, { contentType: 'application/pdf', upsert: true, cacheControl: '31536000' })
-    if (up.error && /bucket.*not.*found/i.test(up.error.message)) { await svc.storage.createBucket('pdfs', { public: true }).catch(() => {}); up = await svc.storage.from('pdfs').upload(path, buf, { contentType: 'application/pdf', upsert: true, cacheControl: '31536000' }) }
-    if (up.error) return NextResponse.json({ ok: false, error: up.error.message }, { status: 500 })
-    const url = svc.storage.from('pdfs').getPublicUrl(path).data.publicUrl as string
+    const st = getStorage()
+    let url: string
+    try {
+      const r = await st.upload({ bucket: 'pdfs', path, data: buf, contentType: 'application/pdf', upsert: true, publico: true, cacheControl: '31536000' })
+      url = r.url ?? st.getPublicUrl('pdfs', path)
+    } catch (e: any) {
+      return NextResponse.json({ ok: false, error: e?.message ?? 'Falha ao enviar o PDF.' }, { status: 500 })
+    }
     const nome = ((file.name || 'PDF').replace(/\.pdf$/i, '').trim()) || 'PDF'
     return NextResponse.json({ ok: true, url, nome })
   }
@@ -68,17 +72,20 @@ export async function POST(req: NextRequest) {
     const chave = slot === 'enunciado' ? 'enunciado' : 'gabarito'
     const hash = createHash('sha1').update(buf).digest('hex').slice(0, 10)
     const path = `materiais/${access.tenantId}/entrega-${bancoId}-${chave}-${hash}.pdf`
-    try { await svc.storage.createBucket('pdfs', { public: true }) } catch { /* já existe */ }
-    let up = await svc.storage.from('pdfs').upload(path, buf, { contentType: 'application/pdf', upsert: true, cacheControl: '31536000' })
-    if (up.error && /bucket.*not.*found/i.test(up.error.message)) { await svc.storage.createBucket('pdfs', { public: true }).catch(() => {}); up = await svc.storage.from('pdfs').upload(path, buf, { contentType: 'application/pdf', upsert: true, cacheControl: '31536000' }) }
-    if (up.error) return NextResponse.json({ ok: false, error: up.error.message }, { status: 500 })
-    const url = svc.storage.from('pdfs').getPublicUrl(path).data.publicUrl as string
+    const st = getStorage()
+    let url: string
+    try {
+      const r = await st.upload({ bucket: 'pdfs', path, data: buf, contentType: 'application/pdf', upsert: true, publico: true, cacheControl: '31536000' })
+      url = r.url ?? st.getPublicUrl('pdfs', path)
+    } catch (e: any) {
+      return NextResponse.json({ ok: false, error: e?.message ?? 'Falha ao enviar o PDF.' }, { status: 500 })
+    }
     const nome = ((file.name || 'PDF').replace(/\.pdf$/i, '').trim()) || 'PDF'
     const p = await svc.from('simulado_pastas').select('caderno_entrega').eq('id', bancoId).eq('tenant_id', access.tenantId).maybeSingle()
     const ent = (((p.data as any)?.caderno_entrega) ?? {}) as Record<string, unknown>
     ent[chave] = { pdfUrl: url, pdfNome: nome }
     const { error } = await svc.from('simulado_pastas').update({ caderno_entrega: ent }).eq('id', bancoId).eq('tenant_id', access.tenantId)
-    if (error) { try { await svc.storage.from('pdfs').remove([path]) } catch { /* ignora */ }; return NextResponse.json({ ok: false, error: /caderno_entrega/i.test(error.message) ? 'Rode o SQL scripts/sql/banco-caderno-entrega.sql.' : error.message }, { status: 500 }) }
+    if (error) { await st.remove('pdfs', path).catch(() => {}); return NextResponse.json({ ok: false, error: /caderno_entrega/i.test(error.message) ? 'Rode o SQL scripts/sql/banco-caderno-entrega.sql.' : error.message }, { status: 500 }) }
     await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_pastas', entidadeId: bancoId, depois: { [`entrega_${chave}_pdf`]: nome } })
     revalidatePath(`/admin/banco-questoes/${bancoId}`)
     return NextResponse.json({ ok: true, url, nome })
@@ -90,14 +97,14 @@ export async function POST(req: NextRequest) {
   const hash = createHash('sha1').update(buf).digest('hex').slice(0, 10)
   const suf = slot === 'enunciado' ? 'enunciado-' : ''
   const path = `materiais/${access.tenantId}/${cadernoId}-${suf}${hash}.pdf`
-  try { await svc.storage.createBucket('pdfs', { public: true }) } catch { /* já existe */ }
-  let { error: upErr } = await svc.storage.from('pdfs').upload(path, buf, { contentType: 'application/pdf', upsert: true, cacheControl: '31536000' })
-  if (upErr && /bucket.*not.*found/i.test(upErr.message)) {
-    await svc.storage.createBucket('pdfs', { public: true }).catch(() => {})
-    ;({ error: upErr } = await svc.storage.from('pdfs').upload(path, buf, { contentType: 'application/pdf', upsert: true, cacheControl: '31536000' }))
+  const st = getStorage()
+  let url: string
+  try {
+    const r = await st.upload({ bucket: 'pdfs', path, data: buf, contentType: 'application/pdf', upsert: true, publico: true, cacheControl: '31536000' })
+    url = r.url ?? st.getPublicUrl('pdfs', path)
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e?.message ?? 'Falha ao enviar o PDF.' }, { status: 500 })
   }
-  if (upErr) return NextResponse.json({ ok: false, error: upErr.message }, { status: 500 })
-  const url = svc.storage.from('pdfs').getPublicUrl(path).data.publicUrl as string
 
   const padrao = slot === 'enunciado' ? 'Enunciado de Questões' : 'Material completo'
   const nome = ((file.name || padrao).replace(/\.pdf$/i, '').trim()) || padrao
@@ -107,12 +114,12 @@ export async function POST(req: NextRequest) {
   const { error } = await svc.from(tabela).update({ config: { ...config, [configKey]: material } }).eq('id', cadernoId).eq('tenant_id', access.tenantId)
   if (error) {
     // Rollback: o config não persistiu → remove o objeto recém-subido para não deixar órfão no storage.
-    try { await svc.storage.from('pdfs').remove([path]) } catch { /* ignora */ }
+    await st.remove('pdfs', path).catch(() => {})
     return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
   }
   // Substituição: apaga o PDF anterior (hash diferente = path diferente) para não acumular órfãos.
   const pathAntigo = pdfStoragePath(urlAntiga)
-  if (pathAntigo && pathAntigo !== path) { try { await svc.storage.from('pdfs').remove([pathAntigo]) } catch { /* ignora */ } }
+  if (pathAntigo && pathAntigo !== path) { await st.remove('pdfs', pathAntigo).catch(() => {}) }
 
   await registrarAudit({ operacao: 'UPDATE', entidade: tabela, entidadeId: cadernoId, depois: { [`${configKey}_pdf`]: nome } })
   if (bancoId) revalidatePath(`/admin/banco-questoes/${bancoId}`)

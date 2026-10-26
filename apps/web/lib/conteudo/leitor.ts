@@ -4,6 +4,7 @@ import { getCurrentTenantId } from '@/lib/tenant'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { remember } from '@/lib/cache/relatorio-cache'
 import { listarAnotacoes, type Anotacao } from './anotacoes'
+import { acessoEfetivo, type ItemAcesso, type Atribuicao, type Aluno, type AcessoGeral, type ModoAcesso, type ResultadoAcesso } from './acesso-efetivo'
 
 // LEITOR do aluno (Fase 8) — monta a leitura a partir dos TRECHOS da versão atual (cada um com seu
 // uid, a âncora estável do grifo) + as anotações do aluno. A ancoragem é por (uid + offset no trecho):
@@ -23,130 +24,140 @@ export interface Leitura {
   anotacoes: Anotacao[]
 }
 
-// ─────────── CONTROLE DE ACESSO (modelo Drive: liberar p/ todos + grupos/alunos + herança) ───────────
-// Regra por NÍVEL (pasta ou documento):
-//   • acesso_geral='todos'         → liberado a TODOS neste nível.
-//   • acesso_geral='restrito'      → só os grupos/alunos atribuídos (sem linhas = ninguém).
-//   • acesso_geral null (padrão)   → SEM linhas = liberado a todos (base); COM linhas = só os atribuídos.
-// HERANÇA (herda_acesso): o nó precisa liberar E, se herda_acesso≠false, o PAI também (recursivo pela
-// cadeia pai_id). herda_acesso=false "corta" a herança (não exige os ancestrais acima dele).
-// Tolerante: tabelas/colunas ausentes → tratado como liberado.
-type AcessoGeral = 'todos' | 'restrito' | null | undefined
+// ─────────── CONTROLE DE ACESSO (motor ÚNICO: ./acesso-efetivo) ───────────
+// O gate do aluno é RELIGADO ao módulo puro `acessoEfetivo`. Cada pasta/doc vira um `ItemAcesso`
+// (modo principal/herdar/propria/bloquear + oculto + acesso_geral + atribuições com origem/permissões),
+// com a cadeia de ancestrais montada por `pai_id`.
+//
+// NÃO-REGRESSÃO: enquanto o admin não configurar os campos novos (modo_acesso/oculto/origem/permissões),
+// os DEFAULTS da migração 20261026000000 + o mapeamento `modoEfetivo` abaixo reproduzem o gate anterior:
+//   • default (acesso_geral null, sem atribuições, herda_acesso!=false, modo herdar/principal) → LIBERADO,
+//     exatamente como antes ("sem linhas = liberado a todos").
+//   • restrição do modelo ANTIGO (acesso_geral='restrito' OU atribuições OU herda_acesso=false) torna o
+//     nível AUTORITATIVO ('propria'), e como `acessoEfetivo` deixa o nível restritivo MAIS PRÓXIMO decidir,
+//     o caso comum (uma única restrição na cadeia) fica idêntico ao AND de nível único de antes.
+//   • modos novos (bloquear/propria/principal) e oculto só passam a valer quando o admin os define na UI.
+// Tolerante: colunas/tabelas ausentes (migração pendente) degradam para LIBERADO, como antes.
 
-function matchAluno(grupos: Set<string> | undefined, estudantes: Set<string> | undefined, meusGrupos: Set<string>, estId: string): boolean {
-  if (grupos && [...grupos].some((x) => meusGrupos.has(x))) return true
-  if (estudantes && estudantes.has(estId)) return true
-  return false
+interface NivelRaw { pai_id?: string | null; herda_acesso?: boolean | null; acesso_geral?: AcessoGeral; modo_acesso?: string | null; oculto?: boolean | null }
+
+/** try com colunas novas; se a coluna/tabela não existe, cai no SELECT legado; se tudo falhar, []. */
+async function fetchTol<T>(primario: () => any, legado: () => any): Promise<T[]> {
+  try { return await fetchAll<T>(primario) } catch { try { return await fetchAll<T>(legado) } catch { return [] } }
+}
+async function fetchTolByIn<T>(ids: string[], primario: (c: string[]) => any, legado: (c: string[]) => any): Promise<T[]> {
+  if (!ids.length) return []
+  try { return await fetchAllByIn<T>(ids, primario) } catch { try { return await fetchAllByIn<T>(ids, legado) } catch { return [] } }
 }
 
-/** Este NÍVEL (pasta/doc) libera o aluno? (só o nível, sem herança). */
-function nivelLibera(geral: AcessoGeral, grupos: Set<string> | undefined, estudantes: Set<string> | undefined, meusGrupos: Set<string>, estId: string): boolean {
-  if (geral === 'todos') return true
-  const temRows = (grupos?.size ?? 0) > 0 || (estudantes?.size ?? 0) > 0
-  if (geral === 'restrito') return matchAluno(grupos, estudantes, meusGrupos, estId) // restrito: só os atribuídos
-  if (!temRows) return true // null + sem linhas = liberado a todos (padrão)
-  return matchAluno(grupos, estudantes, meusGrupos, estId) // null + com linhas = só os atribuídos
+/** Mapeia o estado persistido → modo de 1ª classe, PRESERVANDO o comportamento atual (ver bloco acima). */
+function modoEfetivo(raw: NivelRaw, isRoot: boolean, temAtrib: boolean): ModoAcesso {
+  const m = raw.modo_acesso
+  if (m === 'bloquear') return 'bloquear'
+  if (m === 'propria') return 'propria'
+  if (m === 'principal') return isRoot ? 'principal' : 'propria' // 'principal' em nó não-raiz = autoritativo no próprio nível
+  // 'herdar' ou null/ausente (default / intocado pela UI nova):
+  if (raw.herda_acesso === false) return 'propria' // herda_acesso=false corta a cadeia (decide no próprio nível)
+  if (raw.acesso_geral === 'restrito' || temAtrib) return 'propria' // restrição do modelo antigo = autoritativa
+  return isRoot ? 'principal' : 'herdar'
+}
+
+function itemDeNivel(id: string, raw: NivelRaw, atrib: Atribuicao[], ancestrais: ItemAcesso[], isRoot: boolean): ItemAcesso {
+  return { id, modo: modoEfetivo(raw, isRoot, atrib.length > 0), oculto: raw.oculto === true, acessoGeral: raw.acesso_geral ?? null, atribuicoes: atrib, ancestrais }
+}
+
+function atribDe(tipo: 'grupo' | 'aluno', refId: string, r: any): Atribuicao {
+  const origem = r?.origem === 'individual' ? 'individual' : r?.origem === 'via_pacote' ? 'via_pacote' : 'avulsa'
+  return {
+    tipo, grupoId: tipo === 'grupo' ? refId : null, estudanteId: tipo === 'aluno' ? refId : null, origem,
+    liberadoDe: r?.liberado_de ?? null, liberadoAte: r?.liberado_ate ?? null,
+    // ausentes (SELECT legado) = null → `permsDa` trata como liberado (igual ao gate antigo: atribuição = acesso cheio).
+    podeLer: r?.pode_ler ?? null, podeBaixar: r?.pode_baixar ?? null, podeGrifar: r?.pode_grifar ?? null,
+  }
+}
+
+/** Atribuições (grupos + estudantes) por nó, já como `Atribuicao[]`. Tolerante a colunas/tabelas ausentes. */
+async function carregarAtribuicoes(svc: any, tenantId: string, tipo: 'pasta' | 'doc', ids: string[]): Promise<Map<string, Atribuicao[]>> {
+  const out = new Map<string, Atribuicao[]>()
+  if (!ids.length) return out
+  const tg = tipo === 'pasta' ? 'simulado_pasta_grupos' : 'simulado_conteudo_documento_grupos'
+  const te = tipo === 'pasta' ? 'simulado_pasta_estudantes' : 'simulado_conteudo_documento_estudantes'
+  const key = tipo === 'pasta' ? 'pasta_id' : 'documento_id'
+  const extra = 'origem, pode_ler, pode_baixar, pode_grifar, liberado_de, liberado_ate'
+  const [grupos, estud] = await Promise.all([
+    fetchTolByIn<any>(ids,
+      (c) => svc.from(tg).select(`${key}, grupo_id, ${extra}`).eq('tenant_id', tenantId).in(key, c).order(key, { ascending: true }),
+      (c) => svc.from(tg).select(`${key}, grupo_id`).eq('tenant_id', tenantId).in(key, c).order(key, { ascending: true })),
+    fetchTolByIn<any>(ids,
+      (c) => svc.from(te).select(`${key}, estudante_id, ${extra}`).eq('tenant_id', tenantId).in(key, c).order(key, { ascending: true }),
+      (c) => svc.from(te).select(`${key}, estudante_id`).eq('tenant_id', tenantId).in(key, c).order(key, { ascending: true })),
+  ])
+  const push = (id: string, a: Atribuicao) => { (out.get(id) ?? out.set(id, []).get(id)!).push(a) }
+  for (const r of grupos as any[]) push(r[key], atribDe('grupo', r.grupo_id, r))
+  for (const r of estud as any[]) push(r[key], atribDe('aluno', r.estudante_id, r))
+  return out
 }
 
 /**
- * Contexto de acesso do aluno: grupos dele + função `pastaAcessivel(pastaId)` que aplica a HERANÇA
- * (a pasta e todos os ancestrais via pai_id precisam liberar). Tolerante: tabelas ausentes → tudo liberado.
+ * Motor de acesso do aluno: carrega as pastas de conteúdo (+ atribuições) UMA vez e expõe
+ * `pastaAcessivel(id)` e `avaliarDoc(docRaw, atrib)` — ambos delegam a `acessoEfetivo`. As pastas são
+ * poucas (dezenas), então carregá-las inteiras é barato; atribuições de DOCUMENTO entram por lote fora.
  */
-async function contextoAcessoAluno(svc: any, tenantId: string, estId: string) {
+async function motorAcesso(svc: any, tenantId: string, estId: string) {
   const { data: gm } = await svc.from('simulado_grupo_membros').select('grupo_id').eq('estudante_id', estId)
   const meusGrupos = new Set<string>(((gm as any[]) ?? []).map((r) => r.grupo_id))
+  const aluno: Aluno = { estudanteId: estId, grupos: [...meusGrupos] }
 
-  const pastas = await fetchAll<any>(() => svc.from(T_PASTA).select('id, pai_id, herda_acesso, acesso_geral')
-    .eq('tenant_id', tenantId).eq('folder_area', 'conteudo').order('id', { ascending: true }))
-  const paiDe = new Map<string, string | null>((pastas ?? []).map((p: any) => [p.id, p.pai_id ?? null]))
-  const infoPasta = new Map<string, { herda: boolean; geral: AcessoGeral }>((pastas ?? []).map((p: any) => [p.id, { herda: p.herda_acesso !== false, geral: p.acesso_geral ?? null }]))
-  const pastaIds = [...paiDe.keys()]
+  const pastas = await fetchTol<any>(
+    () => svc.from(T_PASTA).select('id, pai_id, herda_acesso, acesso_geral, modo_acesso, oculto').eq('tenant_id', tenantId).eq('folder_area', 'conteudo').order('id', { ascending: true }),
+    () => svc.from(T_PASTA).select('id, pai_id, herda_acesso, acesso_geral').eq('tenant_id', tenantId).eq('folder_area', 'conteudo').order('id', { ascending: true }),
+  )
+  const infoPasta = new Map<string, NivelRaw>((pastas ?? []).map((p: any) => [p.id, { pai_id: p.pai_id ?? null, herda_acesso: p.herda_acesso, acesso_geral: p.acesso_geral ?? null, modo_acesso: p.modo_acesso ?? null, oculto: p.oculto ?? false }]))
+  const atribPasta = await carregarAtribuicoes(svc, tenantId, 'pasta', [...infoPasta.keys()])
 
-  const gruposPasta = new Map<string, Set<string>>()
-  const estudPasta = new Map<string, Set<string>>()
-  if (pastaIds.length) {
-    try {
-      const [pg, pe] = await Promise.all([
-        fetchAllByIn<any>(pastaIds, (c) => svc.from('simulado_pasta_grupos').select('pasta_id, grupo_id').eq('tenant_id', tenantId).in('pasta_id', c).order('pasta_id', { ascending: true })),
-        fetchAllByIn<any>(pastaIds, (c) => svc.from('simulado_pasta_estudantes').select('pasta_id, estudante_id').eq('tenant_id', tenantId).in('pasta_id', c).order('pasta_id', { ascending: true })),
-      ])
-      for (const r of pg as any[]) (gruposPasta.get(r.pasta_id) ?? gruposPasta.set(r.pasta_id, new Set()).get(r.pasta_id)!).add(r.grupo_id)
-      for (const r of pe as any[]) (estudPasta.get(r.pasta_id) ?? estudPasta.set(r.pasta_id, new Set()).get(r.pasta_id)!).add(r.estudante_id)
-    } catch { /* tabelas de acesso de pasta ausentes → sem restrição de pasta */ }
+  function cadeia(paiId: string | null): ItemAcesso[] {
+    const chain: ItemAcesso[] = []; const seen = new Set<string>(); let cur = paiId
+    while (cur && !seen.has(cur)) {
+      seen.add(cur)
+      const raw = infoPasta.get(cur) ?? { pai_id: null }
+      chain.push(itemDeNivel(cur, raw, atribPasta.get(cur) ?? [], [], (raw.pai_id ?? null) == null))
+      cur = raw.pai_id ?? null
+    }
+    return chain
   }
 
-  const memo = new Map<string, boolean>()
+  const memoP = new Map<string, boolean>()
   function pastaAcessivel(pastaId: string | null): boolean {
-    if (!pastaId) return true // raiz = sempre acessível
-    const cached = memo.get(pastaId); if (cached !== undefined) return cached
-    memo.set(pastaId, true) // provisório (corta ciclos em dados corrompidos)
-    const info = infoPasta.get(pastaId) ?? { herda: true, geral: null }
-    const propria = nivelLibera(info.geral, gruposPasta.get(pastaId), estudPasta.get(pastaId), meusGrupos, estId)
-    // herda_acesso=false corta a cadeia (não exige o pai); senão, o pai também precisa liberar.
-    const ok = propria && (info.herda === false || pastaAcessivel(paiDe.get(pastaId) ?? null))
-    memo.set(pastaId, ok)
+    if (!pastaId) return true
+    const c = memoP.get(pastaId); if (c !== undefined) return c
+    const raw = infoPasta.get(pastaId) ?? { pai_id: null }
+    const item = itemDeNivel(pastaId, raw, atribPasta.get(pastaId) ?? [], cadeia(raw.pai_id ?? null), (raw.pai_id ?? null) == null)
+    const ok = acessoEfetivo(item, aluno).permitido
+    memoP.set(pastaId, ok)
     return ok
   }
 
-  return { meusGrupos, pastaAcessivel }
-}
-
-/**
- * Gate de UM documento (caminho de abrir 1 doc) — ESCOPADO: resolve só a atribuição do doc + a cadeia de
- * ancestrais da pasta dele (não a árvore inteira nem todas as atribuições do tenant). Muito menos egress
- * que `contextoAcessoAluno` no caminho `carregarLeitura` (1 doc por acesso, via iframe, por aluno).
- */
-async function docAcessivelAluno(svc: any, tenantId: string, estId: string, doc: { id: string; pasta_id: string | null; herda_acesso?: boolean; acesso_geral?: AcessoGeral }): Promise<boolean> {
-  const { data: gm } = await svc.from('simulado_grupo_membros').select('grupo_id').eq('estudante_id', estId)
-  const meusGrupos = new Set<string>(((gm as any[]) ?? []).map((r) => r.grupo_id))
-  // nível do próprio documento
-  const { grupos: dG, estud: dE } = await atribuicoesDocs(svc, tenantId, [doc.id])
-  if (!nivelLibera(doc.acesso_geral ?? null, dG.get(doc.id), dE.get(doc.id), meusGrupos, estId)) return false
-  if (doc.herda_acesso === false || !doc.pasta_id) return true // não herda ou sem pasta → não exige ancestrais
-  // cadeia de ancestrais (pastas são poucas → carregar só id/pai_id/herança é barato)
-  const pastas = await fetchAll<any>(() => svc.from(T_PASTA).select('id, pai_id, herda_acesso, acesso_geral').eq('tenant_id', tenantId).eq('folder_area', 'conteudo').order('id', { ascending: true }))
-  const paiDe = new Map<string, string | null>((pastas ?? []).map((p: any) => [p.id, p.pai_id ?? null]))
-  const infoPasta = new Map<string, { herda: boolean; geral: AcessoGeral }>((pastas ?? []).map((p: any) => [p.id, { herda: p.herda_acesso !== false, geral: p.acesso_geral ?? null }]))
-  // só as pastas da cadeia precisam das atribuições
-  const chain: string[] = []; const seen = new Set<string>(); let cur: string | null = doc.pasta_id
-  while (cur && !seen.has(cur)) { seen.add(cur); chain.push(cur); cur = paiDe.get(cur) ?? null }
-  if (!chain.length) return true
-  const gruposPasta = new Map<string, Set<string>>(); const estudPasta = new Map<string, Set<string>>()
-  try {
-    const [pg, pe] = await Promise.all([
-      fetchAllByIn<any>(chain, (c) => svc.from('simulado_pasta_grupos').select('pasta_id, grupo_id').eq('tenant_id', tenantId).in('pasta_id', c).order('pasta_id', { ascending: true })),
-      fetchAllByIn<any>(chain, (c) => svc.from('simulado_pasta_estudantes').select('pasta_id, estudante_id').eq('tenant_id', tenantId).in('pasta_id', c).order('pasta_id', { ascending: true })),
-    ])
-    for (const r of pg as any[]) (gruposPasta.get(r.pasta_id) ?? gruposPasta.set(r.pasta_id, new Set()).get(r.pasta_id)!).add(r.grupo_id)
-    for (const r of pe as any[]) (estudPasta.get(r.pasta_id) ?? estudPasta.set(r.pasta_id, new Set()).get(r.pasta_id)!).add(r.estudante_id)
-  } catch { return true } // tabelas de acesso ausentes → liberado
-  // Sobe pela cadeia respeitando herda_acesso de cada pasta.
-  let pid: string | null = doc.pasta_id
-  const visit = new Set<string>()
-  while (pid && !visit.has(pid)) {
-    visit.add(pid)
-    const info = infoPasta.get(pid) ?? { herda: true, geral: null }
-    if (!nivelLibera(info.geral, gruposPasta.get(pid), estudPasta.get(pid), meusGrupos, estId)) return false
-    if (info.herda === false) return true
-    pid = paiDe.get(pid) ?? null
+  function avaliarDoc(docRaw: { id: string; pasta_id?: string | null; herda_acesso?: boolean | null; acesso_geral?: AcessoGeral; modo_acesso?: string | null; oculto?: boolean | null }, atrib: Atribuicao[]): ResultadoAcesso {
+    const raw: NivelRaw = { pai_id: docRaw.pasta_id ?? null, herda_acesso: docRaw.herda_acesso, acesso_geral: docRaw.acesso_geral ?? null, modo_acesso: docRaw.modo_acesso ?? null, oculto: docRaw.oculto ?? false }
+    const item = itemDeNivel(docRaw.id, raw, atrib, cadeia(raw.pai_id ?? null), (raw.pai_id ?? null) == null)
+    return acessoEfetivo(item, aluno)
   }
-  return true
+
+  return { aluno, meusGrupos, pastaAcessivel, avaliarDoc }
 }
 
-/** Atribuições (grupos/estudantes) por documento de conteúdo. Tolerante a tabelas ausentes. */
-async function atribuicoesDocs(svc: any, tenantId: string, docIds: string[]) {
-  const grupos = new Map<string, Set<string>>()
-  const estud = new Map<string, Set<string>>()
-  if (!docIds.length) return { grupos, estud }
-  try {
-    const [dg, de] = await Promise.all([
-      fetchAllByIn<any>(docIds, (c) => svc.from('simulado_conteudo_documento_grupos').select('documento_id, grupo_id').eq('tenant_id', tenantId).in('documento_id', c).order('documento_id', { ascending: true })),
-      fetchAllByIn<any>(docIds, (c) => svc.from('simulado_conteudo_documento_estudantes').select('documento_id, estudante_id').eq('tenant_id', tenantId).in('documento_id', c).order('documento_id', { ascending: true })),
-    ])
-    for (const r of dg as any[]) (grupos.get(r.documento_id) ?? grupos.set(r.documento_id, new Set()).get(r.documento_id)!).add(r.grupo_id)
-    for (const r of de as any[]) (estud.get(r.documento_id) ?? estud.set(r.documento_id, new Set()).get(r.documento_id)!).add(r.estudante_id)
-  } catch { /* tabelas de acesso de doc ausentes → sem restrição de doc */ }
-  return { grupos, estud }
+/** Busca o doc + (tolerante) as colunas novas modo_acesso/oculto. `cols` = colunas base sempre necessárias. */
+async function fetchDocComAcesso(svc: any, tenantId: string, id: string, cols: string): Promise<any | null> {
+  let r = await svc.from(T_DOC).select(`${cols}, modo_acesso, oculto`).eq('tenant_id', tenantId).eq('id', id).maybeSingle()
+  if (r.error) r = await svc.from(T_DOC).select(cols).eq('tenant_id', tenantId).eq('id', id).maybeSingle()
+  return r.data ?? null
+}
+
+/** Avalia 1 documento (carrega atribuições do próprio doc). Retorna o `ResultadoAcesso` completo. */
+async function avaliarDocAluno(svc: any, tenantId: string, estId: string, docRaw: any): Promise<ResultadoAcesso> {
+  const motor = await motorAcesso(svc, tenantId, estId)
+  const atrib = (await carregarAtribuicoes(svc, tenantId, 'doc', [docRaw.id])).get(docRaw.id) ?? []
+  return motor.avaliarDoc(docRaw, atrib)
 }
 
 export interface PastaAluno { id: string; nome: string; cor: string | null; totalDocs: number }
@@ -174,7 +185,11 @@ export async function arvoreBibliotecaAluno(alunoId: string, pastaId?: string | 
 
   const [pastasRaw, docsRaw] = await Promise.all([
     fetchAll<any>(() => svc.from(T_PASTA).select('id, nome, pai_id, cor, deletado').eq('tenant_id', tenantId).eq('folder_area', 'conteudo').eq('is_folder', true).order('id', { ascending: true })),
-    fetchAll<any>(() => svc.from(T_DOC).select('id, titulo, tipo_origem, versao_atual_id, atualizado_em, pasta_id, herda_acesso, acesso_geral').eq('tenant_id', tenantId).eq('status', 'publicado').eq('deletado', false).eq('categoria', 'conteudo').not('versao_atual_id', 'is', null).order('atualizado_em', { ascending: false }).order('id', { ascending: true })),
+    // modo_acesso/oculto são tolerantes (migração pendente) → cai no SELECT legado.
+    fetchTol<any>(
+      () => svc.from(T_DOC).select('id, titulo, tipo_origem, versao_atual_id, atualizado_em, pasta_id, herda_acesso, acesso_geral, modo_acesso, oculto').eq('tenant_id', tenantId).eq('status', 'publicado').eq('deletado', false).eq('categoria', 'conteudo').not('versao_atual_id', 'is', null).order('atualizado_em', { ascending: false }).order('id', { ascending: true }),
+      () => svc.from(T_DOC).select('id, titulo, tipo_origem, versao_atual_id, atualizado_em, pasta_id, herda_acesso, acesso_geral').eq('tenant_id', tenantId).eq('status', 'publicado').eq('deletado', false).eq('categoria', 'conteudo').not('versao_atual_id', 'is', null).order('atualizado_em', { ascending: false }).order('id', { ascending: true }),
+    ),
   ])
   const pastas = (pastasRaw ?? []).filter((p: any) => !p.deletado)
   const docs = docsRaw ?? []
@@ -182,10 +197,11 @@ export async function arvoreBibliotecaAluno(alunoId: string, pastaId?: string | 
   const nomeDe = new Map<string, string>(pastas.map((p: any) => [p.id, p.nome]))
   const corDe = new Map<string, string | null>(pastas.map((p: any) => [p.id, p.cor ?? null]))
 
-  const { meusGrupos, pastaAcessivel } = await contextoAcessoAluno(svc, tenantId, alunoId)
-  const { grupos: dGrupos, estud: dEstud } = await atribuicoesDocs(svc, tenantId, docs.map((d: any) => d.id))
-  const visiveis = docs.filter((d: any) => nivelLibera(d.acesso_geral ?? null, dGrupos.get(d.id), dEstud.get(d.id), meusGrupos, alunoId)
-    && (d.herda_acesso === false || pastaAcessivel(d.pasta_id ?? null)))
+  // Motor de acesso ÚNICO (acessoEfetivo) — visibilidade da pasta e de cada doc (modo/oculto/origem/janela).
+  const motor = await motorAcesso(svc, tenantId, alunoId)
+  const pastaAcessivel = motor.pastaAcessivel
+  const atribDocs = await carregarAtribuicoes(svc, tenantId, 'doc', docs.map((d: any) => d.id))
+  const visiveis = docs.filter((d: any) => motor.avaliarDoc(d, atribDocs.get(d.id) ?? []).permitido)
 
   // conta docs visíveis na subárvore de cada pasta (para ocultar pastas vazias + mostrar total)
   const totalSub = new Map<string, number>()
@@ -243,13 +259,11 @@ export async function carregarLeitura(documentoId: string, alunoId: string): Pro
   const tenantId = await getCurrentTenantId()
   if (!tenantId || !documentoId) return null
   const svc = createAdminClient()
-  const { data: doc } = await svc.from(T_DOC)
-    .select('id, titulo, status, versao_atual_id, deletado, pasta_id, herda_acesso, acesso_geral, tipo_origem, categoria')
-    .eq('tenant_id', tenantId).eq('id', documentoId).maybeSingle()
+  const doc = await fetchDocComAcesso(svc, tenantId, documentoId, 'id, titulo, status, versao_atual_id, deletado, pasta_id, herda_acesso, acesso_geral, tipo_origem, categoria')
   if (!doc || doc.deletado || doc.status !== 'publicado' || !doc.versao_atual_id || (doc as any).categoria !== 'conteudo') return null
 
-  // Gate de acesso ESCOPADO (nível do doc + cadeia de ancestrais, respeitando herança e "liberar p/ todos").
-  if (!(await docAcessivelAluno(svc, tenantId, alunoId, { id: documentoId, pasta_id: (doc as any).pasta_id ?? null, herda_acesso: (doc as any).herda_acesso, acesso_geral: (doc as any).acesso_geral ?? null }))) return null
+  // Gate de acesso ESCOPADO via motor ÚNICO (acessoEfetivo): modo/oculto do doc + cadeia de ancestrais.
+  if (!(await avaliarDocAluno(svc, tenantId, alunoId, doc)).permitido) return null
 
   const [trechos, anotacoes, ver] = await Promise.all([
     fetchAll<any>(() => svc.from(T_TR).select('uid, ordem, tipo, rotulo, texto').eq('tenant_id', tenantId).eq('versao_id', doc.versao_atual_id).order('ordem', { ascending: true })),
@@ -314,11 +328,9 @@ export async function carregarLeituraPdf(documentoId: string, alunoId: string): 
   const tenantId = await getCurrentTenantId()
   if (!tenantId || !documentoId) return null
   const svc = createAdminClient()
-  const { data: doc } = await svc.from(T_DOC)
-    .select('id, titulo, status, versao_atual_id, deletado, pasta_id, herda_acesso, acesso_geral, tipo_origem, categoria')
-    .eq('tenant_id', tenantId).eq('id', documentoId).maybeSingle()
+  const doc = await fetchDocComAcesso(svc, tenantId, documentoId, 'id, titulo, status, versao_atual_id, deletado, pasta_id, herda_acesso, acesso_geral, tipo_origem, categoria')
   if (!doc || doc.deletado || doc.status !== 'publicado' || !doc.versao_atual_id || (doc as any).categoria !== 'conteudo') return null
-  if (!(await docAcessivelAluno(svc, tenantId, alunoId, { id: documentoId, pasta_id: (doc as any).pasta_id ?? null, herda_acesso: (doc as any).herda_acesso, acesso_geral: (doc as any).acesso_geral ?? null }))) return null
+  if (!(await avaliarDocAluno(svc, tenantId, alunoId, doc)).permitido) return null
 
   const { gerarPdfDocumento } = await import('./thumb')
   const [pdfUrl, grifosRows] = await Promise.all([
@@ -337,11 +349,11 @@ export async function urlDownloadAluno(documentoId: string, alunoId: string): Pr
   const tenantId = await getCurrentTenantId()
   if (!tenantId || !documentoId) return null
   const svc = createAdminClient()
-  const { data: doc } = await svc.from(T_DOC)
-    .select('id, status, deletado, versao_atual_id, pasta_id, herda_acesso, acesso_geral, categoria')
-    .eq('tenant_id', tenantId).eq('id', documentoId).maybeSingle()
+  const doc = await fetchDocComAcesso(svc, tenantId, documentoId, 'id, status, deletado, versao_atual_id, pasta_id, herda_acesso, acesso_geral, categoria')
   if (!doc || doc.deletado || doc.status !== 'publicado' || !doc.versao_atual_id || (doc as any).categoria !== 'conteudo') return null
-  if (!(await docAcessivelAluno(svc, tenantId, alunoId, { id: documentoId, pasta_id: (doc as any).pasta_id ?? null, herda_acesso: (doc as any).herda_acesso, acesso_geral: (doc as any).acesso_geral ?? null }))) return null
+  // Gate + download exige permissão de BAIXAR (acessoEfetivo). Nega se não puder ler OU não puder baixar.
+  const resDl = await avaliarDocAluno(svc, tenantId, alunoId, doc)
+  if (!resDl.permitido || !resDl.permissoes.baixar) return null
   const { data: ver } = await svc.from('simulado_conteudo_versoes').select('arquivo_key').eq('tenant_id', tenantId).eq('id', doc.versao_atual_id).maybeSingle()
   if (!(ver as any)?.arquivo_key) return null
   const { urlAssinadaOriginal } = await import('./ingestao')

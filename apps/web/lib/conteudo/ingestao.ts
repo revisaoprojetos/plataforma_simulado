@@ -4,12 +4,20 @@ import { createHash } from 'node:crypto'
 import { uploadArquivo, getStorage, PRESETS, validateFile } from '@/lib/storage'
 import { createAdminClient } from '@/lib/supabase/server'
 import { extrairTextoPdf } from '@/lib/ia/pdf-texto'
+import { kindPorArquivo } from '@/lib/biblioteca/tipos-conteudo'
+import { ehMidia, arquivoMidia, validacaoMidia, htmlMarcadorMidia, extrairTextoOffice, type KindMidia } from './midia'
 
 // INGESTÃO (Fase 1/2) — recebe o arquivo original, guarda no storage (fonte de edição — N8) e CONVERTE
 // para HTML, que o parser de trechos (trechos.ts) estrutura. docx via mammoth (mesmo styleMap da
 // Leitura), pdf via camada de texto (pdfjs) embrulhada em <p>, html direto. Server-only.
+//
+// TIPOS NOVOS (Fase 1 — só ingestão): pptx/xlsx/video/audio são ACEITOS — guardamos o original e
+// registramos documento/versão com o tipo correto. O pipeline textual de trechos NÃO vale p/ mídia:
+// `converterParaHtml` devolve, p/ esses tipos, um HTML-marcador (0 trechos) — ou, p/ pptx/xlsx, um
+// índice de busca leve quando a extração é trivial (ver ./midia). Visualizadores do aluno = fase posterior.
 
-export type TipoOrigem = 'docx' | 'pdf' | 'html'
+// 'html' é interno da ingestão (vira documento docx no modelo de tipos); os demais casam com KindConteudo.
+export type TipoOrigem = 'docx' | 'pdf' | 'html' | KindMidia
 // Bucket do storage p/ os originais. CONFIGURÁVEL por env (STORAGE_CONTENT_BUCKET) e com AUTO-RESOLUÇÃO:
 // usa o preferido se existir, senão cai no 1º bucket existente da lista (ex.: 'pdfs') — assim o teste
 // não trava se o bucket dedicado ainda não foi criado. Resolvido 1x por processo (cache).
@@ -18,8 +26,13 @@ let _bucketCache: string | null = null
 export async function resolverBucketConteudo(): Promise<string> {
   if (_bucketCache) return _bucketCache
   const preferidos = [process.env.STORAGE_CONTENT_BUCKET, 'conteudos', 'pdfs', 'discursivas'].filter(Boolean) as string[]
+  // Só o provider Supabase expõe listBuckets (auto-resolução p/ não travar se o bucket dedicado ainda
+  // não existe). Nos demais (S3/Hetzner/GCS) os buckets são pré-criados → usa o preferido/ env direto.
+  if ((process.env.STORAGE_PROVIDER ?? 'supabase') !== 'supabase') {
+    _bucketCache = preferidos[0]
+    return _bucketCache
+  }
   try {
-    // só o provider supabase expõe listBuckets; nos demais, usa o preferido direto.
     const svc = createAdminClient()
     const { data } = await svc.storage.listBuckets()
     if (data && data.length) {
@@ -32,18 +45,21 @@ export async function resolverBucketConteudo(): Promise<string> {
   return _bucketCache
 }
 
-const MIME: Record<TipoOrigem, string> = {
+const MIME_TEXTUAL: Record<'docx' | 'pdf' | 'html', string> = {
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   pdf: 'application/pdf',
   html: 'text/html',
 }
 
-/** Detecta o tipo pela extensão/mime declarado. */
+/** Detecta o tipo pela extensão/mime declarado. docx/pdf/html primeiro (preserva 'html' distinto do
+ *  mapeamento docx de kindPorArquivo); depois os tipos de mídia/office (pptx/xlsx/video/audio). */
 export function tipoDoArquivo(nome: string, mime?: string): TipoOrigem | null {
   const n = (nome || '').toLowerCase()
   if (n.endsWith('.docx') || /wordprocessingml/.test(mime || '')) return 'docx'
   if (n.endsWith('.pdf') || /pdf/.test(mime || '')) return 'pdf'
   if (n.endsWith('.html') || n.endsWith('.htm') || /html/.test(mime || '')) return 'html'
+  const k = kindPorArquivo(nome, mime)
+  if (k === 'pptx' || k === 'xlsx' || k === 'video' || k === 'audio') return k
   return null
 }
 
@@ -51,9 +67,19 @@ function escaparHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
-/** Converte os bytes do arquivo em HTML estruturável. */
+/** Converte os bytes do arquivo em HTML estruturável. Para MÍDIA/OFFICE não força o pipeline textual:
+ *  pptx/xlsx tentam um índice de busca leve e, se vazio, caem no HTML-marcador; vídeo/áudio = marcador
+ *  direto. O marcador é um comentário → 0 trechos, mas .trim() não-vazio (passa o gate do importador). */
 export async function converterParaHtml(data: Buffer, tipo: TipoOrigem): Promise<{ html: string; erro?: string }> {
   try {
+    if (ehMidia(tipo)) {
+      if (tipo === 'pptx' || tipo === 'xlsx') {
+        const indice = await extrairTextoOffice(tipo, data, `.${tipo}`)
+        return { html: indice.trim() ? indice : htmlMarcadorMidia(tipo) }
+      }
+      // vídeo/áudio: sem texto. TODO(fase posterior): transcrição/legenda como índice de busca.
+      return { html: htmlMarcadorMidia(tipo) }
+    }
     if (tipo === 'docx') {
       // Mapeia os estilos de TÍTULO em português ("Título 1/2/3") para h1/h2/h3 — o mammoth já mapeia os
       // ingleses ("Heading N") por padrão, mas não os PT. Assim o html_rico/trechos ganham hierarquia real
@@ -100,17 +126,33 @@ export async function baixarOriginal(arquivoKey: string): Promise<Buffer | null>
 export async function guardarOriginal(input: {
   tenantId: string; documentoId: string; numeroVersao: number; tipo: TipoOrigem; data: Buffer; nome: string; criadoPor?: string | null
 }): Promise<{ arquivoKey: string; hash: string } | { erro: string }> {
-  const ext = input.tipo
+  // MÍDIA/OFFICE (pptx/xlsx/video/audio): extensão + content-type REAL (do nome) e validação própria
+  // (ver ./midia). Guarda o original; os visualizadores do aluno vêm em fase posterior.
+  let ext: string
+  let contentType: string
+  if (ehMidia(input.tipo)) {
+    const mid = arquivoMidia(input.tipo as KindMidia, input.nome)
+    ext = mid.ext
+    contentType = mid.contentType
+    const vm = validacaoMidia(input.tipo as KindMidia, input.data, input.nome)
+    if (vm.erro) return { erro: vm.erro }
+    const res = validateFile(input.data, vm.declaredMime, vm.opts)
+    if (!res.ok) return { erro: res.error || 'Arquivo inválido.' }
+  } else {
+    const tipoTxt = input.tipo as 'docx' | 'pdf' | 'html'
+    ext = tipoTxt
+    contentType = MIME_TEXTUAL[tipoTxt]
+    const preset = tipoTxt === 'docx' ? PRESETS.docx : tipoTxt === 'pdf' ? PRESETS.documento : PRESETS.html
+    // IMPORTANTE: .docx é um ZIP (magic bytes PK..) → o validador detecta 'application/zip'. Validamos
+    // passando o mime COMPATÍVEL com a assinatura (senão o anti-spoof rejeita), mas guardamos no storage
+    // com o content-type REAL do docx (para o OnlyOffice servir certo).
+    const mimeValidacao = tipoTxt === 'docx' ? 'application/zip' : tipoTxt === 'pdf' ? 'application/pdf' : 'text/html'
+    const v = validateFile(input.data, mimeValidacao, preset)
+    if (!v.ok) return { erro: v.error || 'Arquivo inválido.' }
+  }
   const path = `conteudo/${input.tenantId}/${input.documentoId}/v${input.numeroVersao}-${Date.now()}.${ext}`
-  const preset = input.tipo === 'docx' ? PRESETS.docx : input.tipo === 'pdf' ? PRESETS.documento : PRESETS.html
-  // IMPORTANTE: .docx é um ZIP (magic bytes PK..) → o validador detecta 'application/zip'. Validamos
-  // passando o mime COMPATÍVEL com a assinatura (senão o anti-spoof rejeita), mas guardamos no storage
-  // com o content-type REAL do docx (para o OnlyOffice servir certo).
-  const mimeValidacao = input.tipo === 'docx' ? 'application/zip' : input.tipo === 'pdf' ? 'application/pdf' : 'text/html'
-  const v = validateFile(input.data, mimeValidacao, preset)
-  if (!v.ok) return { erro: v.error || 'Arquivo inválido.' }
   const up = await uploadArquivo({
-    tenantId: input.tenantId, bucket: await resolverBucketConteudo(), path, data: input.data, contentType: MIME[input.tipo],
+    tenantId: input.tenantId, bucket: await resolverBucketConteudo(), path, data: input.data, contentType,
     nome: input.nome, publico: false, criadoPor: input.criadoPor ?? null,
   })
   if (!up.ok) return { erro: up.error || 'Falha ao guardar o arquivo.' }

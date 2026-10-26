@@ -9,6 +9,7 @@ import { checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { hospedarBase64 } from '@/lib/storage/hospedar-base64'
 import { BUCKET_IMAGENS } from '@/lib/storage/bucket-imagens'
+import { getStorage } from '@/lib/storage'
 import { softDelete } from '@/lib/soft-delete'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -286,14 +287,17 @@ export async function hospedarImagemQuestaoAction(dataUri: string): Promise<{ ok
   let buf: Buffer
   try { buf = Buffer.from(m[2], 'base64') } catch { return { ok: false, error: 'Imagem inválida.' } }
   if (!buf.length) return { ok: false, error: 'Imagem vazia.' }
-  const svc = createAdminClient()
   const hash = createHash('sha1').update(buf).digest('hex').slice(0, 24)
   const path = `assets/${hash}.${ext}`
-  try { await svc.storage.createBucket(BUCKET_IMAGENS, { public: true }) } catch { /* já existe */ }
-  const { error } = await svc.storage.from(BUCKET_IMAGENS).upload(path, buf, { contentType: `image/${tipo}`, upsert: true, cacheControl: '31536000' })
-  if (error && !/exists/i.test(error.message)) return { ok: false, error: error.message }
-  const url = svc.storage.from(BUCKET_IMAGENS).getPublicUrl(path).data.publicUrl as string
-  return { ok: true, url }
+  const st = getStorage()
+  try {
+    const r = await st.upload({ bucket: BUCKET_IMAGENS, path, data: buf, contentType: `image/${tipo}`, upsert: true, publico: true, cacheControl: '31536000' })
+    return { ok: true, url: r.url ?? st.getPublicUrl(BUCKET_IMAGENS, path) }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'Falha no upload.'
+    if (/exists/i.test(msg)) return { ok: true, url: st.getPublicUrl(BUCKET_IMAGENS, path) }
+    return { ok: false, error: msg }
+  }
 }
 
 export async function createQuestaoAction(data: QuestaoData) {

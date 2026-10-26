@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
+import { TIPOS_CONTEUDO, ORDEM_TIPOS, seloStyle } from '@/lib/biblioteca/tipos-conteudo'
 
 const sv = (o: Record<string, string | number>): CSSProperties => o as CSSProperties
 const PALETTE = ['#444746', '#ac725e', '#d06b64', '#f83a22', '#fa573c', '#ff7537', '#ffad46', '#fad165', '#fbe983', '#b3dc6c', '#7bd148', '#16a765', '#42d692', '#92e1c0']
@@ -33,16 +34,6 @@ const P = {
   plus: 'M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z',
 }
 const Ico = ({ d }: { d: string }) => (<svg viewBox="0 0 24 24"><path d={d} /></svg>)
-const TYPE: Record<string, { p: string; c: string; label: string }> = {
-  doc: { p: P.doc, c: '#4285f4', label: 'Documento' },
-  sheet: { p: P.sheet, c: '#0f9d58', label: 'Planilha' },
-  slide: { p: P.slide, c: '#f4b400', label: 'Apresentação' },
-  video: { p: P.video, c: '#7b61ff', label: 'Vídeo' },
-  form: { p: P.form, c: '#7248b9', label: 'Formulário' },
-}
-const Tb = ({ t }: { t: string }) => (<span className="gd-tb" style={{ background: TYPE[t].c }}><Ico d={TYPE[t].p} /></span>)
-
-type SubId = null | 'doc' | 'sheet' | 'slide' | 'form' | 'mais'
 
 export function DriveNovoButton({
   rotuloBranco, onNovaPasta, onUploadArquivos, onUploadPasta, onDocumentoBranco, onToast,
@@ -62,7 +53,6 @@ export function DriveNovoButton({
   const [open, setOpen] = useState(false)
   const [shown, setShown] = useState(false)
   const [coords, setCoords] = useState<{ left: number; top: number; origin: string; flip: boolean }>({ left: 0, top: 0, origin: 'top left', flip: false })
-  const [sub, setSub] = useState<SubId>(null)
   const subTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [novaPastaAberta, setNovaPastaAberta] = useState(false)
 
@@ -75,7 +65,7 @@ export function DriveNovoButton({
     el.appendChild(span); setTimeout(() => span.remove(), 650)
   }, [])
 
-  const fechar = useCallback(() => { setOpen(false); setShown(false); setSub(null); if (subTimer.current) clearTimeout(subTimer.current) }, [])
+  const fechar = useCallback(() => { setOpen(false); setShown(false); if (subTimer.current) clearTimeout(subTimer.current) }, [])
 
   useLayoutEffect(() => {
     if (!open) return
@@ -101,25 +91,20 @@ export function DriveNovoButton({
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onKey); window.removeEventListener('scroll', onMove, true); window.removeEventListener('resize', onMove) }
   }, [open, fechar])
 
-  function hoverItem(alvo: SubId) {
-    if (subTimer.current) clearTimeout(subTimer.current)
-    subTimer.current = setTimeout(() => setSub(alvo), alvo ? 90 : 160)
-  }
-  const emBreve = (q: string) => onToast?.(`${q}: em breve`)
+  // Mantém o comportamento de "cancelar submenu pendente" ao passar por um item simples.
+  function hoverItem(_alvo?: unknown) { if (subTimer.current) clearTimeout(subTimer.current) }
   const act = (fn: () => void) => (e: React.MouseEvent) => { e.stopPropagation(); const t = e.currentTarget as HTMLElement; ripple(t, e); setTimeout(() => { fechar(); fn() }, 140) }
+  // Abre o MESMO seletor de arquivo da "Upload de arquivo", restringindo as extensões ao tipo escolhido.
+  // Todos passam pelo fluxo de upload existente (onUploadArquivos → ticket → importarDeStorage).
+  const pickTipo = (accept: string) => (e: React.MouseEvent) => {
+    e.stopPropagation(); ripple(e.currentTarget as HTMLElement, e); fechar()
+    const el = fileRef.current
+    if (el) el.setAttribute('accept', accept)
+    setTimeout(() => el?.click(), 140)
+  }
 
   let idx = 0
   const i = () => idx++
-
-  const SubNew = ({ t, label, j0 }: { t: string; label: string; j0: number }) => (
-    <div className={`gd-item gd-has-sub${sub === (t as SubId) ? ' gd-active' : ''}`} style={sv({ '--i': i() })} onMouseEnter={() => hoverItem(t as SubId)}>
-      <Tb t={t} /><span className="gd-label">{label}</span><svg className="gd-chev" viewBox="0 0 24 24"><path d={P.chev} /></svg>
-      <div className={`gd-submenu${coords.flip ? ' gd-flip' : ''}`} onClick={(e) => e.stopPropagation()}>
-        <div className="gd-item" style={sv({ '--j': 0 })} onClick={act(() => (t === 'doc' ? onDocumentoBranco() : emBreve(`${TYPE[t].label} em branco`)))}><Ico d={P.add} /><span className="gd-label">{TYPE[t].label} em branco</span></div>
-        <div className="gd-item" style={sv({ '--j': 1 })} onClick={act(() => emBreve('Modelos'))}><Ico d={P.tpl} /><span className="gd-label">De um modelo</span></div>
-      </div>
-    </div>
-  )
 
   return (
     <>
@@ -144,7 +129,7 @@ export function DriveNovoButton({
         >
           <div className="gd-item" style={sv({ '--i': i() })} onMouseEnter={() => hoverItem(null)} onClick={act(() => setNovaPastaAberta(true))}><Ico d={P.newFolder} /><span className="gd-label">Nova pasta</span></div>
           <div className="gd-divider" style={sv({ '--i': i() })} />
-          <div className="gd-item" style={sv({ '--i': i() })} onMouseEnter={() => hoverItem(null)} onClick={(e) => { e.stopPropagation(); ripple(e.currentTarget as HTMLElement, e); fechar(); fileRef.current?.click() }}><Ico d={P.upFile} /><span className="gd-label">Upload de arquivo</span></div>
+          <div className="gd-item" style={sv({ '--i': i() })} onMouseEnter={() => hoverItem(null)} onClick={(e) => { e.stopPropagation(); ripple(e.currentTarget as HTMLElement, e); fechar(); fileRef.current?.removeAttribute('accept'); fileRef.current?.click() }}><Ico d={P.upFile} /><span className="gd-label">Upload de arquivo</span></div>
           <div className="gd-item" style={sv({ '--i': i() })} onMouseEnter={() => hoverItem(null)} onClick={(e) => { e.stopPropagation(); ripple(e.currentTarget as HTMLElement, e); fechar(); folderRef.current?.click() }}><Ico d={P.upFolder} /><span className="gd-label">Upload de pasta</span></div>
           <div className="gd-divider" style={sv({ '--i': i() })} />
           <div className="gd-item" style={sv({ '--i': i() })} onMouseEnter={() => hoverItem(null)} onClick={act(() => onDocumentoBranco())}>
@@ -152,22 +137,18 @@ export function DriveNovoButton({
             <span className="gd-label">{rotuloBranco}</span>
           </div>
           <div className="gd-divider" style={sv({ '--i': i() })} />
-          <SubNew t="doc" label="Documento" j0={0} />
-          <SubNew t="sheet" label="Planilha" j0={0} />
-          <SubNew t="slide" label="Apresentação" j0={0} />
-          <div className="gd-item" style={sv({ '--i': i() })} onMouseEnter={() => hoverItem(null)} onClick={act(() => emBreve('Vídeo'))}><Tb t="video" /><span className="gd-label">Vídeo</span></div>
-          <SubNew t="form" label="Formulário" j0={0} />
-          <div className={`gd-item gd-has-sub${sub === 'mais' ? ' gd-active' : ''}`} style={sv({ '--i': i() })} onMouseEnter={() => hoverItem('mais')}>
-            <span className="gd-tb" style={{ background: 'transparent' }} /><span className="gd-label">Mais</span><svg className="gd-chev" viewBox="0 0 24 24"><path d={P.chev} /></svg>
-            <div className={`gd-submenu${coords.flip ? ' gd-flip' : ''}`} onClick={(e) => e.stopPropagation()}>
-              <div className="gd-item" style={sv({ '--j': 0 })} onClick={act(() => emBreve('Desenho'))}><span className="gd-tb" style={{ background: '#e8710a' }}><Ico d={P.drawing} /></span><span className="gd-label">Desenho</span></div>
-              <div className="gd-item" style={sv({ '--j': 1 })} onClick={act(() => emBreve('Mapa'))}><span className="gd-tb" style={{ background: '#d93025' }}><Ico d={P.map} /></span><span className="gd-label">Mapa personalizado</span></div>
-              <div className="gd-item" style={sv({ '--j': 2 })} onClick={act(() => emBreve('Site'))}><span className="gd-tb" style={{ background: '#185abc' }}><Ico d={P.site} /></span><span className="gd-label">Site</span></div>
-              <div className="gd-item" style={sv({ '--j': 3 })} onClick={act(() => emBreve('Script'))}><span className="gd-tb" style={{ background: '#12a4af' }}><Ico d={P.script} /></span><span className="gd-label">Script</span></div>
-              <div className="gd-divider" style={sv({ '--j': 4 })} />
-              <div className="gd-item" style={sv({ '--j': 5 })} onClick={act(() => emBreve('Central de apps'))}><Ico d={P.add} /><span className="gd-label">Conectar mais apps</span></div>
-            </div>
-          </div>
+          <div className="gd-colors-title" style={{ padding: '2px 12px 4px' }}>Enviar por tipo</div>
+          {/* Todos os tipos (DOC/PDF/PPT/XLS/Vídeo/Áudio) usam o MESMO fluxo de upload; só filtram a extensão. */}
+          {ORDEM_TIPOS.map((kind) => {
+            const t = TIPOS_CONTEUDO[kind]
+            return (
+              <div key={kind} className="gd-item" style={sv({ '--i': i() })} onMouseEnter={() => hoverItem(null)} onClick={pickTipo(t.extensoes.join(','))}>
+                <span className="gd-tb" style={{ background: seloStyle(kind).color, fontSize: 9, fontWeight: 800, color: '#fff', letterSpacing: '.02em' }}>{t.sigla}</span>
+                <span className="gd-label">Enviar {t.label}</span>
+                <span style={{ fontSize: 11, color: 'var(--gd-text-3)' }}>{t.extensoes.join(' ')}</span>
+              </div>
+            )
+          })}
         </div>,
         document.body,
       )}

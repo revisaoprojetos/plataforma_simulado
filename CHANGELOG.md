@@ -12,6 +12,36 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.30.0 — 2026-10-26
+
+**perf: redução de egress + latência no sistema (rankings, board de simulados, Biblioteca) — sem quebrar nada**
+
+Padrão aplicado em tudo: **agregar no banco** (`sqlQuery` com fallback PostgREST em erro/indisponível) e
+**paralelizar round-trips independentes** (`Promise.all`), mantendo a forma de retorno e os fallbacks intactos.
+
+1. **Board de simulados — "fazendo agora" (`/api/stream/online`) de 11-22s → 1 query.** `computarOnlinePorSimulado`
+   puxava TODAS as sessões não-finalizadas + respostas + matrículas de ~70 simulados e cruzava em memória. Agora
+   `lib/simulado/ao-vivo-sql.ts` (`onlinePorSimuladoSql`) conta os alunos distintos ativos por simulado NO BANCO;
+   fallback PostgREST se o SQL direto estiver indisponível.
+
+2. **Rankings/resultados (~9s) paralelizados.** A agregação principal já era RPC no banco, mas havia ~5 leituras
+   SEQUENCIAIS depois (sequência, overrides, ocultos, perfis, e-mails, nível). Viraram `Promise.all` (cada ramo
+   com seu try/catch → fallback vazio) em `lib/jurisprudencia/ranking.ts` e `relatorio.ts`, `lib/leitura/ranking.ts`
+   (`carregarRankingModulo`), `lib/simulado/{ranking-resultado,resultado-aluno,comparativo}.ts`.
+
+3. **Biblioteca — contagens/acesso via SQL agregado.** `lib/conteudo/biblioteca-sql.ts` (`contagensDocsAreaSql`,
+   `resumoAcessoPastaSql`) substitui o `fetchAll` de TODOS os docs só pra contar; `listarArvore` usa o agregado e
+   cai no PostgREST se indisponível.
+
+4. **Projeção de colunas (egress):** removidos `select('*')` de LISTA em `listarBancoAulas`, `listarDocumentosAdmin`
+   e `getAllTenantMensagens` (projeção dos campos realmente usados; mantidos os `*` de snapshot de auditoria/cópia).
+   Guardrail `select('*')` 22→20; baseline atualizado.
+
+5. **Cache + menos chamadas:** `getCurrentTenant` ganhou cache cross-request por host (60s, auto-cura); o polling de
+   progresso do leitor jurídico pausa com a aba oculta (`document.hidden`).
+
+> Inclui também trabalho em andamento da sessão (redesign da Biblioteca/Modelos, acesso, mídia) já com `tsc` verde.
+
 ## 3.29.10 — 2026-10-26
 
 **fix(editor/caderno): persistência da seleção, "Voltar" inteligente e prévia rolável do Diagnóstico**

@@ -32,8 +32,8 @@ export function DrivePastaStyles() {
   .dark .gd-item.gd-danger:hover{background:rgba(242,139,130,.14);color:#f28b82}
   .dark .gd-item.gd-danger:hover>svg:first-child{fill:#f28b82}
 
-  .gd-folder-card{position:relative;isolation:isolate;overflow:hidden;display:flex;align-items:center;gap:14px;height:52px;
-    padding:0 6px 0 16px;border-radius:14px;background:var(--gd-card-bg);cursor:pointer;user-select:none;outline:none;
+  .gd-folder-card{position:relative;isolation:isolate;overflow:hidden;display:flex;align-items:center;gap:14px;min-height:60px;
+    padding:9px 6px 9px 16px;border-radius:14px;background:var(--gd-card-bg);cursor:pointer;user-select:none;outline:none;
     transition:background .25s var(--gd-ease),box-shadow .3s var(--gd-ease),transform .3s var(--gd-ease);
     animation:gdCardIn .5s var(--gd-ease-out) both}
   @keyframes gdCardIn{from{opacity:0;transform:translateY(10px) scale(.98)}}
@@ -50,7 +50,10 @@ export function DrivePastaStyles() {
   .gd-ico.gd-pulse{animation:gdIcoPulse .55s var(--gd-spring)}
   @keyframes gdIcoPulse{0%{transform:scale(1)}40%{transform:scale(1.28) rotate(-6deg)}100%{transform:scale(1)}}
 
-  .gd-name{flex:1;font-size:14px;font-weight:500;letter-spacing:.1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .gd-textcol{flex:1;min-width:0;display:flex;flex-direction:column;justify-content:center;gap:1px}
+  .gd-name{font-size:14px;font-weight:600;letter-spacing:.1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--gd-text)}
+  .gd-sub{font-size:12px;color:var(--gd-text-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .gd-lock{width:15px;height:15px;flex-shrink:0;fill:var(--gd-text-3);opacity:.9}
   .gd-rename{flex:1;min-width:0;font:inherit;font-size:14px;font-weight:500;color:var(--gd-text);background:#fff;
     border:2px solid var(--gd-accent);border-radius:8px;padding:5px 8px;outline:none;box-shadow:0 0 0 4px color-mix(in oklab,var(--brand-primary,var(--primary)) 14%,transparent)}
 
@@ -130,11 +133,12 @@ const PALETTE = ['#444746', '#ac725e', '#d06b64', '#f83a22', '#fa573c', '#ff7537
 type Sub = null | 'compartilhar' | 'organizar' | 'informacoes' | 'cor'
 
 export function PastaCardDrive({
-  id, nome, cor, categoria,
+  id, nome, cor, categoria, itens, restrito,
   onAbrir, onAcesso, onRenomear, onMudarCor, onMover, onExcluir, carregarPastas,
   onCopiarLink, onToast,
 }: {
   id: string; nome: string; cor: string | null; categoria: string
+  itens?: number; restrito?: boolean
   onAbrir: () => void
   onAcesso: () => void
   onRenomear: (novoNome: string) => void
@@ -263,7 +267,14 @@ export function PastaCardDrive({
           onBlur={(e) => commitRename(e.target.value, true)}
         />
       ) : (
-        <span className="gd-name" ref={nameRef} title={nome}>{nome}</span>
+        <span className="gd-textcol">
+          <span className="gd-name" ref={nameRef} title={nome}>{nome}</span>
+          {itens != null && <span className="gd-sub">{itens} {itens === 1 ? 'item' : 'itens'}</span>}
+        </span>
+      )}
+
+      {restrito && !renaming && (
+        <svg className="gd-lock" viewBox="0 0 24 24" aria-label="Acesso restrito"><title>Acesso restrito</title><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zM9 6c0-1.66 1.34-3 3-3s3 1.34 3 3v2H9V6zm9 14H6V10h12v10zm-6-3c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2z" /></svg>
       )}
 
       <button ref={kebabRef} className={`gd-kebab${open ? ' gd-active' : ''}`} aria-label="Mais ações" aria-haspopup="menu" onClick={abrirMenu}>

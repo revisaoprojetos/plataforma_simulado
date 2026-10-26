@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { checkPermission } from '@/lib/auth/permissions'
+import { getStorage } from '@/lib/storage'
 
 /**
  * Upload de imagem p/ símbolo da trilha (Aparência da gamificação). Valida mime/tamanho server-side,
@@ -20,16 +20,14 @@ export async function POST(req: NextRequest) {
   if (file.size > 1024 * 1024) return NextResponse.json({ error: 'Imagem muito grande (máx. 1MB).' }, { status: 400 })
 
   const buf = Buffer.from(await file.arrayBuffer())
-  const svc = createAdminClient()
   const ext = (file.name.split('.').pop() || 'png').toLowerCase().replace(/[^a-z0-9]/g, '') || 'png'
   const path = `${tenantId}/trilha-simbolos/${Date.now()}.${ext}`
   const bucket = 'imagens'
-  let up = await svc.storage.from(bucket).upload(path, buf, { contentType: file.type, upsert: true, cacheControl: '31536000' })
-  if (up.error && /bucket.*not.*found/i.test(up.error.message)) {
-    await svc.storage.createBucket(bucket, { public: true }).catch(() => {})
-    up = await svc.storage.from(bucket).upload(path, buf, { contentType: file.type, upsert: true, cacheControl: '31536000' })
+  const st = getStorage()
+  try {
+    const r = await st.upload({ bucket, path, data: buf, contentType: file.type, upsert: true, publico: true, cacheControl: '31536000' })
+    return NextResponse.json({ url: r.url ?? st.getPublicUrl(bucket, path) })
+  } catch (e) {
+    return NextResponse.json({ error: e instanceof Error ? e.message : 'Falha no upload.' }, { status: 500 })
   }
-  if (up.error) return NextResponse.json({ error: up.error.message }, { status: 500 })
-  const { data } = svc.storage.from(bucket).getPublicUrl(path)
-  return NextResponse.json({ url: data.publicUrl })
 }

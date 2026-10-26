@@ -1,5 +1,6 @@
 import { createHash } from 'crypto'
 import { BUCKET_IMAGENS } from '@/lib/storage/bucket-imagens'
+import { getStorage } from '@/lib/storage'
 
 /**
  * Substitui imagens embutidas em base64 (plano-fundo / imagem) por URLs hospedadas
@@ -8,7 +9,7 @@ import { BUCKET_IMAGENS } from '@/lib/storage/bucket-imagens'
  *
  * Muta o `doc` em memória (não salva no banco) — o doc vem do config a cada request.
  */
-export async function hospedarImagensDoc(doc: any, svc: any): Promise<void> {
+export async function hospedarImagensDoc(doc: any, _svc?: any): Promise<void> {
   if (!doc) return
   const cache = new Map<string, string>()
 
@@ -23,14 +24,14 @@ export async function hospedarImagensDoc(doc: any, svc: any): Promise<void> {
     const hash = createHash('sha1').update(buf).digest('hex').slice(0, 24)
     const nome = `${hash}.${ext}`
     const path = `assets/${nome}`
+    const st = getStorage()
     try {
       // Só sobe se ainda não existe (evita reenviar o arquivo grande a cada geração).
-      const { data: lista } = await svc.storage.from(BUCKET_IMAGENS).list('assets', { search: nome, limit: 1 })
-      if (!lista?.some((f: any) => f.name === nome)) {
-        await svc.storage.from(BUCKET_IMAGENS).upload(path, buf, { contentType: `image/${tipo}`, upsert: true, cacheControl: '31536000' })
+      if (!(await st.exists(BUCKET_IMAGENS, path))) {
+        await st.upload({ bucket: BUCKET_IMAGENS, path, data: buf, contentType: `image/${tipo}`, upsert: true, publico: true, cacheControl: '31536000' })
       }
-    } catch { /* se falhar o upload/list, mantém base64 (não quebra o PDF) */ return null }
-    const url = svc.storage.from(BUCKET_IMAGENS).getPublicUrl(path).data.publicUrl as string
+    } catch { /* se falhar o upload, mantém base64 (não quebra o PDF) */ return null }
+    const url = st.getPublicUrl(BUCKET_IMAGENS, path)
     cache.set(b64, url)
     return url
   }

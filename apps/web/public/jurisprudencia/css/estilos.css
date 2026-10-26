@@ -413,7 +413,10 @@ button{font-family:inherit;color:inherit}
 .cg + .cg{padding-left:16px;border-left:1px dashed #262e8a}
 .cg .kk{display:flex;gap:3px}
 .cg small{font-weight:800;font-size:8.5px;letter-spacing:.16em;color:var(--lav);white-space:nowrap}
-.controls kbd{display:inline-grid;place-items:center;min-width:24px;height:24px;padding:0 6px;font:17px/1 var(--f-px);color:#fff;background:linear-gradient(180deg,#1b2272,#10165a);border:1px solid #3a42a8;border-radius:3px;box-shadow:0 3px 0 #04072a, inset 0 1px 0 rgba(255,255,255,.12);margin:0}
+.controls kbd{display:inline-grid;place-items:center;min-width:24px;height:24px;padding:0 6px;font:17px/1 var(--f-px);color:#fff;background:linear-gradient(180deg,#1b2272,#10165a);border:1px solid #3a42a8;border-radius:3px;box-shadow:0 3px 0 #04072a, inset 0 1px 0 rgba(255,255,255,.12);margin:0;cursor:pointer;user-select:none;-webkit-user-select:none;transition:transform .06s, box-shadow .06s}
+/* Legenda de teclas é CLICÁVEL (fallback de controle no PC) → cara de botão. */
+.controls kbd:hover{border-color:var(--neon);box-shadow:0 3px 0 #04072a, inset 0 1px 0 rgba(255,255,255,.12), 0 0 10px color-mix(in srgb,var(--neon) 70%,transparent)}
+.controls kbd:active{transform:translateY(2px);box-shadow:0 1px 0 #04072a, inset 0 1px 0 rgba(255,255,255,.12)}
 kbd{font:16px/1 var(--f-px);border:1px solid #3a42a0;background:#0a1150;color:#fff;padding:1px 6px;margin:0 1px}
 .dpad{display:none;grid-template-columns:repeat(3,58px);grid-template-rows:repeat(2,58px);gap:6px;justify-content:center;margin:14px auto 0;user-select:none;-webkit-user-select:none}
 /* Layout em 2 linhas: START à DIREITA da seta de cima; a seta de BAIXO ocupa o centro
@@ -437,6 +440,9 @@ kbd{font:16px/1 var(--f-px);border:1px solid #3a42a0;background:#0a1150;color:#f
 .scr-exit:active{transform:scale(.94)}
 .scr-exit[hidden]{display:none}
 @media (pointer:coarse), (max-width:900px){.dpad{display:grid}}
+/* Embutido em iframe (portal/Curseduca): foco de teclado não-confiável → d-pad por clique sempre visível,
+   inclusive no desktop, para o aluno nunca ficar sem controle (personagem parado). */
+body.emb .dpad{display:grid}
 
 /* ---------- direita ---------- */
 .selos{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}

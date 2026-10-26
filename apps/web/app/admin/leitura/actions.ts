@@ -550,7 +550,7 @@ export async function listarDocumentosAdmin(): Promise<{ ok: boolean; itens?: Do
   const g = await guard('leitura:view'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
   const docs = await fetchAll<any>(() =>
-    svc.from('simulado_documentos').select('*').eq('tenant_id', g.tenantId).eq('deletado', false).order('atualizado_em', { ascending: false }))
+    svc.from('simulado_documentos').select('id, titulo, descricao, cor, icone, capa_url, pasta_id, versao, publicado, desafio_ativo, desafio_exige_fim, desafio_tempo_min, materia_id, tipo_norma, numero, ano, titulo_oficial, ementa, slug, esfera, fonte_oficial, ultima_verificacao, ordem, situacao_editorial').eq('tenant_id', g.tenantId).eq('deletado', false).order('atualizado_em', { ascending: false }))
   const ids = docs.map((d) => d.id)
   const artigosPorDoc = new Map<string, number>()
   if (ids.length) {
@@ -607,7 +607,7 @@ export async function listarBancoAulas(pastaId?: string | null, detalhes: boolea
   const todasPastas = await pastasLeitura(svc, g.tenantId, area)
   // Documentos: id+pasta_id de todos (p/ contar por pasta) e os do nível atual (detalhados).
   // Otimização: abas Acessos/Configurações NÃO usam a lista de aulas → pula o fetch de TODOS os docs.
-  const docs = detalhes ? await fetchAll<any>(() => svc.from('simulado_documentos').select('*').eq('tenant_id', g.tenantId).eq('deletado', false)) : []
+  const docs = detalhes ? await fetchAll<any>(() => svc.from('simulado_documentos').select('id, titulo, descricao, cor, capa_url, pasta_id, versao, ordem, atualizado_em, publicado').eq('tenant_id', g.tenantId).eq('deletado', false)) : []
   // Flip preguiçoso de agendamentos vencidos (publicarEm <= agora) → publica de fato (sem cron).
   if (detalhes && docs.length) {
     const agora = new Date().toISOString()

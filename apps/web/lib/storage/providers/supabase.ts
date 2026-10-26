@@ -1,5 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/server'
-import type { StorageProvider, UploadParams, UploadResult } from '@/lib/storage/types'
+import type { StorageProvider, UploadParams, UploadResult, UploadTicket } from '@/lib/storage/types'
 import { StorageError } from '@/lib/storage/types'
 
 /** Provider de Supabase Storage (já funcional — Supabase é dependência do app). */
@@ -39,6 +39,27 @@ export function createSupabaseProvider(): StorageProvider {
     async remove(bucket, path) {
       const { error } = await sb().storage.from(bucket).remove([path])
       if (error) throw new StorageError(error.message)
+    },
+
+    async exists(bucket, path) {
+      // Existência via .list() (NUNCA HEAD na URL: o CDN devolve 200 cacheado mesmo sem o objeto).
+      const barra = path.lastIndexOf('/')
+      const dir = barra >= 0 ? path.slice(0, barra) : ''
+      const base = barra >= 0 ? path.slice(barra + 1) : path
+      const { data } = await sb().storage.from(bucket).list(dir, { search: base, limit: 100 })
+      return Array.isArray(data) && data.some((f: any) => f.name === base)
+    },
+
+    async download(bucket, path) {
+      const { data, error } = await sb().storage.from(bucket).download(path)
+      if (error || !data) return null
+      return new Uint8Array(await data.arrayBuffer())
+    },
+
+    async criarUploadTicket(bucket, path): Promise<UploadTicket> {
+      const { data, error } = await sb().storage.from(bucket).createSignedUploadUrl(path)
+      if (error || !data) throw new StorageError(error?.message ?? 'Falha ao preparar o upload.')
+      return { kind: 'supabase', bucket, path, token: data.token, signedUrl: data.signedUrl }
     },
   }
 }
