@@ -12,6 +12,21 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.29.5 — 2026-10-26
+
+**fix(lab): picker de simulados vazio em domínio custom + sync plugin↔Lab**
+
+- **Picker vazio** (ex.: MEQ): o seletor do Laboratório usava server action, que em domínio custom atrás do
+  Traefik pode ser rejeitada por origem (`serverActions.allowedOrigins` restrito) → "Pasta vazia". Agora o
+  picker usa a **rota de API** `/api/teste/simulados-picker?modo=` (resolve tenant por host, igual ao plugin —
+  comprovadamente funciona). `carregarPicker` ficou resiliente (capas best-effort, nunca lança, retorna `error`)
+  e o dialog **mostra o erro** em vez de vazio silencioso.
+- **Sync plugin↔Lab**: ao escolher um simulado na aba de variáveis do plugin, ele é salvo
+  (`/api/teste/lab-sim`, em `tema.lab_ultimo_sim`) e o **Laboratório já abre com ele** — sem re-selecionar.
+  Selecionar no Lab também persiste. Por tenant, sem migração.
+
+---
+
 ## 3.29.4 — 2026-10-25
 
 **fix(plugin): card com o RÓTULO da faixa separado (em cima) da fórmula do texto (embaixo)**

@@ -64,6 +64,16 @@ export function PreviaLab({ versaoId, titulo: tituloDoc, onlyofficeUrl, wopiHost
 
   useEffect(() => { if (pronto) criarEditor(version) }, [pronto, version, criarEditor])
 
+  // SYNC: ao abrir o Lab, já carrega o último simulado selecionado (no plugin ou aqui) — sem re-selecionar.
+  useEffect(() => {
+    let vivo = true
+    fetch('/api/teste/lab-sim', { cache: 'no-store' }).then((r) => r.json()).then((d) => {
+      if (vivo && d?.sim?.id) selecionar(d.sim.id, d.sim.titulo || '')
+    }).catch(() => {})
+    return () => { vivo = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const aplicar = useCallback((t: string, ds: Disc[]) => {
     if (debRef.current) clearTimeout(debRef.current)
     debRef.current = setTimeout(async () => {
@@ -78,6 +88,8 @@ export function PreviaLab({ versaoId, titulo: tituloDoc, onlyofficeUrl, wopiHost
 
   async function selecionar(sid: string, tituloSel: string) {
     setSimId(sid)
+    // SYNC: persiste a escolha (compartilhada com o plugin do OnlyOffice).
+    try { fetch('/api/teste/lab-sim', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: sid, titulo: tituloSel }) }).catch(() => {}) } catch { /* ok */ }
     if (!sid) { setDiscs([]); setTitulo(''); questoesRef.current = []; resetarPrevia(versaoId).then(() => setVersion(docVersao)); return }
     setCarregando(true); setErro(null)
     try {

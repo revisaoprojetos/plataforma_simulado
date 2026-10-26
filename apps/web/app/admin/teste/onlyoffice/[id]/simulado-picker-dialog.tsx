@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Search, Folder, ChevronRight, ChevronLeft, Loader2, X, FileText } from 'lucide-react'
 import { CapaCard } from '@/components/aluno/capa-card'
-import { carregarPickerSimulados, carregarPickerDesafios, type PickerPasta, type PickerSim } from './previa-actions'
+import type { PickerPasta, PickerSim } from './previa-actions'
 
 const STATUS: Record<string, { label: string; cls: string }> = {
   publicado: { label: 'Publicado', cls: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' },
@@ -20,14 +20,19 @@ export function SimuladoPickerDialog({ onSelect, onClose }: { onSelect: (id: str
   const [pastaAtual, setPastaAtual] = useState<string | null>(null)
   const [busca, setBusca] = useState('')
   const [montado, setMontado] = useState(false)
+  const [erro, setErro] = useState<string | null>(null)
 
   useEffect(() => { setMontado(true) }, [])
   // Recarrega ao trocar de aba (Simulados × Desafios) e reseta a navegação/busca.
   useEffect(() => {
     let vivo = true
-    setCarregando(true); setPastaAtual(null); setBusca('')
+    setCarregando(true); setPastaAtual(null); setBusca(''); setErro(null)
     ;(async () => {
-      try { const r = aba === 'desafio' ? await carregarPickerDesafios() : await carregarPickerSimulados(); if (vivo) { setPastas(r.pastas); setSimulados(r.simulados) } }
+      try {
+        // Rota de API (resolve tenant por host, sem o problema de origem das server actions em domínio custom).
+        const r = await fetch(`/api/teste/simulados-picker${aba === 'desafio' ? '?modo=desafio' : ''}`, { cache: 'no-store' }).then((x) => x.json())
+        if (vivo) { setPastas(r.pastas || []); setSimulados(r.simulados || []); setErro(r.error || r.erro || null) }
+      } catch (e) { if (vivo) setErro(`Falha ao carregar: ${(e as any)?.message || e}`) }
       finally { if (vivo) setCarregando(false) }
     })()
     return () => { vivo = false }
@@ -98,6 +103,8 @@ export function SimuladoPickerDialog({ onSelect, onClose }: { onSelect: (id: str
         <div className="min-h-0 flex-1 overflow-y-auto p-4">
           {carregando ? (
             <div className="flex items-center justify-center gap-2 py-12 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Carregando…</div>
+          ) : erro ? (
+            <div className="mx-auto max-w-md rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-center text-sm text-destructive">{erro}</div>
           ) : (
             <>
               {!buscando && !!subpastas.length && (

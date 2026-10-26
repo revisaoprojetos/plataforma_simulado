@@ -72,10 +72,11 @@ export const DESAFIO_AREAS: readonly string[] = ['maratona']
 /** Árvore de pastas + simulados com capa/visual resolvidos (pro picker).
  *  modo='simulado' (padrão): pastas folder_area='simulado' + TODOS os simulados (inclui os da raiz).
  *  modo='desafio': pastas das áreas de DESAFIO (maratona…) + SÓ os simulados INTERNOS dessas pastas. */
-export async function carregarPicker(modo: 'simulado' | 'desafio' = 'simulado'): Promise<{ pastas: PickerPasta[]; simulados: PickerSim[] }> {
+export async function carregarPicker(modo: 'simulado' | 'desafio' = 'simulado'): Promise<{ pastas: PickerPasta[]; simulados: PickerSim[]; error?: string }> {
   const tenantId = await getCurrentTenantId()
-  if (!tenantId) return { pastas: [], simulados: [] }
+  if (!tenantId) return { pastas: [], simulados: [], error: 'Tenant não resolvido (host/sessão). Recarregue a página.' }
   const svc = createAdminClient()
+  try {
   const pastasRaw = ((await fetchAll<any>(() => svc.from('simulado_pastas')
     .select('id, nome, cor, icone, capa_url, capa_card_url, capa_meta, is_folder, folder_area, pai_id, deletado, tenant_id')
     .eq('tenant_id', tenantId).order('nome', { ascending: true }))) ?? [])
@@ -87,7 +88,9 @@ export async function carregarPicker(modo: 'simulado' | 'desafio' = 'simulado'):
   // No modo DESAFIO só entram os simulados que estão DENTRO de uma pasta de desafio (sem os soltos na raiz).
   const idsPastasVisiveis = new Set(pastasRaw.map((p: any) => String(p.id)))
   const simsRaw = modo === 'desafio' ? simsRawAll.filter((s) => s.pasta_id && idsPastasVisiveis.has(String(s.pasta_id))) : simsRawAll
-  const vis = await resolverVisualSimulados(svc, simsRaw.map((s) => ({ id: s.id, regras: s.regras })))
+  // Capas/visual BEST-EFFORT: se falhar, mostra os simulados mesmo sem capa (nunca esvazia o picker por isso).
+  let vis: Awaited<ReturnType<typeof resolverVisualSimulados>> = new Map()
+  try { vis = await resolverVisualSimulados(svc, simsRaw.map((s) => ({ id: s.id, regras: s.regras }))) } catch { /* sem capas */ }
 
   const simulados: PickerSim[] = simsRaw.map((s) => {
     const v = vis.get(s.id)
@@ -106,4 +109,8 @@ export async function carregarPicker(modo: 'simulado' | 'desafio' = 'simulado'):
     return { id: String(p.id), nome: p.nome || '(sem nome)', cor: p.cor ?? null, icone: p.icone ?? null, capa: p.capa_card_url ?? p.capa_url ?? null, orig: meta?.orig ?? null, cfg: meta?.ticket ?? meta?.poster ?? null, paiId: p.pai_id ?? null, count: contar(String(p.id)) }
   })
   return { pastas, simulados }
+  } catch (e) {
+    console.error('[carregarPicker] falhou:', (e as any)?.message || e)
+    return { pastas: [], simulados: [], error: `Falha ao carregar simulados: ${(e as any)?.message || 'erro'}` }
+  }
 }

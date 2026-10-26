@@ -509,7 +509,9 @@ function renderSimLista(){
   });
   l.appendChild(grid);
 }
-function selSimulado(id,nome){ fecharSeletorSim(); document.getElementById('simsel-lbl').textContent=nome; carregarSimVars(id,nome); }
+function selSimulado(id,nome){ fecharSeletorSim(); document.getElementById('simsel-lbl').textContent=nome; carregarSimVars(id,nome);
+  // SYNC: salva o simulado escolhido pro Laboratório da prévia já abrir com ele (sem re-selecionar).
+  try { fetch('/api/teste/lab-sim', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ id: id, titulo: nome }) }).catch(function(){}); } catch(e){} }
 function carregarSimVars(id,nome){ var c=document.getElementById('simvars'); c.innerHTML='<div class="simloading">Carregando variáveis…</div>'; fetch('/api/teste/simulado-vars/'+encodeURIComponent(id)).then(function(r){return r.json();}).then(function(d){ renderSimVars(d); }).catch(function(e){ c.innerHTML='<div class="simloading">Falha: '+esc(e)+'</div>'; }); }
 // Texto genérico por faixa (0-49 / 50-80 / 81-100) com o NOME do pilar/disciplina interpolado. É SEMPRE
 // coerente com a faixa porque o card é cabeado a {slug_f1}/{slug_f2}/{slug_f3}: só aparece a faixa do % real.
