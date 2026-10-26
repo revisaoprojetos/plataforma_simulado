@@ -15,7 +15,13 @@ export type PickerSim = LPS
 
 /** Questões do simulado (ordem/disciplina/assunto/pilar) + disciplinas com contagem (pros sliders). */
 export async function obterDisciplinasDoSimulado(simuladoId: string) {
-  return carregarQuestoesSimulado(simuladoId)
+  // try/catch para a mensagem REAL chegar à UI: se algo lançar fora do try interno (ex.: resolução de
+  // tenant/headers), sem isto o cliente vê só o genérico "An error occurred in the Server Components render".
+  try {
+    return await carregarQuestoesSimulado(simuladoId)
+  } catch (e) {
+    return { disciplinas: [], questoes: [], erro: `Falha ao ler disciplinas: ${(e as any)?.message || String(e)}` }
+  }
 }
 
 /** Dados do PICKER (pop-up): árvore de pastas + simulados com capa/visual. */

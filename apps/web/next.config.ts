@@ -47,6 +47,10 @@ const nextConfig: NextConfig = {
       // simulado / gerar prévia. Liberamos os domínios conhecidos (+ *.revisaopge.com.br p/ os subdomínios)
       // e os extras de SERVER_ACTION_ORIGINS (env) para novos domínios custom sem rebuild. localhost p/ dev.
       allowedOrigins: ["localhost:3000", "*.revisaopge.com.br", "simulado.meqconcursos.com.br", "simulado.vocenadefensoria.com.br", ...SERVER_ACTION_HOSTS],
+      // allowedForwardedHosts: atrás do Traefik o `x-forwarded-host` (domínio público do tenant) difere do
+      // Host interno; o Next rejeita a server action se esse forwarded host não for confiável. O tipo do
+      // Next 16 não lista essa chave, mas o RUNTIME usa — por isso entra via spread (bypassa o excess-check).
+      ...{ allowedForwardedHosts: ["*.revisaopge.com.br", "simulado.meqconcursos.com.br", "simulado.vocenadefensoria.com.br", ...SERVER_ACTION_HOSTS] },
       // Cadernos do designer podem chegar grandes no PRIMEIRO save (fundos em base64, antes de
       // hospedar). Importação da Biblioteca envia o arquivo em base64 (1 por chamada) — a base64
       // infla ~37%, então 120mb cobre arquivos de até ~85MB (PDFs/.docx grandes de material).

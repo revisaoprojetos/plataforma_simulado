@@ -12,6 +12,31 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.29.7 — 2026-10-26
+
+**fix(infra): Lab da prévia AINDA quebrava no MEQ após a v3.29.6 — trata os 2 cenários restantes**
+
+A v3.29.6 liberou `allowedOrigins`, mas o erro "An error occurred in the Server Components render" persistiu ao
+selecionar simulado / gerar prévia no Lab do MEQ. Duas causas possíveis continuavam em aberto; esta versão cobre
+as duas de uma vez:
+
+1. **Rejeição por `x-forwarded-host`** — atrás do Traefik o host encaminhado (domínio público do tenant) difere
+   do Host interno; o Next rejeita a server action se esse forwarded host não for confiável, INDEPENDENTE de
+   `allowedOrigins`. Adicionado `experimental.serverActions.allowedForwardedHosts` (via spread — o tipo do Next 16
+   não lista a chave, mas o runtime usa) com os mesmos domínios + `SERVER_ACTION_ORIGINS`.
+2. **Exceção real mascarada** — `obterDisciplinasDoSimulado` chamava `carregarQuestoesSimulado` sem `try/catch`;
+   se algo lançasse fora do try interno (ex.: resolução de tenant/headers), o cliente via só o genérico. Agora a
+   action captura e devolve a mensagem REAL (`erro`), que o Lab exibe — então, se ainda falhar, saberemos o motivo
+   exato em vez do texto genérico. Aplicado nos **dois** Labs (Biblioteca **e** Teste/OnlyOffice).
+
+**chore(prévia): verificada a integridade das variáveis vindas de .docx IMPORTADO**
+
+Teste faithful (código real `renderPreviaDocx`) simulando um .docx de Word real — fórmula FRAGMENTADA em vários
+runs, operador escapado `&gt;=`, aspas CURVAS `“ ”` e NBSP no meio da condição. Confirmado que renderiza certo:
+faixas de texto (alto/médio/baixo), fórmula de faixa do card (`81-100`/`50-80`/`0-49`), **N condições** (testado
+com 5 faixas manuais), dentro de tabela, e variável de texto AUSENTE caindo no padrão coerente (nullGetter) sem
+esvaziar nem quebrar. Ou seja: variáveis importadas não bugam nem "deixam de contar".
+
 ## 3.29.6 — 2026-10-26
 
 **fix(infra): server actions rejeitadas em domínio custom (MEQ/VND) — libera origens no next.config**
