@@ -337,8 +337,11 @@ function pcard(nome, corTopo, corPct, t0, t5, t8, w, chave){
   // RÓTULO DA FAIXA (em cima, negrito) numa linha + a FÓRMULA UNIFICADA do texto (embaixo) em OUTRA linha —
   // nunca juntar rótulo+texto com Enter dentro da fórmula (quebra). {chave_faixa} = faixa do % do aluno
   // (0-49/50-80/81-100); troque por um rótulo fixo se quiser. A fórmula escolhe o texto pela pontuação.
+  // DUAS fórmulas (mesmo modelo >=/<), sem rótulo fixo e sem "//": 1) FAIXA (rótulo, totalmente editável —
+  // mude os valores 81/50 e os rótulos à vontade) + 2) TEXTO (variável da aba, ou troque por "texto inline").
   var narr = chave
-    ? pfaixa('{'+chave+'_faixa}', '{'+chave+'_pct>=81; '+chave+'_texto_alto; '+chave+'_pct>=50; '+chave+'_texto_medio; '+chave+'_texto_baixo}')
+    ? pfaixa('{'+chave+'_pct>=81; "81-100"; '+chave+'_pct>=50; "50-80"; "0-49"}',
+             '{'+chave+'_pct>=81; '+chave+'_texto_alto; '+chave+'_pct>=50; '+chave+'_texto_medio; '+chave+'_texto_baixo}')
     : pfaixa('0-49', t0) + pfaixa('50-80', t5) + pfaixa('81-100', t8);
   return '<td width="'+w+'" valign="top" bgcolor="#f8f1d4" style="background-color:#f8f1d4;width:'+w+';border-top:3px solid '+corTopo+';padding:12px 14px;page-break-inside:avoid;'+AR+'">'
     + '<p style="margin:0;'+CR+';font-size:10pt;font-weight:bold;letter-spacing:.03em;color:#1a367c">'+nome+'</p>'

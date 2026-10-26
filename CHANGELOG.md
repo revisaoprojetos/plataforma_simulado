@@ -12,6 +12,29 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.29.6 — 2026-10-26
+
+**fix(infra): server actions rejeitadas em domínio custom (MEQ/VND) — libera origens no next.config**
+
+Causa raiz do "An error occurred in the Server Components render" (Lab não selecionava simulado nem gerava
+prévia no MEQ): o Next valida a origem das server actions e `serverActions.allowedOrigins` só tinha
+`localhost:3000`, então em domínio custom atrás do Traefik a action era rejeitada. Afetava TODAS as server
+actions desses tenants, não só o Lab. Agora `allowedOrigins` inclui `*.revisaopge.com.br`,
+`simulado.meqconcursos.com.br`, `simulado.vocenadefensoria.com.br` + os extras de `SERVER_ACTION_ORIGINS` (env
+CSV) para novos domínios custom sem rebuild.
+
+> Onboarding de novo domínio próprio: além de DNS/Traefik + `tenants.dominio`, adicione o host em
+> `SERVER_ACTION_ORIGINS` (env do stack) para as server actions funcionarem.
+
+**feat(plugin): card de pilar com DUAS fórmulas (faixa + texto), sem rótulo fixo**
+
+No lugar do `{<slug>_faixa}` fixo (que só tinha as faixas padrão 0-49/50-80/81-100), o card agora insere DUAS
+fórmulas editáveis, ambas no modelo `>=/<`: a 1ª é o RÓTULO (`{ls_pct>=81; "81-100"; ls_pct>=50; "50-80"; "0-49"}`)
+e a 2ª é o TEXTO (variável da aba ou `"texto inline"`). Assim dá pra mudar os valores das faixas e os rótulos à
+vontade, com qualquer nº de condições, sem depender de valores fixos e sem o `//`.
+
+---
+
 ## 3.29.5 — 2026-10-26
 
 **fix(lab): picker de simulados vazio em domínio custom + sync plugin↔Lab**

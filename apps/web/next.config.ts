@@ -4,6 +4,11 @@ import { fileURLToPath } from "node:url";
 
 const dir = path.dirname(fileURLToPath(import.meta.url));
 
+// Domínios custom extras p/ liberar server actions (CSV), sem precisar editar+rebuildar a cada novo tenant
+// com domínio próprio: defina SERVER_ACTION_ORIGINS="simulado.novocliente.com.br,..." no stack.
+const SERVER_ACTION_HOSTS = (process.env.SERVER_ACTION_ORIGINS || "")
+  .split(",").map((s) => s.trim()).filter(Boolean);
+
 const nextConfig: NextConfig = {
   output: "standalone",
   // Monorepo pnpm: inclui os pacotes do workspace (ex.: `shared`) no build standalone.
@@ -36,7 +41,12 @@ const nextConfig: NextConfig = {
     // quem não define a env. Ligado pelo script de subir o localhost nesta máquina.
     ...(process.env.TURBOPACK_FS_CACHE === "off" ? { turbopackFileSystemCacheForDev: false } : {}),
     serverActions: {
-      allowedOrigins: ["localhost:3000"],
+      // Server actions atrás do Traefik em DOMÍNIO CUSTOM: o Next valida a origem contra o host; se o
+      // x-forwarded-host (domínio público do tenant) não for confiável, a action é REJEITADA no servidor
+      // ("An error occurred in the Server Components render") — foi o que deixava o Lab do MEQ sem selecionar
+      // simulado / gerar prévia. Liberamos os domínios conhecidos (+ *.revisaopge.com.br p/ os subdomínios)
+      // e os extras de SERVER_ACTION_ORIGINS (env) para novos domínios custom sem rebuild. localhost p/ dev.
+      allowedOrigins: ["localhost:3000", "*.revisaopge.com.br", "simulado.meqconcursos.com.br", "simulado.vocenadefensoria.com.br", ...SERVER_ACTION_HOSTS],
       // Cadernos do designer podem chegar grandes no PRIMEIRO save (fundos em base64, antes de
       // hospedar). Importação da Biblioteca envia o arquivo em base64 (1 por chamada) — a base64
       // infla ~37%, então 120mb cobre arquivos de até ~85MB (PDFs/.docx grandes de material).
