@@ -12,6 +12,24 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.29.10 — 2026-10-26
+
+**fix(editor/caderno): persistência da seleção, "Voltar" inteligente e prévia rolável do Diagnóstico**
+
+1. **Seleção do simulado some ao recarregar** — o plugin de variáveis (dentro do OnlyOffice) salvava o simulado
+   escolhido mas NÃO restaurava ao reabrir/recarregar o editor. Agora `restaurarUltimoSim()` lê o último
+   simulado do tenant no init/load e recarrega a seleção + variáveis. (O Laboratório da prévia já fazia isso.)
+
+2. **"Voltar" voltava sempre pra Biblioteca** — mesmo quando o documento foi aberto pela área de Caderno (do
+   editor do simulado ou do banco). Agora o destino é decidido pela ORIGEM: `categoria='modelo_caderno'` ≠
+   Biblioteca, e um `?origem=<página atual>` (dinâmico via `window.location`) faz o "Voltar" retornar à página
+   EXATA de onde veio — editor do simulado (`/admin/simulados/[id]`), do banco (`/admin/banco-questoes/[id]`) ou
+   a Biblioteca. Anti open-redirect (só caminhos internos `/admin/...`); fallback por categoria.
+
+3. **Diagnóstico (área Caderno) era imagem estática** — virou prévia ROLÁVEL do documento inteiro (PDF via
+   `pdfPreviewDocumento` no `PdfPreview`, igual aos cards de Enunciado/Gabarito; enquanto o PDF gera, mostra a
+   thumb da 1ª página) e ganhou a SETA de abrir (↗) no topo do card.
+
 ## 3.29.9 — 2026-10-26
 
 **fix(prévia): texto do pilar sumindo/cortando na prévia e no PDF real (vírgula + aspas curvas do OnlyOffice)**

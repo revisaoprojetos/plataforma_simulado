@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import { BarChart3, ClipboardList, FileText, BookOpenCheck, ExternalLink, Loader2, FileUp, Trash2, Plus, Pencil, FolderOpen, X, FileType2, Search, ChevronRight } from 'lucide-react'
 import { PdfPreview } from '@/components/admin/pdf-preview'
 import { salvarMontagem, criarCadernoParaSlot, listarArvoreModelosOffice, previaOnlyOffice, type EntregaSlots, type EntregaRef, type MontagemGrupo, type DocOffice, type PastaModelo, type TrechoPrevia } from '@/app/admin/cadernos-teste/actions'
-import { abrirEdicaoDocx, thumbDocumento } from '@/app/admin/biblioteca/actions'
+import { abrirEdicaoDocx, thumbDocumento, pdfPreviewDocumento } from '@/app/admin/biblioteca/actions'
 import { DrivePastaStyles } from '@/components/admin/pasta-card-drive'
 
 type SlotKey = 'diagnostico' | 'folha' | 'enunciado' | 'gabarito'
@@ -102,7 +102,9 @@ function SlotCard({ slot, cor, bancoId, valor, prontos, onSet }: {
     const r = await abrirEdicaoDocx(valor.docId)
     setAbrindoEditor(false)
     if (!r.ok || !r.versaoId) { toast.error(r.error || 'Falha ao abrir o editor.'); return }
-    window.location.href = `/admin/biblioteca/editar/${r.versaoId}`
+    // Passa a ORIGEM (esta página da montagem do banco) pro editor: o "Voltar" retorna aqui, não pra Biblioteca.
+    const origem = encodeURIComponent(window.location.pathname + window.location.search)
+    window.location.href = `/admin/biblioteca/editar/${r.versaoId}?origem=${origem}`
   }
 
   // Escala da prévia do caderno: mostra a folha A4 ajustada à largura do card (rola pelas folhas).
@@ -118,6 +120,16 @@ function SlotCard({ slot, cor, bancoId, valor, prontos, onSet }: {
   const [contentH, setContentH] = useState(BASE_H)
   const ALTURA_SLOT = 380
   useEffect(() => { setContentH(BASE_H) }, [valor?.cadernoId, valor?.itemId])
+  // Diagnóstico via OnlyOffice (ehOffice): PDF do doc INTEIRO (cacheado) p/ a prévia ROLÁVEL (PdfPreview,
+  // igual Enunciado/Gabarito) + a SETA de abrir — em vez da imagem estática da 1ª página (thumb).
+  const [officePdf, setOfficePdf] = useState<string | null>(null)
+  useEffect(() => {
+    setOfficePdf(null)
+    if (!ehOffice || !valor?.docId) return
+    let vivo = true
+    pdfPreviewDocumento(valor.docId).then((r) => { if (vivo && r.ok && r.url) setOfficePdf(r.url) }).catch(() => {})
+    return () => { vivo = false }
+  }, [ehOffice, valor?.docId])
 
   // Cria um caderno da modalidade do slot JÁ associado à entrega e abre o editor.
   function criar() {
@@ -160,6 +172,10 @@ function SlotCard({ slot, cor, bancoId, valor, prontos, onSet }: {
           <a href={valor!.pdfUrl} target="_blank" rel="noreferrer" title="Abrir PDF"
             className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><ExternalLink className="h-3.5 w-3.5" /></a>
         )}
+        {ehOffice && (
+          <a href={officePdf || `/admin/biblioteca/editar/${valor!.versaoId}?preview=1`} target="_blank" rel="noreferrer" title="Abrir documento"
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"><ExternalLink className="h-3.5 w-3.5" /></a>
+        )}
       </div>
 
       <div className="space-y-2 p-2.5">
@@ -179,9 +195,14 @@ function SlotCard({ slot, cor, bancoId, valor, prontos, onSet }: {
           ) : ehPdf ? (
             <PdfPreview url={valor!.pdfUrl!} titulo={slot.titulo} className="absolute inset-0" />
           ) : ehOffice ? (
-            <div className="absolute inset-0 overflow-hidden bg-white dark:bg-neutral-950">
-              <CapaFielOffice docId={valor!.docId!} baseW={BASE_W} escala={escala} />
-            </div>
+            // PDF rolável do doc inteiro (igual aos cards de PDF); enquanto gera, mostra a thumb da 1ª página.
+            officePdf ? (
+              <PdfPreview url={officePdf} titulo={slot.titulo} className="absolute inset-0" />
+            ) : (
+              <div className="absolute inset-0 overflow-hidden bg-white dark:bg-neutral-950">
+                <CapaFielOffice docId={valor!.docId!} baseW={BASE_W} escala={escala} />
+              </div>
+            )
           ) : (
             /* VAZIO: criar (editor), importar PDF (enunciado/gabarito) ou selecionar um caderno já pronto. */
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 px-4 text-center">

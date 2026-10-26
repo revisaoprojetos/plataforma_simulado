@@ -9,9 +9,9 @@ import { PreviaLab } from './previa-lab'
 
 export const dynamic = 'force-dynamic'
 
-export default async function EditarConteudoPage({ params, searchParams }: { params: Promise<{ versaoId: string }>; searchParams: Promise<{ preview?: string }> }) {
+export default async function EditarConteudoPage({ params, searchParams }: { params: Promise<{ versaoId: string }>; searchParams: Promise<{ preview?: string; origem?: string }> }) {
   const { versaoId } = await params
-  const { preview } = await searchParams
+  const { preview, origem } = await searchParams
   const access = await getCurrentAccess()
   if (!access.tenantId) notFound()
   const svc = createAdminClient()
@@ -20,7 +20,7 @@ export default async function EditarConteudoPage({ params, searchParams }: { par
   if (!v || !v.arquivo_key) notFound()
   // Paraleliza as 3 chamadas (doc + URL assinada + tenant) — reduz a latência no localhost (menos ida-e-volta).
   const [docRes, documentUrl, tenant] = await Promise.all([
-    svc.from('simulado_conteudo_documentos').select('titulo').eq('tenant_id', access.tenantId).eq('id', v.documento_id).maybeSingle(),
+    svc.from('simulado_conteudo_documentos').select('titulo, categoria').eq('tenant_id', access.tenantId).eq('id', v.documento_id).maybeSingle(),
     urlAssinadaOriginal(v.arquivo_key, 3600),
     getCurrentTenant(),
   ])
@@ -33,6 +33,14 @@ export default async function EditarConteudoPage({ params, searchParams }: { par
       </div>
     </div>
   )
+  // "Voltar" conforme a ORIGEM do documento: `categoria='modelo_caderno'` (área de Caderno) ≠ Biblioteca.
+  // `origem` (query ?origem=/admin/...) tem prioridade p/ retornar à página EXATA de onde veio (ex.: a montagem
+  // do banco), com validação anti open-redirect (só caminho interno /admin/...). Senão cai no default da área.
+  const ehCaderno = (doc as any)?.categoria === 'modelo_caderno'
+  const origemSegura = typeof origem === 'string' && /^\/admin\//.test(origem) && !origem.startsWith('//') ? origem : ''
+  const voltarHref = origemSegura || (ehCaderno ? '/admin/cadernos-teste' : '/admin/biblioteca')
+  const voltarLabel = origemSegura ? 'Voltar' : (ehCaderno ? 'Cadernos de teste' : 'Biblioteca')
+
   const onlyofficeUrl = process.env.NEXT_PUBLIC_ONLYOFFICE_URL || 'http://localhost:8082'
   const wopiHost = process.env.CONTEUDO_WOPI_HOST || process.env.TESTE_WOPI_HOST || 'http://host.docker.internal:3000'
   const palette = paletaBlocosDoTema(tenant?.tema as any)
@@ -53,6 +61,8 @@ export default async function EditarConteudoPage({ params, searchParams }: { par
       chave={docVersao}
       preview={false}
       palette={palette}
+      voltarHref={voltarHref}
+      voltarLabel={voltarLabel}
     />
   )
 }

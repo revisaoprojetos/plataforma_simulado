@@ -13,8 +13,8 @@ declare global { interface Window { DocsAPI?: any } }
 // (teste_oo_docid), igual ao Teste — por isso Blocos/Variáveis e seleção de simulado funcionam igual.
 const PLUGIN_GUID = 'asc.{C7A3F1E0-9B2D-4E6A-8F14-5D2B7C0A1E33}'
 
-export function ConteudoEditor({ versaoId, titulo, documentUrl, onlyofficeUrl, wopiHost, chave, preview = false, palette }: {
-  versaoId: string; titulo: string; documentUrl: string; onlyofficeUrl: string; wopiHost: string; chave: string; preview?: boolean; palette?: PaletaBlocos
+export function ConteudoEditor({ versaoId, titulo, documentUrl, onlyofficeUrl, wopiHost, chave, preview = false, palette, voltarHref = '/admin/biblioteca', voltarLabel = 'Biblioteca' }: {
+  versaoId: string; titulo: string; documentUrl: string; onlyofficeUrl: string; wopiHost: string; chave: string; preview?: boolean; palette?: PaletaBlocos; voltarHref?: string; voltarLabel?: string
 }) {
   const montado = useRef(false)
   const [erro, setErro] = useState<string | null>(null)
@@ -71,7 +71,7 @@ export function ConteudoEditor({ versaoId, titulo, documentUrl, onlyofficeUrl, w
           </>
         ) : (
           <>
-            <Link href="/admin/biblioteca" className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> Biblioteca</Link>
+            <Link href={voltarHref} className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"><ArrowLeft className="h-4 w-4" /> {voltarLabel}</Link>
             <span className="text-sm font-semibold">{titulo}</span>
             <span className="rounded-full bg-amber-500/10 px-2.5 py-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">Rascunho · salvar re-reconcilia os grifos</span>
             <a href={`/admin/biblioteca/editar/${versaoId}?preview=1`} target="_blank" rel="noopener noreferrer" className="ml-auto inline-flex items-center gap-1.5 rounded-lg border bg-card px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors hover:border-primary hover:text-primary"><Eye className="h-4 w-4" /> Ver com valores</a>

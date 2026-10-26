@@ -517,6 +517,13 @@ function renderSimLista(){
 function selSimulado(id,nome){ fecharSeletorSim(); document.getElementById('simsel-lbl').textContent=nome; carregarSimVars(id,nome);
   // SYNC: salva o simulado escolhido pro Laboratório da prévia já abrir com ele (sem re-selecionar).
   try { fetch('/api/teste/lab-sim', { method:'POST', headers:{'content-type':'application/json'}, body: JSON.stringify({ id: id, titulo: nome }) }).catch(function(){}); } catch(e){} }
+// Restaura o ÚLTIMO simulado escolhido (salvo no tenant) ao (re)abrir o plugin — sem isso a seleção some ao
+// sair/voltar ou recarregar o editor. Só mostra o rótulo + carrega as variáveis; NÃO re-salva (sem POST).
+var SIM_RESTAURADO=false;
+function restaurarUltimoSim(){ if(SIM_RESTAURADO) return; SIM_RESTAURADO=true;
+  try { fetch('/api/teste/lab-sim',{cache:'no-store'}).then(function(r){return r.json();}).then(function(d){
+    if(d&&d.sim&&d.sim.id){ var lbl=document.getElementById('simsel-lbl'); if(lbl) lbl.textContent=d.sim.titulo||'Simulado'; carregarSimVars(String(d.sim.id), d.sim.titulo||''); }
+  }).catch(function(){}); } catch(e){} }
 function carregarSimVars(id,nome){ var c=document.getElementById('simvars'); c.innerHTML='<div class="simloading">Carregando variáveis…</div>'; fetch('/api/teste/simulado-vars/'+encodeURIComponent(id)).then(function(r){return r.json();}).then(function(d){ renderSimVars(d); }).catch(function(e){ c.innerHTML='<div class="simloading">Falha: '+esc(e)+'</div>'; }); }
 // Texto genérico por faixa (0-49 / 50-80 / 81-100) com o NOME do pilar/disciplina interpolado. É SEMPRE
 // coerente com a faixa porque o card é cabeado a {slug_f1}/{slug_f2}/{slug_f3}: só aparece a faixa do % real.
@@ -639,7 +646,7 @@ function plog(o){ try{ fetch('/api/teste/plugin-log',{method:'POST',headers:{'co
 // Diagnóstico p/ o backend: plugins.js carregou? API presente? de onde veio? (não vejo o console do navegador)
 plog({ev:'load', asc:!!window.Asc, plugin:!!(window.Asc&&window.Asc.plugin), ref:(document.referrer||''), href:location.href});
 if(window.Asc&&window.Asc.plugin){
-  window.Asc.plugin.init = function(){ conectado=true; plog({ev:'init'}); setSt('✓ Editor conectado — pode adicionar', true); render(); carregarPaleta(); };
+  window.Asc.plugin.init = function(){ conectado=true; plog({ev:'init'}); setSt('✓ Editor conectado — pode adicionar', true); render(); carregarPaleta(); restaurarUltimoSim(); };
   window.Asc.plugin.button = function(id){ this.executeCommand('close',''); };
   // Tema do editor → injeta as variáveis (--background-normal, --text-normal, …) no plugin, para o
   // fundo/cores acompanharem o OnlyOffice (claro OU escuro) em vez de ficar branco fixo.
@@ -657,6 +664,7 @@ if(window.Asc&&window.Asc.plugin){
 // em que o editor chama o init do plugin ANTES deste script atribuir window.Asc.plugin.init (barra vazia).
 try { render(); } catch (e) {}
 try { carregarPaleta(); } catch (e) {}
+try { restaurarUltimoSim(); } catch (e) {}
 // Diagnóstico: se o editor não chamar o init em 3s, o bridge está morto. Mostra Asc/plugin na faixa E loga.
 try { setTimeout(function(){ if(!conectado){ plog({ev:'timeout3s', asc:!!window.Asc, plugin:!!(window.Asc&&window.Asc.plugin)}); setSt('⚠ init não disparou (Asc='+(!!window.Asc)+' plugin='+(!!(window.Asc&&window.Asc.plugin))+') — recarregue', false); } }, 3000); } catch(e){}
 </script>
