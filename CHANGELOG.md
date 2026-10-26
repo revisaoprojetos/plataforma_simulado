@@ -12,6 +12,29 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.29.9 — 2026-10-26
+
+**fix(prévia): texto do pilar sumindo/cortando na prévia e no PDF real (vírgula + aspas curvas do OnlyOffice)**
+
+Sintoma (relatado com prints): no card de desempenho por pilar, a faixa 81-100 renderizava o texto inteiro, mas
+50-80 CORTAVA na 1ª vírgula (com uma aspa sobrando) e 0-49 saía EM BRANCO. Causa raiz no parser de fórmula
+(`previa-docx.ts`): o `dividirArgs` separava os valores por `;` **e por vírgula**, protegendo a vírgula só quando
+reconhecia as aspas — e o OnlyOffice troca aspas retas por CURVAS (às vezes usando a curva de *fechar* como
+abertura), que o parser não reconhecia; aí a vírgula do texto "escapava" e quebrava o valor. Correções:
+- Formato condição-lista (`{cond; valor; …}`) agora separa **SÓ por `;`** (os valores são texto com vírgulas —
+  nunca devem quebrar na vírgula).
+- Aspas reconhecidas por **FAMÍLIA** (reta/curva dupla/simples/guillemets, abertura OU fechamento) tanto para
+  proteger o separador quanto para remover o par externo do literal.
+Vale para a **prévia** (Lab/preview) e para o **PDF real do aluno** (ambos usam `renderPreviaDocx`). Testado com
+o caso exato dos prints (abertura de aspa invertida + vírgulas): as 3 faixas saem completas, sem aspa sobrando.
+
+**feat(plugin): ajustes de blocos do diagnóstico**
+- Bloco **"Diagnóstico completo"**: "Nº de peito" trocado pelo **Nome do aluno** (`{nome}`); o bloco avulso
+  "Nº de peito" continua disponível à parte.
+- **Card de pilar**: os 3 slots de texto já vêm com as **aspas prontas** e o nome da variável DENTRO como
+  símbolo (`"<chave>_texto_alto"`…) — é só trocar o texto por dentro das aspas, sem esquecê-las (texto literal
+  inline, custom por simulado).
+
 ## 3.29.8 — 2026-10-26
 
 **fix(lab): CORREÇÃO DEFINITIVA — Lab da prévia (Biblioteca) via ROTA DE API em vez de server action**

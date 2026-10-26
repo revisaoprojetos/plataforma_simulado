@@ -39,17 +39,27 @@ function avaliarCond(cond: string, v: number): boolean {
 // Ex.: {SE(ls_pct>=80; "Excelente…"; SE(ls_pct>=50; "Intermediário…"; "Abaixo de 50%"))}
 //      {SE(ls_pct>=80; ls_texto_alto; SE(ls_pct>=50; ls_texto_medio; ls_texto_baixo))}  ← texto em variável (robusto)
 // Condições: >= > <= < = <> ou faixa LO-HI. Valor verdadeiro/falso: outro SE(), uma VARIÁVEL ou texto "entre aspas".
-function dividirArgs(s: string): string[] {
-  const out: string[] = []; let depth = 0, cur = '', q = ''
+// Família de aspas: OnlyOffice/Word trocam aspas RETAS por CURVAS (e às vezes a ABERTURA vira a curva de
+// FECHAR). Reconhecemos qualquer glifo e fechamos na MESMA FAMÍLIA (não no mesmo caractere) — sem isso uma
+// aspa de abertura não reconhecida deixa a VÍRGULA do texto "escapar" e QUEBRAR o valor (texto corta/some).
+function famAspas(ch: string): '' | 'D' | 'S' | 'G' {
+  if (ch === '"' || ch === '“' || ch === '”' || ch === '„' || ch === '‟') return 'D'
+  if (ch === "'" || ch === '‘' || ch === '’' || ch === '‚') return 'S'
+  if (ch === '«' || ch === '»') return 'G'
+  return ''
+}
+// soPv=true → separa SÓ por ';' (formato condição-lista: os valores são TEXTO com vírgulas — nunca separar
+// por vírgula). soPv=false → ';' e ',' (args de SE()/IF()). Em ambos, aspas (qualquer família) e parênteses
+// protegem o separador.
+function dividirArgs(s: string, soPv = false): string[] {
+  const out: string[] = []; let depth = 0, cur = '', q: '' | 'D' | 'S' | 'G' = ''
   for (let i = 0; i < s.length; i++) {
-    const ch = s[i]
-    if (q) { cur += ch; if (ch === q) q = ''; continue }
-    if (ch === '"' || ch === "'") { q = ch; cur += ch; continue }
-    if (ch === '“') { q = '”'; cur += ch; continue }
-    if (ch === '«') { q = '»'; cur += ch; continue }
+    const ch = s[i]; const fam = famAspas(ch)
+    if (q) { cur += ch; if (fam === q) q = ''; continue }
+    if (fam) { q = fam; cur += ch; continue }
     if (ch === '(') { depth++; cur += ch }
     else if (ch === ')') { depth--; cur += ch }
-    else if ((ch === ';' || ch === ',') && depth === 0) { out.push(cur); cur = '' }
+    else if ((ch === ';' || (!soPv && ch === ',')) && depth === 0) { out.push(cur); cur = '' }
     else cur += ch
   }
   out.push(cur)
@@ -66,11 +76,16 @@ function condVerdadeira(cond: string, scope: any, context: any): boolean {
 // Marcador de QUEBRA DE LINHA dentro do texto (não dá pra apertar Enter dentro da fórmula): `//` ou `\n`
 // viram quebra real (com linebreaks:true o docxtemplater renderiza <w:br/>). Permite "rótulo // texto".
 function quebras(s: string): string { return s.replace(/\s*(?:\\n|\/\/)\s*/g, '\n') }
+// Classe de TODAS as aspas (retas + curvas duplas/simples + guillemets) p/ detectar e remover o par externo
+// de um literal, independente do glifo que o OnlyOffice usou na abertura/fechamento.
+const ASPAS = '"\'“”„‟«»‘’‚'
+const RE_ASPAS_PAR = new RegExp('^[' + ASPAS + '][\\s\\S]*[' + ASPAS + ']$')
+const RE_ASPAS_BORDA = new RegExp('^[' + ASPAS + ']+|[' + ASPAS + ']+$', 'g')
 function avaliarValor(expr: string, scope: any, context: any): string {
   const e = expr.trim()
   const se = /^=?\s*(SE|IF)\s*\(([\s\S]*)\)$/i.exec(e)
   if (se) return avaliarSE(se[2], scope, context)
-  if (/^["'“«][\s\S]*["'”»]$/.test(e)) return quebras(e.replace(/^["'“«]|["'”»]$/g, ''))
+  if (RE_ASPAS_PAR.test(e)) return quebras(e.replace(RE_ASPAS_BORDA, ''))
   if (/^[A-Za-z0-9_]+$/.test(e)) { const v = resolveVar(e, scope, context); return v == null ? '' : String(v) }
   return quebras(e)
 }
@@ -97,7 +112,7 @@ function parserPrevia(tag: string): { get: (scope: any, context?: any) => unknow
   // 0) FORMATO PRINCIPAL (só chaves, sem "SE"): {<cond>; <valor>; … ; <padrão>}. Detecta pelo ';' no topo com
   //    a 1ª parte sendo uma condição de %.
   if (tt.includes(';')) {
-    const parts = dividirArgs(tt)
+    const parts = dividirArgs(tt, true) // SÓ ';' — os valores são texto com vírgulas (não quebrar na vírgula)
     if (parts.length >= 2 && ehCondicao(parts[0])) return { get(scope: any, context: any) { return avaliarLista(parts, scope, context) } }
   }
   // 0b) Compat: fórmula SE()/IF() aninhada (estilo Excel).

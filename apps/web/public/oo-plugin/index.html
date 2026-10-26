@@ -338,10 +338,12 @@ function pcard(nome, corTopo, corPct, t0, t5, t8, w, chave){
   // nunca juntar rótulo+texto com Enter dentro da fórmula (quebra). {chave_faixa} = faixa do % do aluno
   // (0-49/50-80/81-100); troque por um rótulo fixo se quiser. A fórmula escolhe o texto pela pontuação.
   // DUAS fórmulas (mesmo modelo >=/<), sem rótulo fixo e sem "//": 1) FAIXA (rótulo, totalmente editável —
-  // mude os valores 81/50 e os rótulos à vontade) + 2) TEXTO (variável da aba, ou troque por "texto inline").
+  // mude os valores 81/50 e os rótulos à vontade) + 2) TEXTO: cada faixa já vem com as ASPAS prontas e o nome
+  // da variável DENTRO delas como SÍMBOLO/placeholder ("<chave>_texto_alto"…) — é só trocar o texto por dentro
+  // das aspas (sem esquecer as aspas). Como está entre aspas, vira texto LITERAL inline (custom por simulado).
   var narr = chave
     ? pfaixa('{'+chave+'_pct>=81; "81-100"; '+chave+'_pct>=50; "50-80"; "0-49"}',
-             '{'+chave+'_pct>=81; '+chave+'_texto_alto; '+chave+'_pct>=50; '+chave+'_texto_medio; '+chave+'_texto_baixo}')
+             '{'+chave+'_pct>=81; "'+chave+'_texto_alto"; '+chave+'_pct>=50; "'+chave+'_texto_medio"; "'+chave+'_texto_baixo"}')
     : pfaixa('0-49', t0) + pfaixa('50-80', t5) + pfaixa('81-100', t8);
   return '<td width="'+w+'" valign="top" bgcolor="#f8f1d4" style="background-color:#f8f1d4;width:'+w+';border-top:3px solid '+corTopo+';padding:12px 14px;page-break-inside:avoid;'+AR+'">'
     + '<p style="margin:0;'+CR+';font-size:10pt;font-weight:bold;letter-spacing:.03em;color:#1a367c">'+nome+'</p>'
@@ -437,7 +439,7 @@ var CADERNO = tb('<tr><td bgcolor="#071a3f" style="background-color:#071a3f;bord
   + '<p style="margin:0;'+AR+';font-size:10.5pt">{#questoes}</p>' + QUESTAO + '<p style="margin:0;'+AR+';font-size:10.5pt">{/questoes}</p>';
 
 var BLOCOS = [
-  { nome:'Diagnóstico completo', ds:'Cabeçalho + nº de peito + nota + desempenho por disciplina, no padrão real.', html: CAB+SP+PEITO+SP+NOTA+SP+DISC },
+  { nome:'Diagnóstico completo', ds:'Cabeçalho + nome do aluno + nota + desempenho por disciplina, no padrão real.', html: CAB+SP+NOME+SP+NOTA+SP+DISC },
   { nome:'Cabeçalho', ds:'Faixa cinza-clara: {simulado}, “Diagnóstico de Desempenho” (20pt) e subtítulo.', html: CAB },
   { nome:'Nome do aluno', ds:'Rótulo “NOME :” na cor da marca + campo branco com {nome}.', html: NOME },
   { nome:'Nº de peito', ds:'Rótulo navy + valor {numero_peito} em célula branca.', html: PEITO },
