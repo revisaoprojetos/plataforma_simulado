@@ -63,6 +63,15 @@ END $$;
 -- 3) ATRIBUIÇÕES (4 tabelas pasta/doc × grupos/estudantes): origem + permissões ler/grifar
 --    (pode_baixar e liberado_de/liberado_ate já existem desde 20261024000000 — NÃO duplicar.)
 -- ─────────────────────────────────────────────────────────────────────────────────────────────────
+-- ⚠️ COLISÃO DE NOME (resolvida de forma NÃO-DESTRUTIVA): `simulado_pasta_estudantes` JÁ TEM uma coluna
+-- `origem` desde 20260926000000, com OUTRO domínio — INTEGRAÇÃO ('manual'/'integracao'), usada para a
+-- revogação automática não apagar acesso manual. O `ADD COLUMN IF NOT EXISTS` abaixo NÃO recria essa
+-- coluna (preserva os marcadores de integração), mas um CHECK estrito `IN ('avulsa','individual')`
+-- rejeitaria as linhas legadas 'manual' → erro 23514. Por isso o CHECK ACEITA os valores legados da
+-- integração ('manual','integracao') ALÉM dos da Biblioteca. Como a origem da Biblioteca só ROTULA a
+-- entrega (não altera o gate) e o código coage valor desconhecido → 'avulsa' (acesso-efetivo.ts), os
+-- dois domínios coexistem sem muddle de comportamento. 'via_pacote' também é valor válido do tipo
+-- `Origem` no código, então entra no conjunto permitido.
 DO $$
 DECLARE t text;
 BEGIN
@@ -74,7 +83,7 @@ BEGIN
     EXECUTE format($f$ALTER TABLE public.%I ADD COLUMN IF NOT EXISTS pode_ler    boolean NOT NULL DEFAULT true$f$, t);
     EXECUTE format($f$ALTER TABLE public.%I ADD COLUMN IF NOT EXISTS pode_grifar boolean NOT NULL DEFAULT true$f$, t);
     EXECUTE format($f$ALTER TABLE public.%I DROP CONSTRAINT IF EXISTS %I$f$, t, 'chk_' || t || '_origem');
-    EXECUTE format($f$ALTER TABLE public.%I ADD CONSTRAINT %I CHECK (origem IN ('avulsa','individual'))$f$, t, 'chk_' || t || '_origem');
+    EXECUTE format($f$ALTER TABLE public.%I ADD CONSTRAINT %I CHECK (origem IN ('avulsa','individual','via_pacote','manual','integracao'))$f$, t, 'chk_' || t || '_origem');
   END LOOP;
 END $$;
 

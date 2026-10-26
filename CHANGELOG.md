@@ -12,6 +12,18 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.30.1 — 2026-10-26
+
+**fix(migração): `20261026000000_biblioteca_acesso_v2` falhava com erro 23514 (colisão da coluna `origem`)**
+
+`simulado_pasta_estudantes.origem` já existia desde `20260926000000` com domínio de INTEGRAÇÃO
+(`'manual'`/`'integracao'`, usado pela revogação automática). A migration da Biblioteca reusou `origem`
+para rotular a entrega e aplicava um CHECK estrito `IN ('avulsa','individual')`, que as linhas legadas
+`'manual'` violavam. Correção **não-destrutiva**: o CHECK agora aceita os valores legados da integração +
+`'via_pacote'` (valor válido do tipo `Origem` no código) →
+`CHECK (origem IN ('avulsa','individual','via_pacote','manual','integracao'))`. Migration idempotente —
+basta re-rodar + `NOTIFY pgrst, 'reload schema';`.
+
 ## 3.30.0 — 2026-10-26
 
 **perf: redução de egress + latência no sistema (rankings, board de simulados, Biblioteca) — sem quebrar nada**
