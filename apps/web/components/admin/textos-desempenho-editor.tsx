@@ -7,7 +7,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { Loader2, Plus, Trash2, Save, Info } from 'lucide-react'
-import { obterTextosDesempenho, gravarTextosDesempenho, type TextosDesempenho } from '@/app/admin/biblioteca/editar/[versaoId]/previa-actions'
+import type { TextosDesempenho } from '@/lib/conteudo/previa-compute'
+
+// Textos via ROTA DE API (não server action — rejeitada pelo check de origem do Next em domínio custom).
+async function obterTextosDesempenho(versaoId: string): Promise<{ ok: boolean; textos?: TextosDesempenho | null; error?: string }> {
+  return fetch(`/api/conteudo/previa/${versaoId}?textos=1`, { cache: 'no-store' }).then((r) => r.json()).catch(() => ({ ok: false, error: 'Falha de rede.' }))
+}
+async function gravarTextosDesempenho(versaoId: string, textos: TextosDesempenho): Promise<{ ok: boolean; error?: string }> {
+  return fetch(`/api/conteudo/previa/${versaoId}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ op: 'textos', textos }) }).then((r) => r.json()).catch(() => ({ ok: false, error: 'Falha de rede.' }))
+}
 
 type Banda = { f1: string; f2: string; f3: string }
 type Override = { slug: string; nome: string } & Banda
@@ -28,7 +36,7 @@ function slugify(s: string): string {
   return (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
 }
 
-export function TextosDesempenhoEditor({ disciplinas = [] }: { disciplinas?: { nome: string }[] }) {
+export function TextosDesempenhoEditor({ disciplinas = [], versaoId }: { disciplinas?: { nome: string }[]; versaoId: string }) {
   const [carregando, setCarregando] = useState(true)
   const [salvando, setSalvando] = useState(false)
   const [def, setDef] = useState<Banda>({ f1: '', f2: '', f3: '' })
@@ -39,7 +47,7 @@ export function TextosDesempenhoEditor({ disciplinas = [] }: { disciplinas?: { n
     let vivo = true
     ;(async () => {
       try {
-        const r = await obterTextosDesempenho()
+        const r = await obterTextosDesempenho(versaoId)
         if (!vivo) return
         const t = r.textos || {}
         setDef({ f1: t.default?.f1 ?? '', f2: t.default?.f2 ?? '', f3: t.default?.f3 ?? '' })
@@ -51,7 +59,7 @@ export function TextosDesempenhoEditor({ disciplinas = [] }: { disciplinas?: { n
       } finally { if (vivo) setCarregando(false) }
     })()
     return () => { vivo = false }
-  }, [])
+  }, [versaoId])
 
   const candidatos = useMemo(() => {
     const extras = disciplinas.map((d) => ({ slug: slugify(d.nome), nome: d.nome })).filter((x) => x.slug)
@@ -80,7 +88,7 @@ export function TextosDesempenhoEditor({ disciplinas = [] }: { disciplinas?: { n
       default: { f1: def.f1.trim() || undefined, f2: def.f2.trim() || undefined, f3: def.f3.trim() || undefined },
       por_pilar,
     }
-    const r = await gravarTextosDesempenho(payload)
+    const r = await gravarTextosDesempenho(versaoId, payload)
     setSalvando(false)
     if (!r.ok) return toast.error(r.error || 'Falha ao salvar.')
     toast.success('Textos de desempenho salvos.')

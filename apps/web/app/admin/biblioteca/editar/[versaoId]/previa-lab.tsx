@@ -3,13 +3,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Eye, Loader2, SlidersHorizontal, RotateCcw, FolderOpen, X, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
-import { obterDisciplinasDoSimulado, aplicarPreviaSimulado, resetarPrevia } from './previa-actions'
 import { SimuladoPickerDialog } from '@/app/admin/teste/onlyoffice/[id]/simulado-picker-dialog'
 import { TextosDesempenhoEditor } from '@/components/admin/textos-desempenho-editor'
 
 declare global { interface Window { DocsAPI?: any } }
 
 type Disc = { nome: string; total: number; assuntos: string; acertos: number }
+
+// POST na ROTA DE API do lab (em vez de server action — rejeitada pelo check de origem do Next em domínio
+// custom atrás do Traefik). Devolve o JSON ({ version, erro? } p/ aplicar/resetar).
+async function previaPost(versaoId: string, body: Record<string, unknown>): Promise<any> {
+  const r = await fetch(`/api/conteudo/previa/${versaoId}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+  return r.json().catch(() => ({}))
+}
 
 // MESMO laboratório de prévia do Teste (seleção de simulado + sliders + preview ao vivo), para a Biblioteca.
 // Reusa o picker e o cálculo; grava os dados por VERSÃO (previa_dados) e aponta pro /api/conteudo/.../preview.
@@ -46,7 +52,7 @@ export function PreviaLab({ versaoId, titulo: tituloDoc, onlyofficeUrl, wopiHost
   useEffect(() => {
     let vivo = true
     ;(async () => {
-      await resetarPrevia(versaoId).catch(() => {})
+      await previaPost(versaoId, { op: 'resetar' }).catch(() => {})
       if (!vivo) return
       const src = `${onlyofficeUrl}/web-apps/apps/api/documents/api.js`
       const done = () => { if (vivo) setPronto(true) }
@@ -79,7 +85,7 @@ export function PreviaLab({ versaoId, titulo: tituloDoc, onlyofficeUrl, wopiHost
     debRef.current = setTimeout(async () => {
       setRecarregando(true)
       try {
-        const r = await aplicarPreviaSimulado(versaoId, { simuladoTitulo: t, disciplinas: ds.map((d) => ({ nome: d.nome, acertos: d.acertos, total: d.total })), questoes: questoesRef.current })
+        const r = await previaPost(versaoId, { op: 'aplicar', payload: { simuladoTitulo: t, disciplinas: ds.map((d) => ({ nome: d.nome, acertos: d.acertos, total: d.total })), questoes: questoesRef.current } })
         if (r.erro) { setErro(r.erro); setRecarregando(false) }
         else setVersion(r.version)
       } catch (e) { setErro(`Falha ao aplicar: ${(e as Error).message}`); setRecarregando(false) }
@@ -90,14 +96,14 @@ export function PreviaLab({ versaoId, titulo: tituloDoc, onlyofficeUrl, wopiHost
     setSimId(sid)
     // SYNC: persiste a escolha (compartilhada com o plugin do OnlyOffice).
     try { fetch('/api/teste/lab-sim', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ id: sid, titulo: tituloSel }) }).catch(() => {}) } catch { /* ok */ }
-    if (!sid) { setDiscs([]); setTitulo(''); questoesRef.current = []; resetarPrevia(versaoId).then(() => setVersion(docVersao)); return }
+    if (!sid) { setDiscs([]); setTitulo(''); questoesRef.current = []; previaPost(versaoId, { op: 'resetar' }).then(() => setVersion(docVersao)); return }
     setCarregando(true); setErro(null)
     try {
-      const r = await obterDisciplinasDoSimulado(sid)
+      const r = await fetch(`/api/conteudo/previa/${versaoId}?simulado=${encodeURIComponent(sid)}`, { cache: 'no-store' }).then((x) => x.json())
       setTitulo(tituloSel)
       if (r.erro) { setErro(r.erro); setDiscs([]); questoesRef.current = []; return }
       questoesRef.current = r.questoes || []
-      const novas: Disc[] = (r.disciplinas || []).map((d) => ({ ...d, acertos: Math.round(d.total * 0.7) }))
+      const novas: Disc[] = (r.disciplinas || []).map((d: { nome: string; total: number; assuntos: string }) => ({ ...d, acertos: Math.round(d.total * 0.7) }))
       setDiscs(novas)
       if (!novas.length) setErro('Esse simulado não tem questões com disciplina.')
       else aplicar(tituloSel, novas)
@@ -150,7 +156,7 @@ export function PreviaLab({ versaoId, titulo: tituloDoc, onlyofficeUrl, wopiHost
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto">
           {abaPanel === 'textos' ? (
-            <TextosDesempenhoEditor disciplinas={discs} />
+            <TextosDesempenhoEditor disciplinas={discs} versaoId={versaoId} />
           ) : (
           <div className="space-y-4 p-4">
             <div>

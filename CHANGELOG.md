@@ -12,6 +12,23 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.29.8 — 2026-10-26
+
+**fix(lab): CORREÇÃO DEFINITIVA — Lab da prévia (Biblioteca) via ROTA DE API em vez de server action**
+
+As v3.29.6/.7 não resolveram: com a v3.29.7 CONFIRMADA no ar (rodapé), o Lab do MEQ seguia com o erro
+GENÉRICO "An error occurred in the Server Components render" ao selecionar simulado / gerar prévia — ou seja,
+a server action é **rejeitada pelo Next ANTES do corpo rodar** (check de origem/CSRF), então nem o try/catch
+nem o `allowedOrigins`/`allowedForwardedHosts` ajudam. Confirmado na fonte do Next 16 (`action-handler.js`):
+só `serverActions.allowedOrigins` existe (`allowedForwardedHosts` nem é lido) e, atrás do Traefik em domínio
+custom, o check de origem falha no runtime por motivo de infra não inspecionável.
+
+**Solução robusta (igual ao picker/preview, que SEMPRE funcionaram no MEQ):** as operações do Lab saíram de
+server actions para uma **rota de API** `POST/GET /api/conteudo/previa/[versaoId]` — rotas de API NÃO passam
+pelo check de origem. Convertidos: selecionar simulado (`?simulado=`), aplicar reguladores (`op:aplicar`),
+resetar (`op:resetar`) e os **Textos de desempenho** (`?textos=1` / `op:textos`). Tenant/permissão validados
+na rota. Nenhuma mudança na lógica de cálculo nem no contrato de variáveis.
+
 ## 3.29.7 — 2026-10-26
 
 **fix(infra): Lab da prévia AINDA quebrava no MEQ após a v3.29.6 — trata os 2 cenários restantes**
