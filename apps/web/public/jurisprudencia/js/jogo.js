@@ -84,10 +84,20 @@ function getTeses(n){
   return S.final.map(([d,i])=>DIAS[d].teses[i]);
 }
 const domOf = n => S.dom[n] || [];
-// Dia com 0 teses (só-leitura, ou cujas questões foram removidas) = NADA a dominar → conta como COMPLETO.
-// Senão ele nunca "fecha" e trava PRA SEMPRE o selo da matéria (ex.: Previdenciário = dias 7+8, com o dia 7
-// sem questões) e o selo final. O dia FINAL não cai aqui: o getTeses dele devolve o POOL emprestado (>0).
-const dayComplete = n => { const t=getTeses(n).length; return t===0 ? dayVisible(n) : domOf(n).length>=t; };
+// SELO FINAL (dia sem questões próprias): conquistado ao CONCLUIR TODAS AS LEITURAS de todos os dias normais
+// (não exige jogar o labirinto final). leituraConcluidaDia é função hoisteada (definida abaixo).
+const todasLeiturasFeitas = () => { const norm=VORD.filter(k=>!isFinalDay(k)); return norm.length>0 && norm.every(leituraConcluidaDia); };
+// Dia COMPLETO (base dos selos). REGRA NOVA (sem obrigar o arcade, e RETROATIVO):
+//  • dia FINAL (sem questões próprias) = concluir TODAS as leituras dos dias normais.
+//  • dia normal = CONCLUIR A LEITURA/QUESTÕES do dia (leituraConcluidaDia, sinal do servidor JÁ gravado →
+//    todo mundo que já fez aparece na hora, sem reabrir) OU dominar as teses no labirinto (dom). Dia com 0
+//    teses = completo se visível.
+const dayComplete = n => {
+  if(isFinalDay(n)) return todasLeiturasFeitas();
+  const t=getTeses(n).length;
+  if(t===0) return dayVisible(n);
+  return domOf(n).length>=t || leituraConcluidaDia(n);
+};
 // Jogável = publicada (demo/preview liberam tudo). Agendada/visualizável/rascunho = bloqueado.
 // Dia FINAL (selo, ex.: dia 15) = BÔNUS ABERTO: libera assim que PUBLICADO, igual a um dia normal — NÃO
 // exige completar os 14 dias antes. (Decisão do produto: o dia 15 é "só leitura + minigame", então os
@@ -531,7 +541,15 @@ async function recarregarLeituras(){
   try{
     const r=await fetch('/api/jurisprudencia/progresso?desafio='+encodeURIComponent(did),{credentials:'same-origin',cache:'no-store'});
     if(r.ok){ const p=await r.json(); if(window.DESAFIO){ window.DESAFIO.LEITURAS=(p&&p.leituras)||{}; window.DESAFIO.LEITURA_DOCS=(p&&p.leituraDocs)||{}; window.DESAFIO.LEITURA_RAPIDA_DOCS=(p&&p.leituraRapidaDocs)||{}; }
-      if(G.mode==='attract'){ aplicarGateAtract(G.day); } }
+      // SYNC do progresso do jogo: concluir as QUESTÕES credita dom/best no SERVIDOR (quiz-tentativa →
+      // creditarTesesLeituraRapida). Sem reaplicar aqui, o SELO da matéria só atualizava após recarregar o
+      // arcade. Merge MONOTÔNICO (união das teses, best=max) p/ não perder o progresso local do labirinto.
+      if(p && p.dom && typeof p.dom==='object'){ for(const k in p.dom){ const srv=(Array.isArray(p.dom[k])?p.dom[k]:[]).map(Number).filter(Number.isInteger); const loc=(Array.isArray(S.dom[k])?S.dom[k]:[]).map(Number).filter(Number.isInteger); S.dom[k]=[...new Set([...loc,...srv])]; } }
+      if(p && p.best && typeof p.best==='object'){ for(const k in p.best){ S.best[k]=Math.max(Number(S.best[k])||0, Number(p.best[k])||0); } }
+      S.recorde=Math.max(Number(S.recorde)||0, ...Object.values(S.best).map(v=>Number(v)||0), 0); save();
+      // Re-renderiza (selo/stages atualizam na hora). Durante o jogo, só o essencial p/ não atrapalhar.
+      if(G.mode==='play'||G.mode==='ready'){ renderSelos(); renderStages(); } else { renderAll(); }
+    }
   }catch(e){ /* mantém o estado atual */ }
   finally{ __recarregando=false; }
 }

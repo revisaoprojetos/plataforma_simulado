@@ -12,6 +12,20 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.31.0 — 2026-10-27
+
+**feat(jurisprudência): selo sai ao concluir leitura/questões — sem obrigar o arcade (e retroativo)**
+
+- **Selo da matéria** agora fecha ao **concluir a leitura/questões do dia** (sinal `LEITURAS` do servidor) OU
+  ao dominar as teses no labirinto — o arcade deixou de ser obrigatório. Como o selo lê o `LEITURAS` que já
+  está gravado, **todo aluno que já cumpriu os dias vê os selos na hora** que abre o arcade (retroativo, sem
+  refazer e sem backfill).
+- **Selo final** (dia sem questões próprias) = concluir **todas as leituras** dos dias normais (não exige
+  jogar o labirinto final).
+- **Atualiza na hora:** ao voltar das questões, o arcade re-sincroniza `dom/best` do servidor e re-renderiza
+  (`recarregarLeituras`), então o selo aparece sem recarregar a página.
+- Bump do cache-bust `?v=` (→ `20261027b`) p/ o `jogo.js` novo chegar ao navegador.
+
 ## 3.30.3 — 2026-10-27
 
 **fix(jurisprudência/arcade): cache-bust do JS do arcade (os fixes não chegavam ao navegador)**
