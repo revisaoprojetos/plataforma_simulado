@@ -12,6 +12,15 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.32.3 — 2026-10-27
+
+**chore(deploy): compose do Portainer repassa as envs de storage S3 aos serviços web e worker**
+
+- O `docker-compose.portainer.yml` não mapeava `STORAGE_PROVIDER`/`S3_*`/`PDF_PUBLIC_BASE` → setar no stack
+  não chegava ao container. Adicionado aos blocos `environment` do **web** e do **worker**, com
+  `STORAGE_PROVIDER=${STORAGE_PROVIDER:-supabase}` (default mantém tudo como está até o flip). Sem isto o
+  flip p/ S3 não teria efeito. Não altera a imagem; aplica-se ao atualizar o stack no Portainer.
+
 ## 3.32.2 — 2026-10-27
 
 **fix(build): `pnpm-lock.yaml` dessincronizado quebrava o build web (CI v3.32.1 falhou)**
