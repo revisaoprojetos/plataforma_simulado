@@ -10,6 +10,7 @@
 //   2) a cada mudança o iframe manda 'leitor-jus-grifos' → reconciliamos com /api/conteudo/grifo-pdf.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
 import type { GrifoPdf } from '@/lib/conteudo/leitor'
 import { APP_VERSION } from '@/lib/version'
 
@@ -21,6 +22,9 @@ interface GrifoEngine { id: string; sec: string; rects: Rect[]; t: string; c: st
 
 const aEngine = (g: GrifoPdf): GrifoEngine => ({ id: g.id, sec: 'p' + g.pagina, rects: g.rects, t: g.tool, c: g.cor, note: g.nota || '', text: g.texto || '' })
 const hashGrifo = (g: GrifoEngine) => `${g.sec}|${JSON.stringify(g.rects)}|${g.t}|${g.c}|${g.note}`
+// Chave de GEOMETRIA (sem cor/nota): se só cor/nota mudou, usamos PATCH em vez de apagar+recriar (evita
+// perder o grifo numa falha parcial de rede).
+const geoGrifo = (g: GrifoEngine) => `${g.sec}|${JSON.stringify(g.rects)}|${g.t}`
 
 export function LeitorBiblioteca({
   documentoId, versaoId, titulo, pdfUrl, grifos: iniciais, voltarHref = '/aluno/biblioteca',
@@ -30,14 +34,14 @@ export function LeitorBiblioteca({
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [pdfMeta, setPdfMeta] = useState<{ url: string; scale: number; pages: { w: number; h: number }[] } | null>(null)
-  const enviados = useRef(new Map<string, { serverId: string; hash: string }>())
-  const busy = useRef(false); const pendente = useRef<GrifoEngine[] | null>(null)
+  const enviados = useRef(new Map<string, { serverId: string; hash: string; geo: string }>())
+  const busy = useRef(false); const pendente = useRef<GrifoEngine[] | null>(null); const avisou = useRef(false)
   const dados = useRef({ documentoId, versaoId, titulo, voltarHref })
   dados.current = { documentoId, versaoId, titulo, voltarHref }
 
   useEffect(() => {
     enviados.current.clear()
-    for (const g of iniciais) { const e = aEngine(g); enviados.current.set(e.id, { serverId: g.id, hash: hashGrifo(e) }) }
+    for (const g of iniciais) { const e = aEngine(g); enviados.current.set(e.id, { serverId: g.id, hash: hashGrifo(e), geo: geoGrifo(e) }) }
   }, [iniciais])
 
   // carrega os metadados do PDF (nº de páginas + tamanho de cada uma na MESMA escala que o iframe usará)
@@ -85,26 +89,49 @@ export function LeitorBiblioteca({
     if (busy.current) { pendente.current = grifos; return }
     busy.current = true
     const d = dados.current; const map = enviados.current
+    let falhou = false
+    const del = async (serverId: string) => {
+      try { const r = await fetch('/api/conteudo/grifo-pdf?id=' + encodeURIComponent(serverId), { method: 'DELETE', credentials: 'same-origin' }); if (!r.ok) falhou = true } catch { falhou = true }
+    }
     try {
       const atual = new Map(grifos.map((g) => [g.id, g]))
+      // removidos no cliente → apaga no servidor
       for (const [cid, info] of [...map.entries()]) {
-        if (!atual.has(cid)) { try { await fetch('/api/conteudo/grifo-pdf?id=' + encodeURIComponent(info.serverId), { method: 'DELETE' }) } catch { /* */ } map.delete(cid) }
+        if (!atual.has(cid)) { await del(info.serverId); map.delete(cid) }
       }
       for (const g of grifos) {
         if (!g.rects || !g.rects.length) continue
-        const info = map.get(g.id); const h = hashGrifo(g)
+        const info = map.get(g.id); const h = hashGrifo(g); const geo = geoGrifo(g)
         if (info && info.hash === h) continue
-        if (info && info.hash !== h) { try { await fetch('/api/conteudo/grifo-pdf?id=' + encodeURIComponent(info.serverId), { method: 'DELETE' }) } catch { /* */ } map.delete(g.id) }
+        // só cor/nota mudou (mesma geometria) → PATCH: NÃO apaga/recria, então falha parcial não perde o grifo
+        if (info && info.geo === geo) {
+          try {
+            const r = await fetch('/api/conteudo/grifo-pdf', {
+              method: 'PATCH', headers: { 'content-type': 'application/json' }, credentials: 'same-origin',
+              body: JSON.stringify({ id: info.serverId, cor: g.c, nota: g.note }),
+            })
+            if (r.ok) map.set(g.id, { serverId: info.serverId, hash: h, geo }); else falhou = true
+          } catch { falhou = true }
+          continue
+        }
+        // geometria nova ou alterada → apaga a antiga (se houver) e cria
+        if (info) { await del(info.serverId); map.delete(g.id) }
         try {
           const r = await fetch('/api/conteudo/grifo-pdf', {
             method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'same-origin',
             body: JSON.stringify({ documento_id: d.documentoId, versao_id: d.versaoId, pagina: Number(g.sec.slice(1)) || 1, rects: g.rects, cor: g.c, tool: g.t, nota: g.note, texto: g.text }),
           })
           const j = await r.json().catch(() => ({}))
-          if (r.ok && j?.id) map.set(g.id, { serverId: j.id, hash: h })
-        } catch { /* tenta no próximo sync */ }
+          if (r.ok && j?.id) map.set(g.id, { serverId: j.id, hash: h, geo }); else falhou = true
+        } catch { falhou = true }
       }
-    } finally { busy.current = false; if (pendente.current) { const p = pendente.current; pendente.current = null; void reconciliar(p) } }
+    } finally {
+      busy.current = false
+      // Antes os erros eram 100% engolidos → o aluno achava que grifou mas sumia ao reabrir. Agora avisa 1x.
+      if (falhou && !avisou.current) { avisou.current = true; toast.error('Não consegui salvar seus grifos agora. Verifique a conexão — eles podem não aparecer ao reabrir.') }
+      if (!falhou) avisou.current = false
+      if (pendente.current) { const p = pendente.current; pendente.current = null; void reconciliar(p) }
+    }
   }, [])
 
   useEffect(() => {

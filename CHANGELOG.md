@@ -12,6 +12,33 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.32.0 — 2026-10-27
+
+**fix(leitor de grifos): grifar deixa de "não ir / bugar a visualização" no Juris e na Biblioteca (celular/tablet/PC)**
+
+Leitor Juris v2 (`leitor-jus.html` em iframe):
+- **Grifos agora PERSISTEM no servidor** (`simulado_leitura_anotacoes` via `/api/leitura/anotacao`, âncora
+  text-quote reusada do leitor de Lei Seca) — sobrevivem a troca de aparelho e a recarregar. Antes era só
+  `localStorage`. Migração automática 1x dos grifos antigos do navegador.
+- **Não "buga toda a visualização":** `paint()` à prova de falha + âncora text-quote (grifo órfão é ignorado,
+  nunca pinta no lugar errado).
+- **Grifar título/tabela:** o seletor de blocos passou a incluir títulos (h2/h3), células (td/th) e citações.
+- **Multi-parágrafo:** arrastar por vários blocos grifa todos como um grifo só.
+- **Toque (celular/tablet):** corrigido o colapso da seleção ao tocar no botão (fazia "o grifo não ir").
+- **Barra de estilos = multi-aplicação:** com o trecho selecionado, cada estilo é um TOGGLE no mesmo trecho
+  (marca-texto E sublinhado etc.) sem reselecionar, e o estilo aplicado fica marcado como ativo.
+
+Leitor da Biblioteca (grifo geométrico sobre PDF):
+- **P1** grifo não pinta mais em dobro (escurecido) ao abrir; **P2** toque no celular/tablet aplica o grifo;
+  **P3** PDF agora **cabe na largura** da tela (antes estourava em celular/tablet); **P4** grifo não vaza mais
+  pela calha de PDFs de 2 colunas; **P5** falha ao carregar o PDF mostra **aviso visível** (não canvas branco).
+- **Host:** erros de salvamento deixam de ser engolidos (toast ao falhar) e a troca de cor/nota usa **PATCH**
+  (antes DELETE+re-POST podia perder o grifo).
+
+Correção de dev:
+- `leitor-jus.tsx` (client) deixou de importar tipo de `@/lib/leitura/acesso` (`server-only`) — isso causava
+  **loop de reload** da leitura no dev local.
+
 ## 3.31.0 — 2026-10-27
 
 **feat(jurisprudência): selo sai ao concluir leitura/questões — sem obrigar o arcade (e retroativo)**

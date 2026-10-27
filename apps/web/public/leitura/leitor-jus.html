@@ -1440,7 +1440,7 @@ function renderBiblioteca(){
   if(CFG.pdf && Array.isArray(CFG.pdf.pages) && CFG.pdf.pages.length){
     $('#article').classList.add('pdf-mode');document.body.classList.add('pdf-reading');
     $('#article').innerHTML=CFG.pdf.pages.map((pg,i)=>`<section class="sec pdf-sec" id="p${i+1}" data-title="Página ${i+1}" data-cite="${esc(titulo)}"><div class="pdfpage" style="width:${pg.w}px;height:${pg.h}px"><canvas></canvas><div class="pdftl textLayer"></div></div></section>`).join('');
-    setTimeout(()=>{renderPdfPages().catch(err=>console.error('[leitor-jus][pdf]',err))},0);
+    setTimeout(()=>{renderPdfPages().catch(err=>{console.error('[leitor-jus][pdf]',err);avisoPdf()})},0);
     return;
   }
   const safe=(CFG.html||'').trim()||'<p>(documento sem conteúdo)</p>';
@@ -1560,7 +1560,7 @@ async function renderPdfPages(){
       const end=document.createElement('div');end.className='endOfContent';tl.appendChild(end);tl.__eoc=end;
       tl.addEventListener('mousedown',()=>tl.classList.add('selecting'));
       initPdfSelection();
-      S.an.filter(a=>a.sec===('p'+n)).forEach(paint); // repinta os grifos (geométricos) desta página
+      $$('.pdfov',wrap).forEach(e=>e.remove());S.an.filter(a=>a.sec===('p'+n)).forEach(paint); // repinta (idempotente) os grifos desta página — limpa antes p/ não empilhar/escurecer
     }catch(err){console.error('[leitor-jus][pdf] página '+n,err)}
   }
   // Sumário por TÍTULOS: índice embutido do PDF (getOutline) ou detecção por tamanho de fonte.
@@ -1573,7 +1573,22 @@ function __afterPdf(){
   try{renderToc()}catch(_){}
   try{if(typeof layoutDoc==='function')layoutDoc()}catch(_){}
   try{if(typeof onScroll==='function')onScroll()}catch(_){}
+  try{fitPdf()}catch(_){}
 }
+// Ajuste de LARGURA do PDF em telas estreitas (celular/tablet): o PDF renderiza em px fixos; sem isto ele
+// estoura a viewport (scroll horizontal, texto minúsculo, seleção/grifo quase impossíveis). Escala a página
+// p/ caber na largura e colapsa o espaço reservado (transform não afeta layout). Overlays de grifo são % da
+// página → acompanham a escala; a matemática da seleção usa getClientRects pós-transform → continua certa.
+function fitPdf(){const secsPdf=$$('#article .pdf-sec');if(!secsPdf.length)return;
+  const avail=((scroller&&scroller.clientWidth)||innerWidth)-16;
+  secsPdf.forEach(sec=>{const pp=$('.pdfpage',sec);if(!pp)return;
+    const pw=parseFloat(pp.style.width)||pp.offsetWidth,ph=parseFloat(pp.style.height)||pp.offsetHeight;if(!pw||!ph)return;
+    const k=Math.min(1,avail/pw);
+    if(k<1){pp.style.transformOrigin='top left';pp.style.transform='scale('+k+')';pp.style.marginRight=(-(pw*(1-k)))+'px';pp.style.marginBottom=(-(ph*(1-k)))+'px'}
+    else{pp.style.transform='';pp.style.transformOrigin='';pp.style.marginRight='';pp.style.marginBottom=''}})}
+// Falha ao carregar o PDF (URL assinada expirada, worker 404, cross-origin) → aviso VISÍVEL em vez de um
+// canvas branco silencioso que o aluno confunde com "não dá pra grifar".
+function avisoPdf(){try{const a=$('#article');if(a&&!$('#pdfErr'))a.insertAdjacentHTML('afterbegin','<div id="pdfErr" style="margin:16px;padding:14px 16px;border:1px solid #f0c0c0;background:#fff4f4;color:#8a1f1f;border-radius:10px;font-family:var(--f-ui)">Não foi possível carregar o documento agora. Atualize a página; se persistir, feche e abra a leitura novamente.</div>')}catch(_){}}
 // Seleção ESTÁVEL na camada de texto do PDF — porte do mecanismo do pdfjs (TextLayerBuilder): o endOfContent
 // "ancora" o fim da seleção p/ ela não vazar e grudar tudo. Sem isto, arrastar o mouse seleciona demais.
 let __pdfSelInit=false;
@@ -1690,6 +1705,65 @@ function bibSyncSoon(){clearTimeout(_bibT);_bibT=setTimeout(bibSync,500)}
 const save=k=>{store.set(k,S[k]);if(k==='an'&&CFG.modo==='biblioteca')bibSyncSoon()};
 const saveSet=()=>save('set');
 
+/* ===== JURIS v2 · grifos persistidos no SERVIDOR (âncora text-quote, igual ao leitor de Lei Seca) =====
+   O #article NUNCA é mutado para ancorar: a âncora é por offset de caractere na "espinha" (concatenação
+   do texto) + fallback {exact,prefix,suffix}. Isso sobrevive à edição do documento (grifo que não casa
+   mais é IGNORADO — nunca pinta errado / nunca "buga toda a visualização") e persiste cross-device via
+   /api/leitura/anotacao (o host faz a chamada; o iframe é isolado). */
+const GRIFO_SERVER=!!CFG.grifosServer&&CFG.modo!=='biblioteca';
+const COR_HEX={y:'#fde047',g:'#86efac',b:'#93c5fd',v:'#c4b5fd',r:'#fca5a5',k:'#374151'};
+const HEX_COR=Object.fromEntries(Object.entries(COR_HEX).map(([k,v])=>[v.toLowerCase(),k]));
+const corToHex=c=>COR_HEX[c]||COR_HEX.y;
+const hexToCor=h=>HEX_COR[String(h||'').toLowerCase()]||'y';
+const GCTX=32;
+function construirEspinha(){const nodes=[];let Sx='';
+  const w=document.createTreeWalker(article,NodeFilter.SHOW_TEXT,{acceptNode(n){let el=n.parentElement;while(el&&el!==article){if(el.hasAttribute&&el.hasAttribute('data-leitura-q'))return NodeFilter.FILTER_REJECT;el=el.parentElement}return NodeFilter.FILTER_ACCEPT}});
+  let n;while(n=w.nextNode()){const t=n.data;if(!t)continue;nodes.push({node:n,start:Sx.length,end:Sx.length+t.length});Sx+=t}return {S:Sx,nodes}}
+function posNaEspinha(esp,container,offset){
+  if(container.nodeType===3){const e=esp.nodes.find(x=>x.node===container);return e?e.start+offset:-1}
+  const el=container,ref=el.childNodes[offset]||null;
+  if(ref===null){let last=-1;for(const x of esp.nodes)if(el.contains(x.node))last=x.end;return last>=0?last:esp.S.length}
+  for(const x of esp.nodes){if(ref===x.node||(ref.contains&&ref.contains(x.node)))return x.start;if(ref.compareDocumentPosition(x.node)&Node.DOCUMENT_POSITION_FOLLOWING)return x.start}
+  return esp.S.length}
+function rangeParaAncora(esp,range){const inicio=posNaEspinha(esp,range.startContainer,range.startOffset),fim=posNaEspinha(esp,range.endContainer,range.endOffset);
+  if(inicio<0||fim<0||fim<=inicio)return null;
+  return {inicio,fim,exact:esp.S.slice(inicio,fim),prefix:esp.S.slice(Math.max(0,inicio-GCTX),inicio),suffix:esp.S.slice(fim,fim+GCTX)}}
+function localizarEsp(esp,pos){for(const e of esp.nodes)if(pos>=e.start&&pos<=e.end)return {node:e.node,offset:pos-e.start};return null}
+function recuperarEsp(Sx,a){if(!a.exact)return null;const idxs=[];let i=Sx.indexOf(a.exact);while(i>=0&&idxs.length<200){idxs.push(i);i=Sx.indexOf(a.exact,i+1)}
+  if(!idxs.length)return null;let best=idxs[0],bs=-Infinity;
+  for(const idx of idxs){const pre=Sx.slice(Math.max(0,idx-(a.prefix||'').length),idx),suf=Sx.slice(idx+a.exact.length,idx+a.exact.length+(a.suffix||'').length);let sc=0;
+    if(a.prefix&&pre.endsWith(a.prefix.slice(-8)))sc+=2;if(a.suffix&&suf.startsWith(a.suffix.slice(0,8)))sc+=2;sc-=Math.abs(idx-a.inicio)/1000;if(sc>bs){bs=sc;best=idx}}
+  return {inicio:best,fim:best+a.exact.length}}
+function ancoraParaRange(esp,a){let inicio=a.inicio,fim=a.fim;
+  if(esp.S.slice(inicio,fim)!==a.exact){const rec=recuperarEsp(esp.S,a);if(!rec)return null;inicio=rec.inicio;fim=rec.fim}
+  const ini=localizarEsp(esp,inicio),end=localizarEsp(esp,fim);if(!ini||!end)return null;
+  const r=document.createRange();try{r.setStart(ini.node,ini.offset);r.setEnd(end.node,end.offset)}catch(_){return null}return r}
+// Range (pode cruzar vários blocos) → segmentos {pid,s,e,sec,text} nos blocos [data-pid] intersectados.
+function segmentosDoRange(range){const segs=[];
+  for(const b of $$('#article [data-pid]')){
+    let cruza;try{cruza=range.intersectsNode(b)}catch(_){cruza=false}if(!cruza)continue;
+    const bc=document.createRange();bc.selectNodeContents(b);
+    const r1=document.createRange();r1.selectNodeContents(b);
+    if(range.compareBoundaryPoints(Range.START_TO_START,bc)>0)r1.setEnd(range.startContainer,range.startOffset);else r1.setEnd(bc.startContainer,bc.startOffset);
+    let s=r1.toString().length;
+    const r2=document.createRange();r2.selectNodeContents(b);
+    if(range.compareBoundaryPoints(Range.END_TO_END,bc)<0){try{r2.setEnd(range.endContainer,range.endOffset)}catch(_){}}else r2.setEnd(bc.endContainer,bc.endOffset);
+    let e=r2.toString().length;const t=b.textContent;while(s<e&&/\s/.test(t[s]))s++;while(e>s&&/\s/.test(t[e-1]))e--;if(e-s<1)continue;
+    const sc=secOf(b);segs.push({pid:b.dataset.pid,s,e,sec:sc?sc.id:'',text:t.slice(s,e)})}
+  return segs}
+// âncora text-quote de UM grifo já criado (pid+s+e) → p/ persistir no servidor.
+function ancoraDoGrifo(a){try{const b=blockOf(a.pid);if(!b)return null;const tn=textNodes(b);let pos=0,sN=null,sO=0,eN=null,eO=0;
+  for(const n of tn){const L=n.nodeValue.length;if(sN===null&&pos+L>=a.s){sN=n;sO=a.s-pos}if(pos+L>=a.e){eN=n;eO=a.e-pos;break}pos+=L}
+  if(!sN||!eN)return null;const r=document.createRange();r.setStart(sN,sO);r.setEnd(eN,eO);return rangeParaAncora(construirEspinha(),r)}catch(_){return null}}
+function grifoPayload(a,anc){return {inicio:anc.inicio,fim:anc.fim,exact:anc.exact,prefix:anc.prefix,suffix:anc.suffix,cor:corToHex(a.c),nota:a.note||'',tipo:a.t==='ul'?'nota':'grifo'}}
+function emitGrifo(op,payload){if(!GRIFO_SERVER)return;try{window.parent.postMessage(Object.assign({type:'leitor-jus-grifo',op},payload),'*')}catch(_){}}
+// Grupo = todos os segmentos de um mesmo grifo (multi-bloco). Edição propaga a todos + 1 upd no servidor.
+function grupoAn(a){return (GRIFO_SERVER&&a&&a.gid)?S.an.filter(x=>x.gid===a.gid):[a]}
+function setCorGrupo(a,c){grupoAn(a).forEach(x=>{x.c=c;anMarks(x.id).forEach(m=>m.dataset.c=c)});if(GRIFO_SERVER&&a.srvId)emitGrifo('upd',{id:a.srvId,cor:corToHex(c),nota:(a.note||null)})}
+function setNotaGrupo(a,nota){a.note=nota;refreshTail(a);if(GRIFO_SERVER&&a.srvId)emitGrifo('upd',{id:a.srvId,cor:corToHex(a.c),nota:(nota||null)})}
+// id do servidor chega de volta → casa pelo cid (=gid do grupo) e marca todos os segmentos.
+window.addEventListener('message',e=>{const m=e&&e.data;if(!m||m.type!=='leitor-jus-grifo-saved'||!m.cid||!m.id)return;(S.an||[]).forEach(a=>{if(a.gid===m.cid)a.srvId=m.id})});
+
 renderDay();
 if(CFG.modo==='biblioteca'){
   if(!CFG.pdf){
@@ -1699,7 +1773,10 @@ if(CFG.modo==='biblioteca'){
   }
   // PDF: os pids são atribuídos por SPAN da camada de texto em renderPdfPages (assíncrono).
 } else {
-  $$('#article .flow p, #article .flow li, #article .tese p, #article .law p').forEach((el,i)=>el.dataset.pid='b'+i);
+  // Blocos grifáveis do Juris: além de parágrafos/listas, inclui TÍTULOS (h2/h3), TABELAS (td/th) e citações
+  // (blockquote) — antes o aluno "não conseguia grifar" título/tabela (sem data-pid, selInfo retornava null).
+  // Índice global em ordem de documento (comma-selector respeita a ordem do DOM) → mantém o `ord()` do caderno.
+  $$('#article .sec h2, #article .flow p, #article .flow li, #article .flow h3, #article .flow h4, #article .flow td, #article .flow th, #article .flow blockquote, #article .tese p, #article .law p').forEach((el,i)=>{if(!el.dataset.pid)el.dataset.pid='b'+i});
 }
 const secs=$$('#article .sec');
 const secOf=el=>el.closest('.sec');
@@ -1830,7 +1907,7 @@ function layoutDoc(){doc.style.marginLeft='';doc.style.marginRight='';
   notesOn=!app.classList.contains('focus')&&free>=NOTE+24;
   if(notesOn&&free<NOTE*2){doc.style.marginLeft=Math.max(0,free-NOTE)+'px';doc.style.marginRight='0'}
   $('#margin').style.left=(pageW+20)+'px';renderNotes();placeShade()}
-addEventListener('resize',()=>{layoutDoc();if(!isNarrow())app.classList.remove('mv-text')});
+addEventListener('resize',()=>{layoutDoc();if(!isNarrow())app.classList.remove('mv-text');try{fitPdf()}catch(_){}});
 
 /* ================= APARÊNCIA ================= */
 function applySet(){const st=S.set,r=document.documentElement;
@@ -1883,7 +1960,7 @@ function wrap(block,s,e,attrs){let pos=0;const segs=[];textNodes(block).forEach(
 function unwrap(ms){const ps=new Set();ms.forEach(m=>{ps.add(m.parentNode);m.replaceWith(...m.childNodes)});ps.forEach(p=>p&&p.normalize())}
 const anMarks=id=>(CFG.modo==='biblioteca'&&CFG.pdf)?$$(`.pdfov[data-aid="${id}"]`,article):$$(`mark.an[data-aid="${id}"]`,article);
 const blockOf=pid=>$(`[data-pid="${pid}"]`);
-function paint(a){if(CFG.modo==='biblioteca'&&CFG.pdf){return paintPdf(a)}const b=blockOf(a.pid);if(!b)return;wrap(b,a.s,a.e,{class:'an','data-aid':a.id,'data-t':a.t,'data-c':a.c});refreshTail(a)}
+function paint(a){try{if(CFG.modo==='biblioteca'&&CFG.pdf){return paintPdf(a)}const b=blockOf(a.pid);if(!b)return;const n=b.textContent.length;if(a.s==null||a.e==null||a.e<=a.s||a.s<0||a.e>n)return;wrap(b,a.s,a.e,{class:'an','data-aid':a.id,'data-t':a.t,'data-c':a.c});refreshTail(a)}catch(_){/* grifo inválido: ignora, nunca quebra o render */}}
 function refreshTail(a){const ms=anMarks(a.id);ms.forEach(m=>m.removeAttribute('data-tail'));if(a.note&&ms.length)ms[ms.length-1].setAttribute('data-tail','')}
 function repaintAll(){if(CFG.modo==='biblioteca'&&CFG.pdf){$$('.pdfov',article).forEach(e=>e.remove());S.an.forEach(paint);return}unwrap($$('mark.an',article));S.an.forEach(paint)}
 function seed(phrase,t,c,note){const b=$$('[data-pid]').find(x=>x.textContent.includes(phrase));if(!b)return null;const s=b.textContent.indexOf(phrase);return {id:uid(),pid:b.dataset.pid,s,e:s+phrase.length,t,c,note,sec:secOf(b).id,text:phrase,ex:true}}
@@ -1891,6 +1968,24 @@ function seed(phrase,t,c,note){const b=$$('[data-pid]').find(x=>x.textContent.in
    salvo (localStorage por dia) e restaurado ao reabrir. Os seeds demo do protótipo foram removidos. */
 if(!S.an){S.an=[];save('an')}
 if(!S.cards){S.cards=[];save('cards')}
+// JURIS v2: o SERVIDOR é a fonte da verdade dos grifos (cross-device). Converte cada âncora text-quote
+// em segmentos pintáveis; grifos "órfãos" (texto mudou) são apenas ignorados — nunca pintam errado.
+if(GRIFO_SERVER){
+  const legacy=Array.isArray(S.an)?S.an.slice():[];
+  const esp=construirEspinha();const srv=[];
+  (Array.isArray(CFG.grifos)?CFG.grifos:[]).forEach(g=>{try{
+    const r=ancoraParaRange(esp,{inicio:g.inicio,fim:g.fim,exact:g.exact,prefix:g.prefix,suffix:g.suffix});if(!r)return;
+    const segs=segmentosDoRange(r);if(!segs.length)return;
+    const gid='s'+g.id,tool=(g.tipo==='nota')?'ul':'hl';
+    segs.forEach((sg,k)=>srv.push({id:uid(),gid,srvId:g.id,pid:sg.pid,s:sg.s,e:sg.e,t:tool,c:hexToCor(g.cor),note:k===0?(g.nota||''):'',sec:sg.sec,text:sg.text}));
+  }catch(_){}});
+  S.an=srv;
+  // Migração 1x: aluno tinha grifos só no localStorage e o servidor está vazio → sobe p/ o servidor.
+  if(!srv.length&&legacy.length&&!store.get('an_migr',false)){
+    legacy.forEach(a=>{try{const anc=ancoraDoGrifo(a);if(!anc)return;a.gid=a.gid||('m'+a.id);S.an.push(a);emitGrifo('add',{cid:a.gid,a:grifoPayload(a,anc)})}catch(_){}});
+    store.set('an_migr',true);
+  }
+}
 S.an.forEach(paint);
 
 /* Histórico (desfazer/refazer) */
@@ -1919,6 +2014,13 @@ const tool=$('#seltool');let pendingSel=null,activeAn=null;
 // navegadores) — confiamos no pendingSel capturado + click normal. Assim a ferramenta aciona de 1ª nos dois.
 tool.addEventListener('mousedown',e=>{if(!matchMedia('(pointer:coarse)').matches)e.preventDefault()});
 function selInfo(){const sel=getSelection();if(!sel.rangeCount||sel.isCollapsed)return null;const r=sel.getRangeAt(0);
+  if(GRIFO_SERVER){
+    // Juris: a seleção pode cruzar VÁRIOS blocos (multi-parágrafo, título+texto, célula de tabela). Retorna
+    // os segmentos por bloco + a âncora text-quote do trecho inteiro. Mantém pid/s/e/sec/text do 1º segmento
+    // para os consumidores existentes (copiar, cartão, folha, borracha).
+    const segs=segmentosDoRange(r);if(!segs.length)return null;const f=segs[0];
+    return {pid:f.pid,s:f.s,e:f.e,sec:f.sec,text:segs.map(x=>x.text).join(' '),rect:r.getBoundingClientRect(),segments:segs,anchor:rangeParaAncora(construirEspinha(),r)};
+  }
   const sc=r.startContainer.nodeType===1?r.startContainer:r.startContainer.parentElement;const b=sc&&sc.closest('[data-pid]');if(!b||!article.contains(b))return null;
   let end=r.endContainer,endOff=r.endOffset;if(!b.contains(end)){end=b;endOff=b.childNodes.length}
   const p1=document.createRange();p1.selectNodeContents(b);p1.setEnd(r.startContainer,r.startOffset);const s=p1.toString().length;
@@ -1948,7 +2050,7 @@ function selInfoPdf(){
 }
 function mergeRects(rects){
   const srt=rects.slice().sort((a,b)=>a.y0-b.y0||a.x0-b.x0);const lines=[];
-  for(const r of srt){const h=r.y1-r.y0;const ln=lines.find(l=>Math.abs((l.y0+l.y1)/2-(r.y0+r.y1)/2)<h*0.6);
+  for(const r of srt){const h=r.y1-r.y0;const ln=lines.find(l=>Math.abs((l.y0+l.y1)/2-(r.y0+r.y1)/2)<h*0.6&&r.x0<=l.x1+0.03&&r.x1>=l.x0-0.03);
     if(ln){ln.x0=Math.min(ln.x0,r.x0);ln.x1=Math.max(ln.x1,r.x1);ln.y0=Math.min(ln.y0,r.y0);ln.y1=Math.max(ln.y1,r.y1)}else lines.push({...r})}
   return lines;
 }
@@ -1968,16 +2070,18 @@ function showTool(rect,existing){tool.classList.add('show');$('[data-a="del"]',t
 function hideTool(){tool.classList.remove('show');pendingSel=null;activeAn=null}
 function onSelectEnd(){
   if(ehPdf()){
-    const i=selInfoPdf();if(!i){if(!activeAn)hideTool();return}
+    const i=selInfoPdf();if(!i){if(!activeAn&&!(tool.classList.contains('show')&&pendingSel))hideTool();return}
     pendingSel=i;lastReaderSel=i;const t=S.set.tool;
     if(t==='select'){activeAn=null;showTool(i.rect,false)}
     else if(t==='eraser'){erasePdf(i);getSelection().removeAllRanges()}
     else{applyPdf(t,S.set.color)}
     return;
   }
-  const i=selInfo();if(!i){if(!activeAn)hideTool();return}
+  // TOUCH: não esconde a barra (nem limpa o pendingSel) quando a seleção "colapsa" com a barra já aberta —
+  // é o que fazia o grifo "não ir" no celular (o toque no botão colapsava a seleção antes do apply).
+  const i=selInfo();if(!i){if(!activeAn&&!(tool.classList.contains('show')&&pendingSel))hideTool();return}
   lastReaderSel=i;const t=S.set.tool;
-  if(t==='select'){pendingSel=i;activeAn=null;showTool(i.rect,false)}
+  if(t==='select'){pendingSel=i;activeAn=null;showTool(i.rect,false);marcarAtivos()}
   else if(t==='eraser'){erase(i);getSelection().removeAllRanges()}
   else{pendingSel=i;apply(t,S.set.color,true);}}
 document.addEventListener('mouseup',e=>{if(e.target.closest&&e.target.closest('#seltool,.pop,#mirror,#anbar'))return;setTimeout(onSelectEnd,10)});
@@ -1986,6 +2090,9 @@ document.addEventListener('selectionchange',()=>{if(matchMedia('(pointer:coarse)
 // TOUCH: ao LEVANTAR o dedo com um trecho já selecionado, mostra a barra NA HORA (sem esperar o debounce
 // de 400ms da seleção) — resolve a sensação de "não acionou". Tap simples (seleção vazia) é inofensivo.
 document.addEventListener('pointerup',e=>{if(!matchMedia('(pointer:coarse)').matches)return;if(e.target.closest&&e.target.closest('#seltool,.pop,#mirror,#anbar'))return;clearTimeout(window._st);window._st=setTimeout(onSelectEnd,120)});
+// TOUCH (fallback p/ navegadores sem pointer events coerentes em celular/tablet): ao soltar o dedo com um
+// trecho selecionado, aciona a barra na hora (não espera o debounce de 400ms do selectionchange).
+document.addEventListener('touchend',e=>{if(e.target.closest&&e.target.closest('#seltool,.pop,#mirror,#anbar'))return;clearTimeout(window._st);window._st=setTimeout(onSelectEnd,80)},{passive:true});
 scroller.addEventListener('scroll',()=>{if(tool.classList.contains('show'))hideTool();if(pop.dataset.kind!=='note')closePop()},{passive:true});
 article.addEventListener('click',e=>{
   if(CFG.modo==='biblioteca'&&CFG.pdf){
@@ -2010,22 +2117,56 @@ article.addEventListener('click',e=>{
 document.addEventListener('mousedown',e=>{if(!e.target.closest('#seltool,mark.an,.pop'))hideTool()});
 
 function apply(t,c,silent){if(ehPdf())return applyPdf(t,c);const i=pendingSel;if(!i)return null;commit();
-  S.an.filter(a=>a.pid===i.pid&&a.t===t&&a.s<i.e&&a.e>i.s).forEach(a=>removeAn(a.id,false,true));
-  const a={id:uid(),pid:i.pid,s:i.s,e:i.e,t,c:t==='bd'?'k':c,note:'',sec:i.sec,text:i.text};S.an.push(a);save('an');getSelection().removeAllRanges();paint(a);hideTool();renderPanels();
-  if(!silent)toast(TOOLS[t]+' aplicado',{label:'Desfazer',fn:undo});return a}
-function removeAn(id,render=true,quiet){if(CFG.modo==='biblioteca'&&CFG.pdf){anMarks(id).forEach(m=>m.remove())}else{unwrap(anMarks(id))}S.an=S.an.filter(a=>a.id!==id);save('an');if(render)renderPanels()}
-function erase(i){const hit=S.an.filter(a=>a.pid===i.pid&&a.s<i.e&&a.e>i.s);if(!hit.length)return;commit();const b=blockOf(i.pid);const txt=b.textContent;
+  const cc=(t==='bd'?'k':c);const segs=(i.segments&&i.segments.length)?i.segments:[{pid:i.pid,s:i.s,e:i.e,sec:i.sec,text:i.text}];
+  const gid='g'+uid();const created=[];
+  segs.forEach(sg=>{S.an.filter(a=>a.pid===sg.pid&&a.t===t&&a.s<sg.e&&a.e>sg.s).forEach(a=>removeAn(a.id,false,true));
+    const a={id:uid(),gid,pid:sg.pid,s:sg.s,e:sg.e,t,c:cc,note:'',sec:sg.sec,text:sg.text};S.an.push(a);paint(a);created.push(a)});
+  save('an');getSelection().removeAllRanges();hideTool();renderPanels();
+  if(GRIFO_SERVER&&created.length){const anc=i.anchor||ancoraDoGrifo(created[0]);if(anc)emitGrifo('add',{cid:gid,a:grifoPayload(created[0],anc)})}
+  if(!silent)toast(TOOLS[t]+' aplicado',{label:'Desfazer',fn:undo});return created[0]||null}
+function removeAn(id,render=true,quiet){let ids=[id],srvId=null;
+  if(GRIFO_SERVER){const a0=S.an.find(x=>x.id===id);if(a0&&a0.gid){ids=S.an.filter(a=>a.gid===a0.gid).map(a=>a.id);srvId=a0.srvId}}
+  ids.forEach(i2=>{if(CFG.modo==='biblioteca'&&CFG.pdf){anMarks(i2).forEach(m=>m.remove())}else{unwrap(anMarks(i2))}});
+  S.an=S.an.filter(a=>ids.indexOf(a.id)<0);save('an');
+  if(GRIFO_SERVER&&srvId)emitGrifo('del',{id:srvId});
+  if(render)renderPanels()}
+function erase(i){const hit=S.an.filter(a=>a.pid===i.pid&&a.s<i.e&&a.e>i.s);if(!hit.length)return;commit();
+  if(GRIFO_SERVER){const seen=new Set();hit.forEach(a=>{const g=a.gid||a.id;if(seen.has(g))return;seen.add(g);removeAn(a.id,false)});save('an');renderPanels();$('#anHint').textContent='Trecho limpo · Ctrl Z desfaz';return}
+  const b=blockOf(i.pid);const txt=b.textContent;
   hit.forEach(a=>{const parts=[];if(a.s<i.s)parts.push({...a,id:uid(),e:i.s,text:txt.slice(a.s,i.s)});if(a.e>i.e)parts.push({...a,id:uid(),s:i.e,text:txt.slice(i.e,a.e),note:parts.length?'':a.note});
     removeAn(a.id,false);parts.forEach(p=>{S.an.push(p);paint(p)})});save('an');renderPanels();$('#anHint').textContent='Trecho limpo · Ctrl Z desfaz'}
 // Reabre o balão JÁ na marcação criada/clicada (modo "existe"): some os estilos, mostra cor ativa + lixeira
 // + Nota/Cartão/Folha. Assim ao MODIFICAR (trocar cor etc.) o balão PERMANECE ABERTO; fecha só no clique
 // fora / rolagem / Esc / lixeira. `activeAn` setado também evita o auto-hide do selectionchange no touch.
 function manterBalaoNa(a){if(!a)return;activeAn=a;pendingSel=null;const m=anMarks(a.id)[0];if(m)showTool(m.getBoundingClientRect(),true)}
+/* MULTI-APLICAÇÃO no MESMO trecho: com um trecho selecionado, a barra fica aberta e cada estilo vira um
+   TOGGLE no mesmo trecho — pode aplicar marca-texto E sublinhado etc. SEM reselecionar, e o estilo aplicado
+   fica marcado como ATIVO. Clicar num grifo já pintado segue abrindo o modo "editar" (activeAn). PDF da
+   Biblioteca (seleção sem bloco pid) mantém o fluxo antigo (manterBalaoNa). */
+function selSegs(i){return (i.segments&&i.segments.length)?i.segments:[{pid:i.pid,s:i.s,e:i.e,sec:i.sec,text:i.text}]}
+function toolAtivo(i,t){const f=selSegs(i)[0];return !!S.an.find(a=>a.t===t&&a.pid===f.pid&&a.s<f.e&&a.e>f.s)}
+function marcarAtivos(){const i=pendingSel;if(!i||ehPdf())return;$$('[data-st]',tool).forEach(b=>b.classList.toggle('on',toolAtivo(i,b.dataset.st)));$$('.cd',tool).forEach(x=>x.classList.toggle('on',x.dataset.c===S.set.color))}
+function toggleNoSel(t,c){const i=pendingSel;if(!i)return;const segs=selSegs(i),f=segs[0];
+  const ja=S.an.find(a=>a.t===t&&a.pid===f.pid&&a.s<f.e&&a.e>f.s);commit();
+  if(ja){removeAn(ja.id)}                                                      // já tinha esse estilo → toggle OFF
+  else{const cc=(t==='bd'?'k':c),gid='g'+uid(),created=[];
+    segs.forEach(sg=>{S.an.filter(a=>a.pid===sg.pid&&a.t===t&&a.s<sg.e&&a.e>sg.s).forEach(a=>removeAn(a.id,false,true));
+      const a={id:uid(),gid,pid:sg.pid,s:sg.s,e:sg.e,t,c:cc,note:'',sec:sg.sec,text:sg.text};S.an.push(a);paint(a);created.push(a)});
+    save('an');renderPanels();
+    if(GRIFO_SERVER&&created.length){const anc=i.anchor||ancoraDoGrifo(created[0]);if(anc)emitGrifo('add',{cid:gid,a:grifoPayload(created[0],anc)})}}
+  showTool(i.rect,false);marcarAtivos()}                                       // MANTÉM a barra no mesmo trecho
 $$('.cd',tool).forEach(d=>d.onclick=()=>{const c=d.dataset.c;
-  if(activeAn){commit();activeAn.c=c;anMarks(activeAn.id).forEach(m=>m.dataset.c=c);save('an');renderPanels();
-    $$('.cd',tool).forEach(x=>x.classList.toggle('on',x.dataset.c===c))}        // troca a cor e MANTÉM aberto
-  else{setColor(c);manterBalaoNa(apply('hl',c,true))}});                        // aplica num trecho novo e CONTINUA aberto
-$$('[data-st]',tool).forEach(b=>b.onclick=()=>{if(activeAn)return;manterBalaoNa(apply(b.dataset.st,S.set.color,true))});
+  if(activeAn){commit();setCorGrupo(activeAn,c);save('an');renderPanels();$$('.cd',tool).forEach(x=>x.classList.toggle('on',x.dataset.c===c));return}
+  if(pendingSel){setColor(c);
+    if(ehPdf()){manterBalaoNa(apply('hl',c,true));return}
+    const f=selSegs(pendingSel)[0];const naSel=S.an.filter(a=>a.pid===f.pid&&a.s<f.e&&a.e>f.s);
+    if(naSel.length){commit();const vis=new Set();naSel.forEach(a=>{const k=a.gid||a.id;if(vis.has(k))return;vis.add(k);setCorGrupo(a,c)});save('an');renderPanels();showTool(pendingSel.rect,false);marcarAtivos()} // recolore o que o trecho já tem
+    else{toggleNoSel('hl',c)}                                                  // nada ainda → aplica marca-texto
+    return}
+  setColor(c)});
+$$('[data-st]',tool).forEach(b=>b.onclick=()=>{if(activeAn)return;
+  if(ehPdf()){manterBalaoNa(apply(b.dataset.st,S.set.color,true));return}
+  if(pendingSel)toggleNoSel(b.dataset.st,S.set.color)});
 tool.addEventListener('click',e=>{const b=e.target.closest('.tbtn');if(!b)return;const a=b.dataset.a;const info=activeAn||pendingSel;if(!info)return;
   if(a==='note'){if(activeAn){const x=activeAn;hideTool();openNote(x)}else{const x=apply('hl',S.set.color,true);if(x)openNote(x)}}
   if(a==='card'){openCardFrom(info);hideTool()}
@@ -2043,8 +2184,8 @@ function openNote(a){const m=anMarks(a.id)[0];if(!m)return;pop.dataset.kind='not
    <div class="pop-b" style="font-family:var(--f-ui)"><div class="quote">${esc(a.text.length>140?a.text.slice(0,140)+'…':a.text)}</div><label for="pnT" class="sr-only">Nota</label><textarea id="pnT" placeholder="Por que isso importa? Ligação com outro tema, pegadinha, artigo relacionado">${esc(a.note||'')}</textarea></div>
    <div class="pop-f"><span><kbd>Ctrl</kbd> <kbd>↵</kbd> salva</span><span style="display:flex;gap:6px">${a.note?'<button class="btn" id="pnDel">Apagar</button>':''}<button class="btn pri" id="pnOk">Salvar nota</button></span></div>`;
   placePop(m.getBoundingClientRect());$('#pnT').focus();$('#pnX').onclick=closePop;
-  $('#pnOk').onclick=()=>{a.note=$('#pnT').value.trim();save('an');refreshTail(a);renderPanels();closePop();toast(a.note?'Nota salva':'Nota removida')};
-  const d=$('#pnDel');if(d)d.onclick=()=>{a.note='';save('an');refreshTail(a);renderPanels();closePop()};
+  $('#pnOk').onclick=()=>{setNotaGrupo(a,$('#pnT').value.trim());save('an');renderPanels();closePop();toast(a.note?'Nota salva':'Nota removida')};
+  const d=$('#pnDel');if(d)d.onclick=()=>{setNotaGrupo(a,'');save('an');renderPanels();closePop()};
   $('#pnT').onkeydown=e=>{if(e.key==='Enter'&&(e.metaKey||e.ctrlKey))$('#pnOk').click()}}
 function showLei(el){const l=$('#'+el.dataset.law);if(!l)return;pop.dataset.kind='lei';const lab=l.dataset.label||'';const a=null;const par=(el.dataset.par||'').replace(/\s+/g,' ').toLowerCase();
   const body=$$('p',l).map(p=>{const t=p.textContent.replace(/^“/,'').trim().toLowerCase().replace(/\s+/g,' ');const hit=par&&t.startsWith(par);return `<p${hit?' class="hlp"':''}>${p.innerHTML}</p>`}).join('');
