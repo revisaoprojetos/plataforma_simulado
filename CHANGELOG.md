@@ -12,6 +12,22 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.32.1 — 2026-10-27
+
+**fix(storage): fecha os bypasses que mandavam arquivos/listagem direto p/ o Supabase (prepara o flip p/ S3)**
+
+- **Worker de PDF** (`pdf-relatorio`/`pdf-caderno`): gravavam os PDFs **direto** em `supabase.storage.from('pdfs')`,
+  ignorando `STORAGE_PROVIDER`. Agora usam `apps/worker/src/lib/storage.ts` (novo) que respeita o provider
+  (supabase|s3), espelhando a abstração da web. Adicionado `@aws-sdk/client-s3` ao worker.
+- **Reconcile/uso provider-aware:** o cron `storage-reconcile` listava só o Supabase e **poda** o catálogo —
+  com `STORAGE_PROVIDER=s3` isso **apagaria do catálogo** os arquivos que estão no S3. A listagem passou a ser
+  por provider (`ListBuckets`/`ListObjectsV2`) em `listar-buckets.ts`, usada por `uso.ts` e pelo browse do
+  `organizador.ts`. O label `provider` do catálogo passou a refletir o provider real.
+- **Verificação:** `apps/web/scripts/verificar-storage.mjs` — mostra o provider ativo, lista buckets e faz um
+  round-trip real (upload→leitura→remoção) no bucket `pdfs`. O worker loga `[storage] provider = …` no arranque.
+- Nada ao vivo muda sem o flip: `STORAGE_PROVIDER` segue `supabase` até ser trocado no stack. Admin do
+  organizador (copiar/mover + busca) e `backup.ts` seguem Supabase-only (ferramentas de manutenção).
+
 ## 3.32.0 — 2026-10-27
 
 **fix(leitor de grifos): grifar deixa de "não ir / bugar a visualização" no Juris e na Biblioteca (celular/tablet/PC)**

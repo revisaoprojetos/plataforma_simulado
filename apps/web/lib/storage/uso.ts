@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { descobrirBuckets, bfsBucket, type ObjetoStorage } from './listar-buckets'
+import { descobrirBucketsAtivo, bfsBucketAtivo, type ObjetoStorage } from './listar-buckets'
 import { categoriaDe, rotuloCategoria, CATEGORIAS } from './canonico'
 import { construirMapaReferencias } from './referencias'
 import { montarRegistros, sincronizarCatalogo } from './reconciliar'
@@ -156,14 +156,14 @@ export async function marcarErro(svc: SupabaseClient, erro: string): Promise<voi
  * `simulado_arquivos` (insere faltantes + poda sumidos). Usado pelo cron e pelo fallback inline.
  */
 export async function recomputarTudo(svc: SupabaseClient): Promise<{ snapshot: UsoSnapshot; reconcile: Awaited<ReturnType<typeof sincronizarCatalogo>> }> {
-  const buckets = await descobrirBuckets(svc)
+  const buckets = await descobrirBucketsAtivo(svc)
   const limites = await lerLimites(svc)
   const mapa = await construirMapaReferencias(svc)
 
   const objetosPorBucket: { bucket: string; publico: boolean; objetos: ObjetoStorage[] }[] = []
   const todos: ObjetoStorage[] = []
   for (const b of buckets) {
-    const objetos = await bfsBucket(svc, b.nome)
+    const objetos = await bfsBucketAtivo(svc, b.nome)
     objetosPorBucket.push({ bucket: b.nome, publico: b.publico, objetos })
     todos.push(...objetos)
   }
@@ -178,9 +178,9 @@ export async function recomputarTudo(svc: SupabaseClient): Promise<{ snapshot: U
 
 /** Total de objetos (rápido) — decide scan inline vs. cron. */
 export async function totalObjetos(svc: SupabaseClient): Promise<number> {
-  const buckets = await descobrirBuckets(svc)
+  const buckets = await descobrirBucketsAtivo(svc)
   let n = 0
-  for (const b of buckets) n += (await bfsBucket(svc, b.nome)).length
+  for (const b of buckets) n += (await bfsBucketAtivo(svc, b.nome)).length
   return n
 }
 

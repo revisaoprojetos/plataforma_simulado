@@ -1,13 +1,12 @@
 import { Job } from 'bullmq'
 import { createClient } from '@supabase/supabase-js'
 import { urlParaPdf } from '../lib/gotenberg'
+import { uploadPublico } from '../lib/storage'
 
 const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!,
 )
-
-const PDF_PUBLIC_BASE = process.env.PDF_PUBLIC_BASE // opcional; senão usa getPublicUrl
 
 interface PdfCadernoData {
   jobId: string
@@ -33,17 +32,13 @@ export async function pdfCadernoProcessor(job: Job<PdfCadernoData>) {
     const m = process.env.CADERNO_PDF_MARGEM != null ? Number(process.env.CADERNO_PDF_MARGEM) : 0
     const pdf = await urlParaPdf(url, { marginTop: m, marginBottom: m, marginLeft: m, marginRight: m })
 
-    // 2. Upload no storage (bucket público `pdfs`)
+    // 2. Upload no storage (bucket público `pdfs`) — via abstração: respeita STORAGE_PROVIDER (supabase|s3)
     const path = `${tenantId}/${jobId}.pdf`
-    const { error: upErr } = await supabase.storage
-      .from('pdfs')
-      .upload(path, pdf, { contentType: 'application/pdf', upsert: true, cacheControl: '31536000' })
-    if (upErr) throw new Error(`Upload falhou: ${upErr.message}`)
+    const up = await uploadPublico({ bucket: 'pdfs', path, body: pdf, contentType: 'application/pdf', cacheSeconds: 31536000 })
+    if (!up.ok) throw new Error(`Upload falhou: ${up.erro}`)
 
-    // 3. URL pública
-    const publicUrl = PDF_PUBLIC_BASE
-      ? `${PDF_PUBLIC_BASE}/${path}`
-      : supabase.storage.from('pdfs').getPublicUrl(path).data.publicUrl
+    // 3. URL pública (do provider ativo)
+    const publicUrl = up.url!
 
     // 4. Marca concluído
     await supabase

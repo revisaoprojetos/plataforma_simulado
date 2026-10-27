@@ -1,6 +1,7 @@
 import { Job } from 'bullmq'
 import { createClient } from '@supabase/supabase-js'
 import { htmlParaPdf } from '../lib/gotenberg'
+import { uploadPublico } from '../lib/storage'
 import { createHash } from 'crypto'
 
 const supabase = createClient(
@@ -177,18 +178,14 @@ export async function pdfRelatorioProcessor(job: Job) {
     marginTop: 0.8, marginBottom: 0.8, marginLeft: 0.6, marginRight: 0.6,
   })
 
-  // 7. Upload to Supabase Storage (bucket `pdfs`)
+  // 7. Upload no storage (bucket `pdfs`) — via abstração: respeita STORAGE_PROVIDER (supabase|s3)
   const fileName = `relatorios/${sessao_id}_${createHash('sha256').update(sessao_id).digest('hex').slice(0, 8)}.pdf`
-  const { error: uploadErr } = await supabase.storage
-    .from('pdfs')
-    .upload(fileName, pdfBuffer, { contentType: 'application/pdf', upsert: true, cacheControl: '86400' })
-
-  if (uploadErr) {
-    console.error('[pdf-relatorio] Upload falhou:', uploadErr.message)
+  const up = await uploadPublico({ bucket: 'pdfs', path: fileName, body: pdfBuffer, contentType: 'application/pdf', cacheSeconds: 86400 })
+  if (!up.ok) {
+    console.error('[pdf-relatorio] Upload falhou:', up.erro)
     // Fall through — still return partial result
   }
-
-  const { data: { publicUrl } } = supabase.storage.from('pdfs').getPublicUrl(fileName)
+  const publicUrl = up.url ?? ''
 
   // 8. Save notification
   await supabase.from('notificacoes').insert({

@@ -10,7 +10,7 @@ async function registrarArquivo(svc: any, meta: { tenantId: string; nome: string
     if (existe?.length) return
     await svc.from('simulado_arquivos').insert({
       tenant_id: meta.tenantId, nome: meta.nome, tipo_mime: meta.tipo, tamanho_bytes: meta.tamanho,
-      provider: 'supabase', bucket: meta.bucket, path: meta.path, publico: true, criado_por: meta.criadoPor ?? null,
+      provider: getStorage().name, bucket: meta.bucket, path: meta.path, publico: true, criado_por: meta.criadoPor ?? null,
     })
   } catch { /* catálogo é secundário — nunca bloqueia o upload */ }
 }

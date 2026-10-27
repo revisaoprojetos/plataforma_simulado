@@ -111,7 +111,7 @@ export async function sincronizarCatalogo(
   for (let i = 0; i < novos.length; i += 500) {
     const lote = novos.slice(i, i + 500).map((r) => ({
       tenant_id: r.tenant_id, nome: r.nome, tipo_mime: mimeDe(r.nome), tamanho_bytes: r.size,
-      provider: 'supabase', bucket: r.bucket, path: r.path, publico: r.bucket !== 'discursivas', criado_por: null,
+      provider: (process.env.STORAGE_PROVIDER ?? 'supabase').toLowerCase(), bucket: r.bucket, path: r.path, publico: r.bucket !== 'discursivas', criado_por: null,
     }))
     const { error } = await svc.from('simulado_arquivos').insert(lote)
     if (error) erros.push(`insert lote ${i}: ${error.message}`)

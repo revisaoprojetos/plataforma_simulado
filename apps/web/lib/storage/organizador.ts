@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { descobrirBuckets, bfsBucket } from './listar-buckets'
+import { descobrirBucketsAtivo, bfsBucketAtivo } from './listar-buckets'
 import { construirMapaReferencias, estaReferenciado } from './referencias'
 import { pathCanonico } from './canonico'
 import { getStorage } from './index'
@@ -45,13 +45,13 @@ async function catalogoIndex(svc: SupabaseClient): Promise<Map<string, string>> 
 }
 
 export async function analisarOrganizacao(svc: SupabaseClient): Promise<RelatorioOrganizador> {
-  const buckets = await descobrirBuckets(svc)
+  const buckets = await descobrirBucketsAtivo(svc)
   const mapa = await construirMapaReferencias(svc)
   const idx = await catalogoIndex(svc)
   const itens: ItemOrganizacao[] = []
 
   for (const b of buckets) {
-    for (const o of await bfsBucket(svc, b.nome)) {
+    for (const o of await bfsBucketAtivo(svc, b.nome)) {
       const destino = pathCanonico({ bucket: b.nome, pathAtual: o.path })
       const catalogId = idx.get(`${b.nome}|${o.path}`) ?? null
       const referenciado = estaReferenciado(mapa, { bucket: b.nome, path: o.path, catalogId })
