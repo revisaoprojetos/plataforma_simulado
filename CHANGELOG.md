@@ -12,6 +12,14 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.32.2 — 2026-10-27
+
+**fix(build): `pnpm-lock.yaml` dessincronizado quebrava o build web (CI v3.32.1 falhou)**
+
+- A v3.32.1 adicionou `@aws-sdk/client-s3` ao `apps/worker/package.json`, mas o worker está no workspace pnpm
+  (`apps/*`) e o build do **web** roda `pnpm install --frozen-lockfile` sobre o monorepo inteiro → lockfile
+  fora de sincronia abortava o build. Regenerado o lockfile (3 linhas; a versão já existia via web).
+
 ## 3.32.1 — 2026-10-27
 
 **fix(storage): fecha os bypasses que mandavam arquivos/listagem direto p/ o Supabase (prepara o flip p/ S3)**

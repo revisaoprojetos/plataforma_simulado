@@ -214,6 +214,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@aws-sdk/client-s3':
+        specifier: 3.709.0
+        version: 3.709.0
       '@supabase/supabase-js':
         specifier: ^2.47.0
         version: 2.108.2
