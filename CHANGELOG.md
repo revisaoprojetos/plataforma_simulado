@@ -12,6 +12,20 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.30.2 — 2026-10-27
+
+**fix(jurisprudência/arcade): selo final (dia 15) libera ao publicar + dia sem teses não trava selo**
+
+- **Dia FINAL (selo, ex.: dia 15) agora é um DIA BÔNUS ABERTO** ([jogo.js](apps/web/public/jurisprudencia/js/jogo.js)
+  `dayUnlocked`): libera assim que **publicado**, igual a um dia normal — não exige mais completar os 14 dias
+  antes. O dia 15 ("só leitura + minigame") estava **bloqueado mesmo publicado**; agora os alunos conseguem
+  jogá-lo. O selo continua sendo conquistado ao dominar as teses do dia; a leitura do dia segue como gate do
+  minigame.
+- **Dia com 0 teses conta como COMPLETO** (`dayComplete`): um dia só-leitura (ou cujas questões foram
+  removidas) tem nada a dominar → não deve travar PRA SEMPRE o selo da matéria nem o selo final (bug: o selo de
+  Previdenciário [dias 7+8] não liberava porque o dia 7 estava sem questões). Robustez; o dia final não cai
+  aqui (as teses dele vêm de um pool emprestado > 0).
+
 ## 3.30.1 — 2026-10-26
 
 **fix(migração): `20261026000000_biblioteca_acesso_v2` falhava com erro 23514 (colisão da coluna `origem`)**

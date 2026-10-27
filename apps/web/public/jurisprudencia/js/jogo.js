@@ -84,18 +84,17 @@ function getTeses(n){
   return S.final.map(([d,i])=>DIAS[d].teses[i]);
 }
 const domOf = n => S.dom[n] || [];
-const dayComplete = n => { const t=getTeses(n).length; return t>0 && domOf(n).length>=t; };
+// Dia com 0 teses (só-leitura, ou cujas questões foram removidas) = NADA a dominar → conta como COMPLETO.
+// Senão ele nunca "fecha" e trava PRA SEMPRE o selo da matéria (ex.: Previdenciário = dias 7+8, com o dia 7
+// sem questões) e o selo final. O dia FINAL não cai aqui: o getTeses dele devolve o POOL emprestado (>0).
+const dayComplete = n => { const t=getTeses(n).length; return t===0 ? dayVisible(n) : domOf(n).length>=t; };
 // Jogável = publicada (demo/preview liberam tudo). Agendada/visualizável/rascunho = bloqueado.
-// SELO FINAL (dia agregado): NÃO basta estar "publicado" — ele é a culminância, então só libera quando
-// TODOS os dias normais estiverem publicados E concluídos. Antes caía no default 'publicada' (sem pub) e
-// ficava jogável cedo demais (e pontuava um "dia 15" que não devia existir ainda).
+// Dia FINAL (selo, ex.: dia 15) = BÔNUS ABERTO: libera assim que PUBLICADO, igual a um dia normal — NÃO
+// exige completar os 14 dias antes. (Decisão do produto: o dia 15 é "só leitura + minigame", então os
+// alunos devem conseguir jogá-lo ao ser publicado.) O SELO continua sendo conquistado ao dominar as teses
+// do dia (pool emprestado); a leitura do dia ainda é gate do minigame via leituraBloqueada().
 function dayUnlocked(n){
   if(S.demoAll||TESTADOR) return true;
-  if(isFinalDay(n)){
-    if(pubEstado(n)==='rascunho') return false;
-    const normais = VORD.filter(k=>!isFinalDay(k));
-    return normais.length>0 && normais.every(k=>pubEstado(k)==='publicada' && dayComplete(k));
-  }
   return pubEstado(n)==='publicada';
 }
 // Data de liberação do dia AGENDADO (p/ exibir "BLOQUEADO - DD/MM/AAAA"). null se não agendado.
