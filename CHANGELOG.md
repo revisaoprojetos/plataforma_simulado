@@ -12,6 +12,18 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.30.3 — 2026-10-27
+
+**fix(jurisprudência/arcade): cache-bust do JS do arcade (os fixes não chegavam ao navegador)**
+
+- O `index.html` do arcade carrega os scripts (bootstrap/jogo/dados) com um cache-bust **manual** fixo
+  (`?v=`), propagado ao `jogo.js` via `injetar()`. Esse `?v=` estava **preso em `20261015b`** desde 15/10, então
+  **nenhuma** mudança no `jogo.js` desta leva chegava ao navegador do aluno (ele servia o `jogo.js` antigo do
+  cache, mesmo com o deploy novo no servidor) — por isso o **dia 15 continuava bloqueado** e os demais fixes
+  (d-pad embutido, legenda clicável, guard de streak, dia-sem-teses/selo, desempenho) não surtiam efeito.
+- Bump do `?v=` para `20261027a` → o navegador busca o `jogo.js`/`bootstrap.js`/`dados.js` novos e **todos os
+  fixes da Jurisprudência passam a valer**. (Lembrete: sempre bumpar esse `?v=` ao mexer no JS do arcade.)
+
 ## 3.30.2 — 2026-10-27
 
 **fix(jurisprudência/arcade): selo final (dia 15) libera ao publicar + dia sem teses não trava selo**
