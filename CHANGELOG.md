@@ -12,6 +12,21 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.32.4 — 2026-10-27
+
+**fix(storage): aws-sdk não ia para a imagem standalone do web → s3 quebrava em runtime**
+
+- O provider S3 importava `@aws-sdk/client-s3`/`s3-request-presigner` por **especificador indireto**
+  (`import(PKG_S3)`), então o tracer do `output: 'standalone'` **não incluía** o aws-sdk na imagem do web.
+  Em produção com `STORAGE_PROVIDER=s3`, o `getSignedUrl`/upload lançava "module not found" → `urlAssinadaOriginal`
+  virava `null` → Biblioteca dava "arquivo original não pôde ser lido". (O worker usa `npm install`, por isso
+  lá funcionava.)
+- Fix: imports **literais** (`import('@aws-sdk/client-s3')`) em `providers/s3.ts` e `listar-buckets.ts` +
+  `@aws-sdk/client-s3`/`s3-request-presigner` em **`serverExternalPackages`** no `next.config.ts` → o tracer
+  agora inclui o pacote na standalone.
+- Também: nesta prod o conteúdo da Biblioteca mora no bucket **`pdfs`** (não existe bucket `conteudos` no
+  Supabase) → usar `STORAGE_CONTENT_BUCKET=pdfs` no flip.
+
 ## 3.32.3 — 2026-10-27
 
 **chore(deploy): compose do Portainer repassa as envs de storage S3 aos serviços web e worker**

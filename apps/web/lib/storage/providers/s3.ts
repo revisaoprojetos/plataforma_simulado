@@ -8,10 +8,9 @@ import { StorageError } from '@/lib/storage/types'
 //      S3_ACCESS_KEY_ID, S3_SECRET_ACCESS_KEY, S3_PUBLIC_BASE_URL (opcional p/ CDN).
 // O SDK é importado dinamicamente para não pesar o bundle enquanto não for usado.
 
-// Especificadores indiretos: evitam que o TS/bundler tente resolver os pacotes
-// enquanto não estiverem instalados (mantém o `next build` verde).
-const PKG_S3 = '@aws-sdk/client-s3'
-const PKG_S3_PRESIGN = '@aws-sdk/s3-request-presigner'
+// Imports LITERAIS (os pacotes são deps de apps/web) + serverExternalPackages no next.config → o tracer do
+// build standalone INCLUI o aws-sdk na imagem. (Antes, com especificador indireto, ficavam de fora e o s3
+// quebrava em runtime no web: getSignedUrl lançava e virava null.)
 
 // Nomes de bucket no S3 (ex.: Hetzner) são GLOBALMENTE únicos entre TODOS os clientes, então os nomes
 // lógicos do sistema ('conteudos'/'imagens'/'pdfs'/'discursivas'/'cadernos') não estão disponíveis.
@@ -26,7 +25,7 @@ function bucketFisico(logico: string): string {
 async function getClient() {
   let mod: any
   try {
-    mod = await import(/* webpackIgnore: true */ PKG_S3)
+    mod = await import('@aws-sdk/client-s3')
   } catch {
     throw new StorageError('Provider S3 selecionado, mas @aws-sdk/client-s3 não está instalado. Rode: pnpm add @aws-sdk/client-s3 @aws-sdk/s3-request-presigner')
   }
@@ -66,7 +65,7 @@ export function createS3Provider(): StorageProvider {
 
     async getSignedUrl(bucket, path, expiresInSec = 3600) {
       const { client, mod } = await getClient()
-      const presign: any = await import(/* webpackIgnore: true */ PKG_S3_PRESIGN).catch(() => {
+      const presign: any = await import('@aws-sdk/s3-request-presigner').catch(() => {
         throw new StorageError('Instale @aws-sdk/s3-request-presigner para URLs assinadas S3.')
       })
       return presign.getSignedUrl(client, new mod.GetObjectCommand({ Bucket: bucketFisico(bucket), Key: path }), { expiresIn: expiresInSec })
@@ -114,7 +113,7 @@ export function createS3Provider(): StorageProvider {
 
     async criarUploadTicket(bucket, path, contentType): Promise<UploadTicket> {
       const { client, mod } = await getClient()
-      const presign: any = await import(/* webpackIgnore: true */ PKG_S3_PRESIGN).catch(() => {
+      const presign: any = await import('@aws-sdk/s3-request-presigner').catch(() => {
         throw new StorageError('Instale @aws-sdk/s3-request-presigner para upload direto S3.')
       })
       const url = await presign.getSignedUrl(

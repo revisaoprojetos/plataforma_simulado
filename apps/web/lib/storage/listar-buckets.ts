@@ -76,14 +76,13 @@ export async function contarObjetos(svc: SupabaseClient, bucket: string): Promis
 // O reconcile/uso precisa listar o storage ATIVO: se o provider for s3, listar o Supabase apagaria do
 // catálogo os arquivos que estão no S3 (prune cego). Estas funções brançam por STORAGE_PROVIDER. Para s3
 // usamos ListBuckets/ListObjectsV2 (SDK via especificador indireto → tsc verde sem resolver o pacote).
-const PKG_S3 = '@aws-sdk/client-s3'
 const providerAtivo = () => (process.env.STORAGE_PROVIDER ?? 'supabase').toLowerCase()
 const prefixoS3 = () => process.env.S3_BUCKET_PREFIX ?? ''
 const logicoDeFisico = (f: string) => { const p = prefixoS3(); return p && f.startsWith(p) ? f.slice(p.length) : f }
 const fisicoDeLogico = (l: string) => { const p = prefixoS3(); return p && !l.startsWith(p) ? p + l : l }
 
 async function s3() {
-  const mod: any = await import(/* webpackIgnore: true */ PKG_S3 as any)
+  const mod: any = await import('@aws-sdk/client-s3')
   const client = new mod.S3Client({
     region: process.env.S3_REGION ?? 'us-east-1',
     endpoint: process.env.S3_ENDPOINT || undefined,

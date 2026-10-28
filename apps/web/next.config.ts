@@ -14,7 +14,9 @@ const nextConfig: NextConfig = {
   // Monorepo pnpm: inclui os pacotes do workspace (ex.: `shared`) no build standalone.
   outputFileTracingRoot: path.join(dir, "../../"),
   // mammoth (.docx) e pdfjs-dist (.pdf) usam deps de node / requires dinâmicos — não bundlear.
-  serverExternalPackages: ["mammoth", "pdfjs-dist"],
+  // @aws-sdk/* (provider S3 do storage): externo + importado por literal → o tracer do standalone os INCLUI
+  // (antes, com especificador indireto, ficavam de fora da imagem e o s3 quebrava em runtime no web).
+  serverExternalPackages: ["mammoth", "pdfjs-dist", "@aws-sdk/client-s3", "@aws-sdk/s3-request-presigner"],
   images: {
     remotePatterns: [
       {
