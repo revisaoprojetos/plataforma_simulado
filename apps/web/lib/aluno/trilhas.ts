@@ -7,6 +7,7 @@ import { resolverEnunciadoUrls } from '@/lib/aluno/enunciado'
 import { idsSimuladosGratuitos } from '@/lib/simulado/gratuito'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { getGamConfig, gamAtivaParaAluno } from '@/lib/gamificacao'
+import { remember, chaveRelatorio } from '@/lib/cache/relatorio-cache'
 import { resumoGamificacao, missoesHoje, atividadeSemana, conquistasProgresso, type ResumoGamificacao, type MissaoView, type DiaAtivo, type ConquistaProgresso } from '@/lib/gamificacao/leitura'
 import type { GamConfig } from '@/lib/gamificacao/config'
 import type { Trilha } from '@/components/aluno/trilha-simulados'
@@ -17,8 +18,12 @@ export interface GamRail { resumo: ResumoGamificacao; missoes: MissaoView[]; sem
  * Monta as trilhas de simulados do aluno (por grupo/pasta, nós concluído → atual → disponível),
  * o mesmo dado usado na Início. Extraído para ser reaproveitado pela página dedicada /aluno/trilha.
  */
-/** Monta o resumo de gamificação (rail) p/ um aluno — reutilizado na Home, na Trilha e no módulo LegProc. */
-export async function carregarGamRail(svc: any, tenantId: string, estId: string): Promise<GamRail | null> {
+/** Monta o resumo de gamificação (rail) p/ um aluno — reutilizado na Home, na Trilha e no módulo LegProc.
+ *  Resultado (PROGRESSO/gamificação do aluno) cacheado por (tenant, aluno) com TTL curto. */
+export function carregarGamRail(svc: any, tenantId: string, estId: string): Promise<GamRail | null> {
+  return remember(chaveRelatorio(tenantId, 'gam-rail', estId), 30, () => _carregarGamRail(svc, tenantId, estId))
+}
+async function _carregarGamRail(svc: any, tenantId: string, estId: string): Promise<GamRail | null> {
   const gamConfig = await getGamConfig(svc, tenantId)
   if (!(await gamAtivaParaAluno(svc, tenantId, estId, gamConfig))) return null
   const cfg = gamConfig!

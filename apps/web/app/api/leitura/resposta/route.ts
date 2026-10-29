@@ -4,6 +4,7 @@ import { getSessaoAluno } from '@/lib/aluno-session'
 import { onPraticaRespondida, onQuizConcluido } from '@/lib/gamificacao'
 import { docAcessivelAluno } from '@/lib/leitura/acesso'
 import { ehTestadorLeituraDoc } from '@/lib/leitura/testadores'
+import { invalidarLeituraAluno } from '@/lib/leitura/cache'
 
 // POST /api/leitura/resposta — responde uma questão inline da leitura (validação server-side).
 export const dynamic = 'force-dynamic'
@@ -145,6 +146,10 @@ export async function POST(request: NextRequest) {
       }
     } catch { /* nunca bloqueia a resposta */ }
   }
+
+  // LACUNA 1: invalida o cache read-through de trilha/leitura do aluno (TTL 30s) na hora — senão a
+  // trilha/módulo/gam-rail pode mostrar estado até 30s velho após responder. Best-effort, fora do caminho crítico.
+  void invalidarLeituraAluno(sessao.tenantId, sessao.estudanteId).catch(() => {})
 
   return NextResponse.json({ ok: true, correta, correta_id: corretaId, letra: LETRA[idx] ?? '?', jaRespondida: !!jaResp })
 }

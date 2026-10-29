@@ -11,6 +11,7 @@ import Link from 'next/link'
 import { Gavel, Scale, Play, BookOpen, Check, Zap, Clock, RotateCcw } from 'lucide-react'
 import { type Brand, type InternaTheme } from '../interna-tokens'
 import { useTemaInterno } from '../use-tema-interno'
+import { useCm } from '@/lib/brand/cor-marca'
 
 type JurisDesafio = { id: string; nome: string; imagemTicket?: string | null; diasFeitos?: number; totalDias?: number }
 
@@ -146,6 +147,7 @@ export function PlatformJuris({ brand, theme: themeProp, titulo, desafios, stats
 // à esquerda + corpo à direita com status, título, barra de progresso (dias dominados/total · %) e
 // botão (Jogar / Continuar / Revisar conforme o estado). O card inteiro é o link que abre o jogo.
 function CardDesafio({ d }: { d: JurisDesafio }) {
+  const cm = useCm()
   const href = `/aluno/jurisprudencia?desafio=${d.id}`
   const capa = d.imagemTicket || null
   const total = d.totalDias ?? 0
@@ -154,7 +156,7 @@ function CardDesafio({ d }: { d: JurisDesafio }) {
   const s: 'done' | 'and' | 'new' = total > 0 && feitos >= total ? 'done' : feitos > 0 ? 'and' : 'new'
   const statusCfg =
     s === 'done'
-      ? { cor: OK, icon: <Check size={13} />, rotulo: 'Concluído' }
+      ? { cor: cm(OK), icon: <Check size={13} />, rotulo: 'Concluído' }
       : s === 'and'
         ? { cor: 'var(--goldInk)', icon: <Zap size={13} />, rotulo: 'Em andamento' }
         : { cor: 'var(--muted)', icon: <Clock size={13} />, rotulo: 'Não iniciado' }
@@ -177,13 +179,13 @@ function CardDesafio({ d }: { d: JurisDesafio }) {
           // eslint-disable-next-line @next/next/no-img-element
           <img src={capa} alt="" className="transition-transform duration-500 group-hover:scale-105" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
         ) : (
-          <div className="transition-transform duration-500 group-hover:scale-105" style={{ position: 'relative', overflow: 'hidden', width: '100%', height: '100%', background: CAPA_GRAD, color: '#FFFFFF', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '14px 16px' }}>
+          <div className="transition-transform duration-500 group-hover:scale-105" style={{ position: 'relative', overflow: 'hidden', width: '100%', height: '100%', background: CAPA_GRAD, color: cm('#FFFFFF'), display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '14px 16px' }}>
             <span aria-hidden="true" className="absolute inset-0" style={{ backgroundImage: CAPA_GRID, backgroundSize: '22px 22px' }} />
-            <span aria-hidden="true" style={{ position: 'absolute', right: -14, bottom: -16, color: 'rgba(255,255,255,.16)' }}>
+            <span aria-hidden="true" style={{ position: 'absolute', right: -14, bottom: -16, color: cm('rgba(255,255,255,.16)') }}>
               <Scale size={104} strokeWidth={1.4} />
             </span>
             <span style={{ position: 'relative', fontSize: 9, fontWeight: 800, letterSpacing: '.14em', opacity: 0.85 }}>JURISPRUDÊNCIA</span>
-            <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginTop: 8, width: 38, height: 38, borderRadius: 11, background: 'rgba(255,255,255,.16)' }}>
+            <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', marginTop: 8, width: 38, height: 38, borderRadius: 11, background: cm('rgba(255,255,255,.16)') }}>
               <Gavel size={20} />
             </span>
           </div>
@@ -214,7 +216,7 @@ function CardDesafio({ d }: { d: JurisDesafio }) {
         <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
           <span
             className="transition group-hover:brightness-110"
-            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 32, padding: '0 16px', borderRadius: 12, background: 'var(--brand)', color: '#FFFFFF', fontSize: 12.5, fontWeight: 800, whiteSpace: 'nowrap' }}
+            style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 32, padding: '0 16px', borderRadius: 12, background: 'var(--brand)', color: cm('#FFFFFF'), fontSize: 12.5, fontWeight: 800, whiteSpace: 'nowrap' }}
           >
             {botao.icon}
             {botao.rotulo}

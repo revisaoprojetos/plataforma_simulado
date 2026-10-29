@@ -64,7 +64,7 @@ type Seed = {
   det: SeedQ[]
 }
 
-const SEEDS: Record<Brand, Seed> = {
+const SEEDS_BY: Record<Exclude<Brand, 'mac'>, Seed> = {
   revisao: {
     titulo: '24/07/2026 – Direito do Trabalho e Processo do Trabalho',
     short: 'TRABALHO',
@@ -191,6 +191,9 @@ const SEEDS: Record<Brand, Seed> = {
     ],
   },
 }
+
+// MAC reaproveita os SEEDS de mock do VND (dados de preview; recolorido bordô via tokens).
+const SEEDS: Record<Brand, Seed> = { ...SEEDS_BY, mac: SEEDS_BY.vnd }
 
 const altsFor = (gab: 'C' | 'E'): ResCorrecao['alternativas'] => [
   { letra: 'C', texto: 'Certo', correta: gab === 'C' },

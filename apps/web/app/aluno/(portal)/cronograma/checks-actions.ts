@@ -16,6 +16,18 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { fetchAll } from '@/lib/supabase/fetch-all'
 import { registrarAudit } from '@/lib/audit'
+import { atualizarPainelSnapshot } from '@/lib/painel/snapshot'
+import { atualizarHomeSnapshot } from '@/lib/home/snapshot'
+
+// Write-behind (backend-first §6): marcar/desmarcar meta muda as metas de hoje e a semana → recomputa os
+// snapshots de Painel e Início. Fica AQUI (mutação compartilhada) p/ cobrir tanto o Painel quanto a página
+// de Cronograma num só ponto. Best-effort, não bloqueia a resposta da ação ao aluno.
+function refrescarSnapshotsMetas(svc: ReturnType<typeof createAdminClient>, tenantId: string, estId: string): void {
+  void Promise.allSettled([
+    atualizarPainelSnapshot(svc, tenantId, estId),
+    atualizarHomeSnapshot(svc, tenantId, estId),
+  ]).catch(() => {})
+}
 
 /** metaId → instante em que o aluno marcou (ISO). */
 export type ChecksDaEmissao = Record<string, string>
@@ -96,6 +108,7 @@ export async function alternarCheckMeta(
       atorId: g.sessao.estudanteId,
       tenantId: g.sessao.tenantId,
     })
+    refrescarSnapshotsMetas(g.svc, g.sessao.tenantId, g.sessao.estudanteId)
     return { ok: true }
   }
 
@@ -125,5 +138,6 @@ export async function alternarCheckMeta(
     atorId: g.sessao.estudanteId,
     tenantId: g.sessao.tenantId,
   })
+  refrescarSnapshotsMetas(g.svc, g.sessao.tenantId, g.sessao.estudanteId)
   return { ok: true, marcadaEm }
 }

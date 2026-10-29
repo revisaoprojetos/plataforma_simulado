@@ -13,7 +13,7 @@ import { RealizadosMeq } from './realizados-meq'
 
 export function PlatformRealizados({ brand, theme, data }: { brand: Brand; theme: InternaTheme; data?: RealizadosData; tab?: string; preview?: boolean }) {
   const d = data ?? realizadosMock() // sem data (preview) → mock; com data (produção) → real
-  if (brand === 'vnd') return <RealizadosVnd theme={theme} data={d} />
+  if (brand === 'vnd' || brand === 'mac') return <RealizadosVnd theme={theme} data={d} />
   if (brand === 'meq') return <RealizadosMeq theme={theme} data={d} />
   return <RealizadosRevisao theme={theme} data={d} />
 }

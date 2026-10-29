@@ -8,7 +8,7 @@ import {
   FolderPlus, Upload, Folder, FileText, FileType2, FileCode2, LayoutGrid, List as ListIcon,
   ChevronRight, ChevronLeft, MoreVertical, Loader2, X, CircleCheck, CircleDashed, Archive,
   Download, Pencil, Info, Trash2, FolderInput, Layers, Link2, RotateCcw, Clock, ExternalLink, Users2,
-  Lock, Palette, Check, Settings2, Copy, Files, Search, Home, FolderTree,
+  Lock, Palette, Check, Settings2, Copy, Files, Search, Home, FolderTree, CalendarClock, GraduationCap,
 } from 'lucide-react'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -34,6 +34,7 @@ import {
   listarArvore, criarPasta, removerPasta, renomearPasta, moverPasta, definirCorPasta, moverDocumento,
   importarDocumento, prepararUploadConteudo, importarDeStorage, criarDocumentoBranco, publicarDocumento, publicarNovaVersao, removerDocumento, detalheDocumento, abrirEdicaoDocx,
   renomearDocumento, urlDownloadDocumento, listarPastasConteudo, dadosVisualizacao, thumbDocumento, pdfPreviewDocumento, conteudoPreviewAdmin, duplicarDocumento,
+  definirPastaDisciplinaCronograma, removerPastaDisciplinaCronograma, definirTipoMaterialSubpasta,
   carregarArvoreAcesso, montarArvoreAcessoDrive, salvarAcessoNo, resolverEstudantePorEmail,
   listarGruposBiblioteca, buscarAlunosBiblioteca, gruposDoEstudante,
   type PastaConteudo, type Categoria, type NoAcesso,
@@ -52,6 +53,41 @@ function docKind(tipoOrigem: string): KindConteudo {
 }
 // Paleta curta para o menu "Mudar cor" da pasta (mesmas cores do protótipo Drive).
 const CORES_PASTA = ['#444746', '#d06b64', '#f83a22', '#ff7537', '#ffad46', '#fad165', '#b3dc6c', '#16a765', '#42d692', '#9fc6e7', '#4986e7', '#9a9cff', '#b99aff', '#cd74e6', '#f691b2']
+
+// ── Cronograma Adaptativo por pasta: rótulos ──
+const CLASSIF_CRONO: { v: string; rot: string }[] = [
+  { v: 'essencial', rot: 'Essencial' },
+  { v: 'complementar', rot: 'Complementar' },
+  { v: 'especifica', rot: 'Específica' },
+]
+const TIPO_MATERIAL_CRONO: { v: string; rot: string }[] = [
+  { v: 'pdfull', rot: 'PDFull' },
+  { v: 'pdfight', rot: 'PDFight' },
+  { v: 'pdflash', rot: 'PDFlash' },
+  { v: 'legproc', rot: 'LegProc' },
+  { v: 'questoes', rot: 'Questões' },
+]
+const rotuloClasse = (v?: string | null) => CLASSIF_CRONO.find((c) => c.v === v)?.rot ?? null
+const rotuloTipoMaterial = (v?: string | null) => TIPO_MATERIAL_CRONO.find((t) => t.v === v)?.rot ?? null
+
+/** Selo de estado do Cronograma no card da pasta: disciplina (+classificação) OU tipo de material da subpasta. */
+function SeloCronograma({ p }: { p: PastaConteudo }) {
+  if (p.disciplina_id) {
+    const cls = rotuloClasse(p.disciplina_classificacao)
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-primary/12 px-2 py-0.5 text-[11px] font-medium text-primary" title="Disciplina do Cronograma Adaptativo">
+        <GraduationCap className="h-3 w-3" />Disciplina{cls ? ` · ${cls}` : ''}
+      </span>
+    )
+  }
+  const tm = rotuloTipoMaterial(p.cronograma_tipo_material)
+  if (tm) return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/12 px-2 py-0.5 text-[11px] font-medium text-sky-700 dark:text-sky-400" title="Tipo de material no Cronograma">
+      <CalendarClock className="h-3 w-3" />{tm}
+    </span>
+  )
+  return null
+}
 
 /** Miniatura do card: tenta a IMAGEM FIEL do .docx (1ª página, render do OnlyOffice) — igual aos Modelos
  *  de Caderno. Se falhar (não-docx, OnlyOffice indisponível), cai na folha de trechos ou no ícone. */
@@ -317,6 +353,19 @@ export function BibliotecaClient() {
     const r = await definirCorPasta(p.id, cor); if (!r.ok) return toast.error(r.error || 'Falha ao mudar a cor.')
     carregar(pastaAtual)
   }
+  // ── Cronograma Adaptativo por pasta ──
+  async function marcarDisciplinaCron(p: PastaConteudo, classificacao: string | null) {
+    const r = await definirPastaDisciplinaCronograma(p.id, { classificacao }); if (!r.ok) return toast.error(r.error || 'Falha.')
+    toast.success(`"${p.nome}" usada no cronograma como disciplina.`); carregar(pastaAtual)
+  }
+  async function removerDisciplinaCron(p: PastaConteudo) {
+    const r = await removerPastaDisciplinaCronograma(p.id); if (!r.ok) return toast.error(r.error || 'Falha.')
+    toast.success('Pasta removida do cronograma.'); carregar(pastaAtual)
+  }
+  async function definirTipoMaterialCron(p: PastaConteudo, tipo: string | null) {
+    const r = await definirTipoMaterialSubpasta(p.id, tipo); if (!r.ok) return toast.error(r.error || 'Falha.')
+    toast.success(tipo ? 'Tipo de material definido.' : 'Tipo de material removido.'); carregar(pastaAtual)
+  }
   async function renomear(p: PastaConteudo) {
     const nome = await pedirTexto({ titulo: 'Renomear pasta', valorInicial: p.nome, confirmar: 'Salvar' })
     if (!nome) return
@@ -519,12 +568,18 @@ export function BibliotecaClient() {
                     nome={p.nome}
                     cor={p.cor ?? null}
                     contagem={contagens[p.id] != null ? `${contagens[p.id]} ${contagens[p.id] === 1 ? 'item' : 'itens'}` : undefined}
-                    pilulas={restritasPasta[p.id] ? <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-400"><Lock className="h-3 w-3" />Restrito</span> : undefined}
+                    pilulas={(restritasPasta[p.id] || p.disciplina_id || p.cronograma_tipo_material) ? (
+                      <span className="inline-flex flex-wrap items-center gap-1.5">
+                        {restritasPasta[p.id] && <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-700 dark:text-amber-400"><Lock className="h-3 w-3" />Restrito</span>}
+                        <SeloCronograma p={p} />
+                      </span>
+                    ) : undefined}
                     onClick={() => carregar(p.id)}
                     acoes={
                       <MenuPasta
                         p={p}
                         categoria={categoria}
+                        ancestralEhDisciplina={breadcrumb.some((b) => !!b.disciplina_id)}
                         onAbrir={() => carregar(p.id)}
                         onAcesso={() => setAcessoDrive({ id: p.id, nome: p.nome })}
                         onRenomear={() => renomear(p)}
@@ -532,6 +587,9 @@ export function BibliotecaClient() {
                         onMover={(dest) => moverPastaFn(p, dest)}
                         onCopiarLink={() => { navigator.clipboard?.writeText(window.location.href).catch(() => {}); toast.success(`Link de "${p.nome}" copiado.`) }}
                         onExcluir={() => excluirPasta(p)}
+                        onDisciplinaCron={(cls) => marcarDisciplinaCron(p, cls)}
+                        onRemoverDisciplinaCron={() => removerDisciplinaCron(p)}
+                        onTipoMaterialCron={(t) => definirTipoMaterialCron(p, t)}
                       />
                     }
                   />
@@ -650,10 +708,11 @@ export function BibliotecaClient() {
 
 /** Dropdown em PORTAL (document.body, posição fixed ancorada no botão) — fica ACIMA de qualquer card/seção,
  *  sem ser preso por contexto de empilhamento/overflow de ancestrais (o bug do clique cair no card de baixo). */
-function MenuPasta({ p, categoria, onAbrir, onAcesso, onRenomear, onMudarCor, onMover, onCopiarLink, onExcluir }: {
-  p: PastaConteudo; categoria: Categoria
+function MenuPasta({ p, categoria, ancestralEhDisciplina, onAbrir, onAcesso, onRenomear, onMudarCor, onMover, onCopiarLink, onExcluir, onDisciplinaCron, onRemoverDisciplinaCron, onTipoMaterialCron }: {
+  p: PastaConteudo; categoria: Categoria; ancestralEhDisciplina: boolean
   onAbrir: () => void; onAcesso: () => void; onRenomear: () => void; onMudarCor: (cor: string | null) => void
   onMover: (destinoId: string | null) => void; onCopiarLink: () => void; onExcluir: () => void
+  onDisciplinaCron: (classificacao: string | null) => void; onRemoverDisciplinaCron: () => void; onTipoMaterialCron: (tipo: string | null) => void
 }) {
   const [open, setOpen] = useState(false)
   const [pastas, setPastas] = useState<{ id: string; nome: string; pai_id: string | null }[] | null>(null)
@@ -699,6 +758,52 @@ function MenuPasta({ p, categoria, onAbrir, onAcesso, onRenomear, onMudarCor, on
             </DropdownMenuSubContent>
           </DropdownMenuSub>
           <DropdownMenuItem onClick={() => { setOpen(false); carregarPastas(); setMoverAberto(true) }}><FolderInput className="mr-2 h-4 w-4" /> Mover para…</DropdownMenuItem>
+          {categoria !== 'modelo_caderno' && (
+            <>
+              <DropdownMenuSeparator />
+              {ancestralEhDisciplina ? (
+                // SUBpasta de uma pasta-disciplina → define o TIPO de material desta subpasta.
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger><CalendarClock className="mr-2 h-4 w-4" /> Tipo de material</DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="w-52">
+                    {TIPO_MATERIAL_CRONO.map((t) => (
+                      <DropdownMenuItem key={t.v} onClick={pick(() => onTipoMaterialCron(t.v))}>
+                        <span className="flex-1">{t.rot}</span>
+                        {p.cronograma_tipo_material === t.v && <Check className="ml-2 h-4 w-4 text-primary" />}
+                      </DropdownMenuItem>
+                    ))}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={pick(() => onTipoMaterialCron(null))}>
+                      <span className="flex-1 text-muted-foreground">Nenhum</span>
+                      {!p.cronograma_tipo_material && <Check className="ml-2 h-4 w-4 text-primary" />}
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              ) : (
+                // Pasta de nível de DISCIPLINA → usar no cronograma + classificação.
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger><GraduationCap className="mr-2 h-4 w-4" /> Cronograma</DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent className="w-60">
+                    <div className="px-2 pb-1 pt-1.5 text-[11px] font-medium text-muted-foreground">Usar no cronograma como disciplina</div>
+                    {CLASSIF_CRONO.map((c) => (
+                      <DropdownMenuItem key={c.v} onClick={pick(() => onDisciplinaCron(c.v))}>
+                        <span className="flex-1">{c.rot}</span>
+                        {p.disciplina_id && p.disciplina_classificacao === c.v && <Check className="ml-2 h-4 w-4 text-primary" />}
+                      </DropdownMenuItem>
+                    ))}
+                    {p.disciplina_id && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={pick(onRemoverDisciplinaCron)} className="text-destructive focus:text-destructive">
+                          <X className="mr-2 h-4 w-4" /> Remover do cronograma
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+              )}
+            </>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={onExcluir} className="text-destructive focus:text-destructive"><Trash2 className="mr-2 h-4 w-4" /> Excluir</DropdownMenuItem>
         </DropdownMenuContent>

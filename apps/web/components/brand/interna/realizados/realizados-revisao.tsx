@@ -12,6 +12,7 @@ import { useTemaInterno } from '../use-tema-interno'
 import { useIsMobile } from '../perfil/use-is-mobile'
 import { Ic, PaneTabs, Filtros, SecaoHead, NotaPill, CoverRev, BarRev, fnum, type Pane, type Filtro } from './shared'
 import type { RealizadosData, RlzEmAndamento, RlzConcluido, RlzPersonalizado, RlzCapa } from './data'
+import { SecaoSimulados } from '../home/revisao/secao-simulados'
 
 const FALLBACK_GRAD = 'linear-gradient(135deg,#2A1E4A,#4A31B8)'
 const gradOf = (c?: RlzCapa) => c?.cor || FALLBACK_GRAD
@@ -19,7 +20,7 @@ const gradOf = (c?: RlzCapa) => c?.cor || FALLBACK_GRAD
 // Tokens spec-03 §1.1 que o mockup define no wrapper (claro/escuro).
 function rvVars(dark: boolean): CSSProperties {
   return {
-    ['--tBg' as string]: dark ? '#2C2C34' : '#ECE8F6',
+    ['--tBg' as string]: dark ? '#171030' : '#ECE8F6',
     ['--tOn' as string]: dark ? '#3A3A44' : '#FFFFFF',
     ['--tOnInk' as string]: dark ? '#FFFFFF' : '#2E1F7A',
     ['--cnt' as string]: dark ? 'rgba(143,117,255,.22)' : '#EFEBFD',
@@ -136,7 +137,7 @@ export function RealizadosRevisao({ theme: themeProp, data }: { theme: InternaTh
   const theme = useTemaInterno(themeProp)
   const dark = theme === 'escuro'
   const mobile = useIsMobile()
-  const [pt, setPt] = useState<Pane>('main')
+  const [pt, setPt] = useState<Pane>('novos')
   const [f, setF] = useState<Filtro>('all')
   const showAnd = f !== 'done'
   const showDone = f !== 'and'
@@ -144,6 +145,7 @@ export function RealizadosRevisao({ theme: themeProp, data }: { theme: InternaTh
   const nAnd = data.emAndamento.length
   const nDone = data.concluidos.length
   const pers = data.personalizados
+  const nNovos = (data.revisao?.recentes.length ?? 0) + (data.revisao?.pastas.length ?? 0)
   // ADAPTATIVO ao container (não fixo em N colunas) — não fica amontoado em tablet/iframe. min(100%,320px)
   // = 1 coluna quando estreito; acima, encaixa quantos tickets de ≥320px couberem.
   const gridCols = 'repeat(auto-fill, minmax(min(100%, 320px), 1fr))'
@@ -156,7 +158,7 @@ export function RealizadosRevisao({ theme: themeProp, data }: { theme: InternaTh
         {/* cabeçalho */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
           <div>
-            <h1 style={{ margin: 0, fontSize: mobile ? 24 : 32, fontWeight: 800, letterSpacing: '-0.045em', color: 'var(--ink)' }}>Simulados realizados</h1>
+            <h1 style={{ margin: 0, fontSize: mobile ? 24 : 32, fontWeight: 800, letterSpacing: '-0.045em', color: 'var(--ink)' }}>Simulados</h1>
             <p style={{ margin: '6px 0 0', fontSize: 14, color: 'var(--muted)' }}>Revise suas notas, refaça simulados e acompanhe o que ainda está em andamento.</p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: mobile ? '1fr 1fr' : 'repeat(4,1fr)', gap: 10 }}>
@@ -168,11 +170,15 @@ export function RealizadosRevisao({ theme: themeProp, data }: { theme: InternaTh
         </div>
         {/* abas + filtros */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-          <PaneTabs marca="Revisão" pt={pt} onPane={setPt} nMain={S.feitos} nPers={pers.itens.length} />
+          <PaneTabs marca="Revisão" pt={pt} onPane={setPt} nNovos={nNovos} nMain={S.feitos} nPers={pers.itens.length} />
           {pt === 'main' ? <Filtros f={f} onFilter={setF} nAll={nAnd + nDone} nAnd={nAnd} nDone={nDone} /> : null}
         </div>
 
-        {pt === 'main' ? (
+        {pt === 'novos' ? (
+          <div className="rlzrv-pv" key="novos">
+            <SecaoSimulados recentes={data.revisao?.recentes ?? []} pastas={data.revisao?.pastas ?? []} />
+          </div>
+        ) : pt === 'main' ? (
           <div className="rlzrv-pv" key={`main-${f}`} style={{ display: 'flex', flexDirection: 'column', gap: 26 }}>
             {showAnd && nAnd > 0 ? (
               <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>

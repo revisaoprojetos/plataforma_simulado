@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { MarkdownContent } from '@/components/markdown-content'
 import { simTokensStyle } from '../sim-tokens'
+import { useBrandAtual, useCm } from '@/lib/brand/cor-marca'
 import {
   Bgfx, MarcaVND, primaryBtnStyle, ghostBtnStyle, ModalShell, sharedKeyframes, modalSheetCss,
   C_OK, C_ERR, C_WARN, C_TIMER,
@@ -41,6 +42,8 @@ function ehCE(q: ProvaLiveQuestao) {
 }
 
 export function ProvaVndLive(p: ProvaMeqLiveProps) {
+  const marca = useBrandAtual() ?? 'vnd'
+  const cm = useCm()
   const { questoes, qi, respostas, marcadas, eliminadas, discPaginas } = p
   const N = questoes.length
   const q = questoes[qi - 1]
@@ -53,8 +56,8 @@ export function ProvaVndLive(p: ProvaMeqLiveProps) {
   const timerColor = p.timerWarning ? C_ERR : C_TIMER
 
   return (
-    <div className={`${P}-root`} style={{ ...simTokensStyle('vnd', p.theme), position: 'relative', minHeight: '100vh', overflowX: 'hidden' }}>
-      <style>{css()}</style>
+    <div className={`${P}-root`} style={{ ...simTokensStyle(marca, p.theme), position: 'relative', minHeight: '100vh', overflowX: 'hidden' }}>
+      <style>{cm(css())}</style>
       <Bgfx prefix={P} variant="soft" />
 
       <div style={{ position: 'relative', zIndex: 1 }}>
@@ -88,7 +91,7 @@ export function ProvaVndLive(p: ProvaMeqLiveProps) {
 
           <button type="button" onClick={p.onToggleDark} aria-label="Tema" className={`${P}-hbtn`} style={hbtn()}><Moon size={16} /></button>
           <button type="button" onClick={p.onCycleFz} aria-label="Tamanho da letra" className={`${P}-hbtn`} style={hbtn()}><span style={{ fontSize: 13 }}>{FZ_LAB[p.fz]}</span></button>
-          <button type="button" onClick={() => p.onSetMd('rev')} className={`${P}-sbtn ${P}-hfin`} style={primaryBtnStyle({ height: 40, padding: '0 16px', borderRadius: 11, fontSize: 13.5 })}>
+          <button type="button" onClick={() => p.onSetMd('rev')} className={`${P}-sbtn ${P}-hfin`} style={primaryBtnStyle({ height: 40, padding: '0 16px', borderRadius: 11, fontSize: 13.5 }, cm)}>
             <Check size={15} /><span className={`${P}-hfinlbl`}>Finalizar</span>
           </button>
           <div style={{ position: 'absolute', left: 0, right: 0, bottom: -1, height: 3, background: 'var(--track)' }}>
@@ -131,7 +134,7 @@ export function ProvaVndLive(p: ProvaMeqLiveProps) {
           </div>
           <button type="button" onClick={() => p.onToggleFlag(q.id)} style={revisarMiniStyle(marcadas.has(q.id))}><Flag size={15} />Revisar</button>
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button type="button" onClick={() => (qi >= N ? p.onSetMd('rev') : p.onGoto(Math.min(N, qi + 1)))} className={`${P}-sbtn`} style={primaryBtnStyle({ height: 46, padding: '0 13px', borderRadius: 12, fontSize: 14 })}>Próximo<ChevronRight size={15} /></button>
+            <button type="button" onClick={() => (qi >= N ? p.onSetMd('rev') : p.onGoto(Math.min(N, qi + 1)))} className={`${P}-sbtn`} style={primaryBtnStyle({ height: 46, padding: '0 13px', borderRadius: 12, fontSize: 14 }, cm)}>Próximo<ChevronRight size={15} /></button>
           </div>
         </div>
       </div>
@@ -175,6 +178,7 @@ function CardQuestao({ q, qi, N, resp, fz, flagged, elim, slotDiscursiva, onMark
   slotDiscursiva?: ReactNode
   onMark: (altId: string) => void; onFlag: () => void; onEliminar: (altId: string) => void; onPrev: () => void; onNext: () => void
 }) {
+  const cm = useCm()
   const ce = ehCE(q)
   const alts = [...q.alternativas].sort((a, b) => a.ordem - b.ordem)
   return (
@@ -269,7 +273,7 @@ function CardQuestao({ q, qi, N, resp, fz, flagged, elim, slotDiscursiva, onMark
           </div>
           <RevisarBtn on={flagged} onClick={onFlag} />
           <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-            <button type="button" onClick={onNext} className={`${P}-sbtn`} style={primaryBtnStyle({ height: 46, padding: '0 20px', borderRadius: 12, fontSize: 14 })}>
+            <button type="button" onClick={onNext} className={`${P}-sbtn`} style={primaryBtnStyle({ height: 46, padding: '0 20px', borderRadius: 12, fontSize: 14 }, cm)}>
               Próximo<ChevronRight size={15} />
             </button>
           </div>
@@ -399,6 +403,7 @@ function Leg({ color, border, label }: { color: string; border?: boolean; label:
 function ModalRev({ questoes, respostas, discPaginas, marcadas, N, cAns, cBl, cFl, onClose, onGo, onConf }: {
   questoes: ProvaLiveQuestao[]; respostas: Record<string, string>; discPaginas: Record<string, number>; marcadas: Set<string>; N: number; cAns: number; cBl: number; cFl: number; onClose: () => void; onGo: (n: number) => void; onConf: () => void
 }) {
+  const cm = useCm()
   const hasBl = cBl > 0
   const blList = questoes.map((q, i) => (respondida(q, respostas, discPaginas) ? -1 : i + 1)).filter((n) => n > 0)
   const blTxt = blList.slice(0, 12).join(', ') + (blList.length > 12 ? ` e mais ${blList.length - 12}` : '')
@@ -442,7 +447,7 @@ function ModalRev({ questoes, respostas, discPaginas, marcadas, N, cAns, cBl, cF
           <button type="button" onClick={() => onGo(firstBl)} className={`${P}-sbtn`} style={ghostBtnStyle({ height: 48, padding: '0 20px', borderRadius: 16, fontSize: 14.5, flex: '1 1 auto' })}><ChevronRight size={17} />Primeira em branco</button>
         )}
         <button type="button" onClick={onClose} className={`${P}-sbtn`} style={ghostBtnStyle({ height: 48, padding: '0 20px', borderRadius: 16, fontSize: 14.5, flex: '1 1 auto' })}>Continuar respondendo</button>
-        <button type="button" onClick={onConf} className={`${P}-sbtn`} style={primaryBtnStyle({ height: 48, padding: '0 20px', borderRadius: 16, fontSize: 14.5, flex: '1 1 auto' })}><Check size={17} />Finalizar e enviar</button>
+        <button type="button" onClick={onConf} className={`${P}-sbtn`} style={primaryBtnStyle({ height: 48, padding: '0 20px', borderRadius: 16, fontSize: 14.5, flex: '1 1 auto' }, cm)}><Check size={17} />Finalizar e enviar</button>
       </div>
     </ModalShell>
   )
@@ -458,6 +463,7 @@ function CountChip({ n, label, color }: { n: number; label: string; color: strin
 }
 
 function ModalConf({ N, cAns, cBl, ck, isFinalizando, setCk, onClose, onOk }: { N: number; cAns: number; cBl: number; ck: boolean; isFinalizando: boolean; setCk: (v: boolean) => void; onClose: () => void; onOk: () => void }) {
+  const cm = useCm()
   return (
     <ModalShell onClose={isFinalizando ? () => {} : onClose} width={500} prefix={P} icon={<Info size={24} />} accent={C_WARN} title="Enviar o simulado?" subtitle="Esta ação não pode ser desfeita" closeOnBackdrop={!isFinalizando}>
       <div style={{ padding: '16px 24px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -468,7 +474,7 @@ function ModalConf({ N, cAns, cBl, ck, isFinalizando, setCk, onClose, onOk }: { 
         </button>
         <div className={`${P}-confact`} style={{ display: 'flex', gap: 8 }}>
           <button type="button" onClick={onClose} disabled={isFinalizando} className={`${P}-sbtn`} style={ghostBtnStyle({ height: 50, borderRadius: 16, fontSize: 14.5, flex: 1, opacity: isFinalizando ? 0.6 : 1 })}><ChevronLeft size={17} />Voltar à revisão</button>
-          <button type="button" onClick={ck && !isFinalizando ? onOk : undefined} className={`${P}-sbtn`} style={primaryBtnStyle({ height: 50, borderRadius: 16, fontSize: 14.5, flex: 1, opacity: ck && !isFinalizando ? 1 : 0.45, pointerEvents: ck && !isFinalizando ? 'auto' : 'none', transition: 'opacity .2s' })}><Check size={16} />{isFinalizando ? 'Enviando…' : 'Sim, enviar agora'}</button>
+          <button type="button" onClick={ck && !isFinalizando ? onOk : undefined} className={`${P}-sbtn`} style={primaryBtnStyle({ height: 50, borderRadius: 16, fontSize: 14.5, flex: 1, opacity: ck && !isFinalizando ? 1 : 0.45, pointerEvents: ck && !isFinalizando ? 'auto' : 'none', transition: 'opacity .2s' }, cm)}><Check size={16} />{isFinalizando ? 'Enviando…' : 'Sim, enviar agora'}</button>
         </div>
       </div>
     </ModalShell>

@@ -12,6 +12,7 @@ import { useTemaInterno } from '../use-tema-interno'
 import { useIsMobile } from '../perfil/use-is-mobile'
 import { Ic, PaneTabs, Filtros, SecaoHead, NotaRing, CoverVnd, Segs, type Pane, type Filtro } from './shared'
 import type { RealizadosData, RlzEmAndamento, RlzConcluido, RlzPersonalizado, RlzCapa } from './data'
+import { useBrandAtual, useCm } from '@/lib/brand/cor-marca'
 
 const HERO = 'linear-gradient(120deg,#041A10 0%,#0B4A2E 55%,#12643D 100%)'
 const FALLBACK_GRAD = 'linear-gradient(140deg,#062A1B,#16804F)'
@@ -23,19 +24,19 @@ const VND_PASSOS: [string, string][] = [
   ['Questões', 'Defina a quantidade'],
 ]
 
-function vnVars(dark: boolean): CSSProperties {
+function vnVars(dark: boolean, cm: (v: string) => string): CSSProperties {
   return {
-    ['--tBg' as string]: dark ? '#1E2A23' : '#E4EDE7',
-    ['--tOn' as string]: dark ? '#2A3A31' : '#FFFFFF',
-    ['--tOnInk' as string]: dark ? '#FFFFFF' : '#0B1F15',
-    ['--cnt' as string]: dark ? 'rgba(79,224,152,.15)' : '#E4F3EA',
-    ['--cntInk' as string]: dark ? '#4FE098' : '#0F7A44',
-    ['--fOn' as string]: dark ? '#E8C877' : '#0F7A44',
-    ['--fOnInk' as string]: dark ? '#2A1F02' : '#FFFFFF',
-    ['--hoverLine' as string]: 'rgba(232,200,119,.7)',
-    ['--gold' as string]: dark ? '#E8C877' : '#D8B45A',
-    ['--goldInk' as string]: dark ? '#F1D48A' : '#9A7414',
-    ['--goldBg' as string]: dark ? 'rgba(232,200,119,.14)' : '#FBF4E2',
+    ['--tBg' as string]: cm(dark ? '#1E2A23' : '#E4EDE7'),
+    ['--tOn' as string]: cm(dark ? '#2A3A31' : '#FFFFFF'),
+    ['--tOnInk' as string]: cm(dark ? '#FFFFFF' : '#0B1F15'),
+    ['--cnt' as string]: cm(dark ? 'rgba(79,224,152,.15)' : '#E4F3EA'),
+    ['--cntInk' as string]: cm(dark ? '#4FE098' : '#0F7A44'),
+    ['--fOn' as string]: cm(dark ? '#E8C877' : '#0F7A44'),
+    ['--fOnInk' as string]: cm(dark ? '#2A1F02' : '#FFFFFF'),
+    ['--hoverLine' as string]: cm('rgba(232,200,119,.7)'),
+    ['--gold' as string]: cm(dark ? '#E8C877' : '#D8B45A'),
+    ['--goldInk' as string]: cm(dark ? '#F1D48A' : '#9A7414'),
+    ['--goldBg' as string]: cm(dark ? 'rgba(232,200,119,.14)' : '#FBF4E2'),
   } as CSSProperties
 }
 
@@ -45,24 +46,25 @@ const GoldLink = ({ href, children, h = 32 }: { href: string; children: React.Re
 )
 
 function Hero({ mobile, S }: { mobile: boolean; S: RealizadosData['stats'] }) {
+  const cm = useCm()
   const tiles: [string, string][] = [[String(S.feitos), 'realizados'], [String(S.concluidos), 'concluídos'], [S.mediaGeral != null ? `${S.mediaGeral}%` : '—', 'média geral'], [S.melhorNota != null ? String(S.melhorNota) : '—', 'melhor nota']]
   return (
-    <section style={{ position: 'relative', overflow: 'hidden', background: HERO, color: '#FFF', padding: mobile ? '22px 16px 20px' : '34px 24px 30px', margin: mobile ? '-14px -14px 0' : '-24px -24px 0' }}>
-      <span aria-hidden className="rlzvn-dots" style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle,rgba(185,245,212,.18) 1.2px,transparent 1.8px)', backgroundSize: '22px 22px', pointerEvents: 'none' }} />
+    <section style={{ position: 'relative', overflow: 'hidden', background: cm(HERO), color: '#FFF', padding: mobile ? '22px 16px 20px' : '34px 24px 30px', margin: mobile ? '-14px -14px 0' : '-24px -24px 0' }}>
+      <span aria-hidden className="rlzvn-dots" style={{ position: 'absolute', inset: 0, backgroundImage: cm('radial-gradient(circle,rgba(185,245,212,.18) 1.2px,transparent 1.8px)'), backgroundSize: '22px 22px', pointerEvents: 'none' }} />
       {[['-90px', 'rgba(232,200,119,.55)', 2], ['-50px', 'rgba(185,245,212,.14)', 1.2], ['-10px', 'rgba(185,245,212,.1)', 1.2]].map(([bottom, stroke, sw], i) => (
-        <svg key={i} className={`rlzvn-chev rlzvn-c${i + 1}`} viewBox="0 0 200 120" aria-hidden preserveAspectRatio="none" style={{ position: 'absolute', right: '-4%', width: '62%', height: 220, bottom: bottom as string, pointerEvents: 'none' }}><path d="M0 0 L100 112 L200 0" fill="none" stroke={stroke as string} strokeWidth={sw as number} vectorEffect="non-scaling-stroke" /></svg>
+        <svg key={i} className={`rlzvn-chev rlzvn-c${i + 1}`} viewBox="0 0 200 120" aria-hidden preserveAspectRatio="none" style={{ position: 'absolute', right: '-4%', width: '62%', height: 220, bottom: bottom as string, pointerEvents: 'none' }}><path d="M0 0 L100 112 L200 0" fill="none" stroke={cm(stroke as string)} strokeWidth={sw as number} vectorEffect="non-scaling-stroke" /></svg>
       ))}
       <div style={{ position: 'relative', display: 'flex', alignItems: mobile ? 'flex-start' : 'flex-end', justifyContent: 'space-between', gap: 30, flexDirection: mobile ? 'column' : 'row' }}>
         <div>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: '#86CFA6' }}><Ic n="clip" s={14} c="#D8B45A" />SEU HISTÓRICO</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: cm('#86CFA6') }}><Ic n="clip" s={14} c="#D8B45A" />SEU HISTÓRICO</span>
           <h1 style={{ margin: '8px 0 4px', fontSize: mobile ? 28 : 40, fontWeight: 800, letterSpacing: '-0.045em' }}>Simulados realizados</h1>
-          <p style={{ margin: 0, fontSize: 14, color: '#CFE3D7' }}>Notas, correções e o que ainda falta terminar.</p>
+          <p style={{ margin: 0, fontSize: 14, color: cm('#CFE3D7') }}>Notas, correções e o que ainda falta terminar.</p>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: mobile ? 'repeat(2,1fr)' : 'repeat(4,auto)', gap: 10, width: mobile ? '100%' : undefined }}>
           {tiles.map(([v, l]) => (
-            <div key={l} style={{ padding: '10px 16px', borderRadius: 16, background: 'rgba(255,255,255,.08)', border: '1px solid rgba(185,245,212,.16)', minWidth: mobile ? 0 : 110 }}>
+            <div key={l} style={{ padding: '10px 16px', borderRadius: 16, background: 'rgba(255,255,255,.08)', border: cm('1px solid rgba(185,245,212,.16)'), minWidth: mobile ? 0 : 110 }}>
               <b style={{ display: 'block', fontSize: 20, fontWeight: 800 }}>{v}</b>
-              <span style={{ fontSize: 11.5, color: '#B7D3C3' }}>{l}</span>
+              <span style={{ fontSize: 11.5, color: cm('#B7D3C3') }}>{l}</span>
             </div>
           ))}
         </div>
@@ -125,11 +127,12 @@ function CardConcluido({ it }: { it: RlzConcluido }) {
 }
 
 function CardPersonalizado({ it }: { it: RlzPersonalizado }) {
+  const cm = useCm()
   const rascunho = it.status === 'rascunho'
   return (
     <div className="rlzvn-card" style={{ position: 'relative', display: 'flex', background: 'var(--surface)', borderRadius: 22, overflow: 'hidden', minHeight: 168 }}>
-      <Link href={it.href} style={{ position: 'relative', width: 150, flexShrink: 0, background: 'linear-gradient(140deg,#0B3A24,#16804F)', color: '#FFF', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '12px 12px', textDecoration: 'none' }}>
-        <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle,rgba(185,245,212,.22) 1px,transparent 1.6px)', backgroundSize: '14px 14px' }} />
+      <Link href={it.href} style={{ position: 'relative', width: 150, flexShrink: 0, background: cm('linear-gradient(140deg,#0B3A24,#16804F)'), color: '#FFF', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '12px 12px', textDecoration: 'none' }}>
+        <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: cm('radial-gradient(circle,rgba(185,245,212,.22) 1px,transparent 1.6px)'), backgroundSize: '14px 14px' }} />
         <span style={{ position: 'relative', fontSize: 8.5, fontWeight: 800, letterSpacing: '.2em', color: '#F1D48A' }}>PERSONALIZADO</span>
         <b style={{ position: 'relative', fontSize: 15, letterSpacing: '-0.03em', lineHeight: 1.1 }}>{it.nome}</b>
         {rascunho
@@ -179,6 +182,8 @@ const CSS = `
 
 export function RealizadosVnd({ theme: themeProp, data }: { theme: InternaTheme; data: RealizadosData }) {
   const theme = useTemaInterno(themeProp)
+  const marca = useBrandAtual() ?? 'vnd'
+  const cm = useCm()
   const dark = theme === 'escuro'
   const mobile = useIsMobile()
   const [pt, setPt] = useState<Pane>('main')
@@ -196,12 +201,12 @@ export function RealizadosVnd({ theme: themeProp, data }: { theme: InternaTheme;
   const doneList = mobile ? data.concluidos.slice(0, 6) : data.concluidos
 
   return (
-    <div className="min-h-full" style={{ ...internaTokensStyle('vnd', theme), ...vnVars(dark), minHeight: '100%' }}>
-      <style>{CSS}</style>
+    <div className="min-h-full" style={{ ...internaTokensStyle(marca, theme), ...vnVars(dark, cm), minHeight: '100%' }}>
+      <style>{cm(CSS)}</style>
       <div style={{ padding: mobile ? '14px' : '24px', display: 'flex', flexDirection: 'column', gap: 24, background: 'var(--bg)', minHeight: '100%' }}>
         <Hero mobile={mobile} S={S} />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-          <PaneTabs marca="VND" pt={pt} onPane={setPt} nMain={S.feitos} nPers={pers.itens.length} />
+          <PaneTabs marca={marca === 'mac' ? 'MAC' : 'VND'} pt={pt} onPane={setPt} nMain={S.feitos} nPers={pers.itens.length} />
           {pt === 'main' ? <Filtros f={f} onFilter={setF} nAll={nAnd + nDone} nAnd={nAnd} nDone={nDone} /> : null}
         </div>
 
@@ -223,18 +228,18 @@ export function RealizadosVnd({ theme: themeProp, data }: { theme: InternaTheme;
         ) : (
           <div className="rlzvn-pv" key="pers" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
             {/* banner verde MONTE O SEU + 3 passos */}
-            <Link href={pers.criarHref} className="rlzvn-newc" style={{ position: 'relative', overflow: 'hidden', borderRadius: 22, background: HERO, color: '#FFF', padding: mobile ? '20px 18px' : '24px 26px', display: 'flex', alignItems: mobile ? 'flex-start' : 'center', gap: 20, flexDirection: mobile ? 'column' : 'row', textDecoration: 'none' }}>
-              <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle,rgba(185,245,212,.14) 1.2px,transparent 1.8px)', backgroundSize: '22px 22px', pointerEvents: 'none' }} />
+            <Link href={pers.criarHref} className="rlzvn-newc" style={{ position: 'relative', overflow: 'hidden', borderRadius: 22, background: cm(HERO), color: '#FFF', padding: mobile ? '20px 18px' : '24px 26px', display: 'flex', alignItems: mobile ? 'flex-start' : 'center', gap: 20, flexDirection: mobile ? 'column' : 'row', textDecoration: 'none' }}>
+              <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: cm('radial-gradient(circle,rgba(185,245,212,.14) 1.2px,transparent 1.8px)'), backgroundSize: '22px 22px', pointerEvents: 'none' }} />
               <div style={{ position: 'relative', width: mobile ? '100%' : 280, flexShrink: 0 }}>
                 <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.2em', color: '#F1D48A' }}>MONTE O SEU</span>
                 <b style={{ display: 'block', fontSize: 24, letterSpacing: '-0.03em', marginTop: 4 }}>Novo simulado personalizado</b>
               </div>
               <div style={{ position: 'relative', flex: 1, display: 'grid', gridTemplateColumns: mobile ? '1fr' : 'repeat(3,1fr)', gap: 10, width: mobile ? '100%' : undefined }}>
                 {VND_PASSOS.map(([t, d], i) => (
-                  <div key={t} style={{ padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,.08)', border: '1px solid rgba(185,245,212,.16)' }}>
+                  <div key={t} style={{ padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,.08)', border: cm('1px solid rgba(185,245,212,.16)') }}>
                     <span style={{ display: 'inline-flex', width: 22, height: 22, borderRadius: 7, background: 'rgba(241,212,138,.2)', color: '#F1D48A', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800 }}>{i + 1}</span>
                     <b style={{ display: 'block', marginTop: 6, fontSize: 14 }}>{t}</b>
-                    <span style={{ fontSize: 11.5, color: '#CFE3D7' }}>{d}</span>
+                    <span style={{ fontSize: 11.5, color: cm('#CFE3D7') }}>{d}</span>
                   </div>
                 ))}
               </div>

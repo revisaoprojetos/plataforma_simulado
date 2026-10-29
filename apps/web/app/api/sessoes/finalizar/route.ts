@@ -7,6 +7,10 @@ import { dispararWebhook } from '@/lib/webhooks/dispatch'
 import { dadosProgressao } from '@/lib/webhooks/payload'
 import { publicarAoVivo } from '@/lib/realtime/pubsub'
 import { onSimuladoFinalizado } from '@/lib/gamificacao'
+import { invalidarCatalogoSimulados } from '@/lib/aluno/catalogo-simulados'
+import { atualizarHomeSnapshot, marcarHomeDesatualizado } from '@/lib/home/snapshot'
+import { atualizarDesempenhoSnapshot, marcarDesempenhoDesatualizado } from '@/lib/desempenho/snapshot'
+import { atualizarPerfilSnapshot, marcarPerfilDesatualizado } from '@/lib/perfil/snapshot'
 
 // POST /api/sessoes/finalizar — finaliza a sessão e calcula a nota.
 //
@@ -35,7 +39,7 @@ export async function POST(request: NextRequest) {
 
   const { data: sessao } = await supabase
     .from('simulado_sessoes_prova')
-    .select('id, simulado_id, status, tenant_id, estudante_id')
+    .select('id, simulado_id, status, tenant_id, estudante_id, iniciado_em')
     .eq('id', sessao_id)
     .maybeSingle()
 
@@ -55,6 +59,8 @@ export async function POST(request: NextRequest) {
     .eq('id', sessao.simulado_id)
     .maybeSingle()
   const pessoal = !!(donoRow as any)?.owner_estudante_id
+  // Finalizou NESTE request? (vs. já finalizada por auto-encerramento/duplo clique) — gate do write-behind.
+  const finalizouAgora = sessao.status !== 'finalizada'
 
   // ── RECONCILIAÇÃO (só enquanto a sessão está aberta) ────────────────────────
   // Garante que TUDO que o aluno marcou esteja salvo antes da correção.
@@ -140,6 +146,19 @@ export async function POST(request: NextRequest) {
       tipo: 'finalizou',
     })
 
+    // CONTABILIDADE DE TEMPO (Fase 2 do Meu Desempenho): credita a duração da sessão na frente "Simulados".
+    // Teto de 6h por sessão (uma prova esquecida aberta não deve inflar o tempo). Best-effort.
+    const iniMs = (sessao as any).iniciado_em ? new Date((sessao as any).iniciado_em).getTime() : 0
+    const durSeg = iniMs ? Math.min(6 * 3600, Math.max(0, Math.round((Date.now() - iniMs) / 1000))) : 0
+    if (durSeg > 0) {
+      const { registrarTempo } = await import('@/lib/desempenho/tempo-estudo')
+      void registrarTempo(supabase, { tenantId: sessao.tenant_id, estudanteId: sessao.estudante_id, frente: 'simulado', segundos: durSeg }).catch(() => {})
+    }
+
+    // O catálogo do aluno muda ao finalizar (sai de "recentes", entra em "feitos"/"realizados") →
+    // invalida o cache por-aluno na hora (TTL 60s cobriria, mas aqui o aluno vê o novo estado já no refresh).
+    void invalidarCatalogoSimulados(sessao.tenant_id, sessao.estudante_id)
+
     if (!pessoal) {
       await rankearSimulado(supabase, sessao.simulado_id)
       void publicarAoVivo(sessao.simulado_id) // realtime: painel "Ao Vivo" (Fase 2)
@@ -155,7 +174,30 @@ export async function POST(request: NextRequest) {
   // do ledger (refId=sessao_id) — seguro mesmo se o auto-encerramento já tiver finalizado. Fire-and-forget.
   // Simulado pessoal NÃO pontua gamificação (evita "farmar" XP com prova própria).
   if (!pessoal) {
+    // Write-behind (backend-first §6): após creditar XP/nota/ranking, recomputa os snapshots do aluno
+    // para a próxima leitura já vir fresca no MESMO dia (Início/Desempenho/Perfil mudam com nota/stats/XP).
+    // Encadeado no fim da gamificação (XP já persistido) e só quando a sessão finalizou NESTE request
+    // (evita recomputo em duplo-clique/sessão já finalizada). Best-effort, nunca bloqueia a resposta.
     void onSimuladoFinalizado(supabase, { tenantId: sessao.tenant_id, estudanteId: sessao.estudante_id, sessaoId: sessao_id, nota, acertos, total: totalQ })
+      .then(() => {
+        if (!finalizouAgora) return
+        return Promise.allSettled([
+          atualizarHomeSnapshot(supabase, sessao.tenant_id, sessao.estudante_id),
+          atualizarDesempenhoSnapshot(supabase, sessao.tenant_id, sessao.estudante_id),
+          atualizarPerfilSnapshot(supabase, sessao.tenant_id, sessao.estudante_id),
+        ])
+      })
+      .catch(() => {})
+  } else if (finalizouAgora) {
+    // PRÁTICA PESSOAL (simulado do próprio aluno): não dispara XP/ranking/webhook, mas MUDA as stats
+    // de questões/acerto do aluno (Desempenho/Perfil) — e, se gamificação de prática existir, a Início.
+    // Em vez do write-behind PESADO (computar*), só MARCA os snapshots como desatualizados: 3 UPDATEs
+    // leves (backend-first) — a próxima leitura (read-through) recomputa. Best-effort, nunca bloqueia.
+    void Promise.allSettled([
+      marcarHomeDesatualizado(supabase, sessao.tenant_id, sessao.estudante_id),
+      marcarDesempenhoDesatualizado(supabase, sessao.tenant_id, sessao.estudante_id),
+      marcarPerfilDesatualizado(supabase, sessao.tenant_id, sessao.estudante_id),
+    ]).catch(() => {})
   }
 
   // Posição final do aluno (após o recálculo).

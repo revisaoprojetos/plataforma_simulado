@@ -7,6 +7,7 @@
 
 import dynamic from 'next/dynamic'
 import type { Brand, Tela, SimScreenProps } from './types'
+import { BrandCorProvider } from '@/lib/brand/cor-marca'
 
 const SimuladoRevisao = dynamic(() => import('./simulado-revisao').then((m) => m.SimuladoRevisao))
 const SimuladoVND = dynamic(() => import('./simulado-vnd').then((m) => m.SimuladoVND))
@@ -18,7 +19,14 @@ export interface PlatformSimuladoProps extends SimScreenProps {
 }
 
 export function PlatformSimulado({ brand, ...rest }: PlatformSimuladoProps) {
-  if (brand === 'vnd') return <SimuladoVND {...rest} />
+  // MAC reaproveita o fluxo de simulado do VND; o provider converte as cores p/ bordô.
+  if (brand === 'vnd' || brand === 'mac') {
+    return (
+      <BrandCorProvider brand={brand}>
+        <SimuladoVND {...rest} />
+      </BrandCorProvider>
+    )
+  }
   if (brand === 'meq') return <SimuladoMEQ {...rest} />
   return <SimuladoRevisao {...rest} />
 }

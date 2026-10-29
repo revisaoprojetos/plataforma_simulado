@@ -1,6 +1,8 @@
 // Contrato de DADOS REAIS da área "Simulados Realizados" (quando ligada ao backend).
 // Cada item carrega os HREFs reais — os componentes renderizam <a>/<Link> funcionais (não botões inertes).
 
+import type { HomeSimuladoCard, HomePasta } from '@/components/brand/interna/home/types'
+
 export interface RlzCapa {
   rotulo: string
   sub: string
@@ -72,4 +74,6 @@ export interface RealizadosData {
   emAndamento: RlzEmAndamento[]
   concluidos: RlzConcluido[]
   personalizados: { criarHref: string; itens: RlzPersonalizado[] }
+  /** Aba "Simulado Revisão" (Revisão): recentes NÃO feitos + pastas, com o MESMO visual da Início. */
+  revisao?: { recentes: HomeSimuladoCard[]; pastas: HomePasta[] }
 }

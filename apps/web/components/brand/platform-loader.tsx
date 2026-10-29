@@ -36,7 +36,7 @@ import { LoadingVndClassico, type VndTheme } from './loadings/loading-vnd-classi
 import { LoadingVndCircuito, type VndCircTheme } from './loadings/loading-vnd-circuito'
 import { LoadingMeqCircuito, type MeqTheme } from './loadings/loading-meq-circuito'
 
-export type Brand = 'revisao' | 'vnd' | 'meq'
+export type Brand = 'revisao' | 'vnd' | 'meq' | 'mac'
 export type Theme = 'claro' | 'escuro' | 'azul'
 
 export interface PlatformLoaderProps {
@@ -62,6 +62,7 @@ type Resolved = { brand: Brand; theme: Theme; style?: string }
 const FALLBACK_STYLE: Record<Brand, string> = {
   revisao: 'rev-loading-classico',
   vnd: 'vnd-loading-classico',
+  mac: 'mac-loading-classico',
   meq: 'meq-loading-circuito',
 }
 
@@ -80,6 +81,7 @@ function normTheme(t: Theme | 'light' | 'dark' | undefined): Theme | undefined {
 function brandDoStyle(style?: string): Brand | null {
   if (!style) return null
   if (style.startsWith('vnd')) return 'vnd'
+  if (style.startsWith('mac')) return 'mac'
   if (style.startsWith('meq')) return 'meq'
   if (style.startsWith('rev')) return 'revisao'
   return null
@@ -185,11 +187,16 @@ function Inner({ brand, theme, style, message }: Resolved & { message?: string }
       return <LoadingVndCircuito theme={theme as VndCircTheme} message={message} vertical simula />
     case 'meq-loading-circuito':
       return <LoadingMeqCircuito theme={theme as MeqTheme} message={message} />
+    case 'mac-loading-classico':
+      // MAC reaproveita o loader do VND (mesma animação), bordô + "M"/"ac" + textos MAC.
+      return <LoadingVndClassico theme={theme as VndTheme} message={message} brand="mac" />
     default:
       // Slug ainda não portado (ver TODO no topo) → fallback DA MARCA.
       switch (brand) {
         case 'vnd':
           return <LoadingVndClassico theme={theme as VndTheme} message={message} />
+        case 'mac':
+          return <LoadingVndClassico theme={theme as VndTheme} message={message} brand="mac" />
         case 'meq':
           return <LoadingMeqCircuito theme={theme as MeqTheme} message={message} />
         case 'revisao':

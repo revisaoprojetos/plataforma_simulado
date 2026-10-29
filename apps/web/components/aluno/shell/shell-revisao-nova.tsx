@@ -43,6 +43,7 @@ import { DownBar } from './revisao-nova/down-bar'
 import { useTheme } from 'next-themes'
 import { usePathname, useRouter } from 'next/navigation'
 import { PlatformLoader } from '@/components/brand/platform-loader'
+import { NavProgress } from '@/components/brand/nav-progress'
 import { useTemaInterno } from '@/components/brand/interna/use-tema-interno'
 
 export interface ShellRevisaoNovaProps {
@@ -109,11 +110,16 @@ export function ShellRevisaoNova({
   // Rota ATUAL pelo cliente: o layout do portal NÃO re-roda na navegação client-side, então o
   // `pathname`/`ativo` do servidor congelam em "Início". usePathname() reflete a rota de verdade.
   const rota = usePathname() || pathname
-  const ehAtivo = (href: string) => (href === '/aluno' ? rota === '/aluno' : rota.startsWith(href))
+  // Ativo = o item cujo href casa com a rota, com o MAIS ESPECÍFICO vencendo. Sem isso o pai
+  // "Comunidade" (/aluno/nova/comunidade) acende junto do filho "Ligas" (/.../comunidade/ligas),
+  // que vive sob ele. `/aluno` é sempre exato. O `+ '/'` evita casar prefixos irmãos (ex.: /questoes-x).
+  const casaRota = (href: string) => (href === '/aluno' ? rota === '/aluno' : rota === href || rota.startsWith(href + '/'))
+  const hrefAtivo = nav.reduce<string | null>((best, it) => (casaRota(it.href) && it.href.length > (best?.length ?? -1) ? it.href : best), null)
+  const ehAtivo = (href: string) => href === hrefAtivo
   // Áreas com CONTEÚDO REDESENHADO (trazem o próprio layout/padding/fundo) ficam FULL-BLEED, como a
   // home — senão o shell aplicaria padding em cima do padding do componente ("encaixe"/caixa dupla).
   // As demais (conteúdo atual) recebem padding para não ficar cortadas. Nova área → adicionar aqui.
-  const AREAS_NOVAS = ['/aluno/perfil', '/aluno/cronograma', '/aluno/recomendado', '/aluno/simulados', '/aluno/questoes', '/aluno/ligas', '/aluno/leitura', '/aluno/jurisprudencia', '/aluno/maratona']
+  const AREAS_NOVAS = ['/aluno/perfil', '/aluno/cronograma', '/aluno/recomendado', '/aluno/simulados', '/aluno/questoes', '/aluno/ligas', '/aluno/leitura', '/aluno/jurisprudencia', '/aluno/maratona', '/aluno/nova']
   const ehAreaNova = rota === '/aluno' || AREAS_NOVAS.some((a) => rota.startsWith(a))
   const [collapsed, toggleCollapsed] = useSidebarCollapsed()
   const [fontIdx, applyFont] = useFontScale()
@@ -200,7 +206,7 @@ export function ShellRevisaoNova({
         >
           {/* Logo lockup */}
           <div style={{ padding: '0 8px 22px' }}>
-            <Link href="/aluno" aria-label={nome} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+            <Link href="/aluno/nova/inicio" aria-label={nome} style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
               {logo ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 // Logo da sidebar SEMPRE em branco (fundo roxo) — filtro neutraliza a cor original.
@@ -527,6 +533,7 @@ export function ShellRevisaoNova({
             borderBottom: '1px solid var(--line)',
           }}
         >
+          <NavProgress />
           <button type="button" className="shr-searchbox" aria-label="Buscar simulados" onClick={() => setBuscaAberta(true)} style={searchBoxStyle()}>
             <Search style={{ width: 17, height: 17 }} />
             <span style={{ flex: 1, minWidth: 0, textAlign: 'left', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>Buscar simulados pelo nome…</span>
@@ -643,7 +650,8 @@ export function ShellRevisaoNova({
             color: '#FFFFFF',
           }}
         >
-          <Link href="/aluno" aria-label={nome} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <NavProgress />
+          <Link href="/aluno/nova/inicio" aria-label={nome} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
             {logo ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={logo} alt="" style={{ height: 28, width: 'auto' }} />

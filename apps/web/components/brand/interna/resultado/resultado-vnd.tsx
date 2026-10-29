@@ -17,6 +17,7 @@ import {
 } from 'lucide-react'
 import { internaTokensStyle, type InternaTheme } from '../interna-tokens'
 import { useTemaInterno } from '../use-tema-interno'
+import { useBrandAtual, useCm } from '@/lib/brand/cor-marca'
 import type { ResultadoInternoData } from './data'
 import { notec } from './mock'
 import {
@@ -45,6 +46,8 @@ type RT = 'geral' | 'quest' | 'rank' | 'aval'
 const P = 'rvn'
 
 export function ResultadoVnd({ theme, data, sessaoId }: { theme: InternaTheme; data: ResultadoInternoData; sessaoId?: string | null }) {
+  const marca = useBrandAtual() ?? 'vnd'
+  const cm = useCm()
   const tema = useTemaInterno(theme)
   const d = data
   const mobile = useIsMobile()
@@ -60,11 +63,11 @@ export function ResultadoVnd({ theme, data, sessaoId }: { theme: InternaTheme; d
   const allSel = () => setSel(Object.fromEntries(d.tentativas.map((a) => [a.n, true])))
   const noneSel = () => setSel(Object.fromEntries(d.tentativas.map((a) => [a.n, false])))
 
-  const style = { ...internaTokensStyle('vnd', tema), ['--cbOn' as string]: 'var(--brand)' }
+  const style = { ...internaTokensStyle(marca, tema), ['--cbOn' as string]: 'var(--brand)' }
 
   return (
     <div className={P} style={style}>
-      <style>{resultadoCss(P)}</style>
+      <style>{cm(resultadoCss(P))}</style>
       <div style={{ minHeight: '100%', background: 'var(--bg)' }}>
         <Header d={d} mobile={mobile} />
         <div className="rrz-pv" style={{ padding: mobile ? '18px 18px 28px' : '24px clamp(16px,4vw,32px) 56px', display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -82,6 +85,7 @@ export function ResultadoVnd({ theme, data, sessaoId }: { theme: InternaTheme; d
 }
 
 function InfoChips({ d }: { d: ResultadoInternoData }) {
+  const cm = useCm()
   const chips: [ReactNode, string][] = [
     [<LayoutGrid key="g" size={13} />, `${d.melhor.total} questões`],
     [<RefreshCw key="r" size={13} />, `${d.tentativas.length} ${d.tentativas.length === 1 ? 'tentativa' : 'tentativas'}`],
@@ -90,31 +94,32 @@ function InfoChips({ d }: { d: ResultadoInternoData }) {
   return (
     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
       {chips.map(([icon, t], i) => (
-        <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 11px', borderRadius: 99, background: 'rgba(255,255,255,.08)', color: '#CFE3D7', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>{icon}{t}</span>
+        <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 11px', borderRadius: 99, background: cm('rgba(255,255,255,.08)'), color: cm('#CFE3D7'), fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>{icon}{t}</span>
       ))}
     </div>
   )
 }
 
 function Header({ d, mobile }: { d: ResultadoInternoData; mobile: boolean }) {
+  const cm = useCm()
   const notaOk = d.notaLiberada && d.melhor.nota !== null
   return (
-    <section style={{ position: 'relative', overflow: 'hidden', background: 'linear-gradient(120deg,#041A10 0%,#0B4A2E 55%,#12643D 100%)', color: '#FFFFFF', padding: mobile ? '18px 18px 22px' : '22px 0 30px' }}>
-      <span aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: 'radial-gradient(circle,rgba(185,245,212,.18) 1.2px,transparent 1.8px)', backgroundSize: '22px 22px' }} />
+    <section style={{ position: 'relative', overflow: 'hidden', background: cm('linear-gradient(120deg,#041A10 0%,#0B4A2E 55%,#12643D 100%)'), color: cm('#FFFFFF'), padding: mobile ? '18px 18px 22px' : '22px 0 30px' }}>
+      <span aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: cm('radial-gradient(circle,rgba(185,245,212,.18) 1.2px,transparent 1.8px)'), backgroundSize: '22px 22px' }} />
       <div style={{ position: 'relative', padding: mobile ? 0 : '0 clamp(16px,4vw,32px)' }}>
-        {!mobile ? <a href="#" style={{ fontSize: 12, fontWeight: 700, color: '#86CFA6' }}>‹ Simulados realizados</a> : null}
+        {!mobile ? <a href="#" style={{ fontSize: 12, fontWeight: 700, color: cm('#86CFA6') }}>‹ Simulados realizados</a> : null}
         <div style={{ display: 'flex', flexDirection: mobile ? 'column' : 'row', alignItems: mobile ? 'stretch' : 'center', gap: mobile ? 16 : 26, flexWrap: 'wrap', marginTop: mobile ? 0 : 10 }}>
           <div style={{ flex: 1, minWidth: 240 }}>
-            <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: '#86CFA6' }}>RESULTADO DO SIMULADO</span>
+            <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: cm('#86CFA6') }}>RESULTADO DO SIMULADO</span>
             <h1 style={{ margin: '4px 0 10px', fontSize: 'clamp(26px,4vw,36px)', fontWeight: 800, letterSpacing: '-0.045em' }}>{d.titulo}</h1>
             <InfoChips d={d} />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             {notaOk ? <Vring nota={d.melhor.nota as number} size={88} /> : null}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.14em', color: '#F1D48A' }}>{notaOk ? 'SUA NOTA' : 'AGUARDANDO LIBERAÇÃO'}</span>
+              <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.14em', color: cm('#F1D48A') }}>{notaOk ? 'SUA NOTA' : 'AGUARDANDO LIBERAÇÃO'}</span>
               {d.refazerHref ? (
-                <a href={d.refazerHref} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 42, padding: '0 16px', borderRadius: 13, background: 'linear-gradient(180deg,#F1D48A,#D8B45A)', color: '#2A1F02', fontSize: 13.5, fontWeight: 800, textDecoration: 'none' }}><RefreshCw size={14} />Refazer</a>
+                <a href={d.refazerHref} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 42, padding: '0 16px', borderRadius: 13, background: cm('linear-gradient(180deg,#F1D48A,#D8B45A)'), color: cm('#2A1F02'), fontSize: 13.5, fontWeight: 800, textDecoration: 'none' }}><RefreshCw size={14} />Refazer</a>
               ) : null}
             </div>
           </div>

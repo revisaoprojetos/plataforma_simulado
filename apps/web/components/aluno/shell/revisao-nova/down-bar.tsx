@@ -6,11 +6,6 @@ import {
   ClipboardList,
   Lightbulb,
   BookOpen,
-  Library,
-  Gavel,
-  CalendarDays,
-  FolderClosed,
-  Plus,
   Trophy,
   ChevronRight,
   ChevronUp,
@@ -21,7 +16,7 @@ import type { AlunoNavItem, AlunoShellUsuario } from '../types'
 import { MarcaR } from './icons'
 import { DOWNBAR_BG, AMARELO, AMARELO_INK, type ShellTheme } from './tokens'
 
-type Grupo = 'sim' | 'des' | 'cro'
+type Grupo = 'sim' | 'des'
 
 interface GItem {
   href: string
@@ -45,30 +40,13 @@ const GRUPOS: GrupoDef[] = [
     label: 'Simulados',
     Icon: ClipboardList,
     itens: [
-      { href: '/aluno/simulados', Icon: ClipboardList, titulo: 'Simulados realizados', sub: 'Histórico, notas e relatórios', short: 'Realizados' },
+      { href: '/aluno/simulados', Icon: ClipboardList, titulo: 'Simulados', sub: 'Histórico, notas e relatórios', short: 'Simulados' },
       { href: '/aluno/recomendado', Icon: Lightbulb, titulo: 'Recomendados para você', sub: 'Escolhidos pelo seu desempenho', short: 'Para você' },
       { href: '/aluno/questoes', Icon: BookOpen, titulo: 'Banco de questões', sub: 'Treine por matéria, banca e ano', short: 'Questões' },
     ],
   },
-  {
-    key: 'des',
-    label: 'Desafios',
-    Icon: Library,
-    itens: [
-      { href: '/aluno/leitura', Icon: Library, titulo: 'Desafio de Lei Seca', sub: 'Trilha diária de artigos', short: 'Lei Seca' },
-      { href: '/aluno/jurisprudencia', Icon: Gavel, titulo: 'Desafio de Jurisprudência', sub: 'Informativos, súmulas e teses', short: 'Juris' },
-    ],
-  },
-  {
-    key: 'cro',
-    label: 'Cronograma',
-    Icon: CalendarDays,
-    itens: [
-      { href: '/aluno/cronograma', Icon: CalendarDays, titulo: 'Meu plano de hoje', sub: 'Tarefas do cronograma ativo', short: 'Cronograma' },
-      { href: '/aluno/cronograma/meus', Icon: FolderClosed, titulo: 'Meus cronogramas', sub: 'Todos os planos que você criou' },
-      { href: '/aluno/cronograma/gerar', Icon: Plus, titulo: 'Gerar novo cronograma', sub: 'Monte um plano em 3 passos' },
-    ],
-  },
+  // Desafios (Lei Seca + Jurisprudência) saíram do menu: o acesso é só pela área de Cursos.
+  // Cronograma saiu do menu (Fase 3): o acesso passa a ser pelo "Meu painel de estudos".
 ]
 
 const SLOT_COLOR = '#D9CFFF'
@@ -86,7 +64,7 @@ export function DownBar({ theme, nav, usuario, pathname, onAccount }: DownBarPro
 
   // Início ativo SÓ na home exata. (O item '/aluno' do nav casa por startsWith → ficava "ativo" em
   // TODAS as rotas /aluno/*; por isso não dá p/ usar nav.find(ativo) aqui.)
-  const inicioAtivo = pathname === '/aluno' || pathname === '/aluno/'
+  const inicioAtivo = pathname === '/aluno/nova/inicio' || pathname === '/aluno' || pathname === '/aluno/'
   const ligasAtivo = pathname.startsWith('/aluno/ligas')
 
   // Qual grupo contém a rota atual + o item ativo (para a pílula).
@@ -239,12 +217,12 @@ export function DownBar({ theme, nav, usuario, pathname, onAccount }: DownBarPro
 
       {/* Slot Início: pílula amarela com marca R quando ativo; senão ícone casa */}
       {inicioAtivo ? (
-        <Link href="/aluno" style={pilulaStyle()}>
+        <Link href="/aluno/nova/inicio" style={pilulaStyle()}>
           <MarcaR size={18} fill={AMARELO_INK} />
           Início
         </Link>
       ) : (
-        <Link href="/aluno" aria-label="Início" title="Início" style={slotLinkStyle()}>
+        <Link href="/aluno/nova/inicio" aria-label="Início" title="Início" style={slotLinkStyle()}>
           <MarcaR size={21} fill={SLOT_COLOR} />
         </Link>
       )}

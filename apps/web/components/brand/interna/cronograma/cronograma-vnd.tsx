@@ -13,20 +13,22 @@ import {
   MeusStats, MeusList, Liberados, PlanHead, PlanKpis, PlanProgress, ViewToggle, GridView,
   PlanList, TodayCard, LegendTypes, VndTrail, useCronogramaState, type CronogramaState,
 } from './shared'
+import { useBrandAtual, useCm } from '@/lib/brand/cor-marca'
 
 const K = 'vnd' as const
 
 function VndHero({ st, mobile }: { st: CronogramaState; mobile: boolean }) {
+  const cm = useCm()
   return (
-    <section style={{ position: 'relative', overflow: 'hidden', background: 'linear-gradient(120deg,#041A10 0%,#0B4A2E 55%,#12643D 100%)', color: '#FFFFFF', padding: mobile ? '22px 18px 24px' : '34px 0 30px' }}>
-      <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle,rgba(185,245,212,.18) 1.2px,transparent 1.8px)', backgroundSize: '22px 22px', pointerEvents: 'none' }} />
+    <section style={{ position: 'relative', overflow: 'hidden', background: cm('linear-gradient(120deg,#041A10 0%,#0B4A2E 55%,#12643D 100%)'), color: cm('#FFFFFF'), padding: mobile ? '22px 18px 24px' : '34px 0 30px' }}>
+      <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: cm('radial-gradient(circle,rgba(185,245,212,.18) 1.2px,transparent 1.8px)'), backgroundSize: '22px 22px', pointerEvents: 'none' }} />
       <div style={{ position: 'relative', maxWidth: mobile ? undefined : 1376, margin: mobile ? undefined : '0 auto', padding: mobile ? undefined : '0 32px', display: 'flex', flexDirection: mobile ? 'column' : 'row', gap: mobile ? 16 : 30, alignItems: mobile ? undefined : 'flex-end', justifyContent: mobile ? undefined : 'space-between' }}>
         <div>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: '#86CFA6' }}>
-            <span style={{ width: 8, height: 8, borderRadius: 2, background: '#D8B45A', transform: 'rotate(45deg)' }} />CRONOGRAMA DE ESTUDOS
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: cm('#86CFA6') }}>
+            <span style={{ width: 8, height: 8, borderRadius: 2, background: cm('#D8B45A'), transform: 'rotate(45deg)' }} />CRONOGRAMA DE ESTUDOS
           </span>
           <h1 style={{ margin: '8px 0 4px', fontSize: mobile ? 28 : 40, fontWeight: 800, letterSpacing: '-0.045em' }}>Monte seu cronograma</h1>
-          <p style={{ margin: 0, fontSize: 14, color: '#CFE3D7', maxWidth: 560 }}>Rotina, cronograma base e data de início · cada meta concluída vale XP na sua liga.</p>
+          <p style={{ margin: 0, fontSize: 14, color: cm('#CFE3D7'), maxWidth: 560 }}>Rotina, cronograma base e data de início · cada meta concluída vale XP na sua liga.</p>
         </div>
       </div>
     </section>
@@ -34,13 +36,14 @@ function VndHero({ st, mobile }: { st: CronogramaState; mobile: boolean }) {
 }
 
 function GerarArea({ st, mobile }: { st: CronogramaState; mobile: boolean }) {
+  const cm = useCm()
   const cardSty: CSSProperties = { borderRadius: 24, background: 'var(--surface)', border: '2px solid var(--line)', boxShadow: '0 6px 0 var(--line)' }
   const wiz = (
     <div style={{ padding: mobile ? 18 : 26, display: 'flex', flexDirection: 'column', gap: 20, ...cardSty }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingBottom: 18, borderBottom: '1px solid var(--line)' }}>
         <Stepper k={K} mobile={mobile} st={st} />
         <div style={{ height: 8, borderRadius: 99, background: 'var(--surface2)', boxShadow: 'inset 0 2px 0 rgba(0,0,0,.06)' }}>
-          <span style={{ display: 'block', height: '100%', width: `${st.gs * 25}%`, borderRadius: 99, background: 'linear-gradient(90deg,#2BB673,#16804F)', transition: 'width .4s' }} />
+          <span style={{ display: 'block', height: '100%', width: `${st.gs * 25}%`, borderRadius: 99, background: cm('linear-gradient(90deg,#2BB673,#16804F)'), transition: 'width .4s' }} />
         </div>
       </div>
       <WizSteps k={K} mobile={mobile} st={st} />
@@ -51,7 +54,7 @@ function GerarArea({ st, mobile }: { st: CronogramaState; mobile: boolean }) {
     <>
       <Card k={K} pad={18}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-          <span style={{ width: 46, height: 46, borderRadius: 14, background: 'linear-gradient(160deg,#F1D48A,#B8913A)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 3px 0 #8A6A1E', color: '#2A1F02' }}><Ic n="cal" s={22} /></span>
+          <span style={{ width: 46, height: 46, borderRadius: 14, background: cm('linear-gradient(160deg,#F1D48A,#B8913A)'), display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: cm('0 3px 0 #8A6A1E'), color: cm('#2A1F02') }}><Ic n="cal" s={22} /></span>
           <div>
             <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.2em', color: 'var(--goldInk)' }}>RESUMO</span>
             <b style={{ display: 'block', fontSize: 18, color: 'var(--ink)' }}>{st.previa.activities} metas · até {st.previa.xp} XP</b>
@@ -61,7 +64,7 @@ function GerarArea({ st, mobile }: { st: CronogramaState; mobile: boolean }) {
       </Card>
       <Card k={K} pad={16}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <span style={{ color: '#F0773A' }}><Ic n="flame" s={26} /></span>
+          <span style={{ color: cm('#F0773A') }}><Ic n="flame" s={26} /></span>
           <span style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.5 }}><b style={{ color: 'var(--ink)' }}>Bônus de constância:</b> cada semana completa vale um baú com XP extra na sua liga.</span>
         </div>
       </Card>
@@ -104,7 +107,7 @@ function PlanoArea({ st, mobile }: { st: CronogramaState; mobile: boolean }) {
   if (mobile) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <PlanHead k={K} mobile st={st} /><PlanKpis k={K} mobile /><TodayCard k={K} /><PlanProgress k={K} st={st} />
+        <PlanHead k={K} mobile st={st} /><PlanKpis k={K} mobile st={st} /><TodayCard k={K} /><PlanProgress k={K} st={st} />
         <VndTrail k={K} mobile />
         <ViewToggle k={K} mobile st={st} />{grid}
         {list && <div className="vlin"><PlanList k={K} mobile st={st} /></div>}
@@ -113,7 +116,7 @@ function PlanoArea({ st, mobile }: { st: CronogramaState; mobile: boolean }) {
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <PlanHead k={K} mobile={false} st={st} /><PlanKpis k={K} mobile={false} /><PlanProgress k={K} st={st} />
+      <PlanHead k={K} mobile={false} st={st} /><PlanKpis k={K} mobile={false} st={st} /><PlanProgress k={K} st={st} />
       <VndTrail k={K} mobile={false} />
       <ViewToggle k={K} mobile={false} st={st} />{grid}
       {list && (
@@ -128,9 +131,16 @@ function PlanoArea({ st, mobile }: { st: CronogramaState; mobile: boolean }) {
 
 export function CronogramaVnd({ theme: themeProp, tab, mobile }: { theme: InternaTheme; tab?: string; mobile: boolean }) {
   const theme = useTemaInterno(themeProp) // reage ao toggle claro/escuro (o theme do servidor é só o fallback)
+  const marca = useBrandAtual() ?? 'vnd'
+  const cm = useCm()
   const st = useCronogramaState(tab)
   const dark = theme === 'escuro'
-  const rootStyle: CSSProperties = { ...internaTokensStyle('vnd', theme), ...cronoVars(K, dark) }
+  // K/cronoVars continuam com a chave 'vnd' (sistema brandKey); o bordô da MAC vem dos tokens
+  // (internaTokensStyle(marca)) + conversão dos verdes fixos do cronoVars via cm.
+  const rootStyle: CSSProperties = {
+    ...internaTokensStyle(marca, theme),
+    ...Object.fromEntries(Object.entries(cronoVars(K, dark)).map(([k, v]) => [k, cm(v as string)])),
+  }
   return (
     <div className="cvn-root" style={rootStyle}>
       <style dangerouslySetInnerHTML={{ __html: cssFor('cvn-root') }} />

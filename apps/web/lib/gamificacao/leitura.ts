@@ -3,6 +3,7 @@ import { progressoNivel, ligaParaXp, proximaLiga, type ProgressoNivel } from './
 import { missoesDoDia } from './rodizio'
 import { diaLocal, inicioDaSemanaISO, inicioDoMesISO, janelaDiaUtc } from './datas'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { remember, chaveRelatorio } from '@/lib/cache/relatorio-cache'
 import { listarConquistasModuloTenant } from '@/lib/leitura/carimbos'
 import { calcularSequencia } from '@/lib/leitura/sequencia'
 
@@ -198,17 +199,29 @@ async function nomesDe(svc: any, ids: string[]): Promise<Map<string, string>> {
   return new Map(rows.map((r) => [r.id, r.nome as string]))
 }
 
+// Base do leaderboard SEM a marca `eu` (depende só de tenant/liga/limite) → CACHEÁVEL e COMPARTILHADO por
+// todos os alunos. A flag `eu` (por aluno) é aplicada barata no wrapper público. TTL 45s: o board de ligas
+// muda devagar e com 1000+ alunos lendo a mesma lista, 1 leitura por janela em vez de N.
+type RankingBase = Omit<RankingItem, 'eu'>
+
+async function leaderboardLigaBase(svc: any, tenantId: string, liga: string, limite: number): Promise<RankingBase[]> {
+  return remember<RankingBase[]>(chaveRelatorio(tenantId, 'gam-lb-liga', liga, limite), 45, async () => {
+    const { data } = await svc
+      .from('simulado_gamificacao_estudante')
+      .select('estudante_id, xp_total')
+      .eq('tenant_id', tenantId).eq('liga', liga)
+      .order('xp_total', { ascending: false })
+      .limit(limite)
+    const rows = (data ?? []) as any[]
+    const nomes = await nomesDe(svc, rows.map((r) => r.estudante_id))
+    return rows.map((r, i) => ({ estudanteId: r.estudante_id, nome: nomes.get(r.estudante_id) ?? 'Aluno', xp: r.xp_total, posicao: i + 1 }))
+  })
+}
+
 /** Leaderboard por XP TOTAL dentro de uma liga (tier). */
 export async function leaderboardLiga(svc: any, tenantId: string, liga: string, eu: string, limite = 20): Promise<RankingItem[]> {
-  const { data } = await svc
-    .from('simulado_gamificacao_estudante')
-    .select('estudante_id, xp_total')
-    .eq('tenant_id', tenantId).eq('liga', liga)
-    .order('xp_total', { ascending: false })
-    .limit(limite)
-  const rows = (data ?? []) as any[]
-  const nomes = await nomesDe(svc, rows.map((r) => r.estudante_id))
-  return rows.map((r, i) => ({ estudanteId: r.estudante_id, nome: nomes.get(r.estudante_id) ?? 'Aluno', xp: r.xp_total, posicao: i + 1, eu: r.estudante_id === eu }))
+  const base = await leaderboardLigaBase(svc, tenantId, liga, limite)
+  return base.map((r) => ({ ...r, eu: r.estudanteId === eu }))
 }
 
 /** Posição do aluno dentro da sua liga (por XP total). */
@@ -221,17 +234,24 @@ export async function posicaoNaLiga(svc: any, tenantId: string, liga: string, xp
   return (count ?? 0) + 1
 }
 
+async function leaderboardGeralBase(svc: any, tenantId: string, limite: number): Promise<RankingBase[]> {
+  return remember<RankingBase[]>(chaveRelatorio(tenantId, 'gam-lb-geral', limite), 45, async () => {
+    const { data } = await svc
+      .from('simulado_gamificacao_estudante')
+      .select('estudante_id, xp_total')
+      .eq('tenant_id', tenantId)
+      .order('xp_total', { ascending: false })
+      .limit(limite)
+    const rows = (data ?? []) as any[]
+    const nomes = await nomesDe(svc, rows.map((r) => r.estudante_id))
+    return rows.map((r, i) => ({ estudanteId: r.estudante_id, nome: nomes.get(r.estudante_id) ?? 'Aluno', xp: r.xp_total, posicao: i + 1 }))
+  })
+}
+
 /** Leaderboard GERAL (todas as ligas) por XP total. */
 export async function leaderboardGeral(svc: any, tenantId: string, eu: string, limite = 20): Promise<RankingItem[]> {
-  const { data } = await svc
-    .from('simulado_gamificacao_estudante')
-    .select('estudante_id, xp_total')
-    .eq('tenant_id', tenantId)
-    .order('xp_total', { ascending: false })
-    .limit(limite)
-  const rows = (data ?? []) as any[]
-  const nomes = await nomesDe(svc, rows.map((r) => r.estudante_id))
-  return rows.map((r, i) => ({ estudanteId: r.estudante_id, nome: nomes.get(r.estudante_id) ?? 'Aluno', xp: r.xp_total, posicao: i + 1, eu: r.estudante_id === eu }))
+  const base = await leaderboardGeralBase(svc, tenantId, limite)
+  return base.map((r) => ({ ...r, eu: r.estudanteId === eu }))
 }
 
 /** Posição GERAL do aluno (por XP total, todas as ligas). */
@@ -244,12 +264,20 @@ export async function posicaoGeral(svc: any, tenantId: string, xpTotal: number):
   return (count ?? 0) + 1
 }
 
+async function rankingPeriodoBase(svc: any, tenantId: string, desdeISO: string, limite: number): Promise<RankingBase[]> {
+  // `desdeISO` = início da semana/mês (estável dentro do período) → a chave rola sozinha na virada.
+  return remember<RankingBase[]>(chaveRelatorio(tenantId, 'gam-lb-periodo', desdeISO, limite), 45, async () => {
+    const { data } = await svc.rpc('rpc_xp_ranking_periodo', { p_tenant: tenantId, p_desde: desdeISO })
+    const rows = ((data ?? []) as any[]).slice(0, limite)
+    const nomes = await nomesDe(svc, rows.map((r) => r.estudante_id))
+    return rows.map((r, i) => ({ estudanteId: r.estudante_id, nome: nomes.get(r.estudante_id) ?? 'Aluno', xp: Number(r.xp), posicao: i + 1 }))
+  })
+}
+
 /** Leaderboard por XP num PERÍODO (semana/mês) via RPC — janela derivada de now(), sem reset. */
 export async function rankingPeriodo(svc: any, tenantId: string, desdeISO: string, eu: string, limite = 20): Promise<RankingItem[]> {
-  const { data } = await svc.rpc('rpc_xp_ranking_periodo', { p_tenant: tenantId, p_desde: desdeISO })
-  const rows = ((data ?? []) as any[]).slice(0, limite)
-  const nomes = await nomesDe(svc, rows.map((r) => r.estudante_id))
-  return rows.map((r, i) => ({ estudanteId: r.estudante_id, nome: nomes.get(r.estudante_id) ?? 'Aluno', xp: Number(r.xp), posicao: i + 1, eu: r.estudante_id === eu }))
+  const base = await rankingPeriodoBase(svc, tenantId, desdeISO, limite)
+  return base.map((r) => ({ ...r, eu: r.estudanteId === eu }))
 }
 
 /**

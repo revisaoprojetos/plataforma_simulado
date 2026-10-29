@@ -30,7 +30,7 @@ export function PlatformResultadoInterno({
   // sem data (preview) → mock completo; com data (produção) → real, com blocos sem fonte
   // real preenchidos por valores de EXEMPLO derivados (fidelidade visual do mockup).
   const d = data ? deriveSamples(brand, data) : resultadoMock(brand)
-  if (brand === 'vnd') return <ResultadoVnd theme={theme} data={d} sessaoId={sessaoId} />
+  if (brand === 'vnd' || brand === 'mac') return <ResultadoVnd theme={theme} data={d} sessaoId={sessaoId} />
   if (brand === 'meq') return <ResultadoMeq theme={theme} data={d} sessaoId={sessaoId} />
   return <ResultadoRevisao theme={theme} data={d} sessaoId={sessaoId} />
 }

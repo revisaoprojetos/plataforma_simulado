@@ -56,7 +56,7 @@ import { fnum, notec, posFmt, stc } from './mock'
 type QStatus = ResStatus
 
 export const acc = (brand: Brand) => (brand === 'meq' ? 'var(--brand2)' : 'var(--brand)')
-const RADIUS = { revisao: 20, vnd: 24, meq: 14 } as const
+const RADIUS = { revisao: 20, vnd: 24, mac: 24, meq: 14 } as const
 
 const OK = '#1FA868'
 const WARN = '#D99A1E'
@@ -793,6 +793,7 @@ function Vring({ nota, size = 40 }: { nota: number; size?: number }) {
 const ACOL: Record<Brand, [string, string, string]> = {
   revisao: ['#C9BDF7', '#8F75FF', '#4B30BE'],
   vnd: ['#B7DEC6', '#46B97E', '#0F6B3C'],
+  mac: ['#DEB7B9', '#B9575C', '#580C10'],
   meq: ['#B9D1F5', '#5E9BFF', '#1F4E9A'],
 }
 const attColor = (k: number, brand: Brand) => ACOL[brand][Math.min(k, 2)]

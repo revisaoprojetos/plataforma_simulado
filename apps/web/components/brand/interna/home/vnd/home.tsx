@@ -19,6 +19,8 @@ import type { HomeData, InternaTheme } from '../types'
 import { internaTokensStyle } from '../../interna-tokens'
 import { useTemaInterno } from '../../use-tema-interno'
 import { BaixarCadernoBtn } from '../../baixar-caderno-btn'
+import { useBrandAtual, useCm } from '@/lib/brand/cor-marca'
+import { MAC_M_PATH } from '../../../brand-marks'
 
 const VND_SVG =
   'M1.00 5.90L11.51 5.77Q12.20 5.76 12.53 6.13L21.21 15.98Q21.47 16.25 21.57 15.86L21.60 8.10C21.60 7.05 20.81 6.30 19.76 5.88L30.57 5.90Q31.00 5.91 30.74 6.33L23.18 14.49C22.26 15.55 21.80 16.65 21.73 18.23L21.67 25.45Q21.60 26.24 20.95 25.96L6.03 8.31C4.78 6.96 3.14 6.19 1.00 5.90Z'
@@ -32,24 +34,24 @@ const SLIDE_BG = [
 const COVER_BG = ['#062A1B,#0F5A36', '#0B3340,#1C7A8C', '#0A2E22,#1E8A64', '#0F2A45,#2A6FB0', '#2E250A,#9A7A22']
 
 // Extras de tokens não garantidos pela interna-tokens (spec §1.2).
-function vndExtras(theme: InternaTheme): React.CSSProperties {
+function vndExtras(theme: InternaTheme, cm: (v: string) => string): React.CSSProperties {
   const dark = theme === 'escuro'
   return {
-    '--gold': dark ? '#E8C877' : '#D8B45A',
-    '--goldInk': dark ? '#F1D48A' : '#9A7414',
-    '--goldBg': dark ? 'rgba(232,200,119,.14)' : '#FBF4E2',
-    '--brandLine': dark ? 'rgba(79,224,152,.4)' : 'rgba(15,122,68,.3)',
-    '--muted2': dark ? '#71907F' : '#B5C4BB',
+    '--gold': cm(dark ? '#E8C877' : '#D8B45A'),
+    '--goldInk': cm(dark ? '#F1D48A' : '#9A7414'),
+    '--goldBg': cm(dark ? 'rgba(232,200,119,.14)' : '#FBF4E2'),
+    '--brandLine': cm(dark ? 'rgba(79,224,152,.4)' : 'rgba(15,122,68,.3)'),
+    '--muted2': cm(dark ? '#71907F' : '#B5C4BB'),
   } as React.CSSProperties
 }
 
-function dotsOverlay(size = 14, op = 0.22) {
+function dotsOverlay(cm: (v: string) => string, size = 14, op = 0.22) {
   return (
     <span
       aria-hidden
       style={{
         position: 'absolute', inset: 0, pointerEvents: 'none',
-        backgroundImage: `radial-gradient(circle,rgba(185,245,212,${op}) 1px,transparent 1.6px)`,
+        backgroundImage: cm(`radial-gradient(circle,rgba(185,245,212,${op}) 1px,transparent 1.6px)`),
         backgroundSize: `${size}px ${size}px`,
       }}
     />
@@ -58,10 +60,13 @@ function dotsOverlay(size = 14, op = 0.22) {
 
 /** Capa de simulado/pasta reutilizável (gradiente verde + marca V + rótulo). */
 function Cover({ rotulo, sub, grad, big = 28, src }: { rotulo: string; sub: string; grad: string; big?: number; src?: string | null }) {
+  const marca = useBrandAtual() ?? 'vnd'
+  const cm = useCm()
+  const VPATH = marca === 'mac' ? MAC_M_PATH : VND_SVG
   // Com imagem REAL do simulado/pasta: preenche o tile (object-cover). Sem imagem: visual VND com gradiente.
   if (src) {
     return (
-      <div className="hvn-cov" style={{ position: 'relative', overflow: 'hidden', width: '100%', height: '100%', background: `linear-gradient(140deg,${grad})` }}>
+      <div className="hvn-cov" style={{ position: 'relative', overflow: 'hidden', width: '100%', height: '100%', background: cm(`linear-gradient(140deg,${grad})`) }}>
         <img src={src} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
       </div>
     )
@@ -71,18 +76,18 @@ function Cover({ rotulo, sub, grad, big = 28, src }: { rotulo: string; sub: stri
       className="hvn-cov"
       style={{
         position: 'relative', overflow: 'hidden', width: '100%', height: '100%',
-        background: `linear-gradient(140deg,${grad})`, color: '#FFFFFF',
+        background: cm(`linear-gradient(140deg,${grad})`), color: '#FFFFFF',
         display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '12px 14px',
       }}
     >
-      {dotsOverlay(14, 0.22)}
+      {dotsOverlay(cm, 14, 0.22)}
       <svg viewBox="0 0 32 32" aria-hidden style={{ position: 'absolute', right: -18, top: -14, width: 110, height: 110, opacity: 0.16 }}>
-        <path fill="#B9F5D4" d={VND_SVG} />
+        <path fill={cm('#B9F5D4')} d={VPATH} />
       </svg>
       <span style={{ position: 'absolute', left: 14, top: 12, display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 8.5, fontWeight: 800, letterSpacing: '.2em', color: '#F1D48A' }}>
-        <svg viewBox="0 0 32 32" style={{ width: 11, height: 11 }}><path fill="#F1D48A" d={VND_SVG} /></svg>SIMULA VND
+        <svg viewBox="0 0 32 32" style={{ width: 11, height: 11 }}><path fill="#F1D48A" d={VPATH} /></svg>{marca === 'mac' ? 'SIMULA MAC' : 'SIMULA VND'}
       </span>
-      <span style={{ position: 'relative', fontSize: 8.5, fontWeight: 800, letterSpacing: '.16em', color: '#CFE3D7' }}>{sub}</span>
+      <span style={{ position: 'relative', fontSize: 8.5, fontWeight: 800, letterSpacing: '.16em', color: cm('#CFE3D7') }}>{sub}</span>
       <span style={{ position: 'relative', fontWeight: 800, fontSize: big, lineHeight: 1.02, letterSpacing: '-0.04em' }}>{rotulo}</span>
       <span aria-hidden style={{ position: 'relative', display: 'block', width: 34, height: 3, borderRadius: 3, background: '#D8B45A', marginTop: 6 }} />
     </div>
@@ -122,6 +127,9 @@ const FLAME_ICON = (
 export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaTheme; data: HomeData; preview?: boolean }) {
   // Tema REAL resolvido no cliente (reage ao toggle claro/escuro; o `theme` do servidor é só o fallback).
   const theme = useTemaInterno(themeProp)
+  const marca = useBrandAtual() ?? 'vnd'
+  const cm = useCm()
+  const VPATH = marca === 'mac' ? MAC_M_PATH : VND_SVG
   const { usuario, sequenciaMeta, missoes, continuar, resumo, desempenho, agenda, destaques, recentes, pastas, outros, outrosDisponiveis } = data
   // Gamificação (config do tenant p/ este aluno). off → esconde nível/XP/sequência/missões/liga.
   const gamOn = data.gamAtivo !== false
@@ -195,7 +203,7 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
   const temLink = (url?: string) => !preview && !!url && url !== '#'
 
   // `color: var(--ink)` garante que textos SEM cor explícita (ex.: títulos <h3>) não herdem o cinza do shell.
-  const style = { ...internaTokensStyle('vnd', theme), ...vndExtras(theme), color: 'var(--ink)', minHeight: '100%' } as React.CSSProperties
+  const style = { ...internaTokensStyle(marca, theme), ...vndExtras(theme, cm), color: 'var(--ink)', minHeight: '100%' } as React.CSSProperties
 
   const resumoStats = [
     { v: resumo.simuladosFeitos, l: 'simulados feitos' },
@@ -206,7 +214,7 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
 
   return (
     <div className={cn('hvn-root', 'app')} style={style}>
-      <style>{CSS}</style>
+      <style>{cm(CSS)}</style>
       <style>{tickCss}</style>
 
       {/* ===================== DESKTOP ===================== */}
@@ -219,17 +227,17 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
           >
             {/* Slide 0 — boas-vindas */}
             <div style={{ position: 'relative', flex: `0 0 ${100 / nSlides}%`, height: '100%' }}>
-              <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: 'linear-gradient(120deg,#041A10 0%,#0B4A2E 55%,#12643D 100%)', color: '#FFFFFF' }}>
-                <div className="hvn-dotsbg" style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle,rgba(185,245,212,.18) 1.2px,transparent 1.8px)', backgroundSize: '22px 22px', WebkitMaskImage: 'linear-gradient(90deg,#000 30%,rgba(0,0,0,.4))', maskImage: 'linear-gradient(90deg,#000 30%,rgba(0,0,0,.4))' }} />
-                <div className="hvn-glow" aria-hidden style={{ position: 'absolute', right: 120, top: -120, width: 560, height: 560, borderRadius: '50%', background: 'radial-gradient(closest-side,rgba(63,213,138,.35),rgba(63,213,138,0))' }} />
+              <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: cm('linear-gradient(120deg,#041A10 0%,#0B4A2E 55%,#12643D 100%)'), color: '#FFFFFF' }}>
+                <div className="hvn-dotsbg" style={{ position: 'absolute', inset: 0, backgroundImage: cm('radial-gradient(circle,rgba(185,245,212,.18) 1.2px,transparent 1.8px)'), backgroundSize: '22px 22px', WebkitMaskImage: 'linear-gradient(90deg,#000 30%,rgba(0,0,0,.4))', maskImage: 'linear-gradient(90deg,#000 30%,rgba(0,0,0,.4))' }} />
+                <div className="hvn-glow" aria-hidden style={{ position: 'absolute', right: 120, top: -120, width: 560, height: 560, borderRadius: '50%', background: cm('radial-gradient(closest-side,rgba(63,213,138,.35),rgba(63,213,138,0))') }} />
                 <svg className="hvn-chev hvn-c1" viewBox="0 0 200 120" aria-hidden preserveAspectRatio="none" style={{ position: 'absolute', right: '-4%', width: '62%', height: 220, bottom: -90, pointerEvents: 'none' }}><path d="M0 0 L100 112 L200 0" fill="none" stroke="rgba(232,200,119,.55)" strokeWidth={2} vectorEffect="non-scaling-stroke" /></svg>
-                <svg className="hvn-chev hvn-c2" viewBox="0 0 200 120" aria-hidden preserveAspectRatio="none" style={{ position: 'absolute', right: '-4%', width: '62%', height: 220, bottom: -50, pointerEvents: 'none' }}><path d="M0 0 L100 112 L200 0" fill="none" stroke="rgba(185,245,212,.14)" strokeWidth={1.2} vectorEffect="non-scaling-stroke" /></svg>
-                <svg className="hvn-chev hvn-c3" viewBox="0 0 200 120" aria-hidden preserveAspectRatio="none" style={{ position: 'absolute', right: '-4%', width: '62%', height: 220, bottom: -10, pointerEvents: 'none' }}><path d="M0 0 L100 112 L200 0" fill="none" stroke="rgba(185,245,212,.1)" strokeWidth={1.2} vectorEffect="non-scaling-stroke" /></svg>
+                <svg className="hvn-chev hvn-c2" viewBox="0 0 200 120" aria-hidden preserveAspectRatio="none" style={{ position: 'absolute', right: '-4%', width: '62%', height: 220, bottom: -50, pointerEvents: 'none' }}><path d="M0 0 L100 112 L200 0" fill="none" stroke={cm('rgba(185,245,212,.14)')} strokeWidth={1.2} vectorEffect="non-scaling-stroke" /></svg>
+                <svg className="hvn-chev hvn-c3" viewBox="0 0 200 120" aria-hidden preserveAspectRatio="none" style={{ position: 'absolute', right: '-4%', width: '62%', height: 220, bottom: -10, pointerEvents: 'none' }}><path d="M0 0 L100 112 L200 0" fill="none" stroke={cm('rgba(185,245,212,.1)')} strokeWidth={1.2} vectorEffect="non-scaling-stroke" /></svg>
                 <span className="hvn-sweep" aria-hidden />
                 <div style={{ position: 'relative', height: '100%', maxWidth: 1376, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 40, padding: '0 80px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 560 }}>
                     <h1 style={{ margin: 0, fontSize: 50, fontWeight: 800, letterSpacing: '-0.05em', lineHeight: 1, color: '#FFFFFF' }}>Olá, {usuario.nome}</h1>
-                    <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.03em', color: '#CFE3D7', lineHeight: '1.2em' }}>
+                    <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.03em', color: cm('#CFE3D7'), lineHeight: '1.2em' }}>
                       Rumo a{' '}
                       <span style={{ display: 'inline-block', height: '1.2em', overflow: 'hidden', verticalAlign: 'bottom' }}>
                         <span className="hvn-tick" style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.2em', color: '#F1D48A' }}>
@@ -244,28 +252,28 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
                       <div style={{ position: 'relative', width: 150, height: 150, flexShrink: 0 }}>
                         <svg viewBox="0 0 150 150" style={{ width: 150, height: 150, transform: 'rotate(-90deg)' }}>
-                          <defs><linearGradient id="hvn-vr" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#5BE39E" /><stop offset="1" stopColor="#E8C877" /></linearGradient></defs>
+                          <defs><linearGradient id="hvn-vr" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={cm('#5BE39E')} /><stop offset="1" stopColor="#E8C877" /></linearGradient></defs>
                           <circle cx="75" cy="75" r={nivelR} fill="none" stroke="rgba(255,255,255,.14)" strokeWidth={11} />
                           <circle className="hvn-ring" cx="75" cy="75" r={nivelR} fill="none" stroke="url(#hvn-vr)" strokeWidth={11} strokeLinecap="round" strokeDasharray={nivelC} strokeDashoffset={nivelC * (1 - nivelPct)} style={{ ['--c' as string]: nivelC }} />
                         </svg>
                         <span style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: 1, color: '#FFFFFF' }}>
                           <b style={{ fontSize: 48, fontWeight: 800, letterSpacing: '-0.05em' }}>{usuario.nivel}</b>
-                          <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.2em', color: '#B9F5D4', marginTop: 4 }}>NÍVEL</span>
+                          <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.2em', color: cm('#B9F5D4'), marginTop: 4 }}>NÍVEL</span>
                         </span>
                       </div>
-                      <span style={{ fontSize: 13, color: '#CFE3D7' }}><b style={{ color: '#FFFFFF' }}>{usuario.tituloNivel}</b> · {usuario.xpNivelAtual}/{usuario.xpNivelMax} XP</span>
+                      <span style={{ fontSize: 13, color: cm('#CFE3D7') }}><b style={{ color: '#FFFFFF' }}>{usuario.tituloNivel}</b> · {usuario.xpNivelAtual}/{usuario.xpNivelMax} XP</span>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                       {[
                         { ic: <Flame size={18} />, c: '#FFB38A', v: streakTxt, l: 'sequência atual' },
-                        { ic: <Zap size={18} />, c: '#B9F5D4', v: `${usuario.xpTotal.toLocaleString('pt-BR')} XP`, l: 'total acumulado' },
+                        { ic: <Zap size={18} />, c: cm('#B9F5D4'), v: `${usuario.xpTotal.toLocaleString('pt-BR')} XP`, l: 'total acumulado' },
                         { ic: <Trophy size={18} />, c: '#F1D48A', v: `Liga ${usuario.liga}`, l: `${usuario.posicaoLiga}º lugar` },
                       ].map((t, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 16, background: 'rgba(255,255,255,.07)', border: '1px solid rgba(185,245,212,.16)', minWidth: 190 }}>
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 16, background: 'rgba(255,255,255,.07)', border: cm('1px solid rgba(185,245,212,.16)'), minWidth: 190 }}>
                           <span style={{ width: 38, height: 38, borderRadius: 12, background: 'rgba(255,255,255,.08)', color: t.c, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{t.ic}</span>
                           <div style={{ lineHeight: 1.2 }}>
                             <b style={{ display: 'block', fontSize: 18, fontWeight: 800 }}>{t.v}</b>
-                            <span style={{ fontSize: 11.5, color: '#B7D3C3' }}>{t.l}</span>
+                            <span style={{ fontSize: 11.5, color: cm('#B7D3C3') }}>{t.l}</span>
                           </div>
                         </div>
                       ))}
@@ -279,7 +287,7 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
             {/* Slides 1–4 — destaques */}
             {slideDest.map((d, i) => (
               <div key={i} style={{ position: 'relative', flex: `0 0 ${100 / nSlides}%`, height: '100%' }}>
-                <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: SLIDE_BG[i % SLIDE_BG.length], color: '#FFFFFF' }}>
+                <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: cm(SLIDE_BG[i % SLIDE_BG.length]), color: '#FFFFFF' }}>
                   {d.imagem ? (
                     <>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -288,8 +296,8 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
                     </>
                   ) : (
                     <>
-                      {dotsOverlay(22, 0.2)}
-                      <svg viewBox="0 0 32 32" aria-hidden style={{ position: 'absolute', right: '6%', top: -60, width: 460, height: 460, opacity: 0.12 }}><path fill="#B9F5D4" d={VND_SVG} /></svg>
+                      {dotsOverlay(cm, 22, 0.2)}
+                      <svg viewBox="0 0 32 32" aria-hidden style={{ position: 'absolute', right: '6%', top: -60, width: 460, height: 460, opacity: 0.12 }}><path fill={cm('#B9F5D4')} d={VPATH} /></svg>
                       {d.fundoTexto ? <span aria-hidden style={{ position: 'absolute', right: '12%', top: '50%', transform: 'translateY(-50%)', fontSize: 150, fontWeight: 800, letterSpacing: '-0.06em', color: 'rgba(255,255,255,.1)' }}>{d.fundoTexto}</span> : null}
                     </>
                   )}
@@ -297,11 +305,11 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
                   <div style={{ position: 'relative', zIndex: 1, height: '100%', maxWidth: 1376, margin: '0 auto', padding: '0 112px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 14 }}>
                     {d.eyebrow ? (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: '#F1D48A' }}>
-                        <span className="hvn-live" style={{ width: 7, height: 7, borderRadius: '50%', background: '#5BE39E' }} />EM DESTAQUE · {d.eyebrow}
+                        <span className="hvn-live" style={{ width: 7, height: 7, borderRadius: '50%', background: cm('#5BE39E') }} />EM DESTAQUE · {d.eyebrow}
                       </span>
                     ) : null}
                     <h2 style={{ margin: 0, maxWidth: 640, fontSize: 46, fontWeight: 800, letterSpacing: '-0.045em', lineHeight: 1.04 }}>{d.titulo}</h2>
-                    {d.subtitulo ? <p style={{ margin: 0, fontSize: 16, color: '#CFE3D7' }}>{d.subtitulo}</p> : null}
+                    {d.subtitulo ? <p style={{ margin: 0, fontSize: 16, color: cm('#CFE3D7') }}>{d.subtitulo}</p> : null}
                     {/* Botão só em slides de TEXTO (sem imagem). Banner de imagem não tem botão. */}
                     {!d.imagem && (
                     <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
@@ -317,8 +325,8 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
             ))}
           </div>
 
-          <button type="button" aria-label="Anterior" onClick={() => go(slide - 1)} className="hvn-arr" style={{ position: 'absolute', top: '50%', left: 24, transform: 'translateY(-50%)', zIndex: 4, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', width: 46, height: 46, borderRadius: '50%', border: '1.5px solid rgba(232,200,119,.7)', background: 'rgba(4,26,16,.45)', color: '#F1D48A', boxShadow: '0 8px 20px -10px rgba(0,0,0,.6)' }}><ChevronLeft size={18} strokeWidth={2.2} /></button>
-          <button type="button" aria-label="Próximo" onClick={() => go(slide + 1)} className="hvn-arr" style={{ position: 'absolute', top: '50%', right: 24, transform: 'translateY(-50%)', zIndex: 4, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', width: 46, height: 46, borderRadius: '50%', border: '1.5px solid rgba(232,200,119,.7)', background: 'rgba(4,26,16,.45)', color: '#F1D48A', boxShadow: '0 8px 20px -10px rgba(0,0,0,.6)' }}><ChevronRight size={18} strokeWidth={2.2} /></button>
+          <button type="button" aria-label="Anterior" onClick={() => go(slide - 1)} className="hvn-arr" style={{ position: 'absolute', top: '50%', left: 24, transform: 'translateY(-50%)', zIndex: 4, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', width: 46, height: 46, borderRadius: '50%', border: '1.5px solid rgba(232,200,119,.7)', background: cm('rgba(4,26,16,.45)'), color: '#F1D48A', boxShadow: '0 8px 20px -10px rgba(0,0,0,.6)' }}><ChevronLeft size={18} strokeWidth={2.2} /></button>
+          <button type="button" aria-label="Próximo" onClick={() => go(slide + 1)} className="hvn-arr" style={{ position: 'absolute', top: '50%', right: 24, transform: 'translateY(-50%)', zIndex: 4, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', width: 46, height: 46, borderRadius: '50%', border: '1.5px solid rgba(232,200,119,.7)', background: cm('rgba(4,26,16,.45)'), color: '#F1D48A', boxShadow: '0 8px 20px -10px rgba(0,0,0,.6)' }}><ChevronRight size={18} strokeWidth={2.2} /></button>
 
           <div style={{ position: 'absolute', left: 0, right: 0, justifyContent: 'center', bottom: 18, zIndex: 3, display: 'flex', alignItems: 'center', gap: 7 }}>
             {Array.from({ length: nSlides }).map((_, i) => (
@@ -387,7 +395,7 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
               <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
                 <div style={{ position: 'relative', width: 58, height: 58, flexShrink: 0 }}>
                   <svg viewBox="0 0 58 58" style={{ width: 58, height: 58, transform: 'rotate(-90deg)' }}>
-                    <defs><linearGradient id="hvn-vm" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#5BE39E" /><stop offset="1" stopColor="#E8C877" /></linearGradient></defs>
+                    <defs><linearGradient id="hvn-vm" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={cm('#5BE39E')} /><stop offset="1" stopColor="#E8C877" /></linearGradient></defs>
                     <circle cx="29" cy="29" r={metaR} fill="none" stroke="var(--track)" strokeWidth={6} />
                     <circle className="hvn-ring" cx="29" cy="29" r={metaR} fill="none" stroke="url(#hvn-vm)" strokeWidth={6} strokeLinecap="round" strokeDasharray={metaC} strokeDashoffset={metaC * (1 - metaPct)} style={{ ['--c' as string]: metaC }} />
                   </svg>
@@ -462,7 +470,7 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
                         <b style={{ color: baixo ? 'var(--goldInk)' : 'var(--brand)' }}>{d.pctAcerto}%</b>
                       </div>
                       <div style={{ height: 8, borderRadius: 99, background: 'var(--track)', overflow: 'hidden' }}>
-                        <span className="hvn-bar" style={{ display: 'block', height: '100%', width: `${d.pctAcerto}%`, borderRadius: 99, background: baixo ? 'linear-gradient(90deg,#E8C877,#D8A23A)' : 'linear-gradient(90deg,#1E9E5E,#3FD58A)' }} />
+                        <span className="hvn-bar" style={{ display: 'block', height: '100%', width: `${d.pctAcerto}%`, borderRadius: 99, background: baixo ? 'linear-gradient(90deg,#E8C877,#D8A23A)' : cm('linear-gradient(90deg,#1E9E5E,#3FD58A)') }} />
                       </div>
                     </div>
                   )
@@ -533,7 +541,7 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
           <section className="up hvn-u6">
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--ink)' }}>Outros simulados</h3>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 24, padding: '0 10px', borderRadius: 99, background: 'var(--chip)', color: 'var(--brand)', fontSize: 12, fontWeight: 800 }}><span className="hvn-live" style={{ width: 6, height: 6, borderRadius: '50%', background: '#2EC77A' }} />Disponíveis · {outrosDisponiveis}</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 24, padding: '0 10px', borderRadius: 99, background: 'var(--chip)', color: 'var(--brand)', fontSize: 12, fontWeight: 800 }}><span className="hvn-live" style={{ width: 6, height: 6, borderRadius: '50%', background: cm('#2EC77A') }} />Disponíveis · {outrosDisponiveis}</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(100%,400px),1fr))', gap: 14 }}>
               {outros.map((s, i) => <RecenteCard key={s.id} s={s} grad={COVER_BG[(i + 2) % COVER_BG.length]} />)}
@@ -545,13 +553,13 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
       {/* ===================== MOBILE ===================== */}
       <div className="hvn-mob" style={{ padding: '14px 18px 96px', flexDirection: 'column', gap: 20 }}>
         {/* Hero saudação (sem carrossel) */}
-        <section style={{ position: 'relative', overflow: 'hidden', margin: '0 -18px', padding: '18px 18px 22px', background: 'linear-gradient(165deg,#062A1B 0%,#0B4A2E 60%,#12643D 100%)', color: '#FFFFFF' }}>
-          <div className="hvn-dotsbg" style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle,rgba(185,245,212,.18) 1.2px,transparent 1.8px)', backgroundSize: '20px 20px' }} />
+        <section style={{ position: 'relative', overflow: 'hidden', margin: '0 -18px', padding: '18px 18px 22px', background: cm('linear-gradient(165deg,#062A1B 0%,#0B4A2E 60%,#12643D 100%)'), color: '#FFFFFF' }}>
+          <div className="hvn-dotsbg" style={{ position: 'absolute', inset: 0, backgroundImage: cm('radial-gradient(circle,rgba(185,245,212,.18) 1.2px,transparent 1.8px)'), backgroundSize: '20px 20px' }} />
           <span className="hvn-sweep" aria-hidden />
           <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
               <h1 style={{ margin: 0, fontSize: 30, fontWeight: 800, letterSpacing: '-0.045em', color: '#FFFFFF' }}>Olá, {usuario.nome}</h1>
-              <div style={{ fontSize: 15, fontWeight: 700, color: '#CFE3D7', marginTop: 2, lineHeight: '1.2em' }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: cm('#CFE3D7'), marginTop: 2, lineHeight: '1.2em' }}>
                 Rumo a{' '}
                 <span style={{ display: 'inline-block', height: '1.2em', overflow: 'hidden', verticalAlign: 'bottom' }}>
                   <span className="hvn-tick" style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.2em', color: '#F1D48A' }}>
@@ -562,33 +570,33 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
               </div>
             </div>
             {gamOn && (<>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 12, borderRadius: 18, background: 'rgba(255,255,255,.07)', border: '1px solid rgba(185,245,212,.16)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 12, borderRadius: 18, background: 'rgba(255,255,255,.07)', border: cm('1px solid rgba(185,245,212,.16)') }}>
               <div style={{ position: 'relative', width: 66, height: 66, flexShrink: 0 }}>
                 <svg viewBox="0 0 66 66" style={{ width: 66, height: 66, transform: 'rotate(-90deg)' }}>
-                  <defs><linearGradient id="hvn-vrm" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#5BE39E" /><stop offset="1" stopColor="#E8C877" /></linearGradient></defs>
+                  <defs><linearGradient id="hvn-vrm" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={cm('#5BE39E')} /><stop offset="1" stopColor="#E8C877" /></linearGradient></defs>
                   <circle cx="33" cy="33" r={nivelRmob} fill="none" stroke="rgba(255,255,255,.14)" strokeWidth={6} />
                   <circle className="hvn-ring" cx="33" cy="33" r={nivelRmob} fill="none" stroke="url(#hvn-vrm)" strokeWidth={6} strokeLinecap="round" strokeDasharray={nivelCmob} strokeDashoffset={nivelCmob * (1 - nivelPct)} style={{ ['--c' as string]: nivelCmob }} />
                 </svg>
                 <span style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: 1, color: '#FFFFFF' }}>
                   <b style={{ fontSize: 21, fontWeight: 800 }}>{usuario.nivel}</b>
-                  <span style={{ fontSize: 8, fontWeight: 800, letterSpacing: '.14em', color: '#B9F5D4', marginTop: 2 }}>NÍVEL</span>
+                  <span style={{ fontSize: 8, fontWeight: 800, letterSpacing: '.14em', color: cm('#B9F5D4'), marginTop: 2 }}>NÍVEL</span>
                 </span>
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><b>{usuario.tituloNivel}</b><span style={{ color: '#B9F5D4' }}>{usuario.xpNivelAtual}/{usuario.xpNivelMax} XP</span></div>
-                <div style={{ height: 7, borderRadius: 99, background: 'rgba(255,255,255,.14)', margin: '8px 0 6px', overflow: 'hidden' }}><span className="hvn-bar" style={{ display: 'block', width: `${nivelPct * 100}%`, height: '100%', borderRadius: 99, background: 'linear-gradient(90deg,#3FD58A,#E8C877)' }} /></div>
-                <span style={{ fontSize: 12, color: '#CFE3D7' }}>Faltam <b style={{ color: '#F1D48A' }}>{faltamXp} XP</b> para o nível {usuario.nivel + 1}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><b>{usuario.tituloNivel}</b><span style={{ color: cm('#B9F5D4') }}>{usuario.xpNivelAtual}/{usuario.xpNivelMax} XP</span></div>
+                <div style={{ height: 7, borderRadius: 99, background: 'rgba(255,255,255,.14)', margin: '8px 0 6px', overflow: 'hidden' }}><span className="hvn-bar" style={{ display: 'block', width: `${nivelPct * 100}%`, height: '100%', borderRadius: 99, background: cm('linear-gradient(90deg,#3FD58A,#E8C877)') }} /></div>
+                <span style={{ fontSize: 12, color: cm('#CFE3D7') }}>Faltam <b style={{ color: '#F1D48A' }}>{faltamXp} XP</b> para o nível {usuario.nivel + 1}</span>
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
               {[
                 { ic: <Flame size={15} />, c: '#FFB38A', v: sequenciaMeta.diasSeguidos, l: 'dias seguidos' },
-                { ic: <Zap size={15} />, c: '#B9F5D4', v: usuario.xpTotal.toLocaleString('pt-BR'), l: 'XP total' },
+                { ic: <Zap size={15} />, c: cm('#B9F5D4'), v: usuario.xpTotal.toLocaleString('pt-BR'), l: 'XP total' },
                 { ic: <Trophy size={15} />, c: '#F1D48A', v: usuario.liga, l: 'sua liga' },
               ].map((t, i) => (
-                <div key={i} style={{ padding: 10, borderRadius: 14, background: 'rgba(255,255,255,.07)', border: '1px solid rgba(185,245,212,.14)' }}>
+                <div key={i} style={{ padding: 10, borderRadius: 14, background: 'rgba(255,255,255,.07)', border: cm('1px solid rgba(185,245,212,.14)') }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 15, fontWeight: 800, color: t.c }}>{t.ic}{t.v}</span>
-                  <span style={{ display: 'block', fontSize: 10.5, color: '#B7D3C3' }}>{t.l}</span>
+                  <span style={{ display: 'block', fontSize: 10.5, color: cm('#B7D3C3') }}>{t.l}</span>
                 </div>
               ))}
             </div>
@@ -601,7 +609,7 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
           <div className="hvn-track" style={{ display: 'flex', height: '100%', width: `${slideDest.length * 100}%`, transform: `translateX(-${(Math.min(slide, slideDest.length - 1) * 100) / slideDest.length}%)`, transition: 'transform .7s cubic-bezier(.6,.05,.2,1)' }}>
             {slideDest.map((d, i) => (
               <div key={i} style={{ position: 'relative', flex: `0 0 ${100 / slideDest.length}%`, height: '100%' }}>
-                <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', borderRadius: 20, background: SLIDE_BG[i % SLIDE_BG.length], color: '#FFFFFF' }}>
+                <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', borderRadius: 20, background: cm(SLIDE_BG[i % SLIDE_BG.length]), color: '#FFFFFF' }}>
                   {d.imagem ? (
                     <>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -610,16 +618,16 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
                     </>
                   ) : (
                     <>
-                      {dotsOverlay(18, 0.2)}
-                      <svg viewBox="0 0 32 32" aria-hidden style={{ position: 'absolute', right: -30, top: -40, width: 170, height: 170, opacity: 0.13 }}><path fill="#B9F5D4" d={VND_SVG} /></svg>
+                      {dotsOverlay(cm, 18, 0.2)}
+                      <svg viewBox="0 0 32 32" aria-hidden style={{ position: 'absolute', right: -30, top: -40, width: 170, height: 170, opacity: 0.13 }}><path fill={cm('#B9F5D4')} d={VPATH} /></svg>
                     </>
                   )}
                   {(!d.imagem || d.titulo) && (
                   <div style={{ position: 'relative', zIndex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 8, padding: '0 18px 44px' }}>
                     <div style={{ minWidth: 0 }}>
-                      {d.eyebrow ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 10.5, fontWeight: 800, letterSpacing: '.2em', color: '#F1D48A' }}><span className="hvn-live" style={{ width: 6, height: 6, borderRadius: '50%', background: '#5BE39E' }} />{d.eyebrow}</span> : null}
+                      {d.eyebrow ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 10.5, fontWeight: 800, letterSpacing: '.2em', color: '#F1D48A' }}><span className="hvn-live" style={{ width: 6, height: 6, borderRadius: '50%', background: cm('#5BE39E') }} />{d.eyebrow}</span> : null}
                       <b style={{ display: 'block', fontSize: 18, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.15, margin: '6px 0 4px' }}>{d.titulo}</b>
-                      {d.subtitulo ? <span style={{ fontSize: 12, color: '#CFE3D7' }}>{d.subtitulo}</span> : null}
+                      {d.subtitulo ? <span style={{ fontSize: 12, color: cm('#CFE3D7') }}>{d.subtitulo}</span> : null}
                     </div>
                     {!d.imagem && (
                     <a className="hvn-gold" {...linkReal(d.cta.url)} style={{ flexShrink: 0, alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 8, height: 38, padding: '0 14px', borderRadius: 13, color: '#2A1F02', fontWeight: 800, fontSize: 13 }}>{d.cta.rotulo}<ArrowRight size={15} /></a>

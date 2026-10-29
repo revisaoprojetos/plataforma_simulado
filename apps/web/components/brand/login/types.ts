@@ -8,7 +8,7 @@
 // hook `useLoginCore` e é repassada via `core`. Assim as 18 variantes não duplicam
 // nada de autenticação — só desenham.
 
-export type Brand = 'revisao' | 'vnd' | 'meq'
+export type Brand = 'revisao' | 'vnd' | 'meq' | 'mac'
 export type LoginTheme = 'claro' | 'escuro' | 'azul' // 'azul' só MEQ
 
 export type Metodo = 'email' | 'email_cpf' | 'email_telefone'

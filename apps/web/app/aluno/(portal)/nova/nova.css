@@ -1,0 +1,143 @@
+/* Tokens da NOVA plataforma do aluno (Revisão) — fonte: design-system/tokens.css do pacote.
+   ESCOPADOS sob `.novaplat` para NÃO colidir com os tokens do app (brand-tokens / tenant-theme),
+   que usam os mesmos nomes (--bg, --surface, --muted…). O tema escuro troca só variáveis. */
+
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Montserrat:wght@500;800&family=Literata:wght@400;600&family=JetBrains+Mono:wght@500;700&display=swap');
+
+.novaplat {
+  /* superfícies — --bg = MESMO fundo interno claro do shell legado (#F5F3FC). */
+  --bg: #F5F3FC;
+  --surface: #FFFFFF;
+  --surface2: #F6F4FC;
+  --top: rgba(244,242,250,.85);
+  /* texto */
+  --ink: #1D1933;
+  --muted: #6E6886;
+  --muted2: #B3ADC7;
+  /* linhas */
+  --line: #EAE6F4;
+  --line2: #D9D2F0;
+  --track: #ECE8F6;
+  /* marca */
+  --brand: #5B3FD0;
+  --brandLine: rgba(91,63,208,.3);
+  --chip: #EFEBFD;
+  --gold: #F1C232;
+  --goldInk: #2A1A55;
+  --accentInk: #9A7400;
+  --peachBg: #FDF5D8;
+  /* estados (tag: fundo / texto) */
+  --ok: #178A55;     --okBg: rgba(46,199,122,.14);
+  --danger: #C7333A; --dangerBg: rgba(229,72,77,.12);
+  --info: #2F66C0;   --infoBg: rgba(62,127,224,.13);
+  --pink: #B23A7A;   --pinkBg: rgba(220,80,150,.12);
+  /* menu lateral + botão primário */
+  --sidebar: linear-gradient(180deg,#2E1F7A 0%,#3A27A0 55%,#4A31B8 100%);
+  --btnPrimary: linear-gradient(180deg,#6449E0,#4B30BE);
+  --nova-hero-bg: linear-gradient(120deg,#2E1F7A 0%,#3A27A0 55%,#4A31B8 100%);
+  /* fontes */
+  --font-ui: 'Plus Jakarta Sans', system-ui, sans-serif;
+  --font-brand: 'Montserrat', sans-serif;
+  --font-read: 'Literata', Georgia, serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.novaplat[data-theme="escuro"], .dark .novaplat {
+  /* Fundo = EXATAMENTE o fundo interno da marca do shell legado (shell-revisao-nova pinta o
+     shr-main com internaBg #0E0A24 no dark e força html/body nele). O .novaplat pintava por cima
+     com #18181D (cinza) → destoava. Agora usa o MESMO #0E0A24. Superfícies iguais às do legado. */
+  --bg: #0E0A24;
+  --surface: #1C1440;
+  --surface2: #171030;
+  --top: rgba(24,16,56,.96);
+  --ink: #FFFFFF;
+  --muted: #BDBBCB;
+  --muted2: #73717F;
+  --line: rgba(255,255,255,.1);
+  --line2: rgba(255,255,255,.18);
+  --track: rgba(255,255,255,.12);
+  --nova-hero-bg: linear-gradient(120deg,#160F33 0%,#241A52 55%,#2E1F6A 100%);
+  --brand: #B3A1FF;
+  --brandLine: rgba(179,161,255,.45);
+  --chip: rgba(143,117,255,.2);
+  --accentInk: #F1C232;
+  --peachBg: rgba(241,194,50,.12);
+  --sidebar: linear-gradient(180deg,#160F36 0%,#22184F 100%);
+}
+
+/* garante que títulos de página não herdem o `main h1{color:var(--content-title)}` do tenant */
+.novaplat h1, .novaplat h2, .novaplat h3 { color: var(--ink); }
+.novaplat a { text-decoration: none; }
+.novaplat ::placeholder { color: var(--muted2); }
+
+/* transição suave de tema — NÃO aplicar dentro de .hrv-root (componentes REAIS reusados, ex.: carrossel):
+   senão esta regra sobrescreve as transições próprias deles (setas animadas, slide, etc.). */
+.novaplat, .novaplat *:not(.hrv-root):not(.hrv-root *) { transition: background-color .15s ease, border-color .15s ease, color .15s ease; }
+
+/* Container do CONTEÚDO da nova área: roda DENTRO do <main> do shell real do portal.
+   Coluna com gap + gutter lateral (px), LARGURA CHEIA — sem max-width/centralização
+   (evita as "faixas laterais"). O fundo da área vem do próprio .novaplat (--bg). */
+.novaplat.np-conteudo {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 28px 28px 48px;
+  width: 100%;
+  min-height: 100%;
+}
+@media (max-width: 900px) { .novaplat.np-conteudo { padding: 18px 16px 90px; gap: 18px; } }
+
+/* Componentes REAIS da plataforma reusados dentro da área nova (ex.: carrossel .hrv-root da Início
+   padrão): NÃO deixar a regra de título do .novaplat sobrescrever a cor que eles herdam (slide = branco). */
+.novaplat .hrv-root h1, .novaplat .hrv-root h2, .novaplat .hrv-root h3 { color: inherit; }
+
+/* Setas do carrossel reusado: re-afirma o comportamento EXATO do original (ocultas + centralizadas no
+   rest; surgem/deslizam no hover) com especificidade maior, pra vencer qualquer regra global do app
+   (ex.: estilos de <button>) que estava deixando-as sempre visíveis e fora do centro vertical. */
+.novaplat .hrv-root .hrv-arr { opacity: 0; top: 50%; transform: translateY(-50%); }
+.novaplat .hrv-root .hrv-arr-prev { transform: translate(-18px, -50%) scale(.8); }
+.novaplat .hrv-root .hrv-arr-next { transform: translate(18px, -50%) scale(.8); }
+.novaplat .hrv-root .hrv-hero:hover .hrv-arr,
+.novaplat .hrv-root .hrv-arr:focus-visible { opacity: 1; transform: translate(0, -50%) scale(1); }
+.novaplat .hrv-root .hrv-hero:hover .hrv-arr-prev:hover { transform: translate(-4px, -50%) scale(1); }
+.novaplat .hrv-root .hrv-hero:hover .hrv-arr-next:hover { transform: translate(4px, -50%) scale(1); }
+
+/* Faixa FULL-BLEED: um bloco que ignora o gutter do .np-conteudo e cola nas bordas da área principal
+   (igual ao carrossel da Início padrão, que é largura total). Cancela o padding do container. */
+.novaplat.np-conteudo > .np-bleed { margin: -28px -28px 0; }
+/* Traço amarelo correndo no "R" do Hero (igual ao banner da Início). */
+.np-hero-run { stroke-dasharray: 22 400; animation: np-hero-run 8s linear infinite; }
+@keyframes np-hero-run { to { stroke-dashoffset: -422; } }
+@media (prefers-reduced-motion: reduce) { .np-hero-run { animation: none; } }
+@media (max-width: 900px) { .novaplat.np-conteudo > .np-bleed { margin: -18px -16px 0; } }
+
+/* defaults (desktop): hamburger e barra inferior escondidos */
+.novaplat .np-hamburger { display: none; }
+.novaplat .np-busca-trigger { font: inherit; }
+
+/* responsivo do split (desktop é o foco; evita corte em telas médias) */
+@media (max-width: 1080px) {
+  .novaplat .np-split { grid-template-columns: 1fr !important; }
+}
+
+/* ───────── Mobile: drawer + barra inferior ───────── */
+@media (max-width: 900px) {
+  .novaplat .np-sidebar { position: fixed !important; left: 0; top: 0; height: 100dvh !important; z-index: 60; width: 264px !important; transform: translateX(-100%); transition: transform .2s ease; }
+  .novaplat .np-sidebar.np-open { transform: translateX(0); box-shadow: 0 30px 80px -20px rgba(10,5,40,.6); }
+  .novaplat .np-hamburger { display: inline-flex !important; }
+  .novaplat .np-downbar { display: flex !important; }
+  .novaplat .np-main { padding: 16px 16px 92px !important; }
+  .novaplat .np-split { grid-template-columns: 1fr !important; }
+  .novaplat header { padding: 10px 14px !important; }
+}
+@media (max-width: 560px) {
+  .novaplat .np-hide-sm { display: none !important; }
+  .novaplat .np-busca-trigger { width: 100% !important; }
+}

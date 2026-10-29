@@ -15,6 +15,8 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { origemSegura } from '@/lib/nova/origem'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import {
@@ -255,6 +257,8 @@ function HeaderHero({
   tab: Tab; setTab: (t: Tab) => void; tabs: { k: Tab; label: string; icon: React.ReactNode }[]
   banner?: string | null; compacto?: boolean; corFundo?: string | null
 }) {
+  // Voltar inteligente: se veio de outra área (?origem, ex.: Cursos), volta pra lá; senão, aos desafios.
+  const voltarHref = origemSegura(useSearchParams().get('origem'), '/aluno/jurisprudencia')
   // Fundo do cabeçalho: imagem > cor custom > gradiente padrão. No compacto desemboca no preto do arcade.
   const bgCompacto = corFundo
     ? `linear-gradient(180deg,${corFundo} 0%,${corFundo} 45%,#05060f 100%)`
@@ -292,7 +296,7 @@ function HeaderHero({
         <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', padding: '0 20px' }}>
           {/* Linha 1 — voltar + título + chip */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, height: 44, flexShrink: 0 }}>
-            <Link href="/aluno/jurisprudencia" aria-label="Voltar aos desafios" style={{ width: 28, height: 28, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,.12)', color: '#fff' }}>
+            <Link href={voltarHref} aria-label="Voltar" style={{ width: 28, height: 28, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,.12)', color: '#fff' }}>
               <ChevronLeft size={15} />
             </Link>
             <span style={{ display: 'inline-flex', color: '#CFC4FF' }}><Scale size={16} /></span>
@@ -322,7 +326,7 @@ function HeaderHero({
       {/* Breadcrumb */}
       <div style={{ position: 'absolute', left: 28, top: 22 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <Link href="/aluno/jurisprudencia" aria-label="Voltar aos desafios" style={{ width: 36, height: 36, borderRadius: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,.12)', color: '#fff' }}>
+          <Link href={voltarHref} aria-label="Voltar" style={{ width: 36, height: 36, borderRadius: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,.12)', color: '#fff' }}>
             <ChevronLeft size={16} />
           </Link>
           <span style={{ display: 'inline-flex', color: '#CFC4FF' }}><Scale size={20} /></span>

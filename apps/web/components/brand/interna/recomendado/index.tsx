@@ -17,7 +17,7 @@ import { RecomendadoMeq } from './recomendado-meq'
 export function PlatformRecomendado({ brand, theme, data, questoes }: { brand: Brand; theme: InternaTheme; data?: RecoData; questoes?: QuestaoAluno[]; tab?: string; preview?: boolean }) {
   const d = data ?? recoMock()
   const q = questoes ?? recoQuestoesMock()
-  if (brand === 'vnd') return <RecomendadoVnd theme={theme} data={d} questoes={q} />
+  if (brand === 'vnd' || brand === 'mac') return <RecomendadoVnd theme={theme} data={d} questoes={q} />
   if (brand === 'meq') return <RecomendadoMeq theme={theme} data={d} questoes={q} />
   return <RecomendadoRevisao theme={theme} data={d} questoes={q} />
 }

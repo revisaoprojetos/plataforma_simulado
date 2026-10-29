@@ -9,7 +9,7 @@
 
 import type { CapaViewCfg } from '@/lib/capa-meta'
 
-export type Brand = 'revisao' | 'vnd' | 'meq'
+export type Brand = 'revisao' | 'vnd' | 'meq' | 'mac'
 export type SimTheme = 'claro' | 'escuro' | 'azul' // 'azul' só MEQ
 export type Tela = 'entrada' | 'prova' | 'resultado'
 

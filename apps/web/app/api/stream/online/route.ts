@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, accessCan } from '@/lib/auth/permissions'
-import { computarOnlinePorSimulado } from '@/lib/simulado/ao-vivo'
+import { onlinePorSimuladoCache } from '@/lib/simulado/ao-vivo'
 import { criarSubscriber, canalAoVivo } from '@/lib/realtime/pubsub'
 
 export const dynamic = 'force-dynamic'
@@ -21,8 +21,9 @@ export async function GET(req: NextRequest) {
   if (!ids.length) return new Response('ids obrigatório', { status: 400 })
 
   const svc = createAdminClient()
-  // computarOnlinePorSimulado filtra por tenant_id → ids de outro tenant retornam 0 (sem vazamento).
-  const inicial = await computarOnlinePorSimulado(svc, tenantId, ids)
+  // onlinePorSimuladoCache filtra por tenant_id → ids de outro tenant retornam 0 (sem vazamento).
+  // Cache (TTL 15s) compartilhado com o board SSR → o pico de 1000+ alunos vira 1 cálculo por janela.
+  const inicial = await onlinePorSimuladoCache(svc, tenantId, ids)
 
   const encoder = new TextEncoder()
   const sub = criarSubscriber()
@@ -37,7 +38,7 @@ export async function GET(req: NextRequest) {
         const agora = Date.now()
         if (agora - ultimoEnvio < 2000) { pendente = true; return }
         ultimoEnvio = agora; pendente = false
-        try { enviar(await computarOnlinePorSimulado(svc, tenantId, ids)) } catch { /* mantém a conexão */ }
+        try { enviar(await onlinePorSimuladoCache(svc, tenantId, ids)) } catch { /* mantém a conexão */ }
       }
 
       if (sub) {

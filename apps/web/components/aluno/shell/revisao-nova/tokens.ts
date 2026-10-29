@@ -10,9 +10,10 @@ export type ShellTheme = 'claro' | 'escuro'
 function revVars(theme: ShellTheme): Record<string, string> {
   if (theme === 'escuro') {
     return {
-      bg: '#18181D',
-      surface: '#232329',
-      surface2: '#2C2C34',
+      // Superfícies ROXAS da marca (antes cinza; mesmo roxo do Recomendado = sim-tokens REV escuro).
+      bg: '#0E0A24',
+      surface: '#1C1440',
+      surface2: '#171030',
       ink: '#FFFFFF',
       muted: '#BDBBCB',
       muted2: '#73717F',

@@ -20,10 +20,12 @@ import type { ProgressoAluno } from '@/components/aluno/aluno-sidebar'
 import { getCurrentTenant } from '@/lib/tenant'
 import { lerAparenciaAuth } from '@/lib/brand/aparencia-auth'
 import { brandTokensCss, TEMAS_POR_MARCA } from '@/lib/brand/brand-tokens'
+import { BrandCorProvider } from '@/lib/brand/cor-marca'
 import { AlunoShell } from '@/components/aluno/shell/aluno-shell'
 import { ShellRevisaoNova } from '@/components/aluno/shell/shell-revisao-nova'
 import { AreaEmManutencao } from '@/components/admin/area-em-manutencao'
 import { resolveTemaDark } from '@/lib/hud/resolve-dark'
+import { remember } from '@/lib/cache/relatorio-cache'
 import type { AlunoBrand, AlunoNavItem, AlunoShellUsuario } from '@/components/aluno/shell/types'
 
 /** Iniciais a partir do nome (1ª letra do 1º e do último termo). Fallback do avatar. */
@@ -61,11 +63,16 @@ export default async function AlunoPortalLayout({ children }: { children: React.
   // tema + contagens da sidebar + progresso de gamificação + personalização. Antes eram 4
   // round-trips em série; agora 1 cliente reutilizado e um único Promise.all.
   const svc = createAdminClient()
+  // PERF: este layout roda a CADA navegação do portal. Cada loader caro é embrulhado em `remember`
+  // (Redis, degrada p/ cálculo direto sem Redis) — dado de TENANT (tema/rótulos, igual p/ todos) com
+  // TTL longo; dado POR-ALUNO (contagens/gamificação/personalização/pendências) com TTL curto. Chaves
+  // sempre escopadas por tenant/aluno → nenhum vazamento cross-aluno. Comportamento idêntico ao shell.
   const [themeData, contadores, gamData, persData, pendLeitura] = await Promise.all([
-    getTenantTheme(),
+    // TENANT: tema/CSS/nome — idêntico p/ todos os alunos do tenant. TTL 120s.
+    remember(`portal-tenant:${sessao.tenantId}`, 120, () => getTenantTheme()),
     // Contagens da sidebar: "Meus Simulados" = oficiais distintos finalizados (badge da esquerda) +
-    // personalizados criados (badge da direita, "X | Y"); "Favoritos".
-    (async (): Promise<{ counts: Record<string, number>; personalizados: number }> => {
+    // personalizados criados (badge da direita, "X | Y"); "Favoritos". POR-ALUNO, TTL curto 30s.
+    remember(`portal-aluno:${sessao.estudanteId}:contadores`, 30, async (): Promise<{ counts: Record<string, number>; personalizados: number }> => {
       try {
         const [{ data: fin }, { count: favs }, { data: pers }] = await Promise.all([
           svc.from('simulado_sessoes_prova').select('simulado_id').eq('estudante_id', sessao.estudanteId).eq('status', 'finalizada').eq('is_teste', false).eq('deletado', false),
@@ -81,10 +88,10 @@ export default async function AlunoPortalLayout({ children }: { children: React.
         if ((favs ?? 0) > 0) c['/aluno/favoritos'] = favs ?? 0
         return { counts: c, personalizados: personalIds.size }
       } catch { return { counts: {}, personalizados: 0 } }
-    })(),
-    // Progresso de gamificação + gate de Trilha/Ligas — só quando ativa.
+    }),
+    // Progresso de gamificação + gate de Trilha/Ligas — só quando ativa. POR-ALUNO, TTL 15s (igual à Início).
     // Devolve também `tituloNivel` e `liga` (derivados do MESMO resumo, sem query extra) p/ o usuário do shell.
-    (async (): Promise<{ progresso: ProgressoAluno | null; gamAtivo: boolean; tituloNivel: string | null; liga: string | null }> => {
+    remember(`portal-aluno:${sessao.estudanteId}:gam`, 15, async (): Promise<{ progresso: ProgressoAluno | null; gamAtivo: boolean; tituloNivel: string | null; liga: string | null }> => {
       try {
         const cfg = await getGamConfig(svc, sessao.tenantId)
         if (!(await gamAtivaParaAluno(svc, sessao.tenantId, sessao.estudanteId, cfg))) return { progresso: null, gamAtivo: false, tituloNivel: null, liga: null }
@@ -96,14 +103,17 @@ export default async function AlunoPortalLayout({ children }: { children: React.
           liga: r?.liga.nome ?? null,
         }
       } catch { return { progresso: null, gamAtivo: false, tituloNivel: null, liga: null } }
-    })(),
-    // Personalização (avatar + cor) — tolerante se a migração ainda não rodou.
-    (async (): Promise<{ avatar: string | null; avatarCor: string | null }> => {
+    }),
+    // Personalização (avatar + cor) — tolerante se a migração ainda não rodou. POR-ALUNO, TTL 30s.
+    remember(`portal-aluno:${sessao.estudanteId}:pers`, 30, async (): Promise<{ avatar: string | null; avatarCor: string | null }> => {
       try { const p = await lerPersonalizacaoEstudante(svc, sessao.estudanteId); return { avatar: p.avatar, avatarCor: p.avatarCor } }
       catch { return { avatar: null, avatarCor: null } }
-    })(),
-    // Pendências do LegProc (selo na sidebar) — só quando a Leitura está ativa; tolerante.
-    (async (): Promise<number> => (LEITURA_ATIVA ? totalPendenciasLeitura(sessao.estudanteId, sessao.tenantId) : 0))(),
+    }),
+    // Pendências do LegProc (selo na sidebar) — só quando a Leitura está ativa; tolerante. POR-ALUNO, TTL 30s.
+    // Flag off → 0 direto (sem round-trip ao Redis p/ um valor constante).
+    LEITURA_ATIVA
+      ? remember(`portal-aluno:${sessao.estudanteId}:pend-leitura`, 30, (): Promise<number> => totalPendenciasLeitura(sessao.estudanteId, sessao.tenantId))
+      : Promise.resolve(0),
   ])
 
   const { css, tema, tenantNome } = themeData
@@ -146,22 +156,45 @@ export default async function AlunoPortalLayout({ children }: { children: React.
   // inofensivo p/ ela. Mesmos gates de visibilidade da sidebar (flags/gamAtivo/cronograma/manutenção).
   const navCanonico: AlunoNavItem[] = (
     [
-      { href: '/aluno', label: 'Início', short: 'Início', icon: 'Home', exact: true },
-      { href: '/aluno/simulados', label: 'Simulados Realizados', short: 'Realizados', icon: 'ClipboardList' },
-      { href: '/aluno/leitura', label: 'Desafio de Lei Seca', short: 'Lei Seca', icon: 'Library', gate: LEITURA_ATIVA },
+      // Revisão: a Início PRINCIPAL é a nova (/aluno/nova/inicio). A original foi desativada (redireciona).
+      { href: brand === 'revisao' ? '/aluno/nova/inicio' : '/aluno', label: 'Início', short: 'Início', icon: 'Home', exact: true },
+      { href: '/aluno/simulados', label: 'Simulados', short: 'Simulados', icon: 'ClipboardList' },
+      // Desafios de Lei Seca e Jurisprudência saem do MENU na Revisão: o acesso ao conteúdo passa a ser
+      // só pela área de Cursos (que abre /aluno/leitura?modulo= e /aluno/jurisprudencia?desafio=). As ROTAS
+      // seguem vivas de propósito (não entram em manutenção) para o Cursos continuar abrindo o conteúdo.
+      { href: '/aluno/leitura', label: 'Desafio de Lei Seca', short: 'Lei Seca', icon: 'Library', gate: LEITURA_ATIVA && brand !== 'revisao' },
       { href: '/aluno/biblioteca', label: 'Biblioteca', short: 'Biblioteca', icon: 'BookOpen' },
-      { href: '/aluno/jurisprudencia', label: 'Desafio de Jurisprudência', short: 'Juris', icon: 'Gavel', gate: JURISPRUDENCIA_ATIVA },
-      { href: '/aluno/cronograma', label: 'Cronograma', short: 'Cronograma', icon: 'CalendarDays', gate: !OCULTAR_CRONOGRAMA },
+      { href: '/aluno/jurisprudencia', label: 'Desafio de Jurisprudência', short: 'Juris', icon: 'Gavel', gate: JURISPRUDENCIA_ATIVA && brand !== 'revisao' },
+      // Cronograma sai do MENU na Revisão (Fase 3): o acesso passa a ser pelo "Meu painel de estudos"
+      // (/aluno/nova/painel). A ROTA antiga segue viva (redireciona). MEQ/VND mantêm o item no menu.
+      { href: '/aluno/cronograma', label: 'Cronograma', short: 'Cronograma', icon: 'CalendarDays', gate: !OCULTAR_CRONOGRAMA && brand !== 'revisao' },
       { href: '/aluno/recomendado', label: 'Recomendado', short: 'Recomendado', icon: 'Lightbulb' },
       { href: '/aluno/questoes', label: 'Banco de Questões', short: 'Questões', icon: 'BookOpen' },
       { href: '/aluno/ligas', label: 'Ligas', short: 'Ligas', icon: 'Trophy', gate: gamAtivo },
+      // ── NOVA PLATAFORMA (/nova) — migração tela a tela. Itens com selo "NOVO"; cada um abre a
+      // experiência nova (que tem o próprio shell). Produção intacta: isto apenas adiciona links. ──
+      // Revisão: item "Início (nova)" sai do menu — virou a própria "Início". (Outras marcas: inalterado.)
+      { href: '/aluno/nova/inicio', label: 'Início (nova)', short: 'Nova', icon: 'Home', badge: 'NOVO', gate: brand !== 'revisao' },
+      { href: '/aluno/nova/painel', label: 'Meu painel de estudos', short: 'Painel', icon: 'LayoutDashboard', badge: 'NOVO' },
+      { href: '/aluno/nova/desempenho', label: 'Meu Desempenho', short: 'Desempenho', icon: 'BarChart3', badge: 'NOVO' },
+      { href: '/aluno/nova/comunidade/ligas', label: 'Ligas', short: 'Ligas', icon: 'Trophy', badge: 'NOVO', gate: gamAtivo },
+      // exact: só acende em /comunidade (senão /comunidade/ligas e /comunidade/perfil acendiam "Comunidade" junto).
+      { href: '/aluno/nova/comunidade', label: 'Comunidade', short: 'Comun.', icon: 'Users', badge: 'NOVO', exact: true },
+      { href: '/aluno/nova/cursos', label: 'Cursos', short: 'Cursos', icon: 'GraduationCap', badge: 'NOVO' },
+      { href: '/aluno/nova/como-estudar', label: 'Como Estudar', short: 'Estudar', icon: 'Lightbulb', badge: 'NOVO' },
+      { href: '/aluno/nova/cadernos', label: 'Cadernos', short: 'Cadernos', icon: 'NotebookPen', badge: 'NOVO' },
+      { href: '/aluno/nova/duvidas', label: 'Dúvidas', short: 'Dúvidas', icon: 'HelpCircle', badge: 'NOVO' },
+      { href: '/aluno/nova/ajuda', label: 'Ajuda', short: 'Ajuda', icon: 'HelpCircle', badge: 'NOVO' },
     ] as Array<AlunoNavItem & { exact?: boolean; gate?: boolean }>
   )
-    .filter((n) => n.gate !== false && !hrefsOcultosAluno.includes(n.href))
+    // As áreas "/nova" (redesign recente da Revisão) ficam fora do menu de VND/MEQ/MAC — só a
+    // Revisão as usa como experiência principal. Para as demais marcas, mostramos apenas as áreas
+    // já consolidadas (Início, Simulados, Desafios, Recomendado, Banco, etc.).
+    .filter((n) => n.gate !== false && !hrefsOcultosAluno.includes(n.href) && !(brand !== 'revisao' && n.href.startsWith('/aluno/nova')))
     .map(({ exact, gate, ...n }) => {
       const c = counts[n.href]
       const ativo = exact ? pathAtual === n.href : pathAtual.startsWith(n.href)
-      return { ...n, badge: c && c > 0 ? String(c) : undefined, ativo }
+      return { ...n, badge: c && c > 0 ? String(c) : n.badge, ativo }
     })
 
   // ── Usuário do shell (perfil + gamificação) — derivado do que o layout já tem. ──
@@ -259,9 +292,13 @@ export default async function AlunoPortalLayout({ children }: { children: React.
       <GuiaTourRunner gamAtivo={gamAtivo} />
       {/* Manutenção por área do aluno: VND/MEQ (e Revisão legada) bloqueiam o CONTEÚDO da rota aqui —
           o shell da Revisão interno já trata no seu ramo; aqui cobrimos o caminho dos demais shells. */}
-      <AlunoShell {...shellProps}>
-        {areaAlunoBloqueada ? <AreaEmManutencao area={areaAlunoBloqueada} /> : children}
-      </AlunoShell>
+      {/* MAC reaproveita os componentes do VND; o provider entrega a conversão de cor bordô
+          (corMarca) à subárvore. Para as outras marcas é identidade (não altera nada). */}
+      <BrandCorProvider brand={brand}>
+        <AlunoShell {...shellProps}>
+          {areaAlunoBloqueada ? <AreaEmManutencao area={areaAlunoBloqueada} /> : children}
+        </AlunoShell>
+      </BrandCorProvider>
     </div>
   )
 }

@@ -5,6 +5,7 @@
 // Porte fiel de `cronograma.py` (content/rev_hero/gerar_area/meus_area/plano_area).
 
 import type { CSSProperties } from 'react'
+import type { CronogramaData } from '@/lib/cronograma/nova-tipos'
 import { internaTokensStyle, type InternaTheme } from '../interna-tokens'
 import {
   brandKey, cronoVars, cssFor, Ic, CgTabs, Stepper, WizSteps, WizNav, SummaryRows, RevTip,
@@ -91,7 +92,7 @@ function PlanoArea({ st, mobile }: { st: CronogramaState; mobile: boolean }) {
   if (mobile) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <PlanHead k={K} mobile st={st} /><PlanKpis k={K} mobile /><TodayCard k={K} /><PlanProgress k={K} st={st} />
+        <PlanHead k={K} mobile st={st} /><PlanKpis k={K} mobile st={st} /><TodayCard k={K} /><PlanProgress k={K} st={st} />
         <ViewToggle k={K} mobile st={st} />{grid}
         {list && <div className="vlin"><PlanList k={K} mobile st={st} /></div>}
       </div>
@@ -99,7 +100,7 @@ function PlanoArea({ st, mobile }: { st: CronogramaState; mobile: boolean }) {
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <PlanHead k={K} mobile={false} st={st} /><PlanKpis k={K} mobile={false} /><PlanProgress k={K} st={st} />
+      <PlanHead k={K} mobile={false} st={st} /><PlanKpis k={K} mobile={false} st={st} /><PlanProgress k={K} st={st} />
       <ViewToggle k={K} mobile={false} st={st} />{grid}
       {list && (
         <div className="vlin" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 320px', gap: 18, alignItems: 'start' }}>
@@ -111,8 +112,8 @@ function PlanoArea({ st, mobile }: { st: CronogramaState; mobile: boolean }) {
   )
 }
 
-export function CronogramaRevisao({ theme, tab, mobile }: { theme: InternaTheme; tab?: string; mobile: boolean }) {
-  const st = useCronogramaState(tab)
+export function CronogramaRevisao({ theme, tab, mobile, data, onToggle, onGerar, generating }: { theme: InternaTheme; tab?: string; mobile: boolean; data?: CronogramaData; onToggle?: (metaId: string, done: boolean) => void; onGerar?: (baseId: string) => void; generating?: boolean }) {
+  const st = useCronogramaState({ data, tab, onToggle, onGerar, generating })
   const dark = theme === 'escuro'
   const rootStyle: CSSProperties = { ...internaTokensStyle('revisao', theme), ...cronoVars(K, dark) }
   return (

@@ -10,12 +10,13 @@ import type { Brand, SimTheme } from '@/components/brand/simulado/types'
 export type { Brand }
 export type InternaTheme = SimTheme // 'claro' | 'escuro' | 'azul' (azul só MEQ)
 
-/** Raio de card por marca (spec 05 §0): Rev 20, VND 24, MEQ 14. */
-export const INTERNA_RADIUS: Record<Brand, number> = { revisao: 20, vnd: 24, meq: 14 }
+/** Raio de card por marca (spec 05 §0): Rev 20, VND 24, MEQ 14. MAC = igual VND. */
+export const INTERNA_RADIUS: Record<Brand, number> = { revisao: 20, vnd: 24, mac: 24, meq: 14 }
 
 export const INTERNA_FONT: Record<Brand, string> = {
   revisao: "'Plus Jakarta Sans',sans-serif",
   vnd: "'Plus Jakarta Sans',sans-serif",
+  mac: "'Plus Jakarta Sans',sans-serif",
   meq: "'Sora',sans-serif",
 }
 

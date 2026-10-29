@@ -13,9 +13,12 @@
  * Keyframes com prefixo `vl-`/classes `.vl-*`. reduced-motion mostra estado final.
  */
 
-import { MarcaVND, MarcaVndND, VND_V_PATH } from '../brand-marks'
+import { MarcaVND, MarcaVndND, VND_V_PATH, MAC_M_PATH, MAC_A_PATH, MAC_C_PATH } from '../brand-marks'
+import { corMarca } from '@/lib/brand/cor-marca'
 
 export type VndTheme = 'claro' | 'escuro'
+/** Marca que usa este loader: 'vnd' (verde, padrão) ou 'mac' (bordô + "M"/"ac"/textos MAC). */
+export type LoaderMarca = 'vnd' | 'mac'
 
 const BG: Record<VndTheme, string> = {
   claro: 'linear-gradient(180deg,#041A10 0%,#072D1C 50%,#0B3D26 100%)',
@@ -40,16 +43,22 @@ export function LoadingVndClassico({
   theme = 'claro',
   message,
   simula = false,
+  brand = 'vnd',
 }: {
   theme?: VndTheme
   message?: string
   simula?: boolean
+  /** 'mac' usa o "M"/"ac", textos "Mentoria Além do Corte" e paleta bordô (corMarca). */
+  brand?: LoaderMarca
 }) {
-  const footColor = FOOT[theme]
-  const [g1, g2, g3] = GLOW[theme]
+  const cm = (s: string) => corMarca(brand, s)
+  const mac = brand === 'mac'
+  const VPATH = mac ? MAC_M_PATH : VND_V_PATH
+  const footColor = cm(FOOT[theme])
+  const [g1, g2, g3] = GLOW[theme].map(cm)
   return (
     <div className="vl-root">
-      <style>{css(theme)}</style>
+      <style>{cm(css(theme))}</style>
       <div className="vl-grid vl-gridIn" aria-hidden="true" />
       <div className="vl-glowIn vl-glow1" style={{ background: g1 }} aria-hidden="true" />
       <div className="vl-glowIn vl-glow2" style={{ background: g2 }} aria-hidden="true" />
@@ -64,23 +73,32 @@ export function LoadingVndClassico({
         ) : null}
         <div className="vl-lockup">
           <div className="vl-vbox">
-            <svg className="vl-vglow" viewBox="0 0 32 32" aria-hidden="true"><path d={VND_V_PATH} fill="rgba(46,210,120,.55)" /></svg>
-            <svg className="vl-echo vl-e1" viewBox="0 0 32 32" aria-hidden="true"><path d={VND_V_PATH} fill="none" stroke="rgba(120,230,170,.5)" strokeWidth="0.12" /></svg>
-            <svg className="vl-echo vl-e2" viewBox="0 0 32 32" aria-hidden="true"><path d={VND_V_PATH} fill="none" stroke="rgba(216,180,90,.5)" strokeWidth="0.12" /></svg>
-            <svg className="vl-echo vl-e3" viewBox="0 0 32 32" aria-hidden="true"><path d={VND_V_PATH} fill="none" stroke="rgba(120,230,170,.5)" strokeWidth="0.12" /></svg>
-            <MarcaVND className="vl-vfill" viewBox="0 0 32 32">
-              <defs><linearGradient id="vndV" x1="0" y1="0" x2="0" y2="1"><stop offset="0.15" stopColor="#3FD58A" /><stop offset="0.85" stopColor="#1E9E5E" /></linearGradient></defs>
-            </MarcaVND>
-            <svg className="vl-vdraw" viewBox="0 0 32 32" aria-hidden="true"><path pathLength={1} d={VND_V_PATH} fill="none" stroke="#9BF0C3" strokeWidth="0.14" strokeLinejoin="round" /></svg>
+            <svg className="vl-vglow" viewBox="0 0 32 32" aria-hidden="true"><path d={VPATH} fill={cm('rgba(46,210,120,.55)')} /></svg>
+            <svg className="vl-echo vl-e1" viewBox="0 0 32 32" aria-hidden="true"><path d={VPATH} fill="none" stroke={cm('rgba(120,230,170,.5)')} strokeWidth="0.12" /></svg>
+            <svg className="vl-echo vl-e2" viewBox="0 0 32 32" aria-hidden="true"><path d={VPATH} fill="none" stroke="rgba(216,180,90,.5)" strokeWidth="0.12" /></svg>
+            <svg className="vl-echo vl-e3" viewBox="0 0 32 32" aria-hidden="true"><path d={VPATH} fill="none" stroke={cm('rgba(120,230,170,.5)')} strokeWidth="0.12" /></svg>
+            <svg className="vl-vfill" viewBox="0 0 32 32" aria-hidden="true">
+              <defs><linearGradient id="brandVfill" x1="0" y1="0" x2="0" y2="1"><stop offset="0.15" stopColor={mac ? '#C86A6F' : '#3FD58A'} /><stop offset="0.85" stopColor={mac ? '#82191E' : '#1E9E5E'} /></linearGradient></defs>
+              <path d={VPATH} fill="url(#brandVfill)" />
+            </svg>
+            <svg className="vl-vdraw" viewBox="0 0 32 32" aria-hidden="true"><path pathLength={1} d={VPATH} fill="none" stroke={cm('#9BF0C3')} strokeWidth="0.14" strokeLinejoin="round" /></svg>
           </div>
 
           <div className="vl-ndwrap">
-            <MarcaVndND className="vl-nd" fill="url(#ndG)" role="img" aria-label="ND">
-              <defs><linearGradient id="ndG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#FFFFFF" /><stop offset="1" stopColor="#D3DED8" /></linearGradient></defs>
-            </MarcaVndND>
+            {mac ? (
+              <svg className="vl-nd" viewBox="38 23 150 96" role="img" aria-label="ac" style={{ width: 155 }}>
+                <defs><linearGradient id="acG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#FFFFFF" /><stop offset="1" stopColor="#EAD4D5" /></linearGradient></defs>
+                <path d={MAC_A_PATH} fill="url(#acG)" />
+                <path d={MAC_C_PATH} fill="url(#acG)" />
+              </svg>
+            ) : (
+              <MarcaVndND className="vl-nd" fill="url(#ndG)" role="img" aria-label="ND">
+                <defs><linearGradient id="ndG" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#FFFFFF" /><stop offset="1" stopColor="#D3DED8" /></linearGradient></defs>
+              </MarcaVndND>
+            )}
             <div className="vl-tag">
-              <span className="vl-tag-sm">VOCÊ NA</span>
-              <span>DEFENSORIA</span>
+              <span className="vl-tag-sm">{mac ? 'MENTORIA' : 'VOCÊ NA'}</span>
+              <span>{mac ? 'ALÉM DO CORTE' : 'DEFENSORIA'}</span>
             </div>
           </div>
         </div>
@@ -94,10 +112,12 @@ export function LoadingVndClassico({
         {message ? <p className="vl-msg" style={{ color: footColor }}>{message}</p> : null}
       </main>
 
-      <div className="vl-foot" style={{ color: footColor }}>© 2026 Você na Defensoria</div>
+      <div className="vl-foot" style={{ color: footColor }}>© 2026 {mac ? 'Mentoria Além do Corte' : 'Você na Defensoria'}</div>
     </div>
   )
 }
+// `MarcaVND` segue importado p/ compat (usado pelo path VND); evita "unused" se o lint reclamar.
+void MarcaVND
 
 function css(_theme: VndTheme) {
   return `

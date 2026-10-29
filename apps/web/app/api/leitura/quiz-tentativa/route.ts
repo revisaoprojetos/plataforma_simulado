@@ -9,6 +9,7 @@ import { avaliarMedalhasPorDocumento } from '@/lib/leitura/carimbos'
 import { diaBRT } from '@/lib/jurisprudencia/sequencia'
 import { creditarTesesLeituraRapida } from '@/lib/jurisprudencia/conteudo'
 import { invalidarRankingJuris } from '@/lib/jurisprudencia/ranking'
+import { invalidarLeituraAluno } from '@/lib/leitura/cache'
 
 // POST /api/leitura/quiz-tentativa — registra UMA tentativa concluída do quiz "Questões do conteúdo".
 // Cada conclusão (inclusive refazer) vira uma tentativa contabilizada. Tolerante: se a migração da
@@ -80,6 +81,8 @@ export async function POST(request: NextRequest) {
         } catch { /* best-effort: nunca quebra o registro da tentativa */ }
       }
     }
+    // LACUNA 1: invalida o cache read-through de trilha/leitura do aluno (TTL 30s) na hora. Best-effort.
+    void invalidarLeituraAluno(sessao.tenantId, sessao.estudanteId).catch(() => {})
     return NextResponse.json({ ok: true, tentativa_num: tentativaNum, acertos, total, nota })
   } catch (e: any) {
     // Migração ausente → não quebra o quiz.

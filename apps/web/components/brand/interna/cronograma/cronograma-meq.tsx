@@ -84,7 +84,7 @@ function PlanoArea({ st, mobile }: { st: CronogramaState; mobile: boolean }) {
   if (mobile) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <PlanHead k={K} mobile st={st} /><PlanKpis k={K} mobile /><TodayCard k={K} /><PlanProgress k={K} st={st} />
+        <PlanHead k={K} mobile st={st} /><PlanKpis k={K} mobile st={st} /><TodayCard k={K} /><PlanProgress k={K} st={st} />
         <Gantt k={K} />
         <ViewToggle k={K} mobile st={st} />{grid}
         {list && <div className="vlin"><PlanList k={K} mobile st={st} /></div>}
@@ -93,7 +93,7 @@ function PlanoArea({ st, mobile }: { st: CronogramaState; mobile: boolean }) {
   }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-      <PlanHead k={K} mobile={false} st={st} /><PlanKpis k={K} mobile={false} /><PlanProgress k={K} st={st} />
+      <PlanHead k={K} mobile={false} st={st} /><PlanKpis k={K} mobile={false} st={st} /><PlanProgress k={K} st={st} />
       <Gantt k={K} />
       <ViewToggle k={K} mobile={false} st={st} />{grid}
       {list && (

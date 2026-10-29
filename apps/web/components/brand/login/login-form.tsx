@@ -55,6 +55,17 @@ const COPY: Record<Brand, Copy> = {
     tituloAluno: 'Entrar',
     tituloAdmin: 'Acesso da equipe',
   },
+  mac: {
+    eyebrowAluno: 'ÁREA DO ALUNO',
+    eyebrowAdmin: 'ÁREA ADMINISTRATIVA',
+    footerAluno: 'Sem senha. Como aluno, basta o seu e-mail.',
+    footerAdmin: 'Acesso restrito à equipe.',
+    pillParaAdmin: 'Admin',
+    pillParaAluno: 'Área do aluno',
+    pillParaAlunoCurto: 'Aluno',
+    tituloAluno: 'Entrar',
+    tituloAdmin: 'Acesso da equipe',
+  },
   meq: {
     eyebrowAluno: 'ÁREA DO ALUNO',
     eyebrowAdmin: 'ÁREA ADMINISTRATIVA',

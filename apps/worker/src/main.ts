@@ -94,7 +94,15 @@ if (WEB_INTERNAL_URL && CRON_SECRET) {
   // O4 — monitor de egress: alerta se o SQL agregado cair (causa do incidente) ou o Redis sumir. A cada 6h;
   // o worker só destaca no log quando NÃO está saudável (o web loga sempre).
   setInterval(() => { void chamarCron('/api/cron/egress-monitor', 'cron egress-monitor', (j) => j && j.ok === false) }, 21_600_000)
-  console.log('[cron] agendado (egress-otimizado): encerramento 180s; curseduca-jobs/integracoes 60s; curseduca-sync/leitura-publicar 300s; sync grupos→bancos 30min; warm-cache 60min; guru-reconcile 6h; gamificacao-streak/engajamento 1h; leitura-engajamento 3h; storage-reconcile 24h; egress-monitor 6h')
+  // Backend-first: rola o snapshot do Painel (metas de hoje) de quem já usou, p/ a 1ª abertura do dia vir
+  // pronta. De hora em hora (idempotente, bounded). Ver docs/ARQUITETURA-BACKEND-FIRST.md.
+  setInterval(() => { void chamarCron('/api/cron/painel-roll', 'cron painel-roll', (j) => !!j.rolados) }, 3_600_000)
+  // Backend-first (Fase 1): roll dos snapshots do aluno (Início/Desempenho/Cursos), gated por atividade, 1h.
+  setInterval(() => { void chamarCron('/api/cron/home-roll', 'cron home-roll', (j) => !!j.rolados) }, 3_600_000)
+  setInterval(() => { void chamarCron('/api/cron/desempenho-roll', 'cron desempenho-roll', (j) => !!j.rolados) }, 3_600_000)
+  setInterval(() => { void chamarCron('/api/cron/cursos-roll', 'cron cursos-roll', (j) => !!j.rolados) }, 3_600_000)
+  setInterval(() => { void chamarCron('/api/cron/perfil-roll', 'cron perfil-roll', (j) => !!j.rolados) }, 3_600_000)
+  console.log('[cron] agendado (egress-otimizado): encerramento 180s; curseduca-jobs/integracoes 60s; curseduca-sync/leitura-publicar 300s; sync grupos→bancos 30min; warm-cache 60min; guru-reconcile 6h; gamificacao-streak/engajamento 1h; leitura-engajamento 3h; storage-reconcile 24h; egress-monitor 6h; painel/home/desempenho/cursos-roll 1h')
 } else {
   console.warn('[cron] DESATIVADO — defina WEB_INTERNAL_URL e CRON_SECRET')
 }

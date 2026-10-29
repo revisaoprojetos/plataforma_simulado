@@ -79,6 +79,7 @@ export type AuthAppearancePublic = Omit<AuthAppearance, 'loadingMinMs'> & { load
 export function inferirMarca(tenant?: { slug?: string | null; nome?: string | null } | null): Brand {
   const s = `${tenant?.slug ?? ''} ${tenant?.nome ?? ''}`.toLowerCase()
   if (/\bmeq\b|meqconcursos/.test(s)) return 'meq'
+  if (/\bmac\b|mentoria\s*al[eé]m\s*do\s*corte|alemdocorte/.test(s)) return 'mac'
   if (/\bvnd\b|defensoria|vocenadefensoria/.test(s)) return 'vnd'
   return 'revisao'
 }

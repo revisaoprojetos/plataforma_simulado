@@ -2,7 +2,7 @@
 // FUNDAÇÃO do ativador: lista os SLUGS selecionáveis no console + os fallbacks (§4).
 // Os componentes visuais em si (PlatformLogin/PlatformLoader por slug) vêm em fase posterior.
 
-export type Brand = 'revisao' | 'vnd' | 'meq'
+export type Brand = 'revisao' | 'vnd' | 'meq' | 'mac'
 export type Theme = 'claro' | 'escuro' | 'azul' // 'azul' só MEQ
 
 export interface EstiloItem {
@@ -75,6 +75,22 @@ const VND: BrandCatalogo = {
   fallback: { login: 'vnd-login-centralizado', loading: 'vnd-loading-classico', theme: 'claro' },
 }
 
+// ─────────────────────────── MAC (Mentoria Além do Corte) ───────────────────────────
+// Reaproveita o layout do VND (centralizado + loading clássico), recolorido bordô.
+// Handoff (00-LEIA-PRIMEIRO §4): só estes 2 estilos; são também o fallback.
+const MAC: BrandCatalogo = {
+  brand: 'mac',
+  nome: 'Mentoria Além do Corte',
+  temas: ['claro', 'escuro'],
+  login: [
+    { slug: 'mac-login-centralizado', nome: 'Centralizado', tags: ['sem SIMULA'] },
+  ],
+  loading: [
+    { slug: 'mac-loading-classico', nome: 'Clássico', tags: ['base'] },
+  ],
+  fallback: { login: 'mac-login-centralizado', loading: 'mac-loading-classico', theme: 'claro' },
+}
+
 // ─────────────────────────── MEQ (§1.5 login, §1.6 loading) — 3 temas ───────────────────────────
 const MEQ: BrandCatalogo = {
   brand: 'meq',
@@ -95,10 +111,11 @@ const MEQ: BrandCatalogo = {
 export const APPEARANCE_CATALOGO: Record<Brand, BrandCatalogo> = {
   revisao: REVISAO,
   vnd: VND,
+  mac: MAC,
   meq: MEQ,
 }
 
-export const BRANDS: Brand[] = ['revisao', 'vnd', 'meq']
+export const BRANDS: Brand[] = ['revisao', 'vnd', 'mac', 'meq']
 
 export function catalogoDaMarca(brand: Brand): BrandCatalogo {
   return APPEARANCE_CATALOGO[brand] ?? REVISAO

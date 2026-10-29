@@ -10,9 +10,9 @@ import { resolverEnunciadoUrls } from '@/lib/aluno/enunciado'
 import { resolverLiberacoes } from '@/lib/simulado/liberacao'
 import { BannersPortal, type HeroSimSlide, type BannerChip, type BannerStats } from '@/components/aluno/banners-portal'
 import { tipoDoSimulado } from '@/lib/simulado/tipo'
-import { idsSimuladosGratuitos } from '@/lib/simulado/gratuito'
-import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { fetchAll } from '@/lib/supabase/fetch-all'
 import { remember } from '@/lib/cache/relatorio-cache'
+import { carregarCatalogoLegado } from '@/lib/aluno/catalogo-simulados'
 import { SimuladosCatalogoAluno, type ItemSimuladoCat, type ProgressoGrupo } from '@/components/aluno/simulados-catalogo-aluno'
 import { SemAcessoModal } from '@/components/aluno/sem-acesso-modal'
 import { getGamConfig, gamAtivaParaAluno } from '@/lib/gamificacao'
@@ -30,6 +30,7 @@ import { getCurrentTenant } from '@/lib/tenant'
 import { resolverCardView } from '@/lib/card-view'
 import { cn } from '@/lib/utils'
 import { lerAparenciaAuth } from '@/lib/brand/aparencia-auth'
+import { R } from '@/lib/nova/rotas'
 import { resolveTemaDark } from '@/lib/hud/resolve-dark'
 import { PlatformHome } from '@/components/brand/interna/home'
 import { PlatformPasta } from '@/components/brand/interna/pasta'
@@ -46,26 +47,24 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   const svc = createAdminClient()
   const estId = sessao.estudanteId
 
-  // EGRESS: dados de TENANT (banners, tema, simulados gratuitos) são IGUAIS p/ todos os alunos e eram
-  // relidos a cada carregamento de cada aluno. Cacheados por tenant (TTL curto) → 1 leitura por janela
-  // em vez de N (nº de alunos × cargas). As leituras PER-ALUNO seguem ao vivo (variam por estudante).
-  const [{ data: mats }, { data: acs }, { data: sessAll }, tenantBundle] = await Promise.all([
-    svc.from('simulado_matriculas').select('simulado_id, liberado').eq('estudante_id', estId),
-    svc.from('simulado_acessos').select('simulado_id, expira_em').eq('estudante_id', estId),
-    svc.from('simulado_sessoes_prova').select('id, simulado_id, status, nota, finalizado_em').eq('estudante_id', estId).eq('is_teste', false).eq('deletado', false),
+  // BACKEND-FIRST (Lacuna 3): o catálogo LEGADO (matrículas/acessos/sessões + simulados + visual/grupos de
+  // TODOS os sims) rodava POR RENDER nesta Início. Agora vem da base SUPERSET cacheada por aluno (TTL 60s) —
+  // 1 compute por janela em vez de ~6 round-trips + fan-out de capas a cada carga. Dados de TENANT (banners,
+  // tema) seguem no cache por-tenant (120s), em paralelo. As leituras PER-ALUNO continuam frescas (TTL curto).
+  const [base, tenantBundle] = await Promise.all([
+    carregarCatalogoLegado(svc, sessao!.tenantId, estId),
     remember(`aluno-home-tenant:${sessao!.tenantId}`, 120, async () => {
-      const [{ data: banRows }, { data: tenantRow }, gratuitoIds] = await Promise.all([
+      const [{ data: banRows }, { data: tenantRow }] = await Promise.all([
         // Mesma ordenação do console (ordem asc, empate por criado_em DESC) para o carrossel bater com a lista de Avisos.
         svc.from('simulado_banners').select('id, tipo, titulo, mensagem, imagem_url, link, cor').eq('tenant_id', sessao!.tenantId).eq('ativo', true).order('ordem', { ascending: true }).order('criado_em', { ascending: false }),
         svc.from('simulado_tenants').select('tema').eq('id', sessao!.tenantId).maybeSingle(),
-        idsSimuladosGratuitos(svc, sessao!.tenantId),
       ])
-      return { banRows: banRows ?? [], tema: (tenantRow?.tema ?? null) as any, gratuitoIds }
+      return { banRows: banRows ?? [], tema: (tenantRow?.tema ?? null) as any }
     }),
   ])
+  const { acs, sessAll, sims, visual, grupoPorSimAll } = base
   const banRows = tenantBundle.banRows
   const tenantRow = { tema: tenantBundle.tema } as { tema: any }
-  const gratuitoIds = tenantBundle.gratuitoIds
   // Painel de desempenho (KPIs) nos banners de simulado: só quando o tenant liga (default OFF).
   const mostrarDesempenhoBanner = (tenantRow?.tema as any)?.banners_desempenho === true
   // Estilo dos cards de simulado, definido no console (tema.card_view) — o aluno apenas obedece.
@@ -109,37 +108,21 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   // Banners de imagem (banner/destaque + pop-up), SEM os de simulado (esses viram slides via `simulados`).
   const bannersSemSim = todosBanners.filter((b) => !ehSimBanner(b))
 
-  const ids = [...new Set([
-    ...(mats ?? []).filter((m: any) => m.liberado !== false).map((m: any) => m.simulado_id),
-    ...(acs ?? []).map((a: any) => a.simulado_id),
-    ...(sessAll ?? []).map((s: any) => s.simulado_id),
-    ...gratuitoIds,
-  ].filter(Boolean))]
+  // `sims`, `visual` (capas) e `grupoPorSimAll` (grupo de TODOS os sims) já vêm PRONTOS da base cacheada
+  // (carregarCatalogoLegado acima) — antes era o fetch dos simulados + fan-out de capas/grupos por render.
   const expiraPorSim = new Map<string, string | null>()
   for (const a of (acs ?? []) as any[]) {
     const atual = expiraPorSim.get(a.simulado_id)
     if (!atual || (a.expira_em && new Date(a.expira_em) > new Date(atual))) expiraPorSim.set(a.simulado_id, a.expira_em ?? null)
   }
 
-  let sims: any[] = []
   const sessoesPorSim = new Map<string, any[]>()
-  if (ids.length) {
-    // owner_estudante_id IS NULL: exclui simulados PESSOAIS do aluno (sessão do runner pessoal os arrastaria pra cá).
-    sims = await fetchAllByIn<any>(ids, (chunk) => svc.from('simulado_simulados').select('id, titulo, status, embed_token, regras, modo_aplicacao, data_inicio, data_fim, created_at, pasta_id').in('id', chunk).eq('deletado', false).is('owner_estudante_id', null).order('id', { ascending: true }))
-    for (const x of (sessAll ?? []) as any[]) { const arr = sessoesPorSim.get(x.simulado_id) ?? []; arr.push(x); sessoesPorSim.set(x.simulado_id, arr) }
-  }
+  for (const x of (sessAll ?? []) as any[]) { const arr = sessoesPorSim.get(x.simulado_id) ?? []; arr.push(x); sessoesPorSim.set(x.simulado_id, arr) }
   const feitosSet = new Set(sims.filter((s) => (sessoesPorSim.get(s.id) ?? []).some((x) => x.status === 'finalizada')).map((s) => s.id))
   // Pasta (folder_area='simulado') de cada simulado no admin — usado p/ o link "Copiar link da pasta"
   // levar o aluno à MESMA pasta que o admin vê (o grupo do catálogo é por banco→pai, um id diferente).
   const pastaBySim = new Map<string, string | null>(sims.map((s: any) => [s.id, s.pasta_id ?? null]))
 
-  // Visual dos simulados + mapa grupo→simulado de TODOS os sims. `grupoPorSimAll` só alimenta os BANNERS
-  // de vitrine (home) → na visão de pasta (?pasta) NÃO resolvemos (economiza ~2 idas ao banco).
-  const [visual, grupoAll] = await Promise.all([
-    resolverVisualSimulados(svc, sims.map((s: any) => ({ id: s.id, regras: s.regras }))),
-    pasta ? Promise.resolve({ grupoPorSim: new Map<string, string | null>() }) : resolverGruposCatalogo(svc, sims.map((s: any) => ({ id: s.id, regras: s.regras }))),
-  ])
-  const grupoPorSimAll = grupoAll.grupoPorSim
   const itensAll = montarItensSimulado(sims, sessoesPorSim, expiraPorSim, visual)
     .filter((i) => i.podeFazer || i.emAndamento || i.refazer || i.statusLabel === 'Agendado')
 
@@ -468,6 +451,9 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
   // usa a home redesenhada ligada aos dados reais. Desligado (padrão) → home atual (abaixo). ──
   const aparencia = lerAparenciaAuth(tenantRow?.tema, { nome: (tenantRow?.tema as any)?.nome_site ?? tenant?.nome ?? null, slug: tenant?.slug ?? null })
   if (aparencia.internoAtivo) {
+    // Início ORIGINAL desativada na Revisão (redesign): a Início NOVA (/aluno/nova/inicio) virou a
+    // principal. VND/MEQ seguem na home interna abaixo. (Views de pasta /aluno?pasta= já retornaram acima.)
+    if (aparencia.brand === 'revisao') redirect(R.inicio)
     // Tema interno: claro/escuro via cookie `theme` (espelho do next-themes). O MEQ tem um 3º
     // tema "azul" (cards brancos sobre fundo gradiente). O seletor de tema fica no SHELL (shared,
     // não editável aqui); quando ele gravar `theme=azul`, a home já respeita. Fallback: claro/escuro.
@@ -535,23 +521,8 @@ export default async function AlunoHome({ searchParams }: { searchParams: Promis
       // Marca → slide de boas-vindas (Revisão=redesign; VND/MEQ=plataforma nova).
       brand: aparencia.brand,
     })
-    // MARATONA (desafio de simulados) — só no Revisão, só p/ quem tem acesso (Guru/Curseduca) e lançada.
-    // A config vem do admin (desafio_jogo.config) com as contagens reais vinculadas → card fiel ao real.
-    if (aparencia.brand === 'revisao') {
-      try {
-        const { estadoMaratonaAluno } = await import('@/lib/maratona/participacao')
-        const { carregarDesafioMaratona, carregarProgressoMaratona } = await import('@/lib/maratona/carregar')
-        const [est, des] = await Promise.all([
-          estadoMaratonaAluno(svc, sessao!.tenantId, estId),
-          carregarDesafioMaratona(svc, sessao!.tenantId),
-        ])
-        if (est.visivel && des.lancada) {
-          // Progressão REAL do aluno (simulados concluídos) p/ o card da Home mostrar "{feitos}/N" + barra.
-          const progresso = des.pastaId ? await carregarProgressoMaratona(svc, sessao!.tenantId, estId, des.pastaId) : 0
-          homeData.maratona = { estado: est.iniciado ? 'continuar' : 'aceitar', recolhido: est.recolhido, config: des.config, progresso }
-        }
-      } catch { /* gating indisponível → não mostra o card */ }
-    }
+    // MARATONA (card ENAP): na Revisão a Início é a NOVA (redireciona acima) e o card já é montado lá
+    // (app/aluno/(portal)/nova/inicio/page.tsx). VND/MEQ não exibem a maratona nesta home.
     return <PlatformHome brand={aparencia.brand} theme={theme} data={homeData} />
   }
 

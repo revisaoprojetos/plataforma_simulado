@@ -19,7 +19,7 @@ import { SidebarProvider } from '@/components/ui/sidebar'
 import { SidebarEdgeToggle } from '@/components/ui/sidebar-collapse'
 import { AlunoSidebar, type ProgressoAluno } from '@/components/aluno/aluno-sidebar'
 import { AlunoMobileNav } from '@/components/aluno/aluno-mobile-nav'
-import { NavProgress } from '@/components/admin/nav-progress'
+import { NavProgress } from '@/components/brand/nav-progress'
 import { AreaEmManutencao } from '@/components/admin/area-em-manutencao'
 import { cn } from '@/lib/utils'
 import type { LoginConfig } from '@/lib/login-config'
@@ -63,7 +63,8 @@ type Props = AlunoShellProps & { revisao?: RevisaoShellData }
 export function AlunoShell(props: Props) {
   const { brand, children } = props
 
-  if (brand === 'vnd') return <ShellVND {...props}>{children}</ShellVND>
+  // MAC reaproveita o shell do VND (top bar), recolorido bordô via corMarca + tokens mac.
+  if (brand === 'vnd' || brand === 'mac') return <ShellVND {...props}>{children}</ShellVND>
   if (brand === 'meq') return <ShellMEQ {...props}>{children}</ShellMEQ>
 
   // ── REVISÃO: shell atual, idêntico ao de produção ──
@@ -97,7 +98,7 @@ export function AlunoShell(props: Props) {
         <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
           {/* Toggle de recolher a sidebar: só no desktop (no mobile vale o chrome abaixo). */}
           <SidebarEdgeToggle hideOnMobile />
-          <Suspense fallback={null}><NavProgress /></Suspense>
+          <NavProgress edge="top" />
           {/* Folga no mobile conforme o modo: 'menu' → app bar no topo (pt); 'tabs' → barra embaixo (pb). */}
           <main className={cn('flex-1 overflow-y-auto p-4 md:p-6', r.navMode === 'menu' ? 'pt-[4.5rem] md:pt-6' : 'pb-24 md:pb-6')}>
             {r.areaBloqueada ? <AreaEmManutencao area={r.areaBloqueada} /> : children}

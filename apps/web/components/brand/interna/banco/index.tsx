@@ -10,6 +10,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { ClipboardCheck, Check, Percent, BookOpen, Search, SlidersHorizontal, X, FileText, Star, Loader2 } from 'lucide-react'
 import { internaTokensStyle, internaVars, INTERNA_FONT, type Brand, type InternaTheme } from '../interna-tokens'
 import { useTemaInterno } from '../use-tema-interno'
+import { useCm } from '@/lib/brand/cor-marca'
 import type { QuestaoAluno } from '@/components/aluno/questao-resolvivel'
 import { QCore } from '../qcore'
 import { useBancoNav } from '@/components/aluno/banco-questoes-client'
@@ -54,6 +55,7 @@ export function PlatformBanco({
   porDia?: { label: string; n: number }[]
 }) {
   const theme = useTemaInterno(themeProp)
+  const cm = useCm()
   const { nav, pending } = useBancoNav()
   // Popup dos selects tematizado com os tokens MEQ do tema RESOLVIDO (inclui azul). Sem isto o dropdown
   // (portalado p/ fora do .app) fica branco com accent roxo do shadcn — o "branco em volta das opções".
@@ -107,8 +109,8 @@ export function PlatformBanco({
 
   const kpis: { icon: ReactNode; cor: string; bg: string; valor: string; rotulo: string }[] = [
     { icon: <ClipboardCheck size={17} />, cor: 'var(--brand)', bg: 'var(--chip)', valor: fmt(stats.resolvidas), rotulo: 'resolvidas' },
-    { icon: <Check size={17} />, cor: '#1FA868', bg: 'rgba(31,168,104,.14)', valor: fmt(stats.acertos), rotulo: 'acertos' },
-    { icon: <Percent size={17} />, cor: '#D99A1E', bg: 'rgba(217,154,30,.16)', valor: `${stats.aproveitamento}%`, rotulo: 'aproveitamento' },
+    { icon: <Check size={17} />, cor: cm('#1FA868'), bg: cm('rgba(31,168,104,.14)'), valor: fmt(stats.acertos), rotulo: 'acertos' },
+    { icon: <Percent size={17} />, cor: cm('#D99A1E'), bg: cm('rgba(217,154,30,.16)'), valor: `${stats.aproveitamento}%`, rotulo: 'aproveitamento' },
     { icon: <BookOpen size={17} />, cor: 'var(--brand)', bg: 'var(--chip)', valor: fmt(stats.total), rotulo: 'questões no filtro' },
   ]
 
@@ -207,7 +209,7 @@ export function PlatformBanco({
               <ToggleLinha on={f.favoritas === '1'} onClick={() => toggle('favoritas')} icon={<Star size={14} />} label="Somente favoritas" />
             </div>
 
-            <button type="button" onClick={aplicar} style={{ width: '100%', marginTop: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 46, borderRadius: 12, border: 0, background: 'var(--brand)', color: '#FFFFFF', fontSize: 13.5, fontWeight: 800, cursor: 'pointer', boxShadow: '0 10px 20px -12px color-mix(in oklab, var(--brand) 70%, transparent)' }}>
+            <button type="button" onClick={aplicar} style={{ width: '100%', marginTop: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 46, borderRadius: 12, border: 0, background: 'var(--brand)', color: cm('#FFFFFF'), fontSize: 13.5, fontWeight: 800, cursor: 'pointer', boxShadow: '0 10px 20px -12px color-mix(in oklab, var(--brand) 70%, transparent)' }}>
               <Search size={14} />Filtrar {fmt(stats.total)} questões
             </button>
           </aside>
@@ -222,7 +224,7 @@ export function PlatformBanco({
                 {SEGMENTOS.map((s) => {
                   const ativo = segAtivo === s.v
                   return (
-                    <button key={s.v || 'all'} type="button" onClick={() => irSegmento(s.v)} style={{ flexShrink: 0, height: 32, padding: '0 12px', borderRadius: 99, border: '1px solid var(--line)', background: ativo ? 'var(--brand)' : 'var(--surface)', color: ativo ? '#FFFFFF' : 'var(--muted)', fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap', cursor: 'pointer' }}>{s.r}</button>
+                    <button key={s.v || 'all'} type="button" onClick={() => irSegmento(s.v)} style={{ flexShrink: 0, height: 32, padding: '0 12px', borderRadius: 99, border: '1px solid var(--line)', background: ativo ? 'var(--brand)' : 'var(--surface)', color: ativo ? cm('#FFFFFF') : 'var(--muted)', fontSize: 12.5, fontWeight: 700, whiteSpace: 'nowrap', cursor: 'pointer' }}>{s.r}</button>
                   )
                 })}
               </div>
@@ -266,14 +268,15 @@ export function PlatformBanco({
 /** Card compacto "Desempenho neste recorte" — resolvidas/acertos/erros do aluno dentro do filtro
  *  atual + mini-gráfico de questões por dia da semana. Só dado real (vindo do servidor). */
 function DesempenhoFiltroCard({ d, porDia }: { d: { acertos: number; erros: number; resolvidas: number }; porDia?: { label: string; n: number }[] }) {
+  const cm = useCm()
   const pct = d.resolvidas > 0 ? Math.round((d.acertos / d.resolvidas) * 100) : 0
   const maxDia = Math.max(1, ...(porDia ?? []).map((x) => x.n))
   return (
     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16, padding: '14px 16px', borderRadius: 16, background: 'var(--surface)', border: '1px solid var(--line)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: 1, minWidth: 200 }}>
         <div><b style={{ display: 'block', fontSize: 18, fontWeight: 800, color: 'var(--ink)' }}>{fmt(d.resolvidas)}</b><span style={{ fontSize: 11.5, color: 'var(--muted)' }}>resolvidas no filtro</span></div>
-        <div><b style={{ display: 'block', fontSize: 18, fontWeight: 800, color: '#1FA868' }}>{fmt(d.acertos)}</b><span style={{ fontSize: 11.5, color: 'var(--muted)' }}>acertos</span></div>
-        <div><b style={{ display: 'block', fontSize: 18, fontWeight: 800, color: '#E5484D' }}>{fmt(d.erros)}</b><span style={{ fontSize: 11.5, color: 'var(--muted)' }}>erros</span></div>
+        <div><b style={{ display: 'block', fontSize: 18, fontWeight: 800, color: cm('#1FA868') }}>{fmt(d.acertos)}</b><span style={{ fontSize: 11.5, color: 'var(--muted)' }}>acertos</span></div>
+        <div><b style={{ display: 'block', fontSize: 18, fontWeight: 800, color: cm('#E5484D') }}>{fmt(d.erros)}</b><span style={{ fontSize: 11.5, color: 'var(--muted)' }}>erros</span></div>
         <div><b style={{ display: 'block', fontSize: 18, fontWeight: 800, color: 'var(--brand)' }}>{pct}%</b><span style={{ fontSize: 11.5, color: 'var(--muted)' }}>aproveitamento</span></div>
       </div>
       {porDia && porDia.length > 0 && (
@@ -316,11 +319,12 @@ function FiltroSelect({ value, onChange, options, placeholder }: { value: string
 }
 
 function ToggleLinha({ on, onClick, icon, label }: { on: boolean; onClick: () => void; icon: ReactNode; label: string }) {
+  const cm = useCm()
   return (
     <button type="button" onClick={onClick} aria-pressed={on} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, width: '100%', height: 40, padding: '0 12px', borderRadius: 12, border: '1px solid var(--line)', background: on ? 'var(--chip)' : 'var(--surface2)', color: on ? 'var(--brand)' : 'var(--ink)', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>{icon}{label}</span>
       <span style={{ position: 'relative', width: 34, height: 20, borderRadius: 99, background: on ? 'var(--brand)' : 'var(--line)', flexShrink: 0, transition: 'background .15s' }}>
-        <span style={{ position: 'absolute', top: 2, left: on ? 16 : 2, width: 16, height: 16, borderRadius: 50, background: '#FFFFFF', transition: 'left .15s' }} />
+        <span style={{ position: 'absolute', top: 2, left: on ? 16 : 2, width: 16, height: 16, borderRadius: 50, background: cm('#FFFFFF'), transition: 'left .15s' }} />
       </span>
     </button>
   )

@@ -111,6 +111,27 @@
   --sel-audio: #1F5BC4; --sel-audio-bg: #E4EEFF;
 }
 
+/* ─── Transição suave ao TROCAR o tema (claro ↔ escuro) ───────────────────────────────
+   Ativa transição das propriedades de COR em TUDO, mas SÓ enquanto o <html> tem `theme-anim`
+   (adicionada por ~450ms pelo <ThemeTransition/> durante a troca). Fora disso não há transição
+   global — zero efeito colateral em hovers/navegação. Só cores (não layout), p/ não "arrastar"
+   posições. Gradientes não interpolam (trocam na hora); o grosso da UI usa cor sólida (tokens). */
+html.theme-anim,
+html.theme-anim *,
+html.theme-anim *::before,
+html.theme-anim *::after {
+  transition-property: background-color, border-color, color, fill, stroke, box-shadow, outline-color, text-decoration-color !important;
+  transition-duration: .32s !important;
+  transition-timing-function: ease !important;
+  transition-delay: 0s !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html.theme-anim,
+  html.theme-anim *,
+  html.theme-anim *::before,
+  html.theme-anim *::after { transition-duration: .01ms !important; }
+}
+
 .dark {
   color-scheme: dark;
   --background: oklch(0.145 0 0);

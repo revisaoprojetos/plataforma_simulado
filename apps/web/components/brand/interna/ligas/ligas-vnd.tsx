@@ -10,6 +10,7 @@ import { useState } from 'react'
 import type { ReactNode } from 'react'
 import { internaTokensStyle, type InternaTheme } from '../interna-tokens'
 import { useTemaInterno } from '../use-tema-interno'
+import { useBrandAtual, useCm } from '@/lib/brand/cor-marca'
 import { useIsMobile } from '../perfil/use-is-mobile'
 import { Ic, Escudo, DivTrack, Podio, SemanaBars, LigaTabs, PrivacyNote, RankingSlot, Painel, StatTile, fmtXp, LIGA_BASE_CSS, type LigaTab, type LigaData } from './shared'
 import { PRIVACY } from './mock'
@@ -36,12 +37,14 @@ const RECOMPENSAS: { pos: string; premio: string }[] = [
 ]
 
 export function LigasVnd({ theme: themeProp, data, ranking }: { theme: InternaTheme; data: LigaData; ranking?: ReactNode }) {
+  const marca = useBrandAtual() ?? 'vnd'
+  const cm = useCm()
   const theme = useTemaInterno(themeProp)
   const dark = theme === 'escuro'
   const mobile = useIsMobile()
   const [tab, setTab] = useState<LigaTab>('liga')
   const cor = data.ligaCor ?? GOLD
-  const heroGrad = 'linear-gradient(120deg,#041A10,#0B4A2E 55%,#12643D)'
+  const heroGrad = cm('linear-gradient(120deg,#041A10,#0B4A2E 55%,#12643D)')
 
   const Left = (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -66,11 +69,11 @@ export function LigasVnd({ theme: themeProp, data, ranking }: { theme: InternaTh
 
   // Painel verde escuro "RAIO-X DO ALUNO" (Sua semana)
   const Xray = (
-    <div className="lgvn-xray lgvn-side-sticky" style={{ borderRadius: 'var(--r)', background: 'linear-gradient(150deg,#06301E,#0B4A2E)', color: '#FFF', padding: 18, display: 'flex', flexDirection: 'column', gap: 14, border: `1px solid ${GOLD}33` }}>
+    <div className="lgvn-xray lgvn-side-sticky" style={{ borderRadius: 'var(--r)', background: cm('linear-gradient(150deg,#06301E,#0B4A2E)'), color: cm('#FFF'), padding: 18, display: 'flex', flexDirection: 'column', gap: 14, border: `1px solid ${GOLD}33` }}>
       <span aria-hidden className="dots" />
       <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 2 }}>
         <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.16em', color: GOLD }}>RAIO-X DO ALUNO</span>
-        <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,.72)' }}>Sua semana de estudo</span>
+        <span style={{ fontSize: 12.5, color: cm('rgba(255,255,255,.72)') }}>Sua semana de estudo</span>
       </div>
       <div style={{ position: 'relative' }}>
         <SemanaBars semana={data.semana} cor={GOLD} />
@@ -83,8 +86,8 @@ export function LigasVnd({ theme: themeProp, data, ranking }: { theme: InternaTh
   )
 
   return (
-    <div className="min-h-full" style={{ ...internaTokensStyle('vnd', theme), minHeight: '100%' }}>
-      <style>{CSS}</style>
+    <div className="min-h-full" style={{ ...internaTokensStyle(marca, theme), minHeight: '100%' }}>
+      <style>{cm(CSS)}</style>
       <div className="lgvn-wrap" style={{ padding: mobile ? '14px' : '24px', display: 'flex', flexDirection: 'column', gap: 22, background: 'var(--bg)', minHeight: '100%' }}>
         {/* HERO VERDE com KPIs em vidro */}
         <div className="lgvn-hero" style={{ borderRadius: 'var(--r)', background: heroGrad, color: '#FFF', padding: mobile ? '18px 16px' : '26px 28px', display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -110,7 +113,7 @@ export function LigasVnd({ theme: themeProp, data, ranking }: { theme: InternaTh
         </Painel>
 
         {/* abas */}
-        <LigaTabs tab={tab} onTab={setTab} onCell="#12643D" onInk="#FFF" bg="var(--surface2)" />
+        <LigaTabs tab={tab} onTab={setTab} onCell={cm('#12643D')} onInk={cm('#FFF')} bg="var(--surface2)" />
 
         {tab === 'liga' ? (
           <div className="lg-pv lgvn-liga" key="liga">

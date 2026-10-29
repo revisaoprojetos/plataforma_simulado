@@ -4,7 +4,7 @@ import { isSuperAdmin } from '@/lib/auth/permissions'
 import Link from 'next/link'
 import { Suspense } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
-import { BookOpen, Merge, Tag } from 'lucide-react'
+import { BookOpen, Merge, Tag, Layers } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { QuestoesFilters } from '@/components/admin/questoes-filters'
 import { PaginationControls } from '@/components/admin/pagination-controls'
@@ -12,6 +12,8 @@ import { faixaUuidDoCodigo } from '@/lib/codigo-questao'
 import { NovaQuestaoDialog } from '@/components/admin/nova-questao-dialog'
 import { ExportQuestoesButton } from '@/components/admin/export-questoes-button'
 import { TaxonomiaUnificacao } from '@/components/admin/taxonomia-unificacao'
+import { DisciplinasClassificacao } from '@/components/admin/disciplinas-classificacao'
+import { listarDisciplinasClassificacao, listarPastasConteudo } from './disciplinas-actions'
 import { QuestoesTabela } from '@/components/admin/questoes-tabela'
 import { listarTaxonomia } from './taxonomia-actions'
 import { ehTipoTaxonomia } from './taxonomia-tipos'
@@ -51,9 +53,11 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
 
   const tab = params.tab === 'etiquetas'
     ? 'etiquetas'
-    : (params.tab === 'unificacao' || params.tab === 'disciplinas')
-      ? 'unificacao'
-      : 'questoes'
+    : params.tab === 'classificacao'
+      ? 'classificacao'
+      : (params.tab === 'unificacao' || params.tab === 'disciplinas')
+        ? 'unificacao'
+        : 'questoes'
   const tipoTax = ehTipoTaxonomia(params.tipoTax) ? params.tipoTax : 'disciplina'
 
   const supabase = await createServiceClient()
@@ -133,6 +137,14 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
   // ── Aba ETIQUETAS: rótulos das questões (movida da sidebar para cá) ──
   const etiquetas = tab === 'etiquetas' ? await listarEtiquetas().then((r) => (r.ok ? r.itens ?? [] : [])) : []
 
+  // ── Aba CLASSIFICAÇÃO: disciplinas + classificação/cor/ordem + vínculo pasta→disciplina ──
+  const [discClass, pastasConteudo] = tab === 'classificacao'
+    ? await Promise.all([
+        listarDisciplinasClassificacao().then((r) => (r.ok ? r.itens ?? [] : [])),
+        listarPastasConteudo().then((r) => (r.ok ? r.itens ?? [] : [])),
+      ])
+    : [[], []]
+
   const tabCls = (ativo: boolean) => cn('flex items-center gap-1.5 border-b-2 px-1 pb-2 font-medium transition-colors', ativo ? 'border-primary text-primary' : 'border-transparent text-muted-foreground hover:text-foreground')
 
   return (
@@ -145,7 +157,9 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
               ? `${count ?? 0} questões cadastradas`
               : tab === 'etiquetas'
                 ? `${etiquetas.length} etiqueta(s) — rótulos para organizar e sinalizar questões`
-                : `${itensTax.length} item(ns) — mescle os duplicados`}
+                : tab === 'classificacao'
+                  ? `${discClass.length} disciplina(s) — classifique e dê cor (usado no Cronograma Adaptativo)`
+                  : `${itensTax.length} item(ns) — mescle os duplicados`}
           </p>
         </div>
         {tab === 'questoes' && (
@@ -160,10 +174,13 @@ export default async function QuestoesPage({ searchParams }: PageProps) {
       <div className="flex gap-4 border-b text-sm">
         <Link href="/admin/questoes" className={tabCls(tab === 'questoes')}><BookOpen className="h-4 w-4" /> Questões</Link>
         <Link href="/admin/questoes?tab=unificacao" className={tabCls(tab === 'unificacao')}><Merge className="h-4 w-4" /> Unificação</Link>
+        <Link href="/admin/questoes?tab=classificacao" className={tabCls(tab === 'classificacao')}><Layers className="h-4 w-4" /> Classificação</Link>
         <Link href="/admin/questoes?tab=etiquetas" className={tabCls(tab === 'etiquetas')}><Tag className="h-4 w-4" /> Etiquetas</Link>
       </div>
 
-      {tab === 'etiquetas' ? (
+      {tab === 'classificacao' ? (
+        <DisciplinasClassificacao itens={discClass} pastas={pastasConteudo} />
+      ) : tab === 'etiquetas' ? (
         <EtiquetasClient inicial={etiquetas} />
       ) : tab === 'unificacao' ? (
         <TaxonomiaUnificacao tipo={tipoTax} itens={itensTax} recentes={recentesUnif} />

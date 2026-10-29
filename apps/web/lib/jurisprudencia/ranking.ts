@@ -29,6 +29,21 @@ export async function invalidarRankingJuris(tenantId: string, desafioId: string)
   await esquecer(chaveRankingJuris(tenantId, desafioId))
 }
 
+export interface ProgressoJurisRow { estudante_id: string; dom: any; best: any; atualizado_em: string | null }
+
+/**
+ * Progresso (dom/best por aluno) de TODOS os alunos de um desafio, 1 linha por aluno — CACHEADO (TTL 30s).
+ * É o item de egress PESADO do ranking do arcade (jsonb de todos os alunos): a rota `/api/jurisprudencia/
+ * ranking` lia isto a CADA request e por CADA aba (geral/dia/matéria). Como o conjunto é o MESMO para todos
+ * os alunos e todas as abas (a matemática por aba é barata em memória), 1 leitura por janela de 30s
+ * coalesce o pico de 1000+ alunos. Mesma TTL do ranking rico (carregarRankingJuris) → consistência.
+ */
+export async function progressoDesafioCache(svc: any, tenantId: string, desafioId: string): Promise<ProgressoJurisRow[]> {
+  return remember<ProgressoJurisRow[]>(`relatorio:${tenantId}:juris-progresso:${desafioId}`, 30, () =>
+    fetchAll<ProgressoJurisRow>(() =>
+      svc.from('simulado_jurisprudencia_progresso').select('estudante_id, dom, best, atualizado_em').eq('desafio_id', desafioId).order('estudante_id', { ascending: true })))
+}
+
 /**
  * CAMINHO RÁPIDO (escala): agrega ranking+relatório do juris NO BANCO via `rpc_juris_relatorio_json`
  * (1 query), evitando puxar o progresso inteiro + varrer o ledger no app. Retorna null se a RPC não

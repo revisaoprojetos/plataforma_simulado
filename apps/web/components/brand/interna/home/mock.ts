@@ -73,6 +73,7 @@ function base(brand: Brand): HomeData {
 const MOCKS: Record<Brand, HomeData> = {
   revisao: base('revisao'),
   vnd: { ...base('vnd'), rotativo: ['Defensor(a) Público(a)', 'Analista da Defensoria', 'Técnico(a) da Defensoria'] },
+  mac: { ...base('mac'), rotativo: ['Analista de Tribunal', 'Técnico Judiciário', 'Oficial de Justiça'] },
   meq: {
     ...base('meq'),
     rotativo: ['Tribunais', 'Polícias', 'Fiscais'],

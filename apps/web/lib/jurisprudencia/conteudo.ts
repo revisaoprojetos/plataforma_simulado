@@ -5,6 +5,7 @@ import { getGamConfig } from '@/lib/gamificacao'
 import { cargoParaNivel } from '@/lib/gamificacao/niveis'
 import { cargoIconeSvg } from '@/lib/gamificacao/cargo-icone-svg'
 import { avatarPadraoDe } from '@/lib/aluno/avatar-padrao'
+import { remember, chaveRelatorio } from '@/lib/cache/relatorio-cache'
 
 /**
  * Conteúdo do Desafio de Jurisprudência (JurisClub). O "desafio" é uma PASTA
@@ -219,17 +220,29 @@ export interface DesafioResumo {
  * Desafios (pastas jurisprudencia) que o aluno PODE ver no tenant.
  * imagemTicket = desafio_jogo.imagens?.ticket ?? null (p/ o ticket estilo "Lei Seca").
  */
-export async function desafiosDoAluno(estudanteId: string, tenantId: string): Promise<DesafioResumo[]> {
+export function desafiosDoAluno(estudanteId: string, tenantId: string): Promise<DesafioResumo[]> {
+  // PROGRESSO/acesso do aluno (filtro por atribuição) — cacheado por (tenant, aluno), TTL curto.
+  return remember(chaveRelatorio(tenantId, 'juris-desafios-aluno', estudanteId), 30, () => _desafiosDoAluno(estudanteId, tenantId))
+}
+
+/** CONTEÚDO dos desafios (pastas) do tenant — igual p/ todos; cacheado por tenant com TTL curto. */
+async function desafiosPastasTenant(svc: any, tenantId: string): Promise<any[]> {
+  return remember(chaveRelatorio(tenantId, 'juris-desafios-pastas'), 60, async () => {
+    const { data } = await svc
+      .from('simulado_pastas')
+      .select('id, nome, desafio_jogo')
+      .eq('tenant_id', tenantId)
+      .eq('folder_area', 'jurisprudencia')
+      .eq('is_folder', true)
+      .eq('deletado', false)
+      .order('id', { ascending: true })
+    return (data ?? []) as any[]
+  })
+}
+
+async function _desafiosDoAluno(estudanteId: string, tenantId: string): Promise<DesafioResumo[]> {
   const svc = createAdminClient()
-  const { data: pastas } = await svc
-    .from('simulado_pastas')
-    .select('id, nome, desafio_jogo')
-    .eq('tenant_id', tenantId)
-    .eq('folder_area', 'jurisprudencia')
-    .eq('is_folder', true)
-    .eq('deletado', false)
-    .order('id', { ascending: true })
-  const lista = (pastas ?? []) as any[]
+  const lista = await desafiosPastasTenant(svc, tenantId)
   if (!lista.length) return []
 
   const ids = lista.map((p) => p.id)

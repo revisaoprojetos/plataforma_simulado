@@ -28,7 +28,7 @@
  * secundário (ver `PEACH_SUAVE`).
  */
 
-export type Brand = 'revisao' | 'vnd' | 'meq'
+export type Brand = 'revisao' | 'vnd' | 'meq' | 'mac'
 export type Theme = 'claro' | 'escuro' | 'azul' // 'azul' só MEQ
 
 /** Mapa de tokens de UMA marca+tema. Chaves = nome da CSS var sem o prefixo `--`. */
@@ -70,6 +70,21 @@ export const VND = {
   /** Padrão de pontos (dots) — background-image + tamanho do tile (spec 03 §1.2). */
   dotsPattern:
     'radial-gradient(circle,rgba(185,245,212,.18) 1.2px,transparent 1.8px)',
+  dotsSize: '22px 22px',
+} as const
+
+/**
+ * Gradientes/decoração da MAC (Mentoria Além do Corte) — clone do VND recolorido
+ * para bordô pela tabela de conversão do handoff (TOKENS-MAC.md / mapa-cores.csv).
+ * O dourado (`gold`/`goldInk`) é o MESMO do VND (acento preservado por decisão de marca).
+ */
+export const MAC = {
+  cta: 'linear-gradient(180deg,#781016,#5A0A0E)', // #14924F→#781016, #0C6E3C→#5A0A0E
+  gold: 'linear-gradient(180deg,#F1D48A,#D8B45A)', // inalterado
+  goldInk: '#2A1F02', // inalterado
+  hero: 'linear-gradient(120deg,#150304 0%,#3D090C 55%,#520F12 100%)', // #041A10/#0B4A2E/#12643D
+  dotsPattern:
+    'radial-gradient(circle,rgba(233,197,199,.18) 1.2px,transparent 1.8px)', // rgb(185,245,212)→rgb(233,197,199)
   dotsSize: '22px 22px',
 } as const
 
@@ -145,9 +160,11 @@ const REVISAO_CLARO: TokenMap = {
 }
 
 const REVISAO_ESCURO: TokenMap = {
-  bg: '#18181D',
-  surface: '#232329',
-  surface2: '#2C2C34',
+  // Superfícies ROXAS da marca (antes cinza #18181D/#232329/#2C2C34 "spec 03"; o usuário quer o
+  // mesmo roxo do Recomendado = sim-tokens REV escuro). bg/surface/surface2 = #0E0A24/#1C1440/#171030.
+  bg: '#0E0A24',
+  surface: '#1C1440',
+  surface2: '#171030',
   ink: '#FFFFFF',
   muted: '#BDBBCB',
   muted2: '#73717F',
@@ -160,8 +177,8 @@ const REVISAO_ESCURO: TokenMap = {
   accentInk: '#F1C232',
   peachBg: 'rgba(241,194,50,.12)',
   top: 'rgba(24,16,56,.96)',
-  tBg: '#2C2C34',
-  tOn: '#3A3A44',
+  tBg: '#171030',
+  tOn: '#2A2150',
   tOnInk: '#FFFFFF',
   cnt: 'rgba(143,117,255,.22)',
   cntInk: '#D2C6FF',
@@ -226,6 +243,66 @@ const VND_ESCURO: TokenMap = {
   tabact: 'rgba(63,213,138,.18)',
   tBg: '#1E2A23',
   tOn: '#2A3A31',
+  tOnInk: '#FFFFFF',
+  fOn: '#E8C877',
+  fOnInk: '#2A1F02',
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 1.2b MAC — Mentoria Além do Corte. MESMOS nomes de token do VND; valores bordô
+// (TOKENS-MAC.md). Surfaces/linhas/chips convertidos pela tabela; o DOURADO
+// (gold/goldInk/goldBg) e o branco permanecem iguais ao VND (acento de marca).
+// ─────────────────────────────────────────────────────────────────────────────
+
+const MAC_CLARO: TokenMap = {
+  bg: '#F6F2F2',
+  surface: '#FFFFFF',
+  surface2: '#F7F2F2',
+  ink: '#19090A',
+  muted: '#5E4D4E',
+  muted2: '#C4B5B6',
+  line: '#EAE1E1',
+  line2: '#DDCFD0',
+  track: '#ECE3E3',
+  brand: '#640C11',
+  brandLine: 'rgba(100,12,17,.3)',
+  chip: '#F3E4E5',
+  gold: '#D8B45A',
+  goldInk: '#9A7414',
+  goldBg: '#FBF4E2',
+  topbg: 'rgba(255,255,255,.88)',
+  topink: '#19090A',
+  topmuted: '#5E4D4E',
+  tabact: '#F3E4E5',
+  tBg: '#EDE4E4',
+  tOn: '#FFFFFF',
+  tOnInk: '#19090A',
+  fOn: '#640C11',
+  fOnInk: '#FFFFFF',
+}
+
+const MAC_ESCURO: TokenMap = {
+  bg: '#161917',
+  surface: '#251516',
+  surface2: '#2F1C1D',
+  ink: '#FFFFFF',
+  muted: '#D3C0C1',
+  muted2: '#907173',
+  line: 'rgba(211,122,127,.16)',
+  line2: 'rgba(211,122,127,.26)',
+  track: 'rgba(255,255,255,.14)',
+  brand: '#D37A7F',
+  brandLine: 'rgba(211,122,127,.4)',
+  chip: 'rgba(211,122,127,.15)',
+  gold: '#E8C877',
+  goldInk: '#F1D48A',
+  goldBg: 'rgba(232,200,119,.14)',
+  topbg: 'rgba(28,5,6,.96)',
+  topink: '#FFFFFF',
+  topmuted: '#C7BABB',
+  tabact: 'rgba(200,106,111,.18)',
+  tBg: '#221919',
+  tOn: '#302223',
   tOnInk: '#FFFFFF',
   fOn: '#E8C877',
   fOnInk: '#2A1F02',
@@ -348,6 +425,11 @@ export const LOGIN_BG = {
     claro: 'linear-gradient(150deg,#041A10,#072D1C,#0B3D26)',
     escuro: 'linear-gradient(150deg,#020906,#03100A,#051A10)',
   },
+  mac: {
+    // bordô (conversão da tabela do handoff): #041A10→#150304, #072D1C→#250607, #0B3D26→#32090B.
+    claro: 'linear-gradient(150deg,#150304,#250607,#32090B)',
+    escuro: 'linear-gradient(150deg,#070202,#0D0203,#150405)',
+  },
   meq: {
     claro: 'linear-gradient(150deg,#F6F9FE,#EEF3FB,#E3ECF8)',
     azul: 'linear-gradient(150deg,#2B5FA8,#306AB5,#4497DB)',
@@ -372,6 +454,10 @@ export const BRAND_TOKENS: Record<Brand, Partial<Record<Theme, TokenMap>>> = {
     claro: { ...VND_CLARO, ...SEMANTICOS_VARS },
     escuro: { ...VND_ESCURO, ...SEMANTICOS_VARS },
   },
+  mac: {
+    claro: { ...MAC_CLARO, ...SEMANTICOS_VARS },
+    escuro: { ...MAC_ESCURO, ...SEMANTICOS_VARS },
+  },
   meq: {
     claro: { ...MEQ_CLARO, ...SEMANTICOS_VARS },
     azul: { ...MEQ_AZUL, ...SEMANTICOS_VARS },
@@ -383,6 +469,7 @@ export const BRAND_TOKENS: Record<Brand, Partial<Record<Theme, TokenMap>>> = {
 export const TEMAS_POR_MARCA: Record<Brand, Theme[]> = {
   revisao: ['claro', 'escuro'],
   vnd: ['claro', 'escuro'],
+  mac: ['claro', 'escuro'],
   meq: ['claro', 'azul', 'escuro'],
 }
 

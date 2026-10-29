@@ -7,28 +7,32 @@
 // desenham e recebem a classe-base do contexto (ex. `${P}-vdraw`).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { VND_V_PATH, VND_N_PATH, VND_D_PATH } from '../../brand-marks'
+import { VND_V_PATH, VND_N_PATH, VND_D_PATH, MAC_M_PATH, MAC_A_PATH, MAC_C_PATH } from '../../brand-marks'
+import { useBrandAtual, useCm } from '@/lib/brand/cor-marca'
 
-/** Marca pequena do header: tile verde + "V" + "Você na Defensoria / SIMULA VND". */
+/** Marca pequena do header: tile + "V"/"M" + nome da marca / selo SIMULA. */
 export function HeaderMarca({ cls }: { cls?: string }) {
+  const mac = (useBrandAtual() ?? 'vnd') === 'mac'
+  const cm = useCm()
+  const VPATH = mac ? MAC_M_PATH : VND_V_PATH
   return (
     <div className={cls} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
       <div
         style={{
           width: 42, height: 42, borderRadius: 13,
-          background: 'linear-gradient(160deg,#0F4A2E,#072A1B)',
-          border: '1px solid rgba(120,230,170,.3)',
-          boxShadow: 'inset 0 1px 0 rgba(255,255,255,.12), 0 8px 20px -8px rgba(34,197,110,.5)',
+          background: cm('linear-gradient(160deg,#0F4A2E,#072A1B)'),
+          border: `1px solid ${cm('rgba(120,230,170,.3)')}`,
+          boxShadow: `inset 0 1px 0 rgba(255,255,255,.12), 0 8px 20px -8px ${cm('rgba(34,197,110,.5)')}`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}
       >
         <svg viewBox="0 0 32 32" width={22} height={22} aria-hidden="true">
-          <path d={VND_V_PATH} fill="#3FD58A" />
+          <path d={VPATH} fill={cm('#3FD58A')} />
         </svg>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
-        <span style={{ fontWeight: 800, fontSize: 15, color: '#FFFFFF' }}>Você na Defensoria</span>
-        <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.18em', color: '#86CFA6' }}>SIMULA VND</span>
+        <span style={{ fontWeight: 800, fontSize: 15, color: '#FFFFFF' }}>{mac ? 'Mentoria Além do Corte' : 'Você na Defensoria'}</span>
+        <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.18em', color: cm('#86CFA6') }}>{mac ? 'SIMULA MAC' : 'SIMULA VND'}</span>
       </div>
     </div>
   )
@@ -108,37 +112,49 @@ export function SimulaLockup({
  * As classes de animação (vfill/vdraw/ndw) vêm do <style> da variante.
  */
 export function LockupVND({ P, scale = 1, gradId }: { P: string; scale?: number; gradId: string }) {
+  const mac = (useBrandAtual() ?? 'vnd') === 'mac'
+  const cm = useCm()
+  const VPATH = mac ? MAC_M_PATH : VND_V_PATH
   const vW = 174.6 * scale
   const vH = 120 * scale
-  const ndW = 189.8 * scale
+  const ndW = (mac ? 97.5 : 189.8) * scale // "ac" (viewBox 150×96) é mais estreito que "ND" (292×96)
   const ndH = 62.4 * scale
   const subSize = 15 * scale
   return (
-    <div role="img" aria-label="VND — Você na Defensoria" style={{ display: 'flex', alignItems: 'flex-start', gap: 11 * scale }}>
+    <div role="img" aria-label={mac ? 'MAC — Mentoria Além do Corte' : 'VND — Você na Defensoria'} style={{ display: 'flex', alignItems: 'flex-start', gap: 11 * scale }}>
       <div style={{ position: 'relative', width: vW, height: vH }}>
         <svg className={`${P}-vfill`} viewBox="0.6 5.4 31 21.3" aria-hidden="true"
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible' }}>
           <defs>
             <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0.1" stopColor="#5BE39E" />
-              <stop offset="0.9" stopColor="#22A866" />
+              <stop offset="0.1" stopColor={cm('#5BE39E')} />
+              <stop offset="0.9" stopColor={cm('#22A866')} />
             </linearGradient>
           </defs>
-          <path fill={`url(#${gradId})`} d={VND_V_PATH} />
+          <path fill={`url(#${gradId})`} d={VPATH} />
         </svg>
         <svg className={`${P}-vdraw`} viewBox="0.6 5.4 31 21.3" aria-hidden="true"
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible' }}>
-          <path pathLength={1000} fill="none" stroke="#B9F5D4" strokeWidth={0.2486} strokeLinejoin="round" d={VND_V_PATH} />
+          <path pathLength={1000} fill="none" stroke={cm('#B9F5D4')} strokeWidth={0.2486} strokeLinejoin="round" d={VPATH} />
         </svg>
       </div>
       <div className={`${P}-ndw`} style={{ display: 'flex', flexDirection: 'column', gap: 12 * scale, marginTop: 24 * scale }}>
-        <svg viewBox="38 23 292 96" aria-hidden="true" style={{ display: 'block', width: ndW, height: ndH, overflow: 'visible' }}>
-          <path fill="#FFFFFF" d={VND_N_PATH} />
-          <path fill="#FFFFFF" d={VND_D_PATH} />
+        <svg viewBox={mac ? '38 23 150 96' : '38 23 292 96'} aria-hidden="true" style={{ display: 'block', width: ndW, height: ndH, overflow: 'visible' }}>
+          {mac ? (
+            <>
+              <path fill="#FFFFFF" d={MAC_A_PATH} />
+              <path fill="#FFFFFF" d={MAC_C_PATH} />
+            </>
+          ) : (
+            <>
+              <path fill="#FFFFFF" d={VND_N_PATH} />
+              <path fill="#FFFFFF" d={VND_D_PATH} />
+            </>
+          )}
         </svg>
         <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.12, fontWeight: 800, fontSize: subSize, letterSpacing: '.06em', color: '#E9EFEC', paddingLeft: 2 }}>
-          <span style={{ fontWeight: 600, color: '#CFDCD5' }}>VOCÊ NA</span>
-          <span>DEFENSORIA</span>
+          <span style={{ fontWeight: 600, color: '#CFDCD5' }}>{mac ? 'MENTORIA' : 'VOCÊ NA'}</span>
+          <span>{mac ? 'ALÉM DO CORTE' : 'DEFENSORIA'}</span>
         </div>
       </div>
     </div>

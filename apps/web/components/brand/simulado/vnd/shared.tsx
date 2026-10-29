@@ -7,6 +7,8 @@
 import { X } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { cn } from '@/lib/utils'
+import { useCm, useBrandAtual } from '@/lib/brand/cor-marca'
+import { MAC_M_PATH } from '../../brand-marks'
 
 // Acentos de marca fixos (spec §0 "Botão primário").
 export const VND_BTN = 'linear-gradient(180deg,#14924F,#0C6E3C)'
@@ -26,15 +28,18 @@ export const C_STAR = '#E8B23A'
 const V_PATH =
   'M1.00 5.90L11.51 5.77Q12.20 5.76 12.53 6.13L21.21 15.98Q21.47 16.25 21.57 15.86L21.60 8.10C21.60 7.05 20.81 6.30 19.76 5.88L30.57 5.90Q31.00 5.91 30.74 6.33L23.18 14.49C22.26 15.55 21.80 16.65 21.73 18.23L21.67 25.45Q21.60 26.24 20.95 25.96L6.03 8.31C4.78 6.96 3.14 6.19 1.00 5.90Z'
 
-/** Logo VND (losango verde). `size` em px. */
+/** Logo VND (losango verde) — MAC troca o "V" pelo "M" e recolore via cm. `size` em px. */
 export function MarcaVND({ size = 20, radius = 11 }: { size?: number; radius?: number }) {
+  const cm = useCm()
+  const marca = useBrandAtual() ?? 'vnd'
+  const VPATH = marca === 'mac' ? MAC_M_PATH : V_PATH
   return (
     <span
       style={{
         width: size + 16,
         height: size + 16,
         borderRadius: radius,
-        background: VND_TILE_BG,
+        background: cm(VND_TILE_BG),
         display: 'inline-flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -42,7 +47,7 @@ export function MarcaVND({ size = 20, radius = 11 }: { size?: number; radius?: n
       }}
     >
       <svg viewBox="0 0 32 32" style={{ width: size, height: size }} aria-hidden="true">
-        <path d={V_PATH} fill={VND_GREEN} />
+        <path d={VPATH} fill={cm(VND_GREEN)} />
       </svg>
     </span>
   )
@@ -91,16 +96,17 @@ export function sharedKeyframes(prefix: string) {
  * Renderizar UMA vez por tela; conteúdo em z-index:1.
  */
 export function Bgfx({ prefix, variant }: { prefix: string; variant: 'entrada' | 'soft' }) {
+  const cm = useCm()
   const dots =
     variant === 'entrada'
       ? {
-          backgroundImage: 'radial-gradient(circle,rgba(63,213,138,.22) 1.2px,transparent 1.8px)',
+          backgroundImage: cm('radial-gradient(circle,rgba(63,213,138,.22) 1.2px,transparent 1.8px)'),
           backgroundSize: '22px 22px',
           WebkitMaskImage: 'linear-gradient(180deg,#000 30%,transparent 90%)',
           maskImage: 'linear-gradient(180deg,#000 30%,transparent 90%)',
         }
       : {
-          backgroundImage: 'radial-gradient(circle,rgba(63,213,138,.2) 1.2px,transparent 1.8px)',
+          backgroundImage: cm('radial-gradient(circle,rgba(63,213,138,.2) 1.2px,transparent 1.8px)'),
           backgroundSize: '22px 22px',
           WebkitMaskImage: 'radial-gradient(ellipse at 50% 0%,#000,transparent 75%)',
           maskImage: 'radial-gradient(ellipse at 50% 0%,#000,transparent 75%)',
@@ -115,7 +121,7 @@ export function Bgfx({ prefix, variant }: { prefix: string; variant: 'entrada' |
             right: 0,
             top: 0,
             height: 560,
-            background: 'linear-gradient(180deg,#041A10 0%,#0B4A2E 55%,transparent 100%)',
+            background: cm('linear-gradient(180deg,#041A10 0%,#0B4A2E 55%,transparent 100%)'),
           }}
         />
       )}
@@ -130,7 +136,7 @@ export function Bgfx({ prefix, variant }: { prefix: string; variant: 'entrada' |
             top: '-20%',
             width: s.w,
             height: '140%',
-            background: `linear-gradient(180deg,transparent,${s.c},transparent)`,
+            background: `linear-gradient(180deg,transparent,${cm(s.c)},transparent)`,
             transform: 'rotate(28deg)',
             animationDelay: s.d,
           }}
@@ -145,7 +151,7 @@ export function Bgfx({ prefix, variant }: { prefix: string; variant: 'entrada' |
           width: 380,
           height: 380,
           borderRadius: '50%',
-          background: 'rgba(232,200,119,.22)',
+          background: cm('rgba(232,200,119,.22)'),
           filter: 'blur(126px)',
         }}
       />
@@ -158,7 +164,7 @@ export function Bgfx({ prefix, variant }: { prefix: string; variant: 'entrada' |
           width: 360,
           height: 360,
           borderRadius: '50%',
-          background: 'rgba(63,213,138,.18)',
+          background: cm('rgba(63,213,138,.18)'),
           filter: 'blur(120px)',
           animationDelay: '4s',
         }}
@@ -176,7 +182,7 @@ export function Bgfx({ prefix, variant }: { prefix: string; variant: 'entrada' |
               <path
                 d="M0 0 L100 112 L200 0"
                 fill="none"
-                stroke={i === 0 ? 'rgba(232,200,119,.55)' : i === 1 ? 'rgba(185,245,212,.14)' : 'rgba(185,245,212,.1)'}
+                stroke={cm(i === 0 ? 'rgba(232,200,119,.55)' : i === 1 ? 'rgba(185,245,212,.14)' : 'rgba(185,245,212,.1)')}
                 strokeWidth={i === 0 ? 2 : 1.2}
                 vectorEffect="non-scaling-stroke"
               />
@@ -206,13 +212,13 @@ export function card3d(extra?: React.CSSProperties): React.CSSProperties {
   }
 }
 
-/** Botão primário VND (verde 3D). */
-export function primaryBtnStyle(extra?: React.CSSProperties): React.CSSProperties {
+/** Botão primário VND (verde 3D). `cm` recolore p/ bordô na MAC (identidade nas demais). */
+export function primaryBtnStyle(extra?: React.CSSProperties, cm: (v: string) => string = (v) => v): React.CSSProperties {
   return {
     border: 0,
-    background: VND_BTN,
+    background: cm(VND_BTN),
     color: '#FFFFFF',
-    boxShadow: VND_BTN_SHADOW,
+    boxShadow: cm(VND_BTN_SHADOW),
     fontWeight: 800,
     display: 'inline-flex',
     alignItems: 'center',
@@ -267,6 +273,7 @@ export function ModalShell({
   plain?: boolean
   closeOnBackdrop?: boolean
 }) {
+  const cm = useCm()
   return (
     <>
       <div
@@ -303,7 +310,7 @@ export function ModalShell({
         {!plain && (
           <>
             <span
-              style={{ display: 'block', height: 5, background: 'linear-gradient(90deg,#0F7A44,#3FD58A 60%,#E8C877)' }}
+              style={{ display: 'block', height: 5, background: cm('linear-gradient(90deg,#0F7A44,#3FD58A 60%,#E8C877)') }}
             />
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '22px 24px 4px' }}>
               {icon && (
@@ -382,6 +389,7 @@ const CF = [
 ]
 
 export function Confetti({ prefix }: { prefix: string }) {
+  const cm = useCm()
   return (
     <>
       {CF.map((c, i) => (
@@ -396,7 +404,7 @@ export function Confetti({ prefix }: { prefix: string }) {
             width: c.w,
             height: c.h,
             borderRadius: 2,
-            background: c.bg,
+            background: cm(c.bg),
             animationDelay: c.d,
             transform: `rotate(${c.r}deg)`,
           }}

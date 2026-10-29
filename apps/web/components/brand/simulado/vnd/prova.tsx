@@ -21,6 +21,7 @@ import {
   Zap,
 } from 'lucide-react'
 import { simTokensStyle } from '../sim-tokens'
+import { useBrandAtual, useCm } from '@/lib/brand/cor-marca'
 import type { SimScreenProps } from '../types'
 import {
   Bgfx,
@@ -40,6 +41,8 @@ const LETTERS = ['A', 'B', 'C', 'D', 'E']
 type Modal = null | 'rev' | 'conf' | 'ok'
 
 export function ProvaVND({ theme, data, mo = 'cad' }: SimScreenProps) {
+  const marca = useBrandAtual() ?? 'vnd'
+  const cm = useCm()
   const { info, questoes, tentativa } = data
   const N = info.n
 
@@ -96,8 +99,8 @@ export function ProvaVND({ theme, data, mo = 'cad' }: SimScreenProps) {
   const timer = info.duracaoMin ? '02:47:15' : '00:42'
 
   return (
-    <div className={`${P}-app`} style={{ ...simTokensStyle('vnd', theme), minHeight: '100vh', position: 'relative' }}>
-      <style>{css}</style>
+    <div className={`${P}-app`} style={{ ...simTokensStyle(marca, theme), minHeight: '100vh', position: 'relative' }}>
+      <style>{cm(css)}</style>
       <Bgfx prefix={P} variant="soft" />
 
       <div style={{ position: 'relative', zIndex: 1 }}>
@@ -141,7 +144,7 @@ export function ProvaVND({ theme, data, mo = 'cad' }: SimScreenProps) {
           <button type="button" aria-label="Tamanho da letra" className={`${P}-iconbtn`} onClick={() => setFz((f) => (f + 1) % 3)}>
             <span style={{ fontSize: 13 }}>{fzLab}</span>
           </button>
-          <button type="button" onClick={() => setMd('rev')} className={`${P}-sbtn ${P}-finbtn`} style={primaryBtnStyle({ height: 40, padding: '0 16px', borderRadius: 11, fontSize: 13.5 })}>
+          <button type="button" onClick={() => setMd('rev')} className={`${P}-sbtn ${P}-finbtn`} style={primaryBtnStyle({ height: 40, padding: '0 16px', borderRadius: 11, fontSize: 13.5 }, cm)}>
             <Check size={15} /> <span className={`${P}-finlbl`}>Finalizar</span>
           </button>
 
@@ -266,7 +269,7 @@ export function ProvaVND({ theme, data, mo = 'cad' }: SimScreenProps) {
                       type="button"
                       onClick={() => (qi === N ? setMd('rev') : setQi((v) => Math.min(N, v + 1)))}
                       className={`${P}-sbtn`}
-                      style={primaryBtnStyle({ height: 46, padding: '0 20px', borderRadius: 12, fontSize: 14 })}
+                      style={primaryBtnStyle({ height: 46, padding: '0 20px', borderRadius: 12, fontSize: 14 }, cm)}
                     >
                       Próximo <ChevronRight size={15} />
                     </button>
@@ -338,7 +341,7 @@ export function ProvaVND({ theme, data, mo = 'cad' }: SimScreenProps) {
               type="button"
               onClick={() => (qi === N ? setMd('rev') : setQi((v) => Math.min(N, v + 1)))}
               className={`${P}-sbtn`}
-              style={primaryBtnStyle({ height: 46, padding: '0 13px', borderRadius: 12, fontSize: 14 })}
+              style={primaryBtnStyle({ height: 46, padding: '0 13px', borderRadius: 12, fontSize: 14 }, cm)}
             >
               Próximo <ChevronRight size={15} />
             </button>
@@ -395,7 +398,7 @@ export function ProvaVND({ theme, data, mo = 'cad' }: SimScreenProps) {
             <button type="button" onClick={() => setMd(null)} className={`${P}-sbtn`} style={ghostBtnStyle({ height: 48, padding: '0 20px', borderRadius: 16, fontSize: 14.5, flex: '1 1 auto' })}>
               Continuar respondendo
             </button>
-            <button type="button" onClick={() => { setCk(false); setMd('conf') }} className={`${P}-sbtn`} style={primaryBtnStyle({ height: 48, padding: '0 20px', borderRadius: 16, fontSize: 14.5, flex: '1 1 auto' })}>
+            <button type="button" onClick={() => { setCk(false); setMd('conf') }} className={`${P}-sbtn`} style={primaryBtnStyle({ height: 48, padding: '0 20px', borderRadius: 16, fontSize: 14.5, flex: '1 1 auto' }, cm)}>
               <Check size={17} /> Finalizar e enviar
             </button>
           </div>
@@ -425,7 +428,7 @@ export function ProvaVND({ theme, data, mo = 'cad' }: SimScreenProps) {
                 type="button"
                 onClick={() => ck && setMd('ok')}
                 className={`${P}-sbtn`}
-                style={primaryBtnStyle({ height: 50, borderRadius: 16, fontSize: 14.5, flex: 1, opacity: ck ? 1 : 0.45, pointerEvents: ck ? 'auto' : 'none', transition: 'opacity .2s' })}
+                style={primaryBtnStyle({ height: 50, borderRadius: 16, fontSize: 14.5, flex: 1, opacity: ck ? 1 : 0.45, pointerEvents: ck ? 'auto' : 'none', transition: 'opacity .2s' }, cm)}
               >
                 <Check size={16} /> Sim, enviar agora
               </button>
@@ -443,7 +446,7 @@ export function ProvaVND({ theme, data, mo = 'cad' }: SimScreenProps) {
             </span>
             <b style={{ fontSize: 22, letterSpacing: '-0.03em', color: 'var(--ink)' }}>Simulado enviado!</b>
             <span style={{ fontSize: 14, color: 'var(--muted)' }}>+120 XP creditados na sua liga!</span>
-            <a href="#" className={`${P}-sbtn`} style={{ ...primaryBtnStyle({ width: '100%', height: 52, borderRadius: 16, fontSize: 15 }), textDecoration: 'none' }}>
+            <a href="#" className={`${P}-sbtn`} style={{ ...primaryBtnStyle({ width: '100%', height: 52, borderRadius: 16, fontSize: 15 }, cm), textDecoration: 'none' }}>
               <TrendingUp size={16} /> Ver meu resultado
             </a>
           </div>

@@ -7,8 +7,9 @@
 
 import { LoginForm } from '../login-form'
 import type { LoginFormTokens, LoginVariantProps } from '../types'
-import { VND_V_PATH } from '../../brand-marks'
+import { VND_V_PATH, MAC_M_PATH } from '../../brand-marks'
 import { HeaderMarca, AjudaBtn, SimulaLockup, Uline, LineIcon } from './shared'
+import { useBrandAtual, useCm } from '@/lib/brand/cor-marca'
 
 const P = 'vlc'
 
@@ -37,48 +38,60 @@ const CARD_BG = {
 }
 
 export function VndCentralizado({ theme, core, preview, simula }: LoginVariantProps & { simula: boolean }) {
+  const marca = useBrandAtual() ?? 'vnd'
+  const mac = marca === 'mac'
+  const cm = useCm()
+  const VPATH = mac ? MAC_M_PATH : VND_V_PATH
   const t = theme === 'escuro' ? 'escuro' : 'claro'
-  const glowA = t === 'claro' ? 'rgba(34,197,110,.34)' : 'rgba(34,197,110,.2)'
-  const glowB = t === 'claro' ? 'rgba(52,200,140,.24)' : 'rgba(52,200,140,.14)'
+  const glowA = cm(t === 'claro' ? 'rgba(34,197,110,.34)' : 'rgba(34,197,110,.2)')
+  const glowB = cm(t === 'claro' ? 'rgba(52,200,140,.24)' : 'rgba(52,200,140,.14)')
+  // Tokens do formulário (verdes → bordô via cm; identidade p/ VND).
+  const tok0 = TOKENS[t]
+  const tokens: LoginFormTokens = {
+    ...tok0,
+    fg: cm(tok0.fg), muted: cm(tok0.muted), fieldBg: cm(tok0.fieldBg), fieldBorder: cm(tok0.fieldBorder),
+    fieldFg: cm(tok0.fieldFg), primary: cm(tok0.primary), ctaBg: cm(tok0.ctaBg), ctaFg: tok0.ctaFg,
+    pillBg: cm(tok0.pillBg), pillFg: cm(tok0.pillFg), pillBorder: cm(tok0.pillBorder),
+  }
 
   return (
     <div
       className={`${P}-root`}
       style={{
-        position: 'relative', overflow: 'hidden', minHeight: '100vh', background: PAGE_BG[t],
+        position: 'relative', overflow: 'hidden', minHeight: '100vh', background: cm(PAGE_BG[t]),
         fontFamily: "'Plus Jakarta Sans', sans-serif", color: '#FFFFFF', display: 'flex', flexDirection: 'column',
       }}
     >
-      <style>{css}</style>
+      <style>{cm(css)}</style>
 
       {/* grade + glows */}
       <div className={`${P}-grid ${P}-gridIn`} aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }} />
       <div className={`${P}-glowIn`} aria-hidden="true" style={{ position: 'absolute', width: 1200, height: 1200, left: '50%', top: '50%', margin: '-660px 0 0 -600px', background: `radial-gradient(closest-side,${glowA},rgba(34,197,110,0))`, pointerEvents: 'none' }} />
       <div className={`${P}-glowIn`} aria-hidden="true" style={{ position: 'absolute', width: 720, height: 720, right: -240, bottom: -300, background: `radial-gradient(closest-side,${glowB},rgba(52,200,140,0))`, pointerEvents: 'none' }} />
-      <div className={`${P}-glowIn`} aria-hidden="true" style={{ position: 'absolute', width: 720, height: 720, left: -260, top: -280, background: 'radial-gradient(closest-side,rgba(63,213,138,.2),rgba(63,213,138,0))', pointerEvents: 'none' }} />
-      <div className={`${P}-glowIn`} aria-hidden="true" style={{ position: 'absolute', width: 520, height: 520, left: -160, bottom: -220, background: 'radial-gradient(closest-side,rgba(63,213,138,.12),rgba(63,213,138,0))', pointerEvents: 'none' }} />
+      <div className={`${P}-glowIn`} aria-hidden="true" style={{ position: 'absolute', width: 720, height: 720, left: -260, top: -280, background: cm('radial-gradient(closest-side,rgba(63,213,138,.2),rgba(63,213,138,0))'), pointerEvents: 'none' }} />
+      <div className={`${P}-glowIn`} aria-hidden="true" style={{ position: 'absolute', width: 520, height: 520, left: -160, bottom: -220, background: cm('radial-gradient(closest-side,rgba(63,213,138,.12),rgba(63,213,138,0))'), pointerEvents: 'none' }} />
 
-      {/* V gigante */}
+      {/* "V"/"M" gigante */}
       <div className={`${P}-vwrap`} aria-hidden="true" style={{ position: 'absolute', width: 980, height: 980, left: '50%', top: '50%', margin: '-470px 0 0 -490px', pointerEvents: 'none' }}>
         <svg className={`${P}-vglow`} viewBox="0 0 32 32" aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', filter: 'blur(46px)' }}>
-          <path d={VND_V_PATH} fill="rgba(46,210,120,.32)" />
+          <path d={VPATH} fill={cm('rgba(46,210,120,.32)')} />
         </svg>
         <svg className={`${P}-vfill`} viewBox="0 0 32 32" aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
           <defs>
             <linearGradient id="vlcVg" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0.18" stopColor="#3FD58A" stopOpacity="0.2" />
-              <stop offset="0.55" stopColor="#3FD58A" stopOpacity="0.08" />
-              <stop offset="0.8" stopColor="#3FD58A" stopOpacity="0.02" />
+              <stop offset="0.18" stopColor={cm('#3FD58A')} stopOpacity="0.2" />
+              <stop offset="0.55" stopColor={cm('#3FD58A')} stopOpacity="0.08" />
+              <stop offset="0.8" stopColor={cm('#3FD58A')} stopOpacity="0.02" />
             </linearGradient>
           </defs>
-          <path d={VND_V_PATH} fill="url(#vlcVg)" />
+          <path d={VPATH} fill="url(#vlcVg)" />
         </svg>
         <svg className={`${P}-vdraw`} viewBox="0 0 32 32" aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
-          <path pathLength={1} d={VND_V_PATH} fill="none" stroke="rgba(140,240,185,.42)" strokeWidth={0.07} />
+          <path pathLength={1} d={VPATH} fill="none" stroke={cm('rgba(140,240,185,.42)')} strokeWidth={0.07} />
         </svg>
-        <svg className={`${P}-echo ${P}-e1`} viewBox="0 0 32 32" aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}><path d={VND_V_PATH} fill="none" stroke="rgba(120,230,170,.22)" strokeWidth={0.04} /></svg>
-        <svg className={`${P}-echo ${P}-e2`} viewBox="0 0 32 32" aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}><path d={VND_V_PATH} fill="none" stroke="rgba(216,180,90,.22)" strokeWidth={0.04} /></svg>
-        <svg className={`${P}-echo ${P}-e3`} viewBox="0 0 32 32" aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}><path d={VND_V_PATH} fill="none" stroke="rgba(120,230,170,.22)" strokeWidth={0.04} /></svg>
+        <svg className={`${P}-echo ${P}-e1`} viewBox="0 0 32 32" aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}><path d={VPATH} fill="none" stroke={cm('rgba(120,230,170,.22)')} strokeWidth={0.04} /></svg>
+        <svg className={`${P}-echo ${P}-e2`} viewBox="0 0 32 32" aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}><path d={VPATH} fill="none" stroke="rgba(216,180,90,.22)" strokeWidth={0.04} /></svg>
+        <svg className={`${P}-echo ${P}-e3`} viewBox="0 0 32 32" aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}><path d={VPATH} fill="none" stroke={cm('rgba(120,230,170,.22)')} strokeWidth={0.04} /></svg>
       </div>
 
       <header className={`${P}-up ${P}-d0 ${P}-header`} style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '28px 40px 0' }}>
@@ -93,27 +106,27 @@ export function VndCentralizado({ theme, core, preview, simula }: LoginVariantPr
           </div>
           <h1 className={`${P}-up ${P}-d1 ${P}-h1`} style={{ margin: 0, fontWeight: 800, lineHeight: 1.04, letterSpacing: '-0.045em', color: '#FFFFFF' }}>
             Sua preparação começa{' '}
-            <span style={{ position: 'relative', display: 'inline-block', color: '#3FD58A' }}>
+            <span style={{ position: 'relative', display: 'inline-block', color: cm('#3FD58A') }}>
               aqui.<Uline P={P} />
             </span>
           </h1>
-          <p className={`${P}-up ${P}-d2`} style={{ margin: '6px 0 0', fontSize: 18, lineHeight: 1.6, color: '#B7D3C3' }}>
+          <p className={`${P}-up ${P}-d2`} style={{ margin: '6px 0 0', fontSize: 18, lineHeight: 1.6, color: cm('#B7D3C3') }}>
             Entre com o seu e-mail e continue de onde parou.
           </p>
         </div>
 
         {/* card */}
         <div className={`${P}-pop ${P}-cardwrap`} style={{ position: 'relative', width: '100%', maxWidth: 440 }}>
-          <div className={`${P}-halo`} aria-hidden="true" style={{ position: 'absolute', inset: -14, borderRadius: 40, background: 'linear-gradient(160deg, rgba(63,213,138,.38), rgba(63,213,138,0) 45%, rgba(52,200,140,.26))', filter: 'blur(24px)', pointerEvents: 'none' }} />
+          <div className={`${P}-halo`} aria-hidden="true" style={{ position: 'absolute', inset: -14, borderRadius: 40, background: cm('linear-gradient(160deg, rgba(63,213,138,.38), rgba(63,213,138,0) 45%, rgba(52,200,140,.26))'), filter: 'blur(24px)', pointerEvents: 'none' }} />
           <div
             className={`${P}-card`}
             style={{
-              position: 'relative', background: CARD_BG[t], color: TOKENS[t].fg, borderRadius: 28, padding: 32,
+              position: 'relative', background: cm(CARD_BG[t]), color: tokens.fg, borderRadius: 28, padding: 32,
               boxSizing: 'border-box', boxShadow: '0 40px 80px -30px rgba(0,0,0,.7)', textAlign: 'left',
-              border: t === 'escuro' ? '1px solid rgba(120,230,170,.16)' : 'none',
+              border: t === 'escuro' ? `1px solid ${cm('rgba(120,230,170,.16)')}` : 'none',
             }}
           >
-            <LoginForm brand="vnd" theme={theme} core={core} tokens={TOKENS[t]} preview={preview}
+            <LoginForm brand={marca} theme={theme} core={core} tokens={tokens} preview={preview}
               centro={false} mostrarTitulo tituloAluno="Entrar" ctaLabel="Entrar" />
           </div>
         </div>
@@ -121,12 +134,12 @@ export function VndCentralizado({ theme, core, preview, simula }: LoginVariantPr
         {/* chips */}
         <ul className={`${P}-chips`} style={{ listStyle: 'none', margin: '4px 0 0', padding: 0, display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 10 }}>
           <li className={`${P}-chip ${P}-up ${P}-c1`}>
-            <span className={`${P}-chipi`} style={{ color: '#3FD58A' }}><LineIcon size={15} d={<><rect x={8} y={2} width={8} height={4} rx={1} /><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><path d="m9 14 2 2 4-4" /></>} /></span>
+            <span className={`${P}-chipi`} style={{ color: cm('#3FD58A') }}><LineIcon size={15} d={<><rect x={8} y={2} width={8} height={4} rx={1} /><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><path d="m9 14 2 2 4-4" /></>} /></span>
             Simulados e correção automática
           </li>
           <li className={`${P}-chip ${P}-up ${P}-c2`}>
-            <span className={`${P}-chipi`} style={{ color: '#3FD58A' }}><LineIcon size={15} d={<><path d="m22 7-8.5 8.5-5-5L2 17" /><path d="M16 7h6v6" /></>} /></span>
-            Crescimento na Defensoria
+            <span className={`${P}-chipi`} style={{ color: cm('#3FD58A') }}><LineIcon size={15} d={<><path d="m22 7-8.5 8.5-5-5L2 17" /><path d="M16 7h6v6" /></>} /></span>
+            {mac ? 'Evolução rumo à aprovação' : 'Crescimento na Defensoria'}
           </li>
           <li className={`${P}-chip ${P}-up ${P}-c3`}>
             <span className={`${P}-chipi`} style={{ color: '#E8C877' }}><LineIcon size={15} d={<><path d="M3 3v18h18" /><path d="M18 17V9M13 17V5M8 17v-3" /></>} /></span>
@@ -135,7 +148,7 @@ export function VndCentralizado({ theme, core, preview, simula }: LoginVariantPr
         </ul>
       </main>
 
-      <footer className={`${P}-up ${P}-d7 ${P}-foot`} style={{ position: 'absolute', left: 40, bottom: 26, fontSize: 12, color: '#7FA893' }}>© 2026 Você na Defensoria</footer>
+      <footer className={`${P}-up ${P}-d7 ${P}-foot`} style={{ position: 'absolute', left: 40, bottom: 26, fontSize: 12, color: cm('#7FA893') }}>© 2026 {mac ? 'Mentoria Além do Corte' : 'Você na Defensoria'}</footer>
     </div>
   )
 }

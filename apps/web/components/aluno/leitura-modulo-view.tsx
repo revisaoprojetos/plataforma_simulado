@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
+import { origemSegura } from '@/lib/nova/origem'
 import { Route, BarChart3, Check, Lock, AlertTriangle, ArrowRight, Library, Trophy, ScrollText, Zap, Play, FileText, ExternalLink, Download, Flame } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -63,6 +65,8 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
    *  tenant — para TODAS as marcas, não só MEQ. Vem de resolverInterno() na página. */
   interno?: { brand: Brand; theme: InternaTheme } | null
 }) {
+  // Voltar inteligente: se veio de outra área (?origem, ex.: Cursos), volta pra lá; senão, aos módulos.
+  const voltarHref = origemSegura(useSearchParams().get('origem'), '/aluno/leitura')
   const desafiosAtivos = (desafios ?? []).filter((d) => d.ativo)
   const desemp = desempenhoDesafios ?? { acertos: 0, aulasConcluidas: 0, aulasGabaritadas: 0 }
   // 1ª aula com questões pendentes (leitura feita) → alvo do CTA do aviso.
@@ -185,8 +189,8 @@ export function LeituraModuloView({ modulo, trilha, desempenho, pendentes, aulas
         icone={Library}
         titulo={trilha.nome}
         subtitulo={subtitulo}
-        voltarHref="/aluno/leitura"
-        voltarLabel="Voltar aos módulos"
+        voltarHref={voltarHref}
+        voltarLabel="Voltar"
         breadcrumb={null}
         // main do aluno é p-4 md:p-6 (o admin é p-6) → casa o "bleed" por breakpoint.
         className="-top-4 -mx-4 -mt-4 md:-top-6 md:-mx-6 md:-mt-6"

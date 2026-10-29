@@ -16,7 +16,7 @@ import { ImpersonationDockProvider } from '@/components/admin/impersonation/impe
 import { contagensSidebar } from '@/lib/admin/sidebar-counts'
 import { SplashSistema } from '@/components/admin/splash-sistema'
 import { TourProvider } from '@/components/admin/tour-guiado'
-import { NavProgress } from '@/components/admin/nav-progress'
+import { NavProgress } from '@/components/brand/nav-progress'
 import { AvisoSemAcesso } from '@/components/admin/aviso-sem-acesso'
 import { FontScaleInit } from '@/components/font-scale-init'
 import { Lock } from 'lucide-react'
@@ -181,7 +181,7 @@ export default async function AdminLayout({
           <TourProvider>
             <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden">
               <SidebarEdgeToggle mode="icon" />
-              <Suspense fallback={null}><NavProgress /></Suspense>
+              <NavProgress edge="top" />
               <Suspense fallback={null}><AvisoSemAcesso /></Suspense>
               <main className="flex-1 overflow-y-auto p-6">
                 {semAcesso ? (

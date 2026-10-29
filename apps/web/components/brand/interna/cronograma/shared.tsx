@@ -11,6 +11,7 @@ import {
   Lightbulb, LayoutGrid, List, BarChart3, BookOpen, Layers, ClipboardCheck, Wand2, Info,
 } from 'lucide-react'
 import type { Brand } from '../interna-tokens'
+import type { CronogramaData, MeuView, SemanaView, MetaView } from '@/lib/cronograma/nova-tipos'
 import {
   TYPES, DAY_DEFAULT, OPT_DEFAULT, MEUS, WK, calcPrevia, cellKey, isMarkable, initialDone,
   PLAN_TOTAL_GOALS, PLAN_WEEKS, PLAN_CURRENT_WEEK, STEPS, ROT, DAYN, BASES, OPTS, SUBJ,
@@ -19,7 +20,7 @@ import {
 } from './mock'
 
 export type BrandKey = 'rev' | 'vnd' | 'meq'
-export const brandKey = (b: Brand): BrandKey => (b === 'revisao' ? 'rev' : b === 'vnd' ? 'vnd' : 'meq')
+export const brandKey = (b: Brand): BrandKey => (b === 'revisao' ? 'rev' : b === 'vnd' || b === 'mac' ? 'vnd' : 'meq')
 
 // Raio de card por marca (spec §0): Rev 20, VND 24, MEQ 14 — e raio genérico de controles.
 export const CARD_R: Record<BrandKey, number> = { rev: 20, vnd: 24, meq: 14 }
@@ -214,6 +215,7 @@ export interface CronogramaState {
   weekdays: boolean[]; toggleDay: (d: number) => void
   // passo 2
   bs: BsKey; setBs: (v: BsKey) => void
+  baseId: string; setBaseId: (v: string) => void  // base real selecionada (id do cronograma-base)
   // passo 3
   sd: number; setSd: (v: number) => void
   opts: boolean[]; toggleOpt: (i: number) => void
@@ -243,10 +245,34 @@ export interface CronogramaState {
   // progresso global
   totalDone: number
   pct: number
+  // ── dado REAL (quando presente, dirige meus/plano/grade/lista; senão cai no mock do preview) ──
+  data?: CronogramaData
+  meus: MeuView[]                 // lista a renderizar (real ou mock-adaptado)
+  semanasReais: SemanaView[] | null
+  weeksCount: number              // nº de semanas da grade
+  totalGoals: number
+  planTitle: string
+  planSub: string
+  planWeeks: number
+  planAtividades: number
+  planCurrentWeek: number
+  generating: boolean
+  onGerar?: (baseId: string) => void
 }
 
-export function useCronogramaState(initialTab?: string): CronogramaState {
-  const initCg: Cg = initialTab === 'meus' ? 'meus' : initialTab === 'plano' ? 'plano' : 'gerar'
+export function useCronogramaState(
+  arg1?: string | { data?: CronogramaData; tab?: string; onToggle?: (metaId: string, done: boolean) => void; onGerar?: (baseId: string) => void; generating?: boolean },
+): CronogramaState {
+  // Compat: aceita `useCronogramaState('meus')` (preview/mock) OU um objeto com dado real + handlers.
+  const cfg = typeof arg1 === 'string' ? { tab: arg1 } : (arg1 ?? {})
+  const data = cfg.data
+  const plano = data?.plano ?? null
+  const semanasReais = plano?.semanas ?? null
+  const real = !!semanasReais
+  const semByN = useMemo(() => new Map((semanasReais ?? []).map((s) => [s.n, s])), [semanasReais])
+  const conteudoWeeks = useMemo(() => (semanasReais ?? []).filter((s) => s.kind === 'conteudo').map((s) => s.n), [semanasReais])
+
+  const initCg: Cg = cfg.tab === 'meus' ? 'meus' : cfg.tab === 'plano' ? 'plano' : 'gerar'
   const [cg, setCg] = useState<Cg>(initCg)
   const [gs, setGs] = useState<1 | 2 | 3 | 4>(1)
   const [genNew, setGenNew] = useState(false)
@@ -254,15 +280,18 @@ export function useCronogramaState(initialTab?: string): CronogramaState {
   const [rt, setRt] = useState<RtKey>('2h')
   const [weekdays, setWeekdays] = useState<boolean[]>([...DAY_DEFAULT])
   const [bs, setBs] = useState<BsKey>('pge')
+  const [baseId, setBaseId] = useState<string>(() => data?.bases?.[0]?.id ?? '')
   const [sd, setSd] = useState(12)
   const [opts, setOpts] = useState<boolean[]>([...OPT_DEFAULT])
 
   const [mf, setMf] = useState<'todos' | 'ativos' | 'arq'>('todos')
   const [pv, setPv] = useState<Pv>('grade')
-  const [gw, setGw] = useState(1)
+  const firstWeek = conteudoWeeks[0] ?? 1
+  const [gw, setGw] = useState(real ? firstWeek : 1)
   const [gridRows, setGridRows] = useState<boolean[]>([true, true, true, true])
   const [hd, setHd] = useState(false)
   const [cells, setCells] = useState<Record<string, boolean>>(() => {
+    if (real) return { ...(plano?.checks ?? {}) } // chave = metaId
     const o: Record<string, boolean> = {}
     for (let w = 1; w <= 6; w++) for (let r = 0; r < 4; r++) for (let d = 0; d < 6; d++) {
       if (isMarkable(w, r) && initialDone(w, r, d)) o[cellKey(w, r, d)] = true
@@ -270,50 +299,69 @@ export function useCronogramaState(initialTab?: string): CronogramaState {
     return o
   })
   const [tf, setTf] = useState<TfKey>('all')
-  const [openWeeks, setOpenWeeks] = useState<Record<number, boolean>>({ 1: true })
+  const [openWeeks, setOpenWeeks] = useState<Record<number, boolean>>({ [real ? firstWeek : 1]: true })
 
   const previa = useMemo(() => calcPrevia(rt, bs, weekdays, sd, opts), [rt, bs, weekdays, sd, opts])
 
+  // ── isDone/toggle: REAL usa metaId; mock usa a chave de 3 dígitos ──
   const isDone = (key: string) => {
+    if (real) return !!cells[key]
     const [w, r, d] = [Number(key[0]), Number(key[1]), Number(key[2])]
     if (!isMarkable(w, r)) return false
     return cells[key] ?? initialDone(w, r, d)
   }
   const toggleCell = (key: string) => {
+    if (real) {
+      const novo = !cells[key]
+      setCells((c) => ({ ...c, [key]: novo }))
+      cfg.onToggle?.(key, novo)
+      return
+    }
     const [w, r] = [Number(key[0]), Number(key[1])]
     if (!isMarkable(w, r)) return
     setCells((c) => ({ ...c, [key]: !isDone(key) }))
   }
-  const markWeek = (w: number) => setCells((c) => {
-    const n = { ...c }
-    for (let r = 0; r < 4; r++) for (let d = 0; d < 6; d++) if (isMarkable(w, r)) n[cellKey(w, r, d)] = true
-    return n
-  })
-  const clearWeek = (w: number) => setCells((c) => {
-    const n = { ...c }
-    for (let r = 0; r < 4; r++) for (let d = 0; d < 6; d++) n[cellKey(w, r, d)] = false
-    return n
-  })
+  const markWeek = (w: number) => {
+    if (real) {
+      const metas = semByN.get(w)?.metas ?? []
+      setCells((c) => { const n = { ...c }; for (const m of metas) n[m.id] = true; return n })
+      for (const m of metas) if (!cells[m.id]) cfg.onToggle?.(m.id, true)
+      return
+    }
+    setCells((c) => { const n = { ...c }; for (let r = 0; r < 4; r++) for (let d = 0; d < 6; d++) if (isMarkable(w, r)) n[cellKey(w, r, d)] = true; return n })
+  }
+  const clearWeek = (w: number) => {
+    if (real) {
+      const metas = semByN.get(w)?.metas ?? []
+      setCells((c) => { const n = { ...c }; for (const m of metas) n[m.id] = false; return n })
+      for (const m of metas) if (cells[m.id]) cfg.onToggle?.(m.id, false)
+      return
+    }
+    setCells((c) => { const n = { ...c }; for (let r = 0; r < 4; r++) for (let d = 0; d < 6; d++) n[cellKey(w, r, d)] = false; return n })
+  }
   const weekTotal = (w: number) => {
-    let t = 0
-    for (let r = 0; r < 4; r++) for (let d = 0; d < 6; d++) if (isMarkable(w, r)) t++
-    return t
+    if (real) return (semByN.get(w)?.metas.length ?? 0)
+    let t = 0; for (let r = 0; r < 4; r++) for (let d = 0; d < 6; d++) if (isMarkable(w, r)) t++; return t
   }
   const weekDone = (w: number) => {
-    let n = 0
-    for (let r = 0; r < 4; r++) for (let d = 0; d < 6; d++) if (isMarkable(w, r) && isDone(cellKey(w, r, d))) n++
-    return n
+    if (real) return (semByN.get(w)?.metas ?? []).filter((m) => cells[m.id]).length
+    let n = 0; for (let r = 0; r < 4; r++) for (let d = 0; d < 6; d++) if (isMarkable(w, r) && isDone(cellKey(w, r, d))) n++; return n
   }
 
   const totalDone = useMemo(() => {
-    let n = 0
-    for (let w = 1; w <= 6; w++) n += weekDone(w)
-    return n
+    if (real) return Object.values(cells).filter(Boolean).length
+    let n = 0; for (let w = 1; w <= 6; w++) n += weekDone(w); return n
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cells])
-  const pct = (totalDone / PLAN_TOTAL_GOALS) * 100
+  }, [cells, real])
+  const totalGoals = real ? (plano?.totalGoals ?? 0) : PLAN_TOTAL_GOALS
+  const pct = totalGoals ? (totalDone / totalGoals) * 100 : 0
 
-  const visibleMeus = MEUS.map((m) => mf === 'todos' || (mf === 'ativos' ? m.status === 'ativo' : m.status === 'arq'))
+  // Meus (lista): real = data.meus; mock = MEUS adaptado.
+  const meus: MeuView[] = real || data ? (data?.meus ?? []) : MEUS.map((m, i) => ({ id: String(i), ...m }))
+  const visibleMeus = meus.map((m) => mf === 'todos' || (mf === 'ativos' ? m.status === 'ativo' : m.status === 'arq'))
+
+  const gwPrev = () => setGw((w) => { if (!real) return Math.max(1, w - 1); const i = conteudoWeeks.indexOf(w); return i > 0 ? conteudoWeeks[i - 1] : w })
+  const gwNext = () => setGw((w) => { if (!real) return Math.min(6, w + 1); const i = conteudoWeeks.indexOf(w); return i >= 0 && i < conteudoWeeks.length - 1 ? conteudoWeeks[i + 1] : w })
 
   return {
     cg, setCg,
@@ -321,25 +369,30 @@ export function useCronogramaState(initialTab?: string): CronogramaState {
     goGerar: () => { setCg('gerar'); setGs(1) },
     goMeus: () => setCg('meus'),
     openPlan: () => setCg('plano'),
-    genDone: () => { setCg('plano'); setGenNew(true) },
+    genDone: () => { if (cfg.onGerar) { cfg.onGerar(baseId || data?.bases?.[0]?.id || '') } else { setCg('plano'); setGenNew(true) } },
     genNew,
     rt, setRt,
     weekdays, toggleDay: (d) => setWeekdays((w) => w.map((v, i) => (i === d ? !v : v))),
     bs, setBs,
+    baseId, setBaseId,
     sd, setSd,
     opts, toggleOpt: (i) => setOpts((o) => o.map((v, k) => (k === i ? !v : v))),
     previa,
     mf, setMf, visibleMeus,
     pv, setPv,
     gw, setGw,
-    gwPrev: () => setGw((w) => Math.max(1, w - 1)),
-    gwNext: () => setGw((w) => Math.min(6, w + 1)),
+    gwPrev, gwNext,
     gridRows, toggleGridRow: (r) => setGridRows((g) => g.map((v, i) => (i === r ? !v : v))),
     hd, setHd,
     cells, isDone, toggleCell, markWeek, clearWeek, weekDone, weekTotal,
     tf, setTf,
     openWeeks, toggleWeek: (w) => setOpenWeeks((o) => ({ ...o, [w]: !o[w] })), closeAllWeeks: () => setOpenWeeks({}),
     totalDone, pct,
+    data, meus, semanasReais, weeksCount: real ? conteudoWeeks.length : 6,
+    totalGoals, planTitle: plano?.title ?? '2H', planSub: plano?.baseLabel ?? 'PGE/PGM Completo · 2h por dia',
+    planWeeks: real ? (plano?.weeks ?? 0) : PLAN_WEEKS, planAtividades: totalGoals,
+    planCurrentWeek: real ? (plano?.currentWeek ?? 1) : PLAN_CURRENT_WEEK,
+    generating: !!cfg.generating, onGerar: cfg.onGerar,
   }
 }
 
@@ -377,7 +430,7 @@ export function CgTabs({ k, mobile, st, onDark }: Shared & { onDark?: boolean })
             {!mobile && <Ic n={icons[i]} s={15} />}
             {labels[i]}
             {!mobile && o === 'meus' && (
-              <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 7px', borderRadius: 99, background: onDark ? 'rgba(255,255,255,.18)' : 'var(--chip)', color: on ? tOnInk : off }}>4</span>
+              <span style={{ fontSize: 11, fontWeight: 800, padding: '2px 7px', borderRadius: 99, background: onDark ? 'rgba(255,255,255,.18)' : 'var(--chip)', color: on ? tOnInk : off }}>{st.meus.length}</span>
             )}
           </button>
         )
@@ -487,13 +540,20 @@ function popularStyle(k: BrandKey): CSSProperties {
 
 // ── Passo 2 ──────────────────────────────────────────────────────────────────
 export function Step2({ k, mobile, st }: Shared) {
+  const basesReais = st.data?.bases
+  const lista = basesReais && basesReais.length
+    ? basesReais.map((b) => ({ key: b.id, title: b.title, sub: b.sub, via: b.via, since: b.since, color: b.cor }))
+    : BASES.map((b) => ({ key: b.key as string, title: b.title, sub: b.sub, via: b.via, since: b.since, color: b.color }))
+  const sel = basesReais && basesReais.length ? st.baseId : st.bs
+  const pick = (key: string) => { if (basesReais && basesReais.length) st.setBaseId(key); else st.setBs(key as BsKey) }
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <Cap>Cronogramas liberados para você</Cap>
-      {BASES.map((b) => {
-        const on = st.bs === b.key
+      {lista.length === 0 && <span style={{ fontSize: 13, color: 'var(--muted)' }}>Nenhum cronograma liberado para você ainda.</span>}
+      {lista.map((b) => {
+        const on = sel === b.key
         return (
-          <button key={b.key} type="button" onClick={() => st.setBs(b.key)} className="opt"
+          <button key={b.key} type="button" onClick={() => pick(b.key)} className="opt"
             style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 16, borderRadius: ctrlR(k), border: `${k === 'vnd' ? 2 : 1.5}px solid ${on ? 'var(--selLine)' : 'var(--line)'}`, ...(k === 'vnd' ? { borderBottomWidth: 5 } : null), background: on ? 'var(--chip)' : 'var(--surface)', color: on ? (k === 'meq' ? 'var(--brand2)' : 'var(--brand)') : 'var(--ink)', font: 'inherit', textAlign: 'left', cursor: 'pointer', width: '100%' }}>
             <span style={{ width: 48, height: 48, borderRadius: k === 'rev' ? '50%' : 12, background: b.color, color: '#FFFFFF', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Ic n="books" s={22} /></span>
             <span style={{ flex: 1, minWidth: 0, lineHeight: 1.3 }}>
@@ -715,10 +775,13 @@ export function RevTip() {
 
 // ── Liberados para você ──────────────────────────────────────────────────────
 export function Liberados({ k, st }: { k: BrandKey; st: CronogramaState }) {
+  const bases = st.data?.bases && st.data.bases.length
+    ? st.data.bases.map((b) => ({ key: b.id, title: b.title, via: b.via, since: b.since, color: b.cor }))
+    : BASES.map((b) => ({ key: b.key as string, title: b.title, via: b.via, since: b.since, color: b.color }))
   return (
     <Card k={k} pad={18}>
-      <Head k={k} icon="gift" title="Liberados para você" sub="3 cronogramas base disponíveis" />
-      {BASES.map((b) => (
+      <Head k={k} icon="gift" title="Liberados para você" sub={`${bases.length} cronograma${bases.length === 1 ? '' : 's'} base disponíve${bases.length === 1 ? 'l' : 'is'}`} />
+      {bases.map((b) => (
         <div key={b.key} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 0', borderTop: '1px solid var(--line)' }}>
           <span style={{ width: 38, height: 38, borderRadius: k === 'rev' ? '50%' : 10, background: `color-mix(in srgb,${b.color} 15%,transparent)`, color: b.color, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Ic n="books" s={17} /></span>
           <div style={{ flex: 1, minWidth: 0, lineHeight: 1.3 }}>
@@ -750,21 +813,22 @@ export function MeusList({ k, mobile, st }: Shared) {
             {(['todos', 'ativos', 'arq'] as const).map((o) => {
               const on = st.mf === o
               return (
-                <button key={o} type="button" onClick={() => st.setMf(o)} style={{ height: 32, padding: '0 12px', borderRadius: k === 'meq' ? 8 : 99, border: '1px solid var(--line)', background: on ? 'var(--fOn)' : 'transparent', color: on ? 'var(--fOnInk)' : 'var(--sub)', font: 'inherit', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>{MEUS_FILTER_LAB[o]}</button>
+                <button key={o} type="button" onClick={() => st.setMf(o)} style={{ height: 32, padding: '0 12px', borderRadius: k === 'meq' ? 8 : 99, border: '1px solid var(--line)', background: on ? 'var(--fOn)' : 'transparent', color: on ? 'var(--fOnInk)' : 'var(--sub)', font: 'inherit', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>{(st.data?.meusFilter ?? MEUS_FILTER_LAB)[o]}</button>
               )
             })}
           </div>
         </div>
       </div>
-      {MEUS.map((m, i) => {
+      {st.meus.map((m, i) => {
         if (!st.visibleMeus[i]) return null
-        const pct = (m.done / m.total) * 100
+        const pct = m.total ? (m.done / m.total) * 100 : 0
         let chip: [string, string, string]
-        if (i === 0) chip = ['Em andamento', k === 'meq' ? 'var(--brand2)' : 'var(--brand)', 'var(--chip)']
+        if (i === 0 && m.status === 'ativo') chip = ['Em andamento', k === 'meq' ? 'var(--brand2)' : 'var(--brand)', 'var(--chip)']
         else if (m.status === 'ativo') chip = ['Ativo', '#1FA868', 'rgba(31,168,104,.12)']
         else chip = ['Arquivado', 'var(--muted)', 'var(--surface2)']
+        const openMeu = () => { if (st.data) { window.location.href = `/aluno/cronograma?emissao=${m.id}` } else { st.openPlan() } }
         return (
-          <div key={i} className="rowh" onClick={st.openPlan} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: `14px ${mobile ? 12 : 16}px`, borderTop: '1px solid var(--line)', cursor: 'pointer' }}>
+          <div key={m.id} className="rowh" onClick={openMeu} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: `14px ${mobile ? 12 : 16}px`, borderTop: '1px solid var(--line)', cursor: 'pointer' }}>
             <span style={{ width: 42, height: 42, ...iconBox, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Ic n="cal" s={19} /></span>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
@@ -843,21 +907,23 @@ export function PlanHead({ k, mobile, st }: Shared) {
       <div>
         <button type="button" onClick={st.goMeus} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 700, color: sk, border: 0, background: 'none', cursor: 'pointer' }}><Ic n="cl" s={14} />Meus cronogramas</button>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
-          <h2 style={{ margin: 0, fontSize: mobile ? 24 : 30, fontWeight: 800, letterSpacing: '-0.04em', color: hk }}>2H</h2>
+          <h2 style={{ margin: 0, fontSize: mobile ? 24 : 30, fontWeight: 800, letterSpacing: '-0.04em', color: hk }}>{st.planTitle}</h2>
           <span style={{ color: sk, display: 'inline-flex' }}><Ic n="edit" s={16} /></span>
           {st.genNew && (
             <span style={{ height: 24, padding: '0 10px', borderRadius: 99, background: 'rgba(31,168,104,.14)', color: '#1FA868', fontSize: 11.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 5 }}><Ic n="check" s={12} sw={3} />Cronograma gerado agora</span>
           )}
         </div>
-        <span style={{ fontSize: 13, color: sk }}>PGE/PGM Completo · 2h por dia · Seg a Sáb · gerado em 02/09/2026 às 15:12</span>
+        <span style={{ fontSize: 13, color: sk }}>{st.planSub}</span>
       </div>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{btn('dl', 'Salvar em PDF')}{btn('cal', 'Exportar agenda')}{btn('folder', 'Arquivar')}</div>
     </div>
   )
 }
 
-export function PlanKpis({ k, mobile }: { k: BrandKey; mobile: boolean }) {
-  const data: Array<[string, string, IconName]> = [['89', 'semanas', 'cal'], ['6', 'dias por semana', 'clock'], ['743', 'atividades', 'list'], ['20/05/2028', 'término previsto', 'flag']]
+export function PlanKpis({ k, mobile, st }: Shared) {
+  const data: Array<[string, string, IconName]> = st.data
+    ? [[String(st.planWeeks), 'semanas', 'cal'], ['—', 'dias por semana', 'clock'], [nbr(st.totalGoals), 'atividades', 'list'], ['—', 'término previsto', 'flag']]
+    : [['89', 'semanas', 'cal'], ['6', 'dias por semana', 'clock'], ['743', 'atividades', 'list'], ['20/05/2028', 'término previsto', 'flag']]
   return (
     <div style={{ display: 'grid', gridTemplateColumns: `repeat(${mobile ? 2 : 4},1fr)`, gap: 10 }}>
       {data.map(([v, l, icn], i) => {
@@ -890,10 +956,10 @@ export function PlanProgress({ k, st }: { k: BrandKey; st: CronogramaState }) {
     <Card k={k} pad="16px 18px">
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
         <b style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink)' }}>{st.totalDone}</b>
-        <span style={{ fontSize: 13, color: 'var(--muted)' }}>de {PLAN_TOTAL_GOALS} metas concluídas</span>
+        <span style={{ fontSize: 13, color: 'var(--muted)' }}>de {nbr(st.totalGoals)} metas concluídas</span>
         <b style={{ fontSize: 13, color: k === 'meq' ? 'var(--brand2)' : 'var(--brand)' }}>{fmtPct(st.pct)}</b>
         <span style={{ flex: 1 }} />
-        <span style={{ fontSize: 12, color: 'var(--muted)' }}>Semana {PLAN_CURRENT_WEEK} de {PLAN_WEEKS} · {nbr(PLAN_TOTAL_GOALS - st.totalDone)} metas restantes</span>
+        <span style={{ fontSize: 12, color: 'var(--muted)' }}>Semana {st.planCurrentWeek} de {st.planWeeks} · {nbr(Math.max(0, st.totalGoals - st.totalDone))} metas restantes</span>
       </div>
       <Bar k={k} pct={Math.max(st.pct, 0.6)} h={10} />
     </Card>
@@ -953,8 +1019,35 @@ function GridCell({ k, week, row, day, kind, st }: { k: BrandKey; week: number; 
   )
 }
 
+// Célula da grade em modo REAL (metas da célula → conteúdo + check por metaId).
+function GridCellReal({ k, metas, kind, st }: { k: BrandKey; metas: MetaView[]; kind: GoalType; st: CronogramaState }) {
+  const bd = { rev: '#6E5BB8', vnd: 'rgba(11,74,46,.35)', meq: 'rgba(48,106,181,.35)' }[k]
+  const m = metas[0]
+  if (!m) return <td style={{ padding: '12px 10px', background: 'var(--gCell)', color: 'var(--gInk)', border: `1px solid ${bd}`, textAlign: 'center', verticalAlign: 'middle', height: 64 }}><span style={{ opacity: 0.45, fontSize: 16 }}>—</span></td>
+  const done = st.isDone(m.id)
+  const extra = metas.length > 1 ? ` +${metas.length - 1}` : ''
+  const content = (
+    <>
+      <b style={{ display: 'block', fontSize: 11.5, lineHeight: 1.35 }}>{m.title}{extra}</b>
+      {m.dur && <span style={{ display: 'block', marginTop: 3, fontSize: 11, opacity: 0.8 }}>{m.dur}</span>}
+    </>
+  )
+  return (
+    <td className="gcell" role="button" aria-label="Marcar meta" onClick={() => st.toggleCell(m.id)}
+      style={{ position: 'relative', padding: '14px 12px 12px', background: done ? 'var(--gDone)' : 'var(--gCell)', color: 'var(--gInk)', border: `1px solid ${bd}`, textAlign: 'center', verticalAlign: 'middle', height: kind === 'aula' ? 104 : 64, cursor: 'pointer' }}>
+      <span style={{ position: 'absolute', right: 6, top: 6, width: 20, height: 20, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+        {done
+          ? <span className="gpop" style={{ width: 20, height: 20, borderRadius: '50%', background: '#22B573', color: '#FFFFFF', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Ic n="check" s={12} sw={3.2} /></span>
+          : <span className="gempty" style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid currentColor', opacity: 0.35 }} />}
+      </span>
+      <div style={{ opacity: done ? (st.hd ? 0.28 : 0.62) : 1, textDecoration: done ? 'line-through' : 'none', transition: 'opacity .25s' }}>{content}</div>
+    </td>
+  )
+}
+
 export function GridTable({ k, mobile, st, week }: Shared & { week: number }) {
   const i = week - 1
+  const semReal = st.semanasReais ? st.semanasReais.find((s) => s.n === week) ?? null : null
   const headBg = { rev: 'linear-gradient(180deg,#2E2366,#3B2F7A)', vnd: 'linear-gradient(180deg,#0B4A2E,#12643D)', meq: 'linear-gradient(120deg,#171E3B,#25356F)' }[k]
   const headInk = { rev: '#F1C232', vnd: '#F1D48A', meq: '#5ECEF0' }[k]
   const subBg = { rev: '#7B66C9', vnd: '#2E8A5A', meq: '#306AB5' }[k]
@@ -964,7 +1057,12 @@ export function GridTable({ k, mobile, st, week }: Shared & { week: number }) {
   const labInk = { rev: '#FFFFFF', vnd: '#F1D48A', meq: '#DCEBFF' }[k]
   const bd = { rev: '#6E5BB8', vnd: 'rgba(11,74,46,.35)', meq: 'rgba(48,106,181,.35)' }[k]
   const r = { rev: 18, vnd: 22, meq: 10 }[k]
-  const subTxt = { rev: 'REVISÃO', vnd: 'VND', meq: 'MEQ' }[k] + ' – CRONOGRAMA PGE/PGM COMPLETO · 2H'
+  const range = semReal ? semReal.range : G_RANGE[i]
+  const diasCol = semReal ? semReal.dias : [...G_DAYS]
+  const weeksArr = st.semanasReais ? st.semanasReais.filter((s) => s.kind === 'conteudo').map((s) => s.n) : [1, 2, 3, 4, 5, 6]
+  const atFirst = st.gw === weeksArr[0]
+  const atLast = st.gw === weeksArr[weeksArr.length - 1]
+  const subTxt = semReal ? st.planSub.toUpperCase() : ({ rev: 'REVISÃO', vnd: 'VND', meq: 'MEQ' }[k] + ' – CRONOGRAMA PGE/PGM COMPLETO · 2H')
   const nav = (fn: () => void, disabled: boolean, path: string, lab: string) => (
     <button type="button" onClick={fn} aria-label={lab} style={{ width: 38, height: 38, borderRadius: k === 'meq' ? 10 : '50%', border: '1px solid rgba(255,255,255,.3)', background: 'rgba(255,255,255,.1)', color: '#FFFFFF', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', opacity: disabled ? 0.35 : 1 }}>
       <svg viewBox="0 0 24 24" style={{ width: 16, height: 16 }} fill="none" stroke="currentColor" strokeWidth={2.6} strokeLinecap="round" strokeLinejoin="round"><path d={path} /></svg>
@@ -974,10 +1072,10 @@ export function GridTable({ k, mobile, st, week }: Shared & { week: number }) {
   return (
     <div style={{ borderRadius: r, overflow: 'hidden', border: `1px solid ${bd}`, background: 'var(--surface)', ...(k === 'vnd' ? { boxShadow: '0 5px 0 var(--line)' } : null) }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: mobile ? 14 : '18px 22px', background: headBg, color: headInk }}>
-        {nav(st.gwPrev, st.gw === 1, 'M15 6l-6 6 6 6', 'Semana anterior')}
+        {nav(st.gwPrev, atFirst, 'M15 6l-6 6 6 6', 'Semana anterior')}
         <div style={{ flex: 1, textAlign: 'center', lineHeight: 1.1 }}>
           <b style={{ display: 'block', fontSize: mobile ? 22 : 30, fontWeight: 800, letterSpacing: '.02em' }}>SEMANA {week}</b>
-          <b style={{ display: 'block', marginTop: 4, fontSize: mobile ? 16 : 22, fontWeight: 800 }}>{G_RANGE[i]}</b>
+          <b style={{ display: 'block', marginTop: 4, fontSize: mobile ? 16 : 22, fontWeight: 800 }}>{range}</b>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, maxWidth: 260, margin: '10px auto 0' }}>
             <div style={{ flex: 1, height: 6, borderRadius: 99, background: 'rgba(255,255,255,.18)', overflow: 'hidden' }}>
               <span style={{ display: 'block', height: '100%', width: `${Math.round((st.weekDone(week) / st.weekTotal(week)) * 100)}%`, borderRadius: 99, background: '#22B573', transition: 'width .4s cubic-bezier(.22,1,.36,1)' }} />
@@ -985,14 +1083,14 @@ export function GridTable({ k, mobile, st, week }: Shared & { week: number }) {
             <span style={{ fontSize: 12, fontWeight: 800, color: '#FFFFFF' }}>{st.weekDone(week)}/{st.weekTotal(week)}</span>
           </div>
         </div>
-        {nav(st.gwNext, st.gw === 6, 'M9 6l6 6-6 6', 'Próxima semana')}
+        {nav(st.gwNext, atLast, 'M9 6l6 6-6 6', 'Próxima semana')}
       </div>
       <div style={{ padding: '8px 12px', background: subBg, color: '#FFFFFF', textAlign: 'center', fontSize: mobile ? 11 : 12.5, fontWeight: 800, letterSpacing: '.08em' }}>{subTxt}</div>
       <div className="hs" style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', minWidth: mobile ? 1000 : 0, borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'fixed' }}>
           <thead><tr>
             <th style={{ padding: '10px 8px', background: labBg, color: labInk, fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', border: `1px solid ${bd}`, width: mobile ? 104 : 130, ...stickyTh }}>Carga horária sugerida</th>
-            {G_DAYS.map((d) => <th key={d} style={{ padding: '10px 8px', background: colBg, color: colInk, fontSize: 12, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', border: `1px solid ${bd}` }}>{d}</th>)}
+            {diasCol.map((d, di) => <th key={di} style={{ padding: '10px 8px', background: colBg, color: colInk, fontSize: 12, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', border: `1px solid ${bd}` }}>{d}</th>)}
           </tr></thead>
           <tbody>
             {G_ROWS.map((rw, ri) => (
@@ -1001,7 +1099,9 @@ export function GridTable({ k, mobile, st, week }: Shared & { week: number }) {
                   <b style={{ display: 'block', fontSize: 12.5 }}>{rw.hrs}</b>
                   <span style={{ display: 'block', marginTop: 4, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.03em', opacity: 0.85 }}>{rw.label}</span>
                 </th>
-                {G_DAYS.map((_, d) => <GridCell key={d} k={k} week={week} row={ri} day={d} kind={rw.type} st={st} />)}
+                {semReal
+                  ? diasCol.map((_, d) => <GridCellReal key={d} k={k} metas={semReal.grid[ri]?.[d] ?? []} kind={rw.type} st={st} />)
+                  : G_DAYS.map((_, d) => <GridCell key={d} k={k} week={week} row={ri} day={d} kind={rw.type} st={st} />)}
               </tr>
             ))}
           </tbody>
@@ -1025,7 +1125,7 @@ export function GridTools({ k, mobile, st }: Shared) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
         {lab('Semana')}
         <div className="hs" style={{ display: 'flex', gap: 6, overflowX: 'auto', width: mobile ? '100%' : undefined }}>
-          {[1, 2, 3, 4, 5, 6].map((w) => {
+          {(st.semanasReais ? st.semanasReais.filter((s) => s.kind === 'conteudo').map((s) => s.n) : [1, 2, 3, 4, 5, 6]).map((w) => {
             const on = st.gw === w
             return (
               <button key={w} type="button" onClick={() => st.setGw(w)} style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 6, height: 34, padding: '0 12px', borderRadius: r, border: '1px solid var(--line)', background: on ? 'var(--chip)' : 'var(--surface)', color: on ? (k === 'meq' ? 'var(--brand2)' : 'var(--brand)') : 'var(--ink)', font: 'inherit', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', whiteSpace: 'nowrap' }}>S{w}<span style={{ fontSize: 10.5, fontWeight: 700, opacity: 0.75 }}>{st.weekDone(w)}/{st.weekTotal(w)}</span></button>
@@ -1108,9 +1208,11 @@ function PlanRow({ k, mobile, st, item }: Shared & { item: { key: string; day: s
   )
 }
 
-function WeekBlock({ k, mobile, st, week, range, total }: Shared & { week: number; range: string; total: number }) {
+function WeekBlock({ k, mobile, st, week, range, total, semana }: Shared & { week: number; range: string; total: number; semana?: SemanaView }) {
   const open = st.openWeeks[week] ?? false
-  const items = listItems(week)
+  const items = semana
+    ? semana.metas.map((m) => ({ key: m.id, day: m.dayLabel, type: m.type, title: m.title, dur: m.dur }))
+    : listItems(week)
   const hb: CSSProperties = k === 'rev' ? { background: 'linear-gradient(90deg,#3B1E8F,#5B3FD0)', color: '#FFFFFF' }
     : k === 'vnd' ? { background: 'linear-gradient(90deg,#0B4A2E,#12643D)', color: '#FFFFFF' }
       : { background: 'var(--surface2)', color: 'var(--ink)' }
@@ -1162,7 +1264,34 @@ export function PlanList({ k, mobile, st }: Shared) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <PlanFilters k={k} mobile={mobile} st={st} />
-      {WK.map((w) => <WeekBlock key={w.n} k={k} mobile={mobile} st={st} week={w.n} range={w.range} total={w.total} />)}
+      {st.semanasReais
+        ? st.semanasReais.map((s) => (
+            s.kind === 'conteudo'
+              ? <WeekBlock key={s.n} k={k} mobile={mobile} st={st} week={s.n} range={s.range} total={s.metas.length} semana={s} />
+              : <RevisaoBlock key={s.n} k={k} semana={s} />
+          ))
+        : WK.map((w) => <WeekBlock key={w.n} k={k} mobile={mobile} st={st} week={w.n} range={w.range} total={w.total} />)}
+    </div>
+  )
+}
+
+// Bloco de semana de REVISÃO/RECESSO (não tem metas marcáveis).
+function RevisaoBlock({ k, semana }: { k: BrandKey; semana: SemanaView }) {
+  const rev = semana.kind === 'revisao'
+  return (
+    <div style={{ borderRadius: ctrlR(k, 14), overflow: 'hidden', border: '1px solid var(--line)', background: 'var(--surface)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: rev ? 'linear-gradient(90deg,#8F75FF,#5B3FD0)' : 'var(--surface2)', color: rev ? '#fff' : 'var(--ink)' }}>
+        <Ic n={rev ? 'target' : 'cal'} s={15} />
+        <b style={{ fontSize: 14 }}>Semana {semana.n} · {rev ? 'Revisão' : 'Recesso'}</b>
+        <span style={{ fontSize: 12, opacity: 0.8 }}>{semana.range}</span>
+      </div>
+      {rev && semana.blocos && semana.blocos.length > 0 && (
+        <div style={{ padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {semana.blocos.map((b, i) => (
+            <div key={i}><b style={{ fontSize: 13, color: 'var(--ink)' }}>{b.titulo}</b><span style={{ display: 'block', fontSize: 12.5, color: 'var(--muted)' }}>{b.texto}</span></div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

@@ -121,3 +121,76 @@ export async function desfazerUnificacao(unificacaoId: string): Promise<{ ok: bo
   revalidatePath('/admin/questoes')
   return { ok: true, questoes: (rpc.data as any)?.questoes ?? 0 }
 }
+
+// ── Classificação de disciplinas (essencial/complementar/específica) + cor + ordem ──
+// Alimenta os grupos do Cronograma Adaptativo (antes hard-coded por nome).
+export type DisciplinaClass = { id: string; nome: string; classificacao: string | null; cor: string | null; ordem: number; questoes: number }
+
+export async function listarDisciplinasClassificacao(): Promise<{ ok: boolean; itens?: DisciplinaClass[]; error?: string }> {
+  const g = await acesso('view'); if (!g) return { ok: false, error: 'Sem permissão.' }
+  const svc = createAdminClient()
+  const { data, error } = await svc.from('simulado_disciplinas')
+    .select('id, nome, classificacao, cor, ordem').eq('tenant_id', g.tenantId)
+    .order('ordem', { ascending: true }).order('nome', { ascending: true })
+  if (error) return { ok: false, error: error.message }
+  const qCount = new Map<string, number>()
+  const qs = await fetchAll<{ disciplina_id: string }>(() => svc.from('simulado_questoes').select('disciplina_id').eq('tenant_id', g.tenantId).eq('deletado', false).not('disciplina_id', 'is', null))
+  for (const r of qs) qCount.set(r.disciplina_id, (qCount.get(r.disciplina_id) ?? 0) + 1)
+  return { ok: true, itens: (data ?? []).map((d: any) => ({ id: d.id, nome: d.nome, classificacao: d.classificacao ?? null, cor: d.cor ?? null, ordem: d.ordem ?? 0, questoes: qCount.get(d.id) ?? 0 })) }
+}
+
+const CLASS_VALIDAS = ['essencial', 'complementar', 'especifica']
+
+export async function atualizarDisciplinaClassificacao(id: string, patch: { classificacao?: string | null; cor?: string | null; ordem?: number }): Promise<{ ok: boolean; error?: string }> {
+  const g = await acesso('update'); if (!g) return { ok: false, error: 'Sem permissão.' }
+  if (!id) return { ok: false, error: 'Disciplina ausente.' }
+  const svc = createAdminClient()
+  const { data: dona } = await svc.from('simulado_disciplinas').select('id, classificacao, cor, ordem').eq('tenant_id', g.tenantId).eq('id', id).maybeSingle()
+  if (!dona) return { ok: false, error: 'Disciplina inválida.' }
+  const up: Record<string, unknown> = {}
+  if ('classificacao' in patch) up.classificacao = patch.classificacao && CLASS_VALIDAS.includes(patch.classificacao) ? patch.classificacao : (patch.classificacao ? String(patch.classificacao).slice(0, 40) : null)
+  if ('cor' in patch) up.cor = patch.cor && /^#[0-9a-fA-F]{6}$/.test(patch.cor) ? patch.cor : (patch.cor ? null : null)
+  if ('ordem' in patch && typeof patch.ordem === 'number') up.ordem = Math.max(0, Math.round(patch.ordem))
+  if (!Object.keys(up).length) return { ok: true }
+  const { error } = await svc.from('simulado_disciplinas').update(up).eq('tenant_id', g.tenantId).eq('id', id)
+  if (error) return { ok: false, error: error.message }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_disciplinas', entidadeId: id, antes: dona, depois: up })
+  revalidatePath('/admin/questoes')
+  return { ok: true }
+}
+
+// ── Vínculo PASTA da Biblioteca → DISCIPLINA (as aulas do Cronograma Adaptativo vêm dos
+//    documentos publicados da pasta vinculada). Lista as pastas de conteúdo e permite marcar. ──
+export type PastaConteudo = { id: string; nome: string; pai_id: string | null; disciplina_id: string | null; docs: number }
+
+export async function listarPastasConteudo(): Promise<{ ok: boolean; itens?: PastaConteudo[]; error?: string }> {
+  const g = await acesso('view'); if (!g) return { ok: false, error: 'Sem permissão.' }
+  const svc = createAdminClient()
+  const { data, error } = await svc.from('simulado_pastas')
+    .select('id, nome, pai_id, disciplina_id').eq('tenant_id', g.tenantId).eq('folder_area', 'conteudo')
+    .order('nome', { ascending: true })
+  if (error) return { ok: false, error: error.message }
+  const pastas = (data ?? []) as Array<{ id: string; nome: string; pai_id: string | null; disciplina_id: string | null }>
+  // contagem de documentos publicados por pasta (direto, não recursivo — referência rápida)
+  const docCount = new Map<string, number>()
+  const docs = await fetchAll<{ pasta_id: string | null }>(() => svc.from('simulado_conteudo_documentos').select('pasta_id').eq('tenant_id', g.tenantId).eq('status', 'publicado').eq('deletado', false).not('pasta_id', 'is', null))
+  for (const d of docs) if (d.pasta_id) docCount.set(d.pasta_id, (docCount.get(d.pasta_id) ?? 0) + 1)
+  return { ok: true, itens: pastas.map((p) => ({ ...p, docs: docCount.get(p.id) ?? 0 })) }
+}
+
+export async function vincularPastaDisciplina(pastaId: string, disciplinaId: string | null): Promise<{ ok: boolean; error?: string }> {
+  const g = await acesso('update'); if (!g) return { ok: false, error: 'Sem permissão.' }
+  if (!pastaId) return { ok: false, error: 'Pasta ausente.' }
+  const svc = createAdminClient()
+  const { data: pasta } = await svc.from('simulado_pastas').select('id, disciplina_id').eq('tenant_id', g.tenantId).eq('id', pastaId).eq('folder_area', 'conteudo').maybeSingle()
+  if (!pasta) return { ok: false, error: 'Pasta inválida.' }
+  if (disciplinaId) {
+    const { data: disc } = await svc.from('simulado_disciplinas').select('id').eq('tenant_id', g.tenantId).eq('id', disciplinaId).maybeSingle()
+    if (!disc) return { ok: false, error: 'Disciplina inválida.' }
+  }
+  const { error } = await svc.from('simulado_pastas').update({ disciplina_id: disciplinaId }).eq('tenant_id', g.tenantId).eq('id', pastaId)
+  if (error) return { ok: false, error: error.message }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_pastas', entidadeId: pastaId, depois: { disciplina_id: disciplinaId } })
+  revalidatePath('/admin/questoes')
+  return { ok: true }
+}

@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { onPraticaRespondida } from '@/lib/gamificacao'
+import { marcarHomeDesatualizado } from '@/lib/home/snapshot'
+import { marcarDesempenhoDesatualizado } from '@/lib/desempenho/snapshot'
+import { marcarPerfilDesatualizado } from '@/lib/perfil/snapshot'
 
 // POST /api/aluno/questao-resposta — registra UMA tentativa avulsa (prática no Banco de Questões).
 // Cada tentativa vira um registro (histórico) — o aluno pode refazer quantas vezes quiser.
@@ -41,6 +44,15 @@ export async function POST(request: NextRequest) {
     // Gamificação: XP de prática + streak/missões/conquistas (idempotente por resposta). Fire-and-forget.
     if (inserida?.id) {
       void onPraticaRespondida(svc, { tenantId: sessao.tenantId, estudanteId: sessao.estudanteId, respostaId: inserida.id, correta: !!alt.correta, disciplinaId: q.disciplina_id ?? null })
+      // Backend-first (LACUNA 2): a prática avulsa (banco de questões) NÃO tem "finalizar" — cada resposta
+      // é um registro próprio. Então aqui, em vez de recompute pesado por questão, só MARCA os snapshots
+      // (Início/Desempenho/Perfil) como desatualizados: UPDATE leve e, pelo guard `neq`, NO-OP quando o
+      // snapshot já está stale (só a 1ª resposta após uma leitura escreve). A próxima leitura recomputa.
+      void Promise.allSettled([
+        marcarHomeDesatualizado(svc, sessao.tenantId, sessao.estudanteId),
+        marcarDesempenhoDesatualizado(svc, sessao.tenantId, sessao.estudanteId),
+        marcarPerfilDesatualizado(svc, sessao.tenantId, sessao.estudanteId),
+      ]).catch(() => {})
     }
     return NextResponse.json({ ok: true, correta: !!alt.correta })
   } catch {

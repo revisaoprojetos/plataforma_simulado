@@ -5,6 +5,8 @@
 // Cada marca compõe sua própria tela — sem "skin" único. Cores de nota via notec (§1.4).
 
 import type { CSSProperties, ReactNode } from 'react'
+import { useBrandAtual, useCm } from '@/lib/brand/cor-marca'
+import { MAC_M_PATH } from '../../brand-marks'
 
 // ---------------------------------------------------------------- ícones (subset lucide / home_common.I)
 const I: Record<string, ReactNode> = {
@@ -41,11 +43,14 @@ export function notec(v: number): [string, string] {
 export const fnum = (v: number) => v.toFixed(1).replace('.', ',')
 
 // ---------------------------------------------------------------- tipos de estado comuns
-export type Pane = 'main' | 'pers'
+export type Pane = 'novos' | 'main' | 'pers'
 export type Filtro = 'all' | 'and' | 'done'
 
-// ---------------------------------------------------------------- abas (Simulados X | Personalizados)
-export function PaneTabs({ marca, pt, onPane, nMain, nPers, radius = 12 }: { marca: string; pt: Pane; onPane: (p: Pane) => void; nMain: number; nPers: number; radius?: number }) {
+// ---------------------------------------------------------------- abas (Simulado Revisão | Realizados | Personalizados)
+// `nNovos` opt-in: quando passado (Revisão), aparece a 1ª aba "Simulado Revisão" e a aba `main` vira
+// "Simulados Realizados" (fixa). Sem `nNovos` (VND/MEQ), mantém o comportamento antigo (`Simulados {marca}`).
+export function PaneTabs({ marca, pt, onPane, nNovos, nMain, nPers, radius = 12 }: { marca: string; pt: Pane; onPane: (p: Pane) => void; nNovos?: number; nMain: number; nPers: number; radius?: number }) {
+  const temNovos = nNovos != null
   const cell = (key: Pane, icon: string, label: string, count: number) => {
     const on = pt === key
     return (
@@ -57,7 +62,8 @@ export function PaneTabs({ marca, pt, onPane, nMain, nPers, radius = 12 }: { mar
   }
   return (
     <div role="tablist" className="hs" style={{ display: 'flex', maxWidth: '100%', overflowX: 'auto', gap: 4, padding: 4, borderRadius: 15, background: 'var(--tBg)', scrollbarWidth: 'none' }}>
-      {cell('main', 'clip', `Simulados ${marca}`, nMain)}
+      {temNovos ? cell('novos', 'play', 'Simulado Revisão', nNovos as number) : null}
+      {cell('main', 'clip', temNovos ? 'Simulados Realizados' : `Simulados ${marca}`, nMain)}
       {cell('pers', 'plus', 'Personalizados', nPers)}
     </div>
   )
@@ -171,18 +177,21 @@ export function CoverRev({ titulo, sub, grad, big = 24, monteItalic = true, img,
 
 // VND: capa verde + folha (leaf) decorativa + traço dourado.
 export function CoverVnd({ titulo, sub, grad, big = 22, showKicker = false, img, fit = 'cover' }: { titulo: string; sub: string; grad: string; big?: number; showKicker?: boolean; img?: string | null; fit?: 'cover' | 'contain' }) {
+  const marca = useBrandAtual() ?? 'vnd'
+  const cm = useCm()
+  const VPATH = marca === 'mac' ? MAC_M_PATH : 'M1 5.9 11.5 5.77Q12.2 5.76 12.53 6.13L21.21 15.98Q21.47 16.25 21.57 15.86L21.6 8.1C21.6 7.05 20.81 6.3 19.76 5.88L30.57 5.9Q31 5.91 30.74 6.33L23.18 14.49C22.26 15.55 21.8 16.65 21.73 18.23L21.67 25.45Q21.6 26.24 20.95 25.96L6.03 8.31C4.78 6.96 3.14 6.19 1 5.9Z'
   return (
-    <div className="rlz-cov" style={{ position: 'relative', overflow: 'hidden', width: '100%', height: '100%', background: grad, color: '#FFF', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: img ? 0 : '12px 14px' }}>
+    <div className="rlz-cov" style={{ position: 'relative', overflow: 'hidden', width: '100%', height: '100%', background: cm(grad), color: '#FFF', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: img ? 0 : '12px 14px' }}>
       {img ? (
         // COM IMAGEM: só a foto, sem texto nem degradê (a arte já tem o título).
         // eslint-disable-next-line @next/next/no-img-element
         <img src={img} alt="" aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: fit }} />
       ) : (
         <>
-          <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle,rgba(185,245,212,.22) 1px,transparent 1.6px)', backgroundSize: '14px 14px', pointerEvents: 'none' }} />
-          <svg viewBox="0 0 32 32" aria-hidden style={{ position: 'absolute', right: -18, top: -14, width: 110, height: 110, opacity: 0.16, pointerEvents: 'none' }}><path fill="#B9F5D4" d="M1 5.9 11.5 5.77Q12.2 5.76 12.53 6.13L21.21 15.98Q21.47 16.25 21.57 15.86L21.6 8.1C21.6 7.05 20.81 6.3 19.76 5.88L30.57 5.9Q31 5.91 30.74 6.33L23.18 14.49C22.26 15.55 21.8 16.65 21.73 18.23L21.67 25.45Q21.6 26.24 20.95 25.96L6.03 8.31C4.78 6.96 3.14 6.19 1 5.9Z" /></svg>
-          {showKicker ? <span style={{ position: 'absolute', left: 14, top: 12, display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 8.5, fontWeight: 800, letterSpacing: '.2em', color: '#F1D48A' }}>SIMULA VND</span> : null}
-          <span style={{ position: 'relative', fontSize: 8.5, fontWeight: 800, letterSpacing: '.16em', color: '#CFE3D7' }}>{sub}</span>
+          <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: cm('radial-gradient(circle,rgba(185,245,212,.22) 1px,transparent 1.6px)'), backgroundSize: '14px 14px', pointerEvents: 'none' }} />
+          <svg viewBox="0 0 32 32" aria-hidden style={{ position: 'absolute', right: -18, top: -14, width: 110, height: 110, opacity: 0.16, pointerEvents: 'none' }}><path fill={cm('#B9F5D4')} d={VPATH} /></svg>
+          {showKicker ? <span style={{ position: 'absolute', left: 14, top: 12, display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 8.5, fontWeight: 800, letterSpacing: '.2em', color: '#F1D48A' }}>{marca === 'mac' ? 'SIMULA MAC' : 'SIMULA VND'}</span> : null}
+          <span style={{ position: 'relative', fontSize: 8.5, fontWeight: 800, letterSpacing: '.16em', color: cm('#CFE3D7') }}>{sub}</span>
           <span style={{ position: 'relative', fontWeight: 800, fontSize: big, lineHeight: 1.02, letterSpacing: '-0.04em' }}>{titulo}</span>
           <span aria-hidden style={{ position: 'relative', display: 'block', width: 34, height: 3, borderRadius: 3, background: '#D8B45A', marginTop: 6 }} />
         </>

@@ -96,6 +96,19 @@ export async function esquecer(chave: string): Promise<void> {
 }
 
 /**
+ * Invalidação por PREFIXO: apaga todas as chaves `relatorio:{tenant}:{prefixo}*` (Redis via SCAN +
+ * fallback em memória). Use para chaves que variam por um sufixo dinâmico — ex.:
+ * `modulo-completo:{estId}:` cobre todos os módulos daquele aluno numa só chamada. Best-effort;
+ * nunca lança. Sem Redis, limpa o cache em memória do processo por prefixo.
+ */
+export async function esquecerPrefixo(tenantId: string | null, prefixo: string): Promise<void> {
+  // Fallback em memória (dev sem Redis): remove as chaves casando o prefixo completo.
+  const chavePrefixo = `relatorio:${tenantId ?? 'none'}:${prefixo}`
+  for (const k of [...mem.keys()]) if (k.startsWith(chavePrefixo)) mem.delete(k)
+  await invalidarPorPadrao(tenantId, `${prefixo}*`)
+}
+
+/**
  * Invalida TODOS os relatórios de um tenant. Chamado nos pontos de mutação que
  * mudam números de relatório: finalização de sessões (cron encerrar-expirados),
  * re-correção e imports. Best-effort e não bloqueante em caso de erro.

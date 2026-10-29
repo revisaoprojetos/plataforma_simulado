@@ -11,6 +11,7 @@ import Link from 'next/link'
 import { Columns3, Check, ClipboardCheck, Target, Zap, Clock, Play, RotateCcw, ChevronRight, BarChart3 } from 'lucide-react'
 import { type Brand, type InternaTheme } from '../interna-tokens'
 import { useTemaInterno } from '../use-tema-interno'
+import { useCm } from '@/lib/brand/cor-marca'
 
 const GOLD = '#F1C232'
 const OK = '#1FA868'
@@ -29,7 +30,7 @@ type LeiSecaModulo = {
 }
 
 type PlatformLeiSecaProps = {
-  brand: 'revisao' | 'vnd' | 'meq'
+  brand: 'revisao' | 'vnd' | 'meq' | 'mac'
   theme: 'claro' | 'escuro' | 'azul'
   modulos: LeiSecaModulo[]
   stats: { leis: number; aulasConcluidas: number; questoesRespondidas: number; acertoMedio: number | null }
@@ -66,6 +67,7 @@ const fmt = (n: number) => n.toLocaleString('pt-BR')
 
 export function PlatformLeiSeca({ brand, theme, modulos, stats, ultimoModuloId }: PlatformLeiSecaProps) {
   const liveTheme: InternaTheme = useTemaInterno(theme)
+  const cm = useCm()
   const [tab, setTab] = useState<'mod' | 'des'>('mod')
   const [filtro, setFiltro] = useState<'all' | 'and' | 'done' | 'new'>('all')
 
@@ -138,7 +140,7 @@ export function PlatformLeiSeca({ brand, theme, modulos, stats, ultimoModuloId }
     borderRadius: 99,
     border: '1px solid var(--line)',
     background: ativo ? 'var(--brand)' : 'var(--surface)',
-    color: ativo ? '#FFFFFF' : 'var(--muted)',
+    color: ativo ? cm('#FFFFFF') : 'var(--muted)',
     fontSize: 12.5,
     fontWeight: 700,
     display: 'inline-flex',
@@ -200,7 +202,7 @@ export function PlatformLeiSeca({ brand, theme, modulos, stats, ultimoModuloId }
               flexShrink: 0,
               padding: 24,
               background: 'linear-gradient(150deg, color-mix(in oklab, var(--brand) 85%, #000), var(--brand))',
-              color: '#FFFFFF',
+              color: cm('#FFFFFF'),
               textShadow: '0 1px 10px rgba(0,0,0,.78), 0 1px 3px rgba(0,0,0,.6)',
               display: 'flex',
               flexDirection: 'column',
@@ -215,26 +217,26 @@ export function PlatformLeiSeca({ brand, theme, modulos, stats, ultimoModuloId }
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={atual.capaCard || atual.capa || ''} alt="" aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
                 {/* Fade preto BEM LEVE (neutro, sem roxo) só p/ o texto ficar legível sobre a imagem. */}
-                <span aria-hidden style={{ position: 'absolute', inset: 0, background: 'linear-gradient(150deg, rgba(0,0,0,.15) 0%, rgba(0,0,0,.3) 55%, rgba(0,0,0,.5) 100%)', pointerEvents: 'none' }} />
+                <span aria-hidden style={{ position: 'absolute', inset: 0, background: cm('linear-gradient(150deg, rgba(0,0,0,.15) 0%, rgba(0,0,0,.3) 55%, rgba(0,0,0,.5) 100%)'), pointerEvents: 'none' }} />
               </>
             ) : (
               <span aria-hidden style={{ ...gridTexture, backgroundSize: '22px 22px' }} />
             )}
-            <span style={{ position: 'relative', fontSize: 10.5, fontWeight: 800, letterSpacing: '.2em', color: GOLD }}>
+            <span style={{ position: 'relative', fontSize: 10.5, fontWeight: 800, letterSpacing: '.2em', color: cm(GOLD) }}>
               CONTINUE DE ONDE PAROU
             </span>
             <b style={{ position: 'relative', fontSize: 44, fontWeight: 800, letterSpacing: '-0.05em', lineHeight: 1 }}>
               Aula {Math.min(atual.done + 1, Math.max(atual.total, 1))}
-              <span style={{ fontSize: 16, fontWeight: 700, color: 'rgba(255,255,255,.72)', letterSpacing: 0 }}> / {atual.total}</span>
+              <span style={{ fontSize: 16, fontWeight: 700, color: cm('rgba(255,255,255,.72)'), letterSpacing: 0 }}> / {atual.total}</span>
             </b>
-            <span style={{ position: 'relative', fontSize: 13, color: 'rgba(255,255,255,.88)' }}>{atual.nome}</span>
+            <span style={{ position: 'relative', fontSize: 13, color: cm('rgba(255,255,255,.88)') }}>{atual.nome}</span>
             <div style={{ position: 'relative', marginTop: 'auto', paddingTop: 10 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: 'rgba(255,255,255,.8)', marginBottom: 6 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: cm('rgba(255,255,255,.8)'), marginBottom: 6 }}>
                 <span>Progresso do módulo</span>
-                <b style={{ color: '#FFFFFF' }}>{pctDe(atual)}%</b>
+                <b style={{ color: cm('#FFFFFF') }}>{pctDe(atual)}%</b>
               </div>
-              <div style={{ height: 6, borderRadius: 99, background: 'rgba(255,255,255,.18)', overflow: 'hidden' }}>
-                <span style={{ display: 'block', width: `${pctDe(atual)}%`, height: '100%', borderRadius: 99, background: GOLD }} />
+              <div style={{ height: 6, borderRadius: 99, background: cm('rgba(255,255,255,.18)'), overflow: 'hidden' }}>
+                <span style={{ display: 'block', width: `${pctDe(atual)}%`, height: '100%', borderRadius: 99, background: cm(GOLD) }} />
               </div>
             </div>
           </div>
@@ -261,7 +263,7 @@ export function PlatformLeiSeca({ brand, theme, modulos, stats, ultimoModuloId }
             <div style={{ marginTop: 'auto', display: 'flex', gap: 8 }}>
               <Link
                 href={`/aluno/leitura?modulo=${atual.id}`}
-                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 44, padding: '0 16px', borderRadius: 12, background: GOLD, color: '#2A1A55', fontSize: 13.5, fontWeight: 800, whiteSpace: 'nowrap' }}
+                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 44, padding: '0 16px', borderRadius: 12, background: cm(GOLD), color: cm('#2A1A55'), fontSize: 13.5, fontWeight: 800, whiteSpace: 'nowrap' }}
               >
                 <Play size={14} />
                 Continuar aula
@@ -323,7 +325,7 @@ export function PlatformLeiSeca({ brand, theme, modulos, stats, ultimoModuloId }
               const capa = m.capaCard || m.capa // ticket usa a imagem NORMAL (card), não a larga (banner)
               const statusCfg =
                 s === 'done'
-                  ? { cor: OK, icon: <Check size={13} />, rotulo: 'Concluída' }
+                  ? { cor: cm(OK), icon: <Check size={13} />, rotulo: 'Concluída' }
                   : s === 'and'
                     ? { cor: 'var(--goldInk)', icon: <Zap size={13} />, rotulo: 'Em andamento' }
                     : { cor: 'var(--muted)', icon: <Clock size={13} />, rotulo: 'Não iniciada' }
@@ -333,7 +335,7 @@ export function PlatformLeiSeca({ brand, theme, modulos, stats, ultimoModuloId }
                   : s === 'and'
                     ? { rotulo: 'Continuar', icon: <Play size={14} /> }
                     : { rotulo: 'Começar', icon: <Play size={14} /> }
-              const acertoCor = m.acerto != null && m.acerto >= 60 ? OK : WARN
+              const acertoCor = m.acerto != null && m.acerto >= 60 ? cm(OK) : cm(WARN)
               return (
                 <Link
                   key={m.id}
@@ -346,10 +348,10 @@ export function PlatformLeiSeca({ brand, theme, modulos, stats, ultimoModuloId }
                     {capa ? (
                       <img src={capa} alt="" className="transition-transform duration-500 group-hover:scale-105" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     ) : (
-                      <div className="transition-transform duration-500 group-hover:scale-105" style={{ position: 'relative', overflow: 'hidden', width: '100%', height: '100%', background: gradienteCapa(m.cor), color: '#FFFFFF', display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '14px 16px' }}>
+                      <div className="transition-transform duration-500 group-hover:scale-105" style={{ position: 'relative', overflow: 'hidden', width: '100%', height: '100%', background: gradienteCapa(m.cor), color: cm('#FFFFFF'), display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '14px 16px' }}>
                         <span aria-hidden style={gridTexture} />
                         <svg viewBox="0 0 68 66" aria-hidden style={{ position: 'absolute', right: -14, bottom: -16, width: 104, height: 100, opacity: 0.14 }}>
-                          <path fill="#FFFFFF" fillRule="evenodd" d="M6 5.5H32C43.5 5.5 49 13 49 23C49 31 45 37 39.5 40.5L62 61H6Z M9.2 9.2H19.2V57.6H9.2Z" />
+                          <path fill={cm('#FFFFFF')} fillRule="evenodd" d="M6 5.5H32C43.5 5.5 49 13 49 23C49 31 45 37 39.5 40.5L62 61H6Z M9.2 9.2H19.2V57.6H9.2Z" />
                         </svg>
                         <span style={{ position: 'relative', fontSize: 9, fontWeight: 800, letterSpacing: '.14em', opacity: 0.85, marginTop: 4 }}>LEI SECA</span>
                         <span style={{ position: 'relative', fontFamily: 'Montserrat, sans-serif', fontStyle: 'italic', fontWeight: 800, fontSize: 22, lineHeight: 1, letterSpacing: '-0.02em', marginTop: 4, textShadow: '0 2px 12px rgba(0,0,0,.25)' }}>
@@ -384,7 +386,7 @@ export function PlatformLeiSeca({ brand, theme, modulos, stats, ultimoModuloId }
                       )}
                       <span
                         className="transition group-hover:brightness-110"
-                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 32, padding: '0 16px', borderRadius: 12, background: 'var(--brand)', color: '#FFFFFF', fontSize: 12.5, fontWeight: 800, whiteSpace: 'nowrap' }}
+                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 32, padding: '0 16px', borderRadius: 12, background: 'var(--brand)', color: cm('#FFFFFF'), fontSize: 12.5, fontWeight: 800, whiteSpace: 'nowrap' }}
                       >
                         {botao.icon}
                         {botao.rotulo}
@@ -416,7 +418,7 @@ export function PlatformLeiSeca({ brand, theme, modulos, stats, ultimoModuloId }
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 {comAcerto.map((m) => {
                   const a = m.acerto as number
-                  const cor = a >= 60 ? OK : WARN
+                  const cor = a >= 60 ? cm(OK) : cm(WARN)
                   return (
                     <div key={m.id} style={{ display: 'grid', gridTemplateColumns: '190px 1fr 48px', alignItems: 'center', gap: 12 }}>
                       <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{m.nome}</span>

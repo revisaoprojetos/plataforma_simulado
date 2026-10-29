@@ -12,7 +12,7 @@ import { CronogramaMeq } from './cronograma-meq'
 
 export function PlatformCronograma({ brand, theme, tab }: InternaScreenProps) {
   const mobile = useIsMobile()
-  if (brand === 'vnd') return <CronogramaVnd theme={theme} tab={tab} mobile={mobile} />
+  if (brand === 'vnd' || brand === 'mac') return <CronogramaVnd theme={theme} tab={tab} mobile={mobile} />
   if (brand === 'meq') return <CronogramaMeq theme={theme} tab={tab} mobile={mobile} />
   return <CronogramaRevisao theme={theme} tab={tab} mobile={mobile} />
 }

@@ -23,6 +23,7 @@ export const HEADER = {
 export const FOCO: Record<Brand, string> = {
   revisao: 'Foco em Procuradorias',
   vnd: 'Foco em Defensoria Pública',
+  mac: 'Foco na sua aprovação',
   meq: 'Foco em Polícias e Tribunais',
 }
 
@@ -30,6 +31,7 @@ export const FOCO: Record<Brand, string> = {
 export const PRIVACY: Record<Brand, string> = {
   revisao: 'E-mail, telefone e outros dados pessoais ficam só nas configurações da conta e nunca aparecem no perfil.',
   vnd: 'Dados pessoais não aparecem no perfil.',
+  mac: 'Dados pessoais não aparecem no perfil.',
   meq: 'Dados pessoais ficam só nas configurações da conta.',
 }
 

@@ -8,6 +8,10 @@ import { invalidarRankingPorDocumento } from '@/lib/leitura/ranking'
 import { avaliarMedalhasPorDocumento } from '@/lib/leitura/carimbos'
 import { diaBRT } from '@/lib/jurisprudencia/sequencia'
 import { invalidarRankingJuris } from '@/lib/jurisprudencia/ranking'
+import { atualizarHomeSnapshot } from '@/lib/home/snapshot'
+import { atualizarPerfilSnapshot } from '@/lib/perfil/snapshot'
+import { invalidarLeituraAluno } from '@/lib/leitura/cache'
+import { registrarTempo } from '@/lib/desempenho/tempo-estudo'
 
 // POST /api/leitura/progresso — auto-save idempotente do progresso de leitura.
 export const dynamic = 'force-dynamic'
@@ -60,9 +64,23 @@ export async function POST(request: NextRequest) {
   // (sem XP/streak/medalhas/ranking) — só confere a visualização.
   const testador = await ehTestadorLeituraDoc(svc, sessao.tenantId, sessao.estudanteId, documento_id)
 
+  // CONTABILIDADE DE TEMPO (Fase 2 do Meu Desempenho): credita o tempo lido na frente. JurisClub quando a
+  // conclusão vem do arcade da juris (body.desafio); senão lei seca (LegProc). Testador não conta. Best-effort.
+  if (!testador && tempoInc > 0) {
+    void registrarTempo(svc, { tenantId: sessao.tenantId, estudanteId: sessao.estudanteId, frente: body.desafio ? 'jurisclub' : 'legproc', segundos: tempoInc, paginas: artigoMax }).catch(() => {})
+  }
+
   // Gamificação só na PRIMEIRA conclusão (idempotente por documento no ledger de qualquer forma).
   if (concluiuAgora && !testador) {
+    // Write-behind (backend-first §6): concluir uma aula credita XP/streak → recomputa Início e Perfil.
+    // Encadeado DEPOIS da gamificação (XP já persistido) e só na PRIMEIRA conclusão (concluiuAgora) — evento
+    // discreto, não é caminho quente. Best-effort, não bloqueia a resposta do auto-save.
     void onLeituraConcluida(svc, { tenantId: sessao.tenantId, estudanteId: sessao.estudanteId, documentoId: documento_id })
+      .then(() => Promise.allSettled([
+        atualizarHomeSnapshot(svc, sessao.tenantId, sessao.estudanteId),
+        atualizarPerfilSnapshot(svc, sessao.tenantId, sessao.estudanteId),
+      ]))
+      .catch(() => {})
     // Concluir a leitura muda o desempenho no ranking/pop-up → invalida o cache do módulo na hora.
     void invalidarRankingPorDocumento(svc, sessao.tenantId, documento_id)
     // Medalhas do módulo (carimbos + conquistas colecionáveis): avalia/concede na conclusão da aula.
@@ -79,6 +97,10 @@ export async function POST(request: NextRequest) {
       ).then(() => invalidarRankingJuris(sessao.tenantId, desafioId), () => {})
     }
   }
+
+  // LACUNA 1: invalida o cache read-through de trilha/leitura do aluno (TTL 30s) na hora — a % e a
+  // conclusão mudam a trilha/módulo. Best-effort, fora do caminho crítico do auto-save.
+  void invalidarLeituraAluno(sessao.tenantId, sessao.estudanteId).catch(() => {})
 
   return NextResponse.json({ ok: true, pct: pctNovo, concluido: !!concluidoEm })
 }

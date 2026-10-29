@@ -28,6 +28,7 @@ import {
   X,
 } from 'lucide-react'
 import { simTokensStyle } from '../sim-tokens'
+import { useBrandAtual, useCm } from '@/lib/brand/cor-marca'
 import type { SimCorrecaoItem, SimScreenProps } from '../types'
 import {
   Bgfx,
@@ -51,6 +52,8 @@ const P = 'svr'
 type Filtro = 'all' | 'e' | 'c' | 'b'
 
 export function ResultadoVND({ theme, data }: SimScreenProps) {
+  const marca = useBrandAtual() ?? 'vnd'
+  const cm = useCm()
   const r = data.resultado
   const { info, aluno } = data
   const [rq, setRq] = useState(1)
@@ -80,8 +83,8 @@ export function ResultadoVND({ theme, data }: SimScreenProps) {
   const biz = r.vizinhanca ?? []
 
   return (
-    <div className={`${P}-app`} style={{ ...simTokensStyle('vnd', theme), minHeight: '100vh', position: 'relative' }}>
-      <style>{css}</style>
+    <div className={`${P}-app`} style={{ ...simTokensStyle(marca, theme), minHeight: '100vh', position: 'relative' }}>
+      <style>{cm(css)}</style>
       <Bgfx prefix={P} variant="soft" />
 
       <div style={{ position: 'relative', zIndex: 1 }}>
@@ -95,7 +98,7 @@ export function ResultadoVND({ theme, data }: SimScreenProps) {
           <a href="#" className={`${P}-sbtn ${P}-htxt`} style={ghostBtnStyle({ height: 40, padding: '0 16px', borderRadius: 11, fontSize: 13, textDecoration: 'none' })}>
             <RotateCcw size={15} /> <span className={`${P}-hlbl`}>Refazer como treino</span>
           </a>
-          <a href="#" className={`${P}-sbtn`} style={{ ...primaryBtnStyle({ height: 40, padding: '0 16px', borderRadius: 11, fontSize: 13 }), textDecoration: 'none' }}>
+          <a href="#" className={`${P}-sbtn`} style={{ ...primaryBtnStyle({ height: 40, padding: '0 16px', borderRadius: 11, fontSize: 13 }, cm), textDecoration: 'none' }}>
             <Home size={15} /> <span className={`${P}-hlbl`}>Início da plataforma</span>
           </a>
         </header>
@@ -114,16 +117,16 @@ export function ResultadoVND({ theme, data }: SimScreenProps) {
               <h1 style={{ margin: '4px 0 0', fontSize: 34, fontWeight: 800, letterSpacing: '-0.045em' }} className={`${P}-heroh1`}>
                 Mandou bem, {aluno.primeiroNome}!
               </h1>
-              <span style={{ fontSize: 14, color: '#CFE3D7' }}>
+              <span style={{ fontSize: 14, color: cm('#CFE3D7') }}>
                 {r.certas} de {info.n} acertos · {r.nota} · {info.curto.replace('SIMULADO NACIONAL', 'Simulado Nacional')}
               </span>
               <div style={{ width: '100%', maxWidth: 460 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, color: '#CFE3D7', marginBottom: 6 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, color: cm('#CFE3D7'), marginBottom: 6 }}>
                   <span>Nível 27 → 28</span>
-                  <span style={{ color: '#F1D48A' }}>+{r.xpGanho ?? 120} XP</span>
+                  <span style={{ color: cm('#F1D48A') }}>+{r.xpGanho ?? 120} XP</span>
                 </div>
                 <div style={{ height: 14, borderRadius: 99, background: 'rgba(255,255,255,.14)', boxShadow: 'inset 0 2px 0 rgba(0,0,0,.2)', overflow: 'hidden' }}>
-                  <span className={`${P}-bar`} style={{ display: 'block', width: `${xpBar}%`, height: '100%', borderRadius: 99, background: 'linear-gradient(90deg,#3FD58A,#F1D48A)' }} />
+                  <span className={`${P}-bar`} style={{ display: 'block', width: `${xpBar}%`, height: '100%', borderRadius: 99, background: cm('linear-gradient(90deg,#3FD58A,#F1D48A)') }} />
                 </div>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 8 }}>
@@ -190,9 +193,9 @@ export function ResultadoVND({ theme, data }: SimScreenProps) {
                           gap: 10,
                           padding: '9px 12px',
                           borderRadius: 14,
-                          background: eu ? VND_GOLD : 'transparent',
-                          color: eu ? VND_GOLD_INK : 'var(--ink)',
-                          boxShadow: eu ? '0 3px 0 #9A7414' : 'none',
+                          background: eu ? cm(VND_GOLD) : 'transparent',
+                          color: eu ? cm(VND_GOLD_INK) : 'var(--ink)',
+                          boxShadow: eu ? cm('0 3px 0 #9A7414') : 'none',
                         }}
                       >
                         <b style={{ width: 44, fontSize: 13 }}>{l.pos}º</b>
@@ -201,8 +204,8 @@ export function ResultadoVND({ theme, data }: SimScreenProps) {
                             width: 30,
                             height: 30,
                             borderRadius: '50%',
-                            background: eu ? '#0B4A2E' : 'var(--chip)',
-                            color: eu ? '#F1D48A' : 'var(--brand)',
+                            background: eu ? cm('#0B4A2E') : 'var(--chip)',
+                            color: eu ? cm('#F1D48A') : 'var(--brand)',
                             display: 'inline-flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -259,7 +262,7 @@ export function ResultadoVND({ theme, data }: SimScreenProps) {
                     </div>
                     <textarea placeholder="Quer contar o porquê? (opcional)" style={{ width: '100%', height: 76, padding: '12px 14px', borderRadius: 12, border: '1.5px solid var(--line2)', background: 'var(--surface)', font: 'inherit', fontSize: 13.5, color: 'var(--ink)', resize: 'none' }} />
                     <div style={{ marginTop: 12, opacity: np >= 0 ? 1 : 0.45 }}>
-                      <button type="button" onClick={() => np >= 0 && setNpSent(true)} className={`${P}-sbtn`} style={primaryBtnStyle({ height: 46, padding: '0 20px', borderRadius: 16, fontSize: 14.5, pointerEvents: np >= 0 ? 'auto' : 'none' })}>
+                      <button type="button" onClick={() => np >= 0 && setNpSent(true)} className={`${P}-sbtn`} style={primaryBtnStyle({ height: 46, padding: '0 20px', borderRadius: 16, fontSize: 14.5, pointerEvents: np >= 0 ? 'auto' : 'none' }, cm)}>
                         <Check size={17} /> Enviar avaliação
                       </button>
                     </div>
@@ -335,7 +338,7 @@ export function ResultadoVND({ theme, data }: SimScreenProps) {
                   <button type="button" onClick={nextErr} disabled={!hasErr} className={`${P}-sbtn`} style={ghostBtnStyle({ height: 44, padding: '0 20px', borderRadius: 16, fontSize: 14.5, opacity: hasErr ? 1 : 0.4 })}>
                     <X size={17} /> Próxima errada
                   </button>
-                  <button type="button" onClick={() => gotoCorr(Math.min(r.correcao.length, rq + 1))} className={`${P}-sbtn`} style={primaryBtnStyle({ height: 44, padding: '0 20px', borderRadius: 16, fontSize: 14.5 })}>
+                  <button type="button" onClick={() => gotoCorr(Math.min(r.correcao.length, rq + 1))} className={`${P}-sbtn`} style={primaryBtnStyle({ height: 44, padding: '0 20px', borderRadius: 16, fontSize: 14.5 }, cm)}>
                     <ChevronRight size={17} /> Próxima
                   </button>
                 </div>
@@ -381,8 +384,9 @@ export function ResultadoVND({ theme, data }: SimScreenProps) {
 
 /* ─── peças ─── */
 function HeroChip({ icon, text }: { icon: React.ReactNode; text: string }) {
+  const cm = useCm()
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 12px', borderRadius: 99, background: 'rgba(255,255,255,.1)', border: '1px solid rgba(185,245,212,.25)', fontSize: 12.5, fontWeight: 700 }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 12px', borderRadius: 99, background: 'rgba(255,255,255,.1)', border: cm('1px solid rgba(185,245,212,.25)'), fontSize: 12.5, fontWeight: 700 }}>
       {icon}
       {text}
     </span>

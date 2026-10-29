@@ -12,6 +12,7 @@ import { Ic, SHARED_CSS, extraVars } from './shared'
 import type { RecoData, RecoDiag } from './data'
 import type { QuestaoAluno } from '@/components/aluno/questao-resolvivel'
 import { CadernoReforco } from './caderno-reforco'
+import { useBrandAtual, useCm } from '@/lib/brand/cor-marca'
 import * as M from './mock'
 
 const GOLD = 'linear-gradient(180deg,#F1D48A,#D8B45A)'
@@ -57,8 +58,9 @@ function Mapa({ mobile, data }: { mobile: boolean; data: RecoData }) {
 }
 
 function PorQue() {
+  const cm = useCm()
   const motIcon: Record<M.Motivo['tipo'], { icon: string; col: string }> = {
-    erro: { icon: 'x', col: '#E5484D' },
+    erro: { icon: 'x', col: cm('#E5484D') },
     banca: { icon: 'target', col: 'var(--goldToken)' },
     nivel: { icon: 'trend', col: 'var(--brand)' },
   }
@@ -78,15 +80,15 @@ function PorQue() {
         )
       })}
       {/* card Sequência de acertos (verde) */}
-      <div style={{ marginTop: 6, padding: 16, borderRadius: 18, background: 'linear-gradient(150deg,#041A10,#0B4A2E 60%,#12643D)', color: '#FFF' }}>
-        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.16em', color: '#F1D48A' }}>SEQUÊNCIA DE ACERTOS</span>
+      <div style={{ marginTop: 6, padding: 16, borderRadius: 18, background: cm('linear-gradient(150deg,#041A10,#0B4A2E 60%,#12643D)'), color: cm('#FFF') }}>
+        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.16em', color: cm('#F1D48A') }}>SEQUÊNCIA DE ACERTOS</span>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, margin: '6px 0 10px' }}>
           <b style={{ fontSize: 30, letterSpacing: '-0.04em' }}>{M.SEQ_ACERTOS.atual}</b>
-          <span style={{ fontSize: 12.5, color: '#CFE3D7' }}>acerte {M.SEQ_ACERTOS.meta} seguidas e ganhe +{M.SEQ_ACERTOS.xp} XP</span>
+          <span style={{ fontSize: 12.5, color: cm('#CFE3D7') }}>acerte {M.SEQ_ACERTOS.meta} seguidas e ganhe +{M.SEQ_ACERTOS.xp} XP</span>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
           {Array.from({ length: M.SEQ_ACERTOS.meta }).map((_, k) => (
-            <span key={k} style={{ flex: 1, height: 8, borderRadius: 99, background: 'rgba(255,255,255,.16)' }} />
+            <span key={k} style={{ flex: 1, height: 8, borderRadius: 99, background: cm('rgba(255,255,255,.16)') }} />
           ))}
         </div>
       </div>
@@ -95,9 +97,10 @@ function PorQue() {
 }
 
 function Treino({ mobile, total, questoes }: { mobile: boolean; total: number; questoes: QuestaoAluno[] }) {
+  const cm = useCm()
   const header = (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-      <span style={{ width: 32, height: 32, borderRadius: 10, background: GOLD, color: GOLD_INK, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Ic n="bolt" s={16} /></span>
+      <span style={{ width: 32, height: 32, borderRadius: 10, background: cm(GOLD), color: cm(GOLD_INK), display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Ic n="bolt" s={16} /></span>
       <div>
         <b style={{ display: 'block', fontSize: 15.5, letterSpacing: '-0.02em', color: 'var(--ink)' }}>Caderno de reforço</b>
         <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>{total} {total === 1 ? 'questão' : 'questões'} · escolhidas pelo seu desempenho</span>
@@ -106,7 +109,7 @@ function Treino({ mobile, total, questoes }: { mobile: boolean; total: number; q
   )
   const questao = (
     <div style={{ minWidth: 0 }}>
-      <CadernoReforco brand="vnd" questoes={questoes} header={header} acento={{ hi: GOLD, hiInk: GOLD_INK, pillShadow: '0 2px 5px -2px rgba(216,180,90,.7)' }} />
+      <CadernoReforco brand="vnd" questoes={questoes} header={header} acento={{ hi: cm(GOLD), hiInk: cm(GOLD_INK), pillShadow: cm('0 2px 5px -2px rgba(216,180,90,.7)') }} />
     </div>
   )
   return (
@@ -137,6 +140,8 @@ const CSS = `
 export function RecomendadoVnd({ theme: themeProp, data, questoes }: { theme: InternaTheme; data: RecoData; questoes: QuestaoAluno[] }) {
   const theme = useTemaInterno(themeProp)
   const mobile = useIsMobile()
+  const marca = useBrandAtual() ?? 'vnd'
+  const cm = useCm()
   const pad = mobile ? 14 : 24
   const s = data.stats
   const stats: [string, string][] = [
@@ -147,28 +152,28 @@ export function RecomendadoVnd({ theme: themeProp, data, questoes }: { theme: In
   ]
 
   return (
-    <div className="rcmvn-root" style={{ ...internaTokensStyle('vnd', theme), ...extraVars('vnd', theme === 'escuro'), minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
-      <style>{SHARED_CSS + CSS}</style>
+    <div className="rcmvn-root" style={{ ...internaTokensStyle(marca, theme), ...Object.fromEntries(Object.entries(extraVars('vnd', theme === 'escuro')).map(([k, v]) => [k, cm(v)])), minHeight: '100%', display: 'flex', flexDirection: 'column' }}>
+      <style>{cm(SHARED_CSS + CSS)}</style>
 
       {/* faixa hero verde (full-bleed) */}
-      <section style={{ position: 'relative', overflow: 'hidden', background: HERO, color: '#FFF', padding: mobile ? '26px 0 24px' : '34px 0 30px' }}>
+      <section style={{ position: 'relative', overflow: 'hidden', background: cm(HERO), color: cm('#FFF'), padding: mobile ? '26px 0 24px' : '34px 0 30px' }}>
         <span aria-hidden className="rcmvn-dots" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }} />
         {[-90, -50, -10].map((b, i) => (
           <svg key={i} className="rcmvn-chev" viewBox="0 0 200 120" aria-hidden preserveAspectRatio="none" style={{ position: 'absolute', right: '-4%', width: '62%', height: 220, bottom: b, pointerEvents: 'none', animationDelay: `${i * 0.6}s` }}>
-            <path d="M0 0 L100 112 L200 0" fill="none" stroke={i === 0 ? 'rgba(232,200,119,.55)' : 'rgba(185,245,212,.12)'} strokeWidth={i === 0 ? 2 : 1.2} vectorEffect="non-scaling-stroke" />
+            <path d="M0 0 L100 112 L200 0" fill="none" stroke={cm(i === 0 ? 'rgba(232,200,119,.55)' : 'rgba(185,245,212,.12)')} strokeWidth={i === 0 ? 2 : 1.2} vectorEffect="non-scaling-stroke" />
           </svg>
         ))}
         <div style={{ position: 'relative', maxWidth: 1376, margin: '0 auto', padding: `0 ${pad}px`, display: 'flex', alignItems: mobile ? 'flex-start' : 'flex-end', justifyContent: 'space-between', gap: 30, flexDirection: mobile ? 'column' : 'row' }}>
           <div>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: '#86CFA6' }}>PARA VOCÊ</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: cm('#86CFA6') }}>PARA VOCÊ</span>
             <h1 style={{ margin: '8px 0 4px', fontSize: mobile ? 30 : 40, fontWeight: 800, letterSpacing: '-0.045em' }}>Recomendado para você</h1>
-            <p style={{ margin: 0, fontSize: 14, color: '#CFE3D7', maxWidth: 560 }}>Treinos montados pelas suas estatísticas — direto no que mais derruba sua nota.</p>
+            <p style={{ margin: 0, fontSize: 14, color: cm('#CFE3D7'), maxWidth: 560 }}>Treinos montados pelas suas estatísticas — direto no que mais derruba sua nota.</p>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: mobile ? 'repeat(2,1fr)' : 'repeat(4,auto)', gap: 10, width: mobile ? '100%' : undefined }}>
             {stats.map(([v, l]) => (
-              <div key={l} style={{ padding: '10px 16px', borderRadius: 16, background: 'rgba(255,255,255,.08)', border: '1px solid rgba(185,245,212,.16)', minWidth: mobile ? 0 : 110 }}>
+              <div key={l} style={{ padding: '10px 16px', borderRadius: 16, background: cm('rgba(255,255,255,.08)'), border: `1px solid ${cm('rgba(185,245,212,.16)')}`, minWidth: mobile ? 0 : 110 }}>
                 <b style={{ display: 'block', fontSize: 20, fontWeight: 800 }}>{v}</b>
-                <span style={{ fontSize: 11.5, color: '#B7D3C3' }}>{l}</span>
+                <span style={{ fontSize: 11.5, color: cm('#B7D3C3') }}>{l}</span>
               </div>
             ))}
           </div>

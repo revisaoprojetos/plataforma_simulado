@@ -33,7 +33,21 @@ async function guard(acao: 'view' | 'update') {
 }
 
 // ── PASTAS (estilo Drive) ────────────────────────────────────────────────────────
-export interface PastaConteudo { id: string; nome: string; pai_id: string | null; cor: string | null }
+export interface PastaConteudo {
+  id: string; nome: string; pai_id: string | null; cor: string | null
+  // Config do Cronograma Adaptativo por pasta:
+  disciplina_id?: string | null            // pasta-DISCIPLINA (vinculada a simulado_disciplinas)
+  disciplina_classificacao?: string | null // essencial/complementar/especifica (da disciplina vinculada)
+  cronograma_tipo_material?: string | null  // SUBpasta: pdfull/pdfight/legproc/questoes
+}
+
+// Pastas da área, incluindo a config de cronograma. `cronograma_tipo_material` é coluna NOVA (criada por
+// outra frente) → SELECT tolerante que cai no legado se a migração ainda não rodou.
+async function fetchPastasArea(svc: ReturnType<typeof createAdminClient>, tenantId: string, area: string): Promise<any[]> {
+  const sel = (cols: string) => () => svc.from(PASTAS).select(cols).eq('tenant_id', tenantId).eq('folder_area', area).eq('is_folder', true).order('id', { ascending: true })
+  try { return (await fetchAll<any>(sel('id, nome, pai_id, cor, deletado, acesso_geral, disciplina_id, cronograma_tipo_material'))) ?? [] }
+  catch { try { return (await fetchAll<any>(sel('id, nome, pai_id, cor, deletado, acesso_geral, disciplina_id'))) ?? [] } catch { return [] } }
+}
 
 export async function listarArvore(pastaId?: string | null, categoria: Categoria = 'conteudo'): Promise<{
   ok: boolean; error?: string
@@ -53,11 +67,27 @@ export async function listarArvore(pastaId?: string | null, categoria: Categoria
   // ONDA 1: pastas da área + docs da pasta atual (paralelo). O "índice de TODOS os docs" NÃO é mais puxado —
   // as contagens vêm do SQL agregado (Fase 1 egress). Só cai no fetchAll de docs se o SQL estiver indisponível.
   const [todas, documentos] = await Promise.all([
-    fetchAll<any>(() => svc.from(PASTAS).select('id, nome, pai_id, cor, deletado, acesso_geral').eq('tenant_id', g.tenantId).eq('folder_area', area).eq('is_folder', true).order('id', { ascending: true })).then((r) => r ?? []),
+    fetchPastasArea(svc, g.tenantId, area),
     listarDocumentos({ pastaId: alvo, categoria }),
   ])
   const doArea = todas.filter((p) => !p.deletado).sort((a, b) => String(a.nome).localeCompare(String(b.nome)))
-  const pastas = doArea.filter((p) => (p.pai_id ?? null) === alvo).map((p) => ({ id: p.id, nome: p.nome, pai_id: p.pai_id ?? null, cor: p.cor ?? null }))
+  // Classificação (essencial/complementar/especifica) das disciplinas vinculadas às pastas — p/ o selo/menu
+  // do Cronograma. Poucos ids (pastas são dezenas) → busca escopada por .in().
+  const discIds = [...new Set(doArea.map((p) => p.disciplina_id).filter(Boolean))] as string[]
+  const classPorDisc = new Map<string, string | null>()
+  if (discIds.length) {
+    try {
+      const discs = (await fetchAllByIn<any>(discIds, (c) => svc.from('simulado_disciplinas').select('id, classificacao').eq('tenant_id', g.tenantId).in('id', c).order('id', { ascending: true }))) ?? []
+      for (const d of discs) classPorDisc.set(d.id, d.classificacao ?? null)
+    } catch { /* best-effort */ }
+  }
+  const mapaPasta = (p: any): PastaConteudo => ({
+    id: p.id, nome: p.nome, pai_id: p.pai_id ?? null, cor: p.cor ?? null,
+    disciplina_id: p.disciplina_id ?? null,
+    disciplina_classificacao: p.disciplina_id ? (classPorDisc.get(p.disciplina_id) ?? null) : null,
+    cronograma_tipo_material: p.cronograma_tipo_material ?? null,
+  })
+  const pastas = doArea.filter((p) => (p.pai_id ?? null) === alvo).map(mapaPasta)
   const docIds = documentos.map((d) => d.id)
 
   const contagens: Record<string, number> = {}
@@ -109,7 +139,7 @@ export async function listarArvore(pastaId?: string | null, categoria: Categoria
   const porId = new Map(doArea.map((p) => [p.id, p]))
   const breadcrumb: PastaConteudo[] = []
   let cur = alvo
-  while (cur && porId.has(cur)) { const p = porId.get(cur)!; breadcrumb.unshift({ id: p.id, nome: p.nome, pai_id: p.pai_id ?? null, cor: p.cor ?? null }); cur = p.pai_id ?? null }
+  while (cur && porId.has(cur)) { const p = porId.get(cur)!; breadcrumb.unshift(mapaPasta(p)); cur = p.pai_id ?? null }
 
   // PRÉVIA dos cards: primeiros trechos ESTRUTURADOS (tipo+texto) p/ montar uma mini-página (título + linhas),
   // em vez de um blocão de texto. Versão = atual (publicada) ou a mais nova. Batched.
@@ -258,6 +288,82 @@ export async function removerPasta(id: string): Promise<{ ok: boolean; error?: s
   await svc.from('simulado_conteudo_documentos').update({ pasta_id: null }).eq('tenant_id', g.tenantId).eq('pasta_id', id)
   const { error } = await svc.from(PASTAS).update({ deletado: true }).eq('tenant_id', g.tenantId).eq('id', id)
   if (error) return { ok: false, error: error.message }
+  revalidatePath('/admin/biblioteca')
+  return { ok: true }
+}
+
+// ── CRONOGRAMA ADAPTATIVO por PASTA ───────────────────────────────────────────────
+// Config "na Biblioteca, por pasta" (decisão do usuário). Uma pasta pode virar DISCIPLINA do Cronograma
+// (garante a simulado_disciplinas pelo NOME da pasta + classificação) e suas SUBpastas marcam o TIPO de
+// material. Reusa o modelo de disciplinas-actions (classificacao mora em simulado_disciplinas).
+const CLASS_CRONO = ['essencial', 'complementar', 'especifica'] as const
+const TIPOS_MATERIAL_CRONO = ['pdfull', 'pdfight', 'pdflash', 'legproc', 'questoes'] as const
+
+/** Marca a pasta como DISCIPLINA do cronograma: garante a simulado_disciplinas (pelo nome da pasta, ou
+ *  a já existente de mesmo nome), vincula `simulado_pastas.disciplina_id` e grava a classificação. */
+export async function definirPastaDisciplinaCronograma(pastaId: string, input: { classificacao?: string | null }): Promise<{ ok: boolean; error?: string; disciplinaId?: string }> {
+  const g = await guard('update'); if (!g.ok) return g
+  if (!pastaId) return { ok: false, error: 'Pasta ausente.' }
+  const svc = createAdminClient()
+  const { data: pasta } = await svc.from(PASTAS).select('id, nome, disciplina_id').eq('tenant_id', g.tenantId).eq('id', pastaId).eq('folder_area', 'conteudo').maybeSingle()
+  if (!pasta) return { ok: false, error: 'Pasta inválida.' }
+  const classificacao = input.classificacao && (CLASS_CRONO as readonly string[]).includes(input.classificacao) ? input.classificacao : null
+
+  // 1) Disciplina: a já vinculada; senão uma existente de mesmo nome; senão cria uma nova com o nome da pasta.
+  let disciplinaId = (pasta as any).disciplina_id as string | null
+  if (!disciplinaId) {
+    const nome = String((pasta as any).nome || '').trim() || 'Disciplina'
+    const { data: existente } = await svc.from('simulado_disciplinas').select('id').eq('tenant_id', g.tenantId).ilike('nome', nome).limit(1).maybeSingle()
+    if (existente) disciplinaId = (existente as any).id
+    else {
+      const { data: nova, error: errNova } = await svc.from('simulado_disciplinas').insert({ tenant_id: g.tenantId, nome }).select('id').single()
+      if (errNova || !nova) return { ok: false, error: errNova?.message || 'Falha ao criar disciplina.' }
+      disciplinaId = (nova as any).id
+    }
+  }
+
+  // 2) Classificação na disciplina (quando informada).
+  if (classificacao) {
+    const { error: errClass } = await svc.from('simulado_disciplinas').update({ classificacao }).eq('tenant_id', g.tenantId).eq('id', disciplinaId)
+    if (errClass) return { ok: false, error: errClass.message }
+  }
+
+  // 3) Vincula a pasta à disciplina.
+  const { error } = await svc.from(PASTAS).update({ disciplina_id: disciplinaId }).eq('tenant_id', g.tenantId).eq('id', pastaId)
+  if (error) return { ok: false, error: error.message }
+
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_pastas', entidadeId: pastaId, depois: { cronograma_disciplina_id: disciplinaId, classificacao }, atorId: g.atorId, tenantId: g.tenantId }).catch(() => {})
+  revalidatePath('/admin/biblioteca'); revalidatePath('/admin/questoes')
+  return { ok: true, disciplinaId: disciplinaId ?? undefined }
+}
+
+/** Desmarca a pasta como disciplina do cronograma (só DESVINCULA; não apaga a disciplina — pode ter questões). */
+export async function removerPastaDisciplinaCronograma(pastaId: string): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('update'); if (!g.ok) return g
+  if (!pastaId) return { ok: false, error: 'Pasta ausente.' }
+  const svc = createAdminClient()
+  const { data: pasta } = await svc.from(PASTAS).select('id, disciplina_id').eq('tenant_id', g.tenantId).eq('id', pastaId).eq('folder_area', 'conteudo').maybeSingle()
+  if (!pasta) return { ok: false, error: 'Pasta inválida.' }
+  const { error } = await svc.from(PASTAS).update({ disciplina_id: null }).eq('tenant_id', g.tenantId).eq('id', pastaId)
+  if (error) return { ok: false, error: error.message }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_pastas', entidadeId: pastaId, antes: { disciplina_id: (pasta as any).disciplina_id }, depois: { disciplina_id: null }, atorId: g.atorId, tenantId: g.tenantId }).catch(() => {})
+  revalidatePath('/admin/biblioteca'); revalidatePath('/admin/questoes')
+  return { ok: true }
+}
+
+/** Define o TIPO de material da SUBpasta (pdfull/pdfight/legproc/questoes) — coluna NOVA
+ *  `cronograma_tipo_material` (criada por outra frente). `null` limpa. Tolerante se a migração não rodou. */
+export async function definirTipoMaterialSubpasta(pastaId: string, tipo: string | null): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('update'); if (!g.ok) return g
+  if (!pastaId) return { ok: false, error: 'Pasta ausente.' }
+  const valor = tipo && (TIPOS_MATERIAL_CRONO as readonly string[]).includes(tipo) ? tipo : null
+  if (tipo && !valor) return { ok: false, error: 'Tipo de material inválido.' }
+  const svc = createAdminClient()
+  const { data: pasta } = await svc.from(PASTAS).select('id').eq('tenant_id', g.tenantId).eq('id', pastaId).eq('folder_area', 'conteudo').maybeSingle()
+  if (!pasta) return { ok: false, error: 'Pasta inválida.' }
+  const { error } = await svc.from(PASTAS).update({ cronograma_tipo_material: valor }).eq('tenant_id', g.tenantId).eq('id', pastaId)
+  if (error) return { ok: false, error: /column .* does not exist|cronograma_tipo_material|schema cache/i.test(error.message) ? 'Rode a migração do cronograma por pasta (coluna cronograma_tipo_material).' : error.message }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_pastas', entidadeId: pastaId, depois: { cronograma_tipo_material: valor }, atorId: g.atorId, tenantId: g.tenantId }).catch(() => {})
   revalidatePath('/admin/biblioteca')
   return { ok: true }
 }

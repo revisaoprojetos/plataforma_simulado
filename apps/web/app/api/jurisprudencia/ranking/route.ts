@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { checkPermission, getCurrentAccess } from '@/lib/auth/permissions'
-import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { lerDesafioJogo, temAcessoDesafio, perfilAlunos, preencherTesesPorQuiz } from '@/lib/jurisprudencia/conteudo'
 import { diasAtivosPorAluno, streakDe } from '@/lib/jurisprudencia/sequencia'
 
@@ -78,11 +78,13 @@ export async function GET(request: NextRequest) {
   } catch { /* coluna ranking_ocultos ausente */ }
   try { const { testadoresDoModulo } = await import('@/lib/leitura/testadores'); for (const id of await testadoresDoModulo(svc, tenantId, desafioId)) ocultosSet.add(id) } catch { /* ausente */ }
 
-  // Progresso de TODOS os alunos do desafio (1 linha por aluno) — paginado (nunca trunca em 1000).
+  // Progresso de TODOS os alunos do desafio (1 linha por aluno) — paginado (nunca trunca em 1000) e
+  // CACHEADO por (tenant, desafio) TTL 30s: o mesmo conjunto serve todas as abas e todos os alunos,
+  // então com 1000+ alunos lendo o ranking vira 1 leitura por janela em vez de N (corta o egress).
   // Remove as contas ocultas/teste para não contaminarem pontos/selos/posições/total.
-  const progresso = (await fetchAll<{ estudante_id: string; dom: any; best: any; atualizado_em: string | null }>(() =>
-    svc.from('simulado_jurisprudencia_progresso').select('estudante_id, dom, best, atualizado_em').eq('desafio_id', desafioId).order('estudante_id', { ascending: true }),
-  )).filter((p) => !ocultosSet.has(p.estudante_id))
+  const { progressoDesafioCache } = await import('@/lib/jurisprudencia/ranking')
+  const progresso = (await progressoDesafioCache(svc, tenantId, desafioId))
+    .filter((p) => !ocultosSet.has(p.estudante_id))
 
   const pontosDe = (best: any): number => {
     if (!best || typeof best !== 'object') return 0

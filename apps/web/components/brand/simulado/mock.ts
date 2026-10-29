@@ -84,7 +84,7 @@ function materias(lista: [string, number, number, number?][]) {
   return lista.map(([nome, total, certas, mediaPct]) => ({ nome, total, certas, mediaPct }))
 }
 
-const MOCKS: Record<Brand, SimMock> = {
+const MOCKS_BY: Record<Exclude<Brand, 'mac'>, SimMock> = {
   revisao: {
     info: {
       titulo: 'Simulado Mensal – 10/2026', curto: 'SIMULADO MENSAL – 10/2026', subtitulo: 'PGE/PGM',
@@ -147,6 +147,9 @@ const MOCKS: Record<Brand, SimMock> = {
     countdown: { dias: 1, horas: 6, min: 40, dataLabel: '06/10 14:00' },
   },
 }
+
+// MAC reaproveita o mock do VND (preview; recolorido bordô via tokens).
+const MOCKS: Record<Brand, SimMock> = { ...MOCKS_BY, mac: MOCKS_BY.vnd }
 
 export function simMock(brand: Brand): SimMock {
   return MOCKS[brand] ?? MOCKS.revisao

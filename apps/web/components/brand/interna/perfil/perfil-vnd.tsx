@@ -8,6 +8,8 @@ import { useState, useTransition } from 'react'
 import Link from 'next/link'
 import { internaTokensStyle, INTERNA_RADIUS, type InternaTheme } from '../interna-tokens'
 import { useTemaInterno } from '../use-tema-interno'
+import { useBrandAtual, useCm } from '@/lib/brand/cor-marca'
+import { MAC_M_PATH } from '@/components/brand/brand-marks'
 import { BK, Ic, Tabs, type TabDef, notec, fnum, LineSvg } from './shared'
 import { useIsMobile } from './use-is-mobile'
 import type { PerfilData, PerfilPreferencias } from './data'
@@ -36,25 +38,28 @@ const bk = new BK('vnd')
 const DASH = '—'
 
 function Chevrons() {
-  const defs: [number, string, number][] = [[-90, 'rgba(232,200,119,.55)', 2], [-50, 'rgba(185,245,212,.14)', 1.2], [-10, 'rgba(185,245,212,.1)', 1.2]]
+  const cm = useCm()
+  const defs: [number, string, number][] = [[-90, cm('rgba(232,200,119,.55)'), 2], [-50, cm('rgba(185,245,212,.14)'), 1.2], [-10, cm('rgba(185,245,212,.1)'), 1.2]]
   return <>{defs.map(([b, c, w], k) => (
     <svg key={k} className={`pvn-chev pvn-c${k + 1}`} viewBox="0 0 200 120" aria-hidden preserveAspectRatio="none" style={{ position: 'absolute', right: '-4%', width: '62%', height: 220, bottom: b, pointerEvents: 'none' }}><path d="M0 0 L100 112 L200 0" fill="none" stroke={c} strokeWidth={w} vectorEffect="non-scaling-stroke" /></svg>
   ))}</>
 }
 
 function Avatar({ size, data }: { size: number; data: PerfilData }) {
+  const cm = useCm()
   const h = data.header
   if (h.avatarUrl) return <img src={h.avatarUrl} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-  return <span style={{ width: '100%', height: '100%', borderRadius: '50%', background: h.avatarCor || 'linear-gradient(160deg,#F7C25A,#E8952A)', color: '#FFF', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.round(size * 0.36), fontWeight: 800 }}>{h.iniciais}</span>
+  return <span style={{ width: '100%', height: '100%', borderRadius: '50%', background: h.avatarCor || cm('linear-gradient(160deg,#F7C25A,#E8952A)'), color: cm('#FFF'), display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.round(size * 0.36), fontWeight: 800 }}>{h.iniciais}</span>
 }
 
 function LvlRing({ size, p, inner }: { size: number; p: number; inner: React.ReactNode }) {
+  const cm = useCm()
   const r = (size - 8) / 2, C = 2 * Math.PI * r
   return (
     <span style={{ position: 'relative', width: size, height: size, display: 'inline-flex', flexShrink: 0 }}>
       <svg viewBox={`0 0 ${size} ${size}`} style={{ position: 'absolute', inset: 0, transform: 'rotate(-90deg)' }}>
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--track)" strokeWidth={4} />
-        <circle className="pvn-ring" cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#E8C877" strokeWidth={4} strokeLinecap="round" strokeDasharray={C.toFixed(1)} strokeDashoffset={(C * (1 - p)).toFixed(1)} style={{ ['--c' as any]: C.toFixed(1) }} />
+        <circle className="pvn-ring" cx={size / 2} cy={size / 2} r={r} fill="none" stroke={cm('#E8C877')} strokeWidth={4} strokeLinecap="round" strokeDasharray={C.toFixed(1)} strokeDashoffset={(C * (1 - p)).toFixed(1)} style={{ ['--c' as any]: C.toFixed(1) }} />
       </svg>
       <span style={{ position: 'absolute', inset: 8, display: 'flex' }}>{inner}</span>
     </span>
@@ -62,6 +67,9 @@ function LvlRing({ size, p, inner }: { size: number; p: number; inner: React.Rea
 }
 
 function Header({ mobile, data }: { mobile: boolean; data: PerfilData }) {
+  const marca = useBrandAtual() ?? 'vnd'
+  const cm = useCm()
+  const VPATH = marca === 'mac' ? MAC_M_PATH : VP
   const h = data.header
   const av = mobile ? 88 : 112
   const ringP = h.gamAtivo && h.xpNivelMax > 0 ? Math.min(1, h.xpNivelAtual / h.xpNivelMax) : 0
@@ -70,12 +78,12 @@ function Header({ mobile, data }: { mobile: boolean; data: PerfilData }) {
   if (h.gamAtivo && h.liga) meta.push(['trophy', h.posicaoLiga != null ? `${h.liga} · ${h.posicaoLiga}º` : h.liga])
   if (h.gamAtivo && h.recorde > 0) meta.push(['flame', `Recorde: ${h.recorde} dias seguidos`])
   const banner = (
-    <section style={{ position: 'relative', overflow: 'hidden', height: mobile ? 150 : 210, background: 'linear-gradient(120deg,#041A10 0%,#0B4A2E 55%,#12643D 100%)' }}>
-      <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle,rgba(185,245,212,.18) 1.2px,transparent 1.8px)', backgroundSize: '22px 22px', pointerEvents: 'none' }} />
+    <section style={{ position: 'relative', overflow: 'hidden', height: mobile ? 150 : 210, background: cm('linear-gradient(120deg,#041A10 0%,#0B4A2E 55%,#12643D 100%)') }}>
+      <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: cm('radial-gradient(circle,rgba(185,245,212,.18) 1.2px,transparent 1.8px)'), backgroundSize: '22px 22px', pointerEvents: 'none' }} />
       <Chevrons />
-      <svg viewBox="0 0 32 32" aria-hidden style={{ position: 'absolute', right: mobile ? -20 : '8%', top: mobile ? -10 : -30, width: mobile ? 170 : 280, height: mobile ? 170 : 280, opacity: 0.08 }}><path fill="#FFF" d={VP} /></svg>
-      {h.memberSince ? <span style={{ position: 'absolute', left: mobile ? 18 : 32, top: 20, display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px', borderRadius: 99, background: 'rgba(255,255,255,.14)', color: '#FFF', fontSize: 11.5, fontWeight: 700 }}><Ic n="crown" s={13} />Aluno desde {h.memberSince}</span> : null}
-      <span style={{ position: 'absolute', left: mobile ? 18 : 32, top: 54, fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: '#86CFA6' }}>FUTURO DEFENSOR</span>
+      <svg viewBox="0 0 32 32" aria-hidden style={{ position: 'absolute', right: mobile ? -20 : '8%', top: mobile ? -10 : -30, width: mobile ? 170 : 280, height: mobile ? 170 : 280, opacity: 0.08 }}><path fill={cm('#FFF')} d={VPATH} /></svg>
+      {h.memberSince ? <span style={{ position: 'absolute', left: mobile ? 18 : 32, top: 20, display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px', borderRadius: 99, background: cm('rgba(255,255,255,.14)'), color: cm('#FFF'), fontSize: 11.5, fontWeight: 700 }}><Ic n="crown" s={13} />Aluno desde {h.memberSince}</span> : null}
+      <span style={{ position: 'absolute', left: mobile ? 18 : 32, top: 54, fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: cm('#86CFA6') }}>{marca === 'mac' ? 'RUMO À APROVAÇÃO' : 'FUTURO DEFENSOR'}</span>
     </section>
   )
   const who = (
@@ -88,7 +96,7 @@ function Header({ mobile, data }: { mobile: boolean; data: PerfilData }) {
       <div style={{ flex: 1, minWidth: 0, paddingTop: mobile ? 0 : 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <b style={{ fontSize: mobile ? 24 : 28, fontWeight: 800, letterSpacing: '-0.04em', color: 'var(--ink)' }}>{h.nome}</b>
-          {h.gamAtivo ? <span style={{ height: 24, padding: '0 10px', borderRadius: 99, background: 'linear-gradient(180deg,#F1D48A,#D8B45A)', color: '#2A1F02', fontSize: 11.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center' }}>Nv {h.nivel} · {h.tituloNivel}</span> : null}
+          {h.gamAtivo ? <span style={{ height: 24, padding: '0 10px', borderRadius: 99, background: cm('linear-gradient(180deg,#F1D48A,#D8B45A)'), color: cm('#2A1F02'), fontSize: 11.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center' }}>Nv {h.nivel} · {h.tituloNivel}</span> : null}
         </div>
         {meta.length ? (
           <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 6, fontSize: 12.5, color: 'var(--muted)' }}>
@@ -122,6 +130,7 @@ function Ring({ p, color, size = 70, sw = 7, inner }: { p: number; color: string
 }
 
 function Kpis({ mobile, data }: { mobile: boolean; data: PerfilData }) {
+  const cm = useCm()
   const k = data.kpis, h = data.header
   const acerto = k.acertoMedio
   const items: { p: number; color: string; inner: React.ReactNode; t: string; s: string }[] = [
@@ -130,8 +139,8 @@ function Kpis({ mobile, data }: { mobile: boolean; data: PerfilData }) {
   ]
   if (h.gamAtivo) {
     const ringP = h.xpNivelMax > 0 ? Math.min(1, h.xpNivelAtual / h.xpNivelMax) : 0
-    items.push({ p: ringP, color: '#7C6CF0', inner: <b style={{ fontSize: 15, color: 'var(--ink)' }}>Nv {h.nivel}</b>, t: 'Próximo nível', s: `${Math.max(0, h.xpNivelMax - h.xpNivelAtual)} XP p/ o ${h.nivel + 1}` })
-    items.push({ p: 0, color: '#F0773A', inner: <Ic n="flame" s={24} c="#F0773A" />, t: 'Sequência', s: `${h.streak} dias · recorde ${h.recorde}` })
+    items.push({ p: ringP, color: cm('#7C6CF0'), inner: <b style={{ fontSize: 15, color: 'var(--ink)' }}>Nv {h.nivel}</b>, t: 'Próximo nível', s: `${Math.max(0, h.xpNivelMax - h.xpNivelAtual)} XP p/ o ${h.nivel + 1}` })
+    items.push({ p: 0, color: cm('#F0773A'), inner: <Ic n="flame" s={24} c={cm('#F0773A')} />, t: 'Sequência', s: `${h.streak} dias · recorde ${h.recorde}` })
   }
   return (
     <div className="pvn-kpis">
@@ -205,11 +214,12 @@ function TabGeral({ mobile, data }: { mobile: boolean; data: PerfilData }) {
 
 // ---------------------------------------------------------------- Conquistas (medalhas 3D)
 function Medal({ a, size = 58 }: { a: PerfilData['conquistas'][number]; size?: number }) {
+  const cm = useCm()
   const c = a.cor || 'var(--brand)'
   const on = a.desbloqueada
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, width: size + 34, textAlign: 'center' }}>
-      <span style={{ width: size, height: size, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', ...(on ? { background: `radial-gradient(circle at 35% 30%, color-mix(in srgb, ${c} 70%, #fff), ${c} 60%, color-mix(in srgb, ${c} 70%, #000))`, color: '#FFF', boxShadow: `0 5px 0 color-mix(in srgb, ${c} 60%, #000), 0 12px 20px -10px ${c}` } : { background: 'var(--surface2)', color: 'var(--muted)', boxShadow: '0 5px 0 var(--line2)' }) }}><Ic n={on ? 'medal' : 'lock'} s={Math.round(size * 0.4)} /></span>
+      <span style={{ width: size, height: size, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', ...(on ? { background: cm(`radial-gradient(circle at 35% 30%, color-mix(in srgb, ${c} 70%, #fff), ${c} 60%, color-mix(in srgb, ${c} 70%, #000))`), color: cm('#FFF'), boxShadow: cm(`0 5px 0 color-mix(in srgb, ${c} 60%, #000), 0 12px 20px -10px ${c}`) } : { background: 'var(--surface2)', color: 'var(--muted)', boxShadow: '0 5px 0 var(--line2)' }) }}><Ic n={on ? 'medal' : 'lock'} s={Math.round(size * 0.4)} /></span>
       <b style={{ fontSize: 11.5, lineHeight: 1.25, color: on ? 'var(--ink)' : 'var(--muted)' }}>{a.titulo}</b>
       {on ? null : a.criterio ? <span style={{ fontSize: 10.5, color: 'var(--muted)' }}>{a.criterio}</span> : null}
     </div>
@@ -217,16 +227,17 @@ function Medal({ a, size = 58 }: { a: PerfilData['conquistas'][number]; size?: n
 }
 
 function TabConq({ mobile, data }: { mobile: boolean; data: PerfilData }) {
+  const cm = useCm()
   const total = data.conquistas.length
   const got = data.conquistas.filter((a) => a.desbloqueada).length
   const vitrine = (
-    <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 24, padding: 22, background: 'linear-gradient(160deg,#041A10,#0B4A2E 60%,#12643D)' }}>
-      <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle,rgba(185,245,212,.14) 1.2px,transparent 1.8px)', backgroundSize: '20px 20px', pointerEvents: 'none' }} />
+    <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 24, padding: 22, background: cm('linear-gradient(160deg,#041A10,#0B4A2E 60%,#12643D)') }}>
+      <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: cm('radial-gradient(circle,rgba(185,245,212,.14) 1.2px,transparent 1.8px)'), backgroundSize: '20px 20px', pointerEvents: 'none' }} />
       <div style={{ position: 'relative' }}>
-        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.2em', color: '#F1D48A' }}>VITRINE</span>
-        <b style={{ display: 'block', marginTop: 6, fontSize: 24, letterSpacing: '-0.03em', color: '#FFF' }}>{got} de {total} medalhas</b>
-        <span style={{ fontSize: 13, color: '#CFE3D7' }}>Conquiste mais estudando e fazendo simulados.</span>
-        {total ? <div style={{ marginTop: 14, display: 'flex', gap: 3, maxWidth: 280 }}>{Array.from({ length: total }).map((_, k) => <span key={k} style={{ flex: 1, height: 8, borderRadius: 3, background: k < got ? '#E8C877' : 'rgba(255,255,255,.16)' }} />)}</div> : null}
+        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.2em', color: cm('#F1D48A') }}>VITRINE</span>
+        <b style={{ display: 'block', marginTop: 6, fontSize: 24, letterSpacing: '-0.03em', color: cm('#FFF') }}>{got} de {total} medalhas</b>
+        <span style={{ fontSize: 13, color: cm('#CFE3D7') }}>Conquiste mais estudando e fazendo simulados.</span>
+        {total ? <div style={{ marginTop: 14, display: 'flex', gap: 3, maxWidth: 280 }}>{Array.from({ length: total }).map((_, k) => <span key={k} style={{ flex: 1, height: 8, borderRadius: 3, background: k < got ? cm('#E8C877') : cm('rgba(255,255,255,.16)') }} />)}</div> : null}
       </div>
     </div>
   )
@@ -355,6 +366,8 @@ const CSS = `
 `
 
 export function PerfilVnd({ theme: themeProp, data }: { theme: InternaTheme; data: PerfilData }) {
+  const marca = useBrandAtual() ?? 'vnd'
+  const cm = useCm()
   const theme = useTemaInterno(themeProp)
   const [pf, setPf] = useState('info')
   const mobile = useIsMobile()
@@ -371,8 +384,8 @@ export function PerfilVnd({ theme: themeProp, data }: { theme: InternaTheme; dat
     </>
   )
   return (
-    <div style={{ ...internaTokensStyle('vnd', theme), ['--r' as any]: `${INTERNA_RADIUS.vnd}px`, minHeight: '100%', background: 'var(--bg)' }}>
-      <style>{CSS + PERFIL_BLOCOS_CSS}</style>
+    <div style={{ ...internaTokensStyle(marca, theme), ['--r' as any]: `${INTERNA_RADIUS[marca]}px`, minHeight: '100%', background: 'var(--bg)' }}>
+      <style>{cm(CSS + PERFIL_BLOCOS_CSS)}</style>
       <Header mobile={mobile} data={data} />
       <div className="pvn-wrap" style={{ padding: mobile ? '18px 18px 28px' : '24px 32px 56px', display: 'flex', flexDirection: 'column', gap: 20 }}>{body}</div>
     </div>

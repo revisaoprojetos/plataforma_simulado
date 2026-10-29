@@ -25,6 +25,7 @@ import {
   ClipboardCheck,
 } from 'lucide-react'
 import { simTokensStyle } from '../sim-tokens'
+import { useBrandAtual, useCm } from '@/lib/brand/cor-marca'
 import type { EstadoEntrada, SimScreenProps, SimEntradaReal } from '../types'
 import {
   Bgfx,
@@ -46,6 +47,8 @@ const P = 'sve'
 type Modal = null | 'ini' | 'ret'
 
 export function EntradaVND({ theme, data, es = 'aberto', preview, real }: SimScreenProps) {
+  const marca = useBrandAtual() ?? 'vnd'
+  const cm = useCm()
   const [estado, setEstado] = useState<EstadoEntrada>(es)
   const [md, setMd] = useState<Modal>(null)
   const [mo, setMo] = useState<'cad' | 'folha'>('cad')
@@ -79,9 +82,9 @@ export function EntradaVND({ theme, data, es = 'aberto', preview, real }: SimScr
   return (
     <div
       className={`${P}-app`}
-      style={{ ...simTokensStyle('vnd', theme), minHeight: '100vh', position: 'relative' }}
+      style={{ ...simTokensStyle(marca, theme), minHeight: '100vh', position: 'relative' }}
     >
-      <style>{css}</style>
+      <style>{cm(css)}</style>
 
       {/* chips de PRÉ-VISUALIZAR ESTADO — ferramenta de MOCK/preview; só aparece no preview, NUNCA no
           acesso real do aluno (antes vazava em produção porque não estava gated). */}
@@ -134,9 +137,9 @@ export function EntradaVND({ theme, data, es = 'aberto', preview, real }: SimScr
           <div className={`${P}-lockup`}>
             <MarcaVND size={22} radius={13} />
             <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
-              <span style={{ fontWeight: 800, fontSize: 14, color: '#FFFFFF' }}>Você na Defensoria</span>
-              <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.18em', color: '#F1D48A' }}>
-                SIMULA VND
+              <span style={{ fontWeight: 800, fontSize: 14, color: '#FFFFFF' }}>{marca === 'mac' ? 'Mentoria Além do Corte' : 'Você na Defensoria'}</span>
+              <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.18em', color: cm('#F1D48A') }}>
+                {marca === 'mac' ? 'SIMULA MAC' : 'SIMULA VND'}
               </span>
             </div>
           </div>
@@ -271,7 +274,7 @@ export function EntradaVND({ theme, data, es = 'aberto', preview, real }: SimScr
               onClick={() => { if (real) real.onIdentificar(mo === 'folha' ? 'folha' : 'iniciar') }}
               className={`${P}-sbtn`}
               style={{
-                ...primaryBtnStyle({ width: '100%', height: 52, borderRadius: 16, fontSize: 15 }),
+                ...primaryBtnStyle({ width: '100%', height: 52, borderRadius: 16, fontSize: 15 }, cm),
                 opacity: ag ? 1 : 0.45,
                 pointerEvents: ag && !real?.carregando ? 'auto' : 'none',
                 transition: 'opacity .2s',
@@ -335,7 +338,7 @@ export function EntradaVND({ theme, data, es = 'aberto', preview, real }: SimScr
             <a
               href="#"
               className={`${P}-sbtn`}
-              style={{ ...primaryBtnStyle({ height: 52, borderRadius: 16, fontSize: 15 }), textDecoration: 'none' }}
+              style={{ ...primaryBtnStyle({ height: 52, borderRadius: 16, fontSize: 15 }, cm), textDecoration: 'none' }}
             >
               <Play size={16} />
               Continuar na questão {data.tentativa.ultimaQuestao}
@@ -416,6 +419,7 @@ function CamposReais({ real }: { real: SimEntradaReal }) {
 }
 
 function FormAberto({ onIni, onFolha, onResultado, real }: { onIni: () => void; onFolha: () => void; onResultado: () => void; real?: SimEntradaReal }) {
+  const cm = useCm()
   const carregando = !!real?.carregando
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -426,7 +430,7 @@ function FormAberto({ onIni, onFolha, onResultado, real }: { onIni: () => void; 
           <span>{real.erro.titulo ? <b>{real.erro.titulo} </b> : null}{real.erro.mensagem}</span>
         </div>
       ) : null}
-      <button type="button" disabled={carregando} onClick={onIni} className={`${P}-sbtn`} style={primaryBtnStyle({ width: '100%', height: 52, borderRadius: 16, fontSize: 14.5 })}>
+      <button type="button" disabled={carregando} onClick={onIni} className={`${P}-sbtn`} style={primaryBtnStyle({ width: '100%', height: 52, borderRadius: 16, fontSize: 14.5 }, cm)}>
         <Play size={17} /> {carregando ? 'Validando…' : 'Iniciar simulado'}
       </button>
       {(!real || real.permiteFolha) && (
@@ -502,6 +506,7 @@ function FormAgendado({
 }
 
 function FormSemcad() {
+  const cm = useCm()
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <EmailField value="aluno.novo@email.com" error />
@@ -514,7 +519,7 @@ function FormSemcad() {
           para fazer este simulado.
         </span>
       </div>
-      <button type="button" className={`${P}-sbtn`} style={primaryBtnStyle({ width: '100%', height: 50, borderRadius: 16, fontSize: 14.5 })}>
+      <button type="button" className={`${P}-sbtn`} style={primaryBtnStyle({ width: '100%', height: 50, borderRadius: 16, fontSize: 14.5 }, cm)}>
         <RotateCcw size={17} /> Tentar novamente
       </button>
       <button type="button" className={`${P}-sbtn`} style={ghostBtnStyle({ width: '100%', height: 48, borderRadius: 16, fontSize: 14.5 })}>
@@ -538,6 +543,7 @@ function FormRetomar({
   tempo?: string
   onRet: () => void
 }) {
+  const cm = useCm()
   const pct = Math.round((respondidas / total) * 100)
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -557,7 +563,7 @@ function FormRetomar({
           {tempo ? ` · tempo restante ${tempo}` : ''}
         </span>
       </div>
-      <button type="button" onClick={onRet} className={`${P}-sbtn`} style={primaryBtnStyle({ width: '100%', height: 52, borderRadius: 16, fontSize: 14.5 })}>
+      <button type="button" onClick={onRet} className={`${P}-sbtn`} style={primaryBtnStyle({ width: '100%', height: 52, borderRadius: 16, fontSize: 14.5 }, cm)}>
         <Play size={17} /> Continuar de onde parei
       </button>
       <button type="button" onClick={onRet} className={`${P}-sbtn`} style={ghostBtnStyle({ width: '100%', height: 48, borderRadius: 16, fontSize: 14.5 })}>
@@ -568,6 +574,7 @@ function FormRetomar({
 }
 
 function FormEncerrado({ fim, real }: { fim: string; real?: SimEntradaReal }) {
+  const cm = useCm()
   const carregando = !!real?.carregando
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -581,7 +588,7 @@ function FormEncerrado({ fim, real }: { fim: string; real?: SimEntradaReal }) {
           <span>{real.erro.titulo ? <b>{real.erro.titulo} </b> : null}{real.erro.mensagem}</span>
         </div>
       ) : null}
-      <button type="button" disabled={carregando} onClick={() => real?.onIdentificar('resultado')} className={`${P}-sbtn`} style={primaryBtnStyle({ width: '100%', height: 52, borderRadius: 16, fontSize: 14.5 })}>
+      <button type="button" disabled={carregando} onClick={() => real?.onIdentificar('resultado')} className={`${P}-sbtn`} style={primaryBtnStyle({ width: '100%', height: 52, borderRadius: 16, fontSize: 14.5 }, cm)}>
         <TrendingUp size={17} /> {carregando ? 'Validando…' : 'Ver meu resultado'}
       </button>
       <button
@@ -589,7 +596,7 @@ function FormEncerrado({ fim, real }: { fim: string; real?: SimEntradaReal }) {
         disabled={carregando}
         onClick={() => real?.onIdentificar('iniciar')}
         className={`${P}-sbtn`}
-        style={{ width: '100%', height: 48, border: 0, borderRadius: 16, background: VND_GOLD, color: VND_GOLD_INK, boxShadow: VND_GOLD_SHADOW, font: 'inherit', fontSize: 14.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9, cursor: 'pointer' }}
+        style={{ width: '100%', height: 48, border: 0, borderRadius: 16, background: cm(VND_GOLD), color: cm(VND_GOLD_INK), boxShadow: cm(VND_GOLD_SHADOW), font: 'inherit', fontSize: 14.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9, cursor: 'pointer' }}
       >
         <RotateCcw size={17} /> Fazer como treino
       </button>

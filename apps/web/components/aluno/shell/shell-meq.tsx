@@ -20,6 +20,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { NavProgress } from '@/components/brand/nav-progress'
 import { createPortal } from 'react-dom'
 import { useTheme } from 'next-themes'
 import {
@@ -251,6 +252,7 @@ export function ShellMEQ({ brand, nav, usuario, pathname, logoUrl, children }: A
               borderBottom: '1px solid var(--railLine)',
             }}
           >
+            <NavProgress />
             {/* Título da página + data por extenso real */}
             <div className="leading-tight">
               <b

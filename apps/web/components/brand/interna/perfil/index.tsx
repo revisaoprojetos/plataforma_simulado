@@ -15,7 +15,7 @@ import { PerfilMeq } from './perfil-meq'
 // `tab`/`preview` são aceitos e IGNORADOS (preview usa mock); a marca governa a composição.
 export function PlatformPerfil({ brand, theme, data }: { brand: Brand; theme: InternaTheme; data?: PerfilData; tab?: string; preview?: boolean }) {
   const d = data ?? perfilMock() // sem data (preview) → mock; com data (produção) → real
-  if (brand === 'vnd') return <PerfilVnd theme={theme} data={d} />
+  if (brand === 'vnd' || brand === 'mac') return <PerfilVnd theme={theme} data={d} />
   if (brand === 'meq') return <PerfilMeq theme={theme} data={d} />
   return <PerfilRevisao theme={theme} data={d} />
 }

@@ -15,7 +15,7 @@ import { LigasMeq } from './ligas-meq'
 
 export function PlatformLigas({ brand, theme, data, ranking }: { brand: Brand; theme: InternaTheme; data?: LigaData; ranking?: ReactNode; tab?: string; preview?: boolean }) {
   const d = data ?? ligaMock()
-  if (brand === 'vnd') return <LigasVnd theme={theme} data={d} ranking={ranking} />
+  if (brand === 'vnd' || brand === 'mac') return <LigasVnd theme={theme} data={d} ranking={ranking} />
   if (brand === 'meq') return <LigasMeq theme={theme} data={d} ranking={ranking} />
   return <LigasRevisao theme={theme} data={d} ranking={ranking} />
 }

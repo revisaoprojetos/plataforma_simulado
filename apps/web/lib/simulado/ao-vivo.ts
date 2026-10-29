@@ -1,6 +1,7 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { remember, chaveRelatorio } from '@/lib/cache/relatorio-cache'
 
 export interface ResumoAoVivo {
   total: number
@@ -126,4 +127,29 @@ export async function computarOnlinePorSimulado(svc: SupabaseClient, tenantId: s
   const out: Record<string, number> = {}
   for (const [k, set] of porSim) out[k] = set.size
   return out
+}
+
+/**
+ * Hash estável (independente de ordem) de um conjunto de ids — MESMO algoritmo do board SSR
+ * (`app/admin/simulados/page.tsx`), para a rota SSE e a página COMPARTILHAREM a mesma chave de cache
+ * `relatorio:{tenant}:online:{hash}`. djb2 sobre os ids ORDENADOS + sufixo com a quantidade.
+ */
+export function hashIdsOnline(ids: string[]): string {
+  let h = 5381
+  const s = [...ids].sort().join(',')
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0
+  return (h >>> 0).toString(36) + '.' + ids.length
+}
+
+/**
+ * "Fazendo agora" por simulado COM CACHE (Redis, TTL 15s) — coalesce o board SSR + TODAS as conexões SSE
+ * + cada recompute por evento/baseline num ÚNICO cálculo por janela de 15s por (tenant, conjunto de ids).
+ * Sem isto, com 1000+ alunos e vários admins no board cada conexão/evento recomputava direto no banco
+ * (11-22s por varredura). A chave é IDÊNTICA à do board SSR → os dois reaproveitam a mesma entrada.
+ * Contrato de saída inalterado (mesmo `Record<simuladoId, number>`); degrada p/ cálculo direto sem Redis.
+ */
+export async function onlinePorSimuladoCache(svc: SupabaseClient, tenantId: string, simuladoIds: string[]): Promise<Record<string, number>> {
+  const ids = [...new Set((simuladoIds ?? []).filter(Boolean))]
+  if (!ids.length) return {}
+  return remember(chaveRelatorio(tenantId, 'online', hashIdsOnline(ids)), 15, () => computarOnlinePorSimulado(svc, tenantId, ids))
 }

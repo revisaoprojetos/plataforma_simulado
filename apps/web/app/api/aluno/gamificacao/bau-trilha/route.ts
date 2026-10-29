@@ -4,6 +4,8 @@ import { getSessaoAluno } from '@/lib/aluno-session'
 import { getGamConfig, gamAtivaParaAluno } from '@/lib/gamificacao'
 import { awardXp } from '@/lib/gamificacao/xp'
 import { carregarTrilhasAluno } from '@/lib/aluno/trilhas'
+import { atualizarHomeSnapshot } from '@/lib/home/snapshot'
+import { atualizarPerfilSnapshot } from '@/lib/perfil/snapshot'
 
 // POST /api/aluno/gamificacao/bau-trilha — resgata o baú de uma trilha (grupo) totalmente concluída.
 // Concede o XP da trilha de forma IDEMPOTENTE (ledger, origem 'chest', ref 'trilha:<grupo>') → só
@@ -37,6 +39,14 @@ export async function POST(req: Request) {
       xp: t.trilhaXp,
       meta: { tipo: 'bau_trilha', grupo: grupoId },
     })
+    // Write-behind (backend-first §6): só quando o XP foi REALMENTE creditado (idempotente — não re-pontua).
+    // Resgatar o baú muda XP/nível/sequência → recomputa Início e Perfil. Best-effort, não bloqueia.
+    if (res.awarded) {
+      void Promise.allSettled([
+        atualizarHomeSnapshot(svc, sessao.tenantId, sessao.estudanteId),
+        atualizarPerfilSnapshot(svc, sessao.tenantId, sessao.estudanteId),
+      ]).catch(() => {})
+    }
     return NextResponse.json({ ok: true, awarded: res.awarded, xp: t.trilhaXp })
   } catch {
     return NextResponse.json({ ok: false, motivo: 'erro' }, { status: 500 })

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { CalendarDays, CalendarRange, ChevronRight } from 'lucide-react'
+import { CalendarDays, CalendarRange, ChevronRight, ArrowLeft } from 'lucide-react'
 import { redirect } from 'next/navigation'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { getTenantTheme } from '@/lib/tenant-theme'
@@ -11,6 +11,7 @@ import { HistoricoTabela, LiberadosTabela } from './cronograma-paineis'
 import { listarMinhasEmissoes } from './emissoes-actions'
 import { resolverInterno } from '@/lib/aluno/interno-gate'
 import { InternaPageShell } from '@/components/brand/interna/page-shell'
+import { CronogramaAdaptativoEmbed } from '@/components/brand/interna/cronograma/adaptativo-embed'
 export const dynamic = 'force-dynamic'
 
 export default async function CronogramaAlunoPage() {
@@ -19,6 +20,20 @@ export default async function CronogramaAlunoPage() {
   // dentro de iframe).
   const sessao = await getSessaoAluno()
   if (!sessao) redirect('/aluno/entrar')
+
+  // ── Revisão: o Cronograma é o ADAPTATIVO 2.0 (iframe). Saiu da SIDEBAR (gate no layout) e é
+  // acessado pelo "Meu painel de estudos" (os botões do hub apontam para cá). Renderiza AQUI, no
+  // shell interno — mesmo título/padding/marca das demais páginas (ex.: Simulados). O embed opera
+  // sobre o plano FIXADO; "+ Novo" chega com ?novo=1 e abre direto em Configurar. ──
+  const _it = await resolverInterno()
+  if (_it.ativo && _it.brand === 'revisao') {
+    // Render no shell interno (mesmo gutter/marca das demais páginas). Breadcrumb acima volta ao
+    // "Meu painel de estudos" (hub). O iframe já traz seu próprio título, então não duplicamos header.
+    // O breadcrumb ("← Painel de estudos / Cronograma") agora vive DENTRO do iframe (topo do conteúdo):
+    // rola junto com o conteúdo (não fica fixo por cima) e o card "Resumo" volta a grudar (o iframe rola
+    // internamente). A página só renderiza o embed, que preenche a área (ehAreaNova, sem padding do shell).
+    return <CronogramaAdaptativoEmbed theme={_it.theme} />
+  }
 
   const svc = createAdminClient()
 
@@ -47,7 +62,7 @@ export default async function CronogramaAlunoPage() {
   const ACENTO = 'var(--brand-accent, #f6c343)'
 
   // ── NOVO VISUAL INTERNO: Cronograma no header/fundo novos, reusando o construtor/tabelas funcionais. ──
-  const _it = await resolverInterno()
+  // (A Revisão com visual interno já foi redirecionada no topo para /aluno/nova/painel.)
   if (_it.ativo) {
     return (
       <InternaPageShell brand={_it.brand} theme={_it.theme} titulo="Cronograma de estudos" subtitulo="Monte, salve e acompanhe seus planos de estudo." icone={<CalendarDays className="h-6 w-6" />}>

@@ -17,6 +17,7 @@ import { LoginRevisao } from './login/login-revisao'
 import { LoginVND } from './login/login-vnd'
 import { LoginMEQ } from './login/login-meq'
 import type { Brand, LoginTheme, Metodo } from './login/types'
+import { BrandCorProvider } from '@/lib/brand/cor-marca'
 import { APP_VERSION } from '@/lib/version'
 
 export interface PlatformLoginProps {
@@ -50,13 +51,15 @@ export function PlatformLogin({
   const core = useLoginCore({ metodo, preview, modoInicial })
   const common = { theme, core, preview, plataforma, logo, style, ticker }
 
+  // MAC reaproveita o login do VND (layout idêntico); a paleta bordô + "M"/textos MAC
+  // vêm do BrandCorProvider (corMarca) + do slug mac-login-centralizado.
   const tela =
-    brand === 'vnd' ? <LoginVND {...common} /> :
+    brand === 'vnd' || brand === 'mac' ? <LoginVND {...common} /> :
     brand === 'meq' ? <LoginMEQ {...common} /> :
     <LoginRevisao {...common} />
 
   return (
-    <>
+    <BrandCorProvider brand={brand}>
       {tela}
       {/* Versão do sistema — canto superior direito do login (as 3 marcas). Oculta no preview. */}
       {!preview && (
@@ -71,6 +74,6 @@ export function PlatformLogin({
           <PlatformLoader brand={brand} theme={theme} style={loadingStyle} />
         </div>
       )}
-    </>
+    </BrandCorProvider>
   )
 }

@@ -64,6 +64,7 @@ export interface EntradaRealProps {
 const PLATAFORMA_LOGIN: Record<Brand, { rotulo: string; url: string }> = {
   revisao: { rotulo: 'Plataforma Revisão', url: 'https://revisaopge.curseduca.pro/login' },
   vnd: { rotulo: 'Plataforma VND', url: 'https://vocenadefensoria.curseduca.pro/login' },
+  mac: { rotulo: 'Plataforma Mentoria Além do Corte', url: 'https://mentoriaalemdocorte.curseduca.pro/login' },
   meq: { rotulo: 'Plataforma MEQ', url: 'https://meqconcursos.curseduca.pro/login' },
 }
 

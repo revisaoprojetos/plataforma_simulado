@@ -168,6 +168,43 @@ export interface ArvoreAluno {
 }
 
 /**
+ * Catálogo-RAIZ do aluno (backend-first, SESSION-INDEPENDENT): só as pastas-raiz de conteúdo
+ * acessíveis, já com a contagem de documentos visíveis na subárvore. Difere de `arvoreBibliotecaAluno`
+ * em dois pontos cruciais p/ custo: (1) NÃO computa thumbs/prévias (as URLs assinadas + trechos são a
+ * parte CARA/egress) e (2) recebe `svc/tenantId/estId` explícitos — não depende de `getCurrentTenantId()`
+ * nem do cache de request — então roda do render, da escrita e do WORKER (cron). Reusa o motor de acesso.
+ * Ideal para alimentar o snapshot de Cursos. Ver docs/ARQUITETURA-BACKEND-FIRST.md.
+ */
+export async function catalogoRaizAluno(svc: any, tenantId: string, estId: string): Promise<PastaAluno[]> {
+  if (!tenantId || !estId) return []
+  const pastasRaw = await fetchTol<any>(
+    () => svc.from(T_PASTA).select('id, nome, pai_id, cor, deletado').eq('tenant_id', tenantId).eq('folder_area', 'conteudo').eq('is_folder', true).order('id', { ascending: true }),
+    () => svc.from(T_PASTA).select('id, nome, pai_id, cor, deletado').eq('tenant_id', tenantId).eq('folder_area', 'conteudo').order('id', { ascending: true }),
+  )
+  const pastas = (pastasRaw ?? []).filter((p: any) => !p.deletado)
+  if (!pastas.length) return []
+  // projeção mínima: só colunas de acesso + pasta_id (nada de html/trechos/versão p/ capa).
+  const docs = await fetchTol<any>(
+    () => svc.from(T_DOC).select('id, pasta_id, herda_acesso, acesso_geral, modo_acesso, oculto').eq('tenant_id', tenantId).eq('status', 'publicado').eq('deletado', false).eq('categoria', 'conteudo').not('versao_atual_id', 'is', null).order('id', { ascending: true }),
+    () => svc.from(T_DOC).select('id, pasta_id, herda_acesso, acesso_geral').eq('tenant_id', tenantId).eq('status', 'publicado').eq('deletado', false).eq('categoria', 'conteudo').not('versao_atual_id', 'is', null).order('id', { ascending: true }),
+  )
+  const paiDe = new Map<string, string | null>(pastas.map((p: any) => [p.id, p.pai_id ?? null]))
+  const motor = await motorAcesso(svc, tenantId, estId)
+  const atribDocs = await carregarAtribuicoes(svc, tenantId, 'doc', (docs ?? []).map((d: any) => d.id))
+  const visiveis = (docs ?? []).filter((d: any) => motor.avaliarDoc(d, atribDocs.get(d.id) ?? []).permitido)
+  // docs visíveis por subárvore: cada doc incrementa a pasta que o contém e TODAS as ancestrais.
+  const totalSub = new Map<string, number>()
+  for (const d of visiveis) {
+    let cur: string | null = d.pasta_id ?? null; const seen = new Set<string>()
+    while (cur && !seen.has(cur)) { seen.add(cur); totalSub.set(cur, (totalSub.get(cur) ?? 0) + 1); cur = paiDe.get(cur) ?? null }
+  }
+  return pastas
+    .filter((p: any) => (p.pai_id ?? null) === null && motor.pastaAcessivel(p.id) && (totalSub.get(p.id) ?? 0) > 0)
+    .map((p: any) => ({ id: p.id, nome: p.nome, cor: p.cor ?? null, totalDocs: totalSub.get(p.id) ?? 0 }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+}
+
+/**
  * Árvore navegável da Biblioteca do aluno (MESMO visual do admin: pastas → documentos com capa), já
  * FILTRADA pelo acesso (grupos/todos + herança). Navega por `pastaId` (null = raiz). Pastas vazias (sem
  * doc visível na subárvore) são ocultadas. Capas/prévias cacheadas, como no admin. Server-only.
@@ -265,23 +302,33 @@ export async function carregarLeitura(documentoId: string, alunoId: string): Pro
   // Gate de acesso ESCOPADO via motor ÚNICO (acessoEfetivo): modo/oculto do doc + cadeia de ancestrais.
   if (!(await avaliarDocAluno(svc, tenantId, alunoId, doc)).permitido) return null
 
-  const [trechos, anotacoes, ver] = await Promise.all([
-    fetchAll<any>(() => svc.from(T_TR).select('uid, ordem, tipo, rotulo, texto').eq('tenant_id', tenantId).eq('versao_id', doc.versao_atual_id).order('ordem', { ascending: true })),
+  // A parte CARA (trechos + HTML rico da versão) é IDÊNTICA p/ todos os alunos e depende SÓ de
+  // (documento_id, versão). Cacheada 300s pela chave c/ versao_atual_id → nova versão (salvar/editar no
+  // admin) muda a chave e invalida sozinho (sem invalidação manual). Os GRIFOS/anotações são POR-ALUNO →
+  // lidos à parte, em paralelo, e NUNCA entram no cache compartilhado. Tolerante a Redis ausente (remember
+  // cai no cálculo). Forma do retorno idêntica à anterior.
+  const [docPart, anotacoes] = await Promise.all([
+    remember<{ trechos: TrechoLeitura[]; html: string }>(`leitura-doc:${tenantId}:${documentoId}:${doc.versao_atual_id}`, 300, async () => {
+      const [trechos, ver] = await Promise.all([
+        fetchAll<any>(() => svc.from(T_TR).select('uid, ordem, tipo, rotulo, texto').eq('tenant_id', tenantId).eq('versao_id', doc.versao_atual_id).order('ordem', { ascending: true })),
+        // tolerante à migração pendente: tenta html_rico+arquivo_key; se a coluna não existir, cai p/ arquivo_key.
+        (async () => {
+          const r = await svc.from('simulado_conteudo_versoes').select('html_rico, arquivo_key').eq('tenant_id', tenantId).eq('id', doc.versao_atual_id).maybeSingle()
+          if (!r.error) return r.data
+          const r2 = await svc.from('simulado_conteudo_versoes').select('arquivo_key').eq('tenant_id', tenantId).eq('id', doc.versao_atual_id).maybeSingle()
+          return r2.data
+        })(),
+      ])
+      const trechosL: TrechoLeitura[] = (trechos ?? []).map((t) => ({ uid: t.uid, ordem: t.ordem, tipo: t.tipo, rotulo: t.rotulo, texto: t.texto }))
+      // HTML fiel: usa o `html_rico` da versão; se ainda não houver (docs importados antes deste recurso),
+      // regenera a partir do original 1x e grava (cacheia na versão) sem tocar nos trechos/grifos.
+      const html = (ver as any)?.html_rico
+        || await regenerarHtmlRico(svc, tenantId, doc.versao_atual_id, (ver as any)?.arquivo_key ?? null, (doc as any).tipo_origem, trechosL)
+      return { trechos: trechosL, html }
+    }),
     listarAnotacoes(documentoId, alunoId),
-    // tolerante à migração pendente: tenta html_rico+arquivo_key; se a coluna não existir, cai p/ arquivo_key.
-    (async () => {
-      const r = await svc.from('simulado_conteudo_versoes').select('html_rico, arquivo_key').eq('tenant_id', tenantId).eq('id', doc.versao_atual_id).maybeSingle()
-      if (!r.error) return r.data
-      const r2 = await svc.from('simulado_conteudo_versoes').select('arquivo_key').eq('tenant_id', tenantId).eq('id', doc.versao_atual_id).maybeSingle()
-      return r2.data
-    })(),
   ])
-  const trechosL: TrechoLeitura[] = (trechos ?? []).map((t) => ({ uid: t.uid, ordem: t.ordem, tipo: t.tipo, rotulo: t.rotulo, texto: t.texto }))
-  // HTML fiel: usa o `html_rico` da versão; se ainda não houver (docs importados antes deste recurso),
-  // regenera a partir do original 1x e grava (cacheia na versão) sem tocar nos trechos/grifos.
-  const html = (ver as any)?.html_rico
-    || await regenerarHtmlRico(svc, tenantId, doc.versao_atual_id, (ver as any)?.arquivo_key ?? null, (doc as any).tipo_origem, trechosL)
-  return { documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, trechos: trechosL, html, anotacoes }
+  return { documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, trechos: docPart.trechos, html: docPart.html, anotacoes }
 }
 
 /**
@@ -333,8 +380,12 @@ export async function carregarLeituraPdf(documentoId: string, alunoId: string): 
   if (!(await avaliarDocAluno(svc, tenantId, alunoId, doc)).permitido) return null
 
   const { gerarPdfDocumento } = await import('./thumb')
+  // O PDF (OnlyOffice→PDF, já cacheado em storage) + a URL assinada são IGUAIS p/ todos os alunos e
+  // dependem só da versão → cacheados 300s pela chave c/ versao_atual_id (nova versão = chave nova, invalida
+  // sozinho). A URL assinada vale 3600s, então 300s NÃO a expira (mesma lógica das thumbs). Os GRIFOS são
+  // POR-ALUNO → lidos à parte, fora do cache compartilhado. Tolerante a Redis ausente (remember cai no cálculo).
   const [pdfUrl, grifosRows] = await Promise.all([
-    gerarPdfDocumento(tenantId, documentoId).catch(() => null),
+    remember<string | null>(`leitura-pdf:${tenantId}:${documentoId}:${doc.versao_atual_id}`, 300, async () => gerarPdfDocumento(tenantId, documentoId).catch(() => null)),
     // tolerante à migração pendente: se a tabela não existir, trata como sem grifos.
     fetchAll<any>(() => svc.from('simulado_conteudo_grifos_pdf').select('id, pagina, rects, cor, tool, nota, texto').eq('tenant_id', tenantId).eq('documento_id', documentoId).eq('aluno_id', alunoId).order('id', { ascending: true })).catch(() => []),
   ])
@@ -368,4 +419,11 @@ export async function registrarLeituraAluno(documentoId: string, alunoId: string
   await svc.from(T_LP).upsert({
     tenant_id: tenantId, aluno_id: alunoId, documento_id: documentoId, versao_id: versaoId, origem, ultima_leitura_em: new Date().toISOString(),
   }, { onConflict: 'tenant_id,aluno_id,documento_id' })
+
+  // Write-behind (backend-first §6): abrir/ler um material muda o "continuar de onde parou" e o progresso
+  // dos cursos → recomputa o snapshot de Cursos para a próxima leitura já vir fresca. Import dinâmico para
+  // evitar a dependência circular (cursos-snapshot importa este módulo). Best-effort, fora do caminho crítico.
+  void import('@/lib/nova/cursos-snapshot')
+    .then((m) => m.atualizarCatalogoSnapshot(svc, tenantId, alunoId))
+    .catch(() => {})
 }

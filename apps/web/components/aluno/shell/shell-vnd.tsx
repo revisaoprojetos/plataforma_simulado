@@ -23,6 +23,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
+import { NavProgress } from '@/components/brand/nav-progress'
 import { useTheme } from 'next-themes'
 import {
   Home, ClipboardList, Library, Gavel, CalendarDays, Lightbulb, BookOpen, Trophy,
@@ -32,6 +33,19 @@ import { cn } from '@/lib/utils'
 import { FontScaleControl } from '@/components/font-scale-control'
 import { CentralNotificacoes } from '@/components/aluno/central-notificacoes'
 import type { AlunoShellProps, AlunoNavItem } from './types'
+import { useBrandAtual, useCm } from '@/lib/brand/cor-marca'
+import { VND_V_PATH, MAC_M_PATH } from '@/components/brand/brand-marks'
+
+/** Nome/selo da marca exibidos no chrome do shell (VND por padrão; MAC quando ativo). */
+function useMarcaShell() {
+  const mac = (useBrandAtual() ?? 'vnd') === 'mac'
+  return {
+    mac,
+    cm: useCm(),
+    nome: mac ? 'Mentoria Além do Corte' : 'Você na Defensoria',
+    selo: mac ? 'SIMULA MAC' : 'SIMULA VND',
+  }
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Mapa de ícones. A sidebar atual (aluno-sidebar.tsx) usa os componentes lucide
@@ -52,34 +66,34 @@ function iconeDe(nome: string): LucideIcon {
   return ICONES[nome] ?? Home
 }
 
-// Marca "V" da VND (mesma SVG do lockup do mockup HomeVND).
-function MarcaV({ className, fill = '#3FD58A' }: { className?: string; fill?: string }) {
+// Marca "V" (VND) / "M" (MAC) — símbolo do lockup. Fill verde → bordô via cm (identidade p/ VND).
+function MarcaV({ className, fill }: { className?: string; fill?: string }) {
+  const mac = (useBrandAtual() ?? 'vnd') === 'mac'
+  const cm = useCm()
   return (
     <svg viewBox="0 0 32 32" aria-hidden="true" className={className}>
-      <path
-        fill={fill}
-        d="M1.00 5.90L11.51 5.77Q12.20 5.76 12.53 6.13L21.21 15.98Q21.47 16.25 21.57 15.86L21.60 8.10C21.60 7.05 20.81 6.30 19.76 5.88L30.57 5.90Q31.00 5.91 30.74 6.33L23.18 14.49C22.26 15.55 21.80 16.65 21.73 18.23L21.67 25.45Q21.60 26.24 20.95 25.96L6.03 8.31C4.78 6.96 3.14 6.19 1.00 5.90Z"
-      />
+      <path fill={cm(fill ?? '#3FD58A')} d={mac ? MAC_M_PATH : VND_V_PATH} />
     </svg>
   )
 }
 
 function Lockup() {
+  const { cm, nome, selo } = useMarcaShell()
   return (
-    <Link href="/aluno" className="flex shrink-0 items-center gap-[11px] whitespace-nowrap" aria-label="Você na Defensoria — início">
+    <Link href="/aluno" className="flex shrink-0 items-center gap-[11px] whitespace-nowrap" aria-label={`${nome} — início`}>
       <span
         className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[13px]"
         style={{
-          background: 'linear-gradient(160deg,#0F4A2E,#072A1B)',
-          border: '1px solid rgba(120,230,170,.3)',
-          boxShadow: 'inset 0 1px 0 rgba(255,255,255,.12), 0 8px 20px -8px rgba(34,197,110,.5)',
+          background: cm('linear-gradient(160deg,#0F4A2E,#072A1B)'),
+          border: `1px solid ${cm('rgba(120,230,170,.3)')}`,
+          boxShadow: `inset 0 1px 0 rgba(255,255,255,.12), 0 8px 20px -8px ${cm('rgba(34,197,110,.5)')}`,
         }}
       >
         <MarcaV className="h-[22px] w-[22px]" />
       </span>
       <span className="flex flex-col leading-[1.2]">
-        <span className="text-[15px] font-extrabold text-[color:var(--topink)]">Você na Defensoria</span>
-        <span className="text-[10.5px] font-bold tracking-[.18em] text-[color:var(--goldInk)]">SIMULA VND</span>
+        <span className="text-[15px] font-extrabold text-[color:var(--topink)]">{nome}</span>
+        <span className="text-[10.5px] font-bold tracking-[.18em] text-[color:var(--goldInk)]">{selo}</span>
       </span>
     </Link>
   )
@@ -321,6 +335,7 @@ function BotaoPerfil({
   const router = useRouter()
   const ref = useRef<HTMLDivElement>(null)
   const { theme, setTheme } = useTheme()
+  const cm = useCm()
   useEffect(() => {
     if (!aberto) return
     const onDown = (e: MouseEvent) => { if (!ref.current?.contains(e.target as Node)) setAberto(false) }
@@ -407,7 +422,7 @@ function BotaoPerfil({
           )}
         >
           {/* Cabeçalho com gradiente verde (sem e-mail — spec §6). */}
-          <div className="rounded-t-[20px] p-4" style={{ background: 'linear-gradient(120deg,#041A10 0%,#0B4A2E 55%,#12643D 100%)' }}>
+          <div className="rounded-t-[20px] p-4" style={{ background: cm('linear-gradient(120deg,#041A10 0%,#0B4A2E 55%,#12643D 100%)') }}>
             <div className="flex items-center gap-3">
               {avatar(44)}
               <div className="min-w-0">
@@ -524,6 +539,8 @@ function FolhaMenu({ nav, aberto, onFechar }: { nav: AlunoNavItem[]; aberto: boo
 // 5 slots que variam por página: 2 fixos de contexto + FAB central + 2 + "Menu".
 // ─────────────────────────────────────────────────────────────────────────────
 function TabBar({ nav, onAbrirMenu }: { nav: AlunoNavItem[]; onAbrirMenu: () => void }) {
+  const mac = (useBrandAtual() ?? 'vnd') === 'mac'
+  const cm = useCm()
   // Helper p/ achar um item do nav por href-suffix (fallback para o 1º do nav).
   const buscar = (sufixo: string) => nav.find((n) => n.href.endsWith(sufixo))
   const inicio = buscar('/aluno') ?? nav[0]
@@ -545,7 +562,7 @@ function TabBar({ nav, onAbrirMenu }: { nav: AlunoNavItem[]; onAbrirMenu: () => 
         href={item.href}
         aria-current={item.ativo ? 'page' : undefined}
         className="flex flex-col items-center gap-1 text-[10.5px]"
-        style={{ color: item.ativo ? '#E8C877' : '#9DB5A8', fontWeight: item.ativo ? 800 : 600 }}
+        style={{ color: item.ativo ? '#E8C877' : cm('#9DB5A8'), fontWeight: item.ativo ? 800 : 600 }}
       >
         <Icone className="h-5 w-5" />
         {item.short}
@@ -558,7 +575,7 @@ function TabBar({ nav, onAbrirMenu }: { nav: AlunoNavItem[]; onAbrirMenu: () => 
     <nav aria-label="Navegação" className="sticky bottom-0 z-[60] h-[84px] lg:hidden" style={{ background: 'transparent' }}>
       {/* Recorte côncavo central (SVG). Cor do fundo da barra = verde-escuro VND. */}
       <svg viewBox="0 0 390 84" preserveAspectRatio="none" aria-hidden="true" className="absolute inset-0 h-full w-full">
-        <path d="M0 14 H140 C158 14 160 44 195 44 C230 44 232 14 250 14 H390 V84 H0 Z" className="fill-[#062A1B] dark:fill-[#202522]" />
+        <path d="M0 14 H140 C158 14 160 44 195 44 C230 44 232 14 250 14 H390 V84 H0 Z" className={mac ? 'fill-[#220506] dark:fill-[#202522]' : 'fill-[#062A1B] dark:fill-[#202522]'} />
       </svg>
       <div className="relative grid h-full grid-cols-[1fr_1fr_96px_1fr_1fr] items-end px-1.5 pb-3.5">
         {slotEsq.map((it) => <Item key={`e-${it.href}`} item={it} />)}
@@ -581,7 +598,7 @@ function TabBar({ nav, onAbrirMenu }: { nav: AlunoNavItem[]; onAbrirMenu: () => 
           type="button"
           onClick={onAbrirMenu}
           className="flex flex-col items-center gap-1 text-[10.5px] font-semibold"
-          style={{ color: '#9DB5A8' }}
+          style={{ color: cm('#9DB5A8') }}
           aria-haspopup="dialog"
         >
           <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden><rect x="3" y="3" width="7" height="7" rx="1.5" fill="currentColor" /><rect x="14" y="3" width="7" height="7" rx="1.5" fill="currentColor" /><rect x="3" y="14" width="7" height="7" rx="1.5" fill="currentColor" /><rect x="14" y="14" width="7" height="7" rx="1.5" fill="currentColor" /></svg>
@@ -598,6 +615,7 @@ function TabBar({ nav, onAbrirMenu }: { nav: AlunoNavItem[]; onAbrirMenu: () => 
 // SHELL VND.
 // ─────────────────────────────────────────────────────────────────────────────
 export function ShellVND({ nav, usuario, children }: AlunoShellProps) {
+  const { mac, cm, nome, selo } = useMarcaShell()
   const [menuAberto, setMenuAberto] = useState<string | null>(null) // href do dropdown desktop aberto (um por vez)
   const [folhaMenu, setFolhaMenu] = useState(false)
   // Escopo da escala de fonte por aluno (mesma convenção da sidebar de Revisão).
@@ -628,6 +646,7 @@ export function ShellVND({ nav, usuario, children }: AlunoShellProps) {
         className="sticky top-0 z-40 hidden h-[76px] items-center gap-3 border-b border-[color:var(--line)] px-5 backdrop-blur-[14px] lg:flex"
         style={{ background: 'var(--topbg)' }}
       >
+        <NavProgress />
         <Lockup />
         <nav className="ml-3 flex items-center gap-0.5" aria-label="Navegação principal">
           {inicio && <NavLinkSimples item={inicio} />}
@@ -656,15 +675,16 @@ export function ShellVND({ nav, usuario, children }: AlunoShellProps) {
       {/* ───── Header mobile (62px) ───── */}
       <header
         className="sticky top-0 z-40 flex h-[62px] items-center gap-2 px-4 lg:hidden"
-        style={{ background: '#062A1B' }}
+        style={{ background: cm('#062A1B') }}
       >
-        <Link href="/aluno" className="flex items-center gap-2" aria-label="Você na Defensoria — início">
-          <span className="flex h-9 w-9 items-center justify-center rounded-[11px]" style={{ background: 'linear-gradient(160deg,#0F4A2E,#072A1B)', border: '1px solid rgba(120,230,170,.3)' }}>
+        <NavProgress />
+        <Link href="/aluno" className="flex items-center gap-2" aria-label={`${nome} — início`}>
+          <span className="flex h-9 w-9 items-center justify-center rounded-[11px]" style={{ background: cm('linear-gradient(160deg,#0F4A2E,#072A1B)'), border: `1px solid ${cm('rgba(120,230,170,.3)')}` }}>
             <MarcaV className="h-[18px] w-[18px]" />
           </span>
           <span className="flex flex-col leading-[1.1]">
-            <span className="text-[13px] font-extrabold text-white">Você na Defensoria</span>
-            <span className="text-[9px] font-bold tracking-[.18em] text-[#F1D48A]">SIMULA VND</span>
+            <span className="text-[13px] font-extrabold text-white">{nome}</span>
+            <span className="text-[9px] font-bold tracking-[.18em] text-[#F1D48A]">{selo}</span>
           </span>
         </Link>
         <div className="ml-auto flex items-center gap-1 text-white [&_svg]:text-white">
@@ -678,7 +698,7 @@ export function ShellVND({ nav, usuario, children }: AlunoShellProps) {
           min-h-dvh (min-height, não height), o `min-height:100%` do conteúdo NÃO resolve → sobraria a faixa
           cinza do fundo do shell (var(--bg)) abaixo dele. Solução: pintar o <main> com o MESMO fundo das
           telas internas (simVars vnd claro/escuro) via dark: — assim não há emenda/faixa em área nenhuma. */}
-      <main className={cn('flex-1', ehAreaNova ? 'bg-[#F5F8F6] pb-[90px] dark:bg-[#061009] lg:pb-0' : 'px-4 pb-[100px] pt-4 lg:px-6 lg:pb-8 lg:pt-6')}>{children}</main>
+      <main className={cn('flex-1', ehAreaNova ? (mac ? 'bg-[#F8F5F5] pb-[90px] dark:bg-[#100706] lg:pb-0' : 'bg-[#F5F8F6] pb-[90px] dark:bg-[#061009] lg:pb-0') : 'px-4 pb-[100px] pt-4 lg:px-6 lg:pb-8 lg:pt-6')}>{children}</main>
 
       {/* ───── Tab bar + folha Menu (mobile) ───── */}
       <TabBar nav={nav} onAbrirMenu={() => setFolhaMenu(true)} />

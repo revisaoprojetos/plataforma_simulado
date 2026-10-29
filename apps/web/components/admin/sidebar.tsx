@@ -45,6 +45,9 @@ import {
   Eye,
   Scale,
   CreditCard,
+  MessageCircle,
+  FileText,
+  Newspaper,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -139,6 +142,7 @@ const navGroups: NavGroup[] = [
       { label: 'Catálogo', href: '/admin/cronogramas', icon: CalendarDays, perm: 'cronogramas:view' },
       { label: 'Relatórios', href: '/admin/cronogramas/relatorios', icon: BarChart3, perm: 'cronogramas:view' },
       { label: 'Importar', href: '/admin/cronogramas/importar', icon: Upload, perm: 'cronogramas:update' },
+      { label: 'Lei seca (adaptativo)', href: '/admin/cronogramas/lei-seca', icon: FileText, perm: 'cronogramas:update' },
     ],
   },
   {
@@ -211,6 +215,16 @@ const navGroups: NavGroup[] = [
     ],
   },
   {
+    // ATENDIMENTO — responder dúvidas (conversa 1:1 aluno↔professor) e processar requerimentos.
+    // Gate por `estudantes:view` (suporte/gestão do aluno; mesmo resource de LGPD e Visualizações).
+    label: 'Atendimento',
+    icon: MessageCircle,
+    items: [
+      { label: 'Dúvidas', href: '/admin/atendimento?tab=duvidas', icon: MessageCircle, perm: 'estudantes:view' },
+      { label: 'Requerimentos', href: '/admin/atendimento?tab=requerimentos', icon: FileText, perm: 'estudantes:view' },
+    ],
+  },
+  {
     label: 'Configuração',
     icon: SlidersHorizontal,
     items: [
@@ -222,6 +236,7 @@ const navGroups: NavGroup[] = [
       { label: 'Sistema', href: '/admin/sistema', icon: ServerCog, perm: 'configuracoes:view' },
       { label: 'Mensagens', href: '/admin/configuracoes/mensagens', icon: MessageSquare, perm: 'configuracoes:view' },
       { label: 'Banners & Pop-ups', href: '/admin/configuracoes/banners', icon: Megaphone, perm: 'configuracoes:view' },
+      { label: 'Novidades', href: '/admin/configuracoes/novidades', icon: Newspaper, perm: 'configuracoes:view' },
       { label: 'LGPD', href: '/admin/lgpd', icon: ShieldCheck, perm: 'estudantes:view' },
       { label: 'Lixeira', href: '/admin/lixeira', icon: Trash2, perm: 'questoes:view' },
       { label: 'Ajuda', href: '/admin/ajuda', icon: HelpCircle },

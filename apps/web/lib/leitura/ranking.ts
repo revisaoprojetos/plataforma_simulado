@@ -164,11 +164,12 @@ export async function carregarRankingModulo(moduloId: string, tenantId: string):
       const dias = diasLedger.get(id) ?? diasResp // prefere o dia imutável do ledger (refazer-safe)
       const seq = calcularSequencia(dias, overridesPorAluno.get(id), hoje, ontem)
       const base = pontuarLegProc(pontuacao, { acertos, aulasConcluidas, aulasGabaritadas }, gamAtivo)
-      // Bônus — só com a gamificação ativa. Ambos pelos dias CONSECUTIVOS (streak): conclusão e
-      // sequência são duas faixas independentes de bônus sobre a mesma sequência de dias.
-      // Bônus de MARCO (pontos extras do desafio) = PERMANENTE: baseado no MAIOR streak atingido (streakMaior),
-      // não no streakAtual (que zera quando o desafio acaba/quebra a sequência → o aluno perdia os extras).
-      const score = base + (gamAtivo ? bonusSequenciaLeitura(seq.streakMaior, pontuacao) + bonusConclusaoLeitura(seq.streakMaior, pontuacao) : 0)
+      // Bônus de MARCO (pontos extras do desafio) = por AULAS CONCLUÍDAS (completar o desafio), NÃO pelo streak
+      // consecutivo de calendário. Quem faz os 30 módulos mas "dobra" um dia (30 módulos em 29 dias) completou
+      // o desafio e deve ganhar o marco de 30 — antes, atrelado a `streakMaior` (dias seguidos), perdia o +50.
+      // Como aulasConcluidas >= streakMaior, ninguém perde pontos; só sobe quem estava subcontado. O streak
+      // (seq.streakAtual) segue só como indicador 🔥, sem afetar os pontos.
+      const score = base + (gamAtivo ? bonusSequenciaLeitura(aulasConcluidas, pontuacao) + bonusConclusaoLeitura(aulasConcluidas, pontuacao) : 0)
       return { estudanteId: id, acertos, aulasConcluidas, aulasGabaritadas, streakAtual: seq.streakAtual, ultimoDia: seq.diasEfetivos[seq.diasEfetivos.length - 1] ?? '', score }
     }
 
@@ -343,9 +344,9 @@ export async function calcularMinhaLinhaLeitura(moduloId: string, tenantId: stri
   } catch { /* ledger indisponível → usa dias das respostas */ }
   const { calcularSequencia } = await import('@/lib/leitura/sequencia')
   const seq = calcularSequencia(diasLedger ?? dias, overrides, hoje, ontem)
-  // marco PERMANENTE: usa streakMaior (pico atingido, do ledger imutável), não streakAtual (zera pós-desafio)
+  // marco por AULAS CONCLUÍDAS (completar o desafio), não pelo streak consecutivo — igual ao ranking (montarBruto).
   const base = pontuarLegProc(pontuacao, { acertos, aulasConcluidas, aulasGabaritadas }, gamAtivo)
-  const score = base + (gamAtivo ? bonusSequenciaLeitura(seq.streakMaior, pontuacao) + bonusConclusaoLeitura(seq.streakMaior, pontuacao) : 0)
+  const score = base + (gamAtivo ? bonusSequenciaLeitura(aulasConcluidas, pontuacao) + bonusConclusaoLeitura(aulasConcluidas, pontuacao) : 0)
   const ultimoDia = seq.diasEfetivos[seq.diasEfetivos.length - 1] ?? ''
 
   const { data: e } = await svc.from('simulado_estudantes').select('nome, email, avatar, perfil_avatar_cor').eq('id', estudanteId).eq('tenant_id', tenantId).maybeSingle()

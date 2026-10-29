@@ -113,9 +113,9 @@ export function HomeRevisao({
     const base = internaTokensStyle('revisao', theme) as Record<string, string>
     const over: Record<string, string> = {
       // Paleta exata do mockup (§1.1) — vence a do simulado.
-      '--bg': dark ? '#18181D' : '#F4F2FA',
-      '--surface': dark ? '#232329' : '#FFFFFF',
-      '--surface2': dark ? '#2C2C34' : '#F6F4FC',
+      '--bg': dark ? '#0E0A24' : '#F4F2FA',
+      '--surface': dark ? '#1C1440' : '#FFFFFF',
+      '--surface2': dark ? '#171030' : '#F6F4FC',
       '--ink': dark ? '#FFFFFF' : '#1D1933',
       '--muted': dark ? '#BDBBCB' : '#6E6886',
       '--muted2': dark ? '#73717F' : '#B3ADC7',
@@ -187,7 +187,7 @@ export function HomeRevisao({
 
 /* ============================ Carrossel (desktop) ============================ */
 
-function Carrossel({ destaques }: { destaques: HomeDestaque[] }) {
+export function Carrossel({ destaques }: { destaques: HomeDestaque[] }) {
   const slides = destaques.length ? destaques : []
   const n = slides.length
   const [slide, setSlide] = useState(0)
@@ -339,7 +339,7 @@ function HeroSlide({ d, bg, index, ilustra }: { d: HomeDestaque; bg: string; ind
 
 /* ============================ Carrossel (mobile) ============================ */
 
-function CarrosselMobile({ destaques }: { destaques: HomeDestaque[] }) {
+export function CarrosselMobile({ destaques }: { destaques: HomeDestaque[] }) {
   const slides = destaques.length ? destaques : []
   const n = slides.length
   const [slide, setSlide] = useState(0)
@@ -395,7 +395,7 @@ function CarrosselMobile({ destaques }: { destaques: HomeDestaque[] }) {
 
 /* ============================ Saudação ============================ */
 
-function Saudacao({ nome, xp, compact }: { nome: string; xp: number; compact?: boolean }) {
+export function Saudacao({ nome, xp, compact }: { nome: string; xp: number; compact?: boolean }) {
   // Privacidade: só primeiro nome.
   const primeiro = nome.trim().split(/\s+/)[0] || nome
   return (
@@ -463,14 +463,13 @@ function Atalhos() {
 
 /* ============================ Nível ============================ */
 
-function NivelCard({ data }: { data: HomeData }) {
+export function NivelCard({ data, semStats, greeting, bare }: { data: HomeData; semStats?: boolean; greeting?: React.ReactNode; bare?: boolean }) {
   const u = data.usuario
   const pct = u.xpNivelMax > 0 ? Math.round((u.xpNivelAtual / u.xpNivelMax) * 100) : 0
   const C = 213.6 // 2πr (r=34)
   const dash = C - (C * pct) / 100
   const r = data.resumo
-  return (
-    <div className="hrv-card hrv-up">
+  const nivelBlock = (
       <div className="hrv-nivel">
         <div className="hrv-ring-wrap">
           <svg viewBox="0 0 80 80" className="hrv-ring-svg">
@@ -505,11 +504,19 @@ function NivelCard({ data }: { data: HomeData }) {
           </span>
         </div>
       </div>
-      <div className="hrv-ministats">
-        <div><b>{r.simuladosFeitos}</b><small>Simulados feitos</small></div>
-        <div><b>{r.questoesResolvidas.toLocaleString('pt-BR')}</b><small>Questões resolvidas</small></div>
-        <div><b>{r.taxaAcerto}%</b><small>Taxa de acerto</small></div>
-      </div>
+  )
+  if (bare) return nivelBlock
+  return (
+    <div className="hrv-card hrv-up">
+      {greeting}
+      {nivelBlock}
+      {!semStats && (
+        <div className="hrv-ministats">
+          <div><b>{r.simuladosFeitos}</b><small>Simulados feitos</small></div>
+          <div><b>{r.questoesResolvidas.toLocaleString('pt-BR')}</b><small>Questões resolvidas</small></div>
+          <div><b>{r.taxaAcerto}%</b><small>Taxa de acerto</small></div>
+        </div>
+      )}
     </div>
   )
 }
@@ -688,7 +695,7 @@ function Desempenho({ data }: { data: HomeData }) {
 
 /* ============================ Meta diária ============================ */
 
-function MetaDiaria({ xpHoje, meta }: { xpHoje: number; meta: number }) {
+export function MetaDiaria({ xpHoje, meta }: { xpHoje: number; meta: number }) {
   const pct = meta > 0 ? Math.min(100, Math.round((xpHoje / meta) * 100)) : 0
   return (
     <div className="hrv-card">
@@ -706,7 +713,7 @@ function MetaDiaria({ xpHoje, meta }: { xpHoje: number; meta: number }) {
 
 /* ============================ Sequência ============================ */
 
-function Sequencia({ data }: { data: HomeData }) {
+export function Sequencia({ data }: { data: HomeData }) {
   const s = data.sequenciaMeta
   const { checked, busy, fazer } = useCheckin(s.checkinHoje)
   const streakTxt = s.diasSeguidos === 1 ? '1 dia' : `${s.diasSeguidos} dias`
@@ -784,7 +791,7 @@ function FogoSvg() {
 
 /* ============================ Missões ============================ */
 
-function Missoes({ data }: { data: HomeData }) {
+export function Missoes({ data }: { data: HomeData }) {
   const miss = data.missoes
   return (
     <div className="hrv-card">
@@ -962,7 +969,7 @@ function CoverMini({ bg, rotulo }: { bg: string; rotulo: string }) {
 
 /* ============================ CSS (scoped, prefixo hrv-) ============================ */
 
-const CSS = `
+export const CSS = `
 .hrv-root{min-height:100%;position:relative}
 .hrv-root *{box-sizing:border-box}
 .hrv-root h1,.hrv-root h2,.hrv-root h3{margin:0}

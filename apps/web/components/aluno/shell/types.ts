@@ -13,7 +13,7 @@
 import type React from 'react'
 
 /** Marca visual do tenant (resolvida de `tema.aparencia_auth.brand`; default 'revisao'). */
-export type AlunoBrand = 'revisao' | 'vnd' | 'meq'
+export type AlunoBrand = 'revisao' | 'vnd' | 'meq' | 'mac'
 
 /**
  * Item de navegação canônico (spec 03 §2.1). `label` = rótulo longo (sidebar),

@@ -23,6 +23,7 @@ import { useAppearance } from '@/lib/brand/use-appearance'
 import { ProvaMeqLive, type ModalProva as ModalProvaMeq } from '@/components/brand/simulado/meq/prova-live'
 import { ProvaRevisaoLive } from '@/components/brand/simulado/revisao/prova-live'
 import { ProvaVndLive } from '@/components/brand/simulado/vnd/prova-live'
+import { BrandCorProvider } from '@/lib/brand/cor-marca'
 import { RevisaoFinalNova } from '@/components/aluno/revisao-final-nova'
 import { ResultadoVndNova } from '@/components/aluno/resultado-vnd-nova'
 import { ResultadoMeqNova } from '@/components/aluno/resultado-meq-nova'
@@ -136,8 +137,8 @@ export function ProvaClient({ token, hudInicial, darkInicial = false, internoAti
   const appearance = useAppearance()
   const brand = appearance.brand
   const isMeq = brand === 'meq'
-  // VND usa o SimProva branded (ProvaVndLive) sobre o mesmo motor — como MEQ, SEM gate de internoAtivo.
-  const isVnd = brand === 'vnd'
+  // VND (e MAC, que reaproveita o VND) usam o SimProva branded (ProvaVndLive) — como MEQ, SEM gate de internoAtivo.
+  const isVnd = brand === 'vnd' || brand === 'mac'
   // Revisão com o visual interno novo (gate estrito): só então usamos as telas branded de prova/resultado.
   const isRevisaoNova = !isMeq && !isVnd && brand === 'revisao' && !!internoAtivo
   // Tema do SimProva: escuro quando dark; senão o tema padrão da marca (MEQ tem claro/azul).
@@ -484,14 +485,16 @@ export function ProvaClient({ token, hudInicial, darkInicial = false, internoAti
     // VND / MEQ: resultado branded da marca (mesma fonte de dados do RevisaoFinal).
     if (isVnd) {
       return (
-        <ResultadoVndNova
-          sessionToken={sessionToken ?? ''}
-          token={token}
-          inicioUrl="/aluno"
-          theme={simTheme}
-          dark={dark}
-          onToggleDark={toggleDark}
-        />
+        <BrandCorProvider brand={brand}>
+          <ResultadoVndNova
+            sessionToken={sessionToken ?? ''}
+            token={token}
+            inicioUrl="/aluno"
+            theme={simTheme}
+            dark={dark}
+            onToggleDark={toggleDark}
+          />
+        </BrandCorProvider>
       )
     }
     if (isMeq) {
@@ -670,6 +673,7 @@ export function ProvaClient({ token, hudInicial, darkInicial = false, internoAti
     const tempoLabel = segundosRestantes !== null ? formatTime(segundosRestantes) : null
     const tempoRegressivo = sessao.tempo_limite_min != null
     return (
+      <BrandCorProvider brand={brand}>
       <ProvaVndLive
         theme={simTheme}
         titulo={sessao.simuladoTitulo ?? 'Simulado'}
@@ -711,6 +715,7 @@ export function ProvaClient({ token, hudInicial, darkInicial = false, internoAti
           />
         ) : undefined}
       />
+      </BrandCorProvider>
     )
   }
 

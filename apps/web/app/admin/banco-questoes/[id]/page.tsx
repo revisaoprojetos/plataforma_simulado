@@ -6,6 +6,7 @@ import { getCurrentTenantId, getCurrentTenant } from '@/lib/tenant'
 import { resolverCardView } from '@/lib/card-view'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { alternativasSaoCertoErrado } from '@/lib/simulado/formato'
+import { bancoContagensSql } from 'data'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -107,17 +108,28 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
     questoes = [...questoes].sort((a, b) => (pos.has(a.id) ? pos.get(a.id)! : FIM) - (pos.has(b.id) ? pos.get(b.id)! : FIM))
   }
 
-  // Agregações por disciplina e assunto.
-  const porDisciplina = new Map<string, number>()
-  const porAssunto = new Map<string, number>()
-  for (const q of questoes) {
-    const d = q.disciplinas?.nome ?? 'Sem disciplina'
-    porDisciplina.set(d, (porDisciplina.get(d) ?? 0) + 1)
-    const a = q.assuntos?.nome ?? 'Sem assunto'
-    porAssunto.set(a, (porAssunto.get(a) ?? 0) + 1)
+  // Agregações por disciplina e assunto (Visão geral) — feitas no BANCO (GROUP BY via SQL agregado),
+  // não mais percorrendo o conjunto completo em memória no render. Fallback: se o SQL direto não
+  // estiver disponível (DATABASE_URL vazio), agrega a lista já carregada em `questoes` (a aba
+  // "Questões" segue usando essa lista completa — este fallback não faz leitura extra).
+  let disc: [string, number][] = []
+  let ass: [string, number][] = []
+  const contagens = await bancoContagensSql(id, tidB)
+  if (contagens) {
+    disc = contagens.porDisciplina.map((x) => [x.nome, x.n] as [string, number])
+    ass = contagens.porAssunto.map((x) => [x.nome, x.n] as [string, number])
+  } else {
+    const porDisciplina = new Map<string, number>()
+    const porAssunto = new Map<string, number>()
+    for (const q of questoes) {
+      const d = q.disciplinas?.nome ?? 'Sem disciplina'
+      porDisciplina.set(d, (porDisciplina.get(d) ?? 0) + 1)
+      const a = q.assuntos?.nome ?? 'Sem assunto'
+      porAssunto.set(a, (porAssunto.get(a) ?? 0) + 1)
+    }
+    disc = [...porDisciplina.entries()].sort((a, b) => b[1] - a[1])
+    ass = [...porAssunto.entries()].sort((a, b) => b[1] - a[1])
   }
-  const disc = [...porDisciplina.entries()].sort((a, b) => b[1] - a[1])
-  const ass = [...porAssunto.entries()].sort((a, b) => b[1] - a[1])
   const maxDisc = disc[0]?.[1] ?? 1
   const maxAss = ass[0]?.[1] ?? 1
 

@@ -9,6 +9,7 @@ import { avaliarMedalhasPorDocumento } from '@/lib/leitura/carimbos'
 import { diaBRT } from '@/lib/jurisprudencia/sequencia'
 import { creditarTesesLeituraRapida } from '@/lib/jurisprudencia/conteudo'
 import { invalidarRankingJuris } from '@/lib/jurisprudencia/ranking'
+import { invalidarLeituraAluno } from '@/lib/leitura/cache'
 import type { RespostaRapida } from '@/lib/leitura/leitura-rapida'
 
 // "Leitura rápida" — progresso PERSISTIDO do caminho alternativo (leitura + questões num HTML isolado).
@@ -122,6 +123,8 @@ export async function POST(request: NextRequest) {
         }
       }
     }
+    // LACUNA 1: invalida o cache read-through de trilha/leitura do aluno (TTL 30s) na hora. Best-effort.
+    void invalidarLeituraAluno(sessao.tenantId, sessao.estudanteId).catch(() => {})
     return NextResponse.json({ ok: true, respondidas, total, acertos, concluido: !!concluidoEm, concluiuAgora: concluirAgora })
   } catch (e: any) {
     return NextResponse.json({ ok: false, message: e?.message ?? 'Leitura rápida indisponível.' })

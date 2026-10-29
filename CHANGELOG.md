@@ -12,6 +12,23 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.33.0 — 2026-10-29
+
+**feat(mac): 4ª plataforma — Mentoria Além do Corte (marca `mac`, bordô)**
+
+- Nova marca `mac` que **reaproveita 100% os componentes do VND** (sem fork), recolorida bordô:
+  - `lib/brand/brand-tokens.ts` + `simulado/sim-tokens.ts` + `interna/interna-tokens.ts`: paletas MAC (claro/escuro) do handoff.
+  - `lib/brand/cor-marca.tsx` (novo): conversor determinístico VND→bordô (`corMarca`, tabela do handoff) + contexto `BrandCorProvider`/`useCm` (identidade para VND/MEQ/Revisão — nenhuma outra marca muda).
+  - `brand-marks.tsx`: símbolo "M" + letras "ac" (viewBox do "V"/"ND").
+  - `appearance-catalogo.ts`/`aparencia-auth.ts`: catálogo `mac` (`mac-login-centralizado`/`mac-loading-classico`) + `inferirMarca`.
+- Roteamento `mac` → componentes do VND em todos os dispatchers (login, loader, simulado, shell, home/realizados/perfil/resultado/ligas/recomendado/cronograma/banco/pasta/juris/leiseca) + `BrandCorProvider` nas raízes (layout do portal, login, loader, prova-client).
+- **Fix:** `aluno-shell.tsx` roteava `mac` para o shell sidebar da Revisão → corrigido para o top bar do VND (`ShellVND`).
+- **Fix:** áreas `/aluno/nova/*` (redesign recente da Revisão) **vazavam** para o menu de VND/MEQ/MAC → agora só aparecem na Revisão.
+- Login/loader/shell com "M", textos "Mentoria Além do Corte"/"SIMULA MAC" e bordô.
+- Assets em `public/brand/mac/` + playbook `docs/onboarding-tenant-mac.md`.
+
+> Dado do tenant (criação/tema/gamificação/acessos) é feito no banco/super-admin — ver o playbook.
+
 ## 3.32.4 — 2026-10-27
 
 **fix(storage): aws-sdk não ia para a imagem standalone do web → s3 quebrava em runtime**

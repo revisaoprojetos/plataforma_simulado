@@ -1,6 +1,7 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { remember, chaveRelatorio } from '@/lib/cache/relatorio-cache'
 import { documentosDoAluno, type DocumentoAluno } from '@/lib/leitura/acesso'
 import { normalizarIntro, introHref, introExterno, type IntroConfig } from '@/lib/leitura/intro'
 import { normalizarRegulamento, type RegulamentoConfig } from '@/lib/leitura/regulamento'
@@ -23,8 +24,15 @@ interface AulaStatus {
 }
 interface AulaSeq extends AulaStatus { estado: EstadoAula; moduloId: string; naoLiberada?: boolean; proxima?: boolean }
 
-/** `.order('ordem')` tolerante (coluna pode não existir ainda). */
+/**
+ * Pastas (módulos) de leitura do tenant — CONTEÚDO (igual para todos os alunos).
+ * Cacheado por tenant (TTL curto): é relido em TODA `sequenciaLeitura` (trilha, módulo,
+ * pendências da sidebar, status de aula), antes um SELECT por render e por aluno.
+ */
 async function pastasLeitura(svc: any, tenantId: string): Promise<any[]> {
+  return remember(chaveRelatorio(tenantId, 'leitura-pastas'), 60, () => _pastasLeitura(svc, tenantId))
+}
+async function _pastasLeitura(svc: any, tenantId: string): Promise<any[]> {
   const base = (cols: string) => svc.from('simulado_pastas').select(cols).eq('tenant_id', tenantId).eq('is_folder', true).eq('folder_area', 'leitura')
   // 1ª tentativa inclui adesivo_url/intro_config (colunas novas, tolerante — cai nas próximas se ausentes).
   let r = await base('id, nome, cor, capa_url, capa_card_url, pai_id, ordem, publicacao, adesivo_url, intro_config, pontuacao, regulamento, trilha_aparencia, regra_sequencial').order('ordem', { ascending: true }).order('nome', { ascending: true })
@@ -239,8 +247,13 @@ function pendenciasDe(arr: AulaSeq[]): number {
   return arr.reduce((s, a) => s + (a.leituraConcluida ? Math.max(0, a.questoesTotal - a.questoesRespondidas) : 0), 0)
 }
 
-/** Trilha(s) do aluno p/ o caminho serpenteado (TrilhaGigante) — uma por módulo. */
-export async function carregarTrilhaLeituraAluno(estId: string, tenantId: string): Promise<Trilha[]> {
+/** Trilha(s) do aluno p/ o caminho serpenteado (TrilhaGigante) — uma por módulo.
+ *  Resultado (PROGRESSO do aluno) cacheado por (tenant, aluno) com TTL curto: a 1ª carga
+ *  computa, as demais (recarregar página / sidebar / perfil) servem do cache. */
+export function carregarTrilhaLeituraAluno(estId: string, tenantId: string): Promise<Trilha[]> {
+  return remember(chaveRelatorio(tenantId, 'trilha-leitura', estId), 30, () => _carregarTrilhaLeituraAluno(estId, tenantId))
+}
+async function _carregarTrilhaLeituraAluno(estId: string, tenantId: string): Promise<Trilha[]> {
   const { modulos, seqByModulo } = await sequenciaLeitura(estId, tenantId)
   return modulos.map((m) => {
     const arr = seqByModulo.get(m.id) ?? []
@@ -300,8 +313,12 @@ export interface ModuloCompleto {
   trilhaAparencia: TrilhaAparencia
 }
 
-/** Módulo aberto: a trilha (serpenteada) + o desempenho por aula + o resumo de pendências — numa passada. */
-export async function carregarModuloCompleto(estId: string, tenantId: string, moduloId: string): Promise<ModuloCompleto> {
+/** Módulo aberto: a trilha (serpenteada) + o desempenho por aula + o resumo de pendências — numa passada.
+ *  Resultado (PROGRESSO do aluno naquele módulo) cacheado por (tenant, aluno, módulo) com TTL curto. */
+export function carregarModuloCompleto(estId: string, tenantId: string, moduloId: string): Promise<ModuloCompleto> {
+  return remember(chaveRelatorio(tenantId, 'modulo-completo', estId, moduloId), 30, () => _carregarModuloCompleto(estId, tenantId, moduloId))
+}
+async function _carregarModuloCompleto(estId: string, tenantId: string, moduloId: string): Promise<ModuloCompleto> {
   const { modulos, seqByModulo } = await sequenciaLeitura(estId, tenantId)
   const m = modulos.find((x) => x.id === moduloId)
   if (!m) return { trilha: null, nome: null, desempenho: [], pendentes: 0, aulasPendentes: 0, regulamento: normalizarRegulamento(null), pontuacao: normalizarPontuacaoLeitura(null), desafios: [], desempenhoDesafios: { acertos: 0, aulasConcluidas: 0, aulasGabaritadas: 0 }, trilhaAparencia: DEFAULT_TRILHA_APARENCIA }
@@ -374,26 +391,14 @@ export async function carregarModuloCompleto(estId: string, tenantId: string, mo
     } else {
       for (const mc of (cfg.marcos_conclusao ?? [])) { const a = concl[(mc.dias || 0) - 1]; if (a) addExtra(a.id, mc.bonus || 0) }
     }
-    // SEQUÊNCIA = bônus de MARCO (pontos extras do desafio) PERMANENTE: baseado no MAIOR run de dias
-    // CONSECUTIVOS já atingido (= streakMaior do ranking), NÃO no run atual/vivo. Uma vez conquistado o
-    // marco (14/21/30 dias…), ele fica — não some quando o desafio termina ou a sequência quebra.
-    // Distribuído no dia em que foi ganho (o N-ésimo dia do maior run) para somar certo e aparecer na tabela.
-    const diasRun = [...new Set(concl.map((a) => a.dia))].sort()
-    let bestStart = 0, bestLen = diasRun.length ? 1 : 0, curStart = 0
-    for (let i = 1; i < diasRun.length; i++) {
-      const consec = Date.parse(diasRun[i] + 'T00:00:00Z') - Date.parse(diasRun[i - 1] + 'T00:00:00Z') === 86_400_000
-      if (!consec) curStart = i
-      const curLen = i - curStart + 1
-      if (curLen > bestLen) { bestLen = curLen; bestStart = curStart }
-    }
-    const run = diasRun.slice(bestStart, bestStart + bestLen) // o MAIOR run (sequência 1..run.length)
-    {
-      const diaParaId = new Map(concl.map((a) => [a.dia, a.id]))
-      if ((cfg.sequencia_modo ?? 'auto') === 'custom') {
-        for (const ms of (cfg.marcos_sequencia ?? [])) { if ((ms.dias || 0) >= 1 && ms.dias <= run.length) { const id = diaParaId.get(run[ms.dias - 1]); if (id) addExtra(id, ms.bonus || 0) } }
-      } else if ((cfg.bonus_semana || 0) > 0 && (cfg.semana_dias || 0) > 0) {
-        for (let k = cfg.semana_dias; k <= run.length; k += cfg.semana_dias) { const id = diaParaId.get(run[k - 1]); if (id) addExtra(id, cfg.bonus_semana) }
-      }
+    // SEQUÊNCIA = bônus de MARCO por AULAS CONCLUÍDAS (completar o desafio), NÃO pelo run consecutivo de
+    // calendário — quem faz os 30 módulos mas "dobra" um dia (30 módulos em 29 dias) completou o desafio e deve
+    // ganhar o marco de 30. Distribuído na ORDEM de conclusão (N-ésima aula concluída), igual à faixa de
+    // CONCLUSÃO acima — assim casa com o ranking (que usa aulasConcluidas) e some certo na tabela.
+    if ((cfg.sequencia_modo ?? 'auto') === 'custom') {
+      for (const ms of (cfg.marcos_sequencia ?? [])) { const a = concl[(ms.dias || 0) - 1]; if (a && (ms.dias || 0) >= 1) addExtra(a.id, ms.bonus || 0) }
+    } else if ((cfg.bonus_semana || 0) > 0 && (cfg.semana_dias || 0) > 0) {
+      concl.forEach((a, i) => { if ((i + 1) % cfg.semana_dias === 0) addExtra(a.id, cfg.bonus_semana) })
     }
   }
 

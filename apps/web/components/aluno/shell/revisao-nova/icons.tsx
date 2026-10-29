@@ -10,6 +10,12 @@ import {
   Lightbulb,
   BookOpen,
   Trophy,
+  LayoutDashboard,
+  BarChart3,
+  Users,
+  GraduationCap,
+  NotebookPen,
+  HelpCircle,
   type LucideProps,
 } from 'lucide-react'
 
@@ -27,6 +33,13 @@ const MAPA: Record<string, ComponentType<LucideProps>> = {
   Lightbulb,
   BookOpen,
   Trophy,
+  // Ícones extras p/ as áreas da NOVA plataforma (/nova) no menu lateral.
+  LayoutDashboard,
+  BarChart3,
+  Users,
+  GraduationCap,
+  NotebookPen,
+  HelpCircle,
 }
 
 export function NavIcon({ name, ...props }: { name: string } & LucideProps) {

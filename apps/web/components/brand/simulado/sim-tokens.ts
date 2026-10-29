@@ -40,6 +40,24 @@ const VND: Partial<Record<SimTheme, Vars>> = {
     fOn: '#E8C877', fOnInk: '#2A2000', tBg: 'rgba(255,255,255,.06)', tOn: '#113322', tOnInk: '#9BE9C0',
   },
 }
+// MAC (Mentoria Além do Corte): VND recolorido bordô (tabela TOKENS-MAC.md). Dourado/âmbar
+// (flag/gold/peach) e semânticos permanecem; só o verde da marca vira bordô.
+const MAC: Partial<Record<SimTheme, Vars>> = {
+  claro: {
+    bg: '#F8F5F5', surface: '#FFFFFF', surface2: '#F7F3F3', ink: '#170D0E', muted: '#6B5C5D',
+    line: '#E8E1E1', line2: '#F2EDED', chip: '#F0E4E5', brand: '#640C11', brand2: '#781016', track: '#E8E1E1',
+    selBg: '#F4E6E7', selLine: '#781016', selDot: '#640C11', flag: '#F2B63B', flagBg: 'rgba(242,182,59,.16)',
+    nAns: '#EFD7D8', nAnsInk: '#5A0A0E', peachBg: '#FFF3D6', goldBg: '#FBEFC9', goldInk: '#9A7414',
+    fOn: '#F2B63B', fOnInk: '#3A2A00', tBg: '#F2EDED', tOn: '#FFFFFF', tOnInk: '#5A0A0E',
+  },
+  escuro: {
+    bg: '#100706', surface: '#1A0A0B', surface2: '#150809', ink: '#F3E8E9', muted: '#B08F91',
+    line: 'rgba(222,158,161,.16)', line2: 'rgba(222,158,161,.1)', chip: 'rgba(222,158,161,.12)', brand: '#C86A6F', brand2: '#781016', track: 'rgba(255,255,255,.08)',
+    selBg: 'rgba(200,106,111,.14)', selLine: '#C86A6F', selDot: '#C86A6F', flag: '#E8C877', flagBg: 'rgba(232,200,119,.16)',
+    nAns: 'rgba(200,106,111,.2)', nAnsInk: '#E9B9BC', peachBg: 'rgba(232,200,119,.14)', goldBg: 'rgba(232,200,119,.14)', goldInk: '#E8C877',
+    fOn: '#E8C877', fOnInk: '#2A2000', tBg: 'rgba(255,255,255,.06)', tOn: '#331316', tOnInk: '#E9B9BC',
+  },
+}
 const MEQ: Partial<Record<SimTheme, Vars>> = {
   claro: {
     bg: '#F6F9FE', surface: '#FFFFFF', surface2: '#F5F8FD', ink: '#171E3B', muted: '#5E6A88',
@@ -64,15 +82,16 @@ const MEQ: Partial<Record<SimTheme, Vars>> = {
   },
 }
 
-const TABELA: Record<Brand, Partial<Record<SimTheme, Vars>>> = { revisao: REV, vnd: VND, meq: MEQ }
+const TABELA: Record<Brand, Partial<Record<SimTheme, Vars>>> = { revisao: REV, vnd: VND, mac: MAC, meq: MEQ }
 
-/** Raio de card por marca (spec §0): Rev 16, VND 18, MEQ 12. */
-export const SIM_RADIUS: Record<Brand, number> = { revisao: 16, vnd: 18, meq: 12 }
+/** Raio de card por marca (spec §0): Rev 16, VND 18, MEQ 12. MAC = igual VND. */
+export const SIM_RADIUS: Record<Brand, number> = { revisao: 16, vnd: 18, mac: 18, meq: 12 }
 
-/** Fonte por marca. Rev/VND Plus Jakarta Sans; MEQ Sora. */
+/** Fonte por marca. Rev/VND/MAC Plus Jakarta Sans; MEQ Sora. */
 export const SIM_FONT: Record<Brand, string> = {
   revisao: "'Plus Jakarta Sans',sans-serif",
   vnd: "'Plus Jakarta Sans',sans-serif",
+  mac: "'Plus Jakarta Sans',sans-serif",
   meq: "'Sora',sans-serif",
 }
 

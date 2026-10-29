@@ -26,7 +26,7 @@ const TEMA_META: Record<Theme, { label: string; Icon: typeof Sun }> = {
   azul: { label: 'Azul', Icon: Droplet },
 }
 
-const BRAND_LABEL: Record<Brand, string> = { revisao: 'Revisão', vnd: 'VND', meq: 'MEQ' }
+const BRAND_LABEL: Record<Brand, string> = { revisao: 'Revisão', vnd: 'VND', mac: 'Mentoria Além do Corte', meq: 'MEQ' }
 
 export function AparenciaAuthForm({ tema, salvarTema }: { tema: any; salvarTema: Salvar }) {
   // Lê a config atual já com fallback por marca (slug inválido → fallback).

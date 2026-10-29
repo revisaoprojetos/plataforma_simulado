@@ -72,7 +72,7 @@ export function LigasRevisao({ theme: themeProp, data, ranking }: { theme: Inter
         </div>
 
         {/* abas */}
-        <LigaTabs tab={tab} onTab={setTab} onCell="#2E1F7A" onInk="#FFF" bg={dark ? '#2C2C34' : '#ECE8F6'} />
+        <LigaTabs tab={tab} onTab={setTab} onCell="#2E1F7A" onInk="#FFF" bg={dark ? '#171030' : '#ECE8F6'} />
 
         {tab === 'liga' ? (
           <div className="lg-pv lgrv-liga" key="liga">

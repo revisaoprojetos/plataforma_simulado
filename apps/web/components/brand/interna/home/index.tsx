@@ -10,7 +10,8 @@ import { HomeVnd } from './vnd/home'
 import { HomeMeq } from './meq/home'
 
 export function PlatformHome({ brand, theme, data, preview }: HomeScreenProps) {
-  if (brand === 'vnd') return <HomeVnd theme={theme} data={data} preview={preview} />
+  // MAC reaproveita a composição do VND (recolorido bordô via tokens + corMarca).
+  if (brand === 'vnd' || brand === 'mac') return <HomeVnd theme={theme} data={data} preview={preview} />
   if (brand === 'meq') return <HomeMeq theme={theme} data={data} preview={preview} />
   return <HomeRevisao theme={theme} data={data} preview={preview} />
 }

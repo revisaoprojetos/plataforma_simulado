@@ -148,5 +148,8 @@ export async function definirVersaoAtual(documentoId: string, versaoId: string):
     .eq('tenant_id', tenantId).eq('id', documentoId)
   if (error) return { ok: false, erro: error.message }
   await emitirEvento(svc, tenantId, 'documento.atualizado', { documento_id: documentoId, versao_id: versaoId })
+  // Mede páginas do PDF (automático, fire-and-forget) p/ o Cronograma Adaptativo — import
+  // dinâmico evita ciclo de módulos. Falha silenciosa; o cron de backfill cobre o resto.
+  void import('@/lib/cronograma/adaptativo/paginas-pdf').then((m) => m.medirPaginasDocumento(svc, tenantId, documentoId)).catch(() => {})
   return { ok: true }
 }
