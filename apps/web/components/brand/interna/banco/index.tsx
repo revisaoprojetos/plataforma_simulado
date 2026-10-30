@@ -16,6 +16,7 @@ import { QCore } from '../qcore'
 import { useBancoNav } from '@/components/aluno/banco-questoes-client'
 import type { Opt, AssuntoOpt, FiltrosParams } from '@/components/aluno/questoes-filtros-aluno'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { QuestoesTabs } from '../questoes-tabs'
 
 export interface BancoStats { resolvidas: number; acertos: number; aproveitamento: number; total: number }
 export type BancoFiltroData = { disciplinas: Opt[]; assuntos: AssuntoOpt[]; bancas: Opt[]; anos: number[]; params: FiltrosParams }
@@ -125,6 +126,8 @@ export function PlatformBanco({
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: 'var(--goldInk)' }}>QUESTÕES</span>
           <h1 style={{ margin: '6px 0 0', fontSize: 32, fontWeight: 800, letterSpacing: '-0.045em', color: 'var(--ink)' }}>Banco de questões</h1>
           <p style={{ margin: '6px 0 0', fontSize: 14, color: 'var(--muted)' }}>Questões comentadas de procuradorias e carreiras jurídicas.</p>
+          {/* Abas da área unificada Questões/Recomendados — só Revisão (não altera VND/MEQ). */}
+          {brand === 'revisao' && <QuestoesTabs ativo="questoes" />}
         </div>
 
         {/* KPIs */}

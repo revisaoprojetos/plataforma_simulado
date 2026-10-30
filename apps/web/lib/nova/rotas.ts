@@ -60,7 +60,7 @@ export type NavItem = { key: NavKey; label: string; icon: string; href: string; 
 // Menu lateral: exatamente 9 itens, na ordem de COMPONENTES.md.
 export const NAV: NavItem[] = [
   { key: 'inicio', label: 'Início', icon: 'home', href: R.inicio },
-  { key: 'painel', label: 'Meu painel de estudos', icon: 'target', href: R.painel },
+  { key: 'painel', label: 'Painel de estudos', icon: 'target', href: R.painel },
   { key: 'desempenho', label: 'Meu desempenho', icon: 'chart', href: R.desempenho },
   { key: 'comunidade', label: 'Ligas e Comunidade', icon: 'users', href: R.comunidade },
   { key: 'cursos', label: 'Cursos', icon: 'book', href: R.cursos },

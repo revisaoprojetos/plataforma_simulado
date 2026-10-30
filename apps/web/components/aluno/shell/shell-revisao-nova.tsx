@@ -113,7 +113,15 @@ export function ShellRevisaoNova({
   // Ativo = o item cujo href casa com a rota, com o MAIS ESPECÍFICO vencendo. Sem isso o pai
   // "Comunidade" (/aluno/nova/comunidade) acende junto do filho "Ligas" (/.../comunidade/ligas),
   // que vive sob ele. `/aluno` é sempre exato. O `+ '/'` evita casar prefixos irmãos (ex.: /questoes-x).
-  const casaRota = (href: string) => (href === '/aluno' ? rota === '/aluno' : rota === href || rota.startsWith(href + '/'))
+  // O Cronograma Adaptativo é acessado DENTRO do "Painel de estudos" (/aluno/cronograma é a casa do
+  // embed, fora da sidebar), então estar nele mantém o item "Painel de estudos" aceso.
+  const casaRota = (href: string) => {
+    if (href === '/aluno') return rota === '/aluno'
+    if (href === '/aluno/nova/painel' && (rota === '/aluno/cronograma' || rota.startsWith('/aluno/cronograma/'))) return true
+    // "Banco de Questões" engloba a aba "Recomendados" (área unificada; sem item próprio no menu).
+    if (href === '/aluno/questoes' && (rota === '/aluno/recomendado' || rota.startsWith('/aluno/recomendado/'))) return true
+    return rota === href || rota.startsWith(href + '/')
+  }
   const hrefAtivo = nav.reduce<string | null>((best, it) => (casaRota(it.href) && it.href.length > (best?.length ?? -1) ? it.href : best), null)
   const ehAtivo = (href: string) => href === hrefAtivo
   // Áreas com CONTEÚDO REDESENHADO (trazem o próprio layout/padding/fundo) ficam FULL-BLEED, como a
@@ -272,8 +280,13 @@ export function ShellRevisaoNova({
             />
           </button>
 
-          {/* Nav */}
-          <nav className="shr-nav" style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {/* Nav — rola sozinha quando a tela é baixa (muitos itens), sem empurrar/cobrir
+              o cartão de perfil do rodapé. flex:1 + minHeight:0 fazem ela ocupar só o
+              espaço livre entre o logo (topo fixo) e o rodapé (base fixa). */}
+          <nav
+            className="shr-nav shr-nav-scroll"
+            style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: '1 1 auto', minHeight: 0, overflowY: 'auto', overflowX: 'hidden' }}
+          >
             {nav.map((item) => {
               const active = ehAtivo(item.href)
               return (
@@ -298,7 +311,9 @@ export function ShellRevisaoNova({
                   <NavIcon name={item.icon} style={{ width: 18, height: 18 }} />
                   <span className="shr-lbl" style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ flex: 1 }}>{item.label}</span>
-                    {item.badge && (
+                    {/* Selo "NOVO" removido da sidebar (pedido do usuário); contadores numéricos
+                        (ex.: "28" em Simulados) continuam aparecendo. */}
+                    {item.badge && item.badge.toUpperCase() !== 'NOVO' && (
                       <span style={badgePill(item.badge)}>{item.badge}</span>
                     )}
                   </span>
@@ -969,6 +984,15 @@ function ScopedStyle() {
 .shr-side.shr-col .shr-sair{gap:0!important}
 .shr-side.shr-col .shr-pop{left:66px!important;bottom:0!important}
 .shr-nav a:hover{background:rgba(255,255,255,.08)}
+/* Scroll da lista de navegação (telas baixas): barra fininha e discreta, sem encostar no texto.
+   Overscroll contido p/ a rolagem da nav não "vazar" para a página. */
+.shr-nav-scroll{overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(255,255,255,.28) transparent;padding-right:4px;margin-right:-4px}
+.shr-nav-scroll::-webkit-scrollbar{width:6px}
+.shr-nav-scroll::-webkit-scrollbar-track{background:transparent}
+.shr-nav-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.26);border-radius:99px}
+.shr-nav-scroll::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.42)}
+/* Recolhida: itens viram ícones centrados; sem padding/margin lateral do scroll. */
+.shr-side.shr-col .shr-nav-scroll{padding-right:0;margin-right:0}
 .shr-prof:hover{transform:translateY(-2px);border-color:rgba(241,194,50,.6);background:linear-gradient(135deg,rgba(255,255,255,.16),rgba(255,255,255,.06))!important}
 .shr-sbtn:hover{background:rgba(255,255,255,.12)!important}
 .shr-sair:hover{background:#E5484D!important;border-color:#E5484D!important;color:#FFFFFF!important}

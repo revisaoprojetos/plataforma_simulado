@@ -6,7 +6,8 @@
 // O plano FIXADO é a fonte das "Metas de hoje" do painel; ao fixar/arquivar, router.refresh() relê o snapshot.
 import * as React from 'react'
 import { useRouter } from 'next/navigation'
-import { Card, Row, Col, Tag, Muted, Btn, Grid, IconBox } from '@/components/nova/ui'
+import { Card, Row, Col, Muted, Btn, Grid, IconBox, IBtn } from '@/components/nova/ui'
+import { Icon } from '@/components/nova/icons'
 
 export type PlanoHub = { id: string; titulo: string | null; fixado: boolean; criado_em: string; atualizado_em: string }
 
@@ -45,6 +46,7 @@ export function CronogramasHub({ planos }: { planos: PlanoHub[] }) {
   }
   const novo = () => {
     setBusy('novo')
+    try { window.dispatchEvent(new Event('navprogress:start')) } catch { /* acende a linha de carregamento já no clique */ }
     post({ acao: 'gerar', novo: true, cfg: CFG_NOVO }).then((j) => {
       if (j?.ok) router.push(`${CRONOGRAMA}?novo=1`)
       else setBusy(null)
@@ -61,32 +63,48 @@ export function CronogramasHub({ planos }: { planos: PlanoHub[] }) {
         <Btn kind="gold" size="sm" icon="plus" onClick={novo}>{busy === 'novo' ? 'Criando…' : 'Novo cronograma'}</Btn>
       </Row>
 
-      <Grid min={300} gap={14}>
+      <Grid min={330} gap={14}>
         {planos.map((p) => {
           const pend = busy === p.id
+          const nome = p.titulo || 'Meu cronograma'
+          const criado = fmtD(p.criado_em), ativo = fmtD(p.atualizado_em)
           return (
-            <Card key={p.id} pad={16} style={{ gap: 10, border: p.fixado ? '1.5px solid var(--brand)' : '1px solid var(--line)' }}>
-              <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-                <Row gap={10}>
-                  <IconBox icon="cal" s={40} />
-                  <Col gap={2} style={{ minWidth: 0 }}>
-                    <b style={{ fontSize: 14.5, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--ink)' }}>{p.titulo || 'Meu cronograma'}</b>
-                    {p.fixado
-                      ? <Tag kind="brand" icon="pin">Em foco</Tag>
-                      : <Muted size={11.5}>Criado em {fmtD(p.criado_em)}</Muted>}
+            <Card key={p.id} pad={0} style={{ position: 'relative', gap: 0, overflow: 'hidden', border: p.fixado ? '1.5px solid var(--brand)' : '1px solid var(--line)' }}>
+              {p.fixado ? <div style={{ height: 4, background: 'var(--brand)' }} /> : null}
+              {/* "Em foco" = ícone no canto superior direito (sem pill no corpo) */}
+              {p.fixado ? (
+                <span title="Em foco" aria-label="Em foco" style={{ position: 'absolute', top: 14, right: 12, width: 28, height: 28, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'color-mix(in srgb, var(--brand) 14%, transparent)', color: 'var(--brand)', zIndex: 1 }}>
+                  <Icon n="tack" size={15} />
+                </span>
+              ) : null}
+              <Col gap={12} style={{ padding: 16 }}>
+                {/* cabeçalho: ícone + nome + datas */}
+                <Row gap={11} style={{ minWidth: 0, paddingRight: p.fixado ? 34 : 0 }}>
+                  <IconBox icon="cal" s={42} fg={p.fixado ? 'var(--brand)' : 'var(--muted)'} />
+                  <Col gap={3} style={{ minWidth: 0 }}>
+                    <b style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nome}</b>
+                    <Muted size={11.5}>Criado em {criado}{ativo && ativo !== criado ? ` · ativo em ${ativo}` : ''}</Muted>
                   </Col>
                 </Row>
-              </Row>
 
-              <Row gap={8} style={{ flexWrap: 'wrap' }}>
-                {p.fixado ? (
-                  <Btn kind="primary" size="sm" icon="cal" href={CRONOGRAMA}>Abrir · Hoje</Btn>
-                ) : (
-                  <Btn kind="secondary" size="sm" icon="pin" onClick={() => fixar(p.id)}>{pend ? '…' : 'Fixar'}</Btn>
-                )}
-                <Btn kind="secondary" size="sm" icon="pen" onClick={() => renomear(p)}>Renomear</Btn>
-                <Btn kind="secondary" size="sm" icon="trash" onClick={() => arquivar(p)}>Arquivar</Btn>
-              </Row>
+                {/* linha explicativa: o que este cronograma é/faz agora */}
+                <div style={{ fontSize: 12.5, lineHeight: 1.45, color: p.fixado ? 'var(--ink)' : 'var(--muted)', padding: '9px 11px', borderRadius: 12, background: p.fixado ? 'color-mix(in srgb, var(--brand) 8%, transparent)' : 'var(--surface2)' }}>
+                  {p.fixado
+                    ? <>É este cronograma que está <b>guiando o seu dia</b> — as <b>“Metas de hoje”</b> acima vêm dele.</>
+                    : <>Fixe para que as <b>“Metas de hoje”</b> passem a ser as deste cronograma.</>}
+                </div>
+
+                {/* ações: 1 principal + secundárias discretas (só ícone, com rótulo em tooltip) */}
+                <Row style={{ justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                  {p.fixado
+                    ? <Btn kind="primary" size="sm" icon="cal" href={CRONOGRAMA}>Abrir · Hoje</Btn>
+                    : <Btn kind="primary" size="sm" icon="tack" onClick={() => fixar(p.id)}>{pend ? 'Fixando…' : 'Fixar como foco'}</Btn>}
+                  <Row gap={6}>
+                    <IBtn icon="pen" label="Renomear cronograma" size={34} onClick={() => renomear(p)} />
+                    <IBtn icon="trash" label="Arquivar cronograma" size={34} onClick={() => arquivar(p)} />
+                  </Row>
+                </Row>
+              </Col>
             </Card>
           )
         })}

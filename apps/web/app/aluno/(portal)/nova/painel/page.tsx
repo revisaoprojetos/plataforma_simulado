@@ -9,6 +9,7 @@ import { carregarPainel } from '@/lib/painel/snapshot'
 import { listarPlanosAdaptativo } from '@/lib/cronograma/adaptativo/dados'
 import { MetasPainel, type MetaPainel } from './_metas-painel'
 import { CronogramasHub, type PlanoHub } from './_cronogramas-hub'
+import { RefreshOnReturn } from './_refresh-on-return'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,9 +31,11 @@ export default async function PainelPage() {
   const primeiroNome = (sessao?.nome ?? 'Aluno').trim().split(/\s+/)[0] || 'Aluno'
   const cont = d.continue
   const temCronograma = planos.length > 0
+  const focoNome = (planos.find((p) => p.fixado)?.titulo || '').trim() // cronograma em foco → nome ao lado de "Metas de hoje"
 
   return (
     <>
+      <RefreshOnReturn />
       {/* Hero COERENTE com ter ou não cronograma (fonte única = planos). Sem cronograma não há
           "Continuar estudando" nem stats de metas — só o convite para criar o primeiro.
           Bg ADAPTATIVO (var --nova-hero-bg): claro = tom da sidebar; escuro = tom do "Meu Desempenho". */}
@@ -77,7 +80,7 @@ export default async function PainelPage() {
       <Split
         main={
           <Card>
-            <SecHead eyebrow="Cronograma adaptativo" title="Metas de hoje" right={<Btn kind="link" href={CRONOGRAMA}>Abrir cronograma</Btn>} />
+            <SecHead eyebrow="Cronograma adaptativo" title={focoNome ? <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>Metas de hoje<span style={{ display: 'inline-block', width: 5, height: 5, borderRadius: '50%', background: 'var(--brand)', alignSelf: 'center' }} /><span style={{ fontSize: 16, fontWeight: 700, color: 'var(--brand)' }}>{focoNome}</span></span> : 'Metas de hoje'} right={<Btn kind="link" href={CRONOGRAMA}>Abrir cronograma</Btn>} />
             {d.totalHoje > 0 ? (
               <Row gap={12} style={{ flexWrap: 'nowrap' }}>
                 <Bar pct={d.pctHoje} color={GBAR} style={{ flex: 1 }} />

@@ -12,6 +12,21 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.34.0 — 2026-10-30
+
+**feat(aluno): Ligas nova no lugar da antiga · Cadernos em manutenção · Ajuda FAQ expansível + admin · unificação Banco + Recomendado**
+
+- **Ligas (Revisão):** a rota antiga `/aluno/ligas` agora **redireciona** para a nova `/aluno/nova/comunidade/ligas` (para todos os alunos); no menu, a antiga sai e a nova vira a **principal** (sem o selo "NOVO"). MEQ/VND intactos.
+- **Cadernos (Revisão):** área nova entra **em manutenção** (bloqueada por padrão) até ter conteúdo configurado — some do menu, a rota mostra "em manutenção", e é gerenciável no admin em **Sistema → Páginas em manutenção → Aluno** (`lib/sistema/manutencao-areas.ts`).
+- **Ajuda — aluno + admin:** o FAQ virou **acordeão** (clica na pergunta → abre a resposta), lendo `tema.ajuda_faq` com fallback ao padrão (`lib/ajuda/faq.ts`, `components/nova/ajuda-faq-accordion.tsx`). Nova tela admin **Configuração → Ajuda / FAQ** (CRUD de temas/perguntas/respostas, "Restaurar padrão"), no padrão das Mensagens — guard `configuracoes:manage`, merge em `tema` sem migração.
+- **Banco de Questões + Recomendado unificados (Revisão):** **aba "tab de linha"** sob o título ("Questões Revisão" / "Recomendados"); "Recomendado" deixa de ser item próprio no menu (vira aba). O card **"Sua maior oportunidade agora"** reconhece a matéria e o botão **"Reforçar {matéria}"** (e as linhas do Diagnóstico) recarregam as questões **daquela matéria** via `?reforco=<disciplina>` (seleção server-side, erradas primeiro). VND/MEQ e o caminho legado não mudam.
+
+> Também incluído neste push (trabalho já pendente na árvore): Cronograma Adaptativo multi-plano, correção de **imagens base64 gigantes** no import da Biblioteca (`lib/conteudo/ingestao.ts`) e ajustes do leitor.
+>
+> ⚠️ **Deploy/DB:** aplicar as migrações de cronograma pendentes (ex.: `20261029010000_cronograma_adaptativo_multi.sql`) + `NOTIFY pgrst`. O toggle de **Cadernos** pode ser desligado no admin quando a área estiver pronta.
+
+---
+
 ## 3.33.0 — 2026-10-29
 
 **feat(mac): 4ª plataforma — Mentoria Além do Corte (marca `mac`, bordô)**

@@ -247,7 +247,7 @@ export async function pausarAdaptativo(svc: SupabaseClient, tenantId: string, es
 // destino (localStorage/NUVEM) por estas funções. Formato IDÊNTICO ao modelo.
 
 export interface DocsModelo {
-  estado: { cfg: Cfg; plano: Plano; fim: number; revs: Record<number, Array<[string, DataISO]>>; pausa: { desde: DataISO } | null; exemplo: boolean; extras?: unknown[] } | null
+  estado: { cfg: Cfg; plano: Plano; fim: number; revs: Record<number, Array<[string, DataISO]>>; pausa: { desde: DataISO } | null; exemplo: boolean; titulo?: string | null; extras?: unknown[] } | null
   progresso: { prog: Record<string, ProgMeta>; extras: unknown[] } | null
   notas: { notas: Record<string, { grau?: number; res?: number; err?: number; diff?: number }> } | null
 }
@@ -276,7 +276,7 @@ export async function carregarDocs(svc: SupabaseClient, tenantId: string, estId:
     if (Object.keys(n).length) notas[m.meta_id] = n
   }
   return {
-    estado: { cfg: row.cfg, plano: row.plano || {}, fim: row.fim || 1, revs: row.revs || {}, pausa: row.pausa || null, exemplo: !!row.exemplo, extras },
+    estado: { cfg: row.cfg, plano: row.plano || {}, fim: row.fim || 1, revs: row.revs || {}, pausa: row.pausa || null, exemplo: !!row.exemplo, titulo: row.titulo ?? null, extras },
     progresso: { prog, extras },
     notas: { notas },
     extras,
@@ -288,6 +288,8 @@ export async function sincronizarDoc(svc: SupabaseClient, tenantId: string, estI
   if (parte === 'estado') {
     const cfg = doc.cfg as Cfg
     if (!cfg || !cfg.start) return { ok: false, error: 'cfg_invalido' }
+    // Nome dado na criação (iframe). Vazio => não sobrescreve o título existente num recálculo.
+    const tituloDoc = typeof doc.titulo === 'string' ? doc.titulo.trim().slice(0, 80) : ''
     const campos = {
       cfg: cfg as unknown as Record<string, unknown>,
       plano: (doc.plano || {}) as Record<string, unknown>,
@@ -300,12 +302,13 @@ export async function sincronizarDoc(svc: SupabaseClient, tenantId: string, estI
     // O iframe edita o plano em FOCO (fixado). Se ainda não há plano, cria já fixado.
     const alvo = await lerPlanoRow(svc, tenantId, estId)
     if (alvo) {
-      const { error } = await svc.from(T_PLANO).update(campos).eq('id', alvo.id)
+      const upd = tituloDoc ? { ...campos, titulo: tituloDoc } : campos
+      const { error } = await svc.from(T_PLANO).update(upd).eq('id', alvo.id)
       return error ? { ok: false, error: error.message } : { ok: true }
     }
     await svc.from(T_PLANO).update({ fixado: false }).eq('tenant_id', tenantId).eq('estudante_id', estId).eq('fixado', true)
     const { error } = await svc.from(T_PLANO)
-      .insert({ tenant_id: tenantId, estudante_id: estId, fixado: true, titulo: 'Meu cronograma', ...campos })
+      .insert({ tenant_id: tenantId, estudante_id: estId, fixado: true, titulo: tituloDoc || 'Meu cronograma', ...campos })
     return error ? { ok: false, error: error.message } : { ok: true }
   }
   const row = await lerPlanoRow(svc, tenantId, estId)

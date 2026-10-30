@@ -20,6 +20,11 @@ const fmt = (n: number) => n.toLocaleString('pt-BR')
 export default async function LigasPage() {
   const sessao = await getSessaoAluno()
   if (!sessao) redirect('/aluno/entrar')
+  // As Ligas migraram para a NOVA área (/aluno/nova/comunidade/ligas) na Revisão. A área antiga fica
+  // APOSENTADA ("em manutenção" para todos os alunos): redireciona para a nova no lugar (a nova página
+  // já trata os estados de gamificação inativa / "em breve"). Outras marcas mantêm a Ligas atual.
+  const _it = await resolverInterno()
+  if (_it.brand === 'revisao') redirect('/aluno/nova/comunidade/ligas')
   const svc = createAdminClient()
   const config = await getGamConfig(svc, sessao.tenantId)
 
@@ -72,7 +77,8 @@ export default async function LigasPage() {
   const maxDia = Math.max(1, ...semana.map((d) => d.xp))
 
   // ── NOVO VISUAL INTERNO (ligado ao real): Ligas redesenhado + ranking funcional (slot). ──
-  const _it = await resolverInterno()
+  // (Revisão já foi redirecionada para /aluno/nova/comunidade/ligas lá em cima; aqui cobrimos
+  //  as demais marcas que tenham o visual interno ligado.)
   if (_it.ativo) {
     const ligaData: LigaData = {
       ligaNome: liga.nome, ligaCor: liga.cor,

@@ -168,16 +168,21 @@ export default async function AlunoPortalLayout({ children }: { children: React.
       // Cronograma sai do MENU na Revisão (Fase 3): o acesso passa a ser pelo "Meu painel de estudos"
       // (/aluno/nova/painel). A ROTA antiga segue viva (redireciona). MEQ/VND mantêm o item no menu.
       { href: '/aluno/cronograma', label: 'Cronograma', short: 'Cronograma', icon: 'CalendarDays', gate: !OCULTAR_CRONOGRAMA && brand !== 'revisao' },
-      { href: '/aluno/recomendado', label: 'Recomendado', short: 'Recomendado', icon: 'Lightbulb' },
+      // Revisão: "Recomendado" deixa de ser item próprio — vira aba DENTRO de "Banco de Questões"
+      // (/aluno/questoes ↔ /aluno/recomendado). Some do menu só na Revisão; MEQ/VND mantêm os dois.
+      { href: '/aluno/recomendado', label: 'Recomendado', short: 'Recomendado', icon: 'Lightbulb', gate: brand !== 'revisao' },
       { href: '/aluno/questoes', label: 'Banco de Questões', short: 'Questões', icon: 'BookOpen' },
-      { href: '/aluno/ligas', label: 'Ligas', short: 'Ligas', icon: 'Trophy', gate: gamAtivo },
+      // Revisão: a Ligas PRINCIPAL é a nova (/aluno/nova/comunidade/ligas). A antiga foi desativada
+      // (redireciona) e sai do menu; MEQ/VND mantêm a Ligas atual.
+      { href: '/aluno/ligas', label: 'Ligas', short: 'Ligas', icon: 'Trophy', gate: gamAtivo && brand !== 'revisao' },
       // ── NOVA PLATAFORMA (/nova) — migração tela a tela. Itens com selo "NOVO"; cada um abre a
       // experiência nova (que tem o próprio shell). Produção intacta: isto apenas adiciona links. ──
       // Revisão: item "Início (nova)" sai do menu — virou a própria "Início". (Outras marcas: inalterado.)
       { href: '/aluno/nova/inicio', label: 'Início (nova)', short: 'Nova', icon: 'Home', badge: 'NOVO', gate: brand !== 'revisao' },
-      { href: '/aluno/nova/painel', label: 'Meu painel de estudos', short: 'Painel', icon: 'LayoutDashboard', badge: 'NOVO' },
+      { href: '/aluno/nova/painel', label: 'Painel de estudos', short: 'Painel', icon: 'LayoutDashboard', badge: 'NOVO' },
       { href: '/aluno/nova/desempenho', label: 'Meu Desempenho', short: 'Desempenho', icon: 'BarChart3', badge: 'NOVO' },
-      { href: '/aluno/nova/comunidade/ligas', label: 'Ligas', short: 'Ligas', icon: 'Trophy', badge: 'NOVO', gate: gamAtivo },
+      // Ligas (nova) — já é a PRINCIPAL na Revisão (sem selo "NOVO"); a antiga saiu do menu acima.
+      { href: '/aluno/nova/comunidade/ligas', label: 'Ligas', short: 'Ligas', icon: 'Trophy', gate: gamAtivo },
       // exact: só acende em /comunidade (senão /comunidade/ligas e /comunidade/perfil acendiam "Comunidade" junto).
       { href: '/aluno/nova/comunidade', label: 'Comunidade', short: 'Comun.', icon: 'Users', badge: 'NOVO', exact: true },
       { href: '/aluno/nova/cursos', label: 'Cursos', short: 'Cursos', icon: 'GraduationCap', badge: 'NOVO' },
@@ -193,7 +198,10 @@ export default async function AlunoPortalLayout({ children }: { children: React.
     .filter((n) => n.gate !== false && !hrefsOcultosAluno.includes(n.href) && !(brand !== 'revisao' && n.href.startsWith('/aluno/nova')))
     .map(({ exact, gate, ...n }) => {
       const c = counts[n.href]
-      const ativo = exact ? pathAtual === n.href : pathAtual.startsWith(n.href)
+      let ativo = exact ? pathAtual === n.href : pathAtual.startsWith(n.href)
+      // Revisão: "Banco de Questões" (item único) acende também em /aluno/recomendado — a aba
+      // "Recomendados" vive sob a mesma área unificada e não tem item próprio no menu.
+      if (brand === 'revisao' && n.href === '/aluno/questoes' && pathAtual.startsWith('/aluno/recomendado')) ativo = true
       return { ...n, badge: c && c > 0 ? String(c) : n.badge, ativo }
     })
 

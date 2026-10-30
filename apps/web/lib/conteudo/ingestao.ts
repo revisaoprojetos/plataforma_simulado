@@ -67,6 +67,16 @@ function escaparHtml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 }
 
+// Remove do HTML do LEITOR as imagens embutidas GRANDES (base64). O mammoth inlina toda imagem como
+// data URI; materiais escaneados trazem imagens de vários MB → HTML gigante que (a) estoura o parser de
+// trechos e (b) detonaria o egress se guardado em html_rico (plataforma sem CDN). Removemos só as GRANDES
+// (tag > ~250k chars ≈ 180KB de imagem); as pequenas (diagramas) ficam. O .docx ORIGINAL no storage
+// mantém TODAS as imagens (download intacto). `data:` não contém '>', então `[^>]*` cobre a URI inteira.
+const LIMITE_IMG_LEITOR = 250_000
+function removerImagensGrandes(html: string): string {
+  return html.replace(/<img\b[^>]*>/gi, (tag) => (tag.length > LIMITE_IMG_LEITOR ? '' : tag))
+}
+
 /** Converte os bytes do arquivo em HTML estruturável. Para MÍDIA/OFFICE não força o pipeline textual:
  *  pptx/xlsx tentam um índice de busca leve e, se vazio, caem no HTML-marcador; vídeo/áudio = marcador
  *  direto. O marcador é um comentário → 0 trechos, mas .trim() não-vazio (passa o gate do importador). */
@@ -94,7 +104,7 @@ export async function converterParaHtml(data: Buffer, tipo: TipoOrigem): Promise
           "p[style-name='Título'] => h1:fresh", "p[style-name='Titulo'] => h1:fresh",
         ],
       } as any)
-      return { html: r.value || '' }
+      return { html: removerImagensGrandes(r.value || '') }
     }
     if (tipo === 'pdf') {
       const texto = await extrairTextoPdf(data, 60)

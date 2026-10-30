@@ -96,7 +96,7 @@ export async function carregarConteudoBanco(svc: SupabaseClient, tenantId: strin
 
   // 4) classifica cada doc pelo tipo herdado da sua subpasta
   //    pdfull | pdfight | null -> aula (PDFull) · legproc -> lei seca · questoes -> reservado (ignora)
-  const aulaDocs: Array<{ titulo: string; versaoId: string | null; discNome: string }> = []
+  const aulaDocs: Array<{ id: string; titulo: string; versaoId: string | null; discNome: string }> = []
   const legprocDocs: Array<{ titulo: string }> = []
   for (const d of docs) {
     const discId = discDaPasta.get(d.pasta_id); if (!discId) continue
@@ -106,7 +106,7 @@ export async function carregarConteudoBanco(svc: SupabaseClient, tenantId: strin
     // AULAS = só PDFull (ou docs sem subpasta tipada, p/ compat). PDFight (questões), PDFlash (revisão)
     // e Questões são MATERIAIS ligados às metas que o engine JÁ gera (qu/fl) — não contam como aula nova.
     if (tipo === 'pdfight' || tipo === 'pdflash' || tipo === 'questoes') continue
-    aulaDocs.push({ titulo: d.titulo, versaoId: d.versao_atual_id, discNome: disc.nome }) // pdfull | null
+    aulaDocs.push({ id: d.id, titulo: d.titulo, versaoId: d.versao_atual_id, discNome: disc.nome }) // pdfull | null
   }
 
   // páginas da versão atual — só das aulas (legproc/questões não precisam de páginas)
@@ -123,16 +123,17 @@ export async function carregarConteudoBanco(svc: SupabaseClient, tenantId: strin
   const col = new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base' })
 
   // 5) monta AS agrupado por disciplina (ordem alfabética-natural do título)
-  const porDisc = new Map<string, Array<{ titulo: string; pags: number }>>()
+  const porDisc = new Map<string, Array<{ id: string; titulo: string; pags: number }>>()
   for (const d of aulaDocs) {
     const pags = (d.versaoId && pagPorVersao.get(d.versaoId)) || PAG_PADRAO
-    const arr = porDisc.get(d.discNome) || []; arr.push({ titulo: d.titulo, pags }); porDisc.set(d.discNome, arr)
+    const arr = porDisc.get(d.discNome) || []; arr.push({ id: d.id, titulo: d.titulo, pags }); porDisc.set(d.discNome, arr)
   }
   const ASout: AS = []
   for (const di of disciplinas) { // segue a ordem das disciplinas (ordem/nome)
     const aulas = porDisc.get(di.nome); if (!aulas || !aulas.length) continue
     aulas.sort((a, b) => col.compare(a.titulo, b.titulo))
-    aulas.forEach((a, i) => ASout.push([di.nome, String(i + 1), a.titulo, a.pags, '', '']))
+    // 7º campo = id do doc da Biblioteca → abre no leitor v2 (/aluno/biblioteca/<id>).
+    aulas.forEach((a, i) => ASout.push([di.nome, String(i + 1), a.titulo, a.pags, '', '', a.id]))
   }
   if (!ASout.length) return { ...fallbackConteudo(), disciplinas, vazio: true }
 

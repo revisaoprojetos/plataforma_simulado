@@ -12,7 +12,8 @@ import { resolverInterno } from '@/lib/aluno/interno-gate'
 import { PlatformRecomendado } from '@/components/brand/interna/recomendado'
 import type { RecoData } from '@/components/brand/interna/recomendado/data'
 
-export default async function RecomendadoPage() {
+export default async function RecomendadoPage({ searchParams }: { searchParams: Promise<{ reforco?: string }> }) {
+  const params = await searchParams
   const sessao = await getSessaoAluno()
   if (!sessao) redirect('/aluno/entrar')
   const svc = createAdminClient()
@@ -150,19 +151,87 @@ export default async function RecomendadoPage() {
 
   const semHistorico = (resp ?? []).length === 0
 
+  // Carrega o CADERNO DE REFORÇO de UMA disciplina específica (publicada, do tenant, não
+  // deletada/anulada/discursiva), priorizando as que o aluno ERROU e excluindo as dominadas.
+  // Tudo no servidor (backend-first): seleção + ordenação + corte já vêm resolvidos.
+  const carregarReforco = async (disciplinaId: string): Promise<QuestaoAluno[]> => {
+    const selCand = (cols: string) => svc
+      .from('simulado_questoes')
+      .select(cols)
+      .eq('tenant_id', sessao!.tenantId)
+      .eq('status', 'publicada')
+      .eq('deletado', false)
+      .eq('anulada', false)
+      .neq('tipo', 'discursiva')
+      .eq('disciplina_id', disciplinaId)
+      .limit(60)
+    let candR: { data: any[] | null; error: unknown } = await selCand('id, tipo, enunciado, imagem_url, disciplina_id, ano, comentario_professor')
+    if ((candR as any).error && /imagem_url|column/i.test(String((candR as any).error?.message))) {
+      candR = await selCand('id, tipo, enunciado, disciplina_id, ano, comentario_professor')
+    }
+    const naoDominadas = (candR.data ?? []).filter((q: any) => !dominadas.has(q.id))
+    naoDominadas.sort((a: any, b: any) => (erradas.has(b.id) ? 1 : 0) - (erradas.has(a.id) ? 1 : 0))
+    const escolhidas = naoDominadas.slice(0, 15)
+    const ids = escolhidas.map((q: any) => q.id)
+    if (!ids.length) return []
+    const [{ data: alts }, { data: favs }] = await Promise.all([
+      svc.from('simulado_alternativas').select('id, questao_id, texto, ordem, correta').in('questao_id', ids),
+      svc.from('simulado_favoritos').select('questao_id').eq('estudante_id', sessao!.estudanteId).in('questao_id', ids),
+    ])
+    const altMap = new Map<string, any[]>()
+    for (const a of alts ?? []) { const arr = altMap.get(a.questao_id) ?? []; arr.push(a); altMap.set(a.questao_id, arr) }
+    const favSet = new Set((favs ?? []).map((f: any) => f.questao_id))
+    const [etiquetasMap, provasMap] = await Promise.all([
+      etiquetasPorQuestao(svc, sessao!.tenantId, ids),
+      provasPorQuestao(svc, sessao!.tenantId, ids),
+    ])
+    return escolhidas.map((q: any) => ({
+      id: q.id,
+      tipo: q.tipo,
+      enunciado: q.enunciado ?? '',
+      imagem_url: q.imagem_url ?? null,
+      disciplina: discNomeMap.get(q.disciplina_id) ?? null,
+      ano: q.ano ?? null,
+      comentario_professor: q.comentario_professor ?? null,
+      favorito: favSet.has(q.id),
+      etiquetas: etiquetasMap.get(q.id) ?? [],
+      provas: provasMap.get(q.id) ?? [],
+      alternativas: (altMap.get(q.id) ?? []).map((a) => ({ id: a.id, texto: a.texto, ordem: a.ordem ?? 0, correta: !!a.correta })),
+    }))
+  }
+
   // ── NOVO VISUAL INTERNO (ligado ao real): Recomendado redesenhado + questões funcionais (slot). ──
   const _it = await resolverInterno()
   if (_it.ativo) {
     const prio = (pct: number): RecoData['diagnostico'][number]['prioridade'] => (pct < 30 ? 'alta' : pct < 60 ? 'media' : 'ok')
     const diag = diagnostico.map((d) => ({ id: d.id, nome: d.nome, ac: d.acertos, tot: d.total, pct: d.pct, prioridade: prio(d.pct) }))
     const pcts = diag.map((d) => d.pct)
+    const baseStats = {
+      materias: diag.length,
+      acertoMedio: pcts.length ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length) : 0,
+      paraReforcar: diag.filter((d) => d.pct <= 70).length,
+    }
+
+    // Revisão (área unificada Questões/Recomendados): o reforço é por MATÉRIA. Assunto ativo =
+    // ?reforco válido (presente no diagnóstico) ou, por padrão, a PIOR matéria (diag[0]) — assim o
+    // card já nasce "reconhecendo" a disciplina. Carrega o caderno específico dessa matéria.
+    if (_it.brand === 'revisao') {
+      const diagIds = new Set(diag.map((d) => d.id))
+      const reforcoParam = typeof params.reforco === 'string' && diagIds.has(params.reforco) ? params.reforco : undefined
+      const activeId = reforcoParam ?? (diag[0]?.id ?? null)
+      const questoesRev = activeId ? await carregarReforco(activeId) : []
+      const activeDiag = diag.find((d) => d.id === activeId) ?? null
+      const recoData: RecoData = {
+        stats: { ...baseStats, questoesHoje: questoesRev.length },
+        diagnostico: diag,
+        insight: activeDiag ? { id: activeDiag.id, materia: activeDiag.nome, pct: activeDiag.pct, ac: activeDiag.ac, tot: activeDiag.tot } : null,
+        heatmap,
+      }
+      return <PlatformRecomendado brand="revisao" theme={_it.theme} data={recoData} questoes={questoesRev} />
+    }
+
     const recoData: RecoData = {
-      stats: {
-        materias: diag.length,
-        acertoMedio: pcts.length ? Math.round(pcts.reduce((a, b) => a + b, 0) / pcts.length) : 0,
-        paraReforcar: diag.filter((d) => d.pct <= 70).length,
-        questoesHoje: recomendadas.length,
-      },
+      stats: { ...baseStats, questoesHoje: recomendadas.length },
       diagnostico: diag,
       insight: diag.length ? { materia: diag[0].nome, pct: diag[0].pct, ac: diag[0].ac, tot: diag[0].tot } : null,
       heatmap,

@@ -68,6 +68,7 @@ export const ICON_PATHS: Record<string, React.ReactNode> = {
   menu: <path d="M3 6h18M3 12h18M3 18h18" />,
   send: <path d="M22 2 11 13M22 2l-7 20-4-9-9-4z" />,
   pin: <><path d="M12 21s-7-5.5-7-11a7 7 0 0 1 14 0c0 5.5-7 11-7 11z" /><circle cx="12" cy="10" r="2.5" /></>,
+  tack: <><line x1="12" x2="12" y1="17" y2="22" /><path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" /></>,
   filter: <path d="M3 4h18l-7 8v6l-4 2v-8z" />,
 }
 

@@ -13,7 +13,7 @@ export interface RecoHeat { bancas: string[]; linhas: RecoHeatRow[]; totalRespon
 export interface RecoData {
   stats: { materias: number; acertoMedio: number; paraReforcar: number; questoesHoje: number }
   diagnostico: RecoDiag[]
-  insight: { materia: string; pct: number; ac: number; tot: number } | null
+  insight: { id?: string; materia: string; pct: number; ac: number; tot: number } | null
   /** MEQ: heatmap real matéria × banca. Sem isto, o MEQ cai num heatmap só com coluna Geral. */
   heatmap?: RecoHeat
 }

@@ -16,7 +16,9 @@ export type DataISO = string // 'YYYY-MM-DD' (local, sem fuso)
 /** Linha de catálogo de aula: [disciplina, aula, tema, páginas, nomeQuestões, nomeTEC] */
 export type Aula = [string, string, number, string, string] | [string, string, string, number, string, string]
 /** Conteúdo: AS = aulas; WLP = lei seca por semana (WLP[semana][j] = texto do bloco) */
-export type AS = Array<[string, string, string, number, string, string]>
+// 7º campo (opcional) = id do documento da Biblioteca que origina a aula → o aluno abre o
+// conteúdo no leitor v2 (/aluno/biblioteca/<id>). Seed não tem (fica undefined, sem link).
+export type AS = Array<[string, string, string, number, string, string, string?]>
 export type WLP = string[][]
 
 export interface Rotina { desde: DataISO; horas: number[] }

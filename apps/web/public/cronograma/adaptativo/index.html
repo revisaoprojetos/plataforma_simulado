@@ -7,6 +7,11 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,650;12..96,800&family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<!-- Anti-FOUC: esconde até o documento estar pronto (classe `embed` já setada + TODO o CSS lido,
+     inclusive as regras body.embed no fim do body). Evita o flash do header em modo standalone
+     (logo .marca aparecendo). A revelação é um <style> no fim do body; o setTimeout é só rede de segurança. -->
+<style>html{visibility:hidden}</style>
+<script>setTimeout(function(){try{document.documentElement.style.visibility='visible'}catch(e){}},2000)</script>
 <style>
 /* Layout: faixa de marca fixa no topo com as abas; cada aba é uma tela de trabalho
    (Hoje = agenda do dia + pendências; Semana = régua de semanas + grade de dias). */
@@ -265,8 +270,9 @@ main{padding-block:22px 64px}
 .meta-cfg input{margin-top:3px;accent-color:var(--brand)}
 .meta-cfg b{display:block;font-size:14px}
 .meta-cfg span{font-size:13px;color:var(--muted)}
-.resumo{padding:18px 20px;display:flex;flex-direction:column;gap:14px;position:sticky;top:calc(env(safe-area-inset-top,0px) + 120px)}
-@media (max-width:980px){.resumo{position:static}}
+/* NÃO sticky: quem fica fixo é o .lado (pai). Ter os dois sticky fazia o Resumo flutuar SOBRE o aviso
+   de carga (sobreposição ao rolar). O aviso agora segue logo abaixo do Resumo, dentro do .lado sticky. */
+.resumo{padding:18px 20px;display:flex;flex-direction:column;gap:14px}
 .resumo dl{margin:0;display:grid;grid-template-columns:1fr auto;gap:8px 12px;font-size:14px}
 .resumo dt{color:var(--muted)}
 .resumo dd{margin:0;font-weight:600;text-align:right;font-variant-numeric:tabular-nums}
@@ -556,7 +562,7 @@ main{padding-block:22px 64px}
 
 <main class="wrap gut">
   <nav class="emb-crumb" aria-label="Navegação">
-    <a href="/aluno/nova/painel" target="_parent"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>Painel de estudos</a>
+    <a href="/aluno/nova/painel" target="_parent"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg>Painel de estudos</a>
     <span class="sep">/</span>
     <b>Cronograma</b>
   </nav>
@@ -860,7 +866,7 @@ function descrever(id, AS, WLP) {
   const rev = t === 'rf' || t === 'rq';
   const i = rev ? +b : +a;
   const e = AS[i];
-  return { tipo: t, disc: e[0], aula: e[1], tema: e[2], pags: e[3], qc: e[4], tec: e[5], idx: i, semRev: rev ? +a : null, parte: t === 'pp' ? +b : null };
+  return { tipo: t, disc: e[0], aula: e[1], tema: e[2], pags: e[3], qc: e[4], tec: e[5], doc: e[6] || null, idx: i, semRev: rev ? +a : null, parte: t === 'pp' ? +b : null };
 }
 
 /** Saúde do plano: atraso das revisões e questões em relação ao ideal (7 e 14 dias). */
@@ -1124,7 +1130,7 @@ function salvar(...partes) {
 }
 const NUVEM = { db: null, base: null, ativa: false };
 function docDe(parte) {
-  if (parte === 'estado') return { cfg: S.cfg, plano: S.plano, fim: S.fim, reorgs: S.reorgs, revs: S.revs || {}, pausa: S.pausa || null, perfil: S.perfil || null, exemplo: !!S.exemplo, atualizado: S.atualizado.estado };
+  if (parte === 'estado') return { cfg: S.cfg, plano: S.plano, fim: S.fim, reorgs: S.reorgs, revs: S.revs || {}, pausa: S.pausa || null, perfil: S.perfil || null, exemplo: !!S.exemplo, titulo: S.titulo || null, atualizado: S.atualizado.estado };
   if (parte === 'progresso') return { prog: S.prog, log: S.log, extras: S.extras || [], atualizado: S.atualizado.progresso };
   return { notas: S.notas, atualizado: S.atualizado.notas };
 }
@@ -1233,9 +1239,19 @@ function textoParou(id) {
 /** Botão que entra no lugar do antigo cronômetro dos cartões. */
 function botaoIniciar(id) {
   if (feito(id)) return '';
+  const play = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9l7.5-4.5z" fill="currentColor"/></svg>`;
   const agora = FOCO && FOCO.id === id;
-  const rot = agora ? (RUN ? 'Em andamento' : 'Pausada') : S.prog[id]?.parou ? 'Continuar meta' : 'Iniciar meta';
-  return `<button type="button" class="btn sm iniciar ${agora ? 'ativa' : ''}" data-acao="iniciar" data-id="${id}"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9l7.5-4.5z" fill="currentColor"/></svg>${rot}${agora ? ` · <span class="timer num" data-timer="${id}">${hms(decorrido(id)).join(':')}</span>` : ''}</button>`;
+  if (agora) {
+    // Meta em andamento: botão principal REABRE o material no leitor v2 (mostra o tempo corrido);
+    // ao lado, Pausar/Continuar o cronômetro sem sair do material.
+    const abrir = `<button type="button" class="btn sm iniciar ativa" data-acao="iniciar" data-id="${id}" title="Abrir o material desta meta no leitor">${play}Abrir material · <span class="timer num" data-timer="${id}">${hms(decorrido(id)).join(':')}</span></button>`;
+    const pp = RUN
+      ? `<button type="button" class="btn sm" data-acao="meta-pausar" data-id="${id}">Pausar</button>`
+      : `<button type="button" class="btn sm" data-acao="meta-continuar" data-id="${id}">Continuar</button>`;
+    return abrir + pp;
+  }
+  const rot = S.prog[id]?.parou ? 'Continuar meta' : 'Iniciar meta';
+  return `<button type="button" class="btn sm iniciar" data-acao="iniciar" data-id="${id}">${play}${rot}</button>`;
 }
 function desenharFoco() {
   let el = $('#foco');
@@ -1344,6 +1360,50 @@ function linksQ(i) {
   if (i.tec) s += `<a class="link-q" href="https://www.tecconcursos.com.br/questoes/buscar?term=${encodeURIComponent(i.tec)}" target="_blank" rel="noopener">TEC ↗</a>`;
   return s ? `<div class="links">${s}</div>` : '';
 }
+/* Faixa de PÁGINAS que o aluno lê nesta meta. Aulas longas são divididas em partes (pp:i:k … pf:i);
+   cada parte cobre uma fatia do PDF, em sequência (parte 1 = pág. 1..X, parte 2 = X+1..Y …). As fatias
+   são proporcionais aos minutos de cada parte e normalizadas p/ cobrir o documento inteiro (1..total). */
+function partesDaAula(i) {
+  const pre = 'pp:' + i + ':', ks = [];
+  for (const id in S.plano) if (id.indexOf(pre) === 0) { const k = +id.slice(pre.length); if (k) ks.push(k); }
+  ks.sort((a, b) => a - b);
+  const seq = ks.map(k => pre + k);
+  if (S.plano['pf:' + i]) seq.push('pf:' + i);
+  return seq;
+}
+function faixaPaginas(id) {
+  const i = info(id); if (i.tipo !== 'pf' && i.tipo !== 'pp') return null;
+  const P = +i.pags || 0; if (!P) return null;
+  const seq = partesDaAula(i.idx);
+  if (seq.length <= 1) return { ini: 1, fim: P, total: P, parte: false }; // aula inteira num dia só
+  const mins = seq.map(x => Math.max(1, Math.round(((S.plano[x] && S.plano[x][1]) || 0) * 60)));
+  const tot = mins.reduce((a, b) => a + b, 0) || 1;
+  let acc = 0; const bound = [0];
+  for (let k = 0; k < seq.length; k++) { acc += mins[k]; bound.push(k === seq.length - 1 ? P : Math.min(P, Math.max(bound[k], Math.round(acc / tot * P)))); }
+  const pos = seq.indexOf(id); if (pos < 0) return { ini: 1, fim: P, total: P, parte: false };
+  const ini = Math.min(P, bound[pos] + 1), fim = Math.max(ini, bound[pos + 1]);
+  return { ini, fim, total: P, parte: true };
+}
+function faixaTexto(id) { const f = faixaPaginas(id); return f && f.parte ? `<div class="c-pags" style="font-size:12.5px;font-weight:600;opacity:.72;margin:2px 0 0">Leitura desta meta · <b>páginas ${f.ini}–${f.fim}</b> de ${f.total}</div>` : ''; }
+/* Tempo já estudado nesta meta (cronometrado dentro do leitor) — exibido no card. */
+function tempoTexto(id) {
+  const t = (S.prog[id] && S.prog[id].t) || 0; if (!t) return '';
+  const m = Math.floor(t / 60), s = t % 60;
+  const lbl = m >= 60 ? `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}` : (m > 0 ? `${m} min` : `${s}s`);
+  return `<div class="c-tempo" style="display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:700;color:var(--brand);margin:3px 0 0"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M12 2h0M9 2h6"/></svg>${lbl} nesta meta</div>`;
+}
+/* Todas as partes de uma aula (p/ o leitor desenhar as divisórias "começa a Parte N" e o botão
+   "Concluir" de cada parte). Só quando a aula foi dividida em mais de um dia. */
+function partesInfo(idx) {
+  const seq = partesDaAula(idx);
+  if (seq.length <= 1) return null;
+  return seq.map((pid, k) => {
+    const f = faixaPaginas(pid);
+    const d = (S.plano[pid] && S.plano[pid][0]) || '';
+    const rot = (pid.indexOf('pf:') === 0 ? 'Parte final' : 'Parte ' + (k + 1)) + (d ? ' · ' + fDM(d) : '');
+    return { id: pid, i: f ? f.ini : 1, f: f ? f.fim : 0, r: rot };
+  });
+}
 function linhaDisc(i) {
   if (i.tipo === 'lp') return `<div class="c-disc"><span class="mono">Lei seca · bloco da semana ${i.sem}</span></div>`;
   if (ehMetaRev(i.tipo)) return `<div class="c-disc"><i class="dot" style="background:${COR[i.disc] || '#888'}"></i>${esc(i.disc)} · Aula ${esc(i.aula)} · <span class="motivo">${motivoRev(i.idx)}</span></div>`;
@@ -1371,6 +1431,8 @@ function cartao(id, opts = {}) {
       <div class="c-topo"><span class="tag">${nomeMeta(id, i)}</span><span class="c-h">${fH(horasDe(id))}</span>${estado}</div>
       <div class="c-tit">${esc(titulo(i))}</div>
       ${linhaDisc(i)}
+      ${faixaTexto(id)}
+      ${tempoTexto(id)}
       ${linksQ(i)}
       ${seletorModo(id, i)}
       ${ehPdf(i.tipo) && S.cfg?.metas?.vd ? `<div class="c-video">▶ Videoaula desta aula <span class="opc">(opcional)</span></div>` : ''}
@@ -1568,11 +1630,11 @@ let R = null; // rascunho das escolhas
 let PREV = null, prevT = null;
 const fDMA = iso => fData(iso, { day: '2-digit', month: '2-digit', year: 'numeric' });
 function iniciarRascunho() {
-  if (S.exemplo) { const c = cfgVazia(); R = { ...c, rotinas: [], recessos: [], h: [...c.horas], desde: null, vel: S.perfil?.vel || VEL_PADRAO, velFonte: S.perfil?.fonte || 'media', velSeg: S.perfil?.seg || null }; return; }
+  if (S.exemplo) { const c = cfgVazia(); R = { ...c, rotinas: [], recessos: [], h: [...c.horas], desde: null, vel: S.perfil?.vel || VEL_PADRAO, velFonte: S.perfil?.fonte || 'media', velSeg: S.perfil?.seg || null, titulo: S.titulo || '' }; return; }
   const c = JSON.parse(JSON.stringify(S.cfg));
   c.arranjo ||= 'pdf'; c.revModelo ||= 'pdflash'; c.revisao = revNorm(c.revisao);
   const desde = hojeISO() > c.start ? hojeISO() : c.start;
-  R = { ...c, rotinas: c.rotinas || [], recessos: c.recessos || [], h: [...horasEm(c, desde)], desde, vel: c.vel || S.perfil?.vel || VEL_PADRAO, velFonte: c.velFonte || S.perfil?.fonte || 'media', velSeg: c.velSeg ?? S.perfil?.seg ?? null };
+  R = { ...c, rotinas: c.rotinas || [], recessos: c.recessos || [], h: [...horasEm(c, desde)], desde, vel: c.vel || S.perfil?.vel || VEL_PADRAO, velFonte: c.velFonte || S.perfil?.fonte || 'media', velSeg: c.velSeg ?? S.perfil?.seg ?? null, titulo: S.titulo || '' };
 }
 /** Converte o rascunho na configuração que o motor usa. */
 function montarCfg() {
@@ -1616,7 +1678,9 @@ function renderConfig() {
   const dRec = r => Math.round((dParse(r.fim) - dParse(r.ini)) / 864e5) + 1;
   $('#tela-configurar').innerHTML = `<div class="cfg">
     <div class="painel">
-      <div class="secao"><h3><span class="n ok">1</span>Início</h3><p class="aj">Dia em que o cronograma começa. As semanas do cronograma são contadas a partir dele.</p>
+      <div class="secao"><h3><span class="n ok">1</span>Início</h3>
+        <label class="campo">Nome do cronograma<input type="text" id="cfg-titulo" maxlength="80" placeholder="Ex.: PGE-SP 2026 · Reta final" value="${esc(R.titulo || '')}"></label>
+        <p class="aj">Dê um nome para reconhecer este cronograma no seu painel. Logo abaixo, escolha o dia em que ele começa — as semanas são contadas a partir dele.</p>
         <label class="campo" style="flex-direction:row;align-items:center;gap:10px;cursor:pointer"><input type="checkbox" id="cfg-sem-data" ${R.semData ? 'checked' : ''} style="width:18px;height:18px;flex:none;cursor:pointer">Gerar sem data de início específica</label>
         ${R.semData ? `<p class="aj" style="margin:8px 0 0">Sem data certa: as telas mostram <b>Semana 1, Semana 2…</b> e <b>Dia 1 da Semana…</b> em vez de datas. O cronograma começa hoje por trás das contas.</p>` : `<label class="campo">Data de início<input type="date" id="cfg-inicio" value="${R.start}"></label>`}</div>
       <div class="secao" id="horas"><h3><span class="n ${nDias ? 'ok' : ''}">2</span>Dias e horas de estudo</h3>
@@ -1701,6 +1765,7 @@ function gerarDaConfig() {
   const g = gerarPlano(c, AS, WLP, fixosAtuais(), ancoraConfig());
   const primeiro = !!S.exemplo;
   S.cfg = c; S.plano = g.plano; S.fim = g.fim; S.exemplo = false;
+  S.titulo = ((R && R.titulo) || S.titulo || '').trim(); // nome dado na criação → representa o plano no painel
   if (S.perfil) S.perfil = { ...S.perfil, vel: c.vel, fonte: c.velFonte, seg: c.velSeg };
   for (const k of Object.keys(S.revs || {})) if (semInicio(c.start, +k) > hojeISO()) delete S.revs[k];
   for (const id in S.prog) if (S.prog[id].s === 'missed') delete S.prog[id].s;
@@ -2003,10 +2068,6 @@ function irPara(t, semHash) {
   if (S.exemplo && !S.perfil) { t = 'inicio'; semHash = true; }
   else if (S.exemplo && t !== 'configurar') { t = 'configurar'; semHash = false; }
   TELA = t;
-  $('.abas').hidden = !!S.exemplo;
-  $('#btn-docx').hidden = !!S.exemplo;
-  $('.band-acoes').hidden = !!S.exemplo && !TESTE;
-  document.body.classList.toggle('modo-inicio', !!S.exemplo);
   TELAS.forEach(x => { $('#tela-' + x).hidden = x !== t; $('#aba-' + x).setAttribute('aria-selected', x === t); });
   $('#tela-inicio').hidden = t !== 'inicio';
   if (!semHash && !TESTE) try { history.replaceState(null, '', '#' + t); } catch (e) {}
@@ -2014,9 +2075,16 @@ function irPara(t, semHash) {
   window.scrollTo({ top: 0 });
 }
 function render(t) {
+  // Faixa Hoje/Semana oculta enquanto CRIANDO: primeiro acesso (exemplo) OU cronograma novo em branco
+  // (sem plano gerado) na tela Configurar. Fica em render() p/ reavaliar quando os dados chegam (boot).
+  const criando = !!S.exemplo || (t === 'configurar' && !Object.keys(S.plano || {}).length);
+  $('.abas').hidden = criando;
+  $('#btn-docx').hidden = criando;
+  $('.band-acoes').hidden = criando && !TESTE;
+  document.body.classList.toggle('modo-inicio', criando);
   ({ inicio: renderInicio, hoje: renderHoje, semana: renderSemana, desempenho: renderDesempenho, configurar: renderConfig })[t]();
   renderBanner();
-  const bp = $('#btn-pausa'); bp.hidden = !!S.exemplo; bp.textContent = S.pausa ? 'Retomar cronograma' : 'Pausar cronograma'; bp.dataset.acao = S.pausa ? 'retomar' : 'pausar'; bp.classList.toggle('pausado', !!S.pausa);
+  const bp = $('#btn-pausa'); bp.hidden = criando; bp.textContent = S.pausa ? 'Retomar cronograma' : 'Pausar cronograma'; bp.dataset.acao = S.pausa ? 'retomar' : 'pausar'; bp.classList.toggle('pausado', !!S.pausa);
 }
 function renderTudo() { render(TELA); }
 function renderBanner() {
@@ -2090,6 +2158,7 @@ document.addEventListener('click', e => {
 });
 document.addEventListener('input', e => {
   const t = e.target;
+  if (t.id === 'cfg-titulo') { if (R) R.titulo = t.value; return; } // nome do cronograma: não recalcula o plano
   if (t.dataset.nota) salvarNota(t.dataset.nota, t.value);
   else if (t.id === 'duv-texto') { const m = $('#duv-mail'); if (m) m.href = `mailto:${CENTRAL}?subject=${encodeURIComponent($('#duv-assunto').value)}&body=${encodeURIComponent(t.value)}`; }
 });
@@ -2244,13 +2313,36 @@ body.embed .flut{display:none}
  const EMB = window.top !== window; if (!EMB) return;
  let VOLTOU = null;
  const avisar = () => { try { parent.postMessage({ type: 'rej-crono-sessao', s: estado() }, '*'); } catch (e) {} };
- function item(id){ const i = info(id); return { id, tipo: i.tipo, nome: nomeMeta(id, i), tit: titulo(i), disc: i.disc || '', aula: i.aula || '', pags: i.pags || null, h: horasDe(id) }; }
+ function item(id){ const i = info(id); return { id, tipo: i.tipo, nome: nomeMeta(id, i), tit: titulo(i), disc: i.disc || '', aula: i.aula || '', pags: i.pags || null, h: horasDe(id), doc: i.doc || null, lp: i.tipo === 'lp' ? (i.texto || '') : null }; }
  function estado(){ if (!FOCO) return null; return Object.assign(item(FOCO.id), { run: !!RUN, seg: Math.floor(decorrido(FOCO.id)), plan: Math.round(horasDe(FOCO.id) * 3600) }); }
- function abrirMaterial(id){ try { parent.postMessage({ type: 'rej-crono-abrir', item: item(id) }, '*'); } catch (e) {} }
+ // URL do material da meta no leitor v2 (Biblioteca do aluno). Aula PDFull → documento da Biblioteca,
+ // já na PÁGINA inicial daquela meta/parte (?pagina=N) — parte 2 abre direto onde a parte 1 terminou.
+ function urlMaterial(id){
+   const i = info(id); if (!i || !i.doc) return null;
+   const f = faixaPaginas(id), qs = [];
+   qs.push('voltar=' + encodeURIComponent('/aluno/cronograma')); // "Voltar" no leitor retorna ao cronograma, não à Biblioteca
+   qs.push('meta=' + encodeURIComponent(id)); // meta aberta → cronômetro no leitor + concluir de volta
+   const tseg = (S.prog[id] && S.prog[id].t) || 0; if (tseg > 0) qs.push('tseg=' + tseg); // tempo já acumulado nesta meta
+   if (f && f.ini > 1) qs.push('pagina=' + f.ini);
+   if (i.tipo === 'pf' || i.tipo === 'pp') {
+     const pis = partesInfo(i.idx);
+     // partes (divisórias + "Concluir" de cada parte no leitor). JSON base64 UTF-8.
+     if (pis && pis.length) { try { qs.push('partes=' + encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(pis)))))); } catch (e) {} }
+   }
+   return '/aluno/biblioteca/' + i.doc + (qs.length ? '?' + qs.join('&') : '');
+ }
+ // Abre na MESMA aba: pede ao portal (React) para navegar via router → mostra a barra de carregamento
+ // e abre o conteúdo no leitor v2. Sem window.open (evita abrir 2x / nova aba).
+ function abrirMaterial(id){ const url = urlMaterial(id); const f = faixaPaginas(id); try { parent.postMessage({ type: 'rej-crono-abrir', item: item(id), url: url, pagina: f ? f.ini : null }, '*'); } catch (e) {} }
  const _iniciar = iniciarMeta;
  iniciarMeta = function(id){ VOLTOU = null; _iniciar(id); FOCO.min = true; desenharFoco(); renderTudo(); avisar(); };
  /* clique em "Iniciar meta" / "Em andamento" dentro do app: inicia (ou retoma) e abre o material */
  document.addEventListener('click', e => {
+  // Pausar / Continuar o cronômetro da meta direto no cartão (sem abrir o painel de foco).
+  const pb = e.target.closest('[data-acao="meta-pausar"]');
+  if (pb) { e.preventDefault(); e.stopImmediatePropagation(); if (FOCO && FOCO.id === pb.dataset.id && RUN) { parar(); desenharFoco(); renderTudo(); avisar(); } return; }
+  const cb = e.target.closest('[data-acao="meta-continuar"]');
+  if (cb) { e.preventDefault(); e.stopImmediatePropagation(); const cid = cb.dataset.id; if (FOCO && FOCO.id === cid && !RUN) { rodar(cid); desenharFoco(); renderTudo(); avisar(); } return; }
   const b = e.target.closest('[data-acao="iniciar"]'); if (!b) return;
   e.preventDefault(); e.stopImmediatePropagation();
   const id = b.dataset.id;
@@ -2380,6 +2472,7 @@ body.embed .flut{display:none}
         var c = j;
         S.cfg = c.estado.cfg; S.plano = c.estado.plano || {}; S.fim = c.estado.fim || 1;
         S.revs = c.estado.revs || {}; S.pausa = c.estado.pausa || null; S.exemplo = !!c.estado.exemplo;
+        S.titulo = c.estado.titulo || '';
         S.prog = (c.progresso && c.progresso.prog) || {};
         S.notas = (c.notas && c.notas.notas) || {};
         S.extras = (c.progresso && c.progresso.extras) || c.estado.extras || [];
@@ -2400,4 +2493,7 @@ body.embed .flut{display:none}
   })();
 })();
 </script>
+<!-- Revela a página só agora: aqui o parser já passou pela classe `embed` e por todo o CSS (header
+     já no visual final de embed), então o primeiro frame visível sai correto, sem flash. -->
+<style>html{visibility:visible}</style>
 </body></html>

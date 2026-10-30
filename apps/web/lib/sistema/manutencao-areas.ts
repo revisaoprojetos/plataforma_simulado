@@ -56,6 +56,9 @@ export const AREAS_MANUTENCAO_ALUNO: AreaManutencao[] = [
   { key: 'trilha', label: 'Trilha', descricao: 'Trilha de simulados/gamificação do aluno (/aluno/trilha).', href: '/aluno/trilha' },
   { key: 'ligas', label: 'Ligas', descricao: 'Ranking por ligas (/aluno/ligas).', href: '/aluno/ligas' },
   { key: 'recomendado', label: 'Recomendado', descricao: 'Questões recomendadas pelo desempenho do aluno (/aluno/recomendado).', href: '/aluno/recomendado' },
+  // Meus Cadernos (área nova da Revisão). Em construção — nasce BLOQUEADA até o conteúdo ser configurado;
+  // some do menu e a rota mostra "em manutenção". Libere (toggle off no admin) quando estiver pronta.
+  { key: 'cadernos', label: 'Meus Cadernos', descricao: 'Cadernos de estudo do aluno (/aluno/nova/cadernos). Ainda sem conteúdo configurado — bloqueada por padrão.', href: '/aluno/nova/cadernos', padraoBloqueado: true },
   // Biblioteca do aluno (ler conteúdos liberados + grifar). Nasce BLOQUEADA — libere por allowlist.
   { key: 'biblioteca', label: 'Biblioteca', descricao: 'Leitura dos materiais liberados, com grifos salvos (/aluno/biblioteca).', href: '/aluno/biblioteca', padraoBloqueado: true },
 ]

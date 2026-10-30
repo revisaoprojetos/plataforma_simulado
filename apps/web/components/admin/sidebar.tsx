@@ -235,6 +235,7 @@ const navGroups: NavGroup[] = [
       // Aparência (identidade/cores/tema) MIGRADA para o Console (super-admin) → Plataformas → Aparência.
       { label: 'Sistema', href: '/admin/sistema', icon: ServerCog, perm: 'configuracoes:view' },
       { label: 'Mensagens', href: '/admin/configuracoes/mensagens', icon: MessageSquare, perm: 'configuracoes:view' },
+      { label: 'Ajuda / FAQ', href: '/admin/configuracoes/ajuda', icon: HelpCircle, perm: 'configuracoes:view' },
       { label: 'Banners & Pop-ups', href: '/admin/configuracoes/banners', icon: Megaphone, perm: 'configuracoes:view' },
       { label: 'Novidades', href: '/admin/configuracoes/novidades', icon: Newspaper, perm: 'configuracoes:view' },
       { label: 'LGPD', href: '/admin/lgpd', icon: ShieldCheck, perm: 'estudantes:view' },

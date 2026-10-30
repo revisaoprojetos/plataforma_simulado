@@ -5,6 +5,7 @@
 // reforço (chips + bloco de questão qcore). Acentos fixos Revisão: amarelo #F1C232 / texto #2A1A55; CTA
 // gradiente roxo. Dark-reativo via useTemaInterno. Prefixo CSS rcmrv-. Full-bleed (min-height:100%).
 
+import Link from 'next/link'
 import { internaTokensStyle, type Brand, type InternaTheme } from '../interna-tokens'
 import { useTemaInterno } from '../use-tema-interno'
 import { useIsMobile } from '../perfil/use-is-mobile'
@@ -12,6 +13,7 @@ import { Ic, SHARED_CSS, OK, extraVars } from './shared'
 import type { RecoData, RecoDiag } from './data'
 import type { QuestaoAluno } from '@/components/aluno/questao-resolvivel'
 import { CadernoReforco } from './caderno-reforco'
+import { QuestoesTabs } from '../questoes-tabs'
 import * as M from './mock'
 
 const AMBAR = '#F1C232'
@@ -22,10 +24,10 @@ function statIcon(i: number) {
   return ['chart', 'target', 'flag', 'clip'][i]
 }
 
-function DiagLinha({ d }: { d: RecoDiag }) {
+function DiagLinha({ d, ativa }: { d: RecoDiag; ativa: boolean }) {
   const [cor, bg] = M.PRIO_COR[d.prioridade]
   return (
-    <div className="rcm-rowh" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 46px 58px', alignItems: 'center', gap: 10, padding: '9px 10px', margin: '0 -10px' }}>
+    <Link href={`/aluno/recomendado?reforco=${encodeURIComponent(d.id)}`} className="rcm-rowh" aria-current={ativa ? 'true' : undefined} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 46px 58px', alignItems: 'center', gap: 10, padding: '9px 10px', margin: '0 -10px', textDecoration: 'none', color: 'inherit', background: ativa ? 'var(--chip)' : undefined, cursor: 'pointer' }}>
       <div style={{ minWidth: 0 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
           <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{d.nome}</span>
@@ -37,11 +39,11 @@ function DiagLinha({ d }: { d: RecoDiag }) {
       </div>
       <b style={{ textAlign: 'right', fontSize: 13.5, color: cor }}>{d.pct}%</b>
       <span style={{ justifySelf: 'end', height: 22, padding: '0 8px', borderRadius: 99, background: bg, color: cor, fontSize: 10.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center' }}>{M.PRIO_LABEL[d.prioridade]}</span>
-    </div>
+    </Link>
   )
 }
 
-function Diagnostico({ data }: { data: RecoData }) {
+function Diagnostico({ data, activeId }: { data: RecoData; activeId: string | null }) {
   return (
     <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 20, padding: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
@@ -51,7 +53,7 @@ function Diagnostico({ data }: { data: RecoData }) {
           <span style={{ display: 'block', fontSize: 12, fontWeight: 500, color: 'var(--muted)', marginTop: 2 }}>{data.stats.materias} matérias · média {data.stats.acertoMedio}%</span>
         </div>
       </div>
-      {data.diagnostico.map((d) => <DiagLinha key={d.id} d={d} />)}
+      {data.diagnostico.map((d) => <DiagLinha key={d.id} d={d} ativa={d.id === activeId} />)}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line)', fontSize: 11.5, color: 'var(--muted)' }}>
         {([['#E5484D', '< 30% prioridade alta'], ['#D99A1E', '30–59% média'], [OK, '60%+ ok']] as [string, string][]).map(([c, t]) => (
           <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: c }} />{t}</span>
@@ -88,6 +90,9 @@ export function RecomendadoRevisao({ theme: themeProp, data, questoes }: { theme
   const pad = mobile ? 14 : 24
   const s = data.stats
   const ins = data.insight
+  // Assunto ativo (reconhecido pelo card): id do insight (resolvido no servidor = ?reforco válido ou a
+  // pior matéria) com fallback p/ a 1ª linha do diagnóstico. Destaca a linha e alimenta o CTA "Reforçar".
+  const activeId = ins?.id ?? data.diagnostico[0]?.id ?? null
   const stats: [string, string][] = [
     [String(s.materias), 'matérias analisadas'],
     [`${s.acertoMedio}%`, 'acerto médio'],
@@ -104,6 +109,8 @@ export function RecomendadoRevisao({ theme: themeProp, data, questoes }: { theme
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: 'var(--accentInk)' }}>PARA VOCÊ</span>
         <h1 style={{ margin: '6px 0 0', fontSize: mobile ? 26 : 32, fontWeight: 800, letterSpacing: '-0.045em', color: 'var(--ink)' }}>Recomendado para você</h1>
         <p style={{ margin: '6px 0 0', fontSize: 14, color: 'var(--muted)' }}>Questões escolhidas a partir das suas estatísticas — reforce onde você mais erra.</p>
+        {/* Abas da área unificada Questões/Recomendados (Revisão). */}
+        <QuestoesTabs ativo="recomendado" />
       </div>
 
       {/* 4 stats (de data.stats) */}
@@ -127,7 +134,9 @@ export function RecomendadoRevisao({ theme: themeProp, data, questoes }: { theme
             <b style={{ display: 'block', fontSize: 15, color: 'var(--ink)' }}>Sua maior oportunidade agora é {ins.materia}</b>
             <span style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--muted)' }}>{ins.tot} questões feitas e {ins.pct}% de acerto ({ins.ac} certas). Com {s.questoesHoje} questões de reforço por dia, você sobe mais rápido a sua média geral.</span>
           </div>
-          <button type="button" className="rcm-cta" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 42, padding: '0 16px', border: 0, borderRadius: 12, background: AMBAR, color: AMBAR_INK, font: 'inherit', fontSize: 13.5, fontWeight: 800, whiteSpace: 'nowrap', cursor: 'pointer' }}><Ic n="play" s={14} />Reforçar {ins.materia}</button>
+          {activeId ? (
+            <Link href={`/aluno/recomendado?reforco=${encodeURIComponent(activeId)}`} className="rcm-cta" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 42, padding: '0 16px', border: 0, borderRadius: 12, background: AMBAR, color: AMBAR_INK, font: 'inherit', fontSize: 13.5, fontWeight: 800, whiteSpace: 'nowrap', cursor: 'pointer', textDecoration: 'none' }}><Ic n="play" s={14} />Reforçar {ins.materia}</Link>
+          ) : null}
         </div>
       )}
 
@@ -136,11 +145,11 @@ export function RecomendadoRevisao({ theme: themeProp, data, questoes }: { theme
         {compact ? (
           <>
             <Caderno brand="revisao" total={s.questoesHoje} questoes={questoes} />
-            <Diagnostico data={data} />
+            <Diagnostico data={data} activeId={activeId} />
           </>
         ) : (
           <>
-            <Diagnostico data={data} />
+            <Diagnostico data={data} activeId={activeId} />
             <Caderno brand="revisao" total={s.questoesHoje} questoes={questoes} />
           </>
         )}

@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { createAdminClient } from '@/lib/supabase/server'
 import { gerarAdaptativo, patchMetaAdaptativo, somarTempoMeta, pausarAdaptativo, carregarDocs, sincronizarDoc, listarPlanosAdaptativo, fixarPlanoAdaptativo, arquivarPlanoAdaptativo, renomearPlanoAdaptativo } from '@/lib/cronograma/adaptativo/dados'
@@ -46,7 +46,9 @@ export async function POST(req: NextRequest) {
       const titulo = typeof body.titulo === 'string' ? body.titulo.trim().slice(0, 80) : undefined
       const novo = body.novo === true
       const r = await gerarAdaptativo(svc, tenantId, estudanteId, cfg, { titulo, ancora, novo })
-      if (r.ok) { try { await atualizarPainelSnapshot(svc, tenantId, estudanteId) } catch { /* best-effort */ } }
+      // Snapshot do Painel é PESADO → roda DEPOIS da resposta (after). O "+ Novo cronograma" responde na
+      // hora (sem espera longa até a tela de configuração); o painel atualiza no próximo load.
+      if (r.ok) after(async () => { try { await atualizarPainelSnapshot(svc, tenantId, estudanteId) } catch { /* best-effort */ } })
       return r.ok ? NextResponse.json({ ok: true, planoId: r.planoId }) : NextResponse.json({ ok: false, message: r.error }, { status: 500 })
     }
     if (acao === 'listar') {
@@ -89,9 +91,10 @@ export async function POST(req: NextRequest) {
       if ('nota' in p) patch.nota = p.nota ? String(p.nota).slice(0, 4000) : null
       const r = await patchMetaAdaptativo(svc, tenantId, estudanteId, metaId, patch)
       // WRITE-BEHIND do Painel: concluir/alterar uma meta muda feitasHoje/pctSemana/pendencias do
-      // "Meu painel de estudos" (que agora lê o Adaptativo FIXADO). Recomputa o snapshot na hora para
-      // que o router.refresh() do cliente já leia os números atualizados. Best-effort (não bloqueia a resposta).
-      if (r.ok) { try { await atualizarPainelSnapshot(svc, tenantId, estudanteId) } catch { /* best-effort */ } }
+      // "Meu painel de estudos" (que lê o Adaptativo FIXADO). O recálculo do snapshot é PESADO, então
+      // roda DEPOIS da resposta (after) — o cliente recebe o OK na hora (concluir ágil) e o painel já
+      // sai atualizado no próximo load. O upsert da meta (a verdade) é o único passo síncrono.
+      if (r.ok) after(async () => { try { await atualizarPainelSnapshot(svc, tenantId, estudanteId) } catch { /* best-effort */ } })
       return r.ok ? NextResponse.json({ ok: true }) : NextResponse.json({ ok: false, message: r.error }, { status: r.error === 'sem_plano' ? 400 : 500 })
     }
     if (acao === 'tempo') {
@@ -110,6 +113,9 @@ export async function POST(req: NextRequest) {
       const parte = String(body.parte || '')
       const doc = (body.doc || {}) as Record<string, unknown>
       const r = await sincronizarDoc(svc, tenantId, estudanteId, parte, doc)
+      // O iframe cria/edita o plano via sync (não via 'gerar'). Write-behind do Painel DEPOIS da resposta
+      // (after): o auto-save do iframe não espera o recálculo pesado; o painel sai atualizado no próximo load.
+      if (r.ok) after(async () => { try { await atualizarPainelSnapshot(svc, tenantId, estudanteId) } catch { /* best-effort */ } })
       return r.ok ? NextResponse.json({ ok: true }) : NextResponse.json({ ok: false, message: r.error }, { status: r.error === 'sem_plano' || r.error === 'cfg_invalido' ? 400 : 500 })
     }
     return NextResponse.json({ ok: false, message: 'Ação desconhecida.' }, { status: 400 })

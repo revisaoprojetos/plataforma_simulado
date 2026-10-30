@@ -4,7 +4,6 @@ import { useState } from 'react'
 import Link from 'next/link'
 import {
   ClipboardList,
-  Lightbulb,
   BookOpen,
   Trophy,
   ChevronRight,
@@ -41,7 +40,8 @@ const GRUPOS: GrupoDef[] = [
     Icon: ClipboardList,
     itens: [
       { href: '/aluno/simulados', Icon: ClipboardList, titulo: 'Simulados', sub: 'Histórico, notas e relatórios', short: 'Simulados' },
-      { href: '/aluno/recomendado', Icon: Lightbulb, titulo: 'Recomendados para você', sub: 'Escolhidos pelo seu desempenho', short: 'Para você' },
+      // "Recomendados" virou aba DENTRO do Banco de questões (/aluno/questoes ↔ /aluno/recomendado):
+      // um único item aqui, que já acende nas duas rotas pelo match por prefixo + '/'.
       { href: '/aluno/questoes', Icon: BookOpen, titulo: 'Banco de questões', sub: 'Treine por matéria, banca e ano', short: 'Questões' },
     ],
   },
@@ -70,7 +70,12 @@ export function DownBar({ theme, nav, usuario, pathname, onAccount }: DownBarPro
   // Qual grupo contém a rota atual + o item ativo (para a pílula).
   function grupoAtivo(): { g: Grupo; item: GItem } | null {
     for (const grp of GRUPOS) {
-      const match = grp.itens.find((it) => pathname === it.href || pathname.startsWith(it.href + '/'))
+      const match = grp.itens.find((it) =>
+        pathname === it.href ||
+        pathname.startsWith(it.href + '/') ||
+        // "Banco de questões" engloba a aba "Recomendados" (área unificada).
+        (it.href === '/aluno/questoes' && (pathname === '/aluno/recomendado' || pathname.startsWith('/aluno/recomendado/'))),
+      )
       if (match) return { g: grp.key, item: match }
     }
     return null
