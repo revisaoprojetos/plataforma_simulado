@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
-import { Loader2, ImagePlus, RefreshCw, Trash2, Check, Crop } from 'lucide-react'
+import { Loader2, ImagePlus, RefreshCw, Trash2, Check, Crop, Play } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { BANCO_CORES } from '@/lib/banco-visual'
 import { hospedarImagemCapa } from '../acoes'
@@ -146,18 +146,24 @@ export default function PersonalizarPage() {
         </div>
       </div>
 
-      {/* Prévia do card (pôster) — WYSIWYG via CapaCard */}
+      {/* Prévia do card no formato TICKET — WYSIWYG com o card do aluno (card-simulado.tsx, variant='ticket'):
+          card baixo/horizontal, imagem 4:3 à esquerda (enquadramento do ticket) e infos à direita. */}
       <div className="space-y-2">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Prévia do card</p>
-        <div className="group/card relative aspect-[4/5] w-full overflow-hidden rounded-2xl border shadow-sm">
-          <CapaCard capa={capaCard.orig ?? draft.capaUrl} cor={cor} icone={draft.icone} orig={capaCard.orig} cfg={capaCard.poster} />
-          <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
-          <div className="absolute inset-x-0 bottom-0 p-4">
-            <p className="text-[11px] font-medium uppercase tracking-wide text-white/70">Simulado</p>
-            <h3 className="mt-0.5 line-clamp-2 text-lg font-bold leading-tight text-white drop-shadow-sm">{draft.simuladoNome || 'Nome do simulado'}</h3>
-            {draft.bancoNome && <span className="mt-2 inline-flex items-center rounded-full bg-white/15 px-2.5 py-0.5 text-xs font-medium text-white backdrop-blur">{draft.bancoNome}</span>}
+        <div className="group/card relative flex h-32 overflow-hidden rounded-2xl border bg-card shadow-sm ring-1 ring-black/5">
+          <div className="relative h-full aspect-[4/3] shrink-0 overflow-hidden">
+            <CapaCard capa={capaCard.orig ?? draft.capaUrl} cor={cor} icone={draft.icone} orig={capaCard.orig} cfg={capaCard.ticket} />
+          </div>
+          <div className="flex min-w-0 flex-1 flex-col justify-center gap-0.5 p-2.5">
+            <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">Simulado</p>
+            <h3 className="line-clamp-1 text-[15px] font-bold leading-tight text-foreground">{draft.simuladoNome || 'Nome do simulado'}</h3>
+            {draft.bancoNome && <span className="mt-1 inline-flex w-fit items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">{draft.bancoNome}</span>}
+            <span className="mt-1.5 inline-flex h-7 w-full items-center justify-center gap-1.5 rounded-lg px-2.5 text-[13px] font-semibold text-white shadow-sm" style={{ background: `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 72%, #000))` }}>
+              <Play className="h-4 w-4" /> Fazer agora
+            </span>
           </div>
         </div>
+        <p className="text-[11px] text-muted-foreground">Proporção ticket 4:3 — como aparece nas listas de simulados do aluno.</p>
       </div>
     </div>
     {cropper && <ImageCropper file={cropper.file} src={cropper.src} aspect={cropper.aspect} titulo={cropper.titulo} onCancel={() => setCropper(null)} onConfirm={aplicarCropBanner} />}

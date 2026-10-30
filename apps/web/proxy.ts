@@ -97,10 +97,28 @@ export async function proxy(request: NextRequest) {
   // token acabou de ser RENOVADO (`renovou`, o cookie de domínio já foi gravado fresco). Fora esses
   // casos (sessão válida que não renovou) NÃO mexe — não dá p/ saber qual cookie o getUser leu, então
   // preserva. O cookie de DOMÍNIO nunca é apagado (chave = nome+domínio+path). Só em prod (cookieDom).
+  // DETECÇÃO do par ambíguo: o navegador manda os cookies duplicados no MESMO header `Cookie`
+  // (`sb-x=A; sb-x=B`). O Next colapsa em request.cookies.getAll() (só vê 1 valor), então contamos
+  // no header CRU. Se um cookie de auth aparece >1x, é a corrupção host-only×domínio → só então
+  // apagamos TAMBÉM a variante de domínio (evita deslogar quem teve um getUser transitório null).
+  const authCookieRe = /^sb-.+-auth-token(\.\d+)?$/
+  const cabCookie = request.headers.get('cookie') || ''
+  const ocorrencias = new Map<string, number>()
+  for (const par of cabCookie.split(';')) {
+    const nome = par.split('=')[0].trim()
+    if (nome && authCookieRe.test(nome)) ocorrencias.set(nome, (ocorrencias.get(nome) ?? 0) + 1)
+  }
   const finalizar = (res: NextResponse) => {
     if (!cookieDom || (user && !renovou)) return res
     for (const c of request.cookies.getAll()) {
-      if (/^sb-.+-auth-token(\.\d+)?$/.test(c.name)) res.headers.append('set-cookie', `${c.name}=; Path=/; Max-Age=0; Secure; SameSite=Lax`)
+      if (!authCookieRe.test(c.name)) continue
+      // Variante host-only (sem Domain) — o órfão que o proxy antigo gravava.
+      res.headers.append('set-cookie', `${c.name}=; Path=/; Max-Age=0; Secure; SameSite=Lax`)
+      // Par duplicado DETECTADO + sem sessão válida → zera também a variante de DOMÍNIO, p/ o usuário
+      // re-logar do zero e quebrar o loop "Entrando…". (Com sessão válida ou sem duplicata, não mexe.)
+      if (!user && (ocorrencias.get(c.name) ?? 0) > 1) {
+        res.headers.append('set-cookie', `${c.name}=; Path=/; Max-Age=0; Secure; SameSite=Lax; Domain=${cookieDom}`)
+      }
     }
     return res
   }

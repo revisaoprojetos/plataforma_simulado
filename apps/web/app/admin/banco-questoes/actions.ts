@@ -625,6 +625,29 @@ function parseCSV(txt: string): string[][] {
   return linhas.map((l) => l.map((x) => x.trim()))
 }
 
+/**
+ * Converte um `cell.value` do ExcelJS em TEXTO, cobrindo TODAS as formas que a lib devolve:
+ *  - rich text  → `{ richText: [{ text }, …] }`  ← célula com negrito/itálico/cor; junta os trechos.
+ *  - hyperlink  → `{ text, hyperlink }`           ← usa o texto exibido.
+ *  - fórmula    → `{ formula, result }`           ← usa o resultado calculado.
+ *  - data       → Date                            ← ISO.
+ *  - erro / objeto desconhecido                   → '' (NUNCA deixa virar "[object Object]").
+ * Antes, só o caso `{ text }` era tratado: uma célula rich-text caía em `String(obj)` e o
+ * enunciado era gravado como a string literal "[object Object]" (bug da importação de .xlsx).
+ */
+function cellToText(v: any): string {
+  if (v == null) return ''
+  if (typeof v === 'object') {
+    if (Array.isArray(v.richText)) return v.richText.map((r: any) => r?.text ?? '').join('')
+    if (typeof v.text === 'string') return v.text
+    if ('result' in v) return cellToText(v.result)
+    if (typeof v.hyperlink === 'string') return v.text ?? v.hyperlink
+    if (v instanceof Date) return v.toISOString()
+    return '' // objeto não reconhecido: melhor vazio (será validado como "Enunciado vazio") que "[object Object]"
+  }
+  return String(v)
+}
+
 /** Lê o arquivo (.xlsx/.xls via exceljs, ou .csv/.txt) em uma matriz de células. */
 async function lerLinhas(arquivo: File): Promise<string[][]> {
   const nome = (arquivo.name || '').toLowerCase()
@@ -637,9 +660,7 @@ async function lerLinhas(arquivo: File): Promise<string[][]> {
     ws?.eachRow((row) => {
       const vals: string[] = []
       row.eachCell({ includeEmpty: true }, (cell) => {
-        const v: any = cell.value
-        const s = v && typeof v === 'object' && 'text' in v ? v.text : v
-        vals.push(s == null ? '' : String(s).trim())
+        vals.push(cellToText(cell.value).trim())
       })
       linhas.push(vals)
     })

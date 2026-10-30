@@ -62,6 +62,7 @@ export function CapaEditorPro({ value, onChange, cor, icone, prepararImagem }: {
           {enviando ? <Loader2 className="h-7 w-7 animate-spin" /> : <ImagePlus className="h-7 w-7" />}
           <span className="text-sm font-medium">Adicionar imagem do card</span>
           <span className="text-xs">Uma imagem serve aos dois formatos. Você enquadra cada um separadamente.</span>
+          <span className="text-[11px] text-muted-foreground/80">Pôster 4:5 (vertical) · Ticket 4:3 (horizontal) · envie em alta (ex.: 1200×1500px)</span>
         </button>
       ) : (
         <>

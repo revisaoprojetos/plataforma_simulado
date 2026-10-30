@@ -1,7 +1,6 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
 import { AlertBox } from '@/components/ui/alert-box'
 import { cn } from '@/lib/utils'
 import { GraduationCap, Loader2, Wrench, Mail, IdCard, Phone, Lock, ArrowRight, CheckCircle2, ShieldCheck, Eye, EyeOff } from 'lucide-react'
@@ -12,6 +11,46 @@ import { APP_VERSION } from '@/lib/version'
 
 type Metodo = 'email' | 'email_cpf' | 'email_telefone'
 
+/** Corre uma promessa contra um tempo-limite — evita que o login fique "pendurado" pra sempre
+ *  se a rede/Supabase travar (o botão volta e mostramos erro acionável em vez de spinner eterno). */
+function comTimeout<T>(p: Promise<T>, ms: number, rotulo = 'tempo esgotado'): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, rej) => setTimeout(() => rej(new Error(rotulo)), ms)),
+  ])
+}
+
+/** Limpa a sessão do Supabase (cookies `sb-*` em todos os domínios candidatos + storage) e recarrega
+ *  SEM cache. É a saída de emergência para o loop de cookie/cache ("Entrando…" infinito): zera o que
+ *  estiver corrompido/ambíguo e deixa o usuário logar do zero. */
+function limparSessaoERecarregar() {
+  try {
+    // localStorage/sessionStorage do supabase-js (chaves sb-*).
+    for (const store of [localStorage, sessionStorage]) {
+      const matar: string[] = []
+      for (let i = 0; i < store.length; i++) { const k = store.key(i); if (k && (k.startsWith('sb-') || k.includes('supabase'))) matar.push(k) }
+      matar.forEach((k) => store.removeItem(k))
+    }
+  } catch {}
+  try {
+    // Cookies sb-* — apaga por-host e em cada domínio-pai possível (resolve o cookie "órfão" de domínio).
+    const host = window.location.hostname
+    const partes = host.split('.')
+    const dominios: (string | undefined)[] = [undefined, host]
+    for (let i = 1; i < partes.length - 1; i++) dominios.push('.' + partes.slice(i).join('.'))
+    dominios.push('.' + partes.join('.'))
+    for (const ck of document.cookie.split(';')) {
+      const nome = ck.split('=')[0].trim()
+      if (!nome || !(nome.startsWith('sb-') || nome.includes('supabase'))) continue
+      for (const d of dominios) {
+        document.cookie = `${nome}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT${d ? `; domain=${d}` : ''}`
+      }
+    }
+  } catch {}
+  // Recarrega forçando revalidação (evita servir uma página/estado em cache).
+  try { window.location.replace(window.location.pathname + '?limpo=' + Date.now()) } catch { window.location.reload() }
+}
+
 const KF = `@keyframes lgDriftA{0%,100%{transform:translate(0,0) scale(1);opacity:.7}50%{transform:translate(8%,-6%) scale(1.12);opacity:1}}@keyframes lgDriftB{0%,100%{transform:translate(0,0) scale(1.08);opacity:.7}50%{transform:translate(-8%,6%) scale(1);opacity:1}}@keyframes lgUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}.lg-aurora{animation:lgDriftA 18s ease-in-out infinite}.lg-aurora2{animation:lgDriftB 22s ease-in-out infinite}.lg-up{animation:lgUp .55s cubic-bezier(.2,.7,.2,1) both}@keyframes lgeFade{from{opacity:0}to{opacity:1}}@keyframes lgeUp{from{opacity:0;transform:translateY(26px)}to{opacity:1;transform:none}}@keyframes lgeDown{from{opacity:0;transform:translateY(-26px)}to{opacity:1;transform:none}}@keyframes lgeZoom{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:none}}@keyframes lgeSlide{from{opacity:0;transform:translateX(-40px)}to{opacity:1;transform:none}}@keyframes lgePop{0%{opacity:0;transform:scale(.8)}60%{opacity:1;transform:scale(1.04)}100%{transform:scale(1)}}@keyframes lgeGiro{from{opacity:0;transform:perspective(900px) rotateX(14deg) translateY(18px)}to{opacity:1;transform:none}}.lge-fade{animation:lgeFade .5s ease both}.lge-up{animation:lgeUp .55s cubic-bezier(.2,.7,.2,1) both}.lge-down{animation:lgeDown .55s cubic-bezier(.2,.7,.2,1) both}.lge-zoom{animation:lgeZoom .5s cubic-bezier(.2,.7,.2,1) both}.lge-slide{animation:lgeSlide .55s cubic-bezier(.2,.7,.2,1) both}.lge-pop{animation:lgePop .6s cubic-bezier(.2,.8,.2,1) both}.lge-giro{animation:lgeGiro .6s ease both}@media (prefers-reduced-motion:reduce){.lg-aurora,.lg-aurora2,.lg-up,[class*="lge-"]{animation:none}}`
 
 export function AlunoEntrarForm({
@@ -19,16 +58,49 @@ export function AlunoEntrarForm({
 }: {
   metodo: Metodo; plataforma: string; logo?: string | null; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string; config?: LoginConfig; preview?: boolean; modoInicial?: 'aluno' | 'admin'
 }) {
-  const router = useRouter()
   const [email, setEmail] = useState('')
   const [cpf, setCpf] = useState('')
   const [telefone, setTelefone] = useState('')
   const [senha, setSenha] = useState('')
   const [modo, setModo] = useState<'aluno' | 'admin'>(modoInicial)
   const [entrando, setEntrando] = useState(false)
+  const [entrandoLento, setEntrandoLento] = useState(false) // navegação pós-login demorando (loop de cookie?)
   const [erro, setErro] = useState<string | null>(null)
   const [manutencao, setManutencao] = useState<{ titulo: string; mensagem: string } | null>(null)
   const [carregando, setCarregando] = useState(false)
+
+  // Rede de segurança do overlay "Entrando…": se a navegação não concluir em ~12s (sintoma do loop
+  // de cookie/sessão não persistida), mostra o cartão de recuperação em vez de spinner eterno.
+  useEffect(() => {
+    if (!entrando) { setEntrandoLento(false); return }
+    const t = setTimeout(() => setEntrandoLento(true), 12000)
+    return () => clearTimeout(t)
+  }, [entrando])
+
+  // QUEBRA-LOOP do redirectTo: quando a sessão demora a ser lida (cookie ambíguo), o gate do portal
+  // devolve ao login com o MESMO ?redirectTo= repetidamente → "fica voltando pro login mesmo dando
+  // certo". Se esta tela remonta ≥3x com o mesmo redirectTo em <20s, DESCARTAMOS o redirectTo da URL
+  // (automatiza o "apagar o resto da URL"): o próximo login cai na home, sem rebote.
+  useEffect(() => {
+    if (typeof window === 'undefined' || preview) return
+    const rt = new URLSearchParams(window.location.search).get('redirectTo')
+    if (!rt) return
+    try {
+      const CHAVE = 'rt-loop'; const agora = Date.now()
+      let st: { rt: string; n: number; t: number } | null = null
+      try { st = JSON.parse(sessionStorage.getItem(CHAVE) || 'null') } catch {}
+      if (!st || st.rt !== rt || agora - st.t > 20000) st = { rt, n: 0, t: agora }
+      st.n += 1; st.t = agora
+      if (st.n >= 3) {
+        sessionStorage.removeItem(CHAVE)
+        window.history.replaceState(null, '', window.location.pathname)
+        setErro('Tivemos um problema de sessão e limpamos o link. Entre de novo — se persistir, limpe os cookies do site.')
+      } else {
+        sessionStorage.setItem(CHAVE, JSON.stringify(st))
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const ehAdmin = modo === 'admin'
   const c = config
@@ -66,7 +138,9 @@ export function AlunoEntrarForm({
       // Se veio de um link do aluno (ex.: /aluno/... ou /simulado/...), volta pra lá; senão, home.
       const rt = destinoRedirect()
       const destino = rt && /^\/(aluno|simulado)(\/|$|\?)/.test(rt) ? rt : '/aluno'
-      setEntrando(true); router.push(destino); router.refresh()
+      // Navegação de PÁGINA INTEIRA (não router.push): um documento novo SEMPRE envia o cookie de
+      // sessão recém-gravado e o gate renderiza do zero — elimina a corrida que fazia o rebote pro login.
+      setEntrando(true); window.location.assign(destino)
     } catch { setErro('Erro de conexão. Tente novamente.') } finally { setCarregando(false) }
   }
 
@@ -75,14 +149,19 @@ export function AlunoEntrarForm({
   async function entrarAdmin() {
     setErro(null); setManutencao(null); setCarregando(true)
     try {
-      const { error } = await createClient().auth.signInWithPassword({ email, password: senha })
+      const { error } = await comTimeout(createClient().auth.signInWithPassword({ email, password: senha }), 20000)
       if (error) { setErro(error.message === 'Invalid login credentials' ? 'Credenciais inválidas. Verifique e-mail e senha.' : error.message); return }
       void fetch('/api/audit/login', { method: 'POST' }).catch(() => {})
       // Com destino (link direto) → vai DIRETO pra ele (o cookie de sessão já foi setado pelo signIn).
       // Sem destino → /login, que roteia: admin comum → /admin; super-admin → seletor de plataformas.
       const rt = destinoRedirect()
-      setEntrando(true); router.push(rt ?? '/login'); router.refresh()
-    } catch { setErro('Erro de conexão. Tente novamente.') } finally { setCarregando(false) }
+      // Página inteira (não router.push): garante o cookie de sessão fresco no próximo request e
+      // deixa o proxy/seletor rotearem corretamente — sem a corrida que rebatia pro login.
+      setEntrando(true); window.location.assign(rt ?? '/login')
+    } catch (e) {
+      const lento = e instanceof Error && e.message === 'tempo esgotado'
+      setErro(lento ? 'Tempo esgotado ao entrar. Verifique a conexão ou limpe o cache (Ctrl+Shift+R) e tente de novo.' : 'Erro de conexão. Tente novamente.')
+    } finally { setCarregando(false) }
   }
 
   function alternarModo() { setModo((m) => (m === 'admin' ? 'aluno' : 'admin')); setErro(null); setManutencao(null); setSenha('') }
@@ -345,6 +424,25 @@ export function AlunoEntrarForm({
       {entrando && !preview && (
         <div className="fixed inset-0 z-[60]">
           <LoginLoading config={c} plataforma={plataforma} logo={logo} logoBg={logoBg} logoEstilo={logoEstilo} logoFiltro={logoFiltro} />
+          {/* Rede de segurança: navegação pós-login travada (loop de cookie/cache) → saída de emergência. */}
+          {entrandoLento && (
+            <div className="absolute inset-0 z-[61] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+              <div className="w-full max-w-sm rounded-2xl border bg-card p-5 text-center shadow-xl">
+                <p className="text-sm font-semibold text-foreground">Está demorando mais que o normal</p>
+                <p className="mt-1.5 text-xs text-muted-foreground">Pode ser sessão/cache do navegador. Limpe a sessão e entre de novo — isso resolve o carregamento travado.</p>
+                <div className="mt-4 flex flex-col gap-2">
+                  <button type="button" onClick={limparSessaoERecarregar}
+                    className="inline-flex h-9 w-full items-center justify-center rounded-lg bg-primary px-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:brightness-110">
+                    Limpar sessão e recarregar
+                  </button>
+                  <button type="button" onClick={() => { setEntrando(false); setEntrandoLento(false) }}
+                    className="inline-flex h-9 w-full items-center justify-center rounded-lg border px-3 text-sm font-medium text-muted-foreground transition hover:bg-muted">
+                    Voltar ao login
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
       {/* Botão que alterna Aluno ↔ Admin. Também aparece (e funciona) na prévia do console. */}

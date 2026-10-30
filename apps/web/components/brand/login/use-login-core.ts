@@ -13,7 +13,6 @@
 // As variantes visuais (Revisão/VND/MEQ) consomem o retorno via o contrato LoginCore.
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { LoginCore, Metodo } from './types'
 
@@ -37,7 +36,6 @@ export function useLoginCore({
   preview?: boolean
   modoInicial?: 'aluno' | 'admin'
 }): LoginCore {
-  const router = useRouter()
   const [email, setEmail] = useState('')
   const [cpf, setCpf] = useState('')
   const [telefone, setTelefone] = useState('')
@@ -87,8 +85,9 @@ export function useLoginCore({
       const destino = rt && /^\/(aluno|simulado)(\/|$|\?)/.test(rt) ? rt : '/aluno'
       setEntrando(true)
       await segurarMin(Date.now()) // deixa a animação de carregamento completar antes de navegar
-      router.push(destino)
-      router.refresh()
+      // Página inteira (não router.push): o próximo request já leva o cookie de sessão fresco e o
+      // gate renderiza do zero — evita o rebote pro login por corrida de cookie/cache.
+      window.location.assign(destino)
     } catch {
       setErro('Erro de conexão. Tente novamente.')
     } finally {
@@ -114,8 +113,9 @@ export function useLoginCore({
       const rt = destinoRedirect()
       setEntrando(true)
       await segurarMin(Date.now()) // deixa a animação de carregamento completar antes de navegar
-      router.push(rt ?? '/login')
-      router.refresh()
+      // Página inteira (não router.push): garante o cookie de sessão fresco e deixa o proxy/seletor
+      // rotearem corretamente — sem a corrida que rebatia pro login.
+      window.location.assign(rt ?? '/login')
     } catch {
       setErro('Erro de conexão. Tente novamente.')
     } finally {

@@ -96,7 +96,7 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
 
   async function irParaPlataforma(p: PlatSimples) {
     if (typeof window === 'undefined') return
-    if (p.id === tenantAtualId) { router.push('/admin'); return }
+    if (p.id === tenantAtualId) { window.location.assign('/admin'); return }
     const origem = origemPlataforma(p)
     // Domínio DIFERENTE → cookies não cruzam. Faz SSO handoff: gera um código de uso único no
     // domínio atual e entrega no destino, que estabelece a sessão sem pedir login de novo.
@@ -142,7 +142,7 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
           if (!plats.some((p) => p.id === tenantAtualId)) setSemAcesso(true)
           // Auto-entra SÓ quem tem 1 plataforma. Com acesso a VÁRIAS (mesmo e-mail em múltiplos tenants),
           // mostra o SELETOR para escolher (antes auto-entrava direto e o seletor nunca aparecia).
-          else if (!forcarSelecao && plats.length <= 1) router.replace('/admin')
+          else if (!forcarSelecao && plats.length <= 1) window.location.replace('/admin')
         }
       })
       .catch(() => { if (vivo) { setErroCarregar(true); toast.error('Não foi possível carregar suas plataformas.') } })
@@ -160,7 +160,7 @@ export function LoginEpic({ marca, jaLogado, tenantAtualId }: { marca: Marca; ja
         setErro(msg); toast.error('Não foi possível entrar', { description: msg }); return
       }
       toast.success('Login realizado com sucesso!')
-      router.push('/aluno')
+      window.location.assign('/aluno')
     } catch { setErro('Erro de conexão. Tente novamente.'); toast.error('Erro de conexão. Tente novamente.') } finally { setLoading(false) }
   }
 

@@ -12,6 +12,27 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.35.1 — 2026-10-30
+
+**fix(login): fim do loop/trava de login (admin e aluno) por cookie/cache + melhorias**
+
+- **Login não trava mais nem rebate pro login.** Causa: `router.push` pós-login (soft nav) rodava o
+  gate ANTES do cookie recém-setado valer → "sem sessão" → voltava ao login com o `redirectTo`; no
+  admin, agravado por cookie `sb-*` duplicado (host-only × domínio). Correções:
+  - **Navegação de página inteira pós-login** (`window.location.assign/replace`) em TODOS os logins —
+    `aluno-entrar-form.tsx`, `login-epic.tsx` (seletor) e `brand/login/use-login-core.ts` (branded).
+  - **Proxy** expira o cookie `sb-*` **duplicado** (as duas variantes) quando não há sessão válida —
+    cirúrgico (só na duplicata real; não desloga `getUser` transitório null).
+  - **Rede de segurança** no form do aluno: overlay "Entrando…" com escape em 12s
+    ("Limpar sessão e recarregar" = apaga sb-*+storage+reload), timeout de 20s no login e
+    **quebra-loop do `redirectTo`** (rebateu 3x → limpa a URL sozinho).
+- **feat(simulado/criar):** prévia do card no passo "Personalizar" agora é no **formato ticket** (4:3)
+  e a área de upload mostra o **tamanho/proporção** recomendado (pôster 4:5 / ticket 4:3).
+- **fix(importação .xlsx):** célula com formatação (rich text) deixava de virar `"[object Object]"`
+  no enunciado — novo `cellToText` cobre richText/hyperlink/fórmula/data.
+
+---
+
 ## 3.35.0 — 2026-10-30
 
 **feat(manutenção): lista do Aluno completa + modo "Em construção" (card animado) por área**
