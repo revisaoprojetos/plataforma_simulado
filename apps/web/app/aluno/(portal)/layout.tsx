@@ -4,7 +4,7 @@ import { getSessaoAluno } from '@/lib/aluno-session'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getTenantTheme } from '@/lib/tenant-theme'
 import { normalizarManutencao, emManutencaoAgora } from '@/lib/sistema/manutencao'
-import { normalizarMapaAreas, normalizarLiberados, areaAlunoBloqueadaDoPath, hrefsBloqueadosAluno, AREAS_MANUTENCAO_ALUNO } from '@/lib/sistema/manutencao-areas'
+import { normalizarMapaAreas, normalizarLiberados, normalizarModos, modoDaAreaAluno, areaAlunoBloqueadaDoPath, hrefsBloqueadosAluno, AREAS_MANUTENCAO_ALUNO } from '@/lib/sistema/manutencao-areas'
 import { resolverSidebarRotulos } from '@/lib/sidebar-rotulos'
 import { GuiaTourRunner } from '@/components/aluno/guia-tour-runner'
 import { resolverLoginConfig } from '@/lib/login-config'
@@ -24,6 +24,7 @@ import { BrandCorProvider } from '@/lib/brand/cor-marca'
 import { AlunoShell } from '@/components/aluno/shell/aluno-shell'
 import { ShellRevisaoNova } from '@/components/aluno/shell/shell-revisao-nova'
 import { AreaEmManutencao } from '@/components/admin/area-em-manutencao'
+import { EmBreveCard } from '@/components/nova/manutencao'
 import { resolveTemaDark } from '@/lib/hud/resolve-dark'
 import { remember } from '@/lib/cache/relatorio-cache'
 import type { AlunoBrand, AlunoNavItem, AlunoShellUsuario } from '@/components/aluno/shell/types'
@@ -146,10 +147,21 @@ export default async function AlunoPortalLayout({ children }: { children: React.
   // Manutenção POR ÁREA do ALUNO: some do menu e bloqueia a rota — exceto os alunos no allowlist.
   const alunoAtivos = normalizarMapaAreas(t.manutencao_aluno, AREAS_MANUTENCAO_ALUNO)
   const alunoLiberados = normalizarLiberados(t.manutencao_aluno_liberados, AREAS_MANUTENCAO_ALUNO)
+  // MODO por área: 'bloqueio' (some do menu + tela "em manutenção") | 'construcao' (fica no menu +
+  // card animado "Em breve"). Lido do MESMO objeto de tema já carregado (sem round-trip extra).
+  const alunoModos = normalizarModos(t.manutencao_aluno_modo, AREAS_MANUTENCAO_ALUNO)
   const hManut = await headers()
   const pathAtual = (hManut.get('x-full-path') || hManut.get('x-pathname') || '').split('?')[0]
   const areaAlunoBloqueada = areaAlunoBloqueadaDoPath(pathAtual, alunoAtivos, alunoLiberados, sessao.estudanteId)
-  const hrefsOcultosAluno = hrefsBloqueadosAluno(alunoAtivos, alunoLiberados, sessao.estudanteId)
+  // Áreas em 'construcao' NÃO são escondidas do menu (seguem clicáveis → card "Em breve").
+  const hrefsOcultosAluno = hrefsBloqueadosAluno(alunoAtivos, alunoLiberados, sessao.estudanteId, alunoModos)
+  // Conteúdo a renderizar quando a rota atual está bloqueada p/ ESTE aluno: card "Em breve" no modo
+  // 'construcao', senão a tela genérica de manutenção. (Alunos liberados têm areaAlunoBloqueada=null → veem children.)
+  const conteudoAreaBloqueada = areaAlunoBloqueada
+    ? (modoDaAreaAluno(areaAlunoBloqueada, alunoModos) === 'construcao'
+        ? <EmBreveCard titulo={areaAlunoBloqueada.label} icon="sliders" mensagem="Estamos finalizando esta área. Em breve ela fica disponível para você." />
+        : <AreaEmManutencao area={areaAlunoBloqueada} />)
+    : null
 
   // ── Nav canônico de 8 itens (spec 03 §2.1), p/ os shells VND/MEQ consumirem via contrato. ──
   // O shell da Revisão continua usando AlunoSidebar/AlunoMobileNav (nav próprio) — este objeto é
@@ -279,7 +291,7 @@ export default async function AlunoPortalLayout({ children }: { children: React.
           nome={t.nome_site ?? tenantNome ?? 'Área do Aluno'}
           subtitulo={t.subtitulo_site ?? null}
         >
-          {areaAlunoBloqueada ? <AreaEmManutencao area={areaAlunoBloqueada} /> : children}
+          {areaAlunoBloqueada ? conteudoAreaBloqueada : children}
         </ShellRevisaoNova>
       </div>
     )
@@ -304,7 +316,7 @@ export default async function AlunoPortalLayout({ children }: { children: React.
           (corMarca) à subárvore. Para as outras marcas é identidade (não altera nada). */}
       <BrandCorProvider brand={brand}>
         <AlunoShell {...shellProps}>
-          {areaAlunoBloqueada ? <AreaEmManutencao area={areaAlunoBloqueada} /> : children}
+          {areaAlunoBloqueada ? conteudoAreaBloqueada : children}
         </AlunoShell>
       </BrandCorProvider>
     </div>

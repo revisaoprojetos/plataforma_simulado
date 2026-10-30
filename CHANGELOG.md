@@ -12,6 +12,21 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.35.0 — 2026-10-30
+
+**feat(manutenção): lista do Aluno completa + modo "Em construção" (card animado) por área**
+
+- `lib/sistema/manutencao-areas.ts` — `AREAS_MANUTENCAO_ALUNO` reconstruída para refletir a estrutura atual:
+  - **2 Inícios** (nova `/aluno/nova/inicio` + legada `/aluno`, esta com match **exato** via novo campo `exact` — senão casaria o portal inteiro), **Simulados**, **Banco de Questões (Questões Revisão + Recomendados)** unificado (cobre `/aluno/questoes` **e** `/aluno/recomendado`), **Biblioteca**, **Painel de estudos**, **Meu Desempenho**, **Ligas** (nova), **Comunidade**, **Cursos**, **Como Estudar**, **Meus Cadernos**, **Central de Dúvidas**, **Ajuda**.
+  - **Legadas** (MEQ/VND) mantidas e rotuladas: Lei Seca, Jurisprudência, Cronograma, Trilha, Ligas (legado). O item avulso "Recomendado" saiu (virou aba do Banco).
+  - **Em manutenção por padrão:** Meus Cadernos (sem conteúdo ainda) e Biblioteca.
+- **Modo por área** (`tema.manutencao_aluno_modo`, sem migração), configurável em *Admin → Sistema → Páginas em manutenção → Aluno*:
+  - **Bloqueio total** (padrão): esconde do menu + tela "em manutenção".
+  - **Em construção** ("criando ainda"): a área **continua no menu e clicável**; quem **não** está na allowlist vê o **card animado `EmBreveCard`** (o mesmo da Comunidade); só **quem tem acesso** (liberado) vê o conteúdo real.
+  - Form do admin com seletor de modo por área (só no painel do Aluno) + leitura no layout via cache do tema (sem round-trip extra).
+
+---
+
 ## 3.34.0 — 2026-10-30
 
 **feat(aluno): Ligas nova no lugar da antiga · Cadernos em manutenção · Ajuda FAQ expansível + admin · unificação Banco + Recomendado**

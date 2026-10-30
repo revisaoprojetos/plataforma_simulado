@@ -6,8 +6,8 @@ import { getCurrentAccess } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { normalizarManutencao, type ManutencaoSistema } from '@/lib/sistema/manutencao'
 import {
-  normalizarManutencaoAreas, normalizarMapaAreas, normalizarLiberados,
-  AREAS_MANUTENCAO, AREAS_MANUTENCAO_ALUNO, type ManutencaoAreas, type ManutencaoLiberados,
+  normalizarManutencaoAreas, normalizarMapaAreas, normalizarLiberados, normalizarModos,
+  AREAS_MANUTENCAO, AREAS_MANUTENCAO_ALUNO, type ManutencaoAreas, type ManutencaoLiberados, type ManutencaoModos,
 } from '@/lib/sistema/manutencao-areas'
 
 /** Salva a manutenção da plataforma em tenants.tema.manutencao_sistema (merge, sem apagar o tema). */
@@ -86,7 +86,7 @@ export async function salvarManutencaoAreas(input: ManutencaoAreas, liberados?: 
  * Salva o mapa de áreas do ALUNO em manutenção + o allowlist (estudantes liberados) em
  * tenants.tema.manutencao_aluno / .manutencao_aluno_liberados (merge, sem apagar o tema).
  */
-export async function salvarManutencaoAluno(input: ManutencaoAreas, liberados: ManutencaoLiberados) {
+export async function salvarManutencaoAluno(input: ManutencaoAreas, liberados: ManutencaoLiberados, modos?: ManutencaoModos) {
   const access = await getCurrentAccess()
   if (!(access.isAdmin || access.permissions.includes('configuracoes:manage'))) {
     return { error: 'Sem permissão para alterar a manutenção do sistema.' }
@@ -100,7 +100,9 @@ export async function salvarManutencaoAluno(input: ManutencaoAreas, liberados: M
   const temaAnterior = (anterior?.tema as Record<string, unknown>) ?? {}
   const cfg = normalizarMapaAreas(input, AREAS_MANUTENCAO_ALUNO)
   const lib = normalizarLiberados(liberados, AREAS_MANUTENCAO_ALUNO)
-  const merged = { ...temaAnterior, manutencao_aluno: cfg, manutencao_aluno_liberados: lib }
+  // Sem `modos` no payload → preserva o que estava salvo (não reseta p/ 'bloqueio' por descuido).
+  const mod = normalizarModos(modos ?? (temaAnterior.manutencao_aluno_modo as unknown), AREAS_MANUTENCAO_ALUNO)
+  const merged = { ...temaAnterior, manutencao_aluno: cfg, manutencao_aluno_liberados: lib, manutencao_aluno_modo: mod }
 
   const { error } = await svc.from('simulado_tenants').update({ tema: merged }).eq('id', tenantId)
   if (error) return { error: `Erro ao salvar: ${error.message}` }
@@ -111,7 +113,7 @@ export async function salvarManutencaoAluno(input: ManutencaoAreas, liberados: M
     entidade: 'simulado_tenants',
     entidadeId: tenantId,
     antes: { manutencao_aluno: (temaAnterior as Record<string, unknown>).manutencao_aluno ?? null },
-    depois: { manutencao_aluno: cfg, manutencao_aluno_liberados: lib },
+    depois: { manutencao_aluno: cfg, manutencao_aluno_liberados: lib, manutencao_aluno_modo: mod },
     tenantId,
   })
 

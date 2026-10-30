@@ -20,6 +20,8 @@ export type AreaManutencao = {
   discursiva?: boolean      // área especial: além da rota, esconde as opções de discursiva espalhadas
   padraoBloqueado?: boolean // nasce BLOQUEADA (ON) quando não há config salva — p/ áreas restritas (ex.: Teste).
                             // O toggle continua significando "em manutenção"; só muda o default. Libere por allowlist.
+  exact?: boolean           // casa só o pathname EXATO (não os subcaminhos). Necessário p/ rotas-raiz como
+                            // `/aluno` (a Início legada), que senão casariam o portal inteiro.
 }
 
 /** Áreas que podem ser colocadas em manutenção. (Não inclui configs sensíveis p/ não trancar o admin.) */
@@ -49,23 +51,54 @@ export const AREAS_MANUTENCAO: AreaManutencao[] = [
  * + `tema.manutencao_aluno_liberados` (ids de estudantes que ainda enxergam a área).
  */
 export const AREAS_MANUTENCAO_ALUNO: AreaManutencao[] = [
-  { key: 'questoes', label: 'Banco de Questões', descricao: 'Prática de questões avulsas (/aluno/questoes).', href: '/aluno/questoes' },
-  { key: 'leitura', label: 'Desafio de Lei Seca', descricao: 'Biblioteca e leitor de documentos (/aluno/leitura).', href: '/aluno/leitura' },
-  { key: 'jurisprudencia', label: 'Desafio de Jurisprudência', descricao: 'Jogo/desafio de jurisprudência (/aluno/jurisprudencia).', href: '/aluno/jurisprudencia' },
-  { key: 'cronograma', label: 'Cronograma', descricao: 'Gerar e acompanhar cronogramas (/aluno/cronograma).', href: '/aluno/cronograma' },
-  { key: 'trilha', label: 'Trilha', descricao: 'Trilha de simulados/gamificação do aluno (/aluno/trilha).', href: '/aluno/trilha' },
-  { key: 'ligas', label: 'Ligas', descricao: 'Ranking por ligas (/aluno/ligas).', href: '/aluno/ligas' },
-  { key: 'recomendado', label: 'Recomendado', descricao: 'Questões recomendadas pelo desempenho do aluno (/aluno/recomendado).', href: '/aluno/recomendado' },
-  // Meus Cadernos (área nova da Revisão). Em construção — nasce BLOQUEADA até o conteúdo ser configurado;
-  // some do menu e a rota mostra "em manutenção". Libere (toggle off no admin) quando estiver pronta.
-  { key: 'cadernos', label: 'Meus Cadernos', descricao: 'Cadernos de estudo do aluno (/aluno/nova/cadernos). Ainda sem conteúdo configurado — bloqueada por padrão.', href: '/aluno/nova/cadernos', padraoBloqueado: true },
+  // ── Áreas consolidadas (todas as marcas) ──
+  { key: 'simulados', label: 'Simulados', descricao: 'Lista e aplicação de simulados do aluno (/aluno/simulados).', href: '/aluno/simulados' },
+  // Banco de Questões já engloba, na Revisão, a aba "Recomendados" (área unificada): bloquear aqui
+  // cobre tanto /aluno/questoes quanto /aluno/recomendado.
+  { key: 'questoes', label: 'Banco de Questões (Questões Revisão + Recomendados)', descricao: 'Banco de questões e, na Revisão, a aba unificada de Recomendados (/aluno/questoes + /aluno/recomendado).', href: '/aluno/questoes', hrefs: ['/aluno/recomendado'] },
   // Biblioteca do aluno (ler conteúdos liberados + grifar). Nasce BLOQUEADA — libere por allowlist.
   { key: 'biblioteca', label: 'Biblioteca', descricao: 'Leitura dos materiais liberados, com grifos salvos (/aluno/biblioteca).', href: '/aluno/biblioteca', padraoBloqueado: true },
+
+  // ── Início — as 2 áreas (nova + legada). A legada usa match EXATO (/aluno é a raiz do portal). ──
+  { key: 'nova_inicio', label: 'Início (nova)', descricao: 'Página inicial nova da Revisão (/aluno/nova/inicio).', href: '/aluno/nova/inicio' },
+  { key: 'inicio', label: 'Início (legado)', descricao: 'Home antiga do aluno (/aluno). Na Revisão redireciona para a Início nova.', href: '/aluno', exact: true },
+
+  // ── Demais áreas novas da Revisão (/aluno/nova/*) ──
+  { key: 'nova_painel', label: 'Painel de estudos', descricao: 'Hub do cronograma adaptativo e painel de estudos (/aluno/nova/painel).', href: '/aluno/nova/painel' },
+  { key: 'nova_desempenho', label: 'Meu Desempenho', descricao: 'Estatísticas e desempenho do aluno (/aluno/nova/desempenho).', href: '/aluno/nova/desempenho' },
+  // Comunidade engloba /comunidade, /comunidade/ligas e /comunidade/perfil (bloquear aqui cobre toda a área).
+  { key: 'nova_comunidade', label: 'Comunidade', descricao: 'Comunidade, perfil e Ligas (/aluno/nova/comunidade — inclui /ligas e /perfil).', href: '/aluno/nova/comunidade' },
+  // Ligas (nova) — é a principal na Revisão; a antiga /aluno/ligas redireciona para cá.
+  { key: 'nova_ligas', label: 'Ligas', descricao: 'Ranking por ligas, área principal da Revisão (/aluno/nova/comunidade/ligas). A antiga /aluno/ligas redireciona para cá.', href: '/aluno/nova/comunidade/ligas' },
+  { key: 'nova_cursos', label: 'Cursos', descricao: 'Produtos e cursos do aluno (/aluno/nova/cursos).', href: '/aluno/nova/cursos' },
+  { key: 'nova_como_estudar', label: 'Como Estudar', descricao: 'Guia "Como Estudar" (/aluno/nova/como-estudar).', href: '/aluno/nova/como-estudar' },
+  // Meus Cadernos (área nova). Em construção — nasce BLOQUEADA até o conteúdo ser configurado; some do
+  // menu e a rota mostra "em manutenção". Libere (toggle off no admin) quando estiver pronta.
+  { key: 'cadernos', label: 'Meus Cadernos', descricao: 'Cadernos de estudo do aluno (/aluno/nova/cadernos). Ainda sem conteúdo configurado — bloqueada por padrão.', href: '/aluno/nova/cadernos', padraoBloqueado: true },
+  { key: 'nova_duvidas', label: 'Central de Dúvidas e Requerimentos', descricao: 'Dúvidas e requerimentos (/aluno/nova/duvidas).', href: '/aluno/nova/duvidas' },
+  { key: 'nova_ajuda', label: 'Ajuda com a Plataforma', descricao: 'FAQ e ajuda do aluno (/aluno/nova/ajuda).', href: '/aluno/nova/ajuda' },
+
+  // ── Áreas legadas (MEQ/VND; na Revisão saíram do menu ou foram substituídas, mas as rotas seguem vivas) ──
+  { key: 'leitura', label: 'Desafio de Lei Seca', descricao: 'Biblioteca e leitor de documentos (/aluno/leitura).', href: '/aluno/leitura' },
+  { key: 'jurisprudencia', label: 'Desafio de Jurisprudência', descricao: 'Jogo/desafio de jurisprudência (/aluno/jurisprudencia).', href: '/aluno/jurisprudencia' },
+  { key: 'cronograma', label: 'Cronograma (legado)', descricao: 'Gerar e acompanhar cronogramas (/aluno/cronograma). Na Revisão o acesso é pelo Painel de estudos.', href: '/aluno/cronograma' },
+  { key: 'trilha', label: 'Trilha', descricao: 'Trilha de simulados/gamificação do aluno (/aluno/trilha).', href: '/aluno/trilha' },
+  { key: 'ligas', label: 'Ligas (legado)', descricao: 'Ranking por ligas antigo (/aluno/ligas). Na Revisão redireciona para a Ligas nova.', href: '/aluno/ligas' },
 ]
 
 export type ManutencaoAreas = Record<string, boolean>
 /** Allowlist por área: quem (ids de usuário/estudante) ainda pode visualizar a área em manutenção. */
 export type ManutencaoLiberados = Record<string, string[]>
+
+/**
+ * MODO de manutenção por área (só ALUNO):
+ *  - 'bloqueio'   (padrão): quem não está liberado NÃO vê a área — ela some do menu e a rota mostra
+ *                 a tela genérica "em manutenção".
+ *  - 'construcao' ("criando ainda"): a área CONTINUA no menu e clicável; quem não está liberado vê o
+ *                 card animado "Em breve"; só quem está no allowlist vê o conteúdo real.
+ */
+export type ModoManutencao = 'bloqueio' | 'construcao'
+export type ManutencaoModos = Record<string, ModoManutencao>
 
 /** Higieniza um mapa {key: boolean} para as chaves conhecidas de um conjunto de áreas. */
 export function normalizarMapaAreas(raw: unknown, areas: AreaManutencao[]): Record<string, boolean> {
@@ -74,6 +107,22 @@ export function normalizarMapaAreas(raw: unknown, areas: AreaManutencao[]): Reco
   // Sem config salva: usa o default da área (`padraoBloqueado`). Com config, respeita o valor salvo.
   for (const a of areas) out[a.key] = a.key in r ? !!r[a.key] : !!a.padraoBloqueado
   return out
+}
+
+/**
+ * Higieniza o mapa de MODOS {key: 'bloqueio'|'construcao'} p/ as chaves conhecidas. Default 'bloqueio'
+ * por área (só 'construcao' sobrescreve); valor inválido/ausente → 'bloqueio'.
+ */
+export function normalizarModos(raw: unknown, areas: AreaManutencao[]): ManutencaoModos {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
+  const out: ManutencaoModos = {}
+  for (const a of areas) out[a.key] = r[a.key] === 'construcao' ? 'construcao' : 'bloqueio'
+  return out
+}
+
+/** Modo configurado para a área do aluno (default 'bloqueio' quando ausente). */
+export function modoDaAreaAluno(area: AreaManutencao, modos?: ManutencaoModos): ModoManutencao {
+  return modos?.[area.key] === 'construcao' ? 'construcao' : 'bloqueio'
 }
 
 /** Higieniza o allowlist {key: string[]} para as chaves conhecidas de um conjunto de áreas. */
@@ -95,7 +144,8 @@ export function normalizarManutencaoAreas(raw: unknown): ManutencaoAreas {
 /** true se o pathname pertence à área (rota base OU qualquer rota extra). */
 function pathBateArea(pathname: string, a: AreaManutencao): boolean {
   const alvos = [a.href, ...(a.hrefs ?? [])]
-  return alvos.some((h) => pathname === h || pathname.startsWith(h + '/'))
+  // `exact`: casa só o caminho idêntico (p/ rotas-raiz como `/aluno`). Senão, casa a rota e os subcaminhos.
+  return alvos.some((h) => pathname === h || (!a.exact && pathname.startsWith(h + '/')))
 }
 
 /**
@@ -113,14 +163,20 @@ export function areaAlunoBloqueadaDoPath(
   return null
 }
 
-/** ALUNO: rotas a esconder do menu agora (áreas em manutenção onde ESTE aluno não está liberado). */
+/**
+ * ALUNO: rotas a esconder do menu agora (áreas em manutenção onde ESTE aluno não está liberado).
+ * `modos` (opcional): áreas no modo 'construcao' FICAM no menu (clicáveis → card "Em breve"), então
+ * NÃO entram na lista de ocultos. Sem `modos`, comportamento legado = tudo escondido ('bloqueio').
+ */
 export function hrefsBloqueadosAluno(
   ativos: Record<string, boolean>, liberados: ManutencaoLiberados, estudanteId: string | null,
+  modos?: ManutencaoModos,
 ): string[] {
   const out: string[] = []
   for (const a of AREAS_MANUTENCAO_ALUNO) {
     if (!ativos[a.key]) continue
     if (estudanteId && (liberados[a.key] ?? []).includes(estudanteId)) continue
+    if (modos && modos[a.key] === 'construcao') continue // modo construção: segue visível no menu
     out.push(a.href, ...(a.hrefs ?? []))
   }
   return out

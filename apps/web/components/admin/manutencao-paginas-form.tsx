@@ -10,7 +10,7 @@ import { toast } from 'sonner'
 import { AlertBox } from '@/components/ui/alert-box'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { SeletorLiberadosDialog, type PessoaItem } from '@/components/admin/seletor-liberados-dialog'
-import type { AreaManutencao } from '@/lib/sistema/manutencao-areas'
+import type { AreaManutencao, ManutencaoModos, ModoManutencao } from '@/lib/sistema/manutencao-areas'
 import { salvarManutencaoAreas, salvarManutencaoAluno } from '@/app/admin/sistema/actions'
 
 const ICONES: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -26,16 +26,18 @@ const ICONES: Record<string, React.ComponentType<{ className?: string }>> = {
  *  - tipo='aluno'  → áreas do portal do aluno; allowlist = ALUNOS liberados.
  * Cada linha tem o liga/desliga + um menu de 3 pontos com "Quem pode visualizar" (allowlist).
  */
-export function ManutencaoPaginasForm({ tipo, areas, ativosIniciais, liberadosIniciais, nomesIniciais }: {
+export function ManutencaoPaginasForm({ tipo, areas, ativosIniciais, liberadosIniciais, nomesIniciais, modosIniciais }: {
   tipo: 'admin' | 'aluno'
   areas: AreaManutencao[]
   ativosIniciais: Record<string, boolean>
   liberadosIniciais: Record<string, string[]>
   nomesIniciais: PessoaItem[]
+  modosIniciais?: ManutencaoModos
 }) {
   const router = useRouter()
   const [ativos, setAtivos] = useState<Record<string, boolean>>(ativosIniciais)
   const [liberados, setLiberados] = useState<Record<string, string[]>>(liberadosIniciais)
+  const [modos, setModos] = useState<ManutencaoModos>(modosIniciais ?? {})
   const [nomes, setNomes] = useState<PessoaItem[]>(nomesIniciais)
   const [pending, start] = useTransition()
   const [salvandoKey, setSalvandoKey] = useState<string | null>(null)
@@ -44,10 +46,11 @@ export function ManutencaoPaginasForm({ tipo, areas, ativosIniciais, liberadosIn
   const modoAllowlist = tipo === 'admin' ? 'admin' : 'estudante'
   const bloqueadas = areas.filter((a) => ativos[a.key]).length
 
-  async function persistir(novoAtivos: Record<string, boolean>, novoLiberados: Record<string, string[]>) {
+  // `modos` só é persistido/relevante no portal do ALUNO; no admin fica undefined no payload.
+  async function persistir(novoAtivos: Record<string, boolean>, novoLiberados: Record<string, string[]>, novoModos: ManutencaoModos) {
     return tipo === 'admin'
       ? salvarManutencaoAreas(novoAtivos, novoLiberados)
-      : salvarManutencaoAluno(novoAtivos, novoLiberados)
+      : salvarManutencaoAluno(novoAtivos, novoLiberados, novoModos)
   }
 
   function toggle(key: string, valor: boolean) {
@@ -56,10 +59,25 @@ export function ManutencaoPaginasForm({ tipo, areas, ativosIniciais, liberadosIn
     setAtivos(novo)
     setSalvandoKey(key)
     start(async () => {
-      const r = await persistir(novo, liberados)
+      const r = await persistir(novo, liberados, modos)
       setSalvandoKey(null)
       if (r?.error) { setAtivos(antAtivos); toast.error(r.error); return }
       toast.success(valor ? 'Área colocada em manutenção' : 'Área reativada')
+      router.refresh()
+    })
+  }
+
+  function setModo(key: string, valor: ModoManutencao) {
+    if ((modos[key] ?? 'bloqueio') === valor) return
+    const antModos = modos
+    const novo = { ...modos, [key]: valor }
+    setModos(novo)
+    setSalvandoKey(key)
+    start(async () => {
+      const r = await persistir(ativos, liberados, novo)
+      setSalvandoKey(null)
+      if (r?.error) { setModos(antModos); toast.error(r.error); return }
+      toast.success(valor === 'construcao' ? 'Área em modo "Em construção"' : 'Área em modo "Bloqueio total"')
       router.refresh()
     })
   }
@@ -76,7 +94,7 @@ export function ManutencaoPaginasForm({ tipo, areas, ativosIniciais, liberadosIn
     })
     setSalvandoKey(key)
     start(async () => {
-      const r = await persistir(ativos, novo)
+      const r = await persistir(ativos, novo, modos)
       setSalvandoKey(null)
       if (r?.error) { setLiberados(antLiberados); toast.error(r.error); return }
       toast.success(ids.length ? `${ids.length} liberado(s) para ver a área` : 'Ninguém liberado nesta área')
@@ -109,6 +127,7 @@ export function ManutencaoPaginasForm({ tipo, areas, ativosIniciais, liberadosIn
           const Icon = ICONES[a.key] ?? Wrench
           const on = !!ativos[a.key]
           const salvando = salvandoKey === a.key && pending
+          const modoArea: ModoManutencao = modos[a.key] === 'construcao' ? 'construcao' : 'bloqueio'
           const liberadosArea = liberados[a.key] ?? []
           const nomesArea = liberadosArea.map((id) => nomes.find((n) => n.id === id)).filter(Boolean) as PessoaItem[]
           return (
@@ -128,6 +147,37 @@ export function ManutencaoPaginasForm({ tipo, areas, ativosIniciais, liberadosIn
                   )}
                 </div>
                 <p className="mt-0.5 text-xs text-muted-foreground">{a.descricao}</p>
+
+                {/* MODO (só portal do aluno; só faz sentido com a área ligada): "Bloqueio total" esconde
+                    do menu + tela genérica; "Em construção" mantém no menu e mostra o card animado "Em breve"
+                    (só quem está no allowlist vê o conteúdo real). */}
+                {tipo === 'aluno' && on && (
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <div role="group" aria-label={`Modo de manutenção: ${a.label}`}
+                      className="inline-flex items-center gap-0.5 rounded-lg border bg-muted/40 p-0.5">
+                      {([
+                        { v: 'bloqueio' as const, rotulo: 'Bloqueio total' },
+                        { v: 'construcao' as const, rotulo: 'Em construção (card animado)' },
+                      ]).map((opt) => {
+                        const ativoBtn = modoArea === opt.v
+                        return (
+                          <button
+                            key={opt.v} type="button" disabled={salvando}
+                            aria-pressed={ativoBtn} onClick={() => setModo(a.key, opt.v)}
+                            className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors disabled:opacity-50 ${ativoBtn ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'}`}
+                          >
+                            {opt.rotulo}
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <span className="text-[11px] text-muted-foreground">
+                      {modoArea === 'construcao'
+                        ? 'Fica no menu e clicável; quem não está liberado vê o card “Em breve”.'
+                        : 'Some do menu; quem não está liberado vê a tela “em manutenção”.'}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* 3 pontos — "Quem pode visualizar" (allowlist) */}

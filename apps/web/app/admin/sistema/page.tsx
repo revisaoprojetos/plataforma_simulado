@@ -42,7 +42,7 @@ export default async function SistemaPage() {
       <SistemaTabs
         manutencao={manutencao}
         admin={{ ativos: adminAtivos, liberados: adminLiberados, nomes: nomesAdmin }}
-        aluno={{ ativos: alunoBloco.ativos, liberados: alunoBloco.liberados, nomes: nomesAluno }}
+        aluno={{ ativos: alunoBloco.ativos, liberados: alunoBloco.liberados, nomes: nomesAluno, modos: alunoBloco.modos }}
       />
     </div>
   )

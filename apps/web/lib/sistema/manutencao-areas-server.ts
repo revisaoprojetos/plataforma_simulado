@@ -2,8 +2,8 @@ import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import {
-  normalizarManutencaoAreas, normalizarMapaAreas, normalizarLiberados, ocultarDiscursivaDe,
-  AREAS_MANUTENCAO, AREAS_MANUTENCAO_ALUNO, type ManutencaoAreas, type ManutencaoLiberados,
+  normalizarManutencaoAreas, normalizarMapaAreas, normalizarLiberados, normalizarModos, ocultarDiscursivaDe,
+  AREAS_MANUTENCAO, AREAS_MANUTENCAO_ALUNO, type ManutencaoAreas, type ManutencaoLiberados, type ManutencaoModos,
 } from './manutencao-areas'
 
 /**
@@ -45,21 +45,29 @@ export async function getManutencaoAreasLiberados(): Promise<ManutencaoLiberados
   }
 }
 
-/** Manutenção das áreas do ALUNO (ativos + allowlist de estudantes) do tenant atual. Fail-open. */
-export async function getManutencaoAluno(): Promise<{ ativos: ManutencaoAreas; liberados: ManutencaoLiberados }> {
+/**
+ * Manutenção das áreas do ALUNO (ativos + allowlist de estudantes + modo por área) do tenant atual.
+ * Fail-open: erro → nada em manutenção e todos os modos em 'bloqueio' (nunca trancar por bug de leitura).
+ */
+export async function getManutencaoAluno(): Promise<{ ativos: ManutencaoAreas; liberados: ManutencaoLiberados; modos: ManutencaoModos }> {
   try {
     const tid = await getCurrentTenantId()
     const svc = createAdminClient()
-    const base = svc.from('simulado_tenants').select('a:tema->manutencao_aluno, l:tema->manutencao_aluno_liberados')
+    const base = svc.from('simulado_tenants').select('a:tema->manutencao_aluno, l:tema->manutencao_aluno_liberados, m:tema->manutencao_aluno_modo')
     const { data } = tid
       ? await base.eq('id', tid).maybeSingle()
       : await base.eq('ativo', true).limit(1).maybeSingle()
-    const row = (data as { a?: unknown; l?: unknown } | null) ?? {}
+    const row = (data as { a?: unknown; l?: unknown; m?: unknown } | null) ?? {}
     return {
       ativos: normalizarMapaAreas(row.a, AREAS_MANUTENCAO_ALUNO),
       liberados: normalizarLiberados(row.l, AREAS_MANUTENCAO_ALUNO),
+      modos: normalizarModos(row.m, AREAS_MANUTENCAO_ALUNO),
     }
   } catch {
-    return { ativos: normalizarMapaAreas(null, AREAS_MANUTENCAO_ALUNO), liberados: normalizarLiberados(null, AREAS_MANUTENCAO_ALUNO) }
+    return {
+      ativos: normalizarMapaAreas(null, AREAS_MANUTENCAO_ALUNO),
+      liberados: normalizarLiberados(null, AREAS_MANUTENCAO_ALUNO),
+      modos: normalizarModos(null, AREAS_MANUTENCAO_ALUNO),
+    }
   }
 }
