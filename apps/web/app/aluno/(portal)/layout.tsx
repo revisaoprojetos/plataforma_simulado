@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getTenantTheme } from '@/lib/tenant-theme'
 import { normalizarManutencao, emManutencaoAgora } from '@/lib/sistema/manutencao'
 import { normalizarMapaAreas, normalizarLiberados, normalizarModos, modoDaAreaAluno, areaAlunoBloqueadaDoPath, hrefsBloqueadosAluno, AREAS_MANUTENCAO_ALUNO } from '@/lib/sistema/manutencao-areas'
+import { normalizarEmailsTestador } from '@/lib/sistema/testadores-globais'
 import { resolverSidebarRotulos } from '@/lib/sidebar-rotulos'
 import { GuiaTourRunner } from '@/components/aluno/guia-tour-runner'
 import { resolverLoginConfig } from '@/lib/login-config'
@@ -120,6 +121,11 @@ export default async function AlunoPortalLayout({ children }: { children: React.
   const { css, tema, tenantNome } = themeData
   const { counts, personalizados: simuladosPersonalizados } = contadores
   const t = (tema ?? {}) as any
+  // TESTADOR GLOBAL: e-mail na lista do tenant (tema.testadores_globais) → ACESSO TOTAL.
+  // Fura manutenção de plataforma/área e some todo bloqueio do menu. Lido do tema já carregado
+  // (zero query extra). Impersonation (sem e-mail) → não é testador (vê como o aluno real).
+  const emailAluno = sessao.email?.trim().toLowerCase() || null
+  const ehTestadorGlobalAluno = !!emailAluno && normalizarEmailsTestador(t.testadores_globais).includes(emailAluno)
   const rotulosAluno = resolverSidebarRotulos(t.sidebar_rotulos).aluno
   // Layout de navegação MOBILE, escolhido no console (Aparência → Mobile): 'tabs' | 'menu'.
   const navMode: 'tabs' | 'menu' = t.mobile_nav === 'menu' ? 'menu' : 'tabs'
@@ -135,7 +141,7 @@ export default async function AlunoPortalLayout({ children }: { children: React.
 
   // Manutenção da plataforma: bloqueia o PORTAL (não o runner do simulado, que é outro layout).
   const manut = normalizarManutencao(t.manutencao_sistema)
-  if (emManutencaoAgora(manut)) {
+  if (emManutencaoAgora(manut) && !ehTestadorGlobalAluno) {
     return (
       <>
         {css && <style dangerouslySetInnerHTML={{ __html: css }} />}
@@ -152,9 +158,10 @@ export default async function AlunoPortalLayout({ children }: { children: React.
   const alunoModos = normalizarModos(t.manutencao_aluno_modo, AREAS_MANUTENCAO_ALUNO)
   const hManut = await headers()
   const pathAtual = (hManut.get('x-full-path') || hManut.get('x-pathname') || '').split('?')[0]
-  const areaAlunoBloqueada = areaAlunoBloqueadaDoPath(pathAtual, alunoAtivos, alunoLiberados, sessao.estudanteId)
+  // Testador global: nunca bloqueado por manutenção de área e vê todos os itens do menu.
+  const areaAlunoBloqueada = ehTestadorGlobalAluno ? null : areaAlunoBloqueadaDoPath(pathAtual, alunoAtivos, alunoLiberados, sessao.estudanteId)
   // Áreas em 'construcao' NÃO são escondidas do menu (seguem clicáveis → card "Em breve").
-  const hrefsOcultosAluno = hrefsBloqueadosAluno(alunoAtivos, alunoLiberados, sessao.estudanteId, alunoModos)
+  const hrefsOcultosAluno = ehTestadorGlobalAluno ? [] : hrefsBloqueadosAluno(alunoAtivos, alunoLiberados, sessao.estudanteId, alunoModos)
   // Conteúdo a renderizar quando a rota atual está bloqueada p/ ESTE aluno: card "Em breve" no modo
   // 'construcao', senão a tela genérica de manutenção. (Alunos liberados têm areaAlunoBloqueada=null → veem children.)
   const conteudoAreaBloqueada = areaAlunoBloqueada
@@ -171,6 +178,8 @@ export default async function AlunoPortalLayout({ children }: { children: React.
       // Revisão: a Início PRINCIPAL é a nova (/aluno/nova/inicio). A original foi desativada (redireciona).
       { href: brand === 'revisao' ? '/aluno/nova/inicio' : '/aluno', label: 'Início', short: 'Início', icon: 'Home', exact: true },
       { href: '/aluno/simulados', label: 'Simulados', short: 'Simulados', icon: 'ClipboardList' },
+      // Hub "Meus Extensivos" (Fase 2 produtos): lista os extensivos do aluno + páginas branded por produto.
+      { href: '/aluno/extensivos', label: 'Meus Extensivos', short: 'Extensivos', icon: 'GraduationCap' },
       // Desafios de Lei Seca e Jurisprudência saem do MENU na Revisão: o acesso ao conteúdo passa a ser
       // só pela área de Cursos (que abre /aluno/leitura?modulo= e /aluno/jurisprudencia?desafio=). As ROTAS
       // seguem vivas de propósito (não entram em manutenção) para o Cursos continuar abrindo o conteúdo.

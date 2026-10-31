@@ -42,6 +42,8 @@ const AREA_PERM: { prefix: string; perm: string; ou?: string }[] = [
   { prefix: '/admin/lgpd', perm: 'estudantes:view' },
   { prefix: '/admin/grupos', perm: 'grupos:view' },
   { prefix: '/admin/matriculas', perm: 'matriculas:view' },
+  { prefix: '/admin/produtos', perm: 'produtos:view' },
+  { prefix: '/admin/liberacao', perm: 'liberacao:view' },
   { prefix: '/admin/integracoes', perm: 'integracoes:view' },
   { prefix: '/admin/conexoes', perm: 'integracoes:view' },
   { prefix: '/admin/relatorios', perm: 'relatorios:view' },
@@ -52,7 +54,25 @@ const AREA_PERM: { prefix: string; perm: string; ou?: string }[] = [
   { prefix: '/admin/configuracoes', perm: 'configuracoes:view' },
   { prefix: '/admin/transcricao', perm: 'configuracoes:view' },
   { prefix: '/admin/sistema', perm: 'configuracoes:view' },
+  { prefix: '/admin/testadores', perm: 'configuracoes:view' },
   { prefix: '/admin/cronogramas', perm: 'cronogramas:view' },
+  // Estúdio de Conteúdo (área NOVA, construída por fora em /admin/conteudos/*). Cada sub-rota tem
+  // a sua permissão. Prefixos distintos (nenhum é prefixo de outro), então a ordem entre eles é
+  // indiferente. Perms ainda não semeadas no catálogo RBAC (flashcards/trilhas/classificacao, e a
+  // futura biblioteca:view — por ora mapeada p/ configuracoes:view) usam a string coerente: até o
+  // catálogo incluí-las, cargos sem acesso total veem "Sem acesso", mas admins passam.
+  { prefix: '/admin/conteudos/produtos', perm: 'produtos:view' },
+  { prefix: '/admin/conteudos/materiais/aulas', perm: 'biblioteca:view' },
+  { prefix: '/admin/conteudos/materiais/biblioteca', perm: 'biblioteca:view' },
+  { prefix: '/admin/conteudos/materiais/questoes', perm: 'questoes:view' },
+  { prefix: '/admin/conteudos/materiais/arquivos', perm: 'biblioteca:view' },
+  { prefix: '/admin/conteudos/flashcards', perm: 'flashcards:view' },
+  { prefix: '/admin/conteudos/trilhas', perm: 'trilhas:view' },
+  { prefix: '/admin/conteudos/ofertas', perm: 'liberacao:view' },
+  { prefix: '/admin/conteudos/classificacao', perm: 'classificacao:view' },
+  { prefix: '/admin/conteudos/grupos', perm: 'grupos:view' },
+  { prefix: '/admin/conteudos/acesso', perm: 'grupos:view' },
+  { prefix: '/admin/conteudos/lixeira', perm: 'questoes:view' },
 ]
 
 export default async function AdminLayout({

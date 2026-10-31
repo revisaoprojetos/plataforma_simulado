@@ -11,6 +11,7 @@ import { invalidarRelatorios, remember, chaveRelatorio, esquecer } from '@/lib/c
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { sincronizarGrupoPassaporte } from '@/lib/estudante/grupo-passaporte'
 import { sincronizarGrupoVitalicio } from '@/lib/estudante/grupo-vitalicio'
+import { resumoAcessoLote } from '@/lib/acesso/aluno-efetivo'
 
 const TENANT_VAZIO = '00000000-0000-0000-0000-000000000000'
 
@@ -18,6 +19,8 @@ export type EstudanteBase = {
   id: string; nome: string; email: string | null; cpf: string | null; telefone: string | null
   classificacao: string | null; created_at: string | null; avatar: string | null; avatarCor: string | null
   feitos: number; media: number | null
+  /** nº de produtos com acesso ATIVO (regras de venda + catálogo). Preenchido só com agregados. */
+  acessoAtivos?: number
 }
 
 export type SortEstudante = { key: 'nome' | 'classificacao' | 'created_at'; dir: 'asc' | 'desc' }
@@ -72,8 +75,13 @@ export async function carregarLoteEstudantes(offset: number, limit: number, comC
   }))
   // Agregados (feitos/média) só quando pedidos (default): outros consumidores (ex.: relatórios) têm
   // agregados próprios e não devem pagar essa query por lote.
-  const agg = opts?.comAgregados === false ? {} : await agregarSessoes(svc, tenantId, base.map((r: any) => r.id))
-  const rows: EstudanteBase[] = base.map((r: any) => ({ ...r, feitos: agg[r.id]?.feitos ?? 0, media: agg[r.id]?.media ?? null }))
+  const comAgg = opts?.comAgregados !== false
+  const ids = base.map((r: any) => r.id)
+  const [agg, acesso] = await Promise.all([
+    comAgg ? agregarSessoes(svc, tenantId, ids) : Promise.resolve({} as Record<string, { feitos: number; media: number | null }>),
+    comAgg ? resumoAcessoLote(tenantId, ids) : Promise.resolve({} as Record<string, number>),
+  ])
+  const rows: EstudanteBase[] = base.map((r: any) => ({ ...r, feitos: agg[r.id]?.feitos ?? 0, media: agg[r.id]?.media ?? null, acessoAtivos: acesso[r.id] ?? 0 }))
   return { rows, total: count ?? rows.length }
 }
 
@@ -107,8 +115,9 @@ export async function buscarEstudantes(termo: string): Promise<EstudanteBase[]> 
     classificacao: e.classificacao ?? null, created_at: e.created_at ?? null,
     avatar: e.avatar ?? null, avatarCor: e.perfil_avatar_cor ?? null,
   }))
-  const agg = await agregarSessoes(svc, tenantId, base.map((r: any) => r.id))
-  return base.map((r: any) => ({ ...r, feitos: agg[r.id]?.feitos ?? 0, media: agg[r.id]?.media ?? null }))
+  const ids = base.map((r: any) => r.id)
+  const [agg, acesso] = await Promise.all([agregarSessoes(svc, tenantId, ids), resumoAcessoLote(tenantId, ids)])
+  return base.map((r: any) => ({ ...r, feitos: agg[r.id]?.feitos ?? 0, media: agg[r.id]?.media ?? null, acessoAtivos: acesso[r.id] ?? 0 }))
 }
 
 /** KPIs + e-mails de admin, CACHEADOS (remember, 5 min) — a parte cara (varrer sessões p/ "ativos"
@@ -148,10 +157,11 @@ export async function exportarTodosEstudantes(): Promise<EstudanteBase[]> {
   ])
   const soma: Record<string, number> = {}, cont: Record<string, number> = {}, feitos: Record<string, number> = {}
   for (const s of sess) { feitos[s.estudante_id] = (feitos[s.estudante_id] ?? 0) + 1; if (s.nota != null) { soma[s.estudante_id] = (soma[s.estudante_id] ?? 0) + Number(s.nota); cont[s.estudante_id] = (cont[s.estudante_id] ?? 0) + 1 } }
+  const acesso = await resumoAcessoLote(tenantId, base.map((e: any) => e.id))
   return base.map((e: any) => ({
     id: e.id, nome: e.nome, email: e.email ?? null, cpf: e.cpf ?? null, telefone: e.telefone ?? null,
     classificacao: e.classificacao ?? null, created_at: e.created_at ?? null, avatar: e.avatar ?? null, avatarCor: e.perfil_avatar_cor ?? null,
-    feitos: feitos[e.id] ?? 0, media: cont[e.id] ? Math.round(((soma[e.id] ?? 0) / cont[e.id]) * 10) / 10 : null,
+    feitos: feitos[e.id] ?? 0, media: cont[e.id] ? Math.round(((soma[e.id] ?? 0) / cont[e.id]) * 10) / 10 : null, acessoAtivos: acesso[e.id] ?? 0,
   }))
 }
 

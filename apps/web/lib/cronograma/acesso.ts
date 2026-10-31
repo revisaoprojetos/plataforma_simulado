@@ -21,6 +21,7 @@ import 'server-only'
  */
 
 import { fetchAllByIn } from './../supabase/fetch-all'
+import { ehTestadorGlobal } from '@/lib/sistema/testadores-globais'
 
 export type ViaAcesso = 'testador' | 'pacote' | 'matricula' | 'avulso'
 
@@ -40,6 +41,10 @@ export async function verificarAcessoCronograma(
   cronogramaId: string,
 ): Promise<{ permitido: boolean; via: ViaAcesso | null }> {
   const tid = tenantId ?? SEM_TENANT
+
+  // TESTADOR GLOBAL do tenant: acesso total (inclui rascunho), mas CONTA normal → via 'pacote'
+  // (não 'testador', que marcaria a emissão como is_teste). Fast-path sem query se não há testadores.
+  if (await ehTestadorGlobal({ tenantId: tid, estudanteId })) return { permitido: true, via: 'pacote' }
 
   const { data: testador } = await svc
     .from('simulado_cronograma_testadores')
@@ -152,6 +157,13 @@ export async function cronogramasDoAluno(
   if (testadorGeral) {
     const { data: todos } = await svc.from('simulado_cronogramas').select('id').eq('tenant_id', tid).eq('deletado', false)
     for (const c of (todos ?? []) as any[]) if (!via.has(c.id)) via.set(c.id, 'testador')
+  }
+
+  // Testador global do tenant: enxerga TODOS os cronogramas liberados no catálogo (via 'pacote' →
+  // conta normal). Rascunhos seguem só por link direto (gate verificarAcessoCronograma já libera).
+  if (await ehTestadorGlobal({ tenantId: tid, estudanteId })) {
+    const { data: todos } = await svc.from('simulado_cronogramas').select('id').eq('tenant_id', tid).eq('deletado', false)
+    for (const c of (todos ?? []) as any[]) if (!via.has(c.id)) via.set(c.id, 'pacote')
   }
 
   const ids = [...via.keys()]

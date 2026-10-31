@@ -12,6 +12,20 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 3.36.0 — 2026-10-31
+
+### Central de Estudos (sub-regra em Cursos)
+- A Central de Estudos (`/aluno/nova/cursos/central`) virou **sub-área de manutenção** do aluno (`nova_cursos_central`), que **nasce bloqueada**: só aparece para os alunos liberados no allowlist (Configuração → Sistema → aba Aluno). O layout bloqueia a rota; na página de Cursos somem o botão "Ir para a Central de Estudos" e a seção de atalhos para quem não tem acesso (sem caminho morto).
+
+### Como Estudar
+- Removida a seção "Para colocar em prática".
+
+### Testadores globais
+- E-mails testadores globais por tenant (`tema.testadores_globais`) com acesso total (furam manutenção de área/plataforma e gates de conteúdo), geridos em **Configuração → Testadores**.
+
+### Visualização de acesso do aluno (admin)
+- Nova aba **Acesso** no detalhe do estudante e coluna **Acesso** na lista de estudantes — produtos liberados por aluno, com status, validade e origem (tolerante a tabelas ainda não migradas).
+
 ## 3.35.1 — 2026-10-30
 
 **fix(login): fim do loop/trava de login (admin e aluno) por cookie/cache + melhorias**

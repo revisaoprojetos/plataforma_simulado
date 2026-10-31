@@ -234,6 +234,7 @@ const navGroups: NavGroup[] = [
       { label: 'Chaves de API', href: '/admin/transcricao', icon: KeyRound, perm: 'configuracoes:view' },
       // Aparência (identidade/cores/tema) MIGRADA para o Console (super-admin) → Plataformas → Aparência.
       { label: 'Sistema', href: '/admin/sistema', icon: ServerCog, perm: 'configuracoes:view' },
+      { label: 'Testadores', href: '/admin/testadores', icon: FlaskConical, perm: 'configuracoes:view' },
       { label: 'Mensagens', href: '/admin/configuracoes/mensagens', icon: MessageSquare, perm: 'configuracoes:view' },
       { label: 'Ajuda / FAQ', href: '/admin/configuracoes/ajuda', icon: HelpCircle, perm: 'configuracoes:view' },
       { label: 'Banners & Pop-ups', href: '/admin/configuracoes/banners', icon: Megaphone, perm: 'configuracoes:view' },

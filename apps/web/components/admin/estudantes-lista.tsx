@@ -142,6 +142,7 @@ export function EstudantesLista({ inicial, total, kpis, adminEmails = [] }: {
     { titulo: 'CPF', valor: (e) => e.cpf },
     { titulo: 'Telefone', valor: (e) => e.telefone },
     { titulo: 'Plano', valor: (e) => (ehAdmin(e) ? 'Admin' : e.classificacao === 'vitalicio' ? 'Vitalício' : e.classificacao === 'passaporte' ? 'Passaporte' : 'Padrão') },
+    { titulo: 'Produtos ativos', valor: (e) => e.acessoAtivos ?? 0 },
     { titulo: 'Simulados feitos', valor: (e) => e.feitos },
     { titulo: 'Média', valor: (e) => (e.media != null ? e.media.toFixed(1).replace('.', ',') : '') },
     { titulo: 'Cadastrado em', valor: (e) => fmtData(e.created_at) },
@@ -201,6 +202,7 @@ export function EstudantesLista({ inicial, total, kpis, adminEmails = [] }: {
                 <Th label="Estudante" k="nome" sort={sort} onSort={ordenarPor} />
                 <th className="hidden px-4 py-2.5 font-medium lg:table-cell">CPF / Telefone</th>
                 <Th label="Plano" k="classificacao" sort={sort} onSort={ordenarPor} />
+                <th className="hidden px-4 py-2.5 font-medium lg:table-cell">Acesso</th>
                 <Th label="Simulados" k="feitos" sort={sort} onSort={ordenarPor} align="center" className="whitespace-nowrap" />
                 <Th label="Média" k="media" sort={sort} onSort={ordenarPor} align="center" className="whitespace-nowrap" />
                 <Th label="Cadastrado" k="created_at" sort={sort} onSort={ordenarPor} className="hidden whitespace-nowrap sm:table-cell" />
@@ -209,7 +211,7 @@ export function EstudantesLista({ inicial, total, kpis, adminEmails = [] }: {
             </thead>
             <tbody>
               {visiveis.length === 0 ? (
-                <tr><td colSpan={7} className="py-12 text-center text-muted-foreground">{(buscando || carregandoPag) ? 'Carregando…' : 'Nenhum estudante encontrado.'}</td></tr>
+                <tr><td colSpan={8} className="py-12 text-center text-muted-foreground">{(buscando || carregandoPag) ? 'Carregando…' : 'Nenhum estudante encontrado.'}</td></tr>
               ) : visiveis.map((e) => (
                 <tr key={e.id} className="group border-b border-border/60 transition-colors last:border-0 hover:bg-muted/40">
                   <td className="px-4 py-2.5">
@@ -226,6 +228,11 @@ export function EstudantesLista({ inicial, total, kpis, adminEmails = [] }: {
                     {ehAdmin(e)
                       ? <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/15 px-2 py-0.5 text-[11px] font-medium text-indigo-600 dark:text-indigo-400">Admin</span>
                       : <ClassificacaoBadge classificacao={e.classificacao} />}
+                  </td>
+                  <td className="hidden px-4 py-2.5 lg:table-cell">
+                    {(e.acessoAtivos ?? 0) > 0
+                      ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">{e.acessoAtivos} produto{(e.acessoAtivos ?? 0) > 1 ? 's' : ''}</span>
+                      : <span className="text-xs text-muted-foreground">—</span>}
                   </td>
                   <td className="px-4 py-2.5 text-center tabular-nums">{e.feitos > 0 ? <span className="font-semibold">{e.feitos}</span> : <span className="text-muted-foreground">—</span>}</td>
                   <td className={cn('px-4 py-2.5 text-center font-semibold tabular-nums', notaTom(e.media))}>{e.media != null ? e.media.toFixed(1) : '—'}</td>

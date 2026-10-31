@@ -7,6 +7,7 @@ import { PageHeader, Card, Grid, Row, Col, H2, Muted, Tag, Btn, Bar, Media, Cove
 import { Icon } from '@/components/nova/icons'
 import { R } from '@/lib/nova/rotas'
 import { carregarCursosReais, type CursoReal } from '@/lib/nova/cursos-reais'
+import { centralEstudosLiberada } from '@/lib/nova/central-acesso'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { createAdminClient } from '@/lib/supabase/server'
 
@@ -63,7 +64,14 @@ const ATALHOS = [
 
 export default async function CursosPage() {
   const sessao = await getSessaoAluno()
-  const cursos = sessao ? await carregarCursosReais(createAdminClient(), sessao.tenantId, sessao.estudanteId) : []
+  // Carrega os cursos e, em paralelo, se a Central de Estudos (sub-regra de Cursos) está liberada p/ este
+  // aluno. Bloqueada (padrão) → some o botão do aviso e toda a seção da Central (sem caminho morto).
+  const [cursos, centralLiberada] = sessao
+    ? await Promise.all([
+        carregarCursosReais(createAdminClient(), sessao.tenantId, sessao.estudanteId),
+        centralEstudosLiberada(sessao.tenantId, sessao.estudanteId, sessao.email),
+      ])
+    : [[] as CursoReal[], false]
   const primeiroNome = (sessao?.nome || 'Aluno').split(' ')[0]
 
   return (
@@ -76,7 +84,8 @@ export default async function CursosPage() {
 
       {cursos.length === 0 ? (
         <Card>
-          <Aviso icon="book" action={<Btn kind="secondary" icon="arrow" href={R.central}>Ir para a Central de Estudos</Btn>}>
+          {/* Sem acesso à Central → mostra só o texto (sem o botão, p/ não levar a um caminho bloqueado). */}
+          <Aviso icon="book" action={centralLiberada ? <Btn kind="secondary" icon="arrow" href={R.central}>Ir para a Central de Estudos</Btn> : undefined}>
             Você ainda não tem cursos liberados, {primeiroNome}. Assim que o Revisão liberar um curso (como o Desafio de Lei Seca, a Jurisprudência ou a Maratona), ele aparece aqui.
           </Aviso>
         </Card>
@@ -90,26 +99,30 @@ export default async function CursosPage() {
         </Col>
       )}
 
-      {/* Central de Estudos (navegação — materiais e ferramentas que acompanham os cursos) */}
-      <Col gap={14}>
-        <SecHead title="Central de Estudos" sub="Materiais e ferramentas que acompanham os seus cursos." right={<Btn kind="link" href={R.central}>Abrir a Central de Estudos</Btn>} />
-        <Grid min={280} gap={16}>
-          {ATALHOS.map((a) => (
-            <Link key={a.titulo} href={a.href} style={{ display: 'block' }}>
-              <Card pad={0} style={{ overflow: 'hidden', gap: 0, height: '100%' }}>
-                <Media ratio="16:9" fallback={<Cover line={a.line} sigla={a.sigla} grad={a.grad} big={a.sigla.length > 10 ? 18 : 22} />} />
-                <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap', padding: 14 }}>
-                  <Col gap={2} style={{ minWidth: 0 }}>
-                    <b style={{ fontSize: 14, fontWeight: 800, color: 'var(--ink)' }}>{a.titulo}</b>
-                    <Muted size={12}>{a.sub}</Muted>
-                  </Col>
-                  <Icon n="chev" size={16} style={{ color: 'var(--muted2)', flexShrink: 0 }} />
-                </Row>
-              </Card>
-            </Link>
-          ))}
-        </Grid>
-      </Col>
+      {/* Central de Estudos (navegação — materiais e ferramentas que acompanham os cursos).
+          Sub-regra 'nova_cursos_central': só aparece p/ quem tem acesso liberado; caso contrário some
+          por completo (junto com o botão do aviso acima) p/ não deixar caminho para uma área bloqueada. */}
+      {centralLiberada && (
+        <Col gap={14}>
+          <SecHead title="Central de Estudos" sub="Materiais e ferramentas que acompanham os seus cursos." right={<Btn kind="link" href={R.central}>Abrir a Central de Estudos</Btn>} />
+          <Grid min={280} gap={16}>
+            {ATALHOS.map((a) => (
+              <Link key={a.titulo} href={a.href} style={{ display: 'block' }}>
+                <Card pad={0} style={{ overflow: 'hidden', gap: 0, height: '100%' }}>
+                  <Media ratio="16:9" fallback={<Cover line={a.line} sigla={a.sigla} grad={a.grad} big={a.sigla.length > 10 ? 18 : 22} />} />
+                  <Row style={{ justifyContent: 'space-between', flexWrap: 'nowrap', padding: 14 }}>
+                    <Col gap={2} style={{ minWidth: 0 }}>
+                      <b style={{ fontSize: 14, fontWeight: 800, color: 'var(--ink)' }}>{a.titulo}</b>
+                      <Muted size={12}>{a.sub}</Muted>
+                    </Col>
+                    <Icon n="chev" size={16} style={{ color: 'var(--muted2)', flexShrink: 0 }} />
+                  </Row>
+                </Card>
+              </Link>
+            ))}
+          </Grid>
+        </Col>
+      )}
     </>
   )
 }

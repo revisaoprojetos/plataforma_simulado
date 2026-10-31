@@ -8,7 +8,7 @@ import { resolverCardView } from '@/lib/card-view'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
-import { ArrowLeft, Mail, Phone, IdCard, Calendar, FolderOpen, User, ListChecks, ClipboardList, FileText, FileCheck2, Star, Trophy, Target, GraduationCap, Hash, Repeat, BookOpen } from 'lucide-react'
+import { ArrowLeft, Mail, Phone, IdCard, Calendar, FolderOpen, User, ListChecks, ClipboardList, FileText, FileCheck2, Star, Trophy, Target, GraduationCap, Hash, Repeat, BookOpen, KeyRound } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { type SessaoRow } from '@/components/admin/historico-estudante'
 import { SimuladosFeitosCards } from '@/components/admin/simulados-feitos-cards'
@@ -25,6 +25,8 @@ import { desafiosAlunoSql, assinaturasAlunoSql, desafiosPendentesAlunoSql, simul
 import { VinculosAluno } from '@/components/admin/vinculos-aluno'
 import { gruposVinculadosFallback, simuladosVinculadosFallback } from '@/lib/admin/vinculos-fallback'
 import { EstudanteAssinaturas } from '@/components/admin/estudante-assinaturas'
+import { EstudanteAcesso } from '@/components/admin/estudante-acesso'
+import { acessoEfetivoDoEstudante } from '@/lib/acesso/aluno-efetivo'
 import type { GrupoBanco } from '@/app/admin/banco-questoes/actions'
 import { modalidadesDoAlunoV2, temEntregaV2, type EntregaSlots, type ModalidadeAluno } from '@/lib/caderno-teste/entrega-aluno'
 import { tipoDoSimulado, filtrarModsPorTipo, type TipoSimulado } from '@/lib/simulado/tipo'
@@ -262,6 +264,10 @@ export default async function EstudantePerfilPage({ params, searchParams }: { pa
   const assinaturas = assinaturasAluno ?? []
   const assAtivas = assinaturas.filter((a) => a.status === 'ativo').length
 
+  // Acesso efetivo (une regras de venda + catálogo/manual → produtos). Tolerante; degrada vazio.
+  const acessoItens = await acessoEfetivoDoEstudante(TID, id).catch(() => [])
+  const acessoAtivos = acessoItens.filter((i) => i.temAcesso).length
+
   // Vínculos (aba): simulados que o aluno acessa + grupos (com nº de alunos).
   // FALLBACK: o SQL agregado devolve `null` quando está OFF (DATABASE_URL ausente / REPORT_SQL=off) —
   // sem isto a aba mostrava "0 grupos" mesmo com o aluno vinculado. Cai no PostgREST (mesmas regras).
@@ -449,6 +455,13 @@ export default async function EstudantePerfilPage({ params, searchParams }: { pa
             icon: <Repeat className="h-4 w-4" />,
             count: assAtivas,
             panel: <EstudanteAssinaturas assinaturas={assinaturasItens} pagamentos={pagamentos} sqlOff={assinaturasAluno == null} />,
+          },
+          {
+            key: 'acesso',
+            label: 'Acesso',
+            icon: <KeyRound className="h-4 w-4" />,
+            count: acessoAtivos,
+            panel: <EstudanteAcesso itens={acessoItens} />,
           },
         ]}
       />

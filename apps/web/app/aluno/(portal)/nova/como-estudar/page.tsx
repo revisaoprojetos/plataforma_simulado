@@ -1,9 +1,8 @@
 // Como Estudar (novo) — ComoEstudarRevisao. Tela de menu (sem caminho).
 // Método em 4 passos + 12 dicas (filtro por categoria) + atalhos "Para colocar em prática".
 // CONTEÚDO DE EXEMPLO — marcado com TODO(dados). Layout fiel ao canvas.
-import { Hero, PageHeader, Card, Soft, Grid, Row, Col, H2, H3, P, Muted, Tag, Btn, Chips, IconBox, Eyebrow } from '@/components/nova/ui'
+import { Hero, PageHeader, Card, Soft, Grid, Row, Col, H2, H3, P, Btn, Chips, IconBox, Eyebrow } from '@/components/nova/ui'
 import { Icon, type IconName } from '@/components/nova/icons'
-import { R } from '@/lib/nova/rotas'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,14 +32,6 @@ const DICAS: Dica[] = [
 ]
 
 const FILTROS = ['Todas 12', 'Método Revisão 3', 'Rotina 3', 'Leitura e grifo 2', 'Revisão 1', 'Questões e simulados 2', 'Dicas da plataforma 1']
-
-const PRATICA = [
-  { titulo: 'COMO ESTUDAR', nome: 'Módulo Como Estudar', sub: 'Orientações de método em vídeo, no Extensivo', href: R.extensivo },
-  { titulo: 'CRONOGRAMA', nome: 'Monte o seu cronograma', sub: 'Coloque o método em prática', href: R.cronogramaMontar },
-  { titulo: 'QUESTÕES E SIMULADOS', nome: 'Questões e Simulados', sub: 'Treine o que você estudou', href: R.questoes },
-]
-
-const PRATICA_GRAD = 'linear-gradient(130deg,#2A1E4A 0%,#4A31B8 60%,#6A3FA0 100%)'
 
 export default function ComoEstudarPage() {
   return (
@@ -98,28 +89,6 @@ export default function ComoEstudarPage() {
                 ))}
               </Soft>
             </Card>
-          ))}
-        </Grid>
-      </Col>
-
-      {/* Para colocar em prática */}
-      <Col gap={16}>
-        <H2>Para colocar em prática</H2>
-        <Grid cols={3} gap={16}>
-          {PRATICA.map((p) => (
-            <a key={p.nome} href={p.href} style={{ display: 'flex', flexDirection: 'column', borderRadius: 18, overflow: 'hidden', border: '1px solid var(--line)', background: 'var(--surface)' }}>
-              <div style={{ position: 'relative', height: 160, background: PRATICA_GRAD, display: 'flex', alignItems: 'flex-end', padding: 18 }}>
-                <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px)', backgroundSize: '30px 30px' }} />
-                <span style={{ position: 'relative', fontFamily: 'Montserrat, sans-serif', fontStyle: 'italic', fontWeight: 800, fontSize: 22, letterSpacing: '-0.01em', color: 'var(--gold)', textShadow: '0 2px 12px rgba(0,0,0,.3)' }}>{p.titulo}</span>
-              </div>
-              <Row style={{ justifyContent: 'space-between', alignItems: 'center', gap: 12, padding: 16 }}>
-                <Col gap={2} style={{ minWidth: 0 }}>
-                  <b style={{ fontSize: 14.5, fontWeight: 800, color: 'var(--ink)' }}>{p.nome}</b>
-                  <Muted size={12}>{p.sub}</Muted>
-                </Col>
-                <Icon n="chev" size={18} style={{ color: 'var(--muted2)', flexShrink: 0 }} />
-              </Row>
-            </a>
           ))}
         </Grid>
       </Col>

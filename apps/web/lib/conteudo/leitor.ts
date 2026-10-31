@@ -1,6 +1,7 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
+import { ehTestadorGlobal } from '@/lib/sistema/testadores-globais'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { remember } from '@/lib/cache/relatorio-cache'
 import { listarAnotacoes, type Anotacao } from './anotacoes'
@@ -297,10 +298,15 @@ export async function carregarLeitura(documentoId: string, alunoId: string): Pro
   if (!tenantId || !documentoId) return null
   const svc = createAdminClient()
   const doc = await fetchDocComAcesso(svc, tenantId, documentoId, 'id, titulo, status, versao_atual_id, deletado, pasta_id, herda_acesso, acesso_geral, tipo_origem, categoria')
-  if (!doc || doc.deletado || doc.status !== 'publicado' || !doc.versao_atual_id || (doc as any).categoria !== 'conteudo') return null
-
-  // Gate de acesso ESCOPADO via motor ÚNICO (acessoEfetivo): modo/oculto do doc + cadeia de ancestrais.
-  if (!(await avaliarDocAluno(svc, tenantId, alunoId, doc)).permitido) return null
+  if (!doc || doc.deletado || !doc.versao_atual_id || (doc as any).categoria !== 'conteudo') return null
+  // TESTADOR GLOBAL: acesso total — fura "não publicado" e o gate de acesso. Fast-path sem query se o
+  // tenant não tiver testadores. Demais guardas (deletado/categoria/versão) continuam valendo.
+  const ehTest = await ehTestadorGlobal({ tenantId, estudanteId: alunoId })
+  if (!ehTest) {
+    if (doc.status !== 'publicado') return null
+    // Gate de acesso ESCOPADO via motor ÚNICO (acessoEfetivo): modo/oculto do doc + cadeia de ancestrais.
+    if (!(await avaliarDocAluno(svc, tenantId, alunoId, doc)).permitido) return null
+  }
 
   // A parte CARA (trechos + HTML rico da versão) é IDÊNTICA p/ todos os alunos e depende SÓ de
   // (documento_id, versão). Cacheada 300s pela chave c/ versao_atual_id → nova versão (salvar/editar no
@@ -376,8 +382,12 @@ export async function carregarLeituraPdf(documentoId: string, alunoId: string): 
   if (!tenantId || !documentoId) return null
   const svc = createAdminClient()
   const doc = await fetchDocComAcesso(svc, tenantId, documentoId, 'id, titulo, status, versao_atual_id, deletado, pasta_id, herda_acesso, acesso_geral, tipo_origem, categoria')
-  if (!doc || doc.deletado || doc.status !== 'publicado' || !doc.versao_atual_id || (doc as any).categoria !== 'conteudo') return null
-  if (!(await avaliarDocAluno(svc, tenantId, alunoId, doc)).permitido) return null
+  if (!doc || doc.deletado || !doc.versao_atual_id || (doc as any).categoria !== 'conteudo') return null
+  // TESTADOR GLOBAL: acesso total (fura "não publicado" + gate). Fast-path sem query sem testadores.
+  if (!(await ehTestadorGlobal({ tenantId, estudanteId: alunoId }))) {
+    if (doc.status !== 'publicado') return null
+    if (!(await avaliarDocAluno(svc, tenantId, alunoId, doc)).permitido) return null
+  }
 
   const { gerarPdfDocumento } = await import('./thumb')
   // O PDF (OnlyOffice→PDF, já cacheado em storage) + a URL assinada são IGUAIS p/ todos os alunos e
@@ -401,10 +411,14 @@ export async function urlDownloadAluno(documentoId: string, alunoId: string): Pr
   if (!tenantId || !documentoId) return null
   const svc = createAdminClient()
   const doc = await fetchDocComAcesso(svc, tenantId, documentoId, 'id, status, deletado, versao_atual_id, pasta_id, herda_acesso, acesso_geral, categoria')
-  if (!doc || doc.deletado || doc.status !== 'publicado' || !doc.versao_atual_id || (doc as any).categoria !== 'conteudo') return null
-  // Gate + download exige permissão de BAIXAR (acessoEfetivo). Nega se não puder ler OU não puder baixar.
-  const resDl = await avaliarDocAluno(svc, tenantId, alunoId, doc)
-  if (!resDl.permitido || !resDl.permissoes.baixar) return null
+  if (!doc || doc.deletado || !doc.versao_atual_id || (doc as any).categoria !== 'conteudo') return null
+  // TESTADOR GLOBAL: baixa qualquer material (fura "não publicado" + gate + permissão de baixar).
+  if (!(await ehTestadorGlobal({ tenantId, estudanteId: alunoId }))) {
+    if (doc.status !== 'publicado') return null
+    // Gate + download exige permissão de BAIXAR (acessoEfetivo). Nega se não puder ler OU não puder baixar.
+    const resDl = await avaliarDocAluno(svc, tenantId, alunoId, doc)
+    if (!resDl.permitido || !resDl.permissoes.baixar) return null
+  }
   const { data: ver } = await svc.from('simulado_conteudo_versoes').select('arquivo_key').eq('tenant_id', tenantId).eq('id', doc.versao_atual_id).maybeSingle()
   if (!(ver as any)?.arquivo_key) return null
   const { urlAssinadaOriginal } = await import('./ingestao')

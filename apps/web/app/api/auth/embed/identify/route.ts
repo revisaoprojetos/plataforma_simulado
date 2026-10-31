@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getTenantMensagem, getTenantContato, type TenantContato } from '@/lib/tenant-messages'
 import { rateLimit } from '@/lib/rate-limit'
 import { registrarAudit } from '@/lib/audit'
+import { ehTestadorGlobal } from '@/lib/sistema/testadores-globais'
 import { dispararWebhook } from '@/lib/webhooks/dispatch'
 import { contatoEstudante } from '@/lib/webhooks/payload'
 import { publicarAoVivo } from '@/lib/realtime/pubsub'
@@ -189,9 +190,13 @@ export async function POST(request: NextRequest) {
   // 3. TESTADOR? Se sim, faz o simulado como TESTE: pula status/janela/manutenção/matrícula, sem
   //    limite de tentativas, e a sessão nasce is_teste=true (fora de estatísticas/ranking/relatórios).
   const ehTeste = await isTestador(supabase, estudante.id, simulado.id)
+  // TESTADOR GLOBAL do tenant (e-mail na lista): também PULA todos os gates (status/janela/
+  // manutenção/matrícula/prazo/não-publicado), mas NÃO vira is_teste → a sessão é real e CONTA
+  // normalmente em ranking/estatística (decisão do produto). Por isso é um flag separado do `ehTeste`.
+  const ehTestadorGlobalSim = await ehTestadorGlobal({ tenantId, email: estudante.email, estudanteId: estudante.id })
 
   let acessoAvulso: { id: string; expira_em: string | null; tentativas_permitidas: number; tentativas_usadas: number } | null = null
-  if (!ehTeste) {
+  if (!ehTeste && !ehTestadorGlobalSim) {
     if (simulado.status !== 'publicado' && simulado.status !== 'ativo') {
       return bloqueio(tenantId, 'bloqueio_fora_janela', { simulado: tituloSimulado })
     }

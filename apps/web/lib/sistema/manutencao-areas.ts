@@ -71,6 +71,11 @@ export const AREAS_MANUTENCAO_ALUNO: AreaManutencao[] = [
   // Ligas (nova) — é a principal na Revisão; a antiga /aluno/ligas redireciona para cá.
   { key: 'nova_ligas', label: 'Ligas', descricao: 'Ranking por ligas, área principal da Revisão (/aluno/nova/comunidade/ligas). A antiga /aluno/ligas redireciona para cá.', href: '/aluno/nova/comunidade/ligas' },
   { key: 'nova_cursos', label: 'Cursos', descricao: 'Produtos e cursos do aluno (/aluno/nova/cursos).', href: '/aluno/nova/cursos' },
+  // SUB-REGRA de Cursos: a Central de Estudos (ferramentas LegProc/JurisClub/Questões + Desafios) e tudo
+  // sob /aluno/nova/cursos/central. Nasce BLOQUEADA — fica OCULTA p/ todos os alunos que não estão no
+  // allowlist (a "regra"): some o botão/atalhos da Central na página de Cursos e bloqueia a rota.
+  // NÃO esconde a área de Cursos em si (só a Central dentro dela). Libere os alunos certos no allowlist.
+  { key: 'nova_cursos_central', label: 'Central de Estudos (dentro de Cursos)', descricao: 'Central de Estudos e ferramentas dentro de Cursos (/aluno/nova/cursos/central). Sub-regra de Cursos: nasce BLOQUEADA — só os alunos liberados (allowlist) veem a Central; para os demais o botão "Ir para a Central de Estudos" e os atalhos somem da página de Cursos.', href: '/aluno/nova/cursos/central', padraoBloqueado: true },
   { key: 'nova_como_estudar', label: 'Como Estudar', descricao: 'Guia "Como Estudar" (/aluno/nova/como-estudar).', href: '/aluno/nova/como-estudar' },
   // Meus Cadernos (área nova). Em construção — nasce BLOQUEADA até o conteúdo ser configurado; some do
   // menu e a rota mostra "em manutenção". Libere (toggle off no admin) quando estiver pronta.
