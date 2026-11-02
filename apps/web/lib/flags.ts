@@ -60,3 +60,17 @@ export const OCULTAR_CRONOGRAMA = process.env.NEXT_PUBLIC_CRONOGRAMA_ATIVO !== '
  * sozinho (NODE_ENV inlinado no bundle → false no build de produção), p/ facilitar o teste local.
  */
 export const MODELOS_CADERNO_ATIVO = process.env.NEXT_PUBLIC_MODELOS_CADERNO_ATIVO === 'true' || process.env.NODE_ENV === 'development'
+
+/**
+ * LIBERACAO_REGRAS_ATIVO: liga o MOTOR DE REGRAS de liberação por venda (webhook de venda →
+ * regras → concessões/`simulado_access_grants`). **Default OFF (dormente)** — kill-switch de segurança.
+ *
+ * Com OFF: o webhook de venda cai no comportamento LEGADO (`aplicarEntitlement` direto, como antes da
+ * liberação existir); as tabelas de liberação (regras/pedidos/grants) NUNCA são tocadas; o cron de
+ * transições não faz nada; e o menu/área `/admin/liberacao` fica escondido. É seguro subir o código
+ * SEM aplicar a migração `...000001_liberacao_regras`.
+ *
+ * Para LIGAR (só depois de aplicar a migração e validar em tenant de teste): defina
+ * NEXT_PUBLIC_LIBERACAO_REGRAS_ATIVO=true no deploy. BUILD-TIME (inlinado no bundle) — exige rebuild.
+ */
+export const LIBERACAO_REGRAS_ATIVO = process.env.NEXT_PUBLIC_LIBERACAO_REGRAS_ATIVO === 'true'

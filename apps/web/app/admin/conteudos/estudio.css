@@ -1,0 +1,50 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+/* Design-system do designer (pacote revisao-admin-conteudos / design-system/tokens.css),
+   ESCOPADO à área Conteúdos (.estudio-scope). Só reescreve as variáveis de tema DENTRO do
+   escopo — o resto do admin fica intacto. Fonte Plus Jakarta Sans + superfícies/linhas/raios
+   do designer, mantendo a marca roxa (= --primary do tenant). */
+
+.estudio-scope {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  /* superfícies / texto / linhas (claro) */
+  --background: #F4F2FA;
+  --foreground: #1D1933;
+  --card: #FFFFFF;
+  --card-foreground: #1D1933;
+  --popover: #FFFFFF;
+  --popover-foreground: #1D1933;
+  --muted: #F6F4FC;
+  --muted-foreground: #6E6886;
+  --secondary: #F6F4FC;
+  --secondary-foreground: #2A1A55;
+  --accent: #EFEBFD;
+  --accent-foreground: #4B30BE;
+  --border: #EAE6F4;
+  --input: #E1DAF2;
+  /* --primary / --ring NÃO são sobrescritos: herdam a marca do tenant (no Revisão já é esse roxo),
+     pra não quebrar o white-label de outros tenants dentro da área Conteúdos. */
+  --radius: 0.7rem;      /* rounded-2xl ≈ 20px (r-card do designer) */
+  --gold-ink: #9A7400;   /* eyebrow dourada sobre claro */
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.dark .estudio-scope {
+  --background: #18181D;
+  --foreground: #FFFFFF;
+  --card: #232329;
+  --card-foreground: #FFFFFF;
+  --popover: #232329;
+  --popover-foreground: #FFFFFF;
+  --muted: #2C2C34;
+  --muted-foreground: #BDBBCB;
+  --secondary: #2C2C34;
+  --secondary-foreground: #FFFFFF;
+  --accent: rgba(143, 117, 255, 0.20);
+  --accent-foreground: #B3A1FF;
+  --border: rgba(255, 255, 255, 0.10);
+  --input: rgba(255, 255, 255, 0.18);
+  /* --primary / --ring herdam a marca do tenant (ver bloco claro). */
+  --gold-ink: #F1C232;
+}

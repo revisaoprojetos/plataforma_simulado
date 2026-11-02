@@ -50,6 +50,14 @@ function NavProgressInner({ edge = 'bottom' }: { edge?: 'bottom' | 'top' }) {
       if (maxT.current) clearTimeout(maxT.current)
       maxT.current = setTimeout(() => setVisivel(false), 12000) // rede de segurança
     }
+    // FIM programático (ex.: troca de tela dentro de um iframe, que não muda a rota do Next):
+    // quem terminou dispara `window.dispatchEvent(new Event('navprogress:done'))`.
+    function terminar() {
+      if (maxT.current) clearTimeout(maxT.current)
+      if (offT.current) clearTimeout(offT.current)
+      const decorrido = inicioRef.current ? Date.now() - inicioRef.current : MIN_VISIVEL
+      offT.current = setTimeout(() => setVisivel(false), Math.max(180, MIN_VISIVEL - decorrido))
+    }
     function onClick(e: MouseEvent) {
       if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return
       const alvo = e.target as HTMLElement | null
@@ -71,7 +79,8 @@ function NavProgressInner({ edge = 'bottom' }: { edge?: 'bottom' | 'top' }) {
     // Navegações PROGRAMÁTICAS (router.push que não passam por <a>, ex.: troca de aba via <button>):
     // quem navega dispara `window.dispatchEvent(new Event('navprogress:start'))`.
     window.addEventListener('navprogress:start', iniciar)
-    return () => { document.removeEventListener('click', onClick, true); window.removeEventListener('popstate', iniciar); window.removeEventListener('navprogress:start', iniciar) }
+    window.addEventListener('navprogress:done', terminar)
+    return () => { document.removeEventListener('click', onClick, true); window.removeEventListener('popstate', iniciar); window.removeEventListener('navprogress:start', iniciar); window.removeEventListener('navprogress:done', terminar) }
   }, [])
 
   if (!visivel) return null

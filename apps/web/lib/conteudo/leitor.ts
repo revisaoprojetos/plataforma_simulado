@@ -161,6 +161,23 @@ async function avaliarDocAluno(svc: any, tenantId: string, estId: string, docRaw
   return motor.avaliarDoc(docRaw, atrib)
 }
 
+/**
+ * Decisão de ACESSO de LEITURA (pode abrir este doc?), CACHEADA 60s por (tenant, aluno, doc).
+ * = testador global (fura "não publicado" + gate) OU (publicado E `avaliarDocAluno`).
+ * MOTIVO (backend-first): abrir uma meta/material re-roda o motor de acesso (`motorAcesso`: carrega
+ * TODAS as pastas + atribuições ≈ 6 queries) a cada vez. O aluno abre materiais em sequência (metas do
+ * cronograma, reabrir), então sem cache cada clique paga o motor inteiro. 60s = mesma classe de defasagem
+ * do cache da árvore (90s) e do tenant (60s): mudança de acesso/publicação aparece em até 60s, sem
+ * invalidação manual. Degrada sozinho se o Redis estiver fora (cai em memória/cálculo direto).
+ */
+async function podeLerDoc(svc: any, tenantId: string, alunoId: string, doc: any): Promise<boolean> {
+  return remember<boolean>(`acesso-leitura:${tenantId}:${alunoId}:${doc.id}`, 60, async () => {
+    if (await ehTestadorGlobal({ tenantId, estudanteId: alunoId })) return true
+    if (doc.status !== 'publicado') return false
+    return (await avaliarDocAluno(svc, tenantId, alunoId, doc)).permitido
+  })
+}
+
 export interface PastaAluno { id: string; nome: string; cor: string | null; totalDocs: number }
 export interface DocAluno { id: string; titulo: string; tipo_origem: string; versaoAtualId: string }
 export interface ArvoreAluno {
@@ -262,31 +279,21 @@ export async function arvoreBibliotecaAluno(alunoId: string, pastaId?: string | 
   const seen = new Set<string>()
   while (cur && nomeDe.has(cur) && !seen.has(cur)) { seen.add(cur); breadcrumb.unshift({ id: cur, nome: nomeDe.get(cur)! }); cur = paiDe.get(cur) ?? null }
 
-  // CAPA (thumb) + prévia (trechos) dos docs DESTE nível — mesma lógica do admin, mas só os visíveis.
+  // CAPA REMOVIDA dos cards de material (decisão do usuário): NÃO geramos mais a thumb nem a URL
+  // assinada, e NÃO disparamos regeneração — senão a capa "voltava" (o loader recriava a miniatura da
+  // 1ª página mesmo nos materiais já reimportados "limpos"). Os cards caem no ícone do tipo (SeloTipo).
+  // Mantemos só a PRÉVIA (trechos de texto). Bônus: corta a URL assinada por doc + a regeneração (egress).
   const thumbs: Record<string, string> = {}
   const previas: Record<string, { tipo: string; texto: string }[]> = {}
   try {
-    const { urlAssinadaOriginal } = await import('./ingestao')
-    const { gerarThumbDocumento } = await import('./thumb')
     const verIds = [...new Set(documentos.map((d) => d.versaoAtualId))]
     if (verIds.length) {
-      const [trechos, vks] = await Promise.all([
-        fetchAllByIn<any>(verIds, (c) => svc.from(T_TR).select('versao_id, ordem, texto, tipo').eq('tenant_id', tenantId).in('versao_id', c).lte('ordem', 24).order('versao_id', { ascending: true }).order('ordem', { ascending: true })),
-        fetchAllByIn<any>(verIds, (c) => svc.from('simulado_conteudo_versoes').select('id, arquivo_key, hash_arquivo').eq('tenant_id', tenantId).in('id', c).order('id', { ascending: true })),
-      ])
+      const trechos = await fetchAllByIn<any>(verIds, (c) => svc.from(T_TR).select('versao_id, ordem, texto, tipo').eq('tenant_id', tenantId).in('versao_id', c).lte('ordem', 24).order('versao_id', { ascending: true }).order('ordem', { ascending: true }))
       const porVersao = new Map<string, { tipo: string; texto: string }[]>()
       for (const t of (trechos ?? [])) { const a = porVersao.get(t.versao_id) ?? []; if (a.length < 24) a.push({ tipo: String(t.tipo || 'paragrafo'), texto: String(t.texto || '').replace(/\s+/g, ' ').trim().slice(0, 320) }); porVersao.set(t.versao_id, a) }
-      const hashPorVer = new Map<string, string>((vks ?? []).map((v: any) => [v.id, String(v.hash_arquivo || '')]))
       for (const d of documentos) { const arr = porVersao.get(d.versaoAtualId); if (arr?.length) previas[d.id] = arr }
-      await Promise.all(documentos.map(async (d) => {
-        if (d.tipo_origem !== 'docx') return
-        const h8 = hashPorVer.get(d.versaoAtualId)?.slice(0, 8) || ''
-        const turl = await urlAssinadaOriginal(`conteudo-thumbs/${tenantId}/${d.versaoAtualId}_${h8}_r1k.png`, 3600)
-        if (turl) thumbs[d.id] = turl
-        else void gerarThumbDocumento(tenantId, d.id).catch(() => {})
-      }))
     }
-  } catch { /* capa/prévia best-effort */ }
+  } catch { /* prévia best-effort */ }
 
   return { pastas: subpastas, documentos, breadcrumb, thumbs, previas, pastaAtual: alvo }
   })
@@ -371,7 +378,7 @@ async function regenerarHtmlRico(svc: any, tenantId: string, versaoId: string, a
 
 // Grifo GEOMÉTRICO sobre o PDF: página + retângulos normalizados (0..1). Alinha sobre o canvas sem bugar.
 export interface GrifoPdf { id: string; pagina: number; rects: { x0: number; y0: number; x1: number; y1: number }[]; cor: string; tool: string; nota: string | null; texto: string | null }
-export interface LeituraPdf { documentoId: string; titulo: string; versaoId: string; pdfUrl: string | null; grifos: GrifoPdf[] }
+export interface LeituraPdf { documentoId: string; titulo: string; versaoId: string; pdfUrl: string | null; grifos: GrifoPdf[]; mostrarLegenda: boolean }
 
 /**
  * Leitura FIEL (PDF do editor) do aluno: devolve o PDF pixel-perfeito (OnlyOffice, cacheado) + os grifos
@@ -383,26 +390,98 @@ export async function carregarLeituraPdf(documentoId: string, alunoId: string): 
   const svc = createAdminClient()
   const doc = await fetchDocComAcesso(svc, tenantId, documentoId, 'id, titulo, status, versao_atual_id, deletado, pasta_id, herda_acesso, acesso_geral, tipo_origem, categoria')
   if (!doc || doc.deletado || !doc.versao_atual_id || (doc as any).categoria !== 'conteudo') return null
-  // TESTADOR GLOBAL: acesso total (fura "não publicado" + gate). Fast-path sem query sem testadores.
-  if (!(await ehTestadorGlobal({ tenantId, estudanteId: alunoId }))) {
-    if (doc.status !== 'publicado') return null
-    if (!(await avaliarDocAluno(svc, tenantId, alunoId, doc)).permitido) return null
-  }
+  // Acesso (testador OU publicado+gate) — decisão cacheada 60s (ver `podeLerDoc`).
+  if (!(await podeLerDoc(svc, tenantId, alunoId, doc))) return null
 
   const { gerarPdfDocumento } = await import('./thumb')
   // O PDF (OnlyOffice→PDF, já cacheado em storage) + a URL assinada são IGUAIS p/ todos os alunos e
   // dependem só da versão → cacheados 300s pela chave c/ versao_atual_id (nova versão = chave nova, invalida
   // sozinho). A URL assinada vale 3600s, então 300s NÃO a expira (mesma lógica das thumbs). Os GRIFOS são
   // POR-ALUNO → lidos à parte, fora do cache compartilhado. Tolerante a Redis ausente (remember cai no cálculo).
-  const [pdfUrl, grifosRows] = await Promise.all([
+  const [pdfUrl, grifosRows, cfgRow] = await Promise.all([
     remember<string | null>(`leitura-pdf:${tenantId}:${documentoId}:${doc.versao_atual_id}`, 300, async () => gerarPdfDocumento(tenantId, documentoId).catch(() => null)),
     // tolerante à migração pendente: se a tabela não existir, trata como sem grifos.
     fetchAll<any>(() => svc.from('simulado_conteudo_grifos_pdf').select('id, pagina, rects, cor, tool, nota, texto').eq('tenant_id', tenantId).eq('documento_id', documentoId).eq('aluno_id', alunoId).order('id', { ascending: true })).catch(() => []),
+    // Toggle da legenda de categorias (LegProc) por documento. Tolerante à migração pendente: se a coluna
+    // legenda_categorias ainda não existe (erro) → null → legenda OCULTA (padrão da Biblioteca).
+    (async () => { try { const r = await svc.from('simulado_conteudo_documentos').select('legenda_categorias').eq('tenant_id', tenantId).eq('id', documentoId).maybeSingle(); return r.error ? null : r.data } catch { return null } })(),
   ])
   const grifos: GrifoPdf[] = (grifosRows ?? []).map((g) => ({
     id: g.id, pagina: g.pagina, rects: Array.isArray(g.rects) ? g.rects : [], cor: g.cor || 'y', tool: g.tool || 'hl', nota: g.nota ?? null, texto: g.texto ?? null,
   })).filter((g) => g.rects.length)
-  return { documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, pdfUrl, grifos }
+  return { documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, pdfUrl, grifos, mostrarLegenda: !!(cfgRow as any)?.legenda_categorias }
+}
+
+// ─────────── MÍDIA (vídeo/áudio) do aluno ───────────
+// Player NATIVO da Biblioteca. O gate é IDÊNTICO a `carregarLeituraPdf` (fetchDocComAcesso + testador
+// global fast-path + status publicado + avaliarDocAluno). Retorna `null` quando o doc não é mídia
+// (vídeo/áudio) — assim o chamador (page do aluno) cai no fluxo de PDF/leitura normal sem ramo extra.
+export interface MidiaAluno {
+  documentoId: string; titulo: string; versaoId: string
+  tipoOrigem: string; kind: 'video' | 'audio'
+  /** URL assinada do arquivo ORIGINAL (1h). null se o storage não gerar o link. */ url: string | null
+  /** Extensão do arquivo_key (minúscula; '' se não houver). */ ext: string
+}
+
+export async function carregarMidiaAluno(documentoId: string, alunoId: string): Promise<MidiaAluno | null> {
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId || !documentoId) return null
+  const svc = createAdminClient()
+  const doc = await fetchDocComAcesso(svc, tenantId, documentoId, 'id, titulo, status, versao_atual_id, deletado, pasta_id, herda_acesso, acesso_geral, tipo_origem, categoria')
+  if (!doc || doc.deletado || !doc.versao_atual_id || (doc as any).categoria !== 'conteudo') return null
+  // Só vídeo/áudio têm player aqui; qualquer outro tipo → null (o chamador abre o leitor de PDF normal).
+  const tipoOrigem = String((doc as any).tipo_origem ?? '')
+  if (tipoOrigem !== 'video' && tipoOrigem !== 'audio') return null
+  const kind = tipoOrigem as 'video' | 'audio'
+  // Acesso (testador OU publicado+gate) — decisão cacheada 60s (ver `podeLerDoc`).
+  if (!(await podeLerDoc(svc, tenantId, alunoId, doc))) return null
+  const { data: ver } = await svc.from('simulado_conteudo_versoes').select('arquivo_key').eq('tenant_id', tenantId).eq('id', doc.versao_atual_id).maybeSingle()
+  const arquivoKey = (ver as any)?.arquivo_key as string | undefined
+  if (!arquivoKey) return null
+  const { urlAssinadaOriginal } = await import('./ingestao')
+  const url = await urlAssinadaOriginal(arquivoKey, 3600)
+  const ext = arquivoKey.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? ''
+  return { documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, tipoOrigem, kind, url, ext }
+}
+
+// ─────────── LOADER UNIFICADO (abrir material: mídia OU PDF) ───────────
+// A página do aluno (biblioteca/[id]) chamava carregarMidiaAluno E carregarLeituraPdf em sequência:
+// cada uma re-buscava o MESMO doc e re-rodava o gate. Este loader faz tudo UMA vez — 1 fetch do doc +
+// 1 decisão de acesso (cacheada) — e ramifica por tipo. Corta ~metade dos round-trips por abertura.
+export type DocParaLeitura = { kind: 'midia'; midia: MidiaAluno } | { kind: 'pdf'; pdf: LeituraPdf }
+
+export async function carregarDocParaLeitura(documentoId: string, alunoId: string): Promise<DocParaLeitura | null> {
+  const tenantId = await getCurrentTenantId()
+  if (!tenantId || !documentoId) return null
+  const svc = createAdminClient()
+  const doc = await fetchDocComAcesso(svc, tenantId, documentoId, 'id, titulo, status, versao_atual_id, deletado, pasta_id, herda_acesso, acesso_geral, tipo_origem, categoria')
+  if (!doc || doc.deletado || !doc.versao_atual_id || (doc as any).categoria !== 'conteudo') return null
+  // Acesso (testador OU publicado+gate) — decisão cacheada 60s (ver `podeLerDoc`). UMA vez para mídia e PDF.
+  if (!(await podeLerDoc(svc, tenantId, alunoId, doc))) return null
+
+  const tipoOrigem = String((doc as any).tipo_origem ?? '')
+  // MÍDIA (vídeo/áudio): player nativo. Só a URL assinada do original (gate já passou).
+  if (tipoOrigem === 'video' || tipoOrigem === 'audio') {
+    const { data: ver } = await svc.from('simulado_conteudo_versoes').select('arquivo_key').eq('tenant_id', tenantId).eq('id', doc.versao_atual_id).maybeSingle()
+    const arquivoKey = (ver as any)?.arquivo_key as string | undefined
+    if (!arquivoKey) return null
+    const { urlAssinadaOriginal } = await import('./ingestao')
+    const url = await urlAssinadaOriginal(arquivoKey, 3600)
+    const ext = arquivoKey.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1] ?? ''
+    return { kind: 'midia', midia: { documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, tipoOrigem, kind: tipoOrigem as 'video' | 'audio', url, ext } }
+  }
+
+  // PDF (fiel): URL (cache 300s por versão) + grifos do aluno + toggle da legenda — tudo em PARALELO.
+  const { gerarPdfDocumento } = await import('./thumb')
+  const [pdfUrl, grifosRows, cfgRow] = await Promise.all([
+    remember<string | null>(`leitura-pdf:${tenantId}:${documentoId}:${doc.versao_atual_id}`, 300, async () => gerarPdfDocumento(tenantId, documentoId).catch(() => null)),
+    fetchAll<any>(() => svc.from('simulado_conteudo_grifos_pdf').select('id, pagina, rects, cor, tool, nota, texto').eq('tenant_id', tenantId).eq('documento_id', documentoId).eq('aluno_id', alunoId).order('id', { ascending: true })).catch(() => []),
+    (async () => { try { const r = await svc.from('simulado_conteudo_documentos').select('legenda_categorias').eq('tenant_id', tenantId).eq('id', documentoId).maybeSingle(); return r.error ? null : r.data } catch { return null } })(),
+  ])
+  const grifos: GrifoPdf[] = (grifosRows ?? []).map((g) => ({
+    id: g.id, pagina: g.pagina, rects: Array.isArray(g.rects) ? g.rects : [], cor: g.cor || 'y', tool: g.tool || 'hl', nota: g.nota ?? null, texto: g.texto ?? null,
+  })).filter((g) => g.rects.length)
+  return { kind: 'pdf', pdf: { documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, pdfUrl, grifos, mostrarLegenda: !!(cfgRow as any)?.legenda_categorias } }
 }
 
 /** URL assinada do arquivo ORIGINAL para o aluno BAIXAR — só se tiver acesso (gate). null se negado. */

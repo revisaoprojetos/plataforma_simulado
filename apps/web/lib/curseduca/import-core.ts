@@ -6,6 +6,7 @@ import { registrarAudit } from '@/lib/audit'
 import { invalidarRelatorios } from '@/lib/cache/relatorio-cache'
 import { ehProdutoPassaporte, ehProdutoVitalicio } from '@/lib/integracoes/normalizar-mapa'
 import { propagarGrupoAosBancos } from '@/lib/simulado/propagar-grupo'
+import { aplicarProdutosPorFonte } from '@/lib/produtos/produtos'
 import { configDoEnv, listarMembrosDoGrupo, mapaMatriculasGrupo, detalheMembro, type CurseducaCfg, type MembroCurseduca, type DetalheMembro } from '@/lib/curseduca/client'
 import type { DestinoImport, ResultadoImportCurseduca } from '@/lib/curseduca/tipos'
 import { descriptografar } from '@/lib/crypto'
@@ -285,7 +286,13 @@ export async function executarImport(
       const novosVinc = unicos.filter((id) => !set.has(id))
       if (novosVinc.length) {
         const { error } = await inserirMembros(novosVinc.map((estudante_id) => ({ tenant_id: g.tenantId, grupo_id: grupoDestinoId, estudante_id })))
-        if (!error) { vinculados = novosVinc.length; await propagarGrupoAosBancos(svc, g.tenantId, grupoDestinoId, novosVinc, 'integracao') }
+        if (!error) {
+          vinculados = novosVinc.length
+          await propagarGrupoAosBancos(svc, g.tenantId, grupoDestinoId, novosVinc, 'integracao')
+          // HOOK Produtos/Extensivos: aplica os produtos cuja FONTE é um dos grupos Curseduca importados
+          // aos alunos recém-vinculados. Aditivo, idempotente e com fast-path (sem fontes casando = no-op).
+          for (const gid of ids) { try { await aplicarProdutosPorFonte(svc, g.tenantId, 'curseduca', String(gid), novosVinc) } catch { /* nunca derruba o import */ } }
+        }
       }
     }
 

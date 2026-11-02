@@ -315,13 +315,25 @@ export async function sincronizarDoc(svc: SupabaseClient, tenantId: string, estI
   if (!row) return { ok: false, error: 'sem_plano' }
   if (parte === 'progresso') {
     const prog = (doc.prog || {}) as Record<string, ProgMeta>
-    const rows = Object.entries(prog).filter(([, p]) => p && (p.s || p.t || p.parou || p.modo)).map(([meta_id, p]) => ({
+    const entradas = Object.entries(prog)
+    const temProg = (p: ProgMeta) => !!(p && (p.s || p.t || p.parou || p.modo))
+    const rows = entradas.filter(([, p]) => temProg(p)).map(([meta_id, p]) => ({
       tenant_id: tenantId, estudante_id: estId, plano_id: row.id, meta_id,
       estado: p.s ?? null, tempo_seg: p.t || 0,
       parcial_v: p.parou?.v ?? null, parcial_em: p.parou?.em || null, modo: p.modo ?? null,
       atualizado_em: new Date().toISOString(),
     }))
     if (rows.length) { const { error } = await svc.from(T_META).upsert(rows, { onConflict: 'plano_id,meta_id' }); if (error) return { ok: false, error: error.message } }
+    // Metas que o aluno DESMARCOU chegam como objeto vazio ({}) no doc. Sem zerar aqui, a coluna
+    // `estado` ('done'/'missed') antiga permanecia no banco e a meta "voltava marcada" ao recarregar.
+    // Zera SÓ as colunas de progresso — a MESMA linha guarda as notas (grau/estrelas/res/err), que ficam.
+    const limpar = entradas.filter(([, p]) => !temProg(p)).map(([meta_id]) => meta_id)
+    for (let k = 0; k < limpar.length; k += 150) {
+      const { error } = await svc.from(T_META)
+        .update({ estado: null, tempo_seg: 0, parcial_v: null, parcial_em: null, modo: null, atualizado_em: new Date().toISOString() })
+        .eq('tenant_id', tenantId).eq('plano_id', row.id).in('meta_id', limpar.slice(k, k + 150))
+      if (error) return { ok: false, error: error.message }
+    }
     if (Array.isArray(doc.extras)) await svc.from(T_PLANO).update({ extras: doc.extras }).eq('id', row.id)
     return { ok: true }
   }

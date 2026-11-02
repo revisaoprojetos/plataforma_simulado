@@ -94,6 +94,11 @@ export function normalizarPorMapa(payload: unknown, mapa?: Record<string, string
       status,
       inicioEm: firstStr(getStr(p, 'subscription.started_at'), getStr(p, 'dates.confirmed_at'), getStr(p, 'created_at')),
       expiraEm: firstStr(getStr(p, 'subscription.next_cycle_at'), getStr(p, 'subscription.expires_at'), getStr(p, 'subscription.ended_at')),
+      // Campos extras p/ o MOTOR DE REGRAS (oferta/período/status bruto). Opcionais — fluem pelo adapter.
+      ofertaRef: val('oferta_ref'),
+      ofertaNome: val('oferta_nome'),
+      dataCompra: firstStr(val('data_compra'), getStr(p, 'dates.confirmed_at'), getStr(p, 'dates.created_at'), getStr(p, 'created_at')),
+      statusBruto,
     },
   }
 }

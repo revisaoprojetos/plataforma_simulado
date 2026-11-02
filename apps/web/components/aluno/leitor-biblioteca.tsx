@@ -17,6 +17,11 @@ import { APP_VERSION } from '@/lib/version'
 
 const PROTOTIPO = `/leitura/leitor-jus.html?v=${APP_VERSION}`
 const LARGURA_ALVO = 820 // largura de referência p/ a escala do PDF (host e iframe usam a MESMA)
+// A legenda de CATEGORIAS do leitor (Núcleo/Prazos/STF/STJ/Equipe…) é específica do LegProc e NÃO se
+// aplica a documentos da Biblioteca (PDFULL/Fight/etc.). Por isso nasce OCULTA (todas as chaves "off");
+// o admin pode religar por documento (mostrarLegenda → legendasOff=[]). Esconder todas também remove o
+// rótulo "LEGENDA" e o botão "Legenda" no leitor (ver aplicarCfgLegendas no leitor-jus.html).
+const LEGENDAS_TODAS = ['nucleo', 'complemento', 'prazo', 'crucial', 'excecao', 'stf', 'stj', 'equipe']
 
 type Rect = { x0: number; y0: number; x1: number; y1: number }
 interface GrifoEngine { id: string; sec: string; rects: Rect[]; t: string; c: string; note: string; text: string }
@@ -31,11 +36,13 @@ export type ParteCrono = { id: string; i: number; f: number; r: string }
 
 export function LeitorBiblioteca({
   documentoId, versaoId, titulo, pdfUrl, grifos: iniciais, voltarHref = '/aluno/biblioteca', paginaInicial = 1,
-  partesCrono = [], metaCrono = '', tempoBase = 0,
+  partesCrono = [], metaCrono = '', tempoBase = 0, tempoDeterminadoSeg = 0, mostrarLegenda = false,
 }: {
   documentoId: string; versaoId: string; titulo: string; pdfUrl: string | null
   grifos: GrifoPdf[]; voltarHref?: string; paginaInicial?: number
   partesCrono?: ParteCrono[]; metaCrono?: string; tempoBase?: number
+  /** Tempo DETERMINADO da meta (planejado, segundos) → contagem regressiva no leitor; 0 = sem. */ tempoDeterminadoSeg?: number
+  /** Religar a legenda de categorias (LegProc) neste doc. Padrão false = oculta na Biblioteca. */ mostrarLegenda?: boolean
 }) {
   const router = useRouter()
   // CRONÔMETRO DA META (cronograma): conta o tempo de leitura DENTRO do leitor. Começa ao abrir a meta,
@@ -43,6 +50,8 @@ export function LeitorBiblioteca({
   // (API acao:'tempo' → somarTempoMeta). sessionStart reseta a cada gravação p/ não contar em dobro.
   const sessaoIni = useRef<number>(metaCrono ? Date.now() : 0)
   const [sessSeg, setSessSeg] = useState(0)
+  // Badge "Tempo nesta meta": o iframe (Pomodoro) decide se aparece — 'meta' mostra, 'pomodoro' oculta.
+  const [usarBadgeMeta, setUsarBadgeMeta] = useState(true)
   useEffect(() => {
     if (!metaCrono) return
     sessaoIni.current = Date.now(); setSessSeg(0)
@@ -78,8 +87,8 @@ export function LeitorBiblioteca({
   const [pdfMeta, setPdfMeta] = useState<{ url: string; scale: number; pages: { w: number; h: number }[] } | null>(null)
   const enviados = useRef(new Map<string, { serverId: string; hash: string; geo: string }>())
   const busy = useRef(false); const pendente = useRef<GrifoEngine[] | null>(null); const avisou = useRef(false)
-  const dados = useRef({ documentoId, versaoId, titulo, voltarHref, paginaInicial, partesCrono, metaCrono })
-  dados.current = { documentoId, versaoId, titulo, voltarHref, paginaInicial, partesCrono, metaCrono }
+  const dados = useRef({ documentoId, versaoId, titulo, voltarHref, paginaInicial, partesCrono, metaCrono, mostrarLegenda, tempoDeterminadoSeg, tempoBase })
+  dados.current = { documentoId, versaoId, titulo, voltarHref, paginaInicial, partesCrono, metaCrono, mostrarLegenda, tempoDeterminadoSeg, tempoBase }
 
   useEffect(() => {
     enviados.current.clear()
@@ -98,10 +107,19 @@ export function LeitorBiblioteca({
         if (!vivo) return
         const v1 = (await pdf.getPage(1)).getViewport({ scale: 1 })
         const scale = Math.max(0.8, Math.min(2, LARGURA_ALVO / v1.width))
-        const pages: { w: number; h: number }[] = []
-        for (let n = 1; n <= pdf.numPages; n++) {
-          const v = (await pdf.getPage(n)).getViewport({ scale })
-          pages.push({ w: Math.round(v.width), h: Math.round(v.height) })
+        // Mede o tamanho de cada página em PARALELO (lotes de 16): o loop 1-a-1 (await por página)
+        // segurava o 1º frame por centenas de ms em PDFs grandes. Em lotes é ordens de grandeza mais
+        // rápido e continua limitado (não dispara N promises de uma vez em docs de 200+ páginas).
+        const total = pdf.numPages
+        const pages: { w: number; h: number }[] = new Array(total)
+        const LOTE = 16
+        for (let ini = 0; ini < total; ini += LOTE) {
+          const fim = Math.min(ini + LOTE, total)
+          const vps = await Promise.all(
+            Array.from({ length: fim - ini }, (_, k) => pdf.getPage(ini + k + 1).then((p: any) => p.getViewport({ scale }))),
+          )
+          if (!vivo) return
+          for (let k = 0; k < vps.length; k++) pages[ini + k] = { w: Math.round(vps[k].width), h: Math.round(vps[k].height) }
         }
         if (!vivo) return
         setPdfMeta({ url: pdfUrl, scale, pages })
@@ -125,6 +143,8 @@ export function LeitorBiblioteca({
         paginaInicial: d.paginaInicial || 1,
         partes: d.partesCrono || [], metaAtual: d.metaCrono || '',
         grifoRevisaoOff: true,
+        legendasOff: d.mostrarLegenda ? [] : LEGENDAS_TODAS,
+        tempoDeterminadoSeg: d.tempoDeterminadoSeg || 0, tempoBaseSeg: d.tempoBase || 0,
       },
     }, '*')
   }, [pdfMeta, iniciais, pdfUrl])
@@ -184,6 +204,9 @@ export function LeitorBiblioteca({
       const m = e.data; if (!m || typeof m !== 'object') return
       if (m.type === 'leitor-jus-ready') { enviarDia(); return }
       if (m.type === 'leitor-jus-grifos') { void reconciliar(Array.isArray(m.grifos) ? m.grifos : []); return }
+      // O aluno escolhe no Pomodoro qual cronômetro usar: 'meta' (badge aqui) ou 'pomodoro' (timer no iframe).
+      // Mostra UM por vez. O tempo da meta continua sendo gravado sempre (independe da escolha).
+      if (m.type === 'leitor-jus-cronometro') { setUsarBadgeMeta(m.mode === 'meta'); return }
       if (m.type === 'leitor-jus-nav') {
         const meta = dados.current.metaCrono
         // "Concluir leitura" (topo, to='questoes') numa meta do cronograma → finaliza a meta e volta.
@@ -226,6 +249,13 @@ export function LeitorBiblioteca({
   // quando os metadados do PDF ficam prontos (após o 'ready'), reenvia o dia já com o PDF
   useEffect(() => { if (pdfMeta) enviarDia() }, [pdfMeta, enviarDia])
 
+  // Transmite ao iframe o tempo TOTAL acumulado na meta (base salva + sessão atual) a cada segundo —
+  // o leitor usa p/ a contagem REGRESSIVA do "Tempo do simulado" na lateral esquerda.
+  useEffect(() => {
+    if (!metaCrono) return
+    try { iframeRef.current?.contentWindow?.postMessage({ type: 'leitor-jus-meta-tempo', totalSeg: tempoBase + sessSeg }, '*') } catch { /* ignore */ }
+  }, [sessSeg, metaCrono, tempoBase])
+
   const totalSeg = tempoBase + sessSeg
   const hh = Math.floor(totalSeg / 3600), mm = Math.floor((totalSeg % 3600) / 60), ss = totalSeg % 60
   const z2 = (n: number) => String(n).padStart(2, '0')
@@ -234,7 +264,7 @@ export function LeitorBiblioteca({
     <div className="fixed inset-0 z-40 bg-[var(--bg,#fbfbfc)]">
       <iframe ref={iframeRef} src={PROTOTIPO} title={titulo || 'Leitura'} onLoad={enviarDia}
         style={{ display: 'block', width: '100%', height: '100%', border: 0, background: 'var(--bg, #fbfbfc)' }} />
-      {metaCrono ? (
+      {metaCrono && usarBadgeMeta && !tempoDeterminadoSeg ? (
         <div aria-live="off" style={{ position: 'fixed', left: '50%', transform: 'translateX(-50%)', bottom: 18, zIndex: 50, display: 'inline-flex', alignItems: 'center', gap: 9, padding: '8px 14px', borderRadius: 999, background: 'color-mix(in srgb, var(--primary, #6d28d9) 92%, #000)', color: '#fff', boxShadow: '0 8px 24px -8px rgba(0,0,0,.4)', fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums', pointerEvents: 'none', userSelect: 'none' }}>
           <style>{'@keyframes lb-pulse{0%,100%{opacity:1}50%{opacity:.35}}'}</style>
           <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#fff', animation: 'lb-pulse 1.4s ease-in-out infinite' }} />

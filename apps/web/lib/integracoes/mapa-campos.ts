@@ -21,6 +21,9 @@ export const CAMPOS_MAPA: CampoMapa[] = [
   { key: 'ddd', label: 'DDD / Código', descricao: 'Código de área do telefone (juntado ao número).', padrao: 'contact.phone_local_code' },
   { key: 'produto_ref', label: 'ID do produto', descricao: 'Identificador do produto/oferta — casa com o Mapeamento de produtos.', padrao: 'product.marketplace_id', padroesAlt: ['product.internal_id', 'product.id', 'product_id'] },
   { key: 'produto_nome', label: 'Nome do produto', descricao: 'Rótulo do produto (exibição).', padrao: 'product.name', padroesAlt: ['product.title'] },
+  { key: 'oferta_ref', label: 'ID da oferta', descricao: 'Identificador da oferta/plano (regras por oferta). Opcional.', padrao: 'offer.id', padroesAlt: ['offer.marketplace_id', 'subscription.plan.id', 'plan.id'] },
+  { key: 'oferta_nome', label: 'Nome da oferta', descricao: 'Rótulo da oferta/plano (regras por nome). Opcional.', padrao: 'offer.name', padroesAlt: ['subscription.plan.name', 'plan.name'] },
+  { key: 'data_compra', label: 'Data da compra', descricao: 'Data/hora da compra (regras por período). Opcional.', padrao: 'dates.confirmed_at', padroesAlt: ['dates.created_at', 'created_at', 'order_date'] },
   { key: 'status', label: 'Status', descricao: 'Status do pedido/assinatura (approved, canceled, refunded…).', padrao: 'status', padroesAlt: ['last_status', 'subscription.last_status', 'subscription.status'] },
 ]
 

@@ -14,13 +14,21 @@ const rest = (p, opt = {}) => fetch(URL + '/rest/v1/' + p, { headers: H, ...opt 
 const json = (r) => r.json()
 
 // Espelha apps/web/lib/rbac-catalogo.ts (permissões que o app realmente verifica).
+// DEVE bater 1:1 com o RBAC_CATALOGO do app — manter em sincronia.
 const CATALOGO = [
   ['questoes', 'view'], ['questoes', 'create'], ['questoes', 'update'],
   ['leitura', 'view'], ['leitura', 'create'], ['leitura', 'update'], ['leitura', 'delete'], ['leitura', 'publicar'],
+  ['correcao', 'view'], ['correcao', 'corrigir'],
   ['simulados', 'view'], ['simulados', 'create'], ['simulados', 'update'], ['simulados', 'delete'],
   ['estudantes', 'view'], ['estudantes', 'create'], ['estudantes', 'update'], ['estudantes', 'delete'],
   ['grupos', 'view'],
   ['matriculas', 'view'], ['matriculas', 'create'], ['matriculas', 'update'], ['matriculas', 'delete'],
+  ['produtos', 'view'], ['produtos', 'create'], ['produtos', 'update'], ['produtos', 'manage'],
+  ['liberacao', 'view'], ['liberacao', 'manage'],
+  ['biblioteca', 'view'], ['biblioteca', 'create'], ['biblioteca', 'update'], ['biblioteca', 'publicar'],
+  ['flashcards', 'view'], ['flashcards', 'create'], ['flashcards', 'update'], ['flashcards', 'manage'],
+  ['trilhas', 'view'], ['trilhas', 'create'], ['trilhas', 'update'], ['trilhas', 'manage'],
+  ['classificacao', 'view'], ['classificacao', 'manage'],
   ['integracoes', 'view'], ['integracoes', 'manage'],
   ['relatorios', 'view'], ['relatorios', 'export'],
   ['gamificacao', 'view'], ['gamificacao', 'manage'],
@@ -28,9 +36,26 @@ const CATALOGO = [
   ['configuracoes', 'view'], ['configuracoes', 'manage'],
   ['api_keys', 'manage'],
   ['rbac', 'view'], ['rbac', 'manage'], ['console', 'view'],
+  ['armazenamento', 'view'], ['armazenamento', 'manage'],
   ['cronogramas', 'view'], ['cronogramas', 'create'], ['cronogramas', 'update'],
   ['cronogramas', 'delete'], ['cronogramas', 'liberar'], ['cronogramas', 'emitir'],
 ].map(([resource, action]) => ({ resource, action }))
+
+// Papel-semente `professor` (self-service da área de Conteúdos). Espelha PROFESSOR_PERMS em
+// apps/web/lib/auth/onboard-tenant.ts e a migration 20261031000000_rbac_professor_conteudos.sql.
+const PROFESSOR_DESC = 'Professor (conteúdo: questões, biblioteca, flashcards, trilhas, produtos)'
+const PROFESSOR_PERMS = [
+  'questoes:view', 'questoes:create', 'questoes:update',
+  'simulados:view', 'simulados:create', 'simulados:update', 'simulados:delete',
+  'biblioteca:view', 'biblioteca:create', 'biblioteca:update', 'biblioteca:publicar',
+  'leitura:view', 'leitura:create', 'leitura:update', 'leitura:publicar',
+  'flashcards:view', 'flashcards:create', 'flashcards:update', 'flashcards:manage',
+  'trilhas:view', 'trilhas:create', 'trilhas:update', 'trilhas:manage',
+  'classificacao:view', 'classificacao:manage',
+  'produtos:view', 'produtos:create', 'produtos:update', 'produtos:manage',
+  'liberacao:view', 'liberacao:manage',
+  'grupos:view', 'estudantes:view', 'matriculas:view', 'relatorios:view',
+]
 
 const alvo = process.argv[2] || null
 
@@ -44,20 +69,49 @@ async function main() {
     console.log(`permissions: +${faltando.length} (HTTP ${r.status})`)
   } else console.log('permissions: já completo')
 
-  // 2) Cargos de sistema (admin/super_admin) por tenant.
+  // IDs de permissão por "resource:action" (inclui as recém-inseridas) — para vincular ao papel professor.
+  const permsFull = await json(await rest('simulado_permissions?select=id,resource,action'))
+  const permId = new Map((permsFull ?? []).map((p) => [`${p.resource}:${p.action}`, p.id]))
+
+  // 2) Cargos de sistema (admin/super_admin) + papel-semente `professor` por tenant.
   const tenants = alvo
     ? [{ id: alvo }]
     : await json(await rest('simulado_tenants?select=id'))
   for (const t of tenants ?? []) {
-    const roles = await json(await rest(`simulado_roles?select=nome&tenant_id=eq.${t.id}`))
-    const nomes = new Set((roles ?? []).map((r) => r.nome))
+    const roles = await json(await rest(`simulado_roles?select=id,nome&tenant_id=eq.${t.id}`))
+    const byNome = new Map((roles ?? []).map((r) => [r.nome, r.id]))
+
+    // 2a) admin/super_admin: acesso total, não dependem da matriz de permissões.
     const base = [
       { nome: 'admin', descricao: 'Administrador (acesso total ao painel)' },
       { nome: 'super_admin', descricao: 'Super administrador (acesso total, não editável)' },
-    ].filter((r) => !nomes.has(r.nome)).map((r) => ({ tenant_id: t.id, nome: r.nome, descricao: r.descricao, is_sistema: true }))
+    ].filter((r) => !byNome.has(r.nome)).map((r) => ({ tenant_id: t.id, nome: r.nome, descricao: r.descricao, is_sistema: true }))
     if (base.length) {
       const r = await rest('simulado_roles', { method: 'POST', headers: { ...H, prefer: 'return=minimal' }, body: JSON.stringify(base) })
-      console.log(`tenant ${t.id}: +${base.length} cargo(s) (HTTP ${r.status})`)
+      console.log(`tenant ${t.id}: +${base.length} cargo(s) de sistema (HTTP ${r.status})`)
+    }
+
+    // 2b) professor: papel editável (is_sistema=false) + permissões de Conteúdos.
+    let profId = byNome.get('professor')
+    if (!profId) {
+      const ins = await json(await rest('simulado_roles', {
+        method: 'POST', headers: { ...H, prefer: 'return=representation' },
+        body: JSON.stringify({ tenant_id: t.id, nome: 'professor', descricao: PROFESSOR_DESC, is_sistema: false }),
+      }))
+      profId = Array.isArray(ins) ? ins[0]?.id : ins?.id
+      if (profId) console.log(`tenant ${t.id}: +papel professor`)
+    }
+    if (profId) {
+      const existentes = await json(await rest(`simulado_role_permissions?select=permission_id&role_id=eq.${profId}`))
+      const have = new Set((existentes ?? []).map((x) => x.permission_id))
+      const novos = PROFESSOR_PERMS
+        .map((k) => permId.get(k))
+        .filter((id) => id && !have.has(id))
+        .map((permission_id) => ({ role_id: profId, permission_id }))
+      if (novos.length) {
+        const r = await rest('simulado_role_permissions', { method: 'POST', headers: { ...H, prefer: 'return=minimal' }, body: JSON.stringify(novos) })
+        console.log(`tenant ${t.id}: professor +${novos.length} permissão(ões) (HTTP ${r.status})`)
+      }
     }
   }
 

@@ -34,12 +34,12 @@ const soDigitos = (s?: string | null) => (s ? s.replace(/\D/g, '') : '')
  * aluno ao grupo à mão). Tolerante à coluna ausente (migração 20260926000000): se `origem` ainda
  * não existe, cai no comportamento antigo (insere/deleta sem o filtro).
  */
-async function inserirIntegracao(svc: any, tabela: string, row: Record<string, unknown>) {
+export async function inserirIntegracao(svc: any, tabela: string, row: Record<string, unknown>) {
   const r = await svc.from(tabela).insert({ ...row, origem: 'integracao' })
   if (r.error && /origem|column/i.test(r.error.message)) return svc.from(tabela).insert(row)
   return r
 }
-async function deletarIntegracao(svc: any, tabela: string, filtros: Record<string, string>) {
+export async function deletarIntegracao(svc: any, tabela: string, filtros: Record<string, string>) {
   const montar = () => { let q = svc.from(tabela).delete(); for (const [k, v] of Object.entries(filtros)) q = q.eq(k, v); return q }
   const r = await montar().eq('origem', 'integracao')
   // Sem a coluna `origem` (migração pendente) → apaga sem o filtro (comportamento anterior).
@@ -77,7 +77,7 @@ async function grupoVitalicio(svc: any, tenantId: string): Promise<string | null
 }
 
 /** Simulados de uma pasta (banco base) que AINDA valem — exclui os encerrados (evita arquivo morto). */
-async function simuladosVivosDaPasta(svc: any, tenantId: string, pastaId: string): Promise<string[]> {
+export async function simuladosVivosDaPasta(svc: any, tenantId: string, pastaId: string): Promise<string[]> {
   try {
     const { data } = await svc.from('simulado_simulados')
       .select('id, status').eq('tenant_id', tenantId).eq('deletado', false)
@@ -90,7 +90,7 @@ async function simuladosVivosDaPasta(svc: any, tenantId: string, pastaId: string
  * Resolve (ou cria) o estudante. Dedupe, em ordem: id-por-provedor (pessoas) → matricula_externa
  * → email → cpf. Faz backfill de cpf/telefone quando faltam. Retorna o id.
  */
-async function resolverEstudante(svc: any, tenantId: string, provider: Provider, p: PessoaNormalizada): Promise<string | null> {
+export async function resolverEstudante(svc: any, tenantId: string, provider: Provider, p: PessoaNormalizada): Promise<string | null> {
   const email = (p.email ?? '').trim().toLowerCase() || null
   const cpf = soDigitos(p.cpf) || null
 
@@ -193,7 +193,7 @@ async function upsertAssinatura(svc: any, tenantId: string, estudanteId: string,
 }
 
 /** True se o estudante tem OUTRA assinatura ativa que concede este grupo/simulado/passaporte. */
-async function outraAtivaConcede(svc: any, tenantId: string, estudanteId: string, excetoExternalId: string, alvo: { grupoId?: string | null; pastaId?: string | null; simuladoId?: string | null; passaporte?: boolean }): Promise<boolean> {
+export async function outraAtivaConcede(svc: any, tenantId: string, estudanteId: string, excetoExternalId: string, alvo: { grupoId?: string | null; pastaId?: string | null; simuladoId?: string | null; passaporte?: boolean }): Promise<boolean> {
   try {
     const { data: ass } = await svc.from('simulado_assinaturas').select('provider, produto_ref, external_id')
       .eq('tenant_id', tenantId).eq('estudante_id', estudanteId).eq('status', 'ativo')
@@ -211,7 +211,7 @@ async function outraAtivaConcede(svc: any, tenantId: string, estudanteId: string
 }
 
 /** Matricula (libera) o estudante num simulado, idempotente. */
-async function matricular(svc: any, tenantId: string, estudanteId: string, simuladoId: string) {
+export async function matricular(svc: any, tenantId: string, estudanteId: string, simuladoId: string) {
   try {
     const { data } = await svc.from('simulado_matriculas').select('id').eq('simulado_id', simuladoId).eq('estudante_id', estudanteId).maybeSingle()
     if (!data) {
@@ -240,7 +240,7 @@ async function propagarGrupoAosBancos(svc: any, tenantId: string, grupoId: strin
 }
 
 /** Adiciona o estudante a um grupo (idempotente) E propaga o acesso aos bancos vinculados. */
-async function entrarGrupo(svc: any, tenantId: string, grupoId: string, estudanteId: string) {
+export async function entrarGrupo(svc: any, tenantId: string, grupoId: string, estudanteId: string) {
   try {
     const { data } = await svc.from('simulado_grupo_membros').select('id').eq('grupo_id', grupoId).eq('estudante_id', estudanteId).maybeSingle()
     if (!data) await inserirIntegracao(svc, 'simulado_grupo_membros', { tenant_id: tenantId, grupo_id: grupoId, estudante_id: estudanteId })
@@ -373,6 +373,9 @@ export async function aplicarEntitlement(params: {
 
   if (entitlement.status === 'ativo') {
     await conceder(svc, tenantId, estudanteId, m)
+    // HOOK Produtos/Extensivos: aplica produtos cuja FONTE é este produto do provedor (ex.: Guru).
+    // Aditivo/idempotente, fast-path se nenhuma fonte casar — não substitui a concessão por mapeamento.
+    try { const { aplicarProdutosPorFonte } = await import('@/lib/produtos/produtos'); await aplicarProdutosPorFonte(svc, tenantId, provider, entitlement.produtoRef, [estudanteId]) } catch (e) { logIntegracao(e) }
     await registrarAudit({ operacao: 'LIBERAR', entidade: 'simulado_assinaturas', entidadeId: estudanteId, tenantId, depois: { acao: 'conceder', provider, produto: entitlement.produtoRef, status: 'ativo' } }).catch(() => {})
     return { ok: true, estudanteId, acao: 'concedido' }
   } else {

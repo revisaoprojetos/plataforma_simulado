@@ -62,6 +62,8 @@ export interface GestaoBase {
   publicadoEm: string | null; criadoEm: string | null; atualizadoEm: string | null
   liberadoDe: string | null; liberadoAte: string | null
   protecao: ProtecaoConteudo
+  /** Religar a legenda de CATEGORIAS do leitor (LegProc) neste doc. Padrão false = oculta na Biblioteca. */
+  legendaCategorias: boolean
   contagens: { origens: number; alunos: number; vinculos: number; pacotes: number }
   /** Fonte da mídia (vídeo/áudio). Sem pipeline de link → padrão 'importado'. */
   fonteMidia: { tipo: 'importado' | 'link'; servico: string | null } | null
@@ -115,12 +117,14 @@ export async function carregarGerenciamento(documentoId: string): Promise<Gestao
   // UMA onda paralela (antes eram 2 → menos round-trips PostgREST, que no remoto custam ~200ms cada).
   // A tabela de ALUNOS (até 300 + detalhes) NÃO entra aqui — é pesada e carrega LAZY ao abrir a aba Alunos.
   const kind = kindSync(doc.tipo_origem)
-  const [versoes, acesso, entregas, vincLeitor, vinculos] = await Promise.all([
+  const [versoes, acesso, entregas, vincLeitor, vinculos, legCfg] = await Promise.all([
     listarVersoes(documentoId).catch(() => []),
     carregarAcesso(svc, g.tenantId, documentoId),
     carregarEntregas(svc, g.tenantId, documentoId),
     carregarVinculosLeitor(svc, g.tenantId, documentoId),
     listarVinculosDoDocumento(documentoId).catch(() => []).then((v) => resolverVinculos(svc, g.tenantId, v)),
+    // Toggle da legenda de categorias — tolerante à migração pendente (coluna ausente → false = oculta).
+    (async () => { try { const r = await svc.from('simulado_conteudo_documentos').select('legenda_categorias').eq('tenant_id', g.tenantId).eq('id', documentoId).maybeSingle(); return r.error ? null : r.data } catch { return null } })(),
   ])
   const versaoNum = doc.versao_atual_id ? (versoes.find((v) => v.id === doc.versao_atual_id)?.numero ?? null) : (versoes[0]?.numero ?? null)
   const todosVinculos = [...vinculos, ...vincLeitor]
@@ -138,6 +142,7 @@ export async function carregarGerenciamento(documentoId: string): Promise<Gestao
     criadoEm: doc.criado_em ?? null, atualizadoEm: doc.atualizado_em ?? null,
     liberadoDe: doc.liberado_de ?? null, liberadoAte: doc.liberado_ate ?? null,
     protecao,
+    legendaCategorias: !!(legCfg as any)?.legenda_categorias,
     contagens: { origens: acesso.origens.length, alunos: acesso.alcanceTotal, vinculos: todosVinculos.length, pacotes: 0 },
     fonteMidia: (kind === 'video' || kind === 'audio') ? { tipo: 'importado', servico: null } : null,
     liberado,
@@ -340,6 +345,16 @@ export async function definirVisibilidadeConteudo(documentoId: string, visivel: 
   const { error } = await svc.from('simulado_conteudo_documentos').update({ oculto: !visivel }).eq('tenant_id', g.tenantId).eq('id', documentoId)
   if (error) return { ok: false, error: /column .* does not exist|schema cache/i.test(error.message) ? 'Rode a migração de acesso v2 (20261026000000).' : error.message }
   await registrarAudit({ operacao: visivel ? 'LIBERAR' : 'BLOQUEAR', entidade: 'simulado_conteudo_documentos', entidadeId: documentoId, depois: { oculto: !visivel }, atorId: g.atorId, tenantId: g.tenantId }).catch(() => {})
+  revalidatePath('/admin/biblioteca'); return { ok: true }
+}
+
+/** Religa/desliga a legenda de CATEGORIAS do leitor (LegProc) neste documento — coluna legenda_categorias. */
+export async function salvarLegendaCategorias(documentoId: string, mostrar: boolean): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('update'); if (!g.ok) return g
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_conteudo_documentos').update({ legenda_categorias: !!mostrar }).eq('tenant_id', g.tenantId).eq('id', documentoId)
+  if (error) return { ok: false, error: /column .* does not exist|legenda_categorias|schema cache/i.test(error.message) ? 'Rode a migração da legenda (20261101120000).' : error.message }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_conteudo_documentos', entidadeId: documentoId, depois: { legenda_categorias: !!mostrar }, atorId: g.atorId, tenantId: g.tenantId }).catch(() => {})
   revalidatePath('/admin/biblioteca'); return { ok: true }
 }
 

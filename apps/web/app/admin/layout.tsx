@@ -7,6 +7,7 @@ import { SidebarProvider } from '@/components/ui/sidebar'
 import { SidebarEdgeToggle } from '@/components/ui/sidebar-collapse'
 import { CanProvider } from '@/components/auth/can-provider'
 import { normalizarManutencaoAreas, normalizarLiberados, areaBloqueadaDoPath, hrefsBloqueados, ocultarDiscursivaDe, AREAS_MANUTENCAO } from '@/lib/sistema/manutencao-areas'
+import { normalizarEmailsTestador } from '@/lib/sistema/testadores-globais'
 import { AreaEmManutencao } from '@/components/admin/area-em-manutencao'
 import { getCurrentAccess, isSuperAdmin, accessCan, getAuthUser } from '@/lib/auth/permissions'
 import { getTenantTheme } from '@/lib/tenant-theme'
@@ -163,9 +164,14 @@ export default async function AdminLayout({
   const manutencaoAreas = normalizarManutencaoAreas((ti as { manutencao_areas?: unknown }).manutencao_areas)
   const manutencaoLiberados = normalizarLiberados((ti as { manutencao_areas_liberados?: unknown }).manutencao_areas_liberados, AREAS_MANUTENCAO)
   const ocultarDiscursiva = ocultarDiscursivaDe(manutencaoAreas)
+  // MEMBRO DO WORKSPACE (e-mail na lista do tenant): acesso total no admin — fura a manutenção de
+  // área, POR CIMA do allowlist. Casa por e-mail (admins não têm grupo de estudante), lido do tema
+  // JÁ carregado (zero query extra).
+  const wsEmailsAdmin = normalizarEmailsTestador((ti as { testadores_globais?: unknown }).testadores_globais)
+  const ehWorkspaceAdmin = !!userEmail && wsEmailsAdmin.includes(userEmail.trim().toLowerCase())
   // O admin no allowlist da área continua vendo o item no menu E acessando a rota.
-  const areasBloqueadas = hrefsBloqueados(manutencaoAreas, manutencaoLiberados, access.userId)
-  const areaEmManutencao = areaBloqueadaDoPath(pathname, manutencaoAreas, manutencaoLiberados, access.userId)
+  const areasBloqueadas = ehWorkspaceAdmin ? [] : hrefsBloqueados(manutencaoAreas, manutencaoLiberados, access.userId)
+  const areaEmManutencao = ehWorkspaceAdmin ? null : areaBloqueadaDoPath(pathname, manutencaoAreas, manutencaoLiberados, access.userId)
   const podeGerenciarManutencao = access.isAdmin || access.permissions.includes('configuracoes:view')
 
   // Visualização de aluno (impersonation): dono global da sessão + janela flutuante (persiste ao

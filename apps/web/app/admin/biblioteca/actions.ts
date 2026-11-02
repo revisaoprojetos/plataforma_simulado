@@ -610,8 +610,14 @@ export async function removerDocumento(documentoId: string): Promise<{ ok: boole
   const g = await guard('update')
   if (!g.ok) return g
   const svc = createAdminClient()
-  const { error } = await svc.from('simulado_conteudo_documentos').update({ deletado: true }).eq('tenant_id', g.tenantId).eq('id', documentoId)
+  // Soft-delete → Lixeira. Esta tabela NÃO tem o trigger de carimbo (só as 8 núcleo),
+  // então setamos deletado_em/deletado_por explicitamente (senão o purge 30d nunca varre).
+  const { error } = await svc
+    .from('simulado_conteudo_documentos')
+    .update({ deletado: true, deletado_em: new Date().toISOString(), deletado_por: g.atorId })
+    .eq('tenant_id', g.tenantId).eq('id', documentoId).eq('deletado', false)
   if (error) return { ok: false, error: error.message }
+  await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_conteudo_documentos', entidadeId: documentoId, depois: { deletado: true } })
   revalidatePath('/admin/biblioteca')
   return { ok: true }
 }
@@ -659,6 +665,26 @@ export async function pdfPreviewDocumento(documentoId: string): Promise<{ ok: bo
   const g = await guard('view'); if (!g.ok) return g
   const url = await gerarPdfDocumento(g.tenantId, documentoId)
   return url ? { ok: true, url } : { ok: false, error: 'Não foi possível preparar o PDF (OnlyOffice indisponível?).' }
+}
+
+// Prévia de MÍDIA (admin): se o doc for vídeo/áudio, devolve a URL assinada do ORIGINAL p/ o player
+// nativo. Se NÃO for mídia, devolve só o tipo (sem url/kind) → o componente cai no fluxo docx/pdf normal.
+export async function midiaPreviewDocumento(documentoId: string): Promise<{ ok: boolean; tipo_origem?: string; kind?: 'video' | 'audio'; url?: string | null; error?: string }> {
+  const g = await guard('view'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { data: doc } = await svc.from('simulado_conteudo_documentos').select('tipo_origem, versao_atual_id').eq('tenant_id', g.tenantId).eq('id', documentoId).eq('deletado', false).maybeSingle()
+  if (!doc) return { ok: false, error: 'Documento não encontrado.' }
+  const tipo_origem = String((doc as any).tipo_origem ?? '')
+  if (tipo_origem !== 'video' && tipo_origem !== 'audio') return { ok: true, tipo_origem }
+  const kind = tipo_origem as 'video' | 'audio'
+  let versaoId = (doc as any).versao_atual_id as string | null
+  if (!versaoId) { const uv = await ultimaVersao(documentoId); versaoId = uv?.id ?? null }
+  if (!versaoId) return { ok: true, tipo_origem, kind }
+  const { data: v } = await svc.from('simulado_conteudo_versoes').select('arquivo_key').eq('tenant_id', g.tenantId).eq('id', versaoId).maybeSingle()
+  const arquivoKey = (v as any)?.arquivo_key as string | undefined
+  if (!arquivoKey) return { ok: true, tipo_origem, kind }
+  const url = await urlAssinadaOriginal(arquivoKey, 3600)
+  return { ok: true, tipo_origem, kind, url }
 }
 
 export async function detalheDocumento(documentoId: string) {

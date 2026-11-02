@@ -41,7 +41,7 @@ import { AccountMenu } from './revisao-nova/account-menu'
 import { NotificationsPanel } from './revisao-nova/notifications'
 import { DownBar } from './revisao-nova/down-bar'
 import { useTheme } from 'next-themes'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { PlatformLoader } from '@/components/brand/platform-loader'
 import { NavProgress } from '@/components/brand/nav-progress'
 import { useTemaInterno } from '@/components/brand/interna/use-tema-interno'
@@ -110,6 +110,10 @@ export function ShellRevisaoNova({
   // Rota ATUAL pelo cliente: o layout do portal NÃO re-roda na navegação client-side, então o
   // `pathname`/`ativo` do servidor congelam em "Início". usePathname() reflete a rota de verdade.
   const rota = usePathname() || pathname
+  // Leitura de uma META do cronograma = /aluno/biblioteca/[id]?meta=... (aberta pelo Painel de estudos,
+  // NÃO por navegar na Biblioteca). Nesse caso o item aceso deve ser "Painel de estudos", não "Biblioteca".
+  const sp = useSearchParams()
+  const emLeituraMeta = rota.startsWith('/aluno/biblioteca/') && !!sp?.get('meta')
   // Ativo = o item cujo href casa com a rota, com o MAIS ESPECÍFICO vencendo. Sem isso o pai
   // "Comunidade" (/aluno/nova/comunidade) acende junto do filho "Ligas" (/.../comunidade/ligas),
   // que vive sob ele. `/aluno` é sempre exato. O `+ '/'` evita casar prefixos irmãos (ex.: /questoes-x).
@@ -117,6 +121,8 @@ export function ShellRevisaoNova({
   // embed, fora da sidebar), então estar nele mantém o item "Painel de estudos" aceso.
   const casaRota = (href: string) => {
     if (href === '/aluno') return rota === '/aluno'
+    // Meta do cronograma aberta no leitor: mantém "Painel de estudos" aceso e NÃO acende "Biblioteca".
+    if (emLeituraMeta) { if (href === '/aluno/nova/painel') return true; if (href === '/aluno/biblioteca') return false }
     if (href === '/aluno/nova/painel' && (rota === '/aluno/cronograma' || rota.startsWith('/aluno/cronograma/'))) return true
     // "Banco de Questões" engloba a aba "Recomendados" (área unificada; sem item próprio no menu).
     if (href === '/aluno/questoes' && (rota === '/aluno/recomendado' || rota.startsWith('/aluno/recomendado/'))) return true

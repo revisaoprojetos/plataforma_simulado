@@ -1,18 +1,9 @@
-import { getCurrentAccess } from '@/lib/auth/permissions'
-import { createAdminClient } from '@/lib/supabase/server'
-import { normalizarEmailsTestador } from '@/lib/sistema/testadores-globais'
-import { TestadoresClient } from './testadores-client'
+import { redirect } from 'next/navigation'
 
+// A gestão de testadores virou o tab "Workspace" dentro de /admin/sistema (equipe interna:
+// e-mail OU grupo, por cima da manutenção, fora de ranking). Esta rota antiga redireciona pra lá.
 export const dynamic = 'force-dynamic'
 
-export default async function TestadoresPage() {
-  const access = await getCurrentAccess()
-  let emails: string[] = []
-  if (access.tenantId) {
-    const svc = createAdminClient()
-    const { data } = await svc.from('simulado_tenants').select('t:tema->testadores_globais').eq('id', access.tenantId).maybeSingle()
-    emails = normalizarEmailsTestador((data as { t?: unknown } | null)?.t)
-  }
-  const podeEditar = access.isAdmin || access.permissions.includes('configuracoes:manage')
-  return <TestadoresClient emailsIniciais={emails} podeEditar={podeEditar} />
+export default function TestadoresPage() {
+  redirect('/admin/sistema')
 }

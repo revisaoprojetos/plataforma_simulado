@@ -12,6 +12,31 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.0.0 — 2026-11-02
+
+Consolidação geral (vários módulos acumulados) + ajuste da sidebar do aluno.
+
+### Sidebar do aluno (Revisão)
+- Reordenação do menu lateral: **Painel de estudos** sobe para acima de *Simulados* e **Cursos** para acima de *Meus Extensivos*. Fonte única (`navCanonico`), vale no desktop e no mobile; MEQ/VND inalterados (os itens `/aluno/nova` seguem ocultos para essas marcas).
+
+### Biblioteca — materiais sem capa
+- Os materiais da Biblioteca passam a **começar no índice** (ou na **legenda**, nos "lei seca"): removidas as capas/folhas iniciais (banner, aviso de direitos autorais, "Novidades desta Versão", imagem de capa), gerando uma **v2** por documento e movendo o ponteiro de versão (reversível). Também removida a capa/thumbnail dos cards de material.
+- **Player nativo de vídeo/áudio** na Biblioteca.
+- Ferramentas de manutenção em `apps/web/scripts/` (corte de `.docx` ancorado no texto, verificação por render do OnlyOffice e relatório por pasta/disciplina).
+
+### Estúdio de Conteúdo (admin)
+- Fundação do **Estúdio de Conteúdo** (`/admin/conteudos`) para professores: `<DataTable>` genérico, `<FilePicker>` e builders de Biblioteca/Questões/Produtos/Acesso/Flashcards/Trilhas (coexistindo com as áreas atuais).
+
+### Produtos, Extensivos e Liberação de acesso
+- Catálogo de **Produtos/Extensivos** (`/admin/produtos`, `/aluno/extensivos`) e hub "Meus Extensivos".
+- Motor de **regras de liberação** por webhook de venda (Guru/Curseduca) com reconciliador e crons (`liberacao-transicoes`, `lixeira-purge`).
+
+### Workspace / Testadores globais
+- **Workspace** (equipe interna) por e-mail ou grupo, com acesso total por cima da manutenção e fora de ranking (aba em *Configuração → Sistema*).
+
+### Outros
+- Ajustes de Cronograma Adaptativo, integrações de venda, nav-progress e manutenção por área.
+
 ## 3.36.0 — 2026-10-31
 
 ### Central de Estudos (sub-regra em Cursos)

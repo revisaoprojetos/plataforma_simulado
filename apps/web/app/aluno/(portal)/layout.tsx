@@ -5,7 +5,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getTenantTheme } from '@/lib/tenant-theme'
 import { normalizarManutencao, emManutencaoAgora } from '@/lib/sistema/manutencao'
 import { normalizarMapaAreas, normalizarLiberados, normalizarModos, modoDaAreaAluno, areaAlunoBloqueadaDoPath, hrefsBloqueadosAluno, AREAS_MANUTENCAO_ALUNO } from '@/lib/sistema/manutencao-areas'
-import { normalizarEmailsTestador } from '@/lib/sistema/testadores-globais'
+import { normalizarEmailsTestador, normalizarIdsWorkspace, estudanteEmAlgumGrupo } from '@/lib/sistema/testadores-globais'
 import { resolverSidebarRotulos } from '@/lib/sidebar-rotulos'
 import { GuiaTourRunner } from '@/components/aluno/guia-tour-runner'
 import { resolverLoginConfig } from '@/lib/login-config'
@@ -121,11 +121,18 @@ export default async function AlunoPortalLayout({ children }: { children: React.
   const { css, tema, tenantNome } = themeData
   const { counts, personalizados: simuladosPersonalizados } = contadores
   const t = (tema ?? {}) as any
-  // TESTADOR GLOBAL: e-mail na lista do tenant (tema.testadores_globais) → ACESSO TOTAL.
-  // Fura manutenção de plataforma/área e some todo bloqueio do menu. Lido do tema já carregado
-  // (zero query extra). Impersonation (sem e-mail) → não é testador (vê como o aluno real).
+  // WORKSPACE (equipe interna): e-mail na lista OU grupo de estudantes do tenant → ACESSO TOTAL.
+  // Fura manutenção de plataforma/área e some todo bloqueio do menu — a regra fica POR CIMA da
+  // manutenção. Lido do tema JÁ carregado (zero query no caso comum); só consulta os grupos do aluno
+  // quando há grupos no Workspace e o e-mail não casou. Impersonation (sem e-mail próprio) → NÃO é
+  // workspace: vê exatamente como o aluno real.
   const emailAluno = sessao.email?.trim().toLowerCase() || null
-  const ehTestadorGlobalAluno = !!emailAluno && normalizarEmailsTestador(t.testadores_globais).includes(emailAluno)
+  const wsEmails = normalizarEmailsTestador(t.testadores_globais)
+  const wsGrupos = normalizarIdsWorkspace(t.workspace_grupos)
+  const ehTestadorGlobalAluno = !!emailAluno && (
+    wsEmails.includes(emailAluno) ||
+    (wsGrupos.length > 0 && await estudanteEmAlgumGrupo(sessao.estudanteId, wsGrupos))
+  )
   const rotulosAluno = resolverSidebarRotulos(t.sidebar_rotulos).aluno
   // Layout de navegação MOBILE, escolhido no console (Aparência → Mobile): 'tabs' | 'menu'.
   const navMode: 'tabs' | 'menu' = t.mobile_nav === 'menu' ? 'menu' : 'tabs'
@@ -177,7 +184,11 @@ export default async function AlunoPortalLayout({ children }: { children: React.
     [
       // Revisão: a Início PRINCIPAL é a nova (/aluno/nova/inicio). A original foi desativada (redireciona).
       { href: brand === 'revisao' ? '/aluno/nova/inicio' : '/aluno', label: 'Início', short: 'Início', icon: 'Home', exact: true },
+      // Revisão: "Painel de estudos" e "Cursos" sobem (pedido do usuário) — Painel acima de Simulados e
+      // Cursos acima de Meus Extensivos. São rotas /aluno/nova (ocultas p/ MEQ/VND), então só a Revisão muda.
+      { href: '/aluno/nova/painel', label: 'Painel de estudos', short: 'Painel', icon: 'LayoutDashboard', badge: 'NOVO' },
       { href: '/aluno/simulados', label: 'Simulados', short: 'Simulados', icon: 'ClipboardList' },
+      { href: '/aluno/nova/cursos', label: 'Cursos', short: 'Cursos', icon: 'GraduationCap', badge: 'NOVO' },
       // Hub "Meus Extensivos" (Fase 2 produtos): lista os extensivos do aluno + páginas branded por produto.
       { href: '/aluno/extensivos', label: 'Meus Extensivos', short: 'Extensivos', icon: 'GraduationCap' },
       // Desafios de Lei Seca e Jurisprudência saem do MENU na Revisão: o acesso ao conteúdo passa a ser
@@ -200,13 +211,11 @@ export default async function AlunoPortalLayout({ children }: { children: React.
       // experiência nova (que tem o próprio shell). Produção intacta: isto apenas adiciona links. ──
       // Revisão: item "Início (nova)" sai do menu — virou a própria "Início". (Outras marcas: inalterado.)
       { href: '/aluno/nova/inicio', label: 'Início (nova)', short: 'Nova', icon: 'Home', badge: 'NOVO', gate: brand !== 'revisao' },
-      { href: '/aluno/nova/painel', label: 'Painel de estudos', short: 'Painel', icon: 'LayoutDashboard', badge: 'NOVO' },
       { href: '/aluno/nova/desempenho', label: 'Meu Desempenho', short: 'Desempenho', icon: 'BarChart3', badge: 'NOVO' },
       // Ligas (nova) — já é a PRINCIPAL na Revisão (sem selo "NOVO"); a antiga saiu do menu acima.
       { href: '/aluno/nova/comunidade/ligas', label: 'Ligas', short: 'Ligas', icon: 'Trophy', gate: gamAtivo },
       // exact: só acende em /comunidade (senão /comunidade/ligas e /comunidade/perfil acendiam "Comunidade" junto).
       { href: '/aluno/nova/comunidade', label: 'Comunidade', short: 'Comun.', icon: 'Users', badge: 'NOVO', exact: true },
-      { href: '/aluno/nova/cursos', label: 'Cursos', short: 'Cursos', icon: 'GraduationCap', badge: 'NOVO' },
       { href: '/aluno/nova/como-estudar', label: 'Como Estudar', short: 'Estudar', icon: 'Lightbulb', badge: 'NOVO' },
       { href: '/aluno/nova/cadernos', label: 'Cadernos', short: 'Cadernos', icon: 'NotebookPen', badge: 'NOVO' },
       { href: '/aluno/nova/duvidas', label: 'Dúvidas', short: 'Dúvidas', icon: 'HelpCircle', badge: 'NOVO' },

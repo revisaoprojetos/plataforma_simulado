@@ -8,7 +8,7 @@ import {
   FolderPlus, Upload, Folder, FileText, FileType2, FileCode2, LayoutGrid, List as ListIcon,
   ChevronRight, ChevronLeft, MoreVertical, Loader2, X, CircleCheck, CircleDashed, Archive,
   Download, Pencil, Info, Trash2, FolderInput, Layers, Link2, RotateCcw, Clock, ExternalLink, Users2,
-  Lock, Palette, Check, Settings2, Copy, Files, Search, Home, FolderTree, CalendarClock, GraduationCap,
+  Lock, Palette, Check, Settings2, Copy, Files, Search, Home, FolderTree, CalendarClock, GraduationCap, Music,
 } from 'lucide-react'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
@@ -33,7 +33,7 @@ import { formatBrt } from '@/lib/brt'
 import {
   listarArvore, criarPasta, removerPasta, renomearPasta, moverPasta, definirCorPasta, moverDocumento,
   importarDocumento, prepararUploadConteudo, importarDeStorage, criarDocumentoBranco, publicarDocumento, publicarNovaVersao, removerDocumento, detalheDocumento, abrirEdicaoDocx,
-  renomearDocumento, urlDownloadDocumento, listarPastasConteudo, dadosVisualizacao, thumbDocumento, pdfPreviewDocumento, conteudoPreviewAdmin, duplicarDocumento,
+  renomearDocumento, urlDownloadDocumento, listarPastasConteudo, dadosVisualizacao, thumbDocumento, pdfPreviewDocumento, midiaPreviewDocumento, conteudoPreviewAdmin, duplicarDocumento,
   definirPastaDisciplinaCronograma, removerPastaDisciplinaCronograma, definirTipoMaterialSubpasta,
   carregarArvoreAcesso, montarArvoreAcessoDrive, salvarAcessoNo, resolverEstudantePorEmail,
   listarGruposBiblioteca, buscarAlunosBiblioteca, gruposDoEstudante,
@@ -47,9 +47,13 @@ type StatusFiltro = 'todos' | 'rascunho' | 'publicado' | 'arquivado'
 
 const ICONE_TIPO: Record<string, typeof FileText> = { docx: FileType2, pdf: FileText, html: FileCode2 }
 
-// Mapeia o tipo_origem armazenado (docx|pdf|html) para o KindConteudo dos selos/cards. html = documento.
+// Mapeia o tipo_origem armazenado (docx|pdf|html|video|audio) para o KindConteudo dos selos/cards.
+// html = documento. Vídeo/áudio ganham selo/ícone próprios no card (placeholder do CardConteudo).
 function docKind(tipoOrigem: string): KindConteudo {
-  return tipoOrigem === 'pdf' ? 'pdf' : 'docx'
+  return tipoOrigem === 'pdf' ? 'pdf'
+    : tipoOrigem === 'video' ? 'video'
+    : tipoOrigem === 'audio' ? 'audio'
+    : 'docx'
 }
 // Paleta curta para o menu "Mudar cor" da pasta (mesmas cores do protótipo Drive).
 const CORES_PASTA = ['#444746', '#d06b64', '#f83a22', '#ff7537', '#ffad46', '#fad165', '#b3dc6c', '#16a765', '#42d692', '#9fc6e7', '#4986e7', '#9a9cff', '#b99aff', '#cd74e6', '#f691b2']
@@ -1246,8 +1250,20 @@ function PreviaFiel({ documentoId, pdfUrlInicial, capaInicial }: { documentoId: 
   const [capa, setCapa] = useState<string | null>(capaInicial ?? null)
   const [pdf, setPdf] = useState<string | null>(pdfUrlInicial ?? null)
   const [pdfFalhou, setPdfFalhou] = useState(false)
+  // Vídeo/áudio: player nativo em vez de docx/pdf. undefined = ainda verificando; null = não é mídia.
+  const [midia, setMidia] = useState<{ kind: 'video' | 'audio'; url: string } | null | undefined>(undefined)
+  useEffect(() => {
+    if (pdfUrlInicial) { setMidia(null); return } // PDF cacheado só existe p/ docx/pdf → nunca é mídia
+    let vivo = true
+    setMidia(undefined)
+    midiaPreviewDocumento(documentoId)
+      .then((r) => { if (!vivo) return; setMidia(r.ok && r.url && (r.kind === 'video' || r.kind === 'audio') ? { kind: r.kind, url: r.url } : null) })
+      .catch(() => { if (vivo) setMidia(null) })
+    return () => { vivo = false }
+  }, [documentoId, pdfUrlInicial])
   useEffect(() => {
     if (pdfUrlInicial) return // já temos o PDF cacheado → nada a buscar
+    if (midia !== null) return // ainda verificando ou é mídia → não dispara a conversão docx/pdf (OnlyOffice)
     let vivo = true
     setCapa(capaInicial ?? null); setPdf(null); setPdfFalhou(false)
     // 1ª página na hora (capa cacheada); em paralelo, o PDF do documento INTEIRO (OnlyOffice, cacheado) —
@@ -1255,7 +1271,27 @@ function PreviaFiel({ documentoId, pdfUrlInicial, capaInicial }: { documentoId: 
     if (!capaInicial) thumbDocumento(documentoId).then((r) => { if (vivo && r.url) setCapa(r.url) }).catch(() => {})
     pdfPreviewDocumento(documentoId).then((r) => { if (!vivo) return; r.ok && r.url ? setPdf(r.url) : setPdfFalhou(true) }).catch(() => { if (vivo) setPdfFalhou(true) })
     return () => { vivo = false }
-  }, [documentoId, pdfUrlInicial, capaInicial])
+  }, [documentoId, pdfUrlInicial, capaInicial, midia])
+  // Mídia (vídeo/áudio): player nativo com tokens — em vez do docx/pdf.
+  if (midia) return (
+    <div className="flex h-full w-full items-center justify-center overflow-auto bg-neutral-200 p-6 dark:bg-neutral-900">
+      {midia.kind === 'video' ? (
+        // eslint-disable-next-line jsx-a11y/media-has-caption
+        <video src={midia.url} controls preload="metadata" playsInline className="mx-auto max-h-full w-full max-w-4xl rounded-2xl border bg-black" />
+      ) : (
+        <div className="mx-auto w-full max-w-xl rounded-2xl border bg-card p-6">
+          <div className="mb-4 flex items-center gap-3">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Music className="h-5 w-5" /></span>
+            <div className="text-sm font-semibold text-foreground">Áudio</div>
+          </div>
+          {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+          <audio src={midia.url} controls className="w-full" />
+        </div>
+      )}
+    </div>
+  )
+  // Enquanto verifica se é mídia, evita piscar o loader/capa do PDF.
+  if (midia === undefined) return <div className="flex h-full items-center justify-center gap-2 text-sm text-neutral-500"><Loader2 className="h-4 w-4 animate-spin" />Carregando prévia…</div>
   // Documento completo (PDF) pronto → visualizador nativo, progressivo e fiel.
   if (pdf) return <iframe src={pdf} className="h-full w-full border-0 bg-neutral-200 dark:bg-neutral-900" title="Documento" />
   // Enquanto o PDF converte, mostra a 1ª página (capa) já renderizada.

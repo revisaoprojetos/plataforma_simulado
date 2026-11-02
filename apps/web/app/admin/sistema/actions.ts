@@ -9,6 +9,8 @@ import {
   normalizarManutencaoAreas, normalizarMapaAreas, normalizarLiberados, normalizarModos,
   AREAS_MANUTENCAO, AREAS_MANUTENCAO_ALUNO, type ManutencaoAreas, type ManutencaoLiberados, type ManutencaoModos,
 } from '@/lib/sistema/manutencao-areas'
+import { normalizarEmailsTestador, normalizarIdsWorkspace } from '@/lib/sistema/testadores-globais'
+import { selecionarGrupos } from '@/lib/simulado/grupos'
 
 /** Salva a manutenção da plataforma em tenants.tema.manutencao_sistema (merge, sem apagar o tema). */
 export async function salvarManutencaoSistema(input: ManutencaoSistema) {
@@ -159,4 +161,56 @@ export async function resolverNomesEstudantes(ids: string[]): Promise<PessoaLibe
   const svc = createAdminClient()
   const { data } = await svc.from('simulado_estudantes').select('id, nome, email').eq('tenant_id', tenantId).in('id', limpos)
   return (data ?? []).map((e: any) => ({ id: e.id, nome: e.nome ?? e.email ?? 'Estudante', email: e.email ?? null }))
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// WORKSPACE (equipe interna) — e-mails + grupos de estudantes com ACESSO TOTAL
+// (por cima da manutenção, no admin e no aluno) e FORA de ranking/estatística.
+// Persistido em tema.testadores_globais (e-mails) + tema.workspace_grupos (ids de grupo).
+// ──────────────────────────────────────────────────────────────────────────────
+
+const WORKSPACE_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+export type WorkspaceGrupo = { id: string; nome: string; cor: string | null }
+
+/** Grupos (não-mestre) do tenant p/ o seletor do Workspace. */
+export async function listarGruposWorkspace(): Promise<WorkspaceGrupo[]> {
+  const access = await getCurrentAccess()
+  if (!(access.isAdmin || access.permissions.includes('configuracoes:view')) || !access.tenantId) return []
+  const svc = createAdminClient()
+  const grupos = await selecionarGrupos(svc, access.tenantId).catch(() => [])
+  return grupos.filter((g) => !g.is_mestre).map((g) => ({ id: g.id, nome: g.nome, cor: g.cor ?? null }))
+}
+
+/** Salva a lista do Workspace (e-mails + grupos) — merge no tema + auditoria + revalida o portal. */
+export async function salvarWorkspace(emailsBrutos: string[], gruposBrutos: string[]) {
+  const access = await getCurrentAccess()
+  if (!(access.isAdmin || access.permissions.includes('configuracoes:manage'))) {
+    return { error: 'Sem permissão para gerenciar o Workspace.' }
+  }
+  const tenantId = access.tenantId
+  if (!tenantId) return { error: 'Tenant não resolvido — recarregue a página.' }
+
+  const emails = normalizarEmailsTestador((emailsBrutos ?? []).filter((e) => WORKSPACE_EMAIL_RE.test((e || '').trim().toLowerCase())))
+  const grupos = normalizarIdsWorkspace(gruposBrutos ?? [])
+
+  const svc = createAdminClient()
+  const { data: anterior } = await svc.from('simulado_tenants').select('tema').eq('id', tenantId).maybeSingle()
+  const temaAnterior = (anterior?.tema as Record<string, unknown>) ?? {}
+  const merged = { ...temaAnterior, testadores_globais: emails, workspace_grupos: grupos }
+  const { error } = await svc.from('simulado_tenants').update({ tema: merged }).eq('id', tenantId)
+  if (error) return { error: `Erro ao salvar: ${error.message}` }
+
+  await registrarAudit({
+    operacao: 'UPDATE',
+    entidade: 'simulado_tenants',
+    entidadeId: tenantId,
+    antes: { testadores_globais: temaAnterior.testadores_globais ?? null, workspace_grupos: temaAnterior.workspace_grupos ?? null },
+    depois: { testadores_globais: emails, workspace_grupos: grupos },
+    tenantId,
+  })
+  // Os gates (admin + aluno) leem o Workspace do tema por request → revalida o layout p/ valer já.
+  revalidatePath('/', 'layout')
+  revalidatePath('/admin/sistema')
+  return { ok: true as const, emails, grupos }
 }

@@ -4,6 +4,8 @@ import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { resolverProviderCfg } from '@/lib/integracoes/config'
 import { getAdapter } from '@/lib/integracoes/registry'
 import { aplicarEntitlement } from '@/lib/integracoes/engine'
+import { aplicarPedidoComRegras } from '@/lib/integracoes/liberacao/engine'
+import { LIBERACAO_REGRAS_ATIVO } from '@/lib/flags'
 import type { Provider, EventoNormalizado, PessoaEntitlement } from '@/lib/integracoes/tipos'
 
 const soDig = (s?: string | null) => (s ? s.replace(/\D/g, '') : '')
@@ -223,7 +225,22 @@ export async function reconciliarPull(
  * que grava em simulado_integracao_eventos ANTES de chamar isto.
  */
 export async function processarEvento(tenantId: string, provider: Provider, ev: EventoNormalizado): Promise<ResultadoImport> {
-  const r = await aplicarEntitlement({ tenantId, provider, pessoa: ev.pessoa, entitlement: ev.entitlement })
+  // KILL-SWITCH (lib/flags.LIBERACAO_REGRAS_ATIVO, default OFF): motor de regras DESLIGADO → cai no
+  // comportamento LEGADO, aplica o entitlement direto (idêntico ao que era antes da liberação existir).
+  // Nenhuma tabela de liberação é lida/escrita — seguro sem a migração ...000001.
+  if (!LIBERACAO_REGRAS_ATIVO) {
+    const r = await aplicarEntitlement({ tenantId, provider, pessoa: ev.pessoa, entitlement: ev.entitlement })
+    if (!r.ok) return { ok: false, error: r.error, erros: 1 }
+    return {
+      ok: true, total: 1,
+      concedidos: r.acao === 'concedido' ? 1 : 0,
+      revogados: r.acao === 'revogado' ? 1 : 0,
+      ignorados: r.acao === 'ignorado' ? 1 : 0,
+      erros: 0,
+    }
+  }
+  // Motor de REGRAS primeiro (grava pedido + grants). Nada casar → fallback AUTO-MAP (dentro da função).
+  const r = await aplicarPedidoComRegras({ tenantId, provider, pessoa: ev.pessoa, entitlement: ev.entitlement })
   if (!r.ok) return { ok: false, error: r.error, erros: 1 }
   return {
     ok: true, total: 1,

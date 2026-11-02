@@ -1,5 +1,24 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
+// Conjunto de permissões do papel-semente `professor` (self-service da área de Conteúdos).
+// Conteúdo/materiais/biblioteca/flashcards/trilhas/classificação + produtos/liberação, espelhando
+// o escopo de `admin_conteudo` e estendendo às áreas novas. SEM rbac/auditoria/tenants/console/
+// configurações/integrações/api_keys/gamificação/armazenamento/correção (não é admin geral).
+// Mantido em sincronia com apps/web/lib/rbac-catalogo.ts, scripts/seed-rbac.mjs e a migration
+// apps/web/supabase/migrations/20261031000000_rbac_professor_conteudos.sql.
+export const PROFESSOR_PERMS: ReadonlySet<string> = new Set([
+  'questoes:view', 'questoes:create', 'questoes:update',
+  'simulados:view', 'simulados:create', 'simulados:update', 'simulados:delete',
+  'biblioteca:view', 'biblioteca:create', 'biblioteca:update', 'biblioteca:publicar',
+  'leitura:view', 'leitura:create', 'leitura:update', 'leitura:publicar',
+  'flashcards:view', 'flashcards:create', 'flashcards:update', 'flashcards:manage',
+  'trilhas:view', 'trilhas:create', 'trilhas:update', 'trilhas:manage',
+  'classificacao:view', 'classificacao:manage',
+  'produtos:view', 'produtos:create', 'produtos:update', 'produtos:manage',
+  'liberacao:view', 'liberacao:manage',
+  'grupos:view', 'estudantes:view', 'matriculas:view', 'relatorios:view',
+])
+
 // Mensagens padrão por tenant (bloqueio / liberação / alerta) com variáveis {{...}}.
 const MENSAGENS_PADRAO: { chave: string; titulo: string; corpo: string }[] = [
   { chave: 'bloqueio_sem_matricula', titulo: 'Acesso não autorizado', corpo: 'Olá {{nome}}, você não possui matrícula ativa nesta plataforma. Entre em contato: {{contato}}' },
@@ -29,6 +48,7 @@ export async function seedTenantDefaults(svc: SupabaseClient, tenantId: string) 
         admin_conteudo: (p) =>
           p.resource === 'questoes' || p.resource === 'simulados' ||
           has(p, 'estudantes', 'view') || has(p, 'matriculas', 'view') || has(p, 'relatorios', 'view'),
+        professor: (p) => PROFESSOR_PERMS.has(`${p.resource}:${p.action}`),
         admin_relatorio: (p) =>
           p.resource === 'relatorios' || has(p, 'auditoria', 'view') || has(p, 'estudantes', 'view'),
         estudante: () => false,
@@ -36,6 +56,7 @@ export async function seedTenantDefaults(svc: SupabaseClient, tenantId: string) 
       const descricoes: Record<string, string> = {
         admin: 'Administrador geral (acesso total)',
         admin_conteudo: 'Gerencia questões e simulados',
+        professor: 'Professor (conteúdo: questões, biblioteca, flashcards, trilhas, produtos)',
         admin_relatorio: 'Relatórios e auditoria',
         estudante: 'Aluno (sem painel)',
       }

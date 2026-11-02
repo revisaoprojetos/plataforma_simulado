@@ -8,11 +8,10 @@ import { TIPOS_CONTEUDO, seloStyle, type KindConteudo } from '@/lib/biblioteca/t
 const ICONE: Record<KindConteudo, typeof FileText> = {
   docx: FileText, pdf: FileType, pptx: Presentation, xlsx: Table2, video: Video, audio: Music,
 }
-// Proporção da capa por tipo: papel (A4-ish), vídeo (16:9), áudio (4:3).
-const ASPECTO: Record<KindConteudo, string> = {
-  docx: 'aspect-[1/1.3]', pdf: 'aspect-[1/1.3]', pptx: 'aspect-[4/3]',
-  xlsx: 'aspect-[4/3]', video: 'aspect-video', audio: 'aspect-[4/3]',
-}
+// Proporção ÚNICA da capa (mesma altura para todos os tipos) — assim os cards ficam alinhados
+// na grade, sem o vídeo/áudio virarem bandas curtas e desalinhadas ao lado dos documentos.
+// O placeholder (ícone) ou a thumb (object-cover) centraliza dentro da mesma área A4-ish.
+const ASPECTO_CAPA = 'aspect-[1/1.3]'
 
 /**
  * Card de CONTEÚDO do redrive (seção "Documentos"). Capa (thumb) por tipo, selo do tipo, selo NOVO,
@@ -60,7 +59,7 @@ export function CardConteudo({
       )}
     >
       {/* Capa */}
-      <div className={cn('relative w-full overflow-hidden bg-muted', ASPECTO[kind])}>
+      <div className={cn('relative w-full overflow-hidden bg-muted', ASPECTO_CAPA)}>
         {capaUrl && !imgErro ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={capaUrl} alt="" className="h-full w-full object-cover" loading="lazy" onError={() => setImgErro(true)} />

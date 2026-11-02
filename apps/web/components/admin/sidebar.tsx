@@ -15,6 +15,7 @@ import {
   MessageSquare,
   KeyRound,
   GraduationCap,
+  Boxes,
   SlidersHorizontal,
   Flag,
   PenLine,
@@ -48,6 +49,12 @@ import {
   MessageCircle,
   FileText,
   Newspaper,
+  FolderTree,
+  PlayCircle,
+  Layers,
+  Route,
+  Tag,
+  Tags,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -81,7 +88,7 @@ import { logoutAction } from '@/app/login/actions'
 import { confirmarDescartarAlteracoes } from '@/components/admin/use-unsaved-guard'
 import { LoginLoading } from '@/components/aluno/login-loading'
 import { LOGIN_DEFAULT, type LoginConfig } from '@/lib/login-config'
-import { LEITURA_ATIVA, JURISPRUDENCIA_ATIVA, MODELOS_CADERNO_ATIVO } from '@/lib/flags'
+import { LEITURA_ATIVA, JURISPRUDENCIA_ATIVA, MODELOS_CADERNO_ATIVO, LIBERACAO_REGRAS_ATIVO } from '@/lib/flags'
 import { rotuloDe, IconeMenu, RotuloMenu, type SidebarRotulosAdmin } from '@/lib/sidebar-rotulos'
 
 type IconType = React.ComponentType<{ className?: string; style?: React.CSSProperties }>
@@ -91,6 +98,7 @@ interface NavItem {
   href: string
   icon: IconType
   exact?: boolean
+  matchPrefix?: string // acende para qualquer rota sob este prefixo (ex.: Estúdio = /admin/conteudos)
   perm?: string // permissão necessária para ver o item
   superOnly?: boolean // só aparece para super-admin GLOBAL (não por-tenant)
   oculto?: boolean // escondido por flag (ex.: feature em construção)
@@ -164,6 +172,7 @@ const navGroups: NavGroup[] = [
     items: [
       { label: 'Estudantes', href: '/admin/estudantes', icon: Users, perm: 'estudantes:view' },
       { label: 'Grupos', href: '/admin/grupos', icon: UsersRound, perm: 'grupos:view' },
+      { label: 'Produtos / Extensivos', href: '/admin/produtos', icon: Boxes, perm: 'produtos:view' },
       { label: 'Visualizações de aluno', href: '/admin/impersonation', icon: Eye, perm: 'estudantes:view' },
     ],
   },
@@ -173,6 +182,7 @@ const navGroups: NavGroup[] = [
     items: [
       { label: 'Integrações', href: '/admin/integracoes', icon: Plug, perm: 'integracoes:view' },
       { label: 'Webhooks & n8n', href: '/admin/conexoes/webhooks', icon: Webhook, perm: 'integracoes:view' },
+      { label: 'Regras de liberação', href: '/admin/liberacao', icon: ShieldCheck, perm: 'liberacao:view', oculto: !LIBERACAO_REGRAS_ATIVO },
     ],
   },
   {
@@ -234,7 +244,6 @@ const navGroups: NavGroup[] = [
       { label: 'Chaves de API', href: '/admin/transcricao', icon: KeyRound, perm: 'configuracoes:view' },
       // Aparência (identidade/cores/tema) MIGRADA para o Console (super-admin) → Plataformas → Aparência.
       { label: 'Sistema', href: '/admin/sistema', icon: ServerCog, perm: 'configuracoes:view' },
-      { label: 'Testadores', href: '/admin/testadores', icon: FlaskConical, perm: 'configuracoes:view' },
       { label: 'Mensagens', href: '/admin/configuracoes/mensagens', icon: MessageSquare, perm: 'configuracoes:view' },
       { label: 'Ajuda / FAQ', href: '/admin/configuracoes/ajuda', icon: HelpCircle, perm: 'configuracoes:view' },
       { label: 'Banners & Pop-ups', href: '/admin/configuracoes/banners', icon: Megaphone, perm: 'configuracoes:view' },
@@ -242,6 +251,17 @@ const navGroups: NavGroup[] = [
       { label: 'LGPD', href: '/admin/lgpd', icon: ShieldCheck, perm: 'estudantes:view' },
       { label: 'Lixeira', href: '/admin/lixeira', icon: Trash2, perm: 'questoes:view' },
       { label: 'Ajuda', href: '/admin/ajuda', icon: HelpCircle },
+    ],
+  },
+  {
+    // ESTÚDIO DE CONTEÚDO — UMA entrada só (spec do designer: "menu lateral = só o item Conteúdos").
+    // A navegação interna é pelas ABAS do topo (Produtos · Materiais · Flashcards · Trilhas · Oferta ·
+    // Classificação) + sub-abas de Materiais — nunca por sub-itens na sidebar. Convive com as áreas de
+    // produção (cutover depois). /admin/conteudos redireciona para o início da área (Produtos).
+    label: 'Conteúdo',
+    icon: FolderTree,
+    items: [
+      { label: 'Produtos', href: '/admin/conteudos/produtos', icon: FolderTree, perm: 'produtos:view', matchPrefix: '/admin/conteudos' },
     ],
   },
   {
@@ -272,6 +292,7 @@ const navGroups: NavGroup[] = [
 function itemCasa(item: NavItem, pathname: string, search: URLSearchParams) {
   const [path, qs] = item.href.split('?')
   if (item.exact) return pathname === path
+  if (item.matchPrefix) return pathname === item.matchPrefix || pathname.startsWith(item.matchPrefix + '/')
   if (qs) {
     // Itens que compartilham a mesma rota e diferem só pela query (ex.: Auditoria).
     if (pathname !== path) return false

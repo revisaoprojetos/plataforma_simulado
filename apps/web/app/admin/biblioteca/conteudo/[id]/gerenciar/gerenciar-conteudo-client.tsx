@@ -1,15 +1,16 @@
 'use client'
 import { useEffect, useMemo, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { formatBrt } from '@/lib/brt'
 import { gestaoDe } from '@/lib/biblioteca/gestao-tipos'
 import { tipoDe, seloStyle } from '@/lib/biblioteca/tipos-conteudo'
 import {
-  salvarProtecaoConteudo, definirVisibilidadeConteudo, arquivarConteudo, removerOrigemAcesso,
+  salvarProtecaoConteudo, definirVisibilidadeConteudo, salvarLegendaCategorias, arquivarConteudo, removerOrigemAcesso,
   carregarRegistroAluno, carregarAlunosGerenciamento, type GestaoDados, type OrigemAcesso, type AlunoAcesso, type EventoRegistro,
 } from '@/app/admin/biblioteca/gestao-actions'
-import { abrirEdicaoDocx } from '@/app/admin/biblioteca/actions'
+import { abrirEdicaoDocx, midiaPreviewDocumento } from '@/app/admin/biblioteca/actions'
 import { AbaFlashcards } from './flashcards-tab'
 
 // PORTE 1:1 do protótipo `Entregas.dc.html` (handoff 03b) — mesma estrutura, blocos e textos. Cores de
@@ -103,7 +104,26 @@ export function GerenciarConteudoClient({ dados }: { dados: GestaoDados }) {
   const ehModelo = base.ehModelo
   const [aba, setAba] = useState<Aba>(ehModelo ? 'uso' : isMedia ? 'fonte' : 'visao')
   const [copied, setCopied] = useState(false)
+  // Player de mídia (vídeo/áudio) — assistir dentro da plataforma, sem sair da gestão.
+  const [player, setPlayer] = useState<{ kind: 'video' | 'audio'; url: string } | null>(null)
+  const [abrindoPlayer, setAbrindoPlayer] = useState(false)
   const linkAluno = `https://simulado.revisaopge.com.br/biblioteca/${base.id}`
+
+  async function abrirPlayer() {
+    setAbrindoPlayer(true)
+    const t = toast.loading('Abrindo o player…')
+    try {
+      const r = await midiaPreviewDocumento(base.id)
+      if (!r.ok || !r.url || !r.kind) { toast.error(r.error || 'Não foi possível abrir a mídia.'); return }
+      setPlayer({ kind: r.kind, url: r.url })
+    } finally { toast.dismiss(t); setAbrindoPlayer(false) }
+  }
+  useEffect(() => {
+    if (!player) return
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); setPlayer(null) } }
+    window.addEventListener('keydown', h, true)
+    return () => window.removeEventListener('keydown', h, true)
+  }, [player])
 
   const facts: { n: string; label: string; go: Aba }[] = ehModelo ? [
     { n: fmt(base.contagens.vinculos), label: base.contagens.vinculos === 1 ? 'vínculo' : 'vínculos', go: 'uso' },
@@ -183,6 +203,7 @@ export function GerenciarConteudoClient({ dados }: { dados: GestaoDados }) {
           </div>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {!ehModelo && <button className={copied ? 'gbtn sm ok' : 'gbtn sm'} onClick={copiarLink}>{copied ? 'Link copiado ✓' : 'Copiar link do aluno'}</button>}
+            {isMedia && <button className="gbtn sm" onClick={abrirPlayer} disabled={abrindoPlayer}>{abrindoPlayer ? 'Abrindo…' : base.kind === 'audio' ? 'Ouvir' : 'Assistir'}</button>}
             {!ehModelo && (tp.verAluno === 'aluno'
               ? <button className="gbtn sm" onClick={() => router.push(`/aluno/biblioteca/${base.id}`)}>Ver como aluno</button>
               : <button className="gbtn sm" onClick={() => setAba('fonte')}>Pré-visualizar</button>)}
@@ -219,6 +240,39 @@ export function GerenciarConteudoClient({ dados }: { dados: GestaoDados }) {
       {aba === 'hist' && <AbaHistorico dados={dados} />}
       {aba === 'cfg' && <AbaConfig base={base} tp={tp} />}
       {aba === 'fonte' && <AbaFonte base={base} linkAluno={linkAluno} />}
+
+      {/* Player de mídia — assistir/ouvir dentro da plataforma (overlay). */}
+      {player && createPortal(
+        <div onClick={() => setPlayer(null)} role="dialog" aria-modal="true" aria-label="Reprodução de mídia"
+          style={{ position: 'fixed', inset: 0, zIndex: 140, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16, background: 'rgba(0,0,0,.7)', backdropFilter: 'blur(4px)' }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ position: 'relative', width: '100%', maxWidth: '56rem', background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 16, overflow: 'hidden', boxShadow: '0 24px 60px -20px rgba(0,0,0,.6)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 16px', borderBottom: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                <span style={{ width: 28, height: 28, borderRadius: 8, display: 'grid', placeItems: 'center', fontSize: 10, fontWeight: 800, ...seloStyle(base.kind) }}>{tipo.sigla}</span>
+                <span style={{ fontWeight: 700, fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={base.titulo}>{base.titulo}</span>
+              </div>
+              <button onClick={() => setPlayer(null)} aria-label="Fechar player"
+                style={{ border: 0, background: 'transparent', color: 'var(--muted-foreground)', cursor: 'pointer', borderRadius: 8, padding: 6, display: 'grid', placeItems: 'center' }}>
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div style={{ padding: 16, background: 'var(--muted)' }}>
+              {player.kind === 'video' ? (
+                // eslint-disable-next-line jsx-a11y/media-has-caption
+                <video src={player.url} controls autoPlay preload="metadata" playsInline
+                  style={{ display: 'block', margin: '0 auto', width: '100%', maxHeight: '72vh', borderRadius: 12, border: '1px solid var(--border)', background: '#000' }} />
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, maxWidth: '36rem', margin: '0 auto', padding: 24, borderRadius: 12, border: '1px solid var(--border)', background: 'var(--card)' }}>
+                  {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                  <audio src={player.url} controls autoPlay style={{ width: '100%' }} />
+                </div>
+              )}
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
     </div>
   )
 }
@@ -522,8 +576,10 @@ function AbaConfig({ base, tp }: { base: GestaoDados['base']; tp: ReturnType<typ
   const b = base!
   const [vis, setVis] = useState(!b.oculto)
   const [prot, setProt] = useState(b.protecao)
+  const [legenda, setLegenda] = useState(b.legendaCategorias)
   const [salvando, setSalvando] = useState(false)
   async function toggleVis() { const nv = !vis; setVis(nv); const r = await definirVisibilidadeConteudo(b.id, nv); if (!r.ok) { setVis(!nv); toast.error(r.error || 'Falha.') } else toast.success(nv ? 'Visível para os alunos.' : 'Oculto para os alunos.') }
+  async function toggleLegenda() { const nv = !legenda; setLegenda(nv); const r = await salvarLegendaCategorias(b.id, nv); if (!r.ok) { setLegenda(!nv); toast.error(r.error || 'Falha.') } else toast.success(nv ? 'Legenda de categorias ativada no leitor.' : 'Legenda de categorias oculta no leitor.') }
   async function toggleProt(k: keyof typeof prot) { const nv = { ...prot, [k]: !prot[k] }; setProt(nv); setSalvando(true); const r = await salvarProtecaoConteudo(b.id, { [k]: nv[k] }); setSalvando(false); if (!r.ok) { setProt(prot); toast.error(r.error || 'Falha.') } }
   async function arquivar() { const r = await arquivarConteudo(b.id); if (!r.ok) return toast.error(r.error || 'Falha.'); toast.success('Conteúdo arquivado.') }
   const Sw = ({ on, onClick }: { on: boolean; onClick: () => void }) => <button className={on ? 'sw on' : 'sw'} role="switch" aria-checked={on} onClick={onClick} />
@@ -535,6 +591,7 @@ function AbaConfig({ base, tp }: { base: GestaoDados['base']; tp: ReturnType<typ
           <span style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 4 }}><strong style={{ fontSize: 15 }}>Publicação</strong><span style={{ fontSize: 12.5, color: 'var(--muted-foreground)' }}>Quem enxerga este conteúdo</span></span>
           <div className="crow"><span style={{ flex: 1 }}><strong style={{ fontSize: 13.5 }}>Visível para os alunos</strong><div style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>Desligar oculta para todos, inclusive nos pacotes</div></span><Sw on={vis} onClick={toggleVis} /></div>
           <div className="crow"><span style={{ flex: 1 }}><strong style={{ fontSize: 13.5 }}>Marca d’água com nome e CPF</strong><div style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>No leitor e no download</div></span><Sw on={prot.marca_dagua} onClick={() => toggleProt('marca_dagua')} /></div>
+          <div className="crow"><span style={{ flex: 1 }}><strong style={{ fontSize: 13.5 }}>Legenda de categorias no leitor</strong><div style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>Barra Núcleo/Prazos/STF/STJ… — específica do LegProc. Deixe desligada em PDFULL/Fight e nos demais.</div></span><Sw on={legenda} onClick={toggleLegenda} /></div>
         </div>
         {/* Proteção */}
         <div className="kc" style={{ gap: 0, padding: '16px 18px' }}>

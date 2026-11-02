@@ -1238,8 +1238,10 @@ function textoParou(id) {
 }
 /** Botão que entra no lugar do antigo cronômetro dos cartões. */
 function botaoIniciar(id) {
-  if (feito(id)) return '';
   const play = `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9l7.5-4.5z" fill="currentColor"/></svg>`;
+  // Meta CONCLUÍDA: ainda deixa ABRIR o material para revisar (quando a meta tem material na Biblioteca),
+  // sem reiniciar o cronômetro/sessão de estudo. Pedido do aluno: poder abrir a meta mesmo já concluída.
+  if (feito(id)) { const i = info(id); return i && i.doc ? `<button type="button" class="btn sm" data-acao="rever" data-id="${id}" title="Abrir o material desta meta para revisar">${play}Abrir material</button>` : ''; }
   const agora = FOCO && FOCO.id === id;
   if (agora) {
     // Meta em andamento: botão principal REABRE o material no leitor v2 (mostra o tempo corrido);
@@ -2317,14 +2319,17 @@ body.embed .flut{display:none}
  function estado(){ if (!FOCO) return null; return Object.assign(item(FOCO.id), { run: !!RUN, seg: Math.floor(decorrido(FOCO.id)), plan: Math.round(horasDe(FOCO.id) * 3600) }); }
  // URL do material da meta no leitor v2 (Biblioteca do aluno). Aula PDFull → documento da Biblioteca,
  // já na PÁGINA inicial daquela meta/parte (?pagina=N) — parte 2 abre direto onde a parte 1 terminou.
- function urlMaterial(id){
+ function urlMaterial(id, rever){
    const i = info(id); if (!i || !i.doc) return null;
    const f = faixaPaginas(id), qs = [];
    qs.push('voltar=' + encodeURIComponent('/aluno/cronograma')); // "Voltar" no leitor retorna ao cronograma, não à Biblioteca
-   qs.push('meta=' + encodeURIComponent(id)); // meta aberta → cronômetro no leitor + concluir de volta
-   const tseg = (S.prog[id] && S.prog[id].t) || 0; if (tseg > 0) qs.push('tseg=' + tseg); // tempo já acumulado nesta meta
+   if (!rever) { // modo REVER (meta já concluída): abre só a leitura, SEM sessão/cronômetro/"concluir" — evita desmarcar sem querer
+     qs.push('meta=' + encodeURIComponent(id)); // meta aberta → cronômetro no leitor + concluir de volta
+     const tseg = (S.prog[id] && S.prog[id].t) || 0; if (tseg > 0) qs.push('tseg=' + tseg); // tempo já acumulado nesta meta
+     const tdet = Math.round(horasDe(id) * 3600); if (tdet > 0) qs.push('tdet=' + tdet); // TEMPO DETERMINADO da meta (planejado) → contagem regressiva no leitor
+   }
    if (f && f.ini > 1) qs.push('pagina=' + f.ini);
-   if (i.tipo === 'pf' || i.tipo === 'pp') {
+   if (!rever && (i.tipo === 'pf' || i.tipo === 'pp')) {
      const pis = partesInfo(i.idx);
      // partes (divisórias + "Concluir" de cada parte no leitor). JSON base64 UTF-8.
      if (pis && pis.length) { try { qs.push('partes=' + encodeURIComponent(btoa(unescape(encodeURIComponent(JSON.stringify(pis)))))); } catch (e) {} }
@@ -2333,7 +2338,7 @@ body.embed .flut{display:none}
  }
  // Abre na MESMA aba: pede ao portal (React) para navegar via router → mostra a barra de carregamento
  // e abre o conteúdo no leitor v2. Sem window.open (evita abrir 2x / nova aba).
- function abrirMaterial(id){ const url = urlMaterial(id); const f = faixaPaginas(id); try { parent.postMessage({ type: 'rej-crono-abrir', item: item(id), url: url, pagina: f ? f.ini : null }, '*'); } catch (e) {} }
+ function abrirMaterial(id, rever){ const url = urlMaterial(id, rever); const f = faixaPaginas(id); try { parent.postMessage({ type: 'rej-crono-abrir', item: item(id), url: url, pagina: f ? f.ini : null }, '*'); } catch (e) {} }
  const _iniciar = iniciarMeta;
  iniciarMeta = function(id){ VOLTOU = null; _iniciar(id); FOCO.min = true; desenharFoco(); renderTudo(); avisar(); };
  /* clique em "Iniciar meta" / "Em andamento" dentro do app: inicia (ou retoma) e abre o material */
@@ -2343,6 +2348,9 @@ body.embed .flut{display:none}
   if (pb) { e.preventDefault(); e.stopImmediatePropagation(); if (FOCO && FOCO.id === pb.dataset.id && RUN) { parar(); desenharFoco(); renderTudo(); avisar(); } return; }
   const cb = e.target.closest('[data-acao="meta-continuar"]');
   if (cb) { e.preventDefault(); e.stopImmediatePropagation(); const cid = cb.dataset.id; if (FOCO && FOCO.id === cid && !RUN) { rodar(cid); desenharFoco(); renderTudo(); avisar(); } return; }
+  // Meta concluída → "Abrir material": só abre a leitura para revisar (sem iniciar sessão/cronômetro).
+  const rv = e.target.closest('[data-acao="rever"]');
+  if (rv) { e.preventDefault(); e.stopImmediatePropagation(); const rid = rv.dataset.id; if (typeof fecharFolha === 'function') try { fecharFolha(); } catch (er) {} abrirMaterial(rid, true); return; }
   const b = e.target.closest('[data-acao="iniciar"]'); if (!b) return;
   e.preventDefault(); e.stopImmediatePropagation();
   const id = b.dataset.id;

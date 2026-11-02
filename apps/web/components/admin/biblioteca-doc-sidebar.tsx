@@ -11,18 +11,20 @@ import { toast } from 'sonner'
 import {
   X, FileText, FileType2, FileCode2, Download, ExternalLink, Users2, Link2, History, Plus, Trash2,
   Eye, Highlighter, Printer, Droplets, Loader2, ChevronRight, Clock, CalendarClock, Settings2,
+  Play, Video, Music,
 } from 'lucide-react'
 import { formatBrt } from '@/lib/brt'
 import {
   carregarSidebarDoc, salvarPermissoesDoc, salvarJanelaDoc, adicionarVinculoLeitor, removerVinculoLeitor,
+  midiaPreviewDocumento,
   type PermissoesAluno, type VinculoLeitor, type AcessoLinhaSidebar, type EventoHistorico,
 } from '@/app/admin/biblioteca/actions'
 
 type Aba = 'detalhes' | 'acesso' | 'vinculos' | 'historico'
 type Dados = Awaited<ReturnType<typeof carregarSidebarDoc>>
 
-const ICONE_TIPO: Record<string, typeof FileText> = { docx: FileType2, pdf: FileText, html: FileCode2 }
-const CORES_TIPO: Record<string, string> = { docx: 'bg-primary text-primary-foreground', pdf: 'bg-rose-600 text-white', html: 'bg-amber-600 text-white' }
+const ICONE_TIPO: Record<string, typeof FileText> = { docx: FileType2, pdf: FileText, html: FileCode2, video: Video, audio: Music }
+const CORES_TIPO: Record<string, string> = { docx: 'bg-primary text-primary-foreground', pdf: 'bg-rose-600 text-white', html: 'bg-amber-600 text-white', video: 'bg-violet-600 text-white', audio: 'bg-sky-600 text-white' }
 
 function papelLabel(papel: string, podeBaixar: boolean): string {
   if (papel === 'editor') return 'Editor'
@@ -52,6 +54,9 @@ export function BibliotecaDocSidebar({
   const [aba, setAba] = useState<Aba>('detalhes')
   const [d, setD] = useState<Dados | null>(null)
   const [carregando, setCarregando] = useState(true)
+  // Player de mídia (vídeo/áudio) dentro da plataforma — overlay por cima do drawer.
+  const [player, setPlayer] = useState<{ kind: 'video' | 'audio'; url: string } | null>(null)
+  const [abrindoPlayer, setAbrindoPlayer] = useState(false)
 
   const recarregar = useCallback(async () => {
     setCarregando(true)
@@ -60,10 +65,27 @@ export function BibliotecaDocSidebar({
 
   useEffect(() => { recarregar() }, [recarregar])
   useEffect(() => { const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onFechar() }; window.addEventListener('keydown', h); return () => window.removeEventListener('keydown', h) }, [onFechar])
+  // Esc fecha o player primeiro (captura, antes do handler do drawer) sem fechar a barra toda.
+  useEffect(() => {
+    if (!player) return
+    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); setPlayer(null) } }
+    window.addEventListener('keydown', h, true)
+    return () => window.removeEventListener('keydown', h, true)
+  }, [player])
 
   const base = d?.base
   const Icone = ICONE_TIPO[base?.tipo_origem ?? ''] ?? FileText
   const corTipo = CORES_TIPO[base?.tipo_origem ?? ''] ?? 'bg-muted text-foreground'
+  const ehMidia = base?.tipo_origem === 'video' || base?.tipo_origem === 'audio'
+
+  async function abrirPlayer() {
+    setAbrindoPlayer(true)
+    try {
+      const r = await midiaPreviewDocumento(documentoId)
+      if (!r.ok || !r.url || !r.kind) { toast.error(r.error || 'Não foi possível abrir a mídia.'); return }
+      setPlayer({ kind: r.kind, url: r.url })
+    } finally { setAbrindoPlayer(false) }
+  }
 
   async function togglePerm(k: keyof PermissoesAluno, v: boolean) {
     if (!d?.permissoes) return
@@ -84,6 +106,7 @@ export function BibliotecaDocSidebar({
   ] as [Aba, string, typeof FileText][]
 
   return createPortal(
+    <>
     <div className="fixed inset-0 z-[120]">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-[1px]" onClick={onFechar} />
       <aside className="absolute right-0 top-0 flex h-full w-full max-w-[420px] flex-col border-l bg-card shadow-2xl" style={{ animation: 'bibSidebarIn .22s cubic-bezier(.2,0,0,1)' }}>
@@ -104,6 +127,12 @@ export function BibliotecaDocSidebar({
           <div className="mt-3 flex items-center gap-2">
             {base?.tipo_origem === 'docx' && (
               <button onClick={onEditarOffice} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-muted"><ExternalLink className="h-3.5 w-3.5" />Abrir no editor</button>
+            )}
+            {ehMidia && (
+              <button onClick={abrirPlayer} disabled={abrindoPlayer} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold hover:bg-muted disabled:opacity-60">
+                {abrindoPlayer ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Play className="h-3.5 w-3.5" />}
+                {base?.tipo_origem === 'audio' ? 'Ouvir' : 'Assistir'}
+              </button>
             )}
             <button onClick={() => router.push(`/admin/biblioteca/conteudo/${documentoId}/gerenciar`)} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 py-2 text-xs font-semibold text-primary-foreground shadow-sm transition hover:brightness-110"><Settings2 className="h-3.5 w-3.5" />Gerenciar</button>
           </div>
@@ -133,7 +162,36 @@ export function BibliotecaDocSidebar({
           )}
         </div>
       </aside>
-    </div>,
+    </div>
+
+    {/* Player de mídia (vídeo/áudio) — overlay por cima do drawer, dentro da plataforma. */}
+    {player && (
+      <div className="fixed inset-0 z-[140] flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Reprodução de mídia">
+        <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setPlayer(null)} />
+        <div className="relative flex w-full max-w-4xl flex-col overflow-hidden rounded-2xl border bg-card shadow-2xl">
+          <div className="flex items-center justify-between gap-3 border-b px-4 py-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg ${corTipo}`}><Icone className="h-4 w-4" /></span>
+              <span className="truncate text-sm font-semibold" title={base?.titulo}>{base?.titulo}</span>
+            </div>
+            <button onClick={() => setPlayer(null)} aria-label="Fechar player" className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted"><X className="h-4 w-4" /></button>
+          </div>
+          <div className="bg-muted p-4 dark:bg-background">
+            {player.kind === 'video' ? (
+              // eslint-disable-next-line jsx-a11y/media-has-caption
+              <video src={player.url} controls autoPlay preload="metadata" playsInline className="mx-auto max-h-[72vh] w-full rounded-xl border bg-black" />
+            ) : (
+              <div className="mx-auto flex max-w-xl items-center gap-3 rounded-xl border bg-card p-6">
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-primary/10 text-primary"><Music className="h-6 w-6" /></span>
+                {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                <audio src={player.url} controls autoPlay className="w-full" />
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )}
+    </>,
     document.body,
   )
 }

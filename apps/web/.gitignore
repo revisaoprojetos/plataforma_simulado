@@ -16,6 +16,8 @@
 # next.js
 /.next/
 /out/
+# marcador do bundler usado no dev (scripts/dev.ps1) — local, não versionar
+/.dev-last-bundler
 
 # production
 /build

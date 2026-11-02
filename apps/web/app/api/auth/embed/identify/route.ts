@@ -189,14 +189,15 @@ export async function POST(request: NextRequest) {
 
   // 3. TESTADOR? Se sim, faz o simulado como TESTE: pula status/janela/manutenção/matrícula, sem
   //    limite de tentativas, e a sessão nasce is_teste=true (fora de estatísticas/ranking/relatórios).
-  const ehTeste = await isTestador(supabase, estudante.id, simulado.id)
-  // TESTADOR GLOBAL do tenant (e-mail na lista): também PULA todos os gates (status/janela/
-  // manutenção/matrícula/prazo/não-publicado), mas NÃO vira is_teste → a sessão é real e CONTA
-  // normalmente em ranking/estatística (decisão do produto). Por isso é um flag separado do `ehTeste`.
-  const ehTestadorGlobalSim = await ehTestadorGlobal({ tenantId, email: estudante.email, estudanteId: estudante.id })
+  const ehTestadorPorSimulado = await isTestador(supabase, estudante.id, simulado.id)
+  // MEMBRO DO WORKSPACE (e-mail na lista OU grupo de estudantes): também PULA todos os gates
+  // (status/janela/manutenção/matrícula/prazo/não-publicado) E a sessão vira is_teste=true → fica
+  // FORA de ranking/estatística (decisão do produto, out/2026 — equipe interna não polui os números).
+  const ehWorkspace = await ehTestadorGlobal({ tenantId, email: estudante.email, estudanteId: estudante.id })
+  const ehTeste = ehTestadorPorSimulado || ehWorkspace
 
   let acessoAvulso: { id: string; expira_em: string | null; tentativas_permitidas: number; tentativas_usadas: number } | null = null
-  if (!ehTeste && !ehTestadorGlobalSim) {
+  if (!ehTeste) {
     if (simulado.status !== 'publicado' && simulado.status !== 'ativo') {
       return bloqueio(tenantId, 'bloqueio_fora_janela', { simulado: tituloSimulado })
     }

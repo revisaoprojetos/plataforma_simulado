@@ -220,9 +220,12 @@ export default async function SimuladoDetailPage({ params, searchParams }: PageP
 
   // Volta: prioriza a ORIGEM da navegação (?voltar=, setado pelo card conforme onde o admin estava),
   // caindo na pasta do simulado só como fallback. Validado (deve apontar p/ /admin/simulados) contra open-redirect.
-  const voltarSeguro = voltarParam && voltarParam.startsWith('/admin/simulados') ? voltarParam : null
+  // "Voltar" inteligente: aceita origem de Simulados OU do navegador de Produtos do Estúdio (?voltar=),
+  // senão cai na pasta do próprio simulado / raiz de Simulados. Só caminhos internos (anti open-redirect).
+  const voltarSeguro = voltarParam && (voltarParam.startsWith('/admin/simulados') || voltarParam.startsWith('/admin/conteudos/produtos')) ? voltarParam : null
   const voltarHref = voltarSeguro ?? ((simulado as any).pasta_id ? `/admin/simulados?pasta=${(simulado as any).pasta_id}` : '/admin/simulados')
-  const voltarLabel = (voltarSeguro ? voltarSeguro.includes('pasta=') : !!(simulado as any).pasta_id) ? 'Voltar para a pasta' : 'Voltar para Simulados'
+  const temPasta = voltarSeguro ? voltarSeguro.includes('pasta=') : !!(simulado as any).pasta_id
+  const voltarLabel = temPasta ? 'Voltar para a pasta' : (voltarSeguro?.startsWith('/admin/conteudos/produtos') ? 'Voltar para Produtos' : 'Voltar para Simulados')
 
   return (
     // Pré-carrega as abas no acesso p/ troca instantânea — EXCETO 'relatorio' (pesado: varreria as

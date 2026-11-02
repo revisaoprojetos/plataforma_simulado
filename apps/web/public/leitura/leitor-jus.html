@@ -67,7 +67,10 @@ kbd{font-family:var(--f-mono);font-size:11px;line-height:1;border:1px solid var(
 [data-c="y"]{--k:var(--c-y);--h:var(--hl-y)} [data-c="g"]{--k:var(--c-g);--h:var(--hl-g)} [data-c="b"]{--k:var(--c-b);--h:var(--hl-b)} [data-c="v"]{--k:var(--c-v);--h:var(--hl-v)} [data-c="r"]{--k:var(--c-r);--h:var(--hl-r)} [data-c="k"]{--k:var(--ink);--h:var(--hover)}
 
 /* ================= SHELL ================= */
-.app{position:fixed;inset:0;display:grid;grid-template-rows:auto minmax(0,1fr);grid-template-columns:var(--sbw,272px) minmax(0,1fr) var(--nbw,0px);transition:grid-template-columns .34s cubic-bezier(.4,0,.2,1)}
+/* NAO animar grid-template-columns: abrir/fechar as laterais mudaria a largura do doc a cada frame
+   (animacao de LAYOUT) e re-layouta o documento inteiro = travado em docs grandes. O grid muda
+   instantaneo (1 reflow so) e os paineis deslizam por `transform` (composto na GPU = suave). */
+.app{position:fixed;inset:0;display:grid;grid-template-rows:auto minmax(0,1fr);grid-template-columns:var(--sbw,272px) minmax(0,1fr) var(--nbw,0px)}
 .app.sb-closed{--sbw:0px}
 @media (min-width:1500px){.app.nb-open{--nbw:360px}}
 @media (prefers-reduced-motion:reduce){.app{transition:none}}
@@ -467,8 +470,10 @@ mark.sr.cur{box-shadow:inset 0 -1.25em var(--hl-y),0 0 0 2px var(--c-y);border-r
 .mr-sel{min-width:140px}
 
 /* ================= CADERNO ================= */
-.nb{grid-row:2;grid-column:3;background:var(--raise);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0;width:360px;overflow:hidden;z-index:30}
+.nb{grid-row:2;grid-column:3;background:var(--raise);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0;width:360px;overflow:hidden;z-index:30;transform:translateX(100%);transition:transform .26s cubic-bezier(.2,.8,.2,1),visibility .26s}
+.app.nb-open .nb{transform:none}
 .app:not(.nb-open) .nb{visibility:hidden}
+@media (prefers-reduced-motion:reduce){.nb{transition:visibility .26s}}
 @media (max-width:1499px){
   .nb{position:fixed;top:calc(56px + env(safe-area-inset-top,0px));right:0;bottom:0;width:min(380px,100vw);box-shadow:var(--shadow-2);transform:translateX(100%);transition:transform .22s ease,visibility .22s}
   .app.nb-open .nb{transform:none}
@@ -557,6 +562,28 @@ input[type=range]{width:100%;accent-color:var(--accent);margin:0}
 .pomo-big{font-family:var(--f-mono);font-size:38px;font-weight:500;text-align:center;letter-spacing:-.02em;margin:4px 0 2px;font-variant-numeric:tabular-nums}
 .pomo-sub{text-align:center;font-size:12px;color:var(--ink-3);margin-bottom:12px}
 .pomo-btns{display:grid;grid-template-columns:1fr auto;gap:6px}
+.pomo-view{display:flex;flex-direction:column;gap:2px}
+.pomo-view .lab{font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin-bottom:8px}
+.pomo-full{position:fixed;inset:0;z-index:93;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:24px}
+.pomo-full[hidden]{display:none}
+.pomo-full-in{display:flex;flex-direction:column;align-items:center;text-align:center;max-width:560px;width:100%}
+.pomo-full-phase{font-size:13px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3)}
+.pomo-full-time{font-family:var(--f-mono);font-size:clamp(72px,22vw,180px);font-weight:500;line-height:1.05;letter-spacing:-.03em;color:var(--ink);font-variant-numeric:tabular-nums;margin:6px 0 2px}
+.pomo-full-sub{font-size:14px;color:var(--ink-3);margin-bottom:28px}
+.pomo-full-btns{display:flex;gap:8px;margin-bottom:18px}
+.pomo-full-btns .btn{height:44px;padding:0 22px;font-size:15px}
+.pomo-full-cycle{width:min(320px,100%)}
+.pomo-full-x{position:fixed;top:16px;right:16px;display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 14px;border-radius:99px;color:var(--ink-2);background:var(--hover);font-size:13px;font-weight:500}
+.pomo-full-x:hover{color:var(--ink)}
+.pomo-full-x .i{width:16px;height:16px}
+.pomo-full-x:focus-visible,.pomo-full-btns .btn:focus-visible,#optPomoView button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+/* Animacao de ENTRADA da tela cheia: roda na troca de display:none->flex (quando sai do [hidden]).
+   Fundo faz fade; o conteudo sobe/escala. */
+@keyframes pomoFullBg{from{opacity:0}to{opacity:1}}
+@keyframes pomoFullUp{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}
+.pomo-full:not([hidden]){animation:pomoFullBg .18s ease}
+.pomo-full:not([hidden]) .pomo-full-in{animation:pomoFullUp .28s cubic-bezier(.2,.8,.2,1)}
+@media (prefers-reduced-motion:reduce){.pomo-full:not([hidden]),.pomo-full:not([hidden]) .pomo-full-in{animation:none}}
 
 .seltool{position:fixed;z-index:60;display:none;align-items:center;gap:2px;background:var(--raise);border:1px solid var(--line);border-radius:11px;padding:4px;box-shadow:var(--shadow-2)}
 .seltool.show{display:flex}
@@ -976,10 +1003,15 @@ html,body,.scroller,.side-in,.pane,.mr-scroll,.menu,.palette .res,.law-pop,.rail
       </div>
     </div>
     <div style="position:relative">
-      <button class="tb" id="btnFocus" title="Foco e sessão (F)" aria-label="Foco e sessão de estudo"><svg class="i"><use href="#i-focus"/></svg><span class="lbl">Foco</span></button>
-      <div class="menu" id="mnFocus" role="dialog" aria-label="Foco e sessão">
+      <button class="tb" id="btnFocus" title="Pomodoro (F abre o modo foco)" aria-label="Pomodoro e foco"><svg class="i"><use href="#i-focus"/></svg><span class="lbl">Pomodoro</span></button>
+      <div class="menu" id="mnFocus" role="dialog" aria-label="Pomodoro">
+        <div class="grp" id="cronGrp" hidden>
+          <div class="lab">Cronometro</div>
+          <div class="seg" id="optCron"><button data-v="meta" aria-label="Usar o tempo da meta">Tempo da meta</button><button data-v="pomodoro" aria-label="Usar o Pomodoro">Pomodoro</button></div>
+          <div class="pomo-sub" id="cronHint" style="margin-top:6px;text-align:left"></div>
+        </div>
         <div class="grp">
-          <div class="row"><span>Modo foco</span><button class="switch" id="swFocus" role="switch" aria-checked="false" aria-label="Modo foco"></button></div>
+          <div class="row"><span>Modo foco (escurecer)</span><button class="switch" id="swFocus" role="switch" aria-checked="false" aria-label="Modo foco (escurecer a tela)"></button></div>
           <div class="row"><span>Régua de leitura</span><button class="switch" id="swRuler" role="switch" aria-checked="false" aria-label="Régua de leitura"></button></div>
         </div>
         <div class="grp">
@@ -989,6 +1021,8 @@ html,body,.scroller,.side-in,.pane,.mr-scroll,.menu,.palette .res,.law-pop,.rail
           <div class="pomo-btns"><button class="btn pri" id="pomoGo">Iniciar sessão</button><button class="btn" id="pomoReset">Zerar</button></div>
           <div class="lab" style="margin-top:14px">Ciclo</div>
           <div class="seg" id="optCycle"><button data-v="25,5">25 / 5</button><button data-v="50,10">50 / 10</button><button data-v="15,3">15 / 3</button></div>
+          <div class="lab" style="margin-top:14px">Modo de exibição</div>
+          <div class="seg" id="optPomoView"><button data-v="mini" aria-label="Exibir na barra superior">Mini</button><button data-v="side" aria-label="Exibir na barra lateral">Lateral</button><button data-v="full" aria-label="Exibir em tela cheia">Tela cheia</button></div>
           <div class="row" style="margin-top:8px"><span>Ativar modo foco ao iniciar</span><button class="switch" id="swAutoFocus" role="switch" aria-checked="true" aria-label="Ativar foco ao iniciar"></button></div>
         </div>
       </div>
@@ -1016,7 +1050,7 @@ html,body,.scroller,.side-in,.pane,.mr-scroll,.menu,.palette .res,.law-pop,.rail
       <ol class="toc" id="toc"></ol>
     </div>
     <div class="side-foot">
-      <div class="goal-row"><span>Leitura hoje</span><span><b id="goalMin">0</b> de 30 min</span></div>
+      <div class="goal-row"><span id="goalLab">Leitura hoje</span><span><b id="goalMin">0</b> de <span id="goalAlvo">30</span> min</span></div>
       <div class="bar"><i id="goalBar" style="background:var(--ok)"></i></div>
       <div style="display:flex;flex-wrap:nowrap;gap:6px;margin:2px -10px -4px"><button class="ghost" id="btnKeys"><svg class="i"><use href="#i-key"/></svg>Atalhos</button><button class="ghost" id="btnLegend"><svg class="i"><use href="#i-info"/></svg>Legenda</button></div>
     </div>
@@ -1175,10 +1209,18 @@ html,body,.scroller,.side-in,.pane,.mr-scroll,.menu,.palette .res,.law-pop,.rail
     <div class="tabs" role="tablist">
       <button data-tab="hl" class="on">Marcações <span class="n" id="nHl">0</span></button>
       <button data-tab="nt">Notas <span class="n" id="nNt">0</span></button>
+      <button data-tab="pomo">Pomodoro</button>
       <span id="nRv" hidden></span>
     </div>
     <div class="pane on" id="p-hl"><div class="chips" id="hlFilter"></div><div id="hlList" style="display:flex;flex-direction:column;gap:8px"></div></div>
     <div class="pane" id="p-nt"><div id="ntList" style="display:flex;flex-direction:column;gap:8px"></div></div>
+    <div class="pane" id="p-pomo"><div class="pomo-view">
+      <div class="pomo-big" id="pomoBigSide">25:00</div>
+      <div class="pomo-sub" id="pomoSubSide">Foco · 0 sessões hoje</div>
+      <div class="pomo-btns"><button class="btn pri" id="pomoGoSide">Iniciar sessão</button><button class="btn" id="pomoResetSide">Zerar</button></div>
+      <div class="lab" style="margin-top:14px">Ciclo</div>
+      <div class="seg" id="optCycleSide"><button data-v="25,5">25 / 5</button><button data-v="50,10">50 / 10</button><button data-v="15,3">15 / 3</button></div>
+    </div></div>
     <div class="pane" id="p-rv">
       <div class="stats"><div><b id="rvDue">0</b><span>para hoje</span></div><div><b id="rvAll">0</b><span>cartões</span></div><div><b id="rvMast">0</b><span>dominados</span></div></div>
       <div><div class="group-h" style="margin:0 0 8px">Caixas de repetição</div><div class="boxes" id="boxes"></div></div>
@@ -1190,6 +1232,17 @@ html,body,.scroller,.side-in,.pane,.mr-scroll,.menu,.palette .res,.law-pop,.rail
   </aside>
   <div class="scrim" id="scrim"></div>
   <div class="shade" id="shadeTop"></div><div class="shade" id="shadeBot"></div>
+</div>
+
+<div class="pomo-full" id="pomoFull" role="dialog" aria-modal="true" aria-label="Pomodoro em tela cheia" hidden>
+  <button class="pomo-full-x" id="pomoFullX" aria-label="Sair da tela cheia do Pomodoro"><svg class="i"><use href="#i-x"/></svg><span>Sair</span></button>
+  <div class="pomo-full-in">
+    <div class="pomo-full-phase" id="pomoPhaseFull">Foco</div>
+    <div class="pomo-full-time" id="pomoBigFull">25:00</div>
+    <div class="pomo-full-sub" id="pomoSubFull">0 sessões hoje</div>
+    <div class="pomo-full-btns"><button class="btn pri" id="pomoGoFull">Iniciar sessão</button><button class="btn" id="pomoResetFull">Zerar</button></div>
+    <div class="seg pomo-full-cycle" id="optCycleFull"><button data-v="25,5">25 / 5</button><button data-v="50,10">50 / 10</button><button data-v="15,3">15 / 3</button></div>
+  </div>
 </div>
 
 <div class="seltool" id="seltool" role="toolbar" aria-label="Marcar seleção">
@@ -1308,7 +1361,7 @@ const CFG=CFG_INJECTED||{};
 const nav=(to)=>{try{if(window.parent!==window)window.parent.postMessage({type:'leitor-jus-nav',to},'*')}catch(_){}
   const href=to==='questoes'?CFG.questoesHref:CFG.voltarHref;if(window.parent===window&&href)location.href=href};
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
-let dayKey='dia';const GLOBAL_KEYS=new Set(['set','time','pcycle','psess']);
+let dayKey='dia';const GLOBAL_KEYS=new Set(['set','time','pcycle','psess','pomoView','cronMode']);
 const skey=k=>'rv4:'+(GLOBAL_KEYS.has(k)?'':dayKey+':')+k;
 const store={get(k,d){try{const v=localStorage.getItem(skey(k));return v==null?d:JSON.parse(v)}catch(e){return d}},set(k,v){try{localStorage.setItem(skey(k),JSON.stringify(v))}catch(e){}}};
 const app=$('#app'),scroller=$('#scroller'),article=$('#article'),doc=$('#doc'),reader=$('#reader');
@@ -2604,26 +2657,72 @@ $('#fbX').onclick=()=>{clearMarks();lastQ='';$('#findbar').classList.remove('sho
 function setFocus(on){app.classList.toggle('focus',on);$('#swFocus').setAttribute('aria-checked',on);closeMenus();setTimeout(()=>{layoutDoc();onScroll()},240);if(on)toast('Modo foco ativado · Esc para sair')}
 $('#swFocus').onclick=()=>setFocus(!app.classList.contains('focus'));
 $('#btnExitFocus').onclick=()=>setFocus(false);
-const P={cycle:store.get('pcycle',[25,5]),phase:'focus',left:0,run:false,t:null,sessions:(store.get('psess',{})[today()]||0)};P.left=P.cycle[0]*60;
+const P={cycle:store.get('pcycle',[25,5]),phase:'focus',left:0,run:false,t:null,sessions:(store.get('psess',{})[today()]||0),view:store.get('pomoView','mini')};P.left=P.cycle[0]*60;
+// Cronometro: quando a leitura e aberta por uma META do cronograma, ha DOIS tempos possiveis -
+// o tempo da meta (conta pra cima, mostrado pelo HOST embaixo) e o Pomodoro (conta pra baixo, aqui).
+// O aluno escolhe UM por vez; o do outro some. 'meta' e o padrao em meta. (O host grava o tempo da
+// meta SEMPRE, independente da escolha - isto so controla qual aparece.)
+const emMeta=!!CFG.metaAtual;
+let cronMode=store.get('cronMode','meta'); if(!emMeta)cronMode='pomodoro';
 const fmt=s=>pad(Math.floor(s/60))+':'+pad(s%60);
+// TEMPO DA META (vai no contador de baixo da lateral esquerda): meta com tempo determinado (durMin).
+// simTotal = tempo total acumulado (base salva + sessao) que o HOST transmite a cada segundo; o renderGoal
+// usa simDet/simTotal p/ mostrar "feito de X min" + barra, SEM card/"cumprido".
+const simDet=Math.max(0,Math.round(+(CFG.tempoDeterminadoSeg||0)));
+let simTotal=Math.max(0,Math.round(+(CFG.tempoBaseSeg||0)));
+/* UM único motor: renderPomo escreve o estado em TODAS as superfícies existentes (chip, menu, aba lateral, overlay) */
 function renderPomo(){const tot=(P.phase==='focus'?P.cycle[0]:P.cycle[1])*60,started=P.run||P.left<tot;
-  $('#pomoBig').textContent=fmt(P.left);$('#timerTxt').textContent=fmt(P.left);
-  const chip=$('#timerChip');chip.classList.toggle('show',started);chip.classList.toggle('brk',P.phase==='break');chip.classList.toggle('paused',!P.run);
-  $('#pomoGo').textContent=P.run?'Pausar':(started?'Continuar':(P.phase==='focus'?'Iniciar sessão':'Iniciar pausa'));
-  $('#pomoSub').textContent=(P.phase==='focus'?'Foco':'Pausa')+' · '+P.sessions+(P.sessions===1?' sessão':' sessões')+' hoje';
-  $$('#optCycle button').forEach(b=>b.classList.toggle('on',b.dataset.v===P.cycle.join(',')))}
+  const time=fmt(P.left),phaseTxt=P.phase==='focus'?'Foco':'Pausa',sessTxt=P.sessions+(P.sessions===1?' sessão':' sessões')+' hoje';
+  const goTxt=P.run?'Pausar':(started?'Continuar':(P.phase==='focus'?'Iniciar sessão':'Iniciar pausa'));
+  const setTxt=(sel,v)=>{const el=$(sel);if(el)el.textContent=v};
+  setTxt('#pomoBig',time);setTxt('#timerTxt',time);setTxt('#pomoBigSide',time);setTxt('#pomoBigFull',time);
+  setTxt('#pomoGo',goTxt);setTxt('#pomoGoSide',goTxt);setTxt('#pomoGoFull',goTxt);
+  setTxt('#pomoSub',phaseTxt+' · '+sessTxt);setTxt('#pomoSubSide',phaseTxt+' · '+sessTxt);
+  setTxt('#pomoPhaseFull',phaseTxt);setTxt('#pomoSubFull',sessTxt);
+  const chip=$('#timerChip');chip.classList.toggle('show',started&&P.view==='mini'&&(cronMode==='pomodoro'||!emMeta));chip.classList.toggle('brk',P.phase==='break');chip.classList.toggle('paused',!P.run);
+  const cyc=P.cycle.join(',');['#optCycle','#optCycleSide','#optCycleFull','#optPomoView'].forEach(g=>$$(g+' button').forEach(b=>b.classList.toggle('on',g==='#optPomoView'?b.dataset.v===P.view:b.dataset.v===cyc)))}
+/* Modo de exibição (mini/lateral/tela cheia) — escolhe UM; persiste em pomoView */
+function applyPomoView(view,userAction){P.view=['mini','side','full'].includes(view)?view:'mini';store.set('pomoView',P.view);
+  const full=$('#pomoFull');
+  if(userAction)closeMenus();
+  if(P.view==='full'){if(userAction){full.hidden=false;setTimeout(()=>$('#pomoGoFull').focus(),0)}}
+  else full.hidden=true;
+  if(P.view==='side'&&userAction)openTab('pomo');
+  renderPomo()}
+function closePomoFull(){applyPomoView('mini',true)}
 function beep(){try{const c=new(window.AudioContext||window.webkitAudioContext)();[0,.22,.44].forEach((t,i)=>{const o=c.createOscillator(),g=c.createGain();o.frequency.value=[660,660,880][i];g.gain.setValueAtTime(.0001,c.currentTime+t);g.gain.exponentialRampToValueAtTime(.18,c.currentTime+t+.02);g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+t+.18);o.connect(g).connect(c.destination);o.start(c.currentTime+t);o.stop(c.currentTime+t+.2)})}catch(e){}}
 function pomoToggle(){P.run=!P.run;clearInterval(P.t);
+  if(P.run&&emMeta&&cronMode==='meta'){cronMode='pomodoro';aplicarCron(true);} // iniciar o Pomodoro troca o cronometro p/ Pomodoro (senao ficaria escondido)
   if(P.run){if(P.phase==='focus'&&$('#swAutoFocus').getAttribute('aria-checked')==='true'&&!app.classList.contains('focus'))setFocus(true);
     P.t=setInterval(()=>{P.left--;if(P.left<=0){beep();clearInterval(P.t);P.run=false;
       if(P.phase==='focus'){P.sessions++;const ps=store.get('psess',{});ps[today()]=P.sessions;store.set('psess',ps);P.phase='break';P.left=P.cycle[1]*60;setFocus(false);toast('Sessão concluída. Pausa de '+P.cycle[1]+' min',{label:'Começar pausa',fn:pomoToggle})}
       else{P.phase='focus';P.left=P.cycle[0]*60;toast('Pausa encerrada',{label:'Voltar ao foco',fn:pomoToggle})}}renderPomo()},1000)}
   renderPomo()}
-$('#pomoGo').onclick=pomoToggle;
+function pomoReset(){clearInterval(P.t);P.run=false;P.phase='focus';P.left=P.cycle[0]*60;renderPomo()}
+function pomoSetCycle(v){if(P.run)return toast('Pause a sessão antes de trocar o ciclo');P.cycle=v.split(',').map(Number);store.set('pcycle',P.cycle);P.phase='focus';P.left=P.cycle[0]*60;renderPomo()}
+/* Mesmos controles (único motor) nas três superfícies: menu, aba lateral e tela cheia */
+['#pomoGo','#pomoGoSide','#pomoGoFull'].forEach(s=>{const el=$(s);if(el)el.onclick=pomoToggle});
+['#pomoReset','#pomoResetSide','#pomoResetFull'].forEach(s=>{const el=$(s);if(el)el.onclick=pomoReset});
+['#optCycle','#optCycleSide','#optCycleFull'].forEach(g=>$$(g+' button').forEach(b=>b.onclick=()=>pomoSetCycle(b.dataset.v)));
 $('#timerChip').onclick=e=>{e.stopPropagation();openMenu($('#mnFocus'),$('#btnFocus'))};
-$('#pomoReset').onclick=()=>{clearInterval(P.t);P.run=false;P.phase='focus';P.left=P.cycle[0]*60;renderPomo()};
-$$('#optCycle button').forEach(b=>b.onclick=()=>{if(P.run)return toast('Pause a sessão antes de trocar o ciclo');P.cycle=b.dataset.v.split(',').map(Number);store.set('pcycle',P.cycle);P.phase='focus';P.left=P.cycle[0]*60;renderPomo()});
+$$('#optPomoView button').forEach(b=>b.onclick=()=>applyPomoView(b.dataset.v,true));
+$('#pomoFullX').onclick=closePomoFull;
 $('#swAutoFocus').onclick=e=>{const b=e.currentTarget;b.setAttribute('aria-checked',b.getAttribute('aria-checked')!=='true')};
+applyPomoView(P.view,false);
+// Seletor de CRONOMETRO (so aparece quando a leitura veio de uma meta do cronograma): 'meta' ou 'pomodoro'.
+// Avisa o HOST qual usar para ele mostrar/ocultar o badge "Tempo nesta meta" (um numero por vez).
+function aplicarCron(userAction){
+  if(!emMeta){cronMode='pomodoro';} else if(userAction){store.set('cronMode',cronMode);}
+  const hint=$('#cronHint'); if(hint)hint.textContent=(emMeta&&cronMode==='meta')?'Tempo da meta no contador da lateral esquerda.':'Usando o Pomodoro (seu tempo).';
+  $$('#optCron button').forEach(b=>b.classList.toggle('on',b.dataset.v===cronMode));
+  try{if(window.parent!==window)window.parent.postMessage({type:'leitor-jus-cronometro',mode:(emMeta?cronMode:'pomodoro')},'*')}catch(_){}
+  renderPomo();renderGoal();
+}
+if(emMeta){const cg=$('#cronGrp'); if(cg)cg.hidden=false;}
+$$('#optCron button').forEach(b=>b.onclick=()=>{cronMode=b.dataset.v;aplicarCron(true)});
+aplicarCron(false);
+// O host transmite o tempo total acumulado na meta a cada segundo → atualiza o contador de baixo.
+window.addEventListener('message',(e)=>{const m=e&&e.data;if(m&&m.type==='leitor-jus-meta-tempo'){simTotal=Math.max(simTotal,Math.round(+m.totalSeg||0));renderGoal();}});
 
 /* ================= VOZ ================= */
 const TTS='speechSynthesis' in window;let tq=[],ti=0,trate=1,tels=[];
@@ -2643,7 +2742,21 @@ $$('.flow h3').forEach(h=>{const b=document.createElement('button');b.className=
 function renderBm(){$$('.bmk').forEach(b=>b.classList.toggle('on',S.bm.includes(b.parentElement.id)));renderToc()}
 let lastAct=Date.now();['mousemove','keydown','touchstart'].forEach(ev=>document.addEventListener(ev,()=>lastAct=Date.now(),{passive:true}));scroller.addEventListener('scroll',()=>lastAct=Date.now(),{passive:true});
 setInterval(()=>{if(document.visibilityState==='visible'&&Date.now()-lastAct<60000){const d=today();S.time[d]=(S.time[d]||0)+5;if(S.time[d]%30===0)save('time');renderGoal()}},5000);
-function renderGoal(){const m=Math.floor((S.time[today()]||0)/60);$('#goalMin').textContent=m;$('#goalBar').style.width=Math.min(100,m/30*100)+'%'}
+function renderGoal(){
+  // Em meta do cronograma COM tempo determinado (modo 'meta'): o contador de baixo vira o TEMPO DA META
+  // (feito / planejado), conta pra cima e salva por meta (o host transmite o total). Senao: meta diaria 30 min.
+  if(simDet>0&&emMeta&&cronMode==='meta'){
+    const alvoMin=Math.max(1,Math.round(simDet/60));
+    const lab=$('#goalLab');if(lab)lab.textContent='Tempo da meta';
+    const alvo=$('#goalAlvo');if(alvo)alvo.textContent=alvoMin;
+    $('#goalMin').textContent=Math.floor(simTotal/60);
+    $('#goalBar').style.width=Math.min(100,simTotal/simDet*100)+'%';
+    return;
+  }
+  const lab=$('#goalLab');if(lab)lab.textContent='Leitura hoje';
+  const alvo=$('#goalAlvo');if(alvo)alvo.textContent='30';
+  const m=Math.floor((S.time[today()]||0)/60);$('#goalMin').textContent=m;$('#goalBar').style.width=Math.min(100,m/30*100)+'%';
+}
 let tT;function toast(msg,act){$('#toastTxt').textContent=msg;const b=$('#toastBtn');if(act){b.hidden=false;b.textContent=act.label;b.onclick=()=>{$('#toast').classList.remove('show');act.fn()}}else b.hidden=true;$('#toast').classList.add('show');clearTimeout(tT);tT=setTimeout(()=>$('#toast').classList.remove('show'),act?5000:2200)}
 function copy(t,msg='Copiado com a citação'){try{navigator.clipboard.writeText(t).then(()=>toast(msg),()=>fb(t))}catch(e){fb(t)}}
 function fb(t){const a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();try{document.execCommand('copy');toast('Copiado')}catch(e){toast('Não foi possível copiar')}a.remove()}
@@ -2657,7 +2770,7 @@ $('#btnQuest').onclick=()=>nav('questoes');
 
 /* ================= ATALHOS ================= */
 document.addEventListener('keydown',e=>{const typing=e.target.closest&&e.target.closest('input,textarea,select,[contenteditable="true"]');
-  if(e.key==='Escape'){if($('#ovSearch').classList.contains('show'))return closeSearch();if($('.modal.show'))return closeModal();if(pop.classList.contains('show'))return closePop();if(tool.classList.contains('show'))return hideTool();if($('.menu.show,.tplmenu.show'))return closeMenus();if(app.classList.contains('focus'))return setFocus(false);if(typing){e.target.blur();return}if(S.set.tool!=='select')return setTool('select');if($('#findbar').classList.contains('show'))return $('#fbX').click();app.classList.remove('sb-open');if(!isWide())setNb(false);return}
+  if(e.key==='Escape'){if(!$('#pomoFull').hidden)return closePomoFull();if($('#ovSearch').classList.contains('show'))return closeSearch();if($('.modal.show'))return closeModal();if(pop.classList.contains('show'))return closePop();if(tool.classList.contains('show'))return hideTool();if($('.menu.show,.tplmenu.show'))return closeMenus();if(app.classList.contains('focus'))return setFocus(false);if(typing){e.target.blur();return}if(S.set.tool!=='select')return setTool('select');if($('#findbar').classList.contains('show'))return $('#fbX').click();app.classList.remove('sb-open');if(!isWide())setNb(false);return}
   if($('#mReview').classList.contains('show')){if(e.key===' '){e.preventDefault();flip()}if(['1','2','3'].includes(e.key)&&$('#rate').classList.contains('show'))rate(+e.key);return}
   if(typing||$('.modal.show')||$('#ovSearch').classList.contains('show'))return;
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){e.preventDefault();e.shiftKey?redo():undo();return}

@@ -12,6 +12,13 @@ export const SOFT_DELETE_TABELAS = [
   'simulado_cadernos_designer',
   'simulado_etiquetas',
   'simulado_sessoes_prova',
+  // Documento da Biblioteca (conteúdo): o soft-delete vem de removerDocumento (biblioteca/actions.ts),
+  // que seta deletado/deletado_em/deletado_por. Entra na Lixeira e no cron de purge 30d (storage incluso).
+  'simulado_conteudo_documentos',
+  // Estúdio de Conteúdo (áreas novas): baralhos de flashcards e trilhas são entidades top-level
+  // soft-deletáveis (deletado/deletado_em/deletado_por). Entram na Lixeira e no cron de purge 30d.
+  'simulado_flashcard_baralhos',
+  'simulado_trilhas',
 ] as const
 export type SoftDeleteTabela = (typeof SOFT_DELETE_TABELAS)[number]
 
@@ -57,7 +64,9 @@ export async function softRestore(tabela: SoftDeleteTabela, id: string) {
   const access = await getCurrentAccess()
   if (!access.userId) return { error: new Error('Sem sessão.') }
   const svc = createAdminClient()
-  let q = svc.from(tabela).update({ deletado: false }).eq('id', id).eq('deletado', true)
+  // Limpa o carimbo explicitamente: nas 8 tabelas núcleo o trigger já zera em/por ao restaurar,
+  // mas simulado_conteudo_documentos não tem esse trigger — aqui garante o reset nos dois casos.
+  let q = svc.from(tabela).update({ deletado: false, deletado_em: null, deletado_por: null }).eq('id', id).eq('deletado', true)
   if (access.tenantId) q = q.eq('tenant_id', access.tenantId)
   const { error } = await q
   return { error: (error as Error) ?? null }

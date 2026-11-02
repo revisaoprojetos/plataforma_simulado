@@ -39,6 +39,11 @@ export interface Entitlement {
   status: StatusEntitlement
   inicioEm?: string | null
   expiraEm?: string | null
+  /** (motor de regras) id/nome da OFERTA, data da compra e status BRUTO do provedor. Opcionais. */
+  ofertaRef?: string | null
+  ofertaNome?: string | null
+  dataCompra?: string | null
+  statusBruto?: string | null
 }
 
 /** Evento normalizado a partir de um webhook (Guru). */

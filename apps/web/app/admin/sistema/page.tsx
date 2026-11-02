@@ -1,7 +1,8 @@
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { getManutencaoSistema } from '@/lib/sistema/manutencao'
 import { getManutencaoAreas, getManutencaoAreasLiberados, getManutencaoAluno } from '@/lib/sistema/manutencao-areas-server'
-import { resolverNomesAdmins, resolverNomesEstudantes } from './actions'
+import { getTestadoresGlobais, getWorkspaceGrupos } from '@/lib/sistema/testadores-globais'
+import { resolverNomesAdmins, resolverNomesEstudantes, listarGruposWorkspace } from './actions'
 import { SemPermissao } from '@/components/ui/alert-box'
 import { ServerCog } from 'lucide-react'
 import { SistemaTabs } from './sistema-tabs'
@@ -19,9 +20,11 @@ export default async function SistemaPage() {
     )
   }
 
-  const [manutencao, adminAtivos, adminLiberados, alunoBloco] = await Promise.all([
+  const [manutencao, adminAtivos, adminLiberados, alunoBloco, wsEmails, wsGrupos, wsGruposDisp] = await Promise.all([
     getManutencaoSistema(), getManutencaoAreas(), getManutencaoAreasLiberados(), getManutencaoAluno(),
+    getTestadoresGlobais(), getWorkspaceGrupos(), listarGruposWorkspace(),
   ])
+  const podeEditarWorkspace = access.isAdmin || access.permissions.includes('configuracoes:manage')
   // Resolve os nomes dos liberados (admins + estudantes) p/ os chips/contagens dos cards.
   const idsAdmin = [...new Set(Object.values(adminLiberados).flat())]
   const idsAluno = [...new Set(Object.values(alunoBloco.liberados).flat())]
@@ -43,6 +46,7 @@ export default async function SistemaPage() {
         manutencao={manutencao}
         admin={{ ativos: adminAtivos, liberados: adminLiberados, nomes: nomesAdmin }}
         aluno={{ ativos: alunoBloco.ativos, liberados: alunoBloco.liberados, nomes: nomesAluno, modos: alunoBloco.modos }}
+        workspace={{ emails: wsEmails, grupos: wsGrupos, gruposDisponiveis: wsGruposDisp, podeEditar: podeEditarWorkspace }}
       />
     </div>
   )

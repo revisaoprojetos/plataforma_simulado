@@ -16,6 +16,9 @@ const CFG: Record<SoftDeleteTabela, { tipo: string; rotulo: string }> = {
   simulado_cadernos_designer: { tipo: 'Caderno', rotulo: 'nome' },
   simulado_etiquetas: { tipo: 'Etiqueta', rotulo: 'nome' },
   simulado_sessoes_prova: { tipo: 'Sessão de prova', rotulo: '__sessao' },
+  simulado_conteudo_documentos: { tipo: 'Documento', rotulo: 'titulo' },
+  simulado_flashcard_baralhos: { tipo: 'Baralho', rotulo: 'nome' },
+  simulado_trilhas: { tipo: 'Trilha', rotulo: 'nome' },
 }
 
 export type LixeiraItem = {
@@ -35,6 +38,9 @@ function pathDaTabela(t: SoftDeleteTabela): string[] {
     case 'simulado_grupos': return ['/admin/grupos']
     case 'simulado_pastas': return ['/admin/banco-questoes']
     case 'simulado_cadernos_designer': return ['/admin/cadernos']
+    case 'simulado_conteudo_documentos': return ['/admin/biblioteca']
+    case 'simulado_flashcard_baralhos': return ['/admin/conteudos/flashcards']
+    case 'simulado_trilhas': return ['/admin/conteudos/trilhas']
     default: return []
   }
 }

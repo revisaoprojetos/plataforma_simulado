@@ -1,28 +1,33 @@
 'use client'
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Wrench, ListChecks, LayoutList, ShieldCheck, GraduationCap } from 'lucide-react'
+import { Wrench, ListChecks, LayoutList, ShieldCheck, GraduationCap, UsersRound } from 'lucide-react'
 import { ManutencaoSistemaForm } from '@/components/admin/manutencao-sistema-form'
 import { ManutencaoPaginasForm } from '@/components/admin/manutencao-paginas-form'
 import { ChecklistSistema } from '@/components/admin/checklist-sistema'
+import { WorkspaceForm } from '@/components/admin/workspace-form'
 import { AREAS_MANUTENCAO, AREAS_MANUTENCAO_ALUNO } from '@/lib/sistema/manutencao-areas'
 import type { ManutencaoSistema } from '@/lib/sistema/manutencao'
 import type { ManutencaoAreas, ManutencaoLiberados, ManutencaoModos } from '@/lib/sistema/manutencao-areas'
 import type { PessoaItem } from '@/components/admin/seletor-liberados-dialog'
+import type { WorkspaceGrupo } from './actions'
 
 // `modos` só existe p/ as áreas do ALUNO (modo bloqueio/construção); o admin não tem modo.
 type BlocoManutencao = { ativos: ManutencaoAreas; liberados: ManutencaoLiberados; nomes: PessoaItem[]; modos?: ManutencaoModos }
+type WorkspaceBloco = { emails: string[]; grupos: string[]; gruposDisponiveis: WorkspaceGrupo[]; podeEditar: boolean }
 
-export function SistemaTabs({ manutencao, admin, aluno }: {
+export function SistemaTabs({ manutencao, admin, aluno, workspace }: {
   manutencao: ManutencaoSistema
   admin: BlocoManutencao
   aluno: BlocoManutencao
+  workspace: WorkspaceBloco
 }) {
   return (
     <Tabs defaultValue="manutencao">
       <TabsList className="flex-wrap">
         <TabsTrigger value="manutencao"><Wrench /> Manutenção</TabsTrigger>
         <TabsTrigger value="areas"><LayoutList /> Páginas em manutenção</TabsTrigger>
+        <TabsTrigger value="workspace"><UsersRound /> Workspace</TabsTrigger>
         <TabsTrigger value="checklist"><ListChecks /> Checklist do sistema</TabsTrigger>
       </TabsList>
       <TabsContent value="manutencao"><ManutencaoSistemaForm inicial={manutencao} /></TabsContent>
@@ -40,6 +45,14 @@ export function SistemaTabs({ manutencao, admin, aluno }: {
             <ManutencaoPaginasForm tipo="aluno" areas={AREAS_MANUTENCAO_ALUNO} ativosIniciais={aluno.ativos} liberadosIniciais={aluno.liberados} nomesIniciais={aluno.nomes} modosIniciais={aluno.modos} />
           </TabsContent>
         </Tabs>
+      </TabsContent>
+      <TabsContent value="workspace">
+        <WorkspaceForm
+          emailsIniciais={workspace.emails}
+          gruposIniciais={workspace.grupos}
+          gruposDisponiveis={workspace.gruposDisponiveis}
+          podeEditar={workspace.podeEditar}
+        />
       </TabsContent>
       <TabsContent value="checklist"><ChecklistSistema /></TabsContent>
     </Tabs>

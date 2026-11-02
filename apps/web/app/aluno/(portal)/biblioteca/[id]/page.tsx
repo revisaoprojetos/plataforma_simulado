@@ -1,11 +1,13 @@
 import { notFound, redirect } from 'next/navigation'
+import { after } from 'next/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
-import { carregarLeituraPdf, registrarLeituraAluno } from '@/lib/conteudo/leitor'
+import { carregarDocParaLeitura, registrarLeituraAluno } from '@/lib/conteudo/leitor'
 import { LeitorBiblioteca } from '@/components/aluno/leitor-biblioteca'
+import { MidiaPlayer } from '@/components/aluno/midia-player'
 
 export const dynamic = 'force-dynamic'
 
-export default async function LeituraConteudoPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ pagina?: string; partes?: string; meta?: string; voltar?: string; tseg?: string }> }) {
+export default async function LeituraConteudoPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ pagina?: string; partes?: string; meta?: string; voltar?: string; tseg?: string; tdet?: string }> }) {
   const { id } = await params
   const sp = await searchParams
   // ?pagina=N — abre o leitor direto na página inicial da meta/parte do Cronograma Adaptativo.
@@ -25,13 +27,30 @@ export default async function LeituraConteudoPage({ params, searchParams }: { pa
   const voltarHref = typeof sp?.voltar === 'string' && sp.voltar.startsWith('/aluno/') ? sp.voltar.slice(0, 200) : '/aluno/biblioteca'
   // ?tseg=N — tempo (segundos) já acumulado nesta meta; o cronômetro do leitor conta a partir dele.
   const tempoBase = Math.max(0, Math.min(999999, Math.trunc(Number(sp?.tseg)) || 0))
+  // ?tdet=N — TEMPO DETERMINADO da meta (planejado, em segundos); o leitor mostra contagem regressiva.
+  const tempoDeterminadoSeg = Math.max(0, Math.min(999999, Math.trunc(Number(sp?.tdet)) || 0))
   const sessao = await getSessaoAluno()
   if (!sessao) redirect('/aluno/entrar')
-  const leitura = await carregarLeituraPdf(id, sessao.estudanteId)
-  if (!leitura) notFound()
-  await registrarLeituraAluno(id, sessao.estudanteId, leitura.versaoId).catch(() => {})
+
+  // LOADER UNIFICADO: 1 fetch do doc + 1 decisão de acesso (cacheada 60s), ramifica mídia/PDF.
+  // Antes eram DUAS passagens (carregarMidiaAluno + carregarLeituraPdf), cada uma re-buscando o doc +
+  // re-rodando o gate. null = sem acesso / não encontrado → 404.
+  const doc = await carregarDocParaLeitura(id, sessao.estudanteId)
+  if (!doc) notFound()
+
+  // Progresso de leitura (histórico + snapshot de cursos) NÃO precisa concluir para a página renderizar:
+  // roda APÓS a resposta (`after`), tirando o upsert + o write-behind do caminho crítico da abertura.
+  const estudanteId = sessao.estudanteId
+  const versaoId = doc.kind === 'midia' ? doc.midia.versaoId : doc.pdf.versaoId
+  after(() => registrarLeituraAluno(id, estudanteId, versaoId).catch(() => {}))
+
+  // MÍDIA (vídeo/áudio): player nativo.
+  if (doc.kind === 'midia') {
+    return <MidiaPlayer titulo={doc.midia.titulo} url={doc.midia.url} kind={doc.midia.kind} voltarHref={voltarHref} />
+  }
 
   // Leitor do Juris (real) + conteúdo = PDF fiel; grifos salvos no perfil do aluno.
+  const leitura = doc.pdf
   return (
     <LeitorBiblioteca
       documentoId={leitura.documentoId}
@@ -44,6 +63,8 @@ export default async function LeituraConteudoPage({ params, searchParams }: { pa
       partesCrono={partesCrono}
       metaCrono={metaAtual}
       tempoBase={tempoBase}
+      tempoDeterminadoSeg={tempoDeterminadoSeg}
+      mostrarLegenda={leitura.mostrarLegenda}
     />
   )
 }
