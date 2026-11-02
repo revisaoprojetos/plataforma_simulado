@@ -12,6 +12,14 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.1.1 — 2026-11-02
+
+### Login (Revisão) — título central editável
+- O título grande do **centro** da tela de login agora é **editável no console** (Configurações → Aparência → "Título central do login"): **1ª linha**, **2ª linha** e a **palavra em destaque** (que fica em roxo), salvas em `tema.aparencia_auth.marca`.
+- Padrão: "Plataforma de estudo, Revisão" / "Ensino Jurídico", com "Revisão" em roxo.
+- **Halo animado** (glow que "respira" — anima só opacidade, sem jank) em volta da palavra em destaque; respeita `prefers-reduced-motion`.
+- Zona do título alargada (1ª linha não quebra); o cabeçalho do canto volta ao "Revisão / ENSINO JURÍDICO".
+
 ## 4.1.0 — 2026-11-02
 
 ### Performance (menos jank nas animações)

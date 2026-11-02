@@ -67,4 +67,6 @@ export interface LoginVariantProps {
   logo?: string | null
   /** Título animado (ticker) do login MEQ — palavras + liga/desliga a animação (editável no console). */
   ticker?: { animar: boolean; palavras: string[] } | null
+  /** Título central do login (linha 1 + linha 2 + palavra em destaque/roxo) — editável no console. */
+  marca?: { linha1: string; linha2: string; destaque: string } | null
 }

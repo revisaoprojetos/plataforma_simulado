@@ -18,11 +18,20 @@ import {
 const MASK = 'radial-gradient(ellipse 75% 75% at 50% 45%,#000 30%,transparent 90%)'
 
 export function LoginRevisaoClassico({
-  theme, core, preview, plataforma, efeito,
+  theme, core, preview, plataforma, efeito, marca,
 }: LoginVariantProps & { efeito: Efeito }) {
   const t: RevTheme = theme === 'escuro' ? 'escuro' : 'claro'
   const quad = efeito === 'quadrados' || efeito === 'formas'
   const formas = efeito === 'formas'
+  // Título central (hero) editável no console (tema.aparencia_auth.marca): 1ª linha + 2ª linha + palavra em destaque (roxo).
+  const l1 = marca?.linha1 || 'Plataforma de estudo, Revisão'
+  const l2 = marca?.linha2 ?? 'Ensino Jurídico'
+  const hDest = (marca?.destaque || 'Revisão').trim()
+  const destacar = (linha: string) => {
+    const i = hDest ? linha.toLowerCase().indexOf(hDest.toLowerCase()) : -1
+    if (i < 0) return linha
+    return (<>{linha.slice(0, i)}<span className="rlc-dest">{linha.slice(i, i + hDest.length)}</span>{linha.slice(i + hDest.length)}</>)
+  }
 
   return (
     <div className="rlc-root" style={{ background: BG[t] }}>
@@ -49,8 +58,7 @@ export function LoginRevisaoClassico({
 
       <main className="rlc-main">
         <div className="rlc-headline">
-          <h1 className="rlc-up rlc-d2">Plataforma <span className="rlc-hl">Revisão</span></h1>
-          <p className="rlc-up rlc-d3">Entre com o seu e-mail e continue de onde parou.</p>
+          <h1 className="rlc-up rlc-d2">{destacar(l1)}{l2 && <><br />{destacar(l2)}</>}</h1>
         </div>
 
         <div className="rlc-cardwrap rlc-pop">
@@ -105,9 +113,13 @@ function css(t: RevTheme) {
 .rlc-ghost:hover{background:rgba(255,255,255,.14)}
 
 .rlc-main{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:34px;padding:24px 24px 96px;box-sizing:border-box;text-align:center}
-.rlc-headline{display:flex;flex-direction:column;align-items:center;gap:14px;max-width:720px}
+.rlc-headline{display:flex;flex-direction:column;align-items:center;gap:14px;max-width:1200px}
 .rlc-headline h1{margin:0;font-weight:800;font-size:54px;line-height:1.06;letter-spacing:-.045em;color:#fff;text-shadow:0 2px 24px rgba(10,5,35,.45)}
 .rlc-hl{color:#fff}
+.rlc-dest{position:relative;display:inline-block;color:#A074FF;isolation:isolate}
+/* Halo roxo "respirando" em volta da palavra em destaque (anima só opacidade → leve). */
+.rlc-dest::before{content:"";position:absolute;inset:-4px -18px;border-radius:999px;background:radial-gradient(62% 135% at 50% 50%,rgba(160,116,255,.6),rgba(160,116,255,0) 70%);filter:blur(16px);z-index:-1;animation:rlcDestGlow 2.6s ease-in-out infinite}
+@keyframes rlcDestGlow{0%,100%{opacity:.28}50%{opacity:.95}}
 .rlc-headline p{margin:0;font-size:17px;line-height:1.6;color:#E1D9FF}
 .rlc-cardwrap{position:relative;width:100%;max-width:420px}
 .rlc-card{position:relative;color:${t === 'escuro' ? '#fff' : '#1D1933'};border-radius:28px;padding:34px 32px 28px;box-sizing:border-box;box-shadow:0 2px 4px rgba(20,10,60,.08),0 40px 80px -28px rgba(10,5,35,.7);display:flex;flex-direction:column;gap:14px;text-align:left}

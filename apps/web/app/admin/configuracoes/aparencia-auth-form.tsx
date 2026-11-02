@@ -58,6 +58,8 @@ export function AparenciaAuthForm({ tema, salvarTema }: { tema: any; salvarTema:
   const setPalavra = (i: number, v: string) => setTicker({ palavras: ticker.palavras.map((w, j) => (j === i ? v : w)) })
   const addPalavra = () => setTicker({ palavras: [...ticker.palavras, ''] })
   const removePalavra = (i: number) => setTicker({ palavras: ticker.palavras.filter((_, j) => j !== i) })
+  // Marca do cabeçalho do login (nome + palavra em destaque/roxo + subtítulo).
+  const setMarca = (patch: Partial<AuthAppearance['marca']>) => setCfg((c) => ({ ...c, marca: { ...c.marca, ...patch } }))
 
   function salvar() {
     // Limpa palavras vazias antes de gravar; sem nenhuma válida, cai no padrão "Tribunais.".
@@ -139,6 +141,34 @@ export function AparenciaAuthForm({ tema, salvarTema }: { tema: any; salvarTema:
         onPick={(slug) => setCfg((c) => ({ ...c, loginStyle: slug }))}
         desativado={!cfg.loginAtivo}
       />
+
+      {/* Título central do login (Revisão) — 1ª linha + 2ª linha + palavra em destaque (roxo). */}
+      {cfg.brand === 'revisao' && (
+        <section className="space-y-3 rounded-xl border bg-muted/20 p-4 sm:max-w-xl">
+          <div className="flex items-center gap-2">
+            <span className="rounded-lg bg-primary/10 p-1.5 text-primary"><Type className="h-4 w-4" /></span>
+            <div>
+              <p className="text-sm font-medium">Título central do login</p>
+              <p className="text-xs text-muted-foreground">As duas linhas grandes no centro da tela de login. A palavra em “destaque” fica em roxo (em qualquer das linhas).</p>
+            </div>
+          </div>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">1ª linha</span>
+            <input value={cfg.marca.linha1} onChange={(e) => setMarca({ linha1: e.target.value })} placeholder="Plataforma de estudo, Revisão"
+              className="h-9 w-full rounded-lg border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40" />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">2ª linha</span>
+            <input value={cfg.marca.linha2} onChange={(e) => setMarca({ linha2: e.target.value })} placeholder="Ensino Jurídico"
+              className="h-9 w-full rounded-lg border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40" />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-muted-foreground">Palavra em destaque (roxo)</span>
+            <input value={cfg.marca.destaque} onChange={(e) => setMarca({ destaque: e.target.value })} placeholder="Revisão"
+              className="h-9 w-full rounded-lg border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40" />
+          </label>
+        </section>
+      )}
 
       {/* Título do login (ticker) — só MEQ com o novo login ativo. Fora disso o editor some, mas a
           config fica salva (reaparece ao reativar). */}

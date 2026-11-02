@@ -43,6 +43,7 @@ export default async function AlunoEntrarPage({ searchParams }: { searchParams: 
           logo={tema.logo_url ?? null}
           modoInicial="aluno"
           ticker={aparencia.loginTicker}
+          marca={aparencia.marca}
         />
       )
     }

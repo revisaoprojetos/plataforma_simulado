@@ -34,6 +34,8 @@ export interface PlatformLoginProps {
   modoInicial?: 'aluno' | 'admin'
   /** Título animado (ticker) do login MEQ — palavras + animar (editável no console). */
   ticker?: { animar: boolean; palavras: string[] } | null
+  /** Título central do login (linha 1 + linha 2 + palavra em destaque) — editável no console. */
+  marca?: { linha1: string; linha2: string; destaque: string } | null
 }
 
 export function PlatformLogin({
@@ -47,9 +49,10 @@ export function PlatformLogin({
   logo = null,
   modoInicial = 'aluno',
   ticker = null,
+  marca = null,
 }: PlatformLoginProps) {
   const core = useLoginCore({ metodo, preview, modoInicial })
-  const common = { theme, core, preview, plataforma, logo, style, ticker }
+  const common = { theme, core, preview, plataforma, logo, style, ticker, marca }
 
   // MAC reaproveita o login do VND (layout idêntico); a paleta bordô + "M"/textos MAC
   // vêm do BrandCorProvider (corMarca) + do slug mac-login-centralizado.

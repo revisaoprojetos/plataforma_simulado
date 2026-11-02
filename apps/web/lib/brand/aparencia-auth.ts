@@ -29,6 +29,28 @@ export interface LoginTicker {
 
 export const TICKER_PADRAO: LoginTicker = { animar: false, palavras: ['Tribunais.'] }
 
+/** Título central do login: 1ª linha + 2ª linha + palavra em destaque (roxo). Editável no console. */
+export interface MarcaLogin {
+  /** 1ª linha do título central (ex.: "Plataforma de estudo, Revisão"). */
+  linha1: string
+  /** 2ª linha do título central (ex.: "Ensino Jurídico"). Vazio = sem 2ª linha. */
+  linha2: string
+  /** Palavra (em qualquer das linhas) que fica em roxo (ex.: "Revisão"). Vazio = sem destaque. */
+  destaque: string
+}
+
+export const MARCA_PADRAO: MarcaLogin = { linha1: 'Plataforma de estudo, Revisão', linha2: 'Ensino Jurídico', destaque: 'Revisão' }
+
+/** Sanea a marca vinda do tema/console (strings aparadas com limites; fallback no padrão; linha2 pode ser vazia). */
+export function sanearMarca(raw: unknown): MarcaLogin {
+  const r = (raw ?? {}) as Partial<MarcaLogin>
+  return {
+    linha1: typeof r.linha1 === 'string' && r.linha1.trim() ? r.linha1.trim().slice(0, 90) : MARCA_PADRAO.linha1,
+    linha2: typeof r.linha2 === 'string' ? r.linha2.trim().slice(0, 90) : MARCA_PADRAO.linha2,
+    destaque: typeof r.destaque === 'string' ? r.destaque.trim().slice(0, 40) : MARCA_PADRAO.destaque,
+  }
+}
+
 /** Sanea o ticker vindo do tema/console: strings não-vazias (máx. 8), fallback "Tribunais.". */
 export function sanearTicker(raw: unknown): LoginTicker {
   const r = (raw ?? {}) as Partial<LoginTicker>
@@ -67,6 +89,8 @@ export interface AuthAppearance {
   loadingMinMs?: number | null // override opcional; null = padrão do estilo (§3.4)
   /** Título animado (ticker) do login MEQ — editável no console. */
   loginTicker: LoginTicker
+  /** Título central do login (linha 1 + linha 2 + palavra em destaque) — editável no console. */
+  marca: MarcaLogin
 }
 
 /** Shape público devolvido pelo endpoint pré-login (sem metadados). */
@@ -121,8 +145,9 @@ export function lerAparenciaAuth(
   const loadingAtivo = raw.loadingAtivo !== false
   const internoAtivo = raw.internoAtivo === true
   const loginTicker = sanearTicker(raw.loginTicker)
+  const marca = sanearMarca(raw.marca)
 
-  return { brand, loginAtivo, loadingAtivo, internoAtivo, loginStyle, loadingStyle, defaultTheme, followSystemTheme, loadingMinMs, loginTicker }
+  return { brand, loginAtivo, loadingAtivo, internoAtivo, loginStyle, loadingStyle, defaultTheme, followSystemTheme, loadingMinMs, loginTicker, marca }
 }
 
 /** Projeção pública (lida ANTES do login, sem dados sensíveis). */
@@ -138,6 +163,7 @@ export function aparenciaAuthPublica(a: AuthAppearance): AuthAppearancePublic {
     followSystemTheme: a.followSystemTheme,
     loadingMinMs: a.loadingMinMs ?? null,
     loginTicker: a.loginTicker,
+    marca: a.marca,
   }
 }
 
@@ -159,5 +185,6 @@ export function sanearAparenciaAuth(input: Partial<AuthAppearance>): AuthAppeara
     followSystemTheme: input.followSystemTheme === true,
     loadingMinMs: typeof input.loadingMinMs === 'number' && input.loadingMinMs >= 0 ? input.loadingMinMs : null,
     loginTicker: sanearTicker(input.loginTicker),
+    marca: sanearMarca(input.marca),
   }
 }
