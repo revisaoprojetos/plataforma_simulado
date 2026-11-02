@@ -12,6 +12,14 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.1.2 — 2026-11-02
+
+### Aluno — visualizador de vídeo/áudio da Biblioteca
+- **Botão "Assistir"/"Ouvir"** aparece para materiais de **vídeo/áudio** (antes caía em "Visualizador em breve"): `temVisualizador` passa a incluir `video`/`audio`.
+- **Feedback de carregamento ao abrir:** clicar em "Assistir" acende a **linha de carregamento do topo** (a `router.push` é programática e não ligava a barra sozinha — agora dispara `navProgressStart()`).
+- **Player de mídia com carregamento próprio:** como o player é tela cheia e cobre a topbar (onde a barra global vive), ele ganhou **linha de carregamento própria** no topo + **spinner "Carregando vídeo…"** sobre o vídeo até poder tocar (estado de erro com dica de baixar); no áudio o ícone vira spinner.
+- **Voltar com feedback:** botão "Voltar" vira `<button>` com `Loader2` girando + acende a barra ao retornar.
+
 ## 4.1.1 — 2026-11-02
 
 ### Login (Revisão) — título central editável

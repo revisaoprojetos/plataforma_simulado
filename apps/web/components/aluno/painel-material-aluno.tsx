@@ -15,6 +15,7 @@ import { DrawerLateral } from '@/components/biblioteca/drawer-lateral'
 import { SeloTipo } from '@/components/biblioteca/selo-tipo'
 import { PermissaoQuadros } from '@/components/biblioteca/permissao-quadros'
 import { tipoDe, type KindConteudo } from '@/lib/biblioteca/tipos-conteudo'
+import { navProgressStart } from '@/lib/nav-progress'
 import type { DocAluno } from '@/lib/conteudo/leitor'
 
 /** Rótulo do botão principal por tipo (adaptativo). */
@@ -52,13 +53,18 @@ export function PainelMaterialAluno({
   if (!doc) return null
   const tipo = tipoDe(doc.tipo_origem)
   const kind = tipo.kind
-  const temVisualizador = tipo.visualizador === 'leitor' || tipo.visualizador === 'pdf'
+  // leitor/pdf (documentos) + video/audio (player nativo em /aluno/biblioteca/[id]). PPT/XLS ainda não têm viewer.
+  const temVisualizador = ['leitor', 'pdf', 'video', 'audio'].includes(tipo.visualizador)
   const href = `/aluno/biblioteca/${doc.id}`
   const linkMaterial = typeof window !== 'undefined' ? `${window.location.origin}${href}` : href
 
   function abrirVisualizador() {
-    onFechar()
+    // Acende a linha de carregamento do topo ANTES de navegar: router.push é programático e,
+    // sem isso, a barra não aparece (ela só liga sozinha em clique de <a>). Fecha o drawer
+    // depois do push para revelar o portal (com a barra) durante a troca de página.
+    navProgressStart()
     router.push(href)
+    onFechar()
   }
 
   function copiarLink() {
