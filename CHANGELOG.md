@@ -12,6 +12,25 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.1.0 — 2026-11-02
+
+### Performance (menos jank nas animações)
+- **Login (Revisão):** removida a animação infinita de `background-position` da grade de fundo (`rlcGridPan`), que **repintava a tela inteira a cada frame**. A grade faz o fade-in e fica estática.
+- **Auroras/orbs decorativos** (login, simulados Revisão/MEQ/VND, rankings): não animam mais `scale` (forçava re-rasterizar o borrão a cada frame) — só `translate` + `will-change:transform`; blurs extremos (126–140px → 90px).
+- **Topbar do portal:** backdrop-blur 12px → 7px.
+
+### Login
+- Título do hero passa a ser **"Plataforma Revisão"** (nos 3 layouts: clássico/código/lista).
+
+### Aluno
+- Sidebar: ícone de **"Meus Extensivos"** distinto (empilhado), separado de "Cursos"; **Painel de estudos** acima de Simulados e **Cursos** acima de Meus Extensivos.
+- **Barra de carregamento** (linha deslizante) ao navegar entre páginas do portal.
+- **Versão do sistema** exibida no rodapé da sidebar (admin e aluno).
+
+### Manutenção por área
+- **"Meus Extensivos"** entra na lista de áreas de manutenção do aluno (toggle no admin, em todas as marcas).
+- Manutenção dessa área **ligada em MEQ/VND/MAC** (Revisão intacta).
+
 ## 4.0.0 — 2026-11-02
 
 Consolidação geral (vários módulos acumulados) + ajuste da sidebar do aluno.

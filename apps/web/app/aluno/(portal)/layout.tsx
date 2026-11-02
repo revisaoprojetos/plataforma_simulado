@@ -190,7 +190,7 @@ export default async function AlunoPortalLayout({ children }: { children: React.
       { href: '/aluno/simulados', label: 'Simulados', short: 'Simulados', icon: 'ClipboardList' },
       { href: '/aluno/nova/cursos', label: 'Cursos', short: 'Cursos', icon: 'GraduationCap', badge: 'NOVO' },
       // Hub "Meus Extensivos" (Fase 2 produtos): lista os extensivos do aluno + páginas branded por produto.
-      { href: '/aluno/extensivos', label: 'Meus Extensivos', short: 'Extensivos', icon: 'GraduationCap' },
+      { href: '/aluno/extensivos', label: 'Meus Extensivos', short: 'Extensivos', icon: brand === 'revisao' ? 'Layers' : 'GraduationCap' },
       // Desafios de Lei Seca e Jurisprudência saem do MENU na Revisão: o acesso ao conteúdo passa a ser
       // só pela área de Cursos (que abre /aluno/leitura?modulo= e /aluno/jurisprudencia?desafio=). As ROTAS
       // seguem vivas de propósito (não entram em manutenção) para o Cursos continuar abrindo o conteúdo.

@@ -76,8 +76,8 @@ export function sharedKeyframes(prefix: string) {
 @keyframes ${prefix}-okpop{from{transform:scale(.4);opacity:0}}
 .${prefix}-bar{animation:${prefix}-barw 1s cubic-bezier(.22,1,.36,1) both}
 @keyframes ${prefix}-barw{from{width:0}}
-.${prefix}-orb{animation:${prefix}-orb 14s ease-in-out infinite alternate}
-@keyframes ${prefix}-orb{to{transform:translate(40px,-30px) scale(1.12)}}
+.${prefix}-orb{animation:${prefix}-orb 14s ease-in-out infinite alternate;will-change:transform}
+@keyframes ${prefix}-orb{to{transform:translate(40px,-30px)}}
 .${prefix}-stk{animation:${prefix}-stk 9s ease-in-out infinite alternate}
 @keyframes ${prefix}-stk{from{opacity:.3}to{opacity:1;margin-left:40px}}
 .${prefix}-cf{animation:${prefix}-cf 3.2s linear infinite}
@@ -152,7 +152,7 @@ export function Bgfx({ prefix, variant }: { prefix: string; variant: 'entrada' |
           height: 380,
           borderRadius: '50%',
           background: cm('rgba(232,200,119,.22)'),
-          filter: 'blur(126px)',
+          filter: 'blur(90px)',
         }}
       />
       <span
@@ -165,7 +165,7 @@ export function Bgfx({ prefix, variant }: { prefix: string; variant: 'entrada' |
           height: 360,
           borderRadius: '50%',
           background: cm('rgba(63,213,138,.18)'),
-          filter: 'blur(120px)',
+          filter: 'blur(90px)',
           animationDelay: '4s',
         }}
       />

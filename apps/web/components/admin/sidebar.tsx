@@ -78,6 +78,7 @@ import {
   DropdownMenuItem,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
+import { APP_VERSION } from '@/lib/version'
 import { OCULTAR_CRONOGRAMA } from '@/lib/flags'
 import { useCan } from '@/components/auth/can-provider'
 import { ThemeToggle } from '@/components/theme-toggle'
@@ -551,6 +552,8 @@ export function AdminSidebar({ logo, nome = 'Plataforma', subtitulo, logoBg = '#
             <LogOut className="h-3.5 w-3.5" /> <span className="group-data-[collapsible=icon]:hidden">Sair</span>
           </button>
         </div>
+        {/* Versão do sistema — visível dentro da plataforma (além do rodapé do login). */}
+        <p className="text-center text-[10px] leading-none text-sidebar-foreground/40 group-data-[collapsible=icon]:hidden">v{APP_VERSION}</p>
       </SidebarFooter>
     </Sidebar>
     </>

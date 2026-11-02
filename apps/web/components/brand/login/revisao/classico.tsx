@@ -49,7 +49,7 @@ export function LoginRevisaoClassico({
 
       <main className="rlc-main">
         <div className="rlc-headline">
-          <h1 className="rlc-up rlc-d2">Sua aprovação começa<br />no <span className="rlc-hl">Revisão</span>.</h1>
+          <h1 className="rlc-up rlc-d2">Plataforma <span className="rlc-hl">Revisão</span></h1>
           <p className="rlc-up rlc-d3">Entre com o seu e-mail e continue de onde parou.</p>
         </div>
 
@@ -84,7 +84,7 @@ function css(t: RevTheme) {
   const a = LINES_A[t]
   return `
 .rlc-root{position:relative;overflow:hidden;min-height:100vh;width:100%;background-attachment:fixed;font-family:'Plus Jakarta Sans',system-ui,sans-serif;color:#fff;display:flex;flex-direction:column}
-.rlc-lines{position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,${a}) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,${a}) 1px,transparent 1px);background-size:64px 64px;-webkit-mask-image:${MASK};mask-image:${MASK};animation:rlcFade 1.4s ease-out both,rlcGridPan 40s linear 1.4s infinite}
+.rlc-lines{position:absolute;inset:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,${a}) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,${a}) 1px,transparent 1px);background-size:64px 64px;-webkit-mask-image:${MASK};mask-image:${MASK};animation:rlcFade 1.4s ease-out both}
 .rlc-wm{position:absolute;width:560px;height:544px;right:5%;top:110px;pointer-events:none;animation:rlcWmIn 1.4s cubic-bezier(.2,.8,.2,1) .3s both,rlcSway 12s ease-in-out 1.7s infinite alternate}
 .rlc-trace{position:absolute;width:320px;height:311px;left:5%;top:300px;pointer-events:none}
 .rlc-trace path:first-child{stroke-dasharray:420;stroke-dashoffset:420;animation:rlcDraw 2.6s cubic-bezier(.6,.1,.2,1) .6s forwards}
@@ -135,7 +135,7 @@ function css(t: RevTheme) {
 
 @media (max-width:640px){
   .rlc-root{background-attachment:scroll}
-  .rlc-lines{background-size:40px 40px;-webkit-mask-image:radial-gradient(ellipse 95% 75% at 50% 40%,#000 30%,transparent 92%);mask-image:radial-gradient(ellipse 95% 75% at 50% 40%,#000 30%,transparent 92%);animation:rlcFade 1.4s ease-out both,rlcGridPanM 40s linear 1.4s infinite}
+  .rlc-lines{background-size:40px 40px;-webkit-mask-image:radial-gradient(ellipse 95% 75% at 50% 40%,#000 30%,transparent 92%);mask-image:radial-gradient(ellipse 95% 75% at 50% 40%,#000 30%,transparent 92%);animation:rlcFade 1.4s ease-out both}
   .rlc-wm{width:280px;height:272px;right:-96px;top:64px}
   .rlc-trace{width:150px;height:146px;left:-46px;top:auto;bottom:96px}
   .rlc-band{height:180px}

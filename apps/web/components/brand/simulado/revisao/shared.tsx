@@ -50,9 +50,9 @@ export function Bgfx({ prefix }: { prefix: string }) {
   const px = squares(70, 1440)
   return (
     <div aria-hidden className={`${prefix}-bgfx`} style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
-      <span className={`${prefix}-orb`} style={{ position: 'absolute', left: -120, top: -80, width: 420, height: 420, borderRadius: '50%', background: 'rgba(100,73,224,.28)', filter: 'blur(140px)', animationDelay: '0s' }} />
-      <span className={`${prefix}-orb`} style={{ position: 'absolute', left: '70%', top: '30%', width: 380, height: 380, borderRadius: '50%', background: 'rgba(241,194,50,.18)', filter: 'blur(126px)', animationDelay: '3s' }} />
-      <span className={`${prefix}-orb`} style={{ position: 'absolute', left: '20%', top: '75%', width: 320, height: 320, borderRadius: '50%', background: 'rgba(143,117,255,.2)', filter: 'blur(106px)', animationDelay: '6s' }} />
+      <span className={`${prefix}-orb`} style={{ position: 'absolute', left: -120, top: -80, width: 420, height: 420, borderRadius: '50%', background: 'rgba(100,73,224,.28)', filter: 'blur(90px)', animationDelay: '0s' }} />
+      <span className={`${prefix}-orb`} style={{ position: 'absolute', left: '70%', top: '30%', width: 380, height: 380, borderRadius: '50%', background: 'rgba(241,194,50,.18)', filter: 'blur(90px)', animationDelay: '3s' }} />
+      <span className={`${prefix}-orb`} style={{ position: 'absolute', left: '20%', top: '75%', width: 320, height: 320, borderRadius: '50%', background: 'rgba(143,117,255,.2)', filter: 'blur(95px)', animationDelay: '6s' }} />
       <div style={{ position: 'absolute', inset: 0 }}>
         {px.map((p, i) => (
           <span
@@ -198,7 +198,7 @@ export function baseKeyframes(p: string) {
 .${p}-okpop{animation:${p}okpop .6s cubic-bezier(.34,1.56,.64,1) both}
 .${p}-grow{transform-origin:50% 100%;animation:${p}growY 1s cubic-bezier(.22,1,.36,1) both}
 .${p}-bar{animation:${p}barw 1s cubic-bezier(.22,1,.36,1) both}
-.${p}-orb{animation:${p}orb 14s ease-in-out infinite alternate}
+.${p}-orb{animation:${p}orb 14s ease-in-out infinite alternate;will-change:transform}
 .${p}-px{position:absolute;opacity:0;animation:${p}px 7s ease-in-out infinite}
 @keyframes ${p}fadein{from{opacity:0}}
 @keyframes ${p}mpop{from{opacity:0;transform:translate(-50%,-46%) scale(.96)}}
@@ -207,7 +207,7 @@ export function baseKeyframes(p: string) {
 @keyframes ${p}okpop{from{transform:scale(.4);opacity:0}}
 @keyframes ${p}growY{from{transform:scaleY(0)}}
 @keyframes ${p}barw{from{width:0}}
-@keyframes ${p}orb{to{transform:translate(40px,-30px) scale(1.12)}}
+@keyframes ${p}orb{to{transform:translate(40px,-30px)}}
 @keyframes ${p}px{0%,100%{opacity:0}12%,30%{opacity:1}44%{opacity:0}}
 @media (prefers-reduced-motion:reduce){
   .${p}-root *{animation:none!important;transition:none!important}

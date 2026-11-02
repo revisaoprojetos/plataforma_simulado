@@ -14,6 +14,7 @@ import {
   BarChart3,
   Users,
   GraduationCap,
+  Layers,
   NotebookPen,
   HelpCircle,
   type LucideProps,
@@ -38,6 +39,7 @@ const MAPA: Record<string, ComponentType<LucideProps>> = {
   BarChart3,
   Users,
   GraduationCap,
+  Layers,
   NotebookPen,
   HelpCircle,
 }

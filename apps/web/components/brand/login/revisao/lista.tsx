@@ -71,7 +71,7 @@ export function LoginRevisaoLista({
                 <span className="rll-w"><span style={{ animationDelay: '.72s' }}><Hl /></span></span>
               </h1>
             ) : (
-              <h1 className="rll-h1 rll-up rll-d2">Sua aprovação<br />começa <Hl /></h1>
+              <h1 className="rll-h1 rll-up rll-d2">Plataforma <span className="rll-hlword">Revisão</span></h1>
             )}
             <p className="rll-sub2 rll-up rll-d3">Entre com o seu e-mail e continue de onde parou.</p>
           </div>

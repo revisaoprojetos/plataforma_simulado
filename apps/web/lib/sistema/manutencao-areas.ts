@@ -53,6 +53,7 @@ export const AREAS_MANUTENCAO: AreaManutencao[] = [
 export const AREAS_MANUTENCAO_ALUNO: AreaManutencao[] = [
   // ── Áreas consolidadas (todas as marcas) ──
   { key: 'simulados', label: 'Simulados', descricao: 'Lista e aplicação de simulados do aluno (/aluno/simulados).', href: '/aluno/simulados' },
+  { key: 'extensivos', label: 'Meus Extensivos', descricao: 'Hub de extensivos/produtos do aluno (/aluno/extensivos).', href: '/aluno/extensivos' },
   // Banco de Questões já engloba, na Revisão, a aba "Recomendados" (área unificada): bloquear aqui
   // cobre tanto /aluno/questoes quanto /aluno/recomendado.
   { key: 'questoes', label: 'Banco de Questões (Questões Revisão + Recomendados)', descricao: 'Banco de questões e, na Revisão, a aba unificada de Recomendados (/aluno/questoes + /aluno/recomendado).', href: '/aluno/questoes', hrefs: ['/aluno/recomendado'] },

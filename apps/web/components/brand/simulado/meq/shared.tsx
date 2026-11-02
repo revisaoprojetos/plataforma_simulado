@@ -60,8 +60,8 @@ export function baseKeyframes(p: string) {
 @keyframes ${p}growY{from{transform:scaleY(0)}}
 .${p}-bar{animation:${p}barw 1s cubic-bezier(.22,1,.36,1) both}
 @keyframes ${p}barw{from{width:0}}
-.${p}-orb{animation:${p}orb 14s ease-in-out infinite alternate}
-@keyframes ${p}orb{to{transform:translate(40px,-30px) scale(1.12)}}
+.${p}-orb{animation:${p}orb 14s ease-in-out infinite alternate;will-change:transform}
+@keyframes ${p}orb{to{transform:translate(40px,-30px)}}
 .${p}-circ .${p}-pl{stroke-dasharray:46 954;stroke-dashoffset:1000;animation:${p}pulse 9s linear infinite}
 .${p}-circ .${p}-pl2{animation-delay:3s}
 .${p}-circ .${p}-pl3{animation-delay:6s}
@@ -79,11 +79,11 @@ export function BgfxMeq({ p }: { p: string }) {
     <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
       <span
         className={`${p}-orb`}
-        style={{ position: 'absolute', left: -80, top: -60, width: 380, height: 380, borderRadius: '50%', background: 'rgba(62,127,224,.25)', filter: 'blur(126px)', animationDelay: '0s' }}
+        style={{ position: 'absolute', left: -80, top: -60, width: 380, height: 380, borderRadius: '50%', background: 'rgba(62,127,224,.25)', filter: 'blur(90px)', animationDelay: '0s' }}
       />
       <span
         className={`${p}-orb`}
-        style={{ position: 'absolute', left: '72%', top: '45%', width: 420, height: 420, borderRadius: '50%', background: 'rgba(94,206,240,.18)', filter: 'blur(140px)', animationDelay: '4s' }}
+        style={{ position: 'absolute', left: '72%', top: '45%', width: 420, height: 420, borderRadius: '50%', background: 'rgba(94,206,240,.18)', filter: 'blur(90px)', animationDelay: '4s' }}
       />
       <Circuit p={p} style={{ left: -200, top: -60, width: 900, height: 570 }} ol="#5ECEF0" olOp={0.3} pl="#5ECEF0" />
       <Circuit p={p} style={{ left: '55%', top: '55%', width: 900, height: 570 }} ol="#3E7FE0" olOp={0.25} pl="#8BEAEA" />

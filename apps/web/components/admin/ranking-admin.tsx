@@ -333,8 +333,9 @@ export function RankingAdmin({
           <div className="rank-sheen absolute -inset-y-10 -left-1/3 w-1/3 rotate-12 bg-gradient-to-r from-transparent via-white/5 to-transparent" style={{ animation: 'rankSheen 9s ease-in-out infinite' }} />
         </div>
         <style>{`
-          @keyframes rankBlobA{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(24px,-18px) scale(1.18)}}
-          @keyframes rankBlobB{0%,100%{transform:translate(0,0) scale(1.1)}50%{transform:translate(-26px,14px) scale(.92)}}
+          .rank-blob{will-change:transform}
+          @keyframes rankBlobA{0%,100%{transform:translate(0,0)}50%{transform:translate(24px,-18px)}}
+          @keyframes rankBlobB{0%,100%{transform:translate(0,0)}50%{transform:translate(-26px,14px)}}
           @keyframes rankSheen{0%{transform:translateX(0) rotate(12deg);opacity:0}15%{opacity:1}50%{transform:translateX(380%) rotate(12deg)}60%,100%{transform:translateX(380%) rotate(12deg);opacity:0}}
           @media (prefers-reduced-motion: reduce){.rank-blob,.rank-sheen{animation:none!important}.rank-sheen{display:none}}
         `}</style>

@@ -20,6 +20,7 @@ import type { AlunoNavItem, AlunoShellUsuario } from './types'
 import { internaTokensStyle } from '@/components/brand/interna/interna-tokens'
 import { BuscaOverlay } from '@/components/brand/interna/busca/busca-overlay'
 import { cn } from '@/lib/utils'
+import { APP_VERSION } from '@/lib/version'
 import { NavIcon, MarcaR } from './revisao-nova/icons'
 import {
   revTokensStyle,
@@ -530,6 +531,8 @@ export function ShellRevisaoNova({
                 </div>
               )}
             </div>
+            {/* Versão do sistema — visível dentro da plataforma. */}
+            <p className="shr-ver" style={{ textAlign: 'center', fontSize: 10, lineHeight: 1, letterSpacing: '.02em', whiteSpace: 'nowrap', color: 'rgba(230,222,255,.42)', margin: '2px 0 0' }}>v{APP_VERSION}</p>
           </div>
         </div>
       </aside>
@@ -549,8 +552,8 @@ export function ShellRevisaoNova({
             height: 72,
             padding: '0 28px',
             background: 'var(--top)',
-            backdropFilter: 'blur(12px)',
-            WebkitBackdropFilter: 'blur(12px)',
+            backdropFilter: 'blur(7px)',
+            WebkitBackdropFilter: 'blur(7px)',
             borderBottom: '1px solid var(--line)',
           }}
         >

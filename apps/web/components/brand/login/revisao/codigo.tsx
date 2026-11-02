@@ -95,7 +95,7 @@ export function LoginRevisaoCodigo({
                 <span className="rlk-w"><span style={{ animationDelay: '.9s' }}>começa no <span className="rlk-hl">Revisão</span>.</span></span>
               </h1>
             ) : (
-              <h1 className="rlk-h1 rlk-up rlk-d3">Sua aprovação<br />começa no <span className="rlk-hl">Revisão</span>.</h1>
+              <h1 className="rlk-h1 rlk-up rlk-d3">Plataforma <span className="rlk-hl">Revisão</span></h1>
             )}
 
             {/* §1º–§3º */}
