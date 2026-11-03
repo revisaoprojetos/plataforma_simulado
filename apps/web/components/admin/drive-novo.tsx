@@ -193,13 +193,54 @@ function NovaPastaDialog({ onFechar, onCriar }: { rotuloBranco: string; onFechar
 
 // ───────── Painel de progresso de UPLOAD (estilo Drive) — total + por arquivo com % ─────────
 export type DriveUploadStatus = 'enviando' | 'processando' | 'ok' | 'erro'
-export type DriveUploadItem = { id: string; nome: string; cor: string; pct: number; status: DriveUploadStatus }
+/** Etapa em que o arquivo falhou — ajuda a identificar ONDE quebrou (navegador, storage ou servidor). */
+export type DriveUploadEtapa = 'validacao' | 'preparo' | 'envio' | 'processamento'
+export type DriveUploadItem = {
+  id: string; nome: string; cor: string; pct: number; status: DriveUploadStatus
+  tamanho?: number            // bytes (exibido na linha)
+  etapa?: DriveUploadEtapa    // onde falhou
+  erro?: string               // mensagem amigável
+  detalhe?: string            // detalhe técnico (HTTP, mensagem crua do servidor) p/ suporte
+}
 // Rótulos do título (reutilizável p/ outros contextos além de documentos — ex.: questões do simulado).
 export type DriveUploadLabels = { gerundio: string; subSing: string; subPlur: string; verbSing: string; verbPlur: string }
 const LABELS_PADRAO: DriveUploadLabels = { gerundio: 'Importando', subSing: 'documento', subPlur: 'documentos', verbSing: 'importado', verbPlur: 'importados' }
+const ETAPA_LABEL: Record<DriveUploadEtapa, string> = { validacao: 'Validação', preparo: 'Preparo do envio', envio: 'Envio ao armazenamento', processamento: 'Processamento' }
 
-export function DriveUploadPanel({ itens, onClose, labels = LABELS_PADRAO }: { itens: DriveUploadItem[]; onClose: () => void; labels?: DriveUploadLabels }) {
+export function fmtBytes(n?: number): string {
+  if (n == null || !isFinite(n)) return ''
+  if (n < 1024) return `${n} B`
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(0)} KB`
+  if (n < 1024 * 1024 * 1024) return `${(n / 1024 / 1024).toFixed(1).replace('.', ',')} MB`
+  return `${(n / 1024 / 1024 / 1024).toFixed(2).replace('.', ',')} GB`
+}
+
+/** Texto copiável com o diagnóstico das falhas (cola no suporte/WhatsApp e já dá pra identificar). */
+export function relatorioErrosUpload(itens: DriveUploadItem[]): string {
+  const erros = itens.filter((x) => x.status === 'erro')
+  const linhas = erros.map((x) => [
+    `• ${x.nome}${x.tamanho != null ? ` (${fmtBytes(x.tamanho)})` : ''}`,
+    `  Etapa: ${x.etapa ? ETAPA_LABEL[x.etapa] : '—'}`,
+    `  Erro: ${x.erro ?? 'desconhecido'}`,
+    x.detalhe ? `  Detalhe: ${x.detalhe}` : '',
+  ].filter(Boolean).join('\n'))
+  return [`Falhas na importação — ${new Date().toLocaleString('pt-BR')}`, `Página: ${typeof location !== 'undefined' ? location.pathname : ''}`, '', ...linhas].join('\n')
+}
+
+async function copiarTexto(t: string): Promise<boolean> {
+  try { await navigator.clipboard.writeText(t); return true } catch { return false }
+}
+
+export function DriveUploadPanel({ itens, onClose, labels = LABELS_PADRAO, onRetry, onRetryTodos }: {
+  itens: DriveUploadItem[]; onClose: () => void; labels?: DriveUploadLabels
+  /** Reenvia UM arquivo que falhou (opcional — sem isso o botão não aparece). */
+  onRetry?: (id: string) => void
+  /** Reenvia todos os que falharam. */
+  onRetryTodos?: () => void
+}) {
   const [colapsado, setColapsado] = useState(false)
+  const [aberto, setAberto] = useState<Record<string, boolean>>({})
+  const [copiado, setCopiado] = useState<string | null>(null)
   const total = itens.length
   const okCount = itens.filter((x) => x.status === 'ok').length
   const erroCount = itens.filter((x) => x.status === 'erro').length
@@ -207,12 +248,28 @@ export function DriveUploadPanel({ itens, onClose, labels = LABELS_PADRAO }: { i
   const fracao = (x: DriveUploadItem) => (x.status === 'ok' || x.status === 'erro' ? 1 : x.status === 'processando' ? 0.95 : (x.pct / 100) * 0.9)
   const overall = Math.round((100 * itens.reduce((s, x) => s + fracao(x), 0)) / Math.max(1, total))
   const terminou = concluidos === total
+  const estado = !terminou ? 'run' : erroCount === 0 ? 'ok' : okCount === 0 ? 'fail' : 'mix'
   const titulo = terminou
-    ? (erroCount ? `${okCount} ${okCount === 1 ? labels.verbSing : labels.verbPlur} · ${erroCount} com erro` : `${okCount} ${okCount === 1 ? labels.subSing : labels.subPlur} ${okCount === 1 ? labels.verbSing : labels.verbPlur}`)
+    ? (erroCount
+      ? (okCount ? `${okCount} ${okCount === 1 ? labels.verbSing : labels.verbPlur} · ${erroCount} com erro` : `${erroCount === 1 ? 'Falha' : `${erroCount} falhas`} na importação`)
+      : `${okCount} ${okCount === 1 ? labels.subSing : labels.subPlur} ${okCount === 1 ? labels.verbSing : labels.verbPlur}`)
     : `${labels.gerundio} ${concluidos} de ${total}…`
+  // Falhou algo → painel se expande sozinho (o erro não pode ficar escondido no recolhido).
+  useEffect(() => { if (erroCount) setColapsado(false) }, [erroCount])
+  // Erros já nascem abertos (o detalhe é o que importa); o usuário pode recolher clicando na linha.
+  const estaAberto = (it: DriveUploadItem) => aberto[it.id] ?? it.status === 'erro'
+  const copiar = async (chave: string, txt: string) => {
+    if (await copiarTexto(txt)) { setCopiado(chave); setTimeout(() => setCopiado((c) => (c === chave ? null : c)), 1600) }
+  }
+
   return createPortal(
-    <div className={`gd-up gd-show${colapsado ? ' gd-collapsed' : ''}`} role="status" aria-live="polite">
+    <div className={`gd-up gd-show gd-st-${estado}${colapsado ? ' gd-collapsed' : ''}`} role="status" aria-live="polite">
       <div className="gd-up-top">
+        <span className="gd-up-badge" aria-hidden>
+          {estado === 'run' ? <span className="gd-up-spin gd-on-dark" />
+            : estado === 'ok' ? <svg viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" /></svg>
+              : <b>!</b>}
+        </span>
         <span className="gd-up-ttl">{titulo}</span>
         {!terminou && <span className="gd-up-tot">{overall}%</span>}
         <button className="gd-icon-btn" onClick={() => setColapsado((c) => !c)} aria-label={colapsado ? 'Expandir' : 'Recolher'}>
@@ -222,21 +279,59 @@ export function DriveUploadPanel({ itens, onClose, labels = LABELS_PADRAO }: { i
       </div>
       <div className="gd-up-barwrap"><div className="gd-up-bar" style={{ width: `${overall}%` }} /></div>
       <div className="gd-up-list"><div>
-        {itens.map((it) => (
-          <div key={it.id} className={`gd-up-row gd-u-${it.status}`}>
-            <span className="gd-up-ic" style={{ background: it.cor }}><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" /></svg></span>
-            <div className="gd-up-mid">
-              <span className="gd-up-nome" title={it.nome}>{it.nome}</span>
-              <div className="gd-up-mini"><i style={{ width: `${it.status === 'enviando' ? it.pct : 100}%` }} /></div>
-            </div>
-            <span className="gd-up-st">
-              {it.status === 'ok' ? <svg className="gd-up-ck" viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" /></svg>
-                : it.status === 'erro' ? <span className="gd-up-err">!</span>
-                  : it.status === 'processando' ? <span className="gd-up-spin" />
-                    : <span className="gd-up-pct">{it.pct}%</span>}
-            </span>
+        {total > 1 && (
+          <div className="gd-up-chips">
+            <span className="gd-chip gd-chip-ok"><i />{okCount} ok</span>
+            {erroCount > 0 && <span className="gd-chip gd-chip-err"><i />{erroCount} com erro</span>}
+            {!terminou && <span className="gd-chip"><i />{total - concluidos} na fila</span>}
           </div>
-        ))}
+        )}
+        {itens.map((it) => {
+          const err = it.status === 'erro'
+          const open = err && estaAberto(it)
+          return (
+            <div key={it.id} className={`gd-up-row gd-u-${it.status}`}>
+              <div className="gd-up-line" onClick={err ? () => setAberto((a) => ({ ...a, [it.id]: !open })) : undefined} style={err ? { cursor: 'pointer' } : undefined}>
+                <span className="gd-up-ic" style={{ background: err ? '#d93025' : it.cor }}><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z" /></svg></span>
+                <div className="gd-up-mid">
+                  <span className="gd-up-nome" title={it.nome}>{it.nome}</span>
+                  <span className="gd-up-sub">
+                    {err ? <span className="gd-up-sub-err">{it.erro ?? 'Falhou'}</span>
+                      : it.status === 'processando' ? 'Convertendo e indexando…'
+                        : it.status === 'ok' ? 'Pronto'
+                          : `Enviando${it.tamanho != null ? ` · ${fmtBytes(it.tamanho)}` : ''}`}
+                  </span>
+                  {!err && <div className="gd-up-mini"><i style={{ width: `${it.status === 'enviando' ? it.pct : 100}%` }} /></div>}
+                </div>
+                <span className="gd-up-st">
+                  {it.status === 'ok' ? <svg className="gd-up-ck" viewBox="0 0 24 24"><path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" /></svg>
+                    : err ? <span className="gd-up-err">!</span>
+                      : it.status === 'processando' ? <span className="gd-up-spin" />
+                        : <span className="gd-up-pct">{it.pct}%</span>}
+                </span>
+              </div>
+              {open && (
+                <div className="gd-up-errbox">
+                  <dl>
+                    {it.etapa && <><dt>Etapa</dt><dd>{ETAPA_LABEL[it.etapa]}</dd></>}
+                    {it.tamanho != null && <><dt>Tamanho</dt><dd>{fmtBytes(it.tamanho)}</dd></>}
+                    {it.detalhe && <><dt>Detalhe</dt><dd className="gd-up-mono">{it.detalhe}</dd></>}
+                  </dl>
+                  <div className="gd-up-acts">
+                    {onRetry && <button className="gd-up-btn gd-up-btn-pri" onClick={() => onRetry(it.id)}>Tentar de novo</button>}
+                    <button className="gd-up-btn" onClick={() => copiar(it.id, relatorioErrosUpload([it]))}>{copiado === it.id ? 'Copiado ✓' : 'Copiar detalhes'}</button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
+        {terminou && erroCount > 0 && (
+          <div className="gd-up-foot">
+            {onRetryTodos && erroCount > 1 && <button className="gd-up-btn gd-up-btn-pri" onClick={onRetryTodos}>Tentar todos de novo</button>}
+            <button className="gd-up-btn" onClick={() => copiar('__todos', relatorioErrosUpload(itens))}>{copiado === '__todos' ? 'Relatório copiado ✓' : 'Copiar relatório de erros'}</button>
+          </div>
+        )}
       </div></div>
     </div>,
     document.body,
@@ -318,6 +413,49 @@ export function DriveNovoStyles() {
   .gd-up-spin{width:18px;height:18px;border-radius:50%;border:2px solid color-mix(in oklab,var(--brand-primary,var(--primary)) 25%,transparent);border-top-color:var(--brand-primary,var(--primary));animation:gdUpSpin .7s linear infinite}
   @keyframes gdUpSpin{to{transform:rotate(360deg)}}
   .gd-up-pct{font-variant-numeric:tabular-nums}
+  /* glow-up: cabeçalho muda de cor pelo resultado + selo animado + detalhe do erro por arquivo */
+  .gd-up-top{transition:background .4s}
+  .gd-st-ok .gd-up-top{background:#0d6e3f}
+  .gd-st-mix .gd-up-top{background:#8a4b00}
+  .gd-st-fail .gd-up-top{background:#a3221a}
+  .gd-up-badge{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;flex-shrink:0;margin-right:6px;background:rgba(255,255,255,.16)}
+  .gd-up-badge svg{width:16px;height:16px;fill:#fff;animation:gdPop .45s cubic-bezier(.34,1.56,.64,1)}
+  .gd-up-badge b{font-size:14px;animation:gdPop .45s cubic-bezier(.34,1.56,.64,1)}
+  @keyframes gdPop{from{transform:scale(0)}}
+  .gd-up-spin.gd-on-dark{width:14px;height:14px;border-color:rgba(255,255,255,.3);border-top-color:#fff}
+  .gd-st-fail .gd-up-bar{background:#f28b82}
+  .gd-st-mix .gd-up-bar{background:#fdd663}
+  .gd-st-ok .gd-up-bar{background:#81c995}
+  .gd-up{width:400px}
+  .gd-up-list>div{max-height:min(440px,60vh)}
+  .gd-up-chips{display:flex;gap:6px;flex-wrap:wrap;padding:10px 16px 4px}
+  .gd-chip{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px;border-radius:11px;font-size:11.5px;font-weight:500;background:color-mix(in oklab,var(--gd-text,#1f1f1f) 7%,transparent);color:var(--gd-text-2,#444)}
+  .gd-chip i{width:7px;height:7px;border-radius:50%;background:currentColor;opacity:.6}
+  .gd-chip-ok{background:#e6f4ea;color:#0d6e3f}
+  .gd-chip-err{background:#fce8e6;color:#b3261e}
+  .dark .gd-chip-ok{background:rgba(129,201,149,.16);color:#81c995}
+  .dark .gd-chip-err{background:rgba(242,139,130,.16);color:#f28b82}
+  .gd-up-row{display:block;padding:0;border-bottom:1px solid color-mix(in oklab,var(--gd-text,#1f1f1f) 6%,transparent)}
+  .gd-up-row:last-child{border-bottom:0}
+  .gd-up-line{display:flex;align-items:center;gap:12px;padding:10px 16px}
+  .gd-u-erro{background:color-mix(in oklab,#d93025 5%,transparent)}
+  .gd-up-sub{display:block;font-size:11.5px;color:var(--gd-text-3,#5f6368);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .gd-up-sub-err{color:#b3261e;font-weight:500;white-space:normal}
+  .dark .gd-up-sub-err{color:#f28b82}
+  .gd-u-erro .gd-up-err{animation:gdShake .5s cubic-bezier(.36,.07,.19,.97)}
+  @keyframes gdShake{20%,60%{transform:translateX(-3px)}40%,80%{transform:translateX(3px)}}
+  .gd-up-errbox{margin:0 16px 12px 58px;padding:10px 12px;border-radius:10px;border:1px solid color-mix(in oklab,#d93025 28%,transparent);background:color-mix(in oklab,#d93025 6%,var(--gd-menu-bg,#fff))}
+  .gd-up-errbox dl{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;margin:0;font-size:12px}
+  .gd-up-errbox dt{color:var(--gd-text-3,#5f6368);font-weight:500}
+  .gd-up-errbox dd{margin:0;min-width:0;overflow-wrap:anywhere}
+  .gd-up-mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11px;opacity:.85}
+  .gd-up-acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+  .gd-up-foot{display:flex;gap:8px;flex-wrap:wrap;padding:10px 16px 12px;border-top:1px solid color-mix(in oklab,var(--gd-text,#1f1f1f) 8%,transparent)}
+  .gd-up-btn{height:28px;padding:0 12px;border-radius:14px;border:1px solid color-mix(in oklab,var(--gd-text,#1f1f1f) 18%,transparent);background:transparent;color:inherit;font:inherit;font-size:12px;font-weight:500;cursor:pointer;transition:background .2s,transform .15s}
+  .gd-up-btn:hover{background:color-mix(in oklab,var(--gd-text,#1f1f1f) 7%,transparent)}
+  .gd-up-btn:active{transform:scale(.96)}
+  .gd-up-btn-pri{border-color:transparent;background:var(--brand-primary,var(--primary));color:var(--primary-foreground,#fff)}
+  .gd-up-btn-pri:hover{background:color-mix(in oklab,var(--brand-primary,var(--primary)) 88%,black)}
     `}</style>
   )
 }

@@ -275,8 +275,8 @@ export function BibliotecaClient() {
     else setGerenciarAberto(true)
   }
 
-  // PUT direto ao storage com progresso de bytes (XHR). Devolve true no 2xx.
-  function subirComProgresso(signedUrl: string, f: File, onProg: (frac: number) => void): Promise<boolean> {
+  // PUT direto ao storage com progresso de bytes (XHR). Devolve o resultado com o HTTP p/ diagnóstico.
+  function subirComProgresso(signedUrl: string, f: File, onProg: (frac: number) => void): Promise<{ ok: boolean; status: number; corpo: string }> {
     return new Promise((resolve) => {
       try {
         const xhr = new XMLHttpRequest()
@@ -284,10 +284,11 @@ export function BibliotecaClient() {
         if (f.type) xhr.setRequestHeader('content-type', f.type)
         xhr.setRequestHeader('x-upsert', 'true')
         xhr.upload.onprogress = (e) => { if (e.lengthComputable) onProg(e.loaded / e.total) }
-        xhr.onload = () => resolve(xhr.status >= 200 && xhr.status < 300)
-        xhr.onerror = () => resolve(false)
+        xhr.onload = () => resolve({ ok: xhr.status >= 200 && xhr.status < 300, status: xhr.status, corpo: String(xhr.responseText || '').slice(0, 300) })
+        xhr.onerror = () => resolve({ ok: false, status: 0, corpo: 'Falha de rede (conexão caiu, bloqueio de CORS ou URL inacessível).' })
+        xhr.ontimeout = () => resolve({ ok: false, status: 0, corpo: 'Tempo esgotado no envio.' })
         xhr.send(f)
-      } catch { resolve(false) }
+      } catch (e: any) { resolve({ ok: false, status: 0, corpo: e?.message ?? 'Erro ao iniciar o envio.' }) }
     })
   }
   // Cor do ícone no painel de progresso: selo do tipo detectado (token fixo por tipo), com fallback à marca.
@@ -296,16 +297,99 @@ export function BibliotecaClient() {
     return k ? `var(--sel-${TIPOS_CONTEUDO[k].seloSlug})` : 'var(--brand-primary, var(--primary))'
   }
 
+  /** Traduz a falha do PUT ao storage em mensagem clara (o HTTP cru vai no detalhe). */
+  function erroDoEnvio(status: number, corpo: string): string {
+    if (status === 0) return 'Não foi possível enviar o arquivo (conexão interrompida ou bloqueada).'
+    if (status === 413 || /too large|exceeded|maximum allowed size/i.test(corpo)) return 'Arquivo maior que o limite do armazenamento.'
+    if (status === 400 && /mime|content.?type|not supported/i.test(corpo)) return 'O armazenamento recusou o tipo do arquivo.'
+    if (status === 401 || status === 403 || /signature|expired|jwt/i.test(corpo)) return 'O link de envio expirou ou foi recusado. Tente de novo.'
+    if (status === 404 || /bucket not found/i.test(corpo)) return 'Pasta de armazenamento não encontrada (bucket). Verifique a configuração do storage.'
+    if (status >= 500) return 'O armazenamento está instável no momento. Tente de novo em instantes.'
+    return `O armazenamento recusou o envio (HTTP ${status}).`
+  }
+  /** Traduz o erro do servidor (conversão/ingestão) em mensagem clara, mantendo a original no detalhe. */
+  function erroDoProcessamento(msg: string): string {
+    if (/formato não suportado/i.test(msg)) return msg
+    if (/body exceeded|payload too large|413/i.test(msg)) return 'Arquivo grande demais para o servidor processar.'
+    if (/convers|gotenberg|onlyoffice|mammoth|pdf/i.test(msg) && /vazi|empty/i.test(msg)) return 'O arquivo não tem texto legível (vazio ou só imagens escaneadas).'
+    if (/convers|gotenberg|onlyoffice|ECONNREFUSED|fetch failed/i.test(msg)) return 'O serviço de conversão de documentos não respondeu.'
+    if (/timeout|timed out|504/i.test(msg)) return 'O processamento demorou demais e foi interrompido.'
+    if (/permiss|unauthor|forbidden|não autorizado/i.test(msg)) return 'Sem permissão para importar nesta biblioteca.'
+    if (/ler o arquivo enviado/i.test(msg)) return 'O arquivo foi enviado, mas o servidor não conseguiu lê-lo do armazenamento.'
+    return msg || 'Falha ao processar o arquivo.'
+  }
+
+  // Arquivos da importação atual por id do item → permite "Tentar de novo" sem escolher de novo.
+  const uploadFilesRef = useRef(new Map<string, { file: File; destino: string | null }>())
+  const patchUpload = (id: string, p: Partial<DriveUploadItem>) => setUploads((prev) => (prev ? prev.map((x) => (x.id === id ? { ...x, ...p } : x)) : prev))
+
+  /** Sobe + ingere UM arquivo, registrando a ETAPA e a MENSAGEM real de qualquer falha. */
+  async function processarUpload(id: string, f: File, destino: string | null): Promise<boolean> {
+    const falhar = (etapa: DriveUploadItem['etapa'], erro: string, detalhe?: string) => {
+      patchUpload(id, { status: 'erro', pct: 100, etapa, erro, detalhe })
+      console.error(`[biblioteca/import] ${f.name} — ${etapa}: ${erro}`, detalhe ?? '')
+      return false
+    }
+    patchUpload(id, { status: 'enviando', pct: 0, etapa: undefined, erro: undefined, detalhe: undefined })
+    if (f.size === 0) return falhar('validacao', 'O arquivo está vazio (0 bytes).')
+    try {
+      const prep = await prepararUploadConteudo(f.name)
+      if (!prep.ok || !prep.path || !prep.uploadUrl) return falhar('preparo', prep.error || 'Não foi possível preparar o envio.', prep.error)
+      // PUT direto ao storage (Supabase signed URL ou S3 presigned PUT) — mesma mecânica XHR com progresso.
+      const put = await subirComProgresso(prep.uploadUrl, f, (frac) => patchUpload(id, { pct: Math.min(99, Math.round(frac * 100)) }))
+      let subiu = put.ok
+      let detalheEnvio = `HTTP ${put.status || 'sem resposta'}${put.corpo ? ` — ${put.corpo}` : ''}`
+      if (!subiu && prep.kind === 'supabase' && prep.token && prep.bucket) { // fallback Supabase (sem progresso de bytes)
+        const up = await createClient().storage.from(prep.bucket).uploadToSignedUrl(prep.path, prep.token, f, { contentType: f.type || undefined })
+        subiu = !up.error
+        if (up.error) detalheEnvio += ` | fallback: ${up.error.message}`
+      }
+      if (!subiu) return falhar('envio', erroDoEnvio(put.status, put.corpo), detalheEnvio)
+      patchUpload(id, { status: 'processando', pct: 100 })
+      const r = await importarDeStorage({ path: prep.path, titulo: f.name.replace(/\.[^.]+$/, ''), nomeArquivo: f.name, mime: f.type, pastaId: destino, categoria })
+      if (!r.ok) return falhar('processamento', erroDoProcessamento(r.error ?? ''), r.error)
+      patchUpload(id, { status: 'ok' })
+      return true
+    } catch (e: any) {
+      // Exceção na server action (rede, timeout do servidor, corpo grande…) — mostra a mensagem real.
+      const msg = String(e?.message ?? e ?? '')
+      return falhar('processamento', erroDoProcessamento(msg) || 'Erro inesperado.', msg || undefined)
+    }
+  }
+
+  /** Reenvia arquivos que falharam (um ou todos). */
+  async function tentarDeNovo(ids: string[]) {
+    let ok = 0
+    for (const id of ids) {
+      const it = uploadFilesRef.current.get(id)
+      if (it && (await processarUpload(id, it.file, it.destino))) ok++
+    }
+    if (ok) { toast.success(ok === 1 ? 'Arquivo importado.' : `${ok} arquivos importados.`); carregar(pastaAtual) }
+  }
+
   // Upload direto (sem pop-up) com painel de progresso (total + por arquivo). comoPasta=true recria a
   // árvore de subpastas pelo webkitRelativePath. Sobe DIRETO ao storage e ingere a partir de lá.
   async function importarArquivos(files: File[], comoPasta: boolean) {
-    // Aceita todas as extensões dos TIPOS_CONTEUDO (docx/pdf/html + pptx/xlsx/vídeo/áudio). A ingestão
-    // dos tipos novos está sendo habilitada no backend; aqui só não bloqueamos o upload por extensão.
-    const suportados = files.filter((f) => kindPorArquivo(f.name, f.type) !== null)
-    if (!suportados.length) { toast.error('Nenhum arquivo suportado encontrado.'); return }
-    const itens: DriveUploadItem[] = suportados.map((f, i) => ({ id: `${Date.now()}-${i}-${f.name}`, nome: f.name, cor: corTipo(f.name), pct: 0, status: 'enviando' }))
+    // Ignora arquivos ocultos/de sistema que vêm junto ao subir uma pasta (.DS_Store, Thumbs.db, ~$temp).
+    const visiveis = files.filter((f) => !/^(\.|~\$)/.test(f.name) && !/^(thumbs\.db|desktop\.ini)$/i.test(f.name))
+    const base = Date.now()
+    // Arquivos de formato não suportado ENTRAM no painel como erro (com o motivo) — nada some calado.
+    const itens: DriveUploadItem[] = visiveis.map((f, i) => {
+      const suportado = kindPorArquivo(f.name, f.type) !== null
+      const ext = (f.name.match(/\.[^./\\]+$/)?.[0] ?? '').toLowerCase()
+      return {
+        id: `${base}-${i}-${f.name}`, nome: f.name, cor: corTipo(f.name), pct: suportado ? 0 : 100, tamanho: f.size,
+        status: suportado ? 'enviando' : 'erro',
+        ...(suportado ? {} : {
+          etapa: 'validacao' as const,
+          erro: ext === '.doc' ? 'Formato .doc (Word antigo) não é aceito — abra no Word e "Salvar como" .docx.' : `Formato ${ext || 'sem extensão'} não é aceito.`,
+          detalhe: 'Aceitos: .docx, .pdf, .html, .pptx/.ppt, .xlsx/.xls, vídeo (.mp4, .webm, .mov, .m4v) e áudio (.mp3, .m4a, .wav, .ogg).',
+        }),
+      }
+    })
+    if (!itens.length) { toast.error('Nenhum arquivo selecionado.'); return }
     setUploads(itens)
-    const patch = (i: number, p: Partial<DriveUploadItem>) => setUploads((prev) => (prev ? prev.map((x, k) => (k === i ? { ...x, ...p } : x)) : prev))
+    uploadFilesRef.current = new Map()
 
     const cache = new Map<string, string | null>([['', pastaAtual]])
     const garantirPasta = async (segmentos: string[]): Promise<string | null> => {
@@ -320,25 +404,22 @@ export function BibliotecaClient() {
       return pai
     }
 
-    for (let i = 0; i < suportados.length; i++) {
-      const f = suportados[i]
-      try {
-        const destino = comoPasta ? await garantirPasta(String((f as any).webkitRelativePath || f.name).split('/').slice(0, -1)) : pastaAtual
-        const prep = await prepararUploadConteudo(f.name)
-        if (!prep.ok || !prep.path || !prep.uploadUrl) { patch(i, { status: 'erro', pct: 100 }); continue }
-        // PUT direto ao storage (Supabase signed URL ou S3 presigned PUT) — mesma mecânica XHR com progresso.
-        let subiu = await subirComProgresso(prep.uploadUrl, f, (frac) => patch(i, { pct: Math.min(99, Math.round(frac * 100)) }))
-        if (!subiu && prep.kind === 'supabase' && prep.token && prep.bucket) { // fallback Supabase (sem progresso de bytes)
-          const up = await createClient().storage.from(prep.bucket).uploadToSignedUrl(prep.path, prep.token, f, { contentType: f.type || undefined })
-          subiu = !up.error
+    let ok = 0, erros = itens.filter((x) => x.status === 'erro').length
+    for (let i = 0; i < visiveis.length; i++) {
+      const f = visiveis[i], it = itens[i]
+      if (it.status === 'erro') continue
+      let destino: string | null = pastaAtual
+      if (comoPasta) {
+        try { destino = await garantirPasta(String((f as any).webkitRelativePath || f.name).split('/').slice(0, -1)) } catch (e: any) {
+          patchUpload(it.id, { status: 'erro', pct: 100, etapa: 'preparo', erro: 'Não foi possível criar a subpasta de destino.', detalhe: e?.message })
+          erros++; continue
         }
-        if (!subiu) { patch(i, { status: 'erro', pct: 100 }); continue }
-        patch(i, { status: 'processando', pct: 100 })
-        const r = await importarDeStorage({ path: prep.path, titulo: f.name.replace(/\.[^.]+$/, ''), nomeArquivo: f.name, mime: f.type, pastaId: destino, categoria })
-        patch(i, { status: r.ok ? 'ok' : 'erro' })
-      } catch { patch(i, { status: 'erro', pct: 100 }) }
+      }
+      uploadFilesRef.current.set(it.id, { file: f, destino })
+      if (await processarUpload(it.id, f, destino)) ok++; else erros++
     }
-    carregar(pastaAtual)
+    if (ok) carregar(pastaAtual)
+    if (erros) toast.error(erros === 1 ? '1 arquivo não foi importado — veja o motivo no painel.' : `${erros} arquivos não foram importados — veja os motivos no painel.`)
   }
   async function excluirPasta(p: PastaConteudo) {
     if (!(await confirmar({ titulo: 'Excluir pasta?', mensagem: `"${p.nome}" — os documentos voltam para a raiz.`, confirmar: 'Excluir', destrutivo: true }))) return
@@ -664,7 +745,9 @@ export function BibliotecaClient() {
       )}
 
       {acessoDrive && <DriveAcessoWrapper pastaId={acessoDrive.id} categoria={categoria} onFechar={() => setAcessoDrive(null)} />}
-      {uploads && uploads.length > 0 && <DriveUploadPanel itens={uploads} onClose={() => setUploads(null)} />}
+      {uploads && uploads.length > 0 && <DriveUploadPanel itens={uploads} onClose={() => setUploads(null)}
+        onRetry={(id) => { if (uploadFilesRef.current.has(id)) void tentarDeNovo([id]) }}
+        onRetryTodos={() => void tentarDeNovo(uploads.filter((x) => x.status === 'erro' && uploadFilesRef.current.has(x.id)).map((x) => x.id))} />}
       {importAberto && <ImportDialog pastaId={pastaAtual} categoria={categoria} onFechar={() => setImportAberto(false)} onPronto={() => { setImportAberto(false); carregar(pastaAtual) }} />}
       {detalheId && (
         <BibliotecaDocSidebar
