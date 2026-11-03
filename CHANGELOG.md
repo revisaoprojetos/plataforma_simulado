@@ -12,6 +12,12 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.2.2 — 2026-11-03
+
+### Leitor da Biblioteca — PDF não derruba mais a aba no iPad/iPhone
+- O leitor desenhava **todas** as páginas do PDF em canvas de alta resolução e mantinha todas na memória (~30 MB por página no iPad). Em PDFs grandes o WebKit encerrava a aba ("Can't open this page" no Chrome do iPad).
+- Agora o bitmap é **sob demanda**: só as páginas perto da tela são desenhadas (IntersectionObserver) e as distantes devolvem a memória (canvas 0×0). No iOS a densidade do canvas é limitada a 2×. Camada de texto, grifos e sumário continuam montados para todas as páginas, sem mudança de comportamento.
+
 ## 4.2.1 — 2026-11-03
 
 ### Storage s3/Hetzner — fonte da conversão por GetObject direto (robustez)
