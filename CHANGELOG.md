@@ -12,6 +12,22 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.2.0 — 2026-11-03
+
+### Desafios de leitura (Lei Seca / Jurisprudência) — legenda de grifos configurável
+- **Novo controle para ocultar a legenda de grifos** (categorias Núcleo/Prazos/STF/STJ… + o botão **"Grifos do Revisão"**) nos leitores, em **3 níveis**: por **plataforma** (interruptor no Console → Plataformas → Aparência → Avançado, `tema.leitor_ocultar_legenda_grifos`, aplicado no read-time), por **módulo/desafio** (botão "Aplicar a todas as aulas deste módulo" no editor de leitura) e por **documento** (já existia). Resolve a marca "Revisão" vazar na legenda de outras empresas.
+
+### Agendamento de aulas de desafio — corrigido
+- **Agendar uma aula não caía mais em "Rascunho".** `listarBancoAulas` não incluía a coluna `publicacao` (jsonb que guarda `estado`+`publicarEm`) no SELECT, então a aula agendada voltava como Rascunho **e** o auto-publicar na data nunca disparava. Corrigido (com fallback p/ bancos sem a migração). Vale p/ Lei Seca e Jurisprudência, em todos os tenants.
+
+### Admin — Acessos do módulo (Grupos vinculados)
+- **"Grupos vinculados" resumido:** com muitos grupos, os chips ficam em ~2 linhas (com fade) e um botão **"Ver todos (N)" / "Ver menos"** — não enche mais a tela.
+- **"Marcar todos / Desmarcar todos"** no pop-up "Adicionar grupo com acesso" (opera sobre os grupos visíveis/filtrados, ignorando os já vinculados).
+
+### Aluno — área do desafio (VND) + quiz
+- **Espaçamento:** os blocos/cards do desafio VND não ficam mais colados na borda (a margem negativa do hero "furava" o `<main>` sem padding das áreas-novas do ShellVND).
+- **Quiz sem "lavado verde":** o quiz usava `bg-muted` (superfície shadcn), mas no ShellVND o `--muted` é a cor de texto da marca (esverdeada) e não era restaurado — o fundo inteiro ficava verde. Restaurado o `--muted` neutro só no quiz (claro/escuro).
+
 ## 4.1.3 — 2026-11-03
 
 ### Storage (migração s3/Hetzner) — conversão docx do OnlyOffice provider-independente

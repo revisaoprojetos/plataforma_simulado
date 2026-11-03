@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
-import { Save, Loader2 } from 'lucide-react'
+import { Save, Loader2, Captions } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -21,6 +21,19 @@ export function AvancadoForm({ tema, salvarTema }: { tema: any; salvarTema: (t: 
   const [pending, start] = useTransition()
   const fonteItems = { [SEM]: 'Padrão (sistema)', ...Object.fromEntries(FONTES.map((f) => [f, f])) }
 
+  // Leitor de desafios (Lei Seca, Jurisprudência): oculta a barra de legenda dos grifos (categorias +
+  // "Grifos do Revisão") em TODA a plataforma — para a marca "Revisão" não vazar em outras empresas.
+  // Auto-save (não depende do botão Salvar abaixo); o nível módulo/documento ajusta exceções por baixo.
+  const [ocultarLeg, setOcultarLeg] = useState<boolean>(!!tema?.leitor_ocultar_legenda_grifos)
+  const [pendingLeg, startLeg] = useTransition()
+  function toggleOcultarLeg() {
+    const next = !ocultarLeg; setOcultarLeg(next)
+    startLeg(async () => {
+      try { await salvarTema({ leitor_ocultar_legenda_grifos: next }); toast.success(next ? 'Legenda de grifos ocultada nos leitores.' : 'Legenda de grifos reativada.') }
+      catch (err) { setOcultarLeg(!next); toast.error(err instanceof Error ? err.message : 'Erro ao salvar') }
+    })
+  }
+
   function salvar() {
     start(async () => {
       try {
@@ -32,6 +45,21 @@ export function AvancadoForm({ tema, salvarTema }: { tema: any; salvarTema: (t: 
 
   return (
     <div className="max-w-xl space-y-5">
+      {/* Leitor de desafios — interruptor por PLATAFORMA (auto-save) */}
+      <div className="rounded-xl border bg-card p-4">
+        <button type="button" role="switch" aria-checked={ocultarLeg} onClick={toggleOcultarLeg} disabled={pendingLeg}
+          className="flex w-full items-start gap-3 text-left disabled:opacity-60">
+          <span className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary"><Captions className="h-4 w-4" /></span>
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-2 text-sm font-semibold text-foreground">Ocultar legenda de grifos nos leitores {pendingLeg && <Loader2 className="h-3.5 w-3.5 animate-spin" />}</span>
+            <span className="mt-0.5 block text-xs text-muted-foreground">Esconde a barra de categorias (Núcleo, Prazos, STF/STJ…) e o botão <b>“Grifos do Revisão”</b> em todos os leitores desta plataforma (Lei Seca e Jurisprudência). Use em empresas onde a marca “Revisão” não deve aparecer.</span>
+          </span>
+          <span className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition-colors ${ocultarLeg ? 'bg-primary' : 'bg-muted-foreground/30'}`}>
+            <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${ocultarLeg ? 'left-[22px]' : 'left-0.5'}`} />
+          </span>
+        </button>
+      </div>
+
       <div className="space-y-2">
         <Label>Fonte</Label>
         <link rel="stylesheet" href={GOOGLE_FONTS_URL} />

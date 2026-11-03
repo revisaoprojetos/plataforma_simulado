@@ -234,10 +234,11 @@ export function DesafioLSVND({
       </div>
 
       <style>{`
-        /* Banner/hero FULL-BLEED: cancela o padding lateral do <main> do AlunoShell (p-4 md:p-6) p/ o hero
-           verde encostar nas bordas (sem faixas do lado). O conteúdo interno reaplica seu próprio respiro. */
-        [data-ls-vnd]{ margin-left:-16px; margin-right:-16px; }
-        @media (min-width:768px){ [data-ls-vnd]{ margin-left:-24px; margin-right:-24px; } }
+        /* Hero FULL-BLEED: no shell NOVO (áreas-novas), o <main> já é sem padding (full-bleed), então o
+           hero verde encosta nas bordas SEM margem negativa. O conteúdo abaixo reaplica seu respiro
+           (padding do bloco de CONTEÚDO). Margem negativa aqui GRUDAVA os cards na borda (o <main> de
+           /aluno/leitura tem padding 0 — ver shell-revisao-nova AREAS_NOVAS). */
+        [data-ls-vnd]{ margin-left:0; margin-right:0; }
         @media (max-width: 1023px){
           [data-ls-vnd] .lsv-trilha-wrap{ flex-direction:column !important; }
           [data-ls-vnd] .lsv-side{ flex:0 0 auto !important; width:100% !important; position:static !important; }

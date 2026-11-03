@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { atualizarDocumento, publicarVersao, salvarIndiceTipos, salvarEspacamentoDocumento, type Documento, type SituacaoEditorial } from '@/app/admin/leitura/actions'
 import { DEFAULT_ESPACAMENTO, ESP_LIMITES, type EspacamentoDoc } from '@/lib/leitura/espacamento'
-import { salvarGrifoCoresDocumento, salvarBlocosDocumento, salvarLegendasDocumento, aplicarConfigTodasAulas } from '@/app/admin/leitura/actions'
+import { salvarGrifoCoresDocumento, salvarBlocosDocumento, salvarLegendasDocumento, aplicarConfigTodasAulas, aplicarLegendasModulo } from '@/app/admin/leitura/actions'
 import { DEFAULT_GRIFO_CORES, type GrifoCores } from '@/lib/leitura/trilha-aparencia'
 import { DEFAULT_BLOCOS, type BlocoDef } from '@/lib/leitura/blocos'
 import { TIPOS_INDICE, contarTiposNoHtml } from '@/lib/leitura/indice'
@@ -175,6 +175,12 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
     confirmar({ titulo: `Aplicar ${oque} a todas as aulas?`, mensagem: `Isso sobrescreve ${oque} em TODAS as outras aulas do Desafio de Lei Seca com o desta aula. Não dá pra desfazer em massa.`, confirmar: 'Aplicar a todas' }).then((ok) => {
       if (!ok) return
       startAplicarTodas(async () => { const r = await aplicarConfigTodasAulas(documento.id, campos); if (r.ok) toast.success(`Aplicado em ${r.total ?? 0} aula(s).`); else toast.error(r.error ?? 'Erro ao aplicar') })
+    })
+  }
+  const aplicarLegendasNoModulo = () => {
+    confirmar({ titulo: 'Aplicar esta legenda a todo o módulo?', mensagem: 'Aplica esta configuração de legenda & "Grifo do Revisão" a TODAS as aulas deste módulo (mesma pasta). Não dá pra desfazer em massa.', confirmar: 'Aplicar ao módulo' }).then((ok) => {
+      if (!ok) return
+      startAplicarTodas(async () => { const r = await aplicarLegendasModulo(documento.id); if (r.ok) toast.success(`Aplicado em ${r.total ?? 0} aula(s).`); else toast.error(r.error ?? 'Erro ao aplicar') })
     })
   }
   // Contagem por tipo — memoizada (cacheada enquanto o conteúdo não muda). Disponíveis = os com >0.
@@ -1121,6 +1127,13 @@ export function LeituraEditor({ documento, htmlAtual, podeEditar, podePublicar =
                 <span className="min-w-0"><span className="font-medium">Grifo do Revisão</span> <span className="text-[11px] text-muted-foreground">— mostra os grifos editoriais e o botão de ocultar/mostrar</span></span>
                 <input type="checkbox" checked={!grifoRevOff} onChange={toggleGrifoRev} className="h-4 w-4 shrink-0 accent-primary" />
               </label>
+              {/* Nível DESAFIO/PASTA: replica esta config de legenda em todas as aulas do mesmo módulo. */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                <p className="min-w-0 flex-1 text-[11px] text-muted-foreground">Para a plataforma inteira, use o Console → Aparência → Avançado (“Ocultar legenda de grifos”).</p>
+                <button type="button" onClick={aplicarLegendasNoModulo} disabled={aplicandoTodas} className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground disabled:opacity-50">
+                  {aplicandoTodas ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Captions className="h-3.5 w-3.5" />} Aplicar a todas as aulas deste módulo
+                </button>
+              </div>
             </div>
           </details>
 

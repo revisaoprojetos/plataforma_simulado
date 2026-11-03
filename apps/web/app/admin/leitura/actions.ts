@@ -607,7 +607,15 @@ export async function listarBancoAulas(pastaId?: string | null, detalhes: boolea
   const todasPastas = await pastasLeitura(svc, g.tenantId, area)
   // Documentos: id+pasta_id de todos (p/ contar por pasta) e os do nível atual (detalhados).
   // Otimização: abas Acessos/Configurações NÃO usam a lista de aulas → pula o fetch de TODOS os docs.
-  const docs = detalhes ? await fetchAll<any>(() => svc.from('simulado_documentos').select('id, titulo, descricao, cor, capa_url, pasta_id, versao, ordem, atualizado_em, publicado').eq('tenant_id', g.tenantId).eq('deletado', false)) : []
+  // `publicacao` (jsonb) é o que guarda o AGENDAMENTO (estado + publicarEm). Sem ela no SELECT a aula
+  // agendada voltava como "Rascunho" e o flip-na-data (abaixo) nunca disparava. Fallback: DB sem a
+  // migração 20260918000000 (coluna ausente) degrada sem quebrar a página.
+  const SEL_AULA = 'id, titulo, descricao, cor, capa_url, pasta_id, versao, ordem, atualizado_em, publicado'
+  let docs: any[] = []
+  if (detalhes) {
+    try { docs = await fetchAll<any>(() => svc.from('simulado_documentos').select(`${SEL_AULA}, publicacao`).eq('tenant_id', g.tenantId).eq('deletado', false)) }
+    catch { docs = await fetchAll<any>(() => svc.from('simulado_documentos').select(SEL_AULA).eq('tenant_id', g.tenantId).eq('deletado', false)) }
+  }
   // Flip preguiçoso de agendamentos vencidos (publicarEm <= agora) → publica de fato (sem cron).
   if (detalhes && docs.length) {
     const agora = new Date().toISOString()
@@ -1435,6 +1443,29 @@ export async function salvarLegendasDocumento(documentoId: string, cfg: { legend
   if (error) return { ok: false, error: QUIZ_SEM_TABELA(error.message) ? 'Rode a migração 20260910000001.' : error.message }
   revalidatePath(`/admin/leitura/${documentoId}`)
   return { ok: true }
+}
+
+/** Aplica a legenda de grifos DESTA aula (legendasOff + grifoRevisaoOff do seu quiz_config) a TODAS as
+ *  aulas do MESMO módulo (mesma pasta) — merge em quiz_config, preserva o resto. Nível "desafio/pasta":
+ *  oculta a legenda/marca "Revisão" de um desafio inteiro sem ir aula por aula. */
+export async function aplicarLegendasModulo(origemId: string): Promise<{ ok: boolean; error?: string; total?: number }> {
+  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const svc = createAdminClient()
+  const { data: orig } = await svc.from('simulado_documentos').select('quiz_config, pasta_id').eq('id', origemId).eq('tenant_id', g.tenantId).maybeSingle()
+  const pastaId = (orig as any)?.pasta_id
+  if (!pastaId) return { ok: false, error: 'Esta aula não está em nenhum módulo/pasta — não há a quem aplicar.' }
+  const qc: any = (orig as any)?.quiz_config ?? {}
+  const legendasOff = Array.isArray(qc.legendasOff) ? [...new Set(qc.legendasOff.filter((s: unknown) => typeof s === 'string'))] : []
+  const grifoRevisaoOff = !!qc.grifoRevisaoOff
+  const docs = await fetchAll<any>(() => svc.from('simulado_documentos').select('id, quiz_config').eq('tenant_id', g.tenantId).eq('pasta_id', pastaId).eq('deletado', false).order('id', { ascending: true }))
+  let n = 0
+  for (const d of docs) {
+    const merged = { ...(d.quiz_config ?? {}), legendasOff, grifoRevisaoOff }
+    const { error } = await svc.from('simulado_documentos').update({ quiz_config: merged, atualizado_em: new Date().toISOString() }).eq('id', d.id).eq('tenant_id', g.tenantId)
+    if (!error) n++
+  }
+  revalidatePath('/admin/leitura'); revalidatePath('/aluno/leitura'); revalidatePath('/aluno/jurisprudencia')
+  return { ok: true, total: n }
 }
 
 /** Blocos de destaque configuráveis (rótulo + palavras-chave + cor) por DOCUMENTO — em

@@ -376,6 +376,17 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
   ])
   const { prefs, ultimoDisp, favorito } = estudo
 
+  // Override por PLATAFORMA (tenant): quando a empresa desliga a legenda de grifos no Console
+  // (tema.leitor_ocultar_legenda_grifos), força TODAS as categorias + "Grifo do Revisão" OCULTOS em
+  // TODOS os leitores (Lei Seca, Jurisprudência) — evita a marca "Revisão" vazar em outras empresas.
+  // Cacheado 60s por tenant (egress baixo); o nível documento/módulo continua valendo por baixo.
+  const ocultarLegGrifosTenant = await remember(`leitura:legendaGrifosOff:${tenantId}`, 60, async () => {
+    const { data } = await svc.from('simulado_tenants').select('tema').eq('id', tenantId).maybeSingle()
+    return (data as any)?.tema?.leitor_ocultar_legenda_grifos === true
+  })
+  const LEG_TODAS = ['nucleo', 'complemento', 'prazo', 'crucial', 'excecao', 'stf', 'stj', 'equipe']
+  const docLegendasOff = Array.isArray((doc as any).quiz_config?.legendasOff) ? (doc as any).quiz_config.legendasOff.filter((s: unknown) => typeof s === 'string') : []
+
   return {
     id: documentoId,
     titulo: (doc as any).titulo,
@@ -405,8 +416,8 @@ export async function carregarDocumentoAluno(documentoId: string, estudanteId: s
     blocos: resolverBlocos((doc as any).quiz_config?.blocos),
     topicos: resolverTopicos((doc as any).quiz_config?.topicos),
     leituraRapida: typeof (doc as any).quiz_config?.leitura_rapida === 'string' ? (doc as any).quiz_config.leitura_rapida : '',
-    legendasOff: Array.isArray((doc as any).quiz_config?.legendasOff) ? (doc as any).quiz_config.legendasOff.filter((s: unknown) => typeof s === 'string') : [],
-    grifoRevisaoOff: !!(doc as any).quiz_config?.grifoRevisaoOff,
+    legendasOff: ocultarLegGrifosTenant ? LEG_TODAS : docLegendasOff,
+    grifoRevisaoOff: ocultarLegGrifosTenant || !!(doc as any).quiz_config?.grifoRevisaoOff,
   }
 }
 

@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog'
-import { UsersRound, Search, Check, Link2, ChevronRight, Folder, FolderOpen } from 'lucide-react'
+import { UsersRound, Search, Check, CheckCheck, Link2, ChevronRight, Folder, FolderOpen } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export type GrupoOpc = {
@@ -77,6 +77,14 @@ export function AdicionarGrupoModuloDialog({ grupos, jaMarcados, onSelecionar, e
   }
 
   const soltos = filhosDe.get('__soltos__') ?? []
+  // Grupos atualmente visíveis (lista plana quando buscando/sem hierarquia; todos os comuns na árvore) —
+  // base do "Marcar/Desmarcar todos", sempre ignorando os já vinculados.
+  const visiveis = (!temHierarquia || q) ? comuns.filter(match) : comuns
+  const livresVis = visiveis.filter((g) => !jaMarcados.has(g.id))
+  const todosVisSel = livresVis.length > 0 && livresVis.every((g) => sel.has(g.id))
+  function marcarTodosVisiveis() {
+    setSel((p) => { const n = new Set(p); if (todosVisSel) livresVis.forEach((g) => n.delete(g.id)); else livresVis.forEach((g) => n.add(g.id)); return n })
+  }
 
   return (
     <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setSel(new Set()) }}>
@@ -154,8 +162,15 @@ export function AdicionarGrupoModuloDialog({ grupos, jaMarcados, onSelecionar, e
         </div>
 
         <div className="flex items-center justify-between gap-3 border-t px-6 py-3">
-          <span className="text-sm text-muted-foreground">{sel.size === 0 ? 'Nenhum grupo selecionado' : `${sel.size} selecionado(s)`}</span>
-          <div className="flex gap-2">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="shrink-0 text-sm text-muted-foreground">{sel.size === 0 ? 'Nenhum grupo selecionado' : `${sel.size} selecionado(s)`}</span>
+            {livresVis.length > 0 && (
+              <button type="button" onClick={marcarTodosVisiveis} className="inline-flex shrink-0 items-center gap-1 text-xs font-medium text-primary hover:underline">
+                <CheckCheck className="h-3.5 w-3.5" /> {todosVisSel ? 'Desmarcar todos' : `Marcar todos${q ? ' (filtrados)' : ''} (${livresVis.length})`}
+              </button>
+            )}
+          </div>
+          <div className="flex shrink-0 gap-2">
             <Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button onClick={adicionar} disabled={sel.size === 0}>Adicionar</Button>
           </div>

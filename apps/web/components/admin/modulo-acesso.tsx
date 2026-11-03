@@ -5,7 +5,7 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { toast } from 'sonner'
-import { Loader2, Search, UserCheck, Info, Check, Trash2, Globe, Lock, Link2, Users2, X, EyeOff, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, FlaskConical } from 'lucide-react'
+import { Loader2, Search, UserCheck, Info, Check, Trash2, Globe, Lock, Link2, Users2, X, EyeOff, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ChevronDown, ChevronUp, FlaskConical } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CopyLink } from '@/components/admin/copy-link'
 import { AvatarEstudante } from '@/components/aluno/avatar-estudante'
@@ -45,6 +45,7 @@ export function ModuloAcesso({ pastaId, area }: { pastaId: string; area?: 'leitu
   const [busca, setBusca] = useState('')
   const [filtroGrupo, setFiltroGrupo] = useState<string>('todos') // 'todos' | grupoId | 'individuais'
   const [pagina, setPagina] = useState(0)
+  const [gruposExpandido, setGruposExpandido] = useState(false) // chips de "Grupos vinculados": 2 linhas por padrão
   const [liberarTodos, setLiberarTodos] = useState(false)
   const [origem, setOrigem] = useState('')
   useEffect(() => { setOrigem(process.env.NEXT_PUBLIC_APP_URL || window.location.origin) }, [])
@@ -191,18 +192,33 @@ export function ModuloAcesso({ pastaId, area }: { pastaId: string; area?: 'leitu
           <div className="p-3">
             {vinc.length === 0 ? (
               <p className="rounded-lg border border-dashed px-3 py-4 text-center text-xs text-muted-foreground">Nenhum grupo vinculado. Vincule um grupo — novos alunos nele (inclusive por sync Curseduca/Guru) entram automaticamente.</p>
-            ) : (
-              <div className="flex flex-wrap gap-2">
-                {vinc.map((g) => (
-                  <span key={g.id} className="inline-flex items-center gap-1.5 rounded-full border bg-muted/40 py-1 pl-2.5 pr-1 text-sm">
-                    <span className="h-2 w-2 rounded-full" style={{ background: g.cor ?? 'var(--primary)' }} />
-                    <span className="font-medium">{g.nome}</span>
-                    <span className="tabular-nums text-xs text-muted-foreground">{g.count.toLocaleString('pt-BR')}</span>
-                    <button type="button" onClick={() => removerGrupo(g.id)} title="Desvincular grupo" className="ml-0.5 rounded-full p-1 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"><X className="h-3.5 w-3.5" /></button>
-                  </span>
-                ))}
-              </div>
-            )}
+            ) : (() => {
+              // Resumido: ~2 linhas de chips por padrão (overflow com fade) + "Ver todos" quando há muitos.
+              const muitos = vinc.length > 8
+              const recolhido = muitos && !gruposExpandido
+              return (
+                <div>
+                  <div className="relative">
+                    <div className={cn('flex flex-wrap gap-2', recolhido && 'max-h-[4.75rem] overflow-hidden')}>
+                      {vinc.map((g) => (
+                        <span key={g.id} className="inline-flex items-center gap-1.5 rounded-full border bg-muted/40 py-1 pl-2.5 pr-1 text-sm">
+                          <span className="h-2 w-2 rounded-full" style={{ background: g.cor ?? 'var(--primary)' }} />
+                          <span className="font-medium">{g.nome}</span>
+                          <span className="tabular-nums text-xs text-muted-foreground">{g.count.toLocaleString('pt-BR')}</span>
+                          <button type="button" onClick={() => removerGrupo(g.id)} title="Desvincular grupo" className="ml-0.5 rounded-full p-1 text-muted-foreground transition hover:bg-destructive/10 hover:text-destructive"><X className="h-3.5 w-3.5" /></button>
+                        </span>
+                      ))}
+                    </div>
+                    {recolhido && <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-card to-transparent" />}
+                  </div>
+                  {muitos && (
+                    <button type="button" onClick={() => setGruposExpandido((v) => !v)} className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+                      {gruposExpandido ? <>Ver menos <ChevronUp className="h-3.5 w-3.5" /></> : <>Ver todos ({vinc.length}) <ChevronDown className="h-3.5 w-3.5" /></>}
+                    </button>
+                  )}
+                </div>
+              )
+            })()}
           </div>
         </div>
 
