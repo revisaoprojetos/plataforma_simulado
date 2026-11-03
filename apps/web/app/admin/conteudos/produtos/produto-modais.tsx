@@ -5,7 +5,7 @@
 
 import { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { Folder, FolderPlus, ChevronRight, ChevronDown, Check, Loader2, Layers, Upload, Pencil, Lock, Boxes } from 'lucide-react'
+import { Folder, FolderPlus, ChevronRight, ChevronDown, Check, Loader2, Layers, Lock, Boxes } from 'lucide-react'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
@@ -16,6 +16,7 @@ import { PRODUTO_TIPOS, type ProdutoTipo } from '@/lib/produtos/tipos'
 import { salvarProdutoAction } from '@/app/admin/produtos/actions'
 import { criarPastaProdutoAction, moverPastaProdutoAction, moverProdutoAction, duplicarProdutoAction } from './actions'
 import { pedirTexto } from '@/components/ui/confirm-dialog'
+import { CampoImagem } from '@/components/admin/campo-imagem'
 import type { PastaProdutoFlat } from '@/lib/produtos/estudio'
 
 // ───────────────────────── Árvore de pastas (seleção de destino) ─────────────────────────
@@ -252,11 +253,6 @@ export function NovoProdutoDialog({ open, onClose, arvore, pastaAtual }: {
     })
   }
 
-  async function pedirCapa() {
-    const url = await pedirTexto({ titulo: 'Capa', label: 'URL da imagem (JPG, PNG ou WEBP · 1280 × 720)', placeholder: 'https://…', valorInicial: capaUrl, confirmar: 'Usar capa' })
-    if (url !== null) setCapaUrl(url.trim())
-  }
-
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o && !pending) onClose() }}>
       {/* flex-col + corpo rolável + rodapé fixo → cabe em monitores pequenos. Animação sobe de baixo. */}
@@ -302,23 +298,8 @@ export function NovoProdutoDialog({ open, onClose, arvore, pastaAtual }: {
             {/* Capa compacta (thumb + ação) — não ocupa a altura toda */}
             <div>
               <span className="mb-1 block text-sm font-medium">Imagem horizontal · 16:9 <span className="font-normal text-muted-foreground">(opcional)</span></span>
-              <div className="flex items-center gap-3">
-                <button type="button" onClick={pedirCapa}
-                  className="group relative grid h-[52px] w-[92px] shrink-0 place-items-center overflow-hidden rounded-lg border-2 border-dashed bg-muted/20 transition-colors hover:border-primary hover:bg-primary/5">
-                  {capaUrl ? (
-                    <>
-                      <img src={capaUrl} alt="" className="h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none' }} />
-                      <span className="absolute inset-0 grid place-items-center text-transparent transition-colors group-hover:bg-black/40 group-hover:text-white"><Pencil className="h-3.5 w-3.5" /></span>
-                    </>
-                  ) : <Upload className="h-4 w-4 text-muted-foreground" />}
-                </button>
-                <div className="min-w-0 text-xs text-muted-foreground">
-                  {capaUrl
-                    ? <button type="button" onClick={() => setCapaUrl('')} className="font-medium text-foreground hover:text-destructive">Remover capa</button>
-                    : <><button type="button" onClick={pedirCapa} className="font-medium text-primary hover:underline">Adicionar capa</button> por URL.</>}
-                  <div className="mt-0.5">JPG, PNG ou WEBP · 1280 × 720</div>
-                </div>
-              </div>
+              <CampoImagem variant="linha" value={capaUrl} onChange={setCapaUrl} />
+              <div className="mt-1 text-xs text-muted-foreground">JPG, PNG ou WEBP · 1280 × 720</div>
             </div>
 
             {/* Depois de criar — 2 opções lado a lado (compacto) */}

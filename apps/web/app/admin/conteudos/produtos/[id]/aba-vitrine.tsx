@@ -11,6 +11,7 @@ import { Plus, Trash2, Loader2, Save, Search, Boxes, Image as ImageIcon, LayoutG
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { CampoImagem } from '@/components/admin/campo-imagem'
 import { SECAO_TAMANHOS, ITENS_PASTA, type SecaoTipo, type SecaoTamanho, type SecaoOrdenacao, type ItemRef, type ItemTipo } from '@/lib/produtos/tipos'
 import { salvarVitrineAction } from '@/app/admin/produtos/actions'
 import { carregarVitrineAction, buscarRecursosAction } from './lazy-actions'
@@ -184,17 +185,13 @@ function Select({ value, onChange, opts, disabled }: { value: string; onChange: 
   )
 }
 
+// Imagem da seção: envio do computador (ou URL) via <CampoImagem>. Antes era só um campo de URL.
 function ImgField({ label, value, onChange, disabled }: { label: string; value: string; onChange: (v: string) => void; disabled?: boolean }) {
   return (
-    <label className="block">
+    <div className="block">
       <span className="mb-1 block text-sm font-medium">{label}</span>
-      <div className="flex items-center gap-2">
-        <div className="flex h-9 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted">
-          {value ? <img src={value} alt="" className="h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none' }} /> : <ImageIcon className="h-4 w-4 text-muted-foreground" />}
-        </div>
-        <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder="https://…" disabled={disabled} />
-      </div>
-    </label>
+      <CampoImagem variant="linha" value={value} onChange={onChange} disabled={disabled} />
+    </div>
   )
 }
 

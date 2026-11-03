@@ -11,6 +11,7 @@ import { useMemo, useState, type CSSProperties } from 'react'
 import { Scissors, Bookmark, Check, X, ArrowRight, Lock, MessageSquare, BarChart3, GraduationCap } from 'lucide-react'
 import type { Brand } from './interna-tokens'
 import type { QuestaoAluno } from '@/components/aluno/questao-resolvivel'
+import { AddToCaderno } from '@/components/aluno/add-to-caderno'
 
 const LETRA = ['A', 'B', 'C', 'D', 'E', 'F']
 const OK = '#1FA868'
@@ -127,6 +128,8 @@ export function QCore({ brand, questao, numero }: { brand: Brand; questao: Quest
         >
           <Bookmark size={16} fill={favorito ? 'currentColor' : 'none'} />
         </button>
+        {/* Adicionar a um caderno do aluno (Meus Cadernos). */}
+        <span className="qc-ibtn" style={{ ...iconBtn, color: 'var(--muted)' }}><AddToCaderno questaoId={questao.id} /></span>
       </div>
 
       {/* enunciado */}

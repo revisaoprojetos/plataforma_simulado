@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { Input } from '@/components/ui/input'
+import { CampoImagem } from '@/components/admin/campo-imagem'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import {
@@ -85,8 +86,8 @@ export function EntradaForm({ cfg }: { cfg: ConfigGlobal | null }) {
       </div>
 
       <div className="space-y-1 sm:col-span-2">
-        <Label htmlFor="e-logo">Logo neutra (URL ou data:image)</Label>
-        <Input id="e-logo" value={logo} onChange={(e) => setLogo(e.target.value)} placeholder="https://… ou data:image/…" />
+        <Label>Logo neutra</Label>
+        <CampoImagem variant="linha" value={logo} onChange={setLogo} />
         <p className="text-xs text-muted-foreground">Aparece no painel do login. Vazio = usa a logo da 1ª plataforma (fallback).</p>
       </div>
 

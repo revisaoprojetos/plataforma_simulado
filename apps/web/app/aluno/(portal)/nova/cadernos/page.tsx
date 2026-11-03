@@ -8,7 +8,7 @@
 // lib/aluno/caderno-marcacoes.ts. Antes as abas levavam para telas que liam só a tabela antiga (vazias).
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { PageHeader, Card, Row, Col, H3, Muted, Tag, Tabs, Btn, Aviso, GR } from '@/components/nova/ui'
+import { PageHeader, Card, Row, Col, H3, Muted, Tag, Tabs, Btn, Aviso, Bar, GR } from '@/components/nova/ui'
 import { Icon } from '@/components/nova/icons'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -16,6 +16,7 @@ import { R } from '@/lib/nova/rotas'
 import { QuestaoCard } from '@/components/aluno/questao-card'
 import { carregarFavoritosAluno } from '@/lib/aluno/favoritos'
 import { carregarMarcacoesAluno, linkLeitor, type MaterialMarcado, type Marcacao } from '@/lib/aluno/caderno-marcacoes'
+import { cadernoDeErros, progressoCadernos } from '@/lib/aluno/cadernos-aluno'
 import { CriarCadernoCard } from './criar-caderno'
 
 export const dynamic = 'force-dynamic'
@@ -28,7 +29,7 @@ const hrefAba = (a: Aba) => (a === 'cadernos' ? R.cadernos : `${R.cadernos}?aba=
 // Grifos por material antes do "ver todos" (um aluno pode ter centenas num PDF só).
 const LIMITE_POR_MATERIAL = 30
 
-type CadernoAluno = { id: string; nome: string; criado_em: string | null; total: number }
+type CadernoAluno = { id: string; nome: string; criado_em: string | null; total: number; resolvidas: number }
 
 const fmtData = (iso: string | null) => {
   if (!iso) return ''
@@ -58,14 +59,21 @@ export default async function CadernosPage({ searchParams }: { searchParams: Pro
   ])
 
   const ids = ((cads ?? []) as any[]).map((c) => c.id as string)
-  const contagem: Record<string, number> = {}
+  // Aba Cadernos: itens de cada caderno → nº de questões + % resolvido (respostas do aluno no banco),
+  // e o caderno AUTOMÁTICO de erros (última resposta errada). Só nesta aba (as outras não usam).
+  const itensCad: { caderno_id: string; questao_id: string }[] = []
+  let erros: { ids: string[]; atualizadoEm: string | null } = { ids: [], atualizadoEm: null }
   if (aba === 'cadernos') {
     for (let i = 0; i < ids.length; i += 100) {
-      const { data } = await svc.from('simulado_aluno_caderno_questoes').select('caderno_id').in('caderno_id', ids.slice(i, i + 100))
-      for (const q of (data ?? []) as any[]) contagem[q.caderno_id] = (contagem[q.caderno_id] ?? 0) + 1
+      const { data } = await svc.from('simulado_aluno_caderno_questoes').select('caderno_id, questao_id').in('caderno_id', ids.slice(i, i + 100))
+      for (const q of (data ?? []) as any[]) itensCad.push({ caderno_id: q.caderno_id, questao_id: q.questao_id })
     }
   }
-  const cadernos: CadernoAluno[] = ((cads ?? []) as any[]).map((c) => ({ id: c.id, nome: c.nome, criado_em: c.criado_em ?? null, total: contagem[c.id] ?? 0 }))
+  const [prog, errosRes] = aba === 'cadernos'
+    ? await Promise.all([progressoCadernos(svc, tenantId, estudanteId, itensCad), cadernoDeErros(svc, tenantId, estudanteId).catch(() => erros)])
+    : [{} as Record<string, { total: number; resolvidas: number }>, erros]
+  erros = errosRes
+  const cadernos: CadernoAluno[] = ((cads ?? []) as any[]).map((c) => ({ id: c.id, nome: c.nome, criado_em: c.criado_em ?? null, total: prog[c.id]?.total ?? 0, resolvidas: prog[c.id]?.resolvidas ?? 0 }))
 
   const totalGrifos = materiais.reduce((n, m) => n + m.marcacoes.length, 0)
   const comNota: MaterialMarcado[] = materiais
@@ -93,6 +101,25 @@ export default async function CadernosPage({ searchParams }: { searchParams: Pro
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 290px), 1fr))', gap: 16, alignItems: 'stretch' }}>
             <CriarCadernoCard />
 
+            {/* AUTOMÁTICO: questões que o aluno errou na última tentativa (sai ao acertar). */}
+            <Link href={`${R.cadernos}/erros`} style={{ display: 'flex' }}>
+              <Card pad={0} style={{ overflow: 'hidden', gap: 0, width: '100%' }}>
+                <div style={{ position: 'relative', background: GR.EXT, color: '#fff', padding: '16px 18px', minHeight: 72, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px)', backgroundSize: '22px 22px' }} />
+                  <span style={{ position: 'relative', fontSize: 11, fontWeight: 800, letterSpacing: '.14em', textTransform: 'uppercase', color: '#E6DEFF' }}>Automático</span>
+                  <span style={{ position: 'relative', fontFamily: 'Montserrat, sans-serif', fontStyle: 'italic', fontWeight: 800, fontSize: 28, color: 'var(--gold)' }}>{erros.ids.length}</span>
+                </div>
+                <Col gap={12} style={{ padding: 18 }}>
+                  <H3>Caderno de erros</H3>
+                  <Row gap={6}><Tag kind="green">Questões</Tag></Row>
+                  <Row style={{ justifyContent: 'space-between', gap: 8 }}>
+                    <Muted size={12}>{erros.ids.length ? (erros.ids.length === 1 ? '1 questão para refazer' : `${erros.ids.length} questões para refazer`) : 'Nenhum erro pendente'}</Muted>
+                    {erros.atualizadoEm && <Muted size={12}>atualizado em {fmtData(erros.atualizadoEm)}</Muted>}
+                  </Row>
+                </Col>
+              </Card>
+            </Link>
+
             {cadernos.map((c) => (
               <Link key={c.id} href={`/aluno/cadernos/${c.id}`} style={{ display: 'flex' }}>
                 <Card pad={0} style={{ overflow: 'hidden', gap: 0, width: '100%' }}>
@@ -108,8 +135,9 @@ export default async function CadernosPage({ searchParams }: { searchParams: Pro
                     <Row gap={6}>
                       <Tag kind="green">{c.total === 1 ? '1 questão' : `${c.total} questões`}</Tag>
                     </Row>
+                    {c.total > 0 && <Bar pct={Math.round((c.resolvidas / c.total) * 100)} color="var(--gold)" />}
                     <Row style={{ justifyContent: 'space-between', gap: 8 }}>
-                      <Muted size={12}>{c.total ? 'Abrir caderno' : 'Caderno vazio'}</Muted>
+                      <Muted size={12}>{c.total ? `${Math.round((c.resolvidas / c.total) * 100)}% resolvido` : 'Caderno vazio'}</Muted>
                       {c.criado_em && <Muted size={12}>criado em {fmtData(c.criado_em)}</Muted>}
                     </Row>
                   </Col>

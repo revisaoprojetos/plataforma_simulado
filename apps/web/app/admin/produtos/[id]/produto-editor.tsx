@@ -20,6 +20,7 @@ import {
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { CampoImagem } from '@/components/admin/campo-imagem'
 import { Switch } from '@/components/ui/switch'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import {
@@ -596,17 +597,13 @@ function ColorField({ label, value, onChange, disabled }: { label: string; value
   )
 }
 
+// Imagem: envio do computador (ou URL) via <CampoImagem>. Antes era só um campo de URL.
 function ImgField({ label, value, onChange, disabled }: { label: string; value: string; onChange: (v: string) => void; disabled?: boolean }) {
   return (
-    <label className="block">
+    <div className="block">
       <span className="mb-1 block text-sm font-medium">{label}</span>
-      <div className="flex items-center gap-2">
-        <div className="flex h-9 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted">
-          {value ? <img src={value} alt="" className="h-full w-full object-cover" onError={(e) => { (e.currentTarget.style.display = 'none') }} /> : <ImageIcon className="h-4 w-4 text-muted-foreground" />}
-        </div>
-        <Input value={value} onChange={(e) => onChange(e.target.value)} placeholder="https://…" disabled={disabled} />
-      </div>
-    </label>
+      <CampoImagem variant="linha" value={value} onChange={onChange} disabled={disabled} />
+    </div>
   )
 }
 

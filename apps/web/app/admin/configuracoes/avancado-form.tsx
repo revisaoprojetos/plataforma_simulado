@@ -3,7 +3,7 @@
 import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Save, Loader2, Captions } from 'lucide-react'
-import { Input } from '@/components/ui/input'
+import { CampoImagem } from '@/components/admin/campo-imagem'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
@@ -78,8 +78,8 @@ export function AvancadoForm({ tema, salvarTema }: { tema: any; salvarTema: (t: 
       </div>
 
       <div className="space-y-2">
-        <Label htmlFor="favicon">URL do Favicon</Label>
-        <Input id="favicon" type="url" value={favicon} onChange={(e) => setFavicon(e.target.value)} placeholder="https://cdn.exemplo.com/favicon.ico" />
+        <Label>Favicon</Label>
+        <CampoImagem variant="linha" value={favicon} onChange={setFavicon} />
         <p className="text-xs text-muted-foreground">Ícone da aba do navegador. A logo do sistema é definida em <span className="font-medium text-foreground">Identidade</span>.</p>
       </div>
 

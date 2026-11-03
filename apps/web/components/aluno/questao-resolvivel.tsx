@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { AddToCaderno } from '@/components/aluno/add-to-caderno'
 import { Star, CheckCircle2, XCircle, RotateCcw, Scissors, FileText, ChevronUp, ChevronDown } from 'lucide-react'
 import { ComentariosFeedbackTabs } from '@/components/aluno/comentarios-feedback-tabs'
 import { MarkdownContent } from '@/components/markdown-content'
@@ -122,6 +123,8 @@ export function QuestaoResolvivel({ questao, numero }: { questao: QuestaoAluno; 
             >
               <Star className={cn('h-5 w-5', favorito && 'fill-amber-400 text-amber-400')} />
             </button>
+            {/* Adicionar a um caderno do aluno (Meus Cadernos). */}
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-muted"><AddToCaderno questaoId={questao.id} /></div>
           </div>
         </div>
 

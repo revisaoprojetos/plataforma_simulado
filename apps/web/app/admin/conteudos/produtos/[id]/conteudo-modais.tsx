@@ -12,6 +12,7 @@ import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { CampoImagem } from '@/components/admin/campo-imagem'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { FilePicker } from '@/components/admin/file-picker'
 import { cn } from '@/lib/utils'
@@ -68,8 +69,8 @@ export function ModuloDialog({ produtoId, modulo, paiId, modulosCount, aulasCoun
           <label className="block"><span className="mb-1 block text-sm font-medium">Título do módulo</span>
             <Input autoFocus value={titulo} onChange={(e) => setTitulo(e.target.value)} /></label>
           <div className="grid gap-4 sm:grid-cols-2">
-            <label className="block"><span className="mb-1 block text-sm font-medium">Imagem do módulo (URL)</span>
-              <Input value={imagem} onChange={(e) => setImagem(e.target.value)} placeholder="https://… · 16:9" /></label>
+            <div className="block"><span className="mb-1 block text-sm font-medium">Imagem do módulo <span className="font-normal text-muted-foreground">· 16:9</span></span>
+              <CampoImagem variant="linha" value={imagem} onChange={setImagem} /></div>
             <label className="block"><span className="mb-1 block text-sm font-medium">Descrição</span>
               <textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={2} placeholder="Descrição curta do módulo (opcional)" className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" /></label>
           </div>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
+import { AddToCaderno } from '@/components/aluno/add-to-caderno'
 import { Star, Send, Loader2, Clock, CheckCircle2 } from 'lucide-react'
 import { ComentariosQuestao } from '@/components/aluno/comentarios-questao'
 import { MarkdownContent } from '@/components/markdown-content'
@@ -67,9 +68,12 @@ export function QuestaoDiscursiva({ questao, numero }: { questao: QuestaoDiscurs
             <span className="rounded bg-primary/10 px-2 py-0.5 font-medium text-primary">Discursiva</span>
             {questao.disciplina && <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 font-medium text-emerald-600/80 dark:text-emerald-400/80">{questao.disciplina}</span>}
           </div>
-          <button onClick={toggleFav} aria-label="Favoritar" className="shrink-0 text-muted-foreground hover:text-amber-500">
-            <Star className={cn('h-5 w-5', favorito && 'fill-amber-400 text-amber-400')} />
-          </button>
+          <div className="flex shrink-0 items-center gap-3">
+            <button onClick={toggleFav} aria-label="Favoritar" className="text-muted-foreground hover:text-amber-500">
+              <Star className={cn('h-5 w-5', favorito && 'fill-amber-400 text-amber-400')} />
+            </button>
+            <AddToCaderno questaoId={questao.id} />
+          </div>
         </div>
 
         <MarkdownContent className="text-sm leading-relaxed">{questao.enunciado}</MarkdownContent>

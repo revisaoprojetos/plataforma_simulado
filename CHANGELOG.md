@@ -12,6 +12,18 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.2.6 — 2026-11-03
+
+### Meus Cadernos — adicionar questões, caderno de erros automático e % resolvido
+- **Adicionar ao caderno**: ícone de caderno ao lado de salvar/favoritar em toda questão resolvível — Banco de Questões (QCore), Recomendados, Salvos, caderno de erros e dentro dos cadernos (objetivas e discursivas). O componente existia mas não estava ligado em nenhuma tela (todos os cadernos estavam vazios).
+- **Caderno de erros (automático)**: cartão em Meus Cadernos + página `/aluno/nova/cadernos/erros` com as questões cuja **última** resposta do aluno no banco foi errada (acertou depois → sai), 30 por vez.
+- **% resolvido** em cada caderno (questões já respondidas pelo aluno ÷ total), na lista e no detalhe.
+- Detalhe do caderno: "voltar" leva a **Meus Cadernos** (antes caía na lista antiga), botão "Tirar do caderno" por questão e atalho para o Banco quando vazio. `/aluno/cadernos` (lista antiga) redireciona para Meus Cadernos.
+
+### Admin — imagens enviadas do computador (não só por URL)
+- Novo `<CampoImagem>` (`components/admin/campo-imagem.tsx`): **clique, arraste e solte ou cole (Ctrl+V)** a imagem do computador; "Usar URL" continua como alternativa. Upload por `POST /api/admin/imagem` (multipart, PNG/JPG/WEBP/GIF/SVG/ICO/AVIF até 8 MB, staff do tenant) para `{BUCKET_IMAGENS}/assets/<sha1>` no provider configurado (Supabase ou S3), deduplicado por conteúdo e registrado em `simulado_arquivos`.
+- Aplicado em: Produto (Estúdio) — capa 16:9, vertical 2:3, banner e logo; modal "Criar produto"; imagens da Vitrine; imagem do módulo (Conteúdos); editor antigo de produto; capa de Novidades; favicon (Configurações › Avançado); logo da tela de entrada. Jurisprudência e modelos de caderno já tinham envio.
+
 ## 4.2.5 — 2026-11-03
 
 ### Portal do aluno (celular) — barra inferior do shell ATUAL também mostra todas as áreas liberadas

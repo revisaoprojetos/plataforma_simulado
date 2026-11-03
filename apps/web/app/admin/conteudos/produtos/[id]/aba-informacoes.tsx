@@ -14,14 +14,15 @@
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  Loader2, UserPlus, Trash2, X, ChevronRight, Image as ImageIcon, Upload, Pencil, List, CalendarClock,
+  Loader2, UserPlus, Trash2, X, ChevronRight, Pencil, List, CalendarClock,
   ShoppingCart, Eye, MoveRight, Droplets, Award, Wand2, Mail, MessageSquare, Copy, FolderInput, Wrench,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
-import { confirmar, pedirTexto } from '@/components/ui/confirm-dialog'
+import { confirmar } from '@/components/ui/confirm-dialog'
+import { CampoImagem } from '@/components/admin/campo-imagem'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { formatBrt } from '@/lib/brt'
@@ -142,15 +143,10 @@ export function AbaInformacoes({
               <Dropzone aspecto="16 / 9" rotulo="Horizontal · 16:9 · 1280 × 720" value={capaUrl} onChange={setCapaUrl} disabled={!podeEditar} />
               <Dropzone aspecto="2 / 3" rotulo="Vertical · 2:3 · 400 × 600" value={posterUrl} onChange={setPosterUrl} disabled={!podeEditar} />
               <Dropzone aspecto="16 / 5" rotulo="Banner · 1920 × 600" value={bannerUrl} onChange={setBannerUrl} disabled={!podeEditar} compacto />
-              <label className="sm:col-span-3 flex items-center gap-2 text-xs text-muted-foreground">
+              <div className="sm:col-span-3 flex items-center gap-3 text-xs text-muted-foreground">
                 <span className="font-medium text-foreground">Logo</span>
-                <div className="flex min-w-0 flex-1 items-center gap-2">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border bg-muted">
-                    {logoUrl ? <img src={logoUrl} alt="" className="h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none' }} /> : <ImageIcon className="h-4 w-4 text-muted-foreground" />}
-                  </div>
-                  <Input value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)} placeholder="https://… (URL do logo)" disabled={!podeEditar} className="h-8" />
-                </div>
-              </label>
+                <CampoImagem variant="linha" value={logoUrl} onChange={setLogoUrl} disabled={!podeEditar} className="flex-1" />
+              </div>
             </div>
           </div>
         </div>
@@ -313,39 +309,12 @@ export function AbaInformacoes({
   )
 }
 
-// ───────────────────────── Dropzone de imagem (URL — dropzone visual FIEL) ─────────────────────────
+// ───────────────────────── Dropzone de imagem (envio do computador + URL) ─────────────────────────
+// Antes só pedia URL; agora usa o <CampoImagem> (clique/arrastar/colar → storage; "Usar URL" opcional).
 function Dropzone({ aspecto, rotulo, value, onChange, disabled, compacto }: {
   aspecto: string; rotulo: string; value: string; onChange: (v: string) => void; disabled?: boolean; compacto?: boolean
 }) {
-  async function pedirUrl() {
-    if (disabled) return
-    const url = await pedirTexto({ titulo: 'Imagem', label: 'URL da imagem (JPG, PNG ou WEBP)', placeholder: 'https://…', valorInicial: value, confirmar: 'Usar imagem' })
-    if (url === null) return
-    onChange(url.trim())
-  }
-  return (
-    <div className="space-y-1.5">
-      <button type="button" onClick={pedirUrl} disabled={disabled}
-        className={cn('group relative flex w-full items-center justify-center overflow-hidden rounded-xl border-2 border-dashed bg-muted/20 text-center transition-colors', !disabled && 'hover:border-primary hover:bg-primary/5', disabled && 'opacity-60')}
-        style={{ aspectRatio: aspecto }}>
-        {value ? (
-          <>
-            <img src={value} alt="" className="h-full w-full object-cover" onError={(e) => { e.currentTarget.style.display = 'none' }} />
-            {!disabled && <span className="absolute inset-0 flex items-center justify-center gap-1 bg-black/0 text-xs font-medium text-transparent transition-colors group-hover:bg-black/40 group-hover:text-white"><Pencil className="h-3.5 w-3.5" />Trocar</span>}
-          </>
-        ) : (
-          <span className={cn('flex flex-col items-center gap-1 px-2 text-muted-foreground', compacto && 'flex-row')}>
-            <Upload className="h-5 w-5" />
-            <span className="text-xs font-medium text-foreground">Solte a capa aqui</span>
-          </span>
-        )}
-      </button>
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-[11px] text-muted-foreground">{rotulo}</span>
-        {value && !disabled && <button type="button" onClick={() => onChange('')} className="text-[11px] text-muted-foreground hover:text-destructive">Remover</button>}
-      </div>
-    </div>
-  )
+  return <CampoImagem variant="area" aspecto={aspecto} rotulo={rotulo} value={value} onChange={onChange} disabled={disabled} compacto={compacto} textoVazio="Enviar imagem" />
 }
 
 // ───────────────────────── Adicionar instrutor ─────────────────────────

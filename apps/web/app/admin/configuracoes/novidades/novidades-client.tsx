@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { CampoImagem } from '@/components/admin/campo-imagem'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
@@ -251,8 +252,8 @@ export function NovidadesClient({ itens, aviso, podeEditar }: { itens: NovidadeA
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="nov-cover">URL da capa</Label>
-                <Input id="nov-cover" type="url" inputMode="url" value={form.cover_url} onChange={(e) => set('cover_url', e.target.value)} placeholder="https://..." />
+                <Label>Capa</Label>
+                <CampoImagem variant="linha" value={form.cover_url} onChange={(v) => set('cover_url', v)} />
               </div>
 
               <div className="space-y-2 rounded-lg border px-3 py-3">
