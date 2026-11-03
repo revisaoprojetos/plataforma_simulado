@@ -12,6 +12,18 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.2.7 — 2026-11-03
+
+### Extensivos do aluno — módulos e aulas do configurador aparecem e abrem
+- O configurador do produto (aba Conteúdos do Estúdio) grava o currículo em `simulado_produto_modulos` / `simulado_produto_modulo_itens`, mas **nenhuma tela do aluno lia essas tabelas**: o extensivo mostrava só "Acessos incluídos", mesmo com o aluno tendo acesso.
+- `/aluno/extensivos/[slug]` ganhou a seção **Conteúdo do curso**: módulos → submódulos → aulas, na ordem do configurador, abertos/recolhidos como definido. Só aulas `ativo` (rascunho não aparece). Documento abre no leitor (com "Voltar" para o extensivo); vídeo/link abrem em nova aba; simulado/quiz levam aos Simulados.
+- **Disponibilidade** respeitada (do módulo e da aula, vale a mais tardia), a partir da matrícula do aluno no produto (assinatura `inicio_em`/`criado_em` ou entrada no grupo vinculado): antes de liberar aparece com cadeado e a data, ou some quando configurado "Oculto até liberar". Ver `lib/produtos/curriculo-aluno.ts`.
+- **Leitor:** um documento que é aula (ativa e já liberada) de um extensivo do aluno passa a abrir mesmo fora das pastas liberadas — antes a aula abriria em 404 (`podeLerDoc` → `docLiberadoPorProduto`).
+- **Extensivo em duas telas (estilo Netflix/Curseduca):** a página do extensivo (largura total) mostra o progresso geral, o botão "Continuar de onde parou" e **fileiras de pôsteres dos módulos** (imagem do módulo do configurador, vertical 2:3; sem imagem, pôster gerado com a cor do produto e o nome). Módulos com o mesmo prefixo "X - " (ex.: "LegProc - …") ganham fileira própria. Cada pôster abre a **página do módulo** (`/aluno/extensivos/[slug]/modulo/[moduloId]`): índice dos módulos com progresso à esquerda, cabeçalho do módulo com barra de progresso, busca e as aulas em **linha única** numeradas (lida/cadeado/data), com navegação para o módulo anterior/próximo. O "Voltar" do leitor retorna à página do módulo. "Acessos incluídos" só aparece quando o produto não tem currículo nem vitrine.
+- Botão "Continuar de onde parou": texto em branco garantido (o CSS do tema pintava o link de escuro sobre o fundo roxo).
+- **Link para embedar na Curseduca:** o configurador do produto (aba Informações → Detalhes) mostra o link do extensivo para o aluno e o código `<iframe>`, com botões de copiar. O portal já é framável e a sessão funciona no iframe; sem login o aluno entra e volta direto ao extensivo.
+- **"Material indisponível" que não saía com "Tentar de novo":** quando a conversão DOCX→PDF (OnlyOffice) falhava, o `null` ficava 5 min no cache `leitura-pdf:*` e toda nova tentativa devolvia o mesmo erro. Agora a falha não é cacheada (o próximo "Tentar de novo" converte de verdade).
+
 ## 4.2.6 — 2026-11-03
 
 ### Meus Cadernos — adicionar questões, caderno de erros automático e % resolvido

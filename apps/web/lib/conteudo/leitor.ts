@@ -174,7 +174,16 @@ async function podeLerDoc(svc: any, tenantId: string, alunoId: string, doc: any)
   return remember<boolean>(`acesso-leitura:${tenantId}:${alunoId}:${doc.id}`, 60, async () => {
     if (await ehTestadorGlobal({ tenantId, estudanteId: alunoId })) return true
     if (doc.status !== 'publicado') return false
-    return (await avaliarDocAluno(svc, tenantId, alunoId, doc)).permitido
+    if ((await avaliarDocAluno(svc, tenantId, alunoId, doc)).permitido) return true
+    // O documento é AULA (ativa e já liberada) do currículo de um extensivo do aluno → libera a leitura,
+    // mesmo fora das pastas liberadas (o configurador do produto pode apontar a qualquer material).
+    try {
+      const [{ docLiberadoPorProduto }, { acessoAoProduto }] = await Promise.all([
+        import('@/lib/produtos/curriculo-aluno'), import('@/lib/produtos/aluno'),
+      ])
+      return await docLiberadoPorProduto(svc, tenantId, alunoId, doc.id,
+        async (produtoId) => !!(await acessoAoProduto(svc, tenantId, alunoId, produtoId)))
+    } catch { return false }
   })
 }
 
@@ -399,7 +408,9 @@ export async function carregarLeituraPdf(documentoId: string, alunoId: string): 
   // sozinho). A URL assinada vale 3600s, então 300s NÃO a expira (mesma lógica das thumbs). Os GRIFOS são
   // POR-ALUNO → lidos à parte, fora do cache compartilhado. Tolerante a Redis ausente (remember cai no cálculo).
   const [pdfUrl, grifosRows, cfgRow] = await Promise.all([
-    remember<string | null>(`leitura-pdf:${tenantId}:${documentoId}:${doc.versao_atual_id}`, 300, async () => gerarPdfDocumento(tenantId, documentoId).catch(() => null)),
+    // Falha (conversão DOCX→PDF fora/lenta) NÃO entra no cache: `undefined` não é guardado pelo remember —
+    // antes o null ficava 5 min em cache e o "Tentar de novo" do leitor repetia o erro sem tentar converter.
+    remember<string | undefined>(`leitura-pdf:${tenantId}:${documentoId}:${doc.versao_atual_id}`, 300, async () => (await gerarPdfDocumento(tenantId, documentoId).catch(() => null)) ?? undefined).then((u) => u ?? null),
     // tolerante à migração pendente: se a tabela não existir, trata como sem grifos.
     fetchAll<any>(() => svc.from('simulado_conteudo_grifos_pdf').select('id, pagina, rects, cor, tool, nota, texto').eq('tenant_id', tenantId).eq('documento_id', documentoId).eq('aluno_id', alunoId).order('id', { ascending: true })).catch(() => []),
     // Toggle da legenda de categorias (LegProc) por documento. Tolerante à migração pendente: se a coluna
@@ -474,7 +485,9 @@ export async function carregarDocParaLeitura(documentoId: string, alunoId: strin
   // PDF (fiel): URL (cache 300s por versão) + grifos do aluno + toggle da legenda — tudo em PARALELO.
   const { gerarPdfDocumento } = await import('./thumb')
   const [pdfUrl, grifosRows, cfgRow] = await Promise.all([
-    remember<string | null>(`leitura-pdf:${tenantId}:${documentoId}:${doc.versao_atual_id}`, 300, async () => gerarPdfDocumento(tenantId, documentoId).catch(() => null)),
+    // Falha (conversão DOCX→PDF fora/lenta) NÃO entra no cache: `undefined` não é guardado pelo remember —
+    // antes o null ficava 5 min em cache e o "Tentar de novo" do leitor repetia o erro sem tentar converter.
+    remember<string | undefined>(`leitura-pdf:${tenantId}:${documentoId}:${doc.versao_atual_id}`, 300, async () => (await gerarPdfDocumento(tenantId, documentoId).catch(() => null)) ?? undefined).then((u) => u ?? null),
     fetchAll<any>(() => svc.from('simulado_conteudo_grifos_pdf').select('id, pagina, rects, cor, tool, nota, texto').eq('tenant_id', tenantId).eq('documento_id', documentoId).eq('aluno_id', alunoId).order('id', { ascending: true })).catch(() => []),
     (async () => { try { const r = await svc.from('simulado_conteudo_documentos').select('legenda_categorias').eq('tenant_id', tenantId).eq('id', documentoId).maybeSingle(); return r.error ? null : r.data } catch { return null } })(),
   ])

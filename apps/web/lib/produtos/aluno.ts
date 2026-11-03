@@ -1,6 +1,7 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
 import { ITENS_PASTA } from './tipos'
+import { curriculoDoAluno, type ModuloAluno } from './curriculo-aluno'
 
 /**
  * Catálogo do ALUNO — os produtos/extensivos que o aluno TEM (assinaturas ativas) e o que cada um
@@ -53,7 +54,7 @@ async function produtosPorGrupo(svc: any, tenantId: string, estudanteId: string,
 }
 
 /** Acesso do aluno a UM produto: assinatura ativa OU grupo vinculado. null = não tem. */
-async function acessoAoProduto(svc: any, tenantId: string, estudanteId: string, produtoId: string): Promise<{ expira_em: string | null } | null> {
+export async function acessoAoProduto(svc: any, tenantId: string, estudanteId: string, produtoId: string): Promise<{ expira_em: string | null } | null> {
   const { data: ass } = await svc.from('simulado_assinaturas').select('expira_em').eq('tenant_id', tenantId).eq('estudante_id', estudanteId).eq('produto_id', produtoId).eq('status', 'ativo').limit(1).maybeSingle()
   if (ass) return { expira_em: (ass as any).expira_em ?? null }
   const viaGrupo = await produtosPorGrupo(svc, tenantId, estudanteId, produtoId)
@@ -267,4 +268,14 @@ export async function getExtensivoDoAluno(tenantId: string, estudanteId: string,
     pastas: pa.map((r: any) => ({ nome: r.nome, area: r.folder_area ?? null })).filter((x: any) => x.nome),
     cronogramas: cr.map((r: any) => r.nome).filter(Boolean),
   }
+}
+
+/**
+ * Currículo (módulos/submódulos/aulas do configurador) de um extensivo do aluno. Chamar SÓ depois de
+ * `getExtensivoDoAluno` (que já fez o gate de acesso ao produto). `slug` monta o "voltar" do leitor.
+ */
+export async function curriculoDoExtensivo(tenantId: string, estudanteId: string, produtoId: string, slug: string): Promise<ModuloAluno[]> {
+  const svc = createAdminClient()
+  // "Voltar" do leitor → página do MÓDULO da aula (não a vitrine do extensivo).
+  return curriculoDoAluno(svc, tenantId, estudanteId, produtoId, (moduloId) => `/aluno/extensivos/${slug}/modulo/${moduloId}`).catch(() => [])
 }

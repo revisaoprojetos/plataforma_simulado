@@ -33,6 +33,32 @@ import { listarInstrutorCandidatosAction, adicionarInstrutorAction, removerInstr
 
 const codigoCurto = (id: string) => (parseInt(id.replace(/-/g, '').slice(0, 5), 16) % 9000 + 1000).toString()
 
+/**
+ * Link do extensivo para EMBEDAR na Curseduca (iframe). O portal do aluno já é framável (proxy:
+ * frame-ancestors * fora do /admin) e o cookie de sessão é particionado (CHIPS) p/ funcionar no iframe;
+ * sem login o aluno passa por /aluno/entrar e VOLTA a este extensivo (redirectTo do layout do portal).
+ * Host = o da página atual (o do tenant), não uma URL global.
+ */
+function LinkEmbed({ slug }: { slug: string }) {
+  const [origem, setOrigem] = useState('')
+  useEffect(() => { setOrigem(window.location.origin) }, [])
+  const url = `${origem}/aluno/extensivos/${slug}`
+  const iframe = `<iframe src="${url}" width="100%" height="900" style="border:0;min-height:80vh" allow="fullscreen; clipboard-write" allowfullscreen></iframe>`
+  const copiar = (txt: string, rotulo: string) => navigator.clipboard.writeText(txt).then(() => toast.success(`${rotulo} copiado`), () => toast.error('Não foi possível copiar'))
+  return (
+    <Campo label="Link para embedar (Curseduca)">
+      <div className="space-y-2">
+        <div className="flex gap-2">
+          <Input value={origem ? url : ''} readOnly className="bg-muted/40 font-mono text-xs" />
+          <Button type="button" variant="outline" size="sm" disabled={!origem} onClick={() => copiar(url, 'Link')}><Copy className="mr-1 h-3.5 w-3.5" />Link</Button>
+          <Button type="button" variant="outline" size="sm" disabled={!origem} onClick={() => copiar(iframe, 'Código do iframe')}><Copy className="mr-1 h-3.5 w-3.5" />iframe</Button>
+        </div>
+        <p className="text-[11px] text-muted-foreground">Só vê o conteúdo quem tem acesso ao produto (assinatura ou grupo vinculado). Sem login, o aluno entra e volta direto a este extensivo.</p>
+      </div>
+    </Campo>
+  )
+}
+
 export function AbaInformacoes({
   produto, instrutores: instrIniciais, resumo, podeEditar, criadoEm, atualizadoEm, mesmoNome,
   onIrConteudos, onIrGrupos, onDuplicar, onMover, onExcluir, onManutencao, registerPublicar,
@@ -173,6 +199,7 @@ export function AbaInformacoes({
               <CampoPh label="Carga horária" />
             </div>
             <Campo label="URL personalizada"><Input value={produto.slug ?? ''} readOnly placeholder="definida na criação" className="bg-muted/40 font-mono text-xs" /></Campo>
+            {produto.slug && <LinkEmbed slug={produto.slug} />}
             <Campo label="Descrição do produto">
               <textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} disabled={!podeEditar} rows={3} placeholder="Descrição do produto" className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" />
             </Campo>

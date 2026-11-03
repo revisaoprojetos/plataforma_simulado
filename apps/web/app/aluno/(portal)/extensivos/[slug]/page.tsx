@@ -1,7 +1,8 @@
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { getSessaoAluno } from '@/lib/aluno-session'
-import { vitrineDoAluno, progressoExtensivo, avisosDoProduto, getExtensivoDoAluno, type VitrineSecao, type VitrineItem } from '@/lib/produtos/aluno'
+import { vitrineDoAluno, progressoExtensivo, avisosDoProduto, getExtensivoDoAluno, curriculoDoExtensivo, type VitrineSecao, type VitrineItem } from '@/lib/produtos/aluno'
+import { ModulosVitrine } from './curriculo'
 import { PRODUTO_TIPOS } from '@/lib/produtos/tipos'
 import { ArrowLeft, ClipboardList, BookOpen, CalendarDays, CalendarClock, ChevronRight, Megaphone, Pin, Layers } from 'lucide-react'
 
@@ -29,21 +30,23 @@ export default async function ExtensivoPage({ params }: { params: Promise<{ slug
   if (!sessao) redirect('/aluno/entrar')
   const ext = await getExtensivoDoAluno(sessao.tenantId, sessao.estudanteId, slug)
   if (!ext) notFound()
-  const [vit, prog, avisos] = await Promise.all([
+  const [vit, prog, avisos, curriculo] = await Promise.all([
     vitrineDoAluno(sessao.tenantId, sessao.estudanteId, slug),
     progressoExtensivo(sessao.tenantId, sessao.estudanteId, ext.id),
     avisosDoProduto(sessao.tenantId, ext.id),
+    curriculoDoExtensivo(sessao.tenantId, sessao.estudanteId, ext.id, slug),
   ])
   if (!vit) notFound()
   const pct = prog.total > 0 ? Math.round((prog.feitos / prog.total) * 100) : 0
   const cor = vit.cor || 'var(--brand-primary, var(--primary))'
   const cor2 = vit.cor_secundaria || cor
   // Fallback: produto sem vitrine montada → lista simples do que foi liberado.
-  const semVitrine = vit.secoes.length === 0
+  // "Acessos incluídos" etc. só quando NÃO há vitrine NEM currículo (era o único conteúdo antes do currículo).
+  const semVitrine = vit.secoes.length === 0 && curriculo.length === 0
   const fallback = ext
 
   return (
-    <div className="mx-auto w-full max-w-6xl space-y-6">
+    <div className="w-full space-y-6">
       <Link href="/aluno/extensivos" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
         <ArrowLeft className="h-4 w-4" />Meus Extensivos
       </Link>
@@ -101,6 +104,9 @@ export default async function ExtensivoPage({ params }: { params: Promise<{ slug
         </div>
       )}
 
+      {/* CONTEÚDO DO CURSO — módulos e aulas montados no configurador do produto */}
+      {curriculo.length > 0 && <ModulosVitrine modulos={curriculo} slug={slug} cor={cor} />}
+
       {/* VITRINE (seções) */}
       {vit.secoes.map((s) => <Secao key={s.id} s={s} cor={cor} />)}
 
@@ -157,3 +163,4 @@ function CardItem({ it, size, cor }: { it: VitrineItem; size: string; cor: strin
     </Link>
   )
 }
+
