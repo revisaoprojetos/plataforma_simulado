@@ -29,6 +29,7 @@ import { EmBreveCard } from '@/components/nova/manutencao'
 import { resolveTemaDark } from '@/lib/hud/resolve-dark'
 import { remember } from '@/lib/cache/relatorio-cache'
 import type { AlunoBrand, AlunoNavItem, AlunoShellUsuario } from '@/components/aluno/shell/types'
+import { SuporteWhatsApp } from '@/components/aluno/suporte-whatsapp'
 
 /** Iniciais a partir do nome (1ª letra do 1º e do último termo). Fallback do avatar. */
 function iniciaisDe(nome: string): string {
@@ -300,6 +301,8 @@ export default async function AlunoPortalLayout({ children }: { children: React.
         <FontScaleInit scope={`aluno:${sessao.email || 'aluno'}`} />
         <MonitorManutencao inicial={{ inicio: manut.inicio, avisos: manut.avisos }} />
         <GuiaTourRunner gamAtivo={gamAtivo} />
+        {/* Botão flutuante de suporte (WhatsApp, rodízio entre os números). */}
+        <SuporteWhatsApp />
         <ShellRevisaoNova
           theme={dark ? 'escuro' : 'claro'}
           nav={navCanonico}
@@ -328,6 +331,8 @@ export default async function AlunoPortalLayout({ children }: { children: React.
       <MonitorManutencao inicial={{ inicio: manut.inicio, avisos: manut.avisos }} />
       {/* Tour guiado da Capi (acionado pelo "Iniciar passo a passo" na Ajuda) — global p/ sobreviver à navegação. */}
       <GuiaTourRunner gamAtivo={gamAtivo} />
+      {/* Botão flutuante de suporte (WhatsApp, rodízio entre os números). */}
+      <SuporteWhatsApp />
       {/* Manutenção por área do aluno: VND/MEQ (e Revisão legada) bloqueiam o CONTEÚDO da rota aqui —
           o shell da Revisão interno já trata no seu ramo; aqui cobrimos o caminho dos demais shells. */}
       {/* MAC reaproveita os componentes do VND; o provider entrega a conversão de cor bordô

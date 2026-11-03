@@ -53,27 +53,46 @@ async function produtosPorGrupo(svc: any, tenantId: string, estudanteId: string,
   return out
 }
 
-/** Acesso do aluno a UM produto: assinatura ativa OU grupo vinculado. null = não tem. */
+/**
+ * Produtos ATIVOS liberados para TODOS os alunos do tenant ("Liberar para todos os alunos da plataforma",
+ * coluna `acesso_gratuito` — mesmo recurso do simulado). Tolerante: sem a coluna (migração ainda não
+ * aplicada) a query falha e devolve vazio, ou seja, ninguém ganha acesso por engano.
+ */
+async function produtosGratuitos(svc: any, tenantId: string, soProduto?: string): Promise<Set<string>> {
+  try {
+    let q = svc.from('simulado_produtos').select('id').eq('tenant_id', tenantId).eq('ativo', true).eq('acesso_gratuito', true)
+    if (soProduto) q = q.eq('id', soProduto)
+    const { data, error } = await q
+    if (error) return new Set()
+    return new Set(((data ?? []) as any[]).map((r) => r.id as string))
+  } catch { return new Set() }
+}
+
+/** Acesso do aluno a UM produto: assinatura ativa, grupo vinculado OU produto liberado para todos. null = não tem. */
 export async function acessoAoProduto(svc: any, tenantId: string, estudanteId: string, produtoId: string): Promise<{ expira_em: string | null } | null> {
   const { data: ass } = await svc.from('simulado_assinaturas').select('expira_em').eq('tenant_id', tenantId).eq('estudante_id', estudanteId).eq('produto_id', produtoId).eq('status', 'ativo').limit(1).maybeSingle()
   if (ass) return { expira_em: (ass as any).expira_em ?? null }
   const viaGrupo = await produtosPorGrupo(svc, tenantId, estudanteId, produtoId)
-  return viaGrupo.has(produtoId) ? { expira_em: viaGrupo.get(produtoId) ?? null } : null
+  if (viaGrupo.has(produtoId)) return { expira_em: viaGrupo.get(produtoId) ?? null }
+  // Liberado para todos os alunos da plataforma → acesso sem prazo.
+  return (await produtosGratuitos(svc, tenantId, produtoId)).has(produtoId) ? { expira_em: null } : null
 }
 
-/** Produtos ativos do aluno (assinatura ativa OU grupo de acesso vinculado), ordenados por `ordem`. */
+/** Produtos ativos do aluno (assinatura ativa, grupo de acesso vinculado OU liberado para todos), ordenados por `ordem`. */
 export async function produtosDoAluno(tenantId: string, estudanteId: string): Promise<ExtensivoCard[]> {
   const svc = createAdminClient()
-  const [{ data: ass }, viaGrupo] = await Promise.all([
+  const [{ data: ass }, viaGrupo, gratuitos] = await Promise.all([
     svc.from('simulado_assinaturas')
       .select('produto_id, expira_em')
       .eq('tenant_id', tenantId).eq('estudante_id', estudanteId).eq('status', 'ativo')
       .not('produto_id', 'is', null),
     produtosPorGrupo(svc, tenantId, estudanteId),
+    produtosGratuitos(svc, tenantId),
   ])
   const expira = new Map<string, string | null>()
   for (const a of (ass ?? []) as any[]) if (a.produto_id) expira.set(a.produto_id, maiorExpira(expira.get(a.produto_id), a.expira_em ?? null))
   for (const [pid, exp] of viaGrupo) expira.set(pid, maiorExpira(expira.get(pid), exp))
+  for (const pid of gratuitos) expira.set(pid, null) // liberado para todos = sem prazo
   const uniq = [...expira.keys()]
   if (!uniq.length) return []
   const [{ data: prods }, { data: itens }] = await Promise.all([

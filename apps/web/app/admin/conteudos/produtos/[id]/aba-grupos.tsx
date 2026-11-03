@@ -14,18 +14,19 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   KeyRound, Link2, Plus, Loader2, Search, Unlink, Users, Pencil, ExternalLink, MoreVertical,
-  ChevronDown, AlertTriangle, FileStack,
+  ChevronDown, AlertTriangle, FileStack, Globe,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import {
   DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
-import { salvarGruposAction } from '@/app/admin/produtos/actions'
+import { salvarGruposAction, lerAcessoGratuitoProdutoAction, definirAcessoGratuitoProdutoAction } from '@/app/admin/produtos/actions'
 import { carregarGruposDoProdutoAction, buscarRecursosAction } from './lazy-actions'
 
 type Grupo = { id: string; nome: string; membros?: number | null }
@@ -94,6 +95,7 @@ export function AbaGrupos({ produtoId, podeEditar }: {
 
   return (
     <div className="space-y-4">
+      <LiberarParaTodos produtoId={produtoId} podeEditar={podeEditar} />
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-2">
         {podeEditar && <Button onClick={() => setVincular(true)} disabled={ligadosRows === null}><Link2 className="h-4 w-4" />Vincular grupo de acesso</Button>}
@@ -317,5 +319,57 @@ function VincularDialog({ ligadosRows, onClose, onConfirmar, pending, onCriarGru
         </div>
       </DialogContent>
     </Dialog>
+  )
+}
+
+/**
+ * "Liberar para todos os alunos da plataforma" — o mesmo recurso do simulado (aba Estudantes). Ligado,
+ * TODO aluno do tenant vê o produto em "Meus Extensivos" e acessa o conteúdo, sem assinatura nem grupo;
+ * os grupos vinculados abaixo continuam valendo (não precisam ser removidos).
+ */
+function LiberarParaTodos({ produtoId, podeEditar }: { produtoId: string; podeEditar: boolean }) {
+  const [estado, setEstado] = useState<{ valor: boolean; disponivel: boolean; alunos: number | null } | null>(null)
+  const [salvando, setSalvando] = useState(false)
+  useEffect(() => {
+    lerAcessoGratuitoProdutoAction(produtoId)
+      .then((r) => setEstado('error' in r ? { valor: false, disponivel: false, alunos: null } : { valor: r.valor, disponivel: r.disponivel, alunos: r.alunos }))
+      .catch(() => setEstado({ valor: false, disponivel: false, alunos: null }))
+  }, [produtoId])
+
+  async function alternar(v: boolean) {
+    if (!estado) return
+    if (v && !(await confirmar({ titulo: 'Liberar para todos os alunos?', mensagem: `Todos os alunos da plataforma${estado.alunos ? ` (${estado.alunos.toLocaleString('pt-BR')})` : ''} passam a ver este produto e o conteúdo dele, sem precisar de grupo ou assinatura.`, confirmar: 'Liberar para todos' }))) return
+    setSalvando(true)
+    const anterior = estado.valor
+    setEstado({ ...estado, valor: v })
+    const r = await definirAcessoGratuitoProdutoAction(produtoId, v).catch(() => ({ error: 'Falha ao salvar.' }))
+    setSalvando(false)
+    if (r && 'error' in r && r.error) { setEstado((e) => (e ? { ...e, valor: anterior } : e)); toast.error(r.error); return }
+    toast.success(v ? 'Produto liberado para todos os alunos' : 'Acesso voltou a ser só por grupo/assinatura')
+  }
+
+  const ligado = !!estado?.valor
+  return (
+    <div className={cn('rounded-2xl border p-4 shadow-sm transition-colors', ligado ? 'border-primary/40 bg-primary/5' : 'bg-card')}>
+      <div className="flex items-start gap-3">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary"><Globe className="h-5 w-5" /></span>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center justify-between gap-3">
+            <label htmlFor="produto-acesso-gratuito" className="cursor-pointer text-sm font-semibold">Liberar para todos os alunos da plataforma</label>
+            {estado === null || salvando
+              ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+              : <Switch id="produto-acesso-gratuito" checked={ligado} disabled={!podeEditar || !estado.disponivel} onCheckedChange={(v) => alternar(!!v)} />}
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {ligado
+              ? <>Todos os alunos cadastrados{estado?.alunos ? <> (<strong>{estado.alunos.toLocaleString('pt-BR')}</strong>)</> : null} veem este produto e o conteúdo dele — <strong>sem precisar de grupo ou assinatura</strong>. Os grupos abaixo continuam valendo.</>
+              : <>Todos os alunos cadastrados poderão acessar este produto — <strong>sem precisar vincular grupos ou estudantes</strong>.</>}
+          </p>
+          {estado && !estado.disponivel && (
+            <p className="mt-2 flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400"><AlertTriangle className="h-3.5 w-3.5" />Recurso ainda não ativado no banco: aplique a migração <code>20261103120000_produto_acesso_gratuito.sql</code>.</p>
+          )}
+        </div>
+      </div>
+    </div>
   )
 }

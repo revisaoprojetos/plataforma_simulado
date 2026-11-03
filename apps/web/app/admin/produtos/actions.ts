@@ -214,3 +214,35 @@ export async function excluirAvisoAction(id: string) {
   if (error) return { error: error.message }
   revalidatePath('/admin/produtos'); return { ok: true as const }
 }
+
+// ───────── "Liberar para todos os alunos da plataforma" (mesmo recurso do simulado) ─────────
+
+/** Estado do "liberar para todos" do produto + total de alunos do tenant (texto do interruptor).
+ *  `disponivel=false` = a coluna ainda não existe (migração 20261103120000 não aplicada). */
+export async function lerAcessoGratuitoProdutoAction(produtoId: string): Promise<{ ok: true; valor: boolean; disponivel: boolean; alunos: number | null } | { error: string }> {
+  const g = await guard(); if ('error' in g) return { error: g.error ?? 'Sem permissão.' }
+  const svc = createAdminClient()
+  const [{ data, error }, alunos] = await Promise.all([
+    svc.from('simulado_produtos').select('acesso_gratuito').eq('id', produtoId).eq('tenant_id', g.tenantId).maybeSingle(),
+    svc.from('simulado_estudantes').select('id', { count: 'exact', head: true }).eq('tenant_id', g.tenantId)
+      .then((r: any) => (r.error ? null : r.count ?? null), () => null),
+  ])
+  if (error) return { ok: true, valor: false, disponivel: false, alunos }
+  return { ok: true, valor: !!(data as any)?.acesso_gratuito, disponivel: true, alunos }
+}
+
+/** Liga/desliga o acesso de TODOS os alunos ao produto. Audita e revalida o editor. */
+export async function definirAcessoGratuitoProdutoAction(produtoId: string, valor: boolean): Promise<{ ok?: boolean; error?: string }> {
+  const g = await guard(true); if ('error' in g) return { error: g.error }
+  const svc = createAdminClient()
+  const { data, error } = await svc.from('simulado_produtos').update({ acesso_gratuito: !!valor })
+    .eq('id', produtoId).eq('tenant_id', g.tenantId).select('id').maybeSingle()
+  if (error) {
+    return { error: /acesso_gratuito/.test(error.message) ? 'Recurso ainda não ativado no banco: aplique a migração 20261103120000_produto_acesso_gratuito.sql.' : error.message }
+  }
+  if (!data) return { error: 'Produto não encontrado.' }
+  await registrarAudit({ operacao: valor ? 'LIBERAR' : 'BLOQUEAR', entidade: 'simulado_produtos', entidadeId: produtoId, depois: { acesso_gratuito: !!valor } })
+  revalidatePath('/admin/produtos')
+  revalidatePath(`/admin/conteudos/produtos/${produtoId}`)
+  return { ok: true }
+}

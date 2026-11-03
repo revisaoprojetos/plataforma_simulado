@@ -12,6 +12,16 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.2.8 — 2026-11-03
+
+### Produtos (extensivo, assinatura, pré-edital…) — "Liberar para todos os alunos da plataforma"
+- Mesmo recurso do simulado (`regras.acesso_gratuito`), agora no produto: interruptor no topo da aba **Grupos de acesso** do configurador. Ligado, **todo aluno do tenant** vê o produto em "Meus Extensivos", abre a página do extensivo/módulos e as aulas no leitor — sem assinatura nem grupo vinculado. Os grupos vinculados continuam valendo. Pede confirmação ao ligar (mostra quantos alunos serão alcançados) e registra na auditoria (`LIBERAR`/`BLOQUEAR`).
+- Backend: coluna `simulado_produtos.acesso_gratuito` (migração `20261103120000_produto_acesso_gratuito.sql`, nasce `false`). `acessoAoProduto` e `produtosDoAluno` consideram o produto liberado para todos (acesso sem prazo). Leitura tolerante: sem a migração aplicada nada muda e o interruptor aparece desabilitado com o aviso.
+- Liberação programada por "dias após a matrícula" não tem data-base para quem entra só pelo "liberar para todos" — nesse caso conta como já cumprida (data fixa continua valendo).
+
+### Portal do aluno — botão flutuante de suporte (WhatsApp)
+- Botão no canto inferior direito em todas as telas/marcas do portal (no celular, acima da down bar): abre o WhatsApp com "Quero falar com suporte", **alternando** entre +55 65 9648-6736 e +55 65 9626-9997 a cada clique (o 1º número de cada aluno é sorteado, para dividir a demanda). Oculto nos leitores (Biblioteca, painel, Lei Seca, leitura rápida) para não cobrir as ferramentas. `components/aluno/suporte-whatsapp.tsx`.
+
 ## 4.2.7 — 2026-11-03
 
 ### Extensivos do aluno — módulos e aulas do configurador aparecem e abrem
