@@ -1782,10 +1782,17 @@ function initPdfSelection(){
   const layers=()=>$$('#article .pdftl');
   const reset=tl=>{const end=tl.__eoc;if(end){tl.appendChild(end);end.style.width='';end.style.height=''}tl.classList.remove('selecting')};
   const resetAll=()=>layers().forEach(reset);
-  document.addEventListener('pointerup',resetAll);
+  // TOQUE (celular/tablet): este mecanismo é p/ ARRASTAR COM MOUSE. No toque ele movia o endOfContent
+  // para DENTRO da seleção a cada selectionchange e de volta no pointerup → mutar o DOM durante a seleção
+  // por toque desfaz a seleção no WebKit (iPhone/iPad, que não é "Chrome ≥128") e em Chrome antigo de
+  // tablet → ao soltar o dedo não havia seleção e a barra de grifo não abria. No toque não mexe no DOM.
+  let toque=matchMedia('(pointer:coarse)').matches;
+  document.addEventListener('pointerdown',e=>{toque=e.pointerType!=='mouse'},true);
+  document.addEventListener('pointerup',e=>{if(e.pointerType==='mouse')resetAll()});
   window.addEventListener('blur',resetAll);
   let modern;
   document.addEventListener('selectionchange',()=>{
+    if(toque)return;
     const sel=getSelection();if(!sel||sel.rangeCount===0){resetAll();return}
     const active=new Set();
     for(let i=0;i<sel.rangeCount;i++){const r=sel.getRangeAt(i);for(const tl of layers())if(!active.has(tl)&&r.intersectsNode(tl))active.add(tl)}
@@ -2838,7 +2845,10 @@ $('#mrFollow').setAttribute('aria-checked',S.set.follow);
 $$('#skColors .cd')[0].classList.add('on');
 applySet();applyVis();renderPanels();renderGoal();renderPomo();setTab('hl');updUndo();
 if(S.set.mode==='paged')setMode('paged');else renderToc();
-if(S.set.mirror)setMirror(true);
+// A preferência "Anotar aberto" é GLOBAL (S.set). No celular/tablet (≤900px) a folha de anotação OCUPA a
+// tela no lugar do texto → o aluno abria todo material na anotação e tinha que fechar para ler. Em tela
+// estreita a leitura abre SEMPRE primeiro; a preferência fica guardada (vale no computador).
+if(S.set.mirror&&!isNarrow())setMirror(true);
 const pos=store.get('pos',null);
 requestAnimationFrame(()=>{layoutDoc();onScroll();
   if(pos&&pos.top>300&&$('#'+pos.sec)){const t=$('#'+pos.sec).dataset.title;toast('Continuar em “'+(t.length>40?t.slice(0,40)+'…':t)+'”',{label:'Continuar',fn:()=>goto(pos.sec,{top:pos.top})})}});
