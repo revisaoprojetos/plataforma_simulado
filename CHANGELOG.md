@@ -12,6 +12,11 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.2.1 — 2026-11-03
+
+### Storage s3/Hetzner — fonte da conversão por GetObject direto (robustez)
+- A rota `/api/conteudo/fonte` (introduzida no v4.1.3, que serve o `.docx` ao OnlyOffice pelo próprio app) passou a ler o arquivo via **`getStorage().download()` (GetObject direto do SDK)** em vez de URL assinada + fetch. Remove a dependência de o presigned ser alcançável/assinável — fragilidade que já derrubava o s3. Conversão (miniatura/PDF/editor) fica robusta no s3, idêntica no Supabase.
+
 ## 4.2.0 — 2026-11-03
 
 ### Desafios de leitura (Lei Seca / Jurisprudência) — legenda de grifos configurável

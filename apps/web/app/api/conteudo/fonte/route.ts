@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { baixarOriginal } from '@/lib/conteudo/ingestao'
+import { getStorage } from '@/lib/storage'
+import { resolverBucketConteudo } from '@/lib/conteudo/ingestao'
 import { lerTokenFonte } from '@/lib/conteudo/fonte-onlyoffice'
 
 // Serve o arquivo-fonte (.docx/pdf) ao Document Server do OnlyOffice — server-to-server, PROVIDER-
@@ -23,7 +24,9 @@ export async function GET(req: Request) {
   if (!t) return new NextResponse('bad request', { status: 400 })
   const key = await lerTokenFonte(t)
   if (!key) return new NextResponse('forbidden', { status: 403 })
-  const buf = await baixarOriginal(key)
+  // GetObject DIRETO do SDK (não presigned+fetch): não depende de o presigned ser alcançável/assinável,
+  // só das credenciais S3 — mais robusto p/ a conversão no s3/Hetzner (e idêntico no Supabase).
+  const buf = await getStorage().download(await resolverBucketConteudo(), key)
   if (!buf) return new NextResponse('not found', { status: 404 })
   const ext = key.split('.').pop()?.toLowerCase() || 'docx'
   const ct = CT[ext] || 'application/octet-stream'
