@@ -548,14 +548,23 @@ export async function nomesDeRecursos(tenantId: string, tipo: RecursoTipo, ids: 
 }
 
 /** Grupos de acesso vinculados ao produto (ids + nomes): só os do produto, não todos os grupos do tenant. */
-export async function gruposDoProduto(tenantId: string, produtoId: string): Promise<{ id: string; nome: string }[]> {
+export async function gruposDoProduto(tenantId: string, produtoId: string): Promise<{ id: string; nome: string; membros: number | null }[]> {
   const svc = createAdminClient()
   try {
     const vinc = await fetchAll<any>(() => svc.from('simulado_produto_itens').select('item_id')
       .eq('tenant_id', tenantId).eq('produto_id', produtoId).eq('tipo_item', 'grupo').order('item_id', { ascending: true }) as any, 1000, 'produto_grupos')
     const ids = vinc.map((r) => r.item_id as string)
-    const nomes = await nomesDeRecursos(tenantId, 'grupo', ids)
-    return ids.map((id) => ({ id, nome: nomes[id]?.nome ?? '(grupo removido)' }))
+    const agora = new Date().toISOString()
+    const [nomes, contagens] = await Promise.all([
+      nomesDeRecursos(tenantId, 'grupo', ids),
+      // Membros com participação válida (sem prazo ou não vencida) = quem recebe o produto pelo grupo.
+      Promise.all(ids.map(async (id) => {
+        const { count, error } = await svc.from('simulado_grupo_membros').select('id', { count: 'exact', head: true })
+          .eq('tenant_id', tenantId).eq('grupo_id', id).or(`expira_em.is.null,expira_em.gt.${agora}`)
+        return error ? null : (count ?? 0)
+      })),
+    ])
+    return ids.map((id, i) => ({ id, nome: nomes[id]?.nome ?? '(grupo removido)', membros: contagens[i] }))
   } catch { return [] }
 }
 

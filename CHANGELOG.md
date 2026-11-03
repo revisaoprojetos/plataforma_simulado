@@ -12,6 +12,18 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.2.3 — 2026-11-03
+
+### Produtos — grupo de acesso vinculado libera o extensivo para os membros
+- O aluno só via um extensivo se tivesse **assinatura ativa** do produto. Vincular um grupo na aba "Grupos de acesso" não liberava nada para quem já era membro (ex.: produto listado + grupo com 15 membros = 0 alunos vendo), embora a tela prometa "todos os membros do grupo veem este produto".
+- `lib/produtos/aluno.ts`: "Meus Extensivos", a página do extensivo e a vitrine passam a liberar o produto também por **participação em grupo vinculado** (participação sem prazo ou não vencida; `expira_em` exibida = a mais longa entre assinatura e grupo). Aluno fora do grupo continua sem acesso.
+- Aba "Grupos de acesso" do produto: **contagem real de membros** (lista e painel) e "Editar grupo" / "Ver membros" / "Abrir grupo" levam ao **grupo específico** (`/admin/grupos/[id]`) em vez da lista geral.
+
+### Portal do aluno (celular) — barra inferior mostra todas as áreas liberadas
+- A down bar do portal novo (`shell/revisao-nova/down-bar.tsx`) tinha só um grupo fixo (Simulados + Banco de questões) e ignorava o menu: Cursos, Meus Extensivos, Meu Desempenho, Como Estudar etc. só apareciam na barra lateral (tablet/desktop).
+- Agora os grupos saem do **mesmo `nav` da lateral** (já filtrado por marca/flags/gamificação): **Simulados ▾** (simulados, questões, cadernos) · **Estudar ▾** (painel, cursos, extensivos, biblioteca, desafios, cronograma) · **Mais ▾** (desempenho, comunidade, como estudar, dúvidas, ajuda e qualquer área nova). A pílula amarela acende pelo item da página atual (match mais longo).
+- **Ligas** usa o link do próprio menu (`/aluno/nova/comunidade/ligas`) e só aparece com gamificação ativa (antes apontava para `/aluno/ligas` e aparecia sempre).
+
 ## 4.2.2 — 2026-11-03
 
 ### Leitor da Biblioteca — PDF não derruba mais a aba no iPad/iPhone

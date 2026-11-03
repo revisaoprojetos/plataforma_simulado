@@ -19,18 +19,61 @@ export interface ExtensivoCard {
   expira_em: string | null
 }
 
-/** Produtos ativos do aluno, ordenados por `ordem`. Vazio se o aluno não tem produto (modelo antigo). */
+/** Junta expirações: null (sem prazo) vence; senão a mais distante. */
+function maiorExpira(a: string | null | undefined, b: string | null | undefined): string | null {
+  if (a === undefined) return b ?? null // ainda não havia valor
+  if (b === undefined) return a
+  if (a === null || b === null) return null // alguma fonte sem prazo → sem prazo
+  return a > b ? a : b
+}
+
+/**
+ * Produtos que o aluno recebe POR GRUPO DE ACESSO: o produto tem o grupo vinculado (item `grupo` ativo,
+ * aba "Grupos de acesso" do produto) e o aluno é membro desse grupo (participação sem prazo ou não
+ * vencida). Sem isto, vincular um grupo não liberava nada para quem JÁ estava nele — só assinaturas
+ * criadas por concessão (venda/manual) davam acesso. Retorna produto_id → expira_em da participação.
+ */
+async function produtosPorGrupo(svc: any, tenantId: string, estudanteId: string, soProduto?: string): Promise<Map<string, string | null>> {
+  const out = new Map<string, string | null>()
+  const agora = new Date().toISOString()
+  const { data: gm } = await svc.from('simulado_grupo_membros').select('grupo_id, expira_em')
+    .eq('tenant_id', tenantId).eq('estudante_id', estudanteId).or(`expira_em.is.null,expira_em.gt.${agora}`)
+  const expGrupo = new Map<string, string | null>()
+  for (const r of (gm ?? []) as any[]) expGrupo.set(r.grupo_id, maiorExpira(expGrupo.get(r.grupo_id), r.expira_em ?? null))
+  const grupos = [...expGrupo.keys()]
+  if (!grupos.length) return out
+  for (let i = 0; i < grupos.length; i += 100) {
+    let q = svc.from('simulado_produto_itens').select('produto_id, item_id')
+      .eq('tenant_id', tenantId).eq('tipo_item', 'grupo').eq('ativo', true).in('item_id', grupos.slice(i, i + 100))
+    if (soProduto) q = q.eq('produto_id', soProduto)
+    const { data: its } = await q
+    for (const it of (its ?? []) as any[]) out.set(it.produto_id, maiorExpira(out.get(it.produto_id), expGrupo.get(it.item_id) ?? null))
+  }
+  return out
+}
+
+/** Acesso do aluno a UM produto: assinatura ativa OU grupo vinculado. null = não tem. */
+async function acessoAoProduto(svc: any, tenantId: string, estudanteId: string, produtoId: string): Promise<{ expira_em: string | null } | null> {
+  const { data: ass } = await svc.from('simulado_assinaturas').select('expira_em').eq('tenant_id', tenantId).eq('estudante_id', estudanteId).eq('produto_id', produtoId).eq('status', 'ativo').limit(1).maybeSingle()
+  if (ass) return { expira_em: (ass as any).expira_em ?? null }
+  const viaGrupo = await produtosPorGrupo(svc, tenantId, estudanteId, produtoId)
+  return viaGrupo.has(produtoId) ? { expira_em: viaGrupo.get(produtoId) ?? null } : null
+}
+
+/** Produtos ativos do aluno (assinatura ativa OU grupo de acesso vinculado), ordenados por `ordem`. */
 export async function produtosDoAluno(tenantId: string, estudanteId: string): Promise<ExtensivoCard[]> {
   const svc = createAdminClient()
-  const { data: ass } = await svc
-    .from('simulado_assinaturas')
-    .select('produto_id, expira_em')
-    .eq('tenant_id', tenantId).eq('estudante_id', estudanteId).eq('status', 'ativo')
-    .not('produto_id', 'is', null)
+  const [{ data: ass }, viaGrupo] = await Promise.all([
+    svc.from('simulado_assinaturas')
+      .select('produto_id, expira_em')
+      .eq('tenant_id', tenantId).eq('estudante_id', estudanteId).eq('status', 'ativo')
+      .not('produto_id', 'is', null),
+    produtosPorGrupo(svc, tenantId, estudanteId),
+  ])
   const expira = new Map<string, string | null>()
-  const ids: string[] = []
-  for (const a of (ass ?? []) as any[]) { if (a.produto_id) { ids.push(a.produto_id); if (!expira.has(a.produto_id)) expira.set(a.produto_id, a.expira_em ?? null) } }
-  const uniq = [...new Set(ids)]
+  for (const a of (ass ?? []) as any[]) if (a.produto_id) expira.set(a.produto_id, maiorExpira(expira.get(a.produto_id), a.expira_em ?? null))
+  for (const [pid, exp] of viaGrupo) expira.set(pid, maiorExpira(expira.get(pid), exp))
+  const uniq = [...expira.keys()]
   if (!uniq.length) return []
   const [{ data: prods }, { data: itens }] = await Promise.all([
     svc.from('simulado_produtos').select('id, slug, nome, tipo, descricao, cor, capa_url, ordem').eq('tenant_id', tenantId).eq('ativo', true).in('id', uniq).order('ordem', { ascending: true }),
@@ -109,7 +152,7 @@ export async function vitrineDoAluno(tenantId: string, estudanteId: string, slug
     .eq('tenant_id', tenantId).eq('slug', slug).eq('ativo', true).maybeSingle()
   if (!p) return null
   const prod = p as any
-  const { data: ass } = await svc.from('simulado_assinaturas').select('expira_em').eq('tenant_id', tenantId).eq('estudante_id', estudanteId).eq('produto_id', prod.id).eq('status', 'ativo').maybeSingle()
+  const ass = await acessoAoProduto(svc, tenantId, estudanteId, prod.id)
   if (!ass) return null
   const { data: secoes } = await svc.from('simulado_produto_secoes').select('id, ordem, tipo, nome, tamanho, config').eq('tenant_id', tenantId).eq('produto_id', prod.id).eq('ativo', true).order('ordem', { ascending: true })
 
@@ -195,8 +238,8 @@ export async function getExtensivoDoAluno(tenantId: string, estudanteId: string,
   const svc = createAdminClient()
   const { data: p } = await svc.from('simulado_produtos').select('id, slug, nome, tipo, descricao, cor, capa_url').eq('tenant_id', tenantId).eq('slug', slug).eq('ativo', true).maybeSingle()
   if (!p) return null
-  const { data: ass } = await svc.from('simulado_assinaturas').select('expira_em').eq('tenant_id', tenantId).eq('estudante_id', estudanteId).eq('produto_id', (p as any).id).eq('status', 'ativo').maybeSingle()
-  if (!ass) return null // o aluno não tem este produto → não vê
+  const ass = await acessoAoProduto(svc, tenantId, estudanteId, (p as any).id)
+  if (!ass) return null // o aluno não tem este produto (nem assinatura nem grupo) → não vê
   const { data: itens } = await svc.from('simulado_produto_itens').select('tipo_item, item_id').eq('tenant_id', tenantId).eq('produto_id', (p as any).id).eq('ativo', true)
   const porTipo = { grupo: [] as string[], simulado: [] as string[], pasta: [] as string[], cronograma: [] as string[] }
   for (const it of (itens ?? []) as any[]) {

@@ -7,7 +7,8 @@
 // Reusa salvarGruposAction de /admin/produtos (vincular/desvincular são reais).
 // LAZY: monta só quando a aba é aberta e busca SÓ os grupos deste produto; o modal "Vincular" BUSCA grupos
 // no servidor (ilike + count + .range, 20 por vez) — nunca recebe a lista inteira de grupos do tenant.
-// Colunas sem dado no backend (membros / conteúdos / tempo de acesso / comunidade) = placeholder "—".
+// Membros = contagem real (participação válida). Colunas ainda sem dado no backend (conteúdos / tempo de
+// acesso / comunidade) = placeholder "—". Editar/Ver membros/Abrir levam ao grupo ESPECÍFICO (/admin/grupos/[id]).
 
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
@@ -27,7 +28,9 @@ import { cn } from '@/lib/utils'
 import { salvarGruposAction } from '@/app/admin/produtos/actions'
 import { carregarGruposDoProdutoAction, buscarRecursosAction } from './lazy-actions'
 
-type Grupo = { id: string; nome: string }
+type Grupo = { id: string; nome: string; membros?: number | null }
+const urlGrupo = (id: string) => `/admin/grupos/${id}`
+const fmtMembros = (n: number | null | undefined) => (n == null ? '—' : n.toLocaleString('pt-BR'))
 
 export function AbaGrupos({ produtoId, podeEditar }: {
   produtoId: string; podeEditar: boolean
@@ -40,10 +43,12 @@ export function AbaGrupos({ produtoId, podeEditar }: {
   const [marcados, setMarcados] = useState<Set<string>>(new Set())
   const [pending, start] = useTransition()
 
-  useEffect(() => {
-    carregarGruposDoProdutoAction(produtoId)
-      .then((r) => { const g = ('ok' in r ? r.grupos : []) ?? []; setLigadosRows(g); setSel(g[0]?.id ?? null) })
-      .catch(() => setLigadosRows([]))
+  function recarregar(manterSel = false) {
+    return carregarGruposDoProdutoAction(produtoId)
+      .then((r) => { const g = ('ok' in r ? r.grupos : []) ?? []; setLigadosRows(g); setSel((cur) => (manterSel && cur && g.some((x) => x.id === cur) ? cur : g[0]?.id ?? null)) })
+      .catch(() => setLigadosRows((cur) => cur ?? []))
+  }
+  useEffect(() => { recarregar() // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [produtoId])
 
   const lista = ligadosRows ?? []
@@ -56,8 +61,9 @@ export function AbaGrupos({ produtoId, podeEditar }: {
       const r = await salvarGruposAction(produtoId, novos)
       if ('error' in r && r.error) { toast.error(r.error); return }
       const atuais = new Map(lista.map((g) => [g.id, g.nome]))
-      setLigadosRows(novos.map((id) => ({ id, nome: atuais.get(id) ?? nomes[id] ?? '(grupo)' })))
+      setLigadosRows(novos.map((id) => ({ id, nome: atuais.get(id) ?? nomes[id] ?? '(grupo)', membros: undefined })))
       setMarcados(new Set()); toast.success(msg); router.refresh()
+      void recarregar(true) // traz a contagem de membros dos recém-vinculados
     })
   }
   async function desvincular(g: Grupo) {
@@ -77,9 +83,9 @@ export function AbaGrupos({ produtoId, podeEditar }: {
       <DropdownMenu>
         <DropdownMenuTrigger aria-label="Ações do grupo" className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-muted-foreground hover:bg-muted hover:text-foreground data-popup-open:bg-muted"><MoreVertical className="h-4 w-4" /></DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => router.push('/admin/grupos')}><Pencil className="h-4 w-4" />Editar grupo</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => router.push('/admin/grupos')}><Users className="h-4 w-4" />Ver membros</DropdownMenuItem>
-          <DropdownMenuItem onClick={() => router.push('/admin/grupos')}><ExternalLink className="h-4 w-4" />Abrir grupo</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => router.push(urlGrupo(g.id))}><Pencil className="h-4 w-4" />Editar grupo</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => router.push(urlGrupo(g.id))}><Users className="h-4 w-4" />Ver membros</DropdownMenuItem>
+          <DropdownMenuItem onClick={() => window.open(urlGrupo(g.id), '_blank', 'noopener')}><ExternalLink className="h-4 w-4" />Abrir grupo</DropdownMenuItem>
           {podeEditar && <><DropdownMenuSeparator /><DropdownMenuItem variant="destructive" onClick={() => desvincular(g)}><Unlink className="h-4 w-4" />Desvincular</DropdownMenuItem></>}
         </DropdownMenuContent>
       </DropdownMenu>
@@ -144,7 +150,7 @@ export function AbaGrupos({ produtoId, podeEditar }: {
                       <td className="px-3 align-middle">
                         <button type="button" onClick={() => setSel(g.id)} className="flex w-full items-center gap-2.5 py-2 text-left">
                           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><KeyRound className="h-4 w-4" /></span>
-                          <span className="min-w-0"><span className="block truncate text-sm font-medium">{g.nome}</span><span className="block truncate text-xs text-muted-foreground">Grupo de acesso</span></span>
+                          <span className="min-w-0"><span className="block truncate text-sm font-medium">{g.nome}</span><span className="block truncate text-xs text-muted-foreground">Grupo de acesso · {g.membros === undefined ? '…' : `${fmtMembros(g.membros)} ${g.membros === 1 ? 'membro' : 'membros'}`}</span></span>
                         </button>
                       </td>
                       <td className="px-3 align-middle text-muted-foreground">—</td>
@@ -169,7 +175,7 @@ export function AbaGrupos({ produtoId, podeEditar }: {
                 <div className="min-w-0"><div className="truncate font-semibold">{selGrupo.nome}</div><div className="text-xs text-muted-foreground">Grupo de acesso</div></div>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <div className="rounded-xl border bg-background p-3"><div className="text-xl font-bold tabular-nums">—</div><div className="flex items-center gap-1 text-xs text-muted-foreground"><Users className="h-3 w-3" />membros</div></div>
+                <div className="rounded-xl border bg-background p-3"><div className="text-xl font-bold tabular-nums">{selGrupo.membros === undefined ? '…' : fmtMembros(selGrupo.membros)}</div><div className="flex items-center gap-1 text-xs text-muted-foreground"><Users className="h-3 w-3" />membros</div></div>
                 <div className="rounded-xl border bg-background p-3"><div className="text-xl font-bold tabular-nums">—</div><div className="flex items-center gap-1 text-xs text-muted-foreground"><FileStack className="h-3 w-3" />conteúdos</div></div>
               </div>
               <div>
@@ -186,10 +192,10 @@ export function AbaGrupos({ produtoId, podeEditar }: {
                 <p className="text-xs text-muted-foreground">Todos os membros do grupo veem este produto na vitrine e no ambiente de aulas, conforme a visibilidade escolhida em Informações.</p>
               </div>
               <div className="grid grid-cols-2 gap-2">
-                <Button variant="outline" size="sm" onClick={() => router.push('/admin/grupos')}><Pencil className="h-4 w-4" />Editar grupo</Button>
-                <Button variant="outline" size="sm" onClick={() => router.push('/admin/grupos')}><Users className="h-4 w-4" />Ver membros</Button>
+                <Button variant="outline" size="sm" onClick={() => router.push(urlGrupo(selGrupo.id))}><Pencil className="h-4 w-4" />Editar grupo</Button>
+                <Button variant="outline" size="sm" onClick={() => router.push(urlGrupo(selGrupo.id))}><Users className="h-4 w-4" />Ver membros</Button>
                 {podeEditar && <Button variant="outline" size="sm" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => desvincular(selGrupo)} disabled={pending}><Unlink className="h-4 w-4" />Desvincular</Button>}
-                <Button variant="outline" size="sm" onClick={() => router.push('/admin/grupos')}><ExternalLink className="h-4 w-4" />Abrir grupo</Button>
+                <Button variant="outline" size="sm" onClick={() => window.open(urlGrupo(selGrupo.id), '_blank', 'noopener')}><ExternalLink className="h-4 w-4" />Abrir grupo</Button>
               </div>
             </div>
           )}

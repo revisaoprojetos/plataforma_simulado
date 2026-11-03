@@ -8,14 +8,15 @@ import {
   Trophy,
   ChevronRight,
   ChevronUp,
+  LayoutGrid,
   ChevronDown,
   Check,
 } from 'lucide-react'
 import type { AlunoNavItem, AlunoShellUsuario } from '../types'
-import { MarcaR } from './icons'
+import { MarcaR, NavIcon } from './icons'
 import { DOWNBAR_BG, AMARELO, AMARELO_INK, type ShellTheme } from './tokens'
 
-type Grupo = 'sim' | 'des'
+type Grupo = 'sim' | 'est' | 'mais'
 
 interface GItem {
   href: string
@@ -33,21 +34,59 @@ interface GrupoDef {
   itens: GItem[]
 }
 
-const GRUPOS: GrupoDef[] = [
-  {
-    key: 'sim',
-    label: 'Simulados',
-    Icon: ClipboardList,
-    itens: [
-      { href: '/aluno/simulados', Icon: ClipboardList, titulo: 'Simulados', sub: 'Histórico, notas e relatórios', short: 'Simulados' },
-      // "Recomendados" virou aba DENTRO do Banco de questões (/aluno/questoes ↔ /aluno/recomendado):
-      // um único item aqui, que já acende nas duas rotas pelo match por prefixo + '/'.
-      { href: '/aluno/questoes', Icon: BookOpen, titulo: 'Banco de questões', sub: 'Treine por matéria, banca e ano', short: 'Questões' },
-    ],
-  },
-  // Desafios (Lei Seca + Jurisprudência) saíram do menu: o acesso é só pela área de Cursos.
-  // Cronograma saiu do menu (Fase 3): o acesso passa a ser pelo "Meu painel de estudos".
-]
+// Subtítulos por área (o resto vem do próprio item do menu: rótulo, rótulo curto e ícone).
+const SUB: Record<string, string> = {
+  '/aluno/simulados': 'Histórico, notas e relatórios',
+  '/aluno/questoes': 'Treine por matéria, banca e ano',
+  '/aluno/recomendado': 'Escolhidos pelo seu desempenho',
+  '/aluno/nova/cadernos': 'Seus cadernos de estudo',
+  '/aluno/nova/painel': 'Seu plano e metas de estudo',
+  '/aluno/nova/cursos': 'Cursos e materiais liberados',
+  '/aluno/extensivos': 'Seus programas de estudo',
+  '/aluno/biblioteca': 'Materiais e documentos liberados',
+  '/aluno/leitura': 'Trilha diária de artigos',
+  '/aluno/jurisprudencia': 'Informativos, súmulas e teses',
+  '/aluno/cronograma': 'Tarefas do cronograma ativo',
+  '/aluno/nova/desempenho': 'Sua evolução e estatísticas',
+  '/aluno/nova/comunidade': 'Turma, ranking e conversas',
+  '/aluno/nova/como-estudar': 'Método e dicas de estudo',
+  '/aluno/nova/duvidas': 'Pergunte aos professores',
+  '/aluno/nova/ajuda': 'Perguntas frequentes e suporte',
+}
+const HREFS_SIM = ['/aluno/simulados', '/aluno/questoes', '/aluno/recomendado', '/aluno/nova/cadernos']
+const HREFS_EST = ['/aluno/nova/painel', '/aluno/nova/cursos', '/aluno/extensivos', '/aluno/biblioteca', '/aluno/leitura', '/aluno/jurisprudencia', '/aluno/cronograma']
+const ehInicio = (href: string) => href === '/aluno' || href === '/aluno/nova/inicio'
+const ehLigas = (href: string) => href === '/aluno/ligas' || href.endsWith('/comunidade/ligas')
+
+/**
+ * Grupos da down bar a partir do MESMO `nav` da sidebar (já filtrado por flags/marca/gamificação/
+ * manutenção no layout). Antes a barra tinha só um grupo fixo (Simulados + Questões) e as demais áreas
+ * liberadas — Painel, Cursos, Meus Extensivos, Biblioteca, Desempenho… — só apareciam na lateral.
+ * Toda área sem grupo próprio cai em "Mais", então nada do menu fica de fora no celular/tablet.
+ */
+function montarGrupos(nav: AlunoNavItem[]): GrupoDef[] {
+  const vistos = new Set<string>()
+  const itens = nav.filter((n) => !ehInicio(n.href) && !ehLigas(n.href) && !vistos.has(n.href) && vistos.add(n.href))
+  const gi = (n: AlunoNavItem): GItem => ({
+    href: n.href,
+    Icon: (p) => <NavIcon name={n.icon} {...p} />,
+    titulo: n.label,
+    sub: SUB[n.href] ?? '',
+    short: n.short || n.label,
+  })
+  const ordem = (hrefs: string[]) => (a: AlunoNavItem, b: AlunoNavItem) => hrefs.indexOf(a.href) - hrefs.indexOf(b.href)
+  const sim = itens.filter((n) => HREFS_SIM.includes(n.href)).sort(ordem(HREFS_SIM)).map(gi)
+  const est = itens.filter((n) => HREFS_EST.includes(n.href)).sort(ordem(HREFS_EST)).map(gi)
+  const mais = itens.filter((n) => !HREFS_SIM.includes(n.href) && !HREFS_EST.includes(n.href)).map(gi)
+  const grupos: GrupoDef[] = [
+    { key: 'sim', label: 'Simulados', Icon: ClipboardList, itens: sim },
+    { key: 'est', label: 'Estudar', Icon: BookOpen, itens: est },
+    { key: 'mais', label: 'Mais', Icon: LayoutGrid, itens: mais },
+  ]
+  return grupos.filter((g) => g.itens.length > 0)
+}
+
+const casa = (pathname: string, href: string) => pathname === href || pathname.startsWith(href + '/')
 
 const SLOT_COLOR = '#D9CFFF'
 
@@ -61,24 +100,28 @@ export interface DownBarProps {
 
 export function DownBar({ theme, nav, usuario, pathname, onAccount }: DownBarProps) {
   const [aberto, setAberto] = useState<Grupo | null>(null)
+  const GRUPOS = montarGrupos(nav)
+  const ligasItem = nav.find((n) => ehLigas(n.href)) ?? null // só existe com gamificação ativa
 
   // Início ativo SÓ na home exata. (O item '/aluno' do nav casa por startsWith → ficava "ativo" em
   // TODAS as rotas /aluno/*; por isso não dá p/ usar nav.find(ativo) aqui.)
   const inicioAtivo = pathname === '/aluno/nova/inicio' || pathname === '/aluno' || pathname === '/aluno/'
-  const ligasAtivo = pathname.startsWith('/aluno/ligas')
+  const ligasAtivo = !!ligasItem && casa(pathname, ligasItem.href)
 
-  // Qual grupo contém a rota atual + o item ativo (para a pílula).
+  // Qual grupo contém a rota atual + o item ativo (para a pílula): o match MAIS LONGO vence
+  // (ex.: /aluno/nova/comunidade/ligas não acende "Comunidade").
   function grupoAtivo(): { g: Grupo; item: GItem } | null {
+    let best: { g: Grupo; item: GItem } | null = null
     for (const grp of GRUPOS) {
-      const match = grp.itens.find((it) =>
-        pathname === it.href ||
-        pathname.startsWith(it.href + '/') ||
-        // "Banco de questões" engloba a aba "Recomendados" (área unificada).
-        (it.href === '/aluno/questoes' && (pathname === '/aluno/recomendado' || pathname.startsWith('/aluno/recomendado/'))),
-      )
-      if (match) return { g: grp.key, item: match }
+      for (const it of grp.itens) {
+        const match = casa(pathname, it.href) ||
+          // "Banco de questões" engloba a aba "Recomendados" (área unificada).
+          (it.href === '/aluno/questoes' && casa(pathname, '/aluno/recomendado'))
+        if (match && (!best || it.href.length > best.item.href.length)) best = { g: grp.key, item: it }
+      }
     }
-    return null
+    if (ligasItem && casa(pathname, ligasItem.href)) return null
+    return best
   }
   const ga = grupoAtivo()
 
@@ -170,8 +213,10 @@ export function DownBar({ theme, nav, usuario, pathname, onAccount }: DownBarPro
                 <ChevronDown style={{ width: 15, height: 15 }} />
               </button>
             </div>
+            {/* lista rola se não couber (muitos itens em tela baixa) */}
+            <div style={{ maxHeight: 'min(60vh, 440px)', overflowY: 'auto', overscrollBehavior: 'contain' }}>
             {grp.itens.map((it, k) => {
-              const atual = pathname === it.href || pathname.startsWith(it.href + '/')
+              const atual = ga?.item.href === it.href
               return (
                 <Link
                   key={it.href}
@@ -206,7 +251,7 @@ export function DownBar({ theme, nav, usuario, pathname, onAccount }: DownBarPro
                   </span>
                   <span style={{ flex: 1, minWidth: 0, lineHeight: 1.25 }}>
                     <b style={{ display: 'block', fontSize: 14 }}>{it.titulo}</b>
-                    <span style={{ fontSize: 12, color: 'var(--muted)' }}>{it.sub}</span>
+                    {it.sub && <span style={{ fontSize: 12, color: 'var(--muted)' }}>{it.sub}</span>}
                   </span>
                   {atual ? (
                     <Check style={{ width: 16, height: 16, color: 'var(--brand)' }} />
@@ -216,6 +261,7 @@ export function DownBar({ theme, nav, usuario, pathname, onAccount }: DownBarPro
                 </Link>
               )
             })}
+            </div>
           </div>
         ) : null,
       )}
@@ -276,17 +322,17 @@ export function DownBar({ theme, nav, usuario, pathname, onAccount }: DownBarPro
         )
       })}
 
-      {/* Ligas */}
-      {ligasAtivo ? (
-        <Link href="/aluno/ligas" style={pilulaStyle()}>
+      {/* Ligas — só quando está no menu (gamificação ativa); usa o href do próprio menu */}
+      {ligasItem && (ligasAtivo ? (
+        <Link href={ligasItem.href} style={pilulaStyle()}>
           <Trophy style={{ width: 18, height: 18 }} />
-          Ligas
+          {ligasItem.short || 'Ligas'}
         </Link>
       ) : (
-        <Link href="/aluno/ligas" aria-label="Ligas" title="Ligas" style={slotLinkStyle()}>
+        <Link href={ligasItem.href} aria-label={ligasItem.label} title={ligasItem.label} style={slotLinkStyle()}>
           <Trophy style={{ width: 21, height: 21 }} />
         </Link>
-      )}
+      ))}
 
       {/* Avatar → menu da conta */}
       <button
