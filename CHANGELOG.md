@@ -12,6 +12,16 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.2.4 — 2026-11-03
+
+### Cronograma do aluno — metas de LegProc voltam a abrir o material
+- As metas de lei seca (LegProc) do Cronograma Adaptativo não abriam: o conteúdo guardava só o **título** dos documentos LegProc (as aulas PDFull levam o id do documento no 7º campo de `AS`), então `urlMaterial()` no iframe não tinha `doc` e "Iniciar meta" / "Rever" não faziam nada.
+- `carregarConteudoBanco` agora devolve `WLPdoc` (paralelo a `WLP`: id do documento de cada bloco), a API do cronograma repassa e o iframe usa em `descrever()` → a meta LegProc abre o documento no leitor (com cronômetro/concluir da meta, como as aulas). `WLP` e o motor do plano não mudam (planos salvos continuam válidos); blocos do fallback (só texto) seguem sem link.
+
+### Meus Cadernos (portal novo) — sai o conteúdo fictício, entram os cadernos reais do aluno
+- A tela `/aluno/nova/cadernos` era o protótipo: 4 cadernos de exemplo ("Caderno de erros", "Responsabilidade civil · revisão final"…) e contadores fixos, iguais para todos os alunos.
+- Agora lista só os cadernos que o aluno criou (`simulado_aluno_cadernos`, com nº real de questões e data), cada cartão abre o caderno (`/aluno/cadernos/[id]`). "Criar caderno" funciona (antes era link morto). Abas com contagens reais e links: Cadernos · Grifos (Meus grifos) · Salvos (favoritos); a aba Anotações saiu (não há tela para ela). Saíram a barra "% resolvido" e "Compartilhar na comunidade" (sem dado/função por trás).
+
 ## 4.2.3 — 2026-11-03
 
 ### Produtos — grupo de acesso vinculado libera o extensivo para os membros

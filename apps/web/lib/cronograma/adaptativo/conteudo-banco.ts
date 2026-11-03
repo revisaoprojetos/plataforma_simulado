@@ -19,7 +19,13 @@ import { conteudoSeed } from './conteudo'
 // Enquanto o admin não vincular pastas/cadastrar lei seca, cai no SEED (não quebra).
 
 export interface DisciplinaInfo { nome: string; classificacao: string | null; cor: string | null }
-export interface ConteudoBanco extends Conteudo { disciplinas: DisciplinaInfo[]; vazio: boolean }
+export interface ConteudoBanco extends Conteudo {
+  disciplinas: DisciplinaInfo[]
+  vazio: boolean
+  /** Paralelo a WLP: id do documento da Biblioteca de cada bloco de lei seca (LegProc) → abre no leitor.
+   *  null quando o bloco vem da tabela de fallback (só texto, sem documento). */
+  WLPdoc?: (string | null)[][]
+}
 
 const PAG_PADRAO = 40 // páginas assumidas quando o PDF ainda não foi medido
 const TIPOS_MATERIAL = new Set(['pdfull', 'pdfight', 'pdflash', 'legproc', 'questoes'])
@@ -97,12 +103,12 @@ export async function carregarConteudoBanco(svc: SupabaseClient, tenantId: strin
   // 4) classifica cada doc pelo tipo herdado da sua subpasta
   //    pdfull | pdfight | null -> aula (PDFull) · legproc -> lei seca · questoes -> reservado (ignora)
   const aulaDocs: Array<{ id: string; titulo: string; versaoId: string | null; discNome: string }> = []
-  const legprocDocs: Array<{ titulo: string }> = []
+  const legprocDocs: Array<{ id: string; titulo: string }> = []
   for (const d of docs) {
     const discId = discDaPasta.get(d.pasta_id); if (!discId) continue
     const disc = discById.get(discId); if (!disc) continue
     const tipo = tipoHerdado(d.pasta_id)
-    if (tipo === 'legproc') { legprocDocs.push({ titulo: d.titulo }); continue } // lei seca → WLP
+    if (tipo === 'legproc') { legprocDocs.push({ id: d.id, titulo: d.titulo }); continue } // lei seca → WLP (+ id p/ abrir no leitor)
     // AULAS = só PDFull (ou docs sem subpasta tipada, p/ compat). PDFight (questões), PDFlash (revisão)
     // e Questões são MATERIAIS ligados às metas que o engine JÁ gera (qu/fl) — não contam como aula nova.
     if (tipo === 'pdfight' || tipo === 'pdflash' || tipo === 'questoes') continue
@@ -143,10 +149,13 @@ export async function carregarConteudoBanco(svc: SupabaseClient, tenantId: strin
   //    doc nº k (1-based) = semana k, 1 bloco por semana (texto = título do documento).
   //    Sem subpastas LegProc com docs → fallback da tabela (comportamento anterior preservado).
   let WLPout: WLP
+  let WLPdoc: (string | null)[][] = []
   if (legprocDocs.length) {
     legprocDocs.sort((a, b) => col.compare(a.titulo, b.titulo))
     WLPout = Array.from({ length: legprocDocs.length + 1 }, () => [] as string[])
-    legprocDocs.forEach((ld, i) => { WLPout[i + 1] = [ld.titulo] })
+    WLPdoc = Array.from({ length: legprocDocs.length + 1 }, () => [] as (string | null)[])
+    // id do doc junto do título: sem ele a meta LegProc do cronograma não tinha link e não abria.
+    legprocDocs.forEach((ld, i) => { WLPout[i + 1] = [ld.titulo]; WLPdoc[i + 1] = [ld.id] })
   } else {
     const { data: lpRows } = await svc.from('simulado_cronograma_adaptativo_legproc')
       .select('semana, ordem, texto').eq('tenant_id', tenantId).order('semana').order('ordem')
@@ -156,7 +165,7 @@ export async function carregarConteudoBanco(svc: SupabaseClient, tenantId: strin
     for (const r of lp) (WLPout[r.semana] ||= []).push(r.texto)
   }
 
-  return { AS: ASout, WLP: WLPout, disciplinas, vazio: false }
+  return { AS: ASout, WLP: WLPout, WLPdoc, disciplinas, vazio: false }
 }
 
 function fallbackConteudo(): Conteudo { return conteudoSeed() }

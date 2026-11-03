@@ -1,71 +1,91 @@
 // Meus Cadernos (novo) — CadernosRevisao. Tela de menu (sem caminho).
-// Abas Cadernos|Anotações|Grifos|Salvos + cadernos (automático/criados/diagnóstico) + criar/compartilhar.
-// CONTEÚDO DE EXEMPLO — marcado com TODO(dados). Layout fiel ao canvas.
-import { PageHeader, Card, Row, Col, H3, Muted, Tag, Btn, Tabs, Bar, GR } from '@/components/nova/ui'
-import { Icon } from '@/components/nova/icons'
+// DADOS REAIS do aluno: cadernos que ELE criou (simulado_aluno_cadernos + nº de questões) e contagens
+// reais de Grifos (leitor da Biblioteca) e Salvos (questões favoritas). Antes a tela era o protótipo
+// com 4 cadernos fictícios iguais para todos os alunos.
+import { redirect } from 'next/navigation'
+import Link from 'next/link'
+import { PageHeader, Card, Row, Col, H3, Muted, Tag, Tabs, GR } from '@/components/nova/ui'
+import { getSessaoAluno } from '@/lib/aluno-session'
+import { createAdminClient } from '@/lib/supabase/server'
 import { R } from '@/lib/nova/rotas'
+import { CriarCadernoCard } from './criar-caderno'
 
 export const dynamic = 'force-dynamic'
 
-// ——— abas (TODO(dados): ligar às coleções reais do aluno) ———
-const ABAS = ['Cadernos', 'Anotações', 'Grifos', 'Salvos']
-const CONTAGENS: (number | null)[] = [4, 24, 57, 19]
+type CadernoAluno = { id: string; nome: string; criado_em: string | null; total: number }
 
-type TagItem = { label: string; kind: 'green' | 'brand' | 'gold' | 'blue' | 'pink' }
-type Caderno = { origem: string; itens: number; titulo: string; tags: TagItem[]; pct: number; meta: string; compartilhar: boolean }
-const CADERNOS: Caderno[] = [
-  { origem: 'Automático', itens: 38, titulo: 'Caderno de erros', tags: [{ label: 'Questões', kind: 'green' }], pct: 42, meta: 'atualizado hoje', compartilhar: false },
-  { origem: 'Criado por você', itens: 46, titulo: 'Responsabilidade civil · revisão final', tags: [{ label: 'Questões', kind: 'green' }, { label: 'LegProc', kind: 'brand' }, { label: 'JurisClub', kind: 'gold' }], pct: 65, meta: 'editado ontem', compartilhar: true },
-  { origem: 'Do diagnóstico', itens: 30, titulo: 'Crédito tributário · diagnóstico PGE/RS', tags: [{ label: 'Questões', kind: 'green' }, { label: 'LegProc', kind: 'brand' }], pct: 0, meta: 'criado em 14/10', compartilhar: true },
-  { origem: 'Criado por você', itens: 22, titulo: 'Lei seca da Fazenda Pública', tags: [{ label: 'LegProc', kind: 'brand' }, { label: 'Anotações', kind: 'pink' }], pct: 80, meta: 'editado em 10/10', compartilhar: true },
-]
+const fmtData = (iso: string | null) => {
+  if (!iso) return ''
+  try { return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' }) } catch { return '' }
+}
 
-export default function CadernosPage() {
+export default async function CadernosPage() {
+  const sessao = await getSessaoAluno()
+  if (!sessao) redirect('/aluno/entrar')
+  const svc = createAdminClient()
+  const { tenantId, estudanteId } = sessao
+
+  const [{ data: cads }, grifos, salvos] = await Promise.all([
+    svc.from('simulado_aluno_cadernos').select('id, nome, criado_em')
+      .eq('tenant_id', tenantId).eq('estudante_id', estudanteId).order('criado_em', { ascending: false }),
+    svc.from('simulado_conteudo_grifos_pdf').select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId).eq('aluno_id', estudanteId).then((r) => (r.error ? null : r.count ?? 0), () => null),
+    svc.from('simulado_favoritos').select('questao_id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId).eq('estudante_id', estudanteId).then((r) => (r.error ? null : r.count ?? 0), () => null),
+  ])
+  const ids = ((cads ?? []) as any[]).map((c) => c.id as string)
+  const contagem: Record<string, number> = {}
+  for (let i = 0; i < ids.length; i += 100) {
+    const { data } = await svc.from('simulado_aluno_caderno_questoes').select('caderno_id').in('caderno_id', ids.slice(i, i + 100))
+    for (const q of (data ?? []) as any[]) contagem[q.caderno_id] = (contagem[q.caderno_id] ?? 0) + 1
+  }
+  const cadernos: CadernoAluno[] = ((cads ?? []) as any[]).map((c) => ({ id: c.id, nome: c.nome, criado_em: c.criado_em ?? null, total: contagem[c.id] ?? 0 }))
+
   return (
     <>
       <PageHeader
         title="Meus Cadernos"
-        sub="Tudo o que você montou, anotou, grifou e salvou na plataforma, num lugar só."
-        right={<Btn kind="primary" icon="pen">Criar caderno</Btn>}
+        sub="Os cadernos de questões que você montou, além dos seus grifos e questões salvas."
       />
 
-      {/* TODO(dados): tornar as abas navegáveis quando as coleções tiverem rota própria */}
-      <Tabs items={ABAS} active={0} counts={CONTAGENS} />
+      <Tabs
+        items={['Cadernos', 'Grifos', 'Salvos']}
+        active={0}
+        counts={[cadernos.length, grifos, salvos]}
+        links={[R.cadernos, R.painelGrifos, '/aluno/favoritos']}
+      />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 290px), 1fr))', gap: 16, alignItems: 'stretch' }}>
-        {/* Criar caderno */}
-        <a href="#" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, textAlign: 'center', minHeight: 260, padding: 24, borderRadius: 20, border: '2px dashed var(--line2)', background: 'var(--surface)' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 56, height: 56, borderRadius: '50%', background: 'var(--gold)', color: 'var(--goldInk)' }}><Icon n="plus" size={24} /></span>
-          <b style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink)' }}>Criar caderno</b>
-          <Muted size={12.5}>questões, artigos, teses e anotações</Muted>
-        </a>
+        <CriarCadernoCard />
 
-        {CADERNOS.map((c, i) => (
-          <Card key={i} pad={0} style={{ overflow: 'hidden', gap: 0 }}>
-            {/* capa/cabeçalho */}
-            <div style={{ position: 'relative', background: GR.EXT, color: '#fff', padding: '16px 18px', minHeight: 72, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px)', backgroundSize: '22px 22px' }} />
-              <span style={{ position: 'relative', fontSize: 11, fontWeight: 800, letterSpacing: '.14em', textTransform: 'uppercase', color: '#E6DEFF' }}>{c.origem}</span>
-              <span style={{ position: 'relative', fontFamily: 'Montserrat, sans-serif', fontStyle: 'italic', fontWeight: 800, fontSize: 28, color: 'var(--gold)' }}>{c.itens}</span>
-            </div>
-            {/* corpo */}
-            <Col gap={12} style={{ padding: 18 }}>
-              <H3>{c.titulo}</H3>
-              <Row gap={6}>
-                {c.tags.map((t, k) => <Tag key={k} kind={t.kind}>{t.label}</Tag>)}
-              </Row>
-              <Bar pct={c.pct} color="var(--gold)" />
-              <Row style={{ justifyContent: 'space-between', gap: 8 }}>
-                <Muted size={12}>{c.pct}% resolvido</Muted>
-                <Muted size={12}>{c.meta}</Muted>
-              </Row>
-              {c.compartilhar ? (
-                <Btn kind="secondary" size="sm" icon="users" style={{ marginTop: 'auto' }}>Compartilhar na comunidade</Btn>
-              ) : null}
-            </Col>
-          </Card>
+        {cadernos.map((c) => (
+          <Link key={c.id} href={`/aluno/cadernos/${c.id}`} style={{ display: 'flex' }}>
+            <Card pad={0} style={{ overflow: 'hidden', gap: 0, width: '100%' }}>
+              {/* capa/cabeçalho */}
+              <div style={{ position: 'relative', background: GR.EXT, color: '#fff', padding: '16px 18px', minHeight: 72, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px)', backgroundSize: '22px 22px' }} />
+                <span style={{ position: 'relative', fontSize: 11, fontWeight: 800, letterSpacing: '.14em', textTransform: 'uppercase', color: '#E6DEFF' }}>Criado por você</span>
+                <span style={{ position: 'relative', fontFamily: 'Montserrat, sans-serif', fontStyle: 'italic', fontWeight: 800, fontSize: 28, color: 'var(--gold)' }}>{c.total}</span>
+              </div>
+              {/* corpo */}
+              <Col gap={12} style={{ padding: 18 }}>
+                <H3>{c.nome}</H3>
+                <Row gap={6}>
+                  <Tag kind="green">{c.total === 1 ? '1 questão' : `${c.total} questões`}</Tag>
+                </Row>
+                <Row style={{ justifyContent: 'space-between', gap: 8 }}>
+                  <Muted size={12}>{c.total ? 'Abrir caderno' : 'Caderno vazio'}</Muted>
+                  {c.criado_em && <Muted size={12}>criado em {fmtData(c.criado_em)}</Muted>}
+                </Row>
+              </Col>
+            </Card>
+          </Link>
         ))}
       </div>
+
+      {cadernos.length === 0 && (
+        <Muted size={13}>Você ainda não criou nenhum caderno. Os cadernos que você criar aparecem aqui.</Muted>
+      )}
     </>
   )
 }

@@ -25,8 +25,8 @@ export async function GET() {
     carregarDocs(svc, sessao.tenantId, sessao.estudanteId),
     carregarConteudoBanco(svc, sessao.tenantId),
   ])
-  // conteudo: AS/WLP + disciplinas(classificacao/cor) p/ o iframe montar grupos e grade.
-  return NextResponse.json({ ok: true, ...docs, conteudo: { AS: conteudo.AS, WLP: conteudo.WLP, disciplinas: conteudo.disciplinas } })
+  // conteudo: AS/WLP (+ WLPdoc = id do doc LegProc de cada bloco, p/ abrir no leitor) + disciplinas(classificacao/cor).
+  return NextResponse.json({ ok: true, ...docs, conteudo: { AS: conteudo.AS, WLP: conteudo.WLP, WLPdoc: conteudo.WLPdoc ?? [], disciplinas: conteudo.disciplinas } })
 }
 
 export async function POST(req: NextRequest) {

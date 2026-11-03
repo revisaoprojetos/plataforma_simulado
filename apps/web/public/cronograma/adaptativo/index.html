@@ -862,7 +862,7 @@ function rankingRevisao(plano, notas, ateData, jaRevisados) {
 /** Descreve uma meta a partir do id. */
 function descrever(id, AS, WLP) {
   const [t, a, b] = id.split(':');
-  if (t === 'lp') return { tipo: 'lp', texto: WLP[+a][+b], sem: +a };
+  if (t === 'lp') return { tipo: 'lp', texto: WLP[+a][+b], sem: +a, doc: ((WLPDOC[+a] || [])[+b]) || null };
   const rev = t === 'rf' || t === 'rq';
   const i = rev ? +b : +a;
   const e = AS[i];
@@ -987,6 +987,8 @@ function _wktbl(wl,dl,days,lm){
    Cronograma Adaptativo — aplicação
    ============================================================ */
 let { AS, WLP } = DADOS;
+// Paralelo a WLP: id do documento LegProc de cada bloco (vem do backend) → a meta de lei seca abre no leitor.
+var WLPDOC = [];
 
 let ESSENCIAIS = ["Direito Administrativo","Direito Constitucional","Direito Civil","Direito Financeiro","Processo Civil","Direito Tributário","Direito Ambiental","Direito do Trabalho","Processo do Trabalho"];
 let COMPLEMENTARES = ["Direito Agrário","Direito do Consumidor","Direito Econômico","Direito Empresarial","Direito Penal","Processo Penal","Legislação Penal Especial","Direito Previdenciário","Direito Previdenciário Público","Direito Urbanístico"];
@@ -2451,7 +2453,7 @@ body.embed .flut{display:none}
   function aplicarConteudo(ct) {
     try {
       if (!ct || !Array.isArray(ct.AS) || !ct.AS.length) return;
-      AS = ct.AS; WLP = Array.isArray(ct.WLP) ? ct.WLP : WLP;
+      AS = ct.AS; WLP = Array.isArray(ct.WLP) ? ct.WLP : WLP; WLPDOC = Array.isArray(ct.WLPdoc) ? ct.WLPdoc : [];
       var disc = Array.isArray(ct.disciplinas) ? ct.disciplinas : [];
       if (disc.length) {
         var ess = disc.filter(function (d) { return d.classificacao === 'essencial'; }).map(function (d) { return d.nome; });
