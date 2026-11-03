@@ -1681,8 +1681,13 @@ async function construirSumarioPdf(pdf,pageLines){
    camada de texto ganha data-pid estável (p<pág>-s<i>) → o motor de grifos marca o texto (transparente)
    sobre o canvas = marca-texto fiel. Ao terminar, repinta os grifos e recalcula sumário/tempo. */
 async function renderPdfPages(){
-  const pdfjs=await import('/pdf/pdf.min.mjs');
-  pdfjs.GlobalWorkerOptions.workerSrc='/pdf/pdf.worker.min.mjs';
+  // BUILD LEGACY do pdf.js (public/pdf, copiado de pdfjs-dist/legacy/build): o build "moderno" do pdf.js 6
+  // usa Promise.withResolvers / Map.getOrInsertComputed / Math.sumPrecise… → quebra no Safari do iPhone/iPad
+  // (iOS < 17.4/18+) e em tablets Android com Chrome antigo = leitor abria SEM conteúdo. A query ?v= muda a
+  // URL a cada troca de build → o Service Worker (cache-first p/ .mjs) não serve o arquivo antigo do cache.
+  const PDFJS_V='6.2.108-legacy';
+  const pdfjs=await import('/pdf/pdf.min.mjs?v='+PDFJS_V);
+  pdfjs.GlobalWorkerOptions.workerSrc='/pdf/pdf.worker.min.mjs?v='+PDFJS_V;
   const pdf=await pdfjs.getDocument({url:CFG.pdf.url}).promise;
   const scale=CFG.pdf.scale||1.4;
   const pageLines={};

@@ -8,7 +8,7 @@
  *
  * Versionar STATIC_CACHE (bump em cada deploy que muda a estratégia) → `activate` limpa os antigos.
  */
-const VERSION = 'v1'
+const VERSION = 'v2' // v2: pdf.js trocado p/ build legacy (o moderno quebrava o leitor no iOS/tablets)
 const STATIC_CACHE = `static-${VERSION}`
 
 self.addEventListener('install', () => {

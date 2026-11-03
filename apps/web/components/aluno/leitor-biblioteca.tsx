@@ -9,7 +9,7 @@
 //      pdf, grifos, ... } } quando o iframe avisa 'leitor-jus-ready';
 //   2) a cada mudança o iframe manda 'leitor-jus-grifos' → reconciliamos com /api/conteudo/grifo-pdf.
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import type { GrifoPdf } from '@/lib/conteudo/leitor'
@@ -17,6 +17,12 @@ import { APP_VERSION } from '@/lib/version'
 
 const PROTOTIPO = `/leitura/leitor-jus.html?v=${APP_VERSION}`
 const LARGURA_ALVO = 820 // largura de referência p/ a escala do PDF (host e iframe usam a MESMA)
+// Worker do pdf.js = BUILD LEGACY em public/pdf (o mesmo que o iframe usa). O build "moderno" do pdf.js 6
+// exige Promise.withResolvers / Map.getOrInsertComputed / Math.sumPrecise… → no Safari do iPhone/iPad e
+// em tablets Android com Chrome antigo ele quebrava AQUI, o erro era engolido, o "dia" nunca era enviado e o
+// leitor abria SEM conteúdo. ?v= força baixar de novo (o Service Worker serve .mjs cache-first).
+const PDFJS_WORKER = '/pdf/pdf.worker.min.mjs?v=6.2.108-legacy'
+const TIMEOUT_PDF_MS = 45000 // celular em rede lenta: depois disso mostra o erro (com "tentar de novo")
 // A legenda de CATEGORIAS do leitor (Núcleo/Prazos/STF/STJ/Equipe…) é específica do LegProc e NÃO se
 // aplica a documentos da Biblioteca (PDFULL/Fight/etc.). Por isso nasce OCULTA (todas as chaves "off");
 // o admin pode religar por documento (mostrarLegenda → legendasOff=[]). Esconder todas também remove o
@@ -85,6 +91,9 @@ export function LeitorBiblioteca({
   }, [salvarTempo])
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [pdfMeta, setPdfMeta] = useState<{ url: string; scale: number; pages: { w: number; h: number }[] } | null>(null)
+  // Falha ao abrir o PDF → tela de erro (antes: falha silenciosa = leitor vazio, sem saber o porquê).
+  const [erroPdf, setErroPdf] = useState<string | null>(pdfUrl ? null : 'sem-pdf')
+  const [tentativa, setTentativa] = useState(0)
   const enviados = useRef(new Map<string, { serverId: string; hash: string; geo: string }>())
   const busy = useRef(false); const pendente = useRef<GrifoEngine[] | null>(null); const avisou = useRef(false)
   const dados = useRef({ documentoId, versaoId, titulo, voltarHref, paginaInicial, partesCrono, metaCrono, mostrarLegenda, tempoDeterminadoSeg, tempoBase })
@@ -97,12 +106,14 @@ export function LeitorBiblioteca({
 
   // carrega os metadados do PDF (nº de páginas + tamanho de cada uma na MESMA escala que o iframe usará)
   useEffect(() => {
-    if (!pdfUrl) return
+    if (!pdfUrl) { setErroPdf('sem-pdf'); return }
     let vivo = true
+    setErroPdf(null)
+    const limite = setTimeout(() => { if (vivo) setErroPdf('O material demorou demais para carregar. Verifique sua conexão.') }, TIMEOUT_PDF_MS)
     ;(async () => {
       try {
-        const pdfjs: any = await import('pdfjs-dist')
-        pdfjs.GlobalWorkerOptions.workerSrc = '/pdf/pdf.worker.min.mjs'
+        const pdfjs: any = await import('pdfjs-dist/legacy/build/pdf.mjs')
+        pdfjs.GlobalWorkerOptions.workerSrc = PDFJS_WORKER
         const pdf = await pdfjs.getDocument({ url: pdfUrl }).promise
         if (!vivo) return
         const v1 = (await pdf.getPage(1)).getViewport({ scale: 1 })
@@ -122,11 +133,22 @@ export function LeitorBiblioteca({
           for (let k = 0; k < vps.length; k++) pages[ini + k] = { w: Math.round(vps[k].width), h: Math.round(vps[k].height) }
         }
         if (!vivo) return
-        setPdfMeta({ url: pdfUrl, scale, pages })
-      } catch { /* sem PDF → o leitor mostra conteúdo vazio; o download continua disponível */ }
+        clearTimeout(limite)
+        setPdfMeta({ url: pdfUrl, scale, pages }); setErroPdf(null) // chegou depois do timeout → some o aviso
+      } catch (e: any) {
+        clearTimeout(limite)
+        if (!vivo) return
+        const msg = String(e?.message || e || '')
+        console.error('[leitor-biblioteca] falha ao abrir o PDF', e)
+        setErroPdf(/is not a function|is not defined|Unexpected token|SyntaxError/i.test(msg)
+          ? 'Seu navegador está desatualizado para o leitor. Atualize o navegador (ou o sistema) e tente de novo.'
+          : /Missing PDF|Invalid PDF|InvalidPDF|corrupt/i.test(msg) ? 'O arquivo do material está corrompido. Avise o suporte.'
+            : /40[13]|Unexpected server response|expired|Forbidden/i.test(msg) ? 'O link do material expirou. Toque em "Tentar de novo".'
+              : 'Não foi possível abrir o material.')
+      }
     })()
-    return () => { vivo = false }
-  }, [pdfUrl])
+    return () => { vivo = false; clearTimeout(limite) }
+  }, [pdfUrl, tentativa])
 
   const enviarDia = useCallback(() => {
     const win = iframeRef.current?.contentWindow
@@ -264,6 +286,24 @@ export function LeitorBiblioteca({
     <div className="fixed inset-0 z-40 bg-[var(--bg,#fbfbfc)]">
       <iframe ref={iframeRef} src={PROTOTIPO} title={titulo || 'Leitura'} onLoad={enviarDia}
         style={{ display: 'block', width: '100%', height: '100%', border: 0, background: 'var(--bg, #fbfbfc)' }} />
+      {erroPdf && (
+        <div role="alert" style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'grid', placeItems: 'center', padding: 20, background: 'color-mix(in srgb, var(--bg, #fbfbfc) 88%, transparent)', backdropFilter: 'blur(6px)' }}>
+          <div style={{ width: 'min(420px, 100%)', borderRadius: 20, padding: '26px 22px 20px', background: 'var(--card, #fff)', color: 'var(--foreground, #1f1f1f)', boxShadow: '0 24px 60px -18px rgba(0,0,0,.35)', border: '1px solid color-mix(in srgb, currentColor 10%, transparent)', textAlign: 'center' }}>
+            <div style={{ width: 52, height: 52, margin: '0 auto 14px', borderRadius: 16, display: 'grid', placeItems: 'center', background: 'color-mix(in srgb, #d93025 12%, transparent)', color: '#d93025', fontSize: 26, fontWeight: 800 }}>!</div>
+            <h2 style={{ fontSize: 17, fontWeight: 700, margin: '0 0 6px' }}>{erroPdf === 'sem-pdf' ? 'Material indisponível' : 'Não foi possível abrir o material'}</h2>
+            <p style={{ fontSize: 14, lineHeight: 1.5, opacity: .75, margin: '0 0 18px' }}>
+              {erroPdf === 'sem-pdf' ? 'Este material ainda não tem a versão de leitura pronta. Tente novamente em alguns minutos.' : erroPdf}
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {erroPdf === 'sem-pdf'
+                ? <button onClick={() => router.refresh()} style={btnPri}>Tentar de novo</button>
+                : <button onClick={() => setTentativa((t) => t + 1)} style={btnPri}>Tentar de novo</button>}
+              {pdfUrl && <a href={pdfUrl} target="_blank" rel="noopener noreferrer" style={btnSec}>Abrir o PDF no navegador</a>}
+              <button onClick={() => irPara(voltarHref)} style={btnSec}>Voltar</button>
+            </div>
+          </div>
+        </div>
+      )}
       {metaCrono && usarBadgeMeta && !tempoDeterminadoSeg ? (
         <div aria-live="off" style={{ position: 'fixed', left: '50%', transform: 'translateX(-50%)', bottom: 18, zIndex: 50, display: 'inline-flex', alignItems: 'center', gap: 9, padding: '8px 14px', borderRadius: 999, background: 'color-mix(in srgb, var(--primary, #6d28d9) 92%, #000)', color: '#fff', boxShadow: '0 8px 24px -8px rgba(0,0,0,.4)', fontSize: 14, fontWeight: 700, fontVariantNumeric: 'tabular-nums', pointerEvents: 'none', userSelect: 'none' }}>
           <style>{'@keyframes lb-pulse{0%,100%{opacity:1}50%{opacity:.35}}'}</style>
@@ -275,3 +315,6 @@ export function LeitorBiblioteca({
     </div>
   )
 }
+
+const btnPri: CSSProperties = { height: 44, borderRadius: 12, border: 0, background: 'var(--primary, #6d28d9)', color: 'var(--primary-foreground, #fff)', fontSize: 15, fontWeight: 600, cursor: 'pointer' }
+const btnSec: CSSProperties = { height: 44, borderRadius: 12, border: '1px solid color-mix(in srgb, currentColor 18%, transparent)', background: 'transparent', color: 'inherit', fontSize: 14, fontWeight: 500, cursor: 'pointer', display: 'grid', placeItems: 'center', textDecoration: 'none' }
