@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { getCurrentTenant } from '@/lib/tenant'
-import { urlAssinadaOriginal } from '@/lib/conteudo/ingestao'
+import { urlFonteOnlyOffice } from '@/lib/conteudo/fonte-onlyoffice'
 import { paletaBlocosDoTema } from '@/lib/conteudo/blocos-palette'
 import { ConteudoEditor } from './conteudo-editor'
 import { PreviaLab } from './previa-lab'
@@ -21,18 +21,10 @@ export default async function EditarConteudoPage({ params, searchParams }: { par
   // Paraleliza as 3 chamadas (doc + URL assinada + tenant) — reduz a latência no localhost (menos ida-e-volta).
   const [docRes, documentUrl, tenant] = await Promise.all([
     svc.from('simulado_conteudo_documentos').select('titulo, categoria').eq('tenant_id', access.tenantId).eq('id', v.documento_id).maybeSingle(),
-    urlAssinadaOriginal(v.arquivo_key, 3600),
+    urlFonteOnlyOffice(v.arquivo_key, 3600),
     getCurrentTenant(),
   ])
   const doc = docRes.data
-  if (!documentUrl) return (
-    <div className="flex min-h-[60vh] items-center justify-center p-8">
-      <div className="max-w-md rounded-xl border border-destructive/30 bg-destructive/5 p-5 text-sm text-destructive">
-        <p className="font-semibold">Não foi possível abrir o arquivo no storage.</p>
-        <p className="mt-2">O documento existe, mas o arquivo original não pôde ser lido (bucket/permissão de storage). Confira o bucket de conteúdos e tente importar de novo.</p>
-      </div>
-    </div>
-  )
   // "Voltar" conforme a ORIGEM do documento: `categoria='modelo_caderno'` (área de Caderno) ≠ Biblioteca.
   // `origem` (query ?origem=/admin/...) tem prioridade p/ retornar à página EXATA de onde veio (ex.: a montagem
   // do banco), com validação anti open-redirect (só caminho interno /admin/...). Senão cai no default da área.

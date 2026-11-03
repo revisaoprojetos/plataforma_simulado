@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createHash } from 'node:crypto'
 import { createAdminClient } from '@/lib/supabase/server'
 import { baixarOriginal, urlAssinadaOriginal, resolverBucketConteudo } from '@/lib/conteudo/ingestao'
+import { urlFonteOnlyOffice } from '@/lib/conteudo/fonte-onlyoffice'
 import { renderPreviaDocx } from '@/lib/conteudo/previa-docx'
 import { emitirVarsAgrupamento, nomeDoSlug } from '@/lib/conteudo/previa-compute'
 import { carregarTextosDesempenho } from '@/lib/conteudo/textos-desempenho'
@@ -118,8 +119,8 @@ export async function GET(request: Request) {
   const contentHash = createHash('sha1').update(filled).digest('hex').slice(0, 16)
   const tmpPath = `conteudo-diag-tmp/${tenantId}/${sessaoId}_${contentHash}.docx`
   try { await uploadArquivo({ tenantId, bucket, path: tmpPath, data: Buffer.from(filled), contentType: DOCX, nome: 'diag.docx', publico: false, criadoPor: null }) } catch { /* mesmo conteúdo já existe → segue p/ a URL assinada */ }
-  const tmpUrl = await urlAssinadaOriginal(tmpPath, 600)
-  if (!tmpUrl) return NextResponse.json({ message: 'Falha ao preparar o documento.' }, { status: 502 })
+  // Fonte do ConvertService = rota do app (provider-independente; o tmp docx é lido via getStorage).
+  const tmpUrl = await urlFonteOnlyOffice(tmpPath, 600)
   const pdf = await converterDocxParaPdf(tmpUrl, `diag_${contentHash}`)
   if (!pdf) return NextResponse.json({ message: 'OnlyOffice indisponível para gerar o PDF.' }, { status: 502 })
   try { await uploadArquivo({ tenantId, bucket, path: pdfPath, data: pdf, contentType: PDF, nome: 'diagnostico.pdf', publico: false, criadoPor: null }) } catch { /* cache best-effort */ }

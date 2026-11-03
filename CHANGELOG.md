@@ -12,6 +12,13 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.1.3 — 2026-11-03
+
+### Storage (migração s3/Hetzner) — conversão docx do OnlyOffice provider-independente
+- **Correção que destrava o `STORAGE_PROVIDER=s3`.** A conversão docx→PDF/miniatura e os editores do OnlyOffice entregavam ao Document Server a **URL assinada do storage** — o container baixava direto, o que só funcionava no Supabase (host público) e **quebrava no Hetzner** ("erro no LibreOffice/conversão").
+- **Nova rota `/api/conteudo/fonte`** serve o `.docx` **pelo próprio app** (lê via `getStorage()`), autorizada por token curto (HMAC do `arquivo_key`). O OnlyOffice passa a baixar do app (host alcançável, o mesmo dos callbacks de edição), nunca do storage direto → funciona igual no Supabase **e** no s3.
+- Apontados para a rota: **miniatura do card**, **PDF do leitor**, **visualizador** e **editor** da Biblioteca, **diagnóstico do aluno** e **editor beta da Leitura**. URLs de navegador (vídeo/áudio/download/PDF cacheado) **não** mudaram. Sem variável de ambiente nova.
+
 ## 4.1.2 — 2026-11-02
 
 ### Aluno — visualizador de vídeo/áudio da Biblioteca

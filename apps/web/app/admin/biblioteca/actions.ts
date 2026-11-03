@@ -13,6 +13,7 @@ import {
 } from '@/lib/conteudo/documentos'
 import { randomUUID } from 'node:crypto'
 import { tipoDoArquivo, converterParaHtml, guardarOriginal, baixarOriginal, urlAssinadaOriginal, resolverBucketConteudo } from '@/lib/conteudo/ingestao'
+import { urlFonteOnlyOffice } from '@/lib/conteudo/fonte-onlyoffice'
 import { contagensDocsAreaSql, resumoAcessoPastaSql } from '@/lib/conteudo/biblioteca-sql'
 import { reconciliarVersao } from '@/lib/conteudo/reconciliacao'
 import { listarVinculosDoDocumento, vincularDocumento, desvincular, type ModoVinculo } from '@/lib/conteudo/vinculos'
@@ -213,8 +214,8 @@ export async function dadosVisualizacao(documentoId: string): Promise<{
     ver = r.data
   }
   if (!ver?.arquivo_key) return { ok: false, error: 'Sem arquivo para visualizar.' }
-  const documentUrl = await urlAssinadaOriginal(ver.arquivo_key, 3600)
-  if (!documentUrl) return { ok: false, error: 'Não foi possível abrir o arquivo no storage.' }
+  // document.url do OnlyOffice = rota do app (provider-independente; funciona no Supabase e no s3).
+  const documentUrl = await urlFonteOnlyOffice(ver.arquivo_key, 3600)
   const tipoOrigem = (doc as any).tipo_origem as string
   const fileType = tipoOrigem === 'pdf' ? 'pdf' : tipoOrigem === 'html' ? 'html' : 'docx'
   return {

@@ -3,6 +3,7 @@ import { SignJWT } from 'jose'
 import { createAdminClient } from '@/lib/supabase/server'
 import { uploadArquivo, getStorage } from '@/lib/storage'
 import { resolverBucketConteudo, urlAssinadaOriginal } from './ingestao'
+import { urlFonteOnlyOffice } from './fonte-onlyoffice'
 
 // Miniatura FIEL do card: converte o .docx na imagem PNG da 1ª página via ConvertService do OnlyOffice
 // (o mesmo Document Server do editor). Assim o card mostra o documento com blocos/cores reais — igual
@@ -77,8 +78,9 @@ export async function gerarThumbDocumento(tenantId: string, documentoId: string,
       const cached = await urlAssinadaOriginal(path, 3600)
       if (cached) return cached
     }
-    const src = await urlAssinadaOriginal(ver.arquivo_key, 600)
-    if (!src) return null
+    // Fonte do ConvertService = rota do PRÓPRIO app (provider-independente); o OnlyOffice baixa daqui,
+    // nunca do storage direto — por isso funciona igual no Supabase e no s3/Hetzner.
+    const src = await urlFonteOnlyOffice(ver.arquivo_key, 1800)
     const png = await gerarThumbDocx(src, `thumb_${ver.id}_${String(ver.hash_arquivo || '').slice(0, 8)}`)
     if (!png) return null
     // Guarda no storage e devolve a URL ASSINADA (evita trafegar o PNG em base64 — centenas de KB — na
@@ -145,8 +147,7 @@ export async function gerarPdfDocumento(tenantId: string, documentoId: string): 
       const cached = await urlAssinadaOriginal(path, 3600)
       if (cached) return cached
     }
-    const src = await urlAssinadaOriginal(ver.arquivo_key, 600)
-    if (!src) return null
+    const src = await urlFonteOnlyOffice(ver.arquivo_key, 1800)
     const pdf = await converterDocxParaPdf(src, `pdf_${ver.id}_${String(ver.hash_arquivo || '').slice(0, 8)}`)
     if (!pdf) return null
     try {

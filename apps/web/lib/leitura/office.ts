@@ -1,6 +1,7 @@
 import 'server-only'
 import { getStorage } from '@/lib/storage'
 import { resolverBucketConteudo } from '@/lib/conteudo/ingestao'
+import { urlFonteOnlyOffice } from '@/lib/conteudo/fonte-onlyoffice'
 
 // OnlyOffice na Leitura — caminho OPCIONAL/BETA (ligado por tenant em tema.leitura_onlyoffice). NÃO
 // substitui o editor atual. É LOSSY (o HTML rico da Leitura — grifos/selos/dispositivos — não sobrevive
@@ -20,7 +21,8 @@ export async function gerarEArmazenarDocx(tenantId: string, documentoId: string,
   const bucket = await resolverBucketConteudo()
   const path = caminhoOfficeLeitura(tenantId, documentoId)
   await getStorage().upload({ bucket, path, data: bytes, contentType: MIME_DOCX, upsert: true })
-  try { return await getStorage().getSignedUrl(bucket, path, 3600) } catch { return null }
+  // document.url do OnlyOffice = rota do app (provider-independente; Supabase e s3).
+  try { return await urlFonteOnlyOffice(path, 3600) } catch { return null }
 }
 
 /** Sobrescreve o docx guardado (chamado pelo callback do OnlyOffice ao salvar). */
