@@ -12,6 +12,8 @@ import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { sincronizarGrupoPassaporte } from '@/lib/estudante/grupo-passaporte'
 import { sincronizarGrupoVitalicio } from '@/lib/estudante/grupo-vitalicio'
 import { resumoAcessoLote } from '@/lib/acesso/aluno-efetivo'
+import { exibidorCpf } from '@/lib/privacidade/cpf-server'
+import { ehCpfMascarado } from '@/lib/privacidade/cpf'
 
 const TENANT_VAZIO = '00000000-0000-0000-0000-000000000000'
 
@@ -68,8 +70,9 @@ export async function carregarLoteEstudantes(offset: number, limit: number, comC
   const asc = opts?.sort ? opts.sort.dir === 'asc' : false
   q = q.order(col, { ascending: asc }).order('id', { ascending: true }).range(offset, offset + lim - 1)
   const { data, count } = await q
+  const exib = await exibidorCpf() // CPF completo só p/ super-admin; demais recebem mascarado
   const base = (data ?? []).map((e: any) => ({
-    id: e.id, nome: e.nome, email: e.email ?? null, cpf: e.cpf ?? null, telefone: e.telefone ?? null,
+    id: e.id, nome: e.nome, email: e.email ?? null, cpf: exib.cpf(e.cpf), telefone: e.telefone ?? null,
     classificacao: e.classificacao ?? null, created_at: e.created_at ?? null,
     avatar: e.avatar ?? null, avatarCor: e.perfil_avatar_cor ?? null,
   }))
@@ -110,8 +113,10 @@ export async function buscarEstudantes(termo: string): Promise<EstudanteBase[]> 
     .or(ors.join(','))
     .order('nome', { ascending: true })
     .limit(200)
+  // A busca casa o CPF REAL (coluna) — só a resposta exibida é mascarada.
+  const exib = await exibidorCpf()
   const base = (data ?? []).map((e: any) => ({
-    id: e.id, nome: e.nome, email: e.email ?? null, cpf: e.cpf ?? null, telefone: e.telefone ?? null,
+    id: e.id, nome: e.nome, email: e.email ?? null, cpf: exib.cpf(e.cpf), telefone: e.telefone ?? null,
     classificacao: e.classificacao ?? null, created_at: e.created_at ?? null,
     avatar: e.avatar ?? null, avatarCor: e.perfil_avatar_cor ?? null,
   }))
@@ -279,6 +284,10 @@ export async function editarEstudanteAction(id: string, data: EditarEstudanteDat
   }
   // Só altera a data de cadastro se foi informada (evita sobrescrever com vazio).
   if (data.created_at) update.created_at = data.created_at
+  // CPF: quem não é super-admin vê o CPF MASCARADO no formulário. `undefined` (campo não
+  // tocado) ou valor mascarado = mantém o CPF atual — nunca grava a máscara no banco. Digitar
+  // um CPF novo continua permitido (corrige/preenche sem precisar ver o anterior).
+  if (data.cpf === undefined || ehCpfMascarado(data.cpf)) delete update.cpf
 
   const { error } = await svc.from('simulado_estudantes').update(update).eq('id', id).eq('tenant_id', tenantId)
   if (error) return { error: error.message }

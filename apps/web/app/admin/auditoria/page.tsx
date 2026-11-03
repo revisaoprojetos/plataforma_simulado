@@ -13,6 +13,7 @@ import { PaginationControls } from '@/components/admin/pagination-controls'
 import { isoParaBrtLocal } from '@/lib/brt'
 import { resumoRegistro } from '@/lib/auditoria/resumo'
 import { cn } from '@/lib/utils'
+import { exibidorCpf } from '@/lib/privacidade/cpf-server'
 
 const ITEMS_PER_PAGE = 12
 
@@ -202,7 +203,10 @@ export default async function AuditoriaPage({ searchParams }: PageProps) {
       if (acessosEstud && sub === 'plataforma') query = estIdsQ?.length ? query.in('entidade_id', estIdsQ) : query.eq('id', NADA)
       else query = query.or(`entidade.ilike.%${like}%,operacao.ilike.%${like}%`)
     }
-    const r = await query; logs = r.data; count = r.count ?? 0
+    const r = await query; count = r.count ?? 0
+    // Diffs (antes/depois) de estudante trazem o CPF → mascarado p/ quem não é super-admin.
+    const exibCpf = await exibidorCpf()
+    logs = exibCpf.ver ? r.data : (r.data ?? []).map((l: any) => ({ ...l, dados_anteriores: exibCpf.profundo(l.dados_anteriores), dados_novos: exibCpf.profundo(l.dados_novos), detalhes: exibCpf.profundo(l.detalhes) }))
 
     if (ehAuto && logs?.length) {
       const grupoIds = [...new Set(logs.filter((l) => l.entidade === 'simulado_estudantes' && isUuid(l.entidade_id)).map((l) => l.entidade_id as string))]

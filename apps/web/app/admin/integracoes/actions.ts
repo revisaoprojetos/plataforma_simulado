@@ -13,6 +13,8 @@ import { aplicarEntitlement, reaplicarLiberacoes } from '@/lib/integracoes/engin
 import { coalescer } from '@/lib/integracoes/ratelimit'
 import { normalizarPorMapa, ehProdutoPassaporte } from '@/lib/integracoes/normalizar-mapa'
 import type { Provider, PessoaNormalizada, Entitlement } from '@/lib/integracoes/tipos'
+import { exibidorCpf } from '@/lib/privacidade/cpf-server'
+import { mascararCpf, ehCpfMascarado } from '@/lib/privacidade/cpf'
 
 const PROVIDERS: Provider[] = ['curseduca', 'guru']
 
@@ -209,7 +211,7 @@ function resumoEvento(payload: any): { comprador: string | null; produto: string
   const c = payload?.contact ?? payload?.buyer ?? {}
   const p = payload?.product ?? {}
   return {
-    comprador: c.email ?? c.name ?? c.doc ?? null,
+    comprador: c.email ?? c.name ?? (c.doc ? mascararCpf(String(c.doc)) : null),
     produto: p.name ?? p.marketplace_id ?? payload?.checkout_url ?? null,
   }
 }
@@ -251,12 +253,13 @@ export async function getEventoDetalhe(provider: string, id: string): Promise<{ 
   } else data = r.data
   if (!data) return { ok: false, error: 'Evento não encontrado.' }
   const h = (data.headers ?? {}) as any
+  const exib = await exibidorCpf() // payload cru: CPF completo só p/ super-admin
   return {
     ok: true,
     detalhe: {
       eventId: data.event_id, tipo: data.tipo, status: data.status, erro: data.erro,
       recebidoEm: data.recebido_em, processadoEm: data.processado_em,
-      headers: h.headers ?? null, query: h.query ?? null, body: data.payload,
+      headers: h.headers ?? null, query: exib.profundo(h.query ?? null), body: exib.profundo(data.payload),
     },
   }
 }
@@ -490,13 +493,14 @@ export async function getRecebidoDetalhe(id: string): Promise<{ ok: boolean; err
   const d = res.data as any
   if (!d) return { ok: false, error: 'Requisição não encontrada.' }
   const tok: string | null = d.token ?? null
+  const exib = await exibidorCpf() // payload cru: CPF completo só p/ super-admin
   return {
     ok: true,
     detalhe: {
       provider: d.provider, fonte: d.fonte ?? d.provider,
       metodo: d.metodo, statusResp: d.status_resp, resultado: d.resultado, ip: d.ip, recebidoEm: d.recebido_em,
       tokenMasc: tok ? `${tok.slice(0, 6)}…${tok.slice(-4)}` : null,
-      headers: d.headers ?? null, query: d.query ?? null, body: d.body_json ?? null, bodyRaw: d.body_raw ?? null,
+      headers: d.headers ?? null, query: exib.profundo(d.query ?? null), body: exib.profundo(d.body_json ?? null), bodyRaw: exib.texto(d.body_raw ?? null),
     },
   }
 }
@@ -517,7 +521,8 @@ async function montarResumoRecebido(svc: ReturnType<typeof createAdminClient>, t
     const { pessoa, entitlement, statusBruto } = norm
     const dig = (s?: string | null) => (s ? s.replace(/\D/g, '') : '')
     const out: string[] = []
-    out.push(`Comprador: ${pessoa.nome}${pessoa.email ? ` · ${pessoa.email}` : ''}${pessoa.cpf ? ` · CPF ${dig(pessoa.cpf)}` : ''}`)
+    const exib = await exibidorCpf()
+    out.push(`Comprador: ${pessoa.nome}${pessoa.email ? ` · ${pessoa.email}` : ''}${pessoa.cpf ? ` · CPF ${exib.cpf(dig(pessoa.cpf))}` : ''}`)
     out.push(`Produto: ${entitlement.produtoNome ?? entitlement.produtoRef} · status "${statusBruto ?? '—'}" → ${entitlement.status === 'ativo' ? 'LIBERA acesso' : 'CANCELA acesso'}`)
     if (ehProdutoPassaporte(entitlement.produtoNome)) out.push('Produto identificado como PASSAPORTE (pelo nome) → acesso a todos os simulados + grupo "Passaporte".')
 
@@ -566,13 +571,14 @@ export async function getWebhookInboxDetalhe(provider: string, id: string): Prom
   if (!data) return { ok: false, error: 'Requisição não encontrada.' }
   const d = data as any
   const tok: string | null = d.token ?? null
+  const exib = await exibidorCpf() // payload cru: CPF completo só p/ super-admin
   const resumo = d.body_json ? await montarResumoRecebido(svc, g.tenantId, provider as Provider, d.body_json) : undefined
   return {
     ok: true,
     detalhe: {
       metodo: d.metodo, statusResp: d.status_resp, resultado: d.resultado, ip: d.ip, recebidoEm: d.recebido_em,
       tokenMasc: tok ? `${tok.slice(0, 6)}…${tok.slice(-4)}` : null,
-      headers: d.headers ?? null, query: d.query ?? null, body: d.body_json ?? null, bodyRaw: d.body_raw ?? null,
+      headers: d.headers ?? null, query: exib.profundo(d.query ?? null), body: exib.profundo(d.body_json ?? null), bodyRaw: exib.texto(d.body_raw ?? null),
       resumo,
     },
   }
@@ -679,13 +685,14 @@ export async function listarAssinaturasSalvas(provider: string, opts?: { page?: 
   const emailSet = new Set((peRes as any[]).map((e) => (e.email ?? '').trim().toLowerCase()))
   const cpfSet = new Set((pcRes as any[]).map((e) => chaveDigitos(e.cpf)))
 
+  const exib = await exibidorCpf() // CPF completo só p/ super-admin (o aplicar relê da base)
   const itens: AssinaturaGuruDTO[] = linhas.map((r) => {
     const email = (r.email ?? '').trim().toLowerCase() || null
     const cpf = chaveDigitos(r.cpf) || null
     return {
       pessoaExternalId: r.pessoa_external_id ?? r.ent_external_id,
       entExternalId: r.ent_external_id,
-      nome: r.nome ?? email ?? 'Aluno', email: r.email, cpf: r.cpf, telefone: r.telefone,
+      nome: r.nome ?? email ?? 'Aluno', email: r.email, cpf: exib.cpf(r.cpf), telefone: r.telefone,
       produtoRef: r.produto_ref ?? '', produtoNome: r.produto_nome, status: r.status ?? 'ativo',
       jaNoSistema: (!!email && emailSet.has(email)) || (!!cpf && cpfSet.has(cpf)),
       temMapeamento: !!r.produto_ref && mapeados.has(r.produto_ref),
@@ -757,8 +764,18 @@ export async function aplicarAssinaturasGuru(provider: string, itens: Assinatura
 
   let concedidos = 0, semMapeamento = 0, erros = 0
   const estudantes = new Set<string>()
+  // O CPF que veio da tela pode estar MASCARADO (só super-admin vê o completo) → relê o CPF
+  // REAL da base local pelo ent_external_id. Nunca grava a máscara no cadastro do aluno.
+  const cpfReal = new Map<string, string | null>()
+  const entIds = [...new Set(itens.map((it) => it.entExternalId).filter(Boolean))]
+  for (let i = 0; i < entIds.length; i += 200) {
+    const { data } = await createAdminClient().from('simulado_integracao_base').select('ent_external_id, cpf')
+      .eq('tenant_id', g.tenantId).eq('provider', provider).in('ent_external_id', entIds.slice(i, i + 200))
+    for (const r of (data ?? []) as any[]) cpfReal.set(r.ent_external_id, r.cpf ?? null)
+  }
   for (const it of itens) {
-    const pessoa: PessoaNormalizada = { nome: it.nome, email: it.email, cpf: it.cpf, telefone: it.telefone, externalId: it.pessoaExternalId }
+    const cpf = cpfReal.has(it.entExternalId) ? cpfReal.get(it.entExternalId)! : (ehCpfMascarado(it.cpf) ? null : it.cpf)
+    const pessoa: PessoaNormalizada = { nome: it.nome, email: it.email, cpf, telefone: it.telefone, externalId: it.pessoaExternalId }
     const entitlement: Entitlement = { externalId: it.entExternalId, produtoRef: it.produtoRef, produtoNome: it.produtoNome, status: (it.status as any) ?? 'ativo' }
     try {
       const r = await aplicarEntitlement({ tenantId: g.tenantId, provider, pessoa, entitlement })

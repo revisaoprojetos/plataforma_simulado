@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { editarEstudanteAction } from '@/app/admin/estudantes/actions'
 import { Loader2, X, Pencil } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ehCpfMascarado } from '@/lib/privacidade/cpf'
 
 type Estudante = {
   id: string
@@ -43,6 +44,7 @@ export function EditarEstudanteDialog({ estudante, onClose }: { estudante: Estud
   const [nome, setNome] = useState(estudante.nome ?? '')
   const [email, setEmail] = useState(estudante.email ?? '')
   const [cpf, setCpf] = useState(estudante.cpf ?? '')
+  const cpfMascarado = ehCpfMascarado(estudante.cpf)
   const [telefone, setTelefone] = useState(estudante.telefone ?? '')
   const [nascimento, setNascimento] = useState(paraDataInput(estudante.data_nascimento))
   const [matricula, setMatricula] = useState(estudante.matricula_externa ?? '')
@@ -63,7 +65,10 @@ export function EditarEstudanteDialog({ estudante, onClose }: { estudante: Estud
     if (!email.trim()) { toast.error('Informe o e-mail.'); return }
     setSalvando(true)
     const r = await editarEstudanteAction(estudante.id, {
-      nome, email, cpf, telefone,
+      nome, email, telefone,
+      // CPF só vai ao servidor se foi ALTERADO — o valor exibido pode estar mascarado
+      // (só super-admin vê o CPF completo) e a máscara nunca deve ser gravada.
+      cpf: cpf !== (estudante.cpf ?? '') ? cpf : undefined,
       data_nascimento: nascimento || null,
       classificacao,
       matricula_externa: matricula,
@@ -89,7 +94,12 @@ export function EditarEstudanteDialog({ estudante, onClose }: { estudante: Estud
           <div className="sm:col-span-2"><Campo label="Nome"><input value={nome} onChange={(e) => setNome(e.target.value)} autoFocus className={inputCls} /></Campo></div>
           <Campo label="E-mail"><input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className={inputCls} /></Campo>
           <Campo label="Telefone"><input value={telefone} onChange={(e) => setTelefone(e.target.value)} className={inputCls} /></Campo>
-          <Campo label="CPF"><input value={cpf} onChange={(e) => setCpf(e.target.value)} className={inputCls} /></Campo>
+          <Campo label="CPF">
+            <input value={cpf} onChange={(e) => setCpf(e.target.value)} className={inputCls}
+              // Mascarado: ao focar, seleciona tudo — digitar substitui pelo CPF novo.
+              onFocus={(e) => { if (cpfMascarado) e.currentTarget.select() }} />
+            {cpfMascarado && <p className="text-[11px] text-muted-foreground">CPF oculto (visível só ao super admin). Digite para substituir.</p>}
+          </Campo>
           <Campo label="Nascimento"><input type="date" value={nascimento} onChange={(e) => setNascimento(e.target.value)} className={inputCls} /></Campo>
           <Campo label="Matrícula externa"><input value={matricula} onChange={(e) => setMatricula(e.target.value)} className={inputCls} /></Campo>
           <Campo label="Cadastrado em"><input type="date" value={cadastro} onChange={(e) => setCadastro(e.target.value)} className={inputCls} /></Campo>

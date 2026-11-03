@@ -13,6 +13,7 @@ import { resolverCfgCurseduca } from '@/lib/curseduca/cfg'
 import { selecionarGrupos } from '@/lib/simulado/grupos'
 import { fetchAll } from '@/lib/supabase/fetch-all'
 import { randomBytes } from 'crypto'
+import { exibidorCpf } from '@/lib/privacidade/cpf-server'
 
 export type GrupoCurseducaDTO = { id: number; nome: string; criadoEm: string | null }
 export type GrupoSistema = { id: string; nome: string; cor: string | null; pai_id: string | null; is_mestre: boolean; membros: number }
@@ -207,10 +208,11 @@ export async function previewMembrosGrupo(groupId: number): Promise<{ ok: boolea
   const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
   try {
     const [lista, matriculas] = await Promise.all([listarMembrosDoGrupo(g.cfg, groupId), mapaMatriculasGrupo(g.cfg, groupId)])
+    const exibCpf = await exibidorCpf() // CPF completo só p/ super-admin (o import relê da API)
     const membros = lista.map((m) => {
       const mat = matriculas.get(m.id)
       return {
-        id: m.id, nome: m.nome, email: m.email, cpf: m.cpf, telefone: m.telefone,
+        id: m.id, nome: m.nome, email: m.email, cpf: exibCpf.cpf(m.cpf), telefone: m.telefone,
         situacao: m.situacao, criadoEm: m.criadoEm, ultimoAcesso: m.ultimoAcesso, cidade: m.cidade, uf: m.uf,
         entrouEm: mat?.entrouEm ?? null, expiraEm: mat?.expiraEm ?? null, temMatricula: !!mat, temAcesso: mat?.temAcesso ?? null,
       }

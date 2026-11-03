@@ -32,6 +32,7 @@ import { modalidadesDoAlunoV2, temEntregaV2, type EntregaSlots, type ModalidadeA
 import { tipoDoSimulado, filtrarModsPorTipo, type TipoSimulado } from '@/lib/simulado/tipo'
 import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
+import { exibidorCpf } from '@/lib/privacidade/cpf-server'
 
 function fmt(d: string | null) {
   return d ? format(new Date(d), 'dd/MM/yyyy HH:mm', { locale: ptBR }) : '—'
@@ -79,7 +80,9 @@ export default async function EstudantePerfilPage({ params, searchParams }: { pa
     svc.from('simulado_matriculas').select('simulado_id').eq('estudante_id', id).eq('tenant_id', TID),
     svc.from('simulado_acessos').select('simulado_id, expira_em').eq('estudante_id', id).eq('tenant_id', TID),
   ])
-  const est = estRes.data
+  // CPF completo só p/ super-admin global — os demais recebem mascarado (já no servidor).
+  const exibCpf = await exibidorCpf()
+  const est = estRes.data ? { ...estRes.data, cpf: exibCpf.cpf((estRes.data as any).cpf) } : estRes.data
   if (!est) notFound()
   const sessoes = sessoesRes.data
 

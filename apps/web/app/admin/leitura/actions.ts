@@ -25,6 +25,7 @@ import { carregarRelatorioModulo, type RelatorioModulo } from '@/lib/leitura/rel
 import { classificarFormato } from '@/lib/simulado/formato'
 import { confirmarImportQuestoes } from '@/app/admin/banco-questoes/actions'
 import type { QuestaoImport } from '@/app/admin/banco-questoes/import-types'
+import { exibidorCpf } from '@/lib/privacidade/cpf-server'
 
 export type SituacaoEditorial = 'em_preparacao' | 'rascunho' | 'em_revisao' | 'publicada' | 'arquivada' | 'revogada'
 
@@ -399,7 +400,8 @@ export async function listarEstudantesTenant(): Promise<{ ok: boolean; itens?: E
   const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
   const data = await fetchAll<any>(() => svc.from('simulado_estudantes').select('id, nome, email, cpf').eq('tenant_id', g.tenantId).eq('deletado', false).order('nome', { ascending: true }))
-  return { ok: true, itens: data.map((e: any) => ({ id: e.id, nome: e.nome ?? 'Aluno', email: e.email ?? null, cpf: e.cpf ?? null })) }
+  const exibCpf = await exibidorCpf() // CPF completo só p/ super-admin
+  return { ok: true, itens: data.map((e: any) => ({ id: e.id, nome: e.nome ?? 'Aluno', email: e.email ?? null, cpf: exibCpf.cpf(e.cpf) })) }
 }
 
 // ── Anotações BASE (pré-definidas do admin) — vêm no documento p/ todos os alunos ──

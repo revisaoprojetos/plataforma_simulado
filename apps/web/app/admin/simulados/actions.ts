@@ -16,6 +16,7 @@ import type { QuestaoImport } from '@/app/admin/banco-questoes/import-types'
 import { reordenarProvaViaApi, estudantesLinkadosViaApi } from '@/lib/data/simulados-api'
 import { estudantesLinkadosSql } from '@/lib/data/relatorios.repo'
 import { criarNotificacoesEmMassa } from '@/lib/notificacoes/criar'
+import { exibidorCpf } from '@/lib/privacidade/cpf-server'
 
 // Sentinela p/ escopo de tenant: com tenantId null, o filtro vira um uuid impossível →
 // 0 linhas (fail-closed). Toda query por id/simulado_id filtra .eq('tenant_id', tenantId ?? SEM_TENANT)
@@ -239,6 +240,7 @@ export async function listarEstudantesSimulado(simuladoId: string): Promise<{ ok
     sessPorEst.set(s.estudante_id, arr)
   }
 
+  const exibCpf = await exibidorCpf() // CPF completo só p/ super-admin
   const estudantes: EstudanteLinkado[] = estIds.map((eid) => {
     const e = estMap.get(eid) ?? {}
     const ss = sessPorEst.get(eid) ?? []
@@ -249,7 +251,7 @@ export async function listarEstudantesSimulado(simuladoId: string): Promise<{ ok
       id: eid,
       nome: e.nome ?? 'Estudante',
       email: e.email ?? null,
-      cpf: e.cpf ?? null,
+      cpf: exibCpf.cpf(e.cpf),
       telefone: e.telefone ?? null,
       classificacao: e.classificacao ?? 'normal',
       liberado: !!libPorEst.get(eid),

@@ -3,6 +3,7 @@ import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { BancoEstudantesClient } from '@/components/admin/banco-estudantes-client'
 import { AlertTriangle } from 'lucide-react'
+import { exibidorCpf } from '@/lib/privacidade/cpf-server'
 
 function SqlPendente() {
   return (
@@ -47,6 +48,8 @@ export async function BancoEstudantes({ bancoId, cor = '#6d28d9' }: { bancoId: s
       ? await fetchAllByIn<any>(vincIds, (ids) => svc
           .from('simulado_estudantes').select('id, nome, email, telefone, cpf, classificacao, avatar, perfil_avatar_cor').in('id', ids), { chunk: 300 })
       : []
+    const exibCpf = await exibidorCpf() // CPF completo só p/ super-admin
+    for (const r of vincRecs) r.cpf = exibCpf.cpf(r.cpf)
     vinculados = vincRecs.sort((a: any, b: any) => (a.nome ?? '').localeCompare(b.nome ?? '', 'pt-BR'))
   }
 
