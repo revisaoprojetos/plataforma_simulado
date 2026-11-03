@@ -1743,7 +1743,9 @@ async function renderPdfPages(){
       try{const tc=await page.getTextContent();pageLines[n]=agruparLinhasPdf(tc.items)}catch(_){pageLines[n]=[]}
       // seleção estável (mecanismo pdfjs): endOfContent + classe .selecting no mousedown
       const end=document.createElement('div');end.className='endOfContent';tl.appendChild(end);tl.__eoc=end;
-      tl.addEventListener('mousedown',()=>tl.classList.add('selecting'));
+      // SÓ mouse de verdade: no toque/caneta o navegador emula um mousedown, a classe ficava presa (o reset é
+      // no pointerup de mouse) e o endOfContent passava a cobrir a página inteira → grifo virava um bloco na folha.
+      tl.addEventListener('pointerdown',e=>{if(e.pointerType==='mouse')tl.classList.add('selecting')});
       initPdfSelection();
       $$('.pdfov',wrap).forEach(e=>e.remove());S.an.filter(a=>a.sec===('p'+n)).forEach(paint); // repinta (idempotente) os grifos desta página — limpa antes p/ não empilhar/escurecer
     }catch(err){console.error('[leitor-jus][pdf] página '+n,err)}
@@ -2280,7 +2282,7 @@ function selInfoPdf(){
   const sel=getSelection();if(!sel.rangeCount||sel.isCollapsed)return null;const r=sel.getRangeAt(0);
   const texto=r.toString().replace(/\s+/g,' ').trim();if(!texto)return null;
   const pageEls=$$('#article .pdf-sec');const porPag=new Map();let first=null;
-  for(const rc of r.getClientRects()){
+  for(const rc of rectsDoTextoPdf(r)){
     if(rc.width<1||rc.height<1)continue;const cx=rc.left+rc.width/2,cy=rc.top+rc.height/2;
     const el=pageEls.find(p=>{const b=p.getBoundingClientRect();return cx>=b.left&&cx<=b.right&&cy>=b.top&&cy<=b.bottom});
     if(!el)continue;const pp=$('.pdfpage',el);const b=pp.getBoundingClientRect();
@@ -2292,6 +2294,21 @@ function selInfoPdf(){
   const all=[...porPag.entries()].map(([sec,rs])=>[sec,mergeRects(rs)]);
   return {sec:all[0][0],rects:all[0][1],text:texto,rect:first,_all:all};
 }
+// Retângulos SÓ do TEXTO selecionado na camada do PDF. Range.getClientRects() devolve também a caixa
+// inteira de cada ELEMENTO contido na seleção (endOfContent, <br>, spans vazios) — quando a seleção
+// atravessava a página (comum com caneta/dedo), entrava a caixa do endOfContent = PÁGINA INTEIRA pintada.
+function rectsDoTextoPdf(r){
+  const out=[];
+  const add=n=>{const sr=document.createRange();
+    try{sr.setStart(n,n===r.startContainer?r.startOffset:0);sr.setEnd(n,n===r.endContainer?r.endOffset:n.nodeValue.length)}catch(_){return}
+    if(sr.collapsed)return;for(const rc of sr.getClientRects())out.push(rc)};
+  const root=r.commonAncestorContainer;
+  if(root.nodeType===3){if(root.parentElement&&root.parentElement.closest('.pdftl'))add(root);return out}
+  const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);let dentro=false;
+  for(let n=w.nextNode();n;n=w.nextNode()){
+    if(!r.intersectsNode(n)){if(dentro)break;continue}
+    dentro=true;if(!n.nodeValue.trim()||!n.parentElement||!n.parentElement.closest('.pdftl'))continue;add(n)}
+  return out}
 function mergeRects(rects){
   const srt=rects.slice().sort((a,b)=>a.y0-b.y0||a.x0-b.x0);const lines=[];
   for(const r of srt){const h=r.y1-r.y0;const ln=lines.find(l=>Math.abs((l.y0+l.y1)/2-(r.y0+r.y1)/2)<h*0.6&&r.x0<=l.x1+0.03&&r.x1>=l.x0-0.03);
@@ -2356,35 +2373,61 @@ document.addEventListener('touchend',e=>{if(window.__penActive)return;if(e.targe
   const dentroLeitura=t=>!!(t&&t.closest&&t.closest('.pdftl,.flow,.sec'));
   const naUI=t=>!!(t&&t.closest&&t.closest('#seltool,.pop,#mirror,#anbar,.menu,.tplmenu,.side,button,a,input,textarea,[contenteditable]'));
   const sel=()=>{try{return getSelection()}catch(_){return null}};
-  let on=false,sN=null,sO=0,pid=null,moved=false,avisou=false;
+  // Só aceita ponto que caiu num NÓ DE TEXTO do conteúdo. Nos vãos entre linhas/palavras do PDF o
+  // caretRangeFromPoint devolve o CONTÊINER (a camada inteira) → a seleção pulava para o início/fim da
+  // página e o grifo saía gigante ou em lugar errado. Fora do texto: mantém o último ponto bom.
+  const caretTexto=(x,y)=>{const c=caretAt(x,y);if(!c||!c.node||c.node.nodeType!==3)return null;
+    const el=c.node.parentElement;if(!el||naUI(el)||!dentroLeitura(el))return null;
+    if(ehPdf()&&!el.closest('.pdftl'))return null;return c};
+  let on=false,sN=null,sO=0,pid=null,moved=false,avisou=false,x0=0,y0=0,supAte=0;
   function setSel(n2,o2){const s=sel();if(s&&sN){try{s.setBaseAndExtent(sN,sO,n2,o2)}catch(_){}}}
   function autoScroll(y){const r=scroller.getBoundingClientRect(),m=54;let d=0;if(y<r.top+m)d=y-(r.top+m);else if(y>r.bottom-m)d=y-(r.bottom-m);if(d)scroller.scrollTop+=Math.max(-20,Math.min(20,d/2.4))}
   function limpar(){on=false;sN=null;pid=null;window.__penActive=false;document.body.classList.remove('pen-ativa')}
   scroller.addEventListener('pointerdown',e=>{
     if(e.pointerType!=='pen'||naUI(e.target)||!dentroLeitura(e.target))return;
-    const c=caretAt(e.clientX,e.clientY);if(!c||!c.node)return;
-    on=true;moved=false;sN=c.node;sO=c.offset;pid=e.pointerId;
+    // Entra no modo caneta MESMO se o toque caiu num vão (margem, entre linhas): antes saía cedo e a caneta
+    // ROLAVA a página. A âncora da seleção fica para o primeiro ponto que cair em texto.
+    on=true;moved=false;pid=e.pointerId;x0=e.clientX;y0=e.clientY;
+    const c=caretTexto(e.clientX,e.clientY);sN=c?c.node:null;sO=c?c.offset:0;
     window.__penActive=true;document.body.classList.add('pen-ativa');
+    $$('#article .pdftl.selecting').forEach(tl=>tl.classList.remove('selecting'));
     try{scroller.setPointerCapture(pid)}catch(_){}
     const s=sel();if(s)try{s.removeAllRanges()}catch(_){}
   });
   scroller.addEventListener('pointermove',e=>{
     if(!on||e.pointerType!=='pen'||e.pointerId!==pid)return;
-    e.preventDefault(); // impede a rolagem/scroll enquanto a caneta grifa
-    const c=caretAt(e.clientX,e.clientY);if(c&&c.node){moved=true;setSel(c.node,c.offset);autoScroll(e.clientY)}
+    e.preventDefault();
+    // tremidinha da ponta ao encostar não é traço: só vira seleção depois de ~6px (senão o toque para
+    // ABRIR um grifo virava uma seleção de 1 letra e não abria nada)
+    if(!moved&&Math.hypot(e.clientX-x0,e.clientY-y0)<6)return;
+    const c=caretTexto(e.clientX,e.clientY);
+    if(c){if(!sN){sN=c.node;sO=c.offset}else{moved=true;setSel(c.node,c.offset)}}
+    autoScroll(e.clientY);
   },{passive:false});
   function fim(e){
     if(!on||e.pointerId!==pid)return;
     try{scroller.releasePointerCapture(pid)}catch(_){}
     const s=sel(),houve=moved&&s&&!s.isCollapsed;
     limpar();clearTimeout(window._st);
-    if(houve){try{onSelectEnd()}catch(_){}if(!avisou){avisou=true;try{toast('Modo caneta: arraste para grifar · use o dedo para rolar')}catch(_){}}}
-    // tap curto da caneta (sem arrastar): deixa o clique nativo abrir o balão do grifo, como o dedo.
+    if(houve){try{onSelectEnd()}catch(_){}if(!avisou){avisou=true;try{toast('Modo caneta: arraste para grifar · use o dedo para rolar')}catch(_){}}return}
+    // TOQUE curto da caneta: o touchstart foi cancelado (p/ a caneta não rolar a página), então o navegador
+    // NÃO gera o clique — e tocar num grifo com a caneta não abria o balão (cor/nota/apagar). Gera o clique
+    // aqui, no ponto tocado, e ignora um eventual clique nativo logo em seguida (não abre/apaga 2 vezes).
+    if(!moved){const alvo=document.elementFromPoint(e.clientX,e.clientY);if(!alvo)return;
+      supAte=Date.now()+600;
+      const ev=new MouseEvent('click',{bubbles:true,cancelable:true,view:window,clientX:e.clientX,clientY:e.clientY});ev.__caneta=true;
+      try{alvo.dispatchEvent(ev)}catch(_){}}
   }
   scroller.addEventListener('pointerup',fim);
   scroller.addEventListener('pointercancel',e=>{if(on&&e.pointerId===pid){try{scroller.releasePointerCapture(pid)}catch(_){}limpar()}});
-  // Rejeição de PALMA: enquanto a caneta grifa, ignora toques de dedo (palma apoiada na tela).
-  scroller.addEventListener('touchstart',e=>{if(window.__penActive)try{e.preventDefault()}catch(_){}},{passive:false});
+  document.addEventListener('click',e=>{if(!e.__caneta&&Date.now()<supAte){e.stopPropagation();e.preventDefault()}},true);
+  // A CANETA NÃO ROLA + rejeição de PALMA. Trocar o touch-action no meio do gesto não vale (o navegador
+  // decide no início), e preventDefault no pointermove não segura a rolagem — quem segura é cancelar os
+  // eventos de TOQUE. Vale p/ o toque da própria caneta e p/ a palma apoiada enquanto ela grifa.
+  // touchType==='stylus' (iPad) cobre o caso de o touchstart chegar antes do pointerdown.
+  const ehCaneta=e=>window.__penActive||[...(e.touches||[])].some(t=>t.touchType==='stylus'&&!naUI(t.target)&&dentroLeitura(t.target));
+  scroller.addEventListener('touchstart',e=>{if(ehCaneta(e))try{e.preventDefault()}catch(_){}},{passive:false});
+  scroller.addEventListener('touchmove',e=>{if(ehCaneta(e))try{e.preventDefault()}catch(_){}},{passive:false});
 })();
 scroller.addEventListener('scroll',()=>{if(tool.classList.contains('show'))hideTool();if(pop.dataset.kind!=='note')closePop()},{passive:true});
 article.addEventListener('click',e=>{
@@ -2651,14 +2694,27 @@ let sk={tool:'pen',c:'k',size:4,drawing:false,last:null,hist:[]};
 const inkOf=c=>getComputedStyle(document.documentElement).getPropertyValue(c==='k'?'--ink':'--c-'+c).trim();
 function drawSketch(data){ctx.clearRect(0,0,canvas.width,canvas.height);sk.hist=[];if(data){const im=new Image();im.onload=()=>ctx.drawImage(im,0,0);im.src=data}}
 function skPoint(e){const r=canvas.getBoundingClientRect();return {x:(e.clientX-r.left)*canvas.width/r.width,y:(e.clientY-r.top)*canvas.height/r.height}}
-canvas.addEventListener('pointerdown',e=>{canvas.setPointerCapture(e.pointerId);sk.drawing=true;sk.last=skPoint(e);try{sk.hist.push(ctx.getImageData(0,0,canvas.width,canvas.height));if(sk.hist.length>20)sk.hist.shift()}catch(err){}});
-canvas.addEventListener('pointermove',e=>{if(!sk.drawing)return;const p=skPoint(e),scale=canvas.width/canvas.getBoundingClientRect().width;ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
+// TABLET: um traço = UM ponteiro (sk.pid). Antes qualquer dedo/palma que encostasse durante o traço da
+// caneta movia o MESMO "último ponto" → riscos retos atravessando a folha. Com a caneta em uso, toques de
+// dedo são ignorados por um instante (rejeição de palma).
+let skPid=null,skPenAt=0;
+canvas.addEventListener('pointerdown',e=>{
+  if(sk.drawing&&e.pointerId!==skPid)return;
+  if(e.pointerType==='pen')skPenAt=Date.now();else if(e.pointerType==='touch'&&Date.now()-skPenAt<1500)return;
+  e.preventDefault();try{canvas.setPointerCapture(e.pointerId)}catch(_){}
+  skPid=e.pointerId;sk.drawing=true;sk.last=skPoint(e);try{sk.hist.push(ctx.getImageData(0,0,canvas.width,canvas.height));if(sk.hist.length>20)sk.hist.shift()}catch(err){}});
+canvas.addEventListener('pointermove',e=>{if(!sk.drawing||e.pointerId!==skPid)return;if(e.pointerType==='pen')skPenAt=Date.now();
+  const scale=canvas.width/canvas.getBoundingClientRect().width;ctx.save();ctx.lineCap='round';ctx.lineJoin='round';
+  // pontos intermediários (a Apple Pencil/S Pen mandam bem mais pontos que os eventos entregues) → traço liso, sem "quinas"
+  let evs=[];try{evs=e.getCoalescedEvents?e.getCoalescedEvents():[]}catch(_){}if(!evs.length)evs=[e];
   if(sk.tool==='eraser'){ctx.globalCompositeOperation='destination-out';ctx.lineWidth=sk.size*6*scale}
   else if(sk.tool==='marker'){ctx.globalAlpha=.3;ctx.strokeStyle=inkOf(sk.c==='k'?'y':sk.c);ctx.lineWidth=sk.size*5*scale}
-  else{ctx.strokeStyle=inkOf(sk.c);ctx.lineWidth=sk.size*scale*(e.pressure&&e.pointerType==='pen'?(.5+e.pressure):1)}
-  ctx.beginPath();ctx.moveTo(sk.last.x,sk.last.y);ctx.lineTo(p.x,p.y);ctx.stroke();ctx.restore();sk.last=p});
-const endStroke=()=>{if(!sk.drawing)return;sk.drawing=false;const sh=sheetOf(sheetSec);sh.sketch=canvas.toDataURL('image/png');sh.at=hhmm();save('sheets');$('#mrSaved').innerHTML='<i></i>Salvo às '+sh.at};
-canvas.addEventListener('pointerup',endStroke);canvas.addEventListener('pointercancel',endStroke);
+  else{ctx.strokeStyle=inkOf(sk.c);ctx.lineWidth=sk.size*scale*(e.pointerType==='pen'&&e.pressure>0?(.5+e.pressure):1)}
+  // UM caminho por evento (não um por ponto): o marca-texto é translúcido e emendas sobrepostas escureciam
+  ctx.beginPath();ctx.moveTo(sk.last.x,sk.last.y);for(const ev of evs){const p=skPoint(ev);ctx.lineTo(p.x,p.y);sk.last=p}ctx.stroke();
+  ctx.restore()});
+const endStroke=()=>{if(!sk.drawing)return;sk.drawing=false;skPid=null;const sh=sheetOf(sheetSec);sh.sketch=canvas.toDataURL('image/png');sh.at=hhmm();save('sheets');$('#mrSaved').innerHTML='<i></i>Salvo às '+sh.at};
+canvas.addEventListener('pointerup',e=>{if(e.pointerId===skPid)endStroke()});canvas.addEventListener('pointercancel',e=>{if(e.pointerId===skPid)endStroke()});
 $$('#skTools [data-sk]').forEach(b=>b.onclick=()=>{sk.tool=b.dataset.sk;$$('#skTools [data-sk]').forEach(x=>x.classList.toggle('on',x===b))});
 $$('#skColors .cd').forEach(b=>b.onclick=()=>{sk.c=b.dataset.c;$$('#skColors .cd').forEach(x=>x.classList.toggle('on',x===b));if(sk.tool==='eraser'){sk.tool='pen';$$('#skTools [data-sk]').forEach(x=>x.classList.toggle('on',x.dataset.sk==='pen'))}});
 $$('#skSize button').forEach(b=>b.onclick=()=>{sk.size=+b.dataset.v;$$('#skSize button').forEach(x=>x.classList.toggle('on',x===b))});

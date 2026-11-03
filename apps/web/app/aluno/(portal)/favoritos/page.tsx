@@ -1,9 +1,8 @@
 import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
-import { type QuestaoAluno } from '@/components/aluno/questao-resolvivel'
 import { QuestaoCard } from '@/components/aluno/questao-card'
-import { etiquetasPorQuestao } from '@/lib/aluno/etiquetas-questao'
+import { carregarFavoritosAluno } from '@/lib/aluno/favoritos'
 import { Star } from 'lucide-react'
 
 export default async function AlunoFavoritosPage() {
@@ -11,51 +10,7 @@ export default async function AlunoFavoritosPage() {
   if (!sessao) redirect('/aluno/entrar')
   const svc = createAdminClient()
 
-  const { data: favs } = await svc
-    .from('simulado_favoritos')
-    .select('questao_id, criado_em')
-    .eq('estudante_id', sessao!.estudanteId)
-    .order('criado_em', { ascending: false })
-
-  const ids = (favs ?? []).map((f: any) => f.questao_id)
-
-  // questões + alternativas + etiquetas dependem só de `ids` (favoritos) → em PARALELO.
-  const [{ data: questoes }, { data: alts }, etiquetasMap] = await Promise.all([
-    ids.length ? svc.from('simulado_questoes').select('id, tipo, enunciado, disciplina_id, ano, comentario_professor').in('id', ids).eq('status', 'publicada') : Promise.resolve({ data: [] as any[] }),
-    ids.length ? svc.from('simulado_alternativas').select('id, questao_id, texto, ordem, correta').in('questao_id', ids) : Promise.resolve({ data: [] as any[] }),
-    etiquetasPorQuestao(svc, sessao!.tenantId, ids),
-  ])
-
-  // Nomes das disciplinas dependem dos disciplina_id das questões → só depois.
-  const discIds = (questoes ?? []).map((x: any) => x.disciplina_id).filter(Boolean)
-  const { data: discNomes } = discIds.length
-    ? await svc.from('simulado_disciplinas').select('id, nome').in('id', discIds)
-    : { data: [] as any[] }
-  const discMap = new Map((discNomes ?? []).map((d: any) => [d.id, d.nome]))
-
-  const altMap = new Map<string, any[]>()
-  for (const a of alts ?? []) {
-    const arr = altMap.get(a.questao_id) ?? []
-    arr.push(a)
-    altMap.set(a.questao_id, arr)
-  }
-
-  // Preserva a ordem dos favoritos (mais recentes primeiro).
-  const qById = new Map((questoes ?? []).map((x: any) => [x.id, x]))
-  const lista: QuestaoAluno[] = ids
-    .map((id) => qById.get(id))
-    .filter(Boolean)
-    .map((x: any) => ({
-      id: x.id,
-      tipo: x.tipo,
-      enunciado: x.enunciado ?? '',
-      disciplina: discMap.get(x.disciplina_id) ?? null,
-      ano: x.ano ?? null,
-      comentario_professor: x.comentario_professor ?? null,
-      favorito: true,
-      etiquetas: etiquetasMap.get(x.id) ?? [],
-      alternativas: (altMap.get(x.id) ?? []).map((a) => ({ id: a.id, texto: a.texto, ordem: a.ordem ?? 0, correta: !!a.correta })),
-    }))
+  const lista = await carregarFavoritosAluno(svc, sessao!.tenantId, sessao!.estudanteId)
 
   return (
     <div className="space-y-5">

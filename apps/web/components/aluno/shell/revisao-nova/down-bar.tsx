@@ -16,9 +16,9 @@ import type { AlunoNavItem, AlunoShellUsuario } from '../types'
 import { MarcaR, NavIcon } from './icons'
 import { DOWNBAR_BG, AMARELO, AMARELO_INK, type ShellTheme } from './tokens'
 
-type Grupo = 'sim' | 'est' | 'mais'
+export type Grupo = 'sim' | 'est' | 'mais'
 
-interface GItem {
+export interface GItem {
   href: string
   Icon: React.ComponentType<{ style?: React.CSSProperties }>
   titulo: string
@@ -27,7 +27,7 @@ interface GItem {
   navKey?: string // href-prefix para casar com nav/pathname
 }
 
-interface GrupoDef {
+export interface GrupoDef {
   key: Grupo
   label: string
   Icon: React.ComponentType<{ style?: React.CSSProperties }>
@@ -39,7 +39,9 @@ const SUB: Record<string, string> = {
   '/aluno/simulados': 'Histórico, notas e relatórios',
   '/aluno/questoes': 'Treine por matéria, banca e ano',
   '/aluno/recomendado': 'Escolhidos pelo seu desempenho',
-  '/aluno/nova/cadernos': 'Seus cadernos de estudo',
+  '/aluno/nova/cadernos': 'Cadernos, anotações, grifos e salvos',
+  '/aluno/cadernos': 'Seus cadernos de questões',
+  '/aluno/favoritos': 'Questões que você salvou',
   '/aluno/nova/painel': 'Seu plano e metas de estudo',
   '/aluno/nova/cursos': 'Cursos e materiais liberados',
   '/aluno/extensivos': 'Seus programas de estudo',
@@ -53,10 +55,10 @@ const SUB: Record<string, string> = {
   '/aluno/nova/duvidas': 'Pergunte aos professores',
   '/aluno/nova/ajuda': 'Perguntas frequentes e suporte',
 }
-const HREFS_SIM = ['/aluno/simulados', '/aluno/questoes', '/aluno/recomendado', '/aluno/nova/cadernos']
+const HREFS_SIM = ['/aluno/simulados', '/aluno/questoes', '/aluno/recomendado', '/aluno/nova/cadernos', '/aluno/cadernos', '/aluno/favoritos']
 const HREFS_EST = ['/aluno/nova/painel', '/aluno/nova/cursos', '/aluno/extensivos', '/aluno/biblioteca', '/aluno/leitura', '/aluno/jurisprudencia', '/aluno/cronograma']
-const ehInicio = (href: string) => href === '/aluno' || href === '/aluno/nova/inicio'
-const ehLigas = (href: string) => href === '/aluno/ligas' || href.endsWith('/comunidade/ligas')
+export const ehInicio = (href: string) => href === '/aluno' || href === '/aluno/nova/inicio'
+export const ehLigas = (href: string) => href === '/aluno/ligas' || href.endsWith('/comunidade/ligas')
 
 /**
  * Grupos da down bar a partir do MESMO `nav` da sidebar (já filtrado por flags/marca/gamificação/
@@ -64,7 +66,7 @@ const ehLigas = (href: string) => href === '/aluno/ligas' || href.endsWith('/com
  * liberadas — Painel, Cursos, Meus Extensivos, Biblioteca, Desempenho… — só apareciam na lateral.
  * Toda área sem grupo próprio cai em "Mais", então nada do menu fica de fora no celular/tablet.
  */
-function montarGrupos(nav: AlunoNavItem[]): GrupoDef[] {
+export function montarGrupos(nav: AlunoNavItem[]): GrupoDef[] {
   const vistos = new Set<string>()
   const itens = nav.filter((n) => !ehInicio(n.href) && !ehLigas(n.href) && !vistos.has(n.href) && vistos.add(n.href))
   const gi = (n: AlunoNavItem): GItem => ({
@@ -86,7 +88,7 @@ function montarGrupos(nav: AlunoNavItem[]): GrupoDef[] {
   return grupos.filter((g) => g.itens.length > 0)
 }
 
-const casa = (pathname: string, href: string) => pathname === href || pathname.startsWith(href + '/')
+export const casa = (pathname: string, href: string) => pathname === href || pathname.startsWith(href + '/')
 
 const SLOT_COLOR = '#D9CFFF'
 

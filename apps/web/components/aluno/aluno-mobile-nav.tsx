@@ -13,6 +13,7 @@ import { avatarPadraoDe } from '@/lib/aluno/avatar-padrao'
 import { LoginLoading } from '@/components/aluno/login-loading'
 import { AlunoDownBar } from '@/components/aluno/aluno-down-bar'
 import type { LoginConfig } from '@/lib/login-config'
+import type { AlunoNavItem } from '@/components/aluno/shell/types'
 
 export type NavMode = 'tabs' | 'menu'
 
@@ -60,6 +61,8 @@ function BottomSheet({ open, onClose, children }: { open: boolean; onClose: () =
 
 interface Props {
   navMode: NavMode
+  /** O MESMO nav do layout (só áreas liberadas p/ o aluno) — a down bar monta os grupos a partir dele. */
+  nav: AlunoNavItem[]
   loginConfig: LoginConfig
   logo?: string | null; nome?: string; subtitulo?: string | null; logoBg?: string; logoEstilo?: string; logoFiltro?: string
   usuarioNome?: string; avatar?: string | null; avatarCor?: string | null; counts?: Record<string, number>; hrefsOcultos?: string[]
@@ -71,7 +74,7 @@ interface Props {
  *  - 'menu' → app bar no topo (hambúrguer + marca + sino + avatar) que abre o drawer lateral, sem barra inferior.
  * Só renderiza no mobile (md-). No desktop vale a sidebar. Cores via tokens white-label (--sidebar-*).
  */
-export function AlunoMobileNav({ navMode, loginConfig, logo, nome = 'Área do Aluno', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none', usuarioNome = 'Aluno', avatar, avatarCor, hrefsOcultos = [] }: Props) {
+export function AlunoMobileNav({ navMode, nav, loginConfig, logo, nome = 'Área do Aluno', subtitulo, logoBg = '#ffffff', logoEstilo = 'arredondado', logoFiltro = 'none', usuarioNome = 'Aluno', avatar, avatarCor }: Props) {
   const pathname = usePathname()
   const isMobile = useIsMobile()
   const { setOpenMobile } = useSidebar()
@@ -142,7 +145,7 @@ export function AlunoMobileNav({ navMode, loginConfig, logo, nome = 'Área do Al
   }
 
   // ─────────────────────────── OPÇÃO A — DOWN BAR agrupada (visual Revisão, spec 03 §2.3) ───────────────────────────
-  // A barra flutuante roxa com pílula amarela + listas agrupadas (Simulados/Desafios/Cronograma)
+  // A barra flutuante roxa com pílula amarela + listas agrupadas (Simulados/Estudar/Mais, do nav)
   // vive em <AlunoDownBar>. O avatar abre o bottom-sheet da conta já existente (reuso).
   return (
     <>
@@ -155,10 +158,10 @@ export function AlunoMobileNav({ navMode, loginConfig, logo, nome = 'Área do Al
       )}
 
       <AlunoDownBar
+        nav={nav}
         usuarioNome={usuarioNome}
         avatar={avatar}
         avatarCor={avatarCor}
-        hrefsOcultos={hrefsOcultos}
         contaAberta={popupPerfil}
         onAbrirConta={() => setPopupPerfil((v) => !v)}
       />

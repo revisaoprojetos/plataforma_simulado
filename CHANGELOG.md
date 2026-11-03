@@ -12,6 +12,23 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.2.5 — 2026-11-03
+
+### Portal do aluno (celular) — barra inferior do shell ATUAL também mostra todas as áreas liberadas
+- A correção da 4.2.3 só valia para a down bar do shell NOVO (`internoAtivo`). Com o shell novo desligado, o celular usa `components/aluno/aluno-down-bar.tsx`, que ainda tinha listas FIXAS (Simulados/Desafios/Cronograma): **Meus Extensivos, Cadernos, Painel de estudos, Cursos, Biblioteca, Desempenho, Comunidade, Dúvidas, Ajuda** não apareciam, e Ligas apontava para a rota antiga mesmo sem gamificação.
+- Agora as duas barras usam o MESMO `nav` do layout (já filtrado por marca/flags/gamificação/manutenção) e o MESMO agrupamento (`montarGrupos`, exportado de `shell/revisao-nova/down-bar.tsx`): **Simulados ▾** (simulados, questões, cadernos, favoritos) · **Estudar ▾** (painel, cursos, extensivos, biblioteca, desafios, cronograma) · **Mais ▾** (todo o resto). Ligas só com gamificação e com o link do menu. Listas longas rolam dentro do popover.
+
+### Leitor — grifo com caneta no tablet (Apple Pencil / S Pen)
+- **Grifo virava um bloco na página inteira:** no toque/caneta o navegador emula `mousedown`, que ligava a classe `.selecting` da camada de texto do PDF (mecanismo só de mouse) e ela nunca saía; o `endOfContent` passava a cobrir a página e, quando a seleção cruzava a página, a caixa dele entrava nos retângulos do grifo. Agora a classe só liga com mouse de verdade e os retângulos do grifo saem **só dos nós de texto** selecionados (`rectsDoTextoPdf`), nunca da caixa de elementos.
+- **Seleção da caneta pulava:** nos vãos entre linhas/palavras o `caretRangeFromPoint` devolvia a camada inteira → a seleção ia para o início/fim da página. A caneta agora só aceita pontos que caem em texto (fora do texto mantém o último ponto bom).
+- **Caneta rolava a página:** se a ponta encostava numa margem/vão o modo caneta não ligava; e trocar `touch-action` no meio do gesto não tem efeito. Agora o modo liga em qualquer ponto da área de leitura e a rolagem é segurada cancelando `touchstart`/`touchmove` (também detecta `touchType==='stylus'` no iPad).
+- **Tocar num grifo com a caneta não abria o balão** (cor/nota/apagar): o clique nativo era suprimido. O toque curto da caneta (< 6px) agora gera o clique no ponto tocado, sem duplicar.
+- **Desenho livre (folha de esquema):** um traço = um ponteiro, e com a caneta em uso o toque da palma é ignorado (antes a palma riscava linhas retas pela folha); traço usa os pontos intermediários da caneta (`getCoalescedEvents`) → linha lisa.
+
+### Meus Cadernos — Anotações, Grifos e Salvos abrem dentro da área
+- As abas viraram seções da própria tela (`?aba=anotacoes|grifos|salvos`). Grifos e Anotações leem o leitor ATUAL (`simulado_conteudo_grifos_pdf`) + o leitor de texto antigo, de todos os materiais, agrupados por material; cada grifo abre o leitor na página dele e o "Voltar" retorna à aba. Antes a aba Grifos levava a uma tela que lia só a tabela antiga (vazia).
+- Salvos: lista as questões favoritas resolvíveis ali mesmo (loader único `lib/aluno/favoritos.ts`, também usado pela tela antiga de Favoritos). A contagem filtrava `tenant_id`, coluna que `simulado_favoritos` não usa → o número não aparecia.
+
 ## 4.2.4 — 2026-11-03
 
 ### Cronograma do aluno — metas de LegProc voltam a abrir o material

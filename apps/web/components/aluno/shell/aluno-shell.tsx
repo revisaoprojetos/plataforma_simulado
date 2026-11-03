@@ -108,6 +108,7 @@ export function AlunoShell(props: Props) {
       {/* Chrome de navegação mobile (barra inferior OU app bar+drawer), definido no console. */}
       <AlunoMobileNav
         navMode={r.navMode}
+        nav={props.nav}
         loginConfig={r.loginConfig}
         logo={r.logo}
         nome={r.nome}
