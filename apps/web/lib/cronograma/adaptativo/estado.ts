@@ -34,7 +34,7 @@ export const hojeISO = (): DataISO => dISO(new Date())
 
 /** Gera plano+fim a partir do cfg (engine puro). */
 export function gerarEstadoPlano(cfg: Cfg, conteudo: _C, fixos?: Record<string, [DataISO, number]>, ancora?: DataISO | null) {
-  const r = gerarPlano(cfg, conteudo.AS, conteudo.WLP, fixos || {}, ancora || null)
+  const r = gerarPlano(cfg, conteudo.AS, conteudo.WLP, fixos || {}, ancora || null, conteudo.LP)
   return { plano: r.plano, fim: r.fim }
 }
 
@@ -83,7 +83,10 @@ export function indexar(st: Estado, conteudo: _C, hoje: DataISO = hojeISO()): In
 
 export const estadoMeta = (st: Estado, id: string) => st.prog[id]?.s || ''
 export const feito = (st: Estado, id: string) => estadoMeta(st, id) === 'done'
-export const info = (id: string, conteudo: _C) => descrever(id, conteudo.AS, conteudo.WLP)
+// Mapa id→item do LegProc 2.8 (memoizado por catálogo) p/ descrever metas "lp:<doc>:<n>".
+const _lpMapas = new WeakMap<object, Record<string, NonNullable<_C['LP']>[number]>>()
+function lpMapa(c: _C) { if (!c.LP) return null; let m = _lpMapas.get(c.LP); if (!m) { m = Object.fromEntries(c.LP.map((x) => [x.id, x])); _lpMapas.set(c.LP, m) } return m }
+export const info = (id: string, conteudo: _C) => descrever(id, conteudo.AS, conteudo.WLP, lpMapa(conteudo))
 
 /** Metas atrasadas: antes de hoje (ou da pausa) e não concluídas. */
 export function atrasadas(st: Estado, hoje: DataISO = hojeISO()): string[] {

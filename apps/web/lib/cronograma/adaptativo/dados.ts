@@ -3,7 +3,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Cfg, DataISO, Plano } from './engine'
 import { gerarPlano, dISO } from './engine'
 import { type Estado, type ProgMeta } from './estado'
-import { carregarConteudo } from './conteudo-banco'
+import { carregarConteudo, carregarConteudoBanco } from './conteudo-banco'
+import { VERSAO_MOTOR } from './motor28'
 import { construirSnapshot, type AdaptativoSnapshot } from './snapshot'
 
 // Camada server do Cronograma Adaptativo. Backend-first: a página chama `carregarAdaptativo`
@@ -87,6 +88,68 @@ async function lerMetas(svc: SupabaseClient, tenantId: string, planoId: string):
   return (data as unknown as MetaRow[]) || []
 }
 
+// ── Cronograma Adaptativo 2.8: o que NÃO se move ao recalcular + migração automática ───────────────
+/** Data de hoje no calendário do aluno (Brasília/Fortaleza, UTC−3 sem horário de verão). */
+export function hojeCal(): DataISO { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Fortaleza' }).format(new Date()) }
+
+/**
+ * Metas que ficam FIXAS num recálculo a partir de `ancora`: concluídas, de dias anteriores à âncora
+ * (histórico/atrasos — "organizar atrasos" é ação própria) e qualquer meta com progresso registrado
+ * (tempo, ponto de parada, anotação, dificuldade, questões). Garante que conclusões, tempo e anotações
+ * nunca "somem" do plano (§8 invariantes).
+ */
+export function fixosPreservados(plano: Plano, metas: MetaRow[], ancora: DataISO | null): Plano {
+  const comDado = new Set(metas.filter((m) => m.estado === 'done' || (m.tempo_seg || 0) > 0 || m.parcial_v || m.nota || m.grau != null || m.res != null || m.estrelas != null).map((m) => m.meta_id))
+  const out: Plano = {}
+  for (const [id, v] of Object.entries(plano || {})) {
+    if (!Array.isArray(v)) continue
+    if (comDado.has(id) || (ancora && v[0] < ancora)) out[id] = v
+  }
+  return out
+}
+
+const ehLpAntigo = (id: string) => /^lp:\d+:\d+$/.test(id)
+
+/**
+ * MIGRAÇÃO para o motor 2.8 (uma vez por plano, ao carregar). Recalcula a partir de HOJE com as
+ * regras 2.8, mantendo fixas as metas de `fixosPreservados` (nada concluído/estudado/anotado se perde;
+ * as linhas de simulado_cronograma_adaptativo_meta — tempo/notas — continuam com os mesmos ids).
+ * LegProc antigo (1 lei inteira por semana, "lp:s:j"): os já concluídos/estudados ficam no histórico
+ * com o id antigo e a 1ª meta nova daquela lei conta como lida (lpIgnorar), sem pedir de novo.
+ * Backup do plano anterior em storage (cronograma/backup-28/<planoId>.json) antes de gravar.
+ */
+async function migrarPara28(svc: SupabaseClient, tenantId: string, row: PlanoRow): Promise<PlanoRow> {
+  const cfg = (row.cfg || {}) as Cfg & { motor?: string; maisPDFull?: boolean; lpIgnorar?: string[] }
+  if (row.exemplo || cfg.motor === VERSAO_MOTOR || !row.plano || !Object.keys(row.plano).length) return row
+  try {
+    const banco = await carregarConteudoBanco(svc, tenantId)
+    const conteudo = banco.vazio ? await carregarConteudo(svc, tenantId) : banco
+    const metas = await lerMetas(svc, tenantId, row.id)
+    const hoje = hojeCal()
+    const fixos = fixosPreservados(row.plano, metas, hoje)
+    // LegProc antigo já lido → 1ª meta nova da mesma lei conta como lida
+    const lpIgnorar = new Set(cfg.lpIgnorar || [])
+    const feitosLp = new Set(metas.filter((m) => m.estado === 'done' && ehLpAntigo(m.meta_id)).map((m) => m.meta_id))
+    for (const id of feitosLp) {
+      const [, s, j] = id.split(':'); const doc = banco.WLPdoc?.[+s]?.[+j]
+      if (doc) lpIgnorar.add(`lp:${doc.replace(/-/g, '').slice(0, 12)}:1`)
+    }
+    const cfg2 = { ...cfg, motor: VERSAO_MOTOR, maisPDFull: cfg.maisPDFull ?? true, lpIgnorar: [...lpIgnorar] } as Cfg
+    const r = gerarPlano(cfg2, conteudo.AS, conteudo.WLP, fixos, hoje, conteudo.LP)
+    try {
+      const corpo = new Blob([JSON.stringify({ planoId: row.id, em: new Date().toISOString(), cfg: row.cfg, plano: row.plano, fim: row.fim })], { type: 'application/json' })
+      await svc.storage.from('pdfs').upload(`cronograma/backup-28/${tenantId}/${row.id}.json`, corpo, { upsert: false, contentType: 'application/json' })
+    } catch { /* backup best-effort (já existe = migrado antes) */ }
+    const { error } = await svc.from(T_PLANO)
+      .update({ cfg: cfg2 as unknown as Record<string, unknown>, plano: r.plano as unknown as Record<string, unknown>, fim: r.fim, atualizado_em: new Date().toISOString() })
+      .eq('id', row.id).filter('cfg->>motor', 'is', null) // concorrência: só migra se ninguém migrou antes
+    if (error) return row
+    return { ...row, cfg: cfg2, plano: r.plano, fim: r.fim }
+  } catch {
+    return row // falha na migração não derruba o cronograma do aluno (segue no plano antigo)
+  }
+}
+
 export interface CargaAdaptativo {
   temPlano: boolean
   planoId: string | null
@@ -96,8 +159,9 @@ export interface CargaAdaptativo {
 
 /** Carga principal (backend-first): devolve o snapshot pronto ou temPlano=false (primeiro acesso). */
 export async function carregarAdaptativo(svc: SupabaseClient, tenantId: string, estId: string, hoje: DataISO = dISO(new Date())): Promise<CargaAdaptativo> {
-  const row = await lerPlanoRow(svc, tenantId, estId)
-  if (!row) return { temPlano: false, planoId: null, titulo: null, snapshot: null }
+  const row0 = await lerPlanoRow(svc, tenantId, estId)
+  if (!row0) return { temPlano: false, planoId: null, titulo: null, snapshot: null }
+  const row = await migrarPara28(svc, tenantId, row0)
   const metas = await lerMetas(svc, tenantId, row.id)
   const est = montarEstado(row, metas)
   const conteudo = await carregarConteudo(svc, tenantId)
@@ -114,13 +178,11 @@ export async function gerarAdaptativo(
   // `novo` => cria OUTRO cronograma (e fixa). Senão => recalcula o plano em FOCO (fixado).
   const alvo = opc.novo ? null : await lerPlanoRow(svc, tenantId, estId)
   // fixos = metas concluídas (não se movem), lidas do plano alvo se existir
-  const fixos: Record<string, [DataISO, number]> = {}
-  if (alvo && opc.ancora) {
-    const metas = await lerMetas(svc, tenantId, alvo.id)
-    const doneIds = new Set(metas.filter((m) => m.estado === 'done').map((m) => m.meta_id))
-    for (const [id, v] of Object.entries(alvo.plano || {})) if (doneIds.has(id)) fixos[id] = v
-  }
-  const r = gerarPlano(cfg, conteudo.AS, conteudo.WLP, fixos, opc.ancora || null)
+  // fixos = concluídas + passadas + com progresso (tempo/notas/parada) — nada estudado se perde (2.8 §8)
+  let fixos: Record<string, [DataISO, number]> = {}
+  if (alvo && opc.ancora) fixos = fixosPreservados(alvo.plano || {}, await lerMetas(svc, tenantId, alvo.id), opc.ancora)
+  cfg = { ...cfg, motor: VERSAO_MOTOR } as Cfg
+  const r = gerarPlano(cfg, conteudo.AS, conteudo.WLP, fixos, opc.ancora || null, conteudo.LP)
   const campos = {
     titulo: opc.titulo ?? alvo?.titulo ?? 'Meu cronograma',
     cfg: cfg as unknown as Record<string, unknown>,
@@ -254,8 +316,9 @@ export interface DocsModelo {
 
 /** Lê os 3 docs do modelo a partir das tabelas (ou nulls se não há plano). */
 export async function carregarDocs(svc: SupabaseClient, tenantId: string, estId: string): Promise<DocsModelo & { extras: unknown[] }> {
-  const row = await lerPlanoRow(svc, tenantId, estId)
-  if (!row) return { estado: null, progresso: null, notas: null, extras: [] }
+  const row0 = await lerPlanoRow(svc, tenantId, estId)
+  if (!row0) return { estado: null, progresso: null, notas: null, extras: [] }
+  const row = await migrarPara28(svc, tenantId, row0)
   const { data: raw } = await svc.from(T_PLANO).select('extras').eq('id', row.id).maybeSingle()
   const extras = ((raw as { extras?: unknown[] } | null)?.extras) || []
   const metas = await lerMetas(svc, tenantId, row.id)

@@ -6,8 +6,10 @@
 
 import seed from './conteudo-seed.json'
 import type { AS, WLP } from './engine'
+import type { ItemLP } from './motor28'
 
-export interface Conteudo { AS: AS; WLP: WLP }
+/** AS = aulas · WLP = lei seca semanal (seed/legado) · LP = LegProc 2.8 por disciplina (banco). */
+export interface Conteudo { AS: AS; WLP: WLP; LP?: ItemLP[] }
 
 /** Conteúdo-semente (modelo). AS: [disc, aula, tema, pags, nomeQuestoes, nomeTEC]; WLP[semana][j]. */
 export const CONTEUDO_SEED: Conteudo = seed as unknown as Conteudo

@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
+    "cronograma:motor": "node scripts/build-motor28.mjs",
     "pdfjs:copiar": "node scripts/copiar-pdfjs.mjs",
     "dev": "next dev --turbopack -H 0.0.0.0",
     "build": "next build",

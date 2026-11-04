@@ -8,9 +8,16 @@
 //             PDFlash 1h · Questões 30 min · LegProc 45 min
 // · PDFlash 1 semana depois do PDFULL, no mesmo dia — exceto disciplinas AGU sem flash
 // · Questões 2 semanas depois do PDFULL, no mesmo dia — nunca são descartadas
-// · Arranjo (cfg.arranjo): 'pdf' | 'equilibrado' | 'constancia'
 // · Semanas de revisão (cfg.revisao = {ativa, cada}): a cada N semanas, sem aulas novas.
+//
+// ⚠ DESDE A 2.8 a GERAÇÃO do plano vive em ./motor28.ts (fonte ÚNICA, também compilada p/ o iframe).
+//   Este módulo mantém os tipos/helpers e delega gerarPlano/horasDia ao motor 2.8. Os "arranjos"
+//   (pdf/equilibrado/constância) foram substituídos pelas regras 2.8 (prioridade do dia, limite de
+//   PDFull novos, LegProc por disciplina em blocos, concentração ≤18h, histórico prévio).
 // ============================================================
+
+import * as M28 from './motor28'
+export type { ItemLP } from './motor28'
 
 export type DataISO = string // 'YYYY-MM-DD' (local, sem fuso)
 /** Linha de catálogo de aula: [disciplina, aula, tema, páginas, nomeQuestões, nomeTEC] */
@@ -58,8 +65,9 @@ export function horasEm(cfg: Cfg, d: DataISO): number[] {
 export function recessoEm(cfg: Cfg, d: DataISO): Recesso | null {
   return (cfg.recessos || []).find((r) => r.ini <= d && d <= r.fim) || null
 }
+/** Horas do dia: pontual da data > recesso (0) > rotina vigente (regra 2.8, §8). */
 export function horasDia(cfg: Cfg, d: DataISO): number {
-  return recessoEm(cfg, d) ? 0 : horasEm(cfg, d)[dDow(d)]
+  return M28.horasDia(cfg as unknown as M28.Cfg28, d)
 }
 export function ehRev(cfg: Cfg, sem: number): boolean {
   const r = cfg.revisao
@@ -87,7 +95,7 @@ export function proxSemConteudo(cfg: Cfg, s: DataISO, n: number): DataISO {
 }
 
 /* Duração das metas, em minutos. PDFULL: páginas ÷ ritmo, em blocos de 30 min. */
-export const DUR: Record<string, number> = { fl: 60, qu: 30, lp: 45 }
+export const DUR: Record<string, number> = { fl: 60, qu: 30, lp: 30 } // LegProc 30 min (2.8)
 export const DIA_CURTO = 120 // Priorizar PDFulls: dias com menos de 2h não recebem PDFULL
 export function minPdf(p: number, vel?: number): number { const v = vel && vel > 0 ? vel : VEL_PADRAO; return Math.max(30, Math.ceil((p || 60) / v * 2 - 1e-9) * 30) }
 export function horasPdf(p: number, vel?: number): number { return minPdf(p, vel) / 60 }
@@ -119,162 +127,22 @@ export function diasDeRevisao(arranjo: string, dias: DataISO[]): DataISO[] {
 
 export interface ResultadoPlano { plano: Plano; fim: number }
 
+/** Catálogo-semente antigo (WLP por semana) → itens de LegProc "gerais" (sem disciplina), ids lp:s:j. */
+export function lpDeWLP(WLP: WLP): M28.ItemLP[] {
+  const out: M28.ItemLP[] = []
+  ;(WLP || []).forEach((linha, s) => (linha || []).forEach((t, j) => {
+    if (t && String(t).trim()) out.push({ id: `lp:${s}:${j}`, disc: '', lei: String(t).split(' - ')[0].trim(), texto: String(t), doc: null })
+  }))
+  return out
+}
+
 /**
- * Gera o plano. cfg = {start, horas[7], rotinas[], recessos[], discs[], metas{pf,fl,qu,lp}, arranjo, revisao{ativa,cada}, vel}
- * fixos = {id: [data, horas]} — metas concluídas, que não se movem.
- * ancora = data a partir da qual tudo que não foi concluído é (re)distribuído.
+ * Gera o plano (motor 2.8). LP = catálogo de LegProc por disciplina (conteudo-banco); sem ele, usa a
+ * lei seca semanal do seed como itens gerais. fixos = metas que não se movem; ancora = data de início
+ * da redistribuição.
  */
-export function gerarPlano(cfg: Cfg, AS: AS, WLP: WLP, fixos: Fixos, ancora: DataISO | null): ResultadoPlano {
-  const start = cfg.start
-  const arranjo = (ARRANJOS as readonly string[]).includes(cfg.arranjo as string) ? (cfg.arranjo as string) : 'pdf'
-  const A = ancora && ancora > start ? ancora : start
-  const ativas = new Set(cfg.discs)
-  const plano: Plano = {}
-  const carga: Record<string, number> = {} // data -> minutos ocupados
-  for (const [id, v] of Object.entries(fixos)) {
-    if (/^r[fqv]:/.test(id)) continue
-    plano[id] = v
-    if (v[0] >= A) carga[v[0]] = (carga[v[0]] || 0) + Math.round(v[1] * 60)
-  }
-  const fixo = (id: string) => !!fixos[id]
-  const algumDia = [cfg.horas, ...(cfg.rotinas || []).map((r) => r.horas)].some((h) => h.some((x) => x > 0))
-  if (!algumDia) return { plano, fim: semDe(start, A) }
-
-  const pdfQ: number[] = []
-  AS.forEach((a, i) => { if (ativas.has(a[0]) && !fixo('pf:' + i)) pdfQ.push(i) })
-  let qi = 0
-  // PDFULL dividido em partes ('pp:i:k'): partes já concluídas descontam do tempo que falta ler
-  const feitoParte: Record<string, number> = {}, maxParte: Record<string, number> = {}
-  for (const [id, v] of Object.entries(fixos)) if (id.startsWith('pp:')) { const [, i, k] = id.split(':'); feitoParte[i] = (feitoParte[i] || 0) + Math.round(v[1] * 60); maxParte[i] = Math.max(maxParte[i] || 0, +k) }
-  const restante = (i: number) => Math.max(30, minPdf(AS[i][3], cfg.vel) + (cfg.metas && cfg.metas.vd ? VID_MIN : 0) - (feitoParte[i] || 0))
-  let emCurso: { i: number; resta: number; k: number; ultima?: DataISO } | null = null
-  const devidos: Array<{ id: string; due: DataISO; tipo: string; ord: number }> = []
-  let ord = 0
-  const registrar = (i: number, dataPdf: DataISO) => {
-    const disc = AS[i][0]
-    if (cfg.metas.fl && !SEM_FLASH.has(disc) && !fixo('fl:' + i)) devidos.push({ id: 'fl:' + i, due: proxSemConteudo(cfg, dataPdf, 1), tipo: 'fl', ord: ord++ })
-    if (cfg.metas.qu && !fixo('qu:' + i)) devidos.push({ id: 'qu:' + i, due: proxSemConteudo(cfg, dataPdf, 2), tipo: 'qu', ord: ord++ })
-  }
-  // dívidas: PDFs já concluídos cujas revisões/questões ainda não foram feitas
-  AS.forEach((a, i) => { if (ativas.has(a[0]) && fixos['pf:' + i]) registrar(i, fixos['pf:' + i][0]) })
-
-  const semA = semDe(start, A)
-  let lpCarry: string[] = []
-  if (cfg.metas.lp) for (let s = 1; s < semA && s < WLP.length; s++) (WLP[s] || []).forEach((t, j) => { if (t && t.trim() && !fixo(`lp:${s}:${j}`)) lpCarry.push(`lp:${s}:${j}`) })
-  const lpPuxado = new Set<string>()
-  const lpDaSemana = (sem: number) => cfg.metas.lp ? (WLP[sem] || []).map((t, j) => (t && t.trim() && !fixo(`lp:${sem}:${j}`) && !lpPuxado.has(`lp:${sem}:${j}`)) ? `lp:${sem}:${j}` : null).filter(Boolean) as string[] : []
-  const ultimaLP = (() => { let u = 0; WLP.forEach((w, s) => { if (w && w.some((t) => t && t.trim())) u = s }); return u })()
-  const porData = (a: { due: DataISO; ord: number }, b: { due: DataISO; ord: number }) => a.due < b.due ? -1 : a.due > b.due ? 1 : a.ord - b.ord
-
-  let fim = semA
-  for (let sem = semA; sem <= MAX_SEM; sem++) {
-    const ini = semInicio(start, sem), fimSem = dAdd(ini, 6)
-    const diasSem = [0, 1, 2, 3, 4, 5, 6].map((d) => dAdd(ini, d)).filter((dt) => dt >= A && horasDia(cfg, dt) > 0)
-    const semRev = ehRev(cfg, sem)
-    const capf = (dt: DataISO) => horasDia(cfg, dt) * 60
-    const livre = (dt: DataISO) => capf(dt) - (carga[dt] || 0)
-    const por = (dt: DataISO, id: string, m: number) => { plano[id] = [dt, m / 60]; carga[dt] = (carga[dt] || 0) + m }
-    const maisLivre = (lista: DataISO[], m: number) => { let b: DataISO | null = null, r = -1; for (const dt of lista) { const x = livre(dt); if (x >= m && x > r) { r = x; b = dt } } return b }
-    const vencidos = (tipo?: string) => devidos.filter((x) => x.due <= fimSem && (!tipo || x.tipo === tipo)).sort(porData)
-    const tirar = (x: { id: string }) => devidos.splice(devidos.findIndex((y) => y === x), 1)
-    const encaixar = (x: { id: string; due: DataISO; tipo: string; ord: number }, dias: DataISO[], soNoDia?: boolean) => {
-      const m = DUR[x.tipo]
-      let dt: DataISO | null = dias.includes(x.due) && livre(x.due) >= m ? x.due : null
-      if (!dt && !soNoDia) dt = maisLivre(dias.filter((d) => d >= x.due), m) || maisLivre(dias, m)
-      if (dt) { por(dt, x.id, m); tirar(x); return true }
-      return false
-    }
-    const encaixarTipo = (tipo: string, dias: DataISO[], soNoDia?: boolean) => { for (const x of vencidos(tipo)) encaixar(x, dias, soNoDia) }
-    const encaixarLP = (dias: DataISO[], umPorDia = true) => {
-      let k = 0
-      if (umPorDia) for (const dt of [...dias].sort((a, b) => livre(b) - livre(a))) { if (k >= lpCarry.length) break; if (livre(dt) >= DUR.lp) por(dt, lpCarry[k++], DUR.lp) }
-      while (k < lpCarry.length) { const dt = maisLivre(dias, DUR.lp); if (!dt) break; por(dt, lpCarry[k++], DUR.lp) }
-      lpCarry = lpCarry.slice(k)
-    }
-    const lerPdf = (dt: DataISO, limite: number) => {
-      if (!emCurso) { if (qi >= pdfQ.length) return false; const i = pdfQ[qi++]; emCurso = { i, resta: restante(i), k: maxParte[i] || 0 } }
-      if (emCurso.ultima && dt < emCurso.ultima) return false
-      const m = Math.min(emCurso.resta, Math.floor(limite / 30) * 30)
-      if (m < 30) return false
-      const { i } = emCurso
-      if (m >= emCurso.resta) { if (cfg.metas.pf) por(dt, 'pf:' + i, m); registrar(i, dt); emCurso = null }
-      else { if (cfg.metas.pf) por(dt, `pp:${i}:${++emCurso.k}`, m); emCurso.resta -= m; emCurso.ultima = dt }
-      return true
-    }
-    const pdfEm = (dias: DataISO[]) => { for (const dt of dias) lerPdf(dt, livre(dt)) }
-    lpCarry.push(...lpDaSemana(sem))
-    const preencher = (dias: DataISO[], comPdf: DataISO[] | null) => {
-      for (const x of vencidos()) encaixar(x, dias)
-      encaixarLP(dias, false)
-      for (let volta = 0; volta < 40; volta++) {
-        let pos = false
-        if (comPdf && !emCurso) {
-          while (qi < pdfQ.length) {
-            const i = pdfQ[qi], m = restante(i)
-            const dt = maisLivre(comPdf, m); if (!dt) break
-            qi++; if (cfg.metas.pf) por(dt, 'pf:' + i, m); registrar(i, dt); pos = true
-          }
-        }
-        if (cfg.metas.lp) {
-          for (let s2 = sem + 1; s2 < WLP.length && s2 <= sem + 8; s2++) {
-            for (const id of lpDaSemana(s2)) { const dt = maisLivre(dias, DUR.lp); if (!dt) break; por(dt, id, DUR.lp); lpPuxado.add(id); pos = true }
-            if (!maisLivre(dias, DUR.lp)) break
-          }
-        }
-        if (!pos && comPdf) {
-          for (const dt of [...comPdf].sort()) while (livre(dt) >= 30 && lerPdf(dt, livre(dt))) pos = true
-        }
-        if (!pos && qi >= pdfQ.length && !emCurso && !lpCarry.length) {
-          for (const x of [...devidos].sort(porData)) {
-            const i = x.id.split(':')[1], antes = x.tipo === 'qu' && plano['fl:' + i] ? plano['fl:' + i][0] : plano['pf:' + i]?.[0]
-            const m = DUR[x.tipo], dt = maisLivre(dias.filter((d) => !antes || d > antes), m)
-            if (dt) { por(dt, x.id, m); tirar(x); pos = true }
-          }
-        }
-        if (!pos) break
-      }
-    }
-    if (semRev) {
-      const temas = Object.entries(plano).filter(([id, [d]]) => id.startsWith('pf:') && d < ini).length
-      const reserva = planoRevisao(diasSem.map((dt) => livre(dt)), temas)
-      diasSem.forEach((dt, k) => { if (reserva[k].usado) carga[dt] = (carga[dt] || 0) + reserva[k].usado })
-      preencher(diasSem, null)
-      fim = sem; continue
-    }
-
-    if (arranjo === 'pdf') {
-      const curtos = diasSem.filter((d) => capf(d) < DIA_CURTO), longos = diasSem.filter((d) => capf(d) >= DIA_CURTO)
-      pdfEm(longos)
-      for (const x of vencidos('qu').filter((x) => x.due < ini)) encaixar(x, curtos)
-      encaixarTipo('qu', curtos)
-      encaixarLP(diasSem)
-      encaixarTipo('fl', diasSem)
-      encaixarTipo('qu', diasSem)
-    } else if (arranjo === 'equilibrado') {
-      const revDias = diasDeRevisao(arranjo, diasSem), aula = diasSem.filter((d) => !revDias.includes(d))
-      pdfEm(aula)
-      encaixarLP(aula)
-      for (const x of vencidos()) encaixar(x, aula, true)
-      for (const x of vencidos()) encaixar(x, revDias)
-      encaixarLP(revDias, false)
-      for (const x of vencidos()) encaixar(x, aula)
-    } else {
-      const revDias = diasDeRevisao(arranjo, diasSem), aula = diasSem.filter((d) => !revDias.includes(d))
-      pdfEm(aula)
-      encaixarLP(aula)
-      for (const dt of revDias) for (const tipo of ['fl', 'qu']) {
-        let n = 0
-        for (const x of vencidos(tipo)) { if (n >= 2) break; if (livre(dt) >= DUR[tipo]) { por(dt, x.id, DUR[tipo]); tirar(x); n++ } }
-      }
-      for (const x of vencidos()) encaixar(x, revDias)
-      if (!revDias.length) for (const x of vencidos()) encaixar(x, aula)
-    }
-    preencher(diasSem, arranjo === 'pdf' ? diasSem.filter((d) => capf(d) >= DIA_CURTO) : diasSem)
-    if (diasSem.some((dt) => carga[dt])) fim = sem
-    const acabou = qi >= pdfQ.length && !emCurso && !devidos.length && !lpCarry.length && (!cfg.metas.lp || sem >= ultimaLP)
-    if (acabou) break
-  }
-  return { plano, fim }
+export function gerarPlano(cfg: Cfg, AS: AS, WLP: WLP, fixos: Fixos, ancora: DataISO | null, LP?: M28.ItemLP[] | null): ResultadoPlano {
+  return M28.gerarPlano(cfg as unknown as M28.Cfg28, AS as M28.AulaAS[], LP && LP.length ? LP : lpDeWLP(WLP), fixos, ancora)
 }
 
 export interface Notas { [id: string]: { grau?: number; res?: number; err?: number; diff?: number } }
@@ -308,11 +176,16 @@ export function rankingRevisao(plano: Plano, notas: Notas, ateData: DataISO, jaR
 export interface MetaDescrita {
   tipo: string; disc?: string; aula?: string; tema?: string; pags?: number; qc?: string; tec?: string
   idx?: number; semRev?: number | null; parte?: number | null; texto?: string; sem?: number
+  lei?: string; doc?: string | null
 }
 /** Descreve uma meta a partir do id. */
-export function descrever(id: string, AS: AS, WLP: WLP): MetaDescrita {
+export function descrever(id: string, AS: AS, WLP: WLP, LPMAP?: Record<string, M28.ItemLP> | null): MetaDescrita {
   const [t, a, b] = id.split(':')
-  if (t === 'lp') return { tipo: 'lp', texto: WLP[+a]?.[+b], sem: +a }
+  if (t === 'lp') {
+    const it = LPMAP && LPMAP[id]
+    if (it) return { tipo: 'lp', texto: it.texto, disc: it.disc || undefined, lei: it.lei, doc: it.doc ?? null }
+    return { tipo: 'lp', texto: WLP[+a]?.[+b] ?? 'LegProc', sem: +a }
+  }
   const rev = t === 'rf' || t === 'rq'
   const i = rev ? +b : +a
   const e = AS[i]

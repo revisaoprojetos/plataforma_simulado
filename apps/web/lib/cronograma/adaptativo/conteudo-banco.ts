@@ -3,6 +3,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { AS, WLP } from './engine'
 import type { Conteudo } from './conteudo'
 import { conteudoSeed } from './conteudo'
+import type { ItemLP } from './motor28'
+import { catalogoLegProc } from './lp-catalogo'
 
 // Loader de CONTEÚDO REAL do Cronograma Adaptativo (substitui o seed):
 //  · disciplinas  → simulado_disciplinas (nome, classificacao, cor, ordem)
@@ -25,6 +27,11 @@ export interface ConteudoBanco extends Conteudo {
   /** Paralelo a WLP: id do documento da Biblioteca de cada bloco de lei seca (LegProc) → abre no leitor.
    *  null quando o bloco vem da tabela de fallback (só texto, sem documento). */
   WLPdoc?: (string | null)[][]
+  /** Materiais de APOIO das aulas (PDFight/PDFlash/Questões) — não viram aula nova, mas pertencem ao
+   *  cronograma: a liberação por data (liberacao.ts) os casa com a aula pelo nº "Aula NN" + disciplina. */
+  materiais?: Array<{ id: string; titulo: string; disc: string }>
+  /** LegProc 2.8: metas de ~30 min por lei, vinculadas à disciplina (ver lp-catalogo.ts). */
+  LP?: ItemLP[]
 }
 
 const PAG_PADRAO = 40 // páginas assumidas quando o PDF ainda não foi medido
@@ -103,15 +110,16 @@ export async function carregarConteudoBanco(svc: SupabaseClient, tenantId: strin
   // 4) classifica cada doc pelo tipo herdado da sua subpasta
   //    pdfull | pdfight | null -> aula (PDFull) · legproc -> lei seca · questoes -> reservado (ignora)
   const aulaDocs: Array<{ id: string; titulo: string; versaoId: string | null; discNome: string }> = []
-  const legprocDocs: Array<{ id: string; titulo: string }> = []
+  const legprocDocs: Array<{ id: string; titulo: string; disc: string; versaoId: string | null }> = []
+  const materiais: Array<{ id: string; titulo: string; disc: string }> = []
   for (const d of docs) {
     const discId = discDaPasta.get(d.pasta_id); if (!discId) continue
     const disc = discById.get(discId); if (!disc) continue
     const tipo = tipoHerdado(d.pasta_id)
-    if (tipo === 'legproc') { legprocDocs.push({ id: d.id, titulo: d.titulo }); continue } // lei seca → WLP (+ id p/ abrir no leitor)
+    if (tipo === 'legproc') { legprocDocs.push({ id: d.id, titulo: d.titulo, disc: disc.nome, versaoId: d.versao_atual_id }); continue } // lei seca → WLP (+ id p/ abrir no leitor)
     // AULAS = só PDFull (ou docs sem subpasta tipada, p/ compat). PDFight (questões), PDFlash (revisão)
     // e Questões são MATERIAIS ligados às metas que o engine JÁ gera (qu/fl) — não contam como aula nova.
-    if (tipo === 'pdfight' || tipo === 'pdflash' || tipo === 'questoes') continue
+    if (tipo === 'pdfight' || tipo === 'pdflash' || tipo === 'questoes') { materiais.push({ id: d.id, titulo: d.titulo, disc: disc.nome }); continue }
     aulaDocs.push({ id: d.id, titulo: d.titulo, versaoId: d.versao_atual_id, discNome: disc.nome }) // pdfull | null
   }
 
@@ -165,7 +173,12 @@ export async function carregarConteudoBanco(svc: SupabaseClient, tenantId: strin
     for (const r of lp) (WLPout[r.semana] ||= []).push(r.texto)
   }
 
-  return { AS: ASout, WLP: WLPout, WLPdoc, disciplinas, vazio: false }
+  // 7) LegProc 2.8: por DISCIPLINA (ordem das disciplinas) → por lei (título natural) → metas de ~30 min.
+  const ordemDisc = new Map(disciplinas.map((d, k) => [d.nome, k]))
+  const lpDocs = [...legprocDocs].sort((a, b) => ((ordemDisc.get(a.disc) ?? 999) - (ordemDisc.get(b.disc) ?? 999)) || col.compare(a.titulo, b.titulo))
+  const LP = await catalogoLegProc(svc, tenantId, lpDocs).catch(() => [] as ItemLP[])
+
+  return { AS: ASout, WLP: WLPout, WLPdoc, materiais, LP, disciplinas, vazio: false }
 }
 
 function fallbackConteudo(): Conteudo { return conteudoSeed() }
@@ -173,5 +186,5 @@ function fallbackConteudo(): Conteudo { return conteudoSeed() }
 /** {AS, WLP} prontos p/ o motor — banco quando houver, senão seed. */
 export async function carregarConteudo(svc: SupabaseClient, tenantId: string): Promise<Conteudo> {
   const b = await carregarConteudoBanco(svc, tenantId)
-  return b.vazio ? conteudoSeed() : { AS: b.AS, WLP: b.WLP }
+  return b.vazio ? conteudoSeed() : { AS: b.AS, WLP: b.WLP, LP: b.LP }
 }

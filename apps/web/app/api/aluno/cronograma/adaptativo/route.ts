@@ -26,7 +26,7 @@ export async function GET() {
     carregarConteudoBanco(svc, sessao.tenantId),
   ])
   // conteudo: AS/WLP (+ WLPdoc = id do doc LegProc de cada bloco, p/ abrir no leitor) + disciplinas(classificacao/cor).
-  return NextResponse.json({ ok: true, ...docs, conteudo: { AS: conteudo.AS, WLP: conteudo.WLP, WLPdoc: conteudo.WLPdoc ?? [], disciplinas: conteudo.disciplinas } })
+  return NextResponse.json({ ok: true, ...docs, conteudo: { AS: conteudo.AS, WLP: conteudo.WLP, WLPdoc: conteudo.WLPdoc ?? [], LP: conteudo.LP ?? [], disciplinas: conteudo.disciplinas } })
 }
 
 export async function POST(req: NextRequest) {

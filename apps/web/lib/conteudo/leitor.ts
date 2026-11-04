@@ -4,6 +4,7 @@ import { getCurrentTenantId } from '@/lib/tenant'
 import { ehTestadorGlobal } from '@/lib/sistema/testadores-globais'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { remember } from '@/lib/cache/relatorio-cache'
+import { docBloqueadoNoCronograma } from '@/lib/cronograma/adaptativo/liberacao'
 import { listarAnotacoes, type Anotacao } from './anotacoes'
 import { acessoEfetivo, type ItemAcesso, type Atribuicao, type Aluno, type AcessoGeral, type ModoAcesso, type ResultadoAcesso } from './acesso-efetivo'
 
@@ -322,6 +323,7 @@ export async function carregarLeitura(documentoId: string, alunoId: string): Pro
     if (doc.status !== 'publicado') return null
     // Gate de acesso ESCOPADO via motor ÚNICO (acessoEfetivo): modo/oculto do doc + cadeia de ancestrais.
     if (!(await avaliarDocAluno(svc, tenantId, alunoId, doc)).permitido) return null
+    if (await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id)) return null // liberação por data do Cronograma Adaptativo
   }
 
   // A parte CARA (trechos + HTML rico da versão) é IDÊNTICA p/ todos os alunos e depende SÓ de
@@ -401,6 +403,7 @@ export async function carregarLeituraPdf(documentoId: string, alunoId: string): 
   if (!doc || doc.deletado || !doc.versao_atual_id || (doc as any).categoria !== 'conteudo') return null
   // Acesso (testador OU publicado+gate) — decisão cacheada 60s (ver `podeLerDoc`).
   if (!(await podeLerDoc(svc, tenantId, alunoId, doc))) return null
+  if (await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id)) return null // liberação por data do Cronograma Adaptativo
 
   const { gerarPdfDocumento } = await import('./thumb')
   // O PDF (OnlyOffice→PDF, já cacheado em storage) + a URL assinada são IGUAIS p/ todos os alunos e
@@ -446,6 +449,7 @@ export async function carregarMidiaAluno(documentoId: string, alunoId: string): 
   const kind = tipoOrigem as 'video' | 'audio'
   // Acesso (testador OU publicado+gate) — decisão cacheada 60s (ver `podeLerDoc`).
   if (!(await podeLerDoc(svc, tenantId, alunoId, doc))) return null
+  if (await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id)) return null // liberação por data do Cronograma Adaptativo
   const { data: ver } = await svc.from('simulado_conteudo_versoes').select('arquivo_key').eq('tenant_id', tenantId).eq('id', doc.versao_atual_id).maybeSingle()
   const arquivoKey = (ver as any)?.arquivo_key as string | undefined
   if (!arquivoKey) return null
@@ -469,6 +473,7 @@ export async function carregarDocParaLeitura(documentoId: string, alunoId: strin
   if (!doc || doc.deletado || !doc.versao_atual_id || (doc as any).categoria !== 'conteudo') return null
   // Acesso (testador OU publicado+gate) — decisão cacheada 60s (ver `podeLerDoc`). UMA vez para mídia e PDF.
   if (!(await podeLerDoc(svc, tenantId, alunoId, doc))) return null
+  if (await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id)) return null // liberação por data do Cronograma Adaptativo
 
   const tipoOrigem = String((doc as any).tipo_origem ?? '')
   // MÍDIA (vídeo/áudio): player nativo. Só a URL assinada do original (gate já passou).
@@ -510,6 +515,8 @@ export async function urlDownloadAluno(documentoId: string, alunoId: string): Pr
     // Gate + download exige permissão de BAIXAR (acessoEfetivo). Nega se não puder ler OU não puder baixar.
     const resDl = await avaliarDocAluno(svc, tenantId, alunoId, doc)
     if (!resDl.permitido || !resDl.permissoes.baixar) return null
+    // Download só do material JÁ LIBERADO no cronograma do aluno (com o bloqueio ativo).
+    if (await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id)) return null // liberação por data do Cronograma Adaptativo
   }
   const { data: ver } = await svc.from('simulado_conteudo_versoes').select('arquivo_key').eq('tenant_id', tenantId).eq('id', doc.versao_atual_id).maybeSingle()
   if (!(ver as any)?.arquivo_key) return null

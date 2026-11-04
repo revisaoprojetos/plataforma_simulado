@@ -55,6 +55,7 @@ import {
   Route,
   Tag,
   Tags,
+  Lock,
 } from 'lucide-react'
 import {
   Sidebar,
@@ -151,6 +152,7 @@ const navGroups: NavGroup[] = [
       { label: 'Catálogo', href: '/admin/cronogramas', icon: CalendarDays, perm: 'cronogramas:view' },
       { label: 'Relatórios', href: '/admin/cronogramas/relatorios', icon: BarChart3, perm: 'cronogramas:view' },
       { label: 'Importar', href: '/admin/cronogramas/importar', icon: Upload, perm: 'cronogramas:update' },
+      { label: 'Adaptativo · Liberação', href: '/admin/cronogramas/adaptativo', icon: Lock, perm: 'cronogramas:update' },
       { label: 'Lei seca (adaptativo)', href: '/admin/cronogramas/lei-seca', icon: FileText, perm: 'cronogramas:update' },
     ],
   },
