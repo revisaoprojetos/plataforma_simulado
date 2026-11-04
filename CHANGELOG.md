@@ -12,6 +12,13 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.4.1 — 2026-11-05
+
+- **Cronograma Adaptativo — Metas:** novo card desativado **Jurisprudência (em breve)** na seção "Metas no cronograma" ("Em breve você poderá incluir meta de jurisprudência no cronograma."). Só aviso na tela; não entra no cálculo.
+- **LegProc em texto (já no 4.4.0) — resumo para referência:** leitor em texto com marcações do professor (Núcleo/Complemento/Prazos/exceção) e legenda clicável por categoria, tabelas e blocos STF/STJ/"Não esqueça" recolhíveis, botão **Inclusos Revisão**, tabela de legenda oculta por padrão (configurável por pasta/documento) e numeração do Word (I, II, a), 1.) preservada. ⚠️ migrações `20261104140000` e `20261104150000`.
+
+---
+
 ## 4.4.0 — 2026-11-05
 
 - **Paleta nova (designer unificado):** paleta do Revisão (roxo/dourado/status) aplicada em admin e aluno por tokens, com interruptor no Console (Aparência → Paleta nova): desligada / só Workspace (teste por e-mail) / todos. Desligado = cores atuais, sem mudança. Cobre tokens padrão, rampas de status do Tailwind, telas de marca do aluno, iframes (Cronograma, leitor, Estúdio) e CSS da área nova; login e carregamento seguem o Workspace via cookie. Outros tenants derivam a paleta do próprio designer.
