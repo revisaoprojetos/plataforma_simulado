@@ -1625,31 +1625,58 @@ function acharTituloNoCorpo(titulo,pageLines,pulaPaginas,corpoH){
 //   3) HEURÍSTICA por tamanho de fonte (reflete o PDF renderizado) — fallback.
 async function construirSumarioPdf(pdf,pageLines){
   const pgs=(CFG.pdf&&CFG.pdf.pages)||[];const scale=CFG.pdf.scale||1.4;
+  const yTela=(page,yPdf)=>{const ph=(pgs[page-1]&&pgs[page-1].h)||0;return ph?Math.max(0,Math.round(ph-yPdf*scale-40)):0};
+  const nums=Object.keys(pageLines).map(Number).sort((a,b)=>a-b);const nPag=nums.length;
+  const linhasDe=n=>(pageLines[n]||[]).slice().sort((a,b)=>b.y-a.y); // de cima p/ baixo (y do PDF cresce p/ cima)
   // corpo = tamanho de fonte MAIS FREQUENTE (p/ distinguir título de texto/rodapé)
-  const todas=[];for(const n in pageLines)for(const L of pageLines[n])todas.push({text:L.text,h:L.h,y:L.y,x:L.x,page:+n});
+  const todas=[];for(const n of nums)for(const L of linhasDe(n))todas.push({text:L.text,h:L.h,y:L.y,x:L.x,page:n});
   const freq=new Map();todas.forEach(L=>{if(L.h)freq.set(L.h,(freq.get(L.h)||0)+1)});
   let corpoH=12,mx=0;freq.forEach((c,h)=>{if(c>mx){mx=c;corpoH=h}});
   // 1) ÍNDICE do próprio documento (página "Sumário/Índice": linhas "Título ..... Nº") — normalmente o MAIS
   //    completo e fiel; navegação achando o título no corpo (nº impresso + offset consensual).
-  let viaIndice=[];
+  let viaIndice=[];const pagsIdx=new Set();
   try{
     const reIdx=/^(.{3,}?)[\s.]*\.{2,}[\s.]*(\d{1,4})\s*$/;
-    const idx=[];const pagsIdx=new Set();
-    for(const n in pageLines){let hits=0;for(const L of (pageLines[n]||[])){const m=L.text.match(reIdx);if(m){const tt=m[1].replace(/[.\s]+$/,'').trim();if(tt.length>=3&&!/^\d+$/.test(tt)){idx.push({titulo:tt,pag:+m[2],x:L.x,h:L.h,page:+n});hits++}}}if(hits>=3)pagsIdx.add(+n)}
-    const noIdx=idx.filter(e=>pagsIdx.has(e.page));
-    if(noIdx.length>=5){
+    const reSemNum=/^(.{3,}?)\s*\.{4,}\s*$/; // pontilhado SEM o nº (a extração às vezes solta o nº noutra linha)
+    const idx=[];
+    for(const n of nums){
+      const ls=linhasDe(n);const temCab=ls.some(L=>/^(sum[áa]rio|[íi]ndice)\b/i.test(L.text));
+      const ent=[];const usadas=new Set();
+      for(let i=0;i<ls.length;i++){const L=ls[i];
+        const m=L.text.match(reIdx);let tt=null,pag=null;
+        if(m){tt=m[1];pag=+m[2]}else{const m2=L.text.match(reSemNum);if(m2)tt=m2[1]}
+        if(tt==null)continue;
+        tt=tt.replace(/[.\s]+$/,'').trim();
+        // título QUEBRADO em 2 linhas no índice: a linha de cima (sem pontilhado, mesma fonte, colada) é o começo.
+        // Antes cada linha virava um item → "título pela metade" + a outra metade sumia ou virava índice extra.
+        const ant=ls[i-1];
+        if(ant&&!usadas.has(i-1)&&!/\.{3,}/.test(ant.text)&&Math.abs(ant.h-L.h)<=1&&(ant.y-L.y)<=L.h*2.2&&ant.text.length<=90&&!/^(sum[áa]rio|[íi]ndice)\b/i.test(ant.text)){tt=ant.text.trim()+' '+tt;usadas.add(i-1)}
+        usadas.add(i);
+        if(tt.length>=3&&!/^\d+$/.test(tt))ent.push({titulo:tt,pag,x:L.x,h:L.h,page:n});
+      }
+      // página de índice: ≥3 itens; ou ≥2 se tiver o cabeçalho "Sumário/Índice" ou estiver no começo do doc
+      // (antes exigia ≥5 no total → aulas curtas, com 2–4 tópicos, caíam na heurística e viravam bagunça).
+      if(ent.length>=3||(ent.length>=2&&(temCab||n<=3))){pagsIdx.add(n);idx.push(...ent)}
+    }
+    if(idx.length>=2){
       // nível por TAMANHO DE FONTE no índice (seções em negrito/MAIÚSCULAS são maiores que os subitens)
-      const hsIdx=[...new Set(noIdx.map(e=>e.h))].sort((a,b)=>b-a);
+      const hsIdx=[...new Set(idx.map(e=>e.h))].sort((a,b)=>b-a);
       const nivelIdx=h=>Math.min(3,Math.max(0,hsIdx.indexOf(h)));
       // Acha cada título no corpo só p/ DESCOBRIR o offset (página renderizada − página impressa do índice).
-      const matches=noIdx.map(e=>({e,a:acharTituloNoCorpo(e.titulo,pageLines,pagsIdx,corpoH)}));
-      const offs=matches.filter(m=>m.a).map(m=>m.a.page-m.e.pag);
+      const matches=idx.map(e=>({e,a:acharTituloNoCorpo(e.titulo,pageLines,pagsIdx,corpoH)}));
+      const offs=matches.filter(m=>m.a&&m.e.pag!=null).map(m=>m.a.page-m.e.pag);
       const offCount=new Map();offs.forEach(o=>offCount.set(o,(offCount.get(o)||0)+1));
       let offBest=0,offMax=0;offCount.forEach((c,o)=>{if(c>offMax){offMax=c;offBest=o}});
-      const consistente=offs.length>=3&&offMax/offs.length>=0.6; // offset bem definido → nº impresso é autoritativo
+      const consistente=offs.length>=2&&offMax/offs.length>=0.6; // offset bem definido → nº impresso é autoritativo
       const med=offs.length?offs.slice().sort((a,b)=>a-b)[Math.floor(offs.length/2)]:0;
-      const offset=consistente?offBest:med;const nP=pgs.length||1;
-      viaIndice=matches.map(({e,a})=>{let page=Math.max(1,Math.min(nP,(e.pag||1)+offset));if(a&&!consistente)page=a.page;let y=0;if(a&&a.page===page){const ph=(pgs[page-1]&&pgs[page-1].h)||0;y=ph?Math.max(0,ph-a.line.y*scale-40):0}return {title:e.titulo,level:nivelIdx(e.h),page,y:Math.round(y)}});
+      const offset=consistente?offBest:med;const nP=pgs.length||nPag||1;
+      viaIndice=matches.map(({e,a})=>{
+        let page;
+        if(e.pag==null){if(!a)return null;page=a.page} // sem nº impresso: só entra se o título existir no corpo
+        else{page=Math.max(1,Math.min(nP,e.pag+offset));if(a&&!consistente)page=a.page}
+        const y=a&&a.page===page?yTela(page,a.line.y):0;
+        return {title:e.titulo,level:nivelIdx(e.h),page,y};
+      }).filter(Boolean);
     }
   }catch(_){}
   // 2) marcadores embutidos (getOutline) — usados se o índice do documento não existir OU for mais pobre.
@@ -1661,18 +1688,65 @@ async function construirSumarioPdf(pdf,pageLines){
       await flat(ol,0);viaOutline=out;}
   }catch(_){}
   // escolhe o MAIS RICO — o índice do documento tem prioridade (é a TOC do autor; marcadores podem ser grossos)
-  if(viaIndice.length>=Math.max(5,viaOutline.length))return viaIndice.slice(0,400);
+  if(viaIndice.length>=2&&viaIndice.length>=viaOutline.length)return viaIndice.slice(0,400);
   if(viaOutline.length)return viaOutline.slice(0,400);
-  if(viaIndice.length>=5)return viaIndice.slice(0,400);
-  // 3) HEURÍSTICA por tamanho de fonte
+  if(viaIndice.length>=2)return viaIndice.slice(0,400);
+  // 3) ESTRUTURA LEGAL (lei seca / códigos): PARTE · LIVRO · TÍTULO · CAPÍTULO · SEÇÃO · SUBSEÇÃO, com o nome
+  //    na mesma linha ou na de baixo. Nas leis esses cabeçalhos têm o MESMO tamanho do texto → a heurística
+  //    por fonte não achava nada e o sumário ficava VAZIO.
+  try{
+    const reLei=/^(PARTE|LIVRO|T[ÍI]TULO|CAP[ÍI]TULO|SE[ÇC][ÃA]O|SUBSE[ÇC][ÃA]O)\s+([IVXLCDM]+|[ÚU]NIC[OA]|\d{1,3})\s*[ºª°o]?(?:\s*[-–—.:]\s*(.+))?$/i;
+    const ORD=['parte','livro','titulo','capitulo','secao','subsecao'];
+    const est=[];
+    // cabeçalho/rodapé corrido ("LEGPROC", nome da lei, nº da página) → pulado ao buscar o nome do título
+    const repetL=new Map();for(const n of nums){new Set(linhasDe(n).map(L=>normTxt(L.text))).forEach(t=>repetL.set(t,(repetL.get(t)||0)+1))}
+    const corrido=L=>/^\d{1,4}$/.test(L.text.trim())||(nPag>=4&&(repetL.get(normTxt(L.text))||0)>=Math.max(3,Math.ceil(nPag*0.3)));
+    const xs=new Map();todas.forEach(L=>{const k=Math.round(L.x);xs.set(k,(xs.get(k)||0)+1)});let corpoX=0,mxX=0;xs.forEach((c,k)=>{if(c>mxX){mxX=c;corpoX=k}});
+    const serveDeNome=t=>t.length<=110&&!/^art\.?\s*\d/i.test(t)&&!reLei.test(t);
+    const maiusc=t=>/[A-ZÀ-Ý]/.test(t)&&!/[a-zà-ÿ]/.test(t);
+    for(const n of nums){const ls=linhasDe(n);
+      for(let i=0;i<ls.length;i++){const L=ls[i];if(L.text.length>90)continue;const m=L.text.match(reLei);if(!m)continue;
+        const tipo=normTxt(m[1]);let nome=(m[3]||'').trim();
+        if(!nome){
+          // nome na linha de baixo; se o título ficou no PÉ da página, o nome está no TOPO da seguinte
+          let seq=ls.slice(i+1).filter(x=>!corrido(x)),ref=L;
+          if(!seq.length&&pageLines[n+1])seq=linhasDe(n+1).filter(x=>!corrido(x)),ref=null;
+          const nx=seq[0];
+          if(nx&&serveDeNome(nx.text)&&(!ref||(ref.y-nx.y)<=L.h*2.6)){
+            nome=nx.text.trim();
+            // nome em 2+ linhas (centralizado, MAIÚSCULAS): "DO JUIZ, … DEFENSOR," + "DOS ASSISTENTES …"
+            for(let k=1;k<3;k++){const a=seq[k-1],b=seq[k];if(!b||!serveDeNome(b.text)||!maiusc(nome)||!maiusc(b.text)||b.x<corpoX+25||(a.y-b.y)>b.h*2.2)break;nome+=' '+b.text.trim()}
+          }
+        }
+        const rot=(m[1]+' '+m[2]).toUpperCase();
+        const ult=est[est.length-1];if(ult&&ult.rot===rot&&ult.nome===nome)continue; // cabeçalho repetido
+        est.push({tipo,rot,nome,page:n,y:L.y});
+      }
+    }
+    if(est.length>=3){
+      const pres=ORD.filter(t=>est.some(e=>e.tipo===t));
+      return est.map(e=>({title:e.nome?e.rot+' — '+e.nome:e.rot,level:Math.min(3,Math.max(0,pres.indexOf(e.tipo))),page:e.page,y:yTela(e.page,e.y)})).slice(0,400);
+    }
+  }catch(_){}
+  // 4) HEURÍSTICA por tamanho de fonte (fallback)
   if(!todas.length)return [];
+  // linhas que se REPETEM em várias páginas = cabeçalho/rodapé corrido ("AULA 4 · DIREITO AGRÁRIO") → não é título
+  const repet=new Map();for(const n of nums){const vistos=new Set(linhasDe(n).map(L=>normTxt(L.text)));vistos.forEach(t=>repet.set(t,(repet.get(t)||0)+1))}
+  const limRep=Math.max(3,Math.ceil(nPag*0.3));
   const limiar=corpoH*1.18;
-  const cand=todas.filter(L=>L.h>=limiar&&L.text.length>=2&&L.text.length<=90&&!/^[\d.\s]+$/.test(L.text)&&!/^(p[áa]gina|p\.)\s*\d/i.test(L.text));
+  const ehCapa=L=>nPag>2&&L.page===1&&L.h>=corpoH*2.5; // título gigante da capa (ex.: "DIREITO AGRÁRIO")
+  const cand=todas.filter(L=>L.h>=limiar&&L.text.length>=2&&L.text.length<=90&&!/^[\d.\s]+$/.test(L.text)&&!/^(p[áa]gina|p\.)\s*\d/i.test(L.text)
+    &&!pagsIdx.has(L.page)&&!ehCapa(L)&&(nPag<4||(repet.get(normTxt(L.text))||0)<limRep));
   if(!cand.length)return [];
-  const alturas=[...new Set(cand.map(L=>L.h))].sort((a,b)=>b-a);
+  // título QUEBRADO em várias linhas (mesma página, mesma fonte, linhas coladas) → UM item só
+  const junt=[];
+  for(const L of cand){const u=junt[junt.length-1];
+    if(u&&u.page===L.page&&Math.abs(u.h-L.h)<=1&&(u.yUlt-L.y)>0&&(u.yUlt-L.y)<=L.h*1.9&&(u.text.length+L.text.length)<=160){u.text+=' '+L.text;u.yUlt=L.y;continue}
+    junt.push({...L,yUlt:L.y});
+  }
+  const alturas=[...new Set(junt.map(L=>L.h))].sort((a,b)=>b-a);
   const nivelH=h=>Math.min(3,Math.max(0,alturas.indexOf(h)));
-  cand.sort((a,b)=>a.page-b.page||b.y-a.y);
-  let out=cand.map(L=>{const ph=(pgs[L.page-1]&&pgs[L.page-1].h)||0;const y=ph?Math.max(0,ph-L.y*scale-40):0;return {title:L.text,level:nivelH(L.h),page:L.page,y:Math.round(y)}});
+  let out=junt.map(L=>({title:L.text,level:nivelH(L.h),page:L.page,y:yTela(L.page,L.y)}));
   if(out.length>180)out=out.filter(o=>o.level===0);
   return out.slice(0,400)
 }
