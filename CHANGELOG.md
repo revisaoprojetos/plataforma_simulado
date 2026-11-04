@@ -12,6 +12,12 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.3.1 — 2026-11-04
+
+- **Correção (Cronograma Adaptativo):** a tela do cronograma do aluno ficava em branco (só o cabeçalho). Colisão de nome no iframe (`var ORDEM` das aulas × `const ORDEM` dos tipos de meta) gerava SyntaxError; a variável das aulas virou `ORDEM_AULAS`.
+
+---
+
 ## 4.3.0 — 2026-11-04
 
 ### Produtos / Extensivos — FORMATO DE EXIBIÇÃO do conteúdo para o aluno

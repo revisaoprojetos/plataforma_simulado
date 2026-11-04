@@ -669,12 +669,12 @@ function diasDeRevisao(arranjo, dias) {
    com rodízio; concentração ≤18h; histórico prévio; horas pontuais; sobras de metas interrompidas. */
 var LPCAT = [], LPMAP = {};
 function lpDeWLP(W) { const out = []; (W || []).forEach((l, s) => (l || []).forEach((t, j) => { if (t && String(t).trim()) out.push({ id: `lp:${s}:${j}`, disc: '', lei: String(t).split(' - ')[0].trim(), texto: String(t), doc: (typeof WLPDOC !== 'undefined' && (WLPDOC[s] || [])[j]) || null }); })); return out; }
-/* Contexto do modelo: ordem de distribuição das aulas (ORDEM, do servidor), metas concluídas e ids já usados. */
-var ORDEM = null, CATALOGO_ID = null, PARAMS_MOTOR = null; /* v3: parâmetros do tenant (admin › Metas & inteligência); null = defaults 2.8 */
+/* Contexto do modelo: ordem de distribuição das aulas (ORDEM_AULAS, do servidor), metas concluídas e ids já usados. */
+var ORDEM_AULAS = null, CATALOGO_ID = null, PARAMS_MOTOR = null; /* v3: parâmetros do tenant (admin › Metas & inteligência); null = defaults 2.8 */
 function gerarPlano(cfg, AS, WLP, fixos, ancora) {
   const prog = (typeof S !== 'undefined' && S && S.prog) || {};
   const feitas = Object.keys(prog).filter(id => prog[id] && prog[id].s === 'done');
-  return Motor28.gerarPlano(cfg, AS, (LPCAT && LPCAT.length) ? LPCAT : lpDeWLP(WLP), fixos || {}, ancora || null, { ordem: ORDEM, feitas, usados: Object.keys(prog), params: PARAMS_MOTOR, notas: (typeof S !== 'undefined' && S && S.notas) || null });
+  return Motor28.gerarPlano(cfg, AS, (LPCAT && LPCAT.length) ? LPCAT : lpDeWLP(WLP), fixos || {}, ancora || null, { ordem: ORDEM_AULAS, feitas, usados: Object.keys(prog), params: PARAMS_MOTOR, notas: (typeof S !== 'undefined' && S && S.notas) || null });
 }
 
 /** Desempenho nas questões de um tema: soma as questões da aula e as das semanas de revisão. */
@@ -1575,7 +1575,7 @@ function renderConfig() {
   const disc = new Set(R.discs);
   const chip = (nomes, rot) => { const on = nomes.every(n => disc.has(n)); const n = nomes.reduce((a, x) => a + (aulasPor[x] || 0), 0); return `<label class="chip ${on ? 'on' : ''}"><input type="checkbox" data-disc="${esc(nomes.join('|'))}" ${on ? 'checked' : ''}><span class="ck"></span>${esc(rot || nomes[0])}<small>${n}</small></label>`; };
   const grupo = (tit, lista, chave) => `<div class="grupo-d"><div class="gt"><span class="rot">${tit}</span><span><button type="button" class="btn sm ghost" data-acao="grupo" data-g="${chave}" data-on="1">Marcar todas</button><button type="button" class="btn sm ghost" data-acao="grupo" data-g="${chave}" data-on="0">Desmarcar</button></span></div><div class="chips">${lista}</div></div>`;
-  const totAulas = (ORDEM || AS.map((_, i) => i)).filter(i => AS[i] && disc.has(AS[i][0])).length;
+  const totAulas = (ORDEM_AULAS || AS.map((_, i) => i)).filter(i => AS[i] && disc.has(AS[i][0])).length;
   const hSem = R.h.reduce((a, b) => a + b, 0), nDias = R.h.filter(Boolean).length;
   const p = PREV;
   const lim = p && p.arr !== 'pdf' ? 6 : 3;
@@ -2399,9 +2399,9 @@ body.embed .flut{display:none}
         COR = Object.assign({}, COR, cors);
       }
       // ordem de distribuição do modelo: só as aulas que entram no cronograma contam
-      ORDEM = Array.isArray(ct.ordem) ? ct.ordem : null; CATALOGO_ID = ct.catalogo || null;
+      ORDEM_AULAS = Array.isArray(ct.ordem) ? ct.ordem : null; CATALOGO_ID = ct.catalogo || null;
       PARAMS_MOTOR = (ct.params && typeof ct.params === 'object') ? ct.params : null;
-      aulasPor = {}; (ORDEM || AS.map(function (_, i) { return i; })).forEach(function (i) { var a = AS[i]; if (a) aulasPor[a[0]] = (aulasPor[a[0]] || 0) + 1; });
+      aulasPor = {}; (ORDEM_AULAS || AS.map(function (_, i) { return i; })).forEach(function (i) { var a = AS[i]; if (a) aulasPor[a[0]] = (aulasPor[a[0]] || 0) + 1; });
     } catch (e) {}
   }
 
