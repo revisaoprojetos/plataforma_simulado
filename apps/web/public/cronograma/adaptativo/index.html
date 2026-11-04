@@ -669,7 +669,13 @@ function diasDeRevisao(arranjo, dias) {
    com rodízio; concentração ≤18h; histórico prévio; horas pontuais; sobras de metas interrompidas. */
 var LPCAT = [], LPMAP = {};
 function lpDeWLP(W) { const out = []; (W || []).forEach((l, s) => (l || []).forEach((t, j) => { if (t && String(t).trim()) out.push({ id: `lp:${s}:${j}`, disc: '', lei: String(t).split(' - ')[0].trim(), texto: String(t), doc: (typeof WLPDOC !== 'undefined' && (WLPDOC[s] || [])[j]) || null }); })); return out; }
-function gerarPlano(cfg, AS, WLP, fixos, ancora) { return Motor28.gerarPlano(cfg, AS, (LPCAT && LPCAT.length) ? LPCAT : lpDeWLP(WLP), fixos || {}, ancora || null); }
+/* Contexto do modelo: ordem de distribuição das aulas (ORDEM, do servidor), metas concluídas e ids já usados. */
+var ORDEM = null, CATALOGO_ID = null;
+function gerarPlano(cfg, AS, WLP, fixos, ancora) {
+  const prog = (typeof S !== 'undefined' && S && S.prog) || {};
+  const feitas = Object.keys(prog).filter(id => prog[id] && prog[id].s === 'done');
+  return Motor28.gerarPlano(cfg, AS, (LPCAT && LPCAT.length) ? LPCAT : lpDeWLP(WLP), fixos || {}, ancora || null, { ordem: ORDEM, feitas, usados: Object.keys(prog) });
+}
 
 /** Desempenho nas questões de um tema: soma as questões da aula e as das semanas de revisão. */
 function acertoTema(notas, i) {
@@ -706,7 +712,7 @@ function rankingRevisao(plano, notas, ateData, jaRevisados) {
 /** Descreve uma meta a partir do id. */
 function descrever(id, AS, WLP) {
   const [t, a, b] = id.split(':');
-  if (t === 'lp') { const it = LPMAP[id]; if (it) return { tipo: 'lp', texto: it.texto, disc: it.disc || '', lei: it.lei, doc: it.doc || null }; return { tipo: 'lp', texto: (WLP[+a] && WLP[+a][+b]) || 'LegProc', sem: +a, doc: ((WLPDOC[+a] || [])[+b]) || null }; }
+  if (t === 'lp') { const it = LPMAP[id] || (S && S.cfg && S.cfg.lpLegado && S.cfg.lpLegado[id]); if (it) return { tipo: 'lp', texto: it.texto, disc: it.disc || '', lei: it.lei, doc: it.doc || null }; return { tipo: 'lp', texto: (WLP[+a] && WLP[+a][+b]) || 'LegProc', sem: +a, doc: ((WLPDOC[+a] || [])[+b]) || null }; }
   const rev = t === 'rf' || t === 'rq';
   const i = rev ? +b : +a;
   const e = AS[i];
@@ -919,7 +925,7 @@ function carregarLocal() {
   return null;
 }
 function cfgVazia() {
-  return { start: hojeISO(), horas: [0, 0, 0, 0, 0, 0, 0], discs: [...ESSENCIAIS], metas: { pf: true, fl: true, qu: true, lp: true }, arranjo: 'pdf', revModelo: 'pdflash', revisao: { ativa: true, cada: 12 }, motor: '2.8', maisPDFull: true };
+  return { start: hojeISO(), horas: [0, 0, 0, 0, 0, 0, 0], discs: [...ESSENCIAIS], metas: { pf: true, fl: true, qu: true, lp: true }, arranjo: 'pdf', revModelo: 'pdflash', revisao: { ativa: true, cada: 12 }, motor: Motor28.VERSAO_MOTOR, maisPDFull: true };
 }
 function novoEstado() {
   return { v: 2, cfg: cfgVazia(), plano: {}, fim: 1, prog: {}, log: {}, extras: [], notas: {}, reorgs: [], revs: {}, pausa: null, perfil: null, exemplo: true, atualizado: { estado: 0, progresso: 0, notas: 0 } };
@@ -936,7 +942,8 @@ function montarRevisao(sem) {
   const dias = [0, 1, 2, 3, 4, 5, 6].map(k => dAdd(ini, k)).filter(d => d >= S.cfg.start && horasDia(S.cfg, d) > 0);
   // o tempo já ocupado por pendências e LegProc nesta semana fica de fora
   const ocupado = d => Object.entries(S.plano).filter(([, [x]]) => x === d).reduce((s, [, [, h]]) => s + h * 60, 0);
-  const plano = planoRevisao(dias.map(d => horasDia(S.cfg, d) * 60 - ocupado(d)), fila.length);
+  const conc = Motor28.perfilSemana(S.cfg, sem).concentrado; // semana ≤18 h: último dia só com questões (modelo)
+  const plano = Motor28.planoRevisao(dias.map(d => horasDia(S.cfg, d) * 60 - ocupado(d)), fila.length, dias.map(d => d === conc));
   const out = [];
   plano.forEach((p, k) => p.itens.forEach(({ t, n }) => out.push([`${t}:${sem}:${fila[n].i}`, dias[k]])));
   return out;
@@ -1253,11 +1260,16 @@ function titulo(i) {
   if (i.tipo === 'pf' && S.plano['pp:' + i.idx + ':1']) return `${i.tema} · parte final`;
   return i.tema;
 }
+/** Link de questões: o catálogo do modelo traz a URL do filtro (QC/TEC); nome de caderno antigo vira busca. */
+function urlQuestao(valor, plataforma) {
+  if (/^https?:\/\//i.test(valor)) return valor;
+  return (plataforma === 'qc' ? 'https://www.qconcursos.com/questoes-de-concursos/questoes?q=' : 'https://www.tecconcursos.com.br/questoes/buscar?term=') + encodeURIComponent(valor);
+}
 function linksQ(i) {
   if (i.tipo !== 'qu' && i.tipo !== 'rq') return '';
   let s = '';
-  if (i.qc) s += `<a class="link-q" href="https://www.qconcursos.com/questoes-de-concursos/questoes?q=${encodeURIComponent(i.qc)}" target="_blank" rel="noopener">QConcursos ↗</a>`;
-  if (i.tec) s += `<a class="link-q" href="https://www.tecconcursos.com.br/questoes/buscar?term=${encodeURIComponent(i.tec)}" target="_blank" rel="noopener">TEC ↗</a>`;
+  if (i.qc) s += `<a class="link-q" href="${esc(urlQuestao(i.qc, 'qc'))}" target="_blank" rel="noopener">QConcursos ↗</a>`;
+  if (i.tec) s += `<a class="link-q" href="${esc(urlQuestao(i.tec, 'tec'))}" target="_blank" rel="noopener">TEC ↗</a>`;
   return s ? `<div class="links">${s}</div>` : '';
 }
 /* Faixa de PÁGINAS que o aluno lê nesta meta. Aulas longas são divididas em partes (pp:i:k … pf:i);
@@ -1546,9 +1558,9 @@ function montarCfg() {
   const c = { start: R.start, vel: R.vel || VEL_PADRAO, velFonte: R.velFonte || 'media', velSeg: R.velSeg || null, discs: R.discs.length ? [...R.discs] : [...ESSENCIAIS], metas: { ...R.metas }, arranjo: 'pdf', revModelo: R.revModelo || 'pdflash', revisao: revNorm(R.revisao), recessos: R.recessos.map(r => ({ ...r })), horas: [...R.horas], rotinas: R.rotinas.map(r => ({ ...r, horas: [...r.horas] })), semData: !!R.semData };
   delete c.metas.vd; // Videoaulas indisponível: nunca somar tempo de vd no motor
   // 2.8: limite de PDFull novos, histórico prévio (só das disciplinas selecionadas) e dados de reorganização
-  c.motor = '2.8'; c.maisPDFull = R.maisPDFull !== false; c.jaEstudaRevisao = !!R.jaEstudaRevisao;
+  c.motor = Motor28.VERSAO_MOTOR; c.maisPDFull = R.maisPDFull !== false; c.jaEstudaRevisao = !!R.jaEstudaRevisao;
   c.ultimosTemas = {}; if (R.jaEstudaRevisao) for (const d of c.discs) { const k = (R.ultimosTemas || {})[d]; if (typeof k === 'number' && k >= 0) c.ultimosTemas[d] = k; }
-  for (const k of ['horasPontuais', 'paginasLidas', 'sobras', 'lpIgnorar']) if (R[k]) c[k] = JSON.parse(JSON.stringify(R[k]));
+  for (const k of ['horasPontuais', 'paginasLidas', 'sobras', 'lpIgnorar', 'lpLegado', 'remanejadas']) if (R[k]) c[k] = JSON.parse(JSON.stringify(R[k]));
   if (R.semData) c.recessos = []; // "sem data" não tem recesso por período
   if (S.exemplo || !R.desde || R.desde <= c.start) { c.horas = [...R.h]; c.rotinas = []; return c; }
   c.rotinas = c.rotinas.filter(r => r.desde < R.desde);
@@ -1563,7 +1575,7 @@ function renderConfig() {
   const disc = new Set(R.discs);
   const chip = (nomes, rot) => { const on = nomes.every(n => disc.has(n)); const n = nomes.reduce((a, x) => a + (aulasPor[x] || 0), 0); return `<label class="chip ${on ? 'on' : ''}"><input type="checkbox" data-disc="${esc(nomes.join('|'))}" ${on ? 'checked' : ''}><span class="ck"></span>${esc(rot || nomes[0])}<small>${n}</small></label>`; };
   const grupo = (tit, lista, chave) => `<div class="grupo-d"><div class="gt"><span class="rot">${tit}</span><span><button type="button" class="btn sm ghost" data-acao="grupo" data-g="${chave}" data-on="1">Marcar todas</button><button type="button" class="btn sm ghost" data-acao="grupo" data-g="${chave}" data-on="0">Desmarcar</button></span></div><div class="chips">${lista}</div></div>`;
-  const totAulas = AS.filter(a => disc.has(a[0])).length;
+  const totAulas = (ORDEM || AS.map((_, i) => i)).filter(i => AS[i] && disc.has(AS[i][0])).length;
   const hSem = R.h.reduce((a, b) => a + b, 0), nDias = R.h.filter(Boolean).length;
   const p = PREV;
   const lim = p && p.arr !== 'pdf' ? 6 : 3;
@@ -1807,8 +1819,8 @@ async function baixarDocx() {
           fl: ids.filter(x => x.startsWith('fl:')).map(txt).join(' • '),
           lp: ids.filter(x => x.startsWith('lp:')).map(x => info(x).texto),
           qu: q.map(i => i.disc + ' Aula ' + i.aula).join(' • '),
-          quUrl: q[0]?.qc ? 'https://www.qconcursos.com/questoes-de-concursos/questoes?q=' + encodeURIComponent(q[0].qc) : '',
-          quUrlTec: q[0]?.tec ? 'https://www.tecconcursos.com.br/questoes/buscar?term=' + encodeURIComponent(q[0].tec) : '',
+          quUrl: q[0]?.qc ? urlQuestao(q[0].qc, 'qc') : '',
+          quUrlTec: q[0]?.tec ? urlQuestao(q[0].tec, 'tec') : '',
         });
       }
       if (algum) wks.push({ wn: 'SEMANA ' + s, wd: fDM(ini) + ' — ' + fDM(dAdd(ini, 6)), days });
@@ -2381,12 +2393,14 @@ body.embed .flut{display:none}
         var esp = disc.filter(function (d) { return d.classificacao === 'especifica'; }).map(function (d) { return d.nome; });
         if (ess.length) ESSENCIAIS = ess;
         if (comp.length) COMPLEMENTARES = comp;
-        if (esp.length) AGU = esp.map(function (n) { return [n]; });
+        if (Array.isArray(ct.agu) && ct.agu.length) AGU = ct.agu; else if (esp.length) AGU = esp.map(function (n) { return [n]; });
         TODAS = [].concat(ESSENCIAIS, COMPLEMENTARES, AGU.flat());
         var cors = {}; disc.forEach(function (d) { if (d.cor) cors[d.nome] = d.cor; });
         COR = Object.assign({}, COR, cors);
       }
-      aulasPor = {}; AS.forEach(function (a) { aulasPor[a[0]] = (aulasPor[a[0]] || 0) + 1; });
+      // ordem de distribuição do modelo: só as aulas que entram no cronograma contam
+      ORDEM = Array.isArray(ct.ordem) ? ct.ordem : null; CATALOGO_ID = ct.catalogo || null;
+      aulasPor = {}; (ORDEM || AS.map(function (_, i) { return i; })).forEach(function (i) { var a = AS[i]; if (a) aulasPor[a[0]] = (aulasPor[a[0]] || 0) + 1; });
     } catch (e) {}
   }
 

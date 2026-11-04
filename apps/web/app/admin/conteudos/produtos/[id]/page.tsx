@@ -6,7 +6,7 @@ import { ProdutoEstudioClient } from './produto-estudio-client'
 
 export const dynamic = 'force-dynamic'
 
-// PRODUTO › editor (Informações · Conteúdos · Vitrine · Grupos de acesso).
+// PRODUTO › editor (Informações · Conteúdos · Vitrine · Grupos de acesso · Visibilidade).
 // Carga INICIAL = só o leve (identidade + vitrine + instrutores + 4 contagens). Currículo, grupos,
 // nomes da vitrine e candidatos são LAZY por aba (lazy-actions.ts) e as listas grandes são BUSCA no servidor.
 export default async function ProdutoPage({ params }: { params: Promise<{ id: string }> }) {

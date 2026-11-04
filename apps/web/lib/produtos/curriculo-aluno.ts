@@ -1,6 +1,7 @@
 import 'server-only'
 import { fetchAll } from '@/lib/supabase/fetch-all'
 import type { Disponibilidade, TipoRef } from './curriculo'
+import { visibilidadeDeConteudos } from '@/lib/segmentos/visibilidade'
 
 /**
  * CURRÍCULO do produto visto pelo ALUNO — os módulos/submódulos e as aulas montados no configurador
@@ -11,6 +12,8 @@ import type { Disponibilidade, TipoRef } from './curriculo'
  *  - só aulas com situacao='ativo' e não deletadas (rascunho não aparece);
  *  - DISPONIBILIDADE (do módulo e da aula — vale a mais tardia): antes de liberar a aula aparece com
  *    cadeado e a data, ou some (antes='oculto'). Base = data de matrícula do aluno NO PRODUTO.
+ *  - SEGMENTOS (aba Visibilidade do produto): módulo/aula fora do segmento some ou aparece com cadeado
+ *    (`exclusivo`), e o bloqueio de um módulo vale para tudo dentro dele;
  *  - o acesso ao PRODUTO é checado por quem chama (getExtensivoDoAluno / acessoAoProduto).
  */
 
@@ -24,6 +27,7 @@ export interface AulaAluno {
   liberada: boolean
   liberaEm: string | null   // ISO, quando ainda bloqueada
   lida: boolean             // documento já aberto pelo aluno (simulado_conteudo_leitura_progresso)
+  exclusivo: boolean        // bloqueada por segmento (conteúdo exclusivo de outro público)
 }
 export interface ModuloAluno {
   id: string
@@ -33,6 +37,7 @@ export interface ModuloAluno {
   aberto: boolean           // exibicao 'aberto' | 'recolhido'
   liberado: boolean
   liberaEm: string | null
+  exclusivo: boolean        // bloqueado por segmento
   aulas: AulaAluno[]
   submodulos: ModuloAluno[]
 }
@@ -114,6 +119,7 @@ export async function curriculoDoAluno(svc: any, tenantId: string, estudanteId: 
       .order('ordem', { ascending: true }).order('id', { ascending: true }), 1000, 'aluno:produto_itens').catch(() => [] as any[]),
     matriculaNoProduto(svc, tenantId, estudanteId, produtoId).catch(() => null),
   ])
+  const visivel = await visibilidadeDeConteudos(svc, tenantId, estudanteId, produtoId).catch(() => (() => 'visivel' as const))
   // Aulas-documento que o aluno já abriu (histórico de leitura) → marca de "lida" e progresso por módulo.
   const docIds = [...new Set(irows.filter((i: any) => i.tipo_ref === 'documento_biblioteca' && i.ref_id).map((i: any) => i.ref_id as string))]
   const lidos = new Set<string>()
@@ -132,31 +138,39 @@ export async function curriculoDoAluno(svc: any, tenantId: string, estudanteId: 
   for (const m of mrows) { const pai = m.pai_id && ids.has(m.pai_id) ? m.pai_id : null; const l = filhos.get(pai) ?? []; l.push(m); filhos.set(pai, l) }
 
   // herdado = liberação do(s) módulo(s) acima: uma aula nunca libera antes do módulo que a contém.
-  const montar = (m: any, herdado: Date | null, raizId: string): ModuloAluno | null => {
+  // segHerdado = módulo acima bloqueado por segmento (cadeado) → tudo dentro fica bloqueado.
+  const montar = (m: any, herdado: Date | null, raizId: string, segHerdado: boolean): ModuloAluno | null => {
     const volta = typeof voltar === 'function' ? voltar(raizId) : voltar
+    const segM = visivel(m.id)
+    if (segM === 'oculto') return null
+    const exclusivoM = segHerdado || segM === 'cadeado'
     const dm = normDisp(m.disponibilidade)
     const libM = maisTarde(herdado, momentoLiberacao(dm, matricula))
     const modLiberado = !libM || +libM <= agora
     if (!modLiberado && dm.antes === 'oculto') return null
     const aulas: AulaAluno[] = []
     for (const i of aulasPorModulo.get(m.id) ?? []) {
+      const segA = visivel(i.id)
+      if (segA === 'oculto') continue
+      const exclusivo = exclusivoM || segA === 'cadeado'
       const di = normDisp(i.disponibilidade)
       const lib = maisTarde(libM, momentoLiberacao(di, matricula))
-      const liberada = !lib || +lib <= agora
-      if (!liberada && (di.antes === 'oculto' || dm.antes === 'oculto')) continue
+      const noPrazo = !lib || +lib <= agora
+      if (!noPrazo && (di.antes === 'oculto' || dm.antes === 'oculto')) continue
+      const liberada = noPrazo && !exclusivo
       const tipo = (i.tipo_ref ?? 'link') as TipoRef
       const { href, externo } = hrefDaAula(tipo, i.ref_id ?? null, i.ref_url ?? null, i.meta, volta)
-      aulas.push({ id: i.id, titulo: i.titulo, subtipo: i.subtipo ?? null, tipoRef: tipo, href: liberada ? href : null, externo, liberada, liberaEm: liberada || !lib ? null : lib.toISOString(), lida: !!i.ref_id && lidos.has(i.ref_id) })
+      aulas.push({ id: i.id, titulo: i.titulo, subtipo: i.subtipo ?? null, tipoRef: tipo, href: liberada ? href : null, externo, liberada, liberaEm: noPrazo || !lib ? null : lib.toISOString(), lida: !!i.ref_id && lidos.has(i.ref_id), exclusivo })
     }
-    const submodulos = (filhos.get(m.id) ?? []).map((s) => montar(s, libM, raizId)).filter(Boolean) as ModuloAluno[]
+    const submodulos = (filhos.get(m.id) ?? []).map((s) => montar(s, libM, raizId, exclusivoM)).filter(Boolean) as ModuloAluno[]
     if (!aulas.length && !submodulos.length) return null // módulo vazio para o aluno: não mostra
     return {
       id: m.id, titulo: m.titulo, descricao: m.descricao ?? null, imagemUrl: m.imagem_url ?? null,
-      aberto: m.exibicao !== 'recolhido', liberado: modLiberado, liberaEm: modLiberado || !libM ? null : libM.toISOString(),
-      aulas, submodulos,
+      aberto: m.exibicao !== 'recolhido', liberado: modLiberado && !exclusivoM, liberaEm: modLiberado || !libM ? null : libM.toISOString(),
+      exclusivo: exclusivoM, aulas, submodulos,
     }
   }
-  return (filhos.get(null) ?? []).map((m) => montar(m, null, m.id)).filter(Boolean) as ModuloAluno[]
+  return (filhos.get(null) ?? []).map((m) => montar(m, null, m.id, false)).filter(Boolean) as ModuloAluno[]
 }
 
 /**
@@ -169,7 +183,7 @@ export async function docLiberadoPorProduto(
   temAcesso: (produtoId: string) => Promise<boolean>,
 ): Promise<boolean> {
   const { data: itens } = await svc.from('simulado_produto_modulo_itens')
-    .select('produto_id, modulo_id, disponibilidade')
+    .select('id, produto_id, modulo_id, disponibilidade')
     .eq('tenant_id', tenantId).eq('ref_id', documentoId).eq('tipo_ref', 'documento_biblioteca')
     .eq('deletado', false).eq('situacao', 'ativo').limit(50)
   const lista = (itens ?? []) as any[]
@@ -179,7 +193,10 @@ export async function docLiberadoPorProduto(
     if (!prod || !(await temAcesso(produtoId))) continue
     // Disponibilidade: a aula (e o módulo dela) precisam já estar liberados para este aluno.
     const matricula = await matriculaNoProduto(svc, tenantId, estudanteId, produtoId).catch(() => null)
+    // Segmentos: a aula, o módulo e o módulo pai precisam estar visíveis (nem oculto nem cadeado).
+    const visivel = await visibilidadeDeConteudos(svc, tenantId, estudanteId, produtoId).catch(() => (() => 'visivel' as const))
     for (const it of lista.filter((i) => i.produto_id === produtoId)) {
+      if (visivel(it.id) !== 'visivel' || visivel(it.modulo_id) !== 'visivel') continue
       const { data: mod } = await svc.from('simulado_produto_modulos').select('disponibilidade, pai_id, deletado').eq('tenant_id', tenantId).eq('id', it.modulo_id).maybeSingle()
       if (!mod || (mod as any).deletado) continue
       let lib = momentoLiberacao(normDisp(it.disponibilidade), matricula)
@@ -188,6 +205,7 @@ export async function docLiberadoPorProduto(
       if ((mod as any).pai_id) {
         const { data: pai } = await svc.from('simulado_produto_modulos').select('disponibilidade, deletado').eq('tenant_id', tenantId).eq('id', (mod as any).pai_id).maybeSingle()
         if (pai && (pai as any).deletado) continue
+        if (visivel((mod as any).pai_id) !== 'visivel') continue
         const lp = pai ? momentoLiberacao(normDisp((pai as any).disponibilidade), matricula) : null
         if (lp && (!lib || lp > lib)) lib = lp
       }

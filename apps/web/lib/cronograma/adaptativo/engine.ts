@@ -5,7 +5,7 @@
 // sem 'server-only' nem acesso a DOM/fetch. NÃO alterar a lógica — só tipar.
 //
 // · Durações: PDFULL = páginas ÷ ritmo de leitura (padrão interno 17 páginas/hora), em blocos de 30 min
-//             PDFlash 1h · Questões 30 min · LegProc 45 min
+//             PDFlash 1h · Questões 30 min · LegProc 30 min
 // · PDFlash 1 semana depois do PDFULL, no mesmo dia — exceto disciplinas AGU sem flash
 // · Questões 2 semanas depois do PDFULL, no mesmo dia — nunca são descartadas
 // · Semanas de revisão (cfg.revisao = {ativa, cada}): a cada N semanas, sem aulas novas.
@@ -104,16 +104,12 @@ export function horasPdf(p: number, vel?: number): number { return minPdf(p, vel
  * Semana de revisão: distribui, em ordem, PDFlash/Flashcard (60 min) e questões (30 min) de cada tema pelos dias.
  */
 export const DUR_REVISAO: Record<string, number> = { rf: 60, rq: 30 }
-export function planoRevisao(capDias: number[], temas: number): Array<{ itens: Array<{ t: string; n: number }>; usado: number }> {
-  const fila: Array<{ t: string; n: number }> = []
-  for (let n = 0; n < temas; n++) fila.push({ t: 'rf', n }, { t: 'rq', n })
-  let q = 0
-  return capDias.map((c) => {
-    const itens: Array<{ t: string; n: number }> = []; let usado = 0
-    while (q < fila.length && usado + DUR_REVISAO[fila[q].t] <= c) { itens.push(fila[q]); usado += DUR_REVISAO[fila[q].t]; q++ }
-    return { itens, usado }
-  })
+/** Semana de revisão (modelo): apenasQuestoes[k] = dia que concentra as questões (≤18 h) — recebe só questões. */
+export function planoRevisao(capDias: number[], temas: number, apenasQuestoes: boolean[] = []): Array<{ itens: Array<{ t: string; n: number }>; usado: number }> {
+  return M28.planoRevisao(capDias, temas, apenasQuestoes)
 }
+/** Dia da semana que concentra as questões (semana de até 18 h com mais de 1 dia disponível) ou null. */
+export function diaConcentrado(cfg: Cfg, sem: number): DataISO | null { return M28.perfilSemana(cfg as unknown as M28.Cfg28, sem).concentrado }
 /** Dias da semana dedicados a PDFlash + questões, conforme o arranjo e os dias de estudo disponíveis. */
 export function diasDeRevisao(arranjo: string, dias: DataISO[]): DataISO[] {
   const n = dias.length
@@ -137,12 +133,12 @@ export function lpDeWLP(WLP: WLP): M28.ItemLP[] {
 }
 
 /**
- * Gera o plano (motor 2.8). LP = catálogo de LegProc por disciplina (conteudo-banco); sem ele, usa a
- * lei seca semanal do seed como itens gerais. fixos = metas que não se movem; ancora = data de início
- * da redistribuição.
+ * Gera o plano (lógica do modelo 2.8, motor28.ts). LP = metas de LegProc por disciplina (conteudo-banco);
+ * sem ele, usa a lei seca semanal do seed. fixos = metas que não se movem; ancora = início da redistribuição;
+ * ctx.ordem = ordem de distribuição das aulas; ctx.feitas = metas concluídas; ctx.usados = ids com registro.
  */
-export function gerarPlano(cfg: Cfg, AS: AS, WLP: WLP, fixos: Fixos, ancora: DataISO | null, LP?: M28.ItemLP[] | null): ResultadoPlano {
-  return M28.gerarPlano(cfg as unknown as M28.Cfg28, AS as M28.AulaAS[], LP && LP.length ? LP : lpDeWLP(WLP), fixos, ancora)
+export function gerarPlano(cfg: Cfg, AS: AS, WLP: WLP, fixos: Fixos, ancora: DataISO | null, LP?: M28.ItemLP[] | null, ctx?: M28.Contexto): ResultadoPlano {
+  return M28.gerarPlano(cfg as unknown as M28.Cfg28, AS as M28.AulaAS[], LP && LP.length ? LP : lpDeWLP(WLP), fixos, ancora, ctx)
 }
 
 export interface Notas { [id: string]: { grau?: number; res?: number; err?: number; diff?: number } }

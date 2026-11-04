@@ -2,7 +2,7 @@
 
 // Editor de Produto do Estúdio (telas Produto / ProdutoConteudos / ProdutoGrupos):
 // cabeçalho FIEL (logo + eyebrow/título + meta + status "Não listado ▾" · Ver como aluno · ⋯ · Publicar alterações)
-// e 3 abas sublinhadas (Informações · Conteúdos · Grupos de acesso).
+// e abas sublinhadas (Informações · Conteúdos · Vitrine · Grupos de acesso · Visibilidade).
 // Reusa as actions de produção (salvarProdutoAction/salvarGruposAction/...) e as tabelas novas do currículo.
 
 import { useRef, useState, useTransition } from 'react'
@@ -27,9 +27,10 @@ import { AbaInformacoes } from './aba-informacoes'
 import { AbaConteudos } from './aba-conteudos'
 import { AbaGrupos } from './aba-grupos'
 import { AbaVitrine } from './aba-vitrine'
+import { AbaVisibilidade } from './aba-visibilidade'
 import { listarPastasProdutoAction } from './lazy-actions'
 
-type Aba = 'informacoes' | 'conteudos' | 'vitrine' | 'grupos'
+type Aba = 'informacoes' | 'conteudos' | 'vitrine' | 'grupos' | 'visibilidade'
 
 /** Payload COMPLETO do produto (salvarProdutoAction é replace total — tudo que não for enviado volta ao default). */
 function payloadCompleto(p: ProdutoLeve, over: Partial<Produto> = {}): Partial<Produto> & { id: string } {
@@ -40,6 +41,8 @@ function payloadCompleto(p: ProdutoLeve, over: Partial<Produto> = {}): Partial<P
     validade_tipo: p.validade_tipo, validade_dias: p.validade_dias, validade_data: p.validade_data, ...over,
   }
 }
+
+const ABAS: Aba[] = ['informacoes', 'conteudos', 'vitrine', 'grupos', 'visibilidade']
 
 export function ProdutoEstudioClient({
   tenantId, podeEditar, produto, instrutores, resumo, breadcrumb,
@@ -52,9 +55,9 @@ export function ProdutoEstudioClient({
   const router = useRouter()
   const searchParams = useSearchParams()
   const inicial = (searchParams.get('aba') as Aba) || 'informacoes'
-  const [aba, setAba] = useState<Aba>(['informacoes', 'conteudos', 'vitrine', 'grupos'].includes(inicial) ? inicial : 'informacoes')
+  const [aba, setAba] = useState<Aba>(ABAS.includes(inicial) ? inicial : 'informacoes')
   // Abas pesadas só montam (e só buscam seus dados) na 1ª abertura; depois ficam montadas/ocultas (sem recarregar).
-  const [visitadas, setVisitadas] = useState<Set<Aba>>(() => new Set([['informacoes', 'conteudos', 'vitrine', 'grupos'].includes(inicial) ? inicial : 'informacoes']))
+  const [visitadas, setVisitadas] = useState<Set<Aba>>(() => new Set([ABAS.includes(inicial) ? inicial : 'informacoes']))
   const [mover, setMover] = useState(false)
   // Árvore de pastas (só p/ o diálogo "Mover") — carregada sob demanda ao abrir.
   const [arvore, setArvore] = useState<PastaProdutoFlat[] | null>(null)
@@ -106,6 +109,7 @@ export function ProdutoEstudioClient({
     ['conteudos', 'Conteúdos', resumo.conteudos],
     ['vitrine', 'Vitrine', produto.secoes.length],
     ['grupos', 'Grupos de acesso', resumo.grupos],
+    ['visibilidade', 'Visibilidade', null],
   ]
 
   return (
@@ -219,6 +223,9 @@ export function ProdutoEstudioClient({
       )}
       {visitadas.has('grupos') && (
         <div hidden={aba !== 'grupos'}><AbaGrupos produtoId={produto.id} podeEditar={podeEditar} /></div>
+      )}
+      {visitadas.has('visibilidade') && (
+        <div hidden={aba !== 'visibilidade'}><AbaVisibilidade produtoId={produto.id} produtoNome={produto.nome} podeEditar={podeEditar} /></div>
       )}
 
       {mover && arvore !== null && <MoverDialog open onClose={() => setMover(false)} arvore={arvore} alvo={{ kind: 'produto', id: produto.id, nome: produto.nome }} onMovido={() => router.refresh()} />}

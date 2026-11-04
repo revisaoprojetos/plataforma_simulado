@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { remember, esquecer } from '@/lib/cache/relatorio-cache'
 import { ehTestadorGlobal } from '@/lib/sistema/testadores-globais'
 import { carregarConteudoBanco } from './conteudo-banco'
+import { chaveDisciplina } from './catalogo-html'
 
 /**
  * LIBERAÇÃO POR DATA do Cronograma Adaptativo.
@@ -90,7 +91,7 @@ export type AlvoDoc = { k: 'a'; i: number } | { k: 'lp'; ids: string[] }
 export interface MapaDocs { docs: Record<string, AlvoDoc>; aulas: number; legproc: number; materiais: number; titulos: Record<string, string> }
 
 const numAula = (t: string) => { const m = /\baula\s*0*(\d{1,3})\b/i.exec(t || ''); return m ? Number(m[1]) : null }
-const normDisc = (s: string) => (s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
+const normDisc = (s: string) => chaveDisciplina(s) // "Eleitoral" = "Direito Eleitoral" etc. (catalogo-html)
 
 export async function mapaDocsCronograma(svc: SupabaseClient, tenantId: string): Promise<MapaDocs> {
   return remember<MapaDocs>(kMapa(tenantId), 300, async () => {
@@ -100,8 +101,12 @@ export async function mapaDocsCronograma(svc: SupabaseClient, tenantId: string):
     const docs: Record<string, AlvoDoc> = {}; const titulos: Record<string, string> = {}
     const porDiscNum = new Map<string, number>() // "disciplina|nºaula" → índice em AS
     let aulas = 0, legproc = 0, materiais = 0
+    const ativas = c.ordem ? new Set(c.ordem) : null
+    const apoio: Array<{ id: string; titulo: string; disc: string }> = []
     c.AS.forEach((e, i) => {
       const docId = e[6]; if (!docId) return
+      // fora da distribuição (ex.: PDFIGHT guardado em pasta sem tipo): trata como material de apoio
+      if (ativas && !ativas.has(i)) { apoio.push({ id: docId, titulo: String(e[2] ?? ''), disc: String(e[0]) }); return }
       docs[docId] = { k: 'a', i }; titulos[docId] = String(e[2] ?? ''); aulas++
       const n = numAula(String(e[2] ?? '')) ?? Number(e[1])
       if (n) porDiscNum.set(`${normDisc(String(e[0]))}|${n}`, i)
@@ -113,7 +118,7 @@ export async function mapaDocsCronograma(svc: SupabaseClient, tenantId: string):
     ;(c.WLPdoc || []).forEach((linha, s) => (linha || []).forEach((docId, j) => { if (docId) addLp(docId, `lp:${s}:${j}`, String(c.WLP[s]?.[j] ?? '')) }))
     for (const [docId, ids] of lpIds) { docs[docId] = { k: 'lp', ids }; legproc++ }
     // PDFight/PDFlash/Questões: liberam JUNTO com a aula de mesmo nº e disciplina (sem par → fica livre).
-    for (const m of c.materiais || []) {
+    for (const m of [...(c.materiais || []), ...apoio]) {
       const n = numAula(m.titulo); if (!n) continue
       const i = porDiscNum.get(`${normDisc(m.disc)}|${n}`); if (i == null) continue
       docs[m.id] = { k: 'a', i }; titulos[m.id] = m.titulo; materiais++

@@ -7,16 +7,24 @@
 import seed from './conteudo-seed.json'
 import type { AS, WLP } from './engine'
 import type { ItemLP } from './motor28'
+import { GRUPOS_HTML } from './catalogo-html'
 
-/** AS = aulas · WLP = lei seca semanal (seed/legado) · LP = LegProc 2.8 por disciplina (banco). */
-export interface Conteudo { AS: AS; WLP: WLP; LP?: ItemLP[] }
+/** AS = aulas · WLP = lei seca semanal (seed/legado) · LP = LegProc por disciplina (modelo + Biblioteca). */
+export interface Conteudo {
+  AS: AS; WLP: WLP; LP?: ItemLP[]
+  /** ordem de distribuição das aulas (índices em AS) — ver catalogo-html.ts */
+  ordem?: number[]
+  /** descrição de metas de LegProc antigas (fora do catálogo atual), por id — só exibição */
+  LPdesc?: Record<string, ItemLP>
+}
 
 /** Conteúdo-semente (modelo). AS: [disc, aula, tema, pags, nomeQuestoes, nomeTEC]; WLP[semana][j]. */
 export const CONTEUDO_SEED: Conteudo = seed as unknown as Conteudo
 
-export const ESSENCIAIS = ['Direito Administrativo', 'Direito Constitucional', 'Direito Civil', 'Direito Financeiro', 'Processo Civil', 'Direito Tributário', 'Direito Ambiental', 'Direito do Trabalho', 'Processo do Trabalho']
-export const COMPLEMENTARES = ['Direito Agrário', 'Direito do Consumidor', 'Direito Econômico', 'Direito Empresarial', 'Direito Penal', 'Processo Penal', 'Legislação Penal Especial', 'Direito Previdenciário', 'Direito Previdenciário Público', 'Direito Urbanístico']
-export const AGU: string[][] = [['Direito Eleitoral'], ['Direito Internacional', 'Direito Internacional Privado'], ['Legislação de Ensino'], ['Legislação da AGU']]
+// Grupos de disciplinas do modelo (catalogo-html); o cronograma usa os da Biblioteca já casados com estes.
+export const ESSENCIAIS = [...GRUPOS_HTML.essenciais]
+export const COMPLEMENTARES = [...GRUPOS_HTML.complementares]
+export const AGU: string[][] = GRUPOS_HTML.agu.map((g) => [...g])
 export const TODAS = [...ESSENCIAIS, ...COMPLEMENTARES, ...AGU.flat()]
 
 /** Cor por disciplina (hex do modelo). No front é mapeada p/ token de marca quando possível. */
@@ -34,7 +42,7 @@ export const TIPOS: Record<string, TipoDef> = {
   pf: { nome: 'PDFULL', c: 'var(--pf)', cs: 'var(--pf-soft)', desc: 'Aula nova, um por dia de estudo' },
   fl: { nome: 'Revisão', c: 'var(--fl)', cs: 'var(--fl-soft)', desc: 'Meta de revisão: você retoma o tema da aula 1 semana depois, no mesmo dia da semana, para fixar o conteúdo antes das questões. Dura 1h.' },
   qu: { nome: 'Questões', c: 'var(--qu)', cs: 'var(--qu-soft)', desc: 'Resolução 2 semanas depois, no mesmo dia · 30min' },
-  lp: { nome: 'LegProc', c: 'var(--lp)', cs: 'var(--lp-soft)', desc: 'Lei seca da semana · 45min por bloco' },
+  lp: { nome: 'LegProc', c: 'var(--lp)', cs: 'var(--lp-soft)', desc: 'Lei seca das disciplinas selecionadas · 30min por meta' },
   pp: { nome: 'PDFULL', c: 'var(--pf)', cs: 'var(--pf-soft)', desc: 'Parte de um PDFULL dividido entre dias', parte: true },
   rf: { nome: 'Revisão', c: 'var(--fl)', cs: 'var(--fl-soft)', desc: 'Revisão do tema na semana de revisão · 1h', rev: true },
   rq: { nome: 'Questões', c: 'var(--qu)', cs: 'var(--qu-soft)', desc: 'Questões do tema em revisão · 30min', rev: true },

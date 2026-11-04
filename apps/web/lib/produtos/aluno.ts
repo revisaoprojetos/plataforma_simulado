@@ -2,6 +2,7 @@ import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
 import { ITENS_PASTA } from './tipos'
 import { curriculoDoAluno, type ModuloAluno } from './curriculo-aluno'
+import { acessoPorSegmento, acessosPorSegmentoDoAluno } from '@/lib/segmentos/visibilidade'
 
 /**
  * Catálogo do ALUNO — os produtos/extensivos que o aluno TEM (assinaturas ativas) e o que cada um
@@ -68,31 +69,40 @@ async function produtosGratuitos(svc: any, tenantId: string, soProduto?: string)
   } catch { return new Set() }
 }
 
-/** Acesso do aluno a UM produto: assinatura ativa, grupo vinculado OU produto liberado para todos. null = não tem. */
+/**
+ * Acesso do aluno a UM produto: assinatura ativa, grupo vinculado, produto liberado para todos OU
+ * segmento com "Liberar acesso para" (aba Visibilidade). Segmento com "Bloquear acesso para" vence
+ * todas as outras fontes. null = não tem.
+ */
 export async function acessoAoProduto(svc: any, tenantId: string, estudanteId: string, produtoId: string): Promise<{ expira_em: string | null } | null> {
+  const seg = await acessoPorSegmento(svc, tenantId, estudanteId, produtoId).catch(() => null)
+  if (seg === 'bloquear') return null
   const { data: ass } = await svc.from('simulado_assinaturas').select('expira_em').eq('tenant_id', tenantId).eq('estudante_id', estudanteId).eq('produto_id', produtoId).eq('status', 'ativo').limit(1).maybeSingle()
   if (ass) return { expira_em: (ass as any).expira_em ?? null }
   const viaGrupo = await produtosPorGrupo(svc, tenantId, estudanteId, produtoId)
   if (viaGrupo.has(produtoId)) return { expira_em: viaGrupo.get(produtoId) ?? null }
+  if (seg === 'liberar') return { expira_em: null } // segmento de acesso → sem prazo
   // Liberado para todos os alunos da plataforma → acesso sem prazo.
   return (await produtosGratuitos(svc, tenantId, produtoId)).has(produtoId) ? { expira_em: null } : null
 }
 
-/** Produtos ativos do aluno (assinatura ativa, grupo de acesso vinculado OU liberado para todos), ordenados por `ordem`. */
+/** Produtos ativos do aluno (assinatura ativa, grupo de acesso vinculado, liberado para todos OU segmento), ordenados por `ordem`. */
 export async function produtosDoAluno(tenantId: string, estudanteId: string): Promise<ExtensivoCard[]> {
   const svc = createAdminClient()
-  const [{ data: ass }, viaGrupo, gratuitos] = await Promise.all([
+  const [{ data: ass }, viaGrupo, gratuitos, porSegmento] = await Promise.all([
     svc.from('simulado_assinaturas')
       .select('produto_id, expira_em')
       .eq('tenant_id', tenantId).eq('estudante_id', estudanteId).eq('status', 'ativo')
       .not('produto_id', 'is', null),
     produtosPorGrupo(svc, tenantId, estudanteId),
     produtosGratuitos(svc, tenantId),
+    acessosPorSegmentoDoAluno(svc, tenantId, estudanteId).catch(() => new Map<string, 'liberar' | 'bloquear'>()),
   ])
   const expira = new Map<string, string | null>()
   for (const a of (ass ?? []) as any[]) if (a.produto_id) expira.set(a.produto_id, maiorExpira(expira.get(a.produto_id), a.expira_em ?? null))
   for (const [pid, exp] of viaGrupo) expira.set(pid, maiorExpira(expira.get(pid), exp))
   for (const pid of gratuitos) expira.set(pid, null) // liberado para todos = sem prazo
+  for (const [pid, ef] of porSegmento) { if (ef === 'liberar') expira.set(pid, null); else expira.delete(pid) } // bloquear vence
   const uniq = [...expira.keys()]
   if (!uniq.length) return []
   const [{ data: prods }, { data: itens }] = await Promise.all([

@@ -5,8 +5,12 @@ import type { Conteudo } from './conteudo'
 import { conteudoSeed } from './conteudo'
 import type { ItemLP } from './motor28'
 import { catalogoLegProc } from './lp-catalogo'
+import { CATALOGO_HTML, GRUPOS_HTML, aulaHTML, chaveDisciplina, chaveLeiHTML, disciplinaHTML, docDaLei, nomeDisciplina, numeroAula } from './catalogo-html'
 
-// Loader de CONTEÚDO REAL do Cronograma Adaptativo (substitui o seed):
+// Loader de CONTEÚDO REAL do Cronograma Adaptativo. As aulas e matérias são as da Biblioteca; os dados do
+// modelo (catalogo-html.ts: páginas, links de questões, ordem de distribuição, metas de LegProc, grupo e cor
+// das disciplinas) enriquecem o que existe — ver os passos 5 e 7.
+//
 //  · disciplinas  → simulado_disciplinas (nome, classificacao, cor, ordem)
 //  · aulas (AS)   → documentos publicados da Biblioteca nas SUBpastas da disciplina marcadas como
 //                   PDFull/PDFight (ou docs soltos na pasta-disciplina, sem subpasta-tipada)
@@ -32,6 +36,10 @@ export interface ConteudoBanco extends Conteudo {
   materiais?: Array<{ id: string; titulo: string; disc: string }>
   /** LegProc 2.8: metas de ~30 min por lei, vinculadas à disciplina (ver lp-catalogo.ts). */
   LP?: ItemLP[]
+  /** Ordem de distribuição das aulas (índices em AS) — a do modelo, + aulas da Biblioteca fora dele no fim. */
+  ordem?: number[]
+  /** Documentos de lei da Biblioteca (uso interno: migração de planos antigos). Não vai ao cliente. */
+  lpDocs?: Array<{ id: string; titulo: string; disc: string; versaoId: string | null }>
 }
 
 const PAG_PADRAO = 40 // páginas assumidas quando o PDF ainda não foi medido
@@ -77,7 +85,7 @@ export async function carregarConteudoBanco(svc: SupabaseClient, tenantId: strin
     const pilha = [p.id]
     while (pilha.length) { const cur = pilha.pop()!; if (!discDaPasta.has(cur)) { discDaPasta.set(cur, p.disciplina_id); (filhos.get(cur) || []).forEach((f) => pilha.push(f)) } }
   }
-  if (discDaPasta.size === 0) return { ...fallbackConteudo(), disciplinas, vazio: true }
+  if (discDaPasta.size === 0) return { ...fallbackConteudo(), disciplinas: disciplinasDoCatalogo(), vazio: true }
 
   // tipo de material herdado: subpasta-tipada mais próxima subindo a árvore (com memoização + anti-ciclo)
   const tipoCache = new Map<string, string | null>()
@@ -136,20 +144,37 @@ export async function carregarConteudoBanco(svc: SupabaseClient, tenantId: strin
 
   const col = new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base' })
 
-  // 5) monta AS agrupado por disciplina (ordem alfabética-natural do título)
-  const porDisc = new Map<string, Array<{ id: string; titulo: string; pags: number }>>()
+  // 5) monta AS agrupado por disciplina (ordem alfabética-natural do título).
+  //    A POSIÇÃO em AS é o id das metas dos planos (pf:<i>) → a montagem (ordem das disciplinas do banco +
+  //    título) NÃO muda. O que vem do modelo (catalogo-html) enriquece cada aula: nome canônico da disciplina,
+  //    nº e tema da aula, páginas do PDFull e links de questões; e define a ORDEM de distribuição.
+  const porDisc = new Map<string, Array<{ id: string; titulo: string; pags: number | null }>>()
   for (const d of aulaDocs) {
-    const pags = (d.versaoId && pagPorVersao.get(d.versaoId)) || PAG_PADRAO
+    const pags = (d.versaoId && pagPorVersao.get(d.versaoId)) || null
     const arr = porDisc.get(d.discNome) || []; arr.push({ id: d.id, titulo: d.titulo, pags }); porDisc.set(d.discNome, arr)
   }
   const ASout: AS = []
+  const daPlanilha = new Map<number, number>() // índice da aula no modelo → índice em AS
+  const semPlanilha: number[] = [] // aulas da Biblioteca que o modelo não tem (entram no fim da ordem)
   for (const di of disciplinas) { // segue a ordem das disciplinas (ordem/nome)
     const aulas = porDisc.get(di.nome); if (!aulas || !aulas.length) continue
     aulas.sort((a, b) => col.compare(a.titulo, b.titulo))
-    // 7º campo = id do doc da Biblioteca → abre no leitor v2 (/aluno/biblioteca/<id>).
-    aulas.forEach((a, i) => ASout.push([di.nome, String(i + 1), a.titulo, a.pags, '', '', a.id]))
+    const nome = nomeDisciplina(di.nome)
+    aulas.forEach((a, k) => {
+      const i = ASout.length, h = aulaHTML(di.nome, a.titulo)
+      if (h && !daPlanilha.has(h.idx)) {
+        daPlanilha.set(h.idx, i)
+        ASout.push([nome, h.numero, h.tema, h.paginas || a.pags || PAG_PADRAO, h.qc, h.tec, a.id])
+      } else {
+        // 7º campo = id do doc da Biblioteca → abre no leitor v2 (/aluno/biblioteca/<id>).
+        ASout.push([nome, String(numeroAula(a.titulo) ?? k + 1), a.titulo, a.pags || PAG_PADRAO, '', '', a.id])
+        // material de apoio guardado em pasta sem tipo (ex.: "Aula 01 - PDFIGHT - …") não é aula de PDFull
+        if (!/\bPDF(IGHT|LASH)\b/i.test(a.titulo)) semPlanilha.push(i)
+      }
+    })
   }
-  if (!ASout.length) return { ...fallbackConteudo(), disciplinas, vazio: true }
+  if (!ASout.length) return { ...fallbackConteudo(), disciplinas: disciplinasDoCatalogo(), vazio: true }
+  const ordem = [...CATALOGO_HTML.ordem.flatMap((h) => (daPlanilha.has(h) ? [daPlanilha.get(h)!] : [])), ...semPlanilha]
 
   // 6) WLP (lei seca por semana)
   //    Heurística doc→semana: todos os docs das subpastas LegProc (de qualquer disciplina) são
@@ -173,18 +198,74 @@ export async function carregarConteudoBanco(svc: SupabaseClient, tenantId: strin
     for (const r of lp) (WLPout[r.semana] ||= []).push(r.texto)
   }
 
-  // 7) LegProc 2.8: por DISCIPLINA (ordem das disciplinas) → por lei (título natural) → metas de ~30 min.
+  // 7) LegProc: metas do MODELO (lei + trecho, 30 min, na ordem das planilhas) nas disciplinas que ele cobre,
+  //    ligadas ao documento da lei na Biblioteca (mesmo nº de lei); nas demais disciplinas com leis na
+  //    Biblioteca, o corte automático por artigos (lp-catalogo.ts) continua valendo.
   const ordemDisc = new Map(disciplinas.map((d, k) => [d.nome, k]))
   const lpDocs = [...legprocDocs].sort((a, b) => ((ordemDisc.get(a.disc) ?? 999) - (ordemDisc.get(b.disc) ?? 999)) || col.compare(a.titulo, b.titulo))
-  const LP = await catalogoLegProc(svc, tenantId, lpDocs).catch(() => [] as ItemLP[])
+  const presentes = new Set([...ASout.map((a) => chaveDisciplina(a[0])), ...lpDocs.map((d) => chaveDisciplina(d.disc))])
+  const LP = lpDoModelo(presentes, lpDocs)
+  const cobertas = new Set(CATALOGO_HTML.legprocs.map((x) => chaveDisciplina(x.disc)))
+  const lpAuto = lpDocs.filter((d) => !cobertas.has(chaveDisciplina(d.disc)))
+  if (lpAuto.length) {
+    const auto = await catalogoLegProc(svc, tenantId, lpAuto).catch(() => [] as ItemLP[])
+    LP.push(...auto.map((x) => ({ ...x, disc: nomeDisciplina(x.disc) })))
+  }
 
-  return { AS: ASout, WLP: WLPout, WLPdoc, materiais, LP, disciplinas, vazio: false }
+  return {
+    AS: ASout, ordem, WLP: WLPout, WLPdoc, materiais: materiais.map((m) => ({ ...m, disc: nomeDisciplina(m.disc) })), LP,
+    disciplinas: disciplinasDoConteudo(disciplinas, ASout, ordem), lpDocs, vazio: false,
+  }
 }
 
-function fallbackConteudo(): Conteudo { return conteudoSeed() }
+/** Metas de LegProc do modelo nas disciplinas presentes, com o documento da lei na Biblioteca (quando houver). */
+function lpDoModelo(presentes: Set<string>, lpDocs: Array<{ id: string; titulo: string; disc: string }>): ItemLP[] {
+  const docsPorDisc = new Map<string, typeof lpDocs>()
+  for (const d of lpDocs) { const k = chaveDisciplina(d.disc); docsPorDisc.set(k, [...(docsPorDisc.get(k) || []), d]) }
+  const nPorLei = new Map<string, number>(), docPorLei = new Map<string, string | null>()
+  const out: ItemLP[] = []
+  for (const k of CATALOGO_HTML.ordemLP) {
+    const m = CATALOGO_HTML.legprocs[k]; if (!m) continue
+    const kd = chaveDisciplina(m.disc); if (!presentes.has(kd)) continue
+    const chave = chaveLeiHTML(m.disc, m.lei)
+    if (!docPorLei.has(chave)) docPorLei.set(chave, docDaLei(m.lei, docsPorDisc.get(kd) || [])?.id ?? null)
+    const n = (nPorLei.get(chave) || 0) + 1; nPorLei.set(chave, n)
+    out.push({ id: `lp:${chave}:${n}`, disc: nomeDisciplina(m.disc), lei: m.lei, texto: `${m.lei} — ${m.texto}`, doc: docPorLei.get(chave), min: m.minutos || 30 })
+  }
+  return out
+}
 
-/** {AS, WLP} prontos p/ o motor — banco quando houver, senão seed. */
+/** Disciplinas que o cronograma mostra: uma por matéria (grafias juntas), só com aulas ativas; grupo/cor do modelo. */
+function disciplinasDoConteudo(banco: DisciplinaInfo[], AS: AS, ordem: number[]): DisciplinaInfo[] {
+  const comAulas = new Set(ordem.map((i) => AS[i][0]))
+  const out = new Map<string, DisciplinaInfo & { _o: number }>()
+  banco.forEach((d, k) => {
+    const nome = nomeDisciplina(d.nome); if (!comAulas.has(nome) || out.has(nome)) return
+    const h = disciplinaHTML(d.nome)
+    out.set(nome, { nome, classificacao: h?.grupo || d.classificacao || 'complementar', cor: h?.cor || d.cor, _o: h ? h.ordem : 1000 + k })
+  })
+  return [...out.values()].sort((a, b) => a._o - b._o).map(({ _o, ...d }) => d)
+}
+/** Sem conteúdo na Biblioteca: disciplinas do próprio modelo. */
+function disciplinasDoCatalogo(): DisciplinaInfo[] {
+  const g = GRUPOS_HTML
+  return [...g.essenciais.map((n) => [n, 'essencial']), ...g.complementares.map((n) => [n, 'complementar']), ...g.agu.flat().map((n) => [n, 'especifica'])]
+    .map(([nome, classificacao]) => ({ nome, classificacao, cor: CATALOGO_HTML.cores[nome] || null }))
+}
+
+/** Sem pastas/aulas na Biblioteca: o catálogo do modelo puro (aulas, ordem e LegProc, sem documentos). */
+function fallbackConteudo(): Conteudo {
+  const presentes = new Set(CATALOGO_HTML.aulas.map((a) => chaveDisciplina(a[0])))
+  return { AS: CATALOGO_HTML.aulas.map((a) => [...a] as AS[number]), ordem: [...CATALOGO_HTML.ordem], WLP: conteudoSeed().WLP, LP: lpDoModelo(presentes, []) }
+}
+
+/** {AS, ordem, LP} prontos p/ o motor — banco quando houver, senão o catálogo do modelo. */
 export async function carregarConteudo(svc: SupabaseClient, tenantId: string): Promise<Conteudo> {
   const b = await carregarConteudoBanco(svc, tenantId)
-  return b.vazio ? conteudoSeed() : { AS: b.AS, WLP: b.WLP, LP: b.LP }
+  return { AS: b.AS, ordem: b.ordem, WLP: b.WLP, LP: b.LP }
+}
+
+/** LegProc ANTIGO (corte automático de todas as leis) — só p/ descrever metas de planos criados antes. */
+export async function lpAutomaticoTodas(svc: SupabaseClient, tenantId: string, lpDocs: Array<{ id: string; titulo: string; disc: string; versaoId: string | null }>): Promise<ItemLP[]> {
+  return catalogoLegProc(svc, tenantId, lpDocs).catch(() => [] as ItemLP[])
 }

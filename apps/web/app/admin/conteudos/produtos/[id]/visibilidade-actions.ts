@@ -1,0 +1,243 @@
+'use server'
+
+// Aba VISIBILIDADE do produto: SEGMENTOS (públicos de alunos por condições) + REGRAS que aplicam os
+// segmentos ao acesso do produto e aos conteúdos (módulos/aulas). Tabelas simulado_segmentos e
+// simulado_produto_visibilidade (migração 20261103130000). Segmentos são do TENANT (reaproveitáveis
+// em vários produtos); regras são por produto. Leitura: produtos:view · escrita: produtos:manage.
+
+import { revalidatePath } from 'next/cache'
+import { createAdminClient } from '@/lib/supabase/server'
+import { getCurrentAccess } from '@/lib/auth/permissions'
+import { registrarAudit } from '@/lib/audit'
+import { nomesDeRecursos, buscarRecursos } from '@/lib/produtos/estudio'
+import { ContextoAluno, explicarRegra } from '@/lib/segmentos/avaliar'
+import {
+  normalizarRegra, validarRegra, refsDaRegra,
+  type RegraSegmento, type Segmento, type RegraVisibilidade, type AlvoTipo, type Efeito, type SemAcesso, type RefTipo,
+} from '@/lib/segmentos/tipos'
+
+async function guard(manage = false) {
+  const access = await getCurrentAccess()
+  const ok = access.isAdmin
+    || access.permissions.includes(manage ? 'produtos:manage' : 'produtos:view')
+    || access.permissions.includes('produtos:manage')
+  if (!ok) return { error: 'Sem permissão.' as const }
+  if (!access.tenantId) return { error: 'Tenant não resolvido — recarregue a página.' as const }
+  return { tenantId: access.tenantId, userId: access.userId }
+}
+
+const MIGRACAO = 'Recurso ainda não ativado no banco: aplique a migração 20261103130000_segmentos_visibilidade.sql.'
+const faltaTabela = (msg: string | undefined) => !!msg && /simulado_segmentos|simulado_produto_visibilidade|schema cache|does not exist/i.test(msg)
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+export type SegmentoAdmin = Segmento & { uso: number }
+export interface AlvosProduto {
+  modulos: { id: string; titulo: string; pai_id: string | null }[]
+  aulas: { id: string; titulo: string; modulo_id: string }[]
+}
+
+function revalidar(produtoId: string) {
+  revalidatePath(`/admin/conteudos/produtos/${produtoId}`)
+}
+
+/** Nomes (grupo/produto/simulado) referenciados por uma lista de regras de segmento — p/ os resumos. */
+async function nomesDasRefs(tenantId: string, regras: RegraSegmento[]): Promise<Record<string, string>> {
+  const ids: Record<RefTipo, Set<string>> = { grupo: new Set(), produto: new Set(), simulado: new Set() }
+  for (const r of regras) { const x = refsDaRegra(r); for (const k of ['grupo', 'produto', 'simulado'] as RefTipo[]) x[k].forEach((i) => ids[k].add(i)) }
+  const out: Record<string, string> = {}
+  const [g, s] = await Promise.all([
+    nomesDeRecursos(tenantId, 'grupo', [...ids.grupo]),
+    nomesDeRecursos(tenantId, 'simulado', [...ids.simulado]),
+  ])
+  for (const m of [g, s]) for (const v of Object.values(m)) out[v.id] = v.nome
+  if (ids.produto.size) {
+    const svc = createAdminClient()
+    const { data } = await svc.from('simulado_produtos').select('id, nome').eq('tenant_id', tenantId).in('id', [...ids.produto].slice(0, 200))
+    for (const p of (data ?? []) as any[]) out[p.id] = p.nome
+  }
+  return out
+}
+
+/** Carga da aba: segmentos do tenant (+ uso), regras deste produto, alvos (módulos/aulas) e nomes. */
+export async function carregarVisibilidadeAction(produtoId: string): Promise<
+  | { ok: true; disponivel: boolean; segmentos: SegmentoAdmin[]; regras: RegraVisibilidade[]; alvos: AlvosProduto; nomes: Record<string, string> }
+  | { error: string }
+> {
+  const g = await guard(); if ('error' in g) return { error: g.error ?? 'Sem permissão.' }
+  const svc = createAdminClient()
+  const [segR, regR, usoR, modR, aulR] = await Promise.all([
+    svc.from('simulado_segmentos').select('id, nome, descricao, regra, atualizado_em').eq('tenant_id', g.tenantId).eq('deletado', false).order('nome', { ascending: true }).limit(500),
+    svc.from('simulado_produto_visibilidade').select('id, segmento_id, alvo_tipo, alvo_id, efeito, sem_acesso, ativo').eq('tenant_id', g.tenantId).eq('produto_id', produtoId).order('criado_em', { ascending: true }).limit(2000),
+    svc.from('simulado_produto_visibilidade').select('segmento_id').eq('tenant_id', g.tenantId).limit(5000),
+    svc.from('simulado_produto_modulos').select('id, titulo, pai_id, ordem').eq('tenant_id', g.tenantId).eq('produto_id', produtoId).eq('deletado', false).order('ordem', { ascending: true }).limit(2000),
+    svc.from('simulado_produto_modulo_itens').select('id, titulo, modulo_id, ordem').eq('tenant_id', g.tenantId).eq('produto_id', produtoId).eq('deletado', false).order('ordem', { ascending: true }).limit(5000),
+  ])
+  const alvos: AlvosProduto = {
+    modulos: ((modR.data ?? []) as any[]).map((m) => ({ id: m.id, titulo: m.titulo, pai_id: m.pai_id ?? null })),
+    aulas: ((aulR.data ?? []) as any[]).map((a) => ({ id: a.id, titulo: a.titulo, modulo_id: a.modulo_id })),
+  }
+  if (segR.error || regR.error) {
+    return { ok: true, disponivel: !(faltaTabela(segR.error?.message) || faltaTabela(regR.error?.message)), segmentos: [], regras: [], alvos, nomes: {} }
+  }
+  const uso = new Map<string, number>()
+  for (const r of (usoR.data ?? []) as any[]) uso.set(r.segmento_id, (uso.get(r.segmento_id) ?? 0) + 1)
+  const segmentos: SegmentoAdmin[] = ((segR.data ?? []) as any[]).map((s) => ({
+    id: s.id, nome: s.nome, descricao: s.descricao ?? null, regra: normalizarRegra(s.regra), atualizado_em: s.atualizado_em ?? null, uso: uso.get(s.id) ?? 0,
+  }))
+  const regras: RegraVisibilidade[] = ((regR.data ?? []) as any[]).map((r) => ({
+    id: r.id, segmento_id: r.segmento_id, alvo_tipo: r.alvo_tipo, alvo_id: r.alvo_id ?? null, efeito: r.efeito, sem_acesso: r.sem_acesso, ativo: r.ativo !== false,
+  }))
+  const nomes = await nomesDasRefs(g.tenantId, segmentos.map((s) => s.regra))
+  return { ok: true, disponivel: true, segmentos, regras, alvos, nomes }
+}
+
+/** Cria/edita um segmento (nome ≤ 250, descrição ≤ 1000, regra validada). */
+export async function salvarSegmentoAction(input: { id?: string | null; nome: string; descricao?: string | null; regra: RegraSegmento }): Promise<{ ok: true; segmento: Segmento; nomes: Record<string, string> } | { error: string }> {
+  const g = await guard(true); if ('error' in g) return { error: g.error ?? 'Sem permissão.' }
+  const nome = String(input.nome ?? '').trim()
+  if (!nome) return { error: 'Dê um nome ao segmento.' }
+  if (nome.length > 250) return { error: 'O nome pode ter até 250 caracteres.' }
+  const descricao = String(input.descricao ?? '').trim() || null
+  if (descricao && descricao.length > 1000) return { error: 'A descrição pode ter até 1000 caracteres.' }
+  const regra = normalizarRegra(input.regra)
+  const erro = validarRegra(regra)
+  if (erro) return { error: erro }
+  const svc = createAdminClient()
+  const agora = new Date().toISOString()
+  const q = input.id
+    ? svc.from('simulado_segmentos').update({ nome, descricao, regra, atualizado_em: agora }).eq('id', input.id).eq('tenant_id', g.tenantId).eq('deletado', false)
+    : svc.from('simulado_segmentos').insert({ tenant_id: g.tenantId, nome, descricao, regra, criado_por: g.userId })
+  const { data, error } = await q.select('id, nome, descricao, regra, atualizado_em').maybeSingle()
+  if (error) return { error: faltaTabela(error.message) ? MIGRACAO : error.message }
+  if (!data) return { error: 'Segmento não encontrado.' }
+  await registrarAudit({ operacao: input.id ? 'UPDATE' : 'INSERT', entidade: 'simulado_segmentos', entidadeId: (data as any).id, depois: { nome, descricao, regra } })
+  const seg: Segmento = { id: (data as any).id, nome: (data as any).nome, descricao: (data as any).descricao ?? null, regra: normalizarRegra((data as any).regra), atualizado_em: (data as any).atualizado_em ?? null }
+  return { ok: true, segmento: seg, nomes: await nomesDasRefs(g.tenantId, [seg.regra]) }
+}
+
+/** Duplica um segmento ("Cópia de …"). */
+export async function duplicarSegmentoAction(id: string): Promise<{ ok: true; segmento: Segmento } | { error: string }> {
+  const g = await guard(true); if ('error' in g) return { error: g.error ?? 'Sem permissão.' }
+  const svc = createAdminClient()
+  const { data: o } = await svc.from('simulado_segmentos').select('nome, descricao, regra').eq('id', id).eq('tenant_id', g.tenantId).eq('deletado', false).maybeSingle()
+  if (!o) return { error: 'Segmento não encontrado.' }
+  const nome = `Cópia de ${(o as any).nome}`.slice(0, 250)
+  const { data, error } = await svc.from('simulado_segmentos').insert({ tenant_id: g.tenantId, nome, descricao: (o as any).descricao, regra: (o as any).regra, criado_por: g.userId })
+    .select('id, nome, descricao, regra, atualizado_em').maybeSingle()
+  if (error || !data) return { error: error?.message ?? 'Falha ao duplicar.' }
+  return { ok: true, segmento: { id: (data as any).id, nome: (data as any).nome, descricao: (data as any).descricao ?? null, regra: normalizarRegra((data as any).regra), atualizado_em: (data as any).atualizado_em ?? null } }
+}
+
+/**
+ * Exclui um segmento (soft delete) e APAGA as regras que o usam em todos os produtos — uma regra
+ * "mostrar somente para" apontando a um segmento excluído esconderia o conteúdo de todos.
+ */
+export async function excluirSegmentoAction(id: string, produtoId: string): Promise<{ ok: true } | { error: string }> {
+  const g = await guard(true); if ('error' in g) return { error: g.error ?? 'Sem permissão.' }
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_segmentos').update({ deletado: true, deletado_em: new Date().toISOString() }).eq('id', id).eq('tenant_id', g.tenantId)
+  if (error) return { error: error.message }
+  await svc.from('simulado_produto_visibilidade').delete().eq('tenant_id', g.tenantId).eq('segmento_id', id)
+  await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_segmentos', entidadeId: id })
+  revalidar(produtoId)
+  return { ok: true }
+}
+
+/** Cria/edita uma regra de visibilidade deste produto. */
+export async function salvarRegraVisibilidadeAction(produtoId: string, input: {
+  id?: string | null; segmento_id: string; alvo_tipo: AlvoTipo; alvo_id?: string | null; efeito: Efeito; sem_acesso?: SemAcesso
+}): Promise<{ ok: true; regra: RegraVisibilidade } | { error: string }> {
+  const g = await guard(true); if ('error' in g) return { error: g.error ?? 'Sem permissão.' }
+  const alvo = input.alvo_tipo
+  if (!['produto', 'modulo', 'aula'].includes(alvo)) return { error: 'Alvo inválido.' }
+  const efeito = input.efeito
+  if (alvo === 'produto' ? !['liberar', 'bloquear'].includes(efeito) : !['mostrar', 'ocultar'].includes(efeito)) return { error: 'Efeito inválido para o alvo.' }
+  if (!input.segmento_id || !UUID.test(input.segmento_id)) return { error: 'Escolha um segmento.' }
+  const alvoId = alvo === 'produto' ? null : (input.alvo_id ?? null)
+  if (alvo !== 'produto' && (!alvoId || !UUID.test(alvoId))) return { error: `Escolha ${alvo === 'modulo' ? 'o módulo' : 'a aula'}.` }
+  const svc = createAdminClient()
+  // O alvo precisa ser DESTE produto (e do tenant).
+  if (alvoId) {
+    const tabela = alvo === 'modulo' ? 'simulado_produto_modulos' : 'simulado_produto_modulo_itens'
+    const { data: a } = await svc.from(tabela).select('id').eq('id', alvoId).eq('tenant_id', g.tenantId).eq('produto_id', produtoId).eq('deletado', false).maybeSingle()
+    if (!a) return { error: 'Conteúdo não encontrado neste produto.' }
+  }
+  const { data: seg } = await svc.from('simulado_segmentos').select('id').eq('id', input.segmento_id).eq('tenant_id', g.tenantId).eq('deletado', false).maybeSingle()
+  if (!seg) return { error: 'Segmento não encontrado.' }
+  const row = {
+    segmento_id: input.segmento_id, alvo_tipo: alvo, alvo_id: alvoId, efeito,
+    sem_acesso: input.sem_acesso === 'bloqueado_cadeado' ? 'bloqueado_cadeado' : 'oculto', atualizado_em: new Date().toISOString(),
+  }
+  const q = input.id
+    ? svc.from('simulado_produto_visibilidade').update(row).eq('id', input.id).eq('tenant_id', g.tenantId).eq('produto_id', produtoId)
+    : svc.from('simulado_produto_visibilidade').insert({ ...row, tenant_id: g.tenantId, produto_id: produtoId, criado_por: g.userId })
+  const { data, error } = await q.select('id, segmento_id, alvo_tipo, alvo_id, efeito, sem_acesso, ativo').maybeSingle()
+  if (error) return { error: faltaTabela(error.message) ? MIGRACAO : error.message }
+  if (!data) return { error: 'Regra não encontrada.' }
+  await registrarAudit({ operacao: input.id ? 'UPDATE' : 'INSERT', entidade: 'simulado_produto_visibilidade', entidadeId: (data as any).id, depois: { produto_id: produtoId, ...row } })
+  revalidar(produtoId)
+  const d = data as any
+  return { ok: true, regra: { id: d.id, segmento_id: d.segmento_id, alvo_tipo: d.alvo_tipo, alvo_id: d.alvo_id ?? null, efeito: d.efeito, sem_acesso: d.sem_acesso, ativo: d.ativo !== false } }
+}
+
+export async function alternarRegraVisibilidadeAction(produtoId: string, id: string, ativo: boolean): Promise<{ ok: true } | { error: string }> {
+  const g = await guard(true); if ('error' in g) return { error: g.error ?? 'Sem permissão.' }
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_produto_visibilidade').update({ ativo: !!ativo, atualizado_em: new Date().toISOString() })
+    .eq('id', id).eq('tenant_id', g.tenantId).eq('produto_id', produtoId)
+  if (error) return { error: error.message }
+  await registrarAudit({ operacao: ativo ? 'LIBERAR' : 'BLOQUEAR', entidade: 'simulado_produto_visibilidade', entidadeId: id, depois: { ativo: !!ativo } })
+  revalidar(produtoId)
+  return { ok: true }
+}
+
+export async function excluirRegraVisibilidadeAction(produtoId: string, id: string): Promise<{ ok: true } | { error: string }> {
+  const g = await guard(true); if ('error' in g) return { error: g.error ?? 'Sem permissão.' }
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_produto_visibilidade').delete().eq('id', id).eq('tenant_id', g.tenantId).eq('produto_id', produtoId)
+  if (error) return { error: error.message }
+  await registrarAudit({ operacao: 'DELETE', entidade: 'simulado_produto_visibilidade', entidadeId: id })
+  revalidar(produtoId)
+  return { ok: true }
+}
+
+/** Busca de grupo / produto / simulado para as condições (20 por vez). */
+export async function buscarRefsSegmentoAction(tipo: RefTipo, q: string): Promise<{ ok: true; rows: { id: string; nome: string }[] } | { error: string }> {
+  const g = await guard(); if ('error' in g) return { error: g.error ?? 'Sem permissão.' }
+  const termo = String(q ?? '').trim().slice(0, 120)
+  if (tipo === 'produto') {
+    const svc = createAdminClient()
+    let qq = svc.from('simulado_produtos').select('id, nome').eq('tenant_id', g.tenantId)
+    if (termo) qq = qq.ilike('nome', `%${termo.replace(/[%_,()]/g, ' ')}%`)
+    const { data } = await qq.order('nome', { ascending: true }).limit(20)
+    return { ok: true, rows: ((data ?? []) as any[]).map((p) => ({ id: p.id, nome: p.nome })) }
+  }
+  if (tipo !== 'grupo' && tipo !== 'simulado') return { error: 'Tipo inválido.' }
+  const r = await buscarRecursos(g.tenantId, tipo, termo, 1, 20)
+  return { ok: true, rows: r.rows.map((x) => ({ id: x.id, nome: x.nome })) }
+}
+
+/** Busca de alunos para o "Testar com um aluno" (nome ou e-mail, 10 por vez). */
+export async function buscarAlunosSegmentoAction(q: string): Promise<{ ok: true; rows: { id: string; nome: string; email: string | null }[] } | { error: string }> {
+  const g = await guard(); if ('error' in g) return { error: g.error ?? 'Sem permissão.' }
+  const termo = String(q ?? '').trim().slice(0, 120).replace(/[%_,()]/g, ' ')
+  if (termo.length < 2) return { ok: true, rows: [] }
+  const svc = createAdminClient()
+  const { data } = await svc.from('simulado_estudantes').select('id, nome, email')
+    .eq('tenant_id', g.tenantId).eq('deletado', false)
+    .or(`nome.ilike.%${termo}%,email.ilike.%${termo}%`).order('nome', { ascending: true }).limit(10)
+  return { ok: true, rows: ((data ?? []) as any[]).map((a) => ({ id: a.id, nome: a.nome, email: a.email ?? null })) }
+}
+
+/** Avalia uma regra (salva ou não) para UM aluno: resultado geral + de cada grupo/condição. */
+export async function testarSegmentoAction(regra: RegraSegmento, estudanteId: string): Promise<
+  { ok: true; corresponde: boolean; condicoes: Record<string, boolean>; grupos: Record<string, boolean> } | { error: string }
+> {
+  const g = await guard(); if ('error' in g) return { error: g.error ?? 'Sem permissão.' }
+  if (!UUID.test(String(estudanteId))) return { error: 'Aluno inválido.' }
+  const svc = createAdminClient()
+  const { data: est } = await svc.from('simulado_estudantes').select('id').eq('id', estudanteId).eq('tenant_id', g.tenantId).maybeSingle()
+  if (!est) return { error: 'Aluno não encontrado.' }
+  const r = await explicarRegra(normalizarRegra(regra), new ContextoAluno(svc, g.tenantId, estudanteId))
+  return { ok: true, ...r }
+}

@@ -5,6 +5,7 @@ import { gerarAdaptativo, patchMetaAdaptativo, somarTempoMeta, pausarAdaptativo,
 import { atualizarPainelSnapshot } from '@/lib/painel/snapshot'
 import { carregarConteudoBanco } from '@/lib/cronograma/adaptativo/conteudo-banco'
 import type { Cfg, DataISO } from '@/lib/cronograma/adaptativo/engine'
+import { CATALOGO_HTML, GRUPOS_HTML } from '@/lib/cronograma/adaptativo/catalogo-html'
 
 // POST /api/aluno/cronograma/adaptativo — mutações do Cronograma Adaptativo 2.0.
 // Rota de API (não server action — landmine de domínio custom). Despacha por `acao`:
@@ -26,7 +27,10 @@ export async function GET() {
     carregarConteudoBanco(svc, sessao.tenantId),
   ])
   // conteudo: AS/WLP (+ WLPdoc = id do doc LegProc de cada bloco, p/ abrir no leitor) + disciplinas(classificacao/cor).
-  return NextResponse.json({ ok: true, ...docs, conteudo: { AS: conteudo.AS, WLP: conteudo.WLP, WLPdoc: conteudo.WLPdoc ?? [], LP: conteudo.LP ?? [], disciplinas: conteudo.disciplinas } })
+  // ordem = distribuição das aulas do modelo; agu = grupos de disciplinas específicas (pares, ex.: Internacional).
+  const nomes = new Set(conteudo.disciplinas.map((d) => d.nome))
+  const agu = GRUPOS_HTML.agu.map((g) => g.filter((n) => nomes.has(n))).filter((g) => g.length)
+  return NextResponse.json({ ok: true, ...docs, conteudo: { AS: conteudo.AS, ordem: conteudo.ordem ?? null, WLP: conteudo.WLP, WLPdoc: conteudo.WLPdoc ?? [], LP: conteudo.LP ?? [], disciplinas: conteudo.disciplinas, agu, catalogo: CATALOGO_HTML.id } })
 }
 
 export async function POST(req: NextRequest) {

@@ -5,7 +5,7 @@
 import {
   type Cfg, type Plano, type Notas, type DataISO,
   gerarPlano, descrever, semInicio, semDe, horasDia, ehRev, dAdd, dISO,
-  planoRevisao, rankingRevisao, DUR_REVISAO, ORDEM,
+  planoRevisao, rankingRevisao, DUR_REVISAO, ORDEM, diaConcentrado,
 } from './engine'
 import type { Conteudo as _C } from './conteudo'
 
@@ -34,7 +34,7 @@ export const hojeISO = (): DataISO => dISO(new Date())
 
 /** Gera plano+fim a partir do cfg (engine puro). */
 export function gerarEstadoPlano(cfg: Cfg, conteudo: _C, fixos?: Record<string, [DataISO, number]>, ancora?: DataISO | null) {
-  const r = gerarPlano(cfg, conteudo.AS, conteudo.WLP, fixos || {}, ancora || null, conteudo.LP)
+  const r = gerarPlano(cfg, conteudo.AS, conteudo.WLP, fixos || {}, ancora || null, conteudo.LP, { ordem: conteudo.ordem })
   return { plano: r.plano, fim: r.fim }
 }
 
@@ -46,7 +46,8 @@ export function montarRevisao(st: Estado, conteudo: _C, sem: number): Array<[str
   const fila = rankingRevisao(st.plano, st.notas, ini, ja)
   const dias = [0, 1, 2, 3, 4, 5, 6].map((k) => dAdd(ini, k)).filter((d) => d >= st.cfg.start && horasDia(st.cfg, d) > 0)
   const ocupado = (d: DataISO) => Object.entries(st.plano).filter(([, [x]]) => x === d).reduce((s, [, [, h]]) => s + h * 60, 0)
-  const plano = planoRevisao(dias.map((d) => horasDia(st.cfg, d) * 60 - ocupado(d)), fila.length)
+  const conc = diaConcentrado(st.cfg, sem) // semana ≤18 h: o último dia recebe só questões (modelo 2.8)
+  const plano = planoRevisao(dias.map((d) => horasDia(st.cfg, d) * 60 - ocupado(d)), fila.length, dias.map((d) => d === conc))
   const out: Array<[string, DataISO]> = []
   plano.forEach((p, k) => p.itens.forEach(({ t, n }) => out.push([`${t}:${sem}:${fila[n].i}`, dias[k]])))
   return out
@@ -85,7 +86,14 @@ export const estadoMeta = (st: Estado, id: string) => st.prog[id]?.s || ''
 export const feito = (st: Estado, id: string) => estadoMeta(st, id) === 'done'
 // Mapa id→item do LegProc 2.8 (memoizado por catálogo) p/ descrever metas "lp:<doc>:<n>".
 const _lpMapas = new WeakMap<object, Record<string, NonNullable<_C['LP']>[number]>>()
-function lpMapa(c: _C) { if (!c.LP) return null; let m = _lpMapas.get(c.LP); if (!m) { m = Object.fromEntries(c.LP.map((x) => [x.id, x])); _lpMapas.set(c.LP, m) } return m }
+function lpMapa(c: _C) {
+  if (!c.LP && !c.LPdesc) return null
+  const chave = (c.LPdesc || c.LP) as object
+  let m = _lpMapas.get(chave)
+  // metas atuais + descrições de metas antigas (planos criados antes do catálogo atual)
+  if (!m) { m = { ...(c.LPdesc || {}), ...Object.fromEntries((c.LP || []).map((x) => [x.id, x])) }; _lpMapas.set(chave, m) }
+  return m
+}
 export const info = (id: string, conteudo: _C) => descrever(id, conteudo.AS, conteudo.WLP, lpMapa(conteudo))
 
 /** Metas atrasadas: antes de hoje (ou da pausa) e não concluídas. */

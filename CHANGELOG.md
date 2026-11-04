@@ -12,6 +12,17 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.2.9 — 2026-11-04
+
+### Produtos — aba Visibilidade com SEGMENTOS de alunos
+- Nova aba **Visibilidade** no produto (Estúdio): segmentos de alunos por condições (estilo "Criar um Segmento" do ActiveCampaign — grupos E/OU; dados do aluno, grupos, assinaturas, atividade em simulados/questões/leitura, tempo de estudo, data) e regras: acesso ao produto **Liberar para** / **Bloquear para** (bloquear vence assinatura e grupo) e módulo/aula **Mostrar somente para** / **Ocultar para**, com os demais vendo "não aparece" ou "cadeado".
+- Avaliação no servidor por aluno (`lib/segmentos/avaliar.ts`, `lib/segmentos/visibilidade.ts`), aplicada em Meus Extensivos, na página/vitrine do extensivo, no currículo e no leitor.
+- **Migração manual**: `20261103130000_segmentos_visibilidade.sql` (tabelas `simulado_segmentos` e `simulado_produto_visibilidade`). Enquanto não for aplicada, nada muda para o aluno e a aba mostra o aviso da migração.
+
+### Cronograma Adaptativo — catálogo estável + dados do modelo HTML 2.8
+- **Catálogo estável** (`lib/cronograma/adaptativo/catalogo.ts`): cada plano guarda as chaves das aulas na ordem em que foi gerado e os ids das metas são traduzidos entre o plano e o catálogo atual — aula nova, renomeada ou disciplina reordenada não desloca mais as metas para outra aula (progresso não "migra" para a aula errada).
+- **Dados de referência do modelo** (`catalogo-html.ts` + `catalogo-html.json`, gerado por `scripts/importar-cronograma-html.mjs`): páginas dos PDFulls, links de questões QC/TEC, ordem de distribuição das matérias, metas de LegProc por disciplina e grupo/cor — **enriquecem** o conteúdo da Biblioteca (não o substituem); casamento por nome canônico de disciplina, nº da aula e nº da lei.
+
 ## 4.2.8 — 2026-11-03
 
 ### Produtos (extensivo, assinatura, pré-edital…) — "Liberar para todos os alunos da plataforma"

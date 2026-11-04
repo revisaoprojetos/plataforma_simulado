@@ -142,7 +142,7 @@ function Poster({ m, nome, n, href, cor }: { m: ModuloAluno; nome: string; n: nu
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/55 to-transparent px-3 pb-3 pt-16">
         <div className={`font-extrabold uppercase leading-[1.05] tracking-tight text-[#F1C232] ${nome.length > 28 ? 'text-[15px]' : 'text-lg'} ${m.imagemUrl ? 'line-clamp-2' : 'line-clamp-4'}`}>{nome}</div>
         <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-medium text-white/80">
-          {!m.liberado ? <><Lock className="h-3 w-3" />{m.liberaEm ? `libera em ${fmtData(m.liberaEm)}` : 'bloqueado'}</> : <>{p.total} {p.total === 1 ? 'aula' : 'aulas'}{p.lidas ? ` · ${p.pct}%` : ''}</>}
+          {!m.liberado ? <><Lock className="h-3 w-3" />{m.exclusivo ? 'conteúdo exclusivo' : m.liberaEm ? `libera em ${fmtData(m.liberaEm)}` : 'bloqueado'}</> : <>{p.total} {p.total === 1 ? 'aula' : 'aulas'}{p.lidas ? ` · ${p.pct}%` : ''}</>}
         </div>
         {m.liberado && p.lidas > 0 && (
           <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/20"><div className="h-full rounded-full bg-[#F1C232]" style={{ width: `${p.pct}%` }} /></div>
@@ -207,7 +207,7 @@ export function ModuloDetalhe({ modulos, atual, slug, cor }: { modulos: ModuloAl
             <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Módulo {idx + 1} de {modulos.length}</div>
             <h1 className="mt-0.5 text-xl font-bold leading-tight tracking-tight sm:text-2xl">{atual.titulo}</h1>
             {atual.descricao && <p className="mt-1 text-sm text-muted-foreground">{atual.descricao}</p>}
-            {!atual.liberado && atual.liberaEm && <p className="mt-1 inline-flex items-center gap-1 text-sm text-muted-foreground"><Lock className="h-3.5 w-3.5" />Libera em {fmtData(atual.liberaEm)}</p>}
+            {!atual.liberado && (atual.exclusivo || atual.liberaEm) && <p className="mt-1 inline-flex items-center gap-1 text-sm text-muted-foreground"><Lock className="h-3.5 w-3.5" />{atual.exclusivo ? 'Conteúdo exclusivo — não disponível para o seu perfil' : `Libera em ${fmtData(atual.liberaEm!)}`}</p>}
             <div className="mt-3 flex items-center gap-3">
               <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full" style={{ width: `${p.pct}%`, background: cor }} /></div>
               <span className="whitespace-nowrap text-xs font-medium tabular-nums text-muted-foreground">{p.lidas}/{p.total} aulas · {p.pct}%</span>
@@ -282,7 +282,8 @@ function AulaLinha({ a, n, cor }: { a: AulaAluno; n: number; cor: string }) {
         <span className={`block text-sm font-medium leading-snug ${a.liberada ? '' : 'text-muted-foreground'}`}>{a.titulo}</span>
         <span className="mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
           {rotulo && <span className="rounded-md bg-muted px-1.5 py-px font-semibold uppercase tracking-wide">{rotulo}</span>}
-          {!a.liberada && a.liberaEm && <span>libera em {fmtData(a.liberaEm)}</span>}
+          {!a.liberada && a.exclusivo && <span>conteúdo exclusivo</span>}
+          {!a.liberada && !a.exclusivo && a.liberaEm && <span>libera em {fmtData(a.liberaEm)}</span>}
           {a.lida && <span style={{ color: cor }}>lida</span>}
         </span>
       </span>

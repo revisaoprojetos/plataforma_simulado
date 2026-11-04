@@ -1,10 +1,12 @@
 import 'server-only'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Cfg, DataISO, Plano } from './engine'
-import { gerarPlano, dISO } from './engine'
+import { gerarPlano, dISO, semInicio } from './engine'
 import { type Estado, type ProgMeta } from './estado'
-import { carregarConteudo, carregarConteudoBanco } from './conteudo-banco'
-import { VERSAO_MOTOR } from './motor28'
+import { carregarConteudo, carregarConteudoBanco, lpAutomaticoTodas } from './conteudo-banco'
+import type { Conteudo } from './conteudo'
+import { VERSAO_MOTOR, type ItemLP } from './motor28'
+import { CATALOGO_HTML, nomeDisciplina } from './catalogo-html'
 import { construirSnapshot, type AdaptativoSnapshot } from './snapshot'
 
 // Camada server do Cronograma Adaptativo. Backend-first: a página chama `carregarAdaptativo`
@@ -108,46 +110,121 @@ export function fixosPreservados(plano: Plano, metas: MetaRow[], ancora: DataISO
   return out
 }
 
-const ehLpAntigo = (id: string) => /^lp:\d+:\d+$/.test(id)
+const ehLpSemanal = (id: string) => /^lp:\d+:\d+$/.test(id)
+type CfgPlano = Cfg & { motor?: string; catalogo?: string; maisPDFull?: boolean; lpIgnorar?: string[]; lpLegado?: Record<string, ItemLP>; ultimosTemas?: Record<string, number> }
+
+/** Seleção de disciplinas do aluno com os nomes do cronograma ("Eleitoral" → "Direito Eleitoral"), sem duplicar. */
+function normalizarDiscs(discs: unknown): string[] {
+  const out: string[] = []
+  for (const d of Array.isArray(discs) ? discs : []) { const n = typeof d === 'string' ? nomeDisciplina(d) : ''; if (n && !out.includes(n)) out.push(n) }
+  return out
+}
+function normalizarUltimos(u: unknown): Record<string, number> | undefined {
+  if (!u || typeof u !== 'object') return undefined
+  const out: Record<string, number> = {}
+  for (const [k, v] of Object.entries(u as Record<string, number>)) { const n = nomeDisciplina(k); if (!(n in out) || v > out[n]) out[n] = v }
+  return out
+}
+/** Último nº de artigo citado numa orientação de leitura ("… — Art. 6º, XXIV ao art. 7º" → 7). */
+function ultimoArtigo(texto: string): number | null {
+  const parte = String(texto || '').split(' — ').slice(1).join(' — ') || String(texto || '')
+  let n: number | null = null
+  for (const m of parte.matchAll(/\barts?\.?\s*(\d+)/gi)) n = Number(m[1])
+  return n
+}
+
+/** Carimba cfg com o motor/catálogo atuais e disciplinas canônicas (planos gerados agora já estão corretos). */
+function carimbar(cfg: CfgPlano, anterior?: CfgPlano | null): CfgPlano {
+  return {
+    ...cfg, motor: VERSAO_MOTOR, catalogo: CATALOGO_HTML.id, discs: normalizarDiscs(cfg.discs),
+    ...(cfg.ultimosTemas ? { ultimosTemas: normalizarUltimos(cfg.ultimosTemas) } : {}),
+    ...(!cfg.lpLegado && anterior?.lpLegado ? { lpLegado: anterior.lpLegado } : {}),
+    ...(!cfg.lpIgnorar && anterior?.lpIgnorar ? { lpIgnorar: anterior.lpIgnorar } : {}),
+  }
+}
 
 /**
- * MIGRAÇÃO para o motor 2.8 (uma vez por plano, ao carregar). Recalcula a partir de HOJE com as
- * regras 2.8, mantendo fixas as metas de `fixosPreservados` (nada concluído/estudado/anotado se perde;
- * as linhas de simulado_cronograma_adaptativo_meta — tempo/notas — continuam com os mesmos ids).
- * LegProc antigo (1 lei inteira por semana, "lp:s:j"): os já concluídos/estudados ficam no histórico
- * com o id antigo e a 1ª meta nova daquela lei conta como lida (lpIgnorar), sem pedir de novo.
- * Backup do plano anterior em storage (cronograma/backup-28/<planoId>.json) antes de gravar.
+ * CORREÇÃO dos cronogramas já criados (uma vez por plano e por versão do catálogo, ao carregar):
+ * recalcula a partir de HOJE com a lógica e os dados do modelo (motor28.ts + catalogo-html), mantendo fixas
+ * as metas de `fixosPreservados` (concluídas, passadas e com tempo/anotação — nada se perde; as linhas de
+ * simulado_cronograma_adaptativo_meta continuam com os mesmos ids). Além disso:
+ *  · disciplinas com o nome do cronograma ("Direito Administrativo - verificar" → "Direito Administrativo");
+ *  · LegProc antigo (lei semanal "lp:s:j" e corte automático "lp:<doc>:<n>") que fica no histórico ganha
+ *    descrição própria (cfg.lpLegado), e as metas novas que ele já cobriu contam como lidas (cfg.lpIgnorar):
+ *    lei semanal lida → 1ª meta da lei; corte automático → metas até o último artigo lido em sequência;
+ *  · semanas de revisão futuras são remontadas.
+ * Backup do plano anterior em storage (cronograma/backup-catalogo/<tenant>/<planoId>.json) antes de gravar.
  */
-async function migrarPara28(svc: SupabaseClient, tenantId: string, row: PlanoRow): Promise<PlanoRow> {
-  const cfg = (row.cfg || {}) as Cfg & { motor?: string; maisPDFull?: boolean; lpIgnorar?: string[] }
-  if (row.exemplo || cfg.motor === VERSAO_MOTOR || !row.plano || !Object.keys(row.plano).length) return row
+export async function migrarPlano(svc: SupabaseClient, tenantId: string, row: PlanoRow): Promise<PlanoRow> {
+  const cfg = (row.cfg || {}) as CfgPlano
+  if (row.exemplo || cfg.catalogo === CATALOGO_HTML.id || !row.plano || !Object.keys(row.plano).length) return row
   try {
     const banco = await carregarConteudoBanco(svc, tenantId)
-    const conteudo = banco.vazio ? await carregarConteudo(svc, tenantId) : banco
     const metas = await lerMetas(svc, tenantId, row.id)
     const hoje = hojeCal()
     const fixos = fixosPreservados(row.plano, metas, hoje)
-    // LegProc antigo já lido → 1ª meta nova da mesma lei conta como lida
-    const lpIgnorar = new Set(cfg.lpIgnorar || [])
-    const feitosLp = new Set(metas.filter((m) => m.estado === 'done' && ehLpAntigo(m.meta_id)).map((m) => m.meta_id))
-    for (const id of feitosLp) {
-      const [, s, j] = id.split(':'); const doc = banco.WLPdoc?.[+s]?.[+j]
-      if (doc) lpIgnorar.add(`lp:${doc.replace(/-/g, '').slice(0, 12)}:1`)
+    const feitas = new Set(metas.filter((m) => m.estado === 'done').map((m) => m.meta_id))
+    const lpAtual = new Map((banco.LP || []).map((x) => [x.id, x]))
+    const hex = (doc: string) => doc.replace(/-/g, '').slice(0, 12)
+    // LegProc antigo sem conclusão nem registro (só atrasado) sai: o trecho volta pelas metas novas da lei
+    const comDado = new Set(Object.keys(fixosPreservados(row.plano, metas, null)))
+    for (const id of Object.keys(fixos)) if (id.startsWith('lp:') && !lpAtual.has(id) && !comDado.has(id)) delete fixos[id]
+    const novasDoDoc = (doc: string) => (banco.LP || []).filter((x) => x.doc === doc)
+
+    // LegProc antigo: descrição p/ o histórico + equivalência com as metas novas
+    const antigos = Object.keys(fixos).filter((id) => id.startsWith('lp:') && !lpAtual.has(id))
+    const precisaAuto = antigos.some((id) => !ehLpSemanal(id)) || (cfg.lpIgnorar || []).length > 0
+    const auto = precisaAuto && banco.lpDocs?.length ? await lpAutomaticoTodas(svc, tenantId, banco.lpDocs) : []
+    const autoMap = new Map(auto.map((x) => [x.id, x]))
+    const discDoDoc = new Map((banco.lpDocs || []).map((d) => [d.id, nomeDisciplina(d.disc)]))
+    const lpLegado: Record<string, ItemLP> = { ...(cfg.lpLegado || {}) }
+    const ignorar = new Set((cfg.lpIgnorar || []).filter((id) => lpAtual.has(id)))
+    for (const id of antigos) {
+      if (ehLpSemanal(id)) {
+        const [, s, j] = id.split(':'), doc = banco.WLPdoc?.[+s]?.[+j] ?? null
+        lpLegado[id] ||= { id, disc: (doc && discDoDoc.get(doc)) || '', lei: doc || id, texto: banco.WLP?.[+s]?.[+j] || 'LegProc', doc }
+        if (doc && feitas.has(id)) { const p = novasDoDoc(doc)[0]; if (p) ignorar.add(p.id) }
+      } else {
+        const it = autoMap.get(id)
+        if (it) lpLegado[id] ||= { ...it, disc: nomeDisciplina(it.disc) }
+      }
     }
-    const cfg2 = { ...cfg, motor: VERSAO_MOTOR, maisPDFull: cfg.maisPDFull ?? true, lpIgnorar: [...lpIgnorar] } as Cfg
-    const r = gerarPlano(cfg2, conteudo.AS, conteudo.WLP, fixos, hoje, conteudo.LP)
+    // corte automático: metas lidas em sequência desde o início da lei → até qual artigo
+    for (const d of banco.lpDocs || []) {
+      const meus = auto.filter((x) => x.doc === d.id).sort((a, b) => +a.id.split(':')[2] - +b.id.split(':')[2])
+      let ate: number | null = null
+      for (const x of meus) { if (!feitas.has(x.id)) break; ate = ultimoArtigo(x.texto) ?? ate }
+      if (ate != null) for (const n of novasDoDoc(d.id)) { const u = ultimoArtigo(n.texto); if (u != null && u <= ate) ignorar.add(n.id) }
+    }
+    // equivalências da migração anterior ("1ª meta da lei lida": lp:<doc>:1)
+    for (const id of cfg.lpIgnorar || []) {
+      if (lpAtual.has(id)) continue
+      const m = /^lp:([0-9a-f]{12}):1$/.exec(id); if (!m) continue
+      const doc = (banco.lpDocs || []).find((x) => hex(x.id) === m[1]); const p = doc && novasDoDoc(doc.id)[0]
+      if (p) ignorar.add(p.id)
+    }
+
+    const cfg2 = carimbar({ ...cfg, maisPDFull: cfg.maisPDFull ?? true, lpLegado, lpIgnorar: [...ignorar] })
+    const r = gerarPlano(cfg2, banco.AS, banco.WLP, fixos, hoje, banco.LP, { ordem: banco.ordem, feitas, usados: metas.map((m) => m.meta_id) })
+    const revs = Object.fromEntries(Object.entries(row.revs || {}).filter(([k]) => semInicio(cfg2.start, +k) <= hoje))
     try {
-      const corpo = new Blob([JSON.stringify({ planoId: row.id, em: new Date().toISOString(), cfg: row.cfg, plano: row.plano, fim: row.fim })], { type: 'application/json' })
-      await svc.storage.from('pdfs').upload(`cronograma/backup-28/${tenantId}/${row.id}.json`, corpo, { upsert: false, contentType: 'application/json' })
+      const corpo = new Blob([JSON.stringify({ planoId: row.id, em: new Date().toISOString(), cfg: row.cfg, plano: row.plano, fim: row.fim, revs: row.revs })], { type: 'application/json' })
+      await svc.storage.from('pdfs').upload(`cronograma/backup-catalogo/${tenantId}/${row.id}.json`, corpo, { upsert: false, contentType: 'application/json' })
     } catch { /* backup best-effort (já existe = migrado antes) */ }
     const { error } = await svc.from(T_PLANO)
-      .update({ cfg: cfg2 as unknown as Record<string, unknown>, plano: r.plano as unknown as Record<string, unknown>, fim: r.fim, atualizado_em: new Date().toISOString() })
-      .eq('id', row.id).filter('cfg->>motor', 'is', null) // concorrência: só migra se ninguém migrou antes
+      .update({ cfg: cfg2 as unknown as Record<string, unknown>, plano: r.plano as unknown as Record<string, unknown>, fim: r.fim, revs, atualizado_em: new Date().toISOString() })
+      .eq('id', row.id).or(`cfg->>catalogo.is.null,cfg->>catalogo.neq.${CATALOGO_HTML.id}`) // concorrência: só uma migração grava
     if (error) return row
-    return { ...row, cfg: cfg2, plano: r.plano, fim: r.fim }
+    return { ...row, cfg: cfg2, plano: r.plano, fim: r.fim, revs }
   } catch {
-    return row // falha na migração não derruba o cronograma do aluno (segue no plano antigo)
+    return row // falha na correção não derruba o cronograma do aluno (segue no plano anterior)
   }
+}
+
+/** Conteúdo do motor + descrição das metas antigas de LegProc deste plano. */
+function comLegado(c: Conteudo, cfg: Cfg): Conteudo {
+  const leg = (cfg as CfgPlano).lpLegado
+  return leg && Object.keys(leg).length ? { ...c, LPdesc: leg } : c
 }
 
 export interface CargaAdaptativo {
@@ -161,10 +238,10 @@ export interface CargaAdaptativo {
 export async function carregarAdaptativo(svc: SupabaseClient, tenantId: string, estId: string, hoje: DataISO = dISO(new Date())): Promise<CargaAdaptativo> {
   const row0 = await lerPlanoRow(svc, tenantId, estId)
   if (!row0) return { temPlano: false, planoId: null, titulo: null, snapshot: null }
-  const row = await migrarPara28(svc, tenantId, row0)
+  const row = await migrarPlano(svc, tenantId, row0)
   const metas = await lerMetas(svc, tenantId, row.id)
   const est = montarEstado(row, metas)
-  const conteudo = await carregarConteudo(svc, tenantId)
+  const conteudo = comLegado(await carregarConteudo(svc, tenantId), row.cfg)
   const snapshot = construirSnapshot(est, conteudo, hoje)
   return { temPlano: true, planoId: row.id, titulo: row.titulo, snapshot }
 }
@@ -180,9 +257,12 @@ export async function gerarAdaptativo(
   // fixos = metas concluídas (não se movem), lidas do plano alvo se existir
   // fixos = concluídas + passadas + com progresso (tempo/notas/parada) — nada estudado se perde (2.8 §8)
   let fixos: Record<string, [DataISO, number]> = {}
-  if (alvo && opc.ancora) fixos = fixosPreservados(alvo.plano || {}, await lerMetas(svc, tenantId, alvo.id), opc.ancora)
-  cfg = { ...cfg, motor: VERSAO_MOTOR } as Cfg
-  const r = gerarPlano(cfg, conteudo.AS, conteudo.WLP, fixos, opc.ancora || null, conteudo.LP)
+  const metasAlvo = alvo ? await lerMetas(svc, tenantId, alvo.id) : []
+  if (alvo && opc.ancora) fixos = fixosPreservados(alvo.plano || {}, metasAlvo, opc.ancora)
+  cfg = carimbar(cfg as CfgPlano, alvo?.cfg as CfgPlano | undefined)
+  const r = gerarPlano(cfg, conteudo.AS, conteudo.WLP, fixos, opc.ancora || null, conteudo.LP, {
+    ordem: conteudo.ordem, feitas: metasAlvo.filter((m) => m.estado === 'done').map((m) => m.meta_id), usados: metasAlvo.map((m) => m.meta_id),
+  })
   const campos = {
     titulo: opc.titulo ?? alvo?.titulo ?? 'Meu cronograma',
     cfg: cfg as unknown as Record<string, unknown>,
@@ -318,7 +398,7 @@ export interface DocsModelo {
 export async function carregarDocs(svc: SupabaseClient, tenantId: string, estId: string): Promise<DocsModelo & { extras: unknown[] }> {
   const row0 = await lerPlanoRow(svc, tenantId, estId)
   if (!row0) return { estado: null, progresso: null, notas: null, extras: [] }
-  const row = await migrarPara28(svc, tenantId, row0)
+  const row = await migrarPlano(svc, tenantId, row0)
   const { data: raw } = await svc.from(T_PLANO).select('extras').eq('id', row.id).maybeSingle()
   const extras = ((raw as { extras?: unknown[] } | null)?.extras) || []
   const metas = await lerMetas(svc, tenantId, row.id)
@@ -349,10 +429,15 @@ export async function carregarDocs(svc: SupabaseClient, tenantId: string, estId:
 /** Grava um doc do modelo. parte ∈ 'estado'|'progresso'|'notas'. */
 export async function sincronizarDoc(svc: SupabaseClient, tenantId: string, estId: string, parte: string, doc: Record<string, unknown>): Promise<{ ok: boolean; error?: string }> {
   if (parte === 'estado') {
-    const cfg = doc.cfg as Cfg
+    let cfg = doc.cfg as CfgPlano
     if (!cfg || !cfg.start) return { ok: false, error: 'cfg_invalido' }
     // Nome dado na criação (iframe). Vazio => não sobrescreve o título existente num recálculo.
     const tituloDoc = typeof doc.titulo === 'string' ? doc.titulo.trim().slice(0, 80) : ''
+    // O alvo é lido ANTES de gravar: preserva a descrição do LegProc antigo e carimba o catálogo quando o plano
+    // veio do motor atual do iframe (um iframe antigo em cache não carimba → a correção roda no próximo acesso).
+    const alvo = await lerPlanoRow(svc, tenantId, estId)
+    if (cfg.motor === VERSAO_MOTOR) cfg = carimbar(cfg, alvo?.cfg as CfgPlano | undefined)
+    else if (cfg.catalogo === CATALOGO_HTML.id) cfg = { ...cfg, catalogo: undefined }
     const campos = {
       cfg: cfg as unknown as Record<string, unknown>,
       plano: (doc.plano || {}) as Record<string, unknown>,
@@ -363,7 +448,6 @@ export async function sincronizarDoc(svc: SupabaseClient, tenantId: string, estI
       atualizado_em: new Date().toISOString(),
     }
     // O iframe edita o plano em FOCO (fixado). Se ainda não há plano, cria já fixado.
-    const alvo = await lerPlanoRow(svc, tenantId, estId)
     if (alvo) {
       const upd = tituloDoc ? { ...campos, titulo: tituloDoc } : campos
       const { error } = await svc.from(T_PLANO).update(upd).eq('id', alvo.id)
@@ -419,6 +503,6 @@ export async function estadoParaRender(svc: SupabaseClient, tenantId: string, es
   if (!row) return null
   const metas = await lerMetas(svc, tenantId, row.id)
   const est = montarEstado(row, metas)
-  const conteudo = await carregarConteudo(svc, tenantId)
+  const conteudo = comLegado(await carregarConteudo(svc, tenantId), row.cfg)
   return { estado: est, snapshot: construirSnapshot(est, conteudo, hoje), titulo: row.titulo }
 }
