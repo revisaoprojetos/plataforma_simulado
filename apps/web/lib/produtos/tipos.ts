@@ -9,6 +9,15 @@ export type ItemTipo = 'grupo' | 'banco' | 'simulado' | 'biblioteca_pasta' | 'bi
 export type AssinaturaOrigem = 'integracao' | 'manual'
 
 export type ProdutoTema = 'claro' | 'escuro'
+/** Formato de exibição do CONTEÚDO (currículo) do produto pro aluno. */
+export type VitrineLayout = 'netflix' | 'grade' | 'trilha' | 'trilha_imagem' | 'lista'
+export const VITRINE_LAYOUTS: { v: VitrineLayout; label: string; descricao: string }[] = [
+  { v: 'netflix', label: 'Netflix (carrosséis)', descricao: 'Linhas horizontais com as capas dos módulos.' },
+  { v: 'grade', label: 'Cards em grade', descricao: 'Capas numa grade que preenche a tela, sem rolar para o lado.' },
+  { v: 'trilha_imagem', label: 'Trilha com imagem', descricao: 'Etapas conectadas em caminho, cada uma com a capa do módulo e o progresso.' },
+  { v: 'trilha', label: 'Trilha simples', descricao: 'Etapas conectadas em caminho, só com texto e progresso (sem capas).' },
+  { v: 'lista', label: 'Lista / acordeão', descricao: 'Módulos empilhados que expandem mostrando as aulas.' },
+]
 /** Layout dos carrosséis da vitrine (espelha os tamanhos da Curseduca). */
 export type SecaoTamanho = 'vertical_small' | 'vertical_large' | 'horizontal_small' | 'horizontal_large' | 'destaque'
 export type SecaoTipo = 'banner' | 'carrossel'
@@ -34,6 +43,10 @@ export interface Produto {
   banner_url: string | null
   banner_mobile_url: string | null
   gamificacao: boolean
+  /** Modo "em edição/manutenção": true = acesso TOTALMENTE bloqueado (até matriculados). Default false. */
+  acesso_bloqueado: boolean
+  /** Formato de exibição do conteúdo pro aluno (default 'netflix'). Opcional: coluna nova, lida tolerante. */
+  vitrine_layout?: VitrineLayout
   ordem: number
 }
 

@@ -4,7 +4,7 @@ import { getSessaoAluno } from '@/lib/aluno-session'
 import { vitrineDoAluno, progressoExtensivo, avisosDoProduto, getExtensivoDoAluno, curriculoDoExtensivo, type VitrineSecao, type VitrineItem } from '@/lib/produtos/aluno'
 import { ModulosVitrine } from './curriculo'
 import { PRODUTO_TIPOS } from '@/lib/produtos/tipos'
-import { ArrowLeft, ClipboardList, BookOpen, CalendarDays, CalendarClock, ChevronRight, Megaphone, Pin, Layers } from 'lucide-react'
+import { ArrowLeft, ClipboardList, BookOpen, CalendarDays, CalendarClock, ChevronRight, Megaphone, Pin, Layers, Wrench } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,6 +30,27 @@ export default async function ExtensivoPage({ params }: { params: Promise<{ slug
   if (!sessao) redirect('/aluno/entrar')
   const ext = await getExtensivoDoAluno(sessao.tenantId, sessao.estudanteId, slug)
   if (!ext) notFound()
+  // Modo "em edição/manutenção": bloqueio TOTAL — todos os alunos (até matriculados) veem a mensagem de
+  // atualização. Bypass: admin VISUALIZANDO a conta (impersonation) ignora o bloqueio p/ conferir antes de publicar.
+  if (ext.bloqueado && !sessao.impersonation) {
+    return (
+      <div className="w-full">
+        <Link href="/aluno/extensivos" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
+          <ArrowLeft className="h-4 w-4" />Meus Extensivos
+        </Link>
+        <div className="mx-auto mt-10 max-w-md rounded-2xl border bg-card p-8 text-center shadow-sm">
+          <span className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
+            <Wrench className="h-7 w-7" />
+          </span>
+          <h1 className="text-lg font-bold tracking-tight">Produto em atualização</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Este produto está temporariamente indisponível enquanto preparamos melhorias. Volte em breve.</p>
+          <Link href="/aluno/extensivos" className="mt-5 inline-flex items-center gap-1.5 rounded-xl border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted">
+            <ArrowLeft className="h-4 w-4" />Voltar para Meus Extensivos
+          </Link>
+        </div>
+      </div>
+    )
+  }
   const [vit, prog, avisos, curriculo] = await Promise.all([
     vitrineDoAluno(sessao.tenantId, sessao.estudanteId, slug),
     progressoExtensivo(sessao.tenantId, sessao.estudanteId, ext.id),
@@ -105,7 +126,7 @@ export default async function ExtensivoPage({ params }: { params: Promise<{ slug
       )}
 
       {/* CONTEÚDO DO CURSO — módulos e aulas montados no configurador do produto */}
-      {curriculo.length > 0 && <ModulosVitrine modulos={curriculo} slug={slug} cor={cor} />}
+      {curriculo.length > 0 && <ModulosVitrine modulos={curriculo} slug={slug} cor={cor} layout={vit.vitrine_layout} />}
 
       {/* VITRINE (seções) */}
       {vit.secoes.map((s) => <Secao key={s.id} s={s} cor={cor} />)}

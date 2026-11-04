@@ -13,10 +13,10 @@ const fmt = (iso: string) => iso.split('-').reverse().join('/')
 
 function Bloco({ titulo, desc, children }: { titulo: string; desc?: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-2xl border bg-card p-5">
+    <section className="rounded-2xl border bg-card p-4">
       <h2 className="text-sm font-semibold">{titulo}</h2>
       {desc && <p className="mt-0.5 text-sm text-muted-foreground">{desc}</p>}
-      <div className="mt-4">{children}</div>
+      <div className="mt-3">{children}</div>
     </section>
   )
 }
@@ -25,7 +25,7 @@ function Opcao<T extends string>({ valor, atual, onChange, titulo, desc }: { val
   const on = valor === atual
   return (
     <button type="button" onClick={() => onChange(valor)}
-      className={cn('flex w-full items-start gap-3 rounded-xl border p-3 text-left transition', on ? 'border-primary bg-primary/5 ring-1 ring-primary/30' : 'hover:bg-muted/50')}>
+      className={cn('flex w-full items-start gap-3 rounded-xl border p-2.5 text-left transition', on ? 'border-primary bg-primary/5 ring-1 ring-primary/30' : 'hover:bg-muted/50')}>
       <span className={cn('mt-0.5 grid h-4 w-4 shrink-0 place-items-center rounded-full border', on ? 'border-primary' : 'border-muted-foreground/40')}>
         {on && <span className="h-2 w-2 rounded-full bg-primary" />}
       </span>
@@ -106,10 +106,10 @@ export function LiberacaoClient({ inicial }: { inicial: PainelLiberacao }) {
   }
 
   return (
-    <div className="space-y-5 pb-24">
+    <div className="space-y-4">
       {/* CHAVE MESTRE */}
-      <section className={cn('flex flex-col gap-4 rounded-2xl border p-5 sm:flex-row sm:items-center', cfg.ativo ? 'border-primary/40 bg-primary/5' : 'bg-card')}>
-        <div className={cn('grid h-12 w-12 shrink-0 place-items-center rounded-2xl', cfg.ativo ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}>
+      <section className={cn('flex flex-col gap-3 rounded-2xl border p-4 sm:flex-row sm:items-center', cfg.ativo ? 'border-primary/40 bg-primary/5' : 'bg-card')}>
+        <div className={cn('grid h-10 w-10 shrink-0 place-items-center rounded-xl', cfg.ativo ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground')}>
           {cfg.ativo ? <Lock className="h-6 w-6" /> : <Unlock className="h-6 w-6" />}
         </div>
         <div className="flex-1">
@@ -129,7 +129,7 @@ export function LiberacaoClient({ inicial }: { inicial: PainelLiberacao }) {
         </button>
       </section>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
         <Bloco titulo="Quando liberar" desc="O material abre na data da meta no plano do aluno — ou alguns dias antes, se você quiser dar folga.">
           <label className="flex items-center gap-3 text-sm">
             <CalendarClock className="h-4 w-4 text-muted-foreground" />
@@ -146,14 +146,14 @@ export function LiberacaoClient({ inicial }: { inicial: PainelLiberacao }) {
         </Bloco>
 
         <Bloco titulo="Aluno sem cronograma" desc="Quem ainda não montou o cronograma adaptativo.">
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Opcao valor="bloquear" atual={cfg.semPlano} onChange={(v) => set('semPlano', v)} titulo="Bloquear os materiais do cronograma" desc="Ele precisa montar o cronograma para começar a liberar (recomendado no lançamento)." />
             <Opcao valor="liberar" atual={cfg.semPlano} onChange={(v) => set('semPlano', v)} titulo="Liberar normalmente" desc="Sem cronograma, segue as regras normais de acesso da Biblioteca." />
           </div>
         </Bloco>
 
         <Bloco titulo="Material fora do plano do aluno" desc="Ex.: aula de uma disciplina que o aluno não escolheu no cronograma dele.">
-          <div className="space-y-2">
+          <div className="space-y-1.5">
             <Opcao valor="bloquear" atual={cfg.foraDoPlano} onChange={(v) => set('foraDoPlano', v)} titulo="Bloquear" desc="Só abre o que está no plano dele." />
             <Opcao valor="liberar" atual={cfg.foraDoPlano} onChange={(v) => set('foraDoPlano', v)} titulo="Liberar" desc="O que não está no plano segue as regras normais de acesso." />
           </div>
@@ -224,19 +224,17 @@ export function LiberacaoClient({ inicial }: { inicial: PainelLiberacao }) {
         </div>
       </Bloco>
 
-      {/* BARRA DE SALVAR */}
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-background/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3">
-          <ShieldCheck className="h-4 w-4 text-muted-foreground" />
-          <p className="flex-1 text-xs text-muted-foreground">
-            {mudou ? 'Há alterações não salvas.' : inicial.cfg.atualizadoEm ? `Salvo em ${new Date(inicial.cfg.atualizadoEm).toLocaleString('pt-BR')}.` : 'Ainda não configurado.'}
-            {' '}Vale em até 1 minuto para os alunos.
-          </p>
-          <button type="button" disabled={!mudou || salvando} onClick={() => salvar()}
-            className="inline-flex h-10 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground disabled:opacity-50">
-            {salvando && <Loader2 className="h-4 w-4 animate-spin" />}Salvar
-          </button>
-        </div>
+      {/* BARRA DE SALVAR — sticky dentro da coluna de conteúdo (não cruza a sidebar) */}
+      <div className="sticky bottom-3 z-20 flex items-center gap-3 rounded-2xl border bg-card/95 px-4 py-2.5 shadow-lg backdrop-blur">
+        <ShieldCheck className="h-4 w-4 shrink-0 text-muted-foreground" />
+        <p className="flex-1 text-xs text-muted-foreground">
+          {mudou ? 'Há alterações não salvas.' : inicial.cfg.atualizadoEm ? `Salvo em ${new Date(inicial.cfg.atualizadoEm).toLocaleString('pt-BR')}.` : 'Ainda não configurado.'}
+          {' '}Vale em até 1 minuto para os alunos.
+        </p>
+        <button type="button" disabled={!mudou || salvando} onClick={() => salvar()}
+          className="inline-flex h-9 items-center gap-2 rounded-lg bg-primary px-5 text-sm font-semibold text-primary-foreground disabled:opacity-50">
+          {salvando && <Loader2 className="h-4 w-4 animate-spin" />}Salvar
+        </button>
       </div>
       <p className="flex items-center gap-1.5 text-xs text-muted-foreground"><FlaskConical className="h-3.5 w-3.5" />Hoje (Brasília): {fmt(inicial.hoje)}</p>
     </div>

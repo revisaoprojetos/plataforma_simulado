@@ -34,7 +34,10 @@
  *    daquela disciplina → ela e as anteriores ficam fora da nova programação.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.DUR_REVISAO = exports.DUR = exports.VEL_PADRAO = exports.MAX_SEM = exports.SEM_FLASH = exports.VERSAO_MOTOR = void 0;
+exports.PARAMS_PADRAO_MOTOR = exports.DUR_REVISAO = exports.DUR = exports.VEL_PADRAO = exports.MAX_SEM = exports.SEM_FLASH = exports.VERSAO_MOTOR = void 0;
+exports.resolverParams = resolverParams;
+exports.temasFracos = temasFracos;
+exports.idealRev = idealRev;
 exports.dParse = dParse;
 exports.dISO = dISO;
 exports.dAdd = dAdd;
@@ -67,6 +70,62 @@ exports.MAX_SEM = 200;
 exports.VEL_PADRAO = 17;
 exports.DUR = { fl: 60, qu: 30, lp: 30 };
 exports.DUR_REVISAO = { rf: 60, rq: 30 };
+function resolverParams(p) {
+    const q = p || {};
+    const num = (v, d) => (typeof v === 'number' && Number.isFinite(v) ? v : d);
+    return {
+        velPadrao: q.velPadrao && q.velPadrao > 0 ? q.velPadrao : exports.VEL_PADRAO,
+        offsetRevisao: num(q.offsetRevisao, 1),
+        offsetQuestoes: num(q.offsetQuestoes, 2),
+        semFlash: Array.isArray(q.semFlash) ? new Set(q.semFlash) : exports.SEM_FLASH,
+        tetoPdfDia: num(q.tetoPdfDia, 2),
+        lpJanelaRodizio: num(q.lpJanelaRodizio, 6),
+        concentracaoAteH: num(q.concentracaoAteH, 18),
+        maxSemanas: num(q.maxSemanas, exports.MAX_SEM),
+        dur: { fl: num(q.durFl, exports.DUR.fl), qu: num(q.durQu, exports.DUR.qu), lp: num(q.durLp, exports.DUR.lp) },
+        durRevisao: { rf: num(q.durRf, exports.DUR_REVISAO.rf), rq: num(q.durRq, exports.DUR_REVISAO.rq) },
+        legproc: { metasDia: num(q.lpMetasDia, 4), discDia: num(q.lpDiscDia, 2), mesmaDisc: num(q.lpMesmaDisc, 2) },
+        desempenho: { ativo: q.usarDesempenhoNoPlano === true, peso: Math.max(0, num(q.pesoDesempenho, 1)), acertoMin: num(q.acertoMin, 60) },
+    };
+}
+exports.PARAMS_PADRAO_MOTOR = resolverParams();
+/** Temas (índice em AS) "fracos": grau de dificuldade ≥ 7 OU acerto (questões da aula + das semanas de revisão) < acertoMin. */
+function temasFracos(notas, acertoMin) {
+    var _a;
+    const fracos = new Set(), res = {}, err = {};
+    for (const [id, n] of Object.entries(notas || {})) {
+        if (!n)
+            continue;
+        const p = id.split(':');
+        if (p[0] === 'pf') {
+            if ((+((_a = n.grau) !== null && _a !== void 0 ? _a : 0)) >= 7)
+                fracos.add(+p[1]);
+        }
+        else if (p[0] === 'qu' || p[0] === 'rq') {
+            const i = +p[p[0] === 'rq' ? 2 : 1];
+            res[i] = (res[i] || 0) + +(n.res || 0);
+            err[i] = (err[i] || 0) + +(n.err || 0);
+        }
+    }
+    for (const k of Object.keys(res)) {
+        const i = +k;
+        if (res[i] > 0 && Math.max(0, (res[i] - (err[i] || 0)) / res[i] * 100) < acertoMin)
+            fracos.add(i);
+    }
+    return fracos;
+}
+/**
+ * Data ideal da revisão ('fl') ou das questões ('qu') de uma aula. Sem desempenho ligado, ou para tema não fraco,
+ * é exatamente a do modelo 2.8 (mesmo dia da semana, N semanas de conteúdo depois). Tema FRACO: antecipa
+ * round(peso × 2) dias, nunca antes de 1 dia após o PDFull.
+ */
+function idealRev(cfg, P, fracos, i, dataPdf, tipo) {
+    const due = proxSemConteudo(cfg, dataPdf, tipo === 'fl' ? P.offsetRevisao : P.offsetQuestoes);
+    if (!P.desempenho.ativo || !fracos.has(i))
+        return due;
+    const adiantado = dAdd(due, -Math.round(P.desempenho.peso * 2)), minimo = dAdd(dataPdf, 1);
+    return adiantado > minimo ? adiantado : (due < minimo ? due : minimo);
+}
 // ── datas (ISO local, sem fuso) ──
 function dParse(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, 12); }
 function dISO(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
@@ -104,7 +163,7 @@ function proxSemConteudo(cfg, s, n) {
     }
     return dAdd(semInicio(cfg.start, sem), dDow(s));
 }
-function minPdf(p, vel) { const v = vel && vel > 0 ? vel : exports.VEL_PADRAO; return Math.max(30, Math.ceil((p || 60) / v * 2 - 1e-9) * 30); }
+function minPdf(p, vel, velPadrao = exports.VEL_PADRAO) { const v = vel && vel > 0 ? vel : (velPadrao > 0 ? velPadrao : exports.VEL_PADRAO); return Math.max(30, Math.ceil((p || 60) / v * 2 - 1e-9) * 30); }
 const proximoEstudo = (cfg, aPartir) => {
     for (let n = 0, d = aPartir; n < 1400; n++, d = dAdd(d, 1))
         if (d >= cfg.start && horasDia(cfg, d) > 0)
@@ -112,16 +171,16 @@ const proximoEstudo = (cfg, aPartir) => {
     return null;
 };
 /** Perfil da semana: horas da rotina e o dia que concentra as questões (≤18 h e mais de 1 dia disponível). */
-function perfilSemana(cfg, sem) {
+function perfilSemana(cfg, sem, ateH = 18) {
     const ini = semInicio(cfg.start, sem), datas = Array.from({ length: 7 }, (_, i) => dAdd(ini, i));
     const horas = datas.reduce((n, d) => n + (+(horasEm(cfg, d)[dDow(d)] || 0)), 0);
     const disponiveis = datas.filter((d) => d >= cfg.start && horasDia(cfg, d) > 0);
-    return { horas, concentrado: horas <= 18 && disponiveis.length > 1 ? disponiveis[disponiveis.length - 1] : null };
+    return { horas, concentrado: horas <= ateH && disponiveis.length > 1 ? disponiveis[disponiveis.length - 1] : null };
 }
 /** Semana de revisão: por tema, Revisão (60) + Questões (30), preenchendo cada dia; dia concentrado só recebe questões. */
-function planoRevisao(capDias, temas, apenasQuestoes = []) {
+function planoRevisao(capDias, temas, apenasQuestoes = [], dur = exports.DUR_REVISAO) {
     if (apenasQuestoes.some(Boolean))
-        return planoRevisaoConcentrada(capDias, temas, apenasQuestoes);
+        return planoRevisaoConcentrada(capDias, temas, apenasQuestoes, dur);
     const fila = [];
     for (let n = 0; n < temas; n++)
         fila.push({ t: 'rf', n }, { t: 'rq', n });
@@ -129,33 +188,33 @@ function planoRevisao(capDias, temas, apenasQuestoes = []) {
     return capDias.map((c) => {
         const itens = [];
         let usado = 0;
-        while (q < fila.length && usado + exports.DUR_REVISAO[fila[q].t] <= c) {
+        while (q < fila.length && usado + dur[fila[q].t] <= c) {
             itens.push(fila[q]);
-            usado += exports.DUR_REVISAO[fila[q].t];
+            usado += dur[fila[q].t];
             q++;
         }
         return { itens, usado };
     });
 }
-function planoRevisaoConcentrada(capDias, temas, apenasQuestoes) {
+function planoRevisaoConcentrada(capDias, temas, apenasQuestoes, dur = exports.DUR_REVISAO) {
     const out = capDias.map(() => ({ itens: [], usado: 0 })), livre = capDias.map((c) => Math.max(0, c));
     for (let n = 0; n < temas; n++) {
         let colocou = false;
         for (let r = 0; r < livre.length; r++) {
-            if (apenasQuestoes[r] || livre[r] < 60)
+            if (apenasQuestoes[r] || livre[r] < dur.rf)
                 continue;
-            livre[r] -= 60;
+            livre[r] -= dur.rf;
             const pref = livre.map((_, k) => k).filter((k) => k >= r).sort((a, b) => Number(!!apenasQuestoes[b]) - Number(!!apenasQuestoes[a]) || a - b);
-            const q = pref.find((k) => livre[k] >= 30);
+            const q = pref.find((k) => livre[k] >= dur.rq);
             if (q == null) {
-                livre[r] += 60;
+                livre[r] += dur.rf;
                 continue;
             }
             out[r].itens.push({ t: 'rf', n });
-            out[r].usado += 60;
+            out[r].usado += dur.rf;
             out[q].itens.push({ t: 'rq', n });
-            out[q].usado += 30;
-            livre[q] -= 30;
+            out[q].usado += dur.rq;
+            livre[q] -= dur.rq;
             colocou = true;
             break;
         }
@@ -171,32 +230,32 @@ function chaveLei(meta) {
     return meta.disc + '|' + String(meta.lei).normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('pt-BR');
 }
 /** Pode entrar mais esta meta de LegProc no dia? ≤4 metas; ≤2 disciplinas; ≤2 por disciplina, e da mesma lei. */
-function permitirLegproc25(id, idsDia, metaDe) {
+function permitirLegproc25(id, idsDia, metaDe, lim = { metasDia: 4, discDia: 2, mesmaDisc: 2 }) {
     const m = metaDe(id);
-    if (!(m === null || m === void 0 ? void 0 : m.disc) || idsDia.length >= 4)
+    if (!(m === null || m === void 0 ? void 0 : m.disc) || idsDia.length >= lim.metasDia)
         return false;
     const existentes = idsDia.map((x) => ({ id: x, m: metaDe(x) })).filter((x) => { var _a; return (_a = x.m) === null || _a === void 0 ? void 0 : _a.disc; });
     const disciplinas = new Set(existentes.map((x) => x.m.disc)), daDisc = existentes.filter((x) => x.m.disc === m.disc);
-    if (daDisc.length >= 2)
+    if (daDisc.length >= lim.mesmaDisc)
         return false;
     if (!daDisc.length)
-        return disciplinas.size < 2;
+        return disciplinas.size < lim.discDia;
     const lei = chaveLei(m);
     return !!lei && daDisc.every((x) => chaveLei(x.m) === lei);
 }
 /** Rodízio de disciplinas do LegProc: janela das 6 primeiras com metas pendentes, girando após a última usada. */
-function criarRodizioLP25(disciplinas, ultima = null) {
+function criarRodizioLP25(disciplinas, ultima = null, janela = 6) {
     const ordem = [...new Set(disciplinas)], estado = { ultima };
     return {
         ordenar(pendentes) {
-            const disponiveis = new Set(pendentes), ativas = ordem.filter((d) => disponiveis.has(d)).slice(0, 6);
+            const disponiveis = new Set(pendentes), ativas = ordem.filter((d) => disponiveis.has(d)).slice(0, janela);
             const pos = ordem.indexOf(estado.ultima);
             return [...ativas.filter((d) => ordem.indexOf(d) > pos), ...ativas.filter((d) => ordem.indexOf(d) <= pos)];
         },
         avancar(disciplina) { estado.ultima = disciplina !== null && disciplina !== void 0 ? disciplina : null; },
     };
 }
-function limitePDF27(cfg) { return cfg.maisPDFull === false ? 1 : 2; }
+function limitePDF27(cfg, teto = 2) { return cfg.maisPDFull === false ? 1 : teto; }
 /** Aulas cujo PDFull COMEÇA no dia d (continuações não contam). */
 function novosPDFDia27(plano, cfg, d, detalhes = {}) {
     var _a, _b, _c;
@@ -238,9 +297,11 @@ const copiar = (x) => JSON.parse(JSON.stringify(x !== null && x !== void 0 ? x :
  * gerarPlanoBase do modelo. cfg.ordemAulas = fila de aulas; legprocs = metas na ordem do catálogo (id = id no plano).
  * fixos = {id: [data, horas]} — metas que não se movem. ancora = data a partir da qual o resto é distribuído.
  */
-function gerarPlanoBase(cfg, AS, ordemAulas, legprocs, fixos, ancora) {
+function gerarPlanoBase(cfg, AS, ordemAulas, legprocs, fixos, ancora, P, fracos) {
     var _a;
     const start = cfg.start;
+    // v3: parâmetros configuráveis sombreiam as constantes 2.8 — sem params = valores idênticos aos de hoje.
+    const DUR = P.dur, SEM_FLASH = P.semFlash, MAX_SEM = P.maxSemanas;
     const A = ancora && ancora > start ? ancora : start;
     const ativas = new Set(cfg.discs);
     const metas = cfg.metas || {};
@@ -269,17 +330,17 @@ function gerarPlanoBase(cfg, AS, ordemAulas, legprocs, fixos, ancora) {
             feitoParte[i] = (feitoParte[i] || 0) + Math.round(v[1] * 60);
             maxParte[i] = Math.max(maxParte[i] || 0, +k);
         }
-    const restante = (i) => { var _a; return Math.max(30, minPdf(AS[i][3], cfg.vel) - (feitoParte[i] || 0) - (((_a = cfg.partesLidas) === null || _a === void 0 ? void 0 : _a[i]) || 0)); };
+    const restante = (i) => { var _a; return Math.max(30, minPdf(AS[i][3], cfg.vel, P.velPadrao) - (feitoParte[i] || 0) - (((_a = cfg.partesLidas) === null || _a === void 0 ? void 0 : _a[i]) || 0)); };
     let ultimaLeitura = start;
     let emCurso = null;
     const devidos = [];
     let ord = 0;
     const registrar = (i, dataPdf) => {
         const disc = AS[i][0];
-        if (metas.fl && !exports.SEM_FLASH.has(disc) && !fixo('fl:' + i))
-            devidos.push({ id: 'fl:' + i, due: proxSemConteudo(cfg, dataPdf, 1), tipo: 'fl', ord: ord++ });
+        if (metas.fl && !SEM_FLASH.has(disc) && !fixo('fl:' + i))
+            devidos.push({ id: 'fl:' + i, due: idealRev(cfg, P, fracos, i, dataPdf, 'fl'), tipo: 'fl', ord: ord++ });
         if (metas.qu && !fixo('qu:' + i))
-            devidos.push({ id: 'qu:' + i, due: proxSemConteudo(cfg, dataPdf, 2), tipo: 'qu', ord: ord++ });
+            devidos.push({ id: 'qu:' + i, due: idealRev(cfg, P, fracos, i, dataPdf, 'qu'), tipo: 'qu', ord: ord++ });
     };
     // dívidas: PDFs já concluídos cujas revisões/questões ainda não foram feitas
     AS.forEach((a, i) => { if (ativas.has(a[0]) && (!ordemAulas || ordemAulas.includes(i)) && fixos['pf:' + i])
@@ -292,15 +353,15 @@ function gerarPlanoBase(cfg, AS, ordemAulas, legprocs, fixos, ancora) {
     const historicoLP25 = Object.entries(fixos).filter(([id, [d]]) => id.startsWith('lp:') && d <= A && mapaLP25.has(id))
         .sort((a, b) => a[1][0].localeCompare(b[1][0]) || mapaLP25.get(a[0]).ordem - mapaLP25.get(b[0]).ordem);
     const ultimaLP25 = historicoLP25.length ? mapaLP25.get(historicoLP25[historicoLP25.length - 1][0]).disc : null;
-    const rodizioLP25 = criarRodizioLP25(cfg.discs, ultimaLP25);
+    const rodizioLP25 = criarRodizioLP25(cfg.discs, ultimaLP25, P.lpJanelaRodizio);
     const porData = (a, b) => (a.due < b.due ? -1 : a.due > b.due ? 1 : a.ord - b.ord);
     const lpMetas = mapaLP25;
     let fim = semA;
-    for (let sem = semA; sem <= exports.MAX_SEM; sem++) {
+    for (let sem = semA; sem <= MAX_SEM; sem++) {
         const ini = semInicio(start, sem), fimSem = dAdd(ini, 6);
         const diasSem = [0, 1, 2, 3, 4, 5, 6].map((d) => dAdd(ini, d)).filter((dt) => dt >= A && horasDia(cfg, dt) > 0);
         const semRev = ehRev(cfg, sem);
-        const perfil = perfilSemana(cfg, sem);
+        const perfil = perfilSemana(cfg, sem, P.concentracaoAteH);
         const concentrado = perfil.concentrado && diasSem.includes(perfil.concentrado) ? perfil.concentrado : null;
         const diasConteudo = diasSem.filter((d) => d !== concentrado);
         const diasQuestoes = concentrado ? [concentrado, ...diasConteudo] : diasSem;
@@ -318,7 +379,7 @@ function gerarPlanoBase(cfg, AS, ordemAulas, legprocs, fixos, ancora) {
         const tirar = (x) => devidos.splice(devidos.indexOf(x), 1);
         /** Coloca uma meta no dia do vencimento; se não couber, no dia mais livre a partir dele; depois, no mais livre da semana. */
         const encaixar = (x, dias, soNoDia) => {
-            const m = exports.DUR[x.tipo];
+            const m = DUR[x.tipo];
             let dt = dias.includes(x.due) && livre(x.due) >= m ? x.due : null;
             if (!dt && !soNoDia)
                 dt = maisLivre(dias.filter((d) => d >= x.due), m) || maisLivre(dias, m);
@@ -331,8 +392,8 @@ function gerarPlanoBase(cfg, AS, ordemAulas, legprocs, fixos, ancora) {
         };
         const encaixarTipo = (tipo, dias, soNoDia) => {
             for (const x of vencidos(tipo)) {
-                if (tipo === 'qu' && concentrado && dias.includes(concentrado) && livre(concentrado) >= exports.DUR.qu) {
-                    por(concentrado, x.id, exports.DUR.qu);
+                if (tipo === 'qu' && concentrado && dias.includes(concentrado) && livre(concentrado) >= DUR.qu) {
+                    por(concentrado, x.id, DUR.qu);
                     tirar(x);
                 }
                 else
@@ -344,12 +405,12 @@ function gerarPlanoBase(cfg, AS, ordemAulas, legprocs, fixos, ancora) {
             const meta = (id) => lpMetas.get(id);
             for (const dt of [...dias].sort()) {
                 const idsDia = () => Object.keys(plano).filter((id) => id.startsWith('lp:') && plano[id][0] === dt);
-                while (livre(dt) >= exports.DUR.lp) {
+                while (livre(dt) >= DUR.lp) {
                     let k = -1;
                     const rodizio = rodizioLP25.ordenar(lpCarry.map((id) => { var _a; return (_a = meta(id)) === null || _a === void 0 ? void 0 : _a.disc; }));
                     for (const disc of rodizio) {
                         const primeiro = lpCarry.findIndex((id) => { var _a; return ((_a = meta(id)) === null || _a === void 0 ? void 0 : _a.disc) === disc; });
-                        if (primeiro >= 0 && permitirLegproc25(lpCarry[primeiro], idsDia(), meta)) {
+                        if (primeiro >= 0 && permitirLegproc25(lpCarry[primeiro], idsDia(), meta, P.legproc)) {
                             k = primeiro;
                             break;
                         }
@@ -357,12 +418,12 @@ function gerarPlanoBase(cfg, AS, ordemAulas, legprocs, fixos, ancora) {
                     if (k < 0)
                         break;
                     const id = lpCarry.splice(k, 1)[0], m = meta(id);
-                    por(dt, id, exports.DUR.lp);
+                    por(dt, id, DUR.lp);
                     rodizioLP25.avancar(m.disc);
                     // Completa o primeiro bloco antes de procurar uma segunda disciplina.
                     const j = lpCarry.findIndex((x) => { var _a; return ((_a = meta(x)) === null || _a === void 0 ? void 0 : _a.disc) === m.disc; });
-                    if (j >= 0 && livre(dt) >= exports.DUR.lp && permitirLegproc25(lpCarry[j], idsDia(), meta))
-                        por(dt, lpCarry.splice(j, 1)[0], exports.DUR.lp);
+                    if (j >= 0 && livre(dt) >= DUR.lp && permitirLegproc25(lpCarry[j], idsDia(), meta, P.legproc))
+                        por(dt, lpCarry.splice(j, 1)[0], DUR.lp);
                 }
             }
         };
@@ -377,7 +438,7 @@ function gerarPlanoBase(cfg, AS, ordemAulas, legprocs, fixos, ancora) {
                 return false;
             const datas = Object.entries(plano).filter(([id]) => /^p[fp]:/.test(id) && +id.split(':')[1] === candidato).map(([, v]) => v[0]);
             const resto = ((emCurso === null || emCurso === void 0 ? void 0 : emCurso.ultima) && emCurso.ultima < dt) || datas.some((d) => d < dt) || (((_b = cfg.paginasLidas) === null || _b === void 0 ? void 0 : _b[candidato]) || 0) > 0 || (((_c = cfg.partesLidas) === null || _c === void 0 ? void 0 : _c[candidato]) || 0) > 0;
-            if (!resto && !pdfsEm(dt).has(candidato) && novosPDFDia27(plano, cfg, dt).size >= limitePDF27(cfg))
+            if (!resto && !pdfsEm(dt).has(candidato) && novosPDFDia27(plano, cfg, dt).size >= limitePDF27(cfg, P.tetoPdfDia))
                 return false;
             if (!emCurso) {
                 if (qi >= pdfQ.length)
@@ -418,9 +479,9 @@ function gerarPlanoBase(cfg, AS, ordemAulas, legprocs, fixos, ancora) {
                     for (const x of [...devidos].filter((y) => y.tipo === tipo).sort(porData)) {
                         const i = x.id.split(':')[1], antes = tipo === 'qu' && plano['fl:' + i] ? plano['fl:' + i][0] : (_a = plano['pf:' + i]) === null || _a === void 0 ? void 0 : _a[0];
                         const permitidos = (tipo === 'fl' ? dias.filter((d) => d !== concentrado) : diasQuestoes).filter((d) => !antes || d > antes);
-                        const dt = permitidos.find((d) => livre(d) >= exports.DUR[tipo]);
+                        const dt = permitidos.find((d) => livre(d) >= DUR[tipo]);
                         if (dt) {
-                            por(dt, x.id, exports.DUR[tipo]);
+                            por(dt, x.id, DUR[tipo]);
                             tirar(x);
                         }
                     }
@@ -430,7 +491,7 @@ function gerarPlanoBase(cfg, AS, ordemAulas, legprocs, fixos, ancora) {
             // Semana de revisão: sem aulas novas. Reserva Revisão + questões (1h30) por tema já estudado;
             // o tempo que sobrar recebe pendências e LegProc.
             const temas = Object.entries(plano).filter(([id, [d]]) => id.startsWith('pf:') && d < ini).length;
-            const reserva = planoRevisao(diasSem.map((dt) => livre(dt)), temas, diasSem.map((dt) => dt === concentrado));
+            const reserva = planoRevisao(diasSem.map((dt) => livre(dt)), temas, diasSem.map((dt) => dt === concentrado), P.durRevisao);
             diasSem.forEach((dt, k) => { if (reserva[k].usado)
                 carga[dt] = (carga[dt] || 0) + reserva[k].usado; });
             preencher(diasSem);
@@ -546,7 +607,7 @@ function calcularDomino(fonte, cfg, desde, opcoes, c) {
         if (p === d && !restos.has(i))
             n++; return n; };
     const anteriores = Object.entries(plano).filter(([id]) => id.startsWith('lp:')).sort((a, b) => a[1][0].localeCompare(b[1][0]));
-    const rodizioDomino25 = criarRodizioLP25(cfg.discs, anteriores.length ? ((_a = disciplinaMeta(anteriores[anteriores.length - 1][0])) !== null && _a !== void 0 ? _a : null) : null);
+    const rodizioDomino25 = criarRodizioLP25(cfg.discs, anteriores.length ? ((_a = disciplinaMeta(anteriores[anteriores.length - 1][0])) !== null && _a !== void 0 ? _a : null) : null, c.params.lpJanelaRodizio);
     const ordemRodizio25 = () => rodizioDomino25.ordenar(fila.filter((x) => x.t === 'lp').map((x) => disciplinaMeta(x.id)));
     const rankRodizio25 = (x, d, ordemRod) => {
         const ids = lpsDia(d);
@@ -574,7 +635,7 @@ function calcularDomino(fonte, cfg, desde, opcoes, c) {
         const i = indiceAula(x.id);
         if (ehPdf(x.t)) {
             const resto = x.detalhe.continuacao || (((_a = cfg.paginasLidas) === null || _a === void 0 ? void 0 : _a[i]) || 0) > 0 || (((_b = cfg.partesLidas) === null || _b === void 0 ? void 0 : _b[i]) || 0) > 0 || ix.pdfAntes.has(i);
-            if (!resto && !ix.pdfsHoje.has(i) && ix.novosHoje >= limitePDF27(cfg))
+            if (!resto && !ix.pdfsHoje.has(i) && ix.novosHoje >= limitePDF27(cfg, c.params.tetoPdfDia))
                 return false;
             const antes = ix.pdfs.some((y) => y !== x && ((!x.detalhe.continuacao && ordAula(indiceAula(y.id)) < ordAula(i)) || (indiceAula(y.id) === i && (y.data < x.data || (y.data === x.data && y.seq < x.seq)))));
             if (antes)
@@ -585,7 +646,7 @@ function calcularDomino(fonte, cfg, desde, opcoes, c) {
             if (ix.idsNaFila.has(pai))
                 return false;
             if (plano[pai]) {
-                const ideal = proxSemConteudo(cfg, plano[pai][0], x.t === 'fl' ? 1 : 2);
+                const ideal = idealRev(cfg, c.params, c.fracos, i, plano[pai][0], x.t === 'fl' ? 'fl' : 'qu');
                 if (d < ideal)
                     return false;
             }
@@ -602,7 +663,7 @@ function calcularDomino(fonte, cfg, desde, opcoes, c) {
                 return false;
         }
         if (x.t === 'lp') {
-            if (!permitirLegproc25(x.id, ix.lpsHoje, lpDe))
+            if (!permitirLegproc25(x.id, ix.lpsHoje, lpDe, c.params.legproc))
                 return false;
             const disc = disciplinaMeta(x.id);
             if (!x.detalhe.continuacao && !ix.ordemRod.includes(disc))
@@ -621,7 +682,7 @@ function calcularDomino(fonte, cfg, desde, opcoes, c) {
         let livre = capacidade(d) - ocupado(d);
         if (livre <= 0)
             continue;
-        const ultimo = perfilSemana(cfg, semDe(cfg.start, d)).concentrado;
+        const ultimo = perfilSemana(cfg, semDe(cfg.start, d), c.params.concentracaoAteH).concentrado;
         while (livre > 0) {
             const idsNaFila = new Set(fila.map((x) => x.id));
             const pdfs = fila.filter((x) => ehPdf(x.t));
@@ -677,7 +738,7 @@ function calcularDomino(fonte, cfg, desde, opcoes, c) {
     return { plano, detalhes, fim };
 }
 /** Interrupções no formato da plataforma (sobras/paginasLidas) → metas remanejadas do modelo. */
-function remanejadasEfetivas(cfg, AS, fixos, base) {
+function remanejadasEfetivas(cfg, AS, fixos, base, P) {
     var _a;
     const out = { ...(cfg.remanejadas || {}) };
     const desde = proximoEstudo(cfg, base) || base;
@@ -691,7 +752,7 @@ function remanejadasEfetivas(cfg, AS, fixos, base) {
         const i = +k, id = 'pf:' + i, pags = +(((_a = AS[i]) === null || _a === void 0 ? void 0 : _a[3]) || 0);
         if (out[id] || fixos[id] || !AS[i] || !(+lida > 0) || !(pags > +lida))
             continue;
-        out[id] = { desde, minutos: minPdf(pags - +lida, cfg.vel), detalhe: { continuacao: true, pai: id, origem: id, paginaInicio: +lida + 1, paginaFim: pags, totalPaginas: pags } };
+        out[id] = { desde, minutos: minPdf(pags - +lida, cfg.vel, P.velPadrao), detalhe: { continuacao: true, pai: id, origem: id, paginaInicio: +lida + 1, paginaFim: pags, totalPaginas: pags } };
     }
     return out;
 }
@@ -703,14 +764,17 @@ function remanejadasEfetivas(cfg, AS, fixos, base) {
 function gerarPlano(cfg, AS, LP, fixos, ancora, ctx = {}) {
     var _a, _b;
     fixos = fixos || {};
+    const P = resolverParams(ctx.params);
     const feitas = new Set(ctx.feitas || []);
     const base = ancora && ancora > cfg.start ? ancora : cfg.start;
-    const remanejadas = remanejadasEfetivas(cfg, AS, fixos, base);
+    const remanejadas = remanejadasEfetivas(cfg, AS, fixos, base, P);
     const c = { ...cfg, remanejadas };
     const lista = (LP || []).filter((x) => x && x.id);
     const ctxI = {
         AS, LP: lista, lpMap: new Map(lista.map((x) => [x.id, x])), lpPos: new Map(lista.map((x, k) => [x.id, k])),
-        ordem: ctx.ordem && ctx.ordem.length ? ctx.ordem.filter((i) => AS[i]) : AS.map((_, i) => i), feitas, usados: new Set(ctx.usados || []),
+        ordem: ctx.ordem && ctx.ordem.length ? ctx.ordem.filter((i) => AS[i]) : AS.map((_, i) => i), feitas, usados: new Set(ctx.usados || []), params: P,
+        // inteligência de desempenho: vazio (e ignorado) enquanto a flag estiver desligada → plano idêntico ao 2.8
+        fracos: P.desempenho.ativo ? temasFracos(ctx.notas, P.desempenho.acertoMin) : new Set(),
     };
     // gerarPlanoCatalogo: fila de aulas sem o histórico prévio; metas remanejadas ficam presas na data pedida
     const anteriores = indicesAnteriores(c, AS);
@@ -726,7 +790,7 @@ function gerarPlano(cfg, AS, LP, fixos, ancora, ctx = {}) {
             continue;
         presos[id] = [r.desde < base ? base : r.desde, r.minutos / 60];
     }
-    const g = gerarPlanoBase(c, AS, ctxI.ordem.filter((i) => !anteriores.has(i)), lista, presos, ancora);
+    const g = gerarPlanoBase(c, AS, ctxI.ordem.filter((i) => !anteriores.has(i)), lista, presos, ancora, P, ctxI.fracos);
     for (const id of Object.keys(remanejadas))
         if (g.plano[id])
             g.fim = Math.max(g.fim, semDe(c.start, g.plano[id][0]));

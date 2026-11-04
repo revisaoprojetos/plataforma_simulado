@@ -46,10 +46,15 @@ export async function salvarProdutoAction(input: Partial<Produto> & { id?: strin
     gamificacao: input.gamificacao ?? false,
   }
   if (!campos.nome) return { error: 'Informe o nome do produto.' }
+  // Formato de exibição do conteúdo: coluna NOVA (migr 20261104000000). Gravada À PARTE e de forma
+  // TOLERANTE — se a coluna ainda não existe, o update falha em silêncio e o resto do save segue normal.
+  const LAYOUTS = ['netflix', 'grade', 'trilha', 'trilha_imagem', 'lista']
+  const layout = input.vitrine_layout && LAYOUTS.includes(input.vitrine_layout) ? input.vitrine_layout : null
   if (input.id) {
     const { error } = await svc.from('simulado_produtos').update(campos).eq('id', input.id).eq('tenant_id', g.tenantId)
     if (error) return { error: error.message }
-    await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_produtos', entidadeId: input.id, depois: campos, tenantId: g.tenantId })
+    if (layout) await svc.from('simulado_produtos').update({ vitrine_layout: layout }).eq('id', input.id).eq('tenant_id', g.tenantId)
+    await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_produtos', entidadeId: input.id, depois: { ...campos, vitrine_layout: layout }, tenantId: g.tenantId })
     revalidatePath('/admin/produtos'); revalidatePath('/admin/conteudos/produtos'); return { ok: true as const, id: input.id }
   }
   // slug é NOT NULL no schema (tabela compartilhada com o módulo de regras). Gera a partir do nome
@@ -244,5 +249,56 @@ export async function definirAcessoGratuitoProdutoAction(produtoId: string, valo
   await registrarAudit({ operacao: valor ? 'LIBERAR' : 'BLOQUEAR', entidade: 'simulado_produtos', entidadeId: produtoId, depois: { acesso_gratuito: !!valor } })
   revalidatePath('/admin/produtos')
   revalidatePath(`/admin/conteudos/produtos/${produtoId}`)
+  return { ok: true }
+}
+
+// ───────── modo "em edição / manutenção": bloqueio TOTAL de acesso ao produto ─────────
+
+/** Liga/desliga o bloqueio TOTAL de acesso do produto (até matriculados veem a mensagem de atualização).
+ *  Grava SÓ a coluna `acesso_bloqueado` (não é full-replace do produto). Audita BLOQUEAR/LIBERAR. */
+/**
+ * Estado ÚNICO do produto (um update atômico em `ativo` + `acesso_bloqueado`):
+ *  - publicado       → ativo=true,  acesso_bloqueado=false  (acesso normal)
+ *  - em_atualizacao  → ativo=true,  acesso_bloqueado=true   (TODOS bloqueados, até pagantes; aluno vê "Produto em atualização")
+ *  - rascunho        → ativo=false, acesso_bloqueado=false  (fora do ar: some da lista e a página dá 404)
+ * Sem a coluna `acesso_bloqueado` (migração pendente): publicado/rascunho funcionam só com `ativo`;
+ * em_atualizacao retorna erro pedindo a migração.
+ */
+export type EstadoProduto = 'publicado' | 'em_atualizacao' | 'rascunho'
+export async function definirEstadoProdutoAction(produtoId: string, estado: EstadoProduto): Promise<{ ok?: boolean; error?: string }> {
+  const g = await guard(true); if ('error' in g) return { error: g.error }
+  if (!['publicado', 'em_atualizacao', 'rascunho'].includes(estado)) return { error: 'Estado inválido.' }
+  const svc = createAdminClient()
+  const ativo = estado !== 'rascunho'
+  const bloqueado = estado === 'em_atualizacao'
+  const agora = new Date().toISOString()
+  let r: any = await svc.from('simulado_produtos').update({ ativo, acesso_bloqueado: bloqueado, atualizado_em: agora })
+    .eq('id', produtoId).eq('tenant_id', g.tenantId).select('id').maybeSingle()
+  if (r.error && /acesso_bloqueado|column|schema cache|does not exist/i.test(r.error.message)) {
+    if (bloqueado) return { error: 'Aplique a migração 20261104120000_produto_acesso_bloqueado.sql para usar "Em atualização".' }
+    r = await svc.from('simulado_produtos').update({ ativo, atualizado_em: agora }).eq('id', produtoId).eq('tenant_id', g.tenantId).select('id').maybeSingle()
+  }
+  if (r.error) return { error: r.error.message }
+  if (!r.data) return { error: 'Produto não encontrado.' }
+  await registrarAudit({ operacao: bloqueado ? 'BLOQUEAR' : 'LIBERAR', entidade: 'simulado_produtos', entidadeId: produtoId, depois: { estado, ativo, acesso_bloqueado: bloqueado }, tenantId: g.tenantId })
+  revalidatePath(`/admin/conteudos/produtos/${produtoId}`)
+  revalidatePath('/admin/conteudos/produtos')
+  revalidatePath('/aluno/extensivos')
+  return { ok: true }
+}
+
+export async function definirAcessoBloqueadoAction(produtoId: string, bloqueado: boolean): Promise<{ ok?: boolean; error?: string }> {
+  const g = await guard(true); if ('error' in g) return { error: g.error }
+  const svc = createAdminClient()
+  const { data, error } = await svc.from('simulado_produtos')
+    .update({ acesso_bloqueado: !!bloqueado, atualizado_em: new Date().toISOString() })
+    .eq('id', produtoId).eq('tenant_id', g.tenantId).select('id').maybeSingle()
+  if (error) {
+    return { error: /acesso_bloqueado|column|schema cache|does not exist/i.test(error.message) ? 'Aplique a migração 20261104120000_produto_acesso_bloqueado.sql.' : error.message }
+  }
+  if (!data) return { error: 'Produto não encontrado.' }
+  await registrarAudit({ operacao: bloqueado ? 'BLOQUEAR' : 'LIBERAR', entidade: 'simulado_produtos', entidadeId: produtoId, depois: { acesso_bloqueado: !!bloqueado }, tenantId: g.tenantId })
+  revalidatePath(`/admin/conteudos/produtos/${produtoId}`)
+  revalidatePath('/aluno/extensivos')
   return { ok: true }
 }

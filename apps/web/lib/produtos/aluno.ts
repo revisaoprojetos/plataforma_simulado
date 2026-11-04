@@ -1,6 +1,6 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
-import { ITENS_PASTA } from './tipos'
+import { ITENS_PASTA, type VitrineLayout } from './tipos'
 import { curriculoDoAluno, type ModuloAluno } from './curriculo-aluno'
 import { acessoPorSegmento, acessosPorSegmentoDoAluno } from '@/lib/segmentos/visibilidade'
 
@@ -162,7 +162,7 @@ export interface VitrineAluno {
   id: string; slug: string; nome: string; tipo: string; descricao: string | null
   cor: string | null; cor_secundaria: string | null; tema: string; logo_url: string | null
   capa_url: string | null; banner_url: string | null; banner_mobile_url: string | null
-  expira_em: string | null; secoes: VitrineSecao[]
+  vitrine_layout: VitrineLayout; expira_em: string | null; secoes: VitrineSecao[]
 }
 
 function hrefDoItem(tipo: string, area: string | null): string {
@@ -184,6 +184,12 @@ export async function vitrineDoAluno(tenantId: string, estudanteId: string, slug
   const prod = p as any
   const ass = await acessoAoProduto(svc, tenantId, estudanteId, prod.id)
   if (!ass) return null
+  // Formato de exibição do conteúdo: coluna nova (migr 20261104000000) — lida TOLERANTE (sem ela, 'netflix').
+  let vitrineLayout: VitrineLayout = 'netflix'
+  try {
+    const vl: any = await svc.from('simulado_produtos').select('vitrine_layout').eq('tenant_id', tenantId).eq('id', prod.id).maybeSingle()
+    if (!vl.error && vl.data?.vitrine_layout) vitrineLayout = vl.data.vitrine_layout
+  } catch { /* coluna ausente → netflix */ }
   const { data: secoes } = await svc.from('simulado_produto_secoes').select('id, ordem, tipo, nome, tamanho, config').eq('tenant_id', tenantId).eq('produto_id', prod.id).eq('ativo', true).order('ordem', { ascending: true })
 
   // Resolve nomes dos itens dos carrosséis em lote por tipo.
@@ -217,7 +223,7 @@ export async function vitrineDoAluno(tenantId: string, estudanteId: string, slug
     id: prod.id, slug: prod.slug, nome: prod.nome, tipo: prod.tipo, descricao: prod.descricao ?? null,
     cor: prod.cor ?? null, cor_secundaria: prod.cor_secundaria ?? null, tema: prod.tema ?? 'claro', logo_url: prod.logo_url ?? null,
     capa_url: prod.capa_url ?? null, banner_url: prod.banner_url ?? null, banner_mobile_url: prod.banner_mobile_url ?? null,
-    expira_em: (ass as any).expira_em ?? null, secoes: secoesOut,
+    vitrine_layout: vitrineLayout, expira_em: (ass as any).expira_em ?? null, secoes: secoesOut,
   }
 }
 
@@ -261,6 +267,9 @@ export interface ExtensivoDetalhe extends ExtensivoCard {
   simulados: string[]
   pastas: { nome: string; area: string | null }[]
   cronogramas: string[]
+  /** Modo "em edição/manutenção" do produto: true = acesso TOTALMENTE bloqueado (mostra tela de atualização).
+   *  Flag ADICIONAL ao gate de entitlement — NÃO vira null (null = 404); o aluno vê a mensagem. */
+  bloqueado: boolean
 }
 
 /** Detalhe de UM extensivo do aluno (pela slug). null se não existe OU o aluno não o tem (gate). */
@@ -270,6 +279,13 @@ export async function getExtensivoDoAluno(tenantId: string, estudanteId: string,
   if (!p) return null
   const ass = await acessoAoProduto(svc, tenantId, estudanteId, (p as any).id)
   if (!ass) return null // o aluno não tem este produto (nem assinatura nem grupo) → não vê
+  // Modo "em edição/manutenção": bloqueio TOTAL. Leitura TOLERANTE — sem a coluna (migr 20261104120000
+  // não aplicada), false. NÃO retorna null: o aluno deve ver a MENSAGEM, não um 404.
+  let bloqueado = false
+  try {
+    const b: any = await svc.from('simulado_produtos').select('acesso_bloqueado').eq('tenant_id', tenantId).eq('id', (p as any).id).maybeSingle()
+    if (!b.error && b.data) bloqueado = !!b.data.acesso_bloqueado
+  } catch { /* coluna ausente → não bloqueado */ }
   const { data: itens } = await svc.from('simulado_produto_itens').select('tipo_item, item_id').eq('tenant_id', tenantId).eq('produto_id', (p as any).id).eq('ativo', true)
   const porTipo = { grupo: [] as string[], simulado: [] as string[], pasta: [] as string[], cronograma: [] as string[] }
   for (const it of (itens ?? []) as any[]) {
@@ -296,6 +312,7 @@ export async function getExtensivoDoAluno(tenantId: string, estudanteId: string,
     simulados: si.map((r: any) => r.titulo).filter(Boolean),
     pastas: pa.map((r: any) => ({ nome: r.nome, area: r.folder_area ?? null })).filter((x: any) => x.nome),
     cronogramas: cr.map((r: any) => r.nome).filter(Boolean),
+    bloqueado,
   }
 }
 

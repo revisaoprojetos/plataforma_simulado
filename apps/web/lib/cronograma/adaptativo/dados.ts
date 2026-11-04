@@ -8,6 +8,8 @@ import type { Conteudo } from './conteudo'
 import { VERSAO_MOTOR, type ItemLP } from './motor28'
 import { CATALOGO_HTML, nomeDisciplina } from './catalogo-html'
 import { construirSnapshot, type AdaptativoSnapshot } from './snapshot'
+import { lerParamsMotor } from './config-metas'
+import { catalogoIdDoTenant } from './catalogo-override-db'
 
 // Camada server do Cronograma Adaptativo. Backend-first: a página chama `carregarAdaptativo`
 // e recebe o snapshot pronto. Mutações via estas funções (expostas por rotas /api, pois
@@ -110,6 +112,16 @@ export function fixosPreservados(plano: Plano, metas: MetaRow[], ancora: DataISO
   return out
 }
 
+/** Anotações por meta (grau/res/err) p/ a inteligência de desempenho do motor (ctx.notas). */
+function notasDeMetas(metas: MetaRow[]): Record<string, { grau?: number; res?: number; err?: number }> {
+  const out: Record<string, { grau?: number; res?: number; err?: number }> = {}
+  for (const m of metas) {
+    if (m.grau == null && m.res == null && m.err == null) continue
+    out[m.meta_id] = { ...(m.grau != null ? { grau: m.grau } : {}), ...(m.res != null ? { res: m.res } : {}), ...(m.err != null ? { err: m.err } : {}) }
+  }
+  return out
+}
+
 const ehLpSemanal = (id: string) => /^lp:\d+:\d+$/.test(id)
 type CfgPlano = Cfg & { motor?: string; catalogo?: string; maisPDFull?: boolean; lpIgnorar?: string[]; lpLegado?: Record<string, ItemLP>; ultimosTemas?: Record<string, number> }
 
@@ -134,9 +146,9 @@ function ultimoArtigo(texto: string): number | null {
 }
 
 /** Carimba cfg com o motor/catálogo atuais e disciplinas canônicas (planos gerados agora já estão corretos). */
-function carimbar(cfg: CfgPlano, anterior?: CfgPlano | null): CfgPlano {
+function carimbar(cfg: CfgPlano, anterior?: CfgPlano | null, catalogoId: string = CATALOGO_HTML.id): CfgPlano {
   return {
-    ...cfg, motor: VERSAO_MOTOR, catalogo: CATALOGO_HTML.id, discs: normalizarDiscs(cfg.discs),
+    ...cfg, motor: VERSAO_MOTOR, catalogo: catalogoId, discs: normalizarDiscs(cfg.discs),
     ...(cfg.ultimosTemas ? { ultimosTemas: normalizarUltimos(cfg.ultimosTemas) } : {}),
     ...(!cfg.lpLegado && anterior?.lpLegado ? { lpLegado: anterior.lpLegado } : {}),
     ...(!cfg.lpIgnorar && anterior?.lpIgnorar ? { lpIgnorar: anterior.lpIgnorar } : {}),
@@ -157,7 +169,9 @@ function carimbar(cfg: CfgPlano, anterior?: CfgPlano | null): CfgPlano {
  */
 export async function migrarPlano(svc: SupabaseClient, tenantId: string, row: PlanoRow): Promise<PlanoRow> {
   const cfg = (row.cfg || {}) as CfgPlano
-  if (row.exemplo || cfg.catalogo === CATALOGO_HTML.id || !row.plano || !Object.keys(row.plano).length) return row
+  // id do catálogo EFETIVO (base + versão do overlay do admin): salvar o Catálogo de metas muda o id → o plano migra 1x.
+  const catId = await catalogoIdDoTenant(svc, tenantId)
+  if (row.exemplo || cfg.catalogo === catId || !row.plano || !Object.keys(row.plano).length) return row
   try {
     const banco = await carregarConteudoBanco(svc, tenantId)
     const metas = await lerMetas(svc, tenantId, row.id)
@@ -185,7 +199,8 @@ export async function migrarPlano(svc: SupabaseClient, tenantId: string, row: Pl
         lpLegado[id] ||= { id, disc: (doc && discDoDoc.get(doc)) || '', lei: doc || id, texto: banco.WLP?.[+s]?.[+j] || 'LegProc', doc }
         if (doc && feitas.has(id)) { const p = novasDoDoc(doc)[0]; if (p) ignorar.add(p.id) }
       } else {
-        const it = autoMap.get(id)
+        // corte automático antigo OU meta do catálogo-base desativada no admin (Catálogo de metas) que já tem histórico
+        const it = autoMap.get(id) ?? (banco.base?.LP ?? []).find((x) => x.id === id)
         if (it) lpLegado[id] ||= { ...it, disc: nomeDisciplina(it.disc) }
       }
     }
@@ -204,8 +219,8 @@ export async function migrarPlano(svc: SupabaseClient, tenantId: string, row: Pl
       if (p) ignorar.add(p.id)
     }
 
-    const cfg2 = carimbar({ ...cfg, maisPDFull: cfg.maisPDFull ?? true, lpLegado, lpIgnorar: [...ignorar] })
-    const r = gerarPlano(cfg2, banco.AS, banco.WLP, fixos, hoje, banco.LP, { ordem: banco.ordem, feitas, usados: metas.map((m) => m.meta_id) })
+    const cfg2 = carimbar({ ...cfg, maisPDFull: cfg.maisPDFull ?? true, lpLegado, lpIgnorar: [...ignorar] }, undefined, catId)
+    const r = gerarPlano(cfg2, banco.AS, banco.WLP, fixos, hoje, banco.LP, { ordem: banco.ordem, feitas, usados: metas.map((m) => m.meta_id), params: await lerParamsMotor(svc, tenantId), notas: notasDeMetas(metas) })
     const revs = Object.fromEntries(Object.entries(row.revs || {}).filter(([k]) => semInicio(cfg2.start, +k) <= hoje))
     try {
       const corpo = new Blob([JSON.stringify({ planoId: row.id, em: new Date().toISOString(), cfg: row.cfg, plano: row.plano, fim: row.fim, revs: row.revs })], { type: 'application/json' })
@@ -213,7 +228,7 @@ export async function migrarPlano(svc: SupabaseClient, tenantId: string, row: Pl
     } catch { /* backup best-effort (já existe = migrado antes) */ }
     const { error } = await svc.from(T_PLANO)
       .update({ cfg: cfg2 as unknown as Record<string, unknown>, plano: r.plano as unknown as Record<string, unknown>, fim: r.fim, revs, atualizado_em: new Date().toISOString() })
-      .eq('id', row.id).or(`cfg->>catalogo.is.null,cfg->>catalogo.neq.${CATALOGO_HTML.id}`) // concorrência: só uma migração grava
+      .eq('id', row.id).or(`cfg->>catalogo.is.null,cfg->>catalogo.neq.${catId}`) // concorrência: só uma migração grava
     if (error) return row
     return { ...row, cfg: cfg2, plano: r.plano, fim: r.fim, revs }
   } catch {
@@ -259,9 +274,10 @@ export async function gerarAdaptativo(
   let fixos: Record<string, [DataISO, number]> = {}
   const metasAlvo = alvo ? await lerMetas(svc, tenantId, alvo.id) : []
   if (alvo && opc.ancora) fixos = fixosPreservados(alvo.plano || {}, metasAlvo, opc.ancora)
-  cfg = carimbar(cfg as CfgPlano, alvo?.cfg as CfgPlano | undefined)
+  cfg = carimbar(cfg as CfgPlano, alvo?.cfg as CfgPlano | undefined, await catalogoIdDoTenant(svc, tenantId))
   const r = gerarPlano(cfg, conteudo.AS, conteudo.WLP, fixos, opc.ancora || null, conteudo.LP, {
     ordem: conteudo.ordem, feitas: metasAlvo.filter((m) => m.estado === 'done').map((m) => m.meta_id), usados: metasAlvo.map((m) => m.meta_id),
+    params: await lerParamsMotor(svc, tenantId), notas: notasDeMetas(metasAlvo),
   })
   const campos = {
     titulo: opc.titulo ?? alvo?.titulo ?? 'Meu cronograma',
@@ -436,8 +452,9 @@ export async function sincronizarDoc(svc: SupabaseClient, tenantId: string, estI
     // O alvo é lido ANTES de gravar: preserva a descrição do LegProc antigo e carimba o catálogo quando o plano
     // veio do motor atual do iframe (um iframe antigo em cache não carimba → a correção roda no próximo acesso).
     const alvo = await lerPlanoRow(svc, tenantId, estId)
-    if (cfg.motor === VERSAO_MOTOR) cfg = carimbar(cfg, alvo?.cfg as CfgPlano | undefined)
-    else if (cfg.catalogo === CATALOGO_HTML.id) cfg = { ...cfg, catalogo: undefined }
+    const catId = await catalogoIdDoTenant(svc, tenantId)
+    if (cfg.motor === VERSAO_MOTOR) cfg = carimbar(cfg, alvo?.cfg as CfgPlano | undefined, catId)
+    else if (cfg.catalogo === catId) cfg = { ...cfg, catalogo: undefined }
     const campos = {
       cfg: cfg as unknown as Record<string, unknown>,
       plano: (doc.plano || {}) as Record<string, unknown>,

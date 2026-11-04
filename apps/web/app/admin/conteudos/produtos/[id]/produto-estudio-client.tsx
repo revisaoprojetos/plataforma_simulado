@@ -1,14 +1,14 @@
 'use client'
 
 // Editor de Produto do Estúdio (telas Produto / ProdutoConteudos / ProdutoGrupos):
-// cabeçalho FIEL (logo + eyebrow/título + meta + status "Não listado ▾" · Ver como aluno · ⋯ · Publicar alterações)
+// cabeçalho FIEL (logo + eyebrow/título + meta + estado "Publicado ▾" · Ver como aluno · ⋯ · Publicar alterações)
 // e abas sublinhadas (Informações · Conteúdos · Vitrine · Grupos de acesso · Visibilidade).
 // Reusa as actions de produção (salvarProdutoAction/salvarGruposAction/...) e as tabelas novas do currículo.
 
 import { useRef, useState, useTransition } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
-  ArrowLeft, Boxes, Copy, FolderInput, Trash2, MoreVertical, Eye, Check, ChevronDown, Wrench, Loader2,
+  ArrowLeft, Boxes, Copy, FolderInput, Trash2, MoreVertical, Eye, Check, ChevronDown, Wrench, Loader2, Save, Globe,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -21,7 +21,7 @@ import { formatBrt } from '@/lib/brt'
 import { navProgressStart, navProgressDone } from '@/lib/nav-progress'
 import { PRODUTO_TIPOS, type Produto, type ProdutoLeve } from '@/lib/produtos/tipos'
 import type { InstrutorRow, ResumoProduto, PastaProdutoFlat } from '@/lib/produtos/estudio'
-import { excluirProdutoAction, salvarProdutoAction } from '@/app/admin/produtos/actions'
+import { definirEstadoProdutoAction, excluirProdutoAction, salvarProdutoAction, type EstadoProduto } from '@/app/admin/produtos/actions'
 import { MoverDialog, DuplicarProdutoDialog } from '../produto-modais'
 import { AbaInformacoes } from './aba-informacoes'
 import { AbaConteudos } from './aba-conteudos'
@@ -38,7 +38,7 @@ function payloadCompleto(p: ProdutoLeve, over: Partial<Produto> = {}): Partial<P
     id: p.id, nome: p.nome, tipo: p.tipo, descricao: p.descricao, tier: p.tier, ativo: p.ativo,
     cor: p.cor, cor_secundaria: p.cor_secundaria, tema: p.tema, logo_url: p.logo_url, capa_url: p.capa_url,
     banner_url: p.banner_url, banner_mobile_url: p.banner_mobile_url, gamificacao: p.gamificacao,
-    validade_tipo: p.validade_tipo, validade_dias: p.validade_dias, validade_data: p.validade_data, ...over,
+    vitrine_layout: p.vitrine_layout, validade_tipo: p.validade_tipo, validade_dias: p.validade_dias, validade_data: p.validade_data, ...over,
   }
 }
 
@@ -82,22 +82,49 @@ export function ProdutoEstudioClient({
     toast.success('Produto enviado para a Lixeira.'); router.push('/admin/conteudos/produtos')
   }
 
-  function definirSituacao(ativo: boolean) {
-    if (ativo === produto.ativo) return
+  // Estado ÚNICO do produto: Publicado · Em atualização (bloqueio TOTAL com mensagem) · Rascunho (fora do ar).
+  const estadoAtual: EstadoProduto = !produto.ativo ? 'rascunho' : produto.acesso_bloqueado ? 'em_atualizacao' : 'publicado'
+  async function definirEstado(novo: EstadoProduto) {
+    if (novo === estadoAtual) return
+    // Tirar do ar um produto que está ao vivo (em atualização/rascunho) afeta TODOS os alunos → confirma.
+    if (estadoAtual === 'publicado') {
+      const ok = await confirmar(novo === 'em_atualizacao'
+        ? { titulo: 'Colocar em atualização?', mensagem: `"${produto.nome}" ficará inacessível para TODOS os alunos (até matriculados) — eles verão "Produto em atualização". Edite à vontade e volte a Publicado quando terminar.`, confirmar: 'Bloquear acesso', destrutivo: true }
+        : { titulo: 'Mover para rascunho?', mensagem: `"${produto.nome}" sai do ar: some da lista dos alunos e a página deixa de abrir, mesmo para matriculados.`, confirmar: 'Mover para rascunho', destrutivo: true })
+      if (!ok) return
+    }
     start(async () => {
-      const r = await salvarProdutoAction(payloadCompleto(produto, { ativo }))
+      const r = await definirEstadoProdutoAction(produto.id, novo)
       if ('error' in r && r.error) { toast.error(r.error); return }
-      toast.success(ativo ? 'Produto listado.' : 'Produto definido como não listado.'); router.refresh()
+      toast.success(novo === 'publicado' ? 'Produto publicado — acesso liberado.' : novo === 'em_atualizacao' ? 'Produto em atualização — acesso bloqueado.' : 'Produto movido para rascunho.')
+      router.refresh()
     })
   }
+  const ESTADOS: { v: EstadoProduto; label: string; desc: string; dot: string }[] = [
+    { v: 'publicado', label: 'Publicado', desc: 'Ao vivo: alunos com acesso entram normalmente.', dot: 'bg-emerald-500' },
+    { v: 'em_atualizacao', label: 'Em atualização', desc: 'Bloqueia TODOS (até pagantes) com aviso. Use para editar com segurança.', dot: 'bg-amber-500' },
+    { v: 'rascunho', label: 'Rascunho', desc: 'Fora do ar: some da lista e não abre para ninguém.', dot: 'bg-muted-foreground' },
+  ]
+  const estadoInfo = ESTADOS.find((e) => e.v === estadoAtual)!
+  const aoVivo = estadoAtual === 'publicado'
 
-  function publicar() {
+  async function publicar() {
+    // PUBLICADO = ao vivo → publicar manda as alterações ao ar NA HORA: confirma antes (sugere "Em atualização"
+    // p/ editar com segurança). Em atualização / Rascunho = ninguém vê → salva direto.
+    if (aoVivo) {
+      const ok = await confirmar({
+        titulo: 'Publicar alterações?',
+        mensagem: `"${produto.nome}" está publicado — ao publicar, as alterações ficam visíveis para os alunos imediatamente. Para editar sem que ninguém veja, mude antes o estado para "Em atualização".`,
+        confirmar: 'Publicar agora',
+      })
+      if (!ok) return
+    }
     if (aba === 'informacoes' && publicarRef.current) { publicarRef.current(); return }
     // Nas demais abas as alterações já são salvas por seção; aqui só confirmamos e tocamos atualizado_em.
     start(async () => {
       const r = await salvarProdutoAction(payloadCompleto(produto))
       if ('error' in r && r.error) { toast.error(r.error); return }
-      toast.success('Alterações publicadas.'); router.refresh()
+      toast.success(aoVivo ? 'Alterações publicadas para os alunos.' : estadoAtual === 'em_atualizacao' ? 'Alterações salvas (produto em atualização — alunos não veem).' : 'Alterações salvas (rascunho).'); router.refresh()
     })
   }
 
@@ -147,20 +174,28 @@ export function ProdutoEstudioClient({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            {/* Situação (listado / não listado) */}
+            {/* Estado único: Publicado · Em atualização (bloqueio total) · Rascunho (fora do ar) */}
             <DropdownMenu>
               <DropdownMenuTrigger
-                aria-label="Situação do produto"
+                aria-label="Estado do produto"
                 disabled={!podeEditar || pending}
                 className="inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium outline-none transition-colors hover:bg-muted data-popup-open:bg-muted disabled:opacity-60"
               >
-                <span className={cn('h-2 w-2 rounded-full', produto.ativo ? 'bg-emerald-500' : 'bg-amber-500')} />
-                {produto.ativo ? 'Listado' : 'Não listado'}
+                <span className={cn('h-2 w-2 rounded-full', estadoInfo.dot)} />
+                {estadoInfo.label}
                 <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => definirSituacao(true)}><span className="h-2 w-2 rounded-full bg-emerald-500" />Listado{produto.ativo && <Check className="ml-auto h-4 w-4" />}</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => definirSituacao(false)}><span className="h-2 w-2 rounded-full bg-amber-500" />Não listado{!produto.ativo && <Check className="ml-auto h-4 w-4" />}</DropdownMenuItem>
+              <DropdownMenuContent align="end" className="w-72">
+                {ESTADOS.map((e) => (
+                  <DropdownMenuItem key={e.v} onClick={() => void definirEstado(e.v)} className="items-start gap-2 py-2">
+                    <span className={cn('mt-1.5 h-2 w-2 shrink-0 rounded-full', e.dot)} />
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium">{e.label}</span>
+                      <span className="block text-xs text-muted-foreground">{e.desc}</span>
+                    </span>
+                    {e.v === estadoAtual && <Check className="mt-0.5 h-4 w-4 shrink-0" />}
+                  </DropdownMenuItem>
+                ))}
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -186,7 +221,11 @@ export function ProdutoEstudioClient({
             )}
 
             {podeEditar && (
-              <Button onClick={publicar} disabled={pending}>{pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}Publicar alterações</Button>
+              <Button onClick={publicar} disabled={pending}
+                title={aoVivo ? 'O produto está publicado — as alterações vão ao ar para os alunos agora' : 'Salva as alterações — os alunos só veem quando o estado for "Publicado"'}>
+                {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : aoVivo ? <Globe className="h-4 w-4" /> : <Save className="h-4 w-4" />}
+                {aoVivo ? 'Publicar alterações' : 'Salvar alterações'}
+              </Button>
             )}
           </div>
         </div>

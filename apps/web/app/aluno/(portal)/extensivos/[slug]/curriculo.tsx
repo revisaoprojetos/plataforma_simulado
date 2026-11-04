@@ -9,8 +9,9 @@
 // Os dados vêm prontos do servidor (curriculoDoAluno: disponibilidade, links e "lida" já resolvidos).
 import { useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
-import { ChevronLeft, ChevronRight, ClipboardList, ExternalLink, FileText, Lock, PlayCircle, Search, CheckCircle2, X, Play } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ChevronDown, ClipboardList, ExternalLink, FileText, Lock, PlayCircle, Search, CheckCircle2, X, Play } from 'lucide-react'
 import type { ModuloAluno, AulaAluno } from '@/lib/produtos/curriculo-aluno'
+import type { VitrineLayout } from '@/lib/produtos/tipos'
 import { SUBTIPO_LABEL } from '@/lib/produtos/curriculo'
 
 const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
@@ -48,7 +49,7 @@ function fileiras(modulos: ModuloAluno[]) {
 
 /* ═════════════════════════ VITRINE (página do extensivo) ═════════════════════════ */
 
-export function ModulosVitrine({ modulos, slug, cor }: { modulos: ModuloAluno[]; slug: string; cor: string }) {
+export function ModulosVitrine({ modulos, slug, cor, layout = 'netflix' }: { modulos: ModuloAluno[]; slug: string; cor: string; layout?: VitrineLayout }) {
   const linhas = useMemo(() => fileiras(modulos), [modulos])
   const geral = useMemo(() => {
     const a = modulos.flatMap(todasAulas), lidas = a.filter((x) => x.lida).length
@@ -88,7 +89,194 @@ export function ModulosVitrine({ modulos, slug, cor }: { modulos: ModuloAluno[];
         )}
       </div>
 
-      {linhas.map((l) => <Fileira key={l.titulo} titulo={l.titulo} itens={l.itens} slug={slug} cor={cor} />)}
+      {layout === 'grade'
+        ? linhas.map((l) => <GradeFileira key={l.titulo} titulo={l.titulo} itens={l.itens} slug={slug} cor={cor} />)
+        : layout === 'lista'
+          ? <ListaModulos modulos={modulos} slug={slug} cor={cor} />
+          : layout === 'trilha_imagem'
+            ? <TrilhaImagem modulos={modulos} slug={slug} cor={cor} />
+            : layout === 'trilha'
+            ? <TrilhaModulos modulos={modulos} slug={slug} cor={cor} />
+            : linhas.map((l) => <Fileira key={l.titulo} titulo={l.titulo} itens={l.itens} slug={slug} cor={cor} />)}
+    </div>
+  )
+}
+
+/* ── Grade: as mesmas fileiras, mas cada uma numa GRADE de pôsteres (sem rolar pro lado) ── */
+function GradeFileira({ titulo, itens, slug, cor }: { titulo: string; itens: { m: ModuloAluno; nome: string }[]; slug: string; cor: string }) {
+  return (
+    <section className="space-y-3">
+      <div className="flex items-center gap-3">
+        <h2 className="text-lg font-bold tracking-tight">{titulo}</h2>
+        <span className="text-xs text-muted-foreground">{itens.length} {itens.length === 1 ? 'módulo' : 'módulos'}</span>
+      </div>
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
+        {itens.map(({ m, nome }, i) => <Poster key={m.id} m={m} nome={nome} n={i + 1} href={hrefModulo(slug, m.id)} cor={cor} grade />)}
+      </div>
+    </section>
+  )
+}
+
+/* ── Trilha simples: jornada vertical com etapas conectadas (nó + card de texto), com progresso ── */
+function TrilhaModulos({ modulos, slug, cor }: { modulos: ModuloAluno[]; slug: string; cor: string }) {
+  return (
+    <ol className="space-y-0">
+      {modulos.map((m, i) => {
+        const p = progresso(m)
+        const feito = p.total > 0 && p.lidas === p.total
+        const ultimo = i === modulos.length - 1
+        return (
+          <li key={m.id} className="relative flex gap-4 pb-4">
+            {!ultimo && <span aria-hidden className="absolute left-[21px] top-11 bottom-0 w-0.5" style={{ background: `color-mix(in srgb, ${cor} 28%, transparent)` }} />}
+            <span className="relative z-10 grid h-11 w-11 shrink-0 place-items-center rounded-full text-sm font-bold shadow-sm"
+              style={feito || m.liberado ? { background: cor, color: '#fff' } : { background: `color-mix(in srgb, ${cor} 14%, transparent)`, color: cor }}>
+              {feito ? <CheckCircle2 className="h-5 w-5" /> : !m.liberado ? <Lock className="h-4 w-4" /> : i + 1}
+            </span>
+            <Link href={hrefModulo(slug, m.id)} title={m.titulo} className="min-w-0 flex-1 rounded-2xl border bg-card p-4 shadow-sm transition-colors hover:bg-muted/40">
+              <div className="flex items-start gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Etapa {i + 1} de {modulos.length}</div>
+                  <h3 className="truncate text-base font-bold tracking-tight">{m.titulo}</h3>
+                  <div className="mt-1 text-xs text-muted-foreground">
+                    {!m.liberado
+                      ? <span className="inline-flex items-center gap-1"><Lock className="h-3 w-3" />{m.exclusivo ? 'conteúdo exclusivo' : m.liberaEm ? `libera em ${fmtData(m.liberaEm)}` : 'bloqueado'}</span>
+                      : <>{p.total} {p.total === 1 ? 'aula' : 'aulas'}{p.lidas ? ` · ${p.pct}%` : ''}</>}
+                  </div>
+                  {m.liberado && p.total > 0 && (
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full" style={{ width: `${p.pct}%`, background: cor }} /></div>
+                  )}
+                </div>
+                <ChevronRight className="mt-1 h-4 w-4 shrink-0 text-muted-foreground" />
+              </div>
+            </Link>
+          </li>
+        )
+      })}
+    </ol>
+  )
+}
+
+/* ── Trilha com imagem (estilo Curseduca): linha central + cards em zigue-zague, capa 16:9 grande,
+      progresso, "Começar/Continuar" e "Conteúdo ▾" (abre as aulas). No celular vira 1 coluna com a linha à esquerda. ── */
+function TrilhaImagem({ modulos, slug, cor }: { modulos: ModuloAluno[]; slug: string; cor: string }) {
+  return (
+    <div className="relative">
+      <span aria-hidden className="absolute bottom-0 left-[7px] top-2 w-0.5 md:left-1/2 md:-translate-x-1/2"
+        style={{ background: `color-mix(in srgb, ${cor} 30%, transparent)` }} />
+      <ol className="relative grid gap-y-6 md:grid-cols-2 md:gap-x-16">
+        {modulos.map((m, i) => {
+          const esq = i % 2 === 0
+          return (
+            // gridRow explícito: cada etapa na sua linha (zigue-zague). A da direita sobe ~meia altura p/ escalonar como na referência.
+            <li key={m.id} style={{ gridRow: i + 1 }} className={`relative pl-9 md:pl-0 ${esq ? 'md:col-start-1' : `md:col-start-2 ${i > 0 ? 'md:-mt-32' : ''}`}`}>
+              <span aria-hidden className={`absolute left-0 top-10 z-10 h-4 w-4 rounded-full border-2 bg-background md:top-24 ${esq ? 'md:left-auto md:-right-8 md:translate-x-1/2' : 'md:-left-8 md:-translate-x-1/2'}`}
+                style={{ borderColor: cor }} />
+              <CardTrilha m={m} n={i + 1} href={hrefModulo(slug, m.id)} cor={cor} />
+            </li>
+          )
+        })}
+      </ol>
+    </div>
+  )
+}
+
+function CardTrilha({ m, n, href, cor }: { m: ModuloAluno; n: number; href: string; cor: string }) {
+  const [aberto, setAberto] = useState(false)
+  const p = progresso(m)
+  const cta = p.lidas > 0 ? 'Continuar' : 'Começar'
+  return (
+    <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+      {/* Capa 16:9 (imagem do módulo; sem imagem → capa gerada com a cor do produto e o nome) */}
+      <Link href={href} title={m.titulo} className="group/capa relative block aspect-video overflow-hidden">
+        {m.imagemUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={m.imagemUrl} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover/capa:scale-105" />
+        ) : (
+          <div className="absolute inset-0" style={{ background: `radial-gradient(120% 90% at 20% 0%, color-mix(in srgb, ${cor} 75%, #fff 10%), transparent 60%), linear-gradient(160deg, color-mix(in srgb, ${cor} 85%, #000), #0b0820 92%)` }}>
+            <span aria-hidden className="absolute inset-0 opacity-30" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.07) 1px,transparent 1px)', backgroundSize: '18px 18px' }} />
+            <span aria-hidden className="absolute -right-2 -top-4 select-none text-[120px] font-black italic leading-none text-white/[.08]">{n}</span>
+            <span className="absolute inset-x-4 bottom-3 line-clamp-2 text-xl font-extrabold leading-tight text-[#F1C232]">{m.titulo}</span>
+          </div>
+        )}
+        {!m.liberado && <span className="absolute right-2 top-2 rounded-full bg-black/60 p-1.5 text-white"><Lock className="h-3.5 w-3.5" /></span>}
+      </Link>
+
+      <div className="space-y-2 px-4 pt-3">
+        <div className="truncate text-xs font-bold" style={{ color: cor }} title={m.titulo}>{m.titulo}</div>
+        <div className="flex items-center gap-2">
+          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full" style={{ width: `${p.pct}%`, background: cor }} /></div>
+          <span className="text-[11px] tabular-nums text-muted-foreground">{p.pct}%</span>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-center gap-3 px-4 py-3">
+        {m.liberado
+          ? <Link href={href} className="text-sm font-bold hover:underline" style={{ color: cor }}>{cta}</Link>
+          : <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Lock className="h-3 w-3" />{m.exclusivo ? 'conteúdo exclusivo' : m.liberaEm ? `libera em ${fmtData(m.liberaEm)}` : 'bloqueado'}</span>}
+        <button type="button" onClick={() => setAberto((v) => !v)} aria-expanded={aberto}
+          className="inline-flex items-center gap-1 rounded-lg bg-muted px-3 py-1.5 text-xs font-semibold text-foreground transition-colors hover:bg-muted/70">
+          Conteúdo <ChevronDown className={`h-3.5 w-3.5 transition-transform ${aberto ? 'rotate-180' : ''}`} />
+        </button>
+      </div>
+
+      {aberto && (
+        <div className="space-y-3 border-t p-3">
+          {todasAulas(m).length ? <ListaAulas aulas={todasAulas(m)} cor={cor} /> : <p className="px-1 py-2 text-xs text-muted-foreground">Sem aulas neste módulo ainda.</p>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/* ── Lista / acordeão: módulos empilhados; cada um abre e mostra as aulas (ListaAulas) ── */
+function ListaModulos({ modulos, slug, cor }: { modulos: ModuloAluno[]; slug: string; cor: string }) {
+  return (
+    <div className="space-y-3">
+      {modulos.map((m, i) => <ModuloAccordion key={m.id} m={m} n={i + 1} slug={slug} cor={cor} />)}
+    </div>
+  )
+}
+
+function ModuloAccordion({ m, n, slug, cor }: { m: ModuloAluno; n: number; slug: string; cor: string }) {
+  const p = progresso(m)
+  const feito = p.total > 0 && p.lidas === p.total
+  const [aberto, setAberto] = useState(n === 1)
+  return (
+    <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+      <button type="button" onClick={() => setAberto((v) => !v)} aria-expanded={aberto} className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-muted/40">
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-[13px] font-bold"
+          style={feito || m.liberado ? { background: cor, color: '#fff' } : { background: `color-mix(in srgb, ${cor} 14%, transparent)`, color: cor }}>
+          {feito ? <CheckCircle2 className="h-4 w-4" /> : !m.liberado ? <Lock className="h-3.5 w-3.5" /> : n}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-semibold">{m.titulo}</span>
+          <span className="text-[11px] text-muted-foreground">
+            {!m.liberado
+              ? (m.exclusivo ? 'conteúdo exclusivo' : m.liberaEm ? `libera em ${fmtData(m.liberaEm)}` : 'bloqueado')
+              : `${p.lidas}/${p.total} aulas${p.lidas ? ` · ${p.pct}%` : ''}`}
+          </span>
+        </span>
+        <ChevronDown className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${aberto ? 'rotate-180' : ''}`} />
+      </button>
+      {aberto && (
+        <div className="space-y-3 border-t p-3">
+          <ListaAulas aulas={m.aulas} cor={cor} />
+          {m.submodulos.map((s) => {
+            const aulas = todasAulas(s)
+            if (!aulas.length) return null
+            return (
+              <div key={s.id} className="space-y-2">
+                <h3 className="px-1 text-xs font-semibold text-muted-foreground">{s.titulo}</h3>
+                <ListaAulas aulas={aulas} cor={cor} />
+              </div>
+            )
+          })}
+          {p.total === 0 && <p className="px-1 py-2 text-xs text-muted-foreground">Sem aulas neste módulo ainda.</p>}
+          <Link href={hrefModulo(slug, m.id)} className="inline-flex items-center gap-1 px-1 text-xs font-semibold" style={{ color: cor }}>
+            Abrir módulo <ChevronRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      )}
     </div>
   )
 }
@@ -123,11 +311,11 @@ function Fileira({ titulo, itens, slug, cor }: { titulo: string; itens: { m: Mod
   )
 }
 
-function Poster({ m, nome, n, href, cor }: { m: ModuloAluno; nome: string; n: number; href: string; cor: string }) {
+function Poster({ m, nome, n, href, cor, grade }: { m: ModuloAluno; nome: string; n: number; href: string; cor: string; grade?: boolean }) {
   const p = progresso(m)
   return (
     <Link href={href} title={m.titulo}
-      className="group/card relative aspect-[2/3] w-40 shrink-0 snap-start overflow-hidden rounded-2xl border border-white/10 shadow-md transition-transform duration-300 hover:-translate-y-1 hover:shadow-xl sm:w-48 lg:w-52">
+      className={`group/card relative aspect-[2/3] overflow-hidden rounded-2xl border border-white/10 shadow-md transition-transform duration-300 hover:-translate-y-1 hover:shadow-xl ${grade ? 'w-full' : 'w-40 shrink-0 snap-start sm:w-48 lg:w-52'}`}>
       {m.imagemUrl ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={m.imagemUrl} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover/card:scale-105" />

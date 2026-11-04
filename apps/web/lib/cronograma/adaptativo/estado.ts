@@ -34,7 +34,7 @@ export const hojeISO = (): DataISO => dISO(new Date())
 
 /** Gera plano+fim a partir do cfg (engine puro). */
 export function gerarEstadoPlano(cfg: Cfg, conteudo: _C, fixos?: Record<string, [DataISO, number]>, ancora?: DataISO | null) {
-  const r = gerarPlano(cfg, conteudo.AS, conteudo.WLP, fixos || {}, ancora || null, conteudo.LP, { ordem: conteudo.ordem })
+  const r = gerarPlano(cfg, conteudo.AS, conteudo.WLP, fixos || {}, ancora || null, conteudo.LP, { ordem: conteudo.ordem, params: conteudo.params })
   return { plano: r.plano, fim: r.fim }
 }
 

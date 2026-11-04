@@ -582,7 +582,9 @@ const PROD_COLS = 'id, nome, slug, tipo, descricao, tier, validade_tipo, validad
 /** 1 linha do produto (+datas/pasta) + vitrine + homônimos, em paralelo. Sem fontes/itens/membros/currículo. */
 export async function getProdutoEditorLeve(tenantId: string, id: string): Promise<ProdutoEditorLeve | null> {
   const svc = createAdminClient()
-  let r: any = await svc.from('simulado_produtos').select(`${PROD_COLS}, criado_em, atualizado_em, pasta_id`).eq('tenant_id', tenantId).eq('id', id).maybeSingle()
+  // `acesso_bloqueado` (migr 20261104120000) entra no SELECT principal; sem a coluna o fallback (PROD_COLS)
+  // responde e o campo cai em false — editor abre normal antes da migração.
+  let r: any = await svc.from('simulado_produtos').select(`${PROD_COLS}, criado_em, atualizado_em, pasta_id, acesso_bloqueado`).eq('tenant_id', tenantId).eq('id', id).maybeSingle()
   if (r.error) r = await svc.from('simulado_produtos').select(PROD_COLS).eq('tenant_id', tenantId).eq('id', id).maybeSingle() // colunas novas ausentes
   const p = r.data as any
   if (!p) return null
@@ -592,8 +594,15 @@ export async function getProdutoEditorLeve(tenantId: string, id: string): Promis
     svc.from('simulado_produtos').select('id, nome').eq('tenant_id', tenantId).eq('nome', p.nome).neq('id', id).limit(20),
   ])
   const { criado_em, atualizado_em, pasta_id, ...resto } = p
+  // Formato de exibição do conteúdo: coluna nova (migração 20261104000000). Leitura TOLERANTE — sem
+  // a coluna cai em 'netflix' (não quebra o editor antes da migração).
+  let vitrineLayout: Produto['vitrine_layout'] = 'netflix'
+  try {
+    const vl: any = await svc.from('simulado_produtos').select('vitrine_layout').eq('tenant_id', tenantId).eq('id', id).maybeSingle()
+    if (!vl.error && vl.data?.vitrine_layout) vitrineLayout = vl.data.vitrine_layout
+  } catch { /* coluna ausente → netflix */ }
   return {
-    produto: { ...(resto as Produto), secoes: ((secoes.data ?? []) as ProdutoSecao[]) },
+    produto: { ...(resto as Produto), vitrine_layout: vitrineLayout, acesso_bloqueado: !!(resto as any).acesso_bloqueado, secoes: ((secoes.data ?? []) as ProdutoSecao[]) },
     criadoEm: criado_em ?? null, atualizadoEm: atualizado_em ?? null, pastaId: pasta_id ?? null,
     mesmoNome: ((homonimos.data ?? []) as { id: string; nome: string }[]),
   }

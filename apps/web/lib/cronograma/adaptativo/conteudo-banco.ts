@@ -5,6 +5,8 @@ import type { Conteudo } from './conteudo'
 import { conteudoSeed } from './conteudo'
 import type { ItemLP } from './motor28'
 import { catalogoLegProc } from './lp-catalogo'
+import { aplicarOverride, type CatalogoOverride } from './catalogo-override'
+import { lerOverride } from './catalogo-override-db'
 import { CATALOGO_HTML, GRUPOS_HTML, aulaHTML, chaveDisciplina, chaveLeiHTML, disciplinaHTML, docDaLei, nomeDisciplina, numeroAula } from './catalogo-html'
 
 // Loader de CONTEÚDO REAL do Cronograma Adaptativo. As aulas e matérias são as da Biblioteca; os dados do
@@ -40,6 +42,10 @@ export interface ConteudoBanco extends Conteudo {
   ordem?: number[]
   /** Documentos de lei da Biblioteca (uso interno: migração de planos antigos). Não vai ao cliente. */
   lpDocs?: Array<{ id: string; titulo: string; disc: string; versaoId: string | null }>
+  /** índice da aula no catálogo do modelo (catalogo-html) para cada posição de AS (-1 = só da Biblioteca). */
+  modeloIdx?: number[]
+  /** Catálogo-BASE (antes do overlay do admin) — o editor do Catálogo de metas parte dele. */
+  base?: { AS: AS; ordem?: number[]; LP: ItemLP[]; modeloIdx: number[] }
 }
 
 const PAG_PADRAO = 40 // páginas assumidas quando o PDF ainda não foi medido
@@ -59,7 +65,21 @@ async function selectInChunks<T>(
   return out
 }
 
+/** Conteúdo para o motor: catálogo-base (Biblioteca + modelo) + overlay editado no admin (Catálogo de metas). */
 export async function carregarConteudoBanco(svc: SupabaseClient, tenantId: string): Promise<ConteudoBanco> {
+  return montarConteudo(svc, tenantId, await lerOverride(svc, tenantId))
+}
+/** Só o catálogo-base (sem overlay) — usado pelo editor do admin. */
+export async function carregarConteudoBancoBase(svc: SupabaseClient, tenantId: string): Promise<ConteudoBanco> {
+  return montarConteudo(svc, tenantId, null)
+}
+
+function comOverride<T extends Conteudo>(c: T, ov: CatalogoOverride | null): T {
+  const r = aplicarOverride(c, ov)
+  return { ...c, AS: r.AS, ordem: r.ordem, LP: r.LP }
+}
+
+async function montarConteudo(svc: SupabaseClient, tenantId: string, ov: CatalogoOverride | null): Promise<ConteudoBanco> {
   // 1) disciplinas
   const { data: discRows } = await svc.from('simulado_disciplinas')
     .select('id, nome, classificacao, cor, ordem').eq('tenant_id', tenantId)
@@ -85,7 +105,7 @@ export async function carregarConteudoBanco(svc: SupabaseClient, tenantId: strin
     const pilha = [p.id]
     while (pilha.length) { const cur = pilha.pop()!; if (!discDaPasta.has(cur)) { discDaPasta.set(cur, p.disciplina_id); (filhos.get(cur) || []).forEach((f) => pilha.push(f)) } }
   }
-  if (discDaPasta.size === 0) return { ...fallbackConteudo(), disciplinas: disciplinasDoCatalogo(), vazio: true }
+  if (discDaPasta.size === 0) return comOverride({ ...fallbackConteudo(), disciplinas: disciplinasDoCatalogo(), vazio: true, modeloIdx: CATALOGO_HTML.aulas.map((_, i) => i) }, ov)
 
   // tipo de material herdado: subpasta-tipada mais próxima subindo a árvore (com memoização + anti-ciclo)
   const tipoCache = new Map<string, string | null>()
@@ -155,6 +175,7 @@ export async function carregarConteudoBanco(svc: SupabaseClient, tenantId: strin
   }
   const ASout: AS = []
   const daPlanilha = new Map<number, number>() // índice da aula no modelo → índice em AS
+  const modeloIdx: number[] = [] // paralelo a ASout: índice no modelo (-1 = só da Biblioteca)
   const semPlanilha: number[] = [] // aulas da Biblioteca que o modelo não tem (entram no fim da ordem)
   for (const di of disciplinas) { // segue a ordem das disciplinas (ordem/nome)
     const aulas = porDisc.get(di.nome); if (!aulas || !aulas.length) continue
@@ -164,16 +185,16 @@ export async function carregarConteudoBanco(svc: SupabaseClient, tenantId: strin
       const i = ASout.length, h = aulaHTML(di.nome, a.titulo)
       if (h && !daPlanilha.has(h.idx)) {
         daPlanilha.set(h.idx, i)
-        ASout.push([nome, h.numero, h.tema, h.paginas || a.pags || PAG_PADRAO, h.qc, h.tec, a.id])
+        ASout.push([nome, h.numero, h.tema, h.paginas || a.pags || PAG_PADRAO, h.qc, h.tec, a.id]); modeloIdx.push(h.idx)
       } else {
         // 7º campo = id do doc da Biblioteca → abre no leitor v2 (/aluno/biblioteca/<id>).
-        ASout.push([nome, String(numeroAula(a.titulo) ?? k + 1), a.titulo, a.pags || PAG_PADRAO, '', '', a.id])
+        ASout.push([nome, String(numeroAula(a.titulo) ?? k + 1), a.titulo, a.pags || PAG_PADRAO, '', '', a.id]); modeloIdx.push(-1)
         // material de apoio guardado em pasta sem tipo (ex.: "Aula 01 - PDFIGHT - …") não é aula de PDFull
         if (!/\bPDF(IGHT|LASH)\b/i.test(a.titulo)) semPlanilha.push(i)
       }
     })
   }
-  if (!ASout.length) return { ...fallbackConteudo(), disciplinas: disciplinasDoCatalogo(), vazio: true }
+  if (!ASout.length) return comOverride({ ...fallbackConteudo(), disciplinas: disciplinasDoCatalogo(), vazio: true, modeloIdx: CATALOGO_HTML.aulas.map((_, i) => i) }, ov)
   const ordem = [...CATALOGO_HTML.ordem.flatMap((h) => (daPlanilha.has(h) ? [daPlanilha.get(h)!] : [])), ...semPlanilha]
 
   // 6) WLP (lei seca por semana)
@@ -212,9 +233,12 @@ export async function carregarConteudoBanco(svc: SupabaseClient, tenantId: strin
     LP.push(...auto.map((x) => ({ ...x, disc: nomeDisciplina(x.disc) })))
   }
 
+  // Overlay do admin (Catálogo de metas): edita/ativa/reordena aulas e metas sem mexer nas posições-base de AS.
+  const ap = aplicarOverride({ AS: ASout, ordem, LP }, ov)
   return {
-    AS: ASout, ordem, WLP: WLPout, WLPdoc, materiais: materiais.map((m) => ({ ...m, disc: nomeDisciplina(m.disc) })), LP,
-    disciplinas: disciplinasDoConteudo(disciplinas, ASout, ordem), lpDocs, vazio: false,
+    AS: ap.AS, ordem: ap.ordem ?? ordem, WLP: WLPout, WLPdoc, materiais: materiais.map((m) => ({ ...m, disc: nomeDisciplina(m.disc) })), LP: ap.LP,
+    disciplinas: disciplinasDoConteudo(disciplinas, ap.AS, ap.ordem ?? ordem), lpDocs, vazio: false,
+    modeloIdx, base: { AS: ASout, ordem, LP, modeloIdx },
   }
 }
 

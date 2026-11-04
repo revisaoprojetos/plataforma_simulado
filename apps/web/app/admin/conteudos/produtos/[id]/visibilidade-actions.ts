@@ -58,26 +58,45 @@ async function nomesDasRefs(tenantId: string, regras: RegraSegmento[]): Promise<
   return out
 }
 
-/** Carga da aba: segmentos do tenant (+ uso), regras deste produto, alvos (módulos/aulas) e nomes. */
+/** Nome de cada alvo (módulo/aula) REFERENCIADO por regras de conteúdo — resolve SÓ os ids citados,
+ *  não a árvore inteira (evita baixar centenas de aulas só p/ mostrar o nome de 1-2 regras). */
+export type AlvoNome = { titulo: string; sub: string | null }
+async function resolverAlvosNomes(svc: ReturnType<typeof createAdminClient>, tenantId: string, produtoId: string, regras: RegraVisibilidade[]): Promise<Record<string, AlvoNome>> {
+  const modIds = new Set<string>(), aulaIds = new Set<string>()
+  for (const r of regras) { if (!r.alvo_id) continue; if (r.alvo_tipo === 'modulo') modIds.add(r.alvo_id); else if (r.alvo_tipo === 'aula') aulaIds.add(r.alvo_id) }
+  if (!modIds.size && !aulaIds.size) return {}
+  const out: Record<string, AlvoNome> = {}
+  // Aulas referenciadas → título + módulo pai.
+  const aulaRows = aulaIds.size ? ((await svc.from('simulado_produto_modulo_itens').select('id, titulo, modulo_id').eq('tenant_id', tenantId).eq('produto_id', produtoId).in('id', [...aulaIds])).data ?? []) as any[] : []
+  // Módulos a resolver: os referenciados + os módulos-pai das aulas; depois os pais desses (p/ "Submódulo").
+  const precisaMod = new Set<string>([...modIds, ...aulaRows.map((a) => a.modulo_id)])
+  let modRows = precisaMod.size ? ((await svc.from('simulado_produto_modulos').select('id, titulo, pai_id').eq('tenant_id', tenantId).eq('produto_id', produtoId).in('id', [...precisaMod])).data ?? []) as any[] : []
+  const faltamPais = [...new Set(modRows.map((m) => m.pai_id).filter(Boolean))].filter((p) => !modRows.some((m) => m.id === p)) as string[]
+  if (faltamPais.length) modRows = [...modRows, ...(((await svc.from('simulado_produto_modulos').select('id, titulo, pai_id').eq('tenant_id', tenantId).eq('produto_id', produtoId).in('id', faltamPais)).data ?? []) as any[])]
+  const modById = new Map(modRows.map((m) => [m.id, m]))
+  for (const id of modIds) { const m = modById.get(id); if (m) out[id] = { titulo: m.titulo, sub: m.pai_id ? (modById.get(m.pai_id)?.titulo ?? null) : null } }
+  for (const a of aulaRows) out[a.id] = { titulo: a.titulo, sub: modById.get(a.modulo_id)?.titulo ?? null }
+  return out
+}
+
+/** Carga da aba (LEVE): segmentos do tenant (+ uso), regras deste produto, nomes dos alvos REFERENCIADOS
+ *  e `temModulos` (count). A árvore completa de módulos/aulas é carregada só ao abrir o picker de conteúdo
+ *  (carregarAlvosConteudoAction) — antes baixava 100s de aulas em TODA abertura, mesmo sem nenhuma regra. */
 export async function carregarVisibilidadeAction(produtoId: string): Promise<
-  | { ok: true; disponivel: boolean; segmentos: SegmentoAdmin[]; regras: RegraVisibilidade[]; alvos: AlvosProduto; nomes: Record<string, string> }
+  | { ok: true; disponivel: boolean; segmentos: SegmentoAdmin[]; regras: RegraVisibilidade[]; alvosNomes: Record<string, AlvoNome>; temModulos: boolean; nomes: Record<string, string> }
   | { error: string }
 > {
   const g = await guard(); if ('error' in g) return { error: g.error ?? 'Sem permissão.' }
   const svc = createAdminClient()
-  const [segR, regR, usoR, modR, aulR] = await Promise.all([
+  const [segR, regR, usoR, modCountR] = await Promise.all([
     svc.from('simulado_segmentos').select('id, nome, descricao, regra, atualizado_em').eq('tenant_id', g.tenantId).eq('deletado', false).order('nome', { ascending: true }).limit(500),
     svc.from('simulado_produto_visibilidade').select('id, segmento_id, alvo_tipo, alvo_id, efeito, sem_acesso, ativo').eq('tenant_id', g.tenantId).eq('produto_id', produtoId).order('criado_em', { ascending: true }).limit(2000),
     svc.from('simulado_produto_visibilidade').select('segmento_id').eq('tenant_id', g.tenantId).limit(5000),
-    svc.from('simulado_produto_modulos').select('id, titulo, pai_id, ordem').eq('tenant_id', g.tenantId).eq('produto_id', produtoId).eq('deletado', false).order('ordem', { ascending: true }).limit(2000),
-    svc.from('simulado_produto_modulo_itens').select('id, titulo, modulo_id, ordem').eq('tenant_id', g.tenantId).eq('produto_id', produtoId).eq('deletado', false).order('ordem', { ascending: true }).limit(5000),
+    svc.from('simulado_produto_modulos').select('id', { count: 'exact', head: true }).eq('tenant_id', g.tenantId).eq('produto_id', produtoId).eq('deletado', false),
   ])
-  const alvos: AlvosProduto = {
-    modulos: ((modR.data ?? []) as any[]).map((m) => ({ id: m.id, titulo: m.titulo, pai_id: m.pai_id ?? null })),
-    aulas: ((aulR.data ?? []) as any[]).map((a) => ({ id: a.id, titulo: a.titulo, modulo_id: a.modulo_id })),
-  }
+  const temModulos = (modCountR.count ?? 0) > 0
   if (segR.error || regR.error) {
-    return { ok: true, disponivel: !(faltaTabela(segR.error?.message) || faltaTabela(regR.error?.message)), segmentos: [], regras: [], alvos, nomes: {} }
+    return { ok: true, disponivel: !(faltaTabela(segR.error?.message) || faltaTabela(regR.error?.message)), segmentos: [], regras: [], alvosNomes: {}, temModulos, nomes: {} }
   }
   const uso = new Map<string, number>()
   for (const r of (usoR.data ?? []) as any[]) uso.set(r.segmento_id, (uso.get(r.segmento_id) ?? 0) + 1)
@@ -87,8 +106,29 @@ export async function carregarVisibilidadeAction(produtoId: string): Promise<
   const regras: RegraVisibilidade[] = ((regR.data ?? []) as any[]).map((r) => ({
     id: r.id, segmento_id: r.segmento_id, alvo_tipo: r.alvo_tipo, alvo_id: r.alvo_id ?? null, efeito: r.efeito, sem_acesso: r.sem_acesso, ativo: r.ativo !== false,
   }))
-  const nomes = await nomesDasRefs(g.tenantId, segmentos.map((s) => s.regra))
-  return { ok: true, disponivel: true, segmentos, regras, alvos, nomes }
+  const [alvosNomes, nomes] = await Promise.all([
+    resolverAlvosNomes(svc, g.tenantId, produtoId, regras),
+    nomesDasRefs(g.tenantId, segmentos.map((s) => s.regra)),
+  ])
+  return { ok: true, disponivel: true, segmentos, regras, alvosNomes, temModulos, nomes }
+}
+
+/** Árvore de módulos/aulas do produto p/ o picker "Adicionar regra de conteúdo" — carregada SÓ quando o
+ *  dialog de conteúdo abre (lazy), não na carga da aba. */
+export async function carregarAlvosConteudoAction(produtoId: string): Promise<{ ok: true; alvos: AlvosProduto } | { error: string }> {
+  const g = await guard(); if ('error' in g) return { error: g.error ?? 'Sem permissão.' }
+  const svc = createAdminClient()
+  const [modR, aulR] = await Promise.all([
+    svc.from('simulado_produto_modulos').select('id, titulo, pai_id, ordem').eq('tenant_id', g.tenantId).eq('produto_id', produtoId).eq('deletado', false).order('ordem', { ascending: true }).limit(2000),
+    svc.from('simulado_produto_modulo_itens').select('id, titulo, modulo_id, ordem').eq('tenant_id', g.tenantId).eq('produto_id', produtoId).eq('deletado', false).order('ordem', { ascending: true }).limit(5000),
+  ])
+  return {
+    ok: true,
+    alvos: {
+      modulos: ((modR.data ?? []) as any[]).map((m) => ({ id: m.id, titulo: m.titulo, pai_id: m.pai_id ?? null })),
+      aulas: ((aulR.data ?? []) as any[]).map((a) => ({ id: a.id, titulo: a.titulo, modulo_id: a.modulo_id })),
+    },
+  }
 }
 
 /** Cria/edita um segmento (nome ≤ 250, descrição ≤ 1000, regra validada). */

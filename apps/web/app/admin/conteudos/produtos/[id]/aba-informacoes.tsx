@@ -14,8 +14,8 @@
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  Loader2, UserPlus, Trash2, X, ChevronRight, Pencil, List, CalendarClock,
-  ShoppingCart, Eye, MoveRight, Droplets, Award, Wand2, Mail, MessageSquare, Copy, FolderInput, Wrench,
+  Loader2, UserPlus, Trash2, X, ChevronRight, Pencil, List, CalendarClock, Check,
+  ShoppingCart, Eye, MoveRight, Droplets, Award, Wand2, Mail, MessageSquare, Copy, FolderInput, Wrench, LayoutGrid,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -26,9 +26,10 @@ import { CampoImagem } from '@/components/admin/campo-imagem'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { formatBrt } from '@/lib/brt'
-import { PRODUTO_TIPOS, type ProdutoLeve, type ProdutoTipo } from '@/lib/produtos/tipos'
+import { PRODUTO_TIPOS, VITRINE_LAYOUTS, type ProdutoLeve, type ProdutoTipo, type VitrineLayout } from '@/lib/produtos/tipos'
 import type { InstrutorRow, ResumoProduto } from '@/lib/produtos/estudio'
 import { salvarProdutoAction } from '@/app/admin/produtos/actions'
+import { PreviaFormatoVitrine } from '@/components/admin/previa-formato-vitrine'
 import { listarInstrutorCandidatosAction, adicionarInstrutorAction, removerInstrutorAction } from '../actions'
 
 const codigoCurto = (id: string) => (parseInt(id.replace(/-/g, '').slice(0, 5), 16) % 9000 + 1000).toString()
@@ -80,6 +81,8 @@ export function AbaInformacoes({
   const [posterUrl, setPosterUrl] = useState(produto.banner_mobile_url ?? '') // Vertical 2:3 (reusa banner_mobile_url)
   const [bannerUrl, setBannerUrl] = useState(produto.banner_url ?? '')        // Banner 1920×600
   const [logoUrl, setLogoUrl] = useState(produto.logo_url ?? '')
+  const [vitrineLayout, setVitrineLayout] = useState<VitrineLayout>(produto.vitrine_layout ?? 'netflix')
+  const [previa, setPrevia] = useState<VitrineLayout | null>(null)
 
   const [instrutores, setInstrutores] = useState<InstrutorRow[]>(instrIniciais)
   const [addInstr, setAddInstr] = useState(false)
@@ -96,6 +99,8 @@ export function AbaInformacoes({
         // imagens
         logo_url: logoUrl || null, capa_url: capaUrl || null,
         banner_url: bannerUrl || null, banner_mobile_url: posterUrl || null,
+        // formato de exibição do conteúdo pro aluno
+        vitrine_layout: vitrineLayout,
       })
       if ('error' in r && r.error) { toast.error(r.error); return }
       toast.success('Alterações publicadas.'); router.refresh()
@@ -205,6 +210,31 @@ export function AbaInformacoes({
             </Campo>
           </CardConfig>
 
+          {/* Formato de exibição do conteúdo (REAL — persiste em simulado_produtos.vitrine_layout) */}
+          <CardConfig icon={<LayoutGrid className="h-4 w-4" />} titulo="Formato de exibição do conteúdo">
+            <p className="-mt-1 text-xs text-muted-foreground">Como os módulos do curso aparecem para o aluno na página do extensivo.</p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {VITRINE_LAYOUTS.map((l) => {
+                const on = vitrineLayout === l.v
+                return (
+                  <div key={l.v} className={cn('flex items-stretch gap-1.5 rounded-xl border transition-colors', on ? 'border-primary bg-primary/10' : 'hover:bg-muted/50')}>
+                    <button type="button" disabled={!podeEditar} onClick={() => setVitrineLayout(l.v)}
+                      className={cn('min-w-0 flex-1 p-3 text-left', !podeEditar && 'cursor-not-allowed opacity-60')}>
+                      <span className="flex items-center gap-1.5 text-sm font-semibold">
+                        {on ? <Check className="h-4 w-4 shrink-0 text-primary" /> : <span className="h-4 w-4 shrink-0 rounded-full border" />}{l.label}
+                      </span>
+                      <span className="mt-1 block text-xs text-muted-foreground">{l.descricao}</span>
+                    </button>
+                    <button type="button" onClick={() => setPrevia(l.v)} title="Ver prévia (visão do aluno)" aria-label={`Ver prévia do formato ${l.label}`}
+                      className="flex shrink-0 items-center gap-1 self-center rounded-lg border bg-background px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted mr-2">
+                      <Eye className="h-3.5 w-3.5" />Prévia
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          </CardConfig>
+
           {/* Data de lançamento (placeholder) */}
           <CardConfig icon={<CalendarClock className="h-4 w-4" />} titulo="Data de lançamento" emBreve>
             <SwitchRowPh label="Habilitar lançamento" descricao="O produto aparece com contagem regressiva até a data." />
@@ -280,7 +310,7 @@ export function AbaInformacoes({
         <div className="rounded-2xl border bg-card p-4 shadow-sm">
           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Resumo</div>
           <dl className="divide-y text-sm">
-            <Linha k="Situação" v={produto.ativo ? 'Listado' : 'Não listado'} />
+            <Linha k="Situação" v={!produto.ativo ? 'Rascunho' : produto.acesso_bloqueado ? 'Em atualização' : 'Publicado'} />
             <Linha k="Tipo" v={tipoLabel} />
             <Linha k="Categoria" v="Geral" />
             <Linha k="Código" v={codigoCurto(produto.id)} />
@@ -332,6 +362,7 @@ export function AbaInformacoes({
 
       {addInstr && <AddInstrutorDialog produtoId={produto.id} jaIds={new Set(instrutores.map((i) => i.user_id).filter(Boolean) as string[])}
         onClose={() => setAddInstr(false)} onAdicionado={(novo) => { setInstrutores((cur) => [...cur, novo]); router.refresh() }} />}
+      {previa && <PreviaFormatoVitrine inicial={previa} cor={produto.cor} onClose={() => setPrevia(null)} />}
     </div>
   )
 }

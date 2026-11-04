@@ -25,7 +25,8 @@ export type Aula = [string, string, number, string, string] | [string, string, s
 /** Conteúdo: AS = aulas; WLP = lei seca por semana (WLP[semana][j] = texto do bloco) */
 // 7º campo (opcional) = id do documento da Biblioteca que origina a aula → o aluno abre o
 // conteúdo no leitor v2 (/aluno/biblioteca/<id>). Seed não tem (fica undefined, sem link).
-export type AS = Array<[string, string, string, number, string, string, string?]>
+// 8º campo (opcional) = chave estável original da aula quando o admin editou o tema (catalogo-override.ts).
+export type AS = Array<[string, string, string, number, string, string, string?, string?]>
 export type WLP = string[][]
 
 export interface Rotina { desde: DataISO; horas: number[] }

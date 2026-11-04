@@ -12,6 +12,17 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.3.0 — 2026-11-04
+
+### Produtos / Extensivos — FORMATO DE EXIBIÇÃO do conteúdo para o aluno
+- Novo seletor **Formato de exibição do conteúdo** na aba Informações do produto (Estúdio), com **Prévia** em pop-up de como o aluno vê cada formato: **Netflix** (carrosséis), **Cards em grade**, **Trilha com imagem** (estilo Curseduca: zigue-zague, capa 16:9, progresso, Começar/Continuar e "Conteúdo ▾"), **Trilha simples** e **Lista / acordeão**.
+- A vitrine do extensivo (`ModulosVitrine`) renderiza o formato escolhido; padrão `netflix` (comportamento atual inalterado).
+- **Migrações manuais** (já aplicadas em prod): `20261104000000_produto_vitrine_layout.sql` e `20261104010000_produto_vitrine_layout_trilha_imagem.sql` (coluna `simulado_produtos.vitrine_layout` + constraint). Leitura/gravação tolerantes: sem a coluna nada muda.
+
+### Produto em atualização + Cronograma Adaptativo (catálogo editável)
+- Produto: estado **publicado / em atualização / rascunho** (`acesso_bloqueado`, migração `20261104120000_produto_acesso_bloqueado.sql`) e ajustes de Visibilidade.
+- Cronograma Adaptativo: edição do **catálogo de metas por plataforma** no admin (overlay por tenant, migração `20261104130000_cronograma_adaptativo_catalogo_override.sql`), metas/params e motor 2.8 atualizado.
+
 ## 4.2.9 — 2026-11-04
 
 ### Produtos — aba Visibilidade com SEGMENTOS de alunos

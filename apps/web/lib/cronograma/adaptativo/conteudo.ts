@@ -7,6 +7,7 @@
 import seed from './conteudo-seed.json'
 import type { AS, WLP } from './engine'
 import type { ItemLP } from './motor28'
+import type { ParamsAdaptativo } from './params'
 import { GRUPOS_HTML } from './catalogo-html'
 
 /** AS = aulas · WLP = lei seca semanal (seed/legado) · LP = LegProc por disciplina (modelo + Biblioteca). */
@@ -14,6 +15,8 @@ export interface Conteudo {
   AS: AS; WLP: WLP; LP?: ItemLP[]
   /** ordem de distribuição das aulas (índices em AS) — ver catalogo-html.ts */
   ordem?: number[]
+  /** parâmetros do motor (v3, config do tenant) — repassados ao gerarPlano; ausente = defaults 2.8 */
+  params?: ParamsAdaptativo
   /** descrição de metas de LegProc antigas (fora do catálogo atual), por id — só exibição */
   LPdesc?: Record<string, ItemLP>
 }

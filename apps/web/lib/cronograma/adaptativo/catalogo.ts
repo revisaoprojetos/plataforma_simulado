@@ -23,7 +23,7 @@ export interface Catalogo {
   lp: string[]
 }
 
-export const chaveAula = (e: AS[number]): string => (e[6] ? `d:${e[6]}` : `t:${e[0]}|${e[2]}`)
+export const chaveAula = (e: AS[number]): string => (e[7] ? String(e[7]) : e[6] ? `d:${e[6]}` : `t:${e[0]}|${e[2]}`)
 
 /** Chaves do catálogo atual (mesma numeração que o motor usa sobre AS/WLP). */
 export function chavesConteudo(AS: AS, WLP: WLP, WLPdoc?: (string | null)[][]): Catalogo {

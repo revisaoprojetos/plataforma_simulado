@@ -9,6 +9,16 @@ import {
   type CfgLiberacao, type MotivoLiberacao,
 } from '@/lib/cronograma/adaptativo/liberacao'
 
+import { esquecer } from '@/lib/cache/relatorio-cache'
+import { lerCfgMetas, salvarCfgMetas } from '@/lib/cronograma/adaptativo/config-metas'
+import { diagnosticarCatalogo, type CatalogoMotor } from '@/lib/cronograma/adaptativo/catalogo-diagnostico'
+import { carregarConteudoBancoBase } from '@/lib/cronograma/adaptativo/conteudo-banco'
+import { lerOverrideRow, salvarOverride } from '@/lib/cronograma/adaptativo/catalogo-override-db'
+import { chavesUnicas, normalizarOverride, partirTexto, OVERRIDE_VAZIO, type CatalogoOverride } from '@/lib/cronograma/adaptativo/catalogo-override'
+import { CATALOGO_HTML, chaveLeiHTML, chaveDisciplina } from '@/lib/cronograma/adaptativo/catalogo-html'
+import origemCat from '@/lib/cronograma/adaptativo/catalogo-origem.json' // origem (planilha/aba/linha) de cada aula e meta — só servidor
+import { PARAMS_PADRAO, normalizarParams, type ParamsAdaptativo } from '@/lib/cronograma/adaptativo/params'
+
 async function acesso(acao: 'view' | 'update') {
   const a = await getCurrentAccess()
   const permitido = a.isAdmin || a.permissions.includes('*') || a.permissions.includes(`cronogramas:${acao}`)
@@ -68,6 +78,154 @@ export async function salvarPainelLiberacao(cfg: CfgLiberacao): Promise<{ ok: bo
     antes: { ...antes }, depois: { ...depois },
   }).catch(() => {})
   revalidatePath('/admin/cronogramas/adaptativo')
+  return { ok: true }
+}
+
+export async function obterCatalogoMotor(): Promise<{ ok: boolean; error?: string; catalogo?: CatalogoMotor }> {
+  const g = await acesso('view'); if (!g) return { ok: false, error: 'Sem permissão.' }
+  try { return { ok: true, catalogo: await diagnosticarCatalogo(createAdminClient(), g.tenantId) } }
+  catch (e) { return { ok: false, error: (e as Error)?.message || 'Falha ao carregar.' } }
+}
+
+// ── Catálogo de metas (editor): aulas, links de questões, LegProc ────────────────────────────────
+export interface EditorAulaBase {
+  key: string; idx: number; disc: string; num: string; tema: string; pags: number; qc: string; tec: string
+  docId: string | null; ativaBase: boolean
+  mat: { pdflashPaginas: number | null; pdfightPaginas: number | null; videoaula: string | null; atualizacao: string | null } | null
+  origem: { arquivo?: string; aba?: string; linha?: number } | null
+}
+export interface EditorLpBase { id: string; disc: string; leiNome: string; trecho: string; doc: string | null; origem: { arquivo?: string; aba?: string; linha?: number } | null }
+export interface EditorCatalogo {
+  versao: number
+  atualizadoEm: string | null
+  tabelaOk: boolean
+  disciplinas: string[]
+  aulas: EditorAulaBase[]
+  /** ordem de distribuição do catálogo-base (só aulas ativas nele), por chave. */
+  ordemBase: string[]
+  lp: EditorLpBase[]
+  override: CatalogoOverride
+  alunosComPlano: number
+  fonteCatalogo: string
+}
+
+export async function obterEditorCatalogo(): Promise<{ ok: boolean; error?: string; editor?: EditorCatalogo }> {
+  const g = await acesso('view'); if (!g) return { ok: false, error: 'Sem permissão.' }
+  const svc = createAdminClient()
+  try {
+    const [c, row, planos, tab] = await Promise.all([
+      carregarConteudoBancoBase(svc, g.tenantId),
+      lerOverrideRow(svc, g.tenantId),
+      svc.from('simulado_cronograma_adaptativo_plano').select('estudante_id').eq('tenant_id', g.tenantId).eq('arquivada', false).eq('exemplo', false),
+      svc.from('simulado_cronograma_adaptativo_catalogo').select('tenant_id').limit(1),
+    ])
+    const baseAS = c.base?.AS ?? c.AS, baseOrdem = c.base?.ordem ?? c.ordem ?? baseAS.map((_, i) => i), baseLP = c.base?.LP ?? c.LP ?? []
+    const modeloIdx = c.base?.modeloIdx ?? c.modeloIdx ?? []
+    const chaves = chavesUnicas(baseAS)
+    const ativasBase = new Set(baseOrdem)
+    const origemLei = new Map<string, { arquivo?: string; aba?: string; linha?: number }>()
+    {
+      const n = new Map<string, number>()
+      for (const k of CATALOGO_HTML.ordemLP) {
+        const m = CATALOGO_HTML.legprocs[k]; if (!m) continue
+        const chave = chaveLeiHTML(m.disc, m.lei), i = (n.get(chave) || 0) + 1; n.set(chave, i)
+        const o = (origemCat.lp as Array<{ arquivo?: string; aba?: string; linha?: number } | null>)[k]
+        if (o) origemLei.set(`lp:${chave}:${i}`, o)
+      }
+    }
+    const mats = CATALOGO_HTML.materiais as Record<string, EditorAulaBase['mat']>
+    const origemAula = origemCat.mat as Record<string, EditorAulaBase['origem']>
+    const aulas: EditorAulaBase[] = baseAS.map((e, i) => {
+      const mi = modeloIdx[i] ?? -1, m = mi >= 0 ? mats[String(mi)] : undefined
+      return {
+        key: chaves[i], idx: i, disc: String(e[0]), num: String(e[1] ?? ''), tema: String(e[2] ?? ''), pags: Number(e[3]) || 0,
+        qc: String(e[4] ?? ''), tec: String(e[5] ?? ''), docId: e[6] ? String(e[6]) : null, ativaBase: ativasBase.has(i),
+        mat: m ? { pdflashPaginas: m.pdflashPaginas ?? null, pdfightPaginas: m.pdfightPaginas ?? null, videoaula: m.videoaula ?? null, atualizacao: m.atualizacao ?? null } : null,
+        origem: mi >= 0 ? (origemAula[String(mi)] ?? null) : null,
+      }
+    })
+    const lp: EditorLpBase[] = baseLP.map((x) => { const p = partirTexto(x.texto); return { id: x.id, disc: x.disc, leiNome: p.leiNome, trecho: p.trecho, doc: x.doc ?? null, origem: origemLei.get(x.id) ?? null } })
+    const nomes = new Set<string>(); const disciplinas: string[] = []
+    for (const n of [...c.disciplinas.map((d) => d.nome), ...aulas.map((a) => a.disc), ...lp.map((l) => l.disc)]) { const k = chaveDisciplina(n); if (!nomes.has(k)) { nomes.add(k); disciplinas.push(n) } }
+    const alunosComPlano = new Set(((planos.data ?? []) as Array<{ estudante_id: string }>).map((p) => p.estudante_id)).size
+    return {
+      ok: true,
+      editor: {
+        versao: row?.versao ?? 0, atualizadoEm: row?.atualizadoEm ?? null, tabelaOk: !tab.error, disciplinas, aulas,
+        ordemBase: baseOrdem.map((i) => chaves[i]).filter(Boolean), lp, override: row?.dados ?? OVERRIDE_VAZIO, alunosComPlano,
+        fonteCatalogo: CATALOGO_HTML.fonte,
+      },
+    }
+  } catch (e) {
+    return { ok: false, error: (e as Error)?.message || 'Falha ao carregar o catálogo.' }
+  }
+}
+
+export async function salvarEditorCatalogo(draft: unknown, versaoBase: number): Promise<{ ok: boolean; error?: string; conflito?: boolean; versao?: number; alunosComPlano?: number }> {
+  const g = await acesso('update'); if (!g) return { ok: false, error: 'Sem permissão.' }
+  const svc = createAdminClient()
+  try {
+    const ov = normalizarOverride(draft)
+    // disciplinas das aulas/metas NOVAS precisam existir no catálogo (não se cria disciplina por aqui)
+    if (ov.novas.length || ov.lpNovas.length) {
+      const c = await carregarConteudoBancoBase(svc, g.tenantId)
+      const conhecidas = new Set([...c.disciplinas.map((d) => d.nome), ...(c.base?.AS ?? c.AS).map((a) => String(a[0])), ...(c.base?.LP ?? c.LP ?? []).map((l) => l.disc)].map((n) => chaveDisciplina(n)))
+      const ruim = [...ov.novas.map((n) => n.disc), ...ov.lpNovas.map((n) => n.disc)].find((d) => !conhecidas.has(chaveDisciplina(d)))
+      if (ruim) return { ok: false, error: `Disciplina "${ruim}" não existe no catálogo.` }
+    }
+    const antes = await lerOverrideRow(svc, g.tenantId)
+    const r = await salvarOverride(svc, g.tenantId, ov, Math.max(0, Math.trunc(Number(versaoBase) || 0)), g.userId)
+    if (!r.ok) return r
+    await registrarAudit({
+      operacao: 'UPDATE', entidade: 'simulado_cronograma_adaptativo_catalogo', entidadeId: g.tenantId, tenantId: g.tenantId,
+      antes: { versao: antes?.versao ?? 0, itens: Object.keys(antes?.dados.aulas ?? {}).length + (antes?.dados.novas.length ?? 0) + Object.keys(antes?.dados.lp ?? {}).length + (antes?.dados.lpNovas.length ?? 0) },
+      depois: { versao: r.versao, itens: Object.keys(ov.aulas).length + ov.novas.length + Object.keys(ov.lp).length + ov.lpNovas.length },
+    }).catch(() => {})
+    const { data } = await svc.from('simulado_cronograma_adaptativo_plano').select('estudante_id').eq('tenant_id', g.tenantId).eq('arquivada', false).eq('exemplo', false)
+    await esquecer(`crono-catalogo-diag:${g.tenantId}`).catch(() => {})
+    revalidatePath('/admin/cronogramas/adaptativo/catalogo')
+    return { ok: true, versao: r.versao, alunosComPlano: new Set(((data ?? []) as Array<{ estudante_id: string }>).map((p) => p.estudante_id)).size }
+  } catch (e) {
+    return { ok: false, error: (e as Error)?.message || 'Falha ao salvar o catálogo.' }
+  }
+}
+
+// ── Metas & inteligência (v3): parâmetros do motor por tenant ────────────────────────────────────
+export interface PainelMetas {
+  params: ParamsAdaptativo
+  padrao: ParamsAdaptativo
+  atualizadoEm: string | null
+  alunosComPlano: number
+}
+
+export async function obterPainelMetas(): Promise<{ ok: boolean; error?: string; painel?: PainelMetas }> {
+  const g = await acesso('view'); if (!g) return { ok: false, error: 'Sem permissão.' }
+  const svc = createAdminClient()
+  try {
+    const [cfg, planos] = await Promise.all([
+      lerCfgMetas(svc, g.tenantId),
+      svc.from('simulado_cronograma_adaptativo_plano').select('estudante_id').eq('tenant_id', g.tenantId).eq('arquivada', false).eq('exemplo', false),
+    ])
+    const { atualizadoEm, atualizadoPor: _a, ...params } = cfg
+    const alunosComPlano = new Set(((planos.data ?? []) as Array<{ estudante_id: string }>).map((p) => p.estudante_id)).size
+    return { ok: true, painel: { params, padrao: PARAMS_PADRAO, atualizadoEm: atualizadoEm ?? null, alunosComPlano } }
+  } catch (e) {
+    return { ok: false, error: (e as Error)?.message || 'Falha ao carregar.' }
+  }
+}
+
+export async function salvarPainelMetas(params: Partial<ParamsAdaptativo>): Promise<{ ok: boolean; error?: string }> {
+  const g = await acesso('update'); if (!g) return { ok: false, error: 'Sem permissão.' }
+  const svc = createAdminClient()
+  const antes = await lerCfgMetas(svc, g.tenantId)
+  const depois = normalizarParams(params)
+  const r = await salvarCfgMetas(svc, g.tenantId, depois, g.userId)
+  if (!r.ok) return r
+  await registrarAudit({
+    operacao: 'UPDATE', entidade: 'simulado_cronograma_adaptativo_cfg', entidadeId: g.tenantId, tenantId: g.tenantId,
+    antes: { ...antes }, depois: { ...depois },
+  }).catch(() => {})
+  revalidatePath('/admin/cronogramas/adaptativo/metas')
   return { ok: true }
 }
 

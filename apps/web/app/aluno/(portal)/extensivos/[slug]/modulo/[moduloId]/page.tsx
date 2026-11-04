@@ -16,6 +16,9 @@ export default async function ModuloExtensivoPage({ params }: { params: Promise<
   // Gate: só quem tem o produto (assinatura ativa OU grupo vinculado).
   const ext = await getExtensivoDoAluno(sessao.tenantId, sessao.estudanteId, slug)
   if (!ext) notFound()
+  // Mesmo bloqueio TOTAL da vitrine: produto "em edição" → volta à página do extensivo (onde a mensagem
+  // de atualização aparece). Bypass p/ admin visualizando (impersonation).
+  if (ext.bloqueado && !sessao.impersonation) redirect(`/aluno/extensivos/${slug}`)
   const modulos = await curriculoDoExtensivo(sessao.tenantId, sessao.estudanteId, ext.id, slug)
   const atual = modulos.find((m) => m.id === moduloId)
   if (!atual) notFound() // módulo inexistente, de outro produto, vazio ou oculto até liberar

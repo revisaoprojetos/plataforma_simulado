@@ -31,10 +31,10 @@ import {
   type CampoId, type Efeito, type SemAcesso, type AlvoTipo, type RefTipo, type Juncao,
 } from '@/lib/segmentos/tipos'
 import {
-  carregarVisibilidadeAction, salvarSegmentoAction, duplicarSegmentoAction, excluirSegmentoAction,
+  carregarVisibilidadeAction, carregarAlvosConteudoAction, salvarSegmentoAction, duplicarSegmentoAction, excluirSegmentoAction,
   salvarRegraVisibilidadeAction, alternarRegraVisibilidadeAction, excluirRegraVisibilidadeAction,
   buscarRefsSegmentoAction, buscarAlunosSegmentoAction, testarSegmentoAction,
-  type SegmentoAdmin, type AlvosProduto,
+  type SegmentoAdmin, type AlvosProduto, type AlvoNome,
 } from './visibilidade-actions'
 
 const MIGRACAO = '20261103130000_segmentos_visibilidade.sql'
@@ -43,25 +43,24 @@ const PERIODOS: [number | null, string][] = [[null, 'desde sempre'], [7, 'nos ú
 const sel = 'h-9 rounded-lg border bg-background px-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50'
 
 export function AbaVisibilidade({ produtoId, produtoNome, podeEditar }: { produtoId: string; produtoNome: string; podeEditar: boolean }) {
-  const [dados, setDados] = useState<null | { disponivel: boolean; segmentos: SegmentoAdmin[]; regras: RegraVisibilidade[]; alvos: AlvosProduto }>(null)
+  const [dados, setDados] = useState<null | { disponivel: boolean; segmentos: SegmentoAdmin[]; regras: RegraVisibilidade[]; alvosNomes: Record<string, AlvoNome>; temModulos: boolean }>(null)
   const [nomes, setNomes] = useState<Record<string, string>>({})
   const [editSeg, setEditSeg] = useState<null | { seg: Segmento | null; aoCriar?: (s: Segmento) => void }>(null)
   const [editRegra, setEditRegra] = useState<null | { modo: 'acesso' | 'conteudo'; regra: RegraVisibilidade | null }>(null)
   const [, start] = useTransition()
+  const vazio = { disponivel: true, segmentos: [], regras: [], alvosNomes: {}, temModulos: false }
 
   function recarregar() {
     return carregarVisibilidadeAction(produtoId).then((r) => {
-      if ('error' in r) { toast.error(r.error); setDados((d) => d ?? { disponivel: true, segmentos: [], regras: [], alvos: { modulos: [], aulas: [] } }); return }
-      setDados({ disponivel: r.disponivel, segmentos: r.segmentos, regras: r.regras, alvos: r.alvos })
+      if ('error' in r) { toast.error(r.error); setDados((d) => d ?? vazio); return }
+      setDados({ disponivel: r.disponivel, segmentos: r.segmentos, regras: r.regras, alvosNomes: r.alvosNomes, temModulos: r.temModulos })
       setNomes((n) => ({ ...n, ...r.nomes }))
-    }).catch(() => setDados((d) => d ?? { disponivel: true, segmentos: [], regras: [], alvos: { modulos: [], aulas: [] } }))
+    }).catch(() => setDados((d) => d ?? vazio))
   }
   useEffect(() => { void recarregar() // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [produtoId])
 
   const segPorId = useMemo(() => new Map((dados?.segmentos ?? []).map((s) => [s.id, s])), [dados])
-  const modPorId = useMemo(() => new Map((dados?.alvos.modulos ?? []).map((m) => [m.id, m])), [dados])
-  const aulaPorId = useMemo(() => new Map((dados?.alvos.aulas ?? []).map((a) => [a.id, a])), [dados])
 
   if (!dados) return <div className="flex items-center gap-2 rounded-xl border bg-card p-6 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Carregando visibilidade…</div>
   if (!dados.disponivel) {
@@ -77,14 +76,9 @@ export function AbaVisibilidade({ produtoId, produtoNome, podeEditar }: { produt
   const regrasConteudo = dados.regras.filter((r) => r.alvo_tipo !== 'produto')
 
   function nomeAlvo(r: RegraVisibilidade): { tipo: string; titulo: string; sub: string | null } {
-    if (r.alvo_tipo === 'modulo') {
-      const m = r.alvo_id ? modPorId.get(r.alvo_id) : undefined
-      const pai = m?.pai_id ? modPorId.get(m.pai_id) : undefined
-      return { tipo: m?.pai_id ? 'Submódulo' : 'Módulo', titulo: m?.titulo ?? '(módulo removido)', sub: pai?.titulo ?? null }
-    }
-    const a = r.alvo_id ? aulaPorId.get(r.alvo_id) : undefined
-    const m = a ? modPorId.get(a.modulo_id) : undefined
-    return { tipo: 'Aula', titulo: a?.titulo ?? '(aula removida)', sub: m?.titulo ?? null }
+    const info = r.alvo_id ? dados?.alvosNomes[r.alvo_id] : undefined
+    if (r.alvo_tipo === 'modulo') return { tipo: info?.sub ? 'Submódulo' : 'Módulo', titulo: info?.titulo ?? '(módulo removido)', sub: info?.sub ?? null }
+    return { tipo: 'Aula', titulo: info?.titulo ?? '(aula removida)', sub: info?.sub ?? null }
   }
 
   function alternar(r: RegraVisibilidade, ativo: boolean) {
@@ -177,10 +171,10 @@ export function AbaVisibilidade({ produtoId, produtoNome, podeEditar }: { produt
         <div className="flex flex-wrap items-end justify-between gap-2">
           <div><h2 className="flex items-center gap-2 text-base font-semibold"><Layers className="h-4 w-4 text-primary" />Conteúdos (módulos e aulas)</h2>
             <p className="text-xs text-muted-foreground">Regra no módulo vale para tudo dentro dele. Funciona junto com a disponibilidade por data.</p></div>
-          {podeEditar && <Button variant="outline" onClick={() => novaRegra('conteudo')} disabled={!dados.alvos.modulos.length}><Plus className="h-4 w-4" />Adicionar regra de conteúdo</Button>}
+          {podeEditar && <Button variant="outline" onClick={() => novaRegra('conteudo')} disabled={!dados.temModulos}><Plus className="h-4 w-4" />Adicionar regra de conteúdo</Button>}
         </div>
         <div className="divide-y overflow-hidden rounded-xl border bg-card">
-          {regrasConteudo.length ? regrasConteudo.map(linhaRegra) : <p className="px-4 py-6 text-center text-sm text-muted-foreground">{dados.alvos.modulos.length ? 'Todos os módulos e aulas estão visíveis para quem tem acesso ao produto.' : 'Este produto ainda não tem módulos — crie na aba Conteúdos.'}</p>}
+          {regrasConteudo.length ? regrasConteudo.map(linhaRegra) : <p className="px-4 py-6 text-center text-sm text-muted-foreground">{dados.temModulos ? 'Todos os módulos e aulas estão visíveis para quem tem acesso ao produto.' : 'Este produto ainda não tem módulos — crie na aba Conteúdos.'}</p>}
         </div>
       </section>
 
@@ -232,7 +226,7 @@ export function AbaVisibilidade({ produtoId, produtoNome, podeEditar }: { produt
       )}
       {editRegra && (
         <RegraDialog
-          modo={editRegra.modo} regra={editRegra.regra} produtoId={produtoId} segmentos={dados.segmentos} alvos={dados.alvos}
+          modo={editRegra.modo} regra={editRegra.regra} produtoId={produtoId} segmentos={dados.segmentos}
           onCriarSegmento={() => { const atual = editRegra; setEditRegra(null); setEditSeg({ seg: null, aoCriar: () => setEditRegra(atual) }) }}
           onClose={() => setEditRegra(null)}
           onSalvo={(r) => { setEditRegra(null); setDados((d) => d && { ...d, regras: d.regras.some((x) => x.id === r.id) ? d.regras.map((x) => (x.id === r.id ? r : x)) : [...d.regras, r] }); void recarregar() }}
@@ -243,8 +237,8 @@ export function AbaVisibilidade({ produtoId, produtoNome, podeEditar }: { produt
 }
 
 // ═══════════════════════ Regra (acesso / conteúdo) ═══════════════════════
-function RegraDialog({ modo, regra, produtoId, segmentos, alvos, onClose, onSalvo, onCriarSegmento }: {
-  modo: 'acesso' | 'conteudo'; regra: RegraVisibilidade | null; produtoId: string; segmentos: SegmentoAdmin[]; alvos: AlvosProduto
+function RegraDialog({ modo, regra, produtoId, segmentos, onClose, onSalvo, onCriarSegmento }: {
+  modo: 'acesso' | 'conteudo'; regra: RegraVisibilidade | null; produtoId: string; segmentos: SegmentoAdmin[]
   onClose: () => void; onSalvo: (r: RegraVisibilidade) => void; onCriarSegmento: () => void
 }) {
   const [segmentoId, setSegmentoId] = useState(regra?.segmento_id ?? segmentos[0]?.id ?? '')
@@ -253,9 +247,18 @@ function RegraDialog({ modo, regra, produtoId, segmentos, alvos, onClose, onSalv
   const [semAcesso, setSemAcesso] = useState<SemAcesso>(regra?.sem_acesso ?? 'oculto')
   const [filtro, setFiltro] = useState('')
   const [pending, start] = useTransition()
+  // Árvore de módulos/aulas carregada SÓ aqui (lazy) quando o dialog de CONTEÚDO abre — nunca na carga da aba.
+  const [alvos, setAlvos] = useState<AlvosProduto | null>(modo === 'conteudo' ? null : { modulos: [], aulas: [] })
+  useEffect(() => {
+    if (modo !== 'conteudo') return
+    let vivo = true
+    void carregarAlvosConteudoAction(produtoId).then((r) => { if (!vivo) return; if ('error' in r) { toast.error(r.error); setAlvos({ modulos: [], aulas: [] }) } else setAlvos(r.alvos) })
+    return () => { vivo = false }
+  }, [modo, produtoId])
 
   // Árvore achatada: módulo → submódulos → aulas (com indentação), filtrada pelo texto.
   const opcoes = useMemo(() => {
+    if (!alvos) return []
     const out: { v: string; label: string; nivel: number; tipo: AlvoTipo }[] = []
     const filhos = new Map<string | null, AlvosProduto['modulos']>()
     const ids = new Set(alvos.modulos.map((m) => m.id))
@@ -299,7 +302,8 @@ function RegraDialog({ modo, regra, produtoId, segmentos, alvos, onClose, onSalv
               <span className="block text-sm font-medium">Conteúdo</span>
               <div className="relative"><Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={filtro} onChange={(e) => setFiltro(e.target.value)} placeholder="Filtrar módulos e aulas…" className="pl-8" /></div>
               <div className="max-h-56 overflow-y-auto rounded-lg border">
-                {opcoes.length ? opcoes.map((o) => (
+                {!alvos ? <p className="flex items-center justify-center gap-2 px-3 py-4 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" />Carregando módulos e aulas…</p>
+                : opcoes.length ? opcoes.map((o) => (
                   <button key={o.v} type="button" onClick={() => setAlvo(o.v)}
                     className={cn('flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-muted', alvo === o.v && 'bg-primary/10 font-medium text-primary')}
                     style={{ paddingLeft: `${12 + o.nivel * 16}px` }}>
