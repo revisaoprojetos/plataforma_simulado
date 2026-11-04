@@ -12,15 +12,15 @@ export const dynamic = 'force-dynamic'
 // 16:9 — atalhos "Comece por aqui" e "Material extra"
 type Link16 = { line: string; sigla: string; grad: string; titulo: string; sub: string; href: string }
 const COMECE: Link16[] = [
-  { line: 'CRONOGRAMA', sigla: 'Cronograma', grad: 'linear-gradient(135deg,#3A1E5C,#7A3DB0)', titulo: 'Gerador de cronograma', sub: 'Monte o seu Cronograma Adaptativo', href: R.cronogramaMontar },
-  { line: 'COMO ESTUDAR', sigla: 'Como Estudar', grad: 'linear-gradient(135deg,#241A52,#5B3FD0)', titulo: 'Módulo Como Estudar', sub: 'Orientações de método em vídeo', href: R.comoEstudar },
+  { line: 'CRONOGRAMA', sigla: 'Cronograma', grad: 'linear-gradient(135deg,var(--pn-3a1e5c,#3A1E5C),var(--pn-7a3db0,#7A3DB0))', titulo: 'Gerador de cronograma', sub: 'Monte o seu Cronograma Adaptativo', href: R.cronogramaMontar },
+  { line: 'COMO ESTUDAR', sigla: 'Como Estudar', grad: 'linear-gradient(135deg,var(--pn-241a52,#241A52),var(--pn-5b3fd0,#5B3FD0))', titulo: 'Módulo Como Estudar', sub: 'Orientações de método em vídeo', href: R.comoEstudar },
 ]
 const EXTRA: Link16[] = [
-  { line: 'ATUALIZAÇÕES', sigla: 'Compilado', grad: 'linear-gradient(135deg,#3A1E5C,#7A3DB0)', titulo: 'Compilado de Atualizações', sub: 'Aulas novas ou reorganizadas', href: R.extensivo },
-  { line: 'LEGPROC', sigla: 'LegProc', grad: 'linear-gradient(135deg,#241A52,#5B3FD0)', titulo: 'LegProc · Legislação anotada', sub: 'Lei seca ligada às aulas', href: R.legproc },
-  { line: 'TESES', sigla: 'Teses e Súmulas', grad: 'linear-gradient(135deg,#1E2A5C,#3F5BD0)', titulo: 'Teses e Súmulas', sub: 'Para a Advocacia Pública', href: R.extensivo },
-  { line: 'GESTÃO', sigla: 'Gestão Emocional', grad: 'linear-gradient(135deg,#5C1E4A,#B03D8A)', titulo: 'Gestão Emocional', sub: 'Encontros ao vivo gravados', href: R.extensivo },
-  { line: 'PREPARAÇÃO 360°', sigla: 'Preparação 360°', grad: 'linear-gradient(135deg,#241A52,#4A31B8)', titulo: 'Preparação 360°', sub: 'Encontros temáticos com os professores', href: R.extensivo },
+  { line: 'ATUALIZAÇÕES', sigla: 'Compilado', grad: 'linear-gradient(135deg,var(--pn-3a1e5c,#3A1E5C),var(--pn-7a3db0,#7A3DB0))', titulo: 'Compilado de Atualizações', sub: 'Aulas novas ou reorganizadas', href: R.extensivo },
+  { line: 'LEGPROC', sigla: 'LegProc', grad: 'linear-gradient(135deg,var(--pn-241a52,#241A52),var(--pn-5b3fd0,#5B3FD0))', titulo: 'LegProc · Legislação anotada', sub: 'Lei seca ligada às aulas', href: R.legproc },
+  { line: 'TESES', sigla: 'Teses e Súmulas', grad: 'linear-gradient(135deg,var(--pn-1e2a5c,#1E2A5C),var(--pn-3f5bd0,#3F5BD0))', titulo: 'Teses e Súmulas', sub: 'Para a Advocacia Pública', href: R.extensivo },
+  { line: 'GESTÃO', sigla: 'Gestão Emocional', grad: 'linear-gradient(135deg,var(--pn-5c1e4a,#5C1E4A),var(--pn-b03d8a,#B03D8A))', titulo: 'Gestão Emocional', sub: 'Encontros ao vivo gravados', href: R.extensivo },
+  { line: 'PREPARAÇÃO 360°', sigla: 'Preparação 360°', grad: 'linear-gradient(135deg,var(--pn-241a52,#241A52),var(--pn-4a31b8,#4A31B8))', titulo: 'Preparação 360°', sub: 'Encontros temáticos com os professores', href: R.extensivo },
 ]
 
 // 2:3 — disciplinas
@@ -103,18 +103,18 @@ export default async function ExtensivoPage() {
       />
 
       {/* Banner */}
-      <section style={{ position: 'relative', overflow: 'hidden', borderRadius: 22, background: 'linear-gradient(120deg,#160F33 0%,#2A1A6A 55%,#3A2490 100%)', color: '#fff', padding: '30px 32px' }}>
+      <section style={{ position: 'relative', overflow: 'hidden', borderRadius: 22, background: 'linear-gradient(120deg,var(--pn-160f33,#160F33) 0%,var(--pn-2a1a6a,#2A1A6A) 55%,var(--pn-3a2490,#3A2490) 100%)', color: '#fff', padding: '30px 32px' }}>
         <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px)', backgroundSize: '44px 44px', WebkitMaskImage: 'linear-gradient(90deg,transparent,#000 60%)', maskImage: 'linear-gradient(90deg,transparent,#000 60%)' }} />
         <Row style={{ position: 'relative', justifyContent: 'space-between', alignItems: 'flex-start', gap: 20 }}>
           <Col gap={10} style={{ maxWidth: 640 }}>
             <Tag kind="gold" icon="layers">Extensivo</Tag>
             <h1 style={{ margin: 0, fontSize: 30, fontWeight: 800, letterSpacing: '-0.03em', color: '#fff' }}>Extensivo Advocacia Pública</h1>
-            <P size={14}><span style={{ color: '#E6DEFF' }}>Esse é o nosso Extensivo completo, {primeiroNome}.</span></P>
+            <P size={14}><span style={{ color: 'var(--pn-e6deff,#E6DEFF)' }}>Esse é o nosso Extensivo completo, {primeiroNome}.</span></P>
           </Col>
           <Col gap={0} style={{ alignItems: 'flex-end', flexShrink: 0 }}>
             {/* REAL: progresso agregado de leitura (materiais lidos / total acessível). */}
             <b style={{ fontSize: 40, fontWeight: 800, color: 'var(--gold)', lineHeight: 1, letterSpacing: '-0.03em' }}>{pct}%</b>
-            <span style={{ fontSize: 12, color: '#E6DEFF', whiteSpace: 'nowrap' }}>{cat.totalLidos.toLocaleString('pt-BR')} de {cat.totalPdfs.toLocaleString('pt-BR')} materiais</span>
+            <span style={{ fontSize: 12, color: 'var(--pn-e6deff,#E6DEFF)', whiteSpace: 'nowrap' }}>{cat.totalLidos.toLocaleString('pt-BR')} de {cat.totalPdfs.toLocaleString('pt-BR')} materiais</span>
           </Col>
         </Row>
       </section>

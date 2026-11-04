@@ -66,7 +66,7 @@ export function ProvaRunner({ voltarHref }: { voltarHref: string }) {
         <span style={{ flex: 1 }} />
         <div style={{ display: 'inline-flex', gap: 4, padding: 4, borderRadius: 13, background: 'var(--track)' }}>
           {(['caderno', 'folha'] as const).map((m) => (
-            <button key={m} type="button" onClick={() => setModo(m)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 34, padding: '0 14px', border: 0, borderRadius: 10, fontSize: 13, fontWeight: modo === m ? 800 : 700, background: modo === m ? 'var(--surface)' : 'transparent', color: modo === m ? 'var(--ink)' : 'var(--muted)', boxShadow: modo === m ? '0 2px 8px rgba(30,15,80,.1)' : undefined, cursor: 'pointer' }}>
+            <button key={m} type="button" onClick={() => setModo(m)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 34, padding: '0 14px', border: 0, borderRadius: 10, fontSize: 13, fontWeight: modo === m ? 800 : 700, background: modo === m ? 'var(--surface)' : 'transparent', color: modo === m ? 'var(--ink)' : 'var(--muted)', boxShadow: modo === m ? '0 2px 8px color-mix(in srgb,var(--pn-1e0f50,#1E0F50) 10%,transparent)' : undefined, cursor: 'pointer' }}>
               <Icon n={m === 'caderno' ? 'book' : 'list'} size={15} />{m === 'caderno' ? 'Caderno' : 'Folha'}
             </button>
           ))}

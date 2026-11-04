@@ -53,7 +53,7 @@ function VizSequencia() {
         </div>
       ))}
       <div className="ml-1 flex flex-col items-center gap-1" style={{ opacity: 0, animation: `dash-pop .55s cubic-bezier(.34,1.56,.64,1) ${fimSemana}s both` }}>
-        <span className="flex h-9 w-9 items-center justify-center rounded-xl border-2 text-white" style={{ background: 'linear-gradient(to bottom,#fde68a,#f59e0b)', borderColor: '#c07f08', boxShadow: '0 0 13px rgba(245,158,11,.6)' }}><Gift className="h-5 w-5" /></span>
+        <span className="flex h-9 w-9 items-center justify-center rounded-xl border-2 text-white" style={{ background: 'linear-gradient(to bottom,var(--pn-fde68a,#fde68a),var(--pn-f59e0b,#f59e0b))', borderColor: 'var(--pn-c07f08,#c07f08)', boxShadow: '0 0 13px color-mix(in srgb,var(--pn-f59e0b,#F59E0B) 60%,transparent)' }}><Gift className="h-5 w-5" /></span>
         <span className="text-[8px] font-bold text-amber-600">Baú!</span>
       </div>
     </div>
@@ -97,7 +97,7 @@ function VizCargos() {
     <div className="flex flex-wrap items-center justify-center gap-1.5">
       {CARGOS.map((c, i) => (
         <Fragment key={c.nome}>
-          <span className={cn('inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold text-white', c.topo && 'ring-2 ring-amber-300')} style={{ opacity: 0, background: c.cor, boxShadow: c.topo ? '0 0 12px rgba(245,158,11,.6)' : undefined, animation: `dash-pop .5s cubic-bezier(.34,1.56,.64,1) ${0.15 + i * passo}s both` }}>
+          <span className={cn('inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-bold text-white', c.topo && 'ring-2 ring-amber-300')} style={{ opacity: 0, background: c.cor, boxShadow: c.topo ? '0 0 12px color-mix(in srgb,var(--pn-f59e0b,#F59E0B) 60%,transparent)' : undefined, animation: `dash-pop .5s cubic-bezier(.34,1.56,.64,1) ${0.15 + i * passo}s both` }}>
             {c.topo && <Crown className="h-3.5 w-3.5" />}{c.nome}
           </span>
           {i < CARGOS.length - 1 && <ArrowRight className="h-3.5 w-3.5 text-muted-foreground/45" style={{ opacity: 0, animation: `dash-pop .45s ease-out ${0.15 + i * passo + 0.3}s both` }} />}

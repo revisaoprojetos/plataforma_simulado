@@ -74,7 +74,7 @@ const vazio = (): EntradaCronograma => ({
 // Cor do "Gerador rápido"/CTA do cronograma — EDITÁVEL via personalização (token `--crono-cor`),
 // com o roxo vibrante como default. Não usa --brand-primary porque a marca do tenant pode ser um
 // roxo mais escuro/opaco (o color-mix nela ficava feio); esta é uma cor DEDICADA e personalizável.
-const MARCA = 'var(--crono-cor, #6a54e0)'
+const MARCA = 'var(--crono-cor, var(--pn-6a54e0,#6a54e0))'
 // Clareia SOBE a luminosidade e mantém o croma (relative color oklch) — vibrante como o roxo original,
 // em vez de misturar com branco (que "lava"/deixa opaco). Continua 100% dirigido pelo token --crono-cor.
 const GRAD_MARCA = `linear-gradient(115deg, ${MARCA} 0%, oklch(from ${MARCA} calc(l + 0.08) c h) 58%, oklch(from ${MARCA} calc(l + 0.17) calc(c * 0.94) h) 100%)`

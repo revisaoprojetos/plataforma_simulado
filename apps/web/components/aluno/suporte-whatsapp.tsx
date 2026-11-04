@@ -42,10 +42,10 @@ export function SuporteWhatsApp() {
   return (
     <>
       <style>{`
-        .sup-wa{position:fixed;right:20px;bottom:calc(env(safe-area-inset-bottom) + 20px);z-index:50;display:inline-flex;align-items:center;gap:10px;height:56px;padding:0 18px 0 14px;border:0;border-radius:999px;background:#25D366;color:#fff;font:inherit;font-size:14px;font-weight:700;box-shadow:0 10px 28px -8px rgba(0,0,0,.35),0 0 0 1px rgba(0,0,0,.04);cursor:pointer;transition:transform .2s,box-shadow .2s}
+        .sup-wa{position:fixed;right:20px;bottom:calc(env(safe-area-inset-bottom) + 20px);z-index:50;display:inline-flex;align-items:center;gap:10px;height:56px;padding:0 18px 0 14px;border:0;border-radius:999px;background:var(--pn-25d366,#25D366);color:#fff;font:inherit;font-size:14px;font-weight:700;box-shadow:0 10px 28px -8px rgba(0,0,0,.35),0 0 0 1px rgba(0,0,0,.04);cursor:pointer;transition:transform .2s,box-shadow .2s}
         .sup-wa:hover{transform:translateY(-2px);box-shadow:0 14px 32px -8px rgba(0,0,0,.4)}
         .sup-wa:active{transform:scale(.96)}
-        .sup-wa:focus-visible{outline:3px solid #128C7E;outline-offset:3px}
+        .sup-wa:focus-visible{outline:3px solid var(--pn-128c7e,#128C7E);outline-offset:3px}
         .sup-wa .sup-txt{white-space:nowrap}
         @media (max-width:767px){
           .sup-wa{right:16px;bottom:calc(env(safe-area-inset-bottom) + 92px);width:54px;height:54px;padding:0;justify-content:center}

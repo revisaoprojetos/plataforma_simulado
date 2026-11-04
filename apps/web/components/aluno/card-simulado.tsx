@@ -14,7 +14,7 @@ function FitaNovo() {
     <span className="pointer-events-none absolute right-3 top-0 z-30 select-none" aria-label="Novo">
       <span
         className="flex h-8 w-11 items-start justify-center pt-1 text-[10px] font-extrabold uppercase tracking-wide text-white shadow-md"
-        style={{ background: 'linear-gradient(180deg, #fb7185, #e11d48)', clipPath: 'polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%)' }}
+        style={{ background: 'linear-gradient(180deg, var(--pn-fb7185,#fb7185), var(--pn-e11d48,#e11d48))', clipPath: 'polygon(0 0, 100% 0, 100% 100%, 50% 72%, 0 100%)' }}
       >
         Novo
       </span>

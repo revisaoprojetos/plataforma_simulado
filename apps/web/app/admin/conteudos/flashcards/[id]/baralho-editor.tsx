@@ -98,7 +98,7 @@ export function BaralhoEditor({ baralho, abrirNovo, podeEditar }: { baralho: Bar
               <Link href="/admin/conteudos/flashcards" className="hover:text-foreground">Flashcards</Link>
               <ChevronRight className="h-3 w-3" /><span className="text-foreground">{baralho.nome}</span>
             </nav>
-            <div className="mt-1 text-[11px] font-extrabold uppercase tracking-[.2em]" style={{ color: 'var(--gold-ink, #9A7400)' }}>Baralho</div>
+            <div className="mt-1 text-[11px] font-extrabold uppercase tracking-[.2em]" style={{ color: 'var(--gold-ink, var(--pn-9a7400,#9A7400))' }}>Baralho</div>
             <h1 className="text-[28px] font-extrabold leading-tight tracking-[-0.03em] text-foreground">{baralho.nome}</h1>
             <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[12.5px] text-muted-foreground">
               <span className={cn('rounded-full px-2.5 py-0.5 text-[11.5px] font-bold', baralho.status === 'publicado' ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-400' : 'bg-muted text-muted-foreground')}>{baralho.status === 'publicado' ? 'Publicado' : 'Rascunho'}</span>

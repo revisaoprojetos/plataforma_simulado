@@ -194,7 +194,7 @@ function Overlay({ titulo, passo, i, total, rect, onAnterior, onProximo, onSair 
           <div className="fixed bg-black/45 backdrop-blur-[2px]" style={{ top: R.top, left: 0, width: Math.max(0, R.left), height: R.h }} />
           <div className="fixed bg-black/45 backdrop-blur-[2px]" style={{ top: R.top, left: R.left + R.w, right: 0, height: R.h }} />
           {/* Anel + pulso no alvo */}
-          <div className="pointer-events-none fixed rounded-xl ring-2 ring-primary" style={{ left: R.left, top: R.top, width: R.w, height: R.h, boxShadow: '0 0 0 4px rgba(124,119,221,.35), 0 0 22px rgba(124,119,221,.55)' }} />
+          <div className="pointer-events-none fixed rounded-xl ring-2 ring-primary" style={{ left: R.left, top: R.top, width: R.w, height: R.h, boxShadow: '0 0 0 4px color-mix(in srgb,var(--pn-7c77dd,#7C77DD) 35%,transparent), 0 0 22px color-mix(in srgb,var(--pn-7c77dd,#7C77DD) 55%,transparent)' }} />
           <div className="pointer-events-none fixed rounded-xl border-2 border-primary" style={{ left: R.left, top: R.top, width: R.w, height: R.h, animation: 'tourPing 1.4s ease-out infinite' }} />
           {/* Seta animada apontando o alvo */}
           <div className="pointer-events-none fixed text-primary drop-shadow" style={{ left: R.left + R.w / 2 - 16, top: setaEmCima ? R.top - 42 : R.top + R.h + 8, animation: 'tourFloat 1s ease-in-out infinite' }}>

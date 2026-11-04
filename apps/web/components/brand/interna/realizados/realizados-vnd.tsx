@@ -14,8 +14,8 @@ import { Ic, PaneTabs, Filtros, SecaoHead, NotaRing, CoverVnd, Segs, type Pane, 
 import type { RealizadosData, RlzEmAndamento, RlzConcluido, RlzPersonalizado, RlzCapa } from './data'
 import { useBrandAtual, useCm } from '@/lib/brand/cor-marca'
 
-const HERO = 'linear-gradient(120deg,#041A10 0%,#0B4A2E 55%,#12643D 100%)'
-const FALLBACK_GRAD = 'linear-gradient(140deg,#062A1B,#16804F)'
+const HERO = 'linear-gradient(120deg,var(--pn-041a10,#041A10) 0%,var(--pn-0b4a2e,#0B4A2E) 55%,var(--pn-12643d,#12643D) 100%)'
+const FALLBACK_GRAD = 'linear-gradient(140deg,var(--pn-062a1b,#062A1B),var(--pn-16804f,#16804F))'
 const gradOf = (c?: RlzCapa) => c?.cor || FALLBACK_GRAD
 
 const VND_PASSOS: [string, string][] = [
@@ -26,23 +26,23 @@ const VND_PASSOS: [string, string][] = [
 
 function vnVars(dark: boolean, cm: (v: string) => string): CSSProperties {
   return {
-    ['--tBg' as string]: cm(dark ? '#1E2A23' : '#E4EDE7'),
-    ['--tOn' as string]: cm(dark ? '#2A3A31' : '#FFFFFF'),
-    ['--tOnInk' as string]: cm(dark ? '#FFFFFF' : '#0B1F15'),
-    ['--cnt' as string]: cm(dark ? 'rgba(79,224,152,.15)' : '#E4F3EA'),
-    ['--cntInk' as string]: cm(dark ? '#4FE098' : '#0F7A44'),
-    ['--fOn' as string]: cm(dark ? '#E8C877' : '#0F7A44'),
-    ['--fOnInk' as string]: cm(dark ? '#2A1F02' : '#FFFFFF'),
-    ['--hoverLine' as string]: cm('rgba(232,200,119,.7)'),
-    ['--gold' as string]: cm(dark ? '#E8C877' : '#D8B45A'),
-    ['--goldInk' as string]: cm(dark ? '#F1D48A' : '#9A7414'),
-    ['--goldBg' as string]: cm(dark ? 'rgba(232,200,119,.14)' : '#FBF4E2'),
+    ['--tBg' as string]: cm(dark ? 'var(--pn-1e2a23,#1E2A23)' : 'var(--pn-e4ede7,#E4EDE7)'),
+    ['--tOn' as string]: cm(dark ? 'var(--pn-2a3a31,#2A3A31)' : '#FFFFFF'),
+    ['--tOnInk' as string]: cm(dark ? '#FFFFFF' : 'var(--pn-0b1f15,#0B1F15)'),
+    ['--cnt' as string]: cm(dark ? 'color-mix(in srgb,var(--pn-4fe098,#4FE098) 15%,transparent)' : 'var(--pn-e4f3ea,#E4F3EA)'),
+    ['--cntInk' as string]: cm(dark ? 'var(--pn-4fe098,#4FE098)' : 'var(--pn-0f7a44,#0F7A44)'),
+    ['--fOn' as string]: cm(dark ? 'var(--pn-e8c877,#E8C877)' : 'var(--pn-0f7a44,#0F7A44)'),
+    ['--fOnInk' as string]: cm(dark ? 'var(--pn-2a1f02,#2A1F02)' : '#FFFFFF'),
+    ['--hoverLine' as string]: cm('color-mix(in srgb,var(--pn-e8c877,#E8C877) 70%,transparent)'),
+    ['--gold' as string]: cm(dark ? 'var(--pn-e8c877,#E8C877)' : 'var(--pn-d8b45a,#D8B45A)'),
+    ['--goldInk' as string]: cm(dark ? 'var(--pn-f1d48a,#F1D48A)' : 'var(--pn-9a7414,#9A7414)'),
+    ['--goldBg' as string]: cm(dark ? 'color-mix(in srgb,var(--pn-e8c877,#E8C877) 14%,transparent)' : 'var(--pn-fbf4e2,#FBF4E2)'),
   } as CSSProperties
 }
 
 // botão dourado como LINK
 const GoldLink = ({ href, children, h = 32 }: { href: string; children: React.ReactNode; h?: number }) => (
-  <Link href={href} className="rlzvn-gold" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: h, padding: '0 14px', borderRadius: 11, color: '#2A1F02', fontSize: 12.5, fontWeight: 800, background: 'linear-gradient(180deg,#F1D48A,#D8B45A)', textDecoration: 'none' }}>{children}</Link>
+  <Link href={href} className="rlzvn-gold" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: h, padding: '0 14px', borderRadius: 11, color: 'var(--pn-2a1f02,#2A1F02)', fontSize: 12.5, fontWeight: 800, background: 'linear-gradient(180deg,var(--pn-f1d48a,#F1D48A),var(--pn-d8b45a,#D8B45A))', textDecoration: 'none' }}>{children}</Link>
 )
 
 function Hero({ mobile, S }: { mobile: boolean; S: RealizadosData['stats'] }) {
@@ -50,21 +50,21 @@ function Hero({ mobile, S }: { mobile: boolean; S: RealizadosData['stats'] }) {
   const tiles: [string, string][] = [[String(S.feitos), 'realizados'], [String(S.concluidos), 'concluídos'], [S.mediaGeral != null ? `${S.mediaGeral}%` : '—', 'média geral'], [S.melhorNota != null ? String(S.melhorNota) : '—', 'melhor nota']]
   return (
     <section style={{ position: 'relative', overflow: 'hidden', background: cm(HERO), color: '#FFF', padding: mobile ? '22px 16px 20px' : '34px 24px 30px', margin: mobile ? '-14px -14px 0' : '-24px -24px 0' }}>
-      <span aria-hidden className="rlzvn-dots" style={{ position: 'absolute', inset: 0, backgroundImage: cm('radial-gradient(circle,rgba(185,245,212,.18) 1.2px,transparent 1.8px)'), backgroundSize: '22px 22px', pointerEvents: 'none' }} />
-      {[['-90px', 'rgba(232,200,119,.55)', 2], ['-50px', 'rgba(185,245,212,.14)', 1.2], ['-10px', 'rgba(185,245,212,.1)', 1.2]].map(([bottom, stroke, sw], i) => (
+      <span aria-hidden className="rlzvn-dots" style={{ position: 'absolute', inset: 0, backgroundImage: cm('radial-gradient(circle,color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 18%,transparent) 1.2px,transparent 1.8px)'), backgroundSize: '22px 22px', pointerEvents: 'none' }} />
+      {[['-90px', 'color-mix(in srgb,var(--pn-e8c877,#E8C877) 55%,transparent)', 2], ['-50px', 'color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 14%,transparent)', 1.2], ['-10px', 'color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 10%,transparent)', 1.2]].map(([bottom, stroke, sw], i) => (
         <svg key={i} className={`rlzvn-chev rlzvn-c${i + 1}`} viewBox="0 0 200 120" aria-hidden preserveAspectRatio="none" style={{ position: 'absolute', right: '-4%', width: '62%', height: 220, bottom: bottom as string, pointerEvents: 'none' }}><path d="M0 0 L100 112 L200 0" fill="none" stroke={cm(stroke as string)} strokeWidth={sw as number} vectorEffect="non-scaling-stroke" /></svg>
       ))}
       <div style={{ position: 'relative', display: 'flex', alignItems: mobile ? 'flex-start' : 'flex-end', justifyContent: 'space-between', gap: 30, flexDirection: mobile ? 'column' : 'row' }}>
         <div>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: cm('#86CFA6') }}><Ic n="clip" s={14} c="#D8B45A" />SEU HISTÓRICO</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: cm('var(--pn-86cfa6,#86CFA6)') }}><Ic n="clip" s={14} c="#D8B45A" />SEU HISTÓRICO</span>
           <h1 style={{ margin: '8px 0 4px', fontSize: mobile ? 28 : 40, fontWeight: 800, letterSpacing: '-0.045em' }}>Simulados realizados</h1>
-          <p style={{ margin: 0, fontSize: 14, color: cm('#CFE3D7') }}>Notas, correções e o que ainda falta terminar.</p>
+          <p style={{ margin: 0, fontSize: 14, color: cm('var(--pn-cfe3d7,#CFE3D7)') }}>Notas, correções e o que ainda falta terminar.</p>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: mobile ? 'repeat(2,1fr)' : 'repeat(4,auto)', gap: 10, width: mobile ? '100%' : undefined }}>
           {tiles.map(([v, l]) => (
-            <div key={l} style={{ padding: '10px 16px', borderRadius: 16, background: 'rgba(255,255,255,.08)', border: cm('1px solid rgba(185,245,212,.16)'), minWidth: mobile ? 0 : 110 }}>
+            <div key={l} style={{ padding: '10px 16px', borderRadius: 16, background: 'rgba(255,255,255,.08)', border: cm('1px solid color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 16%,transparent)'), minWidth: mobile ? 0 : 110 }}>
               <b style={{ display: 'block', fontSize: 20, fontWeight: 800 }}>{v}</b>
-              <span style={{ fontSize: 11.5, color: cm('#B7D3C3') }}>{l}</span>
+              <span style={{ fontSize: 11.5, color: cm('var(--pn-b7d3c3,#B7D3C3)') }}>{l}</span>
             </div>
           ))}
         </div>
@@ -91,7 +91,7 @@ function CardAndamento({ it }: { it: RlzEmAndamento }) {
           <Segs n={10} lit={Math.round(it.pct / 10)} h={6} on="var(--gold)" gap={2} rad={3} />
         </div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end' }}>
-          <span className="rlzvn-gold" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 14px', borderRadius: 11, color: '#2A1F02', fontSize: 12.5, fontWeight: 800, background: 'linear-gradient(180deg,#F1D48A,#D8B45A)' }}><Ic n="play" s={12} />Continuar</span>
+          <span className="rlzvn-gold" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 14px', borderRadius: 11, color: 'var(--pn-2a1f02,#2A1F02)', fontSize: 12.5, fontWeight: 800, background: 'linear-gradient(180deg,var(--pn-f1d48a,#F1D48A),var(--pn-d8b45a,#D8B45A))' }}><Ic n="play" s={12} />Continuar</span>
         </div>
       </div>
     </Link>
@@ -110,7 +110,7 @@ function CardConcluido({ it }: { it: RlzConcluido }) {
         {/* topo: Concluído + data; o TÍTULO logo abaixo (quebra em 2 linhas se não couber) */}
         <div style={{ minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 700, color: '#1FA868' }}><Ic n="check" s={13} />Concluído</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 700, color: 'var(--pn-1fa868,#1FA868)' }}><Ic n="check" s={13} />Concluído</span>
             <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{it.data}</span>
           </div>
           <b className="rlzvn-clamp2" style={{ marginTop: 5, fontSize: 14.5, lineHeight: 1.3, color: 'var(--ink)', fontWeight: 700 }}>{it.titulo}</b>
@@ -131,12 +131,12 @@ function CardPersonalizado({ it }: { it: RlzPersonalizado }) {
   const rascunho = it.status === 'rascunho'
   return (
     <div className="rlzvn-card" style={{ position: 'relative', display: 'flex', background: 'var(--surface)', borderRadius: 22, overflow: 'hidden', minHeight: 168 }}>
-      <Link href={it.href} style={{ position: 'relative', width: 150, flexShrink: 0, background: cm('linear-gradient(140deg,#0B3A24,#16804F)'), color: '#FFF', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '12px 12px', textDecoration: 'none' }}>
-        <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: cm('radial-gradient(circle,rgba(185,245,212,.22) 1px,transparent 1.6px)'), backgroundSize: '14px 14px' }} />
-        <span style={{ position: 'relative', fontSize: 8.5, fontWeight: 800, letterSpacing: '.2em', color: '#F1D48A' }}>PERSONALIZADO</span>
+      <Link href={it.href} style={{ position: 'relative', width: 150, flexShrink: 0, background: cm('linear-gradient(140deg,var(--pn-0b3a24,#0B3A24),var(--pn-16804f,#16804F))'), color: '#FFF', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: '12px 12px', textDecoration: 'none' }}>
+        <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: cm('radial-gradient(circle,color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 22%,transparent) 1px,transparent 1.6px)'), backgroundSize: '14px 14px' }} />
+        <span style={{ position: 'relative', fontSize: 8.5, fontWeight: 800, letterSpacing: '.2em', color: 'var(--pn-f1d48a,#F1D48A)' }}>PERSONALIZADO</span>
         <b style={{ position: 'relative', fontSize: 15, letterSpacing: '-0.03em', lineHeight: 1.1 }}>{it.nome}</b>
         {rascunho
-          ? <span style={{ position: 'absolute', right: 10, top: 10, height: 22, padding: '0 9px', borderRadius: 99, background: 'rgba(0,0,0,.35)', color: '#F1D48A', fontSize: 10.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center' }}>Rascunho</span>
+          ? <span style={{ position: 'absolute', right: 10, top: 10, height: 22, padding: '0 9px', borderRadius: 99, background: 'rgba(0,0,0,.35)', color: 'var(--pn-f1d48a,#F1D48A)', fontSize: 10.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center' }}>Rascunho</span>
           : (it.nota != null ? <span style={{ position: 'absolute', right: 8, top: 8 }}><NotaRing v={it.nota} size={44} /></span> : null)}
       </Link>
       <span aria-hidden className="rlzvn-perf" />
@@ -158,7 +158,7 @@ const CSS = `
    ABAIXO do picote (z-3) → o furo da meia-lua cobre a linha. Sombra de elevação fica no card no hover. */
 .rlzvn-card{transition:transform .55s cubic-bezier(.22,1,.36,1),box-shadow .55s cubic-bezier(.22,1,.36,1)}
 .rlzvn-card::after{content:'';position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 1px var(--line);pointer-events:none;z-index:2;transition:box-shadow .3s}
-.rlzvn-card:hover{transform:translateY(-8px) scale(1.012);box-shadow:0 26px 44px -28px rgba(10,40,25,.6)}
+.rlzvn-card:hover{transform:translateY(-8px) scale(1.012);box-shadow:0 26px 44px -28px color-mix(in srgb,var(--pn-0a2819,#0A2819) 60%,transparent)}
 .rlzvn-card:hover::after{box-shadow:inset 0 0 0 1px var(--hoverLine)}
 /* Ticket VND: perfuração = dots pequenos (furinhos da cor do fundo) ao longo do corte capa/corpo
    (x=150) + FUROS maiores (meia-lua) no topo e na base. Como o contorno do card é box-shadow INSET,
@@ -214,13 +214,13 @@ export function RealizadosVnd({ theme: themeProp, data }: { theme: InternaTheme;
           <div className="rlzvn-pv" key={`main-${f}`} style={{ display: 'flex', flexDirection: 'column', gap: 26 }}>
             {showAnd && nAnd > 0 ? (
               <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <SecaoHead icon="clock" title="Em andamento" count={nAnd} color="#D8B45A" bg="#D8B45A22" />
+                <SecaoHead icon="clock" title="Em andamento" count={nAnd} color="var(--pn-d8b45a,#D8B45A)" bg="#D8B45A22" />
                 <div style={{ display: 'grid', gridTemplateColumns: andCols, gap: 14 }}>{data.emAndamento.map((it) => <CardAndamento key={it.id} it={it} />)}</div>
               </section>
             ) : null}
             {showDone && nDone > 0 ? (
               <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <SecaoHead icon="check" title="Concluídos" count={nDone} color="#1FA868" bg="#1FA86822" />
+                <SecaoHead icon="check" title="Concluídos" count={nDone} color="var(--pn-1fa868,#1FA868)" bg="#1FA86822" />
                 <div style={{ display: 'grid', gridTemplateColumns: doneCols, gap: 16 }}>{doneList.map((it) => <CardConcluido key={it.id} it={it} />)}</div>
               </section>
             ) : null}
@@ -229,21 +229,21 @@ export function RealizadosVnd({ theme: themeProp, data }: { theme: InternaTheme;
           <div className="rlzvn-pv" key="pers" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
             {/* banner verde MONTE O SEU + 3 passos */}
             <Link href={pers.criarHref} className="rlzvn-newc" style={{ position: 'relative', overflow: 'hidden', borderRadius: 22, background: cm(HERO), color: '#FFF', padding: mobile ? '20px 18px' : '24px 26px', display: 'flex', alignItems: mobile ? 'flex-start' : 'center', gap: 20, flexDirection: mobile ? 'column' : 'row', textDecoration: 'none' }}>
-              <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: cm('radial-gradient(circle,rgba(185,245,212,.14) 1.2px,transparent 1.8px)'), backgroundSize: '22px 22px', pointerEvents: 'none' }} />
+              <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: cm('radial-gradient(circle,color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 14%,transparent) 1.2px,transparent 1.8px)'), backgroundSize: '22px 22px', pointerEvents: 'none' }} />
               <div style={{ position: 'relative', width: mobile ? '100%' : 280, flexShrink: 0 }}>
-                <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.2em', color: '#F1D48A' }}>MONTE O SEU</span>
+                <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.2em', color: 'var(--pn-f1d48a,#F1D48A)' }}>MONTE O SEU</span>
                 <b style={{ display: 'block', fontSize: 24, letterSpacing: '-0.03em', marginTop: 4 }}>Novo simulado personalizado</b>
               </div>
               <div style={{ position: 'relative', flex: 1, display: 'grid', gridTemplateColumns: mobile ? '1fr' : 'repeat(3,1fr)', gap: 10, width: mobile ? '100%' : undefined }}>
                 {VND_PASSOS.map(([t, d], i) => (
-                  <div key={t} style={{ padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,.08)', border: cm('1px solid rgba(185,245,212,.16)') }}>
-                    <span style={{ display: 'inline-flex', width: 22, height: 22, borderRadius: 7, background: 'rgba(241,212,138,.2)', color: '#F1D48A', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800 }}>{i + 1}</span>
+                  <div key={t} style={{ padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,.08)', border: cm('1px solid color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 16%,transparent)') }}>
+                    <span style={{ display: 'inline-flex', width: 22, height: 22, borderRadius: 7, background: 'color-mix(in srgb,var(--pn-f1d48a,#F1D48A) 20%,transparent)', color: 'var(--pn-f1d48a,#F1D48A)', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800 }}>{i + 1}</span>
                     <b style={{ display: 'block', marginTop: 6, fontSize: 14 }}>{t}</b>
-                    <span style={{ fontSize: 11.5, color: cm('#CFE3D7') }}>{d}</span>
+                    <span style={{ fontSize: 11.5, color: cm('var(--pn-cfe3d7,#CFE3D7)') }}>{d}</span>
                   </div>
                 ))}
               </div>
-              <div style={{ position: 'relative', flexShrink: 0 }}><span className="rlzvn-gold" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 40, padding: '0 14px', borderRadius: 11, color: '#2A1F02', fontSize: 12.5, fontWeight: 800, background: 'linear-gradient(180deg,#F1D48A,#D8B45A)' }}><Ic n="plus" s={15} />Criar simulado</span></div>
+              <div style={{ position: 'relative', flexShrink: 0 }}><span className="rlzvn-gold" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 40, padding: '0 14px', borderRadius: 11, color: 'var(--pn-2a1f02,#2A1F02)', fontSize: 12.5, fontWeight: 800, background: 'linear-gradient(180deg,var(--pn-f1d48a,#F1D48A),var(--pn-d8b45a,#D8B45A))' }}><Ic n="plus" s={15} />Criar simulado</span></div>
             </Link>
             <SecaoHead icon="clip" title="Seus simulados" count={pers.itens.length} color="var(--brand)" bg="var(--chip)" />
             <div style={{ display: 'grid', gridTemplateColumns: doneCols, gap: 16 }}>{pers.itens.map((it) => <CardPersonalizado key={it.id} it={it} />)}</div>

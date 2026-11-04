@@ -144,7 +144,7 @@ export function DashboardCharts({ inicial }: { inicial: DashboardSerie }) {
             <AreaChart data={dados.pontos} margin={{ top: 8, right: 10, left: -14, bottom: 0 }}>
               <defs>
                 <linearGradient id="gIni" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--primary)" stopOpacity={0.32} /><stop offset="100%" stopColor="var(--primary)" stopOpacity={0} /></linearGradient>
-                <linearGradient id="gFeitos" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#10b981" stopOpacity={0.32} /><stop offset="100%" stopColor="#10b981" stopOpacity={0} /></linearGradient>
+                <linearGradient id="gFeitos" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--pn-10b981,#10b981)" stopOpacity={0.32} /><stop offset="100%" stopColor="var(--pn-10b981,#10b981)" stopOpacity={0} /></linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border/60" vertical={false} />
               <XAxis dataKey="rotulo" tick={{ fontSize: 11 }} className="text-muted-foreground" tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={16} />
@@ -152,7 +152,7 @@ export function DashboardCharts({ inicial }: { inicial: DashboardSerie }) {
               <Tooltip {...tooltipProps} />
               <Legend iconType="plainline" wrapperStyle={{ fontSize: 12, paddingTop: 4 }} />
               <Area type="monotone" dataKey="iniciados" name="Iniciados" stroke="var(--primary)" strokeWidth={2} fill="url(#gIni)" dot={false} activeDot={{ r: 3 }} />
-              <Area type="monotone" dataKey="feitos" name="Feitos" stroke="#10b981" strokeWidth={2} fill="url(#gFeitos)" dot={false} activeDot={{ r: 3 }} />
+              <Area type="monotone" dataKey="feitos" name="Feitos" stroke="var(--pn-10b981,#10b981)" strokeWidth={2} fill="url(#gFeitos)" dot={false} activeDot={{ r: 3 }} />
             </AreaChart>
           </ResponsiveContainer>
         </GraficoCard>
@@ -160,12 +160,12 @@ export function DashboardCharts({ inicial }: { inicial: DashboardSerie }) {
         <GraficoCard titulo="Acessos de estudantes" subtitulo="Alunos que acessaram por dia" icon={Users} total={`${dados.resumo.ativos.toLocaleString('pt-BR')} no período`}>
           <ResponsiveContainer width="100%" height={240}>
             <AreaChart data={dados.pontos} margin={{ top: 8, right: 10, left: -14, bottom: 0 }}>
-              <defs><linearGradient id="gAtivos" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#6366f1" stopOpacity={0.32} /><stop offset="100%" stopColor="#6366f1" stopOpacity={0} /></linearGradient></defs>
+              <defs><linearGradient id="gAtivos" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="var(--pn-6366f1,#6366f1)" stopOpacity={0.32} /><stop offset="100%" stopColor="var(--pn-6366f1,#6366f1)" stopOpacity={0} /></linearGradient></defs>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border/60" vertical={false} />
               <XAxis dataKey="rotulo" tick={{ fontSize: 11 }} className="text-muted-foreground" tickLine={false} axisLine={false} interval="preserveStartEnd" minTickGap={16} />
               <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" tickLine={false} axisLine={false} allowDecimals={false} width={30} />
               <Tooltip {...tooltipProps} />
-              <Area type="monotone" dataKey="ativos" name="Estudantes ativos" stroke="#6366f1" strokeWidth={2} fill="url(#gAtivos)" dot={false} activeDot={{ r: 3 }} />
+              <Area type="monotone" dataKey="ativos" name="Estudantes ativos" stroke="var(--pn-6366f1,#6366f1)" strokeWidth={2} fill="url(#gAtivos)" dot={false} activeDot={{ r: 3 }} />
             </AreaChart>
           </ResponsiveContainer>
         </GraficoCard>

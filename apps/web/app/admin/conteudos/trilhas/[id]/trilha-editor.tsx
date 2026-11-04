@@ -99,7 +99,7 @@ export function TrilhaEditor({ trilha, produtos, outrasTrilhas, tenantId, tabIni
               <Link href="/admin/conteudos/trilhas" className="hover:text-foreground">Trilhas</Link>
               <ChevronRight className="h-3 w-3" /><span className="text-foreground">{trilha.nome}</span>
             </nav>
-            <div className="mt-1 text-[11px] font-extrabold uppercase tracking-[.2em]" style={{ color: 'var(--gold-ink, #9A7400)' }}>Trilha · cód. {trilha.codigo ?? '—'}</div>
+            <div className="mt-1 text-[11px] font-extrabold uppercase tracking-[.2em]" style={{ color: 'var(--gold-ink, var(--pn-9a7400,#9A7400))' }}>Trilha · cód. {trilha.codigo ?? '—'}</div>
             <h1 className="text-[28px] font-extrabold leading-tight tracking-[-0.03em] text-foreground">{tab === 'conteudos' ? 'Conteúdos da trilha' : trilha.nome}</h1>
             {tab === 'conteudos'
               ? <p className="mt-1 text-sm text-muted-foreground">Selecione os conteúdos que fazem parte desta trilha e defina a ordem de exibição.</p>

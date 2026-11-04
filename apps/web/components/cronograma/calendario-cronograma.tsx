@@ -326,7 +326,7 @@ export function CalendarioCronograma({
                       {dia.marca && dia.doMes && (
                         <span
                           className="rounded px-1 py-0.5 text-[9px] font-semibold uppercase leading-none text-white"
-                          style={{ background: dia.marca === 'revisao' ? paleta.revisao : '#71717a' }}
+                          style={{ background: dia.marca === 'revisao' ? paleta.revisao : 'var(--pn-71717a,#71717a)' }}
                         >
                           {dia.marca === 'revisao' ? 'revisão' : 'recesso'}
                         </span>

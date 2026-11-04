@@ -58,9 +58,9 @@ type QStatus = ResStatus
 export const acc = (brand: Brand) => (brand === 'meq' ? 'var(--brand2)' : 'var(--brand)')
 const RADIUS = { revisao: 20, vnd: 24, mac: 24, meq: 14 } as const
 
-const OK = '#1FA868'
-const WARN = '#D99A1E'
-const ERR = '#E5484D'
+const OK = 'var(--pn-1fa868,#1FA868)'
+const WARN = 'var(--pn-d99a1e,#D99A1E)'
+const ERR = 'var(--pn-e5484d,#E5484D)'
 
 /** `true` abaixo de 920px (layout mobile das composições). SSR-safe (começa desktop). */
 export function useIsMobile(bp = 920): boolean {
@@ -129,7 +129,7 @@ export function Card({
         borderRadius: RADIUS[brand],
         background: 'var(--surface)',
         border: '1px solid var(--line)',
-        boxShadow: brand === 'meq' ? '0 1px 2px rgba(16,30,70,.06),0 8px 24px -16px rgba(16,30,70,.25)' : undefined,
+        boxShadow: brand === 'meq' ? '0 1px 2px color-mix(in srgb,var(--pn-101e46,#101E46) 6%,transparent),0 8px 24px -16px color-mix(in srgb,var(--pn-101e46,#101E46) 25%,transparent)' : undefined,
         ...style,
       }}
     >
@@ -221,7 +221,7 @@ export function Btn({
   }
   if (kind === 'accent') {
     base.background = brand === 'vnd' ? 'var(--flag)' : acc(brand)
-    base.color = brand === 'vnd' ? '#2A1F02' : '#FFFFFF'
+    base.color = brand === 'vnd' ? 'var(--pn-2a1f02,#2A1F02)' : '#FFFFFF'
     base.border = '0'
   } else if (kind === 'primary') {
     base.background = acc(brand)
@@ -791,10 +791,10 @@ function Vring({ nota, size = 40 }: { nota: number; size?: number }) {
 // ───────────────────────────── realizações (tentativas) ─────────────────────
 
 const ACOL: Record<Brand, [string, string, string]> = {
-  revisao: ['#C9BDF7', '#8F75FF', '#4B30BE'],
-  vnd: ['#B7DEC6', '#46B97E', '#0F6B3C'],
-  mac: ['#DEB7B9', '#B9575C', '#580C10'],
-  meq: ['#B9D1F5', '#5E9BFF', '#1F4E9A'],
+  revisao: ['var(--pn-c9bdf7,#C9BDF7)', 'var(--pn-8f75ff,#8F75FF)', 'var(--pn-4b30be,#4B30BE)'],
+  vnd: ['var(--pn-b7dec6,#B7DEC6)', 'var(--pn-46b97e,#46B97E)', 'var(--pn-0f6b3c,#0F6B3C)'],
+  mac: ['var(--pn-deb7b9,#DEB7B9)', 'var(--pn-b9575c,#B9575C)', 'var(--pn-580c10,#580C10)'],
+  meq: ['var(--pn-b9d1f5,#B9D1F5)', 'var(--pn-5e9bff,#5E9BFF)', 'var(--pn-1f4e9a,#1F4E9A)'],
 }
 const attColor = (k: number, brand: Brand) => ACOL[brand][Math.min(k, 2)]
 
@@ -874,7 +874,7 @@ export function AttRows({
               <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{a.data}</span>
               {cur ? <span style={{ height: 17, padding: '0 6px', borderRadius: 99, background: 'var(--chip)', color: acc(brand), fontSize: 10.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center' }}>Atual</span> : null}
               {k === best ? (
-                <span style={{ height: 17, padding: '0 6px', borderRadius: 99, background: 'rgba(232,169,58,.16)', color: '#C98A12', fontSize: 10.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+                <span style={{ height: 17, padding: '0 6px', borderRadius: 99, background: 'color-mix(in srgb,var(--pn-e8a93a,#E8A93A) 16%,transparent)', color: 'var(--pn-c98a12,#C98A12)', fontSize: 10.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 3 }}>
                   <Crown size={10} />Melhor
                 </span>
               ) : null}
@@ -1140,16 +1140,16 @@ export function RevisarCard({ brand, data }: { brand: Brand; data: ResultadoInte
   if (brand === 'vnd') {
     return (
       <Card brand="vnd" pad="0" style={{ overflow: 'hidden', border: 0 }}>
-        <div style={{ padding: 20, background: 'linear-gradient(135deg,#0B4A2E,#12643D)', color: '#FFFFFF' }}>
-          <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.14em', color: '#86CFA6' }}>TREINO DOS SEUS ERROS</span>
+        <div style={{ padding: 20, background: 'linear-gradient(135deg,var(--pn-0b4a2e,#0B4A2E),var(--pn-12643d,#12643D))', color: '#FFFFFF' }}>
+          <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.14em', color: 'var(--pn-86cfa6,#86CFA6)' }}>TREINO DOS SEUS ERROS</span>
           <b style={{ display: 'block', margin: '6px 0 4px', fontSize: 18, letterSpacing: '-0.02em' }}>
             {lst.reduce((s, a) => s + a.erros, 0)} questões para revisar
           </b>
-          <p style={{ margin: '0 0 14px', fontSize: 12.5, color: '#CFE3D7', lineHeight: 1.5 }}>
+          <p style={{ margin: '0 0 14px', fontSize: 12.5, color: 'var(--pn-cfe3d7,#CFE3D7)', lineHeight: 1.5 }}>
             Monte um simulado só com os assuntos que você mais errou e feche o ciclo de estudo.
           </p>
           {href ? (
-            <a href={href} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 40, padding: '0 16px', borderRadius: 13, background: 'linear-gradient(180deg,#F1D48A,#D8B45A)', color: '#2A1F02', fontSize: 13, fontWeight: 800, textDecoration: 'none' }}>
+            <a href={href} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 40, padding: '0 16px', borderRadius: 13, background: 'linear-gradient(180deg,var(--pn-f1d48a,#F1D48A),var(--pn-d8b45a,#D8B45A))', color: 'var(--pn-2a1f02,#2A1F02)', fontSize: 13, fontWeight: 800, textDecoration: 'none' }}>
               <Target size={14} />{cta}
             </a>
           ) : null}
@@ -1185,18 +1185,18 @@ export function RecompensasCard({ data }: { data: ResultadoInternoData }) {
   const m = data.melhor
   return (
     <Card brand="vnd" pad="0" style={{ overflow: 'hidden', border: 0 }}>
-      <div style={{ padding: 20, background: 'linear-gradient(135deg,#F1D48A,#D8B45A)', color: '#2A1F02' }}>
+      <div style={{ padding: 20, background: 'linear-gradient(135deg,var(--pn-f1d48a,#F1D48A),var(--pn-d8b45a,#D8B45A))', color: 'var(--pn-2a1f02,#2A1F02)' }}>
         <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.14em', opacity: 0.8 }}>RECOMPENSAS</span>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, margin: '6px 0 12px' }}>
           <b style={{ fontSize: 30, letterSpacing: '-0.03em' }}>+{m.xp ?? 0}</b>
           <span style={{ fontSize: 13, fontWeight: 800 }}>XP ganho</span>
         </div>
         <div style={{ display: 'flex', gap: 10 }}>
-          <div style={{ flex: 1, padding: '10px 12px', borderRadius: 14, background: 'rgba(42,31,2,.1)' }}>
+          <div style={{ flex: 1, padding: '10px 12px', borderRadius: 14, background: 'color-mix(in srgb,var(--pn-2a1f02,#2A1F02) 10%,transparent)' }}>
             <b style={{ display: 'block', fontSize: 18 }}>{m.acertos}</b>
             <span style={{ fontSize: 10.5, fontWeight: 700 }}>questões viradas</span>
           </div>
-          <div style={{ flex: 1, padding: '10px 12px', borderRadius: 14, background: 'rgba(42,31,2,.1)', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ flex: 1, padding: '10px 12px', borderRadius: 14, background: 'color-mix(in srgb,var(--pn-2a1f02,#2A1F02) 10%,transparent)', display: 'flex', alignItems: 'center', gap: 8 }}>
             <Medal size={22} />
             <span style={{ fontSize: 11, fontWeight: 800, lineHeight: 1.2 }}>Medalha<br />Superação</span>
           </div>
@@ -1238,7 +1238,7 @@ function AltRow({ brand, alt, gabaritoLiberado }: { brand: Brand; alt: ResCorrec
   return (
     <div style={{ position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', gap: 12, minHeight: h, padding: '0 12px', borderRadius: r, border: `1.5px solid ${bd}`, background: bg }}>
       {typeof turma === 'number' ? (
-        <span aria-hidden style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${turma}%`, background: isGab ? 'rgba(31,168,104,.07)' : 'rgba(127,127,127,.05)' }} />
+        <span aria-hidden style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: `${turma}%`, background: isGab ? 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 7%,transparent)' : 'rgba(127,127,127,.05)' }} />
       ) : null}
       <span style={{ position: 'relative', width: 28, height: 28, borderRadius: dotR, background: dot, color: dink, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12.5, fontWeight: 800, flexShrink: 0 }}>{alt.letra}</span>
       <b style={{ position: 'relative', flex: 1, fontSize: 14, color: 'var(--ink)' }}>{alt.texto}</b>
@@ -1559,11 +1559,11 @@ function PodioBlock({ data }: { data: ResultadoInternoData }) {
   if (!podio) return null
   const order = [podio[1], podio[0], podio[2]] // 2-1-3
   const heights = [92, 120, 76]
-  const medals = ['#C0C0C0', '#F1D48A', '#CD7F32']
+  const medals = ['#C0C0C0', 'var(--pn-f1d48a,#F1D48A)', 'var(--pn-cd7f32,#CD7F32)']
   return (
     <Card brand="vnd" pad="0" style={{ overflow: 'hidden', border: 0 }}>
-      <div style={{ padding: '18px 16px 20px', background: 'linear-gradient(160deg,#0B4A2E,#041A10)', color: '#FFFFFF' }}>
-        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.14em', color: '#86CFA6' }}>PÓDIO DO SIMULADO</span>
+      <div style={{ padding: '18px 16px 20px', background: 'linear-gradient(160deg,var(--pn-0b4a2e,#0B4A2E),var(--pn-041a10,#041A10))', color: '#FFFFFF' }}>
+        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.14em', color: 'var(--pn-86cfa6,#86CFA6)' }}>PÓDIO DO SIMULADO</span>
         <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: 10, marginTop: 16 }}>
           {order.map((p, i) => {
             const rank = i === 0 ? 2 : i === 1 ? 1 : 3
@@ -1576,13 +1576,13 @@ function PodioBlock({ data }: { data: ResultadoInternoData }) {
                     : <Medal size={i === 1 ? 24 : 18} />}
                 </span>
                 <b style={{ fontSize: 11.5 }}>{p.iniciais}</b>
-                <span style={{ fontSize: 10.5, color: '#CFE3D7' }}>{fnum(p.nota)}</span>
-                <div style={{ width: '100%', height: heights[i], borderRadius: '10px 10px 0 0', background: `linear-gradient(180deg,${medals[rank - 1]},rgba(255,255,255,.08))`, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 6, color: '#2A1F02', fontWeight: 800, fontSize: 16 }}>{rank}º</div>
+                <span style={{ fontSize: 10.5, color: 'var(--pn-cfe3d7,#CFE3D7)' }}>{fnum(p.nota)}</span>
+                <div style={{ width: '100%', height: heights[i], borderRadius: '10px 10px 0 0', background: `linear-gradient(180deg,${medals[rank - 1]},rgba(255,255,255,.08))`, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 6, color: 'var(--pn-2a1f02,#2A1F02)', fontWeight: 800, fontSize: 16 }}>{rank}º</div>
               </div>
             )
           })}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 12, fontSize: 10.5, color: '#CFE3D7' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 12, fontSize: 10.5, color: 'var(--pn-cfe3d7,#CFE3D7)' }}>
           <Lock size={11} />Outros alunos aparecem de forma anônima.
         </div>
       </div>
@@ -1758,8 +1758,8 @@ function AvalMock({ brand, mobile, sessaoId }: { brand: Brand; mobile: boolean; 
         <b style={{ display: 'block', fontSize: 13, color: 'var(--ink)', marginBottom: 10 }}>Como você avalia este simulado?</b>
         <div style={{ display: 'flex', gap: 8 }}>
           {[1, 2, 3, 4, 5].map((s) => (
-            <button key={s} type="button" onClick={() => setStars(s)} aria-label={`${s} estrelas`} style={{ width: 44, height: 44, border: 0, background: 'transparent', color: s <= stars ? '#E8C877' : 'var(--line2)', cursor: 'pointer' }}>
-              <Trophy size={30} fill={s <= stars ? '#E8C877' : 'none'} />
+            <button key={s} type="button" onClick={() => setStars(s)} aria-label={`${s} estrelas`} style={{ width: 44, height: 44, border: 0, background: 'transparent', color: s <= stars ? 'var(--pn-e8c877,#E8C877)' : 'var(--line2)', cursor: 'pointer' }}>
+              <Trophy size={30} fill={s <= stars ? 'var(--pn-e8c877,#E8C877)' : 'none'} />
             </button>
           ))}
         </div>
@@ -1772,7 +1772,7 @@ function AvalMock({ brand, mobile, sessaoId }: { brand: Brand; mobile: boolean; 
           {Array.from({ length: 11 }).map((_, n) => {
             const on = nps === n
             return (
-              <button key={n} type="button" onClick={() => setNps(n)} style={{ flex: 1, minWidth: 34, height: 40, borderRadius: 7, border: `1.5px solid ${on ? '#306AB5' : 'var(--line)'}`, borderBottom: `3px solid ${npsColor(n)}`, background: on ? '#306AB5' : 'transparent', color: on ? '#FFFFFF' : 'var(--ink)', font: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>{n}</button>
+              <button key={n} type="button" onClick={() => setNps(n)} style={{ flex: 1, minWidth: 34, height: 40, borderRadius: 7, border: `1.5px solid ${on ? 'var(--pn-306ab5,#306AB5)' : 'var(--line)'}`, borderBottom: `3px solid ${npsColor(n)}`, background: on ? 'var(--pn-306ab5,#306AB5)' : 'transparent', color: on ? '#FFFFFF' : 'var(--ink)', font: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>{n}</button>
             )
           })}
         </div>
@@ -1784,7 +1784,7 @@ function AvalMock({ brand, mobile, sessaoId }: { brand: Brand; mobile: boolean; 
           {Array.from({ length: 11 }).map((_, n) => {
             const on = nps === n
             return (
-              <button key={n} type="button" onClick={() => setNps(n)} style={{ width: 40, height: 40, borderRadius: 10, border: `1.5px solid ${on ? '#5B3FD0' : 'var(--line)'}`, background: on ? '#5B3FD0' : 'transparent', color: on ? '#FFFFFF' : 'var(--ink)', font: 'inherit', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>{n}</button>
+              <button key={n} type="button" onClick={() => setNps(n)} style={{ width: 40, height: 40, borderRadius: 10, border: `1.5px solid ${on ? 'var(--pn-5b3fd0,#5B3FD0)' : 'var(--line)'}`, background: on ? 'var(--pn-5b3fd0,#5B3FD0)' : 'transparent', color: on ? '#FFFFFF' : 'var(--ink)', font: 'inherit', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>{n}</button>
             )
           })}
         </div>
@@ -1794,7 +1794,7 @@ function AvalMock({ brand, mobile, sessaoId }: { brand: Brand; mobile: boolean; 
   const avalCard = sent ? (
     <Card brand={brand}>
       <div className="rrz-pv" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 8, padding: '28px 16px' }}>
-        <span style={{ width: 52, height: 52, borderRadius: '50%', background: 'rgba(31,168,104,.14)', color: OK, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Check size={26} strokeWidth={3} /></span>
+        <span style={{ width: 52, height: 52, borderRadius: '50%', background: 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 14%,transparent)', color: OK, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Check size={26} strokeWidth={3} /></span>
         <b style={{ fontSize: 16, color: 'var(--ink)' }}>Obrigado pela avaliação!</b>
         <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>+10 XP creditados.</span>
       </div>
@@ -1823,8 +1823,8 @@ function AvalMock({ brand, mobile, sessaoId }: { brand: Brand; mobile: boolean; 
                 <span style={{ fontSize: 13, color: 'var(--ink)' }}>{asp}</span>
                 <span style={{ display: 'inline-flex', gap: 4 }}>
                   {[1, 2, 3, 4, 5].map((s) => (
-                    <button key={s} type="button" onClick={() => setAspects((m) => ({ ...m, [ai]: s }))} aria-label={`${s}`} style={{ width: 20, height: 20, border: 0, background: 'transparent', color: s <= (aspects[ai] ?? 0) ? '#E8C877' : 'var(--line2)', cursor: 'pointer', padding: 0 }}>
-                      <Trophy size={15} fill={s <= (aspects[ai] ?? 0) ? '#E8C877' : 'none'} />
+                    <button key={s} type="button" onClick={() => setAspects((m) => ({ ...m, [ai]: s }))} aria-label={`${s}`} style={{ width: 20, height: 20, border: 0, background: 'transparent', color: s <= (aspects[ai] ?? 0) ? 'var(--pn-e8c877,#E8C877)' : 'var(--line2)', cursor: 'pointer', padding: 0 }}>
+                      <Trophy size={15} fill={s <= (aspects[ai] ?? 0) ? 'var(--pn-e8c877,#E8C877)' : 'none'} />
                     </button>
                   ))}
                 </span>
@@ -1847,7 +1847,7 @@ function AvalMock({ brand, mobile, sessaoId }: { brand: Brand; mobile: boolean; 
       {rsent ? (
         <Card brand={brand}>
           <div className="rrz-pv" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 8, padding: '24px 16px' }}>
-            <span style={{ width: 48, height: 48, borderRadius: '50%', background: 'rgba(31,168,104,.14)', color: OK, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Check size={22} strokeWidth={3} /></span>
+            <span style={{ width: 48, height: 48, borderRadius: '50%', background: 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 14%,transparent)', color: OK, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Check size={22} strokeWidth={3} /></span>
             <b style={{ fontSize: 15, color: 'var(--ink)' }}>Report enviado</b>
             <span style={{ fontSize: 12, color: 'var(--muted)' }}>Resposta em até 48h úteis.</span>
           </div>

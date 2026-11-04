@@ -184,7 +184,7 @@ export function ProvaMeqLive(p: ProvaMeqLiveProps) {
       {/* Sheet navegador mobile */}
       {p.ns && (
         <>
-          <div className={`${P}-mbg`} onClick={() => p.onSetNs(false)} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(10,10,25,.55)', backdropFilter: 'blur(6px)' }} />
+          <div className={`${P}-mbg`} onClick={() => p.onSetNs(false)} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'color-mix(in srgb,var(--pn-0a0a19,#0A0A19) 55%,transparent)', backdropFilter: 'blur(6px)' }} />
           <div className={`${P}-msh`} style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 81, maxHeight: '76%', overflowY: 'auto', background: 'var(--surface)', borderRadius: '22px 22px 0 0', padding: 18 }}>
             <div style={{ width: 40, height: 4, borderRadius: 99, background: 'var(--line2)', margin: '0 auto 14px' }} />
             <b style={{ display: 'block', fontSize: 15, marginBottom: 12, color: 'var(--ink)' }}>Navegador · {cAns}/{N}</b>
@@ -223,7 +223,7 @@ function HeaderLogo({ p }: { p: ProvaMeqLiveProps }) {
 
 function SegBtn({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: ReactNode; label: string }) {
   return (
-    <button type="button" onClick={onClick} style={{ height: 32, padding: '0 12px', border: 0, borderRadius: 9, background: active ? 'var(--tOn)' : 'transparent', color: active ? 'var(--tOnInk)' : 'var(--muted)', font: 'inherit', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, boxShadow: active ? '0 1px 2px rgba(16,30,70,.12)' : undefined }}>
+    <button type="button" onClick={onClick} style={{ height: 32, padding: '0 12px', border: 0, borderRadius: 9, background: active ? 'var(--tOn)' : 'transparent', color: active ? 'var(--tOnInk)' : 'var(--muted)', font: 'inherit', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, boxShadow: active ? '0 1px 2px color-mix(in srgb,var(--pn-101e46,#101E46) 12%,transparent)' : undefined }}>
       {icon}<span className={`${P}-seglab`}>{label}</span>
     </button>
   )
@@ -238,7 +238,7 @@ function CardQuestao({ q, qi, N, resp, fz, flagged, elim, slotDiscursiva, onMark
   const ce = ehCE(q)
   const alts = [...q.alternativas].sort((a, b) => a.ordem - b.ordem)
   return (
-    <div key={qi} className={`${P}-qin`} style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 24, boxShadow: '0 1px 2px rgba(16,30,70,.04)' }}>
+    <div key={qi} className={`${P}-qin`} style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 24, boxShadow: '0 1px 2px color-mix(in srgb,var(--pn-101e46,#101E46) 4%,transparent)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14, flexWrap: 'wrap' }}>
         <span style={{ padding: '6px 11px', borderRadius: 8, background: 'var(--chip)', color: 'var(--brand)', fontSize: 12, fontWeight: 800 }}>{qi} / {N}</span>
         {q.disciplina ? <span style={{ padding: '6px 11px', borderRadius: 8, background: 'var(--surface2)', color: 'var(--muted)', fontSize: 12, fontWeight: 700 }}>{q.disciplina}</span> : null}
@@ -304,7 +304,7 @@ function CardQuestao({ q, qi, N, resp, fz, flagged, elim, slotDiscursiva, onMark
         <div>
           <button type="button" onClick={onPrev} style={{ ...btnGhost(46), width: 'auto', opacity: qi === 1 ? 0.4 : 1, pointerEvents: qi === 1 ? 'none' : 'auto' }}><IconChevL /> Anterior</button>
         </div>
-        <button type="button" onClick={onFlag} style={{ height: 46, padding: '0 16px', borderRadius: 12, cursor: 'pointer', font: 'inherit', fontSize: 13.5, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap', border: `1.5px solid ${flagged ? '#F2B63B' : 'rgba(242,182,59,.55)'}`, background: flagged ? '#F2B63B' : 'rgba(242,182,59,.14)', color: flagged ? '#3A2A00' : '#C98A0B' }}>
+        <button type="button" onClick={onFlag} style={{ height: 46, padding: '0 16px', borderRadius: 12, cursor: 'pointer', font: 'inherit', fontSize: 13.5, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap', border: `1.5px solid ${flagged ? 'var(--pn-f2b63b,#F2B63B)' : 'color-mix(in srgb,var(--pn-f2b63b,#F2B63B) 55%,transparent)'}`, background: flagged ? 'var(--pn-f2b63b,#F2B63B)' : 'color-mix(in srgb,var(--pn-f2b63b,#F2B63B) 14%,transparent)', color: flagged ? 'var(--pn-3a2a00,#3A2A00)' : 'var(--pn-c98a0b,#C98A0B)' }}>
           <IconFlag size={15} /><span className={`${P}-flaglab`}>{flagged ? 'Marcada para revisar' : 'Revisar'}</span>
         </button>
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
@@ -355,7 +355,7 @@ function Folha({ questoes, respostas, discPaginas, cAns, N, onMark }: {
 }) {
   // 6 colunas (spec). Cada célula: nº + bolhas (A–E / C·E / marca discursiva).
   return (
-    <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 20, boxShadow: '0 1px 2px rgba(16,30,70,.04)' }}>
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 20, boxShadow: '0 1px 2px color-mix(in srgb,var(--pn-101e46,#101E46) 4%,transparent)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
         <div>
           <b style={{ fontSize: 17, color: 'var(--ink)' }}>Folha de respostas</b>
@@ -399,7 +399,7 @@ function Navegador({ questoes, qi, respostas, discPaginas, marcadas, cAns, cBl, 
   questoes: ProvaLiveQuestao[]; qi: number; respostas: Record<string, string>; discPaginas: Record<string, number>; marcadas: Set<string>; cAns: number; cBl: number; cFl: number; cPct: number; onGo: (n: number) => void
 }) {
   return (
-    <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 18, boxShadow: '0 1px 2px rgba(16,30,70,.04)' }}>
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 18, boxShadow: '0 1px 2px color-mix(in srgb,var(--pn-101e46,#101E46) 4%,transparent)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
         <b style={{ fontSize: 15, color: 'var(--ink)' }}>Navegador</b>
         <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--brand)' }}>{cPct}% feito</span>
@@ -474,11 +474,11 @@ function ModalRev({ questoes, respostas, discPaginas, marcadas, N, cAns, cBl, cF
           <Chip v={cFl} l="Para revisar" color="var(--flag)" />
         </div>
         {hasBl ? (
-          <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(242,169,59,.14)', borderLeft: `3px solid ${AMBER}`, color: 'var(--ink)', fontSize: 12.5, lineHeight: 1.5 }}>
+          <div style={{ padding: '12px 14px', borderRadius: 12, background: 'color-mix(in srgb,var(--pn-f2a93b,#F2A93B) 14%,transparent)', borderLeft: `3px solid ${AMBER}`, color: 'var(--ink)', fontSize: 12.5, lineHeight: 1.5 }}>
             Você ainda tem {cBl} itens em branco: {blTxt}. <b>No Cebraspe, deixar em branco não desconta.</b>
           </div>
         ) : (
-          <div style={{ padding: '12px 14px', borderRadius: 12, background: 'rgba(31,168,104,.14)', borderLeft: `3px solid ${OK_GREEN}`, color: OK_GREEN, fontSize: 12.5, fontWeight: 700 }}>
+          <div style={{ padding: '12px 14px', borderRadius: 12, background: 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 14%,transparent)', borderLeft: `3px solid ${OK_GREEN}`, color: OK_GREEN, fontSize: 12.5, fontWeight: 700 }}>
             Todas as questões foram respondidas.
           </div>
         )}

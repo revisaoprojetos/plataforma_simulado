@@ -83,8 +83,8 @@ export function ResultadoRevisao({ theme, data }: SimScreenProps) {
           </div>
 
           {/* DICA pêssego */}
-          <div style={{ display: 'flex', gap: 12, padding: '16px 18px', borderRadius: 18, background: 'var(--peachBg)', border: '1px solid rgba(241,194,50,.45)' }}>
-            <span style={{ width: 40, height: 40, borderRadius: 12, background: REV_GOLD, color: '#2A1A55', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Ic size={18}><path d={P.bulb} /><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2V17h6v-.3c0-.8.4-1.5 1-2A7 7 0 0 0 12 2z" /></Ic></span>
+          <div style={{ display: 'flex', gap: 12, padding: '16px 18px', borderRadius: 18, background: 'var(--peachBg)', border: '1px solid color-mix(in srgb,var(--pn-f1c232,#F1C232) 45%,transparent)' }}>
+            <span style={{ width: 40, height: 40, borderRadius: 12, background: REV_GOLD, color: 'var(--pn-2a1a55,#2A1A55)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Ic size={18}><path d={P.bulb} /><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2V17h6v-.3c0-.8.4-1.5 1-2A7 7 0 0 0 12 2z" /></Ic></span>
             <div>
               <b style={{ display: 'block', fontSize: 14, color: 'var(--ink)' }}>Próximo passo sugerido pela Revisão</b>
               <span style={{ fontSize: 13, lineHeight: 1.5, color: 'var(--muted)' }}>Você ficou acima da média em 11 de 15 matérias. Monte um cronograma focado em Direito Financeiro e Urbanístico.</span>
@@ -122,7 +122,7 @@ export function ResultadoRevisao({ theme, data }: SimScreenProps) {
               </div>
             </div>
             {npSent ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 16, borderRadius: 14, background: 'rgba(31,168,104,.1)', color: OK, fontSize: 14, fontWeight: 700 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 16, borderRadius: 14, background: 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 10%,transparent)', color: OK, fontSize: 14, fontWeight: 700 }}>
                 <Ic d={P.check} size={18} />Obrigado! Sua avaliação ajuda a Revisão a melhorar os próximos simulados.
               </div>
             ) : (
@@ -236,7 +236,7 @@ export function ResultadoRevisao({ theme, data }: SimScreenProps) {
                         const isG = a.letra === cur.gabarito
                         const isY = a.letra === cur.suaResposta && !isG
                         const bd = isG ? OK : isY ? ERR : 'var(--line)'
-                        const bg = isG ? 'rgba(31,168,104,.1)' : isY ? 'rgba(229,72,77,.08)' : 'var(--surface)'
+                        const bg = isG ? 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 10%,transparent)' : isY ? 'color-mix(in srgb,var(--pn-e5484d,#E5484D) 8%,transparent)' : 'var(--surface)'
                         const dot = isG ? OK : isY ? ERR : 'transparent'
                         const ink = isG || isY ? '#fff' : 'var(--muted)'
                         return (

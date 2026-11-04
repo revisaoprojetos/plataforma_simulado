@@ -110,7 +110,7 @@ export default async function Page() {
       {cont && atual ? (
         <div className="np-split" style={{ display: 'grid', gridTemplateColumns: '300px minmax(0,1fr)', gap: 0, alignItems: 'stretch', border: '1px solid var(--line)', borderRadius: 20, overflow: 'hidden' }}>
           {/* capa roxa */}
-          <div style={{ position: 'relative', overflow: 'hidden', background: 'linear-gradient(135deg,#2A1E4A,#4A31B8)', color: '#FFFFFF', padding: 24, display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <div style={{ position: 'relative', overflow: 'hidden', background: 'linear-gradient(135deg,var(--pn-2a1e4a,#2A1E4A),var(--pn-4a31b8,#4A31B8))', color: '#FFFFFF', padding: 24, display: 'flex', flexDirection: 'column', gap: 10 }}>
             <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.07) 1px,transparent 1px)', backgroundSize: '26px 26px' }} />
             <span style={{ position: 'relative', fontSize: 10.5, fontWeight: 800, letterSpacing: '.18em', textTransform: 'uppercase', opacity: 0.8 }}>Continue de onde parou</span>
             <span style={{ position: 'relative', display: 'flex', alignItems: 'baseline', gap: 6, fontWeight: 800, letterSpacing: '-0.03em', marginTop: 4 }}>

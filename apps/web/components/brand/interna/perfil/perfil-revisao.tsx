@@ -49,7 +49,7 @@ function squares(W: number, H: number, g: number, n: number, seed: number) {
     if (!set.has(key)) { set.add(key); cells.push({ c, r, d: rnd() * 7.5 + 0.5, k: k++ }) }
   }
   return cells.map(({ c, r, d, k }) => (
-    <span key={k} className="prv-px" style={{ left: c * g + 1, top: r * g + 1, width: g - 1, height: g - 1, background: k % 3 === 0 ? 'rgba(185,168,255,.22)' : 'rgba(241,194,50,.2)', animationDelay: `${d.toFixed(2)}s` }} />
+    <span key={k} className="prv-px" style={{ left: c * g + 1, top: r * g + 1, width: g - 1, height: g - 1, background: k % 3 === 0 ? 'color-mix(in srgb,var(--pn-b9a8ff,#B9A8FF) 22%,transparent)' : 'color-mix(in srgb,var(--pn-f1c232,#F1C232) 20%,transparent)', animationDelay: `${d.toFixed(2)}s` }} />
   ))
 }
 
@@ -90,13 +90,13 @@ function WhoRow({ mobile, data }: { mobile: boolean; data: PerfilData }) {
     <div style={{ display: 'flex', flexDirection: mobile ? 'column' : 'row', gap: mobile ? 14 : 20, alignItems: mobile ? undefined : 'flex-start', padding: `0 ${mobile ? 20 : 32}px ${mobile ? 20 : 24}px`, position: 'relative' }}>
       <div style={{ position: 'relative', padding: 5, borderRadius: '50%', background: mobile ? 'var(--surface)' : 'var(--bg)', alignSelf: 'flex-start', marginTop: -(av / 2 + 5), marginBottom: mobile ? -14 : 0 }}>
         {h.gamAtivo
-          ? <LvlRing size={av} p={ringP} color="#F1C232" inner={<Avatar size={av} data={data} />} />
+          ? <LvlRing size={av} p={ringP} color="var(--pn-f1c232,#F1C232)" inner={<Avatar size={av} data={data} />} />
           : <span style={{ width: av, height: av, display: 'inline-flex' }}><Avatar size={av} data={data} /></span>}
       </div>
       <div style={{ flex: 1, minWidth: 0, paddingTop: mobile ? 0 : 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <b style={{ fontSize: mobile ? 24 : 28, fontWeight: 800, letterSpacing: '-0.04em', color: 'var(--ink)' }}>{h.nome}</b>
-          {h.gamAtivo ? <span style={{ height: 24, padding: '0 10px', borderRadius: 99, background: '#F1C232', color: '#2A1A55', fontSize: 11.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center' }}>Nv {h.nivel} · {h.tituloNivel}</span> : null}
+          {h.gamAtivo ? <span style={{ height: 24, padding: '0 10px', borderRadius: 99, background: 'var(--pn-f1c232,#F1C232)', color: 'var(--pn-2a1a55,#2A1A55)', fontSize: 11.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center' }}>Nv {h.nivel} · {h.tituloNivel}</span> : null}
         </div>
         {meta.length ? (
           <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 6, fontSize: 12.5, color: 'var(--muted)' }}>
@@ -144,7 +144,7 @@ function Header({ mobile, data }: { mobile: boolean; data: PerfilData }) {
   const ehCorCapa = !!capa && capa.startsWith('#')
   const ehAnimado = capa == null || capa === 'anim'
   const banner = (
-    <div style={{ position: 'relative', height: Hb, overflow: 'hidden', background: ehAnimado ? 'linear-gradient(120deg,#24166A,#4B30BE 55%,#6449E0)' : (ehCorCapa ? capa! : '#1a1240') }}>
+    <div style={{ position: 'relative', height: Hb, overflow: 'hidden', background: ehAnimado ? 'linear-gradient(120deg,var(--pn-24166a,#24166A),var(--pn-4b30be,#4B30BE) 55%,var(--pn-6449e0,#6449E0))' : (ehCorCapa ? capa! : 'var(--pn-1a1240,#1a1240)') }}>
       {capa && !ehCorCapa && capa !== 'anim' ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img src={capa} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -156,10 +156,10 @@ function Header({ mobile, data }: { mobile: boolean; data: PerfilData }) {
           {mobile ? null : (
             <svg className="prv-emb" viewBox="0 0 68 66" aria-hidden style={{ position: 'absolute', right: 60, top: '50%', marginTop: -88, width: 180, height: 175, pointerEvents: 'none' }}>
               <path fillRule="evenodd" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.12)" strokeWidth={0.25} d={REV_R} />
-              <path className="prv-run" fill="none" stroke="#F1C232" strokeWidth={0.45} strokeLinecap="round" d={REV_RO} />
+              <path className="prv-run" fill="none" stroke="var(--pn-f1c232,#F1C232)" strokeWidth={0.45} strokeLinecap="round" d={REV_RO} />
             </svg>
           )}
-          {mobile ? null : <span style={{ position: 'absolute', left: 32, top: 56, fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: '#F1C232' }}>RUMO À PROCURADORIA</span>}
+          {mobile ? null : <span style={{ position: 'absolute', left: 32, top: 56, fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: 'var(--pn-f1c232,#F1C232)' }}>RUMO À PROCURADORIA</span>}
         </>
       ) : null}
       {/* Adesivos-decoração salvos pelo aluno (posição/tamanho em % do banner). */}

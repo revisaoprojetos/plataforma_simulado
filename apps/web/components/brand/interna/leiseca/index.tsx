@@ -13,9 +13,9 @@ import { type Brand, type InternaTheme } from '../interna-tokens'
 import { useTemaInterno } from '../use-tema-interno'
 import { useCm } from '@/lib/brand/cor-marca'
 
-const GOLD = '#F1C232'
-const OK = '#1FA868'
-const WARN = '#D99A1E'
+const GOLD = 'var(--pn-f1c232,#F1C232)'
+const OK = 'var(--pn-1fa868,#1FA868)'
+const WARN = 'var(--pn-d99a1e,#D99A1E)'
 
 type LeiSecaModulo = {
   id: string
@@ -263,7 +263,7 @@ export function PlatformLeiSeca({ brand, theme, modulos, stats, ultimoModuloId }
             <div style={{ marginTop: 'auto', display: 'flex', gap: 8 }}>
               <Link
                 href={`/aluno/leitura?modulo=${atual.id}`}
-                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 44, padding: '0 16px', borderRadius: 12, background: cm(GOLD), color: cm('#2A1A55'), fontSize: 13.5, fontWeight: 800, whiteSpace: 'nowrap' }}
+                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 44, padding: '0 16px', borderRadius: 12, background: cm(GOLD), color: cm('var(--pn-2a1a55,#2A1A55)'), fontSize: 13.5, fontWeight: 800, whiteSpace: 'nowrap' }}
               >
                 <Play size={14} />
                 Continuar aula

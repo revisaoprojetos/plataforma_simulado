@@ -74,8 +74,8 @@ export function Vazio({ children }: { children: ReactNode }) {
 
 /** Cor de acerto: vermelho→amarelo→verde. */
 export function corAcerto(pct: number): string {
-  if (pct >= 70) return '#22c55e'
-  if (pct >= 50) return '#eab308'
-  if (pct >= 30) return '#f97316'
-  return '#ef4444'
+  if (pct >= 70) return 'var(--pn-22c55e,#22c55e)'
+  if (pct >= 50) return 'var(--pn-eab308,#eab308)'
+  if (pct >= 30) return 'var(--pn-f97316,#f97316)'
+  return 'var(--pn-ef4444,#ef4444)'
 }

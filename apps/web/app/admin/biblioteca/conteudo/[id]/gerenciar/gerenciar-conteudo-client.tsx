@@ -7,7 +7,7 @@ import { formatBrt } from '@/lib/brt'
 import { gestaoDe } from '@/lib/biblioteca/gestao-tipos'
 import { tipoDe, seloStyle } from '@/lib/biblioteca/tipos-conteudo'
 import {
-  salvarProtecaoConteudo, definirVisibilidadeConteudo, salvarLegendaCategorias, arquivarConteudo, removerOrigemAcesso,
+  salvarProtecaoConteudo, definirVisibilidadeConteudo, salvarLegendaCategorias, salvarLeituraLegproc, salvarLegendaTabelaDoc, arquivarConteudo, removerOrigemAcesso,
   carregarRegistroAluno, carregarAlunosGerenciamento, type GestaoDados, type OrigemAcesso, type AlunoAcesso, type EventoRegistro,
 } from '@/app/admin/biblioteca/gestao-actions'
 import { abrirEdicaoDocx, midiaPreviewDocumento } from '@/app/admin/biblioteca/actions'
@@ -577,9 +577,13 @@ function AbaConfig({ base, tp }: { base: GestaoDados['base']; tp: ReturnType<typ
   const [vis, setVis] = useState(!b.oculto)
   const [prot, setProt] = useState(b.protecao)
   const [legenda, setLegenda] = useState(b.legendaCategorias)
+  const [legproc, setLegproc] = useState(b.leituraLegproc)
+  const [ocultaLegTab, setOcultaLegTab] = useState(b.legendaTabelaOculta)
   const [salvando, setSalvando] = useState(false)
   async function toggleVis() { const nv = !vis; setVis(nv); const r = await definirVisibilidadeConteudo(b.id, nv); if (!r.ok) { setVis(!nv); toast.error(r.error || 'Falha.') } else toast.success(nv ? 'Visível para os alunos.' : 'Oculto para os alunos.') }
   async function toggleLegenda() { const nv = !legenda; setLegenda(nv); const r = await salvarLegendaCategorias(b.id, nv); if (!r.ok) { setLegenda(!nv); toast.error(r.error || 'Falha.') } else toast.success(nv ? 'Legenda de categorias ativada no leitor.' : 'Legenda de categorias oculta no leitor.') }
+  async function toggleLegproc() { const nv = !legproc; setLegproc(nv); const r = await salvarLeituraLegproc(b.id, nv); if (!r.ok) { setLegproc(!nv); toast.error(r.error || 'Falha.') } else toast.success(nv ? 'Documento marcado como LegProc: leitura em texto com STF/STJ recolhíveis.' : 'Leitura LegProc desativada (volta ao PDF fiel).') }
+  async function toggleLegTab() { const nv = !ocultaLegTab; setOcultaLegTab(nv); const r = await salvarLegendaTabelaDoc(b.id, nv); if (!r.ok) { setOcultaLegTab(!nv); toast.error(r.error || 'Falha.') } else toast.success(nv ? 'Tabela de legenda oculta para o aluno.' : 'Tabela de legenda visível para o aluno.') }
   async function toggleProt(k: keyof typeof prot) { const nv = { ...prot, [k]: !prot[k] }; setProt(nv); setSalvando(true); const r = await salvarProtecaoConteudo(b.id, { [k]: nv[k] }); setSalvando(false); if (!r.ok) { setProt(prot); toast.error(r.error || 'Falha.') } }
   async function arquivar() { const r = await arquivarConteudo(b.id); if (!r.ok) return toast.error(r.error || 'Falha.'); toast.success('Conteúdo arquivado.') }
   const Sw = ({ on, onClick }: { on: boolean; onClick: () => void }) => <button className={on ? 'sw on' : 'sw'} role="switch" aria-checked={on} onClick={onClick} />
@@ -592,6 +596,8 @@ function AbaConfig({ base, tp }: { base: GestaoDados['base']; tp: ReturnType<typ
           <div className="crow"><span style={{ flex: 1 }}><strong style={{ fontSize: 13.5 }}>Visível para os alunos</strong><div style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>Desligar oculta para todos, inclusive nos pacotes</div></span><Sw on={vis} onClick={toggleVis} /></div>
           <div className="crow"><span style={{ flex: 1 }}><strong style={{ fontSize: 13.5 }}>Marca d’água com nome e CPF</strong><div style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>No leitor e no download</div></span><Sw on={prot.marca_dagua} onClick={() => toggleProt('marca_dagua')} /></div>
           <div className="crow"><span style={{ flex: 1 }}><strong style={{ fontSize: 13.5 }}>Legenda de categorias no leitor</strong><div style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>Barra Núcleo/Prazos/STF/STJ… — específica do LegProc. Deixe desligada em PDFULL/Fight e nos demais.</div></span><Sw on={legenda} onClick={toggleLegenda} /></div>
+          <div className="crow"><span style={{ flex: 1 }}><strong style={{ fontSize: 13.5 }}>Documento LegProc (leitura em texto)</strong><div style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>O aluno lê em modo texto, com os entendimentos do STF e do STJ recolhidos (clique para expandir), como na Lei Seca. Desligado = PDF fiel.{b.leituraLegprocAuto ? ' Já ativo automaticamente: este documento está numa pasta LegProc.' : ''}</div></span><Sw on={legproc} onClick={toggleLegproc} /></div>
+          <div className="crow"><span style={{ flex: 1 }}><strong style={{ fontSize: 13.5 }}>Ocultar a tabela de legenda do início</strong><div style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>No LegProc em texto, a tabela “LEGENDA: amarelo = núcleo…” repete a barra de legendas do leitor. Ligado (padrão) = não aparece para o aluno. Vale só para este documento; também dá para definir por pasta.</div></span><Sw on={ocultaLegTab} onClick={toggleLegTab} /></div>
         </div>
         {/* Proteção */}
         <div className="kc" style={{ gap: 0, padding: '16px 18px' }}>

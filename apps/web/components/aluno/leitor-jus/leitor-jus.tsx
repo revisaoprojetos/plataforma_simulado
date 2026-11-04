@@ -10,10 +10,11 @@
 //   3) os botões Voltar/Questões do leitor mandam { type:'leitor-jus-nav', to } → navegamos aqui.
 // Config por tópico (tags/tribunal/temas do editor) entra numa fase seguinte, por `cfg`.
 
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { TopicosConfig } from '@/lib/leitura/topicos'
 import { SELOS } from '@/lib/leitura/selos'
 import { APP_VERSION } from '@/lib/version'
+import { SalvarComentarioCaderno, normalizarComentarioCaderno, type ComentarioParaCaderno } from '@/components/aluno/cadernos/salvar-comentario-caderno'
 
 // Tipo LOCAL (client-safe) do grifo do aluno. NÃO importar de '@/lib/leitura/acesso' — aquele módulo é
 // 'server-only'; referenciá-lo num client component quebra o bundle (em dev vira loop de reload). É
@@ -51,6 +52,7 @@ export function LeitorJus({
   anotacoes?: GrifoAluno[]
 }) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
+  const [paraCaderno, setParaCaderno] = useState<ComentarioParaCaderno | null>(null)
   // Mantém os dados num ref para o listener de mensagem sempre ver o valor atual sem re-registrar.
   const dadosRef = useRef({ html, titulo, sobretitulo, topicos, caminho, voltarHref, questoesHref, documentoId, versao, desafio, legendasOff, grifoRevisaoOff, anotacoes })
   dadosRef.current = { html, titulo, sobretitulo, topicos, caminho, voltarHref, questoesHref, documentoId, versao, desafio, legendasOff, grifoRevisaoOff, anotacoes }
@@ -135,6 +137,12 @@ export function LeitorJus({
       if (!m || typeof m !== 'object') return
       if (m.type === 'leitor-jus-ready') { enviarDia(); return }
       if (m.type === 'leitor-jus-grifo') { salvarGrifo(m); return }
+      if (m.type === 'leitor-jus-salvar-caderno') {
+        const d = dadosRef.current
+        const p = normalizarComentarioCaderno(m.grifo, { documento_id: d.documentoId ?? null, documento_versao: d.versao ?? null, titulo_documento: d.titulo || null })
+        if (p) setParaCaderno(p)
+        return
+      }
       if (m.type === 'leitor-jus-nav') {
         const d = dadosRef.current
         const href = m.to === 'questoes' ? d.questoesHref : d.voltarHref
@@ -149,6 +157,7 @@ export function LeitorJus({
   }, [enviarDia, postProgresso, salvarGrifo])
 
   return (
+    <>
     <iframe
       ref={iframeRef}
       src={PROTOTIPO}
@@ -157,5 +166,7 @@ export function LeitorJus({
       onLoad={enviarDia}
       style={{ display: 'block', width: '100%', height: '100%', border: 0, background: 'var(--bg, #fbfbfc)' }}
     />
+    <SalvarComentarioCaderno dados={paraCaderno} onClose={() => setParaCaderno(null)} />
+    </>
   )
 }

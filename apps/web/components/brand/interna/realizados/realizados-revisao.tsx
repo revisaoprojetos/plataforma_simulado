@@ -14,20 +14,20 @@ import { Ic, PaneTabs, Filtros, SecaoHead, NotaPill, CoverRev, BarRev, fnum, typ
 import type { RealizadosData, RlzEmAndamento, RlzConcluido, RlzPersonalizado, RlzCapa } from './data'
 import { SecaoSimulados } from '../home/revisao/secao-simulados'
 
-const FALLBACK_GRAD = 'linear-gradient(135deg,#2A1E4A,#4A31B8)'
+const FALLBACK_GRAD = 'linear-gradient(135deg,var(--pn-2a1e4a,#2A1E4A),var(--pn-4a31b8,#4A31B8))'
 const gradOf = (c?: RlzCapa) => c?.cor || FALLBACK_GRAD
 
 // Tokens spec-03 §1.1 que o mockup define no wrapper (claro/escuro).
 function rvVars(dark: boolean): CSSProperties {
   return {
-    ['--tBg' as string]: dark ? '#171030' : '#ECE8F6',
-    ['--tOn' as string]: dark ? '#3A3A44' : '#FFFFFF',
-    ['--tOnInk' as string]: dark ? '#FFFFFF' : '#2E1F7A',
-    ['--cnt' as string]: dark ? 'rgba(143,117,255,.22)' : '#EFEBFD',
-    ['--cntInk' as string]: dark ? '#D2C6FF' : '#5B3FD0',
-    ['--fOn' as string]: dark ? '#F1C232' : '#2E1F7A',
-    ['--fOnInk' as string]: dark ? '#2A1A55' : '#FFFFFF',
-    ['--hoverLine' as string]: dark ? 'rgba(179,161,255,.45)' : 'rgba(91,63,208,.35)',
+    ['--tBg' as string]: dark ? 'var(--pn-171030,#171030)' : 'var(--pn-ece8f6,#ECE8F6)',
+    ['--tOn' as string]: dark ? 'var(--pn-3a3a44,#3A3A44)' : '#FFFFFF',
+    ['--tOnInk' as string]: dark ? '#FFFFFF' : 'var(--pn-2e1f7a,#2E1F7A)',
+    ['--cnt' as string]: dark ? 'color-mix(in srgb,var(--pn-8f75ff,#8F75FF) 22%,transparent)' : 'var(--pn-efebfd,#EFEBFD)',
+    ['--cntInk' as string]: dark ? 'var(--pn-d2c6ff,#D2C6FF)' : 'var(--pn-5b3fd0,#5B3FD0)',
+    ['--fOn' as string]: dark ? 'var(--pn-f1c232,#F1C232)' : 'var(--pn-2e1f7a,#2E1F7A)',
+    ['--fOnInk' as string]: dark ? 'var(--pn-2a1a55,#2A1A55)' : '#FFFFFF',
+    ['--hoverLine' as string]: dark ? 'color-mix(in srgb,var(--pn-b3a1ff,#B3A1FF) 45%,transparent)' : 'color-mix(in srgb,var(--pn-5b3fd0,#5B3FD0) 35%,transparent)',
   } as CSSProperties
 }
 
@@ -50,8 +50,8 @@ function CardAndamento({ it }: { it: RlzEmAndamento }) {
     <Link href={it.continuarHref} className="rlzrv-card" style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 18, overflow: 'hidden', minHeight: 112, color: 'inherit', textDecoration: 'none' }}>
       <div style={{ position: 'relative', width: '36%', maxWidth: 160, flexShrink: 0, overflow: 'hidden' }}>
         <CoverRev titulo={it.capa.rotulo} sub={it.capa.sub} grad={gradOf(it.capa)} img={it.capa.capa} big={13} />
-        <span style={{ position: 'absolute', left: 8, top: 8, maxWidth: 'calc(100% - 16px)', height: 20, padding: '0 8px', borderRadius: 99, background: 'rgba(241,194,50,.95)', color: '#2A1A55', fontSize: 9.5, fontWeight: 800, letterSpacing: '.02em', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <span className="rlzrv-live" style={{ width: 5, height: 5, borderRadius: '50%', background: '#2A1A55', flexShrink: 0 }} />EM ANDAMENTO
+        <span style={{ position: 'absolute', left: 8, top: 8, maxWidth: 'calc(100% - 16px)', height: 20, padding: '0 8px', borderRadius: 99, background: 'color-mix(in srgb,var(--pn-f1c232,#F1C232) 95%,transparent)', color: 'var(--pn-2a1a55,#2A1A55)', fontSize: 9.5, fontWeight: 800, letterSpacing: '.02em', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <span className="rlzrv-live" style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--pn-2a1a55,#2A1A55)', flexShrink: 0 }} />EM ANDAMENTO
         </span>
       </div>
       <div style={{ flex: 1, minWidth: 0, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -66,7 +66,7 @@ function CardAndamento({ it }: { it: RlzEmAndamento }) {
           </div>
           <BarRev pct={it.pct} />
         </div>
-        <span className="rlzrv-cta" style={{ marginTop: 'auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7, height: 36, borderRadius: 11, color: '#FFF', fontSize: 13, fontWeight: 800, whiteSpace: 'nowrap', background: 'linear-gradient(180deg,#6449E0,#4B30BE)', boxShadow: '0 10px 20px -12px rgba(75,48,190,.8), inset 0 1px 0 rgba(255,255,255,.2)' }}><Ic n="play" s={13} />Continuar</span>
+        <span className="rlzrv-cta" style={{ marginTop: 'auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7, height: 36, borderRadius: 11, color: '#FFF', fontSize: 13, fontWeight: 800, whiteSpace: 'nowrap', background: 'linear-gradient(180deg,var(--pn-6449e0,#6449E0),var(--pn-4b30be,#4B30BE))', boxShadow: '0 10px 20px -12px color-mix(in srgb,var(--pn-4b30be,#4B30BE) 80%,transparent), inset 0 1px 0 rgba(255,255,255,.2)' }}><Ic n="play" s={13} />Continuar</span>
       </div>
     </Link>
   )
@@ -78,7 +78,7 @@ function CardConcluido({ it }: { it: RlzConcluido }) {
       <div style={{ width: '36%', maxWidth: 160, flexShrink: 0, overflow: 'hidden' }}><CoverRev titulo={it.capa.rotulo} sub={it.capa.sub} grad={gradOf(it.capa)} img={it.capa.capa} big={13} /></div>
       <div style={{ flex: 1, minWidth: 0, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 700, color: '#1FA868' }}><Ic n="check" s={13} />Concluído</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 700, color: 'var(--pn-1fa868,#1FA868)' }}><Ic n="check" s={13} />Concluído</span>
           <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{it.data}</span>
         </div>
         <span style={{ fontSize: 14, lineHeight: 1.25, color: 'var(--ink)', fontWeight: 700, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{it.titulo}</span>
@@ -96,7 +96,7 @@ function CardPersonalizado({ it }: { it: RlzPersonalizado }) {
   const rascunho = it.status === 'rascunho'
   return (
     <Link href={it.href} className="rlzrv-card" style={{ display: 'flex', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 18, overflow: 'hidden', minHeight: 112, color: 'inherit', textDecoration: 'none' }}>
-      <div style={{ position: 'relative', width: 116, flexShrink: 0, background: 'linear-gradient(140deg,#3C4458,#5B6478)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,.9)', overflow: 'hidden' }}>
+      <div style={{ position: 'relative', width: 116, flexShrink: 0, background: 'linear-gradient(140deg,var(--pn-3c4458,#3C4458),var(--pn-5b6478,#5B6478))', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,.9)', overflow: 'hidden' }}>
         <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.08) 1px,transparent 1px)', backgroundSize: '16px 16px' }} />
         <span style={{ position: 'relative', width: 48, height: 48, borderRadius: 15, background: 'rgba(255,255,255,.16)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Ic n={rascunho ? 'edit' : 'star'} s={22} /></span>
       </div>
@@ -104,7 +104,7 @@ function CardPersonalizado({ it }: { it: RlzPersonalizado }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
           {rascunho
             ? <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--muted)' }}>Rascunho</span>
-            : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 700, color: '#1FA868' }}><Ic n="check" s={13} />Concluído</span>}
+            : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, fontWeight: 700, color: 'var(--pn-1fa868,#1FA868)' }}><Ic n="check" s={13} />Concluído</span>}
           {it.nQuestoes != null ? <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{it.nQuestoes} questões</span> : null}
         </div>
         <b style={{ fontSize: 14, lineHeight: 1.25, color: 'var(--ink)' }}>{it.nome}</b>
@@ -182,7 +182,7 @@ export function RealizadosRevisao({ theme: themeProp, data }: { theme: InternaTh
           <div className="rlzrv-pv" key={`main-${f}`} style={{ display: 'flex', flexDirection: 'column', gap: 26 }}>
             {showAnd && nAnd > 0 ? (
               <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <SecaoHead icon="clock" title="Em andamento" count={nAnd} color="#D99A1E" bg="#D99A1E22" />
+                <SecaoHead icon="clock" title="Em andamento" count={nAnd} color="var(--pn-d99a1e,#D99A1E)" bg="#D99A1E22" />
                 <div style={{ display: 'grid', gridTemplateColumns: gridCols, gap: 14 }}>
                   {data.emAndamento.map((it) => <CardAndamento key={it.id} it={it} />)}
                 </div>
@@ -190,7 +190,7 @@ export function RealizadosRevisao({ theme: themeProp, data }: { theme: InternaTh
             ) : null}
             {showDone && nDone > 0 ? (
               <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <SecaoHead icon="check" title="Concluídos" count={nDone} color="#1FA868" bg="#1FA86822" />
+                <SecaoHead icon="check" title="Concluídos" count={nDone} color="var(--pn-1fa868,#1FA868)" bg="#1FA86822" />
                 <div style={{ display: 'grid', gridTemplateColumns: gridCols, gap: 14 }}>
                   {doneList.map((it) => <CardConcluido key={it.id} it={it} />)}
                 </div>
@@ -201,13 +201,13 @@ export function RealizadosRevisao({ theme: themeProp, data }: { theme: InternaTh
           <div className="rlzrv-pv" key="pers" style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
             {/* cartão tracejado criar */}
             <Link href={pers.criarHref} className="rlzrv-newc" style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '20px 22px', borderRadius: 20, border: '1.5px dashed var(--line2)', background: 'linear-gradient(120deg,var(--chip),transparent 70%)', color: 'var(--ink)', textDecoration: 'none', flexWrap: mobile ? 'wrap' : undefined }}>
-              <span style={{ width: 56, height: 56, borderRadius: 16, background: 'linear-gradient(160deg,#6449E0,#4B30BE)', color: '#FFF', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 12px 24px -12px rgba(75,48,190,.8)' }}><Ic n="plus" s={24} /></span>
+              <span style={{ width: 56, height: 56, borderRadius: 16, background: 'linear-gradient(160deg,var(--pn-6449e0,#6449E0),var(--pn-4b30be,#4B30BE))', color: '#FFF', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 12px 24px -12px color-mix(in srgb,var(--pn-4b30be,#4B30BE) 80%,transparent)' }}><Ic n="plus" s={24} /></span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <b style={{ display: 'block', fontSize: 18, letterSpacing: '-0.02em' }}>Criar simulado personalizado</b>
                 <span style={{ fontSize: 13, color: 'var(--muted)' }}>Escolha matérias, bancas e quantidade de questões.</span>
               </div>
               {!mobile ? <span style={{ display: 'flex', gap: 6 }}>{M_CRIAR_CHIPS.map((c) => <span key={c} style={{ height: 30, padding: '0 12px', borderRadius: 99, background: 'var(--surface)', border: '1px solid var(--line)', fontSize: 12, fontWeight: 700, color: 'var(--muted)', display: 'inline-flex', alignItems: 'center' }}>{c}</span>)}</span> : null}
-              <span style={{ width: 40, height: 40, borderRadius: 12, background: '#F1C232', color: '#2A1A55', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Ic n="arrow" s={18} /></span>
+              <span style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--pn-f1c232,#F1C232)', color: 'var(--pn-2a1a55,#2A1A55)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Ic n="arrow" s={18} /></span>
             </Link>
             <SecaoHead icon="clip" title="Seus simulados" count={pers.itens.length} color="var(--brand)" bg="var(--chip)" />
             <div style={{ display: 'grid', gridTemplateColumns: gridCols, gap: 14 }}>

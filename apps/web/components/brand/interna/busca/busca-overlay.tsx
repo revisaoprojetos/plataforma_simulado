@@ -18,7 +18,7 @@ type Resultado = {
   progresso: { questaoAtual: number; total: number; pct: number } | null
 }
 
-const GRAD_FALLBACK = 'linear-gradient(135deg,#2E1F7A,#4A31B8)'
+const GRAD_FALLBACK = 'linear-gradient(135deg,var(--pn-2e1f7a,#2E1F7A),var(--pn-4a31b8,#4A31B8))'
 
 // Capa do ticket: imagem real (object-cover, sem texto) ou gradiente da marca + ícone.
 function Capa({ r, w }: { r: Resultado; w: number }) {
@@ -34,7 +34,7 @@ function Capa({ r, w }: { r: Resultado; w: number }) {
 
 function NotaPill({ v }: { v: number }) {
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 3, height: 28, padding: '0 11px', borderRadius: 9, background: '#1FA86822', color: '#1FA868', fontSize: 13, fontWeight: 800 }}>
+    <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 3, height: 28, padding: '0 11px', borderRadius: 9, background: '#1FA86822', color: 'var(--pn-1fa868,#1FA868)', fontSize: 13, fontWeight: 800 }}>
       {v.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 1 })}<span style={{ fontSize: 10, fontWeight: 700, opacity: .8 }}>nota</span>
     </span>
   )
@@ -92,7 +92,7 @@ export function BuscaOverlay({ open, onClose, theme }: { open: boolean; onClose:
     position: 'fixed', inset: 0, zIndex: 120,
     display: 'flex', flexDirection: 'column', alignItems: 'center',
     padding: '10vh 16px 16px',
-    background: 'color-mix(in srgb, #0A0523 55%, transparent)',
+    background: 'color-mix(in srgb, var(--pn-0a0523,#0A0523) 55%, transparent)',
     backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
   }
 
@@ -114,7 +114,7 @@ export function BuscaOverlay({ open, onClose, theme }: { open: boolean; onClose:
           </div>
         ) : null}
         <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button type="button" disabled={!r.embedToken} onClick={() => r.embedToken && ir(`/simulado/${r.embedToken}`)} style={{ flex: 1, minWidth: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7, height: 36, borderRadius: 10, border: 0, color: '#fff', fontSize: 13, fontWeight: 800, background: 'linear-gradient(180deg,#6449E0,#4B30BE)', boxShadow: '0 10px 20px -12px rgba(75,48,190,.8),inset 0 1px 0 rgba(255,255,255,.2)', cursor: r.embedToken ? 'pointer' : 'default', opacity: r.embedToken ? 1 : .5 }}>
+          <button type="button" disabled={!r.embedToken} onClick={() => r.embedToken && ir(`/simulado/${r.embedToken}`)} style={{ flex: 1, minWidth: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7, height: 36, borderRadius: 10, border: 0, color: '#fff', fontSize: 13, fontWeight: 800, background: 'linear-gradient(180deg,var(--pn-6449e0,#6449E0),var(--pn-4b30be,#4B30BE))', boxShadow: '0 10px 20px -12px color-mix(in srgb,var(--pn-4b30be,#4B30BE) 80%,transparent),inset 0 1px 0 rgba(255,255,255,.2)', cursor: r.embedToken ? 'pointer' : 'default', opacity: r.embedToken ? 1 : .5 }}>
             <Play size={12} fill="currentColor" /><span style={{ color: '#fff' }}>{r.emAndamento ? 'Continuar' : 'Fazer agora'}</span>
           </button>
           {r.enunciadoUrl ? (
@@ -133,7 +133,7 @@ export function BuscaOverlay({ open, onClose, theme }: { open: boolean; onClose:
       <Capa r={r} w={120} />
       <div style={{ flex: 1, minWidth: 0, padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 700, color: '#1FA868' }}><Check size={13} />Concluído</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 700, color: 'var(--pn-1fa868,#1FA868)' }}><Check size={13} />Concluído</span>
           {r.data ? <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{r.data}</span> : null}
         </div>
         <b style={{ fontSize: 13.5, lineHeight: 1.3, color: 'var(--ink)', fontWeight: 700, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.titulo}</b>
@@ -156,7 +156,7 @@ export function BuscaOverlay({ open, onClose, theme }: { open: boolean; onClose:
 
   return createPortal(
     <div style={rootStyle} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose() }} role="dialog" aria-modal="true" aria-label="Buscar simulados">
-      <div style={{ width: '100%', maxWidth: 680, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 18, boxShadow: '0 30px 80px -20px rgba(10,5,35,.6)', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '80vh' }}>
+      <div style={{ width: '100%', maxWidth: 680, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 18, boxShadow: '0 30px 80px -20px color-mix(in srgb,var(--pn-0a0523,#0A0523) 60%,transparent)', overflow: 'hidden', display: 'flex', flexDirection: 'column', maxHeight: '80vh' }}>
         {/* Barra de busca */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', borderBottom: '1px solid var(--line)' }}>
           <Search style={{ width: 19, height: 19, color: 'var(--brand)', flexShrink: 0 }} />

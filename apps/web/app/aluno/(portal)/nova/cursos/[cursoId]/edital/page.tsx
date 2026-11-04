@@ -69,18 +69,18 @@ export default async function EditalPage({ params }: { params: Promise<Params> }
         <Row style={{ position: 'relative', justifyContent: 'space-between', flexWrap: 'nowrap', gap: 24, alignItems: 'center' }}>
           <Row gap={22} style={{ flexWrap: 'nowrap', minWidth: 0, alignItems: 'center' }}>
             <div style={{ width: 230, flexShrink: 0, borderRadius: 14, overflow: 'hidden', border: '1px solid rgba(255,255,255,.2)' }}>
-              <Media ratio="16:9" fallback={<Cover line="CURSO" sigla={titulo.length > 14 ? `${titulo.slice(0, 14)}…` : titulo} grad={curso?.cor ? `linear-gradient(135deg, ${curso.cor}, color-mix(in oklab, ${curso.cor} 55%, #0b0a1a))` : GR.RS} big={16} />} />
+              <Media ratio="16:9" fallback={<Cover line="CURSO" sigla={titulo.length > 14 ? `${titulo.slice(0, 14)}…` : titulo} grad={curso?.cor ? `linear-gradient(135deg, ${curso.cor}, color-mix(in oklab, ${curso.cor} 55%, var(--pn-0b0a1a,#0b0a1a)))` : GR.RS} big={16} />} />
             </div>
             <Col gap={8} style={{ minWidth: 0 }}>
               {/* TODO(dados): "edital publicado em"/"prova em" não existem como dado do curso. */}
               <Eyebrow color="var(--gold)">Como encaixar este curso nos seus estudos</Eyebrow>
               <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em', color: '#fff' }}>Como você quer estudar {titulo}?</h1>
-              <P size={13}><span style={{ color: '#E6DEFF' }}>{titulo} · escolha conciliar com o seu cronograma ou estudar o curso por conta própria</span></P>
+              <P size={13}><span style={{ color: 'var(--pn-e6deff,#E6DEFF)' }}>{titulo} · escolha conciliar com o seu cronograma ou estudar o curso por conta própria</span></P>
             </Col>
           </Row>
           <Col gap={0} style={{ alignItems: 'flex-end', flexShrink: 0 }}>
             <b style={{ fontSize: 46, fontWeight: 800, color: 'var(--gold)', lineHeight: 1, letterSpacing: '-0.03em' }}>45</b>
-            <span style={{ fontSize: 12, color: '#E6DEFF', whiteSpace: 'nowrap' }}>dias para a prova</span>
+            <span style={{ fontSize: 12, color: 'var(--pn-e6deff,#E6DEFF)', whiteSpace: 'nowrap' }}>dias para a prova</span>
           </Col>
         </Row>
       </section>
@@ -171,7 +171,7 @@ export default async function EditalPage({ params }: { params: Promise<Params> }
       </Col>
 
       {/* Barra fixa com Salvar */}
-      <div style={{ position: 'sticky', bottom: 16, zIndex: 5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', padding: '14px 20px', borderRadius: 16, background: 'linear-gradient(120deg,#241A52,#2E1F6A)', color: '#fff', boxShadow: '0 18px 40px -20px rgba(30,15,80,.6)' }}>
+      <div style={{ position: 'sticky', bottom: 16, zIndex: 5, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', padding: '14px 20px', borderRadius: 16, background: 'linear-gradient(120deg,var(--pn-241a52,#241A52),var(--pn-2e1f6a,#2E1F6A))', color: '#fff', boxShadow: '0 18px 40px -20px color-mix(in srgb,var(--pn-1e0f50,#1E0F50) 60%,transparent)' }}>
         <span style={{ fontSize: 13 }}>Você pode mudar essa escolha quando quiser. <b style={{ color: 'var(--gold)' }}>Nada do que você já estudou se perde.</b></span>
         <Row gap={10}>
           <Btn kind="ghostdark" href={R.curso(cursoId)}>Ver a área do curso</Btn>

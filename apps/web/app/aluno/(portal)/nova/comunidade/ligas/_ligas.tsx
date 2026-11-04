@@ -41,11 +41,11 @@ const LIGA_EXEMPLO: LigaLinha[] = [
 ]
 // TODO(dados): ranking geral de EXEMPLO (usado só sem props reais).
 const GERAL_EXEMPLO: GeralLinha[] = [
-  { pos: 1, code: 'Aluno D.C.', ligaNome: 'Ametista', ligaCor: '#9B5DE5', xp: 9870 }, { pos: 2, code: 'Aluno H.C.', ligaNome: 'Ametista', ligaCor: '#9B5DE5', xp: 9412 },
-  { pos: 3, code: 'Aluno L.L.', ligaNome: 'Ametista', ligaCor: '#9B5DE5', xp: 8960 }, { pos: 4, code: 'Aluno I.H.', ligaNome: 'Ametista', ligaCor: '#9B5DE5', xp: 8122 },
-  { pos: 5, code: 'Aluno C.F.', ligaNome: 'Ametista', ligaCor: '#9B5DE5', xp: 7805 }, { pos: 6, code: 'Aluno D.S.', ligaNome: 'Diamante', ligaCor: '#3FB6E0', xp: 6930 },
-  { pos: 7, code: 'Aluno I.J.', ligaNome: 'Diamante', ligaCor: '#3FB6E0', xp: 6511 }, { pos: 8, code: 'Aluno C.V.', ligaNome: 'Diamante', ligaCor: '#3FB6E0', xp: 6302 },
-  { pos: 412, code: 'Você', ligaNome: 'Ouro', ligaCor: '#C98A12', xp: 2101, eu: true },
+  { pos: 1, code: 'Aluno D.C.', ligaNome: 'Ametista', ligaCor: 'var(--pn-9b5de5,#9B5DE5)', xp: 9870 }, { pos: 2, code: 'Aluno H.C.', ligaNome: 'Ametista', ligaCor: 'var(--pn-9b5de5,#9B5DE5)', xp: 9412 },
+  { pos: 3, code: 'Aluno L.L.', ligaNome: 'Ametista', ligaCor: 'var(--pn-9b5de5,#9B5DE5)', xp: 8960 }, { pos: 4, code: 'Aluno I.H.', ligaNome: 'Ametista', ligaCor: 'var(--pn-9b5de5,#9B5DE5)', xp: 8122 },
+  { pos: 5, code: 'Aluno C.F.', ligaNome: 'Ametista', ligaCor: 'var(--pn-9b5de5,#9B5DE5)', xp: 7805 }, { pos: 6, code: 'Aluno D.S.', ligaNome: 'Diamante', ligaCor: 'var(--pn-3fb6e0,#3FB6E0)', xp: 6930 },
+  { pos: 7, code: 'Aluno I.J.', ligaNome: 'Diamante', ligaCor: 'var(--pn-3fb6e0,#3FB6E0)', xp: 6511 }, { pos: 8, code: 'Aluno C.V.', ligaNome: 'Diamante', ligaCor: 'var(--pn-3fb6e0,#3FB6E0)', xp: 6302 },
+  { pos: 412, code: 'Você', ligaNome: 'Ouro', ligaCor: 'var(--pn-c98a12,#C98A12)', xp: 2101, eu: true },
 ]
 const GRID = '44px minmax(0,1.6fr) 1fr 0.8fr 0.9fr 0.8fr 0.8fr'
 const n = (v: number) => v.toLocaleString('pt-BR')
@@ -120,7 +120,7 @@ export default function LigasInterativo({ ligaNome, liga, geral, totalAtivos }: 
         {([['liga', 'trophy', 'Minha liga'], ['geral', 'users', 'Ranking geral']] as const).map(([k, ic, lab]) => {
           const on = aba === k
           return (
-            <button key={k} type="button" onClick={() => setAba(k)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 40, padding: '0 16px', border: 0, borderRadius: 11, cursor: 'pointer', fontSize: 13.5, fontWeight: on ? 800 : 700, background: on ? 'var(--surface)' : 'transparent', color: on ? 'var(--ink)' : 'var(--muted)', boxShadow: on ? '0 2px 8px rgba(30,15,80,.1)' : 'none' }}>
+            <button key={k} type="button" onClick={() => setAba(k)} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 40, padding: '0 16px', border: 0, borderRadius: 11, cursor: 'pointer', fontSize: 13.5, fontWeight: on ? 800 : 700, background: on ? 'var(--surface)' : 'transparent', color: on ? 'var(--ink)' : 'var(--muted)', boxShadow: on ? '0 2px 8px color-mix(in srgb,var(--pn-1e0f50,#1E0F50) 10%,transparent)' : 'none' }}>
               <Icon n={ic} size={15} />{lab}
             </button>
           )
@@ -166,12 +166,12 @@ export default function LigasInterativo({ ligaNome, liga, geral, totalAtivos }: 
               <Row gap={10}><Icon n="trophy" size={18} style={{ color: 'var(--brand)' }} /><H3>Pódio da liga</H3></Row>
               {rows.length >= 3 ? (
                 <Row gap={8} style={{ alignItems: 'flex-end', flexWrap: 'nowrap' }}>
-                  {[{ c: rows[1], h: 86, cor: '#C0C7CF', n: 2, idx: 1 }, { c: rows[0], h: 112, cor: '#E8C877', n: 1, idx: 0 }, { c: rows[2], h: 66, cor: '#D3955E', n: 3, idx: 2 }].map((p) => (
+                  {[{ c: rows[1], h: 86, cor: 'var(--pn-c0c7cf,#C0C7CF)', n: 2, idx: 1 }, { c: rows[0], h: 112, cor: 'var(--pn-e8c877,#E8C877)', n: 1, idx: 0 }, { c: rows[2], h: 66, cor: 'var(--pn-d3955e,#D3955E)', n: 3, idx: 2 }].map((p) => (
                     <Col key={p.n} gap={5} style={{ flex: 1, alignItems: 'center' }}>
                       <Avatar url={p.c.avatar} cor={p.c.avatarCor} seed={p.c.estudanteId} nome={p.c.code} size={p.n === 1 ? 44 : 36} />
                       <b style={{ fontSize: 12, color: 'var(--ink)' }}>{p.c.code}</b>
                       <span style={{ fontSize: 11, color: 'var(--muted)' }}>{n(p.c.xp)} XP</span>
-                      <div style={{ width: '100%', height: p.h, borderRadius: '14px 14px 4px 4px', background: `linear-gradient(180deg, ${p.cor}, ${p.cor}44)`, display: 'flex', justifyContent: 'center', paddingTop: 8, color: '#2A1F02', fontSize: 20, fontWeight: 800 }}>{p.n}</div>
+                      <div style={{ width: '100%', height: p.h, borderRadius: '14px 14px 4px 4px', background: `linear-gradient(180deg, ${p.cor}, ${p.cor}44)`, display: 'flex', justifyContent: 'center', paddingTop: 8, color: 'var(--pn-2a1f02,#2A1F02)', fontSize: 20, fontWeight: 800 }}>{p.n}</div>
                     </Col>
                   ))}
                 </Row>

@@ -26,10 +26,10 @@ const PX: { l: number; t: number; c: 'p' | 'a'; d: number }[] = [
 // Formas flutuantes (só em `efeitos`): sobem do rodapé girando. k: 'sq' | 'ci' | 'plus'.
 const SH: { l: string; w: number; k: 'sq' | 'ci' | 'plus'; b: string; dur: number; delay: number }[] = [
   { l: '9%', w: 18, k: 'sq', b: 'rgba(255,255,255,.35)', dur: 22, delay: 0 },
-  { l: '22%', w: 12, k: 'ci', b: 'rgba(255,196,163,.55)', dur: 18, delay: -6 },
+  { l: '22%', w: 12, k: 'ci', b: 'color-mix(in srgb,var(--pn-ffc4a3,#FFC4A3) 55%,transparent)', dur: 18, delay: -6 },
   { l: '36%', w: 22, k: 'ci', b: 'rgba(255,255,255,.25)', dur: 26, delay: -14 },
   { l: '58%', w: 14, k: 'sq', b: 'rgba(255,255,255,.3)', dur: 20, delay: -3 },
-  { l: '70%', w: 20, k: 'sq', b: 'rgba(255,196,163,.5)', dur: 24, delay: -10 },
+  { l: '70%', w: 20, k: 'sq', b: 'color-mix(in srgb,var(--pn-ffc4a3,#FFC4A3) 50%,transparent)', dur: 24, delay: -10 },
   { l: '82%', w: 10, k: 'ci', b: 'rgba(255,255,255,.35)', dur: 17, delay: -8 },
   { l: '92%', w: 16, k: 'sq', b: 'rgba(255,255,255,.25)', dur: 21, delay: -16 },
   { l: '15%', w: 16, k: 'plus', b: '', dur: 25, delay: -12 },
@@ -39,7 +39,7 @@ const SH: { l: string; w: number; k: 'sq' | 'ci' | 'plus'; b: string; dur: numbe
 
 export function RevisaoParticulas({ efeitos = false, quadrados = false }: { efeitos?: boolean; quadrados?: boolean }) {
   if (!efeitos && !quadrados) return null
-  const cor = (c: 'p' | 'a') => (c === 'p' ? 'rgba(185,168,255,.26)' : 'rgba(255,196,163,.20)')
+  const cor = (c: 'p' | 'a') => (c === 'p' ? 'color-mix(in srgb,var(--pn-b9a8ff,#B9A8FF) 26%,transparent)' : 'color-mix(in srgb,var(--pn-ffc4a3,#FFC4A3) 20%,transparent)')
   return (
     <>
       <style>{CSS}</style>

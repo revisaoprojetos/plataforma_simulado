@@ -15,26 +15,26 @@ const P = 'vlc'
 
 const TOKENS: Record<'claro' | 'escuro', LoginFormTokens> = {
   claro: {
-    fg: '#101C16', muted: '#5C6B62', fieldBg: '#F8FAF9', fieldBorder: '#E1E8E3', fieldFg: '#101C16',
-    primary: '#0F7A44', ctaBg: 'linear-gradient(180deg,#14924F,#0C6E3C)', ctaFg: '#ffffff',
-    pillBg: 'rgba(255,255,255,.06)', pillFg: '#D4EADD', pillBorder: 'rgba(255,255,255,.16)',
+    fg: 'var(--pn-101c16,#101C16)', muted: 'var(--pn-5c6b62,#5C6B62)', fieldBg: '#F8FAF9', fieldBorder: 'var(--pn-e1e8e3,#E1E8E3)', fieldFg: 'var(--pn-101c16,#101C16)',
+    primary: 'var(--pn-0f7a44,#0F7A44)', ctaBg: 'linear-gradient(180deg,var(--pn-14924f,#14924F),var(--pn-0c6e3c,#0C6E3C))', ctaFg: '#ffffff',
+    pillBg: 'rgba(255,255,255,.06)', pillFg: 'var(--pn-d4eadd,#D4EADD)', pillBorder: 'rgba(255,255,255,.16)',
   },
   escuro: {
-    fg: '#FFFFFF', muted: '#A9C2B5', fieldBg: 'rgba(255,255,255,.04)', fieldBorder: 'rgba(120,230,170,.16)', fieldFg: '#FFFFFF',
-    primary: '#3FD58A', ctaBg: 'linear-gradient(180deg,#14924F,#0C6E3C)', ctaFg: '#ffffff',
-    pillBg: 'rgba(255,255,255,.06)', pillFg: '#D4EADD', pillBorder: 'rgba(255,255,255,.16)',
+    fg: '#FFFFFF', muted: 'var(--pn-a9c2b5,#A9C2B5)', fieldBg: 'rgba(255,255,255,.04)', fieldBorder: 'color-mix(in srgb,var(--pn-78e6aa,#78E6AA) 16%,transparent)', fieldFg: '#FFFFFF',
+    primary: 'var(--pn-3fd58a,#3FD58A)', ctaBg: 'linear-gradient(180deg,var(--pn-14924f,#14924F),var(--pn-0c6e3c,#0C6E3C))', ctaFg: '#ffffff',
+    pillBg: 'rgba(255,255,255,.06)', pillFg: 'var(--pn-d4eadd,#D4EADD)', pillBorder: 'rgba(255,255,255,.16)',
   },
 }
 
 // Fundo da PÁGINA: o claro usa um verde-escuro levemente mais claro; o escuro é quase preto.
 const PAGE_BG = {
-  claro: 'linear-gradient(180deg,#041A10 0%,#072D1C 50%,#0B3D26 100%)',
-  escuro: 'linear-gradient(180deg,#020906 0%,#03100A 50%,#051A10 100%)',
+  claro: 'linear-gradient(180deg,var(--pn-041a10,#041A10) 0%,var(--pn-072d1c,#072D1C) 50%,var(--pn-0b3d26,#0B3D26) 100%)',
+  escuro: 'linear-gradient(180deg,var(--pn-020906,#020906) 0%,var(--pn-03100a,#03100A) 50%,var(--pn-051a10,#051A10) 100%)',
 }
 // O card: branco no claro, vidro verde no escuro.
 const CARD_BG = {
   claro: '#FFFFFF',
-  escuro: 'linear-gradient(180deg,#0D1F16,#08140E)',
+  escuro: 'linear-gradient(180deg,var(--pn-0d1f16,#0D1F16),var(--pn-08140e,#08140E))',
 }
 
 export function VndCentralizado({ theme, core, preview, simula }: LoginVariantProps & { simula: boolean }) {
@@ -43,8 +43,8 @@ export function VndCentralizado({ theme, core, preview, simula }: LoginVariantPr
   const cm = useCm()
   const VPATH = mac ? MAC_M_PATH : VND_V_PATH
   const t = theme === 'escuro' ? 'escuro' : 'claro'
-  const glowA = cm(t === 'claro' ? 'rgba(34,197,110,.34)' : 'rgba(34,197,110,.2)')
-  const glowB = cm(t === 'claro' ? 'rgba(52,200,140,.24)' : 'rgba(52,200,140,.14)')
+  const glowA = cm(t === 'claro' ? 'color-mix(in srgb,var(--pn-22c56e,#22C56E) 34%,transparent)' : 'color-mix(in srgb,var(--pn-22c56e,#22C56E) 20%,transparent)')
+  const glowB = cm(t === 'claro' ? 'color-mix(in srgb,var(--pn-34c88c,#34C88C) 24%,transparent)' : 'color-mix(in srgb,var(--pn-34c88c,#34C88C) 14%,transparent)')
   // Tokens do formulário (verdes → bordô via cm; identidade p/ VND).
   const tok0 = TOKENS[t]
   const tokens: LoginFormTokens = {
@@ -68,30 +68,30 @@ export function VndCentralizado({ theme, core, preview, simula }: LoginVariantPr
       <div className={`${P}-grid ${P}-gridIn`} aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }} />
       <div className={`${P}-glowIn`} aria-hidden="true" style={{ position: 'absolute', width: 1200, height: 1200, left: '50%', top: '50%', margin: '-660px 0 0 -600px', background: `radial-gradient(closest-side,${glowA},rgba(34,197,110,0))`, pointerEvents: 'none' }} />
       <div className={`${P}-glowIn`} aria-hidden="true" style={{ position: 'absolute', width: 720, height: 720, right: -240, bottom: -300, background: `radial-gradient(closest-side,${glowB},rgba(52,200,140,0))`, pointerEvents: 'none' }} />
-      <div className={`${P}-glowIn`} aria-hidden="true" style={{ position: 'absolute', width: 720, height: 720, left: -260, top: -280, background: cm('radial-gradient(closest-side,rgba(63,213,138,.2),rgba(63,213,138,0))'), pointerEvents: 'none' }} />
-      <div className={`${P}-glowIn`} aria-hidden="true" style={{ position: 'absolute', width: 520, height: 520, left: -160, bottom: -220, background: cm('radial-gradient(closest-side,rgba(63,213,138,.12),rgba(63,213,138,0))'), pointerEvents: 'none' }} />
+      <div className={`${P}-glowIn`} aria-hidden="true" style={{ position: 'absolute', width: 720, height: 720, left: -260, top: -280, background: cm('radial-gradient(closest-side,color-mix(in srgb,var(--pn-3fd58a,#3FD58A) 20%,transparent),color-mix(in srgb,var(--pn-3fd58a,#3FD58A) 0%,transparent))'), pointerEvents: 'none' }} />
+      <div className={`${P}-glowIn`} aria-hidden="true" style={{ position: 'absolute', width: 520, height: 520, left: -160, bottom: -220, background: cm('radial-gradient(closest-side,color-mix(in srgb,var(--pn-3fd58a,#3FD58A) 12%,transparent),color-mix(in srgb,var(--pn-3fd58a,#3FD58A) 0%,transparent))'), pointerEvents: 'none' }} />
 
       {/* "V"/"M" gigante */}
       <div className={`${P}-vwrap`} aria-hidden="true" style={{ position: 'absolute', width: 980, height: 980, left: '50%', top: '50%', margin: '-470px 0 0 -490px', pointerEvents: 'none' }}>
         <svg className={`${P}-vglow`} viewBox="0 0 32 32" aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', filter: 'blur(46px)' }}>
-          <path d={VPATH} fill={cm('rgba(46,210,120,.32)')} />
+          <path d={VPATH} fill={cm('color-mix(in srgb,var(--pn-2ed278,#2ED278) 32%,transparent)')} />
         </svg>
         <svg className={`${P}-vfill`} viewBox="0 0 32 32" aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
           <defs>
             <linearGradient id="vlcVg" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0.18" stopColor={cm('#3FD58A')} stopOpacity="0.2" />
-              <stop offset="0.55" stopColor={cm('#3FD58A')} stopOpacity="0.08" />
-              <stop offset="0.8" stopColor={cm('#3FD58A')} stopOpacity="0.02" />
+              <stop offset="0.18" stopColor={cm('var(--pn-3fd58a,#3FD58A)')} stopOpacity="0.2" />
+              <stop offset="0.55" stopColor={cm('var(--pn-3fd58a,#3FD58A)')} stopOpacity="0.08" />
+              <stop offset="0.8" stopColor={cm('var(--pn-3fd58a,#3FD58A)')} stopOpacity="0.02" />
             </linearGradient>
           </defs>
           <path d={VPATH} fill="url(#vlcVg)" />
         </svg>
         <svg className={`${P}-vdraw`} viewBox="0 0 32 32" aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
-          <path pathLength={1} d={VPATH} fill="none" stroke={cm('rgba(140,240,185,.42)')} strokeWidth={0.07} />
+          <path pathLength={1} d={VPATH} fill="none" stroke={cm('color-mix(in srgb,var(--pn-8cf0b9,#8CF0B9) 42%,transparent)')} strokeWidth={0.07} />
         </svg>
-        <svg className={`${P}-echo ${P}-e1`} viewBox="0 0 32 32" aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}><path d={VPATH} fill="none" stroke={cm('rgba(120,230,170,.22)')} strokeWidth={0.04} /></svg>
-        <svg className={`${P}-echo ${P}-e2`} viewBox="0 0 32 32" aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}><path d={VPATH} fill="none" stroke="rgba(216,180,90,.22)" strokeWidth={0.04} /></svg>
-        <svg className={`${P}-echo ${P}-e3`} viewBox="0 0 32 32" aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}><path d={VPATH} fill="none" stroke={cm('rgba(120,230,170,.22)')} strokeWidth={0.04} /></svg>
+        <svg className={`${P}-echo ${P}-e1`} viewBox="0 0 32 32" aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}><path d={VPATH} fill="none" stroke={cm('color-mix(in srgb,var(--pn-78e6aa,#78E6AA) 22%,transparent)')} strokeWidth={0.04} /></svg>
+        <svg className={`${P}-echo ${P}-e2`} viewBox="0 0 32 32" aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}><path d={VPATH} fill="none" stroke="color-mix(in srgb,var(--pn-d8b45a,#D8B45A) 22%,transparent)" strokeWidth={0.04} /></svg>
+        <svg className={`${P}-echo ${P}-e3`} viewBox="0 0 32 32" aria-hidden="true" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}><path d={VPATH} fill="none" stroke={cm('color-mix(in srgb,var(--pn-78e6aa,#78E6AA) 22%,transparent)')} strokeWidth={0.04} /></svg>
       </div>
 
       <header className={`${P}-up ${P}-d0 ${P}-header`} style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '28px 40px 0' }}>
@@ -106,24 +106,24 @@ export function VndCentralizado({ theme, core, preview, simula }: LoginVariantPr
           </div>
           <h1 className={`${P}-up ${P}-d1 ${P}-h1`} style={{ margin: 0, fontWeight: 800, lineHeight: 1.04, letterSpacing: '-0.045em', color: '#FFFFFF' }}>
             Sua preparação começa{' '}
-            <span style={{ position: 'relative', display: 'inline-block', color: cm('#3FD58A') }}>
+            <span style={{ position: 'relative', display: 'inline-block', color: cm('var(--pn-3fd58a,#3FD58A)') }}>
               aqui.<Uline P={P} />
             </span>
           </h1>
-          <p className={`${P}-up ${P}-d2`} style={{ margin: '6px 0 0', fontSize: 18, lineHeight: 1.6, color: cm('#B7D3C3') }}>
+          <p className={`${P}-up ${P}-d2`} style={{ margin: '6px 0 0', fontSize: 18, lineHeight: 1.6, color: cm('var(--pn-b7d3c3,#B7D3C3)') }}>
             Entre com o seu e-mail e continue de onde parou.
           </p>
         </div>
 
         {/* card */}
         <div className={`${P}-pop ${P}-cardwrap`} style={{ position: 'relative', width: '100%', maxWidth: 440 }}>
-          <div className={`${P}-halo`} aria-hidden="true" style={{ position: 'absolute', inset: -14, borderRadius: 40, background: cm('linear-gradient(160deg, rgba(63,213,138,.38), rgba(63,213,138,0) 45%, rgba(52,200,140,.26))'), filter: 'blur(24px)', pointerEvents: 'none' }} />
+          <div className={`${P}-halo`} aria-hidden="true" style={{ position: 'absolute', inset: -14, borderRadius: 40, background: cm('linear-gradient(160deg, color-mix(in srgb,var(--pn-3fd58a,#3FD58A) 38%,transparent), color-mix(in srgb,var(--pn-3fd58a,#3FD58A) 0%,transparent) 45%, color-mix(in srgb,var(--pn-34c88c,#34C88C) 26%,transparent))'), filter: 'blur(24px)', pointerEvents: 'none' }} />
           <div
             className={`${P}-card`}
             style={{
               position: 'relative', background: cm(CARD_BG[t]), color: tokens.fg, borderRadius: 28, padding: 32,
               boxSizing: 'border-box', boxShadow: '0 40px 80px -30px rgba(0,0,0,.7)', textAlign: 'left',
-              border: t === 'escuro' ? `1px solid ${cm('rgba(120,230,170,.16)')}` : 'none',
+              border: t === 'escuro' ? `1px solid ${cm('color-mix(in srgb,var(--pn-78e6aa,#78E6AA) 16%,transparent)')}` : 'none',
             }}
           >
             <LoginForm brand={marca} theme={theme} core={core} tokens={tokens} preview={preview}
@@ -134,32 +134,32 @@ export function VndCentralizado({ theme, core, preview, simula }: LoginVariantPr
         {/* chips */}
         <ul className={`${P}-chips`} style={{ listStyle: 'none', margin: '4px 0 0', padding: 0, display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 10 }}>
           <li className={`${P}-chip ${P}-up ${P}-c1`}>
-            <span className={`${P}-chipi`} style={{ color: cm('#3FD58A') }}><LineIcon size={15} d={<><rect x={8} y={2} width={8} height={4} rx={1} /><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><path d="m9 14 2 2 4-4" /></>} /></span>
+            <span className={`${P}-chipi`} style={{ color: cm('var(--pn-3fd58a,#3FD58A)') }}><LineIcon size={15} d={<><rect x={8} y={2} width={8} height={4} rx={1} /><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><path d="m9 14 2 2 4-4" /></>} /></span>
             Simulados e correção automática
           </li>
           <li className={`${P}-chip ${P}-up ${P}-c2`}>
-            <span className={`${P}-chipi`} style={{ color: cm('#3FD58A') }}><LineIcon size={15} d={<><path d="m22 7-8.5 8.5-5-5L2 17" /><path d="M16 7h6v6" /></>} /></span>
+            <span className={`${P}-chipi`} style={{ color: cm('var(--pn-3fd58a,#3FD58A)') }}><LineIcon size={15} d={<><path d="m22 7-8.5 8.5-5-5L2 17" /><path d="M16 7h6v6" /></>} /></span>
             {mac ? 'Evolução rumo à aprovação' : 'Crescimento na Defensoria'}
           </li>
           <li className={`${P}-chip ${P}-up ${P}-c3`}>
-            <span className={`${P}-chipi`} style={{ color: '#E8C877' }}><LineIcon size={15} d={<><path d="M3 3v18h18" /><path d="M18 17V9M13 17V5M8 17v-3" /></>} /></span>
+            <span className={`${P}-chipi`} style={{ color: 'var(--pn-e8c877,#E8C877)' }}><LineIcon size={15} d={<><path d="M3 3v18h18" /><path d="M18 17V9M13 17V5M8 17v-3" /></>} /></span>
             Desempenho e evolução num só lugar
           </li>
         </ul>
       </main>
 
-      <footer className={`${P}-up ${P}-d7 ${P}-foot`} style={{ position: 'absolute', left: 40, bottom: 26, fontSize: 12, color: cm('#7FA893') }}>© 2026 {mac ? 'Mentoria Além do Corte' : 'Você na Defensoria'}</footer>
+      <footer className={`${P}-up ${P}-d7 ${P}-foot`} style={{ position: 'absolute', left: 40, bottom: 26, fontSize: 12, color: cm('var(--pn-7fa893,#7FA893)') }}>© 2026 {mac ? 'Mentoria Além do Corte' : 'Você na Defensoria'}</footer>
     </div>
   )
 }
 
 const css = `
-.${P}-root a{color:#3FD58A}
+.${P}-root a{color:var(--pn-3fd58a,#3FD58A)}
 .${P}-grid{background-image:radial-gradient(circle,rgba(140,240,185,.2) 1.2px,transparent 1.8px);background-size:28px 28px;-webkit-mask-image:radial-gradient(ellipse 60% 60% at 50% 45%,#000 25%,transparent 80%);mask-image:radial-gradient(ellipse 60% 60% at 50% 45%,#000 25%,transparent 80%)}
 .${P}-h1{font-size:60px}
 .${P}-ghost{transition:background .2s,color .2s}
 .${P}-ghost:hover{background:rgba(255,255,255,.12);color:#FFFFFF}
-.${P}-chip{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);font-size:13px;font-weight:600;color:#D4EADD;transition:background .2s,border-color .2s,transform .2s}
+.${P}-chip{display:inline-flex;align-items:center;gap:8px;height:36px;padding:0 14px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);font-size:13px;font-weight:600;color:var(--pn-d4eadd,#D4EADD);transition:background .2s,border-color .2s,transform .2s}
 .${P}-chip:hover{background:rgba(63,213,138,.1);border-color:rgba(63,213,138,.35);transform:translateY(-2px)}
 .${P}-chipi{display:inline-flex}
 

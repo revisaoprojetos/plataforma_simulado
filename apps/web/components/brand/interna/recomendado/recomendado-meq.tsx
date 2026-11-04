@@ -17,13 +17,13 @@ import * as M from './mock'
 // 5 faixas de cor do heatmap (mesma escala do mockup). Retorna [bg, textColor] ou null p/ "—".
 function heatCor(pct: number | null): { bg: string; col: string } | null {
   if (pct == null) return null
-  if (pct < 30) return { bg: 'rgba(229,72,77,.85)', col: '#FFF' }
-  if (pct < 40) return { bg: 'rgba(242,140,60,.8)', col: '#FFF' }
-  if (pct < 55) return { bg: 'rgba(242,190,60,.75)', col: '#3A2A00' }
-  if (pct < 70) return { bg: 'rgba(62,160,224,.75)', col: '#FFF' }
-  return { bg: 'rgba(46,199,122,.85)', col: '#FFF' }
+  if (pct < 30) return { bg: 'color-mix(in srgb,var(--pn-e5484d,#E5484D) 85%,transparent)', col: '#FFF' }
+  if (pct < 40) return { bg: 'color-mix(in srgb,var(--pn-f28c3c,#F28C3C) 80%,transparent)', col: '#FFF' }
+  if (pct < 55) return { bg: 'color-mix(in srgb,var(--pn-f2be3c,#F2BE3C) 75%,transparent)', col: 'var(--pn-3a2a00,#3A2A00)' }
+  if (pct < 70) return { bg: 'color-mix(in srgb,var(--pn-3ea0e0,#3EA0E0) 75%,transparent)', col: '#FFF' }
+  return { bg: 'color-mix(in srgb,var(--pn-2ec77a,#2EC77A) 85%,transparent)', col: '#FFF' }
 }
-const LEGEND = ['rgba(229,72,77,.85)', 'rgba(242,140,60,.8)', 'rgba(242,190,60,.75)', 'rgba(62,160,224,.75)', 'rgba(46,199,122,.85)']
+const LEGEND = ['color-mix(in srgb,var(--pn-e5484d,#E5484D) 85%,transparent)', 'color-mix(in srgb,var(--pn-f28c3c,#F28C3C) 80%,transparent)', 'color-mix(in srgb,var(--pn-f2be3c,#F2BE3C) 75%,transparent)', 'color-mix(in srgb,var(--pn-3ea0e0,#3EA0E0) 75%,transparent)', 'color-mix(in srgb,var(--pn-2ec77a,#2EC77A) 85%,transparent)']
 
 function geralCor(pct: number): string {
   if (pct < 30) return ERR

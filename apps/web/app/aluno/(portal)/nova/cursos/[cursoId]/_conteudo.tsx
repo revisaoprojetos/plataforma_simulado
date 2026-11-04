@@ -20,7 +20,7 @@ type TabKey = 'modulos' | 'pdfs' | 'legproc' | 'questoes'
 
 function Circle({ lido }: { lido: boolean }) {
   return lido
-    ? <span style={{ width: 26, height: 26, borderRadius: '50%', background: '#2EC77A', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon n="check" size={14} /></span>
+    ? <span style={{ width: 26, height: 26, borderRadius: '50%', background: 'var(--pn-2ec77a,#2EC77A)', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon n="check" size={14} /></span>
     : <span style={{ width: 26, height: 26, borderRadius: '50%', border: '2px solid var(--line2)', boxSizing: 'border-box', flexShrink: 0 }} />
 }
 

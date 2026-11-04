@@ -30,7 +30,7 @@ import { LeituraRanking } from '@/components/aluno/leitura-ranking'
 import type { RankingLeitura } from '@/lib/leitura/ranking'
 import type { TituloNivel } from '@/lib/gamificacao/config'
 
-const GOLD = '#F1C232'
+const GOLD = 'var(--pn-f1c232,#F1C232)'
 const fmt = (n: number) => (Number(n) || 0).toLocaleString('pt-BR')
 
 type Tab = 'desafio' | 'reg' | 'des' | 'rank'
@@ -176,13 +176,13 @@ export function DesafioJurisInterno({ desafioId, titulo, theme, totalDias, mater
 
       {/* ARCADE: SEMPRE montado — nunca recarrega (nem ao trocar de aba, nem ao abrir a leitura), então
           nada de painéis vazios, perda de progresso ou flash da abertura ao voltar. */}
-      <div data-tour="juris-desafio" style={{ display: tab === 'desafio' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0, background: '#05060f' }}>
+      <div data-tour="juris-desafio" style={{ display: tab === 'desafio' ? 'flex' : 'none', flexDirection: 'column', flex: 1, minHeight: 0, background: 'var(--pn-05060f,#05060f)' }}>
         <iframe
           ref={arcadeRef}
           src={`/jurisprudencia/index.html?desafio=${encodeURIComponent(desafioId)}`}
           title="Desafio de Jurisprudência"
           allow="autoplay; fullscreen"
-          style={{ display: 'block', width: '100%', flex: 1, minHeight: 0, height: '100%', border: 0, background: '#05060f' }}
+          style={{ display: 'block', width: '100%', flex: 1, minHeight: 0, height: '100%', border: 0, background: 'var(--pn-05060f,#05060f)' }}
         />
       </div>
 
@@ -190,11 +190,11 @@ export function DesafioJurisInterno({ desafioId, titulo, theme, totalDias, mater
           SEM barra própria: a leitura abre em TELA CHEIA (embed cobre o shell) e tem o seu botão "Voltar"
           (fecha via #fechar-leitura). Só o loader escuro enquanto o iframe carrega. */}
       {leitura && typeof document !== 'undefined' && createPortal(
-        <div style={{ position: 'fixed', inset: 0, zIndex: 120, background: '#05060f' }}>
+        <div style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'var(--pn-05060f,#05060f)' }}>
           <iframe ref={leituraRef} src={leitura} title={overlayLabel === 'a leitura…' ? 'Leitura do dia' : 'Questões do dia'} onLoad={() => setLeituraLoad(false)} style={{ display: 'block', width: '100%', height: '100%', border: 0, background: '#fff' }} />
           {leituraLoad && (
             // Loader ESCURO por cima do iframe branco → sem a tela branca "em branco" antes da leitura.
-            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, background: '#05060f', color: 'rgba(255,255,255,.75)' }}>
+            <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, background: 'var(--pn-05060f,#05060f)', color: 'rgba(255,255,255,.75)' }}>
               <Loader2 size={30} className="animate-spin" style={{ color: GOLD }} />
               <span style={{ fontSize: 12.5, fontWeight: 700, letterSpacing: '.08em' }}>Carregando {overlayLabel}</span>
             </div>
@@ -261,8 +261,8 @@ function HeaderHero({
   const voltarHref = origemSegura(useSearchParams().get('origem'), '/aluno/jurisprudencia')
   // Fundo do cabeçalho: imagem > cor custom > gradiente padrão. No compacto desemboca no preto do arcade.
   const bgCompacto = corFundo
-    ? `linear-gradient(180deg,${corFundo} 0%,${corFundo} 45%,#05060f 100%)`
-    : 'linear-gradient(180deg,#3B1E8F 0%,#1E1150 48%,#05060f 100%)'
+    ? `linear-gradient(180deg,${corFundo} 0%,${corFundo} 45%,var(--pn-05060f,#05060f) 100%)`
+    : 'linear-gradient(180deg,var(--pn-3b1e8f,#3B1E8F) 0%,var(--pn-1e1150,#1E1150) 48%,var(--pn-05060f,#05060f) 100%)'
   const bgNormal = corFundo || 'radial-gradient(120% 140% at 50% 0%,#3B1E8F 0%,#1E1150 55%,#120A33 100%)'
   // Botões de aba (reusados nos dois modos). `h` = altura da linha (encaixa o sublinhado embaixo).
   const abaBtns = (h: number) => tabs.map((t) => {
@@ -299,9 +299,9 @@ function HeaderHero({
             <Link href={voltarHref} aria-label="Voltar" style={{ width: 28, height: 28, borderRadius: 8, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,.12)', color: '#fff' }}>
               <ChevronLeft size={15} />
             </Link>
-            <span style={{ display: 'inline-flex', color: '#CFC4FF' }}><Scale size={16} /></span>
+            <span style={{ display: 'inline-flex', color: 'var(--pn-cfc4ff,#CFC4FF)' }}><Scale size={16} /></span>
             <b style={{ fontSize: 15, fontWeight: 800, letterSpacing: '-0.02em', color: '#fff', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{titulo}</b>
-            <span className="ji-hero-chip" style={{ height: 22, padding: '0 9px', borderRadius: 99, background: GOLD, color: '#2A1A55', fontSize: 11.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+            <span className="ji-hero-chip" style={{ height: 22, padding: '0 9px', borderRadius: 99, background: GOLD, color: 'var(--pn-2a1a55,#2A1A55)', fontSize: 11.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
               {totalDias} {totalDias === 1 ? 'fase' : 'fases'}{materiasCount ? ` · ${materiasCount} ${materiasCount === 1 ? 'matéria' : 'matérias'}` : ''}
             </span>
             <AjudaTourBtn style={{ marginLeft: 'auto', flexShrink: 0 }} onStart={() => setTab('desafio')} />
@@ -329,9 +329,9 @@ function HeaderHero({
           <Link href={voltarHref} aria-label="Voltar" style={{ width: 36, height: 36, borderRadius: 10, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,.12)', color: '#fff' }}>
             <ChevronLeft size={16} />
           </Link>
-          <span style={{ display: 'inline-flex', color: '#CFC4FF' }}><Scale size={20} /></span>
+          <span style={{ display: 'inline-flex', color: 'var(--pn-cfc4ff,#CFC4FF)' }}><Scale size={20} /></span>
           <b style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.03em', color: '#fff' }}>{titulo}</b>
-          <span className="ji-hero-chip" style={{ height: 24, padding: '0 10px', borderRadius: 99, background: GOLD, color: '#2A1A55', fontSize: 12, fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <span className="ji-hero-chip" style={{ height: 24, padding: '0 10px', borderRadius: 99, background: GOLD, color: 'var(--pn-2a1a55,#2A1A55)', fontSize: 12, fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 6 }}>
             {totalDias} {totalDias === 1 ? 'fase' : 'fases'}{materiasCount ? ` · ${materiasCount} ${materiasCount === 1 ? 'matéria' : 'matérias'}` : ''}
           </span>
         </div>
@@ -463,7 +463,7 @@ function AbaRegulamento({ config, totalDias, materiasCount }: { config: Config; 
 function GanhoItem({ valor, txt, gold }: { valor: string; txt: string; gold?: boolean }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', fontSize: 13 }}>
-      <span style={{ minWidth: 52, height: 24, padding: '0 8px', borderRadius: 8, background: gold ? 'rgba(232,169,58,.16)' : 'var(--chip)', color: gold ? '#C98A12' : 'var(--brand)', fontSize: 12, fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{valor}</span>
+      <span style={{ minWidth: 52, height: 24, padding: '0 8px', borderRadius: 8, background: gold ? 'color-mix(in srgb,var(--pn-e8a93a,#E8A93A) 16%,transparent)' : 'var(--chip)', color: gold ? 'var(--pn-c98a12,#C98A12)' : 'var(--brand)', fontSize: 12, fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{valor}</span>
       <span style={{ color: 'var(--ink)' }}>{txt}</span>
     </div>
   )
@@ -558,7 +558,7 @@ function AbaDesempenho({ desafioId, totalDias, dias }: { desafioId: string; tota
               {fases.slice(0, totalDias).map((f, i) => {
                 const h = Math.max(6, (f.melhor / maxBest) * CHART_H)
                 const x = (CHART_W / Math.max(1, totalDias)) * i + 2
-                const fill = f.melhor > 0 ? '#22B573' : f.jogada ? 'var(--brand)' : 'var(--track)'
+                const fill = f.melhor > 0 ? 'var(--pn-22b573,#22B573)' : f.jogada ? 'var(--brand)' : 'var(--track)'
                 return (
                   <rect key={f.chave} x={x} y={CHART_H - h} width={Math.max(6, barW)} height={h} rx={3} fill={fill}>
                     <title>Fase {i + 1}: {fmt(f.melhor)} pts</title>
@@ -584,7 +584,7 @@ function AbaDesempenho({ desafioId, totalDias, dias }: { desafioId: string; tota
           </div>
           {etapas.map((e, i) => (
             <div key={e.t} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', borderTop: i === 0 ? 0 : '1px solid var(--line)' }}>
-              <span style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: e.ok ? '#22B573' : 'var(--surface2)', color: e.ok ? '#fff' : 'var(--muted)' }}>
+              <span style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: e.ok ? 'var(--pn-22b573,#22B573)' : 'var(--surface2)', color: e.ok ? '#fff' : 'var(--muted)' }}>
                 {e.ok ? <Check size={13} /> : <Flag size={13} />}
               </span>
               <b style={{ flex: 1, fontSize: 13, color: 'var(--ink)' }}>{e.t}</b>

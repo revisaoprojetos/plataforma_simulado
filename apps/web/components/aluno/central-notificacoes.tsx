@@ -30,9 +30,9 @@ const ABAS: { key: Aba; label: string }[] = [
 
 // Tile de categoria — cor SEMÂNTICA fixa + ícone (laranja=estudos, azul=simulados, roxo=ranking).
 const CAT_VIS: Record<Cat, { icon: LucideIcon; tile: string }> = {
-  est: { icon: Flag, tile: '#F2A23C' },
-  sim: { icon: ClipboardList, tile: '#5B8DEF' },
-  rank: { icon: Trophy, tile: '#9B7BE8' },
+  est: { icon: Flag, tile: 'var(--pn-f2a23c,#F2A23C)' },
+  sim: { icon: ClipboardList, tile: 'var(--pn-5b8def,#5B8DEF)' },
+  rank: { icon: Trophy, tile: 'var(--pn-9b7be8,#9B7BE8)' },
   com: { icon: Bell, tile: 'var(--brand)' },
 }
 
@@ -173,14 +173,14 @@ export function CentralNotificacoes({ brand = 'vnd' }: { brand?: Brand }) {
 
       {aberto && typeof document !== 'undefined' && createPortal(
         <>
-          <div className="fixed inset-0 z-[90]" style={{ background: 'rgba(10,17,36,.28)' }} onClick={() => setAberto(false)} aria-hidden />
+          <div className="fixed inset-0 z-[90]" style={{ background: 'color-mix(in srgb,var(--pn-0a1124,#0A1124) 28%,transparent)' }} onClick={() => setAberto(false)} aria-hidden />
           <div
             ref={panelRef}
             role="dialog"
             aria-label="Notificações"
             className="app cn-panel fixed z-[95] flex max-h-[80vh] flex-col overflow-hidden"
             data-brand={brand}
-            style={{ ...tokens, right: pos?.right ?? 16, top: pos?.top ?? 70, width: 404, borderRadius: 20, background: 'var(--surface)', border: '1px solid var(--line)', boxShadow: '0 28px 56px -20px rgba(11,17,36,.5)', animation: 'cnIn .22s cubic-bezier(.22,1,.36,1)', maxHeight: 'calc(100vh - 92px)' }}
+            style={{ ...tokens, right: pos?.right ?? 16, top: pos?.top ?? 70, width: 404, borderRadius: 20, background: 'var(--surface)', border: '1px solid var(--line)', boxShadow: '0 28px 56px -20px color-mix(in srgb,var(--pn-0b1124,#0B1124) 50%,transparent)', animation: 'cnIn .22s cubic-bezier(.22,1,.36,1)', maxHeight: 'calc(100vh - 92px)' }}
           >
             <style>{`@media (max-width:1023px){.cn-panel{left:10px!important;right:10px!important;top:66px!important;width:auto!important;max-height:calc(100dvh - 86px)!important}}`}</style>
 
@@ -280,7 +280,7 @@ function Cartao({ item, onLer, onAbrir, onRemover }: { item: ItemNotif; onLer: (
       <div className="min-w-0 flex-1 leading-snug">
         <div className="flex items-start gap-2">
           <b className="block flex-1 text-[13.5px]" style={{ color: 'var(--ink)', fontWeight: item.lida ? 600 : 800 }}>{item.titulo}</b>
-          {!item.lida && <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: '#1FA868', boxShadow: '0 0 6px rgba(31,168,104,.5)' }} aria-hidden />}
+          {!item.lida && <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: 'var(--pn-1fa868,#1FA868)', boxShadow: '0 0 6px color-mix(in srgb,var(--pn-1fa868,#1FA868) 50%,transparent)' }} aria-hidden />}
         </div>
         {item.mensagem && <span className="mt-0.5 block text-[12.5px]" style={{ color: 'var(--muted)' }}>{item.mensagem}</span>}
         <div className="mt-1.5 text-[11px]" style={{ color: 'var(--muted2,var(--muted))' }}>{tempoRelativo(item.criado_em)}</div>
@@ -289,7 +289,7 @@ function Cartao({ item, onLer, onAbrir, onRemover }: { item: ItemNotif; onLer: (
             type="button"
             onClick={(e) => { e.stopPropagation(); onLer(item.id); onAbrir(item) }}
             className="mt-2.5 inline-flex items-center rounded-[10px] px-3.5 py-1.5 text-[12px] font-extrabold transition-opacity hover:opacity-90"
-            style={{ background: 'var(--flag)', color: '#3a2c08' }}
+            style={{ background: 'var(--flag)', color: 'var(--pn-3a2c08,#3a2c08)' }}
           >
             {item.acao.rotulo}
           </button>

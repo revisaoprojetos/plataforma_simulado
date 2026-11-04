@@ -49,7 +49,7 @@ const GRIFOS_INLINE = [
   { id: 'nucleo', label: 'Núcleo', cor: '#fff35c', texto: '#111' },
   { id: 'complemento', label: 'Complemento', cor: '#a8d08d', texto: '#111' },
   { id: 'prazo', label: 'Prazo', cor: '#cc99ff', texto: '#111' },
-  { id: 'excecao', label: 'Exceção', cor: '#f3b0b0', texto: '#c00000' },
+  { id: 'excecao', label: 'Exceção', cor: '#f3b0b0', texto: 'var(--pn-c00000,#c00000)' },
 ] as const
 // Caixas de destaque (estruturais) — cores batem com o CSS.
 const CAIXAS = [

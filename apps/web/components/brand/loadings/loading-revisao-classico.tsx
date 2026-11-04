@@ -21,14 +21,14 @@ export type RevisaoTheme = 'claro' | 'escuro'
 
 // Fundo e cor do rodapé por tema (spec 02 §5.2 / mockups).
 const BG: Record<RevisaoTheme, string> = {
-  claro: 'linear-gradient(155deg,#2E1F7A 0%,#4A31B8 50%,#7356E6 100%)',
-  escuro: 'linear-gradient(155deg,#0B0720 0%,#140C38 50%,#1F1352 100%)',
+  claro: 'linear-gradient(155deg,var(--pn-2e1f7a,#2E1F7A) 0%,var(--pn-4a31b8,#4A31B8) 50%,var(--pn-7356e6,#7356E6) 100%)',
+  escuro: 'linear-gradient(155deg,var(--pn-0b0720,#0B0720) 0%,var(--pn-140c38,#140C38) 50%,var(--pn-1f1352,#1F1352) 100%)',
 }
-const FOOT: Record<RevisaoTheme, string> = { claro: '#D4C9FA', escuro: '#8E82BF' }
+const FOOT: Record<RevisaoTheme, string> = { claro: 'var(--pn-d4c9fa,#D4C9FA)', escuro: 'var(--pn-8e82bf,#8E82BF)' }
 const LINES_ALPHA: Record<RevisaoTheme, string> = { claro: '.07', escuro: '.05' }
 const BAND: Record<RevisaoTheme, string> = {
-  claro: 'linear-gradient(180deg,rgba(30,18,80,0),rgba(30,18,80,.35))',
-  escuro: 'linear-gradient(180deg,rgba(5,3,18,0),rgba(5,3,18,.55))',
+  claro: 'linear-gradient(180deg,color-mix(in srgb,var(--pn-1e1250,#1E1250) 0%,transparent),color-mix(in srgb,var(--pn-1e1250,#1E1250) 35%,transparent))',
+  escuro: 'linear-gradient(180deg,color-mix(in srgb,var(--pn-050312,#050312) 0%,transparent),color-mix(in srgb,var(--pn-050312,#050312) 55%,transparent))',
 }
 
 const LETRAS = ['R', 'E', 'V', 'I', 'S', 'Ã', 'O']
@@ -60,7 +60,7 @@ export function LoadingRevisaoClassico({
         aria-hidden="true"
       >
         <path fill="none" stroke="rgba(255,255,255,.14)" strokeWidth="0.25" d={REVISAO_R_PATH} />
-        <path className="rl-trace-run" fill="none" stroke="#F1C232" strokeWidth="0.5" strokeLinecap="round" d={REVISAO_R_OUTLINE} />
+        <path className="rl-trace-run" fill="none" stroke="var(--pn-f1c232,#F1C232)" strokeWidth="0.5" strokeLinecap="round" d={REVISAO_R_OUTLINE} />
       </svg>
 
       {/* marca d'água grande à direita */}
@@ -74,7 +74,7 @@ export function LoadingRevisaoClassico({
         <div className="rl-lockup">
           <div className="rl-logo">
             <svg className="rl-echo rl-e1" viewBox="0 0 68 66" aria-hidden="true"><path fill="none" stroke="rgba(255,255,255,.45)" strokeWidth="0.35" d={REVISAO_R_OUTLINE} /></svg>
-            <svg className="rl-echo rl-e2" viewBox="0 0 68 66" aria-hidden="true"><path fill="none" stroke="rgba(255,196,163,.55)" strokeWidth="0.35" d={REVISAO_R_OUTLINE} /></svg>
+            <svg className="rl-echo rl-e2" viewBox="0 0 68 66" aria-hidden="true"><path fill="none" stroke="color-mix(in srgb,var(--pn-ffc4a3,#FFC4A3) 55%,transparent)" strokeWidth="0.35" d={REVISAO_R_OUTLINE} /></svg>
             <svg className="rl-echo rl-e3" viewBox="0 0 68 66" aria-hidden="true"><path fill="none" stroke="rgba(255,255,255,.45)" strokeWidth="0.35" d={REVISAO_R_OUTLINE} /></svg>
             <MarcaRevisao className="rl-rfill" fill="#FFFFFF" />
             <svg className="rl-rdraw" viewBox="0 0 68 66" aria-hidden="true"><path pathLength={1} fill="none" stroke="#FFFFFF" strokeWidth="0.6" strokeLinejoin="round" d={REVISAO_R_PATH} /></svg>
@@ -126,7 +126,7 @@ function css(theme: RevisaoTheme) {
 .rl-w1{animation-delay:1.75s}.rl-w2{animation-delay:1.82s}.rl-w3{animation-delay:1.89s}.rl-w4{animation-delay:1.96s}.rl-w5{animation-delay:2.03s}.rl-w6{animation-delay:2.1s}.rl-w7{animation-delay:2.17s}
 .rl-sub{margin-left:6px;margin-top:25px;font-weight:500;font-size:34px;line-height:.74;letter-spacing:.22em;white-space:nowrap;animation:rlSubIn .9s cubic-bezier(.2,.8,.2,1) 2.4s both}
 .rl-load{position:relative;width:440px;height:5px;border-radius:999px;overflow:hidden;background:rgba(255,255,255,.16);animation:rlUp .8s cubic-bezier(.2,.8,.2,1) 2.8s both}
-.rl-runner{position:absolute;top:0;left:0;height:100%;width:34%;border-radius:999px;background:linear-gradient(90deg,rgba(255,255,255,0),#FFFFFF 55%,#F1C232);transform:translateX(-110%);animation:rlRun 1.5s cubic-bezier(.65,0,.35,1) 3.1s infinite}
+.rl-runner{position:absolute;top:0;left:0;height:100%;width:34%;border-radius:999px;background:linear-gradient(90deg,rgba(255,255,255,0),#FFFFFF 55%,var(--pn-f1c232,#F1C232));transform:translateX(-110%);animation:rlRun 1.5s cubic-bezier(.65,0,.35,1) 3.1s infinite}
 .rl-msg{margin:0;font-size:13px;font-weight:500;animation:rlFade .4s ease-out 3.1s both}
 .rl-foot{position:absolute;bottom:26px;font-size:12px;animation:rlFade 1s ease-out .4s both}
 @keyframes rlFade{from{opacity:0}to{opacity:1}}

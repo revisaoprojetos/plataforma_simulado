@@ -18,7 +18,7 @@ function Previa({ modo }: { modo: CardView }) {
     return (
       <div className="flex h-[104px] w-[104px] items-center">
         <div className="flex h-11 w-full overflow-hidden rounded-lg border bg-card shadow-sm">
-          <div className="h-full w-2/5 shrink-0" style={{ background: `linear-gradient(150deg, ${cor}, #0f172a)` }} />
+          <div className="h-full w-2/5 shrink-0" style={{ background: `linear-gradient(150deg, ${cor}, var(--pn-0f172a,#0f172a))` }} />
           <div className="flex-1 space-y-1 p-1.5">
             <div className="h-1.5 w-4/5 rounded bg-foreground/30" />
             <div className="h-1 w-2/3 rounded bg-muted-foreground/40" />
@@ -30,7 +30,7 @@ function Previa({ modo }: { modo: CardView }) {
   }
   return (
     <div className="flex h-[104px] w-[104px] items-center justify-center">
-      <div className="relative h-full w-[72px] overflow-hidden rounded-lg border shadow-sm" style={{ background: `linear-gradient(155deg, ${cor}, #0f172a)` }}>
+      <div className="relative h-full w-[72px] overflow-hidden rounded-lg border shadow-sm" style={{ background: `linear-gradient(155deg, ${cor}, var(--pn-0f172a,#0f172a))` }}>
         <div className="absolute inset-x-0 bottom-0 space-y-1 bg-gradient-to-t from-black/80 to-transparent p-1.5 pt-5">
           <div className="h-1.5 w-4/5 rounded bg-white/80" />
           <div className="h-2 w-full rounded bg-white/25" />

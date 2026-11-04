@@ -1241,7 +1241,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
     <div className="pointer-events-none absolute inset-0" aria-hidden>
       {matches.map((m, mi) => m.rects.map((r, i) => {
         const atual = mi === matchIdx
-        return <div key={`m-${mi}-${i}`} className="absolute rounded-[2px]" style={{ left: r.left, top: r.top, width: r.width, height: r.height, background: corRealce(atual ? '#f59e0b' : '#3b82f6'), opacity: escuro ? (atual ? 0.7 : 0.5) : (atual ? 0.55 : 0.3), mixBlendMode: blendGrifo, outline: atual ? '1.5px solid #d97706' : 'none' }} />
+        return <div key={`m-${mi}-${i}`} className="absolute rounded-[2px]" style={{ left: r.left, top: r.top, width: r.width, height: r.height, background: corRealce(atual ? '#f59e0b' : '#3b82f6'), opacity: escuro ? (atual ? 0.7 : 0.5) : (atual ? 0.55 : 0.3), mixBlendMode: blendGrifo, outline: atual ? '1.5px solid var(--pn-d97706,#d97706)' : 'none' }} />
       }))}
     </div>
   ), [matches, matchIdx, blendGrifo])
@@ -1462,7 +1462,7 @@ export function LeitorDocumento({ doc, trilha, buscaInicial, grifoCores = DEFAUL
             </div>
           )}
           <div className="ml-auto flex items-center gap-3">
-            <button onClick={toggleFavorito} title={favorito ? 'Remover dos favoritos' : 'Favoritar'} className="rounded-lg border p-1.5 transition-colors" style={{ borderColor: '#0000001a', color: favorito ? '#f59e0b' : cores.fg }} aria-label="Favoritar">
+            <button onClick={toggleFavorito} title={favorito ? 'Remover dos favoritos' : 'Favoritar'} className="rounded-lg border p-1.5 transition-colors" style={{ borderColor: '#0000001a', color: favorito ? 'var(--pn-f59e0b,#f59e0b)' : cores.fg }} aria-label="Favoritar">
               <Star className={cn('h-4 w-4', favorito && 'fill-amber-400')} />
             </button>
             <button onClick={() => setBuscaAberta((v) => !v)} title="Buscar na lei" className={cn('rounded-lg border p-1.5 transition-colors', buscaAberta && 'ring-2 ring-primary')} style={{ borderColor: '#0000001a', color: cores.fg }} aria-label="Buscar">

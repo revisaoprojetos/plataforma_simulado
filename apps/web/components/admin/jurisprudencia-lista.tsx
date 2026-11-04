@@ -102,7 +102,7 @@ function DesafioCard({ d, variant }: { d: DesafioItem; variant: CardView }) {
           {capaTicket
             // eslint-disable-next-line @next/next/no-img-element
             ? <img src={capaTicket} alt="" className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105" />
-            : <div className="absolute inset-0 flex items-center justify-center text-white/90" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }}><Gavel className="h-8 w-8" /></div>}
+            : <div className="absolute inset-0 flex items-center justify-center text-white/90" style={{ background: `linear-gradient(155deg, ${c} 0%, var(--pn-0f172a,#0f172a) 135%)` }}><Gavel className="h-8 w-8" /></div>}
           <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `linear-gradient(110deg, transparent 45%, ${c})` }} />
         </div>
         <div className="flex min-w-0 flex-1 flex-col justify-center gap-1 p-3">
@@ -126,7 +126,7 @@ function DesafioCard({ d, variant }: { d: DesafioItem; variant: CardView }) {
       {capaPoster
         // eslint-disable-next-line @next/next/no-img-element
         ? <img src={capaPoster} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-        : <div className="absolute inset-0 flex items-center justify-center text-white/90" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }}><Gavel className="h-10 w-10" /></div>}
+        : <div className="absolute inset-0 flex items-center justify-center text-white/90" style={{ background: `linear-gradient(155deg, ${c} 0%, var(--pn-0f172a,#0f172a) 135%)` }}><Gavel className="h-10 w-10" /></div>}
       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 p-3">
         <p className="text-[10px] font-medium uppercase tracking-wide text-white/70">Desafio</p>

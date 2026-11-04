@@ -38,7 +38,7 @@ function CardPersonalizado({ s, variant = 'poster' }: { s: MeuSimuladoResumo; va
     return (
       <div className="group relative flex h-28 overflow-hidden rounded-2xl border bg-card shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:shadow-lg sm:h-32">
         <div className="relative w-[42%] max-w-[11rem] shrink-0 overflow-hidden">
-          <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />
+          <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, var(--pn-0f172a,#0f172a) 135%)` }} />
           <Icone className="absolute -right-4 -top-4 h-28 w-28 text-white/10" />
           <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `linear-gradient(110deg, transparent 45%, ${cor})` }} />
         </div>
@@ -62,7 +62,7 @@ function CardPersonalizado({ s, variant = 'poster' }: { s: MeuSimuladoResumo; va
   return (
     <div className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-white/25">
       {/* Fundo: degradê + ícone marca-d'água (cor e ícone escolhidos pelo aluno). */}
-      <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />
+      <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, var(--pn-0f172a,#0f172a) 135%)` }} />
       <Icone className="absolute -right-6 -top-6 h-40 w-40 text-white/10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 opacity-50 transition-opacity duration-300 group-hover:opacity-70" style={{ background: `linear-gradient(to top, ${cor}, transparent)` }} />
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/5" />

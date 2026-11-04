@@ -23,7 +23,7 @@ const LABEL: Record<string, string> = {
   streak: 'Sequência diária', chest: 'Baú', pratica: 'Prática de questões', trilha: 'Bônus de trilha',
 }
 const COR: Record<string, string> = {
-  simulado: '#38bdf8', missao: '#34d399', conquista: '#fbbf24', streak: '#fb923c', chest: '#a78bfa', pratica: '#22d3ee', trilha: '#f472b6',
+  simulado: 'var(--pn-38bdf8,#38bdf8)', missao: 'var(--pn-34d399,#34d399)', conquista: 'var(--pn-fbbf24,#fbbf24)', streak: 'var(--pn-fb923c,#fb923c)', chest: 'var(--pn-a78bfa,#a78bfa)', pratica: 'var(--pn-22d3ee,#22d3ee)', trilha: 'var(--pn-f472b6,#f472b6)',
 }
 
 // Monta as partículas (origem por tipo: 'missao' → card de missões; demais → canto sup. direito).

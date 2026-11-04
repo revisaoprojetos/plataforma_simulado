@@ -138,7 +138,7 @@ export default async function GrifosPage({ searchParams }: { searchParams: Promi
           <Eyebrow color="var(--gold)">Revisão por meus grifos · Cronograma adaptativo</Eyebrow>
           <h1 style={{ margin: 0, fontSize: 30, fontWeight: 800, letterSpacing: '-0.03em', color: '#FFFFFF' }}>{titulo}</h1>
           {/* TODO(dados): disciplina/aula do material (sem loader hoje) — mantido só o que é real. */}
-          <span style={{ fontSize: 14, color: '#E6DEFF' }}>{items.length.toLocaleString('pt-BR')} {items.length === 1 ? 'trecho marcado' : 'trechos marcados'}</span>
+          <span style={{ fontSize: 14, color: 'var(--pn-e6deff,#E6DEFF)' }}>{items.length.toLocaleString('pt-BR')} {items.length === 1 ? 'trecho marcado' : 'trechos marcados'}</span>
           <HeaderToggle active="grifos" docId={docId} />
         </Col>
       </Hero>

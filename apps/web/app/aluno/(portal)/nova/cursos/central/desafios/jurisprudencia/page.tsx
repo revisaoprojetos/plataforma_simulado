@@ -27,7 +27,7 @@ function JurisClubAside() {
         <b style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--ink)' }}>Juris Teste</b>
         <Muted size={12.5}>12 de 40 julgados · 70% de acerto</Muted>
       </Col>
-      <span style={{ height: 8, borderRadius: 99, background: 'var(--track)', overflow: 'hidden' }}><span style={{ display: 'block', width: '30%', height: '100%', borderRadius: 99, background: 'linear-gradient(90deg,#6449E0,#8F75FF 70%,#F1C232)' }} /></span>
+      <span style={{ height: 8, borderRadius: 99, background: 'var(--track)', overflow: 'hidden' }}><span style={{ display: 'block', width: '30%', height: '100%', borderRadius: 99, background: 'linear-gradient(90deg,var(--pn-6449e0,#6449E0),var(--pn-8f75ff,#8F75FF) 70%,var(--pn-f1c232,#F1C232))' }} /></span>
       <Col gap={2}>
         {RANK.map((r) => (
           <Row key={r.pos} gap={10} style={{ padding: '9px 10px', borderRadius: 11, background: r.voce ? 'var(--chip)' : 'transparent' }}>

@@ -36,7 +36,7 @@ export function SemAcessoModal({ pastaNome, capa = null, suporte }: { pastaNome?
           <div className="relative border-b-2 border-primary/40">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={capa} alt="" className="aspect-[1920/500] w-full object-cover" />
-            <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(10,7,20,.5), transparent 62%)' }} />
+            <div className="absolute inset-0" style={{ background: 'linear-gradient(to top, color-mix(in srgb,var(--pn-0a0714,#0A0714) 50%,transparent), transparent 62%)' }} />
             <span className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-lg bg-black/35 text-white ring-1 ring-white/25 backdrop-blur"><Lock className="h-4 w-4" /></span>
           </div>
         )}

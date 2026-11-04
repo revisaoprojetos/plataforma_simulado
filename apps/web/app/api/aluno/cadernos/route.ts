@@ -18,11 +18,16 @@ export async function GET() {
     .order('criado_em', { ascending: false })
 
   const ids = (cadernos ?? []).map((c: any) => c.id)
-  const { data: itens } = ids.length
-    ? await svc.from('simulado_aluno_caderno_questoes').select('caderno_id').in('caderno_id', ids)
-    : { data: [] as any[] }
+  // total = questões + itens (comentários de trecho). Uma query por tabela (.in + tally), sem N+1.
+  // Se a tabela de itens ainda não existir (migração pendente) o erro é ignorado e só contam as questões.
+  const [{ data: itens }, { data: extras }] = ids.length
+    ? await Promise.all([
+        svc.from('simulado_aluno_caderno_questoes').select('caderno_id').in('caderno_id', ids),
+        svc.from('simulado_aluno_caderno_itens').select('caderno_id').eq('tenant_id', sessao.tenantId).in('caderno_id', ids),
+      ])
+    : [{ data: [] as any[] }, { data: [] as any[] }]
   const contagem: Record<string, number> = {}
-  for (const i of itens ?? []) contagem[i.caderno_id] = (contagem[i.caderno_id] ?? 0) + 1
+  for (const i of [...(itens ?? []), ...(extras ?? [])]) contagem[i.caderno_id] = (contagem[i.caderno_id] ?? 0) + 1
 
   return NextResponse.json({
     cadernos: (cadernos ?? []).map((c: any) => ({ id: c.id, nome: c.nome, total: contagem[c.id] ?? 0 })),

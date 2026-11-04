@@ -47,7 +47,7 @@ export function LoginRevisaoClassico({
       {/* contorno traçado à esquerda */}
       <svg className="rlc-trace" viewBox="0 0 68 66" aria-hidden="true">
         <path fill="none" stroke="rgba(255,255,255,.14)" strokeWidth="0.25" d={REVISAO_R_PATH} />
-        <path className="rlc-run" fill="none" stroke="#FFC4A3" strokeWidth="0.5" strokeLinecap="round" d={REVISAO_R_OUTLINE} />
+        <path className="rlc-run" fill="none" stroke="var(--pn-ffc4a3,#FFC4A3)" strokeWidth="0.5" strokeLinecap="round" d={REVISAO_R_OUTLINE} />
       </svg>
 
       {formas && <Formas prefixo="rlc" />}
@@ -64,7 +64,7 @@ export function LoginRevisaoClassico({
         <div className="rlc-cardwrap rlc-pop">
           <div className="rlc-card" style={{ background: CARD_BG[t], border: CARD_BORDER[t] }}>
             <div className="rlc-logo-in">
-              <MarcaRevisao width={60} height={58} fill={t === 'escuro' ? '#FFFFFF' : '#4F4A6A'} />
+              <MarcaRevisao width={60} height={58} fill={t === 'escuro' ? '#FFFFFF' : 'var(--pn-4f4a6a,#4F4A6A)'} />
             </div>
             <LoginForm
               brand="revisao" theme={theme} core={core} tokens={TOKENS[t]} preview={preview}
@@ -76,7 +76,7 @@ export function LoginRevisaoClassico({
         <div className="rlc-chips rlc-up rlc-d7">
           {['Correção automática', 'Desempenho por matéria', 'Acesso só com e-mail'].map((c) => (
             <span key={c} className="rlc-chip">
-              <svg viewBox="0 0 24 24" aria-hidden="true" width="16" height="16" fill="none" stroke="#FFB993" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
+              <svg viewBox="0 0 24 24" aria-hidden="true" width="16" height="16" fill="none" stroke="var(--pn-ffb993,#FFB993)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6 9 17l-5-5" /></svg>
               {c}
             </span>
           ))}
@@ -108,7 +108,7 @@ function css(t: RevTheme) {
 .rlc-brand{display:flex;align-items:center;gap:12px}
 .rlc-brandtxt{display:flex;flex-direction:column;line-height:1.2}
 .rlc-brandname{font-weight:800;font-size:16px;letter-spacing:-.02em}
-.rlc-brandsub{font-size:10.5px;font-weight:700;letter-spacing:.18em;color:#D9CFFF}
+.rlc-brandsub{font-size:10.5px;font-weight:700;letter-spacing:.18em;color:var(--pn-d9cfff,#D9CFFF)}
 .rlc-ghost{display:inline-flex;align-items:center;gap:8px;height:38px;padding:0 14px;border-radius:999px;border:1px solid rgba(255,255,255,.28);color:#fff;font-size:13px;font-weight:600;text-decoration:none;transition:background .15s}
 .rlc-ghost:hover{background:rgba(255,255,255,.14)}
 
@@ -116,15 +116,15 @@ function css(t: RevTheme) {
 .rlc-headline{display:flex;flex-direction:column;align-items:center;gap:14px;max-width:1200px}
 .rlc-headline h1{margin:0;font-weight:800;font-size:54px;line-height:1.06;letter-spacing:-.045em;color:#fff;text-shadow:0 2px 24px rgba(10,5,35,.45)}
 .rlc-hl{color:#fff}
-.rlc-dest{position:relative;display:inline-block;color:#A074FF;isolation:isolate}
+.rlc-dest{position:relative;display:inline-block;color:var(--pn-a074ff,#A074FF);isolation:isolate}
 /* Halo roxo "respirando" em volta da palavra em destaque (anima só opacidade → leve). */
 .rlc-dest::before{content:"";position:absolute;inset:-4px -18px;border-radius:999px;background:radial-gradient(62% 135% at 50% 50%,rgba(160,116,255,.6),rgba(160,116,255,0) 70%);filter:blur(16px);z-index:-1;animation:rlcDestGlow 2.6s ease-in-out infinite}
 @keyframes rlcDestGlow{0%,100%{opacity:.28}50%{opacity:.95}}
-.rlc-headline p{margin:0;font-size:17px;line-height:1.6;color:#E1D9FF}
+.rlc-headline p{margin:0;font-size:17px;line-height:1.6;color:var(--pn-e1d9ff,#E1D9FF)}
 .rlc-cardwrap{position:relative;width:100%;max-width:420px}
-.rlc-card{position:relative;color:${t === 'escuro' ? '#fff' : '#1D1933'};border-radius:28px;padding:34px 32px 28px;box-sizing:border-box;box-shadow:0 2px 4px rgba(20,10,60,.08),0 40px 80px -28px rgba(10,5,35,.7);display:flex;flex-direction:column;gap:14px;text-align:left}
+.rlc-card{position:relative;color:${t === 'escuro' ? '#fff' : 'var(--pn-1d1933,#1D1933)'};border-radius:28px;padding:34px 32px 28px;box-sizing:border-box;box-shadow:0 2px 4px rgba(20,10,60,.08),0 40px 80px -28px rgba(10,5,35,.7);display:flex;flex-direction:column;gap:14px;text-align:left}
 .rlc-logo-in{display:flex;justify-content:center;animation:rlcLogo .9s cubic-bezier(.2,.8,.2,1) .95s both}
-.rlc-chips{display:flex;flex-wrap:wrap;justify-content:center;gap:10px 26px;font-size:13px;font-weight:600;color:#E6DEFF}
+.rlc-chips{display:flex;flex-wrap:wrap;justify-content:center;gap:10px 26px;font-size:13px;font-weight:600;color:var(--pn-e6deff,#E6DEFF)}
 .rlc-chip{display:inline-flex;align-items:center;gap:8px}
 .rlc-foot{position:absolute;left:44px;bottom:26px;font-size:12px}
 

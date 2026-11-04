@@ -84,7 +84,7 @@ function CardPasta({ g, count, prog, variant = 'poster' }: { g: GrupoCatalogo; c
         <div className="relative h-full aspect-[4/3] shrink-0 overflow-hidden">
           {capaT
             ? <img src={capaT} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-            : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
+            : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, var(--pn-0f172a,#0f172a) 135%)` }} />}
           {!capaT && <Icon className="absolute -right-4 -top-4 h-28 w-28 text-white/10" />}
           <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `linear-gradient(110deg, transparent 45%, ${cor})` }} />
         </div>
@@ -113,7 +113,7 @@ function CardPasta({ g, count, prog, variant = 'poster' }: { g: GrupoCatalogo; c
       className="group relative block aspect-[4/5] w-full overflow-hidden rounded-2xl border shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-white/25">
       {capa
         ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-        : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
+        : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, var(--pn-0f172a,#0f172a) 135%)` }} />}
       {!capa && <Icon className="absolute -right-6 -top-6 h-40 w-40 text-white/10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3" />}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 opacity-50 transition-opacity duration-300 group-hover:opacity-70" style={{ background: `linear-gradient(to top, ${cor}, transparent)` }} />
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/5" />
@@ -199,7 +199,7 @@ export function SimuladosCatalogoAluno({ itens, grupos, progresso, recentes, pas
                 <div className="relative w-24 shrink-0 overflow-hidden">
                   {sp.capa
                     ? <img src={sp.capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                    : <div className="absolute inset-0" style={{ background: `linear-gradient(150deg, ${sp.cor ?? '#6d28d9'} 0%, #0f172a 150%)` }} />}
+                    : <div className="absolute inset-0" style={{ background: `linear-gradient(150deg, ${sp.cor ?? '#6d28d9'} 0%, var(--pn-0f172a,#0f172a) 150%)` }} />}
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col justify-center p-3">
                   <span className="inline-flex w-fit items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted-foreground"><FolderOpen className="h-3 w-3" /> Pasta</span>

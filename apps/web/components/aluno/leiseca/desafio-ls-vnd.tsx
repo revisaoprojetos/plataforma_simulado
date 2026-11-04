@@ -148,8 +148,8 @@ function FlameSeq({ size = 18 }: { size?: number }) {
     <svg className="lsvfl" viewBox="0 0 24 30" aria-hidden style={{ width: size, height: Math.round(size * 1.27), overflow: 'visible', display: 'block' }}>
       <ellipse className="sh" cx="12" cy="27.6" rx="7" ry="1.7" fill="rgba(150,50,30,.28)" />
       <g className="b">
-        <path className="o" d="M12 25.4C7.4 25.4 4.1 22.1 4.1 17.7 4.1 14.7 5.5 12.6 6.3 10.7 6.7 9.6 6.7 6.6 7.1 5.3 7.4 4.4 8.4 4.3 8.9 5.1 9.6 6.3 10 7.2 10.6 7.8 11.1 5.7 11.9 2.9 13.4 1.4 14 .8 14.9 .9 15.3 1.6 17.4 5.3 19.9 9.8 19.9 17.4 19.9 22.1 16.6 25.4 12 25.4Z" fill="#F26B4A" />
-        <path className="i" d="M12 23.3C9.9 23.3 8.6 21.8 8.6 20 8.6 17.9 10.5 16.1 11.4 14.3 11.6 13.9 12.4 13.9 12.6 14.3 13.5 16.1 15.4 17.9 15.4 20 15.4 21.8 14.1 23.3 12 23.3Z" fill="#FFC24D" />
+        <path className="o" d="M12 25.4C7.4 25.4 4.1 22.1 4.1 17.7 4.1 14.7 5.5 12.6 6.3 10.7 6.7 9.6 6.7 6.6 7.1 5.3 7.4 4.4 8.4 4.3 8.9 5.1 9.6 6.3 10 7.2 10.6 7.8 11.1 5.7 11.9 2.9 13.4 1.4 14 .8 14.9 .9 15.3 1.6 17.4 5.3 19.9 9.8 19.9 17.4 19.9 22.1 16.6 25.4 12 25.4Z" fill="var(--pn-f26b4a,#F26B4A)" />
+        <path className="i" d="M12 23.3C9.9 23.3 8.6 21.8 8.6 20 8.6 17.9 10.5 16.1 11.4 14.3 11.6 13.9 12.4 13.9 12.6 14.3 13.5 16.1 15.4 17.9 15.4 20 15.4 21.8 14.1 23.3 12 23.3Z" fill="var(--pn-ffc24d,#FFC24D)" />
       </g>
     </svg>
   )
@@ -303,7 +303,7 @@ function HeaderHero({
   return (
     <div style={{ position: 'relative', overflow: 'hidden', background: HERO_BG, color: '#fff', padding: '22px 0 0' }}>
       {/* Grade de pontos (deriva lentamente) */}
-      <span aria-hidden className="lsv-dots" style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle,rgba(185,245,212,.18) 1.2px,transparent 1.8px)', backgroundSize: '22px 22px' }} />
+      <span aria-hidden className="lsv-dots" style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle,color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 18%,transparent) 1.2px,transparent 1.8px)', backgroundSize: '22px 22px' }} />
       {/* Chevrons (só desktop) */}
       <div className="lsv-hero-chev" aria-hidden style={{ position: 'absolute', right: 120, top: 0, bottom: 0, width: 420, pointerEvents: 'none' }}>
         {[0, 1, 2].map((i) => (
@@ -312,25 +312,25 @@ function HeaderHero({
       </div>
       {/* Silhueta de montanha */}
       <svg viewBox="0 0 400 120" preserveAspectRatio="none" aria-hidden style={{ position: 'absolute', left: 0, right: 0, bottom: 40, width: '100%', height: 110, opacity: 0.22 }}>
-        <path d="M0 120 L60 60 L100 90 L170 20 L230 80 L280 45 L340 95 L400 50 L400 120 Z" fill="#0A2E1C" />
+        <path d="M0 120 L60 60 L100 90 L170 20 L230 80 L280 45 L340 95 L400 50 L400 120 Z" fill="var(--pn-0a2e1c,#0A2E1C)" />
       </svg>
 
       <div style={{ position: 'relative', maxWidth: 1440, margin: '0 auto', padding: '0 32px' }}>
-        <Link href="/aluno/leitura" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: '#B7D3C3' }}>
+        <Link href="/aluno/leitura" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 600, color: 'var(--pn-b7d3c3,#B7D3C3)' }}>
           <ChevronLeft size={14} /> Desafio de Lei Seca
         </Link>
         <div style={{ display: 'flex', alignItems: 'center', gap: 24, marginTop: 14 }}>
           {/* Ícone de montanha 92px em quadrado dourado */}
-          <div style={{ width: 92, height: 92, borderRadius: 24, background: `linear-gradient(160deg,${GOLD_HI},#B8913A)`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 16px 30px -16px rgba(0,0,0,.7)' }}>
+          <div style={{ width: 92, height: 92, borderRadius: 24, background: `linear-gradient(160deg,${GOLD_HI},var(--pn-b8913a,#B8913A))`, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 16px 30px -16px rgba(0,0,0,.7)' }}>
             <svg viewBox="0 0 48 32" aria-hidden style={{ width: 66, height: 44 }}>
-              <path d="M2 30 L18 8 L26 18 L32 12 L46 30 Z" fill="#0B4A2E" />
+              <path d="M2 30 L18 8 L26 18 L32 12 L46 30 Z" fill="var(--pn-0b4a2e,#0B4A2E)" />
               <path d="M18 8 L22 14 L19 13 L16 16 Z M32 12 L35 16 L32 15.5 L30 17 Z" fill="#FFFFFF" opacity=".9" />
             </svg>
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: GOLD_HI }}>DESAFIO DE LEI SECA · {totalDias} DIAS</span>
             <h1 style={{ margin: '4px 0 6px', fontSize: 38, fontWeight: 800, letterSpacing: '-0.045em', color: '#fff' }}>{moduloNome}</h1>
-            <span style={{ fontSize: 13.5, color: '#CFE3D7' }}>Um trecho por dia até o cume.</span>
+            <span style={{ fontSize: 13.5, color: 'var(--pn-cfe3d7,#CFE3D7)' }}>Um trecho por dia até o cume.</span>
           </div>
           {/* Anel de progresso + resumo (direita, só desktop) */}
           <div className="lsv-hero-aside" style={{ display: 'flex', alignItems: 'center', gap: 16, flexShrink: 0 }}>
@@ -343,7 +343,7 @@ function HeaderHero({
             </div>
             <div style={{ lineHeight: 1.3 }}>
               <b style={{ display: 'block', fontSize: 20, fontWeight: 800, letterSpacing: '-0.03em', color: '#fff' }}>{diasConcluidos} de {totalDias} dias</b>
-              <span style={{ fontSize: 12.5, color: '#9FC3AE' }}>{posicao != null ? `${posicao}º` : '—'}{totalAlunos ? ` de ${fmt(totalAlunos)} alunos` : ''}</span>
+              <span style={{ fontSize: 12.5, color: 'var(--pn-9fc3ae,#9FC3AE)' }}>{posicao != null ? `${posicao}º` : '—'}{totalAlunos ? ` de ${fmt(totalAlunos)} alunos` : ''}</span>
             </div>
           </div>
         </div>
@@ -364,7 +364,7 @@ function HeaderHero({
                   style={{
                     position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 7, height: 44, padding: '0 4px',
                     border: 0, background: 'none', font: 'inherit', fontSize: 14, fontWeight: 700,
-                    color: ativo ? GOLD_HI : '#CFE3D7', cursor: 'pointer', whiteSpace: 'nowrap',
+                    color: ativo ? GOLD_HI : 'var(--pn-cfe3d7,#CFE3D7)', cursor: 'pointer', whiteSpace: 'nowrap',
                   }}
                 >
                   {t.icon}{t.label}
@@ -429,8 +429,8 @@ function MissaoDoDia({ sel, selDesemp, dy, idxAtual, testador = false }: { sel?:
     <div style={{ borderRadius: 20, overflow: 'hidden', background: 'var(--surface)', border: '1px solid var(--line)', boxShadow: '0 5px 0 var(--line)' }}>
       {/* Cabeçalho verde */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 16px', background: HERO_BG, color: '#fff' }}>
-        <span style={{ width: 40, height: 40, borderRadius: 12, background: `linear-gradient(160deg,${GOLD_HI},#B8913A)`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Mountain size={20} color="#0B4A2E" />
+        <span style={{ width: 40, height: 40, borderRadius: 12, background: `linear-gradient(160deg,${GOLD_HI},var(--pn-b8913a,#B8913A))`, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Mountain size={20} color="var(--pn-0b4a2e,#0B4A2E)" />
         </span>
         <div style={{ flex: 1, minWidth: 0, lineHeight: 1.25 }}>
           <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.16em', color: GOLD_HI }}>MISSÃO DO DIA</span>
@@ -449,7 +449,7 @@ function MissaoDoDia({ sel, selDesemp, dy, idxAtual, testador = false }: { sel?:
               <Lock size={15} /> Libera em breve
             </span>
           ) : (
-            <Link href={href} className="lsv-balao-cta" style={{ width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 10, height: 52, borderRadius: 13, background: concluida ? 'var(--brand)' : `linear-gradient(180deg,${GOLD_HI},${GOLD_LO})`, color: concluida ? '#fff' : '#3A2A05', fontSize: 15, fontWeight: 800, boxShadow: concluida ? undefined : `0 12px 24px -14px rgba(216,180,90,.9)` }}>
+            <Link href={href} className="lsv-balao-cta" style={{ width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 10, height: 52, borderRadius: 13, background: concluida ? 'var(--brand)' : `linear-gradient(180deg,${GOLD_HI},${GOLD_LO})`, color: concluida ? '#fff' : 'var(--pn-3a2a05,#3A2A05)', fontSize: 15, fontWeight: 800, boxShadow: concluida ? undefined : `0 12px 24px -14px color-mix(in srgb,var(--pn-d8b45a,#D8B45A) 90%,transparent)` }}>
               <span style={{ display: 'inline-flex', width: 26, height: 26, borderRadius: '50%', background: 'rgba(0,0,0,.12)', alignItems: 'center', justifyContent: 'center' }}>{concluida ? <RotateCcw size={13} /> : <Play size={13} />}</span>
               {ctaLab}
             </Link>
@@ -468,14 +468,14 @@ function MissaoDoDia({ sel, selDesemp, dy, idxAtual, testador = false }: { sel?:
 function MissaoItem({ done, titulo, sub, xp }: { done: boolean; titulo: string; sub: string; xp: number }) {
   return (
     <div className="lsv-mission" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 12px', borderRadius: 14, background: 'var(--surface2)', border: '1px solid var(--line)' }}>
-      <span style={{ width: 24, height: 24, borderRadius: 7, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: done ? '#22B573' : 'var(--surface)', border: done ? 'none' : '1.5px solid var(--line2)', color: '#fff' }}>
+      <span style={{ width: 24, height: 24, borderRadius: 7, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: done ? 'var(--pn-22b573,#22B573)' : 'var(--surface)', border: done ? 'none' : '1.5px solid var(--line2)', color: '#fff' }}>
         {done && <Check size={14} strokeWidth={3} />}
       </span>
       <div style={{ flex: 1, minWidth: 0, lineHeight: 1.25 }}>
         <b style={{ display: 'block', fontSize: 13, color: 'var(--ink)', textDecoration: done ? 'line-through' : 'none', opacity: done ? 0.75 : 1 }}>{titulo}</b>
         <span style={{ fontSize: 11, color: 'var(--muted)' }}>{sub}</span>
       </div>
-      <span style={{ height: 22, padding: '0 8px', borderRadius: 8, background: 'rgba(232,200,119,.2)', color: GOLD_INK, fontSize: 11, fontWeight: 800, display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>+{xp} XP</span>
+      <span style={{ height: 22, padding: '0 8px', borderRadius: 8, background: 'color-mix(in srgb,var(--pn-e8c877,#E8C877) 20%,transparent)', color: GOLD_INK, fontSize: 11, fontWeight: 800, display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>+{xp} XP</span>
     </div>
   )
 }
@@ -504,7 +504,7 @@ function OfensivaApagada({ desempenho, gam, diasLeitura = [] }: { desempenho: Au
   return (
     <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 20, padding: 18, boxShadow: '0 5px 0 var(--line)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <span style={{ position: 'relative', width: 46, height: 46, borderRadius: 14, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: apagada ? 'linear-gradient(180deg,#F79659,#E5602F)' : 'linear-gradient(180deg,#FFB65A,#F0773A)', boxShadow: '0 5px 0 rgba(180,70,30,.45)' }}>
+        <span style={{ position: 'relative', width: 46, height: 46, borderRadius: 14, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: apagada ? 'linear-gradient(180deg,var(--pn-f79659,#F79659),var(--pn-e5602f,#E5602F))' : 'linear-gradient(180deg,var(--pn-ffb65a,#FFB65A),var(--pn-f0773a,#F0773A))', boxShadow: '0 5px 0 color-mix(in srgb,var(--pn-b4461e,#B4461E) 45%,transparent)' }}>
           <FlameSeq size={22} />
           <span style={{ position: 'absolute', right: -4, bottom: -4, minWidth: 20, height: 20, padding: '0 5px', borderRadius: 99, background: 'var(--surface)', border: '1px solid var(--line)', color: 'var(--ink)', fontSize: 11, fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{streak}</span>
         </span>
@@ -519,9 +519,9 @@ function OfensivaApagada({ desempenho, gam, diasLeitura = [] }: { desempenho: Au
           <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
             <span style={{
               width: 30, height: 30, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-              background: d.ativo ? 'color-mix(in srgb,#F0773A 16%,transparent)' : 'var(--surface2)',
+              background: d.ativo ? 'color-mix(in srgb,var(--pn-f0773a,#F0773A) 16%,transparent)' : 'var(--surface2)',
               border: d.hoje ? '2px solid var(--brand)' : '1px solid var(--line)',
-              color: d.ativo ? '#F0773A' : 'var(--muted)',
+              color: d.ativo ? 'var(--pn-f0773a,#F0773A)' : 'var(--muted)',
             }}>
               {d.ativo ? <FlameSeq size={15} /> : <span style={{ width: 5, height: 5, borderRadius: '50%', background: 'currentColor', opacity: 0.5 }} />}
             </span>
@@ -570,7 +570,7 @@ function SuaCordada({ ranking, minhaLinha, meuId, meuNome, posicao }: { ranking:
               const nome = sou ? 'Você' : iniciaisDe(r.nome)
               const iniTxt = sou ? (meuNome ? inic(meuNome) : 'EU') : iniciaisDe(r.nome).replace(/\./g, '').slice(0, 2)
               return (
-                <div key={r.estudanteId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 12, background: sou ? `linear-gradient(90deg,rgba(232,200,119,.22),rgba(232,200,119,.1))` : 'transparent', border: sou ? `1px solid ${GOLD}` : '1px solid transparent' }}>
+                <div key={r.estudanteId} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 12, background: sou ? `linear-gradient(90deg,color-mix(in srgb,var(--pn-e8c877,#E8C877) 22%,transparent),color-mix(in srgb,var(--pn-e8c877,#E8C877) 10%,transparent))` : 'transparent', border: sou ? `1px solid ${GOLD}` : '1px solid transparent' }}>
                   <b style={{ width: 40, fontSize: 12.5, color: sou ? GOLD_INK : 'var(--muted)', flexShrink: 0 }}>{r.posicao}º</b>
                   <span style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: sou ? 'var(--brand)' : 'var(--surface2)', color: sou ? '#fff' : 'var(--muted)', fontSize: 10.5, fontWeight: 800, border: sou ? 'none' : '1px solid var(--line)' }}>{iniTxt}</span>
                   <b style={{ flex: 1, minWidth: 0, fontSize: 13, color: 'var(--ink)', fontWeight: sou ? 800 : 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{nome}</b>
@@ -604,17 +604,17 @@ function MarcosDaSubida({ gam }: { gam?: GamRail | null }) {
     return { ...d, xp: g?.xp ?? d.xp }
   })
   return (
-    <div style={{ borderRadius: 20, padding: 16, background: `linear-gradient(160deg,${GOLD_HI},${GOLD_LO})`, boxShadow: '0 16px 30px -20px rgba(216,180,90,.9)' }}>
-      <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.2em', color: '#3A2A05' }}>MARCOS DA SUBIDA</span>
+    <div style={{ borderRadius: 20, padding: 16, background: `linear-gradient(160deg,${GOLD_HI},${GOLD_LO})`, boxShadow: '0 16px 30px -20px color-mix(in srgb,var(--pn-d8b45a,#D8B45A) 90%,transparent)' }}>
+      <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.2em', color: 'var(--pn-3a2a05,#3A2A05)' }}>MARCOS DA SUBIDA</span>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
         {marcos.map((m) => (
           <div key={m.dias} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 13, background: 'rgba(255,255,255,.28)' }}>
-            <span style={{ width: 30, height: 30, borderRadius: 9, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(58,42,5,.14)', color: '#3A2A05' }}><Flag size={15} /></span>
+            <span style={{ width: 30, height: 30, borderRadius: 9, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'color-mix(in srgb,var(--pn-3a2a05,#3A2A05) 14%,transparent)', color: 'var(--pn-3a2a05,#3A2A05)' }}><Flag size={15} /></span>
             <div style={{ flex: 1, minWidth: 0, lineHeight: 1.2 }}>
-              <b style={{ display: 'block', fontSize: 13.5, color: '#2A1E03' }}>Dia {m.dias}</b>
-              <span style={{ fontSize: 11, color: '#5A4312' }}>{m.label}</span>
+              <b style={{ display: 'block', fontSize: 13.5, color: 'var(--pn-2a1e03,#2A1E03)' }}>Dia {m.dias}</b>
+              <span style={{ fontSize: 11, color: 'var(--pn-5a4312,#5A4312)' }}>{m.label}</span>
             </div>
-            <b style={{ fontSize: 13, color: '#2A1E03', flexShrink: 0 }}>+{m.xp} XP</b>
+            <b style={{ fontSize: 13, color: 'var(--pn-2a1e03,#2A1E03)', flexShrink: 0 }}>+{m.xp} XP</b>
           </div>
         ))}
       </div>
@@ -836,7 +836,7 @@ function PalcoMontanha({
         onPointerLeave={onPointerUp}
         onDoubleClick={(e) => (zoomRef.current > 1 ? verTudo() : zoomTo(1.8, e.clientX, e.clientY))}
         className="lsv-stage"
-        style={{ position: 'relative', flex: 1, minHeight: 560, width: '100%', overflow: 'hidden', background: '#07140C', touchAction: 'none', cursor: 'grab', userSelect: 'none' }}
+        style={{ position: 'relative', flex: 1, minHeight: 560, width: '100%', overflow: 'hidden', background: 'var(--pn-07140c,#07140C)', touchAction: 'none', cursor: 'grab', userSelect: 'none' }}
       >
         <div ref={stageRef} style={{ position: 'absolute', top: 0, left: 0, width: '100%', aspectRatio: `${CW} / ${CH}`, transformOrigin: '0 0', willChange: 'transform', ['--z' as string]: (1 / zoom).toFixed(3) } as React.CSSProperties}>
           {livreAtivo && livre?.fundo?.url ? (
@@ -852,7 +852,7 @@ function PalcoMontanha({
             <path
               d={spline} fill="none" stroke={GOLD} strokeWidth={6} strokeLinecap="round"
               vectorEffect="non-scaling-stroke" pathLength={1000}
-              style={{ strokeDasharray: 1000, strokeDashoffset: 1000 * (1 - doneFrac), filter: 'drop-shadow(0 0 6px rgba(232,200,119,.6))' }}
+              style={{ strokeDasharray: 1000, strokeDashoffset: 1000 * (1 - doneFrac), filter: 'drop-shadow(0 0 6px color-mix(in srgb,var(--pn-e8c877,#E8C877) 60%,transparent))' }}
             />
           </svg>
 
@@ -878,27 +878,27 @@ function PalcoMontanha({
                   transform: `translate(-50%,-50%) scale(${(1 / zoom).toFixed(3)})`,
                   transition: 'transform .3s cubic-bezier(.22,1,.36,1)',
                   width: sz, height: sz, borderRadius: '50%',
-                  border: atualNode ? '3px solid #fff' : concl ? '2px solid #fff' : bloq ? '1.5px solid rgba(255,255,255,.8)' : '1.5px solid rgba(11,74,46,.3)',
+                  border: atualNode ? '3px solid #fff' : concl ? '2px solid #fff' : bloq ? '1.5px solid rgba(255,255,255,.8)' : '1.5px solid color-mix(in srgb,var(--pn-0b4a2e,#0B4A2E) 30%,transparent)',
                   cursor: 'pointer', padding: 0,
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 11, fontWeight: 800, color: concl ? '#fff' : atualNode ? '#0B4A2E' : '#0B4A2E',
-                  background: concl ? 'linear-gradient(180deg,#2FBE73,#148A4E)' : atualNode ? `linear-gradient(180deg,${GOLD_HI},${GOLD_LO})` : bloq ? 'rgba(255,255,255,.92)' : '#fff',
+                  fontSize: 11, fontWeight: 800, color: concl ? '#fff' : atualNode ? 'var(--pn-0b4a2e,#0B4A2E)' : 'var(--pn-0b4a2e,#0B4A2E)',
+                  background: concl ? 'linear-gradient(180deg,var(--pn-2fbe73,#2FBE73),var(--pn-148a4e,#148A4E))' : atualNode ? `linear-gradient(180deg,${GOLD_HI},${GOLD_LO})` : bloq ? 'rgba(255,255,255,.92)' : '#fff',
                   boxShadow: selN
-                    ? `0 0 0 4px rgba(255,255,255,.95), 0 4px 0 ${concl ? '#0B4A2E' : atualNode ? GOLD_INK : 'rgba(11,74,46,.25)'}`
+                    ? `0 0 0 4px rgba(255,255,255,.95), 0 4px 0 ${concl ? 'var(--pn-0b4a2e,#0B4A2E)' : atualNode ? GOLD_INK : 'color-mix(in srgb,var(--pn-0b4a2e,#0B4A2E) 25%,transparent)'}`
                     : atualNode
                       ? `0 0 0 5px rgba(232,200,119,.5), 0 4px 0 ${GOLD_INK}`
                       : concl
-                        ? '0 4px 0 #0B4A2E'
+                        ? '0 4px 0 var(--pn-0b4a2e,#0B4A2E)'
                         : i === libIdx
-                          ? '0 0 0 4px rgba(20,138,79,.45), 0 3px 0 rgba(11,74,46,.25)'
-                          : '0 3px 0 rgba(11,74,46,.2)',
+                          ? '0 0 0 4px color-mix(in srgb,var(--pn-148a4f,#148A4F) 45%,transparent), 0 3px 0 color-mix(in srgb,var(--pn-0b4a2e,#0B4A2E) 25%,transparent)'
+                          : '0 3px 0 color-mix(in srgb,var(--pn-0b4a2e,#0B4A2E) 20%,transparent)',
                   animation: atualNode ? 'lsvPulse 2.2s ease-in-out infinite' : i === libIdx ? 'lsvPulseLib 2.2s ease-in-out infinite' : undefined,
                   zIndex: atualNode ? 5 : i === libIdx ? 4 : 2,
                 }}
               >
                 {concl ? <Check size={sz * 0.46} strokeWidth={3} />
-                  : atualNode ? <MarcaV size={sz * 0.5} color="#0B4A2E" />
-                    : ehCume ? <Flag size={14} color="#0B4A2E" />
+                  : atualNode ? <MarcaV size={sz * 0.5} color="var(--pn-0b4a2e,#0B4A2E)" />
+                    : ehCume ? <Flag size={14} color="var(--pn-0b4a2e,#0B4A2E)" />
                       : String(i + 1).padStart(2, '0')}
               </button>
             )
@@ -906,22 +906,22 @@ function PalcoMontanha({
 
           {/* Rótulo "Você está aqui" */}
           {!balaoVis && nodePts[idxAtual] && (
-            <span aria-hidden style={{ position: 'absolute', left: `${(nodePts[idxAtual].x / CW) * 100}%`, top: `${(nodePts[idxAtual].y / CH) * 100}%`, transform: 'translate(-50%, calc(-100% - 28px * var(--z,1))) scale(var(--z,1))', transformOrigin: '50% 100%', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', height: 24, padding: '0 11px', borderRadius: 99, background: '#0B4A2E', color: '#fff', fontSize: 11, fontWeight: 800, boxShadow: '0 6px 14px -6px rgba(0,0,0,.6)', zIndex: 7 }}>
+            <span aria-hidden style={{ position: 'absolute', left: `${(nodePts[idxAtual].x / CW) * 100}%`, top: `${(nodePts[idxAtual].y / CH) * 100}%`, transform: 'translate(-50%, calc(-100% - 28px * var(--z,1))) scale(var(--z,1))', transformOrigin: '50% 100%', display: 'inline-flex', alignItems: 'center', gap: 4, whiteSpace: 'nowrap', height: 24, padding: '0 11px', borderRadius: 99, background: 'var(--pn-0b4a2e,#0B4A2E)', color: '#fff', fontSize: 11, fontWeight: 800, boxShadow: '0 6px 14px -6px rgba(0,0,0,.6)', zIndex: 7 }}>
               Você está aqui
-              <span aria-hidden style={{ position: 'absolute', left: '50%', top: '100%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '7px solid #0B4A2E' }} />
+              <span aria-hidden style={{ position: 'absolute', left: '50%', top: '100%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '7px solid var(--pn-0b4a2e,#0B4A2E)' }} />
             </span>
           )}
           {/* Balão "Libera amanhã" */}
           {libIdx >= 0 && nodePts[libIdx] && !(balaoVis && balaoVis.i === libIdx) && (
-            <span aria-hidden style={{ position: 'absolute', left: `${(nodePts[libIdx].x / CW) * 100}%`, top: `${(nodePts[libIdx].y / CH) * 100}%`, transform: 'translate(-50%, calc(-100% - 24px * var(--z,1))) scale(var(--z,1))', transformOrigin: '50% 100%', display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', height: 26, padding: '0 11px 0 6px', borderRadius: 99, background: '#fff', color: '#0F1C16', fontSize: 11.5, fontWeight: 800, boxShadow: '0 10px 22px -10px rgba(0,0,0,.6)', zIndex: 9, animation: 'lsvBobLib 2.6s ease-in-out infinite' }}>
-              <span style={{ width: 20, height: 20, borderRadius: '50%', background: '#0F7A44', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Lock size={11} /></span>
+            <span aria-hidden style={{ position: 'absolute', left: `${(nodePts[libIdx].x / CW) * 100}%`, top: `${(nodePts[libIdx].y / CH) * 100}%`, transform: 'translate(-50%, calc(-100% - 24px * var(--z,1))) scale(var(--z,1))', transformOrigin: '50% 100%', display: 'inline-flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', height: 26, padding: '0 11px 0 6px', borderRadius: 99, background: '#fff', color: 'var(--pn-0f1c16,#0F1C16)', fontSize: 11.5, fontWeight: 800, boxShadow: '0 10px 22px -10px rgba(0,0,0,.6)', zIndex: 9, animation: 'lsvBobLib 2.6s ease-in-out infinite' }}>
+              <span style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--pn-0f7a44,#0F7A44)', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Lock size={11} /></span>
               {libLabel}
               <span aria-hidden style={{ position: 'absolute', left: '50%', top: '100%', transform: 'translateX(-50%)', width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent', borderTop: '7px solid #fff' }} />
             </span>
           )}
           {/* "Cume · Dia N" */}
           {nodePts[nodes.length - 1] && (
-            <span aria-hidden style={{ position: 'absolute', left: `${(nodePts[nodes.length - 1].x / CW) * 100}%`, top: `${(nodePts[nodes.length - 1].y / CH) * 100}%`, transform: 'translate(calc(-50% + 40px * var(--z,1)), calc(-50% - 2px)) scale(var(--z,1))', transformOrigin: '0% 50%', display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap', height: 22, padding: '0 9px', borderRadius: 99, background: '#0B4A2E', color: '#fff', fontSize: 10.5, fontWeight: 800, boxShadow: '0 6px 14px -6px rgba(0,0,0,.6)', zIndex: 6 }}>
+            <span aria-hidden style={{ position: 'absolute', left: `${(nodePts[nodes.length - 1].x / CW) * 100}%`, top: `${(nodePts[nodes.length - 1].y / CH) * 100}%`, transform: 'translate(calc(-50% + 40px * var(--z,1)), calc(-50% - 2px)) scale(var(--z,1))', transformOrigin: '0% 50%', display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap', height: 22, padding: '0 9px', borderRadius: 99, background: 'var(--pn-0b4a2e,#0B4A2E)', color: '#fff', fontSize: 10.5, fontWeight: 800, boxShadow: '0 6px 14px -6px rgba(0,0,0,.6)', zIndex: 6 }}>
               Cume · Dia {totalDias}
             </span>
           )}
@@ -938,13 +938,13 @@ function PalcoMontanha({
             const href = nd.hrefLeitura ?? nd.href ?? '#'
             return (
               <div className={balaoVis.saindo ? undefined : 'lsv-balao-wrap'} onPointerDown={(e) => e.stopPropagation()} style={{ position: 'absolute', left: `${(np.x / CW) * 100}%`, top: `${(np.y / CH) * 100}%`, transform: 'translate(-50%, calc(-100% - 48px * var(--z,1))) scale(var(--z,1))', transformOrigin: '50% 100%', zIndex: 14, width: 216, maxWidth: '82vw' }}>
-                <div className={balaoVis.saindo ? 'lsv-balao-out' : 'lsv-balao-in'} style={{ position: 'relative', borderRadius: 14, padding: '11px 12px', background: '#fff', color: '#0F1C16', boxShadow: '0 16px 34px -14px rgba(0,0,0,.72)' }}>
-                  <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.12em', color: '#0F7A44' }}>DIA {String(balaoVis.i + 1).padStart(2, '0')}</span>
+                <div className={balaoVis.saindo ? 'lsv-balao-out' : 'lsv-balao-in'} style={{ position: 'relative', borderRadius: 14, padding: '11px 12px', background: '#fff', color: 'var(--pn-0f1c16,#0F1C16)', boxShadow: '0 16px 34px -14px rgba(0,0,0,.72)' }}>
+                  <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.12em', color: 'var(--pn-0f7a44,#0F7A44)' }}>DIA {String(balaoVis.i + 1).padStart(2, '0')}</span>
                   <b style={{ display: 'block', margin: '2px 0 9px', fontSize: 13, lineHeight: 1.25, letterSpacing: '-0.01em' }}>{nd.titulo}</b>
                   {bloq ? (
-                    <span style={{ display: 'inline-flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 6, height: 38, borderRadius: 10, background: 'rgba(15,122,68,.08)', color: '#3C6B52', fontSize: 12.5, fontWeight: 700 }}><Lock size={13} /> Libera em breve</span>
+                    <span style={{ display: 'inline-flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 6, height: 38, borderRadius: 10, background: 'color-mix(in srgb,var(--pn-0f7a44,#0F7A44) 8%,transparent)', color: 'var(--pn-3c6b52,#3C6B52)', fontSize: 12.5, fontWeight: 700 }}><Lock size={13} /> Libera em breve</span>
                   ) : (
-                    <Link href={href} onClick={() => setBalaoNode(null)} className="lsv-balao-cta" style={{ display: 'inline-flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 8, height: 40, borderRadius: 10, background: concl ? '#0F7A44' : `linear-gradient(180deg,${GOLD_HI},${GOLD_LO})`, color: concl ? '#fff' : '#3A2A05', fontSize: 13.5, fontWeight: 800 }}>
+                    <Link href={href} onClick={() => setBalaoNode(null)} className="lsv-balao-cta" style={{ display: 'inline-flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 8, height: 40, borderRadius: 10, background: concl ? 'var(--pn-0f7a44,#0F7A44)' : `linear-gradient(180deg,${GOLD_HI},${GOLD_LO})`, color: concl ? '#fff' : 'var(--pn-3a2a05,#3A2A05)', fontSize: 13.5, fontWeight: 800 }}>
                       {concl ? <RotateCcw size={14} /> : <Play size={13} />} {lab}
                     </Link>
                   )}
@@ -962,7 +962,7 @@ function PalcoMontanha({
 
         {/* ── Altímetro vertical (ESQUERDA) ── */}
         <div style={{ position: 'absolute', left: 14, top: 16, bottom: 16, width: 64, zIndex: 6, pointerEvents: 'none', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-          <span style={{ width: 56, height: 56, borderRadius: '50%', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: 1, background: `linear-gradient(160deg,${GOLD_HI},${GOLD_LO})`, color: '#3A2A05', boxShadow: '0 10px 20px -10px rgba(0,0,0,.6)' }}>
+          <span style={{ width: 56, height: 56, borderRadius: '50%', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: 1, background: `linear-gradient(160deg,${GOLD_HI},${GOLD_LO})`, color: 'var(--pn-3a2a05,#3A2A05)', boxShadow: '0 10px 20px -10px rgba(0,0,0,.6)' }}>
             <b style={{ fontSize: 15, fontWeight: 800 }}>{progressoPct}%</b>
             <span style={{ fontSize: 7.5, fontWeight: 800, letterSpacing: '.14em', marginTop: 2 }}>SUBIDA</span>
           </span>
@@ -978,18 +978,18 @@ function PalcoMontanha({
             {/* escalador */}
             <span style={{ position: 'absolute', left: '50%', bottom: `${progressoPct}%`, transform: 'translate(-50%, 50%)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
               <span style={{ width: 18, height: 26, borderRadius: 6, background: '#fff', boxShadow: '0 4px 10px -4px rgba(0,0,0,.6)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Mountain size={12} color="#0F7A44" />
+                <Mountain size={12} color="var(--pn-0f7a44,#0F7A44)" />
               </span>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, height: 20, padding: '0 7px', borderRadius: 99, background: `linear-gradient(180deg,${GOLD_HI},${GOLD_LO})`, color: '#3A2A05', fontSize: 10, fontWeight: 800, whiteSpace: 'nowrap', boxShadow: '0 4px 10px -4px rgba(0,0,0,.5)' }}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, height: 20, padding: '0 7px', borderRadius: 99, background: `linear-gradient(180deg,${GOLD_HI},${GOLD_LO})`, color: 'var(--pn-3a2a05,#3A2A05)', fontSize: 10, fontWeight: 800, whiteSpace: 'nowrap', boxShadow: '0 4px 10px -4px rgba(0,0,0,.5)' }}>
                 <Mountain size={10} /> Dia {String(Math.min(diasConcluidos + 1, totalDias)).padStart(2, '0')}
               </span>
             </span>
           </div>
-          <span style={{ width: 44, height: 28, borderRadius: 99, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(7,20,12,.78)', border: '1px solid rgba(232,200,119,.4)', color: '#fff', fontSize: 11, fontWeight: 800 }}>{diasConcluidos}/{totalDias}</span>
+          <span style={{ width: 44, height: 28, borderRadius: 99, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: 'color-mix(in srgb,var(--pn-07140c,#07140C) 78%,transparent)', border: '1px solid color-mix(in srgb,var(--pn-e8c877,#E8C877) 40%,transparent)', color: '#fff', fontSize: 11, fontWeight: 800 }}>{diasConcluidos}/{totalDias}</span>
         </div>
 
         {/* ── Zoom horizontal (TOPO-DIREITA) ── */}
-        <div style={{ position: 'absolute', right: 14, top: 16, zIndex: 6, display: 'inline-flex', alignItems: 'center', gap: 8, height: 44, padding: '0 10px', borderRadius: 99, background: 'rgba(7,20,12,.82)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', border: '1px solid rgba(232,200,119,.3)' }}>
+        <div style={{ position: 'absolute', right: 14, top: 16, zIndex: 6, display: 'inline-flex', alignItems: 'center', gap: 8, height: 44, padding: '0 10px', borderRadius: 99, background: 'color-mix(in srgb,var(--pn-07140c,#07140C) 82%,transparent)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', border: '1px solid color-mix(in srgb,var(--pn-e8c877,#E8C877) 30%,transparent)' }}>
           <ZBtn onClick={() => zoomBy(1 / 1.5)} title="Afastar"><Minus size={16} /></ZBtn>
           <input
             type="range" min={1} max={2.6} step={0.1} value={zoom}
@@ -1010,7 +1010,7 @@ function PalcoMontanha({
       {/* ── Barra de início acoplada (abaixo do palco) ── */}
       {sel && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', borderTop: '1px solid var(--line)', background: 'var(--surface)' }}>
-          <div style={{ flexShrink: 0, width: 48, height: 48, borderRadius: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: 1, background: selConcl ? 'linear-gradient(180deg,#2FBE73,#148A4E)' : selBloq ? 'var(--surface2)' : `linear-gradient(180deg,${GOLD_HI},${GOLD_LO})`, color: selBloq ? 'var(--muted)' : selConcl ? '#fff' : '#3A2A05' }}>
+          <div style={{ flexShrink: 0, width: 48, height: 48, borderRadius: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: 1, background: selConcl ? 'linear-gradient(180deg,var(--pn-2fbe73,#2FBE73),var(--pn-148a4e,#148A4E))' : selBloq ? 'var(--surface2)' : `linear-gradient(180deg,${GOLD_HI},${GOLD_LO})`, color: selBloq ? 'var(--muted)' : selConcl ? '#fff' : 'var(--pn-3a2a05,#3A2A05)' }}>
             <span style={{ fontSize: 8, fontWeight: 800, letterSpacing: '.1em' }}>DIA</span>
             <b style={{ fontSize: 17, fontWeight: 800 }}>{String(dy + 1).padStart(2, '0')}</b>
           </div>
@@ -1028,7 +1028,7 @@ function PalcoMontanha({
               <Lock size={15} /> Libera em breve
             </span>
           ) : (
-            <Link href={selHref} className="lsv-balao-cta" style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 10, height: 46, padding: '0 22px', borderRadius: 13, background: selConcl ? 'var(--brand)' : `linear-gradient(180deg,${GOLD_HI},${GOLD_LO})`, color: selConcl ? '#fff' : '#3A2A05', fontSize: 14.5, fontWeight: 800, boxShadow: selConcl ? undefined : '0 12px 24px -14px rgba(216,180,90,.9)' }}>
+            <Link href={selHref} className="lsv-balao-cta" style={{ flexShrink: 0, display: 'inline-flex', alignItems: 'center', gap: 10, height: 46, padding: '0 22px', borderRadius: 13, background: selConcl ? 'var(--brand)' : `linear-gradient(180deg,${GOLD_HI},${GOLD_LO})`, color: selConcl ? '#fff' : 'var(--pn-3a2a05,#3A2A05)', fontSize: 14.5, fontWeight: 800, boxShadow: selConcl ? undefined : '0 12px 24px -14px color-mix(in srgb,var(--pn-d8b45a,#D8B45A) 90%,transparent)' }}>
               <span style={{ display: 'inline-flex', width: 24, height: 24, borderRadius: '50%', background: 'rgba(0,0,0,.12)', alignItems: 'center', justifyContent: 'center' }}>{selConcl ? <RotateCcw size={12} /> : <Play size={12} />}</span>
               {dCta}
             </Link>
@@ -1041,14 +1041,14 @@ function PalcoMontanha({
 
 function ZBtn({ onClick, title, children }: { onClick: () => void; title: string; children: React.ReactNode }) {
   return (
-    <button type="button" onClick={onClick} title={title} aria-label={title} style={{ width: 30, height: 30, flexShrink: 0, padding: 0, border: 0, borderRadius: '50%', background: `linear-gradient(180deg,${GOLD_HI},${GOLD_LO})`, color: '#3A2A05', boxShadow: '0 4px 10px -4px rgba(0,0,0,.5)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+    <button type="button" onClick={onClick} title={title} aria-label={title} style={{ width: 30, height: 30, flexShrink: 0, padding: 0, border: 0, borderRadius: '50%', background: `linear-gradient(180deg,${GOLD_HI},${GOLD_LO})`, color: 'var(--pn-3a2a05,#3A2A05)', boxShadow: '0 4px 10px -4px rgba(0,0,0,.5)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
       {children}
     </button>
   )
 }
 function ToolPill({ onClick, title, children }: { onClick: () => void; title?: string; children: React.ReactNode }) {
   return (
-    <button type="button" onClick={onClick} title={title} aria-label={title} style={{ height: 34, padding: '0 14px 0 12px', border: `1px solid ${GOLD}`, borderRadius: 99, background: `linear-gradient(180deg,${GOLD_HI},${GOLD_LO})`, color: '#3A2A05', fontSize: 12.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: '0 8px 18px -10px rgba(216,180,90,.9)' }}>
+    <button type="button" onClick={onClick} title={title} aria-label={title} style={{ height: 34, padding: '0 14px 0 12px', border: `1px solid ${GOLD}`, borderRadius: 99, background: `linear-gradient(180deg,${GOLD_HI},${GOLD_LO})`, color: 'var(--pn-3a2a05,#3A2A05)', fontSize: 12.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', whiteSpace: 'nowrap', boxShadow: '0 8px 18px -10px color-mix(in srgb,var(--pn-d8b45a,#D8B45A) 90%,transparent)' }}>
       {children}
     </button>
   )
@@ -1102,7 +1102,7 @@ function AbaRegulamento({ regulamento, pontuacao, gam, moduloNome, totalDias }: 
           {/* Capa com o logotipo do Desafio no gradiente da marca */}
           <div style={{ borderRadius: 16, padding: '34px 20px', background: HERO_BG, color: '#fff', textAlign: 'center', marginBottom: 20 }}>
             <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.3em', color: GOLD_HI }}>— DESAFIO —</span>
-            <b style={{ display: 'block', margin: '6px 0 4px', fontSize: 34, fontWeight: 800, letterSpacing: '-0.02em', backgroundImage: 'linear-gradient(180deg,#FFFFFF,#CFE3D7)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>LEI SECA</b>
+            <b style={{ display: 'block', margin: '6px 0 4px', fontSize: 34, fontWeight: 800, letterSpacing: '-0.02em', backgroundImage: 'linear-gradient(180deg,#FFFFFF,var(--pn-cfe3d7,#CFE3D7))', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>LEI SECA</b>
             <span style={{ fontStyle: 'italic', fontWeight: 600, fontSize: 17, color: GOLD_HI }}>{moduloNome}</span>
           </div>
           {regulamento?.descricao ? (
@@ -1180,7 +1180,7 @@ function AbaRegulamento({ regulamento, pontuacao, gam, moduloNome, totalDias }: 
 function GanhoItem({ valor, txt, gold }: { valor: string; txt: string; gold?: boolean }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0', fontSize: 13 }}>
-      <span style={{ minWidth: 44, height: 24, padding: '0 8px', borderRadius: 8, background: gold ? 'rgba(232,200,119,.2)' : 'var(--chip)', color: gold ? GOLD_INK : 'var(--brand)', fontSize: 12, fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{valor}</span>
+      <span style={{ minWidth: 44, height: 24, padding: '0 8px', borderRadius: 8, background: gold ? 'color-mix(in srgb,var(--pn-e8c877,#E8C877) 20%,transparent)' : 'var(--chip)', color: gold ? GOLD_INK : 'var(--brand)', fontSize: 12, fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{valor}</span>
       <span style={{ color: 'var(--ink)' }}>{txt}</span>
     </div>
   )
@@ -1229,7 +1229,7 @@ function AbaDesempenho({
       <div className="lsv-des-kpis" style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 10 }}>
         {kpis.map((k) => (
           <div key={k.rotulo} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '12px 14px', borderRadius: 16, background: 'var(--surface)', border: '1px solid var(--line)' }}>
-            <span style={{ width: 36, height: 36, borderRadius: 11, background: k.gold ? 'rgba(232,200,119,.2)' : 'var(--chip)', color: k.gold ? GOLD_INK : 'var(--brand)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{k.icon}</span>
+            <span style={{ width: 36, height: 36, borderRadius: 11, background: k.gold ? 'color-mix(in srgb,var(--pn-e8c877,#E8C877) 20%,transparent)' : 'var(--chip)', color: k.gold ? GOLD_INK : 'var(--brand)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{k.icon}</span>
             <div style={{ lineHeight: 1.2, minWidth: 0 }}>
               <b style={{ display: 'block', fontSize: 18, color: 'var(--ink)' }}>{k.valor}</b>
               <span style={{ fontSize: 11, color: 'var(--muted)' }}>{k.rotulo}</span>
@@ -1284,7 +1284,7 @@ function AbaDesempenho({
           </div>
           {etapas.map((e, i) => (
             <div key={e.t} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', borderTop: i === 0 ? 0 : '1px solid var(--line)' }}>
-              <span style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: e.ok ? '#22B573' : 'var(--surface2)', color: e.ok ? '#fff' : 'var(--muted)' }}>
+              <span style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: e.ok ? 'var(--pn-22b573,#22B573)' : 'var(--surface2)', color: e.ok ? '#fff' : 'var(--muted)' }}>
                 {e.ok ? <Check size={13} /> : <Flag size={13} />}
               </span>
               <b style={{ flex: 1, fontSize: 13, color: 'var(--ink)' }}>{e.t}</b>
@@ -1353,7 +1353,7 @@ function AbaDesempenho({
                 </div>
                 <span style={{ fontSize: 12, color: a.diaFeito ? 'var(--ink)' : 'var(--muted)', whiteSpace: 'nowrap' }}>{fmtDiaFeito(a.diaFeito)}</span>
                 {concl || a.leituraConcluida ? (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 700, color: '#1FA868' }}><Check size={13} strokeWidth={3} /> 100%</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 700, color: 'var(--pn-1fa868,#1FA868)' }}><Check size={13} strokeWidth={3} /> 100%</span>
                 ) : bloqueada ? (
                   <span style={{ color: 'var(--muted)' }}>—</span>
                 ) : (
@@ -1366,12 +1366,12 @@ function AbaDesempenho({
                 )}
                 <span style={{ fontSize: 12.5, color: 'var(--ink)' }}>{a.questoesTotal > 0 ? `${a.questoesRespondidas}/${a.questoesTotal}` : '—'}</span>
                 {a.sequencia > 0 ? (
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12.5, fontWeight: 700, color: '#F0773A' }}><Flame size={13} /> {a.sequencia}</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12.5, fontWeight: 700, color: 'var(--pn-f0773a,#F0773A)' }}><Flame size={13} /> {a.sequencia}</span>
                 ) : <span style={{ color: 'var(--muted)' }}>—</span>}
                 {a.pontos > 0 || a.pontosExtra > 0 ? (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                     <b style={{ fontSize: 12.5, color: 'var(--brand)' }}>+{a.pontos}</b>
-                    {a.pontosExtra > 0 ? <span title="Bônus (sequência/conclusão)" style={{ fontSize: 10, fontWeight: 800, color: GOLD_INK, background: 'rgba(232,200,119,.2)', borderRadius: 99, padding: '1px 6px', whiteSpace: 'nowrap' }}>+{a.pontosExtra} bônus</span> : null}
+                    {a.pontosExtra > 0 ? <span title="Bônus (sequência/conclusão)" style={{ fontSize: 10, fontWeight: 800, color: GOLD_INK, background: 'color-mix(in srgb,var(--pn-e8c877,#E8C877) 20%,transparent)', borderRadius: 99, padding: '1px 6px', whiteSpace: 'nowrap' }}>+{a.pontosExtra} bônus</span> : null}
                   </span>
                 ) : <b style={{ fontSize: 12.5, color: 'var(--muted)' }}>—</b>}
                 {concl ? (
@@ -1501,7 +1501,7 @@ function AbaRanking({
           <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)' }}>{moduloNome}</span>
           <b style={{ display: 'block', margin: '4px 0 2px', fontSize: 22, letterSpacing: '-0.03em', color: 'var(--ink)' }}>Ranking geral</b>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--muted)' }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#1FA868' }} /> Ao vivo · <b style={{ color: 'var(--ink)' }}>{fmt(total)}</b> alunos
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--pn-1fa868,#1FA868)' }} /> Ao vivo · <b style={{ color: 'var(--ink)' }}>{fmt(total)}</b> alunos
           </span>
 
           {top3.length > 0 && (
@@ -1514,11 +1514,11 @@ function AbaRanking({
                 const sou = r.estudanteId === meuId
                 return (
                   <div key={r.estudanteId} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, minWidth: 0 }}>
-                    {pos === 1 && <Crown size={18} color="#E8B83A" />}
+                    {pos === 1 && <Crown size={18} color="var(--pn-e8b83a,#E8B83A)" />}
                     <AvatarV avatar={r.avatar} cor={r.avatarCor} seed={r.estudanteId} size={pos === 1 ? 48 : 40} sou={sou} />
                     <b style={{ fontSize: 12.5, color: 'var(--ink)' }}>{nomeExib(r)}</b>
                     <span style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
-                      {fmt(r.score)} pts{r.streakAtual > 0 ? <> · <span style={{ color: '#F0773A' }}><Flame size={10} style={{ display: 'inline', verticalAlign: '-1px' }} /> {r.streakAtual}</span></> : ''}
+                      {fmt(r.score)} pts{r.streakAtual > 0 ? <> · <span style={{ color: 'var(--pn-f0773a,#F0773A)' }}><Flame size={10} style={{ display: 'inline', verticalAlign: '-1px' }} /> {r.streakAtual}</span></> : ''}
                     </span>
                     <div style={{ width: '100%', height: alt, borderRadius: '14px 14px 4px 4px', background: `linear-gradient(180deg,${cor}66,${cor}11)`, border: `1px solid ${cor}88`, display: 'flex', justifyContent: 'center', paddingTop: 10, fontSize: 20, fontWeight: 800, color: cor }}>
                       {pos}º
@@ -1539,11 +1539,11 @@ function AbaRanking({
                 <AvatarV avatar={eu.avatar} cor={eu.avatarCor} seed={meuId ?? eu.estudanteId} size={40} sou />
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <b style={{ fontSize: 14, color: 'var(--ink)' }}>{meuNome ? primeiroNome(meuNome) : 'Você'}</b>{' '}
-                  <span style={{ height: 18, padding: '0 6px', borderRadius: 99, background: 'rgba(232,200,119,.22)', color: GOLD_INK, fontSize: 10, fontWeight: 800, display: 'inline-flex', alignItems: 'center' }}>VOCÊ</span>
+                  <span style={{ height: 18, padding: '0 6px', borderRadius: 99, background: 'color-mix(in srgb,var(--pn-e8c877,#E8C877) 22%,transparent)', color: GOLD_INK, fontSize: 10, fontWeight: 800, display: 'inline-flex', alignItems: 'center' }}>VOCÊ</span>
                   <span style={{ display: 'block', fontSize: 11.5, color: 'var(--muted)' }}>{eu.aulasConcluidas}/{eu.totalAulas} aulas</span>
                 </div>
                 <div style={{ textAlign: 'center', paddingLeft: 10, borderLeft: '1px solid var(--line)' }}>
-                  <b style={{ display: 'block', fontSize: 16, color: '#F0773A' }}>{eu.streakAtual}</b>
+                  <b style={{ display: 'block', fontSize: 16, color: 'var(--pn-f0773a,#F0773A)' }}>{eu.streakAtual}</b>
                   <span style={{ fontSize: 10.5, color: 'var(--muted)' }}>seq.</span>
                 </div>
                 <div style={{ textAlign: 'center', paddingLeft: 10, borderLeft: '1px solid var(--line)' }}>
@@ -1567,7 +1567,7 @@ function AbaRanking({
           </div>
           <span style={{ fontSize: 12, color: 'var(--muted)' }}>{eu?.aulasConcluidas ?? 0} de {totalDias} aulas concluídas</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line)', fontSize: 12, color: 'var(--muted)' }}>
-            <TrendingUp size={14} color="#1FA868" /> Conclua a aula de hoje para subir no ranking.
+            <TrendingUp size={14} color="var(--pn-1fa868,#1FA868)" /> Conclua a aula de hoje para subir no ranking.
           </div>
         </div>
       </div>
@@ -1608,7 +1608,7 @@ function AbaRanking({
                 </div>
                 <span style={{ textAlign: 'right', fontSize: 13, color: 'var(--muted)' }}>{r.aulasConcluidas}</span>
                 {r.streakAtual > 0 ? (
-                  <span style={{ textAlign: 'right', fontSize: 13, fontWeight: 700, color: '#F0773A' }}><Flame size={12} style={{ display: 'inline', verticalAlign: '-1px' }} /> {r.streakAtual}</span>
+                  <span style={{ textAlign: 'right', fontSize: 13, fontWeight: 700, color: 'var(--pn-f0773a,#F0773A)' }}><Flame size={12} style={{ display: 'inline', verticalAlign: '-1px' }} /> {r.streakAtual}</span>
                 ) : <span style={{ textAlign: 'right', fontSize: 13, color: 'var(--muted)' }}>—</span>}
                 <b style={{ textAlign: 'right', fontSize: 14, color: 'var(--ink)' }}>{fmt(r.score)}</b>
               </div>

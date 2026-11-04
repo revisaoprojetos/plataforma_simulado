@@ -44,7 +44,7 @@ export default async function PerfilPage() {
       <Tabs items={['Comunidade', 'Ligas', 'Perfil e conquistas']} active={2} links={[R.comunidade, R.ligas, R.perfil]} />
 
       {/* Capa */}
-      <section style={{ position: 'relative', overflow: 'hidden', borderRadius: 22, background: 'linear-gradient(120deg,#241A52 0%,#3A27A0 55%,#4A31B8 100%)', color: '#fff', height: 180 }}>
+      <section style={{ position: 'relative', overflow: 'hidden', borderRadius: 22, background: 'linear-gradient(120deg,var(--pn-241a52,#241A52) 0%,var(--pn-3a27a0,#3A27A0) 55%,var(--pn-4a31b8,#4A31B8) 100%)', color: '#fff', height: 180 }}>
         <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px)', backgroundSize: '36px 36px' }} />
         <span aria-hidden style={{ position: 'absolute', right: 28, top: 10, fontSize: 180, fontWeight: 800, fontStyle: 'italic', color: 'rgba(255,255,255,.06)', lineHeight: 1, fontFamily: 'Montserrat, sans-serif' }}>R</span>
         <Col gap={10} style={{ position: 'relative', padding: '22px 28px' }}>

@@ -62,18 +62,18 @@ export function MaratonaCardDestaque({ config, estado, recolhidoInicial, feitos:
               </div>
               <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-                  <span className="mx-new" style={{ ...css(chip), height: 28, padding: '0 12px', background: '#F1C232', color: '#2A1A55', fontSize: 11.5, fontWeight: 800, letterSpacing: '.14em' }}>
-                    <span className="mx-dot" style={{ width: 7, height: 7, borderRadius: '50%', background: '#2A1A55' }} />NOVO DESAFIO
+                  <span className="mx-new" style={{ ...css(chip), height: 28, padding: '0 12px', background: 'var(--pn-f1c232,#F1C232)', color: 'var(--pn-2a1a55,#2A1A55)', fontSize: 11.5, fontWeight: 800, letterSpacing: '.14em' }}>
+                    <span className="mx-dot" style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--pn-2a1a55,#2A1A55)' }} />NOVO DESAFIO
                   </span>
-                  <span style={{ ...css(chip), background: 'rgba(255,138,61,.16)', border: '1px solid rgba(255,138,61,.45)', color: '#FFB37A', fontSize: 12, fontWeight: 700 }}>
+                  <span style={{ ...css(chip), background: 'color-mix(in srgb,var(--pn-ff8a3d,#FF8A3D) 16%,transparent)', border: '1px solid color-mix(in srgb,var(--pn-ff8a3d,#FF8A3D) 45%,transparent)', color: 'var(--pn-ffb37a,#FFB37A)', fontSize: 12, fontWeight: 700 }}>
                     <svg className="i" viewBox="0 0 24 24" aria-hidden="true" style={{ width: 13, height: 13 }}><path d="M12 22c4 0 7-2.7 7-6.6 0-3.4-2.3-5.6-4-7.4-.4 2-1.4 3-2.5 3.4C13 8 12 4.6 9 2c.3 3.6-4 6.4-4 11.4C5 19.3 8 22 12 22z" /></svg>
                     Inscrições até {DMa(config.inscricoesAte)}
                   </span>
                 </div>
                 <b style={{ display: 'block', marginTop: 12, fontSize: 27, fontWeight: 800, letterSpacing: '-0.035em', lineHeight: 1.08 }}>
-                  {config.titulo} <span style={{ whiteSpace: 'nowrap', background: 'linear-gradient(90deg,#FFE27A,#F1C232 45%,#FF8A3D)', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>{config.destaque}</span>
+                  {config.titulo} <span style={{ whiteSpace: 'nowrap', background: 'linear-gradient(90deg,var(--pn-ffe27a,#FFE27A),var(--pn-f1c232,#F1C232) 45%,var(--pn-ff8a3d,#FF8A3D))', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent' }}>{config.destaque}</span>
                 </b>
-                <p style={{ margin: '8px 0 0', maxWidth: 560, fontSize: 13.5, lineHeight: 1.55, color: '#DCD3FF' }}>{config.descricao}</p>
+                <p style={{ margin: '8px 0 0', maxWidth: 560, fontSize: 13.5, lineHeight: 1.55, color: 'var(--pn-dcd3ff,#DCD3FF)' }}>{config.descricao}</p>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px 20px', marginTop: 14 }}>
                   <Destaque icon={<><rect x="8" y="2" width="8" height="4" rx="1" /><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" /><path d="m9 14 2 2 4-4" /></>} titulo={`${config.qtdSimulados} simulados`} sub={`padrão ${config.padrao}`} />
                   <Destaque icon={<><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></>} titulo={`${dias} dias`} sub={`${DMa(config.inicio)} a ${DMa(config.fim)}`} />
@@ -81,18 +81,18 @@ export function MaratonaCardDestaque({ config, estado, recolhidoInicial, feitos:
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 16 }}>
                   <div style={{ flex: 1, display: 'flex', gap: 4, maxWidth: 300 }}>
-                    {segs.map((_, i) => <span key={i} style={{ flex: 1, height: 7, borderRadius: 3, background: i < feitos ? '#F1C232' : 'rgba(255,255,255,.16)' }} />)}
+                    {segs.map((_, i) => <span key={i} style={{ flex: 1, height: 7, borderRadius: 3, background: i < feitos ? 'var(--pn-f1c232,#F1C232)' : 'rgba(255,255,255,.16)' }} />)}
                   </div>
-                  <span style={{ fontSize: 12, color: '#CFC4FF', whiteSpace: 'nowrap' }}><b style={{ color: '#FFFFFF' }}>{feitos}/{config.qtdSimulados}</b> · {config.inscritos.toLocaleString('pt-BR')} inscritos</span>
+                  <span style={{ fontSize: 12, color: 'var(--pn-cfc4ff,#CFC4FF)', whiteSpace: 'nowrap' }}><b style={{ color: '#FFFFFF' }}>{feitos}/{config.qtdSimulados}</b> · {config.inscritos.toLocaleString('pt-BR')} inscritos</span>
                 </div>
                 <div style={{ display: 'flex', gap: 10, marginTop: 18, flexWrap: 'wrap' }}>
-                  <button type="button" onClick={abrirDesafio} className="mx-cta" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9, height: 46, padding: '0 22px', borderRadius: 13, border: 0, cursor: 'pointer', background: 'linear-gradient(180deg,#FFD54F,#F1C232)', color: '#2A1A55', fontSize: 14.5, fontWeight: 800, boxShadow: '0 10px 24px -10px rgba(241,194,50,.8)' }}>
+                  <button type="button" onClick={abrirDesafio} className="mx-cta" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9, height: 46, padding: '0 22px', borderRadius: 13, border: 0, cursor: 'pointer', background: 'linear-gradient(180deg,var(--pn-ffd54f,#FFD54F),var(--pn-f1c232,#F1C232))', color: 'var(--pn-2a1a55,#2A1A55)', fontSize: 14.5, fontWeight: 800, boxShadow: '0 10px 24px -10px color-mix(in srgb,var(--pn-f1c232,#F1C232) 80%,transparent)' }}>
                     <svg className="i" viewBox="0 0 24 24" aria-hidden="true" style={{ width: 16, height: 16 }}><path d="M13 2 3 14h9l-1 8 10-12h-9z" /></svg>
                     {estado === 'continuar' ? 'Continuar desafio' : 'Aceitar desafio'}
                     <svg className="i" viewBox="0 0 24 24" aria-hidden="true" style={{ width: 15, height: 15 }}><path d="m9 18 6-6-6-6" /></svg>
                   </button>
                   <button type="button" onClick={abrirRegulamento} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 46, padding: '0 18px', borderRadius: 13, border: '1px solid rgba(255,255,255,.28)', background: 'rgba(255,255,255,.06)', color: '#FFFFFF', fontSize: 13.5, fontWeight: 700, cursor: 'pointer' }}>Ver regulamento</button>
-                  <button type="button" onClick={toggle} className="mx-hide" aria-label="Ocultar desafio" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7, height: 46, padding: '0 16px', borderRadius: 13, border: 0, background: 'transparent', color: '#CFC4FF', font: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
+                  <button type="button" onClick={toggle} className="mx-hide" aria-label="Ocultar desafio" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7, height: 46, padding: '0 16px', borderRadius: 13, border: 0, background: 'transparent', color: 'var(--pn-cfc4ff,#CFC4FF)', font: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>
                     <svg className="i" viewBox="0 0 24 24" aria-hidden="true" style={{ width: 15, height: 15 }}><path d="m6 15 6-6 6 6" /></svg>Ocultar
                   </button>
                 </div>
@@ -107,7 +107,7 @@ export function MaratonaCardDestaque({ config, estado, recolhidoInicial, feitos:
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '6px 10px 6px 6px' }}>
               <img src={config.capaUrl} alt="" style={{ width: 32, height: 32, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
               <b style={{ flex: 1, minWidth: 0, fontSize: 14.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{config.titulo} {config.destaque}<span className="mx-sub" style={{ fontWeight: 500 }}> · inscrições até {DMa(config.inscricoesAte)}</span></b>
-              <button type="button" onClick={toggle} className="mx-exp" aria-label="Expandir desafio" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 34, padding: '0 14px', borderRadius: 10, border: 0, background: 'linear-gradient(180deg,#FFD54F,#F1C232)', color: '#2A1A55', font: 'inherit', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}>Expandir<svg className="i" viewBox="0 0 24 24" aria-hidden="true" style={{ width: 15, height: 15 }}><path d="m6 9 6 6 6-6" /></svg></button>
+              <button type="button" onClick={toggle} className="mx-exp" aria-label="Expandir desafio" style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 34, padding: '0 14px', borderRadius: 10, border: 0, background: 'linear-gradient(180deg,var(--pn-ffd54f,#FFD54F),var(--pn-f1c232,#F1C232))', color: 'var(--pn-2a1a55,#2A1A55)', font: 'inherit', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}>Expandir<svg className="i" viewBox="0 0 24 24" aria-hidden="true" style={{ width: 15, height: 15 }}><path d="m6 9 6 6 6-6" /></svg></button>
             </div>
           </div>
         </div>
@@ -127,10 +127,10 @@ function css(s: string): React.CSSProperties {
 function Destaque({ icon, titulo, sub }: { icon: React.ReactNode; titulo: string; sub: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <span style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(255,255,255,.1)', color: '#F1C232', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+      <span style={{ width: 34, height: 34, borderRadius: 10, background: 'rgba(255,255,255,.1)', color: 'var(--pn-f1c232,#F1C232)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
         <svg className="i" viewBox="0 0 24 24" aria-hidden="true" style={{ width: 16, height: 16 }}>{icon}</svg>
       </span>
-      <div style={{ lineHeight: 1.2 }}><b style={{ display: 'block', fontSize: 14 }}>{titulo}</b><span style={{ fontSize: 11.5, color: '#CFC4FF' }}>{sub}</span></div>
+      <div style={{ lineHeight: 1.2 }}><b style={{ display: 'block', fontSize: 14 }}>{titulo}</b><span style={{ fontSize: 11.5, color: 'var(--pn-cfc4ff,#CFC4FF)' }}>{sub}</span></div>
     </div>
   )
 }
@@ -138,17 +138,17 @@ function Destaque({ icon, titulo, sub }: { icon: React.ReactNode; titulo: string
 const CSS = `
 @property --mxa { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
 .mx .i { fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }
-.mx { position:relative; border-radius:24px; padding:2px; background:conic-gradient(from var(--mxa), #F1C232, #FF8A3D, #B05BFF, #5B3FD0, #3A27A0, #F1C232); animation:mxSpin 5s linear infinite; box-shadow:0 26px 60px -28px rgba(91,63,208,.75), 0 0 0 1px rgba(241,194,50,.15); transition:border-radius .4s; }
+.mx { position:relative; border-radius:24px; padding:2px; background:conic-gradient(from var(--mxa), var(--pn-f1c232,#F1C232), var(--pn-ff8a3d,#FF8A3D), var(--pn-b05bff,#B05BFF), var(--pn-5b3fd0,#5B3FD0), var(--pn-3a27a0,#3A27A0), var(--pn-f1c232,#F1C232)); animation:mxSpin 5s linear infinite; box-shadow:0 26px 60px -28px color-mix(in srgb,var(--pn-5b3fd0,#5B3FD0) 75%,transparent), 0 0 0 1px color-mix(in srgb,var(--pn-f1c232,#F1C232) 15%,transparent); transition:border-radius .4s; }
 @keyframes mxSpin { to { --mxa:360deg; } }
-.mx-in { position:relative; overflow:hidden; border-radius:22px; background:radial-gradient(120% 140% at 85% 0%, #4B2BC4 0%, #24126E 45%, #120838 100%); color:#fff; transition:border-radius .4s; }
-.mx-st { position:absolute; height:3px; border-radius:99px; background:linear-gradient(90deg, transparent, rgba(255,180,60,.85), transparent); animation:mxStreak 2.8s cubic-bezier(.4,0,.2,1) infinite; opacity:0; }
+.mx-in { position:relative; overflow:hidden; border-radius:22px; background:radial-gradient(120% 140% at 85% 0%, var(--pn-4b2bc4,#4B2BC4) 0%, var(--pn-24126e,#24126E) 45%, var(--pn-120838,#120838) 100%); color:#fff; transition:border-radius .4s; }
+.mx-st { position:absolute; height:3px; border-radius:99px; background:linear-gradient(90deg, transparent, color-mix(in srgb,var(--pn-ffb43c,#FFB43C) 85%,transparent), transparent); animation:mxStreak 2.8s cubic-bezier(.4,0,.2,1) infinite; opacity:0; }
 @keyframes mxStreak { 0%{transform:translateX(-120%);opacity:0} 15%{opacity:1} 60%{opacity:.9} 100%{transform:translateX(260%);opacity:0} }
 .mx-cov { animation:mxFloat 4.5s ease-in-out infinite; }
 @keyframes mxFloat { 50%{transform:translateY(-5px) rotate(-1deg)} }
 .mx-new { animation:mxPop .6s cubic-bezier(.3,1.6,.5,1) .3s both; }
 @keyframes mxPop { from{transform:scale(.6);opacity:0} }
 .mx-dot { animation:mxPing 1.4s ease-out infinite; }
-@keyframes mxPing { 0%{box-shadow:0 0 0 0 rgba(42,26,85,.55)} 100%{box-shadow:0 0 0 8px rgba(42,26,85,0)} }
+@keyframes mxPing { 0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--pn-2a1a55,#2A1A55) 55%,transparent)} 100%{box-shadow:0 0 0 8px color-mix(in srgb,var(--pn-2a1a55,#2A1A55) 0%,transparent)} }
 .mx-cta { position:relative; overflow:hidden; transition:transform .15s, filter .15s; }
 .mx-cta:hover { transform:translateY(-1px); filter:brightness(1.05); }
 .mx-cta::after { content:""; position:absolute; top:0; bottom:0; width:40%; left:-60%; background:linear-gradient(100deg, transparent, rgba(255,255,255,.65), transparent); animation:mxShine 2.6s ease-in-out infinite; }

@@ -18,6 +18,7 @@ import { contagensDocsAreaSql, resumoAcessoPastaSql } from '@/lib/conteudo/bibli
 import { reconciliarVersao } from '@/lib/conteudo/reconciliacao'
 import { listarVinculosDoDocumento, vincularDocumento, desvincular, type ModoVinculo } from '@/lib/conteudo/vinculos'
 import { gerarThumbDocumento, gerarPdfDocumento } from '@/lib/conteudo/thumb'
+import { mapaPastas, resolverCapaDoc, type PastaCP } from '@/lib/conteudo/capa-pagina'
 
 // Duas coleções na mesma infra: 'conteudo' (materiais) e 'modelo_caderno' (modelos de caderno em docx).
 // Cada uma tem suas próprias pastas via folder_area.
@@ -40,14 +41,16 @@ export interface PastaConteudo {
   disciplina_id?: string | null            // pasta-DISCIPLINA (vinculada a simulado_disciplinas)
   disciplina_classificacao?: string | null // essencial/complementar/especifica (da disciplina vinculada)
   cronograma_tipo_material?: string | null  // SUBpasta: pdfull/pdfight/legproc/questoes
+  capa_url?: string | null                  // capa própria da pasta (card); ver capa-actions.ts
 }
 
 // Pastas da área, incluindo a config de cronograma. `cronograma_tipo_material` é coluna NOVA (criada por
 // outra frente) → SELECT tolerante que cai no legado se a migração ainda não rodou.
 async function fetchPastasArea(svc: ReturnType<typeof createAdminClient>, tenantId: string, area: string): Promise<any[]> {
   const sel = (cols: string) => () => svc.from(PASTAS).select(cols).eq('tenant_id', tenantId).eq('folder_area', area).eq('is_folder', true).order('id', { ascending: true })
-  try { return (await fetchAll<any>(sel('id, nome, pai_id, cor, deletado, acesso_geral, disciplina_id, cronograma_tipo_material'))) ?? [] }
-  catch { try { return (await fetchAll<any>(sel('id, nome, pai_id, cor, deletado, acesso_geral, disciplina_id'))) ?? [] } catch { return [] } }
+  try { return (await fetchAll<any>(sel('id, nome, pai_id, cor, deletado, acesso_geral, disciplina_id, cronograma_tipo_material, capa_url, capa_modo, pagina_inicial, pagina_inicial_modo'))) ?? [] }
+  catch { try { return (await fetchAll<any>(sel('id, nome, pai_id, cor, deletado, acesso_geral, disciplina_id, cronograma_tipo_material'))) ?? [] }
+  catch { try { return (await fetchAll<any>(sel('id, nome, pai_id, cor, deletado, acesso_geral, disciplina_id'))) ?? [] } catch { return [] } } }
 }
 
 export async function listarArvore(pastaId?: string | null, categoria: Categoria = 'conteudo'): Promise<{
@@ -87,6 +90,7 @@ export async function listarArvore(pastaId?: string | null, categoria: Categoria
     disciplina_id: p.disciplina_id ?? null,
     disciplina_classificacao: p.disciplina_id ? (classPorDisc.get(p.disciplina_id) ?? null) : null,
     cronograma_tipo_material: p.cronograma_tipo_material ?? null,
+    capa_url: p.capa_url ?? null,
   })
   const pastas = doArea.filter((p) => (p.pai_id ?? null) === alvo).map(mapaPasta)
   const docIds = documentos.map((d) => d.id)
@@ -169,6 +173,18 @@ export async function listarArvore(pastaId?: string | null, categoria: Categoria
       // [versaoId] (só lê o cache; nunca gera no grid). Enquanto não há capa, o card mostra a prévia/placeholder.
     }
   } catch { /* prévia best-effort */ }
+
+  // CAPA customizada dos documentos (própria > pasta em lote). Só a customizada entra aqui; sem ela o card segue com a miniatura
+  // automática (docx) / ícone do tipo. Best-effort: sem a migração (colunas ausentes) nada muda.
+  try {
+    if (docIds.length) {
+      const capaDoc = new Map<string, string | null>()
+      const rows = (await fetchAllByIn<any>(docIds, (c) => svc.from('simulado_conteudo_documentos').select('id, capa_url').eq('tenant_id', g.tenantId).in('id', c).order('id', { ascending: true }))) ?? []
+      for (const r of rows) capaDoc.set(r.id, r.capa_url ?? null)
+      const porIdCP = mapaPastas(doArea as PastaCP[])
+      for (const d of documentos) { const r = resolverCapaDoc(capaDoc.get(d.id), (d as any).pasta_id ?? null, porIdCP); if (r.valor) thumbs[d.id] = r.valor }
+    }
+  } catch { /* sem a coluna capa_url */ }
 
   return { ok: true, pastas, documentos, breadcrumb, previas, thumbs, contagens, restritasPasta, restritoDoc, resumo }
 }
@@ -365,6 +381,21 @@ export async function definirTipoMaterialSubpasta(pastaId: string, tipo: string 
   const { error } = await svc.from(PASTAS).update({ cronograma_tipo_material: valor }).eq('tenant_id', g.tenantId).eq('id', pastaId)
   if (error) return { ok: false, error: /column .* does not exist|cronograma_tipo_material|schema cache/i.test(error.message) ? 'Rode a migração do cronograma por pasta (coluna cronograma_tipo_material).' : error.message }
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_pastas', entidadeId: pastaId, depois: { cronograma_tipo_material: valor }, atorId: g.atorId, tenantId: g.tenantId }).catch(() => {})
+  revalidatePath('/admin/biblioteca')
+  return { ok: true }
+}
+
+/** LegProc: define, para a PASTA (vale para os documentos dentro e subpastas), se a tabela de legenda do início fica oculta
+ *  (true = padrão) ou visível (false). `null` volta a herdar. Tolerante se a migração não rodou. */
+export async function definirLegendaTabelaPasta(pastaId: string, ocultar: boolean | null): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('update'); if (!g.ok) return g
+  if (!pastaId) return { ok: false, error: 'Pasta ausente.' }
+  const svc = createAdminClient()
+  const { data: pasta } = await svc.from(PASTAS).select('id').eq('tenant_id', g.tenantId).eq('id', pastaId).eq('folder_area', 'conteudo').maybeSingle()
+  if (!pasta) return { ok: false, error: 'Pasta inválida.' }
+  const { error } = await svc.from(PASTAS).update({ legproc_ocultar_legenda: ocultar }).eq('tenant_id', g.tenantId).eq('id', pastaId)
+  if (error) return { ok: false, error: /column .* does not exist|legproc_ocultar_legenda|schema cache/i.test(error.message) ? 'Rode a migração da legenda do LegProc (20261104150000).' : error.message }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_pastas', entidadeId: pastaId, depois: { legproc_ocultar_legenda: ocultar }, atorId: g.atorId, tenantId: g.tenantId }).catch(() => {})
   revalidatePath('/admin/biblioteca')
   return { ok: true }
 }

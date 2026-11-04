@@ -29,7 +29,7 @@ function AulaMini({ a }: { a: { titulo: string; estado: Estado; tempo?: string }
   const atual = a.estado === 'atual'
   const circulo = a.estado === 'locked'
     ? <span style={{ width: 24, height: 24, borderRadius: '50%', border: '2px solid var(--line2)', boxSizing: 'border-box', flexShrink: 0 }} />
-    : <span style={{ width: 24, height: 24, borderRadius: '50%', background: atual ? 'var(--brand)' : '#2EC77A', color: '#FFFFFF', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon n={atual ? 'play' : 'check'} size={atual ? 10 : 12} /></span>
+    : <span style={{ width: 24, height: 24, borderRadius: '50%', background: atual ? 'var(--brand)' : 'var(--pn-2ec77a,#2EC77A)', color: '#FFFFFF', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Icon n={atual ? 'play' : 'check'} size={atual ? 10 : 12} /></span>
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 12, background: atual ? 'var(--chip)' : 'transparent' }}>
       {circulo}
@@ -70,12 +70,12 @@ export default async function Page({ params }: { params: Promise<{ cursoId: stri
         {/* Coluna principal */}
         <Col gap={18}>
           {/* Player — EXEMPLO (sem modelo de vídeo na plataforma). TODO(dados): player/stream real. */}
-          <div style={{ position: 'relative', height: 430, borderRadius: 22, overflow: 'hidden', background: 'radial-gradient(120% 120% at 70% 30%,#4A31B8,#241A52 50%,#100A26)', color: '#FFFFFF', padding: '44px 50px', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ position: 'relative', height: 430, borderRadius: 22, overflow: 'hidden', background: 'radial-gradient(120% 120% at 70% 30%,var(--pn-4a31b8,#4A31B8),var(--pn-241a52,#241A52) 50%,var(--pn-100a26,#100A26))', color: '#FFFFFF', padding: '44px 50px', display: 'flex', flexDirection: 'column' }}>
             <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px)', backgroundSize: '44px 44px' }} />
-            <span style={{ position: 'relative', fontSize: 11, fontWeight: 800, letterSpacing: '.2em', color: '#E1D9FF' }}>{cursoTitulo.toUpperCase()}</span>
+            <span style={{ position: 'relative', fontSize: 11, fontWeight: 800, letterSpacing: '.2em', color: 'var(--pn-e1d9ff,#E1D9FF)' }}>{cursoTitulo.toUpperCase()}</span>
             <b style={{ position: 'relative', marginTop: 12, fontSize: 30, fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.15 }}>{tituloAula}</b>
-            <span style={{ position: 'relative', marginTop: 10, maxWidth: 440, fontSize: 13, color: '#DCD3FF' }}>Pré-visualização de exemplo — a plataforma ainda não tem videoaula. Use o PDF da aula abaixo.</span>
-            <button type="button" aria-label="Reproduzir (exemplo)" style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 84, height: 84, borderRadius: '50%', border: 0, background: 'var(--gold)', color: 'var(--goldInk)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 0 0 12px rgba(241,194,50,.2)' }}><Icon n="play" size={30} /></button>
+            <span style={{ position: 'relative', marginTop: 10, maxWidth: 440, fontSize: 13, color: 'var(--pn-dcd3ff,#DCD3FF)' }}>Pré-visualização de exemplo — a plataforma ainda não tem videoaula. Use o PDF da aula abaixo.</span>
+            <button type="button" aria-label="Reproduzir (exemplo)" style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 84, height: 84, borderRadius: '50%', border: 0, background: 'var(--gold)', color: 'var(--goldInk)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 0 0 12px color-mix(in srgb,var(--pn-f1c232,#F1C232) 20%,transparent)' }}><Icon n="play" size={30} /></button>
           </div>
 
           {/* Título da aula + ações */}

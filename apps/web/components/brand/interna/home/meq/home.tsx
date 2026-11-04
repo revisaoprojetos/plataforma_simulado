@@ -27,83 +27,83 @@ import { Capa, CircuitHero, Fogo, Gota, MarcaBarras, Segs } from './circuit'
 // valores exatos dos mockups (class="app" style="…"). --cyan fixo #5ECEF0 em todos.
 const ROOT_VARS: Record<InternaTheme, Record<string, string>> = {
   claro: {
-    '--bg': '#F2F5FA',
+    '--bg': 'var(--pn-f2f5fa,#F2F5FA)',
     '--surface': '#FFFFFF',
-    '--surface2': '#F6F8FC',
-    '--ink': '#171E3B',
-    '--head': '#171E3B',
-    '--sub': '#66729A',
-    '--muted': '#66729A',
-    '--muted2': '#B7C0D8',
-    '--line': '#E3E8F2',
-    '--line2': '#CDD6E8',
-    '--track': '#E4EAF5',
-    '--brand': '#306AB5',
-    '--brand2': '#3E7FE0',
-    '--cyan': '#5ECEF0',
-    '--chip': '#EAF1FB',
-    '--shadow': '0 1px 2px rgba(16,30,70,.04)',
-    '--okBg': 'rgba(46,199,122,.14)',
-    '--okInk': '#1FA868',
+    '--surface2': 'var(--pn-f6f8fc,#F6F8FC)',
+    '--ink': 'var(--pn-171e3b,#171E3B)',
+    '--head': 'var(--pn-171e3b,#171E3B)',
+    '--sub': 'var(--pn-66729a,#66729A)',
+    '--muted': 'var(--pn-66729a,#66729A)',
+    '--muted2': 'var(--pn-b7c0d8,#B7C0D8)',
+    '--line': 'var(--pn-e3e8f2,#E3E8F2)',
+    '--line2': 'var(--pn-cdd6e8,#CDD6E8)',
+    '--track': 'var(--pn-e4eaf5,#E4EAF5)',
+    '--brand': 'var(--pn-306ab5,#306AB5)',
+    '--brand2': 'var(--pn-3e7fe0,#3E7FE0)',
+    '--cyan': 'var(--pn-5ecef0,#5ECEF0)',
+    '--chip': 'var(--pn-eaf1fb,#EAF1FB)',
+    '--shadow': '0 1px 2px color-mix(in srgb,var(--pn-101e46,#101E46) 4%,transparent)',
+    '--okBg': 'color-mix(in srgb,var(--pn-2ec77a,#2EC77A) 14%,transparent)',
+    '--okInk': 'var(--pn-1fa868,#1FA868)',
   },
   azul: {
-    '--bg': 'linear-gradient(170deg,#2B5FA8 0%,#306AB5 30%,#3B82CC 70%,#4497DB 100%)',
+    '--bg': 'linear-gradient(170deg,var(--pn-2b5fa8,#2B5FA8) 0%,var(--pn-306ab5,#306AB5) 30%,var(--pn-3b82cc,#3B82CC) 70%,var(--pn-4497db,#4497DB) 100%)',
     '--surface': '#FFFFFF',
-    '--surface2': '#F5F8FD',
-    '--ink': '#171E3B',
+    '--surface2': 'var(--pn-f5f8fd,#F5F8FD)',
+    '--ink': 'var(--pn-171e3b,#171E3B)',
     '--head': '#FFFFFF',
-    '--sub': '#DCEBFF',
-    '--muted': '#66729A',
-    '--muted2': '#B7C0D8',
-    '--line': '#E3E8F2',
-    '--line2': '#CDD6E8',
-    '--track': '#E4EAF5',
-    '--brand': '#306AB5',
-    '--brand2': '#3E7FE0',
-    '--cyan': '#5ECEF0',
-    '--chip': '#EAF1FB',
-    '--shadow': '0 20px 40px -30px rgba(10,30,80,.6)',
+    '--sub': 'var(--pn-dcebff,#DCEBFF)',
+    '--muted': 'var(--pn-66729a,#66729A)',
+    '--muted2': 'var(--pn-b7c0d8,#B7C0D8)',
+    '--line': 'var(--pn-e3e8f2,#E3E8F2)',
+    '--line2': 'var(--pn-cdd6e8,#CDD6E8)',
+    '--track': 'var(--pn-e4eaf5,#E4EAF5)',
+    '--brand': 'var(--pn-306ab5,#306AB5)',
+    '--brand2': 'var(--pn-3e7fe0,#3E7FE0)',
+    '--cyan': 'var(--pn-5ecef0,#5ECEF0)',
+    '--chip': 'var(--pn-eaf1fb,#EAF1FB)',
+    '--shadow': '0 20px 40px -30px color-mix(in srgb,var(--pn-0a1e50,#0A1E50) 60%,transparent)',
     '--okBg': 'rgba(255,255,255,.2)',
     '--okInk': '#FFFFFF',
   },
   escuro: {
-    '--bg': '#0B1124',
-    '--surface': '#121A3A',
-    '--surface2': '#172146',
+    '--bg': 'var(--pn-0b1124,#0B1124)',
+    '--surface': 'var(--pn-121a3a,#121A3A)',
+    '--surface2': 'var(--pn-172146,#172146)',
     '--ink': '#FFFFFF',
     '--head': '#FFFFFF',
-    '--sub': '#8E9BC4',
-    '--muted': '#8E9BC4',
-    '--muted2': '#3E4A78',
-    '--line': 'rgba(140,170,255,.13)',
-    '--line2': 'rgba(140,170,255,.24)',
-    '--track': 'rgba(140,170,255,.13)',
-    '--brand': '#7FB2FF',
-    '--brand2': '#5E9BFF',
-    '--cyan': '#5ECEF0',
-    '--chip': 'rgba(94,155,255,.14)',
+    '--sub': 'var(--pn-8e9bc4,#8E9BC4)',
+    '--muted': 'var(--pn-8e9bc4,#8E9BC4)',
+    '--muted2': 'var(--pn-3e4a78,#3E4A78)',
+    '--line': 'color-mix(in srgb,var(--pn-8caaff,#8CAAFF) 13%,transparent)',
+    '--line2': 'color-mix(in srgb,var(--pn-8caaff,#8CAAFF) 24%,transparent)',
+    '--track': 'color-mix(in srgb,var(--pn-8caaff,#8CAAFF) 13%,transparent)',
+    '--brand': 'var(--pn-7fb2ff,#7FB2FF)',
+    '--brand2': 'var(--pn-5e9bff,#5E9BFF)',
+    '--cyan': 'var(--pn-5ecef0,#5ECEF0)',
+    '--chip': 'color-mix(in srgb,var(--pn-5e9bff,#5E9BFF) 14%,transparent)',
     '--shadow': 'none',
-    '--okBg': 'rgba(46,199,122,.16)',
-    '--okInk': '#4FDB98',
+    '--okBg': 'color-mix(in srgb,var(--pn-2ec77a,#2EC77A) 16%,transparent)',
+    '--okInk': 'var(--pn-4fdb98,#4FDB98)',
   },
 }
 
-const LARANJA = '#F2A93B' // acento fixo p/ desempenho < 60%
-const LARANJA_INK = '#D9871A'
+const LARANJA = 'var(--pn-f2a93b,#F2A93B)' // acento fixo p/ desempenho < 60%
+const LARANJA_INK = 'var(--pn-d9871a,#D9871A)'
 
 // Gradientes das capas por índice (variações do mockup) — cores fixas.
 const CAPA_GRADS = [
-  'linear-gradient(150deg,#1F2A55,#306AB5)',
-  'linear-gradient(150deg,#121A3A,#2B4A8F)',
-  'linear-gradient(150deg,#0F3A5A,#2B86B8)',
-  'linear-gradient(150deg,#14304F,#3E7FE0)',
+  'linear-gradient(150deg,var(--pn-1f2a55,#1F2A55),var(--pn-306ab5,#306AB5))',
+  'linear-gradient(150deg,var(--pn-121a3a,#121A3A),var(--pn-2b4a8f,#2B4A8F))',
+  'linear-gradient(150deg,var(--pn-0f3a5a,#0F3A5A),var(--pn-2b86b8,#2B86B8))',
+  'linear-gradient(150deg,var(--pn-14304f,#14304F),var(--pn-3e7fe0,#3E7FE0))',
 ]
 // Gradientes dos slides do carrossel.
 const SLIDE_GRADS = [
-  'linear-gradient(120deg,#171E3B 0%,#1F3A78 50%,#306AB5 100%)',
-  'linear-gradient(120deg,#14204A 0%,#1F4C8F 50%,#3E7FE0 100%)',
-  'linear-gradient(120deg,#0F2A3F 0%,#1A5A86 50%,#2B86B8 100%)',
-  'linear-gradient(120deg,#1B2F6B 0%,#2B4FA8 50%,#4A7BE0 100%)',
+  'linear-gradient(120deg,var(--pn-171e3b,#171E3B) 0%,var(--pn-1f3a78,#1F3A78) 50%,var(--pn-306ab5,#306AB5) 100%)',
+  'linear-gradient(120deg,var(--pn-14204a,#14204A) 0%,var(--pn-1f4c8f,#1F4C8F) 50%,var(--pn-3e7fe0,#3E7FE0) 100%)',
+  'linear-gradient(120deg,var(--pn-0f2a3f,#0F2A3F) 0%,var(--pn-1a5a86,#1A5A86) 50%,var(--pn-2b86b8,#2B86B8) 100%)',
+  'linear-gradient(120deg,var(--pn-1b2f6b,#1B2F6B) 0%,var(--pn-2b4fa8,#2B4FA8) 50%,var(--pn-4a7be0,#4A7BE0) 100%)',
 ]
 
 const SEMANA_LABELS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB']
@@ -115,7 +115,7 @@ function primeiroNome(nome: string) {
 }
 
 function statusCor(status: string) {
-  if (status === 'Concluído') return '#2EC77A'
+  if (status === 'Concluído') return 'var(--pn-2ec77a,#2EC77A)'
   if (status === 'Em andamento') return LARANJA
   return 'var(--muted)'
 }
@@ -298,22 +298,22 @@ export function HomeMeq({ theme, data, preview }: { theme: InternaTheme; data: H
                 <img src={d.imagem} alt={d.titulo || ''} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center', display: 'block' }} />
               ) : (
                 <div style={{ position: 'relative', overflow: 'hidden', width: '100%', height: '100%', background: SLIDE_GRADS[i % SLIDE_GRADS.length], color: '#FFFFFF' }}>
-                  <div className="hmq-glow" style={{ position: 'absolute', right: '-10%', top: '-60%', width: 700, height: 600, borderRadius: '50%', background: 'radial-gradient(closest-side,rgba(94,206,240,.4),rgba(94,206,240,0))' }} aria-hidden="true" />
+                  <div className="hmq-glow" style={{ position: 'absolute', right: '-10%', top: '-60%', width: 700, height: 600, borderRadius: '50%', background: 'radial-gradient(closest-side,color-mix(in srgb,var(--pn-5ecef0,#5ECEF0) 40%,transparent),color-mix(in srgb,var(--pn-5ecef0,#5ECEF0) 0%,transparent))' }} aria-hidden="true" />
                   <CircuitHero />
                   <div className="hmq-hero-body">
-                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 700, letterSpacing: '.2em', color: '#8BEAEA' }}>
-                      <span className="hmq-live" style={{ width: 7, height: 7, borderRadius: '50%', background: '#5ECEF0' }} aria-hidden="true" />
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 700, letterSpacing: '.2em', color: 'var(--pn-8beaea,#8BEAEA)' }}>
+                      <span className="hmq-live" style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--pn-5ecef0,#5ECEF0)' }} aria-hidden="true" />
                       {d.eyebrow}
                     </span>
                     <h2 style={{ margin: 0, fontSize: 36, fontWeight: 700, letterSpacing: '-0.045em', lineHeight: 1.08 }}>{d.titulo}</h2>
-                    <p style={{ margin: 0, fontSize: 14.5, color: '#CFE6FF' }}>{d.subtitulo}</p>
+                    <p style={{ margin: 0, fontSize: 14.5, color: 'var(--pn-cfe6ff,#CFE6FF)' }}>{d.subtitulo}</p>
                     <div style={{ display: 'flex', gap: 10, marginTop: 4, flexWrap: 'wrap' }}>
                       <span className="hmq-ctaw hmq-seghov">
                         {d.cta.rotulo}
                         <span style={{ display: 'inline-flex', alignItems: 'flex-end', gap: 3, height: 14 }} aria-hidden="true">
-                          <span className="sgm" style={{ display: 'block', width: 4, height: 7, borderRadius: 1, background: '#306AB5', opacity: 0.45 }} />
-                          <span className="sgm" style={{ display: 'block', width: 4, height: 10, borderRadius: 1, background: '#306AB5', opacity: 0.7 }} />
-                          <span className="sgm" style={{ display: 'block', width: 4, height: 14, borderRadius: 1, background: '#306AB5', opacity: 1 }} />
+                          <span className="sgm" style={{ display: 'block', width: 4, height: 7, borderRadius: 1, background: 'var(--pn-306ab5,#306AB5)', opacity: 0.45 }} />
+                          <span className="sgm" style={{ display: 'block', width: 4, height: 10, borderRadius: 1, background: 'var(--pn-306ab5,#306AB5)', opacity: 0.7 }} />
+                          <span className="sgm" style={{ display: 'block', width: 4, height: 14, borderRadius: 1, background: 'var(--pn-306ab5,#306AB5)', opacity: 1 }} />
                         </span>
                       </span>
                       {d.chips[0] ? (
@@ -352,7 +352,7 @@ export function HomeMeq({ theme, data, preview }: { theme: InternaTheme; data: H
                 aria-label={`Banner ${i + 1}`}
                 onClick={() => irPara(i)}
                 className="hmq-cdot"
-                style={{ width: i === (slide % total) ? 30 : 14, height: 5, padding: 0, border: 0, borderRadius: 1, background: i === (slide % total) ? '#5ECEF0' : 'rgba(255,255,255,.4)' }}
+                style={{ width: i === (slide % total) ? 30 : 14, height: 5, padding: 0, border: 0, borderRadius: 1, background: i === (slide % total) ? 'var(--pn-5ecef0,#5ECEF0)' : 'rgba(255,255,255,.4)' }}
               />
             ))}
           </div>
@@ -454,7 +454,7 @@ export function HomeMeq({ theme, data, preview }: { theme: InternaTheme; data: H
                         className={cn(estudou && 'hmq-fire')}
                         style={
                           estudou
-                            ? { width: '100%', height: 34, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(62,127,224,.14)' }
+                            ? { width: '100%', height: 34, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'color-mix(in srgb,var(--pn-3e7fe0,#3E7FE0) 14%,transparent)' }
                             : hoje
                               ? { width: '100%', height: 34, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--brand2)', color: 'var(--brand2)' }
                               : { width: '100%', height: 34, borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--surface2)', color: 'var(--muted2)' }
@@ -571,7 +571,7 @@ export function HomeMeq({ theme, data, preview }: { theme: InternaTheme; data: H
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
                 <h3 className="hmq-sec-title">Outros simulados</h3>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 24, padding: '0 10px', borderRadius: 6, background: 'var(--okBg)', color: 'var(--okInk)', fontSize: 12, fontWeight: 700 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#2EC77A' }} aria-hidden="true" />
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--pn-2ec77a,#2EC77A)' }} aria-hidden="true" />
                   Disponíveis · {data.outrosDisponiveis}
                 </span>
               </div>
@@ -724,9 +724,9 @@ const CSS = `
 .hmq-h3{margin:0;display:inline-flex;align-items:center;gap:10px;font-size:15px;font-weight:700;letter-spacing:-0.02em;color:var(--ink)}
 .hmq-hl{color:var(--brand2)}
 
-.hmq-cta{background:linear-gradient(180deg,#4A8BEA,#2F64C8);box-shadow:0 10px 22px -14px rgba(62,127,224,.9),inset 0 1px 0 rgba(255,255,255,.22);transition:filter .15s,transform .15s;display:inline-flex;align-items:center;justify-content:center;gap:8px;color:#FFFFFF;font-weight:700;text-decoration:none;cursor:pointer}
+.hmq-cta{background:linear-gradient(180deg,var(--pn-4a8bea,#4A8BEA),var(--pn-2f64c8,#2F64C8));box-shadow:0 10px 22px -14px color-mix(in srgb,var(--pn-3e7fe0,#3E7FE0) 90%,transparent),inset 0 1px 0 rgba(255,255,255,.22);transition:filter .15s,transform .15s;display:inline-flex;align-items:center;justify-content:center;gap:8px;color:#FFFFFF;font-weight:700;text-decoration:none;cursor:pointer}
 .hmq-cta:hover{filter:brightness(1.06);transform:translateY(-1px)}
-.hmq-ctaw{display:inline-flex;align-items:center;gap:10px;height:46px;padding:0 18px;border-radius:12px;background:#FFFFFF;color:#171E3B;font-weight:700;font-size:14px;cursor:pointer;transition:filter .15s,transform .15s}
+.hmq-ctaw{display:inline-flex;align-items:center;gap:10px;height:46px;padding:0 18px;border-radius:12px;background:#FFFFFF;color:var(--pn-171e3b,#171E3B);font-weight:700;font-size:14px;cursor:pointer;transition:filter .15s,transform .15s}
 .hmq-ctaw:hover{filter:brightness(1.06);transform:translateY(-1px)}
 .hmq-ghost{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 12px;border-radius:10px;border:1px solid var(--line);color:var(--muted);font-size:12.5px;font-weight:600;cursor:pointer}
 .hmq-icobtn{width:34px;height:34px;border-radius:10px;border:1px solid var(--line);color:var(--muted);display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
@@ -744,11 +744,11 @@ const CSS = `
 .hmq-hero-body{position:relative;height:100%;display:flex;flex-direction:column;justify-content:center;gap:12px;padding:0 84px 34px;max-width:720px}
 /* Setas SEM caixa: só o ícone (branco + sombra p/ contraste sobre a imagem). */
 .hmq-arr{position:absolute;top:50%;transform:translateY(-50%);z-index:4;display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border:0;background:transparent;color:#FFFFFF;cursor:pointer;filter:drop-shadow(0 2px 5px rgba(0,0,0,.55));transition:transform .15s,color .15s}
-.hmq-arr:hover{color:#5ECEF0;transform:translateY(-50%) scale(1.14)}
+.hmq-arr:hover{color:var(--pn-5ecef0,#5ECEF0);transform:translateY(-50%) scale(1.14)}
 .hmq-cctrl{position:absolute;left:84px;bottom:14px;z-index:3;display:flex;align-items:center;gap:7px}
 .hmq-cdot{transition:width .3s,background .3s;cursor:pointer}
 /* Pausar SEM caixa/borda: só o ícone (ciano + sombra p/ contraste). */
-.hmq-cpause{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border:0;background:transparent;color:#5ECEF0;cursor:pointer;filter:drop-shadow(0 2px 5px rgba(0,0,0,.55));transition:transform .15s,color .15s}
+.hmq-cpause{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border:0;background:transparent;color:var(--pn-5ecef0,#5ECEF0);cursor:pointer;filter:drop-shadow(0 2px 5px rgba(0,0,0,.55));transition:transform .15s,color .15s}
 .hmq-cpause:hover{color:#FFFFFF;transform:scale(1.14)}
 
 /* tabela recentes */
@@ -764,7 +764,7 @@ const CSS = `
 .hmq-sec-title{margin:0;font-size:17px;font-weight:700;letter-spacing:-0.03em;color:var(--head)}
 .hmq-tabs{display:flex;gap:4px;padding:3px;border-radius:11px;background:var(--surface2);border:1px solid var(--line)}
 .hmq-tab{height:30px;padding:0 12px;border:0;border-radius:8px;font-size:12.5px;font-weight:600;display:inline-flex;align-items:center;background:transparent;color:var(--muted);cursor:pointer;font-family:inherit}
-.hmq-tab-on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(10,20,60,.12)}
+.hmq-tab-on{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px color-mix(in srgb,var(--pn-0a143c,#0A143C) 12%,transparent)}
 /* adaptativo ao container (não ao viewport) — não corta em tablet/iframe. */
 .hmq-pastas{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,420px),1fr));gap:14px}
 .hmq-tile{display:flex;align-items:center;gap:14px;padding:14px;border-radius:16px;background:var(--surface);border:1px solid var(--line);text-decoration:none}
@@ -772,7 +772,7 @@ const CSS = `
 
 /* lift / cover shine */
 .hmq-lift{transition:transform .5s cubic-bezier(.22,1,.36,1),box-shadow .5s cubic-bezier(.22,1,.36,1),border-color .3s ease;will-change:transform}
-.hmq-lift:hover{transform:translateY(-4px);border-color:var(--brand2);box-shadow:0 18px 32px -22px rgba(30,70,150,.65),inset 3px 0 0 var(--cyan)}
+.hmq-lift:hover{transform:translateY(-4px);border-color:var(--brand2);box-shadow:0 18px 32px -22px color-mix(in srgb,var(--pn-1e4696,#1E4696) 65%,transparent),inset 3px 0 0 var(--cyan)}
 .hmq-cov{transition:transform .6s cubic-bezier(.22,1,.36,1)}
 .hmq-lift:hover .hmq-cov,.hmq-row:hover .hmq-cov{transform:scale(1.1)}
 .hmq-cov::after{content:'';position:absolute;top:0;bottom:0;left:-60%;width:40%;background:linear-gradient(100deg,rgba(255,255,255,0),rgba(255,255,255,.22),rgba(255,255,255,0));transform:skewX(-18deg);transition:left 0s;pointer-events:none}

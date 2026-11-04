@@ -85,7 +85,7 @@ export function SimuladosFeitosCards({ rows, estudanteId, estudanteNome, visuais
                       <div className="relative aspect-[4/3] h-full shrink-0 overflow-hidden">
                         {v.capa
                           ? <img src={v.capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                          : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }} />}
+                          : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, var(--pn-0f172a,#0f172a) 135%)` }} />}
                         {!v.capa && <Icon className="absolute -right-4 -top-4 h-28 w-28 text-white/10" />}
                       </div>
                       <Link href={detalhe} className="absolute inset-0 z-10" aria-label={g.titulo} />
@@ -114,7 +114,7 @@ export function SimuladosFeitosCards({ rows, estudanteId, estudanteNome, visuais
                   <div key={g.simuladoId} className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm transition-all hover:-translate-y-1 hover:shadow-lg">
                     {v.capa
                       ? <img src={v.capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                      : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }} />}
+                      : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, var(--pn-0f172a,#0f172a) 135%)` }} />}
                     {!v.capa && <Icon className="absolute -right-6 -top-6 h-40 w-40 text-white/10" />}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
 

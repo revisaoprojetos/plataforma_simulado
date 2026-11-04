@@ -41,10 +41,10 @@ type PlatformPastaProps = {
 
 // Gradiente de fallback por marca (mesmos das telas "Realizados").
 const FALLBACK_GRAD: Record<Brand, string> = {
-  revisao: 'linear-gradient(135deg,#2A1E4A,#4A31B8)',
-  vnd: 'linear-gradient(140deg,#062A1B,#16804F)',
-  mac: 'linear-gradient(140deg,#220506,#691216)',
-  meq: 'linear-gradient(150deg,#121A3A,#2B4A8F)',
+  revisao: 'linear-gradient(135deg,var(--pn-2a1e4a,#2A1E4A),var(--pn-4a31b8,#4A31B8))',
+  vnd: 'linear-gradient(140deg,var(--pn-062a1b,#062A1B),var(--pn-16804f,#16804F))',
+  mac: 'linear-gradient(140deg,var(--pn-220506,#220506),var(--pn-691216,#691216))',
+  meq: 'linear-gradient(150deg,var(--pn-121a3a,#121A3A),var(--pn-2b4a8f,#2B4A8F))',
 }
 
 // ---- bucket (MESMA lógica do catálogo antigo: agendados/disponiveis/refazer) ----
@@ -57,9 +57,9 @@ function bucketDe(i: ItemSimuladoCat): Bucket {
 
 // Metadados de cada seção: título + ícone chip + cores semânticas (verde/âmbar/azul).
 const SECOES: { chave: Bucket; titulo: string; dot: string; chipBg: string }[] = [
-  { chave: 'disponiveis', titulo: 'Disponíveis', dot: '#1FA868', chipBg: 'rgba(31,168,104,.14)' },
-  { chave: 'agendados', titulo: 'Agendados', dot: '#D99A1E', chipBg: 'rgba(217,154,30,.16)' },
-  { chave: 'refazer', titulo: 'Refazer / Já concluídos', dot: '#2F7DF6', chipBg: 'rgba(47,125,246,.14)' },
+  { chave: 'disponiveis', titulo: 'Disponíveis', dot: 'var(--pn-1fa868,#1FA868)', chipBg: 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 14%,transparent)' },
+  { chave: 'agendados', titulo: 'Agendados', dot: 'var(--pn-d99a1e,#D99A1E)', chipBg: 'color-mix(in srgb,var(--pn-d99a1e,#D99A1E) 16%,transparent)' },
+  { chave: 'refazer', titulo: 'Refazer / Já concluídos', dot: 'var(--pn-2f7df6,#2F7DF6)', chipBg: 'color-mix(in srgb,var(--pn-2f7df6,#2F7DF6) 14%,transparent)' },
 ]
 
 // Capa do card por marca — reusa a arte das "Realizados" (NÃO recriar). Imagem NORMAL = vis.capa.
@@ -112,10 +112,10 @@ function CardSimPoster({ brand, item }: { brand: Brand; item: ItemSimuladoCat })
       <div style={{ position: 'relative', height: 120, overflow: 'hidden' }}>
         <Capa brand={brand} item={item} />
         {item.novo && (
-          <span style={{ position: 'absolute', left: 12, top: 12, height: 22, padding: '0 9px', borderRadius: 99, background: cm('#E5484D'), color: cm('#FFF'), fontSize: 10, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center' }}>Novo</span>
+          <span style={{ position: 'absolute', left: 12, top: 12, height: 22, padding: '0 9px', borderRadius: 99, background: cm('var(--pn-e5484d,#E5484D)'), color: cm('#FFF'), fontSize: 10, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center' }}>Novo</span>
         )}
         {item.emAndamento && (
-          <span style={{ position: 'absolute', right: 12, top: 12, height: 22, padding: '0 9px', borderRadius: 99, background: cm('#F1C232'), color: cm('#2A1A55'), fontSize: 10, fontWeight: 800, letterSpacing: '.03em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center' }}>Em andamento</span>
+          <span style={{ position: 'absolute', right: 12, top: 12, height: 22, padding: '0 9px', borderRadius: 99, background: cm('var(--pn-f1c232,#F1C232)'), color: cm('var(--pn-2a1a55,#2A1A55)'), fontSize: 10, fontWeight: 800, letterSpacing: '.03em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center' }}>Em andamento</span>
         )}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 16px 16px', flex: 1 }}>
@@ -171,10 +171,10 @@ function CardSim({ brand, item }: { brand: Brand; item: ItemSimuladoCat }) {
       <div style={{ position: 'relative', width: (brand === 'vnd' || brand === 'mac') ? 150 : '36%', maxWidth: (brand === 'vnd' || brand === 'mac') ? 150 : 160, flexShrink: 0, overflow: 'hidden' }}>
         <Capa brand={brand} item={item} />
         {item.novo && (
-          <span style={{ position: 'absolute', left: 10, top: 10, height: 22, padding: '0 9px', borderRadius: 99, background: cm('#E5484D'), color: cm('#FFF'), fontSize: 10, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center' }}>Novo</span>
+          <span style={{ position: 'absolute', left: 10, top: 10, height: 22, padding: '0 9px', borderRadius: 99, background: cm('var(--pn-e5484d,#E5484D)'), color: cm('#FFF'), fontSize: 10, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase', display: 'inline-flex', alignItems: 'center' }}>Novo</span>
         )}
         {item.emAndamento && (
-          <span style={{ position: 'absolute', left: 8, bottom: 8, maxWidth: 'calc(100% - 16px)', height: 20, padding: '0 8px', borderRadius: 99, background: cm('#F1C232'), color: cm('#2A1A55'), fontSize: 9.5, fontWeight: 800, letterSpacing: '.02em', textTransform: 'uppercase', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center' }}>Em andamento</span>
+          <span style={{ position: 'absolute', left: 8, bottom: 8, maxWidth: 'calc(100% - 16px)', height: 20, padding: '0 8px', borderRadius: 99, background: cm('var(--pn-f1c232,#F1C232)'), color: cm('var(--pn-2a1a55,#2A1A55)'), fontSize: 9.5, fontWeight: 800, letterSpacing: '.02em', textTransform: 'uppercase', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center' }}>Em andamento</span>
         )}
       </div>
       {(brand === 'vnd' || brand === 'mac') && <span aria-hidden className="ip-perf" />}
@@ -220,8 +220,8 @@ function CardAndamento({ brand, item, prog }: { brand: Brand; item: ItemSimulado
     <div className={(brand === 'vnd' || brand === 'mac') ? 'ip-card ip-vnd' : 'ip-card'} style={{ display: 'flex', background: 'var(--surface)', ...((brand === 'vnd' || brand === 'mac') ? {} : { border: '1px solid var(--line)' }), borderRadius: 'var(--r)', overflow: 'hidden', minHeight: (brand === 'vnd' || brand === 'mac') ? 150 : 112 }}>
       <div style={{ position: 'relative', width: (brand === 'vnd' || brand === 'mac') ? 150 : '36%', maxWidth: (brand === 'vnd' || brand === 'mac') ? 150 : 160, flexShrink: 0, overflow: 'hidden' }}>
         <Capa brand={brand} item={item} />
-        <span style={{ position: 'absolute', left: 8, top: 8, maxWidth: 'calc(100% - 16px)', height: 20, padding: '0 8px', borderRadius: 99, background: cm('#F1C232'), color: cm('#2A1A55'), fontSize: 9.5, fontWeight: 800, letterSpacing: '.02em', textTransform: 'uppercase', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-          <span style={{ width: 5, height: 5, borderRadius: '50%', background: cm('#2A1A55'), flexShrink: 0 }} />Em andamento
+        <span style={{ position: 'absolute', left: 8, top: 8, maxWidth: 'calc(100% - 16px)', height: 20, padding: '0 8px', borderRadius: 99, background: cm('var(--pn-f1c232,#F1C232)'), color: cm('var(--pn-2a1a55,#2A1A55)'), fontSize: 9.5, fontWeight: 800, letterSpacing: '.02em', textTransform: 'uppercase', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width: 5, height: 5, borderRadius: '50%', background: cm('var(--pn-2a1a55,#2A1A55)'), flexShrink: 0 }} />Em andamento
         </span>
       </div>
       {(brand === 'vnd' || brand === 'mac') && <span aria-hidden className="ip-perf" />}
@@ -258,13 +258,13 @@ function CardFeito({ brand, item, nota }: { brand: Brand; item: ItemSimuladoCat;
       {(brand === 'vnd' || brand === 'mac') && <span aria-hidden className="ip-perf" />}
       <div style={{ flex: 1, minWidth: 0, padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 6 }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 700, color: cm('#1FA868') }}><CircleCheck size={13} />Concluído</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 700, color: cm('var(--pn-1fa868,#1FA868)') }}><CircleCheck size={13} />Concluído</span>
           {nota?.data ? <span style={{ fontSize: 11.5, color: 'var(--muted)' }}>{nota.data}</span> : null}
         </div>
         <span style={{ fontSize: 14.5, lineHeight: 1.3, color: 'var(--ink)', fontWeight: 700, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{item.titulo}</span>
         <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
           {n != null
-            ? <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 3, height: 28, padding: '0 11px', borderRadius: 9, background: cm('#1FA86822'), color: cm('#1FA868'), fontSize: 14, fontWeight: 800 }}>{n.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}<span style={{ fontSize: 10, fontWeight: 700, opacity: .8 }}>nota</span></span>
+            ? <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 3, height: 28, padding: '0 11px', borderRadius: 9, background: cm('#1FA86822'), color: cm('var(--pn-1fa868,#1FA868)'), fontSize: 14, fontWeight: 800 }}>{n.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}<span style={{ fontSize: 10, fontWeight: 700, opacity: .8 }}>nota</span></span>
             : <span style={{ display: 'inline-flex', alignItems: 'center', height: 28, padding: '0 10px', borderRadius: 9, background: 'var(--surface2)', color: 'var(--muted)', fontSize: 11.5, fontWeight: 700 }}>Nota em breve</span>}
         </div>
       </div>
@@ -308,7 +308,7 @@ const CSS = `
 /* Ticket VND dentro das pastas: contorno via ::after (z-2, acima da capa p/ o dourado do hover nos 2
    lados; abaixo do picote z-3) + picote = dots pequenos + furos (meia-lua) no corte capa/corpo (x=150). */
 .ip-vnd::after{content:'';position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 1px var(--line);pointer-events:none;z-index:2;transition:box-shadow .3s}
-.ip-vnd:hover::after{box-shadow:inset 0 0 0 1px var(--hoverLine,rgba(232,200,119,.7))}
+.ip-vnd:hover::after{box-shadow:inset 0 0 0 1px var(--hoverLine,color-mix(in srgb,var(--pn-e8c877,#E8C877) 70%,transparent))}
 .ip-perf{position:absolute;left:150px;top:6px;bottom:6px;width:6px;transform:translateX(-50%);pointer-events:none;z-index:3;background-image:radial-gradient(circle at center,var(--bg) 1.7px,transparent 2.1px);background-size:6px 9px;background-position:center;background-repeat:repeat-y}
 .ip-perf::before,.ip-perf::after{content:'';position:absolute;left:50%;width:17px;height:17px;border-radius:50%;background:var(--bg)}
 .ip-perf::before{top:-6px;transform:translate(-50%,-50%)}
@@ -402,7 +402,7 @@ export function PlatformPasta({ brand, theme, pastaInfo, subpastas, breadcrumb, 
             {emAndamento.length > 0 ? (
               <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ width: 28, height: 28, borderRadius: 9, background: cm('rgba(217,154,30,.16)'), color: cm('#D99A1E'), display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Clock size={15} /></span>
+                  <span style={{ width: 28, height: 28, borderRadius: 9, background: cm('color-mix(in srgb,var(--pn-d99a1e,#D99A1E) 16%,transparent)'), color: cm('var(--pn-d99a1e,#D99A1E)'), display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Clock size={15} /></span>
                   <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--ink)' }}>Em andamento</h2>
                   <span style={{ fontSize: 12.5, fontWeight: 800, padding: '2px 9px', borderRadius: 99, background: 'var(--chip)', color: 'var(--brand)' }}>{emAndamento.length.toLocaleString('pt-BR')}</span>
                 </div>
@@ -436,7 +436,7 @@ export function PlatformPasta({ brand, theme, pastaInfo, subpastas, breadcrumb, 
             {feitos.length > 0 ? (
               <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ width: 28, height: 28, borderRadius: 9, background: cm('rgba(31,168,104,.14)'), color: cm('#1FA868'), display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><CircleCheck size={15} /></span>
+                  <span style={{ width: 28, height: 28, borderRadius: 9, background: cm('color-mix(in srgb,var(--pn-1fa868,#1FA868) 14%,transparent)'), color: cm('var(--pn-1fa868,#1FA868)'), display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><CircleCheck size={15} /></span>
                   <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--ink)' }}>Já feitos</h2>
                   <span style={{ fontSize: 12.5, fontWeight: 800, padding: '2px 9px', borderRadius: 99, background: 'var(--chip)', color: 'var(--brand)' }}>{feitos.length.toLocaleString('pt-BR')}</span>
                 </div>

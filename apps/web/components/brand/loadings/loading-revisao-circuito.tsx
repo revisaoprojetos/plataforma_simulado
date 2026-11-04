@@ -23,10 +23,10 @@ const R_FULL = 'M6 5.5H32C43.5 5.5 49 13 49 23C49 31 45 37 39.5 40.5L62 61H6Z M9
 const R_OUT = 'M6 5.5H32C43.5 5.5 49 13 49 23C49 31 45 37 39.5 40.5L62 61H6Z'
 
 const BG: Record<RevisaoCircTheme, string> = {
-  claro: 'linear-gradient(155deg,#2E1F7A 0%,#4A31B8 50%,#7356E6 100%)',
-  escuro: 'linear-gradient(155deg,#0B0720 0%,#140C38 50%,#1F1352 100%)',
+  claro: 'linear-gradient(155deg,var(--pn-2e1f7a,#2E1F7A) 0%,var(--pn-4a31b8,#4A31B8) 50%,var(--pn-7356e6,#7356E6) 100%)',
+  escuro: 'linear-gradient(155deg,var(--pn-0b0720,#0B0720) 0%,var(--pn-140c38,#140C38) 50%,var(--pn-1f1352,#1F1352) 100%)',
 }
-const FOOT: Record<RevisaoCircTheme, string> = { claro: '#D4C9FA', escuro: '#8E82BF' }
+const FOOT: Record<RevisaoCircTheme, string> = { claro: 'var(--pn-d4c9fa,#D4C9FA)', escuro: 'var(--pn-8e82bf,#8E82BF)' }
 const GRID_A: Record<RevisaoCircTheme, string> = { claro: '.07', escuro: '.05' }
 const OL_OP: Record<RevisaoCircTheme, number> = { claro: 0.28, escuro: 0.32 }
 
@@ -49,9 +49,9 @@ export function LoadingRevisaoCircuito({
       {/* Circuito de fundo: R gigante — contorno desenha + 3 pulsos pêssego viajam. */}
       <svg className="rlc-circ" viewBox="5.4 4.9 57.2 56.7" aria-hidden="true">
         <path className="rlc-ol" pathLength={1000} fill="none" stroke="#FFFFFF" strokeOpacity={OL_OP[theme]} strokeWidth={0.0458} d={R_FULL} />
-        <path className="rlc-pl rlc-pl1" pathLength={1000} fill="none" stroke="#FFC4A3" strokeWidth={0.0839} strokeLinecap="round" d={R_OUT} />
-        <path className="rlc-pl rlc-pl2" pathLength={1000} fill="none" stroke="#FFC4A3" strokeWidth={0.0839} strokeLinecap="round" d={R_OUT} />
-        <path className="rlc-pl rlc-pl3" pathLength={1000} fill="none" stroke="#FFC4A3" strokeWidth={0.0839} strokeLinecap="round" d={R_OUT} />
+        <path className="rlc-pl rlc-pl1" pathLength={1000} fill="none" stroke="var(--pn-ffc4a3,#FFC4A3)" strokeWidth={0.0839} strokeLinecap="round" d={R_OUT} />
+        <path className="rlc-pl rlc-pl2" pathLength={1000} fill="none" stroke="var(--pn-ffc4a3,#FFC4A3)" strokeWidth={0.0839} strokeLinecap="round" d={R_OUT} />
+        <path className="rlc-pl rlc-pl3" pathLength={1000} fill="none" stroke="var(--pn-ffc4a3,#FFC4A3)" strokeWidth={0.0839} strokeLinecap="round" d={R_OUT} />
       </svg>
 
       {/* Camadas de efeitos (compartilhadas): brilhos de pixel (quadrados) + formas flutuantes (efeitos). */}
@@ -60,11 +60,11 @@ export function LoadingRevisaoCircuito({
       <main role="status" aria-live="polite" className="rlc-main">
         <div className="rlc-mark">
           <svg className="rlc-mfill" viewBox="5.4 4.9 57.2 56.7" aria-hidden="true">
-            <defs><linearGradient id="rlcG" x1="0" y1="0" x2="1" y2="1"><stop offset="0.1" stopColor="#FFFFFF" /><stop offset="0.9" stopColor="#D9CFFF" /></linearGradient></defs>
+            <defs><linearGradient id="rlcG" x1="0" y1="0" x2="1" y2="1"><stop offset="0.1" stopColor="#FFFFFF" /><stop offset="0.9" stopColor="var(--pn-d9cfff,#D9CFFF)" /></linearGradient></defs>
             <path fill="url(#rlcG)" fillRule="evenodd" d={R_FULL} />
           </svg>
           <svg className="rlc-mdraw" viewBox="5.4 4.9 57.2 56.7" aria-hidden="true"><path pathLength={1000} fill="none" stroke="#FFFFFF" strokeWidth={0.3661} strokeLinejoin="round" d={R_FULL} /></svg>
-          <svg className="rlc-mrunbox" viewBox="3.112 2.612 61.776 61.276" aria-hidden="true"><path className="rlc-mrun" pathLength={1000} fill="none" stroke="#FFC4A3" strokeWidth={0.5949} strokeLinecap="round" d={R_OUT} /></svg>
+          <svg className="rlc-mrunbox" viewBox="3.112 2.612 61.776 61.276" aria-hidden="true"><path className="rlc-mrun" pathLength={1000} fill="none" stroke="var(--pn-ffc4a3,#FFC4A3)" strokeWidth={0.5949} strokeLinecap="round" d={R_OUT} /></svg>
         </div>
 
         <div className="rlc-wmk">
@@ -100,9 +100,9 @@ function css(theme: RevisaoCircTheme) {
 .rlc-mrun{opacity:0;stroke-dasharray:70 930;animation:rlcFade .4s ease-out 2.4s forwards,rlcPulse 3.2s linear 2.4s infinite}
 .rlc-wmk{display:flex;flex-direction:column;align-items:center;gap:14px;animation:rlcRise .9s cubic-bezier(.2,.8,.2,1) 1.9s both}
 .rlc-wmk-nome{font-weight:800;font-size:64px;line-height:.8;letter-spacing:.01em;padding-top:.1em}
-.rlc-sub{font-weight:500;font-size:21.8px;letter-spacing:.3em;padding-left:.3em;color:#E1D9FF;animation:rlcSubIn 1s cubic-bezier(.2,.8,.2,1) 2.2s both}
+.rlc-sub{font-weight:500;font-size:21.8px;letter-spacing:.3em;padding-left:.3em;color:var(--pn-e1d9ff,#E1D9FF);animation:rlcSubIn 1s cubic-bezier(.2,.8,.2,1) 2.2s both}
 .rlc-prog{position:relative;width:340px;height:5px;border-radius:999px;overflow:hidden;background:rgba(255,255,255,.16);animation:rlcFade .8s ease-out 2.3s both}
-.rlc-runner{position:absolute;top:0;left:0;height:100%;width:34%;border-radius:999px;background:linear-gradient(90deg,rgba(255,255,255,0),#FFFFFF 55%,#FFC4A3);transform:translateX(-110%);animation:rlcRun 1.6s cubic-bezier(.45,0,.55,1) 2.6s infinite}
+.rlc-runner{position:absolute;top:0;left:0;height:100%;width:34%;border-radius:999px;background:linear-gradient(90deg,rgba(255,255,255,0),#FFFFFF 55%,var(--pn-ffc4a3,#FFC4A3));transform:translateX(-110%);animation:rlcRun 1.6s cubic-bezier(.45,0,.55,1) 2.6s infinite}
 .rlc-msg{margin:0;font-size:13px;font-weight:500;animation:rlcFade .4s ease-out 3s both}
 .rlc-foot{position:absolute;bottom:26px;font-size:12px;animation:rlcFade 1s ease-out .4s both}
 @keyframes rlcFade{from{opacity:0}to{opacity:1}}

@@ -21,7 +21,7 @@ export function VisualPersonalizadoPicker({ cor, icone, onChange, titulo = 'Apar
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
         {/* Prévia da capa (mesmo desenho do card da lista) */}
         <div className="relative aspect-[4/5] w-24 shrink-0 overflow-hidden rounded-xl border shadow-sm ring-1 ring-black/5">
-          <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />
+          <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, var(--pn-0f172a,#0f172a) 135%)` }} />
           <Icone className="absolute -right-3 -top-3 h-20 w-20 text-white/10" />
           <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 opacity-50" style={{ background: `linear-gradient(to top, ${cor}, transparent)` }} />
           <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-transparent" />

@@ -84,7 +84,7 @@ export function NovidadesCard({ novidades }: { novidades: NovidadeComLeitura[] }
           {/* Destaque */}
           {destaque ? (
             <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
-              <div style={{ position: 'relative', width: 148, height: 118, flexShrink: 0, borderRadius: 14, overflow: 'hidden', background: destaque.cover_url ? undefined : 'linear-gradient(135deg,#241047,#5B2A9E)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div style={{ position: 'relative', width: 148, height: 118, flexShrink: 0, borderRadius: 14, overflow: 'hidden', background: destaque.cover_url ? undefined : 'linear-gradient(135deg,var(--pn-241047,#241047),var(--pn-5b2a9e,#5B2A9E))', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 {destaque.cover_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src={destaque.cover_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />

@@ -89,7 +89,7 @@ function InfoChips({ d }: { d: ResultadoInternoData }) {
   return (
     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
       {chips.map(([icon, t], i) => (
-        <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 11px', borderRadius: 99, background: 'rgba(255,255,255,.12)', color: '#E1D9FF', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>{icon}{t}</span>
+        <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 28, padding: '0 11px', borderRadius: 99, background: 'rgba(255,255,255,.12)', color: 'var(--pn-e1d9ff,#E1D9FF)', fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap' }}>{icon}{t}</span>
       ))}
     </div>
   )
@@ -100,11 +100,11 @@ function Header({ d, mobile }: { d: ResultadoInternoData; mobile: boolean }) {
   const pos = d.melhor.posicao !== null ? posFmt(d.melhor.posicao) : null
   const part = d.melhor.participantes
   return (
-    <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 22, padding: mobile ? 20 : 'clamp(20px,3vw,26px) clamp(20px,4vw,30px)', background: 'linear-gradient(130deg,#24166A,#4B30BE 55%,#6449E0)', color: '#FFFFFF' }}>
+    <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 22, padding: mobile ? 20 : 'clamp(20px,3vw,26px) clamp(20px,4vw,30px)', background: 'linear-gradient(130deg,var(--pn-24166a,#24166A),var(--pn-4b30be,#4B30BE) 55%,var(--pn-6449e0,#6449E0))', color: '#FFFFFF' }}>
       <span aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: 'linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px)', backgroundSize: '40px 40px' }} />
       <div style={{ position: 'relative', display: 'flex', flexDirection: mobile ? 'column' : 'row', alignItems: mobile ? 'stretch' : 'flex-end', justifyContent: 'space-between', gap: mobile ? 18 : 24, flexWrap: 'wrap' }}>
         <div style={{ minWidth: 0 }}>
-          <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: '#F1C232' }}>RESULTADO</span>
+          <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: 'var(--pn-f1c232,#F1C232)' }}>RESULTADO</span>
           <h1 style={{ margin: '6px 0 12px', fontSize: mobile ? 22 : 'clamp(22px,3vw,30px)', fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.15 }}>{d.titulo}</h1>
           <InfoChips d={d} />
         </div>
@@ -112,11 +112,11 @@ function Header({ d, mobile }: { d: ResultadoInternoData; mobile: boolean }) {
           <div style={{ textAlign: mobile ? 'left' : 'right' }}>
             {notaTxt ? (
               <>
-                <b style={{ display: 'block', fontSize: mobile ? 44 : 'clamp(44px,6vw,56px)', fontWeight: 800, letterSpacing: '-0.05em', lineHeight: 1, color: '#F1C232' }}>{notaTxt}</b>
-                <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.18em', color: '#CFC4FF' }}>MELHOR NOTA{pos ? ` · ${pos}${part ? ` DE ${part.toLocaleString('pt-BR')}` : ''}` : ''}</span>
+                <b style={{ display: 'block', fontSize: mobile ? 44 : 'clamp(44px,6vw,56px)', fontWeight: 800, letterSpacing: '-0.05em', lineHeight: 1, color: 'var(--pn-f1c232,#F1C232)' }}>{notaTxt}</b>
+                <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.18em', color: 'var(--pn-cfc4ff,#CFC4FF)' }}>MELHOR NOTA{pos ? ` · ${pos}${part ? ` DE ${part.toLocaleString('pt-BR')}` : ''}` : ''}</span>
               </>
             ) : (
-              <span style={{ display: 'inline-flex', alignItems: 'center', height: 44, padding: '0 14px', borderRadius: 12, background: 'rgba(255,255,255,.12)', fontSize: 14, fontWeight: 700, color: '#E1D9FF' }}>Aguardando liberação</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', height: 44, padding: '0 14px', borderRadius: 12, background: 'rgba(255,255,255,.12)', fontSize: 14, fontWeight: 700, color: 'var(--pn-e1d9ff,#E1D9FF)' }}>Aguardando liberação</span>
             )}
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
@@ -124,7 +124,7 @@ function Header({ d, mobile }: { d: ResultadoInternoData; mobile: boolean }) {
               <a href={d.cadernoHref} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, height: 42, padding: '0 14px', borderRadius: 12, border: '1px solid rgba(255,255,255,.3)', color: '#FFFFFF', fontSize: 13, fontWeight: 700, textDecoration: 'none' }}><BookOpen size={14} />Caderno</a>
             ) : null}
             {d.refazerHref ? (
-              <a href={d.refazerHref} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 42, padding: '0 16px', borderRadius: 12, background: '#F1C232', color: '#2A1A55', fontSize: 13.5, fontWeight: 800, whiteSpace: 'nowrap', textDecoration: 'none' }}><RefreshCw size={14} />Refazer simulado</a>
+              <a href={d.refazerHref} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 42, padding: '0 16px', borderRadius: 12, background: 'var(--pn-f1c232,#F1C232)', color: 'var(--pn-2a1a55,#2A1A55)', fontSize: 13.5, fontWeight: 800, whiteSpace: 'nowrap', textDecoration: 'none' }}><RefreshCw size={14} />Refazer simulado</a>
             ) : null}
           </div>
         </div>
@@ -198,7 +198,7 @@ function TabQuest({ d, mobile, qf, setFilter, pg, setPg, openMap, toggleOpen, se
           {d.assuntosMaisErrados.slice(0, 4).map((a, i) => (
             <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 8, padding: '6px 0', fontSize: 12, color: 'var(--muted)' }}>
               <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.assunto}</span>
-              <b style={{ color: '#E5484D' }}>{a.erros}</b>
+              <b style={{ color: 'var(--pn-e5484d,#E5484D)' }}>{a.erros}</b>
             </div>
           ))}
         </div>

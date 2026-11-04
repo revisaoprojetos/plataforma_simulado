@@ -3,6 +3,7 @@ import { after } from 'next/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { carregarDocParaLeitura, registrarLeituraAluno } from '@/lib/conteudo/leitor'
 import { LeitorBiblioteca } from '@/components/aluno/leitor-biblioteca'
+import { paginaInicialDoDocumento } from '@/lib/conteudo/capa-pagina-server'
 import { MidiaPlayer } from '@/components/aluno/midia-player'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -77,15 +78,48 @@ export default async function LeituraConteudoPage({ params, searchParams }: { pa
   const doc = await carregarDocParaLeitura(id, sessao.estudanteId)
   if (!doc) notFound()
 
+  // PÁGINA INICIAL (Biblioteca): a do documento ou da pasta em lote. As páginas anteriores nem entram na leitura (não contam).
+  // Um link com ?pagina= (ex.: grifo) abaixo da inicial abre na inicial — a página anterior não existe na leitura.
+  const paginaMinima = doc.kind === 'pdf' ? await paginaInicialDoDocumento(id) : 1
+  const paginaAbrir = Math.max(paginaMinima, paginaInicial)
+
   // Progresso de leitura (histórico + snapshot de cursos) NÃO precisa concluir para a página renderizar:
   // roda APÓS a resposta (`after`), tirando o upsert + o write-behind do caminho crítico da abertura.
   const estudanteId = sessao.estudanteId
-  const versaoId = doc.kind === 'midia' ? doc.midia.versaoId : doc.pdf.versaoId
+  const versaoId = doc.kind === 'midia' ? doc.midia.versaoId : doc.kind === 'texto' ? doc.texto.versaoId : doc.pdf.versaoId
   after(() => registrarLeituraAluno(id, estudanteId, versaoId).catch(() => {}))
 
   // MÍDIA (vídeo/áudio): player nativo.
   if (doc.kind === 'midia') {
     return <MidiaPlayer titulo={doc.midia.titulo} url={doc.midia.url} kind={doc.midia.kind} voltarHref={voltarHref} />
+  }
+
+  // DOCUMENTO LEGPROC (marca no admin): leitor do Juris em modo TEXTO, com os entendimentos STF/STJ
+  // recolhíveis (mesma lib da Lei Seca). Grifos por texto (âncora = trecho + offsets), mapeados aqui no servidor.
+  if (doc.kind === 'texto') {
+    const t = doc.texto
+    const grifosTexto = t.anotacoes
+      .filter((a) => a.estado !== 'orfa')
+      .map((a) => ({
+        id: a.id, pid: a.trecho_uid, s: a.inicio_offset, e: a.fim_offset,
+        t: String(a.conteudo?.tool || (a.tipo === 'riscado' ? 'st' : 'hl')), c: String(a.conteudo?.cor || 'y'), note: String(a.conteudo?.nota || ''),
+        sec: 't1', text: a.texto_ancora,
+      }))
+    return (
+      <LeitorBiblioteca
+        documentoId={t.documentoId}
+        versaoId={t.versaoId}
+        titulo={t.titulo}
+        pdfUrl={null}
+        texto={{ html: t.html, grifos: grifosTexto, ocultarLegendaTabela: t.ocultarLegendaTabela }}
+        grifos={[]}
+        voltarHref={voltarHref}
+        metaCrono={metaAtual}
+        tempoBase={tempoBase}
+        tempoDeterminadoSeg={tempoDeterminadoSeg}
+        mostrarLegenda={t.mostrarLegenda}
+      />
+    )
   }
 
   // Leitor do Juris (real) + conteúdo = PDF fiel; grifos salvos no perfil do aluno.
@@ -98,7 +132,8 @@ export default async function LeituraConteudoPage({ params, searchParams }: { pa
       pdfUrl={leitura.pdfUrl}
       grifos={leitura.grifos}
       voltarHref={voltarHref}
-      paginaInicial={paginaInicial}
+      paginaInicial={paginaAbrir}
+      paginaMinima={paginaMinima}
       partesCrono={partesCrono}
       metaCrono={metaAtual}
       tempoBase={tempoBase}

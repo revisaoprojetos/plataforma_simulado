@@ -13,12 +13,12 @@ export type ConquistaUp = { icon: React.ReactNode; title: string; desc: string }
 
 // Paleta ESCURA própria (independe do tema claro/escuro).
 const A = 'var(--brand-primary, var(--primary))'
-const ACC = 'var(--brand-accent, #f59e0b)'
+const ACC = 'var(--brand-accent, var(--pn-f59e0b,#f59e0b))'
 const mix = (p: number, c: string) => `color-mix(in oklab, ${A} ${p}%, ${c})`
 const amix = (p: number, c: string) => `color-mix(in oklab, ${ACC} ${p}%, ${c})`
 const L1 = mix(28, 'white'), L2 = mix(52, 'white'), L3 = mix(72, 'white')
 const D2 = mix(60, '#0a0a14'), D3 = mix(38, '#0a0a14'), D4 = mix(22, '#0a0a14')
-const FG = '#f3f2fb', MUT = '#a7a6bd', SURF = 'rgba(255,255,255,0.045)', DIV = 'rgba(255,255,255,0.10)', TRACK = 'rgba(255,255,255,0.10)'
+const FG = 'var(--pn-f3f2fb,#f3f2fb)', MUT = 'var(--pn-a7a6bd,#a7a6bd)', SURF = 'rgba(255,255,255,0.045)', DIV = 'rgba(255,255,255,0.10)', TRACK = 'rgba(255,255,255,0.10)'
 const R = 90, CIRC = 2 * Math.PI * R
 // Paleta variada p/ os ícones de pontuação (fallback quando o ganho não traz cor própria).
 const PALETA = ['#38bdf8', '#34d399', '#fbbf24', '#fb923c', '#a78bfa', '#22d3ee', '#f472b6', '#f87171']
@@ -75,7 +75,7 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
   for (let l = from; l <= to; l++) steps.push({ n: l, passou: st.level >= l })
 
   return createPortal(
-    <div className="fixed inset-0 z-[200] flex overflow-hidden" style={{ background: 'radial-gradient(circle at 50% 34%, #1a1730 0%, #0b0912 62%)', color: FG, animation: saindo ? 'lu-out .38s cubic-bezier(.4,0,.2,1) forwards' : 'lu-in .3s ease both' }}>
+    <div className="fixed inset-0 z-[200] flex overflow-hidden" style={{ background: 'radial-gradient(circle at 50% 34%, var(--pn-1a1730,#1a1730) 0%, var(--pn-0b0912,#0b0912) 62%)', color: FG, animation: saindo ? 'lu-out .38s cubic-bezier(.4,0,.2,1) forwards' : 'lu-in .3s ease both' }}>
       {/* Botão "Continuar" FIXO no canto superior direito: em iframe curto (Curseduca) o conteúdo é
           centralizado e cortado em cima/embaixo — pinado ao canto do overlay ele fica SEMPRE visível
           e clicável. Aparece assim que a animação termina (done). */}
@@ -169,7 +169,7 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
 
         {/* Contador de XP */}
         <div className={`flex items-center gap-2 font-black ${done ? 'text-[19px]' : 'min-h-[30px] text-[24px]'}`} style={{ color: '#fff' }}>
-          <Zap className={done ? 'h-4 w-4' : 'h-5 w-5'} style={{ color: '#fbbf24' }} />+{st.xpShown.toLocaleString('pt-BR')} XP
+          <Zap className={done ? 'h-4 w-4' : 'h-5 w-5'} style={{ color: 'var(--pn-fbbf24,#fbbf24)' }} />+{st.xpShown.toLocaleString('pt-BR')} XP
         </div>
 
         {done && (
@@ -231,9 +231,9 @@ export function LevelUpModal({ from, to, curva, gains, unlocked, xpGanho, totalX
             )}
 
             <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 text-[11.5px]" style={{ color: MUT, animation: 'lu-rise .6s ease 1.7s both' }}>
-              <span className="inline-flex items-center gap-1.5"><Zap className="h-3.5 w-3.5" style={{ color: '#fbbf24' }} />{totalXp.toLocaleString('pt-BR')} XP acumulado</span>
-              <span className="inline-flex items-center gap-1.5"><Trophy className="h-3.5 w-3.5" style={{ color: '#f59e0b' }} />{badgesLabel} conquistas</span>
-              <span className="inline-flex items-center gap-1.5"><Flame className="h-3.5 w-3.5" style={{ color: '#fb923c' }} />{streak} dias</span>
+              <span className="inline-flex items-center gap-1.5"><Zap className="h-3.5 w-3.5" style={{ color: 'var(--pn-fbbf24,#fbbf24)' }} />{totalXp.toLocaleString('pt-BR')} XP acumulado</span>
+              <span className="inline-flex items-center gap-1.5"><Trophy className="h-3.5 w-3.5" style={{ color: 'var(--pn-f59e0b,#f59e0b)' }} />{badgesLabel} conquistas</span>
+              <span className="inline-flex items-center gap-1.5"><Flame className="h-3.5 w-3.5" style={{ color: 'var(--pn-fb923c,#fb923c)' }} />{streak} dias</span>
             </div>
 
           </div>

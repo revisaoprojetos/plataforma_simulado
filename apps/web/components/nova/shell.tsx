@@ -78,7 +78,7 @@ export function NovaShell({
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)', color: 'var(--ink)' }}>
       {/* backdrop do drawer (mobile) */}
-      {mobileOpen && <div onClick={() => setMobileOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 55, background: 'rgba(10,5,40,.5)', backdropFilter: 'blur(2px)' }} />}
+      {mobileOpen && <div onClick={() => setMobileOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 55, background: 'color-mix(in srgb,var(--pn-0a0528,#0A0528) 50%,transparent)', backdropFilter: 'blur(2px)' }} />}
 
       {/* ───────── Menu lateral ───────── */}
       <aside className={`np-sidebar${mobileOpen ? ' np-open' : ''}`} style={{ width: W, flexShrink: 0, background: 'var(--sidebar)', color: '#FFFFFF', display: 'flex', flexDirection: 'column', position: 'sticky', top: 0, height: '100vh', transition: 'width .18s ease' }}>
@@ -99,7 +99,7 @@ export function NovaShell({
               <Link key={item.key} href={item.href} title={item.label} style={{
                 display: 'flex', alignItems: 'center', gap: 11, minHeight: 42, padding: recolhido ? '8px 0' : '8px 12px', justifyContent: recolhido ? 'center' : 'flex-start',
                 borderRadius: 12, fontSize: 13.5, lineHeight: 1.25, textDecoration: 'none',
-                fontWeight: on ? 800 : 600, background: on ? 'var(--gold)' : 'transparent', color: on ? 'var(--goldInk)' : '#E6DEFF',
+                fontWeight: on ? 800 : 600, background: on ? 'var(--gold)' : 'transparent', color: on ? 'var(--goldInk)' : 'var(--pn-e6deff,#E6DEFF)',
               }}>
                 <Icon n={item.icon} size={18} />
                 {!recolhido && <span style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
@@ -118,10 +118,10 @@ export function NovaShell({
               : <span style={{ width: 36, height: 36, borderRadius: '50%', background: 'var(--gold)', color: 'var(--goldInk)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 13, flexShrink: 0 }}>{user.iniciais}</span>}
             {!recolhido && <span style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
               <b style={{ fontSize: 13, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.nome}</b>
-              <span style={{ fontSize: 11, color: '#CFC4FF' }}>Nível {user.nivel} · {user.xp.toLocaleString('pt-BR')} XP</span>
+              <span style={{ fontSize: 11, color: 'var(--pn-cfc4ff,#CFC4FF)' }}>Nível {user.nivel} · {user.xp.toLocaleString('pt-BR')} XP</span>
             </span>}
           </Link>
-          <a href="/aluno/sair" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: recolhido ? '8px 0' : '8px 12px', justifyContent: recolhido ? 'center' : 'flex-start', borderRadius: 12, color: '#E6DEFF', fontSize: 13, textDecoration: 'none' }}>
+          <a href="/aluno/sair" style={{ display: 'flex', alignItems: 'center', gap: 10, padding: recolhido ? '8px 0' : '8px 12px', justifyContent: recolhido ? 'center' : 'flex-start', borderRadius: 12, color: 'var(--pn-e6deff,#E6DEFF)', fontSize: 13, textDecoration: 'none' }}>
             <Icon n="x" size={16} />{!recolhido && 'Sair'}
           </a>
         </div>
@@ -142,10 +142,10 @@ export function NovaShell({
 
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
             <span className="np-hide-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 38, padding: '0 13px', borderRadius: 12, background: 'var(--surface)', border: '1px solid var(--line)', color: 'var(--ink)', fontSize: 13, fontWeight: 800, whiteSpace: 'nowrap' }}>
-              <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#E0A800' }} />Foco: {foco ?? 'definir'}
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--pn-e0a800,#E0A800)' }} />Foco: {foco ?? 'definir'}
             </span>
             <span className="np-hide-sm" title="Sequência de dias" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 38, padding: '0 11px', borderRadius: 12, background: 'var(--surface)', border: '1px solid var(--line)', color: 'var(--ink)', fontSize: 13, fontWeight: 800 }}>
-              <Icon n="flame" size={15} style={{ color: '#E0820A' }} />{user.streak}
+              <Icon n="flame" size={15} style={{ color: 'var(--pn-e0820a,#E0820A)' }} />{user.streak}
             </span>
             <span className="np-hide-sm" title="XP" style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 38, padding: '0 11px', borderRadius: 12, background: 'var(--surface)', border: '1px solid var(--line)', color: 'var(--ink)', fontSize: 13, fontWeight: 800 }}>
               <Icon n="bolt" size={15} style={{ color: 'var(--brand)' }} />{user.xp.toLocaleString('pt-BR')}
@@ -198,8 +198,8 @@ function BuscaOverlay({ onClose, onGo }: { onClose: () => void; onGo: (href: str
     ['bookmark', 'Meus cadernos', R.cadernos], ['info', 'Central de dúvidas', R.duvidas],
   ]
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(20,10,50,.55)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '12vh' }}>
-      <div onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Busca" style={{ width: 'min(640px, 92vw)', background: 'var(--surface)', color: 'var(--ink)', borderRadius: 18, boxShadow: '0 40px 80px -30px rgba(10,5,40,.7)', overflow: 'hidden' }}>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'color-mix(in srgb,var(--pn-140a32,#140A32) 55%,transparent)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: '12vh' }}>
+      <div onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Busca" style={{ width: 'min(640px, 92vw)', background: 'var(--surface)', color: 'var(--ink)', borderRadius: 18, boxShadow: '0 40px 80px -30px color-mix(in srgb,var(--pn-0a0528,#0A0528) 70%,transparent)', overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 16px', borderBottom: '1px solid var(--line)' }}>
           <Icon n="search" size={18} />
           <input ref={ref} type="text" placeholder="Buscar simulados, aulas, julgados…" style={{ flex: 1, border: 0, outline: 0, background: 'transparent', font: 'inherit', fontSize: 15, color: 'var(--ink)' }} />

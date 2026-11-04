@@ -33,10 +33,10 @@ export function LogoTopo({ b }: { b?: Branding | null }) {
 
 /** Cor do selo de situação (cada situação tem sua cor, editável no HUD do login). */
 function statusStyle(label: string): React.CSSProperties {
-  if (label === 'Não iniciado') return { background: 'var(--prova-sit-nao-iniciado, #2563eb)', color: '#fff' }
-  if (label === 'Encerrado') return { background: 'var(--prova-sit-encerrado, #dc2626)', color: '#fff' }
-  if (label === 'Disponível') return { background: 'var(--prova-sit-disponivel, #6d28d9)', color: '#fff' }
-  return { background: 'var(--prova-sit-andamento, #e6b83c)', color: '#1a1d24' } // Em andamento (amarelo, texto escuro)
+  if (label === 'Não iniciado') return { background: 'var(--prova-sit-nao-iniciado, var(--pn-2563eb,#2563eb))', color: '#fff' }
+  if (label === 'Encerrado') return { background: 'var(--prova-sit-encerrado, var(--pn-dc2626,#dc2626))', color: '#fff' }
+  if (label === 'Disponível') return { background: 'var(--prova-sit-disponivel, var(--pn-6d28d9,#6d28d9))', color: '#fff' }
+  return { background: 'var(--prova-sit-andamento, var(--pn-e6b83c,#e6b83c))', color: 'var(--pn-1a1d24,#1a1d24)' } // Em andamento (amarelo, texto escuro)
 }
 
 /** Prévia (estática) da página de login do simulado. */
@@ -117,12 +117,12 @@ function InfoBox({ label, valor }: { label: string; valor: string }) {
 
 // Cores do navegador — iguais às da prova (respondem às CSS vars do caderno).
 const COR_MARCADA = 'var(--prova-marcada, var(--primary))'
-const COR_ANUL = 'var(--prova-anulada, #6b7280)'
-const COR_ALT = 'var(--prova-alt, #0891b2)'
-const COR_ACERTO = 'var(--prova-acerto, #16a34a)'
-const COR_ERRO = 'var(--prova-erro, #dc2626)'
-const COR_BRANCO = 'var(--prova-branco, #6b7280)'
-const COR_MEDIA = 'var(--prova-media, #6d28d9)'
+const COR_ANUL = 'var(--prova-anulada, var(--pn-6b7280,#6b7280))'
+const COR_ALT = 'var(--prova-alt, var(--pn-0891b2,#0891b2))'
+const COR_ACERTO = 'var(--prova-acerto, var(--pn-16a34a,#16a34a))'
+const COR_ERRO = 'var(--prova-erro, var(--pn-dc2626,#dc2626))'
+const COR_BRANCO = 'var(--prova-branco, var(--pn-6b7280,#6b7280))'
+const COR_MEDIA = 'var(--prova-media, var(--pn-6d28d9,#6d28d9))'
 // Card de resultado: fundo = versão clara da própria cor.
 const cardStat = (cor: string) => ({ borderColor: `color-mix(in oklab, ${cor} 30%, var(--border))`, background: `color-mix(in oklab, ${cor} 12%, var(--card))` })
 // Botões da prova encerrada — mesma classe .hud-btn da tela real (normal + hover editável no HUD).

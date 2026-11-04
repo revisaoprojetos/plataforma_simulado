@@ -49,14 +49,14 @@ export default function ComoEstudarPage() {
           <Col gap={10} style={{ maxWidth: 440 }}>
             <Eyebrow color="var(--gold)">O método em uma linha</Eyebrow>
             <h2 style={{ margin: 0, fontSize: 26, fontWeight: 800, letterSpacing: '-0.03em', color: '#fff', lineHeight: 1.12 }}>Uma aula, quatro contatos com o conteúdo</h2>
-            <P size={13.5}><span style={{ color: '#E6DEFF' }}>É assim que o seu Cronograma Adaptativo distribui cada aula ao longo das semanas.</span></P>
+            <P size={13.5}><span style={{ color: 'var(--pn-e6deff,#E6DEFF)' }}>É assim que o seu Cronograma Adaptativo distribui cada aula ao longo das semanas.</span></P>
           </Col>
           <Grid cols={4} gap={12} style={{ flex: 1, minWidth: 420 }}>
             {PASSOS.map((p) => (
               <div key={p.n} style={{ borderRadius: 14, border: '1px solid rgba(255,255,255,.18)', background: 'rgba(255,255,255,.06)', padding: '14px 14px' }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 26, height: 26, borderRadius: '50%', background: 'var(--gold)', color: 'var(--goldInk)', fontSize: 13, fontWeight: 800 }}>{p.n}</span>
                 <div style={{ marginTop: 12, fontSize: 15, fontWeight: 800, color: '#fff' }}>{p.t}</div>
-                <div style={{ fontSize: 12, color: '#C9BEF0' }}>{p.s}</div>
+                <div style={{ fontSize: 12, color: 'var(--pn-c9bef0,#C9BEF0)' }}>{p.s}</div>
               </div>
             ))}
           </Grid>

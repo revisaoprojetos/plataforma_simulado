@@ -97,7 +97,7 @@ export function CadernosDownloadDialog({ simuladoId, titulo, brand, theme, onClo
 
   return createPortal(
     <div className="cdd-ov" role="dialog" aria-modal="true" aria-label="Baixar cadernos" onClick={onClose}
-      style={{ ...internaTokensStyle(brand, theme), background: 'color-mix(in srgb, #0A0523 55%, transparent)', color: 'var(--ink)' }}>
+      style={{ ...internaTokensStyle(brand, theme), background: 'color-mix(in srgb, var(--pn-0a0523,#0A0523) 55%, transparent)', color: 'var(--ink)' }}>
       <style>{CSS}</style>
       <div className="cdd-card" onClick={(e) => e.stopPropagation()}>
         <div className="cdd-head">
@@ -129,8 +129,8 @@ export function CadernosDownloadDialog({ simuladoId, titulo, brand, theme, onClo
 }
 
 const CSS = `
-.cdd-ov{position:fixed;inset:0;z-index:140;display:flex;align-items:center;justify-content:center;padding:18px;background:color-mix(in srgb,#0A0523 55%,transparent);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);animation:cddFade .18s ease}
-.cdd-card{width:100%;max-width:540px;max-height:86vh;display:flex;flex-direction:column;overflow:hidden;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:calc(var(--r) * .9);box-shadow:0 24px 60px -20px rgba(10,5,35,.55);animation:cddPop .2s cubic-bezier(.2,.8,.2,1)}
+.cdd-ov{position:fixed;inset:0;z-index:140;display:flex;align-items:center;justify-content:center;padding:18px;background:color-mix(in srgb,var(--pn-0a0523,#0A0523) 55%,transparent);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);animation:cddFade .18s ease}
+.cdd-card{width:100%;max-width:540px;max-height:86vh;display:flex;flex-direction:column;overflow:hidden;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:calc(var(--r) * .9);box-shadow:0 24px 60px -20px color-mix(in srgb,var(--pn-0a0523,#0A0523) 55%,transparent);animation:cddPop .2s cubic-bezier(.2,.8,.2,1)}
 .cdd-head{display:flex;align-items:flex-start;gap:12px;padding:18px 18px 14px;border-bottom:1px solid var(--line)}
 .cdd-htx{display:flex;flex-direction:column;gap:3px;min-width:0;flex:1}
 .cdd-eyebrow{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--brand)}

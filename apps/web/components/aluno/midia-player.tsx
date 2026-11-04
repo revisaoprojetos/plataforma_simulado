@@ -43,8 +43,8 @@ export function MidiaPlayer({ titulo, url, kind, voltarHref }: {
           <span
             className="absolute top-0 h-full w-2/5 rounded"
             style={{
-              background: 'linear-gradient(90deg,transparent,var(--gold,#F1C232),var(--brand,#8F75FF),transparent)',
-              boxShadow: '0 0 12px 2px color-mix(in oklab,var(--gold,#F1C232) 60%,transparent)',
+              background: 'linear-gradient(90deg,transparent,var(--gold,var(--pn-f1c232,#F1C232)),var(--brand,var(--pn-8f75ff,#8F75FF)),transparent)',
+              boxShadow: '0 0 12px 2px color-mix(in oklab,var(--gold,var(--pn-f1c232,#F1C232)) 60%,transparent)',
               animation: 'mpg-move 1.4s cubic-bezier(.45,0,.35,1) infinite',
             }}
           />

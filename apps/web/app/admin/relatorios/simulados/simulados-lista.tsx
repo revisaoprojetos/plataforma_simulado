@@ -54,7 +54,7 @@ export function SimuladosLista({ itens }: { itens: ResumoSimulado[] }) {
             <Link key={s.id} href={`/admin/relatorios/simulados?simulado=${s.id}`}
               className="group relative flex flex-col overflow-hidden rounded-2xl border bg-card transition hover:border-primary/50 hover:shadow-md">
               {/* Capa (banner) maior: imagem do banco/logo ou degradê da cor + ícone */}
-              <div className="relative h-44 w-full overflow-hidden" style={s.capa ? undefined : { background: `linear-gradient(135deg, ${cor} 0%, color-mix(in oklab, ${cor} 55%, #0f172a) 130%)` }}>
+              <div className="relative h-44 w-full overflow-hidden" style={s.capa ? undefined : { background: `linear-gradient(135deg, ${cor} 0%, color-mix(in oklab, ${cor} 55%, var(--pn-0f172a,#0f172a)) 130%)` }}>
                 {s.capa
                   ? <img src={s.capa} alt="" className="absolute inset-0 h-full w-full object-cover object-[center_30%] transition-transform duration-500 group-hover:scale-105" />
                   : <Icon className="absolute -right-4 -top-4 h-28 w-28 text-white/10" />}

@@ -8,24 +8,24 @@
 .estudio-scope {
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   /* superfícies / texto / linhas (claro) */
-  --background: #F4F2FA;
-  --foreground: #1D1933;
+  --background: var(--pn-f4f2fa,#F4F2FA);
+  --foreground: var(--pn-1d1933,#1D1933);
   --card: #FFFFFF;
-  --card-foreground: #1D1933;
+  --card-foreground: var(--pn-1d1933,#1D1933);
   --popover: #FFFFFF;
-  --popover-foreground: #1D1933;
-  --muted: #F6F4FC;
-  --muted-foreground: #6E6886;
-  --secondary: #F6F4FC;
-  --secondary-foreground: #2A1A55;
-  --accent: #EFEBFD;
-  --accent-foreground: #4B30BE;
-  --border: #EAE6F4;
-  --input: #E1DAF2;
+  --popover-foreground: var(--pn-1d1933,#1D1933);
+  --muted: var(--pn-f6f4fc,#F6F4FC);
+  --muted-foreground: var(--pn-6e6886,#6E6886);
+  --secondary: var(--pn-f6f4fc,#F6F4FC);
+  --secondary-foreground: var(--pn-2a1a55,#2A1A55);
+  --accent: var(--pn-efebfd,#EFEBFD);
+  --accent-foreground: var(--pn-4b30be,#4B30BE);
+  --border: var(--pn-eae6f4,#EAE6F4);
+  --input: var(--pn-e1daf2,#E1DAF2);
   /* --primary / --ring NÃO são sobrescritos: herdam a marca do tenant (no Revisão já é esse roxo),
      pra não quebrar o white-label de outros tenants dentro da área Conteúdos. */
   --radius: 0.7rem;      /* rounded-2xl ≈ 20px (r-card do designer) */
-  --gold-ink: #9A7400;   /* eyebrow dourada sobre claro */
+  --gold-ink: var(--pn-9a7400,#9A7400);   /* eyebrow dourada sobre claro */
   background: var(--background);
   color: var(--foreground);
 }
@@ -33,18 +33,18 @@
 .dark .estudio-scope {
   --background: #18181D;
   --foreground: #FFFFFF;
-  --card: #232329;
+  --card: var(--pn-232329,#232329);
   --card-foreground: #FFFFFF;
-  --popover: #232329;
+  --popover: var(--pn-232329,#232329);
   --popover-foreground: #FFFFFF;
-  --muted: #2C2C34;
-  --muted-foreground: #BDBBCB;
-  --secondary: #2C2C34;
+  --muted: var(--pn-2c2c34,#2C2C34);
+  --muted-foreground: var(--pn-bdbbcb,#BDBBCB);
+  --secondary: var(--pn-2c2c34,#2C2C34);
   --secondary-foreground: #FFFFFF;
-  --accent: rgba(143, 117, 255, 0.20);
-  --accent-foreground: #B3A1FF;
+  --accent: color-mix(in srgb,var(--pn-8f75ff,#8F75FF) 20%,transparent);
+  --accent-foreground: var(--pn-b3a1ff,#B3A1FF);
   --border: rgba(255, 255, 255, 0.10);
   --input: rgba(255, 255, 255, 0.18);
   /* --primary / --ring herdam a marca do tenant (ver bloco claro). */
-  --gold-ink: #F1C232;
+  --gold-ink: var(--pn-f1c232,#F1C232);
 }

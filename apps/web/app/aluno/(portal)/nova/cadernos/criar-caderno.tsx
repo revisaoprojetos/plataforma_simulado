@@ -50,7 +50,7 @@ export function CriarCadernoCard() {
         autoFocus value={nome} onChange={(e) => setNome(e.target.value)} maxLength={120} placeholder="Ex.: Revisão de Direito Tributário"
         style={{ width: '100%', maxWidth: 320, height: 42, padding: '0 12px', borderRadius: 12, border: '1px solid var(--line2)', background: 'var(--surface)', color: 'var(--ink)', font: 'inherit', fontSize: 14 }}
       />
-      {erro && <span style={{ fontSize: 12.5, color: '#c0392b' }}>{erro}</span>}
+      {erro && <span style={{ fontSize: 12.5, color: 'var(--pn-c0392b,#c0392b)' }}>{erro}</span>}
       <div style={{ display: 'flex', gap: 8 }}>
         <button type="button" onClick={() => { setAberto(false); setNome(''); setErro(null) }} disabled={salvando}
           style={{ height: 38, padding: '0 14px', borderRadius: 12, border: '1px solid var(--line2)', background: 'transparent', color: 'var(--ink)', font: 'inherit', fontWeight: 700, cursor: 'pointer' }}>Cancelar</button>

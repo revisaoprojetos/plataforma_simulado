@@ -90,7 +90,7 @@ export function montarGrupos(nav: AlunoNavItem[]): GrupoDef[] {
 
 export const casa = (pathname: string, href: string) => pathname === href || pathname.startsWith(href + '/')
 
-const SLOT_COLOR = '#D9CFFF'
+const SLOT_COLOR = 'var(--pn-d9cfff,#D9CFFF)'
 
 export interface DownBarProps {
   theme: ShellTheme
@@ -149,7 +149,7 @@ export function DownBar({ theme, nav, usuario, pathname, onAccount }: DownBarPro
         padding: '0 10px',
         borderRadius: 22,
         background: DOWNBAR_BG[theme],
-        boxShadow: '0 18px 40px -16px rgba(20,10,60,.7)',
+        boxShadow: '0 18px 40px -16px color-mix(in srgb,var(--pn-140a3c,#140A3C) 70%,transparent)',
         border: '1px solid rgba(255,255,255,.1)',
       }}
     >
@@ -159,7 +159,7 @@ export function DownBar({ theme, nav, usuario, pathname, onAccount }: DownBarPro
           className="shr-bbo"
           onClick={close}
           aria-hidden="true"
-          style={{ position: 'fixed', inset: 0, zIndex: -1, background: 'rgba(10,8,25,.42)' }}
+          style={{ position: 'fixed', inset: 0, zIndex: -1, background: 'color-mix(in srgb,var(--pn-0a0819,#0A0819) 42%,transparent)' }}
         />
       )}
 
@@ -179,7 +179,7 @@ export function DownBar({ theme, nav, usuario, pathname, onAccount }: DownBarPro
               padding: 8,
               borderRadius: 22,
               background: 'var(--surface)',
-              boxShadow: '0 26px 50px -18px rgba(30,15,80,.6), 0 0 0 1px var(--line)',
+              boxShadow: '0 26px 50px -18px color-mix(in srgb,var(--pn-1e0f50,#1E0F50) 60%,transparent), 0 0 0 1px var(--line)',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px' }}>
@@ -317,7 +317,7 @@ export function DownBar({ theme, nav, usuario, pathname, onAccount }: DownBarPro
                 height: 4,
                 marginLeft: -2,
                 borderRadius: '50%',
-                background: 'rgba(217,207,255,.55)',
+                background: 'color-mix(in srgb,var(--pn-d9cfff,#D9CFFF) 55%,transparent)',
               }}
             />
           </button>
@@ -347,8 +347,8 @@ export function DownBar({ theme, nav, usuario, pathname, onAccount }: DownBarPro
           display: 'inline-flex',
           padding: 3,
           borderRadius: '50%',
-          border: `2px solid ${pathname.startsWith('/aluno/perfil') ? 'rgba(241,194,50,1)' : 'rgba(241,194,50,.6)'}`,
-          background: pathname.startsWith('/aluno/perfil') ? 'rgba(241,194,50,.2)' : 'transparent',
+          border: `2px solid ${pathname.startsWith('/aluno/perfil') ? 'color-mix(in srgb,var(--pn-f1c232,#F1C232) 100%,transparent)' : 'color-mix(in srgb,var(--pn-f1c232,#F1C232) 60%,transparent)'}`,
+          background: pathname.startsWith('/aluno/perfil') ? 'color-mix(in srgb,var(--pn-f1c232,#F1C232) 20%,transparent)' : 'transparent',
           cursor: 'pointer',
         }}
       >

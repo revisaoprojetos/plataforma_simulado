@@ -104,7 +104,7 @@ export function DivTrack({ tiers, xpTotal, proximaNome, faltam, dark, onDark = f
             <span style={{ color: inkHead }}>faltam {fmtXp(faltam)} XP</span>
           </div>
           <div style={{ height: 8, borderRadius: 99, background: trackBg, overflow: 'hidden' }}>
-            <span className="lg-bar" style={{ display: 'block', width: `${pct}%`, height: '100%', borderRadius: 99, background: 'linear-gradient(90deg,#B9773F,#9AA5B1,#E8A93A)' }} />
+            <span className="lg-bar" style={{ display: 'block', width: `${pct}%`, height: '100%', borderRadius: 99, background: 'linear-gradient(90deg,var(--pn-b9773f,#B9773F),var(--pn-9aa5b1,#9AA5B1),var(--pn-e8a93a,#E8A93A))' }} />
           </div>
         </div>
       ) : (
@@ -138,7 +138,7 @@ export function Podio({ podio, dark }: { podio: LigaPeer[]; dark: boolean }) {
               <img src={avatarPadraoDe(p.iniciais + String(p.pos))} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center 82%' }} />
             </span>
             <b style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--ink)' }}>{fmtXp(p.xp)} XP</b>
-            <div style={{ width: '100%', height: H[p.pos], borderRadius: '10px 10px 0 0', background: `linear-gradient(180deg,${cor},${cor}66)`, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 8, color: dark ? '#10131A' : '#2A1A10', fontSize: 22, fontWeight: 900 }}>{p.pos}</div>
+            <div style={{ width: '100%', height: H[p.pos], borderRadius: '10px 10px 0 0', background: `linear-gradient(180deg,${cor},${cor}66)`, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', paddingTop: 8, color: dark ? 'var(--pn-10131a,#10131A)' : 'var(--pn-2a1a10,#2A1A10)', fontSize: 22, fontWeight: 900 }}>{p.pos}</div>
           </div>
         )
       })}

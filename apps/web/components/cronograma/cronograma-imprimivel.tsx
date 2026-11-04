@@ -107,7 +107,7 @@ export function CronogramaImprimivel({
         /* Uma semana por página; break-inside nas linhas impede a última meta cair sozinha. */
         .pagina + .pagina { border-top: 1px dashed #d4d4d8; }
         .grade { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        .grade td, .grade th { border: 1px solid #b9b9c0; padding: 4px 5px; vertical-align: top; }
+        .grade td, .grade th { border: 1px solid var(--pn-b9b9c0,#b9b9c0); padding: 4px 5px; vertical-align: top; }
         .faixa1, .faixa2 { color: #fff; text-align: center; font-weight: 700; letter-spacing: .02em;
                            -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .faixa1 { font-size: 11pt; padding: 6px; }
@@ -117,18 +117,18 @@ export function CronogramaImprimivel({
         .tipo { font-size: 8pt; font-weight: 700; text-transform: uppercase; width: 15%;
                 -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .chapeu { font-weight: 700; display: block; }
-        .corpo { display: block; color: #3f3f46; }
+        .corpo { display: block; color: var(--pn-3f3f46,#3f3f46); }
         .meta + .meta { margin-top: 5px; padding-top: 5px; border-top: 1px dotted #d4d4d8; }
-        .feito { color: #a1a1aa; text-decoration: line-through; }
+        .feito { color: var(--pn-a1a1aa,#a1a1aa); text-decoration: line-through; }
         /* Área de anotação: a folha é para escrever em cima. Pauta leve, que imprime bem. */
-        .notas { margin-top: 4px; border: 1px solid #b9b9c0; }
+        .notas { margin-top: 4px; border: 1px solid var(--pn-b9b9c0,#b9b9c0); }
         .notasTit { font-size: 7.5pt; font-weight: 700; text-transform: uppercase; letter-spacing: .04em;
-                    color: #52525b; padding: 3px 6px; border-bottom: 1px solid #d4d4d8; }
+                    color: var(--pn-52525b,#52525b); padding: 3px 6px; border-bottom: 1px solid #d4d4d8; }
         .pauta { height: 24mm; background-image: repeating-linear-gradient(
                    to bottom, transparent 0, transparent 7.6mm, #dcdce1 7.6mm, #dcdce1 7.7mm);
                  -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         .aviso { padding: 10px; font-size: 9.5pt; line-height: 1.5; }
-        .rodape { margin-top: 6px; font-size: 7.5pt; color: #a1a1aa; text-align: right; }
+        .rodape { margin-top: 6px; font-size: 7.5pt; color: var(--pn-a1a1aa,#a1a1aa); text-align: right; }
         @media print {
           /* Paisagem: sete colunas de conteúdo não cabem em retrato sem espremer o texto. */
           @page { size: A4 landscape; margin: 0; }
@@ -181,7 +181,7 @@ export function CronogramaImprimivel({
               {s.kind === 'recesso' && (
                 <>
                   <tr>
-                    <td className="faixa2" colSpan={8} style={{ background: '#71717a' }}>
+                    <td className="faixa2" colSpan={8} style={{ background: 'var(--pn-71717a,#71717a)' }}>
                       SEMANA DE RECESSO
                     </td>
                   </tr>

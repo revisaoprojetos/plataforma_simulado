@@ -23,14 +23,14 @@ const ND_N = 'M40 116 L40 37 Q40 26 50 26 Q55 26 59 31 L143 96 L143 27 L157 27 L
 const ND_D = 'M189 25 L284 25 C310 25 327 42 327 64 L327 80 C327 101 311 117 290 117 L198 117 L198 47 L212 47 L212 102 L288 102 C302 102 312 92 312 80 L312 64 C312 50 300 39 284 39 L189 39 Q186 39 186 36 L186 28 Q186 25 189 25 Z'
 
 const BG: Record<VndCircTheme, string> = {
-  claro: 'linear-gradient(180deg,#041A10 0%,#072D1C 50%,#0B3D26 100%)',
-  escuro: 'linear-gradient(180deg,#020906 0%,#03100A 50%,#051A10 100%)',
+  claro: 'linear-gradient(180deg,var(--pn-041a10,#041A10) 0%,var(--pn-072d1c,#072D1C) 50%,var(--pn-0b3d26,#0B3D26) 100%)',
+  escuro: 'linear-gradient(180deg,var(--pn-020906,#020906) 0%,var(--pn-03100a,#03100A) 50%,var(--pn-051a10,#051A10) 100%)',
 }
 const GLOW: Record<VndCircTheme, string> = {
-  claro: 'radial-gradient(closest-side, rgba(34,197,110,.32), rgba(0,0,0,0))',
-  escuro: 'radial-gradient(closest-side, rgba(34,197,110,.18), rgba(0,0,0,0))',
+  claro: 'radial-gradient(closest-side, color-mix(in srgb,var(--pn-22c56e,#22C56E) 32%,transparent), rgba(0,0,0,0))',
+  escuro: 'radial-gradient(closest-side, color-mix(in srgb,var(--pn-22c56e,#22C56E) 18%,transparent), rgba(0,0,0,0))',
 }
-const FOOT: Record<VndCircTheme, string> = { claro: '#7FA893', escuro: '#5E7F6E' }
+const FOOT: Record<VndCircTheme, string> = { claro: 'var(--pn-7fa893,#7FA893)', escuro: 'var(--pn-5e7f6e,#5E7F6E)' }
 
 export function LoadingVndCircuito({
   theme = 'claro', message, simula = false, vertical = false,
@@ -45,11 +45,11 @@ export function LoadingVndCircuito({
   const marca = (
     <div className="vlc-mark">
       <svg className="vlc-mfill" viewBox="0.6 5.4 31 21.3" aria-hidden="true">
-        <defs><linearGradient id="vlcG" x1="0" y1="0" x2="0" y2="1"><stop offset="0.1" stopColor="#3FD58A" /><stop offset="0.9" stopColor="#1E9E5E" /></linearGradient></defs>
+        <defs><linearGradient id="vlcG" x1="0" y1="0" x2="0" y2="1"><stop offset="0.1" stopColor="var(--pn-3fd58a,#3FD58A)" /><stop offset="0.9" stopColor="var(--pn-1e9e5e,#1E9E5E)" /></linearGradient></defs>
         <path fill="url(#vlcG)" fillRule="evenodd" d={V} />
       </svg>
-      <svg className="vlc-mdraw" viewBox="0.6 5.4 31 21.3" aria-hidden="true"><path pathLength={1000} fill="none" stroke="#9BF0C3" strokeWidth={0.1503} strokeLinejoin="round" d={V} /></svg>
-      <svg className="vlc-mrunbox" viewBox="-0.64 4.16 33.48 23.78" aria-hidden="true"><path className="vlc-mrun" pathLength={1000} fill="none" stroke="#E8C877" strokeWidth={0.2442} strokeLinecap="round" d={V} /></svg>
+      <svg className="vlc-mdraw" viewBox="0.6 5.4 31 21.3" aria-hidden="true"><path pathLength={1000} fill="none" stroke="var(--pn-9bf0c3,#9BF0C3)" strokeWidth={0.1503} strokeLinejoin="round" d={V} /></svg>
+      <svg className="vlc-mrunbox" viewBox="-0.64 4.16 33.48 23.78" aria-hidden="true"><path className="vlc-mrun" pathLength={1000} fill="none" stroke="var(--pn-e8c877,#E8C877)" strokeWidth={0.2442} strokeLinecap="round" d={V} /></svg>
     </div>
   )
   const ndSvg = (
@@ -64,10 +64,10 @@ export function LoadingVndCircuito({
 
       {/* Circuito de fundo: V gigante — contorno desenha + 3 pulsos dourados viajam. */}
       <svg className="vlc-circ" viewBox="0.6 5.4 31 21.3" aria-hidden="true">
-        <path className="vlc-ol" pathLength={1000} fill="none" stroke="#5FD69B" strokeOpacity={0.22} strokeWidth={0.0177} d={V} />
-        <path className="vlc-pl vlc-pl1" pathLength={1000} fill="none" stroke="#E8C877" strokeWidth={0.0325} strokeLinecap="round" d={V} />
-        <path className="vlc-pl vlc-pl2" pathLength={1000} fill="none" stroke="#E8C877" strokeWidth={0.0325} strokeLinecap="round" d={V} />
-        <path className="vlc-pl vlc-pl3" pathLength={1000} fill="none" stroke="#E8C877" strokeWidth={0.0325} strokeLinecap="round" d={V} />
+        <path className="vlc-ol" pathLength={1000} fill="none" stroke="var(--pn-5fd69b,#5FD69B)" strokeOpacity={0.22} strokeWidth={0.0177} d={V} />
+        <path className="vlc-pl vlc-pl1" pathLength={1000} fill="none" stroke="var(--pn-e8c877,#E8C877)" strokeWidth={0.0325} strokeLinecap="round" d={V} />
+        <path className="vlc-pl vlc-pl2" pathLength={1000} fill="none" stroke="var(--pn-e8c877,#E8C877)" strokeWidth={0.0325} strokeLinecap="round" d={V} />
+        <path className="vlc-pl vlc-pl3" pathLength={1000} fill="none" stroke="var(--pn-e8c877,#E8C877)" strokeWidth={0.0325} strokeLinecap="round" d={V} />
       </svg>
 
       <main role="status" aria-live="polite" className="vlc-main">
@@ -129,20 +129,20 @@ function css(theme: VndCircTheme, vertical: boolean) {
 .vlc-mrun{opacity:0;stroke-dasharray:70 930;animation:vlcFade .4s ease-out 2.4s forwards,vlcPulse 3.2s linear 2.4s infinite}
 .vlc-ndw{display:flex;flex-direction:column;gap:16px;margin-top:45px;animation:vlcNdin .8s cubic-bezier(.2,.8,.2,1) 1.8s both}
 .vlc-nd{display:block;width:358.9px;height:118px;overflow:visible}
-.vlc-sub{display:flex;flex-direction:column;line-height:1.12;font-weight:800;font-size:19px;letter-spacing:.06em;color:#E9EFEC;padding-left:6px;animation:vlcSubIn 1s cubic-bezier(.2,.8,.2,1) 2.2s both}
-.vlc-sub-sm{font-weight:600;color:#CFDCD5}
+.vlc-sub{display:flex;flex-direction:column;line-height:1.12;font-weight:800;font-size:19px;letter-spacing:.06em;color:var(--pn-e9efec,#E9EFEC);padding-left:6px;animation:vlcSubIn 1s cubic-bezier(.2,.8,.2,1) 2.2s both}
+.vlc-sub-sm{font-weight:600;color:var(--pn-cfdcd5,#CFDCD5)}
 .vlc-wmk{display:flex;flex-direction:column;align-items:center;gap:16px;animation:vlcRise .9s cubic-bezier(.2,.8,.2,1) 1.9s both}
 .vlc-wmk-row{display:flex;align-items:flex-end;gap:4.8px}
 .vlc-wmk-v{width:87.3px;height:60px;overflow:visible}
 .vlc-wmk-nd{width:182.5px;height:60px;overflow:visible}
-.vlc-sub-line{font-size:14px;font-weight:700;letter-spacing:.32em;color:#CFDCD5;padding-left:.32em;animation:vlcSubIn 1s cubic-bezier(.2,.8,.2,1) 2.2s both}
+.vlc-sub-line{font-size:14px;font-weight:700;letter-spacing:.32em;color:var(--pn-cfdcd5,#CFDCD5);padding-left:.32em;animation:vlcSubIn 1s cubic-bezier(.2,.8,.2,1) 2.2s both}
 .vlc-sim{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:-10px;animation:vlcFade .4s ease-out both}
 .vlc-sim-letras{font-weight:800;font-size:30px;letter-spacing:.32em;padding-left:.32em;color:#FFFFFF;line-height:1}
 .vlc-sl{display:inline-block;animation:vlcSl .6s cubic-bezier(.2,.8,.2,1) both}
 .vlc-s1{animation-delay:.25s}.vlc-s2{animation-delay:.33s}.vlc-s3{animation-delay:.41s}.vlc-s4{animation-delay:.49s}.vlc-s5{animation-delay:.57s}.vlc-s6{animation-delay:.65s}
-.vlc-simline{display:block;width:56%;height:2px;border-radius:2px;background:linear-gradient(90deg,rgba(216,180,90,0),#D8B45A,rgba(216,180,90,0));transform-origin:50% 50%;animation:vlcSimline .7s cubic-bezier(.6,.1,.2,1) .8s both}
+.vlc-simline{display:block;width:56%;height:2px;border-radius:2px;background:linear-gradient(90deg,rgba(216,180,90,0),var(--pn-d8b45a,#D8B45A),rgba(216,180,90,0));transform-origin:50% 50%;animation:vlcSimline .7s cubic-bezier(.6,.1,.2,1) .8s both}
 .vlc-load{display:flex;align-items:flex-end;gap:12px;height:32px;animation:vlcUp .8s cubic-bezier(.2,.8,.2,1) 2.3s both}
-.vlc-pt{width:12px;height:12px;border-radius:50%;background:#3FD58A;animation:vlcPt 1.1s cubic-bezier(.45,0,.55,1) infinite}
+.vlc-pt{width:12px;height:12px;border-radius:50%;background:var(--pn-3fd58a,#3FD58A);animation:vlcPt 1.1s cubic-bezier(.45,0,.55,1) infinite}
 .vlc-pa1{animation-delay:2.7s}.vlc-pa2{animation-delay:2.85s}.vlc-pa3{animation-delay:3s}
 .vlc-msg{margin:0;font-size:13px;font-weight:500;animation:vlcFade .4s ease-out 3s both}
 .vlc-foot{position:absolute;bottom:26px;font-size:12px;animation:vlcFade 1s ease-out .4s both}
@@ -156,7 +156,7 @@ function css(theme: VndCircTheme, vertical: boolean) {
 @keyframes vlcUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
 @keyframes vlcSl{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
 @keyframes vlcSimline{from{transform:scaleX(0)}to{transform:scaleX(1)}}
-@keyframes vlcPt{0%,60%,100%{transform:translateY(0);opacity:.55}30%{transform:translateY(-14px);opacity:1;background:#E8C877}}
+@keyframes vlcPt{0%,60%,100%{transform:translateY(0);opacity:.55}30%{transform:translateY(-14px);opacity:1;background:var(--pn-e8c877,#E8C877)}}
 @media (max-width:640px){
   .vlc-glow{width:620px;height:620px;margin:-310px 0 0 -310px}
   .vlc-circ{left:-220px;top:-200px;width:1100px;height:756px}

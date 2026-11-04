@@ -26,12 +26,12 @@ const ddmm = (iso: string | null): string => {
 }
 // Degradês de capa (decorativos) — ciclados de forma determinística por índice, sem inventar metadado.
 const GRADS = [
-  'linear-gradient(135deg,#2A1E4A,#4A31B8)',
-  'linear-gradient(135deg,#9A3412,#EA580C)',
-  'linear-gradient(135deg,#1E2A6A,#2F5BD3)',
-  'linear-gradient(135deg,#0F6E60,#2EC0A2)',
-  'linear-gradient(135deg,#14532D,#1F7A45)',
-  'linear-gradient(135deg,#241047,#5B2A9E)',
+  'linear-gradient(135deg,var(--pn-2a1e4a,#2A1E4A),var(--pn-4a31b8,#4A31B8))',
+  'linear-gradient(135deg,var(--pn-9a3412,#9A3412),var(--pn-ea580c,#EA580C))',
+  'linear-gradient(135deg,var(--pn-1e2a6a,#1E2A6A),var(--pn-2f5bd3,#2F5BD3))',
+  'linear-gradient(135deg,var(--pn-0f6e60,#0F6E60),var(--pn-2ec0a2,#2EC0A2))',
+  'linear-gradient(135deg,var(--pn-14532d,#14532D),var(--pn-1f7a45,#1F7A45))',
+  'linear-gradient(135deg,var(--pn-241047,#241047),var(--pn-5b2a9e,#5B2A9E))',
 ]
 const gradDe = (i: number) => GRADS[i % GRADS.length]
 const siglaDe = (titulo: string) => (titulo || 'Simulado').slice(0, 18)
@@ -168,7 +168,7 @@ function PillTabs({ revisao, personalizados }: { revisao: number; personalizados
   return (
     <Row gap={4} style={{ padding: 4, borderRadius: 15, background: 'var(--track)', flexWrap: 'nowrap' }}>
       {items.map(([t, n, on]) => (
-        <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 42, padding: '0 16px', borderRadius: 12, fontSize: 14, fontWeight: on ? 800 : 700, background: on ? 'var(--surface)' : 'transparent', color: on ? 'var(--ink)' : 'var(--muted)', boxShadow: on ? '0 2px 8px rgba(30,15,80,.1)' : 'none' }}>
+        <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 42, padding: '0 16px', borderRadius: 12, fontSize: 14, fontWeight: on ? 800 : 700, background: on ? 'var(--surface)' : 'transparent', color: on ? 'var(--ink)' : 'var(--muted)', boxShadow: on ? '0 2px 8px color-mix(in srgb,var(--pn-1e0f50,#1E0F50) 10%,transparent)' : 'none' }}>
           <Icon n={t === 'Personalizados' ? 'plus' : 'clip'} size={16} />{t}
           <span style={{ fontSize: 11.5, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: 'var(--chip)', color: 'var(--brand)' }}>{n}</span>
         </span>
@@ -229,8 +229,8 @@ export default async function RealizadosPage() {
               <Card key={s.id} pad={0} style={{ overflow: 'hidden', gap: 0 }}>
                 <div style={{ position: 'relative' }}>
                   <Media ratio="banner" fallback={<Cover line="SIMULADO" sigla={siglaDe(s.titulo)} grad={s.grad} big={22} />} style={{ height: 108 }} />
-                  <span style={{ position: 'absolute', right: 12, top: 12, display: 'inline-flex', alignItems: 'center', gap: 5, height: 24, padding: '0 10px', borderRadius: 99, background: 'rgba(241,194,50,.95)', color: '#2A1A55', fontSize: 11, fontWeight: 800 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#2A1A55' }} />EM ANDAMENTO
+                  <span style={{ position: 'absolute', right: 12, top: 12, display: 'inline-flex', alignItems: 'center', gap: 5, height: 24, padding: '0 10px', borderRadius: 99, background: 'color-mix(in srgb,var(--pn-f1c232,#F1C232) 95%,transparent)', color: 'var(--pn-2a1a55,#2A1A55)', fontSize: 11, fontWeight: 800 }}>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--pn-2a1a55,#2A1A55)' }} />EM ANDAMENTO
                   </span>
                 </div>
                 <Col gap={10} style={{ padding: '14px 16px 16px' }}>

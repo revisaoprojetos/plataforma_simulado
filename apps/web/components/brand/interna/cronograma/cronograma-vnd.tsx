@@ -20,15 +20,15 @@ const K = 'vnd' as const
 function VndHero({ st, mobile }: { st: CronogramaState; mobile: boolean }) {
   const cm = useCm()
   return (
-    <section style={{ position: 'relative', overflow: 'hidden', background: cm('linear-gradient(120deg,#041A10 0%,#0B4A2E 55%,#12643D 100%)'), color: cm('#FFFFFF'), padding: mobile ? '22px 18px 24px' : '34px 0 30px' }}>
-      <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: cm('radial-gradient(circle,rgba(185,245,212,.18) 1.2px,transparent 1.8px)'), backgroundSize: '22px 22px', pointerEvents: 'none' }} />
+    <section style={{ position: 'relative', overflow: 'hidden', background: cm('linear-gradient(120deg,var(--pn-041a10,#041A10) 0%,var(--pn-0b4a2e,#0B4A2E) 55%,var(--pn-12643d,#12643D) 100%)'), color: cm('#FFFFFF'), padding: mobile ? '22px 18px 24px' : '34px 0 30px' }}>
+      <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: cm('radial-gradient(circle,color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 18%,transparent) 1.2px,transparent 1.8px)'), backgroundSize: '22px 22px', pointerEvents: 'none' }} />
       <div style={{ position: 'relative', maxWidth: mobile ? undefined : 1376, margin: mobile ? undefined : '0 auto', padding: mobile ? undefined : '0 32px', display: 'flex', flexDirection: mobile ? 'column' : 'row', gap: mobile ? 16 : 30, alignItems: mobile ? undefined : 'flex-end', justifyContent: mobile ? undefined : 'space-between' }}>
         <div>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: cm('#86CFA6') }}>
-            <span style={{ width: 8, height: 8, borderRadius: 2, background: cm('#D8B45A'), transform: 'rotate(45deg)' }} />CRONOGRAMA DE ESTUDOS
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: cm('var(--pn-86cfa6,#86CFA6)') }}>
+            <span style={{ width: 8, height: 8, borderRadius: 2, background: cm('var(--pn-d8b45a,#D8B45A)'), transform: 'rotate(45deg)' }} />CRONOGRAMA DE ESTUDOS
           </span>
           <h1 style={{ margin: '8px 0 4px', fontSize: mobile ? 28 : 40, fontWeight: 800, letterSpacing: '-0.045em' }}>Monte seu cronograma</h1>
-          <p style={{ margin: 0, fontSize: 14, color: cm('#CFE3D7'), maxWidth: 560 }}>Rotina, cronograma base e data de início · cada meta concluída vale XP na sua liga.</p>
+          <p style={{ margin: 0, fontSize: 14, color: cm('var(--pn-cfe3d7,#CFE3D7)'), maxWidth: 560 }}>Rotina, cronograma base e data de início · cada meta concluída vale XP na sua liga.</p>
         </div>
       </div>
     </section>
@@ -43,7 +43,7 @@ function GerarArea({ st, mobile }: { st: CronogramaState; mobile: boolean }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingBottom: 18, borderBottom: '1px solid var(--line)' }}>
         <Stepper k={K} mobile={mobile} st={st} />
         <div style={{ height: 8, borderRadius: 99, background: 'var(--surface2)', boxShadow: 'inset 0 2px 0 rgba(0,0,0,.06)' }}>
-          <span style={{ display: 'block', height: '100%', width: `${st.gs * 25}%`, borderRadius: 99, background: cm('linear-gradient(90deg,#2BB673,#16804F)'), transition: 'width .4s' }} />
+          <span style={{ display: 'block', height: '100%', width: `${st.gs * 25}%`, borderRadius: 99, background: cm('linear-gradient(90deg,var(--pn-2bb673,#2BB673),var(--pn-16804f,#16804F))'), transition: 'width .4s' }} />
         </div>
       </div>
       <WizSteps k={K} mobile={mobile} st={st} />
@@ -54,7 +54,7 @@ function GerarArea({ st, mobile }: { st: CronogramaState; mobile: boolean }) {
     <>
       <Card k={K} pad={18}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-          <span style={{ width: 46, height: 46, borderRadius: 14, background: cm('linear-gradient(160deg,#F1D48A,#B8913A)'), display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: cm('0 3px 0 #8A6A1E'), color: cm('#2A1F02') }}><Ic n="cal" s={22} /></span>
+          <span style={{ width: 46, height: 46, borderRadius: 14, background: cm('linear-gradient(160deg,var(--pn-f1d48a,#F1D48A),var(--pn-b8913a,#B8913A))'), display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: cm('0 3px 0 var(--pn-8a6a1e,#8A6A1E)'), color: cm('var(--pn-2a1f02,#2A1F02)') }}><Ic n="cal" s={22} /></span>
           <div>
             <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.2em', color: 'var(--goldInk)' }}>RESUMO</span>
             <b style={{ display: 'block', fontSize: 18, color: 'var(--ink)' }}>{st.previa.activities} metas · até {st.previa.xp} XP</b>
@@ -64,7 +64,7 @@ function GerarArea({ st, mobile }: { st: CronogramaState; mobile: boolean }) {
       </Card>
       <Card k={K} pad={16}>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-          <span style={{ color: cm('#F0773A') }}><Ic n="flame" s={26} /></span>
+          <span style={{ color: cm('var(--pn-f0773a,#F0773A)') }}><Ic n="flame" s={26} /></span>
           <span style={{ fontSize: 12.5, color: 'var(--muted)', lineHeight: 1.5 }}><b style={{ color: 'var(--ink)' }}>Bônus de constância:</b> cada semana completa vale um baú com XP extra na sua liga.</span>
         </div>
       </Card>

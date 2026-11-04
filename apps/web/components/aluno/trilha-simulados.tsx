@@ -73,7 +73,7 @@ export interface Trilha {
 
 const COR = 'var(--brand-primary, var(--primary))'
 // Roxo dos botões dos cards de simulado de baixo (card-simulado.tsx: s.vis?.cor ?? '#6d28d9').
-const BTN = '#6d28d9'
+const BTN = 'var(--pn-6d28d9,#6d28d9)'
 
 // Imagem de fundo de uma trilha (mesma regra na Início e na trilha gigante):
 // > 3 ícones de simulado (o baú NÃO é um nó, então não conta) → imagem NORMAL/inteira do banco
@@ -209,17 +209,17 @@ function TrilhaCaminho({ t, gamAtivo, simbolos, estampas = [] }: { t: Trilha; ga
           <div key={n.id} data-trilha-item className="absolute -translate-x-1/2 text-center" style={{ left: cx(p.off), top: p.y - R, width: 200, marginLeft: 0 }}>
             <button type="button" data-trilha-node data-carimbo-alvo={n.id} onClick={() => setAberto(n.id)} aria-label={n.titulo}
               className={cn('relative mx-auto flex items-center justify-center rounded-full border-4 shadow-sm transition-transform hover:scale-105 focus:outline-none', sel && 'ring-4 ring-primary/25')}
-              style={{ width: R * 2, height: R * 2, ...(ouro ? { background: 'radial-gradient(circle at 50% 36%, #ffe680 0%, #ffcf33 46%, #f0b000 78%, #d99200 100%)', borderColor: '#c07f08', color: '#c2680a', boxShadow: '0 0 13px 2px rgba(250,204,21,.5), 0 0 28px 6px rgba(250,204,21,.22), 0 6px 16px -5px rgba(217,119,6,.55)' }
-                : concluido ? { background: '#10b981', borderColor: '#059669', color: '#fff' }
+              style={{ width: R * 2, height: R * 2, ...(ouro ? { background: 'radial-gradient(circle at 50% 36%, var(--pn-ffe680,#ffe680) 0%, var(--pn-ffcf33,#ffcf33) 46%, var(--pn-f0b000,#f0b000) 78%, var(--pn-d99200,#d99200) 100%)', borderColor: 'var(--pn-c07f08,#c07f08)', color: 'var(--pn-c2680a,#c2680a)', boxShadow: '0 0 13px 2px color-mix(in srgb,var(--pn-facc15,#FACC15) 50%,transparent), 0 0 28px 6px color-mix(in srgb,var(--pn-facc15,#FACC15) 22%,transparent), 0 6px 16px -5px color-mix(in srgb,var(--pn-d97706,#D97706) 55%,transparent)' }
+                : concluido ? { background: 'var(--pn-10b981,#10b981)', borderColor: 'var(--pn-059669,#059669)', color: '#fff' }
                 : atual ? { background: `color-mix(in oklab, ${COR} 16%, var(--card))`, borderColor: COR, color: COR }
                 : { background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }), ...corFundoOverride(simbolos[noEstado(concluido, atual)], ouro) }}>
               {atual && <span className="pointer-events-none absolute inset-[-5px] rounded-full border-2 opacity-60 motion-safe:animate-ping" style={{ borderColor: COR }} />}
               {ouro && (<>
-                <Crown className="pointer-events-none absolute -top-[23px] left-1/2 h-[26px] w-[22px] -translate-x-1/2" fill="#ffd24a" strokeWidth={1.75} style={{ color: '#a75d09', filter: 'drop-shadow(0 1px 2px rgba(90,45,0,.5)) drop-shadow(0 0 5px rgba(250,204,21,.55))' }} />
-                <span className="pointer-events-none absolute inset-[4px] rounded-full" style={{ background: 'radial-gradient(circle at 50% 34%, #fff2b0 0%, #ffd93b 44%, #f2b800 100%)', boxShadow: 'inset 0 -3px 6px rgba(170,105,10,.5), inset 0 2px 3px rgba(255,255,255,.7)' }} />
+                <Crown className="pointer-events-none absolute -top-[23px] left-1/2 h-[26px] w-[22px] -translate-x-1/2" fill="var(--pn-ffd24a,#ffd24a)" strokeWidth={1.75} style={{ color: 'var(--pn-a75d09,#a75d09)', filter: 'drop-shadow(0 1px 2px color-mix(in srgb,var(--pn-5a2d00,#5A2D00) 50%,transparent)) drop-shadow(0 0 5px color-mix(in srgb,var(--pn-facc15,#FACC15) 55%,transparent))' }} />
+                <span className="pointer-events-none absolute inset-[4px] rounded-full" style={{ background: 'radial-gradient(circle at 50% 34%, var(--pn-fff2b0,#fff2b0) 0%, var(--pn-ffd93b,#ffd93b) 44%, var(--pn-f2b800,#f2b800) 100%)', boxShadow: 'inset 0 -3px 6px color-mix(in srgb,var(--pn-aa690a,#AA690A) 50%,transparent), inset 0 2px 3px rgba(255,255,255,.7)' }} />
                 <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-full"><span className="absolute inset-0" style={{ background: 'linear-gradient(122deg, transparent 30%, rgba(255,255,255,.7) 44%, rgba(255,255,255,.2) 55%, transparent 67%)' }} /></span>
               </>)}
-              <span className="relative" style={ouro ? { color: '#c2680a' } : undefined}><SimboloNo config={simbolos[noEstado(concluido, atual)]} escala={1} cor={ouro ? '#c2680a' : coresNo(noEstado(concluido, atual), simbolos[noEstado(concluido, atual)]).simbolo} strokeWidth={concluido && ouro ? 3.25 : 2.5} /></span>
+              <span className="relative" style={ouro ? { color: 'var(--pn-c2680a,#c2680a)' } : undefined}><SimboloNo config={simbolos[noEstado(concluido, atual)]} escala={1} cor={ouro ? 'var(--pn-c2680a,#c2680a)' : coresNo(noEstado(concluido, atual), simbolos[noEstado(concluido, atual)]).simbolo} strokeWidth={concluido && ouro ? 3.25 : 2.5} /></span>
             </button>
             {/* Rótulo com fundo próprio p/ não se misturar ao pontilhado que passa atrás. */}
             <div className="relative z-[1] mt-1.5 inline-block max-w-full rounded-lg border bg-background/85 px-2 py-0.5 shadow-sm backdrop-blur-sm">
@@ -389,19 +389,19 @@ export function TrilhaSimulados({ trilhas, gamAtivo, estilo = 'cards', visiveis 
               <div key={n.id} data-trilha-item className="flex gap-4">
                 <div className="flex flex-col items-center pt-3">
                   <span className="relative flex shrink-0 items-center justify-center rounded-full border-4 shadow-sm"
-                    style={{ width: 52, height: 52, ...(ouro ? { background: 'radial-gradient(circle at 50% 36%, #ffe680 0%, #ffcf33 46%, #f0b000 78%, #d99200 100%)', borderColor: '#c07f08', color: '#c2680a', boxShadow: '0 0 11px 2px rgba(250,204,21,.5), 0 5px 14px -5px rgba(217,119,6,.55)' }
-                      : concluido ? { background: '#10b981', borderColor: '#059669', color: '#fff' }
+                    style={{ width: 52, height: 52, ...(ouro ? { background: 'radial-gradient(circle at 50% 36%, var(--pn-ffe680,#ffe680) 0%, var(--pn-ffcf33,#ffcf33) 46%, var(--pn-f0b000,#f0b000) 78%, var(--pn-d99200,#d99200) 100%)', borderColor: 'var(--pn-c07f08,#c07f08)', color: 'var(--pn-c2680a,#c2680a)', boxShadow: '0 0 11px 2px color-mix(in srgb,var(--pn-facc15,#FACC15) 50%,transparent), 0 5px 14px -5px color-mix(in srgb,var(--pn-d97706,#D97706) 55%,transparent)' }
+                      : concluido ? { background: 'var(--pn-10b981,#10b981)', borderColor: 'var(--pn-059669,#059669)', color: '#fff' }
                       : atual ? { background: `color-mix(in oklab, ${COR} 16%, var(--card))`, borderColor: COR, color: COR }
                       : { background: 'var(--card)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }), ...corFundoOverride(simbolos[noEstado(concluido, atual)], ouro) }}>
                     {atual && <span className="pointer-events-none absolute inset-[-5px] rounded-full border-2 opacity-60 motion-safe:animate-ping" style={{ borderColor: COR }} />}
                     {ouro && (<>
-                      <Crown className="pointer-events-none absolute -top-[19px] left-1/2 h-[22px] w-[19px] -translate-x-1/2" fill="#ffd24a" strokeWidth={1.75} style={{ color: '#a75d09', filter: 'drop-shadow(0 1px 2px rgba(90,45,0,.5)) drop-shadow(0 0 4px rgba(250,204,21,.55))' }} />
-                      <span className="pointer-events-none absolute inset-[3px] rounded-full" style={{ background: 'radial-gradient(circle at 50% 34%, #fff2b0 0%, #ffd93b 44%, #f2b800 100%)', boxShadow: 'inset 0 -2px 5px rgba(170,105,10,.5), inset 0 2px 3px rgba(255,255,255,.7)' }} />
+                      <Crown className="pointer-events-none absolute -top-[19px] left-1/2 h-[22px] w-[19px] -translate-x-1/2" fill="var(--pn-ffd24a,#ffd24a)" strokeWidth={1.75} style={{ color: 'var(--pn-a75d09,#a75d09)', filter: 'drop-shadow(0 1px 2px color-mix(in srgb,var(--pn-5a2d00,#5A2D00) 50%,transparent)) drop-shadow(0 0 4px color-mix(in srgb,var(--pn-facc15,#FACC15) 55%,transparent))' }} />
+                      <span className="pointer-events-none absolute inset-[3px] rounded-full" style={{ background: 'radial-gradient(circle at 50% 34%, var(--pn-fff2b0,#fff2b0) 0%, var(--pn-ffd93b,#ffd93b) 44%, var(--pn-f2b800,#f2b800) 100%)', boxShadow: 'inset 0 -2px 5px color-mix(in srgb,var(--pn-aa690a,#AA690A) 50%,transparent), inset 0 2px 3px rgba(255,255,255,.7)' }} />
                       <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-full"><span className="absolute inset-0" style={{ background: 'linear-gradient(122deg, transparent 30%, rgba(255,255,255,.7) 44%, rgba(255,255,255,.2) 55%, transparent 67%)' }} /></span>
                     </>)}
-                    <span className="relative" style={ouro ? { color: '#c2680a' } : undefined}><SimboloNo config={simbolos[noEstado(concluido, atual)]} escala={0.85} cor={ouro ? '#c2680a' : coresNo(noEstado(concluido, atual), simbolos[noEstado(concluido, atual)]).simbolo} strokeWidth={concluido && ouro ? 3 : 2.5} /></span>
+                    <span className="relative" style={ouro ? { color: 'var(--pn-c2680a,#c2680a)' } : undefined}><SimboloNo config={simbolos[noEstado(concluido, atual)]} escala={0.85} cor={ouro ? 'var(--pn-c2680a,#c2680a)' : coresNo(noEstado(concluido, atual), simbolos[noEstado(concluido, atual)]).simbolo} strokeWidth={concluido && ouro ? 3 : 2.5} /></span>
                   </span>
-                  {i < t.nodes.length - 1 && <span className="my-1 flex-1" style={{ width: 6, minHeight: 24, backgroundImage: `radial-gradient(circle, ${concluido ? '#10b981' : 'var(--border)'} 40%, transparent 44%)`, backgroundSize: '6px 12px', backgroundRepeat: 'repeat-y' }} />}
+                  {i < t.nodes.length - 1 && <span className="my-1 flex-1" style={{ width: 6, minHeight: 24, backgroundImage: `radial-gradient(circle, ${concluido ? 'var(--pn-10b981,#10b981)' : 'var(--border)'} 40%, transparent 44%)`, backgroundSize: '6px 12px', backgroundRepeat: 'repeat-y' }} />}
                 </div>
 
                 <NodeCard n={n} gamAtivo={gamAtivo} />
@@ -411,7 +411,7 @@ export function TrilhaSimulados({ trilhas, gamAtivo, estilo = 'cards', visiveis 
 
           <div className="flex items-center gap-4">
             <div className="flex w-[52px] justify-center">
-              <span className="flex items-center justify-center rounded-full border-4" style={{ width: 48, height: 48, ...(t.done >= t.total ? { background: 'var(--brand-accent, #f59e0b)', borderColor: 'color-mix(in oklab, var(--brand-accent, #f59e0b) 70%, #000)', color: '#fff' } : { borderColor: 'var(--border)', color: 'var(--muted-foreground)' }) }}>
+              <span className="flex items-center justify-center rounded-full border-4" style={{ width: 48, height: 48, ...(t.done >= t.total ? { background: 'var(--brand-accent, var(--pn-f59e0b,#f59e0b))', borderColor: 'color-mix(in oklab, var(--brand-accent, var(--pn-f59e0b,#f59e0b)) 70%, #000)', color: '#fff' } : { borderColor: 'var(--border)', color: 'var(--muted-foreground)' }) }}>
                 <Trophy className="h-5 w-5" />
               </span>
             </div>
@@ -650,20 +650,20 @@ export function TrilhaGigante({ trilhas, gamAtivo, reto = false, semFundo = fals
             {proxima && <span className="mb-1 whitespace-nowrap rounded-full bg-amber-500 px-2 py-0.5 text-[11px] font-bold text-white shadow motion-safe:animate-pulse">{rotuloProximaAula(n.liberaEm)}</span>}
             <button type="button" data-trilha-node data-carimbo-alvo={n.id} onClick={() => setAberto(n.id)} aria-label={n.titulo}
               className={cn('relative flex items-center justify-center rounded-full border-4 shadow-sm transition-transform hover:scale-105 focus:outline-none', sel && 'ring-4 ring-primary/25')}
-              style={{ width: r * 2, height: r * 2, ...(ouro ? { background: 'radial-gradient(circle at 50% 36%, #ffe680 0%, #ffcf33 46%, #f0b000 78%, #d99200 100%)', borderColor: '#c07f08', color: '#c2680a', boxShadow: '0 0 13px 2px rgba(250,204,21,.5), 0 0 28px 6px rgba(250,204,21,.22), 0 6px 16px -5px rgba(217,119,6,.55)' }
-                : concluido ? { background: '#10b981', borderColor: '#059669', color: '#fff' }
+              style={{ width: r * 2, height: r * 2, ...(ouro ? { background: 'radial-gradient(circle at 50% 36%, var(--pn-ffe680,#ffe680) 0%, var(--pn-ffcf33,#ffcf33) 46%, var(--pn-f0b000,#f0b000) 78%, var(--pn-d99200,#d99200) 100%)', borderColor: 'var(--pn-c07f08,#c07f08)', color: 'var(--pn-c2680a,#c2680a)', boxShadow: '0 0 13px 2px color-mix(in srgb,var(--pn-facc15,#FACC15) 50%,transparent), 0 0 28px 6px color-mix(in srgb,var(--pn-facc15,#FACC15) 22%,transparent), 0 6px 16px -5px color-mix(in srgb,var(--pn-d97706,#D97706) 55%,transparent)' }
+                : concluido ? { background: 'var(--pn-10b981,#10b981)', borderColor: 'var(--pn-059669,#059669)', color: '#fff' }
                 : atual ? { background: `color-mix(in oklab, ${COR} 16%, var(--card))`, borderColor: COR, color: COR }
                 : { background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }), ...corFundoOverride(simbolos[noEstado(concluido, atual)], ouro) }}>
               {atual && <span className="pointer-events-none absolute inset-[-5px] rounded-full border-2 opacity-60 motion-safe:animate-ping" style={{ borderColor: COR }} />}
               {ouro && (<>
                 {/* Coroa (só 100%) — flutua acima da moeda, dourada com contorno âmbar e leve glow */}
-                <Crown className="pointer-events-none absolute -top-[23px] left-1/2 h-[26px] w-[22px] -translate-x-1/2" fill="#ffd24a" strokeWidth={1.75} style={{ color: '#a75d09', filter: 'drop-shadow(0 1px 2px rgba(90,45,0,.5)) drop-shadow(0 0 5px rgba(250,204,21,.55))' }} />
+                <Crown className="pointer-events-none absolute -top-[23px] left-1/2 h-[26px] w-[22px] -translate-x-1/2" fill="var(--pn-ffd24a,#ffd24a)" strokeWidth={1.75} style={{ color: 'var(--pn-a75d09,#a75d09)', filter: 'drop-shadow(0 1px 2px color-mix(in srgb,var(--pn-5a2d00,#5A2D00) 50%,transparent)) drop-shadow(0 0 5px color-mix(in srgb,var(--pn-facc15,#FACC15) 55%,transparent))' }} />
                 {/* Disco interno da moeda (mais claro, com relevo) */}
-                <span className="pointer-events-none absolute inset-[4px] rounded-full" style={{ background: 'radial-gradient(circle at 50% 34%, #fff2b0 0%, #ffd93b 44%, #f2b800 100%)', boxShadow: 'inset 0 -3px 6px rgba(170,105,10,.5), inset 0 2px 3px rgba(255,255,255,.7)' }} />
+                <span className="pointer-events-none absolute inset-[4px] rounded-full" style={{ background: 'radial-gradient(circle at 50% 34%, var(--pn-fff2b0,#fff2b0) 0%, var(--pn-ffd93b,#ffd93b) 44%, var(--pn-f2b800,#f2b800) 100%)', boxShadow: 'inset 0 -3px 6px color-mix(in srgb,var(--pn-aa690a,#AA690A) 50%,transparent), inset 0 2px 3px rgba(255,255,255,.7)' }} />
                 {/* Faixa de brilho diagonal (verniz), recortada no círculo */}
                 <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-full"><span className="absolute inset-0" style={{ background: 'linear-gradient(122deg, transparent 30%, rgba(255,255,255,.7) 44%, rgba(255,255,255,.2) 55%, transparent 67%)' }} /></span>
               </>)}
-              <span className="relative z-10" style={ouro ? { color: '#c2680a' } : undefined}><SimboloNo config={simbolos[noEstado(concluido, atual)]} escala={1} cor={ouro ? '#c2680a' : coresNo(noEstado(concluido, atual), simbolos[noEstado(concluido, atual)]).simbolo} strokeWidth={concluido && ouro ? 3.25 : 2.5} /></span>
+              <span className="relative z-10" style={ouro ? { color: 'var(--pn-c2680a,#c2680a)' } : undefined}><SimboloNo config={simbolos[noEstado(concluido, atual)]} escala={1} cor={ouro ? 'var(--pn-c2680a,#c2680a)' : coresNo(noEstado(concluido, atual), simbolos[noEstado(concluido, atual)]).simbolo} strokeWidth={concluido && ouro ? 3.25 : 2.5} /></span>
               <EstampasNo estampas={estampas} aulaId={n.id} />
             </button>
             {/* Rótulo cresce lateralmente (largura por conteúdo, teto 260px); título no máx. 2 linhas. */}

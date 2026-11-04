@@ -55,27 +55,27 @@ import { MaratonaCardDestaque } from '@/components/aluno/maratona/maratona-card-
 import { MARATONA } from '@/lib/maratona/config'
 
 // Amarelo fixo da marca (spec §1.1 constantes) + texto legível sobre ele.
-const AMARELO = '#F1C232'
-const AMARELO_INK = '#2A1A55'
+const AMARELO = 'var(--pn-f1c232,#F1C232)'
+const AMARELO_INK = 'var(--pn-2a1a55,#2A1A55)'
 
 // Gradientes de fundo dos 5 slides do carrossel (mockup).
 const SLIDE_BG = [
-  'linear-gradient(120deg,#160F33 0%,#241A52 55%,#2E1F6A 100%)',
-  'linear-gradient(120deg,#1B1240 0%,#33207A 55%,#4A31B8 100%)',
-  'linear-gradient(120deg,#1A1208 0%,#3B2A12 55%,#5C3B12 100%)',
-  'linear-gradient(120deg,#2A0F2E 0%,#4A1F5E 55%,#6A2FB0 100%)',
-  'linear-gradient(120deg,#160F33 0%,#2A1E5A 55%,#3F2E85 100%)',
+  'linear-gradient(120deg,var(--pn-160f33,#160F33) 0%,var(--pn-241a52,#241A52) 55%,var(--pn-2e1f6a,#2E1F6A) 100%)',
+  'linear-gradient(120deg,var(--pn-1b1240,#1B1240) 0%,var(--pn-33207a,#33207A) 55%,var(--pn-4a31b8,#4A31B8) 100%)',
+  'linear-gradient(120deg,var(--pn-1a1208,#1A1208) 0%,var(--pn-3b2a12,#3B2A12) 55%,var(--pn-5c3b12,#5C3B12) 100%)',
+  'linear-gradient(120deg,var(--pn-2a0f2e,#2A0F2E) 0%,var(--pn-4a1f5e,#4A1F5E) 55%,var(--pn-6a2fb0,#6A2FB0) 100%)',
+  'linear-gradient(120deg,var(--pn-160f33,#160F33) 0%,var(--pn-2a1e5a,#2A1E5A) 55%,var(--pn-3f2e85,#3F2E85) 100%)',
 ]
 // Gradientes de capa (determinístico por índice) p/ cards/pastas.
 const COVER_BG = [
-  'linear-gradient(135deg,#241047,#5B2A9E)',
-  'linear-gradient(135deg,#2A1E4A,#4A31B8)',
-  'linear-gradient(135deg,#1C1540,#3E2A93)',
-  'linear-gradient(135deg,#0D2A8F,#2156E8)',
-  'linear-gradient(135deg,#1F3D12,#5B9A22)',
-  'linear-gradient(135deg,#0B6E6E,#1EAAA6)',
-  'linear-gradient(135deg,#A84A14,#E58B3A)',
-  'linear-gradient(135deg,#0C4C7A,#2290BE)',
+  'linear-gradient(135deg,var(--pn-241047,#241047),var(--pn-5b2a9e,#5B2A9E))',
+  'linear-gradient(135deg,var(--pn-2a1e4a,#2A1E4A),var(--pn-4a31b8,#4A31B8))',
+  'linear-gradient(135deg,var(--pn-1c1540,#1C1540),var(--pn-3e2a93,#3E2A93))',
+  'linear-gradient(135deg,var(--pn-0d2a8f,#0D2A8F),var(--pn-2156e8,#2156E8))',
+  'linear-gradient(135deg,var(--pn-1f3d12,#1F3D12),var(--pn-5b9a22,#5B9A22))',
+  'linear-gradient(135deg,var(--pn-0b6e6e,#0B6E6E),var(--pn-1eaaa6,#1EAAA6))',
+  'linear-gradient(135deg,var(--pn-a84a14,#A84A14),var(--pn-e58b3a,#E58B3A))',
+  'linear-gradient(135deg,var(--pn-0c4c7a,#0C4C7A),var(--pn-2290be,#2290BE))',
 ]
 
 const SVG_R = 'M6 5.5H32C43.5 5.5 49 13 49 23C49 31 45 37 39.5 40.5L62 61H6Z M9.2 9.2H19.2V57.6H9.2Z'
@@ -113,20 +113,20 @@ export function HomeRevisao({
     const base = internaTokensStyle('revisao', theme) as Record<string, string>
     const over: Record<string, string> = {
       // Paleta exata do mockup (§1.1) — vence a do simulado.
-      '--bg': dark ? '#0E0A24' : '#F4F2FA',
-      '--surface': dark ? '#1C1440' : '#FFFFFF',
-      '--surface2': dark ? '#171030' : '#F6F4FC',
-      '--ink': dark ? '#FFFFFF' : '#1D1933',
-      '--muted': dark ? '#BDBBCB' : '#6E6886',
-      '--muted2': dark ? '#73717F' : '#B3ADC7',
-      '--line': dark ? 'rgba(255,255,255,.1)' : '#EAE6F4',
-      '--line2': dark ? 'rgba(255,255,255,.18)' : '#D9D2F0',
-      '--track': dark ? 'rgba(255,255,255,.12)' : '#ECE8F6',
-      '--brand': dark ? '#B3A1FF' : '#5B3FD0',
-      '--brandLine': dark ? 'rgba(179,161,255,.45)' : 'rgba(91,63,208,.3)',
-      '--chip': dark ? 'rgba(143,117,255,.2)' : '#EFEBFD',
-      '--accentInk': dark ? AMARELO : '#9A7400',
-      '--peachBg': dark ? 'rgba(241,194,50,.12)' : '#FDF5D8',
+      '--bg': dark ? 'var(--pn-0e0a24,#0E0A24)' : 'var(--pn-f4f2fa,#F4F2FA)',
+      '--surface': dark ? 'var(--pn-1c1440,#1C1440)' : '#FFFFFF',
+      '--surface2': dark ? 'var(--pn-171030,#171030)' : 'var(--pn-f6f4fc,#F6F4FC)',
+      '--ink': dark ? '#FFFFFF' : 'var(--pn-1d1933,#1D1933)',
+      '--muted': dark ? 'var(--pn-bdbbcb,#BDBBCB)' : 'var(--pn-6e6886,#6E6886)',
+      '--muted2': dark ? 'var(--pn-73717f,#73717F)' : 'var(--pn-b3adc7,#B3ADC7)',
+      '--line': dark ? 'rgba(255,255,255,.1)' : 'var(--pn-eae6f4,#EAE6F4)',
+      '--line2': dark ? 'rgba(255,255,255,.18)' : 'var(--pn-d9d2f0,#D9D2F0)',
+      '--track': dark ? 'rgba(255,255,255,.12)' : 'var(--pn-ece8f6,#ECE8F6)',
+      '--brand': dark ? 'var(--pn-b3a1ff,#B3A1FF)' : 'var(--pn-5b3fd0,#5B3FD0)',
+      '--brandLine': dark ? 'color-mix(in srgb,var(--pn-b3a1ff,#B3A1FF) 45%,transparent)' : 'color-mix(in srgb,var(--pn-5b3fd0,#5B3FD0) 30%,transparent)',
+      '--chip': dark ? 'color-mix(in srgb,var(--pn-8f75ff,#8F75FF) 20%,transparent)' : 'var(--pn-efebfd,#EFEBFD)',
+      '--accentInk': dark ? AMARELO : 'var(--pn-9a7400,#9A7400)',
+      '--peachBg': dark ? 'color-mix(in srgb,var(--pn-f1c232,#F1C232) 12%,transparent)' : 'var(--pn-fdf5d8,#FDF5D8)',
       '--r': '20px',
     }
     return { ...base, ...over } as React.CSSProperties
@@ -275,7 +275,7 @@ function HeroSlide({ d, bg, index, ilustra }: { d: HomeDestaque; bg: string; ind
         style={ehImg ? { backgroundImage: `url("${d.imagem}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : { background: bg }}
       >
         {/* Banner real = imagem: overlay p/ legibilidade do texto, sem as decorações do slide. */}
-        {ehImg && <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg,rgba(10,5,35,.72),rgba(10,5,35,.25) 55%,transparent)' }} />}
+        {ehImg && <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(90deg,color-mix(in srgb,var(--pn-0a0523,#0A0523) 72%,transparent),color-mix(in srgb,var(--pn-0a0523,#0A0523) 25%,transparent) 55%,transparent)' }} />}
         {!ehImg && <div className="hrv-grid44" aria-hidden="true" />}
         {!ehImg && <div aria-hidden="true" className="hrv-px-wrap">
           {PX.map((p, k) => (
@@ -285,7 +285,7 @@ function HeroSlide({ d, bg, index, ilustra }: { d: HomeDestaque; bg: string; ind
               style={{
                 left: p.l,
                 top: p.t,
-                background: p.c === 'y' ? 'rgba(241,194,50,.2)' : 'rgba(185,168,255,.22)',
+                background: p.c === 'y' ? 'color-mix(in srgb,var(--pn-f1c232,#F1C232) 20%,transparent)' : 'color-mix(in srgb,var(--pn-b9a8ff,#B9A8FF) 22%,transparent)',
                 animationDelay: `${(p.d + index) % 7}s`,
               }}
             />
@@ -362,7 +362,7 @@ export function CarrosselMobile({ destaques }: { destaques: HomeDestaque[] }) {
               style={d.imagem ? { backgroundImage: `url("${d.imagem}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : { background: d.cores || SLIDE_BG[i % SLIDE_BG.length] }}
             >
               {d.imagem
-                ? <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,rgba(10,5,35,.2),rgba(10,5,35,.7))' }} />
+                ? <div aria-hidden="true" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,color-mix(in srgb,var(--pn-0a0523,#0A0523) 20%,transparent),color-mix(in srgb,var(--pn-0a0523,#0A0523) 70%,transparent))' }} />
                 : <div className="hrv-grid44" aria-hidden="true" />}
               {(d.eyebrow || d.titulo) && (
                 <div className="hrv-slide-txt hrv-slide-txt-m">
@@ -425,7 +425,7 @@ function ChipsMobile({ data }: { data: HomeData }) {
   return (
     <div className="hrv-mchips hrv-up">
       <div className="hrv-mchip">
-        <span style={{ color: '#E0A800' }}><Flame size={15} />{diasSeguidos}</span>
+        <span style={{ color: 'var(--pn-e0a800,#E0A800)' }}><Flame size={15} />{diasSeguidos}</span>
         <small>dias seguidos</small>
       </div>
       <div className="hrv-mchip">
@@ -433,7 +433,7 @@ function ChipsMobile({ data }: { data: HomeData }) {
         <small>XP total</small>
       </div>
       <div className="hrv-mchip">
-        <span style={{ color: '#D99A1E' }}><Trophy size={15} />{liga}</span>
+        <span style={{ color: 'var(--pn-d99a1e,#D99A1E)' }}><Trophy size={15} />{liga}</span>
         <small>sua liga</small>
       </div>
     </div>
@@ -481,7 +481,7 @@ export function NivelCard({ data, semStats, greeting, bare }: { data: HomeData; 
             />
             <defs>
               <linearGradient id="hrv-rg" x1="0" y1="0" x2="1" y2="1">
-                <stop offset="0" stopColor="#8F75FF" />
+                <stop offset="0" stopColor="var(--pn-8f75ff,#8F75FF)" />
                 <stop offset="1" stopColor={AMARELO} />
               </linearGradient>
             </defs>
@@ -497,7 +497,7 @@ export function NivelCard({ data, semStats, greeting, bare }: { data: HomeData; 
             <span><b>{u.xpNivelAtual}</b> / {u.xpNivelMax} XP</span>
           </div>
           <div className="hrv-prog">
-            <span className="hrv-bar" style={{ width: `${pct}%`, background: 'linear-gradient(90deg,#6449E0,#8F75FF 70%,#F1C232)' }} />
+            <span className="hrv-bar" style={{ width: `${pct}%`, background: 'linear-gradient(90deg,var(--pn-6449e0,#6449E0),var(--pn-8f75ff,#8F75FF) 70%,var(--pn-f1c232,#F1C232))' }} />
           </div>
           <span className="hrv-nivel-next">
             Faltam <b style={{ color: 'var(--brand)' }}>{Math.max(0, u.xpNivelMax - u.xpNivelAtual)} XP</b> para o nível {u.nivel + 1} · <b style={{ color: 'var(--ink)' }}>{u.proximoTitulo}</b>
@@ -727,7 +727,7 @@ export function Sequencia({ data }: { data: HomeData }) {
   return (
     <div className="hrv-card">
       <div className="hrv-card-head">
-        <h3 className="hrv-h3"><Flame size={18} style={{ color: '#E8573A' }} />Sequência</h3>
+        <h3 className="hrv-h3"><Flame size={18} style={{ color: 'var(--pn-e8573a,#E8573A)' }} />Sequência</h3>
         <span className="hrv-pill-chip">{streakTxt}</span>
       </div>
       <div className="hrv-week">
@@ -742,7 +742,7 @@ export function Sequencia({ data }: { data: HomeData }) {
                 className={cn('hrv-week-cell', estudou && 'hrv-fire')}
                 style={
                   estudou
-                    ? { background: 'rgba(232,87,58,.14)' }
+                    ? { background: 'color-mix(in srgb,var(--pn-e8573a,#E8573A) 14%,transparent)' }
                     : hoje
                       ? { border: '2px solid var(--brand)', color: 'var(--brand)' }
                       : { border: '1px solid var(--line)', color: 'var(--muted2)' }
@@ -780,10 +780,10 @@ export function Sequencia({ data }: { data: HomeData }) {
 function FogoSvg() {
   return (
     <svg className="hrv-fl" viewBox="0 0 24 30" aria-hidden="true">
-      <ellipse className="sh" cx="12" cy="27.6" rx="7" ry="1.7" fill="rgba(150,50,30,.28)" />
+      <ellipse className="sh" cx="12" cy="27.6" rx="7" ry="1.7" fill="color-mix(in srgb,var(--pn-96321e,#96321E) 28%,transparent)" />
       <g className="b">
-        <path className="o" d="M12 25.4C7.4 25.4 4.1 22.1 4.1 17.7 4.1 14.7 5.5 12.6 6.3 10.7 6.7 9.6 6.7 6.6 7.1 5.3 7.4 4.4 8.4 4.3 8.9 5.1 9.6 6.3 10 7.2 10.6 7.8 11.1 5.7 11.9 2.9 13.4 1.4 14 .8 14.9 .9 15.3 1.6 17.4 5.3 19.9 9.8 19.9 17.4 19.9 22.1 16.6 25.4 12 25.4Z" fill="#F26B4A" />
-        <path className="i" d="M12 23.3C9.9 23.3 8.6 21.8 8.6 20 8.6 17.9 10.5 16.1 11.4 14.3 11.6 13.9 12.4 13.9 12.6 14.3 13.5 16.1 15.4 17.9 15.4 20 15.4 21.8 14.1 23.3 12 23.3Z" fill="#FFC24D" />
+        <path className="o" d="M12 25.4C7.4 25.4 4.1 22.1 4.1 17.7 4.1 14.7 5.5 12.6 6.3 10.7 6.7 9.6 6.7 6.6 7.1 5.3 7.4 4.4 8.4 4.3 8.9 5.1 9.6 6.3 10 7.2 10.6 7.8 11.1 5.7 11.9 2.9 13.4 1.4 14 .8 14.9 .9 15.3 1.6 17.4 5.3 19.9 9.8 19.9 17.4 19.9 22.1 16.6 25.4 12 25.4Z" fill="var(--pn-f26b4a,#F26B4A)" />
+        <path className="i" d="M12 23.3C9.9 23.3 8.6 21.8 8.6 20 8.6 17.9 10.5 16.1 11.4 14.3 11.6 13.9 12.4 13.9 12.6 14.3 13.5 16.1 15.4 17.9 15.4 20 15.4 21.8 14.1 23.3 12 23.3Z" fill="var(--pn-ffc24d,#FFC24D)" />
       </g>
     </svg>
   )
@@ -994,14 +994,14 @@ export const CSS = `
 .hrv-emb{position:absolute;right:40px;top:50%;margin-top:-105px;width:216px;height:210px;pointer-events:none}
 .hrv-run{stroke-dasharray:22 400;animation:hrv-run 8s linear infinite}
 @keyframes hrv-run{to{stroke-dashoffset:-422}}
-.hrv-live{width:7px;height:7px;border-radius:50%;background:#3FD58A;animation:hrv-blink 1.6s ease-in-out infinite}
+.hrv-live{width:7px;height:7px;border-radius:50%;background:var(--pn-3fd58a,#3FD58A);animation:hrv-blink 1.6s ease-in-out infinite}
 @keyframes hrv-blink{50%{opacity:.3}}
 .hrv-slide-txt{position:relative;height:100%;display:flex;flex-direction:column;justify-content:center;gap:16px;padding:0 92px;max-width:680px}
 .hrv-eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:11px;font-weight:800;letter-spacing:.22em;color:${AMARELO}}
 .hrv-slide-h2{font-size:44px;font-weight:800;letter-spacing:-.04em;line-height:1.04}
 .hrv-chips{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .hrv-chip{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 12px;border-radius:999px;border:1px solid rgba(255,255,255,.22);font-size:12.5px;font-weight:700}
-.hrv-chip-gold{border:0;background:rgba(241,194,50,.16);color:#F7DA7A}
+.hrv-chip-gold{border:0;background:rgba(241,194,50,.16);color:var(--pn-f7da7a,#F7DA7A)}
 .hrv-slide-cta{display:flex;gap:10px;margin-top:4px}
 .hrv-btn-gold{display:inline-flex;align-items:center;gap:8px;height:48px;padding:0 20px;border-radius:14px;background:${AMARELO};color:${AMARELO_INK};font-weight:800;font-size:14.5px;transition:filter .15s,transform .15s}
 .hrv-btn-gold:hover{filter:brightness(1.05);transform:translateY(-1px)}
@@ -1022,12 +1022,12 @@ export const CSS = `
 .hrv-pause:hover{color:${AMARELO}}
 /* ilustração pasta */
 .hrv-fold{position:absolute;right:250px;bottom:-6px;width:330px;height:250px;pointer-events:none}
-.hrv-fold-tab{position:absolute;left:30px;top:0;width:120px;height:30px;border-radius:10px 10px 0 0;background:#3A2A78}
-.hrv-fold-pg1{position:absolute;left:22px;right:40px;top:16px;height:60px;background:#F1ECE0;border-radius:4px;transform:rotate(-2deg)}
-.hrv-fold-pg2{position:absolute;left:34px;right:26px;top:26px;height:60px;background:#E5DDCB;border-radius:4px;transform:rotate(1.5deg)}
-.hrv-fold-body{position:absolute;left:0;right:0;top:24px;bottom:0;border-radius:6px 14px 6px 6px;background:linear-gradient(170deg,#3F2E85,#21174A);box-shadow:0 30px 50px -20px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.08)}
-.hrv-fold-label{position:absolute;left:40px;right:40px;top:74px;height:50px;background:#D9CFB6;border-radius:3px;display:flex;align-items:center;justify-content:center;font-family:Georgia,serif;color:#4A3F2A;letter-spacing:.04em;font-size:14px}
-.hrv-fold-seal{position:absolute;right:22px;bottom:18px;width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#E3A74F,#8A5A1C);box-shadow:0 2px 6px rgba(0,0,0,.4)}
+.hrv-fold-tab{position:absolute;left:30px;top:0;width:120px;height:30px;border-radius:10px 10px 0 0;background:var(--pn-3a2a78,#3A2A78)}
+.hrv-fold-pg1{position:absolute;left:22px;right:40px;top:16px;height:60px;background:var(--pn-f1ece0,#F1ECE0);border-radius:4px;transform:rotate(-2deg)}
+.hrv-fold-pg2{position:absolute;left:34px;right:26px;top:26px;height:60px;background:var(--pn-e5ddcb,#E5DDCB);border-radius:4px;transform:rotate(1.5deg)}
+.hrv-fold-body{position:absolute;left:0;right:0;top:24px;bottom:0;border-radius:6px 14px 6px 6px;background:linear-gradient(170deg,var(--pn-3f2e85,#3F2E85),var(--pn-21174a,#21174A));box-shadow:0 30px 50px -20px rgba(0,0,0,.6),inset 0 1px 0 rgba(255,255,255,.08)}
+.hrv-fold-label{position:absolute;left:40px;right:40px;top:74px;height:50px;background:var(--pn-d9cfb6,#D9CFB6);border-radius:3px;display:flex;align-items:center;justify-content:center;font-family:Georgia,serif;color:var(--pn-4a3f2a,#4A3F2A);letter-spacing:.04em;font-size:14px}
+.hrv-fold-seal{position:absolute;right:22px;bottom:18px;width:34px;height:34px;border-radius:50%;background:radial-gradient(circle at 35% 35%,var(--pn-e3a74f,#E3A74F),var(--pn-8a5a1c,#8A5A1C));box-shadow:0 2px 6px rgba(0,0,0,.4)}
 
 /* --- corpo / grids --- */
 .hrv-body{padding:28px 28px 48px;display:flex;flex-direction:column;gap:26px}
@@ -1094,7 +1094,7 @@ export const CSS = `
 .hrv-cont-info>b{display:block;font-size:15.5px;color:var(--ink);letter-spacing:-.02em}
 .hrv-cont-info>span{font-size:12.5px;color:var(--muted)}
 .hrv-cont-actions{display:flex;gap:10px;margin-top:16px}
-.hrv-cta{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;border-radius:13px;color:#fff;font-weight:800;font-size:14px;border:0;background:linear-gradient(180deg,#6449E0,#4B30BE);box-shadow:0 10px 20px -12px rgba(75,48,190,.8),inset 0 1px 0 rgba(255,255,255,.2);transition:filter .15s,transform .15s;flex:1;white-space:nowrap}
+.hrv-cta{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:44px;border-radius:13px;color:#fff;font-weight:800;font-size:14px;border:0;background:linear-gradient(180deg,var(--pn-6449e0,#6449E0),var(--pn-4b30be,#4B30BE));box-shadow:0 10px 20px -12px rgba(75,48,190,.8),inset 0 1px 0 rgba(255,255,255,.2);transition:filter .15s,transform .15s;flex:1;white-space:nowrap}
 .hrv-cta:hover{filter:brightness(1.08);transform:translateY(-1px)}
 .hrv-cta-sm{height:38px;border-radius:11px;font-size:13px;gap:7px}
 .hrv-btn-outline{display:inline-flex;align-items:center;justify-content:center;gap:6px;height:44px;padding:0 14px;border-radius:13px;border:1px solid var(--line);color:var(--ink);font-weight:700;font-size:13px}
@@ -1195,8 +1195,8 @@ export const CSS = `
 /* --- outros --- */
 .hrv-outros-head{display:flex;align-items:center;gap:10px;margin-bottom:14px}
 .hrv-outros-head h3{font-size:16px;font-weight:800;color:var(--ink)}
-.hrv-selo{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:99px;background:rgba(63,213,138,.14);color:#1F9D60;font-size:12px;font-weight:800}
-.hrv-selo-dot{width:6px;height:6px;border-radius:50%;background:#2EC77A}
+.hrv-selo{display:inline-flex;align-items:center;gap:6px;height:24px;padding:0 10px;border-radius:99px;background:rgba(63,213,138,.14);color:var(--pn-1f9d60,#1F9D60);font-size:12px;font-weight:800}
+.hrv-selo-dot{width:6px;height:6px;border-radius:50%;background:var(--pn-2ec77a,#2EC77A)}
 .hrv-rc{display:flex;flex-direction:column;background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden}
 .hrv-rc-cover{height:118px}
 .hrv-rc-body{padding:14px;display:flex;flex-direction:column;gap:8px}

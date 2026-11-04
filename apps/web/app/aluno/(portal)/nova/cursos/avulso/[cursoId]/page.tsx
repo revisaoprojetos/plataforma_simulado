@@ -73,7 +73,7 @@ export default async function Page({ params }: { params: Promise<{ cursoId: stri
           <Col gap={8} style={{ maxWidth: 560 }}>
             <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.2em', color: 'var(--gold)' }}>CURSO · BIBLIOTECA DO REVISÃO</span>
             <b style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-0.045em', color: '#fff' }}>{curso.titulo}</b>
-            <P size={14}><span style={{ color: '#E6DEFF' }}>Os materiais deste curso, organizados em sequência para você avançar do começo ao fim.</span></P>
+            <P size={14}><span style={{ color: 'var(--pn-e6deff,#E6DEFF)' }}>Os materiais deste curso, organizados em sequência para você avançar do começo ao fim.</span></P>
             <Row gap={8}>
               <span style={{ height: 28, padding: '0 11px', borderRadius: 99, background: 'rgba(255,255,255,.12)', fontSize: 12, fontWeight: 800, color: '#fff', display: 'inline-flex', alignItems: 'center' }}>{curso.pdfs.toLocaleString('pt-BR')} materiais</span>
               <span style={{ height: 28, padding: '0 11px', borderRadius: 99, background: 'rgba(255,255,255,.12)', fontSize: 12, fontWeight: 800, color: '#fff', display: 'inline-flex', alignItems: 'center' }}>{feitos.toLocaleString('pt-BR')} concluídos</span>
@@ -81,7 +81,7 @@ export default async function Page({ params }: { params: Promise<{ cursoId: stri
           </Col>
           <Col gap={8} style={{ alignItems: 'flex-end' }}>
             <b style={{ fontSize: 44, fontWeight: 800, letterSpacing: '-0.05em', lineHeight: 1, color: '#fff' }}>{curso.pct}%</b>
-            <span style={{ fontSize: 12.5, color: '#E6DEFF' }}>do curso concluído</span>
+            <span style={{ fontSize: 12.5, color: 'var(--pn-e6deff,#E6DEFF)' }}>do curso concluído</span>
             {curso.continueDocId ? <Btn kind="gold" icon="play" href={R.painelLeitor(curso.continueDocId)}>Continuar de onde parei</Btn> : null}
           </Col>
         </Row>

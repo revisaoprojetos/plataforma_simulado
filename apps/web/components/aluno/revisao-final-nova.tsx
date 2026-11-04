@@ -291,7 +291,7 @@ export function RevisaoFinalNova({
         <div className={`${PFX}-col`} style={{ maxWidth: 1000, margin: '0 auto', padding: '30px 24px 60px', display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Aviso de mudança de gabarito */}
           {data.aviso_gabarito && (
-            <div style={{ display: 'flex', gap: 10, padding: '14px 16px', borderRadius: 16, background: 'var(--peachBg)', border: '1px solid rgba(241,194,50,.45)', color: 'var(--ink)' }}>
+            <div style={{ display: 'flex', gap: 10, padding: '14px 16px', borderRadius: 16, background: 'var(--peachBg)', border: '1px solid color-mix(in srgb,var(--pn-f1c232,#F1C232) 45%,transparent)', color: 'var(--ink)' }}>
               <span style={{ color: WARN, flexShrink: 0 }}><Ic size={18}><circle cx="12" cy="12" r="9" /><path d={RIC.info} /></Ic></span>
               <div style={{ fontSize: 13, lineHeight: 1.5 }}>
                 <b style={{ display: 'block' }}>Houve mudança de gabarito neste simulado</b>
@@ -366,7 +366,7 @@ export function RevisaoFinalNova({
           {data.maratona && (data.maratona.segMin ?? 0) > 0 && (() => {
             const seg = data.maratona.segMin ?? 0, dur = data.maratona.dur ?? 0, ok = !!data.maratona.checkin
             const fmt = (s: number) => { const m = Math.round(s / 60); return m >= 60 ? `${Math.floor(m / 60)}h${String(m % 60).padStart(2, '0')}` : `${m}min` }
-            const cor = ok ? '#1FA868' : '#E0860A'
+            const cor = ok ? 'var(--pn-1fa868,#1FA868)' : 'var(--pn-e0860a,#E0860A)'
             return (
               <div style={cardStyle({ padding: 16 })}>
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
@@ -502,7 +502,7 @@ export function RevisaoFinalNova({
                             const correta = a.correta === true
                             const erradaMarcada = marcada && !correta
                             const bd = correta ? OK : erradaMarcada ? ERR : 'var(--line)'
-                            const bg = correta ? 'rgba(31,168,104,.1)' : erradaMarcada ? 'rgba(229,72,77,.08)' : 'var(--surface)'
+                            const bg = correta ? 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 10%,transparent)' : erradaMarcada ? 'color-mix(in srgb,var(--pn-e5484d,#E5484D) 8%,transparent)' : 'var(--surface)'
                             const dot = correta ? OK : erradaMarcada ? ERR : 'transparent'
                             const ink = correta || erradaMarcada ? '#fff' : 'var(--muted)'
                             return (
@@ -651,9 +651,9 @@ function DiscursivaView({ d }: { d: QuestaoRev['discursiva'] }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {d.status === 'corrigida' ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 12, background: 'rgba(31,168,104,.1)', color: OK, fontSize: 13.5, fontWeight: 700 }}><Ic d={RIC.check} size={16} />Corrigida — nota {Number(d.nota ?? 0).toFixed(1)}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 12, background: 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 10%,transparent)', color: OK, fontSize: 13.5, fontWeight: 700 }}><Ic d={RIC.check} size={16} />Corrigida — nota {Number(d.nota ?? 0).toFixed(1)}</div>
       ) : enviada ? (
-        <div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(242,169,59,.12)', color: WARN, fontSize: 12.5, fontWeight: 700 }}>Resposta enviada — aguardando correção por um avaliador.</div>
+        <div style={{ padding: '10px 12px', borderRadius: 12, background: 'color-mix(in srgb,var(--pn-f2a93b,#F2A93B) 12%,transparent)', color: WARN, fontSize: 12.5, fontWeight: 700 }}>Resposta enviada — aguardando correção por um avaliador.</div>
       ) : (
         <div style={{ padding: '12px 14px', borderRadius: 12, background: 'var(--surface2)', color: 'var(--muted)', fontSize: 13 }}>Questão não respondida.</div>
       )}

@@ -61,7 +61,7 @@ export default async function PerfilAlunoPage() {
   const corTexto = corDestaque || (temFundo ? '#ffffff' : undefined)
   const corMarca = corDestaque || 'var(--brand-primary, var(--primary))'
   // O "Nv" fica sobre fundo claro; se o texto for branco ele sumiria → força preto só nesse caso.
-  const corNivel = corDestaque?.toLowerCase() === '#ffffff' ? '#0f172a' : corMarca
+  const corNivel = corDestaque?.toLowerCase() === '#ffffff' ? 'var(--pn-0f172a,#0f172a)' : corMarca
   const sombraTexto = temFundo ? '0 1px 4px rgba(0,0,0,.55)' : undefined
 
   const nome = est?.nome ?? sessao.nome

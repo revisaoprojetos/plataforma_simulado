@@ -36,9 +36,9 @@ export function Ic({ n, s = 18, c, sw }: { n: string; s?: number; c?: string; sw
 
 // ---------------------------------------------------------------- cores de nota (realizados.notecolor §1.4)
 export function notec(v: number): [string, string] {
-  if (v < 30) return ['#E5484D', 'rgba(229,72,77,.12)']
-  if (v < 60) return ['#D99A1E', 'rgba(217,154,30,.14)']
-  return ['#1FA868', 'rgba(31,168,104,.13)']
+  if (v < 30) return ['var(--pn-e5484d,#E5484D)', 'color-mix(in srgb,var(--pn-e5484d,#E5484D) 12%,transparent)']
+  if (v < 60) return ['var(--pn-d99a1e,#D99A1E)', 'color-mix(in srgb,var(--pn-d99a1e,#D99A1E) 14%,transparent)']
+  return ['var(--pn-1fa868,#1FA868)', 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 13%,transparent)']
 }
 export const fnum = (v: number) => v.toFixed(1).replace('.', ',')
 
@@ -133,7 +133,7 @@ export function Segs({ n, lit, h = 7, on = 'var(--brand)', off = 'var(--track)',
 export function BarRev({ pct, h = 6 }: { pct: number; h?: number }) {
   return (
     <div style={{ height: h, borderRadius: 99, background: 'var(--track)', overflow: 'hidden' }}>
-      <span className="rlz-bar" style={{ display: 'block', width: `${pct}%`, height: '100%', borderRadius: 99, background: 'linear-gradient(90deg,#6449E0,#F1C232)' }} />
+      <span className="rlz-bar" style={{ display: 'block', width: `${pct}%`, height: '100%', borderRadius: 99, background: 'linear-gradient(90deg,var(--pn-6449e0,#6449E0),var(--pn-f1c232,#F1C232))' }} />
     </div>
   )
 }
@@ -142,7 +142,7 @@ export function BarRev({ pct, h = 6 }: { pct: number; h?: number }) {
 export function NotaRing({ v, size = 54 }: { v: number; size?: number }) {
   const r = (size - 8) / 2, C = 2 * Math.PI * r, [c] = notec(v)
   return (
-    <span style={{ position: 'relative', width: size, height: size, flexShrink: 0, display: 'inline-block', borderRadius: '50%', background: 'rgba(4,26,16,.75)', boxShadow: '0 6px 16px -6px rgba(0,0,0,.6)' }}>
+    <span style={{ position: 'relative', width: size, height: size, flexShrink: 0, display: 'inline-block', borderRadius: '50%', background: 'color-mix(in srgb,var(--pn-041a10,#041A10) 75%,transparent)', boxShadow: '0 6px 16px -6px rgba(0,0,0,.6)' }}>
       <svg viewBox={`0 0 ${size} ${size}`} style={{ width: size, height: size, transform: 'rotate(-90deg)' }}>
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(255,255,255,.18)" strokeWidth={4} />
         <circle className="rlz-ring" cx={size / 2} cy={size / 2} r={r} fill="none" stroke={c} strokeWidth={4} strokeLinecap="round" strokeDasharray={C.toFixed(1)} strokeDashoffset={(C * (1 - v / 100)).toFixed(1)} style={{ ['--c' as string]: C.toFixed(1) } as CSSProperties} />
@@ -188,12 +188,12 @@ export function CoverVnd({ titulo, sub, grad, big = 22, showKicker = false, img,
         <img src={img} alt="" aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: fit }} />
       ) : (
         <>
-          <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: cm('radial-gradient(circle,rgba(185,245,212,.22) 1px,transparent 1.6px)'), backgroundSize: '14px 14px', pointerEvents: 'none' }} />
-          <svg viewBox="0 0 32 32" aria-hidden style={{ position: 'absolute', right: -18, top: -14, width: 110, height: 110, opacity: 0.16, pointerEvents: 'none' }}><path fill={cm('#B9F5D4')} d={VPATH} /></svg>
-          {showKicker ? <span style={{ position: 'absolute', left: 14, top: 12, display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 8.5, fontWeight: 800, letterSpacing: '.2em', color: '#F1D48A' }}>{marca === 'mac' ? 'SIMULA MAC' : 'SIMULA VND'}</span> : null}
-          <span style={{ position: 'relative', fontSize: 8.5, fontWeight: 800, letterSpacing: '.16em', color: cm('#CFE3D7') }}>{sub}</span>
+          <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: cm('radial-gradient(circle,color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 22%,transparent) 1px,transparent 1.6px)'), backgroundSize: '14px 14px', pointerEvents: 'none' }} />
+          <svg viewBox="0 0 32 32" aria-hidden style={{ position: 'absolute', right: -18, top: -14, width: 110, height: 110, opacity: 0.16, pointerEvents: 'none' }}><path fill={cm('var(--pn-b9f5d4,#B9F5D4)')} d={VPATH} /></svg>
+          {showKicker ? <span style={{ position: 'absolute', left: 14, top: 12, display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 8.5, fontWeight: 800, letterSpacing: '.2em', color: 'var(--pn-f1d48a,#F1D48A)' }}>{marca === 'mac' ? 'SIMULA MAC' : 'SIMULA VND'}</span> : null}
+          <span style={{ position: 'relative', fontSize: 8.5, fontWeight: 800, letterSpacing: '.16em', color: cm('var(--pn-cfe3d7,#CFE3D7)') }}>{sub}</span>
           <span style={{ position: 'relative', fontWeight: 800, fontSize: big, lineHeight: 1.02, letterSpacing: '-0.04em' }}>{titulo}</span>
-          <span aria-hidden style={{ position: 'relative', display: 'block', width: 34, height: 3, borderRadius: 3, background: '#D8B45A', marginTop: 6 }} />
+          <span aria-hidden style={{ position: 'relative', display: 'block', width: 34, height: 3, borderRadius: 3, background: 'var(--pn-d8b45a,#D8B45A)', marginTop: 6 }} />
         </>
       )}
     </div>
@@ -211,11 +211,11 @@ export function CoverMeq({ titulo, grad, big = 12, img, fit = 'cover' }: { titul
       ) : (
         <>
           <svg viewBox="0 0 160 100" aria-hidden preserveAspectRatio="xMidYMid slice" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
-            <path d="M-5 20 H40 V48 H90 V14 H165" fill="none" stroke="rgba(94,206,240,.3)" strokeWidth={1.4} />
+            <path d="M-5 20 H40 V48 H90 V14 H165" fill="none" stroke="color-mix(in srgb,var(--pn-5ecef0,#5ECEF0) 30%,transparent)" strokeWidth={1.4} />
             <path d="M-5 64 H26 V36 H70 V72 H165" fill="none" stroke="rgba(255,255,255,.1)" strokeWidth={1.2} />
-            {[[40, 20], [90, 48], [26, 64], [70, 36]].map(([x, y], i) => <rect key={i} x={x - 3} y={y - 3} width={6} height={6} rx={1.5} fill="#5ECEF0" opacity={0.7} />)}
+            {[[40, 20], [90, 48], [26, 64], [70, 36]].map(([x, y], i) => <rect key={i} x={x - 3} y={y - 3} width={6} height={6} rx={1.5} fill="var(--pn-5ecef0,#5ECEF0)" opacity={0.7} />)}
           </svg>
-          <span aria-hidden style={{ position: 'absolute', left: 12, top: 10, display: 'flex', gap: 2 }}>{[[5, 0.5], [8, 0.75], [11, 1]].map(([h, o], i) => <span key={i} style={{ display: 'block', width: 4, height: h, borderRadius: 1, background: '#5ECEF0', opacity: o, alignSelf: 'flex-end' }} />)}</span>
+          <span aria-hidden style={{ position: 'absolute', left: 12, top: 10, display: 'flex', gap: 2 }}>{[[5, 0.5], [8, 0.75], [11, 1]].map(([h, o], i) => <span key={i} style={{ display: 'block', width: 4, height: h, borderRadius: 1, background: 'var(--pn-5ecef0,#5ECEF0)', opacity: o, alignSelf: 'flex-end' }} />)}</span>
           <span style={{ position: 'relative', fontWeight: 700, fontSize: big, letterSpacing: '-0.04em', lineHeight: 1.05 }}>{titulo}</span>
         </>
       )}

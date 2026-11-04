@@ -29,7 +29,7 @@ const hrefAba = (a: Aba) => (a === 'cadernos' ? R.cadernos : `${R.cadernos}?aba=
 // Grifos por material antes do "ver todos" (um aluno pode ter centenas num PDF só).
 const LIMITE_POR_MATERIAL = 30
 
-type CadernoAluno = { id: string; nome: string; criado_em: string | null; total: number; resolvidas: number }
+type CadernoAluno = { id: string; nome: string; criado_em: string | null; total: number; resolvidas: number; itens: number }
 
 const fmtData = (iso: string | null) => {
   if (!iso) return ''
@@ -62,18 +62,23 @@ export default async function CadernosPage({ searchParams }: { searchParams: Pro
   // Aba Cadernos: itens de cada caderno → nº de questões + % resolvido (respostas do aluno no banco),
   // e o caderno AUTOMÁTICO de erros (última resposta errada). Só nesta aba (as outras não usam).
   const itensCad: { caderno_id: string; questao_id: string }[] = []
+  // Comentários de trecho salvos nos cadernos (tipo 'comentario'): tally por caderno, sem N+1. Erro (tabela
+  // ainda sem migração) → ignora e a listagem segue só com as questões.
+  const extrasPorCad: Record<string, number> = {}
   let erros: { ids: string[]; atualizadoEm: string | null } = { ids: [], atualizadoEm: null }
   if (aba === 'cadernos') {
     for (let i = 0; i < ids.length; i += 100) {
       const { data } = await svc.from('simulado_aluno_caderno_questoes').select('caderno_id, questao_id').in('caderno_id', ids.slice(i, i + 100))
       for (const q of (data ?? []) as any[]) itensCad.push({ caderno_id: q.caderno_id, questao_id: q.questao_id })
+      const { data: ex } = await svc.from('simulado_aluno_caderno_itens').select('caderno_id').eq('tenant_id', tenantId).in('caderno_id', ids.slice(i, i + 100))
+      for (const x of (ex ?? []) as any[]) extrasPorCad[x.caderno_id] = (extrasPorCad[x.caderno_id] ?? 0) + 1
     }
   }
   const [prog, errosRes] = aba === 'cadernos'
     ? await Promise.all([progressoCadernos(svc, tenantId, estudanteId, itensCad), cadernoDeErros(svc, tenantId, estudanteId).catch(() => erros)])
     : [{} as Record<string, { total: number; resolvidas: number }>, erros]
   erros = errosRes
-  const cadernos: CadernoAluno[] = ((cads ?? []) as any[]).map((c) => ({ id: c.id, nome: c.nome, criado_em: c.criado_em ?? null, total: prog[c.id]?.total ?? 0, resolvidas: prog[c.id]?.resolvidas ?? 0 }))
+  const cadernos: CadernoAluno[] = ((cads ?? []) as any[]).map((c) => ({ id: c.id, nome: c.nome, criado_em: c.criado_em ?? null, total: prog[c.id]?.total ?? 0, resolvidas: prog[c.id]?.resolvidas ?? 0, itens: extrasPorCad[c.id] ?? 0 }))
 
   const totalGrifos = materiais.reduce((n, m) => n + m.marcacoes.length, 0)
   const comNota: MaterialMarcado[] = materiais
@@ -106,7 +111,7 @@ export default async function CadernosPage({ searchParams }: { searchParams: Pro
               <Card pad={0} style={{ overflow: 'hidden', gap: 0, width: '100%' }}>
                 <div style={{ position: 'relative', background: GR.EXT, color: '#fff', padding: '16px 18px', minHeight: 72, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px)', backgroundSize: '22px 22px' }} />
-                  <span style={{ position: 'relative', fontSize: 11, fontWeight: 800, letterSpacing: '.14em', textTransform: 'uppercase', color: '#E6DEFF' }}>Automático</span>
+                  <span style={{ position: 'relative', fontSize: 11, fontWeight: 800, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--pn-e6deff,#E6DEFF)' }}>Automático</span>
                   <span style={{ position: 'relative', fontFamily: 'Montserrat, sans-serif', fontStyle: 'italic', fontWeight: 800, fontSize: 28, color: 'var(--gold)' }}>{erros.ids.length}</span>
                 </div>
                 <Col gap={12} style={{ padding: 18 }}>
@@ -126,18 +131,19 @@ export default async function CadernosPage({ searchParams }: { searchParams: Pro
                   {/* capa/cabeçalho */}
                   <div style={{ position: 'relative', background: GR.EXT, color: '#fff', padding: '16px 18px', minHeight: 72, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px)', backgroundSize: '22px 22px' }} />
-                    <span style={{ position: 'relative', fontSize: 11, fontWeight: 800, letterSpacing: '.14em', textTransform: 'uppercase', color: '#E6DEFF' }}>Criado por você</span>
-                    <span style={{ position: 'relative', fontFamily: 'Montserrat, sans-serif', fontStyle: 'italic', fontWeight: 800, fontSize: 28, color: 'var(--gold)' }}>{c.total}</span>
+                    <span style={{ position: 'relative', fontSize: 11, fontWeight: 800, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--pn-e6deff,#E6DEFF)' }}>Criado por você</span>
+                    <span style={{ position: 'relative', fontFamily: 'Montserrat, sans-serif', fontStyle: 'italic', fontWeight: 800, fontSize: 28, color: 'var(--gold)' }}>{c.total + c.itens}</span>
                   </div>
                   {/* corpo */}
                   <Col gap={12} style={{ padding: 18 }}>
                     <H3>{c.nome}</H3>
                     <Row gap={6}>
-                      <Tag kind="green">{c.total === 1 ? '1 questão' : `${c.total} questões`}</Tag>
+                      {(c.total > 0 || c.itens === 0) && <Tag kind="green">{c.total === 1 ? '1 questão' : `${c.total} questões`}</Tag>}
+                      {c.itens > 0 && <Tag kind="green">{c.itens === 1 ? '1 comentário' : `${c.itens} comentários`}</Tag>}
                     </Row>
                     {c.total > 0 && <Bar pct={Math.round((c.resolvidas / c.total) * 100)} color="var(--gold)" />}
                     <Row style={{ justifyContent: 'space-between', gap: 8 }}>
-                      <Muted size={12}>{c.total ? `${Math.round((c.resolvidas / c.total) * 100)}% resolvido` : 'Caderno vazio'}</Muted>
+                      <Muted size={12}>{c.total ? `${Math.round((c.resolvidas / c.total) * 100)}% resolvido` : c.itens ? '' : 'Caderno vazio'}</Muted>
                       {c.criado_em && <Muted size={12}>criado em {fmtData(c.criado_em)}</Muted>}
                     </Row>
                   </Col>

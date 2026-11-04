@@ -59,7 +59,7 @@ export function BancoCard({ id, nome, total, estudantes = 0, cor, icone, capa, t
         <div className="relative h-full aspect-[4/3] shrink-0 overflow-hidden">
           {capa
             ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105" />
-            : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }} />}
+            : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, var(--pn-0f172a,#0f172a) 135%)` }} />}
           <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `linear-gradient(110deg, transparent 45%, ${c})` }} />
         </div>
         {/* Link cobre o card (abaixo dos controles) */}
@@ -110,7 +110,7 @@ export function BancoCard({ id, nome, total, estudantes = 0, cor, icone, capa, t
       {capa ? (
         <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
       ) : (
-        <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }} />
+        <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, var(--pn-0f172a,#0f172a) 135%)` }} />
       )}
       {/* Degradê para legibilidade do texto */}
       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />

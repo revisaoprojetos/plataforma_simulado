@@ -73,12 +73,12 @@ export function ShellRevisaoNova({
   // Fundo das ÁREAS NOVAS = fundo INTERNA da marca (#0E0A24/#F5F3FC), NÃO o --bg do shell (revTokensStyle
   // usa #18181D cinza no dark). As páginas internas pintam esse mesmo fundo; igualar o shr-main evita a
   // "faixa cinza" quando o conteúdo não preenche a altura toda.
-  const internaBg = theme === 'escuro' ? '#0E0A24' : '#F5F3FC'
+  const internaBg = theme === 'escuro' ? 'var(--pn-0e0a24,#0E0A24)' : 'var(--pn-f5f3fc,#F5F3FC)'
   // Faixa cinza no rodapé (dark): html/body usam bg-background (cinza shadcn), mas o fundo interno é
   // roxo (--bg). Em qualquer área não pintada (overscroll/rodapé) o cinza vazava. Enquanto o shell
   // está montado, forçamos html+body ao --bg da marca (revertendo ao desmontar).
   useEffect(() => {
-    const bg = theme === 'escuro' ? '#0E0A24' : '#F5F3FC'
+    const bg = theme === 'escuro' ? 'var(--pn-0e0a24,#0E0A24)' : 'var(--pn-f5f3fc,#F5F3FC)'
     const html = document.documentElement
     const body = document.body
     const prevH = html.style.background
@@ -243,7 +243,7 @@ export function ShellRevisaoNova({
                     {(nome || 'REVISÃO').toUpperCase()}
                   </span>
                   {subtitulo && (
-                    <span style={{ fontWeight: 500, fontSize: 8, letterSpacing: '.22em', color: '#E1D9FF' }}>
+                    <span style={{ fontWeight: 500, fontSize: 8, letterSpacing: '.22em', color: 'var(--pn-e1d9ff,#E1D9FF)' }}>
                       {subtitulo.toUpperCase()}
                     </span>
                   )}
@@ -278,7 +278,7 @@ export function ShellRevisaoNova({
               alignItems: 'center',
               justifyContent: 'center',
               cursor: 'pointer',
-              boxShadow: '0 6px 14px -4px rgba(20,8,60,.6)',
+              boxShadow: '0 6px 14px -4px color-mix(in srgb,var(--pn-14083c,#14083C) 60%,transparent)',
             }}
           >
             <ChevronLeft
@@ -312,7 +312,7 @@ export function ShellRevisaoNova({
                     whiteSpace: 'nowrap',
                     fontWeight: active ? 800 : 600,
                     background: active ? AMARELO : 'transparent',
-                    color: active ? AMARELO_INK : '#E6DEFF',
+                    color: active ? AMARELO_INK : 'var(--pn-e6deff,#E6DEFF)',
                   }}
                 >
                   <NavIcon name={item.icon} style={{ width: 18, height: 18 }} />
@@ -343,14 +343,14 @@ export function ShellRevisaoNova({
                 padding: 12,
                 borderRadius: 16,
                 background: 'linear-gradient(135deg,rgba(255,255,255,.12),rgba(255,255,255,.04))',
-                border: '1px solid rgba(241,194,50,.28)',
+                border: '1px solid color-mix(in srgb,var(--pn-f1c232,#F1C232) 28%,transparent)',
                 color: '#FFFFFF',
               }}
             >
               <span style={{ position: 'relative', display: 'inline-flex' }}>
                 {usuario.avatarUrl ? (
                   // Cor ATRÁS da foto (capi é PNG transparente) + contain, igual perfil/sidebar.
-                  <span style={{ width: 44, height: 44, borderRadius: '50%', overflow: 'hidden', background: avatarCor, display: 'inline-flex', boxShadow: '0 0 0 2px rgba(241,194,50,.55)' }}>
+                  <span style={{ width: 44, height: 44, borderRadius: '50%', overflow: 'hidden', background: avatarCor, display: 'inline-flex', boxShadow: '0 0 0 2px color-mix(in srgb,var(--pn-f1c232,#F1C232) 55%,transparent)' }}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src={usuario.avatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', objectPosition: 'center 82%' }} />
                   </span>
@@ -369,7 +369,7 @@ export function ShellRevisaoNova({
                       justifyContent: 'center',
                       fontSize: 17,
                       fontWeight: 800,
-                      boxShadow: '0 0 0 2px rgba(241,194,50,.55)',
+                      boxShadow: '0 0 0 2px color-mix(in srgb,var(--pn-f1c232,#F1C232) 55%,transparent)',
                     }}
                   >
                     {usuario.iniciais}
@@ -383,8 +383,8 @@ export function ShellRevisaoNova({
                     width: 12,
                     height: 12,
                     borderRadius: '50%',
-                    background: '#3FD58A',
-                    boxShadow: `0 0 0 2px ${theme === 'escuro' ? '#160F36' : '#2E1F7A'}`,
+                    background: 'var(--pn-3fd58a,#3FD58A)',
+                    boxShadow: `0 0 0 2px ${theme === 'escuro' ? 'var(--pn-160f36,#160F36)' : 'var(--pn-2e1f7a,#2E1F7A)'}`,
                   }}
                 />
               </span>
@@ -394,7 +394,7 @@ export function ShellRevisaoNova({
                   style={{
                     display: 'block',
                     fontSize: 12,
-                    color: '#D9CFFF',
+                    color: 'var(--pn-d9cfff,#D9CFFF)',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
                     textOverflow: 'ellipsis',
@@ -458,7 +458,7 @@ export function ShellRevisaoNova({
                   borderRadius: 11,
                   border: '1px solid rgba(255,255,255,.14)',
                   background: 'rgba(255,255,255,.05)',
-                  color: '#E6DEFF',
+                  color: 'var(--pn-e6deff,#E6DEFF)',
                   fontSize: 13,
                   fontWeight: 700,
                   cursor: 'pointer',
@@ -478,7 +478,7 @@ export function ShellRevisaoNova({
                   <span style={popTitle()}>TEMA</span>
                   <PopOpt
                     active={themePref === 'claro'}
-                    icon={<Sun style={{ width: 16, height: 16, color: '#5B3FD0' }} />}
+                    icon={<Sun style={{ width: 16, height: 16, color: 'var(--pn-5b3fd0,#5B3FD0)' }} />}
                     label="Claro"
                     onClick={() => {
                       applyTheme('claro')
@@ -487,7 +487,7 @@ export function ShellRevisaoNova({
                   />
                   <PopOpt
                     active={themePref === 'escuro'}
-                    icon={<Moon style={{ width: 16, height: 16, color: '#5B3FD0' }} />}
+                    icon={<Moon style={{ width: 16, height: 16, color: 'var(--pn-5b3fd0,#5B3FD0)' }} />}
                     label="Escuro"
                     onClick={() => {
                       applyTheme('escuro')
@@ -496,7 +496,7 @@ export function ShellRevisaoNova({
                   />
                   <PopOpt
                     active={themePref === 'auto'}
-                    icon={<Monitor style={{ width: 16, height: 16, color: '#5B3FD0' }} />}
+                    icon={<Monitor style={{ width: 16, height: 16, color: 'var(--pn-5b3fd0,#5B3FD0)' }} />}
                     label="Automático (sistema)"
                     onClick={() => {
                       applyTheme('auto')
@@ -516,7 +516,7 @@ export function ShellRevisaoNova({
                       active={fontIdx === i}
                       icon={
                         <span
-                          style={{ width: 22, textAlign: 'center', fontWeight: 800, fontSize: 11 + i * 2, color: '#5B3FD0' }}
+                          style={{ width: 22, textAlign: 'center', fontWeight: 800, fontSize: 11 + i * 2, color: 'var(--pn-5b3fd0,#5B3FD0)' }}
                         >
                           Aa
                         </span>
@@ -532,7 +532,7 @@ export function ShellRevisaoNova({
               )}
             </div>
             {/* Versão do sistema — visível dentro da plataforma. */}
-            <p className="shr-ver" style={{ textAlign: 'center', fontSize: 10, lineHeight: 1, letterSpacing: '.02em', whiteSpace: 'nowrap', color: 'rgba(230,222,255,.42)', margin: '2px 0 0' }}>v{APP_VERSION}</p>
+            <p className="shr-ver" style={{ textAlign: 'center', fontSize: 10, lineHeight: 1, letterSpacing: '.02em', whiteSpace: 'nowrap', color: 'color-mix(in srgb,var(--pn-e6deff,#E6DEFF) 42%,transparent)', margin: '2px 0 0' }}>v{APP_VERSION}</p>
           </div>
         </div>
       </aside>
@@ -619,7 +619,7 @@ export function ShellRevisaoNova({
                   width: 8,
                   height: 8,
                   borderRadius: '50%',
-                  background: '#E0A800',
+                  background: 'var(--pn-e0a800,#E0A800)',
                   boxShadow: '0 0 0 2px var(--surface)',
                 }}
               />
@@ -689,7 +689,7 @@ export function ShellRevisaoNova({
                 {(nome || 'REVISÃO').toUpperCase()}
               </span>
               {subtitulo && (
-                <span style={{ fontWeight: 500, fontSize: 5, letterSpacing: '.22em', color: '#E1D9FF' }}>
+                <span style={{ fontWeight: 500, fontSize: 5, letterSpacing: '.22em', color: 'var(--pn-e1d9ff,#E1D9FF)' }}>
                   {subtitulo.toUpperCase()}
                 </span>
               )}
@@ -822,11 +822,11 @@ function badgePill(badge: string): React.CSSProperties {
       letterSpacing: '.08em',
       padding: '3px 7px',
       borderRadius: 99,
-      background: 'rgba(241,194,50,.2)',
-      color: '#F7DA7A',
+      background: 'color-mix(in srgb,var(--pn-f1c232,#F1C232) 20%,transparent)',
+      color: 'var(--pn-f7da7a,#F7DA7A)',
     }
   }
-  return { fontSize: 11, color: '#B9A8FF' }
+  return { fontSize: 11, color: 'var(--pn-b9a8ff,#B9A8FF)' }
 }
 
 function footerBtnStyle(): React.CSSProperties {
@@ -836,7 +836,7 @@ function footerBtnStyle(): React.CSSProperties {
     borderRadius: 11,
     border: '1px solid rgba(255,255,255,.14)',
     background: 'rgba(255,255,255,.05)',
-    color: '#E6DEFF',
+    color: 'var(--pn-e6deff,#E6DEFF)',
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
@@ -855,7 +855,7 @@ function popStyle(left: number): React.CSSProperties {
     borderRadius: 14,
     background: 'var(--surface)',
     color: 'var(--ink)',
-    boxShadow: '0 20px 44px -16px rgba(10,5,40,.6)',
+    boxShadow: '0 20px 44px -16px color-mix(in srgb,var(--pn-0a0528,#0A0528) 60%,transparent)',
   }
 }
 
@@ -906,7 +906,7 @@ function PopOpt({
     >
       {icon}
       <span style={{ flex: 1 }}>{label}</span>
-      {active && <Check style={{ width: 15, height: 15, color: '#5B3FD0' }} />}
+      {active && <Check style={{ width: 15, height: 15, color: 'var(--pn-5b3fd0,#5B3FD0)' }} />}
     </button>
   )
 }
@@ -1002,12 +1002,12 @@ function ScopedStyle() {
 .shr-nav-scroll::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.42)}
 /* Recolhida: itens viram ícones centrados; sem padding/margin lateral do scroll. */
 .shr-side.shr-col .shr-nav-scroll{padding-right:0;margin-right:0}
-.shr-prof:hover{transform:translateY(-2px);border-color:rgba(241,194,50,.6);background:linear-gradient(135deg,rgba(255,255,255,.16),rgba(255,255,255,.06))!important}
+.shr-prof:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--pn-f1c232,#F1C232) 60%,transparent);background:linear-gradient(135deg,rgba(255,255,255,.16),rgba(255,255,255,.06))!important}
 .shr-sbtn:hover{background:rgba(255,255,255,.12)!important}
-.shr-sair:hover{background:#E5484D!important;border-color:#E5484D!important;color:#FFFFFF!important}
+.shr-sair:hover{background:var(--pn-e5484d,#E5484D)!important;border-color:var(--pn-e5484d,#E5484D)!important;color:#FFFFFF!important}
 .shr-opt:hover{filter:brightness(.98)}
 .shr-sbcol{transition:transform .2s cubic-bezier(.22,1,.36,1),box-shadow .2s}
-.shr-sbcol:hover{transform:scale(1.1);box-shadow:0 0 0 4px rgba(91,63,208,.22),0 6px 14px -4px rgba(20,8,60,.6)}
+.shr-sbcol:hover{transform:scale(1.1);box-shadow:0 0 0 4px color-mix(in srgb,var(--pn-5b3fd0,#5B3FD0) 22%,transparent),0 6px 14px -4px color-mix(in srgb,var(--pn-14083c,#14083C) 60%,transparent)}
 .shr-sbcol-ico{transition:transform .38s cubic-bezier(.22,1,.36,1)}
 .shr-pop{animation:shr-popUp .2s cubic-bezier(.2,.8,.2,1) both;transform-origin:20% 100%}
 @keyframes shr-popUp{from{opacity:0;transform:translateY(6px) scale(.97)}to{opacity:1;transform:none}}
@@ -1028,7 +1028,7 @@ function ScopedStyle() {
 .shr-cta:hover{filter:brightness(1.08)}
 /* Áreas não-home: padding do conteúdo (desktop). A home fica full-bleed. */
 .shr-main-pad{padding:24px 28px 40px}
-/* COLISAO --muted: a raiz do shell injeta os tokens internos (--muted = texto cinza da marca, ex. #6E6886),
+/* COLISAO --muted: a raiz do shell injeta os tokens internos (--muted = texto cinza da marca, ex. var(--pn-6e6886,#6E6886)),
    que vazam para componentes shadcn do conteudo (ex.: o runner do quiz usa bg-muted e ficava com fundo roxo).
    Aqui RESTAURAMOS o --muted do shadcn SO no conteudo (.shr-main); as paginas internas reaplicam seus tokens
    no proprio root, entao nao sao afetadas. */
@@ -1038,8 +1038,8 @@ function ScopedStyle() {
 /* FAIXA CINZA no rodape (dark): o body usa bg-background (cinza shadcn), mas o fundo interno e roxo
    (--bg). Quando o conteudo rola, o cinza do body aparecia atras do shell. Enquanto o shell esta
    montado, alinhamos o fundo do body ao --bg da marca (claro/escuro). */
-body:has(.shr-root){background:#F5F3FC}
-.dark body:has(.shr-root){background:#0E0A24}
+body:has(.shr-root){background:var(--pn-f5f3fc,#F5F3FC)}
+.dark body:has(.shr-root){background:var(--pn-0e0a24,#0E0A24)}
 
 /* mobile: esconde sidebar + topbar desktop, mostra topbar mobile + downbar */
 .shr-topbar-mobile{display:none}

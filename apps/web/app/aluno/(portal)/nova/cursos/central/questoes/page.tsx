@@ -22,7 +22,7 @@ type PastaCard = { key: string; linha: string; sigla: string; grad: string; capa
 const fmtInt = (n: number) => n.toLocaleString('pt-BR')
 const PALETA = Object.values(GR)
 function gradDe(cor: string | null | undefined, i: number): string {
-  if (cor) return `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 55%, #0b0a1a))`
+  if (cor) return `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 55%, var(--pn-0b0a1a,#0b0a1a)))`
   return PALETA[i % PALETA.length]
 }
 function abreviar(txt: string, max = 20): string {
@@ -294,12 +294,12 @@ export default async function SimuladosPage() {
             {/* Sequência (REAL) */}
             {seq && seq.semana && seq.semana.length > 0 && (
               <Card>
-                <H3><Icon n="flame" size={15} style={{ color: '#E0820A' }} /> Sequência · {fmtInt(seq.diasSeguidos ?? 0)} {(seq.diasSeguidos ?? 0) === 1 ? 'dia' : 'dias'}</H3>
+                <H3><Icon n="flame" size={15} style={{ color: 'var(--pn-e0820a,#E0820A)' }} /> Sequência · {fmtInt(seq.diasSeguidos ?? 0)} {(seq.diasSeguidos ?? 0) === 1 ? 'dia' : 'dias'}</H3>
                 <Row gap={6} style={{ justifyContent: 'space-between', flexWrap: 'nowrap' }}>
                   {seq.semana.map((d, i) => (
                     <Col key={i} gap={5} style={{ alignItems: 'center', flex: 1 }}>
                       <Muted size={10}>{(d.dia || '').slice(0, 3)}</Muted>
-                      <span style={{ width: 28, height: 28, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: d.estudou ? 'var(--peachBg)' : 'var(--surface2)', color: d.estudou ? '#E0820A' : 'var(--muted2)', outline: d.hoje ? '2px solid var(--brand)' : 'none' }}>
+                      <span style={{ width: 28, height: 28, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: d.estudou ? 'var(--peachBg)' : 'var(--surface2)', color: d.estudou ? 'var(--pn-e0820a,#E0820A)' : 'var(--muted2)', outline: d.hoje ? '2px solid var(--brand)' : 'none' }}>
                         <Icon n="flame" size={14} />
                       </span>
                     </Col>

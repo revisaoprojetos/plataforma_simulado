@@ -205,7 +205,7 @@ export function DesafioLSMeq({
                 background: ativo ? 'var(--surface)' : 'transparent',
                 color: ativo ? 'var(--ink)' : 'var(--muted)',
                 fontSize: 13.5, fontWeight: 700, cursor: 'pointer',
-                boxShadow: ativo ? '0 1px 4px rgba(16,30,70,.08)' : 'none',
+                boxShadow: ativo ? '0 1px 4px color-mix(in srgb,var(--pn-101e46,#101E46) 8%,transparent)' : 'none',
                 transition: 'background .25s,color .25s,box-shadow .25s',
               }}
             >
@@ -265,38 +265,38 @@ function HeaderHero({ moduloNome, heroSub, stats }: { moduloNome: string; heroSu
     <div
       style={{
         position: 'relative', overflow: 'hidden', borderRadius: 14, padding: '22px 24px',
-        background: 'linear-gradient(120deg,#171E3B,#25356F 60%,#306AB5)', color: '#fff',
+        background: 'linear-gradient(120deg,var(--pn-171e3b,#171E3B),var(--pn-25356f,#25356F) 60%,var(--pn-306ab5,#306AB5))', color: '#fff',
         display: 'flex', alignItems: 'center', gap: 20, flexWrap: 'wrap',
       }}
     >
       {/* Circuito SVG decorativo */}
       <svg aria-hidden viewBox="0 0 400 120" preserveAspectRatio="none" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', opacity: 0.5 }}>
-        <g fill="none" stroke="#5ECEF0" strokeOpacity="0.18" strokeWidth="1.5">
+        <g fill="none" stroke="var(--pn-5ecef0,#5ECEF0)" strokeOpacity="0.18" strokeWidth="1.5">
           <path d="M-10 36 H120 L140 56 H260 L280 36 H420" />
           <path d="M-10 86 H80 L104 62 H210 L236 86 H420" />
         </g>
-        <g fill="#5ECEF0" fillOpacity="0.3">
+        <g fill="var(--pn-5ecef0,#5ECEF0)" fillOpacity="0.3">
           <circle cx="120" cy="36" r="3" /><circle cx="260" cy="56" r="3" /><circle cx="80" cy="86" r="3" /><circle cx="236" cy="86" r="3" />
         </g>
       </svg>
 
       <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 16, flex: 1, minWidth: 260 }}>
-        <span style={{ width: 56, height: 56, borderRadius: 12, background: 'rgba(94,206,240,.16)', border: '1px solid rgba(94,206,240,.4)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-          <Mountain size={34} color="#5ECEF0" />
+        <span style={{ width: 56, height: 56, borderRadius: 12, background: 'color-mix(in srgb,var(--pn-5ecef0,#5ECEF0) 16%,transparent)', border: '1px solid color-mix(in srgb,var(--pn-5ecef0,#5ECEF0) 40%,transparent)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <Mountain size={34} color="var(--pn-5ecef0,#5ECEF0)" />
         </span>
         <div style={{ minWidth: 0 }}>
-          <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '.12em', textTransform: 'uppercase', color: '#8BEAEA' }}>
+          <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--pn-8beaea,#8BEAEA)' }}>
             Desafio de Lei Seca · Módulo 1
           </span>
           <b style={{ display: 'block', fontSize: 24, fontWeight: 700, letterSpacing: '-0.03em' }}>{moduloNome}</b>
-          <span style={{ fontSize: 12.5, color: '#A9C6F0' }}>{heroSub}</span>
+          <span style={{ fontSize: 12.5, color: 'var(--pn-a9c6f0,#A9C6F0)' }}>{heroSub}</span>
         </div>
       </div>
 
       <div className="ls-hero-stats" style={{ position: 'relative', display: 'grid', gridTemplateColumns: 'repeat(4,auto)', gap: 26 }}>
         {stats.map((s) => (
           <div key={s.rotulo} style={{ lineHeight: 1.2 }}>
-            <span style={{ display: 'block', fontSize: 10, fontWeight: 600, letterSpacing: '.1em', textTransform: 'uppercase', color: '#A9C6F0' }}>{s.rotulo}</span>
+            <span style={{ display: 'block', fontSize: 10, fontWeight: 600, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--pn-a9c6f0,#A9C6F0)' }}>{s.rotulo}</span>
             <b style={{ fontSize: 20, fontWeight: 700, letterSpacing: '-0.02em' }}>{s.valor}</b>
           </div>
         ))}
@@ -345,7 +345,7 @@ function FichaTecnica({ sel, selDesemp, dy, idxAtual, totalDias, testador = fals
   const atual = sel.estado === 'atual' || (sel.estado === 'disponivel' && !sel.naoLiberada && dy === idxAtual)
   const leituraPct = selDesemp ? Math.round(selDesemp.leituraPct) : 0
   const statusTxt = concluida ? 'Concluída' : bloqueada ? 'Bloqueada' : 'Em andamento'
-  const statusCor = concluida ? '#1FA868' : bloqueada ? 'var(--muted)' : 'var(--brand2)'
+  const statusCor = concluida ? 'var(--pn-1fa868,#1FA868)' : bloqueada ? 'var(--muted)' : 'var(--brand2)'
   const qTxt = selDesemp && selDesemp.questoesTotal > 0
     ? `${selDesemp.questoesRespondidas}/${selDesemp.questoesTotal} questões`
     : '0/10'
@@ -464,11 +464,11 @@ function ChecklistHoje({ sel, selDesemp }: { sel?: TrilhaNode; selDesemp?: AulaD
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {itens.map((it, i) => (
           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '7px 0', borderTop: i === 0 ? 0 : '1px solid var(--line)' }}>
-            <span style={{ width: 20, height: 20, borderRadius: 6, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: it.done ? '#1FA868' : 'var(--surface2)', border: it.done ? 0 : '1px solid var(--line2)', color: '#fff' }}>
+            <span style={{ width: 20, height: 20, borderRadius: 6, flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: it.done ? 'var(--pn-1fa868,#1FA868)' : 'var(--surface2)', border: it.done ? 0 : '1px solid var(--line2)', color: '#fff' }}>
               {it.done && <Check size={13} />}
             </span>
             <span style={{ flex: 1, fontSize: 12.5, color: it.done ? 'var(--muted)' : 'var(--ink)', textDecoration: it.done ? 'line-through' : 'none' }}>{it.txt}</span>
-            <span style={{ fontSize: 12, fontWeight: 700, color: it.done ? '#1FA868' : 'var(--muted)' }}>{it.done ? 'feito' : it.meta}</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: it.done ? 'var(--pn-1fa868,#1FA868)' : 'var(--muted)' }}>{it.done ? 'feito' : it.meta}</span>
           </div>
         ))}
       </div>
@@ -616,14 +616,14 @@ function PalcoMontanha({
         onPointerLeave={onPointerUp}
         onDoubleClick={() => (zoom > 1 ? verTudo() : zoomBy(1.6))}
         className="ls-stage"
-        style={{ position: 'relative', width: '100%', height: 720, overflow: 'hidden', touchAction: 'pan-y', cursor: zoom > 1 ? 'grab' : 'default', background: '#0B0820' }}
+        style={{ position: 'relative', width: '100%', height: 720, overflow: 'hidden', touchAction: 'pan-y', cursor: zoom > 1 ? 'grab' : 'default', background: 'var(--pn-0b0820,#0B0820)' }}
       >
         <div ref={stageRef} style={{ position: 'absolute', inset: 0, transformOrigin: '0 0', willChange: 'transform', ['--z' as string]: (1 / zoom).toFixed(3) } as React.CSSProperties}>
           {/* Fundo da montanha */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/leiseca/trilha_m.jpg" alt="" aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center bottom' }} />
           {/* Tint ciano da marca */}
-          <span aria-hidden style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,rgba(23,30,59,.1),rgba(48,106,181,.28))' }} />
+          <span aria-hidden style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg,color-mix(in srgb,var(--pn-171e3b,#171E3B) 10%,transparent),color-mix(in srgb,var(--pn-306ab5,#306AB5) 28%,transparent))' }} />
 
           {/* Caminho SVG */}
           <svg viewBox={`0 0 ${IMG_W} ${IMG_H}`} preserveAspectRatio="xMidYMax slice" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }} aria-hidden>
@@ -631,9 +631,9 @@ function PalcoMontanha({
             <path d={spline} fill="none" stroke="rgba(255,255,255,.35)" strokeWidth={5} strokeLinecap="round" strokeDasharray="2 14" vectorEffect="non-scaling-stroke" />
             {/* Traço concluído (ciano aceso) */}
             <path
-              d={spline} fill="none" stroke="#5ECEF0" strokeWidth={6} strokeLinecap="round"
+              d={spline} fill="none" stroke="var(--pn-5ecef0,#5ECEF0)" strokeWidth={6} strokeLinecap="round"
               vectorEffect="non-scaling-stroke"
-              style={{ strokeDasharray: 3000, strokeDashoffset: 3000 * (1 - doneFrac), filter: 'drop-shadow(0 0 6px rgba(94,206,240,.7))' }}
+              style={{ strokeDasharray: 3000, strokeDashoffset: 3000 * (1 - doneFrac), filter: 'drop-shadow(0 0 6px color-mix(in srgb,var(--pn-5ecef0,#5ECEF0) 70%,transparent))' }}
             />
           </svg>
 
@@ -663,16 +663,16 @@ function PalcoMontanha({
                   display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: atualNode ? 13 : 11, fontWeight: 800, color: '#fff',
                   background: concluido
-                    ? '#2EC77A'
+                    ? 'var(--pn-2ec77a,#2EC77A)'
                     : atualNode
-                      ? 'linear-gradient(135deg,#3E7FE0,#5ECEF0)'
+                      ? 'linear-gradient(135deg,var(--pn-3e7fe0,#3E7FE0),var(--pn-5ecef0,#5ECEF0))'
                       : bloqueado
-                        ? 'rgba(23,30,59,.66)'
-                        : 'rgba(48,106,181,.9)',
+                        ? 'color-mix(in srgb,var(--pn-171e3b,#171E3B) 66%,transparent)'
+                        : 'color-mix(in srgb,var(--pn-306ab5,#306AB5) 90%,transparent)',
                   boxShadow: sel
-                    ? '0 0 0 4px color-mix(in srgb,#5ECEF0 55%,transparent)'
+                    ? '0 0 0 4px color-mix(in srgb,var(--pn-5ecef0,#5ECEF0) 55%,transparent)'
                     : atualNode
-                      ? '0 0 0 6px rgba(94,206,240,.3)'
+                      ? '0 0 0 6px color-mix(in srgb,var(--pn-5ecef0,#5ECEF0) 30%,transparent)'
                       : '0 2px 6px rgba(0,0,0,.4)',
                   animation: atualNode ? 'lsPulse 2.2s ease-in-out infinite' : undefined,
                   zIndex: atualNode ? 5 : 2,
@@ -693,7 +693,7 @@ function PalcoMontanha({
                 top: `${(nodePts[idxAtual].y / IMG_H) * 100}%`,
                 transform: 'translate(-50%, calc(-100% - 28px * var(--z,1))) scale(var(--z,1))', transformOrigin: '50% 100%',
                 display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap',
-                height: 24, padding: '0 10px', borderRadius: 99, background: '#5ECEF0', color: '#0b1020',
+                height: 24, padding: '0 10px', borderRadius: 99, background: 'var(--pn-5ecef0,#5ECEF0)', color: 'var(--pn-0b1020,#0b1020)',
                 fontSize: 11, fontWeight: 800, boxShadow: '0 4px 12px rgba(0,0,0,.35)', zIndex: 6,
               }}
             >
@@ -710,8 +710,8 @@ function PalcoMontanha({
                 top: `${(nodePts[idxAtual + 1].y / IMG_H) * 100}%`,
                 transform: 'translate(-50%,-220%)',
                 display: 'inline-flex', alignItems: 'center', gap: 5, whiteSpace: 'nowrap',
-                height: 22, padding: '0 9px', borderRadius: 99, background: 'rgba(11,16,32,.85)', color: '#fff',
-                fontSize: 10.5, fontWeight: 700, border: '1px solid rgba(94,206,240,.5)', zIndex: 4,
+                height: 22, padding: '0 9px', borderRadius: 99, background: 'color-mix(in srgb,var(--pn-0b1020,#0B1020) 85%,transparent)', color: '#fff',
+                fontSize: 10.5, fontWeight: 700, border: '1px solid color-mix(in srgb,var(--pn-5ecef0,#5ECEF0) 50%,transparent)', zIndex: 4,
                 animation: 'lsBob 2.6s ease-in-out infinite',
               }}
             >
@@ -731,11 +731,11 @@ function PalcoMontanha({
             const href = nd.hrefLeitura ?? nd.href ?? '#'
             return (
               <div className={balaoVis.saindo ? undefined : 'lsm-balao-wrap'} onPointerDown={(e) => e.stopPropagation()} style={{ position: 'absolute', left: `${(np.x / IMG_W) * 100}%`, top: `${(np.y / IMG_H) * 100}%`, transform: 'translate(-50%, calc(-100% - 48px * var(--z,1))) scale(var(--z,1))', transformOrigin: '50% 100%', zIndex: 14, width: 216, maxWidth: '82vw' }}>
-                <div className={balaoVis.saindo ? 'lsm-balao-out' : 'lsm-balao-in'} style={{ position: 'relative', borderRadius: 14, padding: '11px 12px', background: '#fff', color: '#171E3B', boxShadow: '0 16px 34px -14px rgba(0,0,0,.72)' }}>
+                <div className={balaoVis.saindo ? 'lsm-balao-out' : 'lsm-balao-in'} style={{ position: 'relative', borderRadius: 14, padding: '11px 12px', background: '#fff', color: 'var(--pn-171e3b,#171E3B)', boxShadow: '0 16px 34px -14px rgba(0,0,0,.72)' }}>
                   <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.12em', color: 'var(--brand)' }}>DIA {String(balaoVis.i + 1).padStart(2, '0')}</span>
                   <b style={{ display: 'block', margin: '2px 0 9px', fontSize: 13, lineHeight: 1.25, letterSpacing: '-0.01em' }}>{nd.titulo}</b>
                   {bloq ? (
-                    <span style={{ display: 'inline-flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 6, height: 38, borderRadius: 10, background: 'rgba(23,30,59,.08)', color: '#5A6690', fontSize: 12.5, fontWeight: 700 }}><Lock size={13} /> Libera em breve</span>
+                    <span style={{ display: 'inline-flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 6, height: 38, borderRadius: 10, background: 'color-mix(in srgb,var(--pn-171e3b,#171E3B) 8%,transparent)', color: 'var(--pn-5a6690,#5A6690)', fontSize: 12.5, fontWeight: 700 }}><Lock size={13} /> Libera em breve</span>
                   ) : (
                     <Link href={href} onClick={() => setBalaoNode(null)} className="lsm-balao-cta" style={{ display: 'inline-flex', width: '100%', alignItems: 'center', justifyContent: 'center', gap: 8, height: 40, borderRadius: 10, background: 'var(--brand)', color: '#fff', fontSize: 13.5, fontWeight: 800 }}>
                       {concl ? <RotateCcw size={14} /> : <Play size={13} />} {lab}
@@ -755,20 +755,20 @@ function PalcoMontanha({
         </div>
 
         {/* ── Overlay: painel de vidro "Sua subida" (canto sup-esq; largura total no mobile) ── */}
-        <div className="ls-subida" style={{ position: 'absolute', left: 14, top: 14, width: 310, maxWidth: 'calc(100% - 28px)', padding: '12px 14px', borderRadius: 12, background: 'rgba(11,16,32,.62)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', border: '1px solid rgba(94,206,240,.3)', color: '#fff', zIndex: 10 }}>
+        <div className="ls-subida" style={{ position: 'absolute', left: 14, top: 14, width: 310, maxWidth: 'calc(100% - 28px)', padding: '12px 14px', borderRadius: 12, background: 'color-mix(in srgb,var(--pn-0b1020,#0B1020) 62%,transparent)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', border: '1px solid color-mix(in srgb,var(--pn-5ecef0,#5ECEF0) 30%,transparent)', color: '#fff', zIndex: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ width: 34, height: 34, borderRadius: 8, background: 'rgba(94,206,240,.16)', border: '1px solid rgba(94,206,240,.45)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Mountain size={20} color="#5ECEF0" />
+            <span style={{ width: 34, height: 34, borderRadius: 8, background: 'color-mix(in srgb,var(--pn-5ecef0,#5ECEF0) 16%,transparent)', border: '1px solid color-mix(in srgb,var(--pn-5ecef0,#5ECEF0) 45%,transparent)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Mountain size={20} color="var(--pn-5ecef0,#5ECEF0)" />
             </span>
             <div style={{ flex: 1, minWidth: 0, lineHeight: 1.2 }}>
               <b style={{ display: 'block', fontSize: 13 }}>Sua subida</b>
-              <span style={{ fontSize: 11, color: '#A9C6F0' }}>{diasConcluidos} de {totalDias} dias · dia {Math.min(diasConcluidos + 1, totalDias)}</span>
+              <span style={{ fontSize: 11, color: 'var(--pn-a9c6f0,#A9C6F0)' }}>{diasConcluidos} de {totalDias} dias · dia {Math.min(diasConcluidos + 1, totalDias)}</span>
             </div>
             <b style={{ fontSize: 20, fontWeight: 800 }}>{progressoPct}%</b>
           </div>
           <div style={{ marginTop: 10, display: 'flex', gap: 3 }}>
             {Array.from({ length: 30 }).map((_, i) => (
-              <span key={i} style={{ flex: 1, height: 5, borderRadius: 2, background: i < Math.round((progressoPct / 100) * 30) ? '#5ECEF0' : 'rgba(255,255,255,.2)' }} />
+              <span key={i} style={{ flex: 1, height: 5, borderRadius: 2, background: i < Math.round((progressoPct / 100) * 30) ? 'var(--pn-5ecef0,#5ECEF0)' : 'rgba(255,255,255,.2)' }} />
             ))}
           </div>
         </div>
@@ -780,14 +780,14 @@ function PalcoMontanha({
         </div>
 
         {/* ── Toolbar flutuante centralizada embaixo ── */}
-        <div style={{ position: 'absolute', left: '50%', bottom: 14, transform: 'translateX(-50%)', display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 8px', borderRadius: 99, background: 'rgba(11,16,32,.72)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,.12)', zIndex: 10 }}>
+        <div style={{ position: 'absolute', left: '50%', bottom: 14, transform: 'translateX(-50%)', display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 8px', borderRadius: 99, background: 'color-mix(in srgb,var(--pn-0b1020,#0B1020) 72%,transparent)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,.12)', zIndex: 10 }}>
           <ToolBtn onClick={() => zoomBy(1 / 1.5)} title="Diminuir zoom"><Minus size={15} /></ToolBtn>
           <input
             type="range" min={1} max={2.6} step={0.1} value={zoom}
             onChange={(e) => { const z = Number(e.target.value); setZoom(z); if (z === 1) panRef.current = { x: 0, y: 0 }; requestAnimationFrame(() => { clampPan(); applyTransform() }) }}
             aria-label="Zoom da trilha"
             className="ls-zoom-slider"
-            style={{ width: 160, accentColor: '#5ECEF0' }}
+            style={{ width: 160, accentColor: 'var(--pn-5ecef0,#5ECEF0)' }}
           />
           <ToolBtn onClick={() => zoomBy(1.5)} title="Aumentar zoom"><Plus size={15} /></ToolBtn>
           <span style={{ width: 1, height: 20, background: 'rgba(255,255,255,.15)' }} />
@@ -808,7 +808,7 @@ function ToolBtn({ onClick, title, children }: { onClick: () => void; title: str
 }
 function ToolPill({ onClick, title, children }: { onClick: () => void; title?: string; children: React.ReactNode }) {
   return (
-    <button type="button" onClick={onClick} title={title} aria-label={title} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 30, padding: '0 11px', borderRadius: 99, border: 0, background: 'rgba(94,206,240,.18)', color: '#fff', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+    <button type="button" onClick={onClick} title={title} aria-label={title} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 30, padding: '0 11px', borderRadius: 99, border: 0, background: 'color-mix(in srgb,var(--pn-5ecef0,#5ECEF0) 18%,transparent)', color: '#fff', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
       {children}
     </button>
   )
@@ -824,7 +824,7 @@ function BarraInicio({ sel, selDesemp, dy, idxAtual, testador = false }: { sel?:
   const progTxt = concluida ? 'Aula concluída · +10 pts' : bloqueada ? 'Bloqueada' : `Etapa 1 de 2 · leitura ${leituraPct}%`
   const ctaLab = concluida ? 'Revisar aula' : leituraPct > 0 ? 'Continuar leitura' : 'Começar aula'
   const href = sel.hrefLeitura ?? sel.href ?? '#'
-  const numBg = concluida ? '#22B573' : dy === idxAtual ? 'var(--brand2)' : '#8A8FA3'
+  const numBg = concluida ? 'var(--pn-22b573,#22B573)' : dy === idxAtual ? 'var(--brand2)' : 'var(--pn-8a8fa3,#8A8FA3)'
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 16px', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: '0 0 14px 14px', flexWrap: 'wrap' }}>
@@ -937,7 +937,7 @@ function AbaRegulamento({ regulamento, pontuacao, gam }: { regulamento?: Regulam
 function GanhoItem({ valor, txt, gold }: { valor: string; txt: string; gold?: boolean }) {
   return (
     <li style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13 }}>
-      <span style={{ minWidth: 48, textAlign: 'center', borderRadius: 7, padding: '2px 6px', fontSize: 12, fontWeight: 800, background: gold ? 'color-mix(in srgb,#F2A93B 16%,transparent)' : 'color-mix(in srgb,var(--brand2) 14%,transparent)', color: gold ? '#C98A1E' : 'var(--brand)' }}>{valor}</span>
+      <span style={{ minWidth: 48, textAlign: 'center', borderRadius: 7, padding: '2px 6px', fontSize: 12, fontWeight: 800, background: gold ? 'color-mix(in srgb,var(--pn-f2a93b,#F2A93B) 16%,transparent)' : 'color-mix(in srgb,var(--brand2) 14%,transparent)', color: gold ? 'var(--pn-c98a1e,#C98A1E)' : 'var(--brand)' }}>{valor}</span>
       <span style={{ color: 'var(--ink)' }}>{txt}</span>
     </li>
   )
@@ -1016,16 +1016,16 @@ function AbaDesempenho({ desempenho, totalDias, diasConcluidos, pontos, carimbos
                     </td>
                     <td style={{ ...tdSt, color: a.diaFeito ? 'var(--ink)' : 'var(--muted)', whiteSpace: 'nowrap' }}>{fmtDiaFeito(a.diaFeito)}</td>
                     <td style={tdSt}>
-                      {a.leituraConcluida ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: '#1FA868' }}><Check size={13} /> 100%</span>
+                      {a.leituraConcluida ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, color: 'var(--pn-1fa868,#1FA868)' }}><Check size={13} /> 100%</span>
                         : bloqueada ? <span style={{ color: 'var(--muted)' }}>—</span>
                           : <span style={{ color: 'var(--ink)' }}>{Math.round(a.leituraPct)}%</span>}
                     </td>
                     <td style={tdSt}>{a.questoesTotal > 0 ? `${a.questoesRespondidas}/${a.questoesTotal}` : '—'}</td>
-                    <td style={{ ...tdSt, textAlign: 'center' }}>{a.sequencia > 0 ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: '#F0773A', fontWeight: 700 }}><Flame size={12} /> {a.sequencia}</span> : <span style={{ color: 'var(--muted)' }}>—</span>}</td>
+                    <td style={{ ...tdSt, textAlign: 'center' }}>{a.sequencia > 0 ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: 'var(--pn-f0773a,#F0773A)', fontWeight: 700 }}><Flame size={12} /> {a.sequencia}</span> : <span style={{ color: 'var(--muted)' }}>—</span>}</td>
                     <td style={{ ...tdSt, textAlign: 'center' }}>{a.pontos > 0 || a.pontosExtra > 0 ? (
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, justifyContent: 'center' }}>
                         <b style={{ color: 'var(--brand)' }}>+{a.pontos}</b>
-                        {a.pontosExtra > 0 ? <span title="Bônus (sequência/conclusão)" style={{ fontSize: 10, fontWeight: 800, color: '#C98A12', background: 'rgba(232,169,58,.18)', borderRadius: 99, padding: '1px 6px', whiteSpace: 'nowrap' }}>+{a.pontosExtra} bônus</span> : null}
+                        {a.pontosExtra > 0 ? <span title="Bônus (sequência/conclusão)" style={{ fontSize: 10, fontWeight: 800, color: 'var(--pn-c98a12,#C98A12)', background: 'color-mix(in srgb,var(--pn-e8a93a,#E8A93A) 18%,transparent)', borderRadius: 99, padding: '1px 6px', whiteSpace: 'nowrap' }}>+{a.pontosExtra} bônus</span> : null}
                       </span>
                     ) : <span style={{ color: 'var(--muted)' }}>—</span>}</td>
                     <td style={{ ...tdSt, textAlign: 'right' }}>
@@ -1054,7 +1054,7 @@ function AbaDesempenho({ desempenho, totalDias, diasConcluidos, pontos, carimbos
               const bloqueada = a.estado === 'bloqueado'
               const andamento = a.estado === 'atual'
               return (
-                <span key={a.id} title={`Dia ${i + 1}: ${Math.round(pct)}%`} style={{ flex: 1, height: `${Math.max(4, pct)}%`, minHeight: 4, borderRadius: '3px 3px 0 0', background: bloqueada ? 'var(--track)' : andamento ? 'var(--brand2)' : '#2EC77A' }} />
+                <span key={a.id} title={`Dia ${i + 1}: ${Math.round(pct)}%`} style={{ flex: 1, height: `${Math.max(4, pct)}%`, minHeight: 4, borderRadius: '3px 3px 0 0', background: bloqueada ? 'var(--track)' : andamento ? 'var(--brand2)' : 'var(--pn-2ec77a,#2EC77A)' }} />
               )
             })}
           </div>
@@ -1071,7 +1071,7 @@ function AbaDesempenho({ desempenho, totalDias, diasConcluidos, pontos, carimbos
           </span>
           {etapas.map((e, i) => (
             <div key={e.t} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', borderTop: i === 0 ? 0 : '1px solid var(--line)' }}>
-              <span style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: e.ok ? '#22B573' : 'var(--surface2)', color: e.ok ? '#fff' : 'var(--muted)' }}>
+              <span style={{ width: 28, height: 28, borderRadius: '50%', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: e.ok ? 'var(--pn-22b573,#22B573)' : 'var(--surface2)', color: e.ok ? '#fff' : 'var(--muted)' }}>
                 {e.ok ? <Check size={13} /> : <Flag size={13} />}
               </span>
               <b style={{ flex: 1, fontSize: 13, color: 'var(--ink)' }}>{e.t}</b>
@@ -1149,7 +1149,7 @@ function AbaRanking({ ranking, minhaLinha, meuId, meuNome, progressoPct, totalDi
         <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--line)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <b style={{ fontSize: 15, color: 'var(--ink)', letterSpacing: '-0.02em' }}>Ranking geral</b>
           <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 12, color: 'var(--muted)' }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#1FA868' }} /> Ao vivo · {fmt(total)} alunos
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--pn-1fa868,#1FA868)' }} /> Ao vivo · {fmt(total)} alunos
           </span>
         </div>
         <div style={{ maxHeight: 620, overflowY: 'auto' }}>
@@ -1173,7 +1173,7 @@ function AbaRanking({ ranking, minhaLinha, meuId, meuNome, progressoPct, totalDi
                     <td style={tdSt}><b style={{ color: r.posicao <= 3 ? 'var(--brand)' : 'var(--muted)' }}>{r.posicao}º</b></td>
                     <td style={tdSt}>
                       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
-                        <span style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, background: sou ? '#F2A93B' : 'var(--surface2)', color: sou ? '#fff' : 'var(--muted)', border: sou ? 0 : '1px solid var(--line)' }}>
+                        <span style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, background: sou ? 'var(--pn-f2a93b,#F2A93B)' : 'var(--surface2)', color: sou ? '#fff' : 'var(--muted)', border: sou ? 0 : '1px solid var(--line)' }}>
                           {avatarIniciais(r)}
                         </span>
                         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
@@ -1183,7 +1183,7 @@ function AbaRanking({ ranking, minhaLinha, meuId, meuNome, progressoPct, totalDi
                       </span>
                     </td>
                     <td style={{ ...tdSt, textAlign: 'center' }}>{r.aulasConcluidas}/{r.totalAulas}</td>
-                    <td style={{ ...tdSt, textAlign: 'center' }}>{r.streakAtual > 0 ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: '#F0773A', fontWeight: 700 }}><Flame size={12} /> {r.streakAtual}</span> : <span style={{ color: 'var(--muted)' }}>—</span>}</td>
+                    <td style={{ ...tdSt, textAlign: 'center' }}>{r.streakAtual > 0 ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, color: 'var(--pn-f0773a,#F0773A)', fontWeight: 700 }}><Flame size={12} /> {r.streakAtual}</span> : <span style={{ color: 'var(--muted)' }}>—</span>}</td>
                     <td style={{ ...tdSt, textAlign: 'right' }}><b style={{ color: 'var(--ink)' }}>{fmt(r.score)}</b></td>
                   </tr>
                 )
@@ -1204,12 +1204,12 @@ function AbaRanking({ ranking, minhaLinha, meuId, meuNome, progressoPct, totalDi
                 if (!r) return <span key={idx} />
                 const pos = r.posicao
                 const alt = pos === 1 ? 108 : pos === 2 ? 84 : 64
-                const cor = pos === 1 ? '#F2A93B' : pos === 2 ? '#9AA5B1' : '#B9773F'
+                const cor = pos === 1 ? 'var(--pn-f2a93b,#F2A93B)' : pos === 2 ? 'var(--pn-9aa5b1,#9AA5B1)' : 'var(--pn-b9773f,#B9773F)'
                 const sou = r.estudanteId === meuId
                 return (
                   <div key={r.estudanteId} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-                    {pos === 1 && <Crown size={16} color="#F2A93B" />}
-                    <span style={{ width: 44, height: 44, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: '#fff', background: sou ? '#F2A93B' : cor }}>
+                    {pos === 1 && <Crown size={16} color="var(--pn-f2a93b,#F2A93B)" />}
+                    <span style={{ width: 44, height: 44, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, color: '#fff', background: sou ? 'var(--pn-f2a93b,#F2A93B)' : cor }}>
                       {sou ? inic(meuNome || 'Você') : iniciaisDe(r.nome).replace(/[.\s]/g, '')}
                     </span>
                     <b style={{ fontSize: 12, color: 'var(--ink)' }}>{fmt(r.score)}</b>
@@ -1224,7 +1224,7 @@ function AbaRanking({ ranking, minhaLinha, meuId, meuNome, progressoPct, totalDi
           {/* me_card */}
           {eu && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 12, borderRadius: 11, border: '2px solid var(--brand)', background: 'color-mix(in srgb,var(--brand2) 6%,transparent)' }}>
-              <span style={{ width: 42, height: 42, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 800, color: '#fff', background: '#F2A93B', flexShrink: 0 }}>
+              <span style={{ width: 42, height: 42, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, fontWeight: 800, color: '#fff', background: 'var(--pn-f2a93b,#F2A93B)', flexShrink: 0 }}>
                 {inic(meuNome || 'Você')}
               </span>
               <div style={{ flex: 1, minWidth: 0, lineHeight: 1.3 }}>

@@ -406,7 +406,7 @@ export function BannerEditModal({ banner, imagemOrigInicial = null, tenantId, de
                   ? <div className="pointer-events-none absolute left-0 top-0 origin-top-left" style={{ width: STAGE_W, height: STAGE_H, transform: `scale(${previewScale})` }}><SimSlide s={previewSlide} stats={previewSlide.stats} /></div>
                   : imagem
                     ? <div className="pointer-events-none absolute left-0 top-0 origin-top-left" style={{ width: STAGE_W, height: STAGE_H, transform: `scale(${previewScale})` }}><ImgSlide b={previewBannerB} preview /></div>
-                    : <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${cor} 0%, #1a1030 75%, #0f0a1e 120%)` }} />}
+                    : <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${cor} 0%, var(--pn-1a1030,#1a1030) 75%, var(--pn-0f0a1e,#0f0a1e) 120%)` }} />}
               </div>
             )}
             <p className="mt-3 text-[11px] text-muted-foreground">{uiTipo === 'popup' ? 'Assim o aluno vê o pop-up ao entrar.' : uiTipo === 'simulado' ? 'Prévia real do banner no topo da home.' : `Prévia do banner (molde ${bannerAspect.w}×${bannerAspect.h}).`}</p>

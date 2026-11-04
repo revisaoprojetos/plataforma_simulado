@@ -146,7 +146,7 @@ export default async function BancoDetalhePage({ params, searchParams }: { param
         {capaBanco ? (
           <img src={capaBanco} alt="" className="absolute inset-0 h-full w-full object-cover" />
         ) : (
-          <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${corBanco} 0%, #0f172a 130%)` }} />
+          <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${corBanco} 0%, var(--pn-0f172a,#0f172a) 130%)` }} />
         )}
         {!capaBanco && <IconeBanco className="absolute -right-8 -top-10 h-56 w-56 text-white/10" />}
         <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/45 to-black/25" />

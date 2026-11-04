@@ -60,7 +60,7 @@ export default async function EstudanteDesafioPage({ params }: { params: Promise
           <div className="relative h-20 w-28 shrink-0 overflow-hidden rounded-2xl border">
             {modulo.capa
               ? <img src={modulo.capa} alt="" className="absolute inset-0 h-full w-full object-cover" />
-              : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
+              : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, var(--pn-0f172a,#0f172a) 135%)` }} />}
             {!modulo.capa && <Icon className="absolute -right-3 -top-3 h-20 w-20 text-white/10" />}
           </div>
           <div className="min-w-0">

@@ -14,8 +14,8 @@ import type { QuestaoAluno } from '@/components/aluno/questao-resolvivel'
 import { AddToCaderno } from '@/components/aluno/add-to-caderno'
 
 const LETRA = ['A', 'B', 'C', 'D', 'E', 'F']
-const OK = '#1FA868'
-const ERR = '#E5484D'
+const OK = 'var(--pn-1fa868,#1FA868)'
+const ERR = 'var(--pn-e5484d,#E5484D)'
 
 /** Cor/raio da letra selecionada por marca (herda do mock: Rev/VND redondo, MEQ quadrado).
  *  Raios de linha/tag e estilo de tag vêm dos mockups: alt Rev 14 · VND 16 · MEQ 10;
@@ -166,7 +166,7 @@ export function QCore({ brand, questao, numero }: { brand: Brand; questao: Quest
                   type="button" onClick={() => toggleCut(alt.id)} disabled={revelado}
                   aria-label={eliminada ? `Restaurar alternativa ${LETRA[i]}` : `Eliminar alternativa ${LETRA[i]}`} title="Eliminar alternativa"
                   className="qc-cut"
-                  style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 10, border: 0, background: eliminada ? 'var(--flagBg,rgba(229,72,77,.12))' : 'transparent', color: eliminada ? 'var(--flag,#E5484D)' : 'var(--muted2,var(--muted))', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: revelado ? 'default' : 'pointer', alignSelf: 'center' }}
+                  style={{ width: 38, height: 38, flexShrink: 0, borderRadius: 10, border: 0, background: eliminada ? 'var(--flagBg,color-mix(in srgb,var(--pn-e5484d,#E5484D) 12%,transparent))' : 'transparent', color: eliminada ? 'var(--flag,var(--pn-e5484d,#E5484D))' : 'var(--muted2,var(--muted))', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: revelado ? 'default' : 'pointer', alignSelf: 'center' }}
                 >
                   <Scissors size={16} style={{ transform: eliminada ? 'rotate(-12deg)' : 'none' }} />
                 </button>
@@ -187,7 +187,7 @@ export function QCore({ brand, questao, numero }: { brand: Brand; questao: Quest
 
       {/* resultado */}
       {revelado && (
-        <div className="qc-pv" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, background: acertou ? 'rgba(31,168,104,.1)' : 'rgba(229,72,77,.09)', border: `1px solid ${acertou ? OK : ERR}` }}>
+        <div className="qc-pv" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, background: acertou ? 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 10%,transparent)' : 'color-mix(in srgb,var(--pn-e5484d,#E5484D) 9%,transparent)', border: `1px solid ${acertou ? OK : ERR}` }}>
           <span style={{ width: 30, height: 30, borderRadius: '50%', background: acertou ? OK : ERR, color: '#FFF', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{acertou ? <Check size={16} strokeWidth={3} /> : <X size={16} strokeWidth={3} />}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
             {acertou
@@ -276,7 +276,7 @@ function CertoErrado({ escolhida, revelado, idCorreta, alts, onPick }: {
             key={b.id} type="button" onClick={() => onPick(b.id)} disabled={revelado}
             style={{
               flex: 1, height: 52, borderRadius: 14, border: `1.5px solid ${ativo || mostrarErrada ? b.cor : 'var(--line)'}`,
-              background: ativo ? b.cor : mostrarErrada ? 'rgba(229,72,77,.08)' : 'transparent',
+              background: ativo ? b.cor : mostrarErrada ? 'color-mix(in srgb,var(--pn-e5484d,#E5484D) 8%,transparent)' : 'transparent',
               color: ativo ? '#FFF' : mostrarErrada ? ERR : 'var(--ink)',
               font: 'inherit', fontSize: 15, fontWeight: 800, cursor: revelado ? 'default' : 'pointer',
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, transition: 'all .2s',

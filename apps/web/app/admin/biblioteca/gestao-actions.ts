@@ -64,6 +64,12 @@ export interface GestaoBase {
   protecao: ProtecaoConteudo
   /** Religar a legenda de CATEGORIAS do leitor (LegProc) neste doc. Padrão false = oculta na Biblioteca. */
   legendaCategorias: boolean
+  /** Documento marcado como LegProc: o leitor abre em modo TEXTO com STF/STJ recolhíveis (em vez do PDF). */
+  leituraLegproc: boolean
+  /** true = já vale por estar numa pasta de tipo LegProc (não depende do interruptor). */
+  leituraLegprocAuto: boolean
+  /** LegProc: a tabela de legenda do início fica OCULTA para o aluno (valor efetivo: documento → pasta → padrão oculta). */
+  legendaTabelaOculta: boolean
   contagens: { origens: number; alunos: number; vinculos: number; pacotes: number }
   /** Fonte da mídia (vídeo/áudio). Sem pipeline de link → padrão 'importado'. */
   fonteMidia: { tipo: 'importado' | 'link'; servico: string | null } | null
@@ -117,7 +123,7 @@ export async function carregarGerenciamento(documentoId: string): Promise<Gestao
   // UMA onda paralela (antes eram 2 → menos round-trips PostgREST, que no remoto custam ~200ms cada).
   // A tabela de ALUNOS (até 300 + detalhes) NÃO entra aqui — é pesada e carrega LAZY ao abrir a aba Alunos.
   const kind = kindSync(doc.tipo_origem)
-  const [versoes, acesso, entregas, vincLeitor, vinculos, legCfg] = await Promise.all([
+  const [versoes, acesso, entregas, vincLeitor, vinculos, legCfg, lpCfg] = await Promise.all([
     listarVersoes(documentoId).catch(() => []),
     carregarAcesso(svc, g.tenantId, documentoId),
     carregarEntregas(svc, g.tenantId, documentoId),
@@ -125,6 +131,16 @@ export async function carregarGerenciamento(documentoId: string): Promise<Gestao
     listarVinculosDoDocumento(documentoId).catch(() => []).then((v) => resolverVinculos(svc, g.tenantId, v)),
     // Toggle da legenda de categorias — tolerante à migração pendente (coluna ausente → false = oculta).
     (async () => { try { const r = await svc.from('simulado_conteudo_documentos').select('legenda_categorias').eq('tenant_id', g.tenantId).eq('id', documentoId).maybeSingle(); return r.error ? null : r.data } catch { return null } })(),
+    // Marca LegProc (leitura em texto c/ STF/STJ recolhíveis) — tolerante à migração pendente (coluna ausente → false).
+    (async () => {
+      let flag = false, pastaId: string | null = null
+      try { const r = await svc.from('simulado_conteudo_documentos').select('leitura_legproc, pasta_id').eq('tenant_id', g.tenantId).eq('id', documentoId).maybeSingle(); if (!r.error && r.data) { flag = !!(r.data as any).leitura_legproc; pastaId = (r.data as any).pasta_id ?? null } } catch { /* coluna ausente → false */ }
+      if (!pastaId) { try { const r = await svc.from('simulado_conteudo_documentos').select('pasta_id').eq('tenant_id', g.tenantId).eq('id', documentoId).maybeSingle(); pastaId = (r.data as any)?.pasta_id ?? null } catch { /* */ } }
+      let pastaLegproc = false
+      if (pastaId) { try { const r = await svc.from('simulado_pastas').select('cronograma_tipo_material').eq('tenant_id', g.tenantId).eq('id', pastaId).maybeSingle(); pastaLegproc = !r.error && (r.data as any)?.cronograma_tipo_material === 'legproc' } catch { /* */ } }
+      const { ocultarLegendaTabela } = await import('@/lib/conteudo/legproc-legenda')
+      return { flag, pastaLegproc, ocultarLeg: await ocultarLegendaTabela(svc, g.tenantId, documentoId, pastaId) }
+    })(),
   ])
   const versaoNum = doc.versao_atual_id ? (versoes.find((v) => v.id === doc.versao_atual_id)?.numero ?? null) : (versoes[0]?.numero ?? null)
   const todosVinculos = [...vinculos, ...vincLeitor]
@@ -143,6 +159,9 @@ export async function carregarGerenciamento(documentoId: string): Promise<Gestao
     liberadoDe: doc.liberado_de ?? null, liberadoAte: doc.liberado_ate ?? null,
     protecao,
     legendaCategorias: !!(legCfg as any)?.legenda_categorias,
+    leituraLegproc: !!lpCfg?.flag || !!lpCfg?.pastaLegproc,
+    leituraLegprocAuto: !!lpCfg?.pastaLegproc,
+    legendaTabelaOculta: lpCfg ? lpCfg.ocultarLeg : true,
     contagens: { origens: acesso.origens.length, alunos: acesso.alcanceTotal, vinculos: todosVinculos.length, pacotes: 0 },
     fonteMidia: (kind === 'video' || kind === 'audio') ? { tipo: 'importado', servico: null } : null,
     liberado,
@@ -355,6 +374,26 @@ export async function salvarLegendaCategorias(documentoId: string, mostrar: bool
   const { error } = await svc.from('simulado_conteudo_documentos').update({ legenda_categorias: !!mostrar }).eq('tenant_id', g.tenantId).eq('id', documentoId)
   if (error) return { ok: false, error: /column .* does not exist|legenda_categorias|schema cache/i.test(error.message) ? 'Rode a migração da legenda (20261101120000).' : error.message }
   await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_conteudo_documentos', entidadeId: documentoId, depois: { legenda_categorias: !!mostrar }, atorId: g.atorId, tenantId: g.tenantId }).catch(() => {})
+  revalidatePath('/admin/biblioteca'); return { ok: true }
+}
+
+/** LegProc: mostra/oculta a TABELA DE LEGENDA do início do documento para o aluno (coluna legproc_ocultar_legenda; sobrepõe a pasta). */
+export async function salvarLegendaTabelaDoc(documentoId: string, ocultar: boolean): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('update'); if (!g.ok) return g
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_conteudo_documentos').update({ legproc_ocultar_legenda: !!ocultar }).eq('tenant_id', g.tenantId).eq('id', documentoId)
+  if (error) return { ok: false, error: /column .* does not exist|legproc_ocultar_legenda|schema cache/i.test(error.message) ? 'Rode a migração da legenda do LegProc (20261104150000).' : error.message }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_conteudo_documentos', entidadeId: documentoId, depois: { legproc_ocultar_legenda: !!ocultar }, atorId: g.atorId, tenantId: g.tenantId }).catch(() => {})
+  revalidatePath('/admin/biblioteca'); return { ok: true }
+}
+
+/** Marca/desmarca o documento como LegProc (leitura em texto com STF/STJ recolhíveis) — coluna leitura_legproc. */
+export async function salvarLeituraLegproc(documentoId: string, ativo: boolean): Promise<{ ok: boolean; error?: string }> {
+  const g = await guard('update'); if (!g.ok) return g
+  const svc = createAdminClient()
+  const { error } = await svc.from('simulado_conteudo_documentos').update({ leitura_legproc: !!ativo }).eq('tenant_id', g.tenantId).eq('id', documentoId)
+  if (error) return { ok: false, error: /column .* does not exist|leitura_legproc|schema cache/i.test(error.message) ? 'Rode a migração do LegProc (20261104140000).' : error.message }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_conteudo_documentos', entidadeId: documentoId, depois: { leitura_legproc: !!ativo }, atorId: g.atorId, tenantId: g.tenantId }).catch(() => {})
   revalidatePath('/admin/biblioteca'); return { ok: true }
 }
 

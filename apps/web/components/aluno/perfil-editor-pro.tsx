@@ -204,9 +204,9 @@ function EditorModal({
                 <SubTitulo>Fundo animado</SubTitulo>
                 <button type="button" onClick={() => setCapa('anim')}
                   className={cn('relative h-16 w-full overflow-hidden rounded-xl border transition-colors', ehAnimado ? 'border-primary ring-2 ring-primary/30' : 'hover:border-primary/50')}
-                  style={{ background: 'linear-gradient(120deg,#24166A,#4B30BE 55%,#6449E0)' }}>
+                  style={{ background: 'linear-gradient(120deg,var(--pn-24166a,#24166A),var(--pn-4b30be,#4B30BE) 55%,var(--pn-6449e0,#6449E0))' }}>
                   <span aria-hidden className="absolute inset-0" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.08) 1px,transparent 1px)', backgroundSize: '18px 18px' }} />
-                  <span className="absolute left-3 top-2 text-[11px] font-bold tracking-wider text-[#F1C232]">RUMO À PROCURADORIA · ANIMADO</span>
+                  <span className="absolute left-3 top-2 text-[11px] font-bold tracking-wider text-[color:var(--pn-f1c232,#F1C232)]">RUMO À PROCURADORIA · ANIMADO</span>
                   {ehAnimado && <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-primary text-primary-foreground"><Check className="h-3 w-3" /></span>}
                 </button>
                 <SubTitulo className="mt-4">Cor do banner</SubTitulo>

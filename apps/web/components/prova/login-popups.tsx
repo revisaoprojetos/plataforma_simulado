@@ -101,7 +101,7 @@ export function LoginResultado({ tipo, nome, mensagem, quando, onVoltar, compact
       msg: mensagem ?? null,
     },
     nao_iniciado: {
-      Icon: Clock, cor: 'var(--prova-aviso, #f59e0b)', loading: false, botao: 'Entendi',
+      Icon: Clock, cor: 'var(--prova-aviso, var(--pn-f59e0b,#f59e0b))', loading: false, botao: 'Entendi',
       titulo: 'Simulado ainda não liberado',
       msg: mensagem ?? (quando ? `Este simulado ainda não começou — a liberação é em ${quando}. Volte no horário de início.` : 'Este simulado ainda não foi liberado para acesso. Volte no horário de início.'),
     },
@@ -112,7 +112,7 @@ export function LoginResultado({ tipo, nome, mensagem, quando, onVoltar, compact
     },
     // Aluno pediu "ver meus resultados" mas ainda não concluiu nenhuma tentativa deste simulado.
     sem_resultado: {
-      Icon: Clock, cor: 'var(--prova-aviso, #f59e0b)', loading: false, botao: 'Entendi',
+      Icon: Clock, cor: 'var(--prova-aviso, var(--pn-f59e0b,#f59e0b))', loading: false, botao: 'Entendi',
       titulo: 'Simulado ainda não realizado',
       msg: mensagem ?? 'Você ainda não concluiu este simulado. Conclua a prova para poder ver seus resultados.',
     },

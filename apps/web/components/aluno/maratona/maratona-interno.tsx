@@ -25,7 +25,7 @@ const SIMULADOS_SEL: { cur: number; label: string }[] = [
 // Marca (iguais nos 2 temas; superfícies escuras / acento): NAVY/GOLD. INK fica literal p/ FUNDOS escuros
 // (dots/chips/botão). As demais cores (fundo da página, cards, texto, borda) viram tokens que o CSS troca
 // no tema escuro (.dark .mxi-root) — ver bloco CSS. INK_TX/TEXT = as versões de TEXTO (claras no escuro).
-const NAVY = '#071A3F', GOLD = '#F7B500', INK = '#2E4FB0' // INK = azul da marca (mais claro/vivo) p/ botões, dots de concluído, chips e bordas
+const NAVY = 'var(--pn-071a3f,#071A3F)', GOLD = 'var(--pn-f7b500,#F7B500)', INK = 'var(--pn-2e4fb0,#2E4FB0)' // INK = azul da marca (mais claro/vivo) p/ botões, dots de concluído, chips e bordas
 const TEXT = 'var(--mxi-text)', INK_TX = 'var(--mxi-ink)', MUT = 'var(--mxi-mut)', LINE = 'var(--mxi-line)', BG = 'var(--mxi-bg)'
 const CARD = 'var(--mxi-card)', CARD_SUB = 'var(--mxi-card-sub)'
 const MONO = "'DM Mono', ui-monospace, monospace"
@@ -169,7 +169,7 @@ export function MaratonaInterno({ capaUrl, regulamento, progresso = 0, ranking, 
               ? <img src={capaUrl} alt="" style={{ width: 30, height: 30, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
               : <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, borderRadius: 8, background: GOLD, color: NAVY, fontWeight: 900, fontStyle: 'italic', fontSize: 15 }}>M</span>}
             <div style={{ lineHeight: 1.05 }}>
-              <div style={{ fontSize: 10.5, letterSpacing: '.12em', color: '#BCC8E0', fontWeight: 700 }}>MARATONA DE SIMULADOS</div>
+              <div style={{ fontSize: 10.5, letterSpacing: '.12em', color: 'var(--pn-bcc8e0,#BCC8E0)', fontWeight: 700 }}>MARATONA DE SIMULADOS</div>
               <b style={{ fontSize: 15, fontStyle: 'italic' }}>ENAP + AGU</b>
             </div>
           </div>
@@ -195,7 +195,7 @@ export function MaratonaInterno({ capaUrl, regulamento, progresso = 0, ranking, 
           {/* AJUDA — reinicia o tour guiado da Capi (e é o alvo do último passo). */}
           <button type="button" data-tour="maratona-ajuda" onClick={() => iniciarTourGuia('maratona')}
             title="Rever o tour da maratona com a Capi" aria-label="Ajuda — rever o tour da maratona"
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 12px', borderRadius: 9, background: 'rgba(247,181,0,.15)', color: GOLD, border: '1px solid rgba(247,181,0,.4)', cursor: 'pointer', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
+            style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 12px', borderRadius: 9, background: 'color-mix(in srgb,var(--pn-f7b500,#F7B500) 15%,transparent)', color: GOLD, border: '1px solid color-mix(in srgb,var(--pn-f7b500,#F7B500) 40%,transparent)', cursor: 'pointer', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
             <HelpCircle size={15} /> Ajuda
           </button>
           </div>
@@ -203,7 +203,7 @@ export function MaratonaInterno({ capaUrl, regulamento, progresso = 0, ranking, 
           {/* Dropdown do botão "Simulados" — absoluto ao container (abaixo do botão). Hover realça a opção. */}
           {simMenu && simRect && (
             <div ref={simMenuRef} role="listbox"
-              style={{ position: 'absolute', top: simRect.top, left: simRect.left, width: simRect.width, zIndex: 60, background: CARD, border: `1px solid ${LINE}`, borderRadius: 12, boxShadow: '0 16px 40px rgba(7,26,63,.28)', overflow: 'hidden', padding: 6 }}>
+              style={{ position: 'absolute', top: simRect.top, left: simRect.left, width: simRect.width, zIndex: 60, background: CARD, border: `1px solid ${LINE}`, borderRadius: 12, boxShadow: '0 16px 40px color-mix(in srgb,var(--pn-071a3f,#071A3F) 28%,transparent)', overflow: 'hidden', padding: 6 }}>
               {SIMULADOS_SEL.map((s) => {
                 const on = aba === 'simulados' && simSel === s.cur
                 const hover = hoverSim === s.cur
@@ -215,7 +215,7 @@ export function MaratonaInterno({ capaUrl, regulamento, progresso = 0, ranking, 
                 return (
                   <button key={s.cur} type="button" role="option" aria-selected={on} onClick={() => escolherSim(s.cur)}
                     onMouseEnter={() => setHoverSim(s.cur)} onMouseLeave={() => setHoverSim(null)}
-                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '10px 12px', borderRadius: 8, border: 0, cursor: 'pointer', background: on ? INK : (hover ? 'rgba(46,79,176,.14)' : 'transparent'), color: on ? '#fff' : TEXT, fontSize: 14, fontWeight: 700, transition: 'background .12s' }}>
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '10px 12px', borderRadius: 8, border: 0, cursor: 'pointer', background: on ? INK : (hover ? 'color-mix(in srgb,var(--pn-2e4fb0,#2E4FB0) 14%,transparent)' : 'transparent'), color: on ? '#fff' : TEXT, fontSize: 14, fontWeight: 700, transition: 'background .12s' }}>
                     <FileText size={15} style={{ flexShrink: 0, opacity: on ? 1 : 0.6 }} /> {label}
                     {on && <Check size={15} style={{ marginLeft: 'auto' }} />}
                   </button>
@@ -243,7 +243,7 @@ export function MaratonaInterno({ capaUrl, regulamento, progresso = 0, ranking, 
 }
 
 function Card({ children, style, ...rest }: { children: React.ReactNode; style?: React.CSSProperties } & React.HTMLAttributes<HTMLDivElement>) {
-  return <div {...rest} style={{ background: CARD, borderRadius: 16, boxShadow: '0 1px 3px rgba(7,26,63,.08)', ...style }}>{children}</div>
+  return <div {...rest} style={{ background: CARD, borderRadius: 16, boxShadow: '0 1px 3px color-mix(in srgb,var(--pn-071a3f,#071A3F) 8%,transparent)', ...style }}>{children}</div>
 }
 function Kicker({ children }: { children: React.ReactNode }) {
   return <div style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase', color: INK_TX }}>{children}</div>
@@ -363,24 +363,24 @@ function Percurso({ cur = 0, simulados }: { cur?: number; simulados?: (MaratonaS
     if (i === PC_LAST && s !== 'now') return <Flag size={size} color={NAVY} />
     if (i > 0 && i < PC_LAST && s === 'done') return <Check size={size} color="#fff" />
     if (s === 'now') return <MapPin size={size} color="#fff" />
-    if (i > 0 && i < PC_LAST && s === 'locked') return <Lock size={size} color="#3B4866" />
+    if (i > 0 && i < PC_LAST && s === 'locked') return <Lock size={size} color="var(--pn-3b4866,#3B4866)" />
     return null
   }
   const circulo = (i: number, size: number): CSSProperties => {
     const s = st(i)
     const base: CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 auto', width: size, height: size, borderRadius: '50%', boxSizing: 'border-box', padding: 0, cursor: 'pointer', border: 0 }
     if (i === PC_LAST && s !== 'now') return { ...base, background: GOLD, border: `2px solid ${GOLD}`, ...(s === 'locked' ? { opacity: 0.55 } : {}) }
-    if (s === 'now') return { ...base, background: '#53308F', border: '2px solid #53308F', boxShadow: '0 0 0 5px #CBB8FF' }
+    if (s === 'now') return { ...base, background: 'var(--pn-53308f,#53308F)', border: '2px solid var(--pn-53308f,#53308F)', boxShadow: '0 0 0 5px var(--pn-cbb8ff,#CBB8FF)' }
     if (i === 0) return { ...base, background: NAVY, border: `2px solid ${NAVY}` }
     if (s === 'done') return { ...base, background: INK, border: `2px solid ${INK}` }
-    return { ...base, background: '#fff', border: '2px dashed #C9D1E0' }
+    return { ...base, background: '#fff', border: '2px dashed var(--pn-c9d1e0,#C9D1E0)' }
   }
   const chipDe = (i: number): [CSSProperties, string] => {
     const s = st(i)
     const base: CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 999, fontStretch: '125%', fontWeight: 800, fontSize: 11, letterSpacing: '1.5px', textTransform: 'uppercase' }
     if (i === PC_LAST && s === 'done') return [{ ...base, background: GOLD, color: NAVY }, 'Chegada']
     if (s === 'done') return [{ ...base, background: INK, color: '#fff' }, 'Concluído']
-    if (s === 'now') return [{ ...base, background: '#53308F', color: '#fff' }, 'Você está aqui']
+    if (s === 'now') return [{ ...base, background: 'var(--pn-53308f,#53308F)', color: '#fff' }, 'Você está aqui']
     return [{ ...base, background: CARD, color: MUT, border: `1px solid ${LINE}` }, 'Em ' + pcEf(i).date]
   }
   const routeDone = lastIdx > 0 ? PERCURSO_PCS.slice(0, lastIdx + 1).map((d) => d.x + ',' + d.y).join(' ') : '381,568 381,568'
@@ -396,9 +396,9 @@ function Percurso({ cur = 0, simulados }: { cur?: number; simulados?: (MaratonaS
       <header style={{ position: 'relative', overflow: 'hidden', background: NAVY, color: '#fff' }}>
         <svg aria-hidden="true" viewBox="0 0 1440 460" preserveAspectRatio="xMidYMid slice" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
           <g transform="rotate(-8 720 240)">
-            <rect x="-200" y="150" width="1900" height="26" fill="#2E4FB0" />
-            <rect x="-200" y="190" width="1900" height="26" fill="#2E4FB0" />
-            <rect x="-200" y="230" width="1900" height="26" fill="#53308F" />
+            <rect x="-200" y="150" width="1900" height="26" fill="var(--pn-2e4fb0,#2E4FB0)" />
+            <rect x="-200" y="190" width="1900" height="26" fill="var(--pn-2e4fb0,#2E4FB0)" />
+            <rect x="-200" y="230" width="1900" height="26" fill="var(--pn-53308f,#53308F)" />
           </g>
         </svg>
         <div style={{ position: 'relative', padding: '24px 24px 72px' }}>
@@ -410,7 +410,7 @@ function Percurso({ cur = 0, simulados }: { cur?: number; simulados?: (MaratonaS
             <div style={{ flex: '1 1 420px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
               <span style={{ ...kickerLt, color: GOLD }}>O percurso</span>
               <h1 style={{ margin: 0, fontStretch: '125%', fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', fontSize: 52, lineHeight: 0.98 }}>Do aeroporto<br />ao Ed. II da AGU</h1>
-              <p style={{ margin: 0, maxWidth: 560, fontSize: 15.5, lineHeight: 1.55, color: '#BCC8E0' }}>
+              <p style={{ margin: 0, maxWidth: 560, fontSize: 15.5, lineHeight: 1.55, color: 'var(--pn-bcc8e0,#BCC8E0)' }}>
                 Três simulados, três paradas: 17/10 na AGU, 24/10 na PGF e 31/10 passando pela PGFN até a chegada no Ed. II da AGU, onde foi a posse do último concurso.
               </p>
             </div>
@@ -433,9 +433,9 @@ function Percurso({ cur = 0, simulados }: { cur?: number; simulados?: (MaratonaS
             return (
               <button key={i} type="button" onClick={() => setPicked(i)} style={{ flex: '1 1 0', minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: 0, border: 0, background: 'transparent', cursor: 'pointer', color: TEXT }}>
                 <span style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
-                  <span style={{ ...lineBase, background: i === 0 ? 'transparent' : (st(i) !== 'locked' ? GOLD : '#CBD4E4') }} />
+                  <span style={{ ...lineBase, background: i === 0 ? 'transparent' : (st(i) !== 'locked' ? GOLD : 'var(--pn-cbd4e4,#CBD4E4)') }} />
                   <span style={circulo(i, 40)}>{iconDe(i, 18)}</span>
-                  <span style={{ ...lineBase, background: i === PC_LAST ? 'transparent' : (st(i + 1) !== 'locked' ? GOLD : '#CBD4E4') }} />
+                  <span style={{ ...lineBase, background: i === PC_LAST ? 'transparent' : (st(i + 1) !== 'locked' ? GOLD : 'var(--pn-cbd4e4,#CBD4E4)') }} />
                 </span>
                 <span style={{ fontFamily: MONO, fontSize: 11, color: MUT, whiteSpace: 'nowrap' }}>{pcEf(i).codeLabel}</span>
                 <span className="pn-step-name" style={{ fontStretch: '125%', fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', fontSize: 15, textAlign: 'center' }}>{pcEf(i).stepName}</span>
@@ -448,17 +448,17 @@ function Percurso({ cur = 0, simulados }: { cur?: number; simulados?: (MaratonaS
       {/* Mapa + parada selecionada */}
       <div data-tour="maratona-percurso-mapa" style={{ display: 'flex', flexWrap: 'wrap', gap: 16, alignItems: 'flex-start', scrollMarginTop: 90 }}>
         <Card style={{ flex: '999 1 520px', minWidth: 0, padding: 14 }}>
-          <div style={{ position: 'relative', width: '100%', aspectRatio: '1000 / 620', borderRadius: 10, overflow: 'hidden', background: '#E9EDF3' }}>
+          <div style={{ position: 'relative', width: '100%', aspectRatio: '1000 / 620', borderRadius: 10, overflow: 'hidden', background: 'var(--pn-e9edf3,#E9EDF3)' }}>
             <svg viewBox="0 0 1000 620" preserveAspectRatio="none" aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
-              <rect x="0" y="0" width="1000" height="620" fill="#E9EDF3" />
-              <path d={MAPA_CIDADE} fill="#BCC8E0" />
+              <rect x="0" y="0" width="1000" height="620" fill="var(--pn-e9edf3,#E9EDF3)" />
+              <path d={MAPA_CIDADE} fill="var(--pn-bcc8e0,#BCC8E0)" />
               <g fill="none" strokeLinecap="round" strokeLinejoin="round">
-                <path stroke="#CBD4E4" strokeWidth={5} d={MAPA_RUAS_FINAS} />
-                <path stroke="#CBD4E4" strokeWidth={9} d={MAPA_RUAS_LARGAS} />
+                <path stroke="var(--pn-cbd4e4,#CBD4E4)" strokeWidth={5} d={MAPA_RUAS_FINAS} />
+                <path stroke="var(--pn-cbd4e4,#CBD4E4)" strokeWidth={9} d={MAPA_RUAS_LARGAS} />
                 <path stroke="#FFFFFF" strokeWidth={5} d={MAPA_RUAS_LARGAS} />
-                <path stroke="#C9D1E0" strokeWidth={7} d={MAPA_RUAS_EXTRA} />
+                <path stroke="var(--pn-c9d1e0,#C9D1E0)" strokeWidth={7} d={MAPA_RUAS_EXTRA} />
               </g>
-              <g fontFamily="Archivo, sans-serif" fontWeight={700} letterSpacing="2" fill="#3B4866" fontSize={11}>
+              <g fontFamily="Archivo, sans-serif" fontWeight={700} letterSpacing="2" fill="var(--pn-3b4866,#3B4866)" fontSize={11}>
                 <text x={790} y={250} letterSpacing="3" fontSize={12}>LAGO PARANOÁ</text>
                 <text x={420} y={512}>AEROPORTO JK</text>
                 <text x={330} y={232}>PARQUE DA CIDADE</text>
@@ -466,28 +466,28 @@ function Percurso({ cur = 0, simulados }: { cur?: number; simulados?: (MaratonaS
                 <text x={300} y={320}>ASA SUL</text>
                 <text x={690} y={236} fontSize={10}>PRAÇA DOS TRÊS PODERES</text>
               </g>
-              <g fill="#3B4866"><circle cx={569} cy={174} r={3} /><circle cx={661} cy={205} r={3} /></g>
-              <g fontFamily="Archivo, sans-serif" fontWeight={600} fill="#3B4866" fontSize={9}><text x={574} y={172}>Rodoviária</text><text x={666} y={203}>Congresso</text></g>
-              <polyline points="381,568 580,218 605,132 606,137 605,134" fill="none" stroke="#BCC8E0" strokeWidth={5} strokeDasharray="2 9" strokeLinecap="round" strokeLinejoin="round" />
-              <polyline points={routeDone} fill="none" stroke="#F7B500" strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" />
-              <g stroke="#3B4866" strokeWidth={1.5} fill="none">
+              <g fill="var(--pn-3b4866,#3B4866)"><circle cx={569} cy={174} r={3} /><circle cx={661} cy={205} r={3} /></g>
+              <g fontFamily="Archivo, sans-serif" fontWeight={600} fill="var(--pn-3b4866,#3B4866)" fontSize={9}><text x={574} y={172}>Rodoviária</text><text x={666} y={203}>Congresso</text></g>
+              <polyline points="381,568 580,218 605,132 606,137 605,134" fill="none" stroke="var(--pn-bcc8e0,#BCC8E0)" strokeWidth={5} strokeDasharray="2 9" strokeLinecap="round" strokeLinejoin="round" />
+              <polyline points={routeDone} fill="none" stroke="var(--pn-f7b500,#F7B500)" strokeWidth={6} strokeLinecap="round" strokeLinejoin="round" />
+              <g stroke="var(--pn-3b4866,#3B4866)" strokeWidth={1.5} fill="none">
                 <line x1={580} y1={218} x2={622} y2={252} />
                 <line x1={605} y1={132} x2={548} y2={104} />
                 <line x1={606} y1={137} x2={604} y2={64} />
                 <line x1={605} y1={134} x2={664} y2={104} />
               </g>
-              <g fill="#071A3F"><circle cx={580} cy={218} r={3.5} /><circle cx={605} cy={134} r={4} /></g>
+              <g fill="var(--pn-071a3f,#071A3F)"><circle cx={580} cy={218} r={3.5} /><circle cx={605} cy={134} r={4} /></g>
             </svg>
             {PERCURSO_PCS.map((d, i) => {
-              const lab: CSSProperties = { position: 'absolute', whiteSpace: 'nowrap', padding: '4px 8px', borderRadius: 8, background: '#fff', boxShadow: '0 2px 8px rgba(7,26,63,.16)', pointerEvents: 'none', color: '#071A3F', ...(d.side === 'l' ? { right: 24, top: -18, textAlign: 'right' as const } : d.side === 't' ? { left: '50%', bottom: 24, transform: 'translateX(-50%)', textAlign: 'center' as const } : { left: 24, top: -18 }) }
+              const lab: CSSProperties = { position: 'absolute', whiteSpace: 'nowrap', padding: '4px 8px', borderRadius: 8, background: '#fff', boxShadow: '0 2px 8px color-mix(in srgb,var(--pn-071a3f,#071A3F) 16%,transparent)', pointerEvents: 'none', color: 'var(--pn-071a3f,#071A3F)', ...(d.side === 'l' ? { right: 24, top: -18, textAlign: 'right' as const } : d.side === 't' ? { left: '50%', bottom: 24, transform: 'translateX(-50%)', textAlign: 'center' as const } : { left: 24, top: -18 }) }
               return (
                 <div key={i} style={{ position: 'absolute', left: `${d.mx / 10}%`, top: `${d.my / 6.2}%`, width: 0, height: 0 }}>
                   <button type="button" onClick={() => setPicked(i)} aria-label={d.short} style={{ position: 'absolute', left: -18, top: -18, ...circulo(i, 36) }}>{iconDe(i, 16)}</button>
-                  <span className="mp-label" style={lab}><span style={{ fontFamily: MONO, fontSize: 10, color: '#3B4866', display: 'block' }}>{pcEf(i).codeLabel}</span><span style={{ fontStretch: '125%', fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', fontSize: 13 }}>{pcEf(i).stepName}</span></span>
+                  <span className="mp-label" style={lab}><span style={{ fontFamily: MONO, fontSize: 10, color: 'var(--pn-3b4866,#3B4866)', display: 'block' }}>{pcEf(i).codeLabel}</span><span style={{ fontStretch: '125%', fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', fontSize: 13 }}>{pcEf(i).stepName}</span></span>
                 </div>
               )
             })}
-            <div style={{ position: 'absolute', right: 8, bottom: 6, fontFamily: MONO, fontSize: 9, color: '#3B4866', background: 'rgba(255,255,255,.85)', padding: '2px 6px', borderRadius: 4 }}>Mapa: © colaboradores do OpenStreetMap</div>
+            <div style={{ position: 'absolute', right: 8, bottom: 6, fontFamily: MONO, fontSize: 9, color: 'var(--pn-3b4866,#3B4866)', background: 'rgba(255,255,255,.85)', padding: '2px 6px', borderRadius: 4 }}>Mapa: © colaboradores do OpenStreetMap</div>
           </div>
         </Card>
 
@@ -576,10 +576,10 @@ const MEDAL_IMG: Record<number, [string, string]> = {
   5: ['medalha-ed-ii-agu.png', 'medalha-ed-ii-agu-bloqueada.png'],
 }
 const medalSrc = (n: number, on: boolean) => B + (MEDAL_IMG[n]?.[on ? 0 : 1] ?? MEDAL_IMG[2][1])
-const kickerLt: CSSProperties = { fontStretch: '125%', fontWeight: 800, fontStyle: 'italic', textTransform: 'uppercase', letterSpacing: '3px', fontSize: 13, color: '#CBB8FF' }
+const kickerLt: CSSProperties = { fontStretch: '125%', fontWeight: 800, fontStyle: 'italic', textTransform: 'uppercase', letterSpacing: '3px', fontSize: 13, color: 'var(--pn-cbb8ff,#CBB8FF)' }
 const kickerDk: CSSProperties = { fontStretch: '125%', fontWeight: 800, fontStyle: 'italic', textTransform: 'uppercase', letterSpacing: '3px', fontSize: 13, color: INK_TX }
 const chipBase: CSSProperties = { alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 999, fontStretch: '125%', fontWeight: 800, fontSize: 11, letterSpacing: '1.5px', textTransform: 'uppercase' }
-const panelCard: CSSProperties = { background: CARD, borderRadius: 16, boxShadow: '0 10px 30px rgba(7,26,63,.12)' }
+const panelCard: CSSProperties = { background: CARD, borderRadius: 16, boxShadow: '0 10px 30px color-mix(in srgb,var(--pn-071a3f,#071A3F) 12%,transparent)' }
 
 /** CARD de CHECK-IN da etapa (fundo navy, texto claro): explica o REQUISITO (permanência ≥ tempo mínimo),
  *  mostra o STATUS real e o MOTIVO quando bloqueado — e oferece REFAZER quando o aluno concluiu correndo
@@ -595,14 +595,14 @@ function SeloEtapa({ s, tone = 'navy' }: { s?: MaratonaSimuladoLink | null; tone
   const falhou = s.concluido && !s.checkin && temMin
   const estado: 'ok' | 'falhou' | 'pendente' = s.checkin ? 'ok' : falhou ? 'falhou' : 'pendente'
   // Cor de destaque (accent) + chrome do card por estado.
-  const accent = estado === 'ok' ? '#F2A800' : estado === 'falhou' ? '#E0860A' : (claro ? '#8A93A6' : 'rgba(255,255,255,.4)')
+  const accent = estado === 'ok' ? 'var(--pn-f2a800,#F2A800)' : estado === 'falhou' ? 'var(--pn-e0860a,#E0860A)' : (claro ? 'var(--pn-8a93a6,#8A93A6)' : 'rgba(255,255,255,.4)')
   const bgGrad = estado === 'ok'
-    ? (claro ? 'linear-gradient(135deg, rgba(247,181,0,.18), rgba(247,181,0,.05))' : 'linear-gradient(135deg, rgba(247,181,0,.2), rgba(247,181,0,.05))')
+    ? (claro ? 'linear-gradient(135deg, color-mix(in srgb,var(--pn-f7b500,#F7B500) 18%,transparent), color-mix(in srgb,var(--pn-f7b500,#F7B500) 5%,transparent))' : 'linear-gradient(135deg, color-mix(in srgb,var(--pn-f7b500,#F7B500) 20%,transparent), color-mix(in srgb,var(--pn-f7b500,#F7B500) 5%,transparent))')
     : estado === 'falhou'
-      ? (claro ? 'linear-gradient(135deg, rgba(224,134,10,.16), rgba(224,134,10,.03))' : 'linear-gradient(135deg, rgba(246,166,9,.2), rgba(246,166,9,.04))')
-      : (claro ? 'rgba(7,26,63,.035)' : 'rgba(255,255,255,.05)')
+      ? (claro ? 'linear-gradient(135deg, color-mix(in srgb,var(--pn-e0860a,#E0860A) 16%,transparent), color-mix(in srgb,var(--pn-e0860a,#E0860A) 3%,transparent))' : 'linear-gradient(135deg, color-mix(in srgb,var(--pn-f6a609,#F6A609) 20%,transparent), color-mix(in srgb,var(--pn-f6a609,#F6A609) 4%,transparent))')
+      : (claro ? 'color-mix(in srgb,var(--pn-071a3f,#071A3F) 3.5%,transparent)' : 'rgba(255,255,255,.05)')
   const txtTit = claro ? INK_TX : '#fff'
-  const txtBody = claro ? MUT : '#CBD4E4'
+  const txtBody = claro ? MUT : 'var(--pn-cbd4e4,#CBD4E4)'
   const strong = claro ? INK_TX : '#fff'
   const Icone = estado === 'ok' ? Medal : estado === 'falhou' ? AlertTriangle : Lock
   const badge = estado === 'ok' ? 'OBTIDO' : estado === 'falhou' ? 'NÃO VALIDADO' : 'BLOQUEADO'
@@ -617,23 +617,23 @@ function SeloEtapa({ s, tone = 'navy' }: { s?: MaratonaSimuladoLink | null; tone
       : (encerrado
           ? <>O simulado foi {B('encerrado')} e o check-in desta etapa não foi validado.</>
           : (temMin ? <>Para ganhar o selo e a medalha, permaneça pelo menos {B(minTxt)} no simulado. Só marcar as questões rápido não conta — é preciso realmente fazer o simulado.</> : <>Conclua o simulado para ganhar o selo e a medalha desta etapa.</>))
-  const badgeBg = estado === 'ok' ? 'linear-gradient(135deg,#FFD24A,#F2A800)' : estado === 'falhou' ? 'linear-gradient(135deg,#F6B24A,#E0860A)' : (claro ? 'rgba(7,26,63,.06)' : 'rgba(255,255,255,.08)')
+  const badgeBg = estado === 'ok' ? 'linear-gradient(135deg,var(--pn-ffd24a,#FFD24A),var(--pn-f2a800,#F2A800))' : estado === 'falhou' ? 'linear-gradient(135deg,var(--pn-f6b24a,#F6B24A),var(--pn-e0860a,#E0860A))' : (claro ? 'color-mix(in srgb,var(--pn-071a3f,#071A3F) 6%,transparent)' : 'rgba(255,255,255,.08)')
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 16px', borderRadius: 16, background: bgGrad, border: `1px solid ${estado === 'pendente' ? (claro ? 'rgba(7,26,63,.1)' : 'rgba(255,255,255,.12)') : `color-mix(in srgb, ${accent} 45%, transparent)`}`, boxShadow: estado === 'pendente' ? 'none' : `0 12px 28px -18px ${accent}` }}>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: '14px 16px', borderRadius: 16, background: bgGrad, border: `1px solid ${estado === 'pendente' ? (claro ? 'color-mix(in srgb,var(--pn-071a3f,#071A3F) 10%,transparent)' : 'rgba(255,255,255,.12)') : `color-mix(in srgb, ${accent} 45%, transparent)`}`, boxShadow: estado === 'pendente' ? 'none' : `0 12px 28px -18px ${accent}` }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
         <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 44, height: 44, borderRadius: 14, flexShrink: 0, background: badgeBg, boxShadow: estado === 'pendente' ? 'none' : `0 8px 18px -6px color-mix(in srgb, ${accent} 70%, transparent)`, border: estado === 'pendente' ? `2px dashed ${accent}` : 'none' }}>
-          <Icone size={20} color={estado === 'pendente' ? (claro ? '#3B4866' : '#CBD4E4') : estado === 'ok' ? NAVY : '#fff'} />
+          <Icone size={20} color={estado === 'pendente' ? (claro ? 'var(--pn-3b4866,#3B4866)' : 'var(--pn-cbd4e4,#CBD4E4)') : estado === 'ok' ? NAVY : '#fff'} />
         </span>
         <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', minWidth: 0 }}>
           <span style={{ fontWeight: 800, fontSize: 15, color: txtTit, letterSpacing: '-.01em' }}>{titulo}</span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 9px', borderRadius: 999, background: estado === 'ok' ? 'linear-gradient(135deg,#FFD24A,#F2A800)' : (claro ? 'rgba(7,26,63,.07)' : 'rgba(255,255,255,.14)'), color: estado === 'ok' ? NAVY : accent, fontSize: 10, fontWeight: 900, letterSpacing: '.6px', boxShadow: estado === 'ok' ? '0 3px 8px -2px rgba(247,181,0,.5)' : 'none' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, padding: '2px 9px', borderRadius: 999, background: estado === 'ok' ? 'linear-gradient(135deg,var(--pn-ffd24a,#FFD24A),var(--pn-f2a800,#F2A800))' : (claro ? 'color-mix(in srgb,var(--pn-071a3f,#071A3F) 7%,transparent)' : 'rgba(255,255,255,.14)'), color: estado === 'ok' ? NAVY : accent, fontSize: 10, fontWeight: 900, letterSpacing: '.6px', boxShadow: estado === 'ok' ? '0 3px 8px -2px color-mix(in srgb,var(--pn-f7b500,#F7B500) 50%,transparent)' : 'none' }}>
             {estado === 'ok' ? <Check size={11} strokeWidth={3.5} /> : estado === 'falhou' ? <AlertTriangle size={10} /> : <Lock size={10} />}{badge}
           </span>
         </span>
       </div>
       <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.55, color: txtBody }}>{corpo}</p>
       {encerrado ? (
-        <span style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 7, minHeight: 38, padding: '0 16px', borderRadius: 10, background: claro ? 'rgba(7,26,63,.06)' : 'rgba(255,255,255,.12)', color: claro ? MUT : '#CBD4E4', fontWeight: 800, fontSize: 12.5 }}>
+        <span style={{ alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 7, minHeight: 38, padding: '0 16px', borderRadius: 10, background: claro ? 'color-mix(in srgb,var(--pn-071a3f,#071A3F) 6%,transparent)' : 'rgba(255,255,255,.12)', color: claro ? MUT : 'var(--pn-cbd4e4,#CBD4E4)', fontWeight: 800, fontSize: 12.5 }}>
           <Lock size={14} /> Simulado encerrado
         </span>
       ) : estado === 'falhou' && s.fazerUrl ? (
@@ -666,21 +666,21 @@ function Painel({ onVerMapa, onVerRanking, onIrSimulado, cur = 0, percursoCur, s
     const s = st(i); const isLast = i === LAST_STEP
     let dot: CSSProperties = { display: 'flex', alignItems: 'center', justifyContent: 'center', flex: '0 0 auto', width: 38, height: 38, borderRadius: '50%', boxSizing: 'border-box' }
     if (isLast && s !== 'now') dot = { ...dot, background: GOLD, border: `2px solid ${GOLD}`, ...(s === 'locked' ? { opacity: 0.55 } : {}) }
-    else if (s === 'now') dot = { ...dot, background: '#53308F', border: '2px solid #53308F', boxShadow: '0 0 0 5px #CBB8FF' }
+    else if (s === 'now') dot = { ...dot, background: 'var(--pn-53308f,#53308F)', border: '2px solid var(--pn-53308f,#53308F)', boxShadow: '0 0 0 5px var(--pn-cbb8ff,#CBB8FF)' }
     else if (i === 0) dot = { ...dot, background: NAVY, border: `2px solid ${NAVY}` }
     else if (s === 'done') dot = { ...dot, background: INK, border: `2px solid ${INK}` }
-    else dot = { ...dot, background: CARD, border: '2px dashed #C9D1E0' }
+    else dot = { ...dot, background: CARD, border: '2px dashed var(--pn-c9d1e0,#C9D1E0)' }
     const lineBase: CSSProperties = { flex: '1 1 auto', height: 4, borderRadius: 2 }
     const isStart = i === 0 && s !== 'now'
     const icon: ReactNode = isStart ? <Plane size={16} color="#fff" />
       : (isLast && s !== 'now') ? <Flag size={16} color={NAVY} />
         : (i > 0 && i < LAST_STEP && s === 'done') ? <Check size={16} color="#fff" />
           : s === 'now' ? <MapPin size={16} color="#fff" />
-            : (i > 0 && i < LAST_STEP && s === 'locked') ? <Lock size={14} color="#3B4866" /> : null
+            : (i > 0 && i < LAST_STEP && s === 'locked') ? <Lock size={14} color="var(--pn-3b4866,#3B4866)" /> : null
     return {
       codeLabel: d.code + (s === 'now' ? ' · VOCÊ' : ''), stepName: d.stepName, dot, icon,
-      lineL: { ...lineBase, background: i === 0 ? 'transparent' : (s !== 'locked' ? GOLD : '#CBD4E4') } as CSSProperties,
-      lineR: { ...lineBase, background: isLast ? 'transparent' : (st(i + 1) !== 'locked' ? GOLD : '#CBD4E4') } as CSSProperties,
+      lineL: { ...lineBase, background: i === 0 ? 'transparent' : (s !== 'locked' ? GOLD : 'var(--pn-cbd4e4,#CBD4E4)') } as CSSProperties,
+      lineR: { ...lineBase, background: isLast ? 'transparent' : (st(i + 1) !== 'locked' ? GOLD : 'var(--pn-cbd4e4,#CBD4E4)') } as CSSProperties,
     }
   })
 
@@ -710,7 +710,7 @@ function Painel({ onVerMapa, onVerRanking, onIrSimulado, cur = 0, percursoCur, s
     let row: CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, minHeight: 40, padding: '0 14px', borderRadius: 8, boxSizing: 'border-box' }
     let v = '--'
     if (done) { row = { ...row, background: BG, color: TEXT }; v = '[00:00:00]' }
-    else if (now) { row = { ...row, background: '#53308F', color: '#fff' }; v = 'próximo' }
+    else if (now) { row = { ...row, background: 'var(--pn-53308f,#53308F)', color: '#fff' }; v = 'próximo' }
     else { row = { ...row, background: CARD, border: `1px solid ${LINE}`, color: MUT } }
     return { label: s.label + ' · ' + s.dest.split(' e ')[0], val: v, rowStyle: row }
   })
@@ -720,9 +720,9 @@ function Painel({ onVerMapa, onVerRanking, onIrSimulado, cur = 0, percursoCur, s
       <header style={{ position: 'relative', overflow: 'hidden', background: NAVY, color: '#fff' }}>
         <svg aria-hidden="true" viewBox="0 0 1440 460" preserveAspectRatio="xMidYMid slice" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
           <g transform="rotate(-8 720 240)">
-            <rect x="-200" y="150" width="1900" height="26" fill="#2E4FB0" />
-            <rect x="-200" y="190" width="1900" height="26" fill="#2E4FB0" />
-            <rect x="-200" y="230" width="1900" height="26" fill="#53308F" />
+            <rect x="-200" y="150" width="1900" height="26" fill="var(--pn-2e4fb0,#2E4FB0)" />
+            <rect x="-200" y="190" width="1900" height="26" fill="var(--pn-2e4fb0,#2E4FB0)" />
+            <rect x="-200" y="230" width="1900" height="26" fill="var(--pn-53308f,#53308F)" />
           </g>
         </svg>
         <div style={{ position: 'relative', padding: '24px 24px 72px' }}>
@@ -736,10 +736,10 @@ function Painel({ onVerMapa, onVerRanking, onIrSimulado, cur = 0, percursoCur, s
             <div style={{ flex: '1 1 340px', minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
               <span style={kickerLt}>{h.rotulo}</span>
               <h1 style={{ margin: 0, fontStretch: '125%', fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', fontSize: 52, lineHeight: 0.98 }}>{h.titulo}</h1>
-              <p style={{ margin: 0, maxWidth: 560, fontSize: 15.5, lineHeight: 1.55, color: '#BCC8E0' }}>{h.resumo}</p>
+              <p style={{ margin: 0, maxWidth: 560, fontSize: 15.5, lineHeight: 1.55, color: 'var(--pn-bcc8e0,#BCC8E0)' }}>{h.resumo}</p>
               <div data-tour="maratona-painel-corredor" style={{ marginTop: 6, display: 'flex', flexWrap: 'wrap', alignItems: 'flex-end', gap: 18, scrollMarginTop: 90 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                  <span style={{ fontFamily: MONO, fontSize: 13, color: '#BCC8E0' }}>Tempo de prova acumulado</span>
+                  <span style={{ fontFamily: MONO, fontSize: 13, color: 'var(--pn-bcc8e0,#BCC8E0)' }}>Tempo de prova acumulado</span>
                   <span style={{ fontFamily: MONO, fontSize: 34, lineHeight: 1 }}>{fmtTempo(tempoDecorrido)}</span>
                 </div>
                 {/* NÚMERO DO CORREDOR — destacado à DIREITA do tempo (entregue ao encerrar o 1º simulado). */}
@@ -748,9 +748,9 @@ function Painel({ onVerMapa, onVerRanking, onIrSimulado, cur = 0, percursoCur, s
                       <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 800, letterSpacing: '1.5px' }}>CORREDOR</span>
                       <span style={{ fontFamily: MONO, fontSize: 26, fontWeight: 700, lineHeight: 1 }}>Nº {fmtNum(numero)}</span>
                     </div>
-                  : <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '8px 16px', borderRadius: 12, background: 'rgba(255,255,255,.08)', border: '1px dashed rgba(247,181,0,.6)' }}>
+                  : <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '8px 16px', borderRadius: 12, background: 'rgba(255,255,255,.08)', border: '1px dashed color-mix(in srgb,var(--pn-f7b500,#F7B500) 60%,transparent)' }}>
                       <span style={{ fontFamily: MONO, fontSize: 11, fontWeight: 800, letterSpacing: '1.5px', color: GOLD }}>Nº A DEFINIR</span>
-                      <span style={{ fontFamily: MONO, fontSize: 12.5, color: '#CBD4E4' }}>encerre o 1º simulado</span>
+                      <span style={{ fontFamily: MONO, fontSize: 12.5, color: 'var(--pn-cbd4e4,#CBD4E4)' }}>encerre o 1º simulado</span>
                     </div>}
               </div>
             </div>
@@ -761,10 +761,10 @@ function Painel({ onVerMapa, onVerRanking, onIrSimulado, cur = 0, percursoCur, s
               <div data-tour="maratona-simulados-acesso" style={{ flex: '0 1 300px', minWidth: 240, display: 'flex', flexDirection: 'column', gap: 10, background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.14)', borderRadius: 16, padding: 18, scrollMarginTop: 90 }}>
                 <span style={{ ...kickerLt, color: GOLD }}>Simulado desta etapa</span>
                 <span style={{ fontStretch: '125%', fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', fontSize: 20, lineHeight: 1.08 }}>{alvo.rotulo || alvo.titulo}</span>
-                <span style={{ fontFamily: MONO, fontSize: 13, color: alvo.liberada ? GOLD : '#BCC8E0' }}>{dispoSim(alvo)}</span>
+                <span style={{ fontFamily: MONO, fontSize: 13, color: alvo.liberada ? GOLD : 'var(--pn-bcc8e0,#BCC8E0)' }}>{dispoSim(alvo)}</span>
                 {alvoAcao
                   ? <Link href={alvoAcao.href} style={{ marginTop: 4, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, borderRadius: 10, background: GOLD, color: NAVY, textDecoration: 'none', fontStretch: '125%', fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', fontSize: 15 }}>{alvoAcao.label} →</Link>
-                  : <span style={{ marginTop: 4, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, borderRadius: 10, background: 'rgba(255,255,255,.12)', color: '#CBD4E4', fontWeight: 700, fontSize: 13.5 }}><Lock size={15} /> {dispoSim(alvo)}</span>}
+                  : <span style={{ marginTop: 4, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, borderRadius: 10, background: 'rgba(255,255,255,.12)', color: 'var(--pn-cbd4e4,#CBD4E4)', fontWeight: 700, fontSize: 13.5 }}><Lock size={15} /> {dispoSim(alvo)}</span>}
                 {/* BAIXAR CADERNO — pop-up de cadernos (caderno/gabarito) igual à plataforma, respeitando liberação. */}
                 {alvo.cadernoUrl && <BaixarCaderno simuladoId={alvo.simuladoId} titulo={alvo.rotulo || alvo.titulo} full />}
               </div>
@@ -809,7 +809,7 @@ function Painel({ onVerMapa, onVerRanking, onIrSimulado, cur = 0, percursoCur, s
               <img src={medalSrc(p.n, p.on)} alt={p.on ? 'Medalha conquistada' : 'Medalha bloqueada'} style={{ display: 'block', width: 150, height: 206, ...(p.on ? {} : { filter: 'grayscale(1) brightness(1.05) opacity(.45)' }) }} />
               {!p.on && (
                 <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 52, height: 52, borderRadius: '50%', background: 'rgba(7,26,63,.78)', border: '2px solid rgba(255,255,255,.45)', boxShadow: '0 6px 16px rgba(0,0,0,.35)' }}><Lock size={24} color="#fff" /></span>
+                  <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 52, height: 52, borderRadius: '50%', background: 'color-mix(in srgb,var(--pn-071a3f,#071A3F) 78%,transparent)', border: '2px solid rgba(255,255,255,.45)', boxShadow: '0 6px 16px rgba(0,0,0,.35)' }}><Lock size={24} color="#fff" /></span>
                 </span>
               )}
             </div>
@@ -835,7 +835,7 @@ function Painel({ onVerMapa, onVerRanking, onIrSimulado, cur = 0, percursoCur, s
             <span style={{ fontFamily: MONO, fontSize: 14, color: MUT }}>{finished ? n.meta : (alvo ? dispoSim(alvo) : n.meta)}</span>
             {(() => {
               const btnSt: CSSProperties = { alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', minHeight: 48, padding: '0 22px', borderRadius: 10, border: 0, cursor: 'pointer', background: INK, color: '#fff', textDecoration: 'none', fontStretch: '125%', fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', fontSize: 15, letterSpacing: '0.5px' }
-              const infoSt: CSSProperties = { ...btnSt, opacity: 0.6, cursor: 'default', background: '#6B7280' }
+              const infoSt: CSSProperties = { ...btnSt, opacity: 0.6, cursor: 'default', background: 'var(--pn-6b7280,#6B7280)' }
               if (finished) return <button type="button" onClick={onVerRanking} style={btnSt}>{n.botao}</button>
               // PAINEL (overview): botão ÚNICO "Ir para o simulado N" → vai ao 1º simulado DISPONÍVEL (não feito +
               // liberado). Se o próximo ainda não liberou, mostra QUANDO libera; feito o atual, aponta pro próximo.
@@ -895,11 +895,11 @@ function RankPager({ page, total, onPage }: { page: number; total: number; onPag
 // Uma linha da tabela de classificação (real). Destaca "Você" em roxo.
 function RankRow({ r, sou }: { r: MaratonaRankLinha; sou: boolean }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '56px minmax(0,1fr) 96px 88px 104px', gap: 8, alignItems: 'center', minHeight: 48, padding: '0 22px', borderTop: sou ? `2px solid #CBB8FF` : `1px solid ${LINE}`, background: sou ? '#53308F' : CARD, color: sou ? '#fff' : TEXT }}>
+    <div style={{ display: 'grid', gridTemplateColumns: '56px minmax(0,1fr) 96px 88px 104px', gap: 8, alignItems: 'center', minHeight: 48, padding: '0 22px', borderTop: sou ? `2px solid var(--pn-cbb8ff,#CBB8FF)` : `1px solid ${LINE}`, background: sou ? 'var(--pn-53308f,#53308F)' : CARD, color: sou ? '#fff' : TEXT }}>
       <span style={{ fontFamily: MONO, fontSize: 15, fontWeight: 500 }}>{r.posicao}º</span>
       <span style={{ minWidth: 0, display: 'flex', gap: 8, alignItems: 'baseline', overflow: 'hidden', whiteSpace: 'nowrap' }}>
         <span style={{ fontWeight: 600, fontSize: 15, overflow: 'hidden', textOverflow: 'ellipsis' }}>{sou ? 'Você' : r.nome}</span>
-        {sou && <span style={{ height: 18, padding: '0 6px', borderRadius: 99, background: '#CBB8FF', color: '#2E1065', fontSize: 10, fontWeight: 800, display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>VOCÊ</span>}
+        {sou && <span style={{ height: 18, padding: '0 6px', borderRadius: 99, background: 'var(--pn-cbb8ff,#CBB8FF)', color: 'var(--pn-2e1065,#2E1065)', fontSize: 10, fontWeight: 800, display: 'inline-flex', alignItems: 'center', flexShrink: 0 }}>VOCÊ</span>}
       </span>
       {/* NÚMERO DO CORREDOR (fixo) · CHECK (permaneceu o mínimo) · TEMPO — sem pontos. */}
       <span className="rk-hide" style={{ fontFamily: MONO, fontSize: 13 }}>{fmtNum(r.numero) ? 'Nº ' + fmtNum(r.numero) : '—'}</span>
@@ -938,9 +938,9 @@ function Ranking({ ranking, meuId, simulados }: { ranking?: RankingMaratona; meu
       <header style={{ position: 'relative', overflow: 'hidden', background: NAVY, color: '#fff' }}>
         <svg aria-hidden="true" viewBox="0 0 1440 460" preserveAspectRatio="xMidYMid slice" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}>
           <g transform="rotate(-8 720 240)">
-            <rect x="-200" y="150" width="1900" height="26" fill="#2E4FB0" />
-            <rect x="-200" y="190" width="1900" height="26" fill="#2E4FB0" />
-            <rect x="-200" y="230" width="1900" height="26" fill="#53308F" />
+            <rect x="-200" y="150" width="1900" height="26" fill="var(--pn-2e4fb0,#2E4FB0)" />
+            <rect x="-200" y="190" width="1900" height="26" fill="var(--pn-2e4fb0,#2E4FB0)" />
+            <rect x="-200" y="230" width="1900" height="26" fill="var(--pn-53308f,#53308F)" />
           </g>
         </svg>
         <div style={{ position: 'relative', padding: '24px 24px 72px' }}>
@@ -952,7 +952,7 @@ function Ranking({ ranking, meuId, simulados }: { ranking?: RankingMaratona; meu
             <div style={{ minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
               <span style={{ ...kickerLt, color: GOLD }}>{head.rotulo}</span>
               <h1 style={{ margin: 0, fontStretch: '125%', fontWeight: 900, fontStyle: 'italic', textTransform: 'uppercase', fontSize: 52, lineHeight: 0.98 }}>{head.titulo}</h1>
-              <p style={{ margin: 0, maxWidth: 560, fontSize: 15.5, lineHeight: 1.55, color: '#BCC8E0' }}>{head.resumo}</p>
+              <p style={{ margin: 0, maxWidth: 560, fontSize: 15.5, lineHeight: 1.55, color: 'var(--pn-bcc8e0,#BCC8E0)' }}>{head.resumo}</p>
             </div>
           </div>
         </div>
@@ -990,7 +990,7 @@ function Ranking({ ranking, meuId, simulados }: { ranking?: RankingMaratona; meu
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                     <span style={{ fontWeight: 700, fontSize: 18, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.estudanteId === meuId ? 'Você' : r.nome}</span>
                   </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, borderTop: `1px solid ${first ? 'rgba(7,26,63,.25)' : LINE}`, paddingTop: 12 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, borderTop: `1px solid ${first ? 'color-mix(in srgb,var(--pn-071a3f,#071A3F) 25%,transparent)' : LINE}`, paddingTop: 12 }}>
                     <span style={{ fontFamily: MONO, fontSize: 14 }}>{fmtNum(r.numero) ? 'Nº ' + fmtNum(r.numero) : 'Nº —'}</span>
                     <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontFamily: MONO, fontSize: 14 }}>{r.checkin && <Check size={14} color={first ? NAVY : GOLD} />}{r.tempo}</span>
                   </div>
@@ -1105,11 +1105,11 @@ function Medalhas({ simulados, progresso = 0 }: { simulados?: (MaratonaSimuladoL
                 <img src={medalSrc(m.n, on)} alt="" style={{ width: '100%', height: 'auto', objectFit: 'contain', ...(on ? {} : { filter: 'grayscale(1) opacity(.7)' }) }} />
                 {!on && (
                   <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: '50%', background: 'rgba(7,26,63,.72)', border: '2px solid rgba(255,255,255,.5)' }}><Lock size={18} color="#fff" /></span>
+                    <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: '50%', background: 'color-mix(in srgb,var(--pn-071a3f,#071A3F) 72%,transparent)', border: '2px solid rgba(255,255,255,.5)' }}><Lock size={18} color="#fff" /></span>
                   </span>
                 )}
               </div>
-              <span style={{ fontFamily: MONO, fontSize: 13, textAlign: 'center', color: dark ? '#CBB8FF' : MUT }}>{m.txt}</span>
+              <span style={{ fontFamily: MONO, fontSize: 13, textAlign: 'center', color: dark ? 'var(--pn-cbb8ff,#CBB8FF)' : MUT }}>{m.txt}</span>
               <span style={{ padding: '2px 10px', borderRadius: 999, fontSize: 10.5, fontWeight: 800, letterSpacing: '.5px', ...(on ? { background: GOLD, color: NAVY } : { background: 'var(--mxi-bg)', color: MUT, border: `1px solid ${LINE}` }) }}>{on ? 'CONQUISTADA' : 'BLOQUEADA'}</span>
             </div>
           )
@@ -1127,7 +1127,7 @@ function Medalhas({ simulados, progresso = 0 }: { simulados?: (MaratonaSimuladoL
           ] as const).map((s) => (
             <div key={s.img} style={{ position: 'relative', background: s.dark ? NAVY : CARD, border: `1px solid ${s.dark ? NAVY : LINE}`, borderRadius: 16, padding: '30px 24px 22px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
               <img src={`/maratona/${s.img}`} alt="" style={{ width: '100%', maxWidth: 300, aspectRatio: '1', objectFit: 'contain', ...(s.on ? {} : { filter: 'grayscale(1)', opacity: 0.45 }) }} />
-              <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: MONO, fontSize: 13, letterSpacing: '.02em', textAlign: 'center', color: s.dark ? '#CBB8FF' : MUT }}>
+              <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: MONO, fontSize: 13, letterSpacing: '.02em', textAlign: 'center', color: s.dark ? 'var(--pn-cbb8ff,#CBB8FF)' : MUT }}>
                 {s.on ? <Medal size={15} color={GOLD} /> : <Lock size={14} />}{s.cap}
               </span>
             </div>
@@ -1139,21 +1139,21 @@ function Medalhas({ simulados, progresso = 0 }: { simulados?: (MaratonaSimuladoL
 }
 
 const CSS = `
-.mxi-tab { display:inline-flex; align-items:center; gap:6px; height:36px; padding:0 14px; border-radius:9px; border:0; background:transparent; color:#BCC8E0; font:inherit; font-size:12.5px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; cursor:pointer; white-space:nowrap; }
+.mxi-tab { display:inline-flex; align-items:center; gap:6px; height:36px; padding:0 14px; border-radius:9px; border:0; background:transparent; color:var(--pn-bcc8e0,#BCC8E0); font:inherit; font-size:12.5px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; cursor:pointer; white-space:nowrap; }
 .mxi-tab:hover { color:#fff; }
-.mxi-tab[data-on="1"] { background:#53308F; color:#fff; }
+.mxi-tab[data-on="1"] { background:var(--pn-53308f,#53308F); color:#fff; }
 .mxi-back:hover { background:rgba(255,255,255,.2)!important; }
 .mxi-pill { display:inline-flex; align-items:center; height:28px; padding:0 12px; border-radius:99px; font-size:12px; font-weight:800; letter-spacing:.04em; }
-.mxi-wk { min-height:40px; padding:0 16px; border-radius:10px; cursor:pointer; font:inherit; font-weight:800; font-style:italic; text-transform:uppercase; font-size:12.5px; letter-spacing:1px; background:#fff; color:#071A3F; border:2px solid #CBD4E4; }
-.mxi-wk[data-on="1"] { background:#2E4FB0; color:#fff; border-color:#2E4FB0; }
+.mxi-wk { min-height:40px; padding:0 16px; border-radius:10px; cursor:pointer; font:inherit; font-weight:800; font-style:italic; text-transform:uppercase; font-size:12.5px; letter-spacing:1px; background:#fff; color:var(--pn-071a3f,#071A3F); border:2px solid var(--pn-cbd4e4,#CBD4E4); }
+.mxi-wk[data-on="1"] { background:var(--pn-2e4fb0,#2E4FB0); color:#fff; border-color:var(--pn-2e4fb0,#2E4FB0); }
 /* Container de rolagem próprio: altura = viewport menos a top bar do shell (72px desktop / 64px mobile).
    Assim a barra do desafio gruda no topo deste container, logo abaixo da barra do sistema. */
 .mxi-root { height:calc(100dvh - 72px); overflow-y:auto;
-  --mxi-bg:#E9EDF3; --mxi-card:#fff; --mxi-card-sub:#F4F7FC; --mxi-text:#071A3F; --mxi-ink:#1A367C; --mxi-mut:#3B4866; --mxi-line:#CBD4E4; }
+  --mxi-bg:var(--pn-e9edf3,#E9EDF3); --mxi-card:#fff; --mxi-card-sub:var(--pn-f4f7fc,#F4F7FC); --mxi-text:var(--pn-071a3f,#071A3F); --mxi-ink:var(--pn-1a367c,#1A367C); --mxi-mut:var(--pn-3b4866,#3B4866); --mxi-line:var(--pn-cbd4e4,#CBD4E4); }
 /* Tema ESCURO: fundo/cards/texto/borda trocam; navy+dourado (marca) permanecem. */
-.dark .mxi-root { --mxi-bg:#0a1122; --mxi-card:#121a30; --mxi-card-sub:#19233d; --mxi-text:#e7ebf5; --mxi-ink:#9db2e8; --mxi-mut:#9aa6c2; --mxi-line:#2a3450; }
+.dark .mxi-root { --mxi-bg:var(--pn-0a1122,#0a1122); --mxi-card:var(--pn-121a30,#121a30); --mxi-card-sub:var(--pn-19233d,#19233d); --mxi-text:var(--pn-e7ebf5,#e7ebf5); --mxi-ink:var(--pn-9db2e8,#9db2e8); --mxi-mut:var(--pn-9aa6c2,#9aa6c2); --mxi-line:var(--pn-2a3450,#2a3450); }
 .dark .mxi-root .mxi-wk { background:var(--mxi-card); color:var(--mxi-text); border-color:var(--mxi-line); }
-.dark .mxi-root .mxi-wk[data-on="1"] { background:#2E4FB0; color:#fff; border-color:#2E4FB0; }
+.dark .mxi-root .mxi-wk[data-on="1"] { background:var(--pn-2e4fb0,#2E4FB0); color:#fff; border-color:var(--pn-2e4fb0,#2E4FB0); }
 @media (max-width:720px){ .pn-step-name{display:none} }
 @media (max-width:760px){ .rk-hide{display:none!important} }
 @media (max-width:640px){ .mxi-root{ height:calc(100dvh - 64px); } }

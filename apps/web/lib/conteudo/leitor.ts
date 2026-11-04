@@ -3,9 +3,10 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { ehTestadorGlobal } from '@/lib/sistema/testadores-globais'
 import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
-import { remember } from '@/lib/cache/relatorio-cache'
+import { remember, esquecer } from '@/lib/cache/relatorio-cache'
 import { docBloqueadoNoCronograma } from '@/lib/cronograma/adaptativo/liberacao'
 import { listarAnotacoes, type Anotacao } from './anotacoes'
+import { mapaPastas, resolverCapaDoc } from './capa-pagina'
 import { acessoEfetivo, type ItemAcesso, type Atribuicao, type Aluno, type AcessoGeral, type ModoAcesso, type ResultadoAcesso } from './acesso-efetivo'
 
 // LEITOR do aluno (Fase 8) — monta a leitura a partir dos TRECHOS da versão atual (cada um com seu
@@ -188,7 +189,7 @@ async function podeLerDoc(svc: any, tenantId: string, alunoId: string, doc: any)
   })
 }
 
-export interface PastaAluno { id: string; nome: string; cor: string | null; totalDocs: number }
+export interface PastaAluno { id: string; nome: string; cor: string | null; totalDocs: number; capaUrl?: string | null }
 export interface DocAluno { id: string; titulo: string; tipo_origem: string; versaoAtualId: string }
 export interface ArvoreAluno {
   pastas: PastaAluno[]; documentos: DocAluno[]; breadcrumb: { id: string; nome: string }[]
@@ -249,7 +250,11 @@ export async function arvoreBibliotecaAluno(alunoId: string, pastaId?: string | 
   const svc = createAdminClient()
 
   const [pastasRaw, docsRaw] = await Promise.all([
-    fetchAll<any>(() => svc.from(T_PASTA).select('id, nome, pai_id, cor, deletado').eq('tenant_id', tenantId).eq('folder_area', 'conteudo').eq('is_folder', true).order('id', { ascending: true })),
+    // capa/página (migração 20261105010000) são tolerantes: sem as colunas cai no SELECT legado.
+    fetchTol<any>(
+      () => svc.from(T_PASTA).select('id, nome, pai_id, cor, deletado, capa_url, capa_modo').eq('tenant_id', tenantId).eq('folder_area', 'conteudo').eq('is_folder', true).order('id', { ascending: true }),
+      () => svc.from(T_PASTA).select('id, nome, pai_id, cor, deletado').eq('tenant_id', tenantId).eq('folder_area', 'conteudo').eq('is_folder', true).order('id', { ascending: true }),
+    ),
     // modo_acesso/oculto são tolerantes (migração pendente) → cai no SELECT legado.
     fetchTol<any>(
       () => svc.from(T_DOC).select('id, titulo, tipo_origem, versao_atual_id, atualizado_em, pasta_id, herda_acesso, acesso_geral, modo_acesso, oculto').eq('tenant_id', tenantId).eq('status', 'publicado').eq('deletado', false).eq('categoria', 'conteudo').not('versao_atual_id', 'is', null).order('atualizado_em', { ascending: false }).order('id', { ascending: true }),
@@ -278,7 +283,7 @@ export async function arvoreBibliotecaAluno(alunoId: string, pastaId?: string | 
   const alvo = pastaId ?? null
   const subpastas: PastaAluno[] = pastas
     .filter((p: any) => (p.pai_id ?? null) === alvo && pastaAcessivel(p.id) && (totalSub.get(p.id) ?? 0) > 0)
-    .map((p: any) => ({ id: p.id, nome: p.nome, cor: p.cor ?? null, totalDocs: totalSub.get(p.id) ?? 0 }))
+    .map((p: any) => ({ id: p.id, nome: p.nome, cor: p.cor ?? null, totalDocs: totalSub.get(p.id) ?? 0, capaUrl: p.capa_url ?? null }))
     .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
   const documentos: DocAluno[] = visiveis
     .filter((d: any) => (d.pasta_id ?? null) === alvo)
@@ -294,6 +299,17 @@ export async function arvoreBibliotecaAluno(alunoId: string, pastaId?: string | 
   // 1ª página mesmo nos materiais já reimportados "limpos"). Os cards caem no ícone do tipo (SeloTipo).
   // Mantemos só a PRÉVIA (trechos de texto). Bônus: corta a URL assinada por doc + a regeneração (egress).
   const thumbs: Record<string, string> = {}
+  // ...EXCETO a CAPA CUSTOMIZADA que o admin define (própria do documento ou da pasta em lote): essa é uma imagem escolhida, não a
+  // miniatura automática, então volta a aparecer. Sem capa customizada, o card continua no ícone do tipo.
+  try {
+    if (documentos.length) {
+      const capaDoc = new Map<string, string | null>()
+      for (const r of (await fetchAllByIn<any>(documentos.map((d) => d.id), (c) => svc.from(T_DOC).select('id, capa_url').eq('tenant_id', tenantId).in('id', c).order('id', { ascending: true }))) ?? []) capaDoc.set(r.id, r.capa_url ?? null)
+      const porIdCP = mapaPastas(pastas.map((p: any) => ({ id: p.id, pai_id: p.pai_id ?? null, nome: p.nome, capa_url: p.capa_url ?? null, capa_modo: p.capa_modo ?? null })))
+      const pastaDoDoc = new Map<string, string | null>(visiveis.map((d: any) => [d.id, d.pasta_id ?? null]))
+      for (const d of documentos) { const r = resolverCapaDoc(capaDoc.get(d.id), pastaDoDoc.get(d.id) ?? null, porIdCP); if (r.valor) thumbs[d.id] = r.valor }
+    }
+  } catch { /* sem a coluna capa_url (migração pendente) */ }
   const previas: Record<string, { tipo: string; texto: string }[]> = {}
   try {
     const verIds = [...new Set(documentos.map((d) => d.versaoAtualId))]
@@ -463,7 +479,57 @@ export async function carregarMidiaAluno(documentoId: string, alunoId: string): 
 // A página do aluno (biblioteca/[id]) chamava carregarMidiaAluno E carregarLeituraPdf em sequência:
 // cada uma re-buscava o MESMO doc e re-rodava o gate. Este loader faz tudo UMA vez — 1 fetch do doc +
 // 1 decisão de acesso (cacheada) — e ramifica por tipo. Corta ~metade dos round-trips por abertura.
-export type DocParaLeitura = { kind: 'midia'; midia: MidiaAluno } | { kind: 'pdf'; pdf: LeituraPdf }
+/**
+ * LegProc em TEXTO: garante que o `html_rico` da versão é a conversão que PRESERVA a formatação do professor
+ * (realce/sombreamento/cor → span.ed n|c|p|x, fundo/alinhamento de parágrafo e célula). Idempotente (marcador
+ * `<!--lp1-->`); gera 1x (~2s) a partir do .docx original, com os uids dos trechos (estrutura de blocos idêntica
+ * à do mammoth → a ancoragem dos grifos não muda). Falhou → mantém o html_rico atual (nunca derruba a leitura).
+ */
+const MARCA_LP = '<!--lp4-->' // sobe a cada mudança do conversor (lp1 = versão com o bug do sombreamento de parágrafo) → regenera sozinho
+async function garantirHtmlLegproc(svc: any, tenantId: string, documentoId: string, versaoId: string, tipoOrigem: string | undefined): Promise<boolean> {
+  try {
+    if (tipoOrigem !== 'docx') return false
+    // Checa o marcador SEM trazer o html (1+ MB) a cada abertura: só devolve a linha se já começar com a marca atual.
+    const { data: marcado } = await svc.from('simulado_conteudo_versoes').select('id').eq('tenant_id', tenantId).eq('id', versaoId).like('html_rico', `${MARCA_LP}%`).maybeSingle()
+    if (marcado) return true
+    const { data: ver } = await svc.from('simulado_conteudo_versoes').select('arquivo_key').eq('tenant_id', tenantId).eq('id', versaoId).maybeSingle()
+    if (!ver?.arquivo_key) return false
+    const { baixarOriginal } = await import('./ingestao')
+    const { injetarUidsNoHtml } = await import('./trechos')
+    const { docxParaHtmlLegproc } = await import('./legproc-html')
+    const bytes = await baixarOriginal(ver.arquivo_key)
+    if (!bytes) return false
+    const htmlBase = await docxParaHtmlLegproc(bytes)
+    const lerTrechos = () => fetchAll<any>(() => svc.from(T_TR).select('uid, ordem').eq('tenant_id', tenantId).eq('versao_id', versaoId).order('ordem', { ascending: true }))
+    let trechos = await lerTrechos()
+    if (!trechos?.length) {
+      // Versão ainda SEM trechos (nunca reconciliada, ex.: salva pelo editor): cria agora a partir do HTML novo
+      // (mesma estrutura de blocos), carregando os uids da versão anterior mais próxima que tenha trechos — os
+      // grifos dos alunos continuam ancorados.
+      const { reconciliarVersao } = await import('./reconciliacao')
+      const { data: atual } = await svc.from('simulado_conteudo_versoes').select('numero').eq('tenant_id', tenantId).eq('id', versaoId).maybeSingle()
+      const { data: outras } = await svc.from('simulado_conteudo_versoes').select('id, numero').eq('tenant_id', tenantId).eq('documento_id', documentoId).lt('numero', (atual as any)?.numero ?? 0).order('numero', { ascending: false }).limit(6)
+      let anterior: string | null = null
+      for (const o of (outras ?? []) as any[]) {
+        const { count } = await svc.from(T_TR).select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId).eq('versao_id', o.id)
+        if ((count ?? 0) > 0) { anterior = o.id; break }
+      }
+      await reconciliarVersao({ documentoId, versaoNovaId: versaoId, versaoAnteriorId: anterior, html: htmlBase, tenantId })
+      trechos = await lerTrechos()
+    }
+    if (!trechos?.length) return false
+    const html = injetarUidsNoHtml(htmlBase, trechos.map((t: any) => t.uid))
+    if (!html.trim()) return false
+    const up = await svc.from('simulado_conteudo_versoes').update({ html_rico: MARCA_LP + html }).eq('tenant_id', tenantId).eq('id', versaoId)
+    if (up.error) return false
+    await esquecer(`leitura-doc:${tenantId}:${documentoId}:${versaoId}`)
+    return true
+  } catch { return false /* mantém o html_rico atual */ }
+}
+
+/** Leitura em TEXTO (documento marcado como LegProc): HTML rico com data-uid + grifos por texto do aluno. */
+export interface LeituraTexto { documentoId: string; titulo: string; versaoId: string; html: string; anotacoes: Anotacao[]; mostrarLegenda: boolean; ocultarLegendaTabela: boolean }
+export type DocParaLeitura = { kind: 'midia'; midia: MidiaAluno } | { kind: 'pdf'; pdf: LeituraPdf } | { kind: 'texto'; texto: LeituraTexto }
 
 export async function carregarDocParaLeitura(documentoId: string, alunoId: string): Promise<DocParaLeitura | null> {
   const tenantId = await getCurrentTenantId()
@@ -487,6 +553,40 @@ export async function carregarDocParaLeitura(documentoId: string, alunoId: strin
     return { kind: 'midia', midia: { documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, tipoOrigem, kind: tipoOrigem as 'video' | 'audio', url, ext } }
   }
 
+  // LEGPROC (marca por documento, coluna leitura_legproc): leitura em TEXTO com STF/STJ recolhíveis em vez do
+  // PDF fiel. Tolerante à migração pendente (coluna ausente → false → segue no PDF). Se o HTML não estiver
+  // disponível, cai no PDF (nunca deixa o aluno sem leitura).
+  const marcadoLegproc = await (async () => { try { const r = await svc.from('simulado_conteudo_documentos').select('leitura_legproc, legenda_categorias').eq('tenant_id', tenantId).eq('id', documentoId).maybeSingle(); return r.error ? null : r.data } catch { return null } })()
+  // "Marcado como LegProc" = interruptor do documento OU o doc está numa pasta de tipo LegProc
+  // (cronograma_tipo_material='legproc'): nesses, a leitura em texto (STF/STJ recolhíveis) e a legenda de
+  // categorias já vêm ligadas, sem precisar configurar documento a documento.
+  const pastaLegproc = !!(doc as any).pasta_id && await (async () => { try { const r = await svc.from(T_PASTA).select('cronograma_tipo_material').eq('tenant_id', tenantId).eq('id', (doc as any).pasta_id).maybeSingle(); return !r.error && (r.data as any)?.cronograma_tipo_material === 'legproc' } catch { return false } })()
+  const ehLegproc = !!(marcadoLegproc as any)?.leitura_legproc || pastaLegproc
+  const legendaLegproc = !!(marcadoLegproc as any)?.legenda_categorias || ehLegproc
+  if (ehLegproc) {
+    const convertido = await garantirHtmlLegproc(svc, tenantId, documentoId, doc.versao_atual_id, tipoOrigem)
+    if (convertido) {
+      // html convertido (cache com a MARCA na chave → nunca serve a conversão antiga) + anotações do aluno (gate já passou acima)
+      const html = await remember<string | undefined>(`leitura-lp:${MARCA_LP}:${tenantId}:${documentoId}:${doc.versao_atual_id}`, 900, async () => {
+        const r = await svc.from('simulado_conteudo_versoes').select('html_rico').eq('tenant_id', tenantId).eq('id', doc.versao_atual_id).maybeSingle()
+        const h = (r.data as any)?.html_rico
+        return typeof h === 'string' && h.startsWith(MARCA_LP) ? h : undefined
+      })
+      if (html) {
+        const anotacoes = await listarAnotacoes(documentoId, alunoId)
+        const { ocultarLegendaTabela } = await import('./legproc-legenda')
+        const ocultarLeg = await ocultarLegendaTabela(svc, tenantId, documentoId, (doc as any).pasta_id ?? null)
+        return { kind: 'texto', texto: { documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, html, anotacoes, mostrarLegenda: legendaLegproc, ocultarLegendaTabela: ocultarLeg } }
+      }
+    }
+    const lt = await carregarLeitura(documentoId, alunoId).catch(() => null)
+    if (lt && lt.html && lt.html.trim()) {
+      const { ocultarLegendaTabela } = await import('./legproc-legenda')
+      const ocultarLeg = await ocultarLegendaTabela(svc, tenantId, documentoId, (doc as any).pasta_id ?? null)
+      return { kind: 'texto', texto: { documentoId, titulo: lt.titulo, versaoId: lt.versaoId, html: lt.html, anotacoes: lt.anotacoes, mostrarLegenda: legendaLegproc, ocultarLegendaTabela: ocultarLeg } }
+    }
+  }
+
   // PDF (fiel): URL (cache 300s por versão) + grifos do aluno + toggle da legenda — tudo em PARALELO.
   const { gerarPdfDocumento } = await import('./thumb')
   const [pdfUrl, grifosRows, cfgRow] = await Promise.all([
@@ -499,7 +599,7 @@ export async function carregarDocParaLeitura(documentoId: string, alunoId: strin
   const grifos: GrifoPdf[] = (grifosRows ?? []).map((g) => ({
     id: g.id, pagina: g.pagina, rects: Array.isArray(g.rects) ? g.rects : [], cor: g.cor || 'y', tool: g.tool || 'hl', nota: g.nota ?? null, texto: g.texto ?? null,
   })).filter((g) => g.rects.length)
-  return { kind: 'pdf', pdf: { documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, pdfUrl, grifos, mostrarLegenda: !!(cfgRow as any)?.legenda_categorias } }
+  return { kind: 'pdf', pdf: { documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, pdfUrl, grifos, mostrarLegenda: !!(cfgRow as any)?.legenda_categorias || legendaLegproc } }
 }
 
 /** URL assinada do arquivo ORIGINAL para o aluno BAIXAR — só se tiver acesso (gate). null se negado. */

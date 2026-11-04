@@ -84,9 +84,9 @@ function Lockup() {
       <span
         className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-[13px]"
         style={{
-          background: cm('linear-gradient(160deg,#0F4A2E,#072A1B)'),
-          border: `1px solid ${cm('rgba(120,230,170,.3)')}`,
-          boxShadow: `inset 0 1px 0 rgba(255,255,255,.12), 0 8px 20px -8px ${cm('rgba(34,197,110,.5)')}`,
+          background: cm('linear-gradient(160deg,var(--pn-0f4a2e,#0F4A2E),var(--pn-072a1b,#072A1B))'),
+          border: `1px solid ${cm('color-mix(in srgb,var(--pn-78e6aa,#78E6AA) 30%,transparent)')}`,
+          boxShadow: `inset 0 1px 0 rgba(255,255,255,.12), 0 8px 20px -8px ${cm('color-mix(in srgb,var(--pn-22c56e,#22C56E) 50%,transparent)')}`,
         }}
       >
         <MarcaV className="h-[22px] w-[22px]" />
@@ -422,7 +422,7 @@ function BotaoPerfil({
           )}
         >
           {/* Cabeçalho com gradiente verde (sem e-mail — spec §6). */}
-          <div className="rounded-t-[20px] p-4" style={{ background: cm('linear-gradient(120deg,#041A10 0%,#0B4A2E 55%,#12643D 100%)') }}>
+          <div className="rounded-t-[20px] p-4" style={{ background: cm('linear-gradient(120deg,var(--pn-041a10,#041A10) 0%,var(--pn-0b4a2e,#0B4A2E) 55%,var(--pn-12643d,#12643D) 100%)') }}>
             <div className="flex items-center gap-3">
               {avatar(44)}
               <div className="min-w-0">
@@ -475,8 +475,8 @@ function BotaoPerfil({
               disabled={saindo}
               className="mt-0.5 flex w-full items-center gap-3 rounded-xl px-2.5 py-2.5 text-left transition-colors hover:bg-[color:rgba(229,72,77,.12)] disabled:opacity-60"
             >
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] bg-[color:rgba(229,72,77,.12)] text-[#E5484D]"><LogOut className="h-[18px] w-[18px]" /></span>
-              <b className="text-[13.5px] font-bold text-[#E5484D]">{saindo ? 'Saindo…' : 'Sair da conta'}</b>
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-[10px] bg-[color:rgba(229,72,77,.12)] text-[color:var(--pn-e5484d,#E5484D)]"><LogOut className="h-[18px] w-[18px]" /></span>
+              <b className="text-[13.5px] font-bold text-[color:var(--pn-e5484d,#E5484D)]">{saindo ? 'Saindo…' : 'Sair da conta'}</b>
             </button>
           </div>
         </div>
@@ -562,11 +562,11 @@ function TabBar({ nav, onAbrirMenu }: { nav: AlunoNavItem[]; onAbrirMenu: () => 
         href={item.href}
         aria-current={item.ativo ? 'page' : undefined}
         className="flex flex-col items-center gap-1 text-[10.5px]"
-        style={{ color: item.ativo ? '#E8C877' : cm('#9DB5A8'), fontWeight: item.ativo ? 800 : 600 }}
+        style={{ color: item.ativo ? 'var(--pn-e8c877,#E8C877)' : cm('var(--pn-9db5a8,#9DB5A8)'), fontWeight: item.ativo ? 800 : 600 }}
       >
         <Icone className="h-5 w-5" />
         {item.short}
-        <span className="h-1 w-1 rounded-full" style={{ background: item.ativo ? '#E8C877' : 'transparent' }} />
+        <span className="h-1 w-1 rounded-full" style={{ background: item.ativo ? 'var(--pn-e8c877,#E8C877)' : 'transparent' }} />
       </Link>
     )
   }
@@ -575,7 +575,7 @@ function TabBar({ nav, onAbrirMenu }: { nav: AlunoNavItem[]; onAbrirMenu: () => 
     <nav aria-label="Navegação" className="sticky bottom-0 z-[60] h-[84px] lg:hidden" style={{ background: 'transparent' }}>
       {/* Recorte côncavo central (SVG). Cor do fundo da barra = verde-escuro VND. */}
       <svg viewBox="0 0 390 84" preserveAspectRatio="none" aria-hidden="true" className="absolute inset-0 h-full w-full">
-        <path d="M0 14 H140 C158 14 160 44 195 44 C230 44 232 14 250 14 H390 V84 H0 Z" className={mac ? 'fill-[#220506] dark:fill-[#202522]' : 'fill-[#062A1B] dark:fill-[#202522]'} />
+        <path d="M0 14 H140 C158 14 160 44 195 44 C230 44 232 14 250 14 H390 V84 H0 Z" className={mac ? 'fill-[color:var(--pn-220506,#220506)] dark:fill-[#202522]' : 'fill-[color:var(--pn-062a1b,#062A1B)] dark:fill-[#202522]'} />
       </svg>
       <div className="relative grid h-full grid-cols-[1fr_1fr_96px_1fr_1fr] items-end px-1.5 pb-3.5">
         {slotEsq.map((it) => <Item key={`e-${it.href}`} item={it} />)}
@@ -585,12 +585,12 @@ function TabBar({ nav, onAbrirMenu }: { nav: AlunoNavItem[]; onAbrirMenu: () => 
           aria-label="Simular agora"
           className="fab-vnd col-start-3 -mt-[18px] flex h-[62px] w-[62px] shrink-0 items-center justify-center justify-self-center self-start rounded-full"
           style={{
-            background: 'linear-gradient(180deg,#F1D48A,#D8B45A)',
-            color: '#2A1F02',
+            background: 'linear-gradient(180deg,var(--pn-f1d48a,#F1D48A),var(--pn-d8b45a,#D8B45A))',
+            color: 'var(--pn-2a1f02,#2A1F02)',
             border: '4px solid var(--bg)',
           }}
         >
-          <MarcaV className="h-6 w-6" fill="#2A1F02" />
+          <MarcaV className="h-6 w-6" fill="var(--pn-2a1f02,#2A1F02)" />
         </Link>
         {slotDir.map((it) => <Item key={`d-${it.href}`} item={it} />)}
         {/* Slot 5 = Menu (abre a folha). */}
@@ -598,7 +598,7 @@ function TabBar({ nav, onAbrirMenu }: { nav: AlunoNavItem[]; onAbrirMenu: () => 
           type="button"
           onClick={onAbrirMenu}
           className="flex flex-col items-center gap-1 text-[10.5px] font-semibold"
-          style={{ color: cm('#9DB5A8') }}
+          style={{ color: cm('var(--pn-9db5a8,#9DB5A8)') }}
           aria-haspopup="dialog"
         >
           <svg viewBox="0 0 24 24" className="h-5 w-5" aria-hidden><rect x="3" y="3" width="7" height="7" rx="1.5" fill="currentColor" /><rect x="14" y="3" width="7" height="7" rx="1.5" fill="currentColor" /><rect x="3" y="14" width="7" height="7" rx="1.5" fill="currentColor" /><rect x="14" y="14" width="7" height="7" rx="1.5" fill="currentColor" /></svg>
@@ -606,7 +606,7 @@ function TabBar({ nav, onAbrirMenu }: { nav: AlunoNavItem[]; onAbrirMenu: () => 
           <span className="h-1 w-1" />
         </button>
       </div>
-      <style>{`.fab-vnd{animation:fabVndPulse 2.4s ease-in-out infinite}@keyframes fabVndPulse{0%,100%{box-shadow:0 10px 24px -8px rgba(216,180,90,.8),0 0 0 0 rgba(216,180,90,.45)}50%{box-shadow:0 10px 24px -8px rgba(216,180,90,.8),0 0 0 10px rgba(216,180,90,0)}}@media (prefers-reduced-motion:reduce){.fab-vnd{animation:none}}`}</style>
+      <style>{`.fab-vnd{animation:fabVndPulse 2.4s ease-in-out infinite}@keyframes fabVndPulse{0%,100%{box-shadow:0 10px 24px -8px color-mix(in srgb,var(--pn-d8b45a,#D8B45A) 80%,transparent),0 0 0 0 color-mix(in srgb,var(--pn-d8b45a,#D8B45A) 45%,transparent)}50%{box-shadow:0 10px 24px -8px color-mix(in srgb,var(--pn-d8b45a,#D8B45A) 80%,transparent),0 0 0 10px color-mix(in srgb,var(--pn-d8b45a,#D8B45A) 0%,transparent)}}@media (prefers-reduced-motion:reduce){.fab-vnd{animation:none}}`}</style>
     </nav>
   )
 }
@@ -675,16 +675,16 @@ export function ShellVND({ nav, usuario, children }: AlunoShellProps) {
       {/* ───── Header mobile (62px) ───── */}
       <header
         className="sticky top-0 z-40 flex h-[62px] items-center gap-2 px-4 lg:hidden"
-        style={{ background: cm('#062A1B') }}
+        style={{ background: cm('var(--pn-062a1b,#062A1B)') }}
       >
         <NavProgress />
         <Link href="/aluno" className="flex items-center gap-2" aria-label={`${nome} — início`}>
-          <span className="flex h-9 w-9 items-center justify-center rounded-[11px]" style={{ background: cm('linear-gradient(160deg,#0F4A2E,#072A1B)'), border: `1px solid ${cm('rgba(120,230,170,.3)')}` }}>
+          <span className="flex h-9 w-9 items-center justify-center rounded-[11px]" style={{ background: cm('linear-gradient(160deg,var(--pn-0f4a2e,#0F4A2E),var(--pn-072a1b,#072A1B))'), border: `1px solid ${cm('color-mix(in srgb,var(--pn-78e6aa,#78E6AA) 30%,transparent)')}` }}>
             <MarcaV className="h-[18px] w-[18px]" />
           </span>
           <span className="flex flex-col leading-[1.1]">
             <span className="text-[13px] font-extrabold text-white">{nome}</span>
-            <span className="text-[9px] font-bold tracking-[.18em] text-[#F1D48A]">{selo}</span>
+            <span className="text-[9px] font-bold tracking-[.18em] text-[color:var(--pn-f1d48a,#F1D48A)]">{selo}</span>
           </span>
         </Link>
         <div className="ml-auto flex items-center gap-1 text-white [&_svg]:text-white">
@@ -698,7 +698,7 @@ export function ShellVND({ nav, usuario, children }: AlunoShellProps) {
           min-h-dvh (min-height, não height), o `min-height:100%` do conteúdo NÃO resolve → sobraria a faixa
           cinza do fundo do shell (var(--bg)) abaixo dele. Solução: pintar o <main> com o MESMO fundo das
           telas internas (simVars vnd claro/escuro) via dark: — assim não há emenda/faixa em área nenhuma. */}
-      <main className={cn('flex-1', ehAreaNova ? (mac ? 'bg-[#F8F5F5] pb-[90px] dark:bg-[#100706] lg:pb-0' : 'bg-[#F5F8F6] pb-[90px] dark:bg-[#061009] lg:pb-0') : 'px-4 pb-[100px] pt-4 lg:px-6 lg:pb-8 lg:pt-6')}>{children}</main>
+      <main className={cn('flex-1', ehAreaNova ? (mac ? 'bg-[#F8F5F5] pb-[90px] dark:bg-[color:var(--pn-100706,#100706)] lg:pb-0' : 'bg-[#F5F8F6] pb-[90px] dark:bg-[color:var(--pn-061009,#061009)] lg:pb-0') : 'px-4 pb-[100px] pt-4 lg:px-6 lg:pb-8 lg:pt-6')}>{children}</main>
 
       {/* ───── Tab bar + folha Menu (mobile) ───── */}
       <TabBar nav={nav} onAbrirMenu={() => setFolhaMenu(true)} />

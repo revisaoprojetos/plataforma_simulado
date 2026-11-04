@@ -29,7 +29,7 @@ export default async function CentralEstudosPage() {
   const FERRAMENTAS: Ferramenta[] = [
     {
       nome: 'LegProc', linha: 'LEGPROC', sigla: 'legislação anotada',
-      grad: 'linear-gradient(135deg,#2A1E4A,#4A31B8)',
+      grad: 'linear-gradient(135deg,var(--pn-2a1e4a,#2A1E4A),var(--pn-4a31b8,#4A31B8))',
       desc: 'Lei seca com os grifos do Revisão, organizada por assunto.',
       // REAL: materiais da Biblioteca acessíveis + lidos.
       pct: pctLido, info: `${cat.totalPdfs.toLocaleString('pt-BR')} materiais · ${cat.totalLidos.toLocaleString('pt-BR')} lidos`,
@@ -42,7 +42,7 @@ export default async function CentralEstudosPage() {
     },
     {
       nome: 'JurisClub', linha: 'JURISCLUB', sigla: 'julgados do mês',
-      grad: 'linear-gradient(135deg,#3A1A6A,#7A2F9E)',
+      grad: 'linear-gradient(135deg,var(--pn-3a1a6a,#3A1A6A),var(--pn-7a2f9e,#7A2F9E))',
       desc: 'Julgados do mês com teste rápido e caderno de jurisprudência.',
       // TODO(dados): progresso "X de N julgados" do mês — sem loader barato nesta tela.
       pct: 0, info: 'Julgados comentados do mês',
@@ -55,7 +55,7 @@ export default async function CentralEstudosPage() {
     },
     {
       nome: 'Questões e Simulados', linha: 'QUESTÕES E SIMULADOS', sigla: 'banco e provas',
-      grad: 'linear-gradient(135deg,#1E2A6A,#2F5BD3)',
+      grad: 'linear-gradient(135deg,var(--pn-1e2a6a,#1E2A6A),var(--pn-2f5bd3,#2F5BD3))',
       desc: 'Banco de questões, simulados, resultados e diagnóstico.',
       // REAL: questões resolvidas + % de acerto do aluno.
       pct: stats.acerto, info: `${stats.resolvidas.toLocaleString('pt-BR')} questões · ${stats.acerto}% de acerto`,

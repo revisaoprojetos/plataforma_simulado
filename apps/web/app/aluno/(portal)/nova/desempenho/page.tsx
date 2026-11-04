@@ -75,26 +75,26 @@ export default async function DesempenhoPage() {
   return (
     <>
       {/* Faixa de resumo */}
-      <section style={{ position: 'relative', overflow: 'hidden', borderRadius: 22, background: 'linear-gradient(120deg,#160F33 0%,#241A52 55%,#2E1F6A 100%)', color: '#FFFFFF', padding: '28px 30px' }}>
+      <section style={{ position: 'relative', overflow: 'hidden', borderRadius: 22, background: 'linear-gradient(120deg,var(--pn-160f33,#160F33) 0%,var(--pn-241a52,#241A52) 55%,var(--pn-2e1f6a,#2E1F6A) 100%)', color: '#FFFFFF', padding: '28px 30px' }}>
         <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px)', backgroundSize: '44px 44px' }} />
         <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 24, flexWrap: 'wrap' }}>
           <Col gap={12} style={{ maxWidth: 560 }}>
             <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.2em', textTransform: 'uppercase', color: 'var(--gold)' }}>Meu desempenho</span>
             <h1 style={{ margin: 0, fontSize: 32, fontWeight: 800, letterSpacing: '-0.04em', color: '#fff' }}>Meu Desempenho</h1>
             {foco && (
-              <P size={13.5}><span style={{ color: '#D9CFFF' }}>Foco atual: <b style={{ color: '#fff' }}>{foco.nome}</b>{provaEm ? ` · prova em ${provaEm}` : ''}</span></P>
+              <P size={13.5}><span style={{ color: 'var(--pn-d9cfff,#D9CFFF)' }}>Foco atual: <b style={{ color: '#fff' }}>{foco.nome}</b>{provaEm ? ` · prova em ${provaEm}` : ''}</span></P>
             )}
             {chips.length > 0 && (
               <Row gap={8}>
                 {chips.map((t) => (
-                  <span key={t} style={{ display: 'inline-flex', alignItems: 'center', height: 26, padding: '0 11px', borderRadius: 99, background: 'rgba(241,194,50,.16)', color: 'var(--gold)', fontSize: 12, fontWeight: 700 }}>{t}</span>
+                  <span key={t} style={{ display: 'inline-flex', alignItems: 'center', height: 26, padding: '0 11px', borderRadius: 99, background: 'color-mix(in srgb,var(--pn-f1c232,#F1C232) 16%,transparent)', color: 'var(--gold)', fontSize: 12, fontWeight: 700 }}>{t}</span>
                 ))}
               </Row>
             )}
           </Col>
           <Col gap={10} style={{ alignItems: 'flex-end', textAlign: 'right' }}>
             <b style={{ fontSize: 52, fontWeight: 800, letterSpacing: '-0.04em', color: 'var(--gold)', lineHeight: 1 }}>{d?.acertoMedio != null ? `${d.acertoMedio}%` : '—'}</b>
-            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.12em', color: '#CFC4FF' }}>DE ACERTO MÉDIO</span>
+            <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.12em', color: 'var(--pn-cfc4ff,#CFC4FF)' }}>DE ACERTO MÉDIO</span>
           </Col>
         </div>
       </section>

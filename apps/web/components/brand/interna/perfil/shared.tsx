@@ -65,9 +65,9 @@ export function Ic({ n, s = 18, c, sw }: { n: string; s?: number; c?: string; sw
 
 // ---------------------------------------------------------------- cores de nota (realizados.notecolor)
 export function notec(v: number): [string, string] {
-  if (v < 30) return ['#E5484D', 'rgba(229,72,77,.12)']
-  if (v < 60) return ['#D99A1E', 'rgba(217,154,30,.14)']
-  return ['#1FA868', 'rgba(31,168,104,.13)']
+  if (v < 30) return ['var(--pn-e5484d,#E5484D)', 'color-mix(in srgb,var(--pn-e5484d,#E5484D) 12%,transparent)']
+  if (v < 60) return ['var(--pn-d99a1e,#D99A1E)', 'color-mix(in srgb,var(--pn-d99a1e,#D99A1E) 14%,transparent)']
+  return ['var(--pn-1fa868,#1FA868)', 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 13%,transparent)']
 }
 export const fnum = (v: number) => v.toFixed(1).replace('.', ',')
 
@@ -131,7 +131,7 @@ export class BK {
         </div>
       )
     }
-    const grad = 'linear-gradient(90deg,#6449E0,#8F75FF 70%,#F1C232)'
+    const grad = 'linear-gradient(90deg,var(--pn-6449e0,#6449E0),var(--pn-8f75ff,#8F75FF) 70%,var(--pn-f1c232,#F1C232))'
     return (
       <div style={{ height: h, borderRadius: 99, background: 'var(--track)', overflow: 'hidden' }}>
         <span className="pbar" style={{ display: 'block', width: `${p}%`, height: '100%', borderRadius: 99, background: color || grad }} />
@@ -147,8 +147,8 @@ export class BK {
       return <span style={{ ...base, color: '#FFF', background: this.acc }}>{ico}{text}</span>
     }
     if (kind === 'accent') {
-      if (this.isVnd) return <span style={{ ...base, color: '#2A1F02', background: 'linear-gradient(180deg,#F1D48A,#D8B45A)' }}>{ico}{text}</span>
-      if (this.isRev) return <span style={{ ...base, color: '#2A1A55', background: '#F1C232' }}>{ico}{text}</span>
+      if (this.isVnd) return <span style={{ ...base, color: 'var(--pn-2a1f02,#2A1F02)', background: 'linear-gradient(180deg,var(--pn-f1d48a,#F1D48A),var(--pn-d8b45a,#D8B45A))' }}>{ico}{text}</span>
+      if (this.isRev) return <span style={{ ...base, color: 'var(--pn-2a1a55,#2A1A55)', background: 'var(--pn-f1c232,#F1C232)' }}>{ico}{text}</span>
       return <span style={{ ...base, color: 'var(--surface)', background: 'var(--ink)', fontWeight: 700 }}>{ico}{text}</span>
     }
     return <span style={{ ...base, padding: '0 14px', border: '1px solid var(--line)', color: 'var(--ink)', fontSize: 13, fontWeight: 700 }}>{ico}{text}</span>
@@ -279,7 +279,7 @@ export function LineSvg({ vals, w = 900, h = 180, color = 'var(--brand)', fill =
 }
 
 export function delta(txt: string, good = true) {
-  const col = good ? '#1FA868' : '#E5484D'
+  const col = good ? 'var(--pn-1fa868,#1FA868)' : 'var(--pn-e5484d,#E5484D)'
   return <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2, fontSize: 11.5, fontWeight: 800, color: col, whiteSpace: 'nowrap' }}><Ic n={good ? 'up' : 'down'} s={12} sw={3} />{txt}</span>
 }
 

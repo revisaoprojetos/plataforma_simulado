@@ -147,7 +147,7 @@ export function GrupoEditarClient(props: {
             <KeyRound className="h-5 w-5" />
           </span>
           <div className="min-w-0 space-y-1.5">
-            <p className="text-[11px] font-extrabold uppercase tracking-[.2em]" style={{ color: 'var(--gold-ink, #9A7400)' }}>Grupo de acesso</p>
+            <p className="text-[11px] font-extrabold uppercase tracking-[.2em]" style={{ color: 'var(--gold-ink, var(--pn-9a7400,#9A7400))' }}>Grupo de acesso</p>
             <h1 className="m-0 truncate text-[28px] font-extrabold leading-tight tracking-[-0.03em] text-foreground">{nome || grupo.nome}</h1>
             <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
               <Pill>{membrosTotal.toLocaleString('pt-BR')} membros</Pill>

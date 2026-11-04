@@ -21,7 +21,7 @@ export function JulgadoDia() {
   const [escolha, setEscolha] = React.useState<'CERTO' | 'ERRADO' | null>(null)
   const acertou = escolha === JULGADO.gabarito
   return (
-    <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 20, background: 'linear-gradient(135deg,#241A52,#3A2890)', color: '#FFFFFF', padding: 24, display: 'flex', flexDirection: 'column', gap: 16, minHeight: 300 }}>
+    <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 20, background: 'linear-gradient(135deg,var(--pn-241a52,#241A52),var(--pn-3a2890,#3A2890))', color: '#FFFFFF', padding: 24, display: 'flex', flexDirection: 'column', gap: 16, minHeight: 300 }}>
       <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px)', backgroundSize: '30px 30px', WebkitMaskImage: 'linear-gradient(180deg,#000,transparent 80%)', maskImage: 'linear-gradient(180deg,#000,transparent 80%)' }} />
       <Row gap={10} style={{ position: 'relative', justifyContent: 'space-between' }}>
         <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.18em', color: 'var(--gold)' }}>JULGADO DO DIA</span>
@@ -41,7 +41,7 @@ export function JulgadoDia() {
           </button>
         </Row>
       ) : (
-        <div style={{ position: 'relative', marginTop: 'auto', padding: 16, borderRadius: 14, background: 'rgba(255,255,255,.1)', border: `1px solid ${acertou ? 'rgba(70,200,130,.5)' : 'rgba(241,194,50,.5)'}`, display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ position: 'relative', marginTop: 'auto', padding: 16, borderRadius: 14, background: 'rgba(255,255,255,.1)', border: `1px solid ${acertou ? 'color-mix(in srgb,var(--pn-46c882,#46C882) 50%,transparent)' : 'color-mix(in srgb,var(--pn-f1c232,#F1C232) 50%,transparent)'}`, display: 'flex', flexDirection: 'column', gap: 8 }}>
           <Row gap={8}>
             <Icon n={acertou ? 'check' : 'info'} size={16} />
             <b style={{ fontSize: 14 }}>{acertou ? 'Você acertou! O gabarito é ERRADO.' : 'Não foi dessa vez. O gabarito é ERRADO.'}</b>
@@ -98,7 +98,7 @@ export function DesafiosInformativos({ desafios }: { desafios: DesafioView[] }) 
           const on = aba === k
           return (
             <button key={k} type="button" onClick={() => setAba(k)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 16px', borderRadius: 10, fontSize: 13, whiteSpace: 'nowrap', border: 0, cursor: 'pointer', background: on ? 'var(--surface)' : 'transparent', color: on ? 'var(--ink)' : 'var(--muted)', fontWeight: on ? 800 : 700, boxShadow: on ? '0 2px 8px rgba(30,15,80,.1)' : undefined }}>
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 16px', borderRadius: 10, fontSize: 13, whiteSpace: 'nowrap', border: 0, cursor: 'pointer', background: on ? 'var(--surface)' : 'transparent', color: on ? 'var(--ink)' : 'var(--muted)', fontWeight: on ? 800 : 700, boxShadow: on ? '0 2px 8px color-mix(in srgb,var(--pn-1e0f50,#1E0F50) 10%,transparent)' : undefined }}>
               <Icon n={k === 'desafios' ? 'gavel' : 'book'} size={15} />{k === 'desafios' ? 'Desafios' : 'Informativos'}
             </button>
           )

@@ -151,7 +151,7 @@ export function BibliotecaDrive({ inicial }: { inicial: ArvoreAluno }) {
               <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pastas</div>
               <div style={cardGrid(FOLDER_MIN)}>
                 {pastasFiltradas.map((p) => (
-                  <CardPasta key={p.id} nome={p.nome} cor={p.cor} contagem={`${p.totalDocs} ${p.totalDocs === 1 ? 'material' : 'materiais'}`} onClick={() => ir(p.id)} />
+                  <CardPasta key={p.id} nome={p.nome} cor={p.cor} capaUrl={p.capaUrl} contagem={`${p.totalDocs} ${p.totalDocs === 1 ? 'material' : 'materiais'}`} onClick={() => ir(p.id)} />
                 ))}
               </div>
             </div>
@@ -175,7 +175,7 @@ export function BibliotecaDrive({ inicial }: { inicial: ArvoreAluno }) {
               <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Pastas</div>
               <div style={cardGrid(FOLDER_MIN)}>
                 {pastasFiltradas.map((p) => (
-                  <CardPasta key={p.id} nome={p.nome} cor={p.cor} contagem={`${p.totalDocs} ${p.totalDocs === 1 ? 'material' : 'materiais'}`} onClick={() => ir(p.id)} />
+                  <CardPasta key={p.id} nome={p.nome} cor={p.cor} capaUrl={p.capaUrl} contagem={`${p.totalDocs} ${p.totalDocs === 1 ? 'material' : 'materiais'}`} onClick={() => ir(p.id)} />
                 ))}
               </div>
             </div>

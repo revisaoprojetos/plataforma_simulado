@@ -69,7 +69,7 @@ export function AccountMenu({ usuario, onClose, themePref, onTheme, fontIdx, onF
           position: 'fixed',
           inset: 0,
           zIndex: 90,
-          background: variant === 'desktop' ? 'transparent' : 'rgba(10,8,25,.35)',
+          background: variant === 'desktop' ? 'transparent' : 'color-mix(in srgb,var(--pn-0a0819,#0A0819) 35%,transparent)',
         }}
       />
       <div
@@ -81,7 +81,7 @@ export function AccountMenu({ usuario, onClose, themePref, onTheme, fontIdx, onF
           zIndex: 91,
           borderRadius: 20,
           background: 'var(--surface)',
-          boxShadow: '0 30px 60px -20px rgba(30,15,80,.55), 0 0 0 1px var(--line)',
+          boxShadow: '0 30px 60px -20px color-mix(in srgb,var(--pn-1e0f50,#1E0F50) 55%,transparent), 0 0 0 1px var(--line)',
           ...pos,
         }}
       >
@@ -94,7 +94,7 @@ export function AccountMenu({ usuario, onClose, themePref, onTheme, fontIdx, onF
               top: -6,
               width: 12,
               height: 12,
-              background: '#4A2DB0',
+              background: 'var(--pn-4a2db0,#4A2DB0)',
               transform: 'rotate(45deg)',
               borderRadius: 2,
             }}
@@ -139,7 +139,7 @@ export function AccountMenu({ usuario, onClose, themePref, onTheme, fontIdx, onF
             )}
             <div style={{ flex: 1, minWidth: 0, lineHeight: 1.25 }}>
               <b style={{ display: 'block', fontSize: 15 }}>{usuario.primeiroNome}</b>
-              <span style={{ fontSize: 12, color: '#CFC4FF' }}>
+              <span style={{ fontSize: 12, color: 'var(--pn-cfc4ff,#CFC4FF)' }}>
                 Nível {usuario.nivel} · {usuario.xpTotal.toLocaleString('pt-BR')} XP
               </span>
             </div>
@@ -233,8 +233,8 @@ export function AccountMenu({ usuario, onClose, themePref, onTheme, fontIdx, onF
             </Link>
           </div>
           <div style={{ padding: '4px 6px 6px', borderTop: '1px solid var(--line)' }}>
-            <button type="button" className="shr-pmi" onClick={() => { onClose(); onSair?.() }} style={{ ...linkStyle('#E5484D'), width: '100%', border: 0, background: 'none', cursor: 'pointer', font: 'inherit', textAlign: 'left' }}>
-              <span style={{ ...tileStyle(), background: 'rgba(229,72,77,.12)', color: '#E5484D' }}>
+            <button type="button" className="shr-pmi" onClick={() => { onClose(); onSair?.() }} style={{ ...linkStyle('var(--pn-e5484d,#E5484D)'), width: '100%', border: 0, background: 'none', cursor: 'pointer', font: 'inherit', textAlign: 'left' }}>
+              <span style={{ ...tileStyle(), background: 'color-mix(in srgb,var(--pn-e5484d,#E5484D) 12%,transparent)', color: 'var(--pn-e5484d,#E5484D)' }}>
                 <LogOut style={{ width: 15, height: 15 }} />
               </span>
               <span style={{ flex: 1 }}>Sair da conta</span>

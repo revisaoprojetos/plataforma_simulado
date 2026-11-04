@@ -13,7 +13,7 @@ type Vista = 'grade' | 'lista'
 
 const PALETA = Object.values(GR)
 function gradDe(cor: string | null | undefined, i: number): string {
-  if (cor) return `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 55%, #0b0a1a))`
+  if (cor) return `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 55%, var(--pn-0b0a1a,#0b0a1a)))`
   return PALETA[i % PALETA.length]
 }
 function abreviar(txt: string, max = 16): string {
@@ -72,7 +72,7 @@ function MiniSeg<T extends string>({ items, active, onPick }: { items: [T, strin
       {items.map(([v, label, icon]) => {
         const on = v === active
         return (
-          <button key={v} type="button" onClick={() => onPick(v)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 14px', borderRadius: 10, fontSize: 13, whiteSpace: 'nowrap', fontWeight: on ? 800 : 700, color: on ? 'var(--ink)' : 'var(--muted)', background: on ? 'var(--surface)' : 'transparent', boxShadow: on ? '0 2px 8px rgba(30,15,80,.1)' : 'none', border: 0, cursor: 'pointer' }}>{icon ? <Icon n={icon} size={14} /> : null}{label}</button>
+          <button key={v} type="button" onClick={() => onPick(v)} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 14px', borderRadius: 10, fontSize: 13, whiteSpace: 'nowrap', fontWeight: on ? 800 : 700, color: on ? 'var(--ink)' : 'var(--muted)', background: on ? 'var(--surface)' : 'transparent', boxShadow: on ? '0 2px 8px color-mix(in srgb,var(--pn-1e0f50,#1E0F50) 10%,transparent)' : 'none', border: 0, cursor: 'pointer' }}>{icon ? <Icon n={icon} size={14} /> : null}{label}</button>
         )
       })}
     </div>

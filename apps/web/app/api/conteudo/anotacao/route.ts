@@ -52,3 +52,18 @@ export async function DELETE(request: NextRequest) {
   if (error) return NextResponse.json({ message: error.message }, { status: 500 })
   return NextResponse.json({ ok: true })
 }
+
+// Atualiza cor/nota/ferramenta (conteudo) do grifo do PRÓPRIO aluno — sem apagar/recriar (falha parcial não perde o grifo).
+export async function PATCH(request: NextRequest) {
+  const sessao = await getSessaoAluno()
+  if (!sessao) return NextResponse.json({ message: 'Não autenticado.' }, { status: 401 })
+  let b: any
+  try { b = await request.json() } catch { return NextResponse.json({ message: 'Requisição inválida.' }, { status: 400 }) }
+  if (!b.id || typeof b.conteudo !== 'object' || b.conteudo === null) return NextResponse.json({ message: 'Dados obrigatórios ausentes.' }, { status: 400 })
+  const tipo = ['destaque', 'nota', 'riscado', 'insercao'].includes(b.tipo) ? b.tipo : undefined
+  const svc = createAdminClient()
+  const { error } = await svc.from(T_AN).update({ conteudo: b.conteudo, ...(tipo ? { tipo } : {}) })
+    .eq('id', b.id).eq('aluno_id', sessao.estudanteId).eq('tenant_id', sessao.tenantId)
+  if (error) return NextResponse.json({ message: error.message }, { status: 500 })
+  return NextResponse.json({ ok: true })
+}

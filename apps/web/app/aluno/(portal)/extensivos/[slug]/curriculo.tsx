@@ -192,10 +192,10 @@ function CardTrilha({ m, n, href, cor }: { m: ModuloAluno; n: number; href: stri
           // eslint-disable-next-line @next/next/no-img-element
           <img src={m.imagemUrl} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover/capa:scale-105" />
         ) : (
-          <div className="absolute inset-0" style={{ background: `radial-gradient(120% 90% at 20% 0%, color-mix(in srgb, ${cor} 75%, #fff 10%), transparent 60%), linear-gradient(160deg, color-mix(in srgb, ${cor} 85%, #000), #0b0820 92%)` }}>
+          <div className="absolute inset-0" style={{ background: `radial-gradient(120% 90% at 20% 0%, color-mix(in srgb, ${cor} 75%, #fff 10%), transparent 60%), linear-gradient(160deg, color-mix(in srgb, ${cor} 85%, #000), var(--pn-0b0820,#0b0820) 92%)` }}>
             <span aria-hidden className="absolute inset-0 opacity-30" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.07) 1px,transparent 1px)', backgroundSize: '18px 18px' }} />
             <span aria-hidden className="absolute -right-2 -top-4 select-none text-[120px] font-black italic leading-none text-white/[.08]">{n}</span>
-            <span className="absolute inset-x-4 bottom-3 line-clamp-2 text-xl font-extrabold leading-tight text-[#F1C232]">{m.titulo}</span>
+            <span className="absolute inset-x-4 bottom-3 line-clamp-2 text-xl font-extrabold leading-tight text-[color:var(--pn-f1c232,#F1C232)]">{m.titulo}</span>
           </div>
         )}
         {!m.liberado && <span className="absolute right-2 top-2 rounded-full bg-black/60 p-1.5 text-white"><Lock className="h-3.5 w-3.5" /></span>}
@@ -321,23 +321,23 @@ function Poster({ m, nome, n, href, cor, grade }: { m: ModuloAluno; nome: string
         <img src={m.imagemUrl} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover/card:scale-105" />
       ) : (
         // Pôster gerado (módulo sem imagem): cor do produto + textura + nome em destaque.
-        <div className="absolute inset-0" style={{ background: `radial-gradient(120% 80% at 30% 0%, color-mix(in srgb, ${cor} 75%, #fff 10%), transparent 60%), linear-gradient(170deg, color-mix(in srgb, ${cor} 85%, #000), #0b0820 92%)` }}>
+        <div className="absolute inset-0" style={{ background: `radial-gradient(120% 80% at 30% 0%, color-mix(in srgb, ${cor} 75%, #fff 10%), transparent 60%), linear-gradient(170deg, color-mix(in srgb, ${cor} 85%, #000), var(--pn-0b0820,#0b0820) 92%)` }}>
           <span aria-hidden className="absolute inset-0 opacity-30" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.07) 1px,transparent 1px)', backgroundSize: '18px 18px' }} />
           <span aria-hidden className="absolute -right-3 top-2 select-none text-[110px] font-black italic leading-none text-white/[.08]">{n}</span>
         </div>
       )}
       {/* sombra inferior + título */}
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/55 to-transparent px-3 pb-3 pt-16">
-        <div className={`font-extrabold uppercase leading-[1.05] tracking-tight text-[#F1C232] ${nome.length > 28 ? 'text-[15px]' : 'text-lg'} ${m.imagemUrl ? 'line-clamp-2' : 'line-clamp-4'}`}>{nome}</div>
+        <div className={`font-extrabold uppercase leading-[1.05] tracking-tight text-[color:var(--pn-f1c232,#F1C232)] ${nome.length > 28 ? 'text-[15px]' : 'text-lg'} ${m.imagemUrl ? 'line-clamp-2' : 'line-clamp-4'}`}>{nome}</div>
         <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-medium text-white/80">
           {!m.liberado ? <><Lock className="h-3 w-3" />{m.exclusivo ? 'conteúdo exclusivo' : m.liberaEm ? `libera em ${fmtData(m.liberaEm)}` : 'bloqueado'}</> : <>{p.total} {p.total === 1 ? 'aula' : 'aulas'}{p.lidas ? ` · ${p.pct}%` : ''}</>}
         </div>
         {m.liberado && p.lidas > 0 && (
-          <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/20"><div className="h-full rounded-full bg-[#F1C232]" style={{ width: `${p.pct}%` }} /></div>
+          <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/20"><div className="h-full rounded-full bg-[color:var(--pn-f1c232,#F1C232)]" style={{ width: `${p.pct}%` }} /></div>
         )}
       </div>
       {!m.liberado && <span className="absolute right-2 top-2 rounded-full bg-black/60 p-1.5 text-white"><Lock className="h-3.5 w-3.5" /></span>}
-      {m.liberado && p.total > 0 && p.lidas === p.total && <span className="absolute right-2 top-2 rounded-full bg-[#F1C232] p-1 text-[#2A1A55]"><CheckCircle2 className="h-4 w-4" /></span>}
+      {m.liberado && p.total > 0 && p.lidas === p.total && <span className="absolute right-2 top-2 rounded-full bg-[color:var(--pn-f1c232,#F1C232)] p-1 text-[color:var(--pn-2a1a55,#2A1A55)]"><CheckCircle2 className="h-4 w-4" /></span>}
     </Link>
   )
 }
@@ -385,11 +385,11 @@ export function ModuloDetalhe({ modulos, atual, slug, cor }: { modulos: ModuloAl
         {/* Cabeçalho do módulo: capa + título + progresso */}
         <div className="flex gap-4 rounded-2xl border bg-card p-4 shadow-sm">
           <div className="relative hidden aspect-[2/3] w-24 shrink-0 overflow-hidden rounded-xl sm:block"
-            style={atual.imagemUrl ? undefined : { background: `linear-gradient(170deg, color-mix(in srgb, ${cor} 85%, #000), #0b0820)` }}>
+            style={atual.imagemUrl ? undefined : { background: `linear-gradient(170deg, color-mix(in srgb, ${cor} 85%, #000), var(--pn-0b0820,#0b0820))` }}>
             {atual.imagemUrl
               // eslint-disable-next-line @next/next/no-img-element
               ? <img src={atual.imagemUrl} alt="" className="h-full w-full object-cover" />
-              : <span className="absolute inset-0 flex items-end p-2 text-[11px] font-extrabold uppercase leading-tight text-[#F1C232]">{atual.titulo}</span>}
+              : <span className="absolute inset-0 flex items-end p-2 text-[11px] font-extrabold uppercase leading-tight text-[color:var(--pn-f1c232,#F1C232)]">{atual.titulo}</span>}
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Módulo {idx + 1} de {modulos.length}</div>

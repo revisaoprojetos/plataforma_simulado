@@ -40,7 +40,7 @@ export function NovaDuvida({ categorias }: { categorias: string[] }) {
     return <Btn kind="primary" icon="pen" onClick={() => setAberto(true)}>Nova dúvida</Btn>
   }
   return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'grid', placeItems: 'center', background: 'rgba(17,17,27,.45)', padding: 24 }}
+    <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'grid', placeItems: 'center', background: 'color-mix(in srgb,var(--pn-11111b,#11111B) 45%,transparent)', padding: 24 }}
       onClick={(e) => { if (e.target === e.currentTarget && !pending) setAberto(false) }}>
       <Card pad={24} style={{ width: 'min(560px, 100%)', maxHeight: '90vh', overflow: 'auto' }}>
         <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>

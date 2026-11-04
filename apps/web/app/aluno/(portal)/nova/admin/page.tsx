@@ -45,7 +45,7 @@ const ATALHOS: Atalho[] = [
   { icon: 'chart', t: 'Ver relatórios', s: 'Desempenho, leitura e feedbacks' },
 ]
 
-const DESTAQUE_GRAD = 'linear-gradient(135deg,#2A1E4A,#4A31B8)'
+const DESTAQUE_GRAD = 'linear-gradient(135deg,var(--pn-2a1e4a,#2A1E4A),var(--pn-4a31b8,#4A31B8))'
 
 function EventoRow({ cor, t, s }: { cor: string; t: string; s: string }) {
   return (
@@ -118,7 +118,7 @@ export default function AdminPage() {
                 : <IconBox icon={a.icon} s={44} />}
               <Col gap={2}>
                 <b style={{ fontSize: 15, fontWeight: 800, color: a.destaque ? '#fff' : 'var(--ink)' }}>{a.t}</b>
-                <span style={{ fontSize: 12.5, color: a.destaque ? '#C9BEF0' : 'var(--muted)' }}>{a.s}</span>
+                <span style={{ fontSize: 12.5, color: a.destaque ? 'var(--pn-c9bef0,#C9BEF0)' : 'var(--muted)' }}>{a.s}</span>
               </Col>
             </a>
           ))}

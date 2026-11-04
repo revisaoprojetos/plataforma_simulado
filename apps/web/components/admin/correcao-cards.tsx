@@ -69,7 +69,7 @@ export function CorrecaoCards({ cards }: { cards: CorrecaoCard[] }) {
                 className="group relative flex aspect-[4/5] flex-col justify-end overflow-hidden rounded-2xl border shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
                 {capa
                   ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105" />
-                  : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
+                  : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, var(--pn-0f172a,#0f172a) 135%)` }} />}
                 <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-black/5" />
 
                 <div className="absolute inset-x-0 top-0 flex items-start justify-between p-2.5">

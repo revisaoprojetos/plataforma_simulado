@@ -7,8 +7,8 @@ import { SemPermissao } from '@/components/ui/alert-box'
 export const dynamic = 'force-dynamic'
 
 const PROVIDERS = [
-  { id: 'curseduca', nome: 'Curseduca', desc: 'Importa alunos e grupos de acesso (pull).', cor: '#7c3aed', Icon: DownloadCloud },
-  { id: 'guru', nome: 'Guru', desc: 'Compras e assinaturas (webhook em tempo real).', cor: '#0ea5e9', Icon: CreditCard },
+  { id: 'curseduca', nome: 'Curseduca', desc: 'Importa alunos e grupos de acesso (pull).', cor: 'var(--pn-7c3aed,#7c3aed)', Icon: DownloadCloud },
+  { id: 'guru', nome: 'Guru', desc: 'Compras e assinaturas (webhook em tempo real).', cor: 'var(--pn-0ea5e9,#0ea5e9)', Icon: CreditCard },
 ] as const
 
 export default async function IntegracoesPage() {

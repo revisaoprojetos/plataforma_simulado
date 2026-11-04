@@ -28,6 +28,8 @@
  * secundário (ver `PEACH_SUAVE`).
  */
 
+import { pnR } from './paleta-nova-tokens'
+
 export type Brand = 'revisao' | 'vnd' | 'meq' | 'mac'
 export type Theme = 'claro' | 'escuro' | 'azul' // 'azul' só MEQ
 
@@ -510,7 +512,8 @@ function seletorDoTema(theme: Theme): string {
 export function brandTokensCss(brand: Brand, theme: Theme): string {
   const tokens = getBrandTokens(brand, theme)
   if (!tokens) return ''
-  return `${seletorDoTema(theme)} {\n${tokensToDeclarations(tokens)}\n}`
+  // Paleta nova (designer unificado): chaves do vocabulário do shell seguem `--pn-r-*` quando ela está ativa; fallback = legado.
+  return `${seletorDoTema(theme)} {\n${tokensToDeclarations(theme === 'azul' ? tokens : pnR(tokens))}\n}`
 }
 
 /**

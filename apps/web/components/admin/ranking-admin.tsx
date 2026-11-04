@@ -364,7 +364,7 @@ export function RankingAdmin({
                   <button key={it.estudanteId} type="button" onClick={() => { if (detalheAluno) setDetalhe(it) }} className="group flex flex-col items-center text-center">
                     <span className="relative mb-2 inline-flex rounded-full ring-2 ring-offset-2 ring-offset-background transition-transform group-hover:scale-105"
                       style={{ '--tw-ring-color': cor } as React.CSSProperties}>
-                      {it.posicao === 1 && <Crown className="absolute -top-5 left-1/2 z-10 h-5 w-5 -translate-x-1/2 text-[#f5c518]" />}
+                      {it.posicao === 1 && <Crown className="absolute -top-5 left-1/2 z-10 h-5 w-5 -translate-x-1/2 text-[color:var(--pn-f5c518,#f5c518)]" />}
                       <AvatarEstudante nome={it.nome} avatar={it.avatar} cor={it.avatarCor ?? '#6d28d9'}
                         className={cn('text-white shadow-md', it.posicao === 1 ? 'h-16 w-16 text-lg' : 'h-12 w-12 text-sm')} />
                     </span>

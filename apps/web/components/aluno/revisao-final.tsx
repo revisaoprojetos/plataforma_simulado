@@ -116,7 +116,7 @@ const STYLE_VOLTAR = {
 
 // Estilo da justificativa — segue a cor de acerto/erro do aluno (cores editáveis).
 function justCor(acertou: boolean | null): string {
-  return acertou === null ? 'var(--prova-branco, #6b7280)' : acertou ? 'var(--prova-acerto, #16a34a)' : 'var(--prova-erro, #dc2626)'
+  return acertou === null ? 'var(--prova-branco, var(--pn-6b7280,#6b7280))' : acertou ? 'var(--prova-acerto, var(--pn-16a34a,#16a34a))' : 'var(--prova-erro, var(--pn-dc2626,#dc2626))'
 }
 function justStyle(acertou: boolean | null): React.CSSProperties {
   const cor = justCor(acertou)
@@ -228,12 +228,12 @@ export function RevisaoFinal({
   const numAlt = qs.filter((q) => q.alt_trocada).length
   // Cores do navegador — iguais às da prova (respondem às CSS vars do caderno).
   const COR_MARCADA = 'var(--prova-marcada, var(--primary))'
-  const COR_ANUL = 'var(--prova-anulada, #6b7280)'
-  const COR_ALT = 'var(--prova-alt, #0891b2)'
-  const COR_ACERTO = 'var(--prova-acerto, #16a34a)'
-  const COR_ERRO = 'var(--prova-erro, #dc2626)'
-  const COR_BRANCO = 'var(--prova-branco, #6b7280)'
-  const COR_MEDIA = 'var(--prova-media, #6d28d9)'
+  const COR_ANUL = 'var(--prova-anulada, var(--pn-6b7280,#6b7280))'
+  const COR_ALT = 'var(--prova-alt, var(--pn-0891b2,#0891b2))'
+  const COR_ACERTO = 'var(--prova-acerto, var(--pn-16a34a,#16a34a))'
+  const COR_ERRO = 'var(--prova-erro, var(--pn-dc2626,#dc2626))'
+  const COR_BRANCO = 'var(--prova-branco, var(--pn-6b7280,#6b7280))'
+  const COR_MEDIA = 'var(--prova-media, var(--pn-6d28d9,#6d28d9))'
   // Card de resultado: fundo = versão clara da própria cor; ícone e número = a cor.
   const cardStat = (cor: string) => ({ borderColor: `color-mix(in oklab, ${cor} 30%, var(--border))`, background: `color-mix(in oklab, ${cor} 12%, var(--card))` })
   const fmtData = (s: string | null | undefined) => (s ? new Date(s).toLocaleDateString('pt-BR') : '—')

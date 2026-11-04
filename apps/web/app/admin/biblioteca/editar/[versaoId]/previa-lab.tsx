@@ -186,7 +186,7 @@ export function PreviaLab({ versaoId, titulo: tituloDoc, onlyofficeUrl, wopiHost
                         <span className="text-sm font-semibold leading-tight">{d.nome}</span>
                         <span className="shrink-0 font-mono text-xs"><b className="text-primary">{Math.min(d.acertos, d.total)}</b>/{d.total} · {d.total ? Math.round((Math.min(d.acertos, d.total) / d.total) * 100) : 0}%</span>
                       </div>
-                      <input type="range" min={0} max={d.total} value={Math.min(d.acertos, d.total)} onChange={(e) => setAcerto(i, Number(e.target.value))} className="w-full" style={{ accentColor: 'var(--brand-primary, #1a367c)' }} />
+                      <input type="range" min={0} max={d.total} value={Math.min(d.acertos, d.total)} onChange={(e) => setAcerto(i, Number(e.target.value))} className="w-full" style={{ accentColor: 'var(--brand-primary, var(--pn-1a367c,#1a367c))' }} />
                       <div className="mt-1 flex items-center justify-between">
                         <button onClick={() => setAcerto(i, 0)} className="text-[11px] text-muted-foreground hover:text-foreground">0</button>
                         <button onClick={() => setAcerto(i, d.total)} className="text-[11px] text-muted-foreground hover:text-foreground">tudo</button>

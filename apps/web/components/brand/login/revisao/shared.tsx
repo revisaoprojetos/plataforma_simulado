@@ -16,29 +16,29 @@ export type Efeito = 'nenhum' | 'quadrados' | 'formas' | 'efeitos'
 
 // ── Fundo da página (§5.2) ───────────────────────────────────────────────────
 export const BG: Record<RevTheme, string> = {
-  claro: 'linear-gradient(150deg,#2E1F7A 0%,#4A31B8 55%,#7356E6 100%)',
-  escuro: 'linear-gradient(150deg,#0B0720 0%,#140C38 50%,#1F1352 100%)',
+  claro: 'linear-gradient(150deg,var(--pn-2e1f7a,#2E1F7A) 0%,var(--pn-4a31b8,#4A31B8) 55%,var(--pn-7356e6,#7356E6) 100%)',
+  escuro: 'linear-gradient(150deg,var(--pn-0b0720,#0B0720) 0%,var(--pn-140c38,#140C38) 50%,var(--pn-1f1352,#1F1352) 100%)',
 }
 // Cor do rodapé / copyright
-export const FOOT: Record<RevTheme, string> = { claro: '#D4C9FA', escuro: '#8E82BF' }
+export const FOOT: Record<RevTheme, string> = { claro: 'var(--pn-d4c9fa,#D4C9FA)', escuro: 'var(--pn-8e82bf,#8E82BF)' }
 // Alpha das linhas da grade
 export const LINES_A: Record<RevTheme, string> = { claro: '0.07', escuro: '0.05' }
 // Degradê escuro da base
 export const BAND: Record<RevTheme, string> = {
-  claro: 'linear-gradient(180deg,rgba(30,18,80,0),rgba(30,18,80,.35))',
-  escuro: 'linear-gradient(180deg,rgba(5,3,18,0),rgba(5,3,18,.55))',
+  claro: 'linear-gradient(180deg,color-mix(in srgb,var(--pn-1e1250,#1E1250) 0%,transparent),color-mix(in srgb,var(--pn-1e1250,#1E1250) 35%,transparent))',
+  escuro: 'linear-gradient(180deg,color-mix(in srgb,var(--pn-050312,#050312) 0%,transparent),color-mix(in srgb,var(--pn-050312,#050312) 55%,transparent))',
 }
 
 // ── Tokens do <LoginForm> por tema (campos/CTA/links/pílula) ──────────────────
 export const TOKENS: Record<RevTheme, LoginFormTokens> = {
   claro: {
-    fg: '#1D1933',
-    muted: '#6E6886',
+    fg: 'var(--pn-1d1933,#1D1933)',
+    muted: 'var(--pn-6e6886,#6E6886)',
     fieldBg: '#F8F7FC',
-    fieldBorder: '#E5E1F0',
-    fieldFg: '#1D1933',
-    primary: '#5B3FD0',
-    ctaBg: 'linear-gradient(180deg,#6449E0,#4B30BE)',
+    fieldBorder: 'var(--pn-e5e1f0,#E5E1F0)',
+    fieldFg: 'var(--pn-1d1933,#1D1933)',
+    primary: 'var(--pn-5b3fd0,#5B3FD0)',
+    ctaBg: 'linear-gradient(180deg,var(--pn-6449e0,#6449E0),var(--pn-4b30be,#4B30BE))',
     ctaFg: '#FFFFFF',
     pillBg: 'rgba(255,255,255,.08)',
     pillFg: '#FFFFFF',
@@ -46,12 +46,12 @@ export const TOKENS: Record<RevTheme, LoginFormTokens> = {
   },
   escuro: {
     fg: '#FFFFFF',
-    muted: '#A69FC6',
+    muted: 'var(--pn-a69fc6,#A69FC6)',
     fieldBg: 'rgba(255,255,255,.04)',
-    fieldBorder: 'rgba(185,168,255,.18)',
+    fieldBorder: 'color-mix(in srgb,var(--pn-b9a8ff,#B9A8FF) 18%,transparent)',
     fieldFg: '#FFFFFF',
-    primary: '#8F75FF',
-    ctaBg: 'linear-gradient(180deg,#6449E0,#4B30BE)',
+    primary: 'var(--pn-8f75ff,#8F75FF)',
+    ctaBg: 'linear-gradient(180deg,var(--pn-6449e0,#6449E0),var(--pn-4b30be,#4B30BE))',
     ctaFg: '#FFFFFF',
     pillBg: 'rgba(255,255,255,.08)',
     pillFg: '#FFFFFF',
@@ -62,17 +62,17 @@ export const TOKENS: Record<RevTheme, LoginFormTokens> = {
 // Cor da tinta do card (claro = branco, escuro = gradiente roxo) p/ o slot.
 export const CARD_BG: Record<RevTheme, string> = {
   claro: '#FFFFFF',
-  escuro: 'linear-gradient(180deg,#1C1440,#140E30)',
+  escuro: 'linear-gradient(180deg,var(--pn-1c1440,#1C1440),var(--pn-140e30,#140E30))',
 }
 export const CARD_BORDER: Record<RevTheme, string> = {
-  claro: '1px solid rgba(229,225,240,.9)',
-  escuro: '1px solid rgba(185,168,255,.16)',
+  claro: '1px solid color-mix(in srgb,var(--pn-e5e1f0,#E5E1F0) 90%,transparent)',
+  escuro: '1px solid color-mix(in srgb,var(--pn-b9a8ff,#B9A8FF) 16%,transparent)',
 }
 
 // ── Quadrados piscando (efeito "quadrados"/"formas"/"efeitos") ────────────────
 // Posições alinhadas à grade de 63px (mockups). Cores lilás/pêssego.
-const PX_LILAS = 'rgba(185,168,255,.26)'
-const PX_PESSEGO = 'rgba(255,196,163,.20)'
+const PX_LILAS = 'color-mix(in srgb,var(--pn-b9a8ff,#B9A8FF) 26%,transparent)'
+const PX_PESSEGO = 'color-mix(in srgb,var(--pn-ffc4a3,#FFC4A3) 20%,transparent)'
 type PxSpec = { left: number; top: number; cor: string; delay: number }
 const PX_DESKTOP: PxSpec[] = [
   { left: 1, top: 833, cor: PX_LILAS, delay: 3.54 },

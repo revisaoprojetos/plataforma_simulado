@@ -120,7 +120,7 @@ export default async function ResultadoPage() {
       <Hero bg="linear-gradient(120deg,#2E1F6A 0%,#4A31B8 60%,#5B3FD0 100%)">
         <Row gap={24} style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <Col gap={14} style={{ minWidth: 280, flex: 1 }}>
-            <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.2em', color: '#F1C232' }}>RESULTADO</span>
+            <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.2em', color: 'var(--pn-f1c232,#F1C232)' }}>RESULTADO</span>
             <h2 style={{ margin: 0, fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em', color: '#fff', lineHeight: 1.1 }}>{fmtDataFull(melhor.finalizado_em)} – {sim.titulo}</h2>
             <Row gap={8}>
               {META.map((m) => (
@@ -132,8 +132,8 @@ export default async function ResultadoPage() {
           </Col>
           <Col gap={12} style={{ alignItems: 'flex-end' }}>
             <Col gap={2} style={{ alignItems: 'flex-end' }}>
-              <b style={{ fontSize: 48, fontWeight: 800, letterSpacing: '-0.04em', color: '#F1C232', lineHeight: 1 }}>{notaLiberada ? fmtNota(notaVal) : '—'}</b>
-              <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.1em', color: '#CFC4FF' }}>
+              <b style={{ fontSize: 48, fontWeight: 800, letterSpacing: '-0.04em', color: 'var(--pn-f1c232,#F1C232)', lineHeight: 1 }}>{notaLiberada ? fmtNota(notaVal) : '—'}</b>
+              <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.1em', color: 'var(--pn-cfc4ff,#CFC4FF)' }}>
                 {posicao && participantes ? `MELHOR NOTA · ${posicao}º DE ${nInt(participantes)}` : 'MELHOR NOTA'}
               </span>
             </Col>

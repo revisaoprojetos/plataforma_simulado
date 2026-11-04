@@ -26,22 +26,22 @@ const VND_SVG =
   'M1.00 5.90L11.51 5.77Q12.20 5.76 12.53 6.13L21.21 15.98Q21.47 16.25 21.57 15.86L21.60 8.10C21.60 7.05 20.81 6.30 19.76 5.88L30.57 5.90Q31.00 5.91 30.74 6.33L23.18 14.49C22.26 15.55 21.80 16.65 21.73 18.23L21.67 25.45Q21.60 26.24 20.95 25.96L6.03 8.31C4.78 6.96 3.14 6.19 1.00 5.90Z'
 
 const SLIDE_BG = [
-  'linear-gradient(120deg,#062A1B 0%,#16804F 100%)',
-  'linear-gradient(120deg,#0B3340 0%,#1C7A8C 100%)',
-  'linear-gradient(120deg,#0F2A45 0%,#2A6FB0 100%)',
-  'linear-gradient(120deg,#2E250A 0%,#9A7A22 100%)',
+  'linear-gradient(120deg,var(--pn-062a1b,#062A1B) 0%,var(--pn-16804f,#16804F) 100%)',
+  'linear-gradient(120deg,var(--pn-0b3340,#0B3340) 0%,var(--pn-1c7a8c,#1C7A8C) 100%)',
+  'linear-gradient(120deg,var(--pn-0f2a45,#0F2A45) 0%,var(--pn-2a6fb0,#2A6FB0) 100%)',
+  'linear-gradient(120deg,var(--pn-2e250a,#2E250A) 0%,var(--pn-9a7a22,#9A7A22) 100%)',
 ]
-const COVER_BG = ['#062A1B,#0F5A36', '#0B3340,#1C7A8C', '#0A2E22,#1E8A64', '#0F2A45,#2A6FB0', '#2E250A,#9A7A22']
+const COVER_BG = ['var(--pn-062a1b,#062A1B),var(--pn-0f5a36,#0F5A36)', 'var(--pn-0b3340,#0B3340),var(--pn-1c7a8c,#1C7A8C)', 'var(--pn-0a2e22,#0A2E22),var(--pn-1e8a64,#1E8A64)', 'var(--pn-0f2a45,#0F2A45),var(--pn-2a6fb0,#2A6FB0)', 'var(--pn-2e250a,#2E250A),var(--pn-9a7a22,#9A7A22)']
 
 // Extras de tokens não garantidos pela interna-tokens (spec §1.2).
 function vndExtras(theme: InternaTheme, cm: (v: string) => string): React.CSSProperties {
   const dark = theme === 'escuro'
   return {
-    '--gold': cm(dark ? '#E8C877' : '#D8B45A'),
-    '--goldInk': cm(dark ? '#F1D48A' : '#9A7414'),
-    '--goldBg': cm(dark ? 'rgba(232,200,119,.14)' : '#FBF4E2'),
-    '--brandLine': cm(dark ? 'rgba(79,224,152,.4)' : 'rgba(15,122,68,.3)'),
-    '--muted2': cm(dark ? '#71907F' : '#B5C4BB'),
+    '--gold': cm(dark ? 'var(--pn-e8c877,#E8C877)' : 'var(--pn-d8b45a,#D8B45A)'),
+    '--goldInk': cm(dark ? 'var(--pn-f1d48a,#F1D48A)' : 'var(--pn-9a7414,#9A7414)'),
+    '--goldBg': cm(dark ? 'color-mix(in srgb,var(--pn-e8c877,#E8C877) 14%,transparent)' : 'var(--pn-fbf4e2,#FBF4E2)'),
+    '--brandLine': cm(dark ? 'color-mix(in srgb,var(--pn-4fe098,#4FE098) 40%,transparent)' : 'color-mix(in srgb,var(--pn-0f7a44,#0F7A44) 30%,transparent)'),
+    '--muted2': cm(dark ? 'var(--pn-71907f,#71907F)' : 'var(--pn-b5c4bb,#B5C4BB)'),
   } as React.CSSProperties
 }
 
@@ -82,14 +82,14 @@ function Cover({ rotulo, sub, grad, big = 28, src }: { rotulo: string; sub: stri
     >
       {dotsOverlay(cm, 14, 0.22)}
       <svg viewBox="0 0 32 32" aria-hidden style={{ position: 'absolute', right: -18, top: -14, width: 110, height: 110, opacity: 0.16 }}>
-        <path fill={cm('#B9F5D4')} d={VPATH} />
+        <path fill={cm('var(--pn-b9f5d4,#B9F5D4)')} d={VPATH} />
       </svg>
-      <span style={{ position: 'absolute', left: 14, top: 12, display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 8.5, fontWeight: 800, letterSpacing: '.2em', color: '#F1D48A' }}>
-        <svg viewBox="0 0 32 32" style={{ width: 11, height: 11 }}><path fill="#F1D48A" d={VPATH} /></svg>{marca === 'mac' ? 'SIMULA MAC' : 'SIMULA VND'}
+      <span style={{ position: 'absolute', left: 14, top: 12, display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 8.5, fontWeight: 800, letterSpacing: '.2em', color: 'var(--pn-f1d48a,#F1D48A)' }}>
+        <svg viewBox="0 0 32 32" style={{ width: 11, height: 11 }}><path fill="var(--pn-f1d48a,#F1D48A)" d={VPATH} /></svg>{marca === 'mac' ? 'SIMULA MAC' : 'SIMULA VND'}
       </span>
-      <span style={{ position: 'relative', fontSize: 8.5, fontWeight: 800, letterSpacing: '.16em', color: cm('#CFE3D7') }}>{sub}</span>
+      <span style={{ position: 'relative', fontSize: 8.5, fontWeight: 800, letterSpacing: '.16em', color: cm('var(--pn-cfe3d7,#CFE3D7)') }}>{sub}</span>
       <span style={{ position: 'relative', fontWeight: 800, fontSize: big, lineHeight: 1.02, letterSpacing: '-0.04em' }}>{rotulo}</span>
-      <span aria-hidden style={{ position: 'relative', display: 'block', width: 34, height: 3, borderRadius: 3, background: '#D8B45A', marginTop: 6 }} />
+      <span aria-hidden style={{ position: 'relative', display: 'block', width: 34, height: 3, borderRadius: 3, background: 'var(--pn-d8b45a,#D8B45A)', marginTop: 6 }} />
     </div>
   )
 }
@@ -227,20 +227,20 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
           >
             {/* Slide 0 — boas-vindas */}
             <div style={{ position: 'relative', flex: `0 0 ${100 / nSlides}%`, height: '100%' }}>
-              <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: cm('linear-gradient(120deg,#041A10 0%,#0B4A2E 55%,#12643D 100%)'), color: '#FFFFFF' }}>
-                <div className="hvn-dotsbg" style={{ position: 'absolute', inset: 0, backgroundImage: cm('radial-gradient(circle,rgba(185,245,212,.18) 1.2px,transparent 1.8px)'), backgroundSize: '22px 22px', WebkitMaskImage: 'linear-gradient(90deg,#000 30%,rgba(0,0,0,.4))', maskImage: 'linear-gradient(90deg,#000 30%,rgba(0,0,0,.4))' }} />
-                <div className="hvn-glow" aria-hidden style={{ position: 'absolute', right: 120, top: -120, width: 560, height: 560, borderRadius: '50%', background: cm('radial-gradient(closest-side,rgba(63,213,138,.35),rgba(63,213,138,0))') }} />
-                <svg className="hvn-chev hvn-c1" viewBox="0 0 200 120" aria-hidden preserveAspectRatio="none" style={{ position: 'absolute', right: '-4%', width: '62%', height: 220, bottom: -90, pointerEvents: 'none' }}><path d="M0 0 L100 112 L200 0" fill="none" stroke="rgba(232,200,119,.55)" strokeWidth={2} vectorEffect="non-scaling-stroke" /></svg>
-                <svg className="hvn-chev hvn-c2" viewBox="0 0 200 120" aria-hidden preserveAspectRatio="none" style={{ position: 'absolute', right: '-4%', width: '62%', height: 220, bottom: -50, pointerEvents: 'none' }}><path d="M0 0 L100 112 L200 0" fill="none" stroke={cm('rgba(185,245,212,.14)')} strokeWidth={1.2} vectorEffect="non-scaling-stroke" /></svg>
-                <svg className="hvn-chev hvn-c3" viewBox="0 0 200 120" aria-hidden preserveAspectRatio="none" style={{ position: 'absolute', right: '-4%', width: '62%', height: 220, bottom: -10, pointerEvents: 'none' }}><path d="M0 0 L100 112 L200 0" fill="none" stroke={cm('rgba(185,245,212,.1)')} strokeWidth={1.2} vectorEffect="non-scaling-stroke" /></svg>
+              <div style={{ position: 'relative', width: '100%', height: '100%', overflow: 'hidden', background: cm('linear-gradient(120deg,var(--pn-041a10,#041A10) 0%,var(--pn-0b4a2e,#0B4A2E) 55%,var(--pn-12643d,#12643D) 100%)'), color: '#FFFFFF' }}>
+                <div className="hvn-dotsbg" style={{ position: 'absolute', inset: 0, backgroundImage: cm('radial-gradient(circle,color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 18%,transparent) 1.2px,transparent 1.8px)'), backgroundSize: '22px 22px', WebkitMaskImage: 'linear-gradient(90deg,#000 30%,rgba(0,0,0,.4))', maskImage: 'linear-gradient(90deg,#000 30%,rgba(0,0,0,.4))' }} />
+                <div className="hvn-glow" aria-hidden style={{ position: 'absolute', right: 120, top: -120, width: 560, height: 560, borderRadius: '50%', background: cm('radial-gradient(closest-side,color-mix(in srgb,var(--pn-3fd58a,#3FD58A) 35%,transparent),color-mix(in srgb,var(--pn-3fd58a,#3FD58A) 0%,transparent))') }} />
+                <svg className="hvn-chev hvn-c1" viewBox="0 0 200 120" aria-hidden preserveAspectRatio="none" style={{ position: 'absolute', right: '-4%', width: '62%', height: 220, bottom: -90, pointerEvents: 'none' }}><path d="M0 0 L100 112 L200 0" fill="none" stroke="color-mix(in srgb,var(--pn-e8c877,#E8C877) 55%,transparent)" strokeWidth={2} vectorEffect="non-scaling-stroke" /></svg>
+                <svg className="hvn-chev hvn-c2" viewBox="0 0 200 120" aria-hidden preserveAspectRatio="none" style={{ position: 'absolute', right: '-4%', width: '62%', height: 220, bottom: -50, pointerEvents: 'none' }}><path d="M0 0 L100 112 L200 0" fill="none" stroke={cm('color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 14%,transparent)')} strokeWidth={1.2} vectorEffect="non-scaling-stroke" /></svg>
+                <svg className="hvn-chev hvn-c3" viewBox="0 0 200 120" aria-hidden preserveAspectRatio="none" style={{ position: 'absolute', right: '-4%', width: '62%', height: 220, bottom: -10, pointerEvents: 'none' }}><path d="M0 0 L100 112 L200 0" fill="none" stroke={cm('color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 10%,transparent)')} strokeWidth={1.2} vectorEffect="non-scaling-stroke" /></svg>
                 <span className="hvn-sweep" aria-hidden />
                 <div style={{ position: 'relative', height: '100%', maxWidth: 1376, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 40, padding: '0 80px' }}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 560 }}>
                     <h1 style={{ margin: 0, fontSize: 50, fontWeight: 800, letterSpacing: '-0.05em', lineHeight: 1, color: '#FFFFFF' }}>Olá, {usuario.nome}</h1>
-                    <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.03em', color: cm('#CFE3D7'), lineHeight: '1.2em' }}>
+                    <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.03em', color: cm('var(--pn-cfe3d7,#CFE3D7)'), lineHeight: '1.2em' }}>
                       Rumo a{' '}
                       <span style={{ display: 'inline-block', height: '1.2em', overflow: 'hidden', verticalAlign: 'bottom' }}>
-                        <span className="hvn-tick" style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.2em', color: '#F1D48A' }}>
+                        <span className="hvn-tick" style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.2em', color: 'var(--pn-f1d48a,#F1D48A)' }}>
                           {rotativo.map((r, i) => <span key={i}>{r}.</span>)}
                           {animaRot && <span>{rotativo[0]}.</span>}
                         </span>
@@ -252,28 +252,28 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
                       <div style={{ position: 'relative', width: 150, height: 150, flexShrink: 0 }}>
                         <svg viewBox="0 0 150 150" style={{ width: 150, height: 150, transform: 'rotate(-90deg)' }}>
-                          <defs><linearGradient id="hvn-vr" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={cm('#5BE39E')} /><stop offset="1" stopColor="#E8C877" /></linearGradient></defs>
+                          <defs><linearGradient id="hvn-vr" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={cm('var(--pn-5be39e,#5BE39E)')} /><stop offset="1" stopColor="var(--pn-e8c877,#E8C877)" /></linearGradient></defs>
                           <circle cx="75" cy="75" r={nivelR} fill="none" stroke="rgba(255,255,255,.14)" strokeWidth={11} />
                           <circle className="hvn-ring" cx="75" cy="75" r={nivelR} fill="none" stroke="url(#hvn-vr)" strokeWidth={11} strokeLinecap="round" strokeDasharray={nivelC} strokeDashoffset={nivelC * (1 - nivelPct)} style={{ ['--c' as string]: nivelC }} />
                         </svg>
                         <span style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: 1, color: '#FFFFFF' }}>
                           <b style={{ fontSize: 48, fontWeight: 800, letterSpacing: '-0.05em' }}>{usuario.nivel}</b>
-                          <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.2em', color: cm('#B9F5D4'), marginTop: 4 }}>NÍVEL</span>
+                          <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.2em', color: cm('var(--pn-b9f5d4,#B9F5D4)'), marginTop: 4 }}>NÍVEL</span>
                         </span>
                       </div>
-                      <span style={{ fontSize: 13, color: cm('#CFE3D7') }}><b style={{ color: '#FFFFFF' }}>{usuario.tituloNivel}</b> · {usuario.xpNivelAtual}/{usuario.xpNivelMax} XP</span>
+                      <span style={{ fontSize: 13, color: cm('var(--pn-cfe3d7,#CFE3D7)') }}><b style={{ color: '#FFFFFF' }}>{usuario.tituloNivel}</b> · {usuario.xpNivelAtual}/{usuario.xpNivelMax} XP</span>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                       {[
-                        { ic: <Flame size={18} />, c: '#FFB38A', v: streakTxt, l: 'sequência atual' },
-                        { ic: <Zap size={18} />, c: cm('#B9F5D4'), v: `${usuario.xpTotal.toLocaleString('pt-BR')} XP`, l: 'total acumulado' },
-                        { ic: <Trophy size={18} />, c: '#F1D48A', v: `Liga ${usuario.liga}`, l: `${usuario.posicaoLiga}º lugar` },
+                        { ic: <Flame size={18} />, c: 'var(--pn-ffb38a,#FFB38A)', v: streakTxt, l: 'sequência atual' },
+                        { ic: <Zap size={18} />, c: cm('var(--pn-b9f5d4,#B9F5D4)'), v: `${usuario.xpTotal.toLocaleString('pt-BR')} XP`, l: 'total acumulado' },
+                        { ic: <Trophy size={18} />, c: 'var(--pn-f1d48a,#F1D48A)', v: `Liga ${usuario.liga}`, l: `${usuario.posicaoLiga}º lugar` },
                       ].map((t, i) => (
-                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 16, background: 'rgba(255,255,255,.07)', border: cm('1px solid rgba(185,245,212,.16)'), minWidth: 190 }}>
+                        <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderRadius: 16, background: 'rgba(255,255,255,.07)', border: cm('1px solid color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 16%,transparent)'), minWidth: 190 }}>
                           <span style={{ width: 38, height: 38, borderRadius: 12, background: 'rgba(255,255,255,.08)', color: t.c, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{t.ic}</span>
                           <div style={{ lineHeight: 1.2 }}>
                             <b style={{ display: 'block', fontSize: 18, fontWeight: 800 }}>{t.v}</b>
-                            <span style={{ fontSize: 11.5, color: cm('#B7D3C3') }}>{t.l}</span>
+                            <span style={{ fontSize: 11.5, color: cm('var(--pn-b7d3c3,#B7D3C3)') }}>{t.l}</span>
                           </div>
                         </div>
                       ))}
@@ -297,23 +297,23 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
                   ) : (
                     <>
                       {dotsOverlay(cm, 22, 0.2)}
-                      <svg viewBox="0 0 32 32" aria-hidden style={{ position: 'absolute', right: '6%', top: -60, width: 460, height: 460, opacity: 0.12 }}><path fill={cm('#B9F5D4')} d={VPATH} /></svg>
+                      <svg viewBox="0 0 32 32" aria-hidden style={{ position: 'absolute', right: '6%', top: -60, width: 460, height: 460, opacity: 0.12 }}><path fill={cm('var(--pn-b9f5d4,#B9F5D4)')} d={VPATH} /></svg>
                       {d.fundoTexto ? <span aria-hidden style={{ position: 'absolute', right: '12%', top: '50%', transform: 'translateY(-50%)', fontSize: 150, fontWeight: 800, letterSpacing: '-0.06em', color: 'rgba(255,255,255,.1)' }}>{d.fundoTexto}</span> : null}
                     </>
                   )}
                   {(!d.imagem || d.titulo) && (
                   <div style={{ position: 'relative', zIndex: 1, height: '100%', maxWidth: 1376, margin: '0 auto', padding: '0 112px', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 14 }}>
                     {d.eyebrow ? (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: '#F1D48A' }}>
-                        <span className="hvn-live" style={{ width: 7, height: 7, borderRadius: '50%', background: cm('#5BE39E') }} />EM DESTAQUE · {d.eyebrow}
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: 'var(--pn-f1d48a,#F1D48A)' }}>
+                        <span className="hvn-live" style={{ width: 7, height: 7, borderRadius: '50%', background: cm('var(--pn-5be39e,#5BE39E)') }} />EM DESTAQUE · {d.eyebrow}
                       </span>
                     ) : null}
                     <h2 style={{ margin: 0, maxWidth: 640, fontSize: 46, fontWeight: 800, letterSpacing: '-0.045em', lineHeight: 1.04 }}>{d.titulo}</h2>
-                    {d.subtitulo ? <p style={{ margin: 0, fontSize: 16, color: cm('#CFE3D7') }}>{d.subtitulo}</p> : null}
+                    {d.subtitulo ? <p style={{ margin: 0, fontSize: 16, color: cm('var(--pn-cfe3d7,#CFE3D7)') }}>{d.subtitulo}</p> : null}
                     {/* Botão só em slides de TEXTO (sem imagem). Banner de imagem não tem botão. */}
                     {!d.imagem && (
                     <div style={{ display: 'flex', gap: 10, marginTop: 6 }}>
-                      <a className="hvn-gold" {...linkReal(d.cta.url)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 48, padding: '0 22px', borderRadius: 14, color: '#2A1F02', fontWeight: 800, fontSize: 14.5 }}>{d.cta.rotulo}<ArrowRight size={15} /></a>
+                      <a className="hvn-gold" {...linkReal(d.cta.url)} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, height: 48, padding: '0 22px', borderRadius: 14, color: 'var(--pn-2a1f02,#2A1F02)', fontWeight: 800, fontSize: 14.5 }}>{d.cta.rotulo}<ArrowRight size={15} /></a>
                     </div>
                     )}
                   </div>
@@ -325,16 +325,16 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
             ))}
           </div>
 
-          <button type="button" aria-label="Anterior" onClick={() => go(slide - 1)} className="hvn-arr" style={{ position: 'absolute', top: '50%', left: 24, transform: 'translateY(-50%)', zIndex: 4, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', width: 46, height: 46, borderRadius: '50%', border: '1.5px solid rgba(232,200,119,.7)', background: cm('rgba(4,26,16,.45)'), color: '#F1D48A', boxShadow: '0 8px 20px -10px rgba(0,0,0,.6)' }}><ChevronLeft size={18} strokeWidth={2.2} /></button>
-          <button type="button" aria-label="Próximo" onClick={() => go(slide + 1)} className="hvn-arr" style={{ position: 'absolute', top: '50%', right: 24, transform: 'translateY(-50%)', zIndex: 4, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', width: 46, height: 46, borderRadius: '50%', border: '1.5px solid rgba(232,200,119,.7)', background: cm('rgba(4,26,16,.45)'), color: '#F1D48A', boxShadow: '0 8px 20px -10px rgba(0,0,0,.6)' }}><ChevronRight size={18} strokeWidth={2.2} /></button>
+          <button type="button" aria-label="Anterior" onClick={() => go(slide - 1)} className="hvn-arr" style={{ position: 'absolute', top: '50%', left: 24, transform: 'translateY(-50%)', zIndex: 4, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', width: 46, height: 46, borderRadius: '50%', border: '1.5px solid color-mix(in srgb,var(--pn-e8c877,#E8C877) 70%,transparent)', background: cm('color-mix(in srgb,var(--pn-041a10,#041A10) 45%,transparent)'), color: 'var(--pn-f1d48a,#F1D48A)', boxShadow: '0 8px 20px -10px rgba(0,0,0,.6)' }}><ChevronLeft size={18} strokeWidth={2.2} /></button>
+          <button type="button" aria-label="Próximo" onClick={() => go(slide + 1)} className="hvn-arr" style={{ position: 'absolute', top: '50%', right: 24, transform: 'translateY(-50%)', zIndex: 4, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)', width: 46, height: 46, borderRadius: '50%', border: '1.5px solid color-mix(in srgb,var(--pn-e8c877,#E8C877) 70%,transparent)', background: cm('color-mix(in srgb,var(--pn-041a10,#041A10) 45%,transparent)'), color: 'var(--pn-f1d48a,#F1D48A)', boxShadow: '0 8px 20px -10px rgba(0,0,0,.6)' }}><ChevronRight size={18} strokeWidth={2.2} /></button>
 
           <div style={{ position: 'absolute', left: 0, right: 0, justifyContent: 'center', bottom: 18, zIndex: 3, display: 'flex', alignItems: 'center', gap: 7 }}>
             {Array.from({ length: nSlides }).map((_, i) => (
-              <button key={i} type="button" aria-label={`Banner ${i + 1}`} onClick={() => go(i)} className="hvn-cdot" style={{ width: i === slide ? 28 : 8, height: 8, padding: 0, border: 0, borderRadius: 99, background: i === slide ? '#E8C877' : 'rgba(255,255,255,.45)' }} />
+              <button key={i} type="button" aria-label={`Banner ${i + 1}`} onClick={() => go(i)} className="hvn-cdot" style={{ width: i === slide ? 28 : 8, height: 8, padding: 0, border: 0, borderRadius: 99, background: i === slide ? 'var(--pn-e8c877,#E8C877)' : 'rgba(255,255,255,.45)' }} />
             ))}
           </div>
           <div style={{ position: 'absolute', right: 24, bottom: 10, zIndex: 4 }}>
-            <button type="button" className="hvn-cpause" onClick={() => setPaused((p) => !p)} aria-label={paused ? 'Retomar banner' : 'Pausar banner (fixar)'} title={paused ? 'Retomar banner' : 'Pausar banner (fixar)'} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: '50%', border: 0, background: 'linear-gradient(180deg,#F1D48A,#D8B45A)', color: '#2A1F02', boxShadow: '0 8px 18px -8px rgba(216,180,90,.8)' }}>
+            <button type="button" className="hvn-cpause" onClick={() => setPaused((p) => !p)} aria-label={paused ? 'Retomar banner' : 'Pausar banner (fixar)'} title={paused ? 'Retomar banner' : 'Pausar banner (fixar)'} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: '50%', border: 0, background: 'linear-gradient(180deg,var(--pn-f1d48a,#F1D48A),var(--pn-d8b45a,#D8B45A))', color: 'var(--pn-2a1f02,#2A1F02)', boxShadow: '0 8px 18px -8px color-mix(in srgb,var(--pn-d8b45a,#D8B45A) 80%,transparent)' }}>
               {paused
                 ? <svg viewBox="0 0 24 24" aria-hidden style={{ width: 14, height: 14 }}><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor" /></svg>
                 : <svg viewBox="0 0 24 24" aria-hidden style={{ width: 14, height: 14 }}><rect x="6" y="5" width="4" height="14" rx="1.2" fill="currentColor" /><rect x="14" y="5" width="4" height="14" rx="1.2" fill="currentColor" /></svg>}
@@ -391,11 +391,11 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
             {/* Meta & sequência (gamificação) */}
             {gamOn && (
             <div style={CARD}>
-              <CardHead icon={<Flame size={16} />} title="Meta & sequência" color="#F0773A" right={<span style={{ height: 26, padding: '0 11px', borderRadius: 99, background: 'var(--chip)', color: 'var(--brand)', fontSize: 12, fontWeight: 800, display: 'inline-flex', alignItems: 'center' }}>{streakTxt}</span>} />
+              <CardHead icon={<Flame size={16} />} title="Meta & sequência" color="var(--pn-f0773a,#F0773A)" right={<span style={{ height: 26, padding: '0 11px', borderRadius: 99, background: 'var(--chip)', color: 'var(--brand)', fontSize: 12, fontWeight: 800, display: 'inline-flex', alignItems: 'center' }}>{streakTxt}</span>} />
               <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
                 <div style={{ position: 'relative', width: 58, height: 58, flexShrink: 0 }}>
                   <svg viewBox="0 0 58 58" style={{ width: 58, height: 58, transform: 'rotate(-90deg)' }}>
-                    <defs><linearGradient id="hvn-vm" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={cm('#5BE39E')} /><stop offset="1" stopColor="#E8C877" /></linearGradient></defs>
+                    <defs><linearGradient id="hvn-vm" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={cm('var(--pn-5be39e,#5BE39E)')} /><stop offset="1" stopColor="var(--pn-e8c877,#E8C877)" /></linearGradient></defs>
                     <circle cx="29" cy="29" r={metaR} fill="none" stroke="var(--track)" strokeWidth={6} />
                     <circle className="hvn-ring" cx="29" cy="29" r={metaR} fill="none" stroke="url(#hvn-vm)" strokeWidth={6} strokeLinecap="round" strokeDasharray={metaC} strokeDashoffset={metaC * (1 - metaPct)} style={{ ['--c' as string]: metaC }} />
                   </svg>
@@ -414,7 +414,7 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
                   const hoje = i === sequenciaMeta.semana.length - 1
                   return (
                     <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 7 }}>
-                      <span className={cn(d.estudou && 'hvn-fire')} style={{ width: '100%', height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', ...(d.estudou ? { background: 'rgba(240,119,58,.15)', color: '#FF9600' } : hoje ? { background: 'var(--chip)', color: 'var(--brand)', boxShadow: 'inset 0 0 0 2px var(--brand)' } : { background: 'var(--surface2)', color: 'var(--muted2)' }) }}>
+                      <span className={cn(d.estudou && 'hvn-fire')} style={{ width: '100%', height: 40, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', ...(d.estudou ? { background: 'color-mix(in srgb,var(--pn-f0773a,#F0773A) 15%,transparent)', color: 'var(--pn-ff9600,#FF9600)' } : hoje ? { background: 'var(--chip)', color: 'var(--brand)', boxShadow: 'inset 0 0 0 2px var(--brand)' } : { background: 'var(--surface2)', color: 'var(--muted2)' }) }}>
                         {FLAME_ICON}
                       </span>
                       <span style={{ fontSize: 10, fontWeight: 800, color: hoje ? 'var(--ink)' : 'var(--muted)' }}>{d.dia}</span>
@@ -425,7 +425,7 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
               {checked ? (
                 <div style={{ marginTop: 16, height: 46, borderRadius: 14, background: 'var(--chip)', color: 'var(--brand)', fontWeight: 800, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><Check size={16} />Check-in feito · +{sequenciaMeta.bauXp} XP</div>
               ) : (
-                <button className="hvn-gold" type="button" onClick={(e) => fazer({ clientX: e.clientX, clientY: e.clientY })} disabled={busy} style={{ marginTop: 16, width: '100%', height: 46, border: 0, borderRadius: 14, color: '#2A1F02', fontWeight: 800, fontSize: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><Calendar size={16} />{busy ? 'Registrando…' : 'Fazer check-in de hoje'}</button>
+                <button className="hvn-gold" type="button" onClick={(e) => fazer({ clientX: e.clientX, clientY: e.clientY })} disabled={busy} style={{ marginTop: 16, width: '100%', height: 46, border: 0, borderRadius: 14, color: 'var(--pn-2a1f02,#2A1F02)', fontWeight: 800, fontSize: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><Calendar size={16} />{busy ? 'Registrando…' : 'Fazer check-in de hoje'}</button>
               )}
               <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 10, fontSize: 12, color: 'var(--muted)' }}>
                 <Gift size={18} style={{ color: 'var(--goldInk)' }} />
@@ -470,7 +470,7 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
                         <b style={{ color: baixo ? 'var(--goldInk)' : 'var(--brand)' }}>{d.pctAcerto}%</b>
                       </div>
                       <div style={{ height: 8, borderRadius: 99, background: 'var(--track)', overflow: 'hidden' }}>
-                        <span className="hvn-bar" style={{ display: 'block', height: '100%', width: `${d.pctAcerto}%`, borderRadius: 99, background: baixo ? 'linear-gradient(90deg,#E8C877,#D8A23A)' : cm('linear-gradient(90deg,#1E9E5E,#3FD58A)') }} />
+                        <span className="hvn-bar" style={{ display: 'block', height: '100%', width: `${d.pctAcerto}%`, borderRadius: 99, background: baixo ? 'linear-gradient(90deg,var(--pn-e8c877,#E8C877),var(--pn-d8a23a,#D8A23A))' : cm('linear-gradient(90deg,var(--pn-1e9e5e,#1E9E5E),var(--pn-3fd58a,#3FD58A))') }} />
                       </div>
                     </div>
                   )
@@ -541,7 +541,7 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
           <section className="up hvn-u6">
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
               <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, letterSpacing: '-0.02em', color: 'var(--ink)' }}>Outros simulados</h3>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 24, padding: '0 10px', borderRadius: 99, background: 'var(--chip)', color: 'var(--brand)', fontSize: 12, fontWeight: 800 }}><span className="hvn-live" style={{ width: 6, height: 6, borderRadius: '50%', background: cm('#2EC77A') }} />Disponíveis · {outrosDisponiveis}</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 24, padding: '0 10px', borderRadius: 99, background: 'var(--chip)', color: 'var(--brand)', fontSize: 12, fontWeight: 800 }}><span className="hvn-live" style={{ width: 6, height: 6, borderRadius: '50%', background: cm('var(--pn-2ec77a,#2EC77A)') }} />Disponíveis · {outrosDisponiveis}</span>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(100%,400px),1fr))', gap: 14 }}>
               {outros.map((s, i) => <RecenteCard key={s.id} s={s} grad={COVER_BG[(i + 2) % COVER_BG.length]} />)}
@@ -553,16 +553,16 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
       {/* ===================== MOBILE ===================== */}
       <div className="hvn-mob" style={{ padding: '14px 18px 96px', flexDirection: 'column', gap: 20 }}>
         {/* Hero saudação (sem carrossel) */}
-        <section style={{ position: 'relative', overflow: 'hidden', margin: '0 -18px', padding: '18px 18px 22px', background: cm('linear-gradient(165deg,#062A1B 0%,#0B4A2E 60%,#12643D 100%)'), color: '#FFFFFF' }}>
-          <div className="hvn-dotsbg" style={{ position: 'absolute', inset: 0, backgroundImage: cm('radial-gradient(circle,rgba(185,245,212,.18) 1.2px,transparent 1.8px)'), backgroundSize: '20px 20px' }} />
+        <section style={{ position: 'relative', overflow: 'hidden', margin: '0 -18px', padding: '18px 18px 22px', background: cm('linear-gradient(165deg,var(--pn-062a1b,#062A1B) 0%,var(--pn-0b4a2e,#0B4A2E) 60%,var(--pn-12643d,#12643D) 100%)'), color: '#FFFFFF' }}>
+          <div className="hvn-dotsbg" style={{ position: 'absolute', inset: 0, backgroundImage: cm('radial-gradient(circle,color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 18%,transparent) 1.2px,transparent 1.8px)'), backgroundSize: '20px 20px' }} />
           <span className="hvn-sweep" aria-hidden />
           <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
               <h1 style={{ margin: 0, fontSize: 30, fontWeight: 800, letterSpacing: '-0.045em', color: '#FFFFFF' }}>Olá, {usuario.nome}</h1>
-              <div style={{ fontSize: 15, fontWeight: 700, color: cm('#CFE3D7'), marginTop: 2, lineHeight: '1.2em' }}>
+              <div style={{ fontSize: 15, fontWeight: 700, color: cm('var(--pn-cfe3d7,#CFE3D7)'), marginTop: 2, lineHeight: '1.2em' }}>
                 Rumo a{' '}
                 <span style={{ display: 'inline-block', height: '1.2em', overflow: 'hidden', verticalAlign: 'bottom' }}>
-                  <span className="hvn-tick" style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.2em', color: '#F1D48A' }}>
+                  <span className="hvn-tick" style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.2em', color: 'var(--pn-f1d48a,#F1D48A)' }}>
                     {rotativo.map((r, i) => <span key={i}>{r}.</span>)}
                     {animaRot && <span>{rotativo[0]}.</span>}
                   </span>
@@ -570,33 +570,33 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
               </div>
             </div>
             {gamOn && (<>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 12, borderRadius: 18, background: 'rgba(255,255,255,.07)', border: cm('1px solid rgba(185,245,212,.16)') }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 12, borderRadius: 18, background: 'rgba(255,255,255,.07)', border: cm('1px solid color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 16%,transparent)') }}>
               <div style={{ position: 'relative', width: 66, height: 66, flexShrink: 0 }}>
                 <svg viewBox="0 0 66 66" style={{ width: 66, height: 66, transform: 'rotate(-90deg)' }}>
-                  <defs><linearGradient id="hvn-vrm" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={cm('#5BE39E')} /><stop offset="1" stopColor="#E8C877" /></linearGradient></defs>
+                  <defs><linearGradient id="hvn-vrm" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor={cm('var(--pn-5be39e,#5BE39E)')} /><stop offset="1" stopColor="var(--pn-e8c877,#E8C877)" /></linearGradient></defs>
                   <circle cx="33" cy="33" r={nivelRmob} fill="none" stroke="rgba(255,255,255,.14)" strokeWidth={6} />
                   <circle className="hvn-ring" cx="33" cy="33" r={nivelRmob} fill="none" stroke="url(#hvn-vrm)" strokeWidth={6} strokeLinecap="round" strokeDasharray={nivelCmob} strokeDashoffset={nivelCmob * (1 - nivelPct)} style={{ ['--c' as string]: nivelCmob }} />
                 </svg>
                 <span style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: 1, color: '#FFFFFF' }}>
                   <b style={{ fontSize: 21, fontWeight: 800 }}>{usuario.nivel}</b>
-                  <span style={{ fontSize: 8, fontWeight: 800, letterSpacing: '.14em', color: cm('#B9F5D4'), marginTop: 2 }}>NÍVEL</span>
+                  <span style={{ fontSize: 8, fontWeight: 800, letterSpacing: '.14em', color: cm('var(--pn-b9f5d4,#B9F5D4)'), marginTop: 2 }}>NÍVEL</span>
                 </span>
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><b>{usuario.tituloNivel}</b><span style={{ color: cm('#B9F5D4') }}>{usuario.xpNivelAtual}/{usuario.xpNivelMax} XP</span></div>
-                <div style={{ height: 7, borderRadius: 99, background: 'rgba(255,255,255,.14)', margin: '8px 0 6px', overflow: 'hidden' }}><span className="hvn-bar" style={{ display: 'block', width: `${nivelPct * 100}%`, height: '100%', borderRadius: 99, background: cm('linear-gradient(90deg,#3FD58A,#E8C877)') }} /></div>
-                <span style={{ fontSize: 12, color: cm('#CFE3D7') }}>Faltam <b style={{ color: '#F1D48A' }}>{faltamXp} XP</b> para o nível {usuario.nivel + 1}</span>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13 }}><b>{usuario.tituloNivel}</b><span style={{ color: cm('var(--pn-b9f5d4,#B9F5D4)') }}>{usuario.xpNivelAtual}/{usuario.xpNivelMax} XP</span></div>
+                <div style={{ height: 7, borderRadius: 99, background: 'rgba(255,255,255,.14)', margin: '8px 0 6px', overflow: 'hidden' }}><span className="hvn-bar" style={{ display: 'block', width: `${nivelPct * 100}%`, height: '100%', borderRadius: 99, background: cm('linear-gradient(90deg,var(--pn-3fd58a,#3FD58A),var(--pn-e8c877,#E8C877))') }} /></div>
+                <span style={{ fontSize: 12, color: cm('var(--pn-cfe3d7,#CFE3D7)') }}>Faltam <b style={{ color: 'var(--pn-f1d48a,#F1D48A)' }}>{faltamXp} XP</b> para o nível {usuario.nivel + 1}</span>
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
               {[
-                { ic: <Flame size={15} />, c: '#FFB38A', v: sequenciaMeta.diasSeguidos, l: 'dias seguidos' },
-                { ic: <Zap size={15} />, c: cm('#B9F5D4'), v: usuario.xpTotal.toLocaleString('pt-BR'), l: 'XP total' },
-                { ic: <Trophy size={15} />, c: '#F1D48A', v: usuario.liga, l: 'sua liga' },
+                { ic: <Flame size={15} />, c: 'var(--pn-ffb38a,#FFB38A)', v: sequenciaMeta.diasSeguidos, l: 'dias seguidos' },
+                { ic: <Zap size={15} />, c: cm('var(--pn-b9f5d4,#B9F5D4)'), v: usuario.xpTotal.toLocaleString('pt-BR'), l: 'XP total' },
+                { ic: <Trophy size={15} />, c: 'var(--pn-f1d48a,#F1D48A)', v: usuario.liga, l: 'sua liga' },
               ].map((t, i) => (
-                <div key={i} style={{ padding: 10, borderRadius: 14, background: 'rgba(255,255,255,.07)', border: cm('1px solid rgba(185,245,212,.14)') }}>
+                <div key={i} style={{ padding: 10, borderRadius: 14, background: 'rgba(255,255,255,.07)', border: cm('1px solid color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 14%,transparent)') }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 15, fontWeight: 800, color: t.c }}>{t.ic}{t.v}</span>
-                  <span style={{ display: 'block', fontSize: 10.5, color: cm('#B7D3C3') }}>{t.l}</span>
+                  <span style={{ display: 'block', fontSize: 10.5, color: cm('var(--pn-b7d3c3,#B7D3C3)') }}>{t.l}</span>
                 </div>
               ))}
             </div>
@@ -619,18 +619,18 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
                   ) : (
                     <>
                       {dotsOverlay(cm, 18, 0.2)}
-                      <svg viewBox="0 0 32 32" aria-hidden style={{ position: 'absolute', right: -30, top: -40, width: 170, height: 170, opacity: 0.13 }}><path fill={cm('#B9F5D4')} d={VPATH} /></svg>
+                      <svg viewBox="0 0 32 32" aria-hidden style={{ position: 'absolute', right: -30, top: -40, width: 170, height: 170, opacity: 0.13 }}><path fill={cm('var(--pn-b9f5d4,#B9F5D4)')} d={VPATH} /></svg>
                     </>
                   )}
                   {(!d.imagem || d.titulo) && (
                   <div style={{ position: 'relative', zIndex: 1, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 8, padding: '0 18px 44px' }}>
                     <div style={{ minWidth: 0 }}>
-                      {d.eyebrow ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 10.5, fontWeight: 800, letterSpacing: '.2em', color: '#F1D48A' }}><span className="hvn-live" style={{ width: 6, height: 6, borderRadius: '50%', background: cm('#5BE39E') }} />{d.eyebrow}</span> : null}
+                      {d.eyebrow ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 10.5, fontWeight: 800, letterSpacing: '.2em', color: 'var(--pn-f1d48a,#F1D48A)' }}><span className="hvn-live" style={{ width: 6, height: 6, borderRadius: '50%', background: cm('var(--pn-5be39e,#5BE39E)') }} />{d.eyebrow}</span> : null}
                       <b style={{ display: 'block', fontSize: 18, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.15, margin: '6px 0 4px' }}>{d.titulo}</b>
-                      {d.subtitulo ? <span style={{ fontSize: 12, color: cm('#CFE3D7') }}>{d.subtitulo}</span> : null}
+                      {d.subtitulo ? <span style={{ fontSize: 12, color: cm('var(--pn-cfe3d7,#CFE3D7)') }}>{d.subtitulo}</span> : null}
                     </div>
                     {!d.imagem && (
-                    <a className="hvn-gold" {...linkReal(d.cta.url)} style={{ flexShrink: 0, alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 8, height: 38, padding: '0 14px', borderRadius: 13, color: '#2A1F02', fontWeight: 800, fontSize: 13 }}>{d.cta.rotulo}<ArrowRight size={15} /></a>
+                    <a className="hvn-gold" {...linkReal(d.cta.url)} style={{ flexShrink: 0, alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 8, height: 38, padding: '0 14px', borderRadius: 13, color: 'var(--pn-2a1f02,#2A1F02)', fontWeight: 800, fontSize: 13 }}>{d.cta.rotulo}<ArrowRight size={15} /></a>
                     )}
                   </div>
                   )}
@@ -641,11 +641,11 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
           </div>
           <div style={{ position: 'absolute', left: 18, bottom: 12, zIndex: 3, display: 'flex', alignItems: 'center', gap: 7 }}>
             {slideDest.map((_, i) => (
-              <button key={i} type="button" aria-label={`Banner ${i + 1}`} onClick={() => setSlide(i)} className="hvn-cdot" style={{ width: Math.min(slide, slideDest.length - 1) === i ? 28 : 8, height: 8, padding: 0, border: 0, borderRadius: 99, background: Math.min(slide, slideDest.length - 1) === i ? '#E8C877' : 'rgba(255,255,255,.45)' }} />
+              <button key={i} type="button" aria-label={`Banner ${i + 1}`} onClick={() => setSlide(i)} className="hvn-cdot" style={{ width: Math.min(slide, slideDest.length - 1) === i ? 28 : 8, height: 8, padding: 0, border: 0, borderRadius: 99, background: Math.min(slide, slideDest.length - 1) === i ? 'var(--pn-e8c877,#E8C877)' : 'rgba(255,255,255,.45)' }} />
             ))}
           </div>
           <div style={{ position: 'absolute', right: 16, bottom: 10, zIndex: 4 }}>
-            <button type="button" onClick={() => setPaused((p) => !p)} aria-label={paused ? 'Retomar banner' : 'Pausar banner (fixar)'} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: '50%', border: 0, background: 'linear-gradient(180deg,#F1D48A,#D8B45A)', color: '#2A1F02', boxShadow: '0 8px 18px -8px rgba(216,180,90,.8)' }}>
+            <button type="button" onClick={() => setPaused((p) => !p)} aria-label={paused ? 'Retomar banner' : 'Pausar banner (fixar)'} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, borderRadius: '50%', border: 0, background: 'linear-gradient(180deg,var(--pn-f1d48a,#F1D48A),var(--pn-d8b45a,#D8B45A))', color: 'var(--pn-2a1f02,#2A1F02)', boxShadow: '0 8px 18px -8px color-mix(in srgb,var(--pn-d8b45a,#D8B45A) 80%,transparent)' }}>
               {paused
                 ? <svg viewBox="0 0 24 24" aria-hidden style={{ width: 14, height: 14 }}><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor" /></svg>
                 : <svg viewBox="0 0 24 24" aria-hidden style={{ width: 14, height: 14 }}><rect x="6" y="5" width="4" height="14" rx="1.2" fill="currentColor" /><rect x="14" y="5" width="4" height="14" rx="1.2" fill="currentColor" /></svg>}
@@ -688,13 +688,13 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
         {/* Meta & sequência (mobile, gamificação) */}
         {gamOn && (
         <div style={CARD}>
-          <CardHead icon={<Flame size={16} />} title="Meta & sequência" color="#F0773A" right={<span style={{ height: 26, padding: '0 11px', borderRadius: 99, background: 'var(--chip)', color: 'var(--brand)', fontSize: 12, fontWeight: 800, display: 'inline-flex', alignItems: 'center' }}>{streakTxt}</span>} />
+          <CardHead icon={<Flame size={16} />} title="Meta & sequência" color="var(--pn-f0773a,#F0773A)" right={<span style={{ height: 26, padding: '0 11px', borderRadius: 99, background: 'var(--chip)', color: 'var(--brand)', fontSize: 12, fontWeight: 800, display: 'inline-flex', alignItems: 'center' }}>{streakTxt}</span>} />
           <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
             {sequenciaMeta.semana.map((d, i) => {
               const hoje = i === sequenciaMeta.semana.length - 1
               return (
                 <div key={i} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-                  <span className={cn(d.estudou && 'hvn-fire')} style={{ width: '100%', height: 36, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', ...(d.estudou ? { background: 'rgba(240,119,58,.15)', color: '#FF9600' } : hoje ? { background: 'var(--chip)', color: 'var(--brand)', boxShadow: 'inset 0 0 0 2px var(--brand)' } : { background: 'var(--surface2)', color: 'var(--muted2)' }) }}>{FLAME_ICON}</span>
+                  <span className={cn(d.estudou && 'hvn-fire')} style={{ width: '100%', height: 36, borderRadius: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', ...(d.estudou ? { background: 'color-mix(in srgb,var(--pn-f0773a,#F0773A) 15%,transparent)', color: 'var(--pn-ff9600,#FF9600)' } : hoje ? { background: 'var(--chip)', color: 'var(--brand)', boxShadow: 'inset 0 0 0 2px var(--brand)' } : { background: 'var(--surface2)', color: 'var(--muted2)' }) }}>{FLAME_ICON}</span>
                   <span style={{ fontSize: 9.5, fontWeight: 800, color: hoje ? 'var(--ink)' : 'var(--muted)' }}>{d.dia}</span>
                 </div>
               )
@@ -703,7 +703,7 @@ export function HomeVnd({ theme: themeProp, data, preview }: { theme: InternaThe
           {checked ? (
             <div style={{ height: 44, borderRadius: 14, background: 'var(--chip)', color: 'var(--brand)', fontWeight: 800, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><Check size={16} />Check-in feito · +{sequenciaMeta.bauXp} XP</div>
           ) : (
-            <button className="hvn-gold" type="button" onClick={(e) => fazer({ clientX: e.clientX, clientY: e.clientY })} disabled={busy} style={{ width: '100%', height: 44, border: 0, borderRadius: 14, color: '#2A1F02', fontWeight: 800, fontSize: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><Calendar size={16} />{busy ? 'Registrando…' : 'Fazer check-in de hoje'}</button>
+            <button className="hvn-gold" type="button" onClick={(e) => fazer({ clientX: e.clientX, clientY: e.clientY })} disabled={busy} style={{ width: '100%', height: 44, border: 0, borderRadius: 14, color: 'var(--pn-2a1f02,#2A1F02)', fontWeight: 800, fontSize: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}><Calendar size={16} />{busy ? 'Registrando…' : 'Fazer check-in de hoje'}</button>
           )}
         </div>
         )}
@@ -797,11 +797,11 @@ function RecenteCard({ s, grad }: { s: HomeData['recentes'][number]; grad: strin
 const CSS = `
 .hvn-root{position:relative}
 .hvn-root svg.lucide{stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.hvn-root .hvn-cta{background:linear-gradient(180deg,#14924F,#0C6E3C);box-shadow:0 12px 24px -14px rgba(15,122,68,.9),inset 0 1px 0 rgba(255,255,255,.2);transition:filter .15s,transform .15s;cursor:pointer}
+.hvn-root .hvn-cta{background:linear-gradient(180deg,var(--pn-14924f,#14924F),var(--pn-0c6e3c,#0C6E3C));box-shadow:0 12px 24px -14px color-mix(in srgb,var(--pn-0f7a44,#0F7A44) 90%,transparent),inset 0 1px 0 rgba(255,255,255,.2);transition:filter .15s,transform .15s;cursor:pointer}
 .hvn-root .hvn-cta:hover,.hvn-root .hvn-gold:hover{filter:brightness(1.08);transform:translateY(-1px)}
-.hvn-root .hvn-gold{background:linear-gradient(180deg,#F1D48A,#D8B45A);box-shadow:0 12px 24px -14px rgba(216,180,90,.9),inset 0 1px 0 rgba(255,255,255,.4);transition:filter .15s,transform .15s;cursor:pointer}
+.hvn-root .hvn-gold{background:linear-gradient(180deg,var(--pn-f1d48a,#F1D48A),var(--pn-d8b45a,#D8B45A));box-shadow:0 12px 24px -14px color-mix(in srgb,var(--pn-d8b45a,#D8B45A) 90%,transparent),inset 0 1px 0 rgba(255,255,255,.4);transition:filter .15s,transform .15s;cursor:pointer}
 .hvn-root .hvn-lift{transition:transform .6s cubic-bezier(.22,1,.36,1),box-shadow .6s cubic-bezier(.22,1,.36,1),border-color .35s ease;will-change:transform;backface-visibility:hidden;cursor:pointer}
-.hvn-root .hvn-lift:hover{transform:translateY(-8px) scale(1.015);box-shadow:0 30px 50px -28px rgba(6,60,35,.6),0 0 0 1px rgba(232,200,119,.45);border-color:transparent}
+.hvn-root .hvn-lift:hover{transform:translateY(-8px) scale(1.015);box-shadow:0 30px 50px -28px color-mix(in srgb,var(--pn-063c23,#063C23) 60%,transparent),0 0 0 1px color-mix(in srgb,var(--pn-e8c877,#E8C877) 45%,transparent);border-color:transparent}
 .hvn-root .hvn-lift .hvn-cov{transition:transform .8s cubic-bezier(.22,1,.36,1)}
 .hvn-root .hvn-lift:hover .hvn-cov{transform:scale(1.08) rotate(-.6deg)}
 .hvn-root .hvn-cov::after{content:'';position:absolute;top:0;bottom:0;left:-60%;width:40%;background:linear-gradient(100deg,rgba(255,255,255,0),rgba(255,255,255,.22),rgba(255,255,255,0));transform:skewX(-18deg);transition:left 0s;pointer-events:none}
@@ -838,7 +838,7 @@ const CSS = `
 /* Contorno via ::after (z-index 2): ACIMA da capa → dourado do hover nos DOIS lados; ABAIXO do picote
    (z-3) → o furo da meia-lua cobre a linha. */
 .hvn-root .hvn-tk::after{content:'';position:absolute;inset:0;border-radius:inherit;box-shadow:inset 0 0 0 1px var(--line);pointer-events:none;z-index:2;transition:box-shadow .3s}
-.hvn-root .hvn-tk:hover::after{box-shadow:inset 0 0 0 1px var(--hoverLine,rgba(232,200,119,.7))}
+.hvn-root .hvn-tk:hover::after{box-shadow:inset 0 0 0 1px var(--hoverLine,color-mix(in srgb,var(--pn-e8c877,#E8C877) 70%,transparent))}
 /* Perfuração = dots pequenos (furinhos da cor do fundo) ao longo do corte (x=150) + FUROS maiores
    (meia-lua) no topo e na base. Como o contorno é inset, o furo cobre a linha → meia-lua limpa. */
 .hvn-root .hvn-tk-perf{position:absolute;left:150px;top:6px;bottom:6px;width:6px;transform:translateX(-50%);pointer-events:none;z-index:3;background-image:radial-gradient(circle at center,var(--bg) 1.7px,transparent 2.1px);background-size:6px 9px;background-position:center;background-repeat:repeat-y}

@@ -73,7 +73,7 @@ export function JurisClub({
               <span style={{ fontStyle: 'italic', fontWeight: 800, fontSize: 18, color: '#fff' }}>JurisClub</span>
               <Row gap={6}>
                 {NAV.map((t, k) => (
-                  <a key={t} href={k === 3 ? '#edicoes' : '#'} style={{ display: 'inline-flex', alignItems: 'center', height: 32, padding: '0 14px', borderRadius: 10, fontSize: 13, fontWeight: k === 0 ? 800 : 700, background: k === 0 ? '#fff' : 'transparent', color: k === 0 ? 'var(--ink)' : '#E6DEFF' }}>{t}</a>
+                  <a key={t} href={k === 3 ? '#edicoes' : '#'} style={{ display: 'inline-flex', alignItems: 'center', height: 32, padding: '0 14px', borderRadius: 10, fontSize: 13, fontWeight: k === 0 ? 800 : 700, background: k === 0 ? '#fff' : 'transparent', color: k === 0 ? 'var(--ink)' : 'var(--pn-e6deff,#E6DEFF)' }}>{t}</a>
                 ))}
               </Row>
             </Row>
@@ -97,7 +97,7 @@ export function JurisClub({
               ) : null}
             </div>
             <Row gap={8} style={{ flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 12.5, color: '#C9BEF2' }}>Buscas comuns:</span>
+              <span style={{ fontSize: 12.5, color: 'var(--pn-c9bef2,#C9BEF2)' }}>Buscas comuns:</span>
               {BUSCAS_COMUNS.map((b) => (
                 <button key={b} type="button" onClick={() => setBusca(b)} style={{ display: 'inline-flex', alignItems: 'center', height: 30, padding: '0 12px', borderRadius: 99, background: 'rgba(255,255,255,.1)', border: '1px solid rgba(255,255,255,.18)', color: '#fff', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>{b}</button>
               ))}

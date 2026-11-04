@@ -22,7 +22,7 @@ export function CircuitHero() {
       style={{ position: 'absolute', left: 520, top: -360, width: 1500, height: 950, overflow: 'visible', pointerEvents: 'none' }}
     >
       {MEQ_CIRC_PATHS.map((d, i) => (
-        <path key={`ol${i}`} className="hmq-ol" pathLength={1000} fill="none" stroke="#8BEAEA" strokeOpacity={0.4} strokeWidth={0.3864} strokeLinejoin="round" d={d} />
+        <path key={`ol${i}`} className="hmq-ol" pathLength={1000} fill="none" stroke="var(--pn-8beaea,#8BEAEA)" strokeOpacity={0.4} strokeWidth={0.3864} strokeLinejoin="round" d={d} />
       ))}
       {MEQ_CIRC_PATHS.map((d, i) => (
         <path key={`pl${i}`} className={`hmq-pl hmq-pl${i + 1}`} pathLength={1000} fill="none" stroke="#FFFFFF" strokeWidth={0.7084} strokeLinecap="round" strokeLinejoin="round" d={d} />
@@ -41,7 +41,7 @@ export function CircuitCapa() {
       style={{ position: 'absolute', left: -60, top: -40, width: 260, height: 165, overflow: 'visible', pointerEvents: 'none' }}
     >
       {MEQ_CIRC_PATHS.map((d, i) => (
-        <path key={i} className="hmq-ol" pathLength={1000} fill="none" stroke="#8BEAEA" strokeOpacity={0.35} strokeWidth={1.8577} strokeLinejoin="round" d={d} />
+        <path key={i} className="hmq-ol" pathLength={1000} fill="none" stroke="var(--pn-8beaea,#8BEAEA)" strokeOpacity={0.35} strokeWidth={1.8577} strokeLinejoin="round" d={d} />
       ))}
     </svg>
   )
@@ -49,7 +49,7 @@ export function CircuitCapa() {
 
 /** As 3 barrinhas da marca MEQ (assinatura visual) — crescentes esquerda→direita. */
 export function MarcaBarras({ size = 14, light }: { size?: number; light?: boolean }) {
-  const cor = light ? '#5ECEF0' : 'var(--brand2)'
+  const cor = light ? 'var(--pn-5ecef0,#5ECEF0)' : 'var(--brand2)'
   const w = Math.round((size / 14) * 3)
   return (
     <span aria-hidden="true" style={{ display: 'inline-flex', alignItems: 'flex-end', gap: 2, height: size }}>
@@ -105,10 +105,10 @@ export function Segs({
 export function Fogo() {
   return (
     <svg className="hmq-fl" viewBox="0 0 24 30" aria-hidden="true" style={{ width: 21, height: 26, marginTop: 1, overflow: 'visible' }}>
-      <ellipse className="sh" cx={12} cy={27.6} rx={7} ry={1.7} fill="rgba(20,50,120,.3)" />
+      <ellipse className="sh" cx={12} cy={27.6} rx={7} ry={1.7} fill="color-mix(in srgb,var(--pn-143278,#143278) 30%,transparent)" />
       <g className="b">
-        <path className="o" d="M12 25.4C7.4 25.4 4.1 22.1 4.1 17.7 4.1 14.7 5.5 12.6 6.3 10.7 6.7 9.6 6.7 6.6 7.1 5.3 7.4 4.4 8.4 4.3 8.9 5.1 9.6 6.3 10 7.2 10.6 7.8 11.1 5.7 11.9 2.9 13.4 1.4 14 .8 14.9 .9 15.3 1.6 17.4 5.3 19.9 9.8 19.9 17.4 19.9 22.1 16.6 25.4 12 25.4Z" fill="#3E8BF0" />
-        <path className="i" d="M12 23.3C9.9 23.3 8.6 21.8 8.6 20 8.6 17.9 10.5 16.1 11.4 14.3 11.6 13.9 12.4 13.9 12.6 14.3 13.5 16.1 15.4 17.9 15.4 20 15.4 21.8 14.1 23.3 12 23.3Z" fill="#8BEAEA" />
+        <path className="o" d="M12 25.4C7.4 25.4 4.1 22.1 4.1 17.7 4.1 14.7 5.5 12.6 6.3 10.7 6.7 9.6 6.7 6.6 7.1 5.3 7.4 4.4 8.4 4.3 8.9 5.1 9.6 6.3 10 7.2 10.6 7.8 11.1 5.7 11.9 2.9 13.4 1.4 14 .8 14.9 .9 15.3 1.6 17.4 5.3 19.9 9.8 19.9 17.4 19.9 22.1 16.6 25.4 12 25.4Z" fill="var(--pn-3e8bf0,#3E8BF0)" />
+        <path className="i" d="M12 23.3C9.9 23.3 8.6 21.8 8.6 20 8.6 17.9 10.5 16.1 11.4 14.3 11.6 13.9 12.4 13.9 12.6 14.3 13.5 16.1 15.4 17.9 15.4 20 15.4 21.8 14.1 23.3 12 23.3Z" fill="var(--pn-8beaea,#8BEAEA)" />
       </g>
     </svg>
   )
@@ -154,9 +154,9 @@ export function Capa({ rotulo, grad = 'linear-gradient(150deg,#1F2A55,#306AB5)',
     >
       <CircuitCapa />
       <span style={{ position: 'absolute', left: 12, top: 10, display: 'flex', gap: 2 }} aria-hidden="true">
-        <span style={{ display: 'block', width: 4, height: 5, borderRadius: 1, background: '#5ECEF0', opacity: 0.5, alignSelf: 'flex-end' }} />
-        <span style={{ display: 'block', width: 4, height: 8, borderRadius: 1, background: '#5ECEF0', opacity: 0.75, alignSelf: 'flex-end' }} />
-        <span style={{ display: 'block', width: 4, height: 11, borderRadius: 1, background: '#5ECEF0', opacity: 1, alignSelf: 'flex-end' }} />
+        <span style={{ display: 'block', width: 4, height: 5, borderRadius: 1, background: 'var(--pn-5ecef0,#5ECEF0)', opacity: 0.5, alignSelf: 'flex-end' }} />
+        <span style={{ display: 'block', width: 4, height: 8, borderRadius: 1, background: 'var(--pn-5ecef0,#5ECEF0)', opacity: 0.75, alignSelf: 'flex-end' }} />
+        <span style={{ display: 'block', width: 4, height: 11, borderRadius: 1, background: 'var(--pn-5ecef0,#5ECEF0)', opacity: 1, alignSelf: 'flex-end' }} />
       </span>
       <span style={{ position: 'relative', fontWeight: 700, fontSize: fs, letterSpacing: '-0.04em', lineHeight: 1.05 }}>{rotulo}</span>
     </div>

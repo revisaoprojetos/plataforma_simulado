@@ -14,7 +14,7 @@ export function EstudioHeader({ eyebrow = 'Conteúdos', titulo, acoes, subtabs }
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="flex min-w-0 flex-col gap-1.5">
-          <span className="text-[11px] font-extrabold uppercase tracking-[.2em]" style={{ color: 'var(--gold-ink, #9A7400)' }}>{eyebrow}</span>
+          <span className="text-[11px] font-extrabold uppercase tracking-[.2em]" style={{ color: 'var(--gold-ink, var(--pn-9a7400,#9A7400))' }}>{eyebrow}</span>
           <h1 className="m-0 truncate text-[28px] font-extrabold leading-[1.05] tracking-[-0.035em] text-foreground sm:text-[36px]">{titulo}</h1>
         </div>
         {acoes && <div className="ml-auto flex flex-wrap items-center gap-2">{acoes}</div>}

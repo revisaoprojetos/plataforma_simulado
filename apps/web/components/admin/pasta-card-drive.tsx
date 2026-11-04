@@ -18,19 +18,19 @@ export function DrivePastaStyles() {
   return (
     <style>{`
   .gd-folder-card,.gd-menu,.gd-submenu{
-    --gd-card-bg:#f0f4f9;--gd-card-hover:#e6ebf2;--gd-text:#1f1f1f;--gd-text-2:#444746;--gd-text-3:#5f6368;
-    --gd-menu-bg:#fff;--gd-menu-hover:#eef1f6;--gd-accent:var(--brand-primary,var(--primary));--gd-divider:#e8eaed;--gd-folder:#444746;
-    --gd-shadow-menu:0 1px 2px rgba(60,64,67,.25),0 6px 18px 4px rgba(60,64,67,.14),0 18px 40px -8px rgba(60,64,67,.18);
-    --gd-shadow-card:0 1px 2px rgba(60,64,67,.12),0 4px 12px rgba(60,64,67,.10);
+    --gd-card-bg:var(--pn-f0f4f9,#f0f4f9);--gd-card-hover:var(--pn-e6ebf2,#e6ebf2);--gd-text:#1f1f1f;--gd-text-2:#444746;--gd-text-3:var(--pn-5f6368,#5f6368);
+    --gd-menu-bg:#fff;--gd-menu-hover:var(--pn-eef1f6,#eef1f6);--gd-accent:var(--brand-primary,var(--primary));--gd-divider:#e8eaed;--gd-folder:#444746;
+    --gd-shadow-menu:0 1px 2px color-mix(in srgb,var(--pn-3c4043,#3C4043) 25%,transparent),0 6px 18px 4px color-mix(in srgb,var(--pn-3c4043,#3C4043) 14%,transparent),0 18px 40px -8px color-mix(in srgb,var(--pn-3c4043,#3C4043) 18%,transparent);
+    --gd-shadow-card:0 1px 2px color-mix(in srgb,var(--pn-3c4043,#3C4043) 12%,transparent),0 4px 12px color-mix(in srgb,var(--pn-3c4043,#3C4043) 10%,transparent);
     --gd-ease:cubic-bezier(.2,0,0,1);--gd-ease-out:cubic-bezier(.05,.7,.1,1);--gd-spring:cubic-bezier(.34,1.56,.64,1);
   }
   .dark .gd-folder-card,.dark .gd-menu,.dark .gd-submenu{
-    --gd-card-bg:#2a2b2f;--gd-card-hover:#34353a;--gd-text:#e8eaed;--gd-text-2:#c4c7c5;--gd-text-3:#9aa0a6;
-    --gd-menu-bg:#2d2e31;--gd-menu-hover:#3b3d42;--gd-divider:#3c4043;--gd-folder:#c4c7c5}
+    --gd-card-bg:#2a2b2f;--gd-card-hover:var(--pn-34353a,#34353a);--gd-text:#e8eaed;--gd-text-2:#c4c7c5;--gd-text-3:var(--pn-9aa0a6,#9aa0a6);
+    --gd-menu-bg:#2d2e31;--gd-menu-hover:var(--pn-3b3d42,#3b3d42);--gd-divider:var(--pn-3c4043,#3c4043);--gd-folder:#c4c7c5}
   .dark .gd-kebab:hover{background:rgba(255,255,255,.1)}
   .dark .gd-kebab.gd-active{background:rgba(255,255,255,.14)}
-  .dark .gd-item.gd-danger:hover{background:rgba(242,139,130,.14);color:#f28b82}
-  .dark .gd-item.gd-danger:hover>svg:first-child{fill:#f28b82}
+  .dark .gd-item.gd-danger:hover{background:color-mix(in srgb,var(--pn-f28b82,#F28B82) 14%,transparent);color:var(--pn-f28b82,#f28b82)}
+  .dark .gd-item.gd-danger:hover>svg:first-child{fill:var(--pn-f28b82,#f28b82)}
 
   .gd-folder-card{position:relative;isolation:isolate;overflow:hidden;display:flex;align-items:center;gap:14px;min-height:60px;
     padding:9px 6px 9px 16px;border-radius:14px;background:var(--gd-card-bg);cursor:pointer;user-select:none;outline:none;
@@ -87,8 +87,8 @@ export function DrivePastaStyles() {
   .gd-truncate{white-space:nowrap}
   .gd-chev{width:18px;height:18px;fill:var(--gd-text-3);transition:transform .3s var(--gd-spring)}
   .gd-item.gd-has-sub:hover>.gd-chev,.gd-item.gd-has-sub.gd-active>.gd-chev{transform:translateX(3px)}
-  .gd-item.gd-danger:hover{background:#fce8e6;color:#b3261e}
-  .gd-item.gd-danger:hover>svg:first-child{fill:#b3261e;animation:gdShake .45s var(--gd-ease)}
+  .gd-item.gd-danger:hover{background:var(--pn-fce8e6,#fce8e6);color:var(--pn-b3261e,#b3261e)}
+  .gd-item.gd-danger:hover>svg:first-child{fill:var(--pn-b3261e,#b3261e);animation:gdShake .45s var(--gd-ease)}
   @keyframes gdShake{25%{transform:rotate(-12deg) scale(1.1)}50%{transform:rotate(10deg) scale(1.1)}75%{transform:rotate(-6deg) scale(1.1)}}
   .gd-divider{height:1px;background:var(--gd-divider);margin:6px 4px}
   .gd-item.gd-has-sub{overflow:visible}

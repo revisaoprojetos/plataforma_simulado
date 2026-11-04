@@ -194,7 +194,7 @@ export function ProvaRevisao({ theme, data, mo: moInit = 'cad' }: SimScreenProps
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 10, padding: 12, borderRadius: 12, background: 'var(--peachBg)', fontSize: 12, lineHeight: 1.45, color: 'var(--ink)' }}>
-                <span style={{ color: '#E5A800' }}><Ic size={16}><path d={P.bulb} /><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2V17h6v-.3c0-.8.4-1.5 1-2A7 7 0 0 0 12 2z" /></Ic></span>
+                <span style={{ color: 'var(--pn-e5a800,#E5A800)' }}><Ic size={16}><path d={P.bulb} /><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2V17h6v-.3c0-.8.4-1.5 1-2A7 7 0 0 0 12 2z" /></Ic></span>
                 <span>Use a tesoura para eliminar alternativas e o marcador para voltar depois.</span>
               </div>
             </div>
@@ -219,7 +219,7 @@ export function ProvaRevisao({ theme, data, mo: moInit = 'cad' }: SimScreenProps
       {/* Sheet navegador mobile */}
       {ns && (
         <>
-          <div onClick={() => setNs(false)} style={{ position: 'fixed', inset: 0, zIndex: 70, background: 'rgba(10,10,25,.5)' }} />
+          <div onClick={() => setNs(false)} style={{ position: 'fixed', inset: 0, zIndex: 70, background: 'color-mix(in srgb,var(--pn-0a0a19,#0A0A19) 50%,transparent)' }} />
           <div className={`${PFX}-msh`} style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 71, maxHeight: '76%', overflowY: 'auto', padding: '18px 16px 24px', borderRadius: '22px 22px 0 0', background: 'var(--surface)' }}>
             <span style={{ display: 'block', width: 40, height: 4, margin: '0 auto 14px', borderRadius: 99, background: 'var(--line2)' }} />
             <b style={{ display: 'block', marginBottom: 12, fontSize: 16, color: 'var(--ink)' }}>Navegador · {cAns}/{N}</b>
@@ -238,12 +238,12 @@ export function ProvaRevisao({ theme, data, mo: moInit = 'cad' }: SimScreenProps
               <CountChip n={cFl} label="Para revisar" color="var(--flag)" />
             </div>
             {cBl > 0 ? (
-              <div style={{ display: 'flex', gap: 10, padding: '12px 14px', borderRadius: 12, background: 'rgba(242,169,59,.12)', fontSize: 12.5, lineHeight: 1.45, color: 'var(--ink)' }}>
+              <div style={{ display: 'flex', gap: 10, padding: '12px 14px', borderRadius: 12, background: 'color-mix(in srgb,var(--pn-f2a93b,#F2A93B) 12%,transparent)', fontSize: 12.5, lineHeight: 1.45, color: 'var(--ink)' }}>
                 <span style={{ color: WARN }}><Ic size={17}><circle cx="12" cy="12" r="9" /><path d={P.info} /></Ic></span>
                 <span><b>Você ainda tem {cBl} questões em branco:</b> {blTxt}. Questões em branco contam como erro.</span>
               </div>
             ) : (
-              <div style={{ display: 'flex', gap: 10, padding: '12px 14px', borderRadius: 12, background: 'rgba(31,168,104,.1)', fontSize: 13, color: OK, fontWeight: 700 }}>
+              <div style={{ display: 'flex', gap: 10, padding: '12px 14px', borderRadius: 12, background: 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 10%,transparent)', fontSize: 13, color: OK, fontWeight: 700 }}>
                 <Ic d={P.check} size={17} />Todas as questões foram respondidas.
               </div>
             )}
@@ -282,10 +282,10 @@ export function ProvaRevisao({ theme, data, mo: moInit = 'cad' }: SimScreenProps
       {/* MODAL ok */}
       {md === 'ok' && (
         <>
-          <div className={`${PFX}-mbg`} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(10,10,25,.55)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }} />
+          <div className={`${PFX}-mbg`} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'color-mix(in srgb,var(--pn-0a0a19,#0A0A19) 55%,transparent)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }} />
           <div role="dialog" className={`${PFX}-mpop ${PFX}-sheet`} style={{ position: 'fixed', left: '50%', top: '50%', width: 420, transform: 'translate(-50%,-50%)', zIndex: 81, borderRadius: 22, background: 'var(--surface)', boxShadow: '0 40px 80px -30px rgba(0,0,0,.6)' }}>
             <div style={{ padding: '34px 26px 26px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, textAlign: 'center' }}>
-              <span className={`${PFX}-okpop`} style={{ width: 84, height: 84, borderRadius: '50%', background: 'rgba(31,168,104,.14)', color: OK, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Ic d={P.check} size={40} strokeWidth={2.6} /></span>
+              <span className={`${PFX}-okpop`} style={{ width: 84, height: 84, borderRadius: '50%', background: 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 14%,transparent)', color: OK, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Ic d={P.check} size={40} strokeWidth={2.6} /></span>
               <b style={{ fontSize: 22, letterSpacing: '-0.03em', color: 'var(--ink)' }}>Simulado enviado!</b>
               <span style={{ fontSize: 14, color: 'var(--muted)' }}>Seu relatório completo está pronto.</span>
               <a href="#" className={`${PFX}-sbtn`} style={{ ...primaryBtnStyle(52), width: '100%' }}><Ic size={16}><path d="M3 3v18h18" /><path d={P.chart} /></Ic>Ver meu resultado</a>
@@ -313,14 +313,14 @@ function Seg({ active, onClick, icon, label }: { active: boolean; onClick: () =>
 
 function RevisarBtn({ on, onClick }: { on: boolean; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} style={{ height: 46, padding: '0 16px', borderRadius: 12, border: `1.5px solid ${on ? '#F2B63B' : 'rgba(242,182,59,.55)'}`, background: on ? '#F2B63B' : 'rgba(242,182,59,.14)', color: on ? '#3A2A00' : '#C98A0B', font: 'inherit', fontSize: 13.5, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+    <button type="button" onClick={onClick} style={{ height: 46, padding: '0 16px', borderRadius: 12, border: `1.5px solid ${on ? 'var(--pn-f2b63b,#F2B63B)' : 'color-mix(in srgb,var(--pn-f2b63b,#F2B63B) 55%,transparent)'}`, background: on ? 'var(--pn-f2b63b,#F2B63B)' : 'color-mix(in srgb,var(--pn-f2b63b,#F2B63B) 14%,transparent)', color: on ? 'var(--pn-3a2a00,#3A2A00)' : 'var(--pn-c98a0b,#C98A0B)', font: 'inherit', fontSize: 13.5, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', whiteSpace: 'nowrap' }}>
       <Ic d={P.flag} size={15} />{on ? 'Marcada para revisar' : 'Revisar'}
     </button>
   )
 }
 
 function revisarMiniStyle(on: boolean): React.CSSProperties {
-  return { height: 46, padding: '0 11px', borderRadius: 12, border: `1.5px solid ${on ? '#F2B63B' : 'rgba(242,182,59,.55)'}`, background: on ? '#F2B63B' : 'rgba(242,182,59,.14)', color: on ? '#3A2A00' : '#C98A0B', font: 'inherit', fontSize: 13.5, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', whiteSpace: 'nowrap' }
+  return { height: 46, padding: '0 11px', borderRadius: 12, border: `1.5px solid ${on ? 'var(--pn-f2b63b,#F2B63B)' : 'color-mix(in srgb,var(--pn-f2b63b,#F2B63B) 55%,transparent)'}`, background: on ? 'var(--pn-f2b63b,#F2B63B)' : 'color-mix(in srgb,var(--pn-f2b63b,#F2B63B) 14%,transparent)', color: on ? 'var(--pn-3a2a00,#3A2A00)' : 'var(--pn-c98a0b,#C98A0B)', font: 'inherit', fontSize: 13.5, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', whiteSpace: 'nowrap' }
 }
 
 function Navegador({ N, qi, respostas, flags, onGo, cols, cell }: { N: number; qi: number; respostas: Record<number, string | null>; flags: Record<number, boolean>; onGo: (n: number) => void; cols: number; cell: number }) {
@@ -412,9 +412,9 @@ export function ModalShell({ onClose, width, prefix, icon, iconColor, titulo, su
   const clr = iconColor
   return (
     <>
-      <div onClick={onClose} className={`${prefix}-mbg`} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(10,10,25,.55)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }} />
+      <div onClick={onClose} className={`${prefix}-mbg`} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'color-mix(in srgb,var(--pn-0a0a19,#0A0A19) 55%,transparent)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }} />
       <div role="dialog" className={`${prefix}-mpop ${prefix}-sheet`} style={{ position: 'fixed', left: '50%', top: '50%', width, transform: 'translate(-50%,-50%)', zIndex: 81, maxHeight: 'calc(100% - 24px)', overflowY: 'auto', borderRadius: 22, background: 'var(--surface)', boxShadow: '0 40px 80px -30px rgba(0,0,0,.6)' }}>
-        <span style={{ display: 'block', height: 5, background: `linear-gradient(90deg,#5B3FD0,#8F75FF 60%,${REV_GOLD})` }} />
+        <span style={{ display: 'block', height: 5, background: `linear-gradient(90deg,var(--pn-5b3fd0,#5B3FD0),var(--pn-8f75ff,#8F75FF) 60%,${REV_GOLD})` }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '22px 24px 4px' }}>
           <span style={{ width: 50, height: 50, borderRadius: 16, background: clr ? 'color-mix(in srgb,' + clr + ' 14%,transparent)' : 'color-mix(in srgb,var(--selDot) 14%,transparent)', color: clr ?? 'var(--selDot)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             {icon === P.info ? <Ic size={24}><circle cx="12" cy="12" r="9" /><path d={P.info} /></Ic> : <Ic d={icon} size={24} />}

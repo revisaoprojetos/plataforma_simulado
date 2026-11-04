@@ -92,9 +92,9 @@ export default async function LigasPage() {
     return <PlatformLigas brand={_it.brand} theme={_it.theme} data={ligaData} ranking={<LigaRankingFull corLiga={liga.cor} />} />
   }
 
-  const HERO_BG = 'linear-gradient(135deg, color-mix(in oklab, var(--brand-primary, var(--primary)) 80%, #0b1020) 0%, #0b1226 92%)'
-  const nodeAlc = 'color-mix(in oklab, var(--brand-primary, var(--primary)) 46%, #0b1020)'
-  const nodeFut = 'color-mix(in oklab, var(--brand-primary, var(--primary)) 20%, #0b1020)'
+  const HERO_BG = 'linear-gradient(135deg, color-mix(in oklab, var(--brand-primary, var(--primary)) 80%, var(--pn-0b1020,#0b1020)) 0%, var(--pn-0b1226,#0b1226) 92%)'
+  const nodeAlc = 'color-mix(in oklab, var(--brand-primary, var(--primary)) 46%, var(--pn-0b1020,#0b1020))'
+  const nodeFut = 'color-mix(in oklab, var(--brand-primary, var(--primary)) 20%, var(--pn-0b1020,#0b1020))'
 
   return (
     <div className="tema-gam animate-page space-y-6">
@@ -156,13 +156,13 @@ export default async function LigasPage() {
                         className={cn('relative flex items-center justify-center rounded-full', atual ? 'h-16 w-16 -translate-y-2 border-[3px]' : 'h-12 w-12 border-2')}
                         style={{
                           background: alc ? nodeAlc : nodeFut,
-                          borderColor: atual ? l.cor : alc ? `color-mix(in oklab, ${l.cor} 58%, #fff)` : `color-mix(in oklab, ${l.cor} 45%, #0b1020)`,
+                          borderColor: atual ? l.cor : alc ? `color-mix(in oklab, ${l.cor} 58%, #fff)` : `color-mix(in oklab, ${l.cor} 45%, var(--pn-0b1020,#0b1020))`,
                         }}
                       >
                         {/* Selo "Você": no MOBILE fica ABAIXO do ícone (o layout compacto fazia ele bater no
                             texto "XP até…" acima); no desktop continua acima (-top-8). */}
                         {atual && <span className="absolute left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-white px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wide text-slate-900 shadow top-full mt-1 sm:top-auto sm:bottom-auto sm:-top-8 sm:mt-0">Você</span>}
-                        {passou && <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-[#141233]"><Check className="h-2.5 w-2.5 text-white" strokeWidth={3} /></span>}
+                        {passou && <span className="absolute -bottom-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-emerald-500 ring-2 ring-[color:var(--pn-141233,#141233)]"><Check className="h-2.5 w-2.5 text-white" strokeWidth={3} /></span>}
                         <EscudoLiga cor={l.cor} nome={l.nome} ativo={alc} fundo={false} className={atual ? 'h-9 w-9' : 'h-7 w-7'} />
                         {atual && (
                           <span className="pointer-events-none absolute inset-0 overflow-hidden rounded-full">
@@ -261,7 +261,7 @@ function PodioColuna({ item, av, corLiga, altura }: { item: { estudanteId: strin
   const primeiro = item.posicao === 1
   return (
     <div className="flex min-w-0 flex-1 flex-col items-center">
-      {primeiro && <Crown className="mb-0.5 h-5 w-5 text-amber-400" fill="#fbbf24" />}
+      {primeiro && <Crown className="mb-0.5 h-5 w-5 text-amber-400" fill="var(--pn-fbbf24,#fbbf24)" />}
       <span className={cn('relative flex shrink-0 items-center justify-center overflow-hidden rounded-full text-sm font-bold uppercase text-white', primeiro ? 'h-14 w-14' : 'h-11 w-11', !av?.cor && 'bg-muted !text-foreground')}
         style={{ ...(av?.cor ? { background: av.cor } : {}), ...(primeiro ? { boxShadow: `0 0 0 2px ${corLiga}` } : {}) }}>
         {av?.avatar

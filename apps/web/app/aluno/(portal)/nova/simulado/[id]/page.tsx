@@ -32,7 +32,7 @@ function Info({ icon, label, valor, full }: { icon: Parameters<typeof Icon>[0]['
 // Cabeçalho de card com faixa de degradê (token GBAR) e título com ícone.
 function SimCard({ icon, titulo, children }: { icon: Parameters<typeof Icon>[0]['n']; titulo: string; children: React.ReactNode }) {
   return (
-    <div style={{ borderRadius: 22, background: 'var(--surface)', border: '1px solid var(--line)', boxShadow: '0 24px 50px -36px rgba(40,20,110,.45)', overflow: 'hidden' }}>
+    <div style={{ borderRadius: 22, background: 'var(--surface)', border: '1px solid var(--line)', boxShadow: '0 24px 50px -36px color-mix(in srgb,var(--pn-28146e,#28146E) 45%,transparent)', overflow: 'hidden' }}>
       <span style={{ display: 'block', height: 5, background: GBAR }} />
       <div style={{ padding: '26px 28px' }}>
         <b style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 18, letterSpacing: '-0.02em', color: 'var(--ink)', marginBottom: 16 }}>

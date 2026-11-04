@@ -28,20 +28,20 @@ import {
 // Tokens do <LoginForm> por tema (campos/CTA/links/pílula) — spec §5.2.
 const TOKENS: Record<MeqTheme, LoginFormTokens> = {
   claro: {
-    fg: '#171E3B', muted: '#66729A', fieldBg: '#F5F8FD', fieldBorder: '#DCE3F2', fieldFg: '#171E3B',
-    primary: '#306AB5', ctaBg: 'linear-gradient(180deg,#4A8BEA,#2F64C8)', ctaFg: '#FFFFFF',
-    pillBg: 'rgba(255,255,255,.7)', pillFg: '#171E3B', pillBorder: 'rgba(23,30,59,.16)',
+    fg: 'var(--pn-171e3b,#171E3B)', muted: 'var(--pn-66729a,#66729A)', fieldBg: 'var(--pn-f5f8fd,#F5F8FD)', fieldBorder: 'var(--pn-dce3f2,#DCE3F2)', fieldFg: 'var(--pn-171e3b,#171E3B)',
+    primary: 'var(--pn-306ab5,#306AB5)', ctaBg: 'linear-gradient(180deg,var(--pn-4a8bea,#4A8BEA),var(--pn-2f64c8,#2F64C8))', ctaFg: '#FFFFFF',
+    pillBg: 'rgba(255,255,255,.7)', pillFg: 'var(--pn-171e3b,#171E3B)', pillBorder: 'color-mix(in srgb,var(--pn-171e3b,#171E3B) 16%,transparent)',
   },
   // Azul: o card é BRANCO como no claro (mockup), só o chrome ao redor muda.
   azul: {
-    fg: '#171E3B', muted: '#66729A', fieldBg: '#F5F8FD', fieldBorder: '#DCE3F2', fieldFg: '#171E3B',
-    primary: '#306AB5', ctaBg: 'linear-gradient(180deg,#4A8BEA,#2F64C8)', ctaFg: '#FFFFFF',
-    pillBg: 'rgba(255,255,255,.85)', pillFg: '#171E3B', pillBorder: 'rgba(255,255,255,.55)',
+    fg: 'var(--pn-171e3b,#171E3B)', muted: 'var(--pn-66729a,#66729A)', fieldBg: 'var(--pn-f5f8fd,#F5F8FD)', fieldBorder: 'var(--pn-dce3f2,#DCE3F2)', fieldFg: 'var(--pn-171e3b,#171E3B)',
+    primary: 'var(--pn-306ab5,#306AB5)', ctaBg: 'linear-gradient(180deg,var(--pn-4a8bea,#4A8BEA),var(--pn-2f64c8,#2F64C8))', ctaFg: '#FFFFFF',
+    pillBg: 'rgba(255,255,255,.85)', pillFg: 'var(--pn-171e3b,#171E3B)', pillBorder: 'rgba(255,255,255,.55)',
   },
   escuro: {
-    fg: '#FFFFFF', muted: '#8E9BC4', fieldBg: 'rgba(8,13,32,.55)', fieldBorder: 'rgba(140,170,255,.18)', fieldFg: '#FFFFFF',
-    primary: '#7FC3FF', ctaBg: 'linear-gradient(180deg,#4A8BEA,#2F64C8)', ctaFg: '#FFFFFF',
-    pillBg: 'rgba(48,106,181,.22)', pillFg: '#FFFFFF', pillBorder: 'rgba(140,170,255,.3)',
+    fg: '#FFFFFF', muted: 'var(--pn-8e9bc4,#8E9BC4)', fieldBg: 'color-mix(in srgb,var(--pn-080d20,#080D20) 55%,transparent)', fieldBorder: 'color-mix(in srgb,var(--pn-8caaff,#8CAAFF) 18%,transparent)', fieldFg: '#FFFFFF',
+    primary: 'var(--pn-7fc3ff,#7FC3FF)', ctaBg: 'linear-gradient(180deg,var(--pn-4a8bea,#4A8BEA),var(--pn-2f64c8,#2F64C8))', ctaFg: '#FFFFFF',
+    pillBg: 'color-mix(in srgb,var(--pn-306ab5,#306AB5) 22%,transparent)', pillFg: '#FFFFFF', pillBorder: 'color-mix(in srgb,var(--pn-8caaff,#8CAAFF) 30%,transparent)',
   },
 }
 
@@ -299,7 +299,7 @@ function Trilha({ t, theme, core, preview, ticker }: VProps) {
                   <circle cx={n.cx} cy={n.cy} r={12} fill={c.routeNode} stroke={c.routeNodeStroke} strokeWidth="2" />
                   <circle className="mlt-core" cx={n.cx} cy={n.cy} r={8} fill={c.routeCore} style={{ animationDelay: n.coreDelay }} />
                   {n.check && (
-                    <path className="mlt-chk" d={`M${n.cx - 4} ${n.cy}l3 3 6-6`} fill="none" stroke={t === 'escuro' ? '#0B1124' : '#FFFFFF'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animationDelay: n.coreDelay }} />
+                    <path className="mlt-chk" d={`M${n.cx - 4} ${n.cy}l3 3 6-6`} fill="none" stroke={t === 'escuro' ? 'var(--pn-0b1124,#0B1124)' : '#FFFFFF'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ animationDelay: n.coreDelay }} />
                   )}
                   <text x={n.cx} y={n.cy + 36} textAnchor="middle" fontFamily="Sora, sans-serif" fontSize="12" fontWeight="700" letterSpacing="1.2" fill={c.routeNum}>{n.num}</text>
                   <text x={n.cx} y={n.cy + 56} textAnchor="middle" fontFamily="Sora, sans-serif" fontSize="13" fontWeight="600" fill={c.routeLabel}>{n.label}</text>

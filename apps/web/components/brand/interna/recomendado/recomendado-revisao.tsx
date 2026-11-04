@@ -16,9 +16,9 @@ import { CadernoReforco } from './caderno-reforco'
 import { QuestoesTabs } from '../questoes-tabs'
 import * as M from './mock'
 
-const AMBAR = '#F1C232'
-const AMBAR_INK = '#2A1A55'
-const CTA = 'linear-gradient(180deg,#6449E0,#4B30BE)'
+const AMBAR = 'var(--pn-f1c232,#F1C232)'
+const AMBAR_INK = 'var(--pn-2a1a55,#2A1A55)'
+const CTA = 'linear-gradient(180deg,var(--pn-6449e0,#6449E0),var(--pn-4b30be,#4B30BE))'
 
 function statIcon(i: number) {
   return ['chart', 'target', 'flag', 'clip'][i]
@@ -55,7 +55,7 @@ function Diagnostico({ data, activeId }: { data: RecoData; activeId: string | nu
       </div>
       {data.diagnostico.map((d) => <DiagLinha key={d.id} d={d} ativa={d.id === activeId} />)}
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--line)', fontSize: 11.5, color: 'var(--muted)' }}>
-        {([['#E5484D', '< 30% prioridade alta'], ['#D99A1E', '30–59% média'], [OK, '60%+ ok']] as [string, string][]).map(([c, t]) => (
+        {([['var(--pn-e5484d,#E5484D)', '< 30% prioridade alta'], ['var(--pn-d99a1e,#D99A1E)', '30–59% média'], [OK, '60%+ ok']] as [string, string][]).map(([c, t]) => (
           <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}><span style={{ width: 8, height: 8, borderRadius: '50%', background: c }} />{t}</span>
         ))}
       </div>
@@ -128,7 +128,7 @@ export function RecomendadoRevisao({ theme: themeProp, data, questoes }: { theme
 
       {/* Insight (faixa amarela) — de data.insight */}
       {ins && (
-        <div className="rcm-up" style={{ position: 'relative', overflow: 'hidden', display: 'flex', alignItems: mobile ? 'flex-start' : 'center', gap: 18, padding: '18px 22px', borderRadius: 18, background: 'var(--peachBg)', border: '1px solid rgba(241,194,50,.45)', flexDirection: mobile ? 'column' : 'row' }}>
+        <div className="rcm-up" style={{ position: 'relative', overflow: 'hidden', display: 'flex', alignItems: mobile ? 'flex-start' : 'center', gap: 18, padding: '18px 22px', borderRadius: 18, background: 'var(--peachBg)', border: '1px solid color-mix(in srgb,var(--pn-f1c232,#F1C232) 45%,transparent)', flexDirection: mobile ? 'column' : 'row' }}>
           <span style={{ width: 46, height: 46, borderRadius: 14, background: AMBAR, color: AMBAR_INK, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Ic n="bulb" s={22} /></span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <b style={{ display: 'block', fontSize: 15, color: 'var(--ink)' }}>Sua maior oportunidade agora é {ins.materia}</b>

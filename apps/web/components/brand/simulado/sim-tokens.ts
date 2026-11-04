@@ -3,6 +3,7 @@
 // Cores de marca são FIXAS por design (telas branded, como as de login/loading).
 
 import type { Brand, SimTheme } from './types'
+import { pnS } from '@/lib/brand/paleta-nova-tokens'
 
 type Vars = Record<string, string>
 
@@ -103,7 +104,9 @@ function temaValido(brand: Brand, theme: SimTheme): SimTheme {
 /** Mapa cru de tokens (sem prefixo `--`). */
 export function simVars(brand: Brand, theme: SimTheme): Vars {
   const t = temaValido(brand, theme)
-  return TABELA[brand][t] ?? REV.claro!
+  const v = TABELA[brand][t] ?? REV.claro!
+  // 'azul' (MEQ) é um tema de marca fixo, fora da paleta; os demais seguem a paleta nova quando ela está ativa.
+  return t === 'azul' ? v : pnS(v)
 }
 
 /** Estilo pronto p/ o root: injeta `--bg`, `--surface`, … + `--r` (raio) + fonte. */

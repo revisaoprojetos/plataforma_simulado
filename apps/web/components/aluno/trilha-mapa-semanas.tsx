@@ -117,7 +117,7 @@ function Secao({ t, simbolos, capa }: { t: Trilha; simbolos: TrilhaSimbolos; cap
             <div className="absolute -translate-x-1/2" style={{ left: cx(medal.c), top: cy(medal.r) - R, width: cardW }}>
               <div className="mx-auto flex flex-col items-center">
                 <span className={cn('flex items-center justify-center rounded-full border-4 border-dashed', liberada ? 'text-amber-500' : 'text-muted-foreground/60')}
-                  style={{ width: R * 2, height: R * 2, background: liberada ? 'color-mix(in oklab, #f0b000 18%, var(--card))' : 'var(--muted)', borderColor: liberada ? '#f0b000' : 'var(--border)' }}>
+                  style={{ width: R * 2, height: R * 2, background: liberada ? 'color-mix(in oklab, var(--pn-f0b000,#f0b000) 18%, var(--card))' : 'var(--muted)', borderColor: liberada ? 'var(--pn-f0b000,#f0b000)' : 'var(--border)' }}>
                   <Award className="h-6 w-6" />
                 </span>
                 <div className="mt-2 w-full rounded-xl border bg-card px-3 py-2 text-center shadow-sm">

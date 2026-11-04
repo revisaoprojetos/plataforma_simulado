@@ -58,7 +58,7 @@ export function BauTrilha({ grupoId, xp, liberado, gamAtivo, resgatadoServidor =
       <button
         ref={btnRef} type="button" disabled={!liberado} onClick={() => liberado && setAberto((v) => !v)} aria-label="Baú da trilha"
         className={cn('relative mx-auto flex items-center justify-center rounded-2xl border-4 transition-transform focus:outline-none', liberado ? 'hover:scale-105' : 'cursor-default', podePulsar && 'motion-safe:animate-[bau-pulse_1.5s_ease-in-out_infinite]')}
-        style={{ width: 56, height: 56, ...(resgatado ? { background: '#10b981', borderColor: '#059669', color: '#fff' } : liberado ? { background: 'var(--brand-accent, #f59e0b)', borderColor: 'color-mix(in oklab, var(--brand-accent, #f59e0b) 70%, #000)', color: '#fff' } : { background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }) }}>
+        style={{ width: 56, height: 56, ...(resgatado ? { background: 'var(--pn-10b981,#10b981)', borderColor: 'var(--pn-059669,#059669)', color: '#fff' } : liberado ? { background: 'var(--brand-accent, var(--pn-f59e0b,#f59e0b))', borderColor: 'color-mix(in oklab, var(--brand-accent, var(--pn-f59e0b,#f59e0b)) 70%, #000)', color: '#fff' } : { background: 'var(--muted)', borderColor: 'var(--border)', color: 'var(--muted-foreground)' }) }}>
         {resgatado ? <Check className="h-6 w-6" /> : <Trophy className="h-6 w-6" />}
       </button>
       <div className="mt-1.5 inline-block rounded-lg border bg-background/85 px-2 py-0.5 shadow-sm backdrop-blur-sm">

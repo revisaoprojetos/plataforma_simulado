@@ -7,6 +7,8 @@ import { Toaster } from 'sonner'
 import { ConfirmHost } from '@/components/ui/confirm-dialog'
 import { ServiceWorkerRegister } from '@/components/service-worker-register'
 import { getTenantTheme } from '@/lib/tenant-theme'
+import { paletaHref } from '@/lib/brand/paleta-nova-server'
+import { lerPaletaNova } from '@/lib/brand/paleta-nova'
 
 const inter = Inter({
   subsets: ['latin'],
@@ -46,7 +48,13 @@ export default async function RootLayout({
   children: React.ReactNode
 }>) {
   // Fetch tenant theme server-side; falls back to defaults on any error
-  const { css: tenantCss, tenantNome, favicon, modoPadrao } = await getTenantTheme()
+  const { css: tenantCss, tenantNome, favicon, modoPadrao, tema: temaRaiz } = await getTenantTheme()
+  // Paleta nova (designer unificado): na raiz só o modo `todos` (vale p/ login/prova/embed). `workspace` entra nos layouts aluno/admin.
+  // `workspace` também vale aqui p/ quem já foi reconhecido como membro neste navegador (cookie `pn_ws`, gravado pelos layouts
+  // aluno/admin) — é o que leva a paleta ao login, ao carregamento e à prova, onde ainda não há sessão.
+  const modoPaleta = lerPaletaNova(temaRaiz).modo
+  const wsNesteNavegador = (await cookies()).get('pn_ws')?.value === '1'
+  const paletaRaizHref = modoPaleta === 'todos' || (modoPaleta === 'workspace' && wsNesteNavegador) ? paletaHref(temaRaiz, true) : null
 
   const themeCSS = tenantCss || DEFAULT_THEME_CSS
 
@@ -82,6 +90,7 @@ export default async function RootLayout({
         />
         {/* Dynamic white-label theme — overrides shadcn CSS variable defaults */}
         <style dangerouslySetInnerHTML={{ __html: themeCSS }} />
+        {paletaRaizHref && <link rel="stylesheet" href={paletaRaizHref} precedence="paleta-nova" />}
         {/* Fontes do Google usadas nos cadernos de prova (editor + impressão/PDF) */}
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />

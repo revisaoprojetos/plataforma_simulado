@@ -16,21 +16,21 @@ const P = 'vld'
 // No dividido o FORMULÁRIO fica num fundo claro (claro) ou escuro-glass (escuro).
 const TOKENS: Record<'claro' | 'escuro', LoginFormTokens> = {
   claro: {
-    fg: '#0B1F15', muted: '#5E7368', fieldBg: '#FFFFFF', fieldBorder: '#DDE6E0', fieldFg: '#0B1F15',
-    primary: '#0F7A44', ctaBg: 'linear-gradient(180deg,#14924F,#0C6E3C)', ctaFg: '#ffffff',
-    pillBg: '#FFFFFF', pillFg: '#2A3A32', pillBorder: '#DCE5DF',
+    fg: 'var(--pn-0b1f15,#0B1F15)', muted: 'var(--pn-5e7368,#5E7368)', fieldBg: '#FFFFFF', fieldBorder: 'var(--pn-dde6e0,#DDE6E0)', fieldFg: 'var(--pn-0b1f15,#0B1F15)',
+    primary: 'var(--pn-0f7a44,#0F7A44)', ctaBg: 'linear-gradient(180deg,var(--pn-14924f,#14924F),var(--pn-0c6e3c,#0C6E3C))', ctaFg: '#ffffff',
+    pillBg: '#FFFFFF', pillFg: 'var(--pn-2a3a32,#2A3A32)', pillBorder: 'var(--pn-dce5df,#DCE5DF)',
   },
   escuro: {
-    fg: '#FFFFFF', muted: '#9DB5A8', fieldBg: 'rgba(255,255,255,.04)', fieldBorder: 'rgba(120,230,170,.16)', fieldFg: '#FFFFFF',
-    primary: '#3FD58A', ctaBg: 'linear-gradient(180deg,#14924F,#0C6E3C)', ctaFg: '#ffffff',
-    pillBg: 'rgba(255,255,255,.06)', pillFg: '#D4EADD', pillBorder: 'rgba(255,255,255,.16)',
+    fg: '#FFFFFF', muted: 'var(--pn-9db5a8,#9DB5A8)', fieldBg: 'rgba(255,255,255,.04)', fieldBorder: 'color-mix(in srgb,var(--pn-78e6aa,#78E6AA) 16%,transparent)', fieldFg: '#FFFFFF',
+    primary: 'var(--pn-3fd58a,#3FD58A)', ctaBg: 'linear-gradient(180deg,var(--pn-14924f,#14924F),var(--pn-0c6e3c,#0C6E3C))', ctaFg: '#ffffff',
+    pillBg: 'rgba(255,255,255,.06)', pillFg: 'var(--pn-d4eadd,#D4EADD)', pillBorder: 'rgba(255,255,255,.16)',
   },
 }
 
-const PAGE_BG = { claro: '#F5F8F6', escuro: '#0A120E' }
+const PAGE_BG = { claro: '#F5F8F6', escuro: 'var(--pn-0a120e,#0A120E)' }
 const PANEL_BG = {
-  claro: 'linear-gradient(165deg,#062A1B 0%,#0B4A2E 55%,#12643D 100%)',
-  escuro: 'linear-gradient(165deg,#03140C 0%,#06241A 55%,#0A3323 100%)',
+  claro: 'linear-gradient(165deg,var(--pn-062a1b,#062A1B) 0%,var(--pn-0b4a2e,#0B4A2E) 55%,var(--pn-12643d,#12643D) 100%)',
+  escuro: 'linear-gradient(165deg,var(--pn-03140c,#03140C) 0%,var(--pn-06241a,#06241A) 55%,var(--pn-0a3323,#0A3323) 100%)',
 }
 
 const BULLETS = [
@@ -53,7 +53,7 @@ export function VndDividido({ theme, core, preview, simula }: LoginVariantProps 
       className={`${P}-root`}
       style={{
         position: 'relative', overflow: 'hidden', minHeight: '100vh', display: 'flex',
-        background: PAGE_BG[t], fontFamily: "'Plus Jakarta Sans', sans-serif", color: t === 'escuro' ? '#FFFFFF' : '#0B1F15',
+        background: PAGE_BG[t], fontFamily: "'Plus Jakarta Sans', sans-serif", color: t === 'escuro' ? '#FFFFFF' : 'var(--pn-0b1f15,#0B1F15)',
         ['--vld-page' as any]: PAGE_BG[t],
       }}
     >
@@ -61,10 +61,10 @@ export function VndDividido({ theme, core, preview, simula }: LoginVariantProps 
 
       {/* ── PAINEL ── */}
       <section className={`${P}-panel`} style={{ position: 'relative', overflow: 'hidden', background: PANEL_BG[t], color: '#FFFFFF', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
-        <div className={`${P}-dotsbg`} aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: 'radial-gradient(circle,rgba(185,245,212,.18) 1.2px,transparent 1.8px)', backgroundSize: '28px 28px', WebkitMaskImage: 'linear-gradient(180deg,#000,transparent 85%)', maskImage: 'linear-gradient(180deg,#000,transparent 85%)' }} />
-        <svg className={`${P}-chev ${P}-ch1`} viewBox="0 0 200 120" aria-hidden="true" preserveAspectRatio="none" style={{ position: 'absolute', left: '-8%', width: '116%', height: 360, bottom: -50, pointerEvents: 'none' }}><path d="M0 0 L100 112 L200 0" fill="none" stroke="rgba(232,200,119,.6)" strokeWidth={2} vectorEffect="non-scaling-stroke" /></svg>
-        <svg className={`${P}-chev ${P}-ch2`} viewBox="0 0 200 120" aria-hidden="true" preserveAspectRatio="none" style={{ position: 'absolute', left: '-8%', width: '116%', height: 360, bottom: 14, pointerEvents: 'none' }}><path d="M0 0 L100 112 L200 0" fill="none" stroke="rgba(185,245,212,.16)" strokeWidth={1.2} vectorEffect="non-scaling-stroke" /></svg>
-        <svg className={`${P}-chev ${P}-ch3`} viewBox="0 0 200 120" aria-hidden="true" preserveAspectRatio="none" style={{ position: 'absolute', left: '-8%', width: '116%', height: 360, bottom: 78, pointerEvents: 'none' }}><path d="M0 0 L100 112 L200 0" fill="none" stroke="rgba(185,245,212,.16)" strokeWidth={1.2} vectorEffect="non-scaling-stroke" /></svg>
+        <div className={`${P}-dotsbg`} aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none', backgroundImage: 'radial-gradient(circle,color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 18%,transparent) 1.2px,transparent 1.8px)', backgroundSize: '28px 28px', WebkitMaskImage: 'linear-gradient(180deg,#000,transparent 85%)', maskImage: 'linear-gradient(180deg,#000,transparent 85%)' }} />
+        <svg className={`${P}-chev ${P}-ch1`} viewBox="0 0 200 120" aria-hidden="true" preserveAspectRatio="none" style={{ position: 'absolute', left: '-8%', width: '116%', height: 360, bottom: -50, pointerEvents: 'none' }}><path d="M0 0 L100 112 L200 0" fill="none" stroke="color-mix(in srgb,var(--pn-e8c877,#E8C877) 60%,transparent)" strokeWidth={2} vectorEffect="non-scaling-stroke" /></svg>
+        <svg className={`${P}-chev ${P}-ch2`} viewBox="0 0 200 120" aria-hidden="true" preserveAspectRatio="none" style={{ position: 'absolute', left: '-8%', width: '116%', height: 360, bottom: 14, pointerEvents: 'none' }}><path d="M0 0 L100 112 L200 0" fill="none" stroke="color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 16%,transparent)" strokeWidth={1.2} vectorEffect="non-scaling-stroke" /></svg>
+        <svg className={`${P}-chev ${P}-ch3`} viewBox="0 0 200 120" aria-hidden="true" preserveAspectRatio="none" style={{ position: 'absolute', left: '-8%', width: '116%', height: 360, bottom: 78, pointerEvents: 'none' }}><path d="M0 0 L100 112 L200 0" fill="none" stroke="color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 16%,transparent)" strokeWidth={1.2} vectorEffect="non-scaling-stroke" /></svg>
         <span className={`${P}-sweep`} aria-hidden="true" style={{ position: 'absolute', top: '-20%', bottom: '-20%', width: '30%', left: '-40%', background: 'linear-gradient(100deg,rgba(255,255,255,0),rgba(255,255,255,.07),rgba(255,255,255,0))', transform: 'skewX(-18deg)', pointerEvents: 'none' }} />
 
         <div className={`${P}-up ${P}-d0 ${P}-brandrow`} style={{ position: 'relative' }}>
@@ -77,17 +77,17 @@ export function VndDividido({ theme, core, preview, simula }: LoginVariantProps 
             <LockupVND P={P} scale={1} gradId="vldVg" />
           </div>
           <div className={`${P}-up ${P}-d3 ${P}-ticker`} style={{ display: 'flex', flexDirection: 'column', gap: 4, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1.2 }}>
-            <span style={{ color: '#CFE3D7', fontWeight: 600 }}>Simulados para quem vai ser</span>
+            <span style={{ color: 'var(--pn-cfe3d7,#CFE3D7)', fontWeight: 600 }}>Simulados para quem vai ser</span>
             <span style={{ display: 'block', height: '1.2em', overflow: 'hidden' }}>
-              <span className={`${P}-tick`} style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.2em', color: '#F1D48A' }}>
+              <span className={`${P}-tick`} style={{ display: 'flex', flexDirection: 'column', lineHeight: '1.2em', color: 'var(--pn-f1d48a,#F1D48A)' }}>
                 {TICKER.map((w, i) => <span key={i}>{w}</span>)}
               </span>
             </span>
           </div>
           <ul className={`${P}-bullets`} style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 14 }}>
             {BULLETS.map((b) => (
-              <li key={b.t} className={`${P}-up ${P}-${b.c}`} style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, fontWeight: 600, color: '#E9EFEC' }}>
-                <span style={{ width: 34, height: 34, borderRadius: 11, background: 'rgba(255,255,255,.08)', border: '1px solid rgba(185,245,212,.2)', color: '#7BEAB0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <li key={b.t} className={`${P}-up ${P}-${b.c}`} style={{ display: 'flex', alignItems: 'center', gap: 12, fontSize: 15, fontWeight: 600, color: 'var(--pn-e9efec,#E9EFEC)' }}>
+                <span style={{ width: 34, height: 34, borderRadius: 11, background: 'rgba(255,255,255,.08)', border: '1px solid color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 20%,transparent)', color: 'var(--pn-7beab0,#7BEAB0)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <LineIcon size={17} d={b.icon} />
                 </span>
                 {b.t}
@@ -96,7 +96,7 @@ export function VndDividido({ theme, core, preview, simula }: LoginVariantProps 
           </ul>
         </div>
 
-        <div className={`${P}-up ${P}-d7 ${P}-panelfoot`} style={{ position: 'relative', fontSize: 12, color: '#9DC9B0' }}>© 2026 Você na Defensoria</div>
+        <div className={`${P}-up ${P}-d7 ${P}-panelfoot`} style={{ position: 'relative', fontSize: 12, color: 'var(--pn-9dc9b0,#9DC9B0)' }}>© 2026 Você na Defensoria</div>
       </section>
 
       {/* ── FORMULÁRIO (sem card) ── */}
@@ -118,7 +118,7 @@ export function VndDividido({ theme, core, preview, simula }: LoginVariantProps 
 }
 
 const css = `
-.${P}-root a{color:#0F7A44}
+.${P}-root a{color:var(--pn-0f7a44,#0F7A44)}
 .${P}-panel{width:54%;flex-shrink:0;padding:44px 64px}
 .${P}-formarea{padding:48px 56px}
 .${P}-greet{font-size:34px}

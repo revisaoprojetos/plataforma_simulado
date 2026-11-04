@@ -5,36 +5,36 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Montserrat:wght@500;800&family=Literata:wght@400;600&family=JetBrains+Mono:wght@500;700&display=swap');
 
 .novaplat {
-  /* superfícies — --bg = MESMO fundo interno claro do shell legado (#F5F3FC). */
-  --bg: #F5F3FC;
-  --surface: #FFFFFF;
-  --surface2: #F6F4FC;
-  --top: rgba(244,242,250,.85);
+  /* superfícies — --bg = MESMO fundo interno claro do shell legado (var(--pn-f5f3fc,#F5F3FC)). */
+  --bg: var(--pn-r-bg,var(--pn-f5f3fc,#F5F3FC));
+  --surface: var(--pn-r-surface,#FFFFFF);
+  --surface2: var(--pn-r-surface2,var(--pn-f6f4fc,#F6F4FC));
+  --top: var(--pn-r-top,color-mix(in srgb,var(--pn-f4f2fa,#F4F2FA) 85%,transparent));
   /* texto */
-  --ink: #1D1933;
-  --muted: #6E6886;
-  --muted2: #B3ADC7;
+  --ink: var(--pn-r-ink,var(--pn-1d1933,#1D1933));
+  --muted: var(--pn-r-muted,var(--pn-6e6886,#6E6886));
+  --muted2: var(--pn-r-muted2,var(--pn-b3adc7,#B3ADC7));
   /* linhas */
-  --line: #EAE6F4;
-  --line2: #D9D2F0;
-  --track: #ECE8F6;
+  --line: var(--pn-r-line,var(--pn-eae6f4,#EAE6F4));
+  --line2: var(--pn-r-line2,var(--pn-d9d2f0,#D9D2F0));
+  --track: var(--pn-r-track,var(--pn-ece8f6,#ECE8F6));
   /* marca */
-  --brand: #5B3FD0;
-  --brandLine: rgba(91,63,208,.3);
-  --chip: #EFEBFD;
-  --gold: #F1C232;
-  --goldInk: #2A1A55;
-  --accentInk: #9A7400;
-  --peachBg: #FDF5D8;
+  --brand: var(--pn-r-brand,var(--pn-5b3fd0,#5B3FD0));
+  --brandLine: var(--pn-r-brandLine,color-mix(in srgb,var(--pn-5b3fd0,#5B3FD0) 30%,transparent));
+  --chip: var(--pn-r-chip,var(--pn-efebfd,#EFEBFD));
+  --gold: var(--pn-dourado,var(--pn-f1c232,#F1C232));
+  --goldInk: var(--pn-roxo,var(--pn-2a1a55,#2A1A55));
+  --accentInk: var(--pn-r-accentInk,var(--pn-9a7400,#9A7400));
+  --peachBg: var(--pn-r-peachBg,var(--pn-fdf5d8,#FDF5D8));
   /* estados (tag: fundo / texto) */
-  --ok: #178A55;     --okBg: rgba(46,199,122,.14);
-  --danger: #C7333A; --dangerBg: rgba(229,72,77,.12);
-  --info: #2F66C0;   --infoBg: rgba(62,127,224,.13);
-  --pink: #B23A7A;   --pinkBg: rgba(220,80,150,.12);
+  --ok: var(--pn-ok,var(--pn-178a55,#178A55));     --okBg: color-mix(in srgb,var(--pn-2ec77a,#2EC77A) 14%,transparent);
+  --danger: var(--pn-err,var(--pn-c7333a,#C7333A)); --dangerBg: color-mix(in srgb,var(--pn-e5484d,#E5484D) 12%,transparent);
+  --info: var(--pn-2f66c0,#2F66C0);   --infoBg: color-mix(in srgb,var(--pn-3e7fe0,#3E7FE0) 13%,transparent);
+  --pink: var(--pn-b23a7a,#B23A7A);   --pinkBg: color-mix(in srgb,var(--pn-dc5096,#DC5096) 12%,transparent);
   /* menu lateral + botão primário */
-  --sidebar: linear-gradient(180deg,#2E1F7A 0%,#3A27A0 55%,#4A31B8 100%);
-  --btnPrimary: linear-gradient(180deg,#6449E0,#4B30BE);
-  --nova-hero-bg: linear-gradient(120deg,#2E1F7A 0%,#3A27A0 55%,#4A31B8 100%);
+  --sidebar: var(--pn-r-side,linear-gradient(180deg,var(--pn-2e1f7a,#2E1F7A) 0%,var(--pn-3a27a0,#3A27A0) 55%,var(--pn-4a31b8,#4A31B8) 100%));
+  --btnPrimary: var(--pn-btn,linear-gradient(180deg,var(--pn-6449e0,#6449E0),var(--pn-4b30be,#4B30BE)));
+  --nova-hero-bg: var(--pn-hero,linear-gradient(120deg,var(--pn-2e1f7a,#2E1F7A) 0%,var(--pn-3a27a0,#3A27A0) 55%,var(--pn-4a31b8,#4A31B8) 100%));
   /* fontes */
   --font-ui: 'Plus Jakarta Sans', system-ui, sans-serif;
   --font-brand: 'Montserrat', sans-serif;
@@ -51,25 +51,25 @@
 
 .novaplat[data-theme="escuro"], .dark .novaplat {
   /* Fundo = EXATAMENTE o fundo interno da marca do shell legado (shell-revisao-nova pinta o
-     shr-main com internaBg #0E0A24 no dark e força html/body nele). O .novaplat pintava por cima
-     com #18181D (cinza) → destoava. Agora usa o MESMO #0E0A24. Superfícies iguais às do legado. */
-  --bg: #0E0A24;
-  --surface: #1C1440;
-  --surface2: #171030;
-  --top: rgba(24,16,56,.96);
-  --ink: #FFFFFF;
-  --muted: #BDBBCB;
-  --muted2: #73717F;
-  --line: rgba(255,255,255,.1);
-  --line2: rgba(255,255,255,.18);
-  --track: rgba(255,255,255,.12);
-  --nova-hero-bg: linear-gradient(120deg,#160F33 0%,#241A52 55%,#2E1F6A 100%);
-  --brand: #B3A1FF;
-  --brandLine: rgba(179,161,255,.45);
-  --chip: rgba(143,117,255,.2);
-  --accentInk: #F1C232;
-  --peachBg: rgba(241,194,50,.12);
-  --sidebar: linear-gradient(180deg,#160F36 0%,#22184F 100%);
+     shr-main com internaBg var(--pn-0e0a24,#0E0A24) no dark e força html/body nele). O .novaplat pintava por cima
+     com #18181D (cinza) → destoava. Agora usa o MESMO var(--pn-0e0a24,#0E0A24). Superfícies iguais às do legado. */
+  --bg: var(--pn-r-bg,var(--pn-0e0a24,#0E0A24));
+  --surface: var(--pn-r-surface,var(--pn-1c1440,#1C1440));
+  --surface2: var(--pn-r-surface2,var(--pn-171030,#171030));
+  --top: var(--pn-r-top,color-mix(in srgb,var(--pn-181038,#181038) 96%,transparent));
+  --ink: var(--pn-r-ink,#FFFFFF);
+  --muted: var(--pn-r-muted,var(--pn-bdbbcb,#BDBBCB));
+  --muted2: var(--pn-r-muted2,var(--pn-73717f,#73717F));
+  --line: var(--pn-r-line,rgba(255,255,255,.1));
+  --line2: var(--pn-r-line2,rgba(255,255,255,.18));
+  --track: var(--pn-r-track,rgba(255,255,255,.12));
+  --nova-hero-bg: var(--pn-hero,linear-gradient(120deg,var(--pn-160f33,#160F33) 0%,var(--pn-241a52,#241A52) 55%,var(--pn-2e1f6a,#2E1F6A) 100%));
+  --brand: var(--pn-r-brand,var(--pn-b3a1ff,#B3A1FF));
+  --brandLine: var(--pn-r-brandLine,color-mix(in srgb,var(--pn-b3a1ff,#B3A1FF) 45%,transparent));
+  --chip: var(--pn-r-chip,color-mix(in srgb,var(--pn-8f75ff,#8F75FF) 20%,transparent));
+  --accentInk: var(--pn-r-accentInk,var(--pn-f1c232,#F1C232));
+  --peachBg: var(--pn-r-peachBg,color-mix(in srgb,var(--pn-f1c232,#F1C232) 12%,transparent));
+  --sidebar: var(--pn-r-side,linear-gradient(180deg,var(--pn-160f36,#160F36) 0%,var(--pn-22184f,#22184F) 100%));
 }
 
 /* garante que títulos de página não herdem o `main h1{color:var(--content-title)}` do tenant */
@@ -130,7 +130,7 @@
 /* ───────── Mobile: drawer + barra inferior ───────── */
 @media (max-width: 900px) {
   .novaplat .np-sidebar { position: fixed !important; left: 0; top: 0; height: 100dvh !important; z-index: 60; width: 264px !important; transform: translateX(-100%); transition: transform .2s ease; }
-  .novaplat .np-sidebar.np-open { transform: translateX(0); box-shadow: 0 30px 80px -20px rgba(10,5,40,.6); }
+  .novaplat .np-sidebar.np-open { transform: translateX(0); box-shadow: 0 30px 80px -20px color-mix(in srgb,var(--pn-0a0528,#0A0528) 60%,transparent); }
   .novaplat .np-hamburger { display: inline-flex !important; }
   .novaplat .np-downbar { display: flex !important; }
   .novaplat .np-main { padding: 16px 16px 92px !important; }

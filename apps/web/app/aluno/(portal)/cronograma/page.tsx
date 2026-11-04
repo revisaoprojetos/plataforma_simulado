@@ -58,8 +58,8 @@ export default async function CronogramaAlunoPage() {
   // Mesma linguagem dos heróis do portal (Ligas, Perfil): marca do tenant no gradiente e
   // `--brand-accent` no destaque.
   const HERO_BG =
-    'linear-gradient(135deg, color-mix(in oklab, var(--brand-primary, var(--primary)) 62%, #17122e) 0%, color-mix(in oklab, var(--brand-primary, var(--primary)) 26%, #14102a) 100%)'
-  const ACENTO = 'var(--brand-accent, #f6c343)'
+    'linear-gradient(135deg, color-mix(in oklab, var(--brand-primary, var(--primary)) 62%, var(--pn-17122e,#17122e)) 0%, color-mix(in oklab, var(--brand-primary, var(--primary)) 26%, var(--pn-14102a,#14102a)) 100%)'
+  const ACENTO = 'var(--brand-accent, var(--pn-f6c343,#f6c343))'
 
   // ── NOVO VISUAL INTERNO: Cronograma no header/fundo novos, reusando o construtor/tabelas funcionais. ──
   // (A Revisão com visual interno já foi redirecionada no topo para /aluno/nova/painel.)

@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic'
 
 const PALETA = Object.values(GR)
 function gradDe(cor: string | null | undefined, i: number): string {
-  if (cor) return `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 55%, #0b0a1a))`
+  if (cor) return `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 55%, var(--pn-0b0a1a,#0b0a1a)))`
   return PALETA[i % PALETA.length]
 }
 function abreviar(txt: string, max = 18): string {
@@ -57,9 +57,9 @@ function CursoCard({ c, i }: { c: CursoReal; i: number }) {
 // Atalhos para a Central de Estudos (navegação — não são cursos).
 const ATALHOS = [
   { line: 'EXTENSIVO', sigla: 'Advocacia Pública', grad: GR.EXT, titulo: 'Extensivo', sub: 'Base para PGEs e PGMs', href: R.extensivo },
-  { line: 'LEGPROC', sigla: 'LegProc', grad: 'linear-gradient(135deg,#3A1E5C,#7A3DB0)', titulo: 'LegProc', sub: 'Legislação anotada', href: R.legproc },
-  { line: 'JURISCLUB', sigla: 'JurisClub', grad: 'linear-gradient(135deg,#241A52,#5B3FD0)', titulo: 'JurisClub', sub: 'Julgados do mês', href: R.jurisclub },
-  { line: 'QUESTÕES', sigla: 'Questões e Simulados', grad: 'linear-gradient(135deg,#1E2A5C,#3F5BD0)', titulo: 'Questões e Simulados', sub: 'Banco e provas', href: R.questoes },
+  { line: 'LEGPROC', sigla: 'LegProc', grad: 'linear-gradient(135deg,var(--pn-3a1e5c,#3A1E5C),var(--pn-7a3db0,#7A3DB0))', titulo: 'LegProc', sub: 'Legislação anotada', href: R.legproc },
+  { line: 'JURISCLUB', sigla: 'JurisClub', grad: 'linear-gradient(135deg,var(--pn-241a52,#241A52),var(--pn-5b3fd0,#5B3FD0))', titulo: 'JurisClub', sub: 'Julgados do mês', href: R.jurisclub },
+  { line: 'QUESTÕES', sigla: 'Questões e Simulados', grad: 'linear-gradient(135deg,var(--pn-1e2a5c,#1E2A5C),var(--pn-3f5bd0,#3F5BD0))', titulo: 'Questões e Simulados', sub: 'Banco e provas', href: R.questoes },
 ]
 
 export default async function CursosPage() {

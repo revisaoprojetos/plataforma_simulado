@@ -15,8 +15,8 @@ import { useCm } from '@/lib/brand/cor-marca'
 
 type JurisDesafio = { id: string; nome: string; imagemTicket?: string | null; diasFeitos?: number; totalDias?: number }
 
-const OK = '#1FA868'
-const GOLD = '#F1C232'
+const OK = 'var(--pn-1fa868,#1FA868)'
+const GOLD = 'var(--pn-f1c232,#F1C232)'
 
 type PlatformJurisProps = {
   brand: Brand

@@ -27,7 +27,7 @@ function TicketDesafio({ d }: { d: DesafioJurisTicket }) {
           // eslint-disable-next-line @next/next/no-img-element
           <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105" />
         ) : (
-          <div className="absolute inset-0 flex items-center justify-center text-white/90" style={{ background: 'linear-gradient(155deg, var(--primary) 0%, #0f172a 135%)' }}>
+          <div className="absolute inset-0 flex items-center justify-center text-white/90" style={{ background: 'linear-gradient(155deg, var(--primary) 0%, var(--pn-0f172a,#0f172a) 135%)' }}>
             <Gavel className="h-8 w-8" />
           </div>
         )}

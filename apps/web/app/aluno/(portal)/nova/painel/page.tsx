@@ -43,9 +43,9 @@ export default async function PainelPage() {
         {temCronograma ? (
           <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start', gap: 28 }}>
             <Col gap={14} style={{ maxWidth: 560 }}>
-              <Eyebrow color="#C9B8FF">Painel de estudos</Eyebrow>
+              <Eyebrow color="var(--pn-c9b8ff,#C9B8FF)">Painel de estudos</Eyebrow>
               <h1 style={{ margin: 0, fontSize: 34, fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.1, color: '#fff' }}>Olá, {primeiroNome}. Seu estudo de hoje</h1>
-              <P size={14}><span style={{ color: '#D8CEF5' }}>{d.totalHoje > 0 ? `${d.totalHoje} ${d.totalHoje === 1 ? 'meta' : 'metas'} para hoje no seu Cronograma Adaptativo.` : 'Nenhuma meta para hoje — abra seu cronograma para ajustar o plano.'}</span></P>
+              <P size={14}><span style={{ color: 'var(--pn-d8cef5,#D8CEF5)' }}>{d.totalHoje > 0 ? `${d.totalHoje} ${d.totalHoje === 1 ? 'meta' : 'metas'} para hoje no seu Cronograma Adaptativo.` : 'Nenhuma meta para hoje — abra seu cronograma para ajustar o plano.'}</span></P>
               <Row gap={10} style={{ marginTop: 2 }}>
                 <Btn kind="gold" icon="play" href={CRONOGRAMA}>Continuar estudando</Btn>
                 <Btn kind="ghostdark" icon="chart" href={R.desempenho}>Meu desempenho</Btn>
@@ -61,9 +61,9 @@ export default async function PainelPage() {
         ) : (
           <Row style={{ justifyContent: 'space-between', alignItems: 'center', gap: 28 }}>
             <Col gap={14} style={{ maxWidth: 640 }}>
-              <Eyebrow color="#C9B8FF">Painel de estudos</Eyebrow>
+              <Eyebrow color="var(--pn-c9b8ff,#C9B8FF)">Painel de estudos</Eyebrow>
               <h1 style={{ margin: 0, fontSize: 32, fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.12, color: '#fff' }}>Olá, {primeiroNome}. Vamos montar seu estudo?</h1>
-              <P size={14}><span style={{ color: '#D8CEF5' }}>Você ainda não tem um cronograma. Crie o seu — o Cronograma Adaptativo organiza seu estudo semana a semana e as metas de cada dia passam a aparecer aqui no painel.</span></P>
+              <P size={14}><span style={{ color: 'var(--pn-d8cef5,#D8CEF5)' }}>Você ainda não tem um cronograma. Crie o seu — o Cronograma Adaptativo organiza seu estudo semana a semana e as metas de cada dia passam a aparecer aqui no painel.</span></P>
               <Row gap={10} style={{ marginTop: 2 }}>
                 <Btn kind="gold" icon="plus" href={CRONOGRAMA}>Criar cronograma</Btn>
                 <Btn kind="ghostdark" icon="chart" href={R.desempenho}>Meu desempenho</Btn>
@@ -147,7 +147,7 @@ function HeroStat({ value, label, gold }: { value: string; label: string; gold?:
   return (
     <div style={{ borderRadius: 14, padding: '14px 16px', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.12)' }}>
       <div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-0.03em', color: gold ? 'var(--gold)' : '#fff' }}>{value}</div>
-      <div style={{ fontSize: 12, color: '#CDBFF2', lineHeight: 1.35 }}>{label}</div>
+      <div style={{ fontSize: 12, color: 'var(--pn-cdbff2,#CDBFF2)', lineHeight: 1.35 }}>{label}</div>
     </div>
   )
 }

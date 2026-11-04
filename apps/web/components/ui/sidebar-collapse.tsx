@@ -47,7 +47,7 @@ export function SidebarEdgeToggle({
         aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}
         style={{ left, top: '29px' }}
         className={cn(
-          'group/sbcol fixed z-50 flex h-[30px] w-[30px] -translate-x-1/2 items-center justify-center rounded-full border-0 text-white shadow-[0_6px_14px_-4px_rgba(20,8,60,.6)] transition-[left,transform,box-shadow] duration-[380ms] ease-[cubic-bezier(.22,1,.36,1)] bg-[#3A27A0] dark:bg-[#2A1D66] hover:scale-110 hover:shadow-[0_6px_14px_-4px_rgba(20,8,60,.6),0_0_0_4px_rgba(91,63,208,.22)] motion-reduce:transition-none',
+          'group/sbcol fixed z-50 flex h-[30px] w-[30px] -translate-x-1/2 items-center justify-center rounded-full border-0 text-white shadow-[0_6px_14px_-4px_color-mix(in srgb,var(--pn-14083c,#14083C) 60%,transparent)] transition-[left,transform,box-shadow] duration-[380ms] ease-[cubic-bezier(.22,1,.36,1)] bg-[color:var(--pn-3a27a0,#3A27A0)] dark:bg-[color:var(--pn-2a1d66,#2A1D66)] hover:scale-110 hover:shadow-[0_6px_14px_-4px_color-mix(in srgb,var(--pn-14083c,#14083C) 60%,transparent),0_0_0_4px_color-mix(in srgb,var(--pn-5b3fd0,#5B3FD0) 22%,transparent)] motion-reduce:transition-none',
           hideOnMobile && 'max-md:hidden',
         )}
       >

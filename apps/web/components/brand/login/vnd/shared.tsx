@@ -20,19 +20,19 @@ export function HeaderMarca({ cls }: { cls?: string }) {
       <div
         style={{
           width: 42, height: 42, borderRadius: 13,
-          background: cm('linear-gradient(160deg,#0F4A2E,#072A1B)'),
-          border: `1px solid ${cm('rgba(120,230,170,.3)')}`,
-          boxShadow: `inset 0 1px 0 rgba(255,255,255,.12), 0 8px 20px -8px ${cm('rgba(34,197,110,.5)')}`,
+          background: cm('linear-gradient(160deg,var(--pn-0f4a2e,#0F4A2E),var(--pn-072a1b,#072A1B))'),
+          border: `1px solid ${cm('color-mix(in srgb,var(--pn-78e6aa,#78E6AA) 30%,transparent)')}`,
+          boxShadow: `inset 0 1px 0 rgba(255,255,255,.12), 0 8px 20px -8px ${cm('color-mix(in srgb,var(--pn-22c56e,#22C56E) 50%,transparent)')}`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }}
       >
         <svg viewBox="0 0 32 32" width={22} height={22} aria-hidden="true">
-          <path d={VPATH} fill={cm('#3FD58A')} />
+          <path d={VPATH} fill={cm('var(--pn-3fd58a,#3FD58A)')} />
         </svg>
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
         <span style={{ fontWeight: 800, fontSize: 15, color: '#FFFFFF' }}>{mac ? 'Mentoria Além do Corte' : 'Você na Defensoria'}</span>
-        <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.18em', color: cm('#86CFA6') }}>{mac ? 'SIMULA MAC' : 'SIMULA VND'}</span>
+        <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.18em', color: cm('var(--pn-86cfa6,#86CFA6)') }}>{mac ? 'SIMULA MAC' : 'SIMULA VND'}</span>
       </div>
     </div>
   )
@@ -48,7 +48,7 @@ export function AjudaBtn({ cls }: { cls?: string }) {
       aria-label="Ajuda"
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 8, height: 38, padding: '0 14px',
-        borderRadius: 999, border: '1px solid rgba(255,255,255,.14)', color: '#D4EADD',
+        borderRadius: 999, border: '1px solid rgba(255,255,255,.14)', color: 'var(--pn-d4eadd,#D4EADD)',
         fontSize: 13, fontWeight: 600, textDecoration: 'none',
       }}
     >
@@ -79,7 +79,7 @@ export function SimulaLockup({
         className={`${P}-simline`}
         style={{
           display: 'block', width: 120, height: 2, borderRadius: 2,
-          background: 'linear-gradient(90deg,#D8B45A,rgba(216,180,90,0))',
+          background: 'linear-gradient(90deg,var(--pn-d8b45a,#D8B45A),color-mix(in srgb,var(--pn-d8b45a,#D8B45A) 0%,transparent))',
         }}
       />
     )
@@ -89,8 +89,8 @@ export function SimulaLockup({
     ? { alignItems: 'center' as const }
     : { alignItems: 'flex-start' as const }
   const lineBg = align === 'center'
-    ? 'linear-gradient(90deg,rgba(216,180,90,0),#D8B45A 50%,rgba(216,180,90,0))'
-    : 'linear-gradient(90deg,#D8B45A,rgba(216,180,90,0))'
+    ? 'linear-gradient(90deg,color-mix(in srgb,var(--pn-d8b45a,#D8B45A) 0%,transparent),var(--pn-d8b45a,#D8B45A) 50%,color-mix(in srgb,var(--pn-d8b45a,#D8B45A) 0%,transparent))'
+    : 'linear-gradient(90deg,var(--pn-d8b45a,#D8B45A),color-mix(in srgb,var(--pn-d8b45a,#D8B45A) 0%,transparent))'
   return (
     <div aria-label="SIMULA" style={{ display: 'inline-flex', flexDirection: 'column', gap: 8, ...items }}>
       <div style={{ fontWeight: 800, fontSize: size, letterSpacing: '.34em', paddingLeft: align === 'center' ? '.34em' : 0, color: '#FFFFFF', lineHeight: 1 }}>
@@ -127,15 +127,15 @@ export function LockupVND({ P, scale = 1, gradId }: { P: string; scale?: number;
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible' }}>
           <defs>
             <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0.1" stopColor={cm('#5BE39E')} />
-              <stop offset="0.9" stopColor={cm('#22A866')} />
+              <stop offset="0.1" stopColor={cm('var(--pn-5be39e,#5BE39E)')} />
+              <stop offset="0.9" stopColor={cm('var(--pn-22a866,#22A866)')} />
             </linearGradient>
           </defs>
           <path fill={`url(#${gradId})`} d={VPATH} />
         </svg>
         <svg className={`${P}-vdraw`} viewBox="0.6 5.4 31 21.3" aria-hidden="true"
           style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', overflow: 'visible' }}>
-          <path pathLength={1000} fill="none" stroke={cm('#B9F5D4')} strokeWidth={0.2486} strokeLinejoin="round" d={VPATH} />
+          <path pathLength={1000} fill="none" stroke={cm('var(--pn-b9f5d4,#B9F5D4)')} strokeWidth={0.2486} strokeLinejoin="round" d={VPATH} />
         </svg>
       </div>
       <div className={`${P}-ndw`} style={{ display: 'flex', flexDirection: 'column', gap: 12 * scale, marginTop: 24 * scale }}>
@@ -152,8 +152,8 @@ export function LockupVND({ P, scale = 1, gradId }: { P: string; scale?: number;
             </>
           )}
         </svg>
-        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.12, fontWeight: 800, fontSize: subSize, letterSpacing: '.06em', color: '#E9EFEC', paddingLeft: 2 }}>
-          <span style={{ fontWeight: 600, color: '#CFDCD5' }}>{mac ? 'MENTORIA' : 'VOCÊ NA'}</span>
+        <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.12, fontWeight: 800, fontSize: subSize, letterSpacing: '.06em', color: 'var(--pn-e9efec,#E9EFEC)', paddingLeft: 2 }}>
+          <span style={{ fontWeight: 600, color: 'var(--pn-cfdcd5,#CFDCD5)' }}>{mac ? 'MENTORIA' : 'VOCÊ NA'}</span>
           <span>{mac ? 'ALÉM DO CORTE' : 'DEFENSORIA'}</span>
         </div>
       </div>
@@ -177,7 +177,7 @@ export function Uline({ P }: { P: string }) {
   return (
     <svg className={`${P}-uline`} viewBox="0 0 200 20" preserveAspectRatio="none" aria-hidden="true"
       style={{ position: 'absolute', left: 0, bottom: -10, width: '100%', height: 14 }}>
-      <path pathLength={1} d="M3 14C50 4 140 2 197 10" fill="none" stroke="#D8B45A" strokeWidth={4} strokeLinecap="round" />
+      <path pathLength={1} d="M3 14C50 4 140 2 197 10" fill="none" stroke="var(--pn-d8b45a,#D8B45A)" strokeWidth={4} strokeLinecap="round" />
     </svg>
   )
 }

@@ -20,18 +20,18 @@ import type { HomeSimuladoCard, HomePasta } from '../types'
 import { CSS } from './home'
 
 // Amarelo fixo da marca (spec §1.1) — usado só nos overrides de token (--accentInk/--peachBg).
-const AMARELO = '#F1C232'
+const AMARELO = 'var(--pn-f1c232,#F1C232)'
 
 // Gradientes de capa (determinístico por índice) p/ cards/pastas (cópia de home.tsx).
 const COVER_BG = [
-  'linear-gradient(135deg,#241047,#5B2A9E)',
-  'linear-gradient(135deg,#2A1E4A,#4A31B8)',
-  'linear-gradient(135deg,#1C1540,#3E2A93)',
-  'linear-gradient(135deg,#0D2A8F,#2156E8)',
-  'linear-gradient(135deg,#1F3D12,#5B9A22)',
-  'linear-gradient(135deg,#0B6E6E,#1EAAA6)',
-  'linear-gradient(135deg,#A84A14,#E58B3A)',
-  'linear-gradient(135deg,#0C4C7A,#2290BE)',
+  'linear-gradient(135deg,var(--pn-241047,#241047),var(--pn-5b2a9e,#5B2A9E))',
+  'linear-gradient(135deg,var(--pn-2a1e4a,#2A1E4A),var(--pn-4a31b8,#4A31B8))',
+  'linear-gradient(135deg,var(--pn-1c1540,#1C1540),var(--pn-3e2a93,#3E2A93))',
+  'linear-gradient(135deg,var(--pn-0d2a8f,#0D2A8F),var(--pn-2156e8,#2156E8))',
+  'linear-gradient(135deg,var(--pn-1f3d12,#1F3D12),var(--pn-5b9a22,#5B9A22))',
+  'linear-gradient(135deg,var(--pn-0b6e6e,#0B6E6E),var(--pn-1eaaa6,#1EAAA6))',
+  'linear-gradient(135deg,var(--pn-a84a14,#A84A14),var(--pn-e58b3a,#E58B3A))',
+  'linear-gradient(135deg,var(--pn-0c4c7a,#0C4C7A),var(--pn-2290be,#2290BE))',
 ]
 
 const SVG_R = 'M6 5.5H32C43.5 5.5 49 13 49 23C49 31 45 37 39.5 40.5L62 61H6Z M9.2 9.2H19.2V57.6H9.2Z'
@@ -211,20 +211,20 @@ export function SecaoSimulados({ recentes, pastas }: { recentes: HomeSimuladoCar
     const dark = theme === 'escuro'
     const baseTok = internaTokensStyle('revisao', theme) as Record<string, string>
     const over: Record<string, string> = {
-      '--bg': dark ? '#0E0A24' : '#F4F2FA',
-      '--surface': dark ? '#1C1440' : '#FFFFFF',
-      '--surface2': dark ? '#171030' : '#F6F4FC',
-      '--ink': dark ? '#FFFFFF' : '#1D1933',
-      '--muted': dark ? '#BDBBCB' : '#6E6886',
-      '--muted2': dark ? '#73717F' : '#B3ADC7',
-      '--line': dark ? 'rgba(255,255,255,.1)' : '#EAE6F4',
-      '--line2': dark ? 'rgba(255,255,255,.18)' : '#D9D2F0',
-      '--track': dark ? 'rgba(255,255,255,.12)' : '#ECE8F6',
-      '--brand': dark ? '#B3A1FF' : '#5B3FD0',
-      '--brandLine': dark ? 'rgba(179,161,255,.45)' : 'rgba(91,63,208,.3)',
-      '--chip': dark ? 'rgba(143,117,255,.2)' : '#EFEBFD',
-      '--accentInk': dark ? AMARELO : '#9A7400',
-      '--peachBg': dark ? 'rgba(241,194,50,.12)' : '#FDF5D8',
+      '--bg': dark ? 'var(--pn-0e0a24,#0E0A24)' : 'var(--pn-f4f2fa,#F4F2FA)',
+      '--surface': dark ? 'var(--pn-1c1440,#1C1440)' : '#FFFFFF',
+      '--surface2': dark ? 'var(--pn-171030,#171030)' : 'var(--pn-f6f4fc,#F6F4FC)',
+      '--ink': dark ? '#FFFFFF' : 'var(--pn-1d1933,#1D1933)',
+      '--muted': dark ? 'var(--pn-bdbbcb,#BDBBCB)' : 'var(--pn-6e6886,#6E6886)',
+      '--muted2': dark ? 'var(--pn-73717f,#73717F)' : 'var(--pn-b3adc7,#B3ADC7)',
+      '--line': dark ? 'rgba(255,255,255,.1)' : 'var(--pn-eae6f4,#EAE6F4)',
+      '--line2': dark ? 'rgba(255,255,255,.18)' : 'var(--pn-d9d2f0,#D9D2F0)',
+      '--track': dark ? 'rgba(255,255,255,.12)' : 'var(--pn-ece8f6,#ECE8F6)',
+      '--brand': dark ? 'var(--pn-b3a1ff,#B3A1FF)' : 'var(--pn-5b3fd0,#5B3FD0)',
+      '--brandLine': dark ? 'color-mix(in srgb,var(--pn-b3a1ff,#B3A1FF) 45%,transparent)' : 'color-mix(in srgb,var(--pn-5b3fd0,#5B3FD0) 30%,transparent)',
+      '--chip': dark ? 'color-mix(in srgb,var(--pn-8f75ff,#8F75FF) 20%,transparent)' : 'var(--pn-efebfd,#EFEBFD)',
+      '--accentInk': dark ? AMARELO : 'var(--pn-9a7400,#9A7400)',
+      '--peachBg': dark ? 'color-mix(in srgb,var(--pn-f1c232,#F1C232) 12%,transparent)' : 'var(--pn-fdf5d8,#FDF5D8)',
       '--r': '20px',
     }
     return { ...baseTok, ...over } as React.CSSProperties

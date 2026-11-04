@@ -86,7 +86,7 @@ export function EntradaRevisao({ theme, data, es: esInit = 'aberto', real }: Sim
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <span style={{ color: 'var(--brand)', flexShrink: 0 }}><MarcaR size={52} /></span>
           <div style={{ minWidth: 0 }}>
-            <span className={`${PFX}-badge`} style={{ display: 'inline-flex', height: 26, padding: '0 12px', borderRadius: 99, background: REV_GOLD, color: '#2A1A55', fontSize: 12, fontWeight: 800, alignItems: 'center' }}>{badgeLabel}</span>
+            <span className={`${PFX}-badge`} style={{ display: 'inline-flex', height: 26, padding: '0 12px', borderRadius: 99, background: REV_GOLD, color: 'var(--pn-2a1a55,#2A1A55)', fontSize: 12, fontWeight: 800, alignItems: 'center' }}>{badgeLabel}</span>
             <h1 className={`${PFX}-h1`} style={{ margin: '8px 0 0', fontSize: 42, fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1.05, color: 'var(--brand)', textTransform: 'uppercase' }}>{info.titulo}</h1>
           </div>
         </div>
@@ -121,7 +121,7 @@ export function EntradaRevisao({ theme, data, es: esInit = 'aberto', real }: Sim
               <>
                 <EmailField real={real} />
                 {real?.erro && (
-                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '12px 14px', borderRadius: 12, background: 'rgba(229,72,77,.08)', border: '1px solid rgba(229,72,77,.3)', color: ERR, fontSize: 12.5, lineHeight: 1.5 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '12px 14px', borderRadius: 12, background: 'color-mix(in srgb,var(--pn-e5484d,#E5484D) 8%,transparent)', border: '1px solid color-mix(in srgb,var(--pn-e5484d,#E5484D) 30%,transparent)', color: ERR, fontSize: 12.5, lineHeight: 1.5 }}>
                     <Ic size={16} style={{ marginTop: 1, flexShrink: 0 }}><circle cx="12" cy="12" r="9" /><path d={P.info} /></Ic>
                     <span>{real.erro.titulo ? <b>{real.erro.titulo} </b> : null}{real.erro.mensagem}</span>
                   </div>
@@ -176,7 +176,7 @@ export function EntradaRevisao({ theme, data, es: esInit = 'aberto', real }: Sim
               <>
                 <label style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
                   <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>E-mail cadastrado na plataforma <b style={{ color: ERR }}>*</b></span>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 10, height: 50, padding: '0 14px', borderRadius: 12, border: `1.5px solid ${ERR}`, background: 'var(--surface)', color: 'var(--muted)', boxShadow: `0 0 0 4px rgba(229,72,77,.12)` }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: 10, height: 50, padding: '0 14px', borderRadius: 12, border: `1.5px solid ${ERR}`, background: 'var(--surface)', color: 'var(--muted)', boxShadow: `0 0 0 4px color-mix(in srgb,var(--pn-e5484d,#E5484D) 12%,transparent)` }}>
                     <Ic size={17}><rect x="2" y="4" width="20" height="16" rx="2" /><path d={P.mail} /></Ic>
                     {real
                       ? <input type="email" value={real.email} onChange={(e) => real.setEmail(e.target.value)} placeholder="seu@email.com" autoComplete="email" style={{ flex: 1, minWidth: 0, border: 0, outline: 0, background: 'transparent', font: 'inherit', fontSize: 14.5, color: 'var(--ink)' }} />
@@ -184,7 +184,7 @@ export function EntradaRevisao({ theme, data, es: esInit = 'aberto', real }: Sim
                     <span style={{ color: ERR }}><Ic size={17}><circle cx="12" cy="12" r="9" /><path d={P.info} /></Ic></span>
                   </span>
                 </label>
-                <div style={{ padding: 14, borderRadius: 12, background: 'rgba(229,72,77,.08)', border: '1px solid rgba(229,72,77,.3)' }}>
+                <div style={{ padding: 14, borderRadius: 12, background: 'color-mix(in srgb,var(--pn-e5484d,#E5484D) 8%,transparent)', border: '1px solid color-mix(in srgb,var(--pn-e5484d,#E5484D) 30%,transparent)' }}>
                   <b style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: ERR }}>
                     <Ic size={16}><circle cx="12" cy="12" r="9" /><path d={P.info} /></Ic>{real?.erro?.titulo ?? 'Não encontramos este e-mail'}
                   </b>
@@ -238,7 +238,7 @@ export function EntradaRevisao({ theme, data, es: esInit = 'aberto', real }: Sim
                 <button type="button" className={`${PFX}-sbtn`} style={{ ...ghostBtnStyle(48), width: '100%' }}>
                   <Ic d={P.book} size={17} />Gabarito comentado
                 </button>
-                <button type="button" className={`${PFX}-sbtn`} style={{ width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9, height: 48, border: 0, borderRadius: 14, background: REV_GOLD, color: '#2A1A55', font: 'inherit', fontSize: 14.5, fontWeight: 800, cursor: 'pointer' }}>
+                <button type="button" className={`${PFX}-sbtn`} style={{ width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 9, height: 48, border: 0, borderRadius: 14, background: REV_GOLD, color: 'var(--pn-2a1a55,#2A1A55)', font: 'inherit', fontSize: 14.5, fontWeight: 800, cursor: 'pointer' }}>
                   <Ic d={P.refresh} size={17}><path d={P.refresh} /><path d="M21 3v5h-5" /></Ic>Fazer como treino
                 </button>
               </>
@@ -445,9 +445,9 @@ function ProgressRing({ valor, total }: { valor: number; total: number }) {
 export function Modal({ onClose, width, prefix, icon, titulo, sub, children }: { onClose: () => void; width: number; prefix: string; icon: string; titulo: string; sub: string; children: React.ReactNode }) {
   return (
     <>
-      <div onClick={onClose} className={`${prefix}-mbg`} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(10,10,25,.55)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }} />
+      <div onClick={onClose} className={`${prefix}-mbg`} style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'color-mix(in srgb,var(--pn-0a0a19,#0A0A19) 55%,transparent)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }} />
       <div role="dialog" className={`${prefix}-mpop ${prefix}-sheet`} style={{ position: 'fixed', left: '50%', top: '50%', width, transform: 'translate(-50%,-50%)', zIndex: 81, maxHeight: 'calc(100% - 24px)', overflowY: 'auto', borderRadius: 22, background: 'var(--surface)', boxShadow: '0 40px 80px -30px rgba(0,0,0,.6)' }}>
-        <span style={{ display: 'block', height: 5, background: `linear-gradient(90deg,#5B3FD0,#8F75FF 60%,${REV_GOLD})` }} />
+        <span style={{ display: 'block', height: 5, background: `linear-gradient(90deg,var(--pn-5b3fd0,#5B3FD0),var(--pn-8f75ff,#8F75FF) 60%,${REV_GOLD})` }} />
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '22px 24px 4px' }}>
           <span style={{ width: 50, height: 50, borderRadius: 16, background: 'color-mix(in srgb,var(--selDot) 14%,transparent)', color: 'var(--selDot)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             {icon === P.refresh ? <Ic size={24}><path d={P.refresh} /><path d="M21 3v5h-5" /></Ic> : <Ic d={icon} size={24} />}

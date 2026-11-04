@@ -12,6 +12,14 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.4.0 — 2026-11-05
+
+- **Paleta nova (designer unificado):** paleta do Revisão (roxo/dourado/status) aplicada em admin e aluno por tokens, com interruptor no Console (Aparência → Paleta nova): desligada / só Workspace (teste por e-mail) / todos. Desligado = cores atuais, sem mudança. Cobre tokens padrão, rampas de status do Tailwind, telas de marca do aluno, iframes (Cronograma, leitor, Estúdio) e CSS da área nova; login e carregamento seguem o Workspace via cookie. Outros tenants derivam a paleta do próprio designer.
+- **Biblioteca — capa e página inicial:** capa por pasta (em lote para os documentos ou individual) e por documento; página inicial por pasta/documento. As páginas anteriores à inicial ficam fora da leitura: não aparecem nem contam no progresso, no sumário e no esforço do Cronograma Adaptativo. ⚠️ migração `20261105010000_biblioteca_capa_pagina_inicial.sql`.
+- **Inclui trabalho em paralelo:** LegProc em texto/legenda (migrações `20261104140000`, `20261104150000`), cadernos do aluno (`20261105000000`) e ajustes do leitor/Biblioteca.
+
+---
+
 ## 4.3.1 — 2026-11-04
 
 - **Correção (Cronograma Adaptativo):** a tela do cronograma do aluno ficava em branco (só o cabeçalho). Colisão de nome no iframe (`var ORDEM` das aulas × `const ORDEM` dos tipos de meta) gerava SyntaxError; a variável das aulas virou `ORDEM_AULAS`.

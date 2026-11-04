@@ -14,7 +14,7 @@ import { useIsMobile } from '../perfil/use-is-mobile'
 import { Ic, PaneTabs, Filtros, SecaoHead, Segs, CoverMeq, notec, fnum, type Pane, type Filtro } from './shared'
 import type { RealizadosData, RlzEmAndamento, RlzConcluido, RlzPersonalizado, RlzCapa } from './data'
 
-const FALLBACK_GRAD = 'linear-gradient(150deg,#121A3A,#2B4A8F)'
+const FALLBACK_GRAD = 'linear-gradient(150deg,var(--pn-121a3a,#121A3A),var(--pn-2b4a8f,#2B4A8F))'
 const gradOf = (c?: RlzCapa) => c?.cor || FALLBACK_GRAD
 
 function mqVars(theme: InternaTheme): CSSProperties {
@@ -23,20 +23,20 @@ function mqVars(theme: InternaTheme): CSSProperties {
   // Tokens de abas/filtros/KPI por tema (spec 03 §1.3). No tema AZUL os títulos fora de card
   // ficam BRANCOS sobre o fundo gradiente azul (--head/--sub) e as abas usam vidro translúcido.
   return {
-    ['--tBg' as string]: dark ? '#121A3A' : azul ? 'rgba(255,255,255,.18)' : '#E4EAF5',
-    ['--tOn' as string]: dark ? '#2F64C8' : '#FFFFFF',
-    ['--tOnInk' as string]: dark ? '#FFFFFF' : '#171E3B',
-    ['--cnt' as string]: dark ? 'rgba(94,155,255,.14)' : '#EAF1FB',
-    ['--cntInk' as string]: dark ? '#7FB2FF' : '#306AB5',
+    ['--tBg' as string]: dark ? 'var(--pn-121a3a,#121A3A)' : azul ? 'rgba(255,255,255,.18)' : 'var(--pn-e4eaf5,#E4EAF5)',
+    ['--tOn' as string]: dark ? 'var(--pn-2f64c8,#2F64C8)' : '#FFFFFF',
+    ['--tOnInk' as string]: dark ? '#FFFFFF' : 'var(--pn-171e3b,#171E3B)',
+    ['--cnt' as string]: dark ? 'color-mix(in srgb,var(--pn-5e9bff,#5E9BFF) 14%,transparent)' : 'var(--pn-eaf1fb,#EAF1FB)',
+    ['--cntInk' as string]: dark ? 'var(--pn-7fb2ff,#7FB2FF)' : 'var(--pn-306ab5,#306AB5)',
     // Filtro ATIVO = cor da MARCA + texto branco (igual a Lei Seca/Banco e demais áreas, que usam
     // var(--brand) no selecionado). Antes era um navy fixo (#171E3B) que destoava e, no claro, ainda
     // ficava navy-sobre-navy = texto invisível.
     ['--fOn' as string]: 'var(--brand)',
     ['--fOnInk' as string]: '#FFFFFF',
     ['--hoverLine' as string]: azul ? '#FFFFFF' : 'var(--brand2)',
-    ['--head' as string]: dark || azul ? '#FFFFFF' : '#171E3B',
-    ['--sub' as string]: dark ? '#8E9BC4' : azul ? '#DCEBFF' : '#66729A',
-    ['--shadow' as string]: dark ? 'none' : azul ? '0 20px 40px -30px rgba(10,30,80,.6)' : '0 1px 2px rgba(16,30,70,.04)',
+    ['--head' as string]: dark || azul ? '#FFFFFF' : 'var(--pn-171e3b,#171E3B)',
+    ['--sub' as string]: dark ? 'var(--pn-8e9bc4,#8E9BC4)' : azul ? 'var(--pn-dcebff,#DCEBFF)' : 'var(--pn-66729a,#66729A)',
+    ['--shadow' as string]: dark ? 'none' : azul ? '0 20px 40px -30px color-mix(in srgb,var(--pn-0a1e50,#0A1E50) 60%,transparent)' : '0 1px 2px color-mix(in srgb,var(--pn-101e46,#101E46) 4%,transparent)',
   } as CSSProperties
 }
 
@@ -45,13 +45,13 @@ const Card = ({ children, pad = 20 }: { children: React.ReactNode; pad?: number 
 )
 // CTA como LINK
 const CtaLink = ({ href, children, h = 38 }: { href: string; children: React.ReactNode; h?: number }) => (
-  <Link href={href} className="rlzmq-cta" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: h, padding: '0 16px', borderRadius: 10, color: '#FFF', fontSize: 13, fontWeight: 700, background: 'linear-gradient(180deg,#4A8BEA,#2F64C8)', textDecoration: 'none' }}>{children}</Link>
+  <Link href={href} className="rlzmq-cta" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: h, padding: '0 16px', borderRadius: 10, color: '#FFF', fontSize: 13, fontWeight: 700, background: 'linear-gradient(180deg,var(--pn-4a8bea,#4A8BEA),var(--pn-2f64c8,#2F64C8))', textDecoration: 'none' }}>{children}</Link>
 )
 const cap = (t: string) => <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--muted)' }}>{t}</span>
 
 // Ação primária da linha (Correção/Refazer) — CTA compacto h34 com ícone + rótulo (porte do mockup §4).
 const ActCta = ({ href, icon, label }: { href: string; icon: string; label: string }) => (
-  <Link href={href} className="rlzmq-cta" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 34, padding: '0 12px', borderRadius: 9, color: '#FFF', fontSize: 12.5, fontWeight: 700, background: 'linear-gradient(180deg,#4A8BEA,#2F64C8)', textDecoration: 'none' }}><Ic n={icon} s={13} />{label}</Link>
+  <Link href={href} className="rlzmq-cta" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 34, padding: '0 12px', borderRadius: 9, color: '#FFF', fontSize: 12.5, fontWeight: 700, background: 'linear-gradient(180deg,var(--pn-4a8bea,#4A8BEA),var(--pn-2f64c8,#2F64C8))', textDecoration: 'none' }}><Ic n={icon} s={13} />{label}</Link>
 )
 // Ação secundária com rótulo (Editar rascunho) — contorno h34.
 const ActOutline = ({ href, label }: { href: string; label: string }) => (
@@ -63,7 +63,7 @@ const ActIcon = ({ href, icon, label }: { href: string; icon: string; label: str
 )
 // Selo de status com ponto (§4 personalizados): Concluído verde / Rascunho âmbar.
 const StatusDot = ({ rascunho }: { rascunho: boolean }) => (
-  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: rascunho ? '#D9871A' : '#1FA868' }}>
+  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, fontWeight: 600, color: rascunho ? 'var(--pn-d9871a,#D9871A)' : 'var(--pn-1fa868,#1FA868)' }}>
     <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'currentColor' }} />{rascunho ? 'Rascunho' : 'Concluído'}
   </span>
 )
@@ -95,7 +95,7 @@ function CardAndamento({ it }: { it: RlzEmAndamento }) {
         </div>
         <Segs n={10} lit={Math.round(it.pct / 10)} h={6} on="var(--brand2)" gap={2} rad={2} />
       </div>
-      <div style={{ marginTop: 14 }}><span className="rlzmq-cta" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 38, padding: '0 16px', borderRadius: 10, color: '#FFF', fontSize: 13, fontWeight: 700, background: 'linear-gradient(180deg,#4A8BEA,#2F64C8)' }}>Continuar<Ic n="arrow" s={14} /></span></div>
+      <div style={{ marginTop: 14 }}><span className="rlzmq-cta" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: 38, padding: '0 16px', borderRadius: 10, color: '#FFF', fontSize: 13, fontWeight: 700, background: 'linear-gradient(180deg,var(--pn-4a8bea,#4A8BEA),var(--pn-2f64c8,#2F64C8))' }}>Continuar<Ic n="arrow" s={14} /></span></div>
     </Link>
   )
 }
@@ -219,7 +219,7 @@ function TabelaPersonalizados({ mobile, itens }: { mobile: boolean; itens: RlzPe
         return (
           <div key={it.id} className="rlzmq-row" style={{ display: 'grid', gridTemplateColumns: cols, gap: 16, alignItems: 'center', padding: '12px 10px', borderTop: '1px solid var(--line)' }}>
             <Link href={it.href} style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0, color: 'inherit', textDecoration: 'none' }}>
-              <span style={{ width: 44, height: 44, borderRadius: 10, flexShrink: 0, background: 'linear-gradient(150deg,#1F2A55,#306AB5)', color: '#8BEAEA', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Ic n="edit" s={16} /></span>
+              <span style={{ width: 44, height: 44, borderRadius: 10, flexShrink: 0, background: 'linear-gradient(150deg,var(--pn-1f2a55,#1F2A55),var(--pn-306ab5,#306AB5))', color: 'var(--pn-8beaea,#8BEAEA)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Ic n="edit" s={16} /></span>
               <div style={{ minWidth: 0 }}>
                 <b style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{it.nome}</b>
                 <div style={{ marginTop: 2 }}><StatusDot rascunho={rascunho} /></div>
@@ -294,13 +294,13 @@ export function RealizadosMeq({ theme: themeProp, data }: { theme: InternaTheme;
           <div className="rlzmq-pv" key={`main-${f}`} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
             {showAnd && nAnd > 0 ? (
               <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <SecaoHead icon="clock" title="Em andamento" count={nAnd} color="#F2A93B" bg="#F2A93B22" />
+                <SecaoHead icon="clock" title="Em andamento" count={nAnd} color="var(--pn-f2a93b,#F2A93B)" bg="#F2A93B22" />
                 <div style={{ display: 'grid', gridTemplateColumns: andCols, gap: 12 }}>{data.emAndamento.map((it) => <CardAndamento key={it.id} it={it} />)}</div>
               </section>
             ) : null}
             {showDone && nDone > 0 ? (
               <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <SecaoHead icon="check" title="Concluídos" count={nDone} color="#2EC77A" bg="#2EC77A22" />
+                <SecaoHead icon="check" title="Concluídos" count={nDone} color="var(--pn-2ec77a,#2EC77A)" bg="#2EC77A22" />
                 <TabelaConcluidos mobile={mobile} itens={data.concluidos} />
               </section>
             ) : null}

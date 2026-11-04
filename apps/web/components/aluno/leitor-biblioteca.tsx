@@ -14,8 +14,12 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import type { GrifoPdf } from '@/lib/conteudo/leitor'
 import { APP_VERSION } from '@/lib/version'
+import { prepararHtmlLegproc } from '@/lib/leitura/legproc-caixas'
+import { SalvarComentarioCaderno, normalizarComentarioCaderno, type ComentarioParaCaderno } from '@/components/aluno/cadernos/salvar-comentario-caderno'
 
-const PROTOTIPO = `/leitura/leitor-jus.html?v=${APP_VERSION}`
+// LEITOR_REV: sobe a cada mudança no leitor-jus.html que precisa chegar SEM esperar a próxima versão do app (o ?v= só muda no deploy).
+const LEITOR_REV = 'lp11'
+const PROTOTIPO = `/leitura/leitor-jus.html?v=${APP_VERSION}&r=${LEITOR_REV}`
 const LARGURA_ALVO = 820 // largura de referência p/ a escala do PDF (host e iframe usam a MESMA)
 // Worker do pdf.js = BUILD LEGACY em public/pdf (o mesmo que o iframe usa). O build "moderno" do pdf.js 6
 // exige Promise.withResolvers / Map.getOrInsertComputed / Math.sumPrecise… → no Safari do iPhone/iPad e
@@ -38,14 +42,21 @@ const hashGrifo = (g: GrifoEngine) => `${g.sec}|${JSON.stringify(g.rects)}|${g.t
 // perder o grifo numa falha parcial de rede).
 const geoGrifo = (g: GrifoEngine) => `${g.sec}|${JSON.stringify(g.rects)}|${g.t}`
 
+/** Grifo do modo TEXTO (LegProc): âncora = trecho (uid) + offsets no trecho. */
+interface GrifoTexto { id: string; pid: string; s: number; e: number; t: string; c: string; note: string; sec: string; text: string }
+const hashTexto = (g: GrifoTexto) => `${g.pid}|${g.s}|${g.e}|${g.t}|${g.c}|${g.note}`
+const geoTexto = (g: GrifoTexto) => `${g.pid}|${g.s}|${g.e}`
+
 export type ParteCrono = { id: string; i: number; f: number; r: string }
 
 export function LeitorBiblioteca({
-  documentoId, versaoId, titulo, pdfUrl, grifos: iniciais, voltarHref = '/aluno/biblioteca', paginaInicial = 1,
+  documentoId, versaoId, titulo, pdfUrl, texto, grifos: iniciais, voltarHref = '/aluno/biblioteca', paginaInicial = 1, paginaMinima = 1,
   partesCrono = [], metaCrono = '', tempoBase = 0, tempoDeterminadoSeg = 0, mostrarLegenda = false,
 }: {
   documentoId: string; versaoId: string; titulo: string; pdfUrl: string | null
-  grifos: GrifoPdf[]; voltarHref?: string; paginaInicial?: number
+  /** Documento LegProc: lê em TEXTO (HTML rico) com STF/STJ recolhíveis, em vez do PDF fiel. */
+  texto?: { html: string; grifos: GrifoTexto[]; ocultarLegendaTabela?: boolean }
+  grifos: GrifoPdf[]; voltarHref?: string; paginaInicial?: number; paginaMinima?: number
   partesCrono?: ParteCrono[]; metaCrono?: string; tempoBase?: number
   /** Tempo DETERMINADO da meta (planejado, segundos) → contagem regressiva no leitor; 0 = sem. */ tempoDeterminadoSeg?: number
   /** Religar a legenda de categorias (LegProc) neste doc. Padrão false = oculta na Biblioteca. */ mostrarLegenda?: boolean
@@ -56,6 +67,7 @@ export function LeitorBiblioteca({
   // (API acao:'tempo' → somarTempoMeta). sessionStart reseta a cada gravação p/ não contar em dobro.
   const sessaoIni = useRef<number>(metaCrono ? Date.now() : 0)
   const [sessSeg, setSessSeg] = useState(0)
+  const [paraCaderno, setParaCaderno] = useState<ComentarioParaCaderno | null>(null)
   // Badge "Tempo nesta meta": o iframe (Pomodoro) decide se aparece — 'meta' mostra, 'pomodoro' oculta.
   const [usarBadgeMeta, setUsarBadgeMeta] = useState(true)
   useEffect(() => {
@@ -92,13 +104,18 @@ export function LeitorBiblioteca({
   const iframeRef = useRef<HTMLIFrameElement>(null)
   const [pdfMeta, setPdfMeta] = useState<{ url: string; scale: number; pages: { w: number; h: number }[] } | null>(null)
   // Falha ao abrir o PDF → tela de erro (antes: falha silenciosa = leitor vazio, sem saber o porquê).
-  const [erroPdf, setErroPdf] = useState<string | null>(pdfUrl ? null : 'sem-pdf')
+  const [erroPdf, setErroPdf] = useState<string | null>(pdfUrl || texto ? null : 'sem-pdf')
   const [tentativa, setTentativa] = useState(0)
   const enviados = useRef(new Map<string, { serverId: string; hash: string; geo: string }>())
   const busy = useRef(false); const pendente = useRef<GrifoEngine[] | null>(null); const avisou = useRef(false)
-  const dados = useRef({ documentoId, versaoId, titulo, voltarHref, paginaInicial, partesCrono, metaCrono, mostrarLegenda, tempoDeterminadoSeg, tempoBase })
-  dados.current = { documentoId, versaoId, titulo, voltarHref, paginaInicial, partesCrono, metaCrono, mostrarLegenda, tempoDeterminadoSeg, tempoBase }
+  const dados = useRef({ documentoId, versaoId, titulo, voltarHref, paginaInicial, paginaMinima, partesCrono, metaCrono, mostrarLegenda, tempoDeterminadoSeg, tempoBase })
+  dados.current = { documentoId, versaoId, titulo, voltarHref, paginaInicial, paginaMinima, partesCrono, metaCrono, mostrarLegenda, tempoDeterminadoSeg, tempoBase }
 
+  const enviadosT = useRef(new Map<string, { serverId: string; hash: string; geo: string }>())
+  useEffect(() => {
+    enviadosT.current.clear()
+    for (const g of texto?.grifos ?? []) enviadosT.current.set(g.id, { serverId: g.id, hash: hashTexto(g), geo: geoTexto(g) })
+  }, [texto])
   useEffect(() => {
     enviados.current.clear()
     for (const g of iniciais) { const e = aEngine(g); enviados.current.set(e.id, { serverId: g.id, hash: hashGrifo(e), geo: geoGrifo(e) }) }
@@ -106,7 +123,7 @@ export function LeitorBiblioteca({
 
   // carrega os metadados do PDF (nº de páginas + tamanho de cada uma na MESMA escala que o iframe usará)
   useEffect(() => {
-    if (!pdfUrl) { setErroPdf('sem-pdf'); return }
+    if (!pdfUrl) { if (!texto) setErroPdf('sem-pdf'); return }
     let vivo = true
     setErroPdf(null)
     const limite = setTimeout(() => { if (vivo) setErroPdf('O material demorou demais para carregar. Verifique sua conexão.') }, TIMEOUT_PDF_MS)
@@ -148,28 +165,42 @@ export function LeitorBiblioteca({
       }
     })()
     return () => { vivo = false; clearTimeout(limite) }
-  }, [pdfUrl, tentativa])
+  }, [pdfUrl, tentativa, texto])
+
+  // HTML do modo texto processado UMA vez (caixas STF/STJ) — o iframe boota 1x e o "dia" pode ser reenviado.
+  const htmlProc = useRef<string | null>(null)
+  const htmlTexto = useCallback(() => {
+    if (!texto) return ''
+    if (htmlProc.current === null) htmlProc.current = prepararHtmlLegproc(texto.html)
+    return htmlProc.current
+  }, [texto])
 
   const enviarDia = useCallback(() => {
     const win = iframeRef.current?.contentWindow
     if (!win) return
-    if (pdfUrl && !pdfMeta) return // o leitor boota UMA vez → só manda o "dia" quando o PDF já está pronto
+    if (!texto && pdfUrl && !pdfMeta) return // o leitor boota UMA vez → só manda o "dia" quando o PDF já está pronto
     const d = dados.current
     win.postMessage({
       type: 'leitor-jus-day', html: '',
       cfg: {
         modo: 'biblioteca', docKey: d.documentoId, titulo: d.titulo,
-        pdf: pdfMeta ? { url: pdfMeta.url, scale: pdfMeta.scale, pages: pdfMeta.pages } : null,
-        grifos: iniciais.map(aEngine),
+        pdf: texto ? null : pdfMeta ? { url: pdfMeta.url, scale: pdfMeta.scale, pages: pdfMeta.pages } : null,
+        // LEGPROC (texto): HTML rico já com os entendimentos STF/STJ recolhíveis (lib da Lei Seca) + grifos por âncora de trecho.
+        ...(texto ? { html: htmlTexto() } : {}),
+        grifos: texto ? texto.grifos : iniciais.map(aEngine),
         caminho: ['Biblioteca', d.titulo], voltarHref: d.voltarHref, questoesHref: d.voltarHref,
         paginaInicial: d.paginaInicial || 1,
+        paginaMinima: d.paginaMinima || 1, // 1ª página que entra na leitura (as anteriores não são montadas nem contadas)
         partes: d.partesCrono || [], metaAtual: d.metaCrono || '',
-        grifoRevisaoOff: true,
+        grifosRevisaoLigados: !!texto,
+        ocultarLegendaDoc: !!texto && texto.ocultarLegendaTabela !== false, // tabela de legenda do início do doc (repete a barra de legendas)
+        inclusosRevisao: !!texto, // botão "Inclusos Revisão" (tabelas / entendimentos / Já cobrado) — só no LegProc em texto
+        grifoRevisaoOff: !texto, // LegProc (texto): mostra o botão "Grifos do Revisão" (marcações do professor no próprio texto)
         legendasOff: d.mostrarLegenda ? [] : LEGENDAS_TODAS,
         tempoDeterminadoSeg: d.tempoDeterminadoSeg || 0, tempoBaseSeg: d.tempoBase || 0,
       },
     }, '*')
-  }, [pdfMeta, iniciais, pdfUrl])
+  }, [pdfMeta, iniciais, pdfUrl, texto, htmlTexto])
 
   const reconciliar = useCallback(async (grifos: GrifoEngine[]) => {
     if (busy.current) { pendente.current = grifos; return }
@@ -220,12 +251,67 @@ export function LeitorBiblioteca({
     }
   }, [])
 
+  // Grifos do modo TEXTO → /api/conteudo/anotacao (âncora = trecho_uid + offsets). Grifo em bloco sem uid
+  // (pid efêmero 'x…') não tem âncora estável no servidor: fica só na sessão.
+  const busyT = useRef(false); const pendenteT = useRef<GrifoTexto[] | null>(null)
+  const reconciliarTexto = useCallback(async (grifos: GrifoTexto[]) => {
+    if (busyT.current) { pendenteT.current = grifos; return }
+    busyT.current = true
+    const d = dados.current; const map = enviadosT.current
+    let falhou = false
+    const json = { 'content-type': 'application/json' }
+    const del = async (serverId: string) => {
+      try { const r = await fetch('/api/conteudo/anotacao?id=' + encodeURIComponent(serverId), { method: 'DELETE', credentials: 'same-origin' }); if (!r.ok) falhou = true } catch { falhou = true }
+    }
+    try {
+      const validos = grifos.filter((g) => g.pid && !g.pid.startsWith('x') && g.e > g.s && g.text)
+      const atual = new Map(validos.map((g) => [g.id, g]))
+      for (const [cid, info] of [...map.entries()]) {
+        if (!atual.has(cid)) { await del(info.serverId); map.delete(cid) }
+      }
+      for (const g of validos) {
+        const info = map.get(g.id); const h = hashTexto(g); const geo = geoTexto(g)
+        if (info && info.hash === h) continue
+        const conteudo = { tool: g.t, cor: g.c, nota: g.note }
+        const tipo = g.t === 'st' ? 'riscado' : 'destaque'
+        if (info && info.geo === geo) {
+          try {
+            const r = await fetch('/api/conteudo/anotacao', { method: 'PATCH', headers: json, credentials: 'same-origin', body: JSON.stringify({ id: info.serverId, tipo, conteudo }) })
+            if (r.ok) map.set(g.id, { serverId: info.serverId, hash: h, geo }); else falhou = true
+          } catch { falhou = true }
+          continue
+        }
+        if (info) { await del(info.serverId); map.delete(g.id) }
+        try {
+          const r = await fetch('/api/conteudo/anotacao', {
+            method: 'POST', headers: json, credentials: 'same-origin',
+            body: JSON.stringify({ documento_id: d.documentoId, versao_id: d.versaoId, trecho_uid: g.pid, tipo, inicio_offset: g.s, fim_offset: g.e, texto_ancora: g.text, conteudo }),
+          })
+          const j = await r.json().catch(() => ({}))
+          if (r.ok && j?.id) map.set(g.id, { serverId: j.id, hash: h, geo }); else falhou = true
+        } catch { falhou = true }
+      }
+    } finally {
+      busyT.current = false
+      if (falhou && !avisou.current) { avisou.current = true; toast.error('Não consegui salvar seus grifos agora. Verifique a conexão — eles podem não aparecer ao reabrir.') }
+      if (!falhou) avisou.current = false
+      if (pendenteT.current) { const p = pendenteT.current; pendenteT.current = null; void reconciliarTexto(p) }
+    }
+  }, [])
+
   useEffect(() => {
     const onMsg = (e: MessageEvent) => {
       if (e.source !== iframeRef.current?.contentWindow) return
       const m = e.data; if (!m || typeof m !== 'object') return
       if (m.type === 'leitor-jus-ready') { enviarDia(); return }
-      if (m.type === 'leitor-jus-grifos') { void reconciliar(Array.isArray(m.grifos) ? m.grifos : []); return }
+      // Comentário de um trecho → salvar num caderno do aluno (modal escolhe/cria o caderno).
+      if (m.type === 'leitor-jus-salvar-caderno') {
+        const d = dados.current
+        const p = normalizarComentarioCaderno(m.grifo, { documento_id: d.documentoId, documento_versao: null, titulo_documento: d.titulo || null })
+        if (p) setParaCaderno(p)
+        return
+      }
+      if (m.type === 'leitor-jus-grifos') { const gs = Array.isArray(m.grifos) ? m.grifos : []; if (texto) void reconciliarTexto(gs); else void reconciliar(gs); return }
       // O aluno escolhe no Pomodoro qual cronômetro usar: 'meta' (badge aqui) ou 'pomodoro' (timer no iframe).
       // Mostra UM por vez. O tempo da meta continua sendo gravado sempre (independe da escolha).
       if (m.type === 'leitor-jus-cronometro') { setUsarBadgeMeta(m.mode === 'meta'); return }
@@ -266,7 +352,7 @@ export function LeitorBiblioteca({
     }
     window.addEventListener('message', onMsg)
     return () => window.removeEventListener('message', onMsg)
-  }, [enviarDia, reconciliar, irPara])
+  }, [enviarDia, reconciliar, reconciliarTexto, irPara, texto])
 
   // quando os metadados do PDF ficam prontos (após o 'ready'), reenvia o dia já com o PDF
   useEffect(() => { if (pdfMeta) enviarDia() }, [pdfMeta, enviarDia])
@@ -286,6 +372,7 @@ export function LeitorBiblioteca({
     <div className="fixed inset-0 z-40 bg-[var(--bg,#fbfbfc)]">
       <iframe ref={iframeRef} src={PROTOTIPO} title={titulo || 'Leitura'} onLoad={enviarDia}
         style={{ display: 'block', width: '100%', height: '100%', border: 0, background: 'var(--bg, #fbfbfc)' }} />
+      <SalvarComentarioCaderno dados={paraCaderno} onClose={() => setParaCaderno(null)} />
       {erroPdf && (
         <div role="alert" style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'grid', placeItems: 'center', padding: 20, background: 'color-mix(in srgb, var(--bg, #fbfbfc) 88%, transparent)', backdropFilter: 'blur(6px)' }}>
           <div style={{ width: 'min(420px, 100%)', borderRadius: 20, padding: '26px 22px 20px', background: 'var(--card, #fff)', color: 'var(--foreground, #1f1f1f)', boxShadow: '0 24px 60px -18px rgba(0,0,0,.35)', border: '1px solid color-mix(in srgb, currentColor 10%, transparent)', textAlign: 'center' }}>

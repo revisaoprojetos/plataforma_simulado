@@ -12,15 +12,15 @@ import type { ReactNode } from 'react'
 import { MEQ_CIRC_PATHS } from '../../brand-marks'
 
 // ── Acentos fixos de marca (spec §0) ─────────────────────────────────────────
-export const MEQ_BRAND_GRAD = 'linear-gradient(180deg,#4A8BEA,#2F64C8)'
-export const MEQ_BRAND_SHADOW = '0 10px 22px -14px rgba(62,127,224,.9)'
-export const MEQ_CYAN = '#5ECEF0'
-export const MEQ_NAVY_GRAD = 'linear-gradient(125deg,#171E3B,#25356F 60%,#306AB5)'
-export const CERTO_GRAD = 'linear-gradient(180deg,#25B874,#1A9A5E)'
-export const ERRADO_GRAD = 'linear-gradient(180deg,#EE5A5F,#D63F44)'
-export const OK_GREEN = '#1FA868'
-export const ERR_RED = '#E5484D'
-export const AMBER = '#F2A93B'
+export const MEQ_BRAND_GRAD = 'linear-gradient(180deg,var(--pn-4a8bea,#4A8BEA),var(--pn-2f64c8,#2F64C8))'
+export const MEQ_BRAND_SHADOW = '0 10px 22px -14px color-mix(in srgb,var(--pn-3e7fe0,#3E7FE0) 90%,transparent)'
+export const MEQ_CYAN = 'var(--pn-5ecef0,#5ECEF0)'
+export const MEQ_NAVY_GRAD = 'linear-gradient(125deg,var(--pn-171e3b,#171E3B),var(--pn-25356f,#25356F) 60%,var(--pn-306ab5,#306AB5))'
+export const CERTO_GRAD = 'linear-gradient(180deg,var(--pn-25b874,#25B874),var(--pn-1a9a5e,#1A9A5E))'
+export const ERRADO_GRAD = 'linear-gradient(180deg,var(--pn-ee5a5f,#EE5A5F),var(--pn-d63f44,#D63F44))'
+export const OK_GREEN = 'var(--pn-1fa868,#1FA868)'
+export const ERR_RED = 'var(--pn-e5484d,#E5484D)'
+export const AMBER = 'var(--pn-f2a93b,#F2A93B)'
 
 /** Link do Google Fonts para Sora (não carregada globalmente). */
 export function SoraLink() {
@@ -79,11 +79,11 @@ export function BgfxMeq({ p }: { p: string }) {
     <div aria-hidden style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none', zIndex: 0 }}>
       <span
         className={`${p}-orb`}
-        style={{ position: 'absolute', left: -80, top: -60, width: 380, height: 380, borderRadius: '50%', background: 'rgba(62,127,224,.25)', filter: 'blur(90px)', animationDelay: '0s' }}
+        style={{ position: 'absolute', left: -80, top: -60, width: 380, height: 380, borderRadius: '50%', background: 'color-mix(in srgb,var(--pn-3e7fe0,#3E7FE0) 25%,transparent)', filter: 'blur(90px)', animationDelay: '0s' }}
       />
       <span
         className={`${p}-orb`}
-        style={{ position: 'absolute', left: '72%', top: '45%', width: 420, height: 420, borderRadius: '50%', background: 'rgba(94,206,240,.18)', filter: 'blur(90px)', animationDelay: '4s' }}
+        style={{ position: 'absolute', left: '72%', top: '45%', width: 420, height: 420, borderRadius: '50%', background: 'color-mix(in srgb,var(--pn-5ecef0,#5ECEF0) 18%,transparent)', filter: 'blur(90px)', animationDelay: '4s' }}
       />
       <Circuit p={p} style={{ left: -200, top: -60, width: 900, height: 570 }} ol="#5ECEF0" olOp={0.3} pl="#5ECEF0" />
       <Circuit p={p} style={{ left: '55%', top: '55%', width: 900, height: 570 }} ol="#3E7FE0" olOp={0.25} pl="#8BEAEA" />
@@ -123,7 +123,7 @@ export function ModalShell({
       <div
         className={`${p}-mbg`}
         onClick={closeOnBackdrop ? onClose : undefined}
-        style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'rgba(10,10,25,.55)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
+        style={{ position: 'fixed', inset: 0, zIndex: 80, background: 'color-mix(in srgb,var(--pn-0a0a19,#0A0A19) 55%,transparent)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
       />
       {/* Desktop: centrado. Mobile: bottom-sheet (via classe utilitária no wrapper). */}
       <div className={`${p}-modalwrap`} style={{ position: 'fixed', inset: 0, zIndex: 81, pointerEvents: 'none' }}>
@@ -171,7 +171,7 @@ export function ModalHead({
 }) {
   return (
     <>
-      <span style={{ display: 'block', height: 5, background: 'linear-gradient(90deg,#171E3B,#3E7FE0 60%,#5ECEF0)' }} />
+      <span style={{ display: 'block', height: 5, background: 'linear-gradient(90deg,var(--pn-171e3b,#171E3B),var(--pn-3e7fe0,#3E7FE0) 60%,var(--pn-5ecef0,#5ECEF0))' }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '22px 24px 4px' }}>
         <span style={{ width: 50, height: 50, borderRadius: 12, background: iconBg, color: iconColor, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
           {icon}
@@ -281,7 +281,7 @@ export function MarcaMeq({ size = 30 }: { size?: number }) {
   return (
     <svg viewBox="0 0 483 306" width={size * 1.27} height={size} aria-hidden style={{ flexShrink: 0 }}>
       <defs>
-        <linearGradient id="meqlg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#4A8BEA" /><stop offset="1" stopColor="#2F64C8" /></linearGradient>
+        <linearGradient id="meqlg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="var(--pn-4a8bea,#4A8BEA)" /><stop offset="1" stopColor="var(--pn-2f64c8,#2F64C8)" /></linearGradient>
       </defs>
       <path fill="url(#meqlg)" d="M241 10 462 296H20z M241 96 362 258H120z" fillRule="evenodd" />
     </svg>

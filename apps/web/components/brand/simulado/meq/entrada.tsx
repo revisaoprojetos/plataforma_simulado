@@ -66,7 +66,7 @@ export function Entrada({ theme, data, es = 'aberto', mo = 'cad', real }: { them
     { label: 'Duração', value: dur },
     { label: 'Itens', value: `${info.n} · ${info.tipo === 'CE' ? 'Certo/Errado' : 'Múltipla escolha'}` },
   ]
-  const badgeStyle = { display: 'inline-flex', alignItems: 'center', height: 24, padding: '0 10px', borderRadius: 6, background: MEQ_CYAN, color: '#0B1124', fontSize: 11.5, fontWeight: 700 } as const
+  const badgeStyle = { display: 'inline-flex', alignItems: 'center', height: 24, padding: '0 10px', borderRadius: 6, background: MEQ_CYAN, color: 'var(--pn-0b1124,#0B1124)', fontSize: 11.5, fontWeight: 700 } as const
 
   return (
     <div className={`${P}-app`} style={{ ...simTokensStyle('meq', theme), position: 'relative', minHeight: '100vh', overflowX: 'hidden' }}>
@@ -122,12 +122,12 @@ export function Entrada({ theme, data, es = 'aberto', mo = 'cad', real }: { them
                 o status sobe pra linha da logo). Sem capa: mostra kicker + badge aqui dentro. */}
             {!info.capaUrl ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.2em', color: '#8BEAEA' }}>{info.curto}</span>
+                <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.2em', color: 'var(--pn-8beaea,#8BEAEA)' }}>{info.curto}</span>
                 <span style={badgeStyle}>{badge[es]}</span>
               </div>
             ) : null}
             <h1 style={{ margin: '10px 0 2px', fontSize: 30, fontWeight: 700, letterSpacing: '-0.04em', ...(info.capaUrl ? { textShadow: '0 1px 12px rgba(0,0,0,.6)' } : {}) }}>{info.titulo}</h1>
-            <span style={{ fontSize: 13, color: '#A9C6F0', ...(info.capaUrl ? { textShadow: '0 1px 8px rgba(0,0,0,.55)' } : {}) }}>{info.subtitulo}</span>
+            <span style={{ fontSize: 13, color: 'var(--pn-a9c6f0,#A9C6F0)', ...(info.capaUrl ? { textShadow: '0 1px 8px rgba(0,0,0,.55)' } : {}) }}>{info.subtitulo}</span>
 
             {/* Sem capa: tabela de células aqui dentro. Com capa: viram um card limpo abaixo do banner. */}
             {!info.capaUrl ? (
@@ -160,7 +160,7 @@ export function Entrada({ theme, data, es = 'aberto', mo = 'cad', real }: { them
         ) : null}
 
         {/* Seção 01 · Identificação */}
-        <div style={{ marginTop: 20, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: '24px 28px', boxShadow: '0 1px 2px rgba(16,30,70,.04)' }}>
+        <div style={{ marginTop: 20, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: '24px 28px', boxShadow: '0 1px 2px color-mix(in srgb,var(--pn-101e46,#101E46) 4%,transparent)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
             <b style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.14em', color: 'var(--brand2)' }}>01</b>
             <b style={{ fontSize: 15, color: 'var(--ink)' }}>Identificação do candidato</b>
@@ -189,7 +189,7 @@ export function Entrada({ theme, data, es = 'aberto', mo = 'cad', real }: { them
 
           {/* Erro de bloqueio/identidade do backend (mensagem personalizada do tenant). */}
           {real?.erro && es !== 'semcad' && (
-            <div style={{ display: 'flex', gap: 10, marginTop: 14, padding: '12px 14px', borderRadius: 12, background: 'rgba(229,72,77,.08)', color: 'var(--ink)', fontSize: 12.5, lineHeight: 1.45 }}>
+            <div style={{ display: 'flex', gap: 10, marginTop: 14, padding: '12px 14px', borderRadius: 12, background: 'color-mix(in srgb,var(--pn-e5484d,#E5484D) 8%,transparent)', color: 'var(--ink)', fontSize: 12.5, lineHeight: 1.45 }}>
               <span style={{ color: ERR_RED, flexShrink: 0 }}><IconInfo size={16} /></span>
               <span>{real.erro.titulo ? <b>{real.erro.titulo} </b> : null}{real.erro.mensagem}</span>
             </div>
@@ -220,7 +220,7 @@ export function Entrada({ theme, data, es = 'aberto', mo = 'cad', real }: { them
 function Cell({ label, value, cls }: { label: string; value: string; cls?: string }) {
   return (
     <div className={cn(`${P}-tbl-cell`, cls)} style={{ padding: '10px 12px', borderRight: '1px solid rgba(255,255,255,.14)', borderBottom: '1px solid rgba(255,255,255,.14)' }}>
-      <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: '#8DA6D6' }}>{label}</span>
+      <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--pn-8da6d6,#8DA6D6)' }}>{label}</span>
       <div style={{ marginTop: 3, fontSize: 13.5, fontWeight: 700, color: '#fff' }}>{value}</div>
     </div>
   )
@@ -241,7 +241,7 @@ function CampoEmail({ erro, valor, real }: { erro?: boolean; valor?: string; rea
             ? <a href={linkUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--brand)', fontWeight: 700, textDecoration: 'underline', textUnderlineOffset: 2 }}>{rotulo}</a>
             : <b style={{ color: 'var(--brand)' }}>{rotulo}</b>} <b style={{ color: ERR_RED }}>*</b>
         </span>
-        <span style={{ display: 'flex', alignItems: 'center', gap: 10, height: 50, padding: '0 14px', borderRadius: 8, background: 'var(--surface)', color: erro ? ERR_RED : 'var(--muted)', border: `1.5px solid ${erro ? ERR_RED : 'var(--line2)'}`, boxShadow: erro ? `0 0 0 4px rgba(229,72,77,.12)` : undefined }}>
+        <span style={{ display: 'flex', alignItems: 'center', gap: 10, height: 50, padding: '0 14px', borderRadius: 8, background: 'var(--surface)', color: erro ? ERR_RED : 'var(--muted)', border: `1.5px solid ${erro ? ERR_RED : 'var(--line2)'}`, boxShadow: erro ? `0 0 0 4px color-mix(in srgb,var(--pn-e5484d,#E5484D) 12%,transparent)` : undefined }}>
           <IconMail />
           {real ? (
             <input type="email" placeholder="seu@email.com" value={real.email} onChange={(e) => real.setEmail(e.target.value)} autoComplete="email" style={inputEl} />
@@ -336,7 +336,7 @@ function CorpoSemcad({ real, onTentar }: { real?: SimEntradaReal; onTentar: () =
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <CampoEmail erro valor="outro@tenant.com" real={real} />
-      <div style={{ display: 'flex', gap: 10, padding: '12px 14px', borderRadius: 12, background: 'rgba(229,72,77,.08)', color: 'var(--ink)', fontSize: 12.5, lineHeight: 1.45 }}>
+      <div style={{ display: 'flex', gap: 10, padding: '12px 14px', borderRadius: 12, background: 'color-mix(in srgb,var(--pn-e5484d,#E5484D) 8%,transparent)', color: 'var(--ink)', fontSize: 12.5, lineHeight: 1.45 }}>
         <span style={{ color: ERR_RED, flexShrink: 0 }}><IconInfo size={16} /></span>
         <span>{msg ? msg : <><b>Não encontramos este e-mail</b> na plataforma do simulado. Verifique a digitação ou crie sua conta.</>}</span>
       </div>
@@ -397,7 +397,7 @@ function CorpoEncerrado({ fim, permiteFolha, real, onResultado }: { fim: string;
           <IconBulb size={16} /> Gabarito comentado
         </button>
       </div>
-      <button type="button" className={`${P}-sbtn`} onClick={() => real?.onIdentificar('iniciar')} disabled={!!busy} style={{ ...btnGhost(48), background: MEQ_CYAN, color: '#0B1124', border: 0, opacity: busy && busy !== 'iniciar' ? 0.55 : 1 }}>
+      <button type="button" className={`${P}-sbtn`} onClick={() => real?.onIdentificar('iniciar')} disabled={!!busy} style={{ ...btnGhost(48), background: MEQ_CYAN, color: 'var(--pn-0b1124,#0B1124)', border: 0, opacity: busy && busy !== 'iniciar' ? 0.55 : 1 }}>
         {busy === 'iniciar' ? <><Spinner /> Verificando…</> : <><IconPlay /> Fazer como treino</>}
       </button>
       {permiteFolha ? (
@@ -427,7 +427,7 @@ function ModalIni({ info, modo, setModo, ag, setAg, onClose }: {
         <RadioCard icon={<IconBook />} titulo="Caderno completo" desc="Enunciados, itens e ferramentas de estudo" sel={modo === 'cad'} onClick={() => setModo('cad')} />
         <RadioCard icon={<IconList />} titulo="Só a folha de respostas" desc="Para quem fez no papel e quer apenas marcar" sel={modo === 'folha'} onClick={() => setModo('folha')} />
 
-        <div style={{ display: 'flex', gap: 10, padding: 12, borderRadius: 12, background: 'rgba(242,169,59,.12)', color: 'var(--ink)', fontSize: 12.5, lineHeight: 1.45 }}>
+        <div style={{ display: 'flex', gap: 10, padding: 12, borderRadius: 12, background: 'color-mix(in srgb,var(--pn-f2a93b,#F2A93B) 12%,transparent)', color: 'var(--ink)', fontSize: 12.5, lineHeight: 1.45 }}>
           <span style={{ color: AMBER, flexShrink: 0 }}><IconInfo size={16} /></span>
           <span><b>Atenção:</b> no padrão Cebraspe uma errada anula uma certa. Na dúvida, deixe em branco.</span>
         </div>
@@ -508,7 +508,7 @@ function ModalRet({ nome, n, t, onClose }: { nome: string; n: number; t: SimMock
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 10, padding: 12, borderRadius: 12, background: 'rgba(229,72,77,.08)', color: 'var(--ink)', fontSize: 12.5, lineHeight: 1.45 }}>
+        <div style={{ display: 'flex', gap: 10, padding: 12, borderRadius: 12, background: 'color-mix(in srgb,var(--pn-e5484d,#E5484D) 8%,transparent)', color: 'var(--ink)', fontSize: 12.5, lineHeight: 1.45 }}>
           <span style={{ color: ERR_RED, flexShrink: 0 }}><IconClock size={16} /></span>
           <span>O cronômetro não pausa. Se o tempo acabar, o simulado é enviado automaticamente com o que estiver marcado.</span>
         </div>

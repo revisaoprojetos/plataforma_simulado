@@ -830,7 +830,7 @@ export function ProvaClient({ token, hudInicial, darkInicial = false, internoAti
                 <span>Em branco ({totalQuestoes - totalRespondidas})</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <Flag className="h-3.5 w-3.5" style={{ color: 'var(--prova-revisar, #f59e0b)' }} />
+                <Flag className="h-3.5 w-3.5" style={{ color: 'var(--prova-revisar, var(--pn-f59e0b,#f59e0b))' }} />
                 <span>Para revisar ({marcadas.size})</span>
               </div>
             </div>
@@ -855,12 +855,12 @@ export function ProvaClient({ token, hudInicial, darkInicial = false, internoAti
                     )}
                     style={{
                       ...(jaRespondida ? { background: 'var(--prova-marcada, var(--primary))' } : {}),
-                      ...(marcada ? { boxShadow: '0 0 0 2px var(--prova-revisar, #f59e0b)' } : {}),
+                      ...(marcada ? { boxShadow: '0 0 0 2px var(--prova-revisar, var(--pn-f59e0b,#f59e0b))' } : {}),
                     }}
                   >
                     {i + 1}
                     {marcada && (
-                      <Flag className="absolute -right-1 -top-1 h-3.5 w-3.5 rounded-full p-0.5 text-white" style={{ background: 'var(--prova-revisar, #f59e0b)' }} />
+                      <Flag className="absolute -right-1 -top-1 h-3.5 w-3.5 rounded-full p-0.5 text-white" style={{ background: 'var(--prova-revisar, var(--pn-f59e0b,#f59e0b))' }} />
                     )}
                   </button>
                 )

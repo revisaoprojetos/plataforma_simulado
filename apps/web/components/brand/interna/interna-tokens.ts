@@ -6,6 +6,7 @@
 
 import { simVars } from '@/components/brand/simulado/sim-tokens'
 import type { Brand, SimTheme } from '@/components/brand/simulado/types'
+import { pn } from '@/lib/brand/paleta-nova-tokens'
 
 export type { Brand }
 export type InternaTheme = SimTheme // 'claro' | 'escuro' | 'azul' (azul só MEQ)
@@ -31,12 +32,12 @@ export function internaVars(brand: Brand, theme: InternaTheme): Record<string, s
     sub: base.muted, // texto secundário
     head: base.ink, // títulos
     gCell: base.surface2, // célula de grade (cronograma)
-    gDone: dark ? 'rgba(34,181,115,.18)' : '#E7F7EE', // célula concluída
-    cyan: brand === 'meq' ? base.brand2 : base.selDot,
+    gDone: pn('s-gDone', dark ? 'rgba(34,181,115,.18)' : '#E7F7EE'), // célula concluída
+    cyan: pn('s-cyan', brand === 'meq' ? base.brand2 : base.selDot),
     // Semânticos usados nas telas (nota/aprovação): verde/âmbar/vermelho fixos.
-    ok: '#1FA868',
-    warn: '#F2A93B',
-    err: '#E5484D',
+    ok: pn('s-ok', '#1FA868'),
+    warn: pn('s-warn', '#F2A93B'),
+    err: pn('s-err', '#E5484D'),
   }
 }
 

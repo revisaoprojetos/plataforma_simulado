@@ -39,13 +39,13 @@ function Aurora() {
       {/* véu central que respira (wrapper centraliza; o filho anima só escala/opacidade) */}
       <div className="absolute left-1/2 top-[40%] -translate-x-1/2 -translate-y-1/2">
         <div className="lg-anim h-[48rem] w-[48rem] rounded-full blur-[150px]"
-          style={{ background: 'radial-gradient(circle, rgba(99,102,241,.12), rgba(148,163,184,.07) 45%, transparent 70%)', animation: 'breathe 15s ease-in-out infinite' }} />
+          style={{ background: 'radial-gradient(circle, color-mix(in srgb,var(--pn-6366f1,#6366F1) 12%,transparent), color-mix(in srgb,var(--pn-94a3b8,#94A3B8) 7%,transparent) 45%, transparent 70%)', animation: 'breathe 15s ease-in-out infinite' }} />
       </div>
       {/* dois véus suaves derivando + pulsando devagar */}
       <div className="lg-anim absolute left-[12%] top-[16%] h-[26rem] w-[26rem] rounded-full blur-[130px]"
-        style={{ background: 'radial-gradient(circle, rgba(129,140,248,.16), transparent 70%)', animation: 'driftA 18s ease-in-out infinite' }} />
+        style={{ background: 'radial-gradient(circle, color-mix(in srgb,var(--pn-818cf8,#818CF8) 16%,transparent), transparent 70%)', animation: 'driftA 18s ease-in-out infinite' }} />
       <div className="lg-anim absolute bottom-[12%] right-[10%] h-[24rem] w-[24rem] rounded-full blur-[130px]"
-        style={{ background: 'radial-gradient(circle, rgba(125,211,252,.16), transparent 70%)', animation: 'driftB 22s ease-in-out infinite' }} />
+        style={{ background: 'radial-gradient(circle, color-mix(in srgb,var(--pn-7dd3fc,#7DD3FC) 16%,transparent), transparent 70%)', animation: 'driftB 22s ease-in-out infinite' }} />
     </div>
   )
 }
@@ -60,7 +60,7 @@ function Shell({ children, wide }: { children: React.ReactNode; wide?: boolean }
       <div className={cn('relative w-full', wide ? 'max-w-md' : 'max-w-sm')} style={{ animation: 'loginUp .5s cubic-bezier(.2,.7,.2,1)' }}>
         <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-8 shadow-[0_24px_60px_-24px_rgba(15,23,42,.18)]">
           {/* linha de acento sutil no topo */}
-          <div aria-hidden className="absolute inset-x-6 top-0 h-px" style={{ background: 'linear-gradient(90deg, transparent, rgba(15,23,42,.18), transparent)' }} />
+          <div aria-hidden className="absolute inset-x-6 top-0 h-px" style={{ background: 'linear-gradient(90deg, transparent, color-mix(in srgb,var(--pn-0f172a,#0F172A) 18%,transparent), transparent)' }} />
           {children}
         </div>
       </div>

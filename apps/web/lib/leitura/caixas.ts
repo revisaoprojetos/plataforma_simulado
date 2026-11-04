@@ -7,6 +7,12 @@
  */
 import { DEFAULT_BLOCOS, acharBlocoPorTitulo, acharBlocoPorInicio, estiloBloco, type BlocoDef } from './blocos'
 
+/** Texto de um bloco com ESPAÇO entre parágrafos/itens (textContent cola "LEGENDA" + "AMARELO:" → "LEGENDAAMARELO:"). Só p/ PRÉVIAS. */
+function txtEsp(el: Element): string {
+  const bl = Array.from(el.querySelectorAll('p, li'))
+  return ((bl.length ? bl.map((b) => b.textContent || '').join(' ') : el.textContent) || '').replace(/\s+/g, ' ').trim()
+}
+
 function pintar(div: HTMLElement, bloco: BlocoDef) {
   const e = estiloBloco(bloco.cor)
   div.style.setProperty('background', e.background)
@@ -20,7 +26,7 @@ function pintarTitulo(cab: HTMLElement, corTitulo: string) {
 }
 
 /** Caixas em TABELA (cabeçalho de 1 célula com fundo) → card colapsável do bloco que casar no título. */
-export function prepararCaixasTabela(cont: HTMLElement, blocos: BlocoDef[] = DEFAULT_BLOCOS, _onToggle?: () => void): () => void {
+export function prepararCaixasTabela(cont: HTMLElement, blocos: BlocoDef[] = DEFAULT_BLOCOS, _onToggle?: () => void, opts?: { generico?: boolean; exigirFundo?: boolean; corFiel?: boolean }): () => void {
   const generico: BlocoDef = blocos.find((b) => b.id === 'destaque') ?? blocos[blocos.length - 1] ?? { id: 'destaque', rotulo: 'Destaque', palavras: '', cor: '#eef1f4', corTitulo: '#111111', previa: true }
   for (const tab of Array.from(cont.querySelectorAll<HTMLTableElement>('table'))) {
     const rows = Array.from(tab.rows)
@@ -29,14 +35,20 @@ export function prepararCaixasTabela(cont: HTMLElement, blocos: BlocoDef[] = DEF
     const headCell = rows[0].cells[0] as HTMLElement
     const temFundo = /background/i.test(headCell.getAttribute('style') || '') || /background/i.test(rows[0].getAttribute('style') || '')
     const txt = (headCell.textContent || '').replace(/\s+/g, ' ').trim()
-    if (!temFundo) continue
-    const bloco = acharBlocoPorTitulo(txt, blocos) ?? (txt.length <= 80 ? generico : null)
+    // exigirFundo:false (HTML rico da Biblioteca perde o fundo inline): sem fundo só vira caixa se o TÍTULO (curto) casar um bloco.
+    if (!temFundo && !(opts?.exigirFundo === false && txt.length <= 80 && (opts?.generico !== false || acharBlocoPorTitulo(txt, blocos)))) continue // exigirFundo:false + generico: toda faixa de título curta vira caixa (mesmo sem fundo)
+    const bloco = acharBlocoPorTitulo(txt, blocos) ?? (opts?.generico !== false && txt.length <= 80 ? generico : null) // generico:false = só os blocos informados (ex.: LegProc = STF/STJ)
     if (!bloco) continue
 
     const div = document.createElement('div')
     div.setAttribute('data-caixa', bloco.id)
     div.classList.add('caixa-colapsavel')
     pintar(div, bloco)
+    // corFiel (LegProc): a caixa usa a cor de fundo que veio do documento (célula do cabeçalho), em vez da cor padrão do bloco.
+    if (opts?.corFiel) {
+      const bgDoc = /background(?:-color)?\s*:\s*(#[0-9a-fA-F]{3,8}|rgb[^;]+)/i.exec(headCell.getAttribute('style') || '')?.[1]
+      if (bgDoc) { div.style.setProperty('background', bgDoc); div.style.setProperty('border-color', `color-mix(in srgb, ${bgDoc} 62%, #555)`) }
+    }
     const cab = document.createElement('div'); cab.className = 'caixa-cab'
     // Título = 1º BLOCO do cabeçalho. Blocos EXTRAS na MESMA célula (ex.: subtítulo "Crime cometido…"
     // abaixo do título) vão pro CORPO — senão o flex do cabeçalho alinha os dois lado a lado (o bug do
@@ -66,10 +78,10 @@ export function prepararCaixasTabela(cont: HTMLElement, blocos: BlocoDef[] = DEF
     }
     corpo.appendChild(inner); div.appendChild(corpo)
 
-    const previa = (inner.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 160)
+    const previa = txtEsp(inner).slice(0, 160)
     if (previa && bloco.previa) cab.setAttribute("data-previa", previa)
     const tit = (cab.textContent || '').replace(/\s+/g, ' ').trim()
-    if (tit && !/[:：]$/.test(tit)) cab.setAttribute('data-add-colon', '1')
+    if (tit && !/[:：!?.]$/.test(tit)) cab.setAttribute('data-add-colon', '1')
     cab.setAttribute('role', 'button'); cab.setAttribute('tabindex', '0'); cab.setAttribute('aria-expanded', 'false')
     div.removeAttribute('data-aberto')
   }
@@ -95,7 +107,9 @@ export function prepararCaixasParagrafo(cont: HTMLElement, blocos: BlocoDef[] = 
       const full = el.textContent || ''
       const hit = acharBlocoPorInicio(full, blocos)
       if (!hit) continue
-      const bloco = hit.bloco, k = hit.tam // fim do rótulo no texto original
+      // fim do rótulo no texto original; se o rótulo é seguido de ":" ("STF: …"), o ":" fica no TÍTULO (não no corpo) —
+      // só move nós, a ordem do texto (espinha dos grifos) não muda.
+      const bloco = hit.bloco, k = hit.tam + (/^\s*[:：]/.exec(full.slice(hit.tam))?.[0].length ?? 0)
 
       const box = document.createElement('div')
       box.setAttribute('data-caixa', bloco.id)
@@ -124,6 +138,9 @@ export function prepararCaixasParagrafo(cont: HTMLElement, blocos: BlocoDef[] = 
 
       box.appendChild(cab); box.appendChild(corpo)
       el.replaceWith(box)
+      // Leitura em texto da Biblioteca (HTML rico): o `data-uid` é a âncora do grifo → passa do parágrafo
+      // original (descartado) para a caixa, que mantém a mesma ordem de texto (rótulo + corpo).
+      const uidOrig = el.getAttribute('data-uid'); if (uidOrig) box.setAttribute('data-uid', uidOrig)
 
       if (!(inner.textContent || '').trim()) {
         let s = box.nextElementSibling as HTMLElement | null
@@ -134,10 +151,10 @@ export function prepararCaixasParagrafo(cont: HTMLElement, blocos: BlocoDef[] = 
         }
       }
 
-      const previa = (inner.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 160)
+      const previa = txtEsp(inner).slice(0, 160)
       if (previa && bloco.previa) cab.setAttribute("data-previa", previa)
       const tit = (cab.textContent || '').replace(/\s+/g, ' ').trim()
-      if (tit && !/[:：]$/.test(tit)) cab.setAttribute('data-add-colon', '1')
+      if (tit && !/[:：!?.]$/.test(tit)) cab.setAttribute('data-add-colon', '1')
       cab.setAttribute('role', 'button'); cab.setAttribute('tabindex', '0'); cab.setAttribute('aria-expanded', 'false')
       box.removeAttribute('data-aberto')
     } catch { /* não deixa 1 elemento quebrar os demais */ }
@@ -183,7 +200,7 @@ export function prepararTabelasColapsaveis(cont: HTMLElement): () => void {
       // Prévia (cabeçalhos da 1ª linha) — aparece quando recolhida (via CSS ::before, sem nó de texto).
       const headRow = tab.rows[0]
       if (headRow) {
-        const heads = Array.from(headRow.cells).map((c) => (c.textContent || '').replace(/\s+/g, ' ').trim()).filter(Boolean)
+        const heads = Array.from(headRow.cells).map((c) => txtEsp(c)).filter(Boolean)
         const previa = heads.join(' · ').slice(0, 160)
         if (previa) cab.setAttribute('data-previa', previa)
       }

@@ -30,8 +30,8 @@ export function ctrlR(k: BrandKey, n?: number) {
 }
 export function barGrad(k: BrandKey) {
   return {
-    rev: 'linear-gradient(90deg,#6449E0,#8F75FF 70%,#F1C232)',
-    vnd: 'linear-gradient(90deg,#1E9E5E,#3FD58A)',
+    rev: 'linear-gradient(90deg,var(--pn-6449e0,#6449E0),var(--pn-8f75ff,#8F75FF) 70%,var(--pn-f1c232,#F1C232))',
+    vnd: 'linear-gradient(90deg,var(--pn-1e9e5e,#1E9E5E),var(--pn-3fd58a,#3FD58A))',
     meq: 'var(--brand2)',
   }[k]
 }
@@ -63,7 +63,7 @@ export function Card({ k, children, pad = 20, extra, className, style }: { k: Br
   const base: CSSProperties = {
     background: 'var(--surface)', border: '1px solid var(--line)',
     borderRadius: k === 'meq' ? 14 : CARD_R[k] + 2, padding: p,
-    ...(k === 'meq' ? { boxShadow: '0 1px 2px rgba(16,30,54,.06)' } : null),
+    ...(k === 'meq' ? { boxShadow: '0 1px 2px color-mix(in srgb,var(--pn-101e36,#101E36) 6%,transparent)' } : null),
     ...extra,
   }
   return <div className={className} style={{ ...base, ...style }}>{children}</div>
@@ -140,17 +140,17 @@ export function Bar({ k, pct, color, h = 8 }: { k: BrandKey; pct: number; color?
 /** Tema das cores funcionais do wizard/grade por marca (--stDone/--swOn/--ckOn/…). */
 export function cronoVars(k: BrandKey, dark: boolean): CSSProperties {
   const gv = {
-    rev: dark ? ['rgba(241,194,50,.08)', '#E9E3FF'] : ['#FBF3D5', '#4B3A8C'],
-    vnd: dark ? ['rgba(232,200,119,.08)', '#F1E4C0'] : ['#FBF4E2', '#0B4A2E'],
-    meq: dark ? ['rgba(94,206,240,.06)', '#DCEBFF'] : ['#F2F6FD', '#25356F'],
+    rev: dark ? ['color-mix(in srgb,var(--pn-f1c232,#F1C232) 8%,transparent)', 'var(--pn-e9e3ff,#E9E3FF)'] : ['var(--pn-fbf3d5,#FBF3D5)', 'var(--pn-4b3a8c,#4B3A8C)'],
+    vnd: dark ? ['color-mix(in srgb,var(--pn-e8c877,#E8C877) 8%,transparent)', 'var(--pn-f1e4c0,#F1E4C0)'] : ['var(--pn-fbf4e2,#FBF4E2)', 'var(--pn-0b4a2e,#0B4A2E)'],
+    meq: dark ? ['color-mix(in srgb,var(--pn-5ecef0,#5ECEF0) 6%,transparent)', 'var(--pn-dcebff,#DCEBFF)'] : ['var(--pn-f2f6fd,#F2F6FD)', 'var(--pn-25356f,#25356F)'],
   }[k]
   const brandCfg = {
-    rev: { stDone: '#22B573', stCur: '#5B3FD0', dOn: '#5B3FD0', dOnSh: '0 8px 16px -10px rgba(91,63,208,.9)', swOn: '#5B3FD0', ckOn: '#5B3FD0', calOn: '#5B3FD0' },
-    vnd: { stDone: '#16804F', stCur: '#D8B45A', dOn: '#0F7A44', dOnSh: '0 4px 0 #0B4A2E', swOn: '#0F7A44', ckOn: '#1FA868', calOn: '#0F7A44' },
-    meq: { stDone: '#2EC77A', stCur: 'var(--brand2)', dOn: 'var(--brand2)', dOnSh: 'none', swOn: 'var(--brand2)', ckOn: 'var(--brand2)', calOn: 'var(--brand2)' },
+    rev: { stDone: 'var(--pn-22b573,#22B573)', stCur: 'var(--pn-5b3fd0,#5B3FD0)', dOn: 'var(--pn-5b3fd0,#5B3FD0)', dOnSh: '0 8px 16px -10px color-mix(in srgb,var(--pn-5b3fd0,#5B3FD0) 90%,transparent)', swOn: 'var(--pn-5b3fd0,#5B3FD0)', ckOn: 'var(--pn-5b3fd0,#5B3FD0)', calOn: 'var(--pn-5b3fd0,#5B3FD0)' },
+    vnd: { stDone: 'var(--pn-16804f,#16804F)', stCur: 'var(--pn-d8b45a,#D8B45A)', dOn: 'var(--pn-0f7a44,#0F7A44)', dOnSh: '0 4px 0 var(--pn-0b4a2e,#0B4A2E)', swOn: 'var(--pn-0f7a44,#0F7A44)', ckOn: 'var(--pn-1fa868,#1FA868)', calOn: 'var(--pn-0f7a44,#0F7A44)' },
+    meq: { stDone: 'var(--pn-2ec77a,#2EC77A)', stCur: 'var(--brand2)', dOn: 'var(--brand2)', dOnSh: 'none', swOn: 'var(--brand2)', ckOn: 'var(--brand2)', calOn: 'var(--brand2)' },
   }[k]
   return {
-    '--gCell': gv[0], '--gInk': gv[1], '--gDone': dark ? 'rgba(34,181,115,.16)' : '#E3F6EC',
+    '--gCell': gv[0], '--gInk': gv[1], '--gDone': dark ? 'color-mix(in srgb,var(--pn-22b573,#22B573) 16%,transparent)' : 'var(--pn-e3f6ec,#E3F6EC)',
     '--stDone': brandCfg.stDone, '--stCur': brandCfg.stCur, '--stCurInk': '#FFFFFF', '--stTodo': 'var(--surface2)',
     '--dOn': brandCfg.dOn, '--dOnInk': '#FFFFFF', '--dOnSh': brandCfg.dOnSh,
     '--swOn': brandCfg.swOn, '--ckOn': brandCfg.ckOn, '--calOn': brandCfg.calOn, '--calOnInk': '#FFFFFF',
@@ -523,7 +523,7 @@ export function Step1({ k, mobile, st }: Shared) {
           })}
         </div>
         {st.previa.warn && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, padding: '10px 12px', borderRadius: 10, background: 'rgba(229,72,77,.1)', color: '#E5484D', fontSize: 12.5, fontWeight: 600 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, padding: '10px 12px', borderRadius: 10, background: 'color-mix(in srgb,var(--pn-e5484d,#E5484D) 10%,transparent)', color: 'var(--pn-e5484d,#E5484D)', fontSize: 12.5, fontWeight: 600 }}>
             <Ic n="info" s={15} />Escolha pelo menos 3 dias para um ritmo consistente.
           </div>
         )}
@@ -533,8 +533,8 @@ export function Step1({ k, mobile, st }: Shared) {
   )
 }
 function popularStyle(k: BrandKey): CSSProperties {
-  if (k === 'rev') return { background: '#F1C232', color: '#2A1A55' }
-  if (k === 'vnd') return { background: 'linear-gradient(180deg,#F1D48A,#D8B45A)', color: '#2A1F02' }
+  if (k === 'rev') return { background: 'var(--pn-f1c232,#F1C232)', color: 'var(--pn-2a1a55,#2A1A55)' }
+  if (k === 'vnd') return { background: 'linear-gradient(180deg,var(--pn-f1d48a,#F1D48A),var(--pn-d8b45a,#D8B45A))', color: 'var(--pn-2a1f02,#2A1F02)' }
   return { background: 'var(--brand2)', color: '#FFFFFF' }
 }
 
@@ -707,12 +707,12 @@ export function WizSteps({ k, mobile, st }: Shared) {
 export function WizNav({ k, st }: { k: BrandKey; st: CronogramaState }) {
   const nextLab = ['', 'Escolher o cronograma', 'Definir início', 'Ver prévia', ''][st.gs]
   const nextSty: CSSProperties = k === 'rev'
-    ? { background: '#5B3FD0', color: '#FFFFFF', boxShadow: '0 10px 20px -12px rgba(91,63,208,.9)' }
-    : k === 'vnd' ? { background: 'linear-gradient(180deg,#F1D48A,#D8B45A)', color: '#2A1F02', boxShadow: '0 4px 0 #9A7414' }
+    ? { background: 'var(--pn-5b3fd0,#5B3FD0)', color: '#FFFFFF', boxShadow: '0 10px 20px -12px color-mix(in srgb,var(--pn-5b3fd0,#5B3FD0) 90%,transparent)' }
+    : k === 'vnd' ? { background: 'linear-gradient(180deg,var(--pn-f1d48a,#F1D48A),var(--pn-d8b45a,#D8B45A))', color: 'var(--pn-2a1f02,#2A1F02)', boxShadow: '0 4px 0 var(--pn-9a7414,#9A7414)' }
       : { background: 'var(--brand)', color: '#FFFFFF' }
   const genSty: CSSProperties = k === 'rev'
-    ? { background: '#F1C232', color: '#2A1A55' }
-    : k === 'vnd' ? { background: 'linear-gradient(180deg,#F1D48A,#D8B45A)', color: '#2A1F02', boxShadow: '0 4px 0 #9A7414' }
+    ? { background: 'var(--pn-f1c232,#F1C232)', color: 'var(--pn-2a1a55,#2A1A55)' }
+    : k === 'vnd' ? { background: 'linear-gradient(180deg,var(--pn-f1d48a,#F1D48A),var(--pn-d8b45a,#D8B45A))', color: 'var(--pn-2a1f02,#2A1F02)', boxShadow: '0 4px 0 var(--pn-9a7414,#9A7414)' }
       : { background: 'var(--brand)', color: '#FFFFFF' }
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingTop: 18, borderTop: '1px solid var(--line)' }}>
@@ -763,8 +763,8 @@ export function SummaryRows({ st, darkBg }: { st: CronogramaState; darkBg?: bool
 // ── Dica da Revisão ──────────────────────────────────────────────────────────
 export function RevTip() {
   return (
-    <div style={{ display: 'flex', gap: 12, padding: 16, borderRadius: 18, background: 'var(--peachBg)', border: '1px solid rgba(241,194,50,.45)' }}>
-      <span style={{ width: 40, height: 40, borderRadius: 12, background: '#F1C232', color: '#2A1A55', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Ic n="bulb" s={19} /></span>
+    <div style={{ display: 'flex', gap: 12, padding: 16, borderRadius: 18, background: 'var(--peachBg)', border: '1px solid color-mix(in srgb,var(--pn-f1c232,#F1C232) 45%,transparent)' }}>
+      <span style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--pn-f1c232,#F1C232)', color: 'var(--pn-2a1a55,#2A1A55)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Ic n="bulb" s={19} /></span>
       <div>
         <b style={{ display: 'block', fontSize: 14, color: 'var(--ink)' }}>Dica da Revisão</b>
         <span style={{ fontSize: 12.5, lineHeight: 1.5, color: 'var(--muted)' }}>Marque a meta assim que terminar: o cronograma reorganiza o que ficou para trás sem mexer nas revisões.</span>
@@ -798,7 +798,7 @@ export function Liberados({ k, st }: { k: BrandKey; st: CronogramaState }) {
 // ── Lista "Meus cronogramas" ─────────────────────────────────────────────────
 export function MeusList({ k, mobile, st }: Shared) {
   const iconBox: CSSProperties = k === 'rev' ? { borderRadius: 12, background: 'var(--chip)', color: 'var(--brand)' }
-    : k === 'vnd' ? { borderRadius: 14, background: 'linear-gradient(180deg,#F1D48A,#D8B45A)', color: '#2A1F02', boxShadow: '0 3px 0 #9A7414' }
+    : k === 'vnd' ? { borderRadius: 14, background: 'linear-gradient(180deg,var(--pn-f1d48a,#F1D48A),var(--pn-d8b45a,#D8B45A))', color: 'var(--pn-2a1f02,#2A1F02)', boxShadow: '0 3px 0 var(--pn-9a7414,#9A7414)' }
       : { borderRadius: 9, background: 'color-mix(in srgb,var(--brand2) 12%,transparent)', color: 'var(--brand2)' }
   return (
     <Card k={k} pad={0} extra={{ overflow: 'hidden' }}>
@@ -824,7 +824,7 @@ export function MeusList({ k, mobile, st }: Shared) {
         const pct = m.total ? (m.done / m.total) * 100 : 0
         let chip: [string, string, string]
         if (i === 0 && m.status === 'ativo') chip = ['Em andamento', k === 'meq' ? 'var(--brand2)' : 'var(--brand)', 'var(--chip)']
-        else if (m.status === 'ativo') chip = ['Ativo', '#1FA868', 'rgba(31,168,104,.12)']
+        else if (m.status === 'ativo') chip = ['Ativo', 'var(--pn-1fa868,#1FA868)', 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 12%,transparent)']
         else chip = ['Arquivado', 'var(--muted)', 'var(--surface2)']
         const openMeu = () => { if (st.data) { window.location.href = `/aluno/cronograma?emissao=${m.id}` } else { st.openPlan() } }
         return (
@@ -876,7 +876,7 @@ export function MeusStats({ k, mobile }: { k: BrandKey; mobile: boolean }) {
       {stats[k].map(([icn, v, l], i) => {
         if (k === 'meq') {
           return (
-            <div key={i} style={{ padding: '14px 16px', borderRadius: 12, background: 'var(--surface)', border: '1px solid var(--line)', boxShadow: '0 1px 2px rgba(16,30,54,.06)' }}>
+            <div key={i} style={{ padding: '14px 16px', borderRadius: 12, background: 'var(--surface)', border: '1px solid var(--line)', boxShadow: '0 1px 2px color-mix(in srgb,var(--pn-101e36,#101E36) 6%,transparent)' }}>
               <span style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--muted)' }}>{l}<span style={{ color: 'var(--brand2)' }}><Ic n={icn} s={15} /></span></span>
               <b style={{ display: 'block', marginTop: 4, fontSize: 22, fontWeight: 700, color: 'var(--ink)' }}>{v}</b>
             </div>
@@ -910,7 +910,7 @@ export function PlanHead({ k, mobile, st }: Shared) {
           <h2 style={{ margin: 0, fontSize: mobile ? 24 : 30, fontWeight: 800, letterSpacing: '-0.04em', color: hk }}>{st.planTitle}</h2>
           <span style={{ color: sk, display: 'inline-flex' }}><Ic n="edit" s={16} /></span>
           {st.genNew && (
-            <span style={{ height: 24, padding: '0 10px', borderRadius: 99, background: 'rgba(31,168,104,.14)', color: '#1FA868', fontSize: 11.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 5 }}><Ic n="check" s={12} sw={3} />Cronograma gerado agora</span>
+            <span style={{ height: 24, padding: '0 10px', borderRadius: 99, background: 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 14%,transparent)', color: 'var(--pn-1fa868,#1FA868)', fontSize: 11.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: 5 }}><Ic n="check" s={12} sw={3} />Cronograma gerado agora</span>
           )}
         </div>
         <span style={{ fontSize: 13, color: sk }}>{st.planSub}</span>
@@ -935,7 +935,7 @@ export function PlanKpis({ k, mobile, st }: Shared) {
           </div>
         )
         if (k === 'meq') return (
-          <div key={i} style={{ padding: '14px 16px', borderRadius: 12, background: 'var(--surface)', border: '1px solid var(--line)', boxShadow: '0 1px 2px rgba(16,30,54,.06)' }}>
+          <div key={i} style={{ padding: '14px 16px', borderRadius: 12, background: 'var(--surface)', border: '1px solid var(--line)', boxShadow: '0 1px 2px color-mix(in srgb,var(--pn-101e36,#101E36) 6%,transparent)' }}>
             <span style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, fontWeight: 600, letterSpacing: '.08em', textTransform: 'uppercase', color: 'var(--muted)' }}>{l}<span style={{ color: 'var(--brand2)' }}><Ic n={icn} s={15} /></span></span>
             <b style={{ display: 'block', marginTop: 4, fontSize: 22, fontWeight: 700, letterSpacing: '-0.03em', color: 'var(--ink)' }}>{v}</b>
           </div>
@@ -1001,7 +1001,7 @@ function GridCell({ k, week, row, day, kind, st }: { k: BrandKey; week: number; 
       {c.leg && <><b style={{ display: 'block', fontSize: 12 }}>{c.leg.a}</b><span style={{ fontSize: 12 }}>{c.leg.b}</span></>}
     </>
   )
-  const bd = { rev: '#6E5BB8', vnd: 'rgba(11,74,46,.35)', meq: 'rgba(48,106,181,.35)' }[k]
+  const bd = { rev: 'var(--pn-6e5bb8,#6E5BB8)', vnd: 'color-mix(in srgb,var(--pn-0b4a2e,#0B4A2E) 35%,transparent)', meq: 'color-mix(in srgb,var(--pn-306ab5,#306AB5) 35%,transparent)' }[k]
   if (!mk) {
     return <td style={{ padding: '12px 10px', background: 'var(--gCell)', color: 'var(--gInk)', border: `1px solid ${bd}`, textAlign: 'center', verticalAlign: 'middle', height: 64 }}>{content}</td>
   }
@@ -1011,7 +1011,7 @@ function GridCell({ k, week, row, day, kind, st }: { k: BrandKey; week: number; 
       style={{ position: 'relative', padding: '14px 12px 12px', background: done ? 'var(--gDone)' : 'var(--gCell)', color: 'var(--gInk)', border: `1px solid ${bd}`, textAlign: 'center', verticalAlign: 'middle', height: kind === 'aula' ? 104 : 64, cursor: 'pointer' }}>
       <span style={{ position: 'absolute', right: 6, top: 6, width: 20, height: 20, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
         {done
-          ? <span className="gpop" style={{ width: 20, height: 20, borderRadius: '50%', background: '#22B573', color: '#FFFFFF', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Ic n="check" s={12} sw={3.2} /></span>
+          ? <span className="gpop" style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--pn-22b573,#22B573)', color: '#FFFFFF', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Ic n="check" s={12} sw={3.2} /></span>
           : <span className="gempty" style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid currentColor', opacity: 0.35 }} />}
       </span>
       <div style={{ opacity: done ? (st.hd ? 0.28 : 0.62) : 1, textDecoration: done ? 'line-through' : 'none', transition: 'opacity .25s' }}>{content}</div>
@@ -1021,7 +1021,7 @@ function GridCell({ k, week, row, day, kind, st }: { k: BrandKey; week: number; 
 
 // Célula da grade em modo REAL (metas da célula → conteúdo + check por metaId).
 function GridCellReal({ k, metas, kind, st }: { k: BrandKey; metas: MetaView[]; kind: GoalType; st: CronogramaState }) {
-  const bd = { rev: '#6E5BB8', vnd: 'rgba(11,74,46,.35)', meq: 'rgba(48,106,181,.35)' }[k]
+  const bd = { rev: 'var(--pn-6e5bb8,#6E5BB8)', vnd: 'color-mix(in srgb,var(--pn-0b4a2e,#0B4A2E) 35%,transparent)', meq: 'color-mix(in srgb,var(--pn-306ab5,#306AB5) 35%,transparent)' }[k]
   const m = metas[0]
   if (!m) return <td style={{ padding: '12px 10px', background: 'var(--gCell)', color: 'var(--gInk)', border: `1px solid ${bd}`, textAlign: 'center', verticalAlign: 'middle', height: 64 }}><span style={{ opacity: 0.45, fontSize: 16 }}>—</span></td>
   const done = st.isDone(m.id)
@@ -1037,7 +1037,7 @@ function GridCellReal({ k, metas, kind, st }: { k: BrandKey; metas: MetaView[]; 
       style={{ position: 'relative', padding: '14px 12px 12px', background: done ? 'var(--gDone)' : 'var(--gCell)', color: 'var(--gInk)', border: `1px solid ${bd}`, textAlign: 'center', verticalAlign: 'middle', height: kind === 'aula' ? 104 : 64, cursor: 'pointer' }}>
       <span style={{ position: 'absolute', right: 6, top: 6, width: 20, height: 20, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
         {done
-          ? <span className="gpop" style={{ width: 20, height: 20, borderRadius: '50%', background: '#22B573', color: '#FFFFFF', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Ic n="check" s={12} sw={3.2} /></span>
+          ? <span className="gpop" style={{ width: 20, height: 20, borderRadius: '50%', background: 'var(--pn-22b573,#22B573)', color: '#FFFFFF', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Ic n="check" s={12} sw={3.2} /></span>
           : <span className="gempty" style={{ width: 18, height: 18, borderRadius: '50%', border: '2px solid currentColor', opacity: 0.35 }} />}
       </span>
       <div style={{ opacity: done ? (st.hd ? 0.28 : 0.62) : 1, textDecoration: done ? 'line-through' : 'none', transition: 'opacity .25s' }}>{content}</div>
@@ -1048,14 +1048,14 @@ function GridCellReal({ k, metas, kind, st }: { k: BrandKey; metas: MetaView[]; 
 export function GridTable({ k, mobile, st, week }: Shared & { week: number }) {
   const i = week - 1
   const semReal = st.semanasReais ? st.semanasReais.find((s) => s.n === week) ?? null : null
-  const headBg = { rev: 'linear-gradient(180deg,#2E2366,#3B2F7A)', vnd: 'linear-gradient(180deg,#0B4A2E,#12643D)', meq: 'linear-gradient(120deg,#171E3B,#25356F)' }[k]
-  const headInk = { rev: '#F1C232', vnd: '#F1D48A', meq: '#5ECEF0' }[k]
-  const subBg = { rev: '#7B66C9', vnd: '#2E8A5A', meq: '#306AB5' }[k]
-  const colBg = { rev: '#F1C232', vnd: 'linear-gradient(180deg,#F1D48A,#D8B45A)', meq: '#3E7FE0' }[k]
-  const colInk = { rev: '#2E1F7A', vnd: '#2A1F02', meq: '#FFFFFF' }[k]
-  const labBg = { rev: '#4B3A8C', vnd: '#0E5434', meq: '#25356F' }[k]
-  const labInk = { rev: '#FFFFFF', vnd: '#F1D48A', meq: '#DCEBFF' }[k]
-  const bd = { rev: '#6E5BB8', vnd: 'rgba(11,74,46,.35)', meq: 'rgba(48,106,181,.35)' }[k]
+  const headBg = { rev: 'linear-gradient(180deg,var(--pn-2e2366,#2E2366),var(--pn-3b2f7a,#3B2F7A))', vnd: 'linear-gradient(180deg,var(--pn-0b4a2e,#0B4A2E),var(--pn-12643d,#12643D))', meq: 'linear-gradient(120deg,var(--pn-171e3b,#171E3B),var(--pn-25356f,#25356F))' }[k]
+  const headInk = { rev: 'var(--pn-f1c232,#F1C232)', vnd: 'var(--pn-f1d48a,#F1D48A)', meq: 'var(--pn-5ecef0,#5ECEF0)' }[k]
+  const subBg = { rev: 'var(--pn-7b66c9,#7B66C9)', vnd: 'var(--pn-2e8a5a,#2E8A5A)', meq: 'var(--pn-306ab5,#306AB5)' }[k]
+  const colBg = { rev: 'var(--pn-f1c232,#F1C232)', vnd: 'linear-gradient(180deg,var(--pn-f1d48a,#F1D48A),var(--pn-d8b45a,#D8B45A))', meq: 'var(--pn-3e7fe0,#3E7FE0)' }[k]
+  const colInk = { rev: 'var(--pn-2e1f7a,#2E1F7A)', vnd: 'var(--pn-2a1f02,#2A1F02)', meq: '#FFFFFF' }[k]
+  const labBg = { rev: 'var(--pn-4b3a8c,#4B3A8C)', vnd: 'var(--pn-0e5434,#0E5434)', meq: 'var(--pn-25356f,#25356F)' }[k]
+  const labInk = { rev: '#FFFFFF', vnd: 'var(--pn-f1d48a,#F1D48A)', meq: 'var(--pn-dcebff,#DCEBFF)' }[k]
+  const bd = { rev: 'var(--pn-6e5bb8,#6E5BB8)', vnd: 'color-mix(in srgb,var(--pn-0b4a2e,#0B4A2E) 35%,transparent)', meq: 'color-mix(in srgb,var(--pn-306ab5,#306AB5) 35%,transparent)' }[k]
   const r = { rev: 18, vnd: 22, meq: 10 }[k]
   const range = semReal ? semReal.range : G_RANGE[i]
   const diasCol = semReal ? semReal.dias : [...G_DAYS]
@@ -1078,7 +1078,7 @@ export function GridTable({ k, mobile, st, week }: Shared & { week: number }) {
           <b style={{ display: 'block', marginTop: 4, fontSize: mobile ? 16 : 22, fontWeight: 800 }}>{range}</b>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, maxWidth: 260, margin: '10px auto 0' }}>
             <div style={{ flex: 1, height: 6, borderRadius: 99, background: 'rgba(255,255,255,.18)', overflow: 'hidden' }}>
-              <span style={{ display: 'block', height: '100%', width: `${Math.round((st.weekDone(week) / st.weekTotal(week)) * 100)}%`, borderRadius: 99, background: '#22B573', transition: 'width .4s cubic-bezier(.22,1,.36,1)' }} />
+              <span style={{ display: 'block', height: '100%', width: `${Math.round((st.weekDone(week) / st.weekTotal(week)) * 100)}%`, borderRadius: 99, background: 'var(--pn-22b573,#22B573)', transition: 'width .4s cubic-bezier(.22,1,.36,1)' }} />
             </div>
             <span style={{ fontSize: 12, fontWeight: 800, color: '#FFFFFF' }}>{st.weekDone(week)}/{st.weekTotal(week)}</span>
           </div>
@@ -1163,7 +1163,7 @@ export function GridView({ k, mobile, st }: Shared) {
       <div className="gwin" key={st.gw}><GridTable k={k} mobile={mobile} st={st} week={st.gw} /></div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, fontSize: 12, color: lk }}>
         {G_ROWS.map((rw, i) => <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><b style={{ color: hk }}>{rw.hrs}</b>{rw.label}</span>)}
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 16, height: 16, borderRadius: '50%', background: '#22B573', color: '#FFFFFF', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Ic n="check" s={10} sw={3.2} /></span>meta concluída</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><span style={{ width: 16, height: 16, borderRadius: '50%', background: 'var(--pn-22b573,#22B573)', color: '#FFFFFF', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Ic n="check" s={10} sw={3.2} /></span>meta concluída</span>
       </div>
     </div>
   )
@@ -1177,7 +1177,7 @@ function PlanRow({ k, mobile, st, item }: Shared & { item: { key: string; day: s
       {done && <span className="gpop" style={{ display: 'inline-flex' }}><Ic n="check" s={14} sw={3.2} /></span>}
     </button>
   )
-  const doneTxt = done ? <span style={{ display: 'block', marginTop: 3, fontSize: 11.5, fontWeight: 600, color: '#1FA868' }}>Concluída</span> : null
+  const doneTxt = done ? <span style={{ display: 'block', marginTop: 3, fontSize: 11.5, fontWeight: 600, color: 'var(--pn-1fa868,#1FA868)' }}>Concluída</span> : null
   const titleSty: CSSProperties = { fontSize: mobile ? 13 : 13.5, fontWeight: 600, color: 'var(--ink)', textDecoration: done ? 'line-through' : 'none', opacity: done ? 0.55 : 1 }
   return (
     <div className="rowh" style={{ display: 'flex', alignItems: mobile ? 'flex-start' : 'center', gap: 12, padding: `12px ${mobile ? 12 : 16}px`, borderTop: '1px solid var(--line)' }}>
@@ -1213,13 +1213,13 @@ function WeekBlock({ k, mobile, st, week, range, total, semana }: Shared & { wee
   const items = semana
     ? semana.metas.map((m) => ({ key: m.id, day: m.dayLabel, type: m.type, title: m.title, dur: m.dur }))
     : listItems(week)
-  const hb: CSSProperties = k === 'rev' ? { background: 'linear-gradient(90deg,#3B1E8F,#5B3FD0)', color: '#FFFFFF' }
-    : k === 'vnd' ? { background: 'linear-gradient(90deg,#0B4A2E,#12643D)', color: '#FFFFFF' }
+  const hb: CSSProperties = k === 'rev' ? { background: 'linear-gradient(90deg,var(--pn-3b1e8f,#3B1E8F),var(--pn-5b3fd0,#5B3FD0))', color: '#FFFFFF' }
+    : k === 'vnd' ? { background: 'linear-gradient(90deg,var(--pn-0b4a2e,#0B4A2E),var(--pn-12643d,#12643D))', color: '#FFFFFF' }
       : { background: 'var(--surface2)', color: 'var(--ink)' }
   const badge = k === 'rev'
     ? <span style={{ height: 22, padding: '0 9px', borderRadius: 99, background: 'rgba(255,255,255,.16)', fontSize: 11, fontWeight: 800, display: 'inline-flex', alignItems: 'center' }}>{total} metas</span>
     : k === 'vnd'
-      ? <span style={{ height: 24, padding: '0 10px', borderRadius: 99, background: 'linear-gradient(180deg,#F1D48A,#D8B45A)', color: '#2A1F02', fontSize: 11, fontWeight: 800, display: 'inline-flex', alignItems: 'center', boxShadow: '0 2px 0 #9A7414' }}>{total} metas · +{total * 5} XP</span>
+      ? <span style={{ height: 24, padding: '0 10px', borderRadius: 99, background: 'linear-gradient(180deg,var(--pn-f1d48a,#F1D48A),var(--pn-d8b45a,#D8B45A))', color: 'var(--pn-2a1f02,#2A1F02)', fontSize: 11, fontWeight: 800, display: 'inline-flex', alignItems: 'center', boxShadow: '0 2px 0 var(--pn-9a7414,#9A7414)' }}>{total} metas · +{total * 5} XP</span>
       : <span style={{ fontSize: 11.5, fontWeight: 700, color: 'var(--muted)' }}>{total} metas</span>
   return (
     <div style={{ borderRadius: ctrlR(k, 14), overflow: 'hidden', border: '1px solid var(--line)', background: 'var(--surface)' }}>
@@ -1280,7 +1280,7 @@ function RevisaoBlock({ k, semana }: { k: BrandKey; semana: SemanaView }) {
   const rev = semana.kind === 'revisao'
   return (
     <div style={{ borderRadius: ctrlR(k, 14), overflow: 'hidden', border: '1px solid var(--line)', background: 'var(--surface)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: rev ? 'linear-gradient(90deg,#8F75FF,#5B3FD0)' : 'var(--surface2)', color: rev ? '#fff' : 'var(--ink)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px', background: rev ? 'linear-gradient(90deg,var(--pn-8f75ff,#8F75FF),var(--pn-5b3fd0,#5B3FD0))' : 'var(--surface2)', color: rev ? '#fff' : 'var(--ink)' }}>
         <Ic n={rev ? 'target' : 'cal'} s={15} />
         <b style={{ fontSize: 14 }}>Semana {semana.n} · {rev ? 'Revisão' : 'Recesso'}</b>
         <span style={{ fontSize: 12, opacity: 0.8 }}>{semana.range}</span>
@@ -1300,11 +1300,11 @@ function RevisaoBlock({ k, semana }: { k: BrandKey; semana: SemanaView }) {
 export function TodayCard({ k }: { k: BrandKey }) {
   if (k === 'rev') {
     return (
-      <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 22, padding: 20, background: 'radial-gradient(120% 120% at 100% 0%,#6449E0 0%,#3B1E8F 55%,#1E1150 100%)', color: '#FFFFFF' }}>
-        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.14em', color: '#F1C232' }}>META DE HOJE · QUA</span>
+      <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 22, padding: 20, background: 'radial-gradient(120% 120% at 100% 0%,var(--pn-6449e0,#6449E0) 0%,var(--pn-3b1e8f,#3B1E8F) 55%,var(--pn-1e1150,#1E1150) 100%)', color: '#FFFFFF' }}>
+        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.14em', color: 'var(--pn-f1c232,#F1C232)' }}>META DE HOJE · QUA</span>
         <b style={{ display: 'block', marginTop: 8, fontSize: 17, lineHeight: 1.3 }}>Direito Administrativo: Aula 01 – Introdução ao Direito Administrativo</b>
-        <span style={{ display: 'block', marginTop: 6, fontSize: 12.5, color: '#CFC4FF' }}>PDF · 1h30 · próxima: videoaula 01 amanhã</span>
-        <span className="gobtn" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 16, height: 46, borderRadius: 13, background: '#F1C232', color: '#2A1A55', fontSize: 14.5, fontWeight: 800, cursor: 'pointer' }}><Ic n="play" s={14} />Abrir material</span>
+        <span style={{ display: 'block', marginTop: 6, fontSize: 12.5, color: 'var(--pn-cfc4ff,#CFC4FF)' }}>PDF · 1h30 · próxima: videoaula 01 amanhã</span>
+        <span className="gobtn" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 16, height: 46, borderRadius: 13, background: 'var(--pn-f1c232,#F1C232)', color: 'var(--pn-2a1a55,#2A1A55)', fontSize: 14.5, fontWeight: 800, cursor: 'pointer' }}><Ic n="play" s={14} />Abrir material</span>
       </div>
     )
   }
@@ -1315,7 +1315,7 @@ export function TodayCard({ k }: { k: BrandKey }) {
           <div style={{ position: 'relative', width: 64, height: 64, flexShrink: 0 }}>
             <svg viewBox="0 0 64 64" style={{ width: 64, height: 64, transform: 'rotate(-90deg)' }}>
               <circle cx={32} cy={32} r={26} fill="none" stroke="var(--track)" strokeWidth={8} />
-              <circle cx={32} cy={32} r={26} fill="none" stroke="#E8C877" strokeWidth={8} strokeLinecap="round" strokeDasharray={163.4} strokeDashoffset={108.9} />
+              <circle cx={32} cy={32} r={26} fill="none" stroke="var(--pn-e8c877,#E8C877)" strokeWidth={8} strokeLinecap="round" strokeDasharray={163.4} strokeDashoffset={108.9} />
             </svg>
             <b style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14, color: 'var(--ink)' }}>2/6</b>
           </div>
@@ -1329,7 +1329,7 @@ export function TodayCard({ k }: { k: BrandKey }) {
           <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--muted)' }}>HOJE · QUA</span>
           <b style={{ display: 'block', marginTop: 4, fontSize: 13.5, color: 'var(--ink)' }}>Direito Administrativo: Aula 01</b>
         </div>
-        <span className="gobtn" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 12, height: 48, borderRadius: 14, background: 'linear-gradient(180deg,#F1D48A,#D8B45A)', color: '#2A1F02', fontSize: 15, fontWeight: 800, boxShadow: '0 4px 0 #9A7414', cursor: 'pointer' }}><Ic n="play" s={14} />Estudar agora</span>
+        <span className="gobtn" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: 12, height: 48, borderRadius: 14, background: 'linear-gradient(180deg,var(--pn-f1d48a,#F1D48A),var(--pn-d8b45a,#D8B45A))', color: 'var(--pn-2a1f02,#2A1F02)', fontSize: 15, fontWeight: 800, boxShadow: '0 4px 0 var(--pn-9a7414,#9A7414)', cursor: 'pointer' }}><Ic n="play" s={14} />Estudar agora</span>
       </Card>
     )
   }
@@ -1364,8 +1364,8 @@ export function VndTrail({ k, mobile }: { k: BrandKey; mobile: boolean }) {
   for (let w = 1; w <= last; w++) {
     const stt = w < 5 ? 'done' : w === 5 ? 'cur' : 'lock'
     let s: CSSProperties; let inner: ReactNode
-    if (stt === 'done') { s = { background: 'linear-gradient(180deg,#2BB673,#16804F)', color: '#FFFFFF', boxShadow: '0 4px 0 #0B4A2E' }; inner = <Ic n="check" s={18} sw={3} /> }
-    else if (stt === 'cur') { s = { background: 'linear-gradient(180deg,#F1D48A,#D8B45A)', color: '#2A1F02', boxShadow: '0 4px 0 #9A7414', transform: 'scale(1.12)' }; inner = <b style={{ fontSize: 15 }}>{w}</b> }
+    if (stt === 'done') { s = { background: 'linear-gradient(180deg,var(--pn-2bb673,#2BB673),var(--pn-16804f,#16804F))', color: '#FFFFFF', boxShadow: '0 4px 0 var(--pn-0b4a2e,#0B4A2E)' }; inner = <Ic n="check" s={18} sw={3} /> }
+    else if (stt === 'cur') { s = { background: 'linear-gradient(180deg,var(--pn-f1d48a,#F1D48A),var(--pn-d8b45a,#D8B45A))', color: 'var(--pn-2a1f02,#2A1F02)', boxShadow: '0 4px 0 var(--pn-9a7414,#9A7414)', transform: 'scale(1.12)' }; inner = <b style={{ fontSize: 15 }}>{w}</b> }
     else { s = { background: 'var(--surface2)', color: 'var(--muted)', boxShadow: '0 4px 0 var(--line2)' }; inner = <b style={{ fontSize: 14 }}>{w}</b> }
     items.push(
       <div key={`w${w}`} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, flexShrink: 0 }}>
@@ -1388,14 +1388,14 @@ export function VndTrail({ k, mobile }: { k: BrandKey; mobile: boolean }) {
 export function Gantt({ k }: { k: BrandKey }) {
   return (
     <Card k={k} pad={18}>
-      <Head k={k} icon="chart" title="Linha do tempo das matérias" right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--muted)' }}><span style={{ width: 10, height: 2, background: '#E5484D' }} />você está na semana 5</span>} />
+      <Head k={k} icon="chart" title="Linha do tempo das matérias" right={<span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11.5, color: 'var(--muted)' }}><span style={{ width: 10, height: 2, background: 'var(--pn-e5484d,#E5484D)' }} />você está na semana 5</span>} />
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {GANTT.map((g) => (
           <div key={g.name} style={{ display: 'grid', gridTemplateColumns: '110px minmax(0,1fr)', gap: 10, alignItems: 'center', height: 26 }}>
             <span style={{ fontSize: 11.5, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.name}</span>
             <div style={{ position: 'relative', height: 10, borderRadius: 3, background: 'var(--surface2)' }}>
               {g.segments.map(([a, w], i) => <span key={i} style={{ position: 'absolute', left: `${(a / 89) * 100}%`, width: `${Math.max((w / 89) * 100, 0.9)}%`, top: 0, bottom: 0, borderRadius: 3, background: g.color }} />)}
-              <span style={{ position: 'absolute', left: `${(5 / 89) * 100}%`, top: -6, bottom: -6, width: 2, background: '#E5484D' }} />
+              <span style={{ position: 'absolute', left: `${(5 / 89) * 100}%`, top: -6, bottom: -6, width: 2, background: 'var(--pn-e5484d,#E5484D)' }} />
             </div>
           </div>
         ))}

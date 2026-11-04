@@ -50,19 +50,19 @@ type MeqVars = {
 }
 
 const MEQ_CLARO: MeqVars = {
-  surface: '#FFFFFF', surface2: '#F6F8FC', ink: '#171E3B', muted: '#66729A', line: '#E3E8F2', line2: '#CDD6E8',
-  track: '#E4EAF5', brand: '#306AB5', brand2: '#3E7FE0', cyan: '#5ECEF0', chip: '#EAF1FB',
-  shadow: '0 1px 2px rgba(16,30,70,.04)', tBg: '#E4EAF5', tOn: '#FFFFFF', tOnInk: '#171E3B',
+  surface: '#FFFFFF', surface2: 'var(--pn-f6f8fc,#F6F8FC)', ink: 'var(--pn-171e3b,#171E3B)', muted: 'var(--pn-66729a,#66729A)', line: 'var(--pn-e3e8f2,#E3E8F2)', line2: 'var(--pn-cdd6e8,#CDD6E8)',
+  track: 'var(--pn-e4eaf5,#E4EAF5)', brand: 'var(--pn-306ab5,#306AB5)', brand2: 'var(--pn-3e7fe0,#3E7FE0)', cyan: 'var(--pn-5ecef0,#5ECEF0)', chip: 'var(--pn-eaf1fb,#EAF1FB)',
+  shadow: '0 1px 2px color-mix(in srgb,var(--pn-101e46,#101E46) 4%,transparent)', tBg: 'var(--pn-e4eaf5,#E4EAF5)', tOn: '#FFFFFF', tOnInk: 'var(--pn-171e3b,#171E3B)',
 }
 const MEQ_AZUL: MeqVars = {
-  surface: '#FFFFFF', surface2: '#F5F8FD', ink: '#171E3B', muted: '#66729A', line: '#E3E8F2', line2: '#CDD6E8',
-  track: '#E4EAF5', brand: '#306AB5', brand2: '#3E7FE0', cyan: '#5ECEF0', chip: '#EAF1FB',
-  shadow: '0 20px 40px -30px rgba(10,30,80,.6)', tBg: '#E4EAF5', tOn: '#FFFFFF', tOnInk: '#171E3B',
+  surface: '#FFFFFF', surface2: 'var(--pn-f5f8fd,#F5F8FD)', ink: 'var(--pn-171e3b,#171E3B)', muted: 'var(--pn-66729a,#66729A)', line: 'var(--pn-e3e8f2,#E3E8F2)', line2: 'var(--pn-cdd6e8,#CDD6E8)',
+  track: 'var(--pn-e4eaf5,#E4EAF5)', brand: 'var(--pn-306ab5,#306AB5)', brand2: 'var(--pn-3e7fe0,#3E7FE0)', cyan: 'var(--pn-5ecef0,#5ECEF0)', chip: 'var(--pn-eaf1fb,#EAF1FB)',
+  shadow: '0 20px 40px -30px color-mix(in srgb,var(--pn-0a1e50,#0A1E50) 60%,transparent)', tBg: 'var(--pn-e4eaf5,#E4EAF5)', tOn: '#FFFFFF', tOnInk: 'var(--pn-171e3b,#171E3B)',
 }
 const MEQ_ESCURO: MeqVars = {
-  surface: '#121A3A', surface2: '#172146', ink: '#FFFFFF', muted: '#8E9BC4', line: 'rgba(140,170,255,.13)',
-  line2: 'rgba(140,170,255,.24)', track: 'rgba(140,170,255,.13)', brand: '#7FB2FF', brand2: '#5E9BFF', cyan: '#5ECEF0',
-  chip: 'rgba(94,155,255,.14)', shadow: 'none', tBg: 'rgba(140,170,255,.1)', tOn: '#172146', tOnInk: '#FFFFFF',
+  surface: 'var(--pn-121a3a,#121A3A)', surface2: 'var(--pn-172146,#172146)', ink: '#FFFFFF', muted: 'var(--pn-8e9bc4,#8E9BC4)', line: 'color-mix(in srgb,var(--pn-8caaff,#8CAAFF) 13%,transparent)',
+  line2: 'color-mix(in srgb,var(--pn-8caaff,#8CAAFF) 24%,transparent)', track: 'color-mix(in srgb,var(--pn-8caaff,#8CAAFF) 13%,transparent)', brand: 'var(--pn-7fb2ff,#7FB2FF)', brand2: 'var(--pn-5e9bff,#5E9BFF)', cyan: 'var(--pn-5ecef0,#5ECEF0)',
+  chip: 'color-mix(in srgb,var(--pn-5e9bff,#5E9BFF) 14%,transparent)', shadow: 'none', tBg: 'color-mix(in srgb,var(--pn-8caaff,#8CAAFF) 10%,transparent)', tOn: 'var(--pn-172146,#172146)', tOnInk: '#FFFFFF',
 }
 function palette(theme: InternaTheme): MeqVars {
   if (theme === 'escuro') return MEQ_ESCURO

@@ -41,7 +41,7 @@ export function CapaCard({ capa, cor, icone, orig, cfg }: {
   if (!capa || erro) {
     return (
       <>
-        <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />
+        <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, var(--pn-0f172a,#0f172a) 135%)` }} />
         <Icon className="absolute -right-6 -top-6 h-40 w-40 text-white/10 transition-transform duration-500 group-hover/card:scale-110 group-hover/card:rotate-3" />
       </>
     )

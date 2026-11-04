@@ -50,7 +50,7 @@ function sitTag(s: Situacao) {
 /* ================= HERO ================= */
 function Hero({ dados }: { dados: DesafioDados }) {
   return (
-    <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 22, background: 'linear-gradient(120deg,#160F33 0%,#241A52 55%,#2E1F6A 100%)', color: '#FFFFFF', padding: '26px 30px' }}>
+    <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 22, background: 'linear-gradient(120deg,var(--pn-160f33,#160F33) 0%,var(--pn-241a52,#241A52) 55%,var(--pn-2e1f6a,#2E1F6A) 100%)', color: '#FFFFFF', padding: '26px 30px' }}>
       <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px)', backgroundSize: '32px 32px', WebkitMaskImage: 'linear-gradient(180deg,#000,transparent 85%)', maskImage: 'linear-gradient(180deg,#000,transparent 85%)' }} />
       <span aria-hidden style={{ position: 'absolute', top: -40, right: 120, width: 2, height: 420, background: 'linear-gradient(180deg,transparent,var(--gold),transparent)', transform: 'rotate(28deg)', opacity: 0.5 }} />
       <Row gap={16} style={{ position: 'relative', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -95,7 +95,7 @@ function Trilha({ dados }: { dados: DesafioDados }) {
         {/* Aula do dia */}
         <Card pad={0} style={{ overflow: 'hidden' }}>
           <Row gap={20} style={{ padding: 24, alignItems: 'stretch', flexWrap: 'nowrap' }}>
-            <Col gap={2} style={{ background: 'linear-gradient(135deg,#2A1E4A,#4A31B8)', color: '#FFFFFF', borderRadius: 16, padding: '18px 20px', minWidth: 150, justifyContent: 'center' }}>
+            <Col gap={2} style={{ background: 'linear-gradient(135deg,var(--pn-2a1e4a,#2A1E4A),var(--pn-4a31b8,#4A31B8))', color: '#FFFFFF', borderRadius: 16, padding: '18px 20px', minWidth: 150, justifyContent: 'center' }}>
               <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.14em', opacity: 0.8 }}>DIA</span>
               <span style={{ fontSize: 46, fontWeight: 800, lineHeight: 1, letterSpacing: '-0.03em' }}>{a ? String(a.num).padStart(2, '0') : '—'}</span>
               <span style={{ fontSize: 12, opacity: 0.9, marginTop: 4 }}>{a ? a.titulo : 'Sem aula em andamento'}</span>

@@ -35,43 +35,43 @@ type MeqConf = {
 
 const CONF: Record<MeqTheme, MeqConf> = {
   claro: {
-    bg: 'linear-gradient(180deg,#F6F9FE 0%,#EEF3FB 55%,#E3ECF8 100%)',
-    foot: '#7D89AE',
-    glow: { style: { right: '-10%', top: '-30%', width: 1000, height: 800, borderRadius: '50%' }, bg: 'radial-gradient(closest-side, rgba(94,206,240,.32), rgba(94,206,240,0))' },
-    circ: { style: { left: -380, top: -120, width: 2100, height: 1330 }, ol: { stroke: '#306AB5', opacity: '0.2', w: '0.3220' }, pl: { stroke: '#3E7FE0', w: '0.5520' } },
-    mfillGrad: ['#2F64C8', '#4497DB'],
-    mdrawStroke: '#306AB5',
-    mrunStroke: '#5ECEF0',
-    wordFill: '#171E3B',
-    sgFill: '#3E7FE0',
+    bg: 'linear-gradient(180deg,var(--pn-f6f9fe,#F6F9FE) 0%,var(--pn-eef3fb,#EEF3FB) 55%,var(--pn-e3ecf8,#E3ECF8) 100%)',
+    foot: 'var(--pn-7d89ae,#7D89AE)',
+    glow: { style: { right: '-10%', top: '-30%', width: 1000, height: 800, borderRadius: '50%' }, bg: 'radial-gradient(closest-side, color-mix(in srgb,var(--pn-5ecef0,#5ECEF0) 32%,transparent), color-mix(in srgb,var(--pn-5ecef0,#5ECEF0) 0%,transparent))' },
+    circ: { style: { left: -380, top: -120, width: 2100, height: 1330 }, ol: { stroke: 'var(--pn-306ab5,#306AB5)', opacity: '0.2', w: '0.3220' }, pl: { stroke: 'var(--pn-3e7fe0,#3E7FE0)', w: '0.5520' } },
+    mfillGrad: ['var(--pn-2f64c8,#2F64C8)', 'var(--pn-4497db,#4497DB)'],
+    mdrawStroke: 'var(--pn-306ab5,#306AB5)',
+    mrunStroke: 'var(--pn-5ecef0,#5ECEF0)',
+    wordFill: 'var(--pn-171e3b,#171E3B)',
+    sgFill: 'var(--pn-3e7fe0,#3E7FE0)',
     concursosOpacity: '1',
-    progFill: '#3E7FE0',
+    progFill: 'var(--pn-3e7fe0,#3E7FE0)',
   },
   azul: {
-    bg: 'linear-gradient(160deg,#2B5FA8 0%,#306AB5 40%,#4497DB 100%)',
-    foot: '#DCEBFF',
-    glow: { style: { right: '-10%', top: '-30%', width: 1000, height: 800, borderRadius: '50%' }, bg: 'radial-gradient(closest-side, rgba(94,206,240,.65), rgba(94,206,240,0))' },
-    circ: { style: { left: -380, top: -120, width: 2100, height: 1330 }, ol: { stroke: '#8BEAEA', opacity: '0.45', w: '0.3220' }, pl: { stroke: '#FFFFFF', w: '0.5520' } },
-    mfillGrad: ['#FFFFFF', '#C9F4FF'],
+    bg: 'linear-gradient(160deg,var(--pn-2b5fa8,#2B5FA8) 0%,var(--pn-306ab5,#306AB5) 40%,var(--pn-4497db,#4497DB) 100%)',
+    foot: 'var(--pn-dcebff,#DCEBFF)',
+    glow: { style: { right: '-10%', top: '-30%', width: 1000, height: 800, borderRadius: '50%' }, bg: 'radial-gradient(closest-side, color-mix(in srgb,var(--pn-5ecef0,#5ECEF0) 65%,transparent), color-mix(in srgb,var(--pn-5ecef0,#5ECEF0) 0%,transparent))' },
+    circ: { style: { left: -380, top: -120, width: 2100, height: 1330 }, ol: { stroke: 'var(--pn-8beaea,#8BEAEA)', opacity: '0.45', w: '0.3220' }, pl: { stroke: '#FFFFFF', w: '0.5520' } },
+    mfillGrad: ['#FFFFFF', 'var(--pn-c9f4ff,#C9F4FF)'],
     mdrawStroke: '#FFFFFF',
-    mrunStroke: '#171E3B',
+    mrunStroke: 'var(--pn-171e3b,#171E3B)',
     wordFill: '#FFFFFF',
-    sgFill: '#171E3B',
+    sgFill: 'var(--pn-171e3b,#171E3B)',
     concursosOpacity: '.92',
     progFill: '#FFFFFF',
   },
   escuro: {
-    bg: 'linear-gradient(180deg,#121A3A 0%,#141B38 55%,#0B1124 100%)',
-    foot: '#6F7CA6',
-    glow: { style: { left: '50%', top: '50%', width: 1200, height: 900, margin: '-450px 0 0 -600px', borderRadius: '50%' }, bg: 'radial-gradient(closest-side, rgba(62,127,224,.42), rgba(62,127,224,0))' },
-    circ: { style: { left: -520, top: -260, width: 2300, height: 1457 }, ol: { stroke: '#5E8EF0', opacity: '0.3', w: '0.2730' }, pl: { stroke: '#8BEAEA', w: '0.4830' } },
-    mfillGrad: ['#4A8BEA', '#5ECEF0'],
-    mdrawStroke: '#5ECEF0',
+    bg: 'linear-gradient(180deg,var(--pn-121a3a,#121A3A) 0%,var(--pn-141b38,#141B38) 55%,var(--pn-0b1124,#0B1124) 100%)',
+    foot: 'var(--pn-6f7ca6,#6F7CA6)',
+    glow: { style: { left: '50%', top: '50%', width: 1200, height: 900, margin: '-450px 0 0 -600px', borderRadius: '50%' }, bg: 'radial-gradient(closest-side, color-mix(in srgb,var(--pn-3e7fe0,#3E7FE0) 42%,transparent), color-mix(in srgb,var(--pn-3e7fe0,#3E7FE0) 0%,transparent))' },
+    circ: { style: { left: -520, top: -260, width: 2300, height: 1457 }, ol: { stroke: 'var(--pn-5e8ef0,#5E8EF0)', opacity: '0.3', w: '0.2730' }, pl: { stroke: 'var(--pn-8beaea,#8BEAEA)', w: '0.4830' } },
+    mfillGrad: ['var(--pn-4a8bea,#4A8BEA)', 'var(--pn-5ecef0,#5ECEF0)'],
+    mdrawStroke: 'var(--pn-5ecef0,#5ECEF0)',
     mrunStroke: '#FFFFFF',
     wordFill: '#FFFFFF',
-    sgFill: '#3E7FE0',
+    sgFill: 'var(--pn-3e7fe0,#3E7FE0)',
     concursosOpacity: '.92',
-    progFill: '#5ECEF0',
+    progFill: 'var(--pn-5ecef0,#5ECEF0)',
   },
 }
 
@@ -139,7 +139,7 @@ export function LoadingMeqCircuito({
 
 function css(theme: MeqTheme) {
   return `
-.ml-root{position:relative;overflow:hidden;min-height:100vh;width:100%;background:${CONF[theme].bg};font-family:'Sora',sans-serif;color:#171E3B;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.ml-root{position:relative;overflow:hidden;min-height:100vh;width:100%;background:${CONF[theme].bg};font-family:'Sora',sans-serif;color:var(--pn-171e3b,#171E3B);display:flex;flex-direction:column;align-items:center;justify-content:center}
 .ml-glow{animation:mlFade 1.6s ease-out both,mlBreathe 6s ease-in-out 1.6s infinite alternate}
 .ml-ol{stroke-dasharray:1000;stroke-dashoffset:1000;animation:mlDraw 3.4s cubic-bezier(.6,.1,.2,1) .1s forwards}
 .ml-pl{stroke-dasharray:46 954;stroke-dashoffset:1000;opacity:0;animation:mlFade .6s ease-out 2.6s forwards,mlPulse 8s linear 2.6s infinite}

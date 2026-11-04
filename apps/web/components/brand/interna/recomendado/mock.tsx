@@ -25,9 +25,9 @@ export const PRIO_LABEL: Record<Prioridade, string> = { alta: 'Alta', media: 'M�
 export const PRIO_LABEL_UP: Record<Prioridade, string> = { alta: 'ALTA', media: 'MÉDIA', ok: 'OK' }
 // cor / fundo por faixa (spec §1.4)
 export const PRIO_COR: Record<Prioridade, [string, string]> = {
-  alta: ['#E5484D', 'rgba(229,72,77,.12)'],
-  media: ['#D99A1E', 'rgba(217,154,30,.14)'],
-  ok: ['#1FA868', 'rgba(31,168,104,.13)'],
+  alta: ['var(--pn-e5484d,#E5484D)', 'color-mix(in srgb,var(--pn-e5484d,#E5484D) 12%,transparent)'],
+  media: ['var(--pn-d99a1e,#D99A1E)', 'color-mix(in srgb,var(--pn-d99a1e,#D99A1E) 14%,transparent)'],
+  ok: ['var(--pn-1fa868,#1FA868)', 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 13%,transparent)'],
 }
 
 // Stats do topo (spec §5): 12 matérias · 35% · 11 · 10

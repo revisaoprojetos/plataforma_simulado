@@ -31,8 +31,8 @@ import { montarGrupos, ehInicio, ehLigas, casa, type Grupo, type GItem } from '@
  * tabs/menu continua sendo feita pelo layout (tema.mobile_nav) — não é alterada aqui.
  */
 
-const AMARELO = '#F1C232'
-const AMARELO_INK = '#2A1A55'
+const AMARELO = 'var(--pn-f1c232,#F1C232)'
+const AMARELO_INK = 'var(--pn-2a1a55,#2A1A55)'
 
 type IconeSlot = React.ComponentType<{ style?: React.CSSProperties }>
 
@@ -82,8 +82,8 @@ export function AlunoDownBar({ nav, usuarioNome, avatar, avatarCor, onAbrirConta
     <span
       className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full text-[10px] font-bold text-primary"
       style={{
-        background: perfilAtivo ? 'rgba(241,194,50,.2)' : (avatarCor ?? '#ffffff'),
-        boxShadow: avatarRealce ? '0 0 0 2px rgba(241,194,50,.6)' : '0 0 0 1px rgba(0,0,0,.1)',
+        background: perfilAtivo ? 'color-mix(in srgb,var(--pn-f1c232,#F1C232) 20%,transparent)' : (avatarCor ?? '#ffffff'),
+        boxShadow: avatarRealce ? '0 0 0 2px color-mix(in srgb,var(--pn-f1c232,#F1C232) 60%,transparent)' : '0 0 0 1px rgba(0,0,0,.1)',
       }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -165,13 +165,13 @@ export function AlunoDownBar({ nav, usuarioNome, avatar, avatarCor, onAbrirConta
         {/* A barra */}
         <nav
           aria-label="Navegação"
-          className="relative mx-[14px] mb-[14px] flex h-16 items-center justify-between gap-1 rounded-[22px] border border-white/10 px-2.5 shadow-[0_18px_40px_-16px_rgba(20,10,60,.7)] bg-[#2E1F7A] dark:bg-[#22184F]"
+          className="relative mx-[14px] mb-[14px] flex h-16 items-center justify-between gap-1 rounded-[22px] border border-white/10 px-2.5 shadow-[0_18px_40px_-16px_rgba(20,10,60,.7)] bg-[color:var(--pn-2e1f7a,#2E1F7A)] dark:bg-[color:var(--pn-22184f,#22184F)]"
         >
           {/* Início */}
           <SlotLink href={inicioHref} ativo={inicioAtivo} aria-label="Início">
             {inicioAtivo
               ? <Pilula icon={Home} rotulo="Início" />
-              : <Home className="h-[21px] w-[21px]" style={{ color: '#D9CFFF' }} strokeWidth={2} />}
+              : <Home className="h-[21px] w-[21px]" style={{ color: 'var(--pn-d9cfff,#D9CFFF)' }} strokeWidth={2} />}
           </SlotLink>
 
           {/* Grupos (Simulados / Estudar / Mais) — montados do nav */}
@@ -198,9 +198,9 @@ export function AlunoDownBar({ nav, usuarioNome, avatar, avatarCor, onAbrirConta
                   ? <Pilula icon={Icone} rotulo={atual!.short || g.label} chevron aberto={estaAberto} />
                   : (
                     <>
-                      <Icone style={{ width: 21, height: 21, color: '#D9CFFF' }} />
+                      <Icone style={{ width: 21, height: 21, color: 'var(--pn-d9cfff,#D9CFFF)' }} />
                       {/* pontinho indicando submenu */}
-                      <span className="absolute bottom-1.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full" style={{ background: '#D9CFFF', opacity: 0.8 }} aria-hidden />
+                      <span className="absolute bottom-1.5 left-1/2 h-1 w-1 -translate-x-1/2 rounded-full" style={{ background: 'var(--pn-d9cfff,#D9CFFF)', opacity: 0.8 }} aria-hidden />
                     </>
                   )}
               </button>
@@ -212,7 +212,7 @@ export function AlunoDownBar({ nav, usuarioNome, avatar, avatarCor, onAbrirConta
             <SlotLink href={ligasItem.href} ativo={ligasAtivo} aria-label={ligasItem.label}>
               {ligasAtivo
                 ? <Pilula icon={Trophy} rotulo={ligasItem.short || 'Ligas'} />
-                : <Trophy className="h-[21px] w-[21px]" style={{ color: '#D9CFFF' }} strokeWidth={2} />}
+                : <Trophy className="h-[21px] w-[21px]" style={{ color: 'var(--pn-d9cfff,#D9CFFF)' }} strokeWidth={2} />}
             </SlotLink>
           )}
 

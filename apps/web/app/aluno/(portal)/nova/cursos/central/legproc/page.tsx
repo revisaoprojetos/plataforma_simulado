@@ -205,7 +205,7 @@ export default async function LegProcPage({ searchParams }: { searchParams: Prom
                 <Row gap={10}>
                   <div style={{ display: 'inline-flex', gap: 4, padding: 4, borderRadius: 13, background: 'var(--track)' }}>
                     {['Rolar', 'Capítulo', 'Virar'].map((t, k) => (
-                      <span key={t} style={{ display: 'inline-flex', alignItems: 'center', height: 32, padding: '0 14px', borderRadius: 10, fontSize: 13, fontWeight: k === 0 ? 800 : 700, background: k === 0 ? 'var(--surface)' : 'transparent', color: k === 0 ? 'var(--ink)' : 'var(--muted)', boxShadow: k === 0 ? '0 2px 8px rgba(30,15,80,.1)' : undefined }}>{t}</span>
+                      <span key={t} style={{ display: 'inline-flex', alignItems: 'center', height: 32, padding: '0 14px', borderRadius: 10, fontSize: 13, fontWeight: k === 0 ? 800 : 700, background: k === 0 ? 'var(--surface)' : 'transparent', color: k === 0 ? 'var(--ink)' : 'var(--muted)', boxShadow: k === 0 ? '0 2px 8px color-mix(in srgb,var(--pn-1e0f50,#1E0F50) 10%,transparent)' : undefined }}>{t}</span>
                     ))}
                   </div>
                   <Stepper label="Fonte" value="18" />

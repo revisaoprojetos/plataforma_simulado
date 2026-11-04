@@ -160,11 +160,11 @@ export function BancaCard({ bk, b }: { bk: BK; b: NonNullable<PerfilData['porBan
     {total > 0 && (
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--line)' }}>
         <div style={{ position: 'relative', width: 84, height: 84, flexShrink: 0 }}>
-          <Donut parts={[[b.acertos / total, '#1FA868'], [b.erros / total, '#E5484D'], [b.brancos / total, 'var(--track)']]} size={84} sw={11} />
+          <Donut parts={[[b.acertos / total, 'var(--pn-1fa868,#1FA868)'], [b.erros / total, 'var(--pn-e5484d,#E5484D)'], [b.brancos / total, 'var(--track)']]} size={84} sw={11} />
           <span style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', lineHeight: 1.1 }}><b style={{ fontSize: 14, color: 'var(--ink)' }}>{total.toLocaleString('pt-BR')}</b><span style={{ fontSize: 9, color: 'var(--muted)' }}>respostas</span></span>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
-          {([['#1FA868', 'Acertos', b.acertos], ['#E5484D', 'Erros', b.erros], ['var(--track)', 'Em branco', b.brancos]] as [string, string, number][]).map(([c, l, v]) => (
+          {([['var(--pn-1fa868,#1FA868)', 'Acertos', b.acertos], ['var(--pn-e5484d,#E5484D)', 'Erros', b.erros], ['var(--track)', 'Em branco', b.brancos]] as [string, string, number][]).map(([c, l, v]) => (
             <span key={l} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: 'var(--muted)' }}><span style={{ width: 9, height: 9, borderRadius: '50%', background: c }} />{l} <b style={{ color: 'var(--ink)' }}>{v.toLocaleString('pt-BR')}</b></span>
           ))}
         </div>
@@ -182,9 +182,9 @@ export function FortesFracosCard({ bk, ff }: { bk: BK; ff: NonNullable<PerfilDat
   )
   return bk.card(<>
     {bk.head('trend', 'Fortes e fracos', undefined, 'Do seu acerto por disciplina')}
-    <span style={{ display: 'block', fontSize: 11, fontWeight: 800, letterSpacing: '.08em', color: '#1FA868', marginBottom: 2 }}>PONTOS FORTES</span>
+    <span style={{ display: 'block', fontSize: 11, fontWeight: 800, letterSpacing: '.08em', color: 'var(--pn-1fa868,#1FA868)', marginBottom: 2 }}>PONTOS FORTES</span>
     {ff.fortes.map((d) => <Linha key={d.nome} nome={d.nome} pct={d.pct} c="#1FA868" />)}
-    <span style={{ display: 'block', marginTop: 12, fontSize: 11, fontWeight: 800, letterSpacing: '.08em', color: '#E5484D', marginBottom: 2 }}>PARA REFORÇAR</span>
+    <span style={{ display: 'block', marginTop: 12, fontSize: 11, fontWeight: 800, letterSpacing: '.08em', color: 'var(--pn-e5484d,#E5484D)', marginBottom: 2 }}>PARA REFORÇAR</span>
     {ff.fracos.map((d) => <Linha key={d.nome} nome={d.nome} pct={d.pct} c="#E5484D" />)}
   </>)
 }

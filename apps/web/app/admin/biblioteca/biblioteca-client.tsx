@@ -8,8 +8,10 @@ import {
   FolderPlus, Upload, Folder, FileText, FileType2, FileCode2, LayoutGrid, List as ListIcon,
   ChevronRight, ChevronLeft, MoreVertical, Loader2, X, CircleCheck, CircleDashed, Archive,
   Download, Pencil, Info, Trash2, FolderInput, Layers, Link2, RotateCcw, Clock, ExternalLink, Users2,
-  Lock, Palette, Check, Settings2, Copy, Files, Search, Home, FolderTree, CalendarClock, GraduationCap, Music,
+  Lock, Palette, Check, Settings2, Copy, Files, Search, Home, FolderTree, CalendarClock, GraduationCap, Music, Image as ImageIcon,
 } from 'lucide-react'
+import { CapaPaginaDialog } from '@/components/biblioteca/capa-pagina-dialog'
+import type { AlvoCP } from './capa-actions'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
   DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent,
@@ -34,7 +36,7 @@ import {
   listarArvore, criarPasta, removerPasta, renomearPasta, moverPasta, definirCorPasta, moverDocumento,
   importarDocumento, prepararUploadConteudo, importarDeStorage, criarDocumentoBranco, publicarDocumento, publicarNovaVersao, removerDocumento, detalheDocumento, abrirEdicaoDocx,
   renomearDocumento, urlDownloadDocumento, listarPastasConteudo, dadosVisualizacao, thumbDocumento, pdfPreviewDocumento, midiaPreviewDocumento, conteudoPreviewAdmin, duplicarDocumento,
-  definirPastaDisciplinaCronograma, removerPastaDisciplinaCronograma, definirTipoMaterialSubpasta,
+  definirPastaDisciplinaCronograma, removerPastaDisciplinaCronograma, definirTipoMaterialSubpasta, definirLegendaTabelaPasta,
   carregarArvoreAcesso, montarArvoreAcessoDrive, salvarAcessoNo, resolverEstudantePorEmail,
   listarGruposBiblioteca, buscarAlunosBiblioteca, gruposDoEstudante,
   type PastaConteudo, type Categoria, type NoAcesso,
@@ -193,6 +195,7 @@ export function BibliotecaClient() {
   const [detalheId, setDetalheId] = useState<string | null>(null)
   const [acessoPasta, setAcessoPasta] = useState<PastaConteudo | null>(null) // pasta cujo acesso se gerencia
   const [acessoDoc, setAcessoDoc] = useState<Doc | null>(null) // documento cujo acesso se gerencia
+  const [capaDlg, setCapaDlg] = useState<AlvoCP | null>(null) // "Capa e página inicial" (pasta ou documento)
   const [gerenciarAberto, setGerenciarAberto] = useState(false) // painel "Gerenciar acessos" hierárquico
   const [acessoDrive, setAcessoDrive] = useState<{ id: string; nome: string } | null>(null) // "Liberar acesso" estilo Drive (árvore)
   const [uploads, setUploads] = useState<DriveUploadItem[] | null>(null) // painel de progresso do import
@@ -451,6 +454,10 @@ export function BibliotecaClient() {
     const r = await definirTipoMaterialSubpasta(p.id, tipo); if (!r.ok) return toast.error(r.error || 'Falha.')
     toast.success(tipo ? 'Tipo de material definido.' : 'Tipo de material removido.'); carregar(pastaAtual)
   }
+  async function definirLegendaTabela(p: PastaConteudo, ocultar: boolean | null) {
+    const r = await definirLegendaTabelaPasta(p.id, ocultar); if (!r.ok) return toast.error(r.error || 'Falha.')
+    toast.success(ocultar === false ? 'Tabela de legenda VISÍVEL nesta pasta.' : ocultar ? 'Tabela de legenda oculta nesta pasta.' : 'Tabela de legenda volta ao padrão (oculta).')
+  }
   async function renomear(p: PastaConteudo) {
     const nome = await pedirTexto({ titulo: 'Renomear pasta', valorInicial: p.nome, confirmar: 'Salvar' })
     if (!nome) return
@@ -652,6 +659,7 @@ export function BibliotecaClient() {
                     key={p.id}
                     nome={p.nome}
                     cor={p.cor ?? null}
+                    capaUrl={p.capa_url ?? null}
                     contagem={contagens[p.id] != null ? `${contagens[p.id]} ${contagens[p.id] === 1 ? 'item' : 'itens'}` : undefined}
                     pilulas={(restritasPasta[p.id] || p.disciplina_id || p.cronograma_tipo_material) ? (
                       <span className="inline-flex flex-wrap items-center gap-1.5">
@@ -667,6 +675,7 @@ export function BibliotecaClient() {
                         ancestralEhDisciplina={breadcrumb.some((b) => !!b.disciplina_id)}
                         onAbrir={() => carregar(p.id)}
                         onAcesso={() => setAcessoDrive({ id: p.id, nome: p.nome })}
+                        onCapaPagina={() => setCapaDlg({ tipo: 'pasta', id: p.id })}
                         onRenomear={() => renomear(p)}
                         onMudarCor={(c) => mudarCorPasta(p, c)}
                         onMover={(dest) => moverPastaFn(p, dest)}
@@ -675,6 +684,7 @@ export function BibliotecaClient() {
                         onDisciplinaCron={(cls) => marcarDisciplinaCron(p, cls)}
                         onRemoverDisciplinaCron={() => removerDisciplinaCron(p)}
                         onTipoMaterialCron={(t) => definirTipoMaterialCron(p, t)}
+                        onLegendaTabela={(o) => definirLegendaTabela(p, o)}
                       />
                     }
                   />
@@ -707,6 +717,7 @@ export function BibliotecaClient() {
                     restrito={restritoDoc[d.id]}
                     onAbrir={() => setDetalheId(d.id)}
                     onAcesso={() => setAcessoDoc(d)}
+                    onCapaPagina={() => setCapaDlg({ tipo: 'documento', id: d.id })}
                     onEditarOffice={() => editarDocOffice(d)}
                     onBaixar={() => baixarDoc(d)}
                     onRenomear={() => renomearDoc(d)}
@@ -731,7 +742,7 @@ export function BibliotecaClient() {
                           <td className="px-4 py-2.5 text-center"><SeloTipo kind={docKind(d.tipo_origem)} tamanho="sm" /></td>
                           {!ehModelo && <td className="px-4 py-2.5 text-center"><BadgeStatus s={d.status} /></td>}
                           <td className="px-2 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
-                            <MenuDoc d={d} categoria={categoria} onAbrir={() => setDetalheId(d.id)} onAcesso={() => setAcessoDoc(d)} onEditarOffice={() => editarDocOffice(d)} onBaixar={() => baixarDoc(d)} onRenomear={() => renomearDoc(d)} onMover={(p) => moverDoc(d, p)} onArquivar={() => arquivarDoc(d)} onDuplicar={() => duplicarDoc(d)} />
+                            <MenuDoc d={d} categoria={categoria} onAbrir={() => setDetalheId(d.id)} onAcesso={() => setAcessoDoc(d)} onCapaPagina={() => setCapaDlg({ tipo: 'documento', id: d.id })} onEditarOffice={() => editarDocOffice(d)} onBaixar={() => baixarDoc(d)} onRenomear={() => renomearDoc(d)} onMover={(p) => moverDoc(d, p)} onArquivar={() => arquivarDoc(d)} onDuplicar={() => duplicarDoc(d)} />
                           </td>
                         </tr>
                       )
@@ -744,6 +755,7 @@ export function BibliotecaClient() {
         </div>
       )}
 
+      {capaDlg && <CapaPaginaDialog alvo={capaDlg} onFechar={() => setCapaDlg(null)} onSalvo={() => carregar(pastaAtual)} />}
       {acessoDrive && <DriveAcessoWrapper pastaId={acessoDrive.id} categoria={categoria} onFechar={() => setAcessoDrive(null)} />}
       {uploads && uploads.length > 0 && <DriveUploadPanel itens={uploads} onClose={() => setUploads(null)}
         onRetry={(id) => { if (uploadFilesRef.current.has(id)) void tentarDeNovo([id]) }}
@@ -795,11 +807,12 @@ export function BibliotecaClient() {
 
 /** Dropdown em PORTAL (document.body, posição fixed ancorada no botão) — fica ACIMA de qualquer card/seção,
  *  sem ser preso por contexto de empilhamento/overflow de ancestrais (o bug do clique cair no card de baixo). */
-function MenuPasta({ p, categoria, ancestralEhDisciplina, onAbrir, onAcesso, onRenomear, onMudarCor, onMover, onCopiarLink, onExcluir, onDisciplinaCron, onRemoverDisciplinaCron, onTipoMaterialCron }: {
+function MenuPasta({ p, categoria, ancestralEhDisciplina, onAbrir, onAcesso, onCapaPagina, onRenomear, onMudarCor, onMover, onCopiarLink, onExcluir, onDisciplinaCron, onRemoverDisciplinaCron, onTipoMaterialCron, onLegendaTabela }: {
   p: PastaConteudo; categoria: Categoria; ancestralEhDisciplina: boolean
-  onAbrir: () => void; onAcesso: () => void; onRenomear: () => void; onMudarCor: (cor: string | null) => void
+  onAbrir: () => void; onAcesso: () => void; onCapaPagina: () => void; onRenomear: () => void; onMudarCor: (cor: string | null) => void
   onMover: (destinoId: string | null) => void; onCopiarLink: () => void; onExcluir: () => void
   onDisciplinaCron: (classificacao: string | null) => void; onRemoverDisciplinaCron: () => void; onTipoMaterialCron: (tipo: string | null) => void
+  onLegendaTabela: (ocultar: boolean | null) => void
 }) {
   const [open, setOpen] = useState(false)
   const [pastas, setPastas] = useState<{ id: string; nome: string; pai_id: string | null }[] | null>(null)
@@ -830,6 +843,7 @@ function MenuPasta({ p, categoria, ancestralEhDisciplina, onAbrir, onAcesso, onR
         <DropdownMenuContent align="start" className="w-56">
           <DropdownMenuItem onClick={onAbrir}><FolderInput className="mr-2 h-4 w-4" /> Abrir</DropdownMenuItem>
           {categoria !== 'modelo_caderno' && <DropdownMenuItem onClick={onAcesso}><Users2 className="mr-2 h-4 w-4" /> Acesso dos alunos</DropdownMenuItem>}
+          {categoria !== 'modelo_caderno' && <DropdownMenuItem onClick={onCapaPagina}><ImageIcon className="mr-2 h-4 w-4" /> Capa e página inicial…</DropdownMenuItem>}
           <DropdownMenuItem onClick={onRenomear}><Pencil className="mr-2 h-4 w-4" /> Renomear</DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={onCopiarLink}><Link2 className="mr-2 h-4 w-4" /> Copiar link</DropdownMenuItem>
@@ -889,6 +903,15 @@ function MenuPasta({ p, categoria, ancestralEhDisciplina, onAbrir, onAcesso, onR
                   </DropdownMenuSubContent>
                 </DropdownMenuSub>
               )}
+              {/* LegProc: tabela de legenda do início do documento (repete a barra de legendas do leitor) — vale p/ os docs desta pasta e subpastas */}
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger><span className="mr-2 inline-block w-4" /> Tabela de legenda (LegProc)</DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="w-64">
+                  <div className="px-2 pb-1 pt-1.5 text-[11px] font-medium text-muted-foreground">Para os documentos desta pasta</div>
+                  <DropdownMenuItem onClick={pick(() => onLegendaTabela(null))}>Ocultar para o aluno (padrão)</DropdownMenuItem>
+                  <DropdownMenuItem onClick={pick(() => onLegendaTabela(false))}>Mostrar para o aluno</DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
             </>
           )}
           <DropdownMenuSeparator />
@@ -911,9 +934,9 @@ function MenuPasta({ p, categoria, ancestralEhDisciplina, onAbrir, onAcesso, onR
 }
 
 /** Card de documento (grid) — CardConteudo + selo por tipo + capa lazy (thumb docx) + menu "…". */
-function DocCard({ d, categoria, thumbInicial, restrito, onAbrir, onAcesso, onEditarOffice, onBaixar, onRenomear, onMover, onArquivar, onDuplicar }: {
+function DocCard({ d, categoria, thumbInicial, restrito, onAbrir, onAcesso, onCapaPagina, onEditarOffice, onBaixar, onRenomear, onMover, onArquivar, onDuplicar }: {
   d: Doc; categoria: Categoria; thumbInicial?: string; restrito?: boolean
-  onAbrir: () => void; onAcesso: () => void; onEditarOffice: () => void; onBaixar: () => void
+  onAbrir: () => void; onAcesso: () => void; onCapaPagina: () => void; onEditarOffice: () => void; onBaixar: () => void
   onRenomear: () => void; onMover: (pastaId: string | null) => void; onArquivar: () => void; onDuplicar: () => void
 }) {
   const kind = docKind(d.tipo_origem)
@@ -927,15 +950,15 @@ function DocCard({ d, categoria, thumbInicial, restrito, onAbrir, onAcesso, onEd
       capaUrl={capaUrl}
       onClick={onAbrir}
       pilulas={categoria === 'modelo_caderno' ? undefined : <><BadgeStatus s={d.status} /><AccessLabel restrito={restrito} /></>}
-      acoes={<MenuDoc d={d} categoria={categoria} onAbrir={onAbrir} onAcesso={onAcesso} onEditarOffice={onEditarOffice} onBaixar={onBaixar} onRenomear={onRenomear} onMover={onMover} onArquivar={onArquivar} onDuplicar={onDuplicar} />}
+      acoes={<MenuDoc d={d} categoria={categoria} onAbrir={onAbrir} onAcesso={onAcesso} onCapaPagina={onCapaPagina} onEditarOffice={onEditarOffice} onBaixar={onBaixar} onRenomear={onRenomear} onMover={onMover} onArquivar={onArquivar} onDuplicar={onDuplicar} />}
     />
   )
 }
 
 /** Menu de 3 pontos do documento (estilo Drive): abrir/editar/baixar/renomear/mover/arquivar. */
-function MenuDoc({ d, categoria, onAbrir, onAcesso, onEditarOffice, onBaixar, onRenomear, onMover, onArquivar, onDuplicar }: {
+function MenuDoc({ d, categoria, onAbrir, onAcesso, onCapaPagina, onEditarOffice, onBaixar, onRenomear, onMover, onArquivar, onDuplicar }: {
   d: Doc; categoria: Categoria
-  onAbrir: () => void; onAcesso: () => void; onEditarOffice: () => void; onBaixar: () => void; onRenomear: () => void; onMover: (pastaId: string | null) => void; onArquivar: () => void; onDuplicar: () => void
+  onAbrir: () => void; onAcesso: () => void; onCapaPagina: () => void; onEditarOffice: () => void; onBaixar: () => void; onRenomear: () => void; onMover: (pastaId: string | null) => void; onArquivar: () => void; onDuplicar: () => void
 }) {
   const router = useRouter()
   const [pastas, setPastas] = useState<{ id: string; nome: string; pai_id: string | null }[] | null>(null)
@@ -961,6 +984,7 @@ function MenuDoc({ d, categoria, onAbrir, onAcesso, onEditarOffice, onBaixar, on
           <DropdownMenuItem onClick={() => router.push(`/admin/biblioteca/conteudo/${d.id}/gerenciar`)}><Settings2 className="mr-2 h-4 w-4" /> Gerenciar</DropdownMenuItem>
           <DropdownMenuItem onClick={onAbrir}><Info className="mr-2 h-4 w-4" /> Detalhes / versões</DropdownMenuItem>
           {categoria !== 'modelo_caderno' && <DropdownMenuItem onClick={onAcesso}><Users2 className="mr-2 h-4 w-4" /> Acesso dos alunos</DropdownMenuItem>}
+          {categoria !== 'modelo_caderno' && <DropdownMenuItem onClick={onCapaPagina}><ImageIcon className="mr-2 h-4 w-4" /> Capa e página inicial…</DropdownMenuItem>}
           {d.tipo_origem === 'docx' && <DropdownMenuItem onClick={onEditarOffice}><Pencil className="mr-2 h-4 w-4" /> Editar no OnlyOffice</DropdownMenuItem>}
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={copiarLink}><Link2 className="mr-2 h-4 w-4" /> Copiar link</DropdownMenuItem>
@@ -1447,7 +1471,7 @@ function PreviaConteudo({ documentoId }: { documentoId: string }) {
               : <div key={t.uid} className="mb-2" dangerouslySetInnerHTML={{ __html: t.texto }} />
         ))}
       </article>
-      <style>{`.prev-conteudo img{max-width:100%;height:auto}.prev-conteudo table{border-collapse:collapse;max-width:100%}.prev-conteudo td,.prev-conteudo th{border:1px solid #e5e7eb;padding:4px 8px}.prev-conteudo a{color:#1d4ed8;text-decoration:underline}`}</style>
+      <style>{`.prev-conteudo img{max-width:100%;height:auto}.prev-conteudo table{border-collapse:collapse;max-width:100%}.prev-conteudo td,.prev-conteudo th{border:1px solid var(--pn-e5e7eb,#e5e7eb);padding:4px 8px}.prev-conteudo a{color:var(--pn-1d4ed8,#1d4ed8);text-decoration:underline}`}</style>
     </div>
   )
 }

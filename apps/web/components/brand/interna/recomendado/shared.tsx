@@ -39,9 +39,9 @@ export function Ic({ n, s = 16, c, sw }: { n: string; s?: number; c?: string; sw
 }
 
 // semânticos fixos (spec §1.4)
-export const OK = '#1FA868'
-export const ERR = '#E5484D'
-export const WARN = '#D99A1E'
+export const OK = 'var(--pn-1fa868,#1FA868)'
+export const ERR = 'var(--pn-e5484d,#E5484D)'
+export const WARN = 'var(--pn-d99a1e,#D99A1E)'
 
 export const isRev = (b: Brand) => b === 'revisao'
 export const isVnd = (b: Brand) => b === 'vnd'
@@ -52,23 +52,23 @@ export const isMeq = (b: Brand) => b === 'meq'
 export function extraVars(brand: Brand, dark: boolean): Record<string, string> {
   if (brand === 'revisao') {
     return {
-      '--accentInk': dark ? '#F1C232' : '#9A7400',
-      '--muted2': dark ? '#73717F' : '#B3ADC7',
-      '--peachBg': dark ? 'rgba(241,194,50,.12)' : '#FDF5D8',
+      '--accentInk': dark ? 'var(--pn-f1c232,#F1C232)' : 'var(--pn-9a7400,#9A7400)',
+      '--muted2': dark ? 'var(--pn-73717f,#73717F)' : 'var(--pn-b3adc7,#B3ADC7)',
+      '--peachBg': dark ? 'color-mix(in srgb,var(--pn-f1c232,#F1C232) 12%,transparent)' : 'var(--pn-fdf5d8,#FDF5D8)',
     }
   }
   if (brand === 'vnd') {
     return {
-      '--goldToken': dark ? '#E8C877' : '#D8B45A',
-      '--goldInk': dark ? '#F1D48A' : '#9A7414',
-      '--muted2': dark ? '#71907F' : '#B5C4BB',
+      '--goldToken': dark ? 'var(--pn-e8c877,#E8C877)' : 'var(--pn-d8b45a,#D8B45A)',
+      '--goldInk': dark ? 'var(--pn-f1d48a,#F1D48A)' : 'var(--pn-9a7414,#9A7414)',
+      '--muted2': dark ? 'var(--pn-71907f,#71907F)' : 'var(--pn-b5c4bb,#B5C4BB)',
     }
   }
   // meq
   return {
-    '--muted2': dark ? '#3E4A78' : '#B7C0D8',
-    '--head': dark ? '#FFFFFF' : '#171E3B',
-    '--sub': dark ? '#8E9BC4' : '#66729A',
+    '--muted2': dark ? 'var(--pn-3e4a78,#3E4A78)' : 'var(--pn-b7c0d8,#B7C0D8)',
+    '--head': dark ? '#FFFFFF' : 'var(--pn-171e3b,#171E3B)',
+    '--sub': dark ? 'var(--pn-8e9bc4,#8E9BC4)' : 'var(--pn-66729a,#66729A)',
   }
 }
 
@@ -149,7 +149,7 @@ export function QCore({ brand, q, ctaBg, ctaInk = '#FFF', selDot, selBg }: QCore
 
       {/* resultado */}
       {qr && correta && (
-        <div className="rcm-pv" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, background: 'rgba(31,168,104,.1)', border: `1px solid ${OK}` }}>
+        <div className="rcm-pv" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, background: 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 10%,transparent)', border: `1px solid ${OK}` }}>
           <span style={{ width: 30, height: 30, borderRadius: '50%', background: OK, color: '#FFF', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Ic n="check" s={16} sw={3} /></span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <b style={{ display: 'block', fontSize: 13.5, color: OK }}>Resposta correta!</b>
@@ -158,7 +158,7 @@ export function QCore({ brand, q, ctaBg, ctaInk = '#FFF', selDot, selBg }: QCore
         </div>
       )}
       {qr && !correta && (
-        <div className="rcm-pv" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, background: 'rgba(229,72,77,.09)', border: `1px solid ${ERR}` }}>
+        <div className="rcm-pv" style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', borderRadius: 14, background: 'color-mix(in srgb,var(--pn-e5484d,#E5484D) 9%,transparent)', border: `1px solid ${ERR}` }}>
           <span style={{ width: 30, height: 30, borderRadius: '50%', background: ERR, color: '#FFF', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}><Ic n="x" s={16} sw={3} /></span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <b style={{ display: 'block', fontSize: 13.5, color: ERR }}>Resposta incorreta — o gabarito é {q.gabarito.toUpperCase()}.</b>

@@ -19,8 +19,8 @@ import {
 const ITENS = ['Correção automática', 'Desempenho por matéria', 'Acesso só com e-mail']
 const H1_MASK = 'radial-gradient(ellipse 80% 75% at 30% 45%,#000 30%,transparent 90%)'
 // Eyebrow do card: roxo (aluno) / pêssego-queimado (admin) por tema (§2.3).
-const EYEBROW_ALUNO: Record<RevTheme, string> = { claro: '#5B3FD0', escuro: '#B9A8FF' }
-const EYEBROW_ADMIN: Record<RevTheme, string> = { claro: '#B5653A', escuro: '#FFB993' }
+const EYEBROW_ALUNO: Record<RevTheme, string> = { claro: 'var(--pn-5b3fd0,#5B3FD0)', escuro: 'var(--pn-b9a8ff,#B9A8FF)' }
+const EYEBROW_ADMIN: Record<RevTheme, string> = { claro: 'var(--pn-b5653a,#B5653A)', escuro: 'var(--pn-ffb993,#FFB993)' }
 
 export function LoginRevisaoLista({
   theme, core, preview, plataforma, efeito,
@@ -41,7 +41,7 @@ export function LoginRevisaoLista({
       {/* contorno gigante do R à direita */}
       <svg className="rll-trace" viewBox="0 0 68 66" aria-hidden="true">
         <path fill="none" stroke="rgba(255,255,255,.1)" strokeWidth="0.12" d={REVISAO_R_PATH} />
-        <path className="rll-run" fill="none" stroke="#FFC4A3" strokeWidth="0.25" strokeLinecap="round" d={REVISAO_R_OUTLINE} />
+        <path className="rll-run" fill="none" stroke="var(--pn-ffc4a3,#FFC4A3)" strokeWidth="0.25" strokeLinecap="round" d={REVISAO_R_OUTLINE} />
       </svg>
       <div className="rll-band" aria-hidden="true" />
 
@@ -96,7 +96,7 @@ export function LoginRevisaoLista({
           <div className="rll-card" style={{ background: CARD_BG[t], border: CARD_BORDER[t] }}>
             {ef && (
               <svg className="rll-orbit" aria-hidden="true">
-                <rect x="0" y="0" width="100%" height="100%" rx="28" pathLength={100} fill="none" stroke="#FFC4A3" strokeWidth="2" strokeLinecap="round" />
+                <rect x="0" y="0" width="100%" height="100%" rx="28" pathLength={100} fill="none" stroke="var(--pn-ffc4a3,#FFC4A3)" strokeWidth="2" strokeLinecap="round" />
               </svg>
             )}
             <div className="rll-cardhead">
@@ -107,7 +107,7 @@ export function LoginRevisaoLista({
                 <h2 className="rll-cardh2">Login de Acesso</h2>
               </div>
               <div className="rll-cardlogo rll-logo-in">
-                <MarcaRevisao width={46} height={45} fill={t === 'escuro' ? '#FFFFFF' : '#4F4A6A'} />
+                <MarcaRevisao width={46} height={45} fill={t === 'escuro' ? '#FFFFFF' : 'var(--pn-4f4a6a,#4F4A6A)'} />
               </div>
             </div>
             <LoginForm
@@ -128,7 +128,7 @@ function Hl() {
     <span className="rll-hl">
       no <span className="rll-hlword">Revisão</span>.
       <svg className="rll-uline" viewBox="0 0 200 12" preserveAspectRatio="none" aria-hidden="true">
-        <path pathLength={1} d="M2 8C60 2 140 2 198 6" fill="none" stroke="#FFC4A3" strokeWidth="3.5" strokeLinecap="round" />
+        <path pathLength={1} d="M2 8C60 2 140 2 198 6" fill="none" stroke="var(--pn-ffc4a3,#FFC4A3)" strokeWidth="3.5" strokeLinecap="round" />
       </svg>
     </span>
   )
@@ -158,11 +158,11 @@ function css(t: RevTheme, ef: boolean) {
 .rll-rdraw{stroke-dasharray:1;stroke-dashoffset:1;animation:rllDraw2 1.2s cubic-bezier(.6,.1,.2,1) .3s forwards}
 .rll-wm{display:flex;flex-direction:column;margin-left:-6px;margin-top:21px;font-family:'Montserrat',sans-serif;animation:rllSlide .8s cubic-bezier(.2,.8,.2,1) 1.3s both}
 .rll-word{font-weight:800;font-size:48px;line-height:.74;letter-spacing:.01em;padding-top:.12em;white-space:nowrap}
-.rll-sub{margin-top:11px;margin-left:2px;font-weight:500;font-size:16px;line-height:.74;letter-spacing:.22em;white-space:nowrap;color:#E1D9FF}
+.rll-sub{margin-top:11px;margin-left:2px;font-weight:500;font-size:16px;line-height:.74;letter-spacing:.22em;white-space:nowrap;color:var(--pn-e1d9ff,#E1D9FF)}
 .rll-h1block{display:flex;flex-direction:column;gap:16px}
 .rll-h1{margin:0;font-weight:800;font-size:56px;line-height:1.06;letter-spacing:-.045em;color:#fff;text-shadow:0 2px 24px rgba(10,5,35,.45)}
 .rll-hlword{color:#fff}
-.rll-sub2{margin:0;font-size:18px;line-height:1.6;color:#E1D9FF;max-width:460px}
+.rll-sub2{margin:0;font-size:18px;line-height:1.6;color:var(--pn-e1d9ff,#E1D9FF);max-width:460px}
 .rll-hl{position:relative;white-space:nowrap}
 .rll-uline{position:absolute;left:0;bottom:-8px;width:100%;height:12px}
 .rll-uline path{stroke-dasharray:1;stroke-dashoffset:1;animation:rllDraw2 .9s cubic-bezier(.6,.1,.2,1) 1.4s forwards${ef ? ',rllReline 8s cubic-bezier(.6,.1,.2,1) 6s infinite' : ''}}
@@ -170,22 +170,22 @@ function css(t: RevTheme, ef: boolean) {
 .rll-w>span{display:inline-block;transform:translateY(110%);animation:rllWup .8s cubic-bezier(.2,.8,.2,1) forwards}
 .rll-list{display:flex;flex-direction:column;width:100%;max-width:440px;border-top:1px solid rgba(255,255,255,.16)}
 .rll-row{position:relative;isolation:isolate;display:flex;align-items:center;gap:14px;padding:14px 2px;border-bottom:1px solid rgba(255,255,255,.16);font-size:15px;font-weight:600;color:#fff}
-.rll-num{font-family:Montserrat,sans-serif;font-weight:800;font-size:13px;color:#FFC4A3;width:26px}
-.rll-ck{margin-left:auto;width:26px;height:26px;border-radius:50%;background:rgba(255,196,163,.16);color:#FFC4A3;display:flex;align-items:center;justify-content:center}
+.rll-num{font-family:Montserrat,sans-serif;font-weight:800;font-size:13px;color:var(--pn-ffc4a3,#FFC4A3);width:26px}
+.rll-ck{margin-left:auto;width:26px;height:26px;border-radius:50%;background:rgba(255,196,163,.16);color:var(--pn-ffc4a3,#FFC4A3);display:flex;align-items:center;justify-content:center}
 .rll-rw::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,rgba(255,196,163,.16),rgba(255,196,163,0));transform-origin:0 50%;transform:scaleX(0);animation:rllRowOn 6s cubic-bezier(.6,.1,.2,1) infinite}
 .rll-r1::before{animation-delay:2.4s}.rll-r2::before{animation-delay:4.4s}.rll-r3::before{animation-delay:6.4s}
 .rll-ckon{animation:rllCkOn 6s ease-in-out infinite}
 .rll-r1 .rll-ckon{animation-delay:2.4s}.rll-r2 .rll-ckon{animation-delay:4.4s}.rll-r3 .rll-ckon{animation-delay:6.4s}
 
 .rll-cardwrap{position:relative;width:100%;max-width:420px;flex-shrink:0}
-.rll-tab{position:absolute;left:22px;right:22px;top:-8px;height:8px;border-radius:8px 8px 0 0;background:#FFC4A3;opacity:.9}
-.rll-card{position:relative;color:${t === 'escuro' ? '#fff' : '#1D1933'};border-radius:28px;padding:32px 30px 28px;box-sizing:border-box;box-shadow:0 2px 4px rgba(20,10,60,.08),0 40px 80px -28px rgba(10,5,35,.7);display:flex;flex-direction:column;gap:14px;text-align:left}
+.rll-tab{position:absolute;left:22px;right:22px;top:-8px;height:8px;border-radius:8px 8px 0 0;background:var(--pn-ffc4a3,#FFC4A3);opacity:.9}
+.rll-card{position:relative;color:${t === 'escuro' ? '#fff' : 'var(--pn-1d1933,#1D1933)'};border-radius:28px;padding:32px 30px 28px;box-sizing:border-box;box-shadow:0 2px 4px rgba(20,10,60,.08),0 40px 80px -28px rgba(10,5,35,.7);display:flex;flex-direction:column;gap:14px;text-align:left}
 .rll-orbit{position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible;pointer-events:none}
 .rll-orbit rect{stroke-dasharray:0 100;opacity:0;animation:rllOrbitIn 1.6s cubic-bezier(.6,.1,.2,1) 1.6s forwards,rllOrbit 7s linear 3.2s infinite}
 .rll-cardhead{display:flex;align-items:center;justify-content:space-between;gap:12px}
-.rll-cardtitle{display:flex;flex-direction:column;gap:6px;color:${t === 'escuro' ? '#fff' : '#1D1933'}}
+.rll-cardtitle{display:flex;flex-direction:column;gap:6px;color:${t === 'escuro' ? '#fff' : 'var(--pn-1d1933,#1D1933)'}}
 .rll-eyebrow{font-size:11px;font-weight:800;letter-spacing:.2em}
-.rll-cardh2{margin:0;font-weight:800;font-size:28px;letter-spacing:-.035em;color:${t === 'escuro' ? '#fff' : '#1D1933'}}
+.rll-cardh2{margin:0;font-weight:800;font-size:28px;letter-spacing:-.035em;color:${t === 'escuro' ? '#fff' : 'var(--pn-1d1933,#1D1933)'}}
 .rll-cardlogo{display:flex;flex-shrink:0}
 .rll-logo-in{animation:rllLogo .9s cubic-bezier(.2,.8,.2,1) 1.05s both}
 .rll-foot{position:absolute;left:44px;bottom:26px;font-size:12px}
@@ -212,7 +212,7 @@ function css(t: RevTheme, ef: boolean) {
 @keyframes rllOrbitIn{0%{opacity:1;stroke-dasharray:0 100}100%{opacity:1;stroke-dasharray:12 88}}
 @keyframes rllOrbit{from{stroke-dashoffset:0}to{stroke-dashoffset:-100}}
 @keyframes rllRowOn{0%{transform:scaleX(0)}10%,30%{transform:scaleX(1)}40%,100%{transform:scaleX(1);opacity:0}}
-@keyframes rllCkOn{0%,100%{background:rgba(255,196,163,.16);color:#FFC4A3;transform:none}8%,30%{background:#FFC4A3;color:#2E1F7A;transform:scale(1.12)}40%{background:rgba(255,196,163,.16);color:#FFC4A3;transform:none}}
+@keyframes rllCkOn{0%,100%{background:rgba(255,196,163,.16);color:var(--pn-ffc4a3,#FFC4A3);transform:none}8%,30%{background:var(--pn-ffc4a3,#FFC4A3);color:var(--pn-2e1f7a,#2E1F7A);transform:scale(1.12)}40%{background:rgba(255,196,163,.16);color:var(--pn-ffc4a3,#FFC4A3);transform:none}}
 @keyframes rllReline{0%{stroke-dashoffset:0}10%{stroke-dashoffset:-1}11%{stroke-dashoffset:1}22%,100%{stroke-dashoffset:0}}
 
 @media (max-width:980px){

@@ -99,7 +99,7 @@ function Header({ d, mobile }: { d: ResultadoInternoData; mobile: boolean }) {
   const strip: [string, string, string][] = [
     ['Nota', notaTxt, d.notaLiberada && m.nota !== null ? notec(m.nota)[0] : 'var(--muted)'],
     ['Nota de corte', corte != null ? fnum(corte) : '—', 'var(--ink)'],
-    ['Diferença', diff != null ? `${diff >= 0 ? '+' : ''}${fnum(diff)}` : '—', diff == null ? 'var(--ink)' : diff >= 0 ? '#1FA868' : '#E5484D'],
+    ['Diferença', diff != null ? `${diff >= 0 ? '+' : ''}${fnum(diff)}` : '—', diff == null ? 'var(--ink)' : diff >= 0 ? 'var(--pn-1fa868,#1FA868)' : 'var(--pn-e5484d,#E5484D)'],
     ['Posição', m.posicao !== null ? posFmt(m.posicao) : '—', 'var(--ink)'],
     ['Percentil', m.percentil != null ? `${m.percentil}%` : '—', 'var(--ink)'],
   ]
@@ -184,7 +184,7 @@ function DiscTable({ d, mobile }: { d: ResultadoInternoData; mobile: boolean }) 
               <div style={{ flex: 1 }}><Segs total={10} on={Math.round(di.pct / 10)} h={6} color={notec(di.pct)[0]} /></div>
             </div>
             <b style={{ textAlign: 'right', fontSize: 12, color: notec(di.pct)[0] }}>{di.pct}%</b>
-            <span style={{ textAlign: 'right', fontSize: 12, fontWeight: 700, color: diff == null ? 'var(--muted)' : diff >= 0 ? '#1FA868' : '#E5484D' }}>
+            <span style={{ textAlign: 'right', fontSize: 12, fontWeight: 700, color: diff == null ? 'var(--muted)' : diff >= 0 ? 'var(--pn-1fa868,#1FA868)' : 'var(--pn-e5484d,#E5484D)' }}>
               {diff == null ? '—' : `${diff >= 0 ? '+' : ''}${diff}`}
             </span>
           </div>

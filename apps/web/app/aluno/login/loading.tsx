@@ -6,7 +6,7 @@ export default function Loading() {
   return (
     <div
       className="fixed inset-0 z-[9999] flex items-center justify-center"
-      style={{ background: 'linear-gradient(150deg,#12141c,#181b26,#1e2230)' }}
+      style={{ background: 'linear-gradient(150deg,var(--pn-12141c,#12141c),var(--pn-181b26,#181b26),var(--pn-1e2230,#1e2230))' }}
       role="status"
       aria-busy="true"
       aria-live="polite"

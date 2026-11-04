@@ -109,7 +109,7 @@ export function ResultadoVND({ theme, data }: SimScreenProps) {
             <span aria-hidden="true" className={`${P}-herodots`} />
             <Confetti prefix={P} />
             <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
-              <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.24em', color: '#F1D48A' }}>MISSÃO CUMPRIDA</span>
+              <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.24em', color: 'var(--pn-f1d48a,#F1D48A)' }}>MISSÃO CUMPRIDA</span>
               <div className={`${P}-okpop ${P}-medal`}>
                 <Medal size={50} />
                 <b style={{ fontSize: 12, letterSpacing: '.14em', marginTop: 4 }}>PRATA</b>
@@ -117,16 +117,16 @@ export function ResultadoVND({ theme, data }: SimScreenProps) {
               <h1 style={{ margin: '4px 0 0', fontSize: 34, fontWeight: 800, letterSpacing: '-0.045em' }} className={`${P}-heroh1`}>
                 Mandou bem, {aluno.primeiroNome}!
               </h1>
-              <span style={{ fontSize: 14, color: cm('#CFE3D7') }}>
+              <span style={{ fontSize: 14, color: cm('var(--pn-cfe3d7,#CFE3D7)') }}>
                 {r.certas} de {info.n} acertos · {r.nota} · {info.curto.replace('SIMULADO NACIONAL', 'Simulado Nacional')}
               </span>
               <div style={{ width: '100%', maxWidth: 460 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, color: cm('#CFE3D7'), marginBottom: 6 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, fontWeight: 700, color: cm('var(--pn-cfe3d7,#CFE3D7)'), marginBottom: 6 }}>
                   <span>Nível 27 → 28</span>
-                  <span style={{ color: cm('#F1D48A') }}>+{r.xpGanho ?? 120} XP</span>
+                  <span style={{ color: cm('var(--pn-f1d48a,#F1D48A)') }}>+{r.xpGanho ?? 120} XP</span>
                 </div>
                 <div style={{ height: 14, borderRadius: 99, background: 'rgba(255,255,255,.14)', boxShadow: 'inset 0 2px 0 rgba(0,0,0,.2)', overflow: 'hidden' }}>
-                  <span className={`${P}-bar`} style={{ display: 'block', width: `${xpBar}%`, height: '100%', borderRadius: 99, background: cm('linear-gradient(90deg,#3FD58A,#F1D48A)') }} />
+                  <span className={`${P}-bar`} style={{ display: 'block', width: `${xpBar}%`, height: '100%', borderRadius: 99, background: cm('linear-gradient(90deg,var(--pn-3fd58a,#3FD58A),var(--pn-f1d48a,#F1D48A))') }} />
                 </div>
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 8 }}>
@@ -195,7 +195,7 @@ export function ResultadoVND({ theme, data }: SimScreenProps) {
                           borderRadius: 14,
                           background: eu ? cm(VND_GOLD) : 'transparent',
                           color: eu ? cm(VND_GOLD_INK) : 'var(--ink)',
-                          boxShadow: eu ? cm('0 3px 0 #9A7414') : 'none',
+                          boxShadow: eu ? cm('0 3px 0 var(--pn-9a7414,#9A7414)') : 'none',
                         }}
                       >
                         <b style={{ width: 44, fontSize: 13 }}>{l.pos}º</b>
@@ -204,8 +204,8 @@ export function ResultadoVND({ theme, data }: SimScreenProps) {
                             width: 30,
                             height: 30,
                             borderRadius: '50%',
-                            background: eu ? cm('#0B4A2E') : 'var(--chip)',
-                            color: eu ? cm('#F1D48A') : 'var(--brand)',
+                            background: eu ? cm('var(--pn-0b4a2e,#0B4A2E)') : 'var(--chip)',
+                            color: eu ? cm('var(--pn-f1d48a,#F1D48A)') : 'var(--brand)',
                             display: 'inline-flex',
                             alignItems: 'center',
                             justifyContent: 'center',
@@ -235,7 +235,7 @@ export function ResultadoVND({ theme, data }: SimScreenProps) {
                   </div>
                 </div>
                 {npSent ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 16, borderRadius: 14, background: 'rgba(31,168,104,.1)', color: C_OK, fontSize: 14, fontWeight: 700 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 16, borderRadius: 14, background: 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 10%,transparent)', color: C_OK, fontSize: 14, fontWeight: 700 }}>
                     <Check size={20} /> Obrigado! Sua avaliação ajuda a melhorar os próximos simulados.
                   </div>
                 ) : (
@@ -386,7 +386,7 @@ export function ResultadoVND({ theme, data }: SimScreenProps) {
 function HeroChip({ icon, text }: { icon: React.ReactNode; text: string }) {
   const cm = useCm()
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 12px', borderRadius: 99, background: 'rgba(255,255,255,.1)', border: cm('1px solid rgba(185,245,212,.25)'), fontSize: 12.5, fontWeight: 700 }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 12px', borderRadius: 99, background: 'rgba(255,255,255,.1)', border: cm('1px solid color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 25%,transparent)'), fontSize: 12.5, fontWeight: 700 }}>
       {icon}
       {text}
     </span>
@@ -405,7 +405,7 @@ function Tile({ value, label, color }: { value: string; label: string; color: st
 function Conquista({ icon, title, sub, locked }: { icon: React.ReactNode; title: string; sub: string; locked?: boolean }) {
   return (
     <div style={{ flex: 1, minWidth: 140, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '16px 10px', borderRadius: 18, border: '2px solid var(--line)', borderBottomWidth: 4, background: locked ? 'var(--surface2)' : 'var(--goldBg)', textAlign: 'center', opacity: locked ? 0.6 : 1 }}>
-      <span style={{ width: 48, height: 48, borderRadius: 15, background: locked ? 'var(--surface)' : VND_GOLD, color: locked ? 'var(--muted)' : '#2A1F02', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: locked ? '0 3px 0 var(--line2)' : '0 3px 0 #9A7414' }}>
+      <span style={{ width: 48, height: 48, borderRadius: 15, background: locked ? 'var(--surface)' : VND_GOLD, color: locked ? 'var(--muted)' : 'var(--pn-2a1f02,#2A1F02)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: locked ? '0 3px 0 var(--line2)' : '0 3px 0 var(--pn-9a7414,#9A7414)' }}>
         {icon}
       </span>
       <b style={{ fontSize: 13, color: 'var(--ink)' }}>{title}</b>
@@ -448,11 +448,11 @@ function MateriaRow({ nome, total, certas }: { nome: string; total: number; cert
 function CorrecaoCard({ item, jx, onToggleJx }: { item: SimCorrecaoItem; jx: boolean; onToggleJx: () => void }) {
   const pill =
     item.status === 'certa' ? (
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 26, padding: '0 10px', borderRadius: 99, background: 'rgba(31,168,104,.12)', color: C_OK, fontSize: 12, fontWeight: 800 }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 26, padding: '0 10px', borderRadius: 99, background: 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 12%,transparent)', color: C_OK, fontSize: 12, fontWeight: 800 }}>
         <Check size={13} strokeWidth={3} /> Acertou
       </span>
     ) : item.status === 'errada' ? (
-      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 26, padding: '0 10px', borderRadius: 99, background: 'rgba(229,72,77,.12)', color: C_ERR, fontSize: 12, fontWeight: 800 }}>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, height: 26, padding: '0 10px', borderRadius: 99, background: 'color-mix(in srgb,var(--pn-e5484d,#E5484D) 12%,transparent)', color: C_ERR, fontSize: 12, fontWeight: 800 }}>
         <X size={13} strokeWidth={3} /> Errou
       </span>
     ) : (
@@ -484,7 +484,7 @@ function CorrecaoCard({ item, jx, onToggleJx }: { item: SimCorrecaoItem; jx: boo
                 padding: '12px 14px',
                 borderRadius: 12,
                 border: `1.5px solid ${isG ? C_OK : isY ? C_ERR : 'var(--line)'}`,
-                background: isG ? 'rgba(31,168,104,.1)' : isY ? 'rgba(229,72,77,.08)' : 'var(--surface)',
+                background: isG ? 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 10%,transparent)' : isY ? 'color-mix(in srgb,var(--pn-e5484d,#E5484D) 8%,transparent)' : 'var(--surface)',
               }}
             >
               <span style={{ flexShrink: 0, width: 26, height: 26, borderRadius: '50%', border: '1.5px solid var(--line2)', background: isG ? C_OK : isY ? C_ERR : 'transparent', color: isG || isY ? '#fff' : 'var(--ink)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800 }}>
@@ -542,7 +542,7 @@ ${sharedKeyframes(P)}
 .${P}-wrap{max-width:1180px;margin:0 auto;padding:28px 32px 60px;display:flex;flex-direction:column;gap:18px}
 .${P}-hero{position:relative;overflow:hidden;border-radius:30px;padding:40px 36px;background:${VND_HERO_BG};color:#fff;text-align:center}
 .${P}-herodots{position:absolute;inset:0;background-image:radial-gradient(circle,rgba(185,245,212,.16) 1.2px,transparent 1.8px);background-size:22px 22px}
-.${P}-medal{position:relative;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#FFFFFF,#C9D1D9 40%,#8A96A3);box-shadow:0 8px 0 #5E6A76,0 0 0 8px rgba(255,255,255,.12),0 0 60px rgba(241,212,138,.35);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#1E2A36}
+.${P}-medal{position:relative;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#FFFFFF,var(--pn-c9d1d9,#C9D1D9) 40%,var(--pn-8a96a3,#8A96A3));box-shadow:0 8px 0 var(--pn-5e6a76,#5E6A76),0 0 0 8px rgba(255,255,255,.12),0 0 60px rgba(241,212,138,.35);display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--pn-1e2a36,#1E2A36)}
 .${P}-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
 .${P}-cols{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(0,1fr);gap:18px;align-items:stretch}
 .${P}-matwrap{position:relative;flex:1;min-height:320px}

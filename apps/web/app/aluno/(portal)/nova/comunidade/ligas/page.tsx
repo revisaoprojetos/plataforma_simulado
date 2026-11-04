@@ -175,21 +175,21 @@ export default async function LigasPage() {
       </div>
 
       {/* Banner da liga atual + trilha de divisões */}
-      <section style={{ position: 'relative', overflow: 'hidden', borderRadius: 22, padding: '26px 30px', background: 'linear-gradient(140deg,#24166A,#4B30BE 55%,#6449E0)', color: '#fff', display: 'flex', flexDirection: 'column', gap: 22 }}>
+      <section style={{ position: 'relative', overflow: 'hidden', borderRadius: 22, padding: '26px 30px', background: 'linear-gradient(140deg,var(--pn-24166a,#24166A),var(--pn-4b30be,#4B30BE) 55%,var(--pn-6449e0,#6449E0))', color: '#fff', display: 'flex', flexDirection: 'column', gap: 22 }}>
         <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,.07) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.07) 1px,transparent 1px)', backgroundSize: '24px 24px' }} />
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 20, flexWrap: 'wrap' }}>
           <Row gap={16} style={{ flexWrap: 'nowrap' }}>
-            <span style={{ width: 68, height: 68, borderRadius: 22, background: 'linear-gradient(160deg,#FFE29A,#E8A93A)', color: '#5A3A00', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 14px 30px -12px rgba(232,169,58,.8)', flexShrink: 0 }}><Icon n="trophy" size={32} /></span>
+            <span style={{ width: 68, height: 68, borderRadius: 22, background: 'linear-gradient(160deg,var(--pn-ffe29a,#FFE29A),var(--pn-e8a93a,#E8A93A))', color: 'var(--pn-5a3a00,#5A3A00)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 14px 30px -12px color-mix(in srgb,var(--pn-e8a93a,#E8A93A) 80%,transparent)', flexShrink: 0 }}><Icon n="trophy" size={32} /></span>
             <Col gap={2}>
               <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.2em', color: 'var(--gold)' }}>SUA LIGA ATUAL</span>
               <b style={{ fontSize: 34, letterSpacing: '-0.04em', lineHeight: 1.1 }}>Liga {liga.nome}</b>
-              <span style={{ fontSize: 13, color: '#E1D9FF' }}>{pos}º de {fmt(Math.max(membros, liga_.length))} alunos · {fmt(xpTotal)} XP</span>
+              <span style={{ fontSize: 13, color: 'var(--pn-e1d9ff,#E1D9FF)' }}>{pos}º de {fmt(Math.max(membros, liga_.length))} alunos · {fmt(xpTotal)} XP</span>
             </Col>
           </Row>
           <Row gap={8}>
             {HERO_STATS.map(([v, l]) => (
               <Col key={l} gap={0} style={{ padding: '10px 14px', borderRadius: 14, background: 'rgba(255,255,255,.1)', border: '1px solid rgba(255,255,255,.14)' }}>
-                <b style={{ fontSize: 18 }}>{v}</b><span style={{ fontSize: 11, color: '#CFC4FF' }}>{l}</span>
+                <b style={{ fontSize: 18 }}>{v}</b><span style={{ fontSize: 11, color: 'var(--pn-cfc4ff,#CFC4FF)' }}>{l}</span>
               </Col>
             ))}
           </Row>
@@ -197,12 +197,12 @@ export default async function LigasPage() {
         {/* Trilha de divisões */}
         <div style={{ position: 'relative' }}>
           <span aria-hidden style={{ position: 'absolute', left: 35, right: 35, top: 21, height: 4, borderRadius: 4, background: 'rgba(255,255,255,.15)' }}>
-            <span style={{ display: 'block', width: `${trilhaPct}%`, height: '100%', borderRadius: 4, background: 'linear-gradient(90deg,#B9773F,#9AA5B1,#E8A93A)' }} />
+            <span style={{ display: 'block', width: `${trilhaPct}%`, height: '100%', borderRadius: 4, background: 'linear-gradient(90deg,var(--pn-b9773f,#B9773F),var(--pn-9aa5b1,#9AA5B1),var(--pn-e8a93a,#E8A93A))' }} />
           </span>
           <div style={{ position: 'relative', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             {DIVISOES.map((d) => (
               <Col key={d.nome} gap={6} style={{ alignItems: 'center', width: 70, zIndex: 1 }}>
-                <span style={{ width: d.ativa ? 46 : 38, height: d.ativa ? 46 : 38, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: d.bg, color: d.feito || d.ativa ? '#fff' : 'rgba(255,255,255,.7)', border: d.bg === 'transparent' ? '1.5px dashed rgba(255,255,255,.3)' : 'none', boxShadow: d.ativa ? '0 0 0 4px rgba(232,169,58,.3)' : 'none' }}><Icon n={d.icon} size={d.ativa ? 20 : 17} /></span>
+                <span style={{ width: d.ativa ? 46 : 38, height: d.ativa ? 46 : 38, borderRadius: '50%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', background: d.bg, color: d.feito || d.ativa ? '#fff' : 'rgba(255,255,255,.7)', border: d.bg === 'transparent' ? '1.5px dashed rgba(255,255,255,.3)' : 'none', boxShadow: d.ativa ? '0 0 0 4px color-mix(in srgb,var(--pn-e8a93a,#E8A93A) 30%,transparent)' : 'none' }}><Icon n={d.icon} size={d.ativa ? 20 : 17} /></span>
                 <b style={{ fontSize: 11.5, color: d.feito || d.ativa ? '#fff' : 'rgba(255,255,255,.7)' }}>{d.nome}</b>
                 <span style={{ fontSize: 10.5, color: 'rgba(255,255,255,.7)' }}>{d.xp}</span>
               </Col>

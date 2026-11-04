@@ -30,6 +30,9 @@ import { resolveTemaDark } from '@/lib/hud/resolve-dark'
 import { remember } from '@/lib/cache/relatorio-cache'
 import type { AlunoBrand, AlunoNavItem, AlunoShellUsuario } from '@/components/aluno/shell/types'
 import { SuporteWhatsApp } from '@/components/aluno/suporte-whatsapp'
+import { paletaHref } from '@/lib/brand/paleta-nova-server'
+import { PaletaWsCookie } from '@/components/brand/paleta-ws-cookie'
+import { lerPaletaNova } from '@/lib/brand/paleta-nova'
 
 /** Iniciais a partir do nome (1ª letra do 1º e do último termo). Fallback do avatar. */
 function iniciaisDe(nome: string): string {
@@ -134,6 +137,9 @@ export default async function AlunoPortalLayout({ children }: { children: React.
     wsEmails.includes(emailAluno) ||
     (wsGrupos.length > 0 && await estudanteEmAlgumGrupo(sessao.estudanteId, wsGrupos))
   )
+  // Paleta nova: modo `workspace` só p/ quem está no Workspace (`todos` já entra pela raiz; o precedence dedupe).
+  const paletaLink = paletaHref(t, ehTestadorGlobalAluno)
+  const paletaMarcador = lerPaletaNova(t).modo === 'workspace' ? <PaletaWsCookie ativo={ehTestadorGlobalAluno} /> : null
   const rotulosAluno = resolverSidebarRotulos(t.sidebar_rotulos).aluno
   // Layout de navegação MOBILE, escolhido no console (Aparência → Mobile): 'tabs' | 'menu'.
   const navMode: 'tabs' | 'menu' = t.mobile_nav === 'menu' ? 'menu' : 'tabs'
@@ -153,6 +159,8 @@ export default async function AlunoPortalLayout({ children }: { children: React.
     return (
       <>
         {css && <style dangerouslySetInnerHTML={{ __html: css }} />}
+        {paletaLink && <link rel="stylesheet" href={paletaLink} precedence="paleta-nova" />}
+        {paletaMarcador}
         <TelaManutencao titulo={manut.titulo} mensagem={manut.mensagem} fim={manut.fim} />
       </>
     )
@@ -295,6 +303,8 @@ export default async function AlunoPortalLayout({ children }: { children: React.
     return (
       <div className="app contents" data-brand="revisao">
         {css && <style dangerouslySetInnerHTML={{ __html: css }} />}
+        {paletaLink && <link rel="stylesheet" href={paletaLink} precedence="paleta-nova" />}
+        {paletaMarcador}
         {/* O tenant injeta `main h1{color:var(--content-title)}` (p/ títulos das páginas legadas) — no
             redesign os h1 são títulos de BANNER que devem herdar a cor do contexto (branco no banner). */}
         <style dangerouslySetInnerHTML={{ __html: '.app h1{color:inherit}' }} />
@@ -322,6 +332,8 @@ export default async function AlunoPortalLayout({ children }: { children: React.
     // `.app` + data-brand: escopa os brand-tokens do redesign (VND/MEQ) ao shell do aluno.
     <div className="app contents" data-brand={brand}>
       {css && <style dangerouslySetInnerHTML={{ __html: css }} />}
+        {paletaLink && <link rel="stylesheet" href={paletaLink} precedence="paleta-nova" />}
+        {paletaMarcador}
       {brandCss && <style dangerouslySetInnerHTML={{ __html: brandCss }} />}
       {/* No redesign (internoAtivo), os h1 são títulos de BANNER e devem herdar a cor do contexto —
           neutraliza o `main h1{color:var(--content-title)}` do tenant (que é p/ as páginas legadas). */}

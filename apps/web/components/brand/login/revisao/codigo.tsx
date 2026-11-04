@@ -18,8 +18,8 @@ import {
 } from './shared'
 
 const H1_MASK = 'radial-gradient(ellipse 80% 75% at 30% 45%,#000 30%,transparent 90%)'
-const EYEBROW_ALUNO: Record<RevTheme, string> = { claro: '#5B3FD0', escuro: '#B9A8FF' }
-const EYEBROW_ADMIN: Record<RevTheme, string> = { claro: '#B5653A', escuro: '#FFB993' }
+const EYEBROW_ALUNO: Record<RevTheme, string> = { claro: 'var(--pn-5b3fd0,#5B3FD0)', escuro: 'var(--pn-b9a8ff,#B9A8FF)' }
+const EYEBROW_ADMIN: Record<RevTheme, string> = { claro: 'var(--pn-b5653a,#B5653A)', escuro: 'var(--pn-ffb993,#FFB993)' }
 const PARAGRAFOS = [
   { n: '§ 1º', pre: 'Toda questão tem ', mk: 'correção automática', pos: '.' },
   { n: '§ 2º', pre: 'Seu desempenho fica à vista, ', mk: 'matéria por matéria', pos: '.' },
@@ -44,7 +44,7 @@ export function LoginRevisaoCodigo({
 
       <svg className="rlk-trace" viewBox="0 0 68 66" aria-hidden="true">
         <path fill="none" stroke="rgba(255,255,255,.1)" strokeWidth="0.12" d={REVISAO_R_PATH} />
-        <path className="rlk-run" fill="none" stroke="#FFC4A3" strokeWidth="0.25" strokeLinecap="round" d={REVISAO_R_OUTLINE} />
+        <path className="rlk-run" fill="none" stroke="var(--pn-ffc4a3,#FFC4A3)" strokeWidth="0.25" strokeLinecap="round" d={REVISAO_R_OUTLINE} />
       </svg>
       <div className="rlk-band" aria-hidden="true" />
 
@@ -76,11 +76,11 @@ export function LoginRevisaoCodigo({
                   <div className="rlk-stamp">
                     <svg viewBox="0 0 120 120" style={{ width: '100%', height: '100%', overflow: 'visible' }}>
                       <defs><path id="rlk-sc0" d="M60 60m-45 0a45 45 0 1 1 90 0a45 45 0 1 1-90 0" /></defs>
-                      <circle cx="60" cy="60" r="57" fill="none" stroke="#FFC4A3" strokeWidth="2.5" />
-                      <circle cx="60" cy="60" r="36" fill="none" stroke="#FFC4A3" strokeWidth="1.5" />
-                      <g className="rlk-ring"><text fill="#FFC4A3" fontFamily="Montserrat, sans-serif" fontWeight="800" fontSize="9" letterSpacing="1"><textPath textLength="276" lengthAdjust="spacing" href="#rlk-sc0">REVISÃO · ENSINO JURÍDICO · APROVAÇÃO · </textPath></text></g>
-                      <text x="60" y="58" textAnchor="middle" fill="#FFC4A3" fontFamily="Montserrat, sans-serif" fontWeight="800" fontSize="8.6" letterSpacing=".4">APROVADO</text>
-                      <path d="M52 65l5.5 5.5 11-11" fill="none" stroke="#FFC4A3" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+                      <circle cx="60" cy="60" r="57" fill="none" stroke="var(--pn-ffc4a3,#FFC4A3)" strokeWidth="2.5" />
+                      <circle cx="60" cy="60" r="36" fill="none" stroke="var(--pn-ffc4a3,#FFC4A3)" strokeWidth="1.5" />
+                      <g className="rlk-ring"><text fill="var(--pn-ffc4a3,#FFC4A3)" fontFamily="Montserrat, sans-serif" fontWeight="800" fontSize="9" letterSpacing="1"><textPath textLength="276" lengthAdjust="spacing" href="#rlk-sc0">REVISÃO · ENSINO JURÍDICO · APROVAÇÃO · </textPath></text></g>
+                      <text x="60" y="58" textAnchor="middle" fill="var(--pn-ffc4a3,#FFC4A3)" fontFamily="Montserrat, sans-serif" fontWeight="800" fontSize="8.6" letterSpacing=".4">APROVADO</text>
+                      <path d="M52 65l5.5 5.5 11-11" fill="none" stroke="var(--pn-ffc4a3,#FFC4A3)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   </div>
                 </div>
@@ -113,14 +113,14 @@ export function LoginRevisaoCodigo({
         {/* card com abas */}
         <div className="rlk-cardwrap rlk-pop">
           <div className="rlk-tabs" aria-hidden="true">
-            <span className={`rlk-tb rlk-t1${ef ? ' rlk-peek' : ''}`} style={{ background: '#FFC4A3' }} />
-            <span className={`rlk-tb rlk-t2${ef ? ' rlk-peek' : ''}`} style={{ background: '#B9A8FF' }} />
-            <span className={`rlk-tb rlk-t3${ef ? ' rlk-peek' : ''}`} style={{ background: '#E6DEFF' }} />
+            <span className={`rlk-tb rlk-t1${ef ? ' rlk-peek' : ''}`} style={{ background: 'var(--pn-ffc4a3,#FFC4A3)' }} />
+            <span className={`rlk-tb rlk-t2${ef ? ' rlk-peek' : ''}`} style={{ background: 'var(--pn-b9a8ff,#B9A8FF)' }} />
+            <span className={`rlk-tb rlk-t3${ef ? ' rlk-peek' : ''}`} style={{ background: 'var(--pn-e6deff,#E6DEFF)' }} />
           </div>
           <div className="rlk-card" style={{ background: CARD_BG[t], border: CARD_BORDER[t] }}>
             {ef && (
               <svg className="rlk-orbit" aria-hidden="true">
-                <rect x="0" y="0" width="100%" height="100%" rx="28" pathLength={100} fill="none" stroke="#FFC4A3" strokeWidth="2" strokeLinecap="round" />
+                <rect x="0" y="0" width="100%" height="100%" rx="28" pathLength={100} fill="none" stroke="var(--pn-ffc4a3,#FFC4A3)" strokeWidth="2" strokeLinecap="round" />
               </svg>
             )}
             <div className="rlk-cardhead">
@@ -131,7 +131,7 @@ export function LoginRevisaoCodigo({
                 <h2 className="rlk-cardh2">Login de Acesso</h2>
               </div>
               <div className="rlk-cardlogo rlk-logo-in">
-                <MarcaRevisao width={46} height={45} fill={t === 'escuro' ? '#FFFFFF' : '#4F4A6A'} />
+                <MarcaRevisao width={46} height={45} fill={t === 'escuro' ? '#FFFFFF' : 'var(--pn-4f4a6a,#4F4A6A)'} />
               </div>
             </div>
             <LoginForm
@@ -173,30 +173,30 @@ function css(t: RevTheme, ef: boolean) {
 .rlk-lock{display:flex;align-items:center;gap:10px}
 .rlk-locktxt{display:flex;flex-direction:column;gap:4px;font-family:Montserrat,sans-serif}
 .rlk-word{font-weight:800;font-size:19px;line-height:.8;letter-spacing:.01em}
-.rlk-sub{font-weight:500;font-size:9px;letter-spacing:.22em;color:#E1D9FF}
+.rlk-sub{font-weight:500;font-size:9px;letter-spacing:.22em;color:var(--pn-e1d9ff,#E1D9FF)}
 .rlk-body{display:flex;flex-direction:column;gap:22px}
 ${serRule}
-.rlk-eyebrow{display:flex;align-items:center;gap:12px;font-size:11px;font-weight:800;letter-spacing:.22em;color:#FFC4A3}
+.rlk-eyebrow{display:flex;align-items:center;gap:12px;font-size:11px;font-weight:800;letter-spacing:.22em;color:var(--pn-ffc4a3,#FFC4A3)}
 .rlk-rule{flex:1;max-width:120px;height:1px;background:rgba(255,196,163,.4)}
-.rlk-titulo{color:#D4C9FA}
+.rlk-titulo{color:var(--pn-d4c9fa,#D4C9FA)}
 .rlk-art{display:flex;align-items:baseline;gap:16px;position:relative}
 .rlk-art-ef{padding-right:132px}
-.rlk-artnum{font-size:56px;color:#FFC4A3;line-height:1}
+.rlk-artnum{font-size:56px;color:var(--pn-ffc4a3,#FFC4A3);line-height:1}
 .rlk-artline{height:1px;flex:1;background:linear-gradient(90deg,rgba(255,196,163,.5),rgba(255,196,163,0))}
-.rlk-tw{display:inline-block;overflow:hidden;white-space:nowrap;vertical-align:bottom;max-width:0;padding-right:.08em;border-right:.07em solid #FFC4A3;animation:rlkType .9s steps(8) .7s forwards,rlkCaret .9s step-end 1.6s infinite}
+.rlk-tw{display:inline-block;overflow:hidden;white-space:nowrap;vertical-align:bottom;max-width:0;padding-right:.08em;border-right:.07em solid var(--pn-ffc4a3,#FFC4A3);animation:rlkType .9s steps(8) .7s forwards,rlkCaret .9s step-end 1.6s infinite}
 .rlk-stampwrap{position:absolute;right:0;top:50%;margin-top:-59px;width:118px;height:118px}
 .rlk-stamp{width:100%;height:100%;opacity:0;animation:rlkSlam .55s cubic-bezier(.3,1.4,.5,1) 2.5s forwards}
 .rlk-ring{transform-origin:60px 60px;animation:rlkSpin 24s linear 3.1s infinite}
 .rlk-h1{margin:0;font-weight:800;font-size:54px;line-height:1.08;letter-spacing:-.045em;color:#fff;text-shadow:0 2px 24px rgba(10,5,35,.45)}
 .rlk-hl{color:#fff}
 .rlk-hlwrap{position:relative;display:inline-block;z-index:0}
-.rlk-hlwrap::before{content:"";position:absolute;left:0;right:.25em;bottom:-.02em;height:.14em;border-radius:4px;background:#FFC4A3;z-index:-1;transform-origin:0 50%;transform:scaleX(0);animation:rlkMarker .9s cubic-bezier(.6,.1,.2,1) 1.4s forwards}
+.rlk-hlwrap::before{content:"";position:absolute;left:0;right:.25em;bottom:-.02em;height:.14em;border-radius:4px;background:var(--pn-ffc4a3,#FFC4A3);z-index:-1;transform-origin:0 50%;transform:scaleX(0);animation:rlkMarker .9s cubic-bezier(.6,.1,.2,1) 1.4s forwards}
 .rlk-w{display:inline-block;overflow:hidden;vertical-align:top;padding:0 .04em .22em 0;margin-bottom:-.22em}
 .rlk-w>span{display:inline-block;transform:translateY(110%);animation:rlkWup .8s cubic-bezier(.2,.8,.2,1) forwards}
 .rlk-paras{display:flex;flex-direction:column;gap:12px;border-left:2px solid rgba(255,196,163,.35);padding:2px 0 2px 18px}
-.rlk-para{margin:0;display:flex;gap:14px;font-size:16px;line-height:1.55;color:#E6DEFF}
-.rlk-paranum{flex-shrink:0;width:40px;color:#FFC4A3;font-size:17px}
-.rlk-mk{background:none;color:#fff;font-weight:700;padding:0 1px 2px;background-image:linear-gradient(#FFC4A3,#FFC4A3);background-repeat:no-repeat;background-position:0 100%;background-size:0% 2px;animation:rlkMk 7.5s ease-in-out infinite}
+.rlk-para{margin:0;display:flex;gap:14px;font-size:16px;line-height:1.55;color:var(--pn-e6deff,#E6DEFF)}
+.rlk-paranum{flex-shrink:0;width:40px;color:var(--pn-ffc4a3,#FFC4A3);font-size:17px}
+.rlk-mk{background:none;color:#fff;font-weight:700;padding:0 1px 2px;background-image:linear-gradient(var(--pn-ffc4a3,#FFC4A3),var(--pn-ffc4a3,#FFC4A3));background-repeat:no-repeat;background-position:0 100%;background-size:0% 2px;animation:rlkMk 7.5s ease-in-out infinite}
 .rlk-m1{animation-delay:2.2s}.rlk-m2{animation-delay:4.7s}.rlk-m3{animation-delay:7.2s}
 
 .rlk-cardwrap{position:relative;width:100%;max-width:420px;flex-shrink:0}
@@ -206,13 +206,13 @@ ${serRule}
 .rlk-peek.rlk-t1{animation:rlkTabIn .7s cubic-bezier(.2,.8,.2,1) 1.5s both,rlkPeek 6s ease-in-out 3.4s infinite}
 .rlk-peek.rlk-t2{animation:rlkTabIn .7s cubic-bezier(.2,.8,.2,1) 1.62s both,rlkPeek 6s ease-in-out 5.4s infinite}
 .rlk-peek.rlk-t3{animation:rlkTabIn .7s cubic-bezier(.2,.8,.2,1) 1.74s both,rlkPeek 6s ease-in-out 7.4s infinite}
-.rlk-card{position:relative;color:${t === 'escuro' ? '#fff' : '#1D1933'};border-radius:28px;padding:32px 30px 28px;box-sizing:border-box;box-shadow:0 2px 4px rgba(20,10,60,.08),0 40px 80px -28px rgba(10,5,35,.7);display:flex;flex-direction:column;gap:14px;text-align:left}
+.rlk-card{position:relative;color:${t === 'escuro' ? '#fff' : 'var(--pn-1d1933,#1D1933)'};border-radius:28px;padding:32px 30px 28px;box-sizing:border-box;box-shadow:0 2px 4px rgba(20,10,60,.08),0 40px 80px -28px rgba(10,5,35,.7);display:flex;flex-direction:column;gap:14px;text-align:left}
 .rlk-orbit{position:absolute;left:0;top:0;width:100%;height:100%;overflow:visible;pointer-events:none}
 .rlk-orbit rect{stroke-dasharray:0 100;opacity:0;animation:rlkOrbitIn 1.6s cubic-bezier(.6,.1,.2,1) 1.6s forwards,rlkOrbit 7s linear 3.2s infinite}
 .rlk-cardhead{display:flex;align-items:center;justify-content:space-between;gap:12px}
 .rlk-cardtitle{display:flex;flex-direction:column;gap:6px}
 .rlk-cardeyebrow{font-size:11px;font-weight:800;letter-spacing:.2em}
-.rlk-cardh2{margin:0;font-weight:800;font-size:28px;letter-spacing:-.035em;color:${t === 'escuro' ? '#fff' : '#1D1933'}}
+.rlk-cardh2{margin:0;font-weight:800;font-size:28px;letter-spacing:-.035em;color:${t === 'escuro' ? '#fff' : 'var(--pn-1d1933,#1D1933)'}}
 .rlk-cardlogo{flex-shrink:0}
 .rlk-logo-in{display:flex;animation:rlkLogo .9s cubic-bezier(.2,.8,.2,1) 1.05s both}
 .rlk-foot{position:absolute;left:44px;bottom:26px;font-size:12px}
@@ -233,7 +233,7 @@ ${serRule}
 @keyframes rlkPop{from{opacity:0;transform:translateY(36px) scale(.97)}to{opacity:1;transform:none}}
 @keyframes rlkLogo{from{opacity:0;transform:scale(.7)}to{opacity:1;transform:none}}
 @keyframes rlkMarker{to{transform:scaleX(1)}}
-@keyframes rlkMk{0%{background-size:0% 2px;color:#fff}8%,30%{background-size:100% 2px;color:#FFD9C2}38%,100%{background-size:0% 2px;color:#fff}}
+@keyframes rlkMk{0%{background-size:0% 2px;color:#fff}8%,30%{background-size:100% 2px;color:var(--pn-ffd9c2,#FFD9C2)}38%,100%{background-size:0% 2px;color:#fff}}
 @keyframes rlkWup{to{transform:none}}
 @keyframes rlkTabIn{to{transform:none}}
 @keyframes rlkPeek{0%,30%,100%{transform:none}12%,20%{transform:scaleX(1.45)}}

@@ -18,11 +18,11 @@ function Overlay({ onClose, children, w = 540 }: { onClose: () => void; children
       role="dialog"
       aria-modal="true"
       onClick={onClose}
-      style={{ position: 'fixed', inset: 0, zIndex: 80, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '120px 20px 20px', background: 'rgba(20,12,55,.45)', overflowY: 'auto' }}
+      style={{ position: 'fixed', inset: 0, zIndex: 80, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '120px 20px 20px', background: 'color-mix(in srgb,var(--pn-140c37,#140C37) 45%,transparent)', overflowY: 'auto' }}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        style={{ width: '100%', maxWidth: w, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 20, padding: 24, boxShadow: '0 40px 80px -30px rgba(20,12,55,.5)', display: 'flex', flexDirection: 'column', gap: 16 }}
+        style={{ width: '100%', maxWidth: w, background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 20, padding: 24, boxShadow: '0 40px 80px -30px color-mix(in srgb,var(--pn-140c37,#140C37) 50%,transparent)', display: 'flex', flexDirection: 'column', gap: 16 }}
       >
         {children}
       </div>

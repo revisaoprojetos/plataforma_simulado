@@ -284,7 +284,7 @@ export function ResultadoMeqNova({
     return (
       <div className={`${PFX}-root`} style={{ ...simTokensStyle('meq', theme), minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
         <SoraLink />
-        <div style={{ padding: 32, maxWidth: 420, textAlign: 'center', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', boxShadow: '0 1px 2px rgba(16,30,70,.04)' }}>
+        <div style={{ padding: 32, maxWidth: 420, textAlign: 'center', background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', boxShadow: '0 1px 2px color-mix(in srgb,var(--pn-101e46,#101E46) 4%,transparent)' }}>
           <span style={{ width: 56, height: 56, borderRadius: '50%', background: 'var(--surface2)', color: 'var(--muted)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 14px' }}><IconInfo size={24} /></span>
           <b style={{ display: 'block', fontSize: 18, color: 'var(--ink)', marginBottom: 6 }}>Sessão não encontrada</b>
           <p style={{ margin: '0 0 16px', fontSize: 13.5, lineHeight: 1.5, color: 'var(--muted)' }}>Esta sessão do simulado não existe mais ou o link expirou. Acesse o simulado novamente para realizá-lo.</p>
@@ -318,7 +318,7 @@ export function ResultadoMeqNova({
         <div style={{ position: 'relative', zIndex: 1, maxWidth: 1280, margin: '0 auto', padding: '28px 32px 60px', display: 'flex', flexDirection: 'column', gap: 20 }}>
           {/* Aviso de mudança de gabarito */}
           {data.aviso_gabarito && (
-            <div style={{ display: 'flex', gap: 10, padding: '14px 16px', borderRadius: 'var(--r)', background: 'var(--peachBg)', border: '1px solid rgba(242,169,59,.45)', color: 'var(--ink)' }}>
+            <div style={{ display: 'flex', gap: 10, padding: '14px 16px', borderRadius: 'var(--r)', background: 'var(--peachBg)', border: '1px solid color-mix(in srgb,var(--pn-f2a93b,#F2A93B) 45%,transparent)', color: 'var(--ink)' }}>
               <span style={{ color: WARN, flexShrink: 0 }}><IconInfo size={18} /></span>
               <div style={{ fontSize: 13, lineHeight: 1.5 }}>
                 <b style={{ display: 'block' }}>Houve mudança de gabarito neste simulado</b>
@@ -336,16 +336,16 @@ export function ResultadoMeqNova({
             {/* ── Coluna esquerda: boletim + NPS ── */}
             <div className={`${PFX}-left`} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
               {/* BOLETIM (navy header + gauge semicircular + stats) */}
-              <div style={{ borderRadius: 'var(--r)', overflow: 'hidden', background: 'var(--surface)', border: '1px solid var(--line)', boxShadow: '0 1px 2px rgba(16,30,70,.04)' }}>
+              <div style={{ borderRadius: 'var(--r)', overflow: 'hidden', background: 'var(--surface)', border: '1px solid var(--line)', boxShadow: '0 1px 2px color-mix(in srgb,var(--pn-101e46,#101E46) 4%,transparent)' }}>
                 <div style={{ position: 'relative', overflow: 'hidden', padding: '22px 24px', background: MEQ_NAVY_GRAD, color: '#fff' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                    <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.2em', color: '#8BEAEA' }}>BOLETIM DE DESEMPENHO</span>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.2em', color: 'var(--pn-8beaea,#8BEAEA)' }}>BOLETIM DE DESEMPENHO</span>
                     {liberado && (
-                      <span style={{ display: 'inline-flex', alignItems: 'center', height: 24, padding: '0 10px', borderRadius: 6, background: MEQ_CYAN, color: '#0B1124', fontSize: 11.5, fontWeight: 700 }}>Corrigido</span>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', height: 24, padding: '0 10px', borderRadius: 6, background: MEQ_CYAN, color: 'var(--pn-0b1124,#0B1124)', fontSize: 11.5, fontWeight: 700 }}>Corrigido</span>
                     )}
                   </div>
                   <h1 className={`${PFX}-h1`} style={{ margin: '10px 0 2px', fontSize: 24, fontWeight: 700, letterSpacing: '-0.03em' }}>{data.titulo}</h1>
-                  <span style={{ fontSize: 12.5, color: '#A9C6F0' }}>{data.aluno_nome}{data.aluno_email ? ` · ${data.aluno_email}` : ''}</span>
+                  <span style={{ fontSize: 12.5, color: 'var(--pn-a9c6f0,#A9C6F0)' }}>{data.aluno_nome}{data.aluno_email ? ` · ${data.aluno_email}` : ''}</span>
                 </div>
 
                 {/* Gauge — só com nota liberada (fonte real) */}
@@ -387,7 +387,7 @@ export function ResultadoMeqNova({
               </div>
 
               {/* NPS — componente real (mesmo do RevisaoFinal) */}
-              <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 20, boxShadow: '0 1px 2px rgba(16,30,70,.04)' }}>
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 20, boxShadow: '0 1px 2px color-mix(in srgb,var(--pn-101e46,#101E46) 4%,transparent)' }}>
                 <NpsAvaliacao sessaoId={sessionToken} />
               </div>
             </div>
@@ -395,7 +395,7 @@ export function ResultadoMeqNova({
             {/* ── Coluna direita: downloads + tabela por disciplina ── */}
             <div className={`${PFX}-right`} style={{ display: 'flex', flexDirection: 'column', gap: 18, minWidth: 0 }}>
               {/* DOWNLOADS — "Como você fez" (sempre) + "Com gabarito" (quando liberado) */}
-              <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 20, boxShadow: '0 1px 2px rgba(16,30,70,.04)' }}>
+              <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 20, boxShadow: '0 1px 2px color-mix(in srgb,var(--pn-101e46,#101E46) 4%,transparent)' }}>
                 <b style={{ display: 'block', fontSize: 16, color: 'var(--ink)', marginBottom: 14 }}>Materiais e downloads</b>
                 {(() => {
                   const semg = modalidades.filter((m) => m.semGab)
@@ -428,7 +428,7 @@ export function ResultadoMeqNova({
 
               {/* DESEMPENHO POR DISCIPLINA — só com nota liberada e com dados reais */}
               {notaLiberada && materias.length > 0 && (
-                <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 18, boxShadow: '0 1px 2px rgba(16,30,70,.04)' }}>
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 18, boxShadow: '0 1px 2px color-mix(in srgb,var(--pn-101e46,#101E46) 4%,transparent)' }}>
                   <b style={{ display: 'block', fontSize: 16, color: 'var(--ink)', marginBottom: 6 }}>Desempenho por disciplina</b>
                   <div className={`${PFX}-nscroll`} style={{ position: 'relative', overflow: 'auto' }}>
                     <table style={{ width: '100%', minWidth: 460, borderCollapse: 'collapse' }}>
@@ -469,7 +469,7 @@ export function ResultadoMeqNova({
 
           {/* CORREÇÃO QUESTÃO A QUESTÃO — largura total, só com gabarito liberado */}
           {liberado && qs.length > 0 && (
-            <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 22, boxShadow: '0 1px 2px rgba(16,30,70,.04)' }}>
+            <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 22, boxShadow: '0 1px 2px color-mix(in srgb,var(--pn-101e46,#101E46) 4%,transparent)' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
                 <b style={{ fontSize: 18, color: 'var(--ink)' }}>Correção questão a questão</b>
                 <div className={`${PFX}-hs`} style={{ display: 'flex', gap: 6, overflowX: 'auto' }}>
@@ -482,7 +482,7 @@ export function ResultadoMeqNova({
 
               <div className={`${PFX}-corr`} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 300px', gap: 18, alignItems: 'start' }}>
                 {/* Cartão da questão atual */}
-                <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 22, boxShadow: '0 1px 2px rgba(16,30,70,.04)' }}>
+                <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 22, boxShadow: '0 1px 2px color-mix(in srgb,var(--pn-101e46,#101E46) 4%,transparent)' }}>
                   {cur && (
                     <div key={rq} className={`${PFX}-qin`} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -504,7 +504,7 @@ export function ResultadoMeqNova({
                             const correta = a.correta === true
                             const erradaMarcada = marcada && !correta
                             const bd = correta ? OK : erradaMarcada ? ERR : 'var(--line)'
-                            const bg = correta ? 'rgba(31,168,104,.1)' : erradaMarcada ? 'rgba(229,72,77,.08)' : 'var(--surface)'
+                            const bg = correta ? 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 10%,transparent)' : erradaMarcada ? 'color-mix(in srgb,var(--pn-e5484d,#E5484D) 8%,transparent)' : 'var(--surface)'
                             const dot = correta ? OK : erradaMarcada ? ERR : 'transparent'
                             const ink = correta || erradaMarcada ? '#fff' : 'var(--muted)'
                             return (
@@ -545,7 +545,7 @@ export function ResultadoMeqNova({
 
                 {/* Navegador da correção */}
                 <aside className={`${PFX}-corrnav`} style={{ alignSelf: 'start', position: 'sticky', top: 90 }}>
-                  <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 18, boxShadow: '0 1px 2px rgba(16,30,70,.04)' }}>
+                  <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 18, boxShadow: '0 1px 2px color-mix(in srgb,var(--pn-101e46,#101E46) 4%,transparent)' }}>
                     <b style={{ display: 'block', fontSize: 15, color: 'var(--ink)', marginBottom: 12 }}>Navegador</b>
                     <div className={`${PFX}-cnavgrid ${PFX}-nscroll`} style={{ maxHeight: 440, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 6 }}>
                       {qs.map((item) => {
@@ -590,7 +590,7 @@ function Gauge({ liquida, max, rotulo }: { liquida: number; max: number; rotulo:
     <div style={{ padding: 18, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
       <svg viewBox="0 0 200 124" style={{ width: '100%', maxWidth: 280 }}>
         <path d="M20 100 A80 80 0 0 1 180 100" fill="none" stroke="var(--track)" strokeWidth={16} strokeLinecap="round" />
-        <path className={`${PFX}-gaugefill`} d={`M20 100 A80 80 0 ${largeArc} 1 ${ex.toFixed(1)} ${ey.toFixed(1)}`} fill="none" stroke="#3E7FE0" strokeWidth={16} strokeLinecap="round" />
+        <path className={`${PFX}-gaugefill`} d={`M20 100 A80 80 0 ${largeArc} 1 ${ex.toFixed(1)} ${ey.toFixed(1)}`} fill="none" stroke="var(--pn-3e7fe0,#3E7FE0)" strokeWidth={16} strokeLinecap="round" />
         <text x={cx} y={94} textAnchor="middle" fontSize={34} fontWeight={700} fill="var(--ink)">{liquida}</text>
         <text x={cx} y={112} textAnchor="middle" fontSize={9.5} fill="var(--muted)">{rotulo}</text>
       </svg>
@@ -653,9 +653,9 @@ function DiscursivaView({ d }: { d: QuestaoRev['discursiva'] }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {d.status === 'corrigida' ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 12, background: 'rgba(31,168,104,.1)', color: OK, fontSize: 13.5, fontWeight: 700 }}><IconCheck size={16} />Corrigida — nota {Number(d.nota ?? 0).toFixed(1)}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 12, background: 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 10%,transparent)', color: OK, fontSize: 13.5, fontWeight: 700 }}><IconCheck size={16} />Corrigida — nota {Number(d.nota ?? 0).toFixed(1)}</div>
       ) : enviada ? (
-        <div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(242,169,59,.12)', color: WARN, fontSize: 12.5, fontWeight: 700 }}>Resposta enviada — aguardando correção por um avaliador.</div>
+        <div style={{ padding: '10px 12px', borderRadius: 12, background: 'color-mix(in srgb,var(--pn-f2a93b,#F2A93B) 12%,transparent)', color: WARN, fontSize: 12.5, fontWeight: 700 }}>Resposta enviada — aguardando correção por um avaliador.</div>
       ) : (
         <div style={{ padding: '12px 14px', borderRadius: 12, background: 'var(--surface2)', color: 'var(--muted)', fontSize: 13 }}>Questão não respondida.</div>
       )}

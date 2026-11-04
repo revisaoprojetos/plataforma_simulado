@@ -14,8 +14,8 @@ const CSS = `
    ENTRA DESLIZANDO — dá a impressão de "vir de trás da lateral", nunca aparece inteiro parado na linha.
    Curva ease-out-in suave: entra visível rápido, cruza e sai fora-direita; reinicia atrás da lateral. */
 .npg-seg{position:absolute;top:0;height:100%;width:40%;left:0;border-radius:4px;
-  background:linear-gradient(90deg,transparent,var(--gold,#F1C232),var(--brand,#8F75FF),transparent);
-  box-shadow:0 0 12px 2px color-mix(in oklab,var(--gold,#F1C232) 60%,transparent);
+  background:linear-gradient(90deg,transparent,var(--gold,var(--pn-f1c232,#F1C232)),var(--brand,var(--pn-8f75ff,#8F75FF)),transparent);
+  box-shadow:0 0 12px 2px color-mix(in oklab,var(--gold,var(--pn-f1c232,#F1C232)) 60%,transparent);
   animation:npg-move 1.4s cubic-bezier(.45,0,.35,1) infinite}
 @keyframes npg-move{0%{transform:translateX(-110%)}100%{transform:translateX(260%)}}
 @media (prefers-reduced-motion:reduce){.npg-seg{animation-duration:2.2s}}

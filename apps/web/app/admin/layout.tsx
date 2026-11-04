@@ -11,6 +11,9 @@ import { normalizarEmailsTestador } from '@/lib/sistema/testadores-globais'
 import { AreaEmManutencao } from '@/components/admin/area-em-manutencao'
 import { getCurrentAccess, isSuperAdmin, accessCan, getAuthUser } from '@/lib/auth/permissions'
 import { getTenantTheme } from '@/lib/tenant-theme'
+import { paletaHref } from '@/lib/brand/paleta-nova-server'
+import { PaletaWsCookie } from '@/components/brand/paleta-ws-cookie'
+import { lerPaletaNova } from '@/lib/brand/paleta-nova'
 import { resolverLoginConfig } from '@/lib/login-config'
 import { getImpersonationPermission } from '@/lib/impersonation/permissions'
 import { ImpersonationDockProvider } from '@/components/admin/impersonation/impersonation-dock'
@@ -186,8 +189,12 @@ export default async function AdminLayout({
     plataforma: ti.nome_site ?? tenantNome ?? 'Plataforma',
   }
 
+  const paletaLink = paletaHref(ti, ehWorkspaceAdmin)
+
   return (
     <>
+    {paletaLink && <link rel="stylesheet" href={paletaLink} precedence="paleta-nova" />}
+    {lerPaletaNova(ti).modo === 'workspace' && <PaletaWsCookie ativo={ehWorkspaceAdmin} />}
     {/* Anti-flash: aplica a escala de fonte salva (por usuário) antes do 1º paint. */}
     <FontScaleInit scope={`admin:${userEmail || 'admin'}`} />
     <CanProvider isAdmin={access.isAdmin} permissions={access.permissions} ocultarDiscursiva={ocultarDiscursiva}>

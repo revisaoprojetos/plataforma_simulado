@@ -123,7 +123,7 @@ export default async function FlashcardsPage({ searchParams }: { searchParams: P
           <Eyebrow color="var(--gold)">Revisão por flashcards · Cronograma adaptativo</Eyebrow>
           <h1 style={{ margin: 0, fontSize: 30, fontWeight: 800, letterSpacing: '-0.03em', color: '#FFFFFF' }}>{titulo}</h1>
           {/* TODO(dados): disciplina/aula do material (sem loader hoje) — mantido só o que é real. */}
-          <span style={{ fontSize: 14, color: '#E6DEFF' }}>
+          <span style={{ fontSize: 14, color: 'var(--pn-e6deff,#E6DEFF)' }}>
             {nCards.toLocaleString('pt-BR')} {nCards === 1 ? 'cartão da aula' : 'cartões da aula'}
             {devidos > 0 ? ` · ${devidos.toLocaleString('pt-BR')} para revisar hoje` : ''}
           </span>

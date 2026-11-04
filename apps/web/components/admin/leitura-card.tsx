@@ -30,7 +30,7 @@ export function LeituraCard({ doc }: { doc: Documento }) {
         // eslint-disable-next-line @next/next/no-img-element
         <img src={doc.capa_url} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
       ) : (
-        <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }} />
+        <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, var(--pn-0f172a,#0f172a) 135%)` }} />
       )}
       {!doc.capa_url && <BookOpenText className="absolute -right-6 -top-6 h-40 w-40 text-white/10" />}
       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />

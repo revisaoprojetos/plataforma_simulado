@@ -69,7 +69,7 @@ function CardConcluido({ s, variant = 'poster' }: { s: MeuSimuladoItem; variant?
         <div className="relative w-[42%] max-w-[11rem] shrink-0 overflow-hidden">
           {capaT
             ? <img src={capaT} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-            : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
+            : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, var(--pn-0f172a,#0f172a) 135%)` }} />}
           {!capa && <BancoIcon className="absolute -right-4 -top-4 h-28 w-28 text-white/10" />}
           <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `linear-gradient(110deg, transparent 45%, ${cor})` }} />
         </div>
@@ -96,7 +96,7 @@ function CardConcluido({ s, variant = 'poster' }: { s: MeuSimuladoItem; variant?
     <div className="group relative aspect-[4/5] overflow-hidden rounded-2xl border shadow-sm ring-1 ring-black/5 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:ring-white/25">
       {capa
         ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
-        : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
+        : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, var(--pn-0f172a,#0f172a) 135%)` }} />}
       {!capa && <BancoIcon className="absolute -right-6 -top-6 h-40 w-40 text-white/10 transition-transform duration-500 group-hover:scale-110 group-hover:rotate-3" />}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-3/5 opacity-50 transition-opacity duration-300 group-hover:opacity-70" style={{ background: `linear-gradient(to top, ${cor}, transparent)` }} />
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/35 to-black/5" />
@@ -211,7 +211,7 @@ export function MeusSimuladosCatalogo({ itens, pastas, view = 'poster' }: { iten
         <div className="relative w-[38%] max-w-[12rem] shrink-0 overflow-hidden">
           {capaEff
             ? <img src={capaEff} alt="" className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105" />
-            : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, #0f172a 135%)` }} />}
+            : <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${cor} 0%, var(--pn-0f172a,#0f172a) 135%)` }} />}
           {!capaEff && <Icon className="absolute -right-4 -top-4 h-28 w-28 text-white/10" />}
         </div>
         <div className="flex min-w-0 flex-1 flex-col p-3">

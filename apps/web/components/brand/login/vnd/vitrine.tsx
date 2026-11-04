@@ -14,24 +14,24 @@ const P = 'vlv'
 
 const TOKENS: Record<'claro' | 'escuro', LoginFormTokens> = {
   claro: {
-    fg: '#101C16', muted: '#5C6B62', fieldBg: '#F8FAF9', fieldBorder: '#E1E8E3', fieldFg: '#101C16',
-    primary: '#0F7A44', ctaBg: 'linear-gradient(180deg,#14924F,#0C6E3C)', ctaFg: '#ffffff',
-    pillBg: 'rgba(255,255,255,.06)', pillFg: '#D4EADD', pillBorder: 'rgba(255,255,255,.16)',
+    fg: 'var(--pn-101c16,#101C16)', muted: 'var(--pn-5c6b62,#5C6B62)', fieldBg: '#F8FAF9', fieldBorder: 'var(--pn-e1e8e3,#E1E8E3)', fieldFg: 'var(--pn-101c16,#101C16)',
+    primary: 'var(--pn-0f7a44,#0F7A44)', ctaBg: 'linear-gradient(180deg,var(--pn-14924f,#14924F),var(--pn-0c6e3c,#0C6E3C))', ctaFg: '#ffffff',
+    pillBg: 'rgba(255,255,255,.06)', pillFg: 'var(--pn-d4eadd,#D4EADD)', pillBorder: 'rgba(255,255,255,.16)',
   },
   escuro: {
-    fg: '#FFFFFF', muted: '#A9C2B5', fieldBg: 'rgba(255,255,255,.04)', fieldBorder: 'rgba(120,230,170,.16)', fieldFg: '#FFFFFF',
-    primary: '#3FD58A', ctaBg: 'linear-gradient(180deg,#14924F,#0C6E3C)', ctaFg: '#ffffff',
-    pillBg: 'rgba(255,255,255,.06)', pillFg: '#D4EADD', pillBorder: 'rgba(255,255,255,.16)',
+    fg: '#FFFFFF', muted: 'var(--pn-a9c2b5,#A9C2B5)', fieldBg: 'rgba(255,255,255,.04)', fieldBorder: 'color-mix(in srgb,var(--pn-78e6aa,#78E6AA) 16%,transparent)', fieldFg: '#FFFFFF',
+    primary: 'var(--pn-3fd58a,#3FD58A)', ctaBg: 'linear-gradient(180deg,var(--pn-14924f,#14924F),var(--pn-0c6e3c,#0C6E3C))', ctaFg: '#ffffff',
+    pillBg: 'rgba(255,255,255,.06)', pillFg: 'var(--pn-d4eadd,#D4EADD)', pillBorder: 'rgba(255,255,255,.16)',
   },
 }
 
 const PAGE_BG = {
-  claro: 'linear-gradient(160deg,#041A10 0%,#072D1C 45%,#0B3D26 100%)',
-  escuro: 'linear-gradient(180deg,#020906 0%,#03100A 50%,#051A10 100%)',
+  claro: 'linear-gradient(160deg,var(--pn-041a10,#041A10) 0%,var(--pn-072d1c,#072D1C) 45%,var(--pn-0b3d26,#0B3D26) 100%)',
+  escuro: 'linear-gradient(180deg,var(--pn-020906,#020906) 0%,var(--pn-03100a,#03100A) 50%,var(--pn-051a10,#051A10) 100%)',
 }
 const CARD_BG = {
   claro: '#FFFFFF',
-  escuro: 'linear-gradient(180deg,#0D1F16,#08140E)',
+  escuro: 'linear-gradient(180deg,var(--pn-0d1f16,#0D1F16),var(--pn-08140e,#08140E))',
 }
 
 const FCARDS = [
@@ -43,7 +43,7 @@ const FCARDS = [
 export function VndVitrine({ theme, core, preview, simula }: LoginVariantProps & { simula: boolean }) {
   const t = theme === 'escuro' ? 'escuro' : 'claro'
   const circOp = t === 'claro' ? 0.26 : 0.2
-  const glowA = t === 'claro' ? 'rgba(34,197,110,0.3)' : 'rgba(34,197,110,0.16)'
+  const glowA = t === 'claro' ? 'color-mix(in srgb,var(--pn-22c56e,#22C56E) 30%,transparent)' : 'color-mix(in srgb,var(--pn-22c56e,#22C56E) 16%,transparent)'
   const fcardBg = t === 'claro' ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.035)'
 
   return (
@@ -58,13 +58,13 @@ export function VndVitrine({ theme, core, preview, simula }: LoginVariantProps &
 
       <div className={`${P}-grid`} aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }} />
       <div className={`${P}-glowIn`} aria-hidden="true" style={{ position: 'absolute', width: 1100, height: 1100, left: '18%', top: '50%', margin: '-550px 0 0 -550px', background: `radial-gradient(closest-side,${glowA},rgba(34,197,110,0))`, pointerEvents: 'none' }} />
-      <div className={`${P}-glowIn`} aria-hidden="true" style={{ position: 'absolute', width: 720, height: 720, right: -240, bottom: -280, background: 'radial-gradient(closest-side,rgba(52,200,140,0.24),rgba(52,200,140,0))', pointerEvents: 'none' }} />
+      <div className={`${P}-glowIn`} aria-hidden="true" style={{ position: 'absolute', width: 720, height: 720, right: -240, bottom: -280, background: 'radial-gradient(closest-side,color-mix(in srgb,var(--pn-34c88c,#34C88C) 24%,transparent),color-mix(in srgb,var(--pn-34c88c,#34C88C) 0%,transparent))', pointerEvents: 'none' }} />
 
       {/* circuito (V) ao fundo */}
       <svg className={`${P}-circ`} viewBox="0.6 5.4 31 21.3" aria-hidden="true" style={{ position: 'absolute', left: -300, top: -380, width: 2100, height: 1443, overflow: 'visible', pointerEvents: 'none' }}>
-        <path className={`${P}-ol`} pathLength={1000} fill="none" stroke="#5FD69B" strokeOpacity={circOp} strokeWidth={0.0177} d={VND_V_PATH} />
-        <path className={`${P}-pl ${P}-pl1`} pathLength={1000} fill="none" stroke="#E8C877" strokeWidth={0.0325} strokeLinecap="round" d={VND_V_PATH} />
-        <path className={`${P}-pl ${P}-pl2`} pathLength={1000} fill="none" stroke="#E8C877" strokeWidth={0.0325} strokeLinecap="round" d={VND_V_PATH} />
+        <path className={`${P}-ol`} pathLength={1000} fill="none" stroke="var(--pn-5fd69b,#5FD69B)" strokeOpacity={circOp} strokeWidth={0.0177} d={VND_V_PATH} />
+        <path className={`${P}-pl ${P}-pl1`} pathLength={1000} fill="none" stroke="var(--pn-e8c877,#E8C877)" strokeWidth={0.0325} strokeLinecap="round" d={VND_V_PATH} />
+        <path className={`${P}-pl ${P}-pl2`} pathLength={1000} fill="none" stroke="var(--pn-e8c877,#E8C877)" strokeWidth={0.0325} strokeLinecap="round" d={VND_V_PATH} />
       </svg>
       <div aria-hidden="true" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: 220, background: `linear-gradient(180deg,rgba(2,9,6,0),rgba(2,9,6,${t === 'claro' ? 0.35 : 0.6}))`, pointerEvents: 'none' }} />
 
@@ -83,21 +83,21 @@ export function VndVitrine({ theme, core, preview, simula }: LoginVariantProps &
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
             <h1 className={`${P}-up ${P}-d2 ${P}-h1`} style={{ margin: 0, fontWeight: 800, lineHeight: 1.08, letterSpacing: '-0.045em' }}>
               Sua preparação<br />começa{' '}
-              <span style={{ position: 'relative', display: 'inline-block', color: '#3FD58A' }}>aqui.<Uline P={P} /></span>
+              <span style={{ position: 'relative', display: 'inline-block', color: 'var(--pn-3fd58a,#3FD58A)' }}>aqui.<Uline P={P} /></span>
             </h1>
-            <p className={`${P}-up ${P}-d3`} style={{ margin: 0, fontSize: 17, lineHeight: 1.6, color: '#B7D3C3', maxWidth: 440 }}>
+            <p className={`${P}-up ${P}-d3`} style={{ margin: 0, fontSize: 17, lineHeight: 1.6, color: 'var(--pn-b7d3c3,#B7D3C3)', maxWidth: 440 }}>
               Simulados no padrão das provas da Defensoria, com correção na hora e a sua evolução sempre à vista.
             </p>
           </div>
           <div className={`${P}-fcards`} style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, width: '100%', maxWidth: 560 }}>
             {FCARDS.map((f) => (
-              <div key={f.t} className={`${P}-fcard ${P}-up ${P}-${f.c}`} style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 16, borderRadius: 18, background: fcardBg, border: '1px solid rgba(120,230,170,.14)', textAlign: 'left' }}>
-                <span style={{ width: 34, height: 34, borderRadius: 11, background: 'rgba(63,213,138,.14)', color: '#3FD58A', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <div key={f.t} className={`${P}-fcard ${P}-up ${P}-${f.c}`} style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 16, borderRadius: 18, background: fcardBg, border: '1px solid color-mix(in srgb,var(--pn-78e6aa,#78E6AA) 14%,transparent)', textAlign: 'left' }}>
+                <span style={{ width: 34, height: 34, borderRadius: 11, background: 'color-mix(in srgb,var(--pn-3fd58a,#3FD58A) 14%,transparent)', color: 'var(--pn-3fd58a,#3FD58A)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <LineIcon size={17} d={f.icon} />
                 </span>
                 <span style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   <b style={{ fontSize: 14, fontWeight: 700, color: '#FFFFFF' }}>{f.t}</b>
-                  <span style={{ fontSize: 12.5, color: '#A9C2B5' }}>{f.s}</span>
+                  <span style={{ fontSize: 12.5, color: 'var(--pn-a9c2b5,#A9C2B5)' }}>{f.s}</span>
                 </span>
               </div>
             ))}
@@ -107,23 +107,23 @@ export function VndVitrine({ theme, core, preview, simula }: LoginVariantProps &
         {/* card à direita */}
         <div className={`${P}-pop ${P}-cardwrap`} style={{ position: 'relative', width: '100%', maxWidth: 430, flexShrink: 0 }}>
           <div className={`${P}-ring`} aria-hidden="true" style={{ position: 'absolute', inset: -1.5, borderRadius: 30, overflow: 'hidden', pointerEvents: 'none' }}>
-            <span className={`${P}-spin`} style={{ position: 'absolute', left: '50%', top: '50%', width: '160%', aspectRatio: '1', margin: '-80% 0 0 -80%', background: 'conic-gradient(from 0deg, rgba(63,213,138,0) 0deg, rgba(63,213,138,.9) 60deg, rgba(232,200,119,.9) 110deg, rgba(63,213,138,0) 170deg, rgba(63,213,138,0) 360deg)' }} />
+            <span className={`${P}-spin`} style={{ position: 'absolute', left: '50%', top: '50%', width: '160%', aspectRatio: '1', margin: '-80% 0 0 -80%', background: 'conic-gradient(from 0deg, color-mix(in srgb,var(--pn-3fd58a,#3FD58A) 0%,transparent) 0deg, color-mix(in srgb,var(--pn-3fd58a,#3FD58A) 90%,transparent) 60deg, color-mix(in srgb,var(--pn-e8c877,#E8C877) 90%,transparent) 110deg, color-mix(in srgb,var(--pn-3fd58a,#3FD58A) 0%,transparent) 170deg, color-mix(in srgb,var(--pn-3fd58a,#3FD58A) 0%,transparent) 360deg)' }} />
           </div>
-          <div className={`${P}-halo`} aria-hidden="true" style={{ position: 'absolute', inset: -16, borderRadius: 40, background: 'radial-gradient(closest-side, rgba(63,213,138,.35), rgba(63,213,138,0))', filter: 'blur(18px)', pointerEvents: 'none' }} />
-          <div className={`${P}-card`} style={{ position: 'relative', background: CARD_BG[t], color: TOKENS[t].fg, borderRadius: 28, padding: 32, boxSizing: 'border-box', boxShadow: '0 40px 80px -30px rgba(0,0,0,.7)', textAlign: 'left', border: t === 'escuro' ? '1px solid rgba(120,230,170,.16)' : 'none' }}>
+          <div className={`${P}-halo`} aria-hidden="true" style={{ position: 'absolute', inset: -16, borderRadius: 40, background: 'radial-gradient(closest-side, color-mix(in srgb,var(--pn-3fd58a,#3FD58A) 35%,transparent), color-mix(in srgb,var(--pn-3fd58a,#3FD58A) 0%,transparent))', filter: 'blur(18px)', pointerEvents: 'none' }} />
+          <div className={`${P}-card`} style={{ position: 'relative', background: CARD_BG[t], color: TOKENS[t].fg, borderRadius: 28, padding: 32, boxSizing: 'border-box', boxShadow: '0 40px 80px -30px rgba(0,0,0,.7)', textAlign: 'left', border: t === 'escuro' ? '1px solid color-mix(in srgb,var(--pn-78e6aa,#78E6AA) 16%,transparent)' : 'none' }}>
             <LoginForm brand="vnd" theme={theme} core={core} tokens={TOKENS[t]} preview={preview}
               centro={false} mostrarTitulo tituloAluno="Entrar" ctaLabel="Entrar" />
           </div>
         </div>
       </main>
 
-      <footer className={`${P}-up ${P}-d7 ${P}-foot`} style={{ position: 'absolute', left: 44, bottom: 26, fontSize: 12, color: '#7FA893' }}>© 2026 Você na Defensoria</footer>
+      <footer className={`${P}-up ${P}-d7 ${P}-foot`} style={{ position: 'absolute', left: 44, bottom: 26, fontSize: 12, color: 'var(--pn-7fa893,#7FA893)' }}>© 2026 Você na Defensoria</footer>
     </div>
   )
 }
 
 const css = `
-.${P}-root a{color:#3FD58A}
+.${P}-root a{color:var(--pn-3fd58a,#3FD58A)}
 .${P}-grid{background-image:radial-gradient(circle,rgba(140,240,185,.2) 1.2px,transparent 1.8px);background-size:28px 28px;-webkit-mask-image:radial-gradient(ellipse 70% 70% at 40% 45%,#000 25%,transparent 85%);mask-image:radial-gradient(ellipse 70% 70% at 40% 45%,#000 25%,transparent 85%);animation:${P}-fade 1.4s ease-out both, ${P}-pan 40s linear 1.4s infinite}
 .${P}-h1{font-size:54px}
 .${P}-ghost{transition:background .2s,color .2s}.${P}-ghost:hover{background:rgba(255,255,255,.12);color:#FFFFFF}

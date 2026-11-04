@@ -39,7 +39,7 @@ const DASH = '—'
 
 function Chevrons() {
   const cm = useCm()
-  const defs: [number, string, number][] = [[-90, cm('rgba(232,200,119,.55)'), 2], [-50, cm('rgba(185,245,212,.14)'), 1.2], [-10, cm('rgba(185,245,212,.1)'), 1.2]]
+  const defs: [number, string, number][] = [[-90, cm('color-mix(in srgb,var(--pn-e8c877,#E8C877) 55%,transparent)'), 2], [-50, cm('color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 14%,transparent)'), 1.2], [-10, cm('color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 10%,transparent)'), 1.2]]
   return <>{defs.map(([b, c, w], k) => (
     <svg key={k} className={`pvn-chev pvn-c${k + 1}`} viewBox="0 0 200 120" aria-hidden preserveAspectRatio="none" style={{ position: 'absolute', right: '-4%', width: '62%', height: 220, bottom: b, pointerEvents: 'none' }}><path d="M0 0 L100 112 L200 0" fill="none" stroke={c} strokeWidth={w} vectorEffect="non-scaling-stroke" /></svg>
   ))}</>
@@ -49,7 +49,7 @@ function Avatar({ size, data }: { size: number; data: PerfilData }) {
   const cm = useCm()
   const h = data.header
   if (h.avatarUrl) return <img src={h.avatarUrl} alt="" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-  return <span style={{ width: '100%', height: '100%', borderRadius: '50%', background: h.avatarCor || cm('linear-gradient(160deg,#F7C25A,#E8952A)'), color: cm('#FFF'), display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.round(size * 0.36), fontWeight: 800 }}>{h.iniciais}</span>
+  return <span style={{ width: '100%', height: '100%', borderRadius: '50%', background: h.avatarCor || cm('linear-gradient(160deg,var(--pn-f7c25a,#F7C25A),var(--pn-e8952a,#E8952A))'), color: cm('#FFF'), display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: Math.round(size * 0.36), fontWeight: 800 }}>{h.iniciais}</span>
 }
 
 function LvlRing({ size, p, inner }: { size: number; p: number; inner: React.ReactNode }) {
@@ -59,7 +59,7 @@ function LvlRing({ size, p, inner }: { size: number; p: number; inner: React.Rea
     <span style={{ position: 'relative', width: size, height: size, display: 'inline-flex', flexShrink: 0 }}>
       <svg viewBox={`0 0 ${size} ${size}`} style={{ position: 'absolute', inset: 0, transform: 'rotate(-90deg)' }}>
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--track)" strokeWidth={4} />
-        <circle className="pvn-ring" cx={size / 2} cy={size / 2} r={r} fill="none" stroke={cm('#E8C877')} strokeWidth={4} strokeLinecap="round" strokeDasharray={C.toFixed(1)} strokeDashoffset={(C * (1 - p)).toFixed(1)} style={{ ['--c' as any]: C.toFixed(1) }} />
+        <circle className="pvn-ring" cx={size / 2} cy={size / 2} r={r} fill="none" stroke={cm('var(--pn-e8c877,#E8C877)')} strokeWidth={4} strokeLinecap="round" strokeDasharray={C.toFixed(1)} strokeDashoffset={(C * (1 - p)).toFixed(1)} style={{ ['--c' as any]: C.toFixed(1) }} />
       </svg>
       <span style={{ position: 'absolute', inset: 8, display: 'flex' }}>{inner}</span>
     </span>
@@ -78,12 +78,12 @@ function Header({ mobile, data }: { mobile: boolean; data: PerfilData }) {
   if (h.gamAtivo && h.liga) meta.push(['trophy', h.posicaoLiga != null ? `${h.liga} · ${h.posicaoLiga}º` : h.liga])
   if (h.gamAtivo && h.recorde > 0) meta.push(['flame', `Recorde: ${h.recorde} dias seguidos`])
   const banner = (
-    <section style={{ position: 'relative', overflow: 'hidden', height: mobile ? 150 : 210, background: cm('linear-gradient(120deg,#041A10 0%,#0B4A2E 55%,#12643D 100%)') }}>
-      <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: cm('radial-gradient(circle,rgba(185,245,212,.18) 1.2px,transparent 1.8px)'), backgroundSize: '22px 22px', pointerEvents: 'none' }} />
+    <section style={{ position: 'relative', overflow: 'hidden', height: mobile ? 150 : 210, background: cm('linear-gradient(120deg,var(--pn-041a10,#041A10) 0%,var(--pn-0b4a2e,#0B4A2E) 55%,var(--pn-12643d,#12643D) 100%)') }}>
+      <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: cm('radial-gradient(circle,color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 18%,transparent) 1.2px,transparent 1.8px)'), backgroundSize: '22px 22px', pointerEvents: 'none' }} />
       <Chevrons />
       <svg viewBox="0 0 32 32" aria-hidden style={{ position: 'absolute', right: mobile ? -20 : '8%', top: mobile ? -10 : -30, width: mobile ? 170 : 280, height: mobile ? 170 : 280, opacity: 0.08 }}><path fill={cm('#FFF')} d={VPATH} /></svg>
       {h.memberSince ? <span style={{ position: 'absolute', left: mobile ? 18 : 32, top: 20, display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px', borderRadius: 99, background: cm('rgba(255,255,255,.14)'), color: cm('#FFF'), fontSize: 11.5, fontWeight: 700 }}><Ic n="crown" s={13} />Aluno desde {h.memberSince}</span> : null}
-      <span style={{ position: 'absolute', left: mobile ? 18 : 32, top: 54, fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: cm('#86CFA6') }}>{marca === 'mac' ? 'RUMO À APROVAÇÃO' : 'FUTURO DEFENSOR'}</span>
+      <span style={{ position: 'absolute', left: mobile ? 18 : 32, top: 54, fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: cm('var(--pn-86cfa6,#86CFA6)') }}>{marca === 'mac' ? 'RUMO À APROVAÇÃO' : 'FUTURO DEFENSOR'}</span>
     </section>
   )
   const who = (
@@ -96,7 +96,7 @@ function Header({ mobile, data }: { mobile: boolean; data: PerfilData }) {
       <div style={{ flex: 1, minWidth: 0, paddingTop: mobile ? 0 : 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <b style={{ fontSize: mobile ? 24 : 28, fontWeight: 800, letterSpacing: '-0.04em', color: 'var(--ink)' }}>{h.nome}</b>
-          {h.gamAtivo ? <span style={{ height: 24, padding: '0 10px', borderRadius: 99, background: cm('linear-gradient(180deg,#F1D48A,#D8B45A)'), color: cm('#2A1F02'), fontSize: 11.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center' }}>Nv {h.nivel} · {h.tituloNivel}</span> : null}
+          {h.gamAtivo ? <span style={{ height: 24, padding: '0 10px', borderRadius: 99, background: cm('linear-gradient(180deg,var(--pn-f1d48a,#F1D48A),var(--pn-d8b45a,#D8B45A))'), color: cm('var(--pn-2a1f02,#2A1F02)'), fontSize: 11.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center' }}>Nv {h.nivel} · {h.tituloNivel}</span> : null}
         </div>
         {meta.length ? (
           <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 6, fontSize: 12.5, color: 'var(--muted)' }}>
@@ -105,7 +105,7 @@ function Header({ mobile, data }: { mobile: boolean; data: PerfilData }) {
         ) : null}
         {h.gamAtivo ? (
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 12, maxWidth: 420 }}>
-            <div style={{ flex: 1 }}>{bk.bar(Math.round(ringP * 100), 'var(--gold, #E8C877)', 8)}</div>
+            <div style={{ flex: 1 }}>{bk.bar(Math.round(ringP * 100), 'var(--gold, var(--pn-e8c877,#E8C877))', 8)}</div>
             <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)', whiteSpace: 'nowrap' }}>{h.xpNivelAtual}/{h.xpNivelMax} XP</span>
           </div>
         ) : null}
@@ -135,12 +135,12 @@ function Kpis({ mobile, data }: { mobile: boolean; data: PerfilData }) {
   const acerto = k.acertoMedio
   const items: { p: number; color: string; inner: React.ReactNode; t: string; s: string }[] = [
     { p: acerto == null ? 0 : acerto / 100, color: 'var(--brand)', inner: <b style={{ fontSize: 16, color: 'var(--ink)' }}>{acerto == null ? DASH : `${Math.round(acerto)}%`}</b>, t: 'Acerto médio', s: `${k.simuladosFeitos} simulados` },
-    { p: k.notaMedia == null ? 0 : Math.min(1, k.notaMedia / 100), color: 'var(--gold, #E8C877)', inner: <b style={{ fontSize: 15, color: 'var(--ink)' }}>{k.notaMedia == null ? DASH : fnum(k.notaMedia)}</b>, t: 'Nota média', s: k.melhorNota == null ? 'sem recorde' : `melhor ${fnum(k.melhorNota)}` },
+    { p: k.notaMedia == null ? 0 : Math.min(1, k.notaMedia / 100), color: 'var(--gold, var(--pn-e8c877,#E8C877))', inner: <b style={{ fontSize: 15, color: 'var(--ink)' }}>{k.notaMedia == null ? DASH : fnum(k.notaMedia)}</b>, t: 'Nota média', s: k.melhorNota == null ? 'sem recorde' : `melhor ${fnum(k.melhorNota)}` },
   ]
   if (h.gamAtivo) {
     const ringP = h.xpNivelMax > 0 ? Math.min(1, h.xpNivelAtual / h.xpNivelMax) : 0
-    items.push({ p: ringP, color: cm('#7C6CF0'), inner: <b style={{ fontSize: 15, color: 'var(--ink)' }}>Nv {h.nivel}</b>, t: 'Próximo nível', s: `${Math.max(0, h.xpNivelMax - h.xpNivelAtual)} XP p/ o ${h.nivel + 1}` })
-    items.push({ p: 0, color: cm('#F0773A'), inner: <Ic n="flame" s={24} c={cm('#F0773A')} />, t: 'Sequência', s: `${h.streak} dias · recorde ${h.recorde}` })
+    items.push({ p: ringP, color: cm('var(--pn-7c6cf0,#7C6CF0)'), inner: <b style={{ fontSize: 15, color: 'var(--ink)' }}>Nv {h.nivel}</b>, t: 'Próximo nível', s: `${Math.max(0, h.xpNivelMax - h.xpNivelAtual)} XP p/ o ${h.nivel + 1}` })
+    items.push({ p: 0, color: cm('var(--pn-f0773a,#F0773A)'), inner: <Ic n="flame" s={24} c={cm('var(--pn-f0773a,#F0773A)')} />, t: 'Sequência', s: `${h.streak} dias · recorde ${h.recorde}` })
   }
   return (
     <div className="pvn-kpis">
@@ -189,7 +189,7 @@ function TabGeral({ mobile, data }: { mobile: boolean; data: PerfilData }) {
     {data.leiSeca.map(({ lei, feitas, total }, k) => (
       <div key={lei} style={{ padding: '8px 0', borderTop: k ? '1px solid var(--line)' : undefined }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12.5, marginBottom: 6 }}><b style={{ color: 'var(--ink)' }}>{lei}</b><span style={{ color: 'var(--muted)' }}>{feitas}/{total} aulas</span></div>
-        {bk.bar(total > 0 ? Math.round(100 * feitas / total) : 0, feitas >= total ? 'var(--gold, #E8C877)' : undefined, 6)}
+        {bk.bar(total > 0 ? Math.round(100 * feitas / total) : 0, feitas >= total ? 'var(--gold, var(--pn-e8c877,#E8C877))' : undefined, 6)}
       </div>
     ))}
     <div style={{ marginTop: 14 }}>
@@ -231,13 +231,13 @@ function TabConq({ mobile, data }: { mobile: boolean; data: PerfilData }) {
   const total = data.conquistas.length
   const got = data.conquistas.filter((a) => a.desbloqueada).length
   const vitrine = (
-    <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 24, padding: 22, background: cm('linear-gradient(160deg,#041A10,#0B4A2E 60%,#12643D)') }}>
-      <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: cm('radial-gradient(circle,rgba(185,245,212,.14) 1.2px,transparent 1.8px)'), backgroundSize: '20px 20px', pointerEvents: 'none' }} />
+    <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 24, padding: 22, background: cm('linear-gradient(160deg,var(--pn-041a10,#041A10),var(--pn-0b4a2e,#0B4A2E) 60%,var(--pn-12643d,#12643D))') }}>
+      <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: cm('radial-gradient(circle,color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 14%,transparent) 1.2px,transparent 1.8px)'), backgroundSize: '20px 20px', pointerEvents: 'none' }} />
       <div style={{ position: 'relative' }}>
-        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.2em', color: cm('#F1D48A') }}>VITRINE</span>
+        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.2em', color: cm('var(--pn-f1d48a,#F1D48A)') }}>VITRINE</span>
         <b style={{ display: 'block', marginTop: 6, fontSize: 24, letterSpacing: '-0.03em', color: cm('#FFF') }}>{got} de {total} medalhas</b>
-        <span style={{ fontSize: 13, color: cm('#CFE3D7') }}>Conquiste mais estudando e fazendo simulados.</span>
-        {total ? <div style={{ marginTop: 14, display: 'flex', gap: 3, maxWidth: 280 }}>{Array.from({ length: total }).map((_, k) => <span key={k} style={{ flex: 1, height: 8, borderRadius: 3, background: k < got ? cm('#E8C877') : cm('rgba(255,255,255,.16)') }} />)}</div> : null}
+        <span style={{ fontSize: 13, color: cm('var(--pn-cfe3d7,#CFE3D7)') }}>Conquiste mais estudando e fazendo simulados.</span>
+        {total ? <div style={{ marginTop: 14, display: 'flex', gap: 3, maxWidth: 280 }}>{Array.from({ length: total }).map((_, k) => <span key={k} style={{ flex: 1, height: 8, borderRadius: 3, background: k < got ? cm('var(--pn-e8c877,#E8C877)') : cm('rgba(255,255,255,.16)') }} />)}</div> : null}
       </div>
     </div>
   )

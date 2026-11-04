@@ -103,7 +103,7 @@
   --gam-primary-foreground: var(--sidebar-foreground);
   /* SELOS POR TIPO DE CONTEÚDO (Biblioteca/redrive) — identidade FIXA do tipo, igual em todo tenant
      (semânticas, como emerald/amber/rose/sky). `fg` = texto/ícone, `bg` = fundo do selo. Claro. */
-  --sel-docx: #5B3FD0;  --sel-docx-bg: #EFEBFD;
+  --sel-docx: var(--pn-5b3fd0,#5B3FD0);  --sel-docx-bg: var(--pn-efebfd,#EFEBFD);
   --sel-pdf: #B4232A;   --sel-pdf-bg: #FDECEC;
   --sel-pptx: #C2410C;  --sel-pptx-bg: #FFEDE3;
   --sel-xlsx: #13804B;  --sel-xlsx-bg: #E3F7EC;
@@ -177,7 +177,7 @@ html.theme-anim *::after {
   --brand-primary: oklch(0.62 0.17 293);
   --brand-accent: oklch(0.84 0.15 82);
   /* SELOS POR TIPO (dark) — fg mais claro p/ contraste, bg translúcido do próprio fg. */
-  --sel-docx: #B3A1FF;  --sel-docx-bg: rgba(143,117,255,.18);
+  --sel-docx: var(--pn-b3a1ff,#B3A1FF);  --sel-docx-bg: color-mix(in srgb,var(--pn-8f75ff,#8F75FF) 18%,transparent);
   --sel-pdf: #FF8A8F;   --sel-pdf-bg: rgba(229,72,77,.16);
   --sel-pptx: #FDBA8C;  --sel-pptx-bg: rgba(194,65,12,.22);
   --sel-xlsx: #5FD39B;  --sel-xlsx-bg: rgba(19,128,75,.22);

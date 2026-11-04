@@ -38,7 +38,7 @@ function Header({ mobile, data }: { mobile: boolean; data: PerfilData }) {
   const ringP = h.gamAtivo && h.xpNivelMax > 0 ? Math.min(1, h.xpNivelAtual / h.xpNivelMax) : 0
   const W = 1200
   const traces: [string, string][] = [
-    [`M-10 40 H260 V90 H520 V30 H${W + 10}`, 'rgba(94,206,240,.35)'],
+    [`M-10 40 H260 V90 H520 V30 H${W + 10}`, 'color-mix(in srgb,var(--pn-5ecef0,#5ECEF0) 35%,transparent)'],
     [`M-10 120 H180 V70 H430 V130 H760 V60 H${W + 10}`, 'rgba(255,255,255,.12)'],
     [`M600 -10 V40 H900 V110 H${W + 10}`, 'rgba(255,255,255,.1)'],
   ]
@@ -48,12 +48,12 @@ function Header({ mobile, data }: { mobile: boolean; data: PerfilData }) {
   if (h.gamAtivo && h.liga) meta.push(['trophy', h.posicaoLiga != null ? `${h.liga} · ${h.posicaoLiga}º` : h.liga])
   if (h.gamAtivo && h.recorde > 0) meta.push(['flame', `Recorde: ${h.recorde} dias seguidos`])
   const banner = (
-    <div style={{ position: 'relative', height: mobile ? 120 : 150, background: 'linear-gradient(120deg,#171E3B,#25356F 55%,#306AB5)', overflow: 'hidden' }}>
+    <div style={{ position: 'relative', height: mobile ? 120 : 150, background: 'linear-gradient(120deg,var(--pn-171e3b,#171E3B),var(--pn-25356f,#25356F) 55%,var(--pn-306ab5,#306AB5))', overflow: 'hidden' }}>
       <span aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px)', backgroundSize: '20px 20px', pointerEvents: 'none' }} />
       <svg className="pmq-circ" viewBox={`0 0 ${W} 150`} preserveAspectRatio="xMidYMid slice" aria-hidden style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', pointerEvents: 'none' }}>
         {traces.map(([d, c], i) => <path key={i} d={d} fill="none" stroke={c} strokeWidth={1.5} />)}
-        <path className="pmq-pl" pathLength={1000} d={`M-10 40 H260 V90 H520 V30 H${W + 10}`} fill="none" stroke="#8BEAEA" strokeWidth={2.5} strokeLinecap="round" />
-        {nodes.map(([x, y], i) => <rect key={i} x={x - 4} y={y - 4} width={8} height={8} rx={2} fill="#5ECEF0" opacity={0.7} />)}
+        <path className="pmq-pl" pathLength={1000} d={`M-10 40 H260 V90 H520 V30 H${W + 10}`} fill="none" stroke="var(--pn-8beaea,#8BEAEA)" strokeWidth={2.5} strokeLinecap="round" />
+        {nodes.map(([x, y], i) => <rect key={i} x={x - 4} y={y - 4} width={8} height={8} rx={2} fill="var(--pn-5ecef0,#5ECEF0)" opacity={0.7} />)}
       </svg>
       {h.memberSince ? <span style={{ position: 'absolute', left: mobile ? 20 : 28, top: 18, display: 'inline-flex', alignItems: 'center', gap: 6, height: 26, padding: '0 10px', borderRadius: 7, background: 'rgba(255,255,255,.14)', color: '#FFF', fontSize: 11.5, fontWeight: 700 }}><Ic n="crown" s={13} />Aluno desde {h.memberSince}</span> : null}
     </div>
@@ -69,7 +69,7 @@ function Header({ mobile, data }: { mobile: boolean; data: PerfilData }) {
       <div style={{ flex: 1, minWidth: 0, paddingTop: mobile ? 0 : 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <b style={{ fontSize: mobile ? 24 : 28, fontWeight: 700, letterSpacing: '-0.04em', color: 'var(--ink)' }}>{h.nome}</b>
-          {h.gamAtivo ? <span style={{ height: 24, padding: '0 10px', borderRadius: 6, background: 'var(--brand2)', color: '#0B1124', fontSize: 11.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center' }}>Nv {h.nivel} · {h.tituloNivel}</span> : null}
+          {h.gamAtivo ? <span style={{ height: 24, padding: '0 10px', borderRadius: 6, background: 'var(--brand2)', color: 'var(--pn-0b1124,#0B1124)', fontSize: 11.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center' }}>Nv {h.nivel} · {h.tituloNivel}</span> : null}
         </div>
         {meta.length ? (
           <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginTop: 6, fontSize: 12.5, color: 'var(--muted)' }}>
@@ -94,7 +94,7 @@ function LvlRing({ size, p, inner }: { size: number; p: number; inner: React.Rea
     <span style={{ position: 'relative', width: size, height: size, display: 'inline-flex', flexShrink: 0 }}>
       <svg viewBox={`0 0 ${size} ${size}`} style={{ position: 'absolute', inset: 0, transform: 'rotate(-90deg)' }}>
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--track)" strokeWidth={4} />
-        <circle className="pmq-ring" cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#5ECEF0" strokeWidth={4} strokeLinecap="round" strokeDasharray={C.toFixed(1)} strokeDashoffset={(C * (1 - p)).toFixed(1)} style={{ ['--c' as any]: C.toFixed(1) }} />
+        <circle className="pmq-ring" cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--pn-5ecef0,#5ECEF0)" strokeWidth={4} strokeLinecap="round" strokeDasharray={C.toFixed(1)} strokeDashoffset={(C * (1 - p)).toFixed(1)} style={{ ['--c' as any]: C.toFixed(1) }} />
       </svg>
       <span style={{ position: 'absolute', inset: 8, display: 'flex' }}>{inner}</span>
     </span>
@@ -259,7 +259,7 @@ function TabSelos({ mobile, data }: { mobile: boolean; data: PerfilData }) {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         {bk.card(<>
           {bk.head('shield', 'Selos conquistados', <b style={{ fontSize: 13, color: 'var(--brand2)' }}>{got.length}/{total}</b>)}
-          {got.length ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{got.map((a, k) => <span key={k} title={a.titulo} style={{ width: 40, height: 40, borderRadius: 9, background: 'linear-gradient(150deg,#1F2A55,#306AB5)', color: '#8BEAEA', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Ic n="shield" s={18} /></span>)}</div> : <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>Nenhum selo ainda.</span>}
+          {got.length ? <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{got.map((a, k) => <span key={k} title={a.titulo} style={{ width: 40, height: 40, borderRadius: 9, background: 'linear-gradient(150deg,var(--pn-1f2a55,#1F2A55),var(--pn-306ab5,#306AB5))', color: 'var(--pn-8beaea,#8BEAEA)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><Ic n="shield" s={18} /></span>)}</div> : <span style={{ fontSize: 12.5, color: 'var(--muted)' }}>Nenhum selo ainda.</span>}
         </>, 16)}
         {todo.length ? bk.card(<>
           {bk.head('clock', 'A conquistar')}
@@ -283,11 +283,11 @@ function TabSelos({ mobile, data }: { mobile: boolean; data: PerfilData }) {
           const on = a.desbloqueada
           return (
             <div key={k} style={{ display: 'grid', gridTemplateColumns: cols, gap: 14, alignItems: 'center', padding: '9px 8px', borderBottom: '1px solid var(--line)' }}>
-              <span style={{ width: 38, height: 38, borderRadius: 9, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', ...(on ? { background: 'linear-gradient(150deg,#1F2A55,#306AB5)', color: '#8BEAEA' } : { background: 'var(--surface2)', color: 'var(--muted)', border: '1px dashed var(--line2)' }) }}><Ic n={on ? 'shield' : 'lock'} s={17} /></span>
+              <span style={{ width: 38, height: 38, borderRadius: 9, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', ...(on ? { background: 'linear-gradient(150deg,var(--pn-1f2a55,#1F2A55),var(--pn-306ab5,#306AB5))', color: 'var(--pn-8beaea,#8BEAEA)' } : { background: 'var(--surface2)', color: 'var(--muted)', border: '1px dashed var(--line2)' }) }}><Ic n={on ? 'shield' : 'lock'} s={17} /></span>
               <b style={{ fontSize: 13, fontWeight: 600, color: on ? 'var(--ink)' : 'var(--muted)' }}>{a.titulo}</b>
               <span style={{ fontSize: 12, color: 'var(--muted)' }}>{a.criterio || ''}</span>
               {on
-                ? <span style={{ justifySelf: 'start', height: 24, padding: '0 9px', borderRadius: 6, background: 'rgba(46,199,122,.14)', color: '#2EC77A', fontSize: 11.5, fontWeight: 700, display: 'inline-flex', alignItems: 'center' }}>Obtido</span>
+                ? <span style={{ justifySelf: 'start', height: 24, padding: '0 9px', borderRadius: 6, background: 'color-mix(in srgb,var(--pn-2ec77a,#2EC77A) 14%,transparent)', color: 'var(--pn-2ec77a,#2EC77A)', fontSize: 11.5, fontWeight: 700, display: 'inline-flex', alignItems: 'center' }}>Obtido</span>
                 : <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--muted)' }}>Bloqueado</span>}
             </div>
           )

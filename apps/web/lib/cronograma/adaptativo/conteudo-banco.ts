@@ -5,6 +5,8 @@ import type { Conteudo } from './conteudo'
 import { conteudoSeed } from './conteudo'
 import type { ItemLP } from './motor28'
 import { catalogoLegProc } from './lp-catalogo'
+import { carregarPastasCP } from '@/lib/conteudo/capa-pagina-server'
+import { mapaPastas, resolverPaginaInicialDoc } from '@/lib/conteudo/capa-pagina'
 import { aplicarOverride, type CatalogoOverride } from './catalogo-override'
 import { lerOverride } from './catalogo-override-db'
 import { CATALOGO_HTML, GRUPOS_HTML, aulaHTML, chaveDisciplina, chaveLeiHTML, disciplinaHTML, docDaLei, nomeDisciplina, numeroAula } from './catalogo-html'
@@ -162,6 +164,19 @@ async function montarConteudo(svc: SupabaseClient, tenantId: string, ov: Catalog
     for (const v of verRows) if (v.paginas) pagPorVersao.set(v.id, v.paginas)
   }
 
+  // PÁGINA INICIAL (Biblioteca): as páginas anteriores (capa em imagem, índice) NÃO contam no esforço da meta. Best-effort:
+  // sem a migração (colunas ausentes) nada muda. início efetivo = o do documento ou o da pasta em lote mais próxima.
+  const inicioPorDoc = new Map<string, number>()
+  try {
+    const ids = aulaDocs.map((d) => d.id)
+    const [pastasCP, docsCP] = await Promise.all([
+      carregarPastasCP(svc, tenantId),
+      selectInChunks<{ id: string; pasta_id: string | null; pagina_inicial: number | null }>(ids, (chunk) => svc.from('simulado_conteudo_documentos').select('id, pasta_id, pagina_inicial').eq('tenant_id', tenantId).in('id', chunk)),
+    ])
+    const porId = mapaPastas(pastasCP)
+    for (const d of docsCP) { const v = resolverPaginaInicialDoc(d.pagina_inicial, d.pasta_id, porId).valor; if (v && v > 1) inicioPorDoc.set(d.id, v) }
+  } catch { /* sem migração / falha: contagem inteira, como antes */ }
+
   const col = new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base' })
 
   // 5) monta AS agrupado por disciplina (ordem alfabética-natural do título).
@@ -170,7 +185,8 @@ async function montarConteudo(svc: SupabaseClient, tenantId: string, ov: Catalog
   //    nº e tema da aula, páginas do PDFull e links de questões; e define a ORDEM de distribuição.
   const porDisc = new Map<string, Array<{ id: string; titulo: string; pags: number | null }>>()
   for (const d of aulaDocs) {
-    const pags = (d.versaoId && pagPorVersao.get(d.versaoId)) || null
+    const pagsTotal = (d.versaoId && pagPorVersao.get(d.versaoId)) || null
+    const pags = pagsTotal ? Math.max(1, pagsTotal - ((inicioPorDoc.get(d.id) ?? 1) - 1)) : null // sem a parte anterior à página inicial
     const arr = porDisc.get(d.discNome) || []; arr.push({ id: d.id, titulo: d.titulo, pags }); porDisc.set(d.discNome, arr)
   }
   const ASout: AS = []

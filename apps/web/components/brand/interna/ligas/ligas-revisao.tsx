@@ -32,7 +32,7 @@ export function LigasRevisao({ theme: themeProp, data, ranking }: { theme: Inter
   const mobile = useIsMobile()
   const [tab, setTab] = useState<LigaTab>('liga')
   const cor = data.ligaCor ?? '#E8A93A'
-  const heroGrad = 'linear-gradient(140deg,#24166A,#4B30BE 55%,#6449E0)'
+  const heroGrad = 'linear-gradient(140deg,var(--pn-24166a,#24166A),var(--pn-4b30be,#4B30BE) 55%,var(--pn-6449e0,#6449E0))'
 
   const Side = (
     <div className="lgrv-side" style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -55,7 +55,7 @@ export function LigasRevisao({ theme: themeProp, data, ranking }: { theme: Inter
           <div style={{ position: 'relative', display: 'flex', alignItems: mobile ? 'flex-start' : 'center', gap: 16, flexWrap: 'wrap' }}>
             <Escudo cor={cor} size={mobile ? 56 : 68} />
             <div style={{ flex: 1, minWidth: 180 }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 800, letterSpacing: '.18em', color: '#F1C232' }}>SUA LIGA ATUAL · {data.ligaNome.toUpperCase()}</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, fontWeight: 800, letterSpacing: '.18em', color: 'var(--pn-f1c232,#F1C232)' }}>SUA LIGA ATUAL · {data.ligaNome.toUpperCase()}</span>
               <h1 style={{ margin: '4px 0 0', fontSize: mobile ? 24 : 30, fontWeight: 800, letterSpacing: '-0.04em' }}>{data.posicao}º de {data.membros} alunos</h1>
               <p style={{ margin: '4px 0 0', fontSize: 14, color: 'rgba(255,255,255,.78)' }}>{fmtXp(data.xpTotal)} XP acumulados nesta temporada.</p>
             </div>
@@ -66,13 +66,13 @@ export function LigasRevisao({ theme: themeProp, data, ranking }: { theme: Inter
             </div>
           </div>
           {/* divtrack sobre fundo escuro */}
-          <div style={{ position: 'relative', padding: mobile ? '14px' : '16px 18px', borderRadius: 16, background: 'rgba(13,8,40,.4)', border: '1px solid rgba(255,255,255,.1)' }}>
+          <div style={{ position: 'relative', padding: mobile ? '14px' : '16px 18px', borderRadius: 16, background: 'color-mix(in srgb,var(--pn-0d0828,#0D0828) 40%,transparent)', border: '1px solid rgba(255,255,255,.1)' }}>
             <DivTrack tiers={data.tiers} xpTotal={data.xpTotal} proximaNome={data.proximaNome} faltam={data.faltam} dark={dark} onDark />
           </div>
         </div>
 
         {/* abas */}
-        <LigaTabs tab={tab} onTab={setTab} onCell="#2E1F7A" onInk="#FFF" bg={dark ? '#171030' : '#ECE8F6'} />
+        <LigaTabs tab={tab} onTab={setTab} onCell="#2E1F7A" onInk="#FFF" bg={dark ? 'var(--pn-171030,#171030)' : 'var(--pn-ece8f6,#ECE8F6)'} />
 
         {tab === 'liga' ? (
           <div className="lg-pv lgrv-liga" key="liga">

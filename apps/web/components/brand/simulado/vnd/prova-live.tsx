@@ -142,7 +142,7 @@ export function ProvaVndLive(p: ProvaMeqLiveProps) {
       {/* Sheet navegador mobile */}
       {p.ns && (
         <>
-          <div className={`${P}-mbg`} onClick={() => p.onSetNs(false)} style={{ position: 'fixed', inset: 0, zIndex: 70, background: 'rgba(10,10,25,.5)', backdropFilter: 'blur(6px)' }} />
+          <div className={`${P}-mbg`} onClick={() => p.onSetNs(false)} style={{ position: 'fixed', inset: 0, zIndex: 70, background: 'color-mix(in srgb,var(--pn-0a0a19,#0A0A19) 50%,transparent)', backdropFilter: 'blur(6px)' }} />
           <div className={`${P}-msh`} style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 71, maxHeight: '76%', overflowY: 'auto', padding: '18px 16px 24px', borderRadius: '22px 22px 0 0', background: 'var(--surface)' }}>
             <span style={{ display: 'block', width: 40, height: 4, margin: '0 auto 14px', borderRadius: 99, background: 'var(--line2)' }} />
             <b style={{ display: 'block', marginBottom: 12, fontSize: 16, color: 'var(--ink)' }}>Navegador · {cAns}/{N}</b>
@@ -229,7 +229,7 @@ function CardQuestao({ q, qi, N, resp, fz, flagged, elim, slotDiscursiva, onMark
                 const sel = resp === a.id
                 const dim = !!resp && resp !== a.id
                 const cor = isCerto ? C_OK : C_ERR
-                const grad = isCerto ? 'linear-gradient(180deg,#27C07E,#1FA868)' : 'linear-gradient(180deg,#F0565B,#E5484D)'
+                const grad = isCerto ? 'linear-gradient(180deg,var(--pn-27c07e,#27C07E),var(--pn-1fa868,#1FA868))' : 'linear-gradient(180deg,var(--pn-f0565b,#F0565B),var(--pn-e5484d,#E5484D))'
                 return (
                   <button key={a.id} type="button" onClick={() => onMark(a.id)} className={`${P}-cebtn`} style={{ flex: 1, height: 64, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 12, border: 0, background: grad, boxShadow: sel ? `0 0 0 3px var(--surface),0 0 0 6px ${cor},0 10px 24px -8px ${cor}` : `0 4px 12px -6px ${cor}`, opacity: dim ? 0.4 : 1, cursor: 'pointer', transition: 'opacity .2s,box-shadow .2s' }}>
                     <b style={{ fontSize: 17, fontWeight: 800, letterSpacing: '.02em', color: '#fff' }}>{a.texto}</b>
@@ -285,14 +285,14 @@ function CardQuestao({ q, qi, N, resp, fz, flagged, elim, slotDiscursiva, onMark
 
 function RevisarBtn({ on, onClick }: { on: boolean; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} style={{ height: 46, padding: '0 16px', borderRadius: 12, border: `1.5px solid ${on ? '#F2B63B' : 'rgba(242,182,59,.55)'}`, background: on ? '#F2B63B' : 'rgba(242,182,59,.14)', color: on ? '#3A2A00' : '#C98A0B', font: 'inherit', fontSize: 13.5, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+    <button type="button" onClick={onClick} style={{ height: 46, padding: '0 16px', borderRadius: 12, border: `1.5px solid ${on ? 'var(--pn-f2b63b,#F2B63B)' : 'color-mix(in srgb,var(--pn-f2b63b,#F2B63B) 55%,transparent)'}`, background: on ? 'var(--pn-f2b63b,#F2B63B)' : 'color-mix(in srgb,var(--pn-f2b63b,#F2B63B) 14%,transparent)', color: on ? 'var(--pn-3a2a00,#3A2A00)' : 'var(--pn-c98a0b,#C98A0B)', font: 'inherit', fontSize: 13.5, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', whiteSpace: 'nowrap' }}>
       <Flag size={15} />{on ? 'Marcada para revisar' : 'Revisar'}
     </button>
   )
 }
 
 function revisarMiniStyle(on: boolean): CSSProperties {
-  return { height: 46, padding: '0 11px', borderRadius: 12, border: `1.5px solid ${on ? '#F2B63B' : 'rgba(242,182,59,.55)'}`, background: on ? '#F2B63B' : 'rgba(242,182,59,.14)', color: on ? '#3A2A00' : '#C98A0B', font: 'inherit', fontSize: 13.5, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', whiteSpace: 'nowrap' }
+  return { height: 46, padding: '0 11px', borderRadius: 12, border: `1.5px solid ${on ? 'var(--pn-f2b63b,#F2B63B)' : 'color-mix(in srgb,var(--pn-f2b63b,#F2B63B) 55%,transparent)'}`, background: on ? 'var(--pn-f2b63b,#F2B63B)' : 'color-mix(in srgb,var(--pn-f2b63b,#F2B63B) 14%,transparent)', color: on ? 'var(--pn-3a2a00,#3A2A00)' : 'var(--pn-c98a0b,#C98A0B)', font: 'inherit', fontSize: 13.5, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', whiteSpace: 'nowrap' }
 }
 
 // ── Folha de respostas ──────────────────────────────────────────────────────
@@ -417,12 +417,12 @@ function ModalRev({ questoes, respostas, discPaginas, marcadas, N, cAns, cBl, cF
           <CountChip n={cFl} label="Para revisar" color="var(--flag)" />
         </div>
         {hasBl ? (
-          <div style={{ display: 'flex', gap: 10, padding: '12px 14px', borderRadius: 12, background: 'rgba(242,169,59,.12)', fontSize: 12.5, lineHeight: 1.45, color: 'var(--ink)' }}>
+          <div style={{ display: 'flex', gap: 10, padding: '12px 14px', borderRadius: 12, background: 'color-mix(in srgb,var(--pn-f2a93b,#F2A93B) 12%,transparent)', fontSize: 12.5, lineHeight: 1.45, color: 'var(--ink)' }}>
             <CircleAlert size={17} style={{ color: C_WARN, flexShrink: 0 }} />
             <span><b>Você ainda tem {cBl} questões em branco:</b> {blTxt}.</span>
           </div>
         ) : (
-          <div style={{ display: 'flex', gap: 10, padding: '12px 14px', borderRadius: 12, background: 'rgba(31,168,104,.1)', fontSize: 13, color: C_OK, fontWeight: 700 }}>
+          <div style={{ display: 'flex', gap: 10, padding: '12px 14px', borderRadius: 12, background: 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 10%,transparent)', fontSize: 13, color: C_OK, fontWeight: 700 }}>
             <Check size={17} />Todas as questões foram respondidas.
           </div>
         )}

@@ -280,7 +280,7 @@ export function TrilhaLivre({ nodes, livre, capa, simbolos, editavel = false, on
               {/* Nó PRÓXIMA aula (a liberar): anéis pulsando em ÂMBAR p/ chamar atenção mesmo bloqueada. */}
               {proxima && (<>
                 <span className="pointer-events-none absolute rounded-full border-2 border-amber-400 opacity-80 motion-safe:animate-ping" style={{ inset: -Math.round(nodeSize * 0.12) }} />
-                <span className="pointer-events-none absolute rounded-full opacity-45 motion-safe:animate-ping [animation-delay:600ms]" style={{ inset: -Math.round(nodeSize * 0.05), background: 'radial-gradient(circle, rgba(245,158,11,0.32) 0%, transparent 70%)' }} />
+                <span className="pointer-events-none absolute rounded-full opacity-45 motion-safe:animate-ping [animation-delay:600ms]" style={{ inset: -Math.round(nodeSize * 0.05), background: 'radial-gradient(circle, color-mix(in srgb,var(--pn-f59e0b,#F59E0B) 32%,transparent) 0%, transparent 70%)' }} />
               </>)}
               <span className="relative z-10"><SimboloNo config={simbolos[n.estado]} escala={iconEscala} cor={cor.simbolo} /></span>
               {!editavel && <EstampasNo estampas={estampas} aulaId={n.id} />}

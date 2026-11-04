@@ -59,7 +59,7 @@ export function ModulosArea({ modulos }: { modulos: Mod[] }) {
           const on = aba === k
           return (
             <button key={k} type="button" onClick={() => setAba(k)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 16px', borderRadius: 10, fontSize: 13, whiteSpace: 'nowrap', border: 0, cursor: 'pointer', background: on ? 'var(--surface)' : 'transparent', color: on ? 'var(--ink)' : 'var(--muted)', fontWeight: on ? 800 : 700, boxShadow: on ? '0 2px 8px rgba(30,15,80,.1)' : undefined }}>
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 16px', borderRadius: 10, fontSize: 13, whiteSpace: 'nowrap', border: 0, cursor: 'pointer', background: on ? 'var(--surface)' : 'transparent', color: on ? 'var(--ink)' : 'var(--muted)', fontWeight: on ? 800 : 700, boxShadow: on ? '0 2px 8px color-mix(in srgb,var(--pn-1e0f50,#1E0F50) 10%,transparent)' : undefined }}>
               <Icon n={k === 'modulos' ? 'layers' : 'chart'} size={15} />{k === 'modulos' ? 'Módulos' : 'Desempenho'}
             </button>
           )

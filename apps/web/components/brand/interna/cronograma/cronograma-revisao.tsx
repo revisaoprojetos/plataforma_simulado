@@ -17,15 +17,15 @@ const K = 'rev' as const
 
 function RevHero({ st, mobile }: { st: CronogramaState; mobile: boolean }) {
   return (
-    <div style={{ position: 'relative', overflow: 'hidden', borderRadius: mobile ? 0 : 26, margin: mobile ? '0 -18px' : undefined, padding: mobile ? '24px 18px' : '34px 36px', background: 'radial-gradient(120% 140% at 0% 0%,#3B1E8F 0%,#2E1F7A 45%,#1E1150 100%)', color: '#FFFFFF' }}>
+    <div style={{ position: 'relative', overflow: 'hidden', borderRadius: mobile ? 0 : 26, margin: mobile ? '0 -18px' : undefined, padding: mobile ? '24px 18px' : '34px 36px', background: 'radial-gradient(120% 140% at 0% 0%,var(--pn-3b1e8f,#3B1E8F) 0%,var(--pn-2e1f7a,#2E1F7A) 45%,var(--pn-1e1150,#1E1150) 100%)', color: '#FFFFFF' }}>
       <span aria-hidden style={{ position: 'absolute', right: mobile ? -20 : 30, top: 10, color: 'rgba(255,255,255,.08)', pointerEvents: 'none' }}><Ic n="cal" s={mobile ? 110 : 160} /></span>
-      <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: '#F1C232' }}>
-        <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#F1C232' }} />CRONOGRAMA DE ESTUDOS
+      <span style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: 8, fontSize: 11, fontWeight: 800, letterSpacing: '.22em', color: 'var(--pn-f1c232,#F1C232)' }}>
+        <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--pn-f1c232,#F1C232)' }} />CRONOGRAMA DE ESTUDOS
       </span>
       <h1 style={{ position: 'relative', margin: '10px 0 8px', fontSize: mobile ? 28 : 40, fontWeight: 800, letterSpacing: '-0.045em', lineHeight: 1.08 }}>
-        Seu cronograma de estudo <span style={{ color: '#F1C232' }}>do seu jeito.</span>
+        Seu cronograma de estudo <span style={{ color: 'var(--pn-f1c232,#F1C232)' }}>do seu jeito.</span>
       </h1>
-      <p style={{ position: 'relative', margin: 0, maxWidth: 620, fontSize: 14.5, lineHeight: 1.55, color: '#D9CFFF' }}>
+      <p style={{ position: 'relative', margin: 0, maxWidth: 620, fontSize: 14.5, lineHeight: 1.55, color: 'var(--pn-d9cfff,#D9CFFF)' }}>
         Escolha a rotina, defina quando começar e receba um plano completo, organizado semana a semana e salvo na sua conta.
       </p>
       <div style={{ position: 'relative', marginTop: 18, maxWidth: 640 }}>
@@ -36,7 +36,7 @@ function RevHero({ st, mobile }: { st: CronogramaState; mobile: boolean }) {
 }
 
 function GerarArea({ st, mobile }: { st: CronogramaState; mobile: boolean }) {
-  const cardSty: CSSProperties = { borderRadius: 22, background: 'var(--surface)', border: '1px solid var(--line)', boxShadow: '0 30px 60px -40px rgba(40,20,110,.5)' }
+  const cardSty: CSSProperties = { borderRadius: 22, background: 'var(--surface)', border: '1px solid var(--line)', boxShadow: '0 30px 60px -40px color-mix(in srgb,var(--pn-28146e,#28146E) 50%,transparent)' }
   const wiz = (
     <div style={{ padding: mobile ? 18 : 26, display: 'flex', flexDirection: 'column', gap: 20, ...cardSty }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 14, paddingBottom: 18, borderBottom: '1px solid var(--line)' }}><Stepper k={K} mobile={mobile} st={st} /></div>
@@ -46,9 +46,9 @@ function GerarArea({ st, mobile }: { st: CronogramaState; mobile: boolean }) {
   )
   const side = (
     <>
-      <div style={{ borderRadius: 22, padding: 20, background: 'radial-gradient(120% 120% at 100% 0%,#6449E0 0%,#3B1E8F 55%,#1E1150 100%)', color: '#FFFFFF' }}>
-        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.14em', color: '#F1C232' }}>SEU PLANO ATÉ AGORA</span>
-        <b style={{ display: 'block', margin: '8px 0 6px', fontSize: 32, letterSpacing: '-0.04em' }}>{st.previa.weeks} <span style={{ fontSize: 15, color: '#CFC4FF' }}>semanas</span></b>
+      <div style={{ borderRadius: 22, padding: 20, background: 'radial-gradient(120% 120% at 100% 0%,var(--pn-6449e0,#6449E0) 0%,var(--pn-3b1e8f,#3B1E8F) 55%,var(--pn-1e1150,#1E1150) 100%)', color: '#FFFFFF' }}>
+        <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.14em', color: 'var(--pn-f1c232,#F1C232)' }}>SEU PLANO ATÉ AGORA</span>
+        <b style={{ display: 'block', margin: '8px 0 6px', fontSize: 32, letterSpacing: '-0.04em' }}>{st.previa.weeks} <span style={{ fontSize: 15, color: 'var(--pn-cfc4ff,#CFC4FF)' }}>semanas</span></b>
         <SummaryRows st={st} darkBg />
       </div>
       <RevTip />

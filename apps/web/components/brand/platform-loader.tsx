@@ -88,7 +88,7 @@ function brandDoStyle(style?: string): Brand | null {
 }
 
 /** Fundo do overlay enquanto resolvemos a aparência (NEUTRO, sem marca — dark slate, SEM roxo). */
-const NEUTRO_BG = 'linear-gradient(150deg,#12141c,#181b26,#1e2230)'
+const NEUTRO_BG = 'linear-gradient(150deg,var(--pn-12141c,#12141c),var(--pn-181b26,#181b26),var(--pn-1e2230,#1e2230))'
 
 export function PlatformLoader({ brand, theme: themeProp, style, message }: PlatformLoaderProps) {
   const theme = normTheme(themeProp) // aceita light/dark (simulado) → claro/escuro

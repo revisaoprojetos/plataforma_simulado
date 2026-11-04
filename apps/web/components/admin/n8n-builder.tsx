@@ -158,7 +158,7 @@ function Editor({ automacao, eventos, onVoltar }: { automacao: Automacao | null;
         <div className="rounded-2xl border bg-card p-4">
           {sel === 'gatilho' ? (
             <div className="space-y-3">
-              <div className="flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: '#f9731622', color: '#f97316' }}><Zap className="h-4 w-4" /></span><h3 className="text-sm font-semibold">Gatilho</h3></div>
+              <div className="flex items-center gap-2"><span className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: '#f9731622', color: 'var(--pn-f97316,#f97316)' }}><Zap className="h-4 w-4" /></span><h3 className="text-sm font-semibold">Gatilho</h3></div>
               <div className="space-y-1.5">
                 <Label>Evento que dispara</Label>
                 <div className="space-y-1 rounded-lg border p-2">

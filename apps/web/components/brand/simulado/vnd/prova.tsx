@@ -352,7 +352,7 @@ export function ProvaVND({ theme, data, mo = 'cad' }: SimScreenProps) {
       {/* SHEET navegador (mobile) */}
       {ns && (
         <>
-          <div className={`${P}-mbg`} onClick={() => setNs(false)} style={{ position: 'fixed', inset: 0, zIndex: 70, background: 'rgba(10,10,25,.55)', backdropFilter: 'blur(6px)' }} />
+          <div className={`${P}-mbg`} onClick={() => setNs(false)} style={{ position: 'fixed', inset: 0, zIndex: 70, background: 'color-mix(in srgb,var(--pn-0a0a19,#0A0A19) 55%,transparent)', backdropFilter: 'blur(6px)' }} />
           <div className={`${P}-msh`} style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 71, maxHeight: '76%', overflowY: 'auto', padding: '18px 16px 24px', borderRadius: '22px 22px 0 0', background: 'var(--surface)' }}>
             <span style={{ display: 'block', width: 40, height: 4, borderRadius: 99, background: 'var(--line2)', margin: '0 auto 14px' }} />
             <b style={{ display: 'block', marginBottom: 12, fontSize: 16, color: 'var(--ink)' }}>
@@ -373,14 +373,14 @@ export function ProvaVND({ theme, data, mo = 'cad' }: SimScreenProps) {
               <RevStat value={cFl} label="Para revisar" color="var(--flag)" />
             </div>
             {hasBl ? (
-              <div style={{ display: 'flex', gap: 10, padding: '12px 14px', borderRadius: 12, background: 'rgba(242,169,59,.12)', fontSize: 12.5, lineHeight: 1.45, color: 'var(--ink)' }}>
-                <CircleAlert size={17} style={{ color: '#F2A93B', flexShrink: 0 }} />
+              <div style={{ display: 'flex', gap: 10, padding: '12px 14px', borderRadius: 12, background: 'color-mix(in srgb,var(--pn-f2a93b,#F2A93B) 12%,transparent)', fontSize: 12.5, lineHeight: 1.45, color: 'var(--ink)' }}>
+                <CircleAlert size={17} style={{ color: 'var(--pn-f2a93b,#F2A93B)', flexShrink: 0 }} />
                 <span>
                   <b>Você ainda tem {cBl} questões em branco:</b> {blTxt}. Questões em branco contam como erro.
                 </span>
               </div>
             ) : (
-              <div style={{ display: 'flex', gap: 10, padding: '12px 14px', borderRadius: 12, background: 'rgba(31,168,104,.1)', fontSize: 13, color: C_OK, fontWeight: 700 }}>
+              <div style={{ display: 'flex', gap: 10, padding: '12px 14px', borderRadius: 12, background: 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 10%,transparent)', fontSize: 13, color: C_OK, fontWeight: 700 }}>
                 <Check size={17} /> Todas as questões foram respondidas.
               </div>
             )}
@@ -441,7 +441,7 @@ export function ProvaVND({ theme, data, mo = 'cad' }: SimScreenProps) {
       {md === 'ok' && (
         <ModalShell prefix={P} width={420} onClose={() => setMd(null)} plain closeOnBackdrop={false}>
           <div style={{ padding: '34px 26px 26px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14, textAlign: 'center' }}>
-            <span className={`${P}-okpop`} style={{ width: 84, height: 84, borderRadius: '50%', background: 'rgba(31,168,104,.14)', color: C_OK, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span className={`${P}-okpop`} style={{ width: 84, height: 84, borderRadius: '50%', background: 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 14%,transparent)', color: C_OK, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
               <Check size={40} strokeWidth={2.6} />
             </span>
             <b style={{ fontSize: 22, letterSpacing: '-0.03em', color: 'var(--ink)' }}>Simulado enviado!</b>
@@ -586,9 +586,9 @@ function flagBtnStyle(on: boolean, mobile?: boolean): React.CSSProperties {
     height: 46,
     padding: mobile ? '0 12px' : '0 16px',
     borderRadius: 12,
-    border: `1.5px solid ${on ? '#F2B63B' : 'rgba(242,182,59,.55)'}`,
-    background: on ? '#F2B63B' : 'rgba(242,182,59,.14)',
-    color: on ? '#3A2A00' : '#C98A0B',
+    border: `1.5px solid ${on ? 'var(--pn-f2b63b,#F2B63B)' : 'color-mix(in srgb,var(--pn-f2b63b,#F2B63B) 55%,transparent)'}`,
+    background: on ? 'var(--pn-f2b63b,#F2B63B)' : 'color-mix(in srgb,var(--pn-f2b63b,#F2B63B) 14%,transparent)',
+    color: on ? 'var(--pn-3a2a00,#3A2A00)' : 'var(--pn-c98a0b,#C98A0B)',
     font: 'inherit',
     fontSize: 13.5,
     fontWeight: 700,

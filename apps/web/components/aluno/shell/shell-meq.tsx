@@ -195,11 +195,11 @@ export function ShellMEQ({ brand, nav, usuario, pathname, logoUrl, children }: A
         }
         /* "Sair" em tons de vermelho no hover/clique (igual ao shell novo do Revisão: .shr-sair). */
         .meq-sair { transition: background .18s, border-color .18s, color .18s; }
-        .meq-sair:hover  { background:#E5484D !important; border-color:#E5484D !important; color:#FFFFFF !important; }
-        .meq-sair:active { background:#CF3E42 !important; border-color:#CF3E42 !important; color:#FFFFFF !important; }
+        .meq-sair:hover  { background:var(--pn-e5484d,#E5484D) !important; border-color:var(--pn-e5484d,#E5484D) !important; color:#FFFFFF !important; }
+        .meq-sair:active { background:var(--pn-cf3e42,#CF3E42) !important; border-color:var(--pn-cf3e42,#CF3E42) !important; color:#FFFFFF !important; }
         /* Opção "Sair" no menu da conta: realce vermelho no hover e mais forte no clique. */
-        .meq-sair-row:hover  { background:rgba(229,72,77,.12) !important; }
-        .meq-sair-row:active { background:rgba(229,72,77,.22) !important; }
+        .meq-sair-row:hover  { background:color-mix(in srgb,var(--pn-e5484d,#E5484D) 12%,transparent) !important; }
+        .meq-sair-row:active { background:color-mix(in srgb,var(--pn-e5484d,#E5484D) 22%,transparent) !important; }
       `}</style>
 
       <div className="meq-shell contents">
@@ -286,7 +286,7 @@ export function ShellMEQ({ brand, nav, usuario, pathname, logoUrl, children }: A
                   className="inline-flex h-10 items-center gap-1.5 rounded-[11px] px-3 text-[12.5px] font-bold"
                   style={{ background: 'var(--surface)', border: '1px solid var(--line)', color: 'var(--ink)' }}
                 >
-                  <Zap className="h-[15px] w-[15px]" style={{ color: '#F2A93B' }} />
+                  <Zap className="h-[15px] w-[15px]" style={{ color: 'var(--pn-f2a93b,#F2A93B)' }} />
                   {usuario.xpTotal.toLocaleString('pt-BR')} XP
                 </span>
               )}
@@ -489,7 +489,7 @@ function TabBarMeq({ nav, pathname }: { nav: AlunoNavItem[]; pathname: string })
             )}
             <span
               className="inline-flex h-8 w-10 items-center justify-center rounded-[9px]"
-              style={{ background: ativo ? 'rgba(94,206,240,.16)' : 'transparent' }}
+              style={{ background: ativo ? 'color-mix(in srgb,var(--pn-5ecef0,#5ECEF0) 16%,transparent)' : 'transparent' }}
             >
               <Icone className="h-[19px] w-[19px]" />
             </span>
@@ -713,7 +713,7 @@ function MenuTema({
 
   return (
     <>
-      <div className="fixed inset-0 z-[90] lg:hidden" style={{ background: 'rgba(10,17,36,.35)' }} onClick={onFechar} />
+      <div className="fixed inset-0 z-[90] lg:hidden" style={{ background: 'color-mix(in srgb,var(--pn-0a1124,#0A1124) 35%,transparent)' }} onClick={onFechar} />
       <div
         ref={ref}
         role="menu"
@@ -792,7 +792,7 @@ function MenuFonte({ onFechar }: { onFechar: () => void }) {
 
   return (
     <>
-      <div className="fixed inset-0 z-[90] lg:hidden" style={{ background: 'rgba(10,17,36,.35)' }} onClick={onFechar} />
+      <div className="fixed inset-0 z-[90] lg:hidden" style={{ background: 'color-mix(in srgb,var(--pn-0a1124,#0A1124) 35%,transparent)' }} onClick={onFechar} />
       <div
         ref={ref}
         role="menu"
@@ -905,7 +905,7 @@ function MenuConta({
     <>
       <div
         className="fixed inset-0 z-[90]"
-        style={{ background: variante === 'desktop' ? 'transparent' : 'rgba(10,17,36,.35)' }}
+        style={{ background: variante === 'desktop' ? 'transparent' : 'color-mix(in srgb,var(--pn-0a1124,#0A1124) 35%,transparent)' }}
         onClick={onFechar}
         aria-hidden
       />
@@ -920,7 +920,7 @@ function MenuConta({
           borderRadius: 14,
           background: 'var(--surface)',
           border: '1px solid var(--line)',
-          boxShadow: '0 24px 48px -18px rgba(11,17,36,.45)',
+          boxShadow: '0 24px 48px -18px color-mix(in srgb,var(--pn-0b1124,#0B1124) 45%,transparent)',
           animation: 'meqMenuIn .22s cubic-bezier(.22,1,.36,1)',
         }}
       >
@@ -989,9 +989,9 @@ function MenuConta({
             role="menuitem"
             onClick={async () => { onFechar(); await fetch('/api/aluno/logout', { method: 'POST' }).catch(() => {}); window.location.href = '/aluno/entrar' }}
             className="meq-sair-row flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-[13.5px] font-bold transition-colors"
-            style={{ color: '#E5484D' }}
+            style={{ color: 'var(--pn-e5484d,#E5484D)' }}
           >
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-[10px]" style={{ background: 'rgba(229,72,77,.12)', color: '#E5484D' }}>
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-[10px]" style={{ background: 'color-mix(in srgb,var(--pn-e5484d,#E5484D) 12%,transparent)', color: 'var(--pn-e5484d,#E5484D)' }}>
               <LogOut className="h-[15px] w-[15px]" />
             </span>
             <span className="flex-1">Sair</span>
@@ -1105,7 +1105,7 @@ function CentralNotificacoesMeq({ lidas, setLidas, removidas, setRemovidas, onFe
 
   return (
     <>
-      <div className="fixed inset-0 z-[90]" style={{ background: 'rgba(10,17,36,.35)' }} onClick={onFechar} aria-hidden />
+      <div className="fixed inset-0 z-[90]" style={{ background: 'color-mix(in srgb,var(--pn-0a1124,#0A1124) 35%,transparent)' }} onClick={onFechar} aria-hidden />
       <div
         ref={ref}
         role="dialog"
@@ -1117,7 +1117,7 @@ function CentralNotificacoesMeq({ lidas, setLidas, removidas, setRemovidas, onFe
           borderRadius: 14,
           background: 'var(--surface)',
           border: '1px solid var(--line)',
-          boxShadow: '0 24px 48px -18px rgba(11,17,36,.45)',
+          boxShadow: '0 24px 48px -18px color-mix(in srgb,var(--pn-0b1124,#0B1124) 45%,transparent)',
           animation: 'meqMenuIn .22s cubic-bezier(.22,1,.36,1)',
         }}
       >

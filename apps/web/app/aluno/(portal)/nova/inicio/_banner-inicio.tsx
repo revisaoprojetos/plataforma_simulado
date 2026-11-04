@@ -10,8 +10,8 @@ import type { HomeDestaque } from '@/components/brand/interna/home/types'
 //   escuro → o MESMO gradiente escuro de antes (SLIDE_BG[0]).
 // O slide lê `cores: var(--np-bom-bg)`; o valor é trocado por este CSS conforme o modo.
 const BOM_CSS = `
-.np-banner-bom{--np-bom-bg:linear-gradient(120deg,#4A31B8 0%,#5B3FD0 55%,#7857FF 100%)}
-.novaplat[data-theme="escuro"] .np-banner-bom,.dark .np-banner-bom{--np-bom-bg:linear-gradient(120deg,#160F33 0%,#241A52 55%,#2E1F6A 100%)}
+.np-banner-bom{--np-bom-bg:linear-gradient(120deg,var(--pn-4a31b8,#4A31B8) 0%,var(--pn-5b3fd0,#5B3FD0) 55%,var(--pn-7857ff,#7857FF) 100%)}
+.novaplat[data-theme="escuro"] .np-banner-bom,.dark .np-banner-bom{--np-bom-bg:linear-gradient(120deg,var(--pn-160f33,#160F33) 0%,var(--pn-241a52,#241A52) 55%,var(--pn-2e1f6a,#2E1F6A) 100%)}
 `
 
 export function BannerInicio({ destaques }: { destaques: HomeDestaque[] }) {

@@ -3,6 +3,7 @@
 // o que internaTokensStyle() injeta no root do shell.
 
 import type { CSSProperties } from 'react'
+import { pnR, pn } from '@/lib/brand/paleta-nova-tokens'
 
 export type ShellTheme = 'claro' | 'escuro'
 
@@ -59,7 +60,7 @@ function revVars(theme: ShellTheme): Record<string, string> {
 
 /** Estilo inline com os tokens da marca Revisão para o root do shell. */
 export function revTokensStyle(theme: ShellTheme): CSSProperties {
-  const vars = revVars(theme)
+  const vars = pnR(revVars(theme))
   const style: Record<string, string> = {}
   for (const [k, v] of Object.entries(vars)) style[`--${k}`] = v
   return style as CSSProperties
@@ -67,24 +68,24 @@ export function revTokensStyle(theme: ShellTheme): CSSProperties {
 
 /** Gradiente de fundo da sidebar por tema (spec 03 §1.1). */
 export const SIDEBAR_GRAD: Record<ShellTheme, string> = {
-  claro: 'linear-gradient(180deg,#2E1F7A,#3A27A0 60%,#4A31B8)',
-  escuro: 'linear-gradient(180deg,#160F36,#22184F)',
+  claro: pn('r-side', 'linear-gradient(180deg,#2E1F7A,#3A27A0 60%,#4A31B8)'),
+  escuro: pn('r-side', 'linear-gradient(180deg,#160F36,#22184F)'),
 }
 
 /** Gradiente do cabeçalho dos menus (conta/notificações). */
-export const MENU_HEADER_GRAD = 'radial-gradient(120% 140% at 100% 0%,#6449E0,#3B1E8F 60%,#241047)'
+export const MENU_HEADER_GRAD = pn('r-menu-head', 'radial-gradient(120% 140% at 100% 0%,#6449E0,#3B1E8F 60%,#241047)')
 
 /** Fundo do botão de recolher por tema. */
-export const COLLAPSE_BTN_BG: Record<ShellTheme, string> = { claro: '#3A27A0', escuro: '#2A1D66' }
+export const COLLAPSE_BTN_BG: Record<ShellTheme, string> = { claro: pn('r-collapse', '#3A27A0'), escuro: pn('r-collapse', '#2A1D66') }
 
 /** Gradiente da top bar roxa no mobile. */
 export const MOBILE_TOPBAR_GRAD: Record<ShellTheme, string> = {
-  claro: 'linear-gradient(120deg,#2E1F7A,#4A31B8)',
-  escuro: 'linear-gradient(180deg,#160F36,#22184F)',
+  claro: pn('r-side', 'linear-gradient(120deg,#2E1F7A,#4A31B8)'),
+  escuro: pn('r-side', 'linear-gradient(180deg,#160F36,#22184F)'),
 }
 
 /** Fundo da down bar flutuante por tema. */
-export const DOWNBAR_BG: Record<ShellTheme, string> = { claro: '#2E1F7A', escuro: '#22184F' }
+export const DOWNBAR_BG: Record<ShellTheme, string> = { claro: pn('roxo', '#2E1F7A'), escuro: pn('roxo', '#22184F') }
 
-export const AMARELO = '#F1C232'
-export const AMARELO_INK = '#2A1A55'
+export const AMARELO = pn('dourado', '#F1C232')
+export const AMARELO_INK = pn('roxo', '#2A1A55')

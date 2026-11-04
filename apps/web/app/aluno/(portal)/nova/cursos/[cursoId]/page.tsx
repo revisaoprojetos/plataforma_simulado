@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic'
 
 const PALETA = Object.values(GR)
 function gradDe(cor: string | null | undefined, i = 0): string {
-  if (cor) return `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 55%, #0b0a1a))`
+  if (cor) return `linear-gradient(135deg, ${cor}, color-mix(in oklab, ${cor} 55%, var(--pn-0b0a1a,#0b0a1a)))`
   return PALETA[i % PALETA.length]
 }
 function abreviar(txt: string, max = 10): string {
@@ -69,12 +69,12 @@ export default async function Page({ params, searchParams }: { params: Promise<{
               <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.2em', color: 'var(--gold)' }}>CURSO · BIBLIOTECA DO REVISÃO</span>
               <b style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-0.045em', color: '#fff' }}>{curso.titulo}</b>
               <Bar pct={curso.pct} color={GBAR} style={{ background: 'rgba(255,255,255,.15)' }} />
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#DCD3FF' }}>{curso.pct}% concluído · {curso.lidos.toLocaleString('pt-BR')} de {curso.pdfs.toLocaleString('pt-BR')} materiais</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--pn-dcd3ff,#DCD3FF)' }}>{curso.pct}% concluído · {curso.lidos.toLocaleString('pt-BR')} de {curso.pdfs.toLocaleString('pt-BR')} materiais</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 14 }}>
               <div style={{ textAlign: 'right' }}>
                 <b style={{ display: 'block', fontSize: 52, fontWeight: 800, letterSpacing: '-0.05em', lineHeight: 1, color: 'var(--gold)' }}>{curso.pct}%</b>
-                <span style={{ fontSize: 12.5, color: '#CFC4FF' }}>concluído</span>
+                <span style={{ fontSize: 12.5, color: 'var(--pn-cfc4ff,#CFC4FF)' }}>concluído</span>
               </div>
               <Btn kind="gold" icon="play" href={continuarHref}>{curso.continueDocId ? 'Continuar de onde parou' : 'Começar o curso'}</Btn>
             </div>

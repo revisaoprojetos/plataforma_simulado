@@ -316,7 +316,7 @@ export function ResultadoVndNova({
         <div className={`${PFX}-wrap`}>
           {/* Aviso de mudança de gabarito */}
           {data.aviso_gabarito && (
-            <div style={{ display: 'flex', gap: 10, padding: '14px 16px', borderRadius: 16, background: 'var(--peachBg)', border: '1px solid rgba(242,169,59,.45)', color: 'var(--ink)' }}>
+            <div style={{ display: 'flex', gap: 10, padding: '14px 16px', borderRadius: 16, background: 'var(--peachBg)', border: '1px solid color-mix(in srgb,var(--pn-f2a93b,#F2A93B) 45%,transparent)', color: 'var(--ink)' }}>
               <span style={{ color: C_WARN, flexShrink: 0, marginTop: 1 }}><Lightbulb size={18} /></span>
               <div style={{ fontSize: 13, lineHeight: 1.5 }}>
                 <b style={{ display: 'block' }}>Houve mudança de gabarito neste simulado</b>
@@ -334,14 +334,14 @@ export function ResultadoVndNova({
           <div className={`${PFX}-hero`}>
             <span aria-hidden="true" className={`${PFX}-herodots`} />
             <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
-              <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.24em', color: '#F1D48A' }}>MISSÃO CUMPRIDA</span>
-              <div className={`${PFX}-okpop`} style={{ width: 110, height: 110, borderRadius: '50%', background: 'rgba(63,213,138,.18)', border: '2px solid rgba(185,245,212,.3)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: '#B9F5D4' }}>
+              <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.24em', color: 'var(--pn-f1d48a,#F1D48A)' }}>MISSÃO CUMPRIDA</span>
+              <div className={`${PFX}-okpop`} style={{ width: 110, height: 110, borderRadius: '50%', background: 'color-mix(in srgb,var(--pn-3fd58a,#3FD58A) 18%,transparent)', border: '2px solid color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 30%,transparent)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: 'var(--pn-b9f5d4,#B9F5D4)' }}>
                 <Check size={54} strokeWidth={2.4} />
               </div>
               <h1 style={{ margin: '4px 0 0', fontSize: 34, fontWeight: 800, letterSpacing: '-0.045em' }} className={`${PFX}-heroh1`}>
                 {data.titulo}
               </h1>
-              <span style={{ fontSize: 14, color: '#CFE3D7' }}>
+              <span style={{ fontSize: 14, color: 'var(--pn-cfe3d7,#CFE3D7)' }}>
                 {data.aluno_nome}{data.aluno_email ? ` · ${data.aluno_email}` : ''}
               </span>
 
@@ -478,7 +478,7 @@ export function ResultadoVndNova({
                             const correta = a.correta === true
                             const erradaMarcada = marcada && !correta
                             const bd = correta ? C_OK : erradaMarcada ? C_ERR : 'var(--line)'
-                            const bg = correta ? 'rgba(31,168,104,.1)' : erradaMarcada ? 'rgba(229,72,77,.08)' : 'var(--surface)'
+                            const bg = correta ? 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 10%,transparent)' : erradaMarcada ? 'color-mix(in srgb,var(--pn-e5484d,#E5484D) 8%,transparent)' : 'var(--surface)'
                             const dot = correta ? C_OK : erradaMarcada ? C_ERR : 'transparent'
                             const ink = correta || erradaMarcada ? '#fff' : 'var(--ink)'
                             return (
@@ -557,7 +557,7 @@ export function ResultadoVndNova({
 function HeroMeta({ label, valor }: { label: string; valor: string }) {
   return (
     <div style={{ textAlign: 'center' }}>
-      <span style={{ display: 'block', fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: '#8FBBA3' }}>{label}</span>
+      <span style={{ display: 'block', fontSize: 10, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--pn-8fbba3,#8FBBA3)' }}>{label}</span>
       <b style={{ fontSize: 14, color: '#fff' }}>{valor}</b>
     </div>
   )
@@ -565,7 +565,7 @@ function HeroMeta({ label, valor }: { label: string; valor: string }) {
 
 function HeroChip({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 12px', borderRadius: 99, background: 'rgba(255,255,255,.1)', border: '1px solid rgba(185,245,212,.25)', fontSize: 12.5, fontWeight: 700 }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 32, padding: '0 12px', borderRadius: 99, background: 'rgba(255,255,255,.1)', border: '1px solid color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 25%,transparent)', fontSize: 12.5, fontWeight: 700 }}>
       {icon}
       {text}
     </span>
@@ -655,9 +655,9 @@ function DiscursivaView({ d }: { d: QuestaoRev['discursiva'] }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       {d.status === 'corrigida' ? (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 12, background: 'rgba(31,168,104,.1)', color: C_OK, fontSize: 13.5, fontWeight: 700 }}><Check size={16} />Corrigida — nota {Number(d.nota ?? 0).toFixed(1)}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px', borderRadius: 12, background: 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 10%,transparent)', color: C_OK, fontSize: 13.5, fontWeight: 700 }}><Check size={16} />Corrigida — nota {Number(d.nota ?? 0).toFixed(1)}</div>
       ) : enviada ? (
-        <div style={{ padding: '10px 12px', borderRadius: 12, background: 'rgba(242,169,59,.12)', color: C_WARN, fontSize: 12.5, fontWeight: 700 }}>Resposta enviada — aguardando correção por um avaliador.</div>
+        <div style={{ padding: '10px 12px', borderRadius: 12, background: 'color-mix(in srgb,var(--pn-f2a93b,#F2A93B) 12%,transparent)', color: C_WARN, fontSize: 12.5, fontWeight: 700 }}>Resposta enviada — aguardando correção por um avaliador.</div>
       ) : (
         <div style={{ padding: '12px 14px', borderRadius: 12, background: 'var(--surface2)', color: 'var(--muted)', fontSize: 13 }}>Questão não respondida.</div>
       )}
@@ -687,7 +687,7 @@ ${sharedKeyframes(PFX)}
 .${PFX}-hs{scrollbar-width:none}.${PFX}-hs::-webkit-scrollbar{display:none}
 .${PFX}-header{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:10px;height:70px;padding:0 32px;background:var(--surface);border-bottom:1px solid var(--line)}
 .${PFX}-wrap{max-width:1000px;margin:0 auto;padding:28px 32px 60px;display:flex;flex-direction:column;gap:18px}
-.${PFX}-hero{position:relative;overflow:hidden;border-radius:30px;padding:40px 36px;background:linear-gradient(140deg,#041A10,#0B4A2E 55%,#12643D);color:#fff;text-align:center}
+.${PFX}-hero{position:relative;overflow:hidden;border-radius:30px;padding:40px 36px;background:linear-gradient(140deg,var(--pn-041a10,#041A10),var(--pn-0b4a2e,#0B4A2E) 55%,var(--pn-12643d,#12643D));color:#fff;text-align:center}
 .${PFX}-herodots{position:absolute;inset:0;background-image:radial-gradient(circle,rgba(185,245,212,.16) 1.2px,transparent 1.8px);background-size:22px 22px}
 .${PFX}-herometa{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;width:100%;max-width:460px;margin-top:6px;padding-top:14px;border-top:1px solid rgba(185,245,212,.18)}
 .${PFX}-tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}

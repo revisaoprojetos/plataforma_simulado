@@ -10,8 +10,8 @@ import { cn } from '@/lib/utils'
  */
 const CARDS = [
   { cor: 'var(--brand-primary, var(--primary))', pulsa: true, titulo: 'Em andamento', desc: 'Roxo pulsando — é o simulado atual.', icone: <Star className="h-5 w-5" fill="currentColor" /> },
-  { cor: '#10b981', titulo: 'Concluído', desc: 'Verde com check — já terminado.', icone: <Check className="h-5 w-5" strokeWidth={3} /> },
-  { cor: '#e0a107', ouro: true, titulo: 'Nota máxima', desc: 'Check dourado — você gabaritou! 🏆', icone: <Check className="h-5 w-5" strokeWidth={3.25} /> },
+  { cor: 'var(--pn-10b981,#10b981)', titulo: 'Concluído', desc: 'Verde com check — já terminado.', icone: <Check className="h-5 w-5" strokeWidth={3} /> },
+  { cor: 'var(--pn-e0a107,#e0a107)', ouro: true, titulo: 'Nota máxima', desc: 'Check dourado — você gabaritou! 🏆', icone: <Check className="h-5 w-5" strokeWidth={3.25} /> },
 ]
 
 export function TourIcones() {

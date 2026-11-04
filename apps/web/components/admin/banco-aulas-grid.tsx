@@ -338,7 +338,7 @@ function ModuloCard({ m, variant, onExcluir, basePath = '/admin/leitura', basePa
         <div className="relative h-full aspect-[4/3] shrink-0 overflow-hidden">
           {capa
             ? <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105" />
-            : <div className="absolute inset-0 flex items-center justify-center text-white/90" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }}><Library className="h-8 w-8" /></div>}
+            : <div className="absolute inset-0 flex items-center justify-center text-white/90" style={{ background: `linear-gradient(155deg, ${c} 0%, var(--pn-0f172a,#0f172a) 135%)` }}><Library className="h-8 w-8" /></div>}
           <div className="pointer-events-none absolute inset-0 opacity-40" style={{ background: `linear-gradient(110deg, transparent 45%, ${c})` }} />
         </div>
         <Link href={href} className="absolute inset-0 z-10" aria-label={m.nome} />
@@ -373,7 +373,7 @@ function ModuloCard({ m, variant, onExcluir, basePath = '/admin/leitura', basePa
       {capa ? (
         <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
       ) : (
-        <div className="absolute inset-0 flex items-center justify-center text-white/90" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }}><Library className="h-10 w-10" /></div>
+        <div className="absolute inset-0 flex items-center justify-center text-white/90" style={{ background: `linear-gradient(155deg, ${c} 0%, var(--pn-0f172a,#0f172a) 135%)` }}><Library className="h-10 w-10" /></div>
       )}
       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />
       <Link href={href} className="absolute inset-0 z-10" aria-label={m.nome} />

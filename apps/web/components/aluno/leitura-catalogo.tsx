@@ -99,7 +99,7 @@ function CardLei({ d }: { d: DocumentoAluno }) {
         // eslint-disable-next-line @next/next/no-img-element
         <img src={cap.src} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" style={{ objectPosition: cap.pos }} />
       ) : (
-        <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }} />
+        <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, var(--pn-0f172a,#0f172a) 135%)` }} />
       )}
       {!cap.src && <Scale className="absolute -right-6 -top-6 h-40 w-40 text-white/10" />}
       <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/25 to-black/10" />

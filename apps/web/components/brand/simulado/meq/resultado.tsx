@@ -80,30 +80,30 @@ function Boletim({ data }: { data: SimMock }) {
   const largeArc = fillFrac > 0.5 ? 1 : 0
 
   return (
-    <div style={{ borderRadius: 'var(--r)', overflow: 'hidden', background: 'var(--surface)', border: '1px solid var(--line)', boxShadow: '0 1px 2px rgba(16,30,70,.04)' }}>
+    <div style={{ borderRadius: 'var(--r)', overflow: 'hidden', background: 'var(--surface)', border: '1px solid var(--line)', boxShadow: '0 1px 2px color-mix(in srgb,var(--pn-101e46,#101E46) 4%,transparent)' }}>
       <div style={{ position: 'relative', overflow: 'hidden', padding: '22px 24px', background: MEQ_NAVY_GRAD, color: '#fff' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.2em', color: '#8BEAEA' }}>BOLETIM DE DESEMPENHO</span>
-          <span style={{ display: 'inline-flex', alignItems: 'center', height: 24, padding: '0 10px', borderRadius: 6, background: MEQ_CYAN, color: '#0B1124', fontSize: 11.5, fontWeight: 700 }}>Corrigido</span>
+          <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.2em', color: 'var(--pn-8beaea,#8BEAEA)' }}>BOLETIM DE DESEMPENHO</span>
+          <span style={{ display: 'inline-flex', alignItems: 'center', height: 24, padding: '0 10px', borderRadius: 6, background: MEQ_CYAN, color: 'var(--pn-0b1124,#0B1124)', fontSize: 11.5, fontWeight: 700 }}>Corrigido</span>
         </div>
         <h1 style={{ margin: '10px 0 2px', fontSize: 24, fontWeight: 700, letterSpacing: '-0.03em' }}>{data.info.titulo}</h1>
-        <span style={{ fontSize: 12.5, color: '#A9C6F0' }}>{data.info.subtitulo} · {r.data}</span>
+        <span style={{ fontSize: 12.5, color: 'var(--pn-a9c6f0,#A9C6F0)' }}>{data.info.subtitulo} · {r.data}</span>
       </div>
 
       {/* Gauge */}
       <div style={{ padding: 18, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <svg viewBox="0 0 200 124" style={{ width: '100%', maxWidth: 280 }}>
           <path d={`M20 100 A80 80 0 0 1 180 100`} fill="none" stroke="var(--track)" strokeWidth={16} strokeLinecap="round" />
-          <path className={`${P}-gauge`} d={`M20 100 A80 80 0 ${largeArc} 1 ${ex.toFixed(1)} ${ey.toFixed(1)}`} fill="none" stroke="#3E7FE0" strokeWidth={16} strokeLinecap="round" />
+          <path className={`${P}-gauge`} d={`M20 100 A80 80 0 ${largeArc} 1 ${ex.toFixed(1)} ${ey.toFixed(1)}`} fill="none" stroke="var(--pn-3e7fe0,#3E7FE0)" strokeWidth={16} strokeLinecap="round" />
           <line x1={tx1.toFixed(1)} y1={ty1.toFixed(1)} x2={tx2.toFixed(1)} y2={ty2.toFixed(1)} stroke={ERR_RED} strokeWidth={3} />
           <text x={tx2.toFixed(1)} y={(ty2 - 4).toFixed(1)} fontSize={9} fill={ERR_RED} fontWeight={700} textAnchor="middle">corte {corte}</text>
           <text x={cx} y={94} textAnchor="middle" fontSize={34} fontWeight={700} fill="var(--ink)">{liquida}</text>
           <text x={cx} y={112} textAnchor="middle" fontSize={9.5} fill="var(--muted)">nota líquida</text>
         </svg>
         {delta > 0 ? (
-          <span style={{ marginTop: 6, height: 26, padding: '0 10px', borderRadius: 6, background: 'rgba(229,72,77,.1)', color: ERR_RED, fontSize: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center' }}>{delta} pontos abaixo do corte estimado</span>
+          <span style={{ marginTop: 6, height: 26, padding: '0 10px', borderRadius: 6, background: 'color-mix(in srgb,var(--pn-e5484d,#E5484D) 10%,transparent)', color: ERR_RED, fontSize: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center' }}>{delta} pontos abaixo do corte estimado</span>
         ) : (
-          <span style={{ marginTop: 6, height: 26, padding: '0 10px', borderRadius: 6, background: 'rgba(31,168,104,.1)', color: OK_GREEN, fontSize: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center' }}>acima do corte estimado</span>
+          <span style={{ marginTop: 6, height: 26, padding: '0 10px', borderRadius: 6, background: 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 10%,transparent)', color: OK_GREEN, fontSize: 12, fontWeight: 700, display: 'inline-flex', alignItems: 'center' }}>acima do corte estimado</span>
         )}
       </div>
 
@@ -137,7 +137,7 @@ function Ritmo() {
     ['Itens 81–120', '1h11', '1,8 min/item'],
   ]
   return (
-    <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 18, boxShadow: '0 1px 2px rgba(16,30,70,.04)' }}>
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 18, boxShadow: '0 1px 2px color-mix(in srgb,var(--pn-101e46,#101E46) 4%,transparent)' }}>
       <b style={{ display: 'block', fontSize: 16, color: 'var(--ink)', marginBottom: 6 }}>Ritmo de prova</b>
       {linhas.map(([bloco, t, pace], i) => (
         <div key={bloco} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '9px 0', borderTop: i === 0 ? undefined : '1px solid var(--line)' }}>
@@ -155,7 +155,7 @@ function Ritmo() {
 // ── NPS ─────────────────────────────────────────────────────────────────────
 function Nps({ np, setNp, sent, onSend }: { np: number; setNp: (v: number) => void; sent: boolean; onSend: () => void }) {
   return (
-    <div className={`${P}-fillc`} style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 20, boxShadow: '0 1px 2px rgba(16,30,70,.04)', display: 'flex', flexDirection: 'column', flex: 1 }}>
+    <div className={`${P}-fillc`} style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 20, boxShadow: '0 1px 2px color-mix(in srgb,var(--pn-101e46,#101E46) 4%,transparent)', display: 'flex', flexDirection: 'column', flex: 1 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
         <span style={{ color: 'var(--brand)' }}><IconStar /></span>
         <div>
@@ -164,7 +164,7 @@ function Nps({ np, setNp, sent, onSend }: { np: number; setNp: (v: number) => vo
         </div>
       </div>
       {sent ? (
-        <div style={{ padding: 16, borderRadius: 12, background: 'rgba(31,168,104,.12)', color: OK_GREEN, textAlign: 'center', fontSize: 14, fontWeight: 700 }}>
+        <div style={{ padding: 16, borderRadius: 12, background: 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 12%,transparent)', color: OK_GREEN, textAlign: 'center', fontSize: 14, fontWeight: 700 }}>
           Obrigado! Sua avaliação ajuda a melhorar os próximos simulados.
         </div>
       ) : (
@@ -192,7 +192,7 @@ function Nps({ np, setNp, sent, onSend }: { np: number; setNp: (v: number) => vo
 // ── Downloads ───────────────────────────────────────────────────────────────
 function Downloads({ grupos }: { grupos: SimMock['resultado']['downloads'] }) {
   return (
-    <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 20, boxShadow: '0 1px 2px rgba(16,30,70,.04)' }}>
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 20, boxShadow: '0 1px 2px color-mix(in srgb,var(--pn-101e46,#101E46) 4%,transparent)' }}>
       <b style={{ display: 'block', fontSize: 16, color: 'var(--ink)', marginBottom: 14 }}>Materiais e downloads</b>
       {grupos.map((g, gi) => (
         <div key={g.grupo} style={{ marginTop: gi ? 16 : 0 }}>
@@ -216,7 +216,7 @@ function Downloads({ grupos }: { grupos: SimMock['resultado']['downloads'] }) {
 function TabelaDisciplina({ data }: { data: SimMock }) {
   const linhas = data.resultado.porMateria
   return (
-    <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 18, boxShadow: '0 1px 2px rgba(16,30,70,.04)', display: 'flex', flexDirection: 'column', flex: 1 }}>
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 18, boxShadow: '0 1px 2px color-mix(in srgb,var(--pn-101e46,#101E46) 4%,transparent)', display: 'flex', flexDirection: 'column', flex: 1 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 8 }}>
         <b style={{ fontSize: 16, color: 'var(--ink)' }}>Desempenho por disciplina</b>
         <span style={{ fontSize: 12, color: 'var(--muted)' }}>Aprov. = líquida ÷ itens</span>
@@ -280,7 +280,7 @@ function Grafico({ data }: { data: SimMock }) {
   const maxV = Math.max(...vals, 1)
   const ABBR: Record<string, string> = { 'Direito Administrativo': 'D. Adm.', 'Direito Constitucional': 'D. Const.', 'Língua Portuguesa': 'L. Port.', 'Raciocínio Lógico': 'R. Lógico', 'Direito Penal': 'D. Penal', 'Processo Penal': 'P. Penal', 'Informática': 'Inform.', 'Legislação Especial': 'Leg. Esp.' }
   return (
-    <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 18, boxShadow: '0 1px 2px rgba(16,30,70,.04)' }}>
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 18, boxShadow: '0 1px 2px color-mix(in srgb,var(--pn-101e46,#101E46) 4%,transparent)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
         <b style={{ fontSize: 16, color: 'var(--ink)' }}>Líquida por disciplina × meta do corte</b>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: 'var(--muted)' }}>
@@ -297,7 +297,7 @@ function Grafico({ data }: { data: SimMock }) {
                 <b style={{ fontSize: 11, color: 'var(--ink)' }}>+{v}</b>
                 <div className={`${P}-barbox`} style={{ position: 'relative', width: '100%', height: 175, display: 'flex', alignItems: 'flex-end' }}>
                   <span style={{ position: 'absolute', left: -2, right: -2, bottom: `${Math.round(corteFrac * 175)}px`, height: 2, background: ERR_RED, opacity: 0.8 }} />
-                  <span className={`${P}-grow`} style={{ display: 'block', width: '100%', height: h, borderRadius: '4px 4px 1px 1px', background: 'linear-gradient(180deg,#5ECEF0,#3E7FE0)' }} />
+                  <span className={`${P}-grow`} style={{ display: 'block', width: '100%', height: h, borderRadius: '4px 4px 1px 1px', background: 'linear-gradient(180deg,var(--pn-5ecef0,#5ECEF0),var(--pn-3e7fe0,#3E7FE0))' }} />
                 </div>
                 <span style={{ fontSize: 10, color: 'var(--muted)', textAlign: 'center', lineHeight: 1.2 }}>{ABBR[m.nome] ?? m.nome}</span>
               </div>
@@ -327,7 +327,7 @@ function Correcao({ data, rq, setRq, rf, setRf, jx, setJx }: {
   }
 
   return (
-    <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 22, boxShadow: '0 1px 2px rgba(16,30,70,.04)' }}>
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 22, boxShadow: '0 1px 2px color-mix(in srgb,var(--pn-101e46,#101E46) 4%,transparent)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
         <b style={{ fontSize: 18, color: 'var(--ink)' }}>Correção questão a questão</b>
         <div className={`${P}-hs`} style={{ display: 'flex', gap: 6, overflowX: 'auto' }}>
@@ -342,7 +342,7 @@ function Correcao({ data, rq, setRq, rf, setRf, jx, setJx }: {
         <CardCorrecao item={item} rq={rq} N={N} jx={jx} setJx={setJx} onPrev={() => setRq(Math.max(1, rq - 1))} onNext={() => setRq(Math.min(N, rq + 1))} onNextErr={nextErr} hasErr={cE > 0} />
 
         <aside className={`${P}-corrnav`} style={{ alignSelf: 'start', position: 'sticky', top: 90 }}>
-          <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 18, boxShadow: '0 1px 2px rgba(16,30,70,.04)' }}>
+          <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 18, boxShadow: '0 1px 2px color-mix(in srgb,var(--pn-101e46,#101E46) 4%,transparent)' }}>
             <b style={{ display: 'block', fontSize: 15, color: 'var(--ink)', marginBottom: 12 }}>Navegador</b>
             <div className={`${P}-cnavgrid ${P}-nscroll`} style={{ maxHeight: 440, overflowY: 'auto', display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 6 }}>
               {itens.map((it) => {
@@ -379,13 +379,13 @@ function CardCorrecao({ item, rq, N, jx, setJx, onPrev, onNext, onNextErr, hasEr
   item: SimCorrecaoItem; rq: number; N: number; jx: boolean; setJx: (v: boolean) => void; onPrev: () => void; onNext: () => void; onNextErr: () => void; hasErr: boolean
 }) {
   const statusPill = item.status === 'certa'
-    ? { bg: 'rgba(31,168,104,.12)', color: OK_GREEN, label: 'Acertou', icon: <IconCheck size={13} sw={3} /> }
+    ? { bg: 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 12%,transparent)', color: OK_GREEN, label: 'Acertou', icon: <IconCheck size={13} sw={3} /> }
     : item.status === 'errada'
-      ? { bg: 'rgba(229,72,77,.12)', color: ERR_RED, label: 'Errou', icon: <IconX size={13} /> }
+      ? { bg: 'color-mix(in srgb,var(--pn-e5484d,#E5484D) 12%,transparent)', color: ERR_RED, label: 'Errou', icon: <IconX size={13} /> }
       : { bg: 'var(--surface2)', color: 'var(--muted)', label: 'Em branco', icon: null }
 
   return (
-    <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 22, boxShadow: '0 1px 2px rgba(16,30,70,.04)' }}>
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', padding: 22, boxShadow: '0 1px 2px color-mix(in srgb,var(--pn-101e46,#101E46) 4%,transparent)' }}>
       <div key={rq} className={`${P}-qin`} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <span style={{ height: 28, padding: '0 11px', borderRadius: 8, background: 'var(--surface2)', fontSize: 13, fontWeight: 800, color: 'var(--ink)', display: 'inline-flex', alignItems: 'center' }}>Questão {item.numero}</span>
@@ -427,7 +427,7 @@ function BlocoCE({ letra, rotulo, item }: { letra: string; rotulo: string; item:
   const isGab = item.gabarito === letra
   const isSua = item.suaResposta === letra
   const borda = isGab ? OK_GREEN : isSua ? ERR_RED : 'var(--line)'
-  const bg = isGab ? 'rgba(31,168,104,.08)' : isSua ? 'rgba(229,72,77,.08)' : 'var(--surface)'
+  const bg = isGab ? 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 8%,transparent)' : isSua ? 'color-mix(in srgb,var(--pn-e5484d,#E5484D) 8%,transparent)' : 'var(--surface)'
   return (
     <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: 10, height: 56, padding: '0 14px', borderRadius: 12, border: `2px solid ${borda}`, background: bg }}>
       <span style={{ width: 28, height: 28, borderRadius: 8, background: 'var(--surface2)', color: 'var(--ink)', border: '1.5px solid var(--line2)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, flexShrink: 0 }}>{letra}</span>

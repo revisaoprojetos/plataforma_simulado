@@ -110,8 +110,8 @@ export function PlatformBanco({
 
   const kpis: { icon: ReactNode; cor: string; bg: string; valor: string; rotulo: string }[] = [
     { icon: <ClipboardCheck size={17} />, cor: 'var(--brand)', bg: 'var(--chip)', valor: fmt(stats.resolvidas), rotulo: 'resolvidas' },
-    { icon: <Check size={17} />, cor: cm('#1FA868'), bg: cm('rgba(31,168,104,.14)'), valor: fmt(stats.acertos), rotulo: 'acertos' },
-    { icon: <Percent size={17} />, cor: cm('#D99A1E'), bg: cm('rgba(217,154,30,.16)'), valor: `${stats.aproveitamento}%`, rotulo: 'aproveitamento' },
+    { icon: <Check size={17} />, cor: cm('var(--pn-1fa868,#1FA868)'), bg: cm('color-mix(in srgb,var(--pn-1fa868,#1FA868) 14%,transparent)'), valor: fmt(stats.acertos), rotulo: 'acertos' },
+    { icon: <Percent size={17} />, cor: cm('var(--pn-d99a1e,#D99A1E)'), bg: cm('color-mix(in srgb,var(--pn-d99a1e,#D99A1E) 16%,transparent)'), valor: `${stats.aproveitamento}%`, rotulo: 'aproveitamento' },
     { icon: <BookOpen size={17} />, cor: 'var(--brand)', bg: 'var(--chip)', valor: fmt(stats.total), rotulo: 'questões no filtro' },
   ]
 
@@ -278,8 +278,8 @@ function DesempenhoFiltroCard({ d, porDia }: { d: { acertos: number; erros: numb
     <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 16, padding: '14px 16px', borderRadius: 16, background: 'var(--surface)', border: '1px solid var(--line)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, flex: 1, minWidth: 200 }}>
         <div><b style={{ display: 'block', fontSize: 18, fontWeight: 800, color: 'var(--ink)' }}>{fmt(d.resolvidas)}</b><span style={{ fontSize: 11.5, color: 'var(--muted)' }}>resolvidas no filtro</span></div>
-        <div><b style={{ display: 'block', fontSize: 18, fontWeight: 800, color: cm('#1FA868') }}>{fmt(d.acertos)}</b><span style={{ fontSize: 11.5, color: 'var(--muted)' }}>acertos</span></div>
-        <div><b style={{ display: 'block', fontSize: 18, fontWeight: 800, color: cm('#E5484D') }}>{fmt(d.erros)}</b><span style={{ fontSize: 11.5, color: 'var(--muted)' }}>erros</span></div>
+        <div><b style={{ display: 'block', fontSize: 18, fontWeight: 800, color: cm('var(--pn-1fa868,#1FA868)') }}>{fmt(d.acertos)}</b><span style={{ fontSize: 11.5, color: 'var(--muted)' }}>acertos</span></div>
+        <div><b style={{ display: 'block', fontSize: 18, fontWeight: 800, color: cm('var(--pn-e5484d,#E5484D)') }}>{fmt(d.erros)}</b><span style={{ fontSize: 11.5, color: 'var(--muted)' }}>erros</span></div>
         <div><b style={{ display: 'block', fontSize: 18, fontWeight: 800, color: 'var(--brand)' }}>{pct}%</b><span style={{ fontSize: 11.5, color: 'var(--muted)' }}>aproveitamento</span></div>
       </div>
       {porDia && porDia.length > 0 && (

@@ -253,7 +253,7 @@ export function SimSlide({ s, stats }: { s: HeroSimSlide; stats?: BannerStats | 
     <div className="absolute inset-0">
       {s.capa
         ? <img src={s.capa} alt="" className="absolute inset-0 h-full w-full object-cover" /> // eslint-disable-line @next/next/no-img-element
-        : <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${s.cor} 0%, #1a1030 75%, #0f0a1e 120%)` }} />}
+        : <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${s.cor} 0%, var(--pn-1a1030,#1a1030) 75%, var(--pn-0f0a1e,#0f0a1e) 120%)` }} />}
       {fadeAtivo && <div className="absolute inset-0" style={{ background: `linear-gradient(90deg, rgba(10,7,20,${a(0.94)}) 2%, rgba(10,7,20,${a(0.7)}) 42%, rgba(10,7,20,${a(0.14)}) 78%, rgba(10,7,20,${a(0.5)}) 100%)` }} />}
 
       {/* Conteúdo — recuado à esquerda p/ não ficar atrás da seta "anterior". No mobile, mais
@@ -261,7 +261,7 @@ export function SimSlide({ s, stats }: { s: HeroSimSlide; stats?: BannerStats | 
       <div className="relative flex h-full max-w-2xl flex-col justify-center py-4 pl-12 pr-4 sm:py-7 sm:pl-16 sm:pr-6 md:pl-20">
         {s.destaqueAtivo !== false && (
           <div className="mb-1 flex items-center gap-2 sm:mb-1.5">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 10px 1px rgba(52,211,153,.7)' }} />
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 10px 1px color-mix(in srgb,var(--pn-34d399,#34D399) 70%,transparent)' }} />
             <span className="text-[10px] font-semibold uppercase tracking-[0.22em] sm:text-[11px]" style={{ color: 'var(--brand-accent)' }}>{s.destaqueTexto || 'Em destaque para você'}</span>
           </div>
         )}
@@ -286,7 +286,7 @@ export function SimSlide({ s, stats }: { s: HeroSimSlide; stats?: BannerStats | 
         <div className="mt-3 flex flex-wrap items-center gap-2.5 sm:mt-4">
           {s.link && (
             <Alvo href={s.link} className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold shadow-lg ring-1 ring-white/15 transition-transform hover:scale-[1.03] sm:px-5 sm:py-2.5"
-              style={{ background: `linear-gradient(135deg, ${s.cor}, color-mix(in oklab, ${s.cor} 62%, #f5e6b8))`, color: '#1b1036' }}>
+              style={{ background: `linear-gradient(135deg, ${s.cor}, color-mix(in oklab, ${s.cor} 62%, var(--pn-f5e6b8,#f5e6b8)))`, color: 'var(--pn-1b1036,#1b1036)' }}>
               <Play className="h-4 w-4 fill-current" /> {s.acao}
             </Alvo>
           )}
@@ -330,7 +330,7 @@ export function textoContraste(hex: string): string {
   if (h.length !== 6) return '#ffffff'
   const r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16)
   const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255
-  return lum > 0.62 ? '#1b1036' : '#ffffff'
+  return lum > 0.62 ? 'var(--pn-1b1036,#1b1036)' : '#ffffff'
 }
 
 export type PopupDados = { titulo: string | null; mensagem: string | null; imagem_url: string | null; cor: string | null; link: string | null; estilo?: PopupEstilo | null; pontas?: PopupPontas | null }
@@ -393,8 +393,8 @@ export function PopupCard({ banner, onFechar, preview }: { banner: PopupDados; o
         {banner.imagem_url
           // eslint-disable-next-line @next/next/no-img-element
           ? <img src={banner.imagem_url} alt="" className="absolute inset-0 h-full w-full object-cover" />
-          : <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${cor}, #14101f)` }} />}
-        <div className="pointer-events-none absolute inset-0" style={{ background: 'linear-gradient(to top, rgba(8,6,16,.92) 8%, rgba(8,6,16,.55) 42%, rgba(8,6,16,.06) 80%)' }} />
+          : <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${cor}, var(--pn-14101f,#14101f))` }} />}
+        <div className="pointer-events-none absolute inset-0" style={{ background: 'linear-gradient(to top, color-mix(in srgb,var(--pn-080610,#080610) 92%,transparent) 8%, color-mix(in srgb,var(--pn-080610,#080610) 55%,transparent) 42%, color-mix(in srgb,var(--pn-080610,#080610) 6%,transparent) 80%)' }} />
         {CloseX(true)}
         <div className="relative space-y-2 p-6">
           {Eyebrow(true)}
@@ -461,7 +461,7 @@ export function PopupCard({ banner, onFechar, preview }: { banner: PopupDados; o
           {banner.imagem_url
             // eslint-disable-next-line @next/next/no-img-element
             ? <img src={banner.imagem_url} alt="" className="h-44 w-full object-cover sm:h-full" />
-            : <div className="h-44 w-full sm:h-full" style={{ background: `linear-gradient(135deg, ${cor}, #14101f)` }} />}
+            : <div className="h-44 w-full sm:h-full" style={{ background: `linear-gradient(135deg, ${cor}, var(--pn-14101f,#14101f))` }} />}
         </div>
         <div className="flex flex-1 flex-col justify-center p-6">
           {Eyebrow(false)}
@@ -481,8 +481,8 @@ export function PopupCard({ banner, onFechar, preview }: { banner: PopupDados; o
           {banner.imagem_url
             // eslint-disable-next-line @next/next/no-img-element
             ? <img src={banner.imagem_url} alt="" className="absolute inset-0 h-full w-full object-cover" />
-            : <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${cor}, #14101f)` }} />}
-          <div className="pointer-events-none absolute inset-0" style={{ background: 'linear-gradient(90deg, rgba(8,6,16,.9) 2%, rgba(8,6,16,.55) 42%, rgba(8,6,16,.05) 78%)' }} />
+            : <div className="absolute inset-0" style={{ background: `linear-gradient(120deg, ${cor}, var(--pn-14101f,#14101f))` }} />}
+          <div className="pointer-events-none absolute inset-0" style={{ background: 'linear-gradient(90deg, color-mix(in srgb,var(--pn-080610,#080610) 90%,transparent) 2%, color-mix(in srgb,var(--pn-080610,#080610) 55%,transparent) 42%, color-mix(in srgb,var(--pn-080610,#080610) 5%,transparent) 78%)' }} />
           {CloseX(true)}
           <div className="absolute inset-0 flex max-w-2xl flex-col justify-center gap-2 p-6 sm:p-10">
             {Eyebrow(true)}

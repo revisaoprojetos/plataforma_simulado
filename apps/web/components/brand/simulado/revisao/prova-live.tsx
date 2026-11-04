@@ -156,7 +156,7 @@ export function ProvaRevisaoLive(p: ProvaMeqLiveProps) {
       {/* Sheet navegador mobile */}
       {p.ns && (
         <>
-          <div onClick={() => p.onSetNs(false)} style={{ position: 'fixed', inset: 0, zIndex: 70, background: 'rgba(10,10,25,.5)' }} />
+          <div onClick={() => p.onSetNs(false)} style={{ position: 'fixed', inset: 0, zIndex: 70, background: 'color-mix(in srgb,var(--pn-0a0a19,#0A0A19) 50%,transparent)' }} />
           <div className={`${P}-msh`} style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 71, maxHeight: '76%', overflowY: 'auto', padding: '18px 16px 24px', borderRadius: '22px 22px 0 0', background: 'var(--surface)' }}>
             <span style={{ display: 'block', width: 40, height: 4, margin: '0 auto 14px', borderRadius: 99, background: 'var(--line2)' }} />
             <b style={{ display: 'block', marginBottom: 12, fontSize: 16, color: 'var(--ink)' }}>Navegador · {cAns}/{N}</b>
@@ -195,7 +195,7 @@ function CardQuestao({ q, qi, N, resp, fz, flagged, elim, slotDiscursiva, onMark
   const ce = ehCE(q)
   const alts = [...q.alternativas].sort((a, b) => a.ordem - b.ordem)
   return (
-    <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', boxShadow: '0 24px 50px -36px rgba(40,20,110,.45)', padding: 28 }}>
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', boxShadow: '0 24px 50px -36px color-mix(in srgb,var(--pn-28146e,#28146E) 45%,transparent)', padding: 28 }}>
       <div key={qi} className={`${P}-qin`} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <span style={{ height: 28, padding: '0 11px', borderRadius: 8, background: 'var(--surface2)', color: 'var(--ink)', fontSize: 13, fontWeight: 800, display: 'inline-flex', alignItems: 'center' }}>{qi}<span style={{ color: 'var(--muted)', fontWeight: 600 }}>&nbsp;/ {N}</span></span>
@@ -290,14 +290,14 @@ function CardQuestao({ q, qi, N, resp, fz, flagged, elim, slotDiscursiva, onMark
 
 function RevisarBtn({ on, onClick }: { on: boolean; onClick: () => void }) {
   return (
-    <button type="button" onClick={onClick} style={{ height: 46, padding: '0 16px', borderRadius: 12, border: `1.5px solid ${on ? '#F2B63B' : 'rgba(242,182,59,.55)'}`, background: on ? '#F2B63B' : 'rgba(242,182,59,.14)', color: on ? '#3A2A00' : '#C98A0B', font: 'inherit', fontSize: 13.5, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+    <button type="button" onClick={onClick} style={{ height: 46, padding: '0 16px', borderRadius: 12, border: `1.5px solid ${on ? 'var(--pn-f2b63b,#F2B63B)' : 'color-mix(in srgb,var(--pn-f2b63b,#F2B63B) 55%,transparent)'}`, background: on ? 'var(--pn-f2b63b,#F2B63B)' : 'color-mix(in srgb,var(--pn-f2b63b,#F2B63B) 14%,transparent)', color: on ? 'var(--pn-3a2a00,#3A2A00)' : 'var(--pn-c98a0b,#C98A0B)', font: 'inherit', fontSize: 13.5, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', whiteSpace: 'nowrap' }}>
       <Ic d={RIC.flag} size={15} />{on ? 'Marcada para revisar' : 'Revisar'}
     </button>
   )
 }
 
 function revisarMiniStyle(on: boolean): CSSProperties {
-  return { height: 46, padding: '0 11px', borderRadius: 12, border: `1.5px solid ${on ? '#F2B63B' : 'rgba(242,182,59,.55)'}`, background: on ? '#F2B63B' : 'rgba(242,182,59,.14)', color: on ? '#3A2A00' : '#C98A0B', font: 'inherit', fontSize: 13.5, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', whiteSpace: 'nowrap' }
+  return { height: 46, padding: '0 11px', borderRadius: 12, border: `1.5px solid ${on ? 'var(--pn-f2b63b,#F2B63B)' : 'color-mix(in srgb,var(--pn-f2b63b,#F2B63B) 55%,transparent)'}`, background: on ? 'var(--pn-f2b63b,#F2B63B)' : 'color-mix(in srgb,var(--pn-f2b63b,#F2B63B) 14%,transparent)', color: on ? 'var(--pn-3a2a00,#3A2A00)' : 'var(--pn-c98a0b,#C98A0B)', font: 'inherit', fontSize: 13.5, fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: 7, cursor: 'pointer', whiteSpace: 'nowrap' }
 }
 
 // ── Folha de respostas ──────────────────────────────────────────────────────
@@ -305,7 +305,7 @@ function Folha({ questoes, respostas, discPaginas, cAns, N, onMark }: {
   questoes: ProvaLiveQuestao[]; respostas: Record<string, string>; discPaginas: Record<string, number>; cAns: number; N: number; onMark: (qid: string, altId: string) => void
 }) {
   return (
-    <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', boxShadow: '0 24px 50px -36px rgba(40,20,110,.45)', padding: 20 }}>
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', boxShadow: '0 24px 50px -36px color-mix(in srgb,var(--pn-28146e,#28146E) 45%,transparent)', padding: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
         <div>
           <b style={{ fontSize: 17, color: 'var(--ink)' }}>Folha de respostas</b>
@@ -348,7 +348,7 @@ function Navegador({ questoes, qi, respostas, discPaginas, marcadas, cAns, cBl, 
   questoes: ProvaLiveQuestao[]; qi: number; respostas: Record<string, string>; discPaginas: Record<string, number>; marcadas: Set<string>; cAns: number; cBl: number; cFl: number; cPct: number; onGo: (n: number) => void
 }) {
   return (
-    <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', boxShadow: '0 24px 50px -36px rgba(40,20,110,.45)', padding: 18 }}>
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderRadius: 'var(--r)', boxShadow: '0 24px 50px -36px color-mix(in srgb,var(--pn-28146e,#28146E) 45%,transparent)', padding: 18 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
         <b style={{ fontSize: 15, color: 'var(--ink)' }}>Navegador</b>
         <span style={{ fontSize: 12, fontWeight: 800, color: 'var(--brand)' }}>{cPct}% feito</span>
@@ -372,7 +372,7 @@ function Navegador({ questoes, qi, respostas, discPaginas, marcadas, cAns, cBl, 
         if (!temTesoura) return null
         return (
           <div style={{ display: 'flex', gap: 10, padding: 12, borderRadius: 12, background: 'var(--peachBg)', fontSize: 12, lineHeight: 1.45, color: 'var(--ink)' }}>
-            <span style={{ color: '#E5A800' }}><Ic size={16}><path d={RIC.bulb} /><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2V17h6v-.3c0-.8.4-1.5 1-2A7 7 0 0 0 12 2z" /></Ic></span>
+            <span style={{ color: 'var(--pn-e5a800,#E5A800)' }}><Ic size={16}><path d={RIC.bulb} /><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.2 1 2V17h6v-.3c0-.8.4-1.5 1-2A7 7 0 0 0 12 2z" /></Ic></span>
             <span>Use a tesoura para eliminar alternativas e o marcador para voltar depois.</span>
           </div>
         )
@@ -432,12 +432,12 @@ function ModalRev({ questoes, respostas, discPaginas, marcadas, N, cAns, cBl, cF
           <CountChip n={cFl} label="Para revisar" color="var(--flag)" />
         </div>
         {hasBl ? (
-          <div style={{ display: 'flex', gap: 10, padding: '12px 14px', borderRadius: 12, background: 'rgba(242,169,59,.12)', fontSize: 12.5, lineHeight: 1.45, color: 'var(--ink)' }}>
+          <div style={{ display: 'flex', gap: 10, padding: '12px 14px', borderRadius: 12, background: 'color-mix(in srgb,var(--pn-f2a93b,#F2A93B) 12%,transparent)', fontSize: 12.5, lineHeight: 1.45, color: 'var(--ink)' }}>
             <span style={{ color: WARN }}><Ic size={17}><circle cx="12" cy="12" r="9" /><path d={RIC.info} /></Ic></span>
             <span><b>Você ainda tem {cBl} questões em branco:</b> {blTxt}.</span>
           </div>
         ) : (
-          <div style={{ display: 'flex', gap: 10, padding: '12px 14px', borderRadius: 12, background: 'rgba(31,168,104,.1)', fontSize: 13, color: OK, fontWeight: 700 }}>
+          <div style={{ display: 'flex', gap: 10, padding: '12px 14px', borderRadius: 12, background: 'color-mix(in srgb,var(--pn-1fa868,#1FA868) 10%,transparent)', fontSize: 13, color: OK, fontWeight: 700 }}>
             <Ic d={RIC.check} size={17} />Todas as questões foram respondidas.
           </div>
         )}

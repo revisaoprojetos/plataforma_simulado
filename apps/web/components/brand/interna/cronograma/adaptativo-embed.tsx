@@ -111,10 +111,24 @@ export function CronogramaAdaptativoEmbed({ theme, novo }: { theme: InternaTheme
   useEffect(() => {
     function onMsg(e: MessageEvent) {
       const d = (e?.data || {}) as { type?: string }
-      if (d.type === 'rej-crono-ready') enviarTema()
+      // O iframe avisando "pronto" também libera o loader (não depende só do onLoad do React).
+      if (d.type === 'rej-crono-ready') { enviarTema(); setPronto(true) }
     }
     window.addEventListener('message', onMsg)
     return () => window.removeEventListener('message', onMsg)
+  }, [enviarTema])
+
+  // O loader NUNCA pode ficar preso: o <iframe> é renderizado no SSR e pode terminar de carregar ANTES da
+  // hidratação → o `onLoad` do React não dispara e o "Carregando seu cronograma…" ficava para sempre
+  // mesmo com o cronograma já usável. Então: (1) se o iframe já está completo ao montar, libera;
+  // (2) teto de segurança de 4s.
+  useEffect(() => {
+    try {
+      const doc = ref.current?.contentDocument
+      if (doc && doc.readyState === 'complete' && doc.location.href !== 'about:blank') { enviarTema(); setPronto(true) }
+    } catch { /* ignore */ }
+    const t = setTimeout(() => setPronto(true), 4000)
+    return () => clearTimeout(t)
   }, [enviarTema])
 
   const modo = theme === 'escuro' ? 'dark' : 'light'
@@ -134,6 +148,7 @@ export function CronogramaAdaptativoEmbed({ theme, novo }: { theme: InternaTheme
         onLoad={() => { enviarTema(); setTimeout(enviarTema, 120); setTimeout(enviarTema, 400); setTimeout(enviarTema, 1000); setPronto(true) }}
         style={{ width: '100%', height: altura, border: 0, display: 'block', background: 'transparent', opacity: pronto ? 1 : 0, transform: pronto ? 'none' : 'translateY(10px)', transition: 'opacity .45s ease, transform .45s ease' }}
         allow="clipboard-write"
+        suppressHydrationWarning /* o `cb=Date.now()` do dev difere entre SSR e cliente (só atributo `src`) */
       />
     </div>
   )

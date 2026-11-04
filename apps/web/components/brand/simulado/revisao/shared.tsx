@@ -9,18 +9,18 @@
 import type { ReactNode } from 'react'
 
 /** Acento amarelo fixo da marca Revisão (spec §0). */
-export const REV_GOLD = '#F1C232'
+export const REV_GOLD = 'var(--pn-f1c232,#F1C232)'
 /** Gradiente do botão primário Revisão (spec §0). */
-export const REV_GRAD = 'linear-gradient(180deg,#6449E0,#4B30BE)'
-export const REV_GRAD_SHADOW = '0 12px 24px -14px rgba(75,48,190,.9)'
+export const REV_GRAD = 'linear-gradient(180deg,var(--pn-6449e0,#6449E0),var(--pn-4b30be,#4B30BE))'
+export const REV_GRAD_SHADOW = '0 12px 24px -14px color-mix(in srgb,var(--pn-4b30be,#4B30BE) 90%,transparent)'
 /** Faixa arco-íris do topo dos cartões (spec §1.2). */
-export const RAINBOW = 'linear-gradient(90deg,#3E5BD8 0%,#8F75FF 30%,#F1A21B 55%,#E58BB8 80%,#9B6BF0 100%)'
+export const RAINBOW = 'linear-gradient(90deg,var(--pn-3e5bd8,#3E5BD8) 0%,var(--pn-8f75ff,#8F75FF) 30%,var(--pn-f1a21b,#F1A21B) 55%,var(--pn-e58bb8,#E58BB8) 80%,var(--pn-9b6bf0,#9B6BF0) 100%)'
 /** Sombra difusa roxa dos cartões Revisão. */
-export const CARD_SHADOW = '0 24px 50px -36px rgba(40,20,110,.45)'
+export const CARD_SHADOW = '0 24px 50px -36px color-mix(in srgb,var(--pn-28146e,#28146E) 45%,transparent)'
 /** Cores semânticas (exceção à regra de tokens). */
-export const OK = '#1FA868'
-export const ERR = '#E5484D'
-export const WARN = '#F2A93B'
+export const OK = 'var(--pn-1fa868,#1FA868)'
+export const ERR = 'var(--pn-e5484d,#E5484D)'
+export const WARN = 'var(--pn-f2a93b,#F2A93B)'
 
 /** Quadradinhos piscantes do bgfx — posições DETERMINÍSTICAS (seed simples). */
 function squares(count: number, w: number) {
@@ -50,15 +50,15 @@ export function Bgfx({ prefix }: { prefix: string }) {
   const px = squares(70, 1440)
   return (
     <div aria-hidden className={`${prefix}-bgfx`} style={{ position: 'absolute', inset: 0, overflow: 'hidden', pointerEvents: 'none' }}>
-      <span className={`${prefix}-orb`} style={{ position: 'absolute', left: -120, top: -80, width: 420, height: 420, borderRadius: '50%', background: 'rgba(100,73,224,.28)', filter: 'blur(90px)', animationDelay: '0s' }} />
-      <span className={`${prefix}-orb`} style={{ position: 'absolute', left: '70%', top: '30%', width: 380, height: 380, borderRadius: '50%', background: 'rgba(241,194,50,.18)', filter: 'blur(90px)', animationDelay: '3s' }} />
-      <span className={`${prefix}-orb`} style={{ position: 'absolute', left: '20%', top: '75%', width: 320, height: 320, borderRadius: '50%', background: 'rgba(143,117,255,.2)', filter: 'blur(95px)', animationDelay: '6s' }} />
+      <span className={`${prefix}-orb`} style={{ position: 'absolute', left: -120, top: -80, width: 420, height: 420, borderRadius: '50%', background: 'color-mix(in srgb,var(--pn-6449e0,#6449E0) 28%,transparent)', filter: 'blur(90px)', animationDelay: '0s' }} />
+      <span className={`${prefix}-orb`} style={{ position: 'absolute', left: '70%', top: '30%', width: 380, height: 380, borderRadius: '50%', background: 'color-mix(in srgb,var(--pn-f1c232,#F1C232) 18%,transparent)', filter: 'blur(90px)', animationDelay: '3s' }} />
+      <span className={`${prefix}-orb`} style={{ position: 'absolute', left: '20%', top: '75%', width: 320, height: 320, borderRadius: '50%', background: 'color-mix(in srgb,var(--pn-8f75ff,#8F75FF) 20%,transparent)', filter: 'blur(95px)', animationDelay: '6s' }} />
       <div style={{ position: 'absolute', inset: 0 }}>
         {px.map((p, i) => (
           <span
             key={i}
             className={`${prefix}-px`}
-            style={{ left: p.left, top: p.top, width: 31, height: 31, background: p.gold ? 'rgba(241,194,50,.2)' : 'rgba(185,168,255,.22)', animationDelay: `${p.delay}s` }}
+            style={{ left: p.left, top: p.top, width: 31, height: 31, background: p.gold ? 'color-mix(in srgb,var(--pn-f1c232,#F1C232) 20%,transparent)' : 'color-mix(in srgb,var(--pn-b9a8ff,#B9A8FF) 22%,transparent)', animationDelay: `${p.delay}s` }}
           />
         ))}
       </div>

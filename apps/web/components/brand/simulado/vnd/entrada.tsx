@@ -138,7 +138,7 @@ export function EntradaVND({ theme, data, es = 'aberto', preview, real }: SimScr
             <MarcaVND size={22} radius={13} />
             <div style={{ display: 'flex', flexDirection: 'column', lineHeight: 1.2 }}>
               <span style={{ fontWeight: 800, fontSize: 14, color: '#FFFFFF' }}>{marca === 'mac' ? 'Mentoria Além do Corte' : 'Você na Defensoria'}</span>
-              <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.18em', color: cm('#F1D48A') }}>
+              <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.18em', color: cm('var(--pn-f1d48a,#F1D48A)') }}>
                 {marca === 'mac' ? 'SIMULA MAC' : 'SIMULA VND'}
               </span>
             </div>
@@ -323,13 +323,13 @@ export function EntradaVND({ theme, data, es = 'aberto', preview, real }: SimScr
                 gap: 10,
                 padding: 12,
                 borderRadius: 12,
-                background: 'rgba(229,72,77,.08)',
+                background: 'color-mix(in srgb,var(--pn-e5484d,#E5484D) 8%,transparent)',
                 color: 'var(--ink)',
                 fontSize: 12.5,
                 lineHeight: 1.45,
               }}
             >
-              <Clock size={16} style={{ color: '#E5484D', flexShrink: 0 }} />
+              <Clock size={16} style={{ color: 'var(--pn-e5484d,#E5484D)', flexShrink: 0 }} />
               <span>
                 O cronômetro não pausa. Se o tempo acabar, o simulado é enviado automaticamente com o que estiver
                 marcado.
@@ -364,7 +364,7 @@ function EmailField({ value = '', error = false }: { value?: string; error?: boo
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
       <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>
-        E-mail cadastrado na plataforma <b style={{ color: '#E5484D' }}>*</b>
+        E-mail cadastrado na plataforma <b style={{ color: 'var(--pn-e5484d,#E5484D)' }}>*</b>
       </span>
       <span
         style={{
@@ -374,10 +374,10 @@ function EmailField({ value = '', error = false }: { value?: string; error?: boo
           height: 50,
           padding: '0 14px',
           borderRadius: 14,
-          border: `1.5px solid ${error ? '#E5484D' : 'var(--line2)'}`,
+          border: `1.5px solid ${error ? 'var(--pn-e5484d,#E5484D)' : 'var(--line2)'}`,
           background: 'var(--surface)',
           color: 'var(--muted)',
-          boxShadow: error ? '0 0 0 4px rgba(229,72,77,.12)' : undefined,
+          boxShadow: error ? '0 0 0 4px color-mix(in srgb,var(--pn-e5484d,#E5484D) 12%,transparent)' : undefined,
         }}
       >
         <Mail size={17} />
@@ -387,7 +387,7 @@ function EmailField({ value = '', error = false }: { value?: string; error?: boo
           placeholder="seu@email.com"
           style={{ flex: 1, minWidth: 0, border: 0, outline: 0, background: 'transparent', font: 'inherit', fontSize: 14.5, color: 'var(--ink)' }}
         />
-        {error && <CircleAlert size={17} style={{ color: '#E5484D' }} />}
+        {error && <CircleAlert size={17} style={{ color: 'var(--pn-e5484d,#E5484D)' }} />}
       </span>
     </label>
   )
@@ -397,7 +397,7 @@ function EmailField({ value = '', error = false }: { value?: string; error?: boo
 function CampoReal({ label, icon, type, value, onChange, placeholder, inputMode }: { label: React.ReactNode; icon: React.ReactNode; type?: string; value: string; onChange: (v: string) => void; placeholder: string; inputMode?: 'numeric' | 'tel' }) {
   return (
     <label style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>{label} <b style={{ color: '#E5484D' }}>*</b></span>
+      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>{label} <b style={{ color: 'var(--pn-e5484d,#E5484D)' }}>*</b></span>
       <span style={{ display: 'flex', alignItems: 'center', gap: 10, height: 50, padding: '0 14px', borderRadius: 14, border: '1.5px solid var(--line2)', background: 'var(--surface)', color: 'var(--muted)' }}>
         {icon}
         <input type={type ?? 'text'} inputMode={inputMode} value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder} autoComplete={type === 'email' ? 'email' : undefined} style={{ flex: 1, minWidth: 0, border: 0, outline: 0, background: 'transparent', font: 'inherit', fontSize: 14.5, color: 'var(--ink)' }} />
@@ -425,7 +425,7 @@ function FormAberto({ onIni, onFolha, onResultado, real }: { onIni: () => void; 
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {real ? <CamposReais real={real} /> : <EmailField />}
       {real?.erro ? (
-        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '10px 12px', borderRadius: 12, background: 'rgba(229,72,77,.08)', border: '1px solid rgba(229,72,77,.3)', fontSize: 12.5, color: '#E5484D' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '10px 12px', borderRadius: 12, background: 'color-mix(in srgb,var(--pn-e5484d,#E5484D) 8%,transparent)', border: '1px solid color-mix(in srgb,var(--pn-e5484d,#E5484D) 30%,transparent)', fontSize: 12.5, color: 'var(--pn-e5484d,#E5484D)' }}>
           <CircleAlert size={15} style={{ flexShrink: 0, marginTop: 1 }} />
           <span>{real.erro.titulo ? <b>{real.erro.titulo} </b> : null}{real.erro.mensagem}</span>
         </div>
@@ -510,8 +510,8 @@ function FormSemcad() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <EmailField value="aluno.novo@email.com" error />
-      <div style={{ padding: 14, borderRadius: 12, background: 'rgba(229,72,77,.08)', border: '1px solid rgba(229,72,77,.3)' }}>
-        <b style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: '#E5484D' }}>
+      <div style={{ padding: 14, borderRadius: 12, background: 'color-mix(in srgb,var(--pn-e5484d,#E5484D) 8%,transparent)', border: '1px solid color-mix(in srgb,var(--pn-e5484d,#E5484D) 30%,transparent)' }}>
+        <b style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14, color: 'var(--pn-e5484d,#E5484D)' }}>
           <CircleAlert size={16} /> Não encontramos este e-mail
         </b>
         <span style={{ display: 'block', marginTop: 6, fontSize: 12.5, lineHeight: 1.5, color: 'var(--muted)' }}>
@@ -583,7 +583,7 @@ function FormEncerrado({ fim, real }: { fim: string; real?: SimEntradaReal }) {
       </div>
       {real ? <CamposReais real={real} /> : <EmailField />}
       {real?.erro ? (
-        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '10px 12px', borderRadius: 12, background: 'rgba(229,72,77,.08)', border: '1px solid rgba(229,72,77,.3)', fontSize: 12.5, color: '#E5484D' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', padding: '10px 12px', borderRadius: 12, background: 'color-mix(in srgb,var(--pn-e5484d,#E5484D) 8%,transparent)', border: '1px solid color-mix(in srgb,var(--pn-e5484d,#E5484D) 30%,transparent)', fontSize: 12.5, color: 'var(--pn-e5484d,#E5484D)' }}>
           <CircleAlert size={15} style={{ flexShrink: 0, marginTop: 1 }} />
           <span>{real.erro.titulo ? <b>{real.erro.titulo} </b> : null}{real.erro.mensagem}</span>
         </div>
@@ -697,14 +697,14 @@ ${modalSheetCss(P)}
 .${P}-demochip{flex-shrink:0;height:30px;padding:0 12px;border:1px solid var(--line);border-radius:99px;font:inherit;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
 .${P}-wrap{position:relative;max-width:760px;margin:0 auto;padding:40px 24px 64px;display:flex;flex-direction:column;gap:26px}
 /* Voltar no canto superior ESQUERDO da tela; clamp() adapta a posição ao viewport/iframe. */
-.${P}-back{position:absolute;z-index:6;left:clamp(12px,3vw,32px);top:clamp(14px,2.4vw,26px);display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:700;color:#CFE3D7;text-decoration:none}
+.${P}-back{position:absolute;z-index:6;left:clamp(12px,3vw,32px);top:clamp(14px,2.4vw,26px);display:inline-flex;align-items:center;gap:6px;font-size:13.5px;font-weight:700;color:var(--pn-cfe3d7,#CFE3D7);text-decoration:none}
 .${P}-back:hover{color:#fff}
 .${P}-lockup{display:flex;align-items:center;justify-content:center;gap:11px;flex-shrink:0;white-space:nowrap}
 .${P}-ticket{border-radius:28px;overflow:hidden;background:var(--surface);border:2px solid var(--line);box-shadow:0 8px 0 var(--line),0 40px 70px -40px rgba(4,26,16,.6)}
 .${P}-top{position:relative;overflow:hidden;padding:34px 36px 38px;background:${VND_HERO_BG};color:#fff;text-align:center}
 .${P}-topdots{position:absolute;inset:0;background-image:radial-gradient(circle,rgba(185,245,212,.16) 1.2px,transparent 1.8px);background-size:22px 22px}
-.${P}-tile{width:72px;height:72px;border-radius:22px;background:${VND_GOLD};color:#2A1F02;display:inline-flex;align-items:center;justify-content:center;box-shadow:${VND_GOLD_SHADOW.replace('4px', '5px')}}
-.${P}-statusbadge{display:inline-flex;height:26px;padding:0 12px;border-radius:99px;background:rgba(63,213,138,.18);color:#7BF0B4;font-size:12px;font-weight:800;align-items:center;gap:6px}
+.${P}-tile{width:72px;height:72px;border-radius:22px;background:${VND_GOLD};color:var(--pn-2a1f02,#2A1F02);display:inline-flex;align-items:center;justify-content:center;box-shadow:${VND_GOLD_SHADOW.replace('4px', '5px')}}
+.${P}-statusbadge{display:inline-flex;height:26px;padding:0 12px;border-radius:99px;background:rgba(63,213,138,.18);color:var(--pn-7bf0b4,#7BF0B4);font-size:12px;font-weight:800;align-items:center;gap:6px}
 .${P}-statusdot{width:7px;height:7px;border-radius:50%;background:${VND_GREEN}}
 .${P}-h1{margin:0;font-size:36px;font-weight:800;letter-spacing:-.045em;line-height:1.08}
 .${P}-chips{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:4px}

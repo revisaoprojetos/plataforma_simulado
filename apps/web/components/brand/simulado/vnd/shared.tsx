@@ -11,19 +11,19 @@ import { useCm, useBrandAtual } from '@/lib/brand/cor-marca'
 import { MAC_M_PATH } from '../../brand-marks'
 
 // Acentos de marca fixos (spec §0 "Botão primário").
-export const VND_BTN = 'linear-gradient(180deg,#14924F,#0C6E3C)'
-export const VND_BTN_SHADOW = '0 4px 0 #0A4F2C'
-export const VND_GOLD = 'linear-gradient(180deg,#F1D48A,#D8B45A)'
-export const VND_GOLD_SHADOW = '0 4px 0 #9A7414'
-export const VND_GOLD_INK = '#2A1F02'
-export const VND_GREEN = '#3FD58A'
-export const VND_HERO_BG = 'linear-gradient(140deg,#041A10,#0B4A2E 55%,#12643D)'
-export const VND_TILE_BG = 'linear-gradient(160deg,#0F4A2E,#072A1B)'
-export const C_OK = '#1FA868'
-export const C_ERR = '#E5484D'
-export const C_WARN = '#F2A93B'
-export const C_TIMER = '#D99A1E'
-export const C_STAR = '#E8B23A'
+export const VND_BTN = 'linear-gradient(180deg,var(--pn-14924f,#14924F),var(--pn-0c6e3c,#0C6E3C))'
+export const VND_BTN_SHADOW = '0 4px 0 var(--pn-0a4f2c,#0A4F2C)'
+export const VND_GOLD = 'linear-gradient(180deg,var(--pn-f1d48a,#F1D48A),var(--pn-d8b45a,#D8B45A))'
+export const VND_GOLD_SHADOW = '0 4px 0 var(--pn-9a7414,#9A7414)'
+export const VND_GOLD_INK = 'var(--pn-2a1f02,#2A1F02)'
+export const VND_GREEN = 'var(--pn-3fd58a,#3FD58A)'
+export const VND_HERO_BG = 'linear-gradient(140deg,var(--pn-041a10,#041A10),var(--pn-0b4a2e,#0B4A2E) 55%,var(--pn-12643d,#12643D))'
+export const VND_TILE_BG = 'linear-gradient(160deg,var(--pn-0f4a2e,#0F4A2E),var(--pn-072a1b,#072A1B))'
+export const C_OK = 'var(--pn-1fa868,#1FA868)'
+export const C_ERR = 'var(--pn-e5484d,#E5484D)'
+export const C_WARN = 'var(--pn-f2a93b,#F2A93B)'
+export const C_TIMER = 'var(--pn-d99a1e,#D99A1E)'
+export const C_STAR = 'var(--pn-e8b23a,#E8B23A)'
 
 const V_PATH =
   'M1.00 5.90L11.51 5.77Q12.20 5.76 12.53 6.13L21.21 15.98Q21.47 16.25 21.57 15.86L21.60 8.10C21.60 7.05 20.81 6.30 19.76 5.88L30.57 5.90Q31.00 5.91 30.74 6.33L23.18 14.49C22.26 15.55 21.80 16.65 21.73 18.23L21.67 25.45Q21.60 26.24 20.95 25.96L6.03 8.31C4.78 6.96 3.14 6.19 1.00 5.90Z'
@@ -100,13 +100,13 @@ export function Bgfx({ prefix, variant }: { prefix: string; variant: 'entrada' |
   const dots =
     variant === 'entrada'
       ? {
-          backgroundImage: cm('radial-gradient(circle,rgba(63,213,138,.22) 1.2px,transparent 1.8px)'),
+          backgroundImage: cm('radial-gradient(circle,color-mix(in srgb,var(--pn-3fd58a,#3FD58A) 22%,transparent) 1.2px,transparent 1.8px)'),
           backgroundSize: '22px 22px',
           WebkitMaskImage: 'linear-gradient(180deg,#000 30%,transparent 90%)',
           maskImage: 'linear-gradient(180deg,#000 30%,transparent 90%)',
         }
       : {
-          backgroundImage: cm('radial-gradient(circle,rgba(63,213,138,.2) 1.2px,transparent 1.8px)'),
+          backgroundImage: cm('radial-gradient(circle,color-mix(in srgb,var(--pn-3fd58a,#3FD58A) 20%,transparent) 1.2px,transparent 1.8px)'),
           backgroundSize: '22px 22px',
           WebkitMaskImage: 'radial-gradient(ellipse at 50% 0%,#000,transparent 75%)',
           maskImage: 'radial-gradient(ellipse at 50% 0%,#000,transparent 75%)',
@@ -121,7 +121,7 @@ export function Bgfx({ prefix, variant }: { prefix: string; variant: 'entrada' |
             right: 0,
             top: 0,
             height: 560,
-            background: cm('linear-gradient(180deg,#041A10 0%,#0B4A2E 55%,transparent 100%)'),
+            background: cm('linear-gradient(180deg,var(--pn-041a10,#041A10) 0%,var(--pn-0b4a2e,#0B4A2E) 55%,transparent 100%)'),
           }}
         />
       )}
@@ -151,7 +151,7 @@ export function Bgfx({ prefix, variant }: { prefix: string; variant: 'entrada' |
           width: 380,
           height: 380,
           borderRadius: '50%',
-          background: cm('rgba(232,200,119,.22)'),
+          background: cm('color-mix(in srgb,var(--pn-e8c877,#E8C877) 22%,transparent)'),
           filter: 'blur(90px)',
         }}
       />
@@ -164,7 +164,7 @@ export function Bgfx({ prefix, variant }: { prefix: string; variant: 'entrada' |
           width: 360,
           height: 360,
           borderRadius: '50%',
-          background: cm('rgba(63,213,138,.18)'),
+          background: cm('color-mix(in srgb,var(--pn-3fd58a,#3FD58A) 18%,transparent)'),
           filter: 'blur(90px)',
           animationDelay: '4s',
         }}
@@ -182,7 +182,7 @@ export function Bgfx({ prefix, variant }: { prefix: string; variant: 'entrada' |
               <path
                 d="M0 0 L100 112 L200 0"
                 fill="none"
-                stroke={cm(i === 0 ? 'rgba(232,200,119,.55)' : i === 1 ? 'rgba(185,245,212,.14)' : 'rgba(185,245,212,.1)')}
+                stroke={cm(i === 0 ? 'color-mix(in srgb,var(--pn-e8c877,#E8C877) 55%,transparent)' : i === 1 ? 'color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 14%,transparent)' : 'color-mix(in srgb,var(--pn-b9f5d4,#B9F5D4) 10%,transparent)')}
                 strokeWidth={i === 0 ? 2 : 1.2}
                 vectorEffect="non-scaling-stroke"
               />
@@ -195,10 +195,10 @@ export function Bgfx({ prefix, variant }: { prefix: string; variant: 'entrada' |
 }
 
 const STK = [
-  { left: '12%', top: '-20%', w: 2, c: 'rgba(232,200,119,.55)', d: '0s' },
-  { left: '30%', top: '-20%', w: 10, c: 'rgba(63,213,138,.12)', d: '2s' },
-  { left: '68%', top: '-20%', w: 2, c: 'rgba(232,200,119,.45)', d: '4s' },
-  { left: '84%', top: '-20%', w: 14, c: 'rgba(63,213,138,.1)', d: '1s' },
+  { left: '12%', top: '-20%', w: 2, c: 'color-mix(in srgb,var(--pn-e8c877,#E8C877) 55%,transparent)', d: '0s' },
+  { left: '30%', top: '-20%', w: 10, c: 'color-mix(in srgb,var(--pn-3fd58a,#3FD58A) 12%,transparent)', d: '2s' },
+  { left: '68%', top: '-20%', w: 2, c: 'color-mix(in srgb,var(--pn-e8c877,#E8C877) 45%,transparent)', d: '4s' },
+  { left: '84%', top: '-20%', w: 14, c: 'color-mix(in srgb,var(--pn-3fd58a,#3FD58A) 10%,transparent)', d: '1s' },
 ]
 
 /** Estilo do card 3D VND (borda 2px + sombra sólida). */
@@ -283,7 +283,7 @@ export function ModalShell({
           position: 'fixed',
           inset: 0,
           zIndex: 80,
-          background: 'rgba(10,10,25,.55)',
+          background: 'color-mix(in srgb,var(--pn-0a0a19,#0A0A19) 55%,transparent)',
           backdropFilter: 'blur(6px)',
           WebkitBackdropFilter: 'blur(6px)',
         }}
@@ -310,7 +310,7 @@ export function ModalShell({
         {!plain && (
           <>
             <span
-              style={{ display: 'block', height: 5, background: cm('linear-gradient(90deg,#0F7A44,#3FD58A 60%,#E8C877)') }}
+              style={{ display: 'block', height: 5, background: cm('linear-gradient(90deg,var(--pn-0f7a44,#0F7A44),var(--pn-3fd58a,#3FD58A) 60%,var(--pn-e8c877,#E8C877))') }}
             />
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '22px 24px 4px' }}>
               {icon && (

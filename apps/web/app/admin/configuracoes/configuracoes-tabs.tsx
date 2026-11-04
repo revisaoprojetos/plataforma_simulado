@@ -1,7 +1,7 @@
 'use client'
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Fingerprint, Palette, LoaderCircle, Settings2, PanelTop, MonitorPlay, LayoutGrid, Sparkles, Contact, Smartphone, StretchHorizontal, PanelLeft, LogIn } from 'lucide-react'
+import { Fingerprint, Palette, LoaderCircle, Settings2, PanelTop, MonitorPlay, LayoutGrid, Sparkles, Contact, Smartphone, StretchHorizontal, PanelLeft, LogIn, Brush } from 'lucide-react'
 import { MenuLateralForm } from './menu-lateral-form'
 import { AparenciaAuthForm } from './aparencia-auth-form'
 import { ConfiguracoesForm } from './configuracoes-form'
@@ -9,6 +9,7 @@ import { CardViewForm } from './card-view-form'
 import { CarregamentoForm } from './carregamento-form'
 import { ImersaoForm } from './imersao-form'
 import { AvancadoForm } from './avancado-form'
+import { PaletaNovaForm } from './paleta-nova-form'
 import { TemaSistemaForm } from './tema-sistema-form'
 import { SelecaoForm } from './selecao-form'
 import { AssistenteForm } from './assistente-form'
@@ -25,6 +26,7 @@ export function ConfiguracoesTabs({ tema, salvarTema, capasSistema }: { tema: an
         <TabsTrigger value="identidade"><Fingerprint /> Identidade</TabsTrigger>
         <TabsTrigger value="selecao"><LayoutGrid /> Seleção</TabsTrigger>
         <TabsTrigger value="tema"><Palette /> Cores &amp; Tema</TabsTrigger>
+        <TabsTrigger value="paleta"><Brush /> Paleta nova</TabsTrigger>
         <TabsTrigger value="carregamento"><LoaderCircle /> Carregamento</TabsTrigger>
         <TabsTrigger value="login-carregamento"><LogIn /> Login e carregamento</TabsTrigger>
         <TabsTrigger value="menu"><PanelLeft /> Menu lateral</TabsTrigger>
@@ -45,6 +47,10 @@ export function ConfiguracoesTabs({ tema, salvarTema, capasSistema }: { tema: an
 
       <TabsContent value="tema">
         <TemaSistemaForm tema={tema} salvarTema={salvarTema} />
+      </TabsContent>
+
+      <TabsContent value="paleta">
+        <PaletaNovaForm tema={tema} salvarTema={salvarTema} />
       </TabsContent>
 
       {/* Carregamento reúne, em sub-tabs, o loader de navegação + a tela cheia (splash). */}

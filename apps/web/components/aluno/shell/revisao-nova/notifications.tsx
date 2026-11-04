@@ -43,7 +43,7 @@ export function NotificationsPanel({ onClose, variant }: NotificationsPanelProps
           position: 'fixed',
           inset: 0,
           zIndex: 90,
-          background: variant === 'desktop' ? 'transparent' : 'rgba(10,8,25,.35)',
+          background: variant === 'desktop' ? 'transparent' : 'color-mix(in srgb,var(--pn-0a0819,#0A0819) 35%,transparent)',
         }}
       />
       <div
@@ -55,7 +55,7 @@ export function NotificationsPanel({ onClose, variant }: NotificationsPanelProps
           zIndex: 91,
           borderRadius: 22,
           background: 'var(--surface)',
-          boxShadow: '0 30px 60px -20px rgba(30,15,80,.55), 0 0 0 1px var(--line)',
+          boxShadow: '0 30px 60px -20px color-mix(in srgb,var(--pn-1e0f50,#1E0F50) 55%,transparent), 0 0 0 1px var(--line)',
           overflow: 'visible',
           ...pos,
         }}
@@ -69,7 +69,7 @@ export function NotificationsPanel({ onClose, variant }: NotificationsPanelProps
               top: -6,
               width: 12,
               height: 12,
-              background: '#5B3FD0',
+              background: 'var(--pn-5b3fd0,#5B3FD0)',
               transform: 'rotate(45deg)',
               borderRadius: 2,
             }}
@@ -79,7 +79,7 @@ export function NotificationsPanel({ onClose, variant }: NotificationsPanelProps
           {/* Cabeçalho gradiente roxo */}
           <div
             style={{
-              background: 'radial-gradient(120% 140% at 100% 0%,#6449E0,#3B1E8F 60%,#241047)',
+              background: 'radial-gradient(120% 140% at 100% 0%,var(--pn-6449e0,#6449E0),var(--pn-3b1e8f,#3B1E8F) 60%,var(--pn-241047,#241047))',
               color: '#FFFFFF',
               paddingTop: 16,
             }}

@@ -260,7 +260,7 @@ export function NovoProdutoDialog({ open, onClose, arvore, pastaAtual }: {
         className="flex max-h-[88vh] flex-col gap-0 overflow-hidden p-0 duration-200 sm:max-w-lg data-open:slide-in-from-bottom-2 data-closed:slide-out-to-bottom-1">
         {/* Cabeçalho fixo */}
         <div className="shrink-0 border-b px-5 pb-3 pt-4">
-          <div className="text-[11px] font-extrabold uppercase tracking-[.16em]" style={{ color: 'var(--gold-ink, #9A7400)' }}>Produtos › Criar produto</div>
+          <div className="text-[11px] font-extrabold uppercase tracking-[.16em]" style={{ color: 'var(--gold-ink, var(--pn-9a7400,#9A7400))' }}>Produtos › Criar produto</div>
           <DialogTitle className="mt-0.5 text-[20px] font-extrabold tracking-tight">Criar produto</DialogTitle>
         </div>
 

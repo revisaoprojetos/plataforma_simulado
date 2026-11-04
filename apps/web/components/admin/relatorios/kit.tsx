@@ -7,7 +7,7 @@ import {
 import { cn } from '@/lib/utils'
 
 // Paleta: 1ª cor = primária do tema; demais = tons distintos (bons no claro e no escuro).
-export const PALETA = ['hsl(var(--primary))', '#22c55e', '#f59e0b', '#ec4899', '#06b6d4', '#8b5cf6', '#ef4444', '#14b8a6', '#eab308', '#3b82f6']
+export const PALETA = ['hsl(var(--primary))', 'var(--pn-22c55e,#22c55e)', 'var(--pn-f59e0b,#f59e0b)', 'var(--pn-ec4899,#ec4899)', 'var(--pn-06b6d4,#06b6d4)', 'var(--pn-8b5cf6,#8b5cf6)', 'var(--pn-ef4444,#ef4444)', 'var(--pn-14b8a6,#14b8a6)', 'var(--pn-eab308,#eab308)', 'var(--pn-3b82f6,#3b82f6)']
 
 /** Baixa uma planilha CSV (abre no Excel; BOM p/ acentos; separador ;). */
 export function baixarCsv(nomeArq: string, linhas: (string | number | null)[][]) {

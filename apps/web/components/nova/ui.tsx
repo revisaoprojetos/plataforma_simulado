@@ -93,7 +93,7 @@ export function Hero({ children, bg = 'var(--nova-hero-bg, linear-gradient(120de
       <RMark w={240} h={233} color="#FFFFFF" style={{ position: 'absolute', right: -30, bottom: -60, opacity: 0.06 }} />
       {/* Traço amarelo correndo sobre o "R" — mesma animação do banner da Início */}
       <svg aria-hidden viewBox="0 0 68 66" style={{ position: 'absolute', right: -30, bottom: -60, width: 240, height: 233, pointerEvents: 'none', overflow: 'visible' }}>
-        <path className="np-hero-run" fill="none" stroke="#F1C232" strokeWidth={0.45} strokeLinecap="round" d="M6 5.5H32C43.5 5.5 49 13 49 23C49 31 45 37 39.5 40.5L62 61H6Z" />
+        <path className="np-hero-run" fill="none" stroke="var(--pn-f1c232,#F1C232)" strokeWidth={0.45} strokeLinecap="round" d="M6 5.5H32C43.5 5.5 49 13 49 23C49 31 45 37 39.5 40.5L62 61H6Z" />
       </svg>
       <div style={{ position: 'relative' }}>{children}</div>
     </section>
@@ -113,7 +113,7 @@ export function Btn({ children, kind = 'primary', icon, href = '#', size = 'md',
   const base: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, height: BTN_H[size], padding: `0 ${BTN_PAD[size]}px`, borderRadius: BTN_R[size], fontSize: BTN_FS[size], whiteSpace: 'nowrap', cursor: 'pointer' }
   let s: React.CSSProperties
   if (kind === 'primary') s = { ...base, background: 'var(--btnPrimary)', color: '#FFFFFF', fontWeight: 800 }
-  else if (kind === 'gold') s = { ...base, background: 'var(--gold)', color: 'var(--goldInk)', fontWeight: 800, boxShadow: '0 10px 20px -14px rgba(160,120,0,.9)' }
+  else if (kind === 'gold') s = { ...base, background: 'var(--gold)', color: 'var(--goldInk)', fontWeight: 800, boxShadow: '0 10px 20px -14px color-mix(in srgb,var(--pn-a07800,#A07800) 90%,transparent)' }
   else if (kind === 'ghostdark') s = { ...base, border: '1px solid rgba(255,255,255,.28)', background: 'rgba(255,255,255,.06)', color: '#FFFFFF', fontWeight: 700 }
   else if (kind === 'link') s = { display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 13, fontWeight: 800, color: 'var(--brand)', whiteSpace: 'nowrap', cursor: 'pointer' }
   else s = { ...base, border: '1px solid var(--line)', background: 'var(--surface)', color: 'var(--ink)', fontWeight: 700 }
@@ -137,7 +137,7 @@ export function Seg({ items, active = 0, links, counts, style }: { items: string
       {items.map((t, k) => {
         const on = k === active
         const st: React.CSSProperties = on
-          ? { background: 'var(--surface)', color: 'var(--ink)', boxShadow: '0 2px 8px rgba(30,15,80,.1)', fontWeight: 800 }
+          ? { background: 'var(--surface)', color: 'var(--ink)', boxShadow: '0 2px 8px color-mix(in srgb,var(--pn-1e0f50,#1E0F50) 10%,transparent)', fontWeight: 800 }
           : { background: 'transparent', color: 'var(--muted)', fontWeight: 700 }
         return (
           <a key={k} href={links?.[k] ?? '#'} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, height: 36, padding: '0 14px', borderRadius: 10, fontSize: 13, whiteSpace: 'nowrap', ...st }}>
@@ -197,7 +197,7 @@ export function Tag({ children, kind = 'brand', icon }: { children: Kids; kind?:
 export function Bar({ pct, color = 'var(--brand)', h = 8, style }: { pct: number; color?: string; h?: number; style?: React.CSSProperties }) {
   return <div style={{ height: h, borderRadius: 99, background: 'var(--track)', overflow: 'hidden', ...style }}><span style={{ display: 'block', height: '100%', width: `${Math.max(0, Math.min(100, pct))}%`, borderRadius: 99, background: color }} /></div>
 }
-export const GBAR = 'linear-gradient(90deg,#6449E0,#8F75FF 70%,#F1C232)'
+export const GBAR = 'linear-gradient(90deg,var(--pn-6449e0,#6449E0),var(--pn-8f75ff,#8F75FF) 70%,var(--pn-f1c232,#F1C232))'
 
 export function MiniBar({ pct, color = 'var(--brand)', w = 90 }: { pct: number; color?: string; w?: number }) {
   return (
@@ -272,13 +272,13 @@ export function Cover({ line, sigla, grad = 'linear-gradient(135deg,#2A1E4A,#4A3
 }
 
 export const GR: Record<string, string> = {
-  BA: 'linear-gradient(135deg,#9A3412,#EA580C)',
-  RS: 'linear-gradient(135deg,#0F4C5C,#14868F)',
-  AL: 'linear-gradient(135deg,#0E5C63,#12808A)',
-  RJ: 'linear-gradient(135deg,#1E3A8A,#2F5BD3)',
-  MA: 'linear-gradient(135deg,#14532D,#1F7A45)',
-  EXT: 'linear-gradient(135deg,#2A1E4A,#4A31B8)',
-  ENAP: 'linear-gradient(135deg,#0B5E3A,#1E9A62)',
+  BA: 'linear-gradient(135deg,var(--pn-9a3412,#9A3412),var(--pn-ea580c,#EA580C))',
+  RS: 'linear-gradient(135deg,var(--pn-0f4c5c,#0F4C5C),var(--pn-14868f,#14868F))',
+  AL: 'linear-gradient(135deg,var(--pn-0e5c63,#0E5C63),var(--pn-12808a,#12808A))',
+  RJ: 'linear-gradient(135deg,var(--pn-1e3a8a,#1E3A8A),var(--pn-2f5bd3,#2F5BD3))',
+  MA: 'linear-gradient(135deg,var(--pn-14532d,#14532D),var(--pn-1f7a45,#1F7A45))',
+  EXT: 'linear-gradient(135deg,var(--pn-2a1e4a,#2A1E4A),var(--pn-4a31b8,#4A31B8))',
+  ENAP: 'linear-gradient(135deg,var(--pn-0b5e3a,#0B5E3A),var(--pn-1e9a62,#1E9A62))',
 }
 
 /* ---------- caminho (breadcrumb com voltar) ---------- */

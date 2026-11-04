@@ -359,7 +359,7 @@ export function ModeloCard({ modelo, onMover }: { modelo: ModeloRow; onMover?: (
           <img src={capa} alt="" className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
         ) : (
           <>
-            <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, #0f172a 135%)` }} />
+            <div className="absolute inset-0" style={{ background: `linear-gradient(155deg, ${c} 0%, var(--pn-0f172a,#0f172a) 135%)` }} />
             <Icone className="absolute -right-6 -top-6 h-32 w-32 text-white/10" />
           </>
         )}

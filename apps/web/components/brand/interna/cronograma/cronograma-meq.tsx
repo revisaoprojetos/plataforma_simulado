@@ -18,7 +18,7 @@ import {
 const K = 'meq' as const
 
 function GerarArea({ st, mobile }: { st: CronogramaState; mobile: boolean }) {
-  const cardSty: CSSProperties = { borderRadius: 14, background: 'var(--surface)', border: '1px solid var(--line)', boxShadow: '0 1px 2px rgba(16,30,54,.06)' }
+  const cardSty: CSSProperties = { borderRadius: 14, background: 'var(--surface)', border: '1px solid var(--line)', boxShadow: '0 1px 2px color-mix(in srgb,var(--pn-101e36,#101E36) 6%,transparent)' }
   const pad = mobile ? 18 : 26
   let wiz: ReactElement
   if (!mobile) {
