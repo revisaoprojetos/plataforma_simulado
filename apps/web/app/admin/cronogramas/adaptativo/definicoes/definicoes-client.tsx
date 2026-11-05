@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Database, Info, Loader2, RefreshCw, Search } from 'lucide-react'
-import { listarDefinicoesMetas, sincronizarDefinicoesMetas, type DefAnalise } from '../actions'
+import { listarDefinicoesMetas, sincronizarDefinicoesMetas } from '../actions'
+import type { DefAnalise } from '@/lib/cronograma/adaptativo/meta-def'
 
 type Resumo = { definicoes: number; aulas: number; legprocs: number; ativas: number; semAluno: number; atualizadoEm: string | null } | null
 const POR_PAGINA = 25

@@ -280,7 +280,6 @@ export async function espelharPlanosLote(): Promise<{ ok: boolean; error?: strin
 
 // ── DEFINIÇÃO DAS METAS (cadastro do admin, por plataforma) + ANÁLISE ───────────────────────────────────────────
 import { sincronizarMetaDef, listarMetaDef, resumoMetaDef, type FiltroDef, type DefAnalise } from '@/lib/cronograma/adaptativo/meta-def'
-export type { DefAnalise, FiltroDef }
 
 export async function sincronizarDefinicoesMetas(): Promise<{ ok: boolean; error?: string; aulas?: number; legprocs?: number; desativadas?: number }> {
   const g = await acesso('update'); if (!g) return { ok: false, error: 'Sem permissão.' }

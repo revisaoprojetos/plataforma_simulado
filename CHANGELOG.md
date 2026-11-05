@@ -12,6 +12,12 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.5.1 — 2026-11-05
+
+- **Correção (build do CI):** o build da 4.5.0 falhava no Next/Turbopack com `Export FiltroDef/DefAnalise doesn't exist in target module`. O arquivo `use server` do Cronograma Adaptativo (`actions.ts`) reexportava tipos (`export type { DefAnalise, FiltroDef }`), que não existem em tempo de execução; o `tsc` aceitava, o Turbopack não. O reexport foi removido e a tela de Definições importa o tipo direto de `lib/cronograma/adaptativo/meta-def`. Sem mudança de comportamento. **A 4.5.0 não gerou imagem — use a 4.5.1** (tem tudo da 4.5.0).
+
+---
+
 ## 4.5.0 — 2026-11-05
 
 ### Cursos (aluno)
