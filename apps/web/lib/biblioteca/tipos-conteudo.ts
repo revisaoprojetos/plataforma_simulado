@@ -3,7 +3,8 @@
 // permissões por tipo e (fases posteriores) o visualizador do aluno. PURO (sem server-only) → usável
 // no client e no server. Cores dos selos = tokens FIXOS por tipo em globals.css (`--sel-*`).
 
-export type KindConteudo = 'docx' | 'pdf' | 'pptx' | 'xlsx' | 'video' | 'audio'
+// 'questoes' = card de CONJUNTO DE QUESTÕES (não é upload de arquivo; fica FORA de ORDEM_TIPOS).
+export type KindConteudo = 'docx' | 'pdf' | 'pptx' | 'xlsx' | 'video' | 'audio' | 'questoes'
 
 export interface PermissaoLabels {
   /** chave técnica `ler` */ ler: { letra: string; rotulo: string }
@@ -19,8 +20,8 @@ export interface TipoConteudo {
   /** Editável na plataforma (só DOCX tem "Abrir no editor"). */ editavel: boolean
   /** Pode vir de link externo (YouTube/Vimeo/Spotify…) além de upload. */ fonteExterna: boolean
   /** Visualizador do aluno (componente por tipo; `leitor` = iframe DOCX/PDF já existente). */
-  visualizador: 'leitor' | 'pdf' | 'slides' | 'planilha' | 'video' | 'audio'
-  /** Unidade de progresso/conclusão. */ unidadeProgresso: 'pagina' | 'slide' | 'aba' | 'segundo'
+  visualizador: 'leitor' | 'pdf' | 'slides' | 'planilha' | 'video' | 'audio' | 'quiz'
+  /** Unidade de progresso/conclusão. */ unidadeProgresso: 'pagina' | 'slide' | 'aba' | 'segundo' | 'questao'
   /** Extensões aceitas no upload (minúsculas, com ponto). */ extensoes: string[]
   /** MIME types aceitos (prefixos casam por `startsWith`). */ mimes: string[]
   /** Rótulos das 3 chaves de permissão (variam por tipo — spec §5). */ permissoes: PermissaoLabels
@@ -62,6 +63,12 @@ export const TIPOS_CONTEUDO: Record<KindConteudo, TipoConteudo> = {
     seloSlug: 'audio', editavel: false, fonteExterna: true, visualizador: 'audio', unidadeProgresso: 'segundo',
     extensoes: ['.mp3', '.m4a', '.wav', '.ogg'], mimes: ['audio/'],
     permissoes: { ler: { letra: 'O', rotulo: 'Ouvir' }, baixar: { letra: 'B', rotulo: 'Baixar MP3' }, grifar: { letra: 'M', rotulo: 'Marcadores' } },
+  },
+  questoes: {
+    kind: 'questoes', sigla: 'Q', label: 'Questões', seloSlug: 'questoes',
+    editavel: false, fonteExterna: false, visualizador: 'quiz', unidadeProgresso: 'questao',
+    extensoes: [], mimes: [],
+    permissoes: { ler: { letra: 'R', rotulo: 'Responder' }, baixar: { letra: 'B', rotulo: 'Baixar' }, grifar: { letra: 'M', rotulo: 'Marcar' } },
   },
 }
 

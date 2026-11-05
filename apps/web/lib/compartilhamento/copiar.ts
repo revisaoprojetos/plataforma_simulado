@@ -1,4 +1,5 @@
 import 'server-only'
+import { resolverTaxonomiaPorNome } from '@/lib/taxonomia/resolver-nome'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
@@ -58,13 +59,7 @@ async function lerLinhagem(svc: SupabaseClient, table: string, id: string, tenan
 
 // ─── Taxonomia (resolve por nome no DESTINO, cria se faltar) ─────────────────
 async function resolveByName(svc: SupabaseClient, table: 'simulado_bancas' | 'simulado_orgaos' | 'simulado_disciplinas', tenantId: string, nome?: string | null): Promise<string | null> {
-  const n = nome?.trim()
-  if (!n) return null
-  const { data: ex } = await svc.from(table).select('id').eq('tenant_id', tenantId).ilike('nome', n).maybeSingle()
-  if (ex) return (ex as any).id
-  const { data: cr, error } = await svc.from(table).insert({ nome: n, tenant_id: tenantId }).select('id').single()
-  if (error) { const { data: again } = await svc.from(table).select('id').eq('tenant_id', tenantId).ilike('nome', n).maybeSingle(); return (again as any)?.id ?? null }
-  return (cr as any).id
+  return resolverTaxonomiaPorNome(svc, table, tenantId, nome)
 }
 
 async function resolveAssunto(svc: SupabaseClient, tenantId: string, nome?: string | null, disciplinaId?: string | null): Promise<string | null> {

@@ -114,7 +114,7 @@ export default async function ResultadoPage() {
 
   return (
     <>
-      <Crumbs items={[['Central de Estudos', R.central], ['Questões e Simulados', R.questoes], ['Resultado', '#']]} />
+      <Crumbs items={[['Cursos', R.cursos], ['Questões e Simulados', R.questoes], ['Resultado', '#']]} />
 
       {/* Hero do resultado */}
       <Hero bg="linear-gradient(120deg,#2E1F6A 0%,#4A31B8 60%,#5B3FD0 100%)">
@@ -227,7 +227,7 @@ export default async function ResultadoPage() {
 function VazioResultado({ motivo }: { motivo: 'entrar' | 'sem-sessao' }) {
   return (
     <>
-      <Crumbs items={[['Central de Estudos', R.central], ['Questões e Simulados', R.questoes], ['Resultado', '#']]} />
+      <Crumbs items={[['Cursos', R.cursos], ['Questões e Simulados', R.questoes], ['Resultado', '#']]} />
       <Card pad={40}>
         <Col gap={14} style={{ alignItems: 'center', textAlign: 'center' }}>
           <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 56, height: 56, borderRadius: 16, background: 'var(--chip)', color: 'var(--brand)' }}>

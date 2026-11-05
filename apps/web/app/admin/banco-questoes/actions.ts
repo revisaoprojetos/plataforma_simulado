@@ -1,5 +1,6 @@
 'use server'
 
+import { resolverTaxonomiaPorNome } from '@/lib/taxonomia/resolver-nome'
 import type { CapaMetaIn } from '@/lib/capa-meta'
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -98,7 +99,7 @@ export async function criarBanco(nome: string, tipo: string = 'objetiva', paiId?
 
 /** Cria uma PASTA (folder) para organizar bancos OU simulados. `area` separa onde ela aparece
  * ('banco' = Banco de Simulado, 'simulado' = Aplicação de Simulado). */
-export async function criarPastaFolder(nome: string, paiId?: string | null, area?: 'banco' | 'simulado' | 'caderno' | 'leitura' | 'jurisprudencia' | 'maratona'): Promise<{ ok: boolean; id?: string; error?: string }> {
+export async function criarPastaFolder(nome: string, paiId?: string | null, area?: 'banco' | 'simulado' | 'caderno' | 'leitura' | 'jurisprudencia' | 'jurisclub' | 'maratona'): Promise<{ ok: boolean; id?: string; error?: string }> {
   const g = await guard()
   if (!g.ok) return g
   const titulo = nome.trim()
@@ -789,12 +790,8 @@ function montarQuestoes(linhas: string[][]): QuestaoImport[] {
 
 /** Resolve/cria taxonomia por nome (versão service-role para a importação). */
 async function resolveNome(svc: ReturnType<typeof createAdminClient>, table: 'simulado_bancas' | 'simulado_orgaos' | 'simulado_disciplinas', tenantId: string, nome?: string | null): Promise<string | null> {
-  const n = nome?.trim(); if (!n) return null
-  const { data: ex } = await svc.from(table).select('id').eq('tenant_id', tenantId).ilike('nome', n).maybeSingle()
-  if (ex) return (ex as any).id
-  const { data: cr, error } = await svc.from(table).insert({ nome: n, tenant_id: tenantId }).select('id').single()
-  if (error) { const { data: again } = await svc.from(table).select('id').eq('tenant_id', tenantId).ilike('nome', n).maybeSingle(); return (again as any)?.id ?? null }
-  return (cr as any).id
+  // Normalizado (acento/espaço), determinístico entre homônimas e sem criar duplicada — ver lib/taxonomia/resolver-nome.ts
+  return resolverTaxonomiaPorNome(svc, table, tenantId, nome)
 }
 
 /** Resolve/cria um assunto (filho de disciplina) por nome. */

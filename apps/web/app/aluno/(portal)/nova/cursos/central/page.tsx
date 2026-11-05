@@ -7,6 +7,8 @@ import { PageHeader, Card, Grid, Row, Col, H2, H3, Muted, P, Tag, Btn, Bar, GBAR
 import { Icon, type IconName } from '@/components/nova/icons'
 import { R } from '@/lib/nova/rotas'
 import { carregarCatalogoCursos, estatisticasQuestoesAluno } from '@/lib/nova/cursos'
+import { getSessaoAluno } from '@/lib/aluno-session'
+import { extensivoAtalhoDoAluno } from '@/lib/nova/extensivos-aluno'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,7 +25,11 @@ const DESAFIOS: Desafio[] = [
 ]
 
 export default async function CentralEstudosPage() {
-  const [cat, stats] = await Promise.all([carregarCatalogoCursos(), estatisticasQuestoesAluno()])
+  const sessao = await getSessaoAluno()
+  const [cat, stats, extensivo] = await Promise.all([
+    carregarCatalogoCursos(), estatisticasQuestoesAluno(),
+    sessao ? extensivoAtalhoDoAluno(sessao.tenantId, sessao.estudanteId) : Promise.resolve(null),
+  ])
   const pctLido = cat.totalPdfs ? Math.min(100, Math.round((cat.totalLidos / cat.totalPdfs) * 100)) : 0
 
   const FERRAMENTAS: Ferramenta[] = [
@@ -75,7 +81,9 @@ export default async function CentralEstudosPage() {
         eyebrow="Cursos"
         title="Central de Estudos"
         sub="Ferramentas para praticar e fixar o que você estuda no cronograma. Valem para todos os seus cursos."
-        right={<Seg items={['Meus cursos', 'Extensivo', 'Central de Estudos']} active={2} links={[R.cursos, R.extensivo, R.central]} />}
+        right={extensivo
+          ? <Seg items={['Meus cursos', 'Extensivo', 'Central de Estudos']} active={2} links={[R.cursos, extensivo.href, R.central]} />
+          : <Seg items={['Meus cursos', 'Central de Estudos']} active={1} links={[R.cursos, R.central]} />}
       />
 
       {/* Ferramentas da Central */}

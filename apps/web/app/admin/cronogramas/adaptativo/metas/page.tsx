@@ -1,6 +1,7 @@
 import { obterPainelMetas } from '../actions'
 import { MetasClient } from './metas-client'
 import { AdaptativoTabs } from '@/components/admin/adaptativo-tabs'
+import { EspelhoMetas } from '@/components/admin/espelho-metas'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,6 +23,7 @@ export default async function CronogramaAdaptativoMetasPage() {
       ) : (
         <MetasClient inicial={r.painel} />
       )}
+      <EspelhoMetas />
     </div>
   )
 }

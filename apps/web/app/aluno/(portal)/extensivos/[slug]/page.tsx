@@ -1,8 +1,11 @@
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
+import { RevisaoParticulas } from '@/components/brand/loadings/revisao-particulas'
+import { REVISAO_R_PATH, REVISAO_R_OUTLINE } from '@/components/brand/brand-marks'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { vitrineDoAluno, progressoExtensivo, avisosDoProduto, getExtensivoDoAluno, curriculoDoExtensivo, type VitrineSecao, type VitrineItem } from '@/lib/produtos/aluno'
 import { ModulosVitrine } from './curriculo'
+import { voltarDoExtensivo } from '@/lib/nova/extensivos-aluno'
 import { PRODUTO_TIPOS } from '@/lib/produtos/tipos'
 import { ArrowLeft, ClipboardList, BookOpen, CalendarDays, CalendarClock, ChevronRight, Megaphone, Pin, Layers, Wrench } from 'lucide-react'
 
@@ -28,15 +31,15 @@ export default async function ExtensivoPage({ params }: { params: Promise<{ slug
   const { slug } = await params
   const sessao = await getSessaoAluno()
   if (!sessao) redirect('/aluno/entrar')
-  const ext = await getExtensivoDoAluno(sessao.tenantId, sessao.estudanteId, slug)
+  const [ext, voltar] = await Promise.all([getExtensivoDoAluno(sessao.tenantId, sessao.estudanteId, slug), voltarDoExtensivo()])
   if (!ext) notFound()
   // Modo "em edição/manutenção": bloqueio TOTAL — todos os alunos (até matriculados) veem a mensagem de
   // atualização. Bypass: admin VISUALIZANDO a conta (impersonation) ignora o bloqueio p/ conferir antes de publicar.
   if (ext.bloqueado && !sessao.impersonation) {
     return (
       <div className="w-full">
-        <Link href="/aluno/extensivos" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
-          <ArrowLeft className="h-4 w-4" />Meus Extensivos
+        <Link href={voltar.href} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
+          <ArrowLeft className="h-4 w-4" />{voltar.rotulo}
         </Link>
         <div className="mx-auto mt-10 max-w-md rounded-2xl border bg-card p-8 text-center shadow-sm">
           <span className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
@@ -44,8 +47,8 @@ export default async function ExtensivoPage({ params }: { params: Promise<{ slug
           </span>
           <h1 className="text-lg font-bold tracking-tight">Produto em atualização</h1>
           <p className="mt-2 text-sm text-muted-foreground">Este produto está temporariamente indisponível enquanto preparamos melhorias. Volte em breve.</p>
-          <Link href="/aluno/extensivos" className="mt-5 inline-flex items-center gap-1.5 rounded-xl border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted">
-            <ArrowLeft className="h-4 w-4" />Voltar para Meus Extensivos
+          <Link href={voltar.href} className="mt-5 inline-flex items-center gap-1.5 rounded-xl border px-4 py-2 text-sm font-medium transition-colors hover:bg-muted">
+            <ArrowLeft className="h-4 w-4" />Voltar para {voltar.rotulo}
           </Link>
         </div>
       </div>
@@ -68,25 +71,36 @@ export default async function ExtensivoPage({ params }: { params: Promise<{ slug
 
   return (
     <div className="w-full space-y-6">
-      <Link href="/aluno/extensivos" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground">
-        <ArrowLeft className="h-4 w-4" />Meus Extensivos
-      </Link>
-
-      {/* Cabeçalho branded (banner/cor/logo do produto) */}
-      <div className="relative overflow-hidden rounded-3xl border p-6 text-white shadow-sm sm:p-8"
+      {/* Banner branded (cor/logo do produto) — ocupa o topo inteiro da área (sangra sobre o padding do shell) e leva o "Voltar" dentro */}
+      <div className="relative -mx-[14px] -mt-[14px] min-h-[260px] overflow-hidden p-6 text-white shadow-sm min-[900px]:-mx-7 min-[900px]:-mt-6 min-[900px]:min-h-[320px] sm:p-8 sm:pb-12"
         style={vit.banner_url
           ? { backgroundImage: `linear-gradient(135deg, color-mix(in srgb, ${cor} 82%, transparent), color-mix(in srgb, ${cor2} 60%, #000)), url(${vit.banner_url})`, backgroundSize: 'cover', backgroundPosition: 'center' }
           : { background: `linear-gradient(135deg, ${cor}, color-mix(in srgb, ${cor2} 60%, #000))` }}>
-        {vit.logo_url && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={vit.logo_url} alt="" className="mb-3 h-9 w-auto" />
-        )}
-        <span className="rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-medium backdrop-blur-sm">{labelTipo(vit.tipo)}</span>
-        <h1 className="mt-2 text-2xl font-bold tracking-tight sm:text-3xl">{vit.nome}</h1>
-        {vit.descricao && <p className="mt-1 max-w-2xl text-sm text-white/85">{vit.descricao}</p>}
-        {vit.expira_em && (
-          <div className="mt-3 inline-flex items-center gap-1 text-xs text-white/85"><CalendarClock className="h-3.5 w-3.5" />Acesso até {new Date(vit.expira_em).toLocaleDateString('pt-BR')}</div>
-        )}
+        {/* Grade fixa + quadradinhos que acendem (mesmo efeito do loading/login) + linha percorrendo o contorno do "R" */}
+        <style>{'@keyframes extDraw{to{stroke-dashoffset:0}}@keyframes extRun{to{stroke-dashoffset:-422}}@keyframes extFade{from{opacity:0}to{opacity:1}}.ext-trace-base{stroke-dasharray:420;stroke-dashoffset:420;animation:extDraw 2.6s cubic-bezier(.6,.1,.2,1) .4s forwards}.ext-trace-run{stroke-dasharray:22 400;opacity:0;animation:extFade .6s ease-out 3s forwards,extRun 7s linear 3s infinite}@media (prefers-reduced-motion:reduce){.ext-trace-base{stroke-dashoffset:0;animation:none}.ext-trace-run{display:none}}'}</style>
+        <span aria-hidden className="pointer-events-none absolute inset-0" style={{ backgroundImage: 'linear-gradient(rgba(255,255,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.06) 1px,transparent 1px)', backgroundSize: '64px 64px' }} />
+        <RevisaoParticulas quadrados />
+        <svg aria-hidden viewBox="0 0 68 66" className="pointer-events-none absolute -bottom-4 right-6 h-[210px] w-[216px] sm:right-12">
+          <path fillRule="evenodd" fill="rgba(255,255,255,.06)" d={REVISAO_R_PATH} />
+          <path className="ext-trace-base" fill="none" stroke="rgba(255,255,255,.35)" strokeWidth="0.35" d={REVISAO_R_OUTLINE} />
+          <path className="ext-trace-run" fill="none" stroke="var(--pn-f1c232,#F1C232)" strokeWidth="0.55" strokeLinecap="round" d={REVISAO_R_OUTLINE} />
+        </svg>
+        <div className="relative flex h-full min-h-[212px] flex-col justify-between gap-6 min-[900px]:min-h-[264px]">
+          <Link href={voltar.href} className="self-start mb-0 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-3 py-1.5 text-sm font-medium text-white backdrop-blur-sm transition-colors hover:bg-white/25">
+            <ArrowLeft className="h-4 w-4" />Voltar
+          </Link>
+          <div>
+          {vit.logo_url && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={vit.logo_url} alt="" className="mb-3 h-9 w-auto" />
+          )}
+          <h1 className="text-2xl font-bold tracking-tight sm:text-4xl">{vit.nome}</h1>
+          {vit.descricao && <p className="mt-1 max-w-2xl text-sm text-white/85">{vit.descricao}</p>}
+          {vit.expira_em && (
+            <div className="mt-3 inline-flex items-center gap-1 text-xs text-white/85"><CalendarClock className="h-3.5 w-3.5" />Acesso até {new Date(vit.expira_em).toLocaleDateString('pt-BR')}</div>
+          )}
+          </div>
+        </div>
       </div>
 
       {/* Avisos */}

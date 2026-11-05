@@ -130,7 +130,7 @@ export function CapaPaginaDialog({ alvo, onFechar, onSalvo }: { alvo: AlvoCP; on
               <div>
                 <h4 className="flex items-center gap-1.5 text-sm font-semibold"><BookOpenCheck className="h-4 w-4" /> Página inicial da leitura</h4>
                 <p className="text-xs text-muted-foreground">
-                  O leitor começa nesta página, <span className="font-medium text-foreground">sem a capa e a parte inicial</span> (capa em imagem, aviso de direitos, índice). As páginas anteriores ficam de fora da leitura: não aparecem, <span className="font-medium text-foreground">não contam</span> no progresso, no “X de Y lidas” nem na contagem de páginas do Cronograma Adaptativo. Em branco = documento inteiro, a partir da página 1.
+                  O leitor <span className="font-medium text-foreground">abre direto nesta página</span>, pulando a capa e a parte inicial (capa em imagem, aviso de direitos, índice). As páginas anteriores <span className="font-medium text-foreground">continuam no documento</span>: o aluno só rola para cima se quiser vê-las. Em branco = documento inteiro, a partir da página 1.
                 </p>
               </div>
               <div className="flex flex-wrap items-end gap-4">
@@ -152,7 +152,7 @@ export function CapaPaginaDialog({ alvo, onFechar, onSalvo }: { alvo: AlvoCP; on
                 </div>
               ) : (
                 <div className="rounded-xl border bg-muted/30 p-3 text-xs text-muted-foreground">
-                  {pagina ? `Este documento é lido a partir da página ${pagina}, sem as ${Math.max(0, Number(pagina) - 1)} anteriores (não contam).` : h?.pagina.origem === 'pasta' ? <>Sem página própria: lido a partir da página {h.pagina.valor}, {origemTxt(h.pagina)} (as anteriores não contam).</> : 'Sem página própria nem da pasta: documento inteiro, a partir da página 1.'}
+                  {pagina ? `Este documento abre direto na página ${pagina} (as ${Math.max(0, Number(pagina) - 1)} anteriores continuam acima).` : h?.pagina.origem === 'pasta' ? <>Sem página própria: abre direto na página {h.pagina.valor}, {origemTxt(h.pagina)} (as anteriores continuam acima).</> : 'Sem página própria nem da pasta: documento inteiro, a partir da página 1.'}
                 </div>
               )}
               <p className="text-[11px] text-muted-foreground">A página é a do PDF do documento. Se você substituir o arquivo por uma versão com outra paginação, revise este número.</p>

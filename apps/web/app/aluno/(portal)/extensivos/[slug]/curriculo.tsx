@@ -140,7 +140,7 @@ function TrilhaModulos({ modulos, slug, cor }: { modulos: ModuloAluno[]; slug: s
                   <div className="mt-1 text-xs text-muted-foreground">
                     {!m.liberado
                       ? <span className="inline-flex items-center gap-1"><Lock className="h-3 w-3" />{m.exclusivo ? 'conteúdo exclusivo' : m.liberaEm ? `libera em ${fmtData(m.liberaEm)}` : 'bloqueado'}</span>
-                      : <>{p.total} {p.total === 1 ? 'aula' : 'aulas'}{p.lidas ? ` · ${p.pct}%` : ''}</>}
+                      : <>{p.total} {p.total === 1 ? 'aula' : 'aulas'}{p.total > 0 ? ` · ${p.pct}%` : ''}</>}
                   </div>
                   {m.liberado && p.total > 0 && (
                     <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full" style={{ width: `${p.pct}%`, background: cor }} /></div>
@@ -328,11 +328,11 @@ function Poster({ m, nome, n, href, cor, grade }: { m: ModuloAluno; nome: string
       )}
       {/* sombra inferior + título */}
       <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/90 via-black/55 to-transparent px-3 pb-3 pt-16">
-        <div className={`font-extrabold uppercase leading-[1.05] tracking-tight text-[color:var(--pn-f1c232,#F1C232)] ${nome.length > 28 ? 'text-[15px]' : 'text-lg'} ${m.imagemUrl ? 'line-clamp-2' : 'line-clamp-4'}`}>{nome}</div>
+        {m.ocultarTitulo ? null : <div className={`font-extrabold uppercase leading-[1.05] tracking-tight text-[color:var(--pn-f1c232,#F1C232)] ${nome.length > 28 ? 'text-[15px]' : 'text-lg'} ${m.imagemUrl ? 'line-clamp-2' : 'line-clamp-4'}`}>{nome}</div>}
         <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-medium text-white/80">
           {!m.liberado ? <><Lock className="h-3 w-3" />{m.exclusivo ? 'conteúdo exclusivo' : m.liberaEm ? `libera em ${fmtData(m.liberaEm)}` : 'bloqueado'}</> : <>{p.total} {p.total === 1 ? 'aula' : 'aulas'}{p.lidas ? ` · ${p.pct}%` : ''}</>}
         </div>
-        {m.liberado && p.lidas > 0 && (
+        {m.liberado && p.total > 0 && (
           <div className="mt-2 h-1 overflow-hidden rounded-full bg-white/20"><div className="h-full rounded-full bg-[color:var(--pn-f1c232,#F1C232)]" style={{ width: `${p.pct}%` }} /></div>
         )}
       </div>

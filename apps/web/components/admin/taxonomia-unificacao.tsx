@@ -11,6 +11,7 @@ import { confirmar } from '@/components/ui/confirm-dialog'
 import { unificarTaxonomia, previewUnificacaoTax } from '@/app/admin/questoes/taxonomia-actions'
 import type { TipoTaxonomia, ItemTax } from '@/app/admin/questoes/taxonomia-tipos'
 import { desfazerUnificacao, type UnificacaoRecente } from '@/app/admin/questoes/disciplinas-actions'
+import { chaveSemantica } from '@/lib/taxonomia/disciplina-semantica'
 
 // Canoniza abreviações jurídicas equivalentes p/ UM token só — assim "art."/"arts."/"artigo(s)"
 // (ou "inciso"/"inc.", "§"/"parágrafo", "alínea"/"al.") não geram duplicatas separadas.
@@ -74,7 +75,9 @@ export function TaxonomiaUnificacao({ tipo, itens, recentes = [] }: { tipo: Tipo
   // p/ não repetir o que já está nas sugestões de alta confiança. Revise antes de unificar.
   const clustersBase = useMemo(() => {
     const map = new Map<string, ItemTax[]>()
-    for (const d of itens) { const k = normBase(d.nome); const g = map.get(k) ?? []; g.push(d); map.set(k, g) }
+    // Disciplinas: chave SEMÂNTICA ("Processo Civil" ≡ "Direito Processual Civil", "Direito X - verificar" ≡ "Direito X") — a mesma
+    // inteligência que o importador usa p/ não criar a duplicada. Demais tipos: nome-base como antes.
+    for (const d of itens) { const k = tipo === 'disciplina' ? (chaveSemantica(d.nome) || normBase(d.nome)) : normBase(d.nome); const g = map.get(k) ?? []; g.push(d); map.set(k, g) }
     return [...map.values()]
       .filter((g) => g.length > 1 && new Set(g.map((d) => norm(d.nome))).size > 1)
       .sort((a, b) => b.length - a.length)

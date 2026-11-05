@@ -37,6 +37,8 @@ export function ModuloDialog({ produtoId, modulo, paiId, modulosCount, aulasCoun
   const criando = !modulo
   const [titulo, setTitulo] = useState(modulo?.titulo ?? '')
   const [imagem, setImagem] = useState(modulo?.imagem_url ?? '')
+  // Padrão: criando um módulo com imagem → título oculto (a arte já traz o texto); editando → o que está salvo.
+  const [ocultarTitulo, setOcultarTitulo] = useState(modulo ? !!modulo.ocultar_titulo : true)
   const [descricao, setDescricao] = useState(modulo?.descricao ?? '')
   const [exibicao, setExibicao] = useState<'aberto' | 'recolhido'>(modulo?.exibicao ?? 'aberto')
   const [disp, setDisp] = useState<Disponibilidade>(modulo?.disponibilidade ?? { tipo: 'na_matricula', antes: 'bloqueado_cadeado' })
@@ -46,7 +48,7 @@ export function ModuloDialog({ produtoId, modulo, paiId, modulosCount, aulasCoun
   function salvar() {
     if (!titulo.trim()) { toast.error('Informe o título do módulo.'); return }
     start(async () => {
-      const r = await salvarModuloAction(produtoId, { id: modulo?.id, pai_id: modulo?.pai_id ?? paiId, titulo, imagem_url: imagem || null, descricao: descricao || null, exibicao, disponibilidade: disp })
+      const r = await salvarModuloAction(produtoId, { id: modulo?.id, pai_id: modulo?.pai_id ?? paiId, titulo, imagem_url: imagem || null, ocultar_titulo: ocultarTitulo, descricao: descricao || null, exibicao, disponibilidade: disp })
       if ('error' in r && r.error) { toast.error(r.error); return }
       toast.success(criando ? 'Módulo criado.' : 'Módulo salvo.'); onPronto(); onClose()
     })
@@ -70,7 +72,13 @@ export function ModuloDialog({ produtoId, modulo, paiId, modulosCount, aulasCoun
             <Input autoFocus value={titulo} onChange={(e) => setTitulo(e.target.value)} /></label>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="block"><span className="mb-1 block text-sm font-medium">Imagem do módulo <span className="font-normal text-muted-foreground">· 16:9</span></span>
-              <CampoImagem variant="linha" value={imagem} onChange={setImagem} /></div>
+              <CampoImagem variant="linha" value={imagem} onChange={setImagem} />
+              {imagem ? (
+                <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm">
+                  <input type="checkbox" checked={ocultarTitulo} onChange={(e) => setOcultarTitulo(e.target.checked)} className="h-4 w-4 accent-[var(--brand-primary,currentColor)]" />
+                  <span>Ocultar o título da disciplina sobre a imagem</span>
+                </label>
+              ) : null}</div>
             <label className="block"><span className="mb-1 block text-sm font-medium">Descrição</span>
               <textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={2} placeholder="Descrição curta do módulo (opcional)" className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" /></label>
           </div>

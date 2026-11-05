@@ -252,3 +252,49 @@ export async function simularAlunoLiberacao(alunoId: string): Promise<{ ok: bool
     return { ok: false, error: (e as Error)?.message || 'Falha ao simular.' }
   }
 }
+
+// ── METAS DO PLANO EM LINHAS (espelho relacional da grade JSON) ────────────────────────────────────────────────
+export interface EstadoEspelho { ok: boolean; error?: string; migrado: boolean; planos: number; espelhados: number; linhas: number }
+
+/** Quantos planos já têm as metas em linhas (tabela simulado_cronograma_adaptativo_plano_meta). */
+export async function obterEstadoEspelho(): Promise<EstadoEspelho> {
+  const vazio: EstadoEspelho = { ok: false, migrado: true, planos: 0, espelhados: 0, linhas: 0 }
+  const g = await acesso('view'); if (!g) return { ...vazio, error: 'Sem permissão.' }
+  const svc = createAdminClient()
+  const pl = await svc.from('simulado_cronograma_adaptativo_plano').select('id', { count: 'exact', head: true }).eq('tenant_id', g.tenantId).eq('exemplo', false)
+  const es = await svc.from('simulado_cronograma_adaptativo_plano').select('id', { count: 'exact', head: true }).eq('tenant_id', g.tenantId).eq('exemplo', false).not('grade_espelhada_hash', 'is', null)
+  if (es.error) return { ...vazio, ok: true, migrado: false, planos: pl.count ?? 0 }
+  const li = await svc.from('simulado_cronograma_adaptativo_plano_meta').select('id', { count: 'exact', head: true }).eq('tenant_id', g.tenantId)
+  return { ok: true, migrado: !li.error, planos: pl.count ?? 0, espelhados: es.count ?? 0, linhas: li.count ?? 0 }
+}
+
+/** Espelha um LOTE de planos (preenchimento inicial). Chamar de novo até `restantes = 0`. */
+export async function espelharPlanosLote(): Promise<{ ok: boolean; error?: string; processados?: number; linhas?: number; restantes?: number }> {
+  const g = await acesso('update'); if (!g) return { ok: false, error: 'Sem permissão.' }
+  const { espelharLote } = await import('@/lib/cronograma/adaptativo/plano-metas')
+  const r = await espelharLote(createAdminClient(), g.tenantId, 20)
+  if (!r.ok) return { ok: false, error: r.motivo === 'migracao_pendente' ? 'Aplique a migração 20261105050000_cronograma_adaptativo_plano_meta.sql no Supabase.' : (r.motivo || 'Falha ao espelhar.') }
+  await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_cronograma_adaptativo_plano_meta', entidadeId: g.tenantId, tenantId: g.tenantId, atorId: g.userId, depois: { espelhados: r.processados, linhas: r.linhas } }).catch(() => {})
+  return { ok: true, processados: r.processados, linhas: r.linhas, restantes: r.restantes }
+}
+
+// ── DEFINIÇÃO DAS METAS (cadastro do admin, por plataforma) + ANÁLISE ───────────────────────────────────────────
+import { sincronizarMetaDef, listarMetaDef, resumoMetaDef, type FiltroDef, type DefAnalise } from '@/lib/cronograma/adaptativo/meta-def'
+export type { DefAnalise, FiltroDef }
+
+export async function sincronizarDefinicoesMetas(): Promise<{ ok: boolean; error?: string; aulas?: number; legprocs?: number; desativadas?: number }> {
+  const g = await acesso('update'); if (!g) return { ok: false, error: 'Sem permissão.' }
+  const r = await sincronizarMetaDef(createAdminClient(), g.tenantId)
+  if (!r.ok) return { ok: false, error: r.motivo === 'migracao_pendente' ? 'Aplique a migração 20261105070000_cronograma_adaptativo_meta_def.sql no Supabase.' : (r.motivo || 'Falha ao sincronizar.') }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_cronograma_adaptativo_meta_def', entidadeId: g.tenantId, tenantId: g.tenantId, atorId: g.userId, depois: { aulas: r.aulas, legprocs: r.legprocs, desativadas: r.desativadas } }).catch(() => {})
+  revalidatePath('/admin/cronogramas/adaptativo/definicoes')
+  return { ok: true, aulas: r.aulas, legprocs: r.legprocs, desativadas: r.desativadas }
+}
+
+export async function listarDefinicoesMetas(f: FiltroDef): Promise<{ ok: boolean; error?: string; migrado: boolean; itens: DefAnalise[]; total: number; disciplinas: string[]; resumo: Awaited<ReturnType<typeof resumoMetaDef>> }> {
+  const g = await acesso('view'); if (!g) return { ok: false, error: 'Sem permissão.', migrado: true, itens: [], total: 0, disciplinas: [], resumo: null }
+  const svc = createAdminClient()
+  const [lista, resumo] = await Promise.all([listarMetaDef(svc, g.tenantId, f), resumoMetaDef(svc, g.tenantId)])
+  if (!lista.ok) return { ok: lista.motivo === 'migracao_pendente', error: lista.motivo === 'migracao_pendente' ? undefined : lista.motivo, migrado: lista.motivo !== 'migracao_pendente', itens: [], total: 0, disciplinas: [], resumo: null }
+  return { ok: true, migrado: true, itens: lista.itens, total: lista.total, disciplinas: lista.disciplinas, resumo }
+}

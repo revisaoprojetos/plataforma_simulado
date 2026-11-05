@@ -11,7 +11,9 @@ import { emitirEvento } from './outbox'
 // Fase 1: além de docx/pdf/html, aceita mídia/office (pptx/xlsx/video/audio) — só ingestão (guardar o
 // original + registrar o tipo). ATENÇÃO: a coluna `tipo_origem` tem CHECK que precisa ser ampliado (ver
 // relatório/migração aditiva); sem isso o INSERT desses tipos é rejeitado pelo Postgres.
-export type TipoOrigem = 'docx' | 'pdf' | 'html' | 'pptx' | 'xlsx' | 'video' | 'audio'
+// 'questoes' = card de CONJUNTO DE QUESTÕES (sem arquivo/versão): as questões vêm do banco via
+// simulado_conteudo_quiz_questoes. Aparece no grid da Biblioteca e herda pasta/acesso como os demais.
+export type TipoOrigem = 'docx' | 'pdf' | 'html' | 'pptx' | 'xlsx' | 'video' | 'audio' | 'questoes'
 export type StatusDoc = 'rascunho' | 'publicado' | 'arquivado'
 export type StatusConversao = 'pendente' | 'processando' | 'ok' | 'revisao_necessaria' | 'erro'
 export type CategoriaConteudo = 'conteudo' | 'modelo_caderno'

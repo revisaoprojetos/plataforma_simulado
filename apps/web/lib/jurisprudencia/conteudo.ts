@@ -220,19 +220,28 @@ export interface DesafioResumo {
  * Desafios (pastas jurisprudencia) que o aluno PODE ver no tenant.
  * imagemTicket = desafio_jogo.imagens?.ticket ?? null (p/ o ticket estilo "Lei Seca").
  */
-export function desafiosDoAluno(estudanteId: string, tenantId: string): Promise<DesafioResumo[]> {
-  // PROGRESSO/acesso do aluno (filtro por atribuição) — cacheado por (tenant, aluno), TTL curto.
-  return remember(chaveRelatorio(tenantId, 'juris-desafios-aluno', estudanteId), 30, () => _desafiosDoAluno(estudanteId, tenantId))
+/**
+ * Áreas de pasta que alimentam a JurisClub. Historicamente só 'jurisprudencia' (desafio arcade reusado
+ * como "edição"). A tag 'jurisclub' é a edição REAL gerida na Biblioteca/Produto (docx "ler o julgado" +
+ * questões do banco). O jogo/desafio arcade continua lendo só 'jurisprudencia' (default do loader).
+ */
+export const AREAS_JURISCLUB = ['jurisprudencia', 'jurisclub'] as const
+
+export function desafiosDoAluno(estudanteId: string, tenantId: string, areas: readonly string[] = ['jurisprudencia']): Promise<DesafioResumo[]> {
+  // PROGRESSO/acesso do aluno (filtro por atribuição) — cacheado por (tenant, aluno, áreas), TTL curto.
+  const suf = [...areas].sort().join('+')
+  return remember(chaveRelatorio(tenantId, `juris-desafios-aluno:${suf}`, estudanteId), 30, () => _desafiosDoAluno(estudanteId, tenantId, areas))
 }
 
-/** CONTEÚDO dos desafios (pastas) do tenant — igual p/ todos; cacheado por tenant com TTL curto. */
-async function desafiosPastasTenant(svc: any, tenantId: string): Promise<any[]> {
-  return remember(chaveRelatorio(tenantId, 'juris-desafios-pastas'), 60, async () => {
+/** CONTEÚDO dos desafios (pastas) do tenant — igual p/ todos; cacheado por (tenant, áreas) com TTL curto. */
+async function desafiosPastasTenant(svc: any, tenantId: string, areas: readonly string[]): Promise<any[]> {
+  const suf = [...areas].sort().join('+')
+  return remember(chaveRelatorio(tenantId, `juris-desafios-pastas:${suf}`), 60, async () => {
     const { data } = await svc
       .from('simulado_pastas')
       .select('id, nome, desafio_jogo')
       .eq('tenant_id', tenantId)
-      .eq('folder_area', 'jurisprudencia')
+      .in('folder_area', areas as string[])
       .eq('is_folder', true)
       .eq('deletado', false)
       .order('id', { ascending: true })
@@ -240,9 +249,9 @@ async function desafiosPastasTenant(svc: any, tenantId: string): Promise<any[]> 
   })
 }
 
-async function _desafiosDoAluno(estudanteId: string, tenantId: string): Promise<DesafioResumo[]> {
+async function _desafiosDoAluno(estudanteId: string, tenantId: string, areas: readonly string[]): Promise<DesafioResumo[]> {
   const svc = createAdminClient()
-  const lista = await desafiosPastasTenant(svc, tenantId)
+  const lista = await desafiosPastasTenant(svc, tenantId, areas)
   if (!lista.length) return []
 
   const ids = lista.map((p) => p.id)

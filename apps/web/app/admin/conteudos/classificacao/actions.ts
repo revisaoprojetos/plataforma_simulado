@@ -8,6 +8,7 @@
 // Permissão: classificacao:manage (escrita). Listar e mesclar reusam as actions de
 // app/admin/questoes/taxonomia-actions.ts (listarTaxonomia / unificarTaxonomia). Toda escrita audita.
 
+import { resolverTaxonomiaPorNome } from '@/lib/taxonomia/resolver-nome'
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
@@ -62,10 +63,16 @@ export async function criarItemTaxonomia(
   const svc = createAdminClient()
 
   // Evita duplicado por nome (case-insensitive) no mesmo tenant (e, p/ assunto, na mesma disciplina).
-  let dupQ = svc.from(tabela).select('id').eq('tenant_id', g.tenantId).ilike('nome', n)
-  if (tipo === 'assunto' && opts?.disciplinaId) dupQ = dupQ.eq('disciplina_id', opts.disciplinaId)
-  const { data: existente } = await dupQ.maybeSingle()
-  if (existente) return { ok: false, error: 'Já existe um item com esse nome.' }
+  // (o `.ilike().maybeSingle()` antigo falhava justamente quando JÁ havia 2 iguais — e deixava criar a 3ª)
+  if (tipo === 'assunto') {
+    let dupQ = svc.from(tabela).select('id').eq('tenant_id', g.tenantId).ilike('nome', n)
+    if (opts?.disciplinaId) dupQ = dupQ.eq('disciplina_id', opts.disciplinaId)
+    const { data: existentes } = await dupQ.limit(1)
+    if (existentes && existentes.length) return { ok: false, error: 'Já existe um item com esse nome.' }
+  } else if (tipo === 'disciplina' || tipo === 'banca' || tipo === 'orgao') {
+    const ja = await resolverTaxonomiaPorNome(svc as any, tabela as any, g.tenantId, n, { criar: false })
+    if (ja) return { ok: false, error: 'Já existe um item com esse nome.' }
+  }
 
   const row: Record<string, unknown> = { tenant_id: g.tenantId, nome: n }
   if (tipo === 'assunto') row.disciplina_id = opts?.disciplinaId ?? null

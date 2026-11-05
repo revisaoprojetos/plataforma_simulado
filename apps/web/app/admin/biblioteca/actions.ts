@@ -19,6 +19,7 @@ import { reconciliarVersao } from '@/lib/conteudo/reconciliacao'
 import { listarVinculosDoDocumento, vincularDocumento, desvincular, type ModoVinculo } from '@/lib/conteudo/vinculos'
 import { gerarThumbDocumento, gerarPdfDocumento } from '@/lib/conteudo/thumb'
 import { mapaPastas, resolverCapaDoc, type PastaCP } from '@/lib/conteudo/capa-pagina'
+import { resolverTaxonomiaPorNome } from '@/lib/taxonomia/resolver-nome'
 
 // Duas coleções na mesma infra: 'conteudo' (materiais) e 'modelo_caderno' (modelos de caderno em docx).
 // Cada uma tem suas próprias pastas via folder_area.
@@ -330,13 +331,9 @@ export async function definirPastaDisciplinaCronograma(pastaId: string, input: {
   let disciplinaId = (pasta as any).disciplina_id as string | null
   if (!disciplinaId) {
     const nome = String((pasta as any).nome || '').trim() || 'Disciplina'
-    const { data: existente } = await svc.from('simulado_disciplinas').select('id').eq('tenant_id', g.tenantId).ilike('nome', nome).limit(1).maybeSingle()
-    if (existente) disciplinaId = (existente as any).id
-    else {
-      const { data: nova, error: errNova } = await svc.from('simulado_disciplinas').insert({ tenant_id: g.tenantId, nome }).select('id').single()
-      if (errNova || !nova) return { ok: false, error: errNova?.message || 'Falha ao criar disciplina.' }
-      disciplinaId = (nova as any).id
-    }
+    // Casa por nome NORMALIZADO (acento/espaço) e, havendo homônimas, usa a canônica — só cria se não existir nenhuma.
+    disciplinaId = await resolverTaxonomiaPorNome(svc, 'simulado_disciplinas', g.tenantId, nome)
+    if (!disciplinaId) return { ok: false, error: 'Falha ao criar disciplina.' }
   }
 
   // 2) Classificação na disciplina (quando informada).
@@ -595,6 +592,40 @@ export async function criarDocumentoBranco(input: {
     return { ok: true, documentoId: criado.documentoId }
   } catch (e) {
     return { ok: false, error: (e as Error)?.message || 'Falha ao criar documento em branco.' }
+  }
+}
+
+/**
+ * Cria um CARD "Conjunto de questões" (novo formato): um documento da Biblioteca com
+ * tipo_origem='questoes', SEM arquivo/versão. As questões são anexadas depois (import ou do banco)
+ * em simulado_conteudo_quiz_questoes. Aparece no grid e herda pasta/acesso como os demais cards.
+ */
+export async function criarConteudoQuestoes(input: {
+  titulo: string; pastaId?: string | null; categoria?: Categoria
+}): Promise<{ ok: boolean; error?: string; documentoId?: string }> {
+  try {
+    const g = await guard('update')
+    if (!g.ok) return g
+    const titulo = (input.titulo || '').trim()
+    if (!titulo) return { ok: false, error: 'Informe um título.' }
+    const user = await getAuthUser()
+    const fonte = user?.email || (user?.user_metadata as any)?.name || g.atorId || null
+    const svc = createAdminClient()
+    const { data, error } = await svc.from('simulado_conteudo_documentos').insert({
+      tenant_id: g.tenantId, titulo, tipo_origem: 'questoes', status: 'rascunho', categoria: input.categoria ?? 'conteudo',
+      pasta_id: input.pastaId ?? null, fonte, criado_por: g.atorId,
+    }).select('id').single()
+    if (error || !data) {
+      const msg = /tipo_origem/i.test(error?.message ?? '')
+        ? 'Aplique a migração 20261105090000 (tipo_origem=questoes) no banco.'
+        : (error?.message || 'Falha ao criar conjunto de questões.')
+      return { ok: false, error: msg }
+    }
+    await registrarAudit({ tenantId: g.tenantId, atorId: g.atorId, entidade: 'simulado_conteudo_documentos', operacao: 'INSERT', entidadeId: data.id, depois: { titulo, tipo: 'questoes' } }).catch(() => {})
+    revalidatePath('/admin/biblioteca')
+    return { ok: true, documentoId: data.id }
+  } catch (e) {
+    return { ok: false, error: (e as Error)?.message || 'Falha ao criar conjunto de questões.' }
   }
 }
 

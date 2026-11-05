@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { fetchAll } from '@/lib/supabase/fetch-all'
+import { chaveNome } from '@/lib/taxonomia/resolver-nome'
 
 const NADA = '00000000-0000-0000-0000-000000000000'
 
@@ -88,8 +89,17 @@ export async function unificarDisciplinas(canonicaId: string, duplicadaIds: stri
   if (upQ.error) return { ok: false, error: upQ.error.message }
   const upA = await svc.from('simulado_assuntos').update({ disciplina_id: canonicaId }).eq('tenant_id', g.tenantId).in('disciplina_id', dups)
   if (upA.error) return { ok: false, error: upA.error.message }
-  await svc.from('simulado_cronograma_links').update({ disciplina_id: canonicaId }).eq('tenant_id', g.tenantId).in('disciplina_id', dups)
-  await svc.from('simulado_cronograma_metas').update({ disciplina_id: canonicaId }).eq('tenant_id', g.tenantId).in('disciplina_id', dups)
+  // TODAS as outras referências conhecidas (pasta-disciplina da Biblioteca, conjuntos do cronograma…): sem isto o DELETE abaixo
+  // zerava o vínculo (FK ON DELETE SET NULL) — o "desvincula tudo". A RPC nova (20261105020000) faz isso dinamicamente p/ qualquer tabela.
+  for (const tabela of ['simulado_cronograma_links', 'simulado_cronograma_metas', 'simulado_cronograma_conjuntos', 'simulado_pastas']) {
+    const r = await svc.from(tabela).update({ disciplina_id: canonicaId }).eq('tenant_id', g.tenantId).in('disciplina_id', dups)
+    if (r.error && !/does not exist|schema cache|column/i.test(r.error.message)) return { ok: false, error: `Falha ao repontar ${tabela}: ${r.error.message}` }
+  }
+  // aliases: o nome de cada unificada passa a apontar p/ a canônica (a RPC nova faz isso; aqui no fallback JS, best-effort)
+  try {
+    const aliasDe = (donas ?? []).filter((d: any) => dups.includes(d.id)).map((d: any) => ({ tenant_id: g.tenantId, alias_norm: chaveNome(d.nome), disciplina_id: canonicaId, alias_texto: d.nome })).filter((a: any) => a.alias_norm)
+    if (aliasDe.length) await svc.from('simulado_disciplina_aliases').upsert(aliasDe, { onConflict: 'tenant_id,alias_norm' })
+  } catch { /* tabela ausente */ }
   const del = await svc.from('simulado_disciplinas').delete().eq('tenant_id', g.tenantId).in('id', dups)
   if (del.error) return { ok: false, error: del.error.message }
   const mantida = (donas ?? []).find((d: any) => d.id === canonicaId)?.nome as string | undefined

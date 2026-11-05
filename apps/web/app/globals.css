@@ -109,6 +109,7 @@
   --sel-xlsx: #13804B;  --sel-xlsx-bg: #E3F7EC;
   --sel-video: #8A6600; --sel-video-bg: #FDF5D8;
   --sel-audio: #1F5BC4; --sel-audio-bg: #E4EEFF;
+  --sel-questoes: #0E7C86; --sel-questoes-bg: #DEF4F5;
 }
 
 /* ─── Transição suave ao TROCAR o tema (claro ↔ escuro) ───────────────────────────────
@@ -183,6 +184,7 @@ html.theme-anim *::after {
   --sel-xlsx: #5FD39B;  --sel-xlsx-bg: rgba(19,128,75,.22);
   --sel-video: #E8C877; --sel-video-bg: rgba(241,194,50,.16);
   --sel-audio: #7FB2FF; --sel-audio-bg: rgba(31,91,196,.24);
+  --sel-questoes: #5FD3D8; --sel-questoes-bg: rgba(14,124,134,.24);
 }
 
 /* Escopo de cor da GAMIFICAÇÃO: aplicar `class="tema-gam"` num container recolore TUDO dentro

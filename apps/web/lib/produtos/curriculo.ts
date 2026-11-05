@@ -114,6 +114,7 @@ export interface ModuloRow {
   pai_id: string | null
   titulo: string
   imagem_url: string | null
+  ocultar_titulo?: boolean   // oculta o título sobreposto na capa (imagem já traz o texto)
   descricao: string | null
   ordem: number
   exibicao: 'aberto' | 'recolhido'

@@ -12,7 +12,7 @@ import { Crumbs, Card, Muted } from '@/components/nova/ui'
 import { R } from '@/lib/nova/rotas'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { createAdminClient } from '@/lib/supabase/server'
-import { desafiosDoAluno, lerDesafioJogo, preencherTesesPorQuiz } from '@/lib/jurisprudencia/conteudo'
+import { desafiosDoAluno, lerDesafioJogo, preencherTesesPorQuiz, AREAS_JURISCLUB } from '@/lib/jurisprudencia/conteudo'
 import { JurisClub, type EdicaoItem, type JulgadoView } from './_jurisclub'
 
 export const dynamic = 'force-dynamic'
@@ -34,12 +34,12 @@ export default async function JurisClubPage() {
   const svc = createAdminClient()
 
   // Edições (desafios) a que o aluno tem acesso — REAL. desafiosDoAluno já ordena por id asc.
-  const desafios = await desafiosDoAluno(estudanteId, tenantId).catch(() => [])
+  const desafios = await desafiosDoAluno(estudanteId, tenantId, AREAS_JURISCLUB).catch(() => [])
 
   if (!desafios.length) {
     return (
       <>
-        <Crumbs items={[['Cursos', R.cursos], ['Central de Estudos', R.central], ['JurisClub', '#']]} />
+        <Crumbs items={[['Cursos', R.cursos], ['JurisClub', '#']]} />
         <Card style={{ alignItems: 'center', textAlign: 'center', padding: '48px 24px' }}>
           <Muted size={13}>Nenhuma edição do JurisClub disponível para você no momento.</Muted>
         </Card>
@@ -78,8 +78,8 @@ export default async function JurisClubPage() {
     totalJulgados += teses.length
     const domArr = (Array.isArray(domEdicao[chave]) ? domEdicao[chave] : []).map((x: any) => Number(x))
     const href = d?.documento_id
-      ? `/aluno/jurisprudencia/leitura-rapida/${d.documento_id}?desafio=${edicaoDesafio.id}`
-      : `/aluno/jurisprudencia?desafio=${edicaoDesafio.id}`
+      ? `/aluno/jurisprudencia/leitura-rapida/${d.documento_id}?desafio=${edicaoDesafio.id}&voltar=${encodeURIComponent(R.jurisclub)}`
+      : `/aluno/jurisprudencia?desafio=${edicaoDesafio.id}&origem=${encodeURIComponent(R.jurisclub)}`
     teses.forEach((t: any, i: number) => {
       const lido = domArr.includes(i)
       if (lido) lidos++
@@ -125,13 +125,13 @@ export default async function JurisClubPage() {
         sub: totalDias > 0 ? `${totalDias} dias` : 'Edição',
         badge,
         badgeKind,
-        href: `/aluno/jurisprudencia?desafio=${d.id}`,
+        href: `/aluno/jurisprudencia?desafio=${d.id}&origem=${encodeURIComponent(R.jurisclub)}`,
       }
     })
 
   return (
     <>
-      <Crumbs items={[['Cursos', R.cursos], ['Central de Estudos', R.central], ['JurisClub', '#']]} />
+      <Crumbs items={[['Cursos', R.cursos], ['JurisClub', '#']]} />
       <JurisClub
         alunoNome={primeiroNome(nome)}
         edicao={{
@@ -140,7 +140,7 @@ export default async function JurisClubPage() {
           total: totalJulgados,
           lidos,
           pct,
-          href: `/aluno/jurisprudencia?desafio=${edicaoDesafio.id}`,
+          href: `/aluno/jurisprudencia?desafio=${edicaoDesafio.id}&origem=${encodeURIComponent(R.jurisclub)}`,
         }}
         julgados={julgados}
         disciplinas={disciplinas}

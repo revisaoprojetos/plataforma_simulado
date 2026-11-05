@@ -34,6 +34,7 @@ export interface ModuloAluno {
   titulo: string
   descricao: string | null
   imagemUrl: string | null
+  ocultarTitulo?: boolean   // capa já traz o texto: não sobrepor o título
   aberto: boolean           // exibicao 'aberto' | 'recolhido'
   liberado: boolean
   liberaEm: string | null
@@ -110,7 +111,7 @@ export async function matriculaNoProduto(svc: any, tenantId: string, estudanteId
 export async function curriculoDoAluno(svc: any, tenantId: string, estudanteId: string, produtoId: string, voltar: string | ((moduloRaizId: string) => string)): Promise<ModuloAluno[]> {
   const [mrows, irows, matricula] = await Promise.all([
     fetchAll<any>(() => svc.from('simulado_produto_modulos')
-      .select('id, pai_id, titulo, imagem_url, descricao, ordem, exibicao, disponibilidade')
+      .select('*') // '*': tolerante à coluna ocultar_titulo ainda não migrada
       .eq('tenant_id', tenantId).eq('produto_id', produtoId).eq('deletado', false)
       .order('ordem', { ascending: true }).order('id', { ascending: true }), 1000, 'aluno:produto_modulos').catch(() => [] as any[]),
     fetchAll<any>(() => svc.from('simulado_produto_modulo_itens')
@@ -165,7 +166,7 @@ export async function curriculoDoAluno(svc: any, tenantId: string, estudanteId: 
     const submodulos = (filhos.get(m.id) ?? []).map((s) => montar(s, libM, raizId, exclusivoM)).filter(Boolean) as ModuloAluno[]
     if (!aulas.length && !submodulos.length) return null // módulo vazio para o aluno: não mostra
     return {
-      id: m.id, titulo: m.titulo, descricao: m.descricao ?? null, imagemUrl: m.imagem_url ?? null,
+      id: m.id, titulo: m.titulo, descricao: m.descricao ?? null, imagemUrl: m.imagem_url ?? null, ocultarTitulo: !!m.ocultar_titulo && !!m.imagem_url,
       aberto: m.exibicao !== 'recolhido', liberado: modLiberado && !exclusivoM, liberaEm: modLiberado || !libM ? null : libM.toISOString(),
       exclusivo: exclusivoM, aulas, submodulos,
     }

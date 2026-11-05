@@ -112,7 +112,7 @@ export default async function SimuladosPage() {
 
   return (
     <>
-      <Crumbs items={[['Central de Estudos', R.central], ['Questões e Simulados', R.questoes]]} />
+      <Crumbs items={[['Cursos', R.cursos], ['Questões e Simulados', '#']]} />
       <Tabs items={['Simulados', 'Banco de questões', 'Realizados', 'Recomendado']} links={[R.questoes, R.banco, R.realizados, R.recomendado]} active={0} />
 
       <Split

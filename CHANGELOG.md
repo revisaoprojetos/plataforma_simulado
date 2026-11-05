@@ -12,6 +12,31 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.5.0 — 2026-11-05
+
+### Cursos (aluno)
+- **Central de Estudos acima de "Meus cursos"** na tela de Cursos (Extensivo, LegProc, JurisClub, Questões e Simulados vêm primeiro; os cursos logo abaixo). Subtítulo ajustado. Quem não tem a Central liberada continua sem ela (sem espaço vazio). Capas novas do Extensivo e do JurisClub.
+
+### Cronograma Adaptativo
+- **Plano em linhas (relacional, dual-write):** as metas do plano e o `cfg`/extras/pausa passam a ter colunas e tabelas filhas (como o cronograma normal), separadas do progresso do aluno. O JSON segue como fonte lida pelo motor/iframe; a liberação por data já lê as linhas. Migrações `20261105050000`, `060000` e `061000` (backfill).
+- **Definição das metas (admin, por plataforma)** + espelho das metas e análise, independentes de aluno (migração `20261105070000`). **Segurança:** as duas visões do Adaptativo passam a `security_invoker` (antes legíveis com a chave pública) — migração `20261105080000`, **aplicar logo**.
+- **Painel lateral da meta (aluno):** o botão **Parcial** agora abre o formulário "até onde você parou" (antes não aparecia) e fica **preenchido** quando ativo — inclusive com o formulário aberto; **Não realizado** com texto legível quando ativo. O cursor de mãozinha não vaza mais para o painel inteiro e a tela deixa de **piscar** a cada clique (o fade do fundo só roda na abertura).
+- **Carregamento:** o aviso "Carregando seu cronograma…" não fica mais preso após recarregar (libera pelo `onLoad`, pelo aviso `rej-crono-ready` do iframe, se o iframe já estava pronto antes da hidratação e por teto de 4 s).
+
+### Disciplinas / taxonomia
+- **Unificar disciplinas sem perder vínculos** (`20261105020000`): repontar tudo que aponta para a disciplina, não só questões/assuntos/cronograma. **Sem duplicata + trava** para não voltar (`030000`). **Nome da plataforma visível** na tabela (`040000`). Tela por plataforma no Console.
+
+### Biblioteca / Questões
+- Novo formato **Questões** na Biblioteca: o card é um documento com conjunto de questões, sem arquivo/versão (migração `20261105090000`), e **gerenciar as questões do conteúdo** na tela de gestão.
+
+### Produtos
+- Módulo do extensivo pode **ocultar o título sobre a capa** quando a imagem já traz o texto (migração `20261105100000`); ajustes no currículo/estúdio.
+
+### Migrações a aplicar (SQL editor, em ordem)
+- `20261105000000` (cadernos — comentário do trecho) e `20261105010000` (capa/página inicial), **se ainda não aplicadas**; depois `020000` … `100000`. Sem elas o app degrada com aviso, sem quebrar.
+
+---
+
 ## 4.4.1 — 2026-11-05
 
 - **Cronograma Adaptativo — Metas:** novo card desativado **Jurisprudência (em breve)** na seção "Metas no cronograma" ("Em breve você poderá incluir meta de jurisprudência no cronograma."). Só aviso na tela; não entra no cálculo.

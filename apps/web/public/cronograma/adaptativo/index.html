@@ -92,7 +92,7 @@ main{padding-block:22px 64px}
 .btn.ok{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 45%,var(--line))}
 .btn.ok.on{background:var(--ok);border-color:var(--ok);color:var(--surface)}
 .btn.miss{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 40%,var(--line))}
-.btn.miss.on{background:var(--warn);border-color:var(--warn);color:var(--surface)}
+.btn.miss.on{background:var(--warn);border-color:var(--warn);color:#fff}
 .btn.sm{padding:5px 10px;font-size:13px;border-radius:7px}
 .btn.ghost{background:transparent;border-color:transparent;color:var(--muted)}
 .btn.ghost:hover{color:var(--ink);background:var(--surface-2)}
@@ -536,7 +536,7 @@ main{padding-block:22px 64px}
 .rev-sel select{border:1px solid var(--line);border-radius:10px;padding:8px 12px;font:inherit;font-weight:600;background:var(--surface);color:var(--ink)}
 .rev-dica{font-size:13px;color:var(--muted);margin-top:10px}
 
-.btn.parc{border-color:var(--pn-b9770a,#B9770A);color:var(--pn-9a6200,#9a6200)}.btn.parc.on{background:var(--pn-fdf0d8,#FDF0D8)}
+.btn.parc{border-color:var(--pn-b9770a,#B9770A);color:var(--pn-9a6200,#9a6200)}.btn.parc.on{background:var(--pn-b9770a,#B9770A);border-color:var(--pn-b9770a,#B9770A);color:#fff}
 .parc-form{flex-basis:100%;display:flex;flex-direction:column;gap:6px;margin-top:8px;padding:10px 12px;border:1px dashed var(--line);border-radius:12px;font-size:13.5px}
 .parc-l{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.parc-l input{width:120px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;font:inherit;background:var(--surface);color:var(--ink)}.parc-l span{color:var(--muted);font-size:13px}
 </style>
@@ -1319,7 +1319,11 @@ function partesInfo(idx) {
   });
 }
 function linhaDisc(i) {
-  if (i.tipo === 'lp') return `<div class="c-disc"><span class="mono">Lei seca · bloco da semana ${i.sem}</span></div>`;
+  if (i.tipo === 'lp') {
+    // "bloco da semana N" só existe no modelo antigo (WLP por semana); metas do catálogo editado não trazem `sem` → sem o "undefined".
+    if (i.sem != null && i.sem !== '') return `<div class="c-disc"><span class="mono">Lei seca · bloco da semana ${i.sem}</span></div>`;
+    return `<div class="c-disc">${i.disc ? `<i class="dot" style="background:${COR[i.disc] || '#888'}"></i>${esc(i.disc)} · ` : ''}<span class="mono">Lei seca</span></div>`;
+  }
   if (ehMetaRev(i.tipo)) return `<div class="c-disc"><i class="dot" style="background:${COR[i.disc] || '#888'}"></i>${esc(i.disc)} · Aula ${esc(i.aula)} · <span class="motivo">${motivoRev(i.idx)}</span></div>`;
   return `<div class="c-disc"><i class="dot" style="background:${COR[i.disc] || '#888'}"></i>${esc(i.disc)} · Aula ${esc(i.aula)}${ehPdf(i.tipo) && i.pags ? ` · <span class="num">${i.pags} p.</span>` : ''}</div>`;
 }
@@ -1354,7 +1358,7 @@ function cartao(id, opts = {}) {
       <div class="c-acoes">
         ${botaoIniciar(id)}
         <button type="button" class="btn sm ok ${s === 'done' ? 'on' : ''}" data-acao="feito" data-id="${id}" aria-pressed="${s === 'done'}">${ICK} ${s === 'done' ? 'Concluída' : 'Concluir'}</button>
-        <button type="button" class="btn sm parc ${S.prog[id]?.parou && s !== 'done' ? 'on' : ''}" data-acao="parcial" data-id="${id}">Parcial</button> <button type="button" class="btn sm miss ${s === 'missed' ? 'on' : ''}" data-acao="faltou" data-id="${id}" aria-pressed="${s === 'missed'}">Não realizado</button>${PARCIAL === id ? formParcial(id) : ''}
+        <button type="button" class="btn sm parc ${PARCIAL === id || (S.prog[id]?.parou && s !== 'done') ? 'on' : ''}" data-acao="parcial" data-id="${id}" aria-pressed="${PARCIAL === id || !!(S.prog[id]?.parou && s !== 'done')}">Parcial</button> <button type="button" class="btn sm miss ${s === 'missed' ? 'on' : ''}" data-acao="faltou" data-id="${id}" aria-pressed="${s === 'missed'}">Não realizado</button>${PARCIAL === id ? formParcial(id) : ''}
         <span class="sep"></span>
         <button type="button" class="btn sm ghost" data-acao="abrir" data-id="${id}">Anotações${temNota(id) ? ' •' : ''}</button>
       </div>
@@ -1741,7 +1745,7 @@ function abrirFolha(id, manter) {
       <div class="c-acoes">
         ${botaoIniciar(id)}
         <button type="button" class="btn sm ok ${s === 'done' ? 'on' : ''}" data-acao="feito" data-id="${id}" aria-pressed="${s === 'done'}">${ICK} ${s === 'done' ? 'Concluída' : 'Concluir'}</button>
-        <button type="button" class="btn sm parc ${S.prog[id]?.parou && s !== 'done' ? 'on' : ''}" data-acao="parcial" data-id="${id}">Parcial</button> <button type="button" class="btn sm miss ${s === 'missed' ? 'on' : ''}" data-acao="faltou" data-id="${id}" aria-pressed="${s === 'missed'}">Não realizado</button>${PARCIAL === id ? formParcial(id) : ''}
+        <button type="button" class="btn sm parc ${PARCIAL === id || (S.prog[id]?.parou && s !== 'done') ? 'on' : ''}" data-acao="parcial" data-id="${id}" aria-pressed="${PARCIAL === id || !!(S.prog[id]?.parou && s !== 'done')}">Parcial</button> <button type="button" class="btn sm miss ${s === 'missed' ? 'on' : ''}" data-acao="faltou" data-id="${id}" aria-pressed="${s === 'missed'}">Não realizado</button>${PARCIAL === id ? formParcial(id) : ''}
       </div>
     </div>
     <div class="folha-corpo">

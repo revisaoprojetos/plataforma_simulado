@@ -436,7 +436,7 @@ export async function getProdutoCurriculo(
   try {
     const [mrows, irows] = await Promise.all([
       fetchAll<any>(() => svc.from('simulado_produto_modulos')
-        .select('id, produto_id, pai_id, titulo, imagem_url, descricao, ordem, exibicao, disponibilidade')
+        .select('*')
         .eq('tenant_id', tenantId).eq('produto_id', produtoId).eq('deletado', false)
         .order('ordem', { ascending: true }).order('id', { ascending: true }) as any, 1000, 'produto_modulos'),
       fetchAll<any>(() => {
@@ -450,7 +450,7 @@ export async function getProdutoCurriculo(
     ])
     const modulos: ModuloRow[] = mrows.map((m: any) => ({
       id: m.id, produto_id: m.produto_id, pai_id: m.pai_id ?? null, titulo: m.titulo,
-      imagem_url: m.imagem_url ?? null, descricao: m.descricao ?? null, ordem: m.ordem ?? 0,
+      imagem_url: m.imagem_url ?? null, ocultar_titulo: !!m.ocultar_titulo, descricao: m.descricao ?? null, ordem: m.ordem ?? 0,
       exibicao: m.exibicao === 'recolhido' ? 'recolhido' : 'aberto', disponibilidade: normDisponibilidade(m.disponibilidade),
     }))
     const itens: ItemRow[] = irows.map((i: any) => ({

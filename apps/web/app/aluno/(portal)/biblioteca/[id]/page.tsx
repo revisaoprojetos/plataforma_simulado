@@ -78,10 +78,13 @@ export default async function LeituraConteudoPage({ params, searchParams }: { pa
   const doc = await carregarDocParaLeitura(id, sessao.estudanteId)
   if (!doc) notFound()
 
-  // PÁGINA INICIAL (Biblioteca): a do documento ou da pasta em lote. As páginas anteriores nem entram na leitura (não contam).
-  // Um link com ?pagina= (ex.: grifo) abaixo da inicial abre na inicial — a página anterior não existe na leitura.
-  const paginaMinima = doc.kind === 'pdf' ? await paginaInicialDoDocumento(id) : 1
-  const paginaAbrir = Math.max(paginaMinima, paginaInicial)
+  // PÁGINA INICIAL (Biblioteca): a do documento ou da pasta em lote. O leitor ABRE direto nela, mas NÃO corta o que vem
+  // antes: as páginas anteriores continuam na leitura (é só rolar para cima). Só vale na abertura NORMAL do documento.
+  const paginaDoc = doc.kind === 'pdf' ? await paginaInicialDoDocumento(id) : 1
+  // Aberto pelo CRONOGRAMA (meta/partes) a página é a da PARTE (?pagina= ou a 1ª): a página inicial do documento NÃO se aplica.
+  const doCronograma = !!sp?.meta || !!sp?.partes
+  const paginaExplicita = sp?.pagina !== undefined && Number.isFinite(Number(sp.pagina))
+  const paginaAbrir = paginaExplicita || doCronograma ? paginaInicial : paginaDoc
 
   // Progresso de leitura (histórico + snapshot de cursos) NÃO precisa concluir para a página renderizar:
   // roda APÓS a resposta (`after`), tirando o upsert + o write-behind do caminho crítico da abertura.
@@ -133,7 +136,6 @@ export default async function LeituraConteudoPage({ params, searchParams }: { pa
       grifos={leitura.grifos}
       voltarHref={voltarHref}
       paginaInicial={paginaAbrir}
-      paginaMinima={paginaMinima}
       partesCrono={partesCrono}
       metaCrono={metaAtual}
       tempoBase={tempoBase}

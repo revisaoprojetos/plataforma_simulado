@@ -1,5 +1,6 @@
 'use server'
 
+import { resolverTaxonomiaPorNome } from '@/lib/taxonomia/resolver-nome'
 import { createHash } from 'crypto'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -172,34 +173,8 @@ async function resolveByName(
   tenantId: string,
   nome?: string,
 ): Promise<string | null> {
-  const n = nome?.trim()
-  if (!n) return null
-
-  const { data: existing } = await supabase
-    .from(table)
-    .select('id')
-    .eq('tenant_id', tenantId)
-    .ilike('nome', n)
-    .maybeSingle()
-  if (existing) return existing.id
-
-  const { data: created, error } = await supabase
-    .from(table)
-    .insert({ nome: n, tenant_id: tenantId })
-    .select('id')
-    .single()
-
-  if (error) {
-    // Provável corrida no índice unique: relê o existente.
-    const { data: again } = await supabase
-      .from(table)
-      .select('id')
-      .eq('tenant_id', tenantId)
-      .ilike('nome', n)
-      .maybeSingle()
-    return again?.id ?? null
-  }
-  return created.id
+  // Normalizado (acento/espaço), determinístico entre homônimas e sem criar duplicada — ver lib/taxonomia/resolver-nome.ts
+  return resolverTaxonomiaPorNome(supabase, table, tenantId, nome)
 }
 
 /** Resolve assunto por nome dentro de uma disciplina (cria se necessário). */

@@ -130,7 +130,7 @@ export default async function RecomendadoPage() {
 
   return (
     <>
-      <Crumbs items={[['Central de Estudos', R.central], ['Questões e Simulados', R.questoes]]} />
+      <Crumbs items={[['Cursos', R.cursos], ['Questões e Simulados', R.questoes], ['Recomendado', '#']]} />
       <Tabs items={['Simulados', 'Banco de questões', 'Realizados', 'Recomendado']} links={[R.questoes, R.banco, R.realizados, R.recomendado]} active={3} />
 
       <PageHeader eyebrow="Para você" title="Recomendado para você" sub="Questões escolhidas a partir das suas estatísticas — reforce onde você mais erra." />

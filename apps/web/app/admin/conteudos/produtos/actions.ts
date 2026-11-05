@@ -176,7 +176,7 @@ export async function removerInstrutorAction(id: string, produtoId: string) {
 
 // ═════════════════════════════ CURRÍCULO — módulos ═════════════════════════════
 
-type ModuloInput = { id?: string; pai_id?: string | null; titulo: string; imagem_url?: string | null; descricao?: string | null; exibicao?: 'aberto' | 'recolhido'; disponibilidade?: Disponibilidade }
+type ModuloInput = { id?: string; pai_id?: string | null; titulo: string; imagem_url?: string | null; ocultar_titulo?: boolean; descricao?: string | null; exibicao?: 'aberto' | 'recolhido'; disponibilidade?: Disponibilidade }
 
 export async function salvarModuloAction(produtoId: string, input: ModuloInput) {
   const g = await guard(true); if ('error' in g) return { error: g.error }
@@ -185,15 +185,19 @@ export async function salvarModuloAction(produtoId: string, input: ModuloInput) 
   const campos: any = {
     titulo, pai_id: input.pai_id ?? null, imagem_url: input.imagem_url ?? null, descricao: input.descricao ?? null,
     exibicao: input.exibicao ?? 'aberto', disponibilidade: input.disponibilidade ?? { tipo: 'na_matricula' }, atualizado_em: new Date().toISOString(),
+    ocultar_titulo: !!input.ocultar_titulo && !!input.imagem_url,
   }
+  const semColuna = (m?: string) => /ocultar_titulo/.test(m || '') // migração 20261105100000 ainda não aplicada → salva sem o campo
   if (input.id) {
-    const { error } = await svc.from('simulado_produto_modulos').update(campos).eq('id', input.id).eq('tenant_id', g.tenantId)
+    let { error } = await svc.from('simulado_produto_modulos').update(campos).eq('id', input.id).eq('tenant_id', g.tenantId)
+    if (error && semColuna(error.message)) { const { ocultar_titulo: _o, ...resto } = campos; ({ error } = await svc.from('simulado_produto_modulos').update(resto).eq('id', input.id).eq('tenant_id', g.tenantId)) }
     if (error) return { error: erroModulo(error.message) }
     await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_produto_modulos', entidadeId: input.id, depois: { titulo }, tenantId: g.tenantId })
     revalidar(produtoId); return { ok: true as const, id: input.id }
   }
   const ordem = await proximaOrdem(svc, 'simulado_produto_modulos', { tenant_id: g.tenantId, produto_id: produtoId, pai_id: input.pai_id ?? null })
-  const { data, error } = await svc.from('simulado_produto_modulos').insert({ ...campos, tenant_id: g.tenantId, produto_id: produtoId, ordem }).select('id').single()
+  let { data, error } = await svc.from('simulado_produto_modulos').insert({ ...campos, tenant_id: g.tenantId, produto_id: produtoId, ordem }).select('id').single()
+  if (error && semColuna(error.message)) { const { ocultar_titulo: _o, ...resto } = campos; ({ data, error } = await svc.from('simulado_produto_modulos').insert({ ...resto, tenant_id: g.tenantId, produto_id: produtoId, ordem }).select('id').single()) }
   if (error || !data) return { error: erroModulo(error?.message || 'Falha ao criar módulo.') }
   await registrarAudit({ operacao: 'INSERT', entidade: 'simulado_produto_modulos', entidadeId: data.id, depois: { titulo }, tenantId: g.tenantId })
   revalidar(produtoId); return { ok: true as const, id: data.id }

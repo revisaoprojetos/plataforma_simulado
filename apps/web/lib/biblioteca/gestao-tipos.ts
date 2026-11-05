@@ -140,6 +140,21 @@ export const GESTAO_TIPOS: Record<KindConteudo, GestaoTipo> = {
       { tipo: 'op', id: 'formato_dl', titulo: 'Download', sub: 'com marca sonora', opcoes: [['mp3', 'MP3'], ['so_offline', 'Só offline no app'], ['nao', 'Não']], padrao: 'mp3' }] },
     migracao: 'Manter marcadores na nova versão', rotuloLimite: 'Limite de downloads por aluno',
   },
+  questoes: {
+    kind: 'questoes', rotuloTopo: 'CONJUNTO DE QUESTÕES', ext: 'QUESTÕES', verAluno: 'aluno',
+    acoesTopo: [], // sem editor/exportar — a gestão é de QUESTÕES (adicionar do banco / importar)
+    legendaPerms: 'R = responder as questões.',
+    kpis: ['Responderam', 'Tentativas', 'Questões', 'Acerto médio', 'Concluíram'],
+    hints: ['por aluno', 'questões no conjunto', 'das respostas', 'responderam tudo'],
+    funilTitulo: 'Funil do conjunto de questões', funil: ['Liberado', 'Começaram', 'Responderam 50%+', 'Concluíram', 'Revisaram'],
+    colsAlunos: ['Respostas', 'Acertos', 'Progresso'], maisUm: '+1 tentativa',
+    abaTipo: { tab: 'Questões', titulo: 'Desempenho por questão', sub: '% de acerto por questão' },
+    verbos: { abrir: 'Começou', baixar: '—', grifar: 'Marcou', bloqueio: '—' },
+    configBloco: { titulo: 'Questões', sub: 'Como o aluno responde', rows: [PERM_ROWS_PADRAO,
+      { tipo: 'sw', id: 'embaralhar', titulo: 'Embaralhar questões', sub: 'Ordem aleatória por aluno', padrao: false },
+      { tipo: 'sw', id: 'gabarito', titulo: 'Mostrar gabarito ao responder', sub: 'Comentário e alternativa correta após responder', padrao: true }] },
+    migracao: '—', rotuloLimite: 'Limite de tentativas por aluno',
+  },
 }
 
 export function gestaoDe(kind: string | null | undefined): GestaoTipo {

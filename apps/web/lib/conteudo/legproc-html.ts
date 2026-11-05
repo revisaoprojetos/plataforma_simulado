@@ -269,6 +269,8 @@ export async function docxParaHtmlLegproc(data: Buffer): Promise<string> {
     const css = [v.fill ? `background:#${v.fill}` : '', v.jc ? `text-align:${v.jc === 'both' ? 'justify' : v.jc}` : ''].filter(Boolean).join(';')
     return `<p style="${css}"`
   })
+  // imagens gigantes em base64 (>400 KB) pesariam no banco e na página: fora (mesma regra do importador antigo)
+  html = html.replace(/<img[^>]*>/g, (tag) => (tag.length > 400_000 ? '' : tag))
   // rótulos da numeração do Word (I, II, a), 1.) nos <li> — só se a contagem casar (senão fica a numeração do mammoth)
   if (modeloNum && rotulos.length && (html.match(/<li[ >]/g) || []).length === rotulos.length) {
     let i = 0

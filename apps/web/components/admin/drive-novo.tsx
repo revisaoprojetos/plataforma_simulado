@@ -36,13 +36,15 @@ const P = {
 const Ico = ({ d }: { d: string }) => (<svg viewBox="0 0 24 24"><path d={d} /></svg>)
 
 export function DriveNovoButton({
-  rotuloBranco, onNovaPasta, onUploadArquivos, onUploadPasta, onDocumentoBranco, onToast,
+  rotuloBranco, onNovaPasta, onUploadArquivos, onUploadPasta, onDocumentoBranco, onNovoQuestoes, onToast,
 }: {
   rotuloBranco: string
   onNovaPasta: (nome: string, cor: string | null) => void
   onUploadArquivos: (files: File[]) => void
   onUploadPasta: (files: File[]) => void
   onDocumentoBranco: () => void
+  /** Cria um "Conjunto de questões" (novo formato: card que agrupa questões do banco). Omitido → item não aparece. */
+  onNovoQuestoes?: () => void
   onToast?: (msg: string) => void
 }) {
   const btnRef = useRef<HTMLButtonElement>(null)
@@ -136,6 +138,12 @@ export function DriveNovoButton({
             <span className="gd-tb" style={{ background: 'linear-gradient(135deg, var(--brand-primary, var(--primary)), color-mix(in oklab, var(--brand-primary, var(--primary)) 55%, var(--pn-7b61ff,#7b61ff)))' }}><Ico d={P.add} /></span>
             <span className="gd-label">{rotuloBranco}</span>
           </div>
+          {onNovoQuestoes && (
+            <div className="gd-item" style={sv({ '--i': i() })} onMouseEnter={() => hoverItem(null)} onClick={act(() => onNovoQuestoes())}>
+              <span className="gd-tb" style={{ background: 'var(--sel-questoes, var(--brand-primary, var(--primary)))', fontSize: 9, fontWeight: 800, color: '#fff', letterSpacing: '.02em' }}>Q</span>
+              <span className="gd-label">Conjunto de questões</span>
+            </div>
+          )}
           <div className="gd-divider" style={sv({ '--i': i() })} />
           <div className="gd-colors-title" style={{ padding: '2px 12px 4px' }}>Enviar por tipo</div>
           {/* Todos os tipos (DOC/PDF/PPT/XLS/Vídeo/Áudio) usam o MESMO fluxo de upload; só filtram a extensão. */}

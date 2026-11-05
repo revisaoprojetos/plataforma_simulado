@@ -36,7 +36,7 @@ export async function kindDeTipoOrigem(tipo: string | null | undefined): Promise
   }
 }
 function kindSync(tipo: string | null | undefined): KindConteudo {
-  switch (tipo) { case 'pdf': return 'pdf'; case 'pptx': return 'pptx'; case 'xlsx': return 'xlsx'; case 'video': return 'video'; case 'audio': return 'audio'; default: return 'docx' }
+  switch (tipo) { case 'pdf': return 'pdf'; case 'pptx': return 'pptx'; case 'xlsx': return 'xlsx'; case 'video': return 'video'; case 'audio': return 'audio'; case 'questoes': return 'questoes'; default: return 'docx' }
 }
 function mascararCpf(cpf?: string | null): string {
   const d = (cpf || '').replace(/\D/g, '')

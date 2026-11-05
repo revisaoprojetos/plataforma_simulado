@@ -10,6 +10,7 @@ import { CATALOGO_HTML, nomeDisciplina } from './catalogo-html'
 import { construirSnapshot, type AdaptativoSnapshot } from './snapshot'
 import { lerParamsMotor } from './config-metas'
 import { catalogoIdDoTenant } from './catalogo-override-db'
+import { espelharEmSegundoPlano } from './plano-metas'
 
 // Camada server do Cronograma Adaptativo. Backend-first: a página chama `carregarAdaptativo`
 // e recebe o snapshot pronto. Mutações via estas funções (expostas por rotas /api, pois
@@ -230,6 +231,7 @@ export async function migrarPlano(svc: SupabaseClient, tenantId: string, row: Pl
       .update({ cfg: cfg2 as unknown as Record<string, unknown>, plano: r.plano as unknown as Record<string, unknown>, fim: r.fim, revs, atualizado_em: new Date().toISOString() })
       .eq('id', row.id).or(`cfg->>catalogo.is.null,cfg->>catalogo.neq.${catId}`) // concorrência: só uma migração grava
     if (error) return row
+    espelharEmSegundoPlano(svc, row.id)
     return { ...row, cfg: cfg2, plano: r.plano, fim: r.fim, revs }
   } catch {
     return row // falha na correção não derruba o cronograma do aluno (segue no plano anterior)
@@ -290,6 +292,7 @@ export async function gerarAdaptativo(
     // Recalcula o plano em foco (preserva id, metas e foco).
     const { error } = await svc.from(T_PLANO).update(campos).eq('id', alvo.id)
     if (error) return { ok: false, error: error.message }
+    espelharEmSegundoPlano(svc, alvo.id) // metas em linhas (espelho da grade)
     return { ok: true, planoId: alvo.id }
   }
   // Novo plano: desfixa os demais e cria já fixado (vira o foco).
@@ -298,6 +301,7 @@ export async function gerarAdaptativo(
     .insert({ tenant_id: tenantId, estudante_id: estId, fixado: true, ...campos })
     .select('id').maybeSingle()
   if (error) return { ok: false, error: error.message }
+  espelharEmSegundoPlano(svc, (data as { id?: string } | null)?.id)
   return { ok: true, planoId: (data as { id?: string } | null)?.id }
 }
 
@@ -468,11 +472,14 @@ export async function sincronizarDoc(svc: SupabaseClient, tenantId: string, estI
     if (alvo) {
       const upd = tituloDoc ? { ...campos, titulo: tituloDoc } : campos
       const { error } = await svc.from(T_PLANO).update(upd).eq('id', alvo.id)
+      if (!error) espelharEmSegundoPlano(svc, alvo.id)
       return error ? { ok: false, error: error.message } : { ok: true }
     }
     await svc.from(T_PLANO).update({ fixado: false }).eq('tenant_id', tenantId).eq('estudante_id', estId).eq('fixado', true)
-    const { error } = await svc.from(T_PLANO)
+    const { data: novo, error } = await svc.from(T_PLANO)
       .insert({ tenant_id: tenantId, estudante_id: estId, fixado: true, titulo: tituloDoc || 'Meu cronograma', ...campos })
+      .select('id').maybeSingle()
+    if (!error) espelharEmSegundoPlano(svc, (novo as { id?: string } | null)?.id)
     return error ? { ok: false, error: error.message } : { ok: true }
   }
   const row = await lerPlanoRow(svc, tenantId, estId)

@@ -134,13 +134,37 @@ interface PlanoAluno { tem: boolean; datas: Record<string, string>; feitas: stri
 async function planoDoAluno(svc: SupabaseClient, tenantId: string, alunoId: string): Promise<PlanoAluno> {
   return remember<PlanoAluno>(kPlano(tenantId, alunoId), 60, async () => {
     const T = 'simulado_cronograma_adaptativo_plano'
-    const base = () => svc.from(T).select('id, plano, exemplo').eq('tenant_id', tenantId).eq('estudante_id', alunoId).eq('arquivada', false)
-    let { data: row } = await base().eq('fixado', true).maybeSingle()
-    if (!row) ({ data: row } = await base().order('criado_em', { ascending: false }).limit(1).maybeSingle())
-    const r = row as { id: string; plano: Record<string, [string, number]> | null; exemplo: boolean } | null
-    if (!r || r.exemplo || !r.plano || !Object.keys(r.plano).length) return { tem: false, datas: {}, feitas: [] }
+    // 1ª leitura LEVE (sem o JSON da grade): id, exemplo e se as metas já estão em linhas (plano_meta). Sem a coluna → só o JSON.
+    const leve = (cols: string) => () => svc.from(T).select(cols).eq('tenant_id', tenantId).eq('estudante_id', alunoId).eq('arquivada', false)
+    const achar = async (cols: string) => {
+      let { data: row, error } = await leve(cols)().eq('fixado', true).maybeSingle()
+      if (error) return { row: null, error }
+      if (!row) ({ data: row, error } = await leve(cols)().order('criado_em', { ascending: false }).limit(1).maybeSingle())
+      return { row: row as unknown as { id: string; exemplo: boolean; grade_espelhada_hash?: string | null; plano?: Record<string, [string, number]> | null } | null, error }
+    }
+    let { row: r, error: errLeve } = await achar('id, exemplo, grade_espelhada_hash')
+    const comLinhas = !errLeve
+    if (errLeve) ({ row: r } = await achar('id, exemplo'))
+    if (!r || r.exemplo) return { tem: false, datas: {}, feitas: [] }
+
     const datas: Record<string, string> = {}
-    for (const [id, v] of Object.entries(r.plano)) if (Array.isArray(v) && typeof v[0] === 'string') datas[id] = v[0]
+    if (comLinhas && r.grade_espelhada_hash) {
+      // LINHAS (plano_meta): só meta_id + data — nada de baixar a grade inteira em JSON
+      for (let from = 0; ; from += 1000) {
+        const { data: rows, error } = await svc.from('simulado_cronograma_adaptativo_plano_meta').select('meta_id, data_prevista')
+          .eq('plano_id', r.id).order('meta_id', { ascending: true }).range(from, from + 999)
+        if (error) { for (const k of Object.keys(datas)) delete datas[k]; break } // falhou no meio → cai no JSON abaixo
+        for (const m of (rows ?? []) as Array<{ meta_id: string; data_prevista: string }>) datas[m.meta_id] = m.data_prevista
+        if (!rows || rows.length < 1000) break
+      }
+    }
+    if (!Object.keys(datas).length) {
+      // fallback: grade em JSON (plano ainda não espelhado, ou migração pendente)
+      const { data: pj } = await svc.from(T).select('plano').eq('id', r.id).maybeSingle()
+      const plano = (pj as { plano: Record<string, [string, number]> | null } | null)?.plano
+      if (!plano || !Object.keys(plano).length) return { tem: false, datas: {}, feitas: [] }
+      for (const [id, v] of Object.entries(plano)) if (Array.isArray(v) && typeof v[0] === 'string') datas[id] = v[0]
+    }
     const { data: metas } = await svc.from('simulado_cronograma_adaptativo_meta').select('meta_id')
       .eq('tenant_id', tenantId).eq('plano_id', r.id).eq('estado', 'done')
     return { tem: true, datas, feitas: ((metas ?? []) as Array<{ meta_id: string }>).map((m) => m.meta_id) }

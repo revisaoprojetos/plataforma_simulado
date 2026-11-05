@@ -486,7 +486,21 @@ export async function carregarMidiaAluno(documentoId: string, alunoId: string): 
  * à do mammoth → a ancoragem dos grifos não muda). Falhou → mantém o html_rico atual (nunca derruba a leitura).
  */
 const MARCA_LP = '<!--lp4-->' // sobe a cada mudança do conversor (lp1 = versão com o bug do sombreamento de parágrafo) → regenera sozinho
-async function garantirHtmlLegproc(svc: any, tenantId: string, documentoId: string, versaoId: string, tipoOrigem: string | undefined): Promise<boolean> {
+// Preparos em andamento (1 por versão): vários alunos abrindo o mesmo doc grande NÃO disparam várias conversões/reconciliações.
+const emPreparoLp = new Map<string, Promise<boolean>>()
+/** Garante o texto convertido SEM travar o aluno: espera até `orcamentoMs`; passado isso o preparo continua em segundo plano
+ *  (o próximo acesso já o encontra pronto) e devolve null → o chamador usa a reserva (PDF/texto simples). */
+async function prepararHtmlLegprocComOrcamento(svc: any, tenantId: string, documentoId: string, versaoId: string, tipoOrigem: string | undefined, orcamentoMs = 20000): Promise<boolean | null> {
+  const chave = `${tenantId}:${versaoId}`
+  let p = emPreparoLp.get(chave)
+  if (!p) {
+    p = garantirHtmlLegproc(svc, tenantId, documentoId, versaoId, tipoOrigem).finally(() => { emPreparoLp.delete(chave) })
+    emPreparoLp.set(chave, p)
+  }
+  return Promise.race([p, new Promise<null>((res) => setTimeout(() => res(null), orcamentoMs))])
+}
+
+export async function garantirHtmlLegproc(svc: any, tenantId: string, documentoId: string, versaoId: string, tipoOrigem: string | undefined): Promise<boolean> {
   try {
     if (tipoOrigem !== 'docx') return false
     // Checa o marcador SEM trazer o html (1+ MB) a cada abertura: só devolve a linha se já começar com a marca atual.
@@ -524,7 +538,7 @@ async function garantirHtmlLegproc(svc: any, tenantId: string, documentoId: stri
     if (up.error) return false
     await esquecer(`leitura-doc:${tenantId}:${documentoId}:${versaoId}`)
     return true
-  } catch { return false /* mantém o html_rico atual */ }
+  } catch (e) { console.error('[legproc] falha ao preparar o texto', documentoId, (e as any)?.message || e); return false /* mantém o html_rico atual */ }
 }
 
 /** Leitura em TEXTO (documento marcado como LegProc): HTML rico com data-uid + grifos por texto do aluno. */
@@ -563,28 +577,25 @@ export async function carregarDocParaLeitura(documentoId: string, alunoId: strin
   const pastaLegproc = !!(doc as any).pasta_id && await (async () => { try { const r = await svc.from(T_PASTA).select('cronograma_tipo_material').eq('tenant_id', tenantId).eq('id', (doc as any).pasta_id).maybeSingle(); return !r.error && (r.data as any)?.cronograma_tipo_material === 'legproc' } catch { return false } })()
   const ehLegproc = !!(marcadoLegproc as any)?.leitura_legproc || pastaLegproc
   const legendaLegproc = !!(marcadoLegproc as any)?.legenda_categorias || ehLegproc
+  // Texto convertido (formatação do professor preservada): usado no LegProc E como RESERVA quando o PDF não pôde ser gerado.
+  const montarTextoConvertido = async (): Promise<DocParaLeitura | null> => {
+    const convertido = await prepararHtmlLegprocComOrcamento(svc, tenantId, documentoId, doc.versao_atual_id, tipoOrigem)
+    if (!convertido) return null
+    // html convertido (cache com a MARCA na chave → nunca serve a conversão antiga) + anotações do aluno (gate já passou acima)
+    const html = await remember<string | undefined>(`leitura-lp:${MARCA_LP}:${tenantId}:${documentoId}:${doc.versao_atual_id}`, 900, async () => {
+      const r = await svc.from('simulado_conteudo_versoes').select('html_rico').eq('tenant_id', tenantId).eq('id', doc.versao_atual_id).maybeSingle()
+      const h = (r.data as any)?.html_rico
+      return typeof h === 'string' && h.startsWith(MARCA_LP) ? h : undefined
+    })
+    if (!html) return null
+    const anotacoes = await listarAnotacoes(documentoId, alunoId)
+    const { ocultarLegendaTabela } = await import('./legproc-legenda')
+    const ocultarLeg = await ocultarLegendaTabela(svc, tenantId, documentoId, (doc as any).pasta_id ?? null)
+    return { kind: 'texto', texto: { documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, html, anotacoes, mostrarLegenda: legendaLegproc, ocultarLegendaTabela: ocultarLeg } }
+  }
   if (ehLegproc) {
-    const convertido = await garantirHtmlLegproc(svc, tenantId, documentoId, doc.versao_atual_id, tipoOrigem)
-    if (convertido) {
-      // html convertido (cache com a MARCA na chave → nunca serve a conversão antiga) + anotações do aluno (gate já passou acima)
-      const html = await remember<string | undefined>(`leitura-lp:${MARCA_LP}:${tenantId}:${documentoId}:${doc.versao_atual_id}`, 900, async () => {
-        const r = await svc.from('simulado_conteudo_versoes').select('html_rico').eq('tenant_id', tenantId).eq('id', doc.versao_atual_id).maybeSingle()
-        const h = (r.data as any)?.html_rico
-        return typeof h === 'string' && h.startsWith(MARCA_LP) ? h : undefined
-      })
-      if (html) {
-        const anotacoes = await listarAnotacoes(documentoId, alunoId)
-        const { ocultarLegendaTabela } = await import('./legproc-legenda')
-        const ocultarLeg = await ocultarLegendaTabela(svc, tenantId, documentoId, (doc as any).pasta_id ?? null)
-        return { kind: 'texto', texto: { documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, html, anotacoes, mostrarLegenda: legendaLegproc, ocultarLegendaTabela: ocultarLeg } }
-      }
-    }
-    const lt = await carregarLeitura(documentoId, alunoId).catch(() => null)
-    if (lt && lt.html && lt.html.trim()) {
-      const { ocultarLegendaTabela } = await import('./legproc-legenda')
-      const ocultarLeg = await ocultarLegendaTabela(svc, tenantId, documentoId, (doc as any).pasta_id ?? null)
-      return { kind: 'texto', texto: { documentoId, titulo: lt.titulo, versaoId: lt.versaoId, html: lt.html, anotacoes: lt.anotacoes, mostrarLegenda: legendaLegproc, ocultarLegendaTabela: ocultarLeg } }
-    }
+    const t = await montarTextoConvertido()
+    if (t) return t // senão (preparo demorado, em segundo plano): segue para o PDF e, se falhar, texto simples
   }
 
   // PDF (fiel): URL (cache 300s por versão) + grifos do aluno + toggle da legenda — tudo em PARALELO.
@@ -596,6 +607,19 @@ export async function carregarDocParaLeitura(documentoId: string, alunoId: strin
     fetchAll<any>(() => svc.from('simulado_conteudo_grifos_pdf').select('id, pagina, rects, cor, tool, nota, texto').eq('tenant_id', tenantId).eq('documento_id', documentoId).eq('aluno_id', alunoId).order('id', { ascending: true })).catch(() => []),
     (async () => { try { const r = await svc.from('simulado_conteudo_documentos').select('legenda_categorias').eq('tenant_id', tenantId).eq('id', documentoId).maybeSingle(); return r.error ? null : r.data } catch { return null } })(),
   ])
+  // RESERVA: PDF indisponível (OnlyOffice fora/cheio/lento ou documento sem PDF guardado) → lê em TEXTO em vez de
+  // mostrar "Material indisponível". O acesso do aluno já foi validado acima; só muda o formato da leitura.
+  if (!pdfUrl && tipoOrigem === 'docx') {
+    const t = await montarTextoConvertido()
+    if (t) return t
+    // último recurso: texto simples (sem a formatação do professor) — melhor que "indisponível"
+    const lt = await carregarLeitura(documentoId, alunoId).catch(() => null)
+    if (lt && lt.html && lt.html.trim()) {
+      const { ocultarLegendaTabela } = await import('./legproc-legenda')
+      const ocultarLeg = await ocultarLegendaTabela(svc, tenantId, documentoId, (doc as any).pasta_id ?? null)
+      return { kind: 'texto', texto: { documentoId, titulo: lt.titulo, versaoId: lt.versaoId, html: lt.html, anotacoes: lt.anotacoes, mostrarLegenda: legendaLegproc, ocultarLegendaTabela: ocultarLeg } }
+    }
+  }
   const grifos: GrifoPdf[] = (grifosRows ?? []).map((g) => ({
     id: g.id, pagina: g.pagina, rects: Array.isArray(g.rects) ? g.rects : [], cor: g.cor || 'y', tool: g.tool || 'hl', nota: g.nota ?? null, texto: g.texto ?? null,
   })).filter((g) => g.rects.length)

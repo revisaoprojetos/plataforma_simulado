@@ -5,7 +5,7 @@
  */
 
 import {
-  Folder, FileText, FileType, Presentation, FileSpreadsheet, Video, Music, type LucideIcon,
+  Folder, FileText, FileType, Presentation, FileSpreadsheet, Video, Music, ListChecks, type LucideIcon,
 } from 'lucide-react'
 import { TIPOS_CONTEUDO, type KindConteudo } from '@/lib/biblioteca/tipos-conteudo'
 import { cn } from '@/lib/utils'
@@ -18,12 +18,13 @@ export function kindDeTipoOrigem(tipoOrigem: string): KindConteudo {
     case 'xlsx': return 'xlsx'
     case 'video': return 'video'
     case 'audio': return 'audio'
+    case 'questoes': return 'questoes'
     default: return 'docx' // docx/html e desconhecidos → documento
   }
 }
 
 const ICONE_POR_KIND: Record<KindConteudo, LucideIcon> = {
-  docx: FileText, pdf: FileType, pptx: Presentation, xlsx: FileSpreadsheet, video: Video, audio: Music,
+  docx: FileText, pdf: FileType, pptx: Presentation, xlsx: FileSpreadsheet, video: Video, audio: Music, questoes: ListChecks,
 }
 
 /** Rótulo humano do tipo (pt-BR). */

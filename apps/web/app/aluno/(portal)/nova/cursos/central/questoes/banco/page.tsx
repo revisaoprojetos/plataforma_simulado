@@ -178,7 +178,7 @@ export default async function BancoPage({ searchParams }: PageProps) {
 
   return (
     <>
-      <Crumbs items={[['Central de Estudos', R.central], ['Questões e Simulados', R.questoes]]} />
+      <Crumbs items={[['Cursos', R.cursos], ['Questões e Simulados', R.questoes], ['Banco de questões', '#']]} />
       <Tabs items={['Simulados', 'Banco de questões', 'Realizados', 'Recomendado']} links={[R.questoes, R.banco, R.realizados, R.recomendado]} active={1} />
 
       <PageHeader eyebrow="Questões" title="Banco de questões" sub="Questões comentadas de procuradorias e carreiras jurídicas." />

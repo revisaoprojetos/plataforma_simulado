@@ -1,12 +1,12 @@
 'use client'
 import { useState } from 'react'
-import { FileText, FileType, Presentation, Table2, Video, Music } from 'lucide-react'
+import { FileText, FileType, Presentation, Table2, Video, Music, ListChecks } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { SeloTipo } from './selo-tipo'
 import { TIPOS_CONTEUDO, seloStyle, type KindConteudo } from '@/lib/biblioteca/tipos-conteudo'
 
 const ICONE: Record<KindConteudo, typeof FileText> = {
-  docx: FileText, pdf: FileType, pptx: Presentation, xlsx: Table2, video: Video, audio: Music,
+  docx: FileText, pdf: FileType, pptx: Presentation, xlsx: Table2, video: Video, audio: Music, questoes: ListChecks,
 }
 // Proporção ÚNICA da capa (mesma altura para todos os tipos) — assim os cards ficam alinhados
 // na grade, sem o vídeo/áudio virarem bandas curtas e desalinhadas ao lado dos documentos.

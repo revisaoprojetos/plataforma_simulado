@@ -13,10 +13,10 @@ export const dynamic = 'force-dynamic'
  * (#fechar-leitura) — o arcade fica congelado atrás e o overlay fecha na hora, reaplicando o gate.
  * Ao concluir, grava `simulado_leitura_progresso` (mesmo motor da leitura do dia) → libera o desafio.
  */
-export default async function JurisLeituraRapidaPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ desafio?: string; embed?: string }> }) {
+export default async function JurisLeituraRapidaPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ desafio?: string; embed?: string; voltar?: string }> }) {
   if (!JURISPRUDENCIA_ATIVA) redirect('/aluno')
   const { id } = await params
-  const { desafio, embed } = await searchParams
+  const { desafio, embed, voltar: voltarParam } = await searchParams
   const sessao = await getSessaoAluno()
   if (!sessao) redirect('/aluno/entrar')
   if (desafio && !(await temAcessoDesafio(sessao.estudanteId, sessao.tenantId, desafio))) notFound()
@@ -25,7 +25,8 @@ export default async function JurisLeituraRapidaPage({ params, searchParams }: {
   const ehEmbed = embed === '1'
   const voltar = ehEmbed
     ? '#fechar-leitura'
-    : (desafio ? `/aluno/jurisprudencia?desafio=${encodeURIComponent(desafio)}` : '/aluno/jurisprudencia')
+    : (typeof voltarParam === 'string' && voltarParam.startsWith('/aluno/') && !voltarParam.startsWith('//') ? voltarParam.slice(0, 200) // ?voltar=: volta p/ quem abriu (ex.: JurisClub)
+      : desafio ? `/aluno/jurisprudencia?desafio=${encodeURIComponent(desafio)}` : '/aluno/jurisprudencia')
   const player = <LeituraRapidaPlayer documentoId={id} versao={doc.versao} html={doc.leituraRapida} titulo={doc.titulo} voltarHref={voltar} desafio={desafio} />
   // EMBED (overlay do arcade): a página está no grupo (portal) → o layout renderiza o shell. Um container
   // FIXO em tela cheia cobre o shell → o iframe mostra só a leitura rápida.

@@ -26,7 +26,7 @@ export type EdicaoItem = {
 }
 type EdicaoResumo = { id: string; nome: string; total: number; lidos: number; pct: number; href: string }
 
-const NAV = ['Início', 'Julgados', 'Meu caderno', 'Edições']
+const NAV = ['Início']
 // Buscas comuns = EXEMPLO (atalhos de UI). // TODO(dados): sugestões reais (termos mais buscados do clube).
 const BUSCAS_COMUNS = ['Servidor público', 'Improbidade', 'Tributário', 'Súmulas do STJ']
 
@@ -118,7 +118,11 @@ export function JurisClub({
           const circleBg = e.estado === 'atual' ? 'var(--brand)' : 'var(--track)'
           const circleFg = e.estado === 'atual' ? '#fff' : 'var(--muted)'
           return (
-            <Card key={e.n} pad={18} style={{ border: `1px solid ${e.estado === 'atual' ? 'var(--brand)' : 'var(--line)'}` }}>
+            <Card key={e.n} pad={18} style={{ position: 'relative', overflow: 'hidden', border: `1px solid ${e.estado === 'atual' ? 'var(--brand)' : 'var(--line)'}` }}>
+              {/* Etapas ainda sem conteúdo: fita "Em breve" e sem clique */}
+              {e.exemplo ? (
+                <span aria-hidden style={{ position: 'absolute', top: 16, right: -34, width: 120, transform: 'rotate(45deg)', background: 'var(--gold)', color: '#1a1333', textAlign: 'center', fontSize: 10.5, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', padding: '3px 0', boxShadow: '0 1px 3px rgba(0,0,0,.25)', pointerEvents: 'none' }}>Em breve</span>
+              ) : null}
               <Row style={{ justifyContent: 'space-between' }}>
                 <span style={{ width: 34, height: 34, borderRadius: '50%', background: circleBg, color: circleFg, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 800 }}>{e.n}</span>
                 {e.estado === 'atual' ? <b style={{ fontSize: 12.5, color: 'var(--brand)' }}>Você está aqui</b> : null}
@@ -134,7 +138,9 @@ export function JurisClub({
                   <Muted size={11.5}>{e.prog}</Muted>
                 </Col>
               ) : null}
-              <a href={e.href} style={{ marginTop: 'auto', fontSize: 12.5, fontWeight: 800, color: 'var(--brand)' }}>{e.link}</a>
+              {e.exemplo
+                ? <span aria-disabled="true" style={{ marginTop: 'auto', fontSize: 12.5, fontWeight: 800, color: 'var(--muted)', cursor: 'not-allowed' }}>{e.link}</span>
+                : <a href={e.href} style={{ marginTop: 'auto', fontSize: 12.5, fontWeight: 800, color: 'var(--brand)' }}>{e.link}</a>}
             </Card>
           )
         })}
@@ -170,7 +176,7 @@ export function JurisClub({
                       <Btn kind="primary" size="sm" href={j.href}>Ler o julgado</Btn>
                     </Row>
                   </Row>
-                  <p style={{ margin: 0, fontSize: 15, fontWeight: 700, lineHeight: 1.5, color: 'var(--ink)' }}>{j.texto || 'Julgado comentado desta edição.'}</p>
+                  <p lang="pt-BR" style={{ margin: 0, fontSize: 15, fontWeight: 700, lineHeight: 1.6, color: 'var(--ink)', textAlign: 'justify', textJustify: 'inter-word', hyphens: 'auto', WebkitHyphens: 'auto', overflowWrap: 'break-word' }}>{j.texto || 'Julgado comentado desta edição.'}</p>
                 </Card>
               ))
             )}
@@ -194,7 +200,7 @@ export function JurisClub({
                       key={d}
                       type="button"
                       onClick={() => setDisc(val)}
-                      style={{ display: 'inline-flex', alignItems: 'center', height: 30, padding: '0 12px', borderRadius: 99, fontSize: 12.5, fontWeight: on ? 800 : 700, cursor: 'pointer', border: `1px solid ${on ? 'var(--brand)' : 'var(--line)'}`, background: on ? 'var(--chip)' : 'var(--surface)', color: on ? 'var(--brand)' : 'var(--muted)' }}
+                      style={{ display: 'inline-flex', alignItems: 'center', minHeight: 30, maxWidth: '100%', padding: '6px 12px', borderRadius: 16, textAlign: 'left', whiteSpace: 'normal', overflowWrap: 'anywhere', lineHeight: 1.25, fontSize: 12.5, fontWeight: on ? 800 : 700, cursor: 'pointer', border: `1px solid ${on ? 'var(--brand)' : 'var(--line)'}`, background: on ? 'var(--chip)' : 'var(--surface)', color: on ? 'var(--brand)' : 'var(--muted)' }}
                     >
                       {d}
                     </button>

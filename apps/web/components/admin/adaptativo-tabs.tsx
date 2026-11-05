@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Lock, SlidersHorizontal, Library } from 'lucide-react'
+import { Lock, SlidersHorizontal, Library, ListChecks } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // Abas do admin do Cronograma Adaptativo (sublinhado, padrão do projeto): Liberação · Metas & inteligência.
@@ -10,6 +10,7 @@ const TABS = [
   { href: '/admin/cronogramas/adaptativo', label: 'Liberação', icon: Lock },
   { href: '/admin/cronogramas/adaptativo/metas', label: 'Metas & inteligência', icon: SlidersHorizontal },
   { href: '/admin/cronogramas/adaptativo/catalogo', label: 'Catálogo de metas', icon: Library },
+  { href: '/admin/cronogramas/adaptativo/definicoes', label: 'Definição e análise', icon: ListChecks },
 ]
 
 export function AdaptativoTabs() {

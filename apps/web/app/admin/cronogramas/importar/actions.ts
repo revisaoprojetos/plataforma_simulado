@@ -15,6 +15,7 @@
  * ou nada.
  */
 
+import { indiceDisciplinasCanonicas } from '@/lib/taxonomia/resolver-nome'
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
@@ -281,10 +282,8 @@ export async function importarLinks(links: LinkImportado[]): Promise<{ ok: boole
  * e poluí-lo com erros de digitação de um arquivo seria pior do que o problema.
  */
 async function indiceDisciplinas(svc: any, tenantId: string): Promise<Map<string, string>> {
-  const { data } = await svc.from('simulado_disciplinas').select('id, nome').eq('tenant_id', tenantId)
-  const mapa = new Map<string, string>()
-  for (const d of ((data ?? []) as any[])) mapa.set(normalizarNome(d.nome), d.id)
-  return mapa
+  // Homônimas → a CANÔNICA (antes "a última ganhava", ao acaso, e o cronograma importava p/ a duplicada = desvinculado).
+  return indiceDisciplinasCanonicas(svc, tenantId)
 }
 
 function normalizarNome(s: string): string {

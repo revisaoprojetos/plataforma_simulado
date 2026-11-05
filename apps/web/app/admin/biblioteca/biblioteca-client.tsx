@@ -34,7 +34,7 @@ import { createClient } from '@/lib/supabase/client'
 import { formatBrt } from '@/lib/brt'
 import {
   listarArvore, criarPasta, removerPasta, renomearPasta, moverPasta, definirCorPasta, moverDocumento,
-  importarDocumento, prepararUploadConteudo, importarDeStorage, criarDocumentoBranco, publicarDocumento, publicarNovaVersao, removerDocumento, detalheDocumento, abrirEdicaoDocx,
+  importarDocumento, prepararUploadConteudo, importarDeStorage, criarDocumentoBranco, criarConteudoQuestoes, publicarDocumento, publicarNovaVersao, removerDocumento, detalheDocumento, abrirEdicaoDocx,
   renomearDocumento, urlDownloadDocumento, listarPastasConteudo, dadosVisualizacao, thumbDocumento, pdfPreviewDocumento, midiaPreviewDocumento, conteudoPreviewAdmin, duplicarDocumento,
   definirPastaDisciplinaCronograma, removerPastaDisciplinaCronograma, definirTipoMaterialSubpasta, definirLegendaTabelaPasta,
   carregarArvoreAcesso, montarArvoreAcessoDrive, salvarAcessoNo, resolverEstudantePorEmail,
@@ -55,6 +55,7 @@ function docKind(tipoOrigem: string): KindConteudo {
   return tipoOrigem === 'pdf' ? 'pdf'
     : tipoOrigem === 'video' ? 'video'
     : tipoOrigem === 'audio' ? 'audio'
+    : tipoOrigem === 'questoes' ? 'questoes'
     : 'docx'
 }
 // Paleta curta para o menu "Mudar cor" da pasta (mesmas cores do protótipo Drive).
@@ -71,6 +72,7 @@ const TIPO_MATERIAL_CRONO: { v: string; rot: string }[] = [
   { v: 'pdfight', rot: 'PDFight' },
   { v: 'pdflash', rot: 'PDFlash' },
   { v: 'legproc', rot: 'LegProc' },
+  { v: 'jurisclub', rot: 'JurisClub' },
   { v: 'questoes', rot: 'Questões' },
 ]
 const rotuloClasse = (v?: string | null) => CLASSIF_CRONO.find((c) => c.v === v)?.rot ?? null
@@ -172,6 +174,7 @@ type Ordenar = 'atualizados' | 'nome' | 'criados'
 
 export function BibliotecaClient() {
   const searchParams = useSearchParams()
+  const routerTopo = useRouter()
   const [categoria, setCategoria] = useState<Categoria>(searchParams.get('tab') === 'modelos' ? 'modelo_caderno' : 'conteudo')
   const ehModelo = categoria === 'modelo_caderno'
   const [pastaAtual, setPastaAtual] = useState<string | null>(null)
@@ -271,6 +274,13 @@ export function BibliotecaClient() {
     const r = await criarDocumentoBranco({ titulo, pastaId: pastaAtual, categoria })
     if (!r.ok) return toast.error(r.error || 'Falha ao criar.')
     toast.success('Documento em branco criado.'); carregar(pastaAtual)
+  }
+  async function novoConjuntoQuestoes() {
+    const titulo = await pedirTexto({ titulo: 'Novo conjunto de questões', placeholder: 'Título do conjunto', confirmar: 'Criar' })
+    if (!titulo) return
+    const r = await criarConteudoQuestoes({ titulo, pastaId: pastaAtual, categoria })
+    if (!r.ok) return toast.error(r.error || 'Falha ao criar.')
+    toast.success('Conjunto de questões criado.'); carregar(pastaAtual)
   }
   // "Gerenciar acessos": dentro de uma pasta → árvore Drive daquela pasta; na raiz → painel hierárquico antigo.
   function abrirGerenciarAcessos() {
@@ -582,6 +592,7 @@ export function BibliotecaClient() {
             onUploadArquivos={(files) => importarArquivos(files, false)}
             onUploadPasta={(files) => importarArquivos(files, true)}
             onDocumentoBranco={novoBranco}
+            onNovoQuestoes={ehModelo ? undefined : novoConjuntoQuestoes}
             onToast={(m) => toast.message(m)}
           />
         </div>
@@ -715,7 +726,7 @@ export function BibliotecaClient() {
                     categoria={categoria}
                     thumbInicial={thumbs[d.id]}
                     restrito={restritoDoc[d.id]}
-                    onAbrir={() => setDetalheId(d.id)}
+                    onAbrir={() => { if (d.tipo_origem === 'questoes') { routerTopo.push(`/admin/biblioteca/conteudo/${d.id}/gerenciar`) } else setDetalheId(d.id) }}
                     onAcesso={() => setAcessoDoc(d)}
                     onCapaPagina={() => setCapaDlg({ tipo: 'documento', id: d.id })}
                     onEditarOffice={() => editarDocOffice(d)}
@@ -961,6 +972,7 @@ function MenuDoc({ d, categoria, onAbrir, onAcesso, onCapaPagina, onEditarOffice
   onAbrir: () => void; onAcesso: () => void; onCapaPagina: () => void; onEditarOffice: () => void; onBaixar: () => void; onRenomear: () => void; onMover: (pastaId: string | null) => void; onArquivar: () => void; onDuplicar: () => void
 }) {
   const router = useRouter()
+  const ehQuestoes = d.tipo_origem === 'questoes'
   const [pastas, setPastas] = useState<{ id: string; nome: string; pai_id: string | null }[] | null>(null)
   const [moverAberto, setMoverAberto] = useState(false)
   async function carregarPastas() { if (!pastas) setPastas(await listarPastasConteudo(categoria)) }
@@ -982,14 +994,16 @@ function MenuDoc({ d, categoria, onAbrir, onAcesso, onCapaPagina, onEditarOffice
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start" className="w-56">
           <DropdownMenuItem onClick={() => router.push(`/admin/biblioteca/conteudo/${d.id}/gerenciar`)}><Settings2 className="mr-2 h-4 w-4" /> Gerenciar</DropdownMenuItem>
-          <DropdownMenuItem onClick={onAbrir}><Info className="mr-2 h-4 w-4" /> Detalhes / versões</DropdownMenuItem>
+          {/* Questões = card que só agrupa questões (sem arquivo/versão): esconde Detalhes/versões,
+              Capa, Office, Cópia e Baixar — não fazem sentido p/ esse tipo. */}
+          {!ehQuestoes && <DropdownMenuItem onClick={onAbrir}><Info className="mr-2 h-4 w-4" /> Detalhes / versões</DropdownMenuItem>}
           {categoria !== 'modelo_caderno' && <DropdownMenuItem onClick={onAcesso}><Users2 className="mr-2 h-4 w-4" /> Acesso dos alunos</DropdownMenuItem>}
-          {categoria !== 'modelo_caderno' && <DropdownMenuItem onClick={onCapaPagina}><ImageIcon className="mr-2 h-4 w-4" /> Capa e página inicial…</DropdownMenuItem>}
+          {categoria !== 'modelo_caderno' && !ehQuestoes && <DropdownMenuItem onClick={onCapaPagina}><ImageIcon className="mr-2 h-4 w-4" /> Capa e página inicial…</DropdownMenuItem>}
           {d.tipo_origem === 'docx' && <DropdownMenuItem onClick={onEditarOffice}><Pencil className="mr-2 h-4 w-4" /> Editar no OnlyOffice</DropdownMenuItem>}
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={copiarLink}><Link2 className="mr-2 h-4 w-4" /> Copiar link</DropdownMenuItem>
-          <DropdownMenuItem onClick={onDuplicar}><Files className="mr-2 h-4 w-4" /> Criar uma cópia</DropdownMenuItem>
-          <DropdownMenuItem onClick={onBaixar}><Download className="mr-2 h-4 w-4" /> Baixar</DropdownMenuItem>
+          {!ehQuestoes && <DropdownMenuItem onClick={onDuplicar}><Files className="mr-2 h-4 w-4" /> Criar uma cópia</DropdownMenuItem>}
+          {!ehQuestoes && <DropdownMenuItem onClick={onBaixar}><Download className="mr-2 h-4 w-4" /> Baixar</DropdownMenuItem>}
           <DropdownMenuItem onClick={onRenomear}><Pencil className="mr-2 h-4 w-4" /> Renomear</DropdownMenuItem>
           <DropdownMenuItem onClick={() => { carregarPastas(); setMoverAberto(true) }}><FolderInput className="mr-2 h-4 w-4" /> Mover para…</DropdownMenuItem>
           <DropdownMenuSeparator />
