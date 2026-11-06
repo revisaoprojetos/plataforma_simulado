@@ -393,7 +393,7 @@ $('var').addEventListener('change', renderLib);
 $('b-att').onclick = atualizar;
 
 if (window.Asc && window.Asc.plugin) {
-  window.Asc.plugin.init = function(){ conectado = true; carregar(); atualizar(); };
+  window.Asc.plugin.init = function(){ conectado = true; carregar(); setTimeout(atualizar, 2500); };
   window.Asc.plugin.button = function(){ this.executeCommand('close',''); };
   window.Asc.plugin.onThemeChanged = function(theme){
     try { if (window.Asc.plugin.onThemeChangedBase) window.Asc.plugin.onThemeChangedBase(theme); } catch (e) {}

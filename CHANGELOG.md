@@ -12,6 +12,22 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.8.0 — 2026-11-06
+
+### Cronograma adaptativo
+- **Horas e minutos (2.15):** a rotina semanal e o "Ajustar horas de um dia" passam a ter dois seletores, **Horas** e **Minutos** (30 min só a partir de 2h; teto 12h na rotina e 24h na exceção por data), no lugar do +/−.
+- **Jurisprudência semanal (2.19) no assistente:** o card "em breve" vira "incluída automaticamente" quando o tenant liga a regra (Metas e inteligência); o card de **Videoaulas** foi removido. O painel da meta de Jurisprudência não mostra mais "Aula" em branco.
+- **Visual das metas:** concluída = fundo **verde suave** (sem tachado); atrasada = fundo **vermelho suave** (token `--late`). **Animação** de cor ao aplicar/tirar (Hoje e Semana; respeita "reduzir movimento").
+- **Questões da meta:** tela com margem própria, cabeçalho em faixa e **barra lateral fixa** (só a coluna das questões rola; altura medida na tela).
+
+### OnlyOffice — plugin Selos
+- Abas **Biblioteca / No documento / Etiquetas**; cadastro de **etiquetas com imagem** e código `<...>` editável (criar/editar/excluir) via a página do editor; o Selos não inicia sozinho (não disputa a barra lateral).
+
+### Migrações
+- Aplicar as pendentes (`20261106000000`…`20261106060000`) no SQL Editor, em ordem, se ainda não aplicadas.
+
+---
+
 ## 4.7.0 — 2026-11-06
 
 ### Cronograma adaptativo — questões da plataforma por meta

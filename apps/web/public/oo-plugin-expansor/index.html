@@ -426,7 +426,7 @@ $('nome').addEventListener('keydown', function(e){ if (e.key==='Enter') marcarIn
 $('sw-faixas').addEventListener('change', function(){ alternarFaixas(this.checked); });
 
 if (window.Asc && window.Asc.plugin) {
-  window.Asc.plugin.init = function(){ conectado = true; atualizar(); };
+  window.Asc.plugin.init = function(){ conectado = true; setTimeout(atualizar, 2500); };
   window.Asc.plugin.button = function(){ this.executeCommand('close',''); };
   window.Asc.plugin.onThemeChanged = function(theme){
     try { if (window.Asc.plugin.onThemeChangedBase) window.Asc.plugin.onThemeChangedBase(theme); } catch (e) {}

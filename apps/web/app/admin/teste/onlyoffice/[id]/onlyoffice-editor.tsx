@@ -39,7 +39,7 @@ export function OnlyOfficeEditor({ id, onlyofficeUrl, wopiHost, preview = false,
           editorConfig.mode = 'view'
         } else {
           editorConfig.callbackUrl = `${wopiHost}/api/teste/onlyoffice/callback/${id}`
-          editorConfig.plugins = { autostart: [PLUGIN_GUID, PLUGIN_AREAS_GUID, PLUGIN_EXPANSOR_GUID], pluginsData: [pluginConfig, pluginAreasConfig, pluginExpansorConfig] }
+          editorConfig.plugins = { autostart: [PLUGIN_GUID], pluginsData: [pluginConfig, pluginAreasConfig, pluginExpansorConfig] }
           // Salvamento MANUAL: desliga o autosave (que salvava direto, às vezes um estado vazio por cima)
           // e liga o botão Salvar / Ctrl+S (force-save). Você salva quando o conteúdo está pronto.
           editorConfig.customization = { autosave: false, forcesave: true }

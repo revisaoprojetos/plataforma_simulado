@@ -145,21 +145,41 @@ export function QuestoesMetaClient({
 
   const tempoMeta = tsegInicial + sessao.seg
 
+  // Desktop: a página ocupa EXATAMENTE o que sobra da tela abaixo do topo (medido, sem número fixo) — só a
+  // coluna das questões rola e a barra lateral fica sempre à vista, sem faixa sobrando nem cortando embaixo.
+  const raiz = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = raiz.current
+    if (!el) return
+    const ajustar = () => {
+      if (!window.matchMedia('(min-width: 1024px)').matches) { el.style.height = ''; return }
+      const topo = el.getBoundingClientRect().top
+      el.style.height = `${Math.max(360, Math.floor(window.innerHeight - topo))}px`
+    }
+    ajustar()
+    window.addEventListener('resize', ajustar)
+    const t = window.setTimeout(ajustar, 300) // depois do shell terminar de montar
+    return () => { window.removeEventListener('resize', ajustar); window.clearTimeout(t) }
+  }, [])
+
   return (
-    <div className="space-y-4">
-      <button type="button" onClick={() => sair()} className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+    // O <main> do shell não tem padding nesta área (cada página traz o seu) e a rolagem dele não serve de
+    // referência p/ `sticky`: no desktop a página tem altura fixa e SÓ a coluna das questões rola — a barra
+    // lateral (tempo/progresso/ações) fica sempre visível.
+    <div ref={raiz} className="space-y-4 px-4 py-5 sm:px-6 lg:flex lg:flex-col lg:space-y-0 lg:gap-4 lg:px-8 lg:pb-4 lg:pt-4">
+      <button type="button" onClick={() => sair()} className="inline-flex w-fit items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
         <ArrowLeft className="h-4 w-4" /> Voltar ao cronograma
       </button>
 
-      <div className="grid items-start gap-5 lg:grid-cols-[minmax(0,1fr)_19rem]">
-        {/* Questões */}
-        <div className="min-w-0 space-y-4">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Questões da plataforma</p>
-            <h1 className="text-2xl font-bold tracking-tight">{titulo || 'Questões da meta'}</h1>
-            <p className="text-sm text-muted-foreground">Filtradas para esta meta · {total.toLocaleString('pt-BR')} {total === 1 ? 'questão' : 'questões'} · responda e confira o gabarito de cada uma.</p>
-          </div>
+      <header className="shrink-0 space-y-1 border-b pb-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-primary">Questões da plataforma</p>
+        <h1 className="text-2xl font-bold tracking-tight">{titulo || 'Questões da meta'}</h1>
+        <p className="text-sm text-muted-foreground">Filtradas para esta meta · {total.toLocaleString('pt-BR')} {total === 1 ? 'questão' : 'questões'} · responda e confira o gabarito de cada uma.</p>
+      </header>
 
+      <div className="grid items-start gap-5 lg:min-h-0 lg:flex-1 lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-stretch">
+        {/* Questões (rolam sozinhas no desktop) */}
+        <div className="min-w-0 space-y-4 lg:overflow-y-auto lg:pb-2 lg:pr-2">
           {questoes.map((q, i) => (
             <QuestaoCard key={q.id} questao={q} numero={(page - 1) * porPagina + i + 1} onResponder={onResponder} />
           ))}
@@ -168,7 +188,7 @@ export function QuestoesMetaClient({
         </div>
 
         {/* Barra lateral: progresso + tempo + ações */}
-        <aside className="order-first space-y-3 lg:order-last lg:sticky lg:top-4">
+        <aside className="order-first space-y-3 lg:order-last lg:overflow-y-auto">
           <div className="rounded-2xl border bg-card p-4 shadow-sm">
             <p className="mb-3 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground"><Clock className="h-3.5 w-3.5" />Tempo</p>
             <div className="text-3xl font-bold tabular-nums tracking-tight">{fmt(sessao.seg)}</div>

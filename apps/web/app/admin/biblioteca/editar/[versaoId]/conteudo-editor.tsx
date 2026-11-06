@@ -42,7 +42,7 @@ export function ConteudoEditor({ versaoId, titulo, documentUrl, onlyofficeUrl, w
           editorConfig.mode = 'view'
         } else {
           editorConfig.callbackUrl = `${wopiHost}/api/conteudo/docs/${versaoId}/callback`
-          editorConfig.plugins = { autostart: [PLUGIN_GUID, PLUGIN_AREAS_GUID, PLUGIN_EXPANSOR_GUID], pluginsData: [pluginConfig, pluginAreasConfig, pluginExpansorConfig, pluginSelosConfig] }
+          editorConfig.plugins = { autostart: [PLUGIN_GUID], pluginsData: [pluginConfig, pluginAreasConfig, pluginExpansorConfig, pluginSelosConfig] }
           editorConfig.customization = { autosave: false, forcesave: true }
         }
         new window.DocsAPI.DocEditor('oo-conteudo', {

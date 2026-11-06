@@ -52,10 +52,12 @@ export default async function QuestoesDaMetaPage({ searchParams }: { searchParam
 
 function Aviso({ voltar, texto }: { voltar: string; texto: string }) {
   return (
-    <div className="flex w-full flex-col items-center gap-3 rounded-2xl border bg-card p-10 text-center shadow-sm">
-      <ListChecks className="h-8 w-8 text-muted-foreground" />
-      <p className="text-sm text-muted-foreground">{texto}</p>
-      <Link href={voltar} className="inline-flex h-10 items-center gap-2 rounded-xl border px-4 text-sm font-medium hover:bg-muted"><ArrowLeft className="h-4 w-4" />Voltar ao cronograma</Link>
+    <div className="px-4 py-5 sm:px-6 lg:px-8 lg:py-6">
+      <div className="flex w-full flex-col items-center gap-3 rounded-2xl border bg-card p-10 text-center shadow-sm">
+        <ListChecks className="h-8 w-8 text-muted-foreground" />
+        <p className="text-sm text-muted-foreground">{texto}</p>
+        <Link href={voltar} className="inline-flex h-10 items-center gap-2 rounded-xl border px-4 text-sm font-medium hover:bg-muted"><ArrowLeft className="h-4 w-4" />Voltar ao cronograma</Link>
+      </div>
     </div>
   )
 }
