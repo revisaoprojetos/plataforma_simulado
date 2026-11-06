@@ -52,6 +52,7 @@ export function AparenciaAuthForm({ tema, salvarTema }: { tema: any; salvarTema:
 
   // Ticker (título animado do login MEQ) — só editável quando o novo login da marca MEQ está ativo;
   // em qualquer outra variação o editor some, mas a config permanece salva (reaparece ao reativar).
+  const corQS = cfg.corMarca && /^#[0-9A-F]{6}$/.test(cfg.corMarca) && (cfg.brand === 'vnd' || cfg.brand === 'mac') ? `&cor=${encodeURIComponent(cfg.corMarca)}` : ''
   const mostrarTicker = cfg.loginAtivo && cfg.brand === 'meq'
   const ticker = cfg.loginTicker
   const setTicker = (patch: Partial<typeof ticker>) => setCfg((c) => ({ ...c, loginTicker: { ...c.loginTicker, ...patch } }))
@@ -119,6 +120,34 @@ export function AparenciaAuthForm({ tema, salvarTema }: { tema: any; salvarTema:
           </div>
         )}
       </section>
+
+      {/* Cor da marca (login + carregamento) — só VND/MAC: leva os verdes da arte para a cor escolhida */}
+      {(cfg.brand === 'vnd' || cfg.brand === 'mac') && (
+        <section className="space-y-2 sm:max-w-xl">
+          <h3 className="text-sm font-semibold">Cor da marca no login e no carregamento</h3>
+          <p className="text-xs text-muted-foreground">
+            Troca os tons da arte (brilhos, símbolo, botões, degradês) pela cor escolhida. Dourado e branco não mudam.
+            Sem cor, vale a paleta padrão da marca ({cfg.brand === 'mac' ? 'bordô' : 'verde'}).
+          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <input type="color" aria-label="Cor da marca" value={cfg.corMarca ?? (cfg.brand === 'mac' ? '#580000' : '#0F7A44')}
+              onChange={(e) => setCfg((c) => ({ ...c, corMarca: e.target.value.toUpperCase() }))}
+              className="h-9 w-12 cursor-pointer rounded-lg border bg-background p-1" />
+            <input type="text" value={cfg.corMarca ?? ''} placeholder="Padrão da marca" maxLength={7}
+              onChange={(e) => { const v = e.target.value.trim(); setCfg((c) => ({ ...c, corMarca: v === '' ? null : v.toUpperCase() })) }}
+              className="h-9 w-32 rounded-lg border bg-background px-2.5 font-mono text-sm uppercase outline-none focus-visible:ring-2 focus-visible:ring-ring" />
+            {cfg.corMarca && (
+              <button type="button" onClick={() => setCfg((c) => ({ ...c, corMarca: null }))}
+                className="text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground">
+                Voltar ao padrão
+              </button>
+            )}
+          </div>
+          {cfg.corMarca && !/^#[0-9A-F]{6}$/.test(cfg.corMarca) && (
+            <p className="text-[11px] text-amber-600 dark:text-amber-400">Use o formato #RRGGBB (ex.: #580000). Enquanto estiver incompleto, o padrão da marca é mantido ao salvar.</p>
+          )}
+        </section>
+      )}
 
       {/* Ativador do NOVO login */}
       <label className="flex items-start gap-3 rounded-xl border bg-muted/20 p-4 cursor-pointer sm:max-w-xl">
@@ -301,13 +330,13 @@ export function AparenciaAuthForm({ tema, salvarTema }: { tema: any; salvarTema:
         </button>
         {/* Abre login/carregamento em nova aba com os estilos atuais (sem precisar salvar). */}
         <a
-          href={`/login/preview?view=login&brand=${cfg.brand}&login=${encodeURIComponent(cfg.loginStyle)}&loading=${encodeURIComponent(cfg.loadingStyle)}&theme=${cfg.defaultTheme}${tickerQS}`}
+          href={`/login/preview?view=login&brand=${cfg.brand}&login=${encodeURIComponent(cfg.loginStyle)}&loading=${encodeURIComponent(cfg.loadingStyle)}&theme=${cfg.defaultTheme}${tickerQS}${corQS}`}
           target="_blank" rel="noreferrer"
           className="inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-muted">
           <ExternalLink className="h-4 w-4" /> Pré-ver login
         </a>
         <a
-          href={`/login/preview?view=loading&brand=${cfg.brand}&login=${encodeURIComponent(cfg.loginStyle)}&loading=${encodeURIComponent(cfg.loadingStyle)}&theme=${cfg.defaultTheme}`}
+          href={`/login/preview?view=loading&brand=${cfg.brand}&login=${encodeURIComponent(cfg.loginStyle)}&loading=${encodeURIComponent(cfg.loadingStyle)}&theme=${cfg.defaultTheme}${corQS}`}
           target="_blank" rel="noreferrer"
           className="inline-flex items-center gap-2 rounded-lg border px-4 py-2.5 text-sm font-medium transition-colors hover:bg-muted">
           <ExternalLink className="h-4 w-4" /> Pré-ver carregamento

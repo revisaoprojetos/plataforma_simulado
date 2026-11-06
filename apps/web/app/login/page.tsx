@@ -36,6 +36,7 @@ export default async function LoginPage() {
           modoInicial="aluno"
           ticker={aparencia.loginTicker}
           marca={aparencia.marca}
+          corMarca={aparencia.corMarca}
         />
       )
     }

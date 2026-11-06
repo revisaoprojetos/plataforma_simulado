@@ -36,6 +36,8 @@ export interface PlatformLoginProps {
   ticker?: { animar: boolean; palavras: string[] } | null
   /** Título central do login (linha 1 + linha 2 + palavra em destaque) — editável no console. */
   marca?: { linha1: string; linha2: string; destaque: string } | null
+  /** Cor da marca escolhida no console (hex) — só VND/MAC. */
+  corMarca?: string | null
 }
 
 export function PlatformLogin({
@@ -50,6 +52,7 @@ export function PlatformLogin({
   modoInicial = 'aluno',
   ticker = null,
   marca = null,
+  corMarca = null,
 }: PlatformLoginProps) {
   const core = useLoginCore({ metodo, preview, modoInicial })
   const common = { theme, core, preview, plataforma, logo, style, ticker, marca }
@@ -62,7 +65,7 @@ export function PlatformLogin({
     <LoginRevisao {...common} />
 
   return (
-    <BrandCorProvider brand={brand}>
+    <BrandCorProvider brand={brand} cor={corMarca}>
       {tela}
       {/* Versão do sistema — canto superior direito do login (as 3 marcas). Oculta no preview. */}
       {!preview && (
@@ -74,7 +77,7 @@ export function PlatformLogin({
         <div className="fixed inset-0 z-[60]">
           {/* brand/theme/style EXPLÍCITOS → o loader resolve SÍNCRONO (sem piscar o NEUTRO_BG) e usa o
               CARREGAMENTO escolhido no console. Sem `style`, caía sempre no fallback da marca (bug). */}
-          <PlatformLoader brand={brand} theme={theme} style={loadingStyle} />
+          <PlatformLoader brand={brand} theme={theme} style={loadingStyle} cor={corMarca} />
         </div>
       )}
     </BrandCorProvider>

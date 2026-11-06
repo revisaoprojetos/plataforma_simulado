@@ -19,6 +19,7 @@ export interface Appearance {
   defaultTheme: Theme
   followSystemTheme: boolean
   loadingMinMs: number | null
+  corMarca?: string | null
 }
 
 export interface UseAppearanceResult extends Appearance {
@@ -109,6 +110,7 @@ function normalizar(data: unknown): Appearance {
     defaultTheme: (d.defaultTheme as Theme) ?? fb.defaultTheme,
     followSystemTheme: d.followSystemTheme === true,
     loadingMinMs: typeof d.loadingMinMs === 'number' ? d.loadingMinMs : null,
+    corMarca: typeof d.corMarca === 'string' && /^#[0-9a-fA-F]{6}$/.test(d.corMarca) ? d.corMarca : null,
   }
 }
 

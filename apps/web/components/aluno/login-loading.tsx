@@ -37,14 +37,14 @@ export function LoginLoading(props: LoginLoadingProps) {
 }
 
 function LoginLoadingResolvido(props: LoginLoadingProps) {
-  const { brand, defaultTheme, loadingStyle, loadingAtivo, loading } = useAppearance()
+  const { brand, defaultTheme, loadingStyle, loadingAtivo, loading, corMarca } = useAppearance()
   // Enquanto a aparência não chega, mostra o genérico (mesmo fundo/cores da marca) — sem flash.
   // Ativador desligado no console (loadingAtivo=false) → modelo genérico legado.
   if (loading || !loadingAtivo || !loadingStyle) return <LoginLoadingGenerico {...props} />
   // `loadingStyle` resolvido → tela de carregamento DA PLATAFORMA. Passamos brand/theme/style
   // (já resolvidos pelo hook) p/ o PlatformLoader resolver SÍNCRONO no 1º paint — sem o fundo
   // NEUTRO roxo nem um novo fetch (era isso que causava o flash de tela roxa no VND).
-  return <PlatformLoader brand={brand} theme={defaultTheme} style={loadingStyle} />
+  return <PlatformLoader brand={brand} theme={defaultTheme} style={loadingStyle} cor={corMarca ?? null} />
 }
 
 /** Modelo GENÉRICO (legado): mesmo fundo/cores da marca do login e o MODELO escolhido na config

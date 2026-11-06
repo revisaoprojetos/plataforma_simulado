@@ -91,6 +91,13 @@ export interface AuthAppearance {
   loginTicker: LoginTicker
   /** Título central do login (linha 1 + linha 2 + palavra em destaque) — editável no console. */
   marca: MarcaLogin
+  /** Cor da marca (hex #RRGGBB) do login/carregamento das marcas VND/MAC; null = paleta padrão da marca. */
+  corMarca: string | null
+}
+
+/** Sanea um hex #RRGGBB (ou null). */
+export function sanearCorMarca(v: unknown): string | null {
+  return typeof v === 'string' && /^#[0-9a-fA-F]{6}$/.test(v.trim()) ? v.trim().toUpperCase() : null
 }
 
 /** Shape público devolvido pelo endpoint pré-login (sem metadados). */
@@ -146,8 +153,9 @@ export function lerAparenciaAuth(
   const internoAtivo = raw.internoAtivo === true
   const loginTicker = sanearTicker(raw.loginTicker)
   const marca = sanearMarca(raw.marca)
+  const corMarca = sanearCorMarca(raw.corMarca)
 
-  return { brand, loginAtivo, loadingAtivo, internoAtivo, loginStyle, loadingStyle, defaultTheme, followSystemTheme, loadingMinMs, loginTicker, marca }
+  return { brand, loginAtivo, loadingAtivo, internoAtivo, loginStyle, loadingStyle, defaultTheme, followSystemTheme, loadingMinMs, loginTicker, marca, corMarca }
 }
 
 /** Projeção pública (lida ANTES do login, sem dados sensíveis). */
@@ -164,6 +172,7 @@ export function aparenciaAuthPublica(a: AuthAppearance): AuthAppearancePublic {
     loadingMinMs: a.loadingMinMs ?? null,
     loginTicker: a.loginTicker,
     marca: a.marca,
+    corMarca: a.corMarca,
   }
 }
 
@@ -186,5 +195,6 @@ export function sanearAparenciaAuth(input: Partial<AuthAppearance>): AuthAppeara
     loadingMinMs: typeof input.loadingMinMs === 'number' && input.loadingMinMs >= 0 ? input.loadingMinMs : null,
     loginTicker: sanearTicker(input.loginTicker),
     marca: sanearMarca(input.marca),
+    corMarca: sanearCorMarca(input.corMarca),
   }
 }

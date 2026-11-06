@@ -44,14 +44,17 @@ export function LoadingVndClassico({
   message,
   simula = false,
   brand = 'vnd',
+  cor = null,
 }: {
   theme?: VndTheme
   message?: string
   simula?: boolean
   /** 'mac' usa o "M"/"ac", textos "Mentoria Além do Corte" e paleta bordô (corMarca). */
   brand?: LoaderMarca
+  /** Cor da marca escolhida no console (hex) — null = paleta padrão. */
+  cor?: string | null
 }) {
-  const cm = (s: string) => corMarca(brand, s)
+  const cm = (s: string) => corMarca(brand, s, cor)
   const mac = brand === 'mac'
   const VPATH = mac ? MAC_M_PATH : VND_V_PATH
   const footColor = cm(FOOT[theme])

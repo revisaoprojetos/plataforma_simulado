@@ -49,6 +49,8 @@ export interface PlatformLoaderProps {
   style?: string
   /** Texto opcional abaixo do indicador (ex.: "Montando seu simulado…"). */
   message?: string
+  /** Cor da marca escolhida no console (hex) — só VND/MAC. Sem ela, vem da aparência semeada. */
+  cor?: string | null
   /**
    * TODO (não usado): tempo mínimo de exibição (ms). O minDisplay é controlado
    * pelo CONSUMIDOR (spec §3.4); exposto aqui só para documentação/encaminhamento.
@@ -56,7 +58,7 @@ export interface PlatformLoaderProps {
   minMs?: number
 }
 
-type Resolved = { brand: Brand; theme: Theme; style?: string }
+type Resolved = { brand: Brand; theme: Theme; style?: string; cor?: string | null }
 
 // Fallback de loading por marca (spec 02 §4).
 const FALLBACK_STYLE: Record<Brand, string> = {
@@ -90,7 +92,7 @@ function brandDoStyle(style?: string): Brand | null {
 /** Fundo do overlay enquanto resolvemos a aparência (NEUTRO, sem marca — dark slate, SEM roxo). */
 const NEUTRO_BG = 'linear-gradient(150deg,var(--pn-12141c,#12141c),var(--pn-181b26,#181b26),var(--pn-1e2230,#1e2230))'
 
-export function PlatformLoader({ brand, theme: themeProp, style, message }: PlatformLoaderProps) {
+export function PlatformLoader({ brand, theme: themeProp, style, message, cor: corProp }: PlatformLoaderProps) {
   const theme = normTheme(themeProp) // aceita light/dark (simulado) → claro/escuro
   // Resolução SÍNCRONA (anti-flash de marca errada, spec 02 §3.3):
   //   1) brand/style vieram por prop → usa na hora.
@@ -102,7 +104,7 @@ export function PlatformLoader({ brand, theme: themeProp, style, message }: Plat
   const [resolved, setResolved] = useState<Resolved | null>(() => {
     if (temInicial) {
       const b = (brand ?? brandDoStyle(style) ?? 'revisao') as Brand
-      return { brand: b, theme: temaValidoPara(b, (theme ?? 'claro') as Theme), style }
+      return { brand: b, theme: temaValidoPara(b, (theme ?? 'claro') as Theme), style, cor: corProp ?? lerAppearanceSemeada()?.corMarca ?? null }
     }
     if (semeada) {
       const b = semeada.brand as Brand
@@ -110,6 +112,7 @@ export function PlatformLoader({ brand, theme: themeProp, style, message }: Plat
         brand: b,
         theme: temaValidoPara(b, (theme ?? semeada.defaultTheme ?? 'claro') as Theme),
         style: style ?? semeada.loadingStyle,
+        cor: corProp ?? semeada.corMarca ?? null,
       }
     }
     return null
@@ -127,6 +130,7 @@ export function PlatformLoader({ brand, theme: themeProp, style, message }: Plat
           brand: b,
           theme: temaValidoPara(b, (theme ?? d.defaultTheme ?? 'claro') as Theme),
           style: style ?? d.loadingStyle,
+          cor: corProp ?? (typeof d.corMarca === 'string' ? d.corMarca : null),
         })
       })
       .catch(() => {
@@ -157,7 +161,7 @@ export function PlatformLoader({ brand, theme: themeProp, style, message }: Plat
 }
 
 /** Escolhe o componente de loading pelo slug (fallback → por marca). */
-function Inner({ brand, theme, style, message }: Resolved & { message?: string }) {
+function Inner({ brand, theme, style, message, cor }: Resolved & { message?: string }) {
   const slug = style ?? FALLBACK_STYLE[brand]
 
   switch (slug) {
@@ -174,9 +178,10 @@ function Inner({ brand, theme, style, message }: Resolved & { message?: string }
     case 'rev-loading-circuito-quadrados':
       return <LoadingRevisaoCircuito theme={theme as RevisaoCircTheme} message={message} quadrados />
     case 'vnd-loading-classico':
-      return <LoadingVndClassico theme={theme as VndTheme} message={message} />
+      // brand repassado: tenant MAC com slug 'vnd-*' (fallback) NÃO pode cair no verde do VND
+      return <LoadingVndClassico theme={theme as VndTheme} message={message} brand={brand === 'mac' ? 'mac' : 'vnd'} cor={cor} />
     case 'vnd-loading-classico-simula':
-      return <LoadingVndClassico theme={theme as VndTheme} message={message} simula />
+      return <LoadingVndClassico theme={theme as VndTheme} message={message} simula brand={brand === 'mac' ? 'mac' : 'vnd'} cor={cor} />
     case 'vnd-loading-circuito':
       return <LoadingVndCircuito theme={theme as VndCircTheme} message={message} />
     case 'vnd-loading-circuito-simula':
@@ -189,14 +194,14 @@ function Inner({ brand, theme, style, message }: Resolved & { message?: string }
       return <LoadingMeqCircuito theme={theme as MeqTheme} message={message} />
     case 'mac-loading-classico':
       // MAC reaproveita o loader do VND (mesma animação), bordô + "M"/"ac" + textos MAC.
-      return <LoadingVndClassico theme={theme as VndTheme} message={message} brand="mac" />
+      return <LoadingVndClassico theme={theme as VndTheme} message={message} brand="mac" cor={cor} />
     default:
       // Slug ainda não portado (ver TODO no topo) → fallback DA MARCA.
       switch (brand) {
         case 'vnd':
-          return <LoadingVndClassico theme={theme as VndTheme} message={message} />
+          return <LoadingVndClassico theme={theme as VndTheme} message={message} cor={cor} />
         case 'mac':
-          return <LoadingVndClassico theme={theme as VndTheme} message={message} brand="mac" />
+          return <LoadingVndClassico theme={theme as VndTheme} message={message} brand="mac" cor={cor} />
         case 'meq':
           return <LoadingMeqCircuito theme={theme as MeqTheme} message={message} />
         case 'revisao':

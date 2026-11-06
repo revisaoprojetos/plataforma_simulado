@@ -76,6 +76,10 @@ function hexParaRgbChave(hex: string): string {
 
 // Mapa unificado de hex (RRGGBB maiúsculo → RRGGBB bordô).
 const HEX_MAP = new Map<string, string>(HEX_PARES.map(([v, m]) => [v, m]))
+// Os verdes que a tabela só lista em rgb() (ex.: 22C56E, 34C88C, 78E6AA, 8CF0B9, 2ED278) também aparecem em HEX
+// dentro de `var(--pn-xxxxxx,#XXXXXX)` — sem isto ficavam VERDES no MAC (glows/"M" do login e do loading).
+const rgbParaHex = (t: string) => t.split(',').map((n) => (+n).toString(16).padStart(2, '0')).join('').toUpperCase()
+for (const [v, m] of RGB_PARES) { const h = rgbParaHex(v); if (!HEX_MAP.has(h)) HEX_MAP.set(h, rgbParaHex(m)) }
 
 // Mapa unificado de rgb ("r,g,b" → "r,g,b"), incluindo os triplets derivados da
 // tabela hex — assim uma rgba() cujo triplet casa com uma entrada hex também converte.
@@ -98,8 +102,44 @@ const RE_COR = /#([0-9a-fA-F]{6})\b|#([0-9a-fA-F]{3})\b|rgba?\(\s*(\d+)\s*,\s*(\
  * não são 'mac', devolve o valor intacto (identidade). Tokens fora da tabela ficam
  * inalterados.
  */
-export function corMarca(brand: Brand | null | undefined, valor: string): string {
-  if (brand !== 'mac' || !valor) return valor
+function hexParaHsl(hex: string): { h: number; s: number; l: number } {
+  const r = parseInt(hex.slice(1, 3), 16) / 255, g = parseInt(hex.slice(3, 5), 16) / 255, b = parseInt(hex.slice(5, 7), 16) / 255
+  const mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn, l = (mx + mn) / 2
+  let h = 0
+  if (d) h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4
+  return { h: (h * 60 + 360) % 360, s: d ? d / (1 - Math.abs(2 * l - 1)) : 0, l }
+}
+function hslParaRgb(h: number, s: number, l: number): [number, number, number] {
+  const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = l - c / 2
+  const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x]
+  return [Math.round((r + m) * 255), Math.round((g + m) * 255), Math.round((b + m) * 255)]
+}
+
+/**
+ * COR ESCOLHIDA no console (login/carregamento): leva todo VERDE da marca VND (matiz 80–185°, saturado) para o
+ * matiz da cor escolhida, mantendo luminosidade e proporção de saturação — então brilhos, "M"/"V", botões e
+ * degradês seguem a cor sem precisar de tabela por cor. Dourado/branco/cinzas (fora dessa faixa) ficam como estão.
+ */
+function aplicarCorEscolhida(valor: string, cor: string): string {
+  const alvo = hexParaHsl(cor)
+  return valor.replace(RE_COR, (match, hex6, hex3, r, g, b, a) => {
+    let rgb: [number, number, number]
+    if (hex6) rgb = [parseInt(hex6.slice(0, 2), 16), parseInt(hex6.slice(2, 4), 16), parseInt(hex6.slice(4, 6), 16)]
+    else if (hex3) { const h = expandirHex3(hex3); rgb = [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)] }
+    else if (r !== undefined) rgb = [+r, +g, +b]
+    else return match
+    const hsl = hexParaHsl('#' + rgb.map((n) => n.toString(16).padStart(2, '0')).join(''))
+    if (hsl.s < 0.12 || hsl.h < 80 || hsl.h > 185) return match
+    const [nr, ng, nb] = hslParaRgb(alvo.h, Math.min(1, hsl.s * (alvo.s / 0.7)), hsl.l)
+    return r !== undefined ? (a !== undefined ? `rgba(${nr},${ng},${nb},${a})` : `rgb(${nr},${ng},${nb})`)
+      : '#' + [nr, ng, nb].map((n) => n.toString(16).padStart(2, '0')).join('').toUpperCase()
+  })
+}
+
+export function corMarca(brand: Brand | null | undefined, valor: string, cor?: string | null): string {
+  if (!valor) return valor
+  if (cor && (brand === 'mac' || brand === 'vnd')) return aplicarCorEscolhida(valor, cor)
+  if (brand !== 'mac') return valor
   return valor.replace(RE_COR, (match, hex6, hex3, r, g, b, a) => {
     if (hex6) {
       const mapped = HEX_MAP.get(hex6.toUpperCase())
@@ -125,10 +165,11 @@ export function corMarca(brand: Brand | null | undefined, valor: string): string
 // ─────────────────────────────────────────────────────────────────────────────
 
 const BrandCorContext = createContext<Brand | null>(null)
+const CorEscolhidaContext = createContext<string | null>(null)
 
 /** Envolve a subárvore de uma marca para habilitar a conversão de cor (só 'mac' converte). */
-export function BrandCorProvider({ brand, children }: { brand: Brand | null; children: ReactNode }) {
-  return <BrandCorContext.Provider value={brand}>{children}</BrandCorContext.Provider>
+export function BrandCorProvider({ brand, cor = null, children }: { brand: Brand | null; cor?: string | null; children: ReactNode }) {
+  return <BrandCorContext.Provider value={brand}><CorEscolhidaContext.Provider value={cor}>{children}</CorEscolhidaContext.Provider></BrandCorContext.Provider>
 }
 
 /**
@@ -138,7 +179,8 @@ export function BrandCorProvider({ brand, children }: { brand: Brand | null; chi
  */
 export function useCm(): (valor: string) => string {
   const brand = useContext(BrandCorContext)
-  return (valor: string) => corMarca(brand, valor)
+  const cor = useContext(CorEscolhidaContext)
+  return (valor: string) => corMarca(brand, valor, cor)
 }
 
 /** Marca ativa no contexto (null fora de um provider). Útil p/ trocar o símbolo (V→M). */

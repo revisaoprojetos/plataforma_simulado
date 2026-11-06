@@ -38,28 +38,9 @@ export function HeaderMarca({ cls }: { cls?: string }) {
   )
 }
 
-/** Botão "Ajuda" fantasma (desktop). */
-export function AjudaBtn({ cls }: { cls?: string }) {
-  return (
-    <a
-      className={cls}
-      href="#"
-      onClick={(e) => e.preventDefault()}
-      aria-label="Ajuda"
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: 8, height: 38, padding: '0 14px',
-        borderRadius: 999, border: '1px solid rgba(255,255,255,.14)', color: 'var(--pn-d4eadd,#D4EADD)',
-        fontSize: 13, fontWeight: 600, textDecoration: 'none',
-      }}
-    >
-      <svg viewBox="0 0 24 24" aria-hidden="true" width={16} height={16}
-        fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round">
-        <circle cx={12} cy={12} r={10} />
-        <path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01" />
-      </svg>
-      Ajuda
-    </a>
-  )
+/** Botão "Ajuda" REMOVIDO do login (pedido do usuário, todas as plataformas) — mantido como no-op p/ não mexer nos layouts. */
+export function AjudaBtn(_props: { cls?: string }) {
+  return null
 }
 
 /**

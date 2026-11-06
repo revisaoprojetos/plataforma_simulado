@@ -12,6 +12,13 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.6.0 — 2026-11-06
+
+- **Login/carregamento da Mentoria Além do Corte (MAC) sem o verde do VND:** a conversão verde→bordô (`lib/brand/cor-marca.tsx`) não cobria 5 verdes que a tabela só listava em `rgb()` (`#22C56E`, `#34C88C`, `#78E6AA`, `#8CF0B9`, `#2ED278`) — brilhos, setas e contorno do "M" ficavam verdes. Agora toda cor da tabela `rgb()` vale também em hex. O carregamento com slug `vnd-loading-classico` num tenant MAC também respeita a marca (antes saía verde).
+- **Console (Configurações → aparência de login/carregamento): "Cor da marca"** (VND/MAC): seletor + hex + "Voltar ao padrão". Leva os verdes da arte do login e do carregamento para a cor escolhida (troca de matiz, mantém luminosidade); dourado/branco não mudam. Guardado em `tema.aparencia_auth.corMarca` (sem migração) e refletido nas pré-visualizações.
+- Pré-visualização do console reconhece a marca MAC (antes caía na Revisão).
+- **Removido o botão "Ajuda"** do canto superior do login (logins VND/MAC; Revisão/MEQ já não tinham).
+
 ## 4.5.1 — 2026-11-05
 
 - **Correção (build do CI):** o build da 4.5.0 falhava no Next/Turbopack com `Export FiltroDef/DefAnalise doesn't exist in target module`. O arquivo `use server` do Cronograma Adaptativo (`actions.ts`) reexportava tipos (`export type { DefAnalise, FiltroDef }`), que não existem em tempo de execução; o `tsc` aceitava, o Turbopack não. O reexport foi removido e a tela de Definições importa o tipo direto de `lib/cronograma/adaptativo/meta-def`. Sem mudança de comportamento. **A 4.5.0 não gerou imagem — use a 4.5.1** (tem tudo da 4.5.0).

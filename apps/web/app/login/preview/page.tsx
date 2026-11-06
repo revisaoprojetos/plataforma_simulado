@@ -22,11 +22,12 @@ export default async function LoginPreviewPage({
   const sp = await searchParams
   const str = (k: string) => (Array.isArray(sp[k]) ? sp[k]?.[0] : sp[k]) as string | undefined
 
-  const brand = (['revisao', 'vnd', 'meq'].includes(str('brand') ?? '') ? str('brand') : 'revisao') as Brand
+  const brand = (['revisao', 'vnd', 'mac', 'meq'].includes(str('brand') ?? '') ? str('brand') : 'revisao') as Brand
   const cat = catalogoDaMarca(brand)
   const theme = (temaValido(brand, str('theme') as Theme) ? str('theme') : cat.fallback.theme) as Theme
   const loginStyle = loginSlugValido(brand, str('login') ?? '') ? (str('login') as string) : cat.fallback.login
   const loadingStyle = loadingSlugValido(brand, str('loading') ?? '') ? (str('loading') as string) : cat.fallback.loading
+  const corQ = /^#[0-9a-fA-F]{6}$/.test(str('cor') ?? '') ? (str('cor') as string) : null
   const view = str('view') === 'loading' ? 'loading' : 'login'
 
   // Ticker do título (MEQ) — palavras vêm por query (`words=a|b|c`) p/ o preview refletir as edições
@@ -35,7 +36,7 @@ export default async function LoginPreviewPage({
   const ticker = palavras.length ? { animar: str('animar') === '1', palavras } : null
 
   if (view === 'loading') {
-    return <PlatformLoader brand={brand} theme={theme} style={loadingStyle} message="Pré-visualização do carregamento" />
+    return <PlatformLoader brand={brand} theme={theme} style={loadingStyle} cor={corQ} message="Pré-visualização do carregamento" />
   }
 
   return (
@@ -48,6 +49,7 @@ export default async function LoginPreviewPage({
       plataforma={cat.nome}
       modoInicial="aluno"
       ticker={ticker}
+      corMarca={corQ}
     />
   )
 }
