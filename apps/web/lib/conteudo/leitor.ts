@@ -619,7 +619,9 @@ export async function carregarDocParaLeitura(documentoId: string, alunoId: strin
     const ocultarLeg = await ocultarLegendaTabela(svc, tenantId, documentoId, (doc as any).pasta_id ?? null)
     return { kind: 'texto', texto: { documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, html: f.html, anotacoes, mostrarLegenda: legendaLegproc, ocultarLegendaTabela: ocultarLeg, modeloJuris: (doc as any).categoria === 'jurisclub' } }
   }
-  if (ehLegproc) {
+  // MODELO DE JURISPRUDÊNCIA (categoria 'jurisclub'): SEMPRE em texto — é o leitor que recebe as adaptações (seções
+  // expansivas, selos, tabelas fiéis). O PDF não as comporta; só cai nele se o HTML não puder ser preparado.
+  if (ehLegproc || (doc as any).categoria === 'jurisclub') {
     const t = await montarTextoConvertido()
     if (t) return t // senão (preparo demorado, em segundo plano): segue para o PDF e, se falhar, texto simples
   }

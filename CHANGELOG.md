@@ -12,6 +12,16 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.9.2 — 2026-11-06
+
+### Cronograma adaptativo
+- **Meta de Questões não abre mais o PDFull da matéria** (relato de aluno): "Iniciar meta"/"Abrir material" abrem a tela de questões da plataforma (quando há filtro configurado) ou só iniciam o cronômetro; o cronômetro flutuante também não aponta mais para o PDFull. Vale para Questões e Revisão de Questões.
+
+### Modelos de jurisprudência (JurisClub)
+- Documentos do JurisClub abrem **sempre no leitor em texto** (recebem seções expansivas, selos e tabelas fiéis) e deixam de mostrar a **folha em branco no final** do PDF. Só cai no PDF se o texto não puder ser preparado.
+
+---
+
 ## 4.9.1 — 2026-11-06
 
 ### Correção urgente — Cronograma adaptativo

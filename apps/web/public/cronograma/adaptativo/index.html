@@ -2366,7 +2366,7 @@ body.embed .flut{display:none}
  const EMB = window.top !== window; if (!EMB) return;
  let VOLTOU = null;
  const avisar = () => { try { parent.postMessage({ type: 'rej-crono-sessao', s: estado() }, '*'); } catch (e) {} };
- function item(id){ const i = info(id); return { id, tipo: i.tipo, nome: nomeMeta(id, i), tit: titulo(i), disc: i.disc || '', aula: i.aula || '', pags: i.pags || null, h: horasDe(id), doc: i.doc || null, lp: i.tipo === 'lp' ? (i.texto || '') : null }; }
+ function item(id){ const i = info(id); return { id, tipo: i.tipo, nome: nomeMeta(id, i), tit: titulo(i), disc: i.disc || '', aula: i.aula || '', pags: i.pags || null, h: horasDe(id), doc: (i.tipo === 'qu' || i.tipo === 'rq') ? null : (i.doc || null), lp: i.tipo === 'lp' ? (i.texto || '') : null }; }
  function estado(){ if (!FOCO) return null; return Object.assign(item(FOCO.id), { run: !!RUN, seg: Math.floor(decorrido(FOCO.id)), plan: Math.round(horasDe(FOCO.id) * 3600) }); }
  // URL do material da meta no leitor v2 (Biblioteca do aluno). Aula PDFull → documento da Biblioteca,
  // já na PÁGINA inicial daquela meta/parte (?pagina=N) — parte 2 abre direto onde a parte 1 terminou.
@@ -2389,7 +2389,11 @@ body.embed .flut{display:none}
  }
  // Abre na MESMA aba: pede ao portal (React) para navegar via router → mostra a barra de carregamento
  // e abre o conteúdo no leitor v2. Sem window.open (evita abrir 2x / nova aba).
- function abrirMaterial(id, rever){ const url = urlMaterial(id, rever); const f = faixaPaginas(id); try { parent.postMessage({ type: 'rej-crono-abrir', item: item(id), url: url, pagina: f ? f.ini : null }, '*'); } catch (e) {} }
+ function abrirMaterial(id, rever){
+   // Meta de QUESTÕES (qu/rq): NÃO abre o PDFull da aula. Com filtro da plataforma configurado → tela de questões da
+   // plataforma; sem filtro → só inicia o cronômetro (o aluno usa os links QConcursos/TEC do cartão).
+   const ti = info(id); if (ti && (ti.tipo === 'qu' || ti.tipo === 'rq')) { try { abrirQuestoesPlat(id); } catch (e) {} return; }
+   const url = urlMaterial(id, rever); const f = faixaPaginas(id); try { parent.postMessage({ type: 'rej-crono-abrir', item: item(id), url: url, pagina: f ? f.ini : null }, '*'); } catch (e) {} }
  const _iniciar = iniciarMeta;
  iniciarMeta = function(id){ VOLTOU = null; _iniciar(id); FOCO.min = true; desenharFoco(); renderTudo(); avisar(); };
  /* clique em "Iniciar meta" / "Em andamento" dentro do app: inicia (ou retoma) e abre o material */
