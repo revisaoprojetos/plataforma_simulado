@@ -152,7 +152,16 @@ export function MetasClient({ inicial }: { inicial: PainelMetas }) {
         <Bloco titulo="Jurisprudência semanal (versão 2.19)" desc="Uma meta geral de Jurisprudência por semana de atividade, preferindo sexta ou sábado. Vale só para planos gerados ou recalculados depois de ligar; ela ocupa tempo do aluno, então os planos ficam um pouco mais longos.">
           <Chave ligado={p.jurisprudencia219} onChange={(v) => set('jurisprudencia219', v)}
             titulo="Meta semanal de Jurisprudência" desc="Reserva o tempo antes de distribuir o conteúdo da semana. Semana sem estudo não recebe; semana com estudo mas sem um dia que comporte a meta avisa o aluno para ajustar a rotina." />
+          <Chave ligado={p.jurisTagsImagem} onChange={(v) => set('jurisTagsImagem', v)}
+            titulo="Converter <tags> em imagens de selo na leitura" desc="Na leitura do aluno, troca marcadores como <repercussão geral> ou <entendimento consolidado> pela imagem do selo cadastrado na Biblioteca de tags. Útil para documentos que não foram montados com o plugin Selos no editor. Desligado = o texto aparece como está. Vale na hora, sem recalcular planos." />
+          <Chave ligado={p.jurisTitulosExpansivos} onChange={(v) => set('jurisTitulosExpansivos', v)}
+            titulo="Seções dos títulos expansivas e recolhíveis" desc="Na leitura do aluno, cada título e tudo o que vem abaixo dele, até o próximo título, vira uma área expansiva e recolhível no estilo do JurisClub. O que fica antes do primeiro título (nome do julgado, tags e quadro do entendimento) não muda. Vale na hora, sem recalcular planos." />
           {p.jurisprudencia219 && <Num {...c} k="jurisprudenciaMin" label="Duração da meta" min={15} max={180} un="min" hint="Padrão 60 min (versão 2.19)." />}
+        </Bloco>
+
+        <Bloco titulo="Histórico do aluno (versões 2.13 e 2.17)" desc="Vale só para planos gerados ou recalculados depois de ligar. Quem responde Sim em &quot;Já estuda pelo Revisão?&quot; passa a ter os temas anteriores diagnosticados por questões.">
+          <Chave ligado={p.historicoDiagnostico219} onChange={(v) => set('historicoDiagnostico219', v)}
+            titulo="Diagnóstico e reforço dos temas anteriores" desc="2 metas de questões por semana (3 a partir de 24h) para os temas já estudados das matérias selecionadas. Ao concluir, o aluno informa questões e erros: abaixo de 50% gera PDFull de reforço, de 50% a menos de 70% gera PDFlash, 70% ou mais encerra o diagnóstico." />
         </Bloco>
 
         <Bloco titulo="Inteligência de desempenho" desc="Usa o grau de dificuldade e os acertos que o aluno anotou para priorizar temas fracos.">

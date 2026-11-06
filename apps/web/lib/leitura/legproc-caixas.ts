@@ -33,7 +33,7 @@ function marcarInclusos(cont: HTMLElement) {
   }
 }
 
-export function prepararHtmlLegproc(html: string): string {
+export function prepararHtmlLegproc(html: string, opts?: { juris?: boolean }): string {
   if (typeof document === 'undefined' || !html) return html
   try {
     const cont = document.createElement('div')
@@ -42,9 +42,21 @@ export function prepararHtmlLegproc(html: string): string {
     cont.innerHTML = html
     document.body.appendChild(cont)
     try {
+      if (opts?.juris) {
+        // MODELO DE JURISPRUDÊNCIA: nada de caixa recolhível. Tabelas (termos, entendimento…) ficam NORMAIS, com a cor fiel
+        // do documento (o fundo já vem inline); a de transcrição de ARTIGO fica na metade direita (`tabela-artigo`).
+        // As seções dos títulos viram áreas expansivas no servidor (titulos-expansivos.ts).
+        for (const t of Array.from(cont.querySelectorAll<HTMLTableElement>('table'))) {
+          const ini = (t.querySelector('td,th')?.textContent || '').replace(/\s+/g, ' ').trim()
+          t.classList.add(/^[\s"“”'‘’]*arts?\b/i.test(ini) ? 'tabela-artigo' : 'tabela-fiel')
+        }
+        marcarInclusos(cont)
+        marcarLegendaDoc(cont)
+        return cont.innerHTML
+      }
       prepararCaixasTabela(cont, BLOCOS_TABELA_LEGPROC, undefined, { generico: true, exigirFundo: false, corFiel: true })
       prepararCaixasParagrafo(cont, BLOCOS_LEGPROC)
-      prepararTabelasColapsaveis(cont) // as tabelas que restarem (sem faixa de título) também recolhem/expandem
+      prepararTabelasColapsaveis(cont, { artigoNormal: !!opts?.juris }) // as tabelas que restarem (sem faixa de título) também recolhem/expandem
       // …e começam RECOLHIDAS (como as demais caixas): na leitura enxuta nada fica como "tabela normal" aberta
       for (const t of Array.from(cont.querySelectorAll<HTMLElement>('.tabela-colapsavel'))) {
         t.removeAttribute('data-aberto')

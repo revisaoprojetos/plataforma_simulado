@@ -67,6 +67,12 @@ export interface ParamsAdaptativo {
   jurisprudencia219: boolean
   /** Duração da meta semanal de Jurisprudência (min). */
   jurisprudenciaMin: number
+  /** Leitura do aluno: converte `<tag>` (ex.: <repercussão geral>) na imagem do selo da Biblioteca de tags. */
+  jurisTagsImagem: boolean
+  /** Leitura do aluno: cada título de seção + o conteúdo abaixo dele vira uma área expansiva/recolhível. */
+  jurisTitulosExpansivos: boolean
+  /** Histórico ("Já estuda pelo Revisão?" = Sim): diagnóstico dos temas anteriores (2–3 metas/semana) e reforço pelo resultado. */
+  historicoDiagnostico219: boolean
 }
 
 /** Valores 2.8 (defaults). Mexer aqui muda o comportamento base de TODOS os tenants — prefira a config por tenant. */
@@ -96,6 +102,9 @@ export const PARAMS_PADRAO: ParamsAdaptativo = {
   revisaoPorResultado218: false,
   jurisprudencia219: false,
   jurisprudenciaMin: 60,
+  jurisTagsImagem: true,
+  jurisTitulosExpansivos: true,
+  historicoDiagnostico219: false,
 }
 
 const inteiro = (v: unknown, def: number, min: number, max: number): number => {
@@ -141,6 +150,9 @@ export function normalizarParams(raw: unknown): ParamsAdaptativo {
     revisaoPorResultado218: r.revisaoPorResultado218 === true,
     jurisprudencia219: r.jurisprudencia219 === true,
     jurisprudenciaMin: inteiro(r.jurisprudenciaMin, p.jurisprudenciaMin, 15, 180),
+    jurisTagsImagem: r.jurisTagsImagem !== false,
+    jurisTitulosExpansivos: r.jurisTitulosExpansivos !== false,
+    historicoDiagnostico219: r.historicoDiagnostico219 === true,
   }
 }
 

@@ -326,8 +326,10 @@ export async function removerPasta(id: string): Promise<{ ok: boolean; error?: s
 // Config "na Biblioteca, por pasta" (decisão do usuário). Uma pasta pode virar DISCIPLINA do Cronograma
 // (garante a simulado_disciplinas pelo NOME da pasta + classificação) e suas SUBpastas marcam o TIPO de
 // material. Reusa o modelo de disciplinas-actions (classificacao mora em simulado_disciplinas).
+/** Pastas classificáveis (disciplina / tipo de material / legenda): Biblioteca normal E JurisClub. */
+const AREAS_CLASSIFICAVEIS = ['conteudo', 'conteudo_jurisclub']
 const CLASS_CRONO = ['essencial', 'complementar', 'especifica'] as const
-const TIPOS_MATERIAL_CRONO = ['pdfull', 'pdfight', 'pdflash', 'legproc', 'questoes'] as const
+const TIPOS_MATERIAL_CRONO = ['pdfull', 'pdfight', 'pdflash', 'legproc', 'jurisclub', 'questoes'] as const
 
 /** Marca a pasta como DISCIPLINA do cronograma: garante a simulado_disciplinas (pelo nome da pasta, ou
  *  a já existente de mesmo nome), vincula `simulado_pastas.disciplina_id` e grava a classificação. */
@@ -335,7 +337,7 @@ export async function definirPastaDisciplinaCronograma(pastaId: string, input: {
   const g = await guard('update'); if (!g.ok) return g
   if (!pastaId) return { ok: false, error: 'Pasta ausente.' }
   const svc = createAdminClient()
-  const { data: pasta } = await svc.from(PASTAS).select('id, nome, disciplina_id').eq('tenant_id', g.tenantId).eq('id', pastaId).eq('folder_area', 'conteudo').maybeSingle()
+  const { data: pasta } = await svc.from(PASTAS).select('id, nome, disciplina_id').eq('tenant_id', g.tenantId).eq('id', pastaId).in('folder_area', AREAS_CLASSIFICAVEIS).maybeSingle()
   if (!pasta) return { ok: false, error: 'Pasta inválida.' }
   const classificacao = input.classificacao && (CLASS_CRONO as readonly string[]).includes(input.classificacao) ? input.classificacao : null
 
@@ -368,7 +370,7 @@ export async function removerPastaDisciplinaCronograma(pastaId: string): Promise
   const g = await guard('update'); if (!g.ok) return g
   if (!pastaId) return { ok: false, error: 'Pasta ausente.' }
   const svc = createAdminClient()
-  const { data: pasta } = await svc.from(PASTAS).select('id, disciplina_id').eq('tenant_id', g.tenantId).eq('id', pastaId).eq('folder_area', 'conteudo').maybeSingle()
+  const { data: pasta } = await svc.from(PASTAS).select('id, disciplina_id').eq('tenant_id', g.tenantId).eq('id', pastaId).in('folder_area', AREAS_CLASSIFICAVEIS).maybeSingle()
   if (!pasta) return { ok: false, error: 'Pasta inválida.' }
   const { error } = await svc.from(PASTAS).update({ disciplina_id: null }).eq('tenant_id', g.tenantId).eq('id', pastaId)
   if (error) return { ok: false, error: error.message }
@@ -385,7 +387,7 @@ export async function definirTipoMaterialSubpasta(pastaId: string, tipo: string 
   const valor = tipo && (TIPOS_MATERIAL_CRONO as readonly string[]).includes(tipo) ? tipo : null
   if (tipo && !valor) return { ok: false, error: 'Tipo de material inválido.' }
   const svc = createAdminClient()
-  const { data: pasta } = await svc.from(PASTAS).select('id').eq('tenant_id', g.tenantId).eq('id', pastaId).eq('folder_area', 'conteudo').maybeSingle()
+  const { data: pasta } = await svc.from(PASTAS).select('id').eq('tenant_id', g.tenantId).eq('id', pastaId).in('folder_area', AREAS_CLASSIFICAVEIS).maybeSingle()
   if (!pasta) return { ok: false, error: 'Pasta inválida.' }
   const { error } = await svc.from(PASTAS).update({ cronograma_tipo_material: valor }).eq('tenant_id', g.tenantId).eq('id', pastaId)
   if (error) return { ok: false, error: /column .* does not exist|cronograma_tipo_material|schema cache/i.test(error.message) ? 'Rode a migração do cronograma por pasta (coluna cronograma_tipo_material).' : error.message }
@@ -400,7 +402,7 @@ export async function definirLegendaTabelaPasta(pastaId: string, ocultar: boolea
   const g = await guard('update'); if (!g.ok) return g
   if (!pastaId) return { ok: false, error: 'Pasta ausente.' }
   const svc = createAdminClient()
-  const { data: pasta } = await svc.from(PASTAS).select('id').eq('tenant_id', g.tenantId).eq('id', pastaId).eq('folder_area', 'conteudo').maybeSingle()
+  const { data: pasta } = await svc.from(PASTAS).select('id').eq('tenant_id', g.tenantId).eq('id', pastaId).in('folder_area', AREAS_CLASSIFICAVEIS).maybeSingle()
   if (!pasta) return { ok: false, error: 'Pasta inválida.' }
   const { error } = await svc.from(PASTAS).update({ legproc_ocultar_legenda: ocultar }).eq('tenant_id', g.tenantId).eq('id', pastaId)
   if (error) return { ok: false, error: /column .* does not exist|legproc_ocultar_legenda|schema cache/i.test(error.message) ? 'Rode a migração da legenda do LegProc (20261104150000).' : error.message }

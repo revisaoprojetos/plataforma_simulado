@@ -55,7 +55,7 @@ export function LeitorBiblioteca({
 }: {
   documentoId: string; versaoId: string; titulo: string; pdfUrl: string | null
   /** Documento LegProc: lê em TEXTO (HTML rico) com STF/STJ recolhíveis, em vez do PDF fiel. */
-  texto?: { html: string; grifos: GrifoTexto[]; ocultarLegendaTabela?: boolean }
+  texto?: { html: string; grifos: GrifoTexto[]; ocultarLegendaTabela?: boolean; modeloJuris?: boolean }
   grifos: GrifoPdf[]; voltarHref?: string; paginaInicial?: number; paginaMinima?: number
   partesCrono?: ParteCrono[]; metaCrono?: string; tempoBase?: number
   /** Tempo DETERMINADO da meta (planejado, segundos) → contagem regressiva no leitor; 0 = sem. */ tempoDeterminadoSeg?: number
@@ -171,7 +171,7 @@ export function LeitorBiblioteca({
   const htmlProc = useRef<string | null>(null)
   const htmlTexto = useCallback(() => {
     if (!texto) return ''
-    if (htmlProc.current === null) htmlProc.current = prepararHtmlLegproc(texto.html)
+    if (htmlProc.current === null) htmlProc.current = prepararHtmlLegproc(texto.html, { juris: !!texto.modeloJuris })
     return htmlProc.current
   }, [texto])
 
@@ -192,6 +192,7 @@ export function LeitorBiblioteca({
         paginaInicial: d.paginaInicial || 1,
         paginaMinima: d.paginaMinima || 1, // 1ª página que entra na leitura (as anteriores não são montadas nem contadas)
         partes: d.partesCrono || [], metaAtual: d.metaCrono || '',
+        modeloJuris: !!texto?.modeloJuris, // só os modelos de jurisprudência ganham o estilo próprio (títulos roxos, seções expansivas…)
         grifosRevisaoLigados: !!texto,
         ocultarLegendaDoc: !!texto && texto.ocultarLegendaTabela !== false, // tabela de legenda do início do doc (repete a barra de legendas)
         inclusosRevisao: !!texto, // botão "Inclusos Revisão" (tabelas / entendimentos / Já cobrado) — só no LegProc em texto

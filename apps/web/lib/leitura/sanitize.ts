@@ -123,7 +123,7 @@ function serialize(node: any): string {
 // Resolve o MIOLO de um marcador ("rg", "Repercussão Geral", "rg ic") no HTML da tag da Biblioteca.
 // Aceita (1) nome/slug cadastrado, (2) APELIDO curto dos selos padrão (rg, ffp…) quando o selo desse slug
 // está cadastrado e (3) sufixo de variante `sm`/`ic` (selo menor / só ícone) — só vale p/ selos <span data-selo>.
-function htmlDoMarcador(miolo: string, mapaTags: Record<string, string>): string | null {
+export function htmlDoMarcador(miolo: string, mapaTags: Record<string, string>): string | null {
   let termo = normalizarTermoTag(miolo)
   let variante = ''
   const v = /^(.*\S)\s+(sm|ic)$/.exec(termo)

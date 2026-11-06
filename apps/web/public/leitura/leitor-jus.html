@@ -950,12 +950,30 @@ html,body,.scroller,.side-in,.pane,.mr-scroll,.menu,.palette .res,.law-pop,.rail
 .bib-flow .caixa-colapsavel table{margin:6px 0}
 .bib-flow .caixa-colapsavel p{background:transparent!important}
 /* tabelas SOLTAS recolhíveis: card FIXO (igual aberto/fechado — nada "pula" na animação), cabeçalho sempre no fluxo, rótulo "Tabela" via CSS */
-.bib-flow .tabela-colapsavel{position:relative;color:inherit;font-size:.95em;border:1px solid #8a8a93!important;background:#f3f3f6!important;border-radius:8px;padding:8px 12px!important;margin:8px 0}
+.bib-flow .tabela-colapsavel{position:relative;color:inherit;font-size:.95em;border:1px solid #8a8a93;background:#f3f3f6;border-radius:8px;padding:8px 12px!important;margin:8px 0}
+.bib-flow:not(.modelo-juris) .tabela-colapsavel{border:1px solid #8a8a93!important;background:#f3f3f6!important} /* demais documentos: cinza fixo como antes; modelos de jurisprudência respeitam a cor do documento */
 .bib-flow .tabela-colapsavel > .caixa-cab{color:inherit;font-weight:700;font-size:.9em;padding:0 26px 0 0!important}
 .bib-flow .tabela-colapsavel > .caixa-cab > :first-child{color:inherit!important;white-space:nowrap}
 .bib-flow .tabela-colapsavel > .caixa-cab > :first-child::before{content:"Tabela";font-weight:700}
+.bib-flow.modelo-juris .tabela-colapsavel > .caixa-cab > :first-child::before{content:none}
+.bib-flow.modelo-juris table.tabela-fiel{width:100%;margin:12px 0;border-collapse:collapse;border:1px solid color-mix(in srgb,#8a8a93 70%,transparent);border-radius:6px}
+.bib-flow.modelo-juris table.tabela-fiel :is(th,td){padding:10px 14px;vertical-align:top}
+.bib-flow.modelo-juris table.tabela-fiel :is(th,td) p{margin:.35em 0}
+.bib-flow.modelo-juris table.tabela-artigo{width:50%;min-width:300px;margin:10px 0 10px auto}
+@media (max-width:720px){.bib-flow.modelo-juris table.tabela-artigo{width:100%;min-width:0}}
 .bib-flow .tabela-colapsavel > .caixa-cab::before{opacity:.9;color:inherit}
 .bib-flow .tabela-colapsavel > .caixa-corpo .caixa-corpo-in > table{margin:0;width:100%}
+.bib-flow.modelo-juris .tabela-colapsavel.box-unica > .caixa-corpo .caixa-corpo-in :is(table,thead,tbody,tr,td,th){border:0!important;box-shadow:none!important}
+.bib-flow.modelo-juris .tabela-colapsavel.box-unica > .caixa-corpo .caixa-corpo-in :is(td,th){padding-left:0;padding-right:0}
+.bib-flow.modelo-juris :is(h1,h2,h3,h4,h5,h6){color:var(--accent);text-align:left}
+/* Seção por título (JurisClub): título + conteúdo abaixo = área expansiva/recolhível */
+.bib-flow.modelo-juris details.sec-tit{margin:14px 0;border:1px solid var(--accent-line,#d3cbf3);border-radius:12px;background:var(--bg-card,transparent);padding:0 20px}
+.bib-flow.modelo-juris details.sec-tit>summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.bib-flow.modelo-juris details.sec-tit>summary::-webkit-details-marker{display:none}
+.bib-flow.modelo-juris details.sec-tit>summary>:is(h1,h2,h3){margin:14px 0!important;flex:1 1 auto;min-width:0;font-size:1.25rem!important;line-height:1.3!important;font-weight:700}
+.bib-flow.modelo-juris details.sec-tit>summary::after{content:"";flex:none;width:9px;height:9px;border-right:2px solid var(--accent);border-bottom:2px solid var(--accent);transform:rotate(45deg);transition:transform .25s ease;margin-right:4px}
+.bib-flow.modelo-juris details.sec-tit[open]>summary::after{transform:rotate(-135deg)}
+.bib-flow.modelo-juris details.sec-tit>.sec-corpo{padding:0 0 12px}
 /* "Inclusos Revisão" desligado = leitura enxuta: some tudo que o Revisão incluiu (tabelas, caixas STF/STJ/Não esqueça, "Já cobrado em prova") */
 #article.hide-leg-doc .bib-flow [data-leg-doc]{display:none!important}
 #article.hide-inc .bib-flow table,#article.hide-inc .bib-flow .caixa-colapsavel,#article.hide-inc .bib-flow [data-inc]{display:none!important}
@@ -1571,7 +1589,7 @@ function renderBiblioteca(){
     $('#article').addEventListener('click',toggleCaixa);
     $('#article').addEventListener('keydown',e=>{if(e.key!=='Enter'&&e.key!==' ')return;if(!(e.target&&e.target.closest&&e.target.closest('.caixa-cab')))return;e.preventDefault();toggleCaixa(e)});
   }
-  $('#article').innerHTML=`<section class="sec" id="t1" data-title="${esc(titulo)}" data-cite="${esc(titulo)}"><div class="flow bib-flow">${safe}</div></section>`; /* sem o título extra: o documento já traz o próprio cabeçalho */
+  $('#article').innerHTML=`<section class="sec" id="t1" data-title="${esc(titulo)}" data-cite="${esc(titulo)}"><div class="flow bib-flow${CFG.modeloJuris?' modelo-juris':''}">${safe}</div></section>`; /* sem o título extra: o documento já traz o próprio cabeçalho */
 }
 
 // ── Cronograma Adaptativo: divisórias de PARTE entre as páginas ──────────────────────────────

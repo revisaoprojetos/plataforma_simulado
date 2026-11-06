@@ -172,11 +172,15 @@ export const prepararCaixasCobrado = prepararCaixasParagrafo
  * linha. Só MOVE a tabela pra dentro do corpo (posição e ordem preservadas → espinha dos grifos intacta).
  * Idempotente (pula tabelas já dentro de uma caixa). Recolhido por clique no cabeçalho.
  */
-export function prepararTabelasColapsaveis(cont: HTMLElement): () => void {
+export function prepararTabelasColapsaveis(cont: HTMLElement, opts?: { artigoNormal?: boolean }): () => void {
   for (const tab of Array.from(cont.querySelectorAll<HTMLTableElement>('table'))) {
     try {
       // Já dentro de uma caixa (ENTENDIMENTO multi-col) ou já embrulhada → não mexe.
       if (tab.closest('.caixa-colapsavel')) continue
+
+      // artigoNormal (LegProc): tabela de transcrição de ARTIGO ("Art. 37, CF/88 …") NÃO recolhe — fica como tabela
+      // normal, na metade da largura (classe `tabela-artigo`, estilizada pelo leitor).
+      if (opts?.artigoNormal && /^[\s"“”'‘’]*arts?\b/i.test((tab.querySelector('td,th')?.textContent || '').replace(/\s+/g, ' ').trim())) { tab.classList.add('tabela-artigo'); continue }
 
       // Tabela de 1 COLUNA (box/citação de artigo) NÃO é tabela comparativa → marca p/ o CSS não
       // aplicar o verde das comparativas e renderizar fiel ao HTML (transparente + cor inline da fonte).

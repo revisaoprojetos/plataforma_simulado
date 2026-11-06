@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Columns3, Filter, FileSpreadsheet, Download, Upload, Loader2, Check, X, TriangleAlert } from 'lucide-react'
+import { Columns3, Filter, FileSpreadsheet, FileText, Download, Upload, Loader2, Check, X, TriangleAlert } from 'lucide-react'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { CAMPOS_META, CAMPOS_MULTI, listaMulti, normTexto, type CampoMeta, type Metadados } from '@/lib/conteudo/metadados'
@@ -86,6 +86,7 @@ export function BarraMetadados({
   const [menuCols, setMenuCols] = useState(false)
   const [painelFiltros, setPainelFiltros] = useState(false)
   const [exportando, setExportando] = useState(false)
+  const [gerandoPdf, setGerandoPdf] = useState(false)
   const [dlgImport, setDlgImport] = useState(false)
   const [importando, setImportando] = useState(false)
   const [resultado, setResultado] = useState<ResultadoImport | null>(null)
@@ -112,6 +113,22 @@ export function BarraMetadados({
   }, [docIds, metadados])
   const nFiltros = Object.values(filtros).filter(Boolean).length
   const temOpcoes = Object.keys(opcoes).length > 0
+
+  /** Pré-gera o PDF fiel (cores/fontes) dos docs do escopo; repete sozinho até zerar `restantes`. */
+  async function preGerarPdfs() {
+    setGerandoPdf(true)
+    try {
+      let falhas = 0
+      for (let volta = 0; volta < 20; volta++) {
+        const r = await fetch('/api/admin/biblioteca/pre-gerar-pdf', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ categoria, pasta: pastaId }) })
+        const j = await r.json().catch(() => null)
+        if (!j?.ok) { toast.error(j?.error || 'Falha ao preparar os PDFs.'); return }
+        falhas = j.falhas
+        if (!j.restantes) { j.falhas ? toast.warning(`PDFs prontos, mas ${j.falhas} documento(s) falharam: ${(j.falhou || []).slice(0, 3).join('; ')}`) : toast.success(`PDFs prontos (${j.total} documento(s)).`); return }
+      }
+      toast.info(falhas ? 'Ainda há documentos pendentes — clique novamente.' : 'Ainda há documentos pendentes — clique novamente para continuar.')
+    } catch { toast.error('Falha de rede ao preparar os PDFs.') } finally { setGerandoPdf(false) }
+  }
 
   async function exportar() {
     setExportando(true)
@@ -187,6 +204,9 @@ export function BarraMetadados({
         <div className="ml-auto flex items-center gap-2">
           <button type="button" className={btn} onClick={exportar} disabled={exportando} title={`Exporta os conteúdos de ${escopoRotulo} em Excel`}>
             {exportando ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Exportar planilha
+          </button>
+          <button type="button" className={btn} onClick={preGerarPdfs} disabled={gerandoPdf} title={`Prepara o PDF com a formatação original (cores e fontes) de ${escopoRotulo}, para abrir rápido para o aluno`}>
+            {gerandoPdf ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />} Preparar PDFs
           </button>
           <button type="button" className={btn} onClick={() => { setResultado(null); setDlgImport(true) }} title={`Atualiza metadados de ${escopoRotulo} a partir de uma planilha`}>
             <Upload className="h-4 w-4" /> Importar planilha

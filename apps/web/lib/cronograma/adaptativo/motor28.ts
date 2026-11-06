@@ -50,7 +50,7 @@ export interface ItemLP {
 }
 
 export interface Remanejada { desde: DataISO; minutos: number; geracao?: string | null; detalhe?: Detalhe }
-export interface Detalhe { continuacao?: boolean; pai?: string; origem?: string; paginaInicio?: number; paginaFim?: number; totalPaginas?: number; artigo?: string; deslocada?: boolean; geracao?: string | null; jurisprudencia?: boolean }
+export interface Detalhe { continuacao?: boolean; pai?: string; origem?: string; paginaInicio?: number; paginaFim?: number; totalPaginas?: number; artigo?: string; deslocada?: boolean; geracao?: string | null; jurisprudencia?: boolean; historico?: boolean; reforco?: boolean }
 
 export interface Cfg28 {
   start: DataISO
@@ -113,6 +113,8 @@ export interface ParamsMotor28 {
   pdfInteiro218?: boolean; revisaoPorResultado218?: boolean
   /** 2.19: meta semanal de Jurisprudência (desligada por padrão) e sua duração em minutos (padrão 60). */
   jurisprudencia219?: boolean; jurisprudenciaMin?: number
+  /** 2.13/2.17: diagnóstico dos temas anteriores ("Já estuda pelo Revisão?" = Sim) e reforço pelo resultado (desligado por padrão). */
+  historicoDiagnostico219?: boolean
 }
 export interface ParamsResolvido {
   velPadrao: number
@@ -128,6 +130,7 @@ export interface ParamsResolvido {
   desempenho: { ativo: boolean; peso: number; acertoMin: number }
   regras218: { pdfInteiro: boolean; revisaoPorResultado: boolean }
   juris: { ativo: boolean; min: number }
+  historico: { ativo: boolean }
 }
 export function resolverParams(p?: ParamsMotor28 | null): ParamsResolvido {
   const q = p || {}
@@ -146,6 +149,7 @@ export function resolverParams(p?: ParamsMotor28 | null): ParamsResolvido {
     legproc: { metasDia: num(q.lpMetasDia, 4), discDia: num(q.lpDiscDia, 2), mesmaDisc: num(q.lpMesmaDisc, 2) },
     desempenho: { ativo: q.usarDesempenhoNoPlano === true, peso: Math.max(0, num(q.pesoDesempenho, 1)), acertoMin: num(q.acertoMin, 60) },
     regras218: { pdfInteiro: q.pdfInteiro218 === true, revisaoPorResultado: q.revisaoPorResultado218 === true },
+    historico: { ativo: q.historicoDiagnostico219 === true },
     juris: { ativo: q.jurisprudencia219 === true, min: Math.min(180, Math.max(15, Math.round(num(q.jurisprudenciaMin, 60)))) },
   }
 }
@@ -341,6 +345,9 @@ export function indicesAnteriores(cfg: Cfg28, AS: AulaAS[]): Set<number> {
   return out
 }
 const tipoEstudo = (id: string) => id.split(':')[0]
+/** 2.13: diagnóstico de tema anterior (`qu:<aula>:hist:<semana>`) e reforço do diagnóstico (`pf|fl:<aula>:reforco:<semana>`). */
+export const ehHist = (id: string) => /^qu:\d+:hist:\d+$/.test(id)
+export const ehReforco = (id: string) => /^(pf|fl):\d+:reforco:\d+$/.test(id)
 const ehPdf = (t: string) => t === 'pf' || t === 'pp'
 const indiceAula = (id: string) => { const p = id.split(':'); return +p[/^r[fq]$/.test(p[0]) ? 2 : 1] }
 const copiar = <T>(x: T): T => JSON.parse(JSON.stringify(x ?? {}))
@@ -712,7 +719,7 @@ function gerarPlanoNucleo(cfg: Cfg28, AS: AulaAS[], LP: ItemLP[], fixos: Plano, 
   }
   // gerarPlanoCatalogo: fila de aulas sem o histórico prévio; metas remanejadas ficam presas na data pedida
   const anteriores = indicesAnteriores(c, AS)
-  const ehAnterior = (id: string) => /^(pf|pp|fl|qu|rf|rq):/.test(id) && anteriores.has(indiceAula(id))
+  const ehAnterior = (id: string) => !ehHist(id) && !ehReforco(id) && /^(pf|pp|fl|qu|rf|rq):/.test(id) && anteriores.has(indiceAula(id))
   const presos: Plano = Object.fromEntries(Object.entries(fixos).filter(([id]) => !ehAnterior(id) || feitas.has(id)))
   for (const [id, r] of Object.entries(remanejadas)) {
     if (presos[id] || ehAnterior(id)) continue
@@ -733,12 +740,13 @@ function gerarPlanoNucleo(cfg: Cfg28, AS: AulaAS[], LP: ItemLP[], fixos: Plano, 
   catch { return { ...g, detalhes } } // sem disponibilidade p/ o dominó: fica a distribuição base
 }
 
-// ── 2.19: Jurisprudência semanal (meta geral `jp:<semana>`, 60 min, 1× por semana de atividade) ─────────────
-// Desligada por padrão (params.jurisprudencia219). Fora do núcleo: o plano é gerado com a hora JÁ descontada da
-// capacidade dos dias reservados, e as reservas são reunidas ao plano no fim (como o dominó da 2.19).
+// ── Reservas por semana (fora do núcleo): Jurisprudência semanal (2.19) + diagnóstico do histórico (2.13) ─────────
+// O plano é gerado com o tempo reservado JÁ descontado da capacidade dos dias escolhidos (horasPontuais) e as reservas
+// são reunidas ao plano no fim (como o dominó da 2.19). Ambas desligadas por padrão: sem elas o plano é idêntico.
 export const ehJuris219 = (id: string) => id.startsWith('jp:')
+type Reserva = { id: string; valor: [DataISO, number] }
 
-function reservarJuris219(cfg: Cfg28, sem: number, desde: DataISO, fonte: Plano, feitas: Set<string>, minPadrao: number): { id: string; valor: [DataISO, number] } | null {
+function reservarJuris219(cfg: Cfg28, sem: number, desde: DataISO, fonte: Plano, feitas: Set<string>, minPadrao: number, usados: Record<DataISO, number>): Reserva | null {
   const ini = semInicio(cfg.start, sem), fimSem = dAdd(ini, 6)
   const ids = Object.keys(fonte).filter((id) => ehJuris219(id) && fonte[id][0] >= ini && fonte[id][0] <= fimSem)
   const concluida = ids.find((id) => feitas.has(id))
@@ -752,51 +760,122 @@ function reservarJuris219(cfg: Cfg28, sem: number, desde: DataISO, fonte: Plano,
   const ocupada = (d: DataISO) => Object.entries(fonte).filter(([k, v]) => !ehJuris219(k) && feitas.has(k) && v[0] === d).reduce((s, [, v]) => s + v[1] * 60, 0)
   const datas = Array.from({ length: 7 }, (_, k) => dAdd(ini, k)).filter((d) => d >= cfg.start && d >= desde)
   if (!datas.some((d) => horasDia(cfg, d) > 0)) return null // semana sem estudo não recebe a reserva
-  const livre = (d: DataISO) => horasDia(cfg, d) * 60 - ocupada(d)
+  const livre = (d: DataISO) => horasDia(cfg, d) * 60 - ocupada(d) - (usados[d] || 0)
   const dias = datas.filter((d) => livre(d) >= minutos)
+  let escolhido: DataISO | undefined
   if (rem) {
     if (!dias.includes(rem[1].desde)) throw Error('Não há tempo disponível para a meta de Jurisprudência na data escolhida.')
-    return { id, valor: [rem[1].desde, minutos / 60] }
+    escolhido = rem[1].desde
+  } else {
+    const ordenar = (a: DataISO, b: DataISO) => livre(b) - livre(a) || a.localeCompare(b)
+    const preferidos = dias.filter((d) => [4, 5].includes(dDow(d))).sort(ordenar) // sexta e sábado
+    escolhido = preferidos[0] || [...dias].sort(ordenar)[0]
+    // semana já em andamento (dias anteriores a `desde` ficaram para trás): sem dia que caiba, não trava a reorganização
+    if (!escolhido && ini < desde) return null
+    if (!escolhido) throw Error('A semana ' + sem + ' precisa de um dia com ' + minutos + ' min disponíveis para Jurisprudência. Ajuste a rotina ou as horas dessa semana.')
   }
-  const ordenar = (a: DataISO, b: DataISO) => livre(b) - livre(a) || a.localeCompare(b)
-  const preferidos = dias.filter((d) => [4, 5].includes(dDow(d))).sort(ordenar) // sexta e sábado
-  const d = preferidos[0] || [...dias].sort(ordenar)[0]
-  // semana já em andamento (dias anteriores a `desde` ficaram para trás): sem dia que caiba, não trava a reorganização
-  if (!d && ini < desde) return null
-  if (!d) throw Error('A semana ' + sem + ' precisa de um dia com ' + minutos + ' min disponíveis para Jurisprudência. Ajuste a rotina ou as horas dessa semana.')
-  return { id, valor: [d, minutos / 60] }
+  usados[escolhido] = (usados[escolhido] || 0) + minutos
+  return { id, valor: [escolhido, minutos / 60] }
+}
+
+/** Alvo global semanal de diagnósticos do histórico: 2 metas abaixo de 24h na semana, 3 a partir de 24h. */
+export function metaSemanalHistorico(cfg: Cfg28, sem: number): number {
+  const ini = semInicio(cfg.start, sem)
+  return Array.from({ length: 7 }, (_, k) => horasDia(cfg, dAdd(ini, k)) * 60).reduce((a, b) => a + b, 0) >= 24 * 60 ? 3 : 2
+}
+
+function reservarDiagnostico(cfg: Cfg28, sem: number, desde: DataISO, fonte: Plano, feitas: Set<string>, fila: number[], usados: Record<DataISO, number>): Reserva[] {
+  const out: Reserva[] = []
+  if (ehRev(cfg, sem)) return out // semana de revisão não recebe diagnóstico
+  const ini = semInicio(cfg.start, sem)
+  const datas = Array.from({ length: 7 }, (_, k) => dAdd(ini, k)).filter((d) => d >= cfg.start && d >= desde)
+  const existentes = Object.keys(fonte).filter((id) => ehHist(id) && feitas.has(id) && semDe(cfg.start, fonte[id][0]) === sem).length
+  const ocupada = (d: DataISO) => Object.entries(fonte).filter(([k, v]) => !ehJuris219(k) && feitas.has(k) && v[0] === d).reduce((s, [, v]) => s + v[1] * 60, 0)
+  const livre = (d: DataISO) => horasDia(cfg, d) * 60 - ocupada(d) - (usados[d] || 0)
+  const concentrado = perfilSemana(cfg, sem).concentrado
+  for (let n = existentes; n < metaSemanalHistorico(cfg, sem) && fila.length; n++) {
+    // não tira o tempo do PDFull da semana: precisa sobrar ao menos 30 min além do diagnóstico
+    if (datas.reduce((t, d) => t + Math.max(0, livre(d)), 0) < 30 + (cfg.metas.pf ? 30 : 0)) break
+    const d = datas.filter((x) => livre(x) >= 30)
+      .sort((a, b) => (+(b === concentrado)) - (+(a === concentrado)) || horasDia(cfg, b) - horasDia(cfg, a) || a.localeCompare(b))[0]
+    if (!d) break
+    const i = fila.shift() as number
+    usados[d] = (usados[d] || 0) + 30
+    out.push({ id: `qu:${i}:hist:${sem}`, valor: [d, 0.5] })
+  }
+  return out
+}
+
+/**
+ * Reforço pelo RESULTADO do diagnóstico (2.13 §7.4), derivado das anotações (res/err) a cada geração — sem estado extra:
+ * <50% → PDFull da aula inteira · 50% até <70% → PDFlash · ≥70% nada. Começa na PRÓXIMA semana civil da conclusão
+ * e entra como meta remanejada (continuidade primeiro no dia; o dominó divide o PDFull em partes se não couber).
+ */
+function reforcosDerivados(cfg: Cfg28, AS: AulaAS[], fixos: Plano, feitas: Set<string>, notas: Record<string, NotaTema> | null | undefined, base: DataISO, P: ParamsResolvido): Record<string, Remanejada> {
+  const out: Record<string, Remanejada> = {}
+  for (const id of feitas) {
+    if (!ehHist(id) || !fixos[id]) continue
+    const n = notas?.[id], total = +(n?.res || 0), erros = +(n?.err || 0)
+    if (!n || !Number.isInteger(total) || !Number.isInteger(erros) || total <= 0 || erros < 0 || erros > total) continue
+    const nivel = classificarResultado218((total - erros) / total * 100) // percentual exato
+    if (nivel === 'ok') continue
+    const i = indiceAula(id), disc = AS[i]?.[0]
+    if (!disc) continue
+    const tipo: 'pf' | 'fl' = nivel === 'pf' || P.semFlash.has(disc) ? 'pf' : 'fl'
+    const rid = `${tipo}:${i}:reforco:${id.split(':')[3]}`
+    if (feitas.has(rid) || fixos[rid] && feitas.has(rid)) continue
+    const proxima = dAdd(dMon(fixos[id][0]), 7) // próxima semana civil da conclusão
+    const desde = proxima < base ? base : proxima
+    const pags = +(AS[i]?.[3] || 60)
+    out[rid] = tipo === 'pf'
+      ? { desde, minutos: minPdf(pags, cfg.vel, P.velPadrao), detalhe: { continuacao: true, pai: rid, origem: id, reforco: true, paginaInicio: 1, paginaFim: pags, totalPaginas: pags } }
+      : { desde, minutos: P.dur.fl, detalhe: { continuacao: true, pai: rid, origem: id, reforco: true } }
+  }
+  return out
 }
 
 export function gerarPlano(cfg: Cfg28, AS: AulaAS[], LP: ItemLP[], fixos: Plano, ancora: DataISO | null, ctx: Contexto = {}): ResultadoPlano {
   const P = resolverParams(ctx.params)
-  if (!P.juris.ativo) return gerarPlanoNucleo(cfg, AS, LP, fixos, ancora, ctx) // flag desligada = plano idêntico
+  const anteriores = indicesAnteriores(cfg, AS)
+  const hist = P.historico.ativo && anteriores.size > 0
+  if (!P.juris.ativo && !hist) return gerarPlanoNucleo(cfg, AS, LP, fixos, ancora, ctx) // regras desligadas = plano idêntico
   fixos = fixos || {}
   const feitas = new Set(ctx.feitas || [])
   const base = ancora && ancora > cfg.start ? ancora : cfg.start
   const normal: Plano = {}, passadas: Plano = {}
   for (const [id, v] of Object.entries(fixos)) {
-    if (!ehJuris219(id)) normal[id] = v
-    else if (v[0] < base || feitas.has(id)) passadas[id] = v
+    if (ehJuris219(id)) { if (P.juris.ativo && (v[0] < base || feitas.has(id))) passadas[id] = v; continue }
+    if (ehHist(id) && !feitas.has(id)) continue // diagnóstico ainda não feito: volta para a fila e é replanejado
+    normal[id] = v
   }
-  const cfgN: Cfg28 = { ...cfg, remanejadas: Object.fromEntries(Object.entries(cfg.remanejadas || {}).filter(([id]) => !ehJuris219(id))) }
+  const remanejadas: Record<string, Remanejada> = Object.fromEntries(Object.entries(cfg.remanejadas || {}).filter(([id]) => !ehJuris219(id)))
+  if (hist) for (const [id, r] of Object.entries(reforcosDerivados(cfg, AS, fixos, feitas, ctx.notas, base, P))) if (!remanejadas[id] && !normal[id]) remanejadas[id] = r
+  const cfgN: Cfg28 = { ...cfg, remanejadas }
+  const temasFeitos = new Set([...feitas].filter(ehHist).map(indiceAula))
+  const ordemAulas = ctx.ordem && ctx.ordem.length ? ctx.ordem : AS.map((_, i) => i)
+  const filaBase = hist ? ordemAulas.filter((i) => AS[i] && anteriores.has(i) && cfg.discs.includes(AS[i][0]) && !temasFeitos.has(i)) : []
+  const semIni = Math.max(1, semDe(cfg.start, base))
   let limite = Math.max(semDe(cfg.start, base), gerarPlanoNucleo(cfgN, AS, LP, normal, ancora, ctx).fim)
   for (let tentativa = 0; tentativa < 40; tentativa++) {
-    const reservas: Plano = { ...passadas }
-    const reduzida: Cfg28 = { ...cfgN, horasPontuais: { ...(cfgN.horasPontuais || {}) } }
-    for (let sem = Math.max(1, semDe(cfg.start, base)); sem <= limite; sem++) {
-      const r = reservarJuris219(cfg, sem, base, fixos, feitas, P.juris.min)
-      if (!r) continue
-      reservas[r.id] = r.valor
-      const [d, h] = r.valor
-      if (d >= base) reduzida.horasPontuais![d] = Math.max(0, horasDia(cfg, d) - h)
+    const reservas: Plano = { ...passadas }, usados: Record<DataISO, number> = {}, fila = [...filaBase]
+    const detReservas: Record<string, Detalhe> = {}
+    // semanas até o fim do plano E, se ainda houver diagnósticos na fila, as semanas seguintes (a fila não some)
+    for (let sem = semIni; sem <= limite || (fila.length && sem <= semIni + 520); sem++) {
+      if (P.juris.ativo) {
+        const r = reservarJuris219(cfg, sem, base, fixos, feitas, P.juris.min, usados)
+        if (r) { reservas[r.id] = r.valor; detReservas[r.id] = { jurisprudencia: true } }
+      }
+      if (fila.length) for (const r of reservarDiagnostico(cfg, sem, base, fixos, feitas, fila, usados)) { reservas[r.id] = r.valor; detReservas[r.id] = { historico: true } }
     }
+    const reduzida: Cfg28 = { ...cfgN, horasPontuais: { ...(cfgN.horasPontuais || {}) } }
+    for (const [d, m] of Object.entries(usados)) if (d >= base) reduzida.horasPontuais![d] = Math.max(0, horasDia(cfg, d) - m / 60)
     const g = gerarPlanoNucleo(reduzida, AS, LP, normal, ancora, ctx)
     if (g.fim > limite) { limite = g.fim; continue } // o plano avançou: reserva também as novas semanas
     const detalhes = g.detalhes || {}
-    for (const id of Object.keys(reservas)) detalhes[id] = { ...(detalhes[id] || {}), jurisprudencia: true }
+    for (const [id, d] of Object.entries(detReservas)) detalhes[id] = { ...(detalhes[id] || {}), ...d }
     return { plano: { ...g.plano, ...reservas }, detalhes, fim: Math.max(g.fim, ...Object.values(reservas).map((v) => semDe(cfg.start, v[0]))) }
   }
-  throw Error('Não foi possível encaixar a Jurisprudência semanal e as demais metas. Ajuste a disponibilidade.')
+  throw Error('Não foi possível encaixar as metas extras (Jurisprudência/diagnóstico) e as demais. Ajuste a disponibilidade.')
 }
 
 /** Saúde do plano: atraso das revisões e questões em relação ao ideal (7 e 14 dias). */

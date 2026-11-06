@@ -46,6 +46,9 @@ export interface ConteudoBanco extends Conteudo {
   chaves?: string[]
   /** Documentos de lei da Biblioteca (uso interno: migração de planos antigos). Não vai ao cliente. */
   lpDocs?: Array<{ id: string; titulo: string; disc: string; versaoId: string | null }>
+  /** Documentos de JURISPRUDÊNCIA (JurisClub): pastas com tipo de material 'jurisclub' (+ subpastas), publicados.
+   *  A meta semanal `jp:<semana>` abre o k-ésimo (em ordem natural de título) no leitor. */
+  JPdoc?: Array<{ id: string; titulo: string; disc: string }>
   /** índice da aula no catálogo do modelo (catalogo-html) para cada posição de AS (-1 = só da Biblioteca). */
   modeloIdx?: number[]
   /** Catálogo-BASE (antes do overlay do admin) — o editor do Catálogo de metas parte dele. */
@@ -53,7 +56,7 @@ export interface ConteudoBanco extends Conteudo {
 }
 
 const PAG_PADRAO = 40 // páginas assumidas quando o PDF ainda não foi medido
-const TIPOS_MATERIAL = new Set(['pdfull', 'pdfight', 'pdflash', 'legproc', 'questoes'])
+const TIPOS_MATERIAL = new Set(['pdfull', 'pdfight', 'pdflash', 'legproc', 'jurisclub', 'questoes'])
 
 /** `.in()` em lotes (evita hang do proxy com listas grandes); projeção já vem do build. */
 async function selectInChunks<T>(
@@ -71,7 +74,25 @@ async function selectInChunks<T>(
 
 /** Conteúdo para o motor: catálogo-base (Biblioteca + modelo) + overlay editado no admin (Catálogo de metas). */
 export async function carregarConteudoBanco(svc: SupabaseClient, tenantId: string): Promise<ConteudoBanco> {
-  return montarConteudo(svc, tenantId, await lerOverride(svc, tenantId))
+  const [c, jp] = await Promise.all([montarConteudo(svc, tenantId, await lerOverride(svc, tenantId)), carregarJurisDocs(svc, tenantId).catch(() => [])])
+  return { ...c, JPdoc: jp }
+}
+
+/** Docs publicados das pastas JurisClub marcadas com tipo 'jurisclub' (herdado pelas subpastas). `disc` = pasta-raiz. */
+async function carregarJurisDocs(svc: SupabaseClient, tenantId: string): Promise<Array<{ id: string; titulo: string; disc: string }>> {
+  const { data } = await svc.from('simulado_pastas').select('id, nome, pai_id, cronograma_tipo_material')
+    .eq('tenant_id', tenantId).eq('folder_area', 'conteudo_jurisclub').eq('is_folder', true).eq('deletado', false)
+  const pastas = (data || []) as Array<{ id: string; nome: string; pai_id: string | null; cronograma_tipo_material: string | null }>
+  const porId = new Map(pastas.map((p) => [p.id, p]))
+  const marcada = (id: string): boolean => { let cur: string | null = id, g = 0; while (cur && g++ < 20) { const p = porId.get(cur); if (!p) return false; if (p.cronograma_tipo_material === 'jurisclub') return true; cur = p.pai_id } return false }
+  const raiz = (id: string): string => { let cur = porId.get(id); let g = 0; while (cur?.pai_id && porId.has(cur.pai_id) && g++ < 20) cur = porId.get(cur.pai_id); return cur?.nome ?? '' }
+  const ids = pastas.filter((p) => marcada(p.id)).map((p) => p.id)
+  if (!ids.length) return []
+  const docs = await selectInChunks<{ id: string; titulo: string; pasta_id: string }>(ids, (chunk) =>
+    svc.from('simulado_conteudo_documentos').select('id, titulo, pasta_id').eq('tenant_id', tenantId).eq('categoria', 'jurisclub')
+      .eq('status', 'publicado').eq('deletado', false).in('pasta_id', chunk))
+  const col = new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base' })
+  return docs.map((d) => ({ id: d.id, titulo: d.titulo, disc: raiz(d.pasta_id) })).sort((a, b) => col.compare(a.titulo, b.titulo))
 }
 /** Só o catálogo-base (sem overlay) — usado pelo editor do admin. */
 export async function carregarConteudoBancoBase(svc: SupabaseClient, tenantId: string): Promise<ConteudoBanco> {
@@ -152,7 +173,7 @@ async function montarConteudo(svc: SupabaseClient, tenantId: string, ov: Catalog
     if (tipo === 'legproc') { legprocDocs.push({ id: d.id, titulo: d.titulo, disc: disc.nome, versaoId: d.versao_atual_id }); continue } // lei seca → WLP (+ id p/ abrir no leitor)
     // AULAS = só PDFull (ou docs sem subpasta tipada, p/ compat). PDFight (questões), PDFlash (revisão)
     // e Questões são MATERIAIS ligados às metas que o engine JÁ gera (qu/fl) — não contam como aula nova.
-    if (tipo === 'pdfight' || tipo === 'pdflash' || tipo === 'questoes') { materiais.push({ id: d.id, titulo: d.titulo, disc: disc.nome }); continue }
+    if (tipo === 'pdfight' || tipo === 'pdflash' || tipo === 'jurisclub' || tipo === 'questoes') { materiais.push({ id: d.id, titulo: d.titulo, disc: disc.nome }); continue }
     aulaDocs.push({ id: d.id, titulo: d.titulo, versaoId: d.versao_atual_id, discNome: disc.nome }) // pdfull | null
   }
 

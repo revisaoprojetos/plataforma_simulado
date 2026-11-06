@@ -255,6 +255,8 @@ button.link-q{font-family:inherit;cursor:pointer;line-height:inherit}
 .dia-cfg.off{border-style:dashed;opacity:.75}
 .dia-cfg label{display:flex;align-items:center;gap:6px;font-weight:700;font-size:13px;letter-spacing:.04em}
 .passo{display:flex;align-items:center;gap:4px}
+.secao-hist .sn{margin:6px 0 4px}.h-hist{margin:0 0 4px}.hist-wrap{overflow-x:auto;margin-top:10px}.hist-tabela{width:100%;border-collapse:collapse}.hist-tabela th{text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap}.hist-tabela td{padding:10px;border-bottom:1px solid var(--line);vertical-align:top}.hist-tabela td.col-mat{font-weight:650;min-width:150px}.hist-tabela td.col-ate{min-width:240px}.hist-tabela input[type=number]{width:96px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font:inherit}.hist-tabela select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--ink);font:inherit}.hist-total{display:inline-block;min-width:60px;padding:8px 6px;font-variant-numeric:tabular-nums;font-weight:650}
+@media (max-width:720px){.hist-tabela thead{display:none}.hist-tabela tr{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;padding:10px 0;border-bottom:1px solid var(--line)}.hist-tabela td{border:0;padding:4px}.hist-tabela td.col-mat,.hist-tabela td.col-ate{grid-column:1/-1}.hist-tabela input[type=number]{width:100%}}
 .horario-duplo{display:grid;grid-template-columns:1fr 1fr;gap:6px;width:100%;margin-top:8px}.horario-duplo label{display:flex;flex-direction:column;font-size:11px;gap:4px;text-align:left;min-width:0;font-weight:500;letter-spacing:0}.horario-duplo select{width:100%;min-width:0;padding:7px 3px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);font:inherit;font-size:14px}.dia-cfg{min-width:0}#hd-duplas{max-width:280px}.dias{grid-template-columns:repeat(auto-fit,minmax(100px,1fr))}
 .passo button{width:26px;height:26px;border-radius:7px;border:1px solid var(--line);background:var(--surface-2);padding:0;line-height:1;font-weight:700}
 .passo output{min-width:30px;text-align:center;font-family:var(--f-display);font-weight:650;font-size:17px;font-variant-numeric:tabular-nums}
@@ -719,7 +721,7 @@ function rankingRevisao(plano, notas, ateData, jaRevisados, acertoMin) {
 /** Descreve uma meta a partir do id. */
 function descrever(id, AS, WLP) {
   const [t, a, b] = id.split(':');
-  if (t === 'jp') return { tipo: 'jp', texto: 'Jurisprudência', disc: 'Jurisprudência', aula: '', tema: 'Jurisprudência', pags: 0, qc: '', tec: '', doc: null, idx: null, sem: +a || null };
+  if (t === 'jp') { const jd = JPDOC.length ? JPDOC[(Math.max(1, +a || 1) - 1) % JPDOC.length] : null; return { tipo: 'jp', texto: 'Jurisprudência', disc: 'Jurisprudência', aula: '', tema: jd ? jd.titulo : 'Jurisprudência', pags: 0, qc: '', tec: '', doc: jd ? jd.id : null, idx: null, sem: +a || null }; }
   if (t === 'lp') { const it = LPMAP[id] || (S && S.cfg && S.cfg.lpLegado && S.cfg.lpLegado[id]); if (it) return { tipo: 'lp', texto: it.texto, disc: it.disc || '', lei: it.lei, doc: it.doc || null }; return { tipo: 'lp', texto: (WLP[+a] && WLP[+a][+b]) || 'LegProc', sem: +a, doc: ((WLPDOC[+a] || [])[+b]) || null }; }
   const rev = t === 'rf' || t === 'rq';
   const i = rev ? +b : +a;
@@ -846,7 +848,7 @@ function _wktbl(wl,dl,days,lm){
    ============================================================ */
 let { AS, WLP } = DADOS;
 // Paralelo a WLP: id do documento LegProc de cada bloco (vem do backend) → a meta de lei seca abre no leitor.
-var WLPDOC = [];
+var WLPDOC = [], JPDOC = [];
 
 let ESSENCIAIS = ["Direito Administrativo","Direito Constitucional","Direito Civil","Direito Financeiro","Processo Civil","Direito Tributário","Direito Ambiental","Direito do Trabalho","Processo do Trabalho"];
 let COMPLEMENTARES = ["Direito Agrário","Direito do Consumidor","Direito Econômico","Direito Empresarial","Direito Penal","Processo Penal","Legislação Penal Especial","Direito Previdenciário","Direito Previdenciário Público","Direito Urbanístico"];
@@ -870,7 +872,8 @@ const MODREV = {
 };
 const ehRevisao = tp => tp === 'fl' || tp === 'rf';
 function modoDe(id) { return S.prog[id]?.modo || S.cfg?.revModelo || 'pdflash'; }
-function nomeMeta(id, i) { return TIPOS[i.tipo].nome; }
+const ehHist = id => /^qu:\d+:hist:\d+$/.test(id), ehReforco = id => /^(pf|fl):\d+:reforco:\d+$/.test(id);
+function nomeMeta(id, i) { if (ehHist(id)) return 'Questões · tema anterior'; if (ehReforco(id)) return i.tipo === 'pf' ? 'PDFull · reforço' : 'PDFlash · reforço'; return TIPOS[i.tipo].nome; }
 function seletorModo(id, i) {
   return '';
   const m = modoDe(id);
@@ -1161,12 +1164,30 @@ function atualizarTimers() {
 }
 
 /* ---------- ações sobre metas ---------- */
+/* 2.13 — diagnóstico do histórico: só conclui com as questões resolvidas e os erros informados; o resultado decide o
+   reforço (<50% PDFull · 50–<70% PDFlash · ≥70% nada). O reforço é derivado das anotações a cada geração (sem estado extra). */
+const notaDiagValida = id => { const n = S.notas[id] || {}, t = +n.res || 0, e = +n.err || 0; return Number.isInteger(t) && t > 0 && Number.isInteger(e) && e >= 0 && e <= t; };
+let reforcoT = null;
+function atualizarReforcos() {
+  if (!(PARAMS_MOTOR && PARAMS_MOTOR.historicoDiagnostico219) || S.exemplo || !S.cfg || !S.cfg.jaEstudaRevisao) return;
+  try {
+    const h = hojeISO(), fixos = {}, antes = new Set(Object.keys(S.plano));
+    for (const [id, v] of Object.entries(S.plano)) if (feito(id) || temProgresso(id) || v[0] < h) fixos[id] = v;
+    const g = gerarEstado(S.cfg, fixos, h);
+    S.plano = g.plano; S.fim = g.fim;
+    salvar('estado'); indexar(); renderTudo();
+    const novos = Object.keys(g.plano).filter(id => ehReforco(id) && !antes.has(id));
+    if (novos.length) { const i = info(novos[0]); toast('Reforço agendado: ' + (i.tipo === 'pf' ? 'PDFull' : 'PDFlash') + ' de ' + i.tema + ' em ' + fData(pos(novos[0])[0], { day: 'numeric', month: 'numeric' }) + '.'); }
+  } catch (e) { toast((e && e.message) || 'Não foi possível agendar o reforço.'); }
+}
 function marcar(id, s) {
   const p = S.prog[id] ||= {};
+  if (ehHist(id) && s === 'done' && p.s !== 'done' && !notaDiagValida(id)) { toast('Informe quantas questões você resolveu e quantas errou para concluir este diagnóstico.'); abrirFolha(id); return; }
   if (p.s === s) { delete p.s; delete p.em; } else { p.s = s; p.em = hojeISO(); }
   if (p.s === 'done') { delete p.parou; if (FOCO && FOCO.id === id) { parar(); FOCO = null; desenharFoco(); } }
   salvar('progresso'); renderTudo();
   if (FOLHA) abrirFolha(FOLHA, true);
+  if (ehHist(id)) atualizarReforcos();
 }
 let RETOMA = 'hoje';
 /* 2.8 §7 — meta interrompida: o restante vai para o PRÓXIMO dia disponível (efeito dominó), mesma meta
@@ -1218,6 +1239,16 @@ document.addEventListener('change', e => {
   if (t.dataset.horarioContexto === 'semana') { if (typeof R === 'undefined' || !R) return; R.h[+t.dataset.horarioChave] = valor; mudouRascunho(); }
   else { const v = $('#hd-horas'); if (v) v.value = valor; const box = $('#hd-duplas'); if (box) { box.innerHTML = camposHorarioDuplo(valor, 'data', 'pontual', 24); const s2 = box.querySelector('select'); if (s2) s2.focus(); } }
 });
+
+function histEditar(el) {
+  const d = el.dataset.histAcertos != null ? el.dataset.histAcertos : el.dataset.histErros, campo = el.dataset.histAcertos != null ? 'acertos' : 'erros';
+  R.historicoQuestoes = { ...(R.historicoQuestoes || {}) };
+  const q = R.historicoQuestoes[d] = { ...(R.historicoQuestoes[d] || {}) };
+  q[campo] = el.value === '' ? null : Math.max(0, parseInt(el.value, 10) || 0);
+  const a = histNum(q.acertos), e = histNum(q.erros), out = document.querySelector('[data-hist-total="' + (window.CSS && CSS.escape ? CSS.escape(d) : d) + '"]');
+  if (out) out.textContent = (a == null && e == null) ? '' : String((a || 0) + (e || 0));
+}
+document.addEventListener('input', e => { const t = e.target; if (t && t.dataset && (t.dataset.histAcertos != null || t.dataset.histErros != null) && typeof R !== 'undefined' && R) histEditar(t); });
 
 /* 2.8 §8 — horas de UM dia (hoje ou futuro), sem mudar a rotina semanal; reorganiza a partir dele. */
 function ajustarHorasDia(padrao) {
@@ -1594,10 +1625,10 @@ let R = null; // rascunho das escolhas
 let PREV = null, prevT = null;
 const fDMA = iso => fData(iso, { day: '2-digit', month: '2-digit', year: 'numeric' });
 function iniciarRascunho() {
-  if (S.exemplo) { const c = cfgVazia(); R = { ...c, rotinas: [], recessos: [], h: [...c.horas], desde: null, vel: S.perfil?.vel || VEL_PADRAO, velFonte: S.perfil?.fonte || 'media', velSeg: S.perfil?.seg || null, titulo: S.titulo || '', maisPDFull: true, jaEstudaRevisao: false, ultimosTemas: {} }; return; }
+  if (S.exemplo) { const c = cfgVazia(); R = { ...c, rotinas: [], recessos: [], h: [...c.horas], desde: null, vel: S.perfil?.vel || VEL_PADRAO, velFonte: S.perfil?.fonte || 'media', velSeg: S.perfil?.seg || null, titulo: S.titulo || '', maisPDFull: true, jaEstudaRevisao: false, ultimosTemas: {}, historicoQuestoes: {} }; return; }
   const c = JSON.parse(JSON.stringify(S.cfg));
   c.arranjo ||= 'pdf'; c.revModelo ||= 'pdflash'; c.revisao = revNorm(c.revisao);
-  c.maisPDFull = c.maisPDFull !== false; c.jaEstudaRevisao = !!c.jaEstudaRevisao; c.ultimosTemas = { ...(c.ultimosTemas || {}) };
+  c.maisPDFull = c.maisPDFull !== false; c.jaEstudaRevisao = !!c.jaEstudaRevisao; c.ultimosTemas = { ...(c.ultimosTemas || {}) }; c.historicoQuestoes = JSON.parse(JSON.stringify(c.historicoQuestoes || {}));
   const desde = hojeISO() > c.start ? hojeISO() : c.start;
   R = { ...c, rotinas: c.rotinas || [], recessos: c.recessos || [], h: [...horasEm(c, desde)], desde, vel: c.vel || S.perfil?.vel || VEL_PADRAO, velFonte: c.velFonte || S.perfil?.fonte || 'media', velSeg: c.velSeg ?? S.perfil?.seg ?? null, titulo: S.titulo || '' };
 }
@@ -1607,7 +1638,8 @@ function montarCfg() {
   delete c.metas.vd; // Videoaulas indisponível: nunca somar tempo de vd no motor
   // 2.8: limite de PDFull novos, histórico prévio (só das disciplinas selecionadas) e dados de reorganização
   c.motor = Motor28.VERSAO_MOTOR; c.maisPDFull = R.maisPDFull !== false; c.jaEstudaRevisao = !!R.jaEstudaRevisao;
-  c.ultimosTemas = {}; if (R.jaEstudaRevisao) for (const d of c.discs) { const k = (R.ultimosTemas || {})[d]; if (typeof k === 'number' && k >= 0) c.ultimosTemas[d] = k; }
+  c.ultimosTemas = {}; if (R.jaEstudaRevisao) for (const d of (typeof TODAS !== 'undefined' ? TODAS : c.discs)) { const k = (R.ultimosTemas || {})[d]; if (typeof k === 'number' && k >= 0) c.ultimosTemas[d] = k; }
+  c.historicoQuestoes = {}; for (const [d, q] of Object.entries(R.historicoQuestoes || {})) { const a = histNum(q && q.acertos), e = histNum(q && q.erros); if (a != null || e != null) c.historicoQuestoes[d] = { acertos: a || 0, erros: e || 0, total: (a || 0) + (e || 0) }; }
   for (const k of ['horasPontuais', 'paginasLidas', 'sobras', 'lpIgnorar', 'lpLegado', 'remanejadas']) if (R[k]) c[k] = JSON.parse(JSON.stringify(R[k]));
   if (R.semData) c.recessos = []; // "sem data" não tem recesso por período
   if (S.exemplo || !R.desde || R.desde <= c.start) { c.horas = [...R.h]; c.rotinas = []; return c; }
@@ -1676,7 +1708,7 @@ function renderConfig() {
         ${grupo('Específicas AGU', AGU.map(g => chip(g, g.length > 1 ? 'Direito Internacional Público e Privado' : g[0])).join(''), 'a')}</div>
       <div class="secao"><h3><span class="n ok">5</span>Metas no cronograma</h3>
         <p class="aj">O PDFull é obrigatório. As outras metas já vêm marcadas e você pode retirar as que não quiser.</p>
-        <div class="metas-cfg">${['pf', 'qu', 'fl', 'lp'].map(k => { const t = TIPOS[k], x = META_TXT[k]; return `<label class="meta-cfg ${x[2] ? 'obrig' : ''}" style="--c:${t.c}"><input type="checkbox" id="cfg-m-${k}" data-meta="${k}" ${x[2] || R.metas[k] ? 'checked' : ''} ${x[2] ? 'disabled' : ''}><div><b>${x[0]} <span class="opc">${x[2] ? '(obrigatório)' : '(opcional)'}</span></b><span>${x[1]}</span></div></label>`; }).join('')}${PARAMS_MOTOR && PARAMS_MOTOR.jurisprudencia219 ? `<label class="meta-cfg obrig" style="--c:var(--jp)"><input type="checkbox" checked disabled><div><b>Jurisprudência <span class="opc">(incluída automaticamente)</span></b><span>Uma meta de ${fH(PARAMS_MOTOR.jurisprudenciaMin || 60)} por semana de estudo, de preferência na sexta ou no sábado, para acompanhar julgados e informativos. Ela ocupa parte do seu tempo semanal.</span></div></label>` : `<label class="meta-cfg" style="--c:var(--muted);opacity:.55;cursor:not-allowed"><input type="checkbox" disabled><div><b>Jurisprudência <span class="opc">(em breve)</span></b><span>Em breve você poderá incluir meta de jurisprudência no cronograma.</span></div></label>`}</div>
+        <div class="metas-cfg">${['pf', 'qu', 'fl', 'lp'].map(k => { const t = TIPOS[k], x = META_TXT[k]; return `<label class="meta-cfg ${x[2] ? 'obrig' : ''}" style="--c:${t.c}"><input type="checkbox" id="cfg-m-${k}" data-meta="${k}" ${x[2] || R.metas[k] ? 'checked' : ''} ${x[2] ? 'disabled' : ''}><div><b>${x[0]} <span class="opc">${x[2] ? '(obrigatório)' : '(opcional)'}</span></b><span>${x[1]}</span></div></label>`; }).join('')}${PARAMS_MOTOR && PARAMS_MOTOR.jurisprudencia219 ? `<label class="meta-cfg" style="--c:var(--jp)"><input type="checkbox" id="cfg-m-jp" data-meta="jp" ${R.metas.jp !== false ? 'checked' : ''}><div><b>Jurisprudência <span class="opc">(opcional)</span></b><span>Uma meta de ${fH(PARAMS_MOTOR.jurisprudenciaMin || 60)} por semana de estudo, de preferência na sexta ou no sábado, para acompanhar julgados e informativos. Ela ocupa parte do seu tempo semanal.</span></div></label>` : `<label class="meta-cfg" style="--c:var(--muted);opacity:.55;cursor:not-allowed"><input type="checkbox" disabled><div><b>Jurisprudência <span class="opc">(em breve)</span></b><span>Em breve você poderá incluir meta de jurisprudência no cronograma.</span></div></label>`}</div>
 </div>
       <div class="secao" id="semanas-revisao"><h3><span class="n ok">6</span>Semanas de revisão</h3><p class="aj">Semanas sem aulas novas, dedicadas aos temas em que você teve mais dificuldade e errou mais questões.</p>
         <div class="rev-sn"><span>Incluir semanas de revisão?</span><div class="sn" role="radiogroup" aria-label="Incluir semanas de revisão"><label class="${R.revisao.ativa ? 'on' : ''}"><input type="radio" name="rev-ativa" value="1" ${R.revisao.ativa ? 'checked' : ''}>Sim</label><label class="${R.revisao.ativa ? '' : 'on'}"><input type="radio" name="rev-ativa" value="0" ${R.revisao.ativa ? '' : 'checked'}>Não</label></div>
@@ -1685,8 +1717,7 @@ function renderConfig() {
       <div class="secao" id="aulas-historico"><h3><span class="n ok">7</span>Aulas novas e histórico</h3>
         <div class="rev-sn"><span>Estudar mais de um PDFull novo no mesmo dia?</span><div class="sn" role="radiogroup" aria-label="Mais de um PDFull novo por dia"><label class="${R.maisPDFull !== false ? 'on' : ''}"><input type="radio" name="mais-pdf" value="1" ${R.maisPDFull !== false ? 'checked' : ''}>Sim</label><label class="${R.maisPDFull === false ? 'on' : ''}"><input type="radio" name="mais-pdf" value="0" ${R.maisPDFull === false ? 'checked' : ''}>Não</label></div></div>
         <p class="aj">${R.maisPDFull === false ? 'Até <b>1</b> PDFull novo por dia.' : 'Até <b>2</b> PDFulls novos por dia — o segundo só entra se sobrar tempo depois das outras metas.'} Continuar uma aula já começada não conta nesse limite.</p>
-        <div class="rev-sn" style="margin-top:14px"><span>Já estuda pelo Revisão?</span><div class="sn" role="radiogroup" aria-label="Já estuda pelo Revisão"><label class="${R.jaEstudaRevisao ? 'on' : ''}"><input type="radio" name="ja-estuda" value="1" ${R.jaEstudaRevisao ? 'checked' : ''}>Sim</label><label class="${R.jaEstudaRevisao ? '' : 'on'}"><input type="radio" name="ja-estuda" value="0" ${R.jaEstudaRevisao ? '' : 'checked'}>Não</label></div></div>
-        ${R.jaEstudaRevisao ? `<p class="aj">Escolha, em cada disciplina, o <b>último tema que você já estudou por inteiro</b>. Ele e todos os anteriores ficam fora das novas aulas, revisões e questões — sem marcar conclusões nem tempo.</p><div class="ult-temas" style="display:grid;gap:10px">${(R.discs.length ? R.discs : ESSENCIAIS).filter(d => AS.some(a => a[0] === d)).map(d => `<label class="campo">${esc(d)}<select data-ult-disc="${esc(d)}"><option value="-1">Nenhum tema estudado</option>${AS.filter(a => a[0] === d).map((a, k) => `<option value="${k}" ${(R.ultimosTemas || {})[d] === k ? 'selected' : ''}>Aula ${esc(a[1])} — ${esc(String(a[2]).slice(0, 90))}</option>`).join('')}</select></label>`).join('')}</div>` : ''}
+        ${renderHistoricoConfig()}
       ${primeiro ? '' : `<div class="secao zerar" id="recomecar-zero"><h3>Recomeçar do zero</h3>
         <p class="aj">Apaga o cronograma, as metas concluídas, as anotações e o tempo registrado, e volta para a tela inicial de configuração.</p>
         ${CONF === 'zerar' ? `<div class="confirma"><span><b>Tem certeza?</b> Isso não pode ser desfeito.</span><div class="linha"><button type="button" class="btn perigo sm" data-acao="zerar-ok">Sim, apagar tudo</button><button type="button" class="btn sm" data-acao="zerar-nao">Cancelar</button></div></div>` : `<div><button type="button" class="btn sm miss" data-acao="zerar">Recomeçar do zero</button></div>`}
@@ -1739,8 +1770,33 @@ function recomecar() {
   indexar(); CONF = null; R = null; PREV = null; SEM_SEL = null; fecharFolha();
   irPara('configurar'); toast('Tudo apagado. Monte o cronograma de novo.');
 }
+/* 2.13/2.17 — "Já estuda pelo Revisão?": tabela das matérias com ACERTOS / ERROS / TOTAL (calculado) em Sim e Não;
+   Sim acrescenta "Último tema estudado". Os números são do histórico GERAL da matéria (não são atribuídos aos temas). */
+const histNum = v => (v === '' || v == null) ? null : Number(v);
+function renderHistoricoConfig() {
+  const sim = !!R.jaEstudaRevisao, hq = R.historicoQuestoes || {}, flag = !!(PARAMS_MOTOR && PARAMS_MOTOR.historicoDiagnostico219);
+  const linhas = (typeof TODAS !== 'undefined' ? TODAS : ESSENCIAIS).filter(d => AS.some(a => a[0] === d)).map(d => {
+    const q = hq[d] || {}, a = histNum(q.acertos), e = histNum(q.erros), tot = (a == null && e == null) ? '' : (a || 0) + (e || 0);
+    const ate = sim ? `<td class="col-ate"><label class="campo">Último tema estudado<select data-ult-disc="${esc(d)}"><option value="-1">Nenhum tema concluído</option>${AS.filter(x => x[0] === d).map((x, k) => `<option value="${k}" ${(R.ultimosTemas || {})[d] === k ? 'selected' : ''}>Aula ${esc(x[1])} · ${esc(String(x[2]).slice(0, 90))}</option>`).join('')}</select></label></td>` : '';
+    return `<tr><td class="col-mat"><b>${esc(d)}</b></td>${ate}<td><input type="number" min="0" step="1" inputmode="numeric" data-hist-acertos="${esc(d)}" aria-label="Acertos em ${esc(d)}" value="${a ?? ''}"></td><td><input type="number" min="0" step="1" inputmode="numeric" data-hist-erros="${esc(d)}" aria-label="Erros em ${esc(d)}" value="${e ?? ''}"></td><td><output class="hist-total" data-hist-total="${esc(d)}">${tot}</output></td></tr>`;
+  }).join('');
+  return `<div class="secao-hist"><h3 class="h-hist">Já estuda pelo Revisão?</h3><div class="sn" role="radiogroup" aria-label="Já estuda pelo Revisão"><label class="${sim ? 'on' : ''}"><input type="radio" name="ja-estuda" value="1" ${sim ? 'checked' : ''}>Sim</label><label class="${sim ? '' : 'on'}"><input type="radio" name="ja-estuda" value="0" ${sim ? '' : 'checked'}>Não</label></div>
+    <p class="aj">Registre acertos e erros por matéria; o total é calculado automaticamente. Esses números gerais não são atribuídos artificialmente a cada tema.${sim ? ' Informe também o <b>último tema concluído</b> de cada matéria: ele e os anteriores ficam fora das novas aulas, revisões e questões — sem marcar conclusões nem tempo.' : ''}</p>
+    <div class="hist-wrap"><table class="hist-tabela"><thead><tr><th>Matéria</th>${sim ? '<th>Até onde estudou</th>' : ''}<th>Acertos</th><th>Erros</th><th>Total</th></tr></thead><tbody>${linhas}</tbody></table></div>
+    ${sim && flag ? '<p class="aj">Nas matérias selecionadas, os temas anteriores retornam como <b>questões em 2 a 3 metas por semana</b>. Registre o resultado de cada meta: 70% ou mais encerra o diagnóstico; de 50% a menos de 70% gera um PDFlash de reforço; abaixo de 50% gera um PDFull de reforço na semana seguinte. O tempo disponível limita o que cabe no plano.</p>' : ''}</div>`;
+}
+function validarHistorico() {
+  if (!R) return '';
+  for (const [d, q] of Object.entries(R.historicoQuestoes || {})) for (const k of ['acertos', 'erros']) {
+    const v = histNum(q && q[k]);
+    if (v != null && (!Number.isInteger(v) || v < 0)) return `Histórico de ${d}: ${k} deve ser um número inteiro, zero ou maior.`;
+  }
+  return '';
+}
+
 function gerarDaConfig() {
   clearTimeout(prevT);
+  { const erroH = validarHistorico(); if (erroH) return toast(erroH); }
   const c = montarCfg();
   const g = gerarPlano(c, AS, WLP, fixosAtuais(), ancoraConfig());
   const primeiro = !!S.exemplo;
@@ -1845,6 +1901,7 @@ function salvarNota(campo, valor) {
   const n = S.notas[id] ||= {};
   if (['res', 'err', 'ls', 'dout', 'juris', 'mix', 'diff'].includes(campo)) n[campo] = Math.max(0, parseInt(valor) || 0); else n[campo] = valor;
   clearTimeout(notaT); notaT = setTimeout(() => salvar('notas'), 400);
+  if (ehHist(id) && (campo === 'res' || campo === 'err') && feito(id)) { clearTimeout(reforcoT); reforcoT = setTimeout(atualizarReforcos, 900); } // mudou o resultado de um diagnóstico concluído
 }
 
 /* ---------- exportar DOCX (modelo da Revisão) ---------- */
@@ -2158,6 +2215,7 @@ document.addEventListener('change', e => {
   if (t.name === 'rev-cada') { R.revisao = { ativa: true, cada: +t.value }; mudouRascunho(); return; }
   if (t.name === 'rev-ativa') { R.revisao = { ...R.revisao, ativa: t.value === '1' }; mudouRascunho(); return; }
   if (t.name === 'mais-pdf') { R.maisPDFull = t.value === '1'; mudouRascunho(); return; }
+  if (t.dataset && (t.dataset.histAcertos != null || t.dataset.histErros != null)) { histEditar(t); return; }
   if (t.name === 'ja-estuda') { R.jaEstudaRevisao = t.value === '1'; R.ultimosTemas ||= {}; mudouRascunho(); return; }
   if (t.dataset && t.dataset.ultDisc) { R.ultimosTemas = { ...(R.ultimosTemas || {}), [t.dataset.ultDisc]: +t.value }; mudouRascunho(); return; }
   if (t.id === 'cfg-vel') { const v = parseInt(t.value); if (v >= 3 && v <= 80) { R.vel = v; R.velFonte = 'manual'; R.velSeg = null; } else if (!t.value) { R.vel = VEL_PADRAO; R.velFonte = 'media'; } setTimeout(mudouRascunho, 0); return; }
@@ -2444,7 +2502,7 @@ body.embed .flut{display:none}
   function aplicarConteudo(ct) {
     try {
       if (!ct || !Array.isArray(ct.AS) || !ct.AS.length) return;
-      AS = ct.AS; WLP = Array.isArray(ct.WLP) ? ct.WLP : WLP; WLPDOC = Array.isArray(ct.WLPdoc) ? ct.WLPdoc : [];
+      AS = ct.AS; WLP = Array.isArray(ct.WLP) ? ct.WLP : WLP; WLPDOC = Array.isArray(ct.WLPdoc) ? ct.WLPdoc : []; JPDOC = Array.isArray(ct.JPdoc) ? ct.JPdoc : [];
       LPCAT = Array.isArray(ct.LP) ? ct.LP : []; LPMAP = {}; LPCAT.forEach(function (x) { LPMAP[x.id] = x; });
       var disc = Array.isArray(ct.disciplinas) ? ct.disciplinas : [];
       if (disc.length) {
@@ -2467,11 +2525,28 @@ body.embed .flut{display:none}
   }
 
   // Boot REST: carrega estado + conteúdo do servidor e re-renderiza.
-  (async function () {
+  // Carregamento com TEMPO LIMITE + nova tentativa automática (2x) e, se ainda falhar, mensagem visível com botão —
+  // antes a tela ficava em branco em "Carregando…" quando o servidor demorava/falhava.
+  function falhaCarga(tentativa, motivo) {
+    if (tentativa < 3) { marcarSync(false, 'Tentando novamente…'); setTimeout(function () { carregarDoServidor(tentativa + 1); }, 3000 * tentativa); return; }
+    marcarSync(false, 'Sem conexão com o servidor');
+    try {
+      var tem = S && S.plano && Object.keys(S.plano).length;
+      var aviso = '<div class="painel" style="margin:24px auto;max-width:560px;padding:22px;text-align:center"><h2 style="margin:0 0 8px">Não foi possível carregar o seu cronograma</h2><p style="margin:0 0 14px;color:var(--muted)">' + (motivo || 'O servidor demorou a responder.') + ' Seus dados estão salvos; tente de novo.' + (tem ? ' Abaixo, a última versão salva neste navegador.' : '') + '</p><button type="button" class="btn prim" id="carga-tentar">Tentar novamente</button></div>';
+      var alvo = document.getElementById('tela-hoje');
+      if (alvo && !tem) { alvo.hidden = false; alvo.innerHTML = aviso; }
+      else if (alvo) alvo.insertAdjacentHTML('afterbegin', aviso);
+      var b = document.getElementById('carga-tentar'); if (b) b.onclick = function () { carregarDoServidor(1); };
+    } catch (e) {}
+  }
+  async function carregarDoServidor(tentativa) {
     if (typeof TESTE !== 'undefined' && TESTE) { marcarSync(false, 'Modo de teste · nada é salvo'); return; }
     marcarSync(false, 'Carregando…');
+    var ctl = new AbortController(), tm = setTimeout(function () { ctl.abort(); }, 40000);
     try {
-      var r = await fetch(API, { credentials: 'same-origin', cache: 'no-store' });
+      var r = await fetch(API, { credentials: 'same-origin', cache: 'no-store', signal: ctl.signal });
+      clearTimeout(tm);
+      if (!r.ok) throw new Error('http ' + r.status);
       var j = await r.json();
       if (j && j.conteudo) aplicarConteudo(j.conteudo);
       if (j && j.ok && j.estado) {
@@ -2495,8 +2570,9 @@ body.embed .flut{display:none}
         renderTudo();
         marcarSync(false, 'Salvo neste navegador');
       }
-    } catch (e) { marcarSync(false, 'Salvo neste navegador'); }
-  })();
+    } catch (e) { clearTimeout(tm); falhaCarga(tentativa, e && e.name === 'AbortError' ? 'O servidor demorou mais de 40 segundos.' : 'Falha ao carregar (' + ((e && e.message) || 'erro') + ').'); }
+  }
+  carregarDoServidor(1);
 })();
 </script>
 <script>

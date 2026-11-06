@@ -12,6 +12,19 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.9.0 — 2026-11-06
+
+### Modelos de jurisprudência (JurisClub) — leitor em texto
+- **Só para documentos do JurisClub:** seções dos títulos viram **áreas expansivas e recolhíveis** (já vêm recolhidas); `<tags>` viram **imagens de selo** da Biblioteca de tags; tabelas **não recolhem** e mantêm a **cor fiel** do documento; tabela de **"Art."** fica normal, na metade direita da folha; títulos em roxo (cor de destaque do leitor). Os demais documentos não mudam.
+- **Admin › Metas e inteligência › Jurisprudência:** chaves "Converter <tags> em imagens de selo" e "Seções dos títulos expansivas" (ligadas por padrão).
+- **Biblioteca › Preparar PDFs:** botão que pré-gera o PDF fiel (cores/fontes) dos documentos da pasta; evita a espera e o texto sem formatação na 1ª abertura.
+- **Fix:** o tipo de material **JurisClub** da pasta não era salvo (o servidor só aceitava os demais).
+
+### Cronograma adaptativo
+- **Meta de Jurisprudência opcional** (aluno marca/desmarca) e ligada aos documentos das pastas JurisClub com tipo "JurisClub" (a semana N abre o N-ésimo, em ordem de título). Desmarcada = plano idêntico ao núcleo.
+
+---
+
 ## 4.8.0 — 2026-11-06
 
 ### Cronograma adaptativo

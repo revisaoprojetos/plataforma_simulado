@@ -114,7 +114,7 @@ export default async function LeituraConteudoPage({ params, searchParams }: { pa
         versaoId={t.versaoId}
         titulo={t.titulo}
         pdfUrl={null}
-        texto={{ html: t.html, grifos: grifosTexto, ocultarLegendaTabela: t.ocultarLegendaTabela }}
+        texto={{ html: t.html, grifos: grifosTexto, ocultarLegendaTabela: t.ocultarLegendaTabela, modeloJuris: t.modeloJuris }}
         grifos={[]}
         voltarHref={voltarHref}
         metaCrono={metaAtual}

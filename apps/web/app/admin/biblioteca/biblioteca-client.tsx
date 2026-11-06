@@ -939,7 +939,7 @@ function MenuPasta({ p, categoria, ancestralEhDisciplina, onAbrir, onAcesso, onC
             </DropdownMenuSubContent>
           </DropdownMenuSub>
           <DropdownMenuItem onClick={() => { setOpen(false); carregarPastas(); setMoverAberto(true) }}><FolderInput className="mr-2 h-4 w-4" /> Mover para…</DropdownMenuItem>
-          {categoria === 'conteudo' && (
+          {categoria !== 'modelo_caderno' && (
             <>
               <DropdownMenuSeparator />
               {ancestralEhDisciplina ? (

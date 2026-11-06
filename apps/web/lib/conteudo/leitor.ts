@@ -8,6 +8,9 @@ import { docBloqueadoNoCronograma } from '@/lib/cronograma/adaptativo/liberacao'
 import { listarAnotacoes, type Anotacao } from './anotacoes'
 import { resolverAreas, produtoValidoDoAluno, filtrarHtmlPorAreas, type ResolucaoAreas } from './areas'
 import { mapaPastas, resolverCapaDoc } from './capa-pagina'
+import { converterTagsEmSelos } from '@/lib/leitura/tags-em-selos'
+import { envolverSecoesPorTitulo } from '@/lib/leitura/titulos-expansivos'
+import { lerCfgMetas } from '@/lib/cronograma/adaptativo/config-metas'
 import { acessoEfetivo, type ItemAcesso, type Atribuicao, type Aluno, type AcessoGeral, type ModoAcesso, type ResultadoAcesso } from './acesso-efetivo'
 
 // LEITOR do aluno (Fase 8) — monta a leitura a partir dos TRECHOS da versão atual (cada um com seu
@@ -561,7 +564,7 @@ export async function garantirHtmlLegproc(svc: any, tenantId: string, documentoI
 }
 
 /** Leitura em TEXTO (documento marcado como LegProc): HTML rico com data-uid + grifos por texto do aluno. */
-export interface LeituraTexto { documentoId: string; titulo: string; versaoId: string; html: string; anotacoes: Anotacao[]; mostrarLegenda: boolean; ocultarLegendaTabela: boolean }
+export interface LeituraTexto { documentoId: string; titulo: string; versaoId: string; html: string; anotacoes: Anotacao[]; mostrarLegenda: boolean; ocultarLegendaTabela: boolean; /** documento do JurisClub (modelo de jurisprudência): ajustes de leitura só para ele */ modeloJuris: boolean }
 export type DocParaLeitura = { kind: 'midia'; midia: MidiaAluno } | { kind: 'pdf'; pdf: LeituraPdf } | { kind: 'texto'; texto: LeituraTexto }
 
 export async function carregarDocParaLeitura(documentoId: string, alunoId: string, opts: { produtoId?: string | null } = {}): Promise<DocParaLeitura | null> {
@@ -610,10 +613,11 @@ export async function carregarDocParaLeitura(documentoId: string, alunoId: strin
     })
     if (!html) return null
     const f = filtrarHtmlPorAreas(html, areasAluno.ocultas, areasAluno.blocos, areasAluno.estiloPadrao)
+    f.html = await ajustesLeituraTexto(svc, tenantId, f.html, (doc as any).categoria === 'jurisclub')
     const anotacoes = (await listarAnotacoes(documentoId, alunoId)).filter((a) => !f.uidsRemovidos.has(a.trecho_uid))
     const { ocultarLegendaTabela } = await import('./legproc-legenda')
     const ocultarLeg = await ocultarLegendaTabela(svc, tenantId, documentoId, (doc as any).pasta_id ?? null)
-    return { kind: 'texto', texto: { documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, html: f.html, anotacoes, mostrarLegenda: legendaLegproc, ocultarLegendaTabela: ocultarLeg } }
+    return { kind: 'texto', texto: { documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, html: f.html, anotacoes, mostrarLegenda: legendaLegproc, ocultarLegendaTabela: ocultarLeg, modeloJuris: (doc as any).categoria === 'jurisclub' } }
   }
   if (ehLegproc) {
     const t = await montarTextoConvertido()
@@ -639,13 +643,29 @@ export async function carregarDocParaLeitura(documentoId: string, alunoId: strin
     if (lt && lt.html && lt.html.trim()) {
       const { ocultarLegendaTabela } = await import('./legproc-legenda')
       const ocultarLeg = await ocultarLegendaTabela(svc, tenantId, documentoId, (doc as any).pasta_id ?? null)
-      return { kind: 'texto', texto: { documentoId, titulo: lt.titulo, versaoId: lt.versaoId, html: lt.html, anotacoes: lt.anotacoes, mostrarLegenda: legendaLegproc, ocultarLegendaTabela: ocultarLeg } }
+      const htmlLt = await ajustesLeituraTexto(svc, tenantId, lt.html, (doc as any).categoria === 'jurisclub')
+      return { kind: 'texto', texto: { documentoId, titulo: lt.titulo, versaoId: lt.versaoId, html: htmlLt, anotacoes: lt.anotacoes, mostrarLegenda: legendaLegproc, ocultarLegendaTabela: ocultarLeg, modeloJuris: (doc as any).categoria === 'jurisclub' } }
     }
   }
   const grifos: GrifoPdf[] = (grifosRows ?? []).map((g) => ({
     id: g.id, pagina: g.pagina, rects: Array.isArray(g.rects) ? g.rects : [], cor: g.cor || 'y', tool: g.tool || 'hl', nota: g.nota ?? null, texto: g.texto ?? null,
   })).filter((g) => g.rects.length)
   return { kind: 'pdf', pdf: { documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, pdfUrl, grifos, mostrarLegenda: !!(cfgRow as any)?.legenda_categorias || legendaLegproc } }
+}
+
+/** Chaves do admin (Metas & inteligência › Jurisprudência) aplicadas à leitura em TEXTO: `<tags>` → imagens de selo e
+ *  seções dos títulos expansivas. */
+async function tagsEmImagemLigado(svc: any, tenantId: string): Promise<boolean> {
+  try { return (await lerCfgMetas(svc, tenantId)).jurisTagsImagem === true } catch { return false }
+}
+async function ajustesLeituraTexto(svc: any, tenantId: string, html: string, ehJuris: boolean): Promise<string> {
+  if (!ehJuris) return html // só os MODELOS DE JURISPRUDÊNCIA (categoria 'jurisclub') recebem esses ajustes
+  try {
+    const cfg = await lerCfgMetas(svc, tenantId)
+    if (cfg.jurisTagsImagem === true) html = await converterTagsEmSelos(html, tenantId).catch(() => html)
+    if (cfg.jurisTitulosExpansivos === true) html = envolverSecoesPorTitulo(html)
+  } catch { /* sem config: html como está */ }
+  return html
 }
 
 /** URL assinada do arquivo ORIGINAL para o aluno BAIXAR — só se tiver acesso (gate). null se negado. */
