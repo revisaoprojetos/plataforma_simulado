@@ -12,6 +12,14 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.9.1 — 2026-11-06
+
+### Correção urgente — Cronograma adaptativo
+- **Erro "PR.regras218 is undefined"** ao abrir o cronograma: o `index.html` novo era usado com um `motor28.js` antigo do cache (o `?v=28.1` nunca mudava). Agora o `index.html` referencia `motor28.js?v=<hash do conteúdo>`, e `pnpm cronograma:motor` atualiza o hash sozinho.
+- **Biblioteca › JurisClub:** classificação de pastas (Cronograma/Disciplina, Tipo de material, legenda LegProc) igual à Biblioteca normal (já incluída na 4.9.0).
+
+---
+
 ## 4.9.0 — 2026-11-06
 
 ### Modelos de jurisprudência (JurisClub) — leitor em texto
