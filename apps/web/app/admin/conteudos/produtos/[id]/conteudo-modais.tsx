@@ -117,8 +117,8 @@ export function ModuloDialog({ produtoId, modulo, paiId, modulosCount, aulasCoun
 }
 
 // ═══════════════════════ Novo conteúdo (escolhe módulo + tipo) ═══════════════════════
-export function NovoConteudoDialog({ modulos, moduloPadrao, onClose, onContinuar }: {
-  modulos: ModuloRow[]; moduloPadrao?: string | null
+export function NovoConteudoDialog({ modulos, moduloPadrao, tipoProduto, onClose, onContinuar }: {
+  modulos: ModuloRow[]; moduloPadrao?: string | null; tipoProduto?: string
   onClose: () => void; onContinuar: (sel: { moduloId: string; subtipo: string; tipoRef: TipoRef; daBiblioteca: boolean }) => void
 }) {
   const topo = modulos.filter((m) => !m.pai_id)
@@ -129,7 +129,7 @@ export function NovoConteudoDialog({ modulos, moduloPadrao, onClose, onContinuar
   const subs = modulos.filter((m) => m.pai_id === moduloTopo)
   const [submodulo, setSubmodulo] = useState<string>(() => (moduloPadrao && modulos.find((m) => m.id === moduloPadrao)?.pai_id ? moduloPadrao : ''))
   const [daBiblioteca, setDaBiblioteca] = useState(true)
-  const [subtipo, setSubtipo] = useState<string>('pdfull')
+  const [subtipo, setSubtipo] = useState<string>(tipoProduto === 'jurisclub' ? 'jurisclub' : 'pdfull')
 
   const moduloDestino = submodulo || moduloTopo
   function continuar() {
@@ -270,7 +270,7 @@ export function EditarItemDialog({ tenantId, produtoId, modulos, item, criar, on
       </Dialog>
 
       {picker && (
-        <FilePicker open onClose={() => setPicker(false)} tenantId={tenantId}
+        <FilePicker open onClose={() => setPicker(false)} tenantId={tenantId} categoria={item.subtipo === 'jurisclub' ? 'jurisclub' : 'conteudo'}
           abaInicial={tipoRef === 'video_url' ? 'video' : tipoRef === 'link' ? 'link' : 'biblioteca'}
           onSelecionar={(r) => {
             if (r.tipo === 'biblioteca' || r.tipo === 'upload') { setRefId(r.documentoId); setRefLabel(r.titulo ?? 'Documento'); if (!titulo.trim() && r.titulo) setTitulo(r.titulo) }

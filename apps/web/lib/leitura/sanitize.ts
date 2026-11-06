@@ -1,6 +1,6 @@
 import 'server-only'
 import { parse, NodeType } from 'node-html-parser'
-import { selosParaSpans } from './selos'
+import { selosParaSpans, slugDeTag } from './selos'
 import { normalizarTermoTag, mapaTagsBiblioteca, type TagBiblioteca } from './biblioteca-tags'
 
 // Sanitizador de HTML para a AREA DE LEITURA (server-only).
@@ -120,6 +120,21 @@ function serialize(node: any): string {
 // (colar do Word). O nome é casado pelo TEXTO EXATO que o admin cadastrou na Biblioteca (acento/caixa-
 // insensível) e substituído pelo HTML daquela tag. SEM lista fixa no código: se não houver tag com esse
 // nome na Biblioteca, o bloco fica intacto. Só converte blocos "folha" cujo texto é 100% marcador(es).
+// Resolve o MIOLO de um marcador ("rg", "Repercussão Geral", "rg ic") no HTML da tag da Biblioteca.
+// Aceita (1) nome/slug cadastrado, (2) APELIDO curto dos selos padrão (rg, ffp…) quando o selo desse slug
+// está cadastrado e (3) sufixo de variante `sm`/`ic` (selo menor / só ícone) — só vale p/ selos <span data-selo>.
+function htmlDoMarcador(miolo: string, mapaTags: Record<string, string>): string | null {
+  let termo = normalizarTermoTag(miolo)
+  let variante = ''
+  const v = /^(.*\S)\s+(sm|ic)$/.exec(termo)
+  if (v && !mapaTags[termo]) { termo = v[1]; variante = v[2] }
+  let html = mapaTags[termo]
+  if (!html) { const slug = slugDeTag(termo.replace(/\s+/g, '-')); if (slug) html = mapaTags[normalizarTermoTag(slug)] }
+  if (!html) return null
+  if (variante && /^<span data-selo="[^"]+"><\/span>$/.test(html)) html = html.replace('></span>', ` data-selo-${variante}="1"></span>`)
+  return html
+}
+
 function tagsDeTextoParaHtml(root: any, mapaTags: Record<string, string>): void {
   if (!mapaTags || !Object.keys(mapaTags).length) return
   let blocos: any[]
@@ -129,12 +144,25 @@ function tagsDeTextoParaHtml(root: any, mapaTags: Record<string, string>): void 
       if (!el.tagName) continue
       if (el.querySelector('p, div, li, table, ul, ol, h1, h2, h3, h4, h5, h6')) continue // só blocos folha
       const txt = (el.text || '').replace(/&lt;/gi, '<').replace(/&gt;/gi, '>').replace(/&amp;/gi, '&').replace(/\s+/g, ' ').trim()
-      if (!txt || txt.length > 120 || txt[0] !== '<') continue
-      if (!/^(<[^<>]+>\s*)+$/.test(txt)) continue // o bloco é SÓ marcador(es) <...>?
-      const marcadores: string[] = txt.match(/<[^<>]+>/g) || []
-      const htmls = marcadores.map((mk: string) => mapaTags[normalizarTermoTag(mk.slice(1, -1))])
-      if (!htmls.length || htmls.some((h: string | undefined) => !h)) continue // algum não é tag da Biblioteca → não mexe
-      el.set_content(htmls.join(' '))
+      if (!txt || txt[0] === undefined || !txt.includes('<')) continue
+      // (a) bloco que é SÓ marcador(es) — também com o nome quebrado em vários <span> do Word
+      if (txt.length <= 120 && txt[0] === '<' && /^(<[^<>]+>\s*)+$/.test(txt)) {
+        const marcadores: string[] = txt.match(/<[^<>]+>/g) || []
+        const htmls = marcadores.map((mk: string) => htmlDoMarcador(mk.slice(1, -1), mapaTags))
+        if (htmls.length && !htmls.some((h) => !h)) { el.set_content((htmls as string[]).join(' ')); continue }
+      }
+      // (b) marcador NO MEIO do texto (`... <rg> ...`): troca só os que existem na Biblioteca; fora das tags HTML
+      const partes: string[] = String(el.innerHTML || '').split(/(<[^>]+>)/)
+      let mudou = false
+      for (let i = 0; i < partes.length; i += 2) {
+        partes[i] = partes[i].replace(/&lt;([^<>&]{1,60}?)&gt;/g, (m: string, miolo: string) => {
+          const h = htmlDoMarcador(miolo, mapaTags)
+          if (!h) return m
+          mudou = true
+          return h
+        })
+      }
+      if (mudou) el.set_content(partes.join(''))
     } catch { /* um bloco não quebra os demais */ }
   }
 }

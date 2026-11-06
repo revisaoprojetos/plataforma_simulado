@@ -49,6 +49,7 @@ export const TIPOS: Record<string, TipoDef> = {
   pp: { nome: 'PDFULL', c: 'var(--pf)', cs: 'var(--pf-soft)', desc: 'Parte de um PDFULL dividido entre dias', parte: true },
   rf: { nome: 'Revisão', c: 'var(--fl)', cs: 'var(--fl-soft)', desc: 'Revisão do tema na semana de revisão · 1h', rev: true },
   rq: { nome: 'Questões', c: 'var(--qu)', cs: 'var(--qu-soft)', desc: 'Questões do tema em revisão · 30min', rev: true },
+  jp: { nome: 'Jurisprudência', c: 'var(--jp, #6751b9)', cs: 'var(--jp-soft, #eeeaf7)', desc: 'Uma meta semanal de 1h, preferencialmente sexta ou sábado' },
 }
 
 export const MODREV: Record<string, { nome: string; curto: string; desc: string }> = {

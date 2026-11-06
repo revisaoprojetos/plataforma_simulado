@@ -6,6 +6,7 @@ import { atualizarPainelSnapshot } from '@/lib/painel/snapshot'
 import { carregarConteudoBanco } from '@/lib/cronograma/adaptativo/conteudo-banco'
 import { lerParamsMotor } from '@/lib/cronograma/adaptativo/config-metas'
 import { catalogoIdDoTenant } from '@/lib/cronograma/adaptativo/catalogo-override-db'
+import { lerFiltros } from '@/lib/cronograma/adaptativo/qf-db'
 import type { Cfg, DataISO } from '@/lib/cronograma/adaptativo/engine'
 import { CATALOGO_HTML, GRUPOS_HTML } from '@/lib/cronograma/adaptativo/catalogo-html'
 
@@ -24,17 +25,23 @@ export async function GET() {
   const sessao = await getSessaoAluno()
   if (!sessao) return NextResponse.json({ ok: false, message: 'Não autenticado.' }, { status: 401 })
   const svc = createAdminClient()
-  const [docs, conteudo, params, catalogoId] = await Promise.all([
+  const [docs, conteudo, params, catalogoId, filtrosQf] = await Promise.all([
     carregarDocs(svc, sessao.tenantId, sessao.estudanteId),
     carregarConteudoBanco(svc, sessao.tenantId), // já inclui o overlay do admin (Catálogo de metas)
     lerParamsMotor(svc, sessao.tenantId), // v3: parâmetros do tenant → o iframe gera o plano com os MESMOS valores do servidor
     catalogoIdDoTenant(svc, sessao.tenantId),
+    lerFiltros(svc, sessao.tenantId), // filtros de "questões da plataforma" por aula (tabela própria; cache 30s)
   ])
+  // O iframe só precisa saber QUAIS aulas oferecem questões da plataforma e a CHAVE estável de cada uma (vai na
+  // URL da tela de resolução) — o filtro em si fica no servidor. `qfAulas[i]` = chave, só p/ aulas com filtro.
+  const chaves = conteudo.chaves ?? []
+  const qfAulas: Record<number, string> = {}
+  conteudo.AS.forEach((_, i) => { const k = chaves[i]; if (k && filtrosQf[k]) qfAulas[i] = k })
   // conteudo: AS/WLP (+ WLPdoc = id do doc LegProc de cada bloco, p/ abrir no leitor) + disciplinas(classificacao/cor).
   // ordem = distribuição das aulas do modelo; agu = grupos de disciplinas específicas (pares, ex.: Internacional).
   const nomes = new Set(conteudo.disciplinas.map((d) => d.nome))
   const agu = GRUPOS_HTML.agu.map((g) => g.filter((n) => nomes.has(n))).filter((g) => g.length)
-  return NextResponse.json({ ok: true, ...docs, conteudo: { AS: conteudo.AS, ordem: conteudo.ordem ?? null, WLP: conteudo.WLP, WLPdoc: conteudo.WLPdoc ?? [], LP: conteudo.LP ?? [], disciplinas: conteudo.disciplinas, agu, catalogo: catalogoId, params } })
+  return NextResponse.json({ ok: true, ...docs, conteudo: { AS: conteudo.AS, ordem: conteudo.ordem ?? null, WLP: conteudo.WLP, WLPdoc: conteudo.WLPdoc ?? [], LP: conteudo.LP ?? [], disciplinas: conteudo.disciplinas, agu, catalogo: catalogoId, params, qfAulas } })
 }
 
 export async function POST(req: NextRequest) {

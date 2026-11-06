@@ -41,6 +41,10 @@ export function chaveDisciplina(nome: string): string {
     .replace(/^internacional publico$/, 'internacional')
 }
 
+/** Disciplinas RETIRADAS do catálogo autorizado 2.18 (Direitos Humanos, por decisão do responsável). Os índices ficam reservados; progresso existente é preservado, nada é apagado. */
+const RETIRADAS = new Set(['direitos humanos'])
+export const disciplinaRetirada = (nome: string): boolean => RETIRADAS.has(chaveDisciplina(nome))
+
 export type Grupo = 'essencial' | 'complementar' | 'especifica'
 export interface DiscHTML { nome: string; grupo: Grupo; cor: string | null; ordem: number }
 
@@ -51,7 +55,8 @@ const _disc = new Map<string, DiscHTML>()
   g.essenciais.forEach((n) => add(n, 'essencial'))
   g.complementares.forEach((n) => add(n, 'complementar'))
   g.agu.flat().forEach((n) => add(n, 'especifica'))
-  for (const a of CATALOGO_HTML.aulas) add(a[0], 'complementar')
+  const ativas = new Set(CATALOGO_HTML.ordem)
+  CATALOGO_HTML.aulas.forEach((a, i) => { if (ativas.has(i)) add(a[0], 'complementar') }) // só aulas ativas (índices reservados/retirados não criam disciplina)
 }
 /** Disciplina do modelo correspondente a um nome da plataforma (ou null se a matéria não está no modelo). */
 export function disciplinaHTML(nome: string): DiscHTML | null { return _disc.get(chaveDisciplina(nome)) || null }

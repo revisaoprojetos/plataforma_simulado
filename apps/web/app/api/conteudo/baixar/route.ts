@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     const quando = lib.liberaEm ? ` Ele será liberado em ${lib.liberaEm.split('-').reverse().join('/')}.` : ''
     return NextResponse.json({ message: `Este material ainda não foi liberado no seu cronograma.${quando}` }, { status: 403 })
   }
-  const url = await urlDownloadAluno(doc, sessao.estudanteId)
+  const url = await urlDownloadAluno(doc, sessao.estudanteId, { produtoId: new URL(request.url).searchParams.get('produto') })
   if (!url) return NextResponse.json({ message: 'Sem acesso a este documento.' }, { status: 403 })
   return NextResponse.redirect(url)
 }

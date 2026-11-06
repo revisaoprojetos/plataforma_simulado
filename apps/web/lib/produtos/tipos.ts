@@ -1,6 +1,6 @@
 // Tipos do módulo Produtos / Extensivos. Ver docs/produtos-extensivos-blueprint.md.
 
-export type ProdutoTipo = 'extensivo' | 'assinatura' | 'pre_edital' | 'sprint' | 'amostra' | 'mentoria' | 'avulso' | 'outro'
+export type ProdutoTipo = 'extensivo' | 'assinatura' | 'pre_edital' | 'sprint' | 'amostra' | 'mentoria' | 'jurisclub' | 'avulso' | 'outro'
 export type ProdutoTier = 'passaporte' | 'vitalicio' | 'normal'
 export type ValidadeTipo = 'vitalicio' | 'dias' | 'data_fixa'
 export type FonteProvider = 'curseduca' | 'guru' | 'manual' | string
@@ -109,6 +109,7 @@ export const PRODUTO_TIPOS: { v: ProdutoTipo; label: string }[] = [
   { v: 'sprint', label: 'Sprint' },
   { v: 'amostra', label: 'Amostra' },
   { v: 'mentoria', label: 'Mentoria' },
+  { v: 'jurisclub', label: 'JurisClub' },
   { v: 'avulso', label: 'Avulso' },
   { v: 'outro', label: 'Outro' },
 ]

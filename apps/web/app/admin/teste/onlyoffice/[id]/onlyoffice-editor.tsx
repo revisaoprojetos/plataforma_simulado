@@ -7,6 +7,8 @@ import { ArrowLeft, Eye } from 'lucide-react'
 declare global { interface Window { DocsAPI?: any } }
 
 const PLUGIN_GUID = 'asc.{C7A3F1E0-9B2D-4E6A-8F14-5D2B7C0A1E33}'
+const PLUGIN_AREAS_GUID = 'asc.{8B2D5E71-4F3A-4C19-9A60-D1E7A2B3C4F5}'
+const PLUGIN_EXPANSOR_GUID = 'asc.{3F9A6C24-7D1B-4E58-8B02-5C4E9D7A1F36}'
 
 export function OnlyOfficeEditor({ id, onlyofficeUrl, wopiHost, preview = false, docVersao = '0' }: { id: string; onlyofficeUrl: string; wopiHost: string; preview?: boolean; docVersao?: string }) {
   const montado = useRef(false)
@@ -22,6 +24,8 @@ export function OnlyOfficeEditor({ id, onlyofficeUrl, wopiHost, preview = false,
     // (mesma origem do app → o iframe do plugin lê), pro modo prévia saber qual .docx consultar.
     const origin = window.location.origin
     const pluginConfig = `${origin}/oo-plugin/config.json`
+    const pluginAreasConfig = `${origin}/oo-plugin-areas/config.json`
+    const pluginExpansorConfig = `${origin}/oo-plugin-expansor/config.json`
     try { localStorage.setItem('teste_oo_docid', id) } catch { /* sem storage, prévia degrada */ }
     const criar = () => {
       try {
@@ -35,7 +39,7 @@ export function OnlyOfficeEditor({ id, onlyofficeUrl, wopiHost, preview = false,
           editorConfig.mode = 'view'
         } else {
           editorConfig.callbackUrl = `${wopiHost}/api/teste/onlyoffice/callback/${id}`
-          editorConfig.plugins = { autostart: [PLUGIN_GUID], pluginsData: [pluginConfig] }
+          editorConfig.plugins = { autostart: [PLUGIN_GUID, PLUGIN_AREAS_GUID, PLUGIN_EXPANSOR_GUID], pluginsData: [pluginConfig, pluginAreasConfig, pluginExpansorConfig] }
           // Salvamento MANUAL: desliga o autosave (que salvava direto, às vezes um estado vazio por cima)
           // e liga o botão Salvar / Ctrl+S (force-save). Você salva quando o conteúdo está pronto.
           editorConfig.customization = { autosave: false, forcesave: true }

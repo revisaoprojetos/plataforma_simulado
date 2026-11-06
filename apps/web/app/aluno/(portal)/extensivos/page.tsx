@@ -12,7 +12,7 @@ const labelTipo = (t: string) => PRODUTO_TIPOS.find((x) => x.v === t)?.label ?? 
 export default async function MeusExtensivosPage() {
   const sessao = await getSessaoAluno()
   if (!sessao) redirect('/aluno/entrar')
-  const produtos = await produtosDoAluno(sessao.tenantId, sessao.estudanteId)
+  const produtos = (await produtosDoAluno(sessao.tenantId, sessao.estudanteId)).filter((p) => p.tipo !== 'jurisclub') // JurisClub tem área própria
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-6">

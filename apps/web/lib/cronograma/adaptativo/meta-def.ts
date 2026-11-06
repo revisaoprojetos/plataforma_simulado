@@ -19,6 +19,7 @@ export interface DefLinha {
   disciplina: string | null; numero: string | null; titulo: string | null; texto: string | null
   paginas: number | null; minutos: number | null; link_qc: string | null; link_tec: string | null
   documento_id: string | null; ordem: number | null; ativa: boolean; origem: string
+  aula_key?: string | null // chave estável da aula (= chave, só p/ tipo aula) — independe de ref_pos
 }
 
 /** Puro (sem banco): as definições a partir do conteúdo efetivo. */
@@ -33,7 +34,7 @@ export function definicoesDoConteudo(tenantId: string, c: { AS: Array<Array<unkn
     const n = (chavesVistas.get(base) ?? 0) + 1; chavesVistas.set(base, n)
     const doc = uuidOu(a[6])
     out.push({
-      tenant_id: tenantId, tipo: 'aula', chave: n > 1 ? `${base}#${n}` : base, ref_pos: i,
+      tenant_id: tenantId, tipo: 'aula', chave: n > 1 ? `${base}#${n}` : base, aula_key: n > 1 ? `${base}#${n}` : base, ref_pos: i,
       disciplina: String(a[0] ?? '') || null, numero: String(a[1] ?? '') || null, titulo: String(a[2] ?? '') || null, texto: null,
       paginas: typeof a[3] === 'number' && Number.isFinite(a[3]) ? Math.trunc(a[3]) : null, minutos: null,
       link_qc: String(a[4] ?? '') || null, link_tec: String(a[5] ?? '') || null, documento_id: doc,
@@ -57,7 +58,10 @@ export async function sincronizarMetaDef(svc: SupabaseClient, tenantId: string):
     const defs = definicoesDoConteudo(tenantId, { AS: conteudo.AS as unknown as Array<Array<unknown>>, ordem: conteudo.ordem, LP: conteudo.LP })
     const agora = new Date().toISOString()
     for (let k = 0; k < defs.length; k += 400) {
-      const { error } = await svc.from(T).upsert(defs.slice(k, k + 400).map((d) => ({ ...d, atualizado_em: agora })), { onConflict: 'tenant_id,tipo,chave' })
+      const lote = defs.slice(k, k + 400).map((d) => ({ ...d, atualizado_em: agora }))
+      let { error } = await svc.from(T).upsert(lote, { onConflict: 'tenant_id,tipo,chave' })
+      // migração 20261106030000 (aula_key) ainda não aplicada → grava sem a coluna
+      if (error && /aula_key/i.test(error.message)) ({ error } = await svc.from(T).upsert(lote.map(({ aula_key: _k, ...r }) => r), { onConflict: 'tenant_id,tipo,chave' }))
       if (error) return { ok: false, motivo: /does not exist|schema cache/i.test(error.message) ? 'migracao_pendente' : error.message }
     }
     // o que existia e não está mais no conteúdo → inativa (não apaga: preserva histórico/análise)

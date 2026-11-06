@@ -13,7 +13,7 @@ const DEFS: Record<TipoMeta, TipoMetaDef> = {
   flash: def('flash', 'Revisão', 'REVISÃO', 1, true),
   quest: def('quest', 'Questões', 'RESOLUÇÃO DE QUESTÕES', 2, true),
   legproc: def('legproc', 'LegProc', 'LEGPROC', 3, true),
-  juris: def('juris', 'Jurisprudência', 'JURISPRUDÊNCIA', 4, false),
+  juris: def('juris', 'Jurisprudência', 'JURISPRUDÊNCIA', 4, true),
   simulado: def('simulado', 'Simulado', 'SIMULADO', 5, false),
 }
 
@@ -21,7 +21,7 @@ function def(slug: TipoMeta, nome: string, rotulo: string, ordem: number, sempre
   return {
     id: slug, slug, nome, rotulo_docx: rotulo, ordem, cor: null,
     mostra_links: false, prefixo_aula: false, aula_no_titulo: false, quebra_conteudo: false,
-    conta_atividade: slug !== 'simulado' && slug !== 'juris', destaque_docx: false, sempre_no_docx: sempre,
+    conta_atividade: slug !== 'simulado', destaque_docx: false, sempre_no_docx: sempre,
   }
 }
 
@@ -29,6 +29,7 @@ function tipoCatalogo(t: string): TipoMeta {
   if (t === 'pf' || t === 'pp') return 'pdfull'
   if (t === 'fl' || t === 'rf') return 'flash'
   if (t === 'qu' || t === 'rq') return 'quest'
+  if (t === 'jp') return 'juris' // 2.19: Jurisprudência semanal
   return 'legproc'
 }
 

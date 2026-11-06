@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Visibilidade</title>
+<style>
+  :root {
+    --oo-accent:#446995;
+    --oo-bg: var(--background-normal, #ffffff);
+    --oo-bar: var(--background-toolbar, #f7f7f7);
+    --oo-txt: var(--text-normal, #363636);
+    --oo-txt2: var(--text-tertiary, #90949a);
+    --oo-line: var(--border-regular-control, #cfcfcf);
+    --oo-line2: var(--border-toolbar, #e0e0e0);
+    --oo-hover: var(--highlight-button-hover, #e8eef5);
+  }
+  body.oo-dark {
+    --oo-accent:#4a8ac1;
+    --oo-bg: var(--background-normal, #2b2b2b);
+    --oo-bar: var(--background-toolbar, #333333);
+    --oo-txt: var(--text-normal, #e0e0e0);
+    --oo-txt2: var(--text-tertiary, #9a9a9a);
+    --oo-line: var(--border-regular-control, #4a4a4a);
+    --oo-line2: var(--border-toolbar, #3d3d3d);
+    --oo-hover: var(--highlight-button-hover, #3a4557);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; font-family:'Open Sans','Segoe UI',Arial,sans-serif; font-size:12px; color:var(--oo-txt); background:var(--oo-bg); -webkit-font-smoothing:antialiased; }
+  body { display:flex; flex-direction:column; }
+  .scroll { flex:1; overflow-y:auto; }
+  .wrap { padding:10px 10px 16px; }
+  .ptitle { font-size:13px; font-weight:700; color:var(--oo-accent); margin:0 0 10px; }
+  .note { font-size:10.5px; color:var(--oo-txt2); margin-top:6px; line-height:1.4; }
+  .sec h4 .n { display:inline-flex; align-items:center; justify-content:center; width:15px; height:15px; border-radius:50%; background:var(--oo-accent); color:#fff; font-size:9px; letter-spacing:0; margin-right:-2px; }
+  .hint { font-size:11px; line-height:1.45; color:var(--oo-txt2); background:var(--oo-bar); border:1px solid var(--oo-line2); border-radius:3px; padding:8px 10px; }
+  .sec { margin:0 0 14px; }
+  .sec h4 { margin:0 0 7px; font-size:10px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--oo-txt2); display:flex; align-items:center; gap:8px; }
+  .sec h4::after { content:''; flex:1; height:1px; background:var(--oo-line2); }
+  label.lb { display:block; font-size:11px; font-weight:600; color:var(--oo-txt2); margin-bottom:4px; }
+  input[type=text] { width:100%; border:1px solid var(--oo-line); background:var(--oo-bg); color:var(--oo-txt); border-radius:6px; padding:8px 10px; font-size:12px; outline:none; font-family:inherit; }
+  input[type=text]:focus { border-color:var(--oo-accent); }
+  .btn { width:100%; margin-top:8px; display:flex; align-items:center; justify-content:center; border:1px solid var(--oo-accent); border-radius:6px; background:var(--oo-accent); color:#fff; font-size:12px; font-weight:600; padding:8px; cursor:pointer; font-family:inherit; transition:filter .12s; }
+  .btn:hover { filter:brightness(1.08); }
+  .btn:active { filter:brightness(.94); }
+  .btn.sec2 { background:var(--oo-bg); color:var(--oo-txt); border-color:var(--oo-line); }
+  .btn.sec2:hover { border-color:var(--oo-accent); filter:none; }
+  .btn.sm { width:auto; margin-top:0; padding:5px 10px; font-size:11px; }
+  .row { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .card { border:1px solid var(--oo-line2); border-radius:8px; padding:9px 10px; margin-bottom:8px; background:var(--oo-bg); }
+  .card .nm { font-size:12.5px; font-weight:600; color:var(--oo-txt); word-break:break-word; }
+  .card .id { font-size:10px; color:var(--oo-txt2); font-family:Consolas,monospace; }
+  .tag { font-size:9px; font-weight:700; letter-spacing:.02em; text-transform:uppercase; padding:2px 6px; border-radius:3px; background:var(--oo-line2); color:var(--oo-txt2); flex:none; }
+  .tag.aberta { background:rgba(245,158,11,.16); color:#f59e0b; }
+  .tag.fechada { background:rgba(16,185,129,.16); color:#10b981; }
+  .tag.orfa { background:rgba(220,38,38,.16); color:#dc2626; }
+  .warn { margin-top:6px; font-size:10.5px; line-height:1.4; color:#dc2626; }
+  .empty { padding:12px 0; text-align:center; font-size:11px; color:var(--oo-txt2); }
+  .sw { display:inline-flex; align-items:center; gap:7px; font-size:12px; color:var(--oo-txt); cursor:pointer; user-select:none; }
+  .sw input { display:none; }
+  .track { width:30px; height:16px; border-radius:999px; background:var(--oo-line); position:relative; transition:.16s; flex:none; }
+  .track::after { content:''; position:absolute; top:2px; left:2px; width:12px; height:12px; border-radius:50%; background:#fff; box-shadow:0 1px 1px rgba(0,0,0,.3); transition:.16s; }
+  .sw input:checked + .track { background:var(--oo-accent); }
+  .sw input:checked + .track::after { transform:translateX(14px); }
+  .acts { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .acts .btn.sm.dng { border-color:#dc2626; color:#dc2626; background:var(--oo-bg); }
+  .edit { margin-top:8px; padding-top:8px; border-top:1px dashed var(--oo-line2); }
+  .conf { margin-top:8px; font-size:11px; font-weight:600; color:#dc2626; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+  .count { font-size:10.5px; color:var(--oo-txt2); margin-bottom:6px; }
+  #msg { position:fixed; left:10px; right:10px; bottom:10px; font-size:11.5px; font-weight:600; padding:8px 11px; border-radius:3px; opacity:0; transform:translateY(8px); transition:.2s; pointer-events:none; text-align:center; box-shadow:0 3px 10px rgba(0,0,0,.25); color:#fff; background:#447f3b; }
+  #msg.show { opacity:1; transform:translateY(0); }
+  #msg.err { background:#b42318; }
+</style>
+</head>
+<body>
+<div class="scroll"><div class="wrap">
+  <div class="ptitle">Visibilidade</div>
+
+  <div class="sec">
+    <h4><span class="n">1</span>Nova área</h4>
+    <label class="lb" for="nome">Nome da área</label>
+    <input type="text" id="nome" maxlength="80" placeholder="Ex.: Bônus para alunos do Extensivo" autocomplete="off" />
+    <button class="btn" id="b-ini">Marcar início aqui</button>
+  </div>
+
+  <div class="sec">
+    <h4><span class="n">2</span>Áreas do documento</h4>
+    <div class="count" id="cont"></div>
+    <div id="lista"><div class="empty">Clique em “Atualizar” para ler o documento.</div></div>
+    <button class="btn sec2" id="b-att">Atualizar</button>
+  </div>
+
+  <div class="sec">
+    <h4><span class="n">3</span>Faixas</h4>
+    <label class="sw"><input type="checkbox" id="sw-faixas" checked /><span class="track"></span><span>Mostrar faixas dos marcadores</span></label>
+    <div class="note">Só visual para o admin. O servidor remove os marcadores para o aluno.</div>
+  </div>
+
+  <div class="sec">
+    <h4>Ajuda</h4>
+    <div class="hint">Quem vê cada área de visibilidade é configurado no admin, em <b>Gerenciar conteúdo → Áreas</b>, por produto/grupo/segmento.</div>
+  </div>
+</div></div>
+<div id="msg"></div>
+
+<script>
+/* ============================================================================================
+   Plugin "Visibilidade" (áreas de visibilidade) (OnlyOffice, Word, painel).
+   CONTRATO (o servidor depende — NÃO MUDAR): área = DOIS parágrafos de nível de corpo:
+     início: [[AREA:<id>|<Nome>]]    fim: [[/AREA:<id>]]      id = 8 chars [a-z0-9]; Nome sem "]" nem "|".
+   Inserção: Asc.plugin.callCommand + Document Builder API (Api.CreateParagraph + doc.InsertContent([p], false))
+     — dá parágrafo PRÓPRIO e estilo confiável (shd/cor/tamanho). Se der exceção, cai no PasteHtml (<p style>).
+   Leitura: callCommand percorrendo doc.GetElement(i) (só parágrafos de corpo) + GetText() + regex.
+   OCULTAR FAIXAS: reconstrói cada parágrafo-marcador (RemoveAllElements + run novo) com SetVanish(true) no run
+     e sem sombreamento. Se ApiRun.SetVanish não existir nesta versão do editor, FALLBACK: fonte 1pt branca
+     (SetFontSize(2) = meio-pontos) sem sombreamento. O texto do marcador permanece no .docx (o servidor
+     o reconhece igual). Mostrar restaura: fundo #E6F0FF, fonte 9pt, azul (#1D4ED8 início / #475569 fim).
+   ============================================================================================ */
+var conectado = false;
+var msgTimer;
+function $(id){ return document.getElementById(id); }
+function msg(t, err){ var m=$('msg'); m.textContent=t; m.className='show'+(err?' err':''); clearTimeout(msgTimer); msgTimer=setTimeout(function(){ m.className=''; }, err?5000:2200); }
+function api(){ return window.Asc && window.Asc.plugin ? window.Asc.plugin : null; }
+function limparNome(s){ return String(s||'').replace(/[\]\|\r\n\t]/g,' ').replace(/\s+/g,' ').trim(); }
+function gerarId(){
+  var c='abcdefghijklmnopqrstuvwxyz0123456789', s='';
+  var arr = (window.crypto && crypto.getRandomValues) ? crypto.getRandomValues(new Uint8Array(8)) : null;
+  for (var i=0;i<8;i++) s += c.charAt((arr ? arr[i] : Math.floor(Math.random()*256)) % c.length);
+  return s;
+}
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(ch){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]; }); }
+
+/* Insere um parágrafo-marcador no cursor. tipo: 'ini' | 'fim' */
+function inserirMarcador(texto, tipo){
+  var p = api();
+  if (!p || !conectado) { msg('Editor não conectado — recarregue (Ctrl+F5).', true); return false; }
+  try {
+    Asc.scope.mTexto = texto;
+    Asc.scope.mTipo = tipo;
+    p.callCommand(function(){
+      var doc = Api.GetDocument();
+      var par = Api.CreateParagraph();
+      var run = Api.CreateRun();
+      run.AddText(Asc.scope.mTexto);
+      run.SetFontSize(18); // 9pt (meio-pontos)
+      if (Asc.scope.mTipo === 'ini') run.SetColor(29, 78, 216); else run.SetColor(71, 85, 105);
+      par.AddElement(run);
+      par.SetShd('clear', 230, 240, 255);
+      doc.InsertContent([par], false);
+    }, false, true, function(){ setTimeout(atualizar, 150); });
+    return true;
+  } catch (e) {
+    try { /* fallback: PasteHtml */
+      var cor = tipo==='ini' ? '#1D4ED8' : '#475569';
+      p.executeMethod('PasteHtml', ['<p style="background-color:#E6F0FF;color:'+cor+';font-size:9pt;margin:0">'+esc(texto)+'</p>']);
+      setTimeout(atualizar, 300);
+      return true;
+    } catch (e2) { msg('Não foi possível inserir o marcador: '+(e2 && e2.message || e2), true); return false; }
+  }
+}
+
+function marcarInicio(){
+  try {
+    var nome = limparNome($('nome').value);
+    if (!nome) { msg('Informe o nome da área.', true); $('nome').focus(); return; }
+    var id = gerarId();
+    if (inserirMarcador('[[AREA:'+id+'|'+nome+']]', 'ini')) { $('nome').value=''; msg('Início marcado ('+id+'). Agora marque o fim onde a área termina.'); }
+  } catch (e) { msg('Erro: '+(e && e.message || e), true); }
+}
+function marcarFim(id){
+  try { if (inserirMarcador('[[/AREA:'+id+']]', 'fim')) msg('Fim marcado ('+id+').'); }
+  catch (e) { msg('Erro: '+(e && e.message || e), true); }
+}
+
+/* ---- Gerenciamento: tudo localiza o parágrafo pelo ID dentro do callCommand ---- */
+function executar(func, okMsg){
+  var p = api();
+  if (!p || !conectado) { msg('Editor não conectado — recarregue (Ctrl+F5).', true); return; }
+  try {
+    p.callCommand(func, false, true, function(ret){
+      var r = String(ret == null ? '' : ret);
+      if (r === '0' || r === 'no') msg('Marcador não encontrado — atualize a lista.', true);
+      else msg(okMsg);
+      setTimeout(atualizar, 200);
+    });
+  } catch (e) { msg('Erro: '+(e && e.message || e), true); }
+}
+function renomearArea(id, nome){
+  Asc.scope.gId = id; Asc.scope.gTexto = '[[AREA:'+id+'|'+nome+']]'; Asc.scope.gMostrar = !!$('sw-faixas').checked;
+  executar(function(){
+    var doc = Api.GetDocument(), n = doc.GetElementsCount(), achou = 0;
+    var pref = '[[AREA:' + Asc.scope.gId + '|';
+    for (var i = 0; i < n; i++) {
+      var el = doc.GetElement(i);
+      if (!el || el.GetClassType() !== 'paragraph') continue;
+      var t = (el.GetText() || '').replace(/^\s+|\s+$/g, '');
+      if (t.indexOf(pref) !== 0) continue;
+      el.RemoveAllElements();
+      var run = Api.CreateRun();
+      run.AddText(Asc.scope.gTexto);
+      if (Asc.scope.gMostrar) {
+        run.SetFontSize(18); run.SetColor(29, 78, 216);
+        el.AddElement(run); el.SetShd('clear', 230, 240, 255);
+      } else {
+        if (typeof run.SetVanish === 'function') { run.SetVanish(true); }
+        else { run.SetFontSize(2); run.SetColor(255, 255, 255); }
+        el.AddElement(run); el.SetShd('nil');
+      }
+      achou++; break;
+    }
+    return String(achou);
+  }, 'Área renomeada.');
+}
+function apagarMarcacao(id){
+  Asc.scope.gId = id;
+  executar(function(){
+    var doc = Api.GetDocument(), n = doc.GetElementsCount(), idxs = [];
+    var ini = '[[AREA:' + Asc.scope.gId + '|', fim = '[[/AREA:' + Asc.scope.gId + ']]';
+    for (var i = 0; i < n; i++) {
+      var el = doc.GetElement(i);
+      if (!el || el.GetClassType() !== 'paragraph') continue;
+      var t = (el.GetText() || '').replace(/^\s+|\s+$/g, '');
+      if (t.indexOf(ini) === 0 || t === fim) idxs.push(i);
+    }
+    var feitos = 0;
+    for (var k = idxs.length - 1; k >= 0; k--) { // de trás p/ frente: índices não deslocam
+      var el2 = doc.GetElement(idxs[k]);
+      try { doc.RemoveElement(idxs[k]); feitos++; }
+      catch (e1) {
+        try { el2.Delete(); feitos++; }
+        catch (e2) { try { el2.RemoveAllElements(); feitos++; } catch (e3) {} }
+      }
+    }
+    return String(feitos);
+  }, 'Marcação apagada (conteúdo mantido).');
+}
+function irPara(id){
+  Asc.scope.gId = id;
+  executar(function(){
+    var doc = Api.GetDocument(), n = doc.GetElementsCount();
+    var ini = '[[AREA:' + Asc.scope.gId + '|';
+    for (var i = 0; i < n; i++) {
+      var el = doc.GetElement(i);
+      if (!el || el.GetClassType() !== 'paragraph') continue;
+      var t = (el.GetText() || '').replace(/^\s+|\s+$/g, '');
+      if (t.indexOf(ini) !== 0) continue;
+      if (typeof el.Select === 'function') el.Select();
+      else el.GetRange().Select();
+      return 'ok';
+    }
+    return 'no';
+  }, 'Posicionado no marcador.');
+}
+
+/* Lê o documento e lista as áreas. */
+function atualizar(){
+  var p = api();
+  if (!p || !conectado) { $('lista').innerHTML='<div class="empty">Editor não conectado — recarregue (Ctrl+F5).</div>'; return; }
+  try {
+    p.callCommand(function(){
+      var doc = Api.GetDocument();
+      var n = doc.GetElementsCount();
+      var out = [];
+      for (var i = 0; i < n; i++) {
+        var el = doc.GetElement(i);
+        if (!el || el.GetClassType() !== 'paragraph') continue;
+        var t = (el.GetText() || '').replace(/^\s+|\s+$/g, '');
+        if (t.indexOf('[[') === 0) out.push([i, t]);
+      }
+      return JSON.stringify(out);
+    }, false, false, function(ret){
+      try { renderizar(JSON.parse(ret || '[]')); }
+      catch (e) { $('lista').innerHTML='<div class="empty">Não foi possível ler o documento.</div>'; msg('Erro ao ler: '+(e && e.message || e), true); }
+    });
+  } catch (e) { $('lista').innerHTML='<div class="empty">Não foi possível ler o documento.</div>'; msg('Erro: '+(e && e.message || e), true); }
+}
+
+var RE_INI = /^\[\[AREA:([a-z0-9]{8})\|([^\]|]*)\]\]$/;
+var RE_FIM = /^\[\[\/AREA:([a-z0-9]{8})\]\]$/;
+function renderizar(marcas){
+  var mapa = {}, ordem = [];
+  marcas.forEach(function(m){
+    var idx=m[0], t=m[1], a=RE_INI.exec(t), b=RE_FIM.exec(t);
+    var id = a ? a[1] : b ? b[1] : null; if (!id) return;
+    if (!mapa[id]) { mapa[id] = { id:id, nome:'', ini:[], fim:[] }; ordem.push(id); }
+    if (a) { mapa[id].ini.push(idx); if (!mapa[id].nome) mapa[id].nome = a[2].trim(); }
+    else mapa[id].fim.push(idx);
+  });
+  var box = $('lista'); box.innerHTML='';
+  $('cont').textContent = ordem.length + (ordem.length === 1 ? ' área' : ' áreas');
+  if (!ordem.length) { box.innerHTML='<div class="empty">Nenhuma área neste documento.</div>'; return; }
+  ordem.forEach(function(id){
+    var a = mapa[id], avisos = [], estado;
+    if (!a.ini.length) { estado='orfa'; avisos.push('Órfã: existe só o marcador de fim. Remova-o ou crie o início.'); }
+    else if (!a.fim.length) estado='aberta';
+    else estado='fechada';
+    if (a.ini.length > 1) avisos.push('Marcador de início duplicado ('+a.ini.length+'×). Mantenha apenas um.');
+    if (a.fim.length > 1) avisos.push('Marcador de fim duplicado ('+a.fim.length+'×). Mantenha apenas um.');
+    if (a.ini.length && a.fim.length && a.fim[0] < a.ini[0]) avisos.push('O fim está antes do início.');
+    var c = document.createElement('div'); c.className='card';
+    c.innerHTML = '<div class="row"><div class="nm">'+esc(a.nome || '(sem nome)')+'</div><span class="tag '+estado+'">'+(estado==='orfa'?'órfã':estado)+'</span></div>'
+      + '<div class="id">'+esc(id)+'</div>';
+    var acts = document.createElement('div'); acts.className='acts'; c.appendChild(acts);
+    var area = document.createElement('div'); c.appendChild(area);
+    function btn(txt, fn, cls){ var b=document.createElement('button'); b.className='btn sm sec2'+(cls?' '+cls:''); b.textContent=txt; b.onclick=fn; acts.appendChild(b); return b; }
+    if (estado==='aberta') btn('Marcar fim aqui', function(){ marcarFim(id); });
+    if (a.ini.length) {
+      btn('Renomear', function(){
+        area.innerHTML=''; var ed=document.createElement('div'); ed.className='edit';
+        var inp=document.createElement('input'); inp.type='text'; inp.maxLength=80; inp.value=a.nome;
+        var r=document.createElement('div'); r.className='acts';
+        var ok=document.createElement('button'); ok.className='btn sm'; ok.textContent='Salvar';
+        var no=document.createElement('button'); no.className='btn sm sec2'; no.textContent='Cancelar';
+        function salvar(){ var nn=limparNome(inp.value); if(!nn){ msg('Informe o nome.', true); return; } renomearArea(id, nn); }
+        ok.onclick=salvar; no.onclick=function(){ area.innerHTML=''; };
+        inp.addEventListener('keydown', function(e){ if (e.key==='Enter') salvar(); });
+        r.appendChild(ok); r.appendChild(no); ed.appendChild(inp); ed.appendChild(r); area.appendChild(ed); inp.focus();
+      });
+    }
+    btn('Apagar marcação', function(){
+      area.innerHTML=''; var cf=document.createElement('div'); cf.className='conf';
+      cf.appendChild(document.createTextNode('Apagar? (o conteúdo é mantido)'));
+      var s=document.createElement('button'); s.className='btn sm dng'; s.textContent='Sim';
+      var n=document.createElement('button'); n.className='btn sm sec2'; n.textContent='Não';
+      s.onclick=function(){ apagarMarcacao(id); }; n.onclick=function(){ area.innerHTML=''; };
+      cf.appendChild(s); cf.appendChild(n); area.appendChild(cf);
+    }, 'dng');
+    if (a.ini.length) btn('Ir para', function(){ irPara(id); });
+    avisos.forEach(function(w){ var d=document.createElement('div'); d.className='warn'; d.textContent='⚠ '+w; c.appendChild(d); });
+    box.appendChild(c);
+  });
+}
+
+/* Mostrar/ocultar faixas (ver nota no topo do script). */
+function alternarFaixas(mostrar){
+  var p = api();
+  if (!p || !conectado) { msg('Editor não conectado — recarregue (Ctrl+F5).', true); $('sw-faixas').checked = !mostrar; return; }
+  try {
+    Asc.scope.fMostrar = !!mostrar;
+    p.callCommand(function(){
+      var doc = Api.GetDocument();
+      var n = doc.GetElementsCount();
+      var mostrar = Asc.scope.fMostrar;
+      for (var i = 0; i < n; i++) {
+        var el = doc.GetElement(i);
+        if (!el || el.GetClassType() !== 'paragraph') continue;
+        var t = (el.GetText() || '').replace(/^\s+|\s+$/g, '');
+        var ehIni = /^\[\[AREA:[a-z0-9]{8}\|[^\]|]*\]\]$/.test(t);
+        var ehFim = /^\[\[\/AREA:[a-z0-9]{8}\]\]$/.test(t);
+        if (!ehIni && !ehFim) continue;
+        el.RemoveAllElements();
+        var run = Api.CreateRun();
+        run.AddText(t);
+        if (mostrar) {
+          run.SetFontSize(18);
+          if (ehIni) run.SetColor(29, 78, 216); else run.SetColor(71, 85, 105);
+          el.AddElement(run);
+          el.SetShd('clear', 230, 240, 255);
+        } else {
+          if (typeof run.SetVanish === 'function') { run.SetVanish(true); }
+          else { run.SetFontSize(2); run.SetColor(255, 255, 255); }
+          el.AddElement(run);
+          el.SetShd('nil');
+        }
+      }
+    }, false, true, function(){ msg(mostrar ? 'Faixas visíveis.' : 'Faixas ocultas (só visual).'); });
+  } catch (e) { msg('Erro: '+(e && e.message || e), true); $('sw-faixas').checked = !mostrar; }
+}
+
+$('b-ini').onclick = marcarInicio;
+$('b-att').onclick = atualizar;
+$('nome').addEventListener('keydown', function(e){ if (e.key==='Enter') marcarInicio(); });
+$('sw-faixas').addEventListener('change', function(){ alternarFaixas(this.checked); });
+
+if (window.Asc && window.Asc.plugin) {
+  window.Asc.plugin.init = function(){ conectado = true; atualizar(); };
+  window.Asc.plugin.button = function(){ this.executeCommand('close',''); };
+  window.Asc.plugin.onThemeChanged = function(theme){
+    try { if (window.Asc.plugin.onThemeChangedBase) window.Asc.plugin.onThemeChangedBase(theme); } catch (e) {}
+    try {
+      var m = /(\d+)[,\s]+(\d+)[,\s]+(\d+)/.exec(getComputedStyle(document.body).backgroundColor || '');
+      var dark = m && (0.299*+m[1] + 0.587*+m[2] + 0.114*+m[3]) < 128;
+      document.body.classList.toggle('oo-dark', !!dark);
+    } catch (e) {}
+  };
+}
+</script>
+</body>
+</html>

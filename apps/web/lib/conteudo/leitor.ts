@@ -6,6 +6,7 @@ import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { remember, esquecer } from '@/lib/cache/relatorio-cache'
 import { docBloqueadoNoCronograma } from '@/lib/cronograma/adaptativo/liberacao'
 import { listarAnotacoes, type Anotacao } from './anotacoes'
+import { resolverAreas, produtoValidoDoAluno, filtrarHtmlPorAreas, type ResolucaoAreas } from './areas'
 import { mapaPastas, resolverCapaDoc } from './capa-pagina'
 import { acessoEfetivo, type ItemAcesso, type Atribuicao, type Aluno, type AcessoGeral, type ModoAcesso, type ResultadoAcesso } from './acesso-efetivo'
 
@@ -326,12 +327,18 @@ export async function arvoreBibliotecaAluno(alunoId: string, pastaId?: string | 
 }
 
 /** Carrega a leitura (trechos da versão atual + grifos do aluno). null se não publicado OU sem acesso. */
-export async function carregarLeitura(documentoId: string, alunoId: string): Promise<Leitura | null> {
+/** Áreas de visibilidade do documento p/ ESTE aluno (e produto pelo qual abriu, se válido). Testador vê tudo. */
+async function areasDoAluno(svc: any, tenantId: string, alunoId: string, documentoId: string, produtoId?: string | null): Promise<ResolucaoAreas> {
+  const [verTudo, prod] = await Promise.all([ehTestadorGlobal({ tenantId, estudanteId: alunoId }).catch(() => false), produtoValidoDoAluno(tenantId, alunoId, produtoId)])
+  return resolverAreas(svc, tenantId, alunoId, documentoId, { produtoId: prod, verTudo: !!verTudo })
+}
+
+export async function carregarLeitura(documentoId: string, alunoId: string, opts: { produtoId?: string | null } = {}): Promise<Leitura | null> {
   const tenantId = await getCurrentTenantId()
   if (!tenantId || !documentoId) return null
   const svc = createAdminClient()
   const doc = await fetchDocComAcesso(svc, tenantId, documentoId, 'id, titulo, status, versao_atual_id, deletado, pasta_id, herda_acesso, acesso_geral, tipo_origem, categoria')
-  if (!doc || doc.deletado || !doc.versao_atual_id || (doc as any).categoria !== 'conteudo') return null
+  if (!doc || doc.deletado || !doc.versao_atual_id || !['conteudo', 'jurisclub'].includes((doc as any).categoria)) return null
   // TESTADOR GLOBAL: acesso total — fura "não publicado" e o gate de acesso. Fast-path sem query se o
   // tenant não tiver testadores. Demais guardas (deletado/categoria/versão) continuam valendo.
   const ehTest = await ehTestadorGlobal({ tenantId, estudanteId: alunoId })
@@ -368,6 +375,17 @@ export async function carregarLeitura(documentoId: string, alunoId: string): Pro
     }),
     listarAnotacoes(documentoId, alunoId),
   ])
+  // ÁREAS DE VISIBILIDADE: o cache acima é igual p/ todos; o filtro por aluno roda DEPOIS (nada restrito entra no cache
+  // por aluno e nada oculto sai do servidor). Trechos/anotações das áreas removidas saem junto.
+  const areas = await areasDoAluno(svc, tenantId, alunoId, documentoId, opts.produtoId)
+  if (areas.temAreas) {
+    const f = filtrarHtmlPorAreas(docPart.html, areas.ocultas, areas.blocos, areas.estiloPadrao)
+    return {
+      documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, html: f.html,
+      trechos: docPart.trechos.filter((t) => !f.uidsRemovidos.has(t.uid)),
+      anotacoes: anotacoes.filter((a) => !f.uidsRemovidos.has(a.trecho_uid)),
+    }
+  }
   return { documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, trechos: docPart.trechos, html: docPart.html, anotacoes }
 }
 
@@ -411,17 +429,18 @@ export interface LeituraPdf { documentoId: string; titulo: string; versaoId: str
  * Leitura FIEL (PDF do editor) do aluno: devolve o PDF pixel-perfeito (OnlyOffice, cacheado) + os grifos
  * do aluno (por página + retângulos normalizados). null se não publicado OU sem acesso. Server-only.
  */
-export async function carregarLeituraPdf(documentoId: string, alunoId: string): Promise<LeituraPdf | null> {
+export async function carregarLeituraPdf(documentoId: string, alunoId: string, opts: { produtoId?: string | null } = {}): Promise<LeituraPdf | null> {
   const tenantId = await getCurrentTenantId()
   if (!tenantId || !documentoId) return null
   const svc = createAdminClient()
   const doc = await fetchDocComAcesso(svc, tenantId, documentoId, 'id, titulo, status, versao_atual_id, deletado, pasta_id, herda_acesso, acesso_geral, tipo_origem, categoria')
-  if (!doc || doc.deletado || !doc.versao_atual_id || (doc as any).categoria !== 'conteudo') return null
+  if (!doc || doc.deletado || !doc.versao_atual_id || !['conteudo', 'jurisclub'].includes((doc as any).categoria)) return null
   // Acesso (testador OU publicado+gate) — decisão cacheada 60s (ver `podeLerDoc`).
   if (!(await podeLerDoc(svc, tenantId, alunoId, doc))) return null
   if (await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id)) return null // liberação por data do Cronograma Adaptativo
 
   const { gerarPdfDocumento } = await import('./thumb')
+  const areasPdf = await areasDoAluno(svc, tenantId, alunoId, documentoId, opts.produtoId)
   // O PDF (OnlyOffice→PDF, já cacheado em storage) + a URL assinada são IGUAIS p/ todos os alunos e
   // dependem só da versão → cacheados 300s pela chave c/ versao_atual_id (nova versão = chave nova, invalida
   // sozinho). A URL assinada vale 3600s, então 300s NÃO a expira (mesma lógica das thumbs). Os GRIFOS são
@@ -429,7 +448,7 @@ export async function carregarLeituraPdf(documentoId: string, alunoId: string): 
   const [pdfUrl, grifosRows, cfgRow] = await Promise.all([
     // Falha (conversão DOCX→PDF fora/lenta) NÃO entra no cache: `undefined` não é guardado pelo remember —
     // antes o null ficava 5 min em cache e o "Tentar de novo" do leitor repetia o erro sem tentar converter.
-    remember<string | undefined>(`leitura-pdf:${tenantId}:${documentoId}:${doc.versao_atual_id}`, 300, async () => (await gerarPdfDocumento(tenantId, documentoId).catch(() => null)) ?? undefined).then((u) => u ?? null),
+    remember<string | undefined>(`leitura-pdf:${tenantId}:${documentoId}:${doc.versao_atual_id}${areasPdf.temAreas ? `:a${areasPdf.variante}` : ''}`, 300, async () => (await gerarPdfDocumento(tenantId, documentoId, areasPdf).catch(() => null)) ?? undefined).then((u) => u ?? null),
     // tolerante à migração pendente: se a tabela não existir, trata como sem grifos.
     fetchAll<any>(() => svc.from('simulado_conteudo_grifos_pdf').select('id, pagina, rects, cor, tool, nota, texto').eq('tenant_id', tenantId).eq('documento_id', documentoId).eq('aluno_id', alunoId).order('id', { ascending: true })).catch(() => []),
     // Toggle da legenda de categorias (LegProc) por documento. Tolerante à migração pendente: se a coluna
@@ -458,7 +477,7 @@ export async function carregarMidiaAluno(documentoId: string, alunoId: string): 
   if (!tenantId || !documentoId) return null
   const svc = createAdminClient()
   const doc = await fetchDocComAcesso(svc, tenantId, documentoId, 'id, titulo, status, versao_atual_id, deletado, pasta_id, herda_acesso, acesso_geral, tipo_origem, categoria')
-  if (!doc || doc.deletado || !doc.versao_atual_id || (doc as any).categoria !== 'conteudo') return null
+  if (!doc || doc.deletado || !doc.versao_atual_id || !['conteudo', 'jurisclub'].includes((doc as any).categoria)) return null
   // Só vídeo/áudio têm player aqui; qualquer outro tipo → null (o chamador abre o leitor de PDF normal).
   const tipoOrigem = String((doc as any).tipo_origem ?? '')
   if (tipoOrigem !== 'video' && tipoOrigem !== 'audio') return null
@@ -545,17 +564,19 @@ export async function garantirHtmlLegproc(svc: any, tenantId: string, documentoI
 export interface LeituraTexto { documentoId: string; titulo: string; versaoId: string; html: string; anotacoes: Anotacao[]; mostrarLegenda: boolean; ocultarLegendaTabela: boolean }
 export type DocParaLeitura = { kind: 'midia'; midia: MidiaAluno } | { kind: 'pdf'; pdf: LeituraPdf } | { kind: 'texto'; texto: LeituraTexto }
 
-export async function carregarDocParaLeitura(documentoId: string, alunoId: string): Promise<DocParaLeitura | null> {
+export async function carregarDocParaLeitura(documentoId: string, alunoId: string, opts: { produtoId?: string | null } = {}): Promise<DocParaLeitura | null> {
   const tenantId = await getCurrentTenantId()
   if (!tenantId || !documentoId) return null
   const svc = createAdminClient()
   const doc = await fetchDocComAcesso(svc, tenantId, documentoId, 'id, titulo, status, versao_atual_id, deletado, pasta_id, herda_acesso, acesso_geral, tipo_origem, categoria')
-  if (!doc || doc.deletado || !doc.versao_atual_id || (doc as any).categoria !== 'conteudo') return null
+  if (!doc || doc.deletado || !doc.versao_atual_id || !['conteudo', 'jurisclub'].includes((doc as any).categoria)) return null
   // Acesso (testador OU publicado+gate) — decisão cacheada 60s (ver `podeLerDoc`). UMA vez para mídia e PDF.
   if (!(await podeLerDoc(svc, tenantId, alunoId, doc))) return null
   if (await docBloqueadoNoCronograma(svc, tenantId, alunoId, doc.id)) return null // liberação por data do Cronograma Adaptativo
 
   const tipoOrigem = String((doc as any).tipo_origem ?? '')
+  // ÁREAS DE VISIBILIDADE (plugin do editor): quais áreas ESTE aluno não vê (por produto/grupo/segmento/aluno).
+  const areasAluno = await areasDoAluno(svc, tenantId, alunoId, documentoId, opts.produtoId)
   // MÍDIA (vídeo/áudio): player nativo. Só a URL assinada do original (gate já passou).
   if (tipoOrigem === 'video' || tipoOrigem === 'audio') {
     const { data: ver } = await svc.from('simulado_conteudo_versoes').select('arquivo_key').eq('tenant_id', tenantId).eq('id', doc.versao_atual_id).maybeSingle()
@@ -588,10 +609,11 @@ export async function carregarDocParaLeitura(documentoId: string, alunoId: strin
       return typeof h === 'string' && h.startsWith(MARCA_LP) ? h : undefined
     })
     if (!html) return null
-    const anotacoes = await listarAnotacoes(documentoId, alunoId)
+    const f = filtrarHtmlPorAreas(html, areasAluno.ocultas, areasAluno.blocos, areasAluno.estiloPadrao)
+    const anotacoes = (await listarAnotacoes(documentoId, alunoId)).filter((a) => !f.uidsRemovidos.has(a.trecho_uid))
     const { ocultarLegendaTabela } = await import('./legproc-legenda')
     const ocultarLeg = await ocultarLegendaTabela(svc, tenantId, documentoId, (doc as any).pasta_id ?? null)
-    return { kind: 'texto', texto: { documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, html, anotacoes, mostrarLegenda: legendaLegproc, ocultarLegendaTabela: ocultarLeg } }
+    return { kind: 'texto', texto: { documentoId, titulo: doc.titulo, versaoId: doc.versao_atual_id, html: f.html, anotacoes, mostrarLegenda: legendaLegproc, ocultarLegendaTabela: ocultarLeg } }
   }
   if (ehLegproc) {
     const t = await montarTextoConvertido()
@@ -603,7 +625,7 @@ export async function carregarDocParaLeitura(documentoId: string, alunoId: strin
   const [pdfUrl, grifosRows, cfgRow] = await Promise.all([
     // Falha (conversão DOCX→PDF fora/lenta) NÃO entra no cache: `undefined` não é guardado pelo remember —
     // antes o null ficava 5 min em cache e o "Tentar de novo" do leitor repetia o erro sem tentar converter.
-    remember<string | undefined>(`leitura-pdf:${tenantId}:${documentoId}:${doc.versao_atual_id}`, 300, async () => (await gerarPdfDocumento(tenantId, documentoId).catch(() => null)) ?? undefined).then((u) => u ?? null),
+    remember<string | undefined>(`leitura-pdf:${tenantId}:${documentoId}:${doc.versao_atual_id}${areasAluno.temAreas ? `:a${areasAluno.variante}` : ''}`, 300, async () => (await gerarPdfDocumento(tenantId, documentoId, areasAluno).catch(() => null)) ?? undefined).then((u) => u ?? null),
     fetchAll<any>(() => svc.from('simulado_conteudo_grifos_pdf').select('id, pagina, rects, cor, tool, nota, texto').eq('tenant_id', tenantId).eq('documento_id', documentoId).eq('aluno_id', alunoId).order('id', { ascending: true })).catch(() => []),
     (async () => { try { const r = await svc.from('simulado_conteudo_documentos').select('legenda_categorias').eq('tenant_id', tenantId).eq('id', documentoId).maybeSingle(); return r.error ? null : r.data } catch { return null } })(),
   ])
@@ -613,7 +635,7 @@ export async function carregarDocParaLeitura(documentoId: string, alunoId: strin
     const t = await montarTextoConvertido()
     if (t) return t
     // último recurso: texto simples (sem a formatação do professor) — melhor que "indisponível"
-    const lt = await carregarLeitura(documentoId, alunoId).catch(() => null)
+    const lt = await carregarLeitura(documentoId, alunoId, { produtoId: opts.produtoId }).catch(() => null)
     if (lt && lt.html && lt.html.trim()) {
       const { ocultarLegendaTabela } = await import('./legproc-legenda')
       const ocultarLeg = await ocultarLegendaTabela(svc, tenantId, documentoId, (doc as any).pasta_id ?? null)
@@ -627,12 +649,12 @@ export async function carregarDocParaLeitura(documentoId: string, alunoId: strin
 }
 
 /** URL assinada do arquivo ORIGINAL para o aluno BAIXAR — só se tiver acesso (gate). null se negado. */
-export async function urlDownloadAluno(documentoId: string, alunoId: string): Promise<string | null> {
+export async function urlDownloadAluno(documentoId: string, alunoId: string, opts: { produtoId?: string | null } = {}): Promise<string | null> {
   const tenantId = await getCurrentTenantId()
   if (!tenantId || !documentoId) return null
   const svc = createAdminClient()
   const doc = await fetchDocComAcesso(svc, tenantId, documentoId, 'id, status, deletado, versao_atual_id, pasta_id, herda_acesso, acesso_geral, categoria')
-  if (!doc || doc.deletado || !doc.versao_atual_id || (doc as any).categoria !== 'conteudo') return null
+  if (!doc || doc.deletado || !doc.versao_atual_id || !['conteudo', 'jurisclub'].includes((doc as any).categoria)) return null
   // TESTADOR GLOBAL: baixa qualquer material (fura "não publicado" + gate + permissão de baixar).
   if (!(await ehTestadorGlobal({ tenantId, estudanteId: alunoId }))) {
     if (doc.status !== 'publicado') return null
@@ -645,6 +667,14 @@ export async function urlDownloadAluno(documentoId: string, alunoId: string): Pr
   const { data: ver } = await svc.from('simulado_conteudo_versoes').select('arquivo_key').eq('tenant_id', tenantId).eq('id', doc.versao_atual_id).maybeSingle()
   if (!(ver as any)?.arquivo_key) return null
   const { urlAssinadaOriginal } = await import('./ingestao')
+  // Documento com áreas: o aluno baixa o .docx FILTRADO (sem marcadores e sem as áreas que ele não vê).
+  const areasDl = await areasDoAluno(svc, tenantId, alunoId, documentoId, opts.produtoId)
+  if (areasDl.temAreas) {
+    const { data: vv } = await svc.from('simulado_conteudo_versoes').select('hash_arquivo').eq('tenant_id', tenantId).eq('id', doc.versao_atual_id).maybeSingle()
+    const { chaveDocxVariante } = await import('./thumb')
+    const kv = await chaveDocxVariante(tenantId, doc.versao_atual_id, (ver as any).arquivo_key, (vv as any)?.hash_arquivo ?? '', areasDl)
+    return kv ? urlAssinadaOriginal(kv, 600) : null // sem variante pronta NÃO entrega o original
+  }
   return urlAssinadaOriginal((ver as any).arquivo_key, 600)
 }
 

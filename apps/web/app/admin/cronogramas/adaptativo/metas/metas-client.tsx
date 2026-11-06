@@ -142,6 +142,19 @@ export function MetasClient({ inicial }: { inicial: PainelMetas }) {
           <Num {...c} k="charsMetaLp" label="Tamanho da meta" min={2000} max={40000} un="car" hint="Aplicado ao cortar as leis da Biblioteca em metas (próxima atualização do catálogo)." />
         </Bloco>
 
+        <Bloco titulo="Regras da versão 2.18" desc="Comportamentos do gerador 2.18. Cada um vale só para planos gerados ou recalculados depois de ligar; desligado = comportamento atual.">
+          <Chave ligado={p.pdfInteiro218} onChange={(v) => set('pdfInteiro218', v)}
+            titulo="Segundo PDFull só se couber inteiro" desc="Não abre um segundo PDFull no dia se ele não couber inteiro na sobra de tempo. A continuação do PDFull em curso não é afetada." />
+          <Chave ligado={p.revisaoPorResultado218} onChange={(v) => set('revisaoPorResultado218', v)}
+            titulo="Revisão pelo resultado recente do tema" desc="Na semana de revisão entram os temas com acerto abaixo de 70% (os piores primeiro, depois 50–70%, depois sem resultado). Temas com 70% ou mais ficam de fora." />
+        </Bloco>
+
+        <Bloco titulo="Jurisprudência semanal (versão 2.19)" desc="Uma meta geral de Jurisprudência por semana de atividade, preferindo sexta ou sábado. Vale só para planos gerados ou recalculados depois de ligar; ela ocupa tempo do aluno, então os planos ficam um pouco mais longos.">
+          <Chave ligado={p.jurisprudencia219} onChange={(v) => set('jurisprudencia219', v)}
+            titulo="Meta semanal de Jurisprudência" desc="Reserva o tempo antes de distribuir o conteúdo da semana. Semana sem estudo não recebe; semana com estudo mas sem um dia que comporte a meta avisa o aluno para ajustar a rotina." />
+          {p.jurisprudencia219 && <Num {...c} k="jurisprudenciaMin" label="Duração da meta" min={15} max={180} un="min" hint="Padrão 60 min (versão 2.19)." />}
+        </Bloco>
+
         <Bloco titulo="Inteligência de desempenho" desc="Usa o grau de dificuldade e os acertos que o aluno anotou para priorizar temas fracos.">
           <Num {...c} k="acertoMin" label="Acerto mínimo" min={0} max={100} un="%" hint="Abaixo disso o tema vira prioritário nas semanas de revisão." />
           <Chave ligado={p.usarDesempenhoNoPlano} onChange={(v) => setP((x) => ({ ...x, usarDesempenhoNoPlano: v, pesoDesempenho: v ? (x.pesoDesempenho || 1) : 0 }))}

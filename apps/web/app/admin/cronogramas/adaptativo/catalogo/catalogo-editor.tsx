@@ -3,9 +3,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { ArrowUp, ArrowDown, ChevronRight, Loader2, Plus, RotateCcw, Save, Search, Trash2, Eye, EyeOff, ExternalLink, AlertTriangle } from 'lucide-react'
+import { ArrowUp, ArrowDown, ChevronRight, Loader2, Plus, RotateCcw, Save, Search, Trash2, Eye, EyeOff, ExternalLink, AlertTriangle, ListChecks } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
+import { FiltroQuestoesMetaEditor } from '@/components/admin/filtro-questoes-meta-editor'
+import { contarCriterios, type FiltroQuestoesMeta } from '@/lib/cronograma/adaptativo/qf'
 import {
   type CatalogoOverride, type AulaOv, type AulaNova, type LpOv, type MateriaisOv,
   ordemEfetiva, moverNaDisciplina, contarAlteracoes, OVERRIDE_VAZIO,
@@ -20,9 +22,12 @@ const urlAbre = (v: string) => (/^https?:\/\//i.test(v) ? v : v ? `https://www.g
 interface LinhaAula { key: string; disc: string; num: string; tema: string; pags: number; qc: string; tec: string; ativo: boolean; nova: boolean; alterada: boolean; base: EditorAulaBase | null; mat: MateriaisOv & { pdflashPaginas?: number | null } }
 interface LinhaLp { id: string; disc: string; leiNome: string; trecho: string; ativo: boolean; nova: boolean; alterada: boolean; base: EditorLpBase | null }
 
-export function CatalogoEditor({ inicial }: { inicial: EditorCatalogo }) {
+export function CatalogoEditor({ inicial, filtrosQf = {} }: { inicial: EditorCatalogo; filtrosQf?: Record<string, FiltroQuestoesMeta> }) {
   const router = useRouter()
   const [ov, setOv] = useState<CatalogoOverride>(inicial.override)
+  // Filtros de questões da plataforma por aula (tabela própria; salvam na hora, fora do "Salvar catálogo").
+  const [qf, setQf] = useState<Record<string, FiltroQuestoesMeta>>(filtrosQf)
+  const [qfAbertas, setQfAbertas] = useState<Set<string>>(new Set())
   const [disc, setDisc] = useState<string>(inicial.disciplinas[0] ?? '')
   const [aba, setAba] = useState<Aba>('aulas')
   const [busca, setBusca] = useState('')
@@ -242,6 +247,22 @@ export function CatalogoEditor({ inicial }: { inicial: EditorCatalogo }) {
                   <div className="mt-2 grid gap-2 md:grid-cols-2">
                     <LinkField label="QConcursos" value={l.qc} onChange={(v) => setAula(l.key, { qc: v })} />
                     <LinkField label="TEC" value={l.tec} onChange={(v) => setAula(l.key, { tec: v })} />
+                  </div>
+                  {/* Questões da PLATAFORMA: caminho de filtros (disciplina, assunto, banca…) que define o banco desta meta */}
+                  <div className="mt-2">
+                    <button type="button" aria-expanded={qfAbertas.has(l.key)}
+                      onClick={() => setQfAbertas((s) => { const n = new Set(s); if (n.has(l.key)) n.delete(l.key); else n.add(l.key); return n })}
+                      className="inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium hover:bg-muted">
+                      <ListChecks className="h-3.5 w-3.5" />Questões da plataforma
+                      {contarCriterios(qf[l.key]) > 0 && <span className="rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">{contarCriterios(qf[l.key])} filtro{contarCriterios(qf[l.key]) > 1 ? 's' : ''}</span>}
+                      <ChevronRight className={cn('h-3.5 w-3.5 transition', qfAbertas.has(l.key) && 'rotate-90')} />
+                    </button>
+                    {qfAbertas.has(l.key) && (
+                      <div className="mt-2 rounded-xl border bg-muted/20 p-3">
+                        <FiltroQuestoesMetaEditor aulaKey={l.key} inicial={qf[l.key] ?? {}}
+                          onSalvo={(f) => setQf((m) => { const n = { ...m }; if (contarCriterios(f) > 0) n[l.key] = f; else delete n[l.key]; return n })} />
+                      </div>
+                    )}
                   </div>
                   {aberta && (
                     <div className="mt-3 border-t pt-3">

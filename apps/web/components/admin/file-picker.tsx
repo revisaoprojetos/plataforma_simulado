@@ -74,6 +74,8 @@ export interface FilePickerProps {
   tenantId: string
   /** Filtros opcionais aplicados à aba Biblioteca. `disciplinaId` é reservado (ver limitações). */
   filtros?: { tipos?: KindConteudo[]; disciplinaId?: string }
+  /** Coleção da Biblioteca navegada/alimentada pelo seletor ('conteudo' por padrão; 'jurisclub' p/ itens do JurisClub). */
+  categoria?: Categoria
 }
 
 const ABAS: { k: FilePickerAba; rotulo: string; Icone: typeof FolderOpen }[] = [
@@ -90,8 +92,6 @@ const BOTAO_ROTULO: Record<FilePickerAba, string> = {
   link: 'Usar este link',
 }
 
-const CATEGORIA: Categoria = 'conteudo'
-
 /** tipo_origem armazenado (docx|pdf|html|pptx|xlsx|video|audio) → KindConteudo dos selos/cards. */
 function tipoOrigemToKind(tipoOrigem: string): KindConteudo {
   switch (tipoOrigem) {
@@ -105,7 +105,7 @@ function tipoOrigemToKind(tipoOrigem: string): KindConteudo {
 }
 
 // ───────────────────────── Componente principal ─────────────────────────
-export function FilePicker({ open, onClose, onSelecionar, abaInicial = 'biblioteca', tenantId, filtros }: FilePickerProps) {
+export function FilePicker({ open, onClose, onSelecionar, abaInicial = 'biblioteca', tenantId, filtros, categoria = 'conteudo' }: FilePickerProps) {
   const [aba, setAba] = useState<FilePickerAba>(abaInicial)
   // Resultado(s) pendente(s) reportado(s) pela aba ativa — habilita o botão do rodapé.
   const [pendente, setPendente] = useState<FilePickerResultado[] | null>(null)
@@ -167,8 +167,8 @@ export function FilePicker({ open, onClose, onSelecionar, abaInicial = 'bibliote
 
         {/* Corpo da aba ativa */}
         <div className="min-h-0 flex-1 overflow-hidden">
-          {aba === 'biblioteca' && <AbaBiblioteca tenantId={tenantId} filtros={filtros} onReportar={reportar} />}
-          {aba === 'upload' && <AbaUpload onReportar={reportar} />}
+          {aba === 'biblioteca' && <AbaBiblioteca tenantId={tenantId} filtros={filtros} categoria={categoria} onReportar={reportar} />}
+          {aba === 'upload' && <AbaUpload categoria={categoria} onReportar={reportar} />}
           {aba === 'video' && <AbaVideo onReportar={reportar} />}
           {aba === 'link' && <AbaLink onReportar={reportar} />}
         </div>
@@ -198,8 +198,9 @@ export function FilePicker({ open, onClose, onSelecionar, abaInicial = 'bibliote
 type PastaFlat = { id: string; nome: string; pai_id: string | null }
 type DocBib = Awaited<ReturnType<typeof listarArvore>>['documentos'][number]
 
-function AbaBiblioteca({ tenantId, filtros, onReportar }: {
+function AbaBiblioteca({ tenantId, filtros, categoria: CATEGORIA, onReportar }: {
   tenantId: string
+  categoria: Categoria
   filtros?: { tipos?: KindConteudo[]; disciplinaId?: string }
   onReportar: (r: FilePickerResultado[] | null, texto?: string | null) => void
 }) {
@@ -443,7 +444,7 @@ function PreviaDoc({ d, capaUrl }: { d: DocBib; capaUrl: string | null }) {
 }
 
 // ───────────────────────── Aba: Enviar do computador ─────────────────────────
-function AbaUpload({ onReportar }: { onReportar: (r: FilePickerResultado[] | null, texto?: string | null) => void }) {
+function AbaUpload({ categoria: CATEGORIA, onReportar }: { categoria: Categoria; onReportar: (r: FilePickerResultado[] | null, texto?: string | null) => void }) {
   const [pastas, setPastas] = useState<PastaFlat[]>([])
   const [destino, setDestino] = useState<string | null>(null)
   const [uploads, setUploads] = useState<DriveUploadItem[] | null>(null)

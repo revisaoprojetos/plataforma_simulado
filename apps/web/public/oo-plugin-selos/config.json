@@ -1,0 +1,33 @@
+{
+  "name": "Selos",
+  "nameLocale": { "pt-BR": "Selos" },
+  "guid": "asc.{3E9A4C28-6D1B-4F75-B0A2-7C58E1D93F46}",
+  "version": "1.0.0",
+  "variations": [
+    {
+      "description": "Biblioteca de selos: insira a tag (ex.: <rg>) ou a imagem e veja quais selos o documento já usa. O aluno vê a imagem do selo.",
+      "descriptionLocale": { "pt-BR": "Biblioteca de selos: insira a tag (ex.: <rg>) ou a imagem e veja quais selos o documento já usa. O aluno vê a imagem do selo." },
+      "url": "index.html",
+      "icons": [ "resources/icon.png", "resources/icon@2x.png" ],
+      "icons2": [
+        {
+          "100%": { "normal": "resources/icon.png" },
+          "125%": { "normal": "resources/icon@1.25x.png" },
+          "150%": { "normal": "resources/icon@1.5x.png" },
+          "175%": { "normal": "resources/icon@1.75x.png" },
+          "200%": { "normal": "resources/icon@2x.png" }
+        }
+      ],
+      "isViewer": false,
+      "EditorsSupport": [ "word" ],
+      "isVisual": true,
+      "isModal": false,
+      "isInsideMode": false,
+      "initDataType": "none",
+      "initData": "",
+      "buttons": [],
+      "size": [ 300, 800 ],
+      "type": "panel"
+    }
+  ]
+}

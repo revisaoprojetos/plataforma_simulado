@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Selos</title>
+<style>
+  :root {
+    --oo-accent:#446995;
+    --oo-bg: var(--background-normal, #ffffff);
+    --oo-bar: var(--background-toolbar, #f7f7f7);
+    --oo-txt: var(--text-normal, #363636);
+    --oo-txt2: var(--text-tertiary, #90949a);
+    --oo-line: var(--border-regular-control, #cfcfcf);
+    --oo-line2: var(--border-toolbar, #e0e0e0);
+    --oo-hover: var(--highlight-button-hover, #e8eef5);
+  }
+  body.oo-dark {
+    --oo-accent:#4a8ac1;
+    --oo-bg: var(--background-normal, #2b2b2b);
+    --oo-bar: var(--background-toolbar, #333333);
+    --oo-txt: var(--text-normal, #e0e0e0);
+    --oo-txt2: var(--text-tertiary, #9a9a9a);
+    --oo-line: var(--border-regular-control, #4a4a4a);
+    --oo-line2: var(--border-toolbar, #3d3d3d);
+    --oo-hover: var(--highlight-button-hover, #3a4557);
+  }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; font-family:'Open Sans','Segoe UI',Arial,sans-serif; font-size:12px; color:var(--oo-txt); background:var(--oo-bg); -webkit-font-smoothing:antialiased; }
+  body { display:flex; flex-direction:column; }
+  .scroll { flex:1; overflow-y:auto; }
+  .wrap { padding:10px 10px 16px; }
+  .hint { font-size:11px; line-height:1.45; color:var(--oo-txt2); background:var(--oo-bar); border:1px solid var(--oo-line2); border-radius:3px; padding:8px 10px; margin-bottom:12px; }
+  .hint code, .cod { font-family:Consolas,monospace; }
+  .sec { margin:0 0 14px; }
+  .sec h4 { margin:0 0 7px; font-size:10px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--oo-txt2); display:flex; align-items:center; gap:8px; }
+  .sec h4::after { content:''; flex:1; height:1px; background:var(--oo-line2); }
+  input[type=text], select { width:100%; border:1px solid var(--oo-line); background:var(--oo-bg); color:var(--oo-txt); border-radius:9px; padding:8px 10px; font-size:12px; outline:none; font-family:inherit; }
+  input[type=text]:focus, select:focus { border-color:var(--oo-accent); }
+  .btn { display:inline-flex; align-items:center; justify-content:center; border:1px solid var(--oo-accent); border-radius:9px; background:var(--oo-accent); color:#fff; font-size:11px; font-weight:600; padding:5px 10px; cursor:pointer; font-family:inherit; transition:filter .12s; }
+  .btn:hover { filter:brightness(1.08); }
+  .btn:active { filter:brightness(.94); }
+  .btn.sec2 { background:var(--oo-bg); color:var(--oo-txt); border-color:var(--oo-line); }
+  .btn.sec2:hover { border-color:var(--oo-accent); filter:none; }
+  .btn.full { width:100%; margin-top:8px; padding:8px; font-size:12px; }
+  .row { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .two { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .card { border:1px solid var(--oo-line2); border-radius:12px; padding:9px 10px; margin-bottom:8px; background:var(--oo-bg); }
+  .card .nm { font-size:12px; font-weight:600; color:var(--oo-txt); word-break:break-word; }
+  .card .cod { font-size:10.5px; color:var(--oo-txt2); }
+  .thumb { display:flex; align-items:center; justify-content:flex-start; min-height:34px; margin:6px 0 8px; }
+  .thumb img { height:30px; width:auto; max-width:100%; object-fit:contain; }
+  .thumb img.ic { width:30px; }
+  .acts { display:flex; gap:6px; }
+  .acts .btn { flex:1; }
+  .tag { font-size:9px; font-weight:700; letter-spacing:.02em; text-transform:uppercase; padding:2px 6px; border-radius:3px; background:var(--oo-line2); color:var(--oo-txt2); flex:none; }
+  .tag.ok { background:rgba(16,185,129,.16); color:#10b981; }
+  .tag.aviso { background:rgba(245,158,11,.16); color:#f59e0b; }
+  .tag.erro { background:rgba(220,38,38,.16); color:#dc2626; }
+  .warn { margin-top:6px; font-size:10.5px; line-height:1.4; color:#f59e0b; }
+  .empty { padding:12px 0; text-align:center; font-size:11px; color:var(--oo-txt2); }
+  .lb { display:block; font-size:11px; font-weight:600; color:var(--oo-txt2); margin-bottom:4px; }
+  .found { display:flex; align-items:center; gap:8px; }
+  .found .thumb { margin:0; min-height:0; flex:none; }
+  .found .thumb img { height:22px; }
+  .found .info { flex:1; min-width:0; }
+  .tabs { display:flex; background:var(--oo-bar); border-bottom:1px solid var(--oo-line2); padding:0 6px; flex:none; }
+  .tab { flex:1; padding:9px 6px; font-size:12px; font-weight:600; border:0; border-bottom:2px solid transparent; background:transparent; color:var(--oo-txt2); cursor:pointer; font-family:inherit; transition:color .12s; }
+  .tab:hover { color:var(--oo-txt); }
+  .tab.on { color:var(--oo-accent); border-bottom-color:var(--oo-accent); }
+  .pane { display:none; } .pane.on { display:block; }
+  .codebox { display:flex; align-items:center; gap:4px; } .codebox span { font-family:Consolas,monospace; font-size:14px; color:var(--oo-txt2); }
+  .pick { display:flex; align-items:center; gap:10px; margin-top:4px; } .pick .thumb { margin:0; min-width:64px; border:1px dashed var(--oo-line); border-radius:9px; padding:4px; justify-content:center; }
+  .btn.del { border-color:#dc2626; background:var(--oo-bg); color:#dc2626; }
+  #msg { position:fixed; left:10px; right:10px; bottom:10px; font-size:11.5px; font-weight:600; padding:8px 11px; border-radius:3px; opacity:0; transform:translateY(8px); transition:.2s; pointer-events:none; text-align:center; box-shadow:0 3px 10px rgba(0,0,0,.25); color:#fff; background:#447f3b; }
+  #msg.show { opacity:1; transform:translateY(0); }
+  #msg.err { background:#b42318; }
+</style>
+</head>
+<body>
+<div class="tabs">
+  <button class="tab on" id="t-lib" data-p="lib">Biblioteca</button>
+  <button class="tab" id="t-doc" data-p="doc">No documento</button>
+  <button class="tab" id="t-et" data-p="et">Etiquetas</button>
+</div>
+<div class="scroll"><div class="wrap">
+  <div class="hint">Escreva a tag no texto (ex.: <code>&lt;rg&gt;</code>) ou insira pela biblioteca. Ao importar/salvar, o servidor troca a tag pela <b>imagem do selo</b> que o aluno vê. Variantes: <code>&lt;rg sm&gt;</code> menor · <code>&lt;rg ic&gt;</code> só ícone.</div>
+
+  <div class="pane on" id="p-lib">
+    <input type="text" id="busca" placeholder="Buscar selo (nome ou código)" autocomplete="off" />
+    <div style="margin-top:8px">
+      <label class="lb" for="var">Variante</label>
+      <select id="var">
+        <option value="">Completo</option>
+        <option value="sm">Menor (sm)</option>
+        <option value="ic">Só ícone (ic)</option>
+      </select>
+    </div>
+    <div id="lib" style="margin-top:10px"><div class="empty">Carregando selos…</div></div>
+  </div>
+
+  <div class="pane" id="p-doc">
+    <div id="doc"><div class="empty">Clique em “Atualizar” para ler o documento.</div></div>
+    <button class="btn sec2 full" id="b-att">Atualizar</button>
+  </div>
+
+  <div class="pane" id="p-et">
+    <div class="sec">
+      <h4 id="et-tit">Nova etiqueta</h4>
+      <label class="lb" for="et-nome">Nome</label>
+      <input type="text" id="et-nome" maxlength="80" placeholder="Ex.: Entendimento do STF" autocomplete="off" />
+      <label class="lb" for="et-cod" style="margin-top:8px">Código (o que se escreve no texto)</label>
+      <div class="codebox"><span>&lt;</span><input type="text" id="et-cod" maxlength="40" placeholder="entendimento" autocomplete="off" /><span>&gt;</span></div>
+      <label class="lb" style="margin-top:8px">Imagem</label>
+      <div class="pick">
+        <div class="thumb"><img id="et-prev" alt="" style="display:none" /><span id="et-vazio" style="font-size:10px;color:var(--oo-txt2)">sem imagem</span></div>
+        <button class="btn sec2" id="et-file">Importar imagem…</button>
+        <input type="file" id="et-input" accept="image/png,image/jpeg,image/webp,image/svg+xml" style="display:none" />
+      </div>
+      <div class="acts" style="margin-top:10px"><button class="btn" id="et-salvar">Salvar etiqueta</button><button class="btn sec2" id="et-cancel" style="display:none">Cancelar edição</button></div>
+    </div>
+    <div class="sec">
+      <h4>Minhas etiquetas</h4>
+      <div id="et-lista"><div class="empty">Carregando…</div></div>
+    </div>
+  </div>
+</div></div>
+<div id="msg"></div>
+
+<script>
+/* ============================================================================================
+   Plugin "Selos" (OnlyOffice, Word, painel).
+   CONTRATO (o servidor depende — NÃO MUDAR): o selo é uma TAG DE TEXTO `<codigo>` (ou `<codigo sm|ic>`) no
+     documento. O sanitizador (lib/leitura/sanitize.ts) troca a tag pelo selo cadastrado na Biblioteca do
+     tenant ao importar/salvar — vale parágrafo só com a tag OU tag no meio do texto. Casa por nome, slug ou
+     apelido (sem acento/caixa).
+   IMAGEM: "Inserir imagem" cola a imagem do selo com texto alternativo = a tag (`<rg>`). Na importação, a imagem
+     cuja alt é uma tag volta a ser a tag (lib/conteudo/ingestao.ts) → o aluno vê o selo da Biblioteca.
+   Biblioteca: GET /api/teste/selos-biblioteca (mesmo canal do blocos-palette; tenant pelo host).
+   Leitura do documento: callCommand percorrendo parágrafos (inclusive dentro de tabelas) + regex no painel.
+   ============================================================================================ */
+var conectado = false, msgTimer, SELOS = [], MAPA = {}, achados = [], cursorLoc = {};
+function $(id){ return document.getElementById(id); }
+function msg(t, err){ var m=$('msg'); m.textContent=t; m.className='show'+(err?' err':''); clearTimeout(msgTimer); msgTimer=setTimeout(function(){ m.className=''; }, err?5000:2200); }
+function api(){ return window.Asc && window.Asc.plugin ? window.Asc.plugin : null; }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"]/g,function(ch){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[ch]; }); }
+function norm(s){ return String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/[\s_-]+/g,' ').trim(); }
+function variante(){ return $('var').value; }
+function imgDe(s, v){ return v==='sm' && s.imgSm ? s.imgSm : v==='ic' && s.imgIc ? s.imgIc : s.img; }
+
+/* ---------- biblioteca ---------- */
+function carregar(){
+  fetch('/api/teste/selos-biblioteca', { cache:'no-store' }).then(function(r){ return r.json(); }).then(function(d){
+    SELOS = (d && d.selos) || [];
+    MAPA = {};
+    SELOS.forEach(function(s){
+      [s.codigo, s.slug, s.nome].concat(s.apelidos || []).forEach(function(k){ if (k) MAPA[norm(k)] = s; });
+    });
+    renderLib(); renderEtiquetas();
+  }).catch(function(e){ $('lib').innerHTML = '<div class="empty">Falha ao carregar a biblioteca: '+esc(e && e.message || e)+'</div>'; });
+}
+function tagDe(s){ var v = variante(); return '<'+s.codigo+(v?' '+v:'')+'>'; }
+function renderLib(){
+  var q = norm($('busca').value), box = $('lib'); box.innerHTML = '';
+  var v = variante();
+  var lista = SELOS.filter(function(s){ return !q || norm(s.nome).indexOf(q) >= 0 || norm(s.codigo).indexOf(q) >= 0 || (s.apelidos||[]).some(function(a){ return norm(a).indexOf(q) >= 0; }); });
+  if (!lista.length) { box.innerHTML = '<div class="empty">Nenhum selo encontrado.</div>'; return; }
+  lista.forEach(function(s){
+    var c = document.createElement('div'); c.className = 'card';
+    c.innerHTML = '<div class="row"><div class="nm">'+esc(s.nome)+'</div>'+(s.naBiblioteca ? '' : '<span class="tag aviso" title="Cadastre em Leitura → Biblioteca → Tags (importar selos padrão)">sem cadastro</span>')+'</div>'
+      + '<div class="cod">'+esc(tagDe(s))+'</div>'
+      + '<div class="thumb"><img class="'+(v==='ic'?'ic':'')+'" src="'+esc(imgDe(s, v))+'" alt="" /></div>'
+      + '<div class="acts"><button class="btn" data-a="t">Inserir tag</button><button class="btn sec2" data-a="i">Inserir imagem</button></div>';
+    c.querySelector('[data-a=t]').onclick = function(){ inserirTag(s); };
+    c.querySelector('[data-a=i]').onclick = function(){ inserirImagem(s); };
+    box.appendChild(c);
+  });
+}
+
+/* ---------- inserir ---------- */
+function inserirTag(s){
+  var p = api();
+  if (!p || !conectado) { msg('Editor não conectado — recarregue (Ctrl+F5).', true); return; }
+  try {
+    p.executeMethod('PasteText', [tagDe(s)]);
+    msg('Inserido: '+tagDe(s)); setTimeout(atualizar, 300);
+    if (!s.naBiblioteca) msg('Inserido, mas o selo não está cadastrado na Biblioteca — o aluno não verá a imagem.', true);
+  } catch (e) { msg('Não foi possível inserir: '+(e && e.message || e), true); }
+}
+
+/* Carrega a imagem do selo, reduz (docx leve) e devolve data URL + proporção. */
+function prepararImagem(url, altPx, cb){
+  var im = new Image();
+  im.onload = function(){
+    try {
+      var r = im.naturalWidth / im.naturalHeight, h = altPx, w = Math.round(h * r);
+      var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+      cv.getContext('2d').drawImage(im, 0, 0, w, h);
+      cb(null, cv.toDataURL('image/png'), r);
+    } catch (e) { cb(e); }
+  };
+  im.onerror = function(){ cb(new Error('imagem não carregou')); };
+  im.src = url;
+}
+function inserirImagem(s){
+  var p = api();
+  if (!p || !conectado) { msg('Editor não conectado — recarregue (Ctrl+F5).', true); return; }
+  var v = variante(), tag = tagDe(s);
+  prepararImagem(imgDe(s, v), 96, function(err, dataUrl, ratio){
+    if (err) { msg('Não foi possível preparar a imagem: '+(err.message||err), true); return; }
+    var hPt = v==='ic' ? 16 : 15, wPt = Math.round(hPt * ratio);
+    try {
+      p.executeMethod('PasteHtml', ['<img src="'+dataUrl+'" alt="'+esc(tag)+'" title="'+esc(s.nome)+'" width="'+wPt+'" height="'+hPt+'" style="width:'+wPt+'pt;height:'+hPt+'pt" />']);
+      msg('Imagem inserida ('+tag+').'); setTimeout(atualizar, 400);
+    } catch (e) { msg('Não foi possível inserir a imagem: '+(e && e.message || e), true); }
+  });
+}
+
+/* ---------- leitura do documento ---------- */
+function atualizar(){
+  var p = api();
+  if (!p || !conectado) { $('doc').innerHTML = '<div class="empty">Editor não conectado — recarregue (Ctrl+F5).</div>'; return; }
+  try {
+    p.callCommand(function(){
+      var out = [];
+      function varrer(cont){
+        var n = cont.GetElementsCount();
+        for (var i = 0; i < n; i++) {
+          var el = cont.GetElement(i);
+          if (!el) continue;
+          var tipo = el.GetClassType();
+          if (tipo === 'paragraph') {
+            var t = el.GetText() || '';
+            if (t.indexOf('<') >= 0) out.push(t);
+          } else if (tipo === 'table') {
+            var rows = el.GetRowsCount();
+            for (var r = 0; r < rows; r++) {
+              var row = el.GetRow(r), cells = row.GetCellsCount();
+              for (var c = 0; c < cells; c++) varrer(row.GetCell(c).GetContent());
+            }
+          }
+        }
+      }
+      varrer(Api.GetDocument());
+      return JSON.stringify(out);
+    }, false, false, function(ret){
+      try { renderDoc(JSON.parse(ret || '[]')); }
+      catch (e) { $('doc').innerHTML = '<div class="empty">Não foi possível ler o documento.</div>'; msg('Erro ao ler: '+(e && e.message || e), true); }
+    });
+  } catch (e) { $('doc').innerHTML = '<div class="empty">Não foi possível ler o documento.</div>'; msg('Erro: '+(e && e.message || e), true); }
+}
+
+function resolver(miolo){
+  var t = norm(miolo), v = '';
+  var m = /^(.*\S)\s+(sm|ic)$/.exec(t);
+  if (m && !MAPA[t]) { t = m[1]; v = m[2]; }
+  return { selo: MAPA[t] || null, v: v };
+}
+var RE_TAG = /<([A-Za-zÀ-ÿ][^<>\[\]{}|]{0,58})>/g;
+function renderDoc(paragrafos){
+  var mapa = {}, ordem = [];
+  paragrafos.forEach(function(t){
+    var m; RE_TAG.lastIndex = 0;
+    while ((m = RE_TAG.exec(t))) {
+      var texto = m[0], r = resolver(m[1]);
+      if (!r.selo && !/^[A-Za-zÀ-ÿ][A-Za-zÀ-ÿ0-9 _-]*$/.test(m[1])) continue; // não parece tag
+      if (!mapa[texto]) { mapa[texto] = { texto: texto, selo: r.selo, v: r.v, n: 0 }; ordem.push(texto); }
+      mapa[texto].n++;
+    }
+  });
+  achados = ordem.map(function(k){ return mapa[k]; });
+  var box = $('doc'); box.innerHTML = '';
+  if (!achados.length) { box.innerHTML = '<div class="empty">Nenhuma tag de selo neste documento.</div>'; return; }
+  achados.forEach(function(a){
+    var c = document.createElement('div'); c.className = 'card';
+    var estado = !a.selo ? 'erro' : a.selo.naBiblioteca ? 'ok' : 'aviso';
+    var rot = !a.selo ? 'desconhecida' : a.selo.naBiblioteca ? 'selo' : 'sem cadastro';
+    var thumb = a.selo ? '<div class="thumb"><img class="'+(a.v==='ic'?'ic':'')+'" src="'+esc(imgDe(a.selo, a.v))+'" alt="" /></div>' : '';
+    c.innerHTML = '<div class="found">'+thumb+'<div class="info"><div class="nm cod">'+esc(a.texto)+'</div><div class="cod">'+(a.selo ? esc(a.selo.nome)+' · ' : '')+a.n+'×</div></div><span class="tag '+estado+'">'+rot+'</span></div>'
+      + (!a.selo ? '<div class="warn">Não é um selo da Biblioteca — fica como texto para o aluno.</div>' : (!a.selo.naBiblioteca ? '<div class="warn">Selo padrão ainda não cadastrado na Biblioteca (Leitura → Biblioteca → Tags). Sem isso o aluno vê o texto.</div>' : ''))
+      + '<div class="acts" style="margin-top:8px"><button class="btn sec2">Localizar</button></div>';
+    c.querySelector('button').onclick = function(){ localizar(a.texto); };
+    box.appendChild(c);
+  });
+}
+
+function localizar(texto){
+  var p = api();
+  if (!p || !conectado) { msg('Editor não conectado — recarregue (Ctrl+F5).', true); return; }
+  var i = cursorLoc[texto] || 0;
+  Asc.scope.locTexto = texto; Asc.scope.locIdx = i;
+  try {
+    p.callCommand(function(){
+      var doc = Api.GetDocument();
+      var rs = doc.Search(Asc.scope.locTexto, true) || [];
+      if (!rs.length) return 0;
+      var k = Asc.scope.locIdx % rs.length;
+      rs[k].Select();
+      return rs.length;
+    }, false, false, function(n){
+      if (!n) { msg('Não encontrado (atualize a lista).', true); return; }
+      cursorLoc[texto] = (i + 1) % n;
+      msg('Ocorrência '+((i % n) + 1)+' de '+n);
+    });
+  } catch (e) { msg('Erro ao localizar: '+(e && e.message || e), true); }
+}
+
+/* ---------- abas ---------- */
+function aba(p){
+  ['lib','doc','et'].forEach(function(k){ $('t-'+k).classList.toggle('on', k===p); $('p-'+k).classList.toggle('on', k===p); });
+  if (p==='doc') atualizar();
+  if (p==='et') renderEtiquetas();
+}
+Array.prototype.forEach.call(document.querySelectorAll('.tab'), function(b){ b.onclick = function(){ aba(b.getAttribute('data-p')); }; });
+
+/* ---------- etiquetas (criar / editar / excluir) ----------
+   O iframe do plugin não leva cookies: pede à PÁGINA do editor (window.top), que chama /api/leitura/selos-etiqueta
+   com a sessão do admin e devolve por postMessage. */
+var pend = {}, editId = null, imgNova = null;
+window.addEventListener('message', function(ev){
+  var d = ev.data; if (!d || d.tipo !== 'selos:res' || !pend[d.id]) return;
+  var f = pend[d.id]; delete pend[d.id]; f(d.res);
+});
+function pedir(payload){
+  return new Promise(function(ok){
+    var id = String(Date.now())+Math.random().toString(36).slice(2,7);
+    var t = setTimeout(function(){ delete pend[id]; ok({ ok:false, error:'A página do editor não respondeu — recarregue (Ctrl+F5).' }); }, 30000);
+    pend[id] = function(r){ clearTimeout(t); ok(r || { ok:false, error:'Sem resposta.' }); };
+    try { window.top.postMessage({ tipo:'selos:req', id:id, payload:payload }, location.origin); }
+    catch (e) { clearTimeout(t); delete pend[id]; ok({ ok:false, error:'Não foi possível falar com a página do editor.' }); }
+  });
+}
+function reduzirArquivo(file, altMax, cb){
+  var rd = new FileReader();
+  rd.onload = function(){
+    var im = new Image();
+    im.onload = function(){
+      try {
+        var h = Math.min(altMax, im.naturalHeight || altMax), w = Math.round(h * (im.naturalWidth / (im.naturalHeight || 1)));
+        var cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+        cv.getContext('2d').drawImage(im, 0, 0, w, h);
+        cb(null, cv.toDataURL('image/png'));
+      } catch (e) { cb(e); }
+    };
+    im.onerror = function(){ cb(new Error('Arquivo de imagem inválido.')); };
+    im.src = rd.result;
+  };
+  rd.onerror = function(){ cb(new Error('Não foi possível ler o arquivo.')); };
+  rd.readAsDataURL(file);
+}
+function mostrarPrev(src){ var p=$('et-prev'); if (src) { p.src=src; p.style.display='block'; $('et-vazio').style.display='none'; } else { p.style.display='none'; $('et-vazio').style.display='block'; } }
+function limparForm(){ editId=null; imgNova=null; $('et-nome').value=''; $('et-cod').value=''; $('et-input').value=''; mostrarPrev(null); $('et-tit').textContent='Nova etiqueta'; $('et-salvar').textContent='Salvar etiqueta'; $('et-cancel').style.display='none'; }
+function editar(s){ editId=s.id; imgNova=null; $('et-nome').value=s.nome; $('et-cod').value=s.codigo; mostrarPrev(s.img); $('et-tit').textContent='Editar etiqueta'; $('et-salvar').textContent='Salvar alterações'; $('et-cancel').style.display='block'; aba('et'); }
+function renderEtiquetas(){
+  var box = $('et-lista'), minhas = SELOS.filter(function(s){ return !s.padrao && s.id; });
+  box.innerHTML = '';
+  if (!minhas.length) { box.innerHTML = '<div class="empty">Nenhuma etiqueta própria ainda. Os selos padrão ficam na aba Biblioteca.</div>'; return; }
+  minhas.forEach(function(s){
+    var c = document.createElement('div'); c.className = 'card';
+    c.innerHTML = '<div class="found"><div class="thumb"><img src="'+esc(s.img)+'" alt="" /></div><div class="info"><div class="nm">'+esc(s.nome)+'</div><div class="cod">&lt;'+esc(s.codigo)+'&gt;</div></div></div>'
+      + '<div class="acts" style="margin-top:8px"><button class="btn sec2" data-a="e">Editar</button><button class="btn del" data-a="x">Excluir</button></div>';
+    c.querySelector('[data-a=e]').onclick = function(){ editar(s); };
+    c.querySelector('[data-a=x]').onclick = function(){
+      if (!window.confirm('Excluir a etiqueta "'+s.nome+'"? Documentos que usam <'+s.codigo+'> voltam a mostrar o texto.')) return;
+      pedir({ op:'excluir', id:s.id }).then(function(r){ if (r.ok) { msg('Etiqueta excluída.'); if (editId===s.id) limparForm(); carregar(); } else msg(r.error || 'Falha ao excluir.', true); });
+    };
+    box.appendChild(c);
+  });
+}
+$('et-file').onclick = function(){ $('et-input').click(); };
+$('et-input').onchange = function(){
+  var f = this.files && this.files[0]; if (!f) return;
+  if (f.size > 8*1024*1024) { msg('Imagem muito grande (máx. 8 MB).', true); this.value=''; return; }
+  reduzirArquivo(f, 256, function(err, url){ if (err) { msg(err.message || 'Imagem inválida.', true); return; } imgNova = url; mostrarPrev(url); });
+};
+$('et-cancel').onclick = limparForm;
+$('et-salvar').onclick = function(){
+  var nome = $('et-nome').value.trim(), cod = $('et-cod').value.trim();
+  if (!nome) { msg('Informe o nome.', true); return; }
+  if (!cod) { msg('Informe o código.', true); return; }
+  if (!editId && !imgNova) { msg('Importe a imagem da etiqueta.', true); return; }
+  var b = $('et-salvar'); b.disabled = true;
+  pedir({ op: editId ? 'editar' : 'criar', id: editId, nome: nome, codigo: cod, imagem: imgNova }).then(function(r){
+    b.disabled = false;
+    if (!r.ok) { msg(r.error || 'Falha ao salvar.', true); return; }
+    msg(editId ? 'Etiqueta atualizada.' : 'Etiqueta criada: <'+cod.replace(/^<|>$/g,'')+'>');
+    limparForm(); carregar();
+  });
+};
+
+$('busca').addEventListener('input', renderLib);
+$('var').addEventListener('change', renderLib);
+$('b-att').onclick = atualizar;
+
+if (window.Asc && window.Asc.plugin) {
+  window.Asc.plugin.init = function(){ conectado = true; carregar(); atualizar(); };
+  window.Asc.plugin.button = function(){ this.executeCommand('close',''); };
+  window.Asc.plugin.onThemeChanged = function(theme){
+    try { if (window.Asc.plugin.onThemeChangedBase) window.Asc.plugin.onThemeChangedBase(theme); } catch (e) {}
+    try {
+      var m = /(\d+)[,\s]+(\d+)[,\s]+(\d+)/.exec(getComputedStyle(document.body).backgroundColor || '');
+      var dark = m && (0.299*+m[1] + 0.587*+m[2] + 0.114*+m[3]) < 128;
+      document.body.classList.toggle('oo-dark', !!dark);
+    } catch (e) {}
+  };
+}
+</script>
+</body>
+</html>

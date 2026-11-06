@@ -106,9 +106,11 @@ export function horasPdf(p: number, vel?: number): number { return minPdf(p, vel
  */
 export const DUR_REVISAO: Record<string, number> = { rf: 60, rq: 30 }
 /** Semana de revisão (modelo): apenasQuestoes[k] = dia que concentra as questões (≤18 h) — recebe só questões. */
-export function planoRevisao(capDias: number[], temas: number, apenasQuestoes: boolean[] = []): Array<{ itens: Array<{ t: string; n: number }>; usado: number }> {
-  return M28.planoRevisao(capDias, temas, apenasQuestoes)
+export function planoRevisao(capDias: number[], temas: number, apenasQuestoes: boolean[] = [], dur: Record<string, number> = DUR_REVISAO): Array<{ itens: Array<{ t: string; n: number }>; usado: number }> {
+  return M28.planoRevisao(capDias, temas, apenasQuestoes, dur)
 }
+export const resolverParams = M28.resolverParams
+export const rankingRevisao218 = M28.rankingRevisao218
 /** Dia da semana que concentra as questões (semana de até 18 h com mais de 1 dia disponível) ou null. */
 export function diaConcentrado(cfg: Cfg, sem: number): DataISO | null { return M28.perfilSemana(cfg as unknown as M28.Cfg28, sem).concentrado }
 /** Dias da semana dedicados a PDFlash + questões, conforme o arranjo e os dias de estudo disponíveis. */
@@ -154,16 +156,16 @@ export function acertoTema(notas: Notas, i: number): { res: number; err: number;
 }
 
 export const ACERTO_MIN = 60
-export function rankingRevisao(plano: Plano, notas: Notas, ateData: DataISO, jaRevisados: Set<number>) {
+export function rankingRevisao(plano: Plano, notas: Notas, ateData: DataISO, jaRevisados: Set<number>, acertoMin: number = ACERTO_MIN) {
   const cand: Array<{ i: number; d: DataISO; grau: number | null; acerto: number | null; prioritario: boolean; pontos: number }> = []
   for (const [id, [d]] of Object.entries(plano)) {
     if (!id.startsWith('pf:') || d >= ateData) continue
     const i = +id.split(':')[1]
     const grau = notas['pf:' + i]?.grau ?? null
     const ac = acertoTema(notas, i)
-    const baixo = !!(ac && ac.pct < ACERTO_MIN)
+    const baixo = !!(ac && ac.pct < acertoMin)
     const prioritario = (grau != null && grau > 0) || baixo
-    let pontos = (grau || 0) + (baixo && ac ? 2 + (ACERTO_MIN - ac.pct) / ACERTO_MIN * 8 : 0)
+    let pontos = (grau || 0) + (baixo && ac ? 2 + (acertoMin - ac.pct) / (acertoMin || 1) * 8 : 0)
     if (jaRevisados.has(i)) pontos -= 4
     cand.push({ i, d, grau, acerto: ac ? ac.pct : null, prioritario, pontos })
   }
@@ -178,6 +180,8 @@ export interface MetaDescrita {
 /** Descreve uma meta a partir do id. */
 export function descrever(id: string, AS: AS, WLP: WLP, LPMAP?: Record<string, M28.ItemLP> | null): MetaDescrita {
   const [t, a, b] = id.split(':')
+  // 2.19: Jurisprudência semanal — `jp:<semana de origem>`; não é aula (não consulta o catálogo).
+  if (t === 'jp') return { tipo: 'jp', texto: 'Jurisprudência', disc: 'Jurisprudência', sem: +a || undefined }
   if (t === 'lp') {
     const it = LPMAP && LPMAP[id]
     if (it) return { tipo: 'lp', texto: it.texto, disc: it.disc || undefined, lei: it.lei, doc: it.doc ?? null }
@@ -206,4 +210,4 @@ export function saudePlano(plano: Plano, cfg: Cfg) {
   return out
 }
 
-export const ORDEM: Record<string, number> = { pp: 0, pf: 0, fl: 1, qu: 2, lp: 3, rf: 4, rq: 4 }
+export const ORDEM: Record<string, number> = { pp: 0, pf: 0, fl: 1, qu: 2, lp: 3, rf: 4, rq: 4, jp: 4 }

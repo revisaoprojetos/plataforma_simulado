@@ -20,11 +20,13 @@ import { listarVinculosDoDocumento, vincularDocumento, desvincular, type ModoVin
 import { gerarThumbDocumento, gerarPdfDocumento } from '@/lib/conteudo/thumb'
 import { mapaPastas, resolverCapaDoc, type PastaCP } from '@/lib/conteudo/capa-pagina'
 import { resolverTaxonomiaPorNome } from '@/lib/taxonomia/resolver-nome'
+import { normalizarMetadados, type Metadados } from '@/lib/conteudo/metadados'
 
 // Duas coleções na mesma infra: 'conteudo' (materiais) e 'modelo_caderno' (modelos de caderno em docx).
 // Cada uma tem suas próprias pastas via folder_area.
-export type Categoria = 'conteudo' | 'modelo_caderno'
-const folderArea = (c: Categoria) => (c === 'modelo_caderno' ? 'conteudo_modelo' : 'conteudo')
+// + 'jurisclub' (materiais do JurisClub; entregues via produto, não aparecem na Biblioteca do aluno).
+export type Categoria = 'conteudo' | 'modelo_caderno' | 'jurisclub'
+const folderArea = (c: Categoria) => (c === 'modelo_caderno' ? 'conteudo_modelo' : c === 'jurisclub' ? 'conteudo_jurisclub' : 'conteudo')
 const PASTAS = 'simulado_pastas'
 
 async function guard(acao: 'view' | 'update') {
@@ -63,9 +65,10 @@ export async function listarArvore(pastaId?: string | null, categoria: Categoria
   restritasPasta: Record<string, boolean>  // pasta com acesso_geral = 'restrito'
   restritoDoc: Record<string, boolean>     // doc com acesso_geral = 'restrito'
   resumo: { nGrupos: number; nAlunos: number } // entrega agregada da pasta atual (grupos/alunos distintos)
+  metadados: Record<string, Metadados>     // colunas da lista (disciplina, assunto, tribunal…) por documento
 }> {
   const g = await guard('view')
-  if (!g.ok) return { ok: false, error: g.error, pastas: [], documentos: [], breadcrumb: [], previas: {}, thumbs: {}, contagens: {}, restritasPasta: {}, restritoDoc: {}, resumo: { nGrupos: 0, nAlunos: 0 } }
+  if (!g.ok) return { ok: false, error: g.error, pastas: [], documentos: [], breadcrumb: [], previas: {}, thumbs: {}, contagens: {}, restritasPasta: {}, restritoDoc: {}, resumo: { nGrupos: 0, nAlunos: 0 }, metadados: {} }
   const svc = createAdminClient()
   const area = folderArea(categoria)
   const alvo = pastaId ?? null
@@ -187,7 +190,16 @@ export async function listarArvore(pastaId?: string | null, categoria: Categoria
     }
   } catch { /* sem a coluna capa_url */ }
 
-  return { ok: true, pastas, documentos, breadcrumb, previas, thumbs, contagens, restritasPasta, restritoDoc, resumo }
+  // METADADOS (colunas/filtros da lista). Coluna NOVA (`metadados`): tolerante — sem a migração, vazio.
+  const metadados: Record<string, Metadados> = {}
+  try {
+    if (docIds.length) {
+      const rows = (await fetchAllByIn<any>(docIds, (c) => svc.from('simulado_conteudo_documentos').select('id, metadados').eq('tenant_id', g.tenantId).in('id', c).order('id', { ascending: true }))) ?? []
+      for (const r of rows) { const m = normalizarMetadados(r.metadados); if (Object.keys(m).length) metadados[r.id] = m }
+    }
+  } catch { /* sem a coluna metadados */ }
+
+  return { ok: true, pastas, documentos, breadcrumb, previas, thumbs, contagens, restritasPasta, restritoDoc, resumo, metadados }
 }
 
 /** Trechos da versão atual (ou mais nova) de um documento — para a aba "Prévia" do drawer de detalhe. */

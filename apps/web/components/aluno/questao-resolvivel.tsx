@@ -34,7 +34,10 @@ export interface QuestaoAluno {
   alternativas: AltAluno[]
 }
 
-export function QuestaoResolvivel({ questao, numero }: { questao: QuestaoAluno; numero?: number }) {
+/** Aviso opcional quando o aluno resolve (confere) a questão — p/ telas que acompanham o progresso (ex.: meta do cronograma). */
+export type OnResponder = (r: { questaoId: string; correta: boolean }) => void
+
+export function QuestaoResolvivel({ questao, numero, onResponder }: { questao: QuestaoAluno; numero?: number; onResponder?: OnResponder }) {
   const [escolhida, setEscolhida] = useState<string | null>(null)
   const [revelado, setRevelado] = useState(false)
   const [comentAberto, setComentAberto] = useState(true)
@@ -77,6 +80,7 @@ export function QuestaoResolvivel({ questao, numero }: { questao: QuestaoAluno; 
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ questao_id: questao.id, alternativa_id: escolhida }),
       }).catch(() => {})
+      onResponder?.({ questaoId: questao.id, correta: !!alts.find((a) => a.id === escolhida)?.correta })
     }
   }
 

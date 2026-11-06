@@ -255,7 +255,7 @@ export function ProdutoEstudioClient({
         />
       )}
       {visitadas.has('conteudos') && (
-        <div hidden={aba !== 'conteudos'}><AbaConteudos produtoId={produto.id} podeEditar={podeEditar} tenantId={tenantId} /></div>
+        <div hidden={aba !== 'conteudos'}><AbaConteudos tipoProduto={produto.tipo} produtoId={produto.id} podeEditar={podeEditar} tenantId={tenantId} /></div>
       )}
       {visitadas.has('vitrine') && (
         <div hidden={aba !== 'vitrine'}><AbaVitrine produtoId={produto.id} secoesIniciais={produto.secoes} podeEditar={podeEditar} /></div>

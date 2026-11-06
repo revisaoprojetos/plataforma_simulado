@@ -34,6 +34,10 @@ const nextConfig: NextConfig = {
         source: "/oo-plugin/:path*",
         headers: [{ key: "Access-Control-Allow-Origin", value: "*" }],
       },
+      {
+        source: "/oo-plugin-selos/:path*",
+        headers: [{ key: "Access-Control-Allow-Origin", value: "*" }],
+      },
     ];
   },
   experimental: {

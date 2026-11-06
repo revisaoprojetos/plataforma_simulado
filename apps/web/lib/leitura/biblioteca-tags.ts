@@ -6,7 +6,7 @@ import { fetchAll } from '@/lib/supabase/fetch-all'
 // É a ÚNICA fonte das tags usadas na conversão de "<nome>" em texto → selo na importação/save. Nada de
 // lista fixa no código: se o admin renomear/criar/editar uma tag, a conversão acompanha.
 
-export interface TagBiblioteca { nome: string; slug: string | null; html: string }
+export interface TagBiblioteca { id?: string; nome: string; slug: string | null; html: string }
 
 /** Normaliza um termo p/ casar nome/slug sem acento, caixa ou variação de espaço/hífen.
  * Ex.: "Reafirmação de  Entendimento" / "reafirmacao-de-entendimento" → "reafirmacao de entendimento". */
@@ -20,7 +20,7 @@ export async function carregarTagsBiblioteca(tenantId: string): Promise<TagBibli
     const svc = createAdminClient() as any
     return await fetchAll<TagBiblioteca>(() => svc
       .from('simulado_biblioteca_itens')
-      .select('nome, slug, html')
+      .select('id, nome, slug, html')
       .eq('tenant_id', tenantId).eq('tipo', 'tag').eq('deletado', false).order('id', { ascending: true }))
   } catch { return [] }
 }

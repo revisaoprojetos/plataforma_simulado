@@ -184,7 +184,7 @@ async function alunoEmGrupoLiberado(svc: SupabaseClient, tenantId: string, aluno
 function metaDoAlvo(metaId: string, alvo: AlvoDoc): boolean {
   const [t, a, b] = metaId.split(':')
   if (alvo.k === 'lp') return t === 'lp' && alvo.ids.includes(metaId)
-  if (t === 'lp') return false
+  if (t === 'lp' || t === 'jp') return false // jp = Jurisprudência semanal: não é de nenhuma aula (sem documento)
   const idx = t === 'rf' || t === 'rq' ? Number(b) : Number(a)
   return idx === alvo.i
 }

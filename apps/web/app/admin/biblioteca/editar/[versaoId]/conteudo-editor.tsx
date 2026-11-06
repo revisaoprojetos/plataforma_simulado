@@ -12,6 +12,8 @@ declare global { interface Window { DocsAPI?: any } }
 // callback/prévia batem em /api/conteudo/docs/[versaoId]/*. O plugin lê o doc-id via localStorage
 // (teste_oo_docid), igual ao Teste — por isso Blocos/Variáveis e seleção de simulado funcionam igual.
 const PLUGIN_GUID = 'asc.{C7A3F1E0-9B2D-4E6A-8F14-5D2B7C0A1E33}'
+const PLUGIN_AREAS_GUID = 'asc.{8B2D5E71-4F3A-4C19-9A60-D1E7A2B3C4F5}'
+const PLUGIN_EXPANSOR_GUID = 'asc.{3F9A6C24-7D1B-4E58-8B02-5C4E9D7A1F36}'
 
 export function ConteudoEditor({ versaoId, titulo, documentUrl, onlyofficeUrl, wopiHost, chave, preview = false, palette, voltarHref = '/admin/biblioteca', voltarLabel = 'Biblioteca' }: {
   versaoId: string; titulo: string; documentUrl: string; onlyofficeUrl: string; wopiHost: string; chave: string; preview?: boolean; palette?: PaletaBlocos; voltarHref?: string; voltarLabel?: string
@@ -25,6 +27,9 @@ export function ConteudoEditor({ versaoId, titulo, documentUrl, onlyofficeUrl, w
     const scriptSrc = `${onlyofficeUrl}/web-apps/apps/api/documents/api.js`
     const origin = window.location.origin
     const pluginConfig = `${origin}/oo-plugin/config.json`
+    const pluginAreasConfig = `${origin}/oo-plugin-areas/config.json`
+    const pluginExpansorConfig = `${origin}/oo-plugin-expansor/config.json`
+    const pluginSelosConfig = `${origin}/oo-plugin-selos/config.json`
     try { localStorage.setItem('teste_oo_docid', versaoId) } catch { /* sem storage, prévia do plugin degrada */ }
     // Paleta dos blocos derivada da MARCA do tenant → o plugin usa estas cores (fallback = navy+dourado).
     try { if (palette) localStorage.setItem('oo_blocos_palette', JSON.stringify(palette)) } catch { /* mantém defaults */ }
@@ -37,7 +42,7 @@ export function ConteudoEditor({ versaoId, titulo, documentUrl, onlyofficeUrl, w
           editorConfig.mode = 'view'
         } else {
           editorConfig.callbackUrl = `${wopiHost}/api/conteudo/docs/${versaoId}/callback`
-          editorConfig.plugins = { autostart: [PLUGIN_GUID], pluginsData: [pluginConfig] }
+          editorConfig.plugins = { autostart: [PLUGIN_GUID, PLUGIN_AREAS_GUID, PLUGIN_EXPANSOR_GUID], pluginsData: [pluginConfig, pluginAreasConfig, pluginExpansorConfig, pluginSelosConfig] }
           editorConfig.customization = { autosave: false, forcesave: true }
         }
         new window.DocsAPI.DocEditor('oo-conteudo', {
@@ -59,6 +64,23 @@ export function ConteudoEditor({ versaoId, titulo, documentUrl, onlyofficeUrl, w
     s.onerror = () => setErro(`Não carregou ${scriptSrc}. Suba o OnlyOffice e confira NEXT_PUBLIC_ONLYOFFICE_URL.`)
     document.body.appendChild(s)
   }, [versaoId, onlyofficeUrl, documentUrl, wopiHost, chave, titulo, preview])
+
+  // Ponte do plugin "Selos": o iframe do plugin não leva cookies, então pede à PÁGINA (sessão do admin) que
+  // crie/edite/exclua a etiqueta; só aceita mensagens da própria origem do app.
+  useEffect(() => {
+    const onMsg = async (ev: MessageEvent) => {
+      const d = ev.data as { tipo?: string; id?: string; payload?: unknown } | null
+      if (ev.origin !== window.location.origin || d?.tipo !== 'selos:req' || !d.id) return
+      let res: unknown
+      try {
+        const r = await fetch('/api/leitura/selos-etiqueta', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(d.payload) })
+        res = await r.json()
+      } catch { res = { ok: false, error: 'Falha de rede.' } }
+      try { (ev.source as Window | null)?.postMessage({ tipo: 'selos:res', id: d.id, res }, ev.origin) } catch { /* plugin fechado */ }
+    }
+    window.addEventListener('message', onMsg)
+    return () => window.removeEventListener('message', onMsg)
+  }, [])
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-background">

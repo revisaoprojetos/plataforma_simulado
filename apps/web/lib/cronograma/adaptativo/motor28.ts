@@ -50,7 +50,7 @@ export interface ItemLP {
 }
 
 export interface Remanejada { desde: DataISO; minutos: number; geracao?: string | null; detalhe?: Detalhe }
-export interface Detalhe { continuacao?: boolean; pai?: string; origem?: string; paginaInicio?: number; paginaFim?: number; totalPaginas?: number; artigo?: string; deslocada?: boolean; geracao?: string | null }
+export interface Detalhe { continuacao?: boolean; pai?: string; origem?: string; paginaInicio?: number; paginaFim?: number; totalPaginas?: number; artigo?: string; deslocada?: boolean; geracao?: string | null; jurisprudencia?: boolean }
 
 export interface Cfg28 {
   start: DataISO
@@ -109,6 +109,10 @@ export interface ParamsMotor28 {
   concentracaoAteH?: number; maxSemanas?: number
   /** inteligência de desempenho (Fase 3): antecipa revisão/questões dos temas fracos em TODO o plano. */
   usarDesempenhoNoPlano?: boolean; pesoDesempenho?: number; acertoMin?: number
+  /** regras 2.18 (desligadas por padrão). */
+  pdfInteiro218?: boolean; revisaoPorResultado218?: boolean
+  /** 2.19: meta semanal de Jurisprudência (desligada por padrão) e sua duração em minutos (padrão 60). */
+  jurisprudencia219?: boolean; jurisprudenciaMin?: number
 }
 export interface ParamsResolvido {
   velPadrao: number
@@ -122,6 +126,8 @@ export interface ParamsResolvido {
   durRevisao: Record<string, number> // { rf, rq }
   legproc: { metasDia: number; discDia: number; mesmaDisc: number }
   desempenho: { ativo: boolean; peso: number; acertoMin: number }
+  regras218: { pdfInteiro: boolean; revisaoPorResultado: boolean }
+  juris: { ativo: boolean; min: number }
 }
 export function resolverParams(p?: ParamsMotor28 | null): ParamsResolvido {
   const q = p || {}
@@ -139,6 +145,8 @@ export function resolverParams(p?: ParamsMotor28 | null): ParamsResolvido {
     durRevisao: { rf: num(q.durRf, DUR_REVISAO.rf), rq: num(q.durRq, DUR_REVISAO.rq) },
     legproc: { metasDia: num(q.lpMetasDia, 4), discDia: num(q.lpDiscDia, 2), mesmaDisc: num(q.lpMesmaDisc, 2) },
     desempenho: { ativo: q.usarDesempenhoNoPlano === true, peso: Math.max(0, num(q.pesoDesempenho, 1)), acertoMin: num(q.acertoMin, 60) },
+    regras218: { pdfInteiro: q.pdfInteiro218 === true, revisaoPorResultado: q.revisaoPorResultado218 === true },
+    juris: { ativo: q.jurisprudencia219 === true, min: Math.min(180, Math.max(15, Math.round(num(q.jurisprudenciaMin, 60)))) },
   }
 }
 export const PARAMS_PADRAO_MOTOR = resolverParams()
@@ -157,6 +165,39 @@ export function temasFracos(notas: Record<string, NotaTema> | undefined | null, 
   for (const k of Object.keys(res)) { const i = +k; if (res[i] > 0 && Math.max(0, (res[i] - (err[i] || 0)) / res[i] * 100) < acertoMin) fracos.add(i) }
   return fracos
 }
+// ── Regras da versão 2.18 (puras, testáveis) ─────────────────────────────────────────────────────
+/** Reforço/revisão pelo percentual EXATO, sem arredondar: <50 → 'pf' (releitura) · 50 até <70 → 'fl' (PDFlash) · ≥70 → 'ok' (nada). */
+export function classificarResultado218(pct: number): 'pf' | 'fl' | 'ok' { return pct < 50 ? 'pf' : pct < 70 ? 'fl' : 'ok' }
+/** Resultado de um tema: questões da aula (qu:i) + das semanas de revisão (rq:*:i). Válido só com total inteiro > 0 e 0 ≤ acertos ≤ total. */
+export function resultadoTema218(notas: Record<string, NotaTema> | undefined | null, i: number): { pct: number; total: number } | null {
+  let total = 0, err = 0
+  for (const [id, n] of Object.entries(notas || {})) {
+    if (!n) continue
+    const p = id.split(':')
+    if ((p[0] === 'qu' && +p[1] === i) || (p[0] === 'rq' && +p[2] === i)) {
+      const t = +(n.res || 0), e = +(n.err || 0)
+      if (Number.isInteger(t) && Number.isInteger(e) && t > 0 && e >= 0 && e <= t) { total += t; err += e }
+    }
+  }
+  return total > 0 ? { pct: (total - err) / total * 100, total } : null
+}
+/**
+ * Fila da semana de revisão pelo resultado recente (2.18): <50% primeiro, depois 50–70%, depois temas sem resultado;
+ * ≥70% fica de fora. Dentro do grupo: menor acerto, depois PDFull mais antigo, depois índice. Temas já revisados vão ao fim do grupo.
+ */
+export function rankingRevisao218(plano: Record<string, [DataISO, number]>, notas: Record<string, NotaTema> | undefined | null, ateData: DataISO, jaRevisados: Set<number>) {
+  const cand: Array<{ i: number; d: DataISO; grau: number | null; acerto: number | null; prioritario: boolean; pontos: number }> = []
+  for (const [id, [d]] of Object.entries(plano)) {
+    if (!id.startsWith('pf:') || d >= ateData) continue
+    const i = +id.split(':')[1], r = resultadoTema218(notas, i)
+    const cls = r ? classificarResultado218(r.pct) : null
+    if (cls === 'ok') continue
+    const grupo = cls === 'pf' ? 0 : cls === 'fl' ? 1 : 2
+    cand.push({ i, d, grau: ((notas || {})['pf:' + i]?.grau as number | undefined) ?? null, acerto: r ? r.pct : null, prioritario: grupo < 2, pontos: -(grupo * 1000) + (r ? 100 - r.pct : 0) - (jaRevisados.has(i) ? 4 : 0) })
+  }
+  return cand.sort((a, b) => (b.pontos - a.pontos) || (a.d < b.d ? -1 : a.d > b.d ? 1 : a.i - b.i))
+}
+
 /**
  * Data ideal da revisão ('fl') ou das questões ('qu') de uma aula. Sem desempenho ligado, ou para tema não fraco,
  * é exatamente a do modelo 2.8 (mesmo dia da semana, N semanas de conteúdo depois). Tema FRACO: antecipa
@@ -412,10 +453,11 @@ function gerarPlanoBase(cfg: Cfg28, AS: AulaAS[], ordemAulas: number[] | null, l
     }
     /** Lê PDFULL em um dia: termina o que estiver em curso ou começa o próximo; o que não couber vira parte e continua depois. */
     const pdfsEm = (dt: DataISO) => new Set(Object.entries(plano).filter(([id, [d]]) => d === dt && /^p[fp]:/.test(id)).map(([id]) => +id.split(':')[1]))
-    const lerPdf = (dt: DataISO, limite: number): boolean => {
+    const lerPdf = (dt: DataISO, limite: number, soInteiro = false): boolean => {
       if (dt < ultimaLeitura) return false
       const candidato = emCurso?.i ?? pdfQ[qi]
       if (candidato == null) return false
+      if (soInteiro && !emCurso && restante(candidato) > limite) return false // 2.18 (CT-06): não abre PDFull que não cabe inteiro na sobra
       const datas = Object.entries(plano).filter(([id]) => /^p[fp]:/.test(id) && +id.split(':')[1] === candidato).map(([, v]) => v[0])
       const resto = (emCurso?.ultima && emCurso.ultima < dt) || datas.some((d) => d < dt) || (cfg.paginasLidas?.[candidato] || 0) > 0 || (cfg.partesLidas?.[candidato] || 0) > 0
       if (!resto && !pdfsEm(dt).has(candidato) && novosPDFDia27(plano, cfg, dt).size >= limitePDF27(cfg, P.tetoPdfDia)) return false
@@ -467,7 +509,7 @@ function gerarPlanoBase(cfg: Cfg28, AS: AulaAS[], ordemAulas: number[] | null, l
       if (permitePdf && pdfsEm(dt).size === 0) lerPdf(dt, livre(dt))
       encaixarTipo('qu', [dt])
       encaixarLP([dt])
-      if (permitePdf) for (let tentativa = 0; tentativa < 2 && livre(dt) >= 30; tentativa++) if (!lerPdf(dt, livre(dt))) break
+      if (permitePdf) for (let tentativa = 0; tentativa < 2 && livre(dt) >= 30; tentativa++) if (!lerPdf(dt, livre(dt), P.regras218.pdfInteiro)) break
     }
     preencher(diasSem)
     if (diasSem.some((dt) => carga[dt])) fim = sem
@@ -654,7 +696,7 @@ function remanejadasEfetivas(cfg: Cfg28, AS: AulaAS[], fixos: Plano, base: DataI
  * AS = aulas; LP = metas de LegProc na ordem do catálogo; fixos = metas que não se movem; ancora = início da
  * redistribuição; ctx.ordem = ordem de distribuição das aulas; ctx.feitas = metas concluídas.
  */
-export function gerarPlano(cfg: Cfg28, AS: AulaAS[], LP: ItemLP[], fixos: Plano, ancora: DataISO | null, ctx: Contexto = {}): ResultadoPlano {
+function gerarPlanoNucleo(cfg: Cfg28, AS: AulaAS[], LP: ItemLP[], fixos: Plano, ancora: DataISO | null, ctx: Contexto = {}): ResultadoPlano {
   fixos = fixos || {}
   const P = resolverParams(ctx.params)
   const feitas = new Set(ctx.feitas || [])
@@ -689,6 +731,72 @@ export function gerarPlano(cfg: Cfg28, AS: AulaAS[], LP: ItemLP[], fixos: Plano,
   }
   try { return calcularDomino(g.plano, c, base, { detalhes }, ctxI) }
   catch { return { ...g, detalhes } } // sem disponibilidade p/ o dominó: fica a distribuição base
+}
+
+// ── 2.19: Jurisprudência semanal (meta geral `jp:<semana>`, 60 min, 1× por semana de atividade) ─────────────
+// Desligada por padrão (params.jurisprudencia219). Fora do núcleo: o plano é gerado com a hora JÁ descontada da
+// capacidade dos dias reservados, e as reservas são reunidas ao plano no fim (como o dominó da 2.19).
+export const ehJuris219 = (id: string) => id.startsWith('jp:')
+
+function reservarJuris219(cfg: Cfg28, sem: number, desde: DataISO, fonte: Plano, feitas: Set<string>, minPadrao: number): { id: string; valor: [DataISO, number] } | null {
+  const ini = semInicio(cfg.start, sem), fimSem = dAdd(ini, 6)
+  const ids = Object.keys(fonte).filter((id) => ehJuris219(id) && fonte[id][0] >= ini && fonte[id][0] <= fimSem)
+  const concluida = ids.find((id) => feitas.has(id))
+  if (concluida) return { id: concluida, valor: fonte[concluida] }
+  const rems = Object.entries(cfg.remanejadas || {}).filter(([id]) => ehJuris219(id))
+  const rem = rems.find(([, r]) => semDe(cfg.start, r.desde) === sem)
+  // a meta desta semana foi levada para outra semana: não recria a de origem
+  if (!ids.length && !rem && rems.some(([id, r]) => +id.split(':')[1] === sem && semDe(cfg.start, r.desde) !== sem)) return null
+  const id = rem?.[0] || ids[0] || 'jp:' + sem
+  const minutos = Math.min(minPadrao, Math.max(1, Math.round(rem?.[1].minutos || minPadrao)))
+  const ocupada = (d: DataISO) => Object.entries(fonte).filter(([k, v]) => !ehJuris219(k) && feitas.has(k) && v[0] === d).reduce((s, [, v]) => s + v[1] * 60, 0)
+  const datas = Array.from({ length: 7 }, (_, k) => dAdd(ini, k)).filter((d) => d >= cfg.start && d >= desde)
+  if (!datas.some((d) => horasDia(cfg, d) > 0)) return null // semana sem estudo não recebe a reserva
+  const livre = (d: DataISO) => horasDia(cfg, d) * 60 - ocupada(d)
+  const dias = datas.filter((d) => livre(d) >= minutos)
+  if (rem) {
+    if (!dias.includes(rem[1].desde)) throw Error('Não há tempo disponível para a meta de Jurisprudência na data escolhida.')
+    return { id, valor: [rem[1].desde, minutos / 60] }
+  }
+  const ordenar = (a: DataISO, b: DataISO) => livre(b) - livre(a) || a.localeCompare(b)
+  const preferidos = dias.filter((d) => [4, 5].includes(dDow(d))).sort(ordenar) // sexta e sábado
+  const d = preferidos[0] || [...dias].sort(ordenar)[0]
+  // semana já em andamento (dias anteriores a `desde` ficaram para trás): sem dia que caiba, não trava a reorganização
+  if (!d && ini < desde) return null
+  if (!d) throw Error('A semana ' + sem + ' precisa de um dia com ' + minutos + ' min disponíveis para Jurisprudência. Ajuste a rotina ou as horas dessa semana.')
+  return { id, valor: [d, minutos / 60] }
+}
+
+export function gerarPlano(cfg: Cfg28, AS: AulaAS[], LP: ItemLP[], fixos: Plano, ancora: DataISO | null, ctx: Contexto = {}): ResultadoPlano {
+  const P = resolverParams(ctx.params)
+  if (!P.juris.ativo) return gerarPlanoNucleo(cfg, AS, LP, fixos, ancora, ctx) // flag desligada = plano idêntico
+  fixos = fixos || {}
+  const feitas = new Set(ctx.feitas || [])
+  const base = ancora && ancora > cfg.start ? ancora : cfg.start
+  const normal: Plano = {}, passadas: Plano = {}
+  for (const [id, v] of Object.entries(fixos)) {
+    if (!ehJuris219(id)) normal[id] = v
+    else if (v[0] < base || feitas.has(id)) passadas[id] = v
+  }
+  const cfgN: Cfg28 = { ...cfg, remanejadas: Object.fromEntries(Object.entries(cfg.remanejadas || {}).filter(([id]) => !ehJuris219(id))) }
+  let limite = Math.max(semDe(cfg.start, base), gerarPlanoNucleo(cfgN, AS, LP, normal, ancora, ctx).fim)
+  for (let tentativa = 0; tentativa < 40; tentativa++) {
+    const reservas: Plano = { ...passadas }
+    const reduzida: Cfg28 = { ...cfgN, horasPontuais: { ...(cfgN.horasPontuais || {}) } }
+    for (let sem = Math.max(1, semDe(cfg.start, base)); sem <= limite; sem++) {
+      const r = reservarJuris219(cfg, sem, base, fixos, feitas, P.juris.min)
+      if (!r) continue
+      reservas[r.id] = r.valor
+      const [d, h] = r.valor
+      if (d >= base) reduzida.horasPontuais![d] = Math.max(0, horasDia(cfg, d) - h)
+    }
+    const g = gerarPlanoNucleo(reduzida, AS, LP, normal, ancora, ctx)
+    if (g.fim > limite) { limite = g.fim; continue } // o plano avançou: reserva também as novas semanas
+    const detalhes = g.detalhes || {}
+    for (const id of Object.keys(reservas)) detalhes[id] = { ...(detalhes[id] || {}), jurisprudencia: true }
+    return { plano: { ...g.plano, ...reservas }, detalhes, fim: Math.max(g.fim, ...Object.values(reservas).map((v) => semDe(cfg.start, v[0]))) }
+  }
+  throw Error('Não foi possível encaixar a Jurisprudência semanal e as demais metas. Ajuste a disponibilidade.')
 }
 
 /** Saúde do plano: atraso das revisões e questões em relação ao ideal (7 e 14 dias). */

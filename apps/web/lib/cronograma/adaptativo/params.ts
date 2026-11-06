@@ -55,6 +55,18 @@ export interface ParamsAdaptativo {
   usarDesempenhoNoPlano: boolean
   /** Força do reforço de temas fracos (0 = desligado; 1 = padrão). */
   pesoDesempenho: number
+
+  // ── Regras da versão 2.18 (cada uma desligada por padrão → o plano atual não muda) ──
+  /** 2º PDFull do dia só abre se couber INTEIRO na sobra (a continuação do que está em curso não é afetada). */
+  pdfInteiro218: boolean
+  /** Semana de revisão pelo resultado recente do tema: <50% e 50–70% entram (os piores primeiro); ≥70% fica de fora. */
+  revisaoPorResultado218: boolean
+
+  // ── Versão 2.19 (desligada por padrão → o plano atual não muda) ──
+  /** Meta geral de Jurisprudência: 1× por semana de atividade, preferindo sexta/sábado. */
+  jurisprudencia219: boolean
+  /** Duração da meta semanal de Jurisprudência (min). */
+  jurisprudenciaMin: number
 }
 
 /** Valores 2.8 (defaults). Mexer aqui muda o comportamento base de TODOS os tenants — prefira a config por tenant. */
@@ -80,6 +92,10 @@ export const PARAMS_PADRAO: ParamsAdaptativo = {
   acertoMin: 60,
   usarDesempenhoNoPlano: false,
   pesoDesempenho: 0,
+  pdfInteiro218: false,
+  revisaoPorResultado218: false,
+  jurisprudencia219: false,
+  jurisprudenciaMin: 60,
 }
 
 const inteiro = (v: unknown, def: number, min: number, max: number): number => {
@@ -121,6 +137,10 @@ export function normalizarParams(raw: unknown): ParamsAdaptativo {
     acertoMin: inteiro(r.acertoMin, p.acertoMin, 0, 100),
     usarDesempenhoNoPlano: r.usarDesempenhoNoPlano === true,
     pesoDesempenho: Math.max(0, Math.min(3, Number(r.pesoDesempenho) || (r.usarDesempenhoNoPlano === true ? 1 : 0))),
+    pdfInteiro218: r.pdfInteiro218 === true,
+    revisaoPorResultado218: r.revisaoPorResultado218 === true,
+    jurisprudencia219: r.jurisprudencia219 === true,
+    jurisprudenciaMin: inteiro(r.jurisprudenciaMin, p.jurisprudenciaMin, 15, 180),
   }
 }
 

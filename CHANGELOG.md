@@ -12,6 +12,25 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.7.0 — 2026-11-06
+
+### Cronograma adaptativo — questões da plataforma por meta
+- **Admin › Catálogo de metas:** em cada aula, o botão **"Questões da plataforma"** abre os filtros (disciplinas, assuntos, bancas, órgãos, anos, dificuldade) das questões do banco que aparecem naquela meta. Assunto-pai inclui os filhos; mostra quantas questões elegíveis casam. **Salva na hora**, em tabela própria (`simulado_cronograma_adaptativo_qf`) — não versiona o catálogo, então **não migra os planos dos alunos**.
+- **Aluno:** nas metas de Questões/Revisão de questões que tiverem filtro, o cronograma ganha o botão **"Questões da plataforma →"**. Abre `/aluno/cronograma/questoes` com as questões do filtro (10 por página, paginação no banco), barra lateral com **cronômetro, progresso, acertos/erros e página**, **Concluir meta e voltar** (grava tempo + conclui a meta) e **Voltar ao cronograma**. Meta já concluída abre em modo revisar. Contrato igual ao do leitor da Biblioteca (`meta`/`voltar`/`tseg`).
+- O filtro é ligado à **chave estável da aula** (não ao índice): renomear/reordenar não o perde. `QuestaoCard`/`QuestaoResolvivel` ganharam o callback opcional `onResponder` (usos atuais inalterados).
+- Novo seletor múltiplo `MultiSelectLista` (busca + chips em **uma linha**, o excedente vira **"+N"**).
+
+### Biblioteca — metadados, colunas, filtros e planilha
+- Colunas novas na visão em lista: **Disciplina, Assunto específico, Tribunais, Informativo, Ano, Estado de origem, Selos** e **Data de atualização**, com seletor de **Colunas** (preferência por navegador), **Filtros** por metadado e **rolagem lateral** (nome fixo à esquerda, menu "⋮" fixo à direita).
+- **Exportar/Importar planilha (.xlsx)** por pasta (+ subpastas) ou biblioteca inteira: exporta só conteúdos com todas as informações; o import atualiza **somente os 7 metadados**, casando por **nome** (e tipo) — **Título e Tipo não podem ser alterados** (linha ignorada e reportada). Célula vazia mantém, `-` apaga. Rotas de API (`/api/admin/biblioteca/planilha/*`).
+- Card **"Conjunto de questões"**: gestão própria (sem editor de documento).
+
+### Outras frentes incluídas neste commit
+- Alterações já presentes no working tree: áreas da Biblioteca e plugins do OnlyOffice (areas/expansor/selos), JurisClub como produto/categoria, ajustes do motor e da integridade do cronograma adaptativo (docs em `docs/`).
+
+### Migrações a aplicar (manual) + `NOTIFY pgrst, 'reload schema';`
+`20261106000000_conteudo_metadados`, `20261106010000_biblioteca_categoria_jurisclub`, `20261106020000_conteudo_areas_visibilidade`, `20261106030000_cronograma_adaptativo_aula_key`, `20261106040000_cronograma_adaptativo_integridade`, `20261106050000_cronograma_adaptativo_jurisprudencia_219`, `20261106060000_cronograma_adaptativo_qf`.
+
 ## 4.6.0 — 2026-11-06
 
 - **Login/carregamento da Mentoria Além do Corte (MAC) sem o verde do VND:** a conversão verde→bordô (`lib/brand/cor-marca.tsx`) não cobria 5 verdes que a tabela só listava em `rgb()` (`#22C56E`, `#34C88C`, `#78E6AA`, `#8CF0B9`, `#2ED278`) — brilhos, setas e contorno do "M" ficavam verdes. Agora toda cor da tabela `rgb()` vale também em hex. O carregamento com slug `vnd-loading-classico` num tenant MAC também respeita a marca (antes saía verde).

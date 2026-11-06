@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { AlertTriangle, Info } from 'lucide-react'
 import { obterCatalogoMotor, obterEditorCatalogo } from '../actions'
+import { obterFiltrosQf } from '../qf-actions'
 import { CatalogoEditor } from './catalogo-editor'
 import { AdaptativoTabs } from '@/components/admin/adaptativo-tabs'
 import { cn } from '@/lib/utils'
@@ -9,7 +10,7 @@ export const dynamic = 'force-dynamic'
 
 // Admin: Cronograma Adaptativo — Catálogo de metas: edição de aulas, links de questões e LegProc (+ diagnóstico do que o motor usa).
 export default async function CatalogoMetasPage() {
-  const [ed, r] = await Promise.all([obterEditorCatalogo(), obterCatalogoMotor()])
+  const [ed, r, filtrosQf] = await Promise.all([obterEditorCatalogo(), obterCatalogoMotor(), obterFiltrosQf()])
   const c = r.catalogo
   return (
     <div className="w-full space-y-4">
@@ -46,7 +47,7 @@ export default async function CatalogoMetasPage() {
       {!ed.ok || !ed.editor ? (
         <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">{ed.error ?? 'Falha ao carregar o catálogo.'}</div>
       ) : (
-        <CatalogoEditor inicial={ed.editor} />
+        <CatalogoEditor inicial={ed.editor} filtrosQf={filtrosQf} />
       )}
 
       {c && (

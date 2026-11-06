@@ -26,6 +26,8 @@ import { MenuPortal, ItemMenu } from '@/components/conteudo/menu-drive'
 import { CardPasta } from '@/components/biblioteca/card-pasta'
 import { CardConteudo } from '@/components/biblioteca/card-conteudo'
 import { SeloTipo } from '@/components/biblioteca/selo-tipo'
+import { BarraMetadados, useColunasLista, passaFiltrosMeta, type FiltrosMeta } from '@/components/biblioteca/metadados-toolbar'
+import { CAMPOS_META, listaMulti, textoMeta, type Metadados } from '@/lib/conteudo/metadados'
 import { BuscaDrive, ResultadosBusca, type OpcaoChip, type SugestaoBusca, type ResultadoBusca } from '@/components/biblioteca/busca-drive'
 import { cardGrid, FOLDER_MIN, POSTER_MIN } from '@/components/aluno/card-grid'
 import { TIPOS_CONTEUDO, kindPorArquivo, type KindConteudo } from '@/lib/biblioteca/tipos-conteudo'
@@ -170,13 +172,16 @@ function AccessLabel({ restrito }: { restrito?: boolean }) {
 }
 
 type TipoFiltro = 'todos' | 'docx' | 'pdf'
+// ?tab= → coleção: 'modelos' (menu lateral) e 'jurisclub' (aba abaixo do título); qualquer outro valor = Conteúdos.
+const categoriaDaTab = (t: string | null): Categoria => (t === 'modelos' ? 'modelo_caderno' : t === 'jurisclub' ? 'jurisclub' : 'conteudo')
 type Ordenar = 'atualizados' | 'nome' | 'criados'
 
 export function BibliotecaClient() {
   const searchParams = useSearchParams()
   const routerTopo = useRouter()
-  const [categoria, setCategoria] = useState<Categoria>(searchParams.get('tab') === 'modelos' ? 'modelo_caderno' : 'conteudo')
+  const [categoria, setCategoria] = useState<Categoria>(categoriaDaTab(searchParams.get('tab')))
   const ehModelo = categoria === 'modelo_caderno'
+  const ehJurisclub = categoria === 'jurisclub'
   const [pastaAtual, setPastaAtual] = useState<string | null>(null)
   const [pastas, setPastas] = useState<PastaConteudo[]>([])
   const [docs, setDocs] = useState<Doc[]>([])
@@ -187,6 +192,9 @@ export function BibliotecaClient() {
   const [restritasPasta, setRestritasPasta] = useState<Record<string, boolean>>({})
   const [restritoDoc, setRestritoDoc] = useState<Record<string, boolean>>({})
   const [resumo, setResumo] = useState<{ nGrupos: number; nAlunos: number }>({ nGrupos: 0, nAlunos: 0 })
+  const [metadados, setMetadados] = useState<Record<string, Metadados>>({}) // colunas da lista (disciplina, tribunal…)
+  const [colunas, setColunas] = useColunasLista()                            // colunas visíveis (preferência local)
+  const [filtrosMeta, setFiltrosMeta] = useState<FiltrosMeta>({})            // filtros por metadado
   const [carregando, setCarregando] = useState(true)
   const [view, setView] = useState<'grid' | 'lista'>('grid')
   const [busca, setBusca] = useState('')
@@ -210,7 +218,7 @@ export function BibliotecaClient() {
       const r = await listarArvore(pastaId, cat)
       if (!r.ok) { toast.error(r.error || 'Falha ao carregar.'); return }
       setPastas(r.pastas); setDocs(r.documentos); setPrevias(r.previas || {}); setThumbs(r.thumbs || {}); setBreadcrumb(r.breadcrumb); setPastaAtual(pastaId)
-      setContagens(r.contagens || {}); setRestritasPasta(r.restritasPasta || {}); setRestritoDoc(r.restritoDoc || {}); setResumo(r.resumo || { nGrupos: 0, nAlunos: 0 })
+      setContagens(r.contagens || {}); setRestritasPasta(r.restritasPasta || {}); setRestritoDoc(r.restritoDoc || {}); setResumo(r.resumo || { nGrupos: 0, nAlunos: 0 }); setMetadados(r.metadados || {})
       // Histórico: cada navegação de pasta vira uma entrada (URL inalterada, preservando o estado do Next)
       // → o "Voltar" do navegador sobe de pasta em vez de sair da Biblioteca. push=false quando a
       // própria navegação já veio de um popstate (voltar/avançar do navegador).
@@ -225,7 +233,7 @@ export function BibliotecaClient() {
   }
   // A coleção (Conteúdos × Modelos) vem do ?tab= do menu lateral — sincroniza ao navegar.
   useEffect(() => {
-    const cat: Categoria = searchParams.get('tab') === 'modelos' ? 'modelo_caderno' : 'conteudo'
+    const cat: Categoria = categoriaDaTab(searchParams.get('tab'))
     setCategoria((prev) => (prev === cat ? prev : cat))
     setBusca(''); setBuscaAtiva(null); setFiltro('todos')
   }, [searchParams])
@@ -254,12 +262,13 @@ export function BibliotecaClient() {
       .filter((d) => filtro === 'todos' || d.status === filtro)
       .filter((d) => tipo === 'todos' || d.tipo_origem === tipo)
       .filter((d) => !q || d.titulo.toLowerCase().includes(q))
+      .filter((d) => passaFiltrosMeta(metadados[d.id], filtrosMeta))
     const ord = [...arr]
     if (ordenar === 'nome') ord.sort((a, b) => a.titulo.localeCompare(b.titulo, 'pt-BR'))
     else if (ordenar === 'criados') ord.sort((a, b) => String(b.criado_em).localeCompare(String(a.criado_em)))
     else ord.sort((a, b) => String(b.atualizado_em).localeCompare(String(a.atualizado_em)))
     return ord
-  }, [docs, busca, filtro, tipo, ordenar])
+  }, [docs, busca, filtro, tipo, ordenar, metadados, filtrosMeta])
 
   async function novaPasta() {
     const nome = await pedirTexto({ titulo: 'Nova pasta', placeholder: 'Nome da pasta', confirmar: 'Criar' })
@@ -553,7 +562,7 @@ export function BibliotecaClient() {
           )}
           <div className="min-w-0">
             <nav className="mb-0.5 flex flex-wrap items-center gap-1 text-xs">
-              <button onClick={() => carregar(null)} className={`rounded px-1.5 py-0.5 hover:bg-muted ${pastaAtual === null ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>{ehModelo ? 'Modelos' : 'Biblioteca'}</button>
+              <button onClick={() => carregar(null)} className={`rounded px-1.5 py-0.5 hover:bg-muted ${pastaAtual === null ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>{ehModelo ? 'Modelos' : ehJurisclub ? 'JurisClub' : 'Biblioteca'}</button>
               {breadcrumb.map((b) => (
                 <span key={b.id} className="flex items-center gap-1">
                   <ChevronRight className="h-3 w-3 text-muted-foreground" />
@@ -573,7 +582,9 @@ export function BibliotecaClient() {
                 ? 'Modelos de caderno em .docx, editados 100% no OnlyOffice — organização em Drive (pastas).'
                 : pastaAtual
                   ? `${pastas.length} ${pastas.length === 1 ? 'pasta' : 'pastas'} · ${docs.length} ${docs.length === 1 ? 'material' : 'materiais'} · entrega a ${resumo.nGrupos} ${resumo.nGrupos === 1 ? 'grupo' : 'grupos'} e ${resumo.nAlunos} ${resumo.nAlunos === 1 ? 'aluno' : 'alunos'}`
-                  : `${pastas.length} ${pastas.length === 1 ? 'pasta' : 'pastas'} · documentos versionados — os grifos sobrevivem às edições`}
+                  : ehJurisclub
+                    ? `${pastas.length} ${pastas.length === 1 ? 'pasta' : 'pastas'} · materiais produzidos para o JurisClub — entregues aos alunos pelo gerenciador de produtos`
+                    : `${pastas.length} ${pastas.length === 1 ? 'pasta' : 'pastas'} · documentos versionados — os grifos sobrevivem às edições`}
             </p>
           </div>
         </div>
@@ -592,11 +603,30 @@ export function BibliotecaClient() {
             onUploadArquivos={(files) => importarArquivos(files, false)}
             onUploadPasta={(files) => importarArquivos(files, true)}
             onDocumentoBranco={novoBranco}
-            onNovoQuestoes={ehModelo ? undefined : novoConjuntoQuestoes}
+            onNovoQuestoes={ehModelo || ehJurisclub ? undefined : novoConjuntoQuestoes}
             onToast={(m) => toast.message(m)}
           />
         </div>
       </div>
+
+      {/* Abas da coleção (sublinhado): Conteúdos | JurisClub — logo abaixo do título. Modelos tem entrada própria no menu. */}
+      {!ehModelo && (
+        <div role="tablist" aria-label="Coleção da biblioteca" className="flex gap-1 border-b">
+          {([['conteudo', 'Conteúdos'], ['jurisclub', 'JurisClub']] as [Categoria, string][]).map(([k, label]) => (
+            <button
+              key={k} role="tab" aria-selected={categoria === k}
+              onClick={() => {
+                if (categoria === k) return
+                // Troca de coleção 100% no cliente (sem round-trip do RSC): o efeito [categoria] recarrega a árvore;
+                // a URL acompanha via history (Next sincroniza o useSearchParams).
+                setBusca(''); setBuscaAtiva(null); setFiltro('todos'); setCategoria(k)
+                try { window.history.replaceState({ ...(window.history.state || {}) }, '', k === 'jurisclub' ? '/admin/biblioteca?tab=jurisclub' : '/admin/biblioteca') } catch { /* no-op */ }
+              }}
+              className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition ${categoria === k ? 'border-primary text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'}`}
+            >{label}</button>
+          ))}
+        </div>
+      )}
 
       {/* Busca estilo Drive (Ctrl/⌘+K) */}
       <BuscaDrive
@@ -610,7 +640,7 @@ export function BibliotecaClient() {
         onStatus={(k) => setFiltro(k as StatusFiltro)}
         sugestoes={sugestoesBusca}
         onAbrirSugestao={(s) => setDetalheId(s.id)}
-        escopoLabel={ehModelo ? 'Modelos' : 'Toda a biblioteca'}
+        escopoLabel={ehModelo ? 'Modelos' : ehJurisclub ? 'Todo o JurisClub' : 'Toda a biblioteca'}
         placeholder={ehModelo ? 'Buscar modelos pelo título…' : 'Buscar na biblioteca — títulos, pastas…'}
       />
 
@@ -640,6 +670,22 @@ export function BibliotecaClient() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Colunas + Filtros por metadado + Planilha (exportar/importar) — só na coleção de conteúdos */}
+      {buscaAtiva === null && !ehModelo && (
+        <BarraMetadados
+          docIds={docs.map((d) => d.id)}
+          metadados={metadados}
+          colunas={colunas}
+          onColunas={setColunas}
+          filtros={filtrosMeta}
+          onFiltros={setFiltrosMeta}
+          pastaId={pastaAtual}
+          categoria={categoria}
+          escopoRotulo={pastaAtual ? `a pasta “${breadcrumb[breadcrumb.length - 1]?.nome ?? ''}” (e subpastas)` : ehJurisclub ? 'todo o JurisClub' : 'toda a biblioteca'}
+          onImportado={() => carregar(pastaAtual)}
+        />
       )}
 
       {carregando ? (
@@ -739,20 +785,43 @@ export function BibliotecaClient() {
                 ))}
               </div>
             ) : (
-              <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
-                <table className="w-full text-sm">
+              // Rolagem LATERAL: com muitas colunas a tabela não estoura o layout — o nome (esq.) e o menu "⋮"
+              // (dir.) ficam fixos enquanto as colunas do meio rolam.
+              <div className="overflow-x-auto rounded-2xl border bg-card shadow-sm">
+                <table className="w-full min-w-max text-sm">
                   <thead className="border-b bg-muted/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
-                    <tr><th className="px-4 py-2.5 font-semibold">Documento</th><th className="px-4 py-2.5 text-center font-semibold">Tipo</th>{!ehModelo && <th className="px-4 py-2.5 text-center font-semibold">Status</th>}<th className="w-10" /></tr>
+                    <tr>
+                      <th className="sticky left-0 z-10 bg-[color-mix(in_oklab,var(--muted)_40%,var(--card))] px-4 py-2.5 font-semibold shadow-[inset_-1px_0_0_var(--border)]">Documento</th>
+                      {colunas.tipo && <th className="px-4 py-2.5 text-center font-semibold">Tipo</th>}
+                      {!ehModelo && colunas.status && <th className="px-4 py-2.5 text-center font-semibold">Status</th>}
+                      {!ehModelo && CAMPOS_META.map((c) => colunas[c.k] && <th key={c.k} className="whitespace-nowrap px-4 py-2.5 font-semibold">{c.rot}</th>)}
+                      {!ehModelo && colunas.atualizado_em && <th className="whitespace-nowrap px-4 py-2.5 font-semibold">Atualização</th>}
+                      <th className="sticky right-0 z-10 w-10 bg-[color-mix(in_oklab,var(--muted)_40%,var(--card))] shadow-[inset_1px_0_0_var(--border)]" />
+                    </tr>
                   </thead>
                   <tbody>
                     {docsFiltrados.map((d) => {
                       const Icone = ICONE_TIPO[d.tipo_origem] ?? FileText
                       return (
                         <tr key={d.id} onClick={() => setDetalheId(d.id)} className="group cursor-pointer border-b last:border-0 hover:bg-muted/40">
-                          <td className="px-4 py-2.5"><span className="flex items-center gap-2"><Icone className="h-4 w-4 text-muted-foreground" /><span className="truncate font-medium" title={d.titulo}>{d.titulo}</span></span></td>
-                          <td className="px-4 py-2.5 text-center"><SeloTipo kind={docKind(d.tipo_origem)} tamanho="sm" /></td>
-                          {!ehModelo && <td className="px-4 py-2.5 text-center"><BadgeStatus s={d.status} /></td>}
-                          <td className="px-2 py-2.5 text-right" onClick={(e) => e.stopPropagation()}>
+                          <td className="sticky left-0 z-10 min-w-[16rem] max-w-[26rem] bg-card px-4 py-2.5 shadow-[inset_-1px_0_0_var(--border)] group-hover:bg-[color-mix(in_oklab,var(--muted)_40%,var(--card))]"><span className="flex items-center gap-2"><Icone className="h-4 w-4 shrink-0 text-muted-foreground" /><span className="min-w-0 truncate font-medium" title={d.titulo}>{d.titulo}</span></span></td>
+                          {colunas.tipo && <td className="px-4 py-2.5 text-center"><SeloTipo kind={docKind(d.tipo_origem)} tamanho="sm" /></td>}
+                          {!ehModelo && colunas.status && <td className="px-4 py-2.5 text-center"><BadgeStatus s={d.status} /></td>}
+                          {!ehModelo && CAMPOS_META.map((c) => colunas[c.k] && (
+                            c.k === 'selos' ? (
+                              <td key={c.k} className="px-4 py-2.5" title={textoMeta(metadados[d.id], 'selos')}>
+                                {listaMulti(metadados[d.id]?.selos).length ? (
+                                  <div className="flex max-w-[18rem] gap-1 overflow-hidden">
+                                    {listaMulti(metadados[d.id]?.selos).map((s) => <span key={s} className="whitespace-nowrap rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">{s}</span>)}
+                                  </div>
+                                ) : <span className="text-muted-foreground opacity-40">—</span>}
+                              </td>
+                            ) : (
+                              <td key={c.k} className="max-w-[16rem] truncate px-4 py-2.5 text-muted-foreground" title={textoMeta(metadados[d.id], c.k)}>{textoMeta(metadados[d.id], c.k) || <span className="opacity-40">—</span>}</td>
+                            )
+                          ))}
+                          {!ehModelo && colunas.atualizado_em && <td className="whitespace-nowrap px-4 py-2.5 text-xs tabular-nums text-muted-foreground">{formatBrt(d.atualizado_em) ?? '—'}</td>}
+                          <td className="sticky right-0 z-10 bg-card px-2 py-2.5 text-right shadow-[inset_1px_0_0_var(--border)] group-hover:bg-[color-mix(in_oklab,var(--muted)_40%,var(--card))]" onClick={(e) => e.stopPropagation()}>
                             <MenuDoc d={d} categoria={categoria} onAbrir={() => setDetalheId(d.id)} onAcesso={() => setAcessoDoc(d)} onCapaPagina={() => setCapaDlg({ tipo: 'documento', id: d.id })} onEditarOffice={() => editarDocOffice(d)} onBaixar={() => baixarDoc(d)} onRenomear={() => renomearDoc(d)} onMover={(p) => moverDoc(d, p)} onArquivar={() => arquivarDoc(d)} onDuplicar={() => duplicarDoc(d)} />
                           </td>
                         </tr>
@@ -870,7 +939,7 @@ function MenuPasta({ p, categoria, ancestralEhDisciplina, onAbrir, onAcesso, onC
             </DropdownMenuSubContent>
           </DropdownMenuSub>
           <DropdownMenuItem onClick={() => { setOpen(false); carregarPastas(); setMoverAberto(true) }}><FolderInput className="mr-2 h-4 w-4" /> Mover para…</DropdownMenuItem>
-          {categoria !== 'modelo_caderno' && (
+          {categoria === 'conteudo' && (
             <>
               <DropdownMenuSeparator />
               {ancestralEhDisciplina ? (

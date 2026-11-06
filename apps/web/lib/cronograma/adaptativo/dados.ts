@@ -446,11 +446,22 @@ export async function carregarDocs(svc: SupabaseClient, tenantId: string, estId:
   }
 }
 
+const ID_META = /^(pf|pp|fl|qu|lp|rf|rq|jp):[A-Za-z0-9:_-]{1,60}$/
+/** Grade { meta_id: [AAAA-MM-DD, horas] }: ids no formato do motor, data ISO, horas numéricas; limite de tamanho. */
+export function gradeValida(g: unknown): boolean {
+  if (g == null) return true
+  if (typeof g !== 'object' || Array.isArray(g)) return false
+  const e = Object.entries(g as Record<string, unknown>)
+  if (e.length > 30000) return false
+  return e.every(([id, v]) => ID_META.test(id) && Array.isArray(v) && typeof v[0] === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v[0]) && (v[1] == null || (typeof v[1] === 'number' && Number.isFinite(v[1]) && v[1] >= 0 && v[1] <= 24)))
+}
+
 /** Grava um doc do modelo. parte ∈ 'estado'|'progresso'|'notas'. */
 export async function sincronizarDoc(svc: SupabaseClient, tenantId: string, estId: string, parte: string, doc: Record<string, unknown>): Promise<{ ok: boolean; error?: string }> {
   if (parte === 'estado') {
     let cfg = doc.cfg as CfgPlano
     if (!cfg || !cfg.start) return { ok: false, error: 'cfg_invalido' }
+    if (!gradeValida(doc.plano)) return { ok: false, error: 'plano_invalido' } // o cliente é a fonte da grade → valida o formato
     // Nome dado na criação (iframe). Vazio => não sobrescreve o título existente num recálculo.
     const tituloDoc = typeof doc.titulo === 'string' ? doc.titulo.trim().slice(0, 80) : ''
     // O alvo é lido ANTES de gravar: preserva a descrição do LegProc antigo e carimba o catálogo quando o plano

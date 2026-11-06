@@ -39,7 +39,7 @@ function MaterialBloqueado({ lib, voltarHref }: { lib: Liberacao; voltarHref: st
 
 export const dynamic = 'force-dynamic'
 
-export default async function LeituraConteudoPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ pagina?: string; partes?: string; meta?: string; voltar?: string; tseg?: string; tdet?: string }> }) {
+export default async function LeituraConteudoPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ produto?: string; pagina?: string; partes?: string; meta?: string; voltar?: string; tseg?: string; tdet?: string }> }) {
   const { id } = await params
   const sp = await searchParams
   // ?pagina=N — abre o leitor direto na página inicial da meta/parte do Cronograma Adaptativo.
@@ -75,7 +75,7 @@ export default async function LeituraConteudoPage({ params, searchParams }: { pa
     if (lib.bloqueado) return <MaterialBloqueado lib={lib} voltarHref={voltarHref} />
   }
 
-  const doc = await carregarDocParaLeitura(id, sessao.estudanteId)
+  const doc = await carregarDocParaLeitura(id, sessao.estudanteId, { produtoId: typeof sp?.produto === 'string' ? sp.produto : null })
   if (!doc) notFound()
 
   // PÁGINA INICIAL (Biblioteca): a do documento ou da pasta em lote. O leitor ABRE direto nela, mas NÃO corta o que vem

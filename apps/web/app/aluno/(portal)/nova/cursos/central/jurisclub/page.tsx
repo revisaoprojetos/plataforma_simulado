@@ -8,7 +8,9 @@
 // Loaders reusados: desafiosDoAluno, lerDesafioJogo, preencherTesesPorQuiz (@/lib/jurisprudencia/conteudo).
 // SEM tabela/migração nova. O que não tem fonte (etapas Top3/Flashcards/Aprofundar) fica EXEMPLO + TODO(dados).
 import { redirect } from 'next/navigation'
-import { Crumbs, Card, Muted } from '@/components/nova/ui'
+import Link from 'next/link'
+import { Crumbs, Card, Muted, SecHead, Row, Col, Tag } from '@/components/nova/ui'
+import { materiaisJurisclubDoAluno, type MaterialJurisclub } from '@/lib/produtos/jurisclub-aluno'
 import { R } from '@/lib/nova/rotas'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -25,7 +27,41 @@ function detectarCorte(...campos: (string | null | undefined)[]): 'STF' | 'STJ' 
   return null
 }
 
-const primeiroNome = (nome: string) => (nome || '').trim().split(/\s+/)[0] || 'Aluno'
+/** Materiais do JurisClub liberados pelo(s) produto(s) do aluno (gerenciador de produtos › subtipo JurisClub). */
+function MateriaisProduto({ itens }: { itens: MaterialJurisclub[] }) {
+  return (
+    <div style={{ marginTop: 24 }}>
+      <SecHead title="Materiais do JurisClub" sub="Liberados pelo seu plano" />
+      <Col gap={10}>
+        {itens.map((m) => {
+          const titulo = (
+            <Col gap={2}>
+              <span style={{ fontWeight: 600, fontSize: 14 }}>{m.titulo}</span>
+              <Muted size={12}>{m.produtoNome} · {m.modulo}</Muted>
+            </Col>
+          )
+          return (
+            <Card key={m.id} pad={14} style={m.liberada ? undefined : { opacity: 0.7 }}>
+              <Row gap={12} style={{ justifyContent: 'space-between' }}>
+                {m.liberada && m.href
+                  ? <Link href={m.href} style={{ textDecoration: 'none', color: 'inherit', flex: 1 }}>{titulo}</Link>
+                  : titulo}
+                {m.liberada ? (
+                  <Row gap={6}>
+                    {m.quizDocId && <Link href={`/aluno/jurisprudencia/questoes/${m.quizDocId}`} style={{ textDecoration: 'none' }}><Tag kind="brand">Questões</Tag></Link>}
+                    {m.lida ? <Tag kind="green">Lido</Tag> : <Tag>Abrir</Tag>}
+                  </Row>
+                ) : <Tag kind="gray">{m.liberaEm ? `Libera em ${new Date(m.liberaEm).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })}` : 'Bloqueado'}</Tag>}
+              </Row>
+            </Card>
+          )
+        })}
+      </Col>
+    </div>
+  )
+}
+
+const primeiroNome =(nome: string) => (nome || '').trim().split(/\s+/)[0] || 'Aluno'
 
 export default async function JurisClubPage() {
   const sessao = await getSessaoAluno()
@@ -34,15 +70,22 @@ export default async function JurisClubPage() {
   const svc = createAdminClient()
 
   // Edições (desafios) a que o aluno tem acesso — REAL. desafiosDoAluno já ordena por id asc.
-  const desafios = await desafiosDoAluno(estudanteId, tenantId, AREAS_JURISCLUB).catch(() => [])
+  // Materiais do JurisClub (Biblioteca › JurisClub) entregues pelos PRODUTOS do aluno, em paralelo.
+  const [desafios, materiais] = await Promise.all([
+    desafiosDoAluno(estudanteId, tenantId, AREAS_JURISCLUB).catch(() => []),
+    materiaisJurisclubDoAluno(tenantId, estudanteId, R.jurisclub).catch(() => []),
+  ])
+  const secaoMateriais = materiais.length ? <MateriaisProduto itens={materiais} /> : null
 
   if (!desafios.length) {
     return (
       <>
         <Crumbs items={[['Cursos', R.cursos], ['JurisClub', '#']]} />
-        <Card style={{ alignItems: 'center', textAlign: 'center', padding: '48px 24px' }}>
-          <Muted size={13}>Nenhuma edição do JurisClub disponível para você no momento.</Muted>
-        </Card>
+        {secaoMateriais ?? (
+          <Card style={{ alignItems: 'center', textAlign: 'center', padding: '48px 24px' }}>
+            <Muted size={13}>Nenhuma edição do JurisClub disponível para você no momento.</Muted>
+          </Card>
+        )}
       </>
     )
   }
@@ -146,6 +189,7 @@ export default async function JurisClubPage() {
         disciplinas={disciplinas}
         edicoes={edicoes}
       />
+      {secaoMateriais}
     </>
   )
 }

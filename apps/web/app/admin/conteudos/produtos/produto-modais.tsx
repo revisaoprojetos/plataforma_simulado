@@ -193,7 +193,7 @@ export function DuplicarProdutoDialog({ open, onClose, produto, onDuplicado }: {
 
 // Tipos LIBERADOS (funcionais na plataforma hoje). Os demais ficam "Em breve" (desabilitados) para
 // não criar produtos de um tipo que ainda não existe. Ajuste conforme a plataforma evoluir.
-const TIPOS_LIBERADOS = new Set<ProdutoTipo>(['extensivo'])
+const TIPOS_LIBERADOS = new Set<ProdutoTipo>(['extensivo', 'jurisclub'])
 
 /** Select de Tipo custom (não nativo) com divisão Liberados × Em breve. */
 function TipoSelect({ valor, onValor }: { valor: ProdutoTipo; onValor: (v: ProdutoTipo) => void }) {

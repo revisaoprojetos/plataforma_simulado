@@ -16,7 +16,7 @@ import { emitirEvento } from './outbox'
 export type TipoOrigem = 'docx' | 'pdf' | 'html' | 'pptx' | 'xlsx' | 'video' | 'audio' | 'questoes'
 export type StatusDoc = 'rascunho' | 'publicado' | 'arquivado'
 export type StatusConversao = 'pendente' | 'processando' | 'ok' | 'revisao_necessaria' | 'erro'
-export type CategoriaConteudo = 'conteudo' | 'modelo_caderno'
+export type CategoriaConteudo = 'conteudo' | 'modelo_caderno' | 'jurisclub'
 
 export interface Documento {
   id: string; titulo: string; tipo_origem: TipoOrigem; status: StatusDoc; categoria: CategoriaConteudo

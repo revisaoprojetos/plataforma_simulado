@@ -1,0 +1,33 @@
+{
+  "name": "Expansor",
+  "nameLocale": { "pt-BR": "Expansor" },
+  "guid": "asc.{3F9A6C24-7D1B-4E58-8B02-5C4E9D7A1F36}",
+  "version": "1.0.0",
+  "variations": [
+    {
+      "description": "Crie blocos recolhíveis: o aluno vê uma caixa com título que expande e recolhe no modo texto.",
+      "descriptionLocale": { "pt-BR": "Crie blocos recolhíveis: o aluno vê uma caixa com título que expande e recolhe no modo texto." },
+      "url": "index.html",
+      "icons": [ "resources/icon.png", "resources/icon@2x.png" ],
+      "icons2": [
+        {
+          "100%": { "normal": "resources/icon.png" },
+          "125%": { "normal": "resources/icon@1.25x.png" },
+          "150%": { "normal": "resources/icon@1.5x.png" },
+          "175%": { "normal": "resources/icon@1.75x.png" },
+          "200%": { "normal": "resources/icon@2x.png" }
+        }
+      ],
+      "isViewer": false,
+      "EditorsSupport": [ "word" ],
+      "isVisual": true,
+      "isModal": false,
+      "isInsideMode": false,
+      "initDataType": "none",
+      "initData": "",
+      "buttons": [],
+      "size": [ 300, 800 ],
+      "type": "panel"
+    }
+  ]
+}

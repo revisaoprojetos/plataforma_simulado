@@ -9,7 +9,7 @@ import { carregarPastasCP } from '@/lib/conteudo/capa-pagina-server'
 import { mapaPastas, resolverPaginaInicialDoc } from '@/lib/conteudo/capa-pagina'
 import { aplicarOverride, type CatalogoOverride } from './catalogo-override'
 import { lerOverride } from './catalogo-override-db'
-import { CATALOGO_HTML, GRUPOS_HTML, aulaHTML, chaveDisciplina, chaveLeiHTML, disciplinaHTML, docDaLei, nomeDisciplina, numeroAula } from './catalogo-html'
+import { CATALOGO_HTML, GRUPOS_HTML, aulaHTML, chaveDisciplina, chaveLeiHTML, disciplinaHTML, disciplinaRetirada, docDaLei, nomeDisciplina, numeroAula } from './catalogo-html'
 
 // Loader de CONTEÚDO REAL do Cronograma Adaptativo. As aulas e matérias são as da Biblioteca; os dados do
 // modelo (catalogo-html.ts: páginas, links de questões, ordem de distribuição, metas de LegProc, grupo e cor
@@ -42,6 +42,8 @@ export interface ConteudoBanco extends Conteudo {
   LP?: ItemLP[]
   /** Ordem de distribuição das aulas (índices em AS) — a do modelo, + aulas da Biblioteca fora dele no fim. */
   ordem?: number[]
+  /** Chave estável de cada aula (paralelo a AS). Liga a aula ao filtro de questões da plataforma. */
+  chaves?: string[]
   /** Documentos de lei da Biblioteca (uso interno: migração de planos antigos). Não vai ao cliente. */
   lpDocs?: Array<{ id: string; titulo: string; disc: string; versaoId: string | null }>
   /** índice da aula no catálogo do modelo (catalogo-html) para cada posição de AS (-1 = só da Biblioteca). */
@@ -78,7 +80,8 @@ export async function carregarConteudoBancoBase(svc: SupabaseClient, tenantId: s
 
 function comOverride<T extends Conteudo>(c: T, ov: CatalogoOverride | null): T {
   const r = aplicarOverride(c, ov)
-  return { ...c, AS: r.AS, ordem: r.ordem, LP: r.LP }
+  // `chaves` (paralelo a AS) = chave ESTÁVEL de cada aula: é a que liga a aula ao filtro de questões da plataforma.
+  return { ...c, AS: r.AS, ordem: r.ordem, LP: r.LP, chaves: r.chaves }
 }
 
 async function montarConteudo(svc: SupabaseClient, tenantId: string, ov: CatalogoOverride | null): Promise<ConteudoBanco> {
@@ -194,6 +197,7 @@ async function montarConteudo(svc: SupabaseClient, tenantId: string, ov: Catalog
   const modeloIdx: number[] = [] // paralelo a ASout: índice no modelo (-1 = só da Biblioteca)
   const semPlanilha: number[] = [] // aulas da Biblioteca que o modelo não tem (entram no fim da ordem)
   for (const di of disciplinas) { // segue a ordem das disciplinas (ordem/nome)
+    if (disciplinaRetirada(di.nome)) continue // retirada do catálogo autorizado 2.18 (Direitos Humanos)
     const aulas = porDisc.get(di.nome); if (!aulas || !aulas.length) continue
     aulas.sort((a, b) => col.compare(a.titulo, b.titulo))
     const nome = nomeDisciplina(di.nome)
@@ -252,7 +256,7 @@ async function montarConteudo(svc: SupabaseClient, tenantId: string, ov: Catalog
   // Overlay do admin (Catálogo de metas): edita/ativa/reordena aulas e metas sem mexer nas posições-base de AS.
   const ap = aplicarOverride({ AS: ASout, ordem, LP }, ov)
   return {
-    AS: ap.AS, ordem: ap.ordem ?? ordem, WLP: WLPout, WLPdoc, materiais: materiais.map((m) => ({ ...m, disc: nomeDisciplina(m.disc) })), LP: ap.LP,
+    AS: ap.AS, ordem: ap.ordem ?? ordem, chaves: ap.chaves, WLP: WLPout, WLPdoc, materiais: materiais.map((m) => ({ ...m, disc: nomeDisciplina(m.disc) })), LP: ap.LP,
     disciplinas: disciplinasDoConteudo(disciplinas, ap.AS, ap.ordem ?? ordem), lpDocs, vazio: false,
     modeloIdx, base: { AS: ASout, ordem, LP, modeloIdx },
   }

@@ -9,8 +9,8 @@ import { confirmar } from '@/components/ui/confirm-dialog'
 import type { QuestaoImport } from '@/app/admin/banco-questoes/import-types'
 import {
   listarQuestoesConjunto, adicionarQuestoesConjunto, importarQuestoesConjunto, removerQuestaoConjunto,
-  type QuestaoConjuntoItem,
 } from './questoes-actions'
+import type { QuestaoConjuntoItem } from './questoes-tipos'
 
 const DIF: Record<string, { label: string; cls: string }> = {
   facil: { label: 'Fácil', cls: 'text-emerald-600 dark:text-emerald-400' },

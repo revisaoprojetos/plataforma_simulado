@@ -28,6 +28,7 @@ export interface AulaAluno {
   liberaEm: string | null   // ISO, quando ainda bloqueada
   lida: boolean             // documento já aberto pelo aluno (simulado_conteudo_leitura_progresso)
   exclusivo: boolean        // bloqueada por segmento (conteúdo exclusivo de outro público)
+  quizDocId?: string | null // JurisClub: documento-âncora das questões da meta (meta.quiz_documento_id)
 }
 export interface ModuloAluno {
   id: string
@@ -79,8 +80,8 @@ export function momentoLiberacao(d: Disponibilidade, matricula: Date | null): Da
   }
 }
 
-function hrefDaAula(tipo: TipoRef, refId: string | null, refUrl: string | null, meta: any, voltar: string): { href: string | null; externo: boolean } {
-  if (tipo === 'documento_biblioteca') return refId ? { href: `/aluno/biblioteca/${refId}?voltar=${encodeURIComponent(voltar)}`, externo: false } : { href: null, externo: false }
+function hrefDaAula(tipo: TipoRef, refId: string | null, refUrl: string | null, meta: any, voltar: string, produtoId?: string): { href: string | null; externo: boolean } {
+  if (tipo === 'documento_biblioteca') return refId ? { href: `/aluno/biblioteca/${refId}?voltar=${encodeURIComponent(voltar)}${produtoId ? `&produto=${produtoId}` : ''}`, externo: false } : { href: null, externo: false }
   if (tipo === 'simulado' || tipo === 'quiz') return { href: '/aluno/simulados', externo: false }
   const url = String(refUrl || meta?.embedUrl || '').trim()
   return /^https?:\/\//i.test(url) ? { href: url, externo: true } : { href: null, externo: false }
@@ -160,8 +161,8 @@ export async function curriculoDoAluno(svc: any, tenantId: string, estudanteId: 
       if (!noPrazo && (di.antes === 'oculto' || dm.antes === 'oculto')) continue
       const liberada = noPrazo && !exclusivo
       const tipo = (i.tipo_ref ?? 'link') as TipoRef
-      const { href, externo } = hrefDaAula(tipo, i.ref_id ?? null, i.ref_url ?? null, i.meta, volta)
-      aulas.push({ id: i.id, titulo: i.titulo, subtipo: i.subtipo ?? null, tipoRef: tipo, href: liberada ? href : null, externo, liberada, liberaEm: noPrazo || !lib ? null : lib.toISOString(), lida: !!i.ref_id && lidos.has(i.ref_id), exclusivo })
+      const { href, externo } = hrefDaAula(tipo, i.ref_id ?? null, i.ref_url ?? null, i.meta, volta, produtoId)
+      aulas.push({ id: i.id, titulo: i.titulo, subtipo: i.subtipo ?? null, tipoRef: tipo, href: liberada ? href : null, externo, liberada, liberaEm: noPrazo || !lib ? null : lib.toISOString(), lida: !!i.ref_id && lidos.has(i.ref_id), exclusivo, quizDocId: typeof i.meta?.quiz_documento_id === 'string' ? i.meta.quiz_documento_id : null })
     }
     const submodulos = (filhos.get(m.id) ?? []).map((s) => montar(s, libM, raizId, exclusivoM)).filter(Boolean) as ModuloAluno[]
     if (!aulas.length && !submodulos.length) return null // módulo vazio para o aluno: não mostra

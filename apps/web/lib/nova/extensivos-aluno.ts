@@ -8,7 +8,7 @@ import { lerAparenciaAuth } from '@/lib/brand/aparencia-auth'
 export type ExtensivoAtalho = { qtd: number; href: string; titulo: string; sub: string }
 
 export async function extensivoAtalhoDoAluno(tenantId: string, estudanteId: string): Promise<ExtensivoAtalho | null> {
-  const produtos = await produtosDoAluno(tenantId, estudanteId).catch(() => [])
+  const produtos = (await produtosDoAluno(tenantId, estudanteId).catch(() => [])).filter((p) => p.tipo !== 'jurisclub') // JurisClub tem área própria
   if (!produtos.length) return null
   if (produtos.length === 1) {
     const p = produtos[0]

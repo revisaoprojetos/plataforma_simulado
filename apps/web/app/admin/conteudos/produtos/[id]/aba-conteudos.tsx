@@ -24,6 +24,7 @@ import {
 } from '@/lib/produtos/curriculo'
 import { excluirItemAction, salvarItemAction, reordenarItensAction, reordenarModulosAction } from '../actions'
 import { carregarCurriculoAction } from './lazy-actions'
+import { QuestoesMetaDialog } from './questoes-meta-dialog'
 import {
   ModuloDialog, NovoConteudoDialog, EditarItemDialog, DisponibilidadeDialog,
   MoverAulaDialog, DuplicarAulaDialog, AlterarTipoDialog, iconeTipoRef,
@@ -39,8 +40,8 @@ type Filtro = 'todos' | 'arquivo' | 'video' | 'outros'
 
 type ItemEdit = { item: Partial<ItemRow> & { tipo_ref: TipoRef; subtipo?: string | null; modulo_id: string }; criar: boolean }
 
-export function AbaConteudos({ tenantId, produtoId, podeEditar }: {
-  tenantId: string; produtoId: string; podeEditar: boolean
+export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
+  tenantId: string; produtoId: string; podeEditar: boolean; tipoProduto?: string
 }) {
   const router = useRouter()
 
@@ -80,6 +81,7 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar }: {
   const [moduloDlg, setModuloDlg] = useState<{ modulo: ModuloRow | null; paiId: string | null } | null>(null)
   const [novoConteudo, setNovoConteudo] = useState<{ moduloPadrao: string | null } | null>(null)
   const [editarItem, setEditarItem] = useState<ItemEdit | null>(null)
+  const [questoesMeta, setQuestoesMeta] = useState<ItemRow | null>(null) // JurisClub: questões vinculadas à meta
   const [moverItem, setMoverItem] = useState<ItemRow | null>(null)
   const [duplicarItem, setDuplicarItem] = useState<ItemRow | null>(null)
   const [alterarTipo, setAlterarTipo] = useState<ItemRow | null>(null)
@@ -195,7 +197,7 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar }: {
           </span>
         </button>
         <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium', it.situacao === 'ativo' ? 'bg-emerald-500/12 text-emerald-600 dark:text-emerald-400' : 'bg-muted text-muted-foreground')}>{it.situacao === 'ativo' ? 'Ativo' : 'Rascunho'}</span>
-        {podeEditar && <><Button variant="ghost" size="sm" onClick={() => setEditarItem({ item: it, criar: false })}><Pencil className="h-4 w-4" />Editar</Button>{menuAula(it)}</>}
+        {podeEditar && <>{it.subtipo === 'jurisclub' && <Button variant="ghost" size="sm" onClick={() => setQuestoesMeta(it)}><FileStack className="h-4 w-4" />Questões</Button>}<Button variant="ghost" size="sm" onClick={() => setEditarItem({ item: it, criar: false })}><Pencil className="h-4 w-4" />Editar</Button>{menuAula(it)}</>}
       </div>
     )
   }
@@ -304,13 +306,14 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar }: {
           onClose={() => setModuloDlg(null)} onPronto={refresh} />
       )}
       {novoConteudo && (
-        <NovoConteudoDialog modulos={modulos} moduloPadrao={novoConteudo.moduloPadrao} onClose={() => setNovoConteudo(null)}
+        <NovoConteudoDialog tipoProduto={tipoProduto} modulos={modulos} moduloPadrao={novoConteudo.moduloPadrao} onClose={() => setNovoConteudo(null)}
           onContinuar={(s) => { setNovoConteudo(null); setEditarItem({ item: { modulo_id: s.moduloId, tipo_ref: s.tipoRef, subtipo: s.subtipo }, criar: true }) }} />
       )}
       {editarItem && (
         <EditarItemDialog tenantId={tenantId} produtoId={produtoId} modulos={modulos} item={editarItem.item} criar={editarItem.criar}
           onClose={() => setEditarItem(null)} onPronto={refresh} />
       )}
+      {questoesMeta && <QuestoesMetaDialog produtoId={produtoId} itemId={questoesMeta.id} titulo={questoesMeta.titulo} onClose={() => setQuestoesMeta(null)} />}
       {moverItem && <MoverAulaDialog produtoId={produtoId} item={moverItem} modulos={modulos} onClose={() => setMoverItem(null)} onPronto={refresh} />}
       {duplicarItem && <DuplicarAulaDialog produtoId={produtoId} item={duplicarItem} modulos={modulos} onClose={() => setDuplicarItem(null)} onPronto={refresh} />}
       {alterarTipo && <AlterarTipoDialog produtoId={produtoId} item={alterarTipo} onClose={() => setAlterarTipo(null)} onPronto={() => { const it = alterarTipo; setAlterarTipo(null); if (it) setEditarItem({ item: it, criar: false }); refresh() }} />}

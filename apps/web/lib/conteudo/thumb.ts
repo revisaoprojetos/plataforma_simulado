@@ -2,7 +2,8 @@ import 'server-only'
 import { SignJWT } from 'jose'
 import { createAdminClient } from '@/lib/supabase/server'
 import { uploadArquivo, getStorage } from '@/lib/storage'
-import { resolverBucketConteudo, urlAssinadaOriginal } from './ingestao'
+import { resolverBucketConteudo, urlAssinadaOriginal, baixarOriginal } from './ingestao'
+import { filtrarDocxPorAreas, type ResolucaoAreas } from './areas'
 import { urlFonteOnlyOffice } from './fonte-onlyoffice'
 
 // Miniatura FIEL do card: converte o .docx na imagem PNG da 1ª página via ConvertService do OnlyOffice
@@ -122,13 +123,30 @@ export async function converterDocxParaPdf(url: string, key: string, fileType = 
   } catch { return null }
 }
 
-function pdfPath(tenantId: string, versaoId: string, hash: string) {
-  return `conteudo-pdfs/${tenantId}/${versaoId}_${String(hash || '').slice(0, 8)}.pdf`
+function pdfPath(tenantId: string, versaoId: string, hash: string, variante = '') {
+  return `conteudo-pdfs/${tenantId}/${versaoId}_${String(hash || '').slice(0, 8)}${variante ? `_a${variante}` : ''}.pdf`
+}
+
+/**
+ * .docx FILTRADO por áreas (sem marcadores e sem as áreas ocultas), guardado no storage por (versão, variante) e
+ * reaproveitado. Devolve o arquivo_key dessa variante (usado como fonte do ConvertService e do download do aluno).
+ */
+export async function chaveDocxVariante(tenantId: string, versaoId: string, arquivoKey: string, hash: string, areas: ResolucaoAreas): Promise<string | null> {
+  try {
+    const path = `conteudo-variantes/${tenantId}/${versaoId}_${String(hash || '').slice(0, 8)}_a${areas.variante}.docx`
+    const bucket = await resolverBucketConteudo()
+    if (await getStorage().exists(bucket, path)) return path
+    const original = await baixarOriginal(arquivoKey)
+    if (!original) return null
+    const filtrado = filtrarDocxPorAreas(original, areas.ocultas)
+    const r = await uploadArquivo({ tenantId, bucket, path, data: filtrado, contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', nome: 'doc.docx', publico: false, criadoPor: null })
+    return r.ok ? path : null
+  } catch { return null }
 }
 
 
 /** PDF (doc inteiro) da versão atual/mais nova. Se já é PDF, devolve o original. Cacheado. null = falhou. */
-export async function gerarPdfDocumento(tenantId: string, documentoId: string): Promise<string | null> {
+export async function gerarPdfDocumento(tenantId: string, documentoId: string, areas?: ResolucaoAreas): Promise<string | null> {
   try {
     const svc = createAdminClient()
     const { data: doc } = await svc.from('simulado_conteudo_documentos')
@@ -141,14 +159,27 @@ export async function gerarPdfDocumento(tenantId: string, documentoId: string): 
     if (!ver?.arquivo_key) return null
     if ((doc as any).tipo_origem === 'pdf') return await urlAssinadaOriginal(ver.arquivo_key, 3600) // já é PDF
     if ((doc as any).tipo_origem !== 'docx') return null
-    const path = pdfPath(tenantId, ver.id, ver.hash_arquivo)
+    // Documento COM áreas de visibilidade: o PDF é gerado de um .docx filtrado e cacheado por variante (conjunto de
+    // áreas ocultas) — alunos com a mesma visão compartilham o PDF; conteúdo restrito nunca vaza entre variantes.
+    const variante = areas?.temAreas ? areas.variante : ''
+    const path = pdfPath(tenantId, ver.id, ver.hash_arquivo, variante)
     const bucket = await resolverBucketConteudo()
     if (await getStorage().exists(bucket, path)) {
       const cached = await urlAssinadaOriginal(path, 3600)
       if (cached) return cached
     }
-    const src = await urlFonteOnlyOffice(ver.arquivo_key, 1800)
-    const pdf = await converterDocxParaPdf(src, `pdf_${ver.id}_${String(ver.hash_arquivo || '').slice(0, 8)}`)
+    // DEV local sem host de callback alcançável pelo OnlyOffice (CONTEUDO_WOPI_HOST/TESTE_WOPI_HOST): o Document Server
+    // remoto não consegue baixar o arquivo de localhost e a conversão só falharia depois de esperar o timeout (~45 s),
+    // deixando a abertura do material travada. Falha NA HORA → o leitor cai direto no texto convertido (reserva).
+    if (process.env.NODE_ENV !== 'production' && !process.env.CONTEUDO_WOPI_HOST && !process.env.TESTE_WOPI_HOST) return null
+    let chaveFonte: string = ver.arquivo_key
+    if (areas?.temAreas) {
+      const kv = await chaveDocxVariante(tenantId, ver.id, ver.arquivo_key, ver.hash_arquivo, areas)
+      if (!kv) return null // sem a variante filtrada NÃO serve o original (vazaria a área oculta)
+      chaveFonte = kv
+    }
+    const src = await urlFonteOnlyOffice(chaveFonte, 1800)
+    const pdf = await converterDocxParaPdf(src, `pdf_${ver.id}_${String(ver.hash_arquivo || '').slice(0, 8)}${variante ? `a${variante}` : ''}`)
     if (!pdf) return null
     try {
       await uploadArquivo({ tenantId, bucket, path, data: pdf, contentType: 'application/pdf', nome: 'doc.pdf', publico: false, criadoPor: null })

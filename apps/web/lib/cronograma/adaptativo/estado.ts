@@ -5,7 +5,7 @@
 import {
   type Cfg, type Plano, type Notas, type DataISO,
   gerarPlano, descrever, semInicio, semDe, horasDia, ehRev, dAdd, dISO,
-  planoRevisao, rankingRevisao, DUR_REVISAO, ORDEM, diaConcentrado,
+  planoRevisao, rankingRevisao, rankingRevisao218, resolverParams, DUR_REVISAO, ORDEM, diaConcentrado,
 } from './engine'
 import type { Conteudo as _C } from './conteudo'
 
@@ -43,11 +43,12 @@ export function montarRevisao(st: Estado, conteudo: _C, sem: number): Array<[str
   const ini = semInicio(st.cfg.start, sem)
   const ja = new Set<number>()
   for (const [k, lista] of Object.entries(st.revs || {})) if (+k < sem) lista.forEach(([id]) => ja.add(+id.split(':')[2]))
-  const fila = rankingRevisao(st.plano, st.notas, ini, ja)
+  const P = resolverParams(conteudo.params) // params do tenant (durRf/durRq/acertoMin) — antes ignorados na materialização
+  const fila = P.regras218.revisaoPorResultado ? rankingRevisao218(st.plano, st.notas, ini, ja) : rankingRevisao(st.plano, st.notas, ini, ja, P.desempenho.acertoMin)
   const dias = [0, 1, 2, 3, 4, 5, 6].map((k) => dAdd(ini, k)).filter((d) => d >= st.cfg.start && horasDia(st.cfg, d) > 0)
   const ocupado = (d: DataISO) => Object.entries(st.plano).filter(([, [x]]) => x === d).reduce((s, [, [, h]]) => s + h * 60, 0)
   const conc = diaConcentrado(st.cfg, sem) // semana ≤18 h: o último dia recebe só questões (modelo 2.8)
-  const plano = planoRevisao(dias.map((d) => horasDia(st.cfg, d) * 60 - ocupado(d)), fila.length, dias.map((d) => d === conc))
+  const plano = planoRevisao(dias.map((d) => horasDia(st.cfg, d) * 60 - ocupado(d)), fila.length, dias.map((d) => d === conc), P.durRevisao)
   const out: Array<[string, DataISO]> = []
   plano.forEach((p, k) => p.itens.forEach(({ t, n }) => out.push([`${t}:${sem}:${fila[n].i}`, dias[k]])))
   return out

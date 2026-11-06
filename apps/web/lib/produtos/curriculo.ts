@@ -66,7 +66,7 @@ export function resumoDisponibilidade(d: Disponibilidade | null | undefined): st
 export type SubtipoConteudo =
   | 'pdfull' | 'pdflash' | 'videoaula' | 'slide' | 'legproc' | 'jurisclub'
   | 'video' | 'documento' | 'quiz' | 'incorporacao' | 'audio' | 'texto'
-  | 'webinar' | 'entrega' | 'galeria' | 'flashcards' | 'scorm' | 'formulario'
+  | 'simulado' | 'webinar' | 'entrega' | 'galeria' | 'flashcards' | 'scorm' | 'formulario'
 
 /** Catálogo de subtipos do "Novo conteúdo" → o tipo_ref base de cada um. */
 export interface SubtipoDef {
@@ -90,6 +90,7 @@ export const SUBTIPOS: SubtipoDef[] = [
   { v: 'video', nome: 'Vídeo', descricao: 'Upload ou provedor externo', grupo: 'plataforma', tipoRef: 'video_url' },
   { v: 'documento', nome: 'Documento', descricao: 'PDF ou arquivo para leitura', grupo: 'plataforma', tipoRef: 'documento_biblioteca' },
   { v: 'quiz', nome: 'Quiz', descricao: 'Perguntas de um banco de questões', grupo: 'plataforma', tipoRef: 'quiz' },
+  { v: 'simulado', nome: 'Simulado', descricao: 'Um simulado da plataforma', grupo: 'plataforma', tipoRef: 'simulado' },
   { v: 'incorporacao', nome: 'Incorporação', descricao: 'Código ou link de outro site', grupo: 'plataforma', tipoRef: 'link' },
   { v: 'audio', nome: 'Áudio', descricao: 'Arquivo de áudio', grupo: 'plataforma', tipoRef: 'documento_biblioteca' },
   { v: 'texto', nome: 'Texto', descricao: 'Texto com editor', grupo: 'plataforma', tipoRef: 'link' },

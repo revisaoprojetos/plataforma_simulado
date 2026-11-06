@@ -6,6 +6,7 @@ import { getCurrentAccess } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { confirmarImportQuestoes } from '@/app/admin/banco-questoes/actions'
 import type { QuestaoImport } from '@/app/admin/banco-questoes/import-types'
+import type { QuestaoConjuntoItem } from './questoes-tipos'
 
 // Gestão das QUESTÕES de um card "Conjunto de questões" (tipo_origem='questoes'). As questões vêm do
 // BANCO (simulado_questoes) por referência em simulado_conteudo_quiz_questoes. Reuso total: adicionar do
@@ -17,11 +18,6 @@ async function guard() {
   if (!pode) return { error: 'Sem permissão.' as const }
   if (!a.tenantId) return { error: 'Tenant não resolvido.' as const }
   return { tenantId: a.tenantId, atorId: a.userId ?? null }
-}
-
-export interface QuestaoConjuntoItem {
-  id: string; questao_id: string; ordem: number
-  enunciado: string; disciplina: string | null; tipo: string | null; nivel: string | null
 }
 
 export async function listarQuestoesConjunto(documentoId: string): Promise<{ ok: boolean; itens?: QuestaoConjuntoItem[]; error?: string }> {

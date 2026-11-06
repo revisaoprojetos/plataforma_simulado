@@ -103,8 +103,16 @@ export async function converterParaHtml(data: Buffer, tipo: TipoOrigem): Promise
           "p[style-name='Título 4'] => h4:fresh", "p[style-name='Titulo 4'] => h4:fresh",
           "p[style-name='Título'] => h1:fresh", "p[style-name='Titulo'] => h1:fresh",
         ],
+        // Selo inserido como IMAGEM pelo plugin "Selos" do editor: o texto alternativo guarda a tag (`<rg>`).
+        // Aqui a imagem volta a ser o marcador de texto (o sanitizador o troca pelo selo da Biblioteca).
+        convertImage: (mammoth as any).images.imgElement(async (img: any) => {
+          const alt = String(img.altText || '').trim()
+          if (/^<[^<>]{1,60}>$/.test(alt)) return { src: 'data:,', alt: `__SELO__${alt.slice(1, -1)}__` }
+          return { src: `data:${img.contentType};base64,${await img.read('base64')}` }
+        }),
       } as any)
-      return { html: removerImagensGrandes(r.value || '') }
+      const html = (r.value || '').replace(/<img\b[^>]*alt="__SELO__([^"]*?)__"[^>]*\/?>/gi, (_m, t: string) => `&lt;${t}&gt;`)
+      return { html: removerImagensGrandes(html) }
     }
     if (tipo === 'pdf') {
       const texto = await extrairTextoPdf(data, 60)
@@ -167,5 +175,12 @@ export async function guardarOriginal(input: {
   })
   if (!up.ok) return { erro: up.error || 'Falha ao guardar o arquivo.' }
   const hash = createHash('sha1').update(input.data).digest('hex')
+  // ÁREAS DE VISIBILIDADE: .docx salvo/importado → sincroniza as áreas marcadas pelo plugin (best-effort).
+  if (input.tipo === 'docx') {
+    try {
+      const { sincronizarAreas } = await import('./areas')
+      await sincronizarAreas(createAdminClient(), input.tenantId, input.documentoId, input.data)
+    } catch { /* best-effort */ }
+  }
   return { arquivoKey: up.upload?.path || path, hash }
 }

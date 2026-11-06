@@ -12,6 +12,7 @@ import {
 } from '@/app/admin/biblioteca/gestao-actions'
 import { abrirEdicaoDocx, midiaPreviewDocumento } from '@/app/admin/biblioteca/actions'
 import { AbaFlashcards } from './flashcards-tab'
+import { AbaAreas } from './areas-tab'
 
 // PORTE 1:1 do protótipo `Entregas.dc.html` (handoff 03b) — mesma estrutura, blocos e textos. Cores de
 // MARCA via token (white-label) + semânticas fixas (emerald/amber/rose) e selos por tipo. Onde ainda não
@@ -91,7 +92,7 @@ const CSS = `
 @media(prefers-reduced-motion:reduce){.gcwrap *{transition:none!important}}
 `
 
-type Aba = 'visao' | 'acesso' | 'alunos' | 'uso' | 'pacotes' | 'unit' | 'flash' | 'hist' | 'cfg' | 'fonte'
+type Aba = 'visao' | 'acesso' | 'alunos' | 'uso' | 'pacotes' | 'unit' | 'flash' | 'areas' | 'hist' | 'cfg' | 'fonte'
 const fmt = (n: number) => n.toLocaleString('pt-BR')
 const dt = (s: string | null) => (s ? formatBrt(s) : '—')
 
@@ -170,6 +171,7 @@ export function GerenciarConteudoClient({ dados }: { dados: GestaoDados }) {
     { k: 'pacotes', label: 'Pacotes', n: base.contagens.pacotes },
     { k: 'unit', label: tp.abaTipo.tab },
     { k: 'flash', label: 'Flashcards' },
+    { k: 'areas', label: 'Áreas' },
     { k: 'hist', label: 'Histórico' },
     { k: 'cfg', label: 'Configurações' },
   ]
@@ -237,6 +239,7 @@ export function GerenciarConteudoClient({ dados }: { dados: GestaoDados }) {
       {aba === 'pacotes' && <EmConstrucao titulo="Pacotes de estudo que incluem este conteúdo" texto="Os pacotes (Extensivos) entram numa fase seguinte. Quando existirem, cada pacote aparece aqui com posição, liberação, alunos e permissões." />}
       {aba === 'unit' && <EmConstrucao titulo={tp.abaTipo.titulo} texto={`${tp.abaTipo.sub}. As métricas por ${tp.abaTipo.tab.toLowerCase()} dependem do pipeline de eventos de leitura — em construção.`} />}
       {aba === 'flash' && <AbaFlashcards documentoId={base.id} />}
+      {aba === 'areas' && <AbaAreas documentoId={base.id} />}
       {aba === 'hist' && <AbaHistorico dados={dados} />}
       {aba === 'cfg' && <AbaConfig base={base} tp={tp} />}
       {aba === 'fonte' && <AbaFonte base={base} linkAluno={linkAluno} />}

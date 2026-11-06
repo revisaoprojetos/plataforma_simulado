@@ -83,6 +83,11 @@ async function guard(perm: string) {
   return { ok: true as const, tenantId: access.tenantId, atorId: access.userId ?? null }
 }
 
+/** Quiz do conteúdo: quem edita a Leitura OU gerencia Produtos (metas do JurisClub têm o quiz editado no produto). */
+async function guardQuiz() {
+  return (await checkPermission('leitura:update')) ? guard('leitura:update') : guard('produtos:manage')
+}
+
 /** Cria um documento vazio (rascunho) — o conteúdo HTML entra no editor. */
 export async function criarDocumento(titulo: string, pastaId?: string | null): Promise<{ ok: boolean; id?: string; error?: string }> {
   const g = await guard('leitura:create'); if (!g.ok) return { ok: false, error: g.error }
@@ -1341,7 +1346,7 @@ async function montarQuizLinhas(svc: ReturnType<typeof createAdminClient>, tenan
 }
 
 export async function listarQuizConteudo(documentoId: string): Promise<{ ok: boolean; itens?: QuizLinha[]; config?: QuizConfig; error?: string }> {
-  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const g = await guardQuiz(); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
   const { data: dq, error } = await svc.from('simulado_documento_quiz_questoes').select('questao_id, ordem').eq('tenant_id', g.tenantId).eq('documento_id', documentoId).eq('deletado', false).order('ordem', { ascending: true })
   if (error) return { ok: false, error: QUIZ_SEM_TABELA(error.message) ? 'Rode a migração 20260910000001 (Questões do conteúdo).' : error.message }
@@ -1355,7 +1360,7 @@ export async function listarQuizConteudo(documentoId: string): Promise<{ ok: boo
 }
 
 export async function adicionarQuizQuestoes(documentoId: string, questaoIds: string[]): Promise<{ ok: boolean; error?: string; linhas?: QuizLinha[] }> {
-  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const g = await guardQuiz(); if (!g.ok) return { ok: false, error: g.error }
   const ids = [...new Set((questaoIds ?? []).filter(Boolean))]
   if (!ids.length) return { ok: true, linhas: [] }
   const svc = createAdminClient()
@@ -1370,7 +1375,7 @@ export async function adicionarQuizQuestoes(documentoId: string, questaoIds: str
 
 /** Remove do quiz por QUESTÃO (a tabela base seleciona por questao_id). */
 export async function removerQuizQuestoes(documentoId: string, questaoIds: string[]): Promise<{ ok: boolean; error?: string }> {
-  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const g = await guardQuiz(); if (!g.ok) return { ok: false, error: g.error }
   const ids = [...new Set((questaoIds ?? []).filter(Boolean))]
   if (!ids.length) return { ok: true }
   const svc = createAdminClient()
@@ -1381,14 +1386,14 @@ export async function removerQuizQuestoes(documentoId: string, questaoIds: strin
 
 /** Reordena por QUESTÃO (grava ordem = índice conforme a lista de questao_id). */
 export async function reordenarQuizQuestoes(documentoId: string, questaoIds: string[]): Promise<{ ok: boolean; error?: string }> {
-  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const g = await guardQuiz(); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
   for (let i = 0; i < questaoIds.length; i++) await svc.from('simulado_documento_quiz_questoes').update({ ordem: i }).eq('tenant_id', g.tenantId).eq('documento_id', documentoId).eq('questao_id', questaoIds[i])
   return { ok: true }
 }
 
 export async function importarQuizQuestoes(documentoId: string, rows: QuestaoImport[]): Promise<{ ok: boolean; count?: number; error?: string; linhas?: QuizLinha[] }> {
-  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const g = await guardQuiz(); if (!g.ok) return { ok: false, error: g.error }
   if (!rows?.length) return { ok: false, error: 'Nada para importar.' }
   const imp = await confirmarImportQuestoes(null, rows)
   if (!imp.ok) return { ok: false, error: imp.error ?? 'Falha ao importar as questões.' }
@@ -1398,7 +1403,7 @@ export async function importarQuizQuestoes(documentoId: string, rows: QuestaoImp
 }
 
 export async function salvarQuizConfig(documentoId: string, config: Partial<QuizConfig>): Promise<{ ok: boolean; error?: string }> {
-  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const g = await guardQuiz(); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
   const { data: doc } = await svc.from('simulado_documentos').select('quiz_config').eq('id', documentoId).eq('tenant_id', g.tenantId).maybeSingle()
   const merged = { ...QUIZ_PADRAO, ...((doc as any)?.quiz_config ?? {}), ...config }
@@ -1409,7 +1414,7 @@ export async function salvarQuizConfig(documentoId: string, config: Partial<Quiz
 
 /** Salva os TIPOS de dispositivo que aparecem no índice do conteúdo (em quiz_config.indice_tipos). */
 export async function salvarIndiceTipos(documentoId: string, tipos: string[]): Promise<{ ok: boolean; error?: string }> {
-  const g = await guard('leitura:update'); if (!g.ok) return { ok: false, error: g.error }
+  const g = await guardQuiz(); if (!g.ok) return { ok: false, error: g.error }
   const svc = createAdminClient()
   const { data: doc } = await svc.from('simulado_documentos').select('quiz_config').eq('id', documentoId).eq('tenant_id', g.tenantId).maybeSingle()
   const merged = { ...((doc as any)?.quiz_config ?? {}), indice_tipos: [...new Set((tipos ?? []).filter((t) => typeof t === 'string'))] }
