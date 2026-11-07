@@ -956,6 +956,10 @@ html,body,.scroller,.side-in,.pane,.mr-scroll,.menu,.palette .res,.law-pop,.rail
 .bib-flow .tabela-colapsavel > .caixa-cab > :first-child{color:inherit!important;white-space:nowrap}
 .bib-flow .tabela-colapsavel > .caixa-cab > :first-child::before{content:"Tabela";font-weight:700}
 .bib-flow.modelo-juris .tabela-colapsavel > .caixa-cab > :first-child::before{content:none}
+/* Modo escuro: o leitor está em quirks mode (sem doctype) e tabela NÃO herda a cor do texto → ficava preta no fundo escuro.
+   Tabela sem fundo usa a cor do texto do tema; tabela COM fundo do documento (cor fiel, clara) mantém texto escuro. */
+.bib-flow.modelo-juris table.tabela-fiel,.bib-flow.modelo-juris table.tabela-artigo{color:var(--ink)}
+.bib-flow.modelo-juris table :is(th,td)[style*="background"],.bib-flow.modelo-juris table :is(th,td)[style*="background"] *{color:#1a1a1a!important}
 .bib-flow.modelo-juris table.tabela-fiel{width:100%;margin:12px 0;border-collapse:collapse;border:1px solid color-mix(in srgb,#8a8a93 70%,transparent);border-radius:6px}
 .bib-flow.modelo-juris table.tabela-fiel :is(th,td){padding:10px 14px;vertical-align:top}
 .bib-flow.modelo-juris table.tabela-fiel :is(th,td) p{margin:.35em 0}

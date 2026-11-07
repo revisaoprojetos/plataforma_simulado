@@ -12,6 +12,13 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.9.3 — 2026-11-06
+
+### Modelos de jurisprudência (JurisClub)
+- **Modo escuro:** tabelas (ex.: transcrição de "Art.") apareciam com texto preto no fundo escuro. Tabela sem fundo usa a cor do texto do tema; tabela com a cor do documento mantém texto escuro.
+
+---
+
 ## 4.9.2 — 2026-11-06
 
 ### Cronograma adaptativo
