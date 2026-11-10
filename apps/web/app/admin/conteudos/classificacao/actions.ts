@@ -1,4 +1,5 @@
 'use server'
+import type { TipoEntidade } from './actions-tipos'
 
 // Ações da CLASSIFICAÇÃO standalone (Estúdio de Conteúdo). Curadoria do CADASTRO de taxonomia —
 // disciplinas, assuntos, bancas e órgãos — para que a questão possa ESCOLHER do cadastro em vez de
@@ -18,7 +19,6 @@ import { CFG_TAX } from '@/app/admin/questoes/taxonomia-tipos'
 
 // Só os tipos ENTIDADE (tabela própria) entram na curadoria. cargo/ano/assunto_detalhe são valores-texto
 // e já têm a unificação na tela de Questões — ficam fora do cadastro de entidades.
-export type TipoEntidade = 'disciplina' | 'assunto' | 'banca' | 'orgao'
 const TIPOS_OK: TipoEntidade[] = ['disciplina', 'assunto', 'banca', 'orgao']
 
 function cfgDe(tipo: TipoEntidade): { tabela: string; fk: string } {

@@ -1,4 +1,5 @@
 'use server'
+import type { RegistroTeste, DiscBancoTeste, QuestaoMeta, CadernoTesteGrupo, CadernoTesteResumo, MontagemGrupo, EntregaRef, EntregaSlots, MontagemPdf, DocOffice, TrechoPrevia, PastaModelo } from './actions-tipos'
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -15,9 +16,6 @@ import { gerarThumbDocumento } from '@/lib/conteudo/thumb'
 
 // Tipos declarados aqui (não re-exportados de uma lib) — em arquivo 'use server' o Next trata todo
 // export como server action; re-export de `type` quebra o build. São estruturalmente = aos da lib.
-export type RegistroTeste = { id: string; nome: string; vars: Record<string, string>; respostas: Record<string, string> }
-export type DiscBancoTeste = { nome: string; chave: string; pilar?: string }
-export type QuestaoMeta = { numero: number; disciplinaChave: string; disciplinaNome: string; assunto: string }
 
 /** Metadados leves (sem alternativas) de todas as questões do banco, na ordem do caderno: número +
  * disciplina + assunto. Usado no editor do card de disciplina p/ listar as questões daquela disciplina. */
@@ -81,8 +79,6 @@ export async function dadosBancoTeste(bancoId: string, filtro?: { aluno?: string
   return { ok: true, registros, disciplinas }
 }
 
-export type CadernoTesteGrupo = { id: string; modalidade: string; label: string }
-export type CadernoTesteResumo = { id: string; nome: string; atualizadoEm: string | null; itens: CadernoTesteGrupo[]; material: MaterialCaderno; materialEnunciado: MaterialCaderno }
 
 /** Lista os cadernos de TESTE vinculados a um banco (config.builderV3.bancoId === bancoId), com o material PDF. */
 export async function listarCadernosTesteDoBanco(bancoId: string): Promise<CadernoTesteResumo[]> {
@@ -170,14 +166,10 @@ export async function criarCadernoParaSlot(bancoId: string, slot: 'diagnostico' 
 }
 
 // ===== Montagem / entrega do Caderno (teste) por banco (slots) =====
-export type MontagemGrupo = { cadernoId: string; cadernoNome: string; itemId: string; modalidade: string; modelo: string; label: string }
 // `docId`/`versaoId` = diagnóstico vindo do EDITOR BETA (OnlyOffice / Biblioteca de Conteúdos). Inerte
 // para o aluno hoje (entrega-aluno.usavel() ignora) — é teste de usabilidade no admin. Manter em sincronia
 // com o mesmo tipo em lib/caderno-teste/entrega-aluno.ts.
-export type EntregaRef = { cadernoId?: string; itemId?: string; pdfUrl?: string; pdfNome?: string; docId?: string; versaoId?: string } | null
-export type EntregaSlots = { diagnostico?: EntregaRef; folha?: EntregaRef; enunciado?: EntregaRef; gabarito?: EntregaRef }
 
-export type MontagemPdf = { url: string; nome: string; origem: string }
 
 /** Carrega a montagem salva do banco + grupos + PDFs já enviados nos cadernos do banco. */
 export async function carregarMontagem(bancoId: string): Promise<{ entrega: EntregaSlots; grupos: MontagemGrupo[]; pdfs: MontagemPdf[]; discursivo: boolean }> {
@@ -236,10 +228,7 @@ export async function salvarMontagem(bancoId: string, entrega: EntregaSlots): Pr
 }
 
 // ===== Diagnóstico via EDITOR BETA (OnlyOffice / Biblioteca de Conteúdos) =====
-export type DocOffice = { id: string; titulo: string; versaoAtualId: string }
-export type TrechoPrevia = { tipo: string; rotulo: string | null; texto: string }
 
-export type PastaModelo = { id: string; nome: string; pai_id: string | null; cor: string | null }
 
 /** Documentos .docx PUBLICADOS do novo modelo de cadernos — opções de diagnóstico do editor beta.
  *  FILTRA por `categoria='modelo_caderno'` (antes vinha SEM filtro → misturava a Biblioteca/Conteúdos). */

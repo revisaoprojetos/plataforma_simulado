@@ -6,12 +6,11 @@ import { HelpCircle, Zap, ClipboardList, Shuffle, Plus, Loader2 } from 'lucide-r
 import { cn } from '@/lib/utils'
 import { QuestoesTabelaBase } from '@/components/admin/questoes-tabela-base'
 import { AdicionarQuestoesDialog } from '@/components/admin/adicionar-questoes-dialog'
-import { listarDisciplinasFiltro, type QuestaoBancoBuscaItem } from '@/app/admin/banco-questoes/actions'
+import type { QuestaoBancoBuscaItem } from '@/app/admin/banco-questoes/actions-tipos'
+import {listarDisciplinasFiltro} from '@/app/admin/banco-questoes/actions'
 import type { QuestaoImport } from '@/app/admin/banco-questoes/import-types'
-import {
-  listarQuizConteudo, adicionarQuizQuestoes, removerQuizQuestoes, reordenarQuizQuestoes, importarQuizQuestoes, salvarQuizConfig,
-  type QuizLinha, type QuizConfig,
-} from '@/app/admin/leitura/actions'
+import type { QuizLinha, QuizConfig } from '@/app/admin/leitura/actions-tipos'
+import { listarQuizConteudo, adicionarQuizQuestoes, removerQuizQuestoes, reordenarQuizQuestoes, importarQuizQuestoes, salvarQuizConfig } from '@/app/admin/leitura/actions'
 
 const MODOS: { v: QuizConfig['modo']; label: string; desc: string; Icon: typeof Zap }[] = [
   { v: 'imediato', label: 'Resposta imediata', desc: 'Marca a alternativa e vê na hora se acertou (prática rápida).', Icon: Zap },

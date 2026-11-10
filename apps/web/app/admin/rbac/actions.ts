@@ -1,4 +1,5 @@
 'use server'
+import type { UsuarioPerfil } from './actions-tipos'
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
@@ -125,7 +126,6 @@ export async function saveRolePermissions(
 }
 
 // ── Usuários por perfil (via simulado_tenant_acessos.role = nome do perfil) ──────
-export type UsuarioPerfil = { userId: string; nome: string | null; email: string | null; roleAtual?: string | null }
 
 async function acharRole(svc: ReturnType<typeof createAdminClient>, roleId: string, tenantId: string) {
   const { data } = await svc.from('simulado_roles').select('id, nome, descricao, is_sistema').eq('id', roleId).or(`tenant_id.eq.${tenantId},is_sistema.eq.true`).maybeSingle()

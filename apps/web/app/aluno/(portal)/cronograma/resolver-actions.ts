@@ -1,4 +1,5 @@
 'use server'
+import type { AltResolver, QuestaoResolver } from './resolver-actions-tipos'
 
 /**
  * Resolver das questões de uma meta do cronograma (linha "Resolução de Questões").
@@ -12,9 +13,6 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { verificarAcessoCronograma } from '@/lib/cronograma/acesso'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
-
-export type AltResolver = { id: string; texto: string; correta: boolean }
-export type QuestaoResolver = { id: string; enunciado: string; comentario: string | null; alternativas: AltResolver[] }
 
 export async function carregarQuestoesDaMeta(
   metaId: string,

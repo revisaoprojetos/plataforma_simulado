@@ -9,7 +9,8 @@ import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { Search, X, Plus, Package, Users, Pencil, Trash2, Loader2, ArrowUpDown, Download, Boxes } from 'lucide-react'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { criarPacote, atualizarPacote, excluirPacote, type PacoteLista } from './actions'
+import type { PacoteLista } from './actions-tipos'
+import {criarPacote, atualizarPacote, excluirPacote} from './actions'
 
 const nf = (n: number) => n.toLocaleString('pt-BR')
 // Grade das colunas (px + fr) — casa cabeçalho e linhas, igual à área de Grupos.

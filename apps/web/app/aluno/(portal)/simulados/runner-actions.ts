@@ -1,4 +1,5 @@
 'use server'
+import type { ModoPessoal, AltRunner, QuestaoRunner, SecaoRunner, SessaoPessoal, ResumoPessoal, QuestaoCaderno } from './runner-actions-tipos'
 
 // "Fazer" um simulado PERSONALIZADO do aluno (Fase 2). Reusa a engine de sessão/correção:
 // a sessão é uma linha em simulado_sessoes_prova (mesma tabela dos oficiais), o auto-save usa
@@ -15,23 +16,6 @@ async function ctx() {
   const s = await getSessaoAluno()
   if (!s) throw new Error('Sessão do aluno não encontrada.')
   return { svc: createAdminClient() as SupabaseClient, estudanteId: s.estudanteId, tenantId: s.tenantId }
-}
-
-export type ModoPessoal = 'estudo' | 'prova' | 'revisao'
-export type AltRunner = { id: string; texto: string; ordem: number; correta: boolean }
-export type QuestaoRunner = {
-  id: string; ordem: number; enunciado: string; tipo: string
-  imagemUrl: string | null; disciplina: string | null; comentario: string | null
-  origemSimulado: string | null; origemNumero: number | null
-  alternativas: AltRunner[]
-  bloqueada: boolean // anulada no banco → não responde (ponto garantido a todos na correção)
-}
-export type SecaoRunner = { id: string; nome: string; questaoIds: string[] }
-export type SessaoPessoal = {
-  sessaoId: string; simuladoId: string; titulo: string; modo: ModoPessoal
-  tempoLimiteMin: number | null; iniciadoEm: string; status: string
-  questoes: QuestaoRunner[]; respostas: Record<string, string>; secoes: SecaoRunner[]
-  estudanteNome: string
 }
 
 /**
@@ -178,13 +162,6 @@ export async function abrirSessaoPessoal(simuladoId: string, reiniciar = false):
   return { sessao: { sessaoId, simuladoId, titulo: (sim as any).titulo as string, modo, tempoLimiteMin: (sim as any).tempo_limite_min ?? null, iniciadoEm, status, questoes, respostas, secoes, estudanteNome } }
 }
 
-export type ResumoPessoal = {
-  simuladoId: string; titulo: string; modo: ModoPessoal; tempoLimiteMin: number | null
-  total: number; porDisciplina: { nome: string; count: number }[]
-  secoes: { nome: string; count: number }[]; temSecoes: boolean
-  emAndamento: boolean; respondidas: number
-}
-
 /** Resumo do simulado pessoal para a TELA DE INÍCIO (HUD) — sem criar sessão (o timer do modo
  *  Prova só deve começar ao clicar em Iniciar). Traz total, quebra por matéria e seções. */
 export async function resumoSimuladoPessoal(simuladoId: string): Promise<{ resumo?: ResumoPessoal; error?: string }> {
@@ -220,8 +197,6 @@ export async function resumoSimuladoPessoal(simuladoId: string): Promise<{ resum
 
   return { resumo: { simuladoId, titulo: (sim as any).titulo as string, modo, tempoLimiteMin: (sim as any).tempo_limite_min ?? null, total: qids.length, porDisciplina, secoes, temSecoes: secoes.length > 0, emAndamento: !!aberta, respondidas } }
 }
-
-export type QuestaoCaderno = { numero: number; secao: string | null; disciplina: string | null; enunciado: string; alternativas: string[] }
 
 /** Questões do simulado pessoal para o CADERNO imprimível (sem gabarito). Na ordem do layout. */
 export async function cadernoSimuladoPessoal(simuladoId: string): Promise<{ titulo?: string; questoes?: QuestaoCaderno[]; error?: string }> {

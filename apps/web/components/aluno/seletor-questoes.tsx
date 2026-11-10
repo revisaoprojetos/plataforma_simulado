@@ -5,7 +5,8 @@ import { createPortal } from 'react-dom'
 import { Search, Loader2, Check, ChevronDown, X, ClipboardList, Star, Shuffle, CheckCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
-import { questoesAcessiveis, type QuestaoDisponivel, type OpcoesFiltro } from '@/app/aluno/(portal)/simulados/builder-actions'
+import type { QuestaoDisponivel, OpcoesFiltro } from '@/app/aluno/(portal)/simulados/builder-actions-tipos'
+import {questoesAcessiveis} from '@/app/aluno/(portal)/simulados/builder-actions'
 
 const MAX_MOSTRAR = 100 // teto renderizado — refine os filtros p/ ver as demais
 

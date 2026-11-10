@@ -3,7 +3,7 @@
 // Linha do tempo da publicação usa dados REAIS (versões + eventos de auditoria do conteúdo).
 
 import { GitBranch, Clock } from 'lucide-react'
-import type { GestaoBase, GestaoDados } from '@/app/admin/biblioteca/gestao-actions'
+import type { GestaoBase, GestaoDados } from '@/app/admin/biblioteca/gestao-actions-tipos'
 import type { GestaoTipo } from '@/lib/biblioteca/gestao-tipos'
 import { EmConstrucao, KpiCard, Secao, Vazio, fmtData, fmtDataHora } from './ui'
 

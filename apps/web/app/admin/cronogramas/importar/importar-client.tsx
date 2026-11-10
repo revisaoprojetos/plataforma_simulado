@@ -21,7 +21,8 @@ import {
   type Previa,
 } from '@/lib/cronograma/importar'
 import { abasXlsxParaListas, lerCsv, planilhaAchatadaParaListas, type AbasXlsx } from '@/lib/cronograma/importar-planilha'
-import { finalizarImportacao, importarCronograma, importarLinks, type EstadoAtual } from './actions'
+import type { EstadoAtual } from './actions-tipos'
+import {finalizarImportacao, importarCronograma, importarLinks} from './actions'
 
 type Lido = {
   arquivo: string

@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { KeyRound, Loader2, ChevronDown, CheckCircle2, Server, Lock, ShieldAlert } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { getCurseducaConfig, salvarCurseducaConfig, type CurseducaConfigDTO } from '@/app/admin/curseduca/actions'
+import type { CurseducaConfigDTO } from '@/app/admin/curseduca/actions-tipos'
+import {getCurseducaConfig, salvarCurseducaConfig} from '@/app/admin/curseduca/actions'
 
 /** Configuração das credenciais Curseduca do tenant (com fallback para o .env global). */
 export function CurseducaConfig({ inicialAberto = false, semColapso = false }: { inicialAberto?: boolean; semColapso?: boolean }) {

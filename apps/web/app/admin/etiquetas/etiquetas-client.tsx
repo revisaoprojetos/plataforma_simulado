@@ -7,7 +7,8 @@ import { toast } from 'sonner'
 import { Tag, Plus, Pencil, Trash2, Check, X, Loader2, ChevronRight, BookOpen, ExternalLink, Search, ClipboardList } from 'lucide-react'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/utils'
-import { criarEtiqueta, atualizarEtiqueta, excluirEtiqueta, questoesDaEtiqueta, type Etiqueta, type FuncaoEtiqueta, type QuestaoDaEtiqueta } from './actions'
+import type { Etiqueta, FuncaoEtiqueta, QuestaoDaEtiqueta } from './actions-tipos'
+import {criarEtiqueta, atualizarEtiqueta, excluirEtiqueta, questoesDaEtiqueta} from './actions'
 
 const CORES = ['#ef4444', '#f59e0b', '#eab308', '#22c55e', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#64748b']
 const ordenar = (a: Etiqueta, b: Etiqueta) => a.nome.localeCompare(b.nome, 'pt-BR')

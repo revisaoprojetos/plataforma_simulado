@@ -8,7 +8,8 @@ import { cn } from '@/lib/utils'
 import { iconePersonalizado } from '@/lib/personalizado-visual'
 import { type CardView } from '@/lib/card-view'
 import { cardGrid, POSTER_MIN, TICKET_MIN } from '@/components/aluno/card-grid'
-import { listarMeusSimulados, type MeuSimuladoResumo } from '@/app/aluno/(portal)/simulados/builder-actions'
+import type { MeuSimuladoResumo } from '@/app/aluno/(portal)/simulados/builder-actions-tipos'
+import {listarMeusSimulados} from '@/app/aluno/(portal)/simulados/builder-actions'
 
 // Nota (0–100) → tom (mesma régua dos cards oficiais). `notaTone` = sobre a capa escura (pôster);
 // `notaToneCard` = sobre fundo claro/card (ticket), com variante dark.

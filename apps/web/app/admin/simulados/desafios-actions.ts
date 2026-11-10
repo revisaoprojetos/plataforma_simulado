@@ -1,4 +1,5 @@
 'use server'
+import type { EtapaMaratona, ConfigDesafioSim, ContagemDesafio } from './desafios-actions-tipos'
 
 // Server actions dos DESAFIOS de simulados (maratona). O desafio é uma PASTA real
 // (simulado_pastas, folder_area='maratona') — assim reusamos os componentes da plataforma
@@ -24,39 +25,7 @@ import { carregarRankingMaratonaAdmin, type MaratonaRankingAdminData } from '@/l
  *  (os 3 checkpoints); `slot` (1,2,3) define EM QUAL área o link/acesso do simulado aparece. `slot` ausente
  *  = não incluído no percurso (fica só na ordem como fallback). Data/liberação/regras vêm do PRÓPRIO
  *  simulado. Persistida em `config.etapas` (jsonb, sem migração). */
-export type EtapaMaratona = {
-  simuladoId: string
-  /** Área do percurso (1, 2 ou 3) onde este simulado aparece. Ausente = não incluído. */
-  slot?: number
-  /** Nome EXIBIDO na maratona (dropdown/percurso). Texto é SEMPRE preservado (mesmo com a opção desligada),
-   *  pra não perder o que foi digitado; `rotuloOn` diz se ele deve ser APLICADO. Vazio = usa o nome real. */
-  rotulo?: string
-  /** Aplica o `rotulo` (nome personalizado) na maratona? false = usa o nome real, mas mantém o texto salvo.
-   *  Ausente (dados antigos) = aplica se houver texto (retrocompat). */
-  rotuloOn?: boolean
-  /** Tempo MÍNIMO de permanência NO SIMULADO, em SEGUNDOS, para o aluno ganhar o CHECK-IN (selo) desta etapa.
-   *  O aluno precisa ficar ao menos este tempo (ex.: 1200 = 20min). 0/ausente = sem mínimo (qualquer
-   *  encerramento já dá o check). O tempo real do aluno é o que conta no "tempo decorrido". */
-  segMin?: number
-}
 
-export type ConfigDesafioSim = MaratonaConfig & {
-  lancada: boolean
-  capaOrig?: string | null
-  capaCrop?: { zoom: number; cx: number; cy: number } | null
-  // Vínculo com o conteúdo real: quando `*Auto`, o card usa a contagem REAL (simulados na pasta /
-  // alunos com acesso) em vez do número fixo. Default = automático (reflete o que existe de verdade).
-  qtdSimuladosAuto?: boolean
-  inscritosAuto?: boolean
-  /** Ordem + organização das etapas da maratona (ordem do array = sequência). */
-  etapas?: EtapaMaratona[]
-  /** Visibilidade na HOME do aluno (default = OCULTO; o desafio vive na própria área). Quando ligado,
-   *  a PASTA do desafio aparece na área de Pastas e/ou os simulados dele aparecem nos Recentes. */
-  mostrarNasPastas?: boolean
-  mostrarNosRecentes?: boolean
-}
-
-export type ContagemDesafio = { simulados: number; inscritos: number }
 /** Contagens REAIS do desafio: simulados vinculados à pasta + alunos com acesso (p/ vincular ao card). */
 export async function contarDesafio(pastaId: string): Promise<ContagemDesafio> {
   const tenantId = await getCurrentTenantId()

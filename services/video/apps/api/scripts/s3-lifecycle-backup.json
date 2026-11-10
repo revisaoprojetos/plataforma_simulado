@@ -1,0 +1,11 @@
+{
+  "Rules": [
+    {
+      "ID": "expirar-dumps-antigos",
+      "Status": "Enabled",
+      "Filter": { "Prefix": "pg/" },
+      "Expiration": { "Days": 30 },
+      "AbortIncompleteMultipartUpload": { "DaysAfterInitiation": 2 }
+    }
+  ]
+}

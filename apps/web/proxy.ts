@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
+import { createClient as createDirectSupabaseClient } from '@supabase/supabase-js'
 import { NextResponse, type NextRequest } from 'next/server'
 import { COOKIE_IMPERSONATION, verificarTokenImpersonation } from '@/lib/impersonation/token'
 import { decisaoImpersonation } from '@/lib/impersonation/guard-rule'
@@ -130,13 +131,30 @@ export async function proxy(request: NextRequest) {
 
   const isAdminPath = protectedAdminPaths.some(p => pathname.startsWith(p))
 
-  // Embed routes: permit framing — granular CSP is set in the layout server component
-  // after reading allowed origins from the DB. Here we set a permissive default that
-  // will be overridden by the layout response headers via next/headers.
+  // Embed routes: frame-ancestors via HTTP header (meta tag é ignorado por navegadores).
+  // Lê origens_permitidas do tenant via service role; fallback para '*' em caso de falha
+  // (mantém compatibilidade com Curseduca enquanto o config não foi preenchido).
   if (pathname.startsWith('/embed/')) {
-    // `X-Frame-Options` não tem valor "ALLOWALL" válido (só DENY/SAMEORIGIN) — navegadores ignoram
-    // valores inválidos, então quem manda é o CSP frame-ancestors. Removê-lo evita ambiguidade.
     supabaseResponse.headers.delete('X-Frame-Options')
+    try {
+      const host = (request.headers.get('x-forwarded-host') || request.headers.get('host') || '').split(':')[0]
+      const admin = createDirectSupabaseClient(
+        process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { persistSession: false, autoRefreshToken: false } },
+      )
+      const { data: tenantRow } = await admin.from('tenants').select('id').eq('dominio', host).maybeSingle()
+      if (tenantRow?.id) {
+        const { data: ec } = await admin.from('simulado_embed_config')
+          .select('origens_permitidas')
+          .eq('tenant_id', tenantRow.id)
+          .maybeSingle()
+        const origens = (ec?.origens_permitidas as string[] | null) ?? []
+        const csp = origens.length > 0 ? `frame-ancestors 'self' ${origens.join(' ')}` : "frame-ancestors *"
+        supabaseResponse.headers.set('Content-Security-Policy', csp)
+        return finalizar(supabaseResponse)
+      }
+    } catch { /* fall through to permissive default */ }
     supabaseResponse.headers.set('Content-Security-Policy', 'frame-ancestors *')
     return finalizar(supabaseResponse)
   }

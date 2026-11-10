@@ -4,11 +4,8 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Loader2, Save, Search, Users, UserCheck, Info, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import {
-  carregarAtribuicao, definirGruposDocumento,
-  carregarEstudantesDocumento, definirEstudantesDocumento, listarEstudantesTenantPag,
-  type EstudanteAcessoLinha,
-} from '@/app/admin/leitura/actions'
+import type { EstudanteAcessoLinha } from '@/app/admin/leitura/actions-tipos'
+import { carregarAtribuicao, definirGruposDocumento, carregarEstudantesDocumento, definirEstudantesDocumento, listarEstudantesTenantPag } from '@/app/admin/leitura/actions'
 
 type Grupo = { id: string; nome: string; cor: string | null; atribuido: boolean }
 const POR_PAGINA = 50

@@ -1,4 +1,5 @@
 'use server'
+import type { ConfigDTO, MapeamentoDTO, EventoDTO, EventoDetalhe, ReconciliacaoDTO, MapaConfigDTO, AssinaturaGuruDTO, AssinaturasResult, InboxDTO, RecebidoDTO, InboxDetalhe } from './actions-tipos'
 
 import { revalidatePath } from 'next/cache'
 import { randomBytes } from 'node:crypto'
@@ -13,6 +14,7 @@ import { aplicarEntitlement, reaplicarLiberacoes } from '@/lib/integracoes/engin
 import { coalescer } from '@/lib/integracoes/ratelimit'
 import { normalizarPorMapa, ehProdutoPassaporte } from '@/lib/integracoes/normalizar-mapa'
 import type { Provider, PessoaNormalizada, Entitlement } from '@/lib/integracoes/tipos'
+
 import { exibidorCpf } from '@/lib/privacidade/cpf-server'
 import { mascararCpf, ehCpfMascarado } from '@/lib/privacidade/cpf'
 
@@ -27,15 +29,6 @@ async function ctx() {
 }
 
 // ── Credenciais ───────────────────────────────────────────────────────────────
-export interface ConfigDTO {
-  provider: Provider
-  ativo: boolean
-  baseUrl: string
-  camposPreenchidos: string[]   // quais credenciais já têm valor (sem expor o valor)
-  webhookToken: string | null
-  cripto: boolean               // APP_ENCRYPTION_KEY presente?
-}
-
 export async function getIntegracaoConfig(provider: string): Promise<{ ok: boolean; error?: string; config?: ConfigDTO }> {
   if (!ehProvider(provider)) return { ok: false, error: 'Provedor inválido.' }
   if (!(await checkPermission('estudantes:view')) && !(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
@@ -144,8 +137,6 @@ export async function listarGruposSistema(): Promise<{ ok: boolean; grupos?: { i
 }
 
 // ── Mapeamentos (produto/grupo → classificação/grupo/simulado) ─────────────────
-export interface MapeamentoDTO { id: string; fonteRef: string; fonteNome: string | null; classificacao: string | null; grupoId: string | null; pastaId: string | null; simuladoId: string | null; ativo: boolean }
-
 export async function listarMapeamentos(provider: string): Promise<{ ok: boolean; error?: string; mapeamentos?: MapeamentoDTO[] }> {
   if (!ehProvider(provider)) return { ok: false, error: 'Provedor inválido.' }
   if (!(await checkPermission('estudantes:view')) && !(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
@@ -200,12 +191,6 @@ export async function excluirMapeamento(provider: string, id: string): Promise<{
 }
 
 // ── Eventos (monitor dos webhooks recebidos) ──────────────────────────────────
-export interface EventoDTO {
-  id: string; eventId: string; tipo: string | null; status: string
-  comprador: string | null; produto: string | null
-  recebidoEm: string; processadoEm: string | null; erro: string | null
-}
-
 /** Extrai comprador/produto do payload cru (best-effort, formato Guru). */
 function resumoEvento(payload: any): { comprador: string | null; produto: string | null } {
   const c = payload?.contact ?? payload?.buyer ?? {}
@@ -230,12 +215,6 @@ export async function listarEventos(provider: string, limite = 50): Promise<{ ok
     return { id: e.id, eventId: e.event_id, tipo: e.tipo, status: e.status, comprador: r.comprador, produto: r.produto, recebidoEm: e.recebido_em, processadoEm: e.processado_em, erro: e.erro }
   })
   return { ok: true, eventos }
-}
-
-export interface EventoDetalhe {
-  eventId: string; tipo: string | null; status: string; erro: string | null
-  recebidoEm: string; processadoEm: string | null
-  headers: unknown; query: unknown; body: unknown
 }
 
 /** Detalhe COMPLETO de um evento (headers + body cru) — para o pop-up de visualização. */
@@ -279,11 +258,6 @@ export async function reprocessarLiberacoes(provider: string, soProduto?: string
 }
 
 // ── Reconciliação automática (Curseduca) — agendada pelo cron curseduca-sync ───
-export interface ReconciliacaoDTO {
-  ativo: boolean; intervaloMin: number; grupos: number[]; sincronizar: boolean
-  ultimaExecucao: string | null; ultimoResultado: any | null
-}
-
 export async function getReconciliacao(): Promise<{ ok: boolean; error?: string; dados?: ReconciliacaoDTO }> {
   if (!(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
   const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
@@ -338,11 +312,6 @@ export async function rodarReconciliacaoAgora(): Promise<{ ok: boolean; error?: 
 }
 
 // ── Mapa dinâmico do JSON (webhook) ────────────────────────────────────────────
-export interface MapaConfigDTO {
-  mapa: Record<string, string>
-  ultimoPayload: unknown | null   // último corpo recebido (para pré-visualizar/preencher)
-}
-
 export async function getMapaConfig(provider: string): Promise<{ ok: boolean; error?: string; dados?: MapaConfigDTO }> {
   if (!ehProvider(provider)) return { ok: false, error: 'Provedor inválido.' }
   if (!(await checkPermission('estudantes:view')) && !(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
@@ -426,11 +395,6 @@ export async function processarRecebidosTodos(provider: string, limite = 300): P
 }
 
 // ── Inbox CRU do webhook (toda requisição que bate na URL) ─────────────────────
-export interface InboxDTO {
-  id: string; metodo: string; statusResp: number | null; resultado: string | null
-  comprador: string | null; produto: string | null; ip: string | null; recebidoEm: string
-}
-
 export async function listarWebhookInbox(provider: string, limite = 100): Promise<{ ok: boolean; error?: string; itens?: InboxDTO[]; semTabela?: boolean }> {
   if (!ehProvider(provider)) return { ok: false, error: 'Provedor inválido.' }
   if (!(await checkPermission('estudantes:view')) && !(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
@@ -452,12 +416,6 @@ export async function listarWebhookInbox(provider: string, limite = 100): Promis
 }
 
 // Inbox UNIFICADO (multi-fonte): todas as requisições do tenant, de qualquer fonte.
-export interface RecebidoDTO {
-  id: string; provider: string; fonte: string | null; metodo: string
-  statusResp: number | null; resultado: string | null
-  comprador: string | null; produto: string | null; ip: string | null; recebidoEm: string
-}
-
 export async function listarRecebidos(filtroFonte?: string, limite = 200): Promise<{ ok: boolean; error?: string; itens?: RecebidoDTO[]; fontes?: string[]; semTabela?: boolean }> {
   if (!(await checkPermission('estudantes:view')) && !(await checkPermission('estudantes:create'))) return { ok: false, error: 'Sem permissão.' }
   const g = await ctx(); if (!g.ok) return { ok: false, error: g.error }
@@ -503,13 +461,6 @@ export async function getRecebidoDetalhe(id: string): Promise<{ ok: boolean; err
       headers: d.headers ?? null, query: exib.profundo(d.query ?? null), body: exib.profundo(d.body_json ?? null), bodyRaw: exib.texto(d.body_raw ?? null),
     },
   }
-}
-
-export interface InboxDetalhe {
-  metodo: string; statusResp: number | null; resultado: string | null
-  ip: string | null; recebidoEm: string; tokenMasc: string | null
-  headers: unknown; query: unknown; body: unknown; bodyRaw: string | null
-  resumo?: string[]
 }
 
 /** Resumo humano do que a requisição faz/fez (read-only): comprador, produto, aluno, grupos, mapeamento. */
@@ -605,36 +556,12 @@ export async function reprocessarEvento(provider: string, id: string): Promise<{
 
 // ── Import (ação explícita do admin) ───────────────────────────────────────────
 // ── Assinaturas (Guru): análise + confirmar/adicionar ─────────────────────────
-export interface AssinaturaGuruDTO {
-  pessoaExternalId: string
-  entExternalId: string
-  nome: string
-  email: string | null
-  cpf: string | null
-  telefone: string | null
-  produtoRef: string
-  produtoNome: string | null
-  status: string
-  jaNoSistema: boolean
-  temMapeamento: boolean
-}
-
 const chaveDigitos = (s?: string | null) => (s ? s.replace(/\D/g, '') : '')
 
 interface BaseRow {
   pessoa_external_id: string | null; ent_external_id: string
   nome: string | null; email: string | null; cpf: string | null; telefone: string | null
   produto_ref: string | null; produto_nome: string | null; status: string | null
-}
-
-export interface AssinaturasResult {
-  ok: boolean; error?: string
-  itens?: AssinaturaGuruDTO[]
-  sincronizadoEm?: string | null   // ISO da última sincronização (base_sync_em)
-  total?: number                   // total de linhas que casam a busca (para a paginação)
-  page?: number
-  totalPages?: number
-  nuncaSync?: boolean              // base vazia e nunca sincronizada → sugerir "Sincronizar"
 }
 
 /**

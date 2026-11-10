@@ -15,7 +15,8 @@ import { confirmar } from '@/components/ui/confirm-dialog'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DisciplinaPicker } from '@/components/cronograma/disciplina-picker'
 import { criarDisciplina } from '../[id]/metas-actions'
-import { criarConjunto, criarPastaConteudo, excluirConjunto, excluirPastaConteudo, type ConjuntoLista, type PastaLista } from './actions'
+import type { ConjuntoLista, PastaLista } from './actions-tipos'
+import {criarConjunto, criarPastaConteudo, excluirConjunto, excluirPastaConteudo} from './actions'
 
 const normalizar = (s: string) =>
   s

@@ -47,8 +47,14 @@ export function SuporteWhatsApp() {
         .sup-wa:active{transform:scale(.96)}
         .sup-wa:focus-visible{outline:3px solid var(--pn-128c7e,#128C7E);outline-offset:3px}
         .sup-wa .sup-txt{white-space:nowrap}
+        /* Tablet e telas baixas (celular deitado): só o ícone, menor e translúcido — cobre menos botões da página. */
+        @media (max-width:1023px),(max-height:480px){
+          .sup-wa{right:12px;width:46px;height:46px;padding:0;justify-content:center;opacity:.9}
+          .sup-wa .sup-txt{display:none}
+        }
+        @media (max-height:480px){.sup-wa{bottom:calc(env(safe-area-inset-bottom) + 10px);right:calc(env(safe-area-inset-right) + 10px)}}
         @media (max-width:767px){
-          .sup-wa{right:16px;bottom:calc(env(safe-area-inset-bottom) + 92px);width:54px;height:54px;padding:0;justify-content:center}
+          .sup-wa{right:16px;bottom:calc(env(safe-area-inset-bottom) + 92px);width:48px;height:48px;padding:0;justify-content:center}
           .sup-wa .sup-txt{display:none}
         }
         @media print{.sup-wa{display:none}}

@@ -3,7 +3,7 @@
 import { Eye } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useImpersonationDock } from '@/components/admin/impersonation/impersonation-dock'
-import type { AlunoBusca } from '@/app/admin/impersonation/actions'
+import type { AlunoBusca } from '@/app/admin/impersonation/actions-tipos'
 
 /** Botão "Ver como aluno" no perfil do estudante. Usa o dock GLOBAL: abre a conta do aluno
  *  DIRETO em JANELA (flutuante) — persiste ao navegar e traz todas as opções (dividir/expandir/

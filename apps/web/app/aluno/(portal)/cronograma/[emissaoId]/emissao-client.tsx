@@ -10,13 +10,14 @@ import { AlertBox } from '@/components/ui/alert-box'
 import { BotaoPdfCronograma } from '@/components/cronograma/botao-pdf'
 import { ResumoGrade } from '@/components/cronograma/grade-cronograma'
 import { VisaoCronograma } from '@/components/cronograma/visao-cronograma'
-import type { ChecksDaEmissao } from '../checks-actions'
-import type { NotasDaEmissao } from '../notas-actions'
+import type { ChecksDaEmissao } from '../checks-actions-tipos'
+import type { NotasDaEmissao } from '../notas-actions-tipos'
 import type { PreferenciasEmissao } from '@/lib/cronograma/preferencias'
 import { usarPreferencias } from '@/lib/cronograma/usar-preferencias'
 import { fmtBr } from '@/lib/cronograma/datas'
 import type { Grade } from '@/lib/cronograma/tipos'
-import { arquivarEmissao, renomearEmissao, type EmissaoResumo } from '../emissoes-actions'
+import type { EmissaoResumo } from '../emissoes-actions-tipos'
+import {arquivarEmissao, renomearEmissao} from '../emissoes-actions'
 
 export function EmissaoClient({
   emissao,

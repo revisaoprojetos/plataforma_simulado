@@ -10,7 +10,8 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Save, Loader2, Eye, EyeOff, ShieldCheck, Crown, Check, ExternalLink, Trash2, Users, GraduationCap, ClipboardList, Copy, Link2 } from 'lucide-react'
 import { confirmar, pedirTexto } from '@/components/ui/confirm-dialog'
-import { updateTenantAction, setTenantVisibilidadeAction, deleteTenantAction, type VisibilidadeModo } from '@/app/admin/tenants/actions'
+import type { VisibilidadeModo } from '@/app/admin/tenants/actions-tipos'
+import {updateTenantAction, setTenantVisibilidadeAction, deleteTenantAction} from '@/app/admin/tenants/actions'
 
 const slugify = (s: string) => s.toLowerCase().trim().replace(/[^a-z0-9-]/g, '')
 

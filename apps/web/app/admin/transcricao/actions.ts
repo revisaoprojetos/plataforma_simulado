@@ -1,4 +1,5 @@
 'use server'
+import type { StatusIA } from './actions-tipos'
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -11,8 +12,6 @@ async function gate() {
   const ok = !!access.tenantId && (access.isAdmin || accessCan(access, 'configuracoes:manage') || accessCan(access, 'configuracoes:view'))
   return { access, ok }
 }
-
-export interface StatusIA { configurado: boolean; provider?: Provedor; providerLabel?: string; modelo?: string; mascara?: string; testadaEm?: string | null }
 
 /** Estado atual da config de IA do tenant (sem expor a chave). */
 export async function statusConfigIA(): Promise<StatusIA> {

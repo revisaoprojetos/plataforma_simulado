@@ -7,7 +7,8 @@ import { Loader2, RefreshCw, Eye, Copy, Check, Inbox } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { ModalRequisicao } from '@/components/admin/modal-requisicao'
-import { listarRecebidos, getRecebidoDetalhe, type RecebidoDTO } from '@/app/admin/integracoes/actions'
+import type { RecebidoDTO } from '@/app/admin/integracoes/actions-tipos'
+import {listarRecebidos, getRecebidoDetalhe} from '@/app/admin/integracoes/actions'
 
 type Detalhe = Awaited<ReturnType<typeof getRecebidoDetalhe>>['detalhe']
 

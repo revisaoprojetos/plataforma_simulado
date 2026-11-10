@@ -1,4 +1,5 @@
 'use server'
+import type { SalvarRegraInput } from './actions-tipos'
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -22,16 +23,6 @@ async function guard(manage = false) {
 }
 
 // ───────── Regras (CRUD) ─────────
-export interface SalvarRegraInput {
-  id?: string
-  nome: string
-  status?: 'active' | 'paused'
-  prioridade?: number
-  filtros: RegraFiltros
-  inicio: InicioConfig
-  fim: FimConfig
-  produtoIds: string[]
-}
 
 export async function salvarRegraAction(input: SalvarRegraInput) {
   const g = await guard(true); if ('error' in g) return { error: g.error }

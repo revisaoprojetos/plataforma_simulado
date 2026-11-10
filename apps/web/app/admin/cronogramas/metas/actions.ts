@@ -1,4 +1,5 @@
 'use server'
+import type { FormaAula, CronDaAula, VarianteAula, OndeEsta, GrupoMeta, DuracaoDivergente } from './actions-tipos'
 
 /**
  * Auditoria de metas — a visão TRANSVERSAL que faltava.
@@ -24,47 +25,10 @@ async function guard(perm = 'cronogramas:view') {
   return { ok: true as const, tenantId: access.tenantId, atorId: access.userId ?? null }
 }
 
-export type FormaAula = { aula: string; n: number }
-export type CronDaAula = { id: string; nome: string; aula: string; n: number }
 
-export type VarianteAula = {
-  disciplina: string
-  aula_chave: string
-  total: number
-  formas: FormaAula[]
-  cronogramas: CronDaAula[]
-}
 
-export type OndeEsta = {
-  id: string
-  nome: string
-  semana: number
-  dia: number
-  aula: string | null
-  meta_id: string
-}
 
-export type GrupoMeta = {
-  chave: string
-  tipo: string
-  disciplina: string
-  aula_chave: string
-  conteudo: string | null
-  n_metas: number
-  n_cronogramas: number
-  n_formas_aula: number
-  cronogramas: OndeEsta[]
-  total_linhas: number
-}
 
-export type DuracaoDivergente = {
-  cronograma_id: string
-  cronograma_nome: string
-  semana: number
-  tipo: string
-  valores: { duracao: string; n: number }[]
-  total: number
-}
 
 const n = (v: unknown) => (typeof v === 'number' ? v : Number(v ?? 0))
 

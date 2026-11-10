@@ -1,4 +1,5 @@
 'use server'
+import type { DadosAreas, EntradaRegra } from './areas-actions-tipos'
 
 // ÁREAS DE VISIBILIDADE do documento (aba "Áreas" do gerenciamento). As áreas vêm do .docx (plugin do editor);
 // aqui o admin define QUEM VÊ cada uma: regras "mostrar para"/"ocultar para" por produto, grupo, segmento ou aluno
@@ -25,16 +26,6 @@ const MSG_MIGRACAO = 'Rode a migração das áreas de visibilidade (202611060200
 const ehMigracao = (m?: string) => /does not exist|schema cache|simulado_conteudo_area/i.test(m || '')
 
 type Opcao = { id: string; nome: string }
-export type DadosAreas = {
-  ok: true
-  areas: AreaDoc[]
-  regras: RegraArea[]
-  produtos: Opcao[]
-  segmentos: Opcao[]
-  grupos: Opcao[]
-  alunos: Record<string, string> // nomes dos alunos já usados em regras
-  estiloPadrao: EstiloExp        // estilo padrão dos blocos expansíveis do tenant
-}
 
 export async function carregarAreasAction(documentoId: string): Promise<DadosAreas | { ok: false; error: string }> {
   const g = await guard('view'); if (!g.ok) return g
@@ -60,14 +51,6 @@ export async function carregarAreasAction(documentoId: string): Promise<DadosAre
   return { ok: true, areas, regras, produtos: lista(prod), segmentos: lista(seg), grupos: lista(grp), alunos, estiloPadrao }
 }
 
-export type EntradaRegra = {
-  id?: string | null
-  area_key: string
-  efeito: 'mostrar' | 'ocultar'
-  produto_id: string | null
-  publico_tipo: 'todos' | 'segmento' | 'grupo' | 'aluno'
-  publico_id: string | null
-}
 
 export async function salvarRegraAreaAction(documentoId: string, input: EntradaRegra): Promise<{ ok: true } | { ok: false; error: string }> {
   const g = await guard('update'); if (!g.ok) return g

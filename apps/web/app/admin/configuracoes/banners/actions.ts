@@ -1,4 +1,5 @@
 'use server'
+import type { BannerInput } from './actions-tipos'
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
@@ -6,39 +7,6 @@ import { hospedarBase64 } from '@/lib/storage/hospedar-base64'
 import { getCurrentTenantId } from '@/lib/tenant'
 import { checkPermission, isSuperAdmin } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
-
-export interface BannerInput {
-  tipo: 'banner' | 'popup' | 'hero'
-  titulo?: string | null
-  mensagem?: string | null
-  imagem_url?: string | null
-  /** Imagem ORIGINAL (inteira, não recortada) — guardada p/ reabrir o recorte sem perda. */
-  imagemOrig?: string | null
-  link?: string | null
-  cor?: string | null
-  ativo?: boolean
-  ordem?: number
-  // Config visual por-banner (só nos banners de simulado) — guardada em tema.banner_destaques[id].
-  destaqueAtivo?: boolean
-  destaqueTexto?: string | null
-  fadeAtivo?: boolean
-  fadeNivel?: number
-  // Estilo do pop-up (guardado no mesmo mapa tema.banner_destaques[id]).
-  popupEstilo?: 'classico' | 'sobre' | 'compacto' | 'cartaz' | 'lado' | 'faixa'
-  popupPontas?: 'arredondado' | 'quadrado'
-  // Texto sobre o banner (banner/destaque): posição + cor + tamanho.
-  bannerTextoPos?: string
-  bannerTextoCor?: 'claro' | 'escuro'
-  bannerTextoTam?: 'pequeno' | 'medio' | 'grande'
-  bannerTextoX?: number
-  bannerTextoY?: number
-  bannerOcultarTitulo?: boolean
-  bannerOcultarMensagem?: boolean
-  // Regras de exibição: agendamento (janela) + frequência do pop-up.
-  agendaInicio?: string | null
-  agendaFim?: string | null
-  freq?: 'login' | 'sempre' | 'uma_vez'
-}
 
 type DestaqueEntry = { ativo?: boolean; texto?: string; fadeAtivo?: boolean; fadeNivel?: number; popupEstilo?: string; popupPontas?: string; bannerTextoPos?: string; bannerTextoCor?: string; bannerTextoTam?: string; bannerTextoX?: number; bannerTextoY?: number; bannerOcultarTitulo?: boolean; bannerOcultarMensagem?: boolean; agendaInicio?: string; agendaFim?: string; freq?: string; imagemOrig?: string }
 

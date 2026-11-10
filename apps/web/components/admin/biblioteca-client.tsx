@@ -7,10 +7,8 @@ import { FolderPlus, FilePlus2, Folder, FileCode2, Pencil, Trash2, ChevronRight,
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/utils'
 import { prepararSelosLeitura, codigoCurto } from '@/lib/leitura/selos'
-import {
-  carregarBiblioteca, salvarItem, excluirItem, moverItem, criarPastaBib, renomearPastaBib, excluirPastaBib, importarSelosPadrao, uploadImagemBib,
-  type Tipo, type BibItem, type BibPasta,
-} from '@/app/admin/leitura/biblioteca/actions'
+import type { Tipo, BibItem, BibPasta } from '@/app/admin/leitura/biblioteca/actions-tipos'
+import { carregarBiblioteca, salvarItem, excluirItem, moverItem, criarPastaBib, renomearPastaBib, excluirPastaBib, importarSelosPadrao, uploadImagemBib } from '@/app/admin/leitura/biblioteca/actions'
 
 /** Prévia: injeta o HTML imperativamente (React NÃO gerencia os filhos) e converte os selos
  * (<span data-selo>/tags) na imagem oficial. Imperativo p/ a mutação span→img não ser desfeita

@@ -14,13 +14,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger } from '@/components/u
 import { Search, Loader2, ArrowLeftRight, ChevronLeft, ChevronRight, Check, Building2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { codigoQuestao } from '@/lib/codigo-questao'
-import {
-  listarPlataformasOrigem,
-  buscarQuestoesDePlataforma,
-  importarQuestoesDePlataforma,
-  detalheQuestaoOrigem,
-  type QuestaoOrigem,
-} from '@/app/admin/questoes/importar-plataforma-actions'
+import type { QuestaoOrigem } from '@/app/admin/questoes/importar-plataforma-actions-tipos'
+import { listarPlataformasOrigem, buscarQuestoesDePlataforma, importarQuestoesDePlataforma, detalheQuestaoOrigem } from '@/app/admin/questoes/importar-plataforma-actions'
 
 type Alt = { texto: string; correta: boolean; ordem: number }
 type Detalhe = { loading: boolean; alternativas?: Alt[] }

@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Plus, Loader2, X, FlaskConical } from 'lucide-react'
 import { toast } from 'sonner'
-import { concederTestadores, revogarTestador, type Testador } from '@/app/admin/simulados/actions'
+import type { Testador } from '@/app/admin/simulados/actions-tipos'
+import {concederTestadores, revogarTestador} from '@/app/admin/simulados/actions'
 
 interface Est { id: string; nome: string }
 

@@ -1,4 +1,5 @@
 'use server'
+import type { EstadoProduto } from './actions-tipos'
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -264,7 +265,6 @@ export async function definirAcessoGratuitoProdutoAction(produtoId: string, valo
  * Sem a coluna `acesso_bloqueado` (migração pendente): publicado/rascunho funcionam só com `ativo`;
  * em_atualizacao retorna erro pedindo a migração.
  */
-export type EstadoProduto = 'publicado' | 'em_atualizacao' | 'rascunho'
 export async function definirEstadoProdutoAction(produtoId: string, estado: EstadoProduto): Promise<{ ok?: boolean; error?: string }> {
   const g = await guard(true); if ('error' in g) return { error: g.error }
   if (!['publicado', 'em_atualizacao', 'rascunho'].includes(estado)) return { error: 'Estado inválido.' }

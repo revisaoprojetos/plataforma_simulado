@@ -10,7 +10,7 @@ import { AREAS_MANUTENCAO, AREAS_MANUTENCAO_ALUNO } from '@/lib/sistema/manutenc
 import type { ManutencaoSistema } from '@/lib/sistema/manutencao'
 import type { ManutencaoAreas, ManutencaoLiberados, ManutencaoModos } from '@/lib/sistema/manutencao-areas'
 import type { PessoaItem } from '@/components/admin/seletor-liberados-dialog'
-import type { WorkspaceGrupo } from './actions'
+import type { WorkspaceGrupo } from './actions-tipos'
 
 // `modos` só existe p/ as áreas do ALUNO (modo bloqueio/construção); o admin não tem modo.
 type BlocoManutencao = { ativos: ManutencaoAreas; liberados: ManutencaoLiberados; nomes: PessoaItem[]; modos?: ManutencaoModos }

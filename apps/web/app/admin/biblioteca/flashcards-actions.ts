@@ -1,4 +1,5 @@
 'use server'
+import type { FlashcardAdmin } from './flashcards-actions-tipos'
 
 // AUTORIA DE FLASHCARDS POR MATERIAL (admin). Envolve a lib pronta (lib/flashcards/flashcards.ts)
 // com o padrão de SEGURANÇA das server actions admin: checkPermission + service role + tenant/ator
@@ -14,7 +15,6 @@ import {
   removerFlashcard, reordenarFlashcards, type Flashcard,
 } from '@/lib/flashcards/flashcards'
 
-export type FlashcardAdmin = Flashcard & { criado_em: string }
 
 const T_CARD = 'simulado_flashcards'
 // A migração 20261027000000 ainda NÃO está em produção: a tela não pode quebrar — detecta a tabela

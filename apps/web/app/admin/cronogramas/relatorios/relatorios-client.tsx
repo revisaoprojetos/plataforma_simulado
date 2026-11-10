@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { SecaoHeader } from '@/components/admin/secao-header'
-import { buscarAlunosRelatorio, type DadosRelatorio, type LinhaAluno } from './actions'
+import type { DadosRelatorio, LinhaAluno } from './actions-tipos'
+import {buscarAlunosRelatorio} from './actions'
 
 const POR_PAGINA = 50
 

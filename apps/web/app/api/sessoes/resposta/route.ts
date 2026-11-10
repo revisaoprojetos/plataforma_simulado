@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { sessaoNoTenantDoRequisitante } from '@/lib/simulado/sessao-guard'
+import { getSessaoAluno } from '@/lib/aluno-session'
 import { sessaoExpirada } from '@/lib/simulado/sessao-expiry'
 import { funcaoEtiquetaPorQuestao, funcaoBloqueia } from '@/lib/simulado/etiqueta-funcao'
 
@@ -25,17 +26,26 @@ export async function POST(request: NextRequest) {
 
   const supabase = createAdminClient()
 
+  const alunoSessao = await getSessaoAluno().catch(() => null)
+  if (!alunoSessao) {
+    return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
+  }
+
   const { data: sessao } = await supabase
     .from('simulado_sessoes_prova')
-    .select('id, status, tenant_id, simulado_id, iniciado_em')
+    .select('id, status, tenant_id, simulado_id, iniciado_em, estudante_id')
     .eq('id', sessao_id)
     .maybeSingle()
 
   if (!sessao) {
     return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
   }
-  // Isolamento: a sessão precisa ser do tenant do requisitante (fecha IDOR cross-tenant).
+  // Isolamento cross-tenant: sessão do tenant correto.
   if (!(await sessaoNoTenantDoRequisitante(sessao))) {
+    return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
+  }
+  // Isolamento cross-aluno: sessão pertence ao aluno autenticado (fecha IDOR intra-tenant).
+  if (sessao.estudante_id !== alunoSessao.estudanteId) {
     return NextResponse.json({ message: 'Sessão não encontrada.' }, { status: 404 })
   }
   if (sessao.status === 'finalizada') {

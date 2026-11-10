@@ -14,11 +14,8 @@ import {
   Play, Video, Music,
 } from 'lucide-react'
 import { formatBrt } from '@/lib/brt'
-import {
-  carregarSidebarDoc, salvarPermissoesDoc, salvarJanelaDoc, adicionarVinculoLeitor, removerVinculoLeitor,
-  midiaPreviewDocumento,
-  type PermissoesAluno, type VinculoLeitor, type AcessoLinhaSidebar, type EventoHistorico,
-} from '@/app/admin/biblioteca/actions'
+import type { PermissoesAluno, VinculoLeitor, AcessoLinhaSidebar, EventoHistorico } from '@/app/admin/biblioteca/actions-tipos'
+import { carregarSidebarDoc, salvarPermissoesDoc, salvarJanelaDoc, adicionarVinculoLeitor, removerVinculoLeitor, midiaPreviewDocumento } from '@/app/admin/biblioteca/actions'
 
 type Aba = 'detalhes' | 'acesso' | 'vinculos' | 'historico'
 type Dados = Awaited<ReturnType<typeof carregarSidebarDoc>>

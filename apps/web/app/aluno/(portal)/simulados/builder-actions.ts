@@ -1,4 +1,5 @@
 'use server'
+import type { MeuSimuladoResumo, QuestaoEscolhida, Secao, QuestaoDisponivel, OpcoesFiltro } from './builder-actions-tipos'
 
 // Construtor de simulados PERSONALIZADOS do aluno. Os simulados criados aqui são linhas em
 // simulado_simulados com owner_estudante_id = aluno logado (isolados dos oficiais). Reusam a
@@ -66,17 +67,6 @@ export async function criarMeuSimulado(nome: string): Promise<{ id?: string; err
   return { id: (data as any).id as string }
 }
 
-export type MeuSimuladoResumo = {
-  id: string; titulo: string; status: string; questoes: number; criadoEm: string | null
-  /** Estatísticas das sessões DESTE aluno (para o card mostrar nota/tentativas, como nos oficiais). */
-  tentativas: number            // sessões finalizadas
-  melhorNota: number | null     // maior nota entre as finalizadas
-  emAndamento: boolean          // tem sessão não finalizada
-  ultimaSessaoId: string | null // sessão para "Ver resultado" (a de maior nota; desempate: mais recente)
-  cor: string                   // cor da capa (regras.visual.cor)
-  icone: string                 // ícone da capa (regras.visual.icone)
-}
-
 export async function listarMeusSimulados(): Promise<MeuSimuladoResumo[]> {
   const { svc, estudanteId, tenantId } = await ctx()
   const sims = await fetchAll<any>(() => svc.from('simulado_simulados')
@@ -133,10 +123,6 @@ export async function excluirMeuSimulado(simuladoId: string): Promise<{ ok?: boo
   revalidatePath('/aluno/simulados')
   return { ok: true }
 }
-
-export type QuestaoEscolhida = { questaoId: string; ordem: number; enunciado: string }
-/** Seção (fileira) do simulado do aluno: agrupa questões. Persistida em `regras.secoes` (jsonb). */
-export type Secao = { id: string; nome: string; questaoIds: string[] }
 
 /** Sanea/normaliza as seções vindas do jsonb contra as questões que realmente estão no simulado. */
 function sanearSecoes(raw: unknown, doSim: Set<string>): Secao[] {
@@ -224,25 +210,6 @@ export async function salvarLayout(simuladoId: string, ordemIds: string[], secoe
   }
   revalidatePath(`/aluno/simulados/personalizados/${simuladoId}`)
   return { ok: true }
-}
-
-export type QuestaoDisponivel = {
-  id: string; enunciado: string
-  disciplinaId: string | null; disciplina: string | null
-  assuntoId: string | null; assunto: string | null
-  bancaId: string | null; banca: string | null
-  ano: number | null; tipo: string | null; dificuldade: string | null
-  simuladoId: string | null; simulado: string | null
-  favorito: boolean
-}
-export type OpcoesFiltro = {
-  disciplinas: { id: string; nome: string }[]
-  assuntos: { id: string; nome: string; disciplinaId: string | null }[]
-  bancas: { id: string; nome: string }[]
-  simulados: { id: string; nome: string }[]
-  anos: number[]
-  tipos: string[]
-  dificuldades: string[]
 }
 
 const CAP_ACESSIVEIS = 2500 // teto de questões carregadas no seletor (busca/filtro é client-side)

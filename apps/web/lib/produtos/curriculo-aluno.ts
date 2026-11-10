@@ -1,6 +1,7 @@
 import 'server-only'
 import { fetchAll } from '@/lib/supabase/fetch-all'
 import type { Disponibilidade, TipoRef } from './curriculo'
+import { aulaIdDeReferencia } from '@/lib/biblioteca/video-provedor'
 import { visibilidadeDeConteudos } from '@/lib/segmentos/visibilidade'
 
 /**
@@ -83,6 +84,9 @@ export function momentoLiberacao(d: Disponibilidade, matricula: Date | null): Da
 function hrefDaAula(tipo: TipoRef, refId: string | null, refUrl: string | null, meta: any, voltar: string, produtoId?: string): { href: string | null; externo: boolean } {
   if (tipo === 'documento_biblioteca') return refId ? { href: `/aluno/biblioteca/${refId}?voltar=${encodeURIComponent(voltar)}${produtoId ? `&produto=${produtoId}` : ''}`, externo: false } : { href: null, externo: false }
   if (tipo === 'simulado' || tipo === 'quiz') return { href: '/aluno/simulados', externo: false }
+  // Vídeo próprio (hospedado): `video-proprio:<aulaId>` abre o player interno, na mesma aba.
+  const propria = aulaIdDeReferencia(refUrl)
+  if (propria) return { href: `/aluno/video/${propria}`, externo: false }
   const url = String(refUrl || meta?.embedUrl || '').trim()
   return /^https?:\/\//i.test(url) ? { href: url, externo: true } : { href: null, externo: false }
 }

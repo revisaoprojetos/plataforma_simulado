@@ -13,6 +13,8 @@ export const RBAC_CATALOGO: { resource: string; action: string }[] = [
   { resource: 'matriculas', action: 'view' }, { resource: 'matriculas', action: 'create' }, { resource: 'matriculas', action: 'update' }, { resource: 'matriculas', action: 'delete' },
   { resource: 'produtos', action: 'view' }, { resource: 'produtos', action: 'create' }, { resource: 'produtos', action: 'update' }, { resource: 'produtos', action: 'manage' },
   { resource: 'liberacao', action: 'view' }, { resource: 'liberacao', action: 'manage' },
+  // Vídeo próprio (Estúdio › Vídeos): view = listar/assistir analytics; manage = enviar/reprocessar/excluir.
+  { resource: 'video', action: 'view' }, { resource: 'video', action: 'manage' },
   // Área de Conteúdos (Estúdio de Conteúdo): materiais/biblioteca, flashcards, trilhas e classificação.
   // Gateamento no app chega com os builders; semeadas aqui p/ o papel `professor` (self-service).
   { resource: 'biblioteca', action: 'view' }, { resource: 'biblioteca', action: 'create' }, { resource: 'biblioteca', action: 'update' }, { resource: 'biblioteca', action: 'publicar' },
@@ -45,6 +47,7 @@ export const RBAC_RECURSO_LABEL: Record<string, string> = {
   matriculas: 'Matrículas',
   produtos: 'Produtos / Extensivos',
   liberacao: 'Regras de liberação',
+  video: 'Vídeos (próprio)',
   biblioteca: 'Biblioteca / Materiais',
   flashcards: 'Flashcards',
   trilhas: 'Trilhas',

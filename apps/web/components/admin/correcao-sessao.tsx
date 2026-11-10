@@ -12,7 +12,8 @@ import { useSidebar } from '@/components/ui/sidebar'
 import { CorrecaoFolha, ICONES, type Ferramenta, type Marca } from '@/components/admin/correcao-folha'
 import { DevolutivaAluno } from '@/components/admin/devolutiva-aluno'
 import { PdfPreview } from '@/components/admin/pdf-preview'
-import { assumirCorrecao, salvarCorrecao, salvarQuesito, salvarEspelhoQuesito, salvarTranscricao, imagemParaOCR, salvarAnotacao, removerAnotacao, atualizarAnotacao, type QuesitoPatch } from '@/app/admin/correcao/actions'
+import type { QuesitoPatch } from '@/app/admin/correcao/actions-tipos'
+import {assumirCorrecao, salvarCorrecao, salvarQuesito, salvarEspelhoQuesito, salvarTranscricao, imagemParaOCR, salvarAnotacao, removerAnotacao, atualizarAnotacao} from '@/app/admin/correcao/actions'
 
 export interface CompCorrecao {
   id: string; nome: string; pontos: number

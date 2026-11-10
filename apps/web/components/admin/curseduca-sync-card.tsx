@@ -7,7 +7,7 @@ import { RefreshCw, Loader2, Check, Link2, AlertTriangle, Zap, Clock, ArrowRight
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { salvarSyncSimples, sincronizarCurseducaAgora } from '@/app/admin/curseduca/actions'
-import type { GrupoCurseducaDTO, GrupoSistema } from '@/app/admin/curseduca/actions'
+import type { GrupoCurseducaDTO, GrupoSistema } from '@/app/admin/curseduca/actions-tipos'
 
 const INTERVALOS: Record<string, string> = { '15': '15 minutos', '30': '30 minutos', '60': '1 hora', '120': '2 horas', '240': '4 horas' }
 

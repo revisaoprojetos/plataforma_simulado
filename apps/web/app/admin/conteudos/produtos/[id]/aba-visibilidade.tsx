@@ -30,12 +30,8 @@ import {
   type Condicao, type GrupoCondicoes, type RegraSegmento, type RegraVisibilidade, type Segmento,
   type CampoId, type Efeito, type SemAcesso, type AlvoTipo, type RefTipo, type Juncao,
 } from '@/lib/segmentos/tipos'
-import {
-  carregarVisibilidadeAction, carregarAlvosConteudoAction, salvarSegmentoAction, duplicarSegmentoAction, excluirSegmentoAction,
-  salvarRegraVisibilidadeAction, alternarRegraVisibilidadeAction, excluirRegraVisibilidadeAction,
-  buscarRefsSegmentoAction, buscarAlunosSegmentoAction, testarSegmentoAction,
-  type SegmentoAdmin, type AlvosProduto, type AlvoNome,
-} from './visibilidade-actions'
+import type { SegmentoAdmin, AlvosProduto, AlvoNome } from './visibilidade-actions-tipos'
+import { carregarVisibilidadeAction, carregarAlvosConteudoAction, salvarSegmentoAction, duplicarSegmentoAction, excluirSegmentoAction, salvarRegraVisibilidadeAction, alternarRegraVisibilidadeAction, excluirRegraVisibilidadeAction, buscarRefsSegmentoAction, buscarAlunosSegmentoAction, testarSegmentoAction } from './visibilidade-actions'
 
 const MIGRACAO = '20261103130000_segmentos_visibilidade.sql'
 const REF_LABEL: Record<RefTipo, string> = { grupo: 'grupo', produto: 'produto', simulado: 'simulado' }

@@ -11,6 +11,7 @@ import { getSessaoAluno } from '@/lib/aluno-session'
 import { createAdminClient } from '@/lib/supabase/server'
 import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { provasPorQuestao } from '@/lib/aluno/provas-questao'
+import { carregarHistoricoRespostas } from '@/lib/aluno/historico-respostas'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,20 +41,9 @@ export default async function RecomendadoPage() {
   if (!sessao) redirect('/aluno/entrar')
   const svc = createAdminClient()
 
-  // 1) Sessões reais do aluno (exclui teste/deletadas) → respostas objetivas.
-  const { data: sessoes } = await svc
-    .from('simulado_sessoes_prova')
-    .select('id')
-    .eq('estudante_id', sessao.estudanteId)
-    .eq('is_teste', false)
-    .eq('deletado', false)
-  const sessaoIds = (sessoes ?? []).map((s: any) => s.id)
-
-  // fetchAllByIn (chunk 80): aluno ativo pode ter >1000 respostas → raw .in() truncaria o diagnóstico.
-  const resp = sessaoIds.length
-    ? await fetchAllByIn<any>(sessaoIds, (chunk) =>
-        svc.from('simulado_respostas_objetivas').select('questao_id, correta').in('sessao_id', chunk).order('id', { ascending: true }))
-    : []
+  // 1) Histórico REAL: respostas de simulados (sem teste/deletadas) + prática do banco de questões
+  //    (avulsas). Antes só lia simulados → resolver no banco/reforço nunca atualizava as recomendações.
+  const resp = await carregarHistoricoRespostas(svc, sessao.tenantId, sessao.estudanteId, { soReais: true })
 
   // 2) Mapeia questão → disciplina; marca dominadas/erradas.
   const answeredIds = [...new Set(resp.map((r: any) => r.questao_id))]
@@ -95,7 +85,7 @@ export default async function RecomendadoPage() {
   let escolhidasIds: string[] = []
   if (fracas.length) {
     const cand = await fetchAllByIn<any>(fracas, (chunk) =>
-      svc.from('simulado_questoes').select('id').eq('tenant_id', sessao.tenantId).eq('status', 'publicada').in('disciplina_id', chunk).order('id', { ascending: true }))
+      svc.from('simulado_questoes').select('id').eq('tenant_id', sessao.tenantId).eq('status', 'publicada').eq('deletado', false).eq('anulada', false).neq('tipo', 'discursiva').in('disciplina_id', chunk).order('id', { ascending: true }))
     const naoDominadas = cand.filter((q: any) => !dominadas.has(q.id))
     naoDominadas.sort((a: any, b: any) => (erradas.has(b.id) ? 1 : 0) - (erradas.has(a.id) ? 1 : 0))
     escolhidasIds = naoDominadas.slice(0, 10).map((q: any) => q.id)

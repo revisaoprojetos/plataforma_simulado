@@ -30,10 +30,8 @@ import { STATUS_REQ_LABEL, type Requerimento, type StatusRequerimento } from '@/
 import {
   STATUS_REPORTE_LABEL, TIPOS_REPORTE, type Reporte, type Avaliacao, type StatusReporte, type TipoReporte,
 } from '@/lib/demandas/tipos'
-import {
-  carregarThreadDuvidaAction, responderDuvidaAction, responderRequerimentoAction, resolverReporteAction,
-  type ThreadDuvida,
-} from './actions'
+import type { ThreadDuvida } from './actions-tipos'
+import { carregarThreadDuvidaAction, responderDuvidaAction, responderRequerimentoAction, resolverReporteAction } from './actions'
 
 export type DuvidaRow = Duvida & { estudante_nome: string; estudante_email: string | null }
 export type RequerimentoRow = Requerimento & { estudante_nome: string; estudante_email: string | null }

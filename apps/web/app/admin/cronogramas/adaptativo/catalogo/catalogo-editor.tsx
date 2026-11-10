@@ -12,7 +12,8 @@ import {
   type CatalogoOverride, type AulaOv, type AulaNova, type LpOv, type MateriaisOv,
   ordemEfetiva, moverNaDisciplina, contarAlteracoes, OVERRIDE_VAZIO,
 } from '@/lib/cronograma/adaptativo/catalogo-override'
-import { salvarEditorCatalogo, type EditorCatalogo, type EditorAulaBase, type EditorLpBase } from '../actions'
+import type { EditorCatalogo, EditorAulaBase, EditorLpBase } from '../actions-tipos'
+import {salvarEditorCatalogo} from '../actions'
 
 type Aba = 'aulas' | 'legproc'
 const novoId = () => (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID().replace(/-/g, '').slice(0, 10) : Math.random().toString(36).slice(2, 12))

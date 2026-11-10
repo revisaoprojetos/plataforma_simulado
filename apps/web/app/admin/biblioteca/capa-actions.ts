@@ -1,4 +1,5 @@
 'use server'
+import type { AlvoCP, DadosCP, EstadoCP } from './capa-actions-tipos'
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -15,26 +16,6 @@ import {
 
 const MIGRACAO = '20261105010000_biblioteca_capa_pagina_inicial.sql'
 const colunaAusente = (msg: string) => /column .* does not exist|schema cache|42703|PGRST204/i.test(msg || '')
-
-export type AlvoCP = { tipo: 'pasta' | 'documento'; id: string }
-
-export interface DadosCP {
-  capaUrl: string | null
-  capaModo: ModoCP            // só pasta
-  paginaInicial: number | null
-  paginaInicialModo: ModoCP   // só pasta
-}
-
-export interface EstadoCP {
-  ok: boolean; error?: string
-  migrado: boolean
-  titulo: string
-  atual: DadosCP
-  /** O que ESTE item herda hoje da árvore (sem contar o valor próprio). */
-  herdado: { capa: Resolvido<string>; pagina: Resolvido<number> }
-  /** Quantos documentos (diretos + subpastas) o modo "lote" desta pasta alcança — só p/ pasta. */
-  alcance?: number
-}
 
 const VAZIO: DadosCP = { capaUrl: null, capaModo: 'lote', paginaInicial: null, paginaInicialModo: 'lote' }
 const SEM_HERANCA = { capa: { valor: null, origem: null }, pagina: { valor: null, origem: null } } as EstadoCP['herdado']

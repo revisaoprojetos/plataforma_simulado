@@ -1,4 +1,5 @@
 'use server'
+import type { NovidadeAdmin, NovidadeInput } from './actions-tipos'
 
 // NOVIDADES ("O que mudou") — autoria/gestão do changelog por tenant (admin). Envolve a lib PRONTA
 // (lib/novidades/novidades.ts) com o padrão de SEGURANÇA das server actions admin: checkPermission +
@@ -18,22 +19,8 @@ import {
   type Novidade, type CategoriaNovidade,
 } from '@/lib/novidades/novidades'
 
-export type NovidadeAdmin = Novidade & { ativo: boolean; criado_em: string }
 
 /** Campos do formulário (criar/editar). `publicadoEm` já vem em ISO (convertido no client via @/lib/brt). */
-export type NovidadeInput = {
-  categoria: CategoriaNovidade
-  titulo: string
-  descricao?: string | null
-  destaque?: boolean
-  coverUrl?: string | null
-  ctaLabel?: string | null
-  ctaUrl?: string | null
-  cta2Label?: string | null
-  cta2Url?: string | null
-  publicadoEm?: string | null
-  ativo?: boolean
-}
 
 const T = 'simulado_novidades'
 // A migração 20261028000000 pode ainda NÃO estar aplicada: a tela não pode quebrar — detecta a

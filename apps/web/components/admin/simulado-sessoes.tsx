@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Search, ArrowUpDown, ListChecks } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { formatBrt } from '@/lib/brt'
-import type { SessaoLinkada } from '@/app/admin/simulados/actions'
+import type { SessaoLinkada } from '@/app/admin/simulados/actions-tipos'
 
 type Campo = 'estudante' | 'status' | 'nota' | 'iniciado_em'
 const POR_PAGINA = 11

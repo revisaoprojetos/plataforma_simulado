@@ -61,7 +61,6 @@ export async function resetarPrevia(versaoId: string): Promise<{ ok: boolean }> 
 }
 
 // ── Textos de desempenho (narrativa por faixa) — editados na aba do Lab, guardados no tema do tenant. ──
-export type { TextosDesempenho }
 export async function obterTextosDesempenho(): Promise<{ ok: boolean; textos?: TextosDesempenho | null; error?: string }> {
   const tenantId = await tenantOk(); if (!tenantId) return { ok: false, error: 'Sem permissão.' }
   return { ok: true, textos: await carregarTextosDesempenho(tenantId) }

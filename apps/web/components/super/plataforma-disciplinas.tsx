@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Loader2, Plus, Search, BookOpen, CheckCircle2, Copy } from 'lucide-react'
-import { listarDisciplinasPlataforma, adicionarDisciplinasPlataforma, type DisciplinaAtual, type DisciplinaDisponivel, type PlataformaCol, type DisciplinaTodas } from '@/app/admin/tenants/disciplinas-actions'
+import type { DisciplinaAtual, DisciplinaDisponivel, PlataformaCol, DisciplinaTodas } from '@/app/admin/tenants/disciplinas-actions-tipos'
+import {listarDisciplinasPlataforma, adicionarDisciplinasPlataforma} from '@/app/admin/tenants/disciplinas-actions'
 import { chaveSemantica } from '@/lib/taxonomia/disciplina-semantica'
 
 const ROT_CLASS: Record<string, string> = { essencial: 'Essencial', complementar: 'Complementar', especifica: 'Específica' }

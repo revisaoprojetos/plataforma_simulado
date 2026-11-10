@@ -1,4 +1,5 @@
 'use server'
+import type { AnotacaoInput, AnotacaoRow, QuesitoPatch } from './actions-tipos'
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -109,19 +110,7 @@ export async function salvarCorrecao(
 // Marcas do professor na imagem do aluno (destaque/ponto/ícone/bolinha/texto),
 // coords 0–1, ligadas opcionalmente a um quesito (competência) e a uma página.
 
-export interface AnotacaoInput {
-  arquivo_id?: string | null
-  competencia_id?: string | null
-  tipo: string
-  x: number; y: number
-  largura?: number | null; altura?: number | null
-  cor?: string | null
-  icone?: string | null
-  numero?: number | null
-  conteudo?: string | null
-  comentario?: string | null
-}
-export interface AnotacaoRow extends AnotacaoInput { id: string; origem: string }
+
 
 async function podeCorrigir() {
   const access = await getCurrentAccess()
@@ -194,11 +183,7 @@ const HINT_RITUAL = 'Rode a migração 20260819000002_correcao_ritual.sql.'
 const semUnico = (m: string) => /no unique|exclusion constraint|on conflict|matching the on conflict/i.test(m)
 const colFaltando = (m: string) => /audit_state|mensagem_aluno|atualizado_em|column .* does not exist/i.test(m)
 
-export interface QuesitoPatch {
-  nota?: number; comentario?: string | null; audit_state?: string; mensagem_aluno?: string | null
-  conceito?: string | null; excerpt?: string | null; pagina?: string | null; linhas?: string | null
-  recognized?: string[]; missing?: string[]; leitura_duvidosa?: boolean
-}
+
 
 export async function salvarQuesito(respostaId: string, competenciaId: string, patch: QuesitoPatch): Promise<{ ok: boolean; error?: string }> {
   const { access, ok } = await podeCorrigir()

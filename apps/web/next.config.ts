@@ -11,6 +11,8 @@ const SERVER_ACTION_HOSTS = (process.env.SERVER_ACTION_ORIGINS || "")
 
 const nextConfig: NextConfig = {
   output: "standalone",
+  // Build de verificação isolado (não pisa no .next do `pnpm iniciar`): NEXT_DIST_DIR=.next-build next build
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   // Monorepo pnpm: inclui os pacotes do workspace (ex.: `shared`) no build standalone.
   outputFileTracingRoot: path.join(dir, "../../"),
   // mammoth (.docx) e pdfjs-dist (.pdf) usam deps de node / requires dinâmicos — não bundlear.
@@ -38,6 +40,15 @@ const nextConfig: NextConfig = {
         source: "/oo-plugin-selos/:path*",
         headers: [{ key: "Access-Control-Allow-Origin", value: "*" }],
       },
+      // Plugins de Áreas e Expansor: sem este CORS o editor (outro domínio) não lê o config.json → "Ocorreu um erro".
+      {
+        source: "/oo-plugin-areas/:path*",
+        headers: [{ key: "Access-Control-Allow-Origin", value: "*" }],
+      },
+      {
+        source: "/oo-plugin-expansor/:path*",
+        headers: [{ key: "Access-Control-Allow-Origin", value: "*" }],
+      },
     ];
   },
   experimental: {
@@ -52,11 +63,11 @@ const nextConfig: NextConfig = {
       // ("An error occurred in the Server Components render") — foi o que deixava o Lab do MEQ sem selecionar
       // simulado / gerar prévia. Liberamos os domínios conhecidos (+ *.revisaopge.com.br p/ os subdomínios)
       // e os extras de SERVER_ACTION_ORIGINS (env) para novos domínios custom sem rebuild. localhost p/ dev.
-      allowedOrigins: ["localhost:3000", "*.revisaopge.com.br", "simulado.meqconcursos.com.br", "simulado.vocenadefensoria.com.br", ...SERVER_ACTION_HOSTS],
+      allowedOrigins: ["localhost:3000", "*.revisaopge.com.br", "simulado.meqconcursos.com.br", "simulado.vocenadefensoria.com.br", "*.nip.io", ...SERVER_ACTION_HOSTS],
       // allowedForwardedHosts: atrás do Traefik o `x-forwarded-host` (domínio público do tenant) difere do
       // Host interno; o Next rejeita a server action se esse forwarded host não for confiável. O tipo do
       // Next 16 não lista essa chave, mas o RUNTIME usa — por isso entra via spread (bypassa o excess-check).
-      ...{ allowedForwardedHosts: ["*.revisaopge.com.br", "simulado.meqconcursos.com.br", "simulado.vocenadefensoria.com.br", ...SERVER_ACTION_HOSTS] },
+      ...{ allowedForwardedHosts: ["*.revisaopge.com.br", "simulado.meqconcursos.com.br", "simulado.vocenadefensoria.com.br", "*.nip.io", ...SERVER_ACTION_HOSTS] },
       // Cadernos do designer podem chegar grandes no PRIMEIRO save (fundos em base64, antes de
       // hospedar). Importação da Biblioteca envia o arquivo em base64 (1 por chamada) — a base64
       // infla ~37%, então 120mb cobre arquivos de até ~85MB (PDFs/.docx grandes de material).

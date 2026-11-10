@@ -1,4 +1,5 @@
 'use server'
+import type { CronogramaDetalhe, Diagnostico, EntradaMeta, OpcoesRepetir, ComposicaoBanco, PacotesDoCronograma } from './metas-actions-tipos'
 
 /**
  * Metas de um cronograma: leitura da grade inteira, correção avulsa e diagnóstico.
@@ -17,28 +18,8 @@ import { listarTiposMeta } from '@/lib/cronograma/carregar-tipos'
 import { garantirPlataformaVideo } from '@/lib/cronograma/plataforma-video'
 import type { MetaFonte, TipoMeta, TipoMetaDef } from '@/lib/cronograma/tipos'
 
-export type CronogramaDetalhe = {
-  id: string
-  slug: string
-  nome: string
-  carga_horaria: number
-  total_semanas: number
-  dias_curso: number[]
-  dias_nome: string[]
-  semanas_revisao: number[]
-  categoria_nome: string | null
-  status: 'rascunho' | 'liberado'
-}
 
 /** Problemas de DADO que a equipe precisa ver — não são erros de uso. */
-export type Diagnostico = {
-  semanasComMetasEmRevisao: number[]
-  metasForaDosDias: number
-  metasForaDasSemanas: number
-  questoesSemLink: { disciplina: string; aula: string }[]
-  duracoesDivergentes: { semana: number; tipo: string }[]
-  semanasVazias: number[]
-}
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -204,20 +185,6 @@ function diagnosticar(c: CronogramaDetalhe, metas: MetaFonte[], comLink: Set<str
   }
 }
 
-export type EntradaMeta = {
-  semana: number
-  dia: number
-  tipo: TipoMeta
-  disciplina: string
-  disciplina_id: string | null
-  aula: string | null
-  conteudo: string | null
-  duracao: string | null
-  ordem: number
-  simulado_id: string | null
-  simulado_externo_nome: string | null
-  simulado_externo_url: string | null
-}
 
 /** Valida uma meta contra a grade do cronograma (as mesmas regras do banco, antes de ir). */
 function validarMeta(e: EntradaMeta, c: { total_semanas: number; dias_curso: number[] }): string | null {
@@ -348,12 +315,6 @@ export async function criarMetasEmLote(
   return { ok: true, criadas: linhas.length }
 }
 
-export type OpcoesRepetir = {
-  /** Quanto somar à aula a cada semana repetida. 0 mantém a aula igual. */
-  incrementoAula: number
-  /** Semanas que já têm metas: substituir o conteúdo ou deixar como está. */
-  substituir: boolean
-}
 
 /**
  * Repete as metas de UMA semana para um intervalo de semanas.
@@ -548,12 +509,6 @@ export async function excluirMeta(cronogramaId: string, metaId: string): Promise
 // ─────────────────────────────────────────────────────────────────────────────
 // Compor a partir do Banco de Conteúdos (cópia/snapshot).
 
-export type ComposicaoBanco = {
-  conjuntoIds: string[]
-  semanaInicial: number
-  diaInicial: number
-  estrategia: 'sequencial' | 'mesmo_dia'
-}
 
 /**
  * Copia as aulas dos conjuntos escolhidos para metas do cronograma (snapshot: editar o banco
@@ -812,10 +767,6 @@ function normalizar(e: EntradaMeta) {
 // O pacote é o caminho pelo qual o aluno recebe o cronograma. Poder ver e mexer nisso
 // daqui evita a ida e volta até a tela de pacotes só para conferir "quem recebe este".
 
-export type PacotesDoCronograma = {
-  dentro: { id: string; nome: string; alcance: number }[]
-  fora: { id: string; nome: string; alcance: number }[]
-}
 
 export async function pacotesDoCronograma(cronogramaId: string): Promise<{ ok: boolean; dados?: PacotesDoCronograma; error?: string }> {
   const g = await guard('cronogramas:view')

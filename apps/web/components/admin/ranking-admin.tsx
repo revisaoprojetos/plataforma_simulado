@@ -11,7 +11,7 @@ import { AvatarEstudante } from '@/components/aluno/avatar-estudante'
 import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { DetalheAlunoModal } from '@/components/aluno/leitura-ranking'
 import type { RankingLeitura, RankingLeituraItem, RankingStatus } from '@/lib/leitura/ranking'
-import type { DetalheRankingAluno } from '@/app/admin/leitura/actions'
+import type { DetalheRankingAluno } from '@/app/admin/leitura/actions-tipos'
 import { obterRankingModulo, carregarRankingOcultos, salvarRankingOcultos } from '@/app/admin/leitura/actions'
 import { baixarTabelaCsv, baixarTabelaExcel, baixarTabelaWord, baixarTabelaPdf } from '@/lib/relatorios/exportar-tabela'
 

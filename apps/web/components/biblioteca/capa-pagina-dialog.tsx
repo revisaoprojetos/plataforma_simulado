@@ -5,7 +5,8 @@ import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
 import { Image as ImageIcon, X, Loader2, Save, Layers, FileText, BookOpenCheck, Info, Trash2 } from 'lucide-react'
 import { CampoImagem } from '@/components/admin/campo-imagem'
-import { obterCapaPagina, salvarCapaPagina, type AlvoCP, type EstadoCP } from '@/app/admin/biblioteca/capa-actions'
+import type { AlvoCP, EstadoCP } from '@/app/admin/biblioteca/capa-actions-tipos'
+import {obterCapaPagina, salvarCapaPagina} from '@/app/admin/biblioteca/capa-actions'
 import type { ModoCP } from '@/lib/conteudo/capa-pagina'
 
 // Módulo-level: definido DENTRO do diálogo remontaria a cada tecla (input perderia o foco).

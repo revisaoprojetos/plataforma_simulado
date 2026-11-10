@@ -1,4 +1,5 @@
 'use server'
+import type { RefClass, ClassificacaoPadrao } from './actions-tipos'
 
 // Ações LOCAIS do Banco de Questões no Estúdio (por fora). O CRUD de banco/questão/import é
 // REUSADO de app/admin/banco-questoes/actions.ts e app/admin/questoes/actions.ts — aqui só mora a
@@ -11,14 +12,6 @@ import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
-
-export type RefClass = { id: string; nome: string } | null
-export type ClassificacaoPadrao = {
-  disciplina: RefClass
-  assunto: RefClass
-  banca: RefClass
-  orgao: RefClass
-}
 
 const VAZIA: ClassificacaoPadrao = { disciplina: null, assunto: null, banca: null, orgao: null }
 

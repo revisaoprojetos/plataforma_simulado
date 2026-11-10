@@ -19,14 +19,9 @@ import { Input } from '@/components/ui/input'
 import type { SimuladoOpcao } from '@/components/cronograma/simulado-picker'
 import type { MetaFonte, TipoMetaDef } from '@/lib/cronograma/tipos'
 import { MetasClient } from '../[id]/metas-client'
-import {
-  carregarDetalhe,
-  pacotesDoCronograma,
-  type CronogramaDetalhe,
-  type Diagnostico,
-  type PacotesDoCronograma,
-} from '../[id]/metas-actions'
-import type { CronogramaLista } from '../actions'
+import type { CronogramaDetalhe, Diagnostico, PacotesDoCronograma } from '../[id]/metas-actions-tipos'
+import { carregarDetalhe, pacotesDoCronograma } from '../[id]/metas-actions'
+import type { CronogramaLista } from '../actions-tipos'
 
 const normalizar = (s: string) =>
   s

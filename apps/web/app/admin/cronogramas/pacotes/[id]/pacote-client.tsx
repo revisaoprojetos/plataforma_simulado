@@ -17,16 +17,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { alternarLiberacao, alternarLiberacaoEmLote } from '../../actions'
-import {
-  adicionarEstudantesPorEmails,
-  alternarCronogramaNoPacote,
-  alternarEstudanteNoPacote,
-  buscarEstudantes,
-  desvincularGrupo,
-  previaDesvincularGrupo,
-  vincularGrupo,
-  type PacoteDetalhe,
-} from '../actions'
+import type { PacoteDetalhe } from '../actions-tipos'
+import { adicionarEstudantesPorEmails, alternarCronogramaNoPacote, alternarEstudanteNoPacote, buscarEstudantes, desvincularGrupo, previaDesvincularGrupo, vincularGrupo } from '../actions'
 
 const normalizar = (s: string) =>
   s

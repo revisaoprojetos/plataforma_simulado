@@ -5,7 +5,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { Users2, User, X, Package, SlidersHorizontal, Loader2, UserPlus } from 'lucide-react'
-import type { GestaoBase, OrigemAcesso } from '@/app/admin/biblioteca/gestao-actions'
+import type { GestaoBase, OrigemAcesso } from '@/app/admin/biblioteca/gestao-actions-tipos'
 import { removerOrigemAcesso } from '@/app/admin/biblioteca/gestao-actions'
 import type { GestaoTipo } from '@/lib/biblioteca/gestao-tipos'
 import { PermissaoQuadros } from '@/components/biblioteca/permissao-quadros'

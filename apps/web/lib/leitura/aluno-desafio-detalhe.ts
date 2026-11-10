@@ -1,6 +1,6 @@
 import 'server-only'
 import { createAdminClient } from '@/lib/supabase/server'
-import { fetchAllByIn } from '@/lib/supabase/fetch-all'
+import { fetchAll, fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { getGamConfig } from '@/lib/gamificacao'
 import { calcularSequencia } from '@/lib/leitura/sequencia'
 
@@ -80,7 +80,9 @@ export async function carregarDesafioDetalheAluno(tenantId: string, estudanteId:
     fetchAllByIn<{ documento_id: string; questao_id: string; correta: boolean; respondido_em: string | null }>(aulaIds, (chunk) =>
       svc.from('simulado_leitura_respostas').select('documento_id, questao_id, correta, respondido_em').eq('tenant_id', tenantId).eq('estudante_id', estudanteId).in('documento_id', chunk).order('id')).catch(() => []),
     svc.from('simulado_leitura_progresso').select('documento_id, concluido_em, tempo_seg').eq('tenant_id', tenantId).eq('estudante_id', estudanteId).in('documento_id', aulaIds).then((r) => r.data ?? [], () => []),
-    svc.from('simulado_xp_eventos').select('ref_id, meta, xp, criado_em, origem').eq('tenant_id', tenantId).eq('estudante_id', estudanteId).eq('origem', 'leitura').order('criado_em', { ascending: false }).limit(500).then((r) => r.data ?? [], () => []),
+    // Paginado (sem teto de 500): o teto antigo cortava os dias de conclusão mais antigos → sequência/dias
+    // "voltavam" para quem tem muito histórico (ledger é a fonte imutável dos dias).
+    fetchAll<any>(() => svc.from('simulado_xp_eventos').select('ref_id, meta, xp, criado_em, origem').eq('tenant_id', tenantId).eq('estudante_id', estudanteId).eq('origem', 'leitura').order('criado_em', { ascending: false }).order('id', { ascending: true }) as any, 1000, 'desafio_detalhe_xp').catch(() => [] as any[]),
   ])
 
   let overrides: Record<string, boolean> | undefined

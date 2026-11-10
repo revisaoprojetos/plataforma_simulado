@@ -1,4 +1,5 @@
 'use server'
+import type { SemanaLegproc } from './actions-tipos'
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -18,7 +19,6 @@ async function acesso(acao: 'view' | 'update') {
   return { tenantId: a.tenantId, userId: a.userId ?? null }
 }
 
-export type SemanaLegproc = { semana: number; blocos: string[] }
 
 export async function listarLegproc(): Promise<{ ok: boolean; semanas?: SemanaLegproc[]; error?: string }> {
   const g = await acesso('view'); if (!g) return { ok: false, error: 'Sem permissão.' }

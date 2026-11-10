@@ -8,7 +8,7 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { NovoAdministradorForm } from '@/components/admin/novo-administrador-form'
 import { AdministradoresLista } from '@/components/admin/administradores-lista'
-import type { AdminMembro, CargoOpcao } from '@/app/admin/administradores/actions'
+import type { AdminMembro, CargoOpcao } from '@/app/admin/administradores/actions-tipos'
 
 /** Aba "Acessos" da plataforma (console super): toolbar com "Adicionar administrador" (modal)
  *  e "Configurar RBAC" (página da matriz de permissões), + a lista da equipe. */

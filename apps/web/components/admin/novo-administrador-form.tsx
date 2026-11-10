@@ -10,7 +10,8 @@ import {
 } from '@/components/ui/select'
 import { UserPlus, Loader2, Copy, Check } from 'lucide-react'
 import { toast } from 'sonner'
-import { criarAdministradorAction, type CargoOpcao } from '@/app/admin/administradores/actions'
+import type { CargoOpcao } from '@/app/admin/administradores/actions-tipos'
+import {criarAdministradorAction} from '@/app/admin/administradores/actions'
 import { rotuloCargo } from '@/lib/rbac-cargos'
 
 export function NovoAdministradorForm({ cargos, tenantId, onSuccess }: { cargos: CargoOpcao[]; tenantId?: string; onSuccess?: () => void }) {

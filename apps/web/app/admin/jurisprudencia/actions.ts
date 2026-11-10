@@ -1,4 +1,5 @@
 'use server'
+import type { DesafioListagem, DiaEstado } from './actions-tipos'
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -15,7 +16,7 @@ import { diasAtivosPorAluno } from '@/lib/jurisprudencia/sequencia'
 import { calcularSequencia } from '@/lib/leitura/sequencia'
 import type { RankingLeituraItem } from '@/lib/leitura/ranking'
 import type { RelatorioModulo } from '@/lib/leitura/relatorio'
-import type { DetalheRankingAluno, DetalheAulaRanking } from '@/app/admin/leitura/actions'
+import type { DetalheRankingAluno, DetalheAulaRanking } from '@/app/admin/leitura/actions-tipos'
 
 /**
  * Admin do Desafio de Jurisprudência (JurisClub). O desafio é uma PASTA
@@ -176,8 +177,6 @@ async function salvarMerge(
   return { ok: true }
 }
 
-export interface DesafioListagem { id: string; nome: string; imagens: Record<string, any> }
-
 /** Lista os desafios (pastas jurisprudencia) do tenant. */
 export async function listarDesafios(): Promise<DesafioListagem[]> {
   const g = await guard('leitura:view'); if (!g.ok) return []
@@ -255,7 +254,6 @@ export async function salvarMateriasDesafio(id: string, materias: any[], final: 
 }
 
 // Estados de publicação de um dia (espelha o modelo da Leitura/Lei Seca).
-export type DiaEstado = 'publicada' | 'visualizavel' | 'rascunho'
 type DiaPub = { estado?: DiaEstado; publicarEm?: string | null }
 // `documento_id` liga o dia ao documento de LEITURA (simulado_documentos) que complementa o quiz do arcade.
 type DiaJogo = { titulo?: string; teses?: any[]; materia?: string | null; ordem?: number; pub?: DiaPub; documento_id?: string | null }

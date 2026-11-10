@@ -6,7 +6,8 @@ import { Globe, Lock, Loader2, Users2, X } from 'lucide-react'
 import { AdicionarGrupoModuloDialog } from '@/components/admin/adicionar-grupo-modulo-dialog'
 import { AdicionarEstudantesDialog, type AlunoSel } from '@/components/admin/adicionar-estudantes-dialog'
 import { AvatarEstudante } from '@/components/aluno/avatar-estudante'
-import { carregarAtribuicaoDoc, definirGruposDoc, definirEstudantesDoc, type EstudanteAcessoLinha, type GrupoAtribuido } from '@/app/admin/biblioteca/actions'
+import type { EstudanteAcessoLinha, GrupoAtribuido } from '@/app/admin/biblioteca/actions-tipos'
+import {carregarAtribuicaoDoc, definirGruposDoc, definirEstudantesDoc} from '@/app/admin/biblioteca/actions'
 
 // Acesso de UM documento da Biblioteca: grupos + alunos individuais. SEM nenhum = liberado a todos.
 // Grupos ficam VINCULADOS (conexão viva — novos alunos no grupo passam a ter acesso automaticamente).

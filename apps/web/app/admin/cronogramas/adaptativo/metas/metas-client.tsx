@@ -6,7 +6,8 @@ import { toast } from 'sonner'
 import { Loader2, RotateCcw, Plus, X, Zap, Save } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { ParamsAdaptativo } from '@/lib/cronograma/adaptativo/params'
-import { salvarPainelMetas, type PainelMetas } from '../actions'
+import type { PainelMetas } from '../actions-tipos'
+import {salvarPainelMetas} from '../actions'
 
 type NumKey = { [K in keyof ParamsAdaptativo]: ParamsAdaptativo[K] extends number ? K : never }[keyof ParamsAdaptativo]
 type SetFn = <K extends keyof ParamsAdaptativo>(k: K, v: ParamsAdaptativo[K]) => void

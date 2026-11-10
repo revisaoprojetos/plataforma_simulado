@@ -4,7 +4,7 @@ import { Fragment } from 'react'
 import { Printer, ArrowLeft } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { MarkdownContent } from '@/components/markdown-content'
-import type { QuestaoCaderno } from '@/app/aluno/(portal)/simulados/runner-actions'
+import type { QuestaoCaderno } from '@/app/aluno/(portal)/simulados/runner-actions-tipos'
 
 const LETRA = ['A', 'B', 'C', 'D', 'E', 'F']
 

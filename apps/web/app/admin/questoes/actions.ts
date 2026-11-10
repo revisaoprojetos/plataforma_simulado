@@ -1,4 +1,5 @@
 'use server'
+import type { UsoQuestao } from './actions-tipos'
 
 import { resolverTaxonomiaPorNome } from '@/lib/taxonomia/resolver-nome'
 import { createHash } from 'crypto'
@@ -392,7 +393,6 @@ export async function updateQuestaoAction(id: string, data: QuestaoData) {
   return { ok: true as const }
 }
 
-export interface UsoQuestao { id: string; codigo: string | null; enunciado: string; bancos: string[]; simulados: string[]; respostas: number }
 
 /**
  * Salvaguarda de exclusão: dentre as questões informadas, retorna SÓ as que estão EM USO — em algum

@@ -12,6 +12,16 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.11.0 — 2026-11-10
+
+### Vídeo próprio (gerenciador de vídeo — integração, desligada até configurar)
+- **Serviço de vídeo** (`services/video`: API NestJS + worker FFmpeg, HLS AES-128 de 240p a 1080p, token de playback de 5 min, limite de telas, progresso por heartbeat) com stack Swarm própria (`docker-compose.video.portainer.yml`) e workflow de imagens (`docker-publish-video.yml`). Documentação em `docs/video/` (runbook, plano, contrato web, segurança, piloto/rollback).
+- **Plataforma:** `lib/video/*` + rotas `/api/aluno/video/*` e `/api/admin/video/*`; player do aluno (`/aluno/video/[aulaId]`, hls.js) e aba **Estúdio › Vídeos** (envio multipart, status, analytics); permissões `video:view`/`video:manage`; seletor de vídeo próprio no `FilePicker`; provedor `proprio` na Biblioteca/currículo.
+- **Liberação:** sincronização de matrícula ao reconciliar (`engine.ts`) e cron `video-sync` no worker (2 min). **Sem efeito** até existir uma linha ativa em `video_empresas` e as variáveis `VIDEO_*` no web.
+- **Migração:** `20261110010000_video_proprio.sql` (4 tabelas com RLS por tenant).
+
+---
+
 ## 4.10.0 — 2026-11-10
 
 ### Leitor do aluno — novo visual e videoaula

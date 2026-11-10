@@ -6,7 +6,8 @@ import { toast } from 'sonner'
 import { Search, X, Check, RefreshCw, Trash2, Play, Loader2, Clock, Users, Power } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { criarRegraSync, toggleRegraSync, excluirRegraSync, rodarRegraSyncAgora, type GrupoCurseducaDTO, type GrupoSistema, type RegraSyncDTO } from '@/app/admin/curseduca/actions'
+import type { GrupoCurseducaDTO, GrupoSistema, RegraSyncDTO } from '@/app/admin/curseduca/actions-tipos'
+import {criarRegraSync, toggleRegraSync, excluirRegraSync, rodarRegraSyncAgora} from '@/app/admin/curseduca/actions'
 
 const INTERVALOS: [number, string][] = [[15, '15 min'], [30, '30 min'], [60, '1 hora'], [120, '2 horas'], [240, '4 horas']]
 const intervaloLabel = (m: number) => INTERVALOS.find(([v]) => v === m)?.[1] ?? `${m} min`

@@ -1,4 +1,5 @@
 'use server'
+import type { FuncaoEtiqueta, Etiqueta, SimuladoDaQuestao, QuestaoDaEtiqueta } from './actions-tipos'
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -6,8 +7,6 @@ import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 
-export type FuncaoEtiqueta = 'anular' | 'avisar' | 'desconsiderar'
-export type Etiqueta = { id: string; nome: string; cor: string | null; funcao?: FuncaoEtiqueta | null; total?: number }
 
 const FUNC = (v: unknown): FuncaoEtiqueta | null => (v === 'anular' || v === 'avisar' || v === 'desconsiderar' ? v : null)
 
@@ -154,8 +153,6 @@ export async function etiquetasDaQuestao(questaoId: string): Promise<{ ok: boole
   }
 }
 
-export type SimuladoDaQuestao = { id: string; titulo: string; numero: number; publicado: boolean }
-export type QuestaoDaEtiqueta = { id: string; titulo: string; disciplina: string | null; simulados: SimuladoDaQuestao[] }
 
 /** Questões que têm a etiqueta + em QUAIS simulados cada uma está (com o número/posição dela). */
 export async function questoesDaEtiqueta(etiquetaId: string): Promise<{ ok: boolean; itens?: QuestaoDaEtiqueta[]; error?: string }> {

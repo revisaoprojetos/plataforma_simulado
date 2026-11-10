@@ -1,4 +1,5 @@
 'use server'
+import type { AlunoBusca, DetalhesVinc, GrupoBancoOpc } from './estudantes-actions-tipos'
 
 import { createHash } from 'crypto'
 import { revalidatePath } from 'next/cache'
@@ -480,8 +481,6 @@ export async function removerMaterialPdf(cadernoId: string, bancoId: string, slo
 
 // ── Buscas SOB DEMANDA (evitam carregar TODOS os alunos/filiações no 1º render da aba) ──────────
 
-export interface AlunoBusca { id: string; nome: string; email: string | null; telefone: string | null; classificacao: string | null; jaVinculado: boolean }
-
 /**
  * Busca estudantes da plataforma por nome/e-mail (máx. 50) para o diálogo "Adicionar estudantes".
  * ANTES a aba carregava TODOS (>11 mil) só para preencher esse picker → aba lentíssima. Agora a
@@ -509,8 +508,6 @@ export async function buscarEstudantesPlataforma(bancoId: string, query: string)
   }
   return { ok: true, estudantes: (data ?? []).map((r: any) => ({ id: r.id, nome: r.nome, email: r.email ?? null, telefone: r.telefone ?? null, classificacao: r.classificacao ?? null, jaVinculado: vinc.has(r.id) })) }
 }
-
-export interface DetalhesVinc { ultimo: Record<string, string>; grupos: Record<string, { id: string; nome: string; cor: string | null }[]> }
 
 /**
  * Detalhes SÓ dos estudantes da PÁGINA visível (último acesso + grupos pelos quais chegaram ao banco).
@@ -549,8 +546,6 @@ export async function detalhesVinculadosBanco(bancoId: string, ids: string[]): P
   }
   return { ok: true, ultimo, grupos }
 }
-
-export interface GrupoBancoOpc { id: string; nome: string; cor: string | null; membros: number; vinculado: boolean; pai_id: string | null; is_mestre: boolean }
 
 /**
  * Carrega os grupos do tenant (com contagem de membros e vínculo ao banco) para o diálogo

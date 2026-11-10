@@ -10,7 +10,8 @@ import { SeletorQuestoes } from '@/components/aluno/seletor-questoes'
 import { SeletorTempo, formatarTempo } from '@/components/aluno/seletor-tempo'
 import { VisualPersonalizadoPicker } from '@/components/aluno/visual-personalizado-picker'
 import { COR_PADRAO, ICONE_PADRAO } from '@/lib/personalizado-visual'
-import { criarMeuSimuladoCompleto, type QuestaoDisponivel } from '@/app/aluno/(portal)/simulados/builder-actions'
+import type { QuestaoDisponivel } from '@/app/aluno/(portal)/simulados/builder-actions-tipos'
+import {criarMeuSimuladoCompleto} from '@/app/aluno/(portal)/simulados/builder-actions'
 
 type Modo = 'estudo' | 'prova' | 'revisao'
 const TIPOS: { id: Modo; nome: string; desc: string; Icon: typeof GraduationCap }[] = [

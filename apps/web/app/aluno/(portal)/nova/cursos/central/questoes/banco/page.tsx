@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { fetchAll } from '@/lib/supabase/fetch-all'
+import { provasPorQuestao } from '@/lib/aluno/provas-questao'
 import { questoesForaDeJogoTenant } from '@/lib/simulado/questoes-anuladas'
 import {
   PageHeader, Card, Grid, Row, Col, H2, Muted, P, Tag, Btn, IBtn, Seg,
@@ -111,12 +112,14 @@ export default async function BancoPage({ searchParams }: PageProps) {
   const assuntoIds = questoes.map((x) => x.assunto_id).filter(Boolean)
   const abertaId = questoes[0]?.id as string | undefined
 
-  const [{ data: discNomes }, { data: bancaNomes }, { data: assuntoNomes }, { data: alts }, { data: respRows }] = await Promise.all([
+  const [{ data: discNomes }, { data: bancaNomes }, { data: assuntoNomes }, { data: alts }, { data: respRows }, provasMap] = await Promise.all([
     discIds.length ? svc.from('simulado_disciplinas').select('id, nome').in('id', discIds) : Promise.resolve({ data: [] as any[] }),
     bancaIds.length ? svc.from('simulado_bancas').select('id, nome').in('id', bancaIds) : Promise.resolve({ data: [] as any[] }),
     assuntoIds.length ? svc.from('simulado_assuntos').select('id, nome').in('id', assuntoIds) : Promise.resolve({ data: [] as any[] }),
     abertaId ? svc.from('simulado_alternativas').select('id, texto, ordem').eq('questao_id', abertaId).order('ordem', { ascending: true }) : Promise.resolve({ data: [] as any[] }),
     ids.length ? svc.from('simulado_respostas_avulsas').select('questao_id, correta, respondido_em').eq('estudante_id', estId).in('questao_id', ids) : Promise.resolve({ data: [] as any[] }),
+    // Prova/simulado de origem de cada questão da página (mesmo loader do card de /aluno/questoes).
+    provasPorQuestao(svc, tid, ids),
   ])
 
   const discMap = new Map((discNomes ?? []).map((d: any) => [d.id, d.nome]))
@@ -137,8 +140,9 @@ export default async function BancoPage({ searchParams }: PageProps) {
   }
   const fonteDe = (q: any): string => {
     const banca = bancaMap.get(q.banca_id)
-    if (banca && q.ano) return `${banca} (${q.ano})`
-    return banca ?? (q.ano ? String(q.ano) : '—')
+    const base = banca && q.ano ? `${banca} (${q.ano})` : (banca ?? (q.ano ? String(q.ano) : '—'))
+    const p = provasMap.get(q.id)?.[0]
+    return p ? `${base} · ${p.titulo}${p.numero ? ` — questão ${p.numero}` : ''}` : base
   }
   const codDe = (q: any): string => q.codigo ?? (q.numero != null ? `Q${q.numero}` : q.id.slice(0, 6))
 

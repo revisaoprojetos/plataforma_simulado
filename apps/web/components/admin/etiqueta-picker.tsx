@@ -7,7 +7,8 @@ import { Tag, Plus, X, Loader2, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAbreFecha } from '@/lib/use-abre-fecha'
 import { Button } from '@/components/ui/button'
-import { aplicarEtiqueta, removerEtiquetaDaQuestao, type Etiqueta } from '@/app/admin/etiquetas/actions'
+import type { Etiqueta } from '@/app/admin/etiquetas/actions-tipos'
+import {aplicarEtiqueta, removerEtiquetaDaQuestao} from '@/app/admin/etiquetas/actions'
 
 /**
  * Seletor de etiquetas de UMA questão (usado no editor). Abre um pop-up de seleção múltipla

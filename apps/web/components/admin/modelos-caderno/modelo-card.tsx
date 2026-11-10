@@ -12,7 +12,8 @@ import { confirmar } from '@/components/ui/confirm-dialog'
 import { PreviaBlocos } from '@/lib/caderno-teste/previa-blocos'
 import { Previa } from '@/lib/caderno-teste/previa'
 import { presetDoModelo, metaDaModalidade } from '@/lib/caderno-teste/tipos'
-import { duplicarModelo, renomearModelo, excluirModelo, type ModeloRow } from '@/app/admin/modelos-caderno/actions'
+import type { ModeloRow } from '@/app/admin/modelos-caderno/actions-tipos'
+import {duplicarModelo, renomearModelo, excluirModelo} from '@/app/admin/modelos-caderno/actions'
 
 const SEM_QUESTOES: never[] = [] // referência estável (evita re-render em loop no PreviaBlocos)
 

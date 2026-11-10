@@ -6,7 +6,8 @@ import { Search, Users, Loader2, DownloadCloud, Check, CheckCircle2, FolderPlus,
 import { cn } from '@/lib/utils'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { contarMembrosGrupos, contarTodosGrupos, importarGruposCurseduca, importarCurseducaPorCanal, agendarImportacaoCurseduca, statusImportacaoCurseduca, previewMembrosGrupo, listarGruposSistema, type GrupoCurseducaDTO, type GrupoSistema, type MembroPreview } from '@/app/admin/curseduca/actions'
+import type { GrupoCurseducaDTO, GrupoSistema, MembroPreview } from '@/app/admin/curseduca/actions-tipos'
+import {contarMembrosGrupos, contarTodosGrupos, importarGruposCurseduca, importarCurseducaPorCanal, agendarImportacaoCurseduca, statusImportacaoCurseduca, previewMembrosGrupo, listarGruposSistema} from '@/app/admin/curseduca/actions'
 import { criarGrupo, criarGrupoMestre } from '@/app/admin/grupos/actions'
 import type { ResultadoImportCurseduca } from '@/lib/curseduca/tipos'
 

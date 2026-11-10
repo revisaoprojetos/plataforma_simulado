@@ -1,15 +1,9 @@
 'use server'
+import type { ResultadoBuscaTrilha } from './busca-actions-tipos'
 
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { createAdminClient } from '@/lib/supabase/server'
 import { documentosDoAluno } from '@/lib/leitura/acesso'
-
-export interface ResultadoBuscaTrilha {
-  docId: string
-  titulo: string
-  ocorrencias: number
-  trecho: string
-}
 
 // Normaliza p/ busca: minúsculo + sem acentos (case/acento-insensível).
 const norm = (s: string) => (s ?? '').normalize('NFD').replace(/\p{Diacritic}/gu, '').toLowerCase()

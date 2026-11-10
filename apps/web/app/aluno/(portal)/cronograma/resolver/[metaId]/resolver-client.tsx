@@ -6,7 +6,7 @@ import { ArrowLeft, Check, X } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { MarkdownContent } from '@/components/markdown-content'
-import type { QuestaoResolver } from '../../resolver-actions'
+import type { QuestaoResolver } from '../../resolver-actions-tipos'
 
 const LETRA = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
 

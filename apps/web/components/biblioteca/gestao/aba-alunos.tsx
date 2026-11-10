@@ -5,7 +5,7 @@
 
 import { useMemo, useState } from 'react'
 import { ChevronDown, ChevronUp, ChevronsUpDown, Search, FileDown, BellRing, Loader2, Monitor } from 'lucide-react'
-import type { AlunoAcesso, EventoRegistro, GestaoBase } from '@/app/admin/biblioteca/gestao-actions'
+import type { AlunoAcesso, EventoRegistro, GestaoBase } from '@/app/admin/biblioteca/gestao-actions-tipos'
 import { carregarRegistroAluno } from '@/app/admin/biblioteca/gestao-actions'
 import type { GestaoTipo } from '@/lib/biblioteca/gestao-tipos'
 import { Chip } from '@/components/biblioteca/pilulas'

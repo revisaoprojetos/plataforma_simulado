@@ -30,26 +30,10 @@ import { SimuladoPicker, type SimuladoOpcao } from '@/components/cronograma/simu
 import { alternarCronogramaNoPacote } from '../pacotes/actions'
 import type { MetaFonte, TipoMeta, TipoMetaDef } from '@/lib/cronograma/tipos'
 import { faixaSemanal } from '@/lib/cronograma/faixa'
-import {
-  atualizarMeta,
-  carregarDetalhe,
-  comporDoBanco,
-  criarDisciplina,
-  criarMeta,
-  excluirMeta,
-  type PacotesDoCronograma,
-  type CronogramaDetalhe,
-  type Diagnostico,
-  type EntradaMeta,
-} from './metas-actions'
-import {
-  atualizarBancoConteudo,
-  bancoAulasDaChave,
-  contarPropagacao,
-  propagarConteudoAula,
-  type BancoAulaRef,
-  type PropagacaoAlvo,
-} from '../conteudos/actions'
+import type { PacotesDoCronograma, CronogramaDetalhe, Diagnostico, EntradaMeta } from './metas-actions-tipos'
+import { atualizarMeta, carregarDetalhe, comporDoBanco, criarDisciplina, criarMeta, excluirMeta } from './metas-actions'
+import type { BancoAulaRef, PropagacaoAlvo } from '../conteudos/actions-tipos'
+import { atualizarBancoConteudo, bancoAulasDaChave, contarPropagacao, propagarConteudoAula } from '../conteudos/actions'
 
 const novaMeta = (semana: number, tipo: string): EntradaMeta => ({
   semana,

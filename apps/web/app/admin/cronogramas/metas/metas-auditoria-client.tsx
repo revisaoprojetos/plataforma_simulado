@@ -26,15 +26,8 @@ import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import {
-  buscarGrupos,
-  excluirMetaAvulsa,
-  padronizarDuracao,
-  padronizarFormatoDisciplina,
-  type DuracaoDivergente,
-  type GrupoMeta,
-  type VarianteAula,
-} from './actions'
+import type { DuracaoDivergente, GrupoMeta, VarianteAula } from './actions-tipos'
+import { buscarGrupos, excluirMetaAvulsa, padronizarDuracao, padronizarFormatoDisciplina } from './actions'
 
 const POR_PAGINA = 25
 

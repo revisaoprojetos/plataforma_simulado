@@ -10,7 +10,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { buscarConjuntosParaCompor, type ConjuntoParaCompor } from '@/app/admin/cronogramas/conteudos/actions'
+import type { ConjuntoParaCompor } from '@/app/admin/cronogramas/conteudos/actions-tipos'
+import {buscarConjuntosParaCompor} from '@/app/admin/cronogramas/conteudos/actions'
 import { listarDisciplinasFiltro } from '@/app/admin/banco-questoes/actions'
 
 /**

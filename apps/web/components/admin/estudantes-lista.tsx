@@ -8,7 +8,8 @@ import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
 import { ExcluirEstudanteButton } from '@/components/admin/excluir-estudante-button'
 import { ExportButton } from '@/components/admin/export-button'
 import type { ColunaExport } from '@/lib/exportar'
-import { carregarLoteEstudantes, buscarEstudantes, exportarTodosEstudantes, type EstudanteBase, type SortEstudante, type FiltroEstudante } from '@/app/admin/estudantes/actions'
+import type { EstudanteBase, SortEstudante, FiltroEstudante } from '@/app/admin/estudantes/actions-tipos'
+import {carregarLoteEstudantes, buscarEstudantes, exportarTodosEstudantes} from '@/app/admin/estudantes/actions'
 import { AvatarEstudante } from '@/components/aluno/avatar-estudante'
 
 export type EstudanteRow = EstudanteBase

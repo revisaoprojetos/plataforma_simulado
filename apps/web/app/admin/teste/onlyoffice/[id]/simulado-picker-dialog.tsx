@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Search, Folder, ChevronRight, ChevronLeft, Loader2, X, FileText } from 'lucide-react'
 import { CapaCard } from '@/components/aluno/capa-card'
-import type { PickerPasta, PickerSim } from './previa-actions'
+import type { PickerPasta, PickerSim } from './previa-actions-tipos'
 
 const STATUS: Record<string, { label: string; cls: string }> = {
   publicado: { label: 'Publicado', cls: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' },

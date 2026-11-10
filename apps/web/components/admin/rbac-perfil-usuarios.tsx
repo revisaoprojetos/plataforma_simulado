@@ -5,7 +5,8 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Search, UserPlus, UserMinus, Users, Loader2, X, Mail } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { atribuirPerfil, removerDoPerfil, type UsuarioPerfil } from '@/app/admin/rbac/actions'
+import type { UsuarioPerfil } from '@/app/admin/rbac/actions-tipos'
+import {atribuirPerfil, removerDoPerfil} from '@/app/admin/rbac/actions'
 
 function iniciais(nome: string | null, email: string | null) {
   const base = nome || email || '?'

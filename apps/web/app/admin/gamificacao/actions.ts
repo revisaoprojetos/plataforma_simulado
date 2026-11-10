@@ -1,4 +1,5 @@
 'use server'
+import type { GrupoPublicoOpc } from './actions-tipos'
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -11,10 +12,9 @@ import { selecionarGrupos } from '@/lib/simulado/grupos'
 import { grupoContagensSql } from 'data'
 import { DEFAULT_CONFIG, type XpRegras, type NivelCurva, type LigaDef, type MissaoDef, type MissoesConfig, type ConquistaDef, type PublicoModo } from '@/lib/gamificacao/config'
 import { resolverEngajamento, type EngajamentoConfig } from '@/lib/gamificacao/engajamento-tipos'
-import type { EstudanteAcessoLinha } from '@/app/admin/leitura/actions'
+import type { EstudanteAcessoLinha } from '@/app/admin/leitura/actions-tipos'
 
 /** Grupo no seletor do público, com hierarquia (pasta mestre/pai), contagem, origem e se já está vinculado. */
-export type GrupoPublicoOpc = { id: string; nome: string; cor: string | null; atribuido: boolean; is_mestre: boolean; pai_id: string | null; membros: number; origem: 'guru' | 'curseduca' | null }
 
 const SEM_TENANT = '00000000-0000-0000-0000-000000000000'
 

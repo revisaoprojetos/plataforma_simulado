@@ -12,13 +12,8 @@ import { AvatarEstudante } from '@/components/aluno/avatar-estudante'
 import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
 import { AdicionarEstudantesDialog, type AlunoSel } from '@/components/admin/adicionar-estudantes-dialog'
 import { AdicionarGrupoModuloDialog } from '@/components/admin/adicionar-grupo-modulo-dialog'
-import {
-  carregarAtribuicaoPasta, definirGruposPasta, contarMembrosGrupos,
-  carregarControleAcesso, definirEstudantesPasta,
-  carregarRankingOcultos, salvarRankingOcultos,
-  carregarTestadoresExclusivos, salvarTestadoresExclusivos,
-  type EstudanteAcessoLinha, type ControleAcessoLinha,
-} from '@/app/admin/leitura/actions'
+import type { EstudanteAcessoLinha, ControleAcessoLinha } from '@/app/admin/leitura/actions-tipos'
+import { carregarAtribuicaoPasta, definirGruposPasta, contarMembrosGrupos, carregarControleAcesso, definirEstudantesPasta, carregarRankingOcultos, salvarRankingOcultos, carregarTestadoresExclusivos, salvarTestadoresExclusivos } from '@/app/admin/leitura/actions'
 
 type Grupo = { id: string; nome: string; cor: string | null; is_mestre?: boolean; pai_id?: string | null; membros?: number }
 type GrupoVinc = Grupo & { count: number }

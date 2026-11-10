@@ -13,7 +13,8 @@ import {
 import { cn } from '@/lib/utils'
 import { BRT_LABEL } from '@/lib/brt'
 import { useOcultarDiscursiva } from '@/components/auth/can-provider'
-import { buscarEstudantesSimulado, listarEstudanteIdsSimulado, buscarQuestoesWizard, listarQuestoesDoBanco, contarBancosWizard, type QuestaoWizardItem } from '@/app/admin/simulados/actions'
+import type { QuestaoWizardItem } from '@/app/admin/simulados/actions-tipos'
+import {buscarEstudantesSimulado, listarEstudanteIdsSimulado, buscarQuestoesWizard, listarQuestoesDoBanco, contarBancosWizard} from '@/app/admin/simulados/actions'
 import { toast } from 'sonner'
 
 interface Banco { id: string; nome: string; cor?: string | null; icone?: string | null; capa?: string | null; tipo?: string | null; pasta?: string | null; created_at?: string | null; nQuestoes?: number; nEstudantes?: number }

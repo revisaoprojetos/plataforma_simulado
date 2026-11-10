@@ -6,7 +6,8 @@ import { Voltar } from '@/components/admin/relatorios/voltar'
 import { RelatorioEstudanteView, type DadosRelatorioEstudante } from './relatorio-estudante-view'
 import { EstudantesLista, type AgregadoEstudante } from './estudantes-lista'
 import { montarRelatorioEstudante } from './_dados'
-import { carregarLoteEstudantes, type EstudanteBase } from '@/app/admin/estudantes/actions'
+import type { EstudanteBase } from '@/app/admin/estudantes/actions-tipos'
+import {carregarLoteEstudantes} from '@/app/admin/estudantes/actions'
 
 const PRIMEIRA_PAGINA = 30
 

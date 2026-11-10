@@ -11,7 +11,8 @@ import { SeletorQuestoes } from '@/components/aluno/seletor-questoes'
 import { SeletorTempo } from '@/components/aluno/seletor-tempo'
 import { ExcluirPersonalizadoButton } from '@/components/aluno/excluir-personalizado-button'
 import { VisualPersonalizadoPicker } from '@/components/aluno/visual-personalizado-picker'
-import { adicionarQuestoes, removerQuestao, renomearMeuSimulado, salvarLayout, salvarTempoMeuSimulado, salvarVisualMeuSimulado, type QuestaoEscolhida, type Secao } from '@/app/aluno/(portal)/simulados/builder-actions'
+import type { QuestaoEscolhida, Secao } from '@/app/aluno/(portal)/simulados/builder-actions-tipos'
+import {adicionarQuestoes, removerQuestao, renomearMeuSimulado, salvarLayout, salvarTempoMeuSimulado, salvarVisualMeuSimulado} from '@/app/aluno/(portal)/simulados/builder-actions'
 
 const uid = () => (globalThis.crypto?.randomUUID?.() ?? `s_${Math.random().toString(36).slice(2)}_${Date.now()}`)
 const ORFA = '__sem_secao__' // chave do grupo "Sem seção"

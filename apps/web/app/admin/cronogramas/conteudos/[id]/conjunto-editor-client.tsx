@@ -15,21 +15,8 @@ import { AdicionarQuestoesDialog } from '@/components/admin/adicionar-questoes-d
 import { DisciplinaPicker } from '@/components/cronograma/disciplina-picker'
 import type { TipoMetaDef } from '@/lib/cronograma/tipos'
 import { criarDisciplina } from '../../[id]/metas-actions'
-import {
-  anexarQuestoes,
-  atualizarAula,
-  atualizarConjunto,
-  contarPropagacao,
-  criarAula,
-  excluirAula,
-  propagarConteudoAula,
-  removerQuestao,
-  salvarPdfAula,
-  salvarUrlsAula,
-  type AulaBanco,
-  type ConjuntoDetalhe,
-  type PropagacaoAlvo,
-} from '../actions'
+import type { AulaBanco, ConjuntoDetalhe, PropagacaoAlvo } from '../actions-tipos'
+import { anexarQuestoes, atualizarAula, atualizarConjunto, contarPropagacao, criarAula, excluirAula, propagarConteudoAula, removerQuestao, salvarPdfAula, salvarUrlsAula } from '../actions'
 
 // Rascunho editável de uma aula: tudo que o botão "Salvar" único do topo persiste de uma vez.
 // `urls` = links de questões por plataforma (QC/TEC), SEM o PDF/Vídeo (que têm campo próprio).

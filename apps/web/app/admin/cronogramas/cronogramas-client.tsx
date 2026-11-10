@@ -26,19 +26,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {
-  alternarLiberacao,
-  alternarLiberacaoEmLote,
-  atualizarCategoria,
-  atualizarCronograma,
-  criarCategoria,
-  criarCronograma,
-  excluirCategoria,
-  excluirCronograma,
-  type CategoriaRow,
-  type CronogramaLista,
-  type EntradaCronograma,
-} from './actions'
+import type { CategoriaRow, CronogramaLista, EntradaCronograma } from './actions-tipos'
+import { alternarLiberacao, alternarLiberacaoEmLote, atualizarCategoria, atualizarCronograma, criarCategoria, criarCronograma, excluirCategoria, excluirCronograma } from './actions'
 
 // Feedback de interação padrão do catálogo. O `Button` base já tem `active:scale-[0.97]`
 // (press) + transição; aqui reforçamos o HOVER com um "pop" (escala) + fundo tintado da marca,

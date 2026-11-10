@@ -1,0 +1,19 @@
+node_modules/
+dist/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+.DS_Store
+.vscode/
+.idea/
+# volumes e mídia local
+.data/
+*.mp4
+*.mkv
+*.mov
+!apps/**/fixtures/*.mp4
+test-results/
+playwright-report/
+!.env.prod.example

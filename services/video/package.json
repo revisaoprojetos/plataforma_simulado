@@ -1,0 +1,49 @@
+{
+  "name": "gerenciador-video",
+  "private": true,
+  "version": "0.0.0",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "lint": "eslint .",
+    "test": "npm run test --workspaces --if-present",
+    "smoke:s3": "npm run smoke:s3 -w apps/api",
+    "db:migrate": "prisma migrate dev --schema prisma/schema.prisma",
+    "db:generate": "prisma generate --schema prisma/schema.prisma",
+    "db:seed": "tsx prisma/seed.ts",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "prepare": "husky",
+    "test:e2e": "npm run test:e2e --workspaces --if-present",
+    "admin:create": "tsx prisma/create-platform-admin.ts"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "@eslint/js": "^9.39.5",
+    "eslint": "^9.39.5",
+    "eslint-config-prettier": "^9.1.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.2",
+    "prettier": "^3.9.10",
+    "prisma": "^5.22.0",
+    "tsx": "^4.19.2",
+    "typescript-eslint": "^8.72.0"
+  },
+  "lint-staged": {
+    "*.{ts,mjs,cjs,js}": [
+      "eslint --fix",
+      "prettier --write"
+    ],
+    "*.{json,yml,yaml}": [
+      "prettier --write"
+    ]
+  }
+}

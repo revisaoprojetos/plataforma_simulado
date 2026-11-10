@@ -6,7 +6,8 @@
 import { useState } from 'react'
 import { Loader2, Plus, Save, FileSearch } from 'lucide-react'
 import { toast } from 'sonner'
-import { salvarSemanaLegproc, medirPaginasBibliotecaAction, type SemanaLegproc } from './actions'
+import type { SemanaLegproc } from './actions-tipos'
+import {salvarSemanaLegproc, medirPaginasBibliotecaAction} from './actions'
 
 export function LeiSecaEditor({ inicial }: { inicial: SemanaLegproc[] }) {
   const [semanas, setSemanas] = useState<SemanaLegproc[]>(inicial.length ? inicial : [{ semana: 1, blocos: [] }])

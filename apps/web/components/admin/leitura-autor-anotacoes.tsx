@@ -5,7 +5,8 @@ import { toast } from 'sonner'
 import { Highlighter, Trash2, StickyNote, X, Crosshair } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { construirEspinha, rangeParaAncora, ancoraParaRange, rectsDoRange, type Espinha, type RectRel } from '@/lib/leitura/anotacoes-engine'
-import { listarAnotacoesBase, criarAnotacaoBase, atualizarAnotacaoBase, excluirAnotacaoBase, type AnotacaoBase } from '@/app/admin/leitura/actions'
+import type { AnotacaoBase } from '@/app/admin/leitura/actions-tipos'
+import {listarAnotacoesBase, criarAnotacaoBase, atualizarAnotacaoBase, excluirAnotacaoBase} from '@/app/admin/leitura/actions'
 import { GRIFOS, GRIFOS_LISTA, corDoGrifo, type TipoGrifo } from '@/lib/leitura/grifos'
 
 const useIso = typeof window !== 'undefined' ? useLayoutEffect : useEffect

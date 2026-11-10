@@ -1,4 +1,5 @@
 'use server'
+import type { EstudanteLinkado, SituacaoAoVivo, ProgressoEstudante, Testador, SessaoLinkada, EstudanteBuscaItem, QuestaoWizardItem } from './actions-tipos'
 
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
@@ -170,17 +171,6 @@ export async function updateSimuladoAction(id: string, data: SimuladoData) {
   return { ok: true }
 }
 
-export interface EstudanteLinkado {
-  id: string
-  nome: string
-  email: string | null
-  cpf: string | null
-  telefone: string | null
-  classificacao: string
-  liberado: boolean
-  situacao: 'finalizou' | 'em_andamento' | 'nao_iniciou'
-  nota: number | null
-}
 
 /**
  * Lista TODOS os estudantes matriculados (linkados) em um simulado, com a situação
@@ -220,16 +210,16 @@ export async function listarEstudantesSimulado(simuladoId: string): Promise<{ ok
   // ── Fallback PostgREST (SQL/API indisponíveis). Em vez de buscar estudantes por lotes de ids
   // (dezenas de idas ao banco quando há milhares de passaportes), varremos os estudantes do tenant
   // paginados (poucas páginas) e cruzamos em memória com as matrículas.
-  const [matriculas, estRows, sessRows] = await Promise.all([
+  const [matriculas, sessRows] = await Promise.all([
     fetchAll<{ estudante_id: string; liberado: boolean }>(() =>
       svc.from('simulado_matriculas').select('estudante_id, liberado').eq('simulado_id', simuladoId).eq('tenant_id', tid).order('estudante_id')),
-    fetchAll<any>(() =>
-      svc.from('simulado_estudantes').select('id, nome, email, cpf, telefone, classificacao').eq('tenant_id', tid).eq('deletado', false).order('id')),
     fetchAll<any>(() =>
       svc.from('simulado_sessoes_prova').select('estudante_id, status, nota').eq('simulado_id', simuladoId).eq('tenant_id', tid).eq('deletado', false).order('estudante_id')),
   ])
   const estIds = [...new Set(matriculas.map((m) => m.estudante_id).filter(Boolean))]
   if (!estIds.length) return { ok: true, estudantes: [] }
+  const estRows = await fetchAllByIn(estIds, (c: string[]) =>
+    svc.from('simulado_estudantes').select('id, nome, email, cpf, telefone, classificacao').eq('tenant_id', tid).eq('deletado', false).in('id', c).order('id'))
 
   const libPorEst = new Map(matriculas.map((m) => [m.estudante_id, m.liberado]))
   const estMap = new Map(estRows.map((e: any) => [e.id, e]))
@@ -318,20 +308,7 @@ export async function removerPassaportesIndevidos(simuladoId: string): Promise<{
   return { ok: true, removidos: remover.length }
 }
 
-export type SituacaoAoVivo = 'fazendo' | 'pausado' | 'finalizou' | 'nao_iniciou'
 
-export interface ProgressoEstudante {
-  id: string
-  nome: string
-  email: string | null
-  respondidas: number  // questões marcadas (acertos + erros)
-  acertos: number
-  erros: number
-  emBranco: number
-  media: number        // aproveitamento 0–100 (acertos / total)
-  situacao: SituacaoAoVivo         // estado ao vivo (fazendo agora / pausado / finalizou / não iniciou)
-  ultimaAtividadeMs: number | null // epoch ms da última atividade (resposta ou início); null se não iniciou
-}
 
 /**
  * Progresso individual dos estudantes num simulado: por aluno, respondidas/acertos/erros/
@@ -558,7 +535,6 @@ export async function garantirBancoSimuladoAction(simuladoId: string): Promise<{
 }
 
 // ───────────────────────── Acesso de teste (testadores) ─────────────────────────
-export interface Testador { id: string; estudante_id: string; nome: string; email: string | null; criado_em: string }
 
 /** Lista os estudantes com "acesso de teste" neste simulado (podem fazer fora da janela; is_teste). */
 export async function listarTestadores(simuladoId: string): Promise<{ ok?: boolean; error?: string; testadores?: Testador[] }> {
@@ -610,15 +586,6 @@ export async function revogarTestador(simuladoId: string, estudanteId: string): 
   return { ok: true }
 }
 
-export interface SessaoLinkada {
-  id: string
-  estudante: string
-  status: string
-  nota: number | null
-  iniciado_em: string | null
-  finalizado_em: string | null
-  is_teste: boolean
-}
 
 /**
  * Lista TODAS as sessões de prova de um simulado, com o nome do estudante. Carregado
@@ -634,12 +601,11 @@ export async function listarSessoesSimulado(simuladoId: string): Promise<{ ok?: 
   if (tenantId && (sim as any).tenant_id && (sim as any).tenant_id !== tenantId) return { error: 'Sem acesso a este simulado.' }
   const tid = tenantId ?? (sim as any).tenant_id
 
-  const [sessRows, estRows] = await Promise.all([
-    fetchAll<any>(() =>
-      svc.from('simulado_sessoes_prova').select('id, estudante_id, status, nota, iniciado_em, finalizado_em, is_teste').eq('simulado_id', simuladoId).eq('tenant_id', tid).eq('deletado', false).order('iniciado_em', { ascending: false })),
-    fetchAll<any>(() =>
-      svc.from('simulado_estudantes').select('id, nome').eq('tenant_id', tid).order('id')),
-  ])
+  const sessRows = await fetchAll<any>(() =>
+    svc.from('simulado_sessoes_prova').select('id, estudante_id, status, nota, iniciado_em, finalizado_em, is_teste').eq('simulado_id', simuladoId).eq('tenant_id', tid).eq('deletado', false).order('iniciado_em', { ascending: false }))
+  const estudanteIds = [...new Set(sessRows.map((s: any) => s.estudante_id).filter(Boolean))]
+  const estRows = await fetchAllByIn(estudanteIds, (c: string[]) =>
+    svc.from('simulado_estudantes').select('id, nome').eq('tenant_id', tid).in('id', c).order('id'))
   const nomeMap = new Map(estRows.map((e: any) => [e.id, e.nome ?? 'Estudante']))
 
   const sessoes: SessaoLinkada[] = sessRows.map((s: any) => ({
@@ -691,7 +657,6 @@ export async function vincularCadernoSimulado(simuladoId: string, cadernoId: str
 
 // ─────────── Busca server-side sob demanda (evita carregar todo o banco/estudantes no load) ───────────
 
-export type EstudanteBuscaItem = { id: string; nome: string; email: string | null; telefone: string | null; cpf: string | null; classificacao: string | null; avatar: string | null; perfil_avatar_cor: string | null }
 
 /** Busca estudantes do tenant (nome/email) para o seletor do wizard, limitada. `total` = quantos casam a busca. */
 export async function buscarEstudantesSimulado(busca: string, limite = 40): Promise<{ ok: boolean; itens?: EstudanteBuscaItem[]; total?: number; error?: string }> {
@@ -772,7 +737,6 @@ export async function listarQuestoesDoBanco(bancoId: string, tipo: string): Prom
   return { ok: true, ids }
 }
 
-export type QuestaoWizardItem = { id: string; enunciado: string; disciplina: string | null; banca: string | null }
 
 /** Busca questões do tenant (do tipo escolhido) para o picker do modo "do zero", limitada. */
 export async function buscarQuestoesWizard(filtros: { busca?: string; tipo?: string; disciplinaId?: string }, limite = 40): Promise<{ ok: boolean; itens?: QuestaoWizardItem[]; error?: string }> {

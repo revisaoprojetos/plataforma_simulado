@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import type { RegraAdmin, ProdutoSeletor } from '@/lib/integracoes/liberacao/dados'
 import type { CriterioValor, InicioConfig, FimConfig, ModoNome } from '@/lib/integracoes/liberacao/tipos'
-import type { SalvarRegraInput } from './actions'
+import type { SalvarRegraInput } from './actions-tipos'
 
 const PROVIDERS_SUGERIDOS = ['guru', 'hotmart', 'kiwify', 'hubla', 'curseduca', 'manual']
 const sel = 'h-9 rounded-lg border bg-background px-2 text-sm'

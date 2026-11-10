@@ -5,7 +5,8 @@ import { toast } from 'sonner'
 import { Loader2, Play, Check, X, Clock, CalendarClock, Plus, ShieldCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { getAutoVinculoPassaporte, salvarAutoVinculoPassaporte, rodarAutoVinculoPassaporteAgora, type AutoVinculoDTO } from '@/app/admin/curseduca/actions'
+import type { AutoVinculoDTO } from '@/app/admin/curseduca/actions-tipos'
+import {getAutoVinculoPassaporte, salvarAutoVinculoPassaporte, rodarAutoVinculoPassaporteAgora} from '@/app/admin/curseduca/actions'
 
 const HORAS = Array.from({ length: 24 }, (_, h) => h)
 const INTERVALOS: [number, string][] = [[720, 'A cada 12 horas'], [1440, '1× por dia (24h)'], [2880, 'A cada 2 dias'], [10080, '1× por semana']]

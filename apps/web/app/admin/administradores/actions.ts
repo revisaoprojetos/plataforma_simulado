@@ -1,4 +1,5 @@
 'use server'
+import type { AdminMembro, CargoOpcao } from './actions-tipos'
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentAccess, accessCan, isSuperAdmin } from '@/lib/auth/permissions'
@@ -6,18 +7,6 @@ import { registrarAudit } from '@/lib/audit'
 import { criptografar, descriptografar } from '@/lib/crypto'
 import { revalidatePath } from 'next/cache'
 
-export interface AdminMembro {
-  userId: string
-  nome: string | null
-  email: string | null
-  cargo: string
-  ativo: boolean
-  criadoEm: string | null
-  ehVoce: boolean
-  /** [console super] plataformas (empresas) a que este admin tem acesso — etiquetas na lista. */
-  plataformas?: { id: string; nome: string }[]
-}
-export interface CargoOpcao { nome: string; descricao: string | null; is_sistema: boolean }
 
 // Cargos que dão acesso TOTAL ao painel (não dependem da matriz de permissões).
 const CARGOS_ACESSO_TOTAL = new Set(['admin', 'super_admin', 'admin_geral'])

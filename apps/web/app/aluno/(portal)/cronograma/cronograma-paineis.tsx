@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { faixaSemanal } from '@/lib/cronograma/faixa'
 import type { CronogramaDoAluno } from '@/lib/cronograma/acesso'
-import type { EmissaoResumo } from './emissoes-actions'
+import type { EmissaoResumo } from './emissoes-actions-tipos'
 
 const POR_PAGINA = 10
 const fmtData = (iso?: string | null) => (iso ? new Date(iso).toLocaleDateString('pt-BR') : '—')

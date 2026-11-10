@@ -11,7 +11,7 @@ import { resolverGrifoCores } from '@/lib/leitura/trilha-aparencia'
 import { resolverBlocos } from '@/lib/leitura/blocos'
 import { normalizarEspacamento } from '@/lib/leitura/espacamento'
 import { resolverTopicos } from '@/lib/leitura/topicos'
-import { type Documento } from '../actions'
+import type { Documento } from '../actions-tipos'
 
 export const dynamic = 'force-dynamic'
 

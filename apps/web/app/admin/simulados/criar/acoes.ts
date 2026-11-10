@@ -11,6 +11,7 @@ import { hospedarBase64 } from '@/lib/storage/hospedar-base64'
 import { selecionarGrupos, contarMembrosGrupos } from '@/lib/simulado/grupos'
 import { ehPastaBanco } from '@/lib/simulado/pasta-area'
 import { resolverCardView, type CardView } from '@/lib/card-view'
+import type { PastaSalvar, MembroGrupo } from './acoes-tipos'
 
 /** Estilo de card do admin (tema.card_view_admin, fallback card_view) — p/ o recorte da capa na
  *  criação seguir o formato ativo (ticket = paisagem, não o card 4:5). */
@@ -33,7 +34,6 @@ export async function hospedarImagemCapa(base64: string): Promise<{ ok: boolean;
 }
 
 /** Pastas para a etapa Salvamento: uma lista por área (simulado / banco). */
-export type PastaSalvar = { id: string; nome: string; pai_id: string | null }
 
 export async function listarPastasParaSalvar(): Promise<{ ok: boolean; simulado?: PastaSalvar[]; banco?: PastaSalvar[]; error?: string }> {
   if (!(await checkPermission('simulados:create'))) return { ok: false, error: 'Sem permissão.' }
@@ -85,8 +85,6 @@ export async function contarGruposSimulado(): Promise<{ ok: boolean; counts?: Re
   const svc = createAdminClient()
   return { ok: true, counts: await contarMembrosGrupos(svc, tenantId) }
 }
-
-export type MembroGrupo = { id: string; nome: string; email: string | null; telefone: string | null; cpf: string | null; classificacao: string | null; avatar: string | null; perfil_avatar_cor: string | null }
 
 /** Membros (dados de exibição) dos grupos informados, por grupo — p/ mostrar na tabela da etapa. */
 export async function listarMembrosGrupos(grupoIds: string[]): Promise<{ ok: boolean; membros?: Record<string, MembroGrupo[]>; error?: string }> {

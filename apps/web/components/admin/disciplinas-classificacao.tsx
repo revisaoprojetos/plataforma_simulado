@@ -7,7 +7,8 @@
 import { useMemo, useState } from 'react'
 import { Loader2, Search, Save, ArrowUpDown } from 'lucide-react'
 import { toast } from 'sonner'
-import { atualizarDisciplinaClassificacao, vincularPastaDisciplina, type DisciplinaClass, type PastaConteudo } from '@/app/admin/questoes/disciplinas-actions'
+import type { DisciplinaClass, PastaConteudo } from '@/app/admin/questoes/disciplinas-actions-tipos'
+import {atualizarDisciplinaClassificacao, vincularPastaDisciplina} from '@/app/admin/questoes/disciplinas-actions'
 
 const CLASSES: { v: string; rot: string }[] = [
   { v: '', rot: '—' },

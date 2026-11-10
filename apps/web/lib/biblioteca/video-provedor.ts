@@ -1,8 +1,8 @@
 // Detecção de provedor de vídeo por URL + construção da URL de embed. PURO (sem server-only) → usável
 // no client e no server. Provedores REAIS do projeto: YouTube, Vimeo, Panda Video, Google Drive.
-// NÃO existe "Waid Player"/hospedagem própria no sistema — isso é fase posterior (ver file-picker.tsx).
+// "Vídeo próprio" (hospedado): referência `video-proprio:<aulaId>` (video_aulas.id), tocada pelo <LessonPlayer>.
 
-export type VideoPlataforma = 'youtube' | 'vimeo' | 'panda' | 'google_drive' | 'desconhecido'
+export type VideoPlataforma = 'youtube' | 'vimeo' | 'panda' | 'google_drive' | 'proprio' | 'desconhecido'
 
 export interface VideoInfo {
   /** Provedor detectado pelo domínio. */ plataforma: VideoPlataforma
@@ -16,7 +16,22 @@ export const PLATAFORMA_LABEL: Record<VideoPlataforma, string> = {
   vimeo: 'Vimeo',
   panda: 'Panda Video',
   google_drive: 'Google Drive',
+  proprio: 'Vídeo próprio (hospedado)',
   desconhecido: 'Link de vídeo',
+}
+
+const PREFIXO_PROPRIO = 'video-proprio:'
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/** Referência persistida de um vídeo hospedado: `video-proprio:<aulaId>`. */
+export function referenciaVideoProprio(aulaId: string): string { return `${PREFIXO_PROPRIO}${aulaId.trim()}` }
+
+/** Extrai o aulaId (uuid) de `video-proprio:<id>`; null se não for uma referência válida. */
+export function aulaIdDeReferencia(url: string | null | undefined): string | null {
+  const s = (url || '').trim()
+  if (!s.toLowerCase().startsWith(PREFIXO_PROPRIO)) return null
+  const id = s.slice(PREFIXO_PROPRIO.length).trim()
+  return UUID_RE.test(id) ? id.toLowerCase() : null
 }
 
 /** Normaliza: adiciona https:// quando o usuário cola "youtu.be/..." sem protocolo. */
@@ -32,6 +47,8 @@ function normalizar(raw: string): string {
  * se aceita mesmo assim (ex.: tratar como link externo).
  */
 export function detectarVideo(urlRaw: string): VideoInfo {
+  const propriaId = aulaIdDeReferencia(urlRaw)
+  if (propriaId) return { plataforma: 'proprio', id: propriaId, embedUrl: null, rotulo: PLATAFORMA_LABEL.proprio }
   const url = normalizar(urlRaw)
   let host = ''
   try { host = new URL(url).hostname.toLowerCase() } catch { return { plataforma: 'desconhecido', id: null, embedUrl: null, rotulo: PLATAFORMA_LABEL.desconhecido } }

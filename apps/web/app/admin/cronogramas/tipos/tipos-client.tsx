@@ -21,15 +21,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import {
-  alternarAtivoTipo,
-  atualizarTipo,
-  criarTipo,
-  excluirTipo,
-  reordenarTipos,
-  type EntradaTipo,
-  type TipoComUso,
-} from '../tipos-actions'
+import type { EntradaTipo, TipoComUso } from '../tipos-actions-tipos'
+import { alternarAtivoTipo, atualizarTipo, criarTipo, excluirTipo, reordenarTipos } from '../tipos-actions'
 
 /**
  * Cada flag é uma regra da especificação. O texto abaixo é o que a equipe lê ao decidir —

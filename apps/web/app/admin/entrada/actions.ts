@@ -1,20 +1,11 @@
 'use server'
+import type { ConfigGlobalInput } from './actions-tipos'
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { hospedarBase64 } from '@/lib/storage/hospedar-base64'
 import { revalidatePath } from 'next/cache'
-
-export interface ConfigGlobalInput {
-  login_layout: string
-  login_selecao: boolean
-  logo_filtro_login: string
-  entrada_nome: string
-  entrada_logo_url: string
-  entrada_cor: string
-  entrada_modo: string
-}
 
 // Sanitização (a marca é injetada como cor/URL no login — bloqueia valores perigosos).
 const corSegura = (v: string) => (/^#[0-9a-fA-F]{3,8}$/.test(v.trim()) ? v.trim() : null)

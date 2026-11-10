@@ -1,4 +1,5 @@
 'use server'
+import type { PacoteLista, PacoteDetalhe, PreviaDesvinculo } from './actions-tipos'
 
 /**
  * Pacotes de cronogramas e sua liberação.
@@ -33,19 +34,6 @@ async function guard(perm = 'cronogramas:update') {
   return { ok: true as const, tenantId: access.tenantId, atorId: access.userId ?? null }
 }
 
-export type PacoteLista = {
-  id: string
-  nome: string
-  descricao: string | null
-  ativo: boolean
-  acesso_gratuito: boolean
-  ordem: number
-  cronogramas: number
-  grupos: number
-  estudantes: number
-  /** Alunos alcançados, contando os membros dos grupos vinculados (sem duplicar). */
-  alcance: number
-}
 
 /** Lista os pacotes com o que cada um contém e quantos alunos alcança. */
 export async function listarPacotes(): Promise<{ ok: boolean; itens?: PacoteLista[]; error?: string }> {
@@ -91,16 +79,6 @@ export async function listarPacotes(): Promise<{ ok: boolean; itens?: PacoteList
   return { ok: true, itens: itensLista as PacoteLista[] }
 }
 
-export type PacoteDetalhe = {
-  pacote: { id: string; nome: string; descricao: string | null; ativo: boolean; acesso_gratuito: boolean }
-  cronogramas: { id: string; nome: string; status: string; metas: number }[]
-  grupos: { id: string; nome: string; membros: number }[]
-  estudantes: { id: string; nome: string; email: string | null }[]
-  /** Catálogo e grupos disponíveis para vincular. */
-  cronogramasDisponiveis: { id: string; nome: string; status: string; metas: number }[]
-  gruposDisponiveis: { id: string; nome: string; membros: number }[]
-  alcance: number
-}
 
 export async function carregarPacote(id: string): Promise<{ ok: boolean; dados?: PacoteDetalhe; error?: string }> {
   const g = await guard('cronogramas:view')
@@ -291,15 +269,6 @@ export async function vincularGrupo(pacoteId: string, grupoId: string): Promise<
   return { ok: true, alcance: membros.length }
 }
 
-export type PreviaDesvinculo = {
-  membros: number
-  /** Continuam com acesso por outro grupo vinculado ao mesmo pacote. */
-  mantidosPorOutroGrupo: number
-  /** Já emitiram cronograma deste pacote — perderiam acesso ao que já usam. */
-  jaEmitiram: number
-  /** Perdem acesso de fato. */
-  perdemAcesso: number
-}
 
 /**
  * Prévia do desvínculo — o equivalente ao `contarOrfaosDesvincular` dos simulados.

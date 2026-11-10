@@ -6,7 +6,7 @@ import { saveRolePermissions } from '@/app/admin/rbac/actions'
 import { Check, Loader2, Save } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
-import type { RbacCategoria } from '@/app/admin/tenants/actions'
+import type { RbacCategoria } from '@/app/admin/tenants/actions-tipos'
 import { rotuloCargo } from '@/lib/rbac-cargos'
 
 type Role = { id: string; nome: string; descricao: string | null; is_sistema: boolean }

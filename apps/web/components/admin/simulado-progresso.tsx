@@ -5,7 +5,8 @@ import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Loader2, Search, ArrowUpDown, Users, RefreshCw, Radio, PauseCircle, CheckCircle2, Circle } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { progressoEstudantesSimulado, type ProgressoEstudante, type SituacaoAoVivo } from '@/app/admin/simulados/actions'
+import type { ProgressoEstudante, SituacaoAoVivo } from '@/app/admin/simulados/actions-tipos'
+import {progressoEstudantesSimulado} from '@/app/admin/simulados/actions'
 
 type Campo = 'nome' | 'email' | 'respondidas' | 'acertos' | 'erros' | 'emBranco' | 'media'
 type FiltroSit = 'todos' | SituacaoAoVivo

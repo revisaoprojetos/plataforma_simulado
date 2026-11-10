@@ -21,9 +21,8 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { DataTable, type DataTableColumn, type DataTableSelection } from '@/components/admin/data-table'
 import { EstudioHeader } from '@/components/admin/estudio/estudio-header'
-import {
-  criarItemTaxonomia, renomearItemTaxonomia, excluirItemTaxonomia, reparentarAssunto, type TipoEntidade,
-} from './actions'
+import type { TipoEntidade } from './actions-tipos'
+import { criarItemTaxonomia, renomearItemTaxonomia, excluirItemTaxonomia, reparentarAssunto } from './actions'
 import { unificarTaxonomia, previewUnificacaoTax } from '@/app/admin/questoes/taxonomia-actions'
 import { atualizarDisciplinaClassificacao } from '@/app/admin/questoes/disciplinas-actions'
 

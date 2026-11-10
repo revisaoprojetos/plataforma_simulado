@@ -7,7 +7,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { Save, Droplets, Printer, Download, Eye, Highlighter, Archive, Loader2 } from 'lucide-react'
-import type { GestaoBase, ProtecaoConteudo } from '@/app/admin/biblioteca/gestao-actions'
+import type { GestaoBase, ProtecaoConteudo } from '@/app/admin/biblioteca/gestao-actions-tipos'
 import { salvarProtecaoConteudo, definirVisibilidadeConteudo, definirAgendamentoConteudo, arquivarConteudo } from '@/app/admin/biblioteca/gestao-actions'
 import type { GestaoTipo, ConfigRow } from '@/lib/biblioteca/gestao-tipos'
 import { Secao } from './ui'

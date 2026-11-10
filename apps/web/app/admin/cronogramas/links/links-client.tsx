@@ -21,17 +21,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import {
-  atualizarLink,
-  atualizarPlataforma,
-  criarLink,
-  criarPlataforma,
-  excluirLink,
-  excluirPlataforma,
-  type EntradaLink,
-  type LinkAulaRow,
-  type PlataformaRow,
-} from './actions'
+import type { EntradaLink, LinkAulaRow, PlataformaRow } from './actions-tipos'
+import { atualizarLink, atualizarPlataforma, criarLink, criarPlataforma, excluirLink, excluirPlataforma } from './actions'
 
 const vazio = (): EntradaLink => ({ disciplina: '', aula: '', tema: null, urls: [] })
 

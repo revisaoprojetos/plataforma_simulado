@@ -7,7 +7,8 @@ import { ArrowRight, Loader2, ChevronsLeft, ChevronLeft, ChevronRight, ChevronsR
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { BarraBusca, FiltroSelect, Vazio, Iniciais, Anel, corAcerto } from '@/components/admin/relatorios/lista-kit'
 import { cn } from '@/lib/utils'
-import { carregarLoteEstudantes, type EstudanteBase } from '@/app/admin/estudantes/actions'
+import type { EstudanteBase } from '@/app/admin/estudantes/actions-tipos'
+import {carregarLoteEstudantes} from '@/app/admin/estudantes/actions'
 
 export type AgregadoEstudante = { simulados: number; notaMedia: number | null; ultima: string | null }
 export type ResumoEstudante = { id: string; nome: string; simulados: number; notaMedia: number | null; ultima: string | null }

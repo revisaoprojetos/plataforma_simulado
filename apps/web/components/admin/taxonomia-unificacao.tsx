@@ -10,7 +10,8 @@ import { formatBrt } from '@/lib/brt'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { unificarTaxonomia, previewUnificacaoTax } from '@/app/admin/questoes/taxonomia-actions'
 import type { TipoTaxonomia, ItemTax } from '@/app/admin/questoes/taxonomia-tipos'
-import { desfazerUnificacao, type UnificacaoRecente } from '@/app/admin/questoes/disciplinas-actions'
+import type { UnificacaoRecente } from '@/app/admin/questoes/disciplinas-actions-tipos'
+import {desfazerUnificacao} from '@/app/admin/questoes/disciplinas-actions'
 import { chaveSemantica } from '@/lib/taxonomia/disciplina-semantica'
 
 // Canoniza abreviações jurídicas equivalentes p/ UM token só — assim "art."/"arts."/"artigo(s)"

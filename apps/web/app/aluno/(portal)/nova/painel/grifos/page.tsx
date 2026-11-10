@@ -29,6 +29,7 @@ const COR_TAG: Record<string, { tag: TagKind; label: string }> = {
   b: { tag: 'blue', label: 'Conceito' },
   v: { tag: 'pink', label: 'Dúvida' },
   r: { tag: 'red', label: 'Exceção' },
+  p: { tag: 'pink', label: 'Destaque' },
   k: { tag: 'gray', label: 'Riscado' },
   // HEX equivalentes (forma realmente persistida por grifoPayload → corToHex())
   '#fde047': { tag: 'gold', label: 'Importante' },
@@ -36,6 +37,7 @@ const COR_TAG: Record<string, { tag: TagKind; label: string }> = {
   '#93c5fd': { tag: 'blue', label: 'Conceito' },
   '#c4b5fd': { tag: 'pink', label: 'Dúvida' },
   '#fca5a5': { tag: 'red', label: 'Exceção' },
+  '#f9a8d4': { tag: 'pink', label: 'Destaque' },
   '#374151': { tag: 'gray', label: 'Riscado' },
 }
 
@@ -57,6 +59,7 @@ const FILTROS: { t: string; dot?: string }[] = [
   { t: 'Conceito', dot: 'var(--info)' },
   { t: 'Dúvida', dot: 'var(--pink)' },
   { t: 'Exceção', dot: 'var(--danger)' },
+  { t: 'Destaque', dot: 'var(--pink)' },
 ]
 
 function HeaderToggle({ active, docId }: { active: 'pdflash' | 'flashcards' | 'grifos'; docId: string }) {

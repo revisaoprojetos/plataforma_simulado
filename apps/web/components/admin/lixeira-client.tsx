@@ -12,7 +12,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { RotateCcw, Trash2, Loader2, Search, Trash } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { restaurarItem, excluirDefinitivo, type LixeiraItem } from '@/app/admin/lixeira/actions'
+import type { LixeiraItem } from '@/app/admin/lixeira/actions-tipos'
+import {restaurarItem, excluirDefinitivo} from '@/app/admin/lixeira/actions'
 
 export function LixeiraClient({ itens }: { itens: LixeiraItem[] }) {
   const router = useRouter()

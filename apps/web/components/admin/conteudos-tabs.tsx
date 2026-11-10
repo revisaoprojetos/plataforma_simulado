@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 const TABS: { label: string; href: string; match: string }[] = [
   { label: 'Produtos', href: '/admin/conteudos/produtos', match: '/admin/conteudos/produtos' },
   { label: 'Materiais', href: '/admin/conteudos/materiais/aulas', match: '/admin/conteudos/materiais' },
+  { label: 'Vídeos', href: '/admin/conteudos/videos', match: '/admin/conteudos/videos' },
   { label: 'Flashcards', href: '/admin/conteudos/flashcards', match: '/admin/conteudos/flashcards' },
   { label: 'Trilhas', href: '/admin/conteudos/trilhas', match: '/admin/conteudos/trilhas' },
   { label: 'Oferta', href: '/admin/conteudos/ofertas', match: '/admin/conteudos/ofertas' },

@@ -1,4 +1,5 @@
 'use server'
+import type { CategoriaRow, CronogramaLista, EntradaCronograma } from './actions-tipos'
 
 /**
  * CRUD do catálogo de cronogramas (spec §8).
@@ -13,34 +14,7 @@ import { getCurrentAccess, checkPermission } from '@/lib/auth/permissions'
 import { registrarAudit } from '@/lib/audit'
 import { faixaSemanal } from '@/lib/cronograma/faixa'
 
-export type CategoriaRow = {
-  id: string
-  nome: string
-  slug: string
-  cor: string | null
-  ordem: number
-  /** Quantos cronogramas usam esta categoria — evita excluir uma em uso sem saber. */
-  usos: number
-}
 
-export type CronogramaLista = {
-  id: string
-  slug: string
-  nome: string
-  carga_horaria: number
-  total_semanas: number
-  dias_curso: number[]
-  dias_nome: string[]
-  semanas_revisao: number[]
-  categoria_id: string | null
-  categoria_nome: string | null
-  status: 'rascunho' | 'liberado'
-  ordem: number
-  faixa: string
-  metas: number
-  /** Em quantos pacotes está — zero significa invisível para o aluno. */
-  pacotes: number
-}
 
 async function guard(perm: string) {
   if (!(await checkPermission(perm))) return { ok: false as const, error: 'Sem permissão.' }
@@ -140,17 +114,6 @@ export async function listarCronogramas(): Promise<{ ok: boolean; itens?: Cronog
   return { ok: true, itens }
 }
 
-export type EntradaCronograma = {
-  nome: string
-  carga_horaria: number
-  total_semanas: number
-  dias_curso: number[]
-  dias_nome: string[]
-  semanas_revisao: number[]
-  categoria_id: string | null
-  subtitulo: string | null
-  ordem: number
-}
 
 /** Cria um cronograma. Nasce SEMPRE rascunho e sem metas (spec §8). */
 export async function criarCronograma(e: EntradaCronograma): Promise<{ ok: boolean; id?: string; error?: string }> {

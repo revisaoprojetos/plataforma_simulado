@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
-import { salvarGruposBanco, type GrupoBanco } from '@/app/admin/banco-questoes/actions'
+import type { GrupoBanco } from '@/app/admin/banco-questoes/actions-tipos'
+import {salvarGruposBanco} from '@/app/admin/banco-questoes/actions'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { Plus, Trash2, Loader2, Layers, Check, PencilLine, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'

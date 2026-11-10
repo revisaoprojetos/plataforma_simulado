@@ -1,4 +1,5 @@
 'use server'
+import type { ProtecaoConteudo, GestaoBase, OrigemAcesso, AlunoAcesso, EventoRegistro, VinculoConteudo, VersaoHistorico, EventoEntrega, GestaoDados } from './gestao-actions-tipos'
 
 // Loaders + ações de escrita da PÁGINA DE GERENCIAMENTO DO CONTEÚDO (handoff 03b). Reusa os selects já
 // existentes (lib/conteudo/*, actions.ts) — NÃO reescreve o pipeline. Onde já há dado real (documento,
@@ -51,60 +52,7 @@ function mascararIp(ip?: string | null): string {
 }
 
 // ── DTOs ────────────────────────────────────────────────────────────────────────
-export interface ProtecaoConteudo {
-  pode_ler_plataforma: boolean; pode_baixar: boolean; pode_grifar: boolean; marca_dagua: boolean; pode_imprimir: boolean
-}
-export interface GestaoBase {
-  id: string; titulo: string; kind: KindConteudo; tipoOrigem: string
-  /** Modelo de caderno = SEM aluno (admin-only): esconde acesso/alunos/pacotes/publicado na página. */
-  ehModelo: boolean
-  status: string; oculto: boolean; versaoNum: number | null; versoesCount: number
-  publicadoEm: string | null; criadoEm: string | null; atualizadoEm: string | null
-  liberadoDe: string | null; liberadoAte: string | null
-  protecao: ProtecaoConteudo
-  /** Religar a legenda de CATEGORIAS do leitor (LegProc) neste doc. Padrão false = oculta na Biblioteca. */
-  legendaCategorias: boolean
-  /** Documento marcado como LegProc: o leitor abre em modo TEXTO com STF/STJ recolhíveis (em vez do PDF). */
-  leituraLegproc: boolean
-  /** true = já vale por estar numa pasta de tipo LegProc (não depende do interruptor). */
-  leituraLegprocAuto: boolean
-  /** LegProc: a tabela de legenda do início fica OCULTA para o aluno (valor efetivo: documento → pasta → padrão oculta). */
-  legendaTabelaOculta: boolean
-  contagens: { origens: number; alunos: number; vinculos: number; pacotes: number }
-  /** Fonte da mídia (vídeo/áudio). Sem pipeline de link → padrão 'importado'. */
-  fonteMidia: { tipo: 'importado' | 'link'; servico: string | null } | null
-  liberado: boolean
-}
-export interface OrigemAcesso {
-  chave: string; tipo: 'grupo' | 'aluno'; refId: string; nome: string
-  origem: 'avulsa' | 'individual' | 'via_pacote'
-  perms: { ler: boolean; baixar: boolean; grifar: boolean }
-  liberadoDe: string | null; liberadoAte: string | null; alunos: number
-}
-export interface AlunoAcesso {
-  id: string; nome: string; email: string | null; cpfMasc: string; avatar: string | null; cor: string | null
-  recebidoPor: { origem: 'avulsa' | 'individual' | 'via_pacote'; detalhe: string }
-  situacao: 'nao_abriu' | 'lendo' | 'concluiu'
-  ultimoAcesso: string | null; grifos: number
-}
-export interface EventoRegistro {
-  tipo: 'primeiro' | 'abriu' | 'baixou' | 'grifou' | 'bloqueio' | 'audit'
-  acao: string; detalhe: string | null; em: string; dispositivo: string | null; ipMasc: string | null
-}
-export interface VinculoConteudo {
-  id: string; selo: string; categoria: string; nome: string; comoLigado: string; status: string
-}
-export interface VersaoHistorico { id: string; numero: number; origem: string; status: string; em: string; atual: boolean }
-export interface EventoEntrega { operacao: string; titulo: string; em: string }
 
-export interface GestaoDados {
-  ok: boolean; error?: string
-  base?: GestaoBase
-  acesso?: { origens: OrigemAcesso[]; alcanceTotal: number }
-  alunos?: { itens: AlunoAcesso[]; total: number }
-  vinculos?: VinculoConteudo[]
-  historico?: { versoes: VersaoHistorico[]; entregas: EventoEntrega[] }
-}
 
 const SEL_DOC = 'id, titulo, tipo_origem, categoria, status, versao_atual_id, oculto, pode_ler_plataforma, pode_baixar, pode_grifar, marca_dagua, pode_imprimir, liberado_de, liberado_ate, fonte, criado_em, atualizado_em'
 

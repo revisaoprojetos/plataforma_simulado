@@ -5,7 +5,7 @@ import { SecaoHeader } from '@/components/admin/secao-header'
 import { RbacMatriz } from '@/components/super/rbac-matriz'
 import { RbacCargosControles } from '@/components/super/rbac-cargos-controles'
 import { type CargoItem } from '@/components/super/gerenciar-cargos'
-import { type RbacCategoria } from '@/app/admin/tenants/actions'
+import type { RbacCategoria } from '@/app/admin/tenants/actions-tipos'
 import { RBAC_RECURSO_LABEL, RBAC_ACAO_LABEL } from '@/lib/rbac-catalogo'
 import { ArrowLeft, ShieldCheck, AlertTriangle } from 'lucide-react'
 

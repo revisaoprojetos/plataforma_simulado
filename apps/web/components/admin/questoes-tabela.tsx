@@ -11,7 +11,8 @@ import { confirmar } from '@/components/ui/confirm-dialog'
 import { Badge } from '@/components/ui/badge'
 import { CopiarCodigo } from '@/components/admin/copiar-codigo'
 import { codigoQuestao } from '@/lib/codigo-questao'
-import { verificarUsoQuestoes, excluirQuestoes, type UsoQuestao } from '@/app/admin/questoes/actions'
+import type { UsoQuestao } from '@/app/admin/questoes/actions-tipos'
+import {verificarUsoQuestoes, excluirQuestoes} from '@/app/admin/questoes/actions'
 
 export type LinhaQuestao = {
   id: string; codigo: string | null; enunciado: string; status: string | null; tipo: string | null; formato: string | null

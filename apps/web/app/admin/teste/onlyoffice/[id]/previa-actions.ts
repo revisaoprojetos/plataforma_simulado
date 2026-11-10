@@ -1,4 +1,5 @@
 'use server'
+import type { PickerPasta, PickerSim } from './previa-actions-tipos'
 
 import { escreverPrevia, limparPrevia, versaoPrevia } from '@/lib/teste/store'
 import { carregarQuestoesSimulado, carregarPicker } from '@/lib/teste/simulado-dados'
@@ -10,9 +11,6 @@ import { carregarTextosDesempenho } from '@/lib/conteudo/textos-desempenho'
 // lib/teste/simulado-dados.ts (seleção/questões) e o CÁLCULO em lib/conteudo/previa-compute.ts — a MESMA
 // fonte usada pelo lab da Biblioteca, para o conjunto de variáveis (pilares/sub-pilares/faixas) nunca
 // divergir entre os dois. Aqui só gravamos o resultado no store de disco do Teste.
-export type PickerPasta = LPP
-export type PickerSim = LPS
-
 /** Questões do simulado (ordem/disciplina/assunto/pilar) + disciplinas com contagem (pros sliders). */
 export async function obterDisciplinasDoSimulado(simuladoId: string) {
   // try/catch para a mensagem REAL chegar à UI: se algo lançar fora do try interno (ex.: resolução de

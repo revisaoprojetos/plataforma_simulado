@@ -1,4 +1,5 @@
 'use server'
+import type { ThreadDuvida } from './actions-tipos'
 
 // ATENDIMENTO (admin) — responder Dúvidas (conversa 1:1 aluno↔professor) e processar
 // Requerimentos. Envolve as libs PRONTAS (lib/duvidas, lib/requerimentos) com o padrão
@@ -42,12 +43,6 @@ async function guard(acao: 'view' | 'update') {
 
 // ───────────────────────────── Dúvidas ─────────────────────────────
 
-export type ThreadDuvida = {
-  duvida: Duvida
-  mensagens: DuvidaMensagem[]
-  estudanteNome: string
-  estudanteEmail: string | null
-}
 
 /** Carrega uma dúvida + suas mensagens (para o painel de resposta), já com o nome do aluno. */
 export async function carregarThreadDuvidaAction(

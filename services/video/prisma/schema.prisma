@@ -1,0 +1,424 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  // Conexão usada pela aplicação (pode passar por PgBouncer em modo transaction).
+  url       = env("DATABASE_URL")
+  // Conexão DIRETA ao Postgres, usada por prisma migrate/db (DDL e advisory locks não funcionam via
+  // PgBouncer). Obrigatória nos comandos do Prisma CLI; sem pooler, repita o valor de DATABASE_URL.
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  platform_admin
+  admin
+  professor
+  aluno
+}
+
+enum TenantStatus {
+  active
+  suspended
+}
+
+enum PublishStatus {
+  draft
+  published
+}
+
+enum VideoStatus {
+  uploading
+  uploaded
+  queued
+  processing
+  ready
+  failed
+}
+
+model Tenant {
+  id                    String              @id @default(uuid())
+  slug                  String              @unique
+  name                  String
+  status                TenantStatus        @default(active)
+  allowedDomains        String[]            @default([]) @map("allowed_domains")
+  /// libera a API de integração (matrícula genérica e sessão do aluno); desligada por padrão
+  accessEndpointEnabled Boolean             @default(false) @map("access_endpoint_enabled")
+  createdAt             DateTime            @default(now()) @map("created_at")
+  User                  User[]
+  Course                Course[]
+  Module                Module[]
+  Lesson                Lesson[]
+  Video                 Video[]
+  Enrollment            Enrollment[]
+  Subtitle              Subtitle[]
+  TranscriptSegment     TranscriptSegment[]
+  Chapter               Chapter[]
+  Note                  Note[]
+  ApiToken              ApiToken[]
+  FirstAccessToken      FirstAccessToken[]
+  AuditLog              AuditLog[]
+  WatchSession          WatchSession[]
+  WatchRange            WatchRange[]
+  LessonProgress        LessonProgress[]
+
+  @@map("tenants")
+}
+
+model User {
+  tenantId     String?   @map("tenant_id")
+  id           String    @id @default(uuid())
+  email        String
+  name         String
+  passwordHash String    @map("password_hash")
+  role         Role      @default(aluno)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  deletedAt    DateTime? @map("deleted_at")
+  /// id do aluno no sistema que o integrou (área de membros, checkout…); opcional
+  externalId   String?   @map("external_id")
+
+  enrollments Enrollment[]
+  notes       Note[]
+  sessions    WatchSession[]
+  ranges      WatchRange[]
+  progress    LessonProgress[]
+
+  tenant        Tenant?            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  ownedCourses  Course[]           @relation("CourseOwner")
+  refreshTokens RefreshToken[]
+  apiTokens     ApiToken[]
+  firstAccess   FirstAccessToken[]
+
+  @@unique([tenantId, email])
+  @@unique([tenantId, externalId])
+  @@index([tenantId])
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  familyId  String    @map("family_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([familyId])
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model Course {
+  tenantId    String        @map("tenant_id")
+  id          String        @id @default(uuid())
+  title       String
+  description String?
+  status      PublishStatus @default(draft)
+  ownerId     String?       @map("owner_id")
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  owner       User?        @relation("CourseOwner", fields: [ownerId], references: [id])
+  modules     Module[]
+  enrollments Enrollment[]
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("courses")
+}
+
+model Module {
+  tenantId String @map("tenant_id")
+  id       String @id @default(uuid())
+  courseId String @map("course_id")
+  title    String
+  position Int    @default(0)
+
+  course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons Lesson[]
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([courseId, position])
+  @@map("modules")
+}
+
+model Lesson {
+  tenantId String        @map("tenant_id")
+  id       String        @id @default(uuid())
+  moduleId String        @map("module_id")
+  title    String
+  position Int           @default(0)
+  status   PublishStatus @default(draft)
+  videoId  String?       @unique @map("video_id")
+
+  module    Module           @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  video     Video?           @relation(fields: [videoId], references: [id])
+  subtitles Subtitle[]
+  notes     Note[]
+  chapters  Chapter[]
+  sessions  WatchSession[]
+  ranges    WatchRange[]
+  progress  LessonProgress[]
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([moduleId, position])
+  @@map("lessons")
+}
+
+model Video {
+  tenantId     String      @map("tenant_id")
+  id           String      @id @default(uuid())
+  status       VideoStatus @default(uploaded)
+  sourceKey    String      @map("source_key")
+  originalName String      @map("original_name")
+  contentType  String      @map("content_type")
+  sizeBytes    BigInt      @map("size_bytes")
+  uploadId     String?     @map("upload_id")
+  partSize     Int?        @map("part_size")
+  createdById  String?     @map("created_by_id")
+  durationS    Float?      @map("duration_s")
+  renditions   Json?
+  error        String?
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  lesson   Lesson?
+  segments TranscriptSegment[]
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("videos")
+}
+
+model Enrollment {
+  tenantId    String    @map("tenant_id")
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  courseId    String    @map("course_id")
+  /// janela de acesso; nulo = sem limite naquele lado
+  startsAt    DateTime? @map("starts_at")
+  endsAt      DateTime? @map("ends_at")
+  /// revogada pela API de integração (o registro fica para histórico)
+  revokedAt   DateTime? @map("revoked_at")
+  /// id do pedido no sistema de origem: torna a chamada repetível sem duplicar
+  externalRef String?   @map("external_ref")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, courseId])
+  @@unique([tenantId, externalRef])
+  @@index([tenantId])
+  @@index([courseId])
+  @@map("enrollments")
+}
+
+model Subtitle {
+  tenantId String @map("tenant_id")
+  id       String @id @default(uuid())
+  lessonId String @map("lesson_id")
+  lang     String
+  s3Key    String @map("s3_key")
+
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([lessonId, lang])
+  @@index([tenantId])
+  @@map("subtitles")
+}
+
+model TranscriptSegment {
+  tenantId String @map("tenant_id")
+  id       String @id @default(uuid())
+  videoId  String @map("video_id")
+  lang     String
+  startS   Float  @map("start_s")
+  endS     Float  @map("end_s")
+  text     String
+
+  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([videoId, lang, startS])
+  @@map("transcript_segments")
+}
+
+model Chapter {
+  tenantId String @map("tenant_id")
+  id       String @id @default(uuid())
+  lessonId String @map("lesson_id")
+  startS   Float  @map("start_s")
+  title    String
+
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([lessonId, startS])
+  @@map("chapters")
+}
+
+model Note {
+  tenantId  String   @map("tenant_id")
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  lessonId  String   @map("lesson_id")
+  atS       Float    @map("at_s")
+  text      String
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([userId, lessonId])
+  @@map("notes")
+}
+
+model WatchSession {
+  tenantId   String    @map("tenant_id")
+  id         String    @id
+  userId     String    @map("user_id")
+  lessonId   String    @map("lesson_id")
+  startedAt  DateTime  @default(now()) @map("started_at")
+  lastSeenAt DateTime  @default(now()) @map("last_seen_at")
+  endedAt    DateTime? @map("ended_at")
+  watchedS   Float     @default(0) @map("watched_s")
+  device     String?
+  avgRate    Float?    @map("avg_rate")
+  /// segundos assistidos por velocidade, ex.: {"1": 340, "1.5": 120}
+  ratesS     Json?     @map("rates_s")
+  /// segundos assistidos por qualidade, ex.: {"720p": 400, "480p": 60}
+  qualitiesS Json?     @map("qualities_s")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([lessonId, startedAt])
+  @@index([userId, startedAt])
+  @@map("watch_sessions")
+}
+
+model WatchRange {
+  tenantId String @map("tenant_id")
+  id       String @id @default(uuid())
+  userId   String @map("user_id")
+  lessonId String @map("lesson_id")
+  fromS    Float  @map("from_s")
+  toS      Float  @map("to_s")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([userId, lessonId])
+  @@index([tenantId, lessonId])
+  @@map("watch_ranges")
+}
+
+model LessonProgress {
+  tenantId    String    @map("tenant_id")
+  userId      String    @map("user_id")
+  lessonId    String    @map("lesson_id")
+  lastPos     Float     @default(0) @map("last_pos")
+  maxPos      Float     @default(0) @map("max_pos")
+  percent     Float     @default(0)
+  completedAt DateTime? @map("completed_at")
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@id([userId, lessonId])
+  @@index([tenantId])
+  @@index([lessonId])
+  @@index([tenantId, lessonId])
+  @@map("lesson_progress")
+}
+
+/// Token pessoal do MCP (prefixo gvmcp_): só o HMAC é guardado; o valor aparece uma única vez, na criação.
+model ApiToken {
+  tenantId   String    @map("tenant_id")
+  id         String    @id @default(uuid())
+  userId     String    @map("user_id")
+  name       String
+  /// primeiros caracteres do token, só para identificá-lo na listagem
+  prefix     String
+  tokenHash  String    @unique @map("token_hash")
+  scopes     String[]
+  expiresAt  DateTime  @map("expires_at")
+  revokedAt  DateTime? @map("revoked_at")
+  lastUsedAt DateTime? @map("last_used_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([userId])
+  @@map("api_tokens")
+}
+
+/// Trilha de auditoria das chamadas MCP. Sem FK em actor_id: sobrevive à exclusão do usuário (LGPD).
+model AuditLog {
+  tenantId String   @map("tenant_id")
+  id       String   @id @default(uuid())
+  actorId  String   @map("actor_id")
+  tokenId  String?  @map("token_id")
+  via      String
+  tool     String
+  /// SHA-256 dos argumentos (nunca os argumentos em si, que podem conter texto de anotações)
+  argsHash String   @map("args_hash")
+  ok       Boolean
+  /// ids e datas do que foi feito (nunca e-mail, telefone ou texto livre)
+  detail   Json?
+  at       DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, at])
+  @@index([actorId, at])
+  @@map("audit_log")
+}
+
+/// Token de uso único para o aluno definir a senha (cenário de login direto nesta API).
+model FirstAccessToken {
+  tenantId  String    @map("tenant_id")
+  id        String    @id @default(uuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("first_access_tokens")
+}

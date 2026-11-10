@@ -7,7 +7,8 @@ import { cn } from '@/lib/utils'
 import { AvatarEstudante } from '@/components/aluno/avatar-estudante'
 import { LoginLoading } from '@/components/aluno/login-loading'
 import type { LoginConfig } from '@/lib/login-config'
-import { buscarAlunosImpersonacao, type AlunoBusca } from '@/app/admin/impersonation/actions'
+import type { AlunoBusca } from '@/app/admin/impersonation/actions-tipos'
+import {buscarAlunosImpersonacao} from '@/app/admin/impersonation/actions'
 
 export type LoadingCfg = { config: LoginConfig; logo: string | null; logoBg: string; logoEstilo: string; logoFiltro: string; plataforma: string }
 type StartResp = { session_id: string; expires_at: string; student: { id: string; name: string }; action_level: string }

@@ -1,4 +1,5 @@
 'use server'
+import type { LixeiraItem } from './actions-tipos'
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -21,14 +22,6 @@ const CFG: Record<SoftDeleteTabela, { tipo: string; rotulo: string }> = {
   simulado_trilhas: { tipo: 'Trilha', rotulo: 'nome' },
 }
 
-export type LixeiraItem = {
-  tabela: SoftDeleteTabela
-  tipo: string
-  id: string
-  rotulo: string
-  deletado_em: string | null
-  deletado_por_nome: string | null
-}
 
 function pathDaTabela(t: SoftDeleteTabela): string[] {
   switch (t) {

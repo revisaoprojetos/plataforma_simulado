@@ -1,4 +1,5 @@
 'use server'
+import type { PainelLiberacao, EditorAulaBase, EditorLpBase, EditorCatalogo, PainelMetas, SimulacaoAluno, EstadoEspelho } from './actions-tipos'
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -26,14 +27,6 @@ async function acesso(acao: 'view' | 'update') {
   return { tenantId: a.tenantId, userId: a.userId ?? null }
 }
 
-export interface PainelLiberacao {
-  cfg: CfgLiberacao
-  hoje: string
-  conteudo: { aulas: number; legproc: number; materiais: number }
-  alunosComPlano: number
-  grupos: { id: string; nome: string }[]
-  alunosExcecao: { id: string; nome: string; email: string | null }[]
-}
 
 export async function obterPainelLiberacao(): Promise<{ ok: boolean; error?: string; painel?: PainelLiberacao }> {
   const g = await acesso('view'); if (!g) return { ok: false, error: 'Sem permissão.' }
@@ -88,26 +81,6 @@ export async function obterCatalogoMotor(): Promise<{ ok: boolean; error?: strin
 }
 
 // ── Catálogo de metas (editor): aulas, links de questões, LegProc ────────────────────────────────
-export interface EditorAulaBase {
-  key: string; idx: number; disc: string; num: string; tema: string; pags: number; qc: string; tec: string
-  docId: string | null; ativaBase: boolean
-  mat: { pdflashPaginas: number | null; pdfightPaginas: number | null; videoaula: string | null; atualizacao: string | null } | null
-  origem: { arquivo?: string; aba?: string; linha?: number } | null
-}
-export interface EditorLpBase { id: string; disc: string; leiNome: string; trecho: string; doc: string | null; origem: { arquivo?: string; aba?: string; linha?: number } | null }
-export interface EditorCatalogo {
-  versao: number
-  atualizadoEm: string | null
-  tabelaOk: boolean
-  disciplinas: string[]
-  aulas: EditorAulaBase[]
-  /** ordem de distribuição do catálogo-base (só aulas ativas nele), por chave. */
-  ordemBase: string[]
-  lp: EditorLpBase[]
-  override: CatalogoOverride
-  alunosComPlano: number
-  fonteCatalogo: string
-}
 
 export async function obterEditorCatalogo(): Promise<{ ok: boolean; error?: string; editor?: EditorCatalogo }> {
   const g = await acesso('view'); if (!g) return { ok: false, error: 'Sem permissão.' }
@@ -191,12 +164,6 @@ export async function salvarEditorCatalogo(draft: unknown, versaoBase: number): 
 }
 
 // ── Metas & inteligência (v3): parâmetros do motor por tenant ────────────────────────────────────
-export interface PainelMetas {
-  params: ParamsAdaptativo
-  padrao: ParamsAdaptativo
-  atualizadoEm: string | null
-  alunosComPlano: number
-}
 
 export async function obterPainelMetas(): Promise<{ ok: boolean; error?: string; painel?: PainelMetas }> {
   const g = await acesso('view'); if (!g) return { ok: false, error: 'Sem permissão.' }
@@ -238,10 +205,6 @@ export async function buscarAlunosLiberacao(q: string): Promise<{ id: string; no
   return ((data ?? []) as Array<{ id: string; nome: string | null; email: string | null }>).map((e) => ({ id: e.id, nome: e.nome || 'Aluno', email: e.email }))
 }
 
-export interface SimulacaoAluno {
-  total: number; liberados: number; bloqueados: number; motivo: MotivoLiberacao | null
-  proximas: Array<{ titulo: string; liberaEm: string }>
-}
 
 /** Mostra o que um aluno específico consegue abrir HOJE com a configuração SALVA. */
 export async function simularAlunoLiberacao(alunoId: string): Promise<{ ok: boolean; error?: string; sim?: SimulacaoAluno }> {
@@ -254,7 +217,6 @@ export async function simularAlunoLiberacao(alunoId: string): Promise<{ ok: bool
 }
 
 // ── METAS DO PLANO EM LINHAS (espelho relacional da grade JSON) ────────────────────────────────────────────────
-export interface EstadoEspelho { ok: boolean; error?: string; migrado: boolean; planos: number; espelhados: number; linhas: number }
 
 /** Quantos planos já têm as metas em linhas (tabela simulado_cronograma_adaptativo_plano_meta). */
 export async function obterEstadoEspelho(): Promise<EstadoEspelho> {

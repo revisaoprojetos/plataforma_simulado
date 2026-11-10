@@ -164,6 +164,8 @@ export function LeitorJus({
       title={titulo || 'Leitura'}
       // onLoad reenvia o dia caso o iframe recarregue (o próprio leitor pode dar location.reload()).
       onLoad={enviarDia}
+      allowFullScreen
+      allow="fullscreen"
       style={{ display: 'block', width: '100%', height: '100%', border: 0, background: 'var(--bg, #fbfbfc)' }}
     />
     <SalvarComentarioCaderno dados={paraCaderno} onClose={() => setParaCaderno(null)} />

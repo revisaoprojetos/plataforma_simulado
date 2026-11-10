@@ -1,4 +1,5 @@
 'use server'
+import type { EstudanteBase, SortEstudante, FiltroEstudante, KpisEstudantes } from './actions-tipos'
 
 import { revalidatePath } from 'next/cache'
 import { createServiceClient, createAdminClient } from '@/lib/supabase/server'
@@ -17,16 +18,7 @@ import { ehCpfMascarado } from '@/lib/privacidade/cpf'
 
 const TENANT_VAZIO = '00000000-0000-0000-0000-000000000000'
 
-export type EstudanteBase = {
-  id: string; nome: string; email: string | null; cpf: string | null; telefone: string | null
-  classificacao: string | null; created_at: string | null; avatar: string | null; avatarCor: string | null
-  feitos: number; media: number | null
-  /** nº de produtos com acesso ATIVO (regras de venda + catálogo). Preenchido só com agregados. */
-  acessoAtivos?: number
-}
 
-export type SortEstudante = { key: 'nome' | 'classificacao' | 'created_at'; dir: 'asc' | 'desc' }
-export type FiltroEstudante = 'todos' | 'passaporte' | 'estudante'
 
 /** Agrega feitos/média (sessões finalizadas, sem teste) SÓ dos estudantes da página — barato. */
 async function agregarSessoes(svc: any, tenantId: string, ids: string[]): Promise<Record<string, { feitos: number; media: number | null }>> {
@@ -127,7 +119,6 @@ export async function buscarEstudantes(termo: string): Promise<EstudanteBase[]> 
 
 /** KPIs + e-mails de admin, CACHEADOS (remember, 5 min) — a parte cara (varrer sessões p/ "ativos"
  *  e resolver e-mails de staff no auth) não recomputa a cada visita/volta à lista. */
-export type KpisEstudantes = { total: number; passaporte: number; feitos: number; ativos: number; adminEmails: string[] }
 export async function kpisEstudantes(): Promise<KpisEstudantes> {
   if (!(await checkPermission('estudantes:view'))) return { total: 0, passaporte: 0, feitos: 0, ativos: 0, adminEmails: [] }
   const tenantId = (await getCurrentTenantId()) ?? TENANT_VAZIO

@@ -1,4 +1,5 @@
 'use server'
+import type { Tipo, BibItem, BibPasta } from './actions-tipos'
 
 // Biblioteca do Desafio: blocos HTML (Conteúdos) + Tags (selos), em PASTAS/SUBPASTAS. Espelha o padrão
 // dos modelos-caderno: pastas reusam simulado_pastas (folder_area), itens em simulado_biblioteca_itens.
@@ -14,11 +15,7 @@ import { hospedarBase64 } from '@/lib/storage/hospedar-base64'
 import { SELOS } from '@/lib/leitura/selos'
 
 const TABELA = 'simulado_biblioteca_itens'
-export type Tipo = 'conteudo' | 'tag'
 const AREA: Record<Tipo, string> = { conteudo: 'biblioteca', tag: 'biblioteca_tag' }
-
-export type BibItem = { id: string; tipo: string; nome: string; descricao: string | null; html: string; slug: string | null; pasta_id: string | null; atualizado_em: string | null }
-export type BibPasta = { id: string; nome: string; pai_id: string | null; cor: string | null }
 
 async function guard() {
   if (!(await checkPermission('leitura:view'))) return { ok: false as const, error: 'Sem permissão.' }

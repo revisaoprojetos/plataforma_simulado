@@ -1,4 +1,5 @@
 'use server'
+import type { QuestaoOrigem, FiltrosOrigem } from './importar-plataforma-actions-tipos'
 
 // Importação de questões ENTRE plataformas (cross-tenant), por-questão. Exclusivo do super-admin
 // (lê/escreve outros tenants via service role, fora do RLS) — gate em TODA action.
@@ -22,30 +23,6 @@ async function bancaDaPlataforma(svc: ReturnType<typeof createAdminClient>, dest
   if (ex && ex.length) return (ex[0] as any).id
   const { data: nova } = await svc.from('simulado_bancas').insert({ tenant_id: destino, nome }).select('id').single()
   return (nova as any)?.id ?? null
-}
-
-export interface QuestaoOrigem {
-  id: string
-  codigo: string | null
-  enunciado: string
-  status: string | null
-  tipo: string | null
-  nivel_dificuldade: string | null
-  ano: number | null
-  disciplina: string | null
-  assunto: string | null
-  banca: string | null
-  orgao: string | null
-  cargo: string | null
-}
-
-export interface FiltrosOrigem {
-  busca?: string
-  status?: string
-  disciplinaId?: string
-  dificuldade?: string
-  tipo?: string
-  page?: number
 }
 
 /** Plataformas (tenants ativos) elegíveis como ORIGEM — exclui a plataforma atual (destino). */

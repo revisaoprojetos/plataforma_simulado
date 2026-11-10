@@ -8,7 +8,8 @@ import { Loader2, Search, ArrowUpDown, Users, UserMinus, Globe, Lock, Info } fro
 import { toast } from 'sonner'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/utils'
-import { listarEstudantesSimulado, removerPassaportesIndevidos, definirAcessoGratuitoSimulado, type EstudanteLinkado } from '@/app/admin/simulados/actions'
+import type { EstudanteLinkado } from '@/app/admin/simulados/actions-tipos'
+import {listarEstudantesSimulado, removerPassaportesIndevidos, definirAcessoGratuitoSimulado} from '@/app/admin/simulados/actions'
 import { AdicionarEstudantesDialog } from '@/components/admin/adicionar-estudantes-dialog'
 import { AdicionarGrupoBancoDialog } from '@/components/admin/adicionar-grupo-banco-dialog'
 

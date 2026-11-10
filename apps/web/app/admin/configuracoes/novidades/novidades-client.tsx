@@ -24,10 +24,8 @@ import { AlertBox } from '@/components/ui/alert-box'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { formatBrt, isoParaBrtLocal, brtLocalParaIso, BRT_LABEL } from '@/lib/brt'
 import { CATEGORIAS, CAT_LABEL, type CategoriaNovidade } from '@/lib/novidades/tipos'
-import {
-  criarNovidadeAction, atualizarNovidadeAction, removerNovidadeAction, alternarNovidadeAtivaAction,
-  type NovidadeAdmin, type NovidadeInput,
-} from './actions'
+import type { NovidadeAdmin, NovidadeInput } from './actions-tipos'
+import { criarNovidadeAction, atualizarNovidadeAction, removerNovidadeAction, alternarNovidadeAtivaAction } from './actions'
 
 export type { NovidadeAdmin }
 

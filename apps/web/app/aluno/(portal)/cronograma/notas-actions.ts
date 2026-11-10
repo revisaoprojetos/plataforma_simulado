@@ -1,4 +1,5 @@
 'use server'
+import type { NotasDaEmissao } from './notas-actions-tipos'
 
 /**
  * Anotações pessoais do aluno em cada meta.
@@ -14,9 +15,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { fetchAll } from '@/lib/supabase/fetch-all'
-
-/** metaId → texto da anotação. */
-export type NotasDaEmissao = Record<string, string>
 
 /** Confere que a emissão é MESMO deste aluno — o id vem do cliente. */
 async function daEmissao(emissaoId: string) {

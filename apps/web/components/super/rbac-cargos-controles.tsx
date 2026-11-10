@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { NovoPerfilForm } from '@/components/admin/novo-perfil-form'
 import { GerenciarCargos, type CargoItem } from '@/components/super/gerenciar-cargos'
-import type { RbacCategoria } from '@/app/admin/tenants/actions'
+import type { RbacCategoria } from '@/app/admin/tenants/actions-tipos'
 
 /** Botões da toolbar de cargos: "Novo cargo" (modal de criação, com escolha de categoria) e
  *  "Gerenciar cargos" (modal com categorias + atribuição por cargo + exclusão). */

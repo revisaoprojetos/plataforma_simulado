@@ -17,10 +17,8 @@ import { Switch } from '@/components/ui/switch'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
 } from '@/components/ui/dialog'
-import {
-  listarFlashcardsDoMaterial, criarFlashcardMaterial, atualizarFlashcardMaterial,
-  removerFlashcardMaterial, reordenarFlashcardsMaterial, type FlashcardAdmin,
-} from '@/app/admin/biblioteca/flashcards-actions'
+import type { FlashcardAdmin } from '@/app/admin/biblioteca/flashcards-actions-tipos'
+import { listarFlashcardsDoMaterial, criarFlashcardMaterial, atualizarFlashcardMaterial, removerFlashcardMaterial, reordenarFlashcardsMaterial } from '@/app/admin/biblioteca/flashcards-actions'
 
 const dt = (s: string | null) => (s ? formatBrt(s) : '—')
 

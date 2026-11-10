@@ -16,7 +16,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { DisciplinaPicker } from '@/components/cronograma/disciplina-picker'
-import type { EntradaMeta } from './metas-actions'
+import type { EntradaMeta } from './metas-actions-tipos'
 import { criarMetasEmLote, repetirSemana } from './metas-actions'
 import type { TipoMetaDef } from '@/lib/cronograma/tipos'
 

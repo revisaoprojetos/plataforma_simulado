@@ -1,4 +1,5 @@
 'use server'
+import type { ConjuntoLista, PastaLista, AulaBanco, ConjuntoDetalhe, ConjuntoParaCompor, AulaConteudoBanco, ConteudoBanco, EntradaAula, PropagacaoAlvo, BancoAulaRef } from './actions-tipos'
 
 /**
  * Banco de Conteúdos dos cronogramas.
@@ -28,40 +29,6 @@ async function guard(perm = 'cronogramas:view') {
 }
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
-export type ConjuntoLista = {
-  id: string
-  nome: string
-  disciplina: string
-  disciplina_id: string | null
-  descricao: string | null
-  cor: string | null
-  pasta_id: string | null
-  ordem: number
-  aulas: number
-  questoes: number
-  /** Aulas de tipo 'legproc' deste conjunto — alimenta a aba LegProc (o resto é da disciplina). */
-  aulasLegproc: number
-  /** 'disciplina' (padrão) | 'legproc' — reservado; hoje LegProc vem das aulas, não do conjunto. */
-  tipo: string
-}
-export type PastaLista = { id: string; nome: string; pai_id: string | null }
-export type AulaBanco = {
-  id: string
-  tipo: string
-  aula: string | null
-  conteudo: string | null
-  duracao: string | null
-  video_url: string | null
-  tema: string | null
-  ordem: number
-  urls: { plataforma_id: string; url: string }[]
-  questoes: { id: string; external_id: string | null; enunciado: string }[]
-}
-export type ConjuntoDetalhe = {
-  conjunto: { id: string; nome: string; disciplina: string; disciplina_id: string | null; descricao: string | null; cor: string | null; pasta_id: string | null }
-  aulas: AulaBanco[]
-  plataformas: { id: string; nome: string; slug: string }[]
-}
 
 // ── Catálogo (pastas + conjuntos num nível) ──────────────────────────────────
 export async function listarConteudos(
@@ -183,7 +150,6 @@ export async function listarConteudos(
 }
 
 // ── Busca para compor (picker "Adicionar do banco") ─────────────────────────
-export type ConjuntoParaCompor = { id: string; nome: string; disciplina: string; disciplina_id: string | null; aulas: number; aulasLegproc: number; questoes: number }
 
 export async function buscarConjuntosParaCompor(
   filtros: { busca?: string; disciplinaId?: string } = {},
@@ -226,22 +192,6 @@ export async function buscarConjuntosParaCompor(
 }
 
 // ── Carregar conteúdos p/ o MONTADOR (sequência de aulas + conteúdo/links por tipo) ──
-export type AulaConteudoBanco = {
-  /** Chave normalizada da aula ("1","2","1.1"…) — casa "01" com "1" (R11). */
-  chave: string
-  tipo: string
-  /** A aula EXATA como está no banco ("01" na lição, "1" na resolução…). */
-  aulaReal: string
-  conteudo: string | null
-  tema: string | null
-  /** slug da plataforma → url. */
-  urls: Record<string, string>
-  /** IDs das questões anexadas a esta aula — viram `meta_questoes` ao montar (chip "N questões"). */
-  questaoIds: string[]
-  /** Videoaula da aula — vira link sob a plataforma "Vídeo" na grade. */
-  videoUrl: string | null
-}
-export type ConteudoBanco = { id: string; disciplina: string; disciplina_id: string | null; nome: string; aulas: AulaConteudoBanco[] }
 
 const chaveAulaSrv = (a: string | null) => {
   const t = (a ?? '').trim()
@@ -571,7 +521,6 @@ export async function carregarConjunto(id: string): Promise<{ ok: boolean; dados
 }
 
 // ── Aulas (CRUD) ─────────────────────────────────────────────────────────────
-export type EntradaAula = { tipo: string; aula?: string | null; conteudo?: string | null; duracao?: string | null; video_url?: string | null; tema?: string | null }
 
 async function conjuntoDoTenant(svc: ReturnType<typeof createAdminClient>, tenantId: string, conjuntoId: string) {
   const { data } = await svc.from('simulado_cronograma_conjuntos').select('id').eq('id', conjuntoId).eq('tenant_id', tenantId).eq('deletado', false).maybeSingle()
@@ -703,7 +652,6 @@ export async function removerQuestao(aulaId: string, questaoId: string): Promise
 // Snapshot + push: as metas continuam cópias, mas ao editar uma aula no banco dá para
 // atualizar as metas que representam a MESMA aula (mesma chave natural disciplina+aula+tipo,
 // a mesma que os links já usam). Sem coluna nova — casa metas existentes na hora.
-export type PropagacaoAlvo = { cronograma_id: string; nome: string; status: string; metas: number }
 
 /** Metas do tenant que representam a mesma aula (disciplina + tipo + aula normalizada "01"~"1"). */
 async function metasDaAula(
@@ -782,7 +730,6 @@ export async function propagarConteudoAula(
 }
 
 // ── Vínculo meta ↔ banco: achar (e atualizar) a aula do BANCO da mesma chave ──
-export type BancoAulaRef = { aula_id: string; conjunto_id: string; conjunto_nome: string; conteudo: string | null }
 
 /** Aulas do banco (conjunto_aulas) da mesma chave natural — o "molde" daquela meta. */
 async function bancoAulasMatch(

@@ -1,4 +1,5 @@
 'use server'
+import type { DisciplinaContagem, UnificacaoRecente, DisciplinaClass, PastaConteudo } from './disciplinas-actions-tipos'
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -9,8 +10,6 @@ import { chaveNome } from '@/lib/taxonomia/resolver-nome'
 
 const NADA = '00000000-0000-0000-0000-000000000000'
 
-export type DisciplinaContagem = { id: string; nome: string; questoes: number; assuntos: number }
-export type UnificacaoRecente = { id: string; mantida: string; duplicadas: string[]; questoes: number; criado_em: string }
 
 async function acesso(acao: 'view' | 'update') {
   const a = await getCurrentAccess()
@@ -134,7 +133,6 @@ export async function desfazerUnificacao(unificacaoId: string): Promise<{ ok: bo
 
 // ── Classificação de disciplinas (essencial/complementar/específica) + cor + ordem ──
 // Alimenta os grupos do Cronograma Adaptativo (antes hard-coded por nome).
-export type DisciplinaClass = { id: string; nome: string; classificacao: string | null; cor: string | null; ordem: number; questoes: number }
 
 export async function listarDisciplinasClassificacao(): Promise<{ ok: boolean; itens?: DisciplinaClass[]; error?: string }> {
   const g = await acesso('view'); if (!g) return { ok: false, error: 'Sem permissão.' }
@@ -171,7 +169,6 @@ export async function atualizarDisciplinaClassificacao(id: string, patch: { clas
 
 // ── Vínculo PASTA da Biblioteca → DISCIPLINA (as aulas do Cronograma Adaptativo vêm dos
 //    documentos publicados da pasta vinculada). Lista as pastas de conteúdo e permite marcar. ──
-export type PastaConteudo = { id: string; nome: string; pai_id: string | null; disciplina_id: string | null; docs: number }
 
 export async function listarPastasConteudo(): Promise<{ ok: boolean; itens?: PastaConteudo[]; error?: string }> {
   const g = await acesso('view'); if (!g) return { ok: false, error: 'Sem permissão.' }

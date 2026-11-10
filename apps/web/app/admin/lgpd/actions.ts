@@ -1,4 +1,5 @@
 'use server'
+import type { SolicitacaoLgpd } from './actions-tipos'
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { getCurrentTenantId } from '@/lib/tenant'
@@ -8,11 +9,6 @@ import { exportarDadosEstudante, anonimizarEstudante, type ExportacaoLgpd } from
 
 const SEM_TENANT = '00000000-0000-0000-0000-000000000000'
 const nowIso = () => new Date().toISOString()
-
-export type SolicitacaoLgpd = {
-  id: string; estudante_id: string; estudante_nome: string; estudante_email: string | null
-  tipo: string; status: string; canal: string; motivo: string | null; criado_em: string; processado_em: string | null
-}
 
 /** Lista as solicitações LGPD do tenant (aluno×admin). Tolerante à ausência da tabela. */
 export async function listarSolicitacoes(): Promise<{ ok?: boolean; error?: string; solicitacoes?: SolicitacaoLgpd[]; tabelaAusente?: boolean }> {

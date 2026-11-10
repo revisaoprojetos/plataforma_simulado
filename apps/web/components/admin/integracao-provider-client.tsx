@@ -11,15 +11,8 @@ import { toast } from 'sonner'
 import { JsonViewer } from '@/components/admin/json-viewer'
 import { ModalRequisicao } from '@/components/admin/modal-requisicao'
 import { CAMPOS_PROVIDER, PROVIDER_META } from '@/app/admin/integracoes/campos'
-import {
-  salvarIntegracaoConfig, testarIntegracao, listarFontes, salvarMapeamento, excluirMapeamento, rodarImportIntegracao,
-  listarEventos, reprocessarEvento, getEventoDetalhe, regenerarWebhookToken, testarWebhookInbound, type EventoDTO, type EventoDetalhe,
-  listarAssinaturasSalvas, sincronizarAssinaturas, aplicarAssinaturasGuru, type AssinaturaGuruDTO,
-  listarWebhookInbox, getWebhookInboxDetalhe, type InboxDTO, type InboxDetalhe,
-  getMapaConfig, salvarMapaConfig, reprocessarLiberacoes,
-  processarRecebido, processarRecebidosTodos,
-  getReconciliacao, salvarReconciliacao, rodarReconciliacaoAgora,
-} from '@/app/admin/integracoes/actions'
+import type { EventoDTO, EventoDetalhe, AssinaturaGuruDTO, InboxDTO, InboxDetalhe } from '@/app/admin/integracoes/actions-tipos'
+import { salvarIntegracaoConfig, testarIntegracao, listarFontes, salvarMapeamento, excluirMapeamento, rodarImportIntegracao, listarEventos, reprocessarEvento, getEventoDetalhe, regenerarWebhookToken, testarWebhookInbound, listarAssinaturasSalvas, sincronizarAssinaturas, aplicarAssinaturasGuru, listarWebhookInbox, getWebhookInboxDetalhe, getMapaConfig, salvarMapaConfig, reprocessarLiberacoes, processarRecebido, processarRecebidosTodos, getReconciliacao, salvarReconciliacao, rodarReconciliacaoAgora } from '@/app/admin/integracoes/actions'
 import type { Provider } from '@/lib/integracoes/tipos'
 import { CAMPOS_MAPA } from '@/lib/integracoes/mapa-campos'
 import { getStr, flattenPaths } from '@/lib/integracoes/jsonpath'

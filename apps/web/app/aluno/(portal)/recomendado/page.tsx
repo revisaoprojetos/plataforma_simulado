@@ -8,6 +8,8 @@ import { provasPorQuestao } from '@/lib/aluno/provas-questao'
 import { Card, CardContent } from '@/components/ui/card'
 import { Lightbulb } from 'lucide-react'
 import { DiagnosticoCard } from '@/components/aluno/diagnostico-card'
+import { carregarHistoricoRespostas } from '@/lib/aluno/historico-respostas'
+import { fetchAllByIn } from '@/lib/supabase/fetch-all'
 import { resolverInterno } from '@/lib/aluno/interno-gate'
 import { PlatformRecomendado } from '@/components/brand/interna/recomendado'
 import type { RecoData } from '@/components/brand/interna/recomendado/data'
@@ -18,22 +20,14 @@ export default async function RecomendadoPage({ searchParams }: { searchParams: 
   if (!sessao) redirect('/aluno/entrar')
   const svc = createAdminClient()
 
-  // 1) Histórico de respostas objetivas do aluno (todas as sessões).
-  const { data: sessoes } = await svc
-    .from('simulado_sessoes_prova')
-    .select('id')
-    .eq('estudante_id', sessao!.estudanteId)
-  const sessaoIds = (sessoes ?? []).map((s: any) => s.id)
-
-  const { data: resp } = sessaoIds.length
-    ? await svc.from('simulado_respostas_objetivas').select('questao_id, correta').in('sessao_id', sessaoIds)
-    : { data: [] as any[] }
+  // 1) Histórico: simulados (todas as sessões) + prática do banco de questões (avulsas) — paginado/chunkado.
+  const resp = await carregarHistoricoRespostas(svc, sessao!.tenantId, sessao!.estudanteId)
 
   // 2) Mapeia questão → disciplina + banca.
   const answeredIds = [...new Set((resp ?? []).map((r: any) => r.questao_id))]
-  const { data: qDisc } = answeredIds.length
-    ? await svc.from('simulado_questoes').select('id, disciplina_id, banca_id').in('id', answeredIds)
-    : { data: [] as any[] }
+  const qDisc = answeredIds.length
+    ? await fetchAllByIn<any>(answeredIds, (chunk) => svc.from('simulado_questoes').select('id, disciplina_id, banca_id').in('id', chunk).order('id', { ascending: true }))
+    : []
   const qDiscMap = new Map((qDisc ?? []).map((q: any) => [q.id, q.disciplina_id]))
   const qBancaMap = new Map((qDisc ?? []).map((q: any) => [q.id, q.banca_id ?? null]))
 

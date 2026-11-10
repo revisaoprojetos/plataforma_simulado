@@ -5,7 +5,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { GitBranch, Eye, GitCompare, RotateCcw, CheckCircle2 } from 'lucide-react'
-import type { GestaoBase, VersaoHistorico, EventoEntrega } from '@/app/admin/biblioteca/gestao-actions'
+import type { GestaoBase, VersaoHistorico, EventoEntrega } from '@/app/admin/biblioteca/gestao-actions-tipos'
 import type { GestaoTipo } from '@/lib/biblioteca/gestao-tipos'
 import { EmConstrucao, Vazio, fmtDataHora } from './ui'
 

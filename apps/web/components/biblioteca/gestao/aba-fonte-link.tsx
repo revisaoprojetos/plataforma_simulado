@@ -6,7 +6,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { HardDriveUpload, Link2, Copy, Check, CloudDownload } from 'lucide-react'
-import type { GestaoBase } from '@/app/admin/biblioteca/gestao-actions'
+import type { GestaoBase } from '@/app/admin/biblioteca/gestao-actions-tipos'
 import { Secao } from './ui'
 import { cn } from '@/lib/utils'
 

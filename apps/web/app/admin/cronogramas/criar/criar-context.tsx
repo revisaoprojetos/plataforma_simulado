@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, useEffect, useRef, useState, type MutableRefObject } from 'react'
-import type { ConjuntoParaCompor, ConteudoBanco } from '../conteudos/actions'
+import type { ConjuntoParaCompor, ConteudoBanco } from '../conteudos/actions-tipos'
 
 /**
  * Estado compartilhado da criação de cronograma (página-por-página), espelhando o assistente

@@ -1,4 +1,5 @@
 'use server'
+import type { BotaoExportacao } from './download-actions-tipos'
 
 /**
  * Registro de exportação — uma linha por PDF que o aluno pediu.
@@ -11,8 +12,6 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { getSessaoAluno } from '@/lib/aluno-session'
 import { registrarAudit } from '@/lib/audit'
-
-export type BotaoExportacao = 'pdf' | 'docx' | 'ficha' | 'csv'
 
 /**
  * Best-effort de verdade: um problema aqui NÃO pode impedir o aluno de imprimir o cronograma

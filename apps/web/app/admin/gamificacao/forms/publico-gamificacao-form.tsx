@@ -8,7 +8,7 @@ import { confirmar } from '@/components/ui/confirm-dialog'
 import { ClassificacaoBadge } from '@/components/admin/classificacao-badge'
 import { AdicionarEstudantesDialog, type AlunoSel } from '@/components/admin/adicionar-estudantes-dialog'
 import { AdicionarGrupoModuloDialog } from '@/components/admin/adicionar-grupo-modulo-dialog'
-import { type EstudanteAcessoLinha } from '@/app/admin/leitura/actions'
+import type { EstudanteAcessoLinha } from '@/app/admin/leitura/actions-tipos'
 import { carregarPublicoGam, salvarModoPublico, definirGruposGam, definirEstudantesGam, estudantesDosGruposGam } from '../actions'
 
 type Grupo = { id: string; nome: string; cor: string | null; is_mestre?: boolean; pai_id?: string | null; membros?: number; origem?: 'guru' | 'curseduca' | null }

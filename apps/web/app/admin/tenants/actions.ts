@@ -1,4 +1,5 @@
 'use server'
+import type { VisibilidadeModo, AparenciaInput, EmbedConfigInput, RbacCategoria } from './actions-tipos'
 
 import { createAdminClient } from '@/lib/supabase/server'
 import { isSuperAdmin } from '@/lib/auth/permissions'
@@ -90,8 +91,6 @@ export async function toggleTenantAtivoAction(id: string, ativo: boolean): Promi
   revalidatePath('/admin/tenants')
   return { ok: true }
 }
-
-export type VisibilidadeModo = 'todos' | 'so_admin' | 'so_super' | 'oculta'
 
 /**
  * Define a VISIBILIDADE da plataforma (super-admin) em 4 estados — sem migração, usando o
@@ -202,17 +201,6 @@ export async function salvarTemaSuperAction(tenantId: string, tema: Record<strin
 // Edição visual centralizada no console (super-admin), por plataforma. Mescla em tenants.tema.
 // Não toca no logo base64 aqui (fica no painel) para não apagá-lo por engano; logo por URL é opcional.
 
-export interface AparenciaInput {
-  nome_site?: string | null
-  subtitulo_site?: string | null
-  titulo_pagina?: string | null
-  cor_primaria?: string | null
-  cor_secundaria?: string | null
-  cor_accent?: string | null
-  modo_padrao?: string | null
-  logo_url?: string | null
-}
-
 export async function salvarAparenciaAction(id: string, dados: AparenciaInput): Promise<{ ok: boolean; error?: string }> {
   if (!(await isSuperAdmin())) return { ok: false, error: 'Ação exclusiva do super-administrador global.' }
   const svc = createAdminClient()
@@ -242,13 +230,6 @@ export async function salvarAparenciaAction(id: string, dados: AparenciaInput): 
 // por e-mail. Uma linha por tenant (upsert manual — sem depender de constraint).
 
 const METODOS_ID = ['email', 'email_cpf', 'email_telefone'] as const
-
-export interface EmbedConfigInput {
-  ativo: boolean
-  origens_permitidas: string[]
-  metodo_identificacao: string
-  otp_email: boolean
-}
 
 /** Normaliza uma origem para frame-ancestors: minúsculas, sem espaço/caminho final; mantém
  *  esquema/host/porta/curinga. Só caracteres de URL (não dá pra escapar do meta/CSP). Vazio → null. */
@@ -280,8 +261,6 @@ export async function salvarEmbedConfigAction(tenantId: string, dados: EmbedConf
 // ─────────────────── CATEGORIAS DE CARGO (bandas da matriz RBAC) ───────────────────
 // Sem migração: guardadas em simulado_tenants.tema.rbac = { categorias:[{id,nome,cor}],
 // cargoCategoria:{ [roleId]: categoriaId } }. Só super-admin gerencia.
-
-export type RbacCategoria = { id: string; nome: string; cor: string }
 
 async function lerRbacTema(svc: ReturnType<typeof createAdminClient>, id: string) {
   const { data } = await svc.from('simulado_tenants').select('tema').eq('id', id).maybeSingle()

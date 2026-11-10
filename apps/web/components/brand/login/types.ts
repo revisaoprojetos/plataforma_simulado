@@ -32,7 +32,7 @@ export interface LoginCore {
   entrando: boolean
   erro: string | null
   manutencao: { titulo: string; mensagem: string } | null
-  submit: (e: React.FormEvent) => void
+  submit: (e: React.FormEvent<HTMLFormElement>) => void
 }
 
 /** Paleta que a marca injeta no <LoginForm> (campos/CTA/links) — type-safe, sem CSS vars soltas. */

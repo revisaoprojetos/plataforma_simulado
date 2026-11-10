@@ -8,7 +8,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { MarkdownContent } from '@/components/markdown-content'
 import { PersonalizadoResultado } from '@/components/aluno/personalizado-resultado'
-import type { SessaoPessoal, ModoPessoal } from '@/app/aluno/(portal)/simulados/runner-actions'
+import type { SessaoPessoal, ModoPessoal } from '@/app/aluno/(portal)/simulados/runner-actions-tipos'
 
 const LETRA = ['A', 'B', 'C', 'D', 'E', 'F']
 const MODO_INFO: Record<ModoPessoal, { nome: string; Icon: typeof GraduationCap }> = {

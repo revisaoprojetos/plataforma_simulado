@@ -1,4 +1,5 @@
 'use server'
+import type { QuestaoBancoBuscaItem, FiltrosBuscaBanco, DetalheQuestao, QuestaoDetalheBanco, GrupoBanco } from './actions-tipos'
 
 import { resolverTaxonomiaPorNome } from '@/lib/taxonomia/resolver-nome'
 import type { CapaMetaIn } from '@/lib/capa-meta'
@@ -390,13 +391,7 @@ export async function adicionarQuestoes(bancoId: string, questaoIds: string[]): 
   return { ok: true, adicionadas: novas.length }
 }
 
-export type QuestaoBancoBuscaItem = {
-  id: string; external_id: string | null; enunciado: string; tipo: string; formato: string | null
-  nivel_dificuldade: string | null; disciplina: string | null; assunto: string | null; assunto_detalhe: string | null
-  banca: string | null; orgao: string | null; ano: number | null
-  etiquetas: { nome: string; cor: string | null }[]
-}
-export type FiltrosBuscaBanco = { busca?: string; disciplinaId?: string; dificuldade?: string; tipo?: string }
+
 
 /**
  * Busca questões do tenant que NÃO estão no banco (para o pop-up "Adicionar questões"), server-side
@@ -469,8 +464,6 @@ export async function buscarQuestoesForaBanco(bancoId: string | null, filtros: F
   return { ok: true, itens }
 }
 
-export type QuestaoDetalheBanco = { alternativas: { ordem: number; texto: string; correta: boolean; comentario: string | null }[]; comentario: string | null }
-
 /** Detalhe de UMA questão (alternativas + comentário do professor) — carregado SOB DEMANDA ao expandir
  *  a linha no seletor de questões (evita puxar tudo na listagem). */
 export async function detalheQuestaoBanco(questaoId: string): Promise<{ ok: boolean; detalhe?: QuestaoDetalheBanco; error?: string }> {
@@ -496,12 +489,6 @@ export async function listarDisciplinasFiltro(): Promise<{ id: string; nome: str
 
 /** Detalhe de uma questão (enunciado + alternativas + comentários) para o expandir da tabela do
  * banco. Carregado SOB DEMANDA ao abrir a linha (bancos grandes não carregam tudo no load). */
-export interface DetalheQuestao {
-  enunciado: string
-  comentario_professor: string | null
-  tipo: string | null
-  alternativas: { ordem: number; texto: string; correta: boolean; comentario: string | null; lei: string | null }[]
-}
 export async function carregarDetalheQuestao(questaoId: string): Promise<{ ok: boolean; detalhe?: DetalheQuestao; error?: string }> {
   const g = await guard()
   if (!g.ok) return g
@@ -1063,8 +1050,6 @@ export async function reordenarQuestoesBanco(bancoId: string, ordemIds: string[]
   revalidatePath(`/admin/banco-questoes/${bancoId}`)
   return { ok: true }
 }
-
-export type GrupoBanco = { id: string; nome: string; disciplinas: string[] }
 
 /** Salva os grupos de disciplinas de um banco (pasta). */
 export async function salvarGruposBanco(bancoId: string, grupos: GrupoBanco[]): Promise<{ ok: boolean; error?: string }> {

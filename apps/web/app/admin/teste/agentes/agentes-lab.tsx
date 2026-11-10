@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft, Play, Loader2, Filter, Cog, Scale, ChevronRight, ChevronDown, Coins } from 'lucide-react'
 import Link from 'next/link'
-import { rodarPipelineDemo, statusIA, type ResultadoDemo, type NivelAgregado } from './actions'
+import type { ResultadoDemo, NivelAgregado } from './actions-tipos'
+import {rodarPipelineDemo, statusIA} from './actions'
 
 const EXEMPLO = [
   'Segundo a CF/88, a vedação à acumulação remunerada de cargos públicos aplica-se também às autarquias, fundações, empresas públicas e sociedades de economia mista. (Gabarito: CERTO)',

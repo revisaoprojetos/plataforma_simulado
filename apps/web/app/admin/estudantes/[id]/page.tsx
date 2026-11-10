@@ -27,7 +27,7 @@ import { gruposVinculadosFallback, simuladosVinculadosFallback } from '@/lib/adm
 import { EstudanteAssinaturas } from '@/components/admin/estudante-assinaturas'
 import { EstudanteAcesso } from '@/components/admin/estudante-acesso'
 import { acessoEfetivoDoEstudante } from '@/lib/acesso/aluno-efetivo'
-import type { GrupoBanco } from '@/app/admin/banco-questoes/actions'
+import type { GrupoBanco } from '@/app/admin/banco-questoes/actions-tipos'
 import { modalidadesDoAlunoV2, temEntregaV2, type EntregaSlots, type ModalidadeAluno } from '@/lib/caderno-teste/entrega-aluno'
 import { tipoDoSimulado, filtrarModsPorTipo, type TipoSimulado } from '@/lib/simulado/tipo'
 import { format } from 'date-fns'

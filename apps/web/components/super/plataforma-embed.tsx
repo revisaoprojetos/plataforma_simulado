@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { SecaoHeader } from '@/components/admin/secao-header'
 import { Loader2, Code2, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
-import type { EmbedConfigInput } from '@/app/admin/tenants/actions'
+import type { EmbedConfigInput } from '@/app/admin/tenants/actions-tipos'
 
 /**
  * Config do EMBED por plataforma (super-admin), no console. Edita a linha de

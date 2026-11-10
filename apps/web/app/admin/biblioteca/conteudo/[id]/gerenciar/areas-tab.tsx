@@ -9,11 +9,8 @@ import { toast } from 'sonner'
 import { ChevronDown, Eye, EyeOff, Loader2, Plus, Search, Trash2, Layers } from 'lucide-react'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { Switch } from '@/components/ui/switch'
-import {
-  carregarAreasAction, salvarRegraAreaAction, alternarRegraAreaAction, excluirRegraAreaAction,
-  definirAreaExpansivaAction, buscarAlunosAreaAction, verComoAlunoAction, salvarBlocoExpansivelAction, salvarEstiloPadraoExpansivelAction,
-  type DadosAreas, type EntradaRegra,
-} from '@/app/admin/biblioteca/areas-actions'
+import type { DadosAreas, EntradaRegra } from '@/app/admin/biblioteca/areas-actions-tipos'
+import { carregarAreasAction, salvarRegraAreaAction, alternarRegraAreaAction, excluirRegraAreaAction, definirAreaExpansivaAction, buscarAlunosAreaAction, verComoAlunoAction, salvarBlocoExpansivelAction, salvarEstiloPadraoExpansivelAction } from '@/app/admin/biblioteca/areas-actions'
 import { PRESETS_EXP, ESTILO_EXP_PADRAO } from '@/lib/conteudo/areas-presets'
 
 const sel = 'h-9 rounded-lg border bg-background px-2.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring'

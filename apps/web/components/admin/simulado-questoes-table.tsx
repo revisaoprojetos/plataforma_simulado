@@ -6,7 +6,7 @@ import { QuestoesTabelaBase, type QuestaoLinha } from '@/components/admin/questo
 import { AdicionarQuestoesDialog } from '@/components/admin/adicionar-questoes-dialog'
 import { DriveNovoStyles, DriveUploadPanel, type DriveUploadItem, type DriveUploadStatus, type DriveUploadLabels } from '@/components/admin/drive-novo'
 import { adicionarQuestoesSimulado, removerQuestoesSimulado, reordenarQuestoesSimulado, importarQuestoesSimulado } from '@/app/admin/simulados/actions'
-import type { QuestaoBancoBuscaItem } from '@/app/admin/banco-questoes/actions'
+import type { QuestaoBancoBuscaItem } from '@/app/admin/banco-questoes/actions-tipos'
 import type { QuestaoImport } from '@/app/admin/banco-questoes/import-types'
 import { toast } from 'sonner'
 

@@ -1,4 +1,5 @@
 'use server'
+import type { EmissaoResumo, PaginaEmissoes, EmissaoAberta } from './emissoes-actions-tipos'
 
 /**
  * "Meus cronogramas" — as emissões salvas do aluno.
@@ -25,39 +26,7 @@ import type { Grade, LinkAula, MetaFonte, OpcoesGeracao } from '@/lib/cronograma
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-export type EmissaoResumo = {
-  id: string
-  cronograma_id: string
-  cronograma_nome: string
-  titulo: string | null
-  criado_em: string
-  arquivada: boolean
-  /** Só vem no caminho de renderização (PDF); a lista do aluno não precisa. */
-  estudante_id?: string
-  estudante_nome?: string | null
-  /** Estado de leitura do aluno: semanas fechadas, contagem escondida. */
-  preferencias?: unknown
-  resumo: {
-    totalSemanas?: number
-    semanasConteudo?: number
-    semanasRevisao?: number
-    atividades?: number
-    conclusao?: string
-    subtitulo?: string
-  } | null
-  formulario: Record<string, unknown> | null
-}
-
 const CAMPOS = 'id, cronograma_id, cronograma_nome, titulo, criado_em, arquivada, resumo, formulario'
-
-export type PaginaEmissoes = {
-  itens: EmissaoResumo[]
-  /** Quantos existem no filtro atual — é o que permite montar a paginação. */
-  total: number
-  /** Contagens das duas abas, independentes do filtro, para os rótulos não oscilarem. */
-  ativas: number
-  arquivadas: number
-}
 
 /**
  * Uma página das emissões do aluno, com busca no BANCO.
@@ -125,15 +94,6 @@ export async function listarMinhasEmissoes(
       arquivadas: nArquivadas.count ?? 0,
     },
   }
-}
-
-export type EmissaoAberta = {
-  emissao: EmissaoResumo
-  grade: Grade
-  /** Do CATÁLOGO, não do formulário salvo — a folha impressa usa na faixa "MARCA - 2H". */
-  cargaHoraria: number | null
-  /** O cronograma saiu do ar (despublicado ou excluído) desde a emissão. */
-  indisponivel: boolean
 }
 
 /**

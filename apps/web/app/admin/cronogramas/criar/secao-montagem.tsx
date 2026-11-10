@@ -15,7 +15,8 @@ import { montarPorConteudos, semanasDeConteudo, type ConfigMontagem, type Conteu
 import { useCriar, type LinkDraft, type MetaDraft } from './criar-context'
 import { Secao } from './secao'
 import { dadosMetas } from './dados'
-import { buscarConjuntosParaCompor, buscarConteudosParaMontar, type ConjuntoParaCompor } from '../conteudos/actions'
+import type { ConjuntoParaCompor } from '../conteudos/actions-tipos'
+import {buscarConjuntosParaCompor, buscarConteudosParaMontar} from '../conteudos/actions'
 
 function novoTmpId() {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()

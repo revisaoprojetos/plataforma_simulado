@@ -8,11 +8,8 @@ import { Search, X, Mail, Loader2, ShieldCheck, ShieldOff, Copy, Check, Dices, S
 import { cn } from '@/lib/utils'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { rotuloCargo, CARGOS_ACESSO_TOTAL } from '@/lib/rbac-cargos'
-import {
-  trocarCargoAction, toggleAtivoAdminAction, resetarSenhaAdminAction, removerAcessoAdminAction, atualizarDadosAdminAction,
-  listarPlataformasSuper, adicionarAdminEmPlataformasAction, verSenhaAdminCofre,
-  type AdminMembro, type CargoOpcao,
-} from '@/app/admin/administradores/actions'
+import type { AdminMembro, CargoOpcao } from '@/app/admin/administradores/actions-tipos'
+import { trocarCargoAction, toggleAtivoAdminAction, resetarSenhaAdminAction, removerAcessoAdminAction, atualizarDadosAdminAction, listarPlataformasSuper, adicionarAdminEmPlataformasAction, verSenhaAdminCofre } from '@/app/admin/administradores/actions'
 
 function iniciais(nome: string | null, email: string | null) {
   const base = nome || email || '?'

@@ -1,4 +1,5 @@
 'use server'
+import type { DisciplinaAtual, DisciplinaDisponivel, PlataformaCol, DisciplinaTodas } from './disciplinas-actions-tipos'
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -11,12 +12,8 @@ import { chaveSemantica } from '@/lib/taxonomia/disciplina-semantica'
 // Aqui o super-admin adiciona à plataforma as disciplinas que existem nas OUTRAS e ela ainda não tem. "Ainda não tem" usa o mesmo
 // cruzamento do importador (nome igual, alias ou mesma matéria escrita de outro jeito) — então não cria a duplicada com outro nome.
 
-export type DisciplinaAtual = { id: string; nome: string; classificacao: string | null; cor: string | null; ordem: number | null }
-export type DisciplinaDisponivel = { chave: string; nome: string; classificacao: string | null; cor: string | null; ordem: number | null; origens: string[] }
 const CLASS_OK = ['essencial', 'complementar', 'especifica']
 
-export type PlataformaCol = { id: string; nome: string }
-export type DisciplinaTodas = { id: string; tenant_id: string; nome: string; classificacao: string | null }
 
 export async function listarDisciplinasPlataforma(tenantId: string): Promise<{ ok: boolean; error?: string; atuais?: DisciplinaAtual[]; disponiveis?: DisciplinaDisponivel[]; plataformas?: PlataformaCol[]; todas?: DisciplinaTodas[] }> {
   if (!(await isSuperAdmin())) return { ok: false, error: 'Ação exclusiva do super-administrador global.' }

@@ -3,7 +3,8 @@
 import { useMemo, useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Loader2, Save, KeyRound, Eye, EyeOff, CheckCircle2, Trash2, ShieldCheck, Sparkles, AlertTriangle } from 'lucide-react'
-import { salvarConfigIA, removerConfigIA, testarConfigIA, type StatusIA } from './actions'
+import type { StatusIA } from './actions-tipos'
+import {salvarConfigIA, removerConfigIA, testarConfigIA} from './actions'
 import { formatBrt } from '@/lib/brt'
 
 type Prov = 'anthropic' | 'openai' | 'gemini'

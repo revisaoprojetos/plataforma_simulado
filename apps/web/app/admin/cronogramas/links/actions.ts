@@ -1,4 +1,5 @@
 'use server'
+import type { PlataformaRow, LinkAulaRow, EntradaLink } from './actions-tipos'
 
 /**
  * Links de aula e o cadastro de PLATAFORMAS de curso.
@@ -17,33 +18,8 @@ import { registrarAudit } from '@/lib/audit'
 import { fetchAll } from '@/lib/supabase/fetch-all'
 import { chaveLink } from '@/lib/cronograma/formato-meta'
 
-export type PlataformaRow = {
-  id: string
-  nome: string
-  slug: string
-  cor: string | null
-  ordem: number
-  ativo: boolean
-  /** Quantos links usam esta plataforma — evita excluir uma que está em uso sem saber. */
-  usos: number
-}
 
-export type LinkAulaRow = {
-  id: string
-  disciplina: string
-  aula: string
-  tema: string | null
-  urls: { plataforma_id: string; url: string }[]
-  /** Quantas metas de questões citam este par. */
-  usos: number
-}
 
-export type EntradaLink = {
-  disciplina: string
-  aula: string
-  tema: string | null
-  urls: { plataforma_id: string; url: string }[]
-}
 
 async function guard(perm: string) {
   if (!(await checkPermission(perm))) return { ok: false as const, error: 'Sem permissão.' }

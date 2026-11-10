@@ -1,4 +1,5 @@
 'use server'
+import type { AlunoBusca, PapelImpersonacao } from './actions-tipos'
 
 import { revalidatePath } from 'next/cache'
 import { getCurrentAccess } from '@/lib/auth/permissions'
@@ -6,8 +7,6 @@ import { getImpersonationPermission } from '@/lib/impersonation/permissions'
 import { createAdminClient } from '@/lib/supabase/server'
 import { registrarAudit } from '@/lib/audit'
 import { getModoNotificacao, type NotifMode } from '@/lib/impersonation/notification'
-
-export interface AlunoBusca { id: string; nome: string; email: string | null; avatar: string | null; avatarCor: string | null }
 
 /** Busca alunos do tenant para o console de visualização (só quem pode visualizar). */
 export async function buscarAlunosImpersonacao(query: string): Promise<{ ok: boolean; alunos?: AlunoBusca[]; error?: string }> {
@@ -31,8 +30,6 @@ async function guardAdmin() {
   if (!access.isAdmin) return { ok: false as const, error: 'Apenas administradores podem alterar esta configuração.' }
   return { ok: true as const, access }
 }
-
-export interface PapelImpersonacao { id: string; nome: string; habilitado: boolean; bloqueado: boolean }
 
 /** Carrega os papéis do tenant + se cada um pode visualizar + o modo de notificação. */
 export async function carregarConfigImpersonacao(): Promise<{ ok: boolean; roles?: PapelImpersonacao[]; modo?: NotifMode; error?: string }> {

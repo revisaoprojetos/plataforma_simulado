@@ -9,7 +9,8 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { fmtBr } from '@/lib/cronograma/datas'
-import { listarMinhasEmissoes, type EmissaoResumo, type PaginaEmissoes } from './emissoes-actions'
+import type { EmissaoResumo, PaginaEmissoes } from './emissoes-actions-tipos'
+import {listarMinhasEmissoes} from './emissoes-actions'
 
 const POR_PAGINA = 20
 

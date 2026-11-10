@@ -29,10 +29,8 @@ import { confirmar } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/utils'
 import { brtLocalParaIso, isoParaBrtLocal } from '@/lib/brt'
 import { type CardView } from '@/lib/card-view'
-import {
-  type BancoAulas, type ModuloLeitura, type DocEstado, criarDocumento, excluirModuloLeitura,
-  moverAulaParaModulo, reordenarAulasLeitura, publicarDocumento, definirPublicacaoDocumento, definirPublicacaoDocumentos,
-} from '@/app/admin/leitura/actions'
+import type { BancoAulas, ModuloLeitura, DocEstado } from '@/app/admin/leitura/actions-tipos'
+import { criarDocumento, excluirModuloLeitura, moverAulaParaModulo, reordenarAulasLeitura, publicarDocumento, definirPublicacaoDocumento, definirPublicacaoDocumentos } from '@/app/admin/leitura/actions'
 import { excluirDocumento } from '@/app/admin/leitura/actions'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,

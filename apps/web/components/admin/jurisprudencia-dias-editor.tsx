@@ -14,10 +14,8 @@ import { brtLocalParaIso, isoParaBrtLocal } from '@/lib/brt'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import {
-  criarDiaDesafio, excluirDiaDesafio, reordenarDiasDesafio, definirPublicacaoDiasDesafio,
-  editarLeituraDia, renomearDiaDesafio, type DiaEstado,
-} from '@/app/admin/jurisprudencia/actions'
+import type { DiaEstado } from '@/app/admin/jurisprudencia/actions-tipos'
+import { criarDiaDesafio, excluirDiaDesafio, reordenarDiasDesafio, definirPublicacaoDiasDesafio, editarLeituraDia, renomearDiaDesafio } from '@/app/admin/jurisprudencia/actions'
 
 // Shape de uma tese (casa com dados.js: ref, tema, q, o[3], a=índice correto, tese).
 type Tese = { ref: string; tema: string; q: string; o: string[]; a: number; tese: string }

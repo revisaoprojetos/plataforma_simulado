@@ -1,4 +1,5 @@
 'use server'
+import type { EstadoAtual } from './actions-tipos'
 
 /**
  * Importação do catálogo (spec §9).
@@ -31,13 +32,6 @@ async function guard(perm: string) {
   return { ok: true as const, tenantId: access.tenantId, atorId: access.userId ?? null }
 }
 
-export type EstadoAtual = {
-  cronogramas: { slug: string; nome: string; status: string; metas: number }[]
-  linksChaves: string[]
-  plataformas: { id: string; nome: string; slug: string }[]
-  /** Slugs de tipo cadastrados — a validação das metas confere contra eles. */
-  tiposMeta: string[]
-}
 
 /** O que já existe no catálogo — o cliente usa para montar a prévia (o que entra/muda). */
 export async function carregarEstadoAtual(): Promise<{ ok: boolean; estado?: EstadoAtual; error?: string }> {

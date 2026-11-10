@@ -1,0 +1,131 @@
+name: Build e Push Video para GHCR
+
+# Imagens do Gerenciador de Vídeo (services/video) para o Swarm/Portainer.
+# Independente do docker-publish.yml (web/worker/api do simulado): só dispara quando algo do vídeo muda.
+# NÃO faz deploy: o deploy é passo manual no Portainer, por SHA completo (docs/video/RUNBOOK.md).
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'services/video/**'
+      - 'docker-compose.video.portainer.yml'
+      - '.github/workflows/docker-publish-video.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: docker-publish-video-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  # Padrão do projeto: ghcr.io/<owner>/plataforma_simulado[-sufixo]
+  IMAGE_NAME: plataforma_simulado
+
+jobs:
+  verify:
+    # Porta de qualidade: sem typecheck/testes verdes não publica imagem.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        working-directory: services/video
+    env:
+      HUSKY: '0' # `prepare: husky` não deve rodar no CI (o .git está um nível acima)
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: services/video/package-lock.json
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Prisma generate
+        run: npx prisma generate --schema prisma/schema.prisma
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Testes unitários
+        run: npm test
+
+  build-and-push:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Normalizar owner para minúsculas (GHCR exige)
+        run: echo "IMAGE_OWNER=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_ENV
+
+      - name: Definir tags (SHA sempre; `latest` SÓ na main)
+        id: tags
+        run: |
+          BASE="ghcr.io/${IMAGE_OWNER}/${IMAGE_NAME}"
+          api="${BASE}-video-api:${GITHUB_SHA}"
+          wk="${BASE}-video-worker:${GITHUB_SHA}"
+          # Só a main atualiza o `latest` (usado como rollback) — branches NUNCA mexem nele.
+          if [ "${GITHUB_REF_NAME}" = "main" ]; then
+            api="${api}"$'\n'"${BASE}-video-api:latest"
+            wk="${wk}"$'\n'"${BASE}-video-worker:latest"
+          fi
+          { echo "api<<EOF"; echo "$api"; echo "EOF"; } >> "$GITHUB_OUTPUT"
+          { echo "wk<<EOF"; echo "$wk"; echo "EOF"; } >> "$GITHUB_OUTPUT"
+
+      - name: Login no GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build e push (video-api — API + consolidador + migrate)
+        uses: docker/build-push-action@v6
+        with:
+          # O Dockerfile copia package.json/prisma/apps da raiz do serviço.
+          context: ./services/video
+          file: ./services/video/apps/api/Dockerfile
+          push: true
+          tags: ${{ steps.tags.outputs.api }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+          cache-from: type=gha,scope=video-api
+          cache-to: type=gha,mode=max,scope=video-api
+
+      - name: Build e push (video-worker — ffmpeg)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./services/video
+          file: ./services/video/apps/worker/Dockerfile
+          push: true
+          tags: ${{ steps.tags.outputs.wk }}
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+          cache-from: type=gha,scope=video-worker
+          cache-to: type=gha,mode=max,scope=video-worker
+
+      - name: Resumo (o que colar no Portainer)
+        run: |
+          {
+            echo "### Imagens publicadas"
+            echo ""
+            echo "- \`ghcr.io/${IMAGE_OWNER}/${IMAGE_NAME}-video-api:${GITHUB_SHA}\`"
+            echo "- \`ghcr.io/${IMAGE_OWNER}/${IMAGE_NAME}-video-worker:${GITHUB_SHA}\`"
+            echo ""
+            echo "Deploy manual: defina \`VIDEO_TAG=${GITHUB_SHA}\` na stack \`video\` (docker-compose.video.portainer.yml)."
+          } >> "$GITHUB_STEP_SUMMARY"

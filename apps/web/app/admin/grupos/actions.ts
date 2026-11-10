@@ -1,4 +1,5 @@
 'use server'
+import type { EstBusca } from './actions-tipos'
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -18,8 +19,6 @@ function revalidar(id?: string) {
   revalidatePath('/admin/grupos')
   if (id) revalidatePath(`/admin/grupos/${id}`)
 }
-
-export type EstBusca = { id: string; nome: string; email: string | null; classificacao: string | null }
 
 /**
  * Busca estudantes NÃO-membros do grupo (para o seletor "Adicionar"), server-side e limitada.

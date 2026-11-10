@@ -1,5 +1,5 @@
 import { cache } from 'react'
-import { headers } from 'next/headers'
+import { headers, cookies } from 'next/headers'
 import { createAdminClient } from '@/lib/supabase/server'
 import { remember } from '@/lib/cache/relatorio-cache'
 
@@ -34,6 +34,25 @@ export const getCurrentTenant = cache(async (): Promise<Tenant | null> => {
   // Atrás do Traefik o `host` cru pode vir interno (ex.: 0.0.0.0) — o host real do aluno chega em
   // `x-forwarded-host`. Sem isto o tenant não resolve e o login do aluno dá "Plataforma não encontrada".
   const host = ((h.get('x-forwarded-host') || h.get('host')) ?? '').split(',')[0].split(':')[0].trim().toLowerCase()
+
+  // DEV: acesso por IP puro (192.168.x.x) não carrega subdomínio → lê o cookie de override de tenant
+  // setado via GET /api/dev/set-tenant?slug=X. Permite testar qualquer plataforma no tablet/celular
+  // sem precisar de DNS customizado ou nip.io. Guard de produção: nunca ativo fora de dev.
+  const isIpAccess = process.env.NODE_ENV !== 'production' && /^\d{1,3}(\.\d{1,3}){3}$/.test(host)
+  if (isIpAccess) {
+    try {
+      const jar = await cookies()
+      const slugOverride = jar.get('tenant_dev_slug')?.value
+      if (slugOverride) {
+        return remember(`tenant:slug:${slugOverride}`, TTL_TENANT, async () => {
+          const supabase = createAdminClient()
+          const { data } = await supabase.from('simulado_tenants').select('id, nome, slug, tema, plano, ativo').eq('slug', slugOverride).maybeSingle()
+          return (data as Tenant | null) ?? null
+        })
+      }
+    } catch {}
+  }
+
   return remember(`tenant:host:${host || 'none'}`, TTL_TENANT, () => resolverTenantDoBanco(host))
 })
 

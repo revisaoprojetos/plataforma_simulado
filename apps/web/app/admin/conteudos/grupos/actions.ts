@@ -1,4 +1,5 @@
 'use server'
+import type { BancoVinculavel } from './actions-tipos'
 
 /**
  * Estúdio de Conteúdo · Acesso & Comercial — ações da área Grupos de acesso.
@@ -131,7 +132,6 @@ export async function definirValidadeTodosMembros(grupoId: string, expiraEmIso: 
 
 // ───────────────────────── Vincular grupo a BANCOS (elo grupo→banco) ─────────────────────────
 
-export interface BancoVinculavel { id: string; nome: string; vinculado: boolean }
 
 /** Lista os bancos de questões do tenant + marca quais já estão vinculados a este grupo. */
 export async function buscarBancosVinculaveis(grupoId: string, opts?: { q?: string; soVinculados?: boolean }): Promise<{ ok: boolean; itens?: BancoVinculavel[]; total?: number; error?: string }> {

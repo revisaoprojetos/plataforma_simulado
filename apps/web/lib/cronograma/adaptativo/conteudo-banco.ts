@@ -236,7 +236,7 @@ async function montarConteudo(svc: SupabaseClient, tenantId: string, ov: Catalog
     })
   }
   if (!ASout.length) return comOverride({ ...fallbackConteudo(), disciplinas: disciplinasDoCatalogo(), vazio: true, modeloIdx: CATALOGO_HTML.aulas.map((_, i) => i) }, ov)
-  const ordem = [...CATALOGO_HTML.ordem.flatMap((h) => (daPlanilha.has(h) ? [daPlanilha.get(h)!] : [])), ...semPlanilha]
+  const ordem = encaixarSemPlanilha(CATALOGO_HTML.ordem.flatMap((h) => (daPlanilha.has(h) ? [daPlanilha.get(h)!] : [])), semPlanilha, ASout)
 
   // 6) WLP (lei seca por semana)
   //    Heurística doc→semana: todos os docs das subpastas LegProc (de qualquer disciplina) são
@@ -281,6 +281,31 @@ async function montarConteudo(svc: SupabaseClient, tenantId: string, ov: Catalog
     disciplinas: disciplinasDoConteudo(disciplinas, ap.AS, ap.ordem ?? ordem), lpDocs, vazio: false,
     modeloIdx, base: { AS: ASout, ordem, LP, modeloIdx },
   }
+}
+
+/**
+ * Aulas da Biblioteca que o modelo não reconheceu (título diferente do da planilha) NÃO vão mais para o fim de toda a ordem:
+ * isso fazia "Parte 3" de um assunto aparecer no 1º dia enquanto as partes 1 e 2 (sem match) ficavam para o final.
+ * Cada uma entra logo DEPOIS da aula reconhecida anterior da mesma disciplina (ordem natural dos títulos em AS) ou, se não houver,
+ * logo ANTES da primeira reconhecida seguinte; disciplina sem nenhuma reconhecida: vai ao fim (como antes), em ordem.
+ */
+function encaixarSemPlanilha(base: number[], sem: number[], AS: AS): number[] {
+  if (!sem.length) return base
+  const semSet = new Set(sem), baseSet = new Set(base)
+  const depois = new Map<number, number[]>() // âncora (aula reconhecida) → aulas sem match logo após ela
+  const antes = new Map<number, number[]>() // aula reconhecida → aulas sem match logo antes dela
+  const fim: number[] = []
+  for (const i of sem) {
+    let ant = -1, seg = -1
+    for (let j = i - 1; j >= 0; j--) if (AS[j][0] === AS[i][0] && baseSet.has(j)) { ant = j; break }
+    if (ant < 0) for (let j = i + 1; j < AS.length; j++) if (AS[j][0] === AS[i][0] && baseSet.has(j)) { seg = j; break }
+    if (ant >= 0) depois.set(ant, [...(depois.get(ant) || []), i])
+    else if (seg >= 0) antes.set(seg, [...(antes.get(seg) || []), i])
+    else fim.push(i)
+  }
+  const out: number[] = []
+  for (const i of base) { out.push(...(antes.get(i) || []), i, ...(depois.get(i) || [])) }
+  return [...out, ...fim.filter((i) => semSet.has(i))]
 }
 
 /** Metas de LegProc do modelo nas disciplinas presentes, com o documento da lei na Biblioteca (quando houver). */

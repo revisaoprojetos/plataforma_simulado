@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { ScanText, KeyRound } from 'lucide-react'
 import { TranscricaoForm } from './transcricao-form'
 import { ApiKeysManager } from '../api-keys/api-keys-manager'
-import type { StatusIA } from './actions'
+import type { StatusIA } from './actions-tipos'
 
 interface ApiKey {
   id: string; nome: string; key_prefix: string; escopos: string[]

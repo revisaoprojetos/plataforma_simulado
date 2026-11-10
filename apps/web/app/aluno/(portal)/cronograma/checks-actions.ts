@@ -1,4 +1,5 @@
 'use server'
+import type { ChecksDaEmissao } from './checks-actions-tipos'
 
 /**
  * Metas concluídas — o aluno marca o que já fez, dentro de UMA emissão.
@@ -28,9 +29,6 @@ function refrescarSnapshotsMetas(svc: ReturnType<typeof createAdminClient>, tena
     atualizarHomeSnapshot(svc, tenantId, estId),
   ]).catch(() => {})
 }
-
-/** metaId → instante em que o aluno marcou (ISO). */
-export type ChecksDaEmissao = Record<string, string>
 
 /**
  * Confere que a emissão é MESMO deste aluno antes de deixar mexer.

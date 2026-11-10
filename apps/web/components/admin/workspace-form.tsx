@@ -6,7 +6,8 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { confirmar } from '@/components/ui/confirm-dialog'
-import { salvarWorkspace, type WorkspaceGrupo } from '@/app/admin/sistema/actions'
+import type { WorkspaceGrupo } from '@/app/admin/sistema/actions-tipos'
+import {salvarWorkspace} from '@/app/admin/sistema/actions'
 
 export function WorkspaceForm({
   emailsIniciais,

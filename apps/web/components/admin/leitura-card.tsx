@@ -8,7 +8,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Trash2, Copy, ExternalLink, MoreVertical, Check, Loader2, BookOpenText, Eye, EyeOff } from 'lucide-react'
 import { toast } from 'sonner'
-import { duplicarDocumento, excluirDocumento, type Documento } from '@/app/admin/leitura/actions'
+import type { Documento } from '@/app/admin/leitura/actions-tipos'
+import {duplicarDocumento, excluirDocumento} from '@/app/admin/leitura/actions'
 
 /** Card pôster de um documento de leitura (mesma linguagem do banco-card). */
 export function LeituraCard({ doc }: { doc: Documento }) {

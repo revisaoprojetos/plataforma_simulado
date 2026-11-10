@@ -4,7 +4,8 @@ import { useState, useTransition } from 'react'
 import { toast } from 'sonner'
 import { Check, Loader2, ShieldCheck, Bell, BellOff, History, Eye, Lock } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { salvarPapelImpersonacao, salvarModoNotificacaoImpersonacao, type PapelImpersonacao } from '@/app/admin/impersonation/actions'
+import type { PapelImpersonacao } from '@/app/admin/impersonation/actions-tipos'
+import {salvarPapelImpersonacao, salvarModoNotificacaoImpersonacao} from '@/app/admin/impersonation/actions'
 import type { NotifMode } from '@/lib/impersonation/notification'
 
 const NOME_PAPEL: Record<string, string> = {

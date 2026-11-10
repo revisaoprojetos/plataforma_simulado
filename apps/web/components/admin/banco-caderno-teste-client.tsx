@@ -8,7 +8,8 @@ import { BarChart3, Pencil, Clock, Layers, ExternalLink, Loader2, FileText, Clip
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { MaterialPdfCard } from '@/components/admin/banco-caderno-client'
 import { removerMaterialPdf } from '@/app/admin/banco-questoes/estudantes-actions'
-import { apagarCadernoTeste, type CadernoTesteResumo, type CadernoTesteGrupo } from '@/app/admin/cadernos-teste/actions'
+import type { CadernoTesteResumo, CadernoTesteGrupo } from '@/app/admin/cadernos-teste/actions-tipos'
+import {apagarCadernoTeste} from '@/app/admin/cadernos-teste/actions'
 
 /** Lista os cadernos de teste do banco; cada um com a prévia dos grupos + "Abrir editor" + os 2 PDFs. */
 export function BancoCadernoTesteClient({ bancoId, cor, cadernos }: { bancoId: string; cor: string; cadernos: CadernoTesteResumo[] }) {

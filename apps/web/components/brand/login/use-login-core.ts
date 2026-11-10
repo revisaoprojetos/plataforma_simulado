@@ -55,10 +55,17 @@ export function useLoginCore({
     return rt && rt.startsWith('/') && !rt.startsWith('/login') ? rt : null
   }
 
-  async function submit(e: React.FormEvent) {
+  async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
     if (preview) return
     if (ehAdmin) return entrarAdmin()
+    // Autofill em mobile (Android/iOS) às vezes não dispara onChange do React — o estado
+    // fica vazio mas o input tem valor. Lê o DOM como fallback para não bloquear o submit.
+    const els = e.currentTarget.elements
+    const emailFinal = (els.namedItem('email') as HTMLInputElement | null)?.value?.trim() || email
+    const cpfFinal = (els.namedItem('cpf') as HTMLInputElement | null)?.value?.trim() || cpf
+    const telFinal = (els.namedItem('telefone') as HTMLInputElement | null)?.value?.trim() || telefone
+    if (!emailFinal) { setErro('Informe seu e-mail.'); return }
     setErro(null)
     setManutencao(null)
     setCarregando(true)
@@ -66,7 +73,7 @@ export function useLoginCore({
       const res = await fetch('/api/aluno/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, cpf, telefone }),
+        body: JSON.stringify({ email: emailFinal, cpf: cpfFinal, telefone: telFinal }),
       })
       if (!res.ok) {
         const j = await res.json().catch(() => ({}))

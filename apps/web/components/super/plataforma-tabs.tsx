@@ -11,8 +11,8 @@ import { PlataformaDisciplinas } from '@/components/super/plataforma-disciplinas
 import { ConfiguracoesTabs } from '@/app/admin/configuracoes/configuracoes-tabs'
 import { BannersManager, type Banner, type DestinoBanner } from '@/components/admin/banners-manager'
 import { resolverLoginConfig } from '@/lib/login-config'
-import type { AdminMembro, CargoOpcao } from '@/app/admin/administradores/actions'
-import type { EmbedConfigInput } from '@/app/admin/tenants/actions'
+import type { AdminMembro, CargoOpcao } from '@/app/admin/administradores/actions-tipos'
+import type { EmbedConfigInput } from '@/app/admin/tenants/actions-tipos'
 import type { UsoSnapshot } from '@/lib/storage/uso'
 
 type GeralProps = {

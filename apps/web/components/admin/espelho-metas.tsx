@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Database, Loader2, Play, CheckCircle2, Info } from 'lucide-react'
-import { obterEstadoEspelho, espelharPlanosLote, type EstadoEspelho } from '@/app/admin/cronogramas/adaptativo/actions'
+import type { EstadoEspelho } from '@/app/admin/cronogramas/adaptativo/actions-tipos'
+import {obterEstadoEspelho, espelharPlanosLote} from '@/app/admin/cronogramas/adaptativo/actions'
 
 /** Metas do plano EM LINHAS (tabela simulado_cronograma_adaptativo_plano_meta): estado + preenchimento em lote dos planos existentes. */
 export function EspelhoMetas() {

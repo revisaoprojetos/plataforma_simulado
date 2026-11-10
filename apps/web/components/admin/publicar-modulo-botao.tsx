@@ -7,7 +7,8 @@ import { toast } from 'sonner'
 import { Loader2, X, Check, Send, Pencil, Clock, CircleDot, Ban, CalendarClock, Zap } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { brtLocalParaIso, isoParaBrtLocal } from '@/lib/brt'
-import { salvarPublicacaoModulo, type PublicacaoModulo } from '@/app/admin/leitura/actions'
+import type { PublicacaoModulo } from '@/app/admin/leitura/actions-tipos'
+import {salvarPublicacaoModulo} from '@/app/admin/leitura/actions'
 
 type Estado = { label: string; cls: string; Icon: typeof CircleDot }
 function estadoDe(p: PublicacaoModulo): Estado {

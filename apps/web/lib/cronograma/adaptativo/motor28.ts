@@ -332,17 +332,69 @@ export function novosPDFDia27(plano: Plano, cfg: Cfg28, d: DataISO, detalhes: Re
 
 // ── histórico prévio ("Já estuda pelo Revisão?") ──
 /** Índices de AS declarados como já estudados (prefixo inclusivo, na ordem de AS, por disciplina selecionada). */
-export function indicesAnteriores(cfg: Cfg28, AS: AulaAS[]): Set<number> {
+export function indicesAnteriores(cfg: Cfg28, AS: AulaAS[], ordem?: number[] | null): Set<number> {
   const out = new Set<number>()
   if (!cfg.jaEstudaRevisao || !cfg.ultimosTemas) return out
   const ativas = new Set(cfg.discs)
   const pos: Record<string, number> = {}
+  const escolhida: Record<string, number> = {} // disciplina → índice (em AS) da aula que o aluno marcou como a última estudada
   AS.forEach((a, i) => {
     const disc = a[0]; const k = pos[disc] = (pos[disc] ?? -1) + 1
     const lim = cfg.ultimosTemas![disc]
     if (ativas.has(disc) && typeof lim === 'number' && lim >= 0 && k <= lim) out.add(i)
+    if (ativas.has(disc) && typeof lim === 'number' && lim >= 0 && k === lim) escolhida[disc] = i
   })
+  // O prefixo "já estudado" vale na ORDEM DO CURSO (a de estudo), não na ordem de AS (títulos da Biblioteca, que pode ser
+  // alfabética: marcava "Parte 3" sem as partes 1 e 2 e repetia conteúdo já visto). A aula escolhida continua sendo a mesma.
+  if (ordem && ordem.length) {
+    const rank = new Map(ordem.map((i, k) => [i, k]))
+    for (const [disc, i] of Object.entries(escolhida)) {
+      const r = rank.get(i); if (r == null) continue // aula fora da ordem (inativa): mantém o prefixo antigo da disciplina
+      AS.forEach((a, j) => { if (a[0] === disc) { const rj = rank.get(j); if (rj != null) { if (rj <= r) out.add(j); else out.delete(j) } } })
+    }
+  }
   return out
+}
+/**
+ * Matérias em PARALELO. O catálogo traz as aulas em "ondas" (as 4 primeiras matérias consomem muitas semanas antes de as
+ * outras começarem). Aqui a fila é reequilibrada entre as disciplinas SELECIONADAS: mantém a ordem das aulas dentro de cada
+ * disciplina (Parte 1 → 2 → 3…) e, a cada passo, escolhe a disciplina com MENOR fração do conteúdo já consumida (em páginas),
+ * dentro de uma janela de `paralelo` disciplinas (ao terminar uma, entra a próxima da fila).
+ *  · paralelo > 0  → janela fixa escolhida pelo aluno (limitada ao nº de disciplinas);
+ *  · paralelo null/0 → automático: até 4 disciplinas mantém o catálogo; acima de 4 equilibra todas (evita "4 matérias por 19 semanas").
+ * Não mexe nas aulas fora da seleção / já estudadas (ficam ao fim, na ordem original).
+ */
+export function ordemParalela(ordem: number[], AS: AulaAS[], ativas: Set<string>, anteriores: Set<number>, paralelo: number | null): number[] {
+  const uteis = ordem.filter((i) => AS[i] && ativas.has(AS[i][0]) && !anteriores.has(i))
+  const resto = ordem.filter((i) => !(AS[i] && ativas.has(AS[i][0]) && !anteriores.has(i)))
+  const discs: string[] = []
+  const fila = new Map<string, number[]>()
+  for (const i of uteis) { const d = AS[i][0]; if (!fila.has(d)) { fila.set(d, []); discs.push(d) } fila.get(d)!.push(i) }
+  const n = discs.length
+  const janela = paralelo && paralelo > 0 ? Math.min(Math.floor(paralelo), n) : (n > 4 ? n : 0)
+  if (!janela || n <= 1) return ordem
+  const pag = (i: number) => Math.max(1, +AS[i][3] || 60)
+  const total = new Map(discs.map((d) => [d, fila.get(d)!.reduce((s, i) => s + pag(i), 0)]))
+  const lido = new Map<string, number>(), pos = new Map<string, number>()
+  const ativasJanela = discs.slice(0, janela); let proxima = janela
+  ativasJanela.forEach((d) => { lido.set(d, 0); pos.set(d, 0) })
+  const fr = (d: string) => lido.get(d)! / total.get(d)!
+  const saida: number[] = []
+  while (ativasJanela.length) {
+    let melhor = ativasJanela[0]
+    for (const d of ativasJanela) if (fr(d) < fr(melhor) - 1e-9) melhor = d
+    const q = fila.get(melhor)!, k = pos.get(melhor)!
+    saida.push(q[k]); pos.set(melhor, k + 1); lido.set(melhor, lido.get(melhor)! + pag(q[k]))
+    if (k + 1 >= q.length) {
+      const idx = ativasJanela.indexOf(melhor); ativasJanela.splice(idx, 1)
+      if (proxima < discs.length) { // a próxima disciplina entra no nível das que seguem em andamento (não "recupera" tudo de uma vez)
+        const nova = discs[proxima++]
+        lido.set(nova, ativasJanela.length ? Math.min(...ativasJanela.map(fr)) * total.get(nova)! : 0); pos.set(nova, 0)
+        ativasJanela.push(nova)
+      }
+    }
+  }
+  return [...saida, ...resto]
 }
 const tipoEstudo = (id: string) => id.split(':')[0]
 /** 2.13: diagnóstico de tema anterior (`qu:<aula>:hist:<semana>`) e reforço do diagnóstico (`pf|fl:<aula>:reforco:<semana>`). */
@@ -711,14 +763,17 @@ function gerarPlanoNucleo(cfg: Cfg28, AS: AulaAS[], LP: ItemLP[], fixos: Plano, 
   const remanejadas = remanejadasEfetivas(cfg, AS, fixos, base, P)
   const c: Cfg28 = { ...cfg, remanejadas }
   const lista = (LP || []).filter((x) => x && x.id)
+  const ordemCat = ctx.ordem && ctx.ordem.length ? ctx.ordem.filter((i) => AS[i]) : AS.map((_, i) => i)
+  const anteriores0 = indicesAnteriores(c, AS, ordemCat)
   const ctxI: CtxInterno = {
     AS, LP: lista, lpMap: new Map(lista.map((x) => [x.id, x])), lpPos: new Map(lista.map((x, k) => [x.id, k])),
-    ordem: ctx.ordem && ctx.ordem.length ? ctx.ordem.filter((i) => AS[i]) : AS.map((_, i) => i), feitas, usados: new Set(ctx.usados || []), params: P,
+    // matérias em paralelo (cfg.paralelo): reequilibra a fila entre as disciplinas selecionadas (mantém a ordem dentro de cada uma)
+    ordem: ordemParalela(ordemCat, AS, new Set(c.discs), anteriores0, typeof c.paralelo === 'number' ? c.paralelo : null), feitas, usados: new Set(ctx.usados || []), params: P,
     // inteligência de desempenho: vazio (e ignorado) enquanto a flag estiver desligada → plano idêntico ao 2.8
     fracos: P.desempenho.ativo ? temasFracos(ctx.notas, P.desempenho.acertoMin) : new Set<number>(),
   }
   // gerarPlanoCatalogo: fila de aulas sem o histórico prévio; metas remanejadas ficam presas na data pedida
-  const anteriores = indicesAnteriores(c, AS)
+  const anteriores = anteriores0
   const ehAnterior = (id: string) => !ehHist(id) && !ehReforco(id) && /^(pf|pp|fl|qu|rf|rq):/.test(id) && anteriores.has(indiceAula(id))
   const presos: Plano = Object.fromEntries(Object.entries(fixos).filter(([id]) => !ehAnterior(id) || feitas.has(id)))
   for (const [id, r] of Object.entries(remanejadas)) {
@@ -836,7 +891,7 @@ function reforcosDerivados(cfg: Cfg28, AS: AulaAS[], fixos: Plano, feitas: Set<s
 
 export function gerarPlano(cfg: Cfg28, AS: AulaAS[], LP: ItemLP[], fixos: Plano, ancora: DataISO | null, ctx: Contexto = {}): ResultadoPlano {
   const P = resolverParams(ctx.params)
-  const anteriores = indicesAnteriores(cfg, AS)
+  const anteriores = indicesAnteriores(cfg, AS, ctx.ordem)
   const hist = P.historico.ativo && anteriores.size > 0
   if (!P.juris.ativo && !hist) return gerarPlanoNucleo(cfg, AS, LP, fixos, ancora, ctx) // regras desligadas = plano idêntico
   fixos = fixos || {}

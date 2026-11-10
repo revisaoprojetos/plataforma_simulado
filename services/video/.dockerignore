@@ -1,0 +1,26 @@
+# Nada disto vai para o contexto de build (menor, mais rápido, e sem segredos nas imagens)
+.git
+.github
+.husky
+.vscode
+.idea
+**/node_modules
+**/dist
+**/coverage
+**/test-results
+**/playwright-report
+.env
+.env.*
+!.env.example
+*.log
+*.mp4
+*.mkv
+*.mov
+docs
+*.md
+# o player é um site estático à parte; as imagens da API e do worker não o usam
+apps/player
+# testes e carga não entram nas imagens de produção
+load
+apps/api/test
+docker-compose*.yml

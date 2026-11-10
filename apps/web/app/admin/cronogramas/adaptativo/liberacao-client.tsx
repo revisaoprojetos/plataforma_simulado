@@ -6,7 +6,8 @@ import { toast } from 'sonner'
 import { Lock, Unlock, Users, UserPlus, Search, X, CalendarClock, ShieldCheck, Loader2, FlaskConical } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { CfgLiberacao } from '@/lib/cronograma/adaptativo/liberacao'
-import { salvarPainelLiberacao, buscarAlunosLiberacao, simularAlunoLiberacao, type PainelLiberacao, type SimulacaoAluno } from './actions'
+import type { PainelLiberacao, SimulacaoAluno } from './actions-tipos'
+import {salvarPainelLiberacao, buscarAlunosLiberacao, simularAlunoLiberacao} from './actions'
 
 type AlunoRef = { id: string; nome: string; email: string | null }
 const fmt = (iso: string) => iso.split('-').reverse().join('/')

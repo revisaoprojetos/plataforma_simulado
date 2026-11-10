@@ -24,7 +24,7 @@ import { BancoQuestoesTable } from '@/components/admin/banco-questoes-table'
 import { BancoGrupos } from '@/components/admin/banco-grupos'
 import { BancoPersonalizar } from '@/components/admin/banco-personalizar'
 import { iconeBanco } from '@/lib/banco-visual'
-import type { GrupoBanco } from '@/app/admin/banco-questoes/actions'
+import type { GrupoBanco } from '@/app/admin/banco-questoes/actions-tipos'
 import { listarDisciplinasFiltro } from '@/app/admin/banco-questoes/actions'
 import { ArrowLeft, BookOpen, Layers, Palette, ListTree } from 'lucide-react'
 

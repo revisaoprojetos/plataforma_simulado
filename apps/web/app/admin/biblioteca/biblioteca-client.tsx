@@ -11,7 +11,7 @@ import {
   Lock, Palette, Check, Settings2, Copy, Files, Search, Home, FolderTree, CalendarClock, GraduationCap, Music, Image as ImageIcon,
 } from 'lucide-react'
 import { CapaPaginaDialog } from '@/components/biblioteca/capa-pagina-dialog'
-import type { AlvoCP } from './capa-actions'
+import type { AlvoCP } from './capa-actions-tipos'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
   DropdownMenuSub, DropdownMenuSubTrigger, DropdownMenuSubContent,
@@ -34,15 +34,8 @@ import { TIPOS_CONTEUDO, kindPorArquivo, type KindConteudo } from '@/lib/bibliot
 import { confirmar, pedirTexto } from '@/components/ui/confirm-dialog'
 import { createClient } from '@/lib/supabase/client'
 import { formatBrt } from '@/lib/brt'
-import {
-  listarArvore, criarPasta, removerPasta, renomearPasta, moverPasta, definirCorPasta, moverDocumento,
-  importarDocumento, prepararUploadConteudo, importarDeStorage, criarDocumentoBranco, criarConteudoQuestoes, publicarDocumento, publicarNovaVersao, removerDocumento, detalheDocumento, abrirEdicaoDocx,
-  renomearDocumento, urlDownloadDocumento, listarPastasConteudo, dadosVisualizacao, thumbDocumento, pdfPreviewDocumento, midiaPreviewDocumento, conteudoPreviewAdmin, duplicarDocumento,
-  definirPastaDisciplinaCronograma, removerPastaDisciplinaCronograma, definirTipoMaterialSubpasta, definirLegendaTabelaPasta,
-  carregarArvoreAcesso, montarArvoreAcessoDrive, salvarAcessoNo, resolverEstudantePorEmail,
-  listarGruposBiblioteca, buscarAlunosBiblioteca, gruposDoEstudante,
-  type PastaConteudo, type Categoria, type NoAcesso,
-} from './actions'
+import type { PastaConteudo, Categoria, NoAcesso } from './actions-tipos'
+import { listarArvore, criarPasta, removerPasta, renomearPasta, moverPasta, definirCorPasta, moverDocumento, importarDocumento, prepararUploadConteudo, importarDeStorage, criarDocumentoBranco, criarConteudoQuestoes, publicarDocumento, publicarNovaVersao, removerDocumento, detalheDocumento, abrirEdicaoDocx, renomearDocumento, urlDownloadDocumento, listarPastasConteudo, dadosVisualizacao, thumbDocumento, pdfPreviewDocumento, midiaPreviewDocumento, conteudoPreviewAdmin, duplicarDocumento, definirPastaDisciplinaCronograma, removerPastaDisciplinaCronograma, definirTipoMaterialSubpasta, definirLegendaTabelaPasta, carregarArvoreAcesso, montarArvoreAcessoDrive, salvarAcessoNo, resolverEstudantePorEmail, listarGruposBiblioteca, buscarAlunosBiblioteca, gruposDoEstudante } from './actions'
 
 declare global { interface Window { DocsAPI?: any } }
 

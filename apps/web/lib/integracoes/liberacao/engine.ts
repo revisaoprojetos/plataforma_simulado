@@ -13,6 +13,7 @@ import type {
   SimulacaoRegra, ResultadoSimulacao,
 } from './tipos'
 import type { ItemTipo } from '@/lib/produtos/tipos'
+import { sincronizarAlunoProduto } from '@/lib/video/sync'
 import type { Provider, PessoaNormalizada, Entitlement, ResultadoEntitlement } from '@/lib/integracoes/tipos'
 
 /**
@@ -195,6 +196,9 @@ async function reconciliarEstudanteProduto(svc: any, tenantId: string, estId: st
       await revogarItem(svc, tenantId, estId, it.tipo, it.itemId)
     }
   }
+  // Vídeo próprio: enfileira enroll/revoke dos cursos de vídeo do produto (idempotente; nunca lança;
+  // no-op sem video_empresas ativa). Ver docs/video/INTEGRACAO-LIBERACAO.md.
+  await sincronizarAlunoProduto(tenantId, estId, produtoId, agora)
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

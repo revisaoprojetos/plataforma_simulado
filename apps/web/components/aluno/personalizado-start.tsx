@@ -8,7 +8,8 @@ import { confirmar } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/utils'
 import { formatarTempo } from '@/components/aluno/seletor-tempo'
 import { PersonalizadoRunner } from '@/components/aluno/personalizado-runner'
-import { abrirSessaoPessoal, type ResumoPessoal, type ModoPessoal, type SessaoPessoal } from '@/app/aluno/(portal)/simulados/runner-actions'
+import type { ResumoPessoal, ModoPessoal, SessaoPessoal } from '@/app/aluno/(portal)/simulados/runner-actions-tipos'
+import {abrirSessaoPessoal} from '@/app/aluno/(portal)/simulados/runner-actions'
 
 const MODO: Record<ModoPessoal, { nome: string; desc: string; Icon: typeof GraduationCap }> = {
   estudo: { nome: 'Estudo', desc: 'Gabarito a cada questão', Icon: GraduationCap },

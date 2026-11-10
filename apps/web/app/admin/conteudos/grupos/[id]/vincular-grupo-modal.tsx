@@ -5,7 +5,8 @@ import { toast } from 'sonner'
 import { Search, Check, X, Loader2, AlertTriangle, Database, ExternalLink } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { buscarBancosVinculaveis, vincularGrupoBancos, type BancoVinculavel } from '@/app/admin/conteudos/grupos/actions'
+import type { BancoVinculavel } from '@/app/admin/conteudos/grupos/actions-tipos'
+import {buscarBancosVinculaveis, vincularGrupoBancos} from '@/app/admin/conteudos/grupos/actions'
 
 /**
  * VincularGrupo (versão grupo→bancos). Marca/desmarca os bancos de questões que o grupo alimenta.

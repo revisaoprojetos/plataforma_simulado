@@ -1,4 +1,5 @@
 'use server'
+import type { CadernoBloco, CadernoConfig, CadernoRow, TabelaCaderno } from './actions-tipos'
 
 import { createHash } from 'crypto'
 import { revalidatePath } from 'next/cache'
@@ -11,17 +12,6 @@ import { hospedarBase64 } from '@/lib/storage/hospedar-base64'
 import { BUCKET_IMAGENS } from '@/lib/storage/bucket-imagens'
 import { getStorage } from '@/lib/storage'
 
-export interface CadernoBloco {
-  id: string
-  tipo: 'texto' | 'questao'
-  conteudo?: string
-  questao_id?: string
-}
-export interface CadernoConfig {
-  cabecalho?: string
-  instrucoes?: string
-  blocos: CadernoBloco[]
-}
 
 export async function criarCaderno(nome: string, pastaId?: string | null): Promise<{ ok: boolean; id?: string; error?: string }> {
   if (!(await checkPermission('questoes:create')) && !(await checkPermission('questoes:update'))) {
@@ -53,7 +43,6 @@ function contarBlocosConfig(config: any): number {
   return (config?.blocos ?? []).length
 }
 
-export type CadernoRow = { id: string; nome: string; blocos: number; cor: string | null; icone: string | null; capa: string | null }
 
 /**
  * Cópia LITERAL de um caderno: TODA a config (docsV2/modalidadesV2/cores/material/bancoId…),
@@ -156,7 +145,6 @@ export async function salvarCadernoConfig(id: string, config: CadernoConfig): Pr
 }
 
 /** Salva o documento do editor de blocos v2 (docsV2/modalidadesV2/cores), preservando campos legados. */
-export type TabelaCaderno = 'simulado_cadernos_designer' | 'simulado_cadernos_teste'
 
 export async function salvarCadernoDesignerV2(
   id: string,

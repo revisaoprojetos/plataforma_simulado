@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { confirmar } from '@/components/ui/confirm-dialog'
 import { deleteRoleAction } from '@/app/admin/rbac/actions'
-import { criarCategoriaCargoAction, excluirCategoriaCargoAction, atribuirCategoriaCargoAction, type RbacCategoria } from '@/app/admin/tenants/actions'
+import type { RbacCategoria } from '@/app/admin/tenants/actions-tipos'
+import {criarCategoriaCargoAction, excluirCategoriaCargoAction, atribuirCategoriaCargoAction} from '@/app/admin/tenants/actions'
 
 export type CargoItem = { id: string; nome: string; descricao: string | null; is_sistema: boolean; permCount: number; categoriaId?: string | null }
 

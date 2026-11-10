@@ -49,12 +49,12 @@ import { BuscaDrive, type OpcaoChip } from '@/components/biblioteca/busca-drive'
 import { DriveUploadPanel, DriveNovoStyles, type DriveUploadItem } from '@/components/admin/drive-novo'
 import { cardGrid, FOLDER_MIN, POSTER_MIN } from '@/components/aluno/card-grid'
 import { TIPOS_CONTEUDO, type KindConteudo } from '@/lib/biblioteca/tipos-conteudo'
-import { detectarVideo, PLATAFORMA_LABEL, type VideoPlataforma } from '@/lib/biblioteca/video-provedor'
+import { detectarVideo, PLATAFORMA_LABEL, referenciaVideoProprio, type VideoPlataforma } from '@/lib/biblioteca/video-provedor'
+import { formatTime } from '@/lib/video/player-protocolo'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
-import {
-  listarArvore, listarPastasConteudo, prepararUploadConteudo, importarDeStorage, type Categoria,
-} from '@/app/admin/biblioteca/actions'
+import type { Categoria } from '@/app/admin/biblioteca/actions-tipos'
+import { listarArvore, listarPastasConteudo, prepararUploadConteudo, importarDeStorage } from '@/app/admin/biblioteca/actions'
 
 // ───────────────────────── Tipos públicos (contrato) ─────────────────────────
 export type FilePickerAba = 'biblioteca' | 'upload' | 'video' | 'link'
@@ -555,13 +555,15 @@ function AbaUpload({ categoria: CATEGORIA, onReportar }: { categoria: Categoria;
 function AbaVideo({ onReportar }: { onReportar: (r: FilePickerResultado[] | null, texto?: string | null) => void }) {
   const [url, setUrl] = useState('')
   const [titulo, setTitulo] = useState('')
+  const [proprio, setProprio] = useState<{ id: string; titulo: string } | null>(null)
   const info = useMemo(() => (url.trim() ? detectarVideo(url) : null), [url])
   const valido = !!info && info.plataforma !== 'desconhecido'
 
   useEffect(() => {
-    if (valido && info) onReportar([{ tipo: 'video', url: url.trim(), plataforma: info.plataforma, titulo: titulo.trim() || undefined, embedUrl: info.embedUrl }], `${PLATAFORMA_LABEL[info.plataforma]}${titulo.trim() ? ` · ${titulo.trim()}` : ''}`)
+    if (proprio) onReportar([{ tipo: 'video', url: referenciaVideoProprio(proprio.id), plataforma: 'proprio', titulo: titulo.trim() || proprio.titulo, embedUrl: null }], `${PLATAFORMA_LABEL.proprio} · ${titulo.trim() || proprio.titulo}`)
+    else if (valido && info) onReportar([{ tipo: 'video', url: url.trim(), plataforma: info.plataforma, titulo: titulo.trim() || undefined, embedUrl: info.embedUrl }], `${PLATAFORMA_LABEL[info.plataforma]}${titulo.trim() ? ` · ${titulo.trim()}` : ''}`)
     else onReportar(null)
-  }, [valido, info, url, titulo, onReportar])
+  }, [proprio, valido, info, url, titulo, onReportar])
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-y-auto p-5">
@@ -571,7 +573,7 @@ function AbaVideo({ onReportar }: { onReportar: (r: FilePickerResultado[] | null
             <span className="mb-1 block text-xs font-semibold text-muted-foreground">URL do vídeo</span>
             <input
               value={url}
-              onChange={(e) => setUrl(e.target.value)}
+              onChange={(e) => { setUrl(e.target.value); if (e.target.value.trim()) setProprio(null) }}
               placeholder="Cole o link do YouTube, Vimeo, Panda Video ou Google Drive"
               className="h-10 w-full rounded-lg border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
             />
@@ -592,11 +594,8 @@ function AbaVideo({ onReportar }: { onReportar: (r: FilePickerResultado[] | null
             </div>
           )}
 
-          {/* Placeholder honesto: hospedagem própria (não existe "Waid Player" no sistema). */}
-          <div className="rounded-xl border border-dashed bg-muted/30 p-3 text-xs text-muted-foreground">
-            <div className="mb-0.5 flex items-center gap-1.5 font-semibold text-foreground"><Info className="h-3.5 w-3.5" />Hospedagem própria de vídeo — em breve</div>
-            O upload de vídeo para um player próprio da plataforma (processamento/qualidades, marca d&apos;água, offline) ainda não existe. Por enquanto, use um dos provedores acima por link.
-          </div>
+          {/* Vídeo próprio (hospedado): lista os vídeos prontos do Estúdio (/admin/conteudos/videos). */}
+          <SeletorVideoProprio selecionadoId={proprio?.id ?? null} onEscolher={(v) => { setProprio(v); if (v) setUrl('') }} />
         </div>
 
         {/* Prévia do embed */}
@@ -614,6 +613,77 @@ function AbaVideo({ onReportar }: { onReportar: (r: FilePickerResultado[] | null
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// Vídeos hospedados prontos (GET /api/admin/video?status=ready — busca/paginação no servidor). Sem permissão (403)
+// ou falha → estado vazio discreto; os provedores por link seguem funcionando.
+type LinhaVideoProprio = { id: string; titulo: string; duracaoS?: number | null }
+function SeletorVideoProprio({ selecionadoId, onEscolher }: { selecionadoId: string | null; onEscolher: (v: { id: string; titulo: string } | null) => void }) {
+  const [busca, setBusca] = useState('')
+  const [rows, setRows] = useState<LinhaVideoProprio[]>([])
+  const [estado, setEstado] = useState<'carregando' | 'ok' | 'indisponivel'>('carregando')
+
+  useEffect(() => {
+    const ctrl = new AbortController()
+    const t = setTimeout(async () => {
+      setEstado('carregando')
+      try {
+        const qs = new URLSearchParams({ status: 'ready', pageSize: '50', page: '1' })
+        if (busca.trim()) qs.set('search', busca.trim())
+        const res = await fetch(`/api/admin/video?${qs}`, { signal: ctrl.signal, cache: 'no-store' })
+        if (!res.ok) { setRows([]); setEstado('indisponivel'); return }
+        const j = (await res.json()) as { rows?: LinhaVideoProprio[] }
+        setRows(Array.isArray(j.rows) ? j.rows : [])
+        setEstado('ok')
+      } catch (e) {
+        if ((e as { name?: string })?.name === 'AbortError') return
+        setRows([]); setEstado('indisponivel')
+      }
+    }, busca ? 300 : 0)
+    return () => { clearTimeout(t); ctrl.abort() }
+  }, [busca])
+
+  return (
+    <div className="rounded-xl border bg-card p-3">
+      <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-foreground"><VideoIcon className="h-3.5 w-3.5" />{PLATAFORMA_LABEL.proprio}</div>
+      {estado === 'indisponivel' ? (
+        <p className="text-xs text-muted-foreground">Nenhum vídeo hospedado disponível para seu acesso. Use um dos provedores acima por link.</p>
+      ) : (
+        <>
+          <input
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar vídeo hospedado pelo título"
+            aria-label="Buscar vídeo hospedado"
+            className="mb-2 h-9 w-full rounded-lg border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+          />
+          <div className="max-h-48 overflow-y-auto rounded-lg border">
+            {estado === 'carregando' ? (
+              <div className="flex items-center gap-1.5 p-3 text-xs text-muted-foreground"><Loader2 className="h-3.5 w-3.5 animate-spin" />Carregando vídeos…</div>
+            ) : rows.length === 0 ? (
+              <div className="p-3 text-xs text-muted-foreground">{busca.trim() ? 'Nenhum vídeo pronto encontrado.' : 'Nenhum vídeo pronto ainda.'}</div>
+            ) : (
+              <ul>
+                {rows.map((v) => {
+                  const on = v.id === selecionadoId
+                  return (
+                    <li key={v.id}>
+                      <button type="button" aria-pressed={on} onClick={() => onEscolher(on ? null : { id: v.id, titulo: v.titulo })}
+                        className={cn('flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-muted/60', on && 'bg-primary/10 text-primary')}>
+                        {on ? <Check className="h-4 w-4 shrink-0" /> : <VideoIcon className="h-4 w-4 shrink-0 text-muted-foreground" />}
+                        <span className="min-w-0 flex-1 truncate">{v.titulo}</span>
+                        {typeof v.duracaoS === 'number' && v.duracaoS > 0 && <span className="shrink-0 text-xs text-muted-foreground">{formatTime(v.duracaoS)}</span>}
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </div>
+        </>
+      )}
     </div>
   )
 }

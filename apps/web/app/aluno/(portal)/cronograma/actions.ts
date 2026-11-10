@@ -1,4 +1,5 @@
 'use server'
+import type { ResultadoGeracao } from './actions-tipos'
 
 /**
  * Geração do cronograma pelo aluno.
@@ -19,10 +20,6 @@ import { gerarGrade } from '@/lib/cronograma/gerador'
 import { contarQuestoesPorMeta, aplicarQtdQuestoes } from '@/lib/cronograma/questoes-meta'
 import { mapaTiposMeta } from '@/lib/cronograma/carregar-tipos'
 import type { Grade, LinkAula, MetaFonte, OpcoesGeracao } from '@/lib/cronograma/tipos'
-
-export type ResultadoGeracao =
-  | { ok: true; grade: Grade; emissaoId: string | null; erroAoSalvar?: string }
-  | { ok: false; error: string; semAcesso?: boolean }
 
 /**
  * Monta a grade e registra a emissão.

@@ -1,0 +1,375 @@
+# =====================================================================
+# STACK PORTAINER (Swarm) — Gerenciador de Vídeo (services/video)
+# Serviços: api (N réplicas) · consolidator · worker (nó com CPU) · postgres · redis · migrate (job único)
+# Usa IMAGENS PRONTAS do GHCR (buildadas por .github/workflows/docker-publish-video.yml). Swarm não builda.
+# Modelo: docker-compose.portainer.yml (stack principal). Runbook: docs/video/RUNBOOK.md.
+# Variáveis (todas): services/video/.env.video.example
+#
+# ANTES DE SUBIR (uma vez):
+#  1) O workflow "Build e Push Video para GHCR" precisa ter rodado verde. Deixe os 2 pacotes
+#     (plataforma_simulado-video-api e plataforma_simulado-video-worker) PÚBLICOS no GitHub
+#     (ou configure credenciais do GHCR no Portainer), senão o Swarm não baixa.
+#  2) DNS: registro A de VIDEO_API_HOST (padrão video-api.revisaopge.com.br) -> IP da VPS.
+#  3) Rótulos de nó (docker node update --label-add ...):
+#       video-worker=true   -> nó com CPU que roda o transcode (ffmpeg)
+#       video-data=true     -> nó que guarda os volumes do Postgres e do Redis (dados locais!)
+#     Sem o rótulo video-data o Swarm pode religar o Postgres em outro nó e ele subiria VAZIO.
+#  4) Defina as variáveis no Portainer (Environment variables). Obrigatórias: VIDEO_TAG, POSTGRES_PASSWORD,
+#     REDIS_PASSWORD, S3_ACCESS_KEY, S3_SECRET_KEY, JWT_ACCESS_SECRET, JWT_REFRESH_SECRET, CORS_ORIGINS,
+#     METRICS_TOKEN. Senhas só com letras e números (entram em URLs de conexão).
+#  5) Nome sugerido da stack no Portainer: `video` (serviços viram video_api, video_worker, ...).
+#
+# DEPLOY POR SHA (nunca :latest em branch — ver docs/runbook-deploy-e-incidentes.md §2):
+#     VIDEO_TAG=<SHA completo de 40 caracteres>
+#
+# MIGRATIONS: o serviço `migrate` roda `prisma migrate deploy` UMA vez e termina (restart none).
+#   - Num `stack deploy`/update ele só roda de novo se a sua definição mudar (a tag da imagem muda
+#     a cada deploy, então roda). Para FORÇAR (mesma tag):  docker service update --force video_migrate
+#   - O Swarm não tem `depends_on: condition`, então API/worker NÃO esperam a migration. Por isso as migrations
+#     são sempre ADITIVAS (regra do plano). Ordem segura: atualizar `migrate` primeiro, conferir
+#     `docker service logs video_migrate`, só então subir a nova tag nos demais (ver RUNBOOK §3).
+#
+# Nada aqui publica porta direto no host: o Traefik existente roteia (rede externa TRAEFIK_NETWORK).
+# Segredos: por variável de ambiente. A API NestJS ainda não lê `*_FILE` (Docker secrets) — só o worker lê;
+# ver "Pendências" em docs/video/RUNBOOK.md.
+# =====================================================================
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+x-app-env: &app-env
+  NODE_ENV: production
+  DATABASE_URL: postgresql://video:${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}@video-postgres:5432/video
+  # Reservado para o Prisma `directUrl` (Fase 1.11). Aqui é a mesma conexão (não há PgBouncer).
+  DIRECT_URL: postgresql://video:${POSTGRES_PASSWORD}@video-postgres:5432/video
+  REDIS_URL: redis://:${REDIS_PASSWORD:?defina REDIS_PASSWORD}@video-redis:6379
+  S3_ENDPOINT: ${S3_ENDPOINT:-https://hel1.your-objectstorage.com}
+  S3_REGION: ${S3_REGION:-hel1}
+  S3_BUCKET: ${S3_BUCKET:-revisaopge-videos}
+  S3_ACCESS_KEY: ${S3_ACCESS_KEY:?defina S3_ACCESS_KEY}
+  S3_SECRET_KEY: ${S3_SECRET_KEY:?defina S3_SECRET_KEY}
+  S3_FORCE_PATH_STYLE: ${S3_FORCE_PATH_STYLE:-false}
+  METRICS_TOKEN: ${METRICS_TOKEN:?defina METRICS_TOKEN (16+ caracteres)}
+
+x-api-env: &api-env
+  <<: *app-env
+  JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?defina JWT_ACCESS_SECRET (32+ caracteres)}
+  JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?defina JWT_REFRESH_SECRET (32+ caracteres, diferente do access)}
+  JWT_ACCESS_TTL: ${JWT_ACCESS_TTL:-15m}
+  JWT_REFRESH_TTL: ${JWT_REFRESH_TTL:-7d}
+  CORS_ORIGINS: ${CORS_ORIGINS:?defina CORS_ORIGINS (https://..., separados por vírgula)}
+  TRUST_PROXY: ${TRUST_PROXY:-1}
+  RATE_LIMIT_ENABLED: "true"
+  SWAGGER_ENABLED: ${SWAGGER_ENABLED:-false}
+  ACCESS_ENDPOINT_ENABLED: ${ACCESS_ENDPOINT_ENABLED:-true}
+  LOG_LEVEL: ${LOG_LEVEL:-info}
+  MAX_UPLOAD_BYTES: ${MAX_UPLOAD_BYTES:-10737418240}
+  MAX_CONCURRENT_STREAMS: ${MAX_CONCURRENT_STREAMS:-2}
+  PLAYBACK_TOKEN_TTL: ${PLAYBACK_TOKEN_TTL:-5m}
+  HLS_SEGMENT_URL_TTL: ${HLS_SEGMENT_URL_TTL:-1h}
+
+services:
+  # ------------------------------------------------------------------
+  # API NestJS — stateless, N réplicas. Heartbeats só enfileiram no Redis (consolidação fica no consolidator).
+  # ------------------------------------------------------------------
+  api:
+    image: ghcr.io/${GHCR_OWNER:-revisaoprojetos}/plataforma_simulado-video-api:${VIDEO_TAG:?defina VIDEO_TAG (SHA completo)}
+    init: true
+    environment:
+      <<: *api-env
+      PORT: "3000"
+      PROGRESS_FLUSH_INTERVAL_MS: "0"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    networks:
+      - video_internal
+      - traefik
+    logging: *logging
+    stop_grace_period: 30s
+    # O HEALTHCHECK padrão da imagem (/health/live) vale aqui; o Swarm só promove a task nova quando saudável.
+    deploy:
+      replicas: ${VIDEO_API_REPLICAS:-2}
+      update_config:
+        parallelism: 1
+        order: start-first
+        failure_action: rollback
+        monitor: 45s
+        max_failure_ratio: 0
+      rollback_config:
+        order: start-first
+      restart_policy:
+        condition: any
+        delay: 5s
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1G
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+      placement:
+        constraints:
+          - node.role == worker
+      labels:
+        - "traefik.enable=true"
+        - "traefik.docker.network=${TRAEFIK_NETWORK:-network_swarm_public}"
+        # Rota pública da API (Host explícito > catch-all dos subdomínios de tenant, que tem prioridade 1).
+        - "traefik.http.routers.video-api.rule=Host(`${VIDEO_API_HOST:-video-api.revisaopge.com.br}`)"
+        - "traefik.http.routers.video-api.priority=20"
+        - "traefik.http.routers.video-api.entrypoints=websecure"
+        - "traefik.http.routers.video-api.tls=true"
+        - "traefik.http.routers.video-api.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencryptresolver}"
+        - "traefik.http.routers.video-api.service=video-api"
+        - "traefik.http.services.video-api.loadbalancer.server.port=3000"
+        # MCP desligado (decisão D4) e /metrics só pela rede interna: caminhos bloqueados na borda.
+        # ipwhitelist com 127.0.0.1/32 => 403 para qualquer cliente externo (v2 e v3; em v3 é o nome legado de ipallowlist).
+        - "traefik.http.middlewares.video-api-deny.ipwhitelist.sourcerange=127.0.0.1/32"
+        - "traefik.http.routers.video-api-bloqueados.rule=Host(`${VIDEO_API_HOST:-video-api.revisaopge.com.br}`) && (PathPrefix(`/mcp`) || PathPrefix(`/metrics`))"
+        - "traefik.http.routers.video-api-bloqueados.priority=30"
+        - "traefik.http.routers.video-api-bloqueados.entrypoints=websecure"
+        - "traefik.http.routers.video-api-bloqueados.tls=true"
+        - "traefik.http.routers.video-api-bloqueados.tls.certresolver=${TRAEFIK_CERTRESOLVER:-letsencryptresolver}"
+        - "traefik.http.routers.video-api-bloqueados.middlewares=video-api-deny"
+        - "traefik.http.routers.video-api-bloqueados.service=video-api"
+
+  # ------------------------------------------------------------------
+  # Consolidador — mesmo código da API, outro entrypoint: grava no Postgres os heartbeats enfileirados no Redis.
+  # ------------------------------------------------------------------
+  consolidator:
+    image: ghcr.io/${GHCR_OWNER:-revisaoprojetos}/plataforma_simulado-video-api:${VIDEO_TAG:?defina VIDEO_TAG (SHA completo)}
+    init: true
+    command: ["node", "apps/api/dist/consolidator.main.js"]
+    environment:
+      <<: *api-env
+      PROGRESS_FLUSH_INTERVAL_MS: "2000"
+      CONSOLIDATOR_PORT: "9102"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    networks:
+      - video_internal
+    logging: *logging
+    stop_grace_period: 60s # esvazia a fila de heartbeats antes de sair
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:9102/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
+    deploy:
+      replicas: ${VIDEO_CONSOLIDATOR_REPLICAS:-1}
+      update_config:
+        parallelism: 1
+        order: start-first
+        failure_action: rollback
+        monitor: 30s
+        max_failure_ratio: 0
+      rollback_config:
+        order: start-first
+      restart_policy:
+        condition: any
+        delay: 5s
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+        reservations:
+          memory: 128M
+      placement:
+        constraints:
+          - node.role == worker
+
+  # ------------------------------------------------------------------
+  # Worker de transcode (ffmpeg) — CPU-bound; roda só no(s) nó(s) rotulado(s) video-worker=true.
+  # ------------------------------------------------------------------
+  worker:
+    image: ghcr.io/${GHCR_OWNER:-revisaoprojetos}/plataforma_simulado-video-worker:${VIDEO_TAG:?defina VIDEO_TAG (SHA completo)}
+    init: true
+    environment:
+      <<: *app-env
+      METRICS_PORT: "9100"
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-1}
+      FFMPEG_PRESET: ${FFMPEG_PRESET:-veryfast}
+      FFMPEG_THREADS: ${FFMPEG_THREADS:-0}
+      # Tempo máximo do JOB inteiro (download + qualidades + upload). 3 h.
+      JOB_TIMEOUT_MS: ${JOB_TIMEOUT_MS:-10800000}
+      # lockDuration/stalledInterval: um worker morto à força (OOM/SIGKILL) tem o job retomado em ~90 s.
+      WORKER_LOCK_DURATION_MS: ${WORKER_LOCK_DURATION_MS:-60000}
+      WORKER_STALLED_INTERVAL_MS: ${WORKER_STALLED_INTERVAL_MS:-30000}
+      WORKER_MAX_STALLED_COUNT: ${WORKER_MAX_STALLED_COUNT:-2}
+      # SIGTERM: espera até 2 min os jobs terminarem; depois mata o ffmpeg e DEVOLVE o job à fila (sem gastar tentativa).
+      # Teto de saída = drain + 90 s, sempre menor que o stop_grace_period abaixo.
+      SHUTDOWN_DRAIN_MS: ${VIDEO_SHUTDOWN_DRAIN_MS:-120000}
+      WORK_DIR: /tmp
+      MIN_FREE_DISK_BYTES: ${MIN_FREE_DISK_BYTES:-2147483648}
+      DISK_SPACE_FACTOR: ${DISK_SPACE_FACTOR:-2.5}
+    read_only: true
+    cap_drop:
+      - ALL
+    volumes:
+      # Originais (GBs) e saída HLS: precisam de DISCO, não de RAM (por isso volume, não tmpfs).
+      - worker_tmp:/tmp
+    networks:
+      - video_internal
+    logging: *logging
+    stop_grace_period: 10m
+    deploy:
+      replicas: ${VIDEO_WORKER_REPLICAS:-1}
+      update_config:
+        parallelism: 1
+        # stop-first: nunca dois ffmpeg disputando a mesma CPU/disco durante o deploy.
+        order: stop-first
+        failure_action: rollback
+        monitor: 30s
+      restart_policy:
+        condition: any
+        delay: 10s
+      resources:
+        limits:
+          cpus: "${VIDEO_WORKER_CPUS:-4}"
+          memory: ${VIDEO_WORKER_MEMORY:-3G}
+        reservations:
+          cpus: "1.0"
+          memory: 512M
+      placement:
+        constraints:
+          - node.labels.video-worker == true
+
+  # ------------------------------------------------------------------
+  # Migrations — JOB DE EXECUÇÃO ÚNICA. Mesma imagem da API (tem a CLI do Prisma). Ver instruções no topo.
+  # ------------------------------------------------------------------
+  migrate:
+    image: ghcr.io/${GHCR_OWNER:-revisaoprojetos}/plataforma_simulado-video-api:${VIDEO_TAG:?defina VIDEO_TAG (SHA completo)}
+    command: ["node", "node_modules/prisma/build/index.js", "migrate", "deploy", "--schema", "prisma/schema.prisma"]
+    environment:
+      DATABASE_URL: postgresql://video:${POSTGRES_PASSWORD}@video-postgres:5432/video
+      DIRECT_URL: postgresql://video:${POSTGRES_PASSWORD}@video-postgres:5432/video
+    # O HEALTHCHECK da imagem é da API (porta 3000) e não se aplica a um job.
+    healthcheck:
+      disable: true
+    cap_drop:
+      - ALL
+    networks:
+      - video_internal
+    logging: *logging
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: none
+      resources:
+        limits:
+          memory: 512M
+      placement:
+        constraints:
+          - node.role == worker
+
+  # ------------------------------------------------------------------
+  # Postgres dedicado (heartbeats não vão ao Supabase). Dados em volume LOCAL => fixado no nó video-data=true.
+  # Backup: apps/api/scripts/backup-pg.sh (cron do host) — ver RUNBOOK §6.
+  # ------------------------------------------------------------------
+  postgres:
+    image: postgres:16-alpine
+    command: ["postgres", "-c", "max_connections=200", "-c", "shared_buffers=${VIDEO_PG_SHARED_BUFFERS:-256MB}"]
+    environment:
+      POSTGRES_USER: video
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD}
+      POSTGRES_DB: video
+    volumes:
+      - video_pgdata:/var/lib/postgresql/data
+    networks:
+      video_internal:
+        aliases:
+          - video-postgres
+    logging: *logging
+    stop_grace_period: 60s
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U video -d video"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    deploy:
+      replicas: 1
+      update_config:
+        order: stop-first
+        failure_action: rollback
+      restart_policy:
+        condition: any
+        delay: 5s
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1G
+        reservations:
+          memory: 256M
+      placement:
+        constraints:
+          - node.labels.video-data == true
+
+  # ------------------------------------------------------------------
+  # Redis dedicado: fila de transcode + heartbeats. noeviction (nunca descartar fila) + AOF.
+  # ------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    # Senha lida do ambiente pelo shell (não aparece na lista de argumentos do serviço).
+    command:
+      - sh
+      - -c
+      - exec redis-server --requirepass "$$REDIS_PASSWORD" --appendonly yes --appendfsync everysec --maxmemory ${VIDEO_REDIS_MAXMEMORY:-1gb} --maxmemory-policy noeviction
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?defina REDIS_PASSWORD}
+    volumes:
+      - video_redisdata:/data
+    networks:
+      video_internal:
+        aliases:
+          - video-redis
+    logging: *logging
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" --no-auth-warning ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    deploy:
+      replicas: 1
+      update_config:
+        order: stop-first
+        failure_action: rollback
+      restart_policy:
+        condition: any
+        delay: 5s
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1536M
+        reservations:
+          memory: 128M
+      placement:
+        constraints:
+          - node.labels.video-data == true
+
+networks:
+  # Rede interna da stack: postgres/redis/worker/consolidator só existem aqui (sem porta publicada).
+  # NÃO é `internal: true` porque api/worker precisam sair para o S3 pelo gateway do Docker.
+  # `attachable` permite que o Prometheus (outra stack) e comandos pontuais (backup/restore) entrem nela.
+  video_internal:
+    name: ${VIDEO_INTERNAL_NETWORK:-video_internal}
+    driver: overlay
+    attachable: true
+  traefik:
+    external: true
+    name: ${TRAEFIK_NETWORK:-network_swarm_public}
+
+volumes:
+  video_pgdata:
+  video_redisdata:
+  worker_tmp:

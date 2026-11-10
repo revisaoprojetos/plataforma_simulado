@@ -6,12 +6,11 @@ import { HelpCircle, Trash2, Star, Plus, ListTree, ChevronUp, ChevronDown } from
 import { cn } from '@/lib/utils'
 import { MarkdownContent } from '@/components/markdown-content'
 import { AdicionarQuestoesDialog } from '@/components/admin/adicionar-questoes-dialog'
-import { listarDisciplinasFiltro, type QuestaoBancoBuscaItem } from '@/app/admin/banco-questoes/actions'
+import type { QuestaoBancoBuscaItem } from '@/app/admin/banco-questoes/actions-tipos'
+import {listarDisciplinasFiltro} from '@/app/admin/banco-questoes/actions'
 import type { QuestaoImport } from '@/app/admin/banco-questoes/import-types'
-import {
-  listarQuestoesDocumento, adicionarQuestaoDocumento, atualizarQuestaoDocumento, removerQuestaoDocumento, importarQuestoesLeitura,
-  type QuestaoDoc,
-} from '@/app/admin/leitura/actions'
+import type { QuestaoDoc } from '@/app/admin/leitura/actions-tipos'
+import { listarQuestoesDocumento, adicionarQuestaoDocumento, atualizarQuestaoDocumento, removerQuestaoDocumento, importarQuestoesLeitura } from '@/app/admin/leitura/actions'
 
 // Item do índice — SÓ capítulos (expansíveis) + artigos (§/inciso/"Livros do Tombo" ficam de fora).
 interface OutlineItem { key: string; artId: string | null; nivel: number; isArtigo: boolean; isCap: boolean; label: string }

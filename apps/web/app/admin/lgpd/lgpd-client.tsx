@@ -7,7 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Download, Trash2, XCircle, Loader2, Clock, CheckCircle2, ShieldOff } from 'lucide-react'
 import { confirmar, pedirTexto } from '@/components/ui/confirm-dialog'
 import { AlertBox } from '@/components/ui/alert-box'
-import { listarSolicitacoes, exportarEstudanteAdmin, anonimizarSolicitacao, rejeitarSolicitacao, type SolicitacaoLgpd } from './actions'
+import type { SolicitacaoLgpd } from './actions-tipos'
+import {listarSolicitacoes, exportarEstudanteAdmin, anonimizarSolicitacao, rejeitarSolicitacao} from './actions'
 
 const dataBrt = (iso: string | null) => (iso ? new Date(iso).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' }) : '—')
 

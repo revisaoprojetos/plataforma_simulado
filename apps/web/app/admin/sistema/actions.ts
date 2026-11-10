@@ -1,4 +1,5 @@
 'use server'
+import type { PessoaLiberada, WorkspaceGrupo } from './actions-tipos'
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -124,7 +125,6 @@ export async function salvarManutencaoAluno(input: ManutencaoAreas, liberados: M
   return { ok: true }
 }
 
-export type PessoaLiberada = { id: string; nome: string; email: string | null }
 
 /** Resolve nome/email dos ADMINS (user_ids) para os chips do allowlist. */
 export async function resolverNomesAdmins(ids: string[]): Promise<PessoaLiberada[]> {
@@ -171,7 +171,6 @@ export async function resolverNomesEstudantes(ids: string[]): Promise<PessoaLibe
 
 const WORKSPACE_EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-export type WorkspaceGrupo = { id: string; nome: string; cor: string | null }
 
 /** Grupos (não-mestre) do tenant p/ o seletor do Workspace. */
 export async function listarGruposWorkspace(): Promise<WorkspaceGrupo[]> {

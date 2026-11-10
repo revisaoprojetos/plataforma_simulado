@@ -11,7 +11,8 @@ import { ModeloCard, PastaModeloCard, MODALIDADE_META } from '@/components/admin
 import { EditarPastaModeloDialog } from '@/components/admin/modelos-caderno/editar-pasta-modelo-dialog'
 import { NovoModeloDialog } from '@/components/admin/modelos-caderno/novo-modelo-dialog'
 import { ModelosPadrao } from '@/components/admin/modelos-caderno/modelos-padrao'
-import { moverModelo, excluirPastaModelo, type ModeloRow, type PastaModeloRow } from '@/app/admin/modelos-caderno/actions'
+import type { ModeloRow, PastaModeloRow } from '@/app/admin/modelos-caderno/actions-tipos'
+import {moverModelo, excluirPastaModelo} from '@/app/admin/modelos-caderno/actions'
 import type { PaletaCores } from '@/lib/caderno-teste/tipos'
 
 const MODALIDADES_FILTRO = ['folha_respostas', 'caderno_questoes', 'caderno_completo', 'diagnostico'] as const

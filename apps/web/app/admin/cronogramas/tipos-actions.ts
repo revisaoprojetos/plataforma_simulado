@@ -1,4 +1,5 @@
 'use server'
+import type { TipoComUso, EntradaTipo } from './tipos-actions-tipos'
 
 /**
  * CRUD dos tipos de meta.
@@ -14,7 +15,6 @@ import { registrarAudit } from '@/lib/audit'
 import { listarTiposMeta } from '@/lib/cronograma/carregar-tipos'
 import type { TipoMetaDef } from '@/lib/cronograma/tipos'
 
-export type TipoComUso = TipoMetaDef & { ativo: boolean; usos: number }
 
 async function guard(perm: string) {
   if (!(await checkPermission(perm))) return { ok: false as const, error: 'Sem permissão.' }
@@ -49,18 +49,6 @@ export async function listarTipos(): Promise<{ ok: boolean; itens?: TipoComUso[]
   return { ok: true, itens: tipos.map((t) => ({ ...(t as any), usos: conta.get(t.slug) ?? 0 })) }
 }
 
-export type EntradaTipo = {
-  nome: string
-  rotulo_docx: string
-  cor: string | null
-  mostra_links: boolean
-  prefixo_aula: boolean
-  aula_no_titulo: boolean
-  quebra_conteudo: boolean
-  conta_atividade: boolean
-  destaque_docx: boolean
-  sempre_no_docx: boolean
-}
 
 export async function criarTipo(e: EntradaTipo): Promise<{ ok: boolean; id?: string; slug?: string; error?: string }> {
   const g = await guard('cronogramas:update')

@@ -1,4 +1,5 @@
 'use server'
+import type { GrupoCurseducaDTO, GrupoSistema, CurseducaConfigDTO, MembroPreview, ResultadoPorCanal, RegraSyncDTO, AutoVinculoDTO } from './actions-tipos'
 
 import { revalidatePath } from 'next/cache'
 import { createAdminClient } from '@/lib/supabase/server'
@@ -15,8 +16,6 @@ import { fetchAll } from '@/lib/supabase/fetch-all'
 import { randomBytes } from 'crypto'
 import { exibidorCpf } from '@/lib/privacidade/cpf-server'
 
-export type GrupoCurseducaDTO = { id: number; nome: string; criadoEm: string | null }
-export type GrupoSistema = { id: string; nome: string; cor: string | null; pai_id: string | null; is_mestre: boolean; membros: number }
 
 /** Árvore de grupos do sistema (pastas + grupos) com contagem de membros — para o seletor de destino. */
 async function carregarGruposSistema(tenantId: string): Promise<GrupoSistema[]> {
@@ -91,7 +90,6 @@ export async function contarTodosGrupos(ids: number[]): Promise<{ ok: boolean; c
 }
 
 // ── Credenciais por tenant ──────────────────────────────────────────────────
-export type CurseducaConfigDTO = { base_url: string; usuario: string; ativo: boolean; temApiKey: boolean; temSenha: boolean; usandoEnv: boolean; existe: boolean; criptografado: boolean; criptografiaAtiva: boolean; ilegivel: boolean }
 
 /** Estado da config Curseduca do tenant (nunca devolve api_key/senha — só se estão preenchidas). */
 export async function getCurseducaConfig(): Promise<{ ok: boolean; error?: string; config?: CurseducaConfigDTO }> {
@@ -193,14 +191,6 @@ export async function salvarCurseducaConfig(dados: { base_url?: string; api_key?
   }
 }
 
-export type MembroPreview = {
-  id: number; nome: string; email: string | null; cpf: string | null; telefone: string | null
-  situacao: string | null; criadoEm: string | null; ultimoAcesso: string | null; cidade: string | null; uf: string | null
-  entrouEm: string | null       // entrada no grupo (enteredAt)
-  expiraEm: string | null       // data de expiração (== accessExpiresAt; null = sem data, NÃO garante acesso)
-  temMatricula: boolean         // se há registro de matrícula no grupo (p/ distinguir vitalício de desconhecido)
-  temAcesso: boolean | null     // hasAccess da API — acesso vigente ao grupo (autoritativo)
-}
 
 /** Lista os membros de um grupo (perfil + matrícula: entrada/expiração no grupo) para pré-visualização. */
 export async function previewMembrosGrupo(groupId: number): Promise<{ ok: boolean; error?: string; membros?: MembroPreview[] }> {
@@ -251,7 +241,6 @@ async function inserirGrupo(svc: ReturnType<typeof createAdminClient>, tenantId:
   return null
 }
 
-export type ResultadoPorCanal = ResultadoImportCurseduca & { canais?: number; gruposCriados?: number; gruposReusados?: number }
 
 /**
  * Importa vários canais da Curseduca criando UM grupo por canal (com o nome do canal),
@@ -361,11 +350,6 @@ export async function statusImportacaoCurseduca(jobId: string): Promise<{ ok: bo
 }
 
 // ── Sincronização automática (regras de polling) ────────────────────────────
-export type RegraSyncDTO = {
-  id: string; grupos: number[]; destino: DestinoImport; sincronizar: boolean; intervalo_min: number
-  ativo: boolean; ultima_execucao: string | null; ultimo_resultado: ResultadoImportCurseduca | null; grupoDestinoNome: string | null
-  agruparPorNome: boolean; descobrirCanais: boolean
-}
 const INTERVALOS_OK = new Set([15, 30, 60, 120, 240])
 
 /** Lista as regras de sincronização automática do tenant (com nome do grupo de destino). */
@@ -515,16 +499,6 @@ export async function rodarRegraSyncAgora(id: string): Promise<{ ok: boolean; er
 }
 
 // ── Auto-vínculo Passaporte (automação diária configurável — emenda do superior) ──
-export interface AutoVinculoDTO {
-  ativo: boolean
-  modo: 'horario' | 'intervalo'
-  horario: number
-  intervalo_min: number
-  termos_incluir: string[]
-  termos_excluir: string[]
-  ultimaExecucao: string | null
-  ultimoResultado: any | null
-}
 
 const AUTO_VINC_DEFAULT: AutoVinculoDTO = { ativo: false, modo: 'horario', horario: 3, intervalo_min: 1440, termos_incluir: ['passaporte'], termos_excluir: ['amostra'], ultimaExecucao: null, ultimoResultado: null }
 

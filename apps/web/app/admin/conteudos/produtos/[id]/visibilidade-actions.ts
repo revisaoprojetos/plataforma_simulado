@@ -1,4 +1,5 @@
 'use server'
+import type { SegmentoAdmin, AlvosProduto, AlvoNome } from './visibilidade-actions-tipos'
 
 // Aba VISIBILIDADE do produto: SEGMENTOS (públicos de alunos por condições) + REGRAS que aplicam os
 // segmentos ao acesso do produto e aos conteúdos (módulos/aulas). Tabelas simulado_segmentos e
@@ -30,11 +31,6 @@ const MIGRACAO = 'Recurso ainda não ativado no banco: aplique a migração 2026
 const faltaTabela = (msg: string | undefined) => !!msg && /simulado_segmentos|simulado_produto_visibilidade|schema cache|does not exist/i.test(msg)
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-export type SegmentoAdmin = Segmento & { uso: number }
-export interface AlvosProduto {
-  modulos: { id: string; titulo: string; pai_id: string | null }[]
-  aulas: { id: string; titulo: string; modulo_id: string }[]
-}
 
 function revalidar(produtoId: string) {
   revalidatePath(`/admin/conteudos/produtos/${produtoId}`)
@@ -60,7 +56,6 @@ async function nomesDasRefs(tenantId: string, regras: RegraSegmento[]): Promise<
 
 /** Nome de cada alvo (módulo/aula) REFERENCIADO por regras de conteúdo — resolve SÓ os ids citados,
  *  não a árvore inteira (evita baixar centenas de aulas só p/ mostrar o nome de 1-2 regras). */
-export type AlvoNome = { titulo: string; sub: string | null }
 async function resolverAlvosNomes(svc: ReturnType<typeof createAdminClient>, tenantId: string, produtoId: string, regras: RegraVisibilidade[]): Promise<Record<string, AlvoNome>> {
   const modIds = new Set<string>(), aulaIds = new Set<string>()
   for (const r of regras) { if (!r.alvo_id) continue; if (r.alvo_tipo === 'modulo') modIds.add(r.alvo_id); else if (r.alvo_tipo === 'aula') aulaIds.add(r.alvo_id) }

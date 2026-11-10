@@ -84,6 +84,9 @@ if (WEB_INTERNAL_URL && CRON_SECRET) {
   // Liberação de acesso (regras de venda): promove scheduled→active e expira active→expired pela DATA,
   // reconciliando o acesso efetivo. A cada 5 min (idempotente, bounded — só tenants com grants pendentes).
   setInterval(() => { void chamarCron('/api/cron/liberacao-transicoes', 'cron liberacao-transicoes', (j) => !!(j.resultados?.some((r: any) => r.ativados || r.expirados))) }, 300_000)
+  // Vídeo próprio: processa a fila de matrículas (enroll/revoke) no serviço de vídeo, todos os tenants. A cada 2 min.
+  // Sem empresa de vídeo ativa a fila é vazia (no-op). Falhas HTTP já são logadas por chamarCron.
+  setInterval(() => { void chamarCron('/api/admin/video/sync', 'cron video-sync', () => false) }, 120_000)
   // Gamificação: zera a sequência (streak) de quem não teve atividade ontem. De hora em hora (idempotente).
   setInterval(() => { void chamarCron('/api/cron/gamificacao-streak', 'cron gamificacao-streak', (j) => !!j.zerados) }, 3_600_000)
   // Engajamento: webhook de inatividade (aluno parou de entrar). De hora em hora (idempotente pelo log).
