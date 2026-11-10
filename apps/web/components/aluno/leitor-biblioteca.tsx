@@ -11,6 +11,7 @@
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useRouter } from 'next/navigation'
+import { useTheme } from 'next-themes'
 import { toast } from 'sonner'
 import type { GrifoPdf } from '@/lib/conteudo/leitor'
 import { APP_VERSION } from '@/lib/version'
@@ -18,7 +19,7 @@ import { prepararHtmlLegproc } from '@/lib/leitura/legproc-caixas'
 import { SalvarComentarioCaderno, normalizarComentarioCaderno, type ComentarioParaCaderno } from '@/components/aluno/cadernos/salvar-comentario-caderno'
 
 // LEITOR_REV: sobe a cada mudança no leitor-jus.html que precisa chegar SEM esperar a próxima versão do app (o ?v= só muda no deploy).
-const LEITOR_REV = 'lp11'
+const LEITOR_REV = 'lp58'
 const PROTOTIPO = `/leitura/leitor-jus.html?v=${APP_VERSION}&r=${LEITOR_REV}`
 const LARGURA_ALVO = 820 // largura de referência p/ a escala do PDF (host e iframe usam a MESMA)
 // Worker do pdf.js = BUILD LEGACY em public/pdf (o mesmo que o iframe usa). O build "moderno" do pdf.js 6
@@ -51,8 +52,12 @@ export type ParteCrono = { id: string; i: number; f: number; r: string }
 
 export function LeitorBiblioteca({
   documentoId, versaoId, titulo, pdfUrl, texto, grifos: iniciais, voltarHref = '/aluno/biblioteca', paginaInicial = 1, paginaMinima = 1,
-  partesCrono = [], metaCrono = '', tempoBase = 0, tempoDeterminadoSeg = 0, mostrarLegenda = false,
+  partesCrono = [], metaCrono = '', tempoBase = 0, tempoDeterminadoSeg = 0, mostrarLegenda = false, marca, video,
 }: {
+  /** Vídeo da leitura (faixa recolhível acima da folha). */
+  video?: { kind: 'embed' | 'file'; url: string; titulo: string } | null
+  /** Identidade da empresa (logo clara + nome) exibida na barra do leitor. */
+  marca?: { logo: string | null; nome: string }
   documentoId: string; versaoId: string; titulo: string; pdfUrl: string | null
   /** Documento LegProc: lê em TEXTO (HTML rico) com STF/STJ recolhíveis, em vez do PDF fiel. */
   texto?: { html: string; grifos: GrifoTexto[]; ocultarLegendaTabela?: boolean; modeloJuris?: boolean }
@@ -102,6 +107,8 @@ export function LeitorBiblioteca({
     return () => { window.removeEventListener('pagehide', h); window.removeEventListener('beforeunload', h) }
   }, [salvarTempo])
   const iframeRef = useRef<HTMLIFrameElement>(null)
+  const { setTheme } = useTheme()
+  const setTemaRef = useRef(setTheme); setTemaRef.current = setTheme
   const [pdfMeta, setPdfMeta] = useState<{ url: string; scale: number; pages: { w: number; h: number }[] } | null>(null)
   // Falha ao abrir o PDF → tela de erro (antes: falha silenciosa = leitor vazio, sem saber o porquê).
   const [erroPdf, setErroPdf] = useState<string | null>(pdfUrl || texto ? null : 'sem-pdf')
@@ -192,6 +199,8 @@ export function LeitorBiblioteca({
         paginaInicial: d.paginaInicial || 1,
         paginaMinima: d.paginaMinima || 1, // 1ª página que entra na leitura (as anteriores não são montadas nem contadas)
         partes: d.partesCrono || [], metaAtual: d.metaCrono || '',
+        marca: marca || null,
+        video: video || null,
         modeloJuris: !!texto?.modeloJuris, // só os modelos de jurisprudência ganham o estilo próprio (títulos roxos, seções expansivas…)
         grifosRevisaoLigados: !!texto,
         ocultarLegendaDoc: !!texto && texto.ocultarLegendaTabela !== false, // tabela de legenda do início do doc (repete a barra de legendas)
@@ -312,6 +321,8 @@ export function LeitorBiblioteca({
         if (p) setParaCaderno(p)
         return
       }
+      // Tema escolhido no leitor (Claro/Noite/Auto) → vale também para o portal e persiste ao voltar/avançar.
+      if (m.type === 'leitor-jus-tema') { try { setTemaRef.current(m.tema === 'dark' ? 'dark' : m.tema === 'light' ? 'light' : 'system') } catch { /* ignore */ } return }
       if (m.type === 'leitor-jus-grifos') { const gs = Array.isArray(m.grifos) ? m.grifos : []; if (texto) void reconciliarTexto(gs); else void reconciliar(gs); return }
       // O aluno escolhe no Pomodoro qual cronômetro usar: 'meta' (badge aqui) ou 'pomodoro' (timer no iframe).
       // Mostra UM por vez. O tempo da meta continua sendo gravado sempre (independe da escolha).
@@ -371,7 +382,7 @@ export function LeitorBiblioteca({
   const tempoLabel = hh > 0 ? `${hh}:${z2(mm)}:${z2(ss)}` : `${z2(mm)}:${z2(ss)}`
   return (
     <div className="fixed inset-0 z-40 bg-[var(--bg,#fbfbfc)]">
-      <iframe ref={iframeRef} src={PROTOTIPO} title={titulo || 'Leitura'} onLoad={enviarDia}
+      <iframe ref={iframeRef} src={PROTOTIPO} title={titulo || 'Leitura'} onLoad={enviarDia} allowFullScreen allow="fullscreen"
         style={{ display: 'block', width: '100%', height: '100%', border: 0, background: 'var(--bg, #fbfbfc)' }} />
       <SalvarComentarioCaderno dados={paraCaderno} onClose={() => setParaCaderno(null)} />
       {erroPdf && (

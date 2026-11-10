@@ -2,6 +2,8 @@
 // Módulo PURO (sem server-only, sem 'use server') → usável no client (colunas/filtros) e no server
 // (import/export de planilha). Fonte única dos campos, rótulos e validação.
 
+/** Vídeo da leitura (configurado no gerenciamento do documento): link (YouTube/Vimeo/arquivo) OU um vídeo já cadastrado na Biblioteca. */
+export interface VideoDoc { tipo: 'link' | 'plataforma'; url?: string; doc_id?: string; titulo?: string }
 export type CampoMeta = 'disciplina' | 'assunto_especifico' | 'tribunal' | 'informativo' | 'ano' | 'estado_origem' | 'selos'
 
 export interface Metadados {
@@ -13,6 +15,8 @@ export interface Metadados {
   estado_origem?: string
   /** Etiquetas do conteúdo, separadas por vírgula (ex.: "Novo, Repercussão geral"). */
   selos?: string
+  /** Vídeo mostrado na área de leitura (não é coluna da lista/planilha). */
+  video?: VideoDoc
 }
 
 /** Campos que guardam VÁRIOS valores separados por vírgula (chips na lista, filtro por item). */
@@ -62,6 +66,13 @@ export function normalizarMetadados(v: unknown): Metadados {
   if (typeof o.selos === 'string') {
     const s = listaMulti(o.selos).join(', ').slice(0, MAX_TXT)
     if (s) out.selos = s
+  }
+  const vd = o.video
+  if (vd && typeof vd === 'object' && !Array.isArray(vd)) {
+    const v = vd as Record<string, unknown>
+    const titulo = typeof v.titulo === 'string' ? v.titulo.trim().slice(0, 120) : ''
+    if (v.tipo === 'link' && typeof v.url === 'string' && /^https:\/\/\S{4,}$/i.test(v.url.trim())) out.video = { tipo: 'link', url: v.url.trim().slice(0, 500), ...(titulo ? { titulo } : {}) }
+    else if (v.tipo === 'plataforma' && typeof v.doc_id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v.doc_id)) out.video = { tipo: 'plataforma', doc_id: v.doc_id, ...(titulo ? { titulo } : {}) }
   }
   const a = typeof o.ano === 'number' ? o.ano : parseInt(String(o.ano ?? ''), 10)
   if (Number.isFinite(a) && a >= 1900 && a <= 2100) out.ano = a

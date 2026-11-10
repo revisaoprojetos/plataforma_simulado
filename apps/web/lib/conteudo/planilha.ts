@@ -256,7 +256,7 @@ export async function importarPlanilha(args: {
     jaVistos.add(doc.id)
 
     // 3) aplicar só as colunas de metadado (vazio = mantém; "-" = limpa).
-    const novo: Record<string, string | number | undefined> = { ...doc.metadados }
+    const novo: Record<string, unknown> = { ...doc.metadados }
     let erro: string | null = null
     for (const c of camposPresentes) {
       const bruto = get(c.k)

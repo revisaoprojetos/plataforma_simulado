@@ -11,6 +11,7 @@ import {
   carregarRegistroAluno, carregarAlunosGerenciamento, type GestaoDados, type OrigemAcesso, type AlunoAcesso, type EventoRegistro,
 } from '@/app/admin/biblioteca/gestao-actions'
 import { abrirEdicaoDocx, midiaPreviewDocumento } from '@/app/admin/biblioteca/actions'
+import { AbaVideo } from './video-tab'
 import { AbaFlashcards } from './flashcards-tab'
 import { AbaAreas } from './areas-tab'
 
@@ -600,6 +601,8 @@ function AbaConfig({ base, tp }: { base: GestaoDados['base']; tp: ReturnType<typ
           <div className="crow"><span style={{ flex: 1 }}><strong style={{ fontSize: 13.5 }}>Marca d’água com nome e CPF</strong><div style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>No leitor e no download</div></span><Sw on={prot.marca_dagua} onClick={() => toggleProt('marca_dagua')} /></div>
           <div className="crow"><span style={{ flex: 1 }}><strong style={{ fontSize: 13.5 }}>Legenda de categorias no leitor</strong><div style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>Barra Núcleo/Prazos/STF/STJ… — específica do LegProc. Deixe desligada em PDFULL/Fight e nos demais.</div></span><Sw on={legenda} onClick={toggleLegenda} /></div>
           <div className="crow"><span style={{ flex: 1 }}><strong style={{ fontSize: 13.5 }}>Documento LegProc (leitura em texto)</strong><div style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>O aluno lê em modo texto, com os entendimentos do STF e do STJ recolhidos (clique para expandir), como na Lei Seca. Desligado = PDF fiel.{b.leituraLegprocAuto ? ' Já ativo automaticamente: este documento está numa pasta LegProc.' : ''}</div></span><Sw on={legproc} onClick={toggleLegproc} /></div>
+        {/* VÃ­deo na leitura (faixa recolhÃ­vel acima da folha) */}
+        <AbaVideo documentoId={b.id} />
           <div className="crow"><span style={{ flex: 1 }}><strong style={{ fontSize: 13.5 }}>Ocultar a tabela de legenda do início</strong><div style={{ fontSize: 12, color: 'var(--muted-foreground)' }}>No LegProc em texto, a tabela “LEGENDA: amarelo = núcleo…” repete a barra de legendas do leitor. Ligado (padrão) = não aparece para o aluno. Vale só para este documento; também dá para definir por pasta.</div></span><Sw on={ocultaLegTab} onClick={toggleLegTab} /></div>
         </div>
         {/* Proteção */}

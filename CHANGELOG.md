@@ -12,6 +12,19 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.10.0 — 2026-11-10
+
+### Leitor do aluno — novo visual e videoaula
+- **Identidade da empresa:** barra superior roxa (degradê + grade da sidebar do portal, claro e escuro) com a **logo** da empresa; barra de ferramentas enxuta; título em destaque; tema do leitor **compartilhado com o portal** (escolha no leitor vale ao voltar/avançar).
+- **Videoaula:** configuração em *Biblioteca › Gerenciamento › Configurações › Vídeo na leitura* (**link** YouTube/Vimeo/arquivo ou **vídeo da plataforma**). Na leitura: bloco no canto direito da linha de ferramentas (ferramentas sempre centralizadas) e **popup móvel e redimensionável**; player próprio com **velocidade**, volume vertical, tela cheia só do vídeo e posição/velocidade lembradas.
+- **Pomodoro:** lateral (aba completa) e tela cheia com roxo da plataforma, abertura "do meio", quadrados animados, cartões de ciclo/exibição; chip some quando a lateral está aberta; sem modo foco automático.
+- **Tela cheia limpa:** sem barra superior, com opções do que aparece (barra superior, ferramentas, legenda, sumário) e pílula de ajustes/sair; régua de leitura com **altura ajustável**.
+- **Cores:** cor personalizada (campo de cor, matiz, código, conta-gotas, histórico de 14); legenda dos grifos e barra de ferramentas ocultáveis.
+- **Índice (sumário) de PDF:** reconhece sumários com sublinhados/pontos e nº de página solto; título marcado e centralizado ao clicar; índice de títulos nos documentos em texto. PDF escuro automático no tema escuro; "Modo de leitura" mostra só o que se aplica (PDF × texto); corrige PDF cortado ao abrir painéis.
+- **Fix:** modelos de jurisprudência sempre em texto no leitor; `LEITOR_REV` sobe a cada mudança do leitor.
+
+---
+
 ## 4.9.3 — 2026-11-06
 
 ### Modelos de jurisprudência (JurisClub)

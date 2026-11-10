@@ -6,6 +6,8 @@ import { LeitorBiblioteca } from '@/components/aluno/leitor-biblioteca'
 import { paginaInicialDoDocumento } from '@/lib/conteudo/capa-pagina-server'
 import { MidiaPlayer } from '@/components/aluno/midia-player'
 import { getCurrentTenantId } from '@/lib/tenant'
+import { getTenantTheme } from '@/lib/tenant-theme'
+import { resolverVideoLeitura } from '@/lib/conteudo/video-leitura'
 import { createAdminClient } from '@/lib/supabase/server'
 import { liberacaoDoc, type Liberacao } from '@/lib/cronograma/adaptativo/liberacao'
 import Link from 'next/link'
@@ -75,8 +77,14 @@ export default async function LeituraConteudoPage({ params, searchParams }: { pa
     if (lib.bloqueado) return <MaterialBloqueado lib={lib} voltarHref={voltarHref} />
   }
 
+  // IDENTIDADE da empresa no leitor: logo (versão clara, p/ a barra roxa) + nome.
+  const tt = await getTenantTheme().catch(() => null)
+  const marca = { logo: (tt?.tema as any)?.logo_url ?? (tt?.tema as any)?.logo_dark_url ?? null, nome: tt?.tenantNome ?? '' }
+  // VÍDEO da leitura (configurado no gerenciamento do documento) — em paralelo com o carregamento do documento.
+  const videoP = tenantId ? resolverVideoLeitura(createAdminClient(), tenantId, id, sessao.estudanteId) : Promise.resolve(null)
   const doc = await carregarDocParaLeitura(id, sessao.estudanteId, { produtoId: typeof sp?.produto === 'string' ? sp.produto : null })
   if (!doc) notFound()
+  const video = doc.kind === 'midia' ? null : await videoP
 
   // PÁGINA INICIAL (Biblioteca): a do documento ou da pasta em lote. O leitor ABRE direto nela, mas NÃO corta o que vem
   // antes: as páginas anteriores continuam na leitura (é só rolar para cima). Só vale na abertura NORMAL do documento.
@@ -110,6 +118,8 @@ export default async function LeituraConteudoPage({ params, searchParams }: { pa
       }))
     return (
       <LeitorBiblioteca
+      marca={marca}
+      video={video}
         documentoId={t.documentoId}
         versaoId={t.versaoId}
         titulo={t.titulo}
@@ -129,6 +139,8 @@ export default async function LeituraConteudoPage({ params, searchParams }: { pa
   const leitura = doc.pdf
   return (
     <LeitorBiblioteca
+      marca={marca}
+      video={video}
       documentoId={leitura.documentoId}
       versaoId={leitura.versaoId}
       titulo={leitura.titulo}
