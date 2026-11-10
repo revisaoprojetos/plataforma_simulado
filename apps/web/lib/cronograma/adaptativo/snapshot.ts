@@ -75,7 +75,7 @@ function metaVM(st: Estado, conteudo: Conteudo, id: string, data: DataISO, horas
   return {
     id,
     tipo: t,
-    tipoNome: def.nome,
+    tipoNome: i.rotulo || def.nome, // revisão adaptativa / reforço / diagnóstico têm rótulo próprio (nunca "PDFULL" regular)
     tipoCor: def.c,
     tipoCorSoft: def.cs,
     disc,

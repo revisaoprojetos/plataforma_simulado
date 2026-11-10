@@ -12,6 +12,16 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.12.0 — 2026-11-10
+
+### Cronograma Adaptativo — novo gerador de cronogramas (substitui o motor anterior)
+- **Motor** (`motor30.ts`, bundle `motor28.js`): faixas de horas (10h–14h30 / 15h–24h / >24h), mínimo de 10h por semana, concentração no fim de semana, PDFull inteiro (máx. 3 datas), rodízio por vagas, semana especial de revisão dentro do plano (4/6/8, padrão 8; planos antigos com 10/12 seguem válidos), diagnóstico histórico, Jurisprudência semanal a partir de 14h30 efetivos, horizonte de 600 semanas com aviso de insuficiência, dominó (não realizada, parciais, atrasadas, ajuste de horas, pausa, mover meta).
+- **Planos já gravados não são regenerados**: só plano novo ou recalculado pelo aluno usa o motor novo; os demais seguem no motor legado.
+- **Desempenho**: gerar com metas remanejadas caiu de 35–100 s para ~1–4 s, sem alterar o plano gerado.
+- **Aluno:** seletor de horas sem 1h, tutorial, confirmação ao desativar a semana especial, oferta de LegProc complementar, lei/artigos em Próximos dias, backup JSON, mensagem de insuficiência.
+- **Servidor/admin:** persistência de detalhes das metas de revisão, data real de conclusão e `cert`; liberação e snapshot entendem os ids novos; parâmetros sem efeito listados à parte em Metas & inteligência.
+- ⚠️ **Migração a aplicar:** `20261110020000_cronograma_adaptativo_detalhes_meta.sql` (aditiva; sem ela os detalhes não persistem).
+
 ## 4.11.0 — 2026-11-10
 
 ### Vídeo próprio (gerenciador de vídeo — integração, desligada até configurar)

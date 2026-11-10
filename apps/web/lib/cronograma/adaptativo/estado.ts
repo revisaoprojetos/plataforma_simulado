@@ -14,6 +14,7 @@ export interface ProgMeta {
   modo?: string
   t?: number // tempo acumulado em segundos
   parou?: { v: string; em: DataISO } | null
+  em?: DataISO // data REAL de conclusão (s='done')
 }
 export interface ExtraSessao { tipo: string; min: number; em: DataISO; disc?: string; nota?: string }
 

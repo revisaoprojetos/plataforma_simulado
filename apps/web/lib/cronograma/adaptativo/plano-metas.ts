@@ -4,6 +4,8 @@ import { remember } from '@/lib/cache/relatorio-cache'
 import { carregarConteudoBanco } from './conteudo-banco'
 import { dParse, dDow, semDe } from './motor28'
 import { chavesUnicas } from './catalogo-override'
+import { rotuloMeta, semanaOrigemDaMeta, sanearDetalhes } from './meta-ids'
+import type { Detalhe } from './motor28'
 
 /**
  * ESPELHO RELACIONAL da grade do plano: uma LINHA POR META em `simulado_cronograma_adaptativo_plano_meta`
@@ -22,10 +24,11 @@ export interface LinhaPlanoMeta {
   meta_id: string; tipo: string; tipo_nome: string | null; parte: number | null
   disciplina: string | null; aula: string | null; titulo: string | null; documento_id: string | null; aula_key: string | null
   semana: number; dia: number; data_prevista: string; horas: number | null; ordem: number
+  detalhes: Record<string, unknown> | null; semana_origem: number | null
 }
 
 /** O que precisa do conteúdo p/ descrever as metas (enxuto e serializável → cacheável). */
-interface ConteudoDescricao {
+export interface ConteudoDescricao {
   AS: Array<[string, string, string, string | null, string]>                          // disciplina, nº da aula, tema, documento, chave estável
   LP: Array<{ id: string; disc: string; lei: string; texto: string; doc: string | null }>
   WLP: string[][]; WLPdoc: Array<Array<string | null>>
@@ -45,11 +48,12 @@ async function conteudoParaDescricao(svc: SupabaseClient, tenantId: string): Pro
 
 const uuidOu = (v: unknown): string | null => (typeof v === 'string' && /^[0-9a-f-]{36}$/i.test(v) ? v : null)
 
-/** Descreve UMA meta (id do motor) a partir do conteúdo. Meta desconhecida → só o tipo. */
-function descrever(id: string, c: ConteudoDescricao) {
+/** Descreve UMA meta (id do motor) a partir do conteúdo. Meta desconhecida → só o tipo.
+ *  Entende: pf|fl:i:revisao:s · pf|fl:i:reforco:s · qu:i:hist:s (aula i) · rf:s:i · pp:i:k · lp:* · jp:s. */
+export function descrever(id: string, c: ConteudoDescricao) {
   const p = id.split(':')
   const tipo = p[0]
-  const base = { tipo, tipo_nome: TIPO_NOME[tipo] ?? null, parte: null as number | null, disciplina: null as string | null, aula: null as string | null, titulo: null as string | null, documento_id: null as string | null, aula_key: null as string | null }
+  const base = { tipo, tipo_nome: rotuloMeta(id) ?? TIPO_NOME[tipo] ?? null, parte: null as number | null, disciplina: null as string | null, aula: null as string | null, titulo: null as string | null, documento_id: null as string | null, aula_key: null as string | null }
   const porAula = (i: number) => { const a = c.AS[i]; return a ? { disciplina: a[0] || null, aula: a[1] || null, titulo: a[2] || null, documento_id: uuidOu(a[3]), aula_key: a[4] } : {} }
   if (tipo === 'jp') return { ...base, titulo: 'Jurisprudência' } // 2.19: meta semanal, sem aula/documento
   if (tipo === 'pf' || tipo === 'fl' || tipo === 'qu') return { ...base, ...porAula(+p[1]) }
@@ -123,7 +127,7 @@ async function sincronizarCfg(svc: SupabaseClient, row: { id: string; tenant_id:
 /** Puro: transforma a grade { meta_id: [data, horas] } em linhas (ordenadas por data e, no dia, pela mesma ordem da tela). */
 export function linhasDaGrade(
   ids: { tenantId: string; estudanteId: string; planoId: string },
-  grade: Record<string, unknown>, start: string, conteudo: ConteudoDescricao,
+  grade: Record<string, unknown>, start: string, conteudo: ConteudoDescricao, detalhes: Record<string, Record<string, unknown>> = {},
 ): LinhaPlanoMeta[] {
   const itens: Array<{ id: string; data: string; horas: number | null }> = []
   for (const [id, v] of Object.entries(grade || {})) {
@@ -136,11 +140,34 @@ export function linhasDaGrade(
   return itens.map((it) => {
     const n = ordemNoDia.get(it.data) ?? 0; ordemNoDia.set(it.data, n + 1)
     const d = descrever(it.id, conteudo)
+    const det = detalhes[it.id] ?? null
     return {
       tenant_id: ids.tenantId, estudante_id: ids.estudanteId, plano_id: ids.planoId, meta_id: it.id, ...d,
+      detalhes: det, semana_origem: semanaOrigemDaMeta(it.id, det),
       semana: start ? semDe(start, it.data) : 1, dia: dDow(it.data), data_prevista: it.data, horas: it.horas, ordem: n,
     }
   })
+}
+
+/** Mapa { meta_id: detalhe } do plano (coluna `detalhes_metas`). Migração pendente / erro → {} (nunca lança). */
+export async function lerDetalhesMetas(svc: SupabaseClient, planoId: string): Promise<Record<string, Detalhe>> {
+  try {
+    const { data, error } = await svc.from(T_PLANO).select('detalhes_metas').eq('id', planoId).maybeSingle()
+    if (error) return {}
+    const d = (data as { detalhes_metas?: unknown } | null)?.detalhes_metas
+    return d && typeof d === 'object' && !Array.isArray(d) ? (d as Record<string, Detalhe>) : {}
+  } catch { return {} }
+}
+
+/** Grava o mapa de detalhes do plano (best-effort: sem a migração 20261110020000 não faz nada). Só mantém ids que existem na grade. */
+export async function gravarDetalhesMetas(svc: SupabaseClient, planoId: string, detalhes: Record<string, unknown>, grade?: Record<string, unknown> | null): Promise<boolean> {
+  try {
+    const limpo = sanearDetalhes(detalhes)
+    if (!limpo) return false
+    if (grade) for (const id of Object.keys(limpo)) if (!(id in grade)) delete limpo[id]
+    const { error } = await svc.from(T_PLANO).update({ detalhes_metas: limpo }).eq('id', planoId)
+    return !error
+  } catch { return false }
 }
 
 function hashGrade(s: string): string {
@@ -160,12 +187,13 @@ export async function espelharPlanoMetas(svc: SupabaseClient, planoId: string): 
     if (!p) return { ok: false, motivo: 'plano_inexistente' }
     const row = p as { id: string; tenant_id: string; estudante_id: string; cfg: Record<string, unknown> | null; plano: Record<string, unknown> | null; extras: unknown; pausa: unknown; grade_espelhada_hash: string | null }
     const grade = row.plano ?? {}
-    const hash = hashGrade(JSON.stringify(['k1', row.cfg ?? {}, row.extras ?? [], row.pausa ?? null, grade])) // 'k1' = versão do espelho (aula_key) → re-espelha uma vez; cfg inteiro: mudança de horas/recessos/etc. também ressincroniza
+    const detalhes = (sanearDetalhes(await lerDetalhesMetas(svc, row.id)) ?? {}) as Record<string, Record<string, unknown>>
+    const hash = hashGrade(JSON.stringify(['k2', row.cfg ?? {}, row.extras ?? [], row.pausa ?? null, grade, detalhes])) // 'k1' = versão do espelho (aula_key) → re-espelha uma vez; cfg inteiro: mudança de horas/recessos/etc. também ressincroniza
     if (row.grade_espelhada_hash === hash) return { ok: true, pulado: true }
 
     const conteudo = await conteudoParaDescricao(svc, row.tenant_id)
     const cfgOk = await sincronizarCfg(svc, row) // cfg/extras/pausa → colunas + tabelas filhas (best-effort)
-    const linhas = linhasDaGrade({ tenantId: row.tenant_id, estudanteId: row.estudante_id, planoId: row.id }, grade, String(row.cfg?.start ?? ''), conteudo)
+    const linhas = linhasDaGrade({ tenantId: row.tenant_id, estudanteId: row.estudante_id, planoId: row.id }, grade, String(row.cfg?.start ?? ''), conteudo, detalhes)
 
     // 1º caminho: função TRANSACIONAL (migração 20261106040000) — tudo ou nada, nunca deixa a grade pela metade
     const rpc = await svc.rpc('cron_adapt_espelhar_grade', { p_plano: row.id, p_linhas: linhas })
@@ -195,6 +223,9 @@ export async function espelharPlanoMetas(svc: SupabaseClient, planoId: string): 
       let { error: e3 } = await svc.from(T_PM).upsert(lote, { onConflict: 'plano_id,meta_id' })
       // migração 20261106030000 (aula_key) ainda não aplicada → grava sem a coluna, sem derrubar o espelho
       if (e3 && /aula_key/i.test(e3.message)) ({ error: e3 } = await svc.from(T_PM).upsert(lote.map(({ aula_key: _k, ...r }) => r), { onConflict: 'plano_id,meta_id' }))
+      // migração 20261110020000 (detalhes/semana_origem) ainda não aplicada → grava sem essas colunas
+      if (e3 && /detalhes|semana_origem/i.test(e3.message)) ({ error: e3 } = await svc.from(T_PM).upsert(lote.map(({ detalhes: _d, semana_origem: _s, ...r }) => r), { onConflict: 'plano_id,meta_id' }))
+      if (e3 && /aula_key/i.test(e3.message)) ({ error: e3 } = await svc.from(T_PM).upsert(lote.map(({ aula_key: _k, detalhes: _d, semana_origem: _s, ...r }) => r), { onConflict: 'plano_id,meta_id' }))
       if (e3) return { ok: false, motivo: e3.message }
     }
     if (cfgOk) await svc.from(T_PLANO).update({ grade_espelhada_hash: hash, grade_espelhada_em: agora }).eq('id', row.id)

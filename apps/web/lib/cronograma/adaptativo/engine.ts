@@ -17,6 +17,8 @@
 // ============================================================
 
 import * as M28 from './motor28'
+import * as M30 from './motor30'
+import { subtipoMeta, rotuloMeta, semanaOrigemDaMeta } from './meta-ids'
 export type { ItemLP } from './motor28'
 
 export type DataISO = string // 'YYYY-MM-DD' (local, sem fuso)
@@ -55,7 +57,7 @@ export type Fixos = Record<string, [DataISO, number]>
 export const SEM_FLASH = new Set<string>([
   'Direito Eleitoral', 'Direito Internacional', 'Direito Internacional Privado', 'Legislação de Ensino', 'Legislação da AGU',
 ])
-export const MAX_SEM = 200
+export const MAX_SEM = 600 // horizonte do motor atual (600 semanas); o legado 2.8.1 usa 200 internamente
 export const ARRANJOS = ['pdf', 'equilibrado', 'constancia'] as const
 
 export function horasEm(cfg: Cfg, d: DataISO): number[] {
@@ -140,11 +142,17 @@ export function lpDeWLP(WLP: WLP): M28.ItemLP[] {
  * sem ele, usa a lei seca semanal do seed. fixos = metas que não se movem; ancora = início da redistribuição;
  * ctx.ordem = ordem de distribuição das aulas; ctx.feitas = metas concluídas; ctx.usados = ids com registro.
  */
-export function gerarPlano(cfg: Cfg, AS: AS, WLP: WLP, fixos: Fixos, ancora: DataISO | null, LP?: M28.ItemLP[] | null, ctx?: M28.Contexto): ResultadoPlano {
-  return M28.gerarPlano(cfg as unknown as M28.Cfg28, AS as M28.AulaAS[], LP && LP.length ? LP : lpDeWLP(WLP), fixos, ancora, ctx)
+/** Motor ATUAL (dia a dia, ./motor30.ts) — plano novo ou recalculado pelo aluno. Pode lançar M30.ErroInsuficiencia (horizonte de 600 semanas). */
+export function gerarPlano(cfg: Cfg, AS: AS, WLP: WLP, fixos: Fixos, ancora: DataISO | null, LP?: M28.ItemLP[] | null, ctx?: M30.Contexto30 & { legado?: boolean }): ResultadoPlano & { detalhes?: Record<string, M28.Detalhe> } {
+  const lp = LP && LP.length ? LP : lpDeWLP(WLP)
+  // legado = SÓ para migrações automáticas de planos gravados com o motor 2.8.1 (nunca regenera com o motor atual).
+  if (ctx?.legado) return M28.gerarPlano(cfg as unknown as M28.Cfg28, AS as M28.AulaAS[], lp, fixos, ancora, ctx)
+  return M30.gerarPlano(cfg as unknown as M28.Cfg28, AS as M28.AulaAS[], lp, fixos, ancora, ctx)
 }
+/** O plano foi gerado pelo motor atual? (cfg.motor é carimbo técnico, nunca exibido). */
+export const planoUsaMotorAtual = (motor: unknown): boolean => typeof motor === 'string' && motor.startsWith('3.')
 
-export interface Notas { [id: string]: { grau?: number; res?: number; err?: number; diff?: number } }
+export interface Notas { [id: string]: { grau?: number; res?: number; err?: number; diff?: number; cert?: number } }
 
 /** Desempenho nas questões de um tema: soma as questões da aula e as das semanas de revisão. */
 export function acertoTema(notas: Notas, i: number): { res: number; err: number; pct: number } | null {
@@ -159,7 +167,7 @@ export const ACERTO_MIN = 60
 export function rankingRevisao(plano: Plano, notas: Notas, ateData: DataISO, jaRevisados: Set<number>, acertoMin: number = ACERTO_MIN) {
   const cand: Array<{ i: number; d: DataISO; grau: number | null; acerto: number | null; prioritario: boolean; pontos: number }> = []
   for (const [id, [d]] of Object.entries(plano)) {
-    if (!id.startsWith('pf:') || d >= ateData) continue
+    if (!/^pf:[0-9]+$/.test(id) || d >= ateData) continue // blindagem: pf:i:revisao:s / pf:i:reforco:s não são PDFull regular
     const i = +id.split(':')[1]
     const grau = notas['pf:' + i]?.grau ?? null
     const ac = acertoTema(notas, i)
@@ -176,6 +184,8 @@ export interface MetaDescrita {
   tipo: string; disc?: string; aula?: string; tema?: string; pags?: number; qc?: string; tec?: string
   idx?: number; semRev?: number | null; parte?: number | null; texto?: string; sem?: number
   lei?: string; doc?: string | null
+  /** revisão adaptativa / reforço / diagnóstico (ids pf|fl:i:revisao:s, pf|fl:i:reforco:s, qu:i:hist:s) + rótulo p/ exibição */
+  subtipo?: 'revisao' | 'reforco' | 'historico'; rotulo?: string
 }
 /** Descreve uma meta a partir do id. */
 export function descrever(id: string, AS: AS, WLP: WLP, LPMAP?: Record<string, M28.ItemLP> | null): MetaDescrita {
@@ -190,7 +200,8 @@ export function descrever(id: string, AS: AS, WLP: WLP, LPMAP?: Record<string, M
   const rev = t === 'rf' || t === 'rq'
   const i = rev ? +b : +a
   const e = AS[i]
-  return { tipo: t, disc: e?.[0], aula: e?.[1], tema: e?.[2], pags: e?.[3], qc: e?.[4], tec: e?.[5], idx: i, semRev: rev ? +a : null, parte: t === 'pp' ? +b : null }
+  const sub = subtipoMeta(id) // pf|fl:i:revisao:s · pf|fl:i:reforco:s · qu:i:hist:s → rótulo próprio (aula = i)
+  return { ...(sub ? { subtipo: sub, rotulo: rotuloMeta(id) ?? undefined, sem: semanaOrigemDaMeta(id) ?? undefined } : {}), tipo: t, disc: e?.[0], aula: e?.[1], tema: e?.[2], pags: e?.[3], qc: e?.[4], tec: e?.[5], idx: i, semRev: rev ? +a : null, parte: t === 'pp' ? +b : null }
 }
 
 /** Saúde do plano: atraso das revisões e questões em relação ao ideal (7 e 14 dias). */
@@ -199,6 +210,7 @@ export function saudePlano(plano: Plano, cfg: Cfg) {
   for (const [id, [d]] of Object.entries(plano)) {
     const [t, i] = id.split(':')
     if (t !== 'fl' && t !== 'qu') continue
+    if (!/^(fl|qu):\d+$/.test(id)) continue // fl|qu:i:revisao|reforco|hist:s (revisão adaptativa/diagnóstico) não entram no atraso do ciclo regular
     const pf = plano['pf:' + i]
     if (!pf) continue
     const ideal = proxSemConteudo(cfg, pf[0], t === 'fl' ? 1 : 2)

@@ -4,6 +4,7 @@ import { remember, esquecer } from '@/lib/cache/relatorio-cache'
 import { ehTestadorGlobal } from '@/lib/sistema/testadores-globais'
 import { carregarConteudoBanco } from './conteudo-banco'
 import { chaveDisciplina } from './catalogo-html'
+import { metaDoAlvo as metaDoAlvoPuro } from './meta-alvo'
 
 /**
  * LIBERAÇÃO POR DATA do Cronograma Adaptativo.
@@ -180,14 +181,8 @@ async function alunoEmGrupoLiberado(svc: SupabaseClient, tenantId: string, aluno
   return meus.some((g) => grupos.includes(g))
 }
 
-/** A meta (id do motor) se refere a este alvo? pf:i · pp:i:p · fl:i · qu:i · rf:sem:i · rq:sem:i · lp:s:j */
-function metaDoAlvo(metaId: string, alvo: AlvoDoc): boolean {
-  const [t, a, b] = metaId.split(':')
-  if (alvo.k === 'lp') return t === 'lp' && alvo.ids.includes(metaId)
-  if (t === 'lp' || t === 'jp') return false // jp = Jurisprudência semanal: não é de nenhuma aula (sem documento)
-  const idx = t === 'rf' || t === 'rq' ? Number(b) : Number(a)
-  return idx === alvo.i
-}
+/** A meta (id do motor) se refere a este alvo? (regra pura em ./meta-alvo — testada em scripts/_plano-metas-ids.mjs) */
+const metaDoAlvo = (metaId: string, alvo: AlvoDoc): boolean => metaDoAlvoPuro(metaId, alvo)
 
 /** Hoje em Brasília (YYYY-MM-DD) e soma de dias numa data ISO. */
 export function hojeBrt(): string { return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo' }).format(new Date()) }

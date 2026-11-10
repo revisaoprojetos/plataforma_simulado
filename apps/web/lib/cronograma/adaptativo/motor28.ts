@@ -50,7 +50,7 @@ export interface ItemLP {
 }
 
 export interface Remanejada { desde: DataISO; minutos: number; geracao?: string | null; detalhe?: Detalhe }
-export interface Detalhe { continuacao?: boolean; pai?: string; origem?: string; paginaInicio?: number; paginaFim?: number; totalPaginas?: number; artigo?: string; deslocada?: boolean; geracao?: string | null; jurisprudencia?: boolean; historico?: boolean; reforco?: boolean }
+export interface Detalhe { semanaRevisao?: boolean; semanaOrigemRevisao?: number; ordemAlternancia?: number; essencialNaoSelecionada?: boolean; material?: string; percentualOrigem?: number; continuacao?: boolean; pai?: string; origem?: string; paginaInicio?: number; paginaFim?: number; totalPaginas?: number; artigo?: string; deslocada?: boolean; geracao?: string | null; jurisprudencia?: boolean; historico?: boolean; reforco?: boolean }
 
 export interface Cfg28 {
   start: DataISO
@@ -156,14 +156,14 @@ export function resolverParams(p?: ParamsMotor28 | null): ParamsResolvido {
 export const PARAMS_PADRAO_MOTOR = resolverParams()
 
 // ── Inteligência de desempenho (Fase 3) ──────────────────────────────────────────────────────────
-export interface NotaTema { grau?: number; res?: number; err?: number }
+export interface NotaTema { grau?: number; res?: number; err?: number; cert?: number | null; resultadoAtualizadoEm?: number }
 /** Temas (índice em AS) "fracos": grau de dificuldade ≥ 7 OU acerto (questões da aula + das semanas de revisão) < acertoMin. */
 export function temasFracos(notas: Record<string, NotaTema> | undefined | null, acertoMin: number): Set<number> {
   const fracos = new Set<number>(), res: Record<number, number> = {}, err: Record<number, number> = {}
   for (const [id, n] of Object.entries(notas || {})) {
     if (!n) continue
     const p = id.split(':')
-    if (p[0] === 'pf') { if ((+(n.grau ?? 0)) >= 7) fracos.add(+p[1]) }
+    if (p[0] === 'pf') { if (p.length === 2 && (+(n.grau ?? 0)) >= 7) fracos.add(+p[1]) }
     else if (p[0] === 'qu' || p[0] === 'rq') { const i = +p[p[0] === 'rq' ? 2 : 1]; res[i] = (res[i] || 0) + +(n.res || 0); err[i] = (err[i] || 0) + +(n.err || 0) }
   }
   for (const k of Object.keys(res)) { const i = +k; if (res[i] > 0 && Math.max(0, (res[i] - (err[i] || 0)) / res[i] * 100) < acertoMin) fracos.add(i) }
@@ -192,7 +192,7 @@ export function resultadoTema218(notas: Record<string, NotaTema> | undefined | n
 export function rankingRevisao218(plano: Record<string, [DataISO, number]>, notas: Record<string, NotaTema> | undefined | null, ateData: DataISO, jaRevisados: Set<number>) {
   const cand: Array<{ i: number; d: DataISO; grau: number | null; acerto: number | null; prioritario: boolean; pontos: number }> = []
   for (const [id, [d]] of Object.entries(plano)) {
-    if (!id.startsWith('pf:') || d >= ateData) continue
+    if (!/^pf:[0-9]+$/.test(id) || d >= ateData) continue
     const i = +id.split(':')[1], r = resultadoTema218(notas, i)
     const cls = r ? classificarResultado218(r.pct) : null
     if (cls === 'ok') continue
@@ -217,10 +217,15 @@ export function idealRev(cfg: Cfg28, P: ParamsResolvido, fracos: Set<number>, i:
 // ── datas (ISO local, sem fuso) ──
 export function dParse(s: DataISO): Date { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d, 12) }
 export function dISO(d: Date): DataISO { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') }
-export function dAdd(s: DataISO, n: number): DataISO { const d = dParse(s); d.setDate(d.getDate() + n); return dISO(d) }
-export function dDow(s: DataISO): number { return (dParse(s).getDay() + 6) % 7 }
+// funções de data memoizadas (puras sobre strings; dParse devolve Date mutável, então só os resultados string/number são cacheados)
+const memoStr = <T>(f: (k: string) => T) => { const c = new Map<string, T>(); return (k: string): T => { let v = c.get(k); if (v === undefined) { if (c.size > 80000) c.clear(); v = f(k); c.set(k, v) } return v } }
+const dAddMemo = memoStr((k: string) => { const i = k.indexOf('|'); const d = dParse(k.slice(0, i)); d.setDate(d.getDate() + Number(k.slice(i + 1))); return dISO(d) })
+export function dAdd(s: DataISO, n: number): DataISO { return typeof s === 'string' && typeof n === 'number' ? dAddMemo(s + '|' + n) : (() => { const d = dParse(s); d.setDate(d.getDate() + n); return dISO(d) })() }
+const dDowMemo = memoStr((s: string) => (dParse(s).getDay() + 6) % 7)
+export function dDow(s: DataISO): number { return typeof s === 'string' ? dDowMemo(s) : (dParse(s).getDay() + 6) % 7 }
 export function dMon(s: DataISO): DataISO { return dAdd(s, -dDow(s)) }
-export function semDe(start: DataISO, s: DataISO): number { return Math.round((+dParse(dMon(s)) - +dParse(dMon(start))) / 864e5 / 7) + 1 }
+const semDeMemo = memoStr((k: string) => { const i = k.indexOf('|'); return Math.round((+dParse(dMon(k.slice(i + 1))) - +dParse(dMon(k.slice(0, i)))) / 864e5 / 7) + 1 })
+export function semDe(start: DataISO, s: DataISO): number { return typeof s === 'string' && typeof start === 'string' ? semDeMemo(start + '|' + s) : Math.round((+dParse(dMon(s)) - +dParse(dMon(start))) / 864e5 / 7) + 1 }
 export function semInicio(start: DataISO, sem: number): DataISO { return dAdd(dMon(start), (sem - 1) * 7) }
 
 // ── disponibilidade ──
@@ -246,7 +251,7 @@ export function proxSemConteudo(cfg: Cfg28, s: DataISO, n: number): DataISO {
   return dAdd(semInicio(cfg.start, sem), dDow(s))
 }
 export function minPdf(p: number, vel?: number, velPadrao = VEL_PADRAO): number { const v = vel && vel > 0 ? vel : (velPadrao > 0 ? velPadrao : VEL_PADRAO); return Math.max(30, Math.ceil((p || 60) / v * 2 - 1e-9) * 30) }
-const proximoEstudo = (cfg: Cfg28, aPartir: DataISO): DataISO | null => {
+export const proximoEstudo = (cfg: Cfg28, aPartir: DataISO): DataISO | null => {
   for (let n = 0, d = aPartir; n < 1400; n++, d = dAdd(d, 1)) if (d >= cfg.start && horasDia(cfg, d) > 0) return d
   return null
 }
@@ -290,10 +295,15 @@ export function planoRevisaoConcentrada(capDias: number[], temas: number, apenas
   return out
 }
 
+const chaveLeiCache = new Map<string, string>()
 /** Chave da lei de uma meta de LegProc (disciplina + lei normalizada). */
 export function chaveLei(meta: { disc?: string; lei?: string } | null | undefined): string {
   if (!meta?.lei || !String(meta.lei).trim()) return ''
-  return meta.disc + '|' + String(meta.lei).normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('pt-BR')
+  const k = meta.disc + ' ' + meta.lei
+  let v = chaveLeiCache.get(k); if (v !== undefined) return v
+  v = meta.disc + '|' + String(meta.lei).normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase('pt-BR')
+  if (chaveLeiCache.size > 20000) chaveLeiCache.clear()
+  chaveLeiCache.set(k, v); return v
 }
 /** Pode entrar mais esta meta de LegProc no dia? ≤4 metas; ≤2 disciplinas; ≤2 por disciplina, e da mesma lei. */
 export function permitirLegproc25(id: string, idsDia: string[], metaDe: (id: string) => ItemLP | undefined, lim: { metasDia: number; discDia: number; mesmaDisc: number } = { metasDia: 4, discDia: 2, mesmaDisc: 2 }): boolean {
@@ -322,7 +332,7 @@ export function limitePDF27(cfg: Cfg28, teto = 2): number { return cfg.maisPDFul
 export function novosPDFDia27(plano: Plano, cfg: Cfg28, d: DataISO, detalhes: Record<string, Detalhe> = {}): Set<number> {
   const primeiros = new Map<number, DataISO>(), restos = new Set<number>()
   for (const [id, [dia]] of Object.entries(plano)) {
-    if (!/^p[fp]:/.test(id)) continue
+    if (!/^p[fp]:[0-9]+(:[0-9]+)?$/.test(id)) continue
     const i = +id.split(':')[1]
     if (!primeiros.has(i) || dia < primeiros.get(i)!) primeiros.set(i, dia)
     if (detalhes[id]?.continuacao || (cfg.paginasLidas?.[i] || 0) > 0 || (cfg.partesLidas?.[i] || 0) > 0) restos.add(i)
@@ -582,7 +592,7 @@ function gerarPlanoBase(cfg: Cfg28, AS: AulaAS[], ordemAulas: number[] | null, l
 export function detalhesPdf(id: string, plano: Plano, detalhes: Record<string, Detalhe>, AS: AulaAS[]): Detalhe {
   if (detalhes[id]?.paginaInicio != null) return { ...detalhes[id] }
   const i = indiceAula(id), total = AS[i]?.[3] || 0
-  const blocos = Object.entries(plano).filter(([k]) => ehPdf(tipoEstudo(k)) && indiceAula(k) === i)
+  const blocos = Object.entries(plano).filter(([k]) => /^p[fp]:[0-9]+(:[0-9]+)?$/.test(k) && indiceAula(k) === i)
     .sort((a, b) => a[1][0].localeCompare(b[1][0]) || (Number(tipoEstudo(a[0]) === 'pf') - Number(tipoEstudo(b[0]) === 'pf')) || a[0].localeCompare(b[0], 'en', { numeric: true }))
   const minutos = blocos.reduce((s, [, [, h]]) => s + h * 60, 0); let antes = 0
   for (const [k, [, h]] of blocos) {
@@ -734,7 +744,7 @@ export function calcularDomino(fonte: Plano, cfg: Cfg28, desde: DataISO, opcoes:
 }
 
 /** Interrupções no formato da plataforma (sobras/paginasLidas) → metas remanejadas do modelo. */
-function remanejadasEfetivas(cfg: Cfg28, AS: AulaAS[], fixos: Plano, base: DataISO, P: ParamsResolvido): Record<string, Remanejada> {
+export function remanejadasEfetivas(cfg: Cfg28, AS: AulaAS[], fixos: Plano, base: DataISO, P: ParamsResolvido): Record<string, Remanejada> {
   const out: Record<string, Remanejada> = { ...(cfg.remanejadas || {}) }
   const desde = proximoEstudo(cfg, base) || base
   for (const [id, m] of Object.entries(cfg.sobras || {})) {

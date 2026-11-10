@@ -3,9 +3,9 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { Loader2, RotateCcw, Plus, X, Zap, Save } from 'lucide-react'
+import { Loader2, RotateCcw, Plus, X, Save } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import type { ParamsAdaptativo } from '@/lib/cronograma/adaptativo/params'
+import { PARAMS_SEM_EFEITO, type ParamsAdaptativo } from '@/lib/cronograma/adaptativo/params'
 import type { PainelMetas } from '../actions-tipos'
 import {salvarPainelMetas} from '../actions'
 
@@ -110,12 +110,10 @@ export function MetasClient({ inicial }: { inicial: PainelMetas }) {
           <Num {...c} k="durRq" label="Questões (sem. especial)" min={10} max={240} un="min" />
         </Bloco>
 
-        <Bloco titulo="Revisões, PDFull e semana" desc="Quando a revisão e as questões voltam, quantos PDFulls novos por dia e como a semana se organiza.">
+        <Bloco titulo="Revisões e planejamento" desc="Quando a revisão e as questões voltam e até quantas semanas o gerador planeja à frente.">
           <Num {...c} k="offsetRevisao" label="Revisão após PDFull" min={0} max={12} un="sem" hint="Mesmo dia da semana, N semanas de conteúdo depois (semanas especiais não contam)." />
           <Num {...c} k="offsetQuestoes" label="Questões após PDFull" min={0} max={12} un="sem" />
-          <Num {...c} k="tetoPdfDia" label="PDFulls novos/dia" min={1} max={6} hint="Vale quando o aluno permite mais de um por dia (sem a permissão, é sempre 1). Continuações não contam." />
-          <Num {...c} k="concentracaoAteH" label="Concentrar até" min={0} max={60} un="h/sem" hint="Semanas com até essas horas e mais de um dia concentram questões/LegProc no último dia. 0 desliga." />
-          <Num {...c} k="maxSemanas" label="Limite de planejamento" min={20} max={520} un="sem" />
+          <Num {...c} k="maxSemanas" label="Limite de planejamento" min={20} max={600} un="sem" />
           <div className="col-span-full">
             <span className="text-xs font-medium text-muted-foreground">Disciplinas sem revisão regular</span>
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
@@ -135,47 +133,33 @@ export function MetasClient({ inicial }: { inicial: PainelMetas }) {
           </div>
         </Bloco>
 
-        <Bloco titulo="LegProc" desc="Como as metas de lei seca são agrupadas no dia e alternadas entre disciplinas.">
-          <Num {...c} k="lpMetasDia" label="Metas por dia" min={1} max={12} />
-          <Num {...c} k="lpDiscDia" label="Disciplinas por dia" min={1} max={6} />
-          <Num {...c} k="lpMesmaDisc" label="Metas por disciplina" min={1} max={6} hint="Quando mais de uma, precisam ser da mesma lei." />
+        <Bloco titulo="LegProc" desc="Rodízio de disciplinas e tamanho da meta de lei seca. O limite diário de metas é fixo (2 por dia; 4 nas rotinas de mais horas).">
           <Num {...c} k="lpJanelaRodizio" label="Janela do rodízio" min={1} max={20} un="disc" hint="Quantas disciplinas com pendência alternam ao mesmo tempo." />
           <Num {...c} k="charsMetaLp" label="Tamanho da meta" min={2000} max={40000} un="car" hint="Aplicado ao cortar as leis da Biblioteca em metas (próxima atualização do catálogo)." />
         </Bloco>
 
-        <Bloco titulo="Regras da versão 2.18" desc="Comportamentos do gerador 2.18. Cada um vale só para planos gerados ou recalculados depois de ligar; desligado = comportamento atual.">
-          <Chave ligado={p.pdfInteiro218} onChange={(v) => set('pdfInteiro218', v)}
-            titulo="Segundo PDFull só se couber inteiro" desc="Não abre um segundo PDFull no dia se ele não couber inteiro na sobra de tempo. A continuação do PDFull em curso não é afetada." />
-          <Chave ligado={p.revisaoPorResultado218} onChange={(v) => set('revisaoPorResultado218', v)}
-            titulo="Revisão pelo resultado recente do tema" desc="Na semana de revisão entram os temas com acerto abaixo de 70% (os piores primeiro, depois 50–70%, depois sem resultado). Temas com 70% ou mais ficam de fora." />
-        </Bloco>
 
-        <Bloco titulo="Jurisprudência semanal (versão 2.19)" desc="Uma meta geral de Jurisprudência por semana de atividade, preferindo sexta ou sábado. Vale só para planos gerados ou recalculados depois de ligar; ela ocupa tempo do aluno, então os planos ficam um pouco mais longos.">
-          <Chave ligado={p.jurisprudencia219} onChange={(v) => set('jurisprudencia219', v)}
-            titulo="Meta semanal de Jurisprudência" desc="Reserva o tempo antes de distribuir o conteúdo da semana. Semana sem estudo não recebe; semana com estudo mas sem um dia que comporte a meta avisa o aluno para ajustar a rotina." />
+        <Bloco titulo="Jurisprudência semanal" desc="Uma meta geral de Jurisprudência por semana de atividade, preferindo sexta ou sábado. Sempre ativa nos cronogramas gerados ou recalculados; aqui se ajusta a duração e a leitura do aluno.">
           <Chave ligado={p.jurisTagsImagem} onChange={(v) => set('jurisTagsImagem', v)}
             titulo="Converter <tags> em imagens de selo na leitura" desc="Na leitura do aluno, troca marcadores como <repercussão geral> ou <entendimento consolidado> pela imagem do selo cadastrado na Biblioteca de tags. Útil para documentos que não foram montados com o plugin Selos no editor. Desligado = o texto aparece como está. Vale na hora, sem recalcular planos." />
           <Chave ligado={p.jurisTitulosExpansivos} onChange={(v) => set('jurisTitulosExpansivos', v)}
             titulo="Seções dos títulos expansivas e recolhíveis" desc="Na leitura do aluno, cada título e tudo o que vem abaixo dele, até o próximo título, vira uma área expansiva e recolhível no estilo do JurisClub. O que fica antes do primeiro título (nome do julgado, tags e quadro do entendimento) não muda. Vale na hora, sem recalcular planos." />
-          {p.jurisprudencia219 && <Num {...c} k="jurisprudenciaMin" label="Duração da meta" min={15} max={180} un="min" hint="Padrão 60 min (versão 2.19)." />}
+          <Num {...c} k="jurisprudenciaMin" label="Duração da meta" min={15} max={180} un="min" hint="Padrão 60 min." />
         </Bloco>
 
-        <Bloco titulo="Histórico do aluno (versões 2.13 e 2.17)" desc="Vale só para planos gerados ou recalculados depois de ligar. Quem responde Sim em &quot;Já estuda pelo Revisão?&quot; passa a ter os temas anteriores diagnosticados por questões.">
-          <Chave ligado={p.historicoDiagnostico219} onChange={(v) => set('historicoDiagnostico219', v)}
-            titulo="Diagnóstico e reforço dos temas anteriores" desc="2 metas de questões por semana (3 a partir de 24h) para os temas já estudados das matérias selecionadas. Ao concluir, o aluno informa questões e erros: abaixo de 50% gera PDFull de reforço, de 50% a menos de 70% gera PDFlash, 70% ou mais encerra o diagnóstico." />
-        </Bloco>
 
-        <Bloco titulo="Inteligência de desempenho" desc="Usa o grau de dificuldade e os acertos que o aluno anotou para priorizar temas fracos.">
+        <Bloco titulo="Inteligência de desempenho" desc="Usa os acertos que o aluno anotou para escolher e ordenar os temas da semana de revisão adaptativa.">
           <Num {...c} k="acertoMin" label="Acerto mínimo" min={0} max={100} un="%" hint="Abaixo disso o tema vira prioritário nas semanas de revisão." />
-          <Chave ligado={p.usarDesempenhoNoPlano} onChange={(v) => setP((x) => ({ ...x, usarDesempenhoNoPlano: v, pesoDesempenho: v ? (x.pesoDesempenho || 1) : 0 }))}
-            titulo="Reforçar temas fracos em todo o plano" desc="Antecipa a revisão e as questões dos temas com grau alto ou acerto baixo, além das semanas de revisão. Desligado = comportamento atual." />
-          {p.usarDesempenhoNoPlano && (
-            <label className="col-span-full flex flex-wrap items-center gap-3">
-              <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground"><Zap className="h-3.5 w-3.5 text-primary" />Força do reforço: {p.pesoDesempenho.toLocaleString('pt-BR')}</span>
-              <input type="range" min={0.5} max={3} step={0.5} value={p.pesoDesempenho} onChange={(e) => set('pesoDesempenho', Number(e.target.value))} className="w-48 accent-primary" />
-              <span className="text-[11px] text-muted-foreground">1 = moderado · 3 = forte</span>
-            </label>
-          )}
+        </Bloco>
+        <Bloco titulo="Sem efeito no gerador atual" desc="Estes ajustes continuam guardados (nada foi apagado), mas o gerador atual não os usa mais: as regras correspondentes agora são fixas ou sempre ativas.">
+          <ul className="col-span-full grid gap-x-6 gap-y-1 text-xs text-muted-foreground sm:grid-cols-2">
+            {PARAMS_SEM_EFEITO.map((x) => (
+              <li key={x.k.join('+')} className="flex items-baseline justify-between gap-3 border-b border-border/60 py-1">
+                <span className="min-w-0 truncate" title={x.motivo}>{x.rotulo}</span>
+                <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide">sem efeito</span>
+              </li>
+            ))}
+          </ul>
         </Bloco>
       </div>
 

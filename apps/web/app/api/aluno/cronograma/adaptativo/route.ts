@@ -107,6 +107,8 @@ export async function POST(req: NextRequest) {
       if ('estrelas' in p) patch.estrelas = p.estrelas == null ? null : Math.max(0, Math.min(5, Math.round(Number(p.estrelas))))
       if ('res' in p) patch.res = p.res == null ? null : Math.max(0, Math.round(Number(p.res)))
       if ('err' in p) patch.err = p.err == null ? null : Math.max(0, Math.round(Number(p.err)))
+      if ('concluido_em' in p && typeof p.concluido_em === 'string' && DATA.test(p.concluido_em.slice(0, 10))) patch.concluido_em = p.concluido_em.slice(0, 10) // data REAL (o servidor carimba hoje se faltar)
+      if ('cert' in p) patch.cert = p.cert == null ? null : Math.max(0, Math.round(Number(p.cert)) || 0)
       if ('modo' in p) patch.modo = p.modo ? String(p.modo).slice(0, 20) : null
       if ('nota' in p) patch.nota = p.nota ? String(p.nota).slice(0, 4000) : null
       const r = await patchMetaAdaptativo(svc, tenantId, estudanteId, metaId, patch)

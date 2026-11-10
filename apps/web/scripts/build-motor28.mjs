@@ -10,13 +10,21 @@ import { fileURLToPath } from 'node:url'
 const require = createRequire(import.meta.url)
 const ts = require('typescript')
 const raiz = join(dirname(fileURLToPath(import.meta.url)), '..')
-const src = readFileSync(join(raiz, 'lib/cronograma/adaptativo/motor28.ts'), 'utf8')
-const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019, removeComments: false } }).outputText
-const saida = `/* GERADO por scripts/build-motor28.mjs a partir de lib/cronograma/adaptativo/motor28.ts — NÃO editar à mão. */
+const compilar = (nome) => ts.transpileModule(readFileSync(join(raiz, 'lib/cronograma/adaptativo/' + nome + '.ts'), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2019, removeComments: false } }).outputText
+// motor30 (atual) importa helpers do motor28 (legado 2.8.1): dois módulos CommonJS num mini-require dentro de uma IIFE.
+// window.Motor28 = motor atual (mesma API usada pelo iframe); window.Motor28.legado = motor 2.8.1 (planos antigos, não regenerados).
+const saida = `/* GERADO por scripts/build-motor28.mjs a partir de lib/cronograma/adaptativo/motor30.ts (+ motor28.ts legado) — NÃO editar à mão. */
 (function () {
-  var exports = {}; var module = { exports: exports };
-${js}
-  window.Motor28 = module.exports && Object.keys(module.exports).length ? module.exports : exports;
+  var defs = {}, cache = {};
+  function req(n) { n = String(n).split('/').pop(); if (cache[n]) return cache[n].exports; var m = { exports: {} }; cache[n] = m; defs[n](m, m.exports, req); return m.exports; }
+  defs['motor28'] = function (module, exports, require) {
+${compilar('motor28')}
+  };
+  defs['motor30'] = function (module, exports, require) {
+${compilar('motor30')}
+  };
+  var atual = req('motor30'); atual.legado = req('motor28');
+  window.Motor28 = atual;
 })();
 `
 writeFileSync(join(raiz, 'public/cronograma/adaptativo/motor28.js'), saida)

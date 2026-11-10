@@ -94,7 +94,7 @@ export const PARAMS_PADRAO: ParamsAdaptativo = {
   lpJanelaRodizio: 6,
   charsMetaLp: 12000,
   concentracaoAteH: 18,
-  maxSemanas: 200,
+  maxSemanas: 600,
   acertoMin: 60,
   usarDesempenhoNoPlano: false,
   pesoDesempenho: 0,
@@ -106,6 +106,24 @@ export const PARAMS_PADRAO: ParamsAdaptativo = {
   jurisTitulosExpansivos: true,
   historicoDiagnostico219: false,
 }
+
+/**
+ * Parâmetros que o gerador atual NÃO usa mais (colunas/valores mantidos por compatibilidade; nada é apagado).
+ * O admin os mostra como "sem efeito". Regras correspondentes: PDFull 1/dia (2º só por conclusão), concentração de fim de semana,
+ * LegProc fixo (2/dia; 4 na faixa alta), desempenho só na semana de revisão adaptativa, e as regras de PDFull inteiro, revisão por
+ * resultado, diagnóstico histórico e jurisprudência semanal sempre ativas; o rodízio por vagas substitui "paralelo".
+ */
+export const PARAMS_SEM_EFEITO: ReadonlyArray<{ k: ReadonlyArray<keyof ParamsAdaptativo | 'paralelo'>; rotulo: string; motivo: string }> = [
+  { k: ['tetoPdfDia'], rotulo: 'PDFulls novos por dia', motivo: 'Regra fixa: 1 por dia; o segundo só entra por conclusão na faixa alta de horas.' },
+  { k: ['concentracaoAteH'], rotulo: 'Concentrar questões e LegProc no último dia', motivo: 'Substituído pela concentração de fim de semana.' },
+  { k: ['lpMetasDia', 'lpDiscDia', 'lpMesmaDisc'], rotulo: 'Limites diários de LegProc (metas, disciplinas, mesma disciplina)', motivo: 'Fixos: 2 por dia (4 na faixa alta).' },
+  { k: ['usarDesempenhoNoPlano', 'pesoDesempenho'], rotulo: 'Reforçar temas fracos em todo o plano', motivo: 'O desempenho agora atua na semana de revisão adaptativa.' },
+  { k: ['pdfInteiro218'], rotulo: 'Segundo PDFull só se couber inteiro', motivo: 'Regra incorporada ao gerador.' },
+  { k: ['revisaoPorResultado218'], rotulo: 'Revisão pelo resultado recente do tema', motivo: 'Sempre ativa.' },
+  { k: ['historicoDiagnostico219'], rotulo: 'Diagnóstico e reforço dos temas anteriores', motivo: 'Sempre ativo para quem já estuda pelo Revisão.' },
+  { k: ['jurisprudencia219'], rotulo: 'Ligar a meta semanal de Jurisprudência', motivo: 'Sempre ativa; só a duração é configurável.' },
+  { k: ['paralelo'], rotulo: 'Disciplinas em paralelo', motivo: 'Substituído pelo rodízio por vagas.' },
+]
 
 const inteiro = (v: unknown, def: number, min: number, max: number): number => {
   const n = Math.trunc(Number(v))
@@ -142,7 +160,7 @@ export function normalizarParams(raw: unknown): ParamsAdaptativo {
     lpJanelaRodizio: inteiro(r.lpJanelaRodizio, p.lpJanelaRodizio, 1, 20),
     charsMetaLp: inteiro(r.charsMetaLp, p.charsMetaLp, 2000, 40000),
     concentracaoAteH: inteiro(r.concentracaoAteH, p.concentracaoAteH, 0, 60),
-    maxSemanas: inteiro(r.maxSemanas, p.maxSemanas, 20, 520),
+    maxSemanas: inteiro(r.maxSemanas, p.maxSemanas, 20, 600), // 600 = horizonte do motor atual
     acertoMin: inteiro(r.acertoMin, p.acertoMin, 0, 100),
     usarDesempenhoNoPlano: r.usarDesempenhoNoPlano === true,
     pesoDesempenho: Math.max(0, Math.min(3, Number(r.pesoDesempenho) || (r.usarDesempenhoNoPlano === true ? 1 : 0))),

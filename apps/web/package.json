@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "cronograma:motor": "node scripts/build-motor28.mjs",
-    "cronograma:testar": "node scripts/_equiv-motor.mjs && node scripts/_ac-motor.mjs && node scripts/_catalogo-override.mjs && node scripts/_regras218.mjs && node scripts/_juris219.mjs && node scripts/_historico219.mjs",
+    "cronograma:testar": "node scripts/_equiv-motor.mjs && node scripts/_ac-motor.mjs && node scripts/_catalogo-override.mjs && node scripts/_regras218.mjs && node scripts/_juris219.mjs && node scripts/_historico219.mjs && node scripts/_motor30-diferencial.mjs && node scripts/_motor30-dominio.mjs && node scripts/_motor30-homologacao.mjs && node scripts/_plano-metas-ids.mjs",
     "pdfjs:copiar": "node scripts/copiar-pdfjs.mjs",
     "dev": "next dev --turbopack -H 0.0.0.0",
     "build": "next build",
