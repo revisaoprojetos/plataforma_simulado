@@ -453,6 +453,29 @@ export async function atualizarModulosEmLoteAction(produtoId: string, moduloIds:
   revalidar(produtoId); return { ok: true as const, modulos: raiz.length, aulas: total }
 }
 
+/** CAPA em lote: aplica a mesma imagem (e a opção de ocultar o título) aos módulos escolhidos e, se `incluirSubmodulos`, a TODOS os submódulos
+ *  dentro deles (qualquer nível). Aulas/conteúdos não têm capa própria — o que aparece no aluno é a capa do módulo/submódulo. */
+export async function aplicarCapaEmLoteAction(produtoId: string, moduloIds: string[], capa: { imagem_url: string; ocultar_titulo?: boolean; incluirSubmodulos?: boolean }) {
+  const g = await guard(true); if ('error' in g) return { error: g.error }
+  if (!Array.isArray(moduloIds) || !moduloIds.length) return { error: 'Selecione ao menos um módulo.' }
+  const url = String(capa?.imagem_url ?? '').trim()
+  if (!url || url.length > 2000) return { error: 'Envie a imagem da capa.' }
+  const svc = createAdminClient()
+  const { raiz, todos } = await modulosComDescendentes(svc, g.tenantId, produtoId, moduloIds)
+  if (!raiz.length) return { error: 'Nenhum dos módulos selecionados foi encontrado neste produto.' }
+  const alvos = capa.incluirSubmodulos ? todos : raiz
+  const campos: Record<string, unknown> = { imagem_url: url, atualizado_em: new Date().toISOString() }
+  if (capa.ocultar_titulo !== undefined) campos.ocultar_titulo = !!capa.ocultar_titulo
+  let total = 0
+  for (const c of chunks(alvos)) {
+    const { data, error } = await svc.from('simulado_produto_modulos').update(campos).eq('tenant_id', g.tenantId).eq('produto_id', produtoId).eq('deletado', false).in('id', c).select('id')
+    if (error) return { error: error.message }
+    total += (data ?? []).length
+  }
+  await registrarAudit({ operacao: 'UPDATE', entidade: 'simulado_produto_modulos', entidadeId: produtoId, depois: { capa_em_lote: true, modulos: raiz, incluir_submodulos: !!capa.incluirSubmodulos, total, ocultar_titulo: campos.ocultar_titulo ?? null }, tenantId: g.tenantId })
+  revalidar(produtoId); return { ok: true as const, modulos: raiz.length, total }
+}
+
 /** Exclui (Lixeira) vários módulos com seus submódulos e aulas. */
 export async function excluirModulosEmLoteAction(produtoId: string, moduloIds: string[]) {
   const g = await guard(true); if ('error' in g) return { error: g.error }

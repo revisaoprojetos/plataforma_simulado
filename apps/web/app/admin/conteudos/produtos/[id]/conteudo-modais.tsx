@@ -17,6 +17,7 @@ import { confirmar } from '@/components/ui/confirm-dialog'
 import { FilePicker } from '@/components/admin/file-picker'
 import { cn } from '@/lib/utils'
 import { buscarRecursosAction, nomesRecursosAction } from './lazy-actions'
+import { aplicarCapaEmLoteAction } from '../actions'
 import {
   SUBTIPOS, SUBTIPO_LABEL, TIPO_REF_LABEL, DISPONIBILIDADE_OPCOES, DISPONIBILIDADE_ANTES, DIAS_SEMANA,
   subtipoDef, resumoDisponibilidade,
@@ -45,6 +46,7 @@ export function ModuloDialog({ produtoId, modulo, paiId, modulosCount, aulasCoun
   const [exibicao, setExibicao] = useState<'aberto' | 'recolhido'>(modulo?.exibicao ?? 'aberto')
   const [disp, setDisp] = useState<Disponibilidade>(modulo?.disponibilidade ?? { tipo: 'na_matricula', antes: 'bloqueado_cadeado' })
   const [editarDisp, setEditarDisp] = useState(false)
+  const [paraSubs, setParaSubs] = useState(false) // aplicar esta capa também aos submódulos ao salvar
   const [pending, start] = useTransition()
 
   function salvar() {
@@ -52,6 +54,11 @@ export function ModuloDialog({ produtoId, modulo, paiId, modulosCount, aulasCoun
     start(async () => {
       const r = await salvarModuloAction(produtoId, { id: modulo?.id, pai_id: modulo?.pai_id ?? paiId, titulo, imagem_url: imagem || null, ocultar_titulo: ocultarTitulo, descricao: descricao || null, exibicao, disponibilidade: disp })
       if ('error' in r && r.error) { toast.error(r.error); return }
+      if (!criando && paraSubs && imagem && modulo) {
+        const c = await aplicarCapaEmLoteAction(produtoId, [modulo.id], { imagem_url: imagem, ocultar_titulo: ocultarTitulo, incluirSubmodulos: true })
+        if ('error' in c && c.error) { toast.error(c.error); return }
+        toast.success(`Capa aplicada em ${(c as { total: number }).total} módulo(s)/submódulo(s).`)
+      }
       toast.success(criando ? 'Módulo criado.' : 'Módulo salvo.'); onPronto(); onClose()
     })
   }
@@ -81,6 +88,9 @@ export function ModuloDialog({ produtoId, modulo, paiId, modulosCount, aulasCoun
                   <span>Ocultar o título da disciplina sobre a imagem</span>
                 </label>
               ) : null}
+              {!criando && imagem && (modulosCount ?? 0) > 0 && (
+                <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={paraSubs} onChange={(e) => setParaSubs(e.target.checked)} className="h-4 w-4 accent-[var(--brand-primary,currentColor)]" /><span>Aplicar esta capa também aos {modulosCount} submódulo(s)</span></label>
+              )}
               {!criando && onSegmentos && <button type="button" onClick={() => { onClose(); onSegmentos('capa') }} className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"><Users className="h-3.5 w-3.5" />Imagem por segmento</button>}</div>
             <label className="block"><span className="mb-1 block text-sm font-medium">Descrição</span>
               <textarea value={descricao} onChange={(e) => setDescricao(e.target.value)} rows={2} placeholder="Descrição curta do módulo (opcional)" className="w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring" /></label>

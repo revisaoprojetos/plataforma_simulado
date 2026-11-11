@@ -69,12 +69,14 @@ export type AbaSegmentos = 'visibilidade' | 'liberacao' | 'capa'
 const DISP_PADRAO: Disponibilidade = { tipo: 'na_matricula', antes: 'bloqueado_cadeado' }
 const campo = 'h-10 w-full rounded-xl border bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50'
 
-export function SegmentosDialog({ produtoId, alvos, titulo, titulos, imagens, dados, podeEditar, abaInicial = 'visibilidade', onClose, onMudou, onAplicarBase, baseResumo }: {
+export function SegmentosDialog({ produtoId, alvos, titulo, titulos, imagens, filhosDe, dados, podeEditar, abaInicial = 'visibilidade', onClose, onMudou, onAplicarBase, baseResumo }: {
   produtoId: string
   alvos: AlvoLote[]
   titulo?: string
   /** id do módulo/aula → título (p/ listar quem tem cada regra quando há vários marcados). */
   titulos?: Record<string, string>
+  /** ids de TODOS os submódulos (qualquer nível) de um módulo — p/ aplicar a capa também a eles. */
+  filhosDe?: (moduloId: string) => string[]
   /** id do módulo → capa BASE (p/ comparar com a capa do segmento na grade em massa). */
   imagens?: Record<string, string | null>
   dados: (VisibilidadeConteudo & { disponivel: boolean }) | null
@@ -120,7 +122,7 @@ export function SegmentosDialog({ produtoId, alvos, titulo, titulos, imagens, da
   ]
 
   const comum = {
-    produtoId, alvos, segs, nomesTodos, preferido, nomeAlvo: (id: string) => titulos?.[id] ?? '(item)', imagemBase: (id: string) => imagens?.[id] ?? null, nomeSeg, plural, total, soModulos, podeEditar,
+    produtoId, alvos, segs, nomesTodos, preferido, nomeAlvo: (id: string) => titulos?.[id] ?? '(item)', imagemBase: (id: string) => imagens?.[id] ?? null, filhosDe: filhosDe ?? (() => []), nomeSeg, plural, total, soModulos, podeEditar,
     onNovoSeg: () => setEditSeg({ seg: null }), onEditarSeg: (s: Segmento) => setEditSeg({ seg: s }), onMudou,
   }
 
@@ -221,7 +223,7 @@ const Dica = ({ children }: { children: React.ReactNode }) => (
 )
 
 type Comum = {
-  produtoId: string; alvos: AlvoLote[]; segs: Segmento[]; nomesTodos: Record<string, string>; nomeSeg: (id: string) => string; preferido: string; nomeAlvo: (id: string) => string; imagemBase: (id: string) => string | null
+  produtoId: string; alvos: AlvoLote[]; segs: Segmento[]; nomesTodos: Record<string, string>; nomeSeg: (id: string) => string; preferido: string; nomeAlvo: (id: string) => string; imagemBase: (id: string) => string | null; filhosDe: (moduloId: string) => string[]
   plural: (n: number) => string; total: number; soModulos: boolean; podeEditar: boolean
   onNovoSeg: () => void; onEditarSeg: (s: Segmento) => void; onMudou: () => void | Promise<void>
 }
@@ -514,6 +516,9 @@ function AbaCapa({ rs, setRs, onRs, ...c }: Comum & { rs: RsState; setRs: React.
   const [ocupado, setOcupado] = useState(false)
   const modulos = c.alvos.filter((a) => a.tipo === 'modulo')
   const unico = modulos.length === 1
+  const [incluirSubs, setIncluirSubs] = useState(false)
+  const descendentes = useMemo(() => [...new Set(modulos.flatMap((m) => c.filhosDe(m.id)))].filter((id) => !modulos.some((m) => m.id === id)), [c.alvos]) // eslint-disable-line react-hooks/exhaustive-deps
+  const alvosCapa = (base: { id: string }[]) => (incluirSubs ? [...base.map((m) => m.id), ...descendentes.filter((id) => !base.some((m) => m.id === id))].map((id) => ({ id })) : base)
   const [editAlvo, setEditAlvo] = useState<string | null>(null) // módulo da capa em edição
   const editando = editId !== null
   const ids = useMemo(() => new Set(modulos.map((a) => a.id)), [c.alvos]) // eslint-disable-line react-hooks/exhaustive-deps
@@ -540,9 +545,9 @@ function AbaCapa({ rs, setRs, onRs, ...c }: Comum & { rs: RsState; setRs: React.
     if (!(await garantirAcesso(c, pub, seg))) return // antes de criar o segmento automático
     const sr = await pub.resolver(seg); if (sr === false) return
     if (!sr) { toast.error('Escolha grupos/alunos ou um segmento.'); return }
-    const lista = modoMassa === 'unica' ? (imagemUnica ? modulos.map((m) => ({ id: m.id, url: imagemUnica })) : []) : alterados.map((m) => ({ id: m.id, url: rascunho[m.id] }))
+    const lista = modoMassa === 'unica' ? (imagemUnica ? alvosCapa(modulos).map((m) => ({ id: m.id, url: imagemUnica })) : []) : alvosCapa(alterados).map((m) => ({ id: m.id, url: m.id in rascunho ? rascunho[m.id] : (alterados.length === 1 ? rascunho[alterados[0].id] : '') })).filter((x) => x.url)
     if (!lista.length) { toast.error(modoMassa === 'unica' ? 'Envie a imagem.' : 'Envie ao menos uma imagem nova.'); return }
-    if (!(await confirmar({ titulo: 'Salvar capas do segmento', mensagem: modoMassa === 'unica' ? `Usar a MESMA imagem nos ${lista.length} módulos marcados, para “${sr.nome}”. (Troca a capa que esse segmento já tinha neles.)` : `Salvar ${lista.length} capa(s) para “${sr.nome}”.`, confirmar: 'Salvar' }))) return
+    if (!(await confirmar({ titulo: 'Salvar capas do segmento', mensagem: modoMassa === 'unica' ? `Usar a MESMA imagem em ${lista.length} módulo(s)${incluirSubs ? ' (marcados + submódulos)' : ' marcados'}, para “${sr.nome}”. (Troca a capa que esse segmento já tinha neles.)` : `Salvar ${lista.length} capa(s) para “${sr.nome}”.`, confirmar: 'Salvar' }))) return
     setOcupado(true)
     let ok = 0
     const salvas: CapaSegAdmin[] = []
@@ -569,10 +574,11 @@ function AbaCapa({ rs, setRs, onRs, ...c }: Comum & { rs: RsState; setRs: React.
     setOcupado(true)
     let ok = 0
     const salvas: CapaSegAdmin[] = []
-    const alvoLista = editando && editAlvo ? [{ tipo: 'modulo' as const, id: editAlvo }] : modulos
+    const alvoLista = editando && editAlvo ? [{ id: editAlvo }] : alvosCapa(modulos)
     const comTexto = editando || unico
+    const originais = new Set(modulos.map((x) => x.id))
     for (const m of alvoLista) {
-      const r = await salvarCapaSegmentoAction(c.produtoId, { id: editando ? editId : null, segmento_id: sr.id, alvo_tipo: 'modulo', alvo_id: m.id, imagem_url: imagem || null, titulo: comTexto ? titulo : null, descricao: comTexto ? descricao : null, ocultar_titulo: ocultarTitulo, prioridade })
+      const r = await salvarCapaSegmentoAction(c.produtoId, { id: editando ? editId : null, segmento_id: sr.id, alvo_tipo: 'modulo', alvo_id: m.id, imagem_url: imagem || null, titulo: comTexto && (editando || originais.has(m.id)) ? titulo : null, descricao: comTexto && (editando || originais.has(m.id)) ? descricao : null, ocultar_titulo: ocultarTitulo, prioridade })
       if ('error' in r) { toast.error(r.error); break }
       salvas.push(r.capa); ok++
     }
@@ -638,7 +644,13 @@ function AbaCapa({ rs, setRs, onRs, ...c }: Comum & { rs: RsState; setRs: React.
         direita={!c.podeEditar ? <p className="text-sm text-muted-foreground">Você só pode visualizar.</p> : (
           <>
             <BlocoSegmento c={c} pub={pub} valor={seg} onChange={setSegId} ocupado={ocupado} setOcupado={setOcupado} />
-            <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border bg-card p-3 text-sm"><input type="checkbox" checked={ocultarTitulo} onChange={(e) => setOcultarTitulo(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--primary)]" /><span><span className="font-medium">Ocultar o título sobre a imagem</span><span className="block text-xs text-muted-foreground">Use quando a imagem já traz o texto.</span></span></label>
+            {descendentes.length > 0 && !editando && (
+              <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border bg-card p-3 text-sm"><input type="checkbox" checked={incluirSubs} onChange={(e) => setIncluirSubs(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--primary)]" /><span><span className="font-medium">Aplicar também aos {descendentes.length} submódulo(s) dentro deles</span><span className="block text-xs text-muted-foreground">A capa deste público vai para todos os submódulos (qualquer nível), só a imagem.</span></span></label>
+            )}
+            {descendentes.length > 0 && !editando && (
+              <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border bg-card p-3 text-sm"><input type="checkbox" checked={incluirSubs} onChange={(e) => setIncluirSubs(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--primary)]" /><span><span className="font-medium">Aplicar também aos {descendentes.length} submódulo(s) dentro deles</span><span className="block text-xs text-muted-foreground">A capa deste público vai para todos os submódulos (qualquer nível), só a imagem.</span></span></label>
+            )}
+          <label className="flex cursor-pointer items-start gap-2.5 rounded-xl border bg-card p-3 text-sm"><input type="checkbox" checked={ocultarTitulo} onChange={(e) => setOcultarTitulo(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--primary)]" /><span><span className="font-medium">Ocultar o título sobre a imagem</span><span className="block text-xs text-muted-foreground">Use quando a imagem já traz o texto.</span></span></label>
             <Prioridade valor={prioridade} onChange={setPrioridade} />
             <Button className="w-full" onClick={salvarMassa} disabled={ocupado || !temSeg || !pendentes}>{ocupado ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}Salvar {pendentes ? `${pendentes} capa${pendentes === 1 ? '' : 's'}` : 'capas'}</Button>
             <p className="text-xs text-muted-foreground">Para remover ou editar título/descrição de uma capa, marque só aquele módulo.</p>

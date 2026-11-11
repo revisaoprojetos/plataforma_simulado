@@ -10,7 +10,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Loader2, Plus, FileStack, Search, ChevronLeft, ChevronRight, GripVertical, Pencil, MoreVertical, ArrowLeft,
-  FolderPlus, Trash2, Shuffle, FolderInput, Copy, CalendarClock, Layers, Eye, EyeOff, Paperclip, Lock, Download, Droplets, ArrowUpDown, ChevronDown, LayoutGrid, List as ListIcon, ArrowUp, ArrowDown, Users,
+  FolderPlus, Trash2, Shuffle, FolderInput, Copy, CalendarClock, Layers, Eye, EyeOff, Paperclip, Lock, Download, Droplets, ArrowUpDown, ChevronDown, LayoutGrid, List as ListIcon, ArrowUp, ArrowDown, Users, ImageIcon,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -32,6 +32,7 @@ import {
 } from '../actions'
 import { carregarModulosAction, carregarModuloInternoAction, buscarAulasProdutoAction } from './lazy-actions'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { CapaLoteDialog } from './capa-lote-dialog'
 import { SegmentosDialog, SinaisSegmento, resumoRegrasAlvo, type AbaSegmentos, type SinaisSeg } from './segmentos-dialog'
 import { carregarRegrasSegmentoAction } from './segmento-regras-actions'
 import type { RegrasSegmentoAdmin } from './segmento-regras-tipos'
@@ -109,6 +110,7 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
   const [totalMod, setTotalMod] = useState(0)
   const [totais, setTotais] = useState({ aulas: 0, modulos: 0 })
   const [marcadosMod, setMarcadosMod] = useState<Set<string>>(new Set())
+  const [capaLote, setCapaLote] = useState<string[] | null>(null) // módulos da "Capa em lote"
   // Submódulos do módulo aberto: MESMAS ferramentas da visão de módulos (busca, ordem, página, seleção, lote, reordenar)
   const [qSub, setQSub] = useState('')
   const [ordemSub, setOrdemSub] = useState<OrdemMod>('ordem')
@@ -177,6 +179,12 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
     for (const r of segRegras?.capas ?? []) if (r.ativo && r.alvo_tipo === 'modulo') poe(r.alvo_id, 'capa', seg(r.segmento_id))
     return m
   }, [visDados, segRegras])
+  /** ids de todos os submódulos (qualquer nível) de um módulo. */
+  const filhosDeModulo = (id: string): string[] => {
+    const out: string[] = [], fila = [id]
+    while (fila.length) { const x = fila.pop()!; for (const m of modulos) if (m.pai_id === x && !out.includes(m.id)) { out.push(m.id); fila.push(m.id) } }
+    return out
+  }
   const nomeSegVis = (id: string) => visDados?.segmentos.find((s) => s.id === id)?.nome ?? 'segmento'
 
   const [carregando, setCarregando] = useState(true)
@@ -524,7 +532,7 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
   return (
     <section className={cn('rounded-2xl border bg-card p-2 shadow-sm transition-opacity', carregando && 'opacity-70')} aria-busy={carregando}>
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        <table className="w-full min-w-[1180px] whitespace-nowrap text-sm">
           <thead>
             <tr className="border-b text-left text-xs uppercase tracking-wide text-muted-foreground">
               {podeEditar && (
@@ -538,6 +546,7 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
               <ThOrd rotulo="Aulas" asc="aulas_asc" desc="aulas" className="w-20" />
               <ThOrd rotulo="Submódulos" asc="sub_asc" desc="sub" className="w-28" />
               <th className="px-3 py-2.5 font-medium">Tipos de material</th>
+              <th className="px-3 py-2.5 font-medium">Segmentos</th>
               <th className="px-3 py-2.5 font-medium">Liberação</th>
               <ThOrd rotulo="Situação" asc="rascunhos_asc" desc="rascunhos" className="w-36" />
               <th className="w-28 px-3 py-2.5 text-right font-medium">Ações</th>
@@ -549,28 +558,28 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
               const sit = situacaoModulo(c)
               return (
                 <tr key={c.id} className={cn('border-b last:border-0 hover:bg-muted/40', marcadosX.has(c.id) && 'bg-primary/5')}>
-                  {podeEditar && <td className="px-3 py-1.5"><CaixaSelecao checked={marcadosX.has(c.id)} onChange={() => toggleX(c.id)} label={`Selecionar ${c.titulo}`} /></td>}
-                  <td className="px-3 py-1.5 align-middle">
+                  {podeEditar && <td className="px-3 py-1"><CaixaSelecao checked={marcadosX.has(c.id)} onChange={() => toggleX(c.id)} label={`Selecionar ${c.titulo}`} /></td>}
+                  <td className="px-3 py-1 align-middle">
                     <button type="button" onClick={() => irModulo(c.id)} className="flex min-w-0 items-center gap-2.5 text-left">
-                      <span className="relative h-10 w-[27px] shrink-0 overflow-hidden rounded-md" style={{ background: 'linear-gradient(170deg, var(--primary), color-mix(in srgb, var(--primary) 40%, black))' }}>
+                      <span className="relative h-8 w-[22px] shrink-0 overflow-hidden rounded-md" style={{ background: 'linear-gradient(170deg, var(--primary), color-mix(in srgb, var(--primary) 40%, black))' }}>
                         {c.imagem_url && <img src={c.imagem_url} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />}{/* eslint-disable-line @next/next/no-img-element */}
                       </span>
                       <span className="min-w-0 max-w-[32ch] truncate font-medium hover:underline">{c.titulo}</span>
                     </button>
-                    <SinaisSegmento sinais={sinais.get(c.id)} compacto className="mt-1 pl-[37px]" />
                   </td>
-                  <td className="px-3 py-1.5 tabular-nums">{c.aulas}</td>
-                  <td className="px-3 py-1.5 tabular-nums">{c.submodulos}</td>
-                  <td className="px-3 py-1.5">
-                    <span className="flex flex-wrap gap-1">
+                  <td className="px-3 py-1 tabular-nums">{c.aulas}</td>
+                  <td className="px-3 py-1 tabular-nums">{c.submodulos}</td>
+                  <td className="px-3 py-1">
+                    <span className="flex gap-1">
                       {chips.length === 0 ? <span className="text-muted-foreground">—</span> : chips.map((x) => <span key={x.v} className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">{x.label} <span className="tabular-nums">{c.materiais[x.v]}</span></span>)}
                     </span>
                   </td>
-                  <td className="px-3 py-1.5 text-xs">
-                    {resumoLiberacaoCard(c).map((l) => <div key={l.texto} className={l.alerta ? 'font-medium text-foreground' : 'text-muted-foreground'}>{l.texto}</div>)}
+                  <td className="px-3 py-1">{sinais.get(c.id) && (sinais.get(c.id)!.vis || sinais.get(c.id)!.lib || sinais.get(c.id)!.capa) ? <SinaisSegmento sinais={sinais.get(c.id)} className="flex-nowrap" /> : <span className="text-muted-foreground">—</span>}</td>
+                  <td className="px-3 py-1 text-xs">
+                    {resumoLiberacaoCard(c).map((l, i) => <span key={l.texto} className={l.alerta ? 'font-medium text-foreground' : 'text-muted-foreground'}>{i > 0 ? ' · ' : ''}{l.texto}</span>)}
                   </td>
-                  <td className="px-3 py-1.5"><span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', sit.ativo ? 'bg-emerald-500/12 text-emerald-600 dark:text-emerald-400' : 'bg-muted text-muted-foreground')}>{sit.texto}</span></td>
-                  <td className="px-3 py-1.5">
+                  <td className="px-3 py-1"><span className={cn('rounded-full px-2 py-0.5 text-[11px] font-medium', sit.ativo ? 'bg-emerald-500/12 text-emerald-600 dark:text-emerald-400' : 'bg-muted text-muted-foreground')}>{sit.texto}</span></td>
+                  <td className="px-3 py-1">
                     <div className="flex items-center justify-end gap-1">
                       <Button variant="ghost" size="sm" onClick={() => irModulo(c.id)}>Abrir</Button>
                       {podeEditar && <>
@@ -617,6 +626,7 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
             <div className="ml-auto flex flex-wrap items-center gap-2">
               {emLote && <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />}
               <Button size="sm" variant="outline" disabled={emLote} onClick={() => setPainelVis({ alvos: [...mk].map((id) => ({ tipo: 'modulo' as const, id })) })}><Users className="h-4 w-4" />Segmento</Button>
+              <Button size="sm" variant="outline" disabled={emLote} onClick={() => setCapaLote([...mk])}><ImageIcon className="h-4 w-4" />Capa</Button>
               <Button size="sm" variant="outline" disabled={emLote} onClick={() => aplicarLoteMod({ situacao: 'ativo' }, 'Ativar aulas', 'Tornar ativas', 'ativas', mk, limpar)}><Eye className="h-4 w-4" />Ativar</Button>
               <Button size="sm" variant="outline" disabled={emLote} onClick={() => aplicarLoteMod({ situacao: 'rascunho' }, 'Passar para rascunho', 'Passar para rascunho', 'em rascunho', mk, limpar)}><EyeOff className="h-4 w-4" />Rascunho</Button>
               <Button size="sm" variant="destructive" disabled={emLote} onClick={() => excluirModulosMarcados(mk, limpar)}><Trash2 className="h-4 w-4" />Excluir</Button>
@@ -820,23 +830,26 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
   )
 
   return (
-    <div className={cn('grid grid-cols-[minmax(0,1fr)] gap-5', moduloId && 'xl:grid-cols-[minmax(0,1fr)_minmax(300px,360px)]')}>
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-5">
       {moduloId ? visaoInterna : visaoModulos}
 
-      {/* Detalhe da aula (só dentro do módulo) */}
-      {moduloId && (
-        <aside className="rounded-2xl border bg-card p-4 shadow-sm xl:sticky xl:top-4 xl:self-start">
-          {sel ? <DetalheAula it={sel} podeEditar={podeEditar} visResumo={resumoRegrasAlvo(regrasPorAlvo.get(sel.id), nomeSegVis)} onVis={() => abrirVisAula(sel)} onEditar={() => setEditarItem({ item: sel, criar: false })} onAlterarTipo={() => setAlterarTipo(sel)} onMover={() => setMoverItem(sel)} onDuplicar={() => setDuplicarItem(sel)} onExcluir={() => excluirAula(sel)} /> : (
-            <div className="space-y-3 text-sm">
-              <div className="flex flex-col items-center gap-2 py-6 text-center text-muted-foreground"><FileStack className="h-7 w-7 opacity-40" />Clique numa aula para ver os detalhes.</div>
-              <div className="border-t pt-3">
-                <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tipos de conteúdo</div>
-                <p className="text-xs text-muted-foreground">{TIPOS_CONTEUDO_LISTA.join(' · ')}. A aula aponta ao recurso — sem hospedar.</p>
-              </div>
-            </div>
-          )}
-        </aside>
+      {/* Detalhe da aula: POP-UP ao clicar (a tabela/lista ocupa a largura toda — sem card lateral) */}
+      {moduloId && sel && (
+        <Dialog open onOpenChange={(o) => { if (!o) setSel(null) }}>
+          <DialogContent showCloseButton className="max-h-[92vh] w-[min(1040px,calc(100vw-2rem))] max-w-[min(1040px,calc(100vw-2rem))] gap-0 overflow-y-auto p-0 sm:max-w-[min(1040px,calc(100vw-2rem))]">
+            <DialogTitle className="sr-only">Detalhes da aula</DialogTitle>
+            <DetalheAula it={sel} podeEditar={podeEditar} visResumo={resumoRegrasAlvo(regrasPorAlvo.get(sel.id), nomeSegVis)}
+              onVis={() => { const it = sel; setSel(null); abrirVisAula(it) }}
+              onEditar={() => { const it = sel; setSel(null); setEditarItem({ item: it, criar: false }) }}
+              onAlterarTipo={() => { const it = sel; setSel(null); setAlterarTipo(it) }}
+              onMover={() => { const it = sel; setSel(null); setMoverItem(it) }}
+              onDuplicar={() => { const it = sel; setSel(null); setDuplicarItem(it) }}
+              onExcluir={() => excluirAula(sel)} />
+          </DialogContent>
+        </Dialog>
       )}
+
+      {capaLote && <CapaLoteDialog produtoId={produtoId} moduloIds={capaLote} temSubmodulos={capaLote.some((id) => modulos.some((m) => m.pai_id === id))} onClose={() => setCapaLote(null)} onPronto={() => { setMarcadosMod(new Set()); setMarcadosSub(new Set()); refresh() }} />}
 
       {/* Modais */}
       {moduloDlg && (
@@ -862,7 +875,7 @@ export function AbaConteudos({ tenantId, produtoId, podeEditar, tipoProduto }: {
       {/* Visibilidade dos MÓDULOS marcados (a visão de módulos não tem painel lateral → diálogo) */}
       {painelVis && (
         <SegmentosDialog key={`${painelVis.aba ?? 'v'}:${painelVis.alvos.map((a) => a.id).join(',')}`} produtoId={produtoId} podeEditar={podeEditar} dados={visDados}
-          alvos={painelVis.alvos} titulo={painelVis.titulo} titulos={titulosAlvos} imagens={imagensAlvos} abaInicial={painelVis.aba} onClose={() => setPainelVis(null)} onMudou={recarregarVis}
+          alvos={painelVis.alvos} titulo={painelVis.titulo} titulos={titulosAlvos} filhosDe={filhosDeModulo} imagens={imagensAlvos} abaInicial={painelVis.aba} onClose={() => setPainelVis(null)} onMudou={recarregarVis}
           onAplicarBase={aplicarBase} baseResumo={baseResumoPainel} />
       )}
       {moverLote && (
@@ -882,76 +895,88 @@ function DetalheAula({ it, podeEditar, visResumo, onVis, onEditar, onAlterarTipo
   onEditar: () => void; onAlterarTipo: () => void; onMover: () => void; onDuplicar: () => void; onExcluir: () => void
 }) {
   const subLabel = SUBTIPO_LABEL[it.subtipo ?? ''] ?? TIPO_REF_LABEL[it.tipo_ref]
-  const arquivoTxt = it.tipo_ref === 'documento_biblioteca' ? (it.ref_id ? 'Documento da Biblioteca' : '—') : (it.ref_url || '—')
+  const arquivoTxt = it.tipo_ref === 'documento_biblioteca' ? (it.ref_id ? 'Documento da Biblioteca' : 'Nenhum documento ligado') : (it.ref_url || 'Nenhum link definido')
+  const ativo = it.situacao === 'ativo'
+  const verComoAluno = () => toast.message('Pré-visualização do aluno — em breve.')
   return (
-    <div className="space-y-4">
-      {/* Cabeçalho */}
-      <div className="flex items-start gap-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary">{iconeTipoRef(it.tipo_ref)}</span>
-        <div className="min-w-0"><div className="line-clamp-2 text-sm font-semibold">{it.titulo}</div><div className="text-xs text-muted-foreground">{subLabel}</div></div>
-      </div>
-
-      {/* Poster/thumbnail (placeholder visual gerado a partir do tipo) */}
-      <div className="relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-xl text-primary-foreground" style={{ background: 'linear-gradient(135deg, var(--primary), color-mix(in oklab, var(--primary) 60%, black))' }}>
-        <div className="flex flex-col items-center gap-1">
-          <span className="rounded-full bg-white/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider">{subLabel}</span>
-          <span className="grid h-10 w-10 place-items-center rounded-lg bg-white/15">{iconeTipoRef(it.tipo_ref)}</span>
+    <div className="grid lg:grid-cols-[320px_minmax(0,1fr)]">
+      {/* Coluna esquerda: preview + ações principais */}
+      <aside className="flex flex-col gap-4 border-b bg-muted/30 p-6 lg:border-b-0 lg:border-r">
+        <div className="relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-2xl text-primary-foreground shadow-sm" style={{ background: 'linear-gradient(135deg, var(--primary), color-mix(in oklab, var(--primary) 55%, black))' }}>
+          <span aria-hidden className="absolute -right-4 -top-4 h-24 w-24 rounded-full bg-white/10" />
+          <span aria-hidden className="absolute -bottom-6 -left-6 h-28 w-28 rounded-full bg-white/10" />
+          <div className="relative flex flex-col items-center gap-2">
+            <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider">{subLabel}</span>
+            <span className="grid h-12 w-12 place-items-center rounded-xl bg-white/15">{iconeTipoRef(it.tipo_ref)}</span>
+          </div>
         </div>
-      </div>
-
-      {/* Conteúdo atual */}
-      <div>
-        <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Conteúdo atual</div>
-        <dl className="divide-y text-sm">
-          <L k="Tipo" v={TIPO_REF_LABEL[it.tipo_ref]} />
-          <L k="Arquivo" v={arquivoTxt} />
-          <Lpendente k="Marca d'água" icon={<Droplets className="h-3.5 w-3.5" />} />
-          <Lpendente k="Senha do PDF" icon={<Lock className="h-3.5 w-3.5" />} />
-          <Lpendente k="Download" icon={<Download className="h-3.5 w-3.5" />} />
-        </dl>
-      </div>
-
-      {/* Detalhes */}
-      <div>
-        <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Detalhes</div>
-        <dl className="divide-y text-sm">
-          <L k="Situação" v={it.situacao === 'ativo' ? 'Ativo' : 'Rascunho'} />
-          <L k="Acesso" v={it.visibilidade === 'publico' ? 'Público' : 'Privado'} />
-          <L k="Disponibilidade" v={resumoDisponibilidade(it.disponibilidade)} />
-          <L k="Segmento" v={visResumo ?? 'Todos com acesso'} />
-        </dl>
-      </div>
-
-      {/* Arquivos complementares (placeholder) */}
-      <div>
-        <div className="mb-1 flex items-center justify-between text-xs font-semibold uppercase tracking-wide text-muted-foreground">Arquivos complementares <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium normal-case">Em breve</span></div>
-        <div className="flex items-center gap-2 rounded-lg border border-dashed bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground"><Paperclip className="h-4 w-4 shrink-0" />Nenhum arquivo complementar.</div>
-      </div>
-
-      {/* Ações */}
-      {podeEditar ? (
         <div className="space-y-2">
-          <div className="grid grid-cols-2 gap-2">
-            <Button onClick={onEditar}><Pencil className="h-4 w-4" />Editar conteúdo</Button>
-            <Button variant="outline" onClick={() => toast.message('Pré-visualização do aluno — em breve.')}><Eye className="h-4 w-4" />Ver como aluno</Button>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <Button variant="outline" onClick={onAlterarTipo}><Shuffle className="h-4 w-4" />Alterar tipo</Button>
-            <Button variant="outline" onClick={onMover}><FolderInput className="h-4 w-4" />Mover aula</Button>
-            <Button variant="outline" onClick={onDuplicar}><Copy className="h-4 w-4" />Duplicar aula</Button>
-            <Button variant="outline" className="col-span-2" onClick={onVis}><Users className="h-4 w-4" />Segmento e liberação</Button>
-            <Button variant="destructive" className="col-span-2" onClick={onExcluir}><Trash2 className="h-4 w-4" />Excluir</Button>
-          </div>
+          {podeEditar && <Button className="w-full" onClick={onEditar}><Pencil className="h-4 w-4" />Editar conteúdo</Button>}
+          <Button variant="outline" className="w-full" onClick={verComoAluno}><Eye className="h-4 w-4" />Ver como aluno</Button>
         </div>
-      ) : (
-        <Button variant="outline" className="w-full" onClick={() => toast.message('Pré-visualização do aluno — em breve.')}><Eye className="h-4 w-4" />Ver como aluno</Button>
-      )}
+        <div className="mt-auto border-t pt-3">
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Tipos de conteúdo</div>
+          <p className="text-xs leading-relaxed text-muted-foreground">{TIPOS_CONTEUDO_LISTA.join(' · ')}. A aula aponta ao recurso — sem hospedar.</p>
+        </div>
+      </aside>
 
-      {/* Tipos de conteúdo */}
-      <div className="border-t pt-3">
-        <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Tipos de conteúdo</div>
-        <p className="text-xs text-muted-foreground">{TIPOS_CONTEUDO_LISTA.join(' · ')}</p>
-      </div>
+      {/* Coluna direita: título, situação e informações em cartões */}
+      <section className="flex min-w-0 flex-col gap-5 p-6">
+        <header className="pr-8">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className={cn('rounded-full px-2.5 py-0.5 text-[11px] font-semibold', ativo ? 'bg-emerald-500/12 text-emerald-600 dark:text-emerald-400' : 'bg-muted text-muted-foreground')}>{ativo ? 'Ativo' : 'Rascunho'}</span>
+            <span className="rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground">{it.visibilidade === 'publico' ? 'Acesso público' : 'Acesso privado'}</span>
+            <ChipLiberacao d={it.disponibilidade} />
+            {visResumo && <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary"><Users className="h-3 w-3" />Segmento</span>}
+          </div>
+          <h2 className="mt-2 text-xl font-semibold leading-snug">{it.titulo}</h2>
+          <p className="text-sm text-muted-foreground">{subLabel}</p>
+        </header>
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <CartaoInfo titulo="Conteúdo" icone={<FileStack className="h-4 w-4" />}>
+            <L k="Tipo" v={TIPO_REF_LABEL[it.tipo_ref]} />
+            <L k="Arquivo" v={arquivoTxt} />
+          </CartaoInfo>
+          <CartaoInfo titulo="Publicação" icone={<Eye className="h-4 w-4" />}>
+            <L k="Situação" v={ativo ? 'Ativo' : 'Rascunho'} />
+            <L k="Acesso" v={it.visibilidade === 'publico' ? 'Público' : 'Privado'} />
+          </CartaoInfo>
+          <CartaoInfo titulo="Liberação" icone={<CalendarClock className="h-4 w-4" />}>
+            <L k="Padrão" v={resumoDisponibilidade(it.disponibilidade)} />
+            <L k="Por segmento" v={visResumo ?? 'Sem regra'} />
+          </CartaoInfo>
+          <CartaoInfo titulo="Proteções do PDF" icone={<Lock className="h-4 w-4" />} selo="Em breve">
+            <Lpendente k="Marca d'água" icon={<Droplets className="h-3.5 w-3.5" />} />
+            <Lpendente k="Senha do PDF" icon={<Lock className="h-3.5 w-3.5" />} />
+            <Lpendente k="Download" icon={<Download className="h-3.5 w-3.5" />} />
+          </CartaoInfo>
+        </div>
+
+        <div className="rounded-2xl border border-dashed bg-muted/20 p-4">
+          <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-muted-foreground">Arquivos complementares <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium normal-case">Em breve</span></div>
+          <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground"><Paperclip className="h-4 w-4 shrink-0" />Nenhum arquivo complementar.</div>
+        </div>
+
+        {podeEditar && (
+          <footer className="mt-auto flex flex-wrap items-center gap-2 border-t pt-4">
+            <Button variant="outline" size="sm" onClick={onVis}><Users className="h-4 w-4" />Segmento e liberação</Button>
+            <Button variant="outline" size="sm" onClick={onAlterarTipo}><Shuffle className="h-4 w-4" />Alterar tipo</Button>
+            <Button variant="outline" size="sm" onClick={onMover}><FolderInput className="h-4 w-4" />Mover</Button>
+            <Button variant="outline" size="sm" onClick={onDuplicar}><Copy className="h-4 w-4" />Duplicar</Button>
+            <Button variant="ghost" size="sm" className="ml-auto text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={onExcluir}><Trash2 className="h-4 w-4" />Excluir</Button>
+          </footer>
+        )}
+      </section>
+    </div>
+  )
+}
+
+function CartaoInfo({ titulo, icone, selo, children }: { titulo: string; icone: React.ReactNode; selo?: string; children: React.ReactNode }) {
+  return (
+    <div className="rounded-2xl border bg-card p-4 shadow-sm">
+      <div className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground"><span className="grid h-6 w-6 place-items-center rounded-lg bg-primary/10 text-primary">{icone}</span>{titulo}{selo && <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium normal-case">{selo}</span>}</div>
+      <dl className="divide-y text-sm">{children}</dl>
     </div>
   )
 }

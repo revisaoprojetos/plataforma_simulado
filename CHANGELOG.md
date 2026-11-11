@@ -12,6 +12,19 @@ A versão aparece no rodapé esquerdo da tela de login (`v{APP_VERSION}`).
 
 ---
 
+## 4.16.0 — 2026-11-12
+
+### Conteúdos — organização interna e capas
+- **Sem card lateral** dentro de módulos e submódulos: a tabela/lista ocupa a largura toda e o **detalhe da aula abre em pop-up** largo (1040px) com o design refeito (prévia + ações à esquerda; cartões Conteúdo, Publicação, Liberação e Proteções à direita; barra de ações no rodapé).
+- **Tabela de submódulos/módulos**: nova coluna **Segmentos** (selos Visibilidade/Liberação/Capa), linhas menores (uma linha só) e rolagem horizontal.
+- **Capa em lote**: botão **Capa** na barra de seleção de módulos/submódulos aplica uma imagem a todos os selecionados e, opcionalmente, a todos os submódulos dentro deles (`aplicarCapaEmLoteAction`). No **Editar módulo**: "Aplicar esta capa também aos N submódulo(s)".
+- **Capa por segmento** (aba Segmento › Capa): opção de aplicar também aos submódulos de cada módulo marcado.
+- Segmentos: aba Liberação lista os públicos primeiro e "Demais alunos (padrão)" por último; seleção de grupos/alunos em pop-up grande com conferência de acesso ao produto.
+- Aluno: submódulos do módulo em **lista (padrão)** ou cards.
+- Observação: aulas (conteúdos) não têm capa própria; o aluno vê a capa do módulo/submódulo.
+
+---
+
 ## 4.15.0 — 2026-11-12
 
 ### Conteúdos — Segmentos (visibilidade, liberação e capa por público)
